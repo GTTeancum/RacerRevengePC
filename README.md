@@ -4,7 +4,7 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-The latest original track-class correction is **unbuilt and untested**. The previous GC run reached player node 28, with two opponents stopped at nodes 7/8; no GC lap passed. See [GC status and limits](docs/gc-native-integration50ig.md).
+This separate recovery branch adds an **unbuilt, untested HOST steering mixer**. It reduces common acceleration when needed to preserve saturated steering differential. It is held outside the active candidate; the original track-class correction will be tested first. See [mixer scope](docs/gc-host-steering-authority50iq.md).
 
 The Linux prototype includes native rendering, physics, audio, keyboard controls, and an eight-racer development race. Clegg selection through Main, pause/resume, and a 20-second gameplay capture have passed. An earlier mode1 baseline completed a three-lap race with native timing, Dax, music, and completed-lap display. See [current validation](docs/current-validation.md) for scope.
 
