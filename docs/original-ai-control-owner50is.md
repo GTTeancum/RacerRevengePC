@@ -149,3 +149,7 @@ binary32, normal-or-zero arithmetic and source-state lifetime requirements from
 50IR apply. Keep cold descriptors immutable and all storage disjoint/serial.
 No tests, builds, syntax checks, runtime probes, importer execution, original
 instruction execution, emulation or active checkout edits were performed.
+
+## Integration correction: genuine startup precedes the ordinary adapter
+
+The original state update moves initial FE8=0 to 4 before dispatch. State 4 uses 170B50's genuine racer lists and 1726F0's fixed-200 lookahead policy, then changes to state 2 only when the real CB8 timer exceeds 5. The ordinary 50IS adapter's 0/2/3 admission does not supply that startup path. The outer entry also sets live B94=4 and applies its original dispatch gate before common processing. Do not force state 2 or broaden admission without its actual policy. See the [first runnable slice plan](original-ai-first-runnable-slice.md) for the connected implementation and bounded acceptance.

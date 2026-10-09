@@ -148,3 +148,7 @@ requirements. Unsupported nonzero-subnormal/NaN/infinity/overflow arithmetic
 rejects without state publication; this is not an emulated FPU or an EE
 bit-equivalence certification. No build, syntax check, native test, gameplay,
 original instruction execution, VU emulation, importer or active edit occurred.
+
+## Integration correction: shared navigation cooldown write
+
+BoostScale's return is unused only inside 173180's probability comparison. Original navigation at 170068..170090 reads the newly entered node's actual BoostScale and resets cooldown109C to zero when it exceeds 1. The same persistent 50IT owner must receive this genuine navigation write; the provider alone does not produce it. No probability multiplier is implied. See the [first runnable slice plan](original-ai-first-runnable-slice.md) for shared RNG ownership, source ordering and remaining admission boundaries.

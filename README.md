@@ -4,7 +4,7 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This recovery branch contains native original-AI speed/braking, control and boost-provider components, **unintegrated, unbuilt and untested**. Genuine AI state/count/target producers, global RNG binding, lifecycle and frame-mode admission remain open. Current HOST behavior is unchanged. See [boost-provider scope](docs/original-ai-boost-provider50it.md).
+This recovery branch contains native original-AI speed/braking, control and boost-provider components, **unintegrated, unbuilt and untested**. Genuine AI state/count/target producers, global RNG binding, lifecycle and frame-mode admission remain open. Current HOST behavior is unchanged. See the [first runnable slice plan](docs/original-ai-first-runnable-slice.md).
 
 The Linux prototype includes native rendering, physics, audio, keyboard controls, and an eight-racer development race. Clegg selection through Main, pause/resume, and a 20-second gameplay capture have passed. An earlier mode1 baseline completed a three-lap race with native timing, Dax, music, and completed-lap display. See [current validation](docs/current-validation.md) for scope.
 
