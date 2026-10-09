@@ -1,40 +1,35 @@
 # Current native race validation
 
-## Shared announcer and finish continuation
+The Linux check began on 2026-10-09 at 15:17:47 UTC: two units compiled,
+191 reused, link exit 0. One mode1 race launched at 15:19:01 UTC and exited
+normally without reported errors.
 
-Linux validation began on 2026-10-09 at 14:17:23 UTC: three units compiled,
-190 reused, link exit 0. One autodriven race launched at 14:18:20 UTC and
-exited normally without reported errors.
+- Player completed three laps, finishing first at 160.928 host race seconds.
+  All finish-continuation criteria passed: native owners continued, results
+  stayed sealed, post-finish input could not take over, and models/audio remained.
+- The source announcer prepared 54 clips and actually started types 3, 4 and 6.
+  Last-lap music selected song 29; finish music then selected song 27.
+- The completed-lap HUD showed all three native completed times and best lap;
+  the captured presentation was visually inspected.
+- PCM finalized at 174.032 seconds. Completed-render FPS ranged from
+  53.6133 to 62.6681 in this cloud VM.
 
-- Player completed three laps, finishing first at 160.928 race seconds.
-  All finish-continuation criteria passed: native owners kept advancing,
-  official results stayed sealed, post-finish input could not take over,
-  and opponent models/audio remained present.
-- Five actual Dax starts each produced one begin, end and completion.
-  Preemptions, rejections and group failures were all zero.
-- Observed group levels ducked to29/27/41/45/29/80/100 and restored to
-  45/42/64/70/45/80/100. Dax remained at80 throughout.
-- The original mix finalized to174 seconds of PCM. Completed-render FPS
-  ranged from51.3866 to62.6776 in this cloud VM.
-
-Tested runtime source: `79ece3b97e9e184a8e34c1c79b73f7137749c4c2`.
+Tested runtime source: `0c3810cadd4750b4f5d4785320f0f3d259abe50a`.
 Executable SHA-256:
-`6411a8673f85428c1ec7366a5fe7bbf020e91f16bebd2afd4ce74db62846ca81`.
+`3a3f6b3f175e12e8f9ad7cd22d2db00129c74b809efb005cb1473f4769436ad7`.
 
 ## Scope and remaining gaps
 
-This validates the shared host-Dax completion/duck/restore path. Pause,
-preemption and restart were not exercised. Mode2 remains active and original
-type12 is still unjoined; this is not complete original announcer admission.
+This was one autodriven three-lap race and post-finish observation. Positive
+damage-announcer type12, positive engine-damage dips, pause and restart were
+not exercised. Other Dax/music selections and adverse-input paths need coverage.
+The earlier direct keyboard probe used older source and does not establish
+current-build controller usability or a fully manually driven race.
 
-Player engine modulation previously passed healthy-state integration with
-zero positive dips; damage thresholds and outward/return curves remain
-unverified. The earlier no-autodrive keyboard probe used source `b97e661b`;
-it established scripted input, not current-build usability or a full manual race.
-
-Original results-menu/audio-event waits, listening quality/clipping, broader
-original-game integration and non-Linux execution remain open. The retained
-post-results scene is a host observation window. See
-[shared announcer](shared-announcer-integration50ic.md),
-[engine modulation](engine-damage-audio50ia.md) and
-[finish continuation](finish-continuation50ia.md) for exact boundaries.
+Mode1 uses recovered timing, record, queue, Dax and music logic with explicit
+host scheduling, roster roles, rank/finish observation, a native clock backend
+and known-null original HUD fields. The displayed overlay is host presentation.
+Full original scheduler/console timing, IOP streaming and fade parity are not
+claimed. Listening quality/clipping, full game progression, original results
+menus and non-Linux execution remain open. See
+[mode1 integration](native-mode1-integration50id.md) for detailed boundaries.

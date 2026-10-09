@@ -42,6 +42,9 @@ racerBank.owner(navigationProgress);
 racerBank.owner(navigationCA0);
 racerBank.owner(navigationDiagnostic);
 racerBank.owner(lapContinuity);
+//50ID mode1 timing, cursor and known-null original HUD fields live within
+//lapContinuity above. Shared mode1 config/manager/FIFO/dispatch, session lazy
+//selector state and application clock remain outside this bank; do not register them here.
 racerBank.owner(lapOwner.pending);
 racerBank.owner(lapOwner.diagnostic);
 racerBank.owner(lapOwner.completion);

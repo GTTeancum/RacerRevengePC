@@ -6,7 +6,7 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 The current Linux prototype includes native rendering, vehicle physics, audio, keyboard controls, and an eight-racer development race. Windows source is retained, but the current interactive client targets Linux.
 
-The Linux eight-racer prototype has completed a full three-lap race and an in-process restart check. See [current validation](docs/current-validation.md) for scope and remaining gaps.
+The current mode1 path has passed a full three-lap race with native lap timing, Dax announcements, last-lap/finish music, and completed-lap display. See [current validation](docs/current-validation.md) for tested scope and remaining gaps.
 
 ## Building and game data
 
