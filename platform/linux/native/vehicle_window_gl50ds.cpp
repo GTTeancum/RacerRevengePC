@@ -446,6 +446,89 @@ struct HostHudGeometry {
         text(x + 12.f, y + panelHeight - 12.f, input.footer, 0xA8C5DE);
         return !overflow;
     }
+    bool buildResults(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
+        count = 0; overflow = false;
+        constexpr float panelWidth = 380.f;
+        const float timingY = 79.f + 11.f * float(input.standingsCount);
+        const float actionY = timingY + (input.completedLapTimesValid ?
+            27.f + 11.f * float(input.completedLapTimeCount) : 20.f);
+        const float panelHeight = actionY + 70.f;
+        scale = std::min(2.f, std::min(float(width) / (panelWidth + 24.f),
+            float(height) / (panelHeight + 24.f)));
+        inverseWidth = 2.f / float(width); inverseHeight = 2.f / float(height);
+        const float x = (float(width) / scale - panelWidth) * .5f - 8.f;
+        const float y = 64.f - (float(height) / scale + panelHeight) * .5f;
+        rectangle(x, y, panelWidth, panelHeight, 0x617589);
+        rectangle(x + 1.f, y + 1.f, panelWidth - 2.f, panelHeight - 2.f, 0x0A111B);
+        text(x + 12.f, y + 10.f, "RACE RESULTS", 0x5DDFFF);
+        for (U i = 0; i < input.standingsCount; ++i)
+            if (input.standings[i].racerIndex == input.standingsPlayerIndex)
+                text(x + 12.f, y + 24.f, input.standings[i].displayName, 0xEDF3F8);
+        char place[32]{}, finish[40]{};
+        std::snprintf(place, sizeof(place), "PLACE %u / %u", input.resultsFinishPlace, input.raceRacerCount);
+        // Finish time is the explicit sealed HOST race observation; the native
+        // CC0 lap durations below retain their separate source provenance.
+        const U finishCentiseconds = static_cast<U>(input.resultsFinishSeconds * 100.0 + .5);
+        std::snprintf(finish, sizeof(finish), "FINISH TIME %u:%02u.%02u", finishCentiseconds / 6000u,
+            (finishCentiseconds / 100u) % 60u, finishCentiseconds % 100u);
+        text(x + 12.f, y + 40.f, place, 0xA8E6B4);
+        text(x + 158.f, y + 40.f, finish, 0xA8E6B4);
+        text(x + 12.f, y + 58.f, "STANDINGS AT YOUR FINISH", 0xA8C5DE);
+        text(x + 232.f, y + 58.f, "LAPS", 0xA8C5DE);
+        for (U i = 0; i < input.standingsCount; ++i) {
+            const auto& row = input.standings[i];
+            const float rowY = y + 72.f + 11.f * float(i);
+            const bool player = row.racerIndex == input.standingsPlayerIndex;
+            if (player) rectangle(x + 7.f, rowY - 2.f, panelWidth - 14.f, 11.f, 0x173547);
+            const U color = player ? 0x5DDFFF : 0xEDF3F8;
+            char rank[4]{}, laps[12]{};
+            std::snprintf(rank, sizeof(rank), "%u", row.place);
+            std::snprintf(laps, sizeof(laps), "%u/%u", row.completedLaps, input.raceLapTarget);
+            text(x + 12.f, rowY, rank, color);
+            text(x + 30.f, rowY, row.displayName, color);
+            text(x + 232.f, rowY, laps, color);
+            text(x + 300.f, rowY, row.finished ? "FINISHED" : "UNFINISHED", 0xA8C5DE);
+        }
+        if (input.completedLapTimesValid) {
+            text(x + 12.f, y + timingY, "COMPLETED LAP TIMES", 0xA8C5DE);
+            const auto duration = [&](float rowY, float seconds) noexcept {
+                const U centiseconds = static_cast<U>(double(seconds) * 100.0 + .5);
+                char value[20]{};
+                std::snprintf(value, sizeof(value), "%u:%02u.%02u", centiseconds / 6000u,
+                    (centiseconds / 100u) % 60u, centiseconds % 100u);
+                text(x + 78.f, rowY, value, 0xEDF3F8);
+            };
+            for (U i = 0; i < input.completedLapTimeCount; ++i) {
+                const char label[] = {'L','A','P',' ',char('1' + i),'\0'};
+                const float rowY = y + timingY + 13.f + 11.f * float(i);
+                text(x + 12.f, rowY, label, 0xEDF3F8);
+                duration(rowY, input.completedLapSeconds[i]);
+            }
+            const float bestY = y + timingY + 13.f + 11.f * float(input.completedLapTimeCount);
+            text(x + 12.f, bestY, "BEST", 0xA8E6B4);
+            duration(bestY, input.bestLapSeconds);
+        } else text(x + 12.f, y + timingY, "LAP TIMES UNAVAILABLE", 0xA8C5DE);
+        const char* actions[] = {"RESTART RACE", "MAIN MENU", "EXIT"};
+        if (input.resultsConfirming) {
+            text(x + 12.f, y + actionY, "LEAVE THESE RESULTS", 0xFFBF55);
+            const char* choices[] = {"CANCEL", actions[input.resultsSelectedAction]};
+            for (U i = 0; i < 2; ++i) {
+                const float rowY = y + actionY + 16.f + 16.f * float(i);
+                const bool selected = i == unsigned(input.resultsConfirmAccept);
+                if (selected) rectangle(x + 7.f, rowY - 3.f, panelWidth - 14.f, 13.f, 0x173547);
+                text(x + 12.f, rowY, choices[i], selected ? 0x5DDFFF : 0xEDF3F8);
+            }
+        } else for (U i = 0; i < 3; ++i) {
+            const float rowY = y + actionY + 16.f * float(i);
+            const bool selected = i == input.resultsSelectedAction;
+            if (selected) rectangle(x + 7.f, rowY - 3.f, panelWidth - 14.f, 13.f, 0x173547);
+            text(x + 12.f, rowY, actions[i], selected ? 0x5DDFFF : 0xEDF3F8);
+        }
+        text(x + 12.f, y + panelHeight - 12.f, input.resultsConfirming ?
+            "UP/DOWN SELECT  ENTER CONFIRM  ESC CANCEL" :
+            "UP/DOWN SELECT  ENTER CONFIRM  ESC PAUSE", 0xA8C5DE);
+        return !overflow;
+    }
     void standingsPanel(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
         if (!input.standingsCount) return;
         // Leave a four-cell gap below the race readout, including optional
@@ -511,6 +594,7 @@ struct HostHudGeometry {
         scale = hudScale;
     }
     bool build(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
+        if (input.resultsPanelVisible) return buildResults(input, width, height);
         count = 0; overflow = false;
         const float clockHeight = input.raceClocksValid ? (input.raceFinished ? 14.f : 28.f) : 0.f;
         scale = width >= 960 && height >= 540 ? 2.f : 1.f;
@@ -2677,6 +2761,12 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             return fail(d, VehicleWindowError50DS::frame, "native race HUD counters/status outside admitted bounds");
         if (hud.raceResultsReady && (!hud.raceEnabled || !hud.raceFinished || hud.raceCountdown || hud.raceGo))
             return fail(d, VehicleWindowError50DS::frame, "host results presentation requires a sealed human finish");
+        if (hud.resultsPanelVisible && (!hud.raceResultsReady || !hud.standingsCount ||
+            !hud.resultsFinishPlace || hud.resultsFinishPlace != hud.racePlace ||
+            hud.resultsSelectedAction >= 3 || !std::isfinite(hud.resultsFinishSeconds) ||
+            hud.resultsFinishSeconds < 0.0 || hud.resultsFinishSeconds > double(maxVehicleWindowLapSeconds50DS) ||
+            (!hud.resultsConfirming && hud.resultsConfirmAccept)))
+            return fail(d, VehicleWindowError50DS::frame, "live results panel requires sealed finish and bounded action/time");
         if (hud.raceClocksValid) {
             const auto validSeconds = [](float value) noexcept {
                 return std::isfinite(value) && value >= 0.f && value <= maxVehicleWindowLapSeconds50DS;

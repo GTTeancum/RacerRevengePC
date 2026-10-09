@@ -43,6 +43,7 @@
 // retained-data loading remains, but source-word validation runs separately.
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/host_session_menu50if.h"
+#include "../../platform/linux/native/host_race_results50il.h"
 #include "../../platform/linux/native/keyboard_packet50dr.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
 #include "../../platform/linux/native/fixed_step_clock50dt.h"
@@ -2238,6 +2239,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   constexpr bool alternateHumanReady50IF=true;
   platform::HostSessionMenu50IF sessionMenu(startAtMenu,raceEnabled,playerRacer60,
       alternateHumanReady50IF,audioEnabled,loadedAudioSettings,selectedAudioSettings);
+  platform::HostRaceResults50IL resultsUi;
   std::uint64_t drawnMenuRevision=0;
   std::int32_t drawnMenuWidth=0,drawnMenuHeight=0;
   bool menuImagePublished=false,suppressResumeKeys=false,forceSceneRender=false;
@@ -2258,6 +2260,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<",\"audio_bank_id\":"<<reinterpret_cast<std::uintptr_t>(&liveAudio->bank())
        <<",\"menu\":"<<(sessionMenu.open()?"true":"false")<<",\"page\":"<<unsigned(sessionMenu.page())
        <<",\"loaded_racer\":"<<playerRacer60<<",\"selected_racer\":"<<selectedRacer60
+       <<",\"results_visible\":"<<(humanResultsReady&&!sessionMenu.open()?"true":"false")
+       <<",\"results_action\":"<<resultsUi.selectedAction()
+       <<",\"results_confirming\":"<<(resultsUi.confirming()?"true":"false")
        <<",\"audio_enabled\":"<<(audioEnabled?"true":"false")
        <<",\"audio_pending\":"<<(sessionMenu.audioChangesPending()?"true":"false")
        <<",\"audio_effective\":["<<loadedAudioSettings.effects11020<<','<<loadedAudioSettings.music11024
@@ -2337,6 +2342,35 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     composePacket(false,input);sampleController();
     restartRequested=true;
     break;
+   }
+   const auto resultsRevision=resultsUi.revision();
+   const bool resultsAvailable=humanResultsReady&&!sessionMenu.open()&&!recoveryPaused&&
+       s.phase==VehicleFramePhase49W::Ready&&input.focused&&!input.minimized&&!input.eventBudgetExhausted;
+   const bool resultsBack=resultsAvailable&&resultsUi.confirming()&&input.pressed[41]&&
+       !hostInput.menuRequested&&!hostInput.pauseRequested;
+   const bool resultsAdmitted=resultsAvailable&&!hostInput.menuRequested&&!hostInput.pauseRequested&&
+       (!input.pressed[41]||resultsBack);
+   const auto resultsAction=resultsUi.poll(input,resultsAdmitted);
+   if(resultsBack)input.pressed[41]=0; // Escape cancels this live confirmation, not Pause.
+   if(resultsUi.revision()!=resultsRevision){forceSceneRender=true;reportUiState("results");}
+   if(resultsAction!=platform::HostRaceResults50IL::Action::None){
+    std::cerr<<"host_results_action action="<<unsigned(resultsAction)<<" tick="<<completedFrames
+        <<" mixed_frames="<<liveAudio->mixedFrames()<<'\n';
+    if(resultsAction==platform::HostRaceResults50IL::Action::MainMenu){
+     // An explicit confirmed Results choice uses the existing front-menu
+     // request. Merely displaying/navigating Results never enters this path.
+     hostInput.menuRequested=true;
+    }else{
+     composePacket(false,input);sampleController();
+     restartRequested=resultsAction==platform::HostRaceResults50IL::Action::Restart;
+     break;
+    }
+   }
+   if(humanResultsReady&&!sessionMenu.open()){
+    // These keys belong to Results navigation. Native finish controls retain
+    // sole ownership; UI arrows/Space never count as attempted manual driving.
+    constexpr std::uint16_t gameplayKeys[]={26,22,82,81,44,21,225};
+    for(const auto key:gameplayKeys)input.down[key]=input.pressed[key]=0;
    }
    const bool menuWasOpen=sessionMenu.open();
    const auto menuRevision=sessionMenu.revision();
@@ -2636,8 +2670,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     if(playerFinishDriver){
      // Normal source finish countdown is four seconds. Audio/event waiting and
-     // the original menu transition are not joined: at zero the HOST changes
-     // only its result label and retains this live scene until restart/quit.
+     // the original menu transition remain unjoined. At zero the native client
+     // offers a live Results overlay without stopping this scene or its audio.
      humanResultsCountdown=std::max(0.f,humanResultsCountdown-.016f);
      humanResultsReady=humanResultsCountdown<=0.f;
     }
@@ -2736,6 +2770,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      hud.raceCountdown=race_session50HM::countdownNumber(race);
      hud.raceGo=race.phase==race_session50HM::Phase::Racing&&race.raceSeconds<1.0;
      hud.raceFinished=race.racers[0].finished;hud.raceResultsReady=humanResultsReady;
+     if(humanResultsReady){
+      require50DU(race.resultsClosed&&race.racers[0].finished,"results overlay requires the sealed human finish");
+      hud.resultsPanelVisible=true;
+      hud.resultsFinishPlace=race.racers[0].finishPlace;
+      hud.resultsFinishSeconds=race.racers[0].finishSeconds;
+      hud.resultsSelectedAction=resultsUi.selectedAction();
+      hud.resultsConfirming=resultsUi.confirming();hud.resultsConfirmAccept=resultsUi.confirmAccept();
+     }
      hud.raceLap=race_session50HM::displayedLap(race,0);
      hud.raceLapTarget=race.config.lapTarget;hud.racePlace=race.racers[0].place;
      hud.raceRacerCount=race.racerCount;

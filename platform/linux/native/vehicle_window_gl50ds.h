@@ -274,6 +274,16 @@ struct VehicleWindowHostHud50DS {
     // rows retain their sealed order; player highlighting uses this explicit ID.
     std::uint32_t standingsCount = 0, standingsPlayerIndex = 0;
     VehicleWindowStanding50DS standings[maxVehicleWindowStandings50DS]{};
+    // Explicit nonblocking Results screen. The caller supplies the sealed
+    // race observer's finish place/double seconds, separately from native
+    // CB8/CC0 timing above. These values are not inferred or recomputed here.
+    // Displaying/selecting this overlay does not pause world or audio owners.
+    bool resultsPanelVisible = false;
+    std::uint32_t resultsFinishPlace = 0, resultsSelectedAction = 0;
+    double resultsFinishSeconds = 0.0;
+    // Cancel-first confirmation stays on this live overlay; it never implies
+    // a blocking Pause page or permission to change simulation/audio owners.
+    bool resultsConfirming = false, resultsConfirmAccept = false;
 };
 struct VehicleWindowOpponent50DS {
     // Successful world-space 50CO output from the selected retained 50CR
