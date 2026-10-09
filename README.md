@@ -4,9 +4,9 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-The current Linux prototype includes native rendering, vehicle physics, audio, keyboard controls, and an eight-racer development race. Windows source is retained, but the current interactive client targets Linux.
+This branch preserves an **unexecuted direct-GC original-AI capture harness**. It requires the separately guarded AI runtime and existing central reservation workflow; it permits one process and a 12-second observation window after ready. See the [harness README](tools/capture/native_ai/README.md) for prerequisites, explicit AI/brake acceptance and source-stop limits.
 
-The current mode1 path has passed a full three-lap race with native lap timing, Dax announcements, last-lap/finish music, and completed-lap display. See [current validation](docs/current-validation.md) for tested scope and remaining gaps.
+The inherited runtime source is an earlier tested Linux prototype with rendering, physics, audio and eight-racer racing. It does not contain the new original-AI integration. See [current validation](docs/current-validation.md) for that baseline's scope. No runtime, parser, syntax check or encoding was performed for this helper backup.
 
 ## Building and game data
 
