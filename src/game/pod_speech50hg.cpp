@@ -12,8 +12,11 @@ float sub(float a,float b) noexcept {volatile float v=a-b;return v;}
 float add(float a,float b) noexcept {volatile float v=a+b;return v;}
 bool finite(float v) noexcept{return std::isfinite(v);}
 bool countsValid(const PodSpeechCounts50HG& c) noexcept {
-    return c.lowDamage==4&&c.wallHit==4&&c.passed==6&&c.attacked==5&&
+    const bool pod01=c.lowDamage==4&&c.wallHit==4&&c.passed==6&&c.attacked==5&&
         c.passing==6&&c.attacking==6&&c.death==4&&c.win==3&&c.lose==2;
+    const bool pod03=c.lowDamage==2&&c.wallHit==3&&c.passed==3&&c.attacked==3&&
+        c.passing==4&&c.attacking==4&&c.death==3&&c.win==3&&c.lose==3;
+    return pod01||pod03;
 }
 std::uint32_t draw(std::uint32_t& raw) noexcept {
     raw=raw*0x41c64e6du+0x3039u;return raw&0x7fffffffu;

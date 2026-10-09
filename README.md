@@ -19,6 +19,12 @@ Start with the [interactive build guide](docs/interactive-build50dv.md). The Lin
 - W / S: left-engine throttle / brake
 - Up / Down: right-engine throttle / brake; unequal engine input steers
 - Space: boost; Left Shift: powerslide; R: repair
-- Backspace: return to checkpoint; F5: restart; Escape: quit
+- Backspace: return to checkpoint (restart the whole race in race mode); F5: restart
+- Escape: pause/resume menu; Up/Down or W/S: navigate; Enter or Space: select
+- Start, Controls, Restart, Main Menu, and Exit are available in the host menus
+
+Windowed startup opens the front menu; headless remains automatic unless
+`RR_START_MENU=1` is set. See [host session menus](docs/host-session-menus50if.md)
+for exact behavior and the unvalidated implementation boundary.
 
 Gameplay, roster integration, progression, performance, and cross-platform support remain unfinished. This is a development prototype. Vendored components retain their existing license notices.

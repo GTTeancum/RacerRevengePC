@@ -54,28 +54,37 @@ inline std::vector<rr::assets::AudioRequest50HC> events(
     need(count==expected,"50IE missing event count");for(bool n:names)need(n,"50IE missing authored event");return out;
 }
 }
-inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std::string&error) {
+inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std::string&error,
+    std::uint32_t playerRacer60=1) {
     namespace d=pod_materials50ed_fixture::detail;
     try {
         d::Inputs input;input.capacity=16384;
+        d::need(playerRacer60==1||playerRacer60==3,"50IJ named announcer player identity unsupported");
+        const auto podBytes=playerRacer60==1?2403u:2496u;
+        const char* podFile=playerRacer60==1?"AUDIO/SPEECH/DAX/INRACE/POD01ANN.INI":
+            "AUDIO/SPEECH/DAX/INRACE/POD03ANN.INI";
+        const char* podDigest=playerRacer60==1?
+            "8c4f9b759c8fe933ab85341eff4d42e45e2c391e14f05ccad01238d04139a591":
+            "a3e18679511e73adc664978a0d75d334d710b9f7d0cdd2a53cde1e1b7383f7f7";
         const auto generic=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/GEN_ANN.INI",11704);
-        const auto pod=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/POD01ANN.INI",2403);
+        const auto pod=input.read(discRoot/podFile,podBytes);
         const auto percentages=input.read(discRoot/"AUDIO/SPCHPCT.INI",255);
         d::need(generic.size()==11704&&d::sha256(generic)==
             "24adbcb8784b20fab3d1f97650ffcb3bf12d0c3846b84b7f2477796dfbdcf6ab","50IE original GEN_ANN.INI differs");
-        d::need(pod.size()==2403&&d::sha256(pod)==
-            "8c4f9b759c8fe933ab85341eff4d42e45e2c391e14f05ccad01238d04139a591","50IE original POD01ANN.INI differs");
+        d::need(pod.size()==podBytes&&d::sha256(pod)==podDigest,"50IE original selected named announcer differs");
         d::need(percentages.size()==255&&d::sha256(percentages)==
             "24c2967388a31d04761fb11208faaae43a4ae7b9b88b40291bf64daf195c018c","50IE original SPCHPCT.INI differs");
         const std::string_view pct(reinterpret_cast<const char*>(percentages.data()),percentages.size());
         d::need(pct.find("DaxGenericPercent=0.80f")!=pct.npos&&pct.find("DaxSpeechDelay=7.0f")!=pct.npos,
             "50IE original announcer fields absent");
-        auto g=detail::events(generic,150),p=detail::events(pod,29);
+        // Clegg authors an additional Track Favorite Event30. Preserve its
+        // file's true count while selecting only the represented source keys.
+        auto g=detail::events(generic,150),p=detail::events(pod,playerRacer60==1?29u:30u);
         Authoring next;next.parameters={.80f,7.f};next.cues.reserve(54);
         for(unsigned key=33;key<=51;++key)next.cues.push_back({0,key,g[key-1]});
-        for(unsigned key=7;key<=15;++key)next.cues.push_back({1,key,p[key-1]});
+        for(unsigned key=7;key<=15;++key)next.cues.push_back({playerRacer60,key,p[key-1]});
         for(unsigned key=128;key<=150;++key)next.cues.push_back({0,key,g[key-1]});
-        for(unsigned key=24;key<=26;++key)next.cues.push_back({1,key,p[key-1]});
+        for(unsigned key=24;key<=26;++key)next.cues.push_back({playerRacer60,key,p[key-1]});
         for(const auto&c:next.cues)d::need(!c.request.loop&&!c.request.stereo&&c.request.stream,
             "50IE original announcer delivery flags differ");
         out=std::move(next);error.clear();return true;

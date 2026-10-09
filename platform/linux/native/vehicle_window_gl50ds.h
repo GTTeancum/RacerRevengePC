@@ -201,7 +201,8 @@ struct VehicleWindowRequest50DS {
     VehicleWindowOutput50DS output = VehicleWindowOutput50DS::defaultBackBuffer;
     VehicleWindowCables50DS cables{};
     // Explicit host-authored gameplay overlay, not original-game HUD parity.
-    // Cold opt-in allocates bounded glyph/rectangle storage. Default unchanged.
+    // Cold opt-in allocates bounded glyph/rectangle storage and two color-only
+    // menu targets, independent of the two native frame targets. Default unchanged.
     bool enableHostHud = false;
     VehicleWindowSky50DS sky{};
     // Native soft pod-footprint approximation on actual track receivers.
@@ -281,6 +282,21 @@ struct VehicleWindowOpponent50DS {
     // Zero selects the player bank; 1..request.racerArchetypeCount select the
     // explicitly supplied original geometry, material and cable banks.
     std::uint32_t racerArchetype = 0;
+};
+// Explicit HOST interface, independent of a native vehicle frame. Strings are
+// borrowed only during submitHostMenu; each must terminate within 48 ASCII
+// characters. No source menu assets, transitions, or sound events are inferred.
+inline constexpr std::uint32_t maxVehicleWindowMenuRows50DS = 10;
+inline constexpr std::uint32_t maxVehicleWindowMenuText50DS = 48;
+struct VehicleWindowHostMenu50DS {
+    const char* title = nullptr;
+    const char* subtitle = nullptr;
+    const char* rows[maxVehicleWindowMenuRows50DS]{};
+    const char* footer = nullptr;
+    std::uint32_t rowCount = 0, selectedRow = 0;
+    // Copies the last accepted race image when one exists; never re-evaluates
+    // native geometry. False shows a plain host backdrop, including at startup.
+    bool retainRaceImage = false;
 };
 struct VehicleWindowFrame50DS {
     // Pixel viewport. Window output requires actual default-framebuffer drawable
@@ -376,6 +392,8 @@ struct VehicleWindowDiagnostic50DS {
     bool readbackBufferMayBeModified = false;
     // Host overlay checked draw receipt; require batchAccepted for publication.
     std::uint32_t hostHudDraws = 0, hostHudVertices = 0, hostHudIndices = 0;
+    // UI-only publication, never a successful native vehicle batch receipt.
+    bool hostMenuAccepted = false;
     // Checked opaque opponent commands, not visible pixels. Require accepted
     // publication. Opponent effects are included in transparentPodDraws above.
     std::uint32_t opponentRacersDrawn = 0, opponentOpaqueDraws = 0, opponentOpaqueIndices = 0;
@@ -423,8 +441,16 @@ public:
     // in explicit neutral mode. A matrix/size/structural rejection does not blit.
     bool submit(const game::VehicleDrawBatch50CO&, const VehicleWindowFrame50DS&,
         VehicleWindowDiagnostic50DS&) noexcept;
-    // Both modes: read the last privately committed viewport, including a frame
-    // whose later window blit failed. No image exists before the first commit.
+    // Uses the opt-in HUD's bounded text storage and two private color-only
+    // targets. Preserves both native GPU banks and the last accepted race image.
+    // Safe while simulation is stopped or interrupted; no native data, source
+    // audio, vehicle batch, or original menu state is inspected or advanced.
+    // Success includes a window-back-buffer copy when configured; caller swaps.
+    bool submitHostMenu(const VehicleWindowHostMenu50DS&, std::int32_t width,
+        std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
+    // Both modes: read the last privately committed race or host-menu viewport,
+    // including a frame whose later window blit failed. No image exists before
+    // the first successful private commit from either submission path.
     // RGBA unsigned bytes, tightly packed, bottom row first; width*height*4
     // bytes. No application allocation or pointer retention. Caller supplies
     // live writable storage of at least capacityBytes, disjoint from all inputs

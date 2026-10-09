@@ -61,7 +61,10 @@ struct Counters {
 };
 namespace detail {
 struct Identity {const char* podId;const char* phySha256;};
-inline constexpr Identity originals[maxOpponents]={
+// The seven live opponent slots can include Anakin when another original is
+// selected as the human. Identity count is independent of opponent capacity.
+inline constexpr Identity originals[]={
+    {"POD01","47fcfbaab278d10506b302520adc51af4e3388ceb601daa3dbd588aea1f39a1b"},
     {"POD03","147a9ed4d2449592bc6752fc6b44bdacff56120f1b19f1aa29864d3baf694d47"},
     {"POD04","a1ca33400508684c6b8440f113658458c4efce666dcb68de5cdf1f1209845b81"},
     {"POD07","8615aca792d1efb68abcda048dd2b6cc9207c6c044300bf2306b6618edaffa48"},

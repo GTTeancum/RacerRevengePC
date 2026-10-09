@@ -13,19 +13,39 @@ public:
     bool prepare(const std::filesystem::path&discRoot,const std::filesystem::path&audioRoot,
         rr::platform::AudioMixer50HD&mixer,rr::platform::RaceAudioGroups50IC&groups,
         rr::platform::AnnouncerEpisode50IC&episode,rr::game::LapEventRandomOwner50ID&lazy,
-        rr::game::HostMonotonicClock50ID&clock,std::uint32_t&sharedRaw,std::string&error) {
+        rr::game::HostMonotonicClock50ID&clock,std::uint32_t&sharedRaw,std::string&error,
+        std::uint32_t playerRacer60=1) {
         namespace d=pod_materials50ed_fixture::detail;
         if(attempted_){error="50IE requires a fresh stable owner";return false;}attempted_=true;
         try{
             d::need(groups.uses(mixer)&&episode.uses(mixer)&&!episode.active()&&!episode.episode(),
                 "50IE must borrow the idle shared Dax episode, never another voice");
-            if(!source_announcer_authoring50IE::readAuthoring(discRoot,authoring_,error))return false;
+            if(!source_announcer_authoring50IE::readAuthoring(discRoot,authoring_,error,playerRacer60))return false;
             std::vector<rr::assets::AudioRequest50HC> requests;requests.reserve(authoring_.cues.size());
-            for(const auto&cue:authoring_.cues)requests.push_back(cue.request);
-            d::need(requests.size()==clips_.size(),"50IE original cue count differs");
+            const auto normalized=[](std::string name){
+                for(auto& c:name){if(c=='\\')c='/';else if(c>='A'&&c<='Z')c=char(c-'A'+'a');}
+                return name;
+            };
+            // Source named and generic event keys can share one original VAG.
+            // POD03 keys12/13/14/15 overlap generic42/41/45/51 respectively.
+            // Deduplicate only cold PCM ownership. All54 semantic keys and
+            // original per-bank history rows remain distinct and unmodified.
+            for(const auto&cue:authoring_.cues){
+                bool exists=false;
+                for(const auto& request:requests)if(normalized(request.name)==normalized(cue.request.name)){
+                    d::need(request.loop==cue.request.loop&&request.stereo==cue.request.stereo&&
+                        request.stream==cue.request.stream,"50IE aliased source sample delivery flags differ");
+                    exists=true;break;
+                }
+                if(!exists)requests.push_back(cue.request);
+            }
+            d::need(authoring_.cues.size()==clips_.size(),"50IE original semantic cue count differs");
             if(!rr::assets::loadAudioBank50HC(audioRoot,requests,bank_,error))return false;
-            d::need(bank_.clips.size()==clips_.size(),"50IE incomplete original bank registry");
-            for(std::size_t i=0;i<clips_.size();++i){const auto&c=bank_.clips[i];
+            d::need(bank_.clips.size()==requests.size(),"50IE incomplete original PCM bank registry");
+            for(std::size_t i=0;i<clips_.size();++i){
+                const auto* asset=bank_.find(authoring_.cues[i].request.name);
+                d::need(asset,"50IE semantic cue lacks original PCM registry entry");
+                const auto& c=*asset;availability_[i]=c.state;
                 if(c.state!=rr::assets::AudioAssetState50HC::ready)continue;
                 const auto&p=c.pcm;clips_[i]={p.samples.data(),p.frames,p.sampleRate,p.channels,0,0};
                 d::need(rr::platform::AudioMixer50HD::validClip(clips_[i])&&p.channels==1,
@@ -35,7 +55,7 @@ public:
             d::need(episode.enableOriginalPolicy50IE(),"50IE shared episode already active or policy selected");
             mixer_=&mixer;groups_=&groups;episode_=&episode;lazy_=&lazy;clock_=&clock;raw_=&sharedRaw;
             providers_={this,stopAll,end,begin,play,activity,seed,leader};
-            prepared_=true;error.clear();return true;
+            playerRacer60_=playerRacer60;prepared_=true;error.clear();return true;
         }catch(const std::exception&e){error=e.what();return false;}
     }
     // true means2C2C20 actually returned, including legitimate source rejection
@@ -43,7 +63,7 @@ public:
     bool request(std::uint32_t type,std::uint32_t racer,std::uint32_t variant,
                  std::uint32_t mode11258,std::uint8_t managerFlags58)noexcept {
         using P=rr::game::AnnouncerPhase50IE;using U=rr::game::AnnouncerUpdatePhase50IE;
-        if(!current()||(update_.phase!=U::Idle&&update_.phase!=U::Done))return false;
+        if(!current()||racer!=playerRacer60_||(update_.phase!=U::Idle&&update_.phase!=U::Done))return false;
         const rr::game::AnnouncerRequest50IE request{type,racer,variant};
         if(cursor_.phase==P::Idle||cursor_.phase==P::Done){
             if(!rr::game::beginAnnouncerRequest50IE(request,{mode11258,managerFlags58},cursor_)){
@@ -93,7 +113,7 @@ private:
             if(a.bankRacer!=bank||a.key!=key)continue;
             // A real cold resolution failure is an actual unavailable return,
             // not a fake acknowledgement of an unimplemented event helper.
-            if(o.bank_.clips[i].state!=rr::assets::AudioAssetState50HC::ready)return true;
+            if(o.availability_[i]!=rr::assets::AudioAssetState50HC::ready)return true;
             return o.episode_->sourcePlay50IE(o.clips_[i],started);
         }
         return false;
@@ -118,12 +138,14 @@ private:
     source_announcer_authoring50IE::Authoring authoring_{};
     rr::assets::AudioBank50HC bank_{};
     std::array<rr::platform::AudioClip50HD,54>clips_{};
+    std::array<rr::assets::AudioAssetState50HC,54>availability_{};
     rr::platform::AudioMixer50HD*mixer_=nullptr;
     rr::platform::RaceAudioGroups50IC*groups_=nullptr;
     rr::platform::AnnouncerEpisode50IC*episode_=nullptr;
     rr::game::LapEventRandomOwner50ID*lazy_=nullptr;
     rr::game::HostMonotonicClock50ID*clock_=nullptr;
     std::uint32_t*raw_=nullptr;
+    std::uint32_t playerRacer60_=0;
     rr::game::AnnouncerState50IE state_{};
     rr::game::AnnouncerCursor50IE cursor_{};
     rr::game::AnnouncerUpdateCursor50IE update_{};

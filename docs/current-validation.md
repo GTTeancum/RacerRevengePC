@@ -1,5 +1,22 @@
 # Current native race validation
 
+## WIP: failed Clegg pause test; fix untested
+
+The 2026-10-09 16:18 UTC Clegg/menu attempt compiled four units, reused 189,
+and linked successfully. Source `b180cd8708d1d99a1756bf5dd200ce0263f98e4b`
+opened the front menu, selected Clegg through the menu, rebuilt all eight
+original racers, and advanced to native tick 102. The first headless Pause
+then ended the process with SIGSEGV (exit -11). No dense gameplay video was
+captured; pause/resume and the full Clegg race did not pass.
+
+Source inspection identified an unresolved `glBlitFramebuffer` pointer: it
+was loaded for window output, while the headless pause backdrop also uses it.
+The current correction loads it for the host HUD and explicitly rejects a
+retained backdrop if it is missing. This correction is **UNBUILT/UNTESTED**.
+No retry has run. The next central slot is no earlier than 17:18:11.176531 UTC.
+
+## Earlier validated mode1 baseline
+
 The Linux check began on 2026-10-09 at 15:17:47 UTC: two units compiled,
 191 reused, link exit 0. One mode1 race launched at 15:19:01 UTC and exited
 normally without reported errors.

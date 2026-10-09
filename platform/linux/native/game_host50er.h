@@ -31,9 +31,13 @@ struct GameHostInput50ER {
     // Host-only full-session restart request: F5 press or stdin restart.
     // Per-poll, never a native vehicle reposition action; quit takes priority.
     bool restartRequested = false;
+    // Host session navigation only, never native vehicle action-button bits.
+    // Window Escape is consumed by the client as a fresh toggle edge. These
+    // flags expose explicit stdin requests; window close/EOF still means quit.
+    bool pauseRequested = false, resumeRequested = false, menuRequested = false;
     // Host-only checkpoint reset request: non-repeated Backspace press or
     // stdin checkpoint. Per-poll, coalesced, never a native action-button bit.
-    // Quit/Escape takes priority; the client owns Ready/ground admission.
+    // Quit/Escape/menu takes priority; the client owns Ready/ground admission.
     bool checkpointRequested = false;
     // EOF/read error is a successful terminal input snapshot: all keys are
     // released and quitRequested is latched. Nonzero inputError is errno.
@@ -83,7 +87,9 @@ public:
     // 63 command bytes plus terminator, fixed storage, no heap allocation.
     // Commands are ASCII, newline-delimited and case-insensitive:
     // down KEY | up KEY | release | capture | restart | checkpoint | quit
-    // KEY is W, S, Up, Down, R, Space, Shift (Left Shift), Escape. down/up set raw SDL physical scancodes.
+    // pause | resume | menu
+    // KEY is W, S, Up, Down, R, Space, Shift (Left Shift), Escape, Enter.
+    // down/up set raw SDL physical scancodes; Enter selects the host menu row.
     // Invalid/overlong lines are rejected whole without changing key state.
     // A partial line survives until newline; EOF discards it and quits safely.
     // Like 50DQ, down is the latest drained state. A down/up pair in one poll
