@@ -1,18 +1,16 @@
 # Current native race validation
 
-The current source adds an **unbuilt and untested HOST steering mixer** after the run below. Positive-demand saturation preserves steering differential by reducing common acceleration; achieved speed can change. The preceding result does not validate this new input policy. See [mixer scope](gc-host-steering-authority50iq.md).
+## GC WIP: all racers advance beyond node 40; no completed lap
 
-## GC WIP: original class binding verified; no completed lap
+The 2026-10-09 23:20 central slot built source `53d44876270a095ac956720784437a16126ae584`: two units compiled, 191 reused, link exit 0. An initial cache/build setup was interrupted before gameplay; corrected setup and earlier partial logs were retained. Exactly one runtime ran, from 23:21:52 to 23:23:16 UTC, and exited normally.
 
-The 2026-10-09 22:20:18 UTC central slot built source `8e2d24db0f05c34cd60ff435a9ff6af12b9fa8a9`: one unit compiled, 192 reused, link exit 0. One runtime ran from 22:21:07 to 22:22:30 UTC and exited normally.
+- TA/menu/Pause/Resume, Main cancellation/confirmation and one GC cold transition completed. Menu/session and capture-clock checks passed.
+- One requested 60-second capture retained 1,054 unique actual frames over 60.0145 seconds, 17.546 captured fps, maximum gap 194.3 ms, with no capture-controller errors.
+- The integrated HOST mixer preserved steering differential by reducing common positive acceleration demand. All eight racers passed the opening and node 40. All then stopped OffCourse at nodes 43/44; **no GC lap completed**. This is focused progress, not complete field/course success or original AI.
+- Export verified all 1,054 frames in a 60.015-second silent video. Actual PCM was retained separately because maximum anchor skew reached 116.9 ms and final skew was -94.5 ms. No stretching or synthetic audio was used; synchronized sound is not claimed.
 
-- All eight GC cold owners reported class 3 and their expected original source values. TA/menu/Pause/Resume, Main cancellation/confirmation and one GC cold transition completed.
-- One requested 60-second capture retained 1,006 unique actual frames over 60.0045 seconds, 16.749 captured fps, maximum gap 197.6 ms. The bounded capture completed with no controller errors.
-- Six racers, including the player, reached node 40 and then stopped OffCourse. Slots 2 and 4 stopped at nodes 8 and 7. All eight safety stops remained effective; **no GC lap completed**.
-- This verifies class selection and bounded capture, not complete-course driving, native AI, manual usability or the subsequent mixer. Raw evidence and media remain outside Git.
-
-Runtime binary SHA-256: `ceef8769eb409ac37e97399f5af6bd25852450c61f4548f2f06dde8dfd600314`.
-No additional build, runtime, syntax check, test or encoding was performed during source preservation. Gate/LostAI behavior and broader field/course completion remain unresolved. Earlier results apply to their own source versions.
+Runtime binary SHA-256: `c77b79096fd7fb7073a0aaeeba7dbf6aa3a3e04e01e84d4b210e7e9f5bd6ef31`.
+Only status documentation changed afterward. No new build, runtime, syntax check, test or encoding was performed during this update. The next bend remains under investigation; manual GC usability, Gate/LostAI behavior and full-course completion remain unresolved. Earlier results apply to their own source versions.
 
 ## Current Linux menu and Clegg check
 

@@ -1,13 +1,8 @@
 # Optional GC host steering-saturation allocation (50IQ)
 
-## Integrated candidate: unbuilt and untested
+## Focused runtime coverage; full-course driving incomplete
 
-The original track-class correction completed the 22:20 central build and one
-60-second GC capture. All eight class-C bindings were verified, but all drivers
-stopped before a lap: six at node 40 and two at nodes 8/7. The separate HOST mixer
-was then integrated as the next candidate. This mixer has not been built or run;
-the preceding result does not validate it. Its earlier standalone recovery branch
-remains intact.
+The 23:20 central slot built source 53d44876 and completed one 60-second GC capture. All eight racers passed the opening and node 40, then stopped OffCourse at nodes 43/44. No GC lap or complete-field pass is claimed. This exercises the integrated mixer and shows progress over the class-only run; it does not validate every control boundary. The separate original recovery branch remains intact. See [current validation](current-validation.md).
 
 This is an explicit HOST packet-mixing policy, not original AI. It does not
 change PHY coefficients, class selection, speed targets, preview selection,

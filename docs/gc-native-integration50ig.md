@@ -1,8 +1,8 @@
-# GC native integration: HOST mixer unbuilt and untested
+# GC native integration: all racers reach the next bend; no completed lap
 
-The current candidate joins the separately reviewed GC-only steering-saturation mixer. It retains the requested differential by reducing positive common acceleration when the two demands would otherwise clip. Authored target-speed policy remains unchanged; acceleration and achieved speed can change through the native airbrake. This HOST policy is unbuilt and untested. See [mixer scope](gc-host-steering-authority50iq.md).
+The 23:20 central slot built `53d44876270a095ac956720784437a16126ae584` and completed one 60.0145-second capture with 1,054 unique frames and normal exit. The integrated GC-only HOST mixer was exercised: steering differential is retained by reducing common positive acceleration when the two demands would otherwise clip. Authored target-speed policy remains unchanged; acceleration and achieved speed can change through the native airbrake. See [mixer scope](gc-host-steering-authority50iq.md).
 
-The preceding 22:20 central slot built `8e2d24db0f05c34cd60ff435a9ff6af12b9fa8a9`, verified all eight GC class-3 bindings and completed one 60.0045-second capture with 1,006 unique frames and normal exit. Six racers reached node 40 before OffCourse stops; slots 2 and 4 stopped at nodes 8/7. **No GC lap or complete-field pass is claimed.** The original class correction legitimately changes class-dependent handling and propulsion; the later mixer remains separately unverified. See [current validation](current-validation.md).
+All eight racers passed the opening and node 40, then stopped OffCourse at nodes 43/44. **No GC lap or complete-field pass is claimed.** The next bend remains under investigation. The verified 60.015-second video is silent because actual PCM exceeded the existing skew limits and remains separately preserved; no audio stretching or synthesis occurred. See [current validation](current-validation.md) for exact scope and the retained build-setup interruption.
 
 The cold CHARACTER/non-body guard admitted the original owner mapping during GC setup. Specific contact-response correctness still needs focused coverage; no new response algorithm is claimed. See [CHARACTER response admission](gc-character-response50ig.md).
 
