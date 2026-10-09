@@ -36,9 +36,12 @@ def main():
         parser.error('No complete frame interval')
     gaps = [b['ack_elapsed'] - a['ack_elapsed'] for a, b in zip(frames, frames[1:])]
     duration = sum(gaps)
-    if (not 15 <= duration <= 30.5 or min(gaps) <= 0
+    # A 60-second capture must cover its declared target, never a short prefix.
+    duration_in_bounds = (60 <= duration <= 60.5 if receipt.get('target_seconds') == 60
+                          else 15 <= duration <= 30.5)
+    if (not duration_in_bounds or min(gaps) <= 0
             or len(gaps) / duration < 12 or max(gaps) > 0.25):
-        parser.error('Sparse/incomplete capture refused: need 15–30.5 s, >=12 measured fps, no >250 ms gaps')
+        parser.error('Sparse/incomplete capture refused: need 60–60.5 s for a declared 60 s target, otherwise 15–30.5 s; >=12 measured fps, no >250 ms gaps')
     if len({f['sha256'] for f in frames}) < len(frames) * 0.8:
         parser.error('Fewer than 80% unique actual pixel frames; do not present this as moving gameplay')
     if any(b['tick'] < a['tick'] for a, b in zip(frames, frames[1:])):

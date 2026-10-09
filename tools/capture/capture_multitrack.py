@@ -137,8 +137,8 @@ def main():
     parser.add_argument('--root-owns-active-slot', action='store_true', required=True)
     parser.add_argument('--expected-slot-start', required=True)
     args = parser.parse_args()
-    if args.seconds != 20 or args.fps != 20:
-        parser.error('This bounded exercise requires exactly 20 seconds at 20 requested captures/second')
+    if args.seconds not in (20, 60) or args.fps != 20:
+        parser.error('This bounded exercise requires exactly 20 or 60 seconds at 20 requested captures/second')
     if not re.fullmatch(r'[0-9a-fA-F]{40}', args.source_commit):
         parser.error('--source-commit must be the reviewed 40-character source commit')
     from multitrack_exercise import MultiTrackExercise
@@ -192,7 +192,7 @@ def main():
                    'tick_contract': 'frame.tick/rendered_tick = last committed scene tick; native_tick = completed native counter. Exact equality is required only for fresh live-scene captures.',
                    'scope': ('One headless live process; prepared TA Start, real drive/Pause/Resume, '
                              'cancelled then confirmed Main, GC disclosure and one expected cold Start, '
-                             '20-second actual GC capture, quit. No other restart or retry.'),
+                             f'{args.seconds:g}-second actual GC capture, quit. No other restart or retry.'),
                    'input_note': 'HOST authored-pace course driver by default; not human gameplay or original AI',
                    'audio_note': 'Real native mixed PCM, no microphone/device playback claim',
                    'cold_start_limit_seconds': 360,
@@ -421,7 +421,7 @@ def main():
                            maximum_gap_seconds=max(gaps),
                            unique_pixel_frames=len({f['sha256'] for f in frames}),
                            game_tick_delta=frames[-1]['tick'] - frames[0]['tick'])
-            if (receipt['measured_video_seconds'] < 20
+            if (receipt['measured_video_seconds'] < args.seconds
                     or receipt['measured_capture_fps'] < 12
                     or receipt['maximum_gap_seconds'] > 0.25
                     or receipt['unique_pixel_frames'] < len(frames) * 0.8

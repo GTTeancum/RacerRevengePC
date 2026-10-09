@@ -9,3 +9,5 @@ The corrected MP4 retained each of the 298 original frames exactly once, in orde
 The artifact is silent. Actual simulation-timed PCM drifted from wall-video anchors by up to 141.639 ms and ended 121.674 ms short. It remains separate; the encoder neither stretches/resamples it nor claims synchronized playback. `--require-audio` can make this absence block delivery.
 
 This demonstrates artifact timing, not complete GC driving. The HOST course drivers stopped at node 7 and no GC lap completed. Game behavior, manual usability and listening quality are outside this encoder correction. Existing runtime and source-control histories are unchanged by artifact preparation.
+
+The current source also adds an unexecuted bounded-duration admission: a receipt declaring a 60-second target requires a measured 60–60.5-second window. Existing 20-second capture/export results do not validate that path. All timing, source-frame and PCM safeguards above remain unchanged; see [bounded duration](capture-bounded-duration.md).
