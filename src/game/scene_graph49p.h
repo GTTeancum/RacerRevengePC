@@ -3,18 +3,22 @@
 #include <cstdint>
 
 namespace rr::game {
-constexpr std::uint32_t maxSceneNodes49P = 64;
+// Largest retained roster forest: Pod08 has 61 PSG nodes plus seven owners.
+// This is host storage capacity; individual PSG/MOT palettes remain capped at64.
+constexpr std::uint32_t maxSceneNodes49P = 80;
 // Native record indices, never original guest pointers. No ownership is implied.
 enum class SceneNodeIndex49P : std::int32_t { none = -1 };
 struct SceneNode49P {
     BodyMatrix48G localC0, world100;
-    SceneNodeIndex49P parent180, firstChild184, nextSibling188;
+    SceneNodeIndex49P parent180 = SceneNodeIndex49P::none;
+    SceneNodeIndex49P firstChild184 = SceneNodeIndex49P::none;
+    SceneNodeIndex49P nextSibling188 = SceneNodeIndex49P::none;
     std::uint8_t sceneFlags190;
 };
 struct SceneGraph49P { SceneNode49P* nodes; std::uint32_t count; };
 struct SceneDisplacement49P { float v[4]; };
 
-// Read-only admission of a caller-initialized, coherent acyclic forest, <=64
+// Read-only admission of a caller-initialized, coherent acyclic forest, <=maxSceneNodes49P
 // nodes. Roots have no siblings; each nonroot appears exactly once in its
 // parent's first-child/next-sibling list. Node order need not be parent-first.
 // Empty forests are valid but cannot be the target of an operation. No cache

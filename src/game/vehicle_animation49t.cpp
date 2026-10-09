@@ -57,7 +57,7 @@ bool spans(const VehicleAnimationInput49T& in,const VehicleAnimationBindings49T&
     const std::size_t n[]={g.count*sizeof(SceneNode49P),sizeof s,sizeof h,sizeof v,sizeof w};
     for(unsigned i=0;i<5;++i)for(unsigned j=i+1;j<5;++j)if(overlap(p[i],n[i],p[j],n[j]))return false;
     if(overlap(&w,sizeof w,&in,sizeof in)||overlap(&w,sizeof w,&b,sizeof b)||overlap(&w,sizeof w,&g,sizeof g))return false;
-    const assets::MotionView49O* views[]={b.brakeLeft28C,b.brakeRight290,b.forward280,b.back284,b.left2A0,b.right29C};
+    const assets::MotionView49O* views[]={b.brakeLeft28C,b.brakeRight290,b.forward280,b.back284,b.left2A0,b.right29C,b.mid288,b.rightMid294,b.leftMid298};
     for(const auto* view:views)if(view&&(overlap(&w,sizeof w,view,sizeof *view)||overlap(&w,sizeof w,view->data,view->bytes)))return false;
     const assets::MotionNodeBindings49O* maps[]={b.chariotRows,b.leftRows,b.rightRows};
     for(const auto* map:maps)if(map&&overlap(&w,sizeof w,map,sizeof *map))return false;
@@ -87,7 +87,8 @@ bool advanceVehicleAnimation49T(const VehicleAnimationInput49T& in,
     VehicleAnimationState49T& state,VehicleAnimationShared49T& shared,VisualShared49R& visual,
     VehicleAnimationWorkspace49T& w,VehicleAnimationDiagnostic49T& d) noexcept {
     d={};
-    if(in.phase!=VehicleAnimationPhase49T::beforeAnimation21A000||!in.midRecordsAbsent)
+    const bool midsAbsent=!b.mid288&&!b.rightMid294&&!b.leftMid298;
+    if(in.phase!=VehicleAnimationPhase49T::beforeAnimation21A000||in.midRecordsAbsent!=midsAbsent)
         return reject(d,VehicleAnimationError49T::context,0x21a000);
     if(std::fegetround()!=FE_TONEAREST)return reject(d,VehicleAnimationError49T::rounding_mode,0x21a000);
     if(!graph.count||!validateSceneGraph49P(graph))return reject(d,VehicleAnimationError49T::graph,0x21a000);
@@ -110,12 +111,15 @@ bool advanceVehicleAnimation49T(const VehicleAnimationInput49T& in,
     }
     const bool chariot=b.chariot1B4!=Index::none&&(in.chariot191&1);
     const bool brake=chariot&&b.brakeLeft28C&&b.brakeRight290;
+    const bool mid=chariot&&b.mid288;
     const bool left=b.left2A0&&b.left1BC!=Index::none&&(in.left191&1);
     const bool right=b.right29C&&b.right1B8!=Index::none&&(in.right191&1);
     const bool suffix=chariot&&!in.chariot1B0;
     const bool pair=suffix&&b.forward280&&b.back284&&in.body340Present;
-    if(((brake||pair)&&!rows(graph,b.chariotRows,b.chariot1B4))||
-       (left&&!rows(graph,b.leftRows,b.left1BC))||(right&&!rows(graph,b.rightRows,b.right1B8)))
+    if(((brake||mid||pair)&&!rows(graph,b.chariotRows,b.chariot1B4))||
+       ((left||b.leftMid298)&&!rows(graph,b.leftRows,b.left1BC))||
+       ((right||b.rightMid294)&&!rows(graph,b.rightRows,b.right1B8))||
+       (b.leftMid298&&b.left1BC==Index::none)||(b.rightMid294&&b.right1B8==Index::none))
         return reject(d,VehicleAnimationError49T::bindings,0x21a184);
     if(suffix){
         for(const auto* hand:{&b.hands.left,&b.hands.right})if(hand->target!=Index::none)
@@ -135,8 +139,20 @@ bool advanceVehicleAnimation49T(const VehicleAnimationInput49T& in,
     if(brake){w.state.leftB04=clamp(w.state.leftB04);w.state.rightB0C=clamp(w.state.rightB0C);
         if(!single(b.brakeLeft28C,b.chariotRows,w.state.leftB04,w.state.chariotModel,0x21a190)||
            !single(b.brakeRight290,b.chariotRows,w.state.rightB0C,w.state.chariotModel,0x21a1a8))return false;}
+    // Source21A1B0/21A320/21A390 computes each Mid fraction independently.
+    // Keep source add-before-multiply order and sample with the same model owner.
+    auto middle=[&](const assets::MotionView49O* motion,const assets::MotionNodeBindings49O* map,
+                    ModelMotionState49T& model,std::uint32_t pc) noexcept {
+        if(!std::isfinite(in.steeringB6C))return reject(d,VehicleAnimationError49T::input,pc);
+        Math f;const float fraction=clamp(f.mul(.5f,f.add(1.f,in.steeringB6C)));
+        if(!f.valid)return reject(d,VehicleAnimationError49T::arithmetic,pc);
+        return single(motion,map,fraction,model,pc);
+    };
+    if(mid&&!middle(b.mid288,b.chariotRows,w.state.chariotModel,0x21a218))return false;
     if(left){w.state.leftB04=clamp(w.state.leftB04);if(!single(b.left2A0,b.leftRows,w.state.leftB04,w.state.leftModel,0x21a298))return false;}
     if(right){w.state.rightB0C=clamp(w.state.rightB0C);if(!single(b.right29C,b.rightRows,w.state.rightB0C,w.state.rightModel,0x21a318))return false;}
+    if(b.rightMid294&&!middle(b.rightMid294,b.rightRows,w.state.rightModel,0x21a388))return false;
+    if(b.leftMid298&&!middle(b.leftMid298,b.leftRows,w.state.leftModel,0x21a3f8))return false;
     if(pair){
         if(static_cast<std::uint32_t>(b.bodyScene288)>=graph.count)return reject(d,VehicleAnimationError49T::bindings,0x21a460);
         for(unsigned i=0;i<3;++i)if(!std::isfinite(in.bodyAccelerationC0.v[i]))return reject(d,VehicleAnimationError49T::input,0x21a460);

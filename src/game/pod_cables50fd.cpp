@@ -30,11 +30,11 @@ struct Math {
     }
 };
 bool reject(PodCableDiagnostic50FD& d, PodCableError50FD e) noexcept { d.error=e;return false; }
-bool valid(I i) noexcept { return static_cast<std::int32_t>(i)>=0 && static_cast<std::uint32_t>(i)<vehicleFrameNodeCount49W; }
+bool valid(I i,std::uint32_t count) noexcept { return static_cast<std::int32_t>(i)>=0 && static_cast<std::uint32_t>(i)<count; }
 bool descendant(const SceneGraph49P& g,I child,I root) noexcept {
-    if(!valid(child)||!valid(root)||child==root)return false;
+    if(!valid(child,g.count)||!valid(root,g.count)||child==root)return false;
     I n=g.nodes[static_cast<std::uint32_t>(child)].parent180;
-    for(unsigned k=0;k<vehicleFrameNodeCount49W&&n!=I::none;++k) {
+    for(unsigned k=0;k<g.count&&n!=I::none;++k) {
         if(n==root)return true;
         n=g.nodes[static_cast<std::uint32_t>(n)].parent180;
     }
@@ -54,11 +54,11 @@ bool buildPodCables50FD(const VehicleFrameState49W& state,
     if(cameraForward.v[0]==0.f&&cameraForward.v[1]==0.f&&cameraForward.v[2]==0.f)
         return reject(d,PodCableError50FD::input);
     std::memcpy(w.nodes,state.nodes,sizeof w.nodes);
-    const SceneGraph49P graph{w.nodes,vehicleFrameNodeCount49W};
-    if(!validateSceneGraph49P(graph))return reject(d,PodCableError50FD::graph);
+    const SceneGraph49P graph{w.nodes,state.sceneNodeCount};
+    if(!validVehicleSceneCount49W(state,bindings)||!validateSceneGraph49P(graph))return reject(d,PodCableError50FD::graph);
     const auto& b=bindings.lifecycle;
     const I roots[2]={b.left1BC,b.right1B8};
-    if(!valid(b.model1B4)||cable.chariot[0]==cable.chariot[1]||cable.engine[0]==cable.engine[1])
+    if(!valid(b.model1B4,graph.count)||cable.chariot[0]==cable.chariot[1]||cable.engine[0]==cable.engine[1])
         return reject(d,PodCableError50FD::binding);
     for(unsigned side=0;side<2;++side) {
         d.cable=side;

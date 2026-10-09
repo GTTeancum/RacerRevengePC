@@ -45,7 +45,7 @@ void markAncestors(const SceneGraph49P& graph, Index index) noexcept {
 }
 void invalidate(const SceneGraph49P& graph, Index index) noexcept {
     // Equivalent to 289A20's two-level unrolling. Sibling recursion comes
-    // first even when this node was already dirty. Depth is bounded by 64.
+    // first even when this node was already dirty. Depth is bounded by maxSceneNodes49P.
     auto& node = at(graph, index);
     if (node.nextSibling188 != none) invalidate(graph, node.nextSibling188);
     if ((node.sceneFlags190 & 1u) == 0) return;

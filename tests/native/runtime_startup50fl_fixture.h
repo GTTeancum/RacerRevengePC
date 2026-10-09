@@ -92,7 +92,10 @@ struct Assets {
         // Existing fresh engine-nullcg normalization, before any animation.
         for(U node:{1u,16u})for(U lane:{12u,13u,14u})graph[node].localC0.v[lane]=0;
         graph[50].firstChild184=ix(51);graph[51].parent180=ix(50);
-        graph[52].sceneFlags190=0x80;return graph;
+        graph[52].sceneFlags190=0x80;
+        // Retain all original53-node words; only new spare capacity is identity.
+        for(U node=53;node<vehicleFrameNodeCount49W;++node){graph[node].world100=identity();graph[node].sceneFlags190=0;}
+        return graph;
     }
 };
 struct Fixture {
@@ -133,7 +136,7 @@ struct Fixture {
   require(setLocalMatrix49P(g,ix(30),state.nodes[49].localC0),"initial displayed pose");
   bindings.visual={ix(50),ix(51),ix(15),ix(0),false,false,0};
   bindings.lifecycle={ix(50),ix(51),ix(52),ix(49),ix(30),ix(0),ix(15),ix(35),ix(36)};
-  for(unsigned i=0;i<53;++i)bindings.topology[i]={state.nodes[i].parent180,state.nodes[i].firstChild184,state.nodes[i].nextSibling188};
+  for(unsigned i=0;i<vehicleFrameNodeCount49W;++i)bindings.topology[i]={state.nodes[i].parent180,state.nodes[i].firstChild184,state.nodes[i].nextSibling188};
   bindings.mainDomain=bindings.secondaryDomain={2,false,false,GraphBodyIntegrator49W::OriginalAdamsBashforth2,GraphBodyCallback49W::Clear238};
   rr::assets::initializeVehicleVisualSharedColdRecords49R(state.visualShared);
   const auto visualPhy=readBytes(root/"evidence/authoredInitialization49N/authoring-source/Pod01.phy");

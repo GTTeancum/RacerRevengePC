@@ -6,13 +6,13 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 The current Linux prototype includes native rendering, vehicle physics, audio, keyboard controls, and an eight-racer development race. Windows source is retained, but the current interactive client targets Linux.
 
-Racer-contact integration is in progress; a complete contact-enabled game run is not yet verified.
+This branch contains newer original-roster integration that is unbuilt and untested.
 
 ## Building and game data
 
 Supply your own original game data and generate the required local caches. Game assets, executables, and memory dumps are not included. Some source-comparison tests also need locally generated fixtures.
 
-Start with the [interactive build guide](docs/interactive-build50dv.md). The Linux client needs a C++17 toolchain, Python 3, zlib, SDL2, and desktop OpenGL. See [input requirements](docs/source-only-exclusions.md) for omitted data and [technical notes](docs/) for implementation details.
+Start with the [interactive build guide](docs/interactive-build50dv.md). The Linux client needs a C++20 toolchain, Python 3, zlib, SDL2, and desktop OpenGL. See [input requirements](docs/source-only-exclusions.md) for omitted data and [technical notes](docs/) for implementation details.
 
 ## Controls
 

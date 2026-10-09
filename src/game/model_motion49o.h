@@ -28,6 +28,12 @@ struct ModelMotionDiagnostic49O { ModelMotionError49O error; std::uint32_t track
 // No general animation service, mirror path, scene graph dirty-flag execution,
 // IK, scale restoration, allocation, I/O, or time advancement is represented.
 // False leaves all local matrices untouched; diagnostic is always set.
+// Numeric single1559F0 projection for the optional fresh Mid sample213854.
+// Uses the same source rotation/position sampler without an extra blend.
+bool sampleModelMotion49O(const assets::MotionView49O& motion,
+    const assets::MotionNodeBindings49O& bindings,float frameFraction,
+    ModelLocalMatrix49O* locals,std::uint32_t nodeCount,
+    ModelMotionDiagnostic49O& diagnostic) noexcept;
 bool sampleModelMotionBlend49O(const assets::MotionView49O& first,
     const assets::MotionView49O& second,
     const assets::MotionNodeBindings49O& bindings,

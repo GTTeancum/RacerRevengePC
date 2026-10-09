@@ -29,7 +29,7 @@ struct ModelMotionDiagnostic49Q {
 // ancestor marking and ready01-gated descendant invalidation through equivalent
 // 49P setters. Every world cache and topology link remains unchanged, and a
 // dirty node with ready descendants is intentionally not normalized.
-// Requires FE_TONEAREST,1..64 coherent graph nodes with all local/world lanes
+// Requires FE_TONEAREST,1..maxSceneNodes49P coherent graph nodes with all local/world lanes
 // finite, bindings1..64, finite fraction[0,1], >=2 keys per consumed track,
 // inclusive covered sample times, and finite consumed/intermediate arithmetic.
 // Retains49O original-software trig tables/cold acos padding and separate

@@ -77,7 +77,7 @@ bool prepareVehicleDrawMesh50CM(const assets::Scene48D&, const assets::Mesh48B&,
 // The explicit 49S tags attest the caller's selected render-preparation cut;
 // Ready alone does not prove that an initialized vehicle has run graphics.
 // Derives the model root and flag191 from canonical bindings/fields, snapshots
-// all53 nodes, then runs the real49S palette and diagnostic rigid projection.
+// the active scene forest, then runs the real49S palette and diagnostic rigid projection.
 // Canonical graph, frame caches, physics and RNG are never mutated. In
 // particular, later physical poses never replace the earlier graphics roots.
 //

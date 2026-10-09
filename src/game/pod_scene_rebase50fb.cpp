@@ -38,7 +38,7 @@ bool rebaseColdPodScene50FB(const SceneGraph49P& graph,
         diagnostic.model = model;
         const auto& input = models[model];
         if (!valid(input.root, graph.count) || !input.sourceNodes ||
-            !input.sourceNodeCount || input.sourceNodeCount >= maxSceneNodes49P ||
+            !input.sourceNodeCount || input.sourceNodeCount > maxModelBoundsNodes49O ||
             input.sourceNodeCount != input.hierarchy.nodeCount)
             return reject(PodSceneRebaseError50FB::binding);
         const auto root = static_cast<std::uint32_t>(input.root);

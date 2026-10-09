@@ -27,6 +27,8 @@ struct VehicleAnimationInput49T {
     bool body340Present, midRecordsAbsent;
     // Current body+C0 linear acceleration, not velocity or a later substep.
     VisualVector49R bodyAccelerationC0;
+    // Actual filtered steering+B6C consumed only by present Mid records.
+    float steeringB6C=0;
 };
 struct VehicleAnimationBindings49T {
     SceneNodeIndex49P chariot1B4 = SceneNodeIndex49P::none;
@@ -44,6 +46,9 @@ struct VehicleAnimationBindings49T {
     const assets::MotionView49O* right29C = nullptr;
     ChariotIkBindings49T hands;
     const ChariotIkPair49T* handRecords = nullptr;
+    const assets::MotionView49O* mid288 = nullptr;
+    const assets::MotionView49O* rightMid294 = nullptr;
+    const assets::MotionView49O* leftMid298 = nullptr;
 };
 struct VehicleAnimationWorkspace49T {
     SceneNode49P nodes[maxSceneNodes49P];
@@ -70,8 +75,10 @@ bool initializeVehicleAnimationFilters49T(float seedB04, float seedB0C,
     VehicleAnimationState49T&) noexcept;
 
 // Complete admitted original21A000 internal-animation call through real return.
-// Six resolved Pod01 motions use their actual49O views/bindings; all three Mid
-// records must be absent. Presence pointers and gate bytes retain source skips.
+// Resolved per-model MCF motions use their actual49O views/bindings. Nullable
+// Mid records follow21A218/21A388/21A3F8 and consume filtered steering+B6C.
+// midRecordsAbsent must agree with all three supplied Mid pointers.
+// Presence pointers and gate bytes retain source skips.
 // The caller attests selected resource identity/no foreign matching registry
 // records, valid persistent source-initialized IK coefficients and source body
 // binding. Model roots are distinct unparented roots with rows confined to each
@@ -85,7 +92,7 @@ bool initializeVehicleAnimationFilters49T(float seedB04, float seedB0C,
 // visual is the SAME caller VisualShared49R passed to later21C120/49R, including
 //4433D8. No hidden reset, noise, root21A660, physics, palette or rendering call.
 //
-// Requires current complete coherent graph1..64 with finite local/world words,
+// Requires current complete coherent graph1..maxSceneNodes49P with finite local/world words,
 // FE_TONEAREST, finite consumed arithmetic, nonnegative finite frame factor,
 // positive used filter times and subordinate sampler/IK numeric admissions.
 // A phase tag attests a supplied boundary; it does not execute prior controls.

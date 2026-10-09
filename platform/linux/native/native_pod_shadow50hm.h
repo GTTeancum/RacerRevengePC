@@ -119,4 +119,51 @@ inline bool buildNativePodShadow50HM(const game::VehicleDrawSubmission50CM& mesh
     output = result;
     return true;
 }
+
+// Conservative world-XZ receiver bounds for one submitted racer's three
+// footprints. Only opponents need this broad phase; the player's original
+// three-caster shader path stays unchanged. Includes every permitted height,
+// projected light offset and soft-edge spread, rather than model-space bounds.
+// False preserves output. An empty group uses inverted bounds and shades none.
+inline bool buildNativePodShadowReceiverBounds50HM(
+    const NativePodShadow50HM (&shadows)[3], float (&output)[4]) noexcept {
+    double lowX = INFINITY, lowZ = INFINITY, highX = -INFINITY, highZ = -INFINITY;
+    bool enabled = false;
+    for (const auto& shadow : shadows) {
+        if (shadow.shapeAndOpacity[3] <= 0.f) continue;
+        for (float value : shadow.centerAndReach)
+            if (!std::isfinite(value)) return false;
+        for (float value : shadow.shapeAndOpacity)
+            if (!std::isfinite(value)) return false;
+        const auto& center = shadow.centerAndReach;
+        const double qxx = shadow.shapeAndOpacity[0], qxz = shadow.shapeAndOpacity[1];
+        const double qzz = shadow.shapeAndOpacity[2], determinant = qxx*qzz - qxz*qxz;
+        if (!(qxx > 0. && qzz > 0. && determinant > 0. && center[3] > 0.f)) return false;
+        // sqrt(diag(inverse(Q))) gives each axis's ellipse support. 1.75
+        // conservatively covers maximum spread 1.6 * sqrt(edge radius 1.15),
+        // with margin for the shader's float arithmetic near the soft edge.
+        const double radiusX = 1.75 * std::sqrt(qzz / determinant);
+        const double radiusZ = 1.75 * std::sqrt(qxx / determinant);
+        lowX = std::min(lowX, double(center[0]) - nativeShadowSlopeX50HM*center[3] - radiusX);
+        lowZ = std::min(lowZ, double(center[2]) - nativeShadowSlopeZ50HM*center[3] - radiusZ);
+        highX = std::max(highX, double(center[0]) + radiusX);
+        highZ = std::max(highZ, double(center[2]) + radiusZ);
+        enabled = true;
+    }
+    float result[4] = {1.f, 1.f, -1.f, -1.f};
+    if (enabled) {
+        const double values[4] = {lowX, lowZ, highX, highZ};
+        for (unsigned i = 0; i < 4; ++i) {
+            if (!std::isfinite(values[i]) || std::abs(values[i]) > std::numeric_limits<float>::max())
+                return false;
+            // Round outward, including when a tiny footprint lies at a large
+            // world coordinate. Never accidentally clip its own receiver edge.
+            result[i] = std::nextafter(static_cast<float>(values[i]),
+                i < 2 ? -std::numeric_limits<float>::infinity() : std::numeric_limits<float>::infinity());
+            if (!std::isfinite(result[i])) return false;
+        }
+    }
+    std::copy(result, result + 4, output);
+    return true;
+}
 }

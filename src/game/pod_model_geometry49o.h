@@ -10,6 +10,7 @@ struct FreshPodGeometrySources49O {
     assets::MotionView49O forward;
     assets::MotionView49O back;
     assets::MotionNodeBindings49O chariotBindings;
+    const assets::MotionView49O* mid=nullptr;
 };
 struct FreshPodGeometryWorkspace49O {
     ModelLocalMatrix49O local[64];
@@ -31,10 +32,11 @@ struct FreshPodGeometryDiagnostic49O {
 // Closed numeric projection for the fresh source model context:
 // - unparented identity graphics model roots, source hierarchy in file order;
 // - source node0 is the root nullcg in both original PSGs;
-// - selected Forward/Back are the MCF records resolved for this pod; no Mid;
+// - Forward/Back and optional Mid are the actual selected MCF records;
 // - original initialized bases/trig tables; no additional transform effects.
 // Capture PRE-animation Chariot nullcg LOCAL XYZ and right-engine nullcg WORLD
-// Z; sample155E70 at(.5,0,nonmirror); compute original26F4B0 box aggregate;
+// Z; sample155E70 at(.5,0,nonmirror), then optional1559F0 Mid at.5
+// (213838..213854); compute original26F4B0 box aggregate;
 // bind the original secondary body mass/inertia, target and joint geometry.
 // Stored PSG sphere radius is never substituted for the live aggregate.
 // This does not run the whole original MCF/Create graph, cache clone path,

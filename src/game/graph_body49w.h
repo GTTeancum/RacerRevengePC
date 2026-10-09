@@ -48,7 +48,7 @@ struct GraphBodyWorkspace49W {
 };
 // Source167C40..16836C including the actual empty141ED0 component route.
 // sceneBinding==none is the original missing-body288 branch. Otherwise require
-// a parentless node in the complete coherent<=64-node49P forest. Real children,
+// a parentless node in the complete coherent bounded49P forest. Real children,
 // including190->194, remain present. root.scene is a bitwise projection of the
 // bound node.world100; low sceneFlags190 agrees with its flags, upper24 preserved.
 // Ready world may differ from local. Graph is the sole matrix/flag authority.

@@ -33,7 +33,7 @@ struct ModelMotionDiagnostic49T {
 // at fraction0; final rotation keys skip the interpolation helper.
 //
 // Views and bindings must be successfully admitted, alive and unchanged49O
-// records. Further admission: coherent forest1..64, finite local/world lanes,
+// records. Further admission: coherent forest1..maxSceneNodes49P, finite local/world lanes,
 // bindings1..64, >=2 keys per consumed track, covered sample times, finite
 // consumed values/intermediates, fraction/weight in[0,1], FE_TONEAREST.
 // Pair counts/row sequences must match. BOTH motions use first.duration*fraction;

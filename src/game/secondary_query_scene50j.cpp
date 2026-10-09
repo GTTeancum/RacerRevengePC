@@ -16,14 +16,14 @@ SecondaryQuerySceneStatus50J prepareSecondaryQueryScene50J(VehicleFrameState49W&
     if(!a.springPresent||!a.queryPresent||!a.queryEnabled||a.pairsPresent||(a.providerPresent&&a.pointContactsEnabled)||
        !a.explicitCandidates||a.queryType!=2||a.registrationE0)return S::UnsupportedScope;
     const auto index=static_cast<int>(b.lifecycle.physical19C);
-    if(index<0||index>=static_cast<int>(vehicleFrameNodeCount49W)||a.queryScene!=b.lifecycle.physical19C)return S::InvalidInput;
+    if(!validVehicleSceneCount49W(s,b)||index<0||index>=static_cast<int>(s.sceneNodeCount)||a.queryScene!=b.lifecycle.physical19C)return S::InvalidInput;
     const auto&node=s.nodes[index];const auto&body=s.bodies.secondary;
     if(node.parent180!=SceneNodeIndex49P::none||s.bodies.secondaryDomain.sceneHasParent||
        s.bodies.secondaryDomain.sceneObserverCount||b.secondaryDomain.rootObserverPresent19C)return S::UnsupportedScope;
     if(std::memcmp(&node.world100,&body.root.scene,sizeof node.world100)||
        (body.sceneFlags190&255u)!=node.sceneFlags190)return S::InvalidInput;
     std::memcpy(&w.next,&s,sizeof s);
-    if(!refreshSceneWorld49P({w.next.nodes,vehicleFrameNodeCount49W},b.lifecycle.physical19C))return S::GraphFailure;
+    if(!refreshSceneWorld49P({w.next.nodes,w.next.sceneNodeCount},b.lifecycle.physical19C))return S::GraphFailure;
     const auto&ready=w.next.nodes[index];auto&next=w.next.bodies.secondary;
     std::memcpy(&next.root.scene,&ready.world100,sizeof next.root.scene);
     next.sceneFlags190=(next.sceneFlags190&0xffffff00u)|ready.sceneFlags190;

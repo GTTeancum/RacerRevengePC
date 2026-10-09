@@ -16,14 +16,14 @@ bool reject(VehicleDrawDiagnostic50CM& d, VehicleDrawError50CM error,
     d.item = item;
     return false;
 }
-bool indexValid(SceneNodeIndex49P index) noexcept {
+bool indexValid(SceneNodeIndex49P index,std::uint32_t count) noexcept {
     const auto n = static_cast<std::int32_t>(index);
-    return n >= 0 && static_cast<std::uint32_t>(n) < vehicleFrameNodeCount49W;
+    return n >= 0 && static_cast<std::uint32_t>(n) < count;
 }
 bool belongsTo(const SceneNode49P* nodes, SceneNodeIndex49P node,
-    SceneNodeIndex49P root) noexcept {
-    for (std::uint32_t depth = 0; depth < vehicleFrameNodeCount49W; ++depth) {
-        if (!indexValid(node)) return false;
+    SceneNodeIndex49P root,std::uint32_t count) noexcept {
+    for (std::uint32_t depth = 0; depth < count; ++depth) {
+        if (!indexValid(node,count)) return false;
         if (node == root) return true;
         node = nodes[static_cast<std::uint32_t>(node)].parent180;
     }
@@ -133,17 +133,17 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
         return reject(d, VehicleDrawError50CM::phase);
     SceneNodeIndex49P root = SceneNodeIndex49P::none;
     std::uint8_t flags = 0;
-    if (!model(state, bindings, selection.component, root, flags) || !indexValid(root) ||
+    if (!validVehicleSceneCount49W(state,bindings)||!model(state, bindings, selection.component, root, flags) || !indexValid(root,state.sceneNodeCount) ||
         !selection.sourceNodes || !selection.paletteIds || !mesh.sourceNodeCount ||
         mesh.sourceNodeCount > maxRigidPalette49S || selection.sourceNodeCount != mesh.sourceNodeCount ||
         selection.paletteCount != mesh.sourceNodeCount)
         return reject(d, VehicleDrawError50CM::binding);
     for (std::uint32_t i = 0; i < selection.paletteCount; ++i)
-        if (selection.paletteIds[i] != i || !belongsTo(state.nodes, selection.sourceNodes[i], root))
+        if (selection.paletteIds[i] != i || !belongsTo(state.nodes, selection.sourceNodes[i], root,state.sceneNodeCount))
             return reject(d, VehicleDrawError50CM::binding, i);
 
     std::memcpy(workspace.nodes, state.nodes, sizeof(workspace.nodes));
-    const SceneGraph49P graph{workspace.nodes, vehicleFrameNodeCount49W};
+    const SceneGraph49P graph{workspace.nodes, state.sceneNodeCount};
     const ModelPaletteInput49S paletteInput{selection.phase, selection.suppliedState, flags, root,
         selection.sourceNodes, selection.sourceNodeCount, selection.paletteIds, selection.paletteCount};
     if (!projectModelPalette49S(graph, paletteInput, workspace.palette, workspace.paletteWorkspace, d.palette))

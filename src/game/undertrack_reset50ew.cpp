@@ -44,17 +44,17 @@ std::uint32_t bits(float x) noexcept {std::uint32_t u;std::memcpy(&u,&x,4);retur
 bool validIndex(I i) noexcept {const auto n=static_cast<std::int32_t>(i);return n>=0&&n<static_cast<std::int32_t>(vehicleFrameNodeCount49W);}
 SceneNode49P& node(VehicleFrameState49W& s,I i) noexcept {return s.nodes[static_cast<unsigned>(i)];}
 const SceneNode49P& node(const VehicleFrameState49W& s,I i) noexcept {return s.nodes[static_cast<unsigned>(i)];}
-SceneGraph49P graph(VehicleFrameState49W& s) noexcept {return {s.nodes,vehicleFrameNodeCount49W};}
+SceneGraph49P graph(VehicleFrameState49W& s) noexcept {return {s.nodes,s.sceneNodeCount};}
 bool frameDomain(const VehicleFrameState49W& s,const VehicleFrameBindings49W& b) noexcept {
     if(std::fegetround()!=FE_TONEAREST||s.phase!=VehicleFramePhase49W::PostPackedBytes50S||
        s.fields.vehicle58||s.fields.vehicle3C||b.visual.extra1C0Present||b.visual.extra1C4Present||
        !s.bodies.main.domain.secondBodyPresent||!s.bodies.secondary.scenePresent||
        s.bodies.main.domain.sceneObserverCount||s.bodies.secondaryDomain.sceneObserverCount||
        b.mainDomain.rootObserverPresent19C||b.secondaryDomain.rootObserverPresent19C)return false;
-    if(!validateSceneGraph49P({const_cast<SceneNode49P*>(s.nodes),vehicleFrameNodeCount49W}))return false;
+    if(!validVehicleSceneCount49W(s,b)||!validateSceneGraph49P({const_cast<SceneNode49P*>(s.nodes),s.sceneNodeCount}))return false;
     const I ids[]={b.lifecycle.main190,b.lifecycle.hidden198,b.lifecycle.physical19C,
         b.lifecycle.model1B4,b.lifecycle.right1B8,b.lifecycle.left1BC};
-    for(unsigned i=0;i<6;++i){if(!validIndex(ids[i])||node(s,ids[i]).parent180!=I::none)return false;
+    for(unsigned i=0;i<6;++i){if(!validIndex(ids[i])||static_cast<unsigned>(ids[i])>=s.sceneNodeCount||node(s,ids[i]).parent180!=I::none)return false;
         for(unsigned j=0;j<i;++j)if(ids[i]==ids[j])return false;}
     return true;
 }

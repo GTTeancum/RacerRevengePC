@@ -17,9 +17,12 @@ bool equal(const char* a,const char* b,std::size_t n) noexcept {
 }
 bool readMotionNodeBindings49O(const PsgHierarchyView49O& view,
     const char* text,std::size_t bytes,MotionNodeBindings49O& output,
-    MotionBindingDiagnostic49O& diagnostic) noexcept {
+    MotionBindingDiagnostic49O& diagnostic,MotionBindingMissingNode49O missingNode) noexcept {
     diagnostic={MotionBindingError49O::none,0};
-    const auto fail=[&](MotionBindingError49O e,std::size_t p){diagnostic={e,p};return false;};
+    const auto fail=[&](MotionBindingError49O e,std::size_t p){diagnostic.error=e;diagnostic.offset=p;return false;};
+    if(missingNode!=MotionBindingMissingNode49O::reject&&
+       missingNode!=MotionBindingMissingNode49O::sourceDiagnosticSkip)
+        return fail(MotionBindingError49O::limit,0);
     if(!text||!bytes||bytes>16384)return fail(MotionBindingError49O::limit,0);
     if(!view.nodeCount||view.nodeCount>64)return fail(MotionBindingError49O::hierarchy,0);
     std::int32_t parents[64]{};
@@ -60,7 +63,17 @@ bool readMotionNodeBindings49O(const PsgHierarchyView49O& view,
         if(!identifier(text+sep+1,comma-sep-1))return fail(MotionBindingError49O::line,sep+1);
         if(comma<end&&!identifier(text+comma+1,end-comma-1))return fail(MotionBindingError49O::line,comma+1);
         std::uint32_t row=0;for(;row<result.count;++row)if(equal(result.rows[row].name,text+start,sep-start))break;
-        if(row==result.count)return fail(MotionBindingError49O::unknownNode,start);
+        if(row==result.count){
+            if(missingNode==MotionBindingMissingNode49O::reject)
+                return fail(MotionBindingError49O::unknownNode,start);
+            // Retained00153218-001533F0: lookup returnsFF at153240;153248
+            // falls through to diagnostic153254, then15325C branches directly
+            // to1533F0. The rename/+38/+3C stores are never reached.
+            if(!diagnostic.skippedUnknownNodes)diagnostic.firstUnknownOffset=start;
+            ++diagnostic.skippedUnknownNodes;
+            if(p<bytes)++p;
+            continue;
+        }
         auto& target=result.rows[row];std::memset(target.name,0,sizeof target.name);
         for(std::size_t j=sep+1;j<comma;++j)target.name[j-sep-1]=upper(text[j]);
         target.translationFlag38=comma<end&&upper(text[comma+1])=='T';target.listedFlag3c=true;

@@ -106,7 +106,7 @@ ResetVisibilityResult50EY attachResetVisibility50EY(ResetVisibilityWorld50EY& sp
     if(!bound(space,owner)||owner.membership7F0.attached||!visibilityZoneC30||
        visibilityZoneC30>space.lifecycle.zoneCount)return fail(Status::Binding,0x21687cu);
     const auto main=static_cast<std::int32_t>(bindings.lifecycle.main190);
-    if(main<0||static_cast<std::uint32_t>(main)>=vehicleFrameNodeCount49W||
+    if(!validVehicleSceneCount49W(frame,bindings)||main<0||static_cast<std::uint32_t>(main)>=frame.sceneNodeCount||
        !(frame.nodes[main].sceneFlags190&1u)||frame.shape.type88!=0u||
        frame.shape.registrationE0!=0u||
        std::memcmp(&frame.shape.world80,&frame.nodes[main].world100,sizeof(BodyMatrix48G)))
