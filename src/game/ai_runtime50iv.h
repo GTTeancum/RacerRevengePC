@@ -19,11 +19,18 @@ struct AiRuntimeState50IV {
     std::uint32_t managerIndexFE0=0,racer60=0,fieldFE4=0;
     float engineDifference5C=0.f;
     bool initialized=false;
-    std::uint64_t dispatchedFrames=0,brakingFrames=0,startupFrames=0,ordinaryFrames=0;
+    std::uint64_t dispatchedFrames=0,brakingFrames=0,startupFrames=0,ordinaryFrames=0,boundBrakeSteerFrames=0;
 };
 // This owner is populated by native1B0400 over the actual manager field. CCC
 // and CC4 must never be copied from HOST standings/centerline progress.
 struct AiRaceFields50IV {float remainingCC4=0.f;std::int32_t placeCCC=0;bool bound=false;};
+// Process-lifetime original scalar owners. Source startup clears433CB0;
+//16FFE0 lazily clears/increments the 64-bit navigation call counter433CC0.
+struct AiApplicationGlobals50IV {
+    std::uint32_t paused433CB0=0;
+    std::uint64_t navigationCalls433CC0=0;
+    bool navigationCounterInitialized=false;
+};
 struct AiRuntimeInput50IV {
     const TrackNavigation50EU* mapFF0=nullptr;
     const TrackNavigation50EU* aiFF4=nullptr;
@@ -34,7 +41,8 @@ struct AiRuntimeInput50IV {
     std::size_t racerCount=0;
     const AiRaceFields50IV* raceFields=nullptr;
     const LapTimingFields50ID* timing=nullptr;
-    std::uint32_t actualZoneOrdinal48=0,managerHumanCount34=0,global433CB0=0;
+    AiApplicationGlobals50IV* applicationGlobals=nullptr;
+    std::uint32_t actualZoneOrdinal48=0,managerHumanCount34=0;
     std::uint8_t settings1125C=0;
     float aiTrackLength3C=0.f;
     bool raceOwnersBound=false,settings188F60Nonzero=false;
@@ -67,13 +75,19 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
     if(!ai.initialized||frame.fields.vehicle58!=1u||!frame.fields.nativeAiOwnersBound50IV||
        frame.phase!=VehicleFramePhase49W::PostPlayer)return stop(0x16e8c0);
     parameters.rates.x=4.f; //16E8D4 owns live B94 even when dispatch is skipped.
-    if(in.global433CB0||frame.fields.vehicle3C||!(frame.fields.applicationByte58&2u))return true;
+    if(!in.applicationGlobals)return stop(0x16e950);
+    if(in.applicationGlobals->paused433CB0||frame.fields.vehicle3C||!(frame.fields.applicationByte58&2u))return true;
     if(!in.mapFF0||!in.aiFF4||!in.orientationTrackBC||!in.aiMetadata||!in.tuning||
        !in.tuning->bound||!in.racers||!in.racerCount||ai.managerIndexFE0>=in.racerCount||
        !in.raceOwnersBound||!in.raceFields||!in.raceFields->bound||!in.timing)return stop(0x16e9c0);
     auto&m=frame.bodies.main;const auto&scene=frame.nodes[static_cast<unsigned>(bindings.lifecycle.main190)];
     const auto&bodyScene=frame.nodes[static_cast<unsigned>(bindings.animation.bodyScene288)];
     const float*position=scene.localC0.v+12;const float*forward=scene.localC0.v+8;
+    if(!in.applicationGlobals->navigationCounterInitialized){
+        in.applicationGlobals->navigationCalls433CC0=0;
+        in.applicationGlobals->navigationCounterInitialized=true;
+    }
+    ++in.applicationGlobals->navigationCalls433CC0;
     if(!advanceAiNavigation50IV(*in.mapFF0,*in.aiFF4,*in.aiMetadata,previousCA0,position,
         in.actualZoneOrdinal48,progress,lapCC8,frame.fields.impactFlagsCD8,ai.navigation,ai.boost,receipt.driving))return stop(receipt.driving.sourcePC);
     const auto current=progress.reset.vehicleC80,previous=progress.vehicleC84;
@@ -84,7 +98,7 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
     for(unsigned axis=0;axis<3;++axis){orientation.localForward340_288[axis]=bodyScene.localC0.v[8+axis];
         orientation.currentC80Position[axis]=in.orientationTrackBC->track.nodes[current].position[axis];
         orientation.previousC84Position[axis]=in.orientationTrackBC->track.nodes[previous].position[axis];}
-    //433C70 is original immutable(0,0,0,1); XYZ used by this prefix is zero.
+    //3C9410..3C946C initializes433C70 to(0,0,0,1); XYZ fallback is zero.
     AiOrientationReceipt50IV oriented{};
     if(!updateAiOrientation50IV(orientation,ai.state,oriented,receipt.prefix))return stop(receipt.prefix.sourcePC);
     AiNoCombatInput50IV stateInput{};

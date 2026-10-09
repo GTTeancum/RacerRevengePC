@@ -1459,12 +1459,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  read.context.previousFlagsB9C=s.bodies.main.controls.player.flagsB9C;
  if(s.fields.vehicle58==1u){
   runNative([&]{return readAiVehicleFrame50IV(s,x.bindings,read.preparedFactor,x.workspace,x.diagnostic);},"original AI frame entry");
-  AiRuntimeInput50IV aiInput{};aiInput.mapFF0=navigationMap.get();aiInput.aiFF4=navigationAI.get();
+  AiRuntimeInput50IV aiInput{};aiInput.applicationGlobals=&native_ai50IV::applicationNoise().ai;aiInput.mapFF0=navigationMap.get();aiInput.aiFF4=navigationAI.get();
   aiInput.orientationTrackBC=navigationAI.get();aiInput.aiMetadata=&originalAiMetadata;aiInput.tuning=&originalAiTuning;
   aiInput.racers=originalAiSession.observed;aiInput.racerCount=raceRacerCount;
   aiInput.raceFields=&originalAiSession.fields[originalAi.managerIndexFE0];aiInput.timing=&lapContinuity.timing;
   aiInput.actualZoneOrdinal48=mainMembership.storage.links[0].zone?mainMembership.storage.links[0].zone-1u:0u;
-  aiInput.managerHumanCount34=1u;aiInput.settings1125C=3u;
+  aiInput.managerHumanCount34=1u;
+  // Source fresh profile17E000/17E060 selects three laps in1125C low5.
+  aiInput.settings1125C=3u;
   aiInput.aiTrackLength3C=originalAiMetadata.trackLength3C;
   aiInput.raceOwnersBound=originalAiSession.rankBound&&mainMembership.storage.links[0].zone!=0;
   if(!driveOriginalAi50IV(s,x.bindings,x.parameters,navigationProgress,navigationCA0,
@@ -1573,7 +1575,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      s.nodes[static_cast<unsigned>(x.bindings.animation.bodyScene288)].localC0.v+12,12);
  addCounter50DU(navigationCA0Copies);
  PostPlayerAt217DE0_49K post{};post.player=s.bodies.main.controls.player;post.bindingContext.configurationEntryNonzero=x.configurationEntryNonzero;
- if(s.fields.vehicle58==1u)runNative([&]{return bindAiVehicleFrame50IV(s,x.bindings,x.parameters,x.workspace,x.diagnostic);},"original AI native binding");
+ if(s.fields.vehicle58==1u){
+  runNative([&]{return bindAiVehicleFrame50IV(s,x.bindings,x.parameters,x.workspace,x.diagnostic);},"original AI native binding");
+  if(m.components.bindings.aeroBrakeEC==1.f&&m.controls.player.raw.values[0]!=0.f)
+   ++originalAi.boundBrakeSteerFrames;
+ }
  else runNative([&]{return bindVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::PlayerAndBaseBefore217DE0),post,x.workspace,x.diagnostic);},"persistent binding");
  const BoostInput50FK boostInput{m.frameFactor,m.components.engine.smoothedDrive[0],
      m.components.engine.smoothedDrive[1],m.cachedSpeed34,m.controls.player.flagsB9C,
@@ -3517,7 +3523,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      std::cerr<<"original_ai slot="<<originalAi.managerIndexFE0<<" vehicle58="<<s.fields.vehicle58
          <<" state="<<originalAi.state.aiStateFE8<<" CB8="<<lapContinuity.timing.timeCB8
          <<" startup="<<originalAi.startupFrames<<" ordinary="<<originalAi.ordinaryFrames
-         <<" brake_commands="<<originalAi.brakingFrames<<" target="<<originalAiReceipt.desiredSpeed
+         <<" brake_commands="<<originalAi.brakingFrames<<" bound_brake_steer="<<originalAi.boundBrakeSteerFrames
+         <<" steer="<<m.controls.player.raw.values[0]<<" aeroBrakeEC="<<m.components.bindings.aeroBrakeEC
+         <<" aeroDrive="<<m.components.bindings.aeroDrive[0]<<'/'<<m.components.bindings.aeroDrive[1]<<" target="<<originalAiReceipt.desiredSpeed
          <<" B7C/B80="<<m.controls.player.actionB7C<<'/'<<m.controls.player.actionB80
          <<" B94="<<x.parameters.rates.x<<" C80="<<navigationProgress.reset.vehicleC80
          <<" CC4="<<originalAiSession.fields[originalAiSlot].remainingCC4

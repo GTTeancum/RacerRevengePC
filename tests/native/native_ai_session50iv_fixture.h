@@ -53,7 +53,7 @@ inline bool rank(Session&session,std::size_t count) noexcept {
 // consumers still use the stable frame.noise address; only serial application
 // entry/exit transports it. It is never stored in a racer snapshot.
 struct ApplicationNoise {
-    CoupledNoiseContext49M state{};bool initialized=false;
+    CoupledNoiseContext49M state{};AiApplicationGlobals50IV ai{};bool initialized=false;
 };
 inline ApplicationNoise& applicationNoise() {static ApplicationNoise owner;return owner;}
 struct NoiseLifetime {
