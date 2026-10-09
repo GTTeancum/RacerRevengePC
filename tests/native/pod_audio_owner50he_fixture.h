@@ -44,10 +44,10 @@ inline bool prepareFromPod01(Owner& out,rr::platform::AudioMixer50HD& mixer,
     try {
         shared::need(!out.prepared()&&voiceCount&&firstVoice<mixer.count()&&
             voiceCount<=mixer.count()-firstVoice,"50HE fresh owner and real mixer voice range required");
-        shared::need(playerRacer60==1||playerRacer60==3,"50HE selected original player identity unsupported");
-        const auto archiveSize=playerRacer60==1?lap_sound50GH::podArchiveBytes:328378u;
-        const auto archiveDigest=playerRacer60==1?lap_sound50GH::podArchiveSha256:
-            "4ad6a07ac02bc9ef65e336777ff27e6823060d333b0a885e99f14f58bd3ee26e";
+        const auto* identity=original_player_identity50IK::find(playerRacer60);
+        shared::need(identity,"50HE selected original player identity unsupported");
+        const auto archiveSize=identity->archiveBytes;
+        const auto archiveDigest=identity->archiveSha256;
         shared::Inputs input;input.capacity=archiveSize;
         auto bytes=input.read(archivePath,archiveSize);
         shared::need(bytes.size()==archiveSize&&shared::sha256(bytes)==archiveDigest,

@@ -1,6 +1,6 @@
 # Current native race validation
 
-## WIP: failed Clegg pause test; fix untested
+## WIP: combined future UI and pause fix untested
 
 The 2026-10-09 16:18 UTC Clegg/menu attempt compiled four units, reused 189,
 and linked successfully. Source `b180cd8708d1d99a1756bf5dd200ce0263f98e4b`
@@ -14,6 +14,11 @@ was loaded for window output, while the headless pause backdrop also uses it.
 The current correction loads it for the host HUD and explicitly rejects a
 retained backdrop if it is missing. This correction is **UNBUILT/UNTESTED**.
 No retry has run. The next central slot is no earlier than 17:18:11.176531 UTC.
+
+This separate candidate also contains the unbuilt all-eight human selector,
+next-session Audio Options and native race/current-lap HUD readouts. None of
+those combined changes has run; the failed attempt above used the narrower
+Anakin/Clegg candidate. They require independent validation before promotion.
 
 ## Earlier validated mode1 baseline
 

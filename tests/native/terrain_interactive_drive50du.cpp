@@ -1,4 +1,5 @@
 #include "runtime_allocations50fl.h"
+#include "original_racer_selection50ij.h"
 #include "native_racer_bank50hn_fixture.h"
 #include "native_racer_contact_bank50hw_fixture.h"
 #include "native_racer_rig50hw_fixture.h"
@@ -155,21 +156,24 @@ enum class SessionExit50DU { Quit, Restart, Checkpoint };
 SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const char* capturePath,
     const recovery50FI::Plan* checkpointInput,recovery50FI::Plan& checkpointOutput,
     lap_drive50GJ::Continuity& lapContinuity,std::uint64_t sessionIndex,
-    HostMonotonicClock50ID& applicationClock,bool startAtMenu,std::uint32_t& selectedRacer60){
+    HostMonotonicClock50ID& applicationClock,bool startAtMenu,std::uint32_t& selectedRacer60,
+    const rr::game::RaceAudioSettings50IC& effectiveAudioSettings,
+    rr::game::RaceAudioSettings50IC& selectedAudioSettings){
  // Capture the immutable loaded identity before any front-menu choice changes
  // the next-session selection. The alternate-player integration consumes it.
  const std::uint32_t playerRacer60=selectedRacer60;
- require50DU(playerRacer60==1u||playerRacer60==3u,"unsupported selected racer identity");
+ // Pending choices only apply on an explicit cold Start/Restart.
+ const auto loadedAudioSettings=effectiveAudioSettings;
+ const auto* selectedOriginal=original_racer_selection50IJ::findByRacer60(playerRacer60);
+ require50DU(selectedOriginal&&selectedOriginal->humanJoinImplemented,"unsupported selected racer identity");
  require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest setup failed");
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceEnabled=!(raceSetting&&std::string(raceSetting)=="0");
  // Source21079C retains constructor a1;21081C stores vehicle60 and210820/24
  // formats the original Pod%02d resource prefix. Native bank slot0 is a role.
- require50DU(playerRacer60==1u||playerRacer60==3u,
-     "human selection requires authenticated POD01 or POD03");
  const bool playerUsesRosterRig=playerRacer60!=1u;
- require50DU(raceEnabled||!playerUsesRosterRig,"POD03 selection requires the native race");
- const std::string playerPodId=playerUsesRosterRig?"POD03":"POD01";
+ require50DU(raceEnabled||!playerUsesRosterRig,"alternate original selection requires the native race");
+ const std::string playerPodId(selectedOriginal->podId);
  const auto playerArchive=std::filesystem::path("work/native/project/disc/PODS")/
      playerPodId/(playerPodId+".RES");
  const char* raceModeSetting=std::getenv("RR_RACE_MODE");
@@ -267,7 +271,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
   require50DU(selectedSlot<raceRacerCount,"selected original racer absent from retained roster");
   // Swap complete authenticated entries, preserving all eight distinct racers.
-  // Clegg's former opponent slot receives Anakin's own original resources.
+  // The selected pod's former opponent slot receives Anakin's original resources.
   if(selectedSlot)std::swap(roster.at("racers").at(0),roster.at("racers").at(selectedSlot));
   for(std::size_t racer=0;racer<raceRacerCount;++racer){
    const auto& entry=roster.at("racers").at(racer);
@@ -631,7 +635,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const std::filesystem::path audioRoot=suppliedAudioRoot?suppliedAudioRoot:
       "work/native/project/disc/AUDIO";
   std::string audioError;
-  require50DU(liveAudio->prepare("work/native/project/disc",audioRoot,audioError,playerRacer60),
+  require50DU(liveAudio->prepare("work/native/project/disc",audioRoot,audioError,playerRacer60,loadedAudioSettings),
       audioError.empty()?"native audio bank preparation failed":audioError.c_str());
   auto* materialMixer=liveAudio->mixerForMaterialOwner();
   auto* audioGroups=liveAudio->groupsForProviders();
@@ -685,7 +689,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::cerr<<"Audio bank ready/missing/unsupported/invalid "<<bank.ready<<'/'<<bank.missing
       <<'/'<<bank.unsupported<<'/'<<bank.invalid<<" of "<<bank.clips.size()<<'\n';
   const auto& audioConfig=liveAudio->audioSettings();
-  std::cerr<<"Audio fresh original levels effects/music/character/Dax "
+  std::cerr<<"Audio configured original levels effects/music/character/Dax "
       <<audioConfig.effects11020<<'/'<<audioConfig.music11024<<'/'
       <<audioConfig.character11028<<'/'<<audioConfig.announcer1102C
       <<"; no saved audio preferences loaded; "<<(mode1Enabled?"source mode1":"HOST mode2")
@@ -1840,7 +1844,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
 
  // Cold-selected player publications borrow stable owners through shutdown.
- // The original POD01 fixture resources never supply a POD03 draw or cable.
+ // POD01 fixture resources never supply another original racer's draw or cable.
  auto& playerDrawAssets=playerUsesRosterRig?racerVisuals[0]->drawAssets:drawAssets;
  const auto playerCableBindings=playerUsesRosterRig?racerCables[0]->bindings():cableBindings;
  std::vector<platform::VehicleWindowMaterialUv50DS> playerFlameUvs;
@@ -2229,10 +2233,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   constexpr std::uint64_t stepNs=16000000,maximumSleepNs=4000000;
   require50DU(hostClock.initialize(monotonicNow50DU(),stepNs,4),"fixed-step host clock setup failed");
   platform::GameHostInput50ER hostInput{};auto& input=hostInput.keys;
-  // Root enables this only together with complete POD03 native/audio loading.
+  // Root enables this only together with complete selected-original loading.
   // A menu-only merge must never advertise a racer that still loads POD01.
   constexpr bool alternateHumanReady50IF=true;
-  platform::HostSessionMenu50IF sessionMenu(startAtMenu,raceEnabled,playerRacer60,alternateHumanReady50IF);
+  platform::HostSessionMenu50IF sessionMenu(startAtMenu,raceEnabled,playerRacer60,
+      alternateHumanReady50IF,audioEnabled,loadedAudioSettings,selectedAudioSettings);
   std::uint64_t drawnMenuRevision=0;
   std::int32_t drawnMenuWidth=0,drawnMenuHeight=0;
   bool menuImagePublished=false,suppressResumeKeys=false,forceSceneRender=false;
@@ -2253,6 +2258,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<",\"audio_bank_id\":"<<reinterpret_cast<std::uintptr_t>(&liveAudio->bank())
        <<",\"menu\":"<<(sessionMenu.open()?"true":"false")<<",\"page\":"<<unsigned(sessionMenu.page())
        <<",\"loaded_racer\":"<<playerRacer60<<",\"selected_racer\":"<<selectedRacer60
+       <<",\"audio_enabled\":"<<(audioEnabled?"true":"false")
+       <<",\"audio_pending\":"<<(sessionMenu.audioChangesPending()?"true":"false")
+       <<",\"audio_effective\":["<<loadedAudioSettings.effects11020<<','<<loadedAudioSettings.music11024
+       <<','<<loadedAudioSettings.character11028<<','<<loadedAudioSettings.announcer1102C<<']'
+       <<",\"audio_requested\":["<<selectedAudioSettings.effects11020<<','<<selectedAudioSettings.music11024
+       <<','<<selectedAudioSettings.character11028<<','<<selectedAudioSettings.announcer1102C<<']'
        <<",\"tick\":"<<completedFrames<<",\"mixed_frames\":"<<liveAudio->mixedFrames()<<"}\n";
   };
   auto captureCommitted=[&](){
@@ -2306,7 +2317,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       <<" speed-limit-to-body-scale="<<courseTuning.speedLimitToBodyScale
       <<"; not original AI. Manual W/S/Up/Down takes over. No automatic reset.\n";
   if(headlessLive)std::cerr<<"Stdin host commands include capture, checkpoint, restart, pause, resume, menu, and quit. "
-      "Menus use down/up Up, Down, Enter, Escape. Restart destroys this session and repeats the authored-grid cold setup.\n";
+      "Menus use down/up Up, Down, Left, Right, Enter, Escape. Audio edits apply on Start/Restart only. "
+      "Restart destroys this session and repeats the authored-grid cold setup.\n";
   reportUiState("ready");
   for(;;){
    phase_timing50GK::Scope inputTiming(phaseTiming,phase_timing50GK::Phase::Input);
@@ -2331,6 +2343,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(input.focused&&!input.minimized&&!input.eventBudgetExhausted){
     const auto action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready);
     selectedRacer60=sessionMenu.selectedRacer60();
+    selectedAudioSettings=sessionMenu.selectedAudioSettings();
     if(action==platform::HostSessionMenu50IF::Result::Restart||
        action==platform::HostSessionMenu50IF::Result::Quit){
      composePacket(false,input);sampleController();
@@ -2727,6 +2740,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      hud.raceLapTarget=race.config.lapTarget;hud.racePlace=race.racers[0].place;
      hud.raceRacerCount=race.racerCount;
      if(mode1Enabled&&lapContinuity.timingInitialized){
+      // Read the committed native fields, never HOST raceSeconds/finishSeconds.
+      // The one-human manager closes on finish and leaves CB8 at that boundary.
+      // Renderer omits CB0 after finish because it has restarted the next lap.
+      hud.raceClocksValid=true;
+      hud.raceElapsedSeconds=lapContinuity.timing.timeCB8;
+      hud.currentLapSeconds=lapContinuity.timing.timeCB0;
       // Render only source-completed entries after the accepted world/timing
       // commit. CB0 has already restarted the next lap, including at finish.
       hud.completedLapTimesValid=true;
@@ -2959,6 +2978,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
              <<m.components.root.body.position.v[1]<<','<<m.components.root.body.position.v[2]
              <<" left/right drive "<<drive.engineDrive[0]<<'/'<<drive.engineDrive[1]
              <<" brake "<<drive.aeroBrakeEC
+             <<" native_cached_speed34_internal "<<m.cachedSpeed34
              <<" boost held/state/active "<<controller.buttons().records[boostButtonCode].held
              <<'/'<<boostState.vehicle64<<'/'<<m.selectedEngineFlags.engine34
              <<" boost heat/duration "<<boostState.heat7C<<'/'<<boostState.duration6C
@@ -3150,12 +3170,17 @@ int main(int argc,char**argv){try{
      "RR_START_MENU must be 0 or 1");
  bool startAtMenu=startMenuSetting?std::string(startMenuSetting)=="1":!headlessLive;
  std::uint32_t selectedRacer60=1; // Persist only explicit next-session front-menu selection.
+ // In-memory host settings only. Checkpoint recovery retains effective levels;
+ // explicit Start/Restart alone commits the requested configuration.
+ auto selectedAudioSettings=rr::game::freshOriginalAudioSettings50IC();
+ auto effectiveAudioSettings=selectedAudioSettings;
  std::uint64_t sessionIndex=0;
  for(;;){
   const auto exit=runSession50DU(argv[1],headlessLive,headlessLive?argv[3]:nullptr,
       useCheckpoint?&activeCheckpoint:nullptr,nextCheckpoint,lapContinuity,sessionIndex,
-      applicationClock,startAtMenu,selectedRacer60);
+      applicationClock,startAtMenu,selectedRacer60,effectiveAudioSettings,selectedAudioSettings);
   if(exit==SessionExit50DU::Quit)break;
+  if(exit==SessionExit50DU::Restart)effectiveAudioSettings=selectedAudioSettings;
   require50DU(sessionIndex<std::numeric_limits<std::uint64_t>::max()-1,"audio session index exhausted");
   ++sessionIndex;
   startAtMenu=false; // An explicit restart/start immediately enters its fresh session.

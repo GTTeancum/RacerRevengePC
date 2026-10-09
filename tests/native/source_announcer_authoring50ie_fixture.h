@@ -2,6 +2,7 @@
 // Cold metadata only. This does not decode PCM, create mixer voices, select a
 // live event, or attach the unfinished announcer owner to the native frame.
 #include "pod_materials50ed_fixture.h"
+#include "original_player_identity50ik_fixture.h"
 #include "../../src/assets/audio_assets50hc.h"
 #include "../../src/game/shared_announcer50ie.h"
 #include <charconv>
@@ -59,27 +60,24 @@ inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std
     namespace d=pod_materials50ed_fixture::detail;
     try {
         d::Inputs input;input.capacity=16384;
-        d::need(playerRacer60==1||playerRacer60==3,"50IJ named announcer player identity unsupported");
-        const auto podBytes=playerRacer60==1?2403u:2496u;
-        const char* podFile=playerRacer60==1?"AUDIO/SPEECH/DAX/INRACE/POD01ANN.INI":
-            "AUDIO/SPEECH/DAX/INRACE/POD03ANN.INI";
-        const char* podDigest=playerRacer60==1?
-            "8c4f9b759c8fe933ab85341eff4d42e45e2c391e14f05ccad01238d04139a591":
-            "a3e18679511e73adc664978a0d75d334d710b9f7d0cdd2a53cde1e1b7383f7f7";
+        const auto* identity=original_player_identity50IK::find(playerRacer60);
+        d::need(identity,"50IK named announcer player identity unsupported");
+        const auto podBytes=identity->announcerBytes;
         const auto generic=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/GEN_ANN.INI",11704);
-        const auto pod=input.read(discRoot/podFile,podBytes);
+        const auto pod=input.read(original_player_identity50IK::announcerPath(discRoot,*identity),podBytes);
         const auto percentages=input.read(discRoot/"AUDIO/SPCHPCT.INI",255);
         d::need(generic.size()==11704&&d::sha256(generic)==
             "24adbcb8784b20fab3d1f97650ffcb3bf12d0c3846b84b7f2477796dfbdcf6ab","50IE original GEN_ANN.INI differs");
-        d::need(pod.size()==podBytes&&d::sha256(pod)==podDigest,"50IE original selected named announcer differs");
+        d::need(pod.size()==podBytes&&d::sha256(pod)==identity->announcerSha256,
+            std::string("50IE original selected named announcer differs: ")+identity->podId);
         d::need(percentages.size()==255&&d::sha256(percentages)==
             "24c2967388a31d04761fb11208faaae43a4ae7b9b88b40291bf64daf195c018c","50IE original SPCHPCT.INI differs");
         const std::string_view pct(reinterpret_cast<const char*>(percentages.data()),percentages.size());
         d::need(pct.find("DaxGenericPercent=0.80f")!=pct.npos&&pct.find("DaxSpeechDelay=7.0f")!=pct.npos,
             "50IE original announcer fields absent");
-        // Clegg authors an additional Track Favorite Event30. Preserve its
-        // file's true count while selecting only the represented source keys.
-        auto g=detail::events(generic,150),p=detail::events(pod,playerRacer60==1?29u:30u);
+        // Original POD01/POD11 have29 events; other retained pods also author
+        // Track Favorite30. Parse the true count, retaining represented keys.
+        auto g=detail::events(generic,150),p=detail::events(pod,identity->announcerEvents);
         Authoring next;next.parameters={.80f,7.f};next.cues.reserve(54);
         for(unsigned key=33;key<=51;++key)next.cues.push_back({0,key,g[key-1]});
         for(unsigned key=7;key<=15;++key)next.cues.push_back({playerRacer60,key,p[key-1]});

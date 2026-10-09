@@ -311,6 +311,8 @@ bool validateCableFrame(const game::PodCableMesh50FD& mesh, VehicleWindowDiagnos
 // glyphs, two panel rectangles and eight highlights fits below 8192 quads.
 // Completed timing adds fewer than 1200 quads: four duration values with at
 // most ten digits (12 runs each), punctuation, and their fixed labels.
+// Live clocks add fewer than 360 quads: two ten-digit durations, punctuation,
+// and the fixed RACE / LAP TIME labels. The same 8192-quad bound is retained.
 constexpr U hostHudMaximumQuads = 8192;
 static_assert(maxVehicleWindowStandings50DS <= 9, "standings rank glyph requires a single-digit field");
 constexpr std::uint64_t hudGlyph(U a, U b, U c, U d, U e, U f, U g) noexcept {
@@ -446,15 +448,16 @@ struct HostHudGeometry {
     }
     void standingsPanel(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
         if (!input.standingsCount) return;
-        // Keep every existing HUD anchor and scale unchanged. Only this added
-        // panel contracts when the viewport cannot fit it between the top race
-        // readout and bottom heat/damage panel, or beside the right route cue.
+        // Leave a four-cell gap below the race readout, including optional
+        // clocks. Only this panel contracts when the viewport cannot fit it
+        // above the bottom heat/damage panel or beside the right route cue.
         const float hudScale = scale;
         const float panelWidth = 222.f, standingsHeight = 22.f + 11.f * float(input.standingsCount);
         const float timingHeight = input.completedLapTimesValid ?
             30.f + 11.f * float(input.completedLapTimeCount) : 0.f;
         const float panelHeight = standingsHeight + timingHeight;
-        const float top = 44.f * hudScale;
+        const float clockHeight = input.raceClocksValid ? (input.raceFinished ? 14.f : 28.f) : 0.f;
+        const float top = (44.f + clockHeight) * hudScale;
         const float availableHeight = float(height) - top - 68.f * hudScale;
         const float availableWidth = float(width) - 68.f * hudScale;
         if (availableHeight <= 0.f || availableWidth <= 0.f) return;
@@ -509,9 +512,10 @@ struct HostHudGeometry {
     }
     bool build(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
         count = 0; overflow = false;
+        const float clockHeight = input.raceClocksValid ? (input.raceFinished ? 14.f : 28.f) : 0.f;
         scale = width >= 960 && height >= 540 ? 2.f : 1.f;
         scale = std::min(scale, std::min(float(width) / 176.f,
-            float(height) / (input.raceEnabled ? 112.f : input.lapCountValid ? 100.f : 72.f)));
+            float(height) / (input.raceEnabled ? 112.f + clockHeight : input.lapCountValid ? 100.f : 72.f)));
         inverseWidth = 2.f / float(width); inverseHeight = 2.f / float(height);
         rectangle(0.f, 0.f, 160.f, 56.f, 0x617589);
         rectangle(1.f, 1.f, 158.f, 54.f, 0x0A111B);
@@ -526,8 +530,8 @@ struct HostHudGeometry {
         bar(43.f, input.rightDamage01, 0xEF7767);
         if (input.raceEnabled) {
             const float y = 72.f - float(height) / scale;
-            rectangle(0.f, y, 168.f, 32.f, 0x617589);
-            rectangle(1.f, y + 1.f, 166.f, 30.f, 0x0A111B);
+            rectangle(0.f, y, 168.f, 32.f + clockHeight, 0x617589);
+            rectangle(1.f, y + 1.f, 166.f, 30.f + clockHeight, 0x0A111B);
             char laps[32]{}, place[32]{}, countdown[32]{};
             std::snprintf(laps, sizeof(laps), "LAP %u/%u", input.raceLap, input.raceLapTarget);
             std::snprintf(place, sizeof(place), "POS %u/%u", input.racePlace, input.raceRacerCount);
@@ -538,6 +542,23 @@ struct HostHudGeometry {
                 input.raceGo ? "GO" : input.wrongWay ? "WRONG WAY" : "RACING";
             text(6.f, y + 19.f, status, input.raceFinished || input.raceGo ? 0xA8E6B4 :
                 input.wrongWay ? 0xFF6556 : 0xA8C5DE);
+            if (input.raceClocksValid) {
+                const auto clock = [&](float rowY, float seconds) noexcept {
+                    // These live fields are not CC0's quantized completed laps.
+                    // Truncate for presentation; never advance a source clock.
+                    const U centiseconds = static_cast<U>(double(seconds) * 100.0);
+                    char value[20]{};
+                    std::snprintf(value, sizeof(value), "%u:%02u.%02u", centiseconds / 6000u,
+                        (centiseconds / 100u) % 60u, centiseconds % 100u);
+                    text(66.f, rowY, value, 0xEDF3F8);
+                };
+                text(6.f, y + 33.f, "RACE", 0xA8C5DE);
+                clock(y + 33.f, input.raceElapsedSeconds);
+                if (!input.raceFinished) {
+                    text(6.f, y + 47.f, "LAP TIME", 0xA8C5DE);
+                    clock(y + 47.f, input.currentLapSeconds);
+                }
+            }
         } else if (input.lapCountValid) {
             // Completed count plus optional caller-supplied direction warning.
             // Same fixed batch, top-left opposite NEXT; at most 143 quads.
@@ -2656,6 +2677,14 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             return fail(d, VehicleWindowError50DS::frame, "native race HUD counters/status outside admitted bounds");
         if (hud.raceResultsReady && (!hud.raceEnabled || !hud.raceFinished || hud.raceCountdown || hud.raceGo))
             return fail(d, VehicleWindowError50DS::frame, "host results presentation requires a sealed human finish");
+        if (hud.raceClocksValid) {
+            const auto validSeconds = [](float value) noexcept {
+                return std::isfinite(value) && value >= 0.f && value <= maxVehicleWindowLapSeconds50DS;
+            };
+            if (!hud.raceEnabled || !validSeconds(hud.raceElapsedSeconds) ||
+                (!hud.raceFinished && !validSeconds(hud.currentLapSeconds)))
+                return fail(d, VehicleWindowError50DS::frame, "native race clocks outside admitted presentation bounds");
+        }
         if (hud.completedLapTimesValid) {
             if (!hud.raceEnabled || !hud.lapCountValid || !hud.standingsCount ||
                 hud.raceLapTarget > maxVehicleWindowLapTimes50DS ||

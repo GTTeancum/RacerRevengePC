@@ -26,7 +26,7 @@ struct PodSpeechReceipt50HG {
     bool audible=false,emitted=false;
     std::uint32_t randomDraws=0,sourceSite=0;
 };
-// Exact Pod01/POD03 count domains. Actual counts must be authenticated by coldloader;
+// Exact count domains of the eight retained originals. Authenticate selected counts cold;
 // this function does not silently replace absent authoring with defaultcounts.
 // Source2C1170 initializes SIX rotating counters with shared308030 draws in
 // lowdamage/wall/passed/attacked/passing/attacking order. No private seed/RNG.

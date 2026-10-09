@@ -33,6 +33,8 @@ std::uint16_t scancode(Token key) noexcept {
     if (matches(key, "s")) return 22;
     if (matches(key, "up")) return 82;
     if (matches(key, "down")) return 81;
+    if (matches(key, "left")) return 80;
+    if (matches(key, "right")) return 79;
     if (matches(key, "r")) return 21;
     if (matches(key, "space")) return 44;
     if (matches(key, "shift") || matches(key, "lshift") || matches(key, "leftshift"))

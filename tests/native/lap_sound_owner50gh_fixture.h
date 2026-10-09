@@ -3,6 +3,7 @@
 // response. The explicitly disabled native provider is host policy. It never
 // opens a device, loads sample bytes, or reports successful playback.
 #include "pod_materials50ed_fixture.h"
+#include "original_player_identity50ik_fixture.h"
 #include "../../src/assets/import_decode48c.h"
 #include <array>
 #include <cstddef>
@@ -221,10 +222,10 @@ inline bool prepareDisabledFromPod01(Owner& out, DisabledAudioProvider& provider
     try {
         shared::need(!out.prepared() && !provider.prepared() && !provider.count_,
             "50GH requires a fresh owner and explicit disabled provider");
-        shared::need(playerRacer60==1||playerRacer60==3,"50GH selected original player identity unsupported");
-        const auto archiveSize=playerRacer60==1?podArchiveBytes:328378u;
-        const auto archiveDigest=playerRacer60==1?podArchiveSha256:
-            "4ad6a07ac02bc9ef65e336777ff27e6823060d333b0a885e99f14f58bd3ee26e";
+        const auto* identity=original_player_identity50IK::find(playerRacer60);
+        shared::need(identity,"50GH selected original player identity unsupported");
+        const auto archiveSize=identity->archiveBytes;
+        const auto archiveDigest=identity->archiveSha256;
         shared::Inputs input; input.capacity = archiveSize;
         const auto archiveBytes = input.read(archivePath, archiveSize);
         shared::need(archiveBytes.size()==archiveSize&&shared::sha256(archiveBytes)==archiveDigest,

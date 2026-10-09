@@ -1,8 +1,9 @@
 #pragma once
-// Bounded original2C2C20 owner for authentic Pod01/POD03 requests3..8/12. Effects
+// Bounded original2C2C20 owner for the eight retained racers' requests3..8/12. Effects
 // are synchronous provider calls; resumable phases retain already-returned
 // effects/RNG if a later provider is unavailable. No host speech policy here.
 #include <array>
+#include "original_racer_selection50ij.h"
 #include <cfenv>
 #include <cmath>
 #include <cstdint>
@@ -121,9 +122,9 @@ inline bool beginAnnouncerRequest50IE(const AnnouncerRequest50IE&r,const Announc
     if(c.phase!=AnnouncerPhase50IE::Idle&&c.phase!=AnnouncerPhase50IE::Done)return false;
     // Cold providers authenticate the selected human's actual named bank.
     // Constructor21079C/21081C/210820 ties racer60 to original Pod%02d, not
-    // the host's array position. This bounded join admits POD01 and POD03.
+    // the host's array position. This join admits only the eight retained IDs.
     if(!((r.type>=3&&r.type<=8)||r.type==12)||
-        (r.racer60!=1&&r.racer60!=3)||r.variant>2)return false;
+        !original_racer_selection50IJ::findByRacer60(r.racer60)||r.variant>2)return false;
     c={};c.request=r;c.gate=g;c.priority=r.type==12?1:9;c.phase=AnnouncerPhase50IE::Gate;return true;
 }
 // Source2C2DF0 ->2C2C20 ->2C4910/4840/4AB0. A provider returning false leaves

@@ -260,6 +260,13 @@ struct VehicleWindowHostHud50DS {
     std::uint32_t completedLapTimeCount = 0;
     float completedLapSeconds[maxVehicleWindowLapTimes50DS]{};
     float bestLapSeconds = 0.f;
+    // Optional live native timing: CB8 is this racer's elapsed manager time;
+    // CB0 is the current lap. No HOST double or summed lap times substitute.
+    // Enabled values must be finite [0,maxVehicleWindowLapSeconds50DS], a
+    // presentation bound only. Current-lap seconds are ignored after finish:
+    // source CB0 has already restarted and is not the completed final lap.
+    bool raceClocksValid = false;
+    float raceElapsedSeconds = 0.f, currentLapSeconds = 0.f;
     // Optional complete field, already in the race owner's committed order.
     // Zero count disables it. Otherwise count must equal raceRacerCount and
     // fit the eight-row bound; indices form one permutation and place is 1..N.

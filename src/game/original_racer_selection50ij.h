@@ -13,16 +13,17 @@ struct Entry {
     std::uint32_t racer60;
     std::string_view podId,name,retainedPodJson;
     bool humanJoinImplemented;
+    const char* menuLabel;
 };
 inline constexpr std::array<Entry,8> entries{{
-    {1,"POD01","Anakin Skywalker","pod01/pod.json",true},
-    {3,"POD03","Clegg","pod03/pod.json",true},
-    {4,"POD04","Dudbolt","pod04/pod.json",false},
-    {7,"POD07","Gasgano","pod07/pod.json",false},
-    {8,"POD08","Mars Guo","pod08/pod.json",false},
-    {9,"POD09","Mawhonic","pod09/pod.json",false},
-    {10,"POD10","Alder Bedo","pod10/pod.json",false},
-    {11,"POD11","Ody Mandell","pod11/pod.json",false}
+    {1,"POD01","Anakin Skywalker","pod01/pod.json",true,"RACER: ANAKIN SKYWALKER"},
+    {3,"POD03","Clegg","pod03/pod.json",true,"RACER: CLEGG"},
+    {4,"POD04","Dudbolt","pod04/pod.json",true,"RACER: DUDBOLT"},
+    {7,"POD07","Gasgano","pod07/pod.json",true,"RACER: GASGANO"},
+    {8,"POD08","Mars Guo","pod08/pod.json",true,"RACER: MARS GUO"},
+    {9,"POD09","Mawhonic","pod09/pod.json",true,"RACER: MAWHONIC"},
+    {10,"POD10","Alder Bedo","pod10/pod.json",true,"RACER: ALDER BEDO"},
+    {11,"POD11","Ody Mandell","pod11/pod.json",true,"RACER: ODY MANDELL"}
 }};
 inline constexpr const Entry* findByRacer60(std::uint32_t value) noexcept {
     for(const auto& entry:entries)if(entry.racer60==value)return &entry;
@@ -61,7 +62,7 @@ inline constexpr bool cancel(Selection& state) noexcept {
 }
 // Build the slot -> original roster row permutation once at cold start. All
 // eight originals occur exactly once. Runtime slot0 is human; racer60 remains
-// the source ID, including POD01 when it moves into Clegg's former bot slot.
+// the source ID, including POD01 when it moves into the selected pod's bot slot.
 inline constexpr bool buildRosterOrder(std::uint32_t humanRacer60,
     std::array<std::size_t,entries.size()>& out) noexcept {
     if(!canSelectHuman(humanRacer60))return false;

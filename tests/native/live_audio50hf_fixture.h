@@ -52,14 +52,19 @@ public:
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
 
     // Cold only, once per owner, before any gameplay work. All authenticated
-    // selected requests remain present, including unavailable records:60 for
-    // POD01 and48 for POD03. Both use the same sixty semantic provider slots.
+    // selected requests remain present, including unavailable records.
+    // POD01 has60 authored semantic slots; the other seven have48. All use the
+    // same sixty-slot layout, with immutable PCM aliases resolved only once.
     // discRoot supplies retained originals; audioRoot is the explicit AUDIO
     // directory. No search of another computer or guessed external path occurs.
     bool prepare(const std::filesystem::path& discRoot,const std::filesystem::path& audioRoot,
-        std::string& error,std::uint32_t playerRacer60=1) {
+        std::string& error,std::uint32_t playerRacer60=1,
+        const rr::game::RaceAudioSettings50IC& audioSettings=rr::game::freshOriginalAudioSettings50IC()) {
         if(prepareAttempted_||closed_) {error="50HF preparation requires a fresh stable owner";return false;}
         prepareAttempted_=true;
+        if(!rr::game::announcer_callbacks50IC_detail::settings(audioSettings)) {
+            error="50HF original audio configuration must be integer 0..100";return false;
+        }
         try {
             if(!selected_player_audio50IJ::read(discRoot,playerRacer60,selected_,error)||
                !rr::assets::loadAudioBank50HC(audioRoot,selected_.requests,bank_,error))return false;
@@ -69,18 +74,20 @@ public:
             if(!mixer_.initialize(voices_.data(),voices_.size(),sampleRate)) {
                 error="50HF bounded mixer initialization failed";return false;
             }
-            // This client has no loaded user audio preferences. Its one shared
-            // fresh audio configuration deliberately uses original reset values
-            // effects50/music100/character80/Dax80; it does not change11258.
-            if(!groups_.initialize(mixer_,rr::game::freshOriginalAudioSettings50IC())||
+            // The session owner supplies one immutable effective configuration.
+            // Original reset defaults remain the default for other callers.
+            // Next-session menu edits never mutate this owner's restore target.
+            if(!groups_.initialize(mixer_,audioSettings)||
                !race_audio_groups50IC::bindGameplayCatalog(groups_,providerFirstVoice).complete||
                !race_audio_groups50IC::bindProviderRange(groups_,
                    race_audio_groups50IC::ProviderRole::LapPodEvent,lapFirstVoice,lapVoiceCount)) {
                 error="50IC source group ownership initialization failed";return false;
             }
+            const auto* identity=original_player_identity50IK::find(playerRacer60);
+            if(!identity){error="50IK original player identity unavailable";return false;}
             if(!provider_.prepare(bank_,mixer_,providerFirstVoice,error,&selected_.catalog)||
                !pod_audio50HE::prepareFromPod01(lap_,mixer_,bank_,lapFirstVoice,lapVoiceCount,
-                   error,discRoot/(playerRacer60==1?"PODS/POD01/POD01.RES":"PODS/POD03/POD03.RES"),
+                   error,original_player_identity50IK::archivePath(discRoot,*identity),
                    playerRacer60))return false;
             prepared_=true;error.clear();return true;
         }catch(const std::exception& e){error=e.what();return false;}

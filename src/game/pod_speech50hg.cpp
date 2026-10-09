@@ -14,9 +14,11 @@ bool finite(float v) noexcept{return std::isfinite(v);}
 bool countsValid(const PodSpeechCounts50HG& c) noexcept {
     const bool pod01=c.lowDamage==4&&c.wallHit==4&&c.passed==6&&c.attacked==5&&
         c.passing==6&&c.attacking==6&&c.death==4&&c.win==3&&c.lose==2;
-    const bool pod03=c.lowDamage==2&&c.wallHit==3&&c.passed==3&&c.attacked==3&&
+    // POD03/04/07/08/09/10/11 author exactly these same counts, authenticated
+    // per selected archive. Their actual category filenames remain distinct.
+    const bool otherRetained=c.lowDamage==2&&c.wallHit==3&&c.passed==3&&c.attacked==3&&
         c.passing==4&&c.attacking==4&&c.death==3&&c.win==3&&c.lose==3;
-    return pod01||pod03;
+    return pod01||otherRetained;
 }
 std::uint32_t draw(std::uint32_t& raw) noexcept {
     raw=raw*0x41c64e6du+0x3039u;return raw&0x7fffffffu;
