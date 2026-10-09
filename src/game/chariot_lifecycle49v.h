@@ -20,6 +20,10 @@ struct ChariotLifecycleInput49V {
     std::uint32_t vehicle58, aeroD8, vehicleCFC, vehicleD00;
     float frameFactor, objectD34_10;
     VisualVector49R impactBA0;
+    // Live app28C->B4 byte58, observed from its actual owner. Consumed only
+    // by vehicle58=1 at21BFDC. An unbound constructor zero is not provenance.
+    std::uint8_t applicationByte58;
+    bool applicationByte58Bound;
 };
 struct ChariotLifecycleWorkspace49V {
     SceneNode49P nodes[maxSceneNodes49P];
@@ -37,8 +41,8 @@ struct ChariotLifecycleDiagnostic49V {
     ChariotLifecycleError49V error;
     std::uint32_t sourceStage;
 };
-// Complete ordinary21A660 through its original return, after engine response
-// and before later child cache refresh/physics. Requires vehicle58=40=0 and
+// Bounded21A660 through its original return, after engine response and before
+// later child cache refresh/physics. Requires vehicle58=0 or1, vehicle40=0 and
 // exactly one of (P,V)=(nonzero,0),(0,nonzero),(nonzero,nonzero), finite positive
 // duration848 and finite nonnegative frameFactor. (0,0) has no stack260 producer.
 // Main cached34, local80 XYZ, local angularB4, current probe10C/1D0 and state40
@@ -53,7 +57,12 @@ struct ChariotLifecycleDiagnostic49V {
 // The remaining flag bytes and all unmodified canonical body fields survive.
 // Blend reads the physical cached world directly, uses old elapsed/duration,
 // rebuilds the source orthogonal basis, publishes, then advances elapsed; only
-// updated elapsed>duration clears83C. The ordinary speed tail runs afterward.
+// updated elapsed>duration clears83C. The source selector runs afterward.
+// Ordinary58=0 uses cached speed. AI58=1 consumes bound applicationByte58 bit1:
+// clear selects physical, activates only when838=0, then forces838=1/83C=0;
+// set seeds virtual only when83C=0, then writes838=0/83C=1. If83C was already
+// nonzero it preserves838 and all seed fields. Prefix response/blend always
+// precedes this selector, including when the AI selector will clear83C.
 //
 // The supplied graph is the actual current49P forest with49U's distinct binding
 // constraints. No49M childless, observer, scene-ready or phase guard is weakened:

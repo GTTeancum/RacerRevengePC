@@ -307,8 +307,10 @@ bool updateChariotLifecycle49V(const ChariotLifecycleInput49V& input,
     ChariotLifecycleDiagnostic49V& d) noexcept {
     d={};
     if(input.phase!=ChariotLifecyclePhase49V::afterEngineResponseBeforePhysics||
-        main.vehicleState40||input.vehicle58||(!physical&&!s.vehicle83C))
+        main.vehicleState40||input.vehicle58>1u||(!physical&&!s.vehicle83C))
         return fail(d,ChariotLifecycleError49V::context,0x21a660);
+    if(input.vehicle58==1u&&!input.applicationByte58Bound)
+        return fail(d,ChariotLifecycleError49V::context,0x21bfdc);
     if(std::fegetround()!=FE_TONEAREST)return fail(d,ChariotLifecycleError49V::rounding_mode,0x21a660);
     if(!validateSceneGraph49P(graph)||!bindings(graph,b))
         return fail(d,ChariotLifecycleError49V::graph,0x21a660);
@@ -373,27 +375,35 @@ bool updateChariotLifecycle49V(const ChariotLifecycleInput49V& input,
             return fail(d,ChariotLifecycleError49V::graph,0x21b9c4);
     }
     RR_CHARIOT_LIFECYCLE49V_STAGE(0x21beb8u);
-    if(in.cachedBodySpeed34<effective){
+    const bool ai=input.vehicle58==1u;
+    //21BFDC..21BFF4 extracts bit1 with DSLL32(30),DSRL32(31).
+    // This is the actual manager flag, not the vehicle's own mode word.
+    if(ai)RR_CHARIOT_LIFECYCLE49V_STAGE(0x21bfdcu);
+    const bool selectPhysical=ai?!(input.applicationByte58&2u):in.cachedBodySpeed34<effective;
+    if(selectPhysical){
         if(!w.vehicle838){
-            RR_CHARIOT_LIFECYCLE49V_STAGE(0x21bef8u);
+            RR_CHARIOT_LIFECYCLE49V_STAGE(ai?0x21c008u:0x21bef8u);
             if(!detail::copyLocal49U(g,b.physical19C,node(g,b.model1B4).localC0))
-                return fail(d,ChariotLifecycleError49V::graph,0x21bf00);
-            RR_CHARIOT_LIFECYCLE49V_STAGE(0x21bf08u);
+                return fail(d,ChariotLifecycleError49V::graph,ai?0x21c010u:0x21bf00u);
+            RR_CHARIOT_LIFECYCLE49V_STAGE(ai?0x21c018u:0x21bf08u);
             resetSecondaryActivation49V(w.secondary,w.supplement,globals);
-            RR_CHARIOT_LIFECYCLE49V_STAGE(0x21bf1cu);
+            RR_CHARIOT_LIFECYCLE49V_STAGE(ai?0x21c02cu:0x21bf1cu);
             copySecondaryMainVelocities49V(main.components.root,mainLanes.velocity70W,
                 mainLanes.angularVelocityB0W,w.secondary);
             w.state.elapsed84C=0.0f;w.vehicle838=1;
         }
+        //21C05C/21C064 also run when the physical body was already active.
+        // In particular an existing blend is terminated here, after its prefix.
+        if(ai){w.vehicle838=1;w.state.vehicle83C=0;}
     }else if(!w.state.vehicle83C){
-        RR_CHARIOT_LIFECYCLE49V_STAGE(0x21bf58u);
+        RR_CHARIOT_LIFECYCLE49V_STAGE(ai?0x21c074u:0x21bf58u);
         if(!detail::copyLocal49U(g,b.hidden198,node(g,b.model1B4).localC0))
-            return fail(d,ChariotLifecycleError49V::graph,0x21bf60);
+            return fail(d,ChariotLifecycleError49V::graph,ai?0x21c07cu:0x21bf60u);
         detail::SceneVectorContext49U context{0.0f};M relative{};
         if(!detail::position49U(g,b.model1B4,b.container194,context,w.state.response.position)||
             !detail::relativeMatrix49U(g,b.model1B4,b.container194,context,relative)||
             !detail::matrixQuaternion49U(relative,w.state.response.orientation))
-            return fail(d,ChariotLifecycleError49V::arithmetic,0x21bf70);
+            return fail(d,ChariotLifecycleError49V::arithmetic,ai?0x21c08cu:0x21bf70u);
         w.state.response.linearVelocity=zero;w.state.response.angularVelocity=zero;
         w.vehicle838=0;w.state.vehicle83C=1;
     }

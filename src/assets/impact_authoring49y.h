@@ -6,6 +6,7 @@ struct ImpactAuthoringToken49Y {
     std::uint32_t sectionOffset, sectionBytes, keyOffset, keyBytes, valueOffset, valueBytes;
 };
 struct EnvironmentImpactProvenance49Y { ImpactAuthoringToken49Y fields[10]; };
+struct AIEnvironmentImpactProvenance49Y { ImpactAuthoringToken49Y fields[11]; };
 struct FinalImpactAuthoring49Y { float threshold64, increment68; };
 struct FinalImpactProvenance49Y { ImpactAuthoringToken49Y fields[2]; };
 struct DefenseValue49Y { float value; bool present; };
@@ -22,6 +23,8 @@ bool parseImpactNumber49Y(const char*,std::size_t,float&,
 // byte/line/section/key bounds and ASCII/case/duplicate rules as49N. Unknown
 // values remain unconsumed; duplicate unknown keys/sections still reject.
 // EnvDamage requires all10keys, in source order hitXL..XS,pointsXL..XS.
+// The ordinary reader leaves tuning.aiEnvironmentMultiplierBound=false; its
+// zero-initialized+60 is deliberately not a usable AI tuning value.
 // Defense fields are independently optional: missing remains absent, never
 // supplies a default, resolves upgrades or selects a live/profile CF0.
 // Output and optional provenance are unchanged on failure. Input/output/audit
@@ -30,6 +33,13 @@ bool parseImpactNumber49Y(const char*,std::size_t,float&,
 bool readEnvironmentImpact49Y(const char*,std::size_t,
     rr::game::StaticImpactTuning49Y&,PodPhysicsDiagnostic49N&,
     EnvironmentImpactProvenance49Y* = nullptr) noexcept;
+// AI reader requires the same10 EnvDamage keys and the separate PodDamage
+// AIEnvPointsMultiplier key. Original1AA8E8 stores this value to tuning+60.
+// All11 values and provenance commit together, with+60 explicitly bound.
+// Missing or malformed AI authoring fails, never substituting a multiplier1.
+bool readAIEnvironmentImpact49Y(const char*,std::size_t,
+    rr::game::StaticImpactTuning49Y&,PodPhysicsDiagnostic49N&,
+    AIEnvironmentImpactProvenance49Y* = nullptr) noexcept;
 // Requires both PodDamage.FinalDamageThreshold/FinalDamageIncrement keys.
 // Same bounded/atomic contract as environment authoring; no default values.
 bool readFinalImpactAuthoring49Y(const char*,std::size_t,FinalImpactAuthoring49Y&,

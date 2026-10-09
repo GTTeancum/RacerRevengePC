@@ -59,7 +59,7 @@ bool admit(const S&s,const VehicleFrameBindings49W&b,VehicleFrameDiagnostic49W&d
  // Preserve the old disabled admission; enabled348 requires explicit cold opt-in.
  if(!s.terrainProbe.enabled&&m.probe100)return fail(d,E::Admission,0);
  if(s.terrainProbe.enabled&&(m.probe100!=1u||s.terrainProbe.stage>3u||c.main.components.probe348.field1E8>16u))return fail(d,E::Admission,0x1b1800);
- if(std::fegetround()!=FE_TONEAREST||s.fields.vehicle58||s.fields.vehicle3C||s.fields.vehicle834||c.main.vehicleState40||c.main.applicationActive11C||m.body320!=1||m.bodyChildCount||b.mainDomain.firstComponentChildPresent18||m.sceneObserverCount||!m.sceneAttached||m.sceneHasParent||!m.bodyEnabled||!m.secondBodyPresent||m.override3C||m.resetRequested||m.probe120Present||m.probe124Present||z.body320!=1||z.registrationMask!=2||z.bodyChildCount||b.secondaryDomain.firstComponentChildPresent18||z.sceneObserverCount||z.sceneHasParent||!c.secondary.scenePresent||!c.secondary.enabled||s.shape.type88||s.shape.registrationE0||!emptyRoute(b.mainDomain)||!emptyRoute(b.secondaryDomain))return fail(d,E::Admission,0);
+ if(std::fegetround()!=FE_TONEAREST||s.fields.vehicle58>1u||(s.fields.vehicle58==1u&&!s.fields.nativeAiOwnersBound50IV)||s.fields.vehicle3C||s.fields.vehicle834||c.main.vehicleState40||c.main.applicationActive11C||m.body320!=1||m.bodyChildCount||b.mainDomain.firstComponentChildPresent18||m.sceneObserverCount||!m.sceneAttached||m.sceneHasParent||!m.bodyEnabled||!m.secondBodyPresent||m.override3C||m.resetRequested||m.probe120Present||m.probe124Present||z.body320!=1||z.registrationMask!=2||z.bodyChildCount||b.secondaryDomain.firstComponentChildPresent18||z.sceneObserverCount||z.sceneHasParent||!c.secondary.scenePresent||!c.secondary.enabled||s.shape.type88||s.shape.registrationE0||!emptyRoute(b.mainDomain)||!emptyRoute(b.secondaryDomain))return fail(d,E::Admission,0);
  const SceneGraph49P g{const_cast<SceneNode49P*>(s.nodes),s.sceneNodeCount};
  if(!validVehicleSceneCount49W(s,b)||!validateSceneGraph49P(g))return fail(d,E::Graph,0);
  for(unsigned i=0;i<s.sceneNodeCount;++i){const auto&n=s.nodes[i];const auto&t=b.topology[i];if(n.parent180!=t.parent180||n.firstChild184!=t.firstChild184||n.nextSibling188!=t.nextSibling188)return fail(d,E::Graph,0);}
@@ -192,7 +192,31 @@ bool respondEnabledTerrain50FP(S& s,const VehicleFrameBindings49W& bindings) noe
 }
 } // namespace
 ContactEffects49W contactEffects49W(const S&s) noexcept {const auto&c=s.bodies;const auto&m=c.mainSphere;const auto&z=c.secondary;return {effects(c.main.components.root,m.velocity70W,m.angularVelocityB0W,m.force180W,m.torque190W,s.mainExtra,c.main.components.body20C),effects(z.root,z.velocity70W,z.angularVelocityB0W,z.force180W,z.torque190W,s.secondaryExtra,z.body20C),c.joint,s.fields.impactBA0};}
+bool readAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,float factor,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ if(s.fields.vehicle58!=1u||!s.fields.nativeAiOwnersBound50IV)return fail(d,E::Admission,0x16e8c0);
+ if(!start(s,b,P::Ready,w,d))return false;
+ if(!std::isfinite(factor)||factor<0.f||factor>fp(0x3d75c28f))return fail(d,E::Input,0x16e8c0);
+ auto&m=w.next.bodies.main;m.frameFactor=factor;m.substepIndex=0;
+ m.phase=MainBodyPhase49K::AwaitingPostPlayer;w.next.bodies.phase=CoupledBodyPhase49M::AwaitingPostPlayer;
+ return commit(s,w,P::PostPlayer);
+}
+bool bindAiVehicleFrame50IV(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ if(s.fields.vehicle58!=1u||!s.fields.nativeAiOwnersBound50IV)return fail(d,E::Admission,0x217de0);
+ if(!start(s,b,P::PostPlayer,w,d))return false;
+ if(!(s.bodies.main.controls.player.flagsB9C&0x80u)||p.rates.x!=4.f)return fail(d,E::Admission,0x16e8d4);
+ auto&m=w.next.bodies.main;const auto&actions=m.controls.player;
+ ControlBindingInput48W context{};context.mode58Nonzero=true;context.vehicleState40=m.vehicleState40;
+ context.bodyCachedSpeed34=m.cachedSpeed34;context.actionB7C=actions.actionB7C;context.actionB80=actions.actionB80;
+ context.flagsB9C=actions.flagsB9C;context.source7D0=s.fields.damage7D0;context.source7D4=s.fields.damage7D4;
+ ControlBoundStep48W bound{};
+ if(!stepAndBindControlInputs48W(actions.raw,m.controls.bound.control.shaping.smoothedChannel0D28,
+     m.controls.bound.control.filtered,p.rates,m.frameFactor,context,p.control,m.components.bindings,bound))return fail(d,E::Input,0x217de0);
+ m.controls.bound=bound;m.components.bindings=bound.bindings;
+ m.phase=MainBodyPhase49K::AwaitingPostBase;w.next.bodies.phase=CoupledBodyPhase49M::AwaitingPostBase;
+ return commit(s,w,P::BeforeGraphics);
+}
 bool readVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const FrameReader49K&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ if(s.fields.vehicle58)return fail(d,E::Admission,0x1a15c0);
  if(!start(s,b,P::Ready,w,d))return false;
  if(!std::isfinite(x.preparedFactor)||x.preparedFactor<0||x.preparedFactor>fp(0x3d75c28f))return fail(d,E::Input,0x1a15c0);
  auto&m=w.next.bodies.main;auto c=x.context;
@@ -203,6 +227,7 @@ bool readVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const FrameReader49
  return commit(s,w,P::PostPlayer);
 }
 bool bindVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const PreservingStage49W&cut,const PostPlayerAt217DE0_49K&x,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ if(s.fields.vehicle58)return fail(d,E::Admission,0x217de0);
  if(!start(s,b,P::PostPlayer,w,d)||!preserving(cut,PreservingCut49W::PlayerAndBaseBefore217DE0,d))return false;
  if(!(s.bodies.main.controls.player.flagsB9C&0x80u)||!(x.player.flagsB9C&0x80u)||x.bindingContext.vehicleState40||x.bindingContext.mode58Nonzero)return fail(d,E::Admission,0x217de0);
  auto&m=w.next.bodies.main;auto&c=m.controls.bound.control;RR_VEHICLE_FRAME49W_STAGE(0x217de0);
@@ -226,7 +251,7 @@ bool graphicsVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
  VehicleVisualDiagnostic49R vd{};RR_VEHICLE_FRAME49W_STAGE(0x21c120);
  if(!updateVehicleVisual49R(v,p.visual,b.visual,graph(r),r.visual,r.visualShared,r.noise,w.visual,vd))return fail(d,E::Visual,vd.sourceStage);
  project(r,b);
- const ChariotLifecycleInput49V l{ChariotLifecyclePhase49V::afterEngineResponseBeforePhysics,f.vehicle58,std::uint32_t(c.bindings.aeroTriggerD8),f.vehicleCFC,f.vehicleD00,dt,f.objectD34_10,f.impactBA0};
+ const ChariotLifecycleInput49V l{ChariotLifecyclePhase49V::afterEngineResponseBeforePhysics,f.vehicle58,std::uint32_t(c.bindings.aeroTriggerD8),f.vehicleCFC,f.vehicleD00,dt,f.objectD34_10,f.impactBA0,f.applicationByte58,true};
  ChariotLifecycleDiagnostic49V ld{};RR_VEHICLE_FRAME49W_STAGE(0x21a660);
  if(!updateChariotLifecycle49V(l,p.lifecycle,b.lifecycle,graph(r),m,r.bodies.mainSphere,r.bodies.secondary,r.secondarySupplement,p.activation,r.bodies.vehicle838,r.lifecycle,r.lifecycleShared,r.visualShared.zero434630,r.noise,w.lifecycle,ld))return fail(d,E::Lifecycle,ld.sourceStage);
  project(r,b);return commit(s,w,P::PostGraphics);
@@ -430,6 +455,9 @@ bool integrateVehicleMain49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
    //223030 calls the real28BBB0 getter. Enabled terrain may have dirtied190.
    if(r.terrainProbe.enabled){if(!refreshSceneWorld49P(graph(r),b.lifecycle.main190))return fail(d,E::Graph,0x223030);project(r,b);}
    StaticImpactInput49Y in{};in.vehicle40=m.vehicleState40;in.vehicle58=r.fields.vehicle58;
+   in.vehicleCFC=r.fields.vehicleCFC;in.partnerState=r.impactSupplement.partnerState;
+   in.damage7D0=r.fields.damage7D0;in.damage7D4=r.fields.damage7D4;in.damage7DC=r.fields.damage7DC;
+   in.aiOwnersBound=r.fields.nativeAiOwnersBound50IV;
    in.bodyContactPartnerCount20C=c.body20C;in.flagsCD8=r.fields.impactFlagsCD8;
    in.sceneFlags190=node(r,b.lifecycle.main190).sceneFlags190;
    in.readyMainScene190=node(r,b.lifecycle.main190).world100;

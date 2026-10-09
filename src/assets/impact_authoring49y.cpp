@@ -16,9 +16,10 @@ bool parseImpactNumber49Y(const char* text,std::size_t bytes,float& output,std::
 namespace {
 struct Mapping { const char* section; const char* key; };
 constexpr Mapping env[]={{"EnvDamage","hitXL"},{"EnvDamage","hitL"},{"EnvDamage","hitM"},{"EnvDamage","hitS"},{"EnvDamage","hitXS"},{"EnvDamage","pointsXL"},{"EnvDamage","pointsL"},{"EnvDamage","pointsM"},{"EnvDamage","pointsS"},{"EnvDamage","pointsXS"}};
+constexpr Mapping aiEnv[]={{"EnvDamage","hitXL"},{"EnvDamage","hitL"},{"EnvDamage","hitM"},{"EnvDamage","hitS"},{"EnvDamage","hitXS"},{"EnvDamage","pointsXL"},{"EnvDamage","pointsL"},{"EnvDamage","pointsM"},{"EnvDamage","pointsS"},{"EnvDamage","pointsXS"},{"PodDamage","AIEnvPointsMultiplier"}};
 constexpr Mapping finalImpact[]={{"PodDamage","FinalDamageThreshold"},{"PodDamage","FinalDamageIncrement"}};
 constexpr Mapping defense[]={{"BaseAbilities","Defense"},{"MaxAbilities","Defense"},{"DamageRepair","MinDefense"},{"DamageRepair","MaxDefense"}};
-struct Parsed { float values[10]{}; bool present[10]{}; ImpactAuthoringToken49Y tokens[10]{}; };
+struct Parsed { float values[11]{}; bool present[11]{}; ImpactAuthoringToken49Y tokens[11]{}; };
 struct Slice { const char* p; std::size_t n, offset; };
 char lower(char c) noexcept { return c>='A' && c<='Z' ? static_cast<char>(c+('a'-'A')) : c; }
 bool space(char c) noexcept { return c==' ' || c=='\t' || c=='\r'; }
@@ -102,6 +103,14 @@ bool readEnvironmentImpact49Y(const char* text,std::size_t bytes,rr::game::Stati
     rr::game::StaticImpactTuning49Y result{}; EnvironmentImpactProvenance49Y audit{};
     for(unsigned i=0;i<5;++i) {result.thresholds00[i]=p.values[i];result.severities14[i]=p.values[5+i];}
     for(unsigned i=0;i<10;++i) audit.fields[i]=p.tokens[i];
+    output=result; if(provenance) *provenance=audit; return true;
+}
+bool readAIEnvironmentImpact49Y(const char* text,std::size_t bytes,rr::game::StaticImpactTuning49Y& output,PodPhysicsDiagnostic49N& diagnostic,AIEnvironmentImpactProvenance49Y* provenance) noexcept {
+    Parsed p{}; if(!read(text,bytes,aiEnv,11,true,p,diagnostic)) return false;
+    rr::game::StaticImpactTuning49Y result{}; AIEnvironmentImpactProvenance49Y audit{};
+    for(unsigned i=0;i<5;++i) {result.thresholds00[i]=p.values[i];result.severities14[i]=p.values[5+i];}
+    result.aiEnvironmentMultiplier60=p.values[10];result.aiEnvironmentMultiplierBound=true;
+    for(unsigned i=0;i<11;++i) audit.fields[i]=p.tokens[i];
     output=result; if(provenance) *provenance=audit; return true;
 }
 bool readFinalImpactAuthoring49Y(const char* text,std::size_t bytes,FinalImpactAuthoring49Y& output,PodPhysicsDiagnostic49N& diagnostic,FinalImpactProvenance49Y* provenance) noexcept {

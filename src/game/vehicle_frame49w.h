@@ -73,6 +73,8 @@ struct VehicleFrameFields49W {
     float defenseCF0; // current authored/profile-selected Defense, not a default
     float repairCF4; // current authored/profile-selected BaseRepairAmount
     std::uint8_t impactFlagsCD8;
+    // Native admission receipt set only by the original-AI cold/runtime join.
+    bool nativeAiOwnersBound50IV=false;
 };
 // Only previously unrepresented consumer state lives here. Damage7D0..7DC,
 // CFC/D00, partnerDuration10 and directional maxima keep their existing owners.
@@ -202,6 +204,12 @@ struct MovementQueryCompletion50M {
 // The proven player-finish1A36A0 model write may update aero steering100 after
 // the input-only readVehicleFrame49W and before bindVehicleFrame49W first reads
 // parameters; no mid-physics descriptor mutation is admitted.
+// Original AI16E8C0 entry: no DualShock conditioning or player reader. The
+// genuine controller runs between this entry and bindAiVehicleFrame50IV.
+bool readAiVehicleFrame50IV(VehicleFrameState49W&,const VehicleFrameBindings49W&,
+    float preparedFactor,VehicleFrameWorkspace49W&,VehicleFrameDiagnostic49W&) noexcept;
+bool bindAiVehicleFrame50IV(VehicleFrameState49W&,const VehicleFrameBindings49W&,
+    const VehicleFrameParameters49W&,VehicleFrameWorkspace49W&,VehicleFrameDiagnostic49W&) noexcept;
 bool readVehicleFrame49W(VehicleFrameState49W&,const VehicleFrameBindings49W&,
     const FrameReader49K&,VehicleFrameWorkspace49W&,VehicleFrameDiagnostic49W&) noexcept;
 bool bindVehicleFrame49W(VehicleFrameState49W&,const VehicleFrameBindings49W&,

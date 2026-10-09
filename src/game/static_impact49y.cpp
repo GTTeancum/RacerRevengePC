@@ -1,4 +1,5 @@
 #include "static_impact49y.h"
+#include "scalar_minmax48o.h"
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -20,6 +21,7 @@ struct Math {
     float mul(float x,float y) noexcept {read(x);read(y);volatile float z=x*y;return read(z);}
     float sqrt(float x) noexcept {read(x);volatile float z=static_cast<float>(std::sqrt(static_cast<double>(x)));return read(z);}
     float reciprocal(float x) noexcept {read(x);volatile float z=1.0f/x;return read(z);}
+    float maximum(float x,float y) noexcept {read(x);read(y);return detail::scalarMax48O(x,y);}
 };
 float maxFinite() noexcept {const std::uint32_t bits=0x7f7fffffu;float x;std::memcpy(&x,&bits,4);return x;}
 void inverseDirection(const BodyMatrix48G& m,const float* in,float* out,Math& f) noexcept {
@@ -39,7 +41,9 @@ StaticImpactStatus49Y recordStaticImpact49Y(const StaticImpactInput49Y& in,
     const StaticImpactState49Y& state,StaticImpactState49Y& out,float& nextW) noexcept {
     using S=StaticImpactStatus49Y;
     if((in.flagsCD8&1u)||in.vehicle40==3||in.vehicle40==4){out=state;nextW=in.priorVf9W;return S::skipped;}
-    if(in.vehicle58!=0||in.bodyContactPartnerCount20C!=0||!(in.sceneFlags190&1u))return S::unsupported;
+    if(in.vehicle58>1u||in.bodyContactPartnerCount20C!=0||!(in.sceneFlags190&1u))return S::unsupported;
+    const bool ai=in.vehicle58==1u;
+    if(ai&&(!in.aiOwnersBound||(!in.vehicleCFC&&!in.tuning.aiEnvironmentMultiplierBound)))return S::unsupported;
     if(std::fegetround()!=FE_TONEAREST)return S::arithmetic;
     Math f;
     //223078..22309C scalar world magnitude; no vector/hypot replacement.
@@ -54,8 +58,19 @@ StaticImpactStatus49Y recordStaticImpact49Y(const StaticImpactInput49Y& in,
     const float q=dot==0.0f?maxFinite():f.reciprocal(f.sqrt(dot));
     float normal[3];for(unsigned i=0;i<3;++i)normal[i]=f.mul(local[i],q);
     //222798..22281C first reached threshold; unsorted authored values allowed.
-    float chosen=0.0f;
-    for(unsigned i=0;i<5;++i){if(!(magnitude<f.read(in.tuning.thresholds00[i]))){chosen=f.read(in.tuning.severities14[i]);break;}}
+    float chosen=0.0f;unsigned thresholdIndex=5;
+    for(unsigned i=0;i<5;++i){if(!(magnitude<f.read(in.tuning.thresholds00[i]))){chosen=f.read(in.tuning.severities14[i]);thresholdIndex=i;break;}}
+    //2227AC/2227C8/2227E4/222800 branch straight to22286C. The weaker
+    // XS match alone falls through222820; even no match bypasses this gate.
+    if(ai&&thresholdIndex==4u&&in.partnerState){
+        const float first=f.read(in.damage7D0),second=f.read(in.damage7D4);
+        const float pair=f.maximum(second,first);
+        const float third=f.read(in.damage7DC);
+        //223508 retains the source MAX.S third,third before the final MAX.
+        if(f.maximum(pair,f.maximum(third,third))>0.9f)chosen=0.0f;
+    }
+    //22286C..22289C. This multiply also executes for zero chosen severity.
+    if(ai&&!in.vehicleCFC)chosen=f.mul(chosen,in.tuning.aiEnvironmentMultiplier60);
     const float severity=f.mul(chosen,f.sub(1.0f,in.reductionCF0));
     StaticImpactState49Y s=state;
     auto raise=[&](unsigned index,float value){if(f.read(s.directionalD08[index])<value)s.directionalD08[index]=value;};
@@ -66,7 +81,12 @@ StaticImpactStatus49Y recordStaticImpact49Y(const StaticImpactInput49Y& in,
         const float pz=f.mul(severity,normal[2]),py=f.mul(severity,normal[1]),px=f.mul(severity,normal[0]);
         if(local[0]<-0.1f)raise(0,-px);else if(local[0]>0.1f)raise(1,px);
         if(local[1]<-0.1f)raise(3,-py);else if(local[1]>0.1f)raise(2,py);
-        if(local[2]<-0.1f&&normal[2]<-0.75f)raise(4,-pz);
+        if(local[2]<-0.1f&&normal[2]<-0.75f){
+            //22334C compares the old maximum before the AI-specific gate.
+            const float rear=-pz;
+            if(f.read(s.directionalD08[4])<rear&&
+                (!ai||!in.vehicleCFC||normal[2]<-0.85f))s.directionalD08[4]=rear;
+        }
         else if(local[2]>0.1f)raise(5,pz);
     }
     //2233F0..2234C4 independent absolute-coordinate selection; ties keep bits.
