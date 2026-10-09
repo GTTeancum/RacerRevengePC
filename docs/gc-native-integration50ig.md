@@ -2,7 +2,7 @@
 
 The central 2026-10-09 20:19 slot built `3e4b00c4f0ce1f70eb5b6c916c9d84880e6b15bf` and completed one actual TA→GC menu/cold-load/capture sequence with exit 0. The original backslash material/ATM lookup fix was exercised successfully. Capture retained 298 unique frames over 20.0577 seconds; see [current validation](current-validation.md) for scope.
 
-All HOST drivers then stopped at node 7 with status 3 and cross-track error around 185–188 source units; racers bunched up and **no GC lap completed**. The runtime continued updating the native world. This is a successful cold-load/capture result, not complete-track validation. Video export separately failed duration verification and omitted drifted simulation-timed PCM; the original recording remains preserved outside Git.
+All HOST drivers then stopped at node 7 with status 3 and cross-track error around 185–188 source units; racers bunched up and **no GC lap completed**. The runtime continued updating the native world. This is a successful cold-load/capture result, not complete-track validation. The original video export failed duration verification and remains preserved. A separate artifact-only correction verified all 298 frames in a 20.059-second silent MP4 without rerunning the game. Drifted simulation-timed PCM remains separately preserved; synchronized sound is not claimed.
 
 The cold CHARACTER/non-body guard admitted the original owner mapping during GC setup. Specific contact-response correctness still needs focused coverage; no new response algorithm is claimed. See [CHARACTER response admission](gc-character-response50ig.md).
 

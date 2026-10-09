@@ -8,7 +8,7 @@ The 2026-10-09 20:19 central slot built source `3e4b00c4f0ce1f70eb5b6c916c9d8488
 - One expected GC cold transition succeeded. Original animated owners, four compound parts, 553 registered world candidates, six dynamic draws, 76 ATM states and 35 images were reported by the runtime. These observations do not establish every behavior's correctness.
 - Capture retained 298 unique actual frames over 20.0577 seconds, 14.807 captured fps, maximum gap 187.3 ms. The capture controller completed without errors.
 - All HOST course drivers stopped with status 3 at node 7, cross-track about 185–188 source units, and the racers bunched up. **No GC lap completed.** Manual driving, trigger behavior and full-course completion remain unverified.
-- Video export failed its measured-duration check: 19.992 encoded seconds versus the 20.0577-second capture window. Actual PCM was retained separately and omitted from the export because its maximum anchor drift was 141.6 ms (final duration drift about -121.7 ms). No synchronized video-delivery or listening claim follows.
+- The original video export failed duration verification and remains preserved. A separate artifact-only correction retained all 298 frames and verified a 20.059-second silent MP4, with maximum frame-time error 0.632 ms and no new game run. Actual PCM remains separate because its maximum anchor drift was 141.6 ms (final duration drift about -121.7 ms); no synchronized audio or listening claim follows.
 
 Runtime binary SHA-256: `865eba16ee936128e5de06ecdecb130b5be9d0cbb2029b4aae15b7a25290fae1`.
 Only status documentation changed afterward. No extra test, runtime or encoding was performed during this update. Earlier full Clegg/menu and three-lap results below apply to their own source versions.
