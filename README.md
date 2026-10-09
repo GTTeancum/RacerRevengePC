@@ -4,6 +4,8 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
+This branch adds an **UNCOMPILED / UNTESTED HOST trigger option**, disabled unless `RR_GC_HOST_TRIGGERS=1`. [Recovered actions](docs/gc-trigger-source50in.md) retain an unresolved native hit-leaf blocker; [HOST overlap admission](docs/gc-host-triggers50in.md) is explicit approximation. It is separate from the next GC test candidate.
+
 The previous GC candidate built; the new cold admission guard is **UNBUILT / UNTESTED**, and GC gameplay remains unverified. The capture checker stopped on the first TA Main image before driving or GC loading. See [GC status and omissions](docs/gc-native-integration50ig.md); successful runtime coverage below belongs to the earlier Linux baseline.
 
 The Linux prototype includes native rendering, physics, audio, keyboard controls, and an eight-racer development race. Clegg selection through Main, pause/resume, and a 20-second gameplay capture have passed. An earlier mode1 baseline completed a three-lap race with native timing, Dax, music, and completed-lap display. See [current validation](docs/current-validation.md) for scope.

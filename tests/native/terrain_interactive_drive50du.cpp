@@ -78,6 +78,8 @@
 #include "track_runtime_storage50ig_fixture.h"
 #include "track_static_candidates50ig_fixture.h"
 #include "gc_animated_candidates50ig_fixture.h"
+#include "gc_host_triggers50in_fixture.h"
+#include "gc_gate_audio50in_fixture.h"
 #include "gc_dynamic_window50ig_fixture.h"
 #include "gc_atm_window_fixture.h"
 #include "source_grid50ig_fixture.h"
@@ -177,11 +179,20 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const char* trackSelectionError=nullptr;
  const auto* trackSession=track_session_assets50IG::select(rr::platform::hostTrackCode50IM(loadedTrack),trackSelectionError);
  require50DU(trackSession,trackSelectionError?trackSelectionError:"original track admission failed");
+ const char* hostTriggerSetting=std::getenv("RR_GC_HOST_TRIGGERS");
+ require50DU(!hostTriggerSetting||std::string(hostTriggerSetting)=="0"||std::string(hostTriggerSetting)=="1",
+     "RR_GC_HOST_TRIGGERS must be 0 or 1; default is disabled");
+ const bool gcHostTriggersEnabled=trackSession->originalStaticCandidates&&
+     hostTriggerSetting&&std::string(hostTriggerSetting)=="1";
  if(trackSession->originalStaticCandidates){
   const char* incomplete=std::getenv("RR_GC_INCOMPLETE_WORLD");
   require50DU(incomplete&&std::string(incomplete)=="1",
       "GC native world is incomplete: zone11 opening trigger, authored LostAI branch triggers and Gate sound are unjoined; RR_GC_INCOMPLETE_WORLD=1 explicitly accepts these omissions");
-  std::cerr<<"GC INCOMPLETE WORLD: real original track/navigation and both animated model/type1 collision owners are enabled; "
+  if(gcHostTriggersEnabled)std::cerr<<"GC HOST TRIGGERS OPT-IN: original spheres versus actual main/secondary COL root boxes; "
+      "global authored-order scan and query-time samples are HOST policy, not original native entry-hit parity. "
+      "Recovered Gate/LostAI/actions use source bookkeeping; HOST steering may project an incoming AGC edge without changing source C84. "
+      "Native type2-to-sphere leaf ownership is unresolved. This remains incomplete-track support.\n";
+  else std::cerr<<"GC INCOMPLETE WORLD: real original track/navigation and both animated model/type1 collision owners are enabled; "
       "zone11 opening retains its authored inactive state because its Gate trigger is not joined. "
       "Authored LostAI branch triggers and Gate sound are not yet joined. "
       "This is not complete-track support.\n";
@@ -407,6 +418,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(candidates.size()==trackSession->terrainOwners&&ground.owners.size()==candidates.size(),
      "original track binding must cover every retained terrain owner");
  std::unique_ptr<gc_animated_world50IG::Owner> gcAnimatedWorld;
+ // Separate optional HOST world ownership, never part of native query results
+ // or any serial racer snapshot. Defaults retain the inactive original Gate.
+ std::unique_ptr<gc_trigger_authoring50IN::Owner> gcTriggerAuthoring;
+ std::unique_ptr<gc_host_triggers50IN::Owner> gcHostTriggers;
  gc_animated_world50IG::Diagnostic gcAnimationDiagnostic{};
  // Explicit same fresh-session lifetime as the reconstructed native RNG and
  // existing Dax sessionLazy. This is not a claim of original cross-race statics.
@@ -680,6 +695,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  constexpr std::uint32_t applicationWrongWayBypass34C=0;
  lap_drive50GJ::Owner lapOwner;lapOwner.continuity=&lapContinuity;lapOwner.fields=&s.fields;
  auto liveAudio=std::make_unique<live_audio50HF::Owner>();
+ std::unique_ptr<gc_gate_audio50IN::Owner> gcGateAudio; // Dies before its mixer.
  auto raceAudio=std::make_unique<race_audio50HQ::Owner>();
  auto sourceAnnouncer=std::make_unique<source_announcer50IE::Owner>();
  auto raceMusic=std::make_unique<race_music50IE::Owner>();
@@ -718,6 +734,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(raceEnabled)require50DU(materialMixer&&raceAudio->prepare("work/native/project/disc",
       audioRoot,*materialMixer,*audioGroups,*sharedAnnouncer,audioError,playerRacer60),
       audioError.empty()?"original race audio preparation failed":audioError.c_str());
+  if(gcHostTriggersEnabled){
+   gcGateAudio=std::make_unique<gc_gate_audio50IN::Owner>();
+   require50DU(materialMixer&&gcGateAudio->prepare(*materialMixer,*audioGroups,audioRoot,audioError),
+       audioError.empty()?"original GC Gate PCM preparation failed":audioError.c_str());
+   std::cerr<<"GC Gate original BIGDOOR PCM available="<<gcGateAudio->available()
+       <<"; exclusive World4D8 voice126, nonloop immediate request; missing asset is a reported no-op.\n";
+  }
   if(mode1Requested){
    require50DU(materialMixer&&sourceAnnouncer->prepare("work/native/project/disc",audioRoot,
        *materialMixer,*audioGroups,*sharedAnnouncer,sessionLazy,applicationClock,
@@ -1282,6 +1305,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   packetLive=live;
  };
 
+ // Stable bank slot0 is PLAYER, independently of selected original racer60.
+ // This HOST-only visit identity is never copied into canonical navigation.
+ std::size_t courseRacerIndex=0;
  auto applyCourseInput=[&](){
   rr::host::CourseDriverInput50GK command{};
   command.enabled=autoDriveEnabled;command.elapsedSeconds=.016f;
@@ -1290,6 +1316,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   command.yawRate=m.components.root.body.angularVelocity.v[1];
   command.previousNode=navigationProgress.vehicleC84;
   command.currentNode=navigationProgress.reset.vehicleC80;
+  if(gcHostTriggers)require50DU(gcHostTriggers->projectCoursePrevious(courseRacerIndex,*navigationAI,
+      command.currentNode,command.previousNode,command.pose,command.previousNode),
+      "GC HOST LostAI steering input projection failed; source navigation unchanged");
   const bool driving=rr::host::driveCourse50GK(*navigationAI,courseLimits,courseTuning,
       command,courseState,courseOutput,courseDiagnostic);
   require50DU(rr::host::applyCourseThrottlePacket50GK(courseOutput,packet),"host course packet rejected");
@@ -2044,6 +2073,42 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(gcAtm.loadSource(trackSession->archive,*trackMaterialOwner,atmDiagnostic),
       atmDiagnostic.message.empty()?"original GC ATM source bank rejected":atmDiagnostic.message.c_str());
  }
+ if(gcHostTriggersEnabled){
+  require50DU(gcAnimatedWorld&&navigationAI->track.count==195&&navigationMap->track.count==188,
+      "GC LostAI requires AGC195 C80/C84 and separate MGC188 C88/C8C domains");
+  gcTriggerAuthoring=std::make_unique<gc_trigger_authoring50IN::Owner>();
+  std::string triggerError;
+  require50DU(gcTriggerAuthoring->load(trackSession->archive,navigationAI->track.count,
+      liveWorld.zoneCount,triggerError),triggerError.empty()?"original GC trigger authoring rejected":triggerError.c_str());
+  gc_host_triggers50IN::SoundHooks sound{};sound.enabled=audioEnabled;
+  if(audioEnabled){
+   require50DU(gcGateAudio&&gcGateAudio->ready(),"original GC Gate sound owner unavailable");
+   sound.context=gcGateAudio.get();
+   sound.ready=[](void* p)noexcept{return static_cast<gc_gate_audio50IN::Owner*>(p)->ready();};
+   sound.start=[](void* p)noexcept{static_cast<gc_gate_audio50IN::Owner*>(p)->start();};
+   sound.failed=[](void* p)noexcept{return static_cast<gc_gate_audio50IN::Owner*>(p)->failed();};
+  }
+  gcHostTriggers=std::make_unique<gc_host_triggers50IN::Owner>();
+  require50DU(gcHostTriggers->prepare(*gcTriggerAuthoring,*gcAnimatedWorld,
+      raceEnabled?racerBank.count():1u,navigationAI->track.count,sound),"GC HOST trigger owner preparation rejected");
+ }
+ auto observeGcHostRacer=[&](std::size_t racer){
+  if(!gcHostTriggers)return;
+  // acceptLiveQuery copied the successful query's committed prepared matrix.
+  // Original11FA40 overwrites the type2 matrix from scene100; do NOT compose
+  // the loaded COL localMatrix again. These are retained QUERY-TIME bounds,
+  // not newly synthesized end-of-step body geometry or native hit results.
+  const gc_host_triggers50IN::Geometry main{query.resource,query.worldMatrix,true};
+  const gc_host_triggers50IN::Geometry secondary{secondaryQuery.resource,
+      secondaryQuery.worldMatrix,bool(s.bodies.vehicle838)};
+  // Existing committed HOST chase-camera listener, sampled only when available.
+  // No default/body-distance substitute is passed before its first real sample.
+  const Vector3_48C listener{{audioListener.x,0.f,audioListener.z}};
+  const auto status=gcHostTriggers->observeAcceptedRacer(racer,main,secondary,
+      navigationProgress.reset.vehicleC80,audioListenerReady?&listener:nullptr,audioListenerReady?1u:0u);
+  require50DU(status==gc_host_triggers50IN::Status::Complete,
+      "GC HOST trigger observation failed terminally; no callback replay");
+ };
  std::uint32_t sourceApplicationTimestamp=0;
  std::uint64_t gcAnimatedWorldSteps=0;
  auto advanceWorldAnimations=[&](){
@@ -2057,6 +2122,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       gcAnimationLazy,s.animationShared.motion,gcAnimationDiagnostic),
       gcAnimationDiagnostic.message.empty()?"original GC world animation rejected":gcAnimationDiagnostic.message.c_str());
   if(gcAtm.loaded())require50DU(gcAtm.advance(sourceApplicationTimestamp),"original GC ATM time update rejected");
+  // Original trigger service follows the racer and animation groups. The
+  // explicit HOST backend only prunes its admitted contacts at this boundary.
+  if(gcHostTriggers)require50DU(gcHostTriggers->serviceWorld()==gc_host_triggers50IN::Status::Complete,
+      "GC HOST trigger world service failed terminally; no callback replay");
   require50DU(::allocations==before,"successful GC world animation allocated C++ storage");
   ++gcAnimatedWorldSteps;
  };
@@ -2072,6 +2141,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
   opponentAudio->close(); // Release only96..109 before the live mixer closes.
+  gcGateAudio.reset(); // Stop126 before its PCM or shared mixer is released.
   if(!liveAudio->close(audioDiagnostic)){
    std::cerr<<"audio close failed "<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=false;
   }
@@ -2436,6 +2506,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<",\"loaded_track_incomplete\":"<<(loadedTrack==platform::HostTrack50IM::GC?"true":"false")
        <<",\"gc_incomplete_opt_in\":"<<(trackAdmission.gcIncompleteWorld?"true":"false")
        <<",\"gc_mode2_admitted\":"<<(trackAdmission.gcMode2?"true":"false")
+       <<",\"gc_host_trigger_backend\":"<<(gcHostTriggersEnabled?"true":"false")
        <<",\"results_visible\":"<<(humanResultsReady&&!sessionMenu.open()?"true":"false")
        <<",\"results_action\":"<<resultsUi.selectedAction()
        <<",\"results_confirming\":"<<(resultsUi.confirming()?"true":"false")
@@ -2705,6 +2776,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto nativeFrameAllocations=::allocations;
     phase_timing50GK::Scope physicsTiming(phaseTiming,phase_timing50GK::Phase::Physics);
     const bool frameAdvanced=!playerAdvancing||advanceFrame();
+    if(frameAdvanced&&playerAdvancing)observeGcHostRacer(0);
     if(frameAdvanced)require50DU(::allocations==nativeFrameAllocations,
         "successful player physics frame allocated C++ storage");
     if(frameAdvanced&&raceEnabled){
@@ -2716,12 +2788,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      const platform::WindowInput50DQ noKeys{};
      for(std::size_t racer=1;racer<racerBank.count();++racer){
       if(!racerBank.active(racer)||!race_session50HM::simulationAllowed(race,static_cast<std::uint32_t>(racer)))continue;
-      opponentFrame=true;
+      opponentFrame=true;courseRacerIndex=racer;
       try {
        const bool advanced=racerBank.step(racer,true,[&](){
         composePacket(true,noKeys);applyCourseInput();sampleController();
         const auto beforeOpponentFrame=::allocations;
         const bool completed=advanceFrame();
+        if(completed)observeGcHostRacer(racer);
         if(completed)require50DU(::allocations==beforeOpponentFrame,
             "successful opponent physics frame allocated C++ storage");
         return completed;
@@ -2731,8 +2804,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        racerBank.stop(racer);
        std::cerr<<racerNames[racer]<<" stopped: "<<error.what()<<". Other racers continue.\n";
       }
-      opponentFrame=false;
+      opponentFrame=false;courseRacerIndex=0;
      }
+     // A trigger failure is world-terminal, even if an opponent's existing
+     // recovery boundary caught its exception. Never retry a half-fired Gate.
+     if(gcHostTriggers)require50DU(gcHostTriggers->status()==gc_host_triggers50IN::Status::Complete,
+         "GC HOST trigger action failure ended the session");
      advanceWorldAnimations();
      // Exactly one host contact pass after all successful native participants
      // are Ready, before race observations and the single world audio mix.
@@ -3177,6 +3254,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         <<" dynamic_draws/vertices/indices="<<rendererDiagnostic.dynamicWorldDraws<<'/'
         <<rendererDiagnostic.dynamicWorldVerticesUploaded<<'/'<<rendererDiagnostic.dynamicWorldIndices
         <<" atm_unique=76 atm_images=35\n";
+    if(gcHostTriggers){const auto& t=gcHostTriggers->counters();
+     std::cerr<<"GC HOST TRIGGERS RUNTIME: native_entry_parity=0 observations="<<t.acceptedRacerObservations
+         <<" root_overlaps="<<t.rootBoxOverlaps<<" entry_callbacks="<<t.entryCallbacks
+         <<" exit_callbacks="<<t.exitCallbacks<<" lostai_C80_writes="<<t.lostAiWrites
+         <<" gate_activations="<<t.gateActivations<<" sound_requests="<<t.soundRequests
+         <<" sound_culled="<<t.soundCulled<<" sound_disabled="<<t.soundDisabled
+         <<" audio_starts="<<(gcGateAudio?gcGateAudio->counters().starts:0u)
+         <<" audio_unavailable="<<(gcGateAudio?gcGateAudio->counters().unavailable:0u)
+         <<" world_services="<<t.worldServices<<" host_route_projections="<<t.routeProjections
+         <<" changed_driver_inputs="<<t.routeChangedInputs<<" trigger_rng_draws=0 lostai_by_branch=";
+     for(std::size_t i=0;i<t.lostAiByBranch.size();++i)std::cerr<<(i?",":"")<<t.lostAiByBranch[i];
+     std::cerr<<'\n';
+    }
     const auto& drive=m.components.bindings;
     const auto& cockpitCg=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.model1B4)+1].localC0;
     float bodyDistanceSquared=0.f;
