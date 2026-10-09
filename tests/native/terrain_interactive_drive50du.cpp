@@ -736,7 +736,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       audioError.empty()?"native material audio preparation failed":audioError.c_str());
   if(trackSession->originalStaticCandidates){
    //271600 applies actual AUB assignments before the creator publishes A9.
-   for(std::size_t i=0;i<trackBindings.size();++i){const auto& original=ground.owners[trackBindings[i].originalOwner];
+   for(std::size_t i=0;i<trackBindings.size();++i){
+    const auto& binding=trackBindings[i];
+    // Animated CHARACTER owners retain constructor materialA9=0; AUB's
+    // static SCB assignments do not index their sentinel originalOwner.
+    if(binding.animated)continue;
+    require50DU(binding.originalOwner<ground.owners.size(),"GC static material owner index outside authored ground");
+    const auto& original=ground.owners[binding.originalOwner];
     require50DU(rr::assets::applyTrackMaterialAssignments50HI(materialAudio->catalog(),ground.world,
         original.zone,original.ordinal,trackStorage.contactMaterials[i],audioError),
         audioError.empty()?"original GC contact material assignment failed":audioError.c_str());}
