@@ -1,15 +1,17 @@
 # Current native race validation
 
-## GC WIP: TA menu sequence passed; GC cold load failed
+## GC WIP: capture completed; HOST driving stops before a lap
 
-The 2026-10-09 19:19:23 UTC central attempt built source `c310c4ae12d82a55bc6b68efdbfaed7ed5d73eff`: one unit compiled, 192 reused, link exit 0. The sole runtime ran from 19:20:11 to 19:20:28 UTC and exited 1 during GC material cold loading.
+The 2026-10-09 20:19 central slot built source `3e4b00c4f0ce1f70eb5b6c916c9d84880e6b15bf`: one unit compiled, 192 reused, link exit 0. One runtime ran from 20:20:30 to 20:21:14 UTC and exited normally. The resource-path correction was exercised successfully.
 
-TA mode2 driving, Pause/Resume, Main Cancel then Confirm, track navigation, GC disclosure and pending selection completed. Pause lasted 2.0128 seconds with native/mixed clocks and actual PCM samples frozen; Resume retained the session/bank and advanced clocks. One expected GC cold transition began, but no GC ready state, driving or dense video completed.
+- Actual TA driving, Pause/Resume, Main cancellation/confirmation, track disclosure and GC selection completed. Pause held 2.0081 seconds with frozen native/mixed/PCM clocks; Resume retained the bank and advanced clocks.
+- One expected GC cold transition succeeded. Original animated owners, four compound parts, 553 registered world candidates, six dynamic draws, 76 ATM states and 35 images were reported by the runtime. These observations do not establish every behavior's correctness.
+- Capture retained 298 unique actual frames over 20.0577 seconds, 14.807 captured fps, maximum gap 187.3 ms. The capture controller completed without errors.
+- All HOST course drivers stopped with status 3 at node 7, cross-track about 185–188 source units, and the racers bunched up. **No GC lap completed.** Manual driving, trigger behavior and full-course completion remain unverified.
+- Video export failed its measured-duration check: 19.992 encoded seconds versus the 20.0577-second capture window. Actual PCM was retained separately and omitted from the export because its maximum anchor drift was 141.6 ms (final duration drift about -121.7 ms). No synchronized video-delivery or listening claim follows.
 
-Source inspection found slash-separated member names in the dynamic-material and ATM loaders, while the original GC entries use backslashes. The new three-file correction fixes those names and sequences cold loads before reading diagnostic messages. It is **UNBUILT / UNTESTED**. Failed evidence remains outside Git; no extra runtime was launched during preservation.
-
-Tested binary SHA-256: `26924849463703c6ecc823062d0cb701eceb5c29b49afd464e8f802276031601`.
-The earlier full Clegg/menu capture and three-lap coverage below remain separate from this partial GC attempt.
+Runtime binary SHA-256: `865eba16ee936128e5de06ecdecb130b5be9d0cbb2029b4aae15b7a25290fae1`.
+Only status documentation changed afterward. No extra test, runtime or encoding was performed during this update. Earlier full Clegg/menu and three-lap results below apply to their own source versions.
 
 ## Current Linux menu and Clegg check
 
