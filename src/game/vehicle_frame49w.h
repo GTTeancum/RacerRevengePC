@@ -14,7 +14,7 @@
 #include "terrain_query_workspace48m.h"
 
 namespace rr::game {
-constexpr std::uint32_t vehicleFrameNodeCount49W=53;
+constexpr std::uint32_t vehicleFrameNodeCount49W=maxSceneNodes49P;
 enum class VehicleFramePhase49W : std::uint32_t {
     Ready, PostPlayer, BeforeGraphics, PostGraphics, PostImpactConsumers, PostImpactRepair, AfterImpactBlock, BetweenBodyChildren,
     AfterBodyChildren, SubstepReady, PostWorld, Post354, Post368,
@@ -35,7 +35,9 @@ struct PreservingStage49W {
     bool omittedBB0WNotConsumed;
 };
 struct SceneTopology49W {
-    SceneNodeIndex49P parent180,firstChild184,nextSibling188;
+    SceneNodeIndex49P parent180=SceneNodeIndex49P::none;
+    SceneNodeIndex49P firstChild184=SceneNodeIndex49P::none;
+    SceneNodeIndex49P nextSibling188=SceneNodeIndex49P::none;
 };
 struct VehicleFrameBindings49W {
     VehicleAnimationBindings49T animation;
@@ -43,6 +45,7 @@ struct VehicleFrameBindings49W {
     ChariotLifecycleBindings49V lifecycle;
     SceneTopology49W topology[vehicleFrameNodeCount49W];
     GraphBodyDomain49W mainDomain,secondaryDomain;
+    std::uint32_t sceneNodeCount=53; // Legacy Anakin default; capacity is larger.
 };
 struct VehicleFrameParameters49W {
     CoupledBodyParameters49M bodies;
@@ -118,7 +121,13 @@ struct VehicleFrameState49W {
     // Sole packed C00..C06 owner. Written completely by2291D0 before use.
     std::uint8_t packedC00[7];
     VehicleTerrainProbe50FP terrainProbe;
+    std::uint32_t sceneNodeCount=53; // Active forest only; unused capacity is not consumed.
 };
+inline bool validVehicleSceneCount49W(const VehicleFrameState49W& state,
+    const VehicleFrameBindings49W& bindings) noexcept {
+    return state.sceneNodeCount&&state.sceneNodeCount<=vehicleFrameNodeCount49W&&
+        state.sceneNodeCount==bindings.sceneNodeCount;
+}
 struct VehicleFrameWorkspace49W {
     VehicleFrameState49W next;
     VehicleAnimationWorkspace49T animation;

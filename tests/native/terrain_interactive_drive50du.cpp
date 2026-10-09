@@ -1,6 +1,10 @@
 #include "runtime_allocations50fl.h"
 #include "native_racer_bank50hn_fixture.h"
-#include "native_racer_contact_bank50ht_fixture.h"
+#include "native_racer_contact_bank50hw_fixture.h"
+#include "native_racer_rig50hw_fixture.h"
+#include "native_racer_handling50hw_fixture.h"
+#include "original_racer_visual50hw_fixture.h"
+#include "native_racer_cables50hw_fixture.h"
 #include "native_racer_grid50hn_fixture.h"
 #include "native_racer_draw50hn_fixture.h"
 #include "race_session50hm_fixture.h"
@@ -137,7 +141,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  constexpr std::uint32_t raceRacerCount=rr::game::defaultHostRaceRacers50HT;
  constexpr std::uint32_t raceOpponentCount=raceRacerCount-1;
  static_assert(maxHostRaceOpponents50HT==rr::platform::maxVehicleWindowOpponents50DS);
- static_assert(maxHostRaceRacers50HT<=native_racer_contact50HT::maxRacers);
+ static_assert(maxHostRaceRacers50HT<=native_racer_contact50HW::maxRacers);
  if(raceEnabled){
   require50DU(!checkpointInput,"a race must restart every racer together from the grid");
   lapContinuity={};
@@ -167,6 +171,66 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   cold::words(v.copied40.data(),j["copied40"]);cold::words(v.copied50.data(),j["copied50"]);stackCount=std::max(stackCount,1+shape.view.maxDepth+m.maxDepth);
  }
  f::Fixture x(0);auto&s=x.state;auto&m=s.bodies.main;
+ // Permanent original-resource owners precede the snapshot bank and all draw
+ // publications. Only their immutable borrowed views enter the live arena.
+ std::array<std::unique_ptr<native_racer50HW::Rig>,raceRacerCount> racerRigs;
+ std::array<std::unique_ptr<native_racer_collision50HW::Owner>,raceRacerCount> racerCollisions;
+ std::array<std::unique_ptr<native_racer50HW::Visual>,raceRacerCount> racerVisuals;
+ std::array<std::unique_ptr<native_racer50HW::Cables>,raceRacerCount> racerCables;
+ std::array<std::string,raceRacerCount> racerNames;
+ racerNames[0]="Anakin Skywalker (ep1)";
+ std::size_t mainPairCapacity=shape.view.rayCount,secondaryPairCapacity=0;
+ // COL stores XYZ only. Preserve the retained corpus's explicit HOST poison
+ // policy for opaque W words; these are not claimed loaded original values.
+ const native_racer_collision50HW::EndpointPolicy endpointPolicy{nullptr,
+     [](void*,native_racer_collision50HW::QueryBody,std::size_t index,
+        Type2OpaqueEndpointWords49X& out) noexcept {
+      if(index>=32768)return false;
+      out={0x80000000u+static_cast<std::uint32_t>(index),
+           0x7fc10000u+static_cast<std::uint32_t>(index)};return true;
+     }};
+ const auto matchesEndpointPolicy=[&](const Type2ResourceView49X& resource){
+  for(std::size_t index=0;index<resource.rayCount;++index){
+   Type2OpaqueEndpointWords49X words{};
+   if(!endpointPolicy.words(nullptr,native_racer_collision50HW::QueryBody::Main,index,words)||
+      std::bit_cast<std::uint32_t>(resource.rays[index].first.v[3])!=words.first||
+      std::bit_cast<std::uint32_t>(resource.rays[index].second.v[3])!=words.second)return false;
+  }
+  return true;
+ };
+ if(raceEnabled){
+  require50DU(matchesEndpointPolicy(shape.view),"retained main endpoint-W host policy differs");
+  const auto rosterRoot=std::filesystem::path("evidence/originalRoster50HW/raw-imports");
+  const auto roster=native_racer50HW::rig_detail::json(rosterRoot/"roster.json");
+  require50DU(roster.at("player_index")==0&&roster.at("racers").size()==raceRacerCount,
+      "original roster must contain the player and seven original opponents");
+  for(std::size_t racer=0;racer<raceRacerCount;++racer){
+   const auto& entry=roster.at("racers").at(racer);
+   const auto id=entry.at("pod_id").get<std::string>();
+   require50DU(id.size()==5&&id.substr(0,3)=="POD"&&
+       id[3]>='0'&&id[3]<='9'&&id[4]>='0'&&id[4]<='9'&&
+       (racer!=0||id=="POD01"),"original roster identity rejected");
+   for(std::size_t previous=0;previous<racer;++previous)
+    require50DU(roster.at("racers").at(previous).at("pod_id")!=id,"duplicate original racer");
+   if(racer){
+    const auto relative=std::filesystem::path(entry.at("path").get<std::string>());
+    require50DU(!relative.is_absolute()&&relative.lexically_normal()==relative&&
+        relative.string().find("..") == std::string::npos,"original roster path rejected");
+    racerRigs[racer]=std::make_unique<native_racer50HW::Rig>(".",rosterRoot/relative);
+    require50DU(racerRigs[racer]->podId==id,"original rig and roster identity differ");
+   }
+   racerCollisions[racer]=std::make_unique<native_racer_collision50HW::Owner>();
+   std::string error;
+   const auto archive=std::filesystem::path("work/native/project/disc/PODS")/id/(id+".RES");
+   require50DU(pod_materials50ed_fixture::detail::sha256(f::readBytes(archive))==
+       entry.at("resource_sha256"),"original racer resource archive identity differs");
+   const bool collisionReady=racerCollisions[racer]->prepare(
+       {archive.string(),"Pods\\Pod"+id.substr(3)+"\\"},endpointPolicy,error);
+   require50DU(collisionReady,error.empty()?"original racer collision load failed":error.c_str());
+   mainPairCapacity=std::max(mainPairCapacity,racerCollisions[racer]->main().rayCount);
+   secondaryPairCapacity=std::max(secondaryPairCapacity,racerCollisions[racer]->secondary().rayCount);
+  }
+ }
  // Cold diagnostic setup only: replace retained generic0x84 fixture flags with
  // authenticated fresh graphics-model/source-node flags (49O creation proof).
  // This is before reset setters; never used to coerce a live cache into admission.
@@ -208,7 +272,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  ContactMaterial50HI audioContactMaterials[37]{};
  for(std::size_t k=0;k<candidates.size();++k){const auto&j=row["candidates"][row["order"][k].get<std::size_t>()];const auto name=authored_runtime_ground50cp_fixture::lower(corpus["meshes"][j["mesh"].get<std::size_t>()]["name"].get<std::string>());const authored_runtime_ground50cp_fixture::Owner*match=nullptr;for(const auto&o:ground.owners)if(authored_runtime_ground50cp_fixture::lower(o.name)==name){bool equal=true;for(unsigned n=12;n<15;++n)if(o.instance.world.v[n]!=candidates[k].candidate.collision.geometry.worldMatrix.v[n])equal=false;if(equal){match=&o;break;}}require50DU(match,"actual collider placement matches explicit candidate");candidateZones[k]=match->zone;std::string audioMaterialError;require50DU(rr::assets::readTrackContactMaterial50HI(ground.world,match->zone,match->ordinal,candidates[k].candidate.collision.filter.identity,audioContactMaterials[k],audioMaterialError),audioMaterialError.empty()?"actual contact material mapping failed":audioMaterialError.c_str());auto&radiusOwner=meshes[j["mesh"].get<std::size_t>()];require50DU(radiusOwner.radii.size()==match->mesh.nodes.size(),"actual mesh radius extent");std::vector<std::uint32_t> topology(match->mesh.nodes.size()+match->mesh.faces.size());require50DU(prepareStaticTargetRadii49X(match->mesh,radiusOwner.radii.data(),radiusOwner.radii.size(),{topology.data(),topology.size()},radiusOwner.maxDepth)==Type2ResourceStatus49X::Complete,"radii prepared from owned actual mesh");candidates[k].maxDepth=radiusOwner.maxDepth;stackCount=std::max(stackCount,1+shape.view.maxDepth+radiusOwner.maxDepth);auto&v=candidates[k].candidate.collision;v.geometry.mesh=&match->mesh;v.geometry.worldMatrix=match->instance.world;v.filter.categoryA4=match->instance.category;v.sphere={{{match->instance.sphere.center.v[0],match->instance.sphere.center.v[1],match->instance.sphere.center.v[2]}},match->instance.sphere.radius};}
  ground.audit=J{};
- require50DU(setLocalMatrix49P({s.nodes,53},x.bindings.lifecycle.main190,pose)&&refreshSceneWorld49P({s.nodes,53},x.bindings.lifecycle.main190),"supplied initial pose");f::project(s,x.bindings);
+ require50DU(setLocalMatrix49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190,pose)&&refreshSceneWorld49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190),"supplied initial pose");f::project(s,x.bindings);
  FreshPodGeometrySources49O sources{};sources.chariot=x.assets.hierarchy[2];sources.rightEngine=x.assets.hierarchy[1];sources.forward=x.assets.motions[4];sources.back=x.assets.motions[5];rr::assets::MotionBindingDiagnostic49O bindingDiagnostic{};
  require50DU(rr::assets::readMotionNodeBindings49O(x.assets.hierarchy[2],reinterpret_cast<const char*>(x.assets.vut[2].data()),x.assets.vut[2].size(),sources.chariotBindings,bindingDiagnostic),"actual motion bindings");
  FreshPodGeometryWorkspace49O geometryWorkspace{};FreshPodGeometryResult49O geometry{};FreshPodGeometryDiagnostic49O geometryDiagnostic{};
@@ -216,17 +280,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const auto phy=runtime_startup50fl::readBytes("work/impactAuthoring49Y/Pod01.phy");const AuthoredSelectionContext49N selection{AuthoredClass49N::A,false,true,false,false,{}};
  const auto authored=runtime_startup50fl::bind(phy,geometry,selection,x.parameters,s,x.selectors,x.secondaryInputs);
  auto secondaryPose=pose;for(unsigned i=0;i<3;++i){volatile float a=pose.v[i]*x.secondaryInputs.targetRelative2F0.v[0];volatile float b=pose.v[4+i]*x.secondaryInputs.targetRelative2F0.v[1];volatile float c=pose.v[8+i]*x.secondaryInputs.targetRelative2F0.v[2];volatile float ab=a+b;volatile float abc=ab+c;volatile float position=pose.v[12+i]+abc;secondaryPose.v[12+i]=position;}
- require50DU(setLocalMatrix49P({s.nodes,53},x.bindings.lifecycle.physical19C,secondaryPose)&&refreshSceneWorld49P({s.nodes,53},x.bindings.lifecycle.physical19C),"supplied secondary initial pose");
- require50DU(setLocalMatrix49P({s.nodes,53},x.bindings.lifecycle.model1B4,secondaryPose),"supplied initial displayed pose");f::project(s,x.bindings);
+ require50DU(setLocalMatrix49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.physical19C,secondaryPose)&&refreshSceneWorld49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.physical19C),"supplied secondary initial pose");
+ require50DU(setLocalMatrix49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.model1B4,secondaryPose),"supplied initial displayed pose");f::project(s,x.bindings);
  ResetBoundNode50BA resetModelNodes[18]{};ResetBoundsWorkspace50BA resetBoundsWorkspace{};ModelBoundsResult49O resetModelBounds{};
  require50DU(x.assets.hierarchy[2].nodeCount==18,"actual chariot source node count");
  for(unsigned i=0;i<18;++i){rr::assets::PsgNode49O authoredNode{};require50DU(rr::assets::readPsgNode49O(x.assets.hierarchy[2],i,authoredNode),"actual reset model bound");const auto index=static_cast<std::int32_t>(x.bindings.lifecycle.model1B4)+1+static_cast<std::int32_t>(i);resetModelNodes[i].node=static_cast<SceneNodeIndex49P>(index);const auto expectedParent=static_cast<std::int32_t>(x.bindings.lifecycle.model1B4)+1+authoredNode.parent;require50DU(static_cast<std::int32_t>(s.nodes[index].parent180)==expectedParent,"source flat model parent mapping");for(unsigned j=0;j<3;++j){resetModelNodes[i].center140.v[j]=authoredNode.bounds[j];resetModelNodes[i].halfExtent150.v[j]=authoredNode.bounds[3+j];}}
  const auto beforeResetBounds=::allocations;
- if(!refreshResetModelBounds50BA({s.nodes,53},x.bindings.lifecycle.model1B4,resetModelNodes,18,resetBoundsWorkspace,resetModelBounds)){std::cerr<<"reset root flags "<<unsigned(s.nodes[static_cast<int>(x.bindings.lifecycle.model1B4)].sceneFlags190)<<" descendants";for(const auto&n:resetModelNodes)std::cerr<<' '<<unsigned(s.nodes[static_cast<int>(n.node)].sceneFlags190);std::cerr<<'\n';require50DU(false,"reset model cache admission");}
+ if(!refreshResetModelBounds50BA({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.model1B4,resetModelNodes,18,resetBoundsWorkspace,resetModelBounds)){std::cerr<<"reset root flags "<<unsigned(s.nodes[static_cast<int>(x.bindings.lifecycle.model1B4)].sceneFlags190)<<" descendants";for(const auto&n:resetModelNodes)std::cerr<<' '<<unsigned(s.nodes[static_cast<int>(n.node)].sceneFlags190);std::cerr<<'\n';require50DU(false,"reset model cache admission");}
  require50DU(::allocations==beforeResetBounds,"reset model bounds no allocation");
  PodSceneRebaseWorkspace50FB rebaseWorkspace{};
  ModelBoundsResult49O rebaseBounds[3]{};PodSceneRebaseDiagnostic50FB rebaseDiagnostic{};
- if(!rebaseColdPodScene50FB({s.nodes,53},rebaseModels,rebaseWorkspace,rebaseBounds,rebaseDiagnostic)){
+ if(!rebaseColdPodScene50FB({s.nodes,s.sceneNodeCount},rebaseModels,rebaseWorkspace,rebaseBounds,rebaseDiagnostic)){
   std::cerr<<"cold pod rebase error "<<unsigned(rebaseDiagnostic.error)
            <<" model "<<rebaseDiagnostic.model<<" node "<<rebaseDiagnostic.sourceNode<<'\n';
   require50DU(false,"source first-base pod scene rebase failed");
@@ -298,6 +362,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(terrainAuthored,terrainAuthoringError.c_str());
  for(unsigned axis=0;axis<3;++axis)x.parameters.bodies.main.probeLocal140[axis]=terrainOwner.lowerEndpoint140.v[axis];
  x.parameters.bodies.main.probeLocal140[3]=1.f;
+ // Preserve the actual fresh constructor records before the player's probe
+ // is enabled. Fresh opponent slots install these cold records before enabling
+ // their own authored probe; no already-running state is reset this way.
+ require50DU(s.phase==VehicleFramePhase49W::Ready&&m.frameFactor==0.f&&
+     !s.terrainProbe.enabled&&!s.bodies.main.domain.probe100,
+     "source pre-enable terrain constructor state unavailable");
+ const auto freshTerrainProbe=s.terrainProbe;
+ const auto freshMainProbe=s.bodies.main.components.probe348;
+ const auto freshProbe100=s.bodies.main.domain.probe100;
  require50DU(enableVehicleTerrain50FP(s,x.bindings,terrainOwner.initial,
      terrainOwner.follow,x.workspace,x.diagnostic),"enable source-authored terrain probe");
 
@@ -313,7 +386,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU((*secondaryCase)["order"]==row["order"]&&(*secondaryCase)["candidates"]==row["candidates"],"same explicit ordered terrain inputs");
  StaticSpringState50G secondarySpring{};secondarySpring.records.generatedCapacity88=60;
  SpringRecord48N secondaryRecords[60]{},secondaryQueryRecords[60]{},secondaryScratchRecords[60]{};
- const auto srays=secondaryShape.view.rayCount;
+ if(raceEnabled)require50DU(matchesEndpointPolicy(secondaryShape.view),
+     "retained secondary endpoint-W host policy differs");
+ secondaryPairCapacity=std::max(secondaryPairCapacity,secondaryShape.view.rayCount);
+ std::size_t targetDepth=0;
+ for(const auto& candidate:candidates)targetDepth=std::max(targetDepth,candidate.maxDepth);
+ for(const auto& owner:racerCollisions)if(owner){
+  native_racer_collision50HW::ScratchRequirements required{};
+  require50DU(owner->requirements(targetDepth,required),"original query scratch extent rejected");
+  stackCount=std::max({stackCount,required.mainStack,required.secondaryStack});
+ }
+ const auto srays=secondaryPairCapacity;
  std::vector<SpringCumulativePair48N> sip(srays),ssp(srays),sdp(srays);std::vector<Type2PairMetadata49X> sim(srays),ssm(srays),sdm(srays);
  std::vector<TerrainCandidateEffects48J> sse(candidates.size()),sde(candidates.size());std::vector<Type2WorkItem49X> ss(stackCount+secondaryShape.view.maxDepth);
  Type2StaticInitial49X si{};si.records=secondarySpring.records;si.pairs=sip.data();si.metadata=sim.data();si.pairSlots=srays;si.recordSlots=secondaryRecords;si.recordCount=60;
@@ -322,7 +405,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  SpringGeneratedParameters48K secondarySettings{};secondarySettings.impact54=true;secondarySettings.impact.disableLeverArms5C=false;secondarySettings.impact.correctPenetration64=true;secondarySettings.impact.normalForceScale98=1;secondarySettings.impact.positionCorrectionScaleCC=.025f;
  SpringResponseParameters48L secondaryResponse{};secondaryResponse.maxSpeed94=10000;
  require50DU(rr::assets::applySpringCollision50F(collision,x.parameters.bodies.secondary.body.mass,secondarySettings,secondaryResponse),"authored secondary response settings");
- const auto rays=shape.view.rayCount;
+ const auto rays=mainPairCapacity;
  std::vector<SpringCumulativePair48N> initialPairs(rays),scratchPairs(rays),pairs(rays);std::vector<Type2PairMetadata49X> initialMetadata(rays),scratchMetadata(rays),metadata(rays);
  std::vector<TerrainCandidateEffects48J> scratchEffects(candidates.size()),effects(candidates.size());std::vector<Type2WorkItem49X> stack(stackCount);
  Type2StaticInitial49X initial{};initial.records=spring.records;initial.pairs=initialPairs.data();initial.metadata=initialMetadata.data();initial.pairSlots=rays;initial.recordSlots=records;initial.recordCount=40;
@@ -551,13 +634,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
            <<" zone="<<initialCollisionZone<<" position="<<pose.v[12]<<','<<pose.v[13]<<','<<pose.v[14]
            <<" damage="<<s.fields.damage7D4<<'/'<<s.fields.damage7D0<<'\n';
  }
- const auto bodyScene288=x.bindings.animation.bodyScene288;
- const auto navigationScene190=x.bindings.lifecycle.main190;
- const auto validNavigationScene=[](SceneNodeIndex49P node){
+ const auto validNavigationScene=[&](SceneNodeIndex49P node){
   const auto index=static_cast<std::int32_t>(node);
-  return index>=0&&index<static_cast<std::int32_t>(vehicleFrameNodeCount49W);
+  return index>=0&&index<static_cast<std::int32_t>(s.sceneNodeCount);
  };
- require50DU(validNavigationScene(bodyScene288)&&validNavigationScene(navigationScene190)&&
+ require50DU(validNavigationScene(x.bindings.animation.bodyScene288)&&validNavigationScene(x.bindings.lifecycle.main190)&&
      m.domain.sceneAttached&&!m.domain.sceneHasParent&&!s.fields.vehicle58,
      "source player navigation scene ownership unavailable");
  std::uint64_t navigationUpdates=0,navigationGateSkips=0,navigationCA0Copies=0;
@@ -759,7 +840,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Fresh unrenamed native model roots; later renames/clones are not admitted.
  rr::assets::ModelRootName50BL rootNames[2]{};SceneNodeIndex49P namedIndices[2][14];rr::assets::EffectNameModel50BL namedModels[2]{};rr::assets::EffectNames50BL namesForEffects{};
  for(unsigned side=0;side<2;++side){rr::assets::initializeFreshModelRootName50BL(rootNames[side]);const auto root=side?x.bindings.visual.right1B8:x.bindings.visual.left1BC;require50DU(x.assets.hierarchy[side].nodeCount==14,"actual engine node count");for(unsigned i=0;i<14;++i)namedIndices[side][i]=static_cast<SceneNodeIndex49P>(static_cast<int>(root)+1+i);namedModels[side]={root,&rootNames[side],x.assets.hierarchy[side],namedIndices[side],14};}
- require50DU(rr::assets::buildEffectNames50BL({s.nodes,53},namedModels,2,namesForEffects),"actual effect attachment names");
+ require50DU(rr::assets::buildEffectNames50BL({s.nodes,s.sceneNodeCount},namedModels,2,namesForEffects),"actual effect attachment names");
  EffectOwner50BE nativeEffects[8]{};const char*effectFiles[]={"podLeftEngineDust.emt","podRightEngineDust.emt","podLeftEngineSmoke.emt","podRightEngineSmoke.emt","podSparks.emt","podSparks.emt","podFire.emt","podFire.emt"};
  for(unsigned i=0;i<8;++i){auto raw=runtime_startup50fl::readBytes(std::string("evidence/effectAuthoring50BF/members/")+effectFiles[i]);const auto profile=i<4?EffectProfile50BE::Particle19A5E0:i<6?EffectProfile50BE::Ordinary15F100:EffectProfile50BE::Fire15DE00;require50DU(rr::assets::buildEffectControlOwner50BJ(i+1,profile,reinterpret_cast<const char*>(raw.data()),raw.size(),{0,0},nativeEffects[i]),"actual effect control construction");}
  ResetEffectBindings50BK resetEffectBindings{{1,2},{0,0},{5,6,0,0},false};ResetEffectState50BK resetEffectState{};std::memcpy(resetEffectState.timers820,s.impactSupplement.timers820,16);ResetEffectWorkspace50BK resetEffectWorkspace{};
@@ -1044,7 +1125,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   TrackNavigationInput50EU navigationInput{};
   std::memcpy(navigationInput.previousCA0,navigationCA0,sizeof navigationCA0);
   std::memcpy(navigationInput.currentLocal190,
-      s.nodes[static_cast<unsigned>(navigationScene190)].localC0.v+12,12);
+      s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].localC0.v+12,12);
   navigationInput.currentLocal190[3]=1.f;
   navigationInput.mainBody104=m.components.probe348.field104;
   TrackNavigationReceipt50EU receipt{};
@@ -1069,7 +1150,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  wrongWayInput.config58=s.fields.applicationByte58;
  wrongWayInput.vehicleCD8=s.fields.impactFlagsCD8;
  std::memcpy(wrongWayInput.localForwardE0,
-     s.nodes[static_cast<unsigned>(bodyScene288)].localC0.v+8,12);
+     s.nodes[static_cast<unsigned>(x.bindings.animation.bodyScene288)].localC0.v+8,12);
  // The original native HUD owner is genuinely absent; the separate HOST overlay
  // below observes state and is not substituted as a completed original UI call.
  wrongWayInput.warningOwner=nullptr;
@@ -1090,7 +1171,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!m.applicationActive11C&&!s.fields.vehicle3C&&m.domain.sceneAttached,
      "source CA0 capture owner unavailable");
  std::memcpy(navigationCA0,
-     s.nodes[static_cast<unsigned>(bodyScene288)].localC0.v+12,12);
+     s.nodes[static_cast<unsigned>(x.bindings.animation.bodyScene288)].localC0.v+12,12);
  addCounter50DU(navigationCA0Copies);
  PostPlayerAt217DE0_49K post{};post.player=s.bodies.main.controls.player;post.bindingContext.configurationEntryNonzero=x.configurationEntryNonzero;
  runNative([&]{return bindVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::PlayerAndBaseBefore217DE0),post,x.workspace,x.diagnostic);},"persistent binding");
@@ -1121,7 +1202,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(produced.status==PodSpeechStatus50HG::Complete,"native damage speech enqueue rejected");
   if(produced.eventProduced)++speechEvents;
  }
- ImpactEffectsInput50B owners{};owners.models[0].node=x.bindings.visual.left1BC;owners.models[1].node=x.bindings.visual.right1B8;owners.models[2].node=owners.models[3].node=SceneNodeIndex49P::none;std::size_t count=0;owners.damage00Matches=namesForEffects.damage00;owners.nameCount=53;for(unsigned side=0;side<2;++side){auto&model=owners.models[side];require50DU(namesForEffects.modelRoots&(std::uint64_t(1)<<static_cast<unsigned>(model.node)),"bound model name scope");model.flags03=3;model.effect800={nativeEffects[2+side].id,nativeEffects[2+side].state.flags1D4};model.effect804={nativeEffects[4+side].id,nativeEffects[4+side].state.flags1D4};model.effect80C={nativeEffects[6+side].id,nativeEffects[6+side].state.flags1D4};}
+ ImpactEffectsInput50B owners{};owners.models[0].node=x.bindings.visual.left1BC;owners.models[1].node=x.bindings.visual.right1B8;owners.models[2].node=owners.models[3].node=SceneNodeIndex49P::none;std::size_t count=0;owners.damage00Matches=namesForEffects.damage00;owners.nameCount=s.sceneNodeCount;for(unsigned side=0;side<2;++side){auto&model=owners.models[side];require50DU(rr::assets::effectModelRoot50BL(namesForEffects,model.node),"bound model name scope");model.flags03=3;model.effect800={nativeEffects[2+side].id,nativeEffects[2+side].state.flags1D4};model.effect804={nativeEffects[4+side].id,nativeEffects[4+side].state.flags1D4};model.effect80C={nativeEffects[6+side].id,nativeEffects[6+side].state.flags1D4};}
  runNative([&]{return effectsVehicleImpacts50O(s,x.bindings,owners,effectsWorkspace,generatedEffects,maxImpactEffectEvents50B,count,x.workspace,x.diagnostic);},"actual effect control bindings");runNative([&]{return consumeEffects(generatedEffects,count);},"consume impact effect controls");
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame){
   MaterialAudioInput50HI materialInput{};
@@ -1281,19 +1362,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  return true;
  };
 
- // Separate native vehicles share immutable assets and the serial execution
- // arena, never their live physics, input, contact, navigation or lap histories.
+ // Original racers have distinct immutable resource owners and share only the
+ // serial execution arena, never tuning, poses, contacts or progression histories.
  native_racer50HN::Bank racerBank;
  race_session50HM::Session race{};
  // One cold-owned contact world, outside every racer snapshot. Geometry and
  // scratch never borrow an opponent arena pointer across a bank visit.
- std::unique_ptr<native_racer_contact50HT::Owner> racerContactOwner;
- std::array<std::uint32_t,native_racer_contact50HT::maxRacers> racerContactIds{};
- std::array<std::uint32_t,native_racer_contact50HT::maxRacers> racerContactMaterials{};
+ std::unique_ptr<native_racer_contact50HW::Owner> racerContactOwner;
+ std::array<std::uint32_t,native_racer_contact50HW::maxRacers> racerContactIds{};
+ std::array<std::uint32_t,native_racer_contact50HW::maxRacers> racerContactMaterials{};
  struct RacerContactTotals50HV {
   std::uint64_t passes=0,noPairs=0,testedPairs=0,geometryPairs=0,suppressedPairs=0;
   std::uint64_t respondedPairs=0,generatedRecords=0,activeRecords=0,failures=0;
-  native_racer_contact50HT::Status lastStatus=native_racer_contact50HT::Status::Complete;
+  native_racer_contact50HW::Status lastStatus=native_racer_contact50HW::Status::Complete;
  } racerContactTotals;
  const auto reportRacerContacts=[&](){
   std::cerr<<"racer_contacts enabled="<<racerContactsEnabled
@@ -1304,7 +1385,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       <<" failures="<<racerContactTotals.failures<<" last_status="<<static_cast<unsigned>(racerContactTotals.lastStatus)<<'\n';
  };
  std::array<native_racer50HN::DrawOwner,maxHostRaceOpponents50HT> opponentDraw;
- std::array<platform::VehicleWindowMaterialUv50DS,2> opponentUvs[maxHostRaceOpponents50HT]{};
+ std::array<std::vector<platform::VehicleWindowMaterialUv50DS>,maxHostRaceOpponents50HT> opponentUvs;
  EngineFlareOutput50GV opponentFlames[maxHostRaceOpponents50HT]{};
  bool opponentFlamePrepared[maxHostRaceOpponents50HT]{};
  auto observeLiveRacer=[&](){
@@ -1330,26 +1411,75 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
  };
  if(raceEnabled){
-  if(racerContactsEnabled){
-   racerContactOwner=std::make_unique<native_racer_contact50HT::Owner>();
-   std::string racerContactError;
-   require50DU(racerContactOwner->prepare(shape.view,racerContactError),racerContactError.c_str());
-   for(std::size_t racer=0;racer<raceRacerCount;++racer){
-    racerContactIds[racer]=static_cast<std::uint32_t>(racer+1);
-    // Source-authenticated fresh physical roots have empty names. Material0 is
-    // the explicit deterministic HOST policy, not recovered unknown prefix bytes.
-    racerContactMaterials[racer]=native_racer_contact50HT::emptyPhysicalRootMaterial;
-   }
+  std::array<native_racer_contact50HW::Binding,raceRacerCount> contactBindings{};
+  contactBindings[0]={racerCollisions[0].get(),settings,response};
+  for(std::size_t racer=0;racer<raceRacerCount;++racer){
+   racerContactIds[racer]=static_cast<std::uint32_t>(racer+1);
+   // Empty physical-root material0 is explicit HOST policy for every racer.
+   racerContactMaterials[racer]=native_racer_contact50HW::emptyPhysicalRootMaterial;
   }
 #include "native_racer_owners50hn.inc"
   racerBank.seal(raceRacerCount);
+  for(std::size_t racer=1;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
+   require50DU(completedFrames==0&&m.frameFactor==0.f,"original racer installation requires fresh state");
+   const auto& rig=*racerRigs[racer];const auto& collision=*racerCollisions[racer];
+   rig.install(s,x.bindings,x.handRecords);
+   const auto receipt=native_racer50HW::bindColdHandling(rig.phy,rig.hierarchy[1],
+       rig.hierarchy[0],rig.geometry,collision.mainTarget().source,selection,x,
+       {boostParameters,boostCoolingCF8,settings,response,secondarySettings,secondaryResponse});
+   native_racer50HW::placeColdHandlingRoots(x);
+   for(unsigned component=0;component<3;++component)rebaseModels[component]=rig.rebaseModels[component];
+   require50DU(rebaseColdPodScene50FB({s.nodes,s.sceneNodeCount},rebaseModels,
+       rebaseWorkspace,rebaseBounds,rebaseDiagnostic),"original racer cold model rebase failed");
+   rig.buildEffectNames(s,namesForEffects);
+   query.resource=&collision.main();secondaryQuery.resource=&collision.secondary();
+   terrain_probe_authoring50fq_fixture::Owner ownProbe{};std::string probeError;
+   const bool probeReady=terrain_probe_authoring50fq_fixture::prepare(ownProbe,query,x.parameters,
+       rig.phy,terrainBindings,probeError,collision);
+   require50DU(probeReady,probeError.empty()?"original racer probe authoring failed":probeError.c_str());
+   for(unsigned axis=0;axis<3;++axis)x.parameters.bodies.main.probeLocal140[axis]=ownProbe.lowerEndpoint140.v[axis];
+   x.parameters.bodies.main.probeLocal140[3]=1.f;
+   const bool probeInstalled=terrain_probe_authoring50fq_fixture::installProbeCold(terrainOwner,
+       terrainLiveOwner,ownProbe,probeError);
+   require50DU(probeInstalled,probeError.empty()?"original racer cold probe installation failed":probeError.c_str());
+   // This slot has never advanced. Replace inherited enabled-probe construction
+   // with captured pre-enable construction, then use its own native constructor.
+   s.terrainProbe=freshTerrainProbe;s.bodies.main.components.probe348=freshMainProbe;
+   s.bodies.main.domain.probe100=freshProbe100;
+   require50DU(enableVehicleTerrain50FP(s,x.bindings,terrainOwner.initial,
+       terrainOwner.follow,x.workspace,x.diagnostic),"enable original racer terrain probe");
+   racerVisuals[racer]=std::make_unique<native_racer50HW::Visual>(".",
+       "evidence/originalRoster50HW/original-eight-visuals",rig);
+   racerCables[racer]=std::make_unique<native_racer50HW::Cables>(rig,s,x.bindings);
+   coldFlame=native_racer50HW::buildColdFlames(rig,racerVisuals[racer]->drawAssets,x.bindings);
+   racerNames[racer]=racerVisuals[racer]->displayName;
+   contactBindings[racer]={&collision,settings,response};
+   std::cerr<<"ORIGINAL RACER "<<racer<<": "<<racerNames[racer]<<" ["<<rig.podId
+       <<"] nodes="<<s.sceneNodeCount<<" mass="<<x.parameters.bodies.main.body.mass
+       <<" lift="<<receipt.liftHeight<<" main_rays="<<collision.main().rayCount
+       <<" secondary_rays="<<collision.secondary().rayCount<<'\n';
+  });
 #include "native_racer_grid50hn.inc"
   for(std::size_t racer=1;racer<racerBank.count();++racer)placeOpponentAtGrid50HN(racer);
-  VehicleDrawBatchInput50CO sharedDraw{};
-  require50DU(drawAssets.batchInput(0,ModelPalettePhase49S::selectedRenderPreparation,
-      ModelPaletteSceneState49S::completeCurrentScene,sharedDraw),"opponent source draw descriptors unavailable");
-  for(std::size_t index=0;index<raceOpponentCount;++index)
-   require50DU(opponentDraw[index].initialize(sharedDraw),"opponent draw storage initialization failed");
+  if(racerContactsEnabled){
+   racerContactOwner=std::make_unique<native_racer_contact50HW::Owner>();
+   std::string error;
+   const bool contactsReady=racerContactOwner->prepare(contactBindings.data(),contactBindings.size(),error);
+   require50DU(contactsReady,error.empty()?"original racer contact world preparation failed":error.c_str());
+  }
+  for(std::size_t racer=1;racer<racerBank.count();++racer){
+   const auto index=racer-1;auto& visual=*racerVisuals[racer];
+   VehicleDrawBatchInput50CO source{};
+   require50DU(visual.drawAssets.batchInput(0,ModelPalettePhase49S::selectedRenderPreparation,
+       ModelPaletteSceneState49S::completeCurrentScene,source),"original opponent draw descriptors unavailable");
+   require50DU(opponentDraw[index].initialize(source),"original opponent draw storage initialization failed");
+   for(unsigned component=1;component<3;++component)
+    for(const auto material:visual.flameMaterialIndices(component)){
+     platform::VehicleWindowMaterialUv50DS uv{};
+     uv.component=static_cast<VehicleDrawComponent50CM>(component);uv.materialIndex=material;
+     opponentUvs[index].push_back(uv);
+    }
+  }
   // One neutral, unscored native setup tick establishes actual graphics/ground
   // before countdown rendering. After this all physics freezes until GO.
   const platform::WindowInput50DQ noKeys{};
@@ -1359,8 +1489,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(advanceFrame(),"native race grid setup tick rejected");
    require50DU(lapContinuity.state.vehicleCC8==0,"cold race setup unexpectedly completed a lap");
   };
-  for(std::size_t racer=1;racer<racerBank.count();++racer)
-   racerBank.visit(racer,initializeGraphics);
+  for(std::size_t racer=1;racer<racerBank.count();++racer){
+   opponentFrame=true;
+   try{racerBank.visit(racer,initializeGraphics);}
+   catch(const std::exception& error){
+    opponentFrame=false;
+    throw std::runtime_error("Original racer setup failed for "+racerNames[racer]+": "+error.what());
+   }
+   opponentFrame=false;
+  }
   initializeGraphics();raceSetupFrame=false;
   require50DU(race_session50HM::initialize(race,*navigationMap,lapOwner.track,raceRacerCount),
       "authored race route/markers rejected");
@@ -1370,14 +1507,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(race_session50HM::seedGridOrder(race,gridOrder,raceRacerCount),
       "explicit host starting-grid order rejected");
   sampleRaceField();require50DU(race_session50HM::commitFrame(race,0),"race grid observations rejected");
-  std::cerr<<"HOST RACE: "<<raceRacerCount<<" independently simulated Pod01 vehicles, 3 laps, 3-second countdown. "
+  std::cerr<<"HOST RACE: "<<raceRacerCount<<" distinct original racers, 3 laps, 3-second countdown. "
       "Field count matches the original normal race; the grounded starting grid and opponent controls are host-authored. "
       "Original AI remains unjoined. "
       "Each racer owns "<<racerBank.bytesPerRacer()<<" bytes of native state.\n";
   std::cerr<<"RACER CONTACTS: "<<(racerContactsEnabled?"enabled":"disabled")
-      <<"; actual Pod01 main-body geometry and native two-body response, host world-frame scheduling. "
+      <<"; each original main-body geometry and authored response, host world-frame scheduling. "
         "Empty-root material0 is a deterministic host policy; original padding parity is unclaimed. "
-        "Secondary collision and damage attribution remain unjoined.\n";
+        "Secondary dynamic collision, damage attribution and opponent event audio remain unjoined.\n";
  }
 
  // Actual retained TA visual mesh, already placed by the49G/48F exporter.
@@ -1418,6 +1555,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Host is declared first so renderer destruction always precedes its context.
  platform::GameHost50ER host;
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
+ std::array<platform::MaterialTextureGl50EB,raceOpponentCount> opponentGpuTextures,opponentCableGpuTextures;
  platform::MaterialTextureGlDiagnostic50EB textureDiagnostic{};
  platform::VehicleWindowGl50DS renderer;
  platform::GameHostDiagnostic50ER hostDiagnostic{};
@@ -1434,6 +1572,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // Never destroy a context beneath unresolved GPU ownership. Destructors may
   // retry cleanup in the same correct order; neither silently leaks resources.
   if(renderer.ownsResources())return false;
+  for(std::size_t index=0;index<raceOpponentCount;++index){
+   for(auto* texture:{&opponentGpuTextures[index],&opponentCableGpuTextures[index]}){
+    if(texture->ownsResources()&&!texture->close(textureDiagnostic)){
+     std::cerr<<"original racer texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+    }
+    if(texture->ownsResources())return false;
+   }
+  }
   if(gpuTextures.ownsResources()&&!gpuTextures.close(textureDiagnostic)){
    std::cerr<<"texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
   }
@@ -1663,6 +1809,25 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   renderRequest.sky.maximumIndexBytes=288u*sizeof(std::uint32_t);
   renderRequest.sky.spans=skyBindings.data();
   renderRequest.sky.spanCount=static_cast<std::uint32_t>(skyBindings.size());
+  std::array<platform::VehicleWindowRacerArchetype50DS,raceOpponentCount> racerArchetypes{};
+  if(raceEnabled){
+   for(std::size_t racer=1;racer<racerBank.count();++racer){
+    const auto index=racer-1;const auto& visual=*racerVisuals[racer];
+    const auto ownSamplers=visual.samplers();
+    auto ownRequest=textureRequest;
+    ownRequest.samplers=ownSamplers.data();ownRequest.samplerCount=static_cast<std::uint32_t>(ownSamplers.size());
+    ownRequest.maximumGpuBytes=8u*1024u*1024u;
+    require50DU(opponentGpuTextures[index].create(ownRequest,visual.materials,textureDiagnostic),
+        "original opponent texture upload failed");
+    const auto* ownCableBank=racerCables[racer]->bank();
+    require50DU(ownCableBank&&opponentCableGpuTextures[index].create(cableTextureRequest,
+        *ownCableBank,textureDiagnostic),"original opponent cable texture upload failed");
+    auto& archetype=racerArchetypes[index];archetype.assets=&visual.drawAssets;
+    archetype.materials=visual.windowMaterials(&opponentGpuTextures[index]);
+    archetype.cables.textures=&opponentCableGpuTextures[index];archetype.cables.textureIndex=0;
+   }
+   renderRequest.racerArchetypes=racerArchetypes.data();renderRequest.racerArchetypeCount=raceOpponentCount;
+  }
   if(!renderer.create(renderRequest,drawAssets,rendererDiagnostic)){
    reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("window vehicle renderer creation failed");
   }
@@ -1856,10 +2021,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
             "successful opponent physics frame allocated C++ storage");
         return completed;
        });
-       if(!advanced)std::cerr<<"AI racer "<<racer+1<<" stopped at a native source boundary; other racers continue.\n";
+       if(!advanced)std::cerr<<racerNames[racer]<<" stopped at a native source boundary; other racers continue.\n";
       }catch(const std::exception& error){
        racerBank.stop(racer);
-       std::cerr<<"AI racer "<<racer+1<<" stopped: "<<error.what()<<". Other racers continue.\n";
+       std::cerr<<racerNames[racer]<<" stopped: "<<error.what()<<". Other racers continue.\n";
       }
       opponentFrame=false;
      }
@@ -1867,9 +2032,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      // are Ready, before race observations and the single world audio mix.
      // A failed/nonfinished eligibility boundary never borrows a stale snapshot.
      if(racerContactsEnabled){
-      std::array<bool,native_racer_contact50HT::maxRacers> contactParticipant{};
-      std::array<native_racer_contact50HT::Pair,
-          native_racer_contact50HT::maxRacers*(native_racer_contact50HT::maxRacers-1)> contactOrder{};
+      std::array<bool,native_racer_contact50HW::maxRacers> contactParticipant{};
+      std::array<native_racer_contact50HW::Pair,
+          native_racer_contact50HW::maxRacers*(native_racer_contact50HW::maxRacers-1)> contactOrder{};
       std::size_t contactPairCount=0;
       for(std::size_t racer=0;racer<racerBank.count();++racer)
        contactParticipant[racer]=racerBank.active(racer)&&!race.racers[racer].finished&&
@@ -1878,13 +2043,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        for(std::size_t other=0;other<racerBank.count();++other)
         if(primary!=other&&contactParticipant[other])contactOrder[contactPairCount++]={primary,other};
       if(contactPairCount){
-       native_racer_contact50HT::Receipt contactReceipt{};
+       native_racer_contact50HW::Receipt contactReceipt{};
        const auto beforeRacerContacts=::allocations;
-       const auto contactStatus=native_racer_contact50HT::applyAtWorldBoundary(
+       const auto contactStatus=native_racer_contact50HW::applyAtWorldBoundary(
            racerBank,*racerContactOwner,s,x.bindings,x.parameters,racerContactIds,racerContactMaterials,
-           contactOrder.data(),contactPairCount,settings,response,contactReceipt);
+           contactOrder.data(),contactPairCount,contactReceipt);
        racerContactTotals.lastStatus=contactStatus;
-       if(contactStatus!=native_racer_contact50HT::Status::Complete){
+       if(contactStatus!=native_racer_contact50HW::Status::Complete){
         addCounter50DU(racerContactTotals.failures);
         std::cerr<<"RACER CONTACT FAILURE: player_tick="<<completedFrames<<" ordered_pairs="<<contactPairCount
             <<" status="<<static_cast<unsigned>(contactStatus)<<"; rejected body outputs were not committed.\n";
@@ -2070,16 +2235,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        VehicleDrawBatchDiagnostic50CO opponentDiagnostic{};
        require50DU(opponentDraw[index].prepare(s,x.bindings,drawWorkspace,opponentDiagnostic),
            "actual opponent component projection failed");
-       require50DU(buildPodCables50FD(s,x.bindings,cableBindings,cameraBackward,
+       require50DU(buildPodCables50FD(s,x.bindings,racerCables[racer]->bindings(),cameraBackward,
            opponentDraw[index].cables,cableWorkspace,cableDiagnostic),"actual opponent cable mesh failed");
        EngineFlareDiagnostic50GV flareDiagnostic{};
        require50DU(advanceEngineFlare50GV(s,baseTail,coldFlame,
            static_cast<std::uint32_t>(submittedDrawFrames%0xffffffffull),opponentFlames[index],flareDiagnostic),
            "actual opponent engine flame callback failed");
-       for(unsigned side=0;side<2;++side){
-        auto& uv=opponentUvs[index][side];const auto& source=opponentFlames[index].uv[side];
-        uv.component=side?VehicleDrawComponent50CM::rightEngine:VehicleDrawComponent50CM::leftEngine;
-        uv.materialIndex=1;uv.uScale=source[0];uv.uOffset=source[2];uv.vScale=source[4];uv.vOffset=source[5];
+       for(auto& uv:opponentUvs[index]){
+        const auto side=uv.component==VehicleDrawComponent50CM::leftEngine?0u:1u;
+        const auto& source=opponentFlames[index].uv[side];
+        require50DU(source[1]==0.f&&source[3]==0.f,"original opponent flame affine cross terms unsupported");
+        uv.uScale=source[0];uv.uOffset=source[2];uv.vScale=source[4];uv.vOffset=source[5];
        }
        opponentFlamePrepared[index]=true;
       });
@@ -2087,7 +2253,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       // palette projected from an abandoned native source-cut state.
       require50DU(opponentDraw[index].batch(),"opponent has no completed display batch");
       opponents[index]={opponentDraw[index].batch(),&opponentDraw[index].cables,
-          opponentUvs[index].data(),2};
+          opponentUvs[index].data(),static_cast<std::uint32_t>(opponentUvs[index].size()),
+          static_cast<std::uint32_t>(racer)};
      }
      renderFrame.opponents=opponents;renderFrame.opponentCount=raceOpponentCount;
     }
@@ -2277,7 +2444,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<" seconds="<<race.raceSeconds<<" player_place="<<race.racers[0].place<<"/"<<race.racerCount
          <<" opponent_draws="<<rendererDiagnostic.opponentRacersDrawn;
      for(std::size_t racer=0;racer<race.racerCount;++racer){const auto& r=race.racers[racer];
-      std::cerr<<" racer"<<racer+1<<"="<<r.place<<","<<r.observed.completedLaps<<","<<r.observed.checkpointCursor
+      std::cerr<<" racer"<<racer+1<<"["<<racerNames[racer]<<"]="<<r.place<<","<<r.observed.completedLaps<<","<<r.observed.checkpointCursor
           <<","<<r.observed.position[0]<<","<<r.observed.position[2]<<","<<(racer==0||racerBank.active(racer));
      }
      std::cerr<<'\n';

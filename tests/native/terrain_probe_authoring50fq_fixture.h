@@ -1,7 +1,9 @@
 #pragma once
-// Cold source-derived Pod01 vehicle+348 authoring. No captured RAM, guest
+// Cold source-derived original-pod vehicle+348 authoring. No captured RAM, guest
 // execution, ground-height substitute, or hot loading. Runtime namespace and
 // preserved owner bits are explicit inputs, not invented constructor defaults.
+#include "native_racer_collision50hw_fixture.h"
+#include "live_terrain_probe50fr_fixture.h"
 #include "../../src/game/vehicle_frame49w.h"
 #include "../../src/game/static_type2_producer49x.h"
 #include "../../src/game/type2_bounds50by.h"
@@ -102,7 +104,9 @@ inline bool oneBit(std::uint32_t x) noexcept {return x&&!(x&(x-1));}
 inline bool prepare(Owner& out,const Type2StaticQuery49X& main690,
     const VehicleFrameParameters49W& parameters,const std::vector<std::uint8_t>& phy,
     const Bindings& binding,std::string& error,
-    const char* archivePath="work/native/project/disc/PODS/POD01/POD01.RES") {
+    const char* archivePath="work/native/project/disc/PODS/POD01/POD01.RES",
+    const char* mainMember="Pods\\Pod01\\podboxm.col",
+    const native_racer_collision50HW::Owner* collisionOwner=nullptr) {
     if(out.prepared||std::fegetround()!=FE_TONEAREST||!main690.resource||!main690.queryScene.value||
        !binding.identity||(main690.filter&&binding.identity==main690.filter->identity)||
        binding.collisionTypeTag==binding.groupTypeTag)return detail::fail(error,"invalid fresh probe owner binding");
@@ -119,27 +123,42 @@ inline bool prepare(Owner& out,const Type2StaticQuery49X& main690,
        std::bit_cast<std::uint32_t>(expectedMass)!=std::bit_cast<std::uint32_t>(receipt.bodyMass)||
        std::bit_cast<std::uint32_t>(receipt.authoredLift)!=std::bit_cast<std::uint32_t>(parameters.visual.verticalLimit7EC))
         return detail::fail(error,"canonical probe mass/lift differs from authored PHY");
-    std::ifstream file(archivePath,std::ios::binary);if(!file)return detail::fail(error,"actual Pod01 archive unavailable");
-    std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}},podM;
-    assets::ResArchive48C archive;assets::DecodeError48C decode;
-    if(!assets::decodeResource48C(bytes,archive,decode)||!assets::extractResMember48C(archive,"Pods\\Pod01\\podboxm.col",podM,decode)||podM.size()<92)
-        return detail::fail(error,"actual Pod01 podboxm unavailable");
-    const auto nr=detail::u32(podM.data()+80),nn=detail::u32(podM.data()+84);
-    if(nr>32768||nn>32767||nr!=main690.resource->rayCount||nn!=main690.resource->nodeCount||
-       (nr&&!main690.resource->rays)||(nn&&!main690.resource->nodes))return detail::fail(error,"690 resource extent differs from actual podboxm");
-    std::vector<Type2Node49X> nodes(nn);std::vector<Type2Ray49X> rays(nr);
-    std::vector<Type2OpaqueEndpointWords49X> opaque(nr);std::vector<std::uint32_t> topology(nn+nr);
-    for(std::size_t i=0;i<nr;++i){opaque[i].first=std::bit_cast<std::uint32_t>(main690.resource->rays[i].first.v[3]);
-        opaque[i].second=std::bit_cast<std::uint32_t>(main690.resource->rays[i].second.v[3]);}
-    Type2ResourceView49X authentic{};
-    if(decodeType2Resource49X(podM.data(),podM.size(),opaque.data(),opaque.size(),nodes.data(),nodes.size(),rays.data(),rays.size(),
-       {topology.data(),topology.size()},authentic)!=Type2ResourceStatus49X::Complete||authentic.root!=main690.resource->root||
-       authentic.maxDepth!=main690.resource->maxDepth||std::memcmp(authentic.localMatrix.v,main690.resource->localMatrix.v,sizeof(BodyMatrix48G))||
-       std::memcmp(nodes.data(),main690.resource->nodes,nodes.size()*sizeof(Type2Node49X))||
-       std::memcmp(rays.data(),main690.resource->rays,rays.size()*sizeof(Type2Ray49X)))return detail::fail(error,"690 is not actual native-decoded podboxm");
-    Type2BoundsInput50BY input{};input.resource=&authentic;input.preparedWorld=detail::identity();CollectionBoundsResult48S bounds{};
+    Type2ResourceView49X decodedResource{};
+    const Type2ResourceView49X* authentic=nullptr;
+    std::vector<Type2Node49X> nodes;std::vector<Type2Ray49X> rays;
+    if(collisionOwner){
+        // This stable owner has already decoded/validated the selected RES once.
+        // Its exact borrowed identity prevents a different pod query from being
+        // silently used to derive this racer's probe authoring.
+        if(!collisionOwner->prepared()||main690.resource!=&collisionOwner->main())
+            return detail::fail(error,"probe query is not the supplied original-pod collision owner");
+        authentic=&collisionOwner->main();
+        receipt.archiveBytes=collisionOwner->receipt().archiveBytes;
+        receipt.podBoxMBytes=collisionOwner->receipt().memberBytes[0];
+    }else{
+        if(!archivePath||!mainMember)return detail::fail(error,"probe collision archive/member is unbound");
+        std::ifstream file(archivePath,std::ios::binary);if(!file)return detail::fail(error,"actual pod archive unavailable");
+        std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}},podM;
+        assets::ResArchive48C archive;assets::DecodeError48C decode;
+        if(!assets::decodeResource48C(bytes,archive,decode)||!assets::extractResMember48C(archive,mainMember,podM,decode)||podM.size()<92)
+            return detail::fail(error,"actual podboxm unavailable");
+        const auto nr=detail::u32(podM.data()+80),nn=detail::u32(podM.data()+84);
+        if(nr>32768||nn>32767||nr!=main690.resource->rayCount||nn!=main690.resource->nodeCount||
+           (nr&&!main690.resource->rays)||(nn&&!main690.resource->nodes))return detail::fail(error,"690 resource extent differs from actual podboxm");
+        nodes.resize(nn);rays.resize(nr);
+        std::vector<Type2OpaqueEndpointWords49X> opaque(nr);std::vector<std::uint32_t> topology(nn+nr);
+        for(std::size_t i=0;i<nr;++i){opaque[i].first=std::bit_cast<std::uint32_t>(main690.resource->rays[i].first.v[3]);
+            opaque[i].second=std::bit_cast<std::uint32_t>(main690.resource->rays[i].second.v[3]);}
+        if(decodeType2Resource49X(podM.data(),podM.size(),opaque.data(),opaque.size(),nodes.data(),nodes.size(),rays.data(),rays.size(),
+           {topology.data(),topology.size()},decodedResource)!=Type2ResourceStatus49X::Complete||decodedResource.root!=main690.resource->root||
+           decodedResource.maxDepth!=main690.resource->maxDepth||std::memcmp(decodedResource.localMatrix.v,main690.resource->localMatrix.v,sizeof(BodyMatrix48G))||
+           std::memcmp(nodes.data(),main690.resource->nodes,nodes.size()*sizeof(Type2Node49X))||
+           std::memcmp(rays.data(),main690.resource->rays,rays.size()*sizeof(Type2Ray49X)))return detail::fail(error,"690 is not actual native-decoded podboxm");
+        authentic=&decodedResource;receipt.archiveBytes=bytes.size();receipt.podBoxMBytes=podM.size();
+    }
+    Type2BoundsInput50BY input{};input.resource=authentic;input.preparedWorld=detail::identity();CollectionBoundsResult48S bounds{};
     if(prepareType2Bounds50BY(input,bounds)!=CollectionBoundsStatus48S::Complete)return detail::fail(error,"source2121C8 podboxm bounds rejected");
-    receipt.vehicle324=bounds.half.v[1];receipt.archiveBytes=bytes.size();receipt.podBoxMBytes=podM.size();
+    receipt.vehicle324=bounds.half.v[1];
     const float offset[3]={0,receipt.vehicle324,0},up[3]={0,1,0};
     const float fiveLift=detail::mul(5.f,receipt.authoredLift);
     for(unsigned i=0;i<3;++i){
@@ -167,4 +186,43 @@ inline bool prepare(Owner& out,const Type2StaticQuery49X& main690,
     q.copied40=q.copied50={{0,0,0,1}};q.collisionTypeTag=binding.collisionTypeTag;q.groupTypeTag=binding.groupTypeTag;q.terrainCallbackEnabled=true;
     staged.prepared=true;out=std::move(staged);error.clear();return true;
 }
+// Preferred heterogeneous cold path: reuse the authenticated resource owner;
+// do not reload/decode its archive or replace any ray endpoint W words.
+inline bool prepare(Owner& out,const Type2StaticQuery49X& main690,
+    const VehicleFrameParameters49W& parameters,const std::vector<std::uint8_t>& phy,
+    const Bindings& binding,std::string& error,
+    const native_racer_collision50HW::Owner& collisionOwner) {
+    return prepare(out,main690,parameters,phy,binding,error,nullptr,nullptr,&collisionOwner);
+}
+
+// Install a different fresh racer into an already-sealed execution arena.
+// Vector-backed filter lists are immutable shared namespace bindings and must
+// match exactly. Only registered POD fields change; their addresses stay put.
+// Cold slot initialization only, never reset a moving/live racer this way.
+inline bool installProbeCold(Owner& arena,live_terrain_probe50fr::Owner& live,
+                            const Owner& authored,std::string& error) {
+    if(!arena.prepared||!authored.prepared)
+        return detail::fail(error,"unprepared cold terrain-probe installation");
+    const auto& a=arena.metadata;const auto& b=authored.metadata;
+    const auto& af=a.filter;const auto& bf=b.filter;
+    if(af.identity!=bf.identity||af.categoryA4!=bf.categoryA4||af.acceptMaskB8!=bf.acceptMaskB8||
+       af.categoryModeD4!=bf.categoryModeD4||af.flags31!=bf.flags31||af.categoryMasks!=bf.categoryMasks||
+       a.callbackMasks.collect!=b.callbackMasks.collect||a.callbackMasks.forceAngle!=b.callbackMasks.forceAngle||
+       a.callbackMasks.excludeOwner!=b.callbackMasks.excludeOwner||a.collisionTypeTag!=b.collisionTypeTag||
+       a.groupTypeTag!=b.groupTypeTag||a.terrainCallbackEnabled!=b.terrainCallbackEnabled||
+       a.copied40!=b.copied40||a.copied50!=b.copied50)
+        return detail::fail(error,"cold terrain-probe immutable namespace differs");
+    for(unsigned i=0;i<2;++i)
+        if(af.identityLists[i].mode!=bf.identityLists[i].mode||
+           af.identityLists[i].identities!=bf.identityLists[i].identities)
+            return detail::fail(error,"cold terrain-probe identity lists differ");
+    arena.initial=authored.initial;arena.follow=authored.follow;
+    arena.lowerEndpoint140=authored.lowerEndpoint140;arena.receipt=authored.receipt;
+    arena.prepared=authored.prepared;arena.metadata.filter.flagsF8=authored.metadata.filter.flagsF8;
+    // initialize() has no fallible branch for an empty owner. Initialize at its
+    // final arena address, so resource.rays borrows live.pair, never a temporary.
+    live={};live_terrain_probe50fr::initialize(live,arena.initial.segment);
+    error.clear();return true;
+}
+
 }

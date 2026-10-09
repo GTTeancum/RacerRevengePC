@@ -33,7 +33,7 @@ bool projectModelPalette49S(const SceneGraph49P& graph,
     if (!validIndex(input.modelRoot, graph.count))
         return reject(diagnostic, ModelPaletteError49S::invalidRoot);
     if (input.sourceNodes == nullptr || input.sourceNodeCount == 0 ||
-        input.sourceNodeCount > maxSceneNodes49P)
+        input.sourceNodeCount > maxModelPaletteEntries49S)
         return reject(diagnostic, ModelPaletteError49S::invalidSourceTable);
     for (std::uint32_t source = 0; source < input.sourceNodeCount; ++source)
         if (!validIndex(input.sourceNodes[source], graph.count))

@@ -7,18 +7,36 @@
 // Canonical frame includes both rigid bodies, complete graph/animation/visual,
 // filter histories, joint, ground follow, damage, own serial RNG and source libm.
 racerBank.owner(s);
+//50HW: a roster slot owns its authored tuning and source binding descriptors,
+// not just its live bodies. Borrowed PSG/MOT/type2 arrays remain in permanent
+// per-archetype cold owners; restoring these POD views never moves that data.
+racerBank.owner(x.parameters);
+racerBank.owner(x.bindings);
+racerBank.owner(x.secondaryInputs);
 racerBank.owner(x.handRecords);
 racerBank.owner(x.selectors);
 racerBank.owner(x.frame);
 racerBank.owner(x.diagnostic);
 racerBank.owner(boostState);
 racerBank.owner(boostDiagnostic);
+racerBank.owner(boostParameters);
+racerBank.owner(boostCoolingCF8);
+racerBank.owner(settings);
+racerBank.owner(response);
+racerBank.owner(secondarySettings);
+racerBank.owner(secondaryResponse);
 racerBank.owner(clock);
 racerBank.owner(baseTail);
 racerBank.owner(baseGlobals);
 racerBank.owner(poseHistory);
 racerBank.owner(coldFlame);
+racerBank.owner(namesForEffects);
 racerBank.owner(nativeEffects);
+// Cold placement/geometry views follow the selected original forest. The
+// pointed-to source bytes are immutable; sourceNodes refers either to this
+// registered stable array or to the selected permanent Rig owner.
+racerBank.owner(rebaseNodes);
+racerBank.owner(rebaseModels);
 // Actual source navigation, accepted lap crossings and wrong-way history.
 racerBank.owner(navigationProgress);
 racerBank.owner(navigationCA0);
@@ -85,6 +103,18 @@ racerBank.owner(movementInitial);
 racerBank.owner(movementResult);
 racerBank.owner(movementFlag);
 racerBank.owner(terrainOwner.metadata.filter.flagsF8);
+// The terrain metadata's vector-backed category/identity lists are immutable
+// and shared only when identical. Numeric probe authoring is racer-specific.
+// Never memcpy terrainOwner itself: its metadata contains std::vectors.
+racerBank.owner(terrainOwner.initial);
+racerBank.owner(terrainOwner.follow);
+racerBank.owner(terrainOwner.lowerEndpoint140);
+racerBank.owner(terrainOwner.receipt);
+racerBank.owner(terrainOwner.prepared);
+// resource.rays must point to the SAME live arena terrainLiveOwner.pair for
+// every slot. Rebuild this cold owner in place when installing an archetype;
+// copying an owner whose resource points into a temporary is invalid.
+racerBank.owner(terrainLiveOwner);
 for(auto& candidate:candidates){
  racerBank.owner(candidate.candidate.collision.filter.flagsF8);
  racerBank.owner(candidate.candidate.collision.copied40);

@@ -28,6 +28,7 @@ constexpr std::uint32_t maxVehicleWindowTrackSpans50DS = 65536;
 constexpr std::uint32_t maxVehicleWindowTrackChunks50DS = 65536;
 constexpr std::uint32_t maxVehicleWindowCompletedLaps50DS = 999;
 constexpr std::uint32_t maxVehicleWindowOpponents50DS = game::maxHostRaceOpponents50HT;
+constexpr std::uint32_t maxVehicleWindowRacerArchetypes50DS = maxVehicleWindowOpponents50DS;
 enum class VehicleWindowMaterialMode50DS : std::uint8_t {
     unspecified, requiredTexture, untextured
 };
@@ -161,6 +162,14 @@ struct VehicleWindowCables50DS {
     const MaterialTextureGl50EB* textures = nullptr;
     std::uint32_t textureIndex = assets::unresolvedMaterialTexture50EA;
 };
+struct VehicleWindowRacerArchetype50DS {
+    // Cold-loaded original chariot/left/right assets, kept unchanged until close.
+    // The renderer consumes the caller's independently animated world vertices;
+    // it never flattens component placement or substitutes a whole-pod transform.
+    const assets::VehicleDrawAssets50CR* assets = nullptr;
+    VehicleWindowMaterials50DS materials{};
+    VehicleWindowCables50DS cables{};
+};
 struct VehicleWindowRequest50DS {
     // Borrowed until close. isCurrent must check this exact live desktop GL
     // context AND its host surface/currentness contract, on the creating thread,
@@ -193,6 +202,12 @@ struct VehicleWindowRequest50DS {
     // Native soft pod-footprint approximation on actual track receivers.
     // Explicit opt-in; no original shadow-program or exact-occlusion claim.
     bool enableNativePodShadows = false;
+    // Optional cold-only array. Entries are selected by one-based frame IDs;
+    // ID zero retains the create() player assets/materials/cables. Each entry
+    // owns independently sized immutable indices and two cold vertex banks.
+    // Material mapping arrays are copied; asset and texture owners stay alive.
+    const VehicleWindowRacerArchetype50DS* racerArchetypes = nullptr;
+    std::uint32_t racerArchetypeCount = 0;
 };
 struct VehicleWindowHostHud50DS {
     // Caller-supplied live values, finite [0,1]. Heat 0 = cool, 1 = heat limit;
@@ -222,9 +237,9 @@ struct VehicleWindowHostHud50DS {
     std::uint32_t raceCountdown = 0;
 };
 struct VehicleWindowOpponent50DS {
-    // Successful world-space 50CO output from the SAME retained prepared 50CR
-    // meshes as the player. Each racer requires independent live vertex arrays;
-    // unchanged source indices/spans are shared. Borrowed synchronously only.
+    // Successful world-space 50CO output from the selected retained 50CR
+    // archetype. Each racer requires independent live vertex arrays, while its
+    // own original indices/spans remain unchanged. Borrowed synchronously only.
     const game::VehicleDrawBatch50CO* batch = nullptr;
     // Optional source-generated cables; requires the existing cold cable bank.
     const game::PodCableMesh50FD* cables = nullptr;
@@ -232,6 +247,9 @@ struct VehicleWindowOpponent50DS {
     // entries use identity, independently of player and other racer animation.
     const VehicleWindowMaterialUv50DS* materialUvs = nullptr;
     std::uint32_t materialUvCount = 0;
+    // Zero selects the player bank; 1..request.racerArchetypeCount select the
+    // explicitly supplied original geometry, material and cable banks.
+    std::uint32_t racerArchetype = 0;
 };
 struct VehicleWindowFrame50DS {
     // Pixel viewport. Window output requires actual default-framebuffer drawable

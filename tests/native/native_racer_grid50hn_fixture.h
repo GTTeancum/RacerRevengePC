@@ -11,14 +11,16 @@ namespace native_racer50HN {
 // Explicit HOST starting-grid policy; not the unrecovered lateral-grid leaf.
 // Ground height is always resolved by the actual native reset query against
 // authenticated terrain. It never substitutes an interpolated route elevation.
+// Lift belongs to the selected racer's PHY, not to the shared track owner.
 inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene& ground,
-    const rr::game::BodyMatrix48G& requested,std::uint32_t* stack,std::size_t capacity,
+    const rr::game::BodyMatrix48G& requested,float lift,
+    std::uint32_t* stack,std::size_t capacity,
     rr::game::BodyMatrix48G& result) noexcept {
     using namespace rr::game;
     std::uint32_t position[4]{};
     for(unsigned i=0;i<4;++i)position[i]=std::bit_cast<std::uint32_t>(requested.v[12+i]);
     ResetProbe50AG probe{};
-    if(!beginResetProbe50AG(position,std::bit_cast<std::uint32_t>(ground.lift),probe))return false;
+    if(!beginResetProbe50AG(position,std::bit_cast<std::uint32_t>(lift),probe))return false;
     while(probe.phase==ResetProbePhase50AG::AwaitingQuery){
         SpringVector4_48N start{},end{};
         std::memcpy(start.v,probe.start,16);std::memcpy(end.v,probe.end,16);
@@ -39,6 +41,13 @@ inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene&
     for(unsigned i=0;i<4;++i)result.v[12+i]=std::bit_cast<float>(probe.staged[i]);
     return true;
 }
+// Legacy callers retain their explicit Pod01 development-ground context.
+// Heterogeneous roster callers must use the overload with their own lift.
+inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene& ground,
+    const rr::game::BodyMatrix48G& requested,std::uint32_t* stack,std::size_t capacity,
+    rr::game::BodyMatrix48G& result) noexcept {
+    return groundGridPose(ground,requested,ground.lift,stack,capacity,result);
+}
 // Place a FRESH, still-unadvanced native state at the grounded host grid pose.
 // Basis is unchanged. Uses native scene setters and actual model-bounds refresh;
 // no cache/phase/velocity admission is forged. Never use this for live recovery.
@@ -51,7 +60,7 @@ inline bool placeColdGrid(rr::game::VehicleFrameState49W& state,
     using namespace rr::game;
     if(state.phase!=VehicleFramePhase49W::Ready||state.bodies.main.frameFactor!=0.f)return false;
     const auto main=static_cast<unsigned>(bindings.lifecycle.main190);
-    if(main>=vehicleFrameNodeCount49W)return false;
+    if(!validVehicleSceneCount49W(state,bindings)||main>=state.sceneNodeCount)return false;
     const auto& previous=state.nodes[main].world100;
     for(unsigned i=0;i<12;++i)if(std::bit_cast<std::uint32_t>(previous.v[i])!=
         std::bit_cast<std::uint32_t>(requested.v[i]))return false;
@@ -64,14 +73,14 @@ inline bool placeColdGrid(rr::game::VehicleFrameState49W& state,
            state.bodies.secondary.root.body.velocity.v[i]!=0.f)return false;
     }
     auto next=state;
-    SceneGraph49P graph{next.nodes,vehicleFrameNodeCount49W};
+    SceneGraph49P graph{next.nodes,next.sceneNodeCount};
     const SceneNodeIndex49P ordinary[]={bindings.lifecycle.main190,bindings.lifecycle.physical19C};
     for(auto node:ordinary)if(!addParentlessTranslation49P(graph,node,displacement)||
         !refreshSceneWorld49P(graph,node))return false;
-    ResetBoundNode50BA boundNodes[18]{};ResetBoundsWorkspace50BA workspace{};
+    ResetBoundNode50BA boundNodes[maxModelBoundsNodes49O]{};ResetBoundsWorkspace50BA workspace{};
     ModelBoundsResult49O result{};
     for(const auto& model:models){
-        if(model.sourceNodeCount>18||model.sourceNodeCount!=model.hierarchy.nodeCount)return false;
+        if(model.sourceNodeCount>maxModelBoundsNodes49O||model.sourceNodeCount!=model.hierarchy.nodeCount)return false;
         if(!addParentlessTranslation49P(graph,model.root,displacement))return false;
         for(unsigned i=0;i<model.sourceNodeCount;++i){
             rr::assets::PsgNode49O authored{};

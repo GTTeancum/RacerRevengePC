@@ -1,8 +1,8 @@
 // Include after racerBank.seal(raceRacerCount). Defines a cold-only placement
 // lambda. Seven opponents occupy two explicit HOST rows ahead of the retained
 // rank-four center player pose. These are not claimed original lateral ranks.
-// Native ground probes validate every start; parameters and track gates do not
-// change. Four front starts and three back starts retain at least42 lateral or
+// Native ground probes validate every start using each racer's authored lift.
+// Four front starts and three back starts retain at least42 lateral or
 //40 longitudinal units between pod centers, with player40 behind the back row.
 auto placeOpponentAtGrid50HN=[&](std::size_t racer){
  require50DU(racer>0&&racer<racerBank.count(),"invalid opponent grid slot");
@@ -16,8 +16,9 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
   for(unsigned axis=0;axis<3;++axis)
    requested.v[12+axis]+=requested.v[axis]*lateral[racer]+requested.v[8+axis]*forward[racer];
   BodyMatrix48G grounded{};
-  require50DU(native_racer50HN::groundGridPose(ground,requested,groundStack.data(),
-      groundStack.size(),grounded),"AI grid has no actual ground hit");
+  require50DU(native_racer50HN::groundGridPose(ground,requested,
+      x.parameters.visual.verticalLimit7EC,groundStack.data(),groundStack.size(),
+      grounded),"AI grid has no actual ground hit");
   require50DU(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,mainMembership,
       membershipWork).status==LiveZoneStatus50EN::Complete,"AI main grid detach failed");
   require50DU(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,secondaryMembership,
@@ -49,8 +50,8 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
       terrainBounds,membershipWork).status==LiveZoneStatus50EN::Complete,"AI terrain grid attach failed");
   lapOwner.audioDispatch=nullptr;lapOwner.audioContext=nullptr;
   autoDriveEnabled=true;autoStopReported=false;courseState={};courseOutput={};
-  // Distinct host-driver pace/lookahead only. Every native vehicle uses the
-  // same authenticated Pod01 engine, contact, drag and body parameters.
+  // Distinct host-driver pace/lookahead only. Each native vehicle retains its
+  // own authenticated engine, contact, drag, body and lift parameters.
   courseTuning.authoredSpeedOnly=true;
   const auto paceSteps=std::max<std::size_t>(1,racerBank.count()-2);
   const float pace=.94f+.06f*float(racer-1)/float(paceSteps);

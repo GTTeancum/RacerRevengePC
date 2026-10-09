@@ -32,7 +32,7 @@ Type2StaticStatus49X queryMainIndexedStaticVehicle50CD(const VehicleFrameState49
        (admission.providerPresent&&admission.pointContactsEnabled)||!admission.explicitCandidates||
        admission.queryType!=2||admission.registrationE0)return S::UnsupportedScope;
     const auto index=static_cast<int>(bindings.lifecycle.main190);
-    if(index<0||index>=static_cast<int>(vehicleFrameNodeCount49W)||admission.queryScene!=bindings.lifecycle.main190||!source.queryScene.value)return S::InvalidInput;
+    if(!validVehicleSceneCount49W(frame,bindings)||index<0||index>=static_cast<int>(frame.sceneNodeCount)||admission.queryScene!=bindings.lifecycle.main190||!source.queryScene.value)return S::InvalidInput;
     const auto&node=frame.nodes[index];
     if(!(node.sceneFlags190&1u))return S::UnsupportedScope;
     if(std::memcmp(&node.world100,&frame.bodies.main.components.root.scene,sizeof node.world100))return S::InvalidInput;

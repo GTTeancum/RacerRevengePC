@@ -47,6 +47,8 @@ bool buildFreshPodGeometry49O(const FreshPodGeometrySources49O& sources,
     }
     if(!sampleModelMotionBlend49O(sources.forward,sources.back,sources.chariotBindings,.5f,0,work.local,count,diagnostic.motion))
         return fail(FreshPodGeometryError49O::motion);
+    if(sources.mid&&!sampleModelMotion49O(*sources.mid,sources.chariotBindings,.5f,work.local,count,diagnostic.motion))
+        return fail(FreshPodGeometryError49O::motion);
     for(std::uint32_t i=0;i<count;++i)std::memcpy(work.nodes[i].local.v,work.local[i].m,sizeof work.local[i].m);
     FreshPodGeometryResult49O result{};
     if(!computeModelBounds49O(work.nodes,count,root,work.bounds,result.postMotionBounds))return fail(FreshPodGeometryError49O::bounds);

@@ -1,6 +1,31 @@
+# Original-roster integration: UNBUILT / UNTESTED WIP
+
+This branch preserves the newer original-roster integration on top of recovered
+main commit `122251eb37e1854d02c000644ce1be2de5b49ab9`. It is a source backup, not a
+verified build or gameplay release. The main branch remains at that recovered
+checkpoint.
+
+The new source adds scene capacity of 80 with active node counts and per-racer
+rig, handling, collision, cable, visual, and contact owners. The interactive main
+includes the new roster wiring. Its source SHA-256 at this snapshot is
+`db1110a700b13069aa3e731292df9b32ccb07835b31afa86f6dab58a6a342019`.
+
+No compilation, syntax check, software test, or game run has validated this new
+integration. The earlier focused 161-check/contact and main syntax results below
+apply to the prior recovered checkpoint only; they do not certify these edits.
+The first integration build/test is still pending.
+
+Original disc assets, generated original-roster caches, raw data, and evidence
+remain excluded. The same source-only exclusions and license preservation apply.
+See [integration notes](docs/native-roster-integration50hw.md),
+[rig notes](docs/native-roster-rigs50hw.md), and
+[collision notes](docs/native-racer-collision50hw.md) for implementation scope.
+
+---
+
 # Racer Revenge PC: native source checkpoint
 
-## Current status: recovered 50HV work in progress (2026-10-09)
+## Base checkpoint: recovered 50HV work in progress (2026-10-09)
 
 This private repository preserves the recovered native Windows/Linux source and
 shared code intended for a future original-Xbox port. It is a development

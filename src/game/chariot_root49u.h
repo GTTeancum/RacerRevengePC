@@ -48,7 +48,7 @@ struct ChariotRootDiagnostic49U { ChariotRootError49U error; std::uint32_t sourc
 
 // Complete admitted21A660 through21C110/114. Present distinct parentless main,
 // hidden198, physical19C, displayed1B4 and both primary engine roots;194 is main's
-// direct child, both cable nodes are distinct descendants of1B4. At most64 nodes.
+// direct child, both cable nodes are distinct descendants of1B4. At most maxSceneNodes49P nodes.
 // Requires58=40=0 and cached speed >= effective434750 (cold4312AA7F).
 // Admits physical838!=0/83C=0, producing1B4 then source-seeding198/870/8A0 and
 // switching to virtual; or838=0/83C!=0, integrating198 and publishing1B4. Other

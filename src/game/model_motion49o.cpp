@@ -95,6 +95,42 @@ struct Eval {
 };
 bool reject(ModelMotionDiagnostic49O& d,ModelMotionError49O e,std::uint32_t i=0) noexcept {d={e,i};return false;}
 }
+bool sampleModelMotion49O(const assets::MotionView49O& motion,
+    const assets::MotionNodeBindings49O& bindings,float fraction,
+    ModelLocalMatrix49O* locals,std::uint32_t nodes,ModelMotionDiagnostic49O& d) noexcept {
+    d={};
+    if(std::fegetround()!=FE_TONEAREST)return reject(d,ModelMotionError49O::rounding_mode);
+    if(!locals||!nodes||nodes>64||!motion.data||!std::isfinite(fraction)||fraction<0||fraction>1||
+       !std::isfinite(motion.duration)||!(motion.duration>0))return reject(d,ModelMotionError49O::input);
+    if(motion.rotationCount>64||motion.positionCount>64||!bindings.count||bindings.count>64)
+        return reject(d,ModelMotionError49O::topology);
+    ModelLocalMatrix49O staged[64];
+    for(std::uint32_t i=0;i<nodes;++i){
+        for(unsigned j=0;j<16;++j)if(!std::isfinite(locals[i].m[j]))return reject(d,ModelMotionError49O::input,i);
+        if(locals[i].m[3]!=0||locals[i].m[7]!=0||locals[i].m[11]!=0||locals[i].m[15]!=1)
+            return reject(d,ModelMotionError49O::input,i);
+        staged[i]=locals[i];
+    }
+    Eval e;const float time=e.mul(motion.duration,fraction);
+    if(!e.valid)return reject(d,ModelMotionError49O::arithmetic);
+    for(unsigned channel=0;channel<2;++channel){
+        const auto count=channel?motion.positionCount:motion.rotationCount;
+        for(std::uint32_t i=0;i<count;++i){
+            const auto& track=channel?motion.position[i]:motion.rotation[i];
+            if(track.rowIndex>=bindings.count||bindings.rows[track.rowIndex].sceneNode>=nodes)
+                return reject(d,ModelMotionError49O::binding,i);
+            auto& local=staged[bindings.rows[track.rowIndex].sceneNode];
+            if(!channel){Q q{};if(!e.rotation(motion,i,time,q))return reject(d,ModelMotionError49O::sample_time,i);
+                e.rotationMatrix(q,local);
+            }else{V p{};if(!e.position(motion,i,time,p))return reject(d,ModelMotionError49O::sample_time,i);
+                for(unsigned lane=0;lane<3;++lane)local.m[12+lane]=p[lane];
+            }
+            if(!e.valid)return reject(d,ModelMotionError49O::arithmetic,i);
+        }
+    }
+    for(std::uint32_t i=0;i<nodes;++i)locals[i]=staged[i];
+    return true;
+}
 bool sampleModelMotionBlend49O(const assets::MotionView49O& first,
     const assets::MotionView49O& second,const assets::MotionNodeBindings49O& bindings,
     float fraction,float weight,ModelLocalMatrix49O* locals,std::uint32_t nodes,

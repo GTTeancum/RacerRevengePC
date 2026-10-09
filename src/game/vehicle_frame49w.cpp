@@ -39,7 +39,7 @@ struct Math {
  void addLoad(Vector3_48C& to,const V&v) noexcept {for(unsigned i=0;i<3;++i)to.v[i]=add(to.v[i],v.v[i]);}
 };
 V vector(const Vector3_48C&v,float w=1) noexcept {return {{v.v[0],v.v[1],v.v[2],w}};}
-SceneGraph49P graph(S&s) noexcept {return {s.nodes,vehicleFrameNodeCount49W};}
+SceneGraph49P graph(S&s) noexcept {return {s.nodes,s.sceneNodeCount};}
 const SceneNode49P& node(const S&s,I i) noexcept {return s.nodes[static_cast<unsigned>(i)];}
 SceneNode49P& node(S&s,I i) noexcept {return s.nodes[static_cast<unsigned>(i)];}
 bool index(I i) noexcept {const auto n=static_cast<int>(i);return n>=0&&n<int(vehicleFrameNodeCount49W);}
@@ -60,11 +60,11 @@ bool admit(const S&s,const VehicleFrameBindings49W&b,VehicleFrameDiagnostic49W&d
  if(!s.terrainProbe.enabled&&m.probe100)return fail(d,E::Admission,0);
  if(s.terrainProbe.enabled&&(m.probe100!=1u||s.terrainProbe.stage>3u||c.main.components.probe348.field1E8>16u))return fail(d,E::Admission,0x1b1800);
  if(std::fegetround()!=FE_TONEAREST||s.fields.vehicle58||s.fields.vehicle3C||s.fields.vehicle834||c.main.vehicleState40||c.main.applicationActive11C||m.body320!=1||m.bodyChildCount||b.mainDomain.firstComponentChildPresent18||m.sceneObserverCount||!m.sceneAttached||m.sceneHasParent||!m.bodyEnabled||!m.secondBodyPresent||m.override3C||m.resetRequested||m.probe120Present||m.probe124Present||z.body320!=1||z.registrationMask!=2||z.bodyChildCount||b.secondaryDomain.firstComponentChildPresent18||z.sceneObserverCount||z.sceneHasParent||!c.secondary.scenePresent||!c.secondary.enabled||s.shape.type88||s.shape.registrationE0||!emptyRoute(b.mainDomain)||!emptyRoute(b.secondaryDomain))return fail(d,E::Admission,0);
- const SceneGraph49P g{const_cast<SceneNode49P*>(s.nodes),vehicleFrameNodeCount49W};
- if(!validateSceneGraph49P(g))return fail(d,E::Graph,0);
- for(unsigned i=0;i<vehicleFrameNodeCount49W;++i){const auto&n=s.nodes[i];const auto&t=b.topology[i];if(n.parent180!=t.parent180||n.firstChild184!=t.firstChild184||n.nextSibling188!=t.nextSibling188)return fail(d,E::Graph,0);}
+ const SceneGraph49P g{const_cast<SceneNode49P*>(s.nodes),s.sceneNodeCount};
+ if(!validVehicleSceneCount49W(s,b)||!validateSceneGraph49P(g))return fail(d,E::Graph,0);
+ for(unsigned i=0;i<s.sceneNodeCount;++i){const auto&n=s.nodes[i];const auto&t=b.topology[i];if(n.parent180!=t.parent180||n.firstChild184!=t.firstChild184||n.nextSibling188!=t.nextSibling188)return fail(d,E::Graph,0);}
  const auto&v=b.visual;const auto&l=b.lifecycle;const auto&a=b.animation;
- for(I i:{l.main190,l.container194,l.hidden198,l.physical19C,l.model1B4,l.left1BC,l.right1B8,l.leftCable1E0,l.rightCable1E4})if(!index(i))return fail(d,E::Graph,0);
+ for(I i:{l.main190,l.container194,l.hidden198,l.physical19C,l.model1B4,l.left1BC,l.right1B8,l.leftCable1E0,l.rightCable1E4})if(!index(i)||static_cast<unsigned>(i)>=s.sceneNodeCount)return fail(d,E::Graph,0);
  if(l.main190==l.physical19C||node(s,l.main190).parent180!=I::none||node(s,l.physical19C).parent180!=I::none||node(s,l.container194).parent180!=l.main190||v.main190!=l.main190||v.container194!=l.container194||v.left1BC!=l.left1BC||v.right1B8!=l.right1B8||a.bodyScene288!=l.main190||a.chariot1B4!=l.model1B4||a.left1BC!=l.left1BC||a.right1B8!=l.right1B8||children(s,l.main190)!=m.sceneChildCount||children(s,l.physical19C)!=z.sceneChildCount)return fail(d,E::Graph,0);
  const bool terrainDirty=s.terrainProbe.enabled&&s.terrainProbe.stage==3u&&(s.phase==P::Post368||s.phase==P::MainIntegration);
  if((!(node(s,l.main190).sceneFlags190&1u)&&!terrainDirty)||!same(&c.main.components.root.scene,&node(s,l.main190).world100,sizeof(BodyMatrix48G))||!same(&c.secondary.root.scene,&node(s,l.physical19C).world100,sizeof(BodyMatrix48G))||(c.mainSphere.sceneFlags190&255u)!=node(s,l.main190).sceneFlags190||(c.secondary.sceneFlags190&255u)!=node(s,l.physical19C).sceneFlags190)return fail(d,E::Projection,0);
@@ -217,6 +217,8 @@ bool graphicsVehicleFrame49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
  auto&r=w.next;auto&m=r.bodies.main;auto&c=m.components;const auto&f=r.fields;const float dt=m.frameFactor;
  constexpr std::uint32_t initializedZero[4]={0,0,0,0x3f800000u};if(!same(p.activation.vector433B80,initializedZero,16))return fail(d,E::Admission,0x167ad0);
  VehicleAnimationInput49T a{VehicleAnimationPhase49T::beforeAnimation21A000,dt,c.bindings.aeroDrive[0],c.bindings.aeroDrive[1],f.chariot191,f.chariot1B0,f.left191,f.right191,true,true,vector(c.root.body.linearAcceleration,r.mainSupplement.linearAccelerationC0W)};
+ a.midRecordsAbsent=!b.animation.mid288&&!b.animation.rightMid294&&!b.animation.leftMid298;
+ a.steeringB6C=m.controls.bound.control.filtered.values[0];
  VehicleAnimationDiagnostic49T ad{};RR_VEHICLE_FRAME49W_STAGE(0x21a000);
  if(!advanceVehicleAnimation49T(a,b.animation,graph(r),r.animation,r.animationShared,r.visualShared,w.animation,ad))return fail(d,E::Animation,ad.sourceStage);
  project(r,b);
@@ -577,7 +579,11 @@ bool advanceVehicleBaseThroughEngine50X(S&s,const VehicleFrameBindings49W&b,cons
  if(!start(s,b,P::PostPackedBytes50S,w,d))return false;
  if(!binding.vehicleOwnerId||static_cast<unsigned>(binding.probe128)>2)return fail(d,E::Admission,0x2208a0);
  const auto leftId=static_cast<std::uint32_t>(b.visual.left1BC)+1u,rightId=static_cast<std::uint32_t>(b.visual.right1B8)+1u;
- if(flame.models[0].modelId!=leftId||flame.models[1].modelId!=rightId||flame.models[2].modelId||flame.models[3].modelId||flame.models[0].flameFilter!=1||flame.models[1].flameFilter!=2||flame.models[0].referenceCount!=8||flame.models[1].referenceCount!=8)return fail(d,E::Admission,0x2208d0);
+ if(flame.models[0].modelId!=leftId||flame.models[1].modelId!=rightId||flame.models[2].modelId||flame.models[3].modelId||flame.models[0].flameFilter!=1||flame.models[1].flameFilter!=2)return fail(d,E::Admission,0x2208d0);
+ // Counts come from each retained engine scene, including POD09's additional
+ // static material reference. The prepared projection still has four flame
+ // references per engine and therefore the same eight callback writes below.
+ for(unsigned side=0;side<2;++side)if(!flame.models[side].referenceCount||flame.models[side].referenceCount>rr::assets::podFlameReferencesPerModel50W)return fail(d,E::Admission,0x2208d0);
  scratch.next=tail;scratch.globals=globals;scratch.flame=flame;auto&r=w.next;auto&m=r.bodies.main;
  RR_VEHICLE_FRAME49W_STAGE(0x228b8c);r.fields.impactBA0=r.visualShared.zero434630;
  V position{{0,0,0,1}};

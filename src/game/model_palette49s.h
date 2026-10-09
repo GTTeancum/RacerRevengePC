@@ -3,7 +3,8 @@
 #include <cstdint>
 
 namespace rr::game {
-constexpr std::uint32_t maxModelPaletteEntries49S = maxSceneNodes49P;
+// Per-model palette capacity is independent of the complete scene forest.
+constexpr std::uint32_t maxModelPaletteEntries49S = 64;
 // Caller attestations, not original state fields or a renderer/frame scheduler.
 enum class ModelPalettePhase49S : std::uint8_t {
     unspecified, selectedRenderPreparation
@@ -54,7 +55,7 @@ struct ModelPaletteDiagnostic49S { ModelPaletteError49S error; };
 // to a vertex transformed by nodeWorld. No inverse-bind or weighted skinning.
 //
 // Native bounds are1..64 source nodes and1..64 palette entries in a coherent
-// forest of1..64 nodes; storage order need not be parent-first. The model can
+// forest of1..maxSceneNodes49P nodes; storage order need not be parent-first. The model can
 // have a parent. No geometry, normal, material, packet/VU, LOD, visibility,
 // observer, resource ownership or physical-body association is inferred.
 // Uses49P's strict FP/FE_TONEAREST domain. Copy-only opaque matrix words are
