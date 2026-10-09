@@ -3,6 +3,10 @@
 #include "lap_completion50gg.h"
 #include "vehicle_frame49w.h"
 #include "lap_sound_owner50gh_fixture.h"
+#include "lap_config_ta50id.h"
+#include "lap_timing50id.h"
+#include "race_event_queue50id.h"
+#include "lap_hud_null50id.h"
 
 namespace lap_drive50GJ {
 using namespace rr::game;
@@ -14,6 +18,13 @@ struct Continuity {
     LapProgressState50GF state{};
     UndertrackPlayerPrefix50ET prefix{};
     bool initialized=false;
+    // Trivially-copyable per-racer ownership; existing bank.owner(lapContinuity)
+    // includes these fields automatically. Recovery preserves them.
+    LapTimingFields50ID timing{};
+    LapTimingCursor50ID timingCursor{};
+    bool timingInitialized=false;
+    bool timingEventReturned=false;
+    LapHudFields50ID originalHud{};
 };
 struct AudioDispatchResult {
     bool complete=false,started=false,unavailable=false;
@@ -28,6 +39,12 @@ struct Owner {
     LapCompletionCursor50GG completion{};
     LapCompletionResult50GG completionResult{};
     LapCompletionConfig50GG config{2,0,0};
+    // Optional shared fresh-TA configuration. Null preserves mode2 baseline.
+    // This owner stays outside racer snapshots. The explicit HOST accepted-
+    // world adapter supplies timing/FIFO order; it claims no root scheduler parity.
+    LapConfigTa50ID* nativeConfig=nullptr;
+    void* completionEffectContext=nullptr;
+    bool (*completionEffect)(void*,const LapCompletionRequest50GG&) noexcept=nullptr;
     lap_sound50GH::DisabledAudioProvider provider{};
     lap_sound50GH::Owner sound{};
     // Optional real native provider. Null retains the explicitly disabled
@@ -37,6 +54,110 @@ struct Owner {
         std::uint32_t) noexcept=nullptr;
     std::uint64_t audibleStarts=0;
     std::uint64_t markers=0,completedCallbacks=0,unavailableSounds=0;
+
+    // Cold only, once for each independently owned racer. Native fresh-profile
+    // configuration/selection must have been prepared before this binding.
+    bool initializeTiming() noexcept {
+        if(!continuity||!nativeConfig||!nativeConfig->initialized||
+           continuity->timingInitialized||nativeConfig->mode11258!=1u)return false;
+        initializeLapTimingFields50ID(continuity->timing,nativeConfig->mode11258);
+        continuity->timingInitialized=true;return true;
+    }
+    LapCompletionConfig50GG liveConfig() const noexcept {
+        return nativeConfig?completionConfig50ID(*nativeConfig):config;
+    }
+    // Resume exactly the already-pending50GG call. On missing query/HUD
+    // backing, keep its cursor and enclosing50GF request; never replay audio.
+    bool drainCompletion() noexcept {
+        auto& c=*continuity;
+        for(;;){
+            if(nativeConfig&&!nativeConfig->initialized)return false;
+            const auto currentConfig=liveConfig();
+            if(currentConfig.mode11258!=2u&&(!nativeConfig||!nativeConfig->initialized||
+               currentConfig.mode11258!=1u||!c.timingInitialized))return false;
+            LapCompletionPlayer50GG player{};
+            player.lapCC8=c.state.vehicleCC8;
+            if(currentConfig.mode11258==1u){
+                player.timeCB0=c.timing.timeCB0;player.bestLapCB4=c.timing.bestLapCB4;
+                player.lapTimesCC0=c.timing.lapTimesCC0;
+                player.lapTimeCount=lapTimingCapacity50ID;
+            }
+            completionResult=advanceLapCompletion50GG(player,currentConfig,completion);
+            if(completionResult.status==LapCompletionStatus50GG::Complete){
+                if(!resumePlayerLapAfterCallback50GF(c.state,pending,diagnostic))return false;
+                fields->impactFlagsCD8=c.state.vehicleCD8;++completedCallbacks;return true;
+            }
+            const auto request=completionResult.request;
+            std::uint32_t returnedV0=0;
+            if(completionResult.status==LapCompletionStatus50GG::NeedQuery){
+                if(!nativeConfig||!nativeConfig->initialized)return false;
+                const auto recordConfig=recordConfig50ID(*nativeConfig);
+                const auto tables=recordTables50ID(*nativeConfig);
+                LapRecordQueryResult50ID query{LapRecordQueryStatus50ID::Storage,0,0};
+                if(request.kind==LapCompletionCall50GG::LapLookup1861A0)
+                    query=queryLapRecord50ID(recordConfig,tables,request.argumentA1,request.argumentF12);
+                else if(request.kind==LapCompletionCall50GG::RaceLookup186280)
+                    query=queryRaceRecord50ID(recordConfig,tables,request.argumentA1,request.argumentF12);
+                else return false;
+                if(!query.completed())return false;
+                returnedV0=query.originalV0;
+            }else if(completionResult.status==LapCompletionStatus50GG::NeedEffect){
+                if(request.kind==LapCompletionCall50GG::OwnerSelection292360){
+                    if(audioDispatch){
+                        const auto result=audioDispatch(audioContext,request.argumentA1,
+                            request.argumentA2,request.argumentA3);
+                        if(!result.complete)return false;
+                        if(result.started)++audibleStarts;
+                        if(result.unavailable)++unavailableSounds;
+                    }else{
+                        const auto result=lap_sound50GH::dispatch(sound,request.argumentA1,
+                            request.argumentA2,request.argumentA3);
+                        if(!result.completed())return false;
+                        if(static_cast<std::int32_t>(result.providerResult)<0)++unavailableSounds;
+                    }
+                }else{
+                    const auto hud=applyLapHudNullBranch50ID(c.originalHud,request);
+                    if(hud!=LapHudResult50ID::NullReturned&&
+                       (!completionEffect||!completionEffect(completionEffectContext,request)))
+                        return false;
+                }
+            }else return false;
+            //Only an actually returned effect/query reaches this acknowledgement.
+            if(!acceptLapCompletionReturn50GG(completion,{request.sequence,request.kind,
+                returnedV0,request.query},completionResult))return false;
+        }
+    }
+    // Actual1AFF50 racer cut. Invoke at the explicitly chosen manager boundary,
+    // with shared manager+30 ALREADY advanced by its real binary32 delta.
+    // This method neither reads host50HM seconds nor silently clears lap flags.
+    template<std::size_t N> bool managerTimingCut(LapTimingManager50ID& manager,
+        float delta,std::uint32_t vehicle58,std::uint32_t vehicle5C,
+        RaceActorId50ID actor,const RaceActorResolver50ID& actors,
+        RaceEventQueue50ID<N>& sharedEvents) noexcept {
+        auto& c=*continuity;
+        if(!nativeConfig||!nativeConfig->initialized||!c.timingInitialized||
+           pending.pending.requested||!actor)return false;
+        LapTimingResult50ID result{LapTimingStatus50ID::NeedLapEvent,0,
+            c.timingCursor.pending};
+        if(!c.timingCursor.pending.sequence){
+            const LapTimingInput50ID input{delta,nativeConfig->mode11258,vehicle58,
+                vehicle5C,c.state.vehicleCC8,fields->impactFlagsCD8};
+            result=beginRacerLapTiming50ID(c.timing,manager,input,c.timingCursor);
+        }
+        if(result.status==LapTimingStatus50ID::Complete)return true;
+        if(result.status!=LapTimingStatus50ID::NeedLapEvent)return false;
+        if(!c.timingEventReturned){
+            const auto appended=appendRaceEvent50ID(sharedEvents,{0,6,0,actor,0},actors);
+            if(!appended.helperReturned())return false;
+            c.timingEventReturned=true;
+        }
+        //This completes queue helper1A64B0 only. Its FIFO entry still needs
+        //the ordered event-manager flush; this is not speech completion.
+        result=resumeRacerLapTimingAfterEvent50ID(c.timing,manager,c.timingCursor,
+            result.request.sequence);
+        if(result.status!=LapTimingStatus50ID::Complete)return false;
+        c.timingEventReturned=false;return true;
+    }
 
     static bool accepted(void* context,bool sequential,std::uint32_t node,
                          std::uint32_t current) noexcept {
@@ -54,30 +175,8 @@ struct Owner {
         if(receipt.progressMarkerConsumed)++markers;
         if(!receipt.callback.requested)return true;
         completionResult=beginLapCompletion50GG(completion);
-        if(completionResult.status!=LapCompletionStatus50GG::NeedEffect||
-           completionResult.request.kind!=LapCompletionCall50GG::OwnerSelection292360)return false;
-        if(audioDispatch){
-            const auto result=audioDispatch(audioContext,completionResult.request.argumentA1,
-                completionResult.request.argumentA2,completionResult.request.argumentA3);
-            if(!result.complete)return false;
-            if(result.started)++audibleStarts;
-            if(result.unavailable)++unavailableSounds;
-        }else{
-            const auto result=lap_sound50GH::dispatch(sound,completionResult.request.argumentA1,
-                completionResult.request.argumentA2,completionResult.request.argumentA3);
-            if(!result.completed())return false;
-            if(static_cast<std::int32_t>(result.providerResult)<0)++unavailableSounds;
-        }
-        //292360 is a void effect boundary. A positive233410 sound result is
-        // recorded by the native provider, not substituted as this helper's V0.
-        const LapCompletionReturn50GG returned{completionResult.request.sequence,
-            completionResult.request.kind,0,false};
-        if(!acceptLapCompletionReturn50GG(completion,returned,completionResult))return false;
-        LapCompletionPlayer50GG player{};player.lapCC8=c.state.vehicleCC8;
-        completionResult=advanceLapCompletion50GG(player,config,completion);
-        if(completionResult.status!=LapCompletionStatus50GG::Complete)return false;
-        if(!resumePlayerLapAfterCallback50GF(c.state,pending,diagnostic))return false;
-        fields->impactFlagsCD8=c.state.vehicleCD8;++completedCallbacks;return true;
+        if(completionResult.status!=LapCompletionStatus50GG::NeedEffect)return false;
+        return drainCompletion();
     }
 };
 }

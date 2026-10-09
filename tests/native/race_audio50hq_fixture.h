@@ -130,6 +130,11 @@ public:
     // Only 3/2/1 edges emit race keys1/2/3. Entering Racing emits key4 once.
     // Speech is native policy: authored-group round robin, one voice, five-second
     // place cooldown. Lap/finish preempt place speech; no queued stale messages.
+    // Cold policy switch: mode1 keeps real countdown/GO here while the shared
+    // original announcer consumes event5/event6. No duplicate HOST Dax lines.
+    bool setHostSpeechEnabled(bool enabled)noexcept {
+        if(state_.seeded)return false;hostSpeechEnabled_=enabled;return true;
+    }
     Receipt observe(const race_session50HM::Session&s)noexcept {
         Receipt result;if(!mixer_||!detail::valid(s)||!announcer_||!announcer_->pollCompletion()){
             ++counters_.rejected;return result;}
@@ -146,7 +151,7 @@ public:
             ((!state_.seeded&&s.raceSeconds==0)||(state_.seeded&&state_.phase==race_session50HM::Phase::Countdown))){
             emit(result,Kind::Go,3,false);++counters_.countdownEvents;
         }
-        if(state_.seeded&&s.raceSeconds>state_.seconds){
+        if(hostSpeechEnabled_&&state_.seeded&&s.raceSeconds>state_.seconds){
             if(r.finished&&!state_.finished){
                 ++counters_.finishEvents;
                 if(r.finishPlace==1)emit(result,Kind::Finish1,8,true);
@@ -212,6 +217,6 @@ private:
     std::array<rr::platform::AudioClip50HD,clipCount>clips_{};
     rr::platform::AudioMixer50HD*mixer_=nullptr;
     rr::platform::AnnouncerEpisode50IC*announcer_=nullptr;
-    detail::State state_{};Counters counters_{};bool attempted_=false;
+    detail::State state_{};Counters counters_{};bool attempted_=false,hostSpeechEnabled_=true;
 };
 } // namespace race_audio50HQ

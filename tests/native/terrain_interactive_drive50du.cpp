@@ -9,6 +9,9 @@
 #include "native_racer_draw50hn_fixture.h"
 #include "race_session50hm_fixture.h"
 #include "race_audio50hq_fixture.h"
+#include "race_mode1_host50id_fixture.h"
+#include "source_announcer50ie_fixture.h"
+#include "race_music50ie_fixture.h"
 #include "opponent_engine_audio50hx_fixture.h"
 #include "engine_damage_audio50ia.h"
 #include "wrong_way_progress50go.h"
@@ -150,10 +153,18 @@ namespace recovery50FI=checkpoint_recovery50fi_fixture;
 enum class SessionExit50DU { Quit, Restart, Checkpoint };
 SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const char* capturePath,
     const recovery50FI::Plan* checkpointInput,recovery50FI::Plan& checkpointOutput,
-    lap_drive50GJ::Continuity& lapContinuity,std::uint64_t sessionIndex){
+    lap_drive50GJ::Continuity& lapContinuity,std::uint64_t sessionIndex,
+    HostMonotonicClock50ID& applicationClock){
  require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest setup failed");
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceEnabled=!(raceSetting&&std::string(raceSetting)=="0");
+ const char* raceModeSetting=std::getenv("RR_RACE_MODE");
+ require50DU(!raceModeSetting||std::string(raceModeSetting)=="1"||std::string(raceModeSetting)=="2",
+     "RR_RACE_MODE must be 1 (source events) or 2 (HOST fallback)");
+ const bool mode1Requested=raceEnabled&&(!raceModeSetting||std::string(raceModeSetting)=="1");
+ // Default mode1 is committed only after ALL required providers cold-prepare.
+ // Failure is explicit; RR_RACE_MODE=2 is the selectable existing fallback.
+ bool mode1Enabled=false;
  const char* disableRacerContacts=std::getenv("RR_DISABLE_RACER_CONTACTS");
  const bool racerContactsEnabled=raceEnabled&&
      !(disableRacerContacts&&std::string(disableRacerContacts)=="1");
@@ -195,6 +206,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   cold::words(v.copied40.data(),j["copied40"]);cold::words(v.copied50.data(),j["copied50"]);stackCount=std::max(stackCount,1+shape.view.maxDepth+m.maxDepth);
  }
  f::Fixture x(0);auto&s=x.state;auto&m=s.bodies.main;
+ // Explicit HOST fresh-session policy: this Fixture reconstructs the native
+ // raw RNG, so reset its shared Dax/category6 lazy slot at that SAME boundary.
+ // It is not banked or private audio RNG. Original cross-race static lifetime
+ // is not claimed; the monotonic clock backend itself remains application-wide.
+ LapEventRandomOwner50ID sessionLazy{};
  // Permanent original-resource owners precede the snapshot bank and all draw
  // publications. Only their immutable borrowed views enter the live arena.
  std::array<std::unique_ptr<native_racer50HW::Rig>,raceRacerCount> racerRigs;
@@ -564,11 +580,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  lap_drive50GJ::Owner lapOwner;lapOwner.continuity=&lapContinuity;lapOwner.fields=&s.fields;
  auto liveAudio=std::make_unique<live_audio50HF::Owner>();
  auto raceAudio=std::make_unique<race_audio50HQ::Owner>();
+ auto sourceAnnouncer=std::make_unique<source_announcer50IE::Owner>();
+ auto raceMusic=std::make_unique<race_music50IE::Owner>();
+ std::unique_ptr<race_mode1_host50ID::Owner> mode1;
  auto materialAudio=std::make_unique<material_audio50HI::Provider>();
  // This owner dies before the live mixer and owns only voices96..109.
  auto opponentAudio=std::make_unique<opponent_audio50HX::Owner>();
  const char* audioSetting=std::getenv("RR_AUDIO");
  const bool audioEnabled=!(audioSetting&&std::string(audioSetting)=="0");
+ require50DU(!mode1Requested||audioEnabled,
+     "mode1 requires original audio providers; use RR_RACE_MODE=2 explicitly for RR_AUDIO=0");
  rr::platform::AudioOutputDiagnostic50HD audioDiagnostic{};
  PodSpeechCounts50HG speechCounts{};PodSpeechState50HG speechState{};
  // Selected-player emitter state only; opponent bank visits never mutate it.
@@ -594,6 +615,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(raceEnabled)require50DU(materialMixer&&raceAudio->prepare("work/native/project/disc",
       audioRoot,*materialMixer,*audioGroups,*sharedAnnouncer,audioError),
       audioError.empty()?"original race audio preparation failed":audioError.c_str());
+  if(mode1Requested){
+   require50DU(materialMixer&&sourceAnnouncer->prepare("work/native/project/disc",audioRoot,
+       *materialMixer,*audioGroups,*sharedAnnouncer,sessionLazy,applicationClock,
+       s.noise.sharedRandomState,audioError),
+       audioError.empty()?"source Dax cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
+   require50DU(materialMixer&&raceMusic->prepare("work/native/project/disc",audioRoot,
+       *materialMixer,*audioGroups,audioError),
+       audioError.empty()?"source music cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
+   require50DU(sourceAnnouncer->prepared()&&raceMusic->bank().ready==race_music50IE::clipCount,
+       "mode1 source providers/music PCM incomplete; no silent fallback (RR_RACE_MODE=2 is explicit)");
+   require50DU(raceAudio->setHostSpeechEnabled(false),"mode1 HOST Dax suppression binding failed");
+   mode1Enabled=true;
+  }
   require50DU(materialMixer&&materialAudio->prepare("work/native/project/disc",audioRoot,
       *materialMixer,64,audioError),audioError.empty()?"native material audio preparation failed":audioError.c_str());
   require50DU(race_audio_groups50IC::bindProviderRange(*audioGroups,
@@ -630,7 +664,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::cerr<<"Audio fresh original levels effects/music/character/Dax "
       <<audioConfig.effects11020<<'/'<<audioConfig.music11024<<'/'
       <<audioConfig.character11028<<'/'<<audioConfig.announcer1102C
-      <<"; no saved audio preferences loaded; host Dax policy, shared voice84 completion.\n";
+      <<"; no saved audio preferences loaded; "<<(mode1Enabled?"source mode1":"HOST mode2")
+      <<" Dax policy, shared voice84 completion.\n";
   lapOwner.audioContext=liveAudio.get();
   lapOwner.audioDispatch=[](void* context,std::uint32_t key,std::uint32_t flags,
                            std::uint32_t a3)noexcept{
@@ -1180,12 +1215,38 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   DamageSpeechInput50HG in{};
   in.damage7D0=s.fields.damage7D0;in.damage7D4=s.fields.damage7D4;in.damage7DC=s.fields.damage7DC;
   in.vehicle3C=s.fields.vehicle3C;in.vehicle40=m.vehicleState40;in.vehicle58=s.fields.vehicle58;
-  in.vehicle60=0xffffffffu; // Unrepresented racer ID; announcer request stays unjoined.
-  in.vehicle60Known=false;in.playerSpeechChance138=playerSpeechChance;
+  in.vehicle60=mode1Enabled?1u:0xffffffffu;
+  // Source21081C/210820 authenticates Pod01 racer60=1, not native bank slot0.
+  in.vehicle60Known=mode1Enabled;in.playerSpeechChance138=playerSpeechChance;
   in.config58=s.fields.applicationByte58;
   in.position={m.components.root.body.position.v[0],m.components.root.body.position.v[2]};
   in.listeners={audioListenerReady?&audioListener:nullptr,audioListenerReady?1u:0u};
   return in;
+ };
+ struct Mode1EffectsContext50ID {
+  std::unique_ptr<race_mode1_host50ID::Owner>* mode=nullptr;
+  source_announcer50IE::Owner* dax=nullptr;race_music50IE::Owner* music=nullptr;
+  live_audio50HF::Owner* audio=nullptr;decltype(speechInput)* input=nullptr;
+  std::uint64_t* speechCues=nullptr;
+ } mode1Context{&mode1,sourceAnnouncer.get(),raceMusic.get(),liveAudio.get(),&speechInput,&speechCues};
+ race_mode1_host50ID::Effects mode1Effects{};mode1Effects.context=&mode1Context;
+ mode1Effects.announcer=[](void* opaque,std::uint32_t type,std::uint32_t racer,std::uint32_t variant)noexcept{
+  auto& c=*static_cast<Mode1EffectsContext50ID*>(opaque);
+  return *c.mode&&c.dax->request(type,racer,variant,
+      (*c.mode)->config.mode11258,(*c.mode)->manager.flags58);
+ };
+ mode1Effects.music=[](void* opaque,std::uint32_t key,std::uint32_t argumentA2)noexcept{
+  auto& c=*static_cast<Mode1EffectsContext50ID*>(opaque);
+  return *c.mode&&c.audio->outputOpen()&&c.music->request(key,argumentA2,
+      (*c.mode)->config.mode11258).completed();
+ };
+ mode1Effects.audio=[](void* opaque,const AudioCommand50HE& command)noexcept{
+  auto& c=*static_cast<Mode1EffectsContext50ID*>(opaque);
+  if(!c.audio->outputOpen()||!c.audio->applySourceCommand(command).okay())return false;
+  ++*c.speechCues;return true;
+ };
+ mode1Effects.damageInput=[](void* opaque,DamageSpeechInput50HG& input)noexcept{
+  auto& c=*static_cast<Mode1EffectsContext50ID*>(opaque);input=(*c.input)();return true;
  };
  auto advanceFrame=[&](){
  finishDriverAppliedThisFrame=false;
@@ -1315,7 +1376,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "source repair-completion audio rejected");
   require50DU(afterRepairSpeechState50HG(s.fields.damage7D0,s.fields.damage7D4,
       s.fields.damage7DC,lapContinuity.prefix),"native repair speech state rejected");
-  const auto produced=produceDamageSpeechEvent50HG(speechInput(),lapContinuity.prefix,pendingSpeech);
+  const auto produced=mode1Enabled?mode1->produceDamage(speechInput()):
+      produceDamageSpeechEvent50HG(speechInput(),lapContinuity.prefix,pendingSpeech);
   require50DU(produced.status==PodSpeechStatus50HG::Complete,"native damage speech enqueue rejected");
   if(produced.eventProduced)++speechEvents;
  }
@@ -1707,6 +1769,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(race_session50HM::seedGridOrder(race,gridOrder,raceRacerCount),
       "explicit host starting-grid order rejected");
   sampleRaceField();require50DU(race_session50HM::commitFrame(race,0),"race grid observations rejected");
+  if(mode1Enabled){
+   mode1=std::make_unique<race_mode1_host50ID::Owner>(racerBank,lapOwner,s.fields,race);
+   std::array<race_mode1_host50ID::RosterEntry,raceRacerCount> roles{};
+   roles[0]={1,0,true,true}; // Authenticated original Pod01 identity, one human.
+   // Bot IDs are not synthesized. Category6 sees HOST AI role and returns
+   // before identity-dependent speech; arena vehicle58 remains unchanged.
+   require50DU(mode1->initialize(roles.data(),roles.size()),"cold mode1 lap/record/FIFO binding failed");
+  }
+  std::cerr<<"RACE MODE "<<(mode1Enabled?1:2)
+      <<(mode1Enabled?": source lap/records/event FIFO; explicit HOST world/rank/finish and distance projection.\n":
+         ": existing HOST observer/audio fallback explicitly selected.\n");
   std::cerr<<"HOST RACE: "<<raceRacerCount<<" distinct original racers, 3 laps, 3-second countdown. "
       "Field count matches the original normal race; the grounded starting grid and opponent controls are host-authored. "
       "Original AI remains unjoined. "
@@ -1721,6 +1794,30 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         "Empty-root material0 is a deterministic host policy; original padding parity is unclaimed. "
         "Secondary dynamic collision, damage attribution and opponent speech/collision/boost-event audio remain unjoined.\n";
  }
+
+ // HOST audio/world scheduling: once after each actual common16ms mix,
+ // including countdown. Never rendered-frame, paused or per-racer updates.
+ auto advanceSourceAudioWorld=[&](std::uint64_t beforeMix){
+  if(!mode1Enabled)return;
+  require50DU(raceMusic->pollCompletion(),"mode1 music transport ownership failed after shared mix");
+  const auto afterMix=liveAudio->mixedFrames();
+  require50DU(afterMix>=beforeMix&&(afterMix-beforeMix==0u||afterMix-beforeMix==768u),
+      "mode1 shared mix must advance one actual768-frame step or none");
+  if(afterMix==beforeMix)return;
+  // Output may fail AFTER the actual mix. Source completion/update still runs
+  // exactly once for those consumed frames before surfacing the output error.
+  AnnouncerLeader50IE leader{};
+  if(race.racerCount){
+   const auto slot=race.ordered[0];leader.exists=true;
+   leader.vehicle58=slot==0?0u:1u; // HOST role, not arena player-physics gate.
+   leader.remainingDistance34=static_cast<float>(race.racers[slot].remainingDistance);
+   leader.cachedSpeed34=racerBank.visit(slot,[&](){return m.cachedSpeed34;});
+   leader.hostRemainingProjection=true;
+  }
+  // Exact source remaining/speed<10 priority formula; remaining distance is
+  // HOST interpolation, not original cross-section or ranking-tie arithmetic.
+  require50DU(sourceAnnouncer->update(.016f,leader),"mode1 shared announcer update unresolved");
+ };
 
  // Actual retained TA visual mesh, already placed by the49G/48F exporter.
  // This visual set is broader than the37-collider diagnostic physics scope.
@@ -1768,6 +1865,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  bool restartRequested=false;
  auto closeWindow=[&](){
   bool clean=true;
+  if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
   opponentAudio->close(); // Release only96..109 before the live mixer closes.
   if(!liveAudio->close(audioDiagnostic)){
@@ -1851,6 +1949,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     std::cerr<<"Audio unavailable: no original samples decoded; no device or WAV opened.\n";
    }
   }
+  if(mode1Enabled)require50DU(liveAudio->outputOpen(),"mode1 needs the real shared output backend");
   if(audioEnabled&&raceEnabled){
    require50DU(raceAudio->observe(race).accepted,"initial race audio observation rejected");
    std::cerr<<"Race audio ready/missing/unsupported/invalid "<<raceAudio->bank().ready<<'/'
@@ -2163,7 +2262,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(recoveryPaused){
     // Never prepare or submit a draw batch from the interrupted native state.
     // Readback uses only the renderer's already committed private target.
-    if(audioEnabled)liveAudio->pause(true);
+    if(audioEnabled){liveAudio->pause(true);if(mode1Enabled)raceMusic->pause(true);}
     captureCommitted();hostClock.pause(now);
     std::this_thread::sleep_for(std::chrono::milliseconds(8));
     continue;
@@ -2180,13 +2279,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        info.drawableWidth<=0||info.drawableHeight<=0||oversize;
    composePacket(!paused&&(!raceEnabled||race_session50HM::controlsAllowed(race,0)),input);
    if(paused){
-    if(audioEnabled)liveAudio->pause(true);
+    if(audioEnabled){liveAudio->pause(true);if(mode1Enabled)raceMusic->pause(true);}
     if(!wasPaused)sampleController(); // Publish the declared release-all sample.
     hostClock.pause(now);wasPaused=true;
     std::this_thread::sleep_for(std::chrono::milliseconds(8));
     continue;
    }
-   if(wasPaused){hostClock.pause(now);wasPaused=false;if(audioEnabled)liveAudio->pause(false);}
+   if(wasPaused){hostClock.pause(now);wasPaused=false;if(audioEnabled){liveAudio->pause(false);if(mode1Enabled)raceMusic->pause(false);}}
    // Manual input samples every host poll. The optional host course driver
    // instead emits one ordinary packet per actual 16 ms simulation step.
    if(!autoDriveEnabled)sampleController();
@@ -2197,13 +2296,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     if(raceEnabled&&!race_session50HM::advanceCountdown(race,.016)){
      require50DU(race.error==race_session50HM::Error::None,"race countdown rejected");
      if(audioEnabled){
-      liveAudio->pause(false);
+      liveAudio->pause(false);if(mode1Enabled)raceMusic->pause(false);
       require50DU(raceAudio->observe(race).accepted,"countdown/result audio observation rejected");
       updateOpponentAudio(); // Only countdown holds native vehicle updates.
       // Countdown has a real host clock while native vehicle bodies are held.
       // Advance the shared mixer ONCE; completed results keep normal world steps.
-      if(liveAudio->outputOpen())require50DU(liveAudio->committedStep(audioDiagnostic),
-          "native countdown/result audio step failed");
+      if(liveAudio->outputOpen()){
+       const auto beforeMix=liveAudio->mixedFrames();
+       const bool mixed=liveAudio->committedStep(audioDiagnostic);
+       advanceSourceAudioWorld(beforeMix);
+       require50DU(mixed,"native countdown/result audio step failed");
+      }
      }
      continue;
     }
@@ -2212,7 +2315,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const bool playerFinishDriver=humanResultsActive;
     const bool manualRaceInputHeld=input.down[26]||input.down[22]||input.down[82]||
         input.down[81]||input.down[44]||input.down[21]||input.down[225];
-    if(audioEnabled)liveAudio->pause(false);
+    if(audioEnabled){liveAudio->pause(false);if(mode1Enabled)raceMusic->pause(false);}
     // Recompose at GO so held race input enters this exact native frame.
     // After the human finish, the recovered source driver owns controls while
     // the ordinary coupled-body/native frame keeps advancing.
@@ -2291,6 +2394,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        addCounter50DU(racerContactTotals.activeRecords,contactReceipt.activeRecords);
       }else addCounter50DU(racerContactTotals.noPairs);
      }
+     if(mode1Enabled){
+      const auto timing=mode1->beforeHostCommit(mode1->acceptedWorld+1u,.016f);
+      require50DU(timing.status==race_mode1_host50ID::Status::AwaitHostCommit,
+          "mode1 source timing boundary unresolved; accepted world not replayed");
+     }
      sampleRaceField();
      const auto previousFinishCount=race.finishCount;
      const bool playerWasFinished=race.racers[0].finished;
@@ -2321,18 +2429,34 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       s.fields.applicationByte58=static_cast<std::uint8_t>(s.fields.applicationByte58|1u);
       humanResultsActive=true;humanResultsCountdown=4.f;
      }
+     if(mode1Enabled){
+      // Current native application has no modal original menu: explicit1B0=0.
+      const auto boundary=mode1->afterHostCommit(mode1->acceptedWorld+1u,0);
+      require50DU(boundary.status==race_mode1_host50ID::Status::NeedFlush||
+          boundary.status==race_mode1_host50ID::Status::Complete,"mode1 HOST observer handoff failed");
+     }
      if(audioEnabled)require50DU(raceAudio->observe(race).accepted,
          "committed race audio observation rejected");
     }
     physicsTiming.finish();
     if(!frameAdvanced){
-     if(audioEnabled)liveAudio->pause(true);
+     if(audioEnabled){liveAudio->pause(true);if(mode1Enabled)raceMusic->pause(true);}
      composePacket(false,input);sampleController();
      hostClock.pause(monotonicNow50DU());wasPaused=true;
      break;
     }
     // Source player speech runs only on the human's accepted native step.
-    if(audioEnabled&&playerAdvancing){
+    if(mode1Enabled&&mode1->phase==race_mode1_host50ID::Phase::Flush){
+     const auto flushed=mode1->flush(applicationClock,sessionLazy,s.noise.sharedRandomState,
+         speechCounts,speechState,mode1Effects);
+     if(flushed.status!=race_mode1_host50ID::Status::Complete)
+      std::cerr<<"MODE1 FIFO BLOCKED: source_pc=0x"<<std::hex<<flushed.sourcePC<<std::dec
+          <<" ticket="<<flushed.subscriber.ticket<<" lap_helper="<<unsigned(flushed.subscriber.lapHelper)
+          <<" damage_helper="<<unsigned(flushed.subscriber.damageHelper)<<"; no acknowledgement.\n";
+     require50DU(flushed.status==race_mode1_host50ID::Status::Complete,
+         "mode1 real downstream request unresolved; refusing later world events");
+    }
+    if(audioEnabled&&playerAdvancing&&!mode1Enabled){
      AudioCommand50HE speechCommand{};std::size_t speechCount=0;
      const auto dispatched=dispatchDamageSpeechEvent50HG(speechInput(),speechCounts,pendingSpeech,
          s.noise.sharedRandomState,speechState,&speechCommand,1,speechCount);
@@ -2353,8 +2477,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     updateOpponentAudio(); // After the complete native world commit, before the one shared mix.
     // All racer/audio subscribers feed one mixer. Continue the finish clip and
     // any remaining field while the human is finished; never mix per opponent.
-    if(audioEnabled&&liveAudio->outputOpen())
-     require50DU(liveAudio->committedStep(audioDiagnostic),"native mixed audio world step failed");
+    if(audioEnabled&&liveAudio->outputOpen()){
+     const auto beforeMix=liveAudio->mixedFrames();
+     const bool mixed=liveAudio->committedStep(audioDiagnostic);
+     advanceSourceAudioWorld(beforeMix);
+     require50DU(mixed,"native mixed audio world step failed");
+    }
    }
    if(recoveryPaused){captureCommitted();if(checkpointRequested)break;continue;}
 
@@ -2444,6 +2572,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      hud.raceLap=race_session50HM::displayedLap(race,0);
      hud.raceLapTarget=race.config.lapTarget;hud.racePlace=race.racers[0].place;
      hud.raceRacerCount=race.racerCount;
+     if(mode1Enabled&&lapContinuity.timingInitialized){
+      // Render only source-completed entries after the accepted world/timing
+      // commit. CB0 has already restarted the next lap, including at finish.
+      hud.completedLapTimesValid=true;
+      hud.completedLapTimeCount=std::min(race.racers[0].observed.completedLaps,
+          platform::maxVehicleWindowLapTimes50DS);
+      for(std::uint32_t lap=0;lap<hud.completedLapTimeCount;++lap)
+       hud.completedLapSeconds[lap]=lapContinuity.timing.lapTimesCC0[lap];
+      hud.bestLapSeconds=lapContinuity.timing.bestLapCB4;
+     }
      require50DU(race.racerCount==racerHudNames.size(),"standings require the complete original race field");
      hud.standingsCount=race.racerCount;hud.standingsPlayerIndex=0;
      for(std::uint32_t place=0;place<race.racerCount;++place){
@@ -2739,6 +2877,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<'/'<<materialAudio->counters().starts<<'/'<<materialAudio->counters().controls
          <<'/'<<materialAudio->counters().stops<<'/'<<materialAudio->counters().unavailable<<'\n';
     }
+    if(mode1Enabled){
+     const auto& dax=sourceAnnouncer->state();const auto& last=sourceAnnouncer->lastRequest();
+     std::cerr<<"mode1 world="<<mode1->acceptedWorld<<" phase="<<unsigned(mode1->phase)
+         <<" manager_seconds="<<mode1->manager.time30<<" lap_seconds="<<lapContinuity.timing.timeCB0
+         <<" best_lap="<<lapContinuity.timing.bestLapCB4<<" fifo_count="<<mode1->events.count150
+         <<" fifo_last_ticket="<<mode1->events.lastTicket<<" dax_ready="<<sourceAnnouncer->bank().ready
+         <<" dax_last_type="<<last.request.type<<" dax_admitted="<<last.admitted
+         <<" dax_started="<<last.started<<" dax_queued="<<last.queued
+         <<" dax_pending="<<int(dax.pendingKey19C)<<" dax_episode_ac="<<dax.episodeAC
+         <<" dax_delay_b0="<<dax.timerB0<<" dax_priority_b4="<<dax.priorityB4
+         <<" music_song="<<raceMusic->currentSong()
+         <<" music_starts="<<raceMusic->counters().starts<<" music_active="<<raceMusic->active()<<'\n';
+    }
     if(raceEnabled){
      std::cerr<<"race phase="<<unsigned(race.phase)<<" countdown="<<race_session50HM::countdownNumber(race)
          <<" seconds="<<race.raceSeconds<<" player_place="<<race.racers[0].place<<"/"<<race.racerCount
@@ -2829,7 +2980,8 @@ int main(int argc,char**argv){try{
  const bool headlessLive=argc==4&&std::string(argv[2])=="--headless-live";
  if(argc!=2&&!headlessLive){
   std::cerr<<"usage: terrain_interactive_drive50du CORPUS_JSON [--headless-live CAPTURE_PPM]\n"
-             "Run from the repository root. W/S: left throttle/brake; "
+             "Run from the repository root. RR_RACE_MODE=1 (default with fully prepared providers); "
+             "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
              "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape/quit: quit.\n";
   return 2;
  }
@@ -2837,10 +2989,14 @@ int main(int argc,char**argv){try{
  // asset owners. Only an explicit host request enters another cold setup.
  recovery50FI::Plan activeCheckpoint{},nextCheckpoint{};bool useCheckpoint=false;
  lap_drive50GJ::Continuity lapContinuity{};
+ // One monotonic backend epoch; each cold native session explicitly resets
+ // its shared selector lazy slot alongside the freshly constructed physics RNG.
+ HostMonotonicClock50ID applicationClock{};
  std::uint64_t sessionIndex=0;
  for(;;){
   const auto exit=runSession50DU(argv[1],headlessLive,headlessLive?argv[3]:nullptr,
-      useCheckpoint?&activeCheckpoint:nullptr,nextCheckpoint,lapContinuity,sessionIndex);
+      useCheckpoint?&activeCheckpoint:nullptr,nextCheckpoint,lapContinuity,sessionIndex,
+      applicationClock);
   if(exit==SessionExit50DU::Quit)break;
   require50DU(sessionIndex<std::numeric_limits<std::uint64_t>::max()-1,"audio session index exhausted");
   ++sessionIndex;

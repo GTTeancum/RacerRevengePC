@@ -30,11 +30,38 @@ public:
     bool episode()const noexcept{return episode_;}
     std::size_t slot()const noexcept{return slot_;}
     void pause(bool paused)noexcept{paused_=paused;}
+    // Cold exclusive policy switch after prepare, before any announcement.
+    // Source state now owns admission, pending speech and completion callbacks;
+    // the mode2 host entry remains unchanged unless this is explicitly enabled.
+    bool enableOriginalPolicy50IE()noexcept {
+        if(!mixer_||!groups_->uses(*mixer_)||episode_||active()||sourceControlled_)return false;
+        sourceControlled_=true;return true;
+    }
+    bool originalPolicy50IE()const noexcept{return sourceControlled_;}
+    bool sourceStopAll50IE()noexcept {
+        if(!sourceControlled_||!groups_->uses(*mixer_)||paused_)return false;
+        mixer_->stop(slot_);return true;
+    }
+    bool sourceEnd50IE()noexcept {
+        return sourceControlled_&&groups_->uses(*mixer_)&&restore();
+    }
+    bool sourceBegin50IE()noexcept {
+        if(!sourceControlled_||!groups_->uses(*mixer_)||paused_||!groups_->begin().complete)return false;
+        episode_=true;++counters_.begins;return true;
+    }
+    bool sourcePlay50IE(const AudioClip50HD&clip,bool&started)noexcept {
+        if(!sourceControlled_||!groups_->uses(*mixer_)||paused_||!episode_||
+           !AudioMixer50HD::validClip(clip))return false;
+        started=mixer_->play(slot_,clip,1.f,1.f,false);
+        if(started)++counters_.starts;
+        return true; // Actual native play returned, independently of its result.
+    }
     // Called after the actual common mix and before another request. Pause
     // never advances this voice. No duration estimate or separate host timer.
     bool pollCompletion()noexcept {
         if(!mixer_)return true;
         if(!groups_->uses(*mixer_))return false;
+        if(sourceControlled_)return episode_||!active();
         if(episode_&&!active()){
             if(!restore())return false;
             ++counters_.completions;
@@ -44,7 +71,7 @@ public:
         return episode_||!active();
     }
     HostAnnouncerResult50IC requestHost(const AudioClip50HD& clip,bool preempt)noexcept {
-        if(!mixer_||paused_||!groups_->uses(*mixer_)||!AudioMixer50HD::validClip(clip)||
+        if(sourceControlled_||!mixer_||paused_||!groups_->uses(*mixer_)||!AudioMixer50HD::validClip(clip)||
            !pollCompletion())return rejected();
         if(active()&&!preempt)return HostAnnouncerResult50IC::Busy;
         if(active()){
@@ -79,7 +106,7 @@ private:
     AudioMixer50HD* mixer_=nullptr;
     RaceAudioGroups50IC* groups_=nullptr;
     std::size_t slot_=audioMaximumVoices50HD;
-    bool episode_=false,paused_=false;
+    bool episode_=false,paused_=false,sourceControlled_=false;
     AnnouncerEpisodeCounters50IC counters_{};
 };
 } // namespace rr::platform

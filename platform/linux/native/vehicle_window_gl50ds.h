@@ -29,6 +29,9 @@ constexpr std::uint32_t maxVehicleWindowTrackChunks50DS = 65536;
 constexpr std::uint32_t maxVehicleWindowCompletedLaps50DS = 999;
 constexpr std::uint32_t maxVehicleWindowStandings50DS = game::maxHostRaceRacers50HT;
 constexpr std::uint32_t maxVehicleWindowRacerName50DS = 24;
+constexpr std::uint32_t maxVehicleWindowLapTimes50DS = 3;
+// 50ID's largest completed duration after signed-centisecond saturation.
+constexpr float maxVehicleWindowLapSeconds50DS = 21474836.f;
 constexpr std::uint32_t maxVehicleWindowOpponents50DS = game::maxHostRaceOpponents50HT;
 constexpr std::uint32_t maxVehicleWindowRacerArchetypes50DS = maxVehicleWindowOpponents50DS;
 enum class VehicleWindowMaterialMode50DS : std::uint8_t {
@@ -248,6 +251,14 @@ struct VehicleWindowHostHud50DS {
     bool raceResultsReady = false;
     std::uint32_t raceLap = 1, raceLapTarget = 3, racePlace = 1, raceRacerCount = 1;
     std::uint32_t raceCountdown = 0;
+    // Optional native completed times for the bounded three-lap race. The
+    // caller copies CC0 entries and CB4 after the accepted timing boundary;
+    // CB0 (the current lap) and HOST race/finish clocks are never substituted.
+    // Disabled preserves mode2 presentation. Zero count shows no timed laps.
+    bool completedLapTimesValid = false;
+    std::uint32_t completedLapTimeCount = 0;
+    float completedLapSeconds[maxVehicleWindowLapTimes50DS]{};
+    float bestLapSeconds = 0.f;
     // Optional complete field, already in the race owner's committed order.
     // Zero count disables it. Otherwise count must equal raceRacerCount and
     // fit the eight-row bound; indices form one permutation and place is 1..N.
