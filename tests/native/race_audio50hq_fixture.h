@@ -2,9 +2,10 @@
 // Bounded HOST race-audio subscriber. Original retained clips and their authored
 // EventN categories are used; the complete original announcer scheduler, chance,
 // priority and variant RNG are not reconstructed here. Never creates a race,
-// lap, place or finish. Player0 is the actual Pod01; no other character is voiced.
+// lap, place or finish. Player0 is one explicitly selected retained original.
 #include "race_session50hm_fixture.h"
 #include "pod_materials50ed_fixture.h"
+#include "original_player_identity50ik_fixture.h"
 #include "../../src/assets/audio_assets50hc.h"
 #include "../../platform/linux/native/audio_mixer50hd.h"
 #include "../../platform/linux/native/announcer_episode50ic.h"
@@ -98,18 +99,23 @@ public:
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
     bool prepare(const std::filesystem::path&discRoot,const std::filesystem::path&audioRoot,
         rr::platform::AudioMixer50HD&mixer,rr::platform::RaceAudioGroups50IC&groups,
-        rr::platform::AnnouncerEpisode50IC&announcer,std::string&error) {
+        rr::platform::AnnouncerEpisode50IC&announcer,std::string&error,
+        std::uint32_t playerRacer60=1) {
         namespace d=pod_materials50ed_fixture::detail;
         if(attempted_){error="50HQ preparation requires a fresh stable owner";return false;}attempted_=true;
         try {
             d::need(mixer.count()>=firstVoice+voiceCount,"50HQ reserved voices80..95 unavailable");
             d::need(groups.uses(mixer),"50IC shared group owner differs from race mixer");
             d::Inputs input;input.capacity=4096;
+            const auto* identity=original_player_identity50IK::find(playerRacer60);
+            d::need(identity,"50IK HOST named announcer player identity unsupported");
+            const auto speechSize=identity->announcerBytes;
             const auto raceBytes=input.read(discRoot/"AUDIO/RACE_SND.INI",661);
-            const auto speechBytes=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/POD01ANN.INI",2403);
+            const auto speechBytes=input.read(original_player_identity50IK::announcerPath(discRoot,*identity),speechSize);
             d::need(raceBytes.size()==661&&d::sha256(raceBytes)=="2ab8596ed7c33efc7ca771c73850fc5262b17b05fb07e3a3b8de95f9a6ef1b65","50HQ original RACE_SND.INI identity differs");
-            d::need(speechBytes.size()==2403&&d::sha256(speechBytes)=="8c4f9b759c8fe933ab85341eff4d42e45e2c391e14f05ccad01238d04139a591","50HQ original Pod01 announcer authoring differs");
-            auto race=detail::readEvents(raceBytes,4),speech=detail::readEvents(speechBytes,29);
+            d::need(speechBytes.size()==speechSize&&d::sha256(speechBytes)==identity->announcerSha256,
+                "50HQ original selected player announcer authoring differs");
+            auto race=detail::readEvents(raceBytes,4),speech=detail::readEvents(speechBytes,identity->announcerEvents);
             std::vector<rr::assets::AudioRequest50HC> requests;requests.reserve(clipCount);
             for(std::size_t i=0;i<clipCount;++i){const auto&r=i<4?race[detail::keys[i]-1]:speech[detail::keys[i]-1];
                 d::need(!r.loop&&!r.stereo&&r.stream==(i>=4),"50HQ authored delivery flags differ");requests.push_back(r);}
@@ -163,7 +169,7 @@ public:
                 if(r.observed.completedLaps==1)emit(result,Kind::Lap1,4,true);
                 else if(r.observed.completedLaps==2)emit(result,Kind::Lap2,5,true);
                 else if(r.observed.completedLaps==3)emit(result,Kind::Lap3,variant(6,2,2),true);
-                // No authored Pod01 lap4+ line in the retained bank.
+                // No authored lap4+ line in the selected retained bank.
             }else if(!r.finished&&r.place!=state_.place&&s.raceSeconds-state_.lastPositionVoiceSeconds>=5.0){
                 ++counters_.positionEvents;
                 if(r.place==1)emit(result,Kind::AchieveFirst,variant(13,3,3),false);

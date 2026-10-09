@@ -39,19 +39,23 @@ struct Owner {
 inline bool prepareFromPod01(Owner& out,rr::platform::AudioMixer50HD& mixer,
     const rr::assets::AudioBank50HC& bank,std::size_t firstVoice,std::size_t voiceCount,
     std::string& error,const std::filesystem::path& archivePath=
-        "work/native/project/disc/PODS/POD01/POD01.RES") {
+        "work/native/project/disc/PODS/POD01/POD01.RES",std::uint32_t playerRacer60=1) {
     namespace a=rr::assets;namespace shared=pod_materials50ed_fixture::detail;
     try {
         shared::need(!out.prepared()&&voiceCount&&firstVoice<mixer.count()&&
             voiceCount<=mixer.count()-firstVoice,"50HE fresh owner and real mixer voice range required");
-        shared::Inputs input;input.capacity=lap_sound50GH::podArchiveBytes;
-        auto bytes=input.read(archivePath,lap_sound50GH::podArchiveBytes);
-        shared::need(bytes.size()==lap_sound50GH::podArchiveBytes&&
-            shared::sha256(bytes)==lap_sound50GH::podArchiveSha256,"50HE Pod01 archive identity mismatch");
+        const auto* identity=original_player_identity50IK::find(playerRacer60);
+        shared::need(identity,"50HE selected original player identity unsupported");
+        const auto archiveSize=identity->archiveBytes;
+        const auto archiveDigest=identity->archiveSha256;
+        shared::Inputs input;input.capacity=archiveSize;
+        auto bytes=input.read(archivePath,archiveSize);
+        shared::need(bytes.size()==archiveSize&&shared::sha256(bytes)==archiveDigest,
+            "50HE selected original archive identity mismatch");
         a::ResArchive48C archive;a::DecodeError48C decode;a::DecodeLimits48C limits;
-        limits.resource_file_bytes=lap_sound50GH::podArchiveBytes;
+        limits.resource_file_bytes=archiveSize;
         limits.resource_decoded_bytes=16u*1024u*1024u;limits.resource_entries=512;limits.resource_name_bytes=256;
-        shared::need(a::decodeResource48C(bytes,archive,decode,nullptr,limits),"50HE Pod01 archive decode failed");
+        shared::need(a::decodeResource48C(bytes,archive,decode,nullptr,limits),"50HE selected original archive decode failed");
         std::vector<std::uint8_t> member;
         shared::need(a::extractResMember48C(archive,lap_sound50GH::eventMember,member,decode,
             lap_sound50GH::eventMemberBytes),"50HE p_event member missing");

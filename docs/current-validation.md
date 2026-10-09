@@ -1,35 +1,23 @@
 # Current native race validation
 
-The Linux check began on 2026-10-09 at 15:17:47 UTC: two units compiled,
-191 reused, link exit 0. One mode1 race launched at 15:19:01 UTC and exited
-normally without reported errors.
+## Current Linux menu and Clegg check
 
-- Player completed three laps, finishing first at 160.928 host race seconds.
-  All finish-continuation criteria passed: native owners continued, results
-  stayed sealed, post-finish input could not take over, and models/audio remained.
-- The source announcer prepared 54 clips and actually started types 3, 4 and 6.
-  Last-lap music selected song 29; finish music then selected song 27.
-- The completed-lap HUD showed all three native completed times and best lap;
-  the captured presentation was visually inspected.
-- PCM finalized at 174.032 seconds. Completed-render FPS ranged from
-  53.6133 to 62.6681 in this cloud VM.
+The 2026-10-09 17:18 UTC central build compiled four units, reused 189, and linked successfully. One runtime ran from 17:19:27 to 17:20:01 UTC and exited normally.
 
-Tested runtime source: `0c3810cadd4750b4f5d4785320f0f3d259abe50a`.
-Executable SHA-256:
-`3a3f6b3f175e12e8f9ad7cd22d2db00129c74b809efb005cb1473f4769436ad7`.
+- Actual Main-menu input selected Clegg. One expected cold rebuild installed the selected eight-racer field and audio bank.
+- Pause held for 2.0117 seconds with native ticks, mixed-frame counts, and actual PCM samples frozen. Resume retained the session/bank and advanced the clocks.
+- Dense capture recorded 401 unique actual frames across 20.002 seconds, about 20 captured fps, with a maximum 84.1 ms gap. Final Main and quit completed normally. The resulting video passed the capture/encoding checks; this rate describes recording, not uncaptured rendering performance.
+- The headless pause blit correction passed this scenario. Audio came from the actual native mixer; no device-playback or listening-quality claim follows.
 
-## Scope and remaining gaps
+Tested runtime source: `959d94e1044f74651e7a2713093eec0ac65da932`.
+Executable SHA-256: `0ccae9e676b8d9e0ce7e3b9a798745020f67d88f4ced1a5cea61f6430fd67f98`.
 
-This was one autodriven three-lap race and post-finish observation. Positive
-damage-announcer type12, positive engine-damage dips, pause and restart were
-not exercised. Other Dax/music selections and adverse-input paths need coverage.
-The earlier direct keyboard probe used older source and does not establish
-current-build controller usability or a fully manually driven race.
+Only Clegg selection and the basic Main/start/pause/resume/return flow were exercised. Audio sliders, other human choices, confirmation paths, and Results presentation remain untested. The Results overlay is separately staged. Driving used the HOST authored-pace driver; this was neither a manually driven race nor original AI, and it did not reach a full-race finish.
 
-Mode1 uses recovered timing, record, queue, Dax and music logic with explicit
-host scheduling, roster roles, rank/finish observation, a native clock backend
-and known-null original HUD fields. The displayed overlay is host presentation.
-Full original scheduler/console timing, IOP streaming and fade parity are not
-claimed. Listening quality/clipping, full game progression, original results
-menus and non-Linux execution remain open. See
-[mode1 integration](native-mode1-integration50id.md) for detailed boundaries.
+## Earlier full-race coverage
+
+The 15:17 UTC mode1 baseline `0c3810cadd4750b4f5d4785320f0f3d259abe50a` completed three laps, first at 160.928 host race seconds, with finish-continuation gates passing. Actual Dax types 3/4/6 played; music selected song 29 on the last lap and 27 at finish. All three completed native lap times and best lap were visually inspected. That earlier full-race result does not establish a complete Clegg race on the current build.
+
+## Remaining boundaries
+
+Positive damage-announcer type12 and engine-damage dips, broader input/controller usability, listening quality, full progression, other tracks, and non-Linux execution need coverage. Recovered mode1 logic still uses explicit host scheduling, roster roles, rank/finish observation, a native clock backend, and known-null original HUD fields. The overlay is host presentation. Full original scheduler/console timing, IOP streaming, and fade parity are not claimed. See [mode1 integration](native-mode1-integration50id.md).

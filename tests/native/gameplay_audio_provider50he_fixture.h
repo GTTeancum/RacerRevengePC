@@ -28,40 +28,50 @@ class Provider final {
 public:
     Provider()=default;Provider(const Provider&)=delete;Provider& operator=(const Provider&)=delete;
     Provider(Provider&&)=delete;Provider& operator=(Provider&&)=delete;
-    // Cold only. Registers all60 original authored names, including40 Pod01
-    // voices and3 TA intros, without inventing gameplay events for those names.
+    // Cold only. Registers the selected original authored names. Legacy default
+    // is all60 POD01/TA cues; an explicit selection can leave unauthored slots
+    // empty. No new event is invented merely because its sample is registered.
     // Policy: one dedicated mixer slot per cue (bounded restart of same cue).
     // Native lap owner needs a separate voice range. Bank PCM must stay alive
     // and immutable. It is permissible that every sample is explicitly missing.
     bool prepare(const rr::assets::AudioBank50HC& bank,rr::platform::AudioMixer50HD& mixer,
-        std::size_t firstVoice,std::string& error) {
+        std::size_t firstVoice,std::string& error,
+        const std::array<rr::assets::AudioRequest50HC,cueCount>* selected=nullptr) {
         if(mixer_||firstVoice>mixer.count()||cueCount>mixer.count()-firstVoice) {
             error="50HE provider requires a fresh owner and60 dedicated mixer voices";return false;
         }
         std::array<rr::platform::AudioClip50HD,cueCount> prepared{};
-        std::array<bool,cueCount> ready{};std::size_t loaded=0;
+        std::array<bool,cueCount> ready{},authored{};std::size_t loaded=0;
         for(std::size_t n=0;n<cueCount;++n) {
-            const auto* item=bank.find(std::string(catalog[n].filename));
-            if(!item){error="50HE catalog name absent from resolved bank: "+std::string(catalog[n].filename);return false;}
-            if(item->request.stereo||item->request.loop!=catalog[n].authoredLoop||item->request.stream!=catalog[n].stream) {
-                error="50HE catalog authoring differs from bank: "+std::string(catalog[n].filename);return false;
+            // A selected player's empty slot is genuinely unauthored, not a
+            // request to fall back to the legacy POD01 catalog filename.
+            if(selected&&(*selected)[n].name.empty())continue;
+            authored[n]=true;
+            const std::string name=selected?(*selected)[n].name:catalog[n].filename;
+            const bool loop=selected?(*selected)[n].loop:catalog[n].authoredLoop;
+            const bool stream=selected?(*selected)[n].stream:catalog[n].stream;
+            const auto* item=bank.find(name);
+            if(!item){error="50HE catalog name absent from resolved bank: "+name;return false;}
+            if(item->request.stereo||(selected&&(*selected)[n].stereo)||
+                item->request.loop!=loop||item->request.stream!=stream) {
+                error="50HE catalog authoring differs from bank: "+name;return false;
             }
             if(item->state!=rr::assets::AudioAssetState50HC::ready)continue;
             const auto& pcm=item->pcm;
             prepared[n]={pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,
                 pcm.hasEmbeddedLoop?pcm.loopStart:0,pcm.hasEmbeddedLoop?pcm.loopEnd:0};
             if(pcm.channels!=1||pcm.frames!=pcm.samples.size()||!rr::platform::AudioMixer50HD::validClip(prepared[n])) {
-                error="50HE ready clip has invalid PCM: "+std::string(catalog[n].filename);return false;
+                error="50HE ready clip has invalid PCM: "+name;return false;
             }
             ready[n]=true;++loaded;
         }
-        clips_=prepared;ready_=ready;loaded_=loaded;firstVoice_=firstVoice;mixer_=&mixer;error.clear();return true;
+        clips_=prepared;ready_=ready;authored_=authored;loaded_=loaded;firstVoice_=firstVoice;mixer_=&mixer;error.clear();return true;
     }
     // Hot, ordered, allocation-free. Return values report actual mixer action;
     // registration, an emitted command, or missing bytes are never playback.
     ApplyResult apply(const AudioCommand50HE& command) noexcept {
         if(!mixer_)return ApplyResult::Unprepared;
-        const auto index=cueIndex(command.cue);if(index==cueCount)return ApplyResult::InvalidCue;
+        const auto index=cueIndex(command.cue);if(index==cueCount||!authored_[index])return ApplyResult::InvalidCue;
         if(!std::isfinite(command.gain)||command.gain<0.f||!std::isfinite(command.pitch)||command.pitch<=0.f)
             return ApplyResult::InvalidCommand;
         const auto slot=firstVoice_+index;
@@ -96,7 +106,7 @@ public:
 private:
     rr::platform::AudioMixer50HD* mixer_=nullptr;
     std::array<rr::platform::AudioClip50HD,cueCount> clips_{};
-    std::array<bool,cueCount> ready_{};
+    std::array<bool,cueCount> ready_{},authored_{};
     std::size_t firstVoice_=0,loaded_=0;
     std::uint64_t starts_=0,stops_=0,controls_=0,unavailable_=0;
 };

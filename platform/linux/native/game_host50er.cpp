@@ -33,11 +33,14 @@ std::uint16_t scancode(Token key) noexcept {
     if (matches(key, "s")) return 22;
     if (matches(key, "up")) return 82;
     if (matches(key, "down")) return 81;
+    if (matches(key, "left")) return 80;
+    if (matches(key, "right")) return 79;
     if (matches(key, "r")) return 21;
     if (matches(key, "space")) return 44;
     if (matches(key, "shift") || matches(key, "lshift") || matches(key, "leftshift"))
         return 225; // SDL physical Left Shift; same key as the windowed host.
     if (matches(key, "escape")) return 41;
+    if (matches(key, "enter") || matches(key, "return")) return 40;
     return 0;
 }
 void copyCleanup(GameHostDiagnostic50ER& d, const GameHostDiagnostic50ER& c) noexcept {
@@ -178,6 +181,15 @@ void GameHost50ER::consumeCommand(GameHostInput50ER& input) noexcept {
     } else if (count == 1 && matches(tokens[0], "checkpoint")) {
         releaseKeys(input.keys);
         input.checkpointRequested = true;
+    } else if (count == 1 && matches(tokens[0], "pause")) {
+        releaseKeys(input.keys);
+        input.pauseRequested = true;
+    } else if (count == 1 && matches(tokens[0], "resume")) {
+        releaseKeys(input.keys);
+        input.resumeRequested = true;
+    } else if (count == 1 && matches(tokens[0], "menu")) {
+        releaseKeys(input.keys);
+        input.menuRequested = true;
     } else if (count == 1 && matches(tokens[0], "quit")) {
         releaseKeys(input.keys);
         quitRequested_ = true;
@@ -241,7 +253,8 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
     input.keys.down = down_;
     input.keys.eventsProcessed = input.commandsAccepted + input.commandsRejected;
     input.keys.quitRequested = quitRequested_;
-    if (input.keys.quitRequested || input.keys.pressed[41] || input.keys.down[41])
+    if (input.keys.quitRequested || input.keys.pressed[41] || input.keys.down[41] ||
+        input.menuRequested || input.pauseRequested)
         input.checkpointRequested = false;
     input.inputEnded = inputEnded_;
     input.inputError = inputError_;

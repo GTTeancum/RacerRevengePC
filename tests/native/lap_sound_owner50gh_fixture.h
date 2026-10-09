@@ -3,6 +3,7 @@
 // response. The explicitly disabled native provider is host policy. It never
 // opens a device, loads sample bytes, or reports successful playback.
 #include "pod_materials50ed_fixture.h"
+#include "original_player_identity50ik_fixture.h"
 #include "../../src/assets/import_decode48c.h"
 #include <array>
 #include <cstddef>
@@ -83,7 +84,7 @@ struct Owner;
 struct DispatchReceipt;
 class DisabledAudioProvider;
 bool prepareDisabledFromPod01(Owner&, DisabledAudioProvider&, std::string&,
-    const std::filesystem::path&);
+    const std::filesystem::path&,std::uint32_t);
 DispatchReceipt dispatch(Owner&, std::uint32_t, std::uint32_t, std::uint32_t) noexcept;
 
 // Explicitly instantiate this class to choose silent native-client operation.
@@ -109,7 +110,7 @@ private:
         return ProviderResult::Unavailable;
     }
     friend bool prepareDisabledFromPod01(Owner&, DisabledAudioProvider&,
-        std::string&, const std::filesystem::path&);
+        std::string&, const std::filesystem::path&,std::uint32_t);
     friend DispatchReceipt dispatch(Owner&, std::uint32_t, std::uint32_t,
         std::uint32_t) noexcept;
 };
@@ -128,7 +129,7 @@ struct Owner {
 private:
     DisabledAudioProvider* provider_ = nullptr;
     friend bool prepareDisabledFromPod01(Owner&, DisabledAudioProvider&,
-        std::string&, const std::filesystem::path&);
+        std::string&, const std::filesystem::path&,std::uint32_t);
     friend DispatchReceipt dispatch(Owner&, std::uint32_t, std::uint32_t,
         std::uint32_t) noexcept;
 };
@@ -215,23 +216,27 @@ inline std::int32_t findResource(const std::array<ResourceRow, eventCount>& rows
 // finishes before native owners are changed. No saved guest state is consumed.
 inline bool prepareDisabledFromPod01(Owner& out, DisabledAudioProvider& provider,
     std::string& error, const std::filesystem::path& archivePath =
-        "work/native/project/disc/PODS/POD01/POD01.RES") {
+        "work/native/project/disc/PODS/POD01/POD01.RES",std::uint32_t playerRacer60=1) {
     namespace a = rr::assets;
     using namespace detail;
     try {
         shared::need(!out.prepared() && !provider.prepared() && !provider.count_,
             "50GH requires a fresh owner and explicit disabled provider");
-        shared::Inputs input; input.capacity = podArchiveBytes;
-        const auto archiveBytes = input.read(archivePath, podArchiveBytes);
-        shared::need(archiveBytes.size() == podArchiveBytes &&
-            shared::sha256(archiveBytes) == podArchiveSha256, "50GH original Pod01 archive identity mismatch");
+        const auto* identity=original_player_identity50IK::find(playerRacer60);
+        shared::need(identity,"50GH selected original player identity unsupported");
+        const auto archiveSize=identity->archiveBytes;
+        const auto archiveDigest=identity->archiveSha256;
+        shared::Inputs input; input.capacity = archiveSize;
+        const auto archiveBytes = input.read(archivePath, archiveSize);
+        shared::need(archiveBytes.size()==archiveSize&&shared::sha256(archiveBytes)==archiveDigest,
+            "50GH selected original archive identity mismatch");
         a::ResArchive48C archive; a::DecodeError48C decode;
         a::DecodeLimits48C limits;
-        limits.resource_file_bytes = podArchiveBytes;
+        limits.resource_file_bytes = archiveSize;
         limits.resource_decoded_bytes = 16u * 1024u * 1024u;
         limits.resource_entries = 512; limits.resource_name_bytes = 256;
         shared::need(a::decodeResource48C(archiveBytes, archive, decode, nullptr, limits),
-            "50GH original Pod01 decode failed: " + decode.code);
+            "50GH selected original decode failed: " + decode.code);
         std::vector<std::uint8_t> member;
         shared::need(a::extractResMember48C(archive, eventMember, member, decode, eventMemberBytes),
             "50GH actual p_event.ini extraction failed: " + decode.code);

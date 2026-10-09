@@ -311,6 +311,8 @@ bool validateCableFrame(const game::PodCableMesh50FD& mesh, VehicleWindowDiagnos
 // glyphs, two panel rectangles and eight highlights fits below 8192 quads.
 // Completed timing adds fewer than 1200 quads: four duration values with at
 // most ten digits (12 runs each), punctuation, and their fixed labels.
+// Live clocks add fewer than 360 quads: two ten-digit durations, punctuation,
+// and the fixed RACE / LAP TIME labels. The same 8192-quad bound is retained.
 constexpr U hostHudMaximumQuads = 8192;
 static_assert(maxVehicleWindowStandings50DS <= 9, "standings rank glyph requires a single-digit field");
 constexpr std::uint64_t hudGlyph(U a, U b, U c, U d, U e, U f, U g) noexcept {
@@ -422,17 +424,40 @@ struct HostHudGeometry {
         rectangle(45.f, y, 108.f, 7.f, 0x1D2935);
         rectangle(45.f, y, 108.f * value, 7.f, rgb);
     }
+    bool buildMenu(const VehicleWindowHostMenu50DS& input, I width, I height) noexcept {
+        count = 0; overflow = false;
+        constexpr float panelWidth = 312.f;
+        const float panelHeight = 62.f + 15.f * float(input.rowCount);
+        scale = std::min(2.f, std::min(float(width) / (panelWidth + 24.f),
+            float(height) / (panelHeight + 24.f)));
+        inverseWidth = 2.f / float(width); inverseHeight = 2.f / float(height);
+        const float x = (float(width) / scale - panelWidth) * .5f - 8.f;
+        const float y = 64.f - (float(height) / scale + panelHeight) * .5f;
+        rectangle(x, y, panelWidth, panelHeight, 0x617589);
+        rectangle(x + 1.f, y + 1.f, panelWidth - 2.f, panelHeight - 2.f, 0x0A111B);
+        text(x + 12.f, y + 10.f, input.title, 0x5DDFFF);
+        text(x + 12.f, y + 23.f, input.subtitle, 0xA8C5DE);
+        for (U i = 0; i < input.rowCount; ++i) {
+            const float rowY = y + 41.f + 15.f * float(i);
+            const bool selected = i == input.selectedRow;
+            if (selected) rectangle(x + 7.f, rowY - 3.f, panelWidth - 14.f, 13.f, 0x173547);
+            text(x + 12.f, rowY, input.rows[i], selected ? 0x5DDFFF : 0xEDF3F8);
+        }
+        text(x + 12.f, y + panelHeight - 12.f, input.footer, 0xA8C5DE);
+        return !overflow;
+    }
     void standingsPanel(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
         if (!input.standingsCount) return;
-        // Keep every existing HUD anchor and scale unchanged. Only this added
-        // panel contracts when the viewport cannot fit it between the top race
-        // readout and bottom heat/damage panel, or beside the right route cue.
+        // Leave a four-cell gap below the race readout, including optional
+        // clocks. Only this panel contracts when the viewport cannot fit it
+        // above the bottom heat/damage panel or beside the right route cue.
         const float hudScale = scale;
         const float panelWidth = 222.f, standingsHeight = 22.f + 11.f * float(input.standingsCount);
         const float timingHeight = input.completedLapTimesValid ?
             30.f + 11.f * float(input.completedLapTimeCount) : 0.f;
         const float panelHeight = standingsHeight + timingHeight;
-        const float top = 44.f * hudScale;
+        const float clockHeight = input.raceClocksValid ? (input.raceFinished ? 14.f : 28.f) : 0.f;
+        const float top = (44.f + clockHeight) * hudScale;
         const float availableHeight = float(height) - top - 68.f * hudScale;
         const float availableWidth = float(width) - 68.f * hudScale;
         if (availableHeight <= 0.f || availableWidth <= 0.f) return;
@@ -487,13 +512,14 @@ struct HostHudGeometry {
     }
     bool build(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
         count = 0; overflow = false;
+        const float clockHeight = input.raceClocksValid ? (input.raceFinished ? 14.f : 28.f) : 0.f;
         scale = width >= 960 && height >= 540 ? 2.f : 1.f;
         scale = std::min(scale, std::min(float(width) / 176.f,
-            float(height) / (input.raceEnabled ? 112.f : input.lapCountValid ? 100.f : 72.f)));
+            float(height) / (input.raceEnabled ? 112.f + clockHeight : input.lapCountValid ? 100.f : 72.f)));
         inverseWidth = 2.f / float(width); inverseHeight = 2.f / float(height);
         rectangle(0.f, 0.f, 160.f, 56.f, 0x617589);
         rectangle(1.f, 1.f, 158.f, 54.f, 0x0A111B);
-        text(6.f, 5.f, "HOST HUD", 0xA8C5DE);
+        text(6.f, 5.f, "POD STATUS", 0xA8C5DE);
         text(104.f, 5.f, input.overheated ? "OVERHEAT" : input.boostActive ? "BOOST" : "IDLE",
             input.overheated ? 0xFF6556 : input.boostActive ? 0x5DDFFF : 0xA8E6B4);
         text(6.f, 19.f, "HEAT", 0xEDF3F8);
@@ -504,8 +530,8 @@ struct HostHudGeometry {
         bar(43.f, input.rightDamage01, 0xEF7767);
         if (input.raceEnabled) {
             const float y = 72.f - float(height) / scale;
-            rectangle(0.f, y, 168.f, 32.f, 0x617589);
-            rectangle(1.f, y + 1.f, 166.f, 30.f, 0x0A111B);
+            rectangle(0.f, y, 168.f, 32.f + clockHeight, 0x617589);
+            rectangle(1.f, y + 1.f, 166.f, 30.f + clockHeight, 0x0A111B);
             char laps[32]{}, place[32]{}, countdown[32]{};
             std::snprintf(laps, sizeof(laps), "LAP %u/%u", input.raceLap, input.raceLapTarget);
             std::snprintf(place, sizeof(place), "POS %u/%u", input.racePlace, input.raceRacerCount);
@@ -516,6 +542,23 @@ struct HostHudGeometry {
                 input.raceGo ? "GO" : input.wrongWay ? "WRONG WAY" : "RACING";
             text(6.f, y + 19.f, status, input.raceFinished || input.raceGo ? 0xA8E6B4 :
                 input.wrongWay ? 0xFF6556 : 0xA8C5DE);
+            if (input.raceClocksValid) {
+                const auto clock = [&](float rowY, float seconds) noexcept {
+                    // These live fields are not CC0's quantized completed laps.
+                    // Truncate for presentation; never advance a source clock.
+                    const U centiseconds = static_cast<U>(double(seconds) * 100.0);
+                    char value[20]{};
+                    std::snprintf(value, sizeof(value), "%u:%02u.%02u", centiseconds / 6000u,
+                        (centiseconds / 100u) % 60u, centiseconds % 100u);
+                    text(66.f, rowY, value, 0xEDF3F8);
+                };
+                text(6.f, y + 33.f, "RACE", 0xA8C5DE);
+                clock(y + 33.f, input.raceElapsedSeconds);
+                if (!input.raceFinished) {
+                    text(6.f, y + 47.f, "LAP TIME", 0xA8C5DE);
+                    clock(y + 47.f, input.currentLapSeconds);
+                }
+            }
         } else if (input.lapCountValid) {
             // Completed count plus optional caller-supplied direction warning.
             // Same fixed batch, top-left opposite NEXT; at most 143 quads.
@@ -540,7 +583,6 @@ struct HostHudGeometry {
             const float y = 72.f - float(height) / scale;
             rectangle(x, y, 44.f, 60.f, 0x617589);
             rectangle(x + 1.f, y + 1.f, 42.f, 58.f, 0x0A111B);
-            text(x + 10.f, y + 5.f, "HOST", 0xA8C5DE);
             text(x + 10.f, y + 15.f, "NEXT", 0xEDF3F8);
             const float cx = x + 22.f, cy = y + 41.f;
             const float dx = input.routeX, dy = -input.routeY;
@@ -721,6 +763,9 @@ struct VehicleWindowGl50DS::Storage {
     I nativeShadowCenterUniforms[nativeShadowCasterCount]{}, nativeShadowShapeUniforms[nativeShadowCasterCount]{};
     I nativeShadowOpponentBoundsUniforms[maxVehicleWindowOpponents50DS]{};
     U targets[2]{}, colors[2]{}, depths[2]{};
+    U menuTargets[2]{}, menuColors[2]{}, displayedTarget = 0;
+    std::uint8_t menuPublished = 0;
+    I raceWidth = 0, raceHeight = 0;
     I maximumWidth = 0, maximumHeight = 0, width = 0, height = 0, clipDistances = 0;
     I committedWidth = 0, committedHeight = 0;
     float matrix[16]{}, clearRgba[4]{};
@@ -1069,7 +1114,7 @@ struct VehicleWindowGl50DS::Storage {
         if (trackVertexBuffer || trackIndexBuffer || trackVertexArray || trackNormalBuffer) return true;
         if (skyVertexBuffer || skyIndexBuffer || skyVertexArray) return true;
         for (U b = 0; b < 2; ++b) {
-            if (targets[b] || colors[b] || depths[b]) return true;
+            if (targets[b] || colors[b] || depths[b] || menuTargets[b] || menuColors[b]) return true;
             for (U c = 0; c < 3; ++c)
                 if (resources.bank[b].vertexBuffer[c] || resources.bank[b].vertexArray[c]) return true;
         }
@@ -1135,7 +1180,9 @@ struct VehicleWindowGl50DS::Storage {
         LOAD(gl, pixelStorei, PixelStorei); LOAD(gl, readPixels, ReadPixels);
         LOAD(gl, finish, Finish);
         LOAD(gl, getString, GetString);
-        if (request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
+        // Host pause menus copy the retained race image between private FBOs
+        // in headless mode too. Resolve before exposing either blit path.
+        if (request.output == VehicleWindowOutput50DS::defaultBackBuffer || request.enableHostHud) {
             LOAD(gl, blitFramebuffer, BlitFramebuffer);
         }
         if (usesTextures()) {
@@ -1710,6 +1757,21 @@ void main() { viewerOutput = hudColor; }
             if (status != framebufferComplete) {
                 diagnostic->framebufferStatus = status;
                 return fail(*diagnostic, VehicleWindowError50DS::framebuffer, "incomplete unpublished framebuffer");
+            }
+            if (request.enableHostHud) {
+                gl.genFramebuffers(1, &menuTargets[b]);
+                gl.bindFramebuffer(framebuffer, menuTargets[b]);
+                if (!check("create private host menu framebuffer")) return false;
+                if (!menuTargets[b])
+                    return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero host menu framebuffer");
+                if (!createAttachment(menuColors[b], rgba8, colorAttachment)) return false;
+                gl.drawBuffer(colorAttachment); gl.readBuffer(colorAttachment);
+                const U menuStatus = gl.checkFramebufferStatus(framebuffer);
+                if (!check("check private host menu framebuffer")) return false;
+                if (menuStatus != framebufferComplete) {
+                    diagnostic->framebufferStatus = menuStatus;
+                    return fail(*diagnostic, VehicleWindowError50DS::framebuffer, "incomplete host menu framebuffer");
+                }
             }
         }
         return true;
@@ -2341,6 +2403,8 @@ void main() { viewerOutput = hudColor; }
         // OUTSIDE this transaction, after submitVehicleDrawBatch50CS succeeds.
         s.published = bank;
         s.committedWidth = s.width; s.committedHeight = s.height;
+        s.raceWidth = s.width; s.raceHeight = s.height;
+        s.displayedTarget = s.targets[bank];
         s.imageCommitted = true; s.active = false;
         return true;
     }
@@ -2349,7 +2413,7 @@ void main() { viewerOutput = hudColor; }
         static_cast<Storage*>(context)->active = false;
     }
     bool copyToWindow() noexcept {
-        gl.bindFramebuffer(readFramebuffer, targets[published]);
+        gl.bindFramebuffer(readFramebuffer, displayedTarget);
         gl.readBuffer(colorAttachment);
         gl.bindFramebuffer(drawFramebuffer, 0);
         gl.drawBuffer(backBuffer);
@@ -2364,7 +2428,7 @@ void main() { viewerOutput = hudColor; }
     }
     bool copyRgba(std::uint8_t* destination) noexcept {
         if (!check("before committed RGBA readback")) return false;
-        gl.bindFramebuffer(readFramebuffer, targets[published]);
+        gl.bindFramebuffer(readFramebuffer, displayedTarget);
         gl.readBuffer(colorAttachment);
         // A caller pointer must never be interpreted as an offset into a PBO.
         // Explicit pack state keeps all writes inside the validated tight extent.
@@ -2424,7 +2488,8 @@ void main() { viewerOutput = hudColor; }
         if (hasGlResources() && !current(d)) { d.cleanupIncomplete = true; return false; }
         initialized = false; active = frameSet = imageCommitted = false;
         frameCables = nullptr; frameHostHud = false;
-        committedWidth = committedHeight = 0;
+        committedWidth = committedHeight = raceWidth = raceHeight = 0;
+        displayedTarget = 0;
         adapter.reset();
         if (!hasGlResources()) { shader.reset(); d.cleanupIncomplete = false; return true; }
         // All functions were loaded before the first name could be allocated.
@@ -2492,7 +2557,9 @@ void main() { viewerOutput = hudColor; }
             for (U b = 0; b < 2; ++b)
                 if (!deleteName(targets[b], gl.deleteFramebuffers, d) ||
                     !deleteName(colors[b], gl.deleteRenderbuffers, d) ||
-                    !deleteName(depths[b], gl.deleteRenderbuffers, d)) goto incomplete;
+                    !deleteName(depths[b], gl.deleteRenderbuffers, d) ||
+                    !deleteName(menuTargets[b], gl.deleteFramebuffers, d) ||
+                    !deleteName(menuColors[b], gl.deleteRenderbuffers, d)) goto incomplete;
         }
         d.cleanupIncomplete = hasGlResources();
         if (d.cleanupIncomplete || !complete)
@@ -2525,7 +2592,7 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
             request.output != VehicleWindowOutput50DS::headless) ||
         request.maximumWidth <= 0 || request.maximumHeight <= 0 ||
         std::uint64_t(request.maximumWidth) * std::uint64_t(request.maximumHeight) >
-            std::numeric_limits<std::size_t>::max() / 16)
+            std::numeric_limits<std::size_t>::max() / (request.enableHostHud ? 24u : 16u))
         return fail(d, VehicleWindowError50DS::request,
             "context callbacks, valid output/vehicle shading modes and positive target bounds required");
     if (!assets.loaded()) return fail(d, VehicleWindowError50DS::assets, "50CR assets are not loaded");
@@ -2610,6 +2677,14 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             return fail(d, VehicleWindowError50DS::frame, "native race HUD counters/status outside admitted bounds");
         if (hud.raceResultsReady && (!hud.raceEnabled || !hud.raceFinished || hud.raceCountdown || hud.raceGo))
             return fail(d, VehicleWindowError50DS::frame, "host results presentation requires a sealed human finish");
+        if (hud.raceClocksValid) {
+            const auto validSeconds = [](float value) noexcept {
+                return std::isfinite(value) && value >= 0.f && value <= maxVehicleWindowLapSeconds50DS;
+            };
+            if (!hud.raceEnabled || !validSeconds(hud.raceElapsedSeconds) ||
+                (!hud.raceFinished && !validSeconds(hud.currentLapSeconds)))
+                return fail(d, VehicleWindowError50DS::frame, "native race clocks outside admitted presentation bounds");
+        }
         if (hud.completedLapTimesValid) {
             if (!hud.raceEnabled || !hud.lapCountValid || !hud.standingsCount ||
                 hud.raceLapTarget > maxVehicleWindowLapTimes50DS ||
@@ -2716,6 +2791,77 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         s.frameOpponentArchetypes[i] = 0;
     }
     s.frameOpponentCount = 0;
+    return accepted;
+}
+
+bool VehicleWindowGl50DS::submitHostMenu(const VehicleWindowHostMenu50DS& input,
+    std::int32_t width, std::int32_t height, VehicleWindowDiagnostic50DS& d) noexcept {
+    d = {};
+    if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
+    auto& s = *storage_;
+    if (!s.current(d)) return false;
+    if (s.active || s.frameSet || !s.request.enableHostHud || !s.hostHudGeometry ||
+        !s.hostHudProgram || !s.hostHudVertexBuffer || !s.hostHudIndexBuffer || !s.hostHudVertexArray ||
+        !s.menuTargets[0] || !s.menuTargets[1] ||
+        width <= 0 || height <= 0 || width > s.maximumWidth || height > s.maximumHeight ||
+        !input.rowCount || input.rowCount > maxVehicleWindowMenuRows50DS || input.selectedRow >= input.rowCount)
+        return fail(d, VehicleWindowError50DS::frame, "host menu requires idle opt-in renderer and bounded viewport/rows");
+    if (input.retainRaceImage && s.raceWidth > 0 && s.raceHeight > 0 && !s.gl.blitFramebuffer)
+        return fail(d, VehicleWindowError50DS::entryPoint, "retained host menu backdrop requires glBlitFramebuffer");
+    const auto validText = [](const char* value) noexcept {
+        if (!value) return false;
+        for (U i = 0; i <= maxVehicleWindowMenuText50DS; ++i) {
+            if (!value[i]) return true;
+            if (i == maxVehicleWindowMenuText50DS || (value[i] != ' ' && !hostHudGlyph(value[i]))) return false;
+        }
+        return false;
+    };
+    if (!validText(input.title) || !validText(input.subtitle) || !validText(input.footer))
+        return fail(d, VehicleWindowError50DS::frame, "host menu text is not bounded supported ASCII");
+    for (U i = 0; i < input.rowCount; ++i)
+        if (!validText(input.rows[i]))
+            return fail(d, VehicleWindowError50DS::frame, "host menu row is not bounded supported ASCII");
+    if (!s.hostHudGeometry->buildMenu(input, width, height))
+        return fail(d, VehicleWindowError50DS::frame, "host menu exceeds cold glyph capacity");
+
+    s.diagnostic = &d;
+    bool accepted = s.check("before private host menu submission") &&
+        (s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
+    const auto pending = static_cast<std::uint8_t>(s.menuPublished ^ 1u);
+    if (accepted) {
+        // Separate color-only targets leave the native adapter's publication
+        // bank, both GPU vertex banks, and its last complete race image intact.
+        s.gl.bindFramebuffer(framebuffer, s.menuTargets[pending]);
+        s.gl.drawBuffer(colorAttachment); s.gl.readBuffer(colorAttachment);
+        s.gl.viewport(0, 0, width, height);
+        constexpr U disabled[] = {0x0BE2, 0x0B44, 0x0C11, 0x0B90, 0x8037, 0x0B20,
+            0x8F9D, 0x0BD0, 0x809D, 0x80A0, 0x809E, 0x8C89, 0x8DB9, 0x864F, 0x0B71};
+        for (U capability : disabled) s.gl.disable(capability);
+        for (I i = 0; i < s.clipDistances; ++i) s.gl.disable(0x3000 + static_cast<U>(i));
+        s.gl.colorMask(1, 1, 1, 1); s.gl.polygonMode(0x0408, 0x1B02);
+        s.gl.clearColor(.015f, .025f, .045f, 1.f); s.gl.clear(colorBufferBit);
+        if (input.retainRaceImage && s.raceWidth > 0 && s.raceHeight > 0) {
+            s.gl.bindFramebuffer(readFramebuffer, s.targets[s.published]);
+            s.gl.readBuffer(colorAttachment);
+            s.gl.blitFramebuffer(0, 0, s.raceWidth, s.raceHeight,
+                0, 0, width, height, colorBufferBit, 0x2600);
+        }
+        accepted = s.check("prepare independent host menu backdrop");
+        s.frameHostHud = true;
+        if (accepted) accepted = s.drawHostHud() && s.check("accept private host menu frame");
+        s.frameHostHud = false;
+        if (accepted) {
+            s.menuPublished = pending; s.displayedTarget = s.menuTargets[pending];
+            s.width = s.committedWidth = width; s.height = s.committedHeight = height;
+            s.imageCommitted = true; d.hostMenuAccepted = true;
+            if (s.request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
+                accepted = s.copyToWindow();
+                if (!accepted && d.error == VehicleWindowError50DS::gl)
+                    d.error = VehicleWindowError50DS::presentation;
+            }
+        }
+    }
+    s.diagnostic = nullptr;
     return accepted;
 }
 

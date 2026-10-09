@@ -1,11 +1,12 @@
 // Include after racerBank.seal(raceRacerCount). Defines a cold-only placement
-// lambda. Seven opponents occupy two explicit HOST rows ahead of the retained
+// lambda. Slot zero may refresh an alternate human's own lift/query owners.
+// Seven opponents occupy two explicit HOST rows ahead of the retained
 // rank-four center player pose. These are not claimed original lateral ranks.
 // Native ground probes validate every start using each racer's authored lift.
 // Four front starts and three back starts retain at least42 lateral or
 //40 longitudinal units between pod centers, with player40 behind the back row.
 auto placeOpponentAtGrid50HN=[&](std::size_t racer){
- require50DU(racer>0&&racer<racerBank.count(),"invalid opponent grid slot");
+ require50DU(racer<racerBank.count(),"invalid native grid slot");
  racerBank.visit(racer,[&](){
   require50DU(completedFrames==0,"opponent grid placement requires fresh state");
   constexpr float lateral[maxHostRaceRacers50HT]={0.f,-63.f,-21.f,21.f,63.f,-42.f,0.f,42.f};
@@ -48,6 +49,7 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
   require50DU(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,terrainMembership,
       terrainMembershipStorage,terrainQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.f,
       terrainBounds,membershipWork).status==LiveZoneStatus50EN::Complete,"AI terrain grid attach failed");
+  if(!racer)return; // Human keeps its own controller, lap audio, RNG and driver policy.
   lapOwner.audioDispatch=nullptr;lapOwner.audioContext=nullptr;
   autoDriveEnabled=true;autoStopReported=false;courseState={};courseOutput={};
   // Distinct host-driver pace/lookahead only. Each native vehicle retains its

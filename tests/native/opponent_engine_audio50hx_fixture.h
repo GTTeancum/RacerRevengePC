@@ -2,6 +2,7 @@
 // Cold original-PHY/sample owner + bounded HOST opponent engine subscriber.
 // Install under tests/native. This adds no original D40 object or opponent AI.
 #include "pod_materials50ed_fixture.h"
+#include "original_player_identity50ik_fixture.h"
 #include "../../src/assets/audio_assets50hc.h"
 #include "../../src/game/gameplay_audio50he.h"
 #include "../../src/game/host_race_limits50ht.h"
@@ -60,16 +61,6 @@ struct Counters {
     std::uint64_t silentVoices=0,normalizedUpdates=0,rejected=0,resets=0;
 };
 namespace detail {
-struct Identity {const char* podId;const char* phySha256;};
-inline constexpr Identity originals[maxOpponents]={
-    {"POD03","147a9ed4d2449592bc6752fc6b44bdacff56120f1b19f1aa29864d3baf694d47"},
-    {"POD04","a1ca33400508684c6b8440f113658458c4efce666dcb68de5cdf1f1209845b81"},
-    {"POD07","8615aca792d1efb68abcda048dd2b6cc9207c6c044300bf2306b6618edaffa48"},
-    {"POD08","73ee964a157938c301b8e0da0684c1245e00e723323a0c8ffaffa2642b12af98"},
-    {"POD09","d5aa6a3979b616e38d61e475369ea98216f351ca795f10f68e335be90cf50626"},
-    {"POD10","44b3339b338a3447014b2a2df464b1a54b39238256c11b754c1f94ab9c26c2f6"},
-    {"POD11","fdee08787847253b29a83022bae0249427de5872a5ff409ef657a4c48fe12f12"}
-};
 inline std::string_view trim(std::string_view s)noexcept {
     const auto first=s.find_first_not_of(" \t\r");
     if(first==s.npos)return {};
@@ -85,8 +76,7 @@ inline float number(std::string_view s) {
 }
 inline Mapping readMapping(const Source& source) {
     namespace d=pod_materials50ed_fixture::detail;
-    const Identity* identity=nullptr;
-    for(const auto& candidate:originals)if(source.podId==candidate.podId)identity=&candidate;
+    const auto* identity=original_player_identity50IK::find(source.podId);
     d::need(identity&&source.phy&&!source.phy->empty()&&source.phy->size()<=8192,
         "50HX original opponent PHY mapping unavailable");
     Mapping out;out.podId=source.podId;

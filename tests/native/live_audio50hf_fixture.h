@@ -4,6 +4,7 @@
 #include "gameplay_audio_provider50he_fixture.h"
 #include "pod_audio_owner50he_fixture.h"
 #include "race_audio_groups50ic_fixture.h"
+#include "selected_player_audio50ij_fixture.h"
 #include "../../platform/linux/native/audio_output50hd.h"
 #include "../../platform/linux/native/announcer_episode50ic.h"
 #include <array>
@@ -50,36 +51,44 @@ public:
     Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
 
-    // Cold only, once per owner, before any gameplay work. All 60 authenticated
-    // requests remain present, including missing/unsupported/invalid records.
+    // Cold only, once per owner, before any gameplay work. All authenticated
+    // selected requests remain present, including unavailable records.
+    // POD01 has60 authored semantic slots; the other seven have48. All use the
+    // same sixty-slot layout, with immutable PCM aliases resolved only once.
     // discRoot supplies retained originals; audioRoot is the explicit AUDIO
     // directory. No search of another computer or guessed external path occurs.
     bool prepare(const std::filesystem::path& discRoot,const std::filesystem::path& audioRoot,
-        std::string& error) {
+        std::string& error,std::uint32_t playerRacer60=1,
+        const rr::game::RaceAudioSettings50IC& audioSettings=rr::game::freshOriginalAudioSettings50IC()) {
         if(prepareAttempted_||closed_) {error="50HF preparation requires a fresh stable owner";return false;}
         prepareAttempted_=true;
+        if(!rr::game::announcer_callbacks50IC_detail::settings(audioSettings)) {
+            error="50HF original audio configuration must be integer 0..100";return false;
+        }
         try {
-            std::vector<rr::assets::AudioRequest50HC> requests;
-            if(!rr::assets::readRetainedAudioRequests50HC(discRoot,requests,error)||
-               !rr::assets::loadAudioBank50HC(audioRoot,requests,bank_,error))return false;
-            if(requests.size()!=gameplay_audio50HE::cueCount||bank_.clips.size()!=requests.size()) {
-                error="50HF authenticated audio catalog count differs from the retained 60 cues";return false;
+            if(!selected_player_audio50IJ::read(discRoot,playerRacer60,selected_,error)||
+               !rr::assets::loadAudioBank50HC(audioRoot,selected_.requests,bank_,error))return false;
+            if(bank_.clips.size()!=selected_.requests.size()) {
+                error="50HF authenticated selected audio catalog count differs";return false;
             }
             if(!mixer_.initialize(voices_.data(),voices_.size(),sampleRate)) {
                 error="50HF bounded mixer initialization failed";return false;
             }
-            // This client has no loaded user audio preferences. Its one shared
-            // fresh audio configuration deliberately uses original reset values
-            // effects50/music100/character80/Dax80; it does not change11258.
-            if(!groups_.initialize(mixer_,rr::game::freshOriginalAudioSettings50IC())||
+            // The session owner supplies one immutable effective configuration.
+            // Original reset defaults remain the default for other callers.
+            // Next-session menu edits never mutate this owner's restore target.
+            if(!groups_.initialize(mixer_,audioSettings)||
                !race_audio_groups50IC::bindGameplayCatalog(groups_,providerFirstVoice).complete||
                !race_audio_groups50IC::bindProviderRange(groups_,
                    race_audio_groups50IC::ProviderRole::LapPodEvent,lapFirstVoice,lapVoiceCount)) {
                 error="50IC source group ownership initialization failed";return false;
             }
-            if(!provider_.prepare(bank_,mixer_,providerFirstVoice,error)||
+            const auto* identity=original_player_identity50IK::find(playerRacer60);
+            if(!identity){error="50IK original player identity unavailable";return false;}
+            if(!provider_.prepare(bank_,mixer_,providerFirstVoice,error,&selected_.catalog)||
                !pod_audio50HE::prepareFromPod01(lap_,mixer_,bank_,lapFirstVoice,lapVoiceCount,
-                   error,discRoot/"PODS/POD01/POD01.RES"))return false;
+                   error,original_player_identity50IK::archivePath(discRoot,*identity),
+                   playerRacer60))return false;
             prepared_=true;error.clear();return true;
         }catch(const std::exception& e){error=e.what();return false;}
         catch(...){error="50HF audio preparation failed";return false;}
@@ -230,6 +239,8 @@ public:
     const rr::platform::AnnouncerEpisodeCounters50IC& announcerCounters()const noexcept{return announcer_.counters();}
     const pod_audio50HE::Owner& lapOwner()const noexcept{return lap_;}
     const Counters& counters()const noexcept{return counters_;}
+    const rr::game::PodEngineParameters50HE& engineParameters()const noexcept{return selected_.engine;}
+    const rr::game::PodSpeechCounts50HG& speechCounts()const noexcept{return selected_.speech;}
     rr::platform::AudioOutputInfo50HD info()const noexcept{return output_.info();}
     std::uint64_t mixedFrames()const noexcept{return mixer_.mixedFrames();}
     std::uint64_t clippedSamples()const noexcept{return mixer_.clippedSamples();}
@@ -288,6 +299,7 @@ private:
     rr::platform::RaceAudioGroups50IC groups_{};
     rr::platform::AnnouncerEpisode50IC announcer_{};
     gameplay_audio50HE::Provider provider_{};
+    selected_player_audio50IJ::Authoring selected_{};
     pod_audio50HE::Owner lap_{};
     rr::platform::AudioOutput50HD output_{};
     rr::game::PodWarningState50HE warning_{};
