@@ -20,6 +20,7 @@ struct CourseDriverDiagnostic50GK {
     float aim[3]{},headingError=0,turn=0,bodySpeed=0,targetSpeed=0;
     float crossTrack=0,halfWidth=0,stalledSeconds=0;
     float speedLookahead=0,steeringLookahead=0;
+    float speedDemand=0,mixedDemand=0;
     std::uint32_t steeringSegments=0;
 };
 // Reads the actual ATA SpeedLimit entries without modifying navigation. Every
@@ -57,6 +58,11 @@ struct CourseDriverTuning50GK {
     // and the source direction planner's additional 0.2s sample. Zero preserves
     // legacy steering. Speed preview and all safety limits stay independent.
     float authoredSteeringLookaheadSeconds=0.f;
+    // Optional HOST packet mixing: preserve the requested differential while
+    // positive common demand would clip an axis. This reduces common demand
+    // only as required by steering saturation; target speed is not changed.
+    // Zero/negative demand, manual input and default legacy mixing are unchanged.
+    bool fullThrottleSteeringRange=false;
 };
 struct CourseDriverInput50GK {
     game::BodyMatrix48G pose{}; // canonical basis8..10 and translation12..14

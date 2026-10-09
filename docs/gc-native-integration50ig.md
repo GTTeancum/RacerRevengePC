@@ -1,10 +1,8 @@
-# GC native integration: track-class correction unbuilt and untested
+# GC native integration: HOST mixer unbuilt and untested
 
-The latest source replaces the stale fixed A-class input with the original selector applied to the loaded track identity: TA remains A, GC selects C. Every cold racer owner receives the same decision, legitimately changing original class-dependent handling and propulsion. This correction is unbuilt and untested; the earlier result below applies to the previous source. See [class-selection scope](gc-authored-track-class50ip.md).
+The current candidate joins the separately reviewed GC-only steering-saturation mixer. It retains the requested differential by reducing positive common acceleration when the two demands would otherwise clip. Authored target-speed policy remains unchanged; acceleration and achieved speed can change through the native airbrake. This HOST policy is unbuilt and untested. See [mixer scope](gc-host-steering-authority50iq.md).
 
-The central 2026-10-09 21:19 slot built `e9ece06f227d4834c1591d235e92b1856d944756` and completed one TA→GC menu/cold-load/capture sequence with exit 0. The GC-only authored 0.7/0.2-second HOST steering preview and shared world-yaw correction were exercised; speed-preview, pace and safety stops remain unchanged. See [steering scope](gc-host-steering-preview50io.md).
-
-The player reached AGC node 28. Two opponent drivers stopped with status 3 at nodes 7 and 8, so **no GC lap or complete-field pass is claimed**. Capture retained 342 unique frames over 20.0112 seconds. The verified 20.012-second export included actual native PCM within the existing timing limits; no audio stretching or synthetic sound was introduced. This focused result covers 20 seconds only. See [current validation](current-validation.md) for exact scope.
+The preceding 22:20 central slot built `8e2d24db0f05c34cd60ff435a9ff6af12b9fa8a9`, verified all eight GC class-3 bindings and completed one 60.0045-second capture with 1,006 unique frames and normal exit. Six racers reached node 40 before OffCourse stops; slots 2 and 4 stopped at nodes 8/7. **No GC lap or complete-field pass is claimed.** The original class correction legitimately changes class-dependent handling and propulsion; the later mixer remains separately unverified. See [current validation](current-validation.md).
 
 The cold CHARACTER/non-body guard admitted the original owner mapping during GC setup. Specific contact-response correctness still needs focused coverage; no new response algorithm is claimed. See [CHARACTER response admission](gc-character-response50ig.md).
 

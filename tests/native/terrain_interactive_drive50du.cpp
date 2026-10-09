@@ -684,11 +684,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  rr::host::CourseDriverState50GK courseState{};
  rr::host::CourseDriverDiagnostic50GK courseDiagnostic{};
  rr::host::CourseDriverOutput50GK courseOutput{};
- if(track_session_assets50IG::codeEquals(trackSession->world->code,"GC"))
+ if(track_session_assets50IG::codeEquals(trackSession->world->code,"GC")){
   require50DU(rr::host::readCourseSteeringLookahead50GK(
       reinterpret_cast<const char*>(tuning.data()),tuning.size(),
       courseTuning.authoredSteeringLookaheadSeconds,courseDiagnostic),
       "actual GC AIDriving.Lookahead unavailable for host steering preview");
+  courseTuning.fullThrottleSteeringRange=true;
+ }
  const char* autoPolarity=std::getenv("RR_AUTODRIVE_POLARITY");
  if(autoPolarity){
   require50DU(std::string(autoPolarity)=="1"||std::string(autoPolarity)=="-1","autodrive polarity must be 1 or -1");
@@ -1326,7 +1328,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<" steering_preview="<<courseDiagnostic.steeringLookahead
        <<" steering_segments="<<courseDiagnostic.steeringSegments
        <<" aim="<<courseDiagnostic.aim[0]<<','<<courseDiagnostic.aim[1]<<','<<courseDiagnostic.aim[2]
-       <<" error="<<courseDiagnostic.headingError<<" turn="<<courseDiagnostic.turn<<'\n';
+       <<" error="<<courseDiagnostic.headingError<<" turn="<<courseDiagnostic.turn
+       <<" demand="<<courseDiagnostic.speedDemand<<" mixed_demand="<<courseDiagnostic.mixedDemand
+       <<" left/right="<<courseOutput.left<<'/'<<courseOutput.right
+       <<" packet7/5="<<unsigned(packet.bytes[7])<<'/'<<unsigned(packet.bytes[5])<<'\n';
   if(!driving&&!autoStopReported){
    autoStopReported=true;
    std::cerr<<"Host course driver stopped: status="<<unsigned(courseDiagnostic.status)
@@ -2557,6 +2562,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       <<(courseTuning.authoredSpeedOnly?"authored-limits":"conservative-host")
       <<" speed-limit-to-body-scale="<<courseTuning.speedLimitToBodyScale
       <<" steering-preview-seconds="<<courseTuning.authoredSteeringLookaheadSeconds
+      <<" full-throttle-steering="<<courseTuning.fullThrottleSteeringRange
       <<"; not original AI. Manual W/S/Up/Down takes over. No automatic reset.\n";
   if(headlessLive)std::cerr<<"Stdin host commands include capture, checkpoint, restart, pause, resume, menu, and quit. "
       "Menus use down/up Up, Down, Left, Right, Enter, Escape. Audio edits apply on Start/Restart only. "

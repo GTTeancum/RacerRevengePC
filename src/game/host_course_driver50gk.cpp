@@ -281,10 +281,19 @@ bool driveCourse50GK(const game::TrackNavigation50EU& route,const CourseSpeedLim
     float demand=clamp((d.targetSpeed-d.bodySpeed)*t.speedGain,-1.f,1.f);
     const float turnMagnitude=std::fabs(d.turn);
     if(!t.authoredSpeedOnly&&demand>0.f)demand*=1.f-t.turnThrottleReduction*turnMagnitude;
-    // Saturating differential demands preserve both the ordinary engine and
-    // airbrake branches of preset4. Strong turns may brake the inside engine.
-    out.left=clamp(demand+d.turn,-1.f,1.f);
-    out.right=clamp(demand-d.turn,-1.f,1.f);
+    d.speedDemand=demand;
+    // Independent axis clipping at demand=1 made a full turn emit1/0: only
+    // the engine half of original preset4 steering, with no inside airbrake.
+    // Opt-in steering saturation allocation keeps the requested2*turn span;
+    // it necessarily lowers common acceleration demand when both will not fit.
+    // Full positive demand/full turn now emits1/-1 through the ordinary packet
+    // reader, rate filter and native engine/aero binding. No model writes.
+    float commonDemand=demand;
+    if(t.fullThrottleSteeringRange&&demand>0.f)
+        commonDemand=std::min(demand,1.f-turnMagnitude);
+    d.mixedDemand=commonDemand;
+    out.left=clamp(commonDemand+d.turn,-1.f,1.f);
+    out.right=clamp(commonDemand-d.turn,-1.f,1.f);
     d.status=Status::Driving;return true;
 }
 
