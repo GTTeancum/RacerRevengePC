@@ -197,9 +197,9 @@ public:
         } else if (page_ == Page::IncompleteGC) {
             out.title = "GC EXPERIMENTAL INCOMPLETE";
             out.subtitle = "MODE 2 ONLY. THESE PARTS ARE MISSING:";
-            out.rows[0] = "WINDMILL ANIMATION / TYPE1 COLLISION";
-            out.rows[1] = "TRIGGERED OPENING";
-            out.rows[2] = "AUTHORED LOSTAI BRANCH TRIGGERS";
+            out.rows[0] = "GATE / LOSTAI TRIGGER DETECTION";
+            out.rows[1] = "OPENING TRIGGER ACTIVATION";
+            out.rows[2] = "AUTHORED LOSTAI BRANCH ACTIONS";
             out.rows[3] = "GATE SOUND";
             out.rows[4] = "MODE1 RECORD CONFIGURATION";
             out.rows[5] = "CANCEL"; out.rows[6] = "SELECT GC FOR NEXT SESSION"; out.rowCount = 7;
