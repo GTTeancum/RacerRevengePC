@@ -43,6 +43,7 @@
 // retained-data loading remains, but source-word validation runs separately.
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/host_session_menu50if.h"
+#include "../../platform/linux/native/host_race_results50il.h"
 #include "../../platform/linux/native/keyboard_packet50dr.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
 #include "../../platform/linux/native/fixed_step_clock50dt.h"
@@ -162,12 +163,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     lap_drive50GJ::Continuity& lapContinuity,std::uint64_t sessionIndex,
     HostMonotonicClock50ID& applicationClock,bool startAtMenu,std::uint32_t& selectedRacer60,
     const rr::game::RaceAudioSettings50IC& effectiveAudioSettings,
-    rr::game::RaceAudioSettings50IC& selectedAudioSettings){
+    rr::game::RaceAudioSettings50IC& selectedAudioSettings,
+    rr::platform::HostTrack50IM effectiveTrack,rr::platform::HostTrack50IM& selectedTrack,
+    const rr::platform::HostTrackAdmission50IM& trackAdmission){
  // Capture the immutable loaded identity before any front-menu choice changes
  // the next-session selection. The alternate-player integration consumes it.
  const std::uint32_t playerRacer60=selectedRacer60;
+ const auto loadedTrack=effectiveTrack;
+ require50DU(rr::platform::validHostTrack50IM(loadedTrack),"unsupported loaded track identity");
  const char* trackSelectionError=nullptr;
- const auto* trackSession=track_session_assets50IG::select(std::getenv("RR_TRACK"),trackSelectionError);
+ const auto* trackSession=track_session_assets50IG::select(rr::platform::hostTrackCode50IM(loadedTrack),trackSelectionError);
  require50DU(trackSession,trackSelectionError?trackSelectionError:"original track admission failed");
  if(trackSession->originalStaticCandidates){
   const char* incomplete=std::getenv("RR_GC_INCOMPLETE_WORLD");
@@ -199,6 +204,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool mode1Requested=raceEnabled&&(!raceModeSetting||std::string(raceModeSetting)=="1");
  require50DU(!mode1Requested||trackSession->nativeMode1,
      "GC original record-row/selection configuration is unjoined; choose RR_RACE_MODE=2 explicitly");
+ require50DU(rr::platform::hostTrackAdmitted50IM(loadedTrack,trackAdmission),
+     "GC track selection requires RR_GC_INCOMPLETE_WORLD=1 and RR_RACE_MODE=2 explicitly");
  // Default mode1 is committed only after ALL required providers cold-prepare.
  // Failure is explicit; RR_RACE_MODE=2 is the selectable existing fallback.
  bool mode1Enabled=false;
@@ -2299,7 +2306,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // A menu-only merge must never advertise a racer that still loads POD01.
   constexpr bool alternateHumanReady50IF=true;
   platform::HostSessionMenu50IF sessionMenu(startAtMenu,raceEnabled,playerRacer60,
-      alternateHumanReady50IF,audioEnabled,loadedAudioSettings,selectedAudioSettings);
+      alternateHumanReady50IF,audioEnabled,loadedAudioSettings,selectedAudioSettings,
+      loadedTrack,selectedTrack,trackAdmission);
+  platform::HostRaceResults50IL resultsUi;
   std::uint64_t drawnMenuRevision=0;
   std::int32_t drawnMenuWidth=0,drawnMenuHeight=0;
   bool menuImagePublished=false,suppressResumeKeys=false,forceSceneRender=false;
@@ -2320,6 +2329,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<",\"audio_bank_id\":"<<reinterpret_cast<std::uintptr_t>(&liveAudio->bank())
        <<",\"menu\":"<<(sessionMenu.open()?"true":"false")<<",\"page\":"<<unsigned(sessionMenu.page())
        <<",\"loaded_racer\":"<<playerRacer60<<",\"selected_racer\":"<<selectedRacer60
+       <<",\"loaded_track\":\""<<platform::hostTrackCode50IM(loadedTrack)
+       <<"\",\"selected_track\":\""<<platform::hostTrackCode50IM(selectedTrack)<<'"'
+       <<",\"track_pending\":"<<(sessionMenu.trackChangesPending()?"true":"false")
+       <<",\"loaded_track_incomplete\":"<<(loadedTrack==platform::HostTrack50IM::GC?"true":"false")
+       <<",\"gc_incomplete_opt_in\":"<<(trackAdmission.gcIncompleteWorld?"true":"false")
+       <<",\"gc_mode2_admitted\":"<<(trackAdmission.gcMode2?"true":"false")
+       <<",\"results_visible\":"<<(humanResultsReady&&!sessionMenu.open()?"true":"false")
+       <<",\"results_action\":"<<resultsUi.selectedAction()
+       <<",\"results_confirming\":"<<(resultsUi.confirming()?"true":"false")
        <<",\"audio_enabled\":"<<(audioEnabled?"true":"false")
        <<",\"audio_pending\":"<<(sessionMenu.audioChangesPending()?"true":"false")
        <<",\"audio_effective\":["<<loadedAudioSettings.effects11020<<','<<loadedAudioSettings.music11024
@@ -2400,12 +2418,42 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     restartRequested=true;
     break;
    }
+   const auto resultsRevision=resultsUi.revision();
+   const bool resultsAvailable=humanResultsReady&&!sessionMenu.open()&&!recoveryPaused&&
+       s.phase==VehicleFramePhase49W::Ready&&input.focused&&!input.minimized&&!input.eventBudgetExhausted;
+   const bool resultsBack=resultsAvailable&&resultsUi.confirming()&&input.pressed[41]&&
+       !hostInput.menuRequested&&!hostInput.pauseRequested;
+   const bool resultsAdmitted=resultsAvailable&&!hostInput.menuRequested&&!hostInput.pauseRequested&&
+       (!input.pressed[41]||resultsBack);
+   const auto resultsAction=resultsUi.poll(input,resultsAdmitted);
+   if(resultsBack)input.pressed[41]=0; // Escape cancels this live confirmation, not Pause.
+   if(resultsUi.revision()!=resultsRevision){forceSceneRender=true;reportUiState("results");}
+   if(resultsAction!=platform::HostRaceResults50IL::Action::None){
+    std::cerr<<"host_results_action action="<<unsigned(resultsAction)<<" tick="<<completedFrames
+        <<" mixed_frames="<<liveAudio->mixedFrames()<<'\n';
+    if(resultsAction==platform::HostRaceResults50IL::Action::MainMenu){
+     // An explicit confirmed Results choice uses the existing front-menu
+     // request. Merely displaying/navigating Results never enters this path.
+     hostInput.menuRequested=true;
+    }else{
+     composePacket(false,input);sampleController();
+     restartRequested=resultsAction==platform::HostRaceResults50IL::Action::Restart;
+     break;
+    }
+   }
+   if(humanResultsReady&&!sessionMenu.open()){
+    // These keys belong to Results navigation. Native finish controls retain
+    // sole ownership; UI arrows/Space never count as attempted manual driving.
+    constexpr std::uint16_t gameplayKeys[]={26,22,82,81,44,21,225};
+    for(const auto key:gameplayKeys)input.down[key]=input.pressed[key]=0;
+   }
    const bool menuWasOpen=sessionMenu.open();
    const auto menuRevision=sessionMenu.revision();
    if(input.focused&&!input.minimized&&!input.eventBudgetExhausted){
     const auto action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready);
     selectedRacer60=sessionMenu.selectedRacer60();
     selectedAudioSettings=sessionMenu.selectedAudioSettings();
+    selectedTrack=sessionMenu.selectedTrack();
     if(action==platform::HostSessionMenu50IF::Result::Restart||
        action==platform::HostSessionMenu50IF::Result::Quit){
      composePacket(false,input);sampleController();
@@ -2698,8 +2746,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     if(playerFinishDriver){
      // Normal source finish countdown is four seconds. Audio/event waiting and
-     // the original menu transition are not joined: at zero the HOST changes
-     // only its result label and retains this live scene until restart/quit.
+     // the original menu transition remain unjoined. At zero the native client
+     // offers a live Results overlay without stopping this scene or its audio.
      humanResultsCountdown=std::max(0.f,humanResultsCountdown-.016f);
      humanResultsReady=humanResultsCountdown<=0.f;
     }
@@ -2798,6 +2846,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      hud.raceCountdown=race_session50HM::countdownNumber(race);
      hud.raceGo=race.phase==race_session50HM::Phase::Racing&&race.raceSeconds<1.0;
      hud.raceFinished=race.racers[0].finished;hud.raceResultsReady=humanResultsReady;
+     if(humanResultsReady){
+      require50DU(race.resultsClosed&&race.racers[0].finished,"results overlay requires the sealed human finish");
+      hud.resultsPanelVisible=true;
+      hud.resultsFinishPlace=race.racers[0].finishPlace;
+      hud.resultsFinishSeconds=race.racers[0].finishSeconds;
+      hud.resultsSelectedAction=resultsUi.selectedAction();
+      hud.resultsConfirming=resultsUi.confirming();hud.resultsConfirmAccept=resultsUi.confirmAccept();
+     }
      hud.raceLap=race_session50HM::displayedLap(race,0);
      hud.raceLapTarget=race.config.lapTarget;hud.racePlace=race.racers[0].place;
      hud.raceRacerCount=race.racerCount;
@@ -3236,13 +3292,29 @@ int main(int argc,char**argv){try{
  // explicit Start/Restart alone commits the requested configuration.
  auto selectedAudioSettings=rr::game::freshOriginalAudioSettings50IC();
  auto effectiveAudioSettings=selectedAudioSettings;
+ // Resolve the process default once. Pending menu selection never mutates the
+ // environment or rebinds a live world. Unknown/unbound metadata still fails.
+ const char* initialTrackError=nullptr;
+ const auto* initialTrack=track_session_assets50IG::select(std::getenv("RR_TRACK"),initialTrackError);
+ require50DU(initialTrack,initialTrackError?initialTrackError:"original track admission failed");
+ require50DU(track_session_assets50IG::codeEquals(initialTrack->world->code,"TA")||
+     track_session_assets50IG::codeEquals(initialTrack->world->code,"GC"),"track is not in the explicit menu admission list");
+ auto effectiveTrack=track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")?
+     rr::platform::HostTrack50IM::GC:rr::platform::HostTrack50IM::TA;
+ auto selectedTrack=effectiveTrack;
+ const char* incompleteWorldSetting=std::getenv("RR_GC_INCOMPLETE_WORLD");
+ const char* selectedModeSetting=std::getenv("RR_RACE_MODE");
+ const rr::platform::HostTrackAdmission50IM trackAdmission{
+     incompleteWorldSetting&&std::string(incompleteWorldSetting)=="1",
+     selectedModeSetting&&std::string(selectedModeSetting)=="2"};
  std::uint64_t sessionIndex=0;
  for(;;){
   const auto exit=runSession50DU(argv[1],headlessLive,headlessLive?argv[3]:nullptr,
       useCheckpoint?&activeCheckpoint:nullptr,nextCheckpoint,lapContinuity,sessionIndex,
-      applicationClock,startAtMenu,selectedRacer60,effectiveAudioSettings,selectedAudioSettings);
+      applicationClock,startAtMenu,selectedRacer60,effectiveAudioSettings,selectedAudioSettings,
+      effectiveTrack,selectedTrack,trackAdmission);
   if(exit==SessionExit50DU::Quit)break;
-  if(exit==SessionExit50DU::Restart)effectiveAudioSettings=selectedAudioSettings;
+  if(exit==SessionExit50DU::Restart){effectiveAudioSettings=selectedAudioSettings;effectiveTrack=selectedTrack;}
   require50DU(sessionIndex<std::numeric_limits<std::uint64_t>::max()-1,"audio session index exhausted");
   ++sessionIndex;
   startAtMenu=false; // An explicit restart/start immediately enters its fresh session.

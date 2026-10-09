@@ -10,6 +10,10 @@ namespace rr { namespace assets {
 struct SceneLimits48D {
     std::size_t input_bytes = 8u * 1024u * 1024u;
     std::uint32_t vertices_all_lods = 1000000;
+    // Explicit original quantized signed24-in-V4_32 route. Default admission
+    // stays V4_16, preserving prior rejection of unproven float V4_32 assets.
+    // Caller must establish this original resource uses the compressed path.
+    bool allow_signed32_quantized_positions = false;
 };
 struct SceneNode48D {
     std::string name;

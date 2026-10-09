@@ -27,6 +27,10 @@ struct Read48D {
         range(at, 2); return std::uint16_t(unsigned(data[at]) | (unsigned(data[at + 1]) << 8));
     }
     int i16(std::size_t at) const { const unsigned x = u16(at); return x < 32768 ? int(x) : int(x) - 65536; }
+    int i32(std::size_t at) const {
+        const auto bits = u32(at);
+        return static_cast<int>(bits < 0x80000000u ? std::int64_t(bits) : std::int64_t(bits) - 0x100000000LL);
+    }
     int i8(std::size_t at) const { range(at, 1); return data[at] < 128 ? int(data[at]) : int(data[at]) - 256; }
     double f32(std::size_t at) const {
         static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559, "IEEE binary32 required");
@@ -91,7 +95,8 @@ void accumulateBounds(SceneNode48D& node, const std::array<double, 3>& position)
     ++node.decoded_points;
 }
 void decodeSurface(const Read48D& read, std::size_t begin, std::size_t end, std::uint32_t expectedVertices,
-    Scene48D& scene, SceneSurface48D& surface, const DecodeHooks48C* hooks) {
+    Scene48D& scene, SceneSurface48D& surface, const DecodeHooks48C* hooks,
+    bool allowSigned32QuantizedPositions) {
     std::size_t at = begin;
     surface.vertices.reserve(expectedVertices);
     surface.indices.reserve(static_cast<std::size_t>(expectedVertices) * 3);
@@ -118,7 +123,10 @@ void decodeSurface(const Read48D& read, std::size_t begin, std::size_t end, std:
             DecodeKind48C::unsupported, "scene.group_template", tag, "Only observed original groups of 3..16 vertices supported");
         require(surface.vertices.size() + count <= expectedVertices, DecodeKind48C::malformed,
             "scene.vertex_count", tag, "Surface groups exceed declared vertex count");
-        const auto xyz = take(0x6d, count, 0x8001, 8);
+        const bool widePositions = allowSigned32QuantizedPositions &&
+            read.u32(at) == ((0x6cu << 24) | (count << 16) | 0x8001u);
+        const std::size_t xyzElementBytes = widePositions ? 16 : 8;
+        const auto xyz = take(widePositions ? 0x6c : 0x6d, count, 0x8001, xyzElementBytes);
         const auto normals = take(0x6a, count, 0x8001 + count, 3);
         const auto uv = take(0x65, count, 0x8001 + 2 * count, 4);
         const auto colors = surface.has_original_colors ? take(0x6e, count, 0xc001 + 3 * count, 4) : 0;
@@ -127,11 +135,23 @@ void decodeSurface(const Read48D& read, std::size_t begin, std::size_t end, std:
         at += 4;
         std::array<RawVertex48D, 16> raw{};
         for (unsigned i = 0; i < count; ++i) {
-            for (unsigned axis = 0; axis < 4; ++axis) raw[i].xyz[axis] = read.i16(xyz + i * 8 + axis * 2);
+            for (unsigned axis = 0; axis < 4; ++axis)
+                raw[i].xyz[axis] = widePositions ? read.i32(xyz + i * 16 + axis * 4) :
+                    read.i16(xyz + i * 8 + axis * 2);
+            if (widePositions) for (unsigned axis = 0; axis < 3; ++axis)
+                require(raw[i].xyz[axis] >= -8388608 && raw[i].xyz[axis] <= 8388607,
+                    DecodeKind48C::unsupported, "scene.signed24_position", xyz + i * 16 + axis * 4,
+                    "V4_32 position is outside the authored signed24 quantized subset");
+            const auto boneOffset = xyz + i * xyzElementBytes + (widePositions ? 12 : 6);
+            // Bound signed bone/ADC before abs, including INT_MIN rejection.
+            const int maximumBoneWord = static_cast<int>(scene.nodes.size()) * 16;
+            require(raw[i].xyz[3] >= -maximumBoneWord && raw[i].xyz[3] <= maximumBoneWord,
+                DecodeKind48C::malformed, "scene.bone_index", boneOffset,
+                "Rigid bone/ADC word is outside hierarchy");
             const int boneWord = std::abs(raw[i].xyz[3]);
             require(boneWord != 0 && boneWord % 16 == 0 && boneWord / 16 >= 1 &&
                 static_cast<unsigned>(boneWord / 16) <= scene.nodes.size(), DecodeKind48C::malformed,
-                "scene.bone_index", xyz + i * 8 + 6, "Rigid bone/ADC word is outside hierarchy");
+                "scene.bone_index", boneOffset, "Rigid bone/ADC word is outside hierarchy");
             for (unsigned axis = 0; axis < 3; ++axis) raw[i].normal[axis] = read.i8(normals + i * 3 + axis);
             for (unsigned axis = 0; axis < 2; ++axis) raw[i].uv[axis] = read.i16(uv + i * 4 + axis * 2);
             if (surface.has_original_colors)
@@ -141,7 +161,7 @@ void decodeSurface(const Read48D& read, std::size_t begin, std::size_t end, std:
         std::uint32_t start = 0;
         while (start < count) {
             require(start + 2 < count && raw[start].xyz[3] < 0 && raw[start + 1].xyz[3] < 0,
-                DecodeKind48C::unsupported, "scene.strip_start", xyz + start * 8, "Strip needs two suppressed initial vertices");
+                DecodeKind48C::unsupported, "scene.strip_start", xyz + start * xyzElementBytes, "Strip needs two suppressed initial vertices");
             std::uint32_t finish = start + 2;
             while (finish < count && raw[finish].xyz[3] > 0) {
                 std::uint32_t a = base + finish - 2, b = base + finish - 1;
@@ -149,7 +169,7 @@ void decodeSurface(const Read48D& read, std::size_t begin, std::size_t end, std:
                 surface.indices.push_back(a); surface.indices.push_back(b); surface.indices.push_back(base + finish);
                 ++finish;
             }
-            require(finish > start + 2, DecodeKind48C::unsupported, "scene.empty_strip", xyz + start * 8, "Source strip emits no triangle");
+            require(finish > start + 2, DecodeKind48C::unsupported, "scene.empty_strip", xyz + start * xyzElementBytes, "Source strip emits no triangle");
             if (!surface.strips.empty()) {
                 const auto& previous = surface.strips.back();
                 if (previous.end - previous.start == 16 && previous.start == 0 &&
@@ -338,7 +358,8 @@ bool decodeScene48D(const std::vector<std::uint8_t>& input, Scene48D& output,
                 require(parsed.vertices_all_lods <= vertexLimit && vertexCount <= vertexLimit - parsed.vertices_all_lods,
                     DecodeKind48C::limit, "scene.total_vertices", surface.source_offset, "Total vertices across LODs exceed limit");
                 parsed.vertices_all_lods += vertexCount;
-                decodeSurface(read, at, at + size, vertexCount, parsed, surface, hooks); at += size;
+                decodeSurface(read, at, at + size, vertexCount, parsed, surface, hooks,
+                    limits.allow_signed32_quantized_positions); at += size;
                 lod.surfaces.push_back(std::move(surface)); ++parsed.surfaces_all_lods;
             }
             parsed.lods.push_back(std::move(lod));

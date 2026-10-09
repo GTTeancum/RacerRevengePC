@@ -155,6 +155,21 @@ struct VehicleWindowTrack50DS {
     std::uint32_t sourceProjectionCount = 0;
     std::size_t maximumProjectionBytes = 0;
 };
+// Narrow mutable world path for caller-animated authentic scene owners. The
+// aggregate retains one fixed source topology/material table across the session.
+constexpr std::uint32_t maxVehicleWindowDynamicVertices50DS = 4096;
+constexpr std::uint32_t maxVehicleWindowDynamicIndices50DS = 16384;
+constexpr std::uint32_t maxVehicleWindowDynamicSpans50DS = 64;
+struct VehicleWindowDynamicWorldFrame50DS {
+    // Exact cold vertex order/count. Only positions may change; authored UV and
+    // color bytes must equal the cold mesh. Borrowed only through submit().
+    const assets::Vertex48B* vertices = nullptr;
+    std::uint32_t vertexCount = 0;
+    // Required iff the cold descriptor supplied normals; same exact count.
+    // Finite unit normals or exact zero. No transform/animation is inferred.
+    const assets::WorldNormal50HK* sourceNormals = nullptr;
+    std::uint32_t sourceNormalCount = 0;
+};
 struct VehicleWindowSky50DS {
     // Authored sky geometry only, copied cold into private GPU buffers. Its
     // positions use the separate per-frame skyWorldViewProjection matrix.
@@ -228,6 +243,14 @@ struct VehicleWindowRequest50DS {
     // Material mapping arrays are copied; asset and texture owners stay alive.
     const VehicleWindowRacerArchetype50DS* racerArchetypes = nullptr;
     std::uint32_t racerArchetypeCount = 0;
+    // Optional shared dynamic-world aggregate. Cold validation is the track
+    // contract plus the narrower 4096/16384/64 bounds above. Requires explicit
+    // callerMaterialTextures; no static culling/projection stream is admitted.
+    // Mesh/spans/normals are borrowed only at create. Indices/materials/UV/color
+    // stay fixed; frame.dynamicWorld supplies current positions and normals.
+    // Two cold GPU vertex/normal banks share one immutable index buffer and the
+    // existing private frame transaction. No extra clock or frame allocations.
+    VehicleWindowTrack50DS dynamicWorld{};
 };
 struct VehicleWindowStanding50DS {
     // Exact cold-verified original display name, including its terminator.
@@ -288,6 +311,16 @@ struct VehicleWindowHostHud50DS {
     // rows retain their sealed order; player highlighting uses this explicit ID.
     std::uint32_t standingsCount = 0, standingsPlayerIndex = 0;
     VehicleWindowStanding50DS standings[maxVehicleWindowStandings50DS]{};
+    // Explicit nonblocking Results screen. The caller supplies the sealed
+    // race observer's finish place/double seconds, separately from native
+    // CB8/CC0 timing above. These values are not inferred or recomputed here.
+    // Displaying/selecting this overlay does not pause world or audio owners.
+    bool resultsPanelVisible = false;
+    std::uint32_t resultsFinishPlace = 0, resultsSelectedAction = 0;
+    double resultsFinishSeconds = 0.0;
+    // Cancel-first confirmation stays on this live overlay; it never implies
+    // a blocking Pause page or permission to change simulation/audio owners.
+    bool resultsConfirming = false, resultsConfirmAccept = false;
 };
 struct VehicleWindowOpponent50DS {
     // Successful world-space 50CO output from the selected retained 50CR
@@ -355,6 +388,7 @@ struct VehicleWindowFrame50DS {
     // submitted racer's own current opaque component geometry and material bank.
     const VehicleWindowOpponent50DS* opponents = nullptr;
     std::uint32_t opponentCount = 0;
+    VehicleWindowDynamicWorldFrame50DS dynamicWorld{};
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,
@@ -380,6 +414,11 @@ struct VehicleWindowDiagnostic50DS {
     // readback for actual pixels. Not GPU timing or visible-fragment counts.
     std::uint32_t trackDraws = 0, trackTexturedDraws = 0, trackUntexturedDraws = 0;
     std::uint32_t trackIndices = 0;
+    // Dynamic-world checked GL commands; separate from immutable track counts.
+    // An aborted frame does not publish these draws. No visible-pixel claim.
+    std::uint32_t dynamicWorldDraws = 0, dynamicWorldIndices = 0;
+    std::uint32_t dynamicWorldVerticesUploaded = 0, dynamicWorldNormalsUploaded = 0;
+    std::uint32_t dynamicWorldSpan = assets::unresolvedMaterialTexture50EA;
     // Per-submit CPU selection receipts, also populated when culling is off.
     // Retained means selected, not necessarily submitted: trackDraws/Indices
     // above count checked GL commands; require batchAccepted for publication.

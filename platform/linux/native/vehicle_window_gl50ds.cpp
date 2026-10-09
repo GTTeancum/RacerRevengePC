@@ -268,6 +268,24 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
     // own bounds from the actual indexed world-space geometry after validation.
     return true;
 }
+bool validateDynamicWorld(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept {
+    auto selected = request;
+    selected.track = request.dynamicWorld;
+    selected.enableNativePodShadows = false;
+    const auto& world = selected.track;
+    if (world.mesh && (world.mode != VehicleWindowMode50DS::callerMaterialTextures ||
+        world.mesh->vertices.size() > maxVehicleWindowDynamicVertices50DS ||
+        world.mesh->indices.size() > maxVehicleWindowDynamicIndices50DS ||
+        world.spanCount > maxVehicleWindowDynamicSpans50DS || world.enableFrustumCulling ||
+        world.cullingChunkTriangles || world.sourceProjectionUvs ||
+        world.sourceProjectionCount || world.maximumProjectionBytes))
+        return fail(d, VehicleWindowError50DS::limits,
+            "dynamic world requires bounded textured topology without static culling/projection");
+    const bool result = validateTrack(selected, d);
+    d.dynamicWorldSpan = d.trackSpan;
+    d.trackSpan = assets::unresolvedMaterialTexture50EA;
+    return result;
+}
 bool validateSky(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept {
     const auto& sky = request.sky;
     if (!sky.mesh)
@@ -478,6 +496,89 @@ struct HostHudGeometry {
         text(x + 12.f, y + panelHeight - 12.f, input.footer, 0xA8C5DE);
         return !overflow;
     }
+    bool buildResults(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
+        count = 0; overflow = false;
+        constexpr float panelWidth = 380.f;
+        const float timingY = 79.f + 11.f * float(input.standingsCount);
+        const float actionY = timingY + (input.completedLapTimesValid ?
+            27.f + 11.f * float(input.completedLapTimeCount) : 20.f);
+        const float panelHeight = actionY + 70.f;
+        scale = std::min(2.f, std::min(float(width) / (panelWidth + 24.f),
+            float(height) / (panelHeight + 24.f)));
+        inverseWidth = 2.f / float(width); inverseHeight = 2.f / float(height);
+        const float x = (float(width) / scale - panelWidth) * .5f - 8.f;
+        const float y = 64.f - (float(height) / scale + panelHeight) * .5f;
+        rectangle(x, y, panelWidth, panelHeight, 0x617589);
+        rectangle(x + 1.f, y + 1.f, panelWidth - 2.f, panelHeight - 2.f, 0x0A111B);
+        text(x + 12.f, y + 10.f, "RACE RESULTS", 0x5DDFFF);
+        for (U i = 0; i < input.standingsCount; ++i)
+            if (input.standings[i].racerIndex == input.standingsPlayerIndex)
+                text(x + 12.f, y + 24.f, input.standings[i].displayName, 0xEDF3F8);
+        char place[32]{}, finish[40]{};
+        std::snprintf(place, sizeof(place), "PLACE %u / %u", input.resultsFinishPlace, input.raceRacerCount);
+        // Finish time is the explicit sealed HOST race observation; the native
+        // CC0 lap durations below retain their separate source provenance.
+        const U finishCentiseconds = static_cast<U>(input.resultsFinishSeconds * 100.0 + .5);
+        std::snprintf(finish, sizeof(finish), "FINISH TIME %u:%02u.%02u", finishCentiseconds / 6000u,
+            (finishCentiseconds / 100u) % 60u, finishCentiseconds % 100u);
+        text(x + 12.f, y + 40.f, place, 0xA8E6B4);
+        text(x + 158.f, y + 40.f, finish, 0xA8E6B4);
+        text(x + 12.f, y + 58.f, "STANDINGS AT YOUR FINISH", 0xA8C5DE);
+        text(x + 232.f, y + 58.f, "LAPS", 0xA8C5DE);
+        for (U i = 0; i < input.standingsCount; ++i) {
+            const auto& row = input.standings[i];
+            const float rowY = y + 72.f + 11.f * float(i);
+            const bool player = row.racerIndex == input.standingsPlayerIndex;
+            if (player) rectangle(x + 7.f, rowY - 2.f, panelWidth - 14.f, 11.f, 0x173547);
+            const U color = player ? 0x5DDFFF : 0xEDF3F8;
+            char rank[4]{}, laps[12]{};
+            std::snprintf(rank, sizeof(rank), "%u", row.place);
+            std::snprintf(laps, sizeof(laps), "%u/%u", row.completedLaps, input.raceLapTarget);
+            text(x + 12.f, rowY, rank, color);
+            text(x + 30.f, rowY, row.displayName, color);
+            text(x + 232.f, rowY, laps, color);
+            text(x + 300.f, rowY, row.finished ? "FINISHED" : "UNFINISHED", 0xA8C5DE);
+        }
+        if (input.completedLapTimesValid) {
+            text(x + 12.f, y + timingY, "COMPLETED LAP TIMES", 0xA8C5DE);
+            const auto duration = [&](float rowY, float seconds) noexcept {
+                const U centiseconds = static_cast<U>(double(seconds) * 100.0 + .5);
+                char value[20]{};
+                std::snprintf(value, sizeof(value), "%u:%02u.%02u", centiseconds / 6000u,
+                    (centiseconds / 100u) % 60u, centiseconds % 100u);
+                text(x + 78.f, rowY, value, 0xEDF3F8);
+            };
+            for (U i = 0; i < input.completedLapTimeCount; ++i) {
+                const char label[] = {'L','A','P',' ',char('1' + i),'\0'};
+                const float rowY = y + timingY + 13.f + 11.f * float(i);
+                text(x + 12.f, rowY, label, 0xEDF3F8);
+                duration(rowY, input.completedLapSeconds[i]);
+            }
+            const float bestY = y + timingY + 13.f + 11.f * float(input.completedLapTimeCount);
+            text(x + 12.f, bestY, "BEST", 0xA8E6B4);
+            duration(bestY, input.bestLapSeconds);
+        } else text(x + 12.f, y + timingY, "LAP TIMES UNAVAILABLE", 0xA8C5DE);
+        const char* actions[] = {"RESTART RACE", "MAIN MENU", "EXIT"};
+        if (input.resultsConfirming) {
+            text(x + 12.f, y + actionY, "LEAVE THESE RESULTS", 0xFFBF55);
+            const char* choices[] = {"CANCEL", actions[input.resultsSelectedAction]};
+            for (U i = 0; i < 2; ++i) {
+                const float rowY = y + actionY + 16.f + 16.f * float(i);
+                const bool selected = i == unsigned(input.resultsConfirmAccept);
+                if (selected) rectangle(x + 7.f, rowY - 3.f, panelWidth - 14.f, 13.f, 0x173547);
+                text(x + 12.f, rowY, choices[i], selected ? 0x5DDFFF : 0xEDF3F8);
+            }
+        } else for (U i = 0; i < 3; ++i) {
+            const float rowY = y + actionY + 16.f * float(i);
+            const bool selected = i == input.resultsSelectedAction;
+            if (selected) rectangle(x + 7.f, rowY - 3.f, panelWidth - 14.f, 13.f, 0x173547);
+            text(x + 12.f, rowY, actions[i], selected ? 0x5DDFFF : 0xEDF3F8);
+        }
+        text(x + 12.f, y + panelHeight - 12.f, input.resultsConfirming ?
+            "UP/DOWN SELECT  ENTER CONFIRM  ESC CANCEL" :
+            "UP/DOWN SELECT  ENTER CONFIRM  ESC PAUSE", 0xA8C5DE);
+        return !overflow;
+    }
     void standingsPanel(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
         if (!input.standingsCount) return;
         // Leave a four-cell gap below the race readout, including optional
@@ -543,6 +644,7 @@ struct HostHudGeometry {
         scale = hudScale;
     }
     bool build(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
+        if (input.resultsPanelVisible) return buildResults(input, width, height);
         count = 0; overflow = false;
         const float clockHeight = input.raceClocksValid ? (input.raceFinished ? 14.f : 28.f) : 0.f;
         scale = width >= 960 && height >= 540 ? 2.f : 1.f;
@@ -759,6 +861,14 @@ struct VehicleWindowGl50DS::Storage {
     std::uint64_t texturePublication = 0;
     std::unique_ptr<TrackSpan[]> trackSpans;
     U trackSpanCount = 0;
+    std::unique_ptr<TrackSpan[]> dynamicWorldSpans;
+    std::unique_ptr<assets::Vertex48B[]> dynamicWorldSourceVertices;
+    U dynamicWorldSpanCount = 0, dynamicWorldVertexCount = 0, dynamicWorldNormalCount = 0;
+    U dynamicWorldVertexBuffers[2]{}, dynamicWorldNormalBuffers[2]{}, dynamicWorldArrays[2]{};
+    U dynamicWorldIndexBuffer = 0;
+    I dynamicWorldIndexCount = 0;
+    std::uint64_t dynamicWorldTexturePublication = 0;
+    VehicleWindowDynamicWorldFrame50DS frameDynamicWorld{};
     std::unique_ptr<TrackSpan[]> skySpans;
     U skySpanCount = 0, skyVertexBuffer = 0, skyIndexBuffer = 0, skyVertexArray = 0;
     I skyIndexCount = 0;
@@ -850,6 +960,10 @@ struct VehicleWindowGl50DS::Storage {
                 request.context, request.isCurrent, trackTexturePublication)))
             return fail(d, VehicleWindowError50DS::material,
                 "borrowed track texture publication/context/thread is no longer valid");
+        if (request.dynamicWorld.textures && !request.dynamicWorld.textures->validBorrow(
+            request.context, request.isCurrent, dynamicWorldTexturePublication))
+            return fail(d, VehicleWindowError50DS::material,
+                "borrowed dynamic-world texture publication/context/thread is no longer valid");
         if (request.sky.textures && !request.sky.textures->validBorrow(
             request.context, request.isCurrent, skyTexturePublication))
             return fail(d, VehicleWindowError50DS::material,
@@ -865,11 +979,12 @@ struct VehicleWindowGl50DS::Storage {
             if (racerArchetypes[i].cables.textures) return true;
         return request.mode == VehicleWindowMode50DS::callerMaterialTextures ||
             request.track.mode == VehicleWindowMode50DS::callerMaterialTextures || request.cables.textures ||
-            request.sky.textures;
+            request.sky.textures || request.dynamicWorld.textures;
     }
     bool usesTrackShader() const noexcept {
         return request.track.mode == VehicleWindowMode50DS::sourceVertexColors ||
-            request.track.mode == VehicleWindowMode50DS::callerMaterialTextures;
+            request.track.mode == VehicleWindowMode50DS::callerMaterialTextures ||
+            request.dynamicWorld.mode == VehicleWindowMode50DS::callerMaterialTextures;
     }
     bool createTrackMaterials(const VehicleWindowTrack50DS& input) noexcept {
         if (input.mode != VehicleWindowMode50DS::callerMaterialTextures) return true;
@@ -897,6 +1012,36 @@ struct VehicleWindowGl50DS::Storage {
                 diagnostic->texture = source.material.textureIndex;
                 return fail(*diagnostic, VehicleWindowError50DS::material,
                     "required track texture disappeared during cold preparation");
+            }
+        }
+        return true;
+    }
+    bool createDynamicWorldMaterials(const VehicleWindowTrack50DS& input) noexcept {
+        if (input.mode != VehicleWindowMode50DS::callerMaterialTextures) return true;
+        dynamicWorldSpans.reset(new (std::nothrow) TrackSpan[input.spanCount]);
+        if (!dynamicWorldSpans)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation,
+                "allocate bounded source-ordered dynamic-world span table");
+        dynamicWorldSpanCount = input.spanCount;
+        for (U i = 0; i < dynamicWorldSpanCount; ++i) {
+            const auto& source = input.spans[i];
+            auto& target = dynamicWorldSpans[i];
+            target.indexStart = source.indexStart;
+            target.indexCount = source.indexCount;
+            target.discardZeroAlpha = source.discardZeroAlpha;
+            target.sourcePass = source.sourcePass;
+            target.sourcePassCount = source.sourcePassCount;
+            target.projectionPass = source.projectionPass;
+            target.material.textureIndex = source.material.textureIndex;
+            target.material.policy = source.material;
+            target.material.name = source.material.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
+                input.textures->texture(source.material.textureIndex) : 0;
+            if (source.material.mode == VehicleWindowMaterialMode50DS::requiredTexture &&
+                !target.material.name) {
+                diagnostic->dynamicWorldSpan = i;
+                diagnostic->texture = source.material.textureIndex;
+                return fail(*diagnostic, VehicleWindowError50DS::material,
+                    "required dynamic-world texture disappeared during cold preparation");
             }
         }
         return true;
@@ -1151,6 +1296,9 @@ struct VehicleWindowGl50DS::Storage {
             hostHudVertexBuffer || hostHudIndexBuffer || hostHudVertexArray) return true;
         if (cableVertexBuffer || cableIndexBuffer || cableVertexArray) return true;
         if (trackVertexBuffer || trackIndexBuffer || trackVertexArray || trackNormalBuffer || trackProjectionBuffer) return true;
+        if (dynamicWorldIndexBuffer) return true;
+        for (U b = 0; b < 2; ++b)
+            if (dynamicWorldVertexBuffers[b] || dynamicWorldNormalBuffers[b] || dynamicWorldArrays[b]) return true;
         if (skyVertexBuffer || skyIndexBuffer || skyVertexArray) return true;
         for (U b = 0; b < 2; ++b) {
             if (targets[b] || colors[b] || depths[b] || menuTargets[b] || menuColors[b]) return true;
@@ -1479,7 +1627,8 @@ void main() {
         return true;
     }
     bool createStaticGeometry(const assets::Mesh48B* mesh, U& trackVertexBuffer,
-        U& trackIndexBuffer, U& trackVertexArray, I& trackIndexCount) noexcept {
+        U& trackIndexBuffer, U& trackVertexArray, I& trackIndexCount,
+        U vertexUsage = staticDraw, bool reuseIndices = false) noexcept {
         if (!mesh) return true;
         const std::size_t vertexBytes = mesh->vertices.size() * sizeof(assets::Vertex48B);
         const std::size_t indexBytes = mesh->indices.size() * sizeof(U);
@@ -1490,13 +1639,15 @@ void main() {
         const std::size_t bufferBytes[] = {vertexBytes, indexBytes};
         std::uint8_t scratch[1024];
         for (U b = 0; b < 2; ++b) {
+            if (b == 1 && reuseIndices) continue;
+            const U usage = b == 0 ? vertexUsage : staticDraw;
             gl.genBuffers(1, buffers[b]);
             drawGl.bindBuffer(arrayBuffer, *buffers[b]);
-            gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(bufferBytes[b]), inputs[b], staticDraw);
+            gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(bufferBytes[b]), inputs[b], usage);
             if (!check("upload static world-space track buffer")) return false;
             if (!*buffers[b])
                 return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero track buffer name");
-            if (!verifyBuffer(arrayBuffer, bufferBytes[b], staticDraw)) return false;
+            if (!verifyBuffer(arrayBuffer, bufferBytes[b], usage)) return false;
             const auto* source = static_cast<const std::uint8_t*>(inputs[b]);
             for (std::size_t offset = 0; offset < bufferBytes[b];) {
                 const std::size_t count = std::min(sizeof(scratch), bufferBytes[b] - offset);
@@ -1527,16 +1678,17 @@ void main() {
         trackIndexCount = static_cast<I>(mesh->indices.size());
         return true;
     }
-    bool createTrackNormals(const VehicleWindowTrack50DS& track) noexcept {
+    bool createWorldNormals(const VehicleWindowTrack50DS& track, U& trackNormalBuffer,
+        U trackVertexArray, U usage = staticDraw) noexcept {
         if (!track.sourceNormals) return true;
         const std::size_t bytes = std::size_t(track.sourceNormalCount) * sizeof(assets::WorldNormal50HK);
         gl.genBuffers(1, &trackNormalBuffer);
         drawGl.bindBuffer(arrayBuffer, trackNormalBuffer);
-        gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(bytes), track.sourceNormals, staticDraw);
+        gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(bytes), track.sourceNormals, usage);
         if (!check("upload authenticated track source normals")) return false;
         if (!trackNormalBuffer)
             return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero source normal buffer name");
-        if (!verifyBuffer(arrayBuffer, bytes, staticDraw)) return false;
+        if (!verifyBuffer(arrayBuffer, bytes, usage)) return false;
         std::uint8_t scratch[1024];
         const auto* source = reinterpret_cast<const std::uint8_t*>(track.sourceNormals);
         for (std::size_t offset = 0; offset < bytes;) {
@@ -1602,6 +1754,67 @@ void main() {
         void* pointer = nullptr; gl.getVertexAttribPointerv(4, 0x8645, &pointer);
         if (!check("verify authenticated projection UV offset")) return false;
         return pointer == nullptr || fail(*diagnostic, VehicleWindowError50DS::layout, "source projection UV attribute offset mismatch");
+    }
+    bool createDynamicWorldGeometry(const VehicleWindowTrack50DS& world) noexcept {
+        if (!world.mesh) return true;
+        dynamicWorldVertexCount = static_cast<U>(world.mesh->vertices.size());
+        dynamicWorldNormalCount = world.sourceNormalCount;
+        dynamicWorldSourceVertices.reset(new (std::nothrow) assets::Vertex48B[dynamicWorldVertexCount]);
+        if (!dynamicWorldSourceVertices)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation,
+                "allocate bounded dynamic-world source UV/color provenance");
+        std::memcpy(dynamicWorldSourceVertices.get(), world.mesh->vertices.data(),
+            std::size_t(dynamicWorldVertexCount) * sizeof(assets::Vertex48B));
+        for (U b = 0; b < 2; ++b)
+            if (!createStaticGeometry(world.mesh, dynamicWorldVertexBuffers[b], dynamicWorldIndexBuffer,
+                    dynamicWorldArrays[b], dynamicWorldIndexCount, dynamicDraw, b != 0) ||
+                !createWorldNormals(world, dynamicWorldNormalBuffers[b], dynamicWorldArrays[b], dynamicDraw))
+                return false;
+        return true;
+    }
+    bool validateDynamicWorldFrame(const VehicleWindowDynamicWorldFrame50DS& frame,
+        VehicleWindowDiagnostic50DS& d) const noexcept {
+        if (frame.vertexCount != dynamicWorldVertexCount ||
+            bool(frame.vertices) != bool(dynamicWorldVertexCount) ||
+            frame.sourceNormalCount != dynamicWorldNormalCount ||
+            bool(frame.sourceNormals) != bool(dynamicWorldNormalCount))
+            return fail(d, VehicleWindowError50DS::frame,
+                "dynamic-world streams must exactly match cold vertex/normal counts");
+        for (U v = 0; v < frame.vertexCount; ++v) {
+            const auto& vertex = frame.vertices[v];
+            for (float value : vertex.position)
+                if (!std::isfinite(value))
+                    return fail(d, VehicleWindowError50DS::frame, "nonfinite dynamic-world position");
+            const auto& source = dynamicWorldSourceVertices[v];
+            if (std::memcmp(vertex.uv, source.uv, sizeof(source.uv)) ||
+                std::memcmp(vertex.color, source.color, sizeof(source.color)))
+                return fail(d, VehicleWindowError50DS::frame,
+                    "dynamic-world UV/color must retain exact cold source bytes");
+        }
+        for (U n = 0; n < frame.sourceNormalCount; ++n) {
+            const auto& normal = frame.sourceNormals[n].xyz;
+            const double length = std::hypot(normal[0], normal[1], normal[2]);
+            if (!std::isfinite(length) || (length != 0.0 && std::abs(length - 1.0) > 0.0001))
+                return fail(d, VehicleWindowError50DS::frame,
+                    "dynamic-world normals must be finite unit vectors or explicit zero");
+        }
+        return true;
+    }
+    bool uploadDynamicWorld(U bank) noexcept {
+        if (!dynamicWorldVertexCount) return true;
+        drawGl.bindBuffer(arrayBuffer, dynamicWorldVertexBuffers[bank]);
+        drawGl.bufferSubData(arrayBuffer, 0,
+            std::intptr_t(dynamicWorldVertexCount) * sizeof(assets::Vertex48B), frameDynamicWorld.vertices);
+        if (!check("upload current source-animated dynamic-world vertices")) return false;
+        diagnostic->dynamicWorldVerticesUploaded = dynamicWorldVertexCount;
+        if (dynamicWorldNormalCount) {
+            drawGl.bindBuffer(arrayBuffer, dynamicWorldNormalBuffers[bank]);
+            drawGl.bufferSubData(arrayBuffer, 0,
+                std::intptr_t(dynamicWorldNormalCount) * sizeof(assets::WorldNormal50HK), frameDynamicWorld.sourceNormals);
+            if (!check("upload current source-animated dynamic-world normals")) return false;
+            diagnostic->dynamicWorldNormalsUploaded = dynamicWorldNormalCount;
+        }
+        return true;
     }
     bool createCableGeometry() noexcept {
         bool needed = request.cables.textures != nullptr;
@@ -2006,6 +2219,11 @@ void main() { viewerOutput = hudColor; }
         request.track.mesh = nullptr;
         request.track.spans = nullptr;
         request.track.sourceNormals = nullptr;
+        request.track.sourceProjectionUvs = nullptr;
+        request.dynamicWorld.mesh = nullptr;
+        request.dynamicWorld.spans = nullptr;
+        request.dynamicWorld.sourceNormals = nullptr;
+        request.dynamicWorld.sourceProjectionUvs = nullptr;
         request.sky.mesh = nullptr;
         request.sky.spans = nullptr;
         // Mapping arrays are cold-only; retain just the 50EB owner and its
@@ -2013,6 +2231,7 @@ void main() { viewerOutput = hudColor; }
         for (auto& component : request.materials.component) component = {};
         texturePublication = input.materials.textures ? input.materials.textures->publicationToken() : 0;
         trackTexturePublication = input.track.textures ? input.track.textures->publicationToken() : 0;
+        dynamicWorldTexturePublication = input.dynamicWorld.textures ? input.dynamicWorld.textures->publicationToken() : 0;
         cableTexturePublication = input.cables.textures ? input.cables.textures->publicationToken() : 0;
         skyTexturePublication = input.sky.textures ? input.sky.textures->publicationToken() : 0;
         cableTextureName = input.cables.textures ? input.cables.textures->texture(input.cables.textureIndex) : 0;
@@ -2040,7 +2259,7 @@ void main() { viewerOutput = hudColor; }
         }
         diagnostic->component = 3;
         if (!createMaterials(input.materials) || !createRacerArchetypes(input) ||
-            !createTrackMaterials(input.track) ||
+            !createTrackMaterials(input.track) || !createDynamicWorldMaterials(input.dynamicWorld) ||
             !createTrackVisibility(input.track) || !createSkyMaterials(input.sky)) return false;
         if (!loadFunctions() || !check("initial GL error state") || !checkContext()) return false;
         shader.reset(new (std::nothrow) VehicleGlShader50CZ(shaderGl));
@@ -2052,7 +2271,8 @@ void main() { viewerOutput = hudColor; }
             if (!createGeometry(racerArchetypes[i].resources, racerArchetypes[i].meshes)) return false;
         if (
             !createStaticGeometry(input.track.mesh, trackVertexBuffer, trackIndexBuffer, trackVertexArray, trackIndexCount) ||
-            !createTrackNormals(input.track) ||
+            !createWorldNormals(input.track, trackNormalBuffer, trackVertexArray) ||
+            !createDynamicWorldGeometry(input.dynamicWorld) ||
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() ||
@@ -2102,6 +2322,21 @@ void main() { viewerOutput = hudColor; }
             !s.shader->program() || !s.targets[bank]) return false;
         if (s.trackIndexCount && (!s.trackVertexBuffer || !s.trackIndexBuffer || !s.trackVertexArray))
             return fail(*s.diagnostic, VehicleWindowError50DS::assets, "static track resources are not ready");
+        if (s.dynamicWorldIndexCount && (!s.dynamicWorldIndexBuffer ||
+            !s.dynamicWorldVertexBuffers[bank] || !s.dynamicWorldArrays[bank] ||
+            (s.dynamicWorldNormalCount && !s.dynamicWorldNormalBuffers[bank])))
+            return fail(*s.diagnostic, VehicleWindowError50DS::assets, "dynamic-world resources are not ready");
+        for (U i = 0; i < s.dynamicWorldSpanCount; ++i) {
+            const auto& material = s.dynamicWorldSpans[i].material;
+            if (!material.name) continue;
+            const auto* texture = s.request.dynamicWorld.textures->asset(material.textureIndex);
+            if (!texture || texture->name != material.name) {
+                s.diagnostic->dynamicWorldSpan = i;
+                s.diagnostic->texture = material.textureIndex;
+                return fail(*s.diagnostic, VehicleWindowError50DS::material,
+                    "required dynamic-world texture is no longer the retained publication");
+            }
+        }
         if (s.usesTrackShader() && !s.trackProgram)
             return fail(*s.diagnostic, VehicleWindowError50DS::shader, "source-color track program is not ready");
         if (s.frameHostHud && (!s.request.enableHostHud || !s.hostHudGeometry ||
@@ -2232,7 +2467,8 @@ void main() { viewerOutput = hudColor; }
         if (s.frameTrackDrawCount && (!transparent || s.trackSpanCount)) {
             // The entire draw is still unpublished and abortable. The following
             // vehicle draws retain this exact target, matrix, and written depth.
-            if (s.trackProgram) {
+            if (s.request.track.mode == VehicleWindowMode50DS::sourceVertexColors ||
+                s.request.track.mode == VehicleWindowMode50DS::callerMaterialTextures) {
                 s.gl.useProgram(s.trackProgram);
                 s.gl.uniformMatrix4fv(s.trackMatrixUniform, 1, 0, s.matrix);
                 s.gl.uniform1f(s.trackColorScaleUniform, s.request.track.vertexColorScale);
@@ -2326,6 +2562,46 @@ void main() { viewerOutput = hudColor; }
         }
         resetPodState();
         return s.check("restore opaque vehicle state after track pass");
+    }
+    bool drawDynamicWorld(U bank, bool transparent) noexcept {
+        if (!dynamicWorldSpanCount) return true;
+        gl.useProgram(trackProgram);
+        gl.uniformMatrix4fv(trackMatrixUniform, 1, 0, matrix);
+        gl.uniform1f(trackColorScaleUniform, request.dynamicWorld.vertexColorScale);
+        gl.uniform1i(trackImageUniform, 0);
+        gl.uniform1i(trackUseSourceNormalsUniform, dynamicWorldNormalCount ? 1 : 0);
+        gl.uniform1i(trackProjectionPassUniform, 0);
+        // Static receiver/culling bounds are deliberately not reused for moving owners.
+        gl.uniform1i(nativeShadowEnabledUniform, 0);
+        gl.uniform1i(nativeShadowOpponentCountUniform, 0);
+        drawGl.bindVertexArray(dynamicWorldArrays[bank]);
+        drawGl.bindBuffer(elementBuffer, dynamicWorldIndexBuffer);
+        for (U i = 0; i < dynamicWorldSpanCount; ++i) {
+            const auto& span = dynamicWorldSpans[i];
+            const auto& material = span.material;
+            const bool deferred = span.sourcePassCount == 1 &&
+                material.policy.blend != VehicleWindowBlend50DS::opaque;
+            if (deferred != transparent) continue;
+            diagnostic->dynamicWorldSpan = i;
+            diagnostic->texture = material.textureIndex;
+            configureBlend(material.policy);
+            gl.depthFunc(span.sourcePass > 1 || material.policy.depthEqual ? 0x0203 : 0x0201);
+            gl.bindTexture(texture2D, material.name);
+            gl.uniform1i(trackUseTextureUniform, material.name ? 1 : 0);
+            gl.uniform1i(trackDiscardZeroAlphaUniform, span.discardZeroAlpha ? 1 : 0);
+            gl.uniform1i(trackEffectModeUniform, effectMode(material.policy));
+            gl.uniform1f(trackAlphaScaleUniform, material.policy.alphaScale);
+            gl.uniform1i(trackUnlitUniform, material.policy.unlit ? 1 : 0);
+            if (!check("bind authenticated dynamic-world material")) return false;
+            drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.indexCount), 0x1405,
+                reinterpret_cast<const void*>(std::uintptr_t(span.indexStart) * sizeof(U)), 0);
+            if (!check("draw current original dynamic-world source surface")) return false;
+            ++diagnostic->dynamicWorldDraws;
+            diagnostic->dynamicWorldIndices += span.indexCount;
+        }
+        diagnostic->dynamicWorldSpan = diagnostic->texture = assets::unresolvedMaterialTexture50EA;
+        resetPodState();
+        return check("restore pod state after dynamic-world pass");
     }
     bool applyPodMaterial(const Material& material, bool suppress, const float* overrideUv = nullptr) noexcept {
         configureBlend(material.policy);
@@ -2443,7 +2719,8 @@ void main() { viewerOutput = hudColor; }
         s.gl.clearColor(s.clearRgba[0], s.clearRgba[1], s.clearRgba[2], s.clearRgba[3]);
         s.gl.clear(colorBufferBit | depthBufferBit);
         if (!s.check("begin explicit private frame")) return false;
-        if (!s.drawSky() || !s.drawTrack(false)) return false;
+        if (!s.uploadDynamicWorld(bank) || !s.drawSky() || !s.drawTrack(false) ||
+            !s.drawDynamicWorld(bank, false)) return false;
         return true;
     }
     static bool bindMaterial(void* context, game::VehicleDrawComponent50CM component, U material) noexcept {
@@ -2478,7 +2755,7 @@ void main() { viewerOutput = hudColor; }
                 s.racerView(s.frameOpponentArchetypes[i]).cableTextureName)) return false;
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
-        if (!s.drawTrack(true)) return false;
+        if (!s.drawTrack(true) || !s.drawDynamicWorld(bank, true)) return false;
         // The shared inactive VBOs currently hold the last opaque opponent.
         // Restore the player's independent stream before its deferred effects.
         if (s.frameOpponentCount && s.materials && !s.uploadRacer(bank, s.framePlayerBatch)) return false;
@@ -2645,6 +2922,11 @@ void main() { viewerOutput = hudColor; }
                 !deleteName(trackNormalBuffer, gl.deleteBuffers, d) ||
                 !deleteName(trackProjectionBuffer, gl.deleteBuffers, d) ||
                 !deleteName(trackIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
+            for (U b = 0; b < 2; ++b)
+                if (!deleteName(dynamicWorldArrays[b], gl.deleteVertexArrays, d) ||
+                    !deleteName(dynamicWorldVertexBuffers[b], gl.deleteBuffers, d) ||
+                    !deleteName(dynamicWorldNormalBuffers[b], gl.deleteBuffers, d)) goto incomplete;
+            if (!deleteName(dynamicWorldIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
             if (!deleteName(skyVertexArray, gl.deleteVertexArrays, d) ||
                 !deleteName(skyVertexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(skyIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
@@ -2691,7 +2973,7 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
             "context callbacks, valid output/vehicle shading modes and positive target bounds required");
     if (!assets.loaded()) return fail(d, VehicleWindowError50DS::assets, "50CR assets are not loaded");
     if (!validateTrack(request, d) || !validateMaterials(request, assets, d) ||
-        !validateCables(request, d) || !validateSky(request, d)) return false;
+        !validateCables(request, d) || !validateSky(request, d) || !validateDynamicWorld(request, d)) return false;
     if (request.racerArchetypeCount > maxVehicleWindowRacerArchetypes50DS ||
         bool(request.racerArchetypeCount) != bool(request.racerArchetypes))
         return fail(d, VehicleWindowError50DS::request, "racer archetypes require an explicit bounded cold array");
@@ -2742,7 +3024,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             if (!std::isfinite(frame.skyWorldViewProjection[i]))
                 return fail(d, VehicleWindowError50DS::frame, "nonfinite authored sky matrix");
     if (!s.validateMaterialUvs(frame.materialUvs, frame.materialUvCount, d) ||
-        !s.validateOpponents(batch, frame, d)) return false;
+        !s.validateOpponents(batch, frame, d) || !s.validateDynamicWorldFrame(frame.dynamicWorld, d)) return false;
     if (bool(s.request.cables.textures) != bool(frame.cables))
         return fail(d, VehicleWindowError50DS::frame, "cable frame presence must match explicit cold cable request");
     if (frame.cables && !validateCableFrame(*frame.cables, d)) return false;
@@ -2771,6 +3053,12 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             return fail(d, VehicleWindowError50DS::frame, "native race HUD counters/status outside admitted bounds");
         if (hud.raceResultsReady && (!hud.raceEnabled || !hud.raceFinished || hud.raceCountdown || hud.raceGo))
             return fail(d, VehicleWindowError50DS::frame, "host results presentation requires a sealed human finish");
+        if (hud.resultsPanelVisible && (!hud.raceResultsReady || !hud.standingsCount ||
+            !hud.resultsFinishPlace || hud.resultsFinishPlace != hud.racePlace ||
+            hud.resultsSelectedAction >= 3 || !std::isfinite(hud.resultsFinishSeconds) ||
+            hud.resultsFinishSeconds < 0.0 || hud.resultsFinishSeconds > double(maxVehicleWindowLapSeconds50DS) ||
+            (!hud.resultsConfirming && hud.resultsConfirmAccept)))
+            return fail(d, VehicleWindowError50DS::frame, "live results panel requires sealed finish and bounded action/time");
         if (hud.raceClocksValid) {
             const auto validSeconds = [](float value) noexcept {
                 return std::isfinite(value) && value >= 0.f && value <= maxVehicleWindowLapSeconds50DS;
@@ -2855,6 +3143,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     std::memcpy(s.clearRgba, frame.clearRgba, sizeof(s.clearRgba));
     s.width = frame.width; s.height = frame.height;
     s.frameCables = frame.cables;
+    s.frameDynamicWorld = frame.dynamicWorld;
     s.frameHostHud = frame.hostHud != nullptr;
     s.frameSet = true; s.diagnostic = &d;
     s.prepareTrackVisibility();
@@ -2879,6 +3168,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     }
     s.frameSet = false; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
     s.framePlayerBatch = {};
+    s.frameDynamicWorld = {};
     for (U i = 0; i < s.frameOpponentCount; ++i) {
         s.frameOpponentBatches[i] = {};
         s.frameOpponentCables[i] = nullptr;

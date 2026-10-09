@@ -1,6 +1,7 @@
 #pragma once
 #include "game_host50er.h"
 #include "host_audio_options50ik.h"
+#include "host_track_selection50im.h"
 #include "vehicle_window_gl50ds.h"
 #include "../../../src/game/original_racer_selection50ij.h"
 
@@ -12,16 +13,19 @@ namespace rr::platform {
 class HostSessionMenu50IF final {
 public:
     enum class Result : std::uint8_t { None, StartPrepared, Restart, Quit };
-    enum class Page : std::uint8_t { Closed, Main, Pause, Controls, Restart, Leave, Exit, Audio };
+    enum class Page : std::uint8_t { Closed, Main, Pause, Controls, Restart, Leave, Exit, Audio, Tracks, IncompleteGC };
 
     explicit HostSessionMenu50IF(bool startAtMenu, bool race, std::uint32_t loadedRacer60,
         bool racerSelectionAvailable = false, bool audioOptionsAvailable = false,
         const game::RaceAudioSettings50IC& loadedAudio = game::freshOriginalAudioSettings50IC(),
-        const game::RaceAudioSettings50IC& selectedAudio = game::freshOriginalAudioSettings50IC()) noexcept
+        const game::RaceAudioSettings50IC& selectedAudio = game::freshOriginalAudioSettings50IC(),
+        HostTrack50IM loadedTrack = HostTrack50IM::TA, HostTrack50IM selectedTrack = HostTrack50IM::TA,
+        const HostTrackAdmission50IM& trackAdmission = {}) noexcept
         : page_(startAtMenu ? Page::Main : Page::Closed),
           loadedRacer60_(loadedRacer60), selectedRacer60_(loadedRacer60),
           race_(race), started_(!startAtMenu), racerChoice_(race && racerSelectionAvailable),
-          audioChoice_(audioOptionsAvailable), audioOptions_(loadedAudio, selectedAudio) {
+          audioChoice_(audioOptionsAvailable), audioOptions_(loadedAudio, selectedAudio),
+          loadedTrack_(loadedTrack), selectedTrack_(selectedTrack), trackAdmission_(trackAdmission) {
         audioChoice_ = audioChoice_ && audioOptions_.valid();
     }
     bool open() const noexcept { return page_ != Page::Closed; }
@@ -30,6 +34,8 @@ public:
     std::uint32_t selectedRacer60() const noexcept { return selectedRacer60_; }
     const game::RaceAudioSettings50IC& selectedAudioSettings() const noexcept { return audioOptions_.selected(); }
     bool audioChangesPending() const noexcept { return audioChoice_ && audioOptions_.pending(); }
+    HostTrack50IM selectedTrack() const noexcept { return selectedTrack_; }
+    bool trackChangesPending() const noexcept { return selectedTrack_ != loadedTrack_; }
 
     // Called only for a focused, fully drained input snapshot. Escape/Enter
     // and row movement use fresh edges, never held keys or auto-repeat.
@@ -51,6 +57,8 @@ public:
         }
         if (back) {
             if (page_ == Page::Main) confirm(Page::Exit);
+            else if (page_ == Page::Tracks) { returnPage_ = Page::Main; change(Page::Main); }
+            else if (page_ == Page::IncompleteGC) { returnPage_ = Page::Main; change(Page::Tracks); }
             else change(returnPage_);
             return Result::None;
         }
@@ -59,8 +67,21 @@ public:
             return Result::None;
         }
         const bool up = key[82] || key[26], down = key[81] || key[22];
-        const std::uint32_t count = page_ == Page::Main ? 3u + unsigned(racerChoice_) + unsigned(audioChoice_) :
-            page_ == Page::Pause ? 5u + unsigned(audioChoice_) : page_ == Page::Audio ? 6u : 2u;
+        if (page_ == Page::IncompleteGC) {
+            // Five explanatory rows are not actions. Cancel is always first.
+            if (up != down) { selected_ = selected_ == 5u ? 6u : 5u; ++revision_; return Result::None; }
+            if (up && down) return Result::None;
+            if (key[40] || key[88] || key[44]) {
+                returnPage_ = Page::Main;
+                if (selected_ == 6u && hostTrackAdmitted50IM(HostTrack50IM::GC, trackAdmission_)) {
+                    selectedTrack_ = HostTrack50IM::GC; change(Page::Main);
+                } else change(Page::Tracks);
+            }
+            return Result::None;
+        }
+        const std::uint32_t count = page_ == Page::Main ? 4u + unsigned(racerChoice_) + unsigned(audioChoice_) :
+            page_ == Page::Pause ? 5u + unsigned(audioChoice_) : page_ == Page::Audio ? 6u :
+            page_ == Page::Tracks ? 2u + unsigned(trackAdmission_.gcIncompleteWorld) : 2u;
         if (up != down) {
             selected_ = up ? (selected_ + count - 1u) % count : (selected_ + 1u) % count;
             ++revision_;
@@ -81,9 +102,19 @@ public:
             return Result::None;
         }
         if (!key[40] && !key[88] && !key[44]) return Result::None;
+        if (page_ == Page::Tracks) {
+            if (selected_ == 0) { selectedTrack_ = HostTrack50IM::TA; change(Page::Main); }
+            else if (trackAdmission_.gcIncompleteWorld && selected_ == 1) {
+                if (hostTrackAdmitted50IM(HostTrack50IM::GC, trackAdmission_)) {
+                    returnPage_ = Page::Tracks; change(Page::IncompleteGC); selected_ = 5;
+                } else ++revision_; // Acknowledge unavailable choice without changing selection.
+            } else change(Page::Main);
+            return Result::None;
+        }
         if (page_ == Page::Main) {
             if (selected_ == 0) {
-                if (staleSession_ || selectedRacer60_ != loadedRacer60_ || audioChangesPending()) return Result::Restart;
+                if (!hostTrackAdmitted50IM(selectedTrack_, trackAdmission_)) return Result::None;
+                if (staleSession_ || selectedRacer60_ != loadedRacer60_ || audioChangesPending() || trackChangesPending()) return Result::Restart;
                 started_ = true; change(Page::Closed); return Result::StartPrepared;
             }
             if (racerChoice_ && selected_ == 1) {
@@ -103,6 +134,7 @@ public:
             }
             if (selected_ == (racerChoice_ ? 2u : 1u)) { returnPage_ = Page::Main; change(Page::Controls); }
             else if (audioChoice_ && selected_ == (racerChoice_ ? 3u : 2u)) { returnPage_ = Page::Main; change(Page::Audio); }
+            else if (selected_ == 2u + unsigned(racerChoice_) + unsigned(audioChoice_)) { returnPage_ = Page::Main; change(Page::Tracks); }
             else confirm(Page::Exit);
         } else if (page_ == Page::Pause) {
             if (selected_ == 0) { if (canResume) change(Page::Closed); }
@@ -129,7 +161,8 @@ public:
             out.title = "RACER REVENGE";
             out.subtitle = staleSession_ ? (race_ ? "START A NEW RACE" : "START A NEW DRIVE") :
                 race_ ? "RACE SETUP  8 RACERS  3 LAPS" : "FREE DRIVE";
-            out.rows[0] = audioChangesPending() ? (race_ ? "START RACE (APPLY AUDIO)" : "START DRIVE (APPLY AUDIO)") :
+            out.rows[0] = trackChangesPending() ? (race_ ? "START RACE (APPLY TRACK)" : "START DRIVE (APPLY TRACK)") :
+                audioChangesPending() ? (race_ ? "START RACE (APPLY AUDIO)" : "START DRIVE (APPLY AUDIO)") :
                 race_ ? "START RACE" : "START DRIVE";
             std::uint32_t row = 1;
             if (racerChoice_) {
@@ -138,6 +171,7 @@ public:
             }
             out.rows[row++] = "CONTROLS";
             if (audioChoice_) out.rows[row++] = "AUDIO OPTIONS (NEXT SESSION)";
+            out.rows[row++] = selectedTrack_ == HostTrack50IM::GC ? "TRACK: GC EXPERIMENTAL INCOMPLETE" : "TRACK: TA";
             out.rows[row++] = "EXIT"; out.rowCount = row;
         } else if (page_ == Page::Pause) {
             out.title = "PAUSED";
@@ -151,6 +185,24 @@ public:
             out.rowCount = audioChoice_ ? 6 : 5;
         } else if (page_ == Page::Audio) {
             audioOptions_.view(out);
+        } else if (page_ == Page::Tracks) {
+            out.title = "TRACK SELECTION";
+            out.subtitle = trackAdmission_.gcIncompleteWorld ? "GC IS EXPERIMENTAL AND INCOMPLETE" : "AVAILABLE TRACK";
+            out.rows[0] = selectedTrack_ == HostTrack50IM::TA ? "TA (SELECTED)" : "TA";
+            if (trackAdmission_.gcIncompleteWorld) {
+                out.rows[1] = !trackAdmission_.gcMode2 ? "GC UNAVAILABLE: REQUIRES MODE 2" :
+                    selectedTrack_ == HostTrack50IM::GC ? "GC EXPERIMENTAL INCOMPLETE (SELECTED)" : "GC EXPERIMENTAL INCOMPLETE";
+                out.rows[2] = "BACK"; out.rowCount = 3;
+            } else { out.rows[1] = "BACK"; out.rowCount = 2; }
+        } else if (page_ == Page::IncompleteGC) {
+            out.title = "GC EXPERIMENTAL INCOMPLETE";
+            out.subtitle = "MODE 2 ONLY. THESE PARTS ARE MISSING:";
+            out.rows[0] = "WINDMILL ANIMATION / TYPE1 COLLISION";
+            out.rows[1] = "TRIGGERED OPENING";
+            out.rows[2] = "AUTHORED LOSTAI BRANCH TRIGGERS";
+            out.rows[3] = "GATE SOUND";
+            out.rows[4] = "MODE1 RECORD CONFIGURATION";
+            out.rows[5] = "CANCEL"; out.rows[6] = "SELECT GC FOR NEXT SESSION"; out.rowCount = 7;
         } else if (page_ == Page::Controls) {
             out.title = "CONTROLS"; out.subtitle = "KEYBOARD  TWIN ENGINE CONTROLS";
             out.rows[0] = "W / S      LEFT THROTTLE / BRAKE";
@@ -182,5 +234,7 @@ private:
     bool race_ = true, started_ = false, staleSession_ = false, racerChoice_ = false;
     bool audioChoice_ = false;
     HostAudioOptions50IK audioOptions_;
+    HostTrack50IM loadedTrack_ = HostTrack50IM::TA, selectedTrack_ = HostTrack50IM::TA;
+    HostTrackAdmission50IM trackAdmission_{};
 };
 }

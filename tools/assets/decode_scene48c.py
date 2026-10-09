@@ -68,7 +68,8 @@ def strip_topology(groups, expected_source_strips):
                     'strip_spans':[{k:v for k,v in s.items() if k!='attributes'} for s in strips]}
 
 
-def decode_payload(blob, start, end, components, expected_vertices, expected_strips, node_count):
+def decode_payload(blob, start, end, components, expected_vertices, expected_strips, node_count,
+                   allow_signed32_quantized_positions=False):
     pos=start;groups=[];commands=[];vertex_count=0
     def take(cmd,count,address,fmt):
         nonlocal pos
@@ -84,7 +85,12 @@ def decode_payload(blob, start, end, components, expected_vertices, expected_str
         tag=take(0x6c,1,0x8000,'<4I')[0];n=tag[0]&0x7fff
         require(3<=n<=16 and tag==(0x8000|n,0x30024000,0x412,0),'unsupported original group template')
         require(vertex_count+n<=expected_vertices,'surface exceeds declared vertex count')
-        xyz=take(0x6d,n,0x8001,'<4h')
+        wide_positions = (allow_signed32_quantized_positions and
+                          unpack('<I',blob,pos)[0] == ((0x6c<<24)|(n<<16)|0x8001))
+        xyz=take(0x6c if wide_positions else 0x6d,n,0x8001,'<4i' if wide_positions else '<4h')
+        if wide_positions:
+            require(all(-8388608 <= value <= 8388607 for vertex in xyz for value in vertex[:3]),
+                    'V4_32 position outside original signed24 quantized subset')
         require(all(v[3]!=0 and abs(v[3])%16==0 and 1<=abs(v[3])//16<=node_count for v in xyz),
                 'invalid rigid bone/ADC value')
         normals=take(0x6a,n,0x8001+n,'<3b')
@@ -99,7 +105,7 @@ def decode_payload(blob, start, end, components, expected_vertices, expected_str
     return groups,indices,{'commands':commands,'trailing_padding':end-pos,**topology}
 
 
-def decode_psg3_scene(blob):
+def decode_psg3_scene(blob, allow_signed32_quantized_positions=False):
     require(12<=len(blob)<=8*1024*1024,'unsupported PSG size')
     require(blob[:8]==b'psg\0\x03\0\0\0','expected original PSG3')
     n=unpack('<I',blob,8)[0];require(1<=n<=256,'invalid hierarchy count')
@@ -136,7 +142,8 @@ def decode_psg3_scene(blob):
             require(math.isfinite(uv_size) and uv_size>0 and 3<=nv<=65535 and 1<=nstrip<=nv//3,'invalid surface metadata')
             require(size>0 and size%16==0 and at+size<=len(blob),'invalid surface payload extent')
             total_vertices+=nv;require(total_vertices<=MAX_VERTICES,'total vertex cap')
-            groups,indices,topology=decode_payload(blob,at,at+size,component_word&255,nv,nstrip,n)
+            groups,indices,topology=decode_payload(blob,at,at+size,component_word&255,nv,nstrip,n,
+                                                  allow_signed32_quantized_positions)
             at+=size;vertices=[];normals=[];bones=[];raw_colors=[]
             for g in groups:
                 for xyz,normal,uv,color in zip(g['xyz'],g['normal'],g['uv'],g['color']):
