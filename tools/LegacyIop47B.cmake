@@ -1,0 +1,10 @@
+get_target_property(iop_sources ps2_iop SOURCES)
+list(FIND iop_sources "src/emulator/iop_emulator.cpp" original_index)
+if(original_index LESS 0)
+    message(FATAL_ERROR "Expected original IOP translation unit exactly once")
+endif()
+list(REMOVE_ITEM iop_sources "src/emulator/iop_emulator.cpp")
+list(APPEND iop_sources "${RR_SHARED_ROOT}/build/legacy-iop47B2/iop_emulator.cpp")
+set_property(TARGET ps2_iop PROPERTY SOURCES "${iop_sources}")
+target_include_directories(ps2_iop PRIVATE "${RR_SHARED_ROOT}/src/core"
+    "${CMAKE_SOURCE_DIR}/ps2xIOP/src/emulator")

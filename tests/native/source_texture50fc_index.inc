@@ -1,0 +1,9 @@
+// Generated from actual source conversion; output hashes pin each native asset.
+ {"TEXTURES/ARROWRED.ATM", "dbfdaf3d44918c86254ae9f39f4146cc101c363e1fb9e2cda43bb8c0ea99b220", "arrowred-frame0-mip3.rrtex", "483e1dcbee659193a7aacdd6ba8cca6fd685189ccd12e6ff467624eb74753e79", 114312u, 128u, 128u, 3u},
+ {"TEXTURES/CORD.PST", "91cb74edd2d0cb4f3ca102abea2f06cc5e539f21f6b5fb42b54d42baafdc39a1", "cord-frame0-mip2.rrtex", "ce5f2c98e85fb10437ac76198e9186d2782f10163717fd563c6fb2e4accb670b", 1233u, 64u, 64u, 2u},
+ {"TEXTURES/CRAWLERA.PST", "0130a604d965a47948f36d02e1b6b64aec3ed4cebcffeb36a389a88454aee7e4", "crawlera-frame0-mip4.rrtex", "c237c7ffa11e6f88867fc4b3d51dbc3cadcb555a6bd036d5dca1ba179ea90c6b", 20602u, 256u, 256u, 4u},
+ {"TEXTURES/CROWD.ATM", "76b78e28cda066154e46a22e1ecda5ab4ade267ea30f44472af8e4304e738031", "crowd-frame0-mip4.rrtex", "fcfeb0c00938ab1bbae791a24d705c18989b4b222e9d492ab4593d67dff79e98", 214578u, 256u, 256u, 4u},
+ {"TEXTURES/TRACK.PST", "e27d767a7d2aaa595d97b86b7208658404389540d2265d1bfbcaf2bd09ccbfef", "track-frame0-mip2.rrtex", "3287695155e765342ebd50612c8fb8f06f91f5e514415a0e1ae7a7ad29d07139", 2319u, 64u, 64u, 2u},
+ {"TEXTURES/TRACKDARK.PST", "df48a11d8ca7ad3a4c53e0e2840c4c0df57ce01504751dd5ea62248bfcb6c0c2", "trackdark-frame0-mip2.rrtex", "72796957b8e4c31efb65579c0b8d0c0ba50a70f33019e3f12fecb7c6f558992b", 2590u, 64u, 64u, 2u},
+ {"TEXTURES/TRACKSIDE.PST", "4db3e6270ec85d8ddd16af7445befd43bad7e03f61cc9399d9559095ae9d5d02", "trackside-frame0-mip3.rrtex", "978385960ba70fa91c193f83c95995dde8024d1d8611288fc96e1df24bcfaefa", 7302u, 128u, 128u, 3u},
+ {"TEXTURES/TRACKWHEEL.PST", "de447b0debdad77b00d3f95d0919c0ec9d2a169229a18a61a5df9c722e240265", "trackwheel-frame0-mip2.rrtex", "7f0f729633d84b80e538db64d8885e44af43c6ddc624fbc7ccfaf6b10ff48b02", 2209u, 64u, 64u, 2u},

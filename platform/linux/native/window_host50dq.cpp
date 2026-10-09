@@ -1,0 +1,420 @@
+#include "window_host50dq.h"
+#include <cstring>
+#include <dlfcn.h>
+#include <exception>
+#include <new>
+
+#if !defined(__linux__)
+#error "WindowHost50DQ supports the Linux SDL2 ABI only"
+#endif
+
+namespace rr::platform {
+namespace {
+using Int = std::int32_t;
+using UInt = std::uint32_t;
+struct SdlWindow;
+struct SdlVersion { std::uint8_t major, minor, patch; };
+// Public SDL2 event ABI on ordinary 32/64-bit Linux. Read fields with memcpy,
+// avoiding type-punning a foreign C union. No SDL development headers required.
+struct alignas(8) SdlEvent { unsigned char bytes[56]; };
+static_assert(sizeof(int) == 4 && (sizeof(void*) == 4 || sizeof(void*) == 8),
+    "SDL2 host requires the standard Linux 32/64-bit scalar/pointer ABI");
+static_assert(sizeof(SdlEvent) == 56 && sizeof(SdlVersion) == 3, "SDL2 public ABI");
+template<class T> T field(const SdlEvent& e, std::size_t offset) noexcept {
+    T result{};
+    std::memcpy(&result, e.bytes + offset, sizeof(result));
+    return result;
+}
+constexpr UInt videoInit = 0x20, windowOpenGl = 0x2, windowShown = 0x4;
+constexpr UInt windowResizable = 0x20, windowMinimized = 0x40;
+constexpr UInt windowFocused = 0x200, windowHighDpi = 0x2000;
+constexpr Int windowCentered = 0x2fff0000;
+constexpr UInt quitEvent = 0x100, windowEvent = 0x200;
+constexpr UInt keyDownEvent = 0x300, keyUpEvent = 0x301, textEditingExtEvent = 0x305;
+constexpr UInt dropFileEvent = 0x1000, dropTextEvent = 0x1001;
+constexpr Int glRed = 0, glGreen = 1, glBlue = 2, glAlpha = 3, glDoubleBuffer = 5;
+constexpr Int glDepth = 6, glStencil = 7, glSampleBuffers = 13, glSamples = 14;
+constexpr Int glMajor = 17, glMinor = 18, glFlags = 20, glProfile = 21, glShare = 22;
+constexpr Int coreProfile = 1, compatibilityProfile = 2;
+constexpr UInt glMajorVersion = 0x821b, glMinorVersion = 0x821c, glContextProfileMask = 0x9126;
+
+void copyDetail(std::array<char, 256>& destination, const char* source) noexcept {
+    destination.fill(0);
+    if (!source) return;
+    std::size_t n = 0;
+    while (n + 1 < destination.size() && source[n]) {
+        destination[n] = source[n];
+        ++n;
+    }
+}
+bool fail(WindowHostDiagnostic50DQ& d, WindowHostError50DQ error,
+    const char* operation, const char* detail = nullptr) noexcept {
+    d.error = error;
+    d.operation = operation;
+    copyDetail(d.detail, detail);
+    return false;
+}
+bool valid(const WindowHostRequest50DQ& r) noexcept {
+    return r.title && r.title[0] && r.width > 0 && r.height > 0 &&
+        r.major >= 3 && r.minor >= 0 && (r.major > 3 || r.minor >= 2) &&
+        (r.profile == WindowGlProfile50DQ::Core ||
+         r.profile == WindowGlProfile50DQ::Compatibility) &&
+        r.redBits >= 0 && r.greenBits >= 0 && r.blueBits >= 0 &&
+        r.alphaBits >= 0 && r.depthBits >= 0 && r.stencilBits >= 0 &&
+        r.samples >= 0 && r.swapInterval >= -1 && r.swapInterval <= 1;
+}
+}
+
+struct WindowHost50DQ::State {
+    void* library = nullptr;
+    SdlWindow* window = nullptr;
+    void* context = nullptr;
+    UInt windowId = 0;
+    bool initAttempted = false, ready = false, quitRequested = false;
+    std::array<std::uint8_t, windowScancodeCount50DQ> down{};
+    Int (*init)(UInt) = nullptr;
+    void (*quit)() = nullptr;
+    UInt (*wasInit)(UInt) = nullptr;
+    void (*getVersion)(SdlVersion*) = nullptr;
+    const char* (*getError)() = nullptr;
+    void (*freeMemory)(void*) = nullptr;
+    SdlWindow* (*createWindow)(const char*, Int, Int, Int, Int, UInt) = nullptr;
+    void (*destroyWindow)(SdlWindow*) = nullptr;
+    UInt (*getWindowId)(SdlWindow*) = nullptr;
+    UInt (*getWindowFlags)(SdlWindow*) = nullptr;
+    void (*getWindowSize)(SdlWindow*, Int*, Int*) = nullptr;
+    void (*getDrawableSize)(SdlWindow*, Int*, Int*) = nullptr;
+    void (*resetAttributes)() = nullptr;
+    Int (*setAttribute)(Int, Int) = nullptr;
+    Int (*getAttribute)(Int, Int*) = nullptr;
+    void* (*createContext)(SdlWindow*) = nullptr;
+    void (*deleteContext)(void*) = nullptr;
+    Int (*makeCurrent)(SdlWindow*, void*) = nullptr;
+    void* (*getCurrentContext)() = nullptr;
+    SdlWindow* (*getCurrentWindow)() = nullptr;
+    void* (*getProcAddress)(const char*) = nullptr;
+    Int (*setSwapInterval)(Int) = nullptr;
+    Int (*getSwapInterval)() = nullptr;
+    void (*swapWindow)(SdlWindow*) = nullptr;
+    void (*pumpEvents)() = nullptr;
+    Int (*peepEvents)(SdlEvent*, Int, Int, UInt, UInt) = nullptr;
+    std::uint8_t (*eventState)(UInt, Int) = nullptr;
+    void (*stopTextInput)() = nullptr;
+
+    bool load(WindowHostDiagnostic50DQ& d) noexcept {
+        library = dlopen("libSDL2-2.0.so.0", RTLD_NOW | RTLD_LOCAL);
+        if (!library) library = dlopen("libSDL2.so", RTLD_NOW | RTLD_LOCAL);
+        if (!library) return fail(d, WindowHostError50DQ::LibraryUnavailable,
+            "dlopen(SDL2)", dlerror());
+#define RR_SDL50DQ(member, symbol) \
+        member = reinterpret_cast<decltype(member)>(dlsym(library, symbol)); \
+        if (!member) return fail(d, WindowHostError50DQ::MissingEntryPoint, symbol, dlerror())
+        RR_SDL50DQ(init, "SDL_Init");
+        RR_SDL50DQ(quit, "SDL_Quit");
+        RR_SDL50DQ(wasInit, "SDL_WasInit");
+        RR_SDL50DQ(getVersion, "SDL_GetVersion");
+        RR_SDL50DQ(getError, "SDL_GetError");
+        RR_SDL50DQ(freeMemory, "SDL_free");
+        RR_SDL50DQ(createWindow, "SDL_CreateWindow");
+        RR_SDL50DQ(destroyWindow, "SDL_DestroyWindow");
+        RR_SDL50DQ(getWindowId, "SDL_GetWindowID");
+        RR_SDL50DQ(getWindowFlags, "SDL_GetWindowFlags");
+        RR_SDL50DQ(getWindowSize, "SDL_GetWindowSize");
+        RR_SDL50DQ(getDrawableSize, "SDL_GL_GetDrawableSize");
+        RR_SDL50DQ(resetAttributes, "SDL_GL_ResetAttributes");
+        RR_SDL50DQ(setAttribute, "SDL_GL_SetAttribute");
+        RR_SDL50DQ(getAttribute, "SDL_GL_GetAttribute");
+        RR_SDL50DQ(createContext, "SDL_GL_CreateContext");
+        RR_SDL50DQ(deleteContext, "SDL_GL_DeleteContext");
+        RR_SDL50DQ(makeCurrent, "SDL_GL_MakeCurrent");
+        RR_SDL50DQ(getCurrentContext, "SDL_GL_GetCurrentContext");
+        RR_SDL50DQ(getCurrentWindow, "SDL_GL_GetCurrentWindow");
+        RR_SDL50DQ(getProcAddress, "SDL_GL_GetProcAddress");
+        RR_SDL50DQ(setSwapInterval, "SDL_GL_SetSwapInterval");
+        RR_SDL50DQ(getSwapInterval, "SDL_GL_GetSwapInterval");
+        RR_SDL50DQ(swapWindow, "SDL_GL_SwapWindow");
+        RR_SDL50DQ(pumpEvents, "SDL_PumpEvents");
+        RR_SDL50DQ(peepEvents, "SDL_PeepEvents");
+        RR_SDL50DQ(eventState, "SDL_EventState");
+        RR_SDL50DQ(stopTextInput, "SDL_StopTextInput");
+#undef RR_SDL50DQ
+        SdlVersion version{};
+        getVersion(&version);
+        if (version.major != 2) return fail(d, WindowHostError50DQ::UnsupportedSdl,
+            "SDL_GetVersion/SDL2 required");
+        return true;
+    }
+};
+
+WindowHost50DQ::WindowHost50DQ() noexcept : thread_(std::this_thread::get_id()) {}
+WindowHost50DQ::~WindowHost50DQ() noexcept {
+    WindowHostDiagnostic50DQ d;
+    if (!ownerThread() || !closeOwned(d)) std::terminate();
+}
+bool WindowHost50DQ::ownerThread() const noexcept {
+    return thread_ == std::this_thread::get_id();
+}
+bool WindowHost50DQ::created() const noexcept { return ownerThread() && state_ && state_->ready; }
+bool WindowHost50DQ::ownsResources() const noexcept { return ownerThread() && state_; }
+bool WindowHost50DQ::current() const noexcept {
+    return created() && state_->getCurrentContext() == state_->context &&
+        state_->getCurrentWindow() == state_->window;
+}
+WindowGlProc50DQ WindowHost50DQ::procAddress(const char* name) const noexcept {
+    if (!current() || !name || name[0] != 'g' || name[1] != 'l' || !name[2]) return nullptr;
+    return reinterpret_cast<WindowGlProc50DQ>(state_->getProcAddress(name));
+}
+void WindowHost50DQ::refreshWindowInfo() noexcept {
+    auto& s = *state_;
+    s.getWindowSize(s.window, &info_.width, &info_.height);
+    s.getDrawableSize(s.window, &info_.drawableWidth, &info_.drawableHeight);
+    const UInt flags = s.getWindowFlags(s.window);
+    info_.focused = (flags & windowFocused) != 0;
+    info_.minimized = (flags & windowMinimized) != 0;
+}
+
+bool WindowHost50DQ::create(const WindowHostRequest50DQ& r, WindowHostDiagnostic50DQ& d) noexcept {
+    d = {};
+    if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "create");
+    if (state_) return fail(d, WindowHostError50DQ::AlreadyOwned, "create");
+    if (!valid(r)) return fail(d, WindowHostError50DQ::InvalidRequest, "create");
+    state_ = new (std::nothrow) State;
+    if (!state_) return fail(d, WindowHostError50DQ::OutOfMemory, "create");
+    auto& s = *state_;
+    const auto cleanup = [&]() noexcept {
+        WindowHostDiagnostic50DQ c;
+        if (!closeOwned(c)) {
+            d.cleanupError = c.error;
+            d.cleanupOperation = c.operation;
+            d.cleanupDetail = c.detail;
+        }
+        return false;
+    };
+    const auto sdlFail = [&](WindowHostError50DQ error, const char* operation) noexcept {
+        fail(d, error, operation, s.getError());
+        return cleanup();
+    };
+    if (!s.load(d)) return cleanup();
+    // Attributes, events, text input and SDL_Quit are process-global: never
+    // quietly borrow SDL from another owner or consume its event queue.
+    if (s.wasInit(0)) {
+        fail(d, WindowHostError50DQ::ForeignSdlOwner, "SDL_WasInit/exclusive ownership required");
+        return cleanup();
+    }
+    if (s.getCurrentContext()) {
+        fail(d, WindowHostError50DQ::ForeignCurrentContext, "create/preexisting SDL GL context");
+        return cleanup();
+    }
+    s.initAttempted = true;
+    if (s.init(videoInit) != 0) return sdlFail(WindowHostError50DQ::VideoFailure, "SDL_Init(video)");
+    s.stopTextInput(); // Keyboard controls only; no IME/text-input consumer.
+    // Disable heap-payload events before creating the window/pumping events.
+    // SDL_Quit alone does not free application-owned payloads left in its queue.
+    s.eventState(dropFileEvent, 0);
+    s.eventState(dropTextEvent, 0);
+    s.eventState(textEditingExtEvent, 0);
+    s.resetAttributes();
+    const Int requestedProfile = r.profile == WindowGlProfile50DQ::Core ? coreProfile : compatibilityProfile;
+    const Int attributes[][2] = {
+        {glRed, r.redBits}, {glGreen, r.greenBits}, {glBlue, r.blueBits}, {glAlpha, r.alphaBits},
+        {glDepth, r.depthBits}, {glStencil, r.stencilBits}, {glDoubleBuffer, 1},
+        {glSampleBuffers, r.samples ? 1 : 0}, {glSamples, r.samples},
+        {glMajor, r.major}, {glMinor, r.minor}, {glProfile, requestedProfile}, {glFlags, 0}, {glShare, 0}
+    };
+    for (const auto& attribute : attributes)
+        if (s.setAttribute(attribute[0], attribute[1]) != 0)
+            return sdlFail(WindowHostError50DQ::AttributeFailure, "SDL_GL_SetAttribute");
+    const UInt flags = windowOpenGl | windowShown | windowHighDpi | (r.resizable ? windowResizable : 0u);
+    s.window = s.createWindow(r.title, windowCentered, windowCentered, r.width, r.height, flags);
+    if (!s.window) return sdlFail(WindowHostError50DQ::WindowFailure, "SDL_CreateWindow");
+    s.windowId = s.getWindowId(s.window);
+    if (!s.windowId) return sdlFail(WindowHostError50DQ::WindowFailure, "SDL_GetWindowID");
+    s.context = s.createContext(s.window);
+    if (!s.context) return sdlFail(WindowHostError50DQ::ContextFailure, "SDL_GL_CreateContext");
+    if (s.makeCurrent(s.window, s.context) != 0)
+        return sdlFail(WindowHostError50DQ::ContextFailure, "SDL_GL_MakeCurrent");
+    if (s.getCurrentContext() != s.context || s.getCurrentWindow() != s.window) {
+        fail(d, WindowHostError50DQ::ContextFailure, "SDL_GL_GetCurrentContext/window mismatch");
+        return cleanup();
+    }
+    Int actualProfile = 0, buffers = 0, doubleBuffered = 0;
+    const Int keys[] = { glRed, glGreen, glBlue, glAlpha,
+        glDepth, glStencil, glSamples, glSampleBuffers, glDoubleBuffer };
+    Int* values[] = { &info_.redBits, &info_.greenBits,
+        &info_.blueBits, &info_.alphaBits, &info_.depthBits, &info_.stencilBits, &info_.samples,
+        &buffers, &doubleBuffered };
+    for (std::size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
+        if (s.getAttribute(keys[i], values[i]) != 0)
+            return sdlFail(WindowHostError50DQ::AttributeFailure, "SDL_GL_GetAttribute");
+    // SDL_GL_GetAttribute returns the requested version/profile from SDL's
+    // configuration, not necessarily the actual context. Query GL itself.
+    using GetInteger = void (*)(UInt, Int*);
+    using GetGlError = UInt (*)();
+    const auto getInteger = reinterpret_cast<GetInteger>(s.getProcAddress("glGetIntegerv"));
+    const auto getGlError = reinterpret_cast<GetGlError>(s.getProcAddress("glGetError"));
+    if (!getInteger || !getGlError) {
+        fail(d, WindowHostError50DQ::MissingEntryPoint, !getInteger ? "glGetIntegerv" : "glGetError");
+        return cleanup();
+    }
+    d.glError = getGlError();
+    if (d.glError) {
+        fail(d, WindowHostError50DQ::GlFailure, "GL error before version query");
+        return cleanup();
+    }
+    getInteger(glMajorVersion, &info_.major);
+    getInteger(glMinorVersion, &info_.minor);
+    getInteger(glContextProfileMask, &actualProfile);
+    d.glError = getGlError();
+    if (d.glError) {
+        fail(d, WindowHostError50DQ::GlFailure, "glGetIntegerv/version/profile");
+        return cleanup();
+    }
+    if (info_.major < r.major || (info_.major == r.major && info_.minor < r.minor) ||
+        actualProfile != requestedProfile || !doubleBuffered || info_.redBits < r.redBits ||
+        info_.greenBits < r.greenBits || info_.blueBits < r.blueBits || info_.alphaBits < r.alphaBits ||
+        info_.depthBits < r.depthBits || info_.stencilBits < r.stencilBits ||
+        (r.samples ? buffers < 1 || info_.samples < r.samples : buffers != 0 || info_.samples != 0)) {
+        fail(d, WindowHostError50DQ::RequirementsNotMet, "desktop GL/framebuffer requirements");
+        return cleanup();
+    }
+    info_.profile = r.profile;
+    if (s.setSwapInterval(r.swapInterval) != 0)
+        return sdlFail(WindowHostError50DQ::SwapIntervalFailure, "SDL_GL_SetSwapInterval");
+    info_.swapInterval = s.getSwapInterval();
+    if (info_.swapInterval != r.swapInterval) {
+        fail(d, WindowHostError50DQ::RequirementsNotMet, "SDL_GL_GetSwapInterval/exact interval");
+        return cleanup();
+    }
+    refreshWindowInfo();
+    s.ready = true;
+    return true;
+}
+
+bool WindowHost50DQ::bind(WindowHostDiagnostic50DQ& d) noexcept {
+    d = {};
+    if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "bind");
+    if (!created()) return fail(d, WindowHostError50DQ::NotCreated, "bind");
+    auto& s = *state_;
+    const auto active = s.getCurrentContext();
+    if (active && (active != s.context || s.getCurrentWindow() != s.window))
+        return fail(d, WindowHostError50DQ::ForeignCurrentContext, "bind");
+    if (s.makeCurrent(s.window, s.context) != 0)
+        return fail(d, WindowHostError50DQ::ContextFailure, "SDL_GL_MakeCurrent", s.getError());
+    return true;
+}
+bool WindowHost50DQ::release(WindowHostDiagnostic50DQ& d) noexcept {
+    d = {};
+    if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "release");
+    if (!created()) return fail(d, WindowHostError50DQ::NotCreated, "release");
+    auto& s = *state_;
+    const auto active = s.getCurrentContext();
+    if (!active) return true;
+    if (active != s.context || s.getCurrentWindow() != s.window)
+        return fail(d, WindowHostError50DQ::ForeignCurrentContext, "release");
+    if (s.makeCurrent(s.window, nullptr) != 0)
+        return fail(d, WindowHostError50DQ::ReleaseFailure, "SDL_GL_MakeCurrent/unbind", s.getError());
+    return true;
+}
+
+bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) noexcept {
+    d = {};
+    if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "poll");
+    if (!created()) return fail(d, WindowHostError50DQ::NotCreated, "poll");
+    auto& s = *state_;
+    SdlEvent events[windowEventBudget50DQ]{};
+    s.pumpEvents();
+    const Int count = s.peepEvents(events, static_cast<Int>(windowEventBudget50DQ), 2, 0, 0xffff);
+    if (count < 0) return fail(d, WindowHostError50DQ::EventFailure, "SDL_PeepEvents", s.getError());
+    input = {};
+    input.eventsProcessed = static_cast<UInt>(count);
+    input.eventBudgetExhausted = count == static_cast<Int>(windowEventBudget50DQ);
+    const auto releaseKeys = [&]() noexcept {
+        for (std::size_t key = 0; key < s.down.size(); ++key) {
+            if (s.down[key]) input.released[key] = 1;
+            s.down[key] = 0;
+        }
+    };
+    for (Int i = 0; i < count; ++i) {
+        const auto& event = events[i];
+        const UInt type = field<UInt>(event, 0);
+        if (type == quitEvent) s.quitRequested = true;
+        else if (type == windowEvent && field<UInt>(event, 8) == s.windowId) {
+            switch (field<std::uint8_t>(event, 12)) {
+            case 5: case 6: input.resized = true; break; // RESIZED, SIZE_CHANGED
+            case 12: info_.focused = true; break; // FOCUS_GAINED
+            case 13: info_.focused = false; releaseKeys(); break; // FOCUS_LOST
+            case 14: s.quitRequested = true; break; // CLOSE
+            default: break;
+            }
+        } else if ((type == keyDownEvent || type == keyUpEvent) &&
+            field<UInt>(event, 8) == s.windowId) {
+            const Int scancode = field<Int>(event, 16);
+            if (scancode <= 0 || scancode >= static_cast<Int>(s.down.size())) continue;
+            const auto key = static_cast<std::size_t>(scancode);
+            if (type == keyDownEvent && info_.focused) {
+                if (!s.down[key] && !field<std::uint8_t>(event, 13)) input.pressed[key] = 1;
+                s.down[key] = 1;
+            } else if (type == keyUpEvent) {
+                if (s.down[key]) input.released[key] = 1;
+                s.down[key] = 0;
+            }
+        } else if (type == dropFileEvent || type == dropTextEvent) {
+            s.freeMemory(field<void*>(event, 8));
+        } else if (type == textEditingExtEvent) {
+            constexpr std::size_t textPointerOffset = (12 + alignof(void*) - 1) & ~(alignof(void*) - 1);
+            s.freeMemory(field<void*>(event, textPointerOffset));
+        }
+    }
+    const Int width = info_.width, height = info_.height;
+    const Int drawableWidth = info_.drawableWidth, drawableHeight = info_.drawableHeight;
+    refreshWindowInfo();
+    // Consult actual focus even if FOCUS_LOST remains behind this poll's budget.
+    // This prevents a queued event flood from leaving movement stuck on blur.
+    if (!info_.focused || info_.minimized) releaseKeys();
+    input.resized = input.resized || width != info_.width || height != info_.height ||
+        drawableWidth != info_.drawableWidth || drawableHeight != info_.drawableHeight;
+    input.down = s.down;
+    input.focused = info_.focused;
+    input.minimized = info_.minimized;
+    input.quitRequested = s.quitRequested;
+    return true;
+}
+bool WindowHost50DQ::swap(WindowHostDiagnostic50DQ& d) noexcept {
+    d = {};
+    if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "swap");
+    if (!created()) return fail(d, WindowHostError50DQ::NotCreated, "swap");
+    if (!current()) return fail(d, WindowHostError50DQ::NotCurrent, "swap");
+    state_->swapWindow(state_->window);
+    return true;
+}
+bool WindowHost50DQ::close(WindowHostDiagnostic50DQ& d) noexcept {
+    d = {};
+    if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "close");
+    return closeOwned(d);
+}
+bool WindowHost50DQ::closeOwned(WindowHostDiagnostic50DQ& d) noexcept {
+    if (!state_) return true;
+    auto& s = *state_;
+    s.ready = false;
+    if (s.initAttempted) {
+        const auto active = s.getCurrentContext();
+        if (active && (active != s.context || s.getCurrentWindow() != s.window))
+            return fail(d, WindowHostError50DQ::ForeignCurrentContext, "close");
+        if (active && s.makeCurrent(s.window, nullptr) != 0)
+            return fail(d, WindowHostError50DQ::ReleaseFailure, "SDL_GL_MakeCurrent/unbind", s.getError());
+        if (s.context) { s.deleteContext(s.context); s.context = nullptr; }
+        if (s.window) { s.destroyWindow(s.window); s.window = nullptr; }
+        s.quit();
+        s.initAttempted = false;
+    }
+    if (s.library) {
+        if (dlclose(s.library) != 0)
+            return fail(d, WindowHostError50DQ::LibraryCloseFailure, "dlclose(SDL2)", dlerror());
+        s.library = nullptr;
+    }
+    delete state_;
+    state_ = nullptr;
+    info_ = {};
+    return true;
+}
+}

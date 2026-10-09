@@ -1,0 +1,35 @@
+#include "zone_search_authoring50cn.h"
+#pragma once
+#include "track_collider50ao.h"
+#include "import_world48f.h"
+#include "import_collision48g.h"
+#include "track_start50ad.h"
+#include "vehicle_visual_authoring49r.h"
+#include "grid_center50ac.h"
+#include "reset_candidate50am.h"
+#include "reset_probe50ag.h"
+#include "json.hpp"
+#include <fstream>
+#include <iostream>
+#include <iterator>
+#include <cstring>
+#include <cstdlib>
+#include <new>
+#include <bit>
+#include <cfenv>
+#include <algorithm>
+
+namespace authored_runtime_ground50cp_fixture {
+using namespace rr;using namespace rr::game;
+inline void need(bool x,const char*m){if(!x){std::cerr<<m<<'\n';std::exit(1);}}
+inline std::vector<std::uint8_t> read(const char*p){std::ifstream f(p,std::ios::binary);need(bool(f),p);return{std::istreambuf_iterator<char>(f),{}};}
+inline std::string lower(std::string s){for(auto&c:s)if(c>='A'&&c<='Z')c+=32;return s;}
+inline std::array<float,3> vec(const assets::ParameterBlock48F&b,const char*key){const std::string*s=nullptr;for(const auto&f:b.fields)if(f.name==key)s=&f.value;need(s,"missing authored vector");std::array<float,3> v{};std::size_t begin=0;for(unsigned i=0;i<3;++i){auto end=s->find(',',begin);if(end==std::string::npos)end=s->size();auto a=begin,z=end;while(a<z&&(*s)[a]==' ')++a;while(z>a&&(*s)[z-1]==' ')--z;need(assets::parseTrackNumber50AD(s->data()+a,z-a,v[i]),"original numeric parser");begin=end+1;}need(begin==s->size()+1,"vector trailing");return v;}
+struct Owner{assets::CollisionMesh48I mesh;assets::TrackCollider50AO instance;std::string name;std::uint32_t zone=0,ordinal=0;};
+
+struct ColdScene {std::vector<Owner> owners;BodyMatrix48G pose;float lift;std::size_t stackCount;nlohmann::json audit;assets::World48F world;};
+inline ColdScene load(assets::TrackCollisionMasks50AN masks){std::vector<Owner> owners;owners.reserve(64);std::size_t stackCount=1;nlohmann::json audit=nlohmann::json::array();BodyMatrix48G pose{};float lift=0;assets::World48F world;{assets::DecodeError48C error;assets::ResArchive48C archive;need(assets::decodeResource48C(read("work/native/project/disc/TRACKS/TA.RES"),archive,error),"TA archive");std::vector<std::uint8_t>scb;need(assets::extractResMember48C(archive,"tracks\\ta.scb",scb,error),"SCB");need(assets::decodeWorld48F(scb,world,error),"world");for(std::size_t zone=0;zone<world.zones.size();++zone){const auto selection=assets::readZoneSearchSelection50CN(world,zone);need(selection.status==assets::ZoneSearchReadStatus50CN::Complete&&selection.selection.collisionStatic118==assets::ZoneSearchKind50CN::List&&selection.selection.collisionDynamic11C==assets::ZoneSearchKind50CN::List,"authored List collision method admission");}
+for(const auto&i:world.instances){bool exists=false;for(const auto&e:archive.entries)if(lower(e.name)==lower(i.collision_member)){exists=true;break;}if(!exists)continue;need(owners.size()<64,"explicit cold owner bound");owners.emplace_back();auto&o=owners.back();o.name=i.collision_member;o.zone=i.zone;o.ordinal=i.ordinal;std::vector<std::uint8_t>raw,cache;assets::Collision48G decoded;std::string why;need(assets::extractResMember48C(archive,o.name,raw,error),"COL extraction");if(!assets::decodeCollision48G(raw,decoded,error)){std::cerr<<o.name<<' '<<error.code<<'\n';std::exit(1);}need(assets::encodeCollisionAsset48G(decoded,cache,why)&&assets::loadCollisionMesh48I(cache,o.mesh,why),"native COL cache");const auto&b=world.parameters.blocks[i.parameter_block];auto p=vec(b,"position"),look=vec(b,"lookvector"),up=vec(b,"upvector");need(assets::prepareTrackCollider50AO(o.mesh,p,look,up,o.name.data(),o.name.size(),masks,o.instance),"collider source preparation");stackCount=std::max(stackCount,o.mesh.nodes.size()+o.mesh.faces.size()+1);std::array<float,16> placement;need(assets::placementCollision48I(p,look,up,placement),"placement");auto words=[](const float*p,std::size_t n){std::vector<std::uint32_t>v;for(std::size_t k=0;k<n;++k)v.push_back(std::bit_cast<std::uint32_t>(p[k]));return v;};audit.push_back({{"zone",o.zone},{"ordinal",o.ordinal},{"name",o.name},{"local",words(o.mesh.local_matrix.data(),16)},{"placement",words(placement.data(),16)},{"center",words(o.mesh.nodes[0].center.data(),3)},{"half",words(o.mesh.nodes[0].half.data(),3)},{"world",words(o.instance.world.v,16)},{"sphere",words(o.instance.sphere.center.v,4)},{"radius",std::bit_cast<std::uint32_t>(o.instance.sphere.radius)},{"category",o.instance.category}});}
+std::vector<std::uint8_t>spline;need(assets::extractResMember48C(archive,"tracks\\mta.spl",spline,error),"spline");assets::TrackStartScratch50AD scratch{};assets::TrackStart50AD track{};assets::TrackStartDiagnostic50AD td{};need(assets::readTrackStart50AD(reinterpret_cast<const char*>(spline.data()),spline.size(),4,scratch,track,td),"track start");auto phy=read("work/impactAuthoring49Y/Pod01.phy");assets::VisualAuthoredValues49R visual{};assets::VisualAuthoringDiagnostic49R vd{};need(assets::readVehicleVisualAuthoring49R(reinterpret_cast<const char*>(phy.data()),phy.size(),visual,vd),"PHY");lift=visual.values[static_cast<unsigned>(assets::VisualAuthoredKey49R::MaxLiftHeight)];need(prepareCenterPose50AC(track.grid,lift,{{0,1,0}},pose),"pose");}return {std::move(owners),pose,lift,stackCount,std::move(audit),std::move(world)};}
+inline ResetProbe50AG resolve(const ColdScene&scene,std::uint32_t floorMask,std::uint32_t mode,std::uint32_t*stack,std::size_t capacity){std::uint32_t p[4];for(unsigned i=0;i<4;++i)p[i]=std::bit_cast<std::uint32_t>(scene.pose.v[12+i]);ResetProbe50AG probe{};need(beginResetProbe50AG(p,std::bit_cast<std::uint32_t>(scene.lift),probe),"source probe begin");while(probe.phase==ResetProbePhase50AG::AwaitingQuery){SpringVector4_48N a{},b{};std::memcpy(a.v,probe.start,16);std::memcpy(b.v,probe.end,16);bool hit=false;std::uint32_t y=0;for(const auto&o:scene.owners){if(!(o.instance.category&floorMask))continue;ResetCandidateResult50AM result{};need(queryResetCandidate50AM(a,b,o.instance.world,{{o.instance.sphere.center.v[0],o.instance.sphere.center.v[1],o.instance.sphere.center.v[2]}},o.instance.sphere.radius,1,o.mesh,mode,stack,capacity,result)==ResetTreeStatus50AK::Complete,"source ground candidate");if(result.hit){hit=true;b=result.point;y=std::bit_cast<std::uint32_t>(b.v[1]);}}need(acceptResetProbe50AG(probe,hit,y),"source ground continuation");}return probe;}
+}

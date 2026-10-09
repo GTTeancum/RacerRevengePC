@@ -1,0 +1,48 @@
+{
+  "handlers": 99,
+  "helpers": 50,
+  "origin": "User-supplied work/reference/pcsx2-master; no remote revision inferred",
+  "license": "GPL-3.0-or-later; upstream notices retained",
+  "files": [
+    {
+      "path": "third_party/pcsx2-mmi47k/BitUtils.h",
+      "bytes": 2744,
+      "sha256": "85e3d1f8c30489fd468a7767119f5428c55923adf498df276540d9b2c02f0d41"
+    },
+    {
+      "path": "third_party/pcsx2-mmi47k/COPYING.GPLv3",
+      "bytes": 35147,
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+    },
+    {
+      "path": "third_party/pcsx2-mmi47k/MMI.cpp",
+      "bytes": 41508,
+      "sha256": "5b5a045dfbf896bc470d8aed658dfc492a07a5b74859a0d7832b2969f539159a"
+    },
+    {
+      "path": "third_party/pcsx2-mmi47k/mmi_compat.h",
+      "bytes": 707,
+      "sha256": "1c8e4a89c34e2c87b23ae0d611edbf2a8ff116f39d71f924a34e553bcf3af751"
+    },
+    {
+      "path": "third_party/pcsx2-mmi47k/R5900OpcodeTables.cpp",
+      "bytes": 31265,
+      "sha256": "80562704233e7d7f68d54878f4cf00cad2f63d1ba8362b76ea09634c5093ec1f"
+    },
+    {
+      "path": "third_party/pcsx2-mmi47k/README.md",
+      "bytes": 2585,
+      "sha256": "18850f667628443422b6d869f44a811cf99125a0987623079e13b5bdc7ab2cec"
+    },
+    {
+      "path": "third_party/pcsx2-mmi47k/reference_shim/common/BitUtils.h",
+      "bytes": 71,
+      "sha256": "c7d6c4fcb76e0f4ed6de59a70706e4b83ca087930eaba1b228759cdc78ec5bf0"
+    },
+    {
+      "path": "third_party/pcsx2-mmi47k/reference_shim/Common.h",
+      "bytes": 72,
+      "sha256": "1301b6eac5c3b312836713faa3184252eb5e7ffd280f386f95f3e0f560f3f1bc"
+    }
+  ]
+}

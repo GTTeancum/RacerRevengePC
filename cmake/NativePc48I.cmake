@@ -1,0 +1,16 @@
+include(${CMAKE_CURRENT_LIST_DIR}/NativePc48H.cmake)
+
+target_sources(racer_native_import_decode PRIVATE src/assets/collision_mesh48i.cpp)
+target_sources(racer_native_pc PRIVATE platform/windows/native/import_service48i.cpp)
+add_executable(racer_native_collision_mesh_check tests/native/collision_mesh48i.cpp)
+target_link_libraries(racer_native_collision_mesh_check PRIVATE racer_native_import_decode)
+target_compile_features(racer_native_collision_mesh_check PRIVATE cxx_std_17)
+target_compile_options(racer_native_collision_mesh_check PRIVATE /W4 /permissive- /fp:strict)
+add_test(NAME native_collision_mesh_load COMMAND racer_native_collision_mesh_check ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}/collision-runtime-report48i.json)
+
+target_sources(racer_native_game PRIVATE src/game/collision_tree48i.cpp)
+add_executable(racer_native_collision_tree_check tests/native/collision_tree48i.cpp)
+target_link_libraries(racer_native_collision_tree_check PRIVATE racer_native_game racer_native_import_decode)
+target_compile_features(racer_native_collision_tree_check PRIVATE cxx_std_17)
+target_compile_options(racer_native_collision_tree_check PRIVATE /W4 /permissive- /fp:strict)
+add_test(NAME native_collision_ordered_tree COMMAND racer_native_collision_tree_check ${CMAKE_SOURCE_DIR})

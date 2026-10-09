@@ -1,0 +1,260 @@
+#pragma once
+// Stable native client owner. This subscribes to source-backed gameplay fields;
+// it does not supply the original D40 object or bypass any core source guard.
+#include "gameplay_audio_provider50he_fixture.h"
+#include "pod_audio_owner50he_fixture.h"
+#include "../../platform/linux/native/audio_output50hd.h"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+namespace live_audio50HF {
+inline constexpr std::size_t voiceCount=128,providerFirstVoice=0,lapFirstVoice=60,lapVoiceCount=4;
+inline constexpr std::uint32_t sampleRate=48000,stepMicroseconds=16000,stepFrames=768;
+static_assert(gameplay_audio50HE::cueCount==lapFirstVoice);
+static_assert(lapFirstVoice+lapVoiceCount<=voiceCount);
+
+enum class EventStatus : std::uint8_t { Complete,Unprepared,Paused,Closed,Input,Capacity,ApplyRejected };
+struct EventReceipt {
+    EventStatus status=EventStatus::Unprepared;
+    std::size_t commandCount=0;
+    std::array<rr::game::AudioCommand50HE,5> commands{};
+    std::array<gameplay_audio50HE::ApplyResult,5> results{};
+    // Complete can include explicit missing PCM. It is not a playback claim.
+    bool okay()const noexcept{return status==EventStatus::Complete;}
+};
+struct Counters {
+    std::uint64_t engineUpdates=0,warningUpdates=0,boostUpdates=0,repairUpdates=0;
+    std::uint64_t commands=0,starts=0,stops=0,controls=0,inactive=0,unavailable=0,rejected=0;
+    std::uint64_t inputRejected=0,lapRequests=0,committedSteps=0,mixFailures=0,resets=0;
+};
+inline bool hasJoinedTrigger(rr::game::AudioCue50HE cue) noexcept {
+    return (cue.bank==rr::game::AudioBank50HE::PodEvent&&cue.key>=1&&cue.key<=6)||
+        (cue.bank==rr::game::AudioBank50HE::PodEngine&&cue.key>=1&&cue.key<=3);
+}
+inline constexpr std::size_t unsupportedTriggerCues() noexcept{return gameplay_audio50HE::cueCount-9;}
+
+// Own this at a stable address. PCM, voices, mixer and both providers are never
+// moved or exposed mutably; their borrowed references stay valid until close.
+// All public methods belong to the simulation/main thread. Backend callbacks
+// only consume the output's separately owned PCM ring.
+class Owner final {
+public:
+    Owner()=default;
+    ~Owner()noexcept {rr::platform::AudioOutputDiagnostic50HD diagnostic;close(diagnostic);}
+    Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
+    Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
+
+    // Cold only, once per owner, before any gameplay work. All 60 authenticated
+    // requests remain present, including missing/unsupported/invalid records.
+    // discRoot supplies retained originals; audioRoot is the explicit AUDIO
+    // directory. No search of another computer or guessed external path occurs.
+    bool prepare(const std::filesystem::path& discRoot,const std::filesystem::path& audioRoot,
+        std::string& error) {
+        if(prepareAttempted_||closed_) {error="50HF preparation requires a fresh stable owner";return false;}
+        prepareAttempted_=true;
+        try {
+            std::vector<rr::assets::AudioRequest50HC> requests;
+            if(!rr::assets::readRetainedAudioRequests50HC(discRoot,requests,error)||
+               !rr::assets::loadAudioBank50HC(audioRoot,requests,bank_,error))return false;
+            if(requests.size()!=gameplay_audio50HE::cueCount||bank_.clips.size()!=requests.size()) {
+                error="50HF authenticated audio catalog count differs from the retained 60 cues";return false;
+            }
+            if(!mixer_.initialize(voices_.data(),voices_.size(),sampleRate)) {
+                error="50HF bounded mixer initialization failed";return false;
+            }
+            if(!provider_.prepare(bank_,mixer_,providerFirstVoice,error)||
+               !pod_audio50HE::prepareFromPod01(lap_,mixer_,bank_,lapFirstVoice,lapVoiceCount,
+                   error,discRoot/"PODS/POD01/POD01.RES"))return false;
+            prepared_=true;error.clear();return true;
+        }catch(const std::exception& e){error=e.what();return false;}
+        catch(...){error="50HF audio preparation failed";return false;}
+    }
+
+    // Cold, AFTER WindowHost50DQ::create. Zero decoded samples refuse the
+    // request before output.open, so an empty bank cannot create a proof WAV.
+    // A real backend may be unavailable while the requested PCM capture works.
+    // Caller must inspect info().deviceStatus before reporting device playback.
+    bool openOutput(const rr::platform::AudioOutputRequest50HD& request,
+        rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
+        if(closed_)return fail(diagnostic,rr::platform::AudioOutputError50HD::NotOpen,"50HF.open","Audio owner is closed");
+        if(!prepared_)return fail(diagnostic,rr::platform::AudioOutputError50HD::InvalidRequest,"50HF.open","Audio bank has not been authenticated and prepared");
+        if(outputOpen_)return fail(diagnostic,rr::platform::AudioOutputError50HD::AlreadyOpen,"50HF.open","Audio output is already open");
+        if(!bank_.ready)return fail(diagnostic,rr::platform::AudioOutputError50HD::InvalidRequest,"50HF.open","No decoded original audio samples are available; output and WAV capture were not opened");
+        if(request.sampleRate!=sampleRate)return fail(diagnostic,rr::platform::AudioOutputError50HD::InvalidRequest,"50HF.open","The live 16ms bridge requires 48000Hz output");
+        if(!output_.open(request,diagnostic))return false;
+        outputOpen_=true;
+        if(paused_)output_.pauseDevice(true);
+        return true;
+    }
+
+    // These event methods never allocate or read/decode files. The inputs must
+    // come from the actual source phase. No speech, collision or debris trigger
+    // is invented merely because its authored sample was registered.
+    EventReceipt engine(const rr::game::PodEngineParameters50HE& parameters,
+        const rr::game::PodEngineInput50HE& input)noexcept {
+        EventReceipt r;if(!admit(r))return r;
+        rr::game::PodEngineControls50HE controls;
+        if(!rr::game::podEngineControls50HE(parameters,input,controls))return rejectInput(r);
+        using namespace rr::game;
+        const AudioCue50HE engineCue{AudioBank50HE::PodEngine,1},binderCue{AudioBank50HE::PodEngine,2};
+        r.commands[0]={provider_.active(engineCue)?AudioOperation50HE::Controls:AudioOperation50HE::Start,
+            engineCue,controls.engineGain,controls.enginePitch,true,0x19f5b0};
+        r.commands[1]={provider_.active(binderCue)?AudioOperation50HE::Controls:AudioOperation50HE::Start,
+            binderCue,controls.binderGain,controls.binderPitch,true,0x19f5b0};
+        r.commandCount=2;++counters_.engineUpdates;apply(r);return r;
+    }
+    EventReceipt warnings(const rr::game::PodWarningInput50HE& input)noexcept {
+        EventReceipt r;if(!admit(r))return r;
+        auto next=warning_;
+        const auto status=rr::game::updatePodWarnings50HE(input,warning_,next,
+            r.commands.data(),r.commands.size(),r.commandCount);
+        if(!projected(status,r))return r;
+        warning_=next;++counters_.warningUpdates;apply(r);return r;
+    }
+    EventReceipt boostAtBoundary(bool heldBoost,float heating,std::uint32_t previous64)noexcept {
+        EventReceipt r;if(!admit(r))return r;
+        auto next=boost_;
+        const auto status=rr::game::updatePodBoostAudio50HE(heldBoost,heating,previous64,boost_,next,
+            r.commands.data(),r.commands.size(),r.commandCount);
+        if(!projected(status,r))return r;
+        boost_=next;++counters_.boostUpdates;apply(r);return r;
+    }
+    EventReceipt repairCompletion(std::uint8_t flagsB9C,std::uint32_t vehicle3C,
+        const float (&damage7D0)[4])noexcept {
+        EventReceipt r;if(!admit(r))return r;
+        const auto status=rr::game::repairCompletionAudio50HE(flagsB9C,vehicle3C,damage7D0,
+            r.commands.data(),r.commands.size(),r.commandCount);
+        if(!projected(status,r))return r;
+        ++counters_.repairUpdates;apply(r);return r;
+    }
+    // Admission for another separately recovered source event owner. This
+    // method does not establish or manufacture the caller's gameplay trigger;
+    // static sourceSite remains provenance, never a dispatch/authentication key.
+    EventReceipt applySourceCommand(const rr::game::AudioCommand50HE& command)noexcept {
+        EventReceipt r;if(!admit(r))return r;
+        r.commands[0]=command;r.commandCount=1;apply(r);return r;
+    }
+
+    // This is the genuine bounded lap292360->233410 path only. A completed
+    // unavailable/no-channel call is still completed; it has no audible start.
+    // The caller's void 50GG effect acknowledgement remains originalV0=0,
+    // separate from this receipt's actual nested sound result (0 or 1).
+    pod_audio50HE::DispatchReceipt dispatchLap(std::uint32_t key=1,
+        std::uint32_t flags=0,std::uint32_t argumentA3=0)noexcept {
+        if(!prepared_||closed_||paused_)return {};
+        ++counters_.lapRequests;
+        return pod_audio50HE::dispatchLap(lap_,key,flags,argumentA3);
+    }
+
+    // Exactly once AFTER each committed simulation step, never per video frame,
+    // failed/blocked step, or paused interval. 48kHz *16ms gives exactly768 frames.
+    // Missing-bank mode has no output clock; it must not fabricate mixed frames.
+    bool committedStep(rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
+        if(!outputOpen_||closed_)return fail(diagnostic,rr::platform::AudioOutputError50HD::NotOpen,"50HF.step","Audio output is not open");
+        if(paused_)return fail(diagnostic,rr::platform::AudioOutputError50HD::InvalidRequest,"50HF.step","Paused audio must not advance the simulation sample clock");
+        if(!output_.advanceMicroseconds(mixer_,stepMicroseconds,diagnostic)) {
+            ++counters_.mixFailures;return false;
+        }
+        ++counters_.committedSteps;return true;
+    }
+    void pause(bool paused)noexcept {
+        if(closed_)return;
+        paused_=paused;if(outputOpen_)output_.pauseDevice(paused);
+    }
+    // Host reset policy, not a reconstructed original emitter reset method.
+    // Preserve immutable registrations and cumulative output/capture clock.
+    void resetVoices()noexcept {
+        if(!prepared_||closed_)return;
+        mixer_.stopAll();warning_={};boost_={};++counters_.resets;
+    }
+    // Explicit close BEFORE WindowHost50DQ destruction/SDL_Quit. Idempotent.
+    // Destructor is only a fallback; host construction order remains important.
+    bool close(rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
+        mixer_.stopAll();
+        const bool result=output_.close(diagnostic);
+        outputOpen_=false;closed_=true;return result;
+    }
+
+    bool prepared()const noexcept{return prepared_;}
+    bool outputOpen()const noexcept{return outputOpen_;}
+    bool paused()const noexcept{return paused_;}
+    bool closed()const noexcept{return closed_;}
+    bool boostPitch()const noexcept{return boost_.pitchBoost;}
+    const rr::game::PodWarningState50HE& warningState()const noexcept{return warning_;}
+    const rr::assets::AudioBank50HC& bank()const noexcept{return bank_;}
+    const gameplay_audio50HE::Provider& provider()const noexcept{return provider_;}
+    // Root integration may reserve the disjoint64..79 material-sound range.
+    // This remains main-thread-only; the provider must not touch0..63.
+    rr::platform::AudioMixer50HD* mixerForMaterialOwner()noexcept {
+        return prepared_&&!closed_?&mixer_:nullptr;
+    }
+    const pod_audio50HE::Owner& lapOwner()const noexcept{return lap_;}
+    const Counters& counters()const noexcept{return counters_;}
+    rr::platform::AudioOutputInfo50HD info()const noexcept{return output_.info();}
+    std::uint64_t mixedFrames()const noexcept{return mixer_.mixedFrames();}
+    std::uint64_t clippedSamples()const noexcept{return mixer_.clippedSamples();}
+    std::size_t activeVoices()const noexcept {
+        std::size_t result=0;for(std::size_t n=0;n<voices_.size();++n)if(mixer_.active(n))++result;
+        return result;
+    }
+    std::size_t loadedUnsupportedTriggerCues()const noexcept {
+        std::size_t result=0;
+        for(const auto& definition:gameplay_audio50HE::catalog) {
+            const rr::game::AudioCue50HE cue{definition.bank,definition.key};
+            if(!hasJoinedTrigger(cue)&&provider_.available(cue))++result;
+        }
+        return result;
+    }
+private:
+    static bool fail(rr::platform::AudioOutputDiagnostic50HD& diagnostic,
+        rr::platform::AudioOutputError50HD error,const char* operation,const char* detail)noexcept {
+        diagnostic={};diagnostic.error=error;diagnostic.operation=operation;
+        for(std::size_t n=0;n+1<diagnostic.detail.size()&&detail[n];++n)diagnostic.detail[n]=detail[n];
+        return false;
+    }
+    bool admit(EventReceipt& r)const noexcept {
+        if(closed_){r.status=EventStatus::Closed;return false;}
+        if(!prepared_){r.status=EventStatus::Unprepared;return false;}
+        if(paused_){r.status=EventStatus::Paused;return false;}
+        r.status=EventStatus::Complete;return true;
+    }
+    EventReceipt rejectInput(EventReceipt& r)noexcept {
+        r.status=EventStatus::Input;++counters_.inputRejected;return r;
+    }
+    bool projected(rr::game::AudioEventStatus50HE status,EventReceipt& r)noexcept {
+        if(status==rr::game::AudioEventStatus50HE::Complete)return true;
+        r.status=status==rr::game::AudioEventStatus50HE::Capacity?EventStatus::Capacity:EventStatus::Input;
+        ++counters_.inputRejected;return false;
+    }
+    void apply(EventReceipt& r)noexcept {
+        using Result=gameplay_audio50HE::ApplyResult;
+        for(std::size_t n=0;n<r.commandCount;++n) {
+            const auto result=provider_.apply(r.commands[n]);r.results[n]=result;++counters_.commands;
+            switch(result) {
+                case Result::Started:++counters_.starts;break;
+                case Result::Stopped:++counters_.stops;break;
+                case Result::Controlled:++counters_.controls;break;
+                case Result::Inactive:++counters_.inactive;break;
+                case Result::Unavailable:++counters_.unavailable;break;
+                default:++counters_.rejected;r.status=EventStatus::ApplyRejected;break;
+            }
+        }
+    }
+    // Destruction reverses this order; close also precedes every borrowed PCM
+    // lifetime. No mutable accessors can resize a live PCM vector or voice array.
+    rr::assets::AudioBank50HC bank_{};
+    std::array<rr::platform::AudioVoice50HD,voiceCount> voices_{};
+    rr::platform::AudioMixer50HD mixer_{};
+    gameplay_audio50HE::Provider provider_{};
+    pod_audio50HE::Owner lap_{};
+    rr::platform::AudioOutput50HD output_{};
+    rr::game::PodWarningState50HE warning_{};
+    rr::game::PodBoostAudioState50HE boost_{};
+    Counters counters_{};
+    bool prepareAttempted_=false,prepared_=false,outputOpen_=false,paused_=false,closed_=false;
+};
+}
