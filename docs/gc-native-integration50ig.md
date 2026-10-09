@@ -1,4 +1,6 @@
-# GC native integration: player advances, field driving incomplete
+# GC native integration: track-class correction unbuilt and untested
+
+The latest source replaces the stale fixed A-class input with the original selector applied to the loaded track identity: TA remains A, GC selects C. Every cold racer owner receives the same decision, legitimately changing original class-dependent handling and propulsion. This correction is unbuilt and untested; the earlier result below applies to the previous source. See [class-selection scope](gc-authored-track-class50ip.md).
 
 The central 2026-10-09 21:19 slot built `e9ece06f227d4834c1591d235e92b1856d944756` and completed one TA→GC menu/cold-load/capture sequence with exit 0. The GC-only authored 0.7/0.2-second HOST steering preview and shared world-yaw correction were exercised; speed-preview, pace and safety stops remain unchanged. See [steering scope](gc-host-steering-preview50io.md).
 

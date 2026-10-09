@@ -443,7 +443,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(rr::assets::readMotionNodeBindings49O(x.assets.hierarchy[2],reinterpret_cast<const char*>(x.assets.vut[2].data()),x.assets.vut[2].size(),sources.chariotBindings,bindingDiagnostic),"actual motion bindings");
  FreshPodGeometryWorkspace49O geometryWorkspace{};FreshPodGeometryResult49O geometry{};FreshPodGeometryDiagnostic49O geometryDiagnostic{};
  require50DU(buildFreshPodGeometry49O(sources,geometryWorkspace,geometry,geometryDiagnostic),"actual pod geometry");
- const auto phy=runtime_startup50fl::readBytes("work/impactAuthoring49Y/Pod01.phy");const AuthoredSelectionContext49N selection{AuthoredClass49N::A,false,true,false,false,{}};
+ const auto phy=runtime_startup50fl::readBytes("work/impactAuthoring49Y/Pod01.phy");
+ // Original214954..214AA0 selects initial PHY class from the loaded track's
+ // lowercase two-letter identity. Use the existing source selector, including
+ // its sb/ra/sc exceptions; never carry the old TA-only class into a GC session.
+ const auto sourceTrackLetter=[](char c){return c>='A'&&c<='Z'?char(c+'a'-'A'):c;};
+ const char authoredTrackName[]={sourceTrackLetter(trackSession->world->code[0]),
+     sourceTrackLetter(trackSession->world->code[1]),'\0'};
+ AuthoredClass49N trackClass=AuthoredClass49N::A;
+ require50DU(selectAuthoredClass49N(authoredTrackName,2,trackClass),
+     "loaded original track's authored handling class unavailable");
+ const AuthoredSelectionContext49N selection{trackClass,false,true,false,false,{}};
  auto authored=runtime_startup50fl::bind(phy,geometry,selection,x.parameters,s,x.selectors,x.secondaryInputs);
  // Player1A0858..5C preserves the fully authored aero350+100 as10A4.
  // Capture once, before the finish leaf changes the live steering coefficient.
@@ -520,6 +530,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(boost50fk_fixture::bind(reinterpret_cast<const char*>(phy.data()),phy.size(),
      selection,authored,boostParameters,boostCoolingCF8),"actual boost authoring unavailable");
  BoostState50FK boostState{};BoostDiagnostic50FK boostDiagnostic{};
+ if(!playerUsesRosterRig)std::cerr<<"ORIGINAL HANDLING: slot=0 track="<<authoredTrackName
+     <<" class="<<static_cast<unsigned>(authored.selectedClass)
+     <<" class_values="<<authored.usedAuthoredClassValues
+     <<" max_thrust="<<x.parameters.bodies.main.engine.maxThrust
+     <<" top_speed_body="<<x.parameters.bodies.main.engine.theoreticalTopSpeed
+     <<" steering100="<<x.parameters.bodies.main.aero.steering100
+     <<" repair="<<s.fields.repairCF4<<" cooling="<<boostCoolingCF8<<'\n';
 
  // Explicit native namespace shared with the retained collider/query owners.
  // These IDs/masks are host bindings, not reconstructed guest addresses.
@@ -1875,7 +1892,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::cerr<<"ORIGINAL RACER "<<racer<<": "<<racerNames[racer]<<" ["<<rig.podId
        <<"] nodes="<<s.sceneNodeCount<<" mass="<<x.parameters.bodies.main.body.mass
        <<" lift="<<receipt.liftHeight<<" main_rays="<<collision.main().rayCount
-       <<" secondary_rays="<<collision.secondary().rayCount<<'\n';
+       <<" secondary_rays="<<collision.secondary().rayCount
+       <<" track="<<authoredTrackName<<" class="<<static_cast<unsigned>(receipt.authored.selectedClass)
+       <<" class_values="<<receipt.authored.usedAuthoredClassValues
+       <<" max_thrust="<<x.parameters.bodies.main.engine.maxThrust
+       <<" top_speed_body="<<x.parameters.bodies.main.engine.theoreticalTopSpeed
+       <<" steering100="<<x.parameters.bodies.main.aero.steering100
+       <<" repair="<<s.fields.repairCF4<<" cooling="<<boostCoolingCF8<<'\n';
   });
   // Keep exact original names in fixed cold storage for allocation-free HUD publication.
   for(std::size_t racer=0;racer<raceRacerCount;++racer){

@@ -1,5 +1,7 @@
 # Current native race validation
 
+The current source adds an **unbuilt and untested** original track-class correction after the run below: loaded TA selects A and GC selects C for all cold racer owners. The earlier result does not validate the resulting class-dependent handling/propulsion. See [track-class scope](gc-authored-track-class50ip.md).
+
 ## GC WIP: player advances; two opponents stop before a lap
 
 The 2026-10-09 21:19 central slot built source `e9ece06f227d4834c1591d235e92b1856d944756`: two units compiled, 191 reused, link exit 0. One runtime ran from 21:21:01 to 21:21:45 UTC and exited normally. The GC steering preview and shared world-yaw correction were exercised.
