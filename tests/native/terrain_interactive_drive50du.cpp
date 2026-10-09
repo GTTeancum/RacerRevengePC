@@ -223,7 +223,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  static_assert(live_audio50HF::lapFirstVoice+live_audio50HF::lapVoiceCount<=64);
  static_assert(64+material_audio50HI::soundCount<=race_audio50HQ::firstVoice);
  static_assert(race_audio50HQ::firstVoice+race_audio50HQ::voiceCount<=opponent_audio50HX::firstVoice);
- static_assert(opponent_audio50HX::firstVoice+opponent_audio50HX::voiceCount<=live_audio50HF::voiceCount);
+ static_assert(opponent_audio50HX::firstVoice+opponent_audio50HX::voiceCount<=opponent_audio50HX::boostFirstVoice);
+ static_assert(opponent_audio50HX::boostFirstVoice+opponent_audio50HX::boostVoiceCount<=race_music50IE::voice);
  static_assert(race_music50IE::voice<material_audio50HI::extraFirstVoice);
  static_assert(material_audio50HI::extraFirstVoice+material_audio50HI::maximumExtraVoices<=live_audio50HF::voiceCount);
  if(raceEnabled){
@@ -685,8 +686,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto raceMusic=std::make_unique<race_music50IE::Owner>();
  std::unique_ptr<race_mode1_host50ID::Owner> mode1;
  auto materialAudio=std::make_unique<material_audio50HI::Provider>();
- // This owner dies before the live mixer and owns only voices96..109.
+ // This owner dies before the live mixer/shared boost PCM and owns96..116.
  auto opponentAudio=std::make_unique<opponent_audio50HX::Owner>();
+ // Only fixed source state enters the racer bank; mixer/PCM ownership never does.
+ opponent_audio50HX::BoostState opponentBoostAudio{};
  const char* audioSetting=std::getenv("RR_AUDIO");
  const bool audioEnabled=!(audioSetting&&std::string(audioSetting)=="0");
  require50DU(!audioEnabled||trackSession->materialAudio,
@@ -757,16 +760,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::array<opponent_audio50HX::Source,opponent_audio50HX::maxOpponents> sources{};
    for(std::size_t racer=1;racer<raceRacerCount;++racer)
     sources[racer-1]={racerRigs[racer]->podId,&racerRigs[racer]->phy};
-   const bool prepared=opponentAudio->prepare(sources,audioRoot,*materialMixer,audioError);
+   const bool prepared=opponentAudio->prepare(sources,audioRoot,liveAudio->bank(),*materialMixer,audioError);
    require50DU(prepared,audioError.empty()?"original opponent engine audio preparation failed":audioError.c_str());
    require50DU(race_audio_groups50IC::bindProviderRange(*audioGroups,
        race_audio_groups50IC::ProviderRole::EngineBinderBoost,
-       opponent_audio50HX::firstVoice,opponent_audio50HX::voiceCount),
+       opponent_audio50HX::firstVoice,opponent_audio50HX::ownedVoiceCount),
        "opponent engine group ownership rejected");
    const auto& opponentBank=opponentAudio->bank();
    std::cerr<<"Opponent engine audio ready/missing/unsupported/invalid "<<opponentBank.ready<<'/'
        <<opponentBank.missing<<'/'<<opponentBank.unsupported<<'/'<<opponentBank.invalid
-       <<" unique original samples; exclusive voices96..109; host distance attenuation.\n";
+       <<" unique original engine samples; shared original boost; exclusive voices96..116; host distance attenuation.\n";
    for(const auto& mapping:opponentAudio->mappings())
     std::cerr<<"OPPONENT AUDIO "<<mapping.podId<<" engine="<<mapping.engineName
         <<" binder="<<mapping.binderName<<'\n';
@@ -1488,10 +1491,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      s.fields.vehicle58,2,0,false}; // No D40 audio/control owner in this baseline topology.
  // Native host subscriber at the original boost boundary; this does not claim
  // that the separate original D40 topology guard has been closed.
- if(audioEnabled&&!opponentFrame&&!raceSetupFrame){
+ if(audioEnabled&&!raceSetupFrame){
   const bool heldBoost=(m.controls.player.flagsB9C&1u)&&!(m.controls.player.flagsB9C&2u);
   const float heating=boostParameters.heatRate88*(boostInput.engine70+boostInput.engine74);
-  require50DU(liveAudio->boostAtBoundary(heldBoost,heating,boostState.vehicle64).okay(),
+  if(opponentFrame)require50DU(opponent_audio50HX::boostAtBoundary(opponentBoostAudio,
+      heldBoost,heating,boostState.vehicle64),"source opponent boost audio event rejected");
+  else require50DU(liveAudio->boostAtBoundary(heldBoost,heating,boostState.vehicle64).okay(),
       "source boost audio event rejected");
  }
  runNative([&]{return advancePlayerBoost50FK(boostInput,boostParameters,boostState,
@@ -1748,9 +1753,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      auto& input=opponentEngineInputs[racer-1];const auto& p=m.components.root.body.position;
      input.active=true;input.position={p.v[0],p.v[1],p.v[2]};
      input.speedRatio70=boostState.speedRatio70;
-     // The opponent boost/damage-dip emitter owners are not reconstructed.
-     // Keep explicit undamaged, nonboosted baselines; never borrow player state.
-     input.enginePitchScale484=1.f;input.boostPitch=false;
+     // Preserve the source boost decision made before this racer's native heat
+     // update. Damage-dip modulation remains unjoined; player state is never borrowed.
+     input.enginePitchScale484=1.f;input.boostPitch=opponentBoostAudio.source.pitchBoost;
+     input.boostCommand=opponentBoostAudio.command;input.boostSerial=opponentBoostAudio.serial;
     }
     return observeLiveRacer();
    }):race.racers[racer].live;
@@ -2071,7 +2077,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   bool clean=true;
   if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
-  opponentAudio->close(); // Release only96..109 before the live mixer closes.
+  opponentAudio->close(); // Release96..116 before the live mixer/shared PCM closes.
   if(!liveAudio->close(audioDiagnostic)){
    std::cerr<<"audio close failed "<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=false;
   }
@@ -3278,7 +3284,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       std::cerr<<"audio opponent ready/updates/starts/controls/stops/unavailable/normalized "
           <<opponentAudio->bank().ready<<'/'<<o.updates<<'/'<<o.starts<<'/'<<o.controls
           <<'/'<<o.stops<<'/'<<o.unavailable<<'/'<<o.normalizedUpdates
-          <<" rejected="<<o.rejected<<'\n';
+          <<" rejected="<<o.rejected
+          <<" boost_onsets/starts/unavailable="<<o.boostOnsets<<'/'<<o.boostStarts<<'/'<<o.boostUnavailable<<'\n';
      }
      std::cerr<<"audio material ready/starts/controls/stops/unavailable "<<materialAudio->bank().ready
          <<'/'<<materialAudio->counters().starts<<'/'<<materialAudio->counters().controls

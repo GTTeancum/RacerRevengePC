@@ -4,6 +4,8 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
+This branch preserves **UNBUILT / UNTESTED opponent boost-event audio**. The current HOST opponents never request boost, so ordinary races leave this route dormant. [Scope and review](docs/opponent-event-audio50io.md) covers the source-state connection and voices 110–116; no driving-policy change or positive playback is claimed.
+
 The previous GC candidate built; the new cold admission guard is **UNBUILT / UNTESTED**, and GC gameplay remains unverified. The capture checker stopped on the first TA Main image before driving or GC loading. See [GC status and omissions](docs/gc-native-integration50ig.md); successful runtime coverage below belongs to the earlier Linux baseline.
 
 The Linux prototype includes native rendering, physics, audio, keyboard controls, and an eight-racer development race. Clegg selection through Main, pause/resume, and a 20-second gameplay capture have passed. An earlier mode1 baseline completed a three-lap race with native timing, Dax, music, and completed-lap display. See [current validation](docs/current-validation.md) for scope.

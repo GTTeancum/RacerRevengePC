@@ -19,6 +19,9 @@ racerBank.owner(x.frame);
 racerBank.owner(x.diagnostic);
 racerBank.owner(boostState);
 racerBank.owner(boostDiagnostic);
+// Source boost pitch/onset state is independent per racer. It only emits to
+// the shared mixer after an accepted world commit, never during a bank visit.
+racerBank.owner(opponentBoostAudio);
 racerBank.owner(boostParameters);
 racerBank.owner(boostCoolingCF8);
 racerBank.owner(settings);
