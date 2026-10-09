@@ -1,5 +1,12 @@
 # Current native race validation
 
+## GC WIP: build passed; capture stopped before driving
+
+The 2026-10-09 18:18 central attempt built source `54bc7b5a00244fadf5ccd1fc4ab95e1f34ff771b`: 59 units compiled, 134 reused, link exit 0. Its one runtime loaded TA mode2/Main. The checker rejected the first Main image because the renderer tick was 0 while the native counter was 1. Capture ended incomplete before any drive or GC cold load; the process exited normally during cleanup. This is a build pass and a capture-harness failure, not a gameplay pass. Evidence remains preserved outside the repository, and a helper correction is separate work.
+
+Binary SHA-256: `d7eef1c13f80c4cda81f0ce65bd2d4d5ef35e49997a64e0bd2b21e78d74ef366`.
+The latest successful runtime remains the earlier `959d94e` Clegg/menu check below. Its coverage does not validate the GC additions.
+
 ## Current Linux menu and Clegg check
 
 The 2026-10-09 17:18 UTC central build compiled four units, reused 189, and linked successfully. One runtime ran from 17:19:27 to 17:20:01 UTC and exited normally.
