@@ -479,7 +479,7 @@ struct HostHudGeometry {
             std::snprintf(countdown, sizeof(countdown), "START IN %u", input.raceCountdown);
             text(6.f, y + 5.f, laps, 0xEDF3F8);
             text(90.f, y + 5.f, place, 0xEDF3F8);
-            const char* status = input.raceFinished ? "FINISHED" : input.raceCountdown ? countdown :
+            const char* status = input.raceResultsReady ? "RESULTS" : input.raceFinished ? "FINISHED" : input.raceCountdown ? countdown :
                 input.raceGo ? "GO" : input.wrongWay ? "WRONG WAY" : "RACING";
             text(6.f, y + 19.f, status, input.raceFinished || input.raceGo ? 0xA8E6B4 :
                 input.wrongWay ? 0xFF6556 : 0xA8C5DE);
@@ -2575,6 +2575,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             hud.raceCountdown > 3 ||
             unsigned(hud.raceCountdown != 0) + unsigned(hud.raceGo) + unsigned(hud.raceFinished) > 1))
             return fail(d, VehicleWindowError50DS::frame, "native race HUD counters/status outside admitted bounds");
+        if (hud.raceResultsReady && (!hud.raceEnabled || !hud.raceFinished || hud.raceCountdown || hud.raceGo))
+            return fail(d, VehicleWindowError50DS::frame, "host results presentation requires a sealed human finish");
         if (hud.standingsCount) {
             if (!hud.raceEnabled || hud.standingsCount > maxVehicleWindowStandings50DS ||
                 hud.standingsCount != hud.raceRacerCount || hud.standingsPlayerIndex >= hud.standingsCount)

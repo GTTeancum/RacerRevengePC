@@ -16,7 +16,7 @@ inline constexpr std::size_t maxRacers=16;
 enum class Phase : std::uint8_t { Uninitialized, Countdown, Racing, Complete };
 enum class Error : std::uint8_t {
     None, Configuration, Route, Observation, MissingSample, LapRegression,
-    LapJump, PendingLapCallback, CountdownMovement
+    LapJump, PendingLapCallback, CountdownMovement, FinishedLapMutation
 };
 struct Config {
     std::uint32_t lapTarget=3;
@@ -35,7 +35,9 @@ struct Observation {
     bool lapCallbackPending=false;
 };
 struct Racer {
-    Observation observed{},pending{};
+    // observed is the official ranking snapshot; live continues after the
+    // manager closes results so native progression is still validated.
+    Observation observed{},live{},pending{};
     bool observedValid=false,sampled=false,finished=false;
     std::uint32_t place=0,finishPlace=0;
     double remainingDistance=0,finishSeconds=0;
@@ -45,6 +47,7 @@ struct Session {
     Config config{};
     Phase phase=Phase::Uninitialized;
     Error error=Error::None;
+    bool resultsClosed=false;
     std::uint32_t racerCount=0,nodeCount=0,checkpointCount=0,finishCount=0;
     std::uint32_t ordered[maxRacers]{};
     Racer racers[maxRacers]{};
@@ -218,13 +221,19 @@ inline bool advanceCountdown(Session& s,double seconds) noexcept {
         if(s.countdownRemaining<1e-9){s.countdownRemaining=0;s.phase=Phase::Racing;}
         s.error=Error::None;return false;
     }
-    s.error=Error::None;return s.phase==Phase::Racing;
+    // Results completion does not remove native vehicles from their update
+    // owner. The source finish bit and controller choose post-finish behavior.
+    s.error=Error::None;return s.phase==Phase::Racing||s.phase==Phase::Complete;
 }
 inline std::uint32_t countdownNumber(const Session& s) noexcept {
     return s.phase==Phase::Countdown?static_cast<std::uint32_t>(std::ceil(s.countdownRemaining)):0;
 }
+// Human race-input permission is separate from native world participation.
 inline bool controlsAllowed(const Session& s,std::uint32_t racer) noexcept {
     return s.phase==Phase::Racing&&racer<s.racerCount&&!s.racers[racer].finished;
+}
+inline bool simulationAllowed(const Session& s,std::uint32_t racer) noexcept {
+    return racer<s.racerCount&&(s.phase==Phase::Racing||s.phase==Phase::Complete);
 }
 inline bool sampleRacer(Session& s,std::uint32_t index,const Observation& observation) noexcept {
     if(s.phase==Phase::Uninitialized||index>=s.racerCount||!detail::validObservation(s,observation))
@@ -232,8 +241,13 @@ inline bool sampleRacer(Session& s,std::uint32_t index,const Observation& observ
     if(observation.lapCallbackPending)return detail::fail(s,Error::PendingLapCallback);
     auto& r=s.racers[index];
     if(r.observedValid){
-        if(observation.completedLaps<r.observed.completedLaps)return detail::fail(s,Error::LapRegression);
-        if(observation.completedLaps-r.observed.completedLaps>1)return detail::fail(s,Error::LapJump);
+        // Native CD8 bit0 suppresses additional lap increments after the result
+        // seals. Continue sampling real poses/checkpoints, but reject a broken
+        // finish projection instead of silently changing the sealed lap result.
+        if(r.finished&&observation.completedLaps!=r.live.completedLaps)
+            return detail::fail(s,Error::FinishedLapMutation);
+        if(observation.completedLaps<r.live.completedLaps)return detail::fail(s,Error::LapRegression);
+        if(observation.completedLaps-r.live.completedLaps>1)return detail::fail(s,Error::LapJump);
         if(s.phase==Phase::Countdown&&(observation.completedLaps!=r.observed.completedLaps||
             observation.checkpointCursor!=r.observed.checkpointCursor||
             observation.currentMapNode!=r.observed.currentMapNode||
@@ -256,7 +270,7 @@ inline bool commitFrame(Session& s,double seconds) noexcept {
     for(std::uint32_t i=0;i<s.racerCount;++i){
         const auto& r=s.racers[i];
         if(!r.sampled)return detail::fail(s,Error::MissingSample);
-        if(seconds==0&&r.observedValid&&r.pending.completedLaps!=r.observed.completedLaps)
+        if(seconds==0&&r.observedValid&&r.pending.completedLaps!=r.live.completedLaps)
             return detail::fail(s,Error::LapJump);
     }
     std::uint32_t newlyFinished[maxRacers]{};std::size_t newlyCount=0;
@@ -283,14 +297,29 @@ inline bool commitFrame(Session& s,double seconds) noexcept {
     for(std::size_t i=0;i<newlyCount;++i){auto& r=s.racers[newlyFinished[i]];
         r.finished=true;r.finishPlace=++s.finishCount;}
     for(std::uint32_t i=0;i<s.racerCount;++i){auto& r=s.racers[i];
-        r.observed=r.pending;r.observedValid=true;r.sampled=false;
-        r.remainingDistance=detail::remaining(s,r.observed);
-        r.distanceBucket=static_cast<std::int64_t>(std::floor(r.remainingDistance/s.config.placeQuantum));
+        r.live=r.pending;r.sampled=false;
+        if(!s.resultsClosed){
+            r.observed=r.pending;r.observedValid=true;
+            r.remainingDistance=detail::remaining(s,r.observed);
+            r.distanceBucket=static_cast<std::int64_t>(std::floor(r.remainingDistance/s.config.placeQuantum));
+        }
     }
     if(s.phase==Phase::Racing)s.raceSeconds+=seconds;
-    detail::rank(s);
+    if(!s.resultsClosed)detail::rank(s);
     if(s.finishCount==s.racerCount)s.phase=Phase::Complete;
     s.error=Error::None;return true;
+}
+// Original manager closes official results after all humans have finished.
+// Call at the accepted world boundary after any same-frame finish edges were
+// sealed. This host has one human; it must not wait for remaining AI results.
+// Live sampling/validation and simulation continue independently afterward.
+inline bool closeResults(Session& s) noexcept {
+    if((s.phase!=Phase::Racing&&s.phase!=Phase::Complete)||!s.finishCount)
+        return detail::fail(s,Error::Configuration);
+    for(std::uint32_t i=0;i<s.racerCount;++i)
+        if(!s.racers[i].observedValid||s.racers[i].sampled)
+            return detail::fail(s,Error::MissingSample);
+    s.resultsClosed=true;s.phase=Phase::Complete;s.error=Error::None;return true;
 }
 inline std::uint32_t displayedLap(const Session& s,std::uint32_t racer) noexcept {
     if(racer>=s.racerCount||!s.config.lapTarget)return 0;

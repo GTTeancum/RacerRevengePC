@@ -198,7 +198,10 @@ struct MovementQueryCompletion50M {
 // SubstepSelectionContext observes378/37C into the sole fields owner; the
 // duplicate SecondaryInputs49M gravity members are ignored by49W. Immutable
 // parameter/binding descriptors and source-effective constants must remain
-// unchanged through a staged frame, including all external cuts.
+// unchanged from their first frame use through all subsequent external cuts.
+// The proven player-finish1A36A0 model write may update aero steering100 after
+// the input-only readVehicleFrame49W and before bindVehicleFrame49W first reads
+// parameters; no mid-physics descriptor mutation is admitted.
 bool readVehicleFrame49W(VehicleFrameState49W&,const VehicleFrameBindings49W&,
     const FrameReader49K&,VehicleFrameWorkspace49W&,VehicleFrameDiagnostic49W&) noexcept;
 bool bindVehicleFrame49W(VehicleFrameState49W&,const VehicleFrameBindings49W&,

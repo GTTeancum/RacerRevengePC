@@ -1,30 +1,33 @@
 # Current native race validation
 
-The 2026-10-09 10:16 UTC Linux check built successfully and completed one
-full eight-racer race followed by one restart in the same process. Exit was normal.
+The 2026-10-09 11:16 UTC Linux validation built successfully (21 units compiled,
+172 reused, link exit 0) and completed one focused finish-continuation run.
+The process exited normally without stopped racers or reported errors.
 
-- All eight distinct original racers completed three laps. Player finished
-  first at 160.928 race seconds; the field completed by 223.664.
-- Finished opponents left the render list only after their sealed finish:
-  zero submitted, seven hidden finished, all eight results still displayed.
-- One restart produced a real tick-1 countdown grid, zero completed laps,
-  seven submitted opponents and all eight racers advancing past ten seconds.
-- Both sessions retained original engine and race audio. Four countdown/GO
-  events were observed again in the new session.
-- First WAV: 232.912 seconds. Second WAV: 14.688 seconds. The first PCM prefix
-  and finalized whole-file hash survived session two unchanged.
-- 49 completed-render samples: 53.1286–62.5601 FPS in this cloud VM.
-- Six acknowledged real framebuffer captures document race, clean finish,
-  restarted countdown and subsequent driving.
+- Player completed three laps, finishing first at 160.928 race seconds.
+- All eight native update counters continued after the human finish. The
+  player's CD8 finish bit and ended manager gate 3 remained set.
+- Official standings, sealed place/time and lap count stayed locked. Unfinished
+  AI were not falsely recorded as finishers after official results closed.
+- A six-second S + Down brake hold could not replace the native finish driver.
+- The four-second countdown reached RESULTS; all seven opponent models and
+  eight standings rows remained present.
+- The original mix appended 10.08 seconds of actual PCM after the human finish.
+- 34 completed-render samples: 54.3274–62.5233 FPS in this cloud VM.
 
-Tested source: `ff0763ca42cd0f67127816df30e5c0a8aea3d333`.
+Tested source: `b97e661b0b86e81a08e434045f945ecfa272cae9`.
 Executable SHA-256:
-`411e794bfb074e404848a03f34379944b74e0db4a79a843f363cd6be4cbb5282`.
+`5f84dd50403ca6d5fa9f5c3bf9a057db1ec464466bf2947a498f725a8040f61f`.
 
-This validates the host finish-display policy, not a change to collision
-physics or source finish behavior. Direct player controls with autodrive off
-are the next focused check. Listening quality, broader platform coverage and
-unfinished original-game integration remain open. Earlier audio captures
-reported clipping; it has not been represented as eliminated.
+## Scope and remaining gaps
 
-Fresh Linux results only; no Windows execution occurred during this check.
+Autodrive was enabled. The post-finish input hold does not validate manual
+racing with autodrive disabled. This run did not restart; restart passed on
+`ff0763ca42cd0f67127816df30e5c0a8aea3d333` before the finish-policy change and
+needs rechecking with continuation.
+
+The live post-results scene is a bounded host observation window. Original
+results-menu transitions and audio/event waits remain unjoined. Listening
+quality, earlier clipping reports, broader original-game integration and
+non-Linux execution remain open. See [finish continuation](finish-continuation50ia.md)
+for the implementation boundaries.

@@ -32,7 +32,7 @@ struct Mapping {
 };
 struct Position {float x=0.f,y=0.f,z=0.f;};
 struct Input {
-    bool active=false; // Actual committed, unfinished, live opponent only.
+    bool active=false; // Actual committed, live opponent, including after finish.
     Position position{};
     float speedRatio70=0.f;
     // Explicit baseline when these original emitter owners remain unjoined.

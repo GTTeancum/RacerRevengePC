@@ -12,6 +12,7 @@
 #include "opponent_engine_audio50hx_fixture.h"
 #include "wrong_way_progress50go.h"
 #include "host_course_driver50gk.h"
+#include "player_finish50ia.h"
 #include "phase_timing50gk_fixture.h"
 #include "render_diagnostics50gq_fixture.h"
 #include "lap_drive50gj_fixture.h"
@@ -314,6 +315,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(buildFreshPodGeometry49O(sources,geometryWorkspace,geometry,geometryDiagnostic),"actual pod geometry");
  const auto phy=runtime_startup50fl::readBytes("work/impactAuthoring49Y/Pod01.phy");const AuthoredSelectionContext49N selection{AuthoredClass49N::A,false,true,false,false,{}};
  const auto authored=runtime_startup50fl::bind(phy,geometry,selection,x.parameters,s,x.selectors,x.secondaryInputs);
+ // Player1A0858..5C preserves the fully authored aero350+100 as10A4.
+ // Capture once, before the finish leaf changes the live steering coefficient.
+ const float authoredFinishSteering10A4=x.parameters.bodies.main.aero.steering100;
  auto secondaryPose=pose;for(unsigned i=0;i<3;++i){volatile float a=pose.v[i]*x.secondaryInputs.targetRelative2F0.v[0];volatile float b=pose.v[4+i]*x.secondaryInputs.targetRelative2F0.v[1];volatile float c=pose.v[8+i]*x.secondaryInputs.targetRelative2F0.v[2];volatile float ab=a+b;volatile float abc=ab+c;volatile float position=pose.v[12+i]+abc;secondaryPose.v[12+i]=position;}
  require50DU(setLocalMatrix49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.physical19C,secondaryPose)&&refreshSceneWorld49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.physical19C),"supplied secondary initial pose");
  require50DU(setLocalMatrix49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.model1B4,secondaryPose),"supplied initial displayed pose");f::project(s,x.bindings);
@@ -1081,7 +1085,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   requireActionStatus(controllerActions.acknowledgeComplete(),"acknowledge");
  };
  auto composePacket=[&](bool live,const platform::WindowInput50DQ& input){
-  if(autoDriveEnabled&&(input.down[26]||input.down[22]||input.down[82]||input.down[81])){
+  if(live&&autoDriveEnabled&&(input.down[26]||input.down[22]||input.down[82]||input.down[81])){
    autoDriveEnabled=false;courseState={};courseOutput={};
    std::cerr<<"Host course driver disabled by manual throttle/brake input.\n";
   }
@@ -1111,6 +1115,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
  };
 
+ // The original one-human manager starts results when that human finishes,
+ // independently of unfinished AI. This explicit host clock remains separate
+ // from the sealed race timer and never drives a vehicle pose.
+ bool humanResultsActive=false,humanResultsReady=false;
+ float humanResultsCountdown=0.f;
+ std::uint64_t finishDriverTicks=0,finishManualInputTicks=0;
+ bool finishDriverAppliedThisFrame=false;
  bool opponentFrame=false,raceSetupFrame=false;
  // This host fallback abandons the failed frame; it never supplies a miss
  // or repairs source list topology. Only the exact retained boundary qualifies.
@@ -1156,6 +1167,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   return in;
  };
  auto advanceFrame=[&](){
+ finishDriverAppliedThisFrame=false;
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame)require50DU(advanceSpeechTimers50HG(.016f,lapContinuity.prefix,speechState),
      "native speech countdown failed");
  // The live path does not call fixture/oracle callbacks; retain a bounded
@@ -1193,6 +1205,37 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   addCounter50DU(navigationAIScan,receipt.aiScan);
   addCounter50DU(navigationMapScan,receipt.mapScan);
  }else addCounter50DU(navigationGateSkips);
+ // Original1A1614: once the human manager gate ends, a finished player runs
+ //1A36A0 after navigation and before wrong-way/base processing. Opponents still
+ // use the explicitly host-authored course adapter, not this player leaf.
+ if(!opponentFrame&&!raceSetupFrame&&humanResultsActive){
+  require50DU((s.fields.applicationByte58&3u)!=2u&&(s.fields.impactFlagsCD8&1u),
+      "native finish driver requires ended human gate and source CD8");
+  const auto current=navigationProgress.reset.vehicleC88;
+  require50DU(current<navigationMap->track.count,"finished player map target unavailable");
+  const auto& scene=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)];
+  PlayerFinishInput50IA finishInput{};
+  finishInput.resultsCountdown94=humanResultsCountdown;
+  finishInput.authoredSteering10A4=authoredFinishSteering10A4;
+  finishInput.bodyCachedSpeed34=m.cachedSpeed34;
+  finishInput.bodyWorldAngularA4=m.components.root.worldAngularVelocityA0.v[1];
+  finishInput.engineDifference5C=authored.engineDifference5C;
+  for(unsigned axis=0;axis<3;++axis){
+   finishInput.bodySceneWorldPosition[axis]=scene.world100.v[12+axis];
+   finishInput.mapCurrentNodePosition[axis]=navigationMap->track.nodes[current].position[axis];
+   finishInput.mainSceneLocalForward[axis]=scene.localC0.v[8+axis];
+  }
+  finishInput.mainSceneLocalUpY=scene.localC0.v[5];
+  finishInput.previousFlagsB9C=m.controls.player.flagsB9C;
+  PlayerFinishResult50IA finishResult{};
+  runNative([&](){return driveFinishedPlayer50IA(finishInput,finishResult);},
+      "original finished-player controls rejected");
+  m.controls.player=finishResult.player;
+  // This source model write precedes the first frame use of parameters in
+  //217DE0; keep the resulting descriptor unchanged for the rest of this frame.
+  x.parameters.bodies.main.aero.steering100=finishResult.aeroSteering100;
+  finishDriverAppliedThisFrame=true;
+ }
  //1A1620: after the entire navigation branch, before undertrack processing.
  // Navigation above consumed the previous update's actual flags10CC bit1.
  WrongWayProgressInput50GO wrongWayInput{};
@@ -1243,7 +1286,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      boostState,boostDiagnostic);},"native boost controller");
  x.selectors.vehicle64=boostState.vehicle64;
  runNative([&]{return graphicsVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::Base2176E0BeforeGraphics),x.workspace,x.diagnostic);},"persistent graphics");
- ImpactConsumerInput49Z consumer{};consumer.vehicle64=boostState.vehicle64;consumer.managerFlags58=2;consumer.profile34=2;consumer.finalDamageThreshold64=1;VehicleImpactEvents49Z consumerEvents{};
+ ImpactConsumerInput49Z consumer{};consumer.vehicle64=boostState.vehicle64;consumer.managerFlags58=s.fields.applicationByte58;consumer.profile34=2;consumer.finalDamageThreshold64=1;VehicleImpactEvents49Z consumerEvents{};
  runNative([&]{return consumeVehicleImpacts49Z(s,x.bindings,consumer,consumerEvents,x.workspace,x.diagnostic);},"persistent impact consumers");runNative([&]{return repairVehicleImpacts50A(s,x.bindings,x.workspace,x.diagnostic);},"persistent repair");
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame){
   const float damage[]={s.fields.damage7D0,s.fields.damage7D4,s.fields.damage7D8,s.fields.damage7DC};
@@ -1374,7 +1417,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  runNative([&]{return commitVehicleTerrainQuery50FP(s,x.bindings,terrainResult,x.workspace,x.diagnostic);},
      "commit actual terrain surface");
  ++terrainQueries;if(terrainResult.terrain.surface.hit110||terrainResult.terrain.surface.hit114)++terrainHitFrames;
- PostWorld49W world{};world.point=s.bodies.vehicle838?WorldCut49W::First358Secondary36CAnd219420:WorldCut49W::First358And219420;world.effects=contactEffects49W(s);world.applicationGateByte58=2;
+ PostWorld49W world{};world.point=s.bodies.vehicle838?WorldCut49W::First358Secondary36CAnd219420:WorldCut49W::First358And219420;world.effects=contactEffects49W(s);world.applicationGateByte58=s.fields.applicationByte58;
  runNative([&]{return produceVehicleForces49W(s,x.bindings,x.parameters,world,x.workspace,x.diagnostic);},"native main forces");
  ResponseStorage50K responseStorage;auto responseWorkspace=responseStorage.view(x.workspace);
  runNative([&]{return respondMainStaticVehicle50G(s,x.bindings,x.parameters,settings,response,x.secondaryInputs,query.queryScene,1,spring,records,40,responseWorkspace,x.diagnostic)==VehicleStaticResponseStatus50G::Complete;},"actual main contact response");
@@ -1445,7 +1488,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // field. These host presentation counters never change a native racer.
  struct RacePresentation50HZ {
   bool valid=false;
-  std::uint32_t submittedOpponents=0,hiddenFinishedOpponents=0;
+  std::uint32_t submittedOpponents=0,submittedFinishedOpponents=0;
   std::uint32_t retainedStoppedOpponents=0,standingsRows=0;
  } acceptedRacePresentation;
  auto observeLiveRacer=[&](){
@@ -1462,13 +1505,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Publish trivial engine inputs during the existing race observation visits;
  // no extra full-state bank visits, ownership copies, or per-mix allocations.
  std::array<opponent_audio50HX::Input,opponent_audio50HX::maxOpponents> opponentEngineInputs{};
+ std::array<std::uint64_t,maxHostRaceRacers50HT> observedNativeTicks{};
+ std::array<std::uint8_t,maxHostRaceRacers50HT> observedNativeFinishFlags{};
  auto sampleRaceField=[&](){
+  observedNativeTicks[0]=completedFrames;
+  observedNativeFinishFlags[0]=s.fields.impactFlagsCD8;
   require50DU(race_session50HM::sampleRacer(race,0,observeLiveRacer()),"player race observation rejected");
   for(std::size_t racer=1;racer<racerBank.count();++racer){
    // An abandoned partial frame cannot publish progression or display geometry.
    // Keep the last completed observation for a visibly stopped opponent.
    opponentEngineInputs[racer-1]={};
    const auto observed=racerBank.active(racer)?racerBank.visit(racer,[&](){
+    observedNativeTicks[racer]=completedFrames;
+    observedNativeFinishFlags[racer]=s.fields.impactFlagsCD8;
     if(audioEnabled){
      require50DU(s.phase==VehicleFramePhase49W::Ready,"opponent audio needs a completed native frame");
      auto& input=opponentEngineInputs[racer-1];const auto& p=m.components.root.body.position;
@@ -1479,7 +1528,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      input.enginePitchScale484=1.f;input.boostPitch=false;
     }
     return observeLiveRacer();
-   }):race.racers[racer].observed;
+   }):race.racers[racer].live;
    require50DU(race_session50HM::sampleRacer(race,static_cast<std::uint32_t>(racer),observed),
        "opponent race observation rejected");
   }
@@ -1490,7 +1539,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto inputs=opponentEngineInputs;
   for(std::size_t i=0;i<inputs.size();++i)
    inputs[i].active=inputs[i].active&&racerBank.active(i+1)&&
-       race_session50HM::controlsAllowed(race,static_cast<std::uint32_t>(i+1));
+       race_session50HM::simulationAllowed(race,static_cast<std::uint32_t>(i+1));
   // The listener follows the committed player body, so distance is independent
   // of render cadence, resize, and uncommitted chase-camera preparation.
   const auto& p=m.components.root.body.position;
@@ -1629,9 +1678,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "Field count matches the original normal race; the grounded starting grid and opponent controls are host-authored. "
       "Original AI remains unjoined. "
       "Each racer owns "<<racerBank.bytesPerRacer()<<" bytes of native state.\n";
-  std::cerr<<"HOST FINISH PRESENTATION: omit only sealed-finished opponents from rendering; "
-      "keep all named standings, the player and stopped unfinished opponents. "
-      "Native poses, race progression and collision policy are unchanged.\n";
+  std::cerr<<"NATIVE FINISH CONTINUATION: source CD8 finish state retains native physics, "
+      "engine audio, all original racer draws and sealed named standings. "
+      "Original player finish controls retain the selected twin-engine config; "
+      "RESULTS after the normal four-second countdown retains the live scene "
+      "as HOST presentation until restart/quit.\n";
   std::cerr<<"RACER CONTACTS: "<<(racerContactsEnabled?"enabled":"disabled")
       <<"; each original main-body geometry and authored response, host world-frame scheduling. "
         "Empty-root material0 is a deterministic host policy; original padding parity is unclaimed. "
@@ -2114,32 +2165,42 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      if(audioEnabled){
       liveAudio->pause(false);
       require50DU(raceAudio->observe(race).accepted,"countdown/result audio observation rejected");
-      updateOpponentAudio(); // Countdown/result gates stop only opponent loops.
-      // Countdown and completed-result display have a real host clock even
-      // while native vehicle bodies are held. Advance the shared mixer ONCE.
+      updateOpponentAudio(); // Only countdown holds native vehicle updates.
+      // Countdown has a real host clock while native vehicle bodies are held.
+      // Advance the shared mixer ONCE; completed results keep normal world steps.
       if(liveAudio->outputOpen())require50DU(liveAudio->committedStep(audioDiagnostic),
           "native countdown/result audio step failed");
      }
      continue;
     }
-    const bool playerRunning=!raceEnabled||race_session50HM::controlsAllowed(race,0);
+    const bool playerAdvancing=!raceEnabled||race_session50HM::simulationAllowed(race,0);
+    const bool playerControls=!raceEnabled||race_session50HM::controlsAllowed(race,0);
+    const bool playerFinishDriver=humanResultsActive;
+    const bool manualRaceInputHeld=input.down[26]||input.down[22]||input.down[82]||
+        input.down[81]||input.down[44]||input.down[21]||input.down[225];
     if(audioEnabled)liveAudio->pause(false);
-    // Recompose at GO so a key held during countdown enters this exact native
-    // frame. Finished vehicles are held without modifying their source state.
-    if(playerRunning){
-     composePacket(true,input);
-     if(autoDriveEnabled)applyCourseInput();
+    // Recompose at GO so held race input enters this exact native frame.
+    // After the human finish, the recovered source driver owns controls while
+    // the ordinary coupled-body/native frame keeps advancing.
+    if(playerAdvancing){
+     composePacket(playerControls,input);
+     if(playerControls&&autoDriveEnabled)applyCourseInput();
      sampleController();
     }
     const auto nativeFrameAllocations=::allocations;
     phase_timing50GK::Scope physicsTiming(phaseTiming,phase_timing50GK::Phase::Physics);
-    const bool frameAdvanced=!playerRunning||advanceFrame();
+    const bool frameAdvanced=!playerAdvancing||advanceFrame();
     if(frameAdvanced)require50DU(::allocations==nativeFrameAllocations,
         "successful player physics frame allocated C++ storage");
     if(frameAdvanced&&raceEnabled){
+     if(playerFinishDriver){
+      require50DU(finishDriverAppliedThisFrame,"finished player frame missed native control owner");
+      ++finishDriverTicks;
+      if(manualRaceInputHeld)++finishManualInputTicks;
+     }
      const platform::WindowInput50DQ noKeys{};
      for(std::size_t racer=1;racer<racerBank.count();++racer){
-      if(!racerBank.active(racer)||!race_session50HM::controlsAllowed(race,static_cast<std::uint32_t>(racer)))continue;
+      if(!racerBank.active(racer)||!race_session50HM::simulationAllowed(race,static_cast<std::uint32_t>(racer)))continue;
       opponentFrame=true;
       try {
        const bool advanced=racerBank.step(racer,true,[&](){
@@ -2159,15 +2220,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      }
      // Exactly one host contact pass after all successful native participants
      // are Ready, before race observations and the single world audio mix.
-     // A failed/nonfinished eligibility boundary never borrows a stale snapshot.
+     // A failed native slot never participates through an abandoned snapshot.
+     // Sealed results alone do not remove a Ready native vehicle from contacts.
      if(racerContactsEnabled){
       std::array<bool,native_racer_contact50HW::maxRacers> contactParticipant{};
       std::array<native_racer_contact50HW::Pair,
           native_racer_contact50HW::maxRacers*(native_racer_contact50HW::maxRacers-1)> contactOrder{};
       std::size_t contactPairCount=0;
       for(std::size_t racer=0;racer<racerBank.count();++racer)
-       contactParticipant[racer]=racerBank.active(racer)&&!race.racers[racer].finished&&
-           race_session50HM::controlsAllowed(race,static_cast<std::uint32_t>(racer));
+       contactParticipant[racer]=racerBank.active(racer)&&
+           race_session50HM::simulationAllowed(race,static_cast<std::uint32_t>(racer));
       for(std::size_t primary=0;primary<racerBank.count();++primary)if(contactParticipant[primary])
        for(std::size_t other=0;other<racerBank.count();++other)
         if(primary!=other&&contactParticipant[other])contactOrder[contactPairCount++]={primary,other};
@@ -2196,13 +2258,34 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       }else addCounter50DU(racerContactTotals.noPairs);
      }
      sampleRaceField();
+     const auto previousFinishCount=race.finishCount;
+     const bool playerWasFinished=race.racers[0].finished;
      require50DU(race_session50HM::commitFrame(race,.016),"completed race world frame rejected");
-     if(race.racers[0].finished&&playerRunning){
+     // Original1B035C sets the finished record+48 bit0, alias vehicle+CD8.
+     // Project each newly sealed edge into its independent native state before
+     // another frame. No body pose/velocity or source lap counter is written.
+     for(std::size_t racer=0;racer<racerBank.count();++racer)
+      if(race.racers[racer].finished&&race.racers[racer].finishPlace>previousFinishCount)
+       racerBank.visit(racer,[&](){
+        s.fields.impactFlagsCD8=static_cast<std::uint8_t>(s.fields.impactFlagsCD8|1u);
+        lapContinuity.state.vehicleCD8=s.fields.impactFlagsCD8;
+        observedNativeFinishFlags[racer]=s.fields.impactFlagsCD8;
+       });
+     if(race.racers[0].finished&&!playerWasFinished){
+      //1AF9C0 closes the manager after its completed record pass: preserve all
+      // genuine same-world-frame finish edges, then freeze official standings.
+      require50DU(race_session50HM::closeResults(race),"human finish result closure rejected");
       std::cerr<<"RACE FINISH: player place="<<race.racers[0].finishPlace
           <<"/"<<race.racerCount<<" time="<<race.racers[0].finishSeconds<<" seconds.\n";
-      // Explicit host finish policy stops held engine/warning loops once,
-      // before the genuine observed finish edge starts its authored speech.
-      if(audioEnabled)liveAudio->resetVoices();
+      // Source CD8 warning subscribers stop their own warning loops. Engine,
+      // binder, material and other-racer voices keep their original owners;
+      // never stop the shared mixer at a human finish.
+      // Original manager ends once every human finishes: this host has one.
+      // Its ended-bit projection belongs to the human bank. Native AI checks
+      // only started-bit1; the unjoined AI's HOST player-frame adapters retain
+      // their started gate2 so they can continue their real navigation/physics.
+      s.fields.applicationByte58=static_cast<std::uint8_t>(s.fields.applicationByte58|1u);
+      humanResultsActive=true;humanResultsCountdown=4.f;
      }
      if(audioEnabled)require50DU(raceAudio->observe(race).accepted,
          "committed race audio observation rejected");
@@ -2215,7 +2298,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      break;
     }
     // Source player speech runs only on the human's accepted native step.
-    if(audioEnabled&&playerRunning){
+    if(audioEnabled&&playerAdvancing){
      AudioCommand50HE speechCommand{};std::size_t speechCount=0;
      const auto dispatched=dispatchDamageSpeechEvent50HG(speechInput(),speechCounts,pendingSpeech,
          s.noise.sharedRandomState,speechState,&speechCommand,1,speechCount);
@@ -2226,7 +2309,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       ++speechCues;
      }
     }
-    updateOpponentAudio(); // After world commit/finish stops, before the one shared mix.
+    if(playerFinishDriver){
+     // Normal source finish countdown is four seconds. Audio/event waiting and
+     // the original menu transition are not joined: at zero the HOST changes
+     // only its result label and retains this live scene until restart/quit.
+     humanResultsCountdown=std::max(0.f,humanResultsCountdown-.016f);
+     humanResultsReady=humanResultsCountdown<=0.f;
+    }
+    updateOpponentAudio(); // After the complete native world commit, before the one shared mix.
     // All racer/audio subscribers feed one mixer. Continue the finish clip and
     // any remaining field while the human is finished; never mix per opponent.
     if(audioEnabled&&liveAudio->outputOpen())
@@ -2316,7 +2406,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      hud.raceEnabled=true;
      hud.raceCountdown=race_session50HM::countdownNumber(race);
      hud.raceGo=race.phase==race_session50HM::Phase::Racing&&race.raceSeconds<1.0;
-     hud.raceFinished=race.racers[0].finished;
+     hud.raceFinished=race.racers[0].finished;hud.raceResultsReady=humanResultsReady;
      hud.raceLap=race_session50HM::displayedLap(race,0);
      hud.raceLapTarget=race.config.lapTarget;hud.racePlace=race.racers[0].place;
      hud.raceRacerCount=race.racerCount;
@@ -2373,14 +2463,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     if(raceEnabled){
      for(std::size_t racer=1;racer<racerBank.count();++racer){
       const auto index=racer-1;opponentFlamePrepared[index]=false;
-      // Explicit HOST presentation policy: commitFrame alone seals finished.
-      // Omit that opponent's entire render descriptor (vehicle, cables,
-      // flames and shadow casters); never move its held native pose. Bank
-      // inactivity, zero speed or a pending lap is NOT a finished result.
-      if(race.racers[racer].finished){
-       ++nextRacePresentation.hiddenFinishedOpponents;
-       continue;
-      }
+      // Source result sealing does not remove a racer from the world.
+      // Submit every original pod, including its cables/flames/shadow casters.
+      if(race.racers[racer].finished)++nextRacePresentation.submittedFinishedOpponents;
       if(racerBank.active(racer))racerBank.visit(racer,[&](){
        VehicleDrawBatchDiagnostic50CO opponentDiagnostic{};
        require50DU(opponentDraw[index].prepare(s,x.bindings,drawWorkspace,opponentDiagnostic),
@@ -2399,22 +2484,21 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        }
        opponentFlamePrepared[index]=true;
       });
-      // An unfinished stopped opponent retains its last complete display
+      // A stopped native opponent retains its last complete display
       // batch, never a palette from an abandoned native source-cut state.
       if(!racerBank.active(racer))++nextRacePresentation.retainedStoppedOpponents;
       require50DU(opponentDraw[index].batch(),"opponent has no completed display batch");
-      // Compact only the submission array; keep the original racer archetype
-      // so a gap in finish order cannot substitute another pod/material bank.
+      // Keep the original racer archetype and immutable material ownership.
       opponents[nextRacePresentation.submittedOpponents++]={opponentDraw[index].batch(),&opponentDraw[index].cables,
           opponentUvs[index].data(),static_cast<std::uint32_t>(opponentUvs[index].size()),
           static_cast<std::uint32_t>(racer)};
      }
-     require50DU(nextRacePresentation.submittedOpponents+nextRacePresentation.hiddenFinishedOpponents==raceOpponentCount,
-         "finish presentation must account for the complete opponent field");
+     require50DU(nextRacePresentation.submittedOpponents==raceOpponentCount,
+         "native continuation must submit the complete opponent field");
      nextRacePresentation.standingsRows=hud.standingsCount;
      renderFrame.opponentCount=nextRacePresentation.submittedOpponents;
-     // The renderer requires null/zero together, including after all seven
-     // opponents finish. Its player-only path clears obsolete shadow slots.
+     // Preserve the renderer's null/zero invariant; this eight-racer session
+     // retains all seven opponent descriptors after their results seal.
      renderFrame.opponents=renderFrame.opponentCount?opponents:nullptr;
     }
     render_diagnostics50GQ::Scope submitTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::DriverSubmit);
@@ -2614,13 +2698,41 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<" sealed_finishes="<<race.finishCount
          <<" presentation_valid="<<acceptedRacePresentation.valid
          <<" opponents_submitted="<<acceptedRacePresentation.submittedOpponents
-         <<" opponents_hidden_finished="<<acceptedRacePresentation.hiddenFinishedOpponents
+         <<" opponents_submitted_finished="<<acceptedRacePresentation.submittedFinishedOpponents
+         <<" opponents_hidden_finished=0"
          <<" opponents_retained_stopped="<<acceptedRacePresentation.retainedStoppedOpponents
          <<" standings_rows="<<acceptedRacePresentation.standingsRows;
      for(std::size_t racer=0;racer<race.racerCount;++racer){const auto& r=race.racers[racer];
       std::cerr<<" racer"<<racer+1<<"["<<racerNames[racer]<<"]="<<r.place<<","<<r.observed.completedLaps<<","<<r.observed.checkpointCursor
           <<","<<r.observed.position[0]<<","<<r.observed.position[2]<<","<<(racer==0||racerBank.active(racer));
      }
+     std::cerr<<'\n';
+     std::size_t activeNative=0;
+     for(std::size_t racer=0;racer<racerBank.count();++racer)
+      if(racerBank.active(racer))++activeNative;
+     std::cerr<<"finish_continuation player_finished="<<race.racers[0].finished
+         <<" player_cd8="<<unsigned(observedNativeFinishFlags[0])
+         <<" player_manager_gate="<<unsigned(s.fields.applicationByte58)
+         <<" finish_driver="<<humanResultsActive
+         <<" finish_driver_ticks="<<finishDriverTicks
+         <<" finish_manual_input_ticks="<<finishManualInputTicks
+         <<" player_native_ticks="<<observedNativeTicks[0]
+         <<" sealed_place="<<race.racers[0].finishPlace
+         <<" sealed_time="<<race.racers[0].finishSeconds
+         <<" sealed_laps="<<race.racers[0].observed.completedLaps
+         <<" results_closed="<<race.resultsClosed
+         <<" sealed_finish_count="<<race.finishCount
+         <<" results_countdown="<<humanResultsCountdown
+         <<" host_results_ready="<<humanResultsReady
+         <<" active_native="<<activeNative
+         <<" opponents_submitted="<<acceptedRacePresentation.submittedOpponents
+         <<" standings_rows="<<acceptedRacePresentation.standingsRows;
+     for(std::size_t racer=0;racer<racerBank.count();++racer)
+      std::cerr<<" racer"<<racer<<"_native_ticks="<<observedNativeTicks[racer]
+          <<" racer"<<racer<<"_cd8="<<unsigned(observedNativeFinishFlags[racer])
+          <<" racer"<<racer<<"_live_laps="<<race.racers[racer].live.completedLaps
+          <<" racer"<<racer<<"_x="<<race.racers[racer].live.position[0]
+          <<" racer"<<racer<<"_z="<<race.racers[racer].live.position[2];
      std::cerr<<'\n';
      reportRacerContacts();
     }

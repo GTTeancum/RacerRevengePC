@@ -243,6 +243,9 @@ struct VehicleWindowHostHud50DS {
     // Optional native race presentation, supplied by the race state owner.
     // Disabled preserves HOST LAPS. No game/ranking result is inferred here.
     bool raceEnabled = false, raceGo = false, raceFinished = false;
+    // HOST retained-scene result presentation after the normal four-second
+    // source finish countdown; original menu/event transition is not projected.
+    bool raceResultsReady = false;
     std::uint32_t raceLap = 1, raceLapTarget = 3, racePlace = 1, raceRacerCount = 1;
     std::uint32_t raceCountdown = 0;
     // Optional complete field, already in the race owner's committed order.
