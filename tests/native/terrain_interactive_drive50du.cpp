@@ -225,6 +225,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const char* disableRacerContacts=std::getenv("RR_DISABLE_RACER_CONTACTS");
  const bool racerContactsEnabled=raceEnabled&&
      !(disableRacerContacts&&std::string(disableRacerContacts)=="1");
+ require50DU(!originalAiEnabled||racerContactsEnabled,
+     "original AI first slice requires actual racer contacts and their source boundary");
  constexpr std::uint32_t raceRacerCount=rr::game::defaultHostRaceRacers50HT;
  constexpr std::uint32_t raceOpponentCount=raceRacerCount-1;
  static_assert(raceRacerCount<=rr::platform::maxVehicleWindowStandings50DS);
@@ -1383,6 +1385,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto recoverPortalBoundary=[&](const LiveZoneResult50EN& failure,const char* owner){
   if(failure.status!=LiveZoneStatus50EN::UnsupportedLinkRemoval)return false;
   recoveryPaused=true;
+  if(originalAiEnabled){
+   std::cerr<<"ORIGINAL AI source-recovery boundary: kind=portal owner="<<owner
+       <<" phase="<<static_cast<unsigned>(s.phase)
+       <<" status="<<static_cast<unsigned>(failure.status)<<"; no checkpoint prepared or session rebuilt.\n";
+   require50DU(false,"original AI single session reached native portal boundary");
+  }
   if(opponentFrame)return true; // Keep the unsupported prefix in this AI slot only.
   recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
   BodyMatrix48G groundedCheckpoint{};
@@ -1635,6 +1643,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(!damageReady&&x.diagnostic.error==VehicleFrameError49W::ExternalCut&&
     decision.status==ImpactTransitionStatus50C::unsupportedTransition){
   addCounter50DU(nativeCalls);recoveryPaused=true;
+  if(originalAiEnabled){
+   std::cerr<<"ORIGINAL AI source-recovery boundary: kind=damage pc="<<std::hex
+       <<decision.sourcePC<<std::dec<<" phase="<<static_cast<unsigned>(s.phase)
+       <<"; no checkpoint prepared or session rebuilt.\n";
+   require50DU(false,"original AI single session reached native damage boundary");
+  }
   if(opponentFrame)return false; // A failed AI never restarts the human session.
   recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
   BodyMatrix48G groundedCheckpoint{};
@@ -1664,6 +1678,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(!baseAdvanced&&x.diagnostic.error==VehicleFrameError49W::ExternalCut&&
     x.diagnostic.sourceStage==0x228BBC){
   addCounter50DU(nativeCalls);recoveryPaused=true;
+  if(originalAiEnabled){
+   std::cerr<<"ORIGINAL AI source-recovery boundary: kind=undertrack pc="<<std::hex
+       <<x.diagnostic.sourceStage<<std::dec<<" phase="<<static_cast<unsigned>(s.phase)
+       <<"; no checkpoint prepared or session rebuilt.\n";
+   require50DU(false,"original AI single session reached native undertrack boundary");
+  }
   if(opponentFrame)return false; // A failed AI never restarts the human session.
   recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
   BodyMatrix48G groundedCheckpoint{};
@@ -1790,7 +1810,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Original racers have distinct immutable resource owners and share only the
  // serial execution arena, never tuning, poses, contacts or progression histories.
  native_racer50HN::Bank racerBank;
+ auto requireOriginalAiFleetReady=[&](){
+  // Every actual racer is an input to the joined source manager. A failed
+  // native frame is retained by Bank::visit, but is not a manager observation.
+  // Check the entire fleet before any observation, timing or rank mutation;
+  // never synthesize Ready or silently remove a failed racer from the field.
+  for(std::size_t slot=0;slot<racerBank.count();++slot){
+   const bool active=racerBank.active(slot);
+   racerBank.visit(slot,[&](){
+    if(active&&s.phase==VehicleFramePhase49W::Ready)return;
+    std::cerr<<"ORIGINAL AI world boundary: slot="<<slot<<" active="<<active
+        <<" phase="<<static_cast<unsigned>(s.phase)<<" vehicle58="<<s.fields.vehicle58
+        <<" ai_source_boundary="<<std::hex<<originalAiReceipt.sourceBoundary
+        <<" frame_source_stage="<<x.diagnostic.sourceStage<<std::dec
+        <<"; native partial state retained; manager was not advanced.\n";
+    require50DU(false,"original AI requires every actual racer active and Ready");
+   });
+  }
+ };
  auto observeOriginalAiFleet=[&](){
+  requireOriginalAiFleetReady();
   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
    native_ai50IV::observe(originalAiSession,slot,s,x.bindings,navigationProgress,
        lapContinuity.state.vehicleCC8,lapContinuity.timing.wordCD4,*navigationMap,originalAiMapMetadata);
@@ -1817,6 +1856,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto advanceOriginalAiManager=[&](float factor){
   // Declared accepted-world schedule: genuine1AF9C0 clock,1AFF50 racer
   // timing and1B0400 rank. Exact original application root order is unclaimed.
+  // beginLapManagerClock mutates shared time, so validate before that call.
+  requireOriginalAiFleetReady();
   require50DU(beginLapManagerClock50ID(originalAiSession.manager,factor,false)==LapManagerClockStatus50ID::NeedRacerPass,
       "original AI manager clock boundary");
   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
@@ -2921,6 +2962,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto nativeFrameAllocations=::allocations;
     phase_timing50GK::Scope physicsTiming(phaseTiming,phase_timing50GK::Phase::Physics);
     const bool frameAdvanced=!playerAdvancing||advanceFrame();
+    if(originalAiEnabled&&!frameAdvanced){
+     std::cerr<<"ORIGINAL AI world boundary: slot=0 phase="<<static_cast<unsigned>(s.phase)
+         <<" frame_source_stage="<<std::hex<<x.diagnostic.sourceStage<<std::dec
+         <<"; native partial state retained; manager was not advanced.\n";
+     require50DU(false,"original AI requires the actual human frame to complete");
+    }
     if(frameAdvanced)require50DU(::allocations==nativeFrameAllocations,
         "successful player physics frame allocated C++ storage");
     if(frameAdvanced&&raceEnabled){
@@ -2943,12 +2990,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
             "successful opponent physics frame allocated C++ storage");
         return completed;
        });
-       if(!advanced)std::cerr<<racerNames[racer]<<" stopped at a native source boundary; other racers continue.\n";
+       if(!advanced)std::cerr<<racerNames[racer]<<" stopped at a native source boundary"
+           <<(originalAiEnabled?"; joined AI world cannot continue.\n":"; other racers continue.\n");
       }catch(const std::exception& error){
        racerBank.stop(racer);
-       std::cerr<<racerNames[racer]<<" stopped: "<<error.what()<<". Other racers continue.\n";
+       std::cerr<<racerNames[racer]<<" stopped: "<<error.what()
+           <<(originalAiEnabled?". Joined AI world cannot continue.\n":". Other racers continue.\n");
       }
       opponentFrame=false;
+      // Deliberately outside the per-opponent catch: the optional source-AI
+      // world cannot swallow a requisite racer's failure and advance later
+      // racers, animations, contacts, manager timing or rank from that frame.
+      if(originalAiEnabled)requireOriginalAiFleetReady();
      }
      advanceWorldAnimations();
      // Exactly one host contact pass after all successful native participants
@@ -3668,6 +3721,12 @@ int main(int argc,char**argv){try{
       applicationClock,startAtMenu,selectedRacer60,effectiveAudioSettings,selectedAudioSettings,
       effectiveTrack,selectedTrack,trackAdmission);
   if(exit==SessionExit50DU::Quit)break;
+  const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
+  if(originalAiSetting&&std::string(originalAiSetting)=="1"){
+   std::cerr<<"ORIGINAL AI session-rebuild boundary: exit="<<static_cast<unsigned>(exit)
+       <<" session="<<sessionIndex<<"; optional first slice permits one cold session.\n";
+   require50DU(false,"original AI first slice rejected session rebuild");
+  }
   if(exit==SessionExit50DU::Restart){effectiveAudioSettings=selectedAudioSettings;effectiveTrack=selectedTrack;}
   require50DU(sessionIndex<std::numeric_limits<std::uint64_t>::max()-1,"audio session index exhausted");
   ++sessionIndex;

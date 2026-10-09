@@ -1,9 +1,11 @@
 # Native original-AI first slice: uncompiled source candidate
 
-This branch preserves the frozen 27-file cohesive source candidate and its earlier partial states in Git history. It is uncompiled, untested and not integrated into the active GC candidate. Optional RR_ORIGINAL_AI_FIRST_SLICE=1 joins one genuine mode-1 AI racer in bank slot 1 on the actual GC/mode2 fleet. Runtime readiness is unproven.
+This branch preserves the frozen 27-file cohesive source candidate, its earlier partial states, and the subsequent terminal world/session guard correction. The guarded source is integrated into the cloud candidate but remains uncompiled and untested. Optional RR_ORIGINAL_AI_FIRST_SLICE=1 joins one genuine mode-1 AI racer in bank slot 1 on the actual GC/mode2 fleet. Runtime readiness is unproven.
 
 Cold authoring, process-wide RNG/noise and application globals, source navigation/state/list/direction decisions, boost/braking, manager-derived timing/rank fields, native controls, terrain physics and rendering are connected in source. Startup uses state 0→4 and changes to ordinary state 2 only after native CB8 exceeds 5. Original application-root scheduling is not reconstructed; represented numeric owners run at the declared accepted-world seam.
 
 Actual AI dynamic contact rejects before pair results commit because canonical partner/damage owners remain missing. Eligible combat search, new route choice, state-5 reset, unsupported modes, lap/finish/retirement and unsupported numeric/resource domains stop explicitly. Default Clegg can reach the combat boundary at native CB8 ≥ 9. The first acceptance goal is connected startup 4→2, not a lap or full original AI.
+
+The [guard overlay](original-ai-first-slice-guards50iv.md) rejects any inactive or incomplete requisite racer before observation or manager mutation, requires actual contacts, and stops before a second cold session. Its overlay document records the authoring-time separation from active source; the guarded source has since been centrally integrated. The next bounded acceptance uses direct GC startup with RR_ORIGINAL_AI_FIRST_SLICE=1 and RR_START_MENU=0, targeting genuine startup 4→2 only if no earlier source boundary occurs.
 
 No compilation, syntax check, test, gameplay, candidate importer or emulation was performed for source preservation. Original assets and raw evidence remain excluded. See the [complete source scope and acceptance](original-ai-first-slice50iv.md), [cold ownership](original-ai-cold-owners50iu.md) and [mode continuations](original-ai-mode-continuations.md).
