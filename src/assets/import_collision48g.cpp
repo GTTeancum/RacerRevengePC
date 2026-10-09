@@ -1,7 +1,9 @@
 #include "import_collision48g.h"
 #include <algorithm>
 #include <cmath>
+#include <cfenv>
 #include <cstring>
+#include <limits>
 #include <new>
 #include <stdexcept>
 #include <utility>
@@ -45,16 +47,38 @@ std::uint32_t originalChild(std::uint32_t child) {
     return (child & 32767u) | ((child & collision_leaf48g)?32768u:0u);
 }
 std::uint32_t floatBits(float value) { std::uint32_t bits;std::memcpy(&bits,&value,4);return bits; }
+// Original position prefixes: 106ED0/type3, 107AEC/type2 SAT,
+// 108414/type2 leaf and 10B8DC/triangle. Signed16 -> CVT.S.W ->
+// MUL.S by 0x38000100 -> MUL.S by original ScaleFactor at 383640.
+// Keep both roundings; a direct integer-to-float cast is not the source path.
+// Cold expansion is shared by all live readers, which then enter the same
+// float-coordinate math as those original prefixes. No generated geometry.
+float quantizedPosition(std::uint16_t word) {
+    static_assert(sizeof(float)==4&&std::numeric_limits<float>::is_iec559,
+        "Original collision projection requires IEEE binary32");
+    const std::int32_t signedValue=word<32768u?std::int32_t(word):std::int32_t(word)-65536;
+    const std::uint32_t reciprocalBits=0x38000100u;
+    float reciprocal;std::memcpy(&reciprocal,&reciprocalBits,4);
+    volatile float converted=static_cast<float>(signedValue);
+    volatile float normalized=reciprocal*converted;
+    volatile float expanded=32767.0f*normalized; // Original scale is 32767.
+    return expanded;
+}
 std::size_t validate(const Collision48G& c, bool inspectOriginalDegenerate = false) {
-    need(c.version==1 && c.type==0 && c.quantized==0,"col.typed_variant");
+    need(c.version==1 && c.type==0 && c.quantized<=1,"col.typed_variant");
     need(c.reverse_mode<=1 && c.normals_present<=1,"col.boolean_flag");
+    supported(!c.quantized||!c.normals_present,"col.quantized_normals",80,
+        "Quantized optional vertex normals remain outside this bounded source projection");
+    supported(!c.quantized||std::fegetround()==FE_TONEAREST,"col.quantized_rounding",80,
+        "Quantized position projection requires individually rounded binary32 nearest-even");
     const auto nv=c.vertices.size(), nn=c.nodes.size(), nf=c.faces.size();
     need(nv>0 && nv<=65535 && nn>0 && nn<=32767 && nf>1 && nf<=32768 && nn+1==nf,"col.tree_counts");
     need(c.vertex_normals.size()==(c.normals_present?nv:0),"col.normal_count");
     need(c.matrix[3]==0 && c.matrix[7]==0 && c.matrix[11]==0 && c.matrix[15]==1,"col.affine_matrix");
     for(float x:c.matrix)need(std::isfinite(x),"col.matrix_nonfinite");
-    need(c.vertices_offset==84 && c.normals_flag_offset==84+12*nv &&
-         c.nodes_offset==88+12*nv*(1+c.normals_present) && c.faces_offset==c.nodes_offset+32*nn,"col.source_offsets");
+    const std::size_t stride=c.quantized?6u:12u;
+    need(c.vertices_offset==84 && c.normals_flag_offset==84+stride*nv &&
+         c.nodes_offset==88+stride*nv*(1+c.normals_present) && c.faces_offset==c.nodes_offset+32*nn,"col.source_offsets");
     for(const auto& v:c.vertices)for(float x:v)need(std::isfinite(x),"col.vertex_nonfinite");
     for(const auto& v:c.vertex_normals)for(float x:v)need(std::isfinite(x),"col.normal_nonfinite");
     for(std::size_t i=0;i<nn;++i) {
@@ -97,7 +121,15 @@ Bytes original(const Collision48G& c) {
     validate(c);Writer w;w.u32(1234);w.u32(0x006c6f63);w.u32(1);w.u32(0);
     for(unsigned row=0;row<4;++row)for(unsigned col=0;col<3;++col)w.f32(c.matrix[row*4+col]);
     w.u32(c.reverse_mode);w.u32(c.vertices.size());w.u32(c.nodes.size());w.u32(c.faces.size());w.u32(c.quantized);
-    for(const auto& v:c.vertices)w.values(v);w.u32(c.normals_present);for(const auto& v:c.vertex_normals)w.values(v);
+    if(c.quantized){
+        // Retain actual original int16 words, not a reverse-quantized estimate.
+        // Every projected typed coordinate must still match that exact source.
+        Reader raw{c.original_bytes,c.vertices_offset};
+        for(const auto& v:c.vertices)for(float x:v){const auto word=raw.u16();
+            need(floatBits(x)==floatBits(quantizedPosition(word)),"col.quantized_provenance",raw.at-2,
+                "Expanded collision coordinate differs from original signed-short source");w.u16(word);}
+    }else for(const auto& v:c.vertices)w.values(v);
+    w.u32(c.normals_present);for(const auto& v:c.vertex_normals)w.values(v);
     for(const auto& n:c.nodes){w.f32(n.volume);w.values(n.center);w.values(n.half);for(auto x:n.children)w.u16(originalChild(x));}
     for(const auto& f:c.faces){w.f32(f.d);w.values(f.normal);for(auto x:f.vertices)w.u16(x);}
     need(w.b.size()<=8u*1024u*1024u,"col.original_size");
@@ -126,11 +158,17 @@ bool decodeCollision48G(const Bytes& input, Collision48G& output, DecodeError48C
         r.range(stride*nv+4);r.at=flag;c.normals_present=r.u32();need(c.normals_present<=1,"col.normals_flag",flag);
         const std::size_t expected=flag+4+stride*nv*c.normals_present+32u*nn+22u*nf;
         need(expected==input.size(),"col.exact_extent",r.at,"Truncated COL body or trailing bytes");
-        supported(c.quantized==0,"col.quantized",80,"Short vertex quantization is retained as unsupported until its query scale is independently proved");
+        supported(!c.quantized||!c.normals_present,"col.quantized_normals",flag,
+            "Quantized optional vertex normals remain outside this bounded source projection");
+        supported(!c.quantized||std::fegetround()==FE_TONEAREST,"col.quantized_rounding",80,
+            "Quantized position projection requires individually rounded binary32 nearest-even");
         supported(nn>0,"col.single_leaf",72,"No-node single-face root query policy is not yet supported");
         c.vertices_offset=84;c.normals_flag_offset=static_cast<std::uint32_t>(flag);
         r.at=84;c.vertices.resize(nv);
-        for(std::uint32_t i=0;i<nv;++i){r.values(c.vertices[i]);if((i&255u)==0)tick(hooks,"collision-vertices",i,nv);}
+        for(std::uint32_t i=0;i<nv;++i){
+            if(c.quantized)for(auto& x:c.vertices[i])x=quantizedPosition(r.u16());
+            else r.values(c.vertices[i]);
+            if((i&255u)==0)tick(hooks,"collision-vertices",i,nv);}
         r.u32();if(c.normals_present){c.vertex_normals.resize(nv);for(auto& v:c.vertex_normals)r.values(v);}
         c.nodes_offset=static_cast<std::uint32_t>(r.at);c.nodes.resize(nn);
         for(std::uint32_t i=0;i<nn;++i){auto& n=c.nodes[i];n.source_offset=static_cast<std::uint32_t>(r.at);n.volume=r.f32();r.values(n.center);r.values(n.half);
