@@ -30,6 +30,14 @@ struct SourceAcosTrace49T {
 bool sourceAcos49T(std::uint32_t inputBits, SourceLibmState49T& state,
     std::uint32_t& outputBits, SourceAcosTrace49T* trace = nullptr) noexcept;
 
+// Original311038 ->302580 ->310440 sine for finite nonnegative inputs whose
+// widened magnitude lies within the recovered bound below3*pi/4.
+// Preserves source software-double operations and exact constants, including
+// the special pi/2 reduction tail. No host libm or global state is involved.
+// Legacy original MOT rotation conversion consumes this bounded domain.
+// False preserves output. This does not admit arbitrary sine arguments.
+bool sourceSinePositiveReduced50IG(std::uint32_t inputBits,std::uint32_t& outputBits) noexcept;
+
 #ifdef RR_SOURCE_ACOS49T_TEST_API
 // Test-only access to the elementary source operations and conversions.
 // These symbols are omitted from ordinary production builds.

@@ -196,6 +196,16 @@ struct VehicleWindowCables50DS {
     const MaterialTextureGl50EB* textures = nullptr;
     std::uint32_t textureIndex = assets::unresolvedMaterialTexture50EA;
 };
+// One explicit original static-track texture association and its source-ordered
+// stored frame range in a separate immutable cold texture bank. Timing stays
+// with the source owner; the renderer only validates and selects a frame name.
+constexpr std::uint32_t maxVehicleWindowTrackAnimations50DS = 128;
+constexpr std::uint32_t maxVehicleWindowAnimationFrames50DS = 64;
+struct VehicleWindowTrackAnimation50DS {
+    std::uint32_t sourceSpanIndex = assets::unresolvedMaterialTexture50EA;
+    std::uint32_t sourceTextureIndex = assets::unresolvedMaterialTexture50EA;
+    std::uint32_t firstTextureIndex = 0, frameCount = 0;
+};
 struct VehicleWindowRacerArchetype50DS {
     // Cold-loaded original chariot/left/right assets, kept unchanged until close.
     // The renderer consumes the caller's independently animated world vertices;
@@ -251,6 +261,13 @@ struct VehicleWindowRequest50DS {
     // Two cold GPU vertex/normal banks share one immutable index buffer and the
     // existing private frame transaction. No extra clock or frame allocations.
     VehicleWindowTrack50DS dynamicWorld{};
+    // Optional source-authenticated ATM bank. Borrow its exact publication until
+    // close. Descriptors are copied cold; no texture creation/mutation at submit.
+    // Every sourceSpanIndex names its exact original required-texture span;
+    // sourceTextureIndex must match it. Distinct placed owners remain distinct.
+    const MaterialTextureGl50EB* trackAnimationTextures = nullptr;
+    const VehicleWindowTrackAnimation50DS* trackAnimations = nullptr;
+    std::uint32_t trackAnimationCount = 0;
 };
 struct VehicleWindowStanding50DS {
     // Exact cold-verified original display name, including its terminator.
@@ -389,6 +406,11 @@ struct VehicleWindowFrame50DS {
     const VehicleWindowOpponent50DS* opponents = nullptr;
     std::uint32_t opponentCount = 0;
     VehicleWindowDynamicWorldFrame50DS dynamicWorld{};
+    // Exactly one frame ordinal per cold animation descriptor. Borrowed only
+    // through submit; every index is bounded before GL work. A supplied frame
+    // always binds a genuine already-published image; no timer is advanced here.
+    const std::uint32_t* trackAnimationFrames = nullptr;
+    std::uint32_t trackAnimationFrameCount = 0;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,

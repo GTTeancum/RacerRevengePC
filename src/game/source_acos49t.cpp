@@ -131,6 +131,43 @@ static D ieee_acos(D x) {
  D z=mul(sub(one,x),half);D s=sqrt(z),df=s&0xffffffff00000000ull;
  D c=div(sub(z,mul(df,df)),add(s,df));D r=ratio(z);D w=add(mul(r,s),c);D t=add(df,w);return add(t,t);
 }
+// Bounded original302580 sine: nonnegative input in the recovered range below3*pi/4.
+// This is the actual legacy-MOT quaternion conversion's half-angle domain.
+// All constants are original3C5FE0..3C61A8 words; elementary operations above
+// remain the same source soft-double implementation, never host libm.
+static D sine_kernel(D x) {
+ const U high=U(x>>32)&0x7fffffffu;
+ if(high<=0x3e3fffffu)return x;
+ const D z=mul(x,x),v=mul(z,x);
+ D r=add(mul(z,0x3de5d93a5acfd57cull),0xbe5ae5e68a2b9cebull);
+ r=add(mul(z,r),0x3ec71de357b1fe7dull);
+ r=add(mul(z,r),0xbf2a01a019c161d5ull);
+ r=add(mul(z,r),0x3f8111111110f8a6ull);
+ return add(x,mul(v,add(mul(z,r),0xbfc5555555555549ull)));
+}
+static D cosine_kernel(D x,D y) {
+ const U high=U(x>>32)&0x7fffffffu;
+ if(high<=0x3e3fffffu)return one;
+ const D z=mul(x,x);
+ D r=add(mul(z,0xbda8fae9be8838d4ull),0x3e21ee9ebdb4b1c4ull);
+ r=add(mul(z,r),0xbe927e4f809c52adull);
+ r=add(mul(z,r),0x3efa01a019cb1590ull);
+ r=add(mul(z,r),0xbf56c16c16c15177ull);
+ r=add(mul(z,r),0x3fa555555555554cull);
+ r=mul(z,r);
+ if(high<=0x3fd33332u)return sub(one,sub(mul(half,z),sub(mul(z,r),mul(x,y))));
+ const D qx=high>0x3fe90000u?0x3fd2000000000000ull:D(high-0x00200000u)<<32;
+ const D hz=sub(mul(half,z),qx),a=sub(one,qx);
+ return sub(a,sub(hz,sub(mul(z,r),mul(x,y))));
+}
+static D sine_positive_reduced(D x) {
+ const U high=U(x>>32);
+ if(high<=0x3fe921fbu)return sine_kernel(x);
+ D z=sub(x,0x3ff921fb54400000ull),tail=0x3dd0b4611a626331ull;
+ if(high==0x3ff921fbu){z=sub(z,0x3dd0b4611a600000ull);tail=0x3ba3198a2e037073ull;}
+ const D first=sub(z,tail),second=sub(sub(z,first),tail);
+ return cosine_kernel(first,second);
+}
 } // namespace
 
 bool sourceAcos49T(std::uint32_t inputBits, SourceLibmState49T& state,
@@ -148,6 +185,15 @@ bool sourceAcos49T(std::uint32_t inputBits, SourceLibmState49T& state,
     outputBits = result;
     if (trace) *trace = {widened, inner, wrapped};
     return true;
+}
+
+bool sourceSinePositiveReduced50IG(std::uint32_t inputBits,std::uint32_t& outputBits) noexcept {
+ // Preserve source exponent-zero conversion; reject foreign domains rather
+ // than replacing source range reduction with a host sine approximation.
+ if(inputBits&0x80000000u)return false;
+ const D x=from_float(inputBits);
+ if(U(x>>32)>0x4002d97bu)return false;
+ outputBits=to_float(sine_positive_reduced(x));return true;
 }
 
 #ifdef RR_SOURCE_ACOS49T_TEST_API

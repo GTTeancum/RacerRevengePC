@@ -64,7 +64,7 @@ float quantizedPosition(std::uint16_t word) {
     volatile float expanded=32767.0f*normalized; // Original scale is 32767.
     return expanded;
 }
-std::size_t validate(const Collision48G& c, bool inspectOriginalDegenerate = false) {
+std::size_t validate(const Collision48G& c, bool inspectOriginalDegenerate = false, std::size_t vertexBase = 84) {
     need(c.version==1 && c.type==0 && c.quantized<=1,"col.typed_variant");
     need(c.reverse_mode<=1 && c.normals_present<=1,"col.boolean_flag");
     supported(!c.quantized||!c.normals_present,"col.quantized_normals",80,
@@ -77,8 +77,8 @@ std::size_t validate(const Collision48G& c, bool inspectOriginalDegenerate = fal
     need(c.matrix[3]==0 && c.matrix[7]==0 && c.matrix[11]==0 && c.matrix[15]==1,"col.affine_matrix");
     for(float x:c.matrix)need(std::isfinite(x),"col.matrix_nonfinite");
     const std::size_t stride=c.quantized?6u:12u;
-    need(c.vertices_offset==84 && c.normals_flag_offset==84+stride*nv &&
-         c.nodes_offset==88+stride*nv*(1+c.normals_present) && c.faces_offset==c.nodes_offset+32*nn,"col.source_offsets");
+    need(c.vertices_offset==vertexBase && c.normals_flag_offset==vertexBase+stride*nv &&
+         c.nodes_offset==vertexBase+4+stride*nv*(1+c.normals_present) && c.faces_offset==c.nodes_offset+32*nn,"col.source_offsets");
     for(const auto& v:c.vertices)for(float x:v)need(std::isfinite(x),"col.vertex_nonfinite");
     for(const auto& v:c.vertex_normals)for(float x:v)need(std::isfinite(x),"col.normal_nonfinite");
     for(std::size_t i=0;i<nn;++i) {
@@ -136,6 +136,42 @@ Bytes original(const Collision48G& c) {
     need(w.b==c.original_bytes,"col.provenance_mismatch",0,"Typed collision records do not match complete original bytes");
     return std::move(w.b);
 }
+// Headerless tree body reader shared by original125890 callers. Every source
+// offset is absolute in the actual containing file; no stand-alone header is invented.
+void decodeBody(Reader& r, Collision48G& c, const DecodeHooks48C* hooks,
+                const CollisionLimits48G& limits, bool wholeFile=false) {
+    const auto bodyBase=r.at,vertexBase=r.at+68;
+    for(unsigned row=0;row<4;++row){for(unsigned col=0;col<3;++col)c.matrix[row*4+col]=r.f32();c.matrix[row*4+3]=row==3?1.0f:0.0f;}
+    c.reverse_mode=r.u32();const auto nv=r.u32(),nn=r.u32(),nf=r.u32();c.quantized=r.u32();
+    need(c.reverse_mode<=1&&c.quantized<=1,"col.boolean_flag",bodyBase+48);
+    need(nv>0&&nv<=65535&&nn<=32767&&nf>0&&nf<=32768,"col.counts",bodyBase+52);
+    need(nn+1==nf,"col.tree_counts",bodyBase+56);
+    limit(nv<=limits.vertices&&nn<=limits.nodes&&nf<=limits.faces,"col.count_limit");
+    const std::size_t stride=c.quantized?6:12;const std::size_t flag=vertexBase+stride*nv;
+    r.range(stride*nv+4);r.at=flag;c.normals_present=r.u32();need(c.normals_present<=1,"col.normals_flag",flag);
+    const std::size_t expected=flag+4+stride*nv*c.normals_present+32u*nn+22u*nf;
+    need(wholeFile?expected==r.b.size():expected<=r.b.size(),"col.exact_extent",r.at,"Truncated COL body or trailing bytes");
+    supported(!c.quantized||!c.normals_present,"col.quantized_normals",flag,
+        "Quantized optional vertex normals remain outside this bounded source projection");
+    supported(!c.quantized||std::fegetround()==FE_TONEAREST,"col.quantized_rounding",bodyBase+64,
+        "Quantized position projection requires individually rounded binary32 nearest-even");
+    supported(nn>0,"col.single_leaf",bodyBase+56,"No-node single-face root query policy is not yet supported");
+    c.vertices_offset=static_cast<std::uint32_t>(vertexBase);c.normals_flag_offset=static_cast<std::uint32_t>(flag);
+    r.at=vertexBase;c.vertices.resize(nv);
+    for(std::uint32_t i=0;i<nv;++i){
+        if(c.quantized)for(auto& x:c.vertices[i])x=quantizedPosition(r.u16());
+        else r.values(c.vertices[i]);
+        if((i&255u)==0)tick(hooks,"collision-vertices",i,nv);}
+    r.u32();if(c.normals_present){c.vertex_normals.resize(nv);for(auto& v:c.vertex_normals)r.values(v);}
+    c.nodes_offset=static_cast<std::uint32_t>(r.at);c.nodes.resize(nn);
+    for(std::uint32_t i=0;i<nn;++i){auto& n=c.nodes[i];n.source_offset=static_cast<std::uint32_t>(r.at);n.volume=r.f32();r.values(n.center);r.values(n.half);
+        for(auto& key:n.children){const auto raw=r.u16();key=(raw&32767u)|((raw&32768u)?collision_leaf48g:0u);}
+        if((i&255u)==0)tick(hooks,"collision-nodes",i,nn);}
+    c.faces_offset=static_cast<std::uint32_t>(r.at);c.faces.resize(nf);
+    for(std::uint32_t i=0;i<nf;++i){auto& f=c.faces[i];f.source_offset=static_cast<std::uint32_t>(r.at);f.d=r.rawFloat();for(auto& n:f.normal)n=r.rawFloat();for(auto& v:f.vertices)v=r.u16();if((i&255u)==0)tick(hooks,"collision-faces",i,nf);}
+    need(r.at==expected,"col.exact_extent",r.at);const auto degenerate=validate(c,true,vertexBase);
+    supported(!degenerate,"col.degenerate_plane",degenerate,"Original coincident-vertex face contains the evidenced NaN plane; query behavior is not supported");
+}
 std::string message(const Failure& f) { return std::string(f.code)+" at "+std::to_string(f.offset)+": "+f.detail; }
 bool matrixFinite(const std::array<double,16>& m) { for(double d:m)if(!std::isfinite(d))return false;return m[3]==0&&m[7]==0&&m[11]==0&&m[15]==1; }
 }
@@ -148,40 +184,46 @@ bool decodeCollision48G(const Bytes& input, Collision48G& output, DecodeError48C
         Collision48G c;c.version=r.u32();c.type=r.u32();
         supported(c.version==1,"col.version",8,"Only original COL version 1 is supported");
         supported(c.type==0,"col.type",12,"Only original type 0 triangle trees are supported");
-        for(unsigned row=0;row<4;++row){for(unsigned col=0;col<3;++col)c.matrix[row*4+col]=r.f32();c.matrix[row*4+3]=row==3?1.0f:0.0f;}
-        c.reverse_mode=r.u32();const auto nv=r.u32(),nn=r.u32(),nf=r.u32();c.quantized=r.u32();
-        need(c.reverse_mode<=1&&c.quantized<=1,"col.boolean_flag",64);
-        need(nv>0&&nv<=65535&&nn<=32767&&nf>0&&nf<=32768,"col.counts",68);
-        need(nn+1==nf,"col.tree_counts",72);
-        limit(nv<=limits.vertices&&nn<=limits.nodes&&nf<=limits.faces,"col.count_limit");
-        const std::size_t stride=c.quantized?6:12;const std::size_t flag=84+stride*nv;
-        r.range(stride*nv+4);r.at=flag;c.normals_present=r.u32();need(c.normals_present<=1,"col.normals_flag",flag);
-        const std::size_t expected=flag+4+stride*nv*c.normals_present+32u*nn+22u*nf;
-        need(expected==input.size(),"col.exact_extent",r.at,"Truncated COL body or trailing bytes");
-        supported(!c.quantized||!c.normals_present,"col.quantized_normals",flag,
-            "Quantized optional vertex normals remain outside this bounded source projection");
-        supported(!c.quantized||std::fegetround()==FE_TONEAREST,"col.quantized_rounding",80,
-            "Quantized position projection requires individually rounded binary32 nearest-even");
-        supported(nn>0,"col.single_leaf",72,"No-node single-face root query policy is not yet supported");
-        c.vertices_offset=84;c.normals_flag_offset=static_cast<std::uint32_t>(flag);
-        r.at=84;c.vertices.resize(nv);
-        for(std::uint32_t i=0;i<nv;++i){
-            if(c.quantized)for(auto& x:c.vertices[i])x=quantizedPosition(r.u16());
-            else r.values(c.vertices[i]);
-            if((i&255u)==0)tick(hooks,"collision-vertices",i,nv);}
-        r.u32();if(c.normals_present){c.vertex_normals.resize(nv);for(auto& v:c.vertex_normals)r.values(v);}
-        c.nodes_offset=static_cast<std::uint32_t>(r.at);c.nodes.resize(nn);
-        for(std::uint32_t i=0;i<nn;++i){auto& n=c.nodes[i];n.source_offset=static_cast<std::uint32_t>(r.at);n.volume=r.f32();r.values(n.center);r.values(n.half);
-            for(auto& key:n.children){const auto raw=r.u16();key=(raw&32767u)|((raw&32768u)?collision_leaf48g:0u);}
-            if((i&255u)==0)tick(hooks,"collision-nodes",i,nn);}
-        c.faces_offset=static_cast<std::uint32_t>(r.at);c.faces.resize(nf);
-        for(std::uint32_t i=0;i<nf;++i){auto& f=c.faces[i];f.source_offset=static_cast<std::uint32_t>(r.at);f.d=r.rawFloat();for(auto& n:f.normal)n=r.rawFloat();for(auto& v:f.vertices)v=r.u16();if((i&255u)==0)tick(hooks,"collision-faces",i,nf);}
-        need(r.at==input.size(),"col.exact_extent",r.at);const auto degenerate=validate(c,true);
-        supported(!degenerate,"col.degenerate_plane",degenerate,"Original coincident-vertex face contains the evidenced NaN plane; query behavior is not supported");
+        decodeBody(r,c,hooks,limits,true);
+        need(r.at==input.size(),"col.exact_extent",r.at,"Truncated COL body or trailing bytes");
         c.original_bytes=input;
         tick(hooks,"collision-complete",1,1);output=std::move(c);return true;
     } catch(const Failure& f) {error={f.kind,f.code,f.offset,f.detail};}
       catch(const std::bad_alloc&) {error={DecodeKind48C::limit,"col.allocation",0,"Collision allocation failed"};}
+    return false;
+}
+
+bool decodeCollisionCompound50IJ(const Bytes& input, CollisionCompound50IJ& output,
+    DecodeError48C& error, const DecodeHooks48C* hooks, const CollisionCompoundLimits50IJ& limits) {
+    error={};try {
+        tick(hooks,"compound-collision-header",0,1);
+        limit(input.size()<=std::min<std::size_t>(limits.tree.input_bytes,8u*1024u*1024u),"col.input_limit");
+        Reader r{input};need(r.u32()==1234&&r.u32()==0x006c6f63,"col.magic");
+        CollisionCompound50IJ c;c.version=r.u32();c.type=r.u32();
+        supported(c.version==1,"col.version",8,"Only original COL version 1 is supported");
+        supported(c.type==1,"col.type",12,"Compound reader requires original shape type 1");
+        const auto count=r.u32();c.reverse_mode=r.u32();
+        need(c.reverse_mode<=1,"col.boolean_flag",20);
+        limit(count<=limits.members&&count<=1024,"col.compound_member_limit");
+        // Minimum body extent bounds count before reserving. Exact per-tree extents
+        // and rooted topology are checked by the same reader as static COL0.
+        need(count<=(input.size()-r.at)/76,"col.compound_count_extent",16);
+        c.members.reserve(count);
+        for(std::uint32_t i=0;i<count;++i){
+            CollisionCompoundMember50IJ member;
+            member.source_offset=static_cast<std::uint32_t>(r.at);
+            member.scene_node_index=r.u32();
+            member.body_offset=static_cast<std::uint32_t>(r.at);
+            decodeBody(r,member.tree,hooks,limits.tree);
+            member.source_end=static_cast<std::uint32_t>(r.at);
+            c.members.push_back(std::move(member));
+            tick(hooks,"compound-collision-members",i+1,count);
+        }
+        need(r.at==input.size(),"col.exact_extent",r.at,"Compound COL trailing bytes");
+        c.original_bytes=input;
+        tick(hooks,"compound-collision-complete",1,1);output=std::move(c);return true;
+    }catch(const Failure& f){error={f.kind,f.code,f.offset,f.detail};}
+     catch(const std::bad_alloc&){error={DecodeKind48C::limit,"col.allocation",0,"Compound collision allocation failed"};}
     return false;
 }
 

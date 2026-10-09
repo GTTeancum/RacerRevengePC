@@ -84,28 +84,15 @@ Type3RaySource48P readRays(const Type3RayBuffers48P& b,std::size_t count,std::si
 Type3Segment48P segment(const Type3RayBuffers48P& b,std::size_t i) noexcept {
     return {quad(b.localStarts[i]),quad(b.localDirections[i]),b.lengths[i]};
 }
-Status dispatchBorrowed(const Type3QueryInput48P& input,const Type3QueryContext48P& context,const Type3Candidate48P& candidate,
-    const CollisionSphere48J& sphere,const assets::CollisionMesh48I* mesh,const BodyMatrix48G& matrix,bool shapePresent,
+Status dispatchMesh50IJ(const Type3QueryInput48P& input,const Type3QueryContext48P& context,
+    const assets::CollisionMesh48I* mesh,const BodyMatrix48G& matrix,bool updateCenter,bool identityValid,
     const Type3RayBuffers48P& rays,std::uint32_t* stack,std::size_t stackCapacity,
     Type3QueryState48P& state,bool& hit) noexcept {
-    hit=false;const auto count=static_cast<std::size_t>(context.pairCount);const auto& c=candidate.collision;
-    for(std::size_t i=0;i<count;++i)rays.hits[i]=0;
-    if(!(c.filter.flags31&1u))return Status::Complete;
-    if(!finite(xyz(state.worldCenter))||!std::isfinite(state.radius)||state.radius<0||!finiteSphere(sphere))return Status::InvalidInput;
-    Math math;float d[3];for(unsigned k=0;k<3;++k)d[k]=math.sub(state.worldCenter.v[k],sphere.center.v[k]);
-    const float radius=math.add(sphere.radius,state.radius),squareRadius=math.mul(radius,radius);
-    const float square=math.add(math.add(math.mul(d[0],d[0]),math.mul(d[1],d[1])),math.mul(d[2],d[2]));
-    if(!math.valid)return Status::InvalidInput;
-    if(!(square<squareRadius))return Status::Complete;
-    state.selectedFraction=1.f;state.hitCount=0;
-    for(std::size_t i=0;i<count;++i)rays.fractions[i]=-1.f;
-    if(candidate.shapeType==1)return Status::UnsupportedScope;
-    if(candidate.shapeType!=0)return Status::Complete;
-    if(!shapePresent)return Status::UnsupportedScope;
+    const auto count=static_cast<std::size_t>(context.pairCount);Math math;
     if(!mesh||mesh->nodes.empty()||mesh->faces.empty()||mesh->vertices.empty()||
        (!mesh->vertex_normals.empty()&&mesh->vertex_normals.size()!=mesh->vertices.size()))return Status::InvalidInput;
     if(mesh->reverse_mode)return Status::UnsupportedScope;
-    if(c.geometry.id!=c.filter.identity)return Status::InvalidInput;
+    if(!identityValid)return Status::InvalidInput;
     for(unsigned col=0;col<4;++col)for(unsigned axis=0;axis<3;++axis)
         if(!std::isfinite(matrix.v[col*4+axis]))return Status::InvalidInput;
     const auto inverse=math.inverse(matrix);
@@ -114,7 +101,8 @@ Status dispatchBorrowed(const Type3QueryInput48P& input,const Type3QueryContext4
         rays.localDirections[i]=math.transform(inverse,xyz(rays.worldDirections[i]),false,true);
         rays.localStarts[i]=math.transform(inverse,xyz(rays.worldStarts[i]),true);
     }
-    state.localCenter=math.transform(inverse,xyz(state.worldCenter),true);
+    if(updateCenter)state.localCenter=math.transform(inverse,xyz(state.worldCenter),true);
+    else if(!finite(state.localCenter))return Status::InvalidInput;
     if(!math.valid)return Status::InvalidInput;
     if(!stackCapacity)return Status::InsufficientCapacity;
     if(mesh->nodes.size()>std::numeric_limits<std::size_t>::max()-mesh->faces.size())return Status::InvalidInput;
@@ -173,6 +161,36 @@ Status dispatchBorrowed(const Type3QueryInput48P& input,const Type3QueryContext4
         state.selectedCorrection=quad(math.transform(matrix,xyz(state.selectedCorrection),false,true),3.f);
     }
     return math.valid?Status::Complete:Status::InvalidInput;
+}
+Status dispatchBorrowed(const Type3QueryInput48P& input,const Type3QueryContext48P& context,const Type3Candidate48P& candidate,
+    const CollisionSphere48J& sphere,const assets::CollisionMesh48I* mesh,const BodyMatrix48G& matrix,bool shapePresent,
+    const Type3RayBuffers48P& rays,std::uint32_t* stack,std::size_t stackCapacity,
+    Type3QueryState48P& state,bool& hit) noexcept {
+    hit=false;const auto count=static_cast<std::size_t>(context.pairCount);const auto& c=candidate.collision;
+    for(std::size_t i=0;i<count;++i)rays.hits[i]=0;
+    if(!(c.filter.flags31&1u))return Status::Complete;
+    if(!finite(xyz(state.worldCenter))||!std::isfinite(state.radius)||state.radius<0||!finiteSphere(sphere))return Status::InvalidInput;
+    Math math;float d[3];for(unsigned k=0;k<3;++k)d[k]=math.sub(state.worldCenter.v[k],sphere.center.v[k]);
+    const float radius=math.add(sphere.radius,state.radius),squareRadius=math.mul(radius,radius);
+    const float square=math.add(math.add(math.mul(d[0],d[0]),math.mul(d[1],d[1])),math.mul(d[2],d[2]));
+    if(!math.valid)return Status::InvalidInput;
+    if(!(square<squareRadius))return Status::Complete;
+    state.selectedFraction=1.f;state.hitCount=0;
+    for(std::size_t i=0;i<count;++i)rays.fractions[i]=-1.f;
+    if(candidate.shapeType!=0&&candidate.shapeType!=1)return Status::Complete;
+    if(!shapePresent)return Status::UnsupportedScope;
+    if(candidate.shapeType==0)return dispatchMesh50IJ(input,context,mesh,matrix,true,c.geometry.id==c.filter.identity,rays,stack,stackCapacity,state,hit);
+    if(!candidate.compound)return Status::UnsupportedScope;
+    const auto& compound=*candidate.compound;
+    if(compound.count>maxCompoundMembers50IJ||(compound.count&&!compound.parts))return Status::InvalidInput;
+    //1273A8..127668: no active gate and no recomputation of shape.localCenter.
+    // All flags/fractions and cumulative hit survive between ordered members.
+    for(std::size_t i=0;i<compound.count;++i){
+        const auto& part=compound.parts[i];
+        const auto status=dispatchMesh50IJ(input,context,part.mesh,part.worldMatrix,false,c.geometry.id==c.filter.identity,rays,stack,stackCapacity,state,hit);
+        if(status!=Status::Complete)return status;
+    }
+    return Status::Complete;
 }
 Status dispatch(const Type3QueryInput48P& input,const Type3QueryContext48P& context,const Type3Candidate48P& candidate,
     const Type3RayBuffers48P& rays,std::uint32_t* stack,std::size_t stackCapacity,
@@ -243,6 +261,15 @@ Type3QueryStatus48P queryStaticType3WithContextBounded48P(const Type3QueryInput4
     if(!readFilter(input.filter))return Status::InvalidInput;
     for(std::size_t i=0;i<count;++i){
         const auto& c=candidates[i];if(!readFilter(c.collision.filter)||!readSpan(c.sceneName,c.sceneNameBytes))return Status::InvalidInput;
+        if(c.compound){
+            if(!readSpan(c.compound,1)||c.compound->count>maxCompoundMembers50IJ||
+               !readSpan(c.compound->parts,c.compound->count))return Status::InvalidInput;
+            for(std::size_t j=0;j<c.compound->count;++j){const auto& part=c.compound->parts[j];const auto* m=part.mesh;
+                if(!readSpan(m,1)||!readSpan(m->nodes.data(),m->nodes.size())||!readSpan(m->faces.data(),m->faces.size())||
+                   !readSpan(m->vertices.data(),m->vertices.size())||!readSpan(m->vertex_normals.data(),m->vertex_normals.size())||
+                   !readSpan(part.nodeRadii,part.nodeRadiusCount))return Status::InvalidInput;
+            }
+        }
         if(const auto* mesh=c.collision.geometry.mesh){
             if(!readSpan(mesh,1)||!readSpan(mesh->nodes.data(),mesh->nodes.size())||
                !readSpan(mesh->faces.data(),mesh->faces.size())||!readSpan(mesh->vertices.data(),mesh->vertices.size())||

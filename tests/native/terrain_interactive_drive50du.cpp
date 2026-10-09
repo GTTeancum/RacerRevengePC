@@ -77,6 +77,9 @@
 #include "authored_runtime_ground50cp_fixture.h"
 #include "track_runtime_storage50ig_fixture.h"
 #include "track_static_candidates50ig_fixture.h"
+#include "gc_animated_candidates50ig_fixture.h"
+#include "gc_dynamic_window50ig_fixture.h"
+#include "gc_atm_window_fixture.h"
 #include "source_grid50ig_fixture.h"
 #include "track_session_assets50ig_fixture.h"
 #include "track_start50ad.h"
@@ -177,9 +180,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(trackSession->originalStaticCandidates){
   const char* incomplete=std::getenv("RR_GC_INCOMPLETE_WORLD");
   require50DU(incomplete&&std::string(incomplete)=="1",
-      "GC native world is incomplete: zone2 windmill animation/type1 collision, zone11 triggered opening, authored LostAI branch triggers and Gate sound are unjoined; RR_GC_INCOMPLETE_WORLD=1 explicitly accepts these omissions");
-  std::cerr<<"GC INCOMPLETE WORLD: real original static track/navigation are enabled; "
-      "zone2's initially active looping windmill and zone11's triggered opening still lack original animated/type1 collision owners. "
+      "GC native world is incomplete: zone11 opening trigger, authored LostAI branch triggers and Gate sound are unjoined; RR_GC_INCOMPLETE_WORLD=1 explicitly accepts these omissions");
+  std::cerr<<"GC INCOMPLETE WORLD: real original track/navigation and both animated model/type1 collision owners are enabled; "
+      "zone11 opening retains its authored inactive state because its Gate trigger is not joined. "
       "Authored LostAI branch triggers and Gate sound are not yet joined. "
       "This is not complete-track support.\n";
  }
@@ -403,6 +406,23 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  require50DU(candidates.size()==trackSession->terrainOwners&&ground.owners.size()==candidates.size(),
      "original track binding must cover every retained terrain owner");
+ std::unique_ptr<gc_animated_world50IG::Owner> gcAnimatedWorld;
+ gc_animated_world50IG::Diagnostic gcAnimationDiagnostic{};
+ // Explicit same fresh-session lifetime as the reconstructed native RNG and
+ // existing Dax sessionLazy. This is not a claim of original cross-race statics.
+ gc_animated_world50IG::ServiceShared gcAnimationLazy{};
+ const std::size_t animatedCandidateFirst=candidates.size();
+ if(trackSession->originalStaticCandidates){
+  gcAnimatedWorld=std::make_unique<gc_animated_world50IG::Owner>();
+  require50DU(gcAnimatedWorld->load(trackSession->archive,s.animationShared.libm,
+      s.animationShared.motion,gcAnimationDiagnostic),
+      gcAnimationDiagnostic.message.empty()?"original GC animated resource load failed":gcAnimationDiagnostic.message.c_str());
+  gc_animated_candidates50IG::prepare(*gcAnimatedWorld,candidates,trackBindings,
+      query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
+  for(const auto& candidate:candidates)stackCount=std::max(stackCount,1+shape.view.maxDepth+candidate.maxDepth);
+  std::cerr<<"GC ANIMATED WORLD: original opening/windmill owners=2, vertices=1195, indices=2337, surfaces=6, "
+      "COL1 children=4, CHARACTER native mask=1, source node mappings=1/2 and 0/1; opening inactive, windmill loop15s.\n";
+ }
  ground.audit=J{};
  // Cold, immovable, count-derived storage. Candidate order and every borrowed
  // source mesh/radius remain owned above; publication checks complete coverage.
@@ -413,6 +433,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      trackStorageDiagnostic.message.c_str());
  auto& trackStorage=*trackStorageOwner.get();
  const auto& trackCounts=trackStorage.count;
+ std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,gc_animated_world50IG::ownerCount> gcAnimatedMembership;
+ if(gcAnimatedWorld)for(auto& membership:gcAnimatedMembership)
+  membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
  const auto terrainOwnerCount=trackCounts.terrain;
  auto* audioContactMaterials=trackStorage.contactMaterials.data();
  require50DU(setLocalMatrix49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190,pose)&&refreshSceneWorld49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190),"supplied initial pose");f::project(s,x.bindings);
@@ -880,6 +903,29 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::cerr<<" UnsupportedLinkRemoval";
   std::cerr<<'\n';return false;
  };
+ if(gcAnimatedWorld)for(std::size_t i=0;i<gcAnimatedMembership.size();++i){
+  auto& membership=*gcAnimatedMembership[i];const auto bounds=gc_animated_candidates50IG::bounds(*gcAnimatedWorld,i);
+  const auto ref=static_cast<CollectionRef50BX>(animatedCandidateFirst+i+1);
+  //2D93F0 ->120070(method2,radius0), then2D94B0 ->120230 after cold pose.
+  require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
+      membership.storage(),ref,gcAnimatedWorld->source(i).startingZone,ZoneMethod50CL::Second,0.f,
+      bounds,membershipWork),"GC original animation initial attachment"),"GC original animation zone attachment failed");
+  require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
+      bounds,membershipWork),"GC original animation cold update"),"GC original animation cold membership failed");
+ }
+ auto refreshAnimatedCandidates=[&](){
+  if(!gcAnimatedWorld)return true;
+  gc_animated_candidates50IG::sync(*gcAnimatedWorld,candidates.data(),candidates.size(),animatedCandidateFirst);
+  for(std::size_t i=0;i<gcAnimatedMembership.size();++i){
+   const auto bounds=gc_animated_candidates50IG::bounds(*gcAnimatedWorld,i);
+   const auto result=updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,gcAnimatedMembership[i]->state,bounds,membershipWork);
+   if(!reportMembership(result,"GC original animation live update"))return false;
+   const auto index=animatedCandidateFirst+i;auto& mirror=movementCandidates[index].collision;
+   mirror.geometry.worldMatrix=candidates[index].candidate.collision.geometry.worldMatrix;
+   mirror.sphere=candidates[index].candidate.collision.sphere;
+  }
+  return true;
+ };
  LiveZoneBounds50EN mainInitialBounds{},secondaryInitialBounds{};
  require50DU(prepareQueryCache(query,s.nodes[static_cast<int>(x.bindings.lifecycle.main190)].world100,mainInitialBounds)&&
      prepareQueryCache(secondaryQuery,s.nodes[static_cast<int>(x.bindings.lifecycle.physical19C)].world100,secondaryInitialBounds),
@@ -944,11 +990,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto collectionWork=trackStorage.collectionWorkspace();
  std::uint64_t collectedCalls=0;std::size_t peakCollected=0;
  auto collectRegistered=[&](){
+  // Each HOST racer bank restores its own collection cache. Before it queries,
+  // publish the one shared world's latest accepted compound pose/membership.
+  if(!refreshAnimatedCandidates())return false;
   const auto applied=drainZoneRegistrations50CQ(zoneQueue,zoneLifecycle,zoneScratch,trackCounts.events);
   if(applied.status!=ZoneQueueStatus50CQ::Complete||applied.remaining)return false;
   if(prepareSearchView50BT(registry,registrationBlocks,2,registrationView)!=SearchStorageStatus50BS::Complete)return false;
   //50CL keeps method descriptors current after each explicit registry change.
-  for(std::size_t i=0;i<terrainOwnerCount;++i){const auto&owner=candidates[i].candidate.collision;auto projected=projectCollectionObject50CF(owner.filter,owner.sphere,owner.typeTag,0,0);if(!projected.valid)return false;collectionObjects[i]=projected.object;collectionSource[i]=projected.state;}
+  for(std::size_t i=0;i<terrainOwnerCount;++i){const auto&owner=candidates[i].candidate.collision;auto projected=projectCollectionObject50CF(owner.filter,owner.sphere,owner.typeTag,candidates[i].shapeType,0);if(!projected.valid)return false;collectionObjects[i]=projected.object;collectionSource[i]=projected.state;}
   if(!mainMembership.attached||!secondaryMembership.attached||
      mainMembership.object!=mainQueryRef||secondaryMembership.object!=secondaryQueryRef||
      mainMembership.lastShapeTag!=2||secondaryMembership.lastShapeTag!=2||
@@ -1723,6 +1772,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    racerContactMaterials[racer]=native_racer_contact50HW::emptyPhysicalRootMaterial;
   }
 #include "native_racer_owners50hn.inc"
+  for(auto& membership:gcAnimatedMembership)if(membership){
+   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
+   racerBank.elements(membership->entries.data(),membership->entries.size());
+  }
   racerBank.seal(raceRacerCount);
   // The alternate human uses exactly the same original-resource cold path as
   // the opponents, before any tick. The default retains its established POD01
@@ -1972,6 +2025,32 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      skyDiagnostic.message.empty()?"actual selected-track sky load failed":skyDiagnostic.message.c_str());
  // Host is declared first so renderer destruction always precedes its context.
  platform::GameHost50ER host;
+ gc_dynamic_window50IG::Owner gcDynamicWindow;
+ gc_atm_window_fixture::Owner gcAtm;
+ if(gcAnimatedWorld){
+  gc_dynamic_materials_fixture::Diagnostic materialDiagnostic{};
+  require50DU(gcDynamicWindow.loadSource(trackSession->archive,*gcAnimatedWorld,materialDiagnostic),
+      materialDiagnostic.message.empty()?"original GC dynamic materials rejected":materialDiagnostic.message.c_str());
+  gc_atm_animation_fixture::Diagnostic atmDiagnostic{};
+  require50DU(gcAtm.loadSource(trackSession->archive,*trackMaterialOwner,atmDiagnostic),
+      atmDiagnostic.message.empty()?"original GC ATM source bank rejected":atmDiagnostic.message.c_str());
+ }
+ std::uint32_t sourceApplicationTimestamp=0;
+ std::uint64_t gcAnimatedWorldSteps=0;
+ auto advanceWorldAnimations=[&](){
+  if(!gcAnimatedWorld)return;
+  // Source1AAD98 registers the complete racer group before1B4A58's animation
+  // service. Current HOST participant order stays explicit; world service runs
+  // once after that group, including enabled countdown world traversal.
+  const auto before=::allocations;
+  require50DU(sampleHostTimestamp50ID(applicationClock,sourceApplicationTimestamp),"shared source application timestamp rejected");
+  require50DU(gcAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noise.sharedRandomState,
+      gcAnimationLazy,s.animationShared.motion,gcAnimationDiagnostic),
+      gcAnimationDiagnostic.message.empty()?"original GC world animation rejected":gcAnimationDiagnostic.message.c_str());
+  if(gcAtm.loaded())require50DU(gcAtm.advance(sourceApplicationTimestamp),"original GC ATM time update rejected");
+  require50DU(::allocations==before,"successful GC world animation allocated C++ storage");
+  ++gcAnimatedWorldSteps;
+ };
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
  std::array<platform::MaterialTextureGl50EB,raceOpponentCount> opponentGpuTextures,opponentCableGpuTextures;
  platform::MaterialTextureGlDiagnostic50EB textureDiagnostic{};
@@ -1993,6 +2072,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // Never destroy a context beneath unresolved GPU ownership. Destructors may
   // retry cleanup in the same correct order; neither silently leaks resources.
   if(renderer.ownsResources())return false;
+  if(gcDynamicWindow.ownsResources()&&!gcDynamicWindow.close(textureDiagnostic)){
+   std::cerr<<"GC dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+  }
+  if(gcDynamicWindow.ownsResources())return false;
+  if(gcAtm.ownsResources()&&!gcAtm.close(textureDiagnostic)){
+   std::cerr<<"GC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+  }
+  if(gcAtm.ownsResources())return false;
   for(std::size_t index=0;index<raceOpponentCount;++index){
    for(auto* texture:{&opponentGpuTextures[index],&opponentCableGpuTextures[index]}){
     if(texture->ownsResources()&&!texture->close(textureDiagnostic)){
@@ -2156,10 +2243,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   renderRequest.track.sourceNormalCount=static_cast<std::uint32_t>(trackNormals.size());
   renderRequest.track.maximumNormalBytes=trackSession->originalStaticCandidates?4u*1024u*1024u:2u*1024u*1024u;
   if(trackSession->originalStaticCandidates){
-   const auto& projectionUvs=trackMaterialOwner->projectionUvs();
-   renderRequest.track.sourceProjectionUvs=projectionUvs.data();
-   renderRequest.track.sourceProjectionCount=projectionUvs.size();
-   renderRequest.track.maximumProjectionBytes=projectionUvs.size()*sizeof(rr::assets::TrackProjectedUv);
+   const auto* projectionUvs=trackMaterialOwner->projectionUvs();
+   require50DU(projectionUvs,"original GC projected UV publication missing");
+   renderRequest.track.sourceProjectionUvs=projectionUvs->data();
+   renderRequest.track.sourceProjectionCount=projectionUvs->size();
+   renderRequest.track.maximumProjectionBytes=projectionUvs->size()*sizeof(rr::assets::TrackProjectedUv);
   }
   // Bounded host rendering optimization; an explicit debugging opt-out keeps
   // the same scene and physics available for comparisons.
@@ -2252,8 +2340,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    platform::VehicleWindowTrackSpan50DS binding{};
    binding.indexStart=span.indexStart;binding.indexCount=span.indexCount;
    binding.vertexStart=span.vertexStart;binding.vertexCount=span.vertexCount;
-   binding.sourcePass=span.sourcePass;binding.sourcePassCount=span.sourcePassCount;
-   binding.projectionPass=span.projectionPass;
    binding.material.mode=platform::VehicleWindowMaterialMode50DS::requiredTexture;
    binding.material.textureIndex=span.textureIndex;
    binding.material.depthWrite=false;binding.material.unlit=true;
@@ -2288,6 +2374,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     });
    }
    renderRequest.racerArchetypes=racerArchetypes.data();renderRequest.racerArchetypeCount=raceOpponentCount;
+  }
+  if(gcAnimatedWorld){
+   require50DU(gcDynamicWindow.createGpu(textureRequest,*gcAnimatedWorld,textureDiagnostic),"original GC dynamic texture upload failed");
+   require50DU(gcDynamicWindow.bindRequest(renderRequest,*gcAnimatedWorld),"original GC dynamic renderer publication failed");
+   require50DU(gcAtm.createGpu(textureRequest,textureDiagnostic),"original GC ATM GPU bank rejected");
+   require50DU(gcAtm.bindRequest(renderRequest),"original GC ATM render binding rejected");
   }
   if(!renderer.create(renderRequest,playerDrawAssets,rendererDiagnostic)){
    reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("window vehicle renderer creation failed");
@@ -2571,6 +2663,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    for(std::uint32_t step=0;step<plan.steps;++step){
     if(raceEnabled&&!race_session50HM::advanceCountdown(race,.016)){
      require50DU(race.error==race_session50HM::Error::None,"race countdown rejected");
+     advanceWorldAnimations();
      if(audioEnabled){
       liveAudio->pause(false);if(mode1Enabled)raceMusic->pause(false);
       require50DU(raceAudio->observe(race).accepted,"countdown/result audio observation rejected");
@@ -2631,6 +2724,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       }
       opponentFrame=false;
      }
+     advanceWorldAnimations();
      // Exactly one host contact pass after all successful native participants
      // are Ready, before race observations and the single world audio mix.
      // A failed native slot never participates through an abandoned snapshot.
@@ -2715,6 +2809,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      if(audioEnabled)require50DU(raceAudio->observe(race).accepted,
          "committed race audio observation rejected");
     }
+    if(frameAdvanced&&!raceEnabled)advanceWorldAnimations();
     physicsTiming.finish();
     if(!frameAdvanced){
      if(audioEnabled){liveAudio->pause(true);if(mode1Enabled)raceMusic->pause(true);}
@@ -2916,6 +3011,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     platform::VehicleWindowFrame50DS renderFrame{info.drawableWidth,info.drawableHeight,
         view.worldViewProjection,clearColor,&cableMesh,&hud};
+    if(gcAnimatedWorld){
+     require50DU(gcDynamicWindow.bindFrame(renderFrame,*gcAnimatedWorld),"original GC dynamic frame publication failed");
+     require50DU(gcAtm.bindFrame(renderFrame),"original GC ATM frame selection rejected");
+    }
     renderFrame.materialUvs=playerFlameUvs.data();
     renderFrame.materialUvCount=static_cast<std::uint32_t>(playerFlameUvs.size());
     renderFrame.skyWorldViewProjection=skyView.worldViewProjection;
@@ -3061,6 +3160,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<" overflow="<<renderDiagnostics.overflow<<'\n';
      renderDiagnostics.resetInterval();
     }
+    if(gcAnimatedWorld)std::cerr<<"GC WORLD RUNTIME: accepted_service_steps="<<gcAnimatedWorldSteps
+        <<" source_application_ms="<<sourceApplicationTimestamp
+        <<" windmill_source_time="<<gcAnimatedWorld->state(1).sequence.current34
+        <<" opening_active="<<gcAnimatedWorld->state(0).sequence.active90
+        <<" compound_owners=2 ordered_parts=4 registered_candidates="<<terrainOwnerCount
+        <<" dynamic_draws/vertices/indices="<<rendererDiagnostic.dynamicWorldDraws<<'/'
+        <<rendererDiagnostic.dynamicWorldVerticesUploaded<<'/'<<rendererDiagnostic.dynamicWorldIndices
+        <<" atm_unique=76 atm_images=35\n";
     const auto& drive=m.components.bindings;
     const auto& cockpitCg=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.model1B4)+1].localC0;
     float bodyDistanceSquared=0.f;

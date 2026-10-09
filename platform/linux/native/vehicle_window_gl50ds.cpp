@@ -268,6 +268,39 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
     // own bounds from the actual indexed world-space geometry after validation.
     return true;
 }
+bool validateTrackAnimations(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept {
+    if (!request.trackAnimationCount)
+        return (!request.trackAnimations && !request.trackAnimationTextures) ||
+            fail(d, VehicleWindowError50DS::request, "animation bank/descriptors require a nonzero count");
+    if (request.trackAnimationCount > maxVehicleWindowTrackAnimations50DS ||
+        !request.trackAnimations || !request.trackAnimationTextures ||
+        request.track.mode != VehicleWindowMode50DS::callerMaterialTextures ||
+        !request.trackAnimationTextures->validBorrow(request.context, request.isCurrent,
+            request.trackAnimationTextures->publicationToken()))
+        return fail(d, VehicleWindowError50DS::material, "track animation requires a bounded published source frame bank");
+    for (U i = 0; i < request.trackAnimationCount; ++i) {
+        const auto& animation = request.trackAnimations[i];
+        if (!animation.frameCount || animation.frameCount > maxVehicleWindowAnimationFrames50DS ||
+            animation.firstTextureIndex > request.trackAnimationTextures->textureCount() ||
+            animation.frameCount > request.trackAnimationTextures->textureCount()-animation.firstTextureIndex)
+            return fail(d, VehicleWindowError50DS::limits, "track animation frame range escapes actual published bank");
+        for (U previous = 0; previous < i; ++previous)
+            if (request.trackAnimations[previous].sourceSpanIndex == animation.sourceSpanIndex)
+                return fail(d, VehicleWindowError50DS::material, "duplicate placed animation span association");
+        if (animation.sourceSpanIndex >= request.track.spanCount)
+            return fail(d, VehicleWindowError50DS::material, "animated source span outside original track table");
+        const auto& span = request.track.spans[animation.sourceSpanIndex];
+        if (span.material.mode != VehicleWindowMaterialMode50DS::requiredTexture ||
+            span.material.textureIndex != animation.sourceTextureIndex)
+            return fail(d, VehicleWindowError50DS::material, "animated source span texture identity mismatch");
+        for (U frame = 0; frame < animation.frameCount; ++frame) {
+            const auto* image = request.trackAnimationTextures->asset(animation.firstTextureIndex+frame);
+            if (!image || !image->name)
+                return fail(d, VehicleWindowError50DS::material, "original animation frame is not published");
+        }
+    }
+    return true;
+}
 bool validateDynamicWorld(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept {
     auto selected = request;
     selected.track = request.dynamicWorld;
@@ -810,6 +843,7 @@ struct VehicleWindowGl50DS::Storage {
         Material material{};
         bool discardZeroAlpha = false;
         U sourcePass = 1, sourcePassCount = 1, projectionPass = 0;
+        U animation = assets::unresolvedMaterialTexture50EA;
     };
     struct TrackChunk {
         U sourceSpan = 0, indexStart = 0, indexCount = 0;
@@ -861,6 +895,14 @@ struct VehicleWindowGl50DS::Storage {
     std::uint64_t texturePublication = 0;
     std::unique_ptr<TrackSpan[]> trackSpans;
     U trackSpanCount = 0;
+    struct TrackAnimation {
+        U sourceTextureIndex = assets::unresolvedMaterialTexture50EA;
+        U firstTextureIndex = 0, frameCount = 0, selectedFrame = 0;
+        U names[maxVehicleWindowAnimationFrames50DS]{};
+    };
+    std::unique_ptr<TrackAnimation[]> trackAnimations;
+    U trackAnimationCount = 0;
+    std::uint64_t trackAnimationTexturePublication = 0;
     std::unique_ptr<TrackSpan[]> dynamicWorldSpans;
     std::unique_ptr<assets::Vertex48B[]> dynamicWorldSourceVertices;
     U dynamicWorldSpanCount = 0, dynamicWorldVertexCount = 0, dynamicWorldNormalCount = 0;
@@ -960,6 +1002,10 @@ struct VehicleWindowGl50DS::Storage {
                 request.context, request.isCurrent, trackTexturePublication)))
             return fail(d, VehicleWindowError50DS::material,
                 "borrowed track texture publication/context/thread is no longer valid");
+        if (request.trackAnimationTextures && !request.trackAnimationTextures->validBorrow(
+            request.context, request.isCurrent, trackAnimationTexturePublication))
+            return fail(d, VehicleWindowError50DS::material,
+                "borrowed animation texture publication/context/thread is no longer valid");
         if (request.dynamicWorld.textures && !request.dynamicWorld.textures->validBorrow(
             request.context, request.isCurrent, dynamicWorldTexturePublication))
             return fail(d, VehicleWindowError50DS::material,
@@ -1014,6 +1060,35 @@ struct VehicleWindowGl50DS::Storage {
                     "required track texture disappeared during cold preparation");
             }
         }
+        return true;
+    }
+    bool createTrackAnimations(const VehicleWindowRequest50DS& input) noexcept {
+        if (!input.trackAnimationCount) return true;
+        trackAnimations.reset(new (std::nothrow) TrackAnimation[input.trackAnimationCount]);
+        if (!trackAnimations) return fail(*diagnostic, VehicleWindowError50DS::allocation,
+            "allocate bounded cold original track-animation table");
+        trackAnimationCount = input.trackAnimationCount;
+        for (U i = 0; i < trackAnimationCount; ++i) {
+            const auto& source = input.trackAnimations[i]; auto& target = trackAnimations[i];
+            target.sourceTextureIndex = source.sourceTextureIndex;
+            target.firstTextureIndex = source.firstTextureIndex; target.frameCount = source.frameCount;
+            for (U f = 0; f < target.frameCount; ++f) {
+                target.names[f] = input.trackAnimationTextures->texture(target.firstTextureIndex+f);
+                if (!target.names[f]) return fail(*diagnostic, VehicleWindowError50DS::material,
+                    "original animation frame disappeared during cold preparation");
+            }
+            trackSpans[source.sourceSpanIndex].animation = i;
+        }
+        return true;
+    }
+    bool validateTrackAnimationFrames(const VehicleWindowFrame50DS& frame,
+        VehicleWindowDiagnostic50DS& d) const noexcept {
+        if (frame.trackAnimationFrameCount != trackAnimationCount ||
+            bool(frame.trackAnimationFrames) != bool(trackAnimationCount))
+            return fail(d, VehicleWindowError50DS::frame, "one explicit current frame per original track animation required");
+        for (U i = 0; i < trackAnimationCount; ++i)
+            if (frame.trackAnimationFrames[i] >= trackAnimations[i].frameCount)
+                return fail(d, VehicleWindowError50DS::frame, "current track animation frame outside original stored extent");
         return true;
     }
     bool createDynamicWorldMaterials(const VehicleWindowTrack50DS& input) noexcept {
@@ -2214,6 +2289,7 @@ void main() { viewerOutput = hudColor; }
         const assets::VehicleDrawAssets50CR& owner) noexcept {
         request = input;
         request.racerArchetypes = nullptr; // Cold descriptors are never retained.
+        request.trackAnimations = nullptr;
         // Track CPU bytes are borrowed only for this cold synchronous call.
         // No retained pointer, including after a failed cleanup, is needed.
         request.track.mesh = nullptr;
@@ -2232,6 +2308,7 @@ void main() { viewerOutput = hudColor; }
         texturePublication = input.materials.textures ? input.materials.textures->publicationToken() : 0;
         trackTexturePublication = input.track.textures ? input.track.textures->publicationToken() : 0;
         dynamicWorldTexturePublication = input.dynamicWorld.textures ? input.dynamicWorld.textures->publicationToken() : 0;
+        trackAnimationTexturePublication = input.trackAnimationTextures ? input.trackAnimationTextures->publicationToken() : 0;
         cableTexturePublication = input.cables.textures ? input.cables.textures->publicationToken() : 0;
         skyTexturePublication = input.sky.textures ? input.sky.textures->publicationToken() : 0;
         cableTextureName = input.cables.textures ? input.cables.textures->texture(input.cables.textureIndex) : 0;
@@ -2259,7 +2336,8 @@ void main() { viewerOutput = hudColor; }
         }
         diagnostic->component = 3;
         if (!createMaterials(input.materials) || !createRacerArchetypes(input) ||
-            !createTrackMaterials(input.track) || !createDynamicWorldMaterials(input.dynamicWorld) ||
+            !createTrackMaterials(input.track) || !createTrackAnimations(input) ||
+            !createDynamicWorldMaterials(input.dynamicWorld) ||
             !createTrackVisibility(input.track) || !createSkyMaterials(input.sky)) return false;
         if (!loadFunctions() || !check("initial GL error state") || !checkContext()) return false;
         shader.reset(new (std::nothrow) VehicleGlShader50CZ(shaderGl));
@@ -2322,6 +2400,16 @@ void main() { viewerOutput = hudColor; }
             !s.shader->program() || !s.targets[bank]) return false;
         if (s.trackIndexCount && (!s.trackVertexBuffer || !s.trackIndexBuffer || !s.trackVertexArray))
             return fail(*s.diagnostic, VehicleWindowError50DS::assets, "static track resources are not ready");
+        for (U i = 0; i < s.trackAnimationCount; ++i) {
+            const auto& animation = s.trackAnimations[i];
+            const auto selected = animation.selectedFrame;
+            if (selected >= animation.frameCount)
+                return fail(*s.diagnostic, VehicleWindowError50DS::frame, "track animation frame is not prepared");
+            const auto* image = s.request.trackAnimationTextures->asset(animation.firstTextureIndex+selected);
+            if (!image || image->name != animation.names[selected])
+                return fail(*s.diagnostic, VehicleWindowError50DS::material,
+                    "selected original animation frame no longer matches retained publication");
+        }
         if (s.dynamicWorldIndexCount && (!s.dynamicWorldIndexBuffer ||
             !s.dynamicWorldVertexBuffers[bank] || !s.dynamicWorldArrays[bank] ||
             (s.dynamicWorldNormalCount && !s.dynamicWorldNormalBuffers[bank])))
@@ -2524,7 +2612,10 @@ void main() { viewerOutput = hudColor; }
                     // Retained chunks of one span remain contiguous. Preserve
                     // its exact material policy without rebinding every chunk.
                     if (boundSpan != i) {
-                        s.gl.bindTexture(texture2D, span.material.name);
+                        const U textureName = span.animation == assets::unresolvedMaterialTexture50EA ?
+                            span.material.name : s.trackAnimations[span.animation].names[
+                                s.trackAnimations[span.animation].selectedFrame];
+                        s.gl.bindTexture(texture2D, textureName);
                         s.gl.uniform1i(s.trackUseTextureUniform, span.material.name ? 1 : 0);
                         s.gl.uniform1i(s.trackDiscardZeroAlphaUniform, span.discardZeroAlpha ? 1 : 0);
                         s.configureBlend(span.material.policy);
@@ -2973,7 +3064,8 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
             "context callbacks, valid output/vehicle shading modes and positive target bounds required");
     if (!assets.loaded()) return fail(d, VehicleWindowError50DS::assets, "50CR assets are not loaded");
     if (!validateTrack(request, d) || !validateMaterials(request, assets, d) ||
-        !validateCables(request, d) || !validateSky(request, d) || !validateDynamicWorld(request, d)) return false;
+        !validateCables(request, d) || !validateSky(request, d) || !validateDynamicWorld(request, d) ||
+        !validateTrackAnimations(request, d)) return false;
     if (request.racerArchetypeCount > maxVehicleWindowRacerArchetypes50DS ||
         bool(request.racerArchetypeCount) != bool(request.racerArchetypes))
         return fail(d, VehicleWindowError50DS::request, "racer archetypes require an explicit bounded cold array");
@@ -3024,7 +3116,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             if (!std::isfinite(frame.skyWorldViewProjection[i]))
                 return fail(d, VehicleWindowError50DS::frame, "nonfinite authored sky matrix");
     if (!s.validateMaterialUvs(frame.materialUvs, frame.materialUvCount, d) ||
-        !s.validateOpponents(batch, frame, d) || !s.validateDynamicWorldFrame(frame.dynamicWorld, d)) return false;
+        !s.validateOpponents(batch, frame, d) || !s.validateDynamicWorldFrame(frame.dynamicWorld, d) ||
+        !s.validateTrackAnimationFrames(frame, d)) return false;
     if (bool(s.request.cables.textures) != bool(frame.cables))
         return fail(d, VehicleWindowError50DS::frame, "cable frame presence must match explicit cold cable request");
     if (frame.cables && !validateCableFrame(*frame.cables, d)) return false;
@@ -3144,6 +3237,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     s.width = frame.width; s.height = frame.height;
     s.frameCables = frame.cables;
     s.frameDynamicWorld = frame.dynamicWorld;
+    for (U i = 0; i < s.trackAnimationCount; ++i)
+        s.trackAnimations[i].selectedFrame = frame.trackAnimationFrames[i];
     s.frameHostHud = frame.hostHud != nullptr;
     s.frameSet = true; s.diagnostic = &d;
     s.prepareTrackVisibility();

@@ -36,6 +36,8 @@ TerrainQueryStatus48M queryTerrainViewBounded48M(const TerrainQueryView48M&,
     const TerrainCandidate48J*,std::size_t,const TerrainQueryWorkspace48M&,
     TerrainCandidateEffects48J*,std::size_t,TerrainQueryResult48M&) noexcept;
 // Exact48J prepared limited-list semantics using caller-owned reusable scratch.
+// Additive original121410 compound1: parent-box gate then active ordered children,
+// one effect/callback per owner, source <= selected and strict nearest-pair ties.
 // Input vectors/meshes are persistent, read-only assets/metadata; no per-query
 // allocation or filter copying occurs. Workspace and destination spans must be
 // disjoint from each other and inputs. Capacity failure never truncates a list.

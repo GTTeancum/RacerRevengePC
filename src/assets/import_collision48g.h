@@ -45,6 +45,29 @@ struct Collision48G {
 bool decodeCollision48G(const std::vector<std::uint8_t>& input, Collision48G& output,
                        DecodeError48C& error, const DecodeHooks48C* hooks = nullptr,
                        const CollisionLimits48G& limits = {});
+// Original126450: ordered scene index followed by a headerless125890 tree.
+// The tree is a typed body, NOT a standalone original COL0 file: its offsets
+// are absolute in the compound source, and tree.original_bytes stays empty.
+// The existing COL0/RRCOL001 serializers intentionally do not admit these bodies.
+struct CollisionCompoundMember50IJ {
+    std::uint32_t scene_node_index=0, source_offset=0, body_offset=0, source_end=0;
+    Collision48G tree;
+};
+struct CollisionCompound50IJ {
+    std::uint32_t version=1,type=1,reverse_mode=0;
+    std::vector<CollisionCompoundMember50IJ> members;
+    std::vector<std::uint8_t> original_bytes;
+};
+struct CollisionCompoundLimits50IJ {
+    CollisionLimits48G tree{};
+    std::uint32_t members=80; // caller policy; absolute implementation ceiling1024
+};
+// Direct original-byte cold decode. Full original provenance is retained once;
+// member ordering, indices, tree topology and authored planes are never repaired.
+// Failure leaves output unchanged. No guest execution or generated geometry.
+bool decodeCollisionCompound50IJ(const std::vector<std::uint8_t>& input,
+    CollisionCompound50IJ& output, DecodeError48C& error,
+    const DecodeHooks48C* hooks=nullptr, const CollisionCompoundLimits50IJ& limits={});
 // Canonical source serializer checks typed fields, source offsets, and complete raw provenance.
 bool encodeOriginalCollision48G(const Collision48G& collision, std::vector<std::uint8_t>& output,
                                std::string& error);

@@ -201,22 +201,21 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
         for(auto t:n.children)if((t&leaf)?(t&0x7fff)>=resource.rayCount:t>=resource.nodeCount)return Status::InvalidInput;
     }
     std::size_t aggregateVisitBound=0;
-    for(std::size_t i=0;i<count;++i){
-        const auto& candidate=candidates[i];const auto& c=candidate.candidate.collision;const auto* mesh=c.geometry.mesh;
-        if(!readFilter(c.filter)||!read(candidate.candidate.sceneName,candidate.candidate.sceneNameBytes)||
-           !read(mesh,1)||!read(candidate.nodeRadii,candidate.nodeRadiusCount))return Status::InvalidInput;
+    const auto validateMesh=[&](const assets::CollisionMesh48I* mesh,const BodyMatrix48G& worldMatrix,
+        const float* radii,std::size_t radiusCount,std::size_t maxDepth) noexcept -> Status {
+        if(!read(mesh,1)||!read(radii,radiusCount))return Status::InvalidInput;
         if(!readVector(mesh->nodes)||!readVector(mesh->faces)||!readVector(mesh->vertices)||!readVector(mesh->vertex_normals))return Status::InvalidInput;
         if(mesh->reverse_mode!=0||mesh->nodes.empty()||mesh->faces.empty()||mesh->nodes.size()>32768||mesh->faces.size()>32768||
-           candidate.nodeRadiusCount!=mesh->nodes.size()||!affine(c.geometry.worldMatrix)||!finite(c.sphere))return Status::InvalidInput;
-        if(candidate.maxDepth>std::numeric_limits<std::size_t>::max()-resource.maxDepth-1)return Status::InvalidInput;
-        if(w.stackCapacity<1+resource.maxDepth+candidate.maxDepth)return Status::InsufficientCapacity;
+           radiusCount!=mesh->nodes.size()||!affine(worldMatrix))return Status::InvalidInput;
+        if(maxDepth>std::numeric_limits<std::size_t>::max()-resource.maxDepth-1)return Status::InvalidInput;
+        if(w.stackCapacity<1+resource.maxDepth+maxDepth)return Status::InsufficientCapacity;
         if(resource.nodeCount+resource.rayCount>std::numeric_limits<std::size_t>::max()/(mesh->nodes.size()+mesh->faces.size()))return Status::InvalidInput;
         const auto candidateVisitBound=(resource.nodeCount+resource.rayCount)*(mesh->nodes.size()+mesh->faces.size());
         if(candidateVisitBound>std::numeric_limits<std::size_t>::max()-aggregateVisitBound)return Status::InvalidInput;
         aggregateVisitBound+=candidateVisitBound;
         for(std::size_t j=0;j<mesh->nodes.size();++j){
             const auto& n=mesh->nodes[j];
-            if(!std::isfinite(candidate.nodeRadii[j])||candidate.nodeRadii[j]<0.f||!std::isfinite(n.volume)||
+            if(!std::isfinite(radii[j])||radii[j]<0.f||!std::isfinite(n.volume)||
                !finite(vector(n.center))||!finite(vector(n.half)))return Status::InvalidInput;
             for(unsigned k=0;k<3;++k)if(n.half[k]<0.f)return Status::InvalidInput;
             for(auto t:n.children){const auto index=t&~assets::collision_mesh_leaf48i;
@@ -225,6 +224,24 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
         }
         for(const auto& vertex:mesh->vertices)if(!finite(vector(vertex)))return Status::InvalidInput;
         for(const auto& face:mesh->faces)for(auto index:face.vertices)if(index>=mesh->vertices.size())return Status::InvalidInput;
+        return Status::Complete;
+    };
+    for(std::size_t i=0;i<count;++i){
+        const auto& candidate=candidates[i];const auto& c=candidate.candidate.collision;
+        if(!readFilter(c.filter)||!read(candidate.candidate.sceneName,candidate.candidate.sceneNameBytes)||!finite(c.sphere))return Status::InvalidInput;
+        if(candidate.shapeType==0){
+            const auto status=validateMesh(c.geometry.mesh,c.geometry.worldMatrix,candidate.nodeRadii,candidate.nodeRadiusCount,candidate.maxDepth);
+            if(status!=Status::Complete)return status;
+        }else if(candidate.shapeType==1){
+            const auto* compound=candidate.compound;
+            if(!read(compound,1)||compound->count>maxCompoundMembers50IJ||!read(compound->parts,compound->count)||
+               !affine(compound->ownerWorld)||!compound50ij_detail::box(compound->center,compound->half))return Status::InvalidInput;
+            for(const auto& axis:compound->coarseAxes)if(!finite(axis))return Status::InvalidInput;
+            for(std::size_t j=0;j<compound->count;++j){const auto& part=compound->parts[j];
+                const auto status=validateMesh(part.mesh,part.worldMatrix,part.nodeRadii,part.nodeRadiusCount,part.maxDepth);
+                if(status!=Status::Complete)return status;
+            }
+        }else return Status::UnsupportedScope;
     }
     return Status::Complete;
 }
@@ -251,7 +268,6 @@ Type2StaticStatus49X produceStaticType2Contacts49X(const Type2StaticQuery49X& qu
     auto currentCategory=query.initialCurrentCategory;
     for(std::size_t candidateIndex=0;candidateIndex<count;++candidateIndex){
         const auto& candidate=candidates[candidateIndex];const auto& c=candidate.candidate.collision;
-        const auto& mesh=*c.geometry.mesh;
         auto& effect=w.effects[candidateIndex];effect.identity=c.filter.identity;effect.flagsF8=c.filter.flagsF8;
         std::memcpy(effect.copied40.data(),c.copied40.data(),sizeof(effect.copied40));
         std::memcpy(effect.copied50.data(),c.copied50.data(),sizeof(effect.copied50));
@@ -263,13 +279,16 @@ Type2StaticStatus49X produceStaticType2Contacts49X(const Type2StaticQuery49X& qu
         bool sphereOverlap=false;if(!spheres(query.sphere,c.sphere,sphereOverlap))return Status::InvalidInput;
         if(!sphereOverlap||!filter(*query.filter,c.filter))continue;
         if(c.geometry.id!=c.filter.identity)return Status::InvalidInput;
-        const auto queryToTarget=relative(c.geometry.worldMatrix,query.worldMatrix);
-        const auto targetToQuery=relative(query.worldMatrix,c.geometry.worldMatrix);
+        bool candidateHit=false;
+        const auto visitMesh=[&](const assets::CollisionMesh48I& mesh,const BodyMatrix48G& worldMatrix,
+            const float* radii) noexcept -> Status {
+        const auto queryToTarget=relative(worldMatrix,query.worldMatrix);
+        const auto targetToQuery=relative(query.worldMatrix,worldMatrix);
         if(!affine(queryToTarget)||!affine(targetToQuery))return Status::InvalidInput;
         std::size_t used=1,visits=0;w.stack[0]={resource.root,0};
         result.stackHighWater=std::max(result.stackHighWater,used);
         const auto visitLimit=(resource.nodeCount+resource.rayCount)*(mesh.nodes.size()+mesh.faces.size());
-        bool candidateHit=false;
+        bool partHit=false;
         while(used){
             if(visits++==visitLimit)return Status::InvalidInput;
             ++result.visits;const auto item=w.stack[--used];
@@ -293,7 +312,7 @@ Type2StaticStatus49X produceStaticType2Contacts49X(const Type2StaticQuery49X& qu
                     if(status==TriangleQueryStatus48H::InvalidInput)return Status::InvalidInput;
                     if(status==TriangleQueryStatus48H::UnsupportedInterpolationBoundary)return Status::UnsupportedScope;
                     if(status==TriangleQueryStatus48H::Hit){
-                        outcome=1;candidateHit=true;++result.leafHits;
+                        outcome=1;partHit=true;++result.leafHits;
                         std::size_t pair=0;while(pair<result.pairCount&&w.metadata[pair].queryTag!=item.queryTag)++pair;
                         const bool fresh=pair==result.pairCount;
                         if(fresh||hit.fraction<w.metadata[pair].fraction){
@@ -333,7 +352,7 @@ Type2StaticStatus49X produceStaticType2Contacts49X(const Type2StaticQuery49X& qu
                 if(!finite(tc))return Status::InvalidInput;
                 // 107698 rejects before1076C0 computes the second center.
                 // Do not numerically evaluate an unreachable reverse test.
-                if(sphereBox(tc,qnode.center,qnode.half,candidate.nodeRadii[ti])){
+                if(sphereBox(tc,qnode.center,qnode.half,radii[ti])){
                     const auto qc=point(queryToTarget,vector(qnode.center));
                     if(!finite(qc))return Status::InvalidInput;
                     if(sphereBox(qc,tnode.center,tnode.half,qnode.radius)){
@@ -352,21 +371,45 @@ Type2StaticStatus49X produceStaticType2Contacts49X(const Type2StaticQuery49X& qu
                 w.trace[result.traceUsed++]={c.geometry.id,item.queryTag,item.targetTag,outcome};
             }
         }
-        if(!candidateHit)continue;
-        ++result.geometryHits;result.hasGeometryHit=true;result.queryFlagsF8=static_cast<std::uint8_t>(result.queryFlagsF8|0x20u);
+        if(!partHit)return Status::Complete;
+        candidateHit=true;
         if(!(result.selected.flags&1u)){
-            worldDirection(result.selected.normal,c.geometry.worldMatrix,2.f);
-            worldDirection(result.selected.correction,c.geometry.worldMatrix,3.f);
-            worldPoint(result.selected.surfacePoint,c.geometry.worldMatrix);
+            worldDirection(result.selected.normal,worldMatrix,2.f);
+            worldDirection(result.selected.correction,worldMatrix,3.f);
+            worldPoint(result.selected.surfacePoint,worldMatrix);
             if(!finite(xyz(result.selected.normal))||!finite(xyz(result.selected.correction))||
                !finite(xyz(result.selected.surfacePoint)))return Status::InvalidInput;
             result.selected.flags=static_cast<std::uint8_t>(result.selected.flags|1u);
         }
         for(std::size_t i=0;i<result.pairCount;++i)if(!w.metadata[i].worldConverted){
-            worldDirection(w.pairs[i].normal,c.geometry.worldMatrix,2.f);worldPoint(w.pairs[i].surfacePoint,c.geometry.worldMatrix);
+            worldDirection(w.pairs[i].normal,worldMatrix,2.f);worldPoint(w.pairs[i].surfacePoint,worldMatrix);
             if(!finite(xyz(w.pairs[i].normal))||!finite(xyz(w.pairs[i].surfacePoint)))return Status::InvalidInput;
             w.metadata[i].worldConverted=1;
         }
+            return Status::Complete;
+        };
+        if(candidate.shapeType==0){
+            const auto status=visitMesh(*c.geometry.mesh,c.geometry.worldMatrix,candidate.nodeRadii);
+            if(status!=Status::Complete)return status;
+        }else {
+            //121640/122BA0: parent-box coarse test precedes active-child visits.
+            const auto& compound=*candidate.compound;Vector3_48C center{},half{};
+            if(resource.nodeCount){center=vector(resource.nodes[0].center);half=vector(resource.nodes[0].half);}
+            else for(unsigned j=0;j<3;++j){
+                center.v[j]=mul(.5f,add(resource.rays[0].second.v[j],resource.rays[0].first.v[j]));
+                half.v[j]=mul(.5f,sub(resource.rays[0].second.v[j],resource.rays[0].first.v[j]));
+            }
+            bool coarse=false;if(!compoundCoarseOverlap50IJ(center,half,query.worldMatrix,compound,coarse))return Status::InvalidInput;
+            if(!coarse)continue;
+            //12165C..121870: results accumulate and world-convert per hit part;
+            // filters/effects/callbacks belong to the one outer owner only.
+            for(std::size_t j=0;j<compound.count;++j){const auto& part=compound.parts[j];if(!part.active)continue;
+                const auto status=visitMesh(*part.mesh,part.worldMatrix,part.nodeRadii);
+                if(status!=Status::Complete)return status;
+            }
+        }
+        if(!candidateHit)continue;
+        ++result.geometryHits;result.hasGeometryHit=true;result.queryFlagsF8=static_cast<std::uint8_t>(result.queryFlagsF8|0x20u);
         std::memcpy(effect.copied40.data(),query.copied40.data(),sizeof(effect.copied40));
         std::memcpy(effect.copied50.data(),query.copied50.data(),sizeof(effect.copied50));
         if(query.callbackEnabled){

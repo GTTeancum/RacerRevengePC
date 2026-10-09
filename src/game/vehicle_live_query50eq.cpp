@@ -70,12 +70,26 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
     for(std::size_t i=0;i<count;++i){
         if(indices[i]>=ownerCount)return false;
         const auto& owner=owners[indices[i]];const auto& candidate=owner.candidate;
-        const auto* mesh=candidate.collision.geometry.mesh;
-        if(!g.filter(candidate.collision.filter)||!g.read(candidate.sceneName,candidate.sceneNameBytes)||
-           !g.read(owner.nodeRadii,owner.nodeRadiusCount)||!g.read(mesh,1))return false;
-        if(!g.read(mesh->nodes.data(),mesh->nodes.size())||!g.read(mesh->faces.data(),mesh->faces.size())||
-           !g.read(mesh->vertices.data(),mesh->vertices.size())||
-           !g.read(mesh->vertex_normals.data(),mesh->vertex_normals.size()))return false;
+        if(!g.filter(candidate.collision.filter)||!g.read(candidate.sceneName,candidate.sceneNameBytes))return false;
+        const auto readMesh=[&](const assets::CollisionMesh48I* mesh,const float* radii,
+            std::size_t radiusCount) noexcept {
+            if(!g.read(mesh,1)||!g.read(radii,radiusCount))return false;
+            return g.read(mesh->nodes.data(),mesh->nodes.size())&&g.read(mesh->faces.data(),mesh->faces.size())&&
+                g.read(mesh->vertices.data(),mesh->vertices.size())&&
+                g.read(mesh->vertex_normals.data(),mesh->vertex_normals.size());
+        };
+        if(owner.shapeType==0){
+            if(!readMesh(candidate.collision.geometry.mesh,owner.nodeRadii,owner.nodeRadiusCount))return false;
+        }else if(owner.shapeType==1){
+            // Admit every nested immutable span before the 50EN membership
+            // prefix can mutate any of its buffers. No placeholder mesh read.
+            const auto* compound=owner.compound;
+            if(!g.read(compound,1)||compound->count>maxCompoundMembers50IJ||
+               !g.read(compound->parts,compound->count))return false;
+            for(std::size_t j=0;j<compound->count;++j){const auto& part=compound->parts[j];
+                if(!readMesh(part.mesh,part.nodeRadii,part.nodeRadiusCount))return false;
+            }
+        }else return false;
     }
     return true;
 }

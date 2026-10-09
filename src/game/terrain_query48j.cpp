@@ -69,6 +69,7 @@ TerrainQueryStatus48J queryTerrainLimited48J(const TerrainQuery48J& query,
             if(!finite(c.sphere)||!spheres(query.sphere,c.sphere,overlap))return TerrainQueryStatus48J::InvalidInput;
             if(!overlap||!filter(query.filter,c.filter))continue;
             if(c.geometry.id!=c.filter.identity)return TerrainQueryStatus48J::InvalidInput;
+            if(c.shapeType!=0)return TerrainQueryStatus48J::UnsupportedScope; // bounded48M supplies compound1
             CollisionResult48I hit{};
             const auto status=queryOrderedCollision48I(query.segment,&c.geometry,1,hit);
             if(status==CollisionQueryStatus48I::InvalidInput)return TerrainQueryStatus48J::InvalidInput;

@@ -1,5 +1,6 @@
 #pragma once
 #include "type2_resource49x.h"
+#include "compound_collision50ij.h"
 #include "spring_query48n.h"
 
 namespace rr::game {
@@ -35,6 +36,8 @@ struct Type2StaticCandidate49X {
     const float* nodeRadii=nullptr;
     std::size_t nodeRadiusCount=0,maxDepth=0;
     // Prepared by prepareStaticTargetRadii49X; mesh and radii remain immutable.
+    std::uint32_t shapeType=0;
+    const CompoundCollisionView50IJ* compound=nullptr; // shape1 only; one callback owner
 };
 struct Type2WorkItem49X { std::uint16_t queryTag,targetTag; };
 struct Type2Visit49X {
@@ -76,9 +79,10 @@ struct Type2StaticResult49X {
     bool hasGeometryHit=false;
 };
 enum class Type2StaticStatus49X { Complete,InvalidInput,UnsupportedScope,InsufficientCapacity };
-// Original static type2/mode0 numerical seam, explicit ordered candidates and
+// Original type2/mode0 numerical seam, explicit ordered static0/compound1 owners and
 // prepared affine matrices. Resources must be cold-prepared/validated and stay
-// immutable. No discovery, scene update, registration, E8 or dynamic callbacks.
+// immutable. Compound1 keeps the parent SAT gate, active member order and one
+// callback per owner. No discovery, scene update, registration, E8 or dynamic callbacks.
 // Reset selected endpoints to(+0,+0,+0,1), fraction to1 and cumulative count to0; preserve other
 // initial selected bytes and stale pair slots until original stores replace them.
 // Complete commits declared initial slot prefixes and every candidate effect.

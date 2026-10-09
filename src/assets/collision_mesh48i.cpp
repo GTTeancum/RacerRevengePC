@@ -26,15 +26,7 @@ bool affine(const std::array<float, 16>& m) noexcept {
     for (float f : m) if (!std::isfinite(f)) return false;
     return m[3] == 0 && m[7] == 0 && m[11] == 0 && m[15] == 1;
 }
-}
-static_assert(sizeof(CollisionMeshFace48I) == 16, "Portable compact face record");
-static_assert(sizeof(CollisionMeshNode48I) == 36, "Portable ordered node record");
-bool loadCollisionMesh48I(const std::vector<std::uint8_t>& cache,
-                         CollisionMesh48I& output, std::string& error) {
-    error.clear();
-    try {
-        Collision48G source;
-        if (!parseCollisionAsset48G(cache, source, error)) return false;
+bool project(Collision48G&& source, CollisionMesh48I& output, std::string& error) {
         CollisionMesh48I mesh;
         mesh.local_matrix = source.matrix;
         mesh.reverse_mode = source.reverse_mode;
@@ -55,12 +47,41 @@ bool loadCollisionMesh48I(const std::vector<std::uint8_t>& cache,
                 face.vertices[i] = static_cast<std::uint16_t>(f.vertices[i]);
             mesh.faces.push_back(face);
         }
-        output = std::move(mesh);
-        return true;
+        output=std::move(mesh);return true;
+}
+}
+static_assert(sizeof(CollisionMeshFace48I) == 16, "Portable compact face record");
+static_assert(sizeof(CollisionMeshNode48I) == 36, "Portable ordered node record");
+bool loadCollisionMesh48I(const std::vector<std::uint8_t>& cache,
+                         CollisionMesh48I& output, std::string& error) {
+    error.clear();
+    try {
+        Collision48G source;
+        if (!parseCollisionAsset48G(cache, source, error)) return false;
+        return project(std::move(source),output,error);
     } catch (const std::bad_alloc&) {
         error = "collision.runtime_allocation";
         return false;
     }
+}
+bool loadCollisionCompoundMesh50IJ(const std::vector<std::uint8_t>& original,
+    CollisionCompoundMesh50IJ& output,std::string& error,const CollisionCompoundLimits50IJ& limits) {
+    error.clear();try {
+        CollisionCompound50IJ source;DecodeError48C decode;
+        if(!decodeCollisionCompound50IJ(original,source,decode,nullptr,limits)){
+            error=decode.code+std::string(" at ")+std::to_string(decode.offset)+": "+decode.detail;return false;
+        }
+        CollisionCompoundMesh50IJ result;result.reverse_mode=source.reverse_mode;
+        result.members.reserve(source.members.size());
+        for(auto& member:source.members){
+            CollisionCompoundMeshMember50IJ part;
+            part.scene_node_index=member.scene_node_index;part.source_offset=member.source_offset;
+            part.body_offset=member.body_offset;part.source_end=member.source_end;
+            if(!project(std::move(member.tree),part.mesh,error))return false;
+            result.members.push_back(std::move(part));
+        }
+        output=std::move(result);return true;
+    }catch(const std::bad_alloc&){error="collision.compound_allocation";return false;}
 }
 bool placementCollision48I(const std::array<float, 3>& position,
                           const std::array<float, 3>& look,

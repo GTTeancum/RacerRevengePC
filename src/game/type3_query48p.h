@@ -1,5 +1,6 @@
 #pragma once
 #include "type3_state48p.h"
+#include "compound_collision50ij.h"
 #include "spring_type3_callback48p.h"
 #include "terrain_query48j.h"
 
@@ -39,6 +40,7 @@ struct Type3Candidate48P {
     std::uint32_t shapeType=0; // Distinct from collision-list byte tags/categories.
     bool hasMaterialScene=false;
     const char* sceneName=nullptr;std::size_t sceneNameBytes=0;
+    const CompoundCollisionView50IJ* compound=nullptr; // shape1 only; one outer owner
 };
 struct Type3QueryBuffers48P {
     Type3RayBuffers48P rays{};
@@ -62,9 +64,10 @@ enum class Type3QueryStatus48P {
 };
 // Exact supported projections of original122660 + type3 preparation126F40 and
 // static294BB0 callback. First scope: positive pair count, zero endpoint scene
-// metadata, float mesh shape0, flat/mode1 normals. Shape1 compound is explicitly
-// unsupported when reached; other unhandled shape tags preserve original miss
-// resets. Higher normal modes reject only if interpolation is actually needed.
+// metadata, float mesh shape0 or ordered compound1, flat/mode1 normals.
+// Compound1 preserves stale localCenter, cumulative fractions/hits and repeated
+// world conversion after every member, including misses; active is not consulted.
+// Other unhandled shape tags preserve original miss resets. Higher normal modes reject only if interpolation is actually needed.
 // Reached meshes require reverse_mode=0 and, when populated, a vertex-normal
 // array covering exactly the float vertex array; other shapes remain unadapted.
 // Per-candidate result resets/strict comparisons and stale selected transforms

@@ -83,7 +83,7 @@ struct GroupQueryWorkspace48U {
 // shape4/5 update their separately bound compact shared shape state.
 // Reached null shapes/shape bindings, unknown callbacks and
 // dynamic294BB0 bodies are explicit UnsupportedScope boundaries. Compound1
-// retains the existing dispatcher gate-specific UnsupportedScope boundary;
+// uses the borrowed canonical ordered part span; group setter remains a no-op;
 // other nonzero member tags preserve the original setter no-op/dispatch miss.
 //
 // Every declared mutable span (including inactive tails) is mutually disjoint

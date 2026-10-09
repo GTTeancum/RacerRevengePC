@@ -1,4 +1,5 @@
 #include "terrain_query_workspace48m.h"
+#include "compound_query50ij.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -96,6 +97,14 @@ TerrainQueryStatus48M queryTerrainViewBounded48M(const TerrainQueryView48M& quer
     if(!readFilter(query.filter))return TerrainQueryStatus48M::InvalidInput;
     for(std::size_t i=0;i<count;++i){
         if(!readFilter(candidates[i].filter))return TerrainQueryStatus48M::InvalidInput;
+        if(const auto* compound=candidates[i].compound){
+            if(!aligned48M(compound)||!readSpan(compound,sizeof(*compound))||compound->count>maxCompoundMembers50IJ||
+               (compound->count&&!aligned48M(compound->parts))||!readSpan(compound->parts,compound->count*sizeof(*compound->parts)))return TerrainQueryStatus48M::InvalidInput;
+            for(std::size_t j=0;j<compound->count;++j){const auto* mesh=compound->parts[j].mesh;
+                if(!mesh||!aligned48M(mesh)||!readSpan(mesh,sizeof(*mesh))||!readOnly(mesh->nodes)||!readOnly(mesh->faces)||
+                   !readOnly(mesh->vertices)||!readOnly(mesh->vertex_normals))return TerrainQueryStatus48M::InvalidInput;
+            }
+        }
         if(const auto* mesh=candidates[i].geometry.mesh){
             if(!aligned48M(mesh))return TerrainQueryStatus48M::InvalidInput;
             Range48M meshObject{};if(!range48M(mesh,1,sizeof(*mesh),meshObject))return TerrainQueryStatus48M::InvalidInput;
@@ -124,7 +133,9 @@ TerrainQueryStatus48M queryTerrainViewBounded48M(const TerrainQueryView48M& quer
             CollisionResult48I hit{};
             std::size_t traceUsed=0;
             const CollisionWorkspace48M collision{workspace.treeStack,workspace.treeStackCapacity,nullptr,0};
-            const auto status=queryOrderedCollisionBounded48M(query.segment,&c.geometry,1,collision,hit,traceUsed);
+            if(c.shapeType>1||(c.shapeType==1&&!c.compound))return TerrainQueryStatus48M::UnsupportedScope;
+            const auto status=c.shapeType==1?queryCompoundPair50IJ(query.segment,*c.compound,c.geometry.id,collision,hit):
+                queryOrderedCollisionBounded48M(query.segment,&c.geometry,1,collision,hit,traceUsed);
             if(status==CollisionQueryStatus48I::InsufficientCapacity)return TerrainQueryStatus48M::InsufficientCapacity;
             if(status==CollisionQueryStatus48I::InvalidInput)return TerrainQueryStatus48M::InvalidInput;
             if(status==CollisionQueryStatus48I::UnsupportedInterpolationBoundary)return TerrainQueryStatus48M::UnsupportedInterpolationBoundary;
@@ -190,6 +201,14 @@ TerrainPreparedQueryStatus48M prepareAndQueryTerrain48M(const TerrainPrepareInpu
     for(std::size_t i=0;i<count;++i){
         const auto& candidate=candidates[i];
         if(!filterAvoidsOutput(candidate.filter))return TerrainPreparedQueryStatus48M::InvalidInput;
+        if(const auto* compound=candidate.compound){
+            if(!aligned48M(compound)||!avoidOutput(compound,1,sizeof(*compound))||compound->count>maxCompoundMembers50IJ||
+               (compound->count&&!aligned48M(compound->parts))||!avoidOutput(compound->parts,compound->count,sizeof(*compound->parts)))return TerrainPreparedQueryStatus48M::InvalidInput;
+            for(std::size_t j=0;j<compound->count;++j){const auto* mesh=compound->parts[j].mesh;
+                if(!mesh||!aligned48M(mesh)||!avoidOutput(mesh,1,sizeof(*mesh))||!vectorAvoidsOutput(mesh->nodes)||
+                   !vectorAvoidsOutput(mesh->faces)||!vectorAvoidsOutput(mesh->vertices)||!vectorAvoidsOutput(mesh->vertex_normals))return TerrainPreparedQueryStatus48M::InvalidInput;
+            }
+        }
         if(const auto* mesh=candidate.geometry.mesh){
             if(!aligned48M(mesh)||!avoidOutput(mesh,1,sizeof(*mesh)))return TerrainPreparedQueryStatus48M::InvalidInput;
             if(!vectorAvoidsOutput(mesh->nodes)||!vectorAvoidsOutput(mesh->faces)||!vectorAvoidsOutput(mesh->vertices)||

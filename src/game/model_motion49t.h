@@ -51,6 +51,17 @@ bool sampleModelMotion49T(const assets::MotionView49O& motion,
     const SceneGraph49P& graph, ModelMotionState49T& state,
     ModelMotionSharedState49T& shared, ModelMotionWorkspace49T& workspace,
     ModelMotionDiagnostic49T& diagnostic) noexcept;
+// Original154480's nonmirrored, unmasked direct-time sampling route with
+// no cross-motion blend or scale-restoration owners. Consumes sampleTime as
+// current34, with no duration/fraction roundtrip. Rotation145850 clamps at the
+// final key; Bezier144EB0 extrapolates beyond the last key using the last two
+// positions. This is needed on the nonlooping completion frame before154A00
+// stops playback. Existing fractional APIs retain their covered-time admission.
+// No playback clock, model-pointer or owner state is changed by this helper.
+// Same49T graph/binding/shared/transaction contracts apply; time is finite>=0.
+bool sampleModelMotionTime50IG(const assets::MotionView49O&,
+    const assets::MotionNodeBindings49O&,float sampleTime,const SceneGraph49P&,
+    ModelMotionSharedState49T&,ModelMotionWorkspace49T&,ModelMotionDiagnostic49T&) noexcept;
 bool sampleModelMotionBlend49T(const assets::MotionView49O& first,
     const assets::MotionView49O& second,
     const assets::MotionNodeBindings49O& bindings, float frameFraction,

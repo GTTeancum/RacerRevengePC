@@ -87,6 +87,7 @@ inline bool copyCandidate(const TerrainCandidate48J& source,
     for(unsigned i=0;i<2;++i)if(d.identityLists[i].identities.capacity()<
         f.identityLists[i].identities.size())return false;
     dest.geometry=source.geometry;dest.sphere=source.sphere;
+    dest.shapeType=source.shapeType;dest.compound=source.compound;
     dest.ownerIdentity9C=source.ownerIdentity9C;dest.typeTag=source.typeTag;
     dest.hasResponseCallbackE8=source.hasResponseCallbackE8;
     dest.copied40=source.copied40;dest.copied50=source.copied50;

@@ -265,6 +265,13 @@ Type3QueryStatus48P queryStaticType3GroupsBounded48U(
         const auto* p=groups.objects[i].candidate;
         if(!guard.read(p,1)||!guard.filter(p->collision.filter)||!guard.read(p->sceneName,p->sceneNameBytes)||
            !guard.mesh(p->collision.geometry.mesh))return Status::InvalidInput;
+        if(p->compound){
+            if(!guard.read(p->compound,1)||p->compound->count>maxCompoundMembers50IJ||
+               !guard.read(p->compound->parts,p->compound->count))return Status::InvalidInput;
+            for(std::size_t j=0;j<p->compound->count;++j){const auto& part=p->compound->parts[j];
+                if(!guard.mesh(part.mesh)||!guard.read(part.nodeRadii,part.nodeRadiusCount))return Status::InvalidInput;
+            }
+        }
     }
     for(std::size_t i=0;i<groups.groupCount;++i)
         if(!guard.read(groups.groups[i].members,groups.groups[i].memberCapacity))return Status::InvalidInput;

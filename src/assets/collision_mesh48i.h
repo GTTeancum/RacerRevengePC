@@ -1,4 +1,5 @@
 #pragma once
+#include "import_collision48g.h"
 #include <array>
 #include <cstdint>
 #include <string>
@@ -29,6 +30,22 @@ struct CollisionMesh48I {
 // mesh. No original COL decoder or guest execution. Failure leaves output intact.
 bool loadCollisionMesh48I(const std::vector<std::uint8_t>& cache,
                          CollisionMesh48I& output, std::string& error);
+// Compact runtime projection of original type1, retaining member source order.
+// This storage is cold-owned: freeze members before binding their mesh addresses.
+struct CollisionCompoundMeshMember50IJ {
+    std::uint32_t scene_node_index=0,source_offset=0,body_offset=0,source_end=0;
+    CollisionMesh48I mesh;
+};
+struct CollisionCompoundMesh50IJ {
+    std::uint32_t reverse_mode=0;
+    std::vector<CollisionCompoundMeshMember50IJ> members;
+};
+// Decode original COL1 directly, then apply the same source face-normal packing
+// as loadCollisionMesh48I. No synthesized COL0 header/cache or geometry fallback.
+// Caller retains raw source; failure leaves runtime output unchanged.
+bool loadCollisionCompoundMesh50IJ(const std::vector<std::uint8_t>& original,
+    CollisionCompoundMesh50IJ& output, std::string& error,
+    const CollisionCompoundLimits50IJ& limits={});
 // Original static creator27B1FC: separately normalize Up/Look, then Up x Look.
 // Ordinary finite binary32 domain, strict arithmetic; no orthogonalization.
 bool placementCollision48I(const std::array<float, 3>& position,

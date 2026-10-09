@@ -46,6 +46,12 @@ struct Binding {
     // Every original loaded owner must occur exactly once, with no duplicates.
     std::size_t originalOwner=0;
     Type2StaticCandidate49X* candidate=nullptr;
+    // Additive original TOB/model owner. Not a fake SCB/static geometry row.
+    // Caller authenticates the actual source resource and constructor fields.
+    bool animated=false;
+    std::uint32_t authoredZone=0;
+    std::uint8_t materialA9=0;
+    ZoneMethod50CL method=ZoneMethod50CL::First;
 };
 struct Counts {
     std::size_t terrain=0,zones=0,portals=0,methods=0,blocks=0,objects=0;
@@ -93,6 +99,7 @@ struct Storage {
     const Counts count;
     FixedBuffer<Type2StaticCandidate49X*> candidates;
     FixedBuffer<std::uint32_t> candidateZones;
+    FixedBuffer<ZoneMethod50CL> candidateMethods;
     FixedBuffer<ContactMaterial50HI> contactMaterials;
     FixedBuffer<CandidateHandle50CB> handles;
     FixedBuffer<Type3Candidate48P> movement,registeredMovement;
@@ -132,7 +139,7 @@ struct Storage {
     FixedBuffer<std::uint32_t> scratchIds,firstIds,secondIds,mergeScratch,mergedIds;
     CandidateCollectionInput50BX collectionInput{};
 
-    explicit Storage(Counts n):count(n),candidates(n.terrain),candidateZones(n.terrain),
+    explicit Storage(Counts n):count(n),candidates(n.terrain),candidateZones(n.terrain),candidateMethods(n.terrain),
         contactMaterials(n.terrain),handles(n.terrain),movement(n.terrain),
         registeredMovement(n.terrain),terrainTargets(n.terrain),terrainSelected(n.selected),
         terrainScratchEffects(n.selected),terrainEffects(n.selected),
@@ -184,7 +191,7 @@ struct Storage {
             const std::size_t index=id/4u-1u;
             const auto& input=movement[index];auto& output=registeredMovement[registeredCount];
             if(!live_terrain_probe50fr::detail::copyCandidate(input.collision,output.collision))return false;
-            output.shapeType=input.shapeType;output.hasMaterialScene=input.hasMaterialScene;
+            output.shapeType=input.shapeType;output.compound=input.compound;output.hasMaterialScene=input.hasMaterialScene;
             output.sceneName=input.sceneName;output.sceneNameBytes=input.sceneNameBytes;
             registeredIndices[registeredCount++]=index;
         }
@@ -221,7 +228,7 @@ struct Budget {
 };
 inline void account(Budget& b,const Counts& n){
     b.add<Storage>(1);b.add<Type2StaticCandidate49X*>(n.terrain);
-    b.add<std::uint32_t>(n.terrain);b.add<ContactMaterial50HI>(n.terrain);
+    b.add<std::uint32_t>(n.terrain);b.add<ZoneMethod50CL>(n.terrain);b.add<ContactMaterial50HI>(n.terrain);
     b.add<CandidateHandle50CB>(n.terrain);b.add<Type3Candidate48P>(n.terrain,2);
     b.add<TerrainCandidate48J*>(n.terrain);b.add<TerrainCandidate48J>(n.selected);
     b.add<TerrainCandidateEffects48J>(n.selected,2);b.add<std::size_t>(n.selected,2);
@@ -279,7 +286,7 @@ public:
                 limits.zones&&limits.zones<=hardZones&&limits.portals<=hardPortals&&
                 limits.coldPayloadBytes&&limits.coldPayloadBytes<=32u*1024u*1024u,
                 "track storage limits may only reduce hard ceilings");
-            need(bindings&&count&&count==ground.owners.size()&&count<=limits.terrainOwners,
+            need(bindings&&count&&count>=ground.owners.size()&&count<=limits.terrainOwners,
                 "track storage requires every original loaded COL owner exactly once");
             Counts n{};n.terrain=count;n.zones=ground.world.zones.size();n.portals=ground.world.portals.size();
             need(n.zones&&n.zones<=limits.zones&&n.portals<=limits.portals,"original world exceeds storage bounds");
@@ -298,42 +305,56 @@ public:
                     choice.selection.collisionDynamic11C==a::ZoneSearchKind50CN::List,
                     "original zone requires unsupported search method; no List substitution");
             }
+            std::size_t staticCount=0;
             for(std::size_t i=0;i<count;++i){
                 diagnostic.candidate=i;const auto& binding=bindings[i];
-                need(binding.candidate&&binding.originalOwner<ground.owners.size(),"invalid original collider binding");
-                for(std::size_t j=0;j<i;++j)need(bindings[j].originalOwner!=binding.originalOwner&&
+                need(binding.candidate,"invalid original collider binding");
+                for(std::size_t j=0;j<i;++j)need((binding.animated||bindings[j].animated||bindings[j].originalOwner!=binding.originalOwner)&&
                     bindings[j].candidate!=binding.candidate,"duplicate original collider binding");
-                const auto& original=ground.owners[binding.originalOwner];
                 const auto& c=binding.candidate->candidate.collision;
+                if(binding.animated){
+                    need(binding.originalOwner==std::numeric_limits<std::size_t>::max()&&binding.authoredZone&&binding.authoredZone<=n.zones&&
+                        binding.candidate->shapeType==1&&binding.candidate->compound&&c.shapeType==1&&c.compound==binding.candidate->compound&&
+                        c.filter.identity&&c.geometry.id==c.filter.identity&&c.ownerIdentity9C,
+                        "original animated compound binding is incomplete");
+                }else{
+                need(binding.originalOwner<ground.owners.size(),"invalid original SCB collider index");++staticCount;
+                const auto& original=ground.owners[binding.originalOwner];
                 need(original.zone&&original.zone<=n.zones&&c.geometry.mesh==&original.mesh&&
                     !std::memcmp(c.geometry.worldMatrix.v,original.instance.world.v,sizeof original.instance.world.v)&&
                     c.filter.categoryA4==original.instance.category&&c.filter.identity&&
                     !std::memcmp(c.sphere.center.v,original.instance.sphere.center.v,sizeof c.sphere.center.v)&&
                     !std::memcmp(&c.sphere.radius,&original.instance.sphere.radius,sizeof(float)),
                     "candidate does not borrow its original prepared COL placement/category/sphere");
+                }
                 const auto& f=c.filter;
                 const std::size_t lengths[]{f.categoryMasks.size(),f.identityLists[0].identities.size(),f.identityLists[1].identities.size()};
                 for(unsigned k=0;k<3;++k){budget.add<std::uint32_t>(lengths[k]);filterMaximum[k]=std::max(filterMaximum[k],lengths[k]);}
             }
+            need(staticCount==ground.owners.size(),"not every original SCB collider is bound exactly once");
             for(auto maximum:filterMaximum){budget.add<std::uint32_t>(maximum,n.terrain);budget.add<std::uint32_t>(maximum,n.selected);}
             diagnostic.requestedPayloadBytes=budget.used;
             auto next=std::make_unique<Storage>(n);
             for(std::size_t i=0;i<count;++i){
                 diagnostic.candidate=i;auto& c=*bindings[i].candidate;
-                const auto& original=ground.owners[bindings[i].originalOwner];
-                next->candidates[i]=&c;next->candidateZones[i]=original.zone;
+                const auto& binding=bindings[i];
+                next->candidates[i]=&c;next->candidateZones[i]=binding.animated?binding.authoredZone:ground.owners[binding.originalOwner].zone;
+                next->candidateMethods[i]=binding.method;
                 next->terrainTargets[i]=&c.candidate.collision;
                 next->handles[i]={c.candidate.collision.filter.identity,i};
                 std::string error;
-                need(a::readTrackContactMaterial50HI(ground.world,original.zone,original.ordinal,
-                    c.candidate.collision.filter.identity,next->contactMaterials[i],error),
-                    "original contact MaterialID mapping rejected");
+                if(binding.animated)next->contactMaterials[i]={c.candidate.collision.filter.identity,binding.materialA9};
+                else {const auto& original=ground.owners[binding.originalOwner];
+                    need(a::readTrackContactMaterial50HI(ground.world,original.zone,original.ordinal,
+                        c.candidate.collision.filter.identity,next->contactMaterials[i],error),
+                        "original contact MaterialID mapping rejected");}
+
                 auto& movement=next->movement[i];movement.collision=c.candidate.collision;
-                movement.shapeType=0;movement.hasMaterialScene=c.candidate.hasMaterialScene;
+                movement.shapeType=c.shapeType;movement.compound=c.compound;movement.hasMaterialScene=c.candidate.hasMaterialScene;
                 movement.sceneName=c.candidate.sceneName;movement.sceneNameBytes=c.candidate.sceneNameBytes;
                 reserveFilter(next->registeredMovement[i].collision.filter,filterMaximum);
                 const auto p=projectCollectionObject50CF(c.candidate.collision.filter,
-                    c.candidate.collision.sphere,c.candidate.collision.typeTag,0,0);
+                    c.candidate.collision.sphere,c.candidate.collision.typeTag,c.shapeType,0);
                 need(p.valid,"original candidate collector projection rejected");
                 next->objects[i]=p.object;next->source[i]=p.state;
             }
@@ -358,9 +379,9 @@ public:
             need(initializeZoneLifecycle50CL(next->lifecycle,zones,n.zones,n.objects,runtimeSearchSlotLimit,
                 next->registrationScratch)==SearchStorageStatus50BS::Complete,"track zone lifecycle initialization failed");
             next->queue={next->events.data(),n.events,0,0};
-            for(std::size_t i=0;i<count;++i)
+            for(std::size_t i=0;i<count;++i)if(!bindings[i].animated)
                 need(enqueueZoneRegistration50CQ(next->queue,{ZoneRegistrationOperation50CQ::Set,
-                    static_cast<CollectionRef50BX>(i+1),next->candidateZones[i],ZoneMethod50CL::First})==ZoneQueueStatus50CQ::Complete,
+                    static_cast<CollectionRef50BX>(i+1),next->candidateZones[i],next->candidateMethods[i]})==ZoneQueueStatus50CQ::Complete,
                     "cold original collider registration queue full");
             const auto drained=drainZoneRegistrations50CQ(next->queue,next->lifecycle,next->registrationScratch,n.events);
             need(drained.status==ZoneQueueStatus50CQ::Complete&&!drained.remaining,"cold original collider registration rejected");

@@ -58,11 +58,11 @@ struct Eval {
         for(unsigned i=0;i<3;++i)q[i+1]=mul(mul(value(0x3c010204),static_cast<float>(k.axis[i])),s);
         return q;
     }
-    bool rotation(const assets::MotionView49O& v,std::uint32_t ti,float time,Q& result) noexcept {
+    bool rotation(const assets::MotionView49O& v,std::uint32_t ti,float time,Q& result,bool directTime=false) noexcept {
         const auto n=v.rotation[ti].keyCount;assets::ByteAxisKey49O a{},b{};
         if(n<2||n>assets::maxMotKeysPerTrack49O||!assets::readRotationKey49O(v,ti,0,a)||
-           !assets::readRotationKey49O(v,ti,n-1,b)||time<a.time||time>b.time)return false;
-        if(time==b.time){result=decode(b);return true;}
+           !assets::readRotationKey49O(v,ti,n-1,b)||time<a.time||(!directTime&&time>b.time))return false;
+        if(time>=b.time){result=decode(b);return true;}
         // Same strict upper interval as145850, with checked finite asset view.
         std::uint32_t lo=0,hi=n-1;
         while(hi-lo>1){auto mid=(lo+hi)/2;assets::ByteAxisKey49O k{};
@@ -75,11 +75,11 @@ struct Eval {
         if(dot(result,later)<0)for(auto& x:result)x=-x;
         return true;
     }
-    bool position(const assets::MotionView49O& v,std::uint32_t ti,float time,V& p) noexcept {
+    bool position(const assets::MotionView49O& v,std::uint32_t ti,float time,V& p,bool directTime=false) noexcept {
         const auto n=v.position[ti].keyCount;assets::BezierKey49O a{},b{};
         if(n<2||n>assets::maxMotKeysPerTrack49O||!assets::readPositionKey49O(v,ti,0,a)||
-           !assets::readPositionKey49O(v,ti,n-1,b)||time<a.time||time>b.time)return false;
-        const bool interpolate=time!=b.time;std::uint32_t lo=0,hi=n-1;
+           !assets::readPositionKey49O(v,ti,n-1,b)||time<a.time||(!directTime&&time>b.time))return false;
+        const bool interpolate=time<b.time;std::uint32_t lo=0,hi=n-1;
         if(interpolate){while(hi-lo>1){auto mid=(lo+hi)/2;assets::BezierKey49O k{};
             if(!assets::readPositionKey49O(v,ti,mid,k))return false;
             if(time<k.time)hi=mid;else lo=mid;
@@ -119,11 +119,11 @@ bool sample(const assets::MotionView49O& motion, const assets::MotionView49O* se
     const assets::MotionNodeBindings49O& bindings, float fraction, float weight,
     const SceneGraph49P& graph, ModelMotionState49T& state,
     ModelMotionSharedState49T& shared, ModelMotionWorkspace49T& workspace,
-    ModelMotionDiagnostic49T& d) noexcept {
+    ModelMotionDiagnostic49T& d,bool directTime=false) noexcept {
     d={};
     if(std::fegetround()!=FE_TONEAREST)return reject(d,ModelMotionError49T::rounding_mode);
     if(!graph.nodes||!graph.count||graph.count>maxSceneNodes49P||!motion.data||
-       !std::isfinite(fraction)||fraction<0||fraction>1||
+       !std::isfinite(fraction)||fraction<0||(!directTime&&fraction>1)||
        !std::isfinite(motion.duration)||!(motion.duration>0)||
        (second&&(!second->data||!std::isfinite(weight)||weight<0||weight>1)))
         return reject(d,ModelMotionError49T::input);
@@ -163,7 +163,7 @@ bool sample(const assets::MotionView49O& motion, const assets::MotionView49O* se
     RR_MODEL49T_MODEL_WRITE(stagedState.model18,0);
 #endif
     stagedState.model18=0;
-    Eval e{stagedShared};const float time=e.mul(motion.duration,fraction);
+    Eval e{stagedShared};const float time=directTime?fraction:e.mul(motion.duration,fraction);
     if(!e.valid)return reject(d,ModelMotionError49T::arithmetic);
     for(std::uint32_t channel=0;channel<2;++channel){
         const auto count=channel?motion.positionCount:motion.rotationCount;
@@ -175,11 +175,11 @@ bool sample(const assets::MotionView49O& motion, const assets::MotionView49O* se
                 return reject(d,ModelMotionError49T::binding,i,channel);
             const auto target=static_cast<SceneNodeIndex49P>(bindings.rows[track.rowIndex].sceneNode);
             BodyMatrix48G local=workspace.nodes[bindings.rows[track.rowIndex].sceneNode].localC0;
-            if(!channel){Q q{};if(!e.rotation(motion,i,time,q))return reject(d,ModelMotionError49T::sample_time,i,channel);
+            if(!channel){Q q{};if(!e.rotation(motion,i,time,q,directTime))return reject(d,ModelMotionError49T::sample_time,i,channel);
                 if(second){Q b{};if(!e.rotation(*second,i,time,b))return reject(d,ModelMotionError49T::sample_time,i,channel);
                     q=e.blend(b,q,weight);}
                 e.rotationMatrix(q,local);
-            }else{V p{};if(!e.position(motion,i,time,p))return reject(d,ModelMotionError49T::sample_time,i,channel);
+            }else{V p{};if(!e.position(motion,i,time,p,directTime))return reject(d,ModelMotionError49T::sample_time,i,channel);
                 if(second){V b{};if(!e.position(*second,i,time,b))return reject(d,ModelMotionError49T::sample_time,i,channel);
                     for(unsigned lane=0;lane<3;++lane)p[lane]=e.sub(b[lane],e.mul(weight,e.sub(b[lane],p[lane])));}
                 for(unsigned lane=0;lane<3;++lane)local.v[12+lane]=p[lane];
@@ -204,6 +204,15 @@ bool sampleModelMotion49T(const assets::MotionView49O& motion,
     ModelMotionSharedState49T& shared, ModelMotionWorkspace49T& workspace,
     ModelMotionDiagnostic49T& diagnostic) noexcept {
     return sample(motion,nullptr,bindings,fraction,0,graph,state,shared,workspace,diagnostic);
+}
+bool sampleModelMotionTime50IG(const assets::MotionView49O& motion,
+    const assets::MotionNodeBindings49O& bindings,float sampleTime,
+    const SceneGraph49P& graph,ModelMotionSharedState49T& shared,
+    ModelMotionWorkspace49T& workspace,ModelMotionDiagnostic49T& diagnostic) noexcept {
+    //154480 consumes current34 directly, without duration/fraction roundtrip.
+    // Its model18 is a live motion pointer, not the49T opaque invalidation word.
+    ModelMotionState49T unused{};
+    return sample(motion,nullptr,bindings,sampleTime,0,graph,unused,shared,workspace,diagnostic,true);
 }
 bool sampleModelMotionBlend49T(const assets::MotionView49O& first,
     const assets::MotionView49O& second,

@@ -1,5 +1,6 @@
 #pragma once
 #include "collision_tree48i.h"
+#include "compound_collision50ij.h"
 #include "vehicle_contact48g.h"
 #include <array>
 #include <cstddef>
@@ -27,6 +28,8 @@ struct TerrainCandidate48J {
     std::uint8_t typeTag=0;
     bool hasResponseCallbackE8=false;
     std::array<float,4> copied40{},copied50{};
+    std::uint32_t shapeType=0;
+    const CompoundCollisionView50IJ* compound=nullptr;
 };
 struct TerrainCallbackMasks48J {
     std::uint32_t collect=0,forceAngle=0,excludeOwner=0;
