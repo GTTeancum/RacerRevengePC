@@ -1,5 +1,6 @@
 """Source-only staged TA -> incomplete GC UI controller. Never launches a process."""
 import json
+from capture_clock_contract import verify_capture_clocks
 
 
 class MultiTrackExercise:
@@ -16,6 +17,7 @@ class MultiTrackExercise:
         self.expected = None
         self.actions = []
         self.frozen = None
+        self.frozen_rendered_tick = None
         self.pause_first = None
         self.resume_baseline = None
         self.racing_since = None
@@ -34,8 +36,8 @@ class MultiTrackExercise:
             'cold_rebuilds_allowed': 1, 'cold_rebuilds_observed': 0,
             'bank_identity_note': 'Session counter plus actual bank-owner address. A cold allocator may reuse an address; identity is the pair.',
             'gc_complete_world_admitted': False,
-            'known_gc_omissions': ['zone2 windmill animation/type1 collision',
-                'zone11 triggered opening', 'authored LostAI branch triggers',
+            'known_gc_omissions': ['Gate/LostAI trigger detection',
+                'zone11 opening trigger activation', 'authored LostAI branch actions',
                 'Gate sound', 'mode 1 record configuration'],
         }
 
@@ -198,6 +200,7 @@ class MultiTrackExercise:
             self.identity = self.identity_of(item)
             self.track = self.selected = 'GC'
             self.frozen = None
+            self.frozen_rendered_tick = None
             self.require_state(item, 0)
             self.receipt['gc_ready'] = event
             self.segment_started = at
@@ -216,11 +219,14 @@ class MultiTrackExercise:
             self.selected = selected
             if action.get('freeze'):
                 self.frozen = event
+                self.frozen_rendered_tick = None
             if action.get('resume'):
                 self.resume_baseline = self.frozen
                 self.frozen = None
+                self.frozen_rendered_tick = None
             if action.get('unfreeze'):
                 self.frozen = None
+                self.frozen_rendered_tick = None
                 self.segment_started = at
             self.receipt[action['label']] = event
             self.expected = None
@@ -236,14 +242,20 @@ class MultiTrackExercise:
                 self.video_previous = event
             elif self.state == 'wait_action' and self.expected and self.expected['kind'] == 'capture':
                 action, frame = self.expected, self.pending_capture
-                if frame is None or frame['tick'] != item['tick']:
-                    raise RuntimeError('Capture telemetry lacks its exact committed image/tick')
+                if frame is None:
+                    raise RuntimeError('Capture telemetry lacks its requested committed image')
+                verify_capture_clocks(frame, item)
                 self.require_state(item, action['page'])
                 frame['ui_state'] = event
                 if frame['audio_sample_frames'] is None:
                     raise RuntimeError('Actual native PCM evidence is missing')
                 if self.frozen is not None and frame['audio_sample_frames'] != item['mixed_frames']:
                     raise RuntimeError('Paused actual WAV sample count differs from the frozen mix clock')
+                if self.frozen is not None:
+                    if (self.frozen_rendered_tick is not None
+                            and frame['rendered_tick'] != self.frozen_rendered_tick):
+                        raise RuntimeError('Retained scene tick changed while the same menu held native simulation')
+                    self.frozen_rendered_tick = frame['rendered_tick']
                 if action.get('pause_first'):
                     self.pause_first = event
                     self.receipt['pause_first_pcm_frames'] = frame['audio_sample_frames']

@@ -8,7 +8,7 @@ from pathlib import Path
 LEDGER = Path('/workspace/shared/rr-last-central-test.json')
 ACTIVE = {'running', 'launching', 'reserved', 'building', 'ready', 'active'}
 TERMINAL = {'completed', 'complete', 'passed', 'failed', 'stopped', 'aborted', 'done',
-            'passed_focused_menu_clegg_capture'}
+            'passed_focused_menu_clegg_capture', 'failed_capture_checker_front_menu_tick'}
 
 
 def aware(value):

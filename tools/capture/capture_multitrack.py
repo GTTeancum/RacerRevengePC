@@ -14,11 +14,13 @@ import subprocess
 import tempfile
 import time
 import wave
+from capture_clock_contract import verify_capture_clocks
 
 
 REPO = Path('/workspace/scratch/74cd1d3d7a45/racerrevenge_solo_return/RacerRevengePC')
 LEDGER = Path('/workspace/shared/rr-last-central-test.json')
 COMMIT = re.compile(r'^live capture committed at tick (\d+)')
+CAPTURE_STATE = re.compile(r'^capture_state wrong_way=([01]) tick=(\d+) host_menu=([01])$')
 RACE = re.compile(r'^race phase=(\d+) countdown=(\d+) seconds=([^ ]+)')
 AUDIO_RECORDING = re.compile(r'^Audio recording session=(\d+) path=(.+)$')
 ACTIVE = {'running', 'launching', 'reserved', 'building', 'ready', 'active'}
@@ -147,7 +149,8 @@ def main():
                     else args.cwd / args.fixture).resolve()
     if not args.binary.is_file() or not args.fixture.is_file() or not args.cwd.is_dir():
         parser.error('Existing binary, fixture, and working directory are required; no build is run')
-    source_files = [Path(__file__).resolve(), Path(__file__).resolve().with_name('multitrack_exercise.py')]
+    source_files = [Path(__file__).resolve(), Path(__file__).resolve().with_name('multitrack_exercise.py'),
+                    Path(__file__).resolve().with_name('capture_clock_contract.py')]
     for path in args.source_file:
         resolved = (path if path.is_absolute() else args.cwd / path).resolve()
         if not resolved.is_file():
@@ -186,6 +189,7 @@ def main():
                    'cleared_inherited_rr_variables': sorted(k for k in os.environ if k.startswith('RR_')),
                    'slot': claim, 'target_seconds': args.seconds, 'target_fps': args.fps,
                    'timing_basis': 'Monotonic acknowledgement-observation time, not invented frame rate',
+                   'tick_contract': 'frame.tick/rendered_tick = last committed scene tick; native_tick = completed native counter. Exact equality is required only for fresh live-scene captures.',
                    'scope': ('One headless live process; prepared TA Start, real drive/Pause/Resume, '
                              'cancelled then confirmed Main, GC disclosure and one expected cold Start, '
                              '20-second actual GC capture, quit. No other restart or retry.'),
@@ -288,6 +292,8 @@ def main():
                             with (out / name).open('xb') as target:
                                 target.write(data)
                             frame = {'file': name, 'tick': int(match.group(1)),
+                                     'rendered_tick': int(match.group(1)),
+                                     'retained_before_undertrack_pause': 'retained before undertrack pause' in line,
                                      'purpose': purpose,
                                      'request_elapsed': pending['requested_at'] - start,
                                      'ack_elapsed': observed - start,
@@ -312,6 +318,19 @@ def main():
                             if menu is not None:
                                 awaiting_ui_for = frame
                             pending = None
+                        capture_state = CAPTURE_STATE.fullmatch(line)
+                        if line.startswith('capture_state '):
+                            if (capture_state is None or awaiting_ui_for is None
+                                    or 'capture_state' in awaiting_ui_for):
+                                raise RuntimeError('Unpaired, duplicate, or malformed render capture_state')
+                            rendered_tick = int(capture_state.group(2))
+                            if rendered_tick != awaiting_ui_for['rendered_tick']:
+                                raise RuntimeError('Image ACK and capture_state render ticks differ')
+                            awaiting_ui_for['capture_state'] = {
+                                'rendered_tick': rendered_tick,
+                                'host_menu_image': capture_state.group(3) == '1',
+                                'wrong_way': capture_state.group(1) == '1',
+                                'observed_elapsed': observed - start, 'line': line}
                         if menu is not None:
                             ui_event = menu.observe(line, observed - start)
                             if ui_event is not None and ui_event['reason'] == 'ready':
@@ -323,9 +342,8 @@ def main():
                             if ui_event is not None and ui_event['reason'] == 'capture':
                                 if awaiting_ui_for is None:
                                     raise RuntimeError('UI capture telemetry has no committed image')
+                                verify_capture_clocks(awaiting_ui_for, ui_event)
                                 awaiting_ui_for['ui_state'] = ui_event
-                                if awaiting_ui_for['tick'] != ui_event['tick']:
-                                    raise RuntimeError('Image acknowledgement and native UI tick differ')
                                 awaiting_ui_for = None
                             if ui_event is not None and (ui_event['reason'] != 'capture'
                                     or len(frames) % 40 == 0):
