@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""STAGED, NOT RUN: explicitly requested encoding of an existing dense real take."""
+"""Artifact-only encoding of an existing dense capture; never launches the game."""
 import argparse
 import array
 import hashlib
@@ -24,6 +24,8 @@ def main():
     parser.add_argument('take', type=Path)
     parser.add_argument('--root-requested-encode', action='store_true', required=True)
     parser.add_argument('--require-audio', action='store_true')
+    parser.add_argument('--output', type=Path, required=True,
+                        help='New artifact directory; the failed export is never overwritten')
     args = parser.parse_args()
     take = args.take.resolve()
     receipt = json.loads((take / 'capture-receipt.json').read_text())
@@ -52,9 +54,9 @@ def main():
     ffmpeg, ffprobe = shutil.which('ffmpeg'), shutil.which('ffprobe')
     if not ffmpeg or not ffprobe:
         parser.error('Existing ffmpeg and ffprobe are required; do not install or rerun gameplay')
-    output = take / 'encoded'
+    output = args.output.resolve()
     if output.exists():
-        parser.error('encoded/ already exists; preserve it and review before any retry')
+        parser.error('Output directory already exists; preserve it and choose a new destination')
     audio_report = {'included': False}
     audio_bytes = None
     try:
@@ -108,10 +110,15 @@ def main():
     # A 1 ms input time base preserves measured cadence. The final actual
     # captured frame marks the endpoint and remains visible for one millisecond.
     # No fps filter, motion interpolation, speed-up, or invented intermediate frames.
+    # Disable B-frame reordering so the MP4 decoding and presentation timeline
+    # have the same endpoint. The prior reordered export had correct PTS but
+    # reported a container duration shorter than its final presentation time.
     concat = ['ffconcat version 1.0']
     for frame, gap in zip(frames[:-1], gaps):
-        concat += ["file '../%s'" % frame['file'], 'option framerate 1000', 'duration %.9f' % gap]
-    concat += ["file '../%s'" % frames[-1]['file'], 'option framerate 1000']
+        concat += ["file '%s'" % str(take / frame['file']).replace("'", "'\\''"),
+                   'option framerate 1000', 'duration %.9f' % gap]
+    concat += ["file '%s'" % str(take / frames[-1]['file']).replace("'", "'\\''"),
+               'option framerate 1000']
     (output / 'frames.ffconcat').write_text('\n'.join(concat) + '\n')
     mp4 = output / 'gameplay.mp4'
     command = [ffmpeg, '-hide_banner', '-nostdin', '-n', '-f', 'concat', '-safe', '0',
@@ -121,13 +128,17 @@ def main():
     else:
         command += ['-map', '0:v:0', '-an']
     command += ['-fps_mode', 'vfr', '-enc_time_base', '1:1000',
-                '-c:v', 'libx264', '-crf', '18', '-preset', 'medium', '-pix_fmt', 'yuv420p',
+                '-c:v', 'libx264', '-bf', '0', '-crf', '18', '-preset', 'medium', '-pix_fmt', 'yuv420p',
                 '-video_track_timescale', '1000000', '-movflags', '+faststart', 'gameplay.mp4']
     report = {'capture_receipt': str(take / 'capture-receipt.json'),
               'timing_basis': receipt['timing_basis'], 'measured_video_seconds': duration,
               'measured_capture_fps': len(gaps) / duration, 'maximum_gap_seconds': max(gaps),
               'captured_frames': len(frames), 'visible_source_frames': len(frames),
               'endpoint_frame_duration_seconds': 0.001,
+              'timestamp_quantization_seconds': 0.001,
+              'timing_fix': 'No B-frame reordering; presentation and decoding endpoint agree',
+              'artifact_only': True, 'new_game_runs': 0,
+              'source_speed_adjustment': False, 'invented_or_repeated_source_frames': 0,
               'track_label': receipt['track_label'], 'audio': audio_report, 'ffmpeg_argv': command,
               'verified': False, 'status': 'encoding'}
     report_path = output / 'encode-receipt.json'
@@ -149,6 +160,13 @@ def main():
     elif max(abs(a - b) for a, b in zip(actual_pts, expected_pts)) > 0.003:
         problems.append('Encoded frame times differ by more than 3 ms from measured cadence')
     actual_duration = float(video.get('duration', info['format']['duration']))
+    format_duration = float(info['format']['duration'])
+    if video.get('has_b_frames', 0) != 0:
+        problems.append('Unexpected B-frame reordering')
+    if actual_pts and actual_duration < actual_pts[-1]:
+        problems.append('Container ends before the final real source frame')
+    if abs(format_duration - actual_duration) > 0.001:
+        problems.append('Container and stream duration disagree')
     if abs(actual_duration - (duration + 0.001)) > 0.005:
         problems.append('Encoded duration does not match the measured window')
     if bool(any(s['codec_type'] == 'audio' for s in info['streams'])) != audio_report['included']:
@@ -162,6 +180,10 @@ def main():
     report.update(verified=not problems, status='verified' if not problems else 'verification_failed',
                   problems=problems, encoded_duration_seconds=actual_duration,
                   encoded_video_frames=len(actual_pts), video_sha256=digest(mp4),
+                  maximum_frame_time_error_seconds=max(abs(a - b) for a, b in zip(actual_pts, expected_pts)),
+                  encoded_format_duration_seconds=format_duration,
+                  last_frame_pts_seconds=actual_pts[-1],
+                  encoded_endpoint_frame_duration_seconds=actual_duration-actual_pts[-1],
                   preview_source=preview['file'], preview_source_time=preview['video_time_seconds'],
                   preview_sha256=digest(output / 'preview.jpg'))
     report_path.write_text(json.dumps(report, indent=2) + '\n')

@@ -1,9 +1,12 @@
-# Dense gameplay video capture: staged only
+# Dense gameplay video capture
 
-These files have only been written and read as source. They have not been
-executed, imported, syntax-checked, built, or tested. No runtime was launched or
-attached to, no central slot was claimed, and no video was encoded while staging.
-Root owns the eventual single focused test. Do not run a validation take first.
+The original single-track workflow has focused runtime coverage; newer menu and
+multitrack helpers have their own scoped status documents. The current encoder
+successfully prepared a corrected silent artifact from an existing GC capture,
+without a new game run. See [video export timing](video-export-timing.md).
+Capture remains restricted to one authorized central runtime; encoding consumes
+existing evidence and must use a new output directory. No validation take or
+automatic retry is authorized by these tools.
 
 ## Deliverables
 
@@ -176,16 +179,17 @@ this two-cold-setup option; the expected second setup has its own 75-second boun
 Do not execute this step merely to check its syntax or codec support.
 
 ```
-python3 /workspace/shared/rr-gameplay-video-capture/encode_gameplay.py \
-  /workspace/shared/rr-track-name-slot/take --root-requested-encode
+python3 /path/to/RacerRevengePC/tools/capture/encode_gameplay.py \
+  /path/to/take --root-requested-encode --output /path/to/new-export
 ```
 
 Use `--require-audio` if absence of trustworthy synchronized sound should block
-delivery. Existing `/usr/bin/ffmpeg` and `/usr/bin/ffprobe` files were found by
-filesystem inspection only; their execution and codec support remain untested.
-If encoding fails, preserve the take and diagnose without another gameplay run.
+delivery. The artifact preparation exercised the available ffmpeg/ffprobe path;
+that result does not establish every platform or codec combination. `--output`
+is required and must name a new directory. If encoding fails, preserve the take
+and diagnose without another gameplay run.
 
-Outputs are `take/encoded/gameplay.mp4`, `preview.jpg`, and `encode-receipt.json`.
+Outputs in the requested directory are `gameplay.mp4`, `preview.jpg`, and `encode-receipt.json`.
 The encoder verifies source frame hashes, dimensions, timestamp order, native
 tick advancement, MP4 frame timestamps/count/duration, and audio presence. Root
 must additionally inspect the JPEG and video content before describing the track
