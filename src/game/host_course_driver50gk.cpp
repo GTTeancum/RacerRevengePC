@@ -39,6 +39,7 @@ bool validTuning(const CourseDriverTuning50GK& t) noexcept {
     for(float x:positive)if(!finite(x)||x<=0.f)return false;
     return t.minimumCornerSpeed<=t.cruiseSpeed&&t.lookaheadBase<=t.maximumLookahead&&
         finite(t.lookaheadSeconds)&&t.lookaheadSeconds>=0.f&&
+        finite(t.authoredSteeringLookaheadSeconds)&&t.authoredSteeringLookaheadSeconds>=0.f&&
         finite(t.yawDamping)&&t.yawDamping>=0.f&&
         finite(t.turnThrottleReduction)&&t.turnThrottleReduction>=0.f&&
         t.turnThrottleReduction<=1.f&&
@@ -63,7 +64,56 @@ float halfWidth(const game::TrackNavigation50EU& route,std::uint32_t node) noexc
     //50EU has already applied TrackWidth/2 to the authored per-side offsets.
     return std::max(1.f,.5f*(route.nodes[node].left54+route.nodes[node].right58));
 }
+// Input-only route sampling. Never changes canonical navigation, the graph,
+// speed metadata, safety width or a vehicle pose. At most one authored lap.
+bool steeringPointAhead(const game::TrackNavigation50EU& route,std::uint32_t node,
+    const float* start,float distance,float* aim,std::uint32_t& segments) noexcept {
+    if(!finite(distance)||distance<=0.f)return false;
+    float point[3]={start[0],start[1],start[2]};segments=0;
+    for(std::uint32_t visits=0;visits<route.track.count;++visits){
+        const auto& n=route.track.nodes[node];
+        const float span=length(n.position[0]-point[0],n.position[2]-point[2]);
+        if(!finite(span))return false;
+        if(span>.001f){
+            if(distance<=span){const float a=distance/span;
+                for(unsigned i=0;i<3;++i)aim[i]=point[i]+(n.position[i]-point[i])*a;
+                return true;}
+            distance-=span;
+        }
+        for(unsigned i=0;i<3;++i)point[i]=n.position[i];
+        node=n.next[0];++segments;
+    }
+    return false;
+}
 } // namespace
+
+bool readCourseSteeringLookahead50GK(const char* text,std::size_t bytes,float& out,
+    CourseDriverDiagnostic50GK& d) noexcept {
+    d={};
+    if(!text||!bytes||bytes>game::maxUndertrackText50ET)return stop(Status::InvalidText,d);
+    bool inSection=false,seenSection=false,seen=false;
+    float value=0.f;std::size_t at=0;
+    while(at<bytes){const auto begin=at;while(at<bytes&&text[at]!='\n')++at;
+        auto line=trim({text+begin,at-begin});if(at<bytes)++at;d.textOffset=begin;
+        if(!line.n||line.p[0]==';')continue;
+        if(line.p[0]=='['){
+            if(line.n<3||line.p[line.n-1]!=']')return stop(Status::InvalidText,d);
+            inSection=equal(trim({line.p+1,line.n-2}),"AIDriving");
+            if(inSection){if(seenSection)return stop(Status::InvalidText,d);seenSection=true;}
+            continue;
+        }
+        if(!inSection)continue;
+        std::size_t eq=0;while(eq<line.n&&line.p[eq]!='=')++eq;
+        if(eq==line.n)return stop(Status::InvalidText,d);
+        if(!equal(trim({line.p,eq}),"Lookahead"))continue;
+        const auto token=trim({line.p+eq+1,line.n-eq-1});
+        if(seen||!assets::parseTrackNumber50AD(token.p,token.n,value)||
+           !finite(value)||value<=0.f)return stop(Status::InvalidText,d);
+        seen=true;
+    }
+    if(!seen)return stop(Status::InvalidText,d);
+    out=value;d={};return true;
+}
 
 bool readCourseSpeedLimits50GK(const char* text,std::size_t bytes,std::uint32_t count,
     CourseSpeedLimits50GK& out,CourseDriverDiagnostic50GK& d) noexcept {
@@ -129,6 +179,7 @@ bool driveCourse50GK(const game::TrackNavigation50EU& route,const CourseSpeedLim
     float point[3]={previous.position[0]+tx*along,
         previous.position[1]+(current.position[1]-previous.position[1])*fraction,
         previous.position[2]+tz*along};
+    const float steeringStart[3]={point[0],point[1],point[2]};
     d.crossTrack=length(px-point[0],pz-point[2]);
     d.halfWidth=halfWidth(route,in.currentNode);
     d.bodySpeed=length(in.worldVelocity.v[0],in.worldVelocity.v[2]);
@@ -140,6 +191,7 @@ bool driveCourse50GK(const game::TrackNavigation50EU& route,const CourseSpeedLim
     // segment. Traversal is for choosing an input target, never progression.
     float lookahead=clamp(t.lookaheadBase+t.lookaheadSeconds*d.bodySpeed,t.lookaheadBase,t.maximumLookahead);
     lookahead=std::min(lookahead,std::max(t.lookaheadBase,d.halfWidth*1.25f));
+    d.speedLookahead=lookahead;d.steeringLookahead=lookahead;
     float minimumWidth=d.halfWidth,minimumLimit=limits.values[in.currentNode];
     float bend=0.f,lastX=tx,lastZ=tz;
     std::uint32_t node=in.currentNode;
@@ -169,8 +221,6 @@ bool driveCourse50GK(const game::TrackNavigation50EU& route,const CourseSpeedLim
     // Positive geometric error is toward positive local X for a +Z-forward
     // upright body. Input polarity is explicit; no guessed physical labels.
     d.headingError=std::atan2(fz*aimX-fx*aimZ,fx*aimX+fz*aimZ);
-    const float geometricTurn=clamp(t.headingGain*d.headingError-t.yawDamping*in.yawRate,-1.f,1.f);
-    d.turn=t.steeringPolarity*geometricTurn;
     if(t.authoredSpeedOnly){
         d.targetSpeed=minimumLimit*t.speedLimitToBodyScale;
     } else {
@@ -180,6 +230,37 @@ bool driveCourse50GK(const game::TrackNavigation50EU& route,const CourseSpeedLim
         d.targetSpeed=t.minimumCornerSpeed+(t.cruiseSpeed-t.minimumCornerSpeed)*corner*widthFactor;
         d.targetSpeed=std::min(d.targetSpeed,minimumLimit*t.speedLimitToBodyScale);
     }
+    d.steeringSegments=d.lookaheadSegments;
+    if(t.authoredSteeringLookaheadSeconds>0.f){
+        // Source 172380 uses velocity direction and two speed-scaled previews:
+        // actual AIDriving.Lookahead and 0.2s. This HOST centerline projection
+        // retains that input-planning idea, not the complete native AI. The
+        // short legacy preview above STILL owns the unchanged target speed.
+        const float horizons[2]={
+            std::max(t.lookaheadBase,t.authoredSteeringLookaheadSeconds*d.bodySpeed),
+            std::max(t.lookaheadBase,.2f*d.bodySpeed)};
+        const float vx=d.bodySpeed>.001f?in.worldVelocity.v[0]/d.bodySpeed:fx;
+        const float vz=d.bodySpeed>.001f?in.worldVelocity.v[2]/d.bodySpeed:fz;
+        float bestAlignment=2.f;
+        for(unsigned sample=0;sample<2;++sample){
+            float aim[3]{};std::uint32_t segments=0;
+            if(!steeringPointAhead(route,in.currentNode,steeringStart,horizons[sample],aim,segments))
+                return stop(Status::InvalidRoute,d);
+            const float dx=aim[0]-px,dz=aim[2]-pz,span=length(dx,dz);
+            if(!finite(span)||span<.001f)return stop(Status::InvalidInput,d);
+            const float alignment=(vx*dx+vz*dz)/span;
+            if(!finite(alignment))return stop(Status::InvalidInput,d);
+            if(alignment<=bestAlignment){
+                bestAlignment=alignment;
+                for(unsigned i=0;i<3;++i)d.aim[i]=aim[i];
+                d.steeringLookahead=horizons[sample];d.steeringSegments=segments;
+            }
+        }
+        d.headingError=std::atan2(fz*(d.aim[0]-px)-fx*(d.aim[2]-pz),
+            fx*(d.aim[0]-px)+fz*(d.aim[2]-pz));
+    }
+    const float geometricTurn=clamp(t.headingGain*d.headingError-t.yawDamping*in.yawRate,-1.f,1.f);
+    d.turn=t.steeringPolarity*geometricTurn;
     if(!finite(d.headingError)||!finite(d.turn)||!finite(d.targetSpeed))return stop(Status::InvalidInput,d);
 
     if(!state.initialized){state.initialized=true;state.observedNode=in.currentNode;

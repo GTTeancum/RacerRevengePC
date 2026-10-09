@@ -19,12 +19,20 @@ struct CourseDriverDiagnostic50GK {
     std::size_t textOffset=0;
     float aim[3]{},headingError=0,turn=0,bodySpeed=0,targetSpeed=0;
     float crossTrack=0,halfWidth=0,stalledSeconds=0;
+    float speedLookahead=0,steeringLookahead=0;
+    std::uint32_t steeringSegments=0;
 };
 // Reads the actual ATA SpeedLimit entries without modifying navigation. Every
 // node must have exactly one finite nonnegative limit. Uses the retained native
 // decimal reader. This is a bounded metadata projection, not the AI loader.
 bool readCourseSpeedLimits50GK(const char*,std::size_t,std::uint32_t nodeCount,
     CourseSpeedLimits50GK&,CourseDriverDiagnostic50GK&) noexcept;
+
+// Bounded HOST metadata projection of the actual track TUN [AIDriving]
+// Lookahead. Requires exactly one finite positive value; no invented default.
+// It does not load the original AI configuration/controller. Failure preserves out.
+bool readCourseSteeringLookahead50GK(const char*,std::size_t,float& out,
+    CourseDriverDiagnostic50GK&) noexcept;
 
 struct CourseDriverTuning50GK {
     // All values below are explicit HOST tuning, unrelated to Pod01.ai Skill or
@@ -45,6 +53,10 @@ struct CourseDriverTuning50GK {
     // speedLimitToBodyScale, without HOST corner/width/cruise speed caps or
     // turnThrottleReduction. Differential steering and stop checks still apply.
     bool authoredSpeedOnly=false;
+    // Optional HOST steering-only preview using the actual track TUN horizon
+    // and the source direction planner's additional 0.2s sample. Zero preserves
+    // legacy steering. Speed preview and all safety limits stay independent.
+    float authoredSteeringLookaheadSeconds=0.f;
 };
 struct CourseDriverInput50GK {
     game::BodyMatrix48G pose{}; // canonical basis8..10 and translation12..14

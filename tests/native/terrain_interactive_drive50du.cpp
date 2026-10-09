@@ -667,6 +667,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  rr::host::CourseDriverState50GK courseState{};
  rr::host::CourseDriverDiagnostic50GK courseDiagnostic{};
  rr::host::CourseDriverOutput50GK courseOutput{};
+ if(track_session_assets50IG::codeEquals(trackSession->world->code,"GC"))
+  require50DU(rr::host::readCourseSteeringLookahead50GK(
+      reinterpret_cast<const char*>(tuning.data()),tuning.size(),
+      courseTuning.authoredSteeringLookaheadSeconds,courseDiagnostic),
+      "actual GC AIDriving.Lookahead unavailable for host steering preview");
  const char* autoPolarity=std::getenv("RR_AUTODRIVE_POLARITY");
  if(autoPolarity){
   require50DU(std::string(autoPolarity)=="1"||std::string(autoPolarity)=="-1","autodrive polarity must be 1 or -1");
@@ -1282,22 +1287,38 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   packetLive=live;
  };
 
- auto applyCourseInput=[&](){
+ auto applyCourseInput=[&](std::size_t racerSlot=0){
   rr::host::CourseDriverInput50GK command{};
   command.enabled=autoDriveEnabled;command.elapsedSeconds=.016f;
   command.pose=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
   command.worldVelocity=m.components.root.body.velocity;
-  command.yawRate=m.components.root.body.angularVelocity.v[1];
+  command.yawRate=m.components.root.worldAngularVelocityA0.v[1];
   command.previousNode=navigationProgress.vehicleC84;
   command.currentNode=navigationProgress.reset.vehicleC80;
+  const bool newNode=!courseState.initialized||courseState.observedNode!=command.currentNode;
   const bool driving=rr::host::driveCourse50GK(*navigationAI,courseLimits,courseTuning,
       command,courseState,courseOutput,courseDiagnostic);
   require50DU(rr::host::applyCourseThrottlePacket50GK(courseOutput,packet),"host course packet rejected");
+  if(driving&&newNode&&courseTuning.authoredSteeringLookaheadSeconds>0.f)
+   std::cerr<<"Host course node: slot="<<racerSlot<<" tick="<<completedFrames
+       <<" previous="<<command.previousNode<<" node="<<command.currentNode
+       <<" position="<<command.pose.v[12]<<','<<command.pose.v[13]<<','<<command.pose.v[14]
+       <<" speed="<<courseDiagnostic.bodySpeed<<" target="<<courseDiagnostic.targetSpeed
+       <<" cross_track="<<courseDiagnostic.crossTrack<<" half_width="<<courseDiagnostic.halfWidth
+       <<" speed_preview="<<courseDiagnostic.speedLookahead
+       <<" steering_preview="<<courseDiagnostic.steeringLookahead
+       <<" steering_segments="<<courseDiagnostic.steeringSegments
+       <<" aim="<<courseDiagnostic.aim[0]<<','<<courseDiagnostic.aim[1]<<','<<courseDiagnostic.aim[2]
+       <<" error="<<courseDiagnostic.headingError<<" turn="<<courseDiagnostic.turn<<'\n';
   if(!driving&&!autoStopReported){
    autoStopReported=true;
    std::cerr<<"Host course driver stopped: status="<<unsigned(courseDiagnostic.status)
        <<" node="<<courseDiagnostic.node<<" cross_track="<<courseDiagnostic.crossTrack
-       <<" stalled_s="<<courseDiagnostic.stalledSeconds<<". Neutral input; manual takeover remains available.\n";
+       <<" stalled_s="<<courseDiagnostic.stalledSeconds
+       <<" slot="<<racerSlot<<" tick="<<completedFrames<<" previous="<<command.previousNode
+       <<" position="<<command.pose.v[12]<<','<<command.pose.v[13]<<','<<command.pose.v[14]
+       <<" speed="<<courseDiagnostic.bodySpeed<<" half_width="<<courseDiagnostic.halfWidth
+       <<". Neutral input; manual takeover remains available.\n";
   }
  };
 
@@ -2512,6 +2533,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(autoDriveEnabled)std::cerr<<"HOST course-check autopilot enabled; pace="
       <<(courseTuning.authoredSpeedOnly?"authored-limits":"conservative-host")
       <<" speed-limit-to-body-scale="<<courseTuning.speedLimitToBodyScale
+      <<" steering-preview-seconds="<<courseTuning.authoredSteeringLookaheadSeconds
       <<"; not original AI. Manual W/S/Up/Down takes over. No automatic reset.\n";
   if(headlessLive)std::cerr<<"Stdin host commands include capture, checkpoint, restart, pause, resume, menu, and quit. "
       "Menus use down/up Up, Down, Left, Right, Enter, Escape. Audio edits apply on Start/Restart only. "
@@ -2735,7 +2757,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       opponentFrame=true;
       try {
        const bool advanced=racerBank.step(racer,true,[&](){
-        composePacket(true,noKeys);applyCourseInput();sampleController();
+        composePacket(true,noKeys);applyCourseInput(racer);sampleController();
         const auto beforeOpponentFrame=::allocations;
         const bool completed=advanceFrame();
         if(completed)require50DU(::allocations==beforeOpponentFrame,

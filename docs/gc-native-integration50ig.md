@@ -1,4 +1,6 @@
-# GC native integration: capture complete, full-course driving blocked
+# GC native integration: steering correction unbuilt and untested
+
+The current candidate adds a GC-only authored 0.7/0.2-second HOST steering preview and corrects the shared world-yaw input. Both changes are unbuilt and untested. Speed-preview, pace and safety stops remain unchanged. The earlier result below applies to the previous source; see [steering scope](gc-host-steering-preview50io.md) for the new candidate.
 
 The central 2026-10-09 20:19 slot built `3e4b00c4f0ce1f70eb5b6c916c9d84880e6b15bf` and completed one actual TA→GC menu/cold-load/capture sequence with exit 0. The original backslash material/ATM lookup fix was exercised successfully. Capture retained 298 unique frames over 20.0577 seconds; see [current validation](current-validation.md) for scope.
 
