@@ -143,6 +143,8 @@ def main():
     parser.add_argument('--no-audio', action='store_true')
     parser.add_argument('--exercise-menus', action='store_true',
                         help='Exercise prepared Main/start/pause/resume before video and return to Main afterward')
+    parser.add_argument('--exercise-menus-extended', action='store_true',
+                        help='With menu exercise, add Controls/Back, next-session audio edits, and cancelled confirmations')
     parser.add_argument('--select-racer3', action='store_true',
                         help='With menu exercise, select Clegg through Main and admit one expected pregame cold rebuild')
     parser.add_argument('--root-owns-active-slot', action='store_true')
@@ -156,10 +158,16 @@ def main():
         parser.error('Menu exercise must observe the real mixed-audio clock; --no-audio is incompatible')
     if args.select_racer3 and not args.exercise_menus:
         parser.error('--select-racer3 requires --exercise-menus and real menu input')
+    if args.exercise_menus_extended and not args.exercise_menus:
+        parser.error('--exercise-menus-extended requires --exercise-menus and real menu input')
     menu = None
     if args.exercise_menus:
-        from menu_exercise import MenuExercise
-        menu = MenuExercise(select_racer3=args.select_racer3)
+        if args.exercise_menus_extended:
+            from menu_extended_exercise import ExtendedMenuExercise
+            menu = ExtendedMenuExercise(select_racer3=args.select_racer3)
+        else:
+            from menu_exercise import MenuExercise
+            menu = MenuExercise(select_racer3=args.select_racer3)
     args.cwd = args.cwd.resolve()
     args.binary = args.binary.resolve()
     args.fixture = (args.fixture if args.fixture.is_absolute()
@@ -169,6 +177,8 @@ def main():
     source_files = [Path(__file__).resolve()]
     if menu is not None:
         source_files.append(Path(__file__).resolve().with_name('menu_exercise.py'))
+    if args.exercise_menus_extended:
+        source_files.append(Path(__file__).resolve().with_name('menu_extended_exercise.py'))
     for path in args.source_file:
         resolved = (path if path.is_absolute() else args.cwd / path).resolve()
         if not resolved.is_file():
