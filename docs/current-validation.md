@@ -1,17 +1,16 @@
 # Current native race validation
 
-## GC WIP: capture completed; HOST driving stops before a lap
+## GC WIP: player advances; two opponents stop before a lap
 
-The 2026-10-09 20:19 central slot built source `3e4b00c4f0ce1f70eb5b6c916c9d84880e6b15bf`: one unit compiled, 192 reused, link exit 0. One runtime ran from 20:20:30 to 20:21:14 UTC and exited normally. The resource-path correction was exercised successfully.
+The 2026-10-09 21:19 central slot built source `e9ece06f227d4834c1591d235e92b1856d944756`: two units compiled, 191 reused, link exit 0. One runtime ran from 21:21:01 to 21:21:45 UTC and exited normally. The GC steering preview and shared world-yaw correction were exercised.
 
-- Actual TA driving, Pause/Resume, Main cancellation/confirmation, track disclosure and GC selection completed. Pause held 2.0081 seconds with frozen native/mixed/PCM clocks; Resume retained the bank and advanced clocks.
-- One expected GC cold transition succeeded. Original animated owners, four compound parts, 553 registered world candidates, six dynamic draws, 76 ATM states and 35 images were reported by the runtime. These observations do not establish every behavior's correctness.
-- Capture retained 298 unique actual frames over 20.0577 seconds, 14.807 captured fps, maximum gap 187.3 ms. The capture controller completed without errors.
-- All HOST course drivers stopped with status 3 at node 7, cross-track about 185–188 source units, and the racers bunched up. **No GC lap completed.** Manual driving, trigger behavior and full-course completion remain unverified.
-- The original video export failed duration verification and remains preserved. A separate artifact-only correction retained all 298 frames and verified a 20.059-second silent MP4, with maximum frame-time error 0.632 ms and no new game run. Actual PCM remains separate because its maximum anchor drift was 141.6 ms (final duration drift about -121.7 ms); no synchronized audio or listening claim follows.
+- TA driving, Pause/Resume, Main cancellation/confirmation, GC disclosure and one cold GC transition completed. Menu/session and capture-clock checks passed.
+- Capture retained 342 unique actual frames over 20.0112 seconds, 17.040 captured fps, maximum gap 137.6 ms. This was a 20-second run, not 60-second coverage.
+- The player advanced to AGC node 28. Opponent slots 2 and 3 stopped with status 3 at nodes 7 and 8. **No GC lap completed.** First-bend improvement does not establish complete field or course success.
+- Artifact export verified all 342 frames in a 20.012-second video with actual native PCM. Maximum audio anchor skew was 60.4 ms and final skew -43.2 ms, within the existing admission bounds. No synthesized, normalized, resampled or stretched sound was used; listening quality remains unclaimed.
 
-Runtime binary SHA-256: `865eba16ee936128e5de06ecdecb130b5be9d0cbb2029b4aae15b7a25290fae1`.
-Only status documentation changed afterward. No extra test, runtime or encoding was performed during this update. Earlier full Clegg/menu and three-lap results below apply to their own source versions.
+Runtime binary SHA-256: `7817c40e6baf9da3d5d5c7aea5b574f1a5b4c4f37c7a20652726c4d16f0dea09`.
+Only status documentation changed afterward. No additional build, runtime, test or encoding occurred during this update. Gate/LostAI behavior, manual GC usability and full-course completion remain unresolved. Earlier results apply to their own source versions.
 
 ## Current Linux menu and Clegg check
 
