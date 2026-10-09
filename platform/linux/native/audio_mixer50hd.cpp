@@ -28,21 +28,27 @@ bool AudioMixer50HD::validClip(const AudioClip50HD& clip) noexcept {
 }
 bool AudioMixer50HD::initialize(AudioVoice50HD* voices, std::size_t count,
                               std::uint32_t outputRate) noexcept {
-    if (!voices || !count || count > audioMaximumVoices50HD || !validRate(outputRate))
+    if (!voices || !count || count > audioMaximumVoices50HD || !validRate(outputRate) ||
+        groupEpoch50IC_ == std::numeric_limits<std::uint64_t>::max())
         return false;
     voices_ = voices; count_ = count; rate_ = outputRate;
     masterGain_ = 1.0f; mixedFrames_ = clippedSamples_ = 0;
-    for (std::size_t i = 0; i < count_; ++i) voices_[i] = {};
+    ++groupEpoch50IC_; requireGroups50IC_ = false;
+    for (std::size_t i = 0; i < count_; ++i) {
+        voices_[i] = {}; groupGains50IC_[i] = 1.0f; groupKnown50IC_[i] = false;
+    }
     return true;
 }
 bool AudioMixer50HD::play(std::size_t slot, const AudioClip50HD& clip, float gain,
                         float pitch, bool loop, float pan) noexcept {
-    if (slot >= count_ || !validClip(clip) || !validControls(gain, pitch, pan)) return false;
+    if (slot >= count_ || !validClip(clip) || !validControls(gain, pitch, pan) ||
+        (requireGroups50IC_ && !groupKnown50IC_[slot])) return false;
     voices_[slot] = {clip, 0.0, gain, pitch, pan, true, loop};
     return true;
 }
 bool AudioMixer50HD::controls(std::size_t slot, float gain, float pitch, float pan) noexcept {
-    if (slot >= count_ || !validControls(gain, pitch, pan)) return false;
+    if (slot >= count_ || !validControls(gain, pitch, pan) ||
+        (requireGroups50IC_ && !groupKnown50IC_[slot])) return false;
     auto& voice = voices_[slot];
     voice.gain = gain; voice.pitch = pitch; voice.pan = pan;
     return true;
@@ -55,6 +61,19 @@ bool AudioMixer50HD::setLoop(std::size_t slot, bool loop) noexcept {
 bool AudioMixer50HD::setMasterGain(float gain) noexcept {
     if (!std::isfinite(gain) || gain < 0.0f || gain > 4.0f) return false;
     masterGain_ = gain; return true;
+}
+bool AudioMixer50HD::setVoiceGroupGain50IC(std::size_t slot, float gain) noexcept {
+    if (slot >= count_ || !std::isfinite(gain) || gain < 0.0f || gain > 1.0f) return false;
+    groupGains50IC_[slot] = gain; groupKnown50IC_[slot] = true; return true;
+}
+bool AudioMixer50HD::hasVoiceGroupGain50IC(std::size_t slot) const noexcept {
+    return slot < count_ && groupKnown50IC_[slot];
+}
+bool AudioMixer50HD::requireVoiceGroupGains50IC() noexcept {
+    if (!voices_ || !count_) return false;
+    for (std::size_t i = 0; i < count_; ++i)
+        if (voices_[i].active && !groupKnown50IC_[i]) return false;
+    requireGroups50IC_ = true; return true;
 }
 void AudioMixer50HD::stop(std::size_t slot) noexcept {
     if (slot < count_) voices_[slot].active = false;
@@ -103,8 +122,10 @@ bool AudioMixer50HD::mixStereo16(std::int16_t* output, std::size_t frames) noexc
             const auto rightChannel = static_cast<std::size_t>(clip.channels - 1);
             const double sampleRight = clip.samples[a + rightChannel] +
                 (static_cast<double>(clip.samples[b + rightChannel]) - clip.samples[a + rightChannel]) * fraction;
-            left += sampleLeft * voice.gain * (1.0f - std::max(voice.pan, 0.0f));
-            right += sampleRight * voice.gain * (1.0f + std::min(voice.pan, 0.0f));
+            // Exactly one retained group multiplier; Controls changes only
+            // voice.gain. Unbound legacy voices retain unity until strict mode.
+            left += sampleLeft * voice.gain * groupGains50IC_[i] * (1.0f - std::max(voice.pan, 0.0f));
+            right += sampleRight * voice.gain * groupGains50IC_[i] * (1.0f + std::min(voice.pan, 0.0f));
             voice.sourceFrame += static_cast<double>(clip.sampleRate) / rate_ * voice.pitch;
             if (voice.loop && voice.sourceFrame >= static_cast<double>(loopEnd))
                 voice.sourceFrame = static_cast<double>(loopStart) +

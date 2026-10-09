@@ -588,17 +588,27 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(liveAudio->prepare("work/native/project/disc",audioRoot,audioError),
       audioError.empty()?"native audio bank preparation failed":audioError.c_str());
   auto* materialMixer=liveAudio->mixerForMaterialOwner();
+  auto* audioGroups=liveAudio->groupsForProviders();
+  auto* sharedAnnouncer=liveAudio->sharedAnnouncer();
+  require50DU(audioGroups&&sharedAnnouncer,"shared native audio group/episode owner unavailable");
   if(raceEnabled)require50DU(materialMixer&&raceAudio->prepare("work/native/project/disc",
-      audioRoot,*materialMixer,audioError),
+      audioRoot,*materialMixer,*audioGroups,*sharedAnnouncer,audioError),
       audioError.empty()?"original race audio preparation failed":audioError.c_str());
   require50DU(materialMixer&&materialAudio->prepare("work/native/project/disc",audioRoot,
       *materialMixer,64,audioError),audioError.empty()?"native material audio preparation failed":audioError.c_str());
+  require50DU(race_audio_groups50IC::bindProviderRange(*audioGroups,
+      race_audio_groups50IC::ProviderRole::MaterialCollision,64,material_audio50HI::soundCount),
+      "material group ownership rejected");
   if(raceEnabled){
    std::array<opponent_audio50HX::Source,opponent_audio50HX::maxOpponents> sources{};
    for(std::size_t racer=1;racer<raceRacerCount;++racer)
     sources[racer-1]={racerRigs[racer]->podId,&racerRigs[racer]->phy};
    const bool prepared=opponentAudio->prepare(sources,audioRoot,*materialMixer,audioError);
    require50DU(prepared,audioError.empty()?"original opponent engine audio preparation failed":audioError.c_str());
+   require50DU(race_audio_groups50IC::bindProviderRange(*audioGroups,
+       race_audio_groups50IC::ProviderRole::EngineBinderBoost,
+       opponent_audio50HX::firstVoice,opponent_audio50HX::voiceCount),
+       "opponent engine group ownership rejected");
    const auto& opponentBank=opponentAudio->bank();
    std::cerr<<"Opponent engine audio ready/missing/unsupported/invalid "<<opponentBank.ready<<'/'
        <<opponentBank.missing<<'/'<<opponentBank.unsupported<<'/'<<opponentBank.invalid
@@ -616,6 +626,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const auto& bank=liveAudio->bank();
   std::cerr<<"Audio bank ready/missing/unsupported/invalid "<<bank.ready<<'/'<<bank.missing
       <<'/'<<bank.unsupported<<'/'<<bank.invalid<<" of "<<bank.clips.size()<<'\n';
+  const auto& audioConfig=liveAudio->audioSettings();
+  std::cerr<<"Audio fresh original levels effects/music/character/Dax "
+      <<audioConfig.effects11020<<'/'<<audioConfig.music11024<<'/'
+      <<audioConfig.character11028<<'/'<<audioConfig.announcer1102C
+      <<"; no saved audio preferences loaded; host Dax policy, shared voice84 completion.\n";
   lapOwner.audioContext=liveAudio.get();
   lapOwner.audioDispatch=[](void* context,std::uint32_t key,std::uint32_t flags,
                            std::uint32_t a3)noexcept{
@@ -1753,6 +1768,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  bool restartRequested=false;
  auto closeWindow=[&](){
   bool clean=true;
+  raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
   opponentAudio->close(); // Release only96..109 before the live mixer closes.
   if(!liveAudio->close(audioDiagnostic)){
    std::cerr<<"audio close failed "<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=false;
@@ -2703,6 +2719,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       std::cerr<<"audio race ready/starts/countdown/lap/finish/position/unavailable "
           <<raceAudio->bank().ready<<'/'<<r.starts<<'/'<<r.countdownEvents<<'/'<<r.lapEvents
           <<'/'<<r.finishEvents<<'/'<<r.positionEvents<<'/'<<r.unavailable<<'\n';
+      const auto& episode=liveAudio->announcerCounters();
+      std::cerr<<"audio shared_Dax starts/begins/ends/completions/preemptions/rejected "
+          <<episode.starts<<'/'<<episode.begins<<'/'<<episode.ends<<'/'
+          <<episode.completions<<'/'<<episode.preemptions<<'/'<<episode.rejected
+          <<" group_failures="<<liveAudio->counters().groupFailures;
+      if(const auto* groups=liveAudio->groupsForProviders()){
+       std::cerr<<" group_levels=";
+       for(const auto level:groups->levels().volume38)std::cerr<<level<<'/';
+      }
+      std::cerr<<'\n';
       const auto& o=opponentAudio->counters();
       std::cerr<<"audio opponent ready/updates/starts/controls/stops/unavailable/normalized "
           <<opponentAudio->bank().ready<<'/'<<o.updates<<'/'<<o.starts<<'/'<<o.controls

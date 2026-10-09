@@ -7,6 +7,8 @@
 #include "pod_materials50ed_fixture.h"
 #include "../../src/assets/audio_assets50hc.h"
 #include "../../platform/linux/native/audio_mixer50hd.h"
+#include "../../platform/linux/native/announcer_episode50ic.h"
+#include "race_audio_groups50ic_fixture.h"
 #include <array>
 #include <charconv>
 #include <string_view>
@@ -95,11 +97,13 @@ public:
     Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
     bool prepare(const std::filesystem::path&discRoot,const std::filesystem::path&audioRoot,
-        rr::platform::AudioMixer50HD&mixer,std::string&error) {
+        rr::platform::AudioMixer50HD&mixer,rr::platform::RaceAudioGroups50IC&groups,
+        rr::platform::AnnouncerEpisode50IC&announcer,std::string&error) {
         namespace d=pod_materials50ed_fixture::detail;
         if(attempted_){error="50HQ preparation requires a fresh stable owner";return false;}attempted_=true;
         try {
             d::need(mixer.count()>=firstVoice+voiceCount,"50HQ reserved voices80..95 unavailable");
+            d::need(groups.uses(mixer),"50IC shared group owner differs from race mixer");
             d::Inputs input;input.capacity=4096;
             const auto raceBytes=input.read(discRoot/"AUDIO/RACE_SND.INI",661);
             const auto speechBytes=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/POD01ANN.INI",2403);
@@ -114,7 +118,11 @@ public:
             for(std::size_t i=0;i<clipCount;++i){const auto&c=bank_.clips[i];if(c.state!=rr::assets::AudioAssetState50HC::ready)continue;
                 const auto&p=c.pcm;clips_[i]={p.samples.data(),p.frames,p.sampleRate,p.channels,0,0};
                 d::need(rr::platform::AudioMixer50HD::validClip(clips_[i]),"50HQ ready PCM invalid");}
-            mixer_=&mixer;error.clear();return true;
+            d::need(race_audio_groups50IC::bindProviderRange(groups,
+                race_audio_groups50IC::ProviderRole::CountdownRaceSnd,firstVoice,4),
+                "50IC countdown group binding rejected");
+            d::need(announcer.prepare(mixer,groups,firstVoice+4),"50IC shared Dax episode ownership rejected");
+            announcer_=&announcer;mixer_=&mixer;error.clear();return true;
         }catch(const std::exception&e){error=e.what();return false;}
     }
     // Observe seeded grid, every unpaused countdown tick and every successful
@@ -123,7 +131,8 @@ public:
     // Speech is native policy: authored-group round robin, one voice, five-second
     // place cooldown. Lap/finish preempt place speech; no queued stale messages.
     Receipt observe(const race_session50HM::Session&s)noexcept {
-        Receipt result;if(!mixer_||!detail::valid(s)){++counters_.rejected;return result;}
+        Receipt result;if(!mixer_||!detail::valid(s)||!announcer_||!announcer_->pollCompletion()){
+            ++counters_.rejected;return result;}
         const auto&r=s.racers[0];const auto number=race_session50HM::countdownNumber(s);
         if(state_.seeded&&(s.raceSeconds<state_.seconds||r.observed.completedLaps<state_.laps||
            r.observed.completedLaps-state_.laps>1||
@@ -167,7 +176,11 @@ public:
            s.phase!=state_.phase||s.racers[0].observed.completedLaps!=state_.laps||s.racers[0].finished!=state_.finished){++counters_.rejected;return false;}
         remember(s);++counters_.rebases;return true;
     }
-    void reset()noexcept {if(mixer_)for(std::size_t i=0;i<voiceCount;++i)mixer_->stop(firstVoice+i);state_={};++counters_.resets;}
+    void reset()noexcept {
+        if(mixer_)for(std::size_t i=0;i<4;++i)mixer_->stop(firstVoice+i);
+        if(announcer_&&!announcer_->stop())++counters_.rejected;
+        state_={};++counters_.resets;
+    }
     bool prepared()const noexcept{return mixer_!=nullptr;}
     const rr::assets::AudioBank50HC&bank()const noexcept{return bank_;}
     const Counters&counters()const noexcept{return counters_;}
@@ -184,14 +197,21 @@ private:
         Event event{kind,detail::keys[index],Result::Rejected};
         const auto slot=firstVoice+(index<4?index:4);
         if(bank_.clips[index].state!=rr::assets::AudioAssetState50HC::ready){event.result=Result::Unavailable;++counters_.unavailable;}
-        else if(index>=4&&!preempt&&mixer_->active(slot)){event.result=Result::Busy;++counters_.busy;}
-        else if(mixer_->play(slot,clips_[index],1.f,1.f,false)){event.result=Result::Started;++counters_.starts;}
+        else if(index>=4){
+            // Variant, cooldown and preemption choices above remain HOST50HQ.
+            // Every actual Dax start/completion shares voice84 and callbacks.
+            const auto result=announcer_->requestHost(clips_[index],preempt);
+            if(result==rr::platform::HostAnnouncerResult50IC::Started){event.result=Result::Started;++counters_.starts;}
+            else if(result==rr::platform::HostAnnouncerResult50IC::Busy){event.result=Result::Busy;++counters_.busy;}
+            else ++counters_.rejected;
+        }else if(mixer_->play(slot,clips_[index],1.f,1.f,false)){event.result=Result::Started;++counters_.starts;}
         else ++counters_.rejected;
         r.events[r.eventCount++]=event;
     }
     rr::assets::AudioBank50HC bank_{};
     std::array<rr::platform::AudioClip50HD,clipCount>clips_{};
     rr::platform::AudioMixer50HD*mixer_=nullptr;
+    rr::platform::AnnouncerEpisode50IC*announcer_=nullptr;
     detail::State state_{};Counters counters_{};bool attempted_=false;
 };
 } // namespace race_audio50HQ

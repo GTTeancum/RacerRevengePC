@@ -34,6 +34,16 @@ public:
                   float pan = 0.0f) noexcept;
     bool setLoop(std::size_t slot, bool loop) noexcept;
     bool setMasterGain(float gain) noexcept;
+    // 50IC persistent group layer. These gains are independent of voice.gain:
+    // play/restart, controls and stop do not erase or multiply them into it.
+    // The source-owner adapter supplies a normalized integer group volume.
+    bool setVoiceGroupGain50IC(std::size_t slot, float gain) noexcept;
+    bool hasVoiceGroupGain50IC(std::size_t slot) const noexcept;
+    // One-way until initialize. Refuses any currently active unbound voice;
+    // subsequent play/controls on unbound slots fail rather than bypass groups.
+    bool requireVoiceGroupGains50IC() noexcept;
+    bool requiresVoiceGroupGains50IC() const noexcept { return requireGroups50IC_; }
+    std::uint64_t groupEpoch50IC() const noexcept { return groupEpoch50IC_; }
     void stop(std::size_t slot) noexcept;
     void stopAll() noexcept;
     bool active(std::size_t slot) const noexcept;
@@ -54,6 +64,10 @@ private:
     std::uint32_t rate_ = 0;
     float masterGain_ = 1.0f;
     std::uint64_t mixedFrames_ = 0, clippedSamples_ = 0;
+    float groupGains50IC_[audioMaximumVoices50HD]{};
+    bool groupKnown50IC_[audioMaximumVoices50HD]{};
+    bool requireGroups50IC_ = false;
+    std::uint64_t groupEpoch50IC_ = 0;
 };
 
 // Integer cumulative sample clock: floor(total microseconds * rate / 1e6).

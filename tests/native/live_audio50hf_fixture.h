@@ -3,7 +3,9 @@
 // it does not supply the original D40 object or bypass any core source guard.
 #include "gameplay_audio_provider50he_fixture.h"
 #include "pod_audio_owner50he_fixture.h"
+#include "race_audio_groups50ic_fixture.h"
 #include "../../platform/linux/native/audio_output50hd.h"
+#include "../../platform/linux/native/announcer_episode50ic.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -29,7 +31,7 @@ struct EventReceipt {
 struct Counters {
     std::uint64_t engineUpdates=0,warningUpdates=0,boostUpdates=0,repairUpdates=0;
     std::uint64_t commands=0,starts=0,stops=0,controls=0,inactive=0,unavailable=0,rejected=0;
-    std::uint64_t inputRejected=0,lapRequests=0,committedSteps=0,mixFailures=0,resets=0;
+    std::uint64_t inputRejected=0,lapRequests=0,committedSteps=0,mixFailures=0,resets=0,groupFailures=0;
 };
 inline bool hasJoinedTrigger(rr::game::AudioCue50HE cue) noexcept {
     return (cue.bank==rr::game::AudioBank50HE::PodEvent&&cue.key>=1&&cue.key<=6)||
@@ -65,6 +67,15 @@ public:
             }
             if(!mixer_.initialize(voices_.data(),voices_.size(),sampleRate)) {
                 error="50HF bounded mixer initialization failed";return false;
+            }
+            // This client has no loaded user audio preferences. Its one shared
+            // fresh audio configuration deliberately uses original reset values
+            // effects50/music100/character80/Dax80; it does not change11258.
+            if(!groups_.initialize(mixer_,rr::game::freshOriginalAudioSettings50IC())||
+               !race_audio_groups50IC::bindGameplayCatalog(groups_,providerFirstVoice).complete||
+               !race_audio_groups50IC::bindProviderRange(groups_,
+                   race_audio_groups50IC::ProviderRole::LapPodEvent,lapFirstVoice,lapVoiceCount)) {
+                error="50IC source group ownership initialization failed";return false;
             }
             if(!provider_.prepare(bank_,mixer_,providerFirstVoice,error)||
                !pod_audio50HE::prepareFromPod01(lap_,mixer_,bank_,lapFirstVoice,lapVoiceCount,
@@ -156,27 +167,44 @@ public:
     bool committedStep(rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
         if(!outputOpen_||closed_)return fail(diagnostic,rr::platform::AudioOutputError50HD::NotOpen,"50HF.step","Audio output is not open");
         if(paused_)return fail(diagnostic,rr::platform::AudioOutputError50HD::InvalidRequest,"50HF.step","Paused audio must not advance the simulation sample clock");
-        if(!output_.advanceMicroseconds(mixer_,stepMicroseconds,diagnostic)) {
+        if(!announcer_.pollCompletion()) {
+            ++counters_.groupFailures;
+            return fail(diagnostic,rr::platform::AudioOutputError50HD::Mixer,"50IC.episode","Shared announcer ownership rejected");
+        }
+        const bool mixed=output_.advanceMicroseconds(mixer_,stepMicroseconds,diagnostic);
+        // A failed output write may still follow a completed real mix. Always
+        // observe actual voice activity, without inventing a completed duration.
+        const bool restored=announcer_.pollCompletion();
+        if(!restored)++counters_.groupFailures;
+        if(!mixed) {
             ++counters_.mixFailures;return false;
+        }
+        if(!restored) {
+            return fail(diagnostic,rr::platform::AudioOutputError50HD::Mixer,"50IC.completion","Announcer group restoration rejected");
         }
         ++counters_.committedSteps;return true;
     }
     void pause(bool paused)noexcept {
         if(closed_)return;
-        paused_=paused;if(outputOpen_)output_.pauseDevice(paused);
+        paused_=paused;announcer_.pause(paused);if(outputOpen_)output_.pauseDevice(paused);
     }
     // Host reset policy, not a reconstructed original emitter reset method.
     // Preserve immutable registrations and cumulative output/capture clock.
     void resetVoices()noexcept {
         if(!prepared_||closed_)return;
+        if(!announcer_.stop())++counters_.groupFailures;
         mixer_.stopAll();warning_={};boost_={};++counters_.resets;
     }
     // Explicit close BEFORE WindowHost50DQ destruction/SDL_Quit. Idempotent.
     // Destructor is only a fallback; host construction order remains important.
     bool close(rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
+        const bool restored=announcer_.stop();
         mixer_.stopAll();
         const bool result=output_.close(diagnostic);
-        outputOpen_=false;closed_=true;return result;
+        outputOpen_=false;closed_=true;
+        if(!restored){++counters_.groupFailures;if(result)return fail(diagnostic,
+            rr::platform::AudioOutputError50HD::Mixer,"50IC.close","Announcer group restoration rejected");}
+        return result&&restored;
     }
 
     bool prepared()const noexcept{return prepared_;}
@@ -192,6 +220,14 @@ public:
     rr::platform::AudioMixer50HD* mixerForMaterialOwner()noexcept {
         return prepared_&&!closed_?&mixer_:nullptr;
     }
+    rr::platform::RaceAudioGroups50IC* groupsForProviders()noexcept {
+        return prepared_&&!closed_?&groups_:nullptr;
+    }
+    rr::platform::AnnouncerEpisode50IC* sharedAnnouncer()noexcept {
+        return prepared_&&!closed_?&announcer_:nullptr;
+    }
+    const rr::game::RaceAudioSettings50IC& audioSettings()const noexcept{return groups_.configuredLevels();}
+    const rr::platform::AnnouncerEpisodeCounters50IC& announcerCounters()const noexcept{return announcer_.counters();}
     const pod_audio50HE::Owner& lapOwner()const noexcept{return lap_;}
     const Counters& counters()const noexcept{return counters_;}
     rr::platform::AudioOutputInfo50HD info()const noexcept{return output_.info();}
@@ -249,6 +285,8 @@ private:
     rr::assets::AudioBank50HC bank_{};
     std::array<rr::platform::AudioVoice50HD,voiceCount> voices_{};
     rr::platform::AudioMixer50HD mixer_{};
+    rr::platform::RaceAudioGroups50IC groups_{};
+    rr::platform::AnnouncerEpisode50IC announcer_{};
     gameplay_audio50HE::Provider provider_{};
     pod_audio50HE::Owner lap_{};
     rr::platform::AudioOutput50HD output_{};

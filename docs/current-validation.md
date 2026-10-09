@@ -1,42 +1,40 @@
 # Current native race validation
 
-## Engine-audio integration and finish continuation
+## Shared announcer and finish continuation
 
-The Linux validation began on 2026-10-09 at 13:17:03 UTC: one unit compiled,
-192 reused, link exit 0. One autodriven race launched at 13:18:01 UTC and
-exited normally with no stopped racers or reported errors.
+Linux validation began on 2026-10-09 at 14:17:23 UTC: three units compiled,
+190 reused, link exit 0. One autodriven race launched at 14:18:20 UTC and
+exited normally without reported errors.
 
 - Player completed three laps, finishing first at 160.928 race seconds.
-- All eight native update counters continued after finish. Player CD8 and ended
-  manager gate 3 persisted; official standings and sealed results stayed locked.
-- A six-second brake hold did not replace the native finish driver. The
-  four-second countdown reached RESULTS with seven opponent models retained.
-- Original PCM finalized at 174 seconds, including 10.064 seconds after finish.
-  Completed-render FPS ranged from 52.0452 to 62.5956 in this cloud VM.
-- The last modulation sample recorded 10,410 updates and 20,820 shared RNG draws,
-  with zero dips, returns or completions and pitch scale 1. This validates
-  integration and healthy-state execution, not positive damage-dip behavior.
+  All finish-continuation criteria passed: native owners kept advancing,
+  official results stayed sealed, post-finish input could not take over,
+  and opponent models/audio remained present.
+- Five actual Dax starts each produced one begin, end and completion.
+  Preemptions, rejections and group failures were all zero.
+- Observed group levels ducked to29/27/41/45/29/80/100 and restored to
+  45/42/64/70/45/80/100. Dax remained at80 throughout.
+- The original mix finalized to174 seconds of PCM. Completed-render FPS
+  ranged from51.3866 to62.6776 in this cloud VM.
 
-Tested runtime source: `c10a655a2764314f485998318dd03ad644cdaa5d`.
+Tested runtime source: `79ece3b97e9e184a8e34c1c79b73f7137749c4c2`.
 Executable SHA-256:
-`342850cf7d1cbb510eac72f3e1ffc222e18baf078bb4a6a5acfb9cba4bbf7dae`.
+`6411a8673f85428c1ec7366a5fe7bbf020e91f16bebd2afd4ce74db62846ca81`.
 
-## Earlier direct keyboard probe
+## Scope and remaining gaps
 
-The 12:16 UTC probe on `b97e661b0b86e81a08e434045f945ecfa272cae9`, before
-modulation integration, observed native dual throttle, brake, differential,
-boost and release with autodrive absent. It retained six captures and 24.816
-seconds of PCM, with normal exit and no observed recovery or restart. This
-establishes the scripted input path on that source, not controller usability
-or a complete manually driven race.
+This validates the shared host-Dax completion/duck/restore path. Pause,
+preemption and restart were not exercised. Mode2 remains active and original
+type12 is still unjoined; this is not complete original announcer admission.
 
-## Remaining scope
+Player engine modulation previously passed healthy-state integration with
+zero positive dips; damage thresholds and outward/return curves remain
+unverified. The earlier no-autodrive keyboard probe used source `b97e661b`;
+it established scripted input, not current-build usability or a full manual race.
 
-Positive damage dips, thresholds, cooldown/return curves, and controls after
-the shared-RNG change need focused coverage. Restart needs rechecking with
-continuation and modulation; its earlier pass used the prior finish policy.
 Original results-menu/audio-event waits, listening quality/clipping, broader
 original-game integration and non-Linux execution remain open. The retained
 post-results scene is a host observation window. See
+[shared announcer](shared-announcer-integration50ic.md),
 [engine modulation](engine-damage-audio50ia.md) and
 [finish continuation](finish-continuation50ia.md) for exact boundaries.
