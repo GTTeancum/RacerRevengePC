@@ -50,7 +50,7 @@ struct AiSpeedControlPending50IS {
     PlayerControlStep48X priorControls{};
     ControlModelBindings48W priorBindings{};
     float preparedFactor=0.f,cachedSpeed34=0.f,damage7D0=0.f,damage7D4=0.f;
-    std::uint32_t vehicleState40=0;
+    std::uint32_t vehicleState40=0,observedAiStateFE8=0;
     bool boostHandled=false;
 };
 struct AiBoostOwner50IS {
@@ -58,7 +58,8 @@ struct AiBoostOwner50IS {
     // Implement genuine native173180, including its persistent109C timer and
     // genuine shared308030 random owner. The callback must finish once and
     // preserve canonical body/cache/control/damage fields. It may commit the
-    // genuine boost timer/RNG owners (including frame.noise.sharedRandomState).
+    // genuine boost timer/RNG owners. A per-racer snapshot RNG is NOT the
+    // original cross-racer C-runtime stream; its owner must be explicitly bound.
     // false means an incomplete external boundary,
     // NOT a declined boost. Declined boost is true with sourceReturnNonzero=false.
     bool (*complete173180)(void*,float preparedFactor,float desiredSpeed,
@@ -115,7 +116,8 @@ inline bool prepareAiSpeedControls50IS(const VehicleFrameState49W& s,
     std::memcpy(&next.priorBindings,&m.components.bindings,sizeof m.components.bindings);
     next.preparedFactor=preparedFactor;next.cachedSpeed34=m.cachedSpeed34;
     next.damage7D0=s.fields.damage7D0;next.damage7D4=s.fields.damage7D4;
-    next.vehicleState40=m.vehicleState40;next.phase=AiSpeedControlPhase50IS::AwaitingBoost;
+    next.vehicleState40=m.vehicleState40;next.observedAiStateFE8=input.vehicleAiStateFE8;
+    next.phase=AiSpeedControlPhase50IS::AwaitingBoost;
     // memcpy retains padding bytes used solely by the stale-owner comparison.
     std::memcpy(&pending,&next,sizeof next);return true;
 }

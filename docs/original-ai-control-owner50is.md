@@ -52,7 +52,9 @@ cooling, repair, model, navigation and remaining constructor owners.
 provider returns `MissingBoostOwner`; it never substitutes "boost declined".
 The provider must update its real cooldown109C and the shared308030 random
 owner if their original branches run, and return actual action/flag changes.
-The existing initialized RNG already lives at frame.noise.sharedRandomState;
+A concrete source-only provider is now staged as50IT. It requires the actual
+cross-racer shared RNG explicitly. Current HOST frame.noise is snapshotted and
+XOR-seeded per racer, so it is not sufficient proof of that original owner;
 a new per-AI seed is not allowed. Heat is already represented by BoostState50FK
 heat7C, but that fact alone does not complete173180 or the AI thermal update.
 The provider must preserve the canonical body/cache/control/damage records.
@@ -135,7 +137,8 @@ control output into a player racer would conceal the missing source path.
 Therefore the stage closes a concrete cold/control-output connection, but is
 not yet a usable full-race AI integration. The active GC candidate remains
 separate and is not modified by this stage. The next useful source work is the genuine AI lifecycle
-and scheduling boundary, especially navigation/state/packing and173180; more
+and scheduling boundary, especially navigation/state/packing and genuine
+173180 owner links (the native decision/provider now exists in50IT); more
 HOST speed caps do not close that gap.
 
 ## Verification boundary
