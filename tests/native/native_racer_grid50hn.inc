@@ -74,7 +74,7 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
       std::bit_cast<float>(std::uint32_t{0x3f2e8bc1u});
   courseTuning.lookaheadBase=48.f+3.f*float((racer-1)%3);
   // Each state's source RNG remains independent after this explicit cold seed.
-  s.noise.sharedRandomState^=0x9e3779b9u*static_cast<std::uint32_t>(racer);
+  if(!originalAiEnabled)s.noise.sharedRandomState^=0x9e3779b9u*static_cast<std::uint32_t>(racer);
   recoveryPaused=false;checkpointRequested=false;checkpointOutput={};
  });
 };

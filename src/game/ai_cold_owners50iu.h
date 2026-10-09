@@ -29,6 +29,39 @@ inline bool applyAiCreateClass50IU(AuthoredClass49N actualRaceClass,
     if(actualRaceClass==AuthoredClass49N::A)profile.repairTime1064=2.f;
     return true;
 }
+// Fresh ORIGINAL profile metadata for the currently admitted GC route only.
+//17EE2C stores "gc" at112F0: descriptor11278 +12*10.17F5A0 writes
+//trackID10 at100C4 +40*10;187B10 returns10;16E590/5A4 select class3.
+//17EE64 writes its course-record pod17 at112F8. This is NOT the current
+//human-selected pod, and no loaded save/profile override is invented here.
+struct AiGcCreateSelection50IU {
+    std::uint8_t selectedTrackId1125F=10;
+    std::int32_t selectedOrder187B10=10;
+    AuthoredClass49N actualRaceClass=AuthoredClass49N::C;
+    std::int32_t freshCourseRecordPod11280=17;
+};
+inline bool bindFreshGcAiCreateSelection50IU(const char* trackCode,
+    std::size_t bytes,AiGcCreateSelection50IU& out) noexcept {
+    if(!trackCode||bytes!=2||(trackCode[0]!='g'&&trackCode[0]!='G')||
+       (trackCode[1]!='c'&&trackCode[1]!='C'))return false;
+    out={};return true;
+}
+struct AiCreateIdentity50IU {
+    std::uint32_t ordinalFE0=0;
+    std::int32_t pod60=0;
+    std::uint32_t courseRecordMatchFE4=0;
+};
+//1AE4C4 forms opponent ordinal+human count.16E474 stores FE0,2107E8
+//uses it as vehicle5C. FE0 is an ordinal, never a manager pointer.
+inline bool bindAiCreateIdentity50IU(std::uint32_t actualOpponentOrdinal,
+    std::uint32_t actualHumanCount,std::int32_t actualPod60,
+    std::int32_t actualCourseRecordPod,AiCreateIdentity50IU& out) noexcept {
+    if(!actualHumanCount||actualHumanCount>2||actualOpponentOrdinal>=8||
+       actualHumanCount+actualOpponentOrdinal>=8||actualPod60<=0||actualCourseRecordPod<=0)
+        return false;
+    out={actualOpponentOrdinal+actualHumanCount,actualPod60,
+        actualPod60==actualCourseRecordPod?1u:0u};return true;
+}
 // Cold scalar writes only; not a second live AI runtime owner. The native
 // runtime copies these values once and owns subsequent changes. Native null
 // target is represented by absence; no guest address or fabricated racer ID.
@@ -63,11 +96,13 @@ struct AiTrackNodeMetadata50IU {
 };
 struct AiTrackMetadata50IU {
     AiTrackNodeMetadata50IU nodes[maxUndertrackNodes50ET]{};
+    float trackLength3C=0.f;
     std::uint32_t count=0;
     bool bound=false;
 };
 // Source1AAB30 constructor defaults, then1AA980..1AAB04 authored overrides.
 struct AiTrackTuning50IU {
+    float waitToRepairEnvTime6C=30.f,repairEnvUntil70=.5f,repairEnvThreshold74=1.f;
     float lookahead78=.7f,racePace7C=0.f,racePaceCutoffTime80=100.f;
     float behindPlayerClearance84=50.f,startLineBoostTime88=10.f;
     std::int8_t numPackingFront8C=4,numPackingRear8D=4;

@@ -18,6 +18,7 @@ struct AiObservedRacer50IV {
     std::uint32_t managerIndex=0,vehicle58=0,vehicle40=0,vehicleC80=0;
     float position190[3]{},cachedSpeed34=0.f;
     float progressCC4=0.f;
+    std::int32_t lapCC8=0;
     std::uint8_t flagsB9C=0,flagsCD8=0;
 };
 struct AiRacerLists50IV {

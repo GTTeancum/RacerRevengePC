@@ -6,7 +6,10 @@
 //
 // Canonical frame includes both rigid bodies, complete graph/animation/visual,
 // filter histories, joint, ground follow, damage, own serial RNG and source libm.
-racerBank.owner(s);
+if(originalAiEnabled)registerRacerFrameExceptSharedNoise50IU(racerBank,s);
+else racerBank.owner(s);
+racerBank.owner(originalAi);
+racerBank.owner(originalAiReceipt);
 //50HW: a roster slot owns its authored tuning and source binding descriptors,
 // not just its live bodies. Borrowed PSG/MOT/type2 arrays remain in permanent
 // per-archetype cold owners; restoring these POD views never moves that data.

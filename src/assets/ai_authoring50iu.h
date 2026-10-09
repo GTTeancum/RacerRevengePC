@@ -3,11 +3,13 @@
 #include "track_start50ad.h"
 #include "../game/ai_cold_owners50iu.h"
 #include <cstring>
+#include <cmath>
+#include <cfenv>
 #include <limits>
 
 namespace rr::assets {
 enum class AiAuthoringError50IU : std::uint8_t {
-    None,Input,Text,Limit,Duplicate,Number,Missing,OwnerMismatch
+    None,Input,Text,Limit,Duplicate,Number,Missing,OwnerMismatch,Arithmetic,RoundingMode
 };
 struct AiAuthoringDiagnostic50IU {
     AiAuthoringError50IU error=AiAuthoringError50IU::None;
@@ -177,8 +179,28 @@ inline bool readAiTrackMetadata50IU(const char* text,std::size_t bytes,
         if(!seen[n])return fail(d,AiAuthoringError50IU::Missing,0x2a14d4,0);
         //50EU owns geometry/branch independently; catch joining another file.
         if(result.nodes[n].branch68!=track.nodes[n].branch68||
-           ((result.nodes[n].flags79^track.nodes[n].flags79)&0x48u))
+           (result.nodes[n].flags79!=track.nodes[n].flags79))
             return fail(d,AiAuthoringError50IU::OwnerMismatch,0x2a18ec,0);}
+    //2A1BB8..2A1C5C uses node0, its ACTUAL Next0, full XYZ distance,
+    //then that next node's authored DistanceToFinish. No HOST course sum.
+    if(std::fegetround()!=FE_TONEAREST)
+        return fail(d,AiAuthoringError50IU::RoundingMode,0x2a1c14,0);
+    if(!track.track.nodes[0].nextCount)return fail(d,AiAuthoringError50IU::Missing,0x2a26c0,0);
+    const auto next=track.track.nodes[0].next[0];
+    if(next>=result.count)return fail(d,AiAuthoringError50IU::OwnerMismatch,0x2a26c0,0);
+    const auto& p0=track.track.nodes[0].position;
+    const auto& p1=track.track.nodes[next].position;
+    auto ordinary=[](float value) noexcept {return std::isfinite(value)&&(value==0.f||std::isnormal(value));};
+    for(unsigned axis=0;axis<3;++axis)if(!ordinary(p0[axis])||!ordinary(p1[axis]))
+        return fail(d,AiAuthoringError50IU::Arithmetic,0x2a1c14,0);
+    volatile float dy=p1[1]-p0[1],dz=p1[2]-p0[2],dx=p1[0]-p0[0];
+    volatile float xx=dx*dx,yy=dy*dy,xy=xx+yy,zz=dz*dz,sum=xy+zz;
+    volatile float length=std::sqrt(static_cast<float>(sum));
+    volatile float total=length+result.nodes[next].distanceToFinish60;
+    const float intermediates[]={dy,dz,dx,xx,yy,xy,zz,sum,length,total};
+    for(float value:intermediates)if(!ordinary(value))
+        return fail(d,AiAuthoringError50IU::Arithmetic,0x2a1c58,0);
+    result.trackLength3C=total;
     result.bound=true;output=result;d={};return true;
 }
 
@@ -188,6 +210,9 @@ inline bool readAiTrackTuning50IU(const char* text,std::size_t bytes,
     d={};P result{};
     struct F {const char* section;const char* key;float P::* member;unsigned bit;};
     constexpr F floats[]={
+        {"PodDamage","WaitToRepairEnvTime",&P::waitToRepairEnvTime6C,13},
+        {"PodDamage","RepairEnvUntil",&P::repairEnvUntil70,14},
+        {"PodDamage","RepairEnvThreshold",&P::repairEnvThreshold74,15},
         {"AIDriving","Lookahead",&P::lookahead78,0},
         {"AIDriving","RacePace",&P::racePace7C,1},
         {"AIDriving","RacePaceCutoffTime",&P::racePaceCutoffTime80,2},

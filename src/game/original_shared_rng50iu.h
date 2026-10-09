@@ -8,7 +8,7 @@ namespace rr::game {
 // Original runtime pointer38544C ->385160, raw state+58 starts at1 in ELF.
 // Bind once at fresh native APPLICATION initialization, before any consumer.
 // This is not permission to reseed a continuing race/application chronology.
-// The complete noise owner is process-wide:14EEF0's tables/readiness and
+// The complete noise owner is process-wide:14EFD0's tables/readiness and
 //4332A8 scratch cell are shared too. All represented308030 consumers use this
 // one stable arena address; it is deliberately EXCLUDED from racer snapshots.
 inline void initializeOriginalSharedNoise50IU(CoupledNoiseContext49M& shared) noexcept {

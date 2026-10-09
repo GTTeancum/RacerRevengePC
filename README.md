@@ -4,7 +4,7 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This recovery branch contains an **unfinished, uncompiled and untested original-AI slice**. Cold/main-loop joins are incomplete, AI admission defaults false, and no AI racer is enabled. The active GC candidate is separate. See [partial source status](docs/native-ai-first-slice-status.md).
+This recovery branch contains an **unfinished, uncompiled and untested original-AI slice**. An optional one-racer GC source path now has cold/main-loop joins, but final owner review and runtime validation remain open. The active GC candidate is separate. See [partial source status](docs/native-ai-first-slice-status.md).
 
 The Linux prototype includes native rendering, physics, audio, keyboard controls, and an eight-racer development race. Clegg selection through Main, pause/resume, and a 20-second gameplay capture have passed. An earlier mode1 baseline completed a three-lap race with native timing, Dax, music, and completed-lap display. See [current validation](docs/current-validation.md) for scope.
 

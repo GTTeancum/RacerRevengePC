@@ -7,6 +7,15 @@
 #include "../../src/game/vehicle_frame49w.h"
 
 namespace native_racer_contact50HW {
+// Native admission diagnostic, not a fabricated original return/status.
+// Source223100..223110 requires the real body20C/210 partner list and222F00
+// dynamic-damage owners. This HOST contact seam cannot publish those owners.
+struct AiContactBoundary50IV {
+    bool unsupported=false;
+    std::size_t racerSlot=0;
+    std::uint32_t sourcePC=0;
+    std::int32_t contactCount20C=0;
+};
 // One HOST world-frame boundary only: call after ALL participating independent
 // native frames finished at Ready, outside Bank::visit(), before another racer
 // begins its next frame. No renderer, source query, or event consumer can run
@@ -26,6 +35,12 @@ namespace native_racer_contact50HW {
 // policy for the authenticated fresh empty root, not unknown-prefix recovery. Pair order indexes bank slots directly, with no
 // sorting/deduplication. A stalled/finished racer should appear only if the host
 // deliberately wants it to participate; pair order is the eligibility boundary.
+// Genuine AI58=1 requires canonical dynamic-damage owners that this seam lacks.
+// All requested pairs still run into local scratch. An actual accepted dynamic
+// contact involving AI returns ResponseRejected before ANY racer commit. Mere
+// pair eligibility or a broadphase miss does not reject. Optional aiBoundary
+// identifies this unsupported source boundary. On failure all bank states and
+// receipt remain unchanged; contact scratch and the diagnostic may change.
 inline Status applyAtWorldBoundary(
     native_racer50HN::Bank& bank,Owner& contacts,
     VehicleFrameState49W& live,const VehicleFrameBindings49W& bindings,
@@ -33,7 +48,8 @@ inline Status applyAtWorldBoundary(
     const std::array<std::uint32_t,maxRacers>& identity,
     const std::array<std::uint32_t,maxRacers>& material,
     const Pair* order,std::size_t pairCount,
-    Receipt& receipt) {
+    Receipt& receipt,AiContactBoundary50IV* aiBoundary=nullptr) {
+    if(aiBoundary)*aiBoundary={};
     const auto count=bank.count();
     if(count<2||count>maxRacers||count!=contacts.count())return Status::InvalidInput;
     if(pairCount>maxRacers*(maxRacers-1)||(pairCount&&!order))return Status::InvalidInput;
@@ -43,12 +59,14 @@ inline Status applyAtWorldBoundary(
         participates[order[p].primary]=participates[order[p].other]=true;
     }
     std::array<Body,maxRacers> before{},after{};
+    std::array<bool,maxRacers> actualAi{};
     for(std::size_t i=0;i<count;++i){
         const bool valid=bank.visit(i,[&](){
             const auto node=static_cast<int>(bindings.lifecycle.main190);
             if(!validVehicleSceneCount49W(live,bindings)||node<0||
                node>=static_cast<int>(live.sceneNodeCount))return false;
             const auto& root=live.bodies.main.components.root;
+            actualAi[i]=live.fields.vehicle58==1u;
             if(participates[i]&&(live.phase!=VehicleFramePhase49W::Ready||
                std::memcmp(&root.scene,&live.nodes[node].world100,sizeof(BodyMatrix48G))))return false;
             before[i].physical.identity=identity[i];before[i].physical.body.state=root;
@@ -61,6 +79,15 @@ inline Status applyAtWorldBoundary(
     Receipt staged{};
     const auto status=contacts.run(before.data(),count,order,pairCount,after.data(),staged);
     if(status!=Status::Complete)return status;
+    // Owner::run appends both sides' real contact identities only after an
+    // accepted geometry hit and the original processed-body suppression gate.
+    // Detect the source-required partner branch from that receipt, not from a
+    // guessed distance or a changed impulse (valid contacts may have zero force).
+    for(std::size_t i=0;i<count;++i)
+        if(actualAi[i]&&staged.contacts[i].count20C>0){
+            if(aiBoundary)*aiBoundary={true,i,0x223110u,staged.contacts[i].count20C};
+            return Status::ResponseRejected;
+        }
     // Check every participant BEFORE writing any participant. This catches a
     // caller that changed a racer while collecting snapshots. No retained body
     // or scene pointer crosses a visit: only copied POD snapshots do.
