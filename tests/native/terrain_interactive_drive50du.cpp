@@ -10,6 +10,7 @@
 #include "race_session50hm_fixture.h"
 #include "race_audio50hq_fixture.h"
 #include "opponent_engine_audio50hx_fixture.h"
+#include "engine_damage_audio50ia.h"
 #include "wrong_way_progress50go.h"
 #include "host_course_driver50gk.h"
 #include "player_finish50ia.h"
@@ -570,6 +571,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool audioEnabled=!(audioSetting&&std::string(audioSetting)=="0");
  rr::platform::AudioOutputDiagnostic50HD audioDiagnostic{};
  PodSpeechCounts50HG speechCounts{};PodSpeechState50HG speechState{};
+ // Selected-player emitter state only; opponent bank visits never mutate it.
+ // Fresh session reconstructs original19EBA0 values. Pause retains its timers.
+ EngineDamageState50IA engineDamage{};
+ std::uint64_t engineDamageUpdates=0,engineDamageDraws=0,engineDamageDips=0;
+ std::uint64_t engineDamageReturns=0,engineDamageCompletions=0;
  DamageSpeechEvent50HG pendingSpeech{};
  float playerSpeechChance=0.f;
  SpeechPosition50HG audioListener{};bool audioListenerReady=false;
@@ -1439,7 +1445,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(s.phase==VehicleFramePhase49W::Ready,"one-substep diagnostic frame complete");
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame){
   PodEngineParameters50HE engineParameters{}; // Authenticated Pod01's explicit tuning.
-  PodEngineInput50HE engineInput{boostState.speedRatio70,1.f,liveAudio->boostPitch()};
+  // Original19EEA0 order: cooldown, active curve, damage selection, then
+  // engine pitch controls. The same player RNG already used by effects and
+  // material audio must also receive the source's two healthy-state draws.
+  const EngineDamageInput50IA damageInput{m.frameFactor,s.fields.damage7D0,
+      s.fields.damage7D4,s.fields.damage7DC};
+  const auto damageReceipt=updateEngineDamageAudio50IA(damageInput,engineDamage,
+      engineDamage,s.noise.sharedRandomState);
+  require50DU(damageReceipt.okay(),"original engine damage modulation rejected");
+  ++engineDamageUpdates;engineDamageDraws+=damageReceipt.randomDraws;
+  if(damageReceipt.damageDipStarted)++engineDamageDips;
+  if(damageReceipt.returnStarted)++engineDamageReturns;
+  if(damageReceipt.dipFinished)++engineDamageCompletions;
+  PodEngineInput50HE engineInput{boostState.speedRatio70,engineDamage.scale484,liveAudio->boostPitch()};
   require50DU(liveAudio->engine(engineParameters,engineInput).okay(),"native engine audio controls rejected");
   PodWarningInput50HE warning{};
   warning.damage7D0=s.fields.damage7D0;warning.damage7D4=s.fields.damage7D4;
@@ -2674,6 +2692,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<liveAudio->bank().ready<<'/'<<liveAudio->activeVoices()<<'/'
          <<liveAudio->counters().starts<<'/'<<ai.mixedFrames<<'/'<<ai.capturedFrames
          <<'/'<<ai.deviceUnderrunFrames<<" clipped_samples="<<liveAudio->clippedSamples()<<'\n';
+     std::cerr<<"audio engine_damage updates/draws/dips/returns/completions "
+         <<engineDamageUpdates<<'/'<<engineDamageDraws<<'/'<<engineDamageDips<<'/'
+         <<engineDamageReturns<<'/'<<engineDamageCompletions
+         <<" pitch_scale="<<engineDamage.scale484
+         <<" cooldown="<<engineDamage.cooldown474<<'\n';
      std::cerr<<"audio speech_events/cues/unjoined_announcer "<<speechEvents<<'/'<<speechCues
          <<'/'<<announcerRequestsUnjoined<<'\n';
      if(raceEnabled){const auto& r=raceAudio->counters();
