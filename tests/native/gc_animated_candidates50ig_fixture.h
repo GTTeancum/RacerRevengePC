@@ -50,6 +50,31 @@ inline void prepare(const gc_animated_world50IG::Owner& owner,
  }
  sync(owner,candidates.data(),candidates.size(),first);
 }
+//294C20..294DD8 routes CHARACTER through non-body records, not the
+// PHYSICSBODY virtual callback. Pin the existing native category namespace
+// before a session publishes these owners to either spring query. Animation
+// does not imply a physical body or a target-side E8 response callback.
+inline bool admitNonBodyResponse(const gc_animated_world50IG::Owner& owner,
+    const g::Type2StaticCandidate49X* candidates,std::size_t size,std::size_t first,
+    const g::Type2StaticQuery49X& main,const g::Type2StaticQuery49X& secondary) noexcept {
+ if(!owner.ready()||!candidates||first>size||size-first!=count)return false;
+ // Named category bindings already shared by the native session: trigger8,
+ // PHYSICSBODY2 and STATICOBJECT4. None aliases CHARACTER1.
+ const auto queryRoute=[](const g::Type2StaticQuery49X& query) noexcept {
+  return query.callbackEnabled&&query.skipMask==8u&&query.dynamicMask==2u&&query.materialMask==4u;
+ };
+ if(!queryRoute(main)||!queryRoute(secondary))return false;
+ for(unsigned i=0;i<count;++i){const auto& target=candidates[first+i];const auto& c=target.candidate.collision;
+  if(target.shapeType!=1||target.compound!=&owner.collision(i)||
+     c.shapeType!=1||c.compound!=target.compound||c.filter.categoryA4!=characterMask||
+     c.geometry.id!=firstCollider+i||c.filter.identity!=c.geometry.id||
+     c.ownerIdentity9C!=firstModel+i||c.hasResponseCallbackE8||
+     c.typeTag!=main.collisionTypeTag||c.typeTag!=secondary.collisionTypeTag)return false;
+ }
+ // Existing294BB0 non-body append supplies other44=0/material0, so the
+ // bounded50E/50G main and50J secondary responses need no second body owner.
+ return true;
+}
 inline g::LiveZoneBounds50EN bounds(const gc_animated_world50IG::Owner& owner,std::size_t index){
  const auto& c=owner.state(index).collision;g::LiveZoneBounds50EN out{};
  out.bounds.shapeTag=1;out.bounds.shapeWorld=c.ownerWorld;

@@ -2,6 +2,8 @@
 
 This WIP combines GC static-world and navigation source, original materials/audio, projected rendering, Results, track selection, animated owners, compound collision and ATM playback. The central Linux build of `54bc7b5a00244fadf5ccd1fc4ab95e1f34ff771b` passed on 2026-10-09: 59 units compiled, 134 reused, link exit 0. The sole runtime loaded TA mode2/Main, then the capture checker rejected renderer tick 0 versus native counter 1 on the first image. It stopped before any driving or GC cold load. Capture was incomplete, so **no GC gameplay pass is claimed**. The last successful runtime used `959d94e1044f74651e7a2713093eec0ac65da932` for the TA Clegg/menu scenario; see [current validation](current-validation.md). Tested main remains separate.
 
+A later cold admission guard now pins the original CHARACTER/non-body callback route and masks. That small source increment is **UNBUILT / UNTESTED**; it adds no response algorithm. See [CHARACTER response admission](gc-character-response50ig.md).
+
 TA stays default. Experimental GC requires `RR_TRACK=GC`, explicit `RR_RACE_MODE=2`, and `RR_GC_INCOMPLETE_WORLD=1`. The pending menu choice commits only on a cold Start/Restart. Supply original GC/audio data and generated local caches; game assets and instruction-word evidence are excluded from Git.
 
 The static source preserves original navigation, node-zero grid, 551 collision placements, ordered material assignments, 801 visual placements, projected passes and actual SKY21 inputs. Authentication tables contain hashes, counts and offsets, not asset payloads. Culling diagnostics count complete material-pass index ranges. Results presents sealed race data while the native world and shared mix continue.
