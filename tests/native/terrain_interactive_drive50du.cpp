@@ -1,4 +1,5 @@
 #include "runtime_allocations50fl.h"
+#include "track_session_assets50ig_fixture.h"
 #include "native_racer_bank50hn_fixture.h"
 #include "native_racer_contact_bank50hw_fixture.h"
 #include "native_racer_rig50hw_fixture.h"
@@ -156,6 +157,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     lap_drive50GJ::Continuity& lapContinuity,std::uint64_t sessionIndex,
     HostMonotonicClock50ID& applicationClock){
  require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest setup failed");
+ // Resolve every track-owned path together, before reading any assets. A known
+ // world metadata row is insufficient to admit gameplay on that track.
+ const char* trackSelectionError=nullptr;
+ const auto* selectedTrack=track_session_assets50IG::select(
+     std::getenv("RR_TRACK"),trackSelectionError);
+ require50DU(selectedTrack,trackSelectionError?trackSelectionError:"track selection failed");
+ const auto& trackAssets=*selectedTrack;
+ require50DU(trackAssets.terrainOwners==37&&trackAssets.world->zones==9,
+     "track binding exceeds retained TA collision/zone storage");
+ std::cerr<<"TRACK: "<<trackAssets.world->code<<" original="
+     <<trackAssets.world->container<<'\n';
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceEnabled=!(raceSetting&&std::string(raceSetting)=="0");
  const char* raceModeSetting=std::getenv("RR_RACE_MODE");
@@ -189,7 +201,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool captureFirstWrongWay=headlessLive&&captureWrongSetting&&std::string(captureWrongSetting)=="1";
  bool capturedFirstWrongWay=false,lastCommittedWrongWay=false;
  std::ifstream file(corpusPath);require50DU(bool(file),"cannot open collision corpus");J corpus;file>>corpus;const J*chosen=nullptr;
- for(const auto&row:corpus["cases"])if(row["name"]=="podboxm.col-explicit37-authored-placements-forward")chosen=&row;
+ for(const auto&row:corpus["cases"])if(row["name"]==trackAssets.mainCollisionCase)chosen=&row;
  require50DU(chosen,"authored placement case present");const auto&row=*chosen;const auto&qj=row["query"];
  auto shape=cold::shape(corpus["shapes"][qj["shape"].get<std::size_t>()]);
  std::vector<cold::Mesh> meshes;meshes.reserve(corpus["meshes"].size());for(const auto&j:corpus["meshes"])meshes.push_back(cold::mesh(j));
@@ -305,7 +317,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
 
 
- auto ground=authored_runtime_ground50cp_fixture::load({4,16,32,64});
+ authored_runtime_ground50cp_fixture::Request groundRequest;
+ groundRequest.archive=trackAssets.archive;
+ groundRequest.worldMember=trackAssets.world->worldMember;
+ groundRequest.mapSpline=trackAssets.mapSpline;
+ groundRequest.gridRank=trackAssets.gridRank;
+ auto ground=authored_runtime_ground50cp_fixture::load({4,16,32,64},groundRequest);
  require50DU(ground.lift==x.parameters.visual.verticalLimit7EC,"same actual Pod01 lift");
  std::vector<std::uint32_t> groundStack(ground.stackCount);
  const auto groundAllocations=::allocations;BodyMatrix48G pose=ground.pose;
@@ -359,7 +376,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  SpringGeneratedParameters48K settings{};settings.impact54=true;settings.friction50=true;settings.impact.disableLeverArms5C=true;settings.impact.correctPenetration64=true;settings.impact.normalForceScale98=.97f;settings.impact.positionCorrectionScaleCC=.2f;
  SpringResponseParameters48L response{};response.maxSpeed94=10000;rr::assets::SpringCollisionAuthoring50F collision{};rr::assets::PodPhysicsDiagnostic49N diagnostic{};
  require50DU(rr::assets::readSpringCollision50F(reinterpret_cast<const char*>(phy.data()),phy.size(),collision,diagnostic)&&rr::assets::applySpringCollision50F(collision,x.parameters.bodies.main.body.mass,settings,response),"authored response settings");
- const auto tuning=runtime_startup50fl::readBytes("work/impactAuthoring49Y/ta.tun");require50DU(rr::assets::readEnvironmentImpact49Y(reinterpret_cast<const char*>(tuning.data()),tuning.size(),x.parameters.impactTuning,diagnostic),"actual TA impact tuning");x.parameters.impactTuningBound=true;
+ const auto tuning=runtime_startup50fl::readBytes(trackAssets.impactTuning);require50DU(rr::assets::readEnvironmentImpact49Y(reinterpret_cast<const char*>(tuning.data()),tuning.size(),x.parameters.impactTuning,diagnostic),"actual TA impact tuning");x.parameters.impactTuningBound=true;
  rr::assets::DefenseAuthoring49Y defense{};require50DU(rr::assets::readDefenseAuthoring49Y(reinterpret_cast<const char*>(phy.data()),phy.size(),defense,diagnostic)&&defense.baseDefense.present,"explicit base-profile defense");s.fields.defenseCF0=defense.baseDefense.value;
  // Profile overwrite and authored class selection are separate source gates.
  // Use the same UseValues/class decision as the already-bound physics.
@@ -432,7 +449,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
 
  StaticSpringState50G spring{};spring.records.generatedCapacity88=40;SpringRecord48N records[60]{},queryRecords[60]{},scratchRecords[60]{};
 
- const J*secondaryCase=nullptr;for(const auto&item:corpus["cases"])if(item["name"]=="chariotm.col-explicit37-authored-placements-forward")secondaryCase=&item;
+ const J*secondaryCase=nullptr;for(const auto&item:corpus["cases"])if(item["name"]==trackAssets.secondaryCollisionCase)secondaryCase=&item;
  require50DU(secondaryCase,"actual chariot query present");const auto&sqj=(*secondaryCase)["query"];
  auto secondaryShape=cold::shape(corpus["shapes"][sqj["shape"].get<std::size_t>()]);auto secondaryFilter=cold::filter(sqj["filter"]);
  Type2StaticQuery49X secondaryQuery{};secondaryQuery.resource=&secondaryShape.view;secondaryQuery.filter=&secondaryFilter;secondaryQuery.queryScene.value=78;
@@ -685,7 +702,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
  {
   rr::assets::ResArchive48C navigationArchive;rr::assets::DecodeError48C error;
-  const auto bytes=runtime_startup50fl::readBytes("work/native/project/disc/TRACKS/TA.RES");
+  const auto bytes=runtime_startup50fl::readBytes(trackAssets.archive);
   require50DU(rr::assets::decodeResource48C(bytes,navigationArchive,error),
       "decode actual TA navigation archive");
   auto scratch=std::make_unique<TrackNavigationScratch50EU>();
@@ -704,10 +721,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        liveWorld,destination,navigationDiagnostic),member),
        "bind source navigation portal indices");
   };
-  readNavigation("tracks\\mta.spl",*navigationMap);
+  readNavigation(trackAssets.mapSpline,*navigationMap);
   require50DU(prepareLapProgressTrack50GF(*scratch,lapOwner.track,lapOwner.diagnostic),
       "actual authored lap progress markers rejected");
-  readNavigation("tracks\\ata.spl",*navigationAI);
+  readNavigation(trackAssets.aiSpline,*navigationAI);
  }
  if(!lapContinuity.initialized){
   lapContinuity.state.vehicleCD8=s.fields.impactFlagsCD8;
@@ -730,7 +747,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  //20F5C0..20F5C8 initializes CA0=(0,0,0,1). The first gate query therefore
  // takes1A0940's explicit zero-XZ miss; do not seed this with a guessed pose.
  float navigationCA0[4]{0.f,0.f,0.f,1.f};
- const CollectionRef50BX initialCollisionZone=checkpointInput?checkpointInput->primaryZone:1;
+ const CollectionRef50BX initialCollisionZone=checkpointInput?checkpointInput->primaryZone:trackAssets.initialCollisionZone;
  if(checkpointInput){
   require50DU(checkpointInput->zoneCount==liveWorld.zoneCount,"checkpoint world namespace changed");
   require50DU(checkpointInput->progress.reset.vehicleC80<navigationAI->track.count&&
@@ -1823,17 +1840,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // This visual set is broader than the37-collider diagnostic physics scope.
  rr::assets::Mesh48B trackMesh;std::string trackLoadError;
  const bool trackLoaded=rr::assets::loadMesh48B(
-     "evidence/visual49G/export-placed-normal/ta-world.rrmesh",trackMesh,trackLoadError);
+     trackAssets.visualMesh,trackMesh,trackLoadError);
  require50DU(trackLoaded,trackLoadError.empty()?"retained TA visual mesh load failed":trackLoadError.c_str());
  namespace trackTextures=track_materials50fa_fixture;
  auto trackMaterialOwner=std::make_unique<trackTextures::Owner>();
  trackTextures::Request trackMaterialRequest{};
- trackMaterialRequest.root="evidence/visual49G";
- trackMaterialRequest.exportReport="evidence/visual49G/export-placed-normal/export-report.json";
+ trackMaterialRequest.root=trackAssets.visualRoot;
+ trackMaterialRequest.exportReport=trackAssets.visualReport;
  trackMaterialRequest.choice={1,1,rr::assets::MaterialTextureRequirement50EA::optionalUntextured,
      trackTextures::MipMode::largestRetained,0};
  trackMaterialRequest.coldSourceByteCapacity=32u*1024u*1024u;
- trackMaterialRequest.sourceArchive="work/native/project/disc/TRACKS/TA.RES";
+ trackMaterialRequest.sourceArchive=trackAssets.archive;
  trackMaterialRequest.decodeSourceTexture=&source_texture50fc_fixture::decodeSourceTexture;
  trackMaterialRequest.allowStaticAnimationFrame=true;
  trackMaterialRequest.textureBudgets={32,1024,8u*1024u*1024u,8u*1024u*1024u,1024};
@@ -1849,8 +1866,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      <<" zero/fallback "<<trackNormalDiagnostic.zeroNormals<<'\n';
  auto skyOwner=std::make_unique<sky50gw_fixture::Owner>();
  sky50gw_fixture::Request skyRequest{};
- skyRequest.archive="work/native/project/disc/TRACKS/TA.RES";
- skyRequest.textureRoot="evidence/sky50GW";
+ skyRequest.archive=trackAssets.archive;
+ skyRequest.textureRoot=trackAssets.skyTextureRoot;
  sky50gw_fixture::Diagnostic skyDiagnostic{};
  require50DU(skyOwner->load(skyRequest,skyDiagnostic),
      skyDiagnostic.message.empty()?"actual TA sky load failed":skyDiagnostic.message.c_str());
