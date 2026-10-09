@@ -32,6 +32,10 @@ struct Collision48G {
     std::uint32_t version = 1, type = 0, reverse_mode = 0, quantized = 0, normals_present = 0;
     std::array<float, 16> matrix{}; // Row-vector affine COL local transform.
     std::uint32_t vertices_offset = 0, normals_flag_offset = 0, nodes_offset = 0, faces_offset = 0;
+    // quantized==1 positions retain the original query-prefix projection:
+    // signed16 -> binary32 -> *bits38000100 -> *32767, rounded per operation.
+    // Original shorts remain in original_bytes and are checked on serialization.
+    // Quantized optional normals are still unsupported; float normals unchanged.
     std::vector<std::array<float, 3>> vertices, vertex_normals;
     std::vector<CollisionNode48G> nodes;
     std::vector<CollisionFace48G> faces;

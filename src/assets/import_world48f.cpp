@@ -73,7 +73,8 @@ Bytes encode(const ParameterDocument48F& p) {
         std::vector<std::size_t> order; order.reserve(count); previous.clear();
         for (std::size_t j = 0; j < count; ++j) {
             const auto& field = block.fields[j];
-            malformed(lowerName(field.name) && field.name.size() < 35 && field.name > previous, "parameter.field_names", 0,
+            malformed(lowerName(field.name) && field.name.size() < 35 &&
+                (p.preservesDuplicateLabels ? field.name >= previous : field.name > previous), "parameter.field_names", 0,
                 "Field names must be unique lowercase sorted ASCII"); previous = field.name;
             malformed(field.value.size() < 512 && ascii(field.value), "parameter.value", 0, "Value is not bounded printable ASCII"); order.push_back(j);
         }
@@ -187,7 +188,7 @@ bool decodeParameters48F(const Bytes& input, ParameterDocument48F& output, Decod
         require(r.u32(7) == 1, DecodeKind48C::unsupported, "parameter.version", 7, "Only BINARY version1 supported");
         const auto count = r.u32(11); malformed(count > 0, "parameter.block_count", 11, "Empty block list");
         require(count <= std::min(limits.blocks, 8192u), DecodeKind48C::limit, "parameter.block_count", 11, "Block count cap");
-        ParameterDocument48F parsed; std::size_t at = 15, duplicateOffset = 0; std::string previous;
+        ParameterDocument48F parsed; parsed.preservesDuplicateLabels=limits.retainDuplicateLabels; std::size_t at = 15, duplicateOffset = 0; std::string previous;
         for (std::uint32_t i = 0; i < count; ++i) {
             const auto length = r.u32(at); at += 4; ParameterBlock48F block; block.name_offset = at; block.name = r.text(at, length); at += length;
             malformed(lowerName(block.name) && block.name > previous, "parameter.block_names", block.name_offset, "Block names must be unique lowercase sorted ASCII");
@@ -219,7 +220,7 @@ bool decodeParameters48F(const Bytes& input, ParameterDocument48F& output, Decod
             progress(hooks, "parameter.blocks", i+1, count);
         }
         malformed(physicalNext == input.size(), "parameter.file_suffix", physicalNext, "Unconsumed file suffix");
-        require(!duplicateOffset,DecodeKind48C::unsupported,"parameter.duplicate_label",duplicateOffset,
+        require(!duplicateOffset||limits.retainDuplicateLabels,DecodeKind48C::unsupported,"parameter.duplicate_label",duplicateOffset,
             "Complete original labelled block repeats keys; precedence semantics are unproved");
         malformed(encode(parsed) == input, "parameter.roundtrip", 0, "Reversible parameter serialization differs");
         checkCancel(hooks, physicalNext); parsed.original_bytes = input; output = std::move(parsed); return true;
@@ -229,6 +230,8 @@ bool decodeWorld48F(const Bytes& input, World48F& output, DecodeError48C& error,
     const DecodeHooks48C* hooks, const WorldLimits48F& limits) {
     error = {};
     try {
+        require(!limits.retainDuplicateLabels,DecodeKind48C::unsupported,"world.duplicate_label_policy",0,
+            "World semantic decoding requires unambiguous field names");
         World48F world; if (!decodeParameters48F(input, world.parameters, error, hooks, limits)) return false;
         const auto& p = world.parameters; world.scene_info_block = findBlock(p, "sceneinfo"); const auto& info = p.blocks[world.scene_info_block];
         bool hasZones=false,hasPortals=false,hasFlat=false;

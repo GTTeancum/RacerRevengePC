@@ -11,6 +11,10 @@ struct WorldLimits48F {
     std::size_t input_bytes = 2u * 1024u * 1024u;
     std::uint32_t blocks = 8192, fields_per_block = 1024;
     std::uint32_t zones = 256, portals = 4096, instances_per_zone = 10000, instances = 100000;
+    // Representation-only opt-in: preserve duplicate sorted labels, without
+    // selecting a winning value. Each consumer must reject duplicates it uses.
+    // World semantic decoding never accepts this opt-in.
+    bool retainDuplicateLabels = false;
 };
 struct ParameterField48F {
     std::string name, value;
@@ -28,6 +32,7 @@ struct ParameterDocument48F {
     std::size_t header_table_offset = 0;
     std::vector<ParameterBlock48F> blocks; // Original sorted block order.
     std::vector<std::uint8_t> original_bytes; // Exact file including all raw blocks.
+    bool preservesDuplicateLabels = false;
 };
 struct WorldZone48F {
     std::uint32_t zone = 0, models = 0, parameter_block = 0;

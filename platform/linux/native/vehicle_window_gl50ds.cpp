@@ -115,7 +115,8 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
             track.mode == VehicleWindowMode50DS::unspecified && track.vertexColorScale == 1.f &&
             !track.textures && !track.spans && !track.spanCount && !track.enableFrustumCulling &&
             !track.cullingChunkTriangles && !track.sourceNormals && !track.sourceNormalCount &&
-            !track.maximumNormalBytes) ||
+            !track.maximumNormalBytes && !track.sourceProjectionUvs && !track.sourceProjectionCount &&
+            !track.maximumProjectionBytes) ||
             fail(d, VehicleWindowError50DS::request, "track mode/budgets/culling require an actual visual mesh");
     if ((track.mode != VehicleWindowMode50DS::viewerNeutralUntextured &&
             track.mode != VehicleWindowMode50DS::sourceVertexColors &&
@@ -159,6 +160,20 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
     } else if (track.sourceNormalCount || track.maximumNormalBytes) {
         return fail(d, VehicleWindowError50DS::request, "normal count/budget require an explicit source stream");
     }
+    if (track.sourceProjectionUvs) {
+        const std::uint64_t bytes = std::uint64_t(track.sourceProjectionCount) * sizeof(assets::TrackProjectedUv);
+        if (track.mode != VehicleWindowMode50DS::callerMaterialTextures ||
+            track.sourceProjectionCount != mesh.vertices.size() || !track.maximumProjectionBytes ||
+            bytes > track.maximumProjectionBytes ||
+            bytes > std::uint64_t(std::numeric_limits<std::intptr_t>::max()))
+            return fail(d, VehicleWindowError50DS::limits, "projected UV stream requires exact vertex count and explicit byte budget");
+        for (U v = 0; v < track.sourceProjectionCount; ++v)
+            for (float uv : track.sourceProjectionUvs[v].uv)
+                if (!std::isfinite(uv))
+                    return fail(d, VehicleWindowError50DS::assets, "nonfinite authored projected UV");
+    } else if (track.sourceProjectionCount || track.maximumProjectionBytes) {
+        return fail(d, VehicleWindowError50DS::request, "projected UV count/budget require a source stream");
+    }
     // Mesh48B can be built or changed after parsing. Recheck all geometry
     // before allocating even the renderer owner; do not trust parser history.
     for (const auto& vertex : mesh.vertices) {
@@ -184,16 +199,31 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
             const auto& span = track.spans[i];
             d.texture = span.material.textureIndex;
             if (!validateMaterialPolicy(span.material, d)) return false;
-            if (span.indexStart != nextIndex || span.vertexStart != nextVertex ||
-                !span.indexCount || span.indexCount % 3 || !span.vertexCount ||
-                span.indexCount > mesh.indices.size() - nextIndex ||
-                span.vertexCount > mesh.vertices.size() - nextVertex)
-                return fail(d, VehicleWindowError50DS::indices,
-                    "track spans must partition source index and vertex arrays in order");
-            nextIndex += span.indexCount;
-            nextVertex += span.vertexCount;
-            for (U n = span.indexStart; n < nextIndex; ++n)
-                if (mesh.indices[n] < span.vertexStart || mesh.indices[n] >= nextVertex)
+            if (!span.sourcePass || !span.sourcePassCount || span.sourcePassCount > 2 ||
+                span.sourcePass > span.sourcePassCount || span.projectionPass > 2 ||
+                (span.projectionPass && (!track.sourceProjectionUvs ||
+                    span.projectionPass != span.sourcePass)))
+                return fail(d, VehicleWindowError50DS::material, "invalid original track pass/projection binding");
+            if (span.sourcePass == 1) {
+                if ((i && track.spans[i-1].sourcePass != track.spans[i-1].sourcePassCount) ||
+                    span.indexStart != nextIndex || span.vertexStart != nextVertex ||
+                    !span.indexCount || span.indexCount % 3 || !span.vertexCount ||
+                    span.indexCount > mesh.indices.size() - nextIndex ||
+                    span.vertexCount > mesh.vertices.size() - nextVertex)
+                    return fail(d, VehicleWindowError50DS::indices,
+                        "first material passes must partition source mesh arrays in order");
+                nextIndex += span.indexCount;
+                nextVertex += span.vertexCount;
+            } else {
+                if (!i) return fail(d, VehicleWindowError50DS::indices, "material continuation without first pass");
+                const auto& prior = track.spans[i-1];
+                if (span.sourcePass != prior.sourcePass+1 || span.sourcePassCount != prior.sourcePassCount ||
+                    span.indexStart != prior.indexStart || span.indexCount != prior.indexCount ||
+                    span.vertexStart != prior.vertexStart || span.vertexCount != prior.vertexCount)
+                    return fail(d, VehicleWindowError50DS::indices, "material passes must repeat the exact preceding source surface");
+            }
+            for (U n = span.indexStart; n < span.indexStart+span.indexCount; ++n)
+                if (mesh.indices[n] < span.vertexStart || mesh.indices[n] >= span.vertexStart+span.vertexCount)
                     return fail(d, VehicleWindowError50DS::indices,
                         "track span index escapes its declared source vertex range");
             if (span.material.mode == VehicleWindowMaterialMode50DS::untextured) {
@@ -209,7 +239,8 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
                 return fail(d, VehicleWindowError50DS::material, "track span shading must be explicit");
             }
         }
-        if (nextIndex != mesh.indices.size() || nextVertex != mesh.vertices.size())
+        if (track.spans[track.spanCount-1].sourcePass != track.spans[track.spanCount-1].sourcePassCount ||
+            nextIndex != mesh.indices.size() || nextVertex != mesh.vertices.size())
             return fail(d, VehicleWindowError50DS::indices, "track spans must cover the complete source mesh");
         if (track.cullingChunkTriangles) {
             // Keep the complete original source validation above. Bound the
@@ -256,7 +287,8 @@ bool validateSky(const VehicleWindowRequest50DS& request, VehicleWindowDiagnosti
     for (U i = 0; i < sky.spanCount; ++i) {
         const auto& material = sky.spans[i].material;
         if (material.blend != VehicleWindowBlend50DS::opaque || material.depthWrite ||
-            !material.unlit || sky.spans[i].discardZeroAlpha)
+            !material.unlit || sky.spans[i].discardZeroAlpha || sky.spans[i].sourcePass != 1 ||
+            sky.spans[i].sourcePassCount != 1 || sky.spans[i].projectionPass)
             return fail(d, VehicleWindowError50DS::material,
                 "sky requires explicit unlit opaque non-depth-writing materials");
     }
@@ -675,6 +707,7 @@ struct VehicleWindowGl50DS::Storage {
         U indexStart = 0, indexCount = 0;
         Material material{};
         bool discardZeroAlpha = false;
+        U sourcePass = 1, sourcePassCount = 1, projectionPass = 0;
     };
     struct TrackChunk {
         U sourceSpan = 0, indexStart = 0, indexCount = 0;
@@ -749,11 +782,12 @@ struct VehicleWindowGl50DS::Storage {
     U hostHudProgram = 0, hostHudVertexShader = 0, hostHudFragmentShader = 0;
     U hostHudVertexBuffer = 0, hostHudIndexBuffer = 0, hostHudVertexArray = 0;
     bool frameHostHud = false;
-    U trackVertexBuffer = 0, trackIndexBuffer = 0, trackVertexArray = 0, trackNormalBuffer = 0;
+    U trackCandidateIndexCount = 0; // Sum of original material-pass index ranges.
+    U trackVertexBuffer = 0, trackIndexBuffer = 0, trackVertexArray = 0, trackNormalBuffer = 0, trackProjectionBuffer = 0;
     U trackProgram = 0, trackVertexShader = 0, trackFragmentShader = 0;
     I trackMatrixUniform = -1, trackColorScaleUniform = -1;
     I trackUseTextureUniform = -1, trackImageUniform = -1;
-    I trackDiscardZeroAlphaUniform = -1, trackUseSourceNormalsUniform = -1;
+    I trackDiscardZeroAlphaUniform = -1, trackUseSourceNormalsUniform = -1, trackProjectionPassUniform = -1;
     I trackEffectModeUniform = -1, trackAlphaScaleUniform = -1, trackUnlitUniform = -1;
     I trackIndexCount = 0;
     NativePodShadow50HM podShadows[nativeShadowRacerCount][3]{};
@@ -850,6 +884,9 @@ struct VehicleWindowGl50DS::Storage {
             target.indexStart = source.indexStart;
             target.indexCount = source.indexCount;
             target.discardZeroAlpha = source.discardZeroAlpha;
+            target.sourcePass = source.sourcePass;
+            target.sourcePassCount = source.sourcePassCount;
+            target.projectionPass = source.projectionPass;
             target.material.textureIndex = source.material.textureIndex;
             target.material.policy = source.material;
             target.material.name = source.material.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
@@ -888,6 +925,8 @@ struct VehicleWindowGl50DS::Storage {
     bool createTrackVisibility(const VehicleWindowTrack50DS& input) noexcept {
         if (!input.mesh) return true;
         trackDrawCount = trackSpanCount ? trackSpanCount : 1;
+        trackCandidateIndexCount = trackSpanCount ? 0 : static_cast<U>(input.mesh->indices.size());
+        for (U i = 0; i < trackSpanCount; ++i) trackCandidateIndexCount += trackSpans[i].indexCount;
         if (!input.enableFrustumCulling) return true;
         if (input.cullingChunkTriangles) {
             // Validation already bounded the total, with the original material
@@ -976,7 +1015,7 @@ struct VehicleWindowGl50DS::Storage {
             retainedIndices += trackChunkCount ? trackChunks[draw].indexCount :
                 (trackSpanCount ? trackSpans[draw].indexCount : static_cast<U>(trackIndexCount));
         }
-        diagnostic->trackCulledIndices = static_cast<U>(trackIndexCount) - retainedIndices;
+        diagnostic->trackCulledIndices = trackCandidateIndexCount - retainedIndices;
     }
     bool createMaterials(const VehicleWindowMaterials50DS& input) noexcept {
         if (request.mode != VehicleWindowMode50DS::callerMaterialTextures) return true;
@@ -1111,7 +1150,7 @@ struct VehicleWindowGl50DS::Storage {
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
             hostHudVertexBuffer || hostHudIndexBuffer || hostHudVertexArray) return true;
         if (cableVertexBuffer || cableIndexBuffer || cableVertexArray) return true;
-        if (trackVertexBuffer || trackIndexBuffer || trackVertexArray || trackNormalBuffer) return true;
+        if (trackVertexBuffer || trackIndexBuffer || trackVertexArray || trackNormalBuffer || trackProjectionBuffer) return true;
         if (skyVertexBuffer || skyIndexBuffer || skyVertexArray) return true;
         for (U b = 0; b < 2; ++b) {
             if (targets[b] || colors[b] || depths[b] || menuTargets[b] || menuColors[b]) return true;
@@ -1218,6 +1257,8 @@ in vec3 rrPosition;
 in vec2 rrUv;
 in vec4 rrColor;
 in vec3 rrWorldNormal;
+in vec4 rrProjectedUv;
+uniform int projectionPass;
 uniform mat4 worldViewProjection;
 out vec3 trackWorldNormal;
 out vec3 trackWorldPosition;
@@ -1228,7 +1269,8 @@ void main() {
     trackWorldPosition = rrPosition;
     trackWorldNormal = rrWorldNormal;
     trackSourceColor = rrColor;
-    trackSourceUv = rrUv;
+    trackSourceUv = projectionPass == 1 ? rrProjectedUv.xy :
+        (projectionPass == 2 ? rrProjectedUv.zw : rrUv);
 }
 )GLSL";
         constexpr const char* fragmentSource = R"GLSL(#version 150 core
@@ -1295,6 +1337,7 @@ void main() {
         shaderGl.bindAttribLocation(trackProgram, vehicleGlUvAttribute50CZ, "rrUv");
         shaderGl.bindAttribLocation(trackProgram, vehicleGlColorAttribute50CZ, "rrColor");
         shaderGl.bindAttribLocation(trackProgram, 3, "rrWorldNormal");
+        shaderGl.bindAttribLocation(trackProgram, 4, "rrProjectedUv");
         shaderGl.bindFragDataLocation(trackProgram, vehicleGlColorOutput50CZ, "viewerOutput");
         shaderGl.linkProgram(trackProgram);
         I linked = 0;
@@ -1317,6 +1360,7 @@ void main() {
         trackAlphaScaleUniform = shaderGl.getUniformLocation(trackProgram, "alphaScale");
         trackUnlitUniform = shaderGl.getUniformLocation(trackProgram, "unlit");
         trackUseSourceNormalsUniform = shaderGl.getUniformLocation(trackProgram, "useSourceNormals");
+        trackProjectionPassUniform = shaderGl.getUniformLocation(trackProgram, "projectionPass");
         nativeShadowEnabledUniform = shaderGl.getUniformLocation(trackProgram, "nativePodShadowEnabled");
         nativeShadowOpponentCountUniform = shaderGl.getUniformLocation(trackProgram, "nativePodShadowOpponentCount");
         for (U c = 0; c < nativeShadowCasterCount; ++c) {
@@ -1339,7 +1383,7 @@ void main() {
         if (trackMatrixUniform < 0 || trackColorScaleUniform < 0 ||
             trackUseTextureUniform < 0 || trackImageUniform < 0 || trackDiscardZeroAlphaUniform < 0 ||
             trackEffectModeUniform < 0 || trackAlphaScaleUniform < 0 || trackUnlitUniform < 0 ||
-            trackUseSourceNormalsUniform < 0 || nativeShadowEnabledUniform < 0 || nativeShadowOpponentCountUniform < 0)
+            trackUseSourceNormalsUniform < 0 || trackProjectionPassUniform < 0 || nativeShadowEnabledUniform < 0 || nativeShadowOpponentCountUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "source-color track uniform missing");
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::none;
         return true;
@@ -1520,6 +1564,44 @@ void main() {
         void* pointer = nullptr; gl.getVertexAttribPointerv(3, 0x8645, &pointer);
         if (!check("verify authenticated normal offset")) return false;
         return pointer == nullptr || fail(*diagnostic, VehicleWindowError50DS::layout, "source normal attribute offset mismatch");
+    }
+    bool createTrackProjection(const VehicleWindowTrack50DS& track) noexcept {
+        if (!track.sourceProjectionUvs) return true;
+        const std::size_t bytes = std::size_t(track.sourceProjectionCount) * sizeof(assets::TrackProjectedUv);
+        gl.genBuffers(1, &trackProjectionBuffer);
+        drawGl.bindBuffer(arrayBuffer, trackProjectionBuffer);
+        gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(bytes), track.sourceProjectionUvs, staticDraw);
+        if (!check("upload authenticated track source projection UVs")) return false;
+        if (!trackProjectionBuffer)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero source projection UV buffer name");
+        if (!verifyBuffer(arrayBuffer, bytes, staticDraw)) return false;
+        std::uint8_t scratch[1024];
+        const auto* source = reinterpret_cast<const std::uint8_t*>(track.sourceProjectionUvs);
+        for (std::size_t offset = 0; offset < bytes;) {
+            const auto count = std::min(sizeof(scratch), bytes - offset);
+            gl.getBufferSubData(arrayBuffer, static_cast<std::intptr_t>(offset),
+                static_cast<std::intptr_t>(count), scratch);
+            if (!check("verify authenticated track projection UV bytes")) return false;
+            if (std::memcmp(scratch, source + offset, count))
+                return fail(*diagnostic, VehicleWindowError50DS::assets, "GPU track source projection UV mismatch");
+            offset += count;
+        }
+        drawGl.bindVertexArray(trackVertexArray);
+        gl.enableVertexAttribArray(4);
+        gl.vertexAttribPointer(4, 4, floatType, 0, sizeof(assets::TrackProjectedUv), nullptr);
+        if (!check("bind authenticated track projection UV attribute")) return false;
+        constexpr U properties[] = {0x8622, 0x8623, 0x8624, 0x8625, 0x886A, 0x889F, 0x88FD};
+        const I expected[] = {1, 4, sizeof(assets::TrackProjectedUv), static_cast<I>(floatType), 0,
+            static_cast<I>(trackProjectionBuffer), 0};
+        for (U p = 0; p < 7; ++p) {
+            I value = 0; gl.getVertexAttribiv(4, properties[p], &value);
+            if (!check("verify authenticated track projection UV attribute")) return false;
+            if (value != expected[p])
+                return fail(*diagnostic, VehicleWindowError50DS::layout, "source projection UV attribute layout mismatch");
+        }
+        void* pointer = nullptr; gl.getVertexAttribPointerv(4, 0x8645, &pointer);
+        if (!check("verify authenticated projection UV offset")) return false;
+        return pointer == nullptr || fail(*diagnostic, VehicleWindowError50DS::layout, "source projection UV attribute offset mismatch");
     }
     bool createCableGeometry() noexcept {
         bool needed = request.cables.textures != nullptr;
@@ -1971,6 +2053,7 @@ void main() { viewerOutput = hudColor; }
         if (
             !createStaticGeometry(input.track.mesh, trackVertexBuffer, trackIndexBuffer, trackVertexArray, trackIndexCount) ||
             !createTrackNormals(input.track) ||
+            !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() ||
             !createTargets()) return false;
@@ -2103,6 +2186,7 @@ void main() { viewerOutput = hudColor; }
     void configureBlend(const VehicleWindowMaterialBinding50DS& policy) noexcept {
         gl.enable(0x0B71);
         gl.depthMask(policy.depthWrite ? 1 : 0);
+        gl.depthFunc(policy.depthEqual ? 0x0203 : 0x0201);
         if (policy.blend == VehicleWindowBlend50DS::opaque) gl.disable(0x0BE2);
         else {
             gl.enable(0x0BE2);
@@ -2112,7 +2196,7 @@ void main() { viewerOutput = hudColor; }
         }
     }
     void resetPodState() noexcept {
-        gl.disable(0x0BE2); gl.enable(0x0B71); gl.depthMask(1);
+        gl.disable(0x0BE2); gl.enable(0x0B71); gl.depthMask(1); gl.depthFunc(0x0201);
         gl.useProgram(shader->program());
         const auto& u = shader->uniforms();
         gl.uniformMatrix4fv(u.worldViewProjection, 1, 0, matrix);
@@ -2159,6 +2243,7 @@ void main() { viewerOutput = hudColor; }
                 s.gl.uniform1f(s.trackAlphaScaleUniform, 1.f);
                 s.gl.uniform1i(s.trackUnlitUniform, 0);
                 s.gl.uniform1i(s.trackUseSourceNormalsUniform, s.trackNormalBuffer ? 1 : 0);
+                s.gl.uniform1i(s.trackProjectionPassUniform, 0);
                 s.gl.uniform1i(s.nativeShadowEnabledUniform,
                     s.request.enableNativePodShadows && !transparent ? 1 : 0);
                 s.gl.uniform1i(s.nativeShadowOpponentCountUniform,
@@ -2193,7 +2278,11 @@ void main() { viewerOutput = hudColor; }
                     const U draw = s.frameTrackCullingApplied ? s.trackVisibleDrawIds[n] : n;
                     const U i = s.trackChunkCount ? s.trackChunks[draw].sourceSpan : draw;
                     const auto& span = s.trackSpans[i];
-                    if ((span.material.policy.blend != VehicleWindowBlend50DS::opaque) != transparent) continue;
+                    // Layered materials stay adjacent to their first source pass.
+                    // Their alpha layer is not postponed into a separate world pass.
+                    const bool deferredAlpha = span.sourcePassCount == 1 &&
+                        span.material.policy.blend != VehicleWindowBlend50DS::opaque;
+                    if (deferredAlpha != transparent) continue;
                     s.diagnostic->trackSpan = i;
                     s.diagnostic->texture = span.material.textureIndex;
                     // Retained chunks of one span remain contiguous. Preserve
@@ -2203,11 +2292,15 @@ void main() { viewerOutput = hudColor; }
                         s.gl.uniform1i(s.trackUseTextureUniform, span.material.name ? 1 : 0);
                         s.gl.uniform1i(s.trackDiscardZeroAlphaUniform, span.discardZeroAlpha ? 1 : 0);
                         s.configureBlend(span.material.policy);
+                        // Coplanar authored passes must survive the first pass depth.
+                        // Restore the historical LESS rule for every single-pass draw.
+                        s.gl.depthFunc(span.sourcePass > 1 || span.material.policy.depthEqual ? 0x0203 : 0x0201);
+                        s.gl.uniform1i(s.trackProjectionPassUniform, static_cast<I>(span.projectionPass));
                         s.gl.uniform1i(s.trackEffectModeUniform, effectMode(span.material.policy));
                         s.gl.uniform1f(s.trackAlphaScaleUniform, span.material.policy.alphaScale);
                         s.gl.uniform1i(s.trackUnlitUniform, span.material.policy.unlit ? 1 : 0);
                         s.gl.uniform1i(s.nativeShadowEnabledUniform, s.request.enableNativePodShadows &&
-                            !transparent && span.material.policy.depthWrite && !span.material.policy.unlit ? 1 : 0);
+                            !transparent && span.sourcePass == 1 && span.material.policy.depthWrite && !span.material.policy.unlit ? 1 : 0);
                         if (!s.check("bind explicit source-ordered track material")) return false;
                         boundSpan = i;
                     }
@@ -2218,7 +2311,7 @@ void main() { viewerOutput = hudColor; }
                         0x1405, reinterpret_cast<const void*>(offset), 0);
                     if (!s.check("draw actual track surface range")) return false;
                     ++s.diagnostic->trackDraws;
-                    if (transparent) ++s.diagnostic->transparentTrackDraws;
+                    if (span.material.policy.blend != VehicleWindowBlend50DS::opaque) ++s.diagnostic->transparentTrackDraws;
                     if (span.material.name) ++s.diagnostic->trackTexturedDraws;
                     else ++s.diagnostic->trackUntexturedDraws;
                     s.diagnostic->trackIndices += indexCount;
@@ -2550,6 +2643,7 @@ void main() { viewerOutput = hudColor; }
             if (!deleteName(trackVertexArray, gl.deleteVertexArrays, d) ||
                 !deleteName(trackVertexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(trackNormalBuffer, gl.deleteBuffers, d) ||
+                !deleteName(trackProjectionBuffer, gl.deleteBuffers, d) ||
                 !deleteName(trackIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
             if (!deleteName(skyVertexArray, gl.deleteVertexArrays, d) ||
                 !deleteName(skyVertexBuffer, gl.deleteBuffers, d) ||

@@ -4,6 +4,8 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
+This branch adds **UNCOMPILED / UNTESTED GC integration**. See [GC scope and omissions](docs/gc-native-integration50ig.md); the validation below applies to its earlier Linux baseline.
+
 The Linux prototype includes native rendering, physics, audio, keyboard controls, and an eight-racer development race. Clegg selection through Main, pause/resume, and a 20-second gameplay capture have passed. An earlier mode1 baseline completed a three-lap race with native timing, Dax, music, and completed-lap display. See [current validation](docs/current-validation.md) for scope.
 
 ## Build and game data

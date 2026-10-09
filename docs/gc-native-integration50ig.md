@@ -1,0 +1,13 @@
+# GC native integration: uncompiled and untested
+
+This WIP adds the reviewed GC static-world, navigation, material/audio, sky and projected-rendering source to the Linux baseline. It has not been compiled or run. The tested Clegg/menu result belongs to the unchanged baseline described in [current validation](current-validation.md); it does not validate GC. Results presentation and dynamic-owner follow-ons are separate work.
+
+TA remains the default. Experimental GC admission requires `RR_TRACK=GC`, `RR_RACE_MODE=2`, and the explicit `RR_GC_INCOMPLETE_WORLD=1` acknowledgment. Original GC mode1 record configuration is not recovered. Supply the original GC archive, audio members and generated local caches; this repository contains no game assets or generated visual/audio payloads.
+
+The source consumes actual M/AGC navigation and authored node-zero start-grid data, retaining SCB constructor order and all 551 static collision placements. It includes the bounded short-position COL decoder, count-derived stable cold storage, source static-candidate identities and original material-audio assignments. Constructor provenance includes Standard 0x1B5590, base 0x141300, collision 0x11B190, setter 0x11B570, and grid 0x2A2880. Semantic addresses document provenance; original instruction-word evidence is excluded.
+
+Visual preparation requires the original 801 static visual placements, 426 native scene assets, 375 materials, 59 source images and 48 SKY21 tiles. Source profiles retain authentication hashes, sizes and offsets only. Projected material passes preserve source order, local-position TexGen mapping, required texture ownership, authored clamp axes and repeat-pass depth handling. Culling diagnostics count the complete material-pass index ranges. Asset preparation is separate from software validation.
+
+Known omissions remain explicit: the zone-two windmill and zone-eleven opening lack their animated/type1 collision owners; authored LostAI branch triggers and Gate sound are unjoined. No complete GC driving or collision coverage is claimed. ATM materials use genuine initial frames without animation timing. The original startup DefaultMT material is unavailable, so its final override behavior is not established. Projected arithmetic, host lighting, sampler defaults, GS rasterization, hardware IPUM precision, dynamic scenery and ambient emitters retain documented host boundaries.
+
+This commit preserves the exact 32-file integration, including the warning clarification and culling follow-on, plus this status note and a README WIP marker. No builds, syntax checks, software tests, game launches or asset decoding were performed during preservation.

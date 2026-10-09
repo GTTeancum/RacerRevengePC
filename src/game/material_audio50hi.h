@@ -10,7 +10,11 @@ struct MaterialDriveParameters50HI {
     // Native provider base-pitch units, never fabricated PS2 metadata.
     std::uint32_t basePitch=4096;
 };
-struct MaterialAudioParameters50HI { MaterialDriveParameters50HI drive[8]{}; };
+inline constexpr std::size_t maxMaterialAudioRows50HI=12;
+struct MaterialAudioParameters50HI {
+    MaterialDriveParameters50HI drive[maxMaterialAudioRows50HI]{};
+    std::uint32_t rowCount=8; // Legacy TA callers retain their exact8-row bound.
+};
 struct ContactMaterial50HI { std::uint32_t candidateIdentity=0; std::uint8_t materialA9=0; };
 // Identity0 is the actual no-contact state. A nonzero unresolved identity fails;
 // friction record material4C is deliberately not consulted.
@@ -30,7 +34,7 @@ struct MaterialAudioInput50HI {
 struct MaterialAudioState50HI {
     std::uint8_t emitterFlags22C=0;
     std::int32_t driveMaterial240=-1,driveKey244=-1;
-    std::int32_t cachedSlope20[8]={-1,-1,-1,-1,-1,-1,-1,-1};
+    std::int32_t cachedSlope20[maxMaterialAudioRows50HI]={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
 };
 struct MaterialAudioCommand50HI {
     AudioOperation50HE operation=AudioOperation50HE::Start;
@@ -45,8 +49,8 @@ inline constexpr std::size_t maxMaterialAudioCommands50HI=3;
 // shared RNG owner as other subscribers; no private seed. Missing contact is
 // the source lazy skip, not material0 or an inferred stop. No hot allocation.
 // State/RNG/commands/count are transactional. Prior and next state may alias;
-// other mutable output spans must be distinct. Only retained TA keys1..8 are
-// admitted. Playback availability/restart guards belong to the real provider.
+// other mutable output spans must be distinct. Only complete caller-bound four-variant families up to12 rows are
+// admitted; no positive out-of-range material is substituted. Playback availability/restart guards belong to the real provider.
 AudioEventStatus50HE updateMaterialAudio50HI(const MaterialAudioParameters50HI&,
     const MaterialAudioInput50HI&,const MaterialAudioState50HI&,MaterialAudioState50HI&,
     std::uint32_t& sharedRandomState,MaterialAudioCommand50HI*,std::size_t capacity,

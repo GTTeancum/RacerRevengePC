@@ -4,6 +4,7 @@
 #include "material_texture_gl50eb.h"
 #include "../../../src/assets/native_asset48b.h"
 #include "../../../src/assets/world_normals50hk.h"
+#include "../../../src/assets/track_projected_uv.h"
 #include "../../../src/assets/vehicle_draw_assets50cr.h"
 #include "../../../src/game/draw_visibility50ei.h"
 #include "../../../src/game/host_race_limits50ht.h"
@@ -48,6 +49,8 @@ struct VehicleWindowMaterialBinding50DS {
     VehicleWindowBlend50DS blend = VehicleWindowBlend50DS::opaque;
     // Independent of blending: caller selects the admitted source depth policy.
     bool depthWrite = true;
+    // Original GS GEQUAL in a conventional GL depth map; TA defaults stay LESS.
+    bool depthEqual = false;
     // Nonopaque source alpha = texture alpha * vertex alpha * alphaScale.
     // fixedBlendAlpha is admitted only with additive: RGB *= alphaScale and
     // ONE,ONE blending implements factors above one without alpha clamping.
@@ -75,7 +78,8 @@ struct VehicleWindowMaterials50DS {
 };
 struct VehicleWindowTrackSpan50DS {
     // Source-ordered triangle/vertex ranges into the unchanged flattened mesh.
-    // The full span table must partition both arrays contiguously, from zero.
+    // First material passes partition both arrays contiguously, from zero;
+    // adjacent continuation passes repeat that exact source surface range.
     // Every index must address this span's declared vertex range. Draws use
     // indexStart * sizeof(uint32_t) as their EBO offset and baseVertex = 0.
     std::uint32_t indexStart = 0, indexCount = 0, vertexStart = 0, vertexCount = 0;
@@ -87,6 +91,11 @@ struct VehicleWindowTrackSpan50DS {
     // retain the earlier opaque cutout behavior; not original alpha-test parity.
     // Untextured spans must leave this false.
     bool discardZeroAlpha = false;
+    // Pass one partitions the unchanged mesh. Further original passes must
+    // immediately repeat that exact surface range, in ascending source order.
+    std::uint32_t sourcePass = 1, sourcePassCount = 1;
+    // 0 retains authored mesh UV; 1/2 selects the source-derived sidecar XY/ZW.
+    std::uint32_t projectionPass = 0;
 };
 struct VehicleWindowTrack50DS {
     // Optional actual visual triangle mesh, already in world space. Borrowed
@@ -140,6 +149,11 @@ struct VehicleWindowTrack50DS {
     const assets::WorldNormal50HK* sourceNormals = nullptr;
     std::uint32_t sourceNormalCount = 0;
     std::size_t maximumNormalBytes = 0;
+    // Optional exact per-vertex source projection, copied into a separate VBO.
+    // No generated textures or changes to the original mesh stream.
+    const assets::TrackProjectedUv* sourceProjectionUvs = nullptr;
+    std::uint32_t sourceProjectionCount = 0;
+    std::size_t maximumProjectionBytes = 0;
 };
 struct VehicleWindowSky50DS {
     // Authored sky geometry only, copied cold into private GPU buffers. Its

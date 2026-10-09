@@ -123,42 +123,9 @@ for(auto& candidate:candidates){
  racerBank.owner(candidate.candidate.collision.copied40);
  racerBank.owner(candidate.candidate.collision.copied50);
 }
-for(auto& candidate:movementCandidates){
- racerBank.owner(candidate.collision.filter.flagsF8);
- racerBank.owner(candidate.collision.copied40);
- racerBank.owner(candidate.collision.copied50);
-}
-// Complete independent live portal registration, source collector marked flags,
-// cache descriptors and every pointer-backed mutable registry/link/entry span.
-// Portal link distance caches and portal geometry are mutable source owners.
-racerBank.owner(zoneLifecycle);
-racerBank.owner(zoneRegistries);
-racerBank.owner(zoneRecords);
-racerBank.owner(zoneBlocks);
-racerBank.owner(collectionTrees);
-racerBank.owner(collectionZones);
-racerBank.owner(zoneQueue);
-racerBank.owner(zoneEvents);
-racerBank.contents(portalHeads);
-racerBank.contents(portalLinks);
-racerBank.contents(portalGeometry);
-racerBank.owner(mainMembership);
-racerBank.owner(secondaryMembership);
-racerBank.owner(terrainMembership);
-racerBank.contents(mainMembershipLinks);
-racerBank.contents(mainMembershipEntries);
-racerBank.contents(secondaryMembershipLinks);
-racerBank.contents(secondaryMembershipEntries);
-racerBank.contents(terrainMembershipLinks);
-racerBank.contents(terrainMembershipEntries);
-racerBank.owner(collectionObjects);
-racerBank.owner(collectionSource);
-racerBank.owner(treeSource);
-racerBank.owner(collectionInput);
-racerBank.owner(registeredIndices);
-racerBank.owner(registeredCount);
-racerBank.owner(probeIndices);
-racerBank.owner(probeCount);
+// Registers actual backing elements and mutable lanes, never a FixedBuffer,
+// vector descriptor or the Storage owner. No duplicate old array spans remain.
+trackStorage.registerMutableOwners(racerBank);
 // A native source cut belongs only to its racer; never restart the human's
 // session because an opponent reaches an unsupported source boundary.
 racerBank.owner(recoveryPaused);

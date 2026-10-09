@@ -12,6 +12,7 @@ struct Policy {
     Blend blend = Blend::opaque;
     bool depthWrite = true;
     bool sourceDepthWriteSpecified = false;
+    bool depthEqual = false;
     bool discardZeroAlpha = false;
     bool unlit = false;
     float alphaScale = 1.0f;
@@ -63,12 +64,63 @@ inline std::string lower(std::string value) {
 }
 } // namespace detail
 
+// GC selections carry the exact authenticated original Material48E fields.
+// ProjectedPrelit preserves source prelit color; no host geometric light is
+// added. Unspecified blend fields keep an explicit opaque host policy pending
+// the separately retained startup default-template identity.
+inline bool selectGc(const track_materials50fa_fixture::Selection& selection, Policy& output) {
+    if (selection.track != track_source_fixture::Track::gc || selection.slot != 1 ||
+        !selection.pass || selection.pass > selection.passCount || selection.passCount > 2)
+        return false;
+    const auto& fields = selection.sourcePassFields;
+    if (!fields.is_object() || !fields.contains("authored") || !fields.at("authored").is_array()) return false;
+    auto value = [&](const char* name, std::string& result) {
+        bool found = false;
+        for (const auto& field : fields.at("authored")) {
+            if (!field.is_object() || !field.contains("name") || !field.contains("value")) return false;
+            if (field.at("name") != name) continue;
+            if (found || !field.at("value").is_string()) return false;
+            result = field.at("value").get<std::string>(); found = true;
+        }
+        return true;
+    };
+    std::string blending, depthDisabled, alphaTest, a, b, c, d;
+    if (!value("alphaBlendingOnOff", blending) || !value("zWriteDisabled", depthDisabled) ||
+        !value("alphaTestOnOff", alphaTest) || !value("inputColorA", a) ||
+        !value("inputColorB", b) || !value("inputAlphaC", c) || !value("inputAlphaD", d)) return false;
+    if ((!blending.empty() && blending != "0" && blending != "1") ||
+        (!depthDisabled.empty() && depthDisabled != "0" && depthDisabled != "1") ||
+        (!alphaTest.empty() && alphaTest != "0")) return false;
+    Policy next;
+    next.depthWrite = depthDisabled != "1";
+    next.sourceDepthWriteSpecified = !depthDisabled.empty();
+    // Original GS GEQUAL reverses to LEQUAL in this conventional GL depth map.
+    next.depthEqual = true;
+    if (blending == "1") {
+        if (a != "0" || b != "1" || c != "0" || d != "1" ||
+            selection.textureIndex == track_materials50fa_fixture::unresolved) return false;
+        next.blend = Blend::sourceAlpha;
+        next.alphaScale = (255.0f/128.0f)*(255.0f/128.0f);
+    }
+    if (selection.projectedPrelit) {
+        if (selection.program != "ProjectedPrelit" || selection.passCount != 2 ||
+            blending != (selection.pass == 1 ? "0" : "1") || alphaTest != "0") return false;
+        next.unlit = true;
+    } else if (selection.passCount != 1 ||
+        (selection.program != "PreLitCompressed" && selection.program != "PrelitCompressed" &&
+         selection.program != "DiffuseCompressed")) return false;
+    output = next;
+    return true;
+}
+
 // Call only with a selection borrowed from a successfully loaded 50FA owner.
 // Transactional: unsupported/mismatched selections leave output unchanged.
 // Blank source blending fields retain the previous explicit opaque host policy;
 // they are not claimed as recovered original defaults. Alpha scaling below is
 // a declared GS-style host modulation policy, not original microprogram parity.
 inline bool select(const track_materials50fa_fixture::Selection& selection, Policy& output) {
+    if (selection.track == track_source_fixture::Track::gc) return selectGc(selection, output);
+    if (selection.track != track_source_fixture::Track::ta) return false;
     if (selection.pass != 1 || selection.slot != 1) return false;
     for (const auto& material : detail::materials) {
         if (selection.materialKey != material.key) continue;

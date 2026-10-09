@@ -74,6 +74,10 @@
 #include "reset_lifecycle50at.h"
 #include "main_reset50ar.h"
 #include "authored_runtime_ground50cp_fixture.h"
+#include "track_runtime_storage50ig_fixture.h"
+#include "track_static_candidates50ig_fixture.h"
+#include "source_grid50ig_fixture.h"
+#include "track_session_assets50ig_fixture.h"
 #include "track_start50ad.h"
 #include "track_navigation50eu.h"
 #include <memory>
@@ -162,6 +166,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Capture the immutable loaded identity before any front-menu choice changes
  // the next-session selection. The alternate-player integration consumes it.
  const std::uint32_t playerRacer60=selectedRacer60;
+ const char* trackSelectionError=nullptr;
+ const auto* trackSession=track_session_assets50IG::select(std::getenv("RR_TRACK"),trackSelectionError);
+ require50DU(trackSession,trackSelectionError?trackSelectionError:"original track admission failed");
+ if(trackSession->originalStaticCandidates){
+  const char* incomplete=std::getenv("RR_GC_INCOMPLETE_WORLD");
+  require50DU(incomplete&&std::string(incomplete)=="1",
+      "GC native world is incomplete: zone2 windmill animation/type1 collision, zone11 triggered opening, authored LostAI branch triggers and Gate sound are unjoined; RR_GC_INCOMPLETE_WORLD=1 explicitly accepts these omissions");
+  std::cerr<<"GC INCOMPLETE WORLD: real original static track/navigation are enabled; "
+      "zone2's initially active looping windmill and zone11's triggered opening still lack original animated/type1 collision owners. "
+      "Authored LostAI branch triggers and Gate sound are not yet joined. "
+      "This is not complete-track support.\n";
+ }
+
  // Pending choices only apply on an explicit cold Start/Restart.
  const auto loadedAudioSettings=effectiveAudioSettings;
  const auto* selectedOriginal=original_racer_selection50IJ::findByRacer60(playerRacer60);
@@ -180,6 +197,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!raceModeSetting||std::string(raceModeSetting)=="1"||std::string(raceModeSetting)=="2",
      "RR_RACE_MODE must be 1 (source events) or 2 (HOST fallback)");
  const bool mode1Requested=raceEnabled&&(!raceModeSetting||std::string(raceModeSetting)=="1");
+ require50DU(!mode1Requested||trackSession->nativeMode1,
+     "GC original record-row/selection configuration is unjoined; choose RR_RACE_MODE=2 explicitly");
  // Default mode1 is committed only after ALL required providers cold-prepare.
  // Failure is explicit; RR_RACE_MODE=2 is the selectable existing fallback.
  bool mode1Enabled=false;
@@ -195,6 +214,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  static_assert(64+material_audio50HI::soundCount<=race_audio50HQ::firstVoice);
  static_assert(race_audio50HQ::firstVoice+race_audio50HQ::voiceCount<=opponent_audio50HX::firstVoice);
  static_assert(opponent_audio50HX::firstVoice+opponent_audio50HX::voiceCount<=live_audio50HF::voiceCount);
+ static_assert(race_music50IE::voice<material_audio50HI::extraFirstVoice);
+ static_assert(material_audio50HI::extraFirstVoice+material_audio50HI::maximumExtraVoices<=live_audio50HF::voiceCount);
  if(raceEnabled){
   require50DU(!checkpointInput,"a race must restart every racer together from the grid");
   lapContinuity={};
@@ -207,22 +228,28 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool captureFirstWrongWay=headlessLive&&captureWrongSetting&&std::string(captureWrongSetting)=="1";
  bool capturedFirstWrongWay=false,lastCommittedWrongWay=false;
  std::ifstream file(corpusPath);require50DU(bool(file),"cannot open collision corpus");J corpus;file>>corpus;const J*chosen=nullptr;
- for(const auto&row:corpus["cases"])if(row["name"]=="podboxm.col-explicit37-authored-placements-forward")chosen=&row;
+ for(const auto&row:corpus["cases"])if(row["name"]==trackSession->mainCollisionCase)chosen=&row;
  require50DU(chosen,"authored placement case present");const auto&row=*chosen;const auto&qj=row["query"];
  auto shape=cold::shape(corpus["shapes"][qj["shape"].get<std::size_t>()]);
- std::vector<cold::Mesh> meshes;meshes.reserve(corpus["meshes"].size());for(const auto&j:corpus["meshes"])meshes.push_back(cold::mesh(j));
+ std::vector<cold::Mesh> meshes;
+ if(!trackSession->originalStaticCandidates){meshes.reserve(corpus["meshes"].size());
+  for(const auto&j:corpus["meshes"])meshes.push_back(cold::mesh(j));}
  auto qfilter=cold::filter(qj["filter"]);Type2StaticQuery49X query{};query.resource=&shape.view;query.filter=&qfilter;query.queryScene.value=77;
  query.collisionTypeTag=qj["collision_tag"];query.groupTypeTag=qj["group_tag"];query.callbackEnabled=qj["callback"];
  cold::words(query.copied40.data(),qj["copied40"]);cold::words(query.copied50.data(),qj["copied50"]);
  query.skipMask=row["masks"][0];query.dynamicMask=row["masks"][1];query.materialMask=row["masks"][2];
- std::vector<std::string> names(row["candidates"].size());for(std::size_t i=0;i<names.size();++i)names[i]=cold::unhex(row["candidates"][i]["name_hex"]);
- std::vector<Type2StaticCandidate49X> candidates;candidates.reserve(row["order"].size());std::size_t stackCount=1;
+ std::vector<std::string> names;
+ std::vector<Type2StaticCandidate49X> candidates;std::size_t stackCount=1;
+ if(!trackSession->originalStaticCandidates){
+ names.resize(row["candidates"].size());for(std::size_t i=0;i<names.size();++i)names[i]=cold::unhex(row["candidates"][i]["name_hex"]);
+ candidates.reserve(row["order"].size());
  for(auto index:row["order"].get<std::vector<std::size_t>>()){
   const auto&j=row["candidates"][index];auto&m=meshes[j["mesh"].get<std::size_t>()];candidates.emplace_back();auto&out=candidates.back();
   out.nodeRadii=m.radii.data();out.nodeRadiusCount=m.radii.size();out.maxDepth=m.maxDepth;out.candidate.hasMaterialScene=j["has_scene"];out.candidate.sceneName=names[index].data();out.candidate.sceneNameBytes=names[index].size();
   auto&v=out.candidate.collision;v.geometry={&m.mesh,cold::matrix(j["world"]),j["id"].get<std::uint32_t>()};v.filter=cold::filter(j["filter"]);v.sphere=cold::sphere(j["sphere"]);v.typeTag=j["type_tag"];
   cold::words(v.copied40.data(),j["copied40"]);cold::words(v.copied50.data(),j["copied50"]);stackCount=std::max(stackCount,1+shape.view.maxDepth+m.maxDepth);
  }
+ } // TA retained diagnostic candidate inputs only.
  f::Fixture x(0);auto&s=x.state;auto&m=s.bodies.main;
  // Explicit HOST fresh-session policy: this Fixture reconstructs the native
  // raw RNG, so reset its shared Dax/category6 lazy slot at that SAME boundary.
@@ -334,7 +361,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
 
 
- auto ground=authored_runtime_ground50cp_fixture::load({4,16,32,64});
+ authored_runtime_ground50cp_fixture::Request groundRequest{};
+ groundRequest.archive=trackSession->archive;groundRequest.worldMember=trackSession->world->worldMember;
+ groundRequest.mapSpline=trackSession->mapSpline;groundRequest.gridRank=trackSession->gridRank;
+ groundRequest.archiveSha256=trackSession->archiveSha256;groundRequest.archiveBytes=trackSession->archiveBytes;
+ auto ground=authored_runtime_ground50cp_fixture::load({4,16,32,64},groundRequest);
  require50DU(ground.lift==x.parameters.visual.verticalLimit7EC,"same actual Pod01 lift");
  std::vector<std::uint32_t> groundStack(ground.stackCount);
  const auto groundAllocations=::allocations;BodyMatrix48G pose=ground.pose;
@@ -349,11 +380,34 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   for(unsigned i=0;i<4;++i)pose.v[12+i]=std::bit_cast<float>(groundProbe.staged[i]);
  }
  require50DU(::allocations==groundAllocations,"actual ground query without allocations");
- require50DU(candidates.size()==37,"interactive scene requires exactly 37 retained terrain owners");
- std::uint32_t candidateZones[37]{};
- ContactMaterial50HI audioContactMaterials[37]{};
- for(std::size_t k=0;k<candidates.size();++k){const auto&j=row["candidates"][row["order"][k].get<std::size_t>()];const auto name=authored_runtime_ground50cp_fixture::lower(corpus["meshes"][j["mesh"].get<std::size_t>()]["name"].get<std::string>());const authored_runtime_ground50cp_fixture::Owner*match=nullptr;for(const auto&o:ground.owners)if(authored_runtime_ground50cp_fixture::lower(o.name)==name){bool equal=true;for(unsigned n=12;n<15;++n)if(o.instance.world.v[n]!=candidates[k].candidate.collision.geometry.worldMatrix.v[n])equal=false;if(equal){match=&o;break;}}require50DU(match,"actual collider placement matches explicit candidate");candidateZones[k]=match->zone;std::string audioMaterialError;require50DU(rr::assets::readTrackContactMaterial50HI(ground.world,match->zone,match->ordinal,candidates[k].candidate.collision.filter.identity,audioContactMaterials[k],audioMaterialError),audioMaterialError.empty()?"actual contact material mapping failed":audioMaterialError.c_str());auto&radiusOwner=meshes[j["mesh"].get<std::size_t>()];require50DU(radiusOwner.radii.size()==match->mesh.nodes.size(),"actual mesh radius extent");std::vector<std::uint32_t> topology(match->mesh.nodes.size()+match->mesh.faces.size());require50DU(prepareStaticTargetRadii49X(match->mesh,radiusOwner.radii.data(),radiusOwner.radii.size(),{topology.data(),topology.size()},radiusOwner.maxDepth)==Type2ResourceStatus49X::Complete,"radii prepared from owned actual mesh");candidates[k].maxDepth=radiusOwner.maxDepth;stackCount=std::max(stackCount,1+shape.view.maxDepth+radiusOwner.maxDepth);auto&v=candidates[k].candidate.collision;v.geometry.mesh=&match->mesh;v.geometry.worldMatrix=match->instance.world;v.filter.categoryA4=match->instance.category;v.sphere={{{match->instance.sphere.center.v[0],match->instance.sphere.center.v[1],match->instance.sphere.center.v[2]}},match->instance.sphere.radius};}
+ std::vector<track_runtime_storage50IG::Binding> trackBindings;
+ std::vector<track_static_candidates50IG::Radii> originalStaticRadii;
+ if(trackSession->originalStaticCandidates){
+  track_static_candidates50IG::Bindings staticBindings{};
+  staticBindings.firstIdentity=0x10000000u; // Explicit collision-object native namespace.
+  staticBindings.collisionTypeTag=query.collisionTypeTag;staticBindings.groupTypeTag=query.groupTypeTag;
+  staticBindings.preservedFlags31=static_cast<std::uint8_t>(qfilter.flags31&0xf0u);
+  staticBindings.preservedFlagsF8=static_cast<std::uint8_t>(qfilter.flagsF8&0xc0u);
+  track_static_candidates50IG::prepare(ground,staticBindings,candidates,originalStaticRadii,trackBindings);
+  for(const auto& candidate:candidates)stackCount=std::max(stackCount,1+shape.view.maxDepth+candidate.maxDepth);
+ }else{
+ trackBindings.resize(candidates.size());
+ for(std::size_t k=0;k<candidates.size();++k){const auto&j=row["candidates"][row["order"][k].get<std::size_t>()];const auto name=authored_runtime_ground50cp_fixture::lower(corpus["meshes"][j["mesh"].get<std::size_t>()]["name"].get<std::string>());const authored_runtime_ground50cp_fixture::Owner*match=nullptr;for(const auto&o:ground.owners)if(authored_runtime_ground50cp_fixture::lower(o.name)==name){bool equal=true;for(unsigned n=12;n<15;++n)if(o.instance.world.v[n]!=candidates[k].candidate.collision.geometry.worldMatrix.v[n])equal=false;if(equal){match=&o;break;}}require50DU(match,"actual collider placement matches explicit candidate");trackBindings[k]={static_cast<std::size_t>(match-ground.owners.data()),&candidates[k]};auto&radiusOwner=meshes[j["mesh"].get<std::size_t>()];require50DU(radiusOwner.radii.size()==match->mesh.nodes.size(),"actual mesh radius extent");std::vector<std::uint32_t> topology(match->mesh.nodes.size()+match->mesh.faces.size());require50DU(prepareStaticTargetRadii49X(match->mesh,radiusOwner.radii.data(),radiusOwner.radii.size(),{topology.data(),topology.size()},radiusOwner.maxDepth)==Type2ResourceStatus49X::Complete,"radii prepared from owned actual mesh");candidates[k].maxDepth=radiusOwner.maxDepth;stackCount=std::max(stackCount,1+shape.view.maxDepth+radiusOwner.maxDepth);auto&v=candidates[k].candidate.collision;v.geometry.mesh=&match->mesh;v.geometry.worldMatrix=match->instance.world;v.filter.categoryA4=match->instance.category;v.sphere={{{match->instance.sphere.center.v[0],match->instance.sphere.center.v[1],match->instance.sphere.center.v[2]}},match->instance.sphere.radius};}
+ }
+ require50DU(candidates.size()==trackSession->terrainOwners&&ground.owners.size()==candidates.size(),
+     "original track binding must cover every retained terrain owner");
  ground.audit=J{};
+ // Cold, immovable, count-derived storage. Candidate order and every borrowed
+ // source mesh/radius remain owned above; publication checks complete coverage.
+ track_runtime_storage50IG::Owner trackStorageOwner;
+ track_runtime_storage50IG::Diagnostic trackStorageDiagnostic{};
+ require50DU(trackStorageOwner.prepare(ground,trackBindings.data(),trackBindings.size(),{},
+     trackStorageDiagnostic),trackStorageDiagnostic.message.empty()?"original track storage preparation failed":
+     trackStorageDiagnostic.message.c_str());
+ auto& trackStorage=*trackStorageOwner.get();
+ const auto& trackCounts=trackStorage.count;
+ const auto terrainOwnerCount=trackCounts.terrain;
+ auto* audioContactMaterials=trackStorage.contactMaterials.data();
  require50DU(setLocalMatrix49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190,pose)&&refreshSceneWorld49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190),"supplied initial pose");f::project(s,x.bindings);
  FreshPodGeometrySources49O sources{};sources.chariot=x.assets.hierarchy[2];sources.rightEngine=x.assets.hierarchy[1];sources.forward=x.assets.motions[4];sources.back=x.assets.motions[5];rr::assets::MotionBindingDiagnostic49O bindingDiagnostic{};
  require50DU(rr::assets::readMotionNodeBindings49O(x.assets.hierarchy[2],reinterpret_cast<const char*>(x.assets.vut[2].data()),x.assets.vut[2].size(),sources.chariotBindings,bindingDiagnostic),"actual motion bindings");
@@ -388,7 +442,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  SpringGeneratedParameters48K settings{};settings.impact54=true;settings.friction50=true;settings.impact.disableLeverArms5C=true;settings.impact.correctPenetration64=true;settings.impact.normalForceScale98=.97f;settings.impact.positionCorrectionScaleCC=.2f;
  SpringResponseParameters48L response{};response.maxSpeed94=10000;rr::assets::SpringCollisionAuthoring50F collision{};rr::assets::PodPhysicsDiagnostic49N diagnostic{};
  require50DU(rr::assets::readSpringCollision50F(reinterpret_cast<const char*>(phy.data()),phy.size(),collision,diagnostic)&&rr::assets::applySpringCollision50F(collision,x.parameters.bodies.main.body.mass,settings,response),"authored response settings");
- const auto tuning=runtime_startup50fl::readBytes("work/impactAuthoring49Y/ta.tun");require50DU(rr::assets::readEnvironmentImpact49Y(reinterpret_cast<const char*>(tuning.data()),tuning.size(),x.parameters.impactTuning,diagnostic),"actual TA impact tuning");x.parameters.impactTuningBound=true;
+ const auto tuning=[&](){
+  if(!trackSession->tuningInArchive)return runtime_startup50fl::readBytes(trackSession->impactTuning);
+  rr::assets::ResArchive48C source;rr::assets::DecodeError48C error;std::vector<std::uint8_t> bytes;
+  require50DU(rr::assets::decodeResource48C(runtime_startup50fl::readBytes(trackSession->archive),source,error)&&
+      rr::assets::extractResMember48C(source,trackSession->impactTuning,bytes,error),
+      "actual selected original track tuning unavailable");return bytes;
+ }();require50DU(rr::assets::readEnvironmentImpact49Y(reinterpret_cast<const char*>(tuning.data()),tuning.size(),x.parameters.impactTuning,diagnostic),"actual selected-track impact tuning");x.parameters.impactTuningBound=true;
  rr::assets::DefenseAuthoring49Y defense{};require50DU(rr::assets::readDefenseAuthoring49Y(reinterpret_cast<const char*>(phy.data()),phy.size(),defense,diagnostic)&&defense.baseDefense.present,"explicit base-profile defense");s.fields.defenseCF0=defense.baseDefense.value;
  // Profile overwrite and authored class selection are separate source gates.
  // Use the same UseValues/class decision as the already-bound physics.
@@ -461,14 +521,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
 
  StaticSpringState50G spring{};spring.records.generatedCapacity88=40;SpringRecord48N records[60]{},queryRecords[60]{},scratchRecords[60]{};
 
- const J*secondaryCase=nullptr;for(const auto&item:corpus["cases"])if(item["name"]=="chariotm.col-explicit37-authored-placements-forward")secondaryCase=&item;
+ const J*secondaryCase=nullptr;for(const auto&item:corpus["cases"])if(item["name"]==trackSession->secondaryCollisionCase)secondaryCase=&item;
  require50DU(secondaryCase,"actual chariot query present");const auto&sqj=(*secondaryCase)["query"];
  auto secondaryShape=cold::shape(corpus["shapes"][sqj["shape"].get<std::size_t>()]);auto secondaryFilter=cold::filter(sqj["filter"]);
  Type2StaticQuery49X secondaryQuery{};secondaryQuery.resource=&secondaryShape.view;secondaryQuery.filter=&secondaryFilter;secondaryQuery.queryScene.value=78;
  secondaryQuery.collisionTypeTag=sqj["collision_tag"];secondaryQuery.groupTypeTag=sqj["group_tag"];secondaryQuery.callbackEnabled=sqj["callback"];
  cold::words(secondaryQuery.copied40.data(),sqj["copied40"]);cold::words(secondaryQuery.copied50.data(),sqj["copied50"]);
  secondaryQuery.skipMask=(*secondaryCase)["masks"][0];secondaryQuery.dynamicMask=(*secondaryCase)["masks"][1];secondaryQuery.materialMask=(*secondaryCase)["masks"][2];
- require50DU((*secondaryCase)["order"]==row["order"]&&(*secondaryCase)["candidates"]==row["candidates"],"same explicit ordered terrain inputs");
+ if(!trackSession->originalStaticCandidates)require50DU((*secondaryCase)["order"]==row["order"]&&(*secondaryCase)["candidates"]==row["candidates"],"same explicit ordered terrain inputs");
  StaticSpringState50G secondarySpring{};secondarySpring.records.generatedCapacity88=60;
  SpringRecord48N secondaryRecords[60]{},secondaryQueryRecords[60]{},secondaryScratchRecords[60]{};
  if(raceEnabled)require50DU(matchesEndpointPolicy(secondaryShape.view),
@@ -504,23 +564,22 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  Type3QueryInput48P movement{};movement.filter=qfilter;movement.filter.identity=0xf0000001u;movement.filter.categoryA4=2;movement.filter.acceptMaskB8=4;movement.filter.flagsF8=6;movement.filter.flags31=1;
  movement.pairCount=1;movement.normalMode=0;movement.callbackEnabled=false;movement.collisionTypeTag=query.collisionTypeTag;movement.groupTypeTag=query.groupTypeTag;movement.dynamicMask=2;movement.sentinel={{0,0,0,1}};
  movement.copied40=query.copied40;movement.copied50=query.copied50;for(unsigned i:{0u,5u,10u,15u})movement.bodyScene.v[i]=1;
- std::vector<Type3Candidate48P> movementCandidates;movementCandidates.reserve(candidates.size());for(const auto&c:candidates){Type3Candidate48P target{};target.collision=c.candidate.collision;target.shapeType=0;target.hasMaterialScene=c.candidate.hasMaterialScene;target.sceneName=c.candidate.sceneName;target.sceneNameBytes=c.candidate.sceneNameBytes;movementCandidates.push_back(target);}
+ auto& movementCandidates=trackStorage.movement;
  MovementRays50N movementInitial,movementScratch,movementDestination;SpringVector4_48N endpoints[2]{};std::uint32_t endpointScenes[2]{};
  std::vector<TerrainCandidateEffects48J> movementScratchEffects(candidates.size()),movementEffects(candidates.size());std::vector<std::uint32_t> movementStack(stackCount);
  Type3QuerySource48P movementSource{movementInitial.source(),endpoints,2,endpointScenes,2,nullptr,0};
  Type3QueryWorkspace48P movementWorkspace{{movementScratch.view(),nullptr,0,movementScratchEffects.data(),movementScratchEffects.size()},movementStack.data(),movementStack.size()};
  Type3QueryBuffers48P movementOutput{movementDestination.view(),nullptr,0,movementEffects.data(),movementEffects.size()};Type3QueryResult48P movementResult{};std::uint32_t movementFlag=0;
- // Explicit supplied cold registration order. Authentic SearchList storage and
- // iteration produce the separate late-movement query view.
- SearchStorage50BS registry{};require50DU(candidates.size()==37,"retained37 terrain owners");
- require50DU(initializeColdSearchStorage50BU(registry,1024)==SearchStorageStatus50BS::Complete,"source factory list capacity");std::uint32_t registeredSlot=0;
- require50DU(adoptFirstSearchBlock50BU(registry,registeredSlot)==SearchStorageStatus50BS::Complete,"caller-owned first registration block");
- for(std::size_t i=0;i<candidates.size();++i){require50DU(selectSearchSlot50BS(registry,0,registeredSlot)==SearchStorageStatus50BS::Complete&&registeredSlot==i+1,"ordered registration slot");require50DU(insertSearchSlot50BS(registry,registeredSlot,static_cast<std::uint32_t>((i+1)*4))==SearchStorageStatus50BS::Complete,"register actual terrain owner handle");}
- Type3Candidate48P registeredMovement[37]{};std::size_t registeredIndices[37]{},registeredCount=0;
- std::size_t probeIndices[37]{},probeCount=0;
- SearchListBlock50BR registrationBlocks[2]{};SearchListInput50BR registrationView{};SearchListCursor50BR registrationCursor{};
- auto gatherRegistered=[&](){if(prepareSearchView50BT(registry,registrationBlocks,2,registrationView)!=SearchStorageStatus50BS::Complete)return false;resetSearchList50BR(registrationCursor,true);registeredCount=0;
-  for(;;){std::uint32_t id=0;if(nextSearchList50BR(registrationView,registrationCursor,id)!=SearchListStatus50BR::Complete)return false;if(!id)break;if((id&3)||id/4<1||id/4>candidates.size()||registeredCount>=37)return false;auto index=id/4-1;registeredIndices[registeredCount]=index;registeredMovement[registeredCount]=movementCandidates[index];++registeredCount;}return true;};
+ // Preserve the separate ordered movement registry, prepared once before
+ // publication. Hot gather copies only through capacity-checked native views.
+ auto& registry=trackStorage.movementRegistry;
+ auto* registeredMovement=trackStorage.registeredMovement.data();
+ auto* registeredIndices=trackStorage.registeredIndices.data();
+ auto& registeredCount=trackStorage.registeredCount;
+ auto* probeIndices=trackStorage.probeIndices.data();auto& probeCount=trackStorage.probeCount;
+ auto& registrationBlocks=trackStorage.movementBlocks;
+ auto& registrationView=trackStorage.movementView;
+ auto gatherRegistered=[&](){return trackStorage.gatherMovement();};
 
  // Source spring constructor295424 ->11B570(query,2): enable querying,
  // disable target participation and temporary-registration bits. Both spring
@@ -536,38 +595,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  for(const auto& candidate:candidates)require50DU(candidate.candidate.collision.filter.identity!=secondaryNativeIdentity,
      "reserved secondary query identity conflicts with terrain");
  secondaryFilter.identity=secondaryNativeIdentity;
- // Terrain refs1..37 stay fixed; the two live spring query owners are38/39.
- // They use their own E0 chains over the same persistent zone registries.
- constexpr CollectionRef50BX mainQueryRef=38,secondaryQueryRef=39,terrainQueryRef=40;
- constexpr std::size_t collectionObjectCount=40,zoneCount=9;
- require50DU(ground.world.zones.size()==zoneCount,"retained nine-zone world");
- CollectionObject50BX collectionObjects[collectionObjectCount]{};
- CollectionObjectState50BX collectionSource[collectionObjectCount]{},collectionScratch[collectionObjectCount]{},collectionFirst[collectionObjectCount]{},collectionSecond[collectionObjectCount]{};
- SearchStorage50BS zoneRegistries[18]{};ZoneRegistration50CJ zoneRecords[collectionObjectCount]{};
- ZoneRegistrationScratch50CJ zoneScratch{};ZoneLifecycle50CL zoneLifecycle{};
- SearchListBlock50BR zoneBlocks[36]{};
- CollectionTree50BX collectionTrees[18]{};
- CollectionTreeState50BX treeSource[18]{},treeScratch[18]{},treeFirst[18]{},treeSecond[18]{};
- CollectionZone50BX collectionZones[zoneCount]{};
- const ZoneLifecycleStorage50CL zoneStorage{zoneRegistries,18,zoneRecords,collectionObjectCount,{collectionTrees,18,collectionZones,zoneCount,zoneBlocks,36}};
- require50DU(initializeZoneLifecycle50CL(zoneLifecycle,zoneStorage,zoneCount,collectionObjectCount,1024,zoneScratch)==SearchStorageStatus50BS::Complete,"persistent zone lifecycle initialization");
- ZoneRegistrationCommand50CQ zoneEvents[128]{};ZoneRegistrationQueue50CQ zoneQueue{zoneEvents,128,0,0};
- for(unsigned i=0;i<37;++i){require50DU(enqueueZoneRegistration50CQ(zoneQueue,{ZoneRegistrationOperation50CQ::Set,i+1,candidateZones[i],ZoneMethod50CL::First})==ZoneQueueStatus50CQ::Complete,"queue authored zone owner registration");}
- const auto coldRegistrations=drainZoneRegistrations50CQ(zoneQueue,zoneLifecycle,zoneScratch,128);
- require50DU(coldRegistrations.status==ZoneQueueStatus50CQ::Complete&&!coldRegistrations.remaining,
-             "apply cold terrain registrations before live query attachment");
-
- // Exact World48F text is parsed once with the retained binary32 parser.
- // Directed links preserve original portal order and27F3B0 head insertion.
- const auto authoredPortals=loadLivePortalInputs50EP(ground.world);
- std::vector<CollectionRef50BX> portalHeads(zoneCount);
- std::vector<LiveZonePortalLink50EN> portalLinks(authoredPortals.size()*2);
- std::vector<PortalGeometry50EO> portalGeometry(authoredPortals.size());
- LiveZoneWorld50EN liveWorld{};
- require50DU(prepareLiveZoneWorld50EN(authoredPortals.data(),authoredPortals.size(),zoneCount,
-     {portalHeads.data(),portalHeads.size(),portalLinks.data(),portalLinks.size(),
-      portalGeometry.data(),portalGeometry.size()},liveWorld)==LiveZoneStatus50EN::Complete,
-     "prepare authored live portal world");
+ // Static references preserve authored candidate order; three real query
+ // owners follow them. No fixed TA zone/collider dimensions remain here.
+ const CollectionRef50BX mainQueryRef=trackCounts.mainQuery,
+     secondaryQueryRef=trackCounts.secondaryQuery,terrainQueryRef=trackCounts.terrainQuery;
+ const auto collectionObjectCount=trackCounts.objects,zoneCount=trackCounts.zones;
+ auto* collectionObjects=trackStorage.objects.data();
+ auto* collectionSource=trackStorage.source.data();
+ auto* collectionSecond=trackStorage.second.data();
+ auto* treeSource=trackStorage.treeSource.data();auto* treeSecond=trackStorage.treeSecond.data();
+ auto& zoneScratch=trackStorage.registrationScratch;
+ auto& zoneLifecycle=trackStorage.lifecycle;auto& zoneQueue=trackStorage.queue;
+ auto& liveWorld=trackStorage.world;
  // Cold original TunnelTrack owners, separate from the grid-start projection.
  // Share the existing serial source-libm owner with49T; keep every node/NextN.
  auto navigationMap=std::make_unique<TrackNavigation50EU>();
@@ -617,6 +656,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto opponentAudio=std::make_unique<opponent_audio50HX::Owner>();
  const char* audioSetting=std::getenv("RR_AUDIO");
  const bool audioEnabled=!(audioSetting&&std::string(audioSetting)=="0");
+ require50DU(!audioEnabled||trackSession->materialAudio,
+     "Selected original track material audio provider is unavailable; RR_AUDIO=0 must be explicit");
  require50DU(!mode1Requested||audioEnabled,
      "mode1 requires original audio providers; use RR_RACE_MODE=2 explicitly for RR_AUDIO=0");
  rr::platform::AudioOutputDiagnostic50HD audioDiagnostic{};
@@ -658,10 +699,21 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    mode1Enabled=true;
   }
   require50DU(materialMixer&&materialAudio->prepare("work/native/project/disc",audioRoot,
-      *materialMixer,64,audioError),audioError.empty()?"native material audio preparation failed":audioError.c_str());
+      *materialMixer,64,audioError,trackSession->originalStaticCandidates?material_audio50HI::Track::gc:material_audio50HI::Track::ta),
+      audioError.empty()?"native material audio preparation failed":audioError.c_str());
+  if(trackSession->originalStaticCandidates){
+   //271600 applies actual AUB assignments before the creator publishes A9.
+   for(std::size_t i=0;i<trackBindings.size();++i){const auto& original=ground.owners[trackBindings[i].originalOwner];
+    require50DU(rr::assets::applyTrackMaterialAssignments50HI(materialAudio->catalog(),ground.world,
+        original.zone,original.ordinal,trackStorage.contactMaterials[i],audioError),
+        audioError.empty()?"original GC contact material assignment failed":audioError.c_str());}
+  }
   require50DU(race_audio_groups50IC::bindProviderRange(*audioGroups,
       race_audio_groups50IC::ProviderRole::MaterialCollision,64,material_audio50HI::soundCount),
       "material group ownership rejected");
+  if(materialAudio->extraVoiceCount())require50DU(race_audio_groups50IC::bindProviderRange(*audioGroups,
+      race_audio_groups50IC::ProviderRole::MaterialCollision,material_audio50HI::extraFirstVoice,
+      materialAudio->extraVoiceCount()),"extra original material sound group ownership rejected");
   if(raceEnabled){
    std::array<opponent_audio50HX::Source,opponent_audio50HX::maxOpponents> sources{};
    for(std::size_t racer=1;racer<raceRacerCount;++racer)
@@ -713,9 +765,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
  {
   rr::assets::ResArchive48C navigationArchive;rr::assets::DecodeError48C error;
-  const auto bytes=runtime_startup50fl::readBytes("work/native/project/disc/TRACKS/TA.RES");
+  const auto bytes=runtime_startup50fl::readBytes(trackSession->archive);
   require50DU(rr::assets::decodeResource48C(bytes,navigationArchive,error),
-      "decode actual TA navigation archive");
+      "decode actual selected-track navigation archive");
   auto scratch=std::make_unique<TrackNavigationScratch50EU>();
   auto readNavigation=[&](const char* member,TrackNavigation50EU& destination){
    std::vector<std::uint8_t> text;
@@ -727,15 +779,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        "prepare source navigation gates");
    if(&destination==navigationAI.get())
     require50DU(rr::host::readCourseSpeedLimits50GK(reinterpret_cast<const char*>(text.data()),
-        text.size(),destination.track.count,courseLimits,courseDiagnostic),"actual ATA speed metadata rejected");
+        text.size(),destination.track.count,courseLimits,courseDiagnostic),"actual selected A spline speed metadata rejected");
    require50DU(reportNavigation(bindTrackNavigationZones50EU(
        liveWorld,destination,navigationDiagnostic),member),
        "bind source navigation portal indices");
   };
-  readNavigation("tracks\\mta.spl",*navigationMap);
+  readNavigation(trackSession->mapSpline,*navigationMap);
   require50DU(prepareLapProgressTrack50GF(*scratch,lapOwner.track,lapOwner.diagnostic),
       "actual authored lap progress markers rejected");
-  readNavigation("tracks\\ata.spl",*navigationAI);
+  readNavigation(trackSession->aiSpline,*navigationAI);
  }
  if(!lapContinuity.initialized){
   lapContinuity.state.vehicleCD8=s.fields.impactFlagsCD8;
@@ -759,7 +811,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  //20F5C0..20F5C8 initializes CA0=(0,0,0,1). The first gate query therefore
  // takes1A0940's explicit zero-XZ miss; do not seed this with a guessed pose.
  float navigationCA0[4]{0.f,0.f,0.f,1.f};
- const CollectionRef50BX initialCollisionZone=checkpointInput?checkpointInput->primaryZone:1;
+ const CollectionRef50BX initialCollisionZone=checkpointInput?checkpointInput->primaryZone:trackSession->initialCollisionZone;
  if(checkpointInput){
   require50DU(checkpointInput->zoneCount==liveWorld.zoneCount,"checkpoint world namespace changed");
   require50DU(checkpointInput->progress.reset.vehicleC80<navigationAI->track.count&&
@@ -786,22 +838,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::uint64_t navigationUpdates=0,navigationGateSkips=0,navigationCA0Copies=0;
  std::uint64_t navigationAISequential=0,navigationMapSequential=0;
  std::uint64_t navigationAIScan=0,navigationMapScan=0;
- const auto membershipCapacity=authoredPortals.size()+1;
- std::vector<CollectionZoneLink50BX> mainMembershipLinks(membershipCapacity),secondaryMembershipLinks(membershipCapacity),membershipScratchLinks(membershipCapacity);
- std::vector<LiveZoneEntry50EN> mainMembershipEntries(membershipCapacity),secondaryMembershipEntries(membershipCapacity),membershipScratchEntries(membershipCapacity);
- std::vector<LiveZonePortalLink50EN> portalScratchLinks(portalLinks.size());
- SearchStorage50BS membershipScratchRegistries[18]{};
- LiveZoneWorkspace50EN membershipWork{membershipScratchRegistries,18,
-     membershipScratchLinks.data(),membershipScratchEntries.data(),membershipCapacity,
-     portalScratchLinks.data(),portalScratchLinks.size(),{}};
- LiveZoneMembership50EN mainMembership{},secondaryMembership{},terrainMembership{};
- std::vector<CollectionZoneLink50BX> terrainMembershipLinks(membershipCapacity);
- std::vector<LiveZoneEntry50EN> terrainMembershipEntries(membershipCapacity);
- const LiveZoneStorage50EN terrainMembershipStorage{terrainMembershipLinks.data(),terrainMembershipEntries.data(),membershipCapacity};
+ auto& mainMembership=trackStorage.mainMembership.state;
+ auto& secondaryMembership=trackStorage.secondaryMembership.state;
+ auto& terrainMembership=trackStorage.terrainMembership.state;
+ auto& membershipWork=trackStorage.membershipWork;
+ const auto mainMembershipStorage=trackStorage.mainMembership.storage();
+ const auto secondaryMembershipStorage=trackStorage.secondaryMembership.storage();
+ const auto terrainMembershipStorage=trackStorage.terrainMembership.storage();
  live_terrain_probe50fr::Owner terrainLiveOwner{};
  require50DU(live_terrain_probe50fr::initialize(terrainLiveOwner,terrainOwner.initial.segment),"initialize actual single-pair terrain owner");
- const LiveZoneStorage50EN mainMembershipStorage{mainMembershipLinks.data(),mainMembershipEntries.data(),membershipCapacity};
- const LiveZoneStorage50EN secondaryMembershipStorage{secondaryMembershipLinks.data(),secondaryMembershipEntries.data(),membershipCapacity};
  auto prepareQueryCache=[&](Type2StaticQuery49X& source,const BodyMatrix48G& scene,
                             LiveZoneBounds50EN& bounds){
   if(!source.resource||!source.resource->nodeCount||(source.resource->root&0x8000u)||
@@ -832,7 +877,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(prepareQueryCache(query,s.nodes[static_cast<int>(x.bindings.lifecycle.main190)].world100,mainInitialBounds)&&
      prepareQueryCache(secondaryQuery,s.nodes[static_cast<int>(x.bindings.lifecycle.physical19C)].world100,secondaryInitialBounds),
      "source initial spring matrix and sphere preparation");
- // Retained grid-start1AE578..1AE594 ->2169C0 supplies initial zone1.
+ // Source grid-start1AE578..1AE594 uses collision4C4[0], the first actual zone.
  // Collision registration120070 passes overlap radius0, independently of cache.
  require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,mainMembership,
      mainMembershipStorage,mainQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.0f,mainInitialBounds,membershipWork),
@@ -852,15 +897,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,terrainMembership,
      terrainMembershipStorage,terrainQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.f,
      terrainInitialBounds,membershipWork),"terrain initial attachment"),"attach terrain probe membership");
- TerrainCandidate48J* terrainTargets[37]{};
- for(unsigned i=0;i<37;++i)terrainTargets[i]=&candidates[i].candidate.collision;
- TerrainCandidate48J terrainSelected[37]{};
- require50DU(live_terrain_probe50fr::reserveSelected(terrainSelected,37,terrainTargets,37),"reserve terrain query filter storage");
- TerrainCandidateEffects48J terrainScratchEffects[37]{},terrainEffects[37]{};
  std::vector<std::uint32_t> terrainStack(stackCount);
  live_terrain_probe50fr::Context terrainContext{zoneLifecycle,liveWorld,terrainMembership,membershipWork,
-     terrainQueryRef,terrainTargets,37,terrainSelected,37,
-     {terrainScratchEffects,37,terrainStack.data(),terrainStack.size()},terrainEffects,37};
+     terrainQueryRef,trackStorage.terrainTargets.data(),terrainOwnerCount,
+     trackStorage.terrainSelected.data(),trackCounts.selected,
+     {trackStorage.terrainScratchEffects.data(),trackCounts.selected,terrainStack.data(),terrainStack.size()},
+     trackStorage.terrainEffects.data(),trackCounts.selected};
  std::uint64_t terrainQueries=0,terrainHitFrames=0,terrainSupportedFrames=0;
  const VehicleLiveQueryContext50EQ mainLiveQuery{zoneLifecycle,liveWorld,mainMembership,membershipWork,mainQueryRef};
  const VehicleLiveQueryContext50EQ secondaryLiveQuery{zoneLifecycle,liveWorld,secondaryMembership,membershipWork,secondaryQueryRef};
@@ -886,26 +928,20 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   return false;
  };
 
- std::uint32_t scratchIds[64]{},firstIds[64]{},secondIds[64]{},mergeScratch[64]{},mergedIds[64]{};
- std::size_t resolveScratch[64]{};CandidateHandle50CB ownerHandles[37]{};
- for(std::size_t i=0;i<37;++i)ownerHandles[i]={candidates[i].candidate.collision.filter.identity,i};
- std::sort(std::begin(ownerHandles),std::end(ownerHandles),[](const auto&a,const auto&b){return a.identity<b.identity;});
- auto collectionBuffer=[](CollectionObjectState50BX*objects,CollectionTreeState50BX*trees,std::uint32_t*ids){CandidateCollectionBuffers50BX b{};b.objects=objects;b.objectCapacity=collectionObjectCount;b.trees=trees;b.treeCapacity=18;b.identities=ids;b.identityCapacity=64;return b;};
- CandidateCollectionInput50BX collectionInput{};collectionInput.objects=collectionObjects;collectionInput.objectCount=collectionObjectCount;
- collectionInput.trees=collectionTrees;collectionInput.treeCount=18;collectionInput.zones=collectionZones;collectionInput.zoneCount=9;
+ auto* mergedIds=trackStorage.mergedIds.data();auto* secondIds=trackStorage.secondIds.data();
+ auto* resolveScratch=trackStorage.resolveScratch.data();auto* ownerHandles=trackStorage.handles.data();
+ auto& collectionInput=trackStorage.collectionInput;
  collectionInput.zoneLinks=mainMembership.storage.links;collectionInput.zoneLinkCount=mainMembership.storage.capacity;collectionInput.zoneHead=1;collectionInput.query=mainQueryRef;
  collectionInput.bounds.shapeTag=2;collectionInput.type2Resource=query.resource;collectionInput.directTypeTag=query.collisionTypeTag;collectionInput.groupTypeTag=query.groupTypeTag;
- CandidateCollectionState50BX collectionInitial{};collectionInitial.objects=collectionSource;collectionInitial.objectCapacity=collectionObjectCount;collectionInitial.trees=treeSource;collectionInitial.treeCapacity=18;
- VehicleCandidateWorkspace50CA collectionWork{};collectionWork.collector.buffers=collectionBuffer(collectionScratch,treeScratch,scratchIds);
- collectionWork.first=collectionBuffer(collectionFirst,treeFirst,firstIds);collectionWork.second=collectionBuffer(collectionSecond,treeSecond,secondIds);
- collectionWork.mergeScratch={mergeScratch,64};collectionWork.merged={mergedIds,64};
+ auto collectionInitial=trackStorage.initialCollection();
+ auto collectionWork=trackStorage.collectionWorkspace();
  std::uint64_t collectedCalls=0;std::size_t peakCollected=0;
  auto collectRegistered=[&](){
-  const auto applied=drainZoneRegistrations50CQ(zoneQueue,zoneLifecycle,zoneScratch,128);
+  const auto applied=drainZoneRegistrations50CQ(zoneQueue,zoneLifecycle,zoneScratch,trackCounts.events);
   if(applied.status!=ZoneQueueStatus50CQ::Complete||applied.remaining)return false;
   if(prepareSearchView50BT(registry,registrationBlocks,2,registrationView)!=SearchStorageStatus50BS::Complete)return false;
   //50CL keeps method descriptors current after each explicit registry change.
-  for(std::size_t i=0;i<37;++i){const auto&owner=candidates[i].candidate.collision;auto projected=projectCollectionObject50CF(owner.filter,owner.sphere,owner.typeTag,0,0);if(!projected.valid)return false;collectionObjects[i]=projected.object;collectionSource[i]=projected.state;}
+  for(std::size_t i=0;i<terrainOwnerCount;++i){const auto&owner=candidates[i].candidate.collision;auto projected=projectCollectionObject50CF(owner.filter,owner.sphere,owner.typeTag,0,0);if(!projected.valid)return false;collectionObjects[i]=projected.object;collectionSource[i]=projected.state;}
   if(!mainMembership.attached||!secondaryMembership.attached||
      mainMembership.object!=mainQueryRef||secondaryMembership.object!=secondaryQueryRef||
      mainMembership.lastShapeTag!=2||secondaryMembership.lastShapeTag!=2||
@@ -946,15 +982,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   collectionInput.initialCurrentIdentity=query.initialQueryCurrentIdentity;
   const auto result=collectVehicleCandidates50CA(collectionInput,collectionInitial,collectionWork);
   if(result.phase!=VehicleCandidateResult50CA::Phase::Complete){std::cerr<<"collection phase "<<int(result.phase)<<" status "<<int(result.collectionStatus)<<'\n';return false;}
-  if(resolveCandidateHandles50CB(mergedIds,result.count,ownerHandles,37,resolveScratch,64,registeredIndices,37)!=CandidateHandleStatus50CB::Complete)return false;
-  if(resolveCandidateHandles50CB(secondIds,result.second.count,ownerHandles,37,resolveScratch,64,probeIndices,37)!=CandidateHandleStatus50CB::Complete)return false;
+  if(resolveCandidateHandles50CB(mergedIds,result.count,ownerHandles,terrainOwnerCount,resolveScratch,track_runtime_storage50IG::sourceSelectionCapacity,registeredIndices,trackCounts.selected)!=CandidateHandleStatus50CB::Complete)return false;
+  if(resolveCandidateHandles50CB(secondIds,result.second.count,ownerHandles,terrainOwnerCount,resolveScratch,track_runtime_storage50IG::sourceSelectionCapacity,probeIndices,trackCounts.selected)!=CandidateHandleStatus50CB::Complete)return false;
   probeCount=static_cast<std::size_t>(result.second.count);
   terrainOwner.metadata.filter.flagsF8=collectionSecond[terrainQueryRef-1].flagsF8;
   registeredCount=static_cast<std::size_t>(result.count);peakCollected=std::max(peakCollected,registeredCount);addCounter50DU(collectedCalls);
-  for(unsigned i=0;i<37;++i)candidates[i].candidate.collision.filter.flagsF8=collectionSecond[i].flagsF8;
+  for(std::size_t i=0;i<terrainOwnerCount;++i)candidates[i].candidate.collision.filter.flagsF8=collectionSecond[i].flagsF8;
   qfilter.flagsF8=collectionSecond[mainQueryRef-1].flagsF8;
   secondaryFilter.flagsF8=collectionSecond[secondaryQueryRef-1].flagsF8;query.initialQueryCurrentIdentity=result.second.currentIdentity;
-  std::memcpy(treeSource,treeSecond,sizeof treeSource);return true;
+  std::memcpy(treeSource,treeSecond,trackCounts.methods*sizeof(*treeSource));return true;
  };
  auto commitCandidateEffects=[&](const std::vector<TerrainCandidateEffects48J>&changed){
   if(!registeredCount)return true;
@@ -1416,7 +1452,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   MaterialAudioInput50HI materialInput{};
   materialInput.channelArgument=s.impactSupplement.timers820[4]>0.f?2u:3u;
   require50DU(resolveContactMaterial50HI(spring.records.currentCandidate130,
-      audioContactMaterials,37,materialInput.contactMaterialA9),"actual audio contact identity unresolved");
+      audioContactMaterials,terrainOwnerCount,materialInput.contactMaterialA9),"actual audio contact identity unresolved");
   materialInput.speedRatio70=boostState.speedRatio70;
   if(audioListenerReady){
    const auto& p=m.components.root.body.position;
@@ -1886,41 +1922,47 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(sourceAnnouncer->update(.016f,leader),"mode1 shared announcer update unresolved");
  };
 
- // Actual retained TA visual mesh, already placed by the49G/48F exporter.
- // This visual set is broader than the37-collider diagnostic physics scope.
+ // Actual selected visual mesh, authenticated by its selected source profile.
+ // Visual and collision member closures remain separate admissions.
  rr::assets::Mesh48B trackMesh;std::string trackLoadError;
  const bool trackLoaded=rr::assets::loadMesh48B(
-     "evidence/visual49G/export-placed-normal/ta-world.rrmesh",trackMesh,trackLoadError);
- require50DU(trackLoaded,trackLoadError.empty()?"retained TA visual mesh load failed":trackLoadError.c_str());
+     trackSession->visualMesh,trackMesh,trackLoadError);
+ require50DU(trackLoaded,trackLoadError.empty()?"selected-track visual mesh load failed":trackLoadError.c_str());
  namespace trackTextures=track_materials50fa_fixture;
  auto trackMaterialOwner=std::make_unique<trackTextures::Owner>();
+ const auto trackSource=trackSession->originalStaticCandidates?
+     track_source_fixture::Track::gc:track_source_fixture::Track::ta;
  trackTextures::Request trackMaterialRequest{};
- trackMaterialRequest.root="evidence/visual49G";
- trackMaterialRequest.exportReport="evidence/visual49G/export-placed-normal/export-report.json";
- trackMaterialRequest.choice={1,1,rr::assets::MaterialTextureRequirement50EA::optionalUntextured,
+ trackMaterialRequest.track=trackSource;
+ trackMaterialRequest.root=trackSession->visualRoot;
+ trackMaterialRequest.exportReport=trackSession->visualReport;
+ trackMaterialRequest.choice={1,1,trackSession->originalStaticCandidates?rr::assets::MaterialTextureRequirement50EA::required:
+     rr::assets::MaterialTextureRequirement50EA::optionalUntextured,
      trackTextures::MipMode::largestRetained,0};
  trackMaterialRequest.coldSourceByteCapacity=32u*1024u*1024u;
- trackMaterialRequest.sourceArchive="work/native/project/disc/TRACKS/TA.RES";
- trackMaterialRequest.decodeSourceTexture=&source_texture50fc_fixture::decodeSourceTexture;
+ trackMaterialRequest.sourceArchive=trackSession->archive;
+ trackMaterialRequest.decodeSourceTexture=trackSession->originalStaticCandidates?
+     &source_texture50fc_fixture::decodeSourceTextureGc:&source_texture50fc_fixture::decodeSourceTexture;
+ trackMaterialRequest.includeAllAuthoredPasses=trackSession->originalStaticCandidates;
  trackMaterialRequest.allowStaticAnimationFrame=true;
- trackMaterialRequest.textureBudgets={32,1024,8u*1024u*1024u,8u*1024u*1024u,1024};
+ trackMaterialRequest.textureBudgets={trackSession->originalStaticCandidates?64u:32u,1024,8u*1024u*1024u,8u*1024u*1024u,1024};
  trackTextures::Diagnostic trackMaterialDiagnostic{};
  require50DU(trackMaterialOwner->load(trackMaterialRequest,trackMesh,trackMaterialDiagnostic),
-     trackMaterialDiagnostic.message.empty()?"TA material load failed":trackMaterialDiagnostic.message.c_str());
+     trackMaterialDiagnostic.message.empty()?"selected-track material load failed":trackMaterialDiagnostic.message.c_str());
  std::vector<rr::assets::WorldNormal50HK> trackNormals;
  track_normals50hk_fixture::Diagnostic trackNormalDiagnostic{};
  require50DU(track_normals50hk_fixture::load(trackMaterialRequest.root,
-     trackMaterialRequest.exportReport,trackMesh,trackNormals,trackNormalDiagnostic),
-     trackNormalDiagnostic.message.empty()?"TA authored normal load failed":trackNormalDiagnostic.message.c_str());
- std::cerr<<"TA source normals "<<trackNormalDiagnostic.normals
+     trackMaterialRequest.exportReport,trackMesh,trackNormals,trackNormalDiagnostic,trackSource),
+     trackNormalDiagnostic.message.empty()?"selected-track authored normal load failed":trackNormalDiagnostic.message.c_str());
+ std::cerr<<trackSession->world->code<<" source normals "<<trackNormalDiagnostic.normals
      <<" zero/fallback "<<trackNormalDiagnostic.zeroNormals<<'\n';
  auto skyOwner=std::make_unique<sky50gw_fixture::Owner>();
- sky50gw_fixture::Request skyRequest{};
- skyRequest.archive="work/native/project/disc/TRACKS/TA.RES";
- skyRequest.textureRoot="evidence/sky50GW";
+ sky50gw_fixture::Request skyRequest{};skyRequest.track=trackSource;
+ skyRequest.archive=trackSession->archive;
+ skyRequest.textureRoot=trackSession->skyTextureRoot;
  sky50gw_fixture::Diagnostic skyDiagnostic{};
  require50DU(skyOwner->load(skyRequest,skyDiagnostic),
-     skyDiagnostic.message.empty()?"actual TA sky load failed":skyDiagnostic.message.c_str());
+     skyDiagnostic.message.empty()?"actual selected-track sky load failed":skyDiagnostic.message.c_str());
  // Host is declared first so renderer destruction always precedes its context.
  platform::GameHost50ER host;
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
@@ -2105,45 +2147,63 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   renderRequest.track.mesh=&trackMesh;
   renderRequest.track.sourceNormals=trackNormals.data();
   renderRequest.track.sourceNormalCount=static_cast<std::uint32_t>(trackNormals.size());
-  renderRequest.track.maximumNormalBytes=2u*1024u*1024u;
+  renderRequest.track.maximumNormalBytes=trackSession->originalStaticCandidates?4u*1024u*1024u:2u*1024u*1024u;
+  if(trackSession->originalStaticCandidates){
+   const auto& projectionUvs=trackMaterialOwner->projectionUvs();
+   renderRequest.track.sourceProjectionUvs=projectionUvs.data();
+   renderRequest.track.sourceProjectionCount=projectionUvs.size();
+   renderRequest.track.maximumProjectionBytes=projectionUvs.size()*sizeof(rr::assets::TrackProjectedUv);
+  }
   // Bounded host rendering optimization; an explicit debugging opt-out keeps
   // the same scene and physics available for comparisons.
   const char* disableCulling=std::getenv("RR_DISABLE_TRACK_CULLING");
   renderRequest.track.enableFrustumCulling=!(disableCulling&&std::string(disableCulling)=="1");
-  renderRequest.track.maximumVertexBytes=4u*1024u*1024u;
+  renderRequest.track.maximumVertexBytes=trackSession->originalStaticCandidates?8u*1024u*1024u:4u*1024u*1024u;
   renderRequest.track.maximumIndexBytes=2u*1024u*1024u;
   const auto* trackBank=trackMaterialOwner->bank();
   const auto* trackSpans=trackMaterialOwner->spans();
-  require50DU(trackBank&&trackSpans,"TA material publication missing");
+  require50DU(trackBank&&trackSpans,"selected-track material publication missing");
   std::vector<platform::MaterialTextureSampler50EB> trackSamplers(trackBank->textureCount(),
       {platform::MaterialTextureFilter50EB::linear,platform::MaterialTextureFilter50EB::linear,
        platform::MaterialTextureWrap50EB::repeat,platform::MaterialTextureWrap50EB::repeat});
+  if(trackSession->originalStaticCandidates){
+   const auto* selected=trackMaterialOwner->selections();
+   require50DU(selected,"original GC sampler selections missing");
+   for(const auto& entry:*selected){
+    require50DU(entry.textureIndex<trackSamplers.size(),"original GC sampler texture unresolved");
+    auto& sampler=trackSamplers[entry.textureIndex];
+    sampler.s=entry.clampU?platform::MaterialTextureWrap50EB::clampToEdge:platform::MaterialTextureWrap50EB::repeat;
+    sampler.t=entry.clampV?platform::MaterialTextureWrap50EB::clampToEdge:platform::MaterialTextureWrap50EB::repeat;
+   }
+  }
   auto trackTextureRequest=textureRequest;
   trackTextureRequest.samplers=trackSamplers.data();
   trackTextureRequest.samplerCount=static_cast<std::uint32_t>(trackSamplers.size());
   trackTextureRequest.maximumGpuBytes=8u*1024u*1024u;
   require50DU(trackGpuTextures.create(trackTextureRequest,*trackBank,textureDiagnostic),
-      "actual TA texture upload failed");
+      "actual selected-track texture upload failed");
   std::vector<platform::VehicleWindowTrackSpan50DS> trackBindings;
   trackBindings.reserve(trackSpans->size());
   for(const auto& span:*trackSpans){
    platform::VehicleWindowTrackSpan50DS binding{};
    binding.indexStart=span.indexStart;binding.indexCount=span.indexCount;
    binding.vertexStart=span.vertexStart;binding.vertexCount=span.vertexCount;
+   binding.sourcePass=span.sourcePass;binding.sourcePassCount=span.sourcePassCount;
+   binding.projectionPass=span.projectionPass;
    binding.material.mode=span.textureIndex==trackTextures::unresolved?
        platform::VehicleWindowMaterialMode50DS::untextured:
        platform::VehicleWindowMaterialMode50DS::requiredTexture;
    binding.material.textureIndex=span.textureIndex;
    const auto* trackSelections=trackMaterialOwner->selections();
-   require50DU(trackSelections&&span.materialSelection<trackSelections->size(),"TA material selection missing");
+   require50DU(trackSelections&&span.materialSelection<trackSelections->size(),"selected-track material selection missing");
    material_alpha50gx_fixture::Policy alpha{};
    require50DU(material_alpha50gx_fixture::select(
-       (*trackSelections)[span.materialSelection],alpha),"TA material alpha policy mismatch");
+       (*trackSelections)[span.materialSelection],alpha),"selected-track material alpha policy mismatch");
    using AlphaBlend=material_alpha50gx_fixture::Blend;
    binding.material.blend=alpha.blend==AlphaBlend::additive?
        platform::VehicleWindowBlend50DS::additive:alpha.blend==AlphaBlend::sourceAlpha?
        platform::VehicleWindowBlend50DS::sourceAlpha:platform::VehicleWindowBlend50DS::opaque;
-   binding.material.depthWrite=alpha.depthWrite;
+   binding.material.depthWrite=alpha.depthWrite;binding.material.depthEqual=alpha.depthEqual;
    binding.material.alphaScale=alpha.alphaScale;
    // These authenticated beam placements explicitly disable source lighting.
    binding.material.unlit=alpha.unlit;
@@ -2166,7 +2226,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   renderRequest.track.spans=trackBindings.data();
   renderRequest.track.spanCount=static_cast<std::uint32_t>(trackBindings.size());
   renderRequest.track.mode=platform::VehicleWindowMode50DS::callerMaterialTextures;
-  renderRequest.track.vertexColorScale=2.f; // Explicit host exposure of retained TA colors.
+  renderRequest.track.vertexColorScale=trackSession->originalStaticCandidates?255.f/128.f:2.f; // GC source RGB scale; TA host exposure unchanged.
   const auto* skyBank=skyOwner->bank();const auto* skyMesh=skyOwner->mesh();
   const auto* skySpans=skyOwner->spans();
   require50DU(skyBank&&skyMesh&&skySpans,"actual sky publication missing");
@@ -2185,6 +2245,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    platform::VehicleWindowTrackSpan50DS binding{};
    binding.indexStart=span.indexStart;binding.indexCount=span.indexCount;
    binding.vertexStart=span.vertexStart;binding.vertexCount=span.vertexCount;
+   binding.sourcePass=span.sourcePass;binding.sourcePassCount=span.sourcePassCount;
+   binding.projectionPass=span.projectionPass;
    binding.material.mode=platform::VehicleWindowMaterialMode50DS::requiredTexture;
    binding.material.textureIndex=span.textureIndex;
    binding.material.depthWrite=false;binding.material.unlit=true;
@@ -2305,8 +2367,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
                "Preset4 is explicit. R maps native repair flag69C button4; "
                "Space maps native boost flag698 button5; Left Shift maps powerslide flag6B4 button7; other action buttons stay released. 16ms host ticks, "
                "maximum 4 catch-up ticks. Focus loss/minimize pauses.\n"
-               "Actual textured pod meshes and source TA material spans with host lighting; "
-               "37 colliders with live main/secondary portal memberships across nine zones.\n"
+               "Actual textured pod meshes and selected-track material spans with host lighting; "
+               <<terrainOwnerCount<<" original colliders with live portal memberships across "<<zoneCount<<" zones.\n"
            <<"Navigation: "<<navigationMap->track.count<<" map / "
            <<navigationAI->track.count<<" AI nodes; original gates and portal indices bound. "
              "Live progression is tracked; automatic source-derived host checkpoint recovery is enabled.\n"

@@ -1,9 +1,10 @@
 #pragma once
 #include "pod_materials50ed_fixture.h"
+#include "track_source_fixture.h"
 #include "../../src/assets/import_decode48c.h"
 #include <cfenv>
 
-// Cold TA-only bridge for original skies\ta.cub. Cube geometry is the direct
+// Cold authenticated bridge for original TA/GC sky members. Cube geometry is the direct
 // 12A8A0 source constructor, not an invented enclosing mesh. Only authored
 // face/tile mask bits produce geometry. Images are genuine decoded IPUM bytes.
 namespace sky50gw_fixture {
@@ -11,8 +12,9 @@ namespace a = rr::assets;
 constexpr std::uint32_t tileCount = 48, vertexCount = 192, indexCount = 288;
 constexpr float halfExtent = 25600.0f, cameraRelativeYOffset = 1024.0f;
 struct Request {
-    std::filesystem::path archive; // Exact retained TRACKS/TA.RES.
-    std::filesystem::path textureRoot; // evidence/sky50GW; no runtime codec.
+    std::filesystem::path archive; // Exact archive for the explicitly selected track.
+    std::filesystem::path textureRoot; // Matching cold sky decode; no runtime codec.
+    track_source_fixture::Track track = track_source_fixture::Track::ta;
 };
 struct Span {
     std::uint32_t indexStart = 0, indexCount = 0, vertexStart = 0, vertexCount = 0;
@@ -36,6 +38,36 @@ inline constexpr Entry entries[] = {
 #include "sky50gw_index.inc"
 };
 static_assert(sizeof(entries) / sizeof(entries[0]) == tileCount, "Actual authored TA tile count");
+inline constexpr Entry gcEntries[] = {
+#include "sky_gc_index.inc"
+};
+static_assert(sizeof(gcEntries) / sizeof(gcEntries[0]) == tileCount, "Actual authored GC tile count");
+struct Source {
+    std::size_t archiveBytes, decodedCapacity, cubBytes, sceneBytes;
+    std::uint32_t archiveEntries;
+    const char* archiveSha; const char* cubMember; const char* cubSha;
+    const char* sceneMember; const char* sceneSha;
+    std::size_t fogRgbOffset;
+    const char* fogRgb;
+    const Entry* tiles;
+};
+inline const Source& source(track_source_fixture::Track track) {
+    static const Source ta{3334562,16u*1024u*1024u,164187,130511,383,
+        "b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8",
+        "skies\\ta.cub","27e43db810442e9fd90fda8551e6804ab68d48e8398992a1b2997945e88d68f4",
+        "tracks\\ta.scb","c3431a55c1f44ae704dae5b031a51f4b7907dbfc3e7787aba4c7ccbf9969031d",
+        9928,"175,182,207",entries};
+    static const Source gc{4205067,32u*1024u*1024u,184132,359830,1190,
+        "69dcbd97f010e462895f8712056e0ac9a21fe56dbae6d6b6c090c97c5e7a4cc9",
+        "skies\\sky21.cub","676a6601d962d66210d80f0ca97f2d6ad7a7b6eb43d7ba55c164a4792d6b392c",
+        "tracks\\gc.scb","d47a83f4b50812609c923381f3a9038328c81d9a50563b68fb4de022a9be210d",
+        27716,"151,160,177",gcEntries};
+    switch (track) {
+    case track_source_fixture::Track::ta: return ta;
+    case track_source_fixture::Track::gc: return gc;
+    default: throw std::runtime_error("Unsupported original sky track identity");
+    }
+}
 inline std::uint16_t u16(const std::uint8_t* p) noexcept {
     return std::uint16_t(p[0]) | std::uint16_t(std::uint16_t(p[1]) << 8);
 }
@@ -85,7 +117,7 @@ public:
     const a::Mesh48B* mesh() const noexcept { return storage_ ? &storage_->mesh : nullptr; }
     const a::MaterialTextureAssets50EA* bank() const noexcept { return storage_ ? &storage_->bank : nullptr; }
     const std::vector<Span>* spans() const noexcept { return storage_ ? &storage_->spans : nullptr; }
-    // Exact TA.scb Fog.ColorRGB, also used by the original viewport clear.
+    // Exact selected SCB Fog.ColorRGB, also used by the original viewport clear.
     // Four immutable normalized floats; null before successful publication.
     const float* clearRgba() const noexcept { return storage_ ? storage_->clearRgba.data() : nullptr; }
 
@@ -100,23 +132,22 @@ public:
             need(std::fegetround() == FE_TONEAREST, "Sky geometry requires FE_TONEAREST");
             need(!request.archive.empty() && !request.textureRoot.empty(), "Explicit sky source paths required");
             need(!std::filesystem::is_symlink(request.textureRoot), "Sky texture root symlink rejected");
+            const auto& selected = source(request.track);
             shared::Inputs input; input.capacity = 8u * 1024u * 1024u;
-            auto archiveBytes = input.read(request.archive, 3334562);
-            need(archiveBytes.size() == 3334562 && sha256(archiveBytes) ==
-                "b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8", "Original sky archive identity");
+            auto archiveBytes = input.read(request.archive, selected.archiveBytes);
+            need(archiveBytes.size() == selected.archiveBytes && sha256(archiveBytes) == selected.archiveSha, "Original sky archive identity");
             a::ResArchive48C archive; a::DecodeError48C error;
             a::DecodeLimits48C limits;
-            limits.resource_file_bytes = 3334562;
-            limits.resource_decoded_bytes = 16u * 1024u * 1024u;
-            limits.resource_entries = 383;
+            limits.resource_file_bytes = selected.archiveBytes;
+            limits.resource_decoded_bytes = selected.decodedCapacity;
+            limits.resource_entries = selected.archiveEntries;
             limits.resource_name_bytes = 128;
             need(a::decodeResource48C(archiveBytes, archive, error, nullptr, limits),
                 "Original sky archive decode: " + error.detail);
             Bytes cub;
-            need(a::extractResMember48C(archive, "skies\\ta.cub", cub, error, 164187),
+            need(a::extractResMember48C(archive, selected.cubMember, cub, error, selected.cubBytes),
                 "Original sky member extraction: " + error.detail);
-            need(cub.size() == 164187 && sha256(cub) ==
-                "27e43db810442e9fd90fda8551e6804ab68d48e8398992a1b2997945e88d68f4", "Original CUB identity");
+            need(cub.size() == selected.cubBytes && sha256(cub) == selected.cubSha, "Original CUB identity");
             need(u32(cub.data()) == 1 && u32(cub.data()+4) == 1 &&
                 u32(cub.data()+8) == 16 && u32(cub.data()+12) == 99100, "CUB source table");
             const auto* header = cub.data() + 99100;
@@ -133,18 +164,17 @@ public:
 
             auto next = std::make_unique<Storage>();
             Bytes sceneParameters;
-            need(a::extractResMember48C(archive, "tracks\\ta.scb", sceneParameters, error, 130511),
+            need(a::extractResMember48C(archive, selected.sceneMember, sceneParameters, error, selected.sceneBytes),
                 "Original sky clear parameters extraction: " + error.detail);
-            need(sceneParameters.size() == 130511 && sha256(sceneParameters) ==
-                "c3431a55c1f44ae704dae5b031a51f4b7907dbfc3e7787aba4c7ccbf9969031d",
-                "Original TA scene parameter identity");
+            need(sceneParameters.size() == selected.sceneBytes && sha256(sceneParameters) == selected.sceneSha,
+                "Original scene parameter identity");
             // Exact BINARY1 Fog.ColorRGB field, verified by the existing
             // reversible parameter decoder. Full member authentication makes
             // this a bounded fixed fixture field, not a permissive text parser.
-            constexpr std::size_t fogRgbOffset = 9928;
-            constexpr char fogRgb[] = "175,182,207";
-            need(std::memcmp(sceneParameters.data()+fogRgbOffset, fogRgb, sizeof fogRgb) == 0,
-                "Original TA Fog.ColorRGB field");
+            const auto fogRgbOffset = selected.fogRgbOffset;
+            need(fogRgbOffset+12 <= sceneParameters.size() &&
+                std::memcmp(sceneParameters.data()+fogRgbOffset, selected.fogRgb, 12) == 0,
+                "Original Fog.ColorRGB field");
             for (unsigned channel = 0; channel < 3; ++channel) {
                 const auto* digits = sceneParameters.data()+fogRgbOffset+channel*4;
                 const unsigned value = (digits[0]-'0')*100u+(digits[1]-'0')*10u+(digits[2]-'0');
@@ -160,7 +190,7 @@ public:
             for (std::uint32_t face = 0; face < 6; ++face) for (std::uint32_t tile = 0; tile < 16; ++tile) {
                 if (!(masks[face] & (1u << tile))) continue;
                 need(index < tileCount, "Sky tile count bound");
-                const auto& e = entries[index];
+                const auto& e = selected.tiles[index];
                 need(e.face == face && e.tile == tile && e.offset == offset && e.bytes <= cub.size()-offset,
                     "Sky source tile sequence/extent");
                 Bytes source(cub.begin()+offset, cub.begin()+offset+e.bytes);

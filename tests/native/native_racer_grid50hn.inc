@@ -12,10 +12,23 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
   constexpr float lateral[maxHostRaceRacers50HT]={0.f,-63.f,-21.f,21.f,63.f,-42.f,0.f,42.f};
   constexpr float forward[maxHostRaceRacers50HT]={0.f,80.f,80.f,80.f,80.f,40.f,40.f,40.f};
   BodyMatrix48G requested=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
-  // Keep the authenticated center pose for the human. No guessed original
-  // full-grid routine is invoked; these explicit offsets belong to this host.
-  for(unsigned axis=0;axis<3;++axis)
-   requested.v[12+axis]+=requested.v[axis]*lateral[racer]+requested.v[8+axis]*forward[racer];
+  if(trackSession->originalStaticCandidates){
+   // Every position is original2A2880 geometry over this track's real M spline.
+   // HOST roster rank assignment preserves the existing human rank4 and uses
+   // every other source rank once. It is not an invented lateral grid layout.
+   constexpr std::uint32_t nativeRank[maxHostRaceRacers50HT]={4,0,1,2,3,5,6,7};
+   GridCenterResult50AC authoredGrid{};
+   require50DU(source_grid50IG::prepare(*navigationMap,nativeRank[racer],authoredGrid),
+       "original complete starting-grid geometry unavailable");
+   for(unsigned axis=0;axis<3;++axis){
+    const float at=std::bit_cast<float>(authoredGrid.position[axis]);
+    requested.v[12+axis]=axis==1?at+x.parameters.visual.verticalLimit7EC:at;
+   }
+  }else{
+   // Preserve the existing explicit TA HOST grid unchanged.
+   for(unsigned axis=0;axis<3;++axis)
+    requested.v[12+axis]+=requested.v[axis]*lateral[racer]+requested.v[8+axis]*forward[racer];
+  }
   BodyMatrix48G grounded{};
   require50DU(native_racer50HN::groundGridPose(ground,requested,
       x.parameters.visual.verticalLimit7EC,groundStack.data(),groundStack.size(),

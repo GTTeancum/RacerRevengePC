@@ -1,10 +1,10 @@
 #pragma once
 #include "pod_materials50ed_fixture.h"
 
-// Cold-only adapter for the eight source-decoded TA textures from 50FC.
+// Cold-only adapters for authenticated TA/GC source textures.
 // No codec runs in the client. The generated table pins original member bytes
 // and genuine decoded output bytes; this adapter authenticates both. ATM uses
-// the actual first stored frame, not a fabricated replacement or animation.
+// genuine retained source frames, not fabricated replacements or animation.
 namespace source_texture50fc_fixture {
 namespace detail {
 namespace shared = pod_materials50ed_fixture::detail;
@@ -19,12 +19,17 @@ inline constexpr Entry entries[] = {
 #include "source_texture50fc_index.inc"
 };
 static_assert(sizeof(entries) / sizeof(entries[0]) == 8, "Exact retained TA source texture closure");
+inline constexpr Entry gcEntries[] = {
+#include "source_texture_gc_index.inc"
+};
+static_assert(sizeof(gcEntries) / sizeof(gcEntries[0]) == 4, "Exact retained GC source animation closure");
 } // namespace detail
 
 // Matches track_materials50fa_fixture::SourceTextureDecoder. Root explicitly
 // chooses largest retained mip and enables static ATM frame0. Caller's output
 // bytes and mipIndex remain unchanged on failure; only error is replaced.
-inline bool decodeSourceTexture(const char* sourceMember,
+inline bool decodeRetainedSource(const detail::Entry* entries, std::size_t entryCount,
+    const std::filesystem::path& root, const char* sourceMember,
     const std::vector<std::uint8_t>& source, std::vector<std::uint8_t>& rrtex,
     std::uint32_t& mipIndex, std::string& error) {
     using namespace detail;
@@ -33,13 +38,13 @@ inline bool decodeSourceTexture(const char* sourceMember,
             "50FC exact source member and bounded bytes required");
         const auto member = shared::normalized(sourceMember);
         const Entry* selected = nullptr;
-        for (const auto& entry : entries) if (member == entry.member) {
+        for (std::size_t i = 0; i < entryCount; ++i) {
+            const auto& entry = entries[i]; if (member != entry.member) continue;
             shared::need(!selected, "50FC duplicate source member"); selected = &entry;
         }
         shared::need(selected, "50FC source member was not decoded");
         shared::need(source.size() == selected->sourceBytes && shared::sha256(source) == selected->sourceSha256,
             "50FC original source hash/extent mismatch");
-        const std::filesystem::path root("evidence/textures50FC");
         shared::need(!std::filesystem::is_symlink(root), "50FC retained image directory symlink rejected");
         const auto expected = std::size_t(selected->width) * selected->height * 4 + 16;
         shared::need(selected->width && selected->height && selected->width <= 1024 && selected->height <= 1024 &&
@@ -56,5 +61,20 @@ inline bool decodeSourceTexture(const char* sourceMember,
         rrtex = std::move(decoded); mipIndex = selected->mipIndex; error.clear(); return true;
     } catch (const std::exception& e) { try { error = e.what(); } catch (...) {} return false; }
     catch (...) { try { error = "Unexpected 50FC cold source image failure"; } catch (...) {} return false; }
+}
+// Existing TA callers and retained output identities are unchanged.
+inline bool decodeSourceTexture(const char* sourceMember,
+    const std::vector<std::uint8_t>& source, std::vector<std::uint8_t>& rrtex,
+    std::uint32_t& mipIndex, std::string& error) {
+    return decodeRetainedSource(detail::entries, sizeof(detail::entries)/sizeof(detail::entries[0]),
+        "evidence/textures50FC", sourceMember, source, rrtex, mipIndex, error);
+}
+// GC uses its own original-byte/output table, including the exact authored
+// start frames of s_flaga/b/c. No same-name TA resource is selected.
+inline bool decodeSourceTextureGc(const char* sourceMember,
+    const std::vector<std::uint8_t>& source, std::vector<std::uint8_t>& rrtex,
+    std::uint32_t& mipIndex, std::string& error) {
+    return decodeRetainedSource(detail::gcEntries, sizeof(detail::gcEntries)/sizeof(detail::gcEntries[0]),
+        "evidence/texturesGC", sourceMember, source, rrtex, mipIndex, error);
 }
 } // namespace source_texture50fc_fixture
