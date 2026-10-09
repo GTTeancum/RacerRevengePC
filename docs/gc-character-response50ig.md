@@ -1,6 +1,6 @@
 # GC CHARACTER response admission
 
-The cold admission guard is integrated but UNBUILT / UNTESTED. The preceding `54bc7b5a` build passed; its capture checker stopped on the first TA Main image before driving or GC loading. That result does not validate this guard or GC contacts.
+The cold admission guard compiled in `c310c4ae`. That central attempt passed the TA driving/menu sequence but failed GC material cold loading before gameplay, so GC contact behavior remains unverified. The subsequent resource-path correction is unbuilt and untested.
 
 Original opening and windmill owners are animated CHARACTER colliders, not PHYSICSBODY owners. Construction through 0x11A750/0x11A8E0 and 0x11B190 leaves E4, E8 and the physical-body pointer clear. The model binding at 0x124260 sets owner identity and category; registration does not install an impact callback. Registry initialization at 0x3C80F0 establishes CHARACTER. Native category bits remain explicit session mappings rather than claimed original runtime bit positions.
 

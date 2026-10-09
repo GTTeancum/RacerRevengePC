@@ -1,11 +1,15 @@
 # Current native race validation
 
-## GC WIP: build passed; capture stopped before driving
+## GC WIP: TA menu sequence passed; GC cold load failed
 
-The 2026-10-09 18:18 central attempt built source `54bc7b5a00244fadf5ccd1fc4ab95e1f34ff771b`: 59 units compiled, 134 reused, link exit 0. Its one runtime loaded TA mode2/Main. The checker rejected the first Main image because the renderer tick was 0 while the native counter was 1. Capture ended incomplete before any drive or GC cold load; the process exited normally during cleanup. This is a build pass and a capture-harness failure, not a gameplay pass. Evidence remains preserved outside the repository, and a helper correction is separate work.
+The 2026-10-09 19:19:23 UTC central attempt built source `c310c4ae12d82a55bc6b68efdbfaed7ed5d73eff`: one unit compiled, 192 reused, link exit 0. The sole runtime ran from 19:20:11 to 19:20:28 UTC and exited 1 during GC material cold loading.
 
-Binary SHA-256: `d7eef1c13f80c4cda81f0ce65bd2d4d5ef35e49997a64e0bd2b21e78d74ef366`.
-The latest successful runtime remains the earlier `959d94e` Clegg/menu check below. Its coverage does not validate the GC additions.
+TA mode2 driving, Pause/Resume, Main Cancel then Confirm, track navigation, GC disclosure and pending selection completed. Pause lasted 2.0128 seconds with native/mixed clocks and actual PCM samples frozen; Resume retained the session/bank and advanced clocks. One expected GC cold transition began, but no GC ready state, driving or dense video completed.
+
+Source inspection found slash-separated member names in the dynamic-material and ATM loaders, while the original GC entries use backslashes. The new three-file correction fixes those names and sequences cold loads before reading diagnostic messages. It is **UNBUILT / UNTESTED**. Failed evidence remains outside Git; no extra runtime was launched during preservation.
+
+Tested binary SHA-256: `26924849463703c6ecc823062d0cb701eceb5c29b49afd464e8f802276031601`.
+The earlier full Clegg/menu capture and three-lap coverage below remain separate from this partial GC attempt.
 
 ## Current Linux menu and Clegg check
 

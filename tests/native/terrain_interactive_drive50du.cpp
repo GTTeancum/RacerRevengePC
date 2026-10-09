@@ -2038,10 +2038,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  gc_atm_window_fixture::Owner gcAtm;
  if(gcAnimatedWorld){
   gc_dynamic_materials_fixture::Diagnostic materialDiagnostic{};
-  require50DU(gcDynamicWindow.loadSource(trackSession->archive,*gcAnimatedWorld,materialDiagnostic),
+  // Finish each cold call before reading its diagnostic: function argument
+  // evaluation order must not select the fallback from a still-empty message.
+  const bool gcMaterialsLoaded=gcDynamicWindow.loadSource(trackSession->archive,*gcAnimatedWorld,materialDiagnostic);
+  if(!gcMaterialsLoaded)std::cerr<<"GC dynamic material load diagnostic material="<<materialDiagnostic.material
+      <<" source_code="<<materialDiagnostic.source.code<<" source_offset="<<materialDiagnostic.source.offset
+      <<" source_detail="<<materialDiagnostic.source.detail
+      <<" bank_error="<<static_cast<unsigned>(materialDiagnostic.bank.error)
+      <<" bank_texture="<<materialDiagnostic.bank.texture<<" bank_slot="<<materialDiagnostic.bank.slot
+      <<" bank_offset="<<materialDiagnostic.bank.byteOffset<<" bank_detail="<<materialDiagnostic.bank.parserMessage<<'\n';
+  require50DU(gcMaterialsLoaded,
       materialDiagnostic.message.empty()?"original GC dynamic materials rejected":materialDiagnostic.message.c_str());
   gc_atm_animation_fixture::Diagnostic atmDiagnostic{};
-  require50DU(gcAtm.loadSource(trackSession->archive,*trackMaterialOwner,atmDiagnostic),
+  const bool gcAtmLoaded=gcAtm.loadSource(trackSession->archive,*trackMaterialOwner,atmDiagnostic);
+  if(!gcAtmLoaded)std::cerr<<"GC ATM load diagnostic animation="<<atmDiagnostic.animation<<" frame="<<atmDiagnostic.frame
+      <<" source_code="<<atmDiagnostic.source.code<<" source_offset="<<atmDiagnostic.source.offset
+      <<" source_detail="<<atmDiagnostic.source.detail
+      <<" bank_error="<<static_cast<unsigned>(atmDiagnostic.bank.error)
+      <<" bank_texture="<<atmDiagnostic.bank.texture<<" bank_slot="<<atmDiagnostic.bank.slot
+      <<" bank_offset="<<atmDiagnostic.bank.byteOffset<<" bank_detail="<<atmDiagnostic.bank.parserMessage<<'\n';
+  require50DU(gcAtmLoaded,
       atmDiagnostic.message.empty()?"original GC ATM source bank rejected":atmDiagnostic.message.c_str());
  }
  std::uint32_t sourceApplicationTimestamp=0;

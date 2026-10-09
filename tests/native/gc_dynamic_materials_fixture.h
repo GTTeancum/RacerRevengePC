@@ -85,7 +85,7 @@ public:
             for (std::uint32_t i = 0; i < 6; ++i) {
                 d.material = i;
                 const auto& entry = entries[i];
-                const std::string stem = std::string("textures/") + entry.name;
+                const std::string stem = std::string("textures\\") + entry.name;
                 std::vector<std::uint8_t> psm, pst;
                 need(a::extractResMember48C(archive, stem+".psm", psm, d.source, 1024) &&
                     psm.size() == entry.materialBytes && shared::sha256(psm) == entry.materialSha,

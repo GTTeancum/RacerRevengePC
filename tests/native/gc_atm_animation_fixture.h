@@ -102,7 +102,7 @@ public:
                 d.animation=i;const auto& entry=entries[i];auto& out=definitions[i];
                 out.firstTextureIndex=entry.firstTextureIndex;out.frameCount=entry.frameCount;
                 out.initialFrame=entry.initialFrame;out.framesPerSecond=entry.fps;
-                const std::string stem=std::string("textures/")+entry.name;
+                const std::string stem=std::string("textures\\")+entry.name;
                 std::vector<std::uint8_t> original,psm;
                 need(a::extractResMember48C(archive,stem+".atm",original,d.source,128u*1024u)&&
                     original.size()==entry.sourceBytes&&shared::sha256(original)==entry.sourceSha,
