@@ -133,6 +133,9 @@ TerrainQueryStatus48M queryTerrainViewBounded48M(const TerrainQueryView48M& quer
             CollisionResult48I hit{};
             std::size_t traceUsed=0;
             const CollisionWorkspace48M collision{workspace.treeStack,workspace.treeStackCapacity,nullptr,0};
+            // Original126F40 dispatch admits no shape5 terrain hit (1270BC).
+            // Do not give the terrain probe the new racer type2 Gate policy.
+            if(c.shapeType==5)continue;
             if(c.shapeType>1||(c.shapeType==1&&!c.compound))return TerrainQueryStatus48M::UnsupportedScope;
             const auto status=c.shapeType==1?queryCompoundPair50IJ(query.segment,*c.compound,c.geometry.id,collision,hit):
                 queryOrderedCollisionBounded48M(query.segment,&c.geometry,1,collision,hit,traceUsed);

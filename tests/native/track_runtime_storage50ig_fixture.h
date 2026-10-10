@@ -52,6 +52,7 @@ struct Binding {
     std::uint32_t authoredZone=0;
     std::uint8_t materialA9=0;
     ZoneMethod50CL method=ZoneMethod50CL::First;
+    bool trigger=false; // authenticated additive TOB Gate sphere, no SCB index
 };
 struct Counts {
     std::size_t terrain=0,zones=0,portals=0,methods=0,blocks=0,objects=0;
@@ -309,10 +310,17 @@ public:
             for(std::size_t i=0;i<count;++i){
                 diagnostic.candidate=i;const auto& binding=bindings[i];
                 need(binding.candidate,"invalid original collider binding");
-                for(std::size_t j=0;j<i;++j)need((binding.animated||bindings[j].animated||bindings[j].originalOwner!=binding.originalOwner)&&
+                for(std::size_t j=0;j<i;++j)need((binding.animated||binding.trigger||bindings[j].animated||bindings[j].trigger||bindings[j].originalOwner!=binding.originalOwner)&&
                     bindings[j].candidate!=binding.candidate,"duplicate original collider binding");
                 const auto& c=binding.candidate->candidate.collision;
-                if(binding.animated){
+                if(binding.trigger){
+                    need(!binding.animated&&binding.originalOwner==std::numeric_limits<std::size_t>::max()&&
+                        binding.authoredZone&&binding.authoredZone<=n.zones&&binding.method==ZoneMethod50CL::First&&
+                        binding.candidate->shapeType==5&&binding.candidate->gate&&c.shapeType==5&&
+                        !c.geometry.mesh&&!c.compound&&c.hasResponseCallbackE8&&c.filter.categoryA4==8u&&
+                        c.filter.identity&&c.geometry.id==c.filter.identity&&c.ownerIdentity9C,
+                        "original Gate sphere binding is incomplete");
+                }else if(binding.animated){
                     need(binding.originalOwner==std::numeric_limits<std::size_t>::max()&&binding.authoredZone&&binding.authoredZone<=n.zones&&
                         binding.candidate->shapeType==1&&binding.candidate->compound&&c.shapeType==1&&c.compound==binding.candidate->compound&&
                         c.filter.identity&&c.geometry.id==c.filter.identity&&c.ownerIdentity9C,
@@ -338,12 +346,12 @@ public:
             for(std::size_t i=0;i<count;++i){
                 diagnostic.candidate=i;auto& c=*bindings[i].candidate;
                 const auto& binding=bindings[i];
-                next->candidates[i]=&c;next->candidateZones[i]=binding.animated?binding.authoredZone:ground.owners[binding.originalOwner].zone;
+                next->candidates[i]=&c;next->candidateZones[i]=(binding.animated||binding.trigger)?binding.authoredZone:ground.owners[binding.originalOwner].zone;
                 next->candidateMethods[i]=binding.method;
                 next->terrainTargets[i]=&c.candidate.collision;
                 next->handles[i]={c.candidate.collision.filter.identity,i};
                 std::string error;
-                if(binding.animated)next->contactMaterials[i]={c.candidate.collision.filter.identity,binding.materialA9};
+                if(binding.animated||binding.trigger)next->contactMaterials[i]={c.candidate.collision.filter.identity,binding.materialA9};
                 else {const auto& original=ground.owners[binding.originalOwner];
                     need(a::readTrackContactMaterial50HI(ground.world,original.zone,original.ordinal,
                         c.candidate.collision.filter.identity,next->contactMaterials[i],error),
@@ -379,7 +387,7 @@ public:
             need(initializeZoneLifecycle50CL(next->lifecycle,zones,n.zones,n.objects,runtimeSearchSlotLimit,
                 next->registrationScratch)==SearchStorageStatus50BS::Complete,"track zone lifecycle initialization failed");
             next->queue={next->events.data(),n.events,0,0};
-            for(std::size_t i=0;i<count;++i)if(!bindings[i].animated)
+            for(std::size_t i=0;i<count;++i)if(!bindings[i].animated&&!bindings[i].trigger)
                 need(enqueueZoneRegistration50CQ(next->queue,{ZoneRegistrationOperation50CQ::Set,
                     static_cast<CollectionRef50BX>(i+1),next->candidateZones[i],next->candidateMethods[i]})==ZoneQueueStatus50CQ::Complete,
                     "cold original collider registration queue full");

@@ -59,6 +59,17 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
        !g.write(w.stack,w.stackCapacity)||!g.write(w.trace,w.traceCapacity)||
        !g.write(d.pairs,d.pairCapacity)||!g.write(d.metadata,d.metadataCapacity)||
        !g.write(d.records,d.recordCapacity)||!g.write(d.effects,d.effectCapacity)||!g.write(&result,1))return false;
+    Span ownerSpan{},indexSpan{};GateTriggerBinding50KG* gateOwner=nullptr;
+    if(!span(owners,ownerCount,ownerSpan)||!span(indices,count,indexSpan))return false;
+    for(std::size_t i=0;i<count;++i){
+        if(indices[i]>=ownerCount)return false;
+        const auto& owner=owners[indices[i]];
+        if(owner.shapeType==5){
+            if(!owner.gate||(gateOwner&&gateOwner!=owner.gate))return false;
+            gateOwner=owner.gate;
+        }
+    }
+    if(gateOwner&&!g.write(gateOwner,1))return false;
     if(!g.read(&frame,1)||!g.read(&bindings,1)||!g.read(&admission,1)||!g.read(&live,1)||
        !g.read(&source,1)||!g.read(&initial,1)||!g.read(&w,1)||!g.read(&d,1)||
        !g.read(&world,1)||!g.read(world.portalHeads,world.zoneCount)||!g.read(world.portals,world.portalCount)||
@@ -89,6 +100,9 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
             for(std::size_t j=0;j<compound->count;++j){const auto& part=compound->parts[j];
                 if(!readMesh(part.mesh,part.nodeRadii,part.nodeRadiusCount))return false;
             }
+        }else if(owner.shapeType==5){
+            if(!source.nativeGatePolicy||owner.gate!=gateOwner||
+               !owner.gate->callbacks.activateAnimation)return false;
         }else return false;
     }
     return true;
@@ -136,6 +150,12 @@ VehicleLiveQueryResult50EQ query(bool secondary,const VehicleFrameState49W& fram
         return outcome;
     }
     Type2StaticQuery49X preparedQuery;std::memcpy(&preparedQuery,&source,sizeof preparedQuery);
+    if(source.nativeGatePolicy){
+        // Source worldMatrix is the previous accepted canonical query cache.
+        // Racer-bank ownership already keeps it separate for every body/racer.
+        preparedQuery.nativeGatePreviousWorld=source.worldMatrix;
+        preparedQuery.nativeGateHasPrevious=true;
+    }
     std::memcpy(&preparedQuery.worldMatrix,&prepared.world,sizeof preparedQuery.worldMatrix);
     for(unsigned i=0;i<3;++i)preparedQuery.sphere.center.v[i]=prepared.center.v[i];
     preparedQuery.sphere.radius=prepared.radius;preparedQuery.resetRecordsBefore=admission.resetSpring;

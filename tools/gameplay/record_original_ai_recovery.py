@@ -737,6 +737,8 @@ def main():
     parser.add_argument("--not-before", default=EARLIEST.isoformat(),
                         help="UTC launch gate, never earlier than 2026-10-10 15:18 UTC")
     parser.add_argument("--capture-hz", type=float, default=5.0)
+    parser.add_argument("--native-gc-gate", action="store_true",
+                        help="Opt into native swept collider/ authored Gate sphere contact; records the compatibility policy")
     parser.add_argument("--ready-window-seconds", type=float, default=30.0,
                         help="Bounded observation after readiness, at most 180 seconds")
     parser.add_argument("--startup-timeout", type=float, default=180.0)
@@ -777,6 +779,7 @@ def main():
         "HOME": str(output / "home"), "TMPDIR": str(output / "tmp"),
         "XDG_CACHE_HOME": str(output / "cache"),
         **RR_ENV, "RR_AUDIO_WAV": str(output / "audio.wav"),
+        "RR_GC_NATIVE_GATE": "1" if args.native_gc_gate else "0",
     }
     manifest = {
         "prepared_candidate_validation": "Source-only; not executed or syntax-checked during authoring",
@@ -793,6 +796,7 @@ def main():
         "capture_ack_timeout_seconds": args.ack_timeout, "quit_timeout_seconds": args.quit_timeout,
         "termination_grace_seconds": 2, "kill_reap_grace_seconds": 2,
         "not_before": gate.isoformat(), "single_process_attempt": True,
+        "gc_gate_contact_policy": "native_swept_type2_segments" if args.native_gc_gate else "disabled",
     }
     json_write(output / "launch.json", manifest)
     return Recorder(args, output, manifest).run()

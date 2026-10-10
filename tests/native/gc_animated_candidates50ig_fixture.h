@@ -12,7 +12,7 @@ inline constexpr std::size_t count=gc_animated_world50IG::ownerCount;
 inline constexpr std::uint32_t characterMask=1,firstCollider=0x20000000u,firstModel=0x21000000u;
 inline void sync(const gc_animated_world50IG::Owner& owner,
     g::Type2StaticCandidate49X* candidates,std::size_t size,std::size_t first){
- if(!owner.ready()||!candidates||first>size||size-first!=count)
+ if(!owner.ready()||!candidates||first>size||size-first<count)
   throw std::runtime_error("GC animated candidate extent");
  for(unsigned i=0;i<count;++i){auto& candidate=candidates[first+i];auto& c=candidate.candidate.collision;
   const auto& state=owner.state(i).collision;c.geometry.worldMatrix=state.ownerWorld;
@@ -57,7 +57,7 @@ inline void prepare(const gc_animated_world50IG::Owner& owner,
 inline bool admitNonBodyResponse(const gc_animated_world50IG::Owner& owner,
     const g::Type2StaticCandidate49X* candidates,std::size_t size,std::size_t first,
     const g::Type2StaticQuery49X& main,const g::Type2StaticQuery49X& secondary) noexcept {
- if(!owner.ready()||!candidates||first>size||size-first!=count)return false;
+ if(!owner.ready()||!candidates||first>size||size-first<count)return false;
  // Named category bindings already shared by the native session: trigger8,
  // PHYSICSBODY2 and STATICOBJECT4. None aliases CHARACTER1.
  const auto queryRoute=[](const g::Type2StaticQuery49X& query) noexcept {

@@ -80,6 +80,7 @@
 #include "track_runtime_storage50ig_fixture.h"
 #include "track_static_candidates50ig_fixture.h"
 #include "gc_animated_candidates50ig_fixture.h"
+#include "gc_gate_candidates50kg_fixture.h"
 #include "gc_dynamic_window50ig_fixture.h"
 #include "gc_atm_window_fixture.h"
 #include "source_grid50ig_fixture.h"
@@ -182,13 +183,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const char* trackSelectionError=nullptr;
  const auto* trackSession=track_session_assets50IG::select(rr::platform::hostTrackCode50IM(loadedTrack),trackSelectionError);
  require50DU(trackSession,trackSelectionError?trackSelectionError:"original track admission failed");
+ const char* gateSetting=std::getenv("RR_GC_NATIVE_GATE");
+ const bool gcNativeGate=trackSession->originalStaticCandidates&&gateSetting&&std::string(gateSetting)=="1";
  if(trackSession->originalStaticCandidates){
   const char* incomplete=std::getenv("RR_GC_INCOMPLETE_WORLD");
   require50DU(incomplete&&std::string(incomplete)=="1",
-      "GC native world is incomplete: zone11 opening trigger, authored LostAI branch triggers and Gate sound are unjoined; RR_GC_INCOMPLETE_WORLD=1 explicitly accepts these omissions");
+      "GC native world is incomplete: authored LostAI branch triggers and Gate sound are unjoined; opening needs explicit RR_GC_NATIVE_GATE=1 native geometry policy; RR_GC_INCOMPLETE_WORLD=1 accepts these limits");
   std::cerr<<"GC INCOMPLETE WORLD: real original track/navigation and both animated model/type1 collision owners are enabled; "
-      "zone11 opening retains its authored inactive state because its Gate trigger is not joined. "
-      "Authored LostAI branch triggers and Gate sound are not yet joined. "
+      <<(gcNativeGate?"zone11 Gate uses opt-in native swept type2-segment/sphere contact. ":
+          "zone11 opening retains its authored inactive state; native Gate policy is disabled. ")
+      <<"Authored LostAI branch triggers and Gate sound are not yet joined. "
       "This is not complete-track support.\n";
  }
 
@@ -478,12 +482,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // existing Dax sessionLazy. This is not a claim of original cross-race statics.
  gc_animated_world50IG::ServiceShared gcAnimationLazy{};
  const std::size_t animatedCandidateFirst=candidates.size();
+ std::size_t gcGateCandidate=std::numeric_limits<std::size_t>::max();
  if(trackSession->originalStaticCandidates){
   gcAnimatedWorld=std::make_unique<gc_animated_world50IG::Owner>();
   require50DU(gcAnimatedWorld->load(trackSession->archive,s.animationShared.libm,
       s.animationShared.motion,gcAnimationDiagnostic),
       gcAnimationDiagnostic.message.empty()?"original GC animated resource load failed":gcAnimationDiagnostic.message.c_str());
   gc_animated_candidates50IG::prepare(*gcAnimatedWorld,candidates,trackBindings,
+      query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
+  if(gcNativeGate)gcGateCandidate=gc_gate_candidates50KG::prepare(*gcAnimatedWorld,candidates,trackBindings,
       query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
   for(const auto& candidate:candidates)stackCount=std::max(stackCount,1+shape.view.maxDepth+candidate.maxDepth);
   std::cerr<<"GC ANIMATED WORLD: original opening/windmill owners=2, vertices=1195, indices=2337, surfaces=6, "
@@ -502,6 +509,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,gc_animated_world50IG::ownerCount> gcAnimatedMembership;
  if(gcAnimatedWorld)for(auto& membership:gcAnimatedMembership)
   membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ std::unique_ptr<track_runtime_storage50IG::Membership> gcGateMembership;
+ if(gcNativeGate)gcGateMembership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
  const auto terrainOwnerCount=trackCounts.terrain;
  auto* audioContactMaterials=trackStorage.contactMaterials.data();
  require50DU(setLocalMatrix49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190,pose)&&refreshSceneWorld49P({s.nodes,s.sceneNodeCount},x.bindings.lifecycle.main190),"supplied initial pose");f::project(s,x.bindings);
@@ -653,6 +662,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  secondaryQuery.collisionTypeTag=sqj["collision_tag"];secondaryQuery.groupTypeTag=sqj["group_tag"];secondaryQuery.callbackEnabled=sqj["callback"];
  cold::words(secondaryQuery.copied40.data(),sqj["copied40"]);cold::words(secondaryQuery.copied50.data(),sqj["copied50"]);
  secondaryQuery.skipMask=(*secondaryCase)["masks"][0];secondaryQuery.dynamicMask=(*secondaryCase)["masks"][1];secondaryQuery.materialMask=(*secondaryCase)["masks"][2];
+ query.nativeGatePolicy=secondaryQuery.nativeGatePolicy=gcNativeGate;
  if(gcAnimatedWorld)require50DU(gc_animated_candidates50IG::admitNonBodyResponse(*gcAnimatedWorld,
      candidates.data(),candidates.size(),animatedCandidateFirst,query,secondaryQuery),
      "GC original CHARACTER non-body spring response routing differs");
@@ -854,7 +864,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto& binding=trackBindings[i];
     // Animated CHARACTER owners retain constructor materialA9=0; AUB's
     // static SCB assignments do not index their sentinel originalOwner.
-    if(binding.animated)continue;
+    if(binding.animated||binding.trigger)continue;
     require50DU(binding.originalOwner<ground.owners.size(),"GC static material owner index outside authored ground");
     const auto& original=ground.owners[binding.originalOwner];
     require50DU(rr::assets::applyTrackMaterialAssignments50HI(materialAudio->catalog(),ground.world,
@@ -1040,6 +1050,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"GC original animation cold update"),"GC original animation cold membership failed");
  }
+ if(gcGateMembership){
+  const auto bounds=gc_gate_candidates50KG::bounds(*gcAnimatedWorld);
+  const auto ref=static_cast<CollectionRef50BX>(gcGateCandidate+1);
+  require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,gcGateMembership->state,
+      gcGateMembership->storage(),ref,gcAnimatedWorld->gateSource().startingZone,ZoneMethod50CL::First,0.f,
+      bounds,membershipWork),"GC original Gate initial attachment"),"GC Gate zone attachment failed");
+  require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,gcGateMembership->state,
+      bounds,membershipWork),"GC original Gate cold update"),"GC Gate cold membership failed");
+  std::cerr<<"GC NATIVE GATE: authenticated Trigger9, zone11, radius300, one-shot Animation1; "
+      "actual type2 endpoint geometry with linear two-triangle swept surfaces; "
+      "native approximation, registered-list scope, PodSound unavailable.\n";
+ }
  auto refreshAnimatedCandidates=[&](){
   if(!gcAnimatedWorld)return true;
   gc_animated_candidates50IG::sync(*gcAnimatedWorld,candidates.data(),candidates.size(),animatedCandidateFirst);
@@ -1087,6 +1109,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const VehicleLiveQueryContext50EQ mainLiveQuery{zoneLifecycle,liveWorld,mainMembership,membershipWork,mainQueryRef};
  const VehicleLiveQueryContext50EQ secondaryLiveQuery{zoneLifecycle,liveWorld,secondaryMembership,membershipWork,secondaryQueryRef};
  std::uint64_t mainCrossedPortals=0,secondaryCrossedPortals=0;
+ std::uint64_t reportedGateDispatches=0; // one shared track event, outside racer bank
  auto acceptLiveQuery=[&](const VehicleLiveQueryResult50EQ& attempt,
                          Type2StaticQuery49X& source,const LiveZoneMembership50EN& membership,
                          std::uint64_t& crossedPortals,const char* operation){
@@ -1097,6 +1120,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    source.worldMatrix=membership.lastShapeWorld;
    for(unsigned i=0;i<3;++i)source.sphere.center.v[i]=membership.bounds.cachedCenter.v[i];
    source.sphere.radius=membership.bounds.cachedRadius;
+  }
+  if(gcNativeGate&&gcAnimatedWorld->gateBinding().dispatches!=reportedGateDispatches){
+   const auto& gate=gcAnimatedWorld->gateBinding();reportedGateDispatches=gate.dispatches;
+   std::cerr<<"GC GATE ACTION: collider="<<gate.state.lastCollider<<" dispatches="<<gate.dispatches
+       <<" opening_active="<<gcAnimatedWorld->state(0).sequence.active90
+       <<" sound_unavailable="<<gate.soundUnavailable<<" policy=native_swept_type2_segments\n";
   }
   if(attempt.status==VehicleLiveQueryStatus50EQ::Complete)return true;
   std::cerr<<operation<<" live-query status "<<static_cast<unsigned>(attempt.status)
@@ -3846,6 +3875,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         <<" source_application_ms="<<sourceApplicationTimestamp
         <<" windmill_source_time="<<gcAnimatedWorld->state(1).sequence.current34
         <<" opening_active="<<gcAnimatedWorld->state(0).sequence.active90
+        <<" opening_source_time="<<gcAnimatedWorld->state(0).sequence.current34
+        <<" gate_native_policy="<<gcNativeGate<<" gate_fired="<<bool(gcAnimatedWorld->gateBinding().state.flags1B8&8u)
+        <<" gate_dispatches="<<gcAnimatedWorld->gateBinding().dispatches
+        <<" gate_sound_unavailable="<<gcAnimatedWorld->gateBinding().soundUnavailable
         <<" compound_owners=2 ordered_parts=4 registered_candidates="<<terrainOwnerCount
         <<" dynamic_draws/vertices/indices="<<rendererDiagnostic.dynamicWorldDraws<<'/'
         <<rendererDiagnostic.dynamicWorldVerticesUploaded<<'/'<<rendererDiagnostic.dynamicWorldIndices

@@ -53,7 +53,16 @@ CollectionBoundsStatus48S prepareCollectionBounds48S(
        !span(in.endpointScenes,in.endpointSceneCount,reads[2])||
        !span(in.scenes,in.sceneCount,reads[3])||!span(&out,1,write))return Status::InvalidInput;
     for(auto read:reads)if(overlap(write,read))return Status::InvalidInput;
-    if(in.shapeTag!=1&&in.shapeTag!=3&&in.shapeTag!=6)return Status::UnsupportedBounds;
+    if(in.shapeTag!=1&&in.shapeTag!=3&&in.shapeTag!=5&&in.shapeTag!=6)return Status::UnsupportedBounds;
+    if(in.shapeTag==5){
+        // Bounded unparented sphere path1208E4..1209A4. Constructor11C0B0
+        // installs identity matrix and unit center/radius scales. Scaled or
+        // parented spheres remain outside this adapter.
+        if(!std::isfinite(in.cachedRadius)||in.cachedRadius<=0)return Status::InvalidInput;
+        for(unsigned i=0;i<16;++i)if(in.shapeWorld.v[i]!=(i%5==0?1.f:0.f))return Status::UnsupportedBounds;
+        for(unsigned i=0;i<3;++i)if(in.localCenter.v[i]!=in.cachedCenter.v[i]||
+            in.localHalf.v[i]!=in.cachedRadius)return Status::UnsupportedBounds;
+    }
     CollectionBoundsResult48S result{};
     std::memcpy(&result.cachedCenter,&in.cachedCenter,sizeof(result.cachedCenter));
     std::memcpy(&result.cachedRadius,&in.cachedRadius,sizeof(result.cachedRadius));
