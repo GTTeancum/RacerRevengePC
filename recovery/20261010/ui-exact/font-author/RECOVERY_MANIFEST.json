@@ -1,0 +1,43 @@
+{
+  "scope": "Exact literal transcript recovery and SHA256 verification only",
+  "recovered_version": "Original author stage recorded at 2026-10-10 10:53 UTC, before any later zero-extent correction",
+  "all_four_original_versions_hash_verified": true,
+  "zero_extent_correction_recovered": false,
+  "missing_source": "No literal later zero-extent correction or corrected hashes are retained in this author transcript. No guessed correction was applied.",
+  "active_baseline_touched": false,
+  "tests_builds_syntax_checks_importers_or_execution_run": false,
+  "files": [
+    {
+      "path": "src/assets/original_ui_font50kg.h",
+      "expected_original_sha256": "058dbd2805c8e05a4ffca62bfc7d065979b8920ae3a67384323044829d99fe81",
+      "actual_sha256": "058dbd2805c8e05a4ffca62bfc7d065979b8920ae3a67384323044829d99fe81",
+      "expected_original_bytes": 3102,
+      "actual_bytes": 3102,
+      "verified_exact_original": true
+    },
+    {
+      "path": "src/assets/original_ui_font50kg.cpp",
+      "expected_original_sha256": "f68debf847501d1321710c2480eaaf5e0972612020990f5edea3e716cb7ac7c8",
+      "actual_sha256": "f68debf847501d1321710c2480eaaf5e0972612020990f5edea3e716cb7ac7c8",
+      "expected_original_bytes": 5103,
+      "actual_bytes": 5103,
+      "verified_exact_original": true
+    },
+    {
+      "path": "src/game/original_ui_text50kg.h",
+      "expected_original_sha256": "003a1d340a3877b119b0ae4cbd68f993fe5a205388ae22254f865b8862fcdd0d",
+      "actual_sha256": "003a1d340a3877b119b0ae4cbd68f993fe5a205388ae22254f865b8862fcdd0d",
+      "expected_original_bytes": 3404,
+      "actual_bytes": 3404,
+      "verified_exact_original": true
+    },
+    {
+      "path": "src/game/original_ui_text50kg.cpp",
+      "expected_original_sha256": "99c763ec1485d258b1d6cb7fa2c0b761d3091a56c1db067183fdef49d65713e0",
+      "actual_sha256": "99c763ec1485d258b1d6cb7fa2c0b761d3091a56c1db067183fdef49d65713e0",
+      "expected_original_bytes": 6151,
+      "actual_bytes": 6151,
+      "verified_exact_original": true
+    }
+  ]
+}

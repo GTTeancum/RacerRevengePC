@@ -1,0 +1,28 @@
+{
+  "status": "new untested reconstruction; not recovered historical bytes",
+  "baseline": "/workspace/scratch/74cd1d3d7a45/remote-recovery-51c6e707-20261010T1230/source",
+  "validation": "No build, syntax, tests, importer or gameplay run",
+  "files": [
+    {
+      "path": "platform/linux/native/original_ui_native_draw50kg.h",
+      "kind": "new reconstruction",
+      "preimage_sha256": null,
+      "postimage_sha256": "6c61f5a73f376987045fdd5d46895b6da6ea114de486767d29fbd696256ed0ae",
+      "bytes": 1969
+    },
+    {
+      "path": "platform/linux/native/vehicle_window_gl50ds.cpp",
+      "kind": "new reconstruction",
+      "preimage_sha256": "fcbad811c4a70c2025345a91527fcad549d01cb58be9793bf08493f498421441",
+      "postimage_sha256": "6e0481c27da4e732a936db18a284b77f6940ac0e10a052a61c187f5d839bfca1",
+      "bytes": 234734
+    },
+    {
+      "path": "platform/linux/native/vehicle_window_gl50ds.h",
+      "kind": "new reconstruction",
+      "preimage_sha256": "9e2053013915aeb095edd0bebb57761a8378a9fc6a2efa74ba449986601779ad",
+      "postimage_sha256": "0322c57001898a2600b1148e33269a2b19c3a3210b24bca0b99d96692871e627",
+      "bytes": 36492
+    }
+  ]
+}

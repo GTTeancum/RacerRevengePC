@@ -1,0 +1,44 @@
+{
+  "scope": "Four authorized literal source recoveries only",
+  "all_expected_hashes_match": true,
+  "files": [
+    {
+      "path": "tests/native/native_racer_physical50jq_fixture.h",
+      "bytes": 8221,
+      "expected_sha256": "3efe9771a40510495120162c761d3b1f607a40167edc6a8e22b3076a3bd44af5",
+      "recovered_sha256": "3efe9771a40510495120162c761d3b1f607a40167edc6a8e22b3076a3bd44af5",
+      "exact_match": true,
+      "recovery": "complete-final-literal"
+    },
+    {
+      "path": "tests/native/native_racer_frame50jq_fixture.h",
+      "bytes": 12817,
+      "expected_sha256": "c7ac13df33c7db0f01137bf3e9ce5bfd699a256e8c41366817c6d3d5011239cc",
+      "recovered_sha256": "c7ac13df33c7db0f01137bf3e9ce5bfd699a256e8c41366817c6d3d5011239cc",
+      "exact_match": true,
+      "recovery": "complete-final-literal"
+    },
+    {
+      "path": "tests/native/shared_query_world50jq_fixture.h",
+      "bytes": 25154,
+      "expected_sha256": "b04c96a4538f88f695e26cb3453056d9aee636b0bdb2cf8843d99d72ad6d8d4b",
+      "recovered_sha256": "b04c96a4538f88f695e26cb3453056d9aee636b0bdb2cf8843d99d72ad6d8d4b",
+      "exact_match": true,
+      "recovery": "complete-preimage-and-literal-edit-chain"
+    },
+    {
+      "path": "tests/native/extended_fallback_world50jm_fixture.h",
+      "bytes": 34917,
+      "expected_sha256": "77c7d22b869b3d0265eed029013fae8126b0b6b2e7642e24f16341a99793f39e",
+      "recovered_sha256": "77c7d22b869b3d0265eed029013fae8126b0b6b2e7642e24f16341a99793f39e",
+      "exact_match": true,
+      "recovery": "complete-preimage-and-literal-edit-chain"
+    }
+  ],
+  "unverified_mismatches": [],
+  "no_semantic_reconstruction": true,
+  "no_baseline_edits": true,
+  "no_build_test_syntax_importer_integration_execution": true,
+  "missing_file_list": "MISSING-FILES.md",
+  "provenance": "PROVENANCE.md"
+}

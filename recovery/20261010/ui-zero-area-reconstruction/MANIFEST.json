@@ -1,0 +1,18 @@
+{
+  "kind": "NEW source-derived reconstruction; not recovered historical final overlay",
+  "baseline": "ui-exact/font-author/src/game/original_ui_text50kg.cpp",
+  "files": [
+    {
+      "path": "src/game/original_ui_text50kg.cpp",
+      "pre_sha256": "99c763ec1485d258b1d6cb7fa2c0b761d3091a56c1db067183fdef49d65713e0",
+      "post_sha256": "9c9b4b9e512d731a21e21f2956026774f9ea7d9bff18b2bf89459506cd552ea6",
+      "pre_bytes": 6151,
+      "post_bytes": 6374
+    }
+  ],
+  "patch_sha256": "34b4b323aa09665b9dc68a2b1ae7578de31e1fef7f54d0dfc78569cdb70761ac",
+  "validation": "Source inspection and artifact hashes only. No tests, builds, syntax checks, importers, gameplay, PC access or Git commands.",
+  "exact_recovery_changed": false,
+  "root_repository_changed": false,
+  "historical_final_overlay_match": "Unknown: final overlay bytes and expected hash not recovered."
+}

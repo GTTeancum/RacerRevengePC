@@ -1,0 +1,182 @@
+{
+  "metadata_kind": "regenerated recovery verification; not original stage manifest bytes",
+  "scope": "Only literal restoration and SHA256 verification in newly authorized recovery directory. No active/baseline edits, integration, software execution, build, syntax checks, tests or importers.",
+  "baseline": {
+    "commit": "51c6e707",
+    "tree": "09dace21929d3802556d48f375163806e8025776",
+    "source": "/workspace/scratch/74cd1d3d7a45/remote-recovery-51c6e707-20261010T1230/source",
+    "texture_cpp_preimage_sha256": "706b19a8d02ef6c4896801b9b5a1621f0d41a853c76e46e3109197e295434c74"
+  },
+  "original_stage_references": {
+    "original-ui-atm50kg": {
+      "path": "/workspace/shared/rr-original-ui-atm50kg",
+      "manifest_sha256": "01f96a3fc5954a5ca81e4f4945823162ecd1ccce3f62f82bd5826a1a6dc50357",
+      "full_original_manifest_recovered": false
+    },
+    "original-ui-material50kg": {
+      "path": "/workspace/shared/rr-original-ui-material50kg",
+      "manifest_sha256": "003cc7f9cd41d560db2cc8fde551e2aadc3b8e913a08546cda1966618b732f82",
+      "changes_patch_sha256": "07a9252f1d097fcabbbe3b3477175d533b2a27ace5a47a4191caafc1afb705be",
+      "full_original_manifest_recovered": false
+    },
+    "original-ui-atlas50kg": {
+      "path": "/workspace/shared/rr-original-ui-atlas50kg",
+      "manifest_sha256": null,
+      "full_original_manifest_recovered": false
+    },
+    "original-ui-assets50kg": {
+      "path": "/workspace/shared/rr-original-ui-assets50kg",
+      "manifest_sha256": null,
+      "full_original_manifest_recovered": false
+    }
+  },
+  "files": [
+    {
+      "path": "files/src/assets/original_ui_atm50kg.h",
+      "original_stage": "original-ui-atm50kg",
+      "original_path": "/workspace/shared/rr-original-ui-atm50kg/files/src/assets/original_ui_atm50kg.h",
+      "bytes": 1504,
+      "expected_sha256": "558cc9c87ac300afeedf06dc7e31edb2c5b49a770108f9f2eee42b60faafb1eb",
+      "recovered_sha256": "558cc9c87ac300afeedf06dc7e31edb2c5b49a770108f9f2eee42b60faafb1eb",
+      "status": "exact_match",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    },
+    {
+      "path": "files/src/assets/original_ui_atm50kg.cpp",
+      "original_stage": "original-ui-atm50kg",
+      "original_path": "/workspace/shared/rr-original-ui-atm50kg/files/src/assets/original_ui_atm50kg.cpp",
+      "bytes": 6389,
+      "expected_sha256": "7c1713ba0e6c494507fa7c6a924e8bfb68f08a87dda107805345752f0087ce0a",
+      "recovered_sha256": "7c1713ba0e6c494507fa7c6a924e8bfb68f08a87dda107805345752f0087ce0a",
+      "status": "exact_match",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    },
+    {
+      "path": "files/src/game/original_ui_texture_animation50kg.h",
+      "original_stage": "original-ui-atm50kg",
+      "original_path": "/workspace/shared/rr-original-ui-atm50kg/files/src/game/original_ui_texture_animation50kg.h",
+      "bytes": 6572,
+      "expected_sha256": "412f0fe17906e1e10a61911bc1c963de42a2f6a60fb7b3b4be9117151f9f4dfe",
+      "recovered_sha256": "412f0fe17906e1e10a61911bc1c963de42a2f6a60fb7b3b4be9117151f9f4dfe",
+      "status": "exact_match",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    },
+    {
+      "path": "files/docs/original-ui-atm50kg.md",
+      "original_stage": "original-ui-atm50kg",
+      "original_path": "/workspace/shared/rr-original-ui-atm50kg/files/docs/original-ui-atm50kg.md",
+      "bytes": 8547,
+      "expected_sha256": "48397301fc575b9c86e2963bb7ec659971db296c7ab6725d51948f69be66aee1",
+      "recovered_sha256": "48397301fc575b9c86e2963bb7ec659971db296c7ab6725d51948f69be66aee1",
+      "status": "exact_match",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    },
+    {
+      "path": "files/src/assets/original_ui_material50kg.h",
+      "original_stage": "original-ui-material50kg",
+      "original_path": "/workspace/shared/rr-original-ui-material50kg/files/src/assets/original_ui_material50kg.h",
+      "bytes": 6946,
+      "expected_sha256": "e4717dfd89d39f7358d8604e370f48046f1a73c0d019062f64e39a7e4de4d5d1",
+      "recovered_sha256": "e4717dfd89d39f7358d8604e370f48046f1a73c0d019062f64e39a7e4de4d5d1",
+      "status": "exact_match",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    },
+    {
+      "path": "files/src/assets/original_ui_material50kg.cpp",
+      "original_stage": "original-ui-material50kg",
+      "original_path": "/workspace/shared/rr-original-ui-material50kg/files/src/assets/original_ui_material50kg.cpp",
+      "bytes": 17079,
+      "expected_sha256": "5ff8bc6480e2409da54691d66e2be04aafb797e899d3a20fb9d22b38836edd1e",
+      "recovered_sha256": "5ff8bc6480e2409da54691d66e2be04aafb797e899d3a20fb9d22b38836edd1e",
+      "status": "exact_match",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    },
+    {
+      "path": "files/src/assets/original_ui_material_fields50kg.inc",
+      "original_stage": "original-ui-material50kg",
+      "original_path": "/workspace/shared/rr-original-ui-material50kg/files/src/assets/original_ui_material_fields50kg.inc",
+      "bytes": 2028,
+      "expected_sha256": "6b4fb2ca2814ab6849bca64a618b9ea657251823babc3062499f685e22b36416",
+      "recovered_sha256": "6b4fb2ca2814ab6849bca64a618b9ea657251823babc3062499f685e22b36416",
+      "status": "exact_match",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    },
+    {
+      "path": "files/docs/original-ui-material50kg.md",
+      "original_stage": "original-ui-material50kg",
+      "original_path": "/workspace/shared/rr-original-ui-material50kg/files/docs/original-ui-material50kg.md",
+      "bytes": 9475,
+      "expected_sha256": "d70a8883bc172b1cf01981cb952e75300f5cf54dc0558f71a0bf13f8c8951351",
+      "recovered_sha256": "d70a8883bc172b1cf01981cb952e75300f5cf54dc0558f71a0bf13f8c8951351",
+      "status": "exact_match",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    },
+    {
+      "path": "files/src/assets/import_texture48e.h",
+      "original_stage": "original-ui-atlas50kg",
+      "original_path": "/workspace/shared/rr-original-ui-atlas50kg/files/src/assets/import_texture48e.h",
+      "bytes": 3105,
+      "expected_sha256": "093147ca1f6d43fa9d566dc290be019b8f8df0316d705bd9f371378f661d69f6",
+      "recovered_sha256": "093147ca1f6d43fa9d566dc290be019b8f8df0316d705bd9f371378f661d69f6",
+      "status": "exact_match",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    },
+    {
+      "path": "files/src/assets/import_texture48e.cpp",
+      "original_stage": "original-ui-atlas50kg",
+      "original_path": "/workspace/shared/rr-original-ui-atlas50kg/files/src/assets/import_texture48e.cpp",
+      "bytes": 19677,
+      "expected_sha256": "15ffdb328539309d449f940985f03a62b917f21bfab8d50b06614429508b0d2a",
+      "recovered_sha256": "15ffdb328539309d449f940985f03a62b917f21bfab8d50b06614429508b0d2a",
+      "status": "exact_match",
+      "method": "Exact retained decoder function plus byte-identical read-only baseline preimage remainder; final expected hash matches"
+    },
+    {
+      "path": "files/src/assets/original_ui_archive50kg.h",
+      "original_stage": "original-ui-assets50kg",
+      "original_path": "/workspace/shared/rr-original-ui-assets50kg/resource-read/files/src/assets/original_ui_archive50kg.h",
+      "bytes": 3340,
+      "expected_sha256": null,
+      "recovered_sha256": "ce4643ffc01fad5c6a0fd81b8f320ce14538f165b99d03e9ac38617fb1b180ce",
+      "status": "unverified_no_retained_expected_hash",
+      "method": "Complete literal retained tool-write/output, including captured corrections"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "evidence/import_texture48e.decodeTexture48E.PARTIAL.cpp.txt",
+      "bytes": 6866,
+      "sha256": "a92e44fba517e485e57287f7931b023707c564d0a73be76fe0e8ea884e4fc7ba",
+      "status": "partial literal source evidence"
+    },
+    {
+      "path": "evidence/material-source-review-amendments.md",
+      "bytes": 1447,
+      "sha256": "c291046fdd55e047b88acaf8d186e1a4abdc356ba1a35e4261e2d39f8b8285d0",
+      "status": "complete literal tool-write without retained expected hash"
+    },
+    {
+      "path": "evidence/pst-recovery-receipt.json",
+      "bytes": 621,
+      "sha256": "8e155d06079ff378a9046a5c383b474997c5db10efee52c41e01eb82897c07b5",
+      "status": "regenerated verification metadata"
+    }
+  ],
+  "regenerated_metadata": [
+    {
+      "path": "verification-metadata/original-ui-material50kg.changes.regenerated.patch",
+      "kind": "regenerated verification metadata",
+      "expected_sha256": "07a9252f1d097fcabbbe3b3477175d533b2a27ace5a47a4191caafc1afb705be",
+      "recovered_sha256": "07a9252f1d097fcabbbe3b3477175d533b2a27ace5a47a4191caafc1afb705be",
+      "status": "exact_match"
+    }
+  ],
+  "not_recovered": [
+    "Archive reader original_ui_archive50kg.cpp",
+    "Archive catalog and private SHA/catalog include files",
+    "Complete historical catalogue/index/material evidence JSON files",
+    "Original atlas research/docs/manifest/provenance/patch",
+    "Original complete ATM/material research evidence/manifests/provenance; expected aggregate identities retained only",
+    "Actual original UI archive payloads"
+  ]
+}

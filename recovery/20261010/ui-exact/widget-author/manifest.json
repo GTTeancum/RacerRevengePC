@@ -1,0 +1,37 @@
+{
+  "stage": "original-ui-text-widget50kg",
+  "status": "frozen-source-only-unexecuted",
+  "scope": "Two additive static Overlay_Text runtime owner files; no active edits or renderer/main changes",
+  "dependencies": ["rr-original-ui-pages50kg"],
+  "new_repository_paths": [
+    "src/game/original_ui_text_widget50kg.h",
+    "src/game/original_ui_text_widget50kg.cpp"
+  ],
+  "files": [
+    {
+      "path": "src/game/original_ui_text_widget50kg.h",
+      "bytes": 6224,
+      "sha256": "c55dcdf86fdf4d860b18eb2f811875b4afd0b288057fd91c7596d5f5452af361"
+    },
+    {
+      "path": "src/game/original_ui_text_widget50kg.cpp",
+      "bytes": 12788,
+      "sha256": "b5e3d0d75045ff84022f41f05845fe5ea990c3c9d0178c26ba0b86e54ad28b5f"
+    },
+    {
+      "path": "RECOVERY.md",
+      "bytes": 6849,
+      "sha256": "64ad848ec39e057ff7fe3cf274396e25453406b27733b8f0a2ea21d91200275d"
+    },
+    {
+      "path": "review/source-review-20261010.md",
+      "bytes": 1692,
+      "sha256": "7d24ec44972fe3bea9e1c13a02d9d8d3129a261362a6a48292dc365143f7ba1e"
+    },
+    {
+      "path": "research/static-anchor-words.txt",
+      "bytes": 1493,
+      "sha256": "f9b4d541a77880c21e0669fcd15dabeb96c7432aaa5e6c737edbe6cba72a8de8"
+    }
+  ]
+}

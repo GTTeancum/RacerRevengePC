@@ -2770,6 +2770,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   renderRequest.mode=platform::VehicleWindowMode50DS::callerMaterialTextures;
   renderRequest.track.mesh=&trackMesh;
+  // Reconstruction gate: RGB is authenticated by skyOwner; distance constants
+  // and formula come from the retained pre-loss design, not recovered bytes.
+  // Keep off by default until that source provenance is independently restored.
+  const char* authoredFogSetting=std::getenv("RR_AUTHORED_WORLD_FOG");
+  require50DU(!authoredFogSetting||std::string(authoredFogSetting)=="0"||
+      std::string(authoredFogSetting)=="1","RR_AUTHORED_WORLD_FOG must be 0 or 1");
+  if(authoredFogSetting&&std::string(authoredFogSetting)=="1"){
+   require50DU(trackSource==track_source_fixture::Track::ta||
+       trackSource==track_source_fixture::Track::gc,"unsupported reconstructed fog track");
+   auto& fog=renderRequest.track.worldFog;
+   const float* color=skyOwner->clearRgba();
+   require50DU(color,"authenticated world fog RGB missing");
+   for(unsigned i=0;i<3;++i)fog.color[i]=color[i];
+   constexpr float minimum=1333.300048828125f,maximum=4000.f,haziness=.5f;
+   const float visibility=trackSource==track_source_fixture::Track::ta?1.f:.5f;
+   fog.end=minimum+visibility*(maximum-minimum);
+   fog.start=(fog.end-64.f)*(1.f-haziness);fog.enabled=true;
+   std::cerr<<"Opt-in reconstructed native world fog: start "<<fog.start
+       <<" end "<<fog.end<<"; distance provenance pending, no retail shader parity claim\n";
+  }
   renderRequest.track.sourceNormals=trackNormals.data();
   renderRequest.track.sourceNormalCount=static_cast<std::uint32_t>(trackNormals.size());
   renderRequest.track.maximumNormalBytes=trackSession->originalStaticCandidates?4u*1024u*1024u:2u*1024u*1024u;
@@ -3668,6 +3688,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     renderFrame.materialUvs=playerFlameUvs.data();
     renderFrame.materialUvCount=static_cast<std::uint32_t>(playerFlameUvs.size());
     renderFrame.skyWorldViewProjection=skyView.worldViewProjection;
+    renderFrame.worldFogCamera=camera.eye;
     platform::VehicleWindowOpponent50DS opponents[maxHostRaceOpponents50HT]{};
     RacePresentation50HZ nextRacePresentation{};
     if(raceEnabled){

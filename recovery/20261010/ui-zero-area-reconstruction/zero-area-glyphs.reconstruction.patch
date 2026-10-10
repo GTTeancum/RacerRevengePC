@@ -1,0 +1,14 @@
+--- a/src/game/original_ui_text50kg.cpp
++++ b/src/game/original_ui_text50kg.cpp
+@@ -69,7 +69,10 @@
+         float left = 0, top = 0, right = 0, bottom = 0;
+         float u0 = g->left, v0 = g->top, u1 = g->right, v1 = g->bottom;
+         if (pixelMode) {
+-            if (g->widthMinusOne < 0 || g->heightMinusOne < 0)
++            // CEL metrics store extent minus one: -1 is a genuine zero-area
++            // glyph. Keep its authored bearing/advance and degenerate corners;
++            // only values below -1 describe a negative extent.
++            if (g->widthMinusOne < -1 || g->heightMinusOne < -1)
+                 return fail(diagnostic, OriginalUiTextError50KG::glyphGeometry,
+                             0x2E0B2Cu, i, ascii);
+             // Source 0x2E0B2C..0x2E0BE4 and 0x2E0D00..0x2E0D14.

@@ -1,0 +1,30 @@
+{
+  "base_commit": "64a4aca3be7cd9ca565c9bde12ec07d2bfc6d14a",
+  "status": "source-only, unexecuted; source-owner review only; independent review pending",
+  "paths": [
+    {
+      "path": "src/assets/original_ui_icon50kg.cpp",
+      "sha256": "10f29624cbafc72f0bae99672317fdb51f3083ef44bf40b47c8f61ebb736dab6",
+      "bytes": 5032,
+      "preimage_sha256": null
+    },
+    {
+      "path": "src/assets/original_ui_icon50kg.h",
+      "sha256": "147e80fa10de46939698a9f6d741faa22f85f495600587cc0f5b2d92ec79985c",
+      "bytes": 1144,
+      "preimage_sha256": null
+    },
+    {
+      "path": "src/game/original_ui_icon_layout50kg.cpp",
+      "sha256": "bf2eccc4af8ff3903f41defe68f8668eea2cff862bacdab376565f097cfbf5d0",
+      "bytes": 2980,
+      "preimage_sha256": null
+    },
+    {
+      "path": "src/game/original_ui_icon_layout50kg.h",
+      "sha256": "e8b431d2383ef1cb87252aa391b537fa48970de89b05e82075393bbd5969e293",
+      "bytes": 1355,
+      "preimage_sha256": null
+    }
+  ]
+}

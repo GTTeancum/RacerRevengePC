@@ -38,6 +38,28 @@ def main():
         absolute = str(ROOT / source)
         if absolute not in argv:
             argv.insert(argv.index('-lz'), absolute)
+    # Inactive original UI modules; source registration does not enable frontend.
+    for source in (
+        'src/assets/original_ui_archive50kg.cpp',
+        'src/assets/original_ui_atm50kg.cpp',
+        'src/assets/original_ui_font50kg.cpp',
+        'src/assets/original_ui_icon50kg.cpp',
+        'src/assets/original_ui_localization50kg.cpp',
+        'src/assets/original_ui_material50kg.cpp',
+        'src/assets/original_ui_overlay_text50kg.cpp',
+        'src/assets/original_ui_pages50kg.cpp',
+        'src/assets/original_ui_screen_assets50kg.cpp',
+        'src/game/original_ui_icon_layout50kg.cpp',
+        'src/game/original_ui_main_layout50kg.cpp',
+        'src/game/original_ui_navigation50kg.cpp',
+        'src/game/original_ui_text50kg.cpp',
+        'src/game/original_ui_text_geometry50kg.cpp',
+        'src/game/original_ui_text_position50kg.cpp',
+        'src/game/original_ui_text_widget50kg.cpp',
+    ):
+        absolute = str(ROOT / source)
+        if absolute not in argv:
+            argv.insert(argv.index('-lz'), absolute)
     destination.write_text(json.dumps(argv, indent=2) + '\n', encoding='utf-8')
 
 if __name__ == '__main__':

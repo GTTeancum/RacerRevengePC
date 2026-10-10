@@ -1,0 +1,29 @@
+{
+  "status": "source-only, unexecuted",
+  "paths": [
+    {
+      "path": "platform/linux/native/original_ui_screen_canvas50kg.cpp",
+      "sha256": "05ab58d407758584033f305b75b447869603370cb9c779c2816e80b36400469b",
+      "bytes": 1312,
+      "preimage_sha256": null
+    },
+    {
+      "path": "platform/linux/native/original_ui_screen_canvas50kg.h",
+      "sha256": "4416ddf316d26fa7f06e4e44e6ac9c68deea45c391f50f6188172eb3f9df36d1",
+      "bytes": 1631,
+      "preimage_sha256": null
+    },
+    {
+      "path": "src/game/original_ui_text_geometry50kg.cpp",
+      "sha256": "7882c11ad9edc42ed8b8c4614a21b6ed0862f0e6be06c91fa3a2f4daf9ee0d6a",
+      "bytes": 2461,
+      "preimage_sha256": null
+    },
+    {
+      "path": "src/game/original_ui_text_geometry50kg.h",
+      "sha256": "87afc659aec2b4fcfd5f552b57879a9830bc237d2f623640175aea54a06b195d",
+      "bytes": 1592,
+      "preimage_sha256": null
+    }
+  ]
+}

@@ -116,14 +116,24 @@ bool decodeTexture48E(const Bytes& input, Texture48E& output, DecodeError48C& er
         Reader read{input}; read.range(0, 12);
         require(read.u16(0) == 1, DecodeKind48C::unsupported, "pst.revision", 0, "Only original PST revision 1 is supported");
         require(read.u16(2) == 0, DecodeKind48C::unsupported, "pst.flags", 2, "Only observed flags zero are supported");
-        require(read.u32(4) == 1, DecodeKind48C::unsupported, "pst.kind", 4, "Only 256-entry indexed kind 1 is supported");
+        const auto kind = read.u32(4);
+        require(kind == 0 || kind == 1, DecodeKind48C::unsupported, "pst.kind", 4,
+            "Only original 16-entry kind 0 and 256-entry kind 1 are supported");
         const auto count = read.u32(8);
         require(count >= 1 && count <= 7, DecodeKind48C::unsupported, "pst.mip_count", 8, "Only one through seven mip levels are supported");
-        read.range(12, 1024);
+        // Original kind is an enum, not the bit depth: 29E6D0 maps 0 -> 4,
+        // 1 -> 8, 2 -> 16. Kind2 is a different packed1555 path and remains
+        // unsupported. 24E9C0 -> 11A4F0/11A580 reads16 raw RGBA entries;
+        // 24EA00 -> 11A5A0/11A630 reads256. Neither path normalizes alpha.
+        const unsigned paletteEntries = kind == 0 ? 16u : 256u;
+        const std::size_t paletteBytes = std::size_t(paletteEntries) * 4;
+        read.range(12, paletteBytes);
         Texture48E parsed;
-        for (unsigned i = 0; i < 256; ++i) for (unsigned c = 0; c < 4; ++c)
+        parsed.kind = kind;
+        for (unsigned i = 0; i < paletteEntries; ++i) for (unsigned c = 0; c < 4; ++c)
             parsed.original_palette[i][c] = input[12 + 4 * i + c];
-        std::size_t at = 1036, decoded = 16, nonPowerOffset = 0, smallOffset = 0;
+        const std::size_t firstMip = 12 + paletteBytes;
+        std::size_t at = firstMip, decoded = 16, nonPowerOffset = 0, smallOffset = 0;
         std::uint32_t previousW = 0, previousH = 0;
         // First validate every level/extent before allocating pixel arrays.
         for (std::uint32_t level = 0; level < count; ++level) {
@@ -141,7 +151,12 @@ bool decodeTexture48E(const Bytes& input, Texture48E& output, DecodeError48C& er
             require(level == 0 || (mip.width == previousW * 2 && mip.height == previousH * 2),
                 DecodeKind48C::malformed, "pst.mip_order", at, "Original mip dimensions must ascend by factors of two");
             const std::size_t texels = std::size_t(mip.width) * mip.height;
-            read.range(at + 16, texels); at += 16 + texels;
+            // 24EDC0..24EDE8 reads width*height*bitsPerPixel/8. Do not
+            // fabricate a last half-byte for an unsupported odd-sized image.
+            require(kind != 0 || !(texels & 1u), DecodeKind48C::unsupported,
+                "pst.packed_odd_extent", at, "Kind 0 requires a complete packed texel pair");
+            const std::size_t sourceBytes = kind == 0 ? texels / 2 : texels;
+            read.range(at + 16, sourceBytes); at += 16 + sourceBytes;
             decoded += texels * 4 * (level + 1 == count ? 2 : 1);
             require(decoded <= std::min(limits.decoded_bytes, std::size_t(16u * 1024u * 1024u)),
                 DecodeKind48C::limit, "pst.output_limit", mip.source_header_offset, "Retained RGBA and base RRTEX exceed byte limit");
@@ -150,20 +165,33 @@ bool decodeTexture48E(const Bytes& input, Texture48E& output, DecodeError48C& er
         require(at == input.size(), DecodeKind48C::malformed, "pst.trailing_bytes", at, "Unconsumed PST suffix");
         // Original UI textures use complete640x448 levels; small original mips
         // also exist. Reject these unproved interpretations only after checking
-        // all known-kind1 extents, so truncation/corruption stays fatal.
+        // all admitted indexed extents, so truncation/corruption stays fatal.
         require(!nonPowerOffset, DecodeKind48C::unsupported, "pst.non_power_of_two", nonPowerOffset,
             "Structurally complete non-power-of-two PST needs separate layout proof");
         require(!smallOffset, DecodeKind48C::unsupported, "pst.dimension_subset", smallOffset,
             "Structurally complete mip below16 needs separate layout proof");
-        progress(hooks, "pst.rgba", 0, count); checkCancel(hooks, 1036);
+        progress(hooks, "pst.rgba", 0, count); checkCancel(hooks, firstMip);
         for (std::uint32_t level = 0; level < count; ++level) {
             auto& mip = parsed.mips[level]; mip.rgba.resize(std::size_t(mip.width) * mip.height * 4);
             for (std::uint32_t y = 0; y < mip.height; ++y) {
-                if (!(y & 63)) checkCancel(hooks, mip.source_indices_offset + std::size_t(y) * mip.width);
+                if (!(y & 63)) {
+                    const auto rowPixel = std::size_t(y) * mip.width;
+                    checkCancel(hooks, mip.source_indices_offset + (kind == 0 ? rowPixel / 2 : rowPixel));
+                }
                 for (std::uint32_t x = 0; x < mip.width; ++x) {
                     const std::size_t pixel = std::size_t(y) * mip.width + x;
-                    const unsigned index = input[mip.source_indices_offset + pixel];
-                    const unsigned entry = (index & ~24u) | ((index & 8u) << 1) | ((index & 16u) >> 1);
+                    unsigned entry;
+                    if (kind == 0) {
+                        // Original PSMT4 transfer: low nibble at x, high at
+                        // x+1. Raw8x2 palette upload + T32I4 CSM1/CPSM32/CSA0
+                        // composes to identity (retained cable50FC proof).
+                        // 24EDF0 bypasses kind1's optional upload conversion.
+                        const unsigned packed = input[mip.source_indices_offset + pixel / 2];
+                        entry = (packed >> ((pixel & 1u) * 4u)) & 15u;
+                    } else {
+                        const unsigned index = input[mip.source_indices_offset + pixel];
+                        entry = (index & ~24u) | ((index & 8u) << 1) | ((index & 16u) >> 1);
+                    }
                     for (unsigned c = 0; c < 4; ++c) mip.rgba[4 * pixel + c] = parsed.original_palette[entry][c];
                 }
             }

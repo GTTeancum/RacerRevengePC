@@ -1,0 +1,30 @@
+{
+  "baseline": "32df461 (parent supplied; no Git commands)",
+  "status": "new reconstruction, source-only, untested",
+  "files": [
+    {
+      "path": "docs/track-world-fog-reconstruction-20261010.md",
+      "before_sha256": null,
+      "after_sha256": "a79fc254c6e47c466a3fc66fbd0a2bd58d7eb0d157fd6f7b857d7c04153723d8",
+      "bytes": 4963
+    },
+    {
+      "path": "platform/linux/native/vehicle_window_gl50ds.cpp",
+      "before_sha256": "6e0481c27da4e732a936db18a284b77f6940ac0e10a052a61c187f5d839bfca1",
+      "after_sha256": "114feb710c0c29a3e4d2c80cfe47367aebd8b17e0dbce32199679d321ab5fceb",
+      "bytes": 239365
+    },
+    {
+      "path": "platform/linux/native/vehicle_window_gl50ds.h",
+      "before_sha256": "0322c57001898a2600b1148e33269a2b19c3a3210b24bca0b99d96692871e627",
+      "after_sha256": "03d5f25b8ba41697df15577bbc3d18bf414de874671b183e7f3d02f643f18236",
+      "bytes": 37165
+    },
+    {
+      "path": "tests/native/terrain_interactive_drive50du.cpp",
+      "before_sha256": "e53c563303f311aded314f6342254d8c5e444f52e0a8887405d068ccb896ed02",
+      "after_sha256": "a8d56ed8f1973df131a8353bd3cc59587ab1f328310863fb6cc5dc50442dcd54",
+      "bytes": 284043
+    }
+  ]
+}

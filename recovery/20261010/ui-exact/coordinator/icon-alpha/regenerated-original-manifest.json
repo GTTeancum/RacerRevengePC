@@ -1,0 +1,17 @@
+{
+  "status": "source-only correction over frozen Icon stage",
+  "paths": [
+    {
+      "path": "src/game/original_ui_icon_layout50kg.cpp",
+      "preimage_sha256": "bf2eccc4af8ff3903f41defe68f8668eea2cff862bacdab376565f097cfbf5d0",
+      "sha256": "b8d303cc4e51c302627e3249b3bd54da9870ce1f60c3c21371cd26af4462f37e",
+      "bytes": 3044
+    },
+    {
+      "path": "src/game/original_ui_icon_layout50kg.h",
+      "preimage_sha256": "e8b431d2383ef1cb87252aa391b537fa48970de89b05e82075393bbd5969e293",
+      "sha256": "11a676524ae9f8729f6588f5d28086835bc243564e92099d33edcbfb39e71332",
+      "bytes": 1606
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "recovery": "exact conversation payloads only",
+  "files": [
+    {
+      "path": "src/game/vehicle_live_query50eq.h",
+      "retained_pin_sha256": "40312f2921542fed003cc99a77d550e6a56008423d257d5d09b6fed0ab23f1ee",
+      "recovered_sha256": "40312f2921542fed003cc99a77d550e6a56008423d257d5d09b6fed0ab23f1ee",
+      "pin_match": true,
+      "source": "byte-complete literal source retained in author conversation",
+      "original_stage": "vegetation-raw-dispatch",
+      "original_status": "isolated source-only; never built, tested or syntax-checked by this author"
+    },
+    {
+      "path": "src/game/vegetation_raw_dispatch50jl.h",
+      "retained_pin_sha256": "85e6e6ec855e870ec076da62f08cbf7db7f5c65b68bcbb63fc4db0fe4a6b9837",
+      "recovered_sha256": "85e6e6ec855e870ec076da62f08cbf7db7f5c65b68bcbb63fc4db0fe4a6b9837",
+      "pin_match": true,
+      "source": "byte-complete literal source retained in author conversation",
+      "original_stage": "vegetation-raw-dispatch",
+      "original_status": "isolated source-only; never built, tested or syntax-checked by this author"
+    },
+    {
+      "path": "tests/native/live_terrain_probe50fr_fixture.h",
+      "retained_pin_sha256": "a9435669cd4827d5b07ba89560ee05b3c46042b5162f871290630ebf3197fd4c",
+      "recovered_sha256": "a9435669cd4827d5b07ba89560ee05b3c46042b5162f871290630ebf3197fd4c",
+      "pin_match": true,
+      "source": "byte-complete literal source retained in author conversation",
+      "original_stage": "vegetation-raw-dispatch",
+      "original_status": "isolated source-only; never built, tested or syntax-checked by this author"
+    }
+  ],
+  "unavailable": [
+    {
+      "path": "src/game/vegetation_mesh50jj.h",
+      "sha256": "4624207bf30d46340f3823dbcf65f388cba1b83dd50898feee7c68055c141d0c",
+      "reason": "Only summary and hash retained; no complete literal source body."
+    },
+    {
+      "path": "src/game/type3_raw_cursor50jn.cpp",
+      "sha256": "edc5c49e68c82948ec9556802070dc6702f4e220d579d555ff68d0b1a45d3a68",
+      "reason": "Final frozen body was not printed whole after last changes. Earlier complete draft excluded; no transformation reconstruction performed."
+    },
+    {
+      "path": "src/game/vegetation_raw_dispatch50jl.cpp",
+      "sha256": "b156b613681c1f6e43ba8ee67c9699661bccbfe109231ceea90a5b5d8c85eb83",
+      "reason": "Retained source output truncated; complete final literal payload unavailable."
+    },
+    {
+      "path": "src/game/vegetation_raw_terrain50jl.cpp",
+      "sha256": "6dbf7790a244bd3f6402d28421fa8dcb232809ef08ab275d8914ed8698cd30b5",
+      "reason": "Complete earlier body plus later fragments/transform commands retained, but no complete literal final payload; no reconstruction performed."
+    },
+    {
+      "path": "src/game/vehicle_live_query50eq.cpp",
+      "sha256": "beda14270542a70587093579e635fb3886e3b9db1df398548e620d4652b93923",
+      "reason": "Only separate partial source ranges retained; excluded from strict whole-literal recovery."
+    }
+  ],
+  "peer_files": [
+    {
+      "path": "runtime-exact/active/pre-gate-query-audit/src/game/type3_raw_cursor50jn.h",
+      "observed_sha256": "20a616942edc5553581822b011bc881f2c673a45a91e9026612cbdf1429d88c2",
+      "matches_author_frozen_pin": true,
+      "action": "hash read only; no duplicate write"
+    },
+    {
+      "path": "runtime-exact/active/pre-gate-query-audit/src/game/vegetation_raw_dispatch50jl.h",
+      "observed_sha256": "72bcac4269857ee35b4b4dd71ea318a4e80b9a2dddb28444c0d926cc21d84a19",
+      "matches_author_frozen_pin": false,
+      "action": "left unchanged; distinct author version restored separately, requires parent reconciliation"
+    }
+  ],
+  "validation": "SHA256 comparisons only. No tests, builds, syntax checks, Git, PC access, active source edits or guest execution."
+}

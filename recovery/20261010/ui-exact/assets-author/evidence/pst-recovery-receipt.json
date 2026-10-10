@@ -1,0 +1,10 @@
+{
+  "metadata_kind": "regenerated recovery verification, not original bytes",
+  "baseline_path": "/workspace/scratch/74cd1d3d7a45/remote-recovery-51c6e707-20261010T1230/source/src/assets/import_texture48e.cpp",
+  "baseline_sha256": "706b19a8d02ef6c4896801b9b5a1621f0d41a853c76e46e3109197e295434c74",
+  "baseline_commit": "51c6e707",
+  "replacement": "Complete literal decodeTexture48E from retained full tool output",
+  "recovered_sha256": "15ffdb328539309d449f940985f03a62b917f21bfab8d50b06614429508b0d2a",
+  "expected_sha256": "15ffdb328539309d449f940985f03a62b917f21bfab8d50b06614429508b0d2a",
+  "exact_match": true
+}

@@ -1,0 +1,40 @@
+{
+  "scope": "literal original source restoration only; no new implementation or software execution",
+  "paths": [
+    {
+      "original_path": "platform/linux/native/original_ui_canvas50kg.h",
+      "recovered_sha256": "5c4f344bf033e4f5a17a917339df5974947d5e901fa52e204f12a5d981e777e9",
+      "bytes": 6368,
+      "expected_sha256": null,
+      "status": "complete literal tool-output/write-payload transcription; original per-file hash unavailable; NOT hash-verified"
+    },
+    {
+      "original_path": "platform/linux/native/original_ui_draw50kg.h",
+      "recovered_sha256": "c9c99d476c53bc33e6ac272449d0bd306b1b55c72025d81fa9d5fdd3a867136e",
+      "bytes": 2154,
+      "expected_sha256": null,
+      "status": "complete literal tool-output/write-payload transcription; original per-file hash unavailable; NOT hash-verified"
+    },
+    {
+      "original_path": "src/assets/original_ui_screen_assets50kg.cpp",
+      "recovered_sha256": "7a64f1858d783c3238271b3b5d1aee8ea8d662f4db8c7616f3e86230ff5adf2b",
+      "bytes": 4432,
+      "expected_sha256": null,
+      "status": "complete literal tool-output/write-payload transcription; original per-file hash unavailable; NOT hash-verified"
+    },
+    {
+      "original_path": "src/assets/original_ui_screen_assets50kg.h",
+      "recovered_sha256": "98dfa21df336d35d324d2266099db9fd8ec3d202fa9b8bb5b2c5039736039846",
+      "bytes": 2005,
+      "expected_sha256": null,
+      "status": "complete literal tool-output/write-payload transcription; original per-file hash unavailable; NOT hash-verified"
+    },
+    {
+      "original_path": "tools/prepare_interactive_build50dv.py",
+      "recovered_sha256": "e27dce341d4f188c0548fcff78e257f1925a96dd1f0663f6a9066583b2b7dd9e",
+      "bytes": 4380,
+      "expected_sha256": null,
+      "status": "complete literal tool-output/write-payload transcription; original per-file hash unavailable; NOT hash-verified"
+    }
+  ]
+}

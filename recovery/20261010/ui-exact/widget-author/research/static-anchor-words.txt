@@ -1,0 +1,30 @@
+Read-only ELF word inspection, 2026-10-10. No guest or project execution.
+ELF: RacerRevengePC/work/native/project/disc/SLUS_202.68
+Retained ELF SHA-256: c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30
+Source mapping used throughout sibling recovery: file offset = VA - 0x100000 + 0x80.
+
+Constructor 0x29C850, relevant exact source words:
+VA        word      meaning
+0029c888  3c04bf80  lui a0,0xbf80 (binary32 -1)
+0029c88c  3c033f80  lui v1,0x3f80 (binary32 1)
+0029c8c4  ac460080  sw a2,+0x80(v0), a2=1 from29C884
+0029c8cc  ac440084  sw a0,+0x84(v0): initial hold=-1
+0029c8d4  ac400088  sw zero,+0x88(v0): initial indefinite=false
+0029c914  ac4000a0  sw zero,+0xA0(v0): initial alpha duration=0
+0029c93c  ac4000cc  sw zero,+0xCC(v0): initial lock=false
+0029c944  ac4400d0  sw a0,+0xD0(v0): initial second-phase delay=-1
+
+Internal current-alpha/scale/rotation setters (od file offsets preserved):
+19dd40 44850000 24030001 46800020 ac830184
+19dd50 03e00008 e4800174 00000000 00000000
+19dd60 24030001 ac830188 03e00008 e48c0178
+19dd70 24030001 ac83018c 03e00008 e48c017c
+
+29DCC0: mtc1 a1,f0; addiu v1,zero,1; cvt.s.w f0,f0;
+         sw v1,+0x184(a0); jr ra; swc1 f0,+0x174(a0).
+No clamp or lock gate is present in this internal setter.
+29DCE0: dirty scale=1, current scale=f12.
+29DCF0: dirty rotation=1, current rotation=f12.
+
+The outer29DBC0 setter clamps0..255 and honors lock; the update calls this
+internal29DCC0 setter directly, so it must not repeat either outer behavior.
