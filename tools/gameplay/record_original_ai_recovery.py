@@ -357,6 +357,13 @@ class Recorder:
         pending["after_target_deadline"] = now > self.deadline_ns
         pending["after_reported_boundary"] = bool(self.boundaries)
         problems = []
+        # drain() can deliver the final acknowledgment before the outer loop
+        # gets to its timeout check. Preserve the evidence, but never erase an
+        # expired deadline by clearing pending after a late acknowledgment.
+        pending["ack_deadline_exceeded"] = now >= pending["ack_deadline_ns"]
+        if pending["ack_deadline_exceeded"] and not pending.get("timeout_reported"):
+            pending["timeout_reported"] = True
+            problems.append("Complete capture acknowledgment arrived after its deadline")
         try:
             self.check_ui(ui)
             if ui.get("reason") != "capture":
