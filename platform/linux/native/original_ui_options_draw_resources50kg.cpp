@@ -257,6 +257,7 @@ const game::OriginalUiOptionsBackground50KG* OriginalUiOptionsDrawResources50KG:
 const game::OriginalUiOptionsCamera50KG* OriginalUiOptionsDrawResources50KG::camera() const noexcept {return storage_?&storage_->camera:nullptr;}
 const game::OriginalUiMainSceneOwner50KG* OriginalUiOptionsDrawResources50KG::scene() const noexcept {return storage_?&storage_->scene:nullptr;}
 game::OriginalUiMainFireOwner50KG* OriginalUiOptionsDrawResources50KG::fire() noexcept {return storage_?&storage_->fire:nullptr;}
+const game::OriginalUiMainFireOwner50KG* OriginalUiOptionsDrawResources50KG::fire() const noexcept {return storage_?&storage_->fire:nullptr;}
 const game::OriginalUiOptionsParticleRenderState50KG* OriginalUiOptionsDrawResources50KG::particleRenderState() const noexcept {return storage_?&storage_->renderState:nullptr;}
 const assets::OriginalUiMainParticleMaterial50KG* OriginalUiOptionsDrawResources50KG::particleMaterial() const noexcept {return storage_?&storage_->particle:nullptr;}
 std::uint32_t OriginalUiOptionsDrawResources50KG::particleImageIndex() const noexcept {return storage_?storage_->particleImage:unresolved;}

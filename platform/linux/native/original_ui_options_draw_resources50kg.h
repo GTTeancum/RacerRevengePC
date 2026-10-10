@@ -83,6 +83,7 @@ public:
     const game::OriginalUiOptionsCamera50KG* camera() const noexcept;
     const game::OriginalUiMainSceneOwner50KG* scene() const noexcept;
     game::OriginalUiMainFireOwner50KG* fire() noexcept;
+    const game::OriginalUiMainFireOwner50KG* fire() const noexcept;
     const game::OriginalUiOptionsParticleRenderState50KG* particleRenderState() const noexcept;
     const assets::OriginalUiMainParticleMaterial50KG* particleMaterial() const noexcept;
     std::uint32_t particleImageIndex() const noexcept;
