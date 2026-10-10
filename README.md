@@ -4,7 +4,7 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-Recovery branch based on the verified GitHub source snapshot51c6e707. Some newer source is recovered separately; the latest pre-reset game build has not been restored.
+Recovery branch based on the verified GitHub source snapshot 51c6e707. Some newer source is recovered separately; the latest pre-reset game build has not been restored.
 
 The reconstructed original-art UI renderer and material adapter pass a focused Linux C++20 compile. Original UI is still inactive pending assets and screen wiring. No new gameplay or visual validation has run. See [recovery validation](docs/recovery-validation-20261010.md).
 
