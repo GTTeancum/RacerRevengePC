@@ -106,6 +106,16 @@ bool validateMaterials(const VehicleWindowRequest50DS& request,
 }
 bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept {
     const auto& track = request.track;
+    const auto& fog = track.worldFog;
+    if (fog.enabled) {
+        if (!track.mesh || track.mode != VehicleWindowMode50DS::callerMaterialTextures ||
+            !std::isfinite(fog.start) || !std::isfinite(fog.end) ||
+            fog.start < 0.f || fog.end <= fog.start)
+            return fail(d, VehicleWindowError50DS::request, "world fog requires textured world and finite ordered range");
+        for (float value : fog.color)
+            if (!std::isfinite(value) || value < 0.f || value > 1.f)
+                return fail(d, VehicleWindowError50DS::request, "world fog color outside finite [0,1]");
+    }
     if (request.enableNativePodShadows && (!track.mesh ||
         (track.mode != VehicleWindowMode50DS::sourceVertexColors &&
          track.mode != VehicleWindowMode50DS::callerMaterialTextures)))
@@ -845,6 +855,7 @@ struct VehicleWindowGl50DS::Storage {
         Material material{};
         bool discardZeroAlpha = false;
         U sourcePass = 1, sourcePassCount = 1, projectionPass = 0;
+        bool worldFogEligible = false;
         U animation = assets::unresolvedMaterialTexture50EA;
     };
     struct TrackChunk {
@@ -946,6 +957,9 @@ struct VehicleWindowGl50DS::Storage {
     I trackUseTextureUniform = -1, trackImageUniform = -1;
     I trackDiscardZeroAlphaUniform = -1, trackUseSourceNormalsUniform = -1, trackProjectionPassUniform = -1;
     I trackEffectModeUniform = -1, trackAlphaScaleUniform = -1, trackUnlitUniform = -1;
+    I worldFogEnabledUniform = -1, worldFogCameraUniform = -1;
+    I worldFogColorUniform = -1, worldFogRangeUniform = -1;
+    float worldFogCamera[3]{};
     I trackIndexCount = 0;
     NativePodShadow50HM podShadows[nativeShadowRacerCount][3]{};
     float podShadowOpponentBounds[maxVehicleWindowOpponents50DS][4]{};
@@ -1059,6 +1073,25 @@ struct VehicleWindowGl50DS::Storage {
             target.sourcePass = source.sourcePass;
             target.sourcePassCount = source.sourcePassCount;
             target.projectionPass = source.projectionPass;
+            // All source ranges/pass continuity were validated before creation.
+            // For alpha-over pairs, fogging both colors with the same factor
+            // yields fog(alpha*layer + (1-alpha)*base), without fogging alpha.
+            target.worldFogEligible = source.sourcePassCount == 1 &&
+                source.material.blend == VehicleWindowBlend50DS::opaque && source.material.depthWrite;
+            if (source.sourcePassCount == 2) {
+                const U first = i - (source.sourcePass - 1);
+                const auto& base = input.spans[first];
+                const auto& layer = input.spans[first + 1];
+                target.worldFogEligible = base.projectionPass == 1 && layer.projectionPass == 2 &&
+                    base.sourcePass == 1 && layer.sourcePass == 2 &&
+                    base.material.mode == VehicleWindowMaterialMode50DS::requiredTexture &&
+                    layer.material.mode == VehicleWindowMaterialMode50DS::requiredTexture &&
+                    base.material.blend == VehicleWindowBlend50DS::opaque && base.material.depthWrite &&
+                    layer.material.blend == VehicleWindowBlend50DS::sourceAlpha &&
+                    !base.material.fixedBlendAlpha && !layer.material.fixedBlendAlpha &&
+                    base.material.unlit && layer.material.unlit &&
+                    !base.discardZeroAlpha && !layer.discardZeroAlpha;
+            }
             target.material.textureIndex = source.material.textureIndex;
             target.material.policy = source.material;
             target.material.name = source.material.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
@@ -1521,6 +1554,10 @@ in vec4 rrColor;
 in vec3 rrWorldNormal;
 in vec4 rrProjectedUv;
 uniform int projectionPass;
+uniform int worldFogEnabled;
+uniform vec4 worldFogCamera;
+uniform vec4 worldFogRange;
+out float trackFogAmount;
 uniform mat4 worldViewProjection;
 out vec3 trackWorldNormal;
 out vec3 trackWorldPosition;
@@ -1529,6 +1566,10 @@ out vec2 trackSourceUv;
 void main() {
     gl_Position = vec4(rrPosition, 1.0) * worldViewProjection;
     trackWorldPosition = rrPosition;
+    // Native radial world distance per vertex. No clip-W/perspective scale.
+    trackFogAmount = worldFogEnabled != 0 ? clamp(
+        (length(rrPosition - worldFogCamera.xyz) - worldFogRange.x) /
+        (worldFogRange.y - worldFogRange.x), 0.0, 1.0) : 0.0;
     trackWorldNormal = rrWorldNormal;
     trackSourceColor = rrColor;
     trackSourceUv = projectionPass == 1 ? rrProjectedUv.xy :
@@ -1537,6 +1578,9 @@ void main() {
 )GLSL";
         constexpr const char* fragmentSource = R"GLSL(#version 150 core
 in vec3 trackWorldPosition;
+in float trackFogAmount;
+uniform int worldFogEnabled;
+uniform vec4 worldFogColor;
 in vec3 trackWorldNormal;
 in vec4 trackSourceColor;
 in vec2 trackSourceUv;
@@ -1582,6 +1626,7 @@ void main() {
     }
     color *= rrNativePodShadow(trackWorldPosition, normal);
     if (effectMode == 2) color *= alphaScale;
+    if (worldFogEnabled != 0) color = mix(color, worldFogColor.rgb, trackFogAmount);
     viewerOutput = vec4(color, effectMode == 1 ? clamp(alpha * alphaScale, 0.0, 1.0) : 1.0);
 }
 )GLSL";
@@ -1613,6 +1658,10 @@ void main() {
             return fail(*diagnostic, VehicleWindowError50DS::shader, "source-color track program link failed");
         }
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::uniforms;
+        worldFogEnabledUniform = shaderGl.getUniformLocation(trackProgram, "worldFogEnabled");
+        worldFogCameraUniform = shaderGl.getUniformLocation(trackProgram, "worldFogCamera");
+        worldFogColorUniform = shaderGl.getUniformLocation(trackProgram, "worldFogColor");
+        worldFogRangeUniform = shaderGl.getUniformLocation(trackProgram, "worldFogRange");
         trackMatrixUniform = shaderGl.getUniformLocation(trackProgram, "worldViewProjection");
         trackColorScaleUniform = shaderGl.getUniformLocation(trackProgram, "vertexColorScale");
         trackUseTextureUniform = shaderGl.getUniformLocation(trackProgram, "useTexture");
@@ -1642,7 +1691,9 @@ void main() {
                 return fail(*diagnostic, VehicleWindowError50DS::shader, "native opponent shadow bounds uniform missing");
         }
         if (!check("query source-color track uniforms")) return false;
-        if (trackMatrixUniform < 0 || trackColorScaleUniform < 0 ||
+        if (worldFogEnabledUniform < 0 || worldFogCameraUniform < 0 ||
+            worldFogColorUniform < 0 || worldFogRangeUniform < 0 ||
+            trackMatrixUniform < 0 || trackColorScaleUniform < 0 ||
             trackUseTextureUniform < 0 || trackImageUniform < 0 || trackDiscardZeroAlphaUniform < 0 ||
             trackEffectModeUniform < 0 || trackAlphaScaleUniform < 0 || trackUnlitUniform < 0 ||
             trackUseSourceNormalsUniform < 0 || trackProjectionPassUniform < 0 || nativeShadowEnabledUniform < 0 || nativeShadowOpponentCountUniform < 0)
@@ -2735,6 +2786,11 @@ void main() { viewerOutput = hudColor; }
         }
     }
     void resetPodState() noexcept {
+        // Explicitly clear the shared world shader before any pod/sky/UI path.
+        if (trackProgram) {
+            gl.useProgram(trackProgram);
+            gl.uniform1i(worldFogEnabledUniform, 0);
+        }
         gl.disable(0x0BE2); gl.enable(0x0B71); gl.depthMask(1); gl.depthFunc(0x0201);
         gl.useProgram(shader->program());
         const auto& u = shader->uniforms();
@@ -2775,6 +2831,11 @@ void main() { viewerOutput = hudColor; }
             if (s.request.track.mode == VehicleWindowMode50DS::sourceVertexColors ||
                 s.request.track.mode == VehicleWindowMode50DS::callerMaterialTextures) {
                 s.gl.useProgram(s.trackProgram);
+                const auto& fog = s.request.track.worldFog;
+                s.gl.uniform1i(s.worldFogEnabledUniform, 0);
+                s.gl.uniform4f(s.worldFogCameraUniform, s.worldFogCamera[0], s.worldFogCamera[1], s.worldFogCamera[2], 0.f);
+                s.gl.uniform4f(s.worldFogColorUniform, fog.color[0], fog.color[1], fog.color[2], 1.f);
+                s.gl.uniform4f(s.worldFogRangeUniform, fog.start, fog.end, 0.f, 0.f);
                 s.gl.uniformMatrix4fv(s.trackMatrixUniform, 1, 0, s.matrix);
                 s.gl.uniform1f(s.trackColorScaleUniform, s.request.track.vertexColorScale);
                 s.gl.uniform1i(s.trackUseTextureUniform, 0);
@@ -2835,6 +2896,8 @@ void main() { viewerOutput = hudColor; }
                         s.gl.bindTexture(texture2D, textureName);
                         s.gl.uniform1i(s.trackUseTextureUniform, span.material.name ? 1 : 0);
                         s.gl.uniform1i(s.trackDiscardZeroAlphaUniform, span.discardZeroAlpha ? 1 : 0);
+                        s.gl.uniform1i(s.worldFogEnabledUniform,
+                            s.request.track.worldFog.enabled && span.worldFogEligible ? 1 : 0);
                         s.configureBlend(span.material.policy);
                         // Coplanar authored passes must survive the first pass depth.
                         // Restore the historical LESS rule for every single-pass draw.
@@ -2874,6 +2937,7 @@ void main() { viewerOutput = hudColor; }
     bool drawDynamicWorld(U bank, bool transparent) noexcept {
         if (!dynamicWorldSpanCount) return true;
         gl.useProgram(trackProgram);
+        gl.uniform1i(worldFogEnabledUniform, 0);
         gl.uniformMatrix4fv(trackMatrixUniform, 1, 0, matrix);
         gl.uniform1f(trackColorScaleUniform, request.dynamicWorld.vertexColorScale);
         gl.uniform1i(trackImageUniform, 0);
@@ -3349,6 +3413,13 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     for (U i = 0; i < 4; ++i)
         if (!std::isfinite(frame.clearRgba[i]) || frame.clearRgba[i] < 0 || frame.clearRgba[i] > 1)
             return fail(d, VehicleWindowError50DS::frame, "clear color outside finite [0,1]");
+    if (s.request.track.worldFog.enabled) {
+        if (!frame.worldFogCamera)
+            return fail(d, VehicleWindowError50DS::frame, "world fog requires explicit camera position");
+        for (U i = 0; i < 3; ++i)
+            if (!std::isfinite(frame.worldFogCamera[i]))
+                return fail(d, VehicleWindowError50DS::frame, "nonfinite world fog camera");
+    }
     if (bool(s.skyIndexCount) != bool(frame.skyWorldViewProjection))
         return fail(d, VehicleWindowError50DS::frame, "sky matrix presence must match authored sky request");
     if (frame.skyWorldViewProjection)
@@ -3472,6 +3543,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     }
     if (frame.skyWorldViewProjection)
         std::memcpy(s.skyMatrix, frame.skyWorldViewProjection, sizeof(s.skyMatrix));
+    if (s.request.track.worldFog.enabled)
+        std::memcpy(s.worldFogCamera, frame.worldFogCamera, sizeof(s.worldFogCamera));
     std::memcpy(s.matrix, frame.worldViewProjection, sizeof(s.matrix));
     std::memcpy(s.clearRgba, frame.clearRgba, sizeof(s.clearRgba));
     s.width = frame.width; s.height = frame.height;

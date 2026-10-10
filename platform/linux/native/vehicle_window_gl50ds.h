@@ -98,6 +98,13 @@ struct VehicleWindowTrackSpan50DS {
     // 0 retains authored mesh UV; 1/2 selects the source-derived sidecar XY/ZW.
     std::uint32_t projectionPass = 0;
 };
+// Newly reconstructed native display policy, not recovered shader parity.
+// Disabled unless the caller explicitly accepts the distance-source uncertainty.
+struct VehicleWindowWorldFog50DS {
+    bool enabled = false;
+    float color[3]{};
+    float start = 0.f, end = 1.f;
+};
 struct VehicleWindowTrack50DS {
     // Optional actual visual triangle mesh, already in world space. Borrowed
     // unchanged only during synchronous create(); success owns a GPU copy.
@@ -155,6 +162,9 @@ struct VehicleWindowTrack50DS {
     const assets::TrackProjectedUv* sourceProjectionUvs = nullptr;
     std::uint32_t sourceProjectionCount = 0;
     std::size_t maximumProjectionBytes = 0;
+    // Static-world opaque depth-writing surfaces and admitted projected pairs
+    // only. Does not apply to sky, pod effects, UI or dynamic-world owners.
+    VehicleWindowWorldFog50DS worldFog{};
 };
 // Narrow mutable world path for caller-animated authentic scene owners. The
 // aggregate retains one fixed source topology/material table across the session.
@@ -418,6 +428,9 @@ struct VehicleWindowFrame50DS {
     // always binds a genuine already-published image; no timer is advanced here.
     const std::uint32_t* trackAnimationFrames = nullptr;
     std::uint32_t trackAnimationFrameCount = 0;
+    // Required iff track.worldFog.enabled. Three finite world-space camera
+    // coordinates, copied during submit. Never derived from clip-space depth.
+    const float* worldFogCamera = nullptr;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,
