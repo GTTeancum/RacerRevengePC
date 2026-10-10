@@ -1,6 +1,6 @@
 # Batched racer observation
 
-Status: source-reviewed and centrally integrated; uncompiled and untested. This change replaces redundant camera-slot restores between existing serial observation callbacks with one bounded bank lease. It is based on the all-eight original-AI/lighting/route source that passed the preceding short GC run. Performance has not been measured after this change.
+Status: source-reviewed and centrally integrated; uncompiled and untested. The later [typed scalar-read change](typed-racer-observation.md) replaces these four observation call sites while retaining the reusable batching primitive and this historical cost comparison. This change replaces redundant camera-slot restores between existing serial observation callbacks with one bounded bank lease. It is based on the all-eight original-AI/lighting/route source that passed the preceding short GC run. Performance has not been measured after this change.
 
 `Bank::visitMany` preserves the supplied callback order; `visitAll` supplies ordinal order. The same full-fleet readiness, dynamic-peer, dynamic-actor and original-AI observation sweeps remain. Callbacks copy current owners into external observations and retain no arena pointers. False stops immediately, exceptions propagate, and the scope guard saves the current slot and restores camera slot zero. Nested visits remain disallowed during the lease.
 

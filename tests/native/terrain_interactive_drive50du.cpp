@@ -1969,45 +1969,48 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Original racers have distinct immutable resource owners and share only the
  // serial execution arena, never tuning, poses, contacts or progression histories.
  native_racer50HN::Bank racerBank;
+ native_racer50IZ::FrameReads racerFrameReads;
+ native_ai50IV::ObservationReads originalAiReads;
  auto captureDynamicBeforeFrame=[&](std::size_t slot){
   if(!dynamicContactEnabled)return;
   native_dynamic_contact50IW::Diagnostic diagnostic{};
-  if(!dynamicRegistry.captureBeforeFrame(racerBank,s,slot,dynamicPeers,diagnostic))
+  if(!dynamicRegistry.captureBeforeFrame(racerBank,racerFrameReads,slot,dynamicPeers,diagnostic))
    dynamicBoundary(diagnostic.sourcePC,"every dynamic peer must be active and Ready");
   dynamicSelfSlot=slot;
-  racerBank.visitAll([&](std::size_t actor){
-   dynamicActors.values[actor]={s.fields.vehicle3C,s.fields.vehicle58,dynamicRacer60[actor],
-       lapContinuity.state.vehicleCC8,static_cast<std::uint32_t>(originalAiSession.rank[actor].placeCCC),s.fields.impactFlagsCD8};
+  for(std::size_t actor=0;actor<racerBank.count();++actor){
+   dynamicActors.values[actor]={racerBank.read(actor,racerFrameReads.vehicle3C),
+       racerBank.read(actor,racerFrameReads.vehicle58),dynamicRacer60[actor],
+       racerBank.read(actor,originalAiReads.lapCC8),
+       static_cast<std::uint32_t>(originalAiSession.rank[actor].placeCCC),
+       racerBank.read(actor,racerFrameReads.flagsCD8)};
    dynamicActors.bound[actor]=true;
-   return true;
-  });
+  }
  };
  auto requireOriginalAiFleetReady=[&](){
   // Every actual racer is an input to the joined source manager. A failed
   // native frame is retained by Bank::visit, but is not a manager observation.
   // Check the entire fleet before any observation, timing or rank mutation;
   // never synthesize Ready or silently remove a failed racer from the field.
-  racerBank.visitAll([&](std::size_t slot){
+  for(std::size_t slot=0;slot<racerBank.count();++slot){
    const bool active=racerBank.active(slot);
-   if(active&&s.phase==VehicleFramePhase49W::Ready&&
-      (!allAiEnabled||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV&&
-         originalAi.initialized&&originalAi.managerIndexFE0==slot)))return true;
+   if(active&&racerBank.read(slot,racerFrameReads.phase)==VehicleFramePhase49W::Ready&&
+      (!allAiEnabled||(racerBank.read(slot,racerFrameReads.vehicle58)==1u&&
+         racerBank.read(slot,racerFrameReads.aiOwnersBound)&&
+         racerBank.read(slot,originalAiReads.initialized)&&
+         racerBank.read(slot,originalAiReads.managerIndexFE0)==slot)))continue;
    std::cerr<<"ORIGINAL AI world boundary: slot="<<slot<<" active="<<active
-       <<" phase="<<static_cast<unsigned>(s.phase)<<" vehicle58="<<s.fields.vehicle58
-       <<" ai_source_boundary="<<std::hex<<originalAiReceipt.sourceBoundary
-       <<" frame_source_stage="<<x.diagnostic.sourceStage<<std::dec
+       <<" phase="<<static_cast<unsigned>(racerBank.read(slot,racerFrameReads.phase))
+       <<" vehicle58="<<racerBank.read(slot,racerFrameReads.vehicle58)
+       <<" ai_source_boundary="<<std::hex<<racerBank.read(slot,originalAiReads.sourceBoundary)
+       <<" frame_source_stage="<<racerBank.read(slot,originalAiReads.frameSourceStage)<<std::dec
        <<"; native partial state retained; manager was not advanced.\n";
    require50DU(false,"original AI requires every actual racer active and Ready");
-   return false; // require50DU throws; preserve the batch's early-stop contract.
-  });
+  }
  };
  auto observeOriginalAiFleet=[&](){
   requireOriginalAiFleetReady();
-  racerBank.visitAll([&](std::size_t slot){
-   native_ai50IV::observe(originalAiSession,slot,s,x.bindings,navigationProgress,
-       lapContinuity.state.vehicleCC8,lapContinuity.timing.wordCD4,*navigationMap,originalAiMapMetadata);
-   return true;
-  });
+  for(std::size_t slot=0;slot<racerBank.count();++slot)
+   originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,*navigationMap,originalAiMapMetadata);
  };
  auto rankOriginalAiFleet=[&](){
   observeOriginalAiFleet();
@@ -2184,6 +2187,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
   racerBank.seal(raceRacerCount);
+  if(originalAiEnabled){
+   // Handles bind registered locations only. Actual values are read afresh
+   // after every native step; no per-world peer cache or arena swap is used.
+   racerFrameReads.bind(racerBank,s);
+   originalAiReads.bind(racerBank,x.bindings,navigationProgress,
+       lapContinuity.state.vehicleCC8,lapContinuity.timing.wordCD4,
+       originalAi,originalAiReceipt,x.diagnostic);
+  }
   // Alternate camera selections and every all-AI slot use their actual
   // original-resource cold path before any tick. Only the legacy mixed POD01
   // selection retains the fixture startup. No live identity is flipped.

@@ -33,6 +33,45 @@ public:
     Bank()=default;
     Bank(const Bank&)=delete;
     Bank& operator=(const Bank&)=delete;
+    // Cold-bound scalar subrange of one registered owner span. No caller may
+    // construct an offset, borrow a snapshot pointer, or read shared noise.
+    template<class T> class ReadHandle {
+        static_assert(std::is_arithmetic_v<T>||std::is_enum_v<T>,
+            "Read handles copy only scalar/enum values, never pointers or owner records");
+        friend class Bank;
+        const Bank* owner_=nullptr;
+        const unsigned char* live_=nullptr;
+        std::size_t offset_=0;
+    public:
+        ReadHandle()=default;
+    };
+    template<class T> ReadHandle<T> bindRead(const T& value) const {
+        if(!sealed_||visiting_||readBlocked_)
+            throw std::runtime_error("racer read binding requires a sealed idle bank");
+        const auto address=reinterpret_cast<std::uintptr_t>(&value);
+        for(const auto& span:spans_){
+            const auto first=reinterpret_cast<std::uintptr_t>(span.address);
+            if(address<first)continue;
+            const auto within=address-first;
+            if(within>span.bytes||sizeof(T)>span.bytes-within)continue;
+            ReadHandle<T> handle;
+            handle.owner_=this;
+            handle.live_=reinterpret_cast<const unsigned char*>(&value);
+            handle.offset_=span.offset+within;
+            return handle;
+        }
+        throw std::runtime_error("racer read field is not within one registered owner span");
+    }
+    template<class T> T read(std::size_t index,const ReadHandle<T>& handle) const {
+        if(!sealed_||visiting_||readBlocked_||index>=count_||handle.owner_!=this||!handle.live_)
+            throw std::runtime_error("invalid or leased native racer scalar read");
+        T value;
+        // Slot0 may have advanced since its last save. Every nonzero slot is
+        // saved at visit/step exit; reads never run inside either arena lease.
+        const auto* source=index?slots_[index].bytes.data()+handle.offset_:handle.live_;
+        std::memcpy(&value,source,sizeof value);
+        return value;
+    }
     // Cold registration only. The rejection of overlapping spans catches an
     // accidental duplicate registration of a parent record and one of its fields.
     template<class T> void owner(T& value) {
@@ -66,7 +105,17 @@ public:
     template<class F> decltype(auto) visit(std::size_t index,F&& operation) {
         if(!sealed_||index>=count_||visiting_)
             throw std::runtime_error("invalid or nested native racer visit");
-        if(!index)return std::forward<F>(operation)();
+        if(!index){
+            // Legacy slot0 visits do not take the swapping lease. Keep their
+            // existing nesting semantics, but reject scalar observations from
+            // inside the callback just as for a nonzero/batched lease.
+            const bool previous=readBlocked_;readBlocked_=true;
+            struct ReadBlock {
+                Bank& bank;bool previous;
+                ~ReadBlock(){bank.readBlocked_=previous;}
+            } readBlock{*this,previous};
+            return std::forward<F>(operation)();
+        }
         save(0);restore(index);visiting_=true;
         struct Restore {
             Bank& bank;std::size_t index;
@@ -135,7 +184,7 @@ private:
     std::vector<Span> spans_;
     std::array<Slot,maximumRacers> slots_{};
     std::size_t bytes_=0,count_=0;
-    bool sealed_=false,visiting_=false;
+    bool sealed_=false,visiting_=false,readBlocked_=false;
     void add(void* address,std::size_t bytes) {
         if(sealed_||!address||!bytes||bytes>std::numeric_limits<std::size_t>::max()-bytes_)
             throw std::runtime_error("invalid native racer owner span");

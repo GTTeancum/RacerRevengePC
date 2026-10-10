@@ -3,6 +3,7 @@
 // cross-racer observations. This registry is independent of the bank's reused
 // execution arena addresses. It does not invent original all-body scheduling.
 #include "native_racer_bank50hn_fixture.h"
+#include "native_racer_observation50iz_fixture.h"
 #include "../../src/game/dynamic_impact50iw.h"
 #include "../../src/game/vehicle_frame49w.h"
 #include <array>
@@ -132,9 +133,11 @@ public:
     // invalid: a prior human frame may have changed its persistent D34.state3.
     // Self arithmetic inputs must be projected anew from the current live frame
     // at223030, not from this pre-frame copy. Snapshot contains no arena pointer.
+    // The read handles bind once after bank seal, but all values below come
+    // from the current live slot0 or latest saved peer bytes on every call.
     // On failure destination and successful-observation serial are unchanged.
-    bool captureBeforeFrame(native_racer50HN::Bank& bank,
-        const VehicleFrameState49W& live,std::size_t selfBankSlot,
+    bool captureBeforeFrame(const native_racer50HN::Bank& bank,
+        const native_racer50IZ::FrameReads& live,std::size_t selfBankSlot,
         Snapshot& destination,Diagnostic& diagnostic) {
         diagnostic={};
         const auto reject=[&](Error error,std::uint32_t pc,std::size_t slot,
@@ -149,29 +152,23 @@ public:
         Snapshot staged{};staged.total30=static_cast<std::int32_t>(count_);
         staged.humanCount34=humanCount_;staged.selfManagerIndex=indexBySlot_[selfBankSlot];
         staged.selfBankSlot=selfBankSlot;
-        std::array<std::size_t,maximumRacers> sourceOrder{};
-        for(std::size_t index=0;index<count_;++index)
-            sourceOrder[index]=bindings_[index].bankSlot;
-        const bool observed=bank.visitMany(sourceOrder.data(),count_,[&](std::size_t slot){
-            const auto index=static_cast<std::size_t>(indexBySlot_[slot]);
+        for(std::size_t index=0;index<count_;++index){
+            const auto slot=bindings_[index].bankSlot;
             if(!bank.active(slot))return reject(Error::Inactive,0x1af330u,slot,static_cast<std::int32_t>(index));
-            if(live.phase!=VehicleFramePhase49W::Ready)
+            if(bank.read(slot,live.phase)!=VehicleFramePhase49W::Ready)
                 return reject(Error::Phase,0x219d98u,slot,static_cast<std::int32_t>(index));
-            if(!live.fields.dynamicOwnersBound50IW)
+            if(!bank.read(slot,live.dynamicOwnersBound))
                 return reject(Error::Owners,0x223110u,slot,static_cast<std::int32_t>(index));
-            const auto& main=live.bodies.main;
             auto& peer=staged.peers[index];
             peer.present=true;peer.managerIndex=static_cast<std::int32_t>(index);
             peer.mainBody340=bindings_[index].mainBody340;
-            peer.vehicle40=main.vehicleState40;peer.flagsCD8=live.fields.impactFlagsCD8;
-            peer.vehicle58=live.fields.vehicle58;
-            peer.partnerStateD34=live.impactSupplement.partnerState;
-            peer.smoothedChannel0D28=main.controls.bound.control.shaping.smoothedChannel0D28;
-            peer.worldAngularVelocityA4=main.components.root.worldAngularVelocityA0.v[1];
-            peer.cachedSpeed34=main.cachedSpeed34;peer.liveInputsBound=true;
-            return true;
-        });
-        if(!observed)return false;
+            peer.vehicle40=bank.read(slot,live.vehicle40);peer.flagsCD8=bank.read(slot,live.flagsCD8);
+            peer.vehicle58=bank.read(slot,live.vehicle58);
+            peer.partnerStateD34=bank.read(slot,live.partnerStateD34);
+            peer.smoothedChannel0D28=bank.read(slot,live.smoothedChannel0D28);
+            peer.worldAngularVelocityA4=bank.read(slot,live.worldAngularVelocityA4);
+            peer.cachedSpeed34=bank.read(slot,live.cachedSpeed34);peer.liveInputsBound=true;
+        }
         staged.observationSerial=observationSerial_+1;staged.bound=true;
         destination=staged;observationSerial_=staged.observationSerial;return true;
     }

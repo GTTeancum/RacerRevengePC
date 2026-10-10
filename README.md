@@ -4,7 +4,7 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-The current Linux WIP adds a source-reviewed batching optimization for racer observations. It is uncompiled and untested; speedup is unmeasured. The preceding source passed a bounded GC run with all eight original-AI racers, zero HOST/controller input, and visible source-normal lighting. See [candidate scope](docs/native-ai-lighting-integration.md).
+The current Linux WIP adds source-reviewed batching and fresh scalar-read optimizations for racer observations. It is uncompiled and untested; speedup is unmeasured. The preceding source passed a bounded GC run with all eight original-AI racers, zero HOST/controller input, and visible source-normal lighting. See [candidate scope](docs/native-ai-lighting-integration.md).
 
 The preceding run remained in startup state 4 and completed no lap. Its video is an incomplete silent prefix. Full-course GC driving, original scheduler/shader parity and real-time performance remain unfinished. See [current validation](docs/current-validation.md).
 
