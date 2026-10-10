@@ -85,12 +85,13 @@ inline bool position(const SceneGraph49P& g,I i,float (&p)[4]) noexcept {
 }
 inline void transform(const BodyMatrix48G& matrix,const float (&p)[4],
     float (&out)[4],Math& m,std::uint32_t pc) noexcept {
-    for(unsigned c=0;c<3;++c){
-        float a=m.mul(matrix.v[c],p[0],pc);
-        a=m.add(a,m.mul(matrix.v[4+c],p[1],pc+4),pc+4);
-        a=m.add(a,m.mul(matrix.v[8+c],p[2],pc+8),pc+8);
-        out[c]=m.add(a,matrix.v[12+c],pc+12);
-    }
+    float a[3];
+    // Each source vector operation covers its XYZ lanes before the next
+    // operation. Keep that group order for the first arithmetic boundary.
+    for(unsigned c=0;c<3;++c)a[c]=m.mul(matrix.v[c],p[0],pc);
+    for(unsigned c=0;c<3;++c)a[c]=m.add(a[c],m.mul(matrix.v[4+c],p[1],pc+4),pc+4);
+    for(unsigned c=0;c<3;++c)a[c]=m.add(a[c],m.mul(matrix.v[8+c],p[2],pc+8),pc+8);
+    for(unsigned c=0;c<3;++c)out[c]=m.add(a[c],matrix.v[12+c],pc+12);
     out[3]=1.f;
 }
 inline void inversePoint(const BodyMatrix48G& source,const float (&p)[4],
@@ -100,16 +101,20 @@ inline void inversePoint(const BodyMatrix48G& source,const float (&p)[4],
     // transform translation before the point. Do not reduce to R*(p-T).
     BodyMatrix48G inverse=source;
     for(unsigned row=0;row<3;++row)for(unsigned c=0;c<4;++c)
-        inverse.v[4*row+c]=(c==3||c==row)?
-            m.add(source.v[4*row+c],0.f,0x28be3cu+row*4):
-            m.add(0.f,source.v[4*c+row],0x28be48u);
-    for(unsigned c=0;c<3;++c){
-        float a=m.mul(inverse.v[c],source.v[12],0x28be6cu);
-        a=m.add(a,m.mul(inverse.v[4+c],source.v[13],0x28be70u),0x28be70u);
-        a=m.add(a,m.mul(inverse.v[8+c],source.v[14],0x28be74u),0x28be74u);
-        inverse.v[12+c]=m.mul(a,m.sub(0.f,1.f,0x28be7cu),0x28be80u);
-    }
-    inverse.v[15]=m.add(source.v[15],0.f,0x28be68u);
+        inverse.v[4*row+c]=m.add(source.v[4*row+c],0.f,0x28be3cu+row*4);
+    inverse.v[4]=m.add(0.f,source.v[1],0x28be48u);
+    inverse.v[8]=m.add(0.f,source.v[2],0x28be4cu);
+    inverse.v[9]=m.add(0.f,source.v[6],0x28be50u);
+    inverse.v[1]=m.add(0.f,source.v[4],0x28be54u);
+    inverse.v[2]=m.add(0.f,source.v[8],0x28be58u);
+    inverse.v[6]=m.add(0.f,source.v[9],0x28be5cu);
+    for(unsigned c=0;c<4;++c)inverse.v[12+c]=m.add(source.v[12+c],0.f,0x28be68u);
+    float a[3];
+    for(unsigned c=0;c<3;++c)a[c]=m.mul(inverse.v[c],source.v[12],0x28be6cu);
+    for(unsigned c=0;c<3;++c)a[c]=m.add(a[c],m.mul(inverse.v[4+c],source.v[13],0x28be70u),0x28be70u);
+    for(unsigned c=0;c<3;++c)a[c]=m.add(a[c],m.mul(inverse.v[8+c],source.v[14],0x28be74u),0x28be74u);
+    const auto negativeOne=m.sub(0.f,1.f,0x28be7cu);
+    for(unsigned c=0;c<3;++c)inverse.v[12+c]=m.mul(a[c],negativeOne,0x28be80u);
     transform(inverse,p,out,m,0x28beb0u);
 }
 struct Builder {
@@ -173,8 +178,11 @@ inline WaterVehicleEffectResult50JC projectWaterVehicleEffects50JC(
     SceneGraph49P staged{w.nextNodes,graph.count};next.graphRead=true;next.graphCount=graph.count;
     float current[4];if(!position(staged,in.chariot1B4.node,current))return result(Status::Graph,0x22a668u);
     Math m;float delta[4]={0,0,0,1};
-    for(unsigned c=0;c<3;++c)delta[c]=m.sub(in.previousBE0[c],current[c],0x22a698u+c*4);
-    float squared=m.add(m.mul(delta[0],delta[0],0x22a6c8u),m.mul(delta[1],delta[1],0x22a6ccu),0x22a6d0u);
+    constexpr std::uint32_t deltaPC[3]{0x22a698u,0x22a69cu,0x22a6a4u};
+    for(unsigned c=0;c<3;++c)delta[c]=m.sub(in.previousBE0[c],current[c],deltaPC[c]);
+    const auto squareX=m.mul(delta[0],delta[0],0x22a6c8u);
+    const auto squareY=m.mul(delta[1],delta[1],0x22a6ccu);
+    float squared=m.add(squareX,squareY,0x22a6d0u);
     squared=m.add(squared,m.mul(delta[2],delta[2],0x22a6d4u),0x22a6d4u);
     volatile float root=std::sqrt(squared);const float distance=m.read(root,0x22a6d8u);
     if(m.badPC)return result(Status::Arithmetic,m.badPC);
@@ -187,7 +195,11 @@ inline WaterVehicleEffectResult50JC projectWaterVehicleEffects50JC(
     if(*in.vehicle58==0u){
         if(!in.query348WaterY164)return result(Status::Owner,0x22a788u);
         float anchor[4]={0,0,0,1};
-        for(unsigned c=0;c<3;++c)anchor[c]=m.add(current[c],m.mul(6.f,delta[c],0x22a730u+c*4),0x22a75cu+c*8);
+        constexpr std::uint32_t scalePC[3]{0x22a730u,0x22a734u,0x22a73cu};
+        constexpr std::uint32_t addPC[3]{0x22a75cu,0x22a764u,0x22a76cu};
+        float scaled[3];
+        for(unsigned c=0;c<3;++c)scaled[c]=m.mul(6.f,delta[c],scalePC[c]);
+        for(unsigned c=0;c<3;++c)anchor[c]=m.add(current[c],scaled[c],addPC[c]);
         anchor[1]=*in.query348WaterY164;
         b.add(WaterVehicleActionKind50JC::Anchor2B1690,0x22a794u,in.waterOwner334,anchor);
     }
@@ -202,7 +214,11 @@ inline WaterVehicleEffectResult50JC projectWaterVehicleEffects50JC(
         if(m.badPC)return result(Status::Arithmetic,m.badPC);
         if(iterations<1||iterations>15)return result(Status::Unsupported,0x22a80cu);
         const float reciprocal=m.div(1.f,m.integer(iterations,0x22a814u),0x22a818u);
-        for(unsigned c=0;c<3;++c)step[c]=m.mul(-3.f,m.mul(delta[c],reciprocal,0x22a81cu+c*4),0x22a844u+c*8);
+        constexpr std::uint32_t dividePC[3]{0x22a81cu,0x22a820u,0x22a828u};
+        constexpr std::uint32_t scalePC[3]{0x22a844u,0x22a84cu,0x22a854u};
+        float divided[3];
+        for(unsigned c=0;c<3;++c)divided[c]=m.mul(delta[c],reciprocal,dividePC[c]);
+        for(unsigned c=0;c<3;++c)step[c]=m.mul(-3.f,divided[c],scalePC[c]);
         step[3]=1.f;
     }
     float amplitude=m.add(0.f,m.div(m.mul(m.sub(speed,0.f,0x22a874u),3.f,0x22a884u),300.f,0x22a894u),0x22a89cu);
@@ -241,11 +257,20 @@ inline WaterVehicleEffectResult50JC projectWaterVehicleEffects50JC(
         local[0]=side?m.add(local[0],15.f,0x22ac78u):m.sub(local[0],15.f,0x22aa24u);
         float forcePoint[4];transform(matrix,local,forcePoint,m,0x28bb7cu);
         for(std::int32_t iteration=0;iteration<iterations;++iteration){
-            for(unsigned c=0;c<3;++c)forcePoint[c]=m.sub(forcePoint[c],step[c],(side?0x22acacu:0x22aa58u)+c*16);
+            constexpr std::uint32_t subtractPC[2][3]{{0x22aa58u,0x22aa64u,0x22aa70u},
+                {0x22acacu,0x22acb8u,0x22acc4u}};
+            for(unsigned c=0;c<3;++c)forcePoint[c]=m.sub(forcePoint[c],step[c],subtractPC[side][c]);
             forcePoint[1]=*in.query348WaterY164;
             b.force(side?0x22acdcu:0x22aa88u,in.waterOwner334,forcePoint,amplitude);
             float negative[4]={0,0,0,1};
-            for(unsigned c=0;c<3;++c)negative[c]=m.add(forcePoint[c],m.mul(10.f,delta[c],side?0x22acfcu:0x22aaa8u),side?0x22ad34u:0x22aae0u);
+            constexpr std::uint32_t scalePC[2][3]{{0x22aaa8u,0x22aac0u,0x22aab8u},
+                {0x22acfcu,0x22ad14u,0x22ad0cu}};
+            constexpr std::uint32_t addPC[2][3]{{0x22aae0u,0x22aae4u,0x22aaecu},
+                {0x22ad34u,0x22ad38u,0x22ad40u}};
+            float scaled[3];
+            constexpr unsigned multiplyOrder[3]{0u,2u,1u};
+            for(unsigned k=0;k<3;++k){const auto c=multiplyOrder[k];scaled[c]=m.mul(10.f,delta[c],scalePC[side][c]);}
+            for(unsigned c=0;c<3;++c)negative[c]=m.add(forcePoint[c],scaled[c],addPC[side][c]);
             b.force(side?0x22ad54u:0x22ab00u,in.waterOwner334,negative,-amplitude);
         }
     }
