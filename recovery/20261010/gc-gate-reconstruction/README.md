@@ -2,7 +2,7 @@
 
 ## Result and status
 
-This is a newly authored native Gate join, not recovery of the lost pre-reset Gate source or `d546da8` commit. The candidate is staged only. It has not been compiled, syntax-checked, tested, run, or integrated into the active repository.
+This is a newly authored native Gate join, not recovery of the lost pre-reset Gate source or `d546da8` commit. Root integrated the reviewed candidate in commit `70369e8` on 2026-10-10. It has not been compiled, syntax-checked, tested, or run. The last gameplay capture used earlier commit `17659ca` and does not validate this change.
 
 The source-supported Trigger9 one-shot action now has a concrete staged path from an eligible registered native collision to animation owner 0. The opening mesh and its two active collision parts continue to consume the existing shared animated scene graph. No collision part is removed or disabled to make the track passable. No pose teleport, stuck detector, camera distance, route-node threshold, or forced open state is used.
 
