@@ -1,37 +1,24 @@
 # Current native race validation
 
-The current source adds an **unbuilt and untested HOST steering mixer** after the run below. Positive-demand saturation preserves steering differential by reducing common acceleration; achieved speed can change. The preceding result does not validate this new input policy. See [mixer scope](gc-host-steering-authority50iq.md).
+## Bounded original-AI first slice passed
 
-## GC WIP: original class binding verified; no completed lap
+The central slot beginning 2026-10-10 00:20:53 UTC built source `93201627ee0b2afd834cb2ab51885fc55f749c6d`: 34 units compiled, 159 reused, link exit 0. One direct-GC process ran from 00:22:05 to 00:22:21 UTC, exited normally, and reached the 12-second observation window after ready, including countdown. No source boundary, observer error or forced cleanup occurred.
 
-The 2026-10-09 22:20:18 UTC central slot built source `8e2d24db0f05c34cd60ff435a9ff6af12b9fa8a9`: one unit compiled, 192 reused, link exit 0. One runtime ran from 22:21:07 to 22:22:30 UTC and exited normally.
+**Only Clegg in bank slot 1 used original AI.** The human and six other racers retained existing HOST controls. All eight distinct racers were active, and each native counter advanced from 78 to 342 between status samples. This is not all-eight original-AI validation.
 
-- All eight GC cold owners reported class 3 and their expected original source values. TA/menu/Pause/Resume, Main cancellation/confirmation and one GC cold transition completed.
-- One requested 60-second capture retained 1,006 unique actual frames over 60.0045 seconds, 16.749 captured fps, maximum gap 197.6 ms. The bounded capture completed with no controller errors.
-- Six racers, including the player, reached node 40 and then stopped OffCourse. Slots 2 and 4 stopped at nodes 8 and 7. All eight safety stops remained effective; **no GC lap completed**.
-- This verifies class selection and bounded capture, not complete-course driving, native AI, manual usability or the subsequent mixer. Raw evidence and media remain outside Git.
+- The actual `vehicle58=1` racer was observed in startup state 4 at native CB8 1.232, then state 2 at CB8 5.45599, with source boundary 0.
+- The later sample recorded 313 startup and 28 ordinary planner updates, ten genuine brake commands, and ten successful simultaneous native brake/steer bindings. The sampled instantaneous brake was zero; the counters establish prior binding, not completion of that exact physics frame.
+- The take retained 116 fresh paired images, 107 distinct pixel images, and finalized 48 kHz stereo PCM totaling 10.064 seconds. Image observations covered 11.5276 seconds at about 9.98 captured fps. The bounded milestone and capture reports passed.
+- A separately verified silent export retained a contiguous 115-frame, 11.2097-second prefix. Actual PCM diverged from wall video and was omitted without stretching, resampling or synthesis. Raw media and receipts remain outside Git.
 
-Runtime binary SHA-256: `ceef8769eb409ac37e97399f5af6bd25852450c61f4548f2f06dde8dfd600314`.
-No additional build, runtime, syntax check, test or encoding was performed during source preservation. Gate/LostAI behavior and broader field/course completion remain unresolved. Earlier results apply to their own source versions.
+Runtime executable SHA-256: `5406d7bdd37ba97b61f96b3643772e2b61f286ded283e76dff2adf83ca60c691`.
 
-## Current Linux menu and Clegg check
+Five-second telemetry does not expose cold state 0, the exact state-transition instant, or AI-specific terrain support. Planner/binding counts are not complete-frame evidence. No lap, full GC world, combat continuation, actual AI contact ownership, failed-frame guard trigger, restart, pause or complete original-AI behavior was established. See [first-slice scope](original-ai-first-slice50iv.md) and [guard scope](original-ai-first-slice-guards50iv.md).
 
-The 2026-10-09 17:18 UTC central build compiled four units, reused 189, and linked successfully. One runtime ran from 17:19:27 to 17:20:01 UTC and exited normally.
+## Next source scope
 
-- Actual Main-menu input selected Clegg. One expected cold rebuild installed the selected eight-racer field and audio bank.
-- Pause held for 2.0117 seconds with native ticks, mixed-frame counts, and actual PCM samples frozen. Resume retained the session/bank and advanced the clocks.
-- Dense capture recorded 401 unique actual frames across 20.002 seconds, about 20 captured fps, with a maximum 84.1 ms gap. Final Main and quit completed normally. The resulting video passed the capture/encoding checks; this rate describes recording, not uncaptured rendering performance.
-- The headless pause blit correction passed this scenario. Audio came from the actual native mixer; no device-playback or listening-quality claim follows.
+The requested next step is all eight racers using original AI. That behavior is not in this tested source or validated here. Dynamic-contact joining and source-normal racer lighting are separate untested work. No additional build, runtime, syntax check or encoding was performed for this documentation update.
 
-Tested runtime source: `959d94e1044f74651e7a2713093eec0ac65da932`.
-Executable SHA-256: `0ccae9e676b8d9e0ce7e3b9a798745020f67d88f4ced1a5cea61f6430fd67f98`.
+## Earlier independent coverage
 
-Only Clegg selection and the basic Main/start/pause/resume/return flow were exercised. Audio sliders, other human choices, confirmation paths, and Results presentation remain untested. The Results overlay is separately staged. Driving used the HOST authored-pace driver; this was neither a manually driven race nor original AI, and it did not reach a full-race finish.
-
-## Earlier full-race coverage
-
-The 15:17 UTC mode1 baseline `0c3810cadd4750b4f5d4785320f0f3d259abe50a` completed three laps, first at 160.928 host race seconds, with finish-continuation gates passing. Actual Dax types 3/4/6 played; music selected song 29 on the last lap and 27 at finish. All three completed native lap times and best lap were visually inspected. That earlier full-race result does not establish a complete Clegg race on the current build.
-
-## Remaining boundaries
-
-Positive damage-announcer type12 and engine-damage dips, broader input/controller usability, listening quality, full progression, other tracks, and non-Linux execution need coverage. Recovered mode1 logic still uses explicit host scheduling, roster roles, rank/finish observation, a native clock backend, and known-null original HUD fields. The overlay is host presentation. Full original scheduler/console timing, IOP streaming, and fade parity are not claimed. See [mode1 integration](native-mode1-integration50id.md).
+The 17:18 UTC Linux source `959d94e` passed actual Clegg menu selection, one expected cold-bank change, pause/resume with frozen native/audio clocks, a 20-second capture, Main return and normal quit. The earlier mode1 source `0c3810c` completed three laps with native lap timing, Dax, last-lap/finish music and completed-lap display. These results apply to their own source versions and do not establish current all-racer AI, full-course GC driving, general controller usability or original scheduler/console parity.
