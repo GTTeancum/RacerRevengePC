@@ -89,7 +89,7 @@ Remaining integration joins, not falsely declared complete by this module:
 1. Actual Main manager ownership, phase ordering, enable/pause/lifetime and render traversal, plus widget/page/scene interleaving.
 2. Borrowed camera activation and particle-camera extension; sibling camera owner provides the numeric leaf.
 3. Native `ParticleCode` quad expansion/material/GL submission. The original program registration at15065C names ParticleCode at3A5418 and points toprogram3212A0. The separate GPU worker has this exact anchor.
-4. Four-corner lighting from149310, requested by162CD0, and actual source material context/depth/alpha handling. This module supplies exact packet brightness but does not fake RGB lighting.
+4. Main four-corner lighting is now supplied by the separate `particle-lighting-extension/files/` pair. Actual source material context/depth/alpha handling remains the GPU/material owner's responsibility. Main RGB is49 per channel; source setup W is raw bits0x40, not floating64.
 5. SCN light/lens-flare/environment side effects beyond the represented Main fire, including whether authored zero-RGB directional lens-flare metadata produces a visible object. The source SCN is retained and accessible.
 
 ## Static evidence
@@ -99,3 +99,13 @@ Original ELF SHA-256: `c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea
 The byte-display text under `evidence/` was produced with the sibling stdlib static decoder using `fileOffset = VA - 0x100000 + 0x80`; it does not execute, interpret, or emulate instructions. Unknown opcodes remain explicitly unknown. Scalar/COP1 branch meanings used above were read from instruction bits; no microprogram was run. The existing source conversion contract `docs/simulation-contract48b.md` states EE CVT.W.S truncation/saturation; every conversion here is bounded safely within signed32.
 
 Use only `files/` plus this description/provenance for clean-source integration. Keep `evidence/assets/` and any original payloads private and out of source publication. No active repository file was changed by this worker.
+
+## Packet failure/publication contract
+
+`preparePackets` returns a status that the caller must check on every call. No packets may be consumed after any non-complete result, regardless of the observed count. Unprepared/upfront rounding/camera-input validation failures happen before count invalidation and can preserve an older count. Once those inputs pass validation, preparation clears drawCount; later definition/depth/arithmetic failures leave itzero. This API is not transactional packet publication. Do not treat a nonzero count as current-frame success. The frozen source semantics are unchanged.
+
+## Separate lighting/material completion
+
+`particle-lighting-extension/` now stages the bounded native Main lighting pair and its full source derivation. Authenticated ambient50 is halved by the original light constructor to25, then149310 computes trunc(255*(25/128))=49 at each corner. Directional RGBzero makes the actual four normals irrelevant to this Main result. Input RGB rows are floating49, and setupW is raw integer bits0x40. The helper preserves those meanings and refuses non-Main lighting rather than inventing general normals.
+
+Particle material association is proven to be AppStart\DefaultMT: startup17CAE8 binds global3833E8 to that template, and particle160FFF4 passes that owner through2465B0 ->299BE0 ->14D590. AppStart\ScreenMT uses a separate global3833F0. The GPU/material worker has this evidence.
