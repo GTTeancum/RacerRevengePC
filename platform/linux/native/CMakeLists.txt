@@ -50,6 +50,8 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/original_ui_main_widget_manager50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_options_menu_controller50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_selection50kg.cpp"
+  "${RR_ROOT}/src/assets/original_ui_rider_character_assets50kg.cpp"
+  "${RR_ROOT}/src/game/original_ui_rider_stat_projection50kg.cpp"
   "${RR_ROOT}/src/game/reset_model_bounds50ba.cpp"
   "${RR_ROOT}/src/game/static_impact49y.cpp"
   "${RR_ROOT}/src/assets/impact_authoring49y.cpp"
