@@ -1975,10 +1975,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(!dynamicRegistry.captureBeforeFrame(racerBank,s,slot,dynamicPeers,diagnostic))
    dynamicBoundary(diagnostic.sourcePC,"every dynamic peer must be active and Ready");
   dynamicSelfSlot=slot;
-  for(std::size_t actor=0;actor<racerBank.count();++actor)racerBank.visit(actor,[&](){
+  racerBank.visitAll([&](std::size_t actor){
    dynamicActors.values[actor]={s.fields.vehicle3C,s.fields.vehicle58,dynamicRacer60[actor],
        lapContinuity.state.vehicleCC8,static_cast<std::uint32_t>(originalAiSession.rank[actor].placeCCC),s.fields.impactFlagsCD8};
    dynamicActors.bound[actor]=true;
+   return true;
   });
  };
  auto requireOriginalAiFleetReady=[&](){
@@ -1986,26 +1987,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // native frame is retained by Bank::visit, but is not a manager observation.
   // Check the entire fleet before any observation, timing or rank mutation;
   // never synthesize Ready or silently remove a failed racer from the field.
-  for(std::size_t slot=0;slot<racerBank.count();++slot){
+  racerBank.visitAll([&](std::size_t slot){
    const bool active=racerBank.active(slot);
-   racerBank.visit(slot,[&](){
-    if(active&&s.phase==VehicleFramePhase49W::Ready&&
-       (!allAiEnabled||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV&&
-          originalAi.initialized&&originalAi.managerIndexFE0==slot)))return;
-    std::cerr<<"ORIGINAL AI world boundary: slot="<<slot<<" active="<<active
-        <<" phase="<<static_cast<unsigned>(s.phase)<<" vehicle58="<<s.fields.vehicle58
-        <<" ai_source_boundary="<<std::hex<<originalAiReceipt.sourceBoundary
-        <<" frame_source_stage="<<x.diagnostic.sourceStage<<std::dec
-        <<"; native partial state retained; manager was not advanced.\n";
-    require50DU(false,"original AI requires every actual racer active and Ready");
-   });
-  }
+   if(active&&s.phase==VehicleFramePhase49W::Ready&&
+      (!allAiEnabled||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV&&
+         originalAi.initialized&&originalAi.managerIndexFE0==slot)))return true;
+   std::cerr<<"ORIGINAL AI world boundary: slot="<<slot<<" active="<<active
+       <<" phase="<<static_cast<unsigned>(s.phase)<<" vehicle58="<<s.fields.vehicle58
+       <<" ai_source_boundary="<<std::hex<<originalAiReceipt.sourceBoundary
+       <<" frame_source_stage="<<x.diagnostic.sourceStage<<std::dec
+       <<"; native partial state retained; manager was not advanced.\n";
+   require50DU(false,"original AI requires every actual racer active and Ready");
+   return false; // require50DU throws; preserve the batch's early-stop contract.
+  });
  };
  auto observeOriginalAiFleet=[&](){
   requireOriginalAiFleetReady();
-  for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+  racerBank.visitAll([&](std::size_t slot){
    native_ai50IV::observe(originalAiSession,slot,s,x.bindings,navigationProgress,
        lapContinuity.state.vehicleCC8,lapContinuity.timing.wordCD4,*navigationMap,originalAiMapMetadata);
+   return true;
   });
  };
  auto rankOriginalAiFleet=[&](){

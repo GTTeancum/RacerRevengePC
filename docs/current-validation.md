@@ -1,5 +1,7 @@
 # Current native race validation
 
+Current source adds the [batched observation optimization](batched-racer-observation.md), which is uncompiled and untested. The bounded result below applies to unchanged prior source `d3d854b6`; it does not measure the new optimization.
+
 ## Bounded all-eight original-AI run passed
 
 The central slot beginning 2026-10-10 01:21:13 UTC built source `d3d854b67d3cbcae8bd640c85e2e9b6756bbea5f`: 28 units compiled, 165 reused, link exit 0. One direct-GC process ran from 01:22:26 to 01:22:42 UTC, reached 12.0007 seconds after ready including countdown, and exited normally. Bounded runtime acceptance passed, with no source boundary, observer error or forced cleanup.
@@ -16,4 +18,4 @@ One final capture request remained unacknowledged, so `capture_complete` is fals
 
 Runtime executable SHA-256: `35d0589fa155f9229980189c78133f6d47aeef89d20730e2bb3435b8f1563210`.
 
-No full GC lap, reset, finish, pause/restart, retail zero-human bootstrap, complete original-AI behavior, or original scheduler parity is established. See [combined scope](native-ai-lighting-integration.md). The earlier Clegg-only run and tested-main menu/race results apply to their own source versions. This documentation commit preserves all runtime source bytes from `d3d854b6`; no additional software check or encoding was performed for publication.
+No full GC lap, reset, finish, pause/restart, retail zero-human bootstrap, complete original-AI behavior, or original scheduler parity is established. See [combined scope](native-ai-lighting-integration.md). The earlier Clegg-only run and tested-main menu/race results apply to their own source versions. The subsequent batching change has received source review only. No additional software check or encoding was performed for its publication.

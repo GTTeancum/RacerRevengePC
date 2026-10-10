@@ -74,6 +74,42 @@ public:
         } restorePlayer{*this,index};
         return std::forward<F>(operation)();
     }
+    // One bounded serial lease for an existing whole-fleet observation sweep.
+    // A null order means slots0..visitCount-1; otherwise preserve the supplied
+    // order exactly. Callback false stops immediately; exceptions propagate.
+    // Like visit(), save the current slot even on failure and restore player0
+    // before returning. Only the redundant between-peer player swaps vanish.
+    // Callbacks may copy observations out but must not retain arena references,
+    // visit/step another slot, or depend on a player restore between callbacks.
+    // This does not advance any slot's completedSteps or change eligibility.
+    template<class F> bool visitMany(const std::size_t* order,
+        std::size_t visitCount,F&& operation) {
+        if(!sealed_||visiting_||visitCount>count_)
+            throw std::runtime_error("invalid or nested native racer batch visit");
+        for(std::size_t position=0;position<visitCount;++position)
+            if(order&&order[position]>=count_)
+                throw std::runtime_error("invalid native racer batch slot");
+        if(!visitCount)return true;
+        visiting_=true;
+        std::size_t current=0;
+        struct Restore {
+            Bank& bank;std::size_t& current;
+            ~Restore(){
+                bank.save(current);
+                if(current)bank.restore(0);
+                bank.visiting_=false;
+            }
+        } restorePlayer{*this,current};
+        for(std::size_t position=0;position<visitCount;++position){
+            const auto index=order?order[position]:position;
+            if(index!=current){save(current);restore(index);current=index;}
+            if(!operation(index))return false;
+        }
+        return true;
+    }
+    template<class F> bool visitAll(F&& operation) {
+        return visitMany(nullptr,count_,std::forward<F>(operation));
+    }
     // Race gate is supplied by the host countdown/finish owner. A stopped slot
     // remains inspectable/renderable; it is never silently reset or teleported.
     template<class Step> bool step(std::size_t index,bool racing,Step&& operation) {

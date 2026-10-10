@@ -149,28 +149,29 @@ public:
         Snapshot staged{};staged.total30=static_cast<std::int32_t>(count_);
         staged.humanCount34=humanCount_;staged.selfManagerIndex=indexBySlot_[selfBankSlot];
         staged.selfBankSlot=selfBankSlot;
-        for(std::size_t index=0;index<count_;++index){
-            const auto slot=bindings_[index].bankSlot;
+        std::array<std::size_t,maximumRacers> sourceOrder{};
+        for(std::size_t index=0;index<count_;++index)
+            sourceOrder[index]=bindings_[index].bankSlot;
+        const bool observed=bank.visitMany(sourceOrder.data(),count_,[&](std::size_t slot){
+            const auto index=static_cast<std::size_t>(indexBySlot_[slot]);
             if(!bank.active(slot))return reject(Error::Inactive,0x1af330u,slot,static_cast<std::int32_t>(index));
-            const bool observed=bank.visit(slot,[&](){
-                if(live.phase!=VehicleFramePhase49W::Ready)
-                    return reject(Error::Phase,0x219d98u,slot,static_cast<std::int32_t>(index));
-                if(!live.fields.dynamicOwnersBound50IW)
-                    return reject(Error::Owners,0x223110u,slot,static_cast<std::int32_t>(index));
-                const auto& main=live.bodies.main;
-                auto& peer=staged.peers[index];
-                peer.present=true;peer.managerIndex=static_cast<std::int32_t>(index);
-                peer.mainBody340=bindings_[index].mainBody340;
-                peer.vehicle40=main.vehicleState40;peer.flagsCD8=live.fields.impactFlagsCD8;
-                peer.vehicle58=live.fields.vehicle58;
-                peer.partnerStateD34=live.impactSupplement.partnerState;
-                peer.smoothedChannel0D28=main.controls.bound.control.shaping.smoothedChannel0D28;
-                peer.worldAngularVelocityA4=main.components.root.worldAngularVelocityA0.v[1];
-                peer.cachedSpeed34=main.cachedSpeed34;peer.liveInputsBound=true;
-                return true;
-            });
-            if(!observed)return false;
-        }
+            if(live.phase!=VehicleFramePhase49W::Ready)
+                return reject(Error::Phase,0x219d98u,slot,static_cast<std::int32_t>(index));
+            if(!live.fields.dynamicOwnersBound50IW)
+                return reject(Error::Owners,0x223110u,slot,static_cast<std::int32_t>(index));
+            const auto& main=live.bodies.main;
+            auto& peer=staged.peers[index];
+            peer.present=true;peer.managerIndex=static_cast<std::int32_t>(index);
+            peer.mainBody340=bindings_[index].mainBody340;
+            peer.vehicle40=main.vehicleState40;peer.flagsCD8=live.fields.impactFlagsCD8;
+            peer.vehicle58=live.fields.vehicle58;
+            peer.partnerStateD34=live.impactSupplement.partnerState;
+            peer.smoothedChannel0D28=main.controls.bound.control.shaping.smoothedChannel0D28;
+            peer.worldAngularVelocityA4=main.components.root.worldAngularVelocityA0.v[1];
+            peer.cachedSpeed34=main.cachedSpeed34;peer.liveInputsBound=true;
+            return true;
+        });
+        if(!observed)return false;
         staged.observationSerial=observationSerial_+1;staged.bound=true;
         destination=staged;observationSerial_=staged.observationSerial;return true;
     }
