@@ -215,7 +215,11 @@ struct Frontend {
         }
         if(status==Status::unavailableDestination||status==Status::secondControllerRequired){
             ++unavailableCount;std::cerr<<"original_ui_destination unavailable screen="<<unsigned(receipt.source.screen)
-                <<" status="<<unsigned(status)<<"; no destination or gameplay entered.\n";
+                <<" status="<<unsigned(status)<<" source="<<diagnostic.sourcePC
+                <<" main="<<unsigned(diagnostic.main.status)<<" options="<<unsigned(diagnostic.options.status)
+                <<" options_resource="<<unsigned(diagnostic.optionsResources.error)
+                <<" gpu="<<unsigned(diagnostic.gpu.error)<<" renderer="<<unsigned(diagnostic.renderer.error)
+                <<"; no destination or gameplay entered.\n";
         }else if(status!=Status::ok&&status!=Status::noChange&&status!=Status::routeAccepted)fail("input");
     }
     std::uint64_t acceptedElapsed(std::uint64_t now) {
