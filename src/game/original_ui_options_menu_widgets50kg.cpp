@@ -151,11 +151,18 @@ Status OriginalUiOptionsMenuWidgets50KG::phase(OriginalUiOptionsMenuPhase50KG ph
 Status OriginalUiOptionsMenuWidgets50KG::input(std::uint8_t controller,assets::OriginalUiMovementInput50KG input,
     bool reached,bool enabled,const OriginalUiOptionsContext50KG& context,OriginalUiOptionsMenuPageResult50KG& output,
     OriginalUiMovementNotification50KG& notification,Diagnostic& d) noexcept {
+    return inputWithPageEffects(controller,input,reached,enabled,context,nullptr,nullptr,output,notification,d);
+}
+Status OriginalUiOptionsMenuWidgets50KG::inputWithPageEffects(std::uint8_t controller,assets::OriginalUiMovementInput50KG input,
+    bool reached,bool enabled,const OriginalUiOptionsContext50KG& context,void* effectsContext,
+    bool (*pageEffects)(void*,const OriginalUiOptionsMenuPageResult50KG&) noexcept,
+    OriginalUiOptionsMenuPageResult50KG& output,OriginalUiMovementNotification50KG& notification,Diagnostic& d) noexcept {
     d={};if(!storage_)return finish(d,Status::notBound);
     OriginalUiOptionsMenuInput50KG delivery{reached,enabled,false};OriginalUiOptionsMenuPageResult50KG pageResult;
     const auto status=storage_->controller.pageInput(storage_->navigation,controller,input,delivery,context,pageResult);
     d.controller=status;
     if(status!=Control::ok&&status!=Control::noChange&&status!=Control::unavailable)return finish(d,Status::controllerFailure);
+    if(pageEffects&&!pageEffects(effectsContext,pageResult))return finish(d,Status::controllerFailure);
     delivery.movementSelectedAtSnapshot=storage_->state[5].selected;
     OriginalUiOptionsMenuPlan50KG p;OriginalUiMovementNotification50KG notice;
     const auto movement=storage_->controller.movementInput(storage_->navigation,controller,input,delivery,pageResult.pageAccepted,p,notice);

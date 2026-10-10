@@ -73,6 +73,14 @@ public:
         bool containerReached,bool pageInputEnabled268,const OriginalUiOptionsContext50KG&,
         OriginalUiOptionsMenuPageResult50KG&,OriginalUiMovementNotification50KG&,
         OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
+    // Concrete session effect boundary: page handler requests are consumed
+    // before the selected Movement_Control5 snapshot/delivery. False stops
+    // traversal and must be treated as a source-owner failure, never retried.
+    OriginalUiOptionsWidgetStatus50KG inputWithPageEffects(std::uint8_t,assets::OriginalUiMovementInput50KG,
+        bool containerReached,bool pageInputEnabled268,const OriginalUiOptionsContext50KG&,
+        void* effectsContext,bool (*pageEffects)(void*,const OriginalUiOptionsMenuPageResult50KG&) noexcept,
+        OriginalUiOptionsMenuPageResult50KG&,OriginalUiMovementNotification50KG&,
+        OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
     OriginalUiOptionsWidgetStatus50KG updateText(std::uint16_t,bool ancestorsShown,
         OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
     OriginalUiOptionsWidgetStatus50KG projectText(std::uint16_t,std::size_t,float fontLineHeight,

@@ -1,4 +1,5 @@
 #include "original_ui_options_draw_resources50kg.h"
+#include "original_ui_options_particle_adapter50kg.h"
 #include <cmath>
 #include <utility>
 namespace rr::platform {
@@ -35,7 +36,8 @@ constexpr Image imageEntries[]={
     {"arrwrght",Archive::options,"ui/textures/arrwrght.atm",nullptr,true},
     {"arrwleft",Archive::options,"ui/textures/arrwleft.atm",nullptr,true},
     {"icon_x",Archive::overlays,"ui/textures/icon_x.pst",nullptr,false},
-    {"icon_tri",Archive::overlays,"ui/textures/icon_tri.pst",nullptr,false}
+    {"icon_tri",Archive::overlays,"ui/textures/icon_tri.pst",nullptr,false},
+    {"mmprt",Archive::options,"particle/mmprt.pst",nullptr,false}
 };
 struct Material {const char* name;const char* texture;std::uint32_t token;std::size_t offset;};
 // Actual APPSTART registry order, projected to live Options menu materials.
@@ -62,11 +64,17 @@ std::uint32_t find(const std::vector<OriginalUiOptionsMaterialBinding50KG>& list
 bool registry(const assets::OriginalUiMemberView50KG& table) noexcept {
     if(!table.identity||!table.data||table.size!=70962)return false;
     const auto delimiter=[](std::uint8_t c){return c==' '||c=='\r'||c=='\n';};
-    std::size_t cursor=0,matched=0;std::uint32_t token=0;
+    std::size_t cursor=0,matched=0;std::uint32_t token=0;bool particle=false;
     while(cursor<table.size) {
         while(cursor<table.size&&delimiter(table.data[cursor]))++cursor;
         if(cursor==table.size)break;
         const auto start=cursor;while(cursor<table.size&&!delimiter(table.data[cursor]))++cursor;
+        if(token==2902) {
+            constexpr const char* name="particle/mmprt";std::size_t j=0;
+            if(start!=64764)return false;
+            for(;name[j];++j)if(start+j>=cursor||fold(char(table.data[start+j]))!=name[j])return false;
+            if(start+j!=cursor)return false;particle=true;
+        }
         if(matched<10&&token==materialEntries[matched].token) {
             const auto& m=materialEntries[matched];if(start!=m.offset)return false;
             std::size_t j=0;
@@ -75,7 +83,7 @@ bool registry(const assets::OriginalUiMemberView50KG& table) noexcept {
         }
         ++token;
     }
-    return matched==10&&token==3235;
+    return particle&&matched==10&&token==3235;
 }
 bool animation(const assets::OriginalUiMaterialPass50KG& pass,
     game::OriginalUiTextureAnimationConfig50KG& out,Diagnostic& d) {
@@ -105,6 +113,13 @@ struct OriginalUiOptionsDrawResources50KG::Storage {
     std::array<std::uint32_t,107> widgetMaterial{};
     game::OriginalUiOptionsBackground50KG background;
     game::OriginalUiOptionsCamera50KG camera;
+    game::OriginalUiExitText50KG exitText;
+    game::OriginalUiMainSceneOwner50KG scene;
+    game::OriginalUiMainFireOwner50KG fire;
+    game::OriginalUiMainParticleLighting50KG lighting;
+    game::OriginalUiOptionsParticleRenderState50KG renderState;
+    assets::OriginalUiMainParticleMaterial50KG particle;
+    std::uint32_t particleImage=unresolved;
 };
 OriginalUiOptionsDrawResources50KG::OriginalUiOptionsDrawResources50KG() noexcept=default;
 OriginalUiOptionsDrawResources50KG::~OriginalUiOptionsDrawResources50KG()=default;
@@ -119,10 +134,17 @@ bool OriginalUiOptionsDrawResources50KG::load(const OriginalUiOptionsColdInput50
         if(s->widgets.bind(in.options,in.english,d.widgets)!=game::OriginalUiOptionsWidgetStatus50KG::ok)return fail(d,Error::widgets);
         if(game::prepareOriginalUiOptionsCamera50KG(*in.options,s->camera,d.camera)!=game::OriginalUiOptionsCameraStatus50KG::ok)
             return fail(d,Error::geometry,0x1D08B8);
+        if(!s->scene.prepareOptionsMenu(*in.options,d.scene))return fail(d,Error::resource,0x1D06B4);
+        d.fire=s->fire.initializeOptionsMenu(s->scene);
+        d.lighting=game::prepareOriginalUiOptionsParticleLighting50KG(s->scene,s->lighting);
+        if(d.fire!=game::OriginalUiMainFireStatus50KG::complete||d.lighting!=game::OriginalUiMainParticleLightingStatus50KG::complete)
+            return fail(d,Error::geometry);
+        d.renderState=game::prepareOriginalUiOptionsParticleRenderState50KG(s->scene,s->camera,s->lighting,s->renderState);
+        if(d.renderState!=game::OriginalUiOptionsParticleRenderStateStatus50KG::complete)return fail(d,Error::geometry);
         if(!s->templates.load(*in.appStart,d.material))return fail(d,Error::material);
         const auto table=in.appStart->find("AppStart/Mat_Stbl.txt");if(!registry(table))return fail(d,Error::registry,0x298724);
-        std::vector<assets::OriginalUiImageSource50KG> sources;std::array<std::vector<std::uint32_t>,8> indices;
-        for(std::size_t i=0;i<8;++i) {
+        std::vector<assets::OriginalUiImageSource50KG> sources;std::array<std::vector<std::uint32_t>,9> indices;
+        for(std::size_t i=0;i<9;++i) {
             const auto& entry=imageEntries[i];const auto& sourceOwner=owner(in,entry.archive);const auto member=sourceOwner.find(entry.member);
             if(!member.identity)return fail(d,Error::resource);
             if(entry.atm) {
@@ -154,8 +176,8 @@ bool OriginalUiOptionsDrawResources50KG::load(const OriginalUiOptionsColdInput50
             const auto& pass=b.material.passes[0];
             if(entry.texture) {
                 if(pass.textureCount!=1||!same(pass.textureName,entry.texture))return fail(d,Error::material);
-                std::size_t image=0;for(;image<8;++image)if(same(imageEntries[image].name,entry.texture))break;
-                if(image==8)return fail(d,Error::resource);b.images=indices[image];b.animated=imageEntries[image].atm;
+                std::size_t image=0;for(;image<9;++image)if(same(imageEntries[image].name,entry.texture))break;
+                if(image==9)return fail(d,Error::resource);b.images=indices[image];b.animated=imageEntries[image].atm;
                 if(b.animated) {
                     if(!animation(pass,b.animation,d)||!game::validOriginalUiTextureAnimationConfig50KG(b.animation,
                         static_cast<std::uint32_t>(b.images.size())))return fail(d,Error::animation);
@@ -172,6 +194,18 @@ bool OriginalUiOptionsDrawResources50KG::load(const OriginalUiOptionsColdInput50
                 return fail(d,Error::material);
             s->bindings.push_back(std::move(b));
         }
+        s->particleImage=indices[8][0];
+        if(!assets::prepareOriginalUiOptionsParticleMaterial50KG(*in.options,s->templates,in.runtime,
+            *s->images->decodedTexture(s->particleImage),s->particle,d.material))return fail(d,Error::material);
+        if(!s->scene.particleMaterial()||s->particle.identity!=s->scene.particleMaterial()->identity())return fail(d,Error::material);
+        for(std::uint8_t state=0;state<2;++state) {
+            OriginalUiMaterialSpan50KG converted;
+            if(!convertOriginalUiOptionsParticleSpan50KG(s->particle,state,{0,1,1,s->particleImage,bank->textureCount()},converted))
+                return fail(d,Error::material);
+            if(state&&!sameSampler(s->samplers[s->particleImage],converted.native.sampler))return fail(d,Error::samplerConflict);
+            s->samplers[s->particleImage]=converted.native.sampler;
+        }
+        samplerSet[s->particleImage]=true;
         for(bool set:samplerSet)if(!set)return fail(d,Error::resource);
         for(auto id:game::originalUiOptionsMenuWidgetIds50KG) {
             d.widgetId=id;
@@ -194,9 +228,12 @@ bool OriginalUiOptionsDrawResources50KG::load(const OriginalUiOptionsColdInput50
         }
         const auto bg=find(s->bindings,"ui/textures/mmbkg");const auto* atlas=bank->texture(s->bindings[bg].images[0]);
         if(!atlas||!game::layoutOriginalUiOptionsBackground50KG(atlas->texture.width,atlas->texture.height,s->background))return fail(d,Error::geometry);
+        if(!in.english||s->exitText.prepare({12,1},in.options,*in.english,s->images,indices[0][0],d.exitText)!=
+            game::OriginalUiExitTextStatus50KG::ok)return fail(d,Error::geometry,0x1D6AEC);
         storage_=std::move(s);d={};return true;
     } catch(...) {return fail(d,Error::allocation);}
 }
+game::OriginalUiExitText50KG* OriginalUiOptionsDrawResources50KG::exitText() noexcept {return storage_?&storage_->exitText:nullptr;}
 bool OriginalUiOptionsDrawResources50KG::loaded() const noexcept {return bool(storage_);}
 game::OriginalUiOptionsMenuWidgets50KG* OriginalUiOptionsDrawResources50KG::widgets() noexcept {return storage_?&storage_->widgets:nullptr;}
 const game::OriginalUiOptionsMenuWidgets50KG* OriginalUiOptionsDrawResources50KG::widgets() const noexcept {return storage_?&storage_->widgets:nullptr;}
@@ -218,6 +255,11 @@ std::uint32_t OriginalUiOptionsDrawResources50KG::materialIndex(const char* name
 }
 const game::OriginalUiOptionsBackground50KG* OriginalUiOptionsDrawResources50KG::background() const noexcept {return storage_?&storage_->background:nullptr;}
 const game::OriginalUiOptionsCamera50KG* OriginalUiOptionsDrawResources50KG::camera() const noexcept {return storage_?&storage_->camera:nullptr;}
+const game::OriginalUiMainSceneOwner50KG* OriginalUiOptionsDrawResources50KG::scene() const noexcept {return storage_?&storage_->scene:nullptr;}
+game::OriginalUiMainFireOwner50KG* OriginalUiOptionsDrawResources50KG::fire() noexcept {return storage_?&storage_->fire:nullptr;}
+const game::OriginalUiOptionsParticleRenderState50KG* OriginalUiOptionsDrawResources50KG::particleRenderState() const noexcept {return storage_?&storage_->renderState:nullptr;}
+const assets::OriginalUiMainParticleMaterial50KG* OriginalUiOptionsDrawResources50KG::particleMaterial() const noexcept {return storage_?&storage_->particle:nullptr;}
+std::uint32_t OriginalUiOptionsDrawResources50KG::particleImageIndex() const noexcept {return storage_?storage_->particleImage:unresolved;}
 bool OriginalUiOptionsDrawResources50KG::selection(game::OriginalUiOptionsSelection50KG& output,Diagnostic& d) const noexcept {
     d={};if(!storage_)return fail(d,Error::notLoaded);
     const auto slot=storage_->widgets.navigation()->groups[1].selectedSlot;const auto id=game::originalUiOptionsSelectedText50KG(slot);

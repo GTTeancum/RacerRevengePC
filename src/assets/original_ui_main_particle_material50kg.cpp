@@ -72,14 +72,14 @@ bool known(const std::string& field){
     return false;
 }
 }
-bool prepareOriginalUiMainParticleMaterial50KG(const OriginalUiArchive50KG& archive,
+static bool prepareParticleMaterial(const OriginalUiArchive50KG& archive,
     const OriginalUiMaterialTemplates50KG& templates,const OriginalUiMaterialRuntime50KG& runtime,
     const Texture48E& texture,OriginalUiMainParticleMaterial50KG& output,
-    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    OriginalUiMaterialDiagnostic50KG& d,OriginalUiArchiveId50KG expected) noexcept {
     d={};d.pass=1;
     try{
-        if(!archive.loaded()||!archive.identity()||archive.identity()->id!=OriginalUiArchiveId50KG::mainMenu)
-            return fail(d,Error::archive,"UIMAIN");
+        if(!archive.loaded()||archive.identity()!=originalUiArchiveIdentity50KG(expected))
+            return fail(d,Error::archive,"authenticated Main/Options source owner");
         const auto* inherited=templates.get(OriginalUiTemplate50KG::defaultMt);
         if(!inherited||!inherited->identity||!runtime.overrideKnown)
             return fail(d,Error::templateOwner,"actual particle DefaultMT",0x160ff4);
@@ -163,5 +163,17 @@ bool prepareOriginalUiMainParticleMaterial50KG(const OriginalUiArchive50KG& arch
         next.fogEnabled=true;next.alphaTestGreaterZero=true;next.noDestinationAlphaConsumer=true;
         output=next;d={};return true;
     }catch(...){return fail(d,Error::allocation,"Main particle material");}
+}
+bool prepareOriginalUiMainParticleMaterial50KG(const OriginalUiArchive50KG& archive,
+    const OriginalUiMaterialTemplates50KG& templates,const OriginalUiMaterialRuntime50KG& runtime,
+    const Texture48E& texture,OriginalUiMainParticleMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    return prepareParticleMaterial(archive,templates,runtime,texture,output,d,OriginalUiArchiveId50KG::mainMenu);
+}
+bool prepareOriginalUiOptionsParticleMaterial50KG(const OriginalUiArchive50KG& archive,
+    const OriginalUiMaterialTemplates50KG& templates,const OriginalUiMaterialRuntime50KG& runtime,
+    const Texture48E& texture,OriginalUiMainParticleMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    return prepareParticleMaterial(archive,templates,runtime,texture,output,d,OriginalUiArchiveId50KG::options);
 }
 }

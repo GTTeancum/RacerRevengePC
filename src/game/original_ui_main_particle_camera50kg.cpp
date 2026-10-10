@@ -51,21 +51,18 @@ Matrix multiply(Arithmetic& a,const Matrix& x,const Matrix& y) noexcept {
     return result;
 }
 }
-OriginalUiMainParticleCameraStatus50KG prepareOriginalUiMainParticleCamera50KG(
-    const OriginalUiMainCameraPreparation50KG& camera,
+OriginalUiMainParticleCameraStatus50KG prepareOriginalUiParticleCameraFromView50KG(
+    const CameraViewOutput49F& core,float originalWidth,float originalHeight,
     OriginalUiMainParticleCamera50KG& output) noexcept {
     using Status=OriginalUiMainParticleCameraStatus50KG;
     static_assert(sizeof(float)==4&&std::numeric_limits<float>::is_iec559,"Main camera requires binary32");
-    assets::OriginalUiMainCameraConfig50KG identity;
-    identity.identity=camera.configurationIdentity;
-    if(!assets::isOriginalUiMainCameraConfig50KG(identity)||
-        camera.originalWidth!=640||camera.originalHeight!=448)return Status::invalidCamera;
+    if(originalWidth!=640||originalHeight!=448)return Status::invalidCamera;
     if(std::fegetround()!=FE_TONEAREST)return Status::unsupportedArithmetic;
     Arithmetic a;OriginalUiMainParticleCamera50KG next;
-    for(float v:camera.core.combined)a.check(v);
-    const float fov=a.check(camera.core.sceneAfter.fovDegrees);
-    const float width=static_cast<float>(camera.originalWidth);
-    const float height=static_cast<float>(camera.originalHeight);
+    for(float v:core.combined)a.check(v);
+    const float fov=a.check(core.sceneAfter.fovDegrees);
+    const float width=static_cast<float>(originalWidth);
+    const float height=static_cast<float>(originalHeight);
     const float halfWidth=a.mul(0.5f,width),halfHeight=a.mul(0.5f,height);
     const float left=a.sub(2048.0f,halfWidth),right=a.add(2048.0f,halfWidth);
     const float top=a.sub(2048.0f,halfHeight),bottom=a.add(2048.0f,halfHeight);
@@ -79,7 +76,7 @@ OriginalUiMainParticleCameraStatus50KG prepareOriginalUiMainParticleCamera50KG(
     next.sourceScreen140[12]=a.add(initialX,left);
     next.sourceScreen140[13]=a.add(initialY,bottom);
     next.sourceScreen140[14]=depthFar;next.sourceScreen140[15]=1.0f;
-    next.combinedSourceScreen250=multiply(a,camera.core.combined,next.sourceScreen140);
+    next.combinedSourceScreen250=multiply(a,core.combined,next.sourceScreen140);
     //+1E8 is unsigned source viewport width:114988. Main640 needs no special
     // large-unsigned conversion path from1154B4..1154E4.
     const float halfFov=a.mul(0.5f,fov);
@@ -87,5 +84,18 @@ OriginalUiMainParticleCameraStatus50KG prepareOriginalUiMainParticleCamera50KG(
     next.focalPixels1D8=a.div(a.mul(0.5f,width),tangent);
     if(!a.ok)return Status::unsupportedArithmetic;
     output=next;return Status::ok;
+}
+OriginalUiMainParticleCameraStatus50KG prepareOriginalUiMainParticleCamera50KG(
+    const OriginalUiMainCameraPreparation50KG& camera,OriginalUiMainParticleCamera50KG& output) noexcept {
+    assets::OriginalUiMainCameraConfig50KG identity;identity.identity=camera.configurationIdentity;
+    if(!assets::isOriginalUiMainCameraConfig50KG(identity))return OriginalUiMainParticleCameraStatus50KG::invalidCamera;
+    return prepareOriginalUiParticleCameraFromView50KG(camera.core,camera.originalWidth,camera.originalHeight,output);
+}
+OriginalUiMainParticleCameraStatus50KG prepareOriginalUiOptionsParticleCamera50KG(
+    const OriginalUiOptionsCamera50KG& camera,OriginalUiMainParticleCamera50KG& output) noexcept {
+    // Options catalog ordinal0 is the actual UI/UIOption/ui.dat, not a Main alias.
+    if(!camera.uiIdentity||camera.uiIdentity!=assets::originalUiMemberIdentity50KG(assets::OriginalUiArchiveId50KG::options,0))
+        return OriginalUiMainParticleCameraStatus50KG::invalidCamera;
+    return prepareOriginalUiParticleCameraFromView50KG(camera.core,640,448,output);
 }
 }

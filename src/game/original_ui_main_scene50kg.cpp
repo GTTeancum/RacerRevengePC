@@ -5,6 +5,7 @@
 namespace rr::game {
 using namespace assets;
 struct OriginalUiMainSceneOwner50KG::Storage {
+    const OriginalUiArchiveIdentity50KG* archive=nullptr;
     OriginalUiMainSceneDefinition50KG definition;
     OriginalUiDat50KG scn,toy,prt,emt,psm;
     Texture48E texture;
@@ -42,7 +43,7 @@ bool readDefinition(const OriginalUiDat50KG& scn,const OriginalUiDat50KG& toy,
     const OriginalUiDat50KG& prt,const OriginalUiDat50KG& emt,const OriginalUiDat50KG& psm,
     OriginalUiMainSceneDefinition50KG& out,OriginalUiMainSceneDiagnostic50KG& d) {
     Reader r{d};auto& f=out.fire;std::int32_t count=0;
-    d.member="ui\\UIMain\\mm.scn";
+    d.member=scn.identity()->name;
     if(!r.section(scn,"SceneInfo")||!r.text("SceneName","MainMenu")||
        !r.section(scn,"StaticModels")||!r.i("NumberOfStaticModels",out.staticModelCount)||
        !r.section(scn,"Environment")||!r.text("ParticleTextureMapName","mmprt.tga")||
@@ -53,7 +54,7 @@ bool readDefinition(const OriginalUiDat50KG& scn,const OriginalUiDat50KG& toy,
        !r.section(scn,"Light2")||!r.text("Type","Directional")||
        !r.v("ColorRGB",out.directionalColor)||!r.v("Position",out.lightPosition)||
        !r.v("TargetPosition",out.lightTarget))return false;
-    d.member="ui\\UIMain\\mm.toy";
+    d.member=toy.identity()->name;
     if(!r.section(toy,"CSCameras")||!r.i("NumberOfCameras",out.sceneCameraCount)||
        !r.section(toy,"Animations")||!r.i("NumberOfAnimations",out.animationCount)||
        !r.section(toy,"ParticleEmitters")||!r.i("NumberOfEmitters",count,0x27de64)||count!=1||
@@ -122,13 +123,22 @@ OriginalUiMainSceneOwner50KG::OriginalUiMainSceneOwner50KG() noexcept=default;
 OriginalUiMainSceneOwner50KG::~OriginalUiMainSceneOwner50KG()=default;
 bool OriginalUiMainSceneOwner50KG::prepare(const OriginalUiArchive50KG& a,
     OriginalUiMainSceneDiagnostic50KG& d) noexcept {
+    return prepareScene(a,false,d);
+}
+bool OriginalUiMainSceneOwner50KG::prepareOptionsMenu(const OriginalUiArchive50KG& a,
+    OriginalUiMainSceneDiagnostic50KG& d) noexcept {
+    return prepareScene(a,true,d);
+}
+bool OriginalUiMainSceneOwner50KG::prepareScene(const OriginalUiArchive50KG& a,bool options,
+    OriginalUiMainSceneDiagnostic50KG& d) noexcept {
     d={};
     if(storage_){d.status=OriginalUiMainSceneStatus50KG::alreadyPrepared;return false;}
-    if(!a.loaded()||!a.identity()||a.identity()->id!=OriginalUiArchiveId50KG::mainMenu){
+    if(!a.loaded()||a.identity()!=originalUiArchiveIdentity50KG(options?OriginalUiArchiveId50KG::options:OriginalUiArchiveId50KG::mainMenu)){
         d.status=OriginalUiMainSceneStatus50KG::archive;return false;}
     try {
-        auto p=std::make_unique<Storage>();
-        const char* names[]={"ui\\UIMain\\mm.scn","ui\\UIMain\\mm.toy","particle\\mmprt.prt",
+        auto p=std::make_unique<Storage>();p->archive=a.identity();
+        const char* names[]={options?"ui\\UIOption\\opt.scn":"ui\\UIMain\\mm.scn",
+            options?"ui\\UIOption\\opt.toy":"ui\\UIMain\\mm.toy","particle\\mmprt.prt",
             "particle\\mmfire.emt","particle\\mmprt.psm"};
         OriginalUiDat50KG* docs[]={&p->scn,&p->toy,&p->prt,&p->emt,&p->psm};
         for(unsigned i=0;i<5;++i){d.member=names[i];
@@ -151,6 +161,9 @@ bool OriginalUiMainSceneOwner50KG::prepare(const OriginalUiArchive50KG& a,
     }catch(...){d.status=OriginalUiMainSceneStatus50KG::allocation;return false;}
 }
 bool OriginalUiMainSceneOwner50KG::prepared() const noexcept{return bool(storage_);}
+const OriginalUiArchiveIdentity50KG* OriginalUiMainSceneOwner50KG::archiveIdentity() const noexcept {
+    return storage_?storage_->archive:nullptr;
+}
 const OriginalUiMainSceneDefinition50KG* OriginalUiMainSceneOwner50KG::definition() const noexcept{
     return storage_?&storage_->definition:nullptr;}
 const Texture48E* OriginalUiMainSceneOwner50KG::particleTexture() const noexcept{

@@ -1,4 +1,6 @@
 #include "original_ui_options_draw_contribution50kg.h"
+#include "original_ui_options_particle_adapter50kg.h"
+#include <algorithm>
 #include <cmath>
 #include <utility>
 namespace rr::platform {
@@ -16,6 +18,16 @@ struct OriginalUiOptionsDrawContribution50KG::Storage {
     std::vector<std::uint32_t> frames;
     std::vector<assets::Vertex48B> vertices;
     std::vector<OriginalUiOptionsPacket50KG> packets;
+    std::vector<float> fog,drainedFog;
+    std::vector<assets::Vertex48B> drainedVertices;
+    std::vector<std::uint32_t> order;
+    std::vector<OriginalUiSpan50KG> spans;
+    std::vector<OriginalUiNativeSpan50KG> states;
+    std::shared_ptr<const MaterialTextureGl50EB> gpu;
+    std::uint64_t publication=0;
+    OriginalUiNativeDraw50KG draw{};
+    std::array<float,3> fogColor{};
+    bool scene=false,drained=false,exitText=false;
     OriginalUiOptionsClock50KG clock;
     bool active=false,ordinary=false,page=false,pageShown=false,prompts=false,top=false,finished=false,failed=false;
     std::uint8_t apertureCount=0;
@@ -32,12 +44,28 @@ bool OriginalUiOptionsDrawContribution50KG::bind(std::shared_ptr<OriginalUiOptio
             !game::initializeOriginalUiTextureAnimation50KG(s->animation[i],materials[i].animation,
                 static_cast<std::uint32_t>(materials[i].images.size())))return fail(d,Error::clock);
         s->vertices.reserve(originalUiMaximumQuads50KG*4u);s->packets.reserve(originalUiMaximumSpans50KG);
+        s->fog.reserve(originalUiMaximumQuads50KG*4u);s->drainedFog.reserve(originalUiMaximumQuads50KG*4u);
+        s->drainedVertices.reserve(originalUiMaximumQuads50KG*4u);s->order.reserve(originalUiMaximumSpans50KG);
+        s->spans.reserve(originalUiMaximumSpans50KG);s->states.reserve(originalUiMaximumSpans50KG);
         storage_=std::move(s);return true;
     }catch(...){return fail(d,Error::allocation);}
 }
+bool OriginalUiOptionsDrawContribution50KG::bindFrame(std::shared_ptr<OriginalUiOptionsDrawResources50KG> resources,
+    std::shared_ptr<const MaterialTextureGl50EB> gpu,Diagnostic& d) noexcept {
+    d={};if(storage_)return fail(d,Error::alreadyBound);
+    if(!resources||!resources->loaded()||!gpu||!gpu->initialized()||!gpu->publicationToken()||
+        gpu->textureCount()!=resources->textures()->textureCount())return fail(d,Error::publication);
+    for(std::uint32_t i=0;i<gpu->textureCount();++i) {
+        const auto* a=gpu->asset(i);const auto* b=resources->textures()->texture(i);
+        if(!a||!b||a->identity!=b->identity)return fail(d,Error::publication);
+    }
+    if(!bind(std::move(resources),d))return false;
+    storage_->publication=gpu->publicationToken();storage_->gpu=std::move(gpu);return true;
+}
 bool OriginalUiOptionsDrawContribution50KG::begin(const OriginalUiOptionsClock50KG& clock,Diagnostic& d) noexcept {
     d={};if(!storage_)return fail(d,Error::notBound);if(!clock.known)return fail(d,Error::clock);
-    auto& s=*storage_;s.clock=clock;s.active=true;s.ordinary=s.page=s.pageShown=s.prompts=s.top=s.finished=s.failed=false;
+    auto& s=*storage_;if(s.gpu&&(!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication))return fail(d,Error::publication);
+    s.scene=s.drained=s.exitText=false;s.fog.clear();s.drainedFog.clear();s.drainedVertices.clear();s.order.clear();s.spans.clear();s.states.clear();s.clock=clock;s.active=true;s.ordinary=s.page=s.pageShown=s.prompts=s.top=s.finished=s.failed=false;
     s.apertureCount=0;s.vertices.clear();s.packets.clear();
     const auto& materials=*s.resources->materials();
     for(std::size_t i=0;i<materials.size();++i)if(materials[i].animated&&
@@ -63,7 +91,7 @@ bool OriginalUiOptionsDrawContribution50KG::append(const game::OriginalUiOverlay
         for(unsigned c=0;c<4;++c)out.color[c]=quad.sourcePacketColor[c];
     }
     const auto first=static_cast<std::uint32_t>(s.vertices.size()/4),ordinal=static_cast<std::uint32_t>(s.packets.size());
-    s.vertices.insert(s.vertices.end(),vertices.begin(),vertices.end());
+    s.vertices.insert(s.vertices.end(),vertices.begin(),vertices.end());s.fog.insert(s.fog.end(),4,0.f);
     s.packets.push_back({first,1,material,image,frame,ordinal,quad.sourcePC,widgetId,segment});return true;
 }
 bool OriginalUiOptionsDrawContribution50KG::widgets(bool top,bool shown,Diagnostic& d) noexcept {
@@ -89,7 +117,7 @@ bool OriginalUiOptionsDrawContribution50KG::widgets(bool top,bool shown,Diagnost
                 const auto first=static_cast<std::uint32_t>(s.vertices.size()/4),ordinal=static_cast<std::uint32_t>(s.packets.size());
                 for(std::size_t q=0;q<line.glyphs.count;++q)for(const auto& glyph:line.glyphs.quads[q].vertices) {
                     assets::Vertex48B v{};v.position[0]=glyph.x;v.position[1]=glyph.y;v.position[2]=16777214.f;
-                    v.uv[0]=glyph.u;v.uv[1]=glyph.v;for(unsigned c=0;c<4;++c)v.color[c]=live.line.packetColor[c];s.vertices.push_back(v);
+                    v.uv[0]=glyph.u;v.uv[1]=glyph.v;for(unsigned c=0;c<4;++c)v.color[c]=live.line.packetColor[c];s.vertices.push_back(v);s.fog.push_back(0.f);
                 }
                 s.packets.push_back({first,line.glyphs.count,material,binding.images[0],0,ordinal,0x2E0A30,id,segment});
             }
@@ -123,6 +151,33 @@ bool OriginalUiOptionsDrawContribution50KG::projectPage(bool shown,Diagnostic& d
         !append(selection.afterText,s.resources->materialIndex("ui/textures/arrwleft"),16777214.f,Segment::page,selection.textWidgetId,d))
         {s.failed=true;return false;}
     return true;
+}
+bool OriginalUiOptionsDrawContribution50KG::projectExitText(const game::OriginalUiApertureHook50KG& hook,Diagnostic& d) noexcept {
+    d={};if(!storage_)return fail(d,Error::notBound);auto& s=*storage_;
+    if(!s.active||!s.page||!s.pageShown||s.apertureCount||s.prompts||s.top||s.exitText||s.failed||s.finished)
+        return fail(d,Error::sourceOrder,0x1D75A4);
+    // Source capacity10 upper-bounds the real glyph packet before the owner
+    // performs RenderText preparation. This is not an invented loading label.
+    if(s.vertices.size()/4+10>originalUiMaximumQuads50KG||s.packets.size()>=originalUiMaximumSpans50KG)
+        return fail(d,Error::capacity);
+    const auto m=s.resources->materialIndex("font/denmrk16top");
+    if(m>=s.resources->materials()->size())return fail(d,Error::material);
+    const auto& binding=(*s.resources->materials())[m];
+    if(binding.images.size()!=1)return fail(d,Error::material);
+    game::OriginalUiExitTextProjection50KG live;
+    if(s.resources->exitText()->projectRender2E0170(hook,live)!=game::OriginalUiExitTextStatus50KG::ok||
+        !live.glyphs||live.images!=s.resources->images()||live.imageIndex!=binding.images[0]||
+        live.materialIdentity!=binding.material.identity||live.assignedDepth!=1||live.packetColor[3]>128||live.glyphs->count>10)
+        {s.failed=true;return fail(d,Error::projection,0x2E0170);}
+    const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
+    for(std::size_t q=0;q<live.glyphs->count;++q)for(const auto& glyph:live.glyphs->quads[q].vertices) {
+        assets::Vertex48B v{};v.position[0]=glyph.x;v.position[1]=glyph.y;v.position[2]=16777214.f;
+        v.uv[0]=glyph.u;v.uv[1]=glyph.v;for(unsigned c=0;c<4;++c)v.color[c]=live.packetColor[c];
+        s.vertices.push_back(v);s.fog.push_back(0.f);
+    }
+    if(live.glyphs->count)s.packets.push_back({first,live.glyphs->count,m,live.imageIndex,0,
+        static_cast<std::uint32_t>(s.packets.size()),live.submitPC,0,Segment::exitText});
+    s.exitText=true;return true;
 }
 bool OriginalUiOptionsDrawContribution50KG::projectAperture(std::uint8_t ordinal,
     const game::OriginalUiApertureRectangle50KG& rect,Diagnostic& d) noexcept {
@@ -158,9 +213,119 @@ bool OriginalUiOptionsDrawContribution50KG::projectOnTopWidgets(bool shown,Diagn
         (s.pageShown&&(!s.prompts||s.apertureCount!=2)))return fail(d,Error::sourceOrder);
     if(!widgets(true,shown,d)){s.failed=true;return false;}s.top=true;return true;
 }
+bool OriginalUiOptionsDrawContribution50KG::projectParticles(Diagnostic& d) noexcept {
+    d={};if(!storage_)return fail(d,Error::notBound);auto& s=*storage_;
+    if(!s.active||!s.top||s.scene||s.failed||s.drained)return fail(d,Error::sourceOrder);
+    auto& fire=*s.resources->fire();const auto& scene=*s.resources->scene();
+    const auto& renderState=*s.resources->particleRenderState();
+    const auto* definition=scene.definition();const auto* material=scene.particleMaterial();
+    if(!scene.prepared()||!definition||!material||material->identity()!=s.resources->particleMaterial()->identity)
+        return fail(d,Error::resource);
+    // The scene fog entity runs after the manager fog entity and rewrites the
+    // source camera near/far before ParticleCode sees its constants. Consume
+    // that concrete prepared state, including exact packed FOGCOL conversion.
+    for(unsigned c=0;c<3;++c){
+        const auto value=renderState.fogColor[c];
+        if(!std::isfinite(value)||value<0||value>1)return fail(d,Error::input);
+        s.fogColor[c]=value;
+    }
+    const auto& camera=renderState.particleCamera;const auto& constants=renderState.constants;
+    const game::OriginalUiMainParticleView50KG view{{camera.combinedSourceScreen250[2],camera.combinedSourceScreen250[6],
+        camera.combinedSourceScreen250[10],camera.combinedSourceScreen250[14]},camera.focalPixels1D8};
+    d.fire=fire.preparePackets(view);
+    if(d.fire!=game::OriginalUiMainFireStatus50KG::complete){s.failed=true;return fail(d,Error::projection);}
+    const auto count=fire.packetCount();const auto* source=fire.packets();
+    if(count>game::originalUiMainParticleCapacity50KG||(count&&!source)||
+        s.vertices.size()/4+count>originalUiMaximumQuads50KG)return fail(d,Error::capacity);
+    // Each source run is at most12 and chooses ONE of the two material states.
+    // Header validation occurs before projecting any of this batch.
+    for(std::size_t start=0;start<count;){
+        const auto signedCount=source[start].signedRunCount;
+        if(signedCount==0||signedCount<-12||signedCount>12)return fail(d,Error::input);
+        const auto n=static_cast<std::size_t>(signedCount<0?-signedCount:signedCount);
+        if(n>count-start)return fail(d,Error::input);
+        for(std::size_t j=1;j<n;++j)if(source[start+j].signedRunCount)return fail(d,Error::input);
+        start+=n;
+    }
+    for(std::size_t start=0;start<count;){
+        const auto signedCount=source[start].signedRunCount;
+        const auto n=static_cast<std::size_t>(signedCount<0?-signedCount:signedCount);
+        const std::uint8_t state=signedCount<0?1:0;
+        const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
+        for(std::size_t j=0;j<n;++j){
+            game::OriginalUiMainParticleQuad50KG quad;
+            d.particle=game::projectOriginalUiMainParticleQuad50KG(source[start+j],state,camera,constants,quad);
+            if(d.particle!=game::OriginalUiMainParticleGeometryStatus50KG::complete){s.failed=true;return fail(d,Error::projection);}
+            if(!quad.visible)continue;
+            s.vertices.insert(s.vertices.end(),quad.vertices.begin(),quad.vertices.end());
+            s.fog.insert(s.fog.end(),quad.fogFactors.begin(),quad.fogFactors.end());
+        }
+        const auto quads=static_cast<std::uint32_t>(s.vertices.size()/4)-first;
+        if(quads){
+            if(s.packets.size()>=originalUiMaximumSpans50KG){s.failed=true;return fail(d,Error::capacity);}
+            s.packets.push_back({first,quads,unresolved,s.resources->particleImageIndex(),state,static_cast<std::uint32_t>(s.packets.size()),
+                0x162248,0,Segment::particles});
+        }
+        start+=n;
+    }
+    s.scene=true;return true;
+}
+bool OriginalUiOptionsDrawContribution50KG::drain(Diagnostic& d) noexcept {
+    d={};if(!storage_)return fail(d,Error::notBound);auto& s=*storage_;
+    if(!s.active||!s.ordinary||!s.page||!s.prompts||!s.top||!s.scene||s.failed||s.drained||s.apertureCount!=2)return fail(d,Error::unfinished);
+    const auto& materials=*s.resources->materials();
+    if(!s.gpu||!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication)return fail(d,Error::publication);
+    s.order.clear();
+    for(std::size_t i=0;i<s.packets.size();++i)
+        if(s.packets[i].materialIndex==unresolved||materials[s.packets[i].materialIndex].material.passes[0].enabled!=0)s.order.push_back(static_cast<std::uint32_t>(i));
+    std::sort(s.order.begin(),s.order.end(),[&](std::uint32_t a,std::uint32_t b){
+        const auto ga=s.packets[a].materialIndex==unresolved?2902:materials[s.packets[a].materialIndex].registryToken;
+        const auto gb=s.packets[b].materialIndex==unresolved?2902:materials[s.packets[b].materialIndex].registryToken;
+        return ga!=gb?ga<gb:s.packets[a].sourceOrdinal<s.packets[b].sourceOrdinal;
+    });
+    std::uint32_t total=0;for(const auto i:s.order)total+=s.packets[i].quadCount;
+    if(!total)return fail(d,Error::unfinished);
+    s.drainedVertices.clear();s.drainedFog.clear();s.spans.clear();s.states.clear();
+    for(const auto i:s.order){
+        const auto& p=s.packets[i];
+        const auto first=static_cast<std::uint32_t>(s.drainedVertices.size()/4);
+        OriginalUiMaterialSpan50KG converted;bool okay=false;
+        if(p.materialIndex==unresolved)okay=convertOriginalUiOptionsParticleSpan50KG(*s.resources->particleMaterial(),
+            static_cast<std::uint8_t>(p.frameIndex),{first,p.quadCount,total,p.imageIndex,s.gpu->textureCount()},converted);
+        else {
+            const auto& material=materials[p.materialIndex];
+            okay=material.images.empty()?
+                convertOriginalUiUntexturedMaterialSpan50KG(material.untextured,{first,p.quadCount,total},converted):
+                convertOriginalUiMaterialSpan50KG(material.policies[p.frameIndex],
+                    {first,p.quadCount,total,p.imageIndex,s.gpu->textureCount()},converted);
+        }
+        if(!okay){s.failed=true;return fail(d,Error::material);}
+        const auto begin=s.vertices.begin()+std::size_t(p.firstQuad)*4;
+        s.drainedVertices.insert(s.drainedVertices.end(),begin,begin+std::size_t(p.quadCount)*4);
+        const auto fogBegin=s.fog.begin()+std::size_t(p.firstQuad)*4;
+        s.drainedFog.insert(s.drainedFog.end(),fogBegin,fogBegin+std::size_t(p.quadCount)*4);
+        s.spans.push_back(converted.span);s.states.push_back(converted.native);
+    }
+    s.draw={};
+    s.draw.draw.textures=s.gpu.get();s.draw.draw.texturePublication=s.publication;
+    s.draw.draw.vertices=s.drainedVertices.data();s.draw.draw.quadCount=total;
+    s.draw.draw.spans=s.spans.data();s.draw.draw.spanCount=static_cast<std::uint32_t>(s.spans.size());
+    s.draw.draw.canvasWidth=640;s.draw.draw.canvasHeight=448;
+    // Actual Options PageInfo background, retained in the authenticated page owner.
+    const auto* page=s.resources->widgets()->page();
+    for(unsigned c=0;c<3;++c)s.draw.draw.clearRgba[c]=page->backgroundColor[c]/255.f;
+    s.draw.draw.clearRgba[3]=1;s.draw.draw.retainRaceImage=false;
+    s.draw.states=s.states.data();s.draw.stateCount=static_cast<std::uint32_t>(s.states.size());
+    s.draw.particleFog=s.drainedFog.data();s.draw.particleFogCount=static_cast<std::uint32_t>(s.drainedFog.size());
+    for(unsigned c=0;c<3;++c)s.draw.particleFogColor[c]=s.fogColor[c];
+    s.draw.opaquePresentationAlphaOnly=true;s.drained=true;s.finished=true;return true;
+}
+const OriginalUiNativeDraw50KG* OriginalUiOptionsDrawContribution50KG::draw() const noexcept {
+    return storage_&&storage_->drained&&!storage_->failed?&storage_->draw:nullptr;
+}
 bool OriginalUiOptionsDrawContribution50KG::finishContribution(Diagnostic& d) noexcept {
     d={};if(!storage_)return fail(d,Error::notBound);auto& s=*storage_;
-    if(!s.active||!s.ordinary||!s.page||!s.top||s.failed||s.finished||
+    if(!s.active||!s.ordinary||!s.page||!s.top||!s.scene||s.failed||s.finished||
         (s.pageShown&&(!s.prompts||s.apertureCount!=2)))return fail(d,Error::unfinished);
     s.finished=true;return true;
 }

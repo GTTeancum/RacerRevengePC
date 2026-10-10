@@ -55,6 +55,12 @@ public:
     OriginalUiMainSceneOwner50KG& operator=(const OriginalUiMainSceneOwner50KG&)=delete;
     bool prepare(const assets::OriginalUiArchive50KG&,
         OriginalUiMainSceneDiagnostic50KG&) noexcept;
+    // Explicit second source identity: Options opt.scn/opt.toy and four
+    // particle members are byte-identical to Main, but retain Options catalog
+    // identities. Historical Main-named numeric types are shared, not forged.
+    bool prepareOptionsMenu(const assets::OriginalUiArchive50KG&,
+        OriginalUiMainSceneDiagnostic50KG&) noexcept;
+    const assets::OriginalUiArchiveIdentity50KG* archiveIdentity() const noexcept;
     bool prepared() const noexcept;
     const OriginalUiMainSceneDefinition50KG* definition() const noexcept;
     const assets::Texture48E* particleTexture() const noexcept;
@@ -66,5 +72,7 @@ public:
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
+    bool prepareScene(const assets::OriginalUiArchive50KG&,bool options,
+        OriginalUiMainSceneDiagnostic50KG&) noexcept;
 };
 }

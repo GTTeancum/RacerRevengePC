@@ -8,13 +8,15 @@ namespace {
 float sourceDiv(float a,float b) noexcept {volatile float r=a/b;return r;}
 float sourceMul(float a,float b) noexcept {volatile float r=a*b;return r;}
 }
-OriginalUiMainParticleLightingStatus50KG prepareOriginalUiMainParticleLighting50KG(
+static OriginalUiMainParticleLightingStatus50KG prepareSceneLighting(
     const OriginalUiMainSceneOwner50KG& scene,
-    OriginalUiMainParticleLighting50KG& output) noexcept {
+    OriginalUiMainParticleLighting50KG& output,bool options) noexcept {
     using S=OriginalUiMainParticleLightingStatus50KG;
     const auto* definition=scene.definition();
     if(!definition)return S::unprepared;
-    // This bounded leaf relies on the exact authenticated Main scene. A
+    if(scene.archiveIdentity()!=assets::originalUiArchiveIdentity50KG(options?
+        assets::OriginalUiArchiveId50KG::options:assets::OriginalUiArchiveId50KG::mainMenu))return S::unsupportedScene;
+    // Exact authenticated Main or separately admitted Options scene. A
     // nonzero directional color needs the full original four-normal path.
     for(unsigned lane=0;lane<3;++lane)
         if(definition->ambientColor[lane]!=50.f||definition->directionalColor[lane]!=0.f)
@@ -45,5 +47,13 @@ OriginalUiMainParticleLightingStatus50KG prepareOriginalUiMainParticleLighting50
     }
     output=prepared;
     return S::complete;
+}
+OriginalUiMainParticleLightingStatus50KG prepareOriginalUiMainParticleLighting50KG(
+    const OriginalUiMainSceneOwner50KG& scene,OriginalUiMainParticleLighting50KG& output) noexcept {
+    return prepareSceneLighting(scene,output,false);
+}
+OriginalUiMainParticleLightingStatus50KG prepareOriginalUiOptionsParticleLighting50KG(
+    const OriginalUiMainSceneOwner50KG& scene,OriginalUiMainParticleLighting50KG& output) noexcept {
+    return prepareSceneLighting(scene,output,true);
 }
 }

@@ -32,11 +32,21 @@ OriginalUiMainFireOwner50KG::OriginalUiMainFireOwner50KG() noexcept=default;
 OriginalUiMainFireOwner50KG::~OriginalUiMainFireOwner50KG()=default;
 OriginalUiMainFireStatus50KG OriginalUiMainFireOwner50KG::initialize(
     const OriginalUiMainSceneOwner50KG& scene) noexcept {
+    return initializeScene(scene,false);
+}
+OriginalUiMainFireStatus50KG OriginalUiMainFireOwner50KG::initializeOptionsMenu(
+    const OriginalUiMainSceneOwner50KG& scene) noexcept {
+    return initializeScene(scene,true);
+}
+OriginalUiMainFireStatus50KG OriginalUiMainFireOwner50KG::initializeScene(
+    const OriginalUiMainSceneOwner50KG& scene,bool options) noexcept {
     using S=OriginalUiMainFireStatus50KG;
     if(storage_)return S::alreadyInitialized;
     const auto* definition=scene.definition();if(!definition)return S::unprepared;
+    if(scene.archiveIdentity()!=assets::originalUiArchiveIdentity50KG(options?
+        assets::OriginalUiArchiveId50KG::options:assets::OriginalUiArchiveId50KG::mainMenu))return S::definition;
     const auto& f=definition->fire;
-    // This is an authenticated, deliberately Main-only leaf. Do not silently
+    // Authenticated Main or explicit byte-identical Options scene only. Do not
     // broaden it to attached/racing emitters, other modes, or arbitrary EMTs.
     if(f.type!=8||f.instances!=1||f.particleGroup!=4||!f.startOn||
        f.emitMode!=0||f.delaySeconds!=0||f.forcedSetCount!=0||

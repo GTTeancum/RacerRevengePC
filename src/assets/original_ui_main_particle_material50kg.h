@@ -22,4 +22,10 @@ bool prepareOriginalUiMainParticleMaterial50KG(const OriginalUiArchive50KG&,
     const OriginalUiMaterialTemplates50KG&,const OriginalUiMaterialRuntime50KG&,
     const Texture48E&,OriginalUiMainParticleMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;
+// Identical authenticated mmprt bytes in Options, with Options member identity.
+// Main-named immutable policy type is retained for numeric/backend compatibility.
+bool prepareOriginalUiOptionsParticleMaterial50KG(const OriginalUiArchive50KG& options,
+    const OriginalUiMaterialTemplates50KG&,const OriginalUiMaterialRuntime50KG&,
+    const Texture48E&,OriginalUiMainParticleMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
 }

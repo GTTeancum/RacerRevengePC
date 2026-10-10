@@ -4,8 +4,11 @@
 #include "../../../src/game/original_ui_options_menu_widgets50kg.h"
 #include "../../../src/game/original_ui_options_menu_layout50kg.h"
 #include "../../../src/game/original_ui_options_camera50kg.h"
+#include "../../../src/game/original_ui_options_particle_render_state50kg.h"
+#include "../../../src/assets/original_ui_main_particle_material50kg.h"
 #include "../../../src/game/original_ui_text_geometry50kg.h"
 #include "../../../src/game/original_ui_texture_animation50kg.h"
+#include "../../../src/game/original_ui_exit_text50kg.h"
 #include <memory>
 #include <vector>
 
@@ -24,6 +27,11 @@ struct OriginalUiOptionsDrawDiagnostic50KG {
     game::OriginalUiOptionsWidgetDiagnostic50KG widgets{};
     game::OriginalUiTextGeometryDiagnostic50KG text{};
     game::OriginalUiOptionsCameraDiagnostic50KG camera{};
+    game::OriginalUiExitTextDiagnostic50KG exitText{};
+    game::OriginalUiMainSceneDiagnostic50KG scene{};
+    game::OriginalUiMainFireStatus50KG fire=game::OriginalUiMainFireStatus50KG::unprepared;
+    game::OriginalUiMainParticleLightingStatus50KG lighting=game::OriginalUiMainParticleLightingStatus50KG::unprepared;
+    game::OriginalUiOptionsParticleRenderStateStatus50KG renderState=game::OriginalUiOptionsParticleRenderStateStatus50KG::input;
 };
 struct OriginalUiOptionsVideoOwner50KG {
     // Genuine ownership of original-mode native video; no no-op alias.
@@ -60,6 +68,7 @@ public:
     OriginalUiOptionsDrawResources50KG& operator=(const OriginalUiOptionsDrawResources50KG&)=delete;
     bool load(const OriginalUiOptionsColdInput50KG&,OriginalUiOptionsDrawDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
+    game::OriginalUiExitText50KG* exitText() noexcept;
     game::OriginalUiOptionsMenuWidgets50KG* widgets() noexcept;
     const game::OriginalUiOptionsMenuWidgets50KG* widgets() const noexcept;
     const assets::OriginalUiScreenAssets50KG* images() const noexcept;
@@ -72,6 +81,11 @@ public:
     std::uint32_t materialIndex(const char*) const noexcept;
     const game::OriginalUiOptionsBackground50KG* background() const noexcept;
     const game::OriginalUiOptionsCamera50KG* camera() const noexcept;
+    const game::OriginalUiMainSceneOwner50KG* scene() const noexcept;
+    game::OriginalUiMainFireOwner50KG* fire() noexcept;
+    const game::OriginalUiOptionsParticleRenderState50KG* particleRenderState() const noexcept;
+    const assets::OriginalUiMainParticleMaterial50KG* particleMaterial() const noexcept;
+    std::uint32_t particleImageIndex() const noexcept;
     // Current selection's original first-line coordinates/width and cold arrow
     // dimensions. Does not change the animated frame or sample a clock.
     bool selection(game::OriginalUiOptionsSelection50KG&,OriginalUiOptionsDrawDiagnostic50KG&) const noexcept;

@@ -1,5 +1,6 @@
 #pragma once
 #include "original_ui_main_camera50kg.h"
+#include "original_ui_options_camera50kg.h"
 #include <array>
 #include <cstdint>
 
@@ -28,4 +29,13 @@ struct OriginalUiMainParticleCamera50KG {
 OriginalUiMainParticleCameraStatus50KG prepareOriginalUiMainParticleCamera50KG(
     const OriginalUiMainCameraPreparation50KG&,
     OriginalUiMainParticleCamera50KG&) noexcept;
+// Same native236DD0/11548C numeric continuation, actual Options ui.dat identity.
+OriginalUiMainParticleCameraStatus50KG prepareOriginalUiOptionsParticleCamera50KG(
+    const OriginalUiOptionsCamera50KG&,OriginalUiMainParticleCamera50KG&) noexcept;
+// Shared native source-screen continuation. Numeric only: each concrete caller
+// must authenticate its own camera/page identity before reaching this boundary.
+OriginalUiMainParticleCameraStatus50KG prepareOriginalUiParticleCameraFromView50KG(
+    const CameraViewOutput49F&,float originalWidth,float originalHeight,
+    OriginalUiMainParticleCamera50KG&) noexcept;
+
 }

@@ -1,0 +1,118 @@
+{
+  "status": "frozen source-only; no build/test/project decoder executions",
+  "prerequisites": [
+    "ui-exit-transition-reconstruction",
+    "audio f087350"
+  ],
+  "new_cpp": [
+    "src/game/original_ui_options_particle_render_state50kg.cpp",
+    "platform/linux/native/original_ui_options_session50kg.cpp"
+  ],
+  "files": [
+    {
+      "path": "src/assets/original_ui_main_particle_material50kg.cpp",
+      "sha256": "4a55c3a657eae3abe38d35146a0a5a6b1a88765b311b0270a3e22471d65d271f",
+      "preimage_sha256": "333c1faa01a67c662a1a2ecd3c5e9cf01fdbb47a9aacd8986b0fe449e1411e1f"
+    },
+    {
+      "path": "src/assets/original_ui_main_particle_material50kg.h",
+      "sha256": "b39c936d15d56f163ce084ed2270853f0cf2fe55140aa9169fe2dfdeb6f5f37e",
+      "preimage_sha256": "59a673da2b5cd7ea6fe0faeec95208203f1030850217fd21b39227a3cde57892"
+    },
+    {
+      "path": "src/game/original_ui_main_fire50kg.cpp",
+      "sha256": "fab08e6b634cbe7144a79cc44e7c07687f10e7235d271c6a0b36b55f53371f36",
+      "preimage_sha256": "dd2aa6fce07fddbccaf4d6395ccd632e4a6cfe0d3862f580e081358fb4e567c4"
+    },
+    {
+      "path": "src/game/original_ui_main_fire50kg.h",
+      "sha256": "370409b1c809fc2c4897d4dba17d435d52c0e79d4be2e61a883d9018784e126e",
+      "preimage_sha256": "493d6a935f522e885c313cd5a7308dfd47bd0746ea1293356f0b4370e6443eb3"
+    },
+    {
+      "path": "src/game/original_ui_main_particle_camera50kg.cpp",
+      "sha256": "c56d3c87f4ffb3f59e28f2cf14a21371d6b2135a4c09b34f24563288dcf85246",
+      "preimage_sha256": "189cef91bda7ee97a3faabe2e54e23bae780290b405b6893cdaf5d90283e4144"
+    },
+    {
+      "path": "src/game/original_ui_main_particle_camera50kg.h",
+      "sha256": "9370bdb4b6ff218593e033dbad86976a0abf70905fe14d5cf196e72be8875922",
+      "preimage_sha256": "7179d8f894cbd1146890bffb019efa61c150f0b781f1beb32da5a93995a7aa09"
+    },
+    {
+      "path": "src/game/original_ui_main_particle_lighting50kg.cpp",
+      "sha256": "53230fce4e5fc676eae6b21a213a1faf3eacfb469eaa1c79aefe7a6227c8df69",
+      "preimage_sha256": "fa0bfec01465f8ab43d9646f0e72a8f94f369d5a4310dd76db02846c694f4e17"
+    },
+    {
+      "path": "src/game/original_ui_main_particle_lighting50kg.h",
+      "sha256": "98c6e70b8b5036985b97856a0cc07909d754e117048bb684a50ba7326709ec01",
+      "preimage_sha256": "491932a516ce400b14c77e738d11b936273d91274147d212216bca0fccef151f"
+    },
+    {
+      "path": "src/game/original_ui_main_scene50kg.cpp",
+      "sha256": "a47d7766015701e14ad33bf3bf42904aa898ab5a8f2560ac9c0da26316bedf8c",
+      "preimage_sha256": "4f6450c32ee73738dfb9b54485e446b78937824344b4f3951c1c4ceffa328006"
+    },
+    {
+      "path": "src/game/original_ui_main_scene50kg.h",
+      "sha256": "08a7472dd787a6ac4758b56709137fc45377c0573834f6b3fe0436aa4a3fb5f5",
+      "preimage_sha256": "052e2953794feb154a6ee1ae63be7021e5e0640f4c1d62b537dce60009b8ea56"
+    },
+    {
+      "path": "src/game/original_ui_options_menu_widgets50kg.cpp",
+      "sha256": "b415cb00553037d2d33fbdcf6ef24e1621a3bdef3ae1da88e6027e43dda91dc8",
+      "preimage_sha256": "3a0ee82de7c4eaa2386b156758823a958e8c03c423a04ba1c0d1a2d728296a90"
+    },
+    {
+      "path": "src/game/original_ui_options_menu_widgets50kg.h",
+      "sha256": "fa1edba2f51e92c5ea551d7ad8b6577fef006331134205a2572ed643d684b006",
+      "preimage_sha256": "f8645bad13c4350f71675bb9cf070ce3e30757e52ff3cc9148d1b3397ac1a839"
+    },
+    {
+      "path": "src/game/original_ui_options_particle_render_state50kg.cpp",
+      "sha256": "ed88a4b69c493d3ca45c82a602ef54aa4d6844654f1d11606b70cca75c4ef741",
+      "preimage_sha256": null
+    },
+    {
+      "path": "src/game/original_ui_options_particle_render_state50kg.h",
+      "sha256": "014ceb6a5ee64f2b3a88c9b14ed908c84acc48da436bd4d7ee762305dcb8664a",
+      "preimage_sha256": null
+    },
+    {
+      "path": "platform/linux/native/original_ui_options_draw_contribution50kg.cpp",
+      "sha256": "d11f72849234646c1bb611abf98f1047dca1e028761e975f585e262392419e0e",
+      "preimage_sha256": "93f9b769e74331b94f6c6579bfbbb47b741fe6c4584edb51e867afe7faa9b56b"
+    },
+    {
+      "path": "platform/linux/native/original_ui_options_draw_contribution50kg.h",
+      "sha256": "f273acfd87b0ab5e4d59fd8cb43ab9b9a4486ac365f93781a525ddd8023cbde8",
+      "preimage_sha256": "bdf549cb21cf862f4378900b15078f30d54dbd6c5d83cef30f67576f9098bab5"
+    },
+    {
+      "path": "platform/linux/native/original_ui_options_draw_resources50kg.cpp",
+      "sha256": "ad43475ecca11c8ffe3de5b389e80a3451d5c0caae2d724a81950949a64215ca",
+      "preimage_sha256": "fbd0211b9942e07038c0b23b9abb71b157959231f4a3ad85c21a619f7fb909d9"
+    },
+    {
+      "path": "platform/linux/native/original_ui_options_draw_resources50kg.h",
+      "sha256": "704da8a8056cb1d46b142fe869dc35aeefb368336aa50401f948d5e4b61f4faf",
+      "preimage_sha256": "535ece47c5869532ee102cf6b94ca324c16c2b243a4a310d2e89eec7a3712d3a"
+    },
+    {
+      "path": "platform/linux/native/original_ui_options_particle_adapter50kg.h",
+      "sha256": "7281876a4c3eb6d73dafe28017696c3088c61affd941eb6694579e9bae24b7da",
+      "preimage_sha256": null
+    },
+    {
+      "path": "platform/linux/native/original_ui_options_session50kg.cpp",
+      "sha256": "64995d6ef966d97a8e5131b96d6dd3b2d02ee23e5edb208722ad5af1ced1529e",
+      "preimage_sha256": null
+    },
+    {
+      "path": "platform/linux/native/original_ui_options_session50kg.h",
+      "sha256": "71930df54f737d8a3f715714c1ebd79b4c455e061561c8372c883cfa77898b6e",
+      "preimage_sha256": null
+    }
+  ]
+}

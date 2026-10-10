@@ -47,6 +47,8 @@ public:
     OriginalUiMainFireOwner50KG(const OriginalUiMainFireOwner50KG&)=delete;
     OriginalUiMainFireOwner50KG& operator=(const OriginalUiMainFireOwner50KG&)=delete;
     OriginalUiMainFireStatus50KG initialize(const OriginalUiMainSceneOwner50KG&) noexcept;
+    // Same source emitter equations, explicitly admitted actual Options owner.
+    OriginalUiMainFireStatus50KG initializeOptionsMenu(const OriginalUiMainSceneOwner50KG&) noexcept;
     // Separate source subscribers: caller must preserve actual manager order.
     // No manufactured fixed tick, elapsed clamp, private seed, or reseeding.
     // Shared RNG is the SAME application raw308030 state as other consumers.
@@ -66,5 +68,6 @@ public:
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
+    OriginalUiMainFireStatus50KG initializeScene(const OriginalUiMainSceneOwner50KG&,bool options) noexcept;
 };
 }

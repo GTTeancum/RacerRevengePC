@@ -25,4 +25,7 @@ enum class OriginalUiMainParticleLightingStatus50KG : std::uint8_t {
 OriginalUiMainParticleLightingStatus50KG prepareOriginalUiMainParticleLighting50KG(
     const OriginalUiMainSceneOwner50KG&,
     OriginalUiMainParticleLighting50KG&) noexcept;
+OriginalUiMainParticleLightingStatus50KG prepareOriginalUiOptionsParticleLighting50KG(
+    const OriginalUiMainSceneOwner50KG& optionsScene,
+    OriginalUiMainParticleLighting50KG&) noexcept;
 }
