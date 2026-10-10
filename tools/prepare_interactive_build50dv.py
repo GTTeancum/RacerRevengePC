@@ -71,7 +71,10 @@ def main():
         'src/game/original_ui_main_particle_lighting50kg.cpp',
         'src/assets/original_ui_main_particle_material50kg.cpp',
         'src/game/original_ui_main_particle_geometry50kg.cpp',
+        'src/game/original_ui_main_particle_render_state50kg.cpp',
         'platform/linux/native/original_ui_main_audio50kg.cpp',
+        'platform/linux/native/original_ui_main_draw50kg.cpp',
+        'platform/linux/native/original_ui_main_session50kg.cpp',
         'src/game/original_ui_main_widget_manager50kg.cpp',
     ):
         absolute = str(ROOT / source)
