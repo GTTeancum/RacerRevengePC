@@ -17,3 +17,9 @@ Candidate: e96209f9ccee45d8229f0964f6416b0724ceb0b1. The centrally reserved asse
 This is cold asset preparation only. It does not establish a successful full game build, rendering, audio playback, original-AI driving, complete GC behavior, or a Windows result. The importer still reports unsupported geometry and unresolved material bindings; the retained visual selection is not proof that those limitations have been fixed. Historical gameplay videos remain historical.
 
 The sole hourly software-check slot is consumed. The shared reservation permits the next centralized software check no earlier than October 10 at 15:18 UTC. Helpers remain source-only.
+
+## Subsequent original UI loader source integration (untested)
+
+Added a newly reconstructed immutable original UI archive loader and manifest-backed catalog for ten archives / 958 members. The loader authenticates compressed archive identity, decoded member table/order/bounds and every member digest before publication. Original seven enum ordinals are preserved; course/rider/options are appended. This is new source, not recovered lost implementation. The historical 978-member claim remains unresolved and was not padded into the catalog.
+
+Root and an independent helper reviewed the source contracts. No software check ran for this change, no raw original UI archives were recovered, and the game frontend remains inactive. Source-proven screen/depth/material ownership and native draw submission still need integration. This change makes no finished-menu or visual-equivalence claim.
