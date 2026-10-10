@@ -19,6 +19,10 @@ struct OriginalUiNativeSpan50KG {
     // Untextured spans must leave every sampler field unspecified. No texture
     // is bound as a surrogate and no irrelevant sampler policy is invented.
     MaterialTextureSampler50EB sampler{};
+    // Only the two explicit source Diffuse modes consume these fields. The
+    // material owner supplies FGE and the admitted GREATER/AREF0/KEEP test.
+    bool sourceFogEnabled = false;
+    bool sourceAlphaTestGreaterZero = false;
 };
 struct OriginalUiNativeDraw50KG {
     OriginalUiDraw50KG draw{};
@@ -29,12 +33,19 @@ struct OriginalUiNativeDraw50KG {
     // cleared to alpha 1 and RGB-only writes preserve that value. RGBA readback
     // is presentation data, NOT source framebuffer-alpha recovery.
     bool opaquePresentationAlphaOnly = false;
-    // Actual Main ParticleCode's source fog byte /256, parallel to all draw
-    // vertices. Required if any mainParticle span exists; other slots are 0.
+    // Source fog byte /256, parallel to all draw vertices. Required for Main
+    // particles or a fog-enabled Diffuse span. Main admits 0..254, Diffuse
+    // 0..255. Unused slots may be 0; per-span policy controls consumption.
     // This is a separate native stream, never a fabricated texture channel.
     const float* particleFog = nullptr;
     std::uint32_t particleFogCount = 0;
     float particleFogColor[3] = {0.f,0.f,0.f}; // authored source RGB /255
+    // Original pre-divide projected W, parallel to all vertices. Required for
+    // Diffuse/Compressed spans; consumed only by those modes. Ordinary screen
+    // and particle spans retain W=1. Preserves source perspective ST/Q while
+    // packet RGB and fog remain screen-linear. No reconstruction from depth.
+    const float* sourceRasterW = nullptr;
+    std::uint32_t sourceRasterWCount = 0;
     // Vertex position[2] is the original integer packet Z in [0,16777215].
     // The vertex shader normalizes it once into native D24 reverse depth.
     // XY stays on the 640x448 source canvas. UI corners are TL,TR,BR,BL;

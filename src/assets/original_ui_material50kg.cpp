@@ -334,16 +334,23 @@ bool readOriginalUiOptionsMenuPromptFallbackMaterial50KG(const OriginalUiArchive
         output=std::move(result);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }
-bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
+static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG& pass,
     const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
-    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    OriginalUiMaterialDiagnostic50KG& d, bool litProgram,
+    bool& fogEnabled, bool& alphaTestGreaterZero) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
             return fail(d, Error::untexturedAdapterRequired, "zero-map requires untextured material policy", 0x2474b8u);
-        if (!sourceIdentityKnown(pass) || !pass.inheritedTemplate || pass.microprogram != "ScreenObject" ||
+        const bool programMatches = litProgram ?
+            ((same(pass.microprogram, "Diffuse") || same(pass.microprogram, "DiffuseCompressed")) &&
+             pass.provenance.origin == OriginalUiMaterialOrigin50KG::authoredPsm &&
+             pass.inheritedTemplate == catalogMember(OriginalUiArchiveId50KG::appStart,
+                 "AppStart\\DefaultMT.psm")) : pass.microprogram == "ScreenObject";
+        if (!sourceIdentityKnown(pass) || !pass.inheritedTemplate || !programMatches ||
             pass.enabled != 1 || pass.textureCount != 1 || pass.textureCoordinateIndex != 0)
-            return fail(d, Error::profile, "enabled single-map ScreenObject", 0x2471bcu);
+            return fail(d, Error::profile, litProgram ? "authored DefaultMT Diffuse/Compressed" :
+                "enabled single-map ScreenObject", 0x2471bcu);
         for (const auto& field : pass.authored.values)
             if (field.sourceValuePresent && !knownPassField(field.key))
                 return fail(d, Error::unsupportedField, field.key.c_str(), 0x247110u);
@@ -365,11 +372,17 @@ bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
             !expect(Field::colorClampingMethod, 1) || !expect(Field::alphaCorrectionValue, 0) ||
             !expect(Field::alphaBlendingControlInUnitsOfPixels, 0) ||
             !expect(Field::gouraudShadingOnOff, 1) || !expect(Field::textureMappingOnOff, 1) ||
-            !expect(Field::foggingOnOff, 0) || !expect(Field::onePassAntiAliasingOnOff, 0) ||
+            (!litProgram && !expect(Field::foggingOnOff, 0)) || !expect(Field::onePassAntiAliasingOnOff, 0) ||
             !expect(Field::textureCoordinatesSTQorUV, 0) ||
             !expect(Field::environmentContext0or1, 0) ||
-            !expect(Field::fragmentValueControlFixedOrNot, 0) || !expect(Field::alphaTestOnOff, 0) ||
+            !expect(Field::fragmentValueControlFixedOrNot, 0) ||
+            (!litProgram && !expect(Field::alphaTestOnOff, 0)) ||
             !expect(Field::destinationAlphaTestOnOff, 0)) return false;
+        const bool sourceFog = litProgram && value(Field::foggingOnOff) != 0;
+        const bool sourceAlphaTest = litProgram && value(Field::alphaTestOnOff) != 0;
+        if (sourceAlphaTest && (!expect(Field::alphaTestMethod, 6) ||
+            !expect(Field::alphaReferenceValue, 0) ||
+            !expect(Field::processingMethodWhenFailedInAlphaTest, 0))) return false;
         if (texture.revision != 1 || texture.flags || texture.kind > 1 || texture.mips.size() != 1)
             return fail(d, Error::texture, "single original indexed RGBA mip", 0x24e880u);
         const auto& mip = texture.mips.front();
@@ -421,8 +434,25 @@ bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
         policy.environmentContext = static_cast<std::uint8_t>(value(Field::environmentContext0or1));
         policy.requiresOriginalDepthOwner = policy.depthMethod != 1 || policy.depthWrite;
         policy.requiresSeparateAlphaStore = blend != 0;
-        output = policy; d = {}; return true;
+        output = policy; fogEnabled = sourceFog; alphaTestGreaterZero = sourceAlphaTest;
+        d = {}; return true;
     } catch (...) { d.error = Error::allocation; return false; }
+}
+bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
+    const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    bool fog = false, alphaTest = false;
+    return prepareOriginalUiOneMapMaterial50KM(pass, texture, output, d, false, fog, alphaTest);
+}
+bool prepareOriginalUiLitMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const Texture48E& texture, OriginalUiLitMaterial50KM& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    OriginalUiLitMaterial50KM next;
+    if (!prepareOriginalUiOneMapMaterial50KM(pass, texture, next.raster, d, true,
+        next.fogEnabled, next.alphaTestGreaterZero)) return false;
+    next.program = same(pass.microprogram, "Diffuse") ? OriginalUiLitProgram50KM::diffuse :
+        OriginalUiLitProgram50KM::diffuseCompressed;
+    output = next; return true;
 }
 bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     OriginalUiNativeUntexturedMaterial50KG& output,

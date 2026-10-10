@@ -66,6 +66,7 @@ def main():
         'src/game/original_ui_movement_widget50kg.cpp',
         'src/game/original_ui_main_camera50kg.cpp',
         'src/game/original_ui_main_particle_camera50kg.cpp',
+        'src/game/original_ui_lit_geometry50km.cpp',
         'src/game/original_ui_rider_camera50kg.cpp',
         'src/game/original_ui_rider_render_context50kg.cpp',
         'src/game/original_ui_rider_model_fog50kg.cpp',

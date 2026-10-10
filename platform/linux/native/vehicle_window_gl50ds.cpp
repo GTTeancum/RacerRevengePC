@@ -972,9 +972,10 @@ struct VehicleWindowGl50DS::Storage {
     std::uint8_t menuPublished = 0;
     U uiTargets[2]{}, uiColors[2]{}, uiDepths[2]{};
     U uiProgram = 0, uiVertexShader = 0, uiFragmentShader = 0;
-    U uiVertexBuffer = 0, uiIndexBuffer = 0, uiVertexArray = 0, uiParticleFogBuffer = 0;
+    U uiVertexBuffer = 0, uiIndexBuffer = 0, uiVertexArray = 0, uiParticleFogBuffer = 0, uiSourceRasterWBuffer = 0;
     I uiCanvasUniform = -1, uiImageUniform = -1, uiAlphaUniform = -1, uiTexturedUniform = -1;
-    I uiParticleFogColorUniform = -1;
+    I uiParticleFogColorUniform = -1, uiSourceRasterUniform = -1;
+    I uiSourceFogEnabledUniform = -1, uiSourceAlphaTestUniform = -1;
     // Cold immutable atlas maxima; native blend admission is a joint texture
     // and vertex bound. Real Main atlases legitimately contain raw alpha255.
     std::uint8_t uiTextureMaximumAlpha[assets::maxMaterialTextureAssets50EA]{};
@@ -1436,7 +1437,7 @@ struct VehicleWindowGl50DS::Storage {
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
             hostHudVertexBuffer || hostHudIndexBuffer || hostHudVertexArray) return true;
         if (uiProgram || uiVertexShader || uiFragmentShader ||
-            uiVertexBuffer || uiIndexBuffer || uiVertexArray || uiParticleFogBuffer) return true;
+            uiVertexBuffer || uiIndexBuffer || uiVertexArray || uiParticleFogBuffer || uiSourceRasterWBuffer) return true;
         for (U b = 0; b < 2; ++b)
             if (uiTargets[b] || uiColors[b] || uiDepths[b]) return true;
         if (cableVertexBuffer || cableIndexBuffer || cableVertexArray) return true;
@@ -2108,23 +2109,28 @@ in vec3 rrPosition;
 in vec2 rrUv;
 in vec4 rrColor;
 in float rrParticleFog;
+in float rrSourceRasterW;
 uniform vec4 canvasToClip;
+uniform int uiSourceRaster;
 out vec2 uiUv;
-out vec4 uiColor;
-out float uiParticleFog;
+noperspective out vec4 uiColor;
+noperspective out float uiParticleFog;
 void main() {
+    float w = uiSourceRaster != 0 ? rrSourceRasterW : 1.0;
     gl_Position = vec4(rrPosition.xy * canvasToClip.xy + canvasToClip.zw,
-        (rrPosition.z / 16777215.0) * 2.0 - 1.0, 1.0);
+        (rrPosition.z / 16777215.0) * 2.0 - 1.0, 1.0) * w;
     uiUv = rrUv; uiColor = rrColor; uiParticleFog = rrParticleFog;
 }
 )GLSL";
         constexpr const char* fragmentSource = R"GLSL(#version 150 core
 in vec2 uiUv;
-in vec4 uiColor;
-in float uiParticleFog;
+noperspective in vec4 uiColor;
+noperspective in float uiParticleFog;
 uniform sampler2D uiImage;
 uniform float uiAlphaScale;
 uniform int uiTextured;
+uniform int uiSourceFogEnabled;
+uniform int uiSourceAlphaTest;
 uniform vec4 uiParticleFogColor;
 out vec4 viewerOutput;
 void main() {
@@ -2133,10 +2139,10 @@ void main() {
         // MODULATE clamps before blend, not after addition to destination RGB.
         viewerOutput = vec4(clamp(raw.rgb * (255.0 / 128.0), 0.0, 1.0),
             clamp(raw.a * uiAlphaScale, 0.0, 1.0));
-        if (uiTextured == 2) {
-            // Actual DefaultMT ATE/GREATER/AREF0/KEEP. Source MODULATE alpha
-            // is byte-quantized before the test: values below one byte fail.
-            if (raw.a * (255.0 * 255.0 / 128.0) < 1.0) discard;
+        // Actual DefaultMT ATE/GREATER/AREF0/KEEP. Source MODULATE alpha
+        // is byte-quantized before the test: values below one byte fail.
+        if (uiSourceAlphaTest != 0 && raw.a * (255.0 * 255.0 / 128.0) < 1.0) discard;
+        if (uiSourceFogEnabled != 0) {
             // Source F is a byte, with both fog weights divided by256.
             // Fog changes RGB only; A/128 remains the blend coefficient.
             viewerOutput.rgb = viewerOutput.rgb * uiParticleFog +
@@ -2175,6 +2181,7 @@ void main() {
         shaderGl.bindAttribLocation(uiProgram, 1, "rrUv");
         shaderGl.bindAttribLocation(uiProgram, 2, "rrColor");
         shaderGl.bindAttribLocation(uiProgram, 3, "rrParticleFog");
+        shaderGl.bindAttribLocation(uiProgram, 4, "rrSourceRasterW");
         shaderGl.bindFragDataLocation(uiProgram, vehicleGlColorOutput50CZ, "viewerOutput");
         shaderGl.linkProgram(uiProgram);
         I linked = 0; shaderGl.getProgramiv(uiProgram, 0x8B82, &linked);
@@ -2190,9 +2197,13 @@ void main() {
         uiAlphaUniform = shaderGl.getUniformLocation(uiProgram, "uiAlphaScale");
         uiTexturedUniform = shaderGl.getUniformLocation(uiProgram, "uiTextured");
         uiParticleFogColorUniform = shaderGl.getUniformLocation(uiProgram, "uiParticleFogColor");
+        uiSourceRasterUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceRaster");
+        uiSourceFogEnabledUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceFogEnabled");
+        uiSourceAlphaTestUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceAlphaTest");
         if (!check("locate original UI uniforms")) return false;
         if (uiCanvasUniform < 0 || uiImageUniform < 0 || uiAlphaUniform < 0 || uiTexturedUniform < 0 ||
-            uiParticleFogColorUniform < 0)
+            uiParticleFogColorUniform < 0 || uiSourceRasterUniform < 0 ||
+            uiSourceFogEnabledUniform < 0 || uiSourceAlphaTestUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "original UI uniform missing");
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::none;
         constexpr std::intptr_t vertexBytes = originalUiMaximumQuads50KG * 4 * sizeof(assets::Vertex48B);
@@ -2206,6 +2217,11 @@ void main() {
         gl.bufferData(arrayBuffer, fogBytes, nullptr, dynamicDraw);
         if (!check("allocate bounded original UI particle fog")) return false;
         if (!uiParticleFogBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI fog buffer");
+        if (!verifyBuffer(arrayBuffer, fogBytes, dynamicDraw)) return false;
+        gl.genBuffers(1, &uiSourceRasterWBuffer); drawGl.bindBuffer(arrayBuffer, uiSourceRasterWBuffer);
+        gl.bufferData(arrayBuffer, fogBytes, nullptr, dynamicDraw);
+        if (!check("allocate bounded original UI source W")) return false;
+        if (!uiSourceRasterWBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI source W buffer");
         if (!verifyBuffer(arrayBuffer, fogBytes, dynamicDraw)) return false;
         // Heap allocation is cold-only; no large transient frame stack.
         std::unique_ptr<U[]> indices(new (std::nothrow) U[originalUiMaximumQuads50KG * 6]);
@@ -2253,7 +2269,22 @@ void main() {
         }
         void* fogPointer = nullptr; gl.getVertexAttribPointerv(3, 0x8645, &fogPointer);
         if (!check("verify original UI particle fog offset")) return false;
-        return !fogPointer || fail(*diagnostic, VehicleWindowError50DS::layout, "particle fog offset mismatch");
+        if (fogPointer) return fail(*diagnostic, VehicleWindowError50DS::layout, "particle fog offset mismatch");
+        drawGl.bindBuffer(arrayBuffer, uiSourceRasterWBuffer);
+        gl.enableVertexAttribArray(4);
+        gl.vertexAttribPointer(4, 1, floatType, 0, sizeof(float), nullptr);
+        if (!check("create original UI source W layout")) return false;
+        const I wExpected[] = {1, 1, sizeof(float), static_cast<I>(floatType), 0,
+            static_cast<I>(uiSourceRasterWBuffer), 0};
+        for (U p = 0; p < 7; ++p) {
+            I value = 0; gl.getVertexAttribiv(4, fogProperties[p], &value);
+            if (!check("verify original UI source W attribute")) return false;
+            if (value != wExpected[p]) return fail(*diagnostic, VehicleWindowError50DS::layout,
+                "source W attribute mismatch");
+        }
+        void* wPointer = nullptr; gl.getVertexAttribPointerv(4, 0x8645, &wPointer);
+        if (!check("verify original UI source W offset")) return false;
+        return !wPointer || fail(*diagnostic, VehicleWindowError50DS::layout, "source W offset mismatch");
     }
     bool createHostHud() noexcept {
         if (!request.enableHostHud) return true;
@@ -3333,6 +3364,7 @@ void main() { viewerOutput = hudColor; }
                 !deleteName(uiVertexArray, gl.deleteVertexArrays, d) ||
                 !deleteName(uiVertexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(uiParticleFogBuffer, gl.deleteBuffers, d) ||
+                !deleteName(uiSourceRasterWBuffer, gl.deleteBuffers, d) ||
                 !deleteName(uiIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
             for (U b = 0; b < 2; ++b)
                 if (!deleteName(uiTargets[b], gl.deleteFramebuffers, d) ||
@@ -3682,7 +3714,7 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
     auto& s = *storage_; const auto& input = native.draw;
     if (!s.current(d)) return false;
     if (s.active || s.frameSet || !s.request.enableOriginalUi || !s.uiProgram ||
-        !s.uiVertexBuffer || !s.uiIndexBuffer || !s.uiVertexArray || !s.uiParticleFogBuffer ||
+        !s.uiVertexBuffer || !s.uiIndexBuffer || !s.uiVertexArray || !s.uiParticleFogBuffer || !s.uiSourceRasterWBuffer ||
         !s.uiTargets[0] || !s.uiTargets[1] ||
         width <= 0 || height <= 0 || width > s.maximumWidth || height > s.maximumHeight ||
         input.canvasWidth != 640.f || input.canvasHeight != 448.f ||
@@ -3712,11 +3744,13 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
             return fail(d, VehicleWindowError50DS::frame, "UI requires original 24-bit packet depth and raw alpha <=128");
     }
     U next = 0;
-    bool anyParticle = false;
+    bool anyFog = false, anySourceRaster = false;
     for (U i = 0; i < input.spanCount; ++i) {
         const auto& span = input.spans[i]; const auto& state = native.states[i];
         const bool particle = span.materialMode == OriginalUiMaterialMode50KG::mainParticle;
-        const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate || particle;
+        const bool sourceRaster = span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuse ||
+            span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed;
+        const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate || particle || sourceRaster;
         const bool untextured = span.materialMode == OriginalUiMaterialMode50KG::untexturedVertexColor;
         const float blendAlphaScale = textured ? (255.f / 128.f) * (255.f / 128.f) : 255.f / 128.f;
         if (!span.quadCount || span.firstQuad != next || span.quadCount > input.quadCount - next ||
@@ -3727,8 +3761,11 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
             (state.depth != OriginalUiDepth50KG::never && state.depth != OriginalUiDepth50KG::always &&
                 state.depth != OriginalUiDepth50KG::greaterEqual && state.depth != OriginalUiDepth50KG::greater))
             return fail(d, VehicleWindowError50DS::material, "invalid ordered original UI material/depth policy");
+        if (!sourceRaster && (state.sourceFogEnabled || state.sourceAlphaTestGreaterZero))
+            return fail(d, VehicleWindowError50DS::material, "source Diffuse flags on another material identity");
+        anyFog = anyFog || particle || (sourceRaster && state.sourceFogEnabled);
+        anySourceRaster = anySourceRaster || sourceRaster;
         if (particle) {
-            anyParticle = true;
             if (span.blend == OriginalUiBlend50KG::opaque || state.depth != OriginalUiDepth50KG::greaterEqual ||
                 state.depthWrite || state.sampler.minification != MaterialTextureFilter50EB::linear ||
                 state.sampler.magnification != MaterialTextureFilter50EB::linear ||
@@ -3773,15 +3810,32 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
     }
     if (next != input.quadCount)
         return fail(d, VehicleWindowError50DS::frame, "original UI spans must partition all quads exactly");
-    if (anyParticle && (!native.particleFog || native.particleFogCount != input.quadCount * 4))
-        return fail(d, VehicleWindowError50DS::frame, "Main particles require the parallel source fog stream");
+    if (anyFog && (!native.particleFog || native.particleFogCount != input.quadCount * 4))
+        return fail(d, VehicleWindowError50DS::frame, "fog-enabled materials require the parallel source fog stream");
     if ((native.particleFog == nullptr) != (native.particleFogCount == 0) ||
         (native.particleFog && native.particleFogCount != input.quadCount * 4))
         return fail(d, VehicleWindowError50DS::frame, "invalid particle fog stream bounds");
     for (U i = 0; i < native.particleFogCount; ++i)
         if (!std::isfinite(native.particleFog[i]) || native.particleFog[i] < 0.f ||
-            native.particleFog[i] > 254.f / 256.f)
+            native.particleFog[i] > 255.f / 256.f)
             return fail(d, VehicleWindowError50DS::frame, "invalid source particle fog coefficient");
+    if ((native.sourceRasterW == nullptr) != (native.sourceRasterWCount == 0) ||
+        (native.sourceRasterW && native.sourceRasterWCount != input.quadCount * 4) ||
+        (anySourceRaster && !native.sourceRasterW))
+        return fail(d, VehicleWindowError50DS::frame, "invalid or missing source perspective W stream");
+    for (U i = 0; i < native.sourceRasterWCount; ++i)
+        if (!std::isfinite(native.sourceRasterW[i]) || native.sourceRasterW[i] <= 0.f)
+            return fail(d, VehicleWindowError50DS::frame, "source perspective W must be finite and positive");
+    for (U i = 0; i < input.spanCount; ++i) {
+        const auto& span = input.spans[i]; const auto& state = native.states[i];
+        const bool particle = span.materialMode == OriginalUiMaterialMode50KG::mainParticle;
+        if (!particle && !state.sourceFogEnabled) continue;
+        for (U v = span.firstQuad * 4; v < (span.firstQuad + span.quadCount) * 4; ++v) {
+            const float f = native.particleFog[v];
+            if ((particle && f > 254.f / 256.f) || (!particle && std::floor(f * 256.f) != f * 256.f))
+                return fail(d, VehicleWindowError50DS::frame, "fog stream does not match source program byte domain");
+        }
+    }
     for (float value : native.particleFogColor)
         if (!std::isfinite(value) || value < 0.f || value > 1.f)
             return fail(d, VehicleWindowError50DS::frame, "invalid authored particle fog color");
@@ -3858,9 +3912,13 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
             native.particleFogColor[1], native.particleFogColor[2], 1.f);
         s.drawGl.bindVertexArray(s.uiVertexArray); s.drawGl.bindBuffer(arrayBuffer, s.uiVertexBuffer);
         s.drawGl.bufferSubData(arrayBuffer, 0, std::intptr_t(input.quadCount) * 4 * sizeof(assets::Vertex48B), input.vertices);
-        if (anyParticle) {
+        if (anyFog) {
             s.drawGl.bindBuffer(arrayBuffer, s.uiParticleFogBuffer);
             s.drawGl.bufferSubData(arrayBuffer, 0, std::intptr_t(native.particleFogCount) * sizeof(float), native.particleFog);
+        }
+        if (anySourceRaster) {
+            s.drawGl.bindBuffer(arrayBuffer, s.uiSourceRasterWBuffer);
+            s.drawGl.bufferSubData(arrayBuffer, 0, std::intptr_t(native.sourceRasterWCount) * sizeof(float), native.sourceRasterW);
         }
         s.drawGl.bindBuffer(elementBuffer, s.uiIndexBuffer);
         accepted = s.check("prepare authenticated original UI frame");
@@ -3877,8 +3935,13 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
             }
             s.gl.uniform1f(s.uiAlphaUniform, span.alphaScale);
             const bool particle = span.materialMode == OriginalUiMaterialMode50KG::mainParticle;
-            const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate || particle;
-            s.gl.uniform1i(s.uiTexturedUniform, particle ? 2 : (textured ? 1 : 0));
+            const bool sourceRaster = span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuse ||
+                span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed;
+            const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate || particle || sourceRaster;
+            s.gl.uniform1i(s.uiTexturedUniform, textured ? 1 : 0);
+            s.gl.uniform1i(s.uiSourceRasterUniform, sourceRaster ? 1 : 0);
+            s.gl.uniform1i(s.uiSourceFogEnabledUniform, (particle || state.sourceFogEnabled) ? 1 : 0);
+            s.gl.uniform1i(s.uiSourceAlphaTestUniform, (particle || state.sourceAlphaTestGreaterZero) ? 1 : 0);
             s.gl.bindTexture(texture2D, textured ? input.textures->texture(span.textureIndex) : 0);
             s.drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.quadCount * 6), 0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(span.firstQuad) * 6 * sizeof(U)), 0);

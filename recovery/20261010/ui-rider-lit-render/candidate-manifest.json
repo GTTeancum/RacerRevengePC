@@ -1,0 +1,54 @@
+{
+  "source_only": true,
+  "execution": "none",
+  "files": [
+    {
+      "path": "platform/linux/native/original_ui_draw50kg.h",
+      "operation": "replace",
+      "preimage_sha256": "7c38b4b6e141e8d957377529553ddbe18a9b145b4f93f1b8709eefc598be9cd7",
+      "candidate_sha256": "f7b35513c26eeec3d45fb50439a1aac259d565e86613bfc8da6d3ba17454e47a"
+    },
+    {
+      "path": "platform/linux/native/original_ui_lit_material_adapter50km.h",
+      "operation": "new",
+      "preimage_sha256": null,
+      "candidate_sha256": "f6d2788bfc4645e5853418e269a947a53bbbc9577e1954123138248e213b1436"
+    },
+    {
+      "path": "platform/linux/native/original_ui_native_draw50kg.h",
+      "operation": "replace",
+      "preimage_sha256": "5606ef28e2b2ba9bab132567911e1fbd1a7434f02fb971be198815a7324b2862",
+      "candidate_sha256": "be7362032fdc6c7a8f2f2f34856794db9714e6019608b3d0bf3678c78326d854"
+    },
+    {
+      "path": "platform/linux/native/vehicle_window_gl50ds.cpp",
+      "operation": "replace",
+      "preimage_sha256": "fbb5559d72f81c8f8c246a88e02b94dca02eea30e25c739f324650917ee81ca7",
+      "candidate_sha256": "c7c600e6723b167c75ccc777e9960a4c53073a3474850e66b23e30fd89d9e613"
+    },
+    {
+      "path": "src/assets/original_ui_material50kg.cpp",
+      "operation": "replace",
+      "preimage_sha256": "3f4ce705f1f6effeae587e90c9c60cc1e7309c1cc4a9f62b4ff57d605284ec5e",
+      "candidate_sha256": "4ddc68a7ce2c26f55adc50c1a816b63ef01643f60f9f765e4145ed9bff9b824b"
+    },
+    {
+      "path": "src/assets/original_ui_material50kg.h",
+      "operation": "replace",
+      "preimage_sha256": "b30f1ca061f9997280693f97cf4702765be728d260c053366d38b3cbed987985",
+      "candidate_sha256": "6ca6def8d2456542d0267fa7b3c8675207a50ae2e75859836dc3139148f30a87"
+    },
+    {
+      "path": "src/game/original_ui_lit_geometry50km.cpp",
+      "operation": "new",
+      "preimage_sha256": null,
+      "candidate_sha256": "e20704fae6b1901a50067a231dc10db9ad8cf94f13e309339df4b95fe012dfe0"
+    },
+    {
+      "path": "src/game/original_ui_lit_geometry50km.h",
+      "operation": "new",
+      "preimage_sha256": null,
+      "candidate_sha256": "32713d9a6d4699b1f2d29952f3b562c4e49ab75da4229e59ea3ddcfac947ef7b"
+    }
+  ]
+}

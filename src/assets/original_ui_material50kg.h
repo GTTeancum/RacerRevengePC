@@ -213,4 +213,19 @@ bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass5
 bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG&,
     const Texture48E& exactAtlas, OriginalUiNativeMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;
+// Separate original 3D programs. These do not become ScreenObject passes.
+enum class OriginalUiLitProgram50KM : std::uint8_t { diffuse, diffuseCompressed };
+struct OriginalUiLitMaterial50KM {
+    OriginalUiNativeMaterial50KG raster{};
+    OriginalUiLitProgram50KM program = OriginalUiLitProgram50KM::diffuseCompressed;
+    bool fogEnabled = false, alphaTestGreaterZero = false;
+};
+// Actual authored, DefaultMT-associated one-map Diffuse/Compressed only.
+// Requires original normal/light/projection producers and a real fog-byte
+// stream when enabled. This CPU admission is not those owners or GPU readiness.
+// Kind2/IPUM, multiple mips, destination-alpha factors and unknown tests reject.
+bool prepareOriginalUiLitMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const Texture48E& exactTexture, OriginalUiLitMaterial50KM&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+
 }

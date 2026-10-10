@@ -13,7 +13,10 @@ enum class OriginalUiBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };
 enum class OriginalUiMaterialMode50KG : std::uint8_t {
     unspecified, texturedModulate, untexturedVertexColor,
     // Actual Main ParticleCode: MODULATE, alpha GREATER 0, source fog.
-    mainParticle
+    mainParticle,
+    // Actual DefaultMT Diffuse identities. CPU owner supplies original packet
+    // RGB, source fixed-point XY/Z and perspective W; no generic relighting.
+    sourceDiffuse, sourceDiffuseCompressed
 };
 struct OriginalUiSpan50KG {
     // Contiguous quad partition in the caller's source-resolved draw order.
