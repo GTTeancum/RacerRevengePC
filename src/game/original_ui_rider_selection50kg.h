@@ -58,8 +58,8 @@ struct OriginalUiRiderAppearance50KG {
     std::array<OriginalUiRiderWidgetEnable50KG,6> widgets{};
     std::size_t count=0;
     std::uint32_t promptMask42C=0;
-    // Before widget calls, apply actual saved lighting520/cameraTint530 when
-    // unlocked; otherwise actual locked lighting500/cameraTint510. These are
+    // Before widget calls, apply actual saved ambient520/directionalColor530 when
+    // unlocked; otherwise actual locked ambient500/directionalColor510. These are
     // references to the page's real captured colors, never replacement art.
     bool useSavedColors=false;
 };

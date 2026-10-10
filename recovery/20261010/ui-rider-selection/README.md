@@ -37,7 +37,7 @@ no invented profile defaults. The source capture/restore of first pod-widget
 transform, selected-control reset2A5A00, and deferred4EC=3 are explicit proposals,
 not completed actions. Appearance is between movement and reset/restore.
 
-Appearance1EAFB0 uses actual saved lighting520/camera tint530 for unlocked riders,
+Appearance1EAFB0 uses actual saved ambient520/directional light color530 for unlocked riders,
 locked colors500/510 otherwise. It calls widget enable2A7A00 in exact order:
 - Unlocked: hide4, show1; mode2 show117/118/119; show7 iff mode2 career byte is
   nonzero, otherwise hide7; prompt mask7 for reset available,3 otherwise.
@@ -54,7 +54,7 @@ No new route registry, readiness mask, fake popup, save IO, or gameplay launch.
 Entry74=1E9C50 clears42C/4E0/4E4, sets4E8=1, hides widget4, disables Group2,
 restores selected rider/slot, handles optional4BC child, clears UI popup3D8 and
 publishes page430 through global442F70+28. OpeningAC=1E9E70 sets locked colors
-(0,0,0,64)/(0,0,0,255), captures actual ambient/light tint, enters Group1 for
+(0,0,0,64)/(0,0,0,255), captures actual ambient/directional light color, enters Group1 for
 actual player, sets globalUI474=0/478=1 for player2, refreshes appearance then
 clears42C, optionally requests scene animation7, and disables Group2 again.
 OpenedB0=1EA090 enables Group2, updates title widget87 from localized index168
@@ -63,7 +63,7 @@ on non-career branches, then refreshes appearance.
 
 ClosingB4=1EA360 clears42C, disables Group2, hides the selected control's SECOND
 widget (name text), and if4E8!=0 requests the scene animation transition with
-float1.0. Closing-thresholdB8=1EA3E0 restores captured lighting520/tint530; for
+float1.0. Closing-thresholdB8=1EA3E0 restores captured ambient520/directional color530; for
 player2 restores globalUI474=1/478=0. ClosedBC is shared1D7A00.
 
 Rider begin7C1ED1C0 entry delegates shared aperture; exit is no-op. Actual update

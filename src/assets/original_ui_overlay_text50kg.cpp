@@ -106,11 +106,15 @@ bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
             }
         } else {
             const auto* text=s->find("Text");
-            if (!text) return fail(d,OriginalUiPageError50KG::missingKey,*s,"Text",0x2A9950);
-            if (r.height) { if (!split(text->text,r,*s,"Text",d)) return false; }
+            // 2A9950 ignores GetString's return. Missing key1588DC..1588EC
+            // copies literal3A6288 (empty string), then the same direct/split
+            // constructor runs. Rider65/66/73 are authentic examples.
+            const std::string empty;
+            const auto& bytes=text?text->text:empty;
+            if (r.height) { if (!split(bytes,r,*s,"Text",d)) return false; }
             else {
-                if (text->text.size()>255) return fail(d,OriginalUiPageError50KG::capacity,*s,"Text",0x2A9950);
-                r.lines.push_back(text->text);
+                if (bytes.size()>255) return fail(d,OriginalUiPageError50KG::capacity,*s,"Text",0x2A9950);
+                r.lines.push_back(bytes);
             }
         }
         output=std::move(r);d={};return true;
