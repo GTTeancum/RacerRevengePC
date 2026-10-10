@@ -270,5 +270,27 @@ bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19IpumMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
+enum class OriginalUiNativeIndexedImagePolicy50KM : std::uint8_t {
+    unavailable, highestResolutionBaseOnly
+};
+struct OriginalUiRider19BodyMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    OriginalUiNativeIndexedImagePolicy50KM imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::unavailable;
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+    std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0;
+};
+// Exact Rider19_1/19_2 first DiffuseCompressed passes and original UIPODTEX
+// indexed images only. The ordinary one-mip overload remains unchanged. This
+// explicit native policy binds the actual bank's largest original mip, keeps
+// all five source mips/palette on CPU, and does not claim historical residentF4.
+// MXL0, equal original texel filters, opaque RGB and alpha-test OFF are required.
+// Original alpha bytes remain intact. The bodies' later destination-alpha
+// specular passes still need a source framebuffer-alpha owner; this admission
+// cannot establish the existing presentation-only alpha-disposability promise.
+bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19BodyMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
 }

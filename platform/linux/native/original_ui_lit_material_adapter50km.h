@@ -44,4 +44,23 @@ inline bool convertOriginalUiRider19IpumMaterialSpan50KM(
         material.material.alphaTestGreaterZero)return false;
     return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
 }
+// Same concrete publication check for authentic five-mip indexed pod bodies.
+// This converts their first pass only, and cannot discard or approve the later
+// destination-alpha specular pass or assert an alpha-disposable frame.
+inline bool convertOriginalUiRider19BodyMaterialSpan50KM(
+    const assets::OriginalUiRider19BodyMaterial50KM& material,
+    const assets::OriginalUiScreenAssets50KG& publishedImages,
+    const OriginalUiMaterialSpanBinding50KG& binding,
+    OriginalUiMaterialSpan50KG& output) noexcept {
+    const auto* bank=publishedImages.textures();
+    const auto* image=bank?bank->texture(binding.textureIndex):nullptr;
+    if(material.imagePolicy!=assets::OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly ||
+        material.images!=&publishedImages || !publishedImages.loaded() || !image ||
+        binding.textureIndex!=material.imageIndex || binding.textureCount!=bank->textureCount() ||
+        image->identity!=material.imageIdentity || material.sourceStoredMipIndex!=4 ||
+        material.sourceMipCount!=5 || material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed ||
+        material.material.raster.blend!=assets::OriginalUiMaterialBlend50KG::opaque ||
+        material.material.alphaTestGreaterZero)return false;
+    return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
+}
 }

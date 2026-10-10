@@ -416,7 +416,8 @@ bool readOriginalUiRiderStatFallbackMaterial50KG(const OriginalUiArchive50KG& ri
 static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG& pass,
     const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
     OriginalUiMaterialDiagnostic50KG& d, bool litProgram,
-    bool& fogEnabled, bool& alphaTestGreaterZero, bool authenticatedRiderIpum = false) noexcept {
+    bool& fogEnabled, bool& alphaTestGreaterZero, bool authenticatedRiderIpum = false,
+    bool authenticatedRiderIndexedBody = false) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
@@ -464,6 +465,7 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
             !expect(Field::processingMethodWhenFailedInAlphaTest, 0))) return false;
         const bool textureShape = authenticatedRiderIpum ?
             (litProgram && texture.kind == 2 && texture.mips.size() == originalUiIpumMipCount50KG) :
+            authenticatedRiderIndexedBody ? (litProgram && texture.kind == 1 && texture.mips.size() == 5) :
             (texture.kind <= 1 && texture.mips.size() == 1);
         if (texture.revision != 1 || texture.flags || !textureShape)
             return fail(d, Error::texture, "admitted original texture/mip provenance", 0x24e880u);
@@ -574,6 +576,41 @@ bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG& 
         next.sourceMipCount=static_cast<std::uint32_t>(texture->mips.size());
         output=next;return true;
     } catch (...) { d.error=Error::allocation; return false; }
+}
+bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19BodyMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        const bool body1=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_1.psm");
+        const bool body2=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_2.psm");
+        if ((!body1&&!body2) || pass.pass!=1 || !same(pass.microprogram,"DiffuseCompressed") ||
+            !same(pass.textureName,body1?"19_1":"19_2") ||
+            pass.gs[Field::alphaBlendingOnOff].value!=0 || pass.gs[Field::alphaTestOnOff].value!=0)
+            return fail(d,Error::profile,"actual opaque alpha-test-off Rider19 body pass",0x2476a0u);
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::podTextures,
+            body1?"ui\\textures\\19_1.pst":"ui\\textures\\19_2.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();
+        const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=5)
+            return fail(d,Error::texture,"authenticated original UIPODTEX body image bank",0x24e880u);
+        const auto& base=texture->mips.back();
+        if (base.width!=256 || base.height!=256 || image->texture.width!=base.width ||
+            image->texture.height!=base.height || image->texture.rgba!=base.rgba)
+            return fail(d,Error::texture,"published native body image must equal original largest mip",0x24eb90u);
+        OriginalUiRider19BodyMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=4;next.sourceMipCount=5;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
 }
 bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     OriginalUiNativeUntexturedMaterial50KG& output,
