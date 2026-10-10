@@ -72,7 +72,11 @@ struct OriginalUiGroup50KG {
 struct OriginalUiPage50KG {
     const OriginalUiMemberIdentity50KG* identity = nullptr;
     std::uint16_t widgetCount = 0;
-    std::int32_t pageNo = 0, staticWidgetCount = 0;
+    std::int32_t pageNo = 0;
+    // Source 1D6DEC / 2A5FE0 stores this metadata at page +0x13C.
+    // The inspected page/manager leaves never use it to create a membership
+    // list. It must not select leading widget IDs or imply Control 0.
+    std::int32_t staticWidgetCount = 0;
     std::string background = "*INVALID*";
     bool useVideoAsTexture = false;
     // These vectors include entry zero: the source loops 0..count inclusive.

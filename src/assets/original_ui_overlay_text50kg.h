@@ -21,6 +21,11 @@ struct OriginalUiOverlayText50KG {
     bool hasHighlightColor=false,hasDisabledColor=false;
     bool enableOnSelect=false,disableOnSelect=false,enableOnDeselect=false,disableOnDeselect=false;
     std::array<bool,2> wantsJoystickInput{{false,false}}; // Manager 0x2A44A0.
+    // PodUIManager 1CD890, integer default 0: nonzero defers attachment.
+    // Manager child order is ordinary widgets ascending, intervening original
+    // setup/page children, then OnTop widgets descending. This is tree order,
+    // not a material/depth/alpha override or a page membership designation.
+    bool onTop=false;
     // Manager 0x2A44E0 recursively hides every newly created widget; initial
     // visible membership comes from page callbacks, not a synthesized flag.
     // Original one-byte character strings. TextID and Height-triggered Text

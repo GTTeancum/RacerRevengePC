@@ -89,7 +89,7 @@ public:
 
     // Source update's supported zero/nonpositive-duration branch, not a time
     // fast-forward. Call at the ordinary update point. Hidden hierarchy skips
-    // update; ancestor visibility is supplied by the owning page. Inactive
+    // update; caller supplies the established manager/entity ancestry. Inactive
     // overlays still receive the source alpha comparison/setter projection.
     OriginalUiTextWidgetStatus50KG updateStatic(bool ancestorsShown=true) noexcept;
 
