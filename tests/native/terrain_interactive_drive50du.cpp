@@ -2375,7 +2375,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // including countdown. Never rendered-frame, paused or per-racer updates.
  auto advanceSourceAudioWorld=[&](std::uint64_t beforeMix){
   if(!mode1Enabled&&!dynamicContactEnabled)return;
-  require50DU(raceMusic->pollCompletion(),"mode1 music transport ownership failed after shared mix");
+  // Dynamic update performs its own source activity read after the timer.
+  // Legacy category6-only mode keeps the existing explicit completion poll.
+  if(!dynamicContactEnabled)require50DU(raceMusic->pollCompletion(),
+      "mode1 music transport ownership failed after shared mix");
   const auto afterMix=liveAudio->mixedFrames();
   require50DU(afterMix>=beforeMix&&(afterMix-beforeMix==0u||afterMix-beforeMix==768u),
       "mode1 shared mix must advance one actual768-frame step or none");
