@@ -2466,10 +2466,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::cerr<<"RACE MODE "<<(mode1Enabled?1:2)
       <<(mode1Enabled?": source lap/records/event FIFO; explicit HOST world/rank/finish and distance projection.\n":
          ": existing HOST observer/audio fallback explicitly selected.\n");
-  std::cerr<<"HOST RACE: "<<raceRacerCount<<" distinct original racers, 3 laps, 3-second countdown. "
-      "Field count matches the original normal race; the grounded starting grid and opponent controls are host-authored. "
-      "Original AI remains unjoined. "
-      "Each racer owns "<<racerBank.bytesPerRacer()<<" bytes of native state.\n";
+  std::cerr<<"NATIVE RACE: "<<raceRacerCount<<" distinct original racers, 3 laps, 3-second countdown. "
+      "Field count matches the original normal race; starting-grid placement and world scheduling are host-owned. ";
+  if(allAiEnabled)std::cerr<<"Every racer, including the camera-followed racer, uses original in-game AI. ";
+  else if(originalAiEnabled)std::cerr<<"One designated racer uses original in-game AI; other control paths remain separate. ";
+  else std::cerr<<"This session has no original AI controller enabled. ";
+  std::cerr<<"Each racer owns "<<racerBank.bytesPerRacer()<<" bytes of native state.\n";
   std::cerr<<"NATIVE FINISH CONTINUATION: source CD8 finish state retains native physics, "
       "engine audio, all original racer draws and sealed named standings. "
       "Original player finish controls retain the selected twin-engine config; "
