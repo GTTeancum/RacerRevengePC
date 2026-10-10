@@ -4,9 +4,9 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This branch is the **uncompiled and untested combined Linux candidate** for all-eight original AI, source route choices, dynamic contacts and source-normal racer lighting. Its source has been centrally integrated after review. Explicit source boundaries still stop incomplete behavior. See [candidate scope](docs/native-ai-lighting-integration.md).
+This Linux WIP passed a bounded GC run with all eight racers using original AI, zero HOST/controller input, and source-normal racer lighting visible in the actual capture. It retains source route choices and dynamic contacts. See [candidate scope](docs/native-ai-lighting-integration.md).
 
-The previous bounded GC run used original AI only for Clegg, with all eight native racers advancing. It observed startup state 4, later state 2 and brake/steer bindings, but no lap. That result does not validate this new candidate. See [current validation](docs/current-validation.md) for limits. Full GC driving, original scheduler/shader parity, controller usability and cross-platform support remain unfinished.
+Performance remains limited: every racer stayed in startup state 4 during the short run, and no lap was completed. The recorded video is an incomplete silent prefix. Full-course GC driving, original scheduler/shader parity, controller usability and cross-platform support remain unfinished. See [current validation](docs/current-validation.md).
 
 ## Build and game data
 
@@ -22,4 +22,4 @@ Start with the [interactive build guide](docs/interactive-build50dv.md). Linux r
 - Backspace: checkpoint return, or race restart; F5: restart
 - Escape: pause/resume; Up/Down or W/S: menu navigation; Enter or Space: select
 
-Windowed startup opens Main; headless requires `RR_START_MENU=1` for menus. Other human selections, Audio Options, and Results presentation await focused coverage. Progression, other tracks, performance, controller usability, and cross-platform support remain unfinished. Vendored licenses remain intact.
+Windowed startup opens Main; headless menus require `RR_START_MENU=1`. Vendored licenses remain intact.
