@@ -30,6 +30,8 @@ struct OriginalUiScreenAssetDiagnostic50KG {
 // RES members are authenticated upstream; exact stored-PST ranges come from
 // source-defined standalone/ATM loaders. No path search, guessed atlas,
 // arbitrary image file, material default, sampler policy or GL call occurs.
+// Failure publishes neither textures, decoded source evidence nor fonts and
+// leaves an empty owner retryable. Reload preserves the published owner.
 class OriginalUiScreenAssets50KG final {
 public:
     OriginalUiScreenAssets50KG() noexcept;
@@ -40,6 +42,12 @@ public:
         OriginalUiScreenAssetDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
     const MaterialTextureAssets50EA* textures() const noexcept;
+    // Exact decodeTexture48E result, including original format, palette, all
+    // mips and raw alpha. Index matches sources[index] and textures()->texture(index),
+    // whose Texture48B is parsed from this same result's base_rrtex bytes.
+    // Null means unloaded or invalid index. Immutable borrowed access; keep
+    // this owner alive. No material admission or GPU readiness is implied.
+    const Texture48E* decodedTexture(std::uint32_t index) const noexcept;
     const OriginalUiFont50KG* font(std::uint32_t index) const noexcept;
 private:
     struct Storage;

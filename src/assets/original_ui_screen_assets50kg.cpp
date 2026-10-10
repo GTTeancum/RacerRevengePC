@@ -23,6 +23,10 @@ bool fontPair(const char* atlas,const char* cel) {
 }
 struct OriginalUiScreenAssets50KG::Storage {
     MaterialTextureAssets50EA bank;
+    // New reconstruction: retain the original decoder's complete result in
+    // bank input order. RRTEX/Texture48B alone cannot prove source kind,
+    // mip count or original palette. No source fields or alpha are rewritten.
+    std::vector<Texture48E> decodedTextures;
     std::vector<OriginalUiFont50KG> fonts;
 };
 OriginalUiScreenAssets50KG::OriginalUiScreenAssets50KG() noexcept=default;
@@ -46,13 +50,15 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
             }else if(s.cel.data||s.cel.size)return fail(d,Error::sources,i);
         }
         auto next=std::make_unique<Storage>();next->fonts.resize(sources.size());
-        std::vector<std::vector<std::uint8_t>> encoded(sources.size());
+        // Size once before taking any base_rrtex addresses. These results and
+        // the bank stay private until all decoding and bank admission succeed.
+        next->decodedTextures.resize(sources.size());
         std::vector<MaterialTextureAssetInput50EA> images(sources.size());
         std::size_t totalSource=0,totalRgba=0;
         for(std::size_t i=0;i<sources.size();++i){
             const auto& s=sources[i];
             const std::vector<std::uint8_t> pst(s.member.data+s.pstOffset,s.member.data+s.pstOffset+s.pstBytes);
-            Texture48E decoded;
+            auto& decoded=next->decodedTextures[i];
             if(!decodeTexture48E(pst,decoded,d.texture))return fail(d,Error::texture,i);
             if(decoded.mips.empty())return fail(d,Error::texture,i);
             const auto& base=decoded.mips.back();
@@ -60,7 +66,7 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
                 decoded.base_rrtex.size()>maxMaterialTextureSourceBytes50EA-totalSource)
                 return fail(d,Error::sources,i);
             totalRgba+=base.rgba.size();totalSource+=decoded.base_rrtex.size();
-            encoded[i]=std::move(decoded.base_rrtex);images[i]={s.identity,&encoded[i]};
+            images[i]={s.identity,&decoded.base_rrtex};
             if(s.cel.identity&&!decodeOriginalUiCel50KG(s.cel.data,s.cel.size,next->fonts[i],d.font))
                 return fail(d,Error::font,i);
         }
@@ -75,6 +81,9 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
 bool OriginalUiScreenAssets50KG::loaded() const noexcept{return bool(storage_);}
 const MaterialTextureAssets50EA* OriginalUiScreenAssets50KG::textures() const noexcept{
     return storage_?&storage_->bank:nullptr;
+}
+const Texture48E* OriginalUiScreenAssets50KG::decodedTexture(std::uint32_t i) const noexcept{
+    return storage_&&i<storage_->decodedTextures.size()?&storage_->decodedTextures[i]:nullptr;
 }
 const OriginalUiFont50KG* OriginalUiScreenAssets50KG::font(std::uint32_t i) const noexcept{
     return storage_&&i<storage_->fonts.size()&&storage_->fonts[i].decoded()?&storage_->fonts[i]:nullptr;
