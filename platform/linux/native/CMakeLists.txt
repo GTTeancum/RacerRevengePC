@@ -34,6 +34,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/assets/original_ui_main_camera_config50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_movement_widget50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_main_camera50kg.cpp"
+  "${RR_ROOT}/src/game/original_ui_main_particle_camera50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_main_widget_manager50kg.cpp"
   "${RR_ROOT}/src/game/reset_model_bounds50ba.cpp"
   "${RR_ROOT}/src/game/static_impact49y.cpp"

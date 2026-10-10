@@ -1,0 +1,2 @@
+189cef91bda7ee97a3faabe2e54e23bae780290b405b6893cdaf5d90283e4144  /workspace/shared/recovery-20261010/ui-main-movement-reconstruction/particle-camera-extension/files/src/game/original_ui_main_particle_camera50kg.cpp
+7179d8f894cbd1146890bffb019efa61c150f0b781f1beb32da5a93995a7aa09  /workspace/shared/recovery-20261010/ui-main-movement-reconstruction/particle-camera-extension/files/src/game/original_ui_main_particle_camera50kg.h
