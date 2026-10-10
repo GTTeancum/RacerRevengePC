@@ -258,8 +258,10 @@ struct VehicleWindowRequest50DS {
     // menu targets, independent of the two native frame targets. Default unchanged.
     bool enableHostHud = false;
     // NEW opt-in reconstructed original-art renderer. Disabled by default.
-    // Exact CPU/GPU bank pair is checked cold, including raw alpha <=128.
-    // Both immutable owners must outlive close; no generated/font fallback.
+    // Exact CPU/GPU bank pair is checked cold; actual atlas alpha maxima are
+    // combined with vertex alpha during draw admission (atlases may reach255).
+    // Both immutable owners remain alive through close or an explicit bank
+    // replacement with completed prior GPU work; no generated/font fallback.
     // Both may be null for explicit untextured-only draws; a textured span
     // still requires its real bank, and a partial bank pair always rejects.
     bool enableOriginalUi = false;
