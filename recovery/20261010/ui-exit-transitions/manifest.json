@@ -1,0 +1,95 @@
+{
+  "scope": "source-only; no builds/tests/syntax checks/project code execution",
+  "new_translation_units": [
+    "src/game/original_ui_exit_text50kg.cpp"
+  ],
+  "base_preimages": "Main/assets/transition copied at7655c5c; audio copied afterf087350",
+  "source_elf_sha256": "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30",
+  "files": [
+    {
+      "path": "platform/linux/native/original_ui_main_audio50kg.cpp",
+      "new": false,
+      "preimage_sha256": "d40b772225f1edabeb5b0dbf95b62bb99527e8c80ea244c1cd37bb7e0acb7f79",
+      "candidate_sha256": "85fdd5ac7c0f2ea1d92e455cc14bee3bd882d811241027fd156c303566d14718",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "platform/linux/native/original_ui_main_audio50kg.h",
+      "new": false,
+      "preimage_sha256": "bfde53f03d9cb00490fad31f8766459c0e48913397556a4f0d983089a77631ab",
+      "candidate_sha256": "74177f54e2e18e61fe5f3d37a95736cf9de067e3ed6d5f803e59714b0818f8a9",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "platform/linux/native/original_ui_main_draw50kg.cpp",
+      "new": false,
+      "preimage_sha256": "c8391abb9780aacbd5c86c7692a79c73c0fd13839f1c50826169d5f254e30f83",
+      "candidate_sha256": "8aa1f5538dfc00dcc71001fad32c9e93f13562a8c4c289c6c697814803193f36",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "platform/linux/native/original_ui_main_draw50kg.h",
+      "new": false,
+      "preimage_sha256": "b3f13c2e8c7a2d45f899c025c242925a6598b0fa220653b55f940c2a90990e0e",
+      "candidate_sha256": "c8b8fefd208d363c642684dc89e478c920c0a84d4d8845cc77e06816eeeeb3eb",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "platform/linux/native/original_ui_main_session50kg.cpp",
+      "new": false,
+      "preimage_sha256": "758bc113ab677cc89b91d2b71c1a85dd37e99dd405d91d3a42ce5b411a93901d",
+      "candidate_sha256": "93e74c200f74d3e0ce532ec18e78aae9fcb461fc1fdc7de438da263ec9a3549f",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "platform/linux/native/original_ui_main_session50kg.h",
+      "new": false,
+      "preimage_sha256": "101445c6f94cac761e1064c325feb7f98d382d8bf1ca2081b266a7f96e5d8d0b",
+      "candidate_sha256": "5947ddcdb30138d9a1d33f1ccaecbe0a971808355dd3082a928e0707ebb17aae",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "src/assets/original_ui_screen_assets50kg.cpp",
+      "new": false,
+      "preimage_sha256": "e3ad6f75db2fcb7616bbae0578bc4eccaed6862f24d5d229ebf4a32c5e7b04f2",
+      "candidate_sha256": "338c3ddb8c7cacb8396f628f5b7b11d3240edc647217bdc3f261b15e4a9946bd",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "src/assets/original_ui_screen_assets50kg.h",
+      "new": false,
+      "preimage_sha256": "9c790d3f4fc1d23036743668a3554cf4df9d9b37e7377c87f52cb1c0538beb70",
+      "candidate_sha256": "c928f85f81e9b62f59bda8fea27e712fd7bf9ee6cce11c2d63a8768245179509",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "src/game/original_ui_exit_text50kg.cpp",
+      "new": true,
+      "preimage_sha256": null,
+      "candidate_sha256": "447b0624c3621272aa735b27539071b9467835c39d934fff407dffa76f642ed5",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "src/game/original_ui_exit_text50kg.h",
+      "new": true,
+      "preimage_sha256": null,
+      "candidate_sha256": "92ffe37c9afcc750a48bd1d9573ae422b84600ef48e9890d7ab27017a4ad6da5",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "src/game/original_ui_transition_owner50kg.cpp",
+      "new": false,
+      "preimage_sha256": "dd4ed9d576264faed3a26d110662450b289dfef168ffbb85dcfeacb3e557ef19",
+      "candidate_sha256": "67eaa780f6ef7e392947a40ab7995ddb60c8ace5cd7bd8f64e75dbb3af182953",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "src/game/original_ui_transition_owner50kg.h",
+      "new": false,
+      "preimage_sha256": "188e927f149b3def24988db42ddc52811445ef83f1fc5e0230ae79174d49c216",
+      "candidate_sha256": "260f6edff8b16fbf968562d72ee1bf10a2da9f7515917dce222bec7019e32e72",
+      "preimage_matches_current_active": true
+    }
+  ],
+  "revision": "2026-10-10T18:06Z: reject already-bound external manager before cold-bind side effects; external owner identity/lifetime reviewed"
+}

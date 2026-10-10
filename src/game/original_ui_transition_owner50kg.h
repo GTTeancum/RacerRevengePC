@@ -121,6 +121,11 @@ public:
     // no previousPage94. First and second tick retain separate source cases.
     // All required native callbacks are admitted before publication/calls.
     OriginalUiTransitionStatus50KG bindInitialMain(const OriginalUiTransitionCallbacks50KG&) noexcept;
+    // Same shared2A3C10 initial-selection boundary for another independently
+    // admitted concrete page. Does not weaken route readiness or manufacture
+    // a completed entry. Source restart+17C and initialEntry remain separate.
+    OriginalUiTransitionStatus50KG bindInitialPage(std::uint32_t screen,std::uint32_t page,
+        const OriginalUiTransitionCallbacks50KG&) noexcept;
     OriginalUiTransitionSnapshot50KG snapshot() const noexcept { return state_; }
 
     // All requests reject unsupported routes before mutation or notification.

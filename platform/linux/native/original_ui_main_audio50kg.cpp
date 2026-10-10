@@ -174,6 +174,10 @@ bool OriginalUiMainAudio50KG::startMainLoop9() noexcept {
 }
 bool OriginalUiMainAudio50KG::fadeMain(float seconds) noexcept {
     if (!current() || paused_ || (seconds!=0.f && seconds!=1.f)) return false;
+    // Source234480: inactive stream(+5C==-1) returns without effects; Main
+    // B4 ignores that source result. Native true means command handled, not
+    // a fabricated source return1. A foreign active voice is still rejected.
+    if (!ownsMusic_ && !mixer_->active(musicVoice)) return true;
     if (!ownsMusic_ || !mixer_->active(musicVoice)) return false;
     if (seconds==0.f) {
         mixer_->stop(musicVoice); ownsMusic_=false; fading_=false; musicGain_=0.f; return true;

@@ -120,6 +120,7 @@ struct OriginalUiMainDrawResources50KG::Storage {
     std::array<std::unique_ptr<game::OriginalUiTextGeometry50KG>,50> text;
     std::array<std::uint32_t,50> widgetMaterial{};
     game::OriginalUiMainBackground50KG background;
+    game::OriginalUiExitText50KG exitText;
 };
 OriginalUiMainDrawResources50KG::OriginalUiMainDrawResources50KG() noexcept=default;
 OriginalUiMainDrawResources50KG::~OriginalUiMainDrawResources50KG()=default;
@@ -267,6 +268,13 @@ bool OriginalUiMainDrawResources50KG::load(const OriginalUiMainColdInput50KG& in
                 next->widgetMaterial[id]=m;
             }
         }
+        const auto exitMaterial=findMaterial(next->materials,"font/denmrk16top");
+        if(exitMaterial==unresolved || !in.english)return fail(d,Error::resource,0x1d6ba8);
+        const auto& exitBinding=next->materials[exitMaterial];
+        if(exitBinding.animated || exitBinding.images.size()!=1 ||
+            next->exitText.prepare({4,1},in.mainMenu,*in.english,next->images,
+                exitBinding.images[0],d.exitText)!=game::OriginalUiExitTextStatus50KG::ok)
+            return fail(d,Error::geometry,0x1d6bb0);
         const auto backgroundMaterial=findMaterial(next->materials,"ui/textures/mmbkg");
         const auto* atlas=bank->texture(next->materials[backgroundMaterial].images[0]);
         if(!atlas||!game::layoutOriginalUiMainBackground50KG(atlas->texture.width,atlas->texture.height,next->background))
@@ -295,6 +303,8 @@ std::uint32_t OriginalUiMainDrawResources50KG::materialIndex(const char* name)co
     }
     return unresolved;
 }
+game::OriginalUiExitText50KG* OriginalUiMainDrawResources50KG::exitText() noexcept{return storage_?&storage_->exitText:nullptr;}
+const game::OriginalUiExitText50KG* OriginalUiMainDrawResources50KG::exitText() const noexcept{return storage_?&storage_->exitText:nullptr;}
 const game::OriginalUiMainBackground50KG* OriginalUiMainDrawResources50KG::background()const noexcept{return storage_?&storage_->background:nullptr;}
 
 const assets::OriginalUiMainParticleMaterial50KG* OriginalUiMainDrawResources50KG::particleMaterial()const noexcept{return storage_?&storage_->particle:nullptr;}
@@ -317,6 +327,7 @@ struct OriginalUiMainDraw50KG::Storage {
     OriginalUiMainFrameClock50KG clock;
     bool active=false,ordinary=false,main=false,prompts=false,top=false,scene=false,drained=false,failed=false;
     std::uint8_t apertureCount=0;
+    bool exitText=false;
     std::uint32_t nextOrdinal=0;
 };
 OriginalUiMainDraw50KG::OriginalUiMainDraw50KG()noexcept=default;
@@ -355,7 +366,7 @@ bool OriginalUiMainDraw50KG::begin(const OriginalUiMainFrameClock50KG& clock,
     if(!clock.known)return fail(d,Error::animation);
     if(s.gpu->publicationToken()!=s.publication||!s.gpu->initialized())return fail(d,Error::publication);
     s.clock=clock;s.active=true;s.ordinary=s.main=s.prompts=s.top=s.scene=s.drained=s.failed=false;
-    s.apertureCount=0;s.nextOrdinal=0;s.draw={};
+    s.apertureCount=0;s.exitText=false;s.nextOrdinal=0;s.draw={};
     s.submittedVertices.clear();s.drainedVertices.clear();s.submittedFog.clear();s.drainedFog.clear();s.packets.clear();s.order.clear();s.spans.clear();s.states.clear();
     for(std::size_t i=0;i<s.animations.size();++i){
         if((*s.resources->materials())[i].animated&&
@@ -484,6 +495,43 @@ bool OriginalUiMainDraw50KG::projectMainPage(bool shown,OriginalUiMainDrawDiagno
     if(!appendOverlay(arrows.beforeText,right,z,segment,arrows.textWidgetId,d)||
         !appendOverlay(arrows.afterText,left,z,segment,arrows.textWidgetId,d)){s.failed=true;return false;}
     return true;
+}
+bool OriginalUiMainDraw50KG::projectExitText(const game::OriginalUiApertureHook50KG& event,
+    OriginalUiMainDrawDiagnostic50KG& d) noexcept {
+    d={};if(!storage_)return fail(d,Error::notLoaded);auto& s=*storage_;
+    if(!s.active || !s.main || s.exitText || s.apertureCount || s.prompts || s.top || s.failed || s.drained)
+        return fail(d,Error::sourceOrder,0x1d75a4);
+    auto* owner=s.resources->exitText();
+    const auto material=s.resources->materialIndex("font/denmrk16top");
+    const auto& materials=*s.resources->materials();
+    if(!owner || !owner->prepared() || material>=materials.size())return fail(d,Error::resource,0x1d6bb0);
+    const auto count=owner->snapshot().characterCount5C;
+    float z=0;
+    if(!packetDepth(*s.resources->video(),1,z))return fail(d,Error::unsupportedDepth,0x2e10dc);
+    if(s.submittedVertices.size()/4+count>originalUiMaximumQuads50KG || s.packets.size()>=originalUiMaximumSpans50KG)
+        return fail(d,Error::capacity,0x2e02b0);
+    game::OriginalUiExitTextProjection50KG live;
+    if(owner->projectRender2E0170(event,live)!=game::OriginalUiExitTextStatus50KG::ok)
+        return fail(d,Error::projection,0x2e0170);
+    const auto& binding=materials[material];
+    if(!live.glyphs || live.glyphs->count!=count || live.images!=s.resources->images() ||
+        live.materialIdentity!=binding.material.identity || binding.animated || binding.images.size()!=1 ||
+        live.imageIndex!=binding.images[0] || live.assignedDepth!=1 || live.packetColor[3]>128){
+        s.failed=true;return fail(d,Error::resource,0x2e02b0);
+    }
+    const auto first=static_cast<std::uint32_t>(s.submittedVertices.size()/4);
+    for(std::size_t q=0;q<live.glyphs->count;++q)for(const auto& source:live.glyphs->quads[q].vertices){
+        assets::Vertex48B vertex{};
+        vertex.position[0]=source.x;vertex.position[1]=source.y;vertex.position[2]=z;
+        vertex.uv[0]=source.u;vertex.uv[1]=source.v;
+        for(unsigned c=0;c<4;++c)vertex.color[c]=live.packetColor[c];
+        s.submittedVertices.push_back(vertex);s.submittedFog.push_back(0.f);
+    }
+    // Capacity10 fits one original <=36-character ScreenText packet. Retain
+    // one source submission, including original zero-area space glyphs.
+    s.packets.push_back({first,count,material,live.imageIndex,0,s.nextOrdinal++,live.submitPC,0,
+        OriginalUiMainDrawSegment50KG::exitText});
+    s.exitText=true;return true;
 }
 bool OriginalUiMainDraw50KG::projectAperture(std::uint8_t ordinal,
     const game::OriginalUiApertureRectangle50KG& rectangle,OriginalUiMainDrawDiagnostic50KG& d) noexcept {

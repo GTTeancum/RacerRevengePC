@@ -66,7 +66,11 @@ Status OriginalUiTransitionOwner50KG::bind(std::uint32_t screen,std::uint32_t pa
 }
 
 Status OriginalUiTransitionOwner50KG::bindInitialMain(const OriginalUiTransitionCallbacks50KG& callbacks) noexcept {
-    const auto status=bind(4,1,callbacks);
+    return bindInitialPage(4,1,callbacks);
+}
+Status OriginalUiTransitionOwner50KG::bindInitialPage(std::uint32_t screen,std::uint32_t page,
+    const OriginalUiTransitionCallbacks50KG& callbacks) noexcept {
+    const auto status=bind(screen,page,callbacks);
     if(status!=Status::ok)return status;
     state_.initialRestartPending=true;
     notify(Notice::requestedPage90,state_.current,0x2A3C44);

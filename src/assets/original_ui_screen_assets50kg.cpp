@@ -28,6 +28,7 @@ struct OriginalUiScreenAssets50KG::Storage {
     // mip count or original palette. No source fields or alpha are rewritten.
     std::vector<Texture48E> decodedTextures;
     std::vector<OriginalUiFont50KG> fonts;
+    std::vector<OriginalUiImageProvenance50KG> provenance;
 };
 OriginalUiScreenAssets50KG::OriginalUiScreenAssets50KG() noexcept=default;
 OriginalUiScreenAssets50KG::~OriginalUiScreenAssets50KG()=default;
@@ -53,10 +54,12 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
         // Size once before taking any base_rrtex addresses. These results and
         // the bank stay private until all decoding and bank admission succeed.
         next->decodedTextures.resize(sources.size());
+        next->provenance.resize(sources.size());
         std::vector<MaterialTextureAssetInput50EA> images(sources.size());
         std::size_t totalSource=0,totalRgba=0;
         for(std::size_t i=0;i<sources.size();++i){
             const auto& s=sources[i];
+            next->provenance[i]={s.member.identity,s.cel.identity,s.pstOffset,s.pstBytes};
             const std::vector<std::uint8_t> pst(s.member.data+s.pstOffset,s.member.data+s.pstOffset+s.pstBytes);
             auto& decoded=next->decodedTextures[i];
             if(!decodeTexture48E(pst,decoded,d.texture))return fail(d,Error::texture,i);
@@ -84,6 +87,9 @@ const MaterialTextureAssets50EA* OriginalUiScreenAssets50KG::textures() const no
 }
 const Texture48E* OriginalUiScreenAssets50KG::decodedTexture(std::uint32_t i) const noexcept{
     return storage_&&i<storage_->decodedTextures.size()?&storage_->decodedTextures[i]:nullptr;
+}
+const OriginalUiImageProvenance50KG* OriginalUiScreenAssets50KG::sourceProvenance(std::uint32_t i) const noexcept{
+    return storage_&&i<storage_->provenance.size()?&storage_->provenance[i]:nullptr;
 }
 const OriginalUiFont50KG* OriginalUiScreenAssets50KG::font(std::uint32_t i) const noexcept{
     return storage_&&i<storage_->fonts.size()&&storage_->fonts[i].decoded()?&storage_->fonts[i]:nullptr;

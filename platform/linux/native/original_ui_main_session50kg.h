@@ -36,7 +36,7 @@ enum class OriginalUiMainAudioMode50KG : std::uint8_t { enabled,muted };
 enum class OriginalUiMainSessionStatus50KG : std::uint8_t {
     ok,noChange,unavailableDestination,secondControllerRequired,notBound,
     alreadyBound,invalidInput,unsupportedState,resource,widget,transition,
-    aperture,camera,scene,particle,audio,draw,allocation,faulted,quit
+    aperture,camera,scene,particle,audio,draw,allocation,faulted,quit,routeProposed
 };
 struct OriginalUiMainSessionDiagnostic50KG {
     OriginalUiMainSessionStatus50KG status=OriginalUiMainSessionStatus50KG::ok;
@@ -58,6 +58,7 @@ struct OriginalUiMainSessionSnapshot50KG {
     std::uint64_t updateCount=0,renderCount=0;
     game::OriginalUiTransitionSnapshot50KG transition{};
     game::OriginalUiApertureSnapshot50KG aperture{};
+    game::OriginalUiExitTextSnapshot50KG exitText{};
     OriginalUiMainSessionAudioReceipt50KG audio{};
     game::OriginalUiMainFireReceipt50KG lastParticleAdvance{},lastFireEmit{};
 };
@@ -69,6 +70,14 @@ struct OriginalUiMainSessionCold50KG {
     std::shared_ptr<OriginalUiMainApplication50KG> application;
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
     std::shared_ptr<OriginalUiMainAudio50KG> audio;
+    // Explicit coordinator mode: the actual sole manager lifecycle owner.
+    // It must be unbound at cold bind; an already-bound owner is rejected before
+    // page/resource side effects. This session retains the same owner but never
+    // binds or ticks it. Cold preparation emits no page notifications; the
+    // coordinator binds this fresh owner only after
+    // all real destination/page/render owners exist. nullptr keeps standalone
+    // Main's existing initial-selection/tick behavior unchanged.
+    std::shared_ptr<game::OriginalUiTransitionOwner50KG> externalTransition;
 };
 struct OriginalUiMainSessionInput50KG {
     // Original container enum0..15, never gameplay flags. Host maps real input
@@ -77,9 +86,19 @@ struct OriginalUiMainSessionInput50KG {
     std::uint8_t controller=0,originalInput=0;
     bool popupActive=false,sourceInputBlocked=false,secondControllerPresent=false;
 };
+class OriginalUiMainSession50KG;
+struct OriginalUiMainRouteProposal50KG {
+    // A proposal is an unaccepted original route, never a readiness token.
+    // No mode/player-bit/saved-slot/manager/audio effects occur on production.
+    const OriginalUiMainSession50KG* source=nullptr;
+    std::uint64_t serial=0;
+    game::OriginalUiMainDecision50KG decision{};
+    game::OriginalUiTransitionSnapshot50KG observedLifecycle{};
+};
 struct OriginalUiMainSessionInputReceipt50KG {
     bool containerReached=false,pageCallbackRan=false,pageAccepted=false;
     game::OriginalUiMainDecision50KG decision{};
+    OriginalUiMainRouteProposal50KG routeProposal{};
     game::OriginalUiMovementNotification50KG movement{};
     OriginalUiMainSessionStatus50KG status=OriginalUiMainSessionStatus50KG::noChange;
 };
@@ -95,9 +114,11 @@ struct OriginalUiMainSessionUpdate50KG {
     std::array<bool,4> debugChordHeld{};
 };
 // Concrete bounded Main lifecycle, tree update and render composition. The
-// session owns callback implementations; callers cannot certify arbitrary
-// trace-only callbacks as effects. No Rider/Course/Options/Gallery destination
-// is admitted. Unavailable confirm leaves profile and manager route unchanged.
+// session owns callback implementations, shared+440 ScreenText and full Main
+// close hooks; callers cannot certify arbitrary trace-only callbacks as effects.
+// Standalone mode admits no Rider/Course/Options/Gallery destination. External
+// mode returns proposals to the coordinator, which alone admits destinations
+// and commits source profile/manager changes. Missing admission changes none.
 // It never launches gameplay, executes guest code or samples a host clock.
 class OriginalUiMainSession50KG final {
 public:
@@ -109,11 +130,35 @@ public:
         OriginalUiMainSessionDiagnostic50KG&) noexcept;
     OriginalUiMainSessionStatus50KG input(const OriginalUiMainSessionInput50KG&,
         OriginalUiMainSessionInputReceipt50KG&,OriginalUiMainSessionDiagnostic50KG&) noexcept;
+    // External mode only: one-use audio boundary, before coordinator tick.
+    // update must follow with identical arguments and consumes this preparation
+    // without advancing audio again. Duplicate preparation/mismatched consume
+    // faults after any consumed audio, so the host cannot retry that frame.
+    OriginalUiMainSessionStatus50KG prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG&,
+        OriginalUiMainSessionDiagnostic50KG&) noexcept;
     OriginalUiMainSessionStatus50KG update(const OriginalUiMainSessionUpdate50KG&,
         OriginalUiMainSessionDiagnostic50KG&) noexcept;
     // Owns source-prepared scene fog, adjusted particle camera, lighting and
     // canvas offsets. Callers cannot supply guessed fog or certify empty work.
     OriginalUiMainSessionStatus50KG render(const OriginalUiMainFrameClock50KG&,
+        OriginalUiMainSessionDiagnostic50KG&) noexcept;
+    // Coordinator-only page boundaries. Notifications must be the actual
+    // borrowed owner's synchronous callback and match its current snapshot.
+    // Poll is read-only; update() skips manager tick in external mode, while
+    // render() obtains lifecycle from that SAME owner, not a supplied snapshot.
+    OriginalUiMainSessionStatus50KG notifyTransition(const game::OriginalUiTransitionNotification50KG&,
+        OriginalUiMainSessionDiagnostic50KG&) noexcept;
+    game::OriginalUiTransitionCompletion50KG pollCompletion(game::OriginalUiTransitionRoute50KG,
+        game::OriginalUiTransitionPhase50KG) const noexcept;
+    const game::OriginalUiTransitionOwner50KG* externalLifecycleOwner() const noexcept;
+    // Rejects stale/foreign proposals and any changed selection or lifecycle.
+    // Invalidated by another input/update/render/notification. It certifies
+    // only source facts, never destination readiness. Coordinator commits
+    // requestMain and savedSlot6E0, then calls notifyRouteAccepted immediately,
+    // before tick, for the exact once-only source SELECT1 effect. The latter
+    // verifies the real manager request/profile writes and writes neither.
+    bool routeProposalCurrent(const OriginalUiMainRouteProposal50KG&) const noexcept;
+    OriginalUiMainSessionStatus50KG notifyRouteAccepted(const OriginalUiMainRouteProposal50KG&,
         OriginalUiMainSessionDiagnostic50KG&) noexcept;
     // Explicit host window/application quit, separate from original back6.
     void requestQuit() noexcept;

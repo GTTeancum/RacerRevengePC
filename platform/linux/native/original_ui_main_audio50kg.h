@@ -38,6 +38,9 @@ public:
     // Bounded source calls admitted: zero immediate stop or exactly1 second.
     // Native policy: linear gain at accepted source-update boundaries, followed
     // by the source0.35s silent retirement margin. This is not IOP timing emulation.
+    // A concretely idle owned transport is a successful no-change command,
+    // matching source234480's early return ignored by Main B4. A foreign or
+    // stale active voice remains unavailable; true is not the source result.
     bool fadeMain(float seconds = 1.f) noexcept;
     // Authenticated UIEVENTS IDs1(select),3(left),4(right),7(badcall), all one-shot.
     // Source292810 flags1 ->233410 stops an active sound before restart.

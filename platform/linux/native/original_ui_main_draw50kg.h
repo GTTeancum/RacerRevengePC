@@ -6,6 +6,7 @@
 #include "../../../src/assets/original_ui_atm50kg.h"
 #include "../../../src/assets/original_ui_main_material_schedule50kg.h"
 #include "../../../src/game/original_ui_aperture_owner50kg.h"
+#include "../../../src/game/original_ui_exit_text50kg.h"
 #include "../../../src/game/original_ui_main_widget_manager50kg.h"
 #include "../../../src/game/original_ui_text_geometry50kg.h"
 #include "../../../src/game/original_ui_texture_animation50kg.h"
@@ -31,6 +32,7 @@ struct OriginalUiMainDrawDiagnostic50KG {
     assets::OriginalUiMainMaterialScheduleDiagnostic50KG registry{};
     game::OriginalUiMainWidgetDiagnostic50KG manager{};
     game::OriginalUiTextGeometryDiagnostic50KG text{};
+    game::OriginalUiExitTextDiagnostic50KG exitText{};
     game::OriginalUiMainFireStatus50KG fire=game::OriginalUiMainFireStatus50KG::complete;
     game::OriginalUiMainParticleGeometryStatus50KG particle=game::OriginalUiMainParticleGeometryStatus50KG::complete;
 };
@@ -84,6 +86,9 @@ public:
     std::uint32_t widgetMaterial(std::uint16_t) const noexcept;
     std::uint32_t materialIndex(const char* registeredName) const noexcept;
     const game::OriginalUiMainBackground50KG* background() const noexcept;
+    // One embedded shared-page+440 owner, independent of DAT widget IDs.
+    game::OriginalUiExitText50KG* exitText() noexcept;
+    const game::OriginalUiExitText50KG* exitText() const noexcept;
     const assets::OriginalUiMainParticleMaterial50KG* particleMaterial() const noexcept;
     std::uint32_t particleImageIndex() const noexcept;
 private:
@@ -92,7 +97,7 @@ private:
 };
 
 enum class OriginalUiMainDrawSegment50KG : std::uint8_t {
-    ordinaryWidgets,mainPage,aperture,basePrompts,onTopWidgets,particles
+    ordinaryWidgets,mainPage,aperture,basePrompts,onTopWidgets,particles,exitText
 };
 struct OriginalUiMainSubmittedPacket50KG {
     // materialIndex==unresolvedMaterialTexture50EA denotes the separately
@@ -134,6 +139,11 @@ public:
     // Call at Main1E6410 before shared1D7550, only if that page is actually
     // traversed. Selected slot comes from the SAME manager's page1 Group1.
     bool projectMainPage(bool pageAncestorsShown,OriginalUiMainDrawDiagnostic50KG&) noexcept;
+    // Wire to screenExitObject440 at1D75A4 before aperture rectangle0. This
+    // prepares the actual localized shared ScreenText and queues its genuine
+    // denmrk16Top packet through the same source registry as all other text.
+    bool projectExitText(const game::OriginalUiApertureHook50KG&,
+        OriginalUiMainDrawDiagnostic50KG&) noexcept;
     // Wire directly to aperture.submitOverlay at1D798C. No render/update is
     // invoked here. Original RGB=0, alpha=63, primitive depth=1; source order
     // is +424 then +428. Source rectangle order becomes0,2,3,1.
