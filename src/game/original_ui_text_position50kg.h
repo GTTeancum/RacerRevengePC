@@ -10,7 +10,7 @@ struct OriginalUiTextPositionInput50KG {
     std::size_t line=0;
     float fontLineHeight=0;
     // Source ScreenText::GetWidth/GetHeight integer results, after source
-    // metric rounding. Font layout's unrounded values are not interchangeable.
+    // metric truncation. Font layout's unconverted values are not interchangeable.
     std::int32_t measuredWidth=0,measuredHeight=0;
 };
 struct OriginalUiTextPosition50KG {
@@ -21,13 +21,15 @@ struct OriginalUiTextPosition50KG {
     // for a settled, unanimated original main text line. Animated transforms
     // must be separately source-updated; this function does not erase them.
 };
-// Source GetWidth/GetHeight final multiply and cvt.w.s. This closes the
-// font leaf's unrounded metric contract without depending on host fenv.
+// Source GetWidth/GetHeight final multiply and CVT.W.S truncation toward zero.
+// The converted product must be finite and int32-representable; out-of-domain
+// inputs are rejected, not source-saturated. Conversion does not use host fenv.
 bool roundOriginalUiTextMetric50KG(float beforeScale,float sourceScale,
     std::int32_t& output) noexcept;
 // Line leading 0x2A9684/0x2A98A8/0x2A9D20 and justification 0x2E13A0.
 // Explicit Height only affects the localized/split branch (0x2A9CD4).
-// Integer conversion explicitly uses nearest-even; never host rounding mode.
+// CVT.W.S conversion truncates toward zero in the finite int32 domain;
+// out-of-domain inputs are rejected before casting. Never host rounding mode.
 bool positionOriginalUiText50KG(const OriginalUiTextPositionInput50KG&,
     OriginalUiTextPosition50KG&) noexcept;
 // Independent ScreenText packet route: 29DA10->29DCB0 stores packed color;

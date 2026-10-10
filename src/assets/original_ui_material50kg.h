@@ -40,7 +40,7 @@ enum class OriginalUiTemplate50KG : std::uint8_t { unresolved, defaultMt, screen
 enum class OriginalUiMaterialError50KG : std::uint8_t {
     none, alreadyLoaded, archive, templateOwner, document, section, value,
     passCount, textureCount, textureName, profile, unsupportedField,
-    unsupportedValue, texture, allocation
+    unsupportedValue, texture, allocation, fallbackSource, untexturedAdapterRequired
 };
 struct OriginalUiMaterialDiagnostic50KG {
     OriginalUiMaterialError50KG error = OriginalUiMaterialError50KG::none;
@@ -65,11 +65,30 @@ private:
     bool loaded_ = false;
     OriginalUiMaterialTemplateState50KG defaults_, screen_;
 };
+enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
+    authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback,
+    optionsMenuPromptMissingPsmFallback
+};
+struct OriginalUiMaterialProvenance50KG {
+    OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
+    const OriginalUiArchiveIdentity50KG* archive = nullptr;
+    // Only the bounded no-PSM branch uses these fields. A real texture member
+    // does not become a fabricated PSM identity or authored shader section.
+    const OriginalUiMemberIdentity50KG* fallbackTexture = nullptr;
+    const OriginalUiMemberIdentity50KG* fallbackWidgetSource = nullptr;
+    const OriginalUiMemberIdentity50KG* fallbackPageSource = nullptr;
+    std::uint32_t sourceCallerPC = 0;
+    std::string registeredName, attemptedPsmMember;
+    std::uint32_t creationPC = 0;
+};
 struct OriginalUiMaterialPass50KG {
     const OriginalUiMemberIdentity50KG* identity = nullptr;
     const OriginalUiMemberIdentity50KG* inheritedTemplate = nullptr;
+    OriginalUiMaterialProvenance50KG provenance;
     std::uint32_t pass = 0;
     std::string microprogram, textureName, shaderPassGroup;
+    // Zero-map authored passes retain an empty textureName and never perform
+    // the texture-name fallback or map lookup. They need an untextured draw owner.
     std::int32_t enabled = 1, textureCount = 1, textureCoordinateIndex = 0;
     OriginalUiGsState50KG gs;
     // TEX1 values are pass-local source defaults, not inherited template fields.
@@ -82,6 +101,7 @@ struct OriginalUiMaterialPass50KG {
 };
 struct OriginalUiMaterial50KG {
     const OriginalUiMemberIdentity50KG* identity = nullptr;
+    OriginalUiMaterialProvenance50KG provenance;
     std::vector<OriginalUiMaterialPass50KG> passes;
 };
 struct OriginalUiMaterialRuntime50KG {
@@ -93,11 +113,46 @@ struct OriginalUiMaterialRuntime50KG {
 // Explicit selection represents the actual material registry associated owner
 // (14D5E0). Only a source-known null may choose nullOwnerScreenFallback.
 // ScreenTexture 2DF10C and ScreenText 2DFAA0 explicitly supply screenMt.
-// Bounded single-map numbered-pass path 2476A0; two-map 2480D0 is rejected.
+// Bounded zero/one-map numbered-pass path 2476A0. Original 247444..2474BC
+// selects this builder for zero and one maps; two-map 2480D0 is rejected.
 bool readOriginalUiMaterial50KG(const OriginalUiArchive50KG&, const std::string& member,
     const OriginalUiMaterialTemplates50KG&, OriginalUiTemplate50KG associatedOwner,
     const OriginalUiMaterialRuntime50KG&,
     OriginalUiMaterial50KG&, OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Source 29B630..29B6A4 -> vtable3D2110+18 -> 2475C0: the original missing
+// PSM branch, narrowly admitted for authenticated Main Icon35/mmlogo only.
+// Confirms the original widget reference, actual mmlogo.pst, and absent PSM.
+// ScreenTexture explicitly associates ScreenMT (2DF10C -> 299D38), so only
+// screenMt is accepted here; unknown/null owners are not silently substituted.
+// identity remains null, authored stays empty, and provenance records the
+// original assets and constructor PCs. No PSM text is synthesized.
+bool readOriginalUiMainLogoFallbackMaterial50KG(const OriginalUiArchive50KG& mainArchive,
+    const OriginalUiMaterialTemplates50KG&, OriginalUiTemplate50KG associatedOwner,
+    const OriginalUiMaterialRuntime50KG&, OriginalUiMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Shared page constructor1D682C/68DC/6994/6A4C creates these real button
+// prompts from literal names through ScreenTexture2DF0B0. Their exact PSTs
+// live in authenticated OVERLAYS; absent PSM invokes the SAME2475C0 builder.
+// Main entry74 clears the mask; openedB0 sets X only, closingB4 clears it.
+// Source caller/page/texture identities remain explicit; no general fallback.
+enum class OriginalUiMainPrompt50KG : std::uint8_t { cross,triangle,square,circle };
+bool readOriginalUiMainPromptFallbackMaterial50KG(
+    const OriginalUiArchive50KG& mainArchive,const OriginalUiArchive50KG& overlays,
+    OriginalUiMainPrompt50KG,const OriginalUiMaterialTemplates50KG&,
+    OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
+    OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Same inherited page constructor1D63B0, actually called by OptionsMenu1F8E54.
+// Only screen12/page1's live cross/triangle prompts are admitted, with their
+// own Options page provenance. No Main archive/identity is fabricated.
+enum class OriginalUiOptionsMenuPrompt50KG : std::uint8_t { cross,triangle };
+bool readOriginalUiOptionsMenuPromptFallbackMaterial50KG(
+    const OriginalUiArchive50KG& options,const OriginalUiArchive50KG& overlays,
+    OriginalUiOptionsMenuPrompt50KG,const OriginalUiMaterialTemplates50KG&,
+    OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
+    OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
 enum class OriginalUiMaterialBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };
 enum class OriginalUiMaterialFilter50KG : std::uint8_t { nearest, linear };
@@ -111,6 +166,8 @@ struct OriginalUiNativeMaterial50KG {
     std::uint8_t depthMethod = 0, environmentContext = 0;
     bool depthWrite = false;
     // Raw RGBA8 texture and raw original packet vertex bytes, no recoloring.
+    // Native blended admission additionally requires the exact joint alpha
+    // bound documented below; this cold policy alone has no vertex packets.
     float colorScale = 255.f / 128.f;
     float storedAlphaScale = 255.f / 128.f;
     float blendAlphaScale = (255.f / 128.f) * (255.f / 128.f);
@@ -122,11 +179,36 @@ struct OriginalUiNativeMaterial50KG {
     // CPU policy is not a certification of the existing color-only UI target.
     // Current draw's joint blendFunc/disabled-depth cannot silently satisfy it.
     bool requiresOriginalDepthOwner = true;
+    // Per-vertex ceiling only. For native fixed-function blending the draw
+    // owner must ALSO enforce vertexAlpha * exactAtlasMaximumAlpha <=16384.
+    // Full-byte original texture alpha is retained, including values above128.
     std::uint8_t maximumVertexAlpha = 128;
 };
+// Separate type: no texture atlas, MODULATE operation, or sampler exists for
+// the admitted zero-map/TME=0 path. Raw vertex channels reach the GS directly.
+struct OriginalUiNativeUntexturedMaterial50KG {
+    OriginalUiMaterialBlend50KG blend = OriginalUiMaterialBlend50KG::opaque;
+    std::uint8_t depthMethod = 0, environmentContext = 0;
+    bool depthWrite = false;
+    float colorScale = 1.f, storedAlphaScale = 1.f;
+    float blendAlphaScale = 255.f / 128.f;
+    float alphaStoreFromBlendFactor = 128.f / 255.f;
+    bool requiresSeparateAlphaStore = false;
+    bool requiresOriginalDepthOwner = true;
+    std::uint8_t maximumVertexAlpha = 128;
+};
+// Only authenticated authored zero-map ScreenObject passes with TME=0 and
+// the supported native GS state subset. EnableFillColor/color overrides are
+// outside this bounded policy. No atlas is accepted or fabricated. The caller
+// must provide the actual untextured native span/depth/alpha-store owner.
+bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass50KG&,
+    OriginalUiNativeUntexturedMaterial50KG&, OriginalUiMaterialDiagnostic50KG&) noexcept;
 // Strict typed policy for single-level indexed-RGBA ScreenObject MODULATE.
 // Consumes the exact selected CPU atlas; rejects tests/fog/DAT/PABE/FBA/etc.
 // Returns explicit source depth and alpha requirements, never GPU readiness.
+// Authenticated Main-logo/shared-prompt missing-PSM provenance is supported. A zero-map
+// descriptor returns untexturedAdapterRequired without inspecting an atlas;
+// this texture-taking API must not fabricate a white texture for NoTexture.
 // Any authored animation still needs its own original state/frame owner.
 bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG&,
     const Texture48E& exactAtlas, OriginalUiNativeMaterial50KG&,

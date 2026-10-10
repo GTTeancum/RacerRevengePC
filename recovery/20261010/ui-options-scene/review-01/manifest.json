@@ -1,0 +1,15 @@
+{
+  "status": "source-only frozen correction; active source preimages",
+  "files": [
+    {
+      "path": "platform/linux/native/original_ui_main_session50kg.cpp",
+      "sha256": "48e1ba69931438063be167fd764ca3e334fbf6bbdaf60937127c60a1010bd9e8",
+      "preimage_sha256": "93e74c200f74d3e0ce532ec18e78aae9fcb461fc1fdc7de438da263ec9a3549f"
+    },
+    {
+      "path": "platform/linux/native/original_ui_options_session50kg.cpp",
+      "sha256": "7e3f0dc740e11b271e365cc4498218e4c5302a337732721d0ed3aa1a5f780ee6",
+      "preimage_sha256": "64995d6ef966d97a8e5131b96d6dd3b2d02ee23e5edb208722ad5af1ced1529e"
+    }
+  ]
+}

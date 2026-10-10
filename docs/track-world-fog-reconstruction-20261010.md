@@ -19,20 +19,29 @@ This reconstruction consumes its already-published normalized color. It does not
 alter sky images, sky geometry, the sky shader, or the viewport clear color.
 There is no blanket green filter or screen-space grading.
 
-The parent's retained pre-loss design provides minimum 1333.300048828125,
-maximum 4000, haziness 0.5, TA visibility 1, GC visibility 0.5, and:
+Independent source closure now establishes minimum1333.300048828125,
+maximum4000, base64, haziness0.5, TA visibility1 and GC visibility0.5. The
+PodRaceEvent scene loader at1AA158..1AA178 passes literal0x44A6A99A as the
+minimum; do not replace it with Main's computed4000/3. Scene reader278570 uses
+source defaults1/0.5 for absent Visibility/Haziness. TA's authenticated Fog
+block has only ColorRGB; GC additionally authors Visibility0.5.
+
+Source13E830 performs separately rounded binary32 arithmetic:
 
     end = minimum + visibility * (maximum - minimum)
-    start = (end - 64) * (1 - haziness)
+    start = (1 - haziness) * (end - 64)
 
-This gives TA start 1968 / end 4000 and approximately GC start 1301.325 /
-end 2666.65 in host float arithmetic. Available current source corroborates RGB
-but does not independently establish these range constants or formula. They
-remain historical-design evidence, not independently verified retail provenance.
-Consequently RR_AUTHORED_WORLD_FOG=1 is required to enable this reconstruction;
-unset or 0 disables it, other values fail clearly. The historical default-on
-behavior is deliberately not restored while this evidence gap remains. Enabling
-logs the range and provenance limitation. No implicit inference from track tint.
+This gives TA start1968/end4000 and GC start1301.324951171875 /
+end2666.64990234375. Fog13EA10 sets active camera near1/far=end and rebuilds;
+reset13F910 restores1/100000; scene proxy13FA20 reinstates the fog owner's range.
+See recovery/20261010/track-fog-source-closure/README.md and its byte evidence
+for gameplay ownership, authoring offsets, exact defaults and camera phases.
+
+RR_AUTHORED_WORLD_FOG=1 remains required: the Euclidean native shader and its
+material/interpolation/quantization policies below are still reconstruction,
+not source-closed retail world shader behavior. Unset or0 disables it; other
+values fail clearly. Numeric range provenance is now established, but this
+alone does not justify default-on or a retail shader parity claim.
 
 ## Native rendering path
 
@@ -87,4 +96,4 @@ TA/GC enabled captures with actual camera positions near/start/end distances;
 paired ProjectedPrelit surfaces and unchanged alpha; blended/electrical/sky/UI
 exclusion; camera validation rejecting null/nonfinite before GL work; switching
 between fogged spans, excluded spans and frames without state leakage; prior UI
-checks. Restore independent source evidence before considering default-on.
+checks. Close the actual track material fog coordinate/quantization path and native camera-phase fidelity before considering default-on.

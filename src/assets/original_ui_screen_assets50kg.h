@@ -16,6 +16,14 @@ struct OriginalUiImageSource50KG {
     // Optional exact same-name CEL for a font atlas. No metrics are generated.
     OriginalUiMemberView50KG cel{};
 };
+// Immutable source metadata retained from the same successful decode. No
+// borrowed source-byte pointer survives load. These are canonical archive
+// member identities, not dimensions or an opaque caller image-identity guess.
+struct OriginalUiImageProvenance50KG {
+    const OriginalUiMemberIdentity50KG* memberIdentity=nullptr;
+    const OriginalUiMemberIdentity50KG* celIdentity=nullptr;
+    std::size_t pstOffset=0,pstBytes=0;
+};
 enum class OriginalUiScreenAssetError50KG : std::uint8_t {
     none, alreadyLoaded, sources, texture, font, bank, allocation, unexpectedFailure
 };
@@ -49,6 +57,7 @@ public:
     // this owner alive. No material admission or GPU readiness is implied.
     const Texture48E* decodedTexture(std::uint32_t index) const noexcept;
     const OriginalUiFont50KG* font(std::uint32_t index) const noexcept;
+    const OriginalUiImageProvenance50KG* sourceProvenance(std::uint32_t index) const noexcept;
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;

@@ -1,4 +1,5 @@
 #include "chariot_ik49t.h"
+#include "character_mode0_ik50kg.h"
 #include <cfenv>
 #include <cmath>
 #include <cstddef>
@@ -235,14 +236,14 @@ void lazy(VisualLazyWord49R& s) noexcept { if (s.guard == 0) { s.word = 0xffffff
 bool setLocal(const SceneGraph49P& g, I i, const M& m, Math& f) noexcept {
     return f.valid && setLocalMatrix49P(g, i, m);
 }
-bool construct(const SceneGraph49P& g, const ChariotIkChainBinding49T& binding,
-               bool right, ChariotIkChain49T& out, SourceLibmState49T& libm, Math& f) noexcept {
+bool constructAxis(const SceneGraph49P& g, const ChariotIkChainBinding49T& binding,
+               const V& axis, ChariotIkChain49T& out, SourceLibmState49T& libm, Math& f) noexcept {
     out.shoulder0 = binding.shoulder; out.elbow4 = binding.elbow; out.wrist8 = binding.wrist;
     const V a = worldPosition(g, binding.shoulder, f);
     const V b = worldPosition(g, binding.elbow, f);
     const V c = worldPosition(g, binding.wrist, f);
     out.savedElbowLocal30 = xyz(node(g, binding.elbow).localC0, 12);
-    out.axis50 = right ? V{{fp(0x80000000u), -1.0f, fp(0x80000000u), 1.0f}} : V{{0, 1, 0, 1}};
+    out.axis50 = axis;
     const V cb = f.difference(b, c), ab = f.difference(a, b);
     const float firstLength = f.length(cb), secondLength = f.length(ab);
     out.lengthSquared14 = f.add(f.mul(firstLength, firstLength), f.mul(secondLength, secondLength));
@@ -284,6 +285,11 @@ bool construct(const SceneGraph49P& g, const ChariotIkChainBinding49T& binding,
     if (!(f.dot(out.axis50, cross) <= 0.0f)) out.restAngle2C = f.neg(out.restAngle2C);
     out.debug40 = 0; out.mode10 = 1;
     return f.valid;
+}
+bool construct(const SceneGraph49P& g, const ChariotIkChainBinding49T& binding,
+               bool right, ChariotIkChain49T& out, SourceLibmState49T& libm, Math& f) noexcept {
+    const V axis = right ? V{{fp(0x80000000u), -1.0f, fp(0x80000000u), 1.0f}} : V{{0, 1, 0, 1}};
+    return constructAxis(g, binding, axis, out, libm, f);
 }
 bool wristOrientation(const SceneGraph49P& g, const ChariotIkChainBinding49T& b,
                       VisualShared49R& shared, Math& f) noexcept {
@@ -337,6 +343,56 @@ bool solve(const SceneGraph49P& g, const ChariotIkChainBinding49T& b,
     for (U i = 0; i < 4; ++i) rotated.v[12 + i] = old.v[12 + i];
     if (!setLocal(g, record.shoulder0, rotated, f)) return false;
     return wristOrientation(g, b, visual, f);
+}
+//28B6A0 multiplies a local axis-angle increment into the existing local,
+// then restores all four translation lanes before original cache invalidation.
+bool rotateLocalMode0(const SceneGraph49P& g, I i, const V& axis,
+                      float co, float si, Math& f) noexcept {
+    const M old = node(g, i).localC0;
+    M rotated = product(axisAngle(axis, co, si, f), old, f);
+    for (U j = 0; j < 4; ++j) rotated.v[12 + j] = old.v[12 + j];
+    return setLocal(g, i, rotated, f);
+}
+bool solveMode0(const SceneGraph49P& g, const ChariotIkChain49T& r,
+                const V& target, ModelMode0IkShared50KG& shared, Math& f) noexcept {
+    lazy(shared.sentinel443460); lazy(shared.sentinel443468);
+    //290230..290258: preserve all three reads, including their lazy caches.
+    const V shoulder = worldPosition(g, r.shoulder0, f);
+    const V elbow = worldPosition(g, r.elbow4, f);
+    const V wrist = worldPosition(g, r.wrist8, f);
+    V towardTarget = f.difference(target, shoulder);
+    const float distance = f.scalarRoot(f.square(towardTarget));
+    //2902CC..29033C: both clamps are present in mode0.
+    float desiredCosine = f.mul(r.inverseLengthProduct18,
+        f.sub(r.lengthSquared14, f.mul(distance, distance)));
+    if (!(desiredCosine <= 1.0f)) desiredCosine = 1.0f;
+    if (desiredCosine < -1.0f) desiredCosine = -1.0f;
+    const float desiredSine = f.scalarRoot(f.sub(1.0f, f.mul(desiredCosine, desiredCosine)));
+    //290340..2904DC: current angle and current bend axis, NOT the rest axis50.
+    const V towardShoulder = f.vuNormalize(f.difference(shoulder, elbow));
+    const V towardWrist = f.vuNormalize(f.difference(wrist, elbow));
+    const float currentCosine = f.dot(towardShoulder, towardWrist);
+    const float currentSine = f.scalarRoot(f.sub(1.0f, f.mul(currentCosine, currentCosine)));
+    V axis = f.scalarNormalize(f.cross(towardShoulder, towardWrist, 0.0f));
+    //2904E0 MULA.S then2904E4 MADD.S form cos(current-desired).
+    const float deltaCosine = f.add(f.mul(currentCosine, desiredCosine),
+        f.mul(currentSine, desiredSine));
+    const float deltaSine = f.scalarRoot(f.sub(1.0f, f.mul(deltaCosine, deltaCosine)));
+    if (currentCosine < desiredCosine) {
+        for (U j = 0; j < 3; ++j) axis.v[j] = f.mul(-1.0f, axis.v[j]);
+        axis.v[3] = 1.0f;
+    }
+    axis = inverseVector(g, r.elbow4, axis, false, f);
+    if (!rotateLocalMode0(g, r.elbow4, axis, deltaCosine, deltaSine, f)) return false;
+    //290580..2906D8: align the newly bent chain with the target direction.
+    const V newWrist = worldPosition(g, r.wrist8, f);
+    const V direction = f.vuNormalize(f.difference(newWrist, shoulder));
+    towardTarget = f.vuNormalize(towardTarget);
+    const V worldAxis = f.vuNormalize(f.cross(direction, towardTarget, 0.0f));
+    const V localAxis = inverseVector(g, r.shoulder0, worldAxis, false, f);
+    const float alignment = f.dot(direction, towardTarget);
+    const float sineAlignment = f.scalarRoot(f.sub(1.0f, f.mul(alignment, alignment)));
+    return rotateLocalMode0(g, r.shoulder0, localAxis, alignment, sineAlignment, f);
 }
 bool recordContext(const ChariotIkChain49T& r, const ChariotIkChainBinding49T& b, bool right) noexcept {
     if (r.shoulder0 != b.shoulder || r.elbow4 != b.elbow || r.wrist8 != b.wrist || r.mode10 != 1 || r.debug40 != 0) return false;
@@ -411,4 +467,65 @@ bool solveChariotHands49T(const ChariotIkBindings49T& binding, const ChariotIkPa
     copyGraph(staged, graph.nodes); libm = work.libm; shared = work.shared; visual = work.visual;
     return true;
 }
+bool initializeModelMode0Ik50KG(I endpoint, const SceneGraph49P& graph,
+    ChariotIkChain49T& record, SourceLibmState49T& libm, ChariotIkWorkspace49T& work,
+    ChariotIkDiagnostic49T& diagnostic) noexcept {
+    diagnostic = {};
+    if (std::fegetround() != FE_TONEAREST) return fail(diagnostic, ChariotIkError49T::rounding_mode, 0x1568c8);
+    if (!finiteGraph(graph)) return fail(diagnostic, ChariotIkError49T::graph, 0x1568c8);
+    const Span live[] = {{graph.nodes, graph.count * sizeof(SceneNode49P)}, {&record, sizeof record},
+        {&libm, sizeof libm}, {&work, sizeof work}, {&graph, sizeof graph}, {&diagnostic, sizeof diagnostic}};
+    if (!spans(live, 6)) return fail(diagnostic, ChariotIkError49T::records, 0x1568c8);
+    if (!index(endpoint, graph.count)) return fail(diagnostic, ChariotIkError49T::bindings, 0x156658);
+    const I elbow = node(graph, endpoint).parent180;
+    if (!index(elbow, graph.count)) return fail(diagnostic, ChariotIkError49T::bindings, 0x156658);
+    const I shoulder = node(graph, elbow).parent180;
+    const ChariotIkChainBinding49T binding{shoulder, elbow, endpoint, none};
+    if (!chainBinding(graph, binding)) return fail(diagnostic, ChariotIkError49T::bindings, 0x15666c);
+    if (!libmContext(libm)) return fail(diagnostic, ChariotIkError49T::context, 0x302730);
+    copyGraph(graph, work.nodes); work.libm = libm;
+    const SceneGraph49P staged{work.nodes, graph.count}; Math f;
+    //433400 is initialized to(+1,+0,+0,1) by3C8DD0..3C8E4C.
+    if (!constructAxis(staged, binding, V{{1.0f, 0.0f, 0.0f, 1.0f}}, work.records.left, work.libm, f))
+        return fail(diagnostic, ChariotIkError49T::arithmetic, 0x28eb90);
+    work.records.left.mode10 = 0; //156920, after the complete constructor.
+    copyGraph(staged, graph.nodes); record = work.records.left; libm = work.libm;
+    return true;
+}
+
+bool solveModelMode0Ik50KG(const ChariotIkChain49T& record, const Vector3_48C& target,
+    ModelMode0IkShared50KG& shared, const SceneGraph49P& graph,
+    ChariotIkWorkspace49T& work, ChariotIkDiagnostic49T& diagnostic) noexcept {
+    diagnostic = {};
+    if (std::fegetround() != FE_TONEAREST) return fail(diagnostic, ChariotIkError49T::rounding_mode, 0x28ffd0);
+    if (!finiteGraph(graph)) return fail(diagnostic, ChariotIkError49T::graph, 0x28ffd0);
+    const Span live[] = {{graph.nodes, graph.count * sizeof(SceneNode49P)}, {&record, sizeof record},
+        {&target, sizeof target}, {&shared, sizeof shared}, {&work, sizeof work},
+        {&graph, sizeof graph}, {&diagnostic, sizeof diagnostic}};
+    if (!spans(live, 7)) return fail(diagnostic, ChariotIkError49T::records, 0x28ffd0);
+    const ChariotIkChainBinding49T binding{record.shoulder0, record.elbow4, record.wrist8, none};
+    if (!chainBinding(graph, binding)) return fail(diagnostic, ChariotIkError49T::bindings, 0x28ffd0);
+    if (record.mode10 != 0 || record.debug40 != 0 ||
+        !std::isfinite(record.lengthSquared14) || !std::isfinite(record.inverseLengthProduct18))
+        return fail(diagnostic, ChariotIkError49T::context, 0x28f5b8);
+    for (float x : target.v) if (!std::isfinite(x)) return fail(diagnostic, ChariotIkError49T::arithmetic, 0x290264);
+    copyGraph(graph, work.nodes);
+    ModelMode0IkShared50KG stagedShared = shared;
+    const SceneGraph49P staged{work.nodes, graph.count}; Math f;
+    if (!solveMode0(staged, record, V{{target.v[0], target.v[1], target.v[2], 1.0f}}, stagedShared, f))
+        return fail(diagnostic, ChariotIkError49T::arithmetic, 0x28ffd0);
+    copyGraph(staged, graph.nodes); shared = stagedShared;
+    return true;
+}
+
+bool modelMode0IkCallback50KG(const void* context, U chain, const Vector3_48C& target,
+    ModelMode0IkShared50KG& shared, const SceneGraph49P& graph) noexcept {
+    if (context == nullptr) return false;
+    const auto& records = *static_cast<const ModelMode0IkContext50KG*>(context);
+    if (records.chains == nullptr || records.count > maxSceneNodes49P || chain >= records.count) return false;
+    ChariotIkWorkspace49T work;
+    ChariotIkDiagnostic49T diagnostic{};
+    return solveModelMode0Ik50KG(records.chains[chain], target, shared, graph, work, diagnostic);
+}
+
 }

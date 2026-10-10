@@ -10,9 +10,15 @@ namespace rr::platform {
 inline constexpr std::uint32_t originalUiMaximumQuads50KG = 8192;
 inline constexpr std::uint32_t originalUiMaximumSpans50KG = 2048;
 enum class OriginalUiBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };
+enum class OriginalUiMaterialMode50KG : std::uint8_t {
+    unspecified, texturedModulate, untexturedVertexColor,
+    // Actual Main ParticleCode: MODULATE, alpha GREATER 0, source fog.
+    mainParticle
+};
 struct OriginalUiSpan50KG {
-    // Contiguous quad partition, in original painter order. Repeated textures
-    // are not sorted or regrouped. Each vertex is real authored XY/UV/RGBA.
+    // Contiguous quad partition in the caller's source-resolved draw order.
+    // Textured/untextured spans and repeated images are never regrouped here.
+    // Each vertex carries real source XY/RGBA and textured spans' authored UV.
     std::uint32_t firstQuad = 0, quadCount = 0;
     std::uint32_t textureIndex = assets::unresolvedMaterialTexture50EA;
     OriginalUiBlend50KG blend = OriginalUiBlend50KG::sourceAlpha;
@@ -20,10 +26,15 @@ struct OriginalUiSpan50KG {
     float alphaScale = 1.f;
     // Explicit source material modulation normalization; packet bytes remain exact.
     float colorScale = 1.f;
+    // Explicit source admission, never inferred from a missing texture. The
+    // untextured mode requires the unresolved index; it samples no image.
+    OriginalUiMaterialMode50KG materialMode = OriginalUiMaterialMode50KG::unspecified;
 };
 struct OriginalUiDraw50KG {
     // Exact published original texture bank; its owner outlives this call.
     // Raw native GLuints and fallback textures cannot enter the interface.
+    // An all-untextured renderer may omit both bank and publication (null/0).
+    // Mixed draws retain the same authenticated bank as their textured spans.
     const MaterialTextureGl50EB* textures = nullptr;
     std::uint64_t texturePublication = 0;
     const assets::Vertex48B* vertices = nullptr; // four vertices per quad

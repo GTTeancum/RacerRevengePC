@@ -1,0 +1,86 @@
+[
+  {
+    "path": "src/game/collection_bounds48s.cpp",
+    "preimage_sha256": "9176b0cbca5581b43d18544de6d86b20b97fe2ccdf5e0c47dd2451a949a00dd1",
+    "staged_sha256": "2b88a50d954f20e4f741bcd54bd910ebbdc32515e59bc9c9a380ac1a4e5d7bfd",
+    "status": "modified"
+  },
+  {
+    "path": "src/game/collection_bounds48s.h",
+    "preimage_sha256": "ac37547227114abe87aa84d6268f87b4c7c9983a4cc1311eb8e57859536d06ec",
+    "staged_sha256": "7150effecae4133635d0183f3f1d70bc83ae4257b6c3aa100e177145050b7500",
+    "status": "modified"
+  },
+  {
+    "path": "src/game/gate_trigger_action50kg.h",
+    "preimage_sha256": null,
+    "staged_sha256": "0d320adfac088b915fc801d1090e570087f426c25abcfbcf05ba5a5e393eb259",
+    "status": "new"
+  },
+  {
+    "path": "src/game/indexed_type2_contact50cc.cpp",
+    "preimage_sha256": "44881e2a3f3fbf4b60903880f13de7de72eb7193f7105a64f72792fcc38e1f7c",
+    "staged_sha256": "fe90b57e29cf334ed6ca2cd9702e82fc35d9b36f62206fad76b68538c81082b0",
+    "status": "modified"
+  },
+  {
+    "path": "src/game/indexed_type2_contact50cc.h",
+    "preimage_sha256": "b17a2fab9253c9f2f5f4eea93deb85d10447717629af88fe6cddde8d2dfeaf9b",
+    "staged_sha256": "e907051fb4bcdd87f3125ed0a69f32cfe8ba7bcb1407b394dbf5b60c711ffca5",
+    "status": "modified"
+  },
+  {
+    "path": "src/game/native_gate_geometry50kg.h",
+    "preimage_sha256": null,
+    "staged_sha256": "c66be38a467ef57b8437712fd5dad8299dd21633fc63e31dcfad5220034c98b3",
+    "status": "new"
+  },
+  {
+    "path": "src/game/static_type2_producer49x.h",
+    "preimage_sha256": "09153c9c233125bbcaa797e5e1b3a2eb163946653d09450d7ff30af4a67465f9",
+    "staged_sha256": "4e5d172aa0fd3f197d6557577e5fefb2bf10b19cf10f0692dccd5b0347229e1f",
+    "status": "modified"
+  },
+  {
+    "path": "src/game/terrain_query_workspace48m.cpp",
+    "preimage_sha256": "a18fda74edde6684ddaad3c0b06ce17be0a810dc05f57460836dfe220b83206e",
+    "staged_sha256": "af2a9007c86d1657762c025e3a8f22294d42d6af6ea91d3e5c49c02254090dc9",
+    "status": "modified"
+  },
+  {
+    "path": "src/game/vehicle_live_query50eq.cpp",
+    "preimage_sha256": "5f730b311c41fe05680e99d14fcddc28e82e15aa95997b9deb3b4482f1208abd",
+    "staged_sha256": "37e965e779d2398d3d7aec5bc7097f03e4b37e8ab959d72dd526c550d0e87417",
+    "status": "modified"
+  },
+  {
+    "path": "tests/native/gc_animated_candidates50ig_fixture.h",
+    "preimage_sha256": "11542eda714da1af68aeb56f763623afc005239fa3cb34013c71027b8e52273e",
+    "staged_sha256": "1775217320861c5780256a9f56440bdb9ebf6681f83eff083f7946f18102c521",
+    "status": "modified"
+  },
+  {
+    "path": "tests/native/gc_animated_world50ig_fixture.h",
+    "preimage_sha256": "cec7c7db25666e03966034301c0189bea77314ccc0f54be0f75681b717c4ff4e",
+    "staged_sha256": "13a5f187636452944128ce55ddad17b8734e35c06fce96675f9f3d8701cbbd06",
+    "status": "modified"
+  },
+  {
+    "path": "tests/native/gc_gate_candidates50kg_fixture.h",
+    "preimage_sha256": null,
+    "staged_sha256": "4d7935363471c4ee60db57da06ec482ef85683d32d57d7191918baa3ee554442",
+    "status": "new"
+  },
+  {
+    "path": "tests/native/terrain_interactive_drive50du.cpp",
+    "preimage_sha256": "8dbd12170ffb2fda8c6da892e51a3ed254469070eb9c69f014375f87b0aa7432",
+    "staged_sha256": "5232eb0d9246f955c6a32ceddbd47d48663b98beb89ee15cfcfc75a3587bb4cd",
+    "status": "modified"
+  },
+  {
+    "path": "tests/native/track_runtime_storage50ig_fixture.h",
+    "preimage_sha256": "9606baa0ee1853eb005b73a6450c47084d7cc305ef13c1db953fd79dd2ba9097",
+    "staged_sha256": "2dbd3444470b0edd5900dfebd5bc3905e2674b073c74f499e55b0b50c55b6dfe",
+    "status": "modified"
+  }
+]

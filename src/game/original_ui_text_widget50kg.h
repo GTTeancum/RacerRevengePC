@@ -70,12 +70,20 @@ public:
     bool disabled() const noexcept { return disabled_; }
     bool shown() const noexcept { return shown_; }
 
-    // Expand navigation commands through every authored membership in order,
-    // including duplicates, then call this once for each matching widget.
-    // value matters only for setEnabled. show/hide and reset do not reenable
-    // stopped TextOverlays. reset is the inherited 2A79E0 show-only callback.
+    // Native widget callback entry points. The legacy setEnabled operation
+    // here selects text's enable/disable virtuals+80/+84; it is NOT the
+    // UIControl2A5B60 operation. Navigation owners use setControlEnabled for
+    // that nonvirtual call. Other operations preserve authored member order,
+    // including duplicates. show/hide and inherited reset2A79E0 do not
+    // reenable stopped TextOverlays.
     OriginalUiTextWidgetStatus50KG apply(OriginalUiControlOperation50KG,
         bool value=false) noexcept;
+
+    // Nonvirtual UIWidget::SetEnabled 2A7A00, called by UIControl2A5BA4
+    // and Main's direct widget effects. This writes selected+38 and recursive
+    // hierarchy visibility only. It does not call text enable/disable+80/+84,
+    // change disabled+4C, recolor lines, or restart/stop TextOverlays.
+    OriginalUiTextWidgetStatus50KG setControlEnabled(bool) noexcept;
 
     // Actual source line entry points. A locked line suppresses setup/color/
     // alpha BEFORE inspecting the requested values. stop is unconditional and

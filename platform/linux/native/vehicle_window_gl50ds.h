@@ -60,6 +60,9 @@ struct VehicleWindowMaterialBinding50DS {
     // Bypass host geometric lighting; retain explicit RGB exposure. Opaque
     // racer bodies use source normals; nonopaque pod effects remain unlit.
     bool unlit = false;
+    // Authenticated material program preserves precomputed vertex RGB.
+    // Bypass added host illumination without suppressing native shadow receipt.
+    bool sourcePrelit = false;
 };
 struct VehicleWindowComponentMaterials50DS {
     const VehicleWindowMaterialBinding50DS* bindings = nullptr;
@@ -255,8 +258,12 @@ struct VehicleWindowRequest50DS {
     // menu targets, independent of the two native frame targets. Default unchanged.
     bool enableHostHud = false;
     // NEW opt-in reconstructed original-art renderer. Disabled by default.
-    // Exact CPU/GPU bank pair is checked cold, including raw alpha <=128.
-    // Both immutable owners must outlive close; no generated/font fallback.
+    // Exact CPU/GPU bank pair is checked cold; actual atlas alpha maxima are
+    // combined with vertex alpha during draw admission (atlases may reach255).
+    // Both immutable owners remain alive through close or an explicit bank
+    // replacement with completed prior GPU work; no generated/font fallback.
+    // Both may be null for explicit untextured-only draws; a textured span
+    // still requires its real bank, and a partial bank pair always rejects.
     bool enableOriginalUi = false;
     const assets::MaterialTextureAssets50EA* originalUiCpuTextures = nullptr;
     const MaterialTextureGl50EB* originalUiTextures = nullptr;
@@ -549,6 +556,14 @@ public:
     // Does not advance gameplay or replace the retained race publication.
     bool submitOriginalUi(const OriginalUiNativeDraw50KG&, std::int32_t width,
         std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
+    // Explicit destination resource publication between complete submissions.
+    // Authenticates every CPU/GPU texture identity and caches actual alpha
+    // maxima before replacing the retained borrow. False preserves the old
+    // bank and image. No draw, upload, route admission or gameplay work occurs.
+    // Caller retains the new immutable owners through the next replacement or
+    // close, and retains prior GPU owners until their submitted work completes.
+    bool bindOriginalUiTextures(const assets::MaterialTextureAssets50EA&,
+        const MaterialTextureGl50EB&, VehicleWindowDiagnostic50DS&) noexcept;
     // Source-compatible fail-closed boundary: recovered draw-only packets lack
     // explicit source depth and destination-alpha-consumer ownership.
     bool submitOriginalUi(const OriginalUiDraw50KG&, std::int32_t width,

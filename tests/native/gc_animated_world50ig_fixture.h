@@ -51,6 +51,14 @@ struct Source {
  std::uint32_t startingZone=0,vertexStart=0;
  bool motionLoops=false;
 };
+struct GateSource {
+ g::CollisionSphere48J sphere{};
+ std::uint32_t startingZone=0,animationOwner=0;
+ std::string soundFilename;
+ std::array<float,3> soundPosition{};
+ float soundMinDistance=0,soundMaxDistance=0;
+ bool authenticated=false;
+};
 struct Diagnostic {std::string message;std::size_t owner=0;g::ModelMotionDiagnostic49T motion{};};
 namespace detail {
 inline void need(bool ok,const char* text){if(!ok)throw std::runtime_error(text);}
@@ -106,6 +114,7 @@ class Owner final {
  std::array<Span,surfaceCount> spans_{};
  g::ModelMotionWorkspace49T workspace_{};
  PlaybackShared playback_{};
+ GateSource gateSource_{};g::GateTriggerBinding50KG gate_{};
  std::array<g::CompoundCollisionView50IJ,ownerCount> collisionViews_{};
  bool attempted_=false,ready_=false;
  bool updateCollision(std::size_t owner,State& state){
@@ -160,6 +169,37 @@ public:
    auto tob=member("tracks\\gc.tob","e677f80d12da2c2225c8ba030e2a29e3a358c52bcfd4f9c981b79c3c53b72454");
    a::ParameterDocument48F params;need(a::decodeParameters48F(tob,params,error),"GC original TOB decode");
    need(field(block(params,"animations"),"numberofanimations")=="2","GC original animated owner count");
+   // Read Trigger9 from this same SHA-authenticated original TOB, not a host
+   // threshold, invented waypoint, or replacement animation configuration.
+   need(field(block(params,"triggers"),"numberoftriggers")=="9","GC authored trigger count");
+   const auto& gate=block(params,"trigger9");
+   need(field(gate,"name")=="Gate"&&field(gate,"zone")=="11"&&
+        field(gate,"numberofactions")=="2"&&field(gate,"onetimeonly")=="T",
+        "GC authored Gate identity/one-shot differs");
+   need(!optional(gate,"startenabled")&&!optional(gate,"ignoretrigger")&&
+        !optional(gate,"randomtriggerpercent"),"GC Gate constructor defaults differ");
+   const auto gatePosition=vector(field(gate,"position"));
+   for(unsigned axis=0;axis<3;++axis)gateSource_.sphere.center.v[axis]=gatePosition[axis];
+   gateSource_.sphere.radius=decimal(field(gate,"radius"));
+   need(gateSource_.sphere.radius==300.f,"GC authored Gate radius differs");
+   gateSource_.startingZone=11;gateSource_.animationOwner=0;
+   const auto& animationAction=block(params,"trigger9action1");
+   need(field(animationAction,"actiontype")=="Animation"&&
+        field(animationAction,"animationnumber")=="1"&&
+        !optional(animationAction,"timetillreset")&&!optional(animationAction,"specificobject")&&
+        !optional(animationAction,"animationnameref"),"GC authored Gate animation action differs");
+   // Source parser ignores Animation action's OneTimeOnly field. The Gate's
+   // own OneTimeOnly above supplies the actual one-shot policy.
+   const auto& soundAction=block(params,"trigger9action2");
+   need(field(soundAction,"actiontype")=="PodSound","GC authored Gate second action differs");
+   gateSource_.soundFilename=field(soundAction,"filename");
+   need(gateSource_.soundFilename=="sfx\\race\\bigdoor.vag","GC original Gate sound differs");
+   gateSource_.soundPosition=vector(field(soundAction,"position"));
+   gateSource_.soundMinDistance=decimal(field(soundAction,"mindistance"));
+   gateSource_.soundMaxDistance=decimal(field(soundAction,"maxdistance"));
+   need(gateSource_.soundMinDistance==0.f&&gateSource_.soundMaxDistance==2500.f,
+        "GC original Gate sound range differs");
+   gateSource_.authenticated=true;
    constexpr const char* names[]={"opening","windmill"};
    constexpr const char* hashes[2][4]={
     {"5070ad1c3d7435233ff14bf71aae91bc65fa65d9829d9cdeb5b58659756b0af6","7e2c6886fd6f7866967d325050ffef09775cd57abbdacd7e5ad67a08bdd728f9","2461e850de0f00381d73ed0997068160ea2ebf7448e2665b2e4384dc9108a71f","992ef9ca4e4beee1d72f6728c3a9ec2abb3e119bf6c73ae55b4d0ee7ff5c61b8"},
@@ -220,7 +260,14 @@ public:
    need(mesh_.vertices.size()==vertexCount&&mesh_.indices.size()==indexCount&&spanIndex==surfaceCount,"GC animated aggregate exact extent");
    nextVertices_=mesh_.vertices;nextNormals_=normals_;pending_=state_;
    for(unsigned axis=0;axis<3;++axis){mesh_.bounds.minimum[axis]=mesh_.bounds.maximum[axis]=mesh_.vertices.front().position[axis];for(const auto& v:mesh_.vertices){mesh_.bounds.minimum[axis]=std::min(mesh_.bounds.minimum[axis],v.position[axis]);mesh_.bounds.maximum[axis]=std::max(mesh_.bounds.maximum[axis],v.position[axis]);}}
-   publishCollision();libm=nextLibm;shared=nextShared;ready_=true;d={};return true;
+   publishCollision();libm=nextLibm;shared=nextShared;ready_=true;
+   gate_.callbacks.context=this;
+   gate_.callbacks.activateAnimation=[](void* context,std::size_t owner) noexcept {
+    return static_cast<Owner*>(context)->activateSequence(owner);
+   };
+   // PodSound has no bound native owner here. The one-shot receipt explicitly
+   // records its omission rather than claiming playback or retrying each frame.
+   d={};return true;
   }catch(const std::exception& e){d.message=e.what();return false;}
  }
  // Caller supplies actual source elapsed, once at the world animation service
@@ -261,9 +308,13 @@ public:
   if(!advance(delta,shared,d))return false;
   sharedRaw=raw;lazy=next;return true;
  }
- //101C10/101CD0 sequence activation, called only after the real authored
+ //101170 authored action callback, sharing101CD0 sequence stores. Called
+ // only after the real authored
  // trigger/action selector has admitted it. Does not fake a trigger hit.
  bool activateSequence(std::size_t owner) noexcept {if(!ready_||owner>=ownerCount)return false;auto& q=state_[owner].sequence;q.active90=true;q.nextSequenceA0=q.nextMotionA8=-1;return true;}
+ const GateSource& gateSource()const noexcept{return gateSource_;}
+ g::GateTriggerBinding50KG& gateBinding() noexcept{return gate_;}
+ const g::GateTriggerBinding50KG& gateBinding()const noexcept{return gate_;}
  const a::Mesh48B& mesh()const noexcept{return mesh_;}
  const std::vector<a::WorldNormal50HK>& normals()const noexcept{return normals_;}
  const std::array<Span,surfaceCount>& spans()const noexcept{return spans_;}

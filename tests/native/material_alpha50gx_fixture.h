@@ -16,6 +16,8 @@ struct Policy {
     bool discardZeroAlpha = false;
     bool unlit = false;
     float alphaScale = 1.0f;
+    // Actual prelit program copies authored RGB; distinct from emissive/unlit.
+    bool sourcePrelit = false;
 };
 namespace detail {
 struct Material {
@@ -109,6 +111,8 @@ inline bool selectGc(const track_materials50fa_fixture::Selection& selection, Po
     } else if (selection.passCount != 1 ||
         (selection.program != "PreLitCompressed" && selection.program != "PrelitCompressed" &&
          selection.program != "DiffuseCompressed")) return false;
+    next.sourcePrelit = selection.projectedPrelit ||
+        detail::lower(selection.program) == "prelitcompressed";
     output = next;
     return true;
 }
@@ -148,6 +152,7 @@ inline bool select(const track_materials50fa_fixture::Selection& selection, Poli
             // product below. Clamp the resulting factor in the draw shader.
             next.alphaScale = (255.0f / 128.0f) * (255.0f / 128.0f);
         }
+        next.sourcePrelit = detail::lower(selection.program) == "prelitcompressed";
         output = next;
         return true;
     }

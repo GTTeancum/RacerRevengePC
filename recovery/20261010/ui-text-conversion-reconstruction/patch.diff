@@ -1,0 +1,125 @@
+--- a/src/assets/original_ui_overlay_text50kg.cpp
++++ b/src/assets/original_ui_overlay_text50kg.cpp
+@@ -8,9 +8,9 @@
+     const OriginalUiDatSection50KG& s,const std::string& key,std::uint32_t pc) noexcept {
+     const auto* v=s.find(key);d={e,v?v->valueOffset:s.sourceOffset,pc};return false;
+ }
+-std::uint32_t roundEven(float f) noexcept {
+-    const auto n=static_cast<std::uint32_t>(f);const float fraction=f-float(n);
+-    return n+(fraction>0.5f || (fraction==0.5f && (n&1u)) ? 1u : 0u);
++std::uint32_t truncateColor(float f) noexcept {
++    // Source CVT.W.S truncates; color() admits only finite [0,255] inputs.
++    return static_cast<std::uint32_t>(static_cast<std::int32_t>(f));
+ }
+ bool color(const OriginalUiDatSection50KG& s,const char* key,float fallback,
+     std::uint32_t& output,OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
+@@ -18,7 +18,7 @@
+     if (!originalUiTriple50KG(s,key,{{fallback,fallback,fallback}},v,d,pc)) return false;
+     for (float f:v) if (!std::isfinite(f) || f<0 || f>255)
+         return fail(d,OriginalUiPageError50KG::unsupportedValue,s,key,pc);
+-    output=0xff000000u | (roundEven(v[0])<<16) | (roundEven(v[1])<<8) | roundEven(v[2]);
++    output=0xff000000u | (truncateColor(v[0])<<16) | (truncateColor(v[1])<<8) | truncateColor(v[2]);
+     return true;
+ }
+ bool flag(const OriginalUiDatSection50KG& s,const char* key,bool& value,
+--- a/src/assets/original_ui_overlay_text50kg.h
++++ b/src/assets/original_ui_overlay_text50kg.h
+@@ -36,7 +36,7 @@
+ // Source Overlay_Text::Create 0x2A9000. Widget sections are "Widget N".
+ // Actual DAT data and optional authenticated English lookup are required.
+ // Missing required text/font references fail; no fallback labels are supplied.
+-// Color uses source cvt.w.s ties-to-even then packed 0xFFRRGGBB. Native
++// Color uses source CVT.W.S truncation toward zero then packed 0xFFRRGGBB. Native
+ // admission restricts RGB to [0,255], coordinates to safe signed16, 64 lines,
+ // and each glyph run to 255 bytes. These are bounds, not authored defaults.
+ // Alpha remains authored here; source TextOverlay setter clamps to 0..255.
+--- a/src/game/original_ui_text_position50kg.cpp
++++ b/src/game/original_ui_text_position50kg.cpp
+@@ -4,21 +4,22 @@
+ 
+ namespace rr::game {
+ namespace {
+-bool nearestEven(float value,std::int32_t& out) noexcept {
++bool truncateToInt32(float value,std::int32_t& out) noexcept {
+     if (!std::isfinite(value)) return false;
+-    const double n=std::floor(double(value));const double fraction=double(value)-n;
+-    const double rounded=n+(fraction>0.5 || (fraction==0.5 && std::fmod(n,2.0)!=0.0)?1.0:0.0);
+-    if (rounded<double(std::numeric_limits<std::int32_t>::min()) ||
+-        rounded>double(std::numeric_limits<std::int32_t>::max())) return false;
+-    out=static_cast<std::int32_t>(rounded);return true;
++    // EE CVT.W.S truncates toward zero. This native path admits only finite,
++    // representable inputs; rejection outside that domain is not EE saturation.
++    if (double(value)<double(std::numeric_limits<std::int32_t>::min()) ||
++        double(value)>double(std::numeric_limits<std::int32_t>::max())) return false;
++    out=static_cast<std::int32_t>(value);return true;
+ }
+-// Each source mul.s/add.s has its own binary32 rounding; forbid contraction.
++// Keep source mul.s/add.s as separate host float operations; forbid contraction.
++// This materialization is not a claim of all-input EE floating-point parity.
+ float mul(float a,float b) noexcept { volatile float f=a*b;return f; }
+ float add(float a,float b) noexcept { volatile float f=a+b;return f; }
+ }
+ bool roundOriginalUiTextMetric50KG(float beforeScale,float scale,std::int32_t& output) noexcept {
+     if (!std::isfinite(beforeScale) || !std::isfinite(scale)) return false;
+-    std::int32_t result=0;if (!nearestEven(mul(beforeScale,scale),result)) return false;
++    std::int32_t result=0;if (!truncateToInt32(mul(beforeScale,scale),result)) return false;
+     output=result;return true;
+ }
+ bool positionOriginalUiText50KG(const OriginalUiTextPositionInput50KG& input,
+@@ -34,22 +35,22 @@
+     } else {
+         const float advance=mul(w.leadingFactor,input.fontLineHeight);
+         const float distance=mul(float(input.line),advance);
+-        if (!nearestEven(add(float(w.y),distance),result.authoredLineY)) return false;
++        if (!truncateToInt32(add(float(w.y),distance),result.authoredLineY)) return false;
+     }
+     result.positionedX=float(result.authoredLineX);result.positionedY=float(result.authoredLineY);
+     if (!w.lines[input.line].empty()) {
+         const auto j=w.justification;std::int32_t coordinate=0;
+         if (j==assets::OriginalUiTextJustification50KG::centerHorizontal ||
+             j==assets::OriginalUiTextJustification50KG::centerBoth) {
+-            if (!nearestEven(add(result.positionedX,-mul(float(input.measuredWidth),0.5f)),coordinate)) return false;
++            if (!truncateToInt32(add(result.positionedX,-mul(float(input.measuredWidth),0.5f)),coordinate)) return false;
+             result.positionedX=float(coordinate);
+         } else if (j==assets::OriginalUiTextJustification50KG::right) {
+-            if (!nearestEven(add(result.positionedX,-float(input.measuredWidth)),coordinate)) return false;
++            if (!truncateToInt32(add(result.positionedX,-float(input.measuredWidth)),coordinate)) return false;
+             result.positionedX=float(coordinate);
+         }
+         if (j==assets::OriginalUiTextJustification50KG::centerVertical ||
+             j==assets::OriginalUiTextJustification50KG::centerBoth) {
+-            if (!nearestEven(add(result.positionedY,-mul(float(input.measuredHeight),0.5f)),coordinate)) return false;
++            if (!truncateToInt32(add(result.positionedY,-mul(float(input.measuredHeight),0.5f)),coordinate)) return false;
+             result.positionedY=float(coordinate);
+         }
+     }
+--- a/src/game/original_ui_text_position50kg.h
++++ b/src/game/original_ui_text_position50kg.h
+@@ -10,7 +10,7 @@
+     std::size_t line=0;
+     float fontLineHeight=0;
+     // Source ScreenText::GetWidth/GetHeight integer results, after source
+-    // metric rounding. Font layout's unrounded values are not interchangeable.
++    // metric truncation. Font layout's unconverted values are not interchangeable.
+     std::int32_t measuredWidth=0,measuredHeight=0;
+ };
+ struct OriginalUiTextPosition50KG {
+@@ -21,13 +21,15 @@
+     // for a settled, unanimated original main text line. Animated transforms
+     // must be separately source-updated; this function does not erase them.
+ };
+-// Source GetWidth/GetHeight final multiply and cvt.w.s. This closes the
+-// font leaf's unrounded metric contract without depending on host fenv.
++// Source GetWidth/GetHeight final multiply and CVT.W.S truncation toward zero.
++// The converted product must be finite and int32-representable; out-of-domain
++// inputs are rejected, not source-saturated. Conversion does not use host fenv.
+ bool roundOriginalUiTextMetric50KG(float beforeScale,float sourceScale,
+     std::int32_t& output) noexcept;
+ // Line leading 0x2A9684/0x2A98A8/0x2A9D20 and justification 0x2E13A0.
+ // Explicit Height only affects the localized/split branch (0x2A9CD4).
+-// Integer conversion explicitly uses nearest-even; never host rounding mode.
++// CVT.W.S conversion truncates toward zero in the finite int32 domain;
++// out-of-domain inputs are rejected before casting. Never host rounding mode.
+ bool positionOriginalUiText50KG(const OriginalUiTextPositionInput50KG&,
+     OriginalUiTextPosition50KG&) noexcept;
+ // Independent ScreenText packet route: 29DA10->29DCB0 stores packed color;

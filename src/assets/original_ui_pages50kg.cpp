@@ -17,20 +17,48 @@ bool fail(OriginalUiPageDiagnostic50KG& d, OriginalUiPageError50KG e,
 bool integer(const std::string& text, std::int32_t& out) noexcept {
     if (text.empty()) return false;
     std::size_t at=0;
-    const bool neg=text[0]=='-';
-    if (neg || text[0]=='+') ++at;
+    while (at<text.size() && space(text[at])) ++at;
     if (at==text.size()) return false;
+    const bool neg=text[at]=='-';
+    if (neg || text[at]=='+') ++at;
+    if (at==text.size()) return false;
+    // 0x158920 -> 0x30AE70 uses base 0. Keep the native conversion within
+    // signed32, but admit the original DATs' trailing semicolon annotations.
+    unsigned base=10;
+    if (text[at]=='0') {
+        base=8;
+        if (at+1<text.size() && lower(text[at+1])=='x') { base=16;at+=2; }
+    }
+    const auto digits=at;
     const std::uint64_t limit=neg ? 2147483648ull : 2147483647ull;
     std::uint64_t n=0;
     for (;at<text.size();++at) {
-        if (text[at]<'0' || text[at]>'9') return false;
-        const unsigned digit=unsigned(text[at]-'0');
-        if (n>(limit-digit)/10) return false;
-        n=n*10+digit;
+        const char c=lower(text[at]);
+        const unsigned digit=c>='0' && c<='9' ? unsigned(c-'0')
+            : c>='a' && c<='f' ? unsigned(c-'a'+10) : 16u;
+        if (digit>=base) break;
+        if (n>(limit-digit)/base) return false;
+        n=n*base+digit;
     }
+    if (at==digits) return false;
+    while (at<text.size() && space(text[at])) ++at;
+    if (at<text.size() && text[at]!=';') return false;
     out=neg ? static_cast<std::int32_t>(-static_cast<std::int64_t>(n))
             : static_cast<std::int32_t>(n);
     return true;
+}
+bool boolean(const std::string& text, bool& out) noexcept {
+    if (text.empty()) return false;
+    // 0x158950/78 and 0x1589E8/0x158A10 compare only one character;
+    // 0x15899C/C0 compare the entire ON/OFF token, all case-insensitively.
+    const char first=lower(text[0]);
+    if (first=='t' || first=='y' ||
+        (text.size()==2 && first=='o' && lower(text[1])=='n')) { out=true;return true; }
+    if (first=='f' || first=='n' ||
+        (text.size()==3 && first=='o' && lower(text[1])=='f' && lower(text[2])=='f')) { out=false;return true; }
+    std::int32_t n=0;
+    if (!integer(text,n)) return false;
+    out=n!=0;return true;
 }
 // Source DAT numbers admit an omitted integral zero (.6, -.25). This
 // bounded lexical expansion retains the existing exact decimal arithmetic;
@@ -98,6 +126,13 @@ bool originalUiInteger50KG(const OriginalUiDatSection50KG& s,const std::string& 
     if (v && !integer(v->text,n)) return fail(d,OriginalUiPageError50KG::integerSyntax,v->valueOffset,pc);
     output=n;d={};return true;
 }
+bool originalUiBoolean50KG(const OriginalUiDatSection50KG& s,const std::string& key,
+    bool fallback,bool& output,OriginalUiPageDiagnostic50KG& d,
+    std::uint32_t pc) noexcept {
+    const auto* v=s.find(key);bool n=fallback;
+    if (v && !boolean(v->text,n)) return fail(d,OriginalUiPageError50KG::booleanSyntax,v->valueOffset,pc);
+    output=n;d={};return true;
+}
 bool originalUiNumber50KG(const OriginalUiDatSection50KG& s,const std::string& key,
     float fallback,float& output,OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
     const auto* v=s.find(key);float n=fallback;
@@ -140,9 +175,15 @@ bool readOriginalUiDat50KG(const OriginalUiArchive50KG& archive,const std::strin
             // Keep an offset for every retained character so diagnostics still
             // name bytes in the authenticated member after source cleaning.
             std::string line;std::vector<std::size_t> offsets;
+            const bool sectionHeader=p[first]=='[';
             bool quoted=false;int brackets=0;
             for (std::size_t i=lineStart;i<lineEnd;++i) {
                 const char c=char(p[i]);
+                // 0x157548..74 extracts the name through the first ']'. Admit
+                // its authored trailing comment only, before comment quotes or
+                // brackets can affect syntax; never strip a value semicolon.
+                if (sectionHeader && c==';' && !quoted && brackets==0 &&
+                    !line.empty() && line.back()==']') break;
                 if (c=='"') quoted=!quoted;
                 else if (c=='[') ++brackets;
                 else if (c==']') --brackets;
@@ -199,16 +240,15 @@ bool readOriginalUiPage50KG(const OriginalUiDat50KG& page,const OriginalUiDat50K
             !originalUiInteger50KG(*info,"PageNo",0,result.pageNo,d,0x1D6D94) ||
             !originalUiInteger50KG(*info,"OpenSize",224,result.openSize,d,0x1D64DC) ||
             !originalUiNumber50KG(*info,"Time",1.0f,result.openTime,d,0x1D64F4) ||
-            !originalUiInteger50KG(*info,"UseVideoAsTexture",0,n,d,0x1D6D74)) return false;
-        result.widgetCount=static_cast<std::uint16_t>(wc);result.useVideoAsTexture=n!=0;
+            !originalUiBoolean50KG(*info,"UseVideoAsTexture",false,result.useVideoAsTexture,d,0x1D6D74)) return false;
+        result.widgetCount=static_cast<std::uint16_t>(wc);
         if (result.openSize<0 || result.openSize>224 || result.openTime<=0.0f)
             return fail(d,OriginalUiPageError50KG::unsupportedValue,info->sourceOffset,0x1D67E4);
         if (const auto* v=info->find("Background")) result.background=v->text;
         if (const auto* v=info->find("Start")) result.start=v->text;
         if (const auto* v=info->find("BackgroundColor"))
             if (!vector3(*v,result.backgroundColor,d,0x1D6D1C)) return false;
-        if (!originalUiInteger50KG(*info,"HasPopup",0,n,d,0x1D6570)) return false;
-        result.hasPopup=n!=0;
+        if (!originalUiBoolean50KG(*info,"HasPopup",false,result.hasPopup,d,0x1D6570)) return false;
         constexpr const char* keys[]={"PopupConfirmWidget","PopupFormatWidget","PopupFormatSuccessWidget",
             "PopupFormatFailWidget","PopupYesWidget","PopupNoWidget","PopupAskFormatWidget",
             "PopupNoMemcardWidget","PopupFullMemcardWidget"};
@@ -255,8 +295,7 @@ bool readOriginalUiPage50KG(const OriginalUiDat50KG& page,const OriginalUiDat50K
                 if (id<0 || id>cc) return fail(d,OriginalUiPageError50KG::reference,offset(*section,key),0x1D70E8);
                 group.associations.push_back(static_cast<std::uint16_t>(id));
             }
-            if (!originalUiInteger50KG(*section,"KeepEnabled",1,n,d,0x1D7110)) return false;
-            group.keepEnabled=n!=0;
+            if (!originalUiBoolean50KG(*section,"KeepEnabled",true,group.keepEnabled,d,0x1D7110)) return false;
         }
         output=std::move(result);d={};return true;
     } catch (...) { return fail(d,OriginalUiPageError50KG::allocation); }

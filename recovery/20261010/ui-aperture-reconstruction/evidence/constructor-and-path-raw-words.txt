@@ -1,0 +1,41 @@
+Static raw ELF source review only. No guest execution, asset decode, build or test.
+Source: SLUS_202.68, VA 0x100000 -> file offset 0x80.
+
+Main ctor 0x1E5400..0x1E5470. Each row is four consecutive little-endian words; first row VA 0x1E5400.
+ 27bdffe0 7fbf0000 afa4001c 0c0757a8
+ 8fa4001c 3c02003d 244411e0 8fa3001c
+ 3c02002e 2445ef40 3c02002e 2446efe0
+ ac640008 8fa2001c 24070060 24080004
+ 0c0ba218 244404c0 8fa2001c 0c0b7bd0
+ 24440640 8fa2001c 0c0b7bd0 244406a0
+ 8fa2001c 7bbf0000 03e00008 27bd0020
+
+Shared controller ctor 0x1D5EA0..0x1D5F90. First row VA 0x1D5EA0.
+ 27bdffe0 7fbf0000 afa4001c 0c0a971c
+ 8fa4001c 3c02003d 244416c0 8fa3001c
+ 3c02002e 2445ef40 3c02002e 2446efe0
+ ac640008 8fa2001c 24070060 24080004
+ 0c0ba218 244402a0 8fa2001c 0c0b80bc
+ 24440440 8fa2001c 240600e0 24050280
+ 240401c0 ac460274 8fa2001c 24030003
+ ac4004b0 8fa2001c ac40027c 8fa2001c
+ ac400288 8fa2001c ac400278 8fa2001c
+ ac450290 8fa2001c ac450280 8fa2001c
+ ac440294 8fa2001c ac400298 8fa2001c
+ ac400420 8fa2001c ac43042c 8fa2001c
+ ac400434 8fa2001c ac400438 8fa2001c
+ ac400268 8fa2001c ac4004bc 8fa2001c
+ 7bbf0000 03e00008 27bd0020 00000000
+
+Reviewed anchors:
+1E540C 0C0757A8 jal 0x1D5EA0
+1D5EAC 0C0A971C jal 0x2A5C70
+1D5F48 AC400298 sw zero,0x298(v0)
+1D5F70 AC400268 sw zero,0x268(v0)
+The intervening 8FA2001C reloads v0 from the constructor object argument.
+Main constructor does not overwrite +0x268 after shared construction.
+
+Path formatting literal 0x3AD6C0:
+   %   s   %   s  \0  \0  \0  \0
+Prefix operand at 0x36BB90 (LUI 0x37 + signed ADDIU 0xBB90):
+ 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00

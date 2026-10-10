@@ -230,10 +230,27 @@ bool AudioOutput50HD::open(const AudioOutputRequest50HD& request,
 }
 bool AudioOutput50HD::advanceMicroseconds(AudioMixer50HD& mixer, std::uint32_t microseconds,
                                         AudioOutputDiagnostic50HD& d) noexcept {
+    // Preserve the ordinary gameplay API and its exact mixer admission. This
+    // stack adapter is never retained; both overloads use one PCM output path.
+    class MixerProducer final : public AudioStereoProducer50HD {
+    public:
+        explicit MixerProducer(AudioMixer50HD& value) noexcept : mixer_(value) {}
+        bool ready() const noexcept override { return mixer_.count()!=0; }
+        std::uint32_t sampleRate() const noexcept override { return mixer_.sampleRate(); }
+        bool mixStereo16(std::int16_t* output,std::size_t frames) noexcept override {
+            return mixer_.mixStereo16(output,frames);
+        }
+    private:
+        AudioMixer50HD& mixer_;
+    } producer(mixer);
+    return advanceMicroseconds(producer,microseconds,d);
+}
+bool AudioOutput50HD::advanceMicroseconds(AudioStereoProducer50HD& producer, std::uint32_t microseconds,
+                                        AudioOutputDiagnostic50HD& d) noexcept {
     d = {};
     if (!state_ || state_->failed) return fail(d, AudioOutputError50HD::NotOpen, "audio.advance");
     auto& s = *state_;
-    if (!mixer.count() || mixer.sampleRate() != s.info.sampleRate)
+    if (!producer.ready() || producer.sampleRate() != s.info.sampleRate)
         return fail(d, AudioOutputError50HD::Mixer, "audio.advance/sample-rate mismatch");
     std::uint32_t remaining = 0;
     if (!s.clock.advance(microseconds, remaining))
@@ -245,7 +262,7 @@ bool AudioOutput50HD::advanceMicroseconds(AudioMixer50HD& mixer, std::uint32_t m
     }
     while (remaining) {
         const auto frames = std::min<std::uint32_t>(remaining, blockFrames);
-        if (!mixer.mixStereo16(s.mixed.data(), frames)) {
+        if (!producer.mixStereo16(s.mixed.data(), frames)) {
             s.failed = true; return fail(d, AudioOutputError50HD::Mixer, "audio.advance/mix");
         }
         s.info.mixedFrames += frames;

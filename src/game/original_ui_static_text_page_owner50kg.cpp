@@ -322,8 +322,14 @@ void OriginalUiStaticTextPageOwner50KG::commitCommands(const OriginalUiCommands5
         // Text apply is total for bound descriptors and these seven admitted
         // operations. Preflight plus private immutable ownership makes this
         // second pass nonfailing. No external callback/reentry point is exposed.
-        for (const auto id:storage_->page.controls[command.controlId].widgets)
-            (void)storage_->widgets[id].apply(command.operation,command.value);
+        for (const auto id:storage_->page.controls[command.controlId].widgets) {
+            // UIControl2A5BA4 calls nonvirtual2A7A00, not the text
+            // enable/disable virtuals. It sets selection and visibility only.
+            if (command.operation==Op::setEnabled)
+                (void)storage_->widgets[id].setControlEnabled(command.value);
+            else
+                (void)storage_->widgets[id].apply(command.operation,command.value);
+        }
         auto& state=storage_->navigation.controls[command.controlId];
         switch (command.operation) {
         case Op::select: state.selected=true;break;

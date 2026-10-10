@@ -58,6 +58,7 @@ inline bool convertOriginalUiMaterialSpan50KG(
     next.span.quadCount = binding.quadCount;
     next.span.textureIndex = binding.textureIndex;
     next.span.colorScale = policy.colorScale;
+    next.span.materialMode = OriginalUiMaterialMode50KG::texturedModulate;
     next.native.depthWrite = policy.depthWrite;
     switch (policy.blend) {
     case assets::OriginalUiMaterialBlend50KG::opaque:
@@ -111,6 +112,69 @@ inline bool convertOriginalUiMaterialSpan50KG(
         !filter(policy.magnification, next.native.sampler.magnification) ||
         !wrap(policy.u, next.native.sampler.s) || !wrap(policy.v, next.native.sampler.t))
         return false;
+    output = next;
+    return true;
+}
+
+// A zero-map source has geometry bounds only. Texture indices/counts and
+// samplers deliberately cannot be supplied through this separate binding.
+struct OriginalUiUntexturedMaterialSpanBinding50KG {
+    std::uint32_t firstQuad = 0, quadCount = 0, drawQuadCount = 0;
+};
+// PRECONDITION: unchanged successful result of the separate authenticated
+// prepareOriginalUiNativeUntexturedMaterial50KG admission. Like the textured
+// converter, this cannot prove source/pass/depth/alpha-consumer ownership.
+// It neither constructs an atlas nor treats a missing real texture as valid
+// untextured material. Output remains unchanged on failure.
+inline bool convertOriginalUiUntexturedMaterialSpan50KG(
+    const assets::OriginalUiNativeUntexturedMaterial50KG& policy,
+    const OriginalUiUntexturedMaterialSpanBinding50KG& binding,
+    OriginalUiMaterialSpan50KG& output) noexcept {
+    if (!binding.drawQuadCount || binding.drawQuadCount > originalUiMaximumQuads50KG ||
+        !binding.quadCount || binding.firstQuad >= binding.drawQuadCount ||
+        binding.quadCount > binding.drawQuadCount - binding.firstQuad)
+        return false;
+    // TME=0 bypasses texture modulation. RGB and stored alpha are raw vertex
+    // bytes; an active RGB blend coefficient uses A/128, not texture*A/128^2.
+    if (policy.environmentContext != 0 || policy.maximumVertexAlpha != 128 ||
+        policy.colorScale != 1.f || policy.storedAlphaScale != 1.f ||
+        policy.blendAlphaScale != 255.f / 128.f ||
+        policy.alphaStoreFromBlendFactor != 128.f / 255.f ||
+        policy.requiresOriginalDepthOwner != (policy.depthMethod != 1 || policy.depthWrite))
+        return false;
+
+    OriginalUiMaterialSpan50KG next{};
+    next.span.firstQuad = binding.firstQuad;
+    next.span.quadCount = binding.quadCount;
+    next.span.materialMode = OriginalUiMaterialMode50KG::untexturedVertexColor;
+    next.span.colorScale = policy.colorScale;
+    next.native.depthWrite = policy.depthWrite;
+    switch (policy.blend) {
+    case assets::OriginalUiMaterialBlend50KG::opaque:
+        if (policy.requiresSeparateAlphaStore) return false;
+        next.span.blend = OriginalUiBlend50KG::opaque;
+        next.span.alphaScale = 1.f;
+        break;
+    case assets::OriginalUiMaterialBlend50KG::sourceAlpha:
+        if (!policy.requiresSeparateAlphaStore) return false;
+        next.span.blend = OriginalUiBlend50KG::sourceAlpha;
+        next.span.alphaScale = policy.blendAlphaScale;
+        break;
+    case assets::OriginalUiMaterialBlend50KG::additive:
+        if (!policy.requiresSeparateAlphaStore) return false;
+        next.span.blend = OriginalUiBlend50KG::additive;
+        next.span.alphaScale = policy.blendAlphaScale;
+        break;
+    default: return false;
+    }
+    switch (policy.depthMethod) {
+    case 0: next.native.depth = OriginalUiDepth50KG::never; break;
+    case 1: next.native.depth = OriginalUiDepth50KG::always; break;
+    case 2: next.native.depth = OriginalUiDepth50KG::greaterEqual; break;
+    case 3: next.native.depth = OriginalUiDepth50KG::greater; break;
+    default: return false;
+    }
+    // Defaults retain unresolved textureIndex and unspecified sampler fields.
     output = next;
     return true;
 }

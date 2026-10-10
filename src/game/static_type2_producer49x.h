@@ -2,6 +2,7 @@
 #include "type2_resource49x.h"
 #include "compound_collision50ij.h"
 #include "spring_query48n.h"
+#include "gate_trigger_action50kg.h"
 
 namespace rr::game {
 struct Type2PairMetadata49X {
@@ -30,6 +31,10 @@ struct Type2StaticQuery49X {
     std::uint32_t initialCurrentCategory=0,initialQueryCurrentIdentity=0;
     std::uint8_t collisionTypeTag=0,groupTypeTag=0;
     bool callbackEnabled=true,resetRecordsBefore=true;
+    // Explicit opt-in native Gate geometry policy; the live wrapper supplies
+    // the preceding accepted per-racer matrix before preparing the current one.
+    bool nativeGatePolicy=false,nativeGateHasPrevious=false;
+    BodyMatrix48G nativeGatePreviousWorld{};
 };
 struct Type2StaticCandidate49X {
     SpringStaticCandidate48N candidate;
@@ -38,6 +43,9 @@ struct Type2StaticCandidate49X {
     // Prepared by prepareStaticTargetRadii49X; mesh and radii remain immutable.
     std::uint32_t shapeType=0;
     const CompoundCollisionView50IJ* compound=nullptr; // shape1 only; one callback owner
+    // Only indexed50CC supports this bounded registered shape5 Gate owner.
+    // Shared track lifetime, never per-racer copied or rolled back.
+    GateTriggerBinding50KG* gate=nullptr;
 };
 struct Type2WorkItem49X { std::uint16_t queryTag,targetTag; };
 struct Type2Visit49X {

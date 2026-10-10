@@ -8,9 +8,9 @@ bool fail(OriginalUiPageDiagnostic50KG& d,OriginalUiPageError50KG e,
     const OriginalUiDatSection50KG& s,const std::string& key,std::uint32_t pc) noexcept {
     const auto* v=s.find(key);d={e,v?v->valueOffset:s.sourceOffset,pc};return false;
 }
-std::uint32_t roundEven(float f) noexcept {
-    const auto n=static_cast<std::uint32_t>(f);const float fraction=f-float(n);
-    return n+(fraction>0.5f || (fraction==0.5f && (n&1u)) ? 1u : 0u);
+std::uint32_t truncateColor(float f) noexcept {
+    // Source CVT.W.S truncates; color() admits only finite [0,255] inputs.
+    return static_cast<std::uint32_t>(static_cast<std::int32_t>(f));
 }
 bool color(const OriginalUiDatSection50KG& s,const char* key,float fallback,
     std::uint32_t& output,OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
@@ -18,13 +18,12 @@ bool color(const OriginalUiDatSection50KG& s,const char* key,float fallback,
     if (!originalUiTriple50KG(s,key,{{fallback,fallback,fallback}},v,d,pc)) return false;
     for (float f:v) if (!std::isfinite(f) || f<0 || f>255)
         return fail(d,OriginalUiPageError50KG::unsupportedValue,s,key,pc);
-    output=0xff000000u | (roundEven(v[0])<<16) | (roundEven(v[1])<<8) | roundEven(v[2]);
+    output=0xff000000u | (truncateColor(v[0])<<16) | (truncateColor(v[1])<<8) | truncateColor(v[2]);
     return true;
 }
 bool flag(const OriginalUiDatSection50KG& s,const char* key,bool& value,
     OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
-    std::int32_t n=0;if (!originalUiInteger50KG(s,key,0,n,d,pc)) return false;
-    value=n!=0;return true;
+    return originalUiBoolean50KG(s,key,false,value,d,pc);
 }
 bool split(const std::string& text,OriginalUiOverlayText50KG& result,
     const OriginalUiDatSection50KG& s,const char* key,OriginalUiPageDiagnostic50KG& d) {
@@ -107,11 +106,15 @@ bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
             }
         } else {
             const auto* text=s->find("Text");
-            if (!text) return fail(d,OriginalUiPageError50KG::missingKey,*s,"Text",0x2A9950);
-            if (r.height) { if (!split(text->text,r,*s,"Text",d)) return false; }
+            // 2A9950 ignores GetString's return. Missing key1588DC..1588EC
+            // copies literal3A6288 (empty string), then the same direct/split
+            // constructor runs. Rider65/66/73 are authentic examples.
+            const std::string empty;
+            const auto& bytes=text?text->text:empty;
+            if (r.height) { if (!split(bytes,r,*s,"Text",d)) return false; }
             else {
-                if (text->text.size()>255) return fail(d,OriginalUiPageError50KG::capacity,*s,"Text",0x2A9950);
-                r.lines.push_back(text->text);
+                if (bytes.size()>255) return fail(d,OriginalUiPageError50KG::capacity,*s,"Text",0x2A9950);
+                r.lines.push_back(bytes);
             }
         }
         output=std::move(r);d={};return true;

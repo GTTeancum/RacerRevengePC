@@ -27,7 +27,8 @@ struct OriginalUiDatSection50KG {
 enum class OriginalUiPageError50KG : std::uint8_t {
     none, missingArchive, missingMember, unsupportedEncoding, capacity,
     textSyntax, duplicateSection, duplicateKey, missingSection, missingKey,
-    integerSyntax, numberSyntax, reference, unsupportedValue, allocation
+    integerSyntax, numberSyntax, reference, unsupportedValue, allocation,
+    booleanSyntax
 };
 struct OriginalUiPageDiagnostic50KG {
     OriginalUiPageError50KG error = OriginalUiPageError50KG::none;
@@ -50,7 +51,8 @@ private:
 };
 // Only authenticated original archive members enter this reader. Source
 // 0x159440 removes whitespace outside quotes and brackets; 0x158824 removes
-// one outer quote pair. Semicolons are comments only at cleaned line start.
+// one outer quote pair. Semicolons begin comments at cleaned line start or
+// after a section's closing bracket; value semicolons remain value bytes.
 // Unknown fields and repeated values (when explicitly requested) retain order.
 // find() returns the first matching present value, as source 0x158648 does.
 // ASCII LF/CRLF with optional final NUL; malformed quotes/brackets, duplicate
@@ -106,10 +108,20 @@ struct OriginalUiPageIndex50KG {
 bool readOriginalUiPageIndex50KG(const OriginalUiDat50KG& ui,
     OriginalUiPageIndex50KG& output, OriginalUiPageDiagnostic50KG& diagnostic) noexcept;
 
-// Shared strict value readers. Missing key writes the supplied original
+// Shared bounded value readers. Missing key writes the supplied original
 // default. Invalid authored values preserve output and return a source offset.
+// Integer values follow source base-0 conversion within signed32, allowing
+// surrounding whitespace and a trailing semicolon annotation. Other suffixes
+// reject, and the stored DAT value text is never altered by a typed reader.
 bool originalUiInteger50KG(const OriginalUiDatSection50KG&, const std::string& key,
     std::int32_t originalDefault, std::int32_t& output,
+    OriginalUiPageDiagnostic50KG&, std::uint32_t sourcePC) noexcept;
+// Source 0x158B30 -> 0x158920: case-insensitive T/F and Y/N first characters,
+// exact ON/OFF, then the same bounded base-0 integer conversion above. Missing
+// values use the supplied default. Only boolean fields use this reader; the
+// generic integer reader does not accept the source's alphabetic bool tokens.
+bool originalUiBoolean50KG(const OriginalUiDatSection50KG&, const std::string& key,
+    bool originalDefault, bool& output,
     OriginalUiPageDiagnostic50KG&, std::uint32_t sourcePC) noexcept;
 bool originalUiNumber50KG(const OriginalUiDatSection50KG&, const std::string& key,
     float originalDefault, float& output, OriginalUiPageDiagnostic50KG&,

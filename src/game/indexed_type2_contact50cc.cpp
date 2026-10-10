@@ -1,5 +1,6 @@
 #include "indexed_type2_contact50cc.h"
 #include "type2_triangle_axes49x.h"
+#include "native_gate_geometry50kg.h"
 #include <algorithm>
 #include <cmath>
 #include <cfenv>
@@ -156,7 +157,7 @@ template<class T>bool aligned(const T* p,std::size_t n) noexcept {return !n||rei
 Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* candidates,std::size_t ownerCount,const std::size_t* indices,std::size_t count,
     const Type2StaticInitial49X& initial,const Type2StaticWorkspace49X& w,
     const Type2StaticDestination49X& d,Type2StaticResult49X& result) noexcept {
-    Range writes[11]{};unsigned nw=0;
+    Range writes[12]{};unsigned nw=0;
     const auto write=[&](auto* p,std::size_t n) noexcept {
         if(!aligned(p,n)||!range(p,n,sizeof(*p),writes[nw]))return false;
         for(unsigned i=0;i<nw;++i)if(overlap(writes[nw],writes[i]))return false;
@@ -166,6 +167,21 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
        !write(w.effects,w.effectCapacity)||!write(w.stack,w.stackCapacity)||!write(w.trace,w.traceCapacity)||
        !write(d.pairs,d.pairCapacity)||!write(d.metadata,d.metadataCapacity)||!write(d.records,d.recordCapacity)||
        !write(d.effects,d.effectCapacity)||!write(&result,1))return Status::InvalidInput;
+    // The exact GC scope has one shared Gate. Admit its writable bytes before
+    // checking every immutable span. Duplicate visits may share that binding.
+    Range ownerRange{},indexRange{};GateTriggerBinding50KG* gateOwner=nullptr;
+    if(!aligned(candidates,ownerCount)||!range(candidates,ownerCount,sizeof(*candidates),ownerRange)||
+       !aligned(indices,count)||!range(indices,count,sizeof(*indices),indexRange))return Status::InvalidInput;
+    for(std::size_t i=0;i<count;++i){
+        if(indices[i]>=ownerCount)return Status::InvalidInput;
+        const auto& candidate=candidates[indices[i]];
+        if(candidate.shapeType==5){
+            if(!candidate.gate)return Status::InvalidInput;
+            if(gateOwner&&gateOwner!=candidate.gate)return Status::UnsupportedScope;
+            gateOwner=candidate.gate;
+        }
+    }
+    if(gateOwner&&!write(gateOwner,1))return Status::InvalidInput;
     const auto read=[&](const auto* p,std::size_t n) noexcept {
         Range input{};if(!aligned(p,n)||!range(p,n,sizeof(*p),input))return false;
         for(unsigned i=0;i<nw;++i)if(overlap(input,writes[i]))return false;
@@ -242,6 +258,12 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
                 const auto status=validateMesh(part.mesh,part.worldMatrix,part.nodeRadii,part.nodeRadiusCount,part.maxDepth);
                 if(status!=Status::Complete)return status;
             }
+        }else if(candidate.shapeType==5){
+            if(!q.nativeGatePolicy||!q.callbackEnabled||q.skipMask!=8u||
+               c.shapeType!=5||c.compound||c.geometry.mesh||c.filter.categoryA4!=8u||
+               !c.hasResponseCallbackE8||candidate.gate!=gateOwner||
+               !candidate.gate->callbacks.activateAnimation)return Status::UnsupportedScope;
+            if(q.nativeGateHasPrevious&&!affine(q.nativeGatePreviousWorld))return Status::InvalidInput;
         }else return Status::UnsupportedScope;
     }
     return Status::Complete;
@@ -284,7 +306,10 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
         }
         result.currentCandidateIdentity=c.filter.identity;effect.flagsF8=static_cast<std::uint8_t>(effect.flagsF8|0x10u);
         bool sphereOverlap=false;if(!spheres(query.sphere,c.sphere,sphereOverlap))return Status::InvalidInput;
-        if(!sphereOverlap||!filter(*query.filter,c.filter))continue;
+        // A registered Gate keeps bilateral filtering but its continuous
+        // narrowphase may cross while the current endpoint sphere is outside.
+        if((!sphereOverlap&&!(candidate.shapeType==5&&query.nativeGateHasPrevious))||
+           !filter(*query.filter,c.filter))continue;
         if(c.geometry.id!=c.filter.identity)return Status::InvalidInput;
         bool candidateHit=false;
         const auto visitMesh=[&](const assets::CollisionMesh48I& mesh,const BodyMatrix48G& worldMatrix,
@@ -398,6 +423,10 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
         if(candidate.shapeType==0){
             const auto status=visitMesh(*c.geometry.mesh,c.geometry.worldMatrix,candidate.nodeRadii);
             if(status!=Status::Complete)return status;
+        }else if(candidate.shapeType==5){
+            if(!nativeType2GateOverlap50KG(resource,query.worldMatrix,
+                query.nativeGateHasPrevious?&query.nativeGatePreviousWorld:nullptr,
+                c.sphere,candidateHit))return Status::InvalidInput;
         }else {
             //121640/122BA0: parent-box coarse test precedes active-child visits.
             const auto& compound=*candidate.compound;Vector3_48C center{},half{};
@@ -434,7 +463,13 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
                 if(!before||(currentCategory&query.dynamicMask))currentCategory=c.filter.categoryA4;
             }
         }
-        if(c.hasResponseCallbackE8)return Status::UnsupportedScope;
+        if(c.hasResponseCallbackE8){
+            if(candidate.shapeType!=5||!candidate.gate)return Status::UnsupportedScope;
+            //122860..88: E4 skips TRIGGER8 first; E8 then commits its action
+            // synchronously. A later numerical failure cannot undo this event.
+            const auto receipt=dispatchGateContact50KG(*candidate.gate,query.filter->identity);
+            if(receipt.status==GateTriggerStatus50KG::ActionCallbackFailed)return Status::UnsupportedScope;
+        }
     }
     std::memcpy(d.pairs,w.pairs,initial.pairSlots*sizeof(*d.pairs));
     std::memcpy(d.metadata,w.metadata,initial.pairSlots*sizeof(*d.metadata));

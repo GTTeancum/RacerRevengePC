@@ -36,7 +36,7 @@ struct OriginalUiOverlayText50KG {
 // Source Overlay_Text::Create 0x2A9000. Widget sections are "Widget N".
 // Actual DAT data and optional authenticated English lookup are required.
 // Missing required text/font references fail; no fallback labels are supplied.
-// Color uses source cvt.w.s ties-to-even then packed 0xFFRRGGBB. Native
+// Color uses source CVT.W.S truncation toward zero then packed 0xFFRRGGBB. Native
 // admission restricts RGB to [0,255], coordinates to safe signed16, 64 lines,
 // and each glyph run to 255 bytes. These are bounds, not authored defaults.
 // Alpha remains authored here; source TextOverlay setter clamps to 0..255.

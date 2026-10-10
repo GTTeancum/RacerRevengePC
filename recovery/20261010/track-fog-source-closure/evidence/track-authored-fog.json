@@ -1,0 +1,65 @@
+{
+  "ta": {
+    "sha256": "c3431a55c1f44ae704dae5b031a51f4b7907dbfc3e7787aba4c7ccbf9969031d",
+    "fog_block_index": 2,
+    "block_offset": 9881,
+    "size_without_count": 55,
+    "field_count": 1,
+    "fields": [
+      {
+        "label": "colorrgb",
+        "entry_offset": 9885,
+        "value_offset": 9928,
+        "value_bytes": 12,
+        "value": "175,182,207"
+      }
+    ],
+    "source_ranges": {
+      "minimum": 1333.300048828125,
+      "maximum": 4000,
+      "visibility": 1,
+      "haziness": 0.5,
+      "base": 64,
+      "start": 1968.0,
+      "end": 4000.0,
+      "camera_near": 1,
+      "camera_far": 4000.0,
+      "fog_scale": -0.125492125749588
+    }
+  },
+  "gc": {
+    "sha256": "d47a83f4b50812609c923381f3a9038328c81d9a50563b68fb4de022a9be210d",
+    "fog_block_index": 2,
+    "block_offset": 27626,
+    "size_without_count": 102,
+    "field_count": 2,
+    "fields": [
+      {
+        "label": "colorrgb",
+        "entry_offset": 27630,
+        "value_offset": 27716,
+        "value_bytes": 12,
+        "value": "151,160,177"
+      },
+      {
+        "label": "visibility",
+        "entry_offset": 27673,
+        "value_offset": 27728,
+        "value_bytes": 4,
+        "value": "0.5"
+      }
+    ],
+    "source_ranges": {
+      "minimum": 1333.300048828125,
+      "maximum": 4000,
+      "visibility": 0.5,
+      "haziness": 0.5,
+      "base": 64,
+      "start": 1301.324951171875,
+      "end": 2666.64990234375,
+      "camera_near": 1,
+      "camera_far": 2666.64990234375,
+      "fog_scale": -0.18676872551441193
+    }
+  }
+}

@@ -6,8 +6,16 @@ namespace rr::game {
 // Effects are emitted in list order. Repeated owner indices carry forward their
 // earlier mutable effect state. Static0 and original compound1 owners share
 // this indexed path: parent-box gate, active part order, cumulative pairs and
-// exactly one callback/effect per outer index. Owner storage stays unchanged until caller
-// commits effects in order. Other49X transactional/finite-input rules apply.
+// exactly one callback/effect per outer index. Numerical owner/effect storage
+// stays unchanged until the caller commits. Other49X numerical rules apply.
+// Opt-in shape5 Gate uses the explicitly native segment/swept-surface policy.
+// Its one uniquely bound GateTriggerBinding is a separately guarded writable
+// owner: genuine hits commit E8 action state immediately, after E4's TRIGGER
+// skip, even if a later candidate fails. Actions are never rolled back/replayed.
+// External callback context must be stable, disjoint from numerical query
+// storage and mutate only its admitted action owner; callbacks must not throw.
+// The GC context activates sequence0 only. Visual/collision pose changes occur
+// together in the later shared world-animation service, outside this query.
 Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(
     const Type2StaticQuery49X&,const Type2StaticCandidate49X* owners,std::size_t ownerCount,
     const std::size_t* orderedIndices,std::size_t count,const Type2StaticInitial49X&,
