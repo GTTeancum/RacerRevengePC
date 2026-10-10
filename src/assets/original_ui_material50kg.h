@@ -66,7 +66,8 @@ private:
     OriginalUiMaterialTemplateState50KG defaults_, screen_;
 };
 enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
-    authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback
+    authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback,
+    optionsMenuPromptMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -140,6 +141,16 @@ enum class OriginalUiMainPrompt50KG : std::uint8_t { cross,triangle,square,circl
 bool readOriginalUiMainPromptFallbackMaterial50KG(
     const OriginalUiArchive50KG& mainArchive,const OriginalUiArchive50KG& overlays,
     OriginalUiMainPrompt50KG,const OriginalUiMaterialTemplates50KG&,
+    OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
+    OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Same inherited page constructor1D63B0, actually called by OptionsMenu1F8E54.
+// Only screen12/page1's live cross/triangle prompts are admitted, with their
+// own Options page provenance. No Main archive/identity is fabricated.
+enum class OriginalUiOptionsMenuPrompt50KG : std::uint8_t { cross,triangle };
+bool readOriginalUiOptionsMenuPromptFallbackMaterial50KG(
+    const OriginalUiArchive50KG& options,const OriginalUiArchive50KG& overlays,
+    OriginalUiOptionsMenuPrompt50KG,const OriginalUiMaterialTemplates50KG&,
     OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
     OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 

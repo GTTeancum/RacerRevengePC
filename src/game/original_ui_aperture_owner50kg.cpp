@@ -71,17 +71,29 @@ Status OriginalUiApertureOwner50KG::bindMain(
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
     const OriginalUiApertureCallbacks50KG& supplied,
     OriginalUiApertureDiagnostic50KG& d) noexcept {
-    return bindMainImpl(std::move(archive),supplied,false,d);
+    return bindPageImpl(std::move(archive),supplied,false,false,d);
 }
 Status OriginalUiApertureOwner50KG::bindMainEntryOnly(
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
     const OriginalUiApertureCallbacks50KG& supplied,
     OriginalUiApertureDiagnostic50KG& d) noexcept {
-    return bindMainImpl(std::move(archive),supplied,true,d);
+    return bindPageImpl(std::move(archive),supplied,true,false,d);
 }
-Status OriginalUiApertureOwner50KG::bindMainImpl(
+Status OriginalUiApertureOwner50KG::bindOptionsMenu(
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
-    const OriginalUiApertureCallbacks50KG& supplied,bool entryOnly,
+    const OriginalUiApertureCallbacks50KG& supplied,
+    OriginalUiApertureDiagnostic50KG& d) noexcept {
+    return bindPageImpl(std::move(archive),supplied,false,true,d);
+}
+Status OriginalUiApertureOwner50KG::bindOptionsMenuEntryOnly(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
+    const OriginalUiApertureCallbacks50KG& supplied,
+    OriginalUiApertureDiagnostic50KG& d) noexcept {
+    return bindPageImpl(std::move(archive),supplied,true,true,d);
+}
+Status OriginalUiApertureOwner50KG::bindPageImpl(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
+    const OriginalUiApertureCallbacks50KG& supplied,bool entryOnly,bool optionsMenu,
     OriginalUiApertureDiagnostic50KG& d) noexcept {
     static_assert(sizeof(float)==4 && std::numeric_limits<float>::is_iec559,
         "Original aperture requires IEEE binary32");
@@ -91,7 +103,7 @@ Status OriginalUiApertureOwner50KG::bindMainImpl(
     OperationScope operation(inOperation_);
     const auto callbacks=supplied;
     if (!archive || !archive->loaded() || !archive->identity() ||
-        archive->identity()->id!=assets::OriginalUiArchiveId50KG::mainMenu)
+        archive->identity()->id!=(optionsMenu?assets::OriginalUiArchiveId50KG::options:assets::OriginalUiArchiveId50KG::mainMenu))
         return fail(d,Status::invalidArchive);
     if (!dependencies(callbacks)) return fail(d,Status::missingDependency);
     if (!dependenciesAvailable(callbacks)) return fail(d,Status::unavailable);
@@ -99,14 +111,15 @@ Status OriginalUiApertureOwner50KG::bindMainImpl(
     try {
         assets::OriginalUiDat50KG indexDat,pageDat;
         assets::OriginalUiPageIndex50KG index;
-        if (!assets::readOriginalUiDat50KG(*archive,"UI/UIMain/ui.dat",indexDat,d.parse) ||
+        const std::string directory=optionsMenu?"UI/UIOption/":"UI/UIMain/";
+        if (!assets::readOriginalUiDat50KG(*archive,directory+"ui.dat",indexDat,d.parse) ||
             !assets::readOriginalUiPageIndex50KG(indexDat,index,d.parse))
             return fail(d,Status::parseFailure,d.parse.sourcePC);
         if (index.pageFiles.empty()) return fail(d,Status::missingPage,0x1CEC8C);
         // Pod page loader1CECA4..BC prefixes the actual manager directory
         // before its PageFile. This is source path construction, not a search
         // or basename fallback; Main's authored value is simply main.dat.
-        const auto pageMember=std::string("UI/UIMain/")+index.pageFiles[0];
+        const auto pageMember=directory+index.pageFiles[0];
         if (!assets::readOriginalUiDat50KG(*archive,pageMember,pageDat,d.parse))
             return fail(d,Status::parseFailure,d.parse.sourcePC);
         const auto* info=pageDat.section("PageInfo");
@@ -143,7 +156,7 @@ Status OriginalUiApertureOwner50KG::bindMainImpl(
         // 2A5CCC's 1). Only the non-Closed config branch 1D654C writes it to 1.
         next.inputEnabled268=!config.startClosed;
         // No source update sample or rendered primitive is fabricated at bind.
-        archive_=std::move(archive);config_=config;callbacks_=callbacks;state_=next;entryOnly_=entryOnly;
+        archive_=std::move(archive);config_=config;callbacks_=callbacks;state_=next;entryOnly_=entryOnly;optionsMenu_=optionsMenu;
         return fail(d,Status::ok);
     } catch (const std::bad_alloc&) { return fail(d,Status::allocation); }
     catch (...) { return fail(d,Status::parseFailure); }
@@ -164,20 +177,29 @@ Status OriginalUiApertureOwner50KG::beginTransition7C(Phase phase) noexcept {
     if (phase==Phase::entry) {
         if (state_.state==State::open || state_.state==State::opening) return Status::noChange;
         state_.state=State::opening;
-        emit(Hook::openingAC,0x1D750C,0x1E66C0);
+        emit(Hook::openingAC,0x1D750C,optionsMenu_?0x1F9D20:0x1E66C0);
         return Status::ok;
     }
     if (phase==Phase::exit) {
         if (entryOnly_) return Status::unavailable;
         if (state_.state==State::closed || state_.state==State::closing) return Status::noChange;
         state_.state=State::closing;state_.inputEnabled268=false;
-        emit(Hook::closingB4,0x1D74B4,0x1E6960);
+        emit(Hook::closingB4,0x1D74B4,optionsMenu_?0x1F9ED0:0x1E6960);
         return Status::ok;
     }
     // Native rejection instead of executing the source bad-transition assert.
     return Status::invalidPhase;
 }
 Status OriginalUiApertureOwner50KG::saveMainUpdateDelta38(float actualDelta) noexcept {
+    if(optionsMenu_)return Status::invalidPhase;
+    return saveUpdateDelta38(actualDelta);
+}
+Status OriginalUiApertureOwner50KG::saveOptionsMenuUpdateDelta38(float actualDelta) noexcept {
+    if(!state_.bound)return Status::notBound;
+    if(!optionsMenu_)return Status::invalidPhase;
+    return saveUpdateDelta38(actualDelta);
+}
+Status OriginalUiApertureOwner50KG::saveUpdateDelta38(float actualDelta) noexcept {
     if (inOperation_) return Status::busy;
     if (!state_.bound) return Status::notBound;
     OperationScope operation(inOperation_);
@@ -226,12 +248,12 @@ Status OriginalUiApertureOwner50KG::render48(Life lifecycle) noexcept {
     } else if (closing) {
         state_.bottom28C=bottom;state_.top284=top;
         if (state_.bottom28C<=224 && state_.top284>=224)
-            emit(Hook::closingThresholdB8,0x1D7630,0x1E6A50);
+            emit(Hook::closingThresholdB8,0x1D7630,optionsMenu_?0x1F9FE0:0x1E6A50);
         // Deliberately retain closing here, including a crossed endpoint.
     } else if (opening && openEndpoint) {
         state_.top284=config_.openSize274;state_.bottom28C=448-config_.openSize274;
         state_.state=State::open;state_.inputEnabled268=true;
-        emit(Hook::openedB0,0x1D7698,0x1E68F0);
+        emit(Hook::openedB0,0x1D7698,optionsMenu_?0x1F9E20:0x1E68F0);
     } else if (opening) {
         state_.bottom28C=bottom;state_.top284=top;
         // Source has no opening post-step threshold check or callback.
@@ -249,7 +271,7 @@ Status OriginalUiApertureOwner50KG::render48(Life lifecycle) noexcept {
 }
 Completion OriginalUiApertureOwner50KG::pollCompletion(
     OriginalUiTransitionRoute50KG route,Phase phase) const noexcept {
-    if (inOperation_ || !state_.bound || route.screen!=4 || route.page!=1)
+    if (inOperation_ || !state_.bound || route.screen!=(optionsMenu_?12:4) || route.page!=1)
         return Completion::unavailable;
     OperationScope operation(inOperation_);
     if (!available()) return Completion::unavailable;

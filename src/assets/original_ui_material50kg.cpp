@@ -105,13 +105,18 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
             p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::mainMenu,"UI\\UIMain\\Widgets.Dat") &&
             p.registeredName=="ui\\textures\\mmlogo" && p.attemptedPsmMember=="ui\\textures\\mmlogo.psm" &&
             pass.textureName=="mmlogo" && !p.fallbackPageSource && !p.sourceCallerPC;
-    if(p.origin!=OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback ||
-        p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays) || p.fallbackWidgetSource ||
-        p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::mainMenu,"UI\\UIMain\\main.dat"))return false;
-    for(const auto& source:promptSources)
+    const bool main=p.origin==OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback;
+    const bool options=p.origin==OriginalUiMaterialOrigin50KG::optionsMenuPromptMissingPsmFallback;
+    if((!main&&!options) || p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays) ||
+        p.fallbackWidgetSource || p.fallbackPageSource!=catalogMember(
+            main?OriginalUiArchiveId50KG::mainMenu:OriginalUiArchiveId50KG::options,
+            main?"UI\\UIMain\\main.dat":"UI\\UIOption\\menu.dat"))return false;
+    for(std::size_t i=0;i<(main?4u:2u);++i) {
+        const auto& source=promptSources[i];
         if(p.sourceCallerPC==source.callPC && p.registeredName==source.registeredName &&
             p.attemptedPsmMember==source.psm && pass.textureName==source.texture &&
             p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::overlays,source.member))return true;
+    }
     return false;
 }
 // Common original2475C0 ->2476A0 NULL-config builder. There is no authored
@@ -292,6 +297,35 @@ bool readOriginalUiMainPromptFallbackMaterial50KG(const OriginalUiArchive50KG& m
             return fail(d,Error::fallbackSource,"actual prompt texture/page and absent PSM",source.callPC);
         OriginalUiMaterialProvenance50KG provenance;
         provenance.origin=OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback;
+        provenance.archive=overlays.identity();provenance.fallbackTexture=texture.identity;
+        provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=source.callPC;
+        provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
+        provenance.creationPC=0x2475c0;
+        auto result=screenTextureFallback(provenance,source.texture,*inherited,runtime);
+        output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiOptionsMenuPromptFallbackMaterial50KG(const OriginalUiArchive50KG& options,
+    const OriginalUiArchive50KG& overlays,OriginalUiOptionsMenuPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!options.loaded()||options.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Options and shared OVERLAYS",0x1f8e54);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index>=2)return fail(d,Error::fallbackSource,"Options menu cross/triangle only");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=overlays.find(source.member);const auto page=options.find("UI\\UIOption\\menu.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||options.find(source.psm).identity||options.find(source.member).identity)
+            return fail(d,Error::fallbackSource,"shared prompt texture and original Options menu",source.callPC);
+        OriginalUiMaterialProvenance50KG provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::optionsMenuPromptMissingPsmFallback;
         provenance.archive=overlays.identity();provenance.fallbackTexture=texture.identity;
         provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=source.callPC;
         provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;

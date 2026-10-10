@@ -121,6 +121,15 @@ public:
     OriginalUiApertureStatus50KG bindMainEntryOnly(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    // Same shared numeric1D7550 owner, separately authenticated Options page1.
+    // Hooks target actual1F9D20/1F9E20/1F9ED0/1F9FE0, never Main callbacks.
+    // Full bind requires real +440 exit-object effects; entry-only rejects exit.
+    OriginalUiApertureStatus50KG bindOptionsMenu(
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    OriginalUiApertureStatus50KG bindOptionsMenuEntryOnly(
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
     OriginalUiApertureSnapshot50KG snapshot() const noexcept { return state_; }
     const OriginalUiApertureConfig50KG* config() const noexcept {
         return state_.bound?&config_:nullptr;
@@ -137,6 +146,8 @@ public:
     // update 2A6BB0. It saves actual dt and never changes aperture geometry.
     // This is not the entire Main update and does not traverse children.
     OriginalUiApertureStatus50KG saveMainUpdateDelta38(float actualDelta) noexcept;
+    // Options actual+38=1F9A70 saves dt at1F9A74 before jumping to2A6BB0.
+    OriginalUiApertureStatus50KG saveOptionsMenuUpdateDelta38(float actualDelta) noexcept;
     // Call ONLY at the real Main render's 1E6688 -> 1D7550 point. Uses the
     // saved delta, never a new elapsed timer. Every real render may use that
     // same saved sample, as source does; no synthetic per-tick deduplication.
@@ -157,10 +168,12 @@ private:
     OriginalUiApertureCallbacks50KG callbacks_{};
     mutable bool inOperation_=false;
     bool entryOnly_=false;
-    OriginalUiApertureStatus50KG bindMainImpl(
+    bool optionsMenu_=false;
+    OriginalUiApertureStatus50KG bindPageImpl(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
-        const OriginalUiApertureCallbacks50KG&,bool entryOnly,
+        const OriginalUiApertureCallbacks50KG&,bool entryOnly,bool optionsMenu,
         OriginalUiApertureDiagnostic50KG&) noexcept;
+    OriginalUiApertureStatus50KG saveUpdateDelta38(float actualDelta) noexcept;
     bool available() const noexcept;
     void emit(OriginalUiApertureHookKind50KG,std::uint32_t callPC,
         std::uint32_t targetPC) noexcept;
