@@ -18,7 +18,7 @@ replace that initial camera or change original input/debug/matrix-skip gates.
 
 No assertion is made that any source model has its fog packet bit enabled.
 Renderer owner must preserve actual flag and inherited material FGE1; a no-fog
-packet branch must use original constant F=254 rather than silently disabling
+packet branch must use original constant F=255 rather than silently disabling
 material fog. Diffuse/Compressed packet producer owns this branch.
 
 Evidence: ../camera/evidence/manager-fog.txt. UI core camera evidence and exact
