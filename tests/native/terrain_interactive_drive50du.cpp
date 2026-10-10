@@ -2060,6 +2060,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         <<" FF8="<<originalAi.referenceFF8<<" FFC="<<originalAi.packing.scaleFFC
         <<" 1038/103C="<<originalAi.lists.counts[0]<<'/'<<originalAi.lists.counts[1]
         <<" cooldown109C="<<originalAi.boost.cooldown109C
+        <<" route_selections="<<originalAi.navigation.routeSelections
+        <<" route_rng_draws="<<originalAi.navigation.routeRandomDraws
+        <<" route1080/1084="<<originalAi.navigation.choice1080<<'/'<<originalAi.navigation.choice1084
         <<" source_boundary="<<std::hex<<originalAiReceipt.sourceBoundary<<std::dec<<'\n';
    });
   }

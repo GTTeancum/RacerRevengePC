@@ -94,8 +94,10 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
         in.applicationGlobals->navigationCounterInitialized=true;
     }
     ++in.applicationGlobals->navigationCalls433CC0;
+    const AiRouteChoiceOwners50IY routeOwners{*in.aiMetadata,ai.fieldFE4,
+        ai.state.aiStateFE8,ai.packing.policy1000,frame.noise.sharedRandomState};
     if(!advanceAiNavigation50IV(*in.mapFF0,*in.aiFF4,*in.aiMetadata,previousCA0,position,
-        in.actualZoneOrdinal48,progress,lapCC8,frame.fields.impactFlagsCD8,ai.navigation,ai.boost,receipt.driving))return stop(receipt.driving.sourcePC);
+        in.actualZoneOrdinal48,progress,lapCC8,frame.fields.impactFlagsCD8,ai.navigation,ai.boost,routeOwners,receipt.driving))return stop(receipt.driving.sourcePC);
     const auto current=progress.reset.vehicleC80,previous=progress.vehicleC84;
     if(current>=in.orientationTrackBC->track.count||previous>=in.orientationTrackBC->track.count)return stop(0x173af0);
     AiOrientationInput50IV orientation{};
@@ -183,7 +185,7 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
     if(ai.state.aiStateFE8==4u){
         if(!buildAiRacerLists50IV(*in.aiFF4,progress,ai.profile,in.racers,in.racerCount,ai.managerIndexFE0,
             position,forward,ai.lists,receipt.driving)||
-           !aiDesiredPosition50IV(*in.aiFF4,progress,ai.navigation,position,200.f,target,receipt.driving))return stop(receipt.driving.sourcePC);
+           !aiDesiredPosition50IV(*in.aiFF4,progress,ai.navigation,routeOwners,position,200.f,target,receipt.driving))return stop(receipt.driving.sourcePC);
         direction=normalize(f,sub(f,target,point(position)));
         if(!steerAi50IV(direction.v,forward,scene.localC0.v[5],m.cachedSpeed34,ai.engineDifference5C,
             m.components.root.worldAngularVelocityA0.v[1],ai.racer60,actions,receipt.driving)||
@@ -200,8 +202,8 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
                 ai.state.stallTimer1090=f.sub(ai.state.stallTimer1090,m.frameFactor);
             else ai.state.stallTimer1090=1.5f;
             V nearTarget{{0,0,0,1}};
-            if(!aiDesiredPosition50IV(*in.aiFF4,progress,ai.navigation,position,f.mul(m.cachedSpeed34,in.tuning->lookahead78),target,receipt.driving)||
-               !aiDesiredPosition50IV(*in.aiFF4,progress,ai.navigation,position,f.mul(m.cachedSpeed34,ai_speed_detail50IR::word(0x3e4ccccdu)),nearTarget,receipt.driving))return stop(receipt.driving.sourcePC);
+            if(!aiDesiredPosition50IV(*in.aiFF4,progress,ai.navigation,routeOwners,position,f.mul(m.cachedSpeed34,in.tuning->lookahead78),target,receipt.driving)||
+               !aiDesiredPosition50IV(*in.aiFF4,progress,ai.navigation,routeOwners,position,f.mul(m.cachedSpeed34,ai_speed_detail50IR::word(0x3e4ccccdu)),nearTarget,receipt.driving))return stop(receipt.driving.sourcePC);
             const V velocity=normalize(f,point(m.components.root.body.velocity.v));
             const V distant=normalize(f,sub(f,target,point(position))),nearby=normalize(f,sub(f,nearTarget,point(position)));
             direction=normalize(f,dot(f,distant,velocity)<dot(f,nearby,velocity)?distant:nearby);

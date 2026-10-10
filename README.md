@@ -4,7 +4,7 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This branch is the **uncompiled and untested combined Linux candidate** for all-eight original AI, dynamic contacts and source-normal racer lighting. Its source has been centrally integrated after review. Explicit source boundaries still stop incomplete behavior. See [candidate scope](docs/native-ai-lighting-integration.md).
+This branch is the **uncompiled and untested combined Linux candidate** for all-eight original AI, source route choices, dynamic contacts and source-normal racer lighting. Its source has been centrally integrated after review. Explicit source boundaries still stop incomplete behavior. See [candidate scope](docs/native-ai-lighting-integration.md).
 
 The previous bounded GC run used original AI only for Clegg, with all eight native racers advancing. It observed startup state 4, later state 2 and brake/steer bindings, but no lap. That result does not validate this new candidate. See [current validation](docs/current-validation.md) for limits. Full GC driving, original scheduler/shader parity, controller usability and cross-platform support remain unfinished.
 
