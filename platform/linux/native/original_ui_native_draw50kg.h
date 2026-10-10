@@ -29,12 +29,23 @@ struct OriginalUiNativeDraw50KG {
     // cleared to alpha 1 and RGB-only writes preserve that value. RGBA readback
     // is presentation data, NOT source framebuffer-alpha recovery.
     bool opaquePresentationAlphaOnly = false;
+    // Actual Main ParticleCode's source fog byte /256, parallel to all draw
+    // vertices. Required if any mainParticle span exists; other slots are 0.
+    // This is a separate native stream, never a fabricated texture channel.
+    const float* particleFog = nullptr;
+    std::uint32_t particleFogCount = 0;
+    float particleFogColor[3] = {0.f,0.f,0.f}; // authored source RGB /255
     // Vertex position[2] is the original integer packet Z in [0,16777215].
     // The vertex shader normalizes it once into native D24 reverse depth.
-    // XY stays on the 640x448 source canvas; corners remain TL,TR,BR,BL.
+    // XY stays on the 640x448 source canvas. UI corners are TL,TR,BR,BL;
+    // particle corners BL,TL,TR,BR preserve the source strip's BL--TR diagonal.
     // texturedModulate: colorScale=255/128, blended alphaScale=(255/128)^2.
     // untexturedVertexColor: colorScale=1, blended alphaScale=255/128.
     // Opaque spans retain alphaScale=1 (source framebuffer alpha is not stored).
     // Both modes retain raw vertex alpha <=128 as a bounded native admission.
+    // Blended textured spans additionally require each vertex alpha times the
+    // real texture's maximum alpha <=16384. Full-byte atlases (including actual
+    // Main alpha255) are valid with source packet alpha63/64. This joint bound
+    // prevents native blend-factor clamping from hiding a source factor >1.
 };
 }

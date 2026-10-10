@@ -38,6 +38,8 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/original_ui_main_scene50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_main_fire50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_main_particle_lighting50kg.cpp"
+  "${RR_ROOT}/src/assets/original_ui_main_particle_material50kg.cpp"
+  "${RR_ROOT}/src/game/original_ui_main_particle_geometry50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_main_audio50kg.cpp"
   "${RR_ROOT}/src/assets/audio_assets50hc.cpp"
   "${RR_ROOT}/platform/linux/native/audio_mixer50hd.cpp"
