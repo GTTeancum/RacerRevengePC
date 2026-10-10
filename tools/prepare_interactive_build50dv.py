@@ -77,6 +77,7 @@ def main():
         'platform/linux/native/original_ui_main_session50kg.cpp',
         'src/game/original_ui_main_widget_manager50kg.cpp',
         'src/game/original_ui_options_menu_controller50kg.cpp',
+        'src/game/original_ui_rider_selection50kg.cpp',
     ):
         absolute = str(ROOT / source)
         if absolute not in argv:
