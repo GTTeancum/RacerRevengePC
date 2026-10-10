@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""STAGED, UNEXECUTED: one root-reserved direct-GC all-AI route-continuation capture."""
+"""STAGED, UNEXECUTED: one root-reserved direct-GC all-AI typed-observation capture."""
 import argparse
 import datetime as dt
 import fcntl
@@ -120,15 +120,20 @@ def live_audio_frames(path):
 
 
 # This reviewed candidate is restricted to the parent's next eligible slot.
-EARLIEST_AUTHORIZED_UTC = '2026-10-10T01:20:53.750715+00:00'
+EARLIEST_AUTHORIZED_UTC = '2026-10-10T02:21:13.272691+00:00'
 FROZEN_SOURCE = Path('/workspace/shared/rr-native-ai-all-racers50ix/freeze-01')
 FROZEN_OVERLAY = Path('/workspace/shared/rr-native-ai-all-racers50ix/live-peers-combat-scan-overlay')
 FROZEN_ROUTE = Path('/workspace/shared/rr-native-ai-route-choices50iy/freeze-01')
-FROZEN_MANIFESTS = ((FROZEN_SOURCE, '08714176387446725cf38543a7cc0f0624445dcc24f040c976e69105e49cab7d'),
-                    (FROZEN_OVERLAY, '05661df7c70f77e9d608bf156d32aaf86aeb81fa166a5e0134704184511c4ed1'),
-                    (FROZEN_ROUTE, 'c6dc39ee0005669d9f278392733954220711154ec236c8cca55831870ff6ec56'))
-GUARD_SOURCE = FROZEN_ROUTE / 'files/tests/native/terrain_interactive_drive50du.cpp'
-GUARD_SOURCE_SHA256 = 'f18e369d8c436cf3c94ee66539a698966a648314ca1572150d2be9e64fda202f'
+FROZEN_BATCHED = Path('/workspace/shared/rr-batched-racer-observation')
+FROZEN_TYPED = Path('/workspace/shared/rr-typed-racer-observation')
+# Each reviewed manifest format has an explicit pinned digest-field name.
+FROZEN_MANIFESTS = ((FROZEN_SOURCE, '08714176387446725cf38543a7cc0f0624445dcc24f040c976e69105e49cab7d', 'sha256'),
+                    (FROZEN_OVERLAY, '05661df7c70f77e9d608bf156d32aaf86aeb81fa166a5e0134704184511c4ed1', 'sha256'),
+                    (FROZEN_ROUTE, 'c6dc39ee0005669d9f278392733954220711154ec236c8cca55831870ff6ec56', 'sha256'),
+                    (FROZEN_BATCHED, '7f162a23ad5c349ddaf9edfee4516bb36a8b68b1f62890a581e3b7e2faae865b', 'staged_sha256'),
+                    (FROZEN_TYPED, '283f41af5a60e98c62afe8fe2780caf1e04eea58cc8af6d81c7031510296ccae', 'staged_sha256'))
+GUARD_SOURCE = FROZEN_TYPED / 'files/tests/native/terrain_interactive_drive50du.cpp'
+GUARD_SOURCE_SHA256 = 'e53c563303f311aded314f6342254d8c5e444f52e0a8887405d068ccb896ed02'
 PHASE_TIMING_SOURCE = Path('tests/native/phase_timing50gk_fixture.h')
 PHASE_TIMING_SOURCE_SHA256 = '815e00ed388fc1dc114a4bbc8f3453fdadd8fb28018cbaf368ad75e4f017748b'
 
@@ -190,13 +195,13 @@ def main():
         parser.error('The frozen all-eight-AI runtime/guard source changed')
     applied_guard_source = args.cwd / 'tests/native/terrain_interactive_drive50du.cpp'
     if not applied_guard_source.is_file() or digest(applied_guard_source) != GUARD_SOURCE_SHA256:
-        parser.error('The applied route-continuation runtime/guard source changed or is missing')
+        parser.error('The applied typed-observation runtime/guard source changed or is missing')
     source_files.append(applied_guard_source)
     phase_timing_source = args.cwd / PHASE_TIMING_SOURCE
     if not phase_timing_source.is_file() or digest(phase_timing_source) != PHASE_TIMING_SOURCE_SHA256:
         parser.error('The reviewed observation-only phase timing source changed or is missing')
     source_files.append(phase_timing_source)
-    for frozen_root, expected_manifest_hash in FROZEN_MANIFESTS:
+    for frozen_root, expected_manifest_hash, digest_field in FROZEN_MANIFESTS:
         frozen_manifest = frozen_root / 'manifest.json'
         if digest(frozen_manifest) != expected_manifest_hash:
             parser.error('Reviewed immutable all-AI source manifest changed: ' + str(frozen_manifest))
@@ -205,10 +210,17 @@ def main():
         frozen = json.loads(frozen_manifest.read_text())
         for entry in frozen['files']:
             path = (frozen_root / 'files' / entry['path']).resolve()
-            if not path.is_relative_to((frozen_root / 'files').resolve()) or digest(path) != entry['sha256']:
+            if not path.is_relative_to((frozen_root / 'files').resolve()) or digest(path) != entry[digest_field]:
                 parser.error('Frozen runtime source identity changed: ' + str(path))
             if path not in source_files:
                 source_files.append(path)
+            if frozen_root == FROZEN_TYPED:
+                applied = (args.cwd / entry['path']).resolve()
+                if (not applied.is_relative_to(args.cwd) or not applied.is_file()
+                        or digest(applied) != entry[digest_field]):
+                    parser.error('Applied typed-observation source identity changed: ' + str(applied))
+                if applied not in source_files:
+                    source_files.append(applied)
     for path in args.source_file:
         path = (path if path.is_absolute() else args.cwd / path).resolve()
         if path not in source_files:
@@ -252,7 +264,8 @@ def main():
             'binary_sha256': binary_hash, 'fixture_sha256': fixture_hash,
             'source_hashes_before': source_hashes, 'cwd': str(args.cwd),
             'required_runtime_guard_sha256': GUARD_SOURCE_SHA256,
-            'frozen_all_ai_manifest_hashes': {str(root / 'manifest.json'): value for root, value in FROZEN_MANIFESTS},
+            'frozen_all_ai_manifest_hashes': {str(root / 'manifest.json'): value for root, value, _ in FROZEN_MANIFESTS},
+            'applied_typed_observation_sources_must_match_final_manifest': True,
             'phase_timing': {
                 'flag': 'RR_TRACE_PHASES=1', 'source_sha256': PHASE_TIMING_SOURCE_SHA256,
                 'observations_only': True, 'raw_rows_retained_in_stderr_and_events': True,

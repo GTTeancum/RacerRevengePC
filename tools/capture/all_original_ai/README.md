@@ -1,16 +1,20 @@
-# All-eight original-AI capture and prefix export
+# Typed-observation all-eight original-AI capture and prefix export
 
 Unexecuted source-only helpers. No module import, syntax check, runtime, encoding or software test was performed for this backup. Earlier capture helpers are preserved separately.
 
 ## Runtime and local prerequisites
 
-The collector is pinned to combined local source `d3d854b67d3cbcae8bd640c85e2e9b6756bbea5f`, published as `9bf910c7b86c0df08449a9c27efd88bbef81693c`. Required applied main SHA-256 is `f18e369d8c436cf3c94ee66539a698966a648314ca1572150d2be9e64fda202f`; the existing phase-timing header must match `815e00ed388fc1dc114a4bbc8f3453fdadd8fb28018cbaf368ad75e4f017748b`. The runtime is on a separate branch; this helper branch retains an older runtime baseline.
+The collector is pinned to combined local source `bf42968ac607ff5bdd38522611d006276cdebd6a`, published as `51c6e7071df6b54d472f1aa16a86db0e6090f54a`. Required applied main SHA-256 is `e53c563303f311aded314f6342254d8c5e444f52e0a8887405d068ccb896ed02`; the existing phase-timing header must match `815e00ed388fc1dc114a4bbc8f3453fdadd8fb28018cbaf368ad75e4f017748b`. The runtime is on a separate branch; this helper branch retains an older runtime baseline.
 
-Exact reviewed cloud paths remain in the modules. The collector requires the existing central ledger, three immutable source manifests and their source files, the independently built matching binary, collision fixture and user-supplied game/audio data. These are not included here. A clone alone is not a portable execution bundle. The root build receipt must establish binary-to-source provenance; source hashes alone cannot do that.
+Exact reviewed cloud paths remain in the modules. The collector requires the existing central ledger, five immutable source manifests and their source files, the independently built matching binary, collision fixture and user-supplied game/audio data. These are not included here. A clone alone is not a portable execution bundle. The root build receipt must establish binary-to-source provenance; source hashes alone cannot do that.
+
+The five manifests cover all-racer ownership, fresh peer/combat observations, route choices, batching and typed scalar reads. Their formats explicitly use `sha256` for the first three and `staged_sha256` for the last two. Every final typed-stage source file must match the applied runtime, including the new scalar observation header. No later runtime change inherits these pins.
+
+The exact four-module source bundle manifest SHA-256 is `78e85782700ed42812d142fe63ba9b4bdcfa96eb00f14ce14b95c7d98e8fae52`; collector SHA-256 is `076b28c699e59e10140f07431d8d450c6ce1def35d5cd0ad6d0dc80462b56736`. The evidence collector, clock helpers and encoder retain their previous exact bytes. This branch changes source admission only; no candidate execution or encoding occurred.
 
 ## Sole collection
 
-`capture_all_original_ai.py` accepts only the already reserved central slot, matching source commit/start time and zero previous launches. It uses the shared lock, compare-before-write ledger and pre-Popen charge, with no retry or replacement reservation. The frozen floor is 2026-10-10 01:20:53.750715 UTC; the rolling-hour policy still applies.
+`capture_all_original_ai.py` accepts only the already reserved central slot, matching source commit/start time and zero previous launches. It uses the shared lock, compare-before-write ledger and pre-Popen charge, with no retry or replacement reservation. The frozen floor is 2026-10-10 02:21:13.272691 UTC; the rolling-hour policy still applies.
 
 It clears inherited RR settings and selects all eight original-AI owners, zero humans, camera slot 0, direct GC/mode2, incomplete-world opt-in, menus off, real contacts/audio and `RR_AUTODRIVE=0`. Only capture/quit commands are sent. The 12-second window begins at ready, includes countdown and bounds requests/acceptance, not hard process lifetime. Existing cleanup bounds preserve an honest stopped prefix.
 
