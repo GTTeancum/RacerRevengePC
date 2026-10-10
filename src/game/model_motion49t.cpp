@@ -1,4 +1,5 @@
 #include "model_motion49t.h"
+#include "model_playback50kg.h"
 #include <array>
 #include <cfenv>
 #include <cmath>
@@ -256,5 +257,66 @@ bool sampleModelMotionBlend49T(const assets::MotionView49O& first,
     ModelMotionSharedState49T& shared, ModelMotionWorkspace49T& workspace,
     ModelMotionDiagnostic49T& diagnostic) noexcept {
     return sample(first,&second,bindings,fraction,weight,graph,state,shared,workspace,diagnostic);
+}
+bool sampleModelMotionTransition50KG(const assets::MotionView49O& current,
+    const assets::MotionView49O* previous, const ModelCapturedPose50KG* captured,
+    const assets::MotionNodeBindings49O& bindings, float currentTime, float previousTime,
+    float weight, const SceneGraph49P& graph, ModelMotionSharedState49T& shared,
+    ModelMotionWorkspace49T& work, ModelMotionDiagnostic49T& d) noexcept {
+    d={};
+    if(std::fegetround()!=FE_TONEAREST)return reject(d,ModelMotionError49T::rounding_mode);
+    if(!graph.nodes||!graph.count||graph.count>maxSceneNodes49P||!current.data||
+       bool(previous)==bool(captured)||!std::isfinite(currentTime)||currentTime<0||
+       !std::isfinite(previousTime)||previousTime<0||!std::isfinite(weight)||weight<0||weight>1||
+       (previous&&!previous->data))return reject(d,ModelMotionError49T::input);
+    if(!bindings.count||bindings.count>assets::maxModelNodes49O||
+       current.rotationCount>assets::maxMotTracks49O||current.positionCount>assets::maxMotTracks49O||
+       (previous&&(previous->rotationCount!=current.rotationCount||previous->positionCount!=current.positionCount))||
+       (captured&&captured->count!=bindings.count)||!validateSceneGraph49P(graph))
+        return reject(d,ModelMotionError49T::topology);
+    const auto bytes=sizeof(SceneNode49P)*graph.count;
+    if(overlaps(&work,sizeof work,graph.nodes,bytes)||overlaps(&work,sizeof work,&shared,sizeof shared)||
+       overlaps(&work,sizeof work,&current,sizeof current)||overlaps(&work,sizeof work,current.data,current.bytes)||
+       overlaps(&work,sizeof work,&bindings,sizeof bindings)||
+       (previous&&(overlaps(&work,sizeof work,previous,sizeof *previous)||overlaps(&work,sizeof work,previous->data,previous->bytes)))||
+       (captured&&overlaps(&work,sizeof work,captured,sizeof *captured))||
+       overlaps(&shared,sizeof shared,graph.nodes,bytes))return reject(d,ModelMotionError49T::input);
+    for(std::uint32_t i=0;i<graph.count;++i)for(unsigned k=0;k<16;++k)
+        if(!std::isfinite(graph.nodes[i].localC0.v[k])||!std::isfinite(graph.nodes[i].world100.v[k]))
+            return reject(d,ModelMotionError49T::input,i);
+    auto stagedShared=shared;
+    Eval e{stagedShared};
+    std::memcpy(work.nodes,graph.nodes,bytes);
+    const SceneGraph49P staged{work.nodes,graph.count};
+    for(std::uint32_t channel=0;channel<2;++channel){
+        const auto count=channel?current.positionCount:current.rotationCount;
+        for(std::uint32_t i=0;i<count;++i){
+            const auto& track=channel?current.position[i]:current.rotation[i];
+            if(track.rowIndex>=bindings.count||bindings.rows[track.rowIndex].sceneNode>=graph.count||
+               (previous&&(channel?previous->position[i]:previous->rotation[i]).rowIndex!=track.rowIndex))
+                return reject(d,ModelMotionError49T::binding,i,channel);
+            const auto target=static_cast<SceneNodeIndex49P>(bindings.rows[track.rowIndex].sceneNode);
+            auto local=work.nodes[bindings.rows[track.rowIndex].sceneNode].localC0;
+            if(!channel){
+                Q next{},old{};
+                if(!e.rotation(current,i,currentTime,next,true))return reject(d,ModelMotionError49T::sample_time,i,channel);
+                if(previous){
+                    if(!e.rotation(*previous,i,previousTime,old,true))return reject(d,ModelMotionError49T::sample_time,i,channel);
+                }else for(unsigned k=0;k<4;++k)old[k]=e.finite(captured->rotation[track.rowIndex].v[k]);
+                e.rotationMatrix(e.blend(old,next,weight),local);
+            }else{
+                V next{},old{};
+                if(!e.position(current,i,currentTime,next,true))return reject(d,ModelMotionError49T::sample_time,i,channel);
+                if(previous){
+                    if(!e.position(*previous,i,previousTime,old,true))return reject(d,ModelMotionError49T::sample_time,i,channel);
+                }else for(unsigned k=0;k<3;++k)old[k]=e.finite(captured->position[track.rowIndex].v[k]);
+                const float remaining=e.sub(1,weight);
+                for(unsigned k=0;k<3;++k)local.v[12+k]=e.add(next[k],e.mul(remaining,e.sub(old[k],next[k])));
+            }
+            if(!e.valid)return reject(d,ModelMotionError49T::arithmetic,i,channel);
+            if(!setLocalMatrix49P(staged,target,local))return reject(d,ModelMotionError49T::topology,i,channel);
+        }
+    }
+    std::memcpy(graph.nodes,work.nodes,bytes);shared=stagedShared;return true;
 }
 }

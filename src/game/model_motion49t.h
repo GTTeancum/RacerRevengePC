@@ -6,13 +6,16 @@
 
 namespace rr::game {
 struct ModelMotionState49T { std::uint32_t model18; };
-// The two source writable lazy records, shared across all models and motions.
+// Source writable lazy records, shared across all models and motions.
 // Any nonzero guard byte is warm; warm value words are opaque and store-only.
 struct ModelMotionSharedState49T {
     std::uint32_t interpolationValue4332F0;
     std::uint32_t pairValue433478;
     std::uint8_t interpolationGuard3D5D8C;
     std::uint8_t pairGuard3D5DC4;
+    //154480 shared entry sentinel, independent of interpolation/pair guards.
+    std::uint32_t updateValue433468 = 0;
+    std::uint8_t updateGuard3D5DBC = 0;
 };
 struct ModelMotionWorkspace49T { SceneNode49P nodes[maxSceneNodes49P]; };
 enum class ModelMotionError49T : std::uint32_t {
@@ -40,7 +43,9 @@ struct ModelMotionDiagnostic49T {
 // weight0 selects the second resource through original arithmetic, without an
 // endpoint shortcut. Pair does not consume second.duration.
 // Retains49O original software trig tables and cold acos padding; separate
-// nearest/even binary32 operations. No host trig, IK, mirror/mask, allocation,
+// nearest/even binary32 operations. ShortAxis trig uses explicitly documented
+// native double sin/cos table construction; ByteAxis tables remain original.
+// No IK, mirror/mask, allocation,
 // I/O, world refresh, playback clock or ownership service.
 // Graph, mutable state, shared state, diagnostic, scratch and immutable inputs
 // must be disjoint; serial access. Fixed-record scratch overlap is rejected.

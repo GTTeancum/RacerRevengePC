@@ -85,6 +85,11 @@ def main():
         'src/game/original_ui_rider_selection50kg.cpp',
         'src/assets/original_ui_rider_character_assets50kg.cpp',
         'src/game/original_ui_rider_stat_projection50kg.cpp',
+        'src/game/model_playback50kg.cpp',
+        'src/game/original_ui_rider_character50kg.cpp',
+        'src/game/original_ui_user_rotate50kg.cpp',
+        'src/assets/original_ui_rider_pod_assets50kg.cpp',
+        'src/game/original_ui_rider_binder50kg.cpp',
     ):
         absolute = str(ROOT / source)
         if absolute not in argv:
