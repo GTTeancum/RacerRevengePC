@@ -8,9 +8,9 @@ bool fail(OriginalUiPageDiagnostic50KG& d,OriginalUiPageError50KG e,
     const OriginalUiDatSection50KG& s,const std::string& key,std::uint32_t pc) noexcept {
     const auto* v=s.find(key);d={e,v?v->valueOffset:s.sourceOffset,pc};return false;
 }
-std::uint32_t roundEven(float f) noexcept {
-    const auto n=static_cast<std::uint32_t>(f);const float fraction=f-float(n);
-    return n+(fraction>0.5f || (fraction==0.5f && (n&1u)) ? 1u : 0u);
+std::uint32_t truncateColor(float f) noexcept {
+    // Source CVT.W.S truncates; color() admits only finite [0,255] inputs.
+    return static_cast<std::uint32_t>(static_cast<std::int32_t>(f));
 }
 bool color(const OriginalUiDatSection50KG& s,const char* key,float fallback,
     std::uint32_t& output,OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
@@ -18,7 +18,7 @@ bool color(const OriginalUiDatSection50KG& s,const char* key,float fallback,
     if (!originalUiTriple50KG(s,key,{{fallback,fallback,fallback}},v,d,pc)) return false;
     for (float f:v) if (!std::isfinite(f) || f<0 || f>255)
         return fail(d,OriginalUiPageError50KG::unsupportedValue,s,key,pc);
-    output=0xff000000u | (roundEven(v[0])<<16) | (roundEven(v[1])<<8) | roundEven(v[2]);
+    output=0xff000000u | (truncateColor(v[0])<<16) | (truncateColor(v[1])<<8) | truncateColor(v[2]);
     return true;
 }
 bool flag(const OriginalUiDatSection50KG& s,const char* key,bool& value,

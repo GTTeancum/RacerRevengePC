@@ -4,21 +4,22 @@
 
 namespace rr::game {
 namespace {
-bool nearestEven(float value,std::int32_t& out) noexcept {
+bool truncateToInt32(float value,std::int32_t& out) noexcept {
     if (!std::isfinite(value)) return false;
-    const double n=std::floor(double(value));const double fraction=double(value)-n;
-    const double rounded=n+(fraction>0.5 || (fraction==0.5 && std::fmod(n,2.0)!=0.0)?1.0:0.0);
-    if (rounded<double(std::numeric_limits<std::int32_t>::min()) ||
-        rounded>double(std::numeric_limits<std::int32_t>::max())) return false;
-    out=static_cast<std::int32_t>(rounded);return true;
+    // EE CVT.W.S truncates toward zero. This native path admits only finite,
+    // representable inputs; rejection outside that domain is not EE saturation.
+    if (double(value)<double(std::numeric_limits<std::int32_t>::min()) ||
+        double(value)>double(std::numeric_limits<std::int32_t>::max())) return false;
+    out=static_cast<std::int32_t>(value);return true;
 }
-// Each source mul.s/add.s has its own binary32 rounding; forbid contraction.
+// Keep source mul.s/add.s as separate host float operations; forbid contraction.
+// This materialization is not a claim of all-input EE floating-point parity.
 float mul(float a,float b) noexcept { volatile float f=a*b;return f; }
 float add(float a,float b) noexcept { volatile float f=a+b;return f; }
 }
 bool roundOriginalUiTextMetric50KG(float beforeScale,float scale,std::int32_t& output) noexcept {
     if (!std::isfinite(beforeScale) || !std::isfinite(scale)) return false;
-    std::int32_t result=0;if (!nearestEven(mul(beforeScale,scale),result)) return false;
+    std::int32_t result=0;if (!truncateToInt32(mul(beforeScale,scale),result)) return false;
     output=result;return true;
 }
 bool positionOriginalUiText50KG(const OriginalUiTextPositionInput50KG& input,
@@ -34,22 +35,22 @@ bool positionOriginalUiText50KG(const OriginalUiTextPositionInput50KG& input,
     } else {
         const float advance=mul(w.leadingFactor,input.fontLineHeight);
         const float distance=mul(float(input.line),advance);
-        if (!nearestEven(add(float(w.y),distance),result.authoredLineY)) return false;
+        if (!truncateToInt32(add(float(w.y),distance),result.authoredLineY)) return false;
     }
     result.positionedX=float(result.authoredLineX);result.positionedY=float(result.authoredLineY);
     if (!w.lines[input.line].empty()) {
         const auto j=w.justification;std::int32_t coordinate=0;
         if (j==assets::OriginalUiTextJustification50KG::centerHorizontal ||
             j==assets::OriginalUiTextJustification50KG::centerBoth) {
-            if (!nearestEven(add(result.positionedX,-mul(float(input.measuredWidth),0.5f)),coordinate)) return false;
+            if (!truncateToInt32(add(result.positionedX,-mul(float(input.measuredWidth),0.5f)),coordinate)) return false;
             result.positionedX=float(coordinate);
         } else if (j==assets::OriginalUiTextJustification50KG::right) {
-            if (!nearestEven(add(result.positionedX,-float(input.measuredWidth)),coordinate)) return false;
+            if (!truncateToInt32(add(result.positionedX,-float(input.measuredWidth)),coordinate)) return false;
             result.positionedX=float(coordinate);
         }
         if (j==assets::OriginalUiTextJustification50KG::centerVertical ||
             j==assets::OriginalUiTextJustification50KG::centerBoth) {
-            if (!nearestEven(add(result.positionedY,-mul(float(input.measuredHeight),0.5f)),coordinate)) return false;
+            if (!truncateToInt32(add(result.positionedY,-mul(float(input.measuredHeight),0.5f)),coordinate)) return false;
             result.positionedY=float(coordinate);
         }
     }

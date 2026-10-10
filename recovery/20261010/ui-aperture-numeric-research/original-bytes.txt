@@ -1,0 +1,66 @@
+Read-only original ELF evidence, 2026-10-10 UTC
+
+Source SHA256
+c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30  /workspace/shared/recovery-20261010/native-assets-prepared-01/work/native/project/disc/SLUS_202.68
+
+Program headers (mapping: file offset = virtual address - 0x00100000 + 0x80)
+
+Elf file type is EXEC (Executable file)
+Entry point 0x100008
+There are 2 program headers, starting at offset 52
+
+Program Headers:
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  LOAD           0x000080 0x00100000 0x00100000 0x2d5a00 0x34f600 RWE 0x80
+  LOAD           0x2d5a80 0x0044f600 0x0044f600 0x00000 0x00000 RW  0x10
+
+ Section to Segment mapping:
+  Segment Sections...
+   00      
+   01      
+
+First aperture conversion: file D7668 = VA 1D75E8
+0d7658 c60104b8 c6000298 8e02028c 46000802
+0d7668 46000024 44030000 00000000 00431023
+0d7678 ae02028c 8e020284 00431021 ae020284
+0d7688 8e02028c 284100e1 10200031 00000000
+0d7698
+
+Second aperture conversion: file D7738 = VA 1D76B8
+0d7728 c60104b8 c6000298 8e02028c 46000802
+0d7738 46000024 44030000 00000000 00431021
+0d7748 ae02028c 8e020284 00431023 ae020284
+0d7758 8e040424 24020005 8c83000c 14620003
+0d7768
+
+Aligned CTC1 rt,FCR31 signature search across original ELF; these are static candidates, not an execution trace
+151e24 44c9f800
+152104 44c9f800
+1ccc88 44c9f800
+
+Candidate context at file 0x151df4
+151df4 c457005c c4580060 c4590064 c45a0068
+151e04 c45b006c c45c0070 c45d0074 c45e0078
+151e14 c45f007c 78680000 78690010 44c80000
+151e24 44c9f800 0000000f 42000038 7bbf0040
+151e34 c7bf003c c7be0038 c7bd0034 c7bc0030
+151e44 c7bb002c c7ba0028 c7b90024 c7b80020
+151e54
+
+Candidate context at file 0x1520d4
+1520d4 c457005c c4580060 c4590064 c45a0068
+1520e4 c45b006c c45c0070 c45d0074 c45e0078
+1520f4 c45f007c 78680000 78690010 44c80000
+152104 44c9f800 0000000f 42000038 7bbf0030
+152114 c7bf002c c7be0028 c7bd0024 c7bc0020
+152124 c7bb001c c7ba0018 c7b90014 c7b80010
+152134
+
+Candidate context at file 0x1ccc58
+1ccc58 c457005c c4580060 c4590064 c45a0068
+1ccc68 c45b006c c45c0070 c45d0074 c45e0078
+1ccc78 c45f007c 78680000 78690010 44c80000
+1ccc88 44c9f800 0000000f 42000038 7bbf0030
+1ccc98 c7bf002c c7be0028 c7bd0024 c7bc0020
+1ccca8 c7bb001c c7ba0018 c7b90014 c7b80010
+1cccb8
