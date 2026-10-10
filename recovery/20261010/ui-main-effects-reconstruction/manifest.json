@@ -1,0 +1,105 @@
+{
+  "scope": "Inactive native source with static source/data evidence only. No software validation executed.",
+  "files": [
+    {
+      "path": "SOURCE-EVIDENCE.md",
+      "bytes": 7657,
+      "sha256": "624c0679b95e2c8995913bd84b0b84f7b107057e81bb005a512faae2b59b49f2"
+    },
+    {
+      "path": "evidence/audio-framing-inspection.json",
+      "bytes": 1410,
+      "sha256": "401d7b00b54b26c0abba424892ccec45ed9c6f0068a97f9aed2554a9a28422e7"
+    },
+    {
+      "path": "evidence/audio-source-identities.json",
+      "bytes": 2127,
+      "sha256": "b6850a9263f70c71c5d44f0e279fcc3ec71b318450032d9126a5e4fceeb77196"
+    },
+    {
+      "path": "evidence/fade.txt",
+      "bytes": 2484,
+      "sha256": "6c3bedc37d3f49607b743267138edf05d504ffe11cb34bc5c16f83985a230381"
+    },
+    {
+      "path": "evidence/group-volume.words.txt",
+      "bytes": 3389,
+      "sha256": "fa4a24feb9bcdda29a5d9c6962355db65ab683cff0d953d0b7779d8f05382a15"
+    },
+    {
+      "path": "evidence/main-loop-fade.words.txt",
+      "bytes": 4789,
+      "sha256": "3f6d29347e5ad67bd0088f2462a55b2cfa3b998f84adf592a96b6f315b895c5b"
+    },
+    {
+      "path": "evidence/play.txt",
+      "bytes": 2604,
+      "sha256": "0b4eccdfcf67ec76a08b52c6f9cbcf0d9d21e8c467930826cbeb6c841c1b7c18"
+    },
+    {
+      "path": "evidence/response-emitter-dispatch.words.txt",
+      "bytes": 4050,
+      "sha256": "c093659585816efb545844b2db414a55143facc23432fa79664623ed4bf43db5"
+    },
+    {
+      "path": "evidence/response-event-load.words.txt",
+      "bytes": 5209,
+      "sha256": "e6d1d7e254d12f16e833866e2d3ce0ccb18123dc32b82e3e388bc7d59a45345f"
+    },
+    {
+      "path": "evidence/sound-factory.words.txt",
+      "bytes": 3624,
+      "sha256": "08bef1447ade020630d2a0c02f8feab1aa4e5dc317f4f445f070fa13251833bd"
+    },
+    {
+      "path": "evidence/sound-play-restart.words.txt",
+      "bytes": 5093,
+      "sha256": "e860c6e8c3409e83e67cdb7325fa30356e7e8672ac1dd60a676b104b17436db0"
+    },
+    {
+      "path": "evidence/sound-play.words.txt",
+      "bytes": 5896,
+      "sha256": "b8cf1dbc666bf6800fccf2c02d29bd1312116aba4c3ddb8f24509586c1f1d14e"
+    },
+    {
+      "path": "evidence/stream-start.words.txt",
+      "bytes": 5430,
+      "sha256": "6b6eb5faa9a42b345b182ba93039febe210a0f529fd45a13c3905ec5471f394a"
+    },
+    {
+      "path": "evidence/stream-volume-fade.words.txt",
+      "bytes": 3259,
+      "sha256": "cb94c862ec61fec3ed54e47022ce0e107bf239d558a3e33dffb503de12736b3a"
+    },
+    {
+      "path": "evidence/transport-volume-fade.words.txt",
+      "bytes": 3237,
+      "sha256": "411711e064b978e034544ac012c6d264c8a8de4fbcc9840b40fb11b2c806e441"
+    },
+    {
+      "path": "evidence/ui-audio-create.words.txt",
+      "bytes": 6218,
+      "sha256": "11e4d6da6fcf62a9a0323ab7b3fd577138628db9f9c688095f9e714fa0ed5b5c"
+    },
+    {
+      "path": "evidence/ui-response-play.words.txt",
+      "bytes": 2672,
+      "sha256": "d9b34c7f011f390009ff657e7081309848fc5a1c047d62e9e54ae430945a6477"
+    },
+    {
+      "path": "evidence/ui-stream-constructor.words.txt",
+      "bytes": 1840,
+      "sha256": "b5a11a9197e97f0cfd26510b703a334d76909a6a7d3c7ff1085e92fe7d35aa4d"
+    },
+    {
+      "path": "files/platform/linux/native/original_ui_main_audio50kg.cpp",
+      "bytes": 13127,
+      "sha256": "11666914741b5c773fdf7563362d2a8665b55024c604aec50eafbe2857cc49cc"
+    },
+    {
+      "path": "files/platform/linux/native/original_ui_main_audio50kg.h",
+      "bytes": 3411,
+      "sha256": "2c4532b2cad5524e5eec65e887c1e0093ac51f07d24b37b3192f0472be7cedba"
+    }
+  ]
+}
