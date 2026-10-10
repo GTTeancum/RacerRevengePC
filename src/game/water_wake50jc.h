@@ -6,6 +6,9 @@ namespace rr::game {
 // Source-backed scalar pieces of2B1690 and2B1760, including a bounded
 // native120x120 /88x88 integer lattices derived from2B1BB0..2B1D0C.
 // Proposals never mutate canonical buffers, selectors, origins or shared time.
+// Caller precondition for every API below: writable proposal/workspace/scratch
+// storage is disjoint from ALL borrowed canonical owners, scalar fields and
+// coefficient arrays. Partial runtime overlap guards do not relax this rule.
 enum class WaterWakeStatus50JC : std::uint8_t {
     Complete,Paused,LatticeComputed,ForceProjected,NeedsBaseChildren141ED0,NeedsLatticeKernel,
     Owner,Arithmetic,Storage,Unsupported
@@ -479,6 +482,8 @@ struct WaterWakeForceProposal50JC {
 // Success leaves canonical storage unchanged and exposes every source SH,
 // including zero-delta writes. Commit against the captured prior values before
 // the next force call/query/lattice use; never aggregate against stale buffers.
+// Workspace must be disjoint from canonical source owners and the proposal;
+// represented owner/storage overlaps are rejected before the first write.
 // Failure may modify workspace entries, but leaves the public proposal intact.
 inline WaterWakeResult50JC projectWaterWakeForce50JC(
     const WaterWakeProvider50JC& p,const WaterWakeForceGlobals50JC& g,
@@ -494,8 +499,17 @@ inline WaterWakeResult50JC projectWaterWakeForce50JC(
         (p.dimensionB0==88&&p.blocksPerRowB4==11)))
         return result(Status::Unsupported,0x2b1450u);
     const std::size_t visited=p.last48+1u;
-    if(visited>std::numeric_limits<std::size_t>::max()/4u||
+    if(visited>std::numeric_limits<std::size_t>::max()/(4u*sizeof(WaterWakeForceWrite50JC))||
         !workspace.writes||workspace.capacity<visited*4u)
+        return result(Status::Storage,0x2b1554u);
+    const std::size_t workspaceBytes=visited*4u*sizeof(WaterWakeForceWrite50JC);
+    if(overlap(workspace.writes,workspaceBytes,&p,sizeof(p))||
+        overlap(workspace.writes,workspaceBytes,&g,sizeof(g))||
+        overlap(workspace.writes,workspaceBytes,&in,sizeof(in))||
+        overlap(workspace.writes,workspaceBytes,&out,sizeof(out))||
+        overlap(workspace.writes,workspaceBytes,p.buckets40,visited*sizeof(WaterWakeBucket50JC))||
+        overlap(workspace.writes,workspaceBytes,g.forceScale383428,sizeof(float))||
+        overlap(workspace.writes,workspaceBytes,g.shiftGP8024,sizeof(std::int16_t)))
         return result(Status::Storage,0x2b1554u);
     const std::size_t signedBytes=std::size_t(p.dimensionB0)*std::size_t(p.blocksPerRowB4)*64u;
     const std::size_t rowStride=std::size_t(p.blocksPerRowB4)*64u;
@@ -506,6 +520,15 @@ inline WaterWakeResult50JC projectWaterWakeForce50JC(
         if(!b.sourceBound||!b.inverseCellSize04||!b.origin10||!b.activeBuffer30||
             *b.activeBuffer30<0||*b.activeBuffer30>1)
             return result(Status::Owner,0x2b13e4u,i);
+        if(overlap(workspace.writes,workspaceBytes,b.inverseCellSize04,sizeof(float))||
+            overlap(workspace.writes,workspaceBytes,b.origin10,4u*sizeof(float))||
+            overlap(workspace.writes,workspaceBytes,b.activeBuffer30,sizeof(std::int32_t)))
+            return result(Status::Storage,0x2b1554u,i);
+        for(const auto& storage:b.signedBuffers38)
+            if(storage.data&&overlap(workspace.writes,workspaceBytes,storage.data,storage.size))
+                return result(Status::Storage,0x2b1554u,i);
+        if(b.texture34.data&&overlap(workspace.writes,workspaceBytes,b.texture34.data,b.texture34.size))
+            return result(Status::Storage,0x2b1554u,i);
         const auto& bytes=b.signedBuffers38[*b.activeBuffer30];
         if(!bytes.bound||!bytes.data||bytes.size<signedBytes)
             return result(Status::Storage,0x2b1510u,i);
