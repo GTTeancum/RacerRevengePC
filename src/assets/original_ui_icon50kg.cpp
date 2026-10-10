@@ -29,7 +29,7 @@ bool rect(const OriginalUiDatSection50KG& s,const char* key,OriginalUiIconRect50
 }
 bool flag(const OriginalUiDatSection50KG& s,const char* key,bool& out,
     OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) {
-    std::int32_t value=0;if(!originalUiInteger50KG(s,key,0,value,d,pc))return false;out=value!=0;return true;
+    return originalUiBoolean50KG(s,key,false,out,d,pc);
 }
 }
 bool readOriginalUiIcon50KG(const OriginalUiDat50KG& widgets,std::uint16_t id,

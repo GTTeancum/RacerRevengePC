@@ -23,8 +23,7 @@ bool color(const OriginalUiDatSection50KG& s,const char* key,float fallback,
 }
 bool flag(const OriginalUiDatSection50KG& s,const char* key,bool& value,
     OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
-    std::int32_t n=0;if (!originalUiInteger50KG(s,key,0,n,d,pc)) return false;
-    value=n!=0;return true;
+    return originalUiBoolean50KG(s,key,false,value,d,pc);
 }
 bool split(const std::string& text,OriginalUiOverlayText50KG& result,
     const OriginalUiDatSection50KG& s,const char* key,OriginalUiPageDiagnostic50KG& d) {
