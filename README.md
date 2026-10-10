@@ -4,9 +4,9 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This recovery branch contains an **uncompiled and untested original-AI source candidate**, now integrated into the cloud candidate with terminal world/session guards. The optional one-racer GC path has connected source owners and explicit unsupported-branch stops. Runtime readiness is unproven. See [source scope](docs/original-ai-first-slice50iv.md) and [guarded acceptance](docs/native-ai-first-slice-status.md).
+This branch preserves **unfinished, uncompiled and untested dynamic-contact source work** on the guarded original-AI baseline. It adds native contact-owner, damage and event components. Main and grid are unchanged: optional dynamic-contact admission remains disabled and the first-slice source boundary stays active. See the [partial source scope and remaining joins](docs/original-ai-dynamic-contact50iw-partial01.md).
 
-The Linux prototype includes native rendering, physics, audio, keyboard controls, and an eight-racer development race. Clegg selection through Main, pause/resume, and a 20-second gameplay capture have passed. An earlier mode1 baseline completed a three-lap race with native timing, Dax, music, and completed-lap display. See [current validation](docs/current-validation.md) for scope.
+This partial is for recovery, not active integration. Cohesive cold/main wiring, real shared event/effect returns and collision music remain unfinished. Original AI and the GC world still have explicit unsupported boundaries. See [current validation](docs/current-validation.md) for the inherited tested Linux prototype's scope; those results do not validate this branch.
 
 ## Build and game data
 

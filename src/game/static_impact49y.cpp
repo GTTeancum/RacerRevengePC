@@ -94,4 +94,49 @@ StaticImpactStatus49Y recordStaticImpact49Y(const StaticImpactInput49Y& in,
     if(!f.valid)return S::arithmetic;
     out=s;nextW=w;return S::applied;
 }
+
+StaticImpactStatus49Y prepareImpactGeometry50IW(const StaticImpactInput49Y& in,
+    ImpactGeometry50IW& out) noexcept {
+    using S=StaticImpactStatus49Y;
+    if((in.flagsCD8&1u)||in.vehicle40==3||in.vehicle40==4)return S::skipped;
+    if(in.vehicle58>1u||!(in.sceneFlags190&1u))return S::unsupported;
+    if(std::fegetround()!=FE_TONEAREST)return S::arithmetic;
+    Math f;ImpactGeometry50IW g{};
+    const float yy=f.mul(in.accumulatedImpact1C0[1],in.accumulatedImpact1C0[1]);
+    const float xx=f.mul(in.accumulatedImpact1C0[0],in.accumulatedImpact1C0[0]);
+    g.magnitude=f.sqrt(f.add(f.add(xx,yy),f.mul(in.accumulatedImpact1C0[2],in.accumulatedImpact1C0[2])));
+    inverseDirection(in.readyMainScene190,in.accumulatedImpact1C0,g.local,f);
+    g.nextScratchW=f.add(in.priorVf9W,1.0f);
+    const float x2=f.mul(g.local[0],g.local[0]),y2=f.mul(g.local[1],g.local[1]),z2=f.mul(g.local[2],g.local[2]);
+    const float dot=f.add(f.add(x2,y2),f.mul(1.0f,z2));
+    const float q=dot==0.0f?maxFinite():f.reciprocal(f.sqrt(dot));
+    for(unsigned i=0;i<3;++i)g.normal[i]=f.mul(g.local[i],q);
+    if(!f.valid)return S::arithmetic;out=g;return S::applied;
+}
+StaticImpactStatus49Y applyImpactSeverity50IW(const StaticImpactInput49Y& in,
+    const ImpactGeometry50IW& g,float sourceSeverity,
+    const StaticImpactState49Y& state,StaticImpactState49Y& out) noexcept {
+    using S=StaticImpactStatus49Y;
+    if((in.flagsCD8&1u)||in.vehicle40==3||in.vehicle40==4){out=state;return S::skipped;}
+    if(in.vehicle58>1u||!(in.sceneFlags190&1u))return S::unsupported;
+    if(std::fegetround()!=FE_TONEAREST)return S::arithmetic;
+    Math f;const auto severity=f.read(sourceSeverity);const auto* local=g.local;const auto* normal=g.normal;
+    StaticImpactState49Y s=state;
+    auto raise=[&](unsigned index,float value){if(f.read(s.directionalD08[index])<value)s.directionalD08[index]=value;};
+    if(f.read(local[0])<-0.1f)raise(7,-local[0]);
+    else if(local[0]>0.1f)raise(6,local[0]);
+    if(severity>0.1f){
+        const float pz=f.mul(severity,normal[2]),py=f.mul(severity,normal[1]),px=f.mul(severity,normal[0]);
+        if(local[0]<-0.1f)raise(0,-px);else if(local[0]>0.1f)raise(1,px);
+        if(f.read(local[1])<-0.1f)raise(3,-py);else if(local[1]>0.1f)raise(2,py);
+        if(f.read(local[2])<-0.1f&&normal[2]<-0.75f){
+            const float rear=-pz;
+            if(f.read(s.directionalD08[4])<rear&&
+                (in.vehicle58!=1u||!in.vehicleCFC||normal[2]<-0.85f))s.directionalD08[4]=rear;
+        }else if(local[2]>0.1f)raise(5,pz);
+    }
+    for(unsigned i=0;i<3;++i)if(std::fabs(f.read(in.accumulatedImpact1C0[i]))>std::fabs(f.read(s.impactBA0[i])))s.impactBA0[i]=in.accumulatedImpact1C0[i];
+    if(!f.valid)return S::arithmetic;out=s;return S::applied;
+}
+
 }

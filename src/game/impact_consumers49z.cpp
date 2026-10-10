@@ -65,14 +65,16 @@ void periodic(const ImpactConsumerInput49Z& i, ImpactConsumerState49Z& s, Math& 
 }
 ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
     const ImpactConsumerState49Z& state, ImpactConsumerState49Z& output,
-    ImpactConsumerEvent49Z* events, std::size_t capacity, std::size_t& count) noexcept {
+    ImpactConsumerEvent49Z* events, std::size_t capacity, std::size_t& count,
+    ImpactPartnerEvents49Z* partnerEvents) noexcept {
     if (!(i.managerFlags58 & 2) || ((i.flagsCD8 & 1) && !i.vehicle3C)) {
-        std::memcpy(&output, &state, sizeof state); count = 0;
+        std::memcpy(&output, &state, sizeof state); count = 0;if(partnerEvents)*partnerEvents={};
         return ImpactConsumerStatus49Z::skipped;
     }
     if (std::fegetround() != FE_TONEAREST) return ImpactConsumerStatus49Z::arithmetic;
     ImpactConsumerState49Z s; std::memcpy(&s, &state, sizeof s);
     ImpactConsumerEvent49Z pending[2]{}; std::size_t used = 0; Math m;
+    ImpactPartnerEvents49Z partners{};
     for (auto& timer : s.timers820) if (m.read(timer) > 0.0f) timer = m.sub(timer, i.factor);
     if (m.read(s.cooldown7E0) > 0.0f) s.cooldown7E0 = m.sub(s.cooldown7E0, i.factor);
     if (s.partnerState == 2) s.partnerDuration10 = m.add(s.partnerDuration10, i.factor);
@@ -81,7 +83,9 @@ ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
         s.partnerId = 0xffffffffu; s.partnerTimer08 = 0;
     }
     if (s.partnerId != 0xffffffffu && m.read(s.partnerAmount0C) < 0.1f) {
-        return m.valid ? ImpactConsumerStatus49Z::unsupportedPartner : ImpactConsumerStatus49Z::arithmetic;
+        if(!i.dynamicPartnerEventsBound||!partnerEvents)
+            return m.valid ? ImpactConsumerStatus49Z::unsupportedPartner : ImpactConsumerStatus49Z::arithmetic;
+        partners.values[partners.count++]={0x222cfcu,s.partnerId,0u};
     }
     const float lateral = m.add(s.directionalD08[6], s.directionalD08[7]);
     if (lateral > 0.0f) {
@@ -98,15 +102,20 @@ ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
             // source arithmetic/domain even though admitted calls cannot use it.
             const auto pair = m.add(s.directionalD08[0], s.directionalD08[1]);
             const auto three = m.add(s.directionalD08[4], pair);
-            (void)m.add(s.directionalD08[5], three);
+            const float damageSum=m.add(s.directionalD08[5], three);
             const unsigned indices[] = {0, 1, 4, 5};
             const unsigned masks[] = {0x10, 1, 0x11, 0x11};
             for (unsigned n = 0; n != 4; ++n) {
                 const auto value = m.read(s.directionalD08[indices[n]]);
                 if (value > 0.1f) damage(i, s, masks[n], m.div(value, n == 3 ? 200.0f : 100.0f), m);
             }
-            // Any partner with amount<.1 was already rejected at222CEC above;
-            // admitted damage leaves that partner predicate unchanged.
+            if(s.partnerId!=0xffffffffu&&m.read(s.partnerAmount0C)<0.1f){
+                if(!i.dynamicPartnerEventsBound||!partnerEvents)
+                    return ImpactConsumerStatus49Z::unsupportedPartner;
+                if(!i.partnerEventThresholdBound)return ImpactConsumerStatus49Z::unsupportedDynamicTuning;
+                if(!(damageSum<=m.read(i.partnerEventThreshold48)))
+                    partners.values[partners.count++]={0x222accu,s.partnerId,1u};
+            }
         }
         clearDirectional(s);
     }
@@ -120,6 +129,7 @@ ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
     std::memcpy(&output, &s, sizeof s);
     if (used) std::memcpy(events, pending, used * sizeof *events);
     count = used;
+    if(partnerEvents)*partnerEvents=partners;
     return ImpactConsumerStatus49Z::applied;
 }
 }

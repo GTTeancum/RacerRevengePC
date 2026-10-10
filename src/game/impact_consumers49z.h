@@ -21,6 +21,10 @@ struct ImpactConsumerInput49Z {
     std::uint32_t componentPresence;
     std::uint32_t profile34, profile10FAC, profileFlags11050;
     float factor, finalDamageThreshold64, finalDamageIncrement68;
+    // Joined original22ADE0 requests are returned to the exact shared event
+    // owner before any later frame stage. Legacy callers remain rejected.
+    bool dynamicPartnerEventsBound=false,partnerEventThresholdBound=false;
+    float partnerEventThreshold48=0;
 };
 // Source controller virtual calls, in order. The caller binds these to its
 // real controller backend; neither is an audio or gameplay-state substitute.
@@ -28,7 +32,9 @@ struct ImpactConsumerEvent49Z {
     std::uint32_t sourcePC, vtableSlot, player, channel, argument2;
     float amount;
 };
-enum class ImpactConsumerStatus49Z { applied, skipped, unsupportedPartner, arithmetic, capacity };
+struct ImpactPartnerEvent49Z {std::uint32_t sourcePC,partnerId,word8;};
+struct ImpactPartnerEvents49Z {ImpactPartnerEvent49Z values[2]{};std::size_t count=0;};
+enum class ImpactConsumerStatus49Z { applied, skipped, unsupportedPartner, arithmetic, capacity, unsupportedDynamicTuning };
 // Includes original manager bit1 dispatch at2288A8,222B20,2228D0,221710,
 // reached221590 and the real188EC0 profile predicate. No BA0 write occurs here.
 // Dynamic1AF330/22ADE0 route rejects atomically when reached. All other ordinary
@@ -44,5 +50,5 @@ enum class ImpactConsumerStatus49Z { applied, skipped, unsupportedPartner, arith
 ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z&,
     const ImpactConsumerState49Z&, ImpactConsumerState49Z& output,
     ImpactConsumerEvent49Z* events, std::size_t capacity,
-    std::size_t& count) noexcept;
+    std::size_t& count,ImpactPartnerEvents49Z* partnerEvents=nullptr) noexcept;
 }

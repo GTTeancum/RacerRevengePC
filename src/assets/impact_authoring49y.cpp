@@ -17,9 +17,10 @@ namespace {
 struct Mapping { const char* section; const char* key; };
 constexpr Mapping env[]={{"EnvDamage","hitXL"},{"EnvDamage","hitL"},{"EnvDamage","hitM"},{"EnvDamage","hitS"},{"EnvDamage","hitXS"},{"EnvDamage","pointsXL"},{"EnvDamage","pointsL"},{"EnvDamage","pointsM"},{"EnvDamage","pointsS"},{"EnvDamage","pointsXS"}};
 constexpr Mapping aiEnv[]={{"EnvDamage","hitXL"},{"EnvDamage","hitL"},{"EnvDamage","hitM"},{"EnvDamage","hitS"},{"EnvDamage","hitXS"},{"EnvDamage","pointsXL"},{"EnvDamage","pointsL"},{"EnvDamage","pointsM"},{"EnvDamage","pointsS"},{"EnvDamage","pointsXS"},{"PodDamage","AIEnvPointsMultiplier"}};
+constexpr Mapping dynamicImpact[]={{"PodDamage","hitXL"},{"PodDamage","hitL"},{"PodDamage","hitM"},{"PodDamage","hitS"},{"PodDamage","hitXS"},{"PodDamage","pointsXL"},{"PodDamage","pointsL"},{"PodDamage","pointsM"},{"PodDamage","pointsS"},{"PodDamage","pointsXS"},{"PodDamage","MinGrindingSpeed"},{"PodDamage","AIPointsMultiplier"},{"PodDamage","AIMultiplierDecrement"}};
 constexpr Mapping finalImpact[]={{"PodDamage","FinalDamageThreshold"},{"PodDamage","FinalDamageIncrement"}};
 constexpr Mapping defense[]={{"BaseAbilities","Defense"},{"MaxAbilities","Defense"},{"DamageRepair","MinDefense"},{"DamageRepair","MaxDefense"}};
-struct Parsed { float values[11]{}; bool present[11]{}; ImpactAuthoringToken49Y tokens[11]{}; };
+struct Parsed { float values[13]{}; bool present[13]{}; ImpactAuthoringToken49Y tokens[13]{}; };
 struct Slice { const char* p; std::size_t n, offset; };
 char lower(char c) noexcept { return c>='A' && c<='Z' ? static_cast<char>(c+('a'-'A')) : c; }
 bool space(char c) noexcept { return c==' ' || c=='\t' || c=='\r'; }
@@ -118,6 +119,13 @@ bool readFinalImpactAuthoring49Y(const char* text,std::size_t bytes,FinalImpactA
     const FinalImpactAuthoring49Y result{p.values[0],p.values[1]};
     const FinalImpactProvenance49Y audit{{p.tokens[0],p.tokens[1]}};
     output=result; if(provenance) *provenance=audit; return true;
+}
+bool readDynamicImpactAuthoring50IW(const char* text,std::size_t bytes,rr::game::DynamicImpactTuning50IW& output,PodPhysicsDiagnostic49N& diagnostic,DynamicImpactProvenance50IW* provenance) noexcept {
+    Parsed p{};if(!read(text,bytes,dynamicImpact,13,true,p,diagnostic))return false;
+    rr::game::DynamicImpactTuning50IW result{};DynamicImpactProvenance50IW audit{};
+    for(unsigned i=0;i<5;++i){result.thresholds28[i]=p.values[i];result.points3C[i]=p.values[5+i];}
+    result.minGrindingSpeed54=p.values[10];result.aiPointsMultiplier58=p.values[11];result.aiMultiplierDecrement5C=p.values[12];result.bound=true;
+    for(unsigned i=0;i<13;++i)audit.fields[i]=p.tokens[i];output=result;if(provenance)*provenance=audit;return true;
 }
 bool readDefenseAuthoring49Y(const char* text,std::size_t bytes,DefenseAuthoring49Y& output,PodPhysicsDiagnostic49N& diagnostic,DefenseProvenance49Y* provenance) noexcept {
     Parsed p{}; if(!read(text,bytes,defense,4,false,p,diagnostic)) return false;

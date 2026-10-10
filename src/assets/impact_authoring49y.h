@@ -1,12 +1,14 @@
 #pragma once
 #include "pod_physics49n.h"
 #include "../game/static_impact49y.h"
+#include "../game/dynamic_impact50iw.h"
 namespace rr::assets {
 struct ImpactAuthoringToken49Y {
     std::uint32_t sectionOffset, sectionBytes, keyOffset, keyBytes, valueOffset, valueBytes;
 };
 struct EnvironmentImpactProvenance49Y { ImpactAuthoringToken49Y fields[10]; };
 struct AIEnvironmentImpactProvenance49Y { ImpactAuthoringToken49Y fields[11]; };
+struct DynamicImpactProvenance50IW { ImpactAuthoringToken49Y fields[13]; };
 struct FinalImpactAuthoring49Y { float threshold64, increment68; };
 struct FinalImpactProvenance49Y { ImpactAuthoringToken49Y fields[2]; };
 struct DefenseValue49Y { float value; bool present; };
@@ -44,6 +46,9 @@ bool readAIEnvironmentImpact49Y(const char*,std::size_t,
 // Same bounded/atomic contract as environment authoring; no default values.
 bool readFinalImpactAuthoring49Y(const char*,std::size_t,FinalImpactAuthoring49Y&,
     PodPhysicsDiagnostic49N&,FinalImpactProvenance49Y* = nullptr) noexcept;
+bool readDynamicImpactAuthoring50IW(const char*,std::size_t,
+    rr::game::DynamicImpactTuning50IW&,PodPhysicsDiagnostic49N&,
+    DynamicImpactProvenance50IW* = nullptr) noexcept;
 bool readDefenseAuthoring49Y(const char*,std::size_t,DefenseAuthoring49Y&,
     PodPhysicsDiagnostic49N&,DefenseProvenance49Y* = nullptr) noexcept;
 }

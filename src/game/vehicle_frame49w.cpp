@@ -261,6 +261,7 @@ bool consumeVehicleImpacts49Z(S&s,const VehicleFrameBindings49W&b,const ImpactCo
  if(overlap(&events,sizeof events,&s,sizeof s)||overlap(&events,sizeof events,&w,sizeof w)||overlap(&events,sizeof events,&b,sizeof b)||overlap(&events,sizeof events,&input,sizeof input)||overlap(&events,sizeof events,&d,sizeof d))return fail(d,E::Storage,0);
  auto&r=w.next;auto&f=r.fields;auto&z=r.impactSupplement;
  ImpactConsumerInput49Z in;std::memcpy(&in,&input,sizeof in);
+ if(in.dynamicPartnerEventsBound&&!r.fields.dynamicOwnersBound50IW)return fail(d,E::Admission,0x222cec);
  auto copyFloat=[](float&to,const float&from){std::memcpy(&to,&from,sizeof(float));};
  copyFloat(in.factor,r.bodies.main.frameFactor);in.flagsCD8=f.impactFlagsCD8;
  in.vehicle3C=f.vehicle3C;in.vehicle40=r.bodies.main.vehicleState40;in.vehicle58=f.vehicle58;
@@ -276,8 +277,10 @@ bool consumeVehicleImpacts49Z(S&s,const VehicleFrameBindings49W&b,const ImpactCo
  copyFloat(before.environmentalD38,z.environmentalD38);copyFloat(before.environmentalD3C,z.environmentalD3C);
  VehicleImpactEvents49Z next{};
  RR_VEHICLE_FRAME49W_STAGE(0x2288a8);
- const auto status=consumeImpacts49Z(in,before,after,next.values,2,next.count);
+ const auto status=consumeImpacts49Z(in,before,after,next.values,2,next.count,
+     in.dynamicPartnerEventsBound?&next.partners:nullptr);
  if(status==ImpactConsumerStatus49Z::unsupportedPartner)return fail(d,E::Admission,0x222cec);
+ if(status==ImpactConsumerStatus49Z::unsupportedDynamicTuning)return fail(d,E::Admission,0x222a84);
  if(status==ImpactConsumerStatus49Z::arithmetic)return fail(d,E::Arithmetic,0x222b20);
  if(status==ImpactConsumerStatus49Z::capacity)return fail(d,E::Storage,0x222d8c);
  std::memcpy(f.impactDirectionalD08,after.directionalD08,sizeof after.directionalD08);
@@ -438,6 +441,93 @@ bool respondVehicle368_49W(S&s,const VehicleFrameBindings49W&b,const VehicleFram
  RR_VEHICLE_FRAME49W_STAGE(0x2190fc);if(!advanceGraphBody49W(z.root,r.secondarySupplement,r.secondaryExtra,{z.velocity70W,z.angularVelocityB0W,z.force180W,z.torque190W},z.sceneFlags190,par.body,par.centerOffset,b.lifecycle.physical19C,z.enabled,b.secondaryDomain,r.bodies.main.schedule.factorPerSubstep,graph(r),w.body,d.body))return fail(d,E::Body,0x2190fc);
  z.phase=SecondaryPhase49M::Ready;r.bodies.phase=CoupledBodyPhase49M::AwaitingMainIntegration;project(r,b);return commit(s,w,P::MainIntegration);
 }
+
+namespace {
+DynamicImpactState50IW dynamicImpactState50IW(const S&s,const BasePoseHistoryState50Y&h) noexcept {
+ const auto&f=s.fields;const auto&z=s.impactSupplement;DynamicImpactState50IW n{};
+ n.vehicleCFC=f.vehicleCFC;n.vehicleD00=f.vehicleD00;n.fieldD04=z.fieldD04;
+ n.timerD2CBits=h.timerD2C;n.markerD30=h.markerD30;n.partnerId=z.partnerId;n.partnerState=z.partnerState;
+ n.partnerTimer08=z.partnerTimer08;n.partnerAmount0C=z.partnerAmount0C;n.partnerDuration10=f.objectD34_10;
+ n.flagsB9D=static_cast<std::uint8_t>(s.bodies.main.controls.player.flagsB9C>>8u);return n;
+}
+void installDynamicImpactState50IW(S&s,BasePoseHistoryState50Y&h,const DynamicImpactState50IW&n) noexcept {
+ auto&f=s.fields;auto&z=s.impactSupplement;
+ f.vehicleCFC=n.vehicleCFC;f.vehicleD00=n.vehicleD00;z.fieldD04=n.fieldD04;
+ h.timerD2C=n.timerD2CBits;h.markerD30=n.markerD30;z.partnerId=n.partnerId;z.partnerState=n.partnerState;
+ z.partnerTimer08=n.partnerTimer08;z.partnerAmount0C=n.partnerAmount0C;f.objectD34_10=n.partnerDuration10;
+ auto&flags=s.bodies.main.controls.player.flagsB9C;flags=(flags&~0xff00u)|(static_cast<std::uint32_t>(n.flagsB9D)<<8u);
+}
+DynamicVehicleImpactStatus50IW finishDynamicImpact50IW(S&s,BasePoseHistoryState50Y&h,
+ DynamicVehicleImpactCursor50IW&call,const DynamicImpactResult50IW&result,
+ const DynamicImpactState50IW&next,VehicleFrameDiagnostic49W&d) noexcept {
+ using T=DynamicVehicleImpactStatus50IW;
+ if(result.status==DynamicImpactStatus50IW::unsupported||result.status==DynamicImpactStatus50IW::arithmetic){
+  fail(d,result.status==DynamicImpactStatus50IW::arithmetic?E::Arithmetic:E::Admission,result.sourcePC);return T::Rejected;
+ }
+ installDynamicImpactState50IW(s,h,next);call.prefix=next;
+ if(result.status==DynamicImpactStatus50IW::needsFirstContact22A400){call.awaitingFirstContact=true;return T::NeedFirstContact;}
+ call.awaitingFirstContact=false;call.source.vehicleCFC=s.fields.vehicleCFC;
+ StaticImpactState49Y before{},after{};
+ std::memcpy(before.directionalD08,s.fields.impactDirectionalD08,sizeof before.directionalD08);
+ std::memcpy(before.impactBA0,s.fields.impactBA0.v,sizeof before.impactBA0);
+ const auto applied=applyImpactSeverity50IW(call.source,call.geometry,result.severity,before,after);
+ if(applied!=StaticImpactStatus49Y::applied){fail(d,E::Arithmetic,0x22313c);return T::Rejected;}
+ std::memcpy(s.fields.impactDirectionalD08,after.directionalD08,sizeof after.directionalD08);
+ std::memcpy(s.fields.impactBA0.v,after.impactBA0,sizeof after.impactBA0);
+ s.impactConsumerPending49Y=1;s.dynamicImpactRecorded50IW=true;return T::Complete;
+}
+}
+DynamicVehicleImpactStatus50IW beginVehicleDynamicImpact50IW(S&s,
+ const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,
+ BasePoseHistoryState50Y&history,const DynamicImpactManagerView50IW&peers,
+ const DynamicImpactTuning50IW&tuning,const DynamicImpactProfile50IW&profile,
+ DynamicVehicleImpactCursor50IW&call,VehicleFrameDiagnostic49W&d) noexcept {
+ using T=DynamicVehicleImpactStatus50IW;call={};d={};
+ if(s.phase!=P::MainIntegration||!s.fields.dynamicOwnersBound50IW||s.dynamicImpactRecorded50IW){
+  fail(d,E::Phase,0x219d98);return T::Rejected;}
+ const auto&m=s.bodies.main;const auto&body=m.components;
+ if(!body.body20C)return T::Complete;
+ if(body.body20C>BodyContactCapacity48R){fail(d,E::Admission,0x223110);return T::Rejected;}
+ bool impact=false;
+ for(unsigned axis=0;axis<3;++axis){
+  if(!std::isfinite(s.visualShared.zero434630.v[axis])){fail(d,E::Admission,0x219d98);return T::Rejected;}
+  if(body.root.accumulator1c0.v[axis]!=s.visualShared.zero434630.v[axis]){impact=true;break;}
+ }
+ if(!impact||(s.fields.impactFlagsCD8&1u)||m.vehicleState40==3u||m.vehicleState40==4u)return T::Complete;
+ if(s.terrainProbe.enabled){
+  if(!refreshSceneWorld49P(graph(s),b.lifecycle.main190)){fail(d,E::Graph,0x223030);return T::Rejected;}
+  project(s,b);
+ }
+ auto&in=call.source;in.vehicle40=m.vehicleState40;in.vehicle58=s.fields.vehicle58;
+ in.bodyContactPartnerCount20C=body.body20C;in.flagsCD8=s.fields.impactFlagsCD8;
+ in.sceneFlags190=node(s,b.lifecycle.main190).sceneFlags190;in.readyMainScene190=node(s,b.lifecycle.main190).world100;
+ std::memcpy(in.accumulatedImpact1C0,body.root.accumulator1c0.v,12);
+ std::memcpy(&in.accumulatedImpact1C0[3],&s.mainExtra.accumulator1C0W,4);
+ in.reductionCF0=s.fields.defenseCF0;in.tuning=p.impactTuning;in.priorVf9W=0;
+ const auto geometry=prepareImpactGeometry50IW(in,call.geometry);
+ if(geometry!=StaticImpactStatus49Y::applied){fail(d,geometry==StaticImpactStatus49Y::arithmetic?E::Arithmetic:E::Admission,0x223030);return T::Rejected;}
+ auto&dynamic=call.input;dynamic.manager338=peers;dynamic.managerB0=peers;
+ dynamic.contacts.count20C=static_cast<std::int32_t>(body.body20C);
+ std::memcpy(dynamic.contacts.slots210.data(),s.mainContactPartners210,sizeof s.mainContactPartners210);
+ dynamic.self={s.fields.vehicle58,m.controls.player.raw.values[0],m.controls.bound.control.shaping.smoothedChannel0D28,
+  body.root.worldAngularVelocityA0.v[1],m.cachedSpeed34,s.fields.defenseCF0,
+  s.fields.damage7D0,s.fields.damage7D4,s.fields.damage7DC,true};
+ dynamic.tuning=tuning;dynamic.profile=profile;dynamic.environmentTuning=p.impactTuning;
+ dynamic.environmentTuningBound=p.impactTuningBound;dynamic.worldMagnitude=call.geometry.magnitude;
+ dynamic.normalizedLocalX=call.geometry.normal[0];dynamic.normalizedLocalZ=call.geometry.normal[2];
+ const auto before=dynamicImpactState50IW(s,history);DynamicImpactState50IW after{};
+ const auto result=beginDynamicImpact50IW(dynamic,before,after);
+ return finishDynamicImpact50IW(s,history,call,result,after,d);
+}
+DynamicVehicleImpactStatus50IW resumeVehicleDynamicImpact50IW(S&s,BasePoseHistoryState50Y&history,
+ DynamicVehicleImpactCursor50IW&call,VehicleFrameDiagnostic49W&d) noexcept {
+ using T=DynamicVehicleImpactStatus50IW;
+ if(s.phase!=P::MainIntegration||!s.fields.dynamicOwnersBound50IW||!call.awaitingFirstContact||s.dynamicImpactRecorded50IW){
+  fail(d,E::Phase,0x222fa0);return T::Rejected;}
+ DynamicImpactState50IW after{};const auto result=resumeDynamicImpactAfter22A40050IW(call.input,call.prefix,after);
+ return finishDynamicImpact50IW(s,history,call,result,after,d);
+}
+
 bool integrateVehicleMain49W(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::MainIntegration,w,d))return false;auto&r=w.next;auto&m=r.bodies.main;auto&c=m.components;auto&lanes=r.bodies.mainSphere;const auto&par=p.bodies.main;
  bool impact=false;
@@ -449,6 +539,10 @@ bool integrateVehicleMain49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
  }
  if(impact){
   RR_VEHICLE_FRAME49W_STAGE(0x219d98);
+  if(r.dynamicImpactRecorded50IW){
+   if(!r.fields.dynamicOwnersBound50IW)return fail(d,E::Admission,0x223110);
+   r.dynamicImpactRecorded50IW=false;
+  }else{
   // The entry skip consumes neither tuning nor defense nor the partner list.
   if(!(r.fields.impactFlagsCD8&1u)&&m.vehicleState40!=3&&m.vehicleState40!=4){
    if(!p.impactTuningBound)return fail(d,E::Admission,0x223030);
@@ -476,7 +570,9 @@ bool integrateVehicleMain49W(S&s,const VehicleFrameBindings49W&b,const VehicleFr
    std::memcpy(r.fields.impactBA0.v,next.impactBA0,16);
    r.impactConsumerPending49Y=1;
   }
+  }
  }
+ if(r.dynamicImpactRecorded50IW)return fail(d,E::Phase,0x219d98);
  RR_VEHICLE_FRAME49W_STAGE(0x219e80);if(!advanceGraphBody49W(c.root,r.mainSupplement,r.mainExtra,{lanes.velocity70W,lanes.angularVelocityB0W,lanes.force180W,lanes.torque190W},lanes.sceneFlags190,par.body,par.centerOffset,b.lifecycle.main190,m.domain.bodyEnabled,b.mainDomain,m.schedule.factorPerSubstep,graph(r),w.body,d.body))return fail(d,E::Body,0x219e80);
  RR_VEHICLE_FRAME49W_STAGE(0x219e94);clearMainBodyPost20C49K(c.body20C);
  //28B1A0(null) writes XYZ only.7CC survives, including copy-only payloads.

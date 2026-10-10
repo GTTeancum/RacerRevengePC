@@ -57,4 +57,16 @@ enum class StaticImpactStatus49Y { applied, skipped, unsupported, arithmetic };
 StaticImpactStatus49Y recordStaticImpact49Y(const StaticImpactInput49Y&,
     const StaticImpactState49Y&, StaticImpactState49Y& output,
     float& nextVf9W) noexcept;
+// Original223030 split around its222F00 dynamic call. These transient values
+// are calculated once from the canonical scene/1C0, never supplied as guessed
+// contact direction or severity. The dynamic source continuation owns the
+// scalar severity between these two calls. Existing static entry is unchanged.
+struct ImpactGeometry50IW {
+    float magnitude=0,local[3]{},normal[3]{},nextScratchW=0;
+};
+StaticImpactStatus49Y prepareImpactGeometry50IW(const StaticImpactInput49Y&,
+    ImpactGeometry50IW&) noexcept;
+StaticImpactStatus49Y applyImpactSeverity50IW(const StaticImpactInput49Y&,
+    const ImpactGeometry50IW&,float sourceSeverity,
+    const StaticImpactState49Y&,StaticImpactState49Y&) noexcept;
 }

@@ -12,6 +12,9 @@
 #include "optional_probe_effects50p.h"
 #include "impact_transitions50c.h"
 #include "terrain_query_workspace48m.h"
+#include "body_contact_list48r.h"
+#include "dynamic_impact50iw.h"
+#include "base_pose_history50y.h"
 
 namespace rr::game {
 constexpr std::uint32_t vehicleFrameNodeCount49W=maxSceneNodes49P;
@@ -75,6 +78,8 @@ struct VehicleFrameFields49W {
     std::uint8_t impactFlagsCD8;
     // Native admission receipt set only by the original-AI cold/runtime join.
     bool nativeAiOwnersBound50IV=false;
+    // Exact dynamic-contact registry/list/runtime join, independent of AI role.
+    bool dynamicOwnersBound50IW=false;
 };
 // Only previously unrepresented consumer state lives here. Damage7D0..7DC,
 // CFC/D00, partnerDuration10 and directional maxima keep their existing owners.
@@ -87,6 +92,7 @@ struct VehicleImpactSupplement49Z {
 struct VehicleImpactEvents49Z {
     ImpactConsumerEvent49Z values[2];
     std::size_t count;
+    ImpactPartnerEvents49Z partners{};
 };
 // Explicit enabled348 extension. Shared flags/150/1D0 remain solely in
 // main.components.probe348. Only previously absent fields live here.
@@ -124,6 +130,12 @@ struct VehicleFrameState49W {
     std::uint8_t packedC00[7];
     VehicleTerrainProbe50FP terrainProbe;
     std::uint32_t sceneNodeCount=53; // Active forest only; unused capacity is not consumed.
+    // Canonical count remains main.components.body20C. Source165420 clears
+    // only that count; these ten ordered body-identity slots keep their bits.
+    BodyContactIdentity48R mainContactPartners210[BodyContactCapacity48R]{};
+    // Native sequencing receipt:223030 dynamic branch/common maxima completed
+    // at MainIntegration; the immediately following body integration consumes it.
+    bool dynamicImpactRecorded50IW=false;
 };
 inline bool validVehicleSceneCount49W(const VehicleFrameState49W& state,
     const VehicleFrameBindings49W& bindings) noexcept {
@@ -146,6 +158,26 @@ struct VehicleFrameDiagnostic49W {
     std::uint32_t sourceStage;
     GraphBodyDiagnostic49W body;
 };
+// One source223030 call, valid only until the immediate original222F00 tail
+// returns. Borrowed peer views outlive this call; this is never banked state.
+struct DynamicVehicleImpactCursor50IW {
+    StaticImpactInput49Y source{};
+    ImpactGeometry50IW geometry{};
+    DynamicImpactInput50IW input{};
+    DynamicImpactState50IW prefix{};
+    bool awaitingFirstContact=false;
+};
+enum class DynamicVehicleImpactStatus50IW {Complete,NeedFirstContact,Rejected};
+DynamicVehicleImpactStatus50IW beginVehicleDynamicImpact50IW(
+    VehicleFrameState49W&,const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
+    BasePoseHistoryState50Y&,const DynamicImpactManagerView50IW&,
+    const DynamicImpactTuning50IW&,const DynamicImpactProfile50IW&,
+    DynamicVehicleImpactCursor50IW&,VehicleFrameDiagnostic49W&) noexcept;
+// Call only after this call's actual22A400 cursor has completed. Never retry
+// begin or acknowledge an effect merely because its request was emitted.
+DynamicVehicleImpactStatus50IW resumeVehicleDynamicImpact50IW(
+    VehicleFrameState49W&,BasePoseHistoryState50Y&,
+    DynamicVehicleImpactCursor50IW&,VehicleFrameDiagnostic49W&) noexcept;
 // Narrow scene/history-preserving external contact projection. XYZ velocities,
 // loads/corrections/accumulators and their represented W lanes are permitted;
 // all poses, caches, time864, derivatives, phases and topology remain native.
