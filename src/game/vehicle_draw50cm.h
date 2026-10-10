@@ -4,6 +4,7 @@
 #include "rigid_vertices49s.h"
 #include "../assets/import_scene48d.h"
 #include "../assets/native_asset48b.h"
+#include "../assets/world_normals50hk.h"
 
 namespace rr::game {
 constexpr std::uint32_t maxVehicleDrawSpans50CM = 64;
@@ -20,6 +21,9 @@ struct VehicleDrawMesh50CM {
     std::uint32_t indexCount = 0;
     const assets::SceneSpan48D* spans = nullptr;
     std::uint32_t spanCount = 0;
+    // Immutable semantic normals in the same flattened order, when prepared
+    // from Scene48D. Keeps authored normals/splits outside Vertex48B's ABI.
+    const assets::Scene48D* semanticScene = nullptr;
 };
 struct VehicleDrawSelection50CM {
     VehicleDrawComponent50CM component = VehicleDrawComponent50CM::chariot;
@@ -35,6 +39,8 @@ struct VehicleDrawSelection50CM {
 struct VehicleDrawBuffer50CM {
     assets::Vertex48B* vertices = nullptr;
     std::uint32_t capacity = 0;
+    assets::WorldNormal50HK* sourceNormals = nullptr;
+    std::uint32_t normalCapacity = 0;
 };
 struct VehicleDrawSubmission50CM {
     const assets::Vertex48B* vertices = nullptr;
@@ -45,15 +51,20 @@ struct VehicleDrawSubmission50CM {
     std::uint32_t spanCount = 0;
     // Computed display bounds, not source model/collision bounds.
     assets::Bounds48B bounds{};
+    // Optional source-derived world normals, exact vertex order. Zero normals
+    // request geometric fallback; neither positions nor RGB/alpha are altered.
+    const assets::WorldNormal50HK* sourceNormals = nullptr;
+    std::uint32_t sourceNormalCount = 0;
 };
 struct VehicleDrawWorkspace50CM {
     SceneNode49P nodes[vehicleFrameNodeCount49W];
     ModelPalette49S palette;
     ModelPaletteWorkspace49S paletteWorkspace;
     RigidPosition49S positions[maxRigidVertices49S];
+    assets::WorldNormal50HK normals[maxRigidVertices49S];
 };
 enum class VehicleDrawError50CM : std::uint8_t {
-    none, storage, scene, geometry, vertexTemplate, phase, binding, palette, vertices
+    none, storage, scene, geometry, vertexTemplate, phase, binding, palette, vertices, normals
 };
 struct VehicleDrawDiagnostic50CM {
     VehicleDrawError50CM error = VehicleDrawError50CM::none;
@@ -85,6 +96,9 @@ bool prepareVehicleDrawMesh50CM(const assets::Scene48D&, const assets::Mesh48B&,
 // R32_UINT indices, triangle-list SceneSpan48D ranges and baseVertex=0. Positions
 // are already world-space; do not apply rootWorld or another model transform.
 // UV/color/index/span/material bytes remain those of the prepared source.
+// An optional separate sourceNormals destination receives authored normals
+// transformed by the same per-node world palette. Singular transforms produce
+// zero, requesting geometric lighting fallback; no normals are smoothed.
 // No device commands, camera, material selection, visibility, LOD scheduling,
 // packet execution or original VU-shader parity is supplied.
 //

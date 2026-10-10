@@ -82,6 +82,8 @@ bool prepareVehicleDrawMesh50CM(const assets::Scene48D& scene, const assets::Mes
             if (source.bone >= scene.nodes.size()) return reject(d, VehicleDrawError50CM::geometry, s);
             for (const double value : source.position_local)
                 if (!std::isfinite(value)) return reject(d, VehicleDrawError50CM::geometry, s);
+            for (const double value : source.normal_local)
+                if (!std::isfinite(value)) return reject(d, VehicleDrawError50CM::normals, s);
             for (std::uint32_t lane = 0; lane < 2; ++lane) {
                 const double uv = source.uv[lane];
                 const double limit = static_cast<double>(std::numeric_limits<float>::max());
@@ -113,6 +115,7 @@ bool prepareVehicleDrawMesh50CM(const assets::Scene48D& scene, const assets::Mes
     }
     output = {local, mesh.vertices.data(), vertex, static_cast<std::uint32_t>(scene.nodes.size()),
         mesh.indices.data(), index, scene.spans_lod0.data(), static_cast<std::uint32_t>(surfaces.size())};
+    output.semanticScene = &scene;
     return true;
 }
 
@@ -126,6 +129,10 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
         destination.capacity < mesh.vertexCount || !mesh.indexCount ||
         mesh.indexCount > assets::max_mesh_indices || !mesh.spanCount ||
         mesh.spanCount > maxVehicleDrawSpans50CM)
+        return reject(d, VehicleDrawError50CM::storage);
+    if (bool(destination.sourceNormals) != bool(destination.normalCapacity) ||
+        (destination.sourceNormals && (destination.normalCapacity < mesh.vertexCount ||
+            !mesh.semanticScene || mesh.semanticScene->lods.empty())))
         return reject(d, VehicleDrawError50CM::storage);
     if ((state.phase != VehicleFramePhase49W::Ready && state.phase != VehicleFramePhase49W::PostGraphics) ||
         selection.phase != ModelPalettePhase49S::selectedRenderPreparation ||
@@ -153,6 +160,35 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
         {workspace.positions, maxRigidVertices49S}, d.vertices))
         return reject(d, VehicleDrawError50CM::vertices);
 
+    // Use the exact current per-node palette already used for positions. The
+    // inverse transpose preserves authored hard edges under scale and shear.
+    // Finish all fallible work before publishing either output stream.
+    if (destination.sourceNormals) {
+        std::array<std::array<double, 16>, maxRigidPalette49S> matrices{};
+        for (std::uint32_t bone = 0; bone < workspace.palette.entryCount; ++bone)
+            for (std::uint32_t lane = 0; lane < 16; ++lane)
+                matrices[bone][lane] = workspace.palette.nodeWorld[bone].v[lane];
+        std::uint32_t vertex = 0;
+        for (const auto& surface : mesh.semanticScene->lods[0].surfaces)
+            for (const auto& source : surface.vertices) {
+                if (vertex >= mesh.vertexCount || source.bone >= workspace.palette.entryCount)
+                    return reject(d, VehicleDrawError50CM::normals, vertex);
+                // An explicitly absent source normal stays absent even on a
+                // collapsed effect node; the shader has a geometric fallback.
+                if (source.normal_local[0] == 0.0 && source.normal_local[1] == 0.0 &&
+                    source.normal_local[2] == 0.0) workspace.normals[vertex] = {};
+                else if (!assets::transformWorldNormal50HK(source.normal_local,
+                    matrices[source.bone], workspace.normals[vertex]))
+                    // A collapsed/degenerate node has no inverse transpose.
+                    // Keep valid geometry drawable with the shader's geometric
+                    // fallback rather than rejecting an entire race frame.
+                    workspace.normals[vertex] = {};
+                ++vertex;
+            }
+        if (vertex != mesh.vertexCount)
+            return reject(d, VehicleDrawError50CM::normals, vertex);
+    }
+
     VehicleDrawSubmission50CM next{destination.vertices, mesh.vertexCount, mesh.indices,
         mesh.indexCount, mesh.spans, mesh.spanCount, {}};
     for (std::uint32_t axis = 0; axis < 3; ++axis)
@@ -165,6 +201,12 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
             if (value < next.bounds.minimum[axis]) next.bounds.minimum[axis] = value;
             if (value > next.bounds.maximum[axis]) next.bounds.maximum[axis] = value;
         }
+    }
+    if (destination.sourceNormals) {
+        std::memcpy(destination.sourceNormals, workspace.normals,
+            std::size_t(mesh.vertexCount) * sizeof(assets::WorldNormal50HK));
+        next.sourceNormals = destination.sourceNormals;
+        next.sourceNormalCount = mesh.vertexCount;
     }
     output = next;
     return true;

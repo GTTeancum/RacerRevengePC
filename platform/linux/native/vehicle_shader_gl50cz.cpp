@@ -13,22 +13,28 @@ static_assert(std::is_standard_layout<assets::Vertex48B>::value && sizeof(float)
     "48B viewer / 50CV GL attribute layout");
 }
 
-// Literal diagnostic-shader behavior from platform/windows/native/main48b.cpp.
+// Default diagnostic behavior from platform/windows/native/main48b.cpp, with
+// explicit opt-in native source-normal lighting for the window renderer.
 // This is not a recovered original-game material program or PS2 transform.
 const char* vehicleGlVertexSource50CZ() noexcept {
     return R"GLSL(#version 150 core
 in vec3 rrPosition;
 in vec2 rrUv;
 in vec4 rrColor;
+in vec3 rrWorldNormal;
 uniform mat4 worldViewProjection;
 uniform int useUvTransform;
 uniform vec4 uvScaleOffset;
 out vec2 viewerUv;
 out vec4 viewerColor;
+out vec3 viewerWorldPosition;
+out vec3 viewerWorldNormal;
 void main() {
     gl_Position = vec4(rrPosition, 1.0) * worldViewProjection;
     viewerUv = useUvTransform != 0 ? rrUv * uvScaleOffset.xy + uvScaleOffset.zw : rrUv;
     viewerColor = rrColor;
+    viewerWorldPosition = rrPosition;
+    viewerWorldNormal = rrWorldNormal;
 }
 )GLSL";
 }
@@ -37,13 +43,27 @@ const char* vehicleGlFragmentSource50CZ() noexcept {
     return R"GLSL(#version 150 core
 in vec2 viewerUv;
 in vec4 viewerColor;
+in vec3 viewerWorldPosition;
+in vec3 viewerWorldNormal;
 uniform int useTexture;
 uniform sampler2D image;
 uniform int effectMode;
 uniform float alphaScale;
 uniform int suppressDraw;
+uniform int useLighting;
 out vec4 viewerOutput;
 void main() {
+    // Evaluate derivatives before any discard. Source normals retain their
+    // authored signs; only the zero-normal fallback follows triangle winding.
+    vec3 plane = cross(dFdx(viewerWorldPosition), dFdy(viewerWorldPosition));
+    float planeLength = dot(plane, plane);
+    vec3 normal = vec3(0.0, 1.0, 0.0);
+    float authoredLength = dot(viewerWorldNormal, viewerWorldNormal);
+    if (authoredLength > 0.000001) normal = viewerWorldNormal * inversesqrt(authoredLength);
+    else if (planeLength > 0.0) {
+        normal = plane * inversesqrt(planeLength);
+        if (!gl_FrontFacing) normal = -normal;
+    }
     if (suppressDraw != 0) discard;
     vec4 texel = useTexture != 0 ? texture(image, viewerUv) : vec4(1.0);
     vec3 color = useTexture != 0 || effectMode != 0 ?
@@ -51,6 +71,12 @@ void main() {
     float alpha = 1.0;
     if (effectMode == 1) alpha = clamp(texel.a * viewerColor.a * alphaScale, 0.0, 1.0);
     if (effectMode == 2) color *= alphaScale;
+    if (useLighting != 0) {
+        vec3 lightDirection = normalize(vec3(0.35, 0.85, 0.30));
+        float illumination = 0.32 + 0.16 * max(normal.y, 0.0) +
+            0.52 * max(dot(normal, lightDirection), 0.0);
+        color *= illumination;
+    }
     viewerOutput = vec4(color, alpha);
 }
 )GLSL";
@@ -146,6 +172,8 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic) 
     if (!noGlError(diagnostic)) return fail();
     gl_.bindAttribLocation(program_, vehicleGlColorAttribute50CZ, "rrColor");
     if (!noGlError(diagnostic)) return fail();
+    gl_.bindAttribLocation(program_, vehicleGlNormalAttribute50CZ, "rrWorldNormal");
+    if (!noGlError(diagnostic)) return fail();
     gl_.bindFragDataLocation(program_, vehicleGlColorOutput50CZ, "viewerOutput");
     if (!noGlError(diagnostic)) return fail();
     gl_.linkProgram(program_);
@@ -172,8 +200,10 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic) 
     uniforms_.suppressDraw = gl_.getUniformLocation(program_, "suppressDraw");
     uniforms_.useUvTransform = gl_.getUniformLocation(program_, "useUvTransform");
     uniforms_.uvScaleOffset = gl_.getUniformLocation(program_, "uvScaleOffset");
+    uniforms_.useLighting = gl_.getUniformLocation(program_, "useLighting");
     if (!noGlError(diagnostic) || uniforms_.effectMode < 0 || uniforms_.alphaScale < 0 ||
-        uniforms_.suppressDraw < 0 || uniforms_.useUvTransform < 0 || uniforms_.uvScaleOffset < 0)
+        uniforms_.suppressDraw < 0 || uniforms_.useUvTransform < 0 || uniforms_.uvScaleOffset < 0 ||
+        uniforms_.useLighting < 0)
         return fail();
     ready_ = true;
     diagnostic.stage = VehicleGlShaderStage50CZ::none;

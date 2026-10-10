@@ -5,7 +5,7 @@
 #include <vector>
 
 namespace native_racer50HN {
-// Each opponent owns ONLY its transformed display vertices and cable output.
+// Each opponent owns its transformed display vertices, normals and cable output.
 // Source mesh/index/span/palette/texture data are borrowed from the very same
 // authenticated Pod01 asset owner as the human. No rigid whole-pod transform is
 // substituted: native49S/50CO prepares all actual component/node poses.
@@ -23,8 +23,10 @@ public:
         input_=source;
         for(unsigned component=0;component<3;++component){
             vertices_[component].resize(source.mesh[component].vertexCount);
+            normals_[component].resize(source.mesh[component].vertexCount);
             input_.staging[component]={vertices_[component].data(),
-                static_cast<std::uint32_t>(vertices_[component].size())};
+                static_cast<std::uint32_t>(vertices_[component].size()),
+                normals_[component].data(),static_cast<std::uint32_t>(normals_[component].size())};
         }
         initialized_=true;return true;
     }
@@ -40,6 +42,7 @@ public:
     rr::game::PodCableMesh50FD cables{};
 private:
     std::array<std::vector<rr::assets::Vertex48B>,3> vertices_;
+    std::array<std::vector<rr::assets::WorldNormal50HK>,3> normals_;
     rr::game::VehicleDrawBatchInput50CO input_{};
     rr::game::VehicleDrawBatch50CO batch_{};
     bool initialized_=false,valid_=false;
