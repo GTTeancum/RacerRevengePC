@@ -247,8 +247,8 @@ Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in
     if(!s)return result(d,Status::notBound);
     if(s->state.faulted)return result(d,Status::faulted);
     if(s->state.quitRequested)return result(d,Status::quit);
-    if(s->inOperation || in.controller>1 || in.originalInput>15)return result(d,Status::invalidInput);
-    s->pendingRoute={};
+    if(s->inOperation || s->updateAudioPrepared || in.controller>1 || in.originalInput>15)return result(d,Status::invalidInput);
+    s->state.framePublished=false;s->pendingRoute={};
     if(s->cold.externalTransition && !s->currentMainLifecycle())return result(d,Status::noChange);
     ++s->inputSerial;
     receipt.containerReached=s->state.mainPageShown && s->state.inputContainerShown;
@@ -328,6 +328,7 @@ Status OriginalUiMainSession50KG::update(const OriginalUiMainSessionUpdate50KG& 
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
     if(s->state.faulted)return result(d,Status::faulted);
     if(s->inOperation)return result(d,Status::invalidInput);
+    s->state.framePublished=false;
     if(s->cold.externalTransition){
         if(!s->updateAudioPrepared)return result(d,Status::unsupportedState,0x234440);
         // Consume once even when the caller changed arguments or manager. The
@@ -441,7 +442,7 @@ Status OriginalUiMainSession50KG::notifyTransition(const game::OriginalUiTransit
     const auto t=s->lifecycle().snapshot();
     if(!t.bound || event.route.screen!=4 || event.route.page!=1 || event.lifecycle!=t.lifecycle || event.phase!=t.phase ||
         (!sameRoute(event.route,t.current) && !sameRoute(event.route,t.requested)))return result(d,Status::invalidInput,event.sourcePC);
-    s->pendingRoute={};s->inOperation=true;Storage::notify(s,event);s->inOperation=false;
+    s->state.framePublished=false;s->pendingRoute={};s->inOperation=true;Storage::notify(s,event);s->inOperation=false;
     if(s->state.faulted){d=s->callbackFault;return d.status;}
     return result(d,Status::ok);
 }
@@ -460,7 +461,7 @@ const game::OriginalUiTransitionOwner50KG* OriginalUiMainSession50KG::externalLi
 }
 bool OriginalUiMainSession50KG::routeProposalCurrent(const OriginalUiMainRouteProposal50KG& p) const noexcept {
     const auto* s=storage_.get();
-    if(!s || !s->cold.externalTransition || s->inOperation || !s->operational() || p.source!=this || !p.serial ||
+    if(!s || !s->cold.externalTransition || s->inOperation || s->updateAudioPrepared || !s->operational() || p.source!=this || !p.serial ||
         s->pendingRoute.source!=this || p.serial!=s->pendingRoute.serial ||
         !sameDecision(p.decision,s->pendingRoute.decision))return false;
     const auto t=s->lifecycle().snapshot();const auto a=s->aperture.snapshot();
@@ -475,7 +476,7 @@ bool OriginalUiMainSession50KG::routeProposalCurrent(const OriginalUiMainRoutePr
 Status OriginalUiMainSession50KG::notifyRouteAccepted(const OriginalUiMainRouteProposal50KG& p,
     OriginalUiMainSessionDiagnostic50KG& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
-    if(!s->cold.externalTransition || s->inOperation || !s->operational() || p.source!=this || !p.serial ||
+    if(!s->cold.externalTransition || s->inOperation || s->updateAudioPrepared || !s->operational() || p.source!=this || !p.serial ||
         p.serial!=s->pendingRoute.serial || !sameDecision(p.decision,s->pendingRoute.decision))
         return result(d,Status::invalidInput);
     const auto t=s->lifecycle().snapshot();const auto* nav=s->cold.resources->manager()->navigation(1);
@@ -492,7 +493,7 @@ Status OriginalUiMainSession50KG::notifyRouteAccepted(const OriginalUiMainRouteP
     if(p.decision.selectedSlot<=3 && (s->cold.profile->mode34!=static_cast<std::uint32_t>(p.decision.originalGameMode) ||
         (s->cold.profile->playerBits1125C&0x60u)!=p.decision.originalPlayerBits))
         return result(d,Status::unsupportedState,0x1E5EF8);
-    s->pendingRoute={};s->inOperation=true;
+    s->state.framePublished=false;s->pendingRoute={};s->inOperation=true;
     const bool okay=s->audioEffect(1);s->inOperation=false;
     if(!okay){d=s->callbackFault;return d.status;}
     return result(d,Status::ok,0x1E61B4);
@@ -508,7 +509,11 @@ OriginalUiMainSessionSnapshot50KG OriginalUiMainSession50KG::snapshot() const no
     if(const auto* text=storage_->cold.resources->exitText())snapshot.exitText=text->snapshot();
     return snapshot;
 }
-const OriginalUiNativeDraw50KG* OriginalUiMainSession50KG::draw() const noexcept {return storage_ && !storage_->state.faulted && !storage_->state.quitRequested && storage_->state.framePublished?storage_->collector.draw():nullptr;}
+const OriginalUiNativeDraw50KG* OriginalUiMainSession50KG::draw() const noexcept {
+    return storage_ && !storage_->state.faulted && !storage_->state.quitRequested && storage_->state.framePublished &&
+        !storage_->inOperation && !storage_->updateAudioPrepared &&
+        (!storage_->cold.externalTransition || storage_->currentMainLifecycle())?storage_->collector.draw():nullptr;
+}
 const game::OriginalUiMainCameraPreparation50KG* OriginalUiMainSession50KG::camera() const noexcept {return storage_?&storage_->camera:nullptr;}
 const game::OriginalUiMainParticleCamera50KG* OriginalUiMainSession50KG::particleCamera() const noexcept {return storage_?&storage_->particleRenderState.particleCamera:nullptr;}
 const game::OriginalUiMainParticleRenderState50KG* OriginalUiMainSession50KG::particleRenderState() const noexcept {return storage_?&storage_->particleRenderState:nullptr;}

@@ -117,7 +117,7 @@ Status OriginalUiOptionsSession50KG::notifyTransition(const game::OriginalUiTran
     const auto t=s->transition();
     if(!t.bound||event.lifecycle!=t.lifecycle||event.phase!=t.phase||
         !((t.current.screen==12&&t.current.page==1)||(t.requested.screen==12&&t.requested.page==1)))return result(d,Status::invalidInput,event.sourcePC);
-    s->state.backProposalPending=false;s->inOperation=true;
+    s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;
     switch(event.kind) {
     case Notice::requestedPage90:s->widgetPhase(Phase::requestedPage90,event.sourcePC);s->state.pageShown=true;break;
     case Notice::previousPage94:s->widgetPhase(Phase::previousPage94,event.sourcePC);s->state.pageShown=false;break;
@@ -149,7 +149,7 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
     d={};receipt={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
     if(s->state.faulted)return result(d,Status::faulted);if(s->state.quitRequested)return result(d,Status::quit);
     if(s->inOperation||s->updatePrepared||in.controller>1||in.originalInput>15)return result(d,Status::invalidInput);
-    s->state.backProposalPending=false;receipt.sourceLifecycle=s->transition();
+    s->state.framePublished=false;s->state.backProposalPending=false;receipt.sourceLifecycle=s->transition();
     receipt.containerReached=s->currentPage()&&s->state.pageShown&&s->state.inputContainerShown;
     if(!receipt.containerReached||!s->aperture.snapshot().inputEnabled268)return result(d,Status::noChange);
     if(s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState,0x267BE0);
@@ -184,7 +184,9 @@ bool OriginalUiOptionsSession50KG::routeProposalCurrent(const OriginalUiOptionsR
     const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||!s->idleInput()||proposal.source!=this||!proposal.serial||proposal.serial!=s->proposalSerial)return false;
     const auto& expected=s->pendingBack;const auto& a=decision.request;const auto& b=expected.request;
     const auto* nav=s->cold.resources->widgets()->navigation();
-    if(!nav||nav->controllerGroup[0]!=1||nav->groups[1].selectedSlot!=expected.selectedSlot||
+    if(!s->cold.profile->known||!s->cold.commonProfile->known||!s->cold.application->known||
+        (s->cold.application->globalFlags228&4u)||s->cold.application->transportE00!=-1||
+        !nav||nav->controllerGroup[0]!=1||nav->groups[1].selectedSlot!=expected.selectedSlot||
         decision.inputPC!=expected.inputPC||decision.selectedSlot!=expected.selectedSlot||decision.selectedRider!=expected.selectedRider||
         a.kind!=b.kind||a.sourceScreen!=b.sourceScreen||a.sourcePage!=b.sourcePage||a.targetScreen!=b.targetScreen||a.targetPage!=b.targetPage||a.sourcePC!=b.sourcePC||
         decision.admitted!=expected.admitted||decision.blockers!=expected.blockers||decision.action!=expected.action||
@@ -211,23 +213,25 @@ Status OriginalUiOptionsSession50KG::notifyRouteAccepted(const OriginalUiOptions
     if(!t.bound||t.current.screen!=12||t.current.page!=1||t.requested.screen!=4||t.requested.page!=1||
         t.lifecycle!=game::OriginalUiTransitionLifecycle50KG::requestScreenExit||t.phase!=game::OriginalUiTransitionPhase50KG::none||
         t.applicationRequestQueued||t.initialRestartPending||!nav||nav->controllerGroup[0]!=1||nav->groups[1].selectedSlot!=decision.selectedSlot||
-        !s->cold.profile->known||s->cold.profile->savedSlot6E4!=p.value||s->cold.application->transportE00!=-1)
+        !s->cold.profile->known||!s->cold.commonProfile->known||!s->cold.application->known||
+        (s->cold.application->globalFlags228&4u)||s->cold.profile->savedSlot6E4!=p.value||s->cold.application->transportE00!=-1)
         return result(d,Status::unsupportedState,0x1F99D0);
     // Original1F9994 writes +6E4;1F999C sets lifecycle6;1F99A4/B0 sets
     // target4/page1; only then1F99D0 plays BACK5 and1F99E8 flushes. The
     // admitted process transportE00=-1 takes the actual no-work flush return.
-    s->state.backProposalPending=false;s->inOperation=true;
+    s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;
     const bool okay=s->audioEffect(5);s->inOperation=false;
     if(!okay){d=s->callbackFault;return d.status;}return result(d,Status::ok);
 }
 Status OriginalUiOptionsSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG& in,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
     if(s->state.faulted)return result(d,Status::faulted);if(s->state.quitRequested)return result(d,Status::quit);
+    if(s->inOperation)return result(d,Status::invalidInput);
     if(s->updatePrepared){s->fault(Status::unsupportedState,0x234440);d=s->callbackFault;return d.status;}
     if(s->inOperation||!s->currentPage()||!std::isfinite(in.elapsedSeconds)||in.elapsedSeconds<0||in.elapsedSeconds>1||
         (in.paused&&in.elapsedSeconds!=0))return result(d,Status::invalidInput);
     if((s->cold.application->globalFlags228&4u)||s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState);
-    s->state.backProposalPending=false;s->inOperation=true;s->paused=in.paused;
+    s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;s->paused=in.paused;
     if(s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled){s->cold.audio->pause(in.paused);
         if(!s->cold.audio->update(in.elapsedSeconds))s->fault(Status::audio,0x234440);}
     s->inOperation=false;if(s->state.faulted){d=s->callbackFault;return d.status;}
@@ -255,9 +259,12 @@ Status OriginalUiOptionsSession50KG::update(const OriginalUiMainSessionUpdate50K
     ++s->state.updateCount;return result(d,Status::ok);
 }
 Status OriginalUiOptionsSession50KG::render(const OriginalUiOptionsClock50KG& clock,Diagnostic& d) noexcept {
-    d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);s->state.framePublished=false;
+    d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
+    if(s->inOperation)return result(d,Status::invalidInput);
+    s->state.framePublished=false;
     if(s->state.faulted)return result(d,Status::faulted);if(s->state.quitRequested)return result(d,Status::quit);
-    if(s->inOperation||s->updatePrepared||!s->currentPage()||!s->state.updateCount||!s->state.cameraActive||(s->paused&&clock.advanceAnimations))return result(d,Status::invalidInput);
+    if(s->updatePrepared){s->fault(Status::unsupportedState,0x234440);d=s->callbackFault;return d.status;}
+    if(!s->currentPage()||!s->state.updateCount||!s->state.cameraActive||(s->paused&&clock.advanceAnimations))return result(d,Status::invalidInput);
     s->state.backProposalPending=false;s->inOperation=true;s->rendering=true;
     bool okay=s->collector.begin(clock,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&s->collector.projectPage(s->state.pageShown,d.draw);
     if(okay)okay=apertureOkay(s->aperture.render48(s->transition().lifecycle));
@@ -272,7 +279,8 @@ OriginalUiOptionsSessionSnapshot50KG OriginalUiOptionsSession50KG::snapshot() co
     out.promptMask42C=storage_->cold.resources->widgets()->pageInputFlags42C();return out;
 }
 const OriginalUiNativeDraw50KG* OriginalUiOptionsSession50KG::draw() const noexcept {
-    return storage_&&storage_->state.framePublished&&!storage_->state.faulted&&!storage_->state.quitRequested?storage_->collector.draw():nullptr;
+    return storage_&&storage_->state.framePublished&&!storage_->state.faulted&&!storage_->state.quitRequested&&
+        !storage_->inOperation&&!storage_->updatePrepared&&storage_->currentPage()?storage_->collector.draw():nullptr;
 }
 void OriginalUiOptionsSession50KG::requestQuit() noexcept {
     if(!storage_||storage_->inOperation)return;storage_->state.quitRequested=true;storage_->state.framePublished=false;
