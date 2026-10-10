@@ -807,10 +807,12 @@ struct OwnerGl {
     void (*blendEquation)(U) = nullptr;
     void (*activeTexture)(U) = nullptr;
     void (*bindTexture)(U, U) = nullptr;
+    void (*getTexParameteriv)(U, U, I*) = nullptr;
     // Only loaded if GL >= 3.3 or ARB_sampler_objects is advertised.
     void (*bindSampler)(U, U) = nullptr;
     const unsigned char* (*getStringi)(U, U) = nullptr;
     void (*viewport)(I, I, I, I) = nullptr;
+    void (*scissor)(I, I, I, I) = nullptr;
     void (*enable)(U) = nullptr;
     void (*disable)(U) = nullptr;
     void (*depthFunc)(U) = nullptr;
@@ -954,6 +956,12 @@ struct VehicleWindowGl50DS::Storage {
     U targets[2]{}, colors[2]{}, depths[2]{};
     U menuTargets[2]{}, menuColors[2]{}, displayedTarget = 0;
     std::uint8_t menuPublished = 0;
+    U uiTargets[2]{}, uiColors[2]{}, uiDepths[2]{};
+    U uiProgram = 0, uiVertexShader = 0, uiFragmentShader = 0;
+    U uiVertexBuffer = 0, uiIndexBuffer = 0, uiVertexArray = 0;
+    I uiCanvasUniform = -1, uiImageUniform = -1, uiAlphaUniform = -1;
+    std::uint8_t uiPublished = 0;
+    std::uint64_t uiTexturePublication = 0;
     I raceWidth = 0, raceHeight = 0;
     I maximumWidth = 0, maximumHeight = 0, width = 0, height = 0, clipDistances = 0;
     I committedWidth = 0, committedHeight = 0;
@@ -1028,7 +1036,7 @@ struct VehicleWindowGl50DS::Storage {
             if (racerArchetypes[i].cables.textures) return true;
         return request.mode == VehicleWindowMode50DS::callerMaterialTextures ||
             request.track.mode == VehicleWindowMode50DS::callerMaterialTextures || request.cables.textures ||
-            request.sky.textures || request.dynamicWorld.textures;
+            request.sky.textures || request.dynamicWorld.textures || request.enableOriginalUi;
     }
     bool usesTrackShader() const noexcept {
         return request.track.mode == VehicleWindowMode50DS::sourceVertexColors ||
@@ -1390,6 +1398,10 @@ struct VehicleWindowGl50DS::Storage {
         if (trackProgram || trackVertexShader || trackFragmentShader) return true;
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
             hostHudVertexBuffer || hostHudIndexBuffer || hostHudVertexArray) return true;
+        if (uiProgram || uiVertexShader || uiFragmentShader ||
+            uiVertexBuffer || uiIndexBuffer || uiVertexArray) return true;
+        for (U b = 0; b < 2; ++b)
+            if (uiTargets[b] || uiColors[b] || uiDepths[b]) return true;
         if (cableVertexBuffer || cableIndexBuffer || cableVertexArray) return true;
         if (trackVertexBuffer || trackIndexBuffer || trackVertexArray || trackNormalBuffer || trackProjectionBuffer) return true;
         if (dynamicWorldIndexBuffer) return true;
@@ -1468,8 +1480,11 @@ struct VehicleWindowGl50DS::Storage {
         LOAD(gl, getString, GetString);
         // Host pause menus copy the retained race image between private FBOs
         // in headless mode too. Resolve before exposing either blit path.
-        if (request.output == VehicleWindowOutput50DS::defaultBackBuffer || request.enableHostHud) {
+        if (request.output == VehicleWindowOutput50DS::defaultBackBuffer || request.enableHostHud || request.enableOriginalUi) {
             LOAD(gl, blitFramebuffer, BlitFramebuffer);
+        }
+        if (request.enableOriginalUi) {
+            LOAD(gl, scissor, Scissor); LOAD(gl, getTexParameteriv, GetTexParameteriv);
         }
         if (usesTextures()) {
             LOAD(gl, activeTexture, ActiveTexture); LOAD(gl, bindTexture, BindTexture);
@@ -2003,6 +2018,134 @@ void main() {
         check("read host HUD shader log");
         return fail(*diagnostic, VehicleWindowError50DS::shader, "host HUD shader compilation failed");
     }
+    bool validateOriginalUiBank(const VehicleWindowRequest50DS& input) noexcept {
+        if (!input.enableOriginalUi)
+            return (!input.originalUiCpuTextures && !input.originalUiTextures) ||
+                fail(*diagnostic, VehicleWindowError50DS::request, "UI banks require explicit original UI opt-in");
+        const auto* cpu = input.originalUiCpuTextures;
+        const auto* gpu = input.originalUiTextures;
+        if (!cpu || !cpu->loaded() || !gpu || !gpu->validBorrow(input.context, input.isCurrent,
+            gpu->publicationToken()) || !cpu->textureCount() || cpu->textureCount() != gpu->textureCount())
+            return fail(*diagnostic, VehicleWindowError50DS::material, "UI requires matching immutable CPU/GPU publication");
+        // Cold-only scan. Owners stay alive and immutable through close.
+        for (U i = 0; i < cpu->textureCount(); ++i) {
+            const auto* source = cpu->texture(i); const auto* image = gpu->asset(i);
+            if (!source || !image || !image->name || image->identity != source->identity)
+                return fail(*diagnostic, VehicleWindowError50DS::material, "UI CPU/GPU texture identity mismatch");
+            for (std::size_t a = 3; a < source->texture.rgba.size(); a += 4)
+                if (source->texture.rgba[a] > 128)
+                    return fail(*diagnostic, VehicleWindowError50DS::material, "UI raw texture alpha exceeds source blend admission");
+        }
+        return true;
+    }
+    bool createOriginalUi() noexcept {
+        if (!request.enableOriginalUi) return true;
+        constexpr const char* vertexSource = R"GLSL(#version 150 core
+in vec3 rrPosition;
+in vec2 rrUv;
+in vec4 rrColor;
+uniform vec4 canvasToClip;
+out vec2 uiUv;
+out vec4 uiColor;
+void main() {
+    gl_Position = vec4(rrPosition.xy * canvasToClip.xy + canvasToClip.zw,
+        (rrPosition.z / 16777215.0) * 2.0 - 1.0, 1.0);
+    uiUv = rrUv; uiColor = rrColor;
+}
+)GLSL";
+        constexpr const char* fragmentSource = R"GLSL(#version 150 core
+in vec2 uiUv;
+in vec4 uiColor;
+uniform sampler2D uiImage;
+uniform float uiAlphaScale;
+out vec4 viewerOutput;
+void main() {
+    vec4 raw = texture(uiImage, uiUv) * uiColor;
+    // MODULATE clamps before blend, not after addition to destination RGB.
+    viewerOutput = vec4(clamp(raw.rgb * (255.0 / 128.0), 0.0, 1.0),
+        clamp(raw.a * uiAlphaScale, 0.0, 1.0));
+}
+)GLSL";
+        const auto compile = [&](U type, const char* source, U& name) noexcept {
+            name = shaderGl.createShader(type);
+            if (!check("create original UI shader")) return false;
+            if (!name) return fail(*diagnostic, VehicleWindowError50DS::shader, "zero original UI shader");
+            shaderGl.shaderSource(name, 1, &source, nullptr); shaderGl.compileShader(name);
+            I compiled = 0; shaderGl.getShaderiv(name, 0x8B81, &compiled);
+            if (!check("compile original UI shader")) return false;
+            if (compiled) return true;
+            shaderGl.getShaderInfoLog(name, static_cast<I>(sizeof(diagnostic->shader.log)), nullptr, diagnostic->shader.log);
+            diagnostic->shader.log[sizeof(diagnostic->shader.log)-1] = '\0';
+            check("read original UI shader log");
+            return fail(*diagnostic, VehicleWindowError50DS::shader, "original UI shader compilation failed");
+        };
+        diagnostic->shader.stage = VehicleGlShaderStage50CZ::vertex;
+        if (!compile(0x8B31, vertexSource, uiVertexShader)) return false;
+        diagnostic->shader.stage = VehicleGlShaderStage50CZ::fragment;
+        if (!compile(0x8B30, fragmentSource, uiFragmentShader)) return false;
+        diagnostic->shader.stage = VehicleGlShaderStage50CZ::link;
+        uiProgram = shaderGl.createProgram();
+        if (!check("create original UI program")) return false;
+        if (!uiProgram) return fail(*diagnostic, VehicleWindowError50DS::shader, "zero original UI program");
+        shaderGl.attachShader(uiProgram, uiVertexShader); shaderGl.attachShader(uiProgram, uiFragmentShader);
+        shaderGl.bindAttribLocation(uiProgram, 0, "rrPosition");
+        shaderGl.bindAttribLocation(uiProgram, 1, "rrUv");
+        shaderGl.bindAttribLocation(uiProgram, 2, "rrColor");
+        shaderGl.bindFragDataLocation(uiProgram, vehicleGlColorOutput50CZ, "viewerOutput");
+        shaderGl.linkProgram(uiProgram);
+        I linked = 0; shaderGl.getProgramiv(uiProgram, 0x8B82, &linked);
+        if (!check("link original UI program")) return false;
+        if (!linked) {
+            shaderGl.getProgramInfoLog(uiProgram, static_cast<I>(sizeof(diagnostic->shader.log)), nullptr, diagnostic->shader.log);
+            diagnostic->shader.log[sizeof(diagnostic->shader.log)-1] = '\0';
+            check("read original UI program log");
+            return fail(*diagnostic, VehicleWindowError50DS::shader, "original UI program link failed");
+        }
+        uiCanvasUniform = shaderGl.getUniformLocation(uiProgram, "canvasToClip");
+        uiImageUniform = shaderGl.getUniformLocation(uiProgram, "uiImage");
+        uiAlphaUniform = shaderGl.getUniformLocation(uiProgram, "uiAlphaScale");
+        if (!check("locate original UI uniforms")) return false;
+        if (uiCanvasUniform < 0 || uiImageUniform < 0 || uiAlphaUniform < 0)
+            return fail(*diagnostic, VehicleWindowError50DS::shader, "original UI uniform missing");
+        diagnostic->shader.stage = VehicleGlShaderStage50CZ::none;
+        constexpr std::intptr_t vertexBytes = originalUiMaximumQuads50KG * 4 * sizeof(assets::Vertex48B);
+        gl.genBuffers(1, &uiVertexBuffer); drawGl.bindBuffer(arrayBuffer, uiVertexBuffer);
+        gl.bufferData(arrayBuffer, vertexBytes, nullptr, dynamicDraw);
+        if (!check("allocate bounded original UI vertices")) return false;
+        if (!uiVertexBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI vertex buffer");
+        if (!verifyBuffer(arrayBuffer, vertexBytes, dynamicDraw)) return false;
+        // Heap allocation is cold-only; no large transient frame stack.
+        std::unique_ptr<U[]> indices(new (std::nothrow) U[originalUiMaximumQuads50KG * 6]);
+        if (!indices) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate original UI quad indices");
+        constexpr U corners[] = {0, 1, 2, 0, 2, 3};
+        for (U i = 0; i < originalUiMaximumQuads50KG * 6; ++i) indices[i] = (i / 6) * 4 + corners[i % 6];
+        constexpr std::intptr_t indexBytes = originalUiMaximumQuads50KG * 6 * sizeof(U);
+        gl.genBuffers(1, &uiIndexBuffer); drawGl.bindBuffer(arrayBuffer, uiIndexBuffer);
+        gl.bufferData(arrayBuffer, indexBytes, indices.get(), staticDraw);
+        if (!check("upload original UI quad indices")) return false;
+        if (!uiIndexBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI index buffer");
+        if (!verifyBuffer(arrayBuffer, indexBytes, staticDraw)) return false;
+        U uploaded[256];
+        for (U i = 0; i < originalUiMaximumQuads50KG * 6; i += 256) {
+            const auto bytes = std::min<U>(256, originalUiMaximumQuads50KG * 6 - i) * sizeof(U);
+            gl.getBufferSubData(arrayBuffer, std::intptr_t(i) * sizeof(U), bytes, uploaded);
+            if (!check("verify original UI index bytes")) return false;
+            if (std::memcmp(indices.get() + i, uploaded, bytes))
+                return fail(*diagnostic, VehicleWindowError50DS::indices, "original UI GPU index mismatch");
+        }
+        gl.genVertexArrays(1, &uiVertexArray); drawGl.bindVertexArray(uiVertexArray);
+        drawGl.bindBuffer(arrayBuffer, uiVertexBuffer); drawGl.bindBuffer(elementBuffer, uiIndexBuffer);
+        constexpr I sizes[] = {3, 2, 4};
+        constexpr std::uintptr_t offsets[] = {0, 12, 20};
+        for (U a = 0; a < 3; ++a) {
+            gl.enableVertexAttribArray(a);
+            gl.vertexAttribPointer(a, sizes[a], a == 2 ? unsignedByte : floatType,
+                a == 2 ? 1 : 0, 24, reinterpret_cast<const void*>(offsets[a]));
+        }
+        if (!check("create original UI Vertex48B layout")) return false;
+        if (!uiVertexArray) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI vertex array");
+        return verifyLayout(uiVertexBuffer, uiIndexBuffer);
+    }
     bool createHostHud() noexcept {
         if (!request.enableHostHud) return true;
         constexpr const char* vertexSource = R"GLSL(#version 150 core
@@ -2181,6 +2324,21 @@ void main() { viewerOutput = hudColor; }
                 diagnostic->framebufferStatus = status;
                 return fail(*diagnostic, VehicleWindowError50DS::framebuffer, "incomplete unpublished framebuffer");
             }
+            if (request.enableOriginalUi) {
+                gl.genFramebuffers(1, &uiTargets[b]);
+                gl.bindFramebuffer(framebuffer, uiTargets[b]);
+                if (!check("create private original UI framebuffer")) return false;
+                if (!uiTargets[b]) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI framebuffer");
+                if (!createAttachment(uiColors[b], rgba8, colorAttachment) ||
+                    !createAttachment(uiDepths[b], depth24, depthAttachment)) return false;
+                gl.drawBuffer(colorAttachment); gl.readBuffer(colorAttachment);
+                const U uiStatus = gl.checkFramebufferStatus(framebuffer);
+                if (!check("check private original UI framebuffer")) return false;
+                if (uiStatus != framebufferComplete) {
+                    diagnostic->framebufferStatus = uiStatus;
+                    return fail(*diagnostic, VehicleWindowError50DS::framebuffer, "incomplete original UI framebuffer");
+                }
+            }
             if (request.enableHostHud) {
                 gl.genFramebuffers(1, &menuTargets[b]);
                 gl.bindFramebuffer(framebuffer, menuTargets[b]);
@@ -2341,6 +2499,8 @@ void main() { viewerOutput = hudColor; }
     bool initialize(const VehicleWindowRequest50DS& input,
         const assets::VehicleDrawAssets50CR& owner) noexcept {
         request = input;
+        if (!validateOriginalUiBank(input)) return false;
+        uiTexturePublication = input.originalUiTextures ? input.originalUiTextures->publicationToken() : 0;
         request.racerArchetypes = nullptr; // Cold descriptors are never retained.
         request.trackAnimations = nullptr;
         // Track CPU bytes are borrowed only for this cold synchronous call.
@@ -2408,7 +2568,7 @@ void main() { viewerOutput = hudColor; }
             !createDynamicWorldGeometry(input.dynamicWorld) ||
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
-            !createCableGeometry() || !createHostHud() ||
+            !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
             !createTargets()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
@@ -3043,6 +3203,16 @@ void main() { viewerOutput = hudColor; }
         // failing deletion instead of conflating it with subsequent objects.
         if (!drainCleanupErrors(d)) complete = false;
         else {
+            if (!deleteShaderName(uiProgram, true, d) ||
+                !deleteShaderName(uiVertexShader, false, d) ||
+                !deleteShaderName(uiFragmentShader, false, d) ||
+                !deleteName(uiVertexArray, gl.deleteVertexArrays, d) ||
+                !deleteName(uiVertexBuffer, gl.deleteBuffers, d) ||
+                !deleteName(uiIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
+            for (U b = 0; b < 2; ++b)
+                if (!deleteName(uiTargets[b], gl.deleteFramebuffers, d) ||
+                    !deleteName(uiColors[b], gl.deleteRenderbuffers, d) ||
+                    !deleteName(uiDepths[b], gl.deleteRenderbuffers, d)) goto incomplete;
             if (!deleteShaderName(trackProgram, true, d) ||
                 !deleteShaderName(trackVertexShader, false, d) ||
                 !deleteShaderName(trackFragmentShader, false, d)) goto incomplete;
@@ -3128,7 +3298,8 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
             request.output != VehicleWindowOutput50DS::headless) ||
         request.maximumWidth <= 0 || request.maximumHeight <= 0 ||
         std::uint64_t(request.maximumWidth) * std::uint64_t(request.maximumHeight) >
-            std::numeric_limits<std::size_t>::max() / (request.enableHostHud ? 24u : 16u))
+            std::numeric_limits<std::size_t>::max() /
+                (16u + (request.enableHostHud ? 8u : 0u) + (request.enableOriginalUi ? 16u : 0u)))
         return fail(d, VehicleWindowError50DS::request,
             "context callbacks, valid output/vehicle shading modes and positive target bounds required");
     if (!assets.loaded()) return fail(d, VehicleWindowError50DS::assets, "50CR assets are not loaded");
@@ -3339,6 +3510,185 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         s.frameOpponentArchetypes[i] = 0;
     }
     s.frameOpponentCount = 0;
+    return accepted;
+}
+
+bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiDraw50KG&,
+    std::int32_t, std::int32_t, VehicleWindowDiagnostic50DS& d) noexcept {
+    d = {};
+    return fail(d, VehicleWindowError50DS::material,
+        "draw-only original UI lacks explicit depth and alpha-consumer ownership; use native descriptor");
+}
+
+bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& native,
+    std::int32_t width, std::int32_t height, VehicleWindowDiagnostic50DS& d) noexcept {
+    d = {};
+    if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
+    auto& s = *storage_; const auto& input = native.draw;
+    if (!s.current(d)) return false;
+    if (s.active || s.frameSet || !s.request.enableOriginalUi || !s.uiProgram ||
+        !s.uiVertexBuffer || !s.uiIndexBuffer || !s.uiVertexArray || !s.uiTargets[0] || !s.uiTargets[1] ||
+        width <= 0 || height <= 0 || width > s.maximumWidth || height > s.maximumHeight ||
+        input.canvasWidth != 640.f || input.canvasHeight != 448.f ||
+        !input.quadCount || input.quadCount > originalUiMaximumQuads50KG || !input.vertices ||
+        !input.spanCount || input.spanCount > originalUiMaximumSpans50KG || !input.spans ||
+        !native.states || native.stateCount != input.spanCount || !native.opaquePresentationAlphaOnly)
+        return fail(d, VehicleWindowError50DS::frame, "original UI requires explicit native policy and bounded 640x448 draw");
+    if (input.textures != s.request.originalUiTextures || input.texturePublication != s.uiTexturePublication ||
+        !input.textures || !input.textures->validBorrow(s.request.context, s.request.isCurrent, s.uiTexturePublication))
+        return fail(d, VehicleWindowError50DS::material, "original UI texture publication/context/thread changed");
+    for (float value : input.clearRgba)
+        if (!std::isfinite(value) || value < 0.f || value > 1.f)
+            return fail(d, VehicleWindowError50DS::frame, "invalid original UI clear color");
+    if (input.clearRgba[3] != 1.f)
+        return fail(d, VehicleWindowError50DS::frame, "original UI presentation alpha must be opaque");
+    if (input.retainRaceImage && (s.raceWidth <= 0 || s.raceHeight <= 0 || !s.gl.blitFramebuffer))
+        return fail(d, VehicleWindowError50DS::noImage, "requested original UI race backdrop is unavailable");
+    for (U i = 0; i < input.quadCount * 4; ++i) {
+        const auto& v = input.vertices[i];
+        for (float value : v.position) if (!std::isfinite(value))
+            return fail(d, VehicleWindowError50DS::frame, "nonfinite original UI position");
+        for (float value : v.uv) if (!std::isfinite(value))
+            return fail(d, VehicleWindowError50DS::frame, "nonfinite original UI UV");
+        if (v.position[2] < 0.f || v.position[2] > 16777215.f ||
+            std::floor(v.position[2]) != v.position[2] || v.color[3] > 128)
+            return fail(d, VehicleWindowError50DS::frame, "UI requires original 24-bit packet depth and raw alpha <=128");
+    }
+    U next = 0;
+    for (U i = 0; i < input.spanCount; ++i) {
+        const auto& span = input.spans[i]; const auto& state = native.states[i];
+        if (!span.quadCount || span.firstQuad != next || span.quadCount > input.quadCount - next ||
+            span.colorScale != 255.f / 128.f ||
+            (span.blend != OriginalUiBlend50KG::opaque && span.blend != OriginalUiBlend50KG::sourceAlpha &&
+                span.blend != OriginalUiBlend50KG::additive) ||
+            span.alphaScale != (span.blend == OriginalUiBlend50KG::opaque ? 1.f : (255.f / 128.f) * (255.f / 128.f)) ||
+            (state.depth != OriginalUiDepth50KG::never && state.depth != OriginalUiDepth50KG::always &&
+                state.depth != OriginalUiDepth50KG::greaterEqual && state.depth != OriginalUiDepth50KG::greater))
+            return fail(d, VehicleWindowError50DS::material, "invalid ordered original UI material/depth policy");
+        const auto filter = [](MaterialTextureFilter50EB v) noexcept {
+            return v == MaterialTextureFilter50EB::nearest || v == MaterialTextureFilter50EB::linear;
+        };
+        const auto wrap = [](MaterialTextureWrap50EB v) noexcept {
+            return v == MaterialTextureWrap50EB::repeat || v == MaterialTextureWrap50EB::clampToEdge;
+        };
+        if (!filter(state.sampler.minification) || !filter(state.sampler.magnification) ||
+            state.sampler.minification != state.sampler.magnification ||
+            !wrap(state.sampler.s) || !wrap(state.sampler.t))
+            return fail(d, VehicleWindowError50DS::material, "UI requires explicit admitted matching min/mag source sampler");
+        const auto* texture = input.textures->asset(span.textureIndex);
+        if (!texture || !texture->name)
+            return fail(d, VehicleWindowError50DS::material, "original UI span lacks its real published texture");
+        next += span.quadCount;
+    }
+    if (next != input.quadCount)
+        return fail(d, VehicleWindowError50DS::frame, "original UI spans must partition all quads exactly");
+
+    s.diagnostic = &d;
+    bool accepted = s.check("before original UI submission") &&
+        (s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
+    const auto pending = static_cast<std::uint8_t>(s.uiPublished ^ 1u);
+    if (accepted) {
+        // Sampler zero exposes the immutable published texture parameters.
+        // Check every span independently: same-image conflicting policy rejects.
+        s.gl.activeTexture(textureUnit0); if (s.gl.bindSampler) s.gl.bindSampler(0, 0);
+        for (U i = 0; accepted && i < input.spanCount; ++i) {
+            const auto& sampler = native.states[i].sampler;
+            s.gl.bindTexture(texture2D, input.textures->texture(input.spans[i].textureIndex));
+            constexpr U parameters[] = {0x2801, 0x2800, 0x2802, 0x2803, 0x813C, 0x813D};
+            const I expected[] = {
+                sampler.minification == MaterialTextureFilter50EB::nearest ? 0x2600 : 0x2601,
+                sampler.magnification == MaterialTextureFilter50EB::nearest ? 0x2600 : 0x2601,
+                sampler.s == MaterialTextureWrap50EB::repeat ? 0x2901 : 0x812F,
+                sampler.t == MaterialTextureWrap50EB::repeat ? 0x2901 : 0x812F, 0, 0};
+            for (U p = 0; accepted && p < 6; ++p) {
+                I actual = -1; s.gl.getTexParameteriv(texture2D, parameters[p], &actual);
+                accepted = s.check("verify per-span original UI sampler");
+                if (accepted && actual != expected[p])
+                    accepted = fail(d, VehicleWindowError50DS::material,
+                        "UI span source sampler differs from immutable bank texture parameters");
+            }
+        }
+    }
+    if (accepted) {
+        s.gl.bindFramebuffer(framebuffer, s.uiTargets[pending]);
+        s.gl.drawBuffer(colorAttachment); s.gl.readBuffer(colorAttachment);
+        s.gl.viewport(0, 0, width, height);
+        constexpr U disabled[] = {0x0BE2, 0x0B44, 0x0C11, 0x0B90, 0x8037, 0x0B20,
+            0x8F9D, 0x0BD0, 0x809D, 0x80A0, 0x809E, 0x8C89, 0x8DB9, 0x864F};
+        for (U capability : disabled) s.gl.disable(capability);
+        for (I i = 0; i < s.clipDistances; ++i) s.gl.disable(0x3000 + static_cast<U>(i));
+        s.gl.colorMask(1, 1, 1, 1); s.gl.depthMask(1);
+        s.gl.depthRange(0.0, 1.0); s.gl.clearDepth(0.0);
+        s.gl.polygonMode(0x0408, 0x1B02);
+        s.gl.clearColor(input.clearRgba[0], input.clearRgba[1], input.clearRgba[2], 1.f);
+        s.gl.clear(colorBufferBit | depthBufferBit);
+        if (input.retainRaceImage) {
+            // Preserve the race aspect ratio too; blit bounds are whole pixels.
+            const double fit = std::min(double(width) / s.raceWidth, double(height) / s.raceHeight);
+            const I rw = std::max<I>(1, static_cast<I>(std::floor(s.raceWidth * fit)));
+            const I rh = std::max<I>(1, static_cast<I>(std::floor(s.raceHeight * fit)));
+            const I x = (width - rw) / 2, y = (height - rh) / 2;
+            s.gl.bindFramebuffer(readFramebuffer, s.targets[s.published]); s.gl.readBuffer(colorAttachment);
+            s.gl.blitFramebuffer(0, 0, s.raceWidth, s.raceHeight, x, y, x + rw, y + rh, colorBufferBit, 0x2600);
+            s.gl.bindFramebuffer(framebuffer, s.uiTargets[pending]);
+            // Blit ignores color masks. Reset only presentation alpha afterward.
+            s.gl.colorMask(0, 0, 0, 1); s.gl.clear(colorBufferBit);
+        }
+        s.gl.colorMask(1, 1, 1, 0); // Explicit non-source opaque presentation alpha.
+        const double scale = std::min(double(width) / 640.0, double(height) / 448.0);
+        const double ox = (width - 640.0 * scale) * 0.5;
+        const double oy = (height - 448.0 * scale) * 0.5;
+        // One scale for both axes. Raster scissor encloses fractional boundaries;
+        // shader geometry is never rounded, stretched, or half-pixel adjusted.
+        const I sx = static_cast<I>(std::floor(ox)), sy = static_cast<I>(std::floor(oy));
+        const I ex = std::min<I>(width, static_cast<I>(std::ceil(ox + 640.0 * scale)));
+        const I ey = std::min<I>(height, static_cast<I>(std::ceil(oy + 448.0 * scale)));
+        s.gl.scissor(sx, sy, ex - sx, ey - sy); s.gl.enable(0x0C11);
+        s.gl.enable(0x0B71); s.gl.useProgram(s.uiProgram);
+        s.gl.uniform4f(s.uiCanvasUniform, float(2.0 * scale / width), float(-2.0 * scale / height),
+            float(2.0 * ox / width - 1.0), float(1.0 - 2.0 * oy / height));
+        s.gl.activeTexture(textureUnit0); if (s.gl.bindSampler) s.gl.bindSampler(0, 0);
+        s.gl.uniform1i(s.uiImageUniform, 0);
+        s.drawGl.bindVertexArray(s.uiVertexArray); s.drawGl.bindBuffer(arrayBuffer, s.uiVertexBuffer);
+        s.drawGl.bufferSubData(arrayBuffer, 0, std::intptr_t(input.quadCount) * 4 * sizeof(assets::Vertex48B), input.vertices);
+        s.drawGl.bindBuffer(elementBuffer, s.uiIndexBuffer);
+        accepted = s.check("prepare authenticated original UI frame");
+        for (U i = 0; accepted && i < input.spanCount; ++i) {
+            const auto& span = input.spans[i]; const auto& state = native.states[i];
+            const U depth = state.depth == OriginalUiDepth50KG::never ? 0x0200 :
+                state.depth == OriginalUiDepth50KG::always ? 0x0207 :
+                state.depth == OriginalUiDepth50KG::greaterEqual ? 0x0206 : 0x0204;
+            s.gl.depthFunc(depth); s.gl.depthMask(state.depthWrite ? 1 : 0);
+            if (span.blend == OriginalUiBlend50KG::opaque) s.gl.disable(0x0BE2);
+            else {
+                s.gl.enable(0x0BE2); s.gl.blendEquation(0x8006);
+                s.gl.blendFunc(0x0302, span.blend == OriginalUiBlend50KG::additive ? 1 : 0x0303);
+            }
+            s.gl.uniform1f(s.uiAlphaUniform, span.alphaScale);
+            s.gl.bindTexture(texture2D, input.textures->texture(span.textureIndex));
+            s.drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.quadCount * 6), 0x1405,
+                reinterpret_cast<const void*>(std::uintptr_t(span.firstQuad) * 6 * sizeof(U)), 0);
+            accepted = s.check("draw ordered original UI span");
+            if (accepted) { ++d.originalUiDraws; d.originalUiQuads += span.quadCount; }
+        }
+        // Restore renderer-owned baseline state even on draw failure. The next
+        // world begin supplies its own program, matrix, viewport and geometry.
+        s.gl.disable(0x0C11); s.gl.disable(0x0BE2); s.gl.depthMask(1); s.gl.depthFunc(0x0201);
+        s.gl.colorMask(1, 1, 1, 1); s.gl.clearDepth(1.0);
+        s.drawGl.bindVertexArray(0); s.drawGl.bindBuffer(arrayBuffer, 0);
+        const bool restored = s.check("finish private original UI frame");
+        accepted = accepted && restored;
+        if (accepted) {
+            s.uiPublished = pending; s.displayedTarget = s.uiTargets[pending];
+            s.width = s.committedWidth = width; s.height = s.committedHeight = height;
+            s.imageCommitted = true; d.originalUiAccepted = true;
+            if (s.request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
+                accepted = s.copyToWindow();
+                if (!accepted && d.error == VehicleWindowError50DS::gl) d.error = VehicleWindowError50DS::presentation;
+            }
+        }
+    }
+    s.diagnostic = nullptr;
     return accepted;
 }
 

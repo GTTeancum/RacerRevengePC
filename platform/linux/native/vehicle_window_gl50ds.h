@@ -2,6 +2,7 @@
 #include "vehicle_draw_gl50cv.h"
 #include "vehicle_shader_gl50cz.h"
 #include "material_texture_gl50eb.h"
+#include "original_ui_native_draw50kg.h"
 #include "../../../src/assets/native_asset48b.h"
 #include "../../../src/assets/world_normals50hk.h"
 #include "../../../src/assets/track_projected_uv.h"
@@ -243,6 +244,12 @@ struct VehicleWindowRequest50DS {
     // Cold opt-in allocates bounded glyph/rectangle storage and two color-only
     // menu targets, independent of the two native frame targets. Default unchanged.
     bool enableHostHud = false;
+    // NEW opt-in reconstructed original-art renderer. Disabled by default.
+    // Exact CPU/GPU bank pair is checked cold, including raw alpha <=128.
+    // Both immutable owners must outlive close; no generated/font fallback.
+    bool enableOriginalUi = false;
+    const assets::MaterialTextureAssets50EA* originalUiCpuTextures = nullptr;
+    const MaterialTextureGl50EB* originalUiTextures = nullptr;
     VehicleWindowSky50DS sky{};
     // Native soft pod-footprint approximation on actual track receivers.
     // Explicit opt-in; no original shadow-program or exact-occlusion claim.
@@ -476,6 +483,8 @@ struct VehicleWindowDiagnostic50DS {
     std::uint32_t hostHudDraws = 0, hostHudVertices = 0, hostHudIndices = 0;
     // UI-only publication, never a successful native vehicle batch receipt.
     bool hostMenuAccepted = false;
+    bool originalUiAccepted = false;
+    std::uint32_t originalUiDraws = 0, originalUiQuads = 0;
     // Checked opaque opponent commands, not visible pixels. Require accepted
     // publication. Opponent effects are included in transparentPodDraws above.
     std::uint32_t opponentRacersDrawn = 0, opponentOpaqueDraws = 0, opponentOpaqueIndices = 0;
@@ -523,6 +532,14 @@ public:
     // in explicit neutral mode. A matrix/size/structural rejection does not blit.
     bool submit(const game::VehicleDrawBatch50CO&, const VehicleWindowFrame50DS&,
         VehicleWindowDiagnostic50DS&) noexcept;
+    // Ordered authenticated original quads, separate RGBA8/D24 transaction.
+    // Does not advance gameplay or replace the retained race publication.
+    bool submitOriginalUi(const OriginalUiNativeDraw50KG&, std::int32_t width,
+        std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
+    // Source-compatible fail-closed boundary: recovered draw-only packets lack
+    // explicit source depth and destination-alpha-consumer ownership.
+    bool submitOriginalUi(const OriginalUiDraw50KG&, std::int32_t width,
+        std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
     // Uses the opt-in HUD's bounded text storage and two private color-only
     // targets. Preserves both native GPU banks and the last accepted race image.
     // Safe while simulation is stopped or interrupted; no native data, source
@@ -530,9 +547,9 @@ public:
     // Success includes a window-back-buffer copy when configured; caller swaps.
     bool submitHostMenu(const VehicleWindowHostMenu50DS&, std::int32_t width,
         std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
-    // Both modes: read the last privately committed race or host-menu viewport,
+    // Both modes: read the last privately committed race, host-menu or original-UI viewport,
     // including a frame whose later window blit failed. No image exists before
-    // the first successful private commit from either submission path.
+    // the first successful private commit from a submission path.
     // RGBA unsigned bytes, tightly packed, bottom row first; width*height*4
     // bytes. No application allocation or pointer retention. Caller supplies
     // live writable storage of at least capacityBytes, disjoint from all inputs
