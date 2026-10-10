@@ -1,5 +1,6 @@
 #pragma once
 #include "original_ui_navigation50kg.h"
+#include "original_ui_route_decisions50kg.h"
 #include "original_ui_route_registry50kg.h"
 #include <cstdint>
 
@@ -77,6 +78,13 @@ struct OriginalUiTransitionCallbacks50KG {
     // or gameplay launch. Keeping this absent disables those main requests.
     bool (*commitMainSelection)(void*,const OriginalUiMainDecision50KG&) noexcept=nullptr;
 
+    // Route leaves publish proposals only. This callback must validate the
+    // still-current page/profile/selection snapshot and atomically apply all
+    // admitted profile changes, or return false with no effects. It is called
+    // after destination admission and immediately before the infallible
+    // manager request write. It cannot launch or destroy anything inline.
+    bool (*commitRouteSelection)(void*,const OriginalUiRouteDecision50KG&) noexcept=nullptr;
+
     // Enqueue only. True accepts exactly once; false MUST have no effects and
     // allows a later tick to retry. Defer consumption until after tick returns:
     // this callback must not switch/destroy managers or launch gameplay inline.
@@ -122,6 +130,9 @@ public:
     // unavailable/popup decision can become a request. Slots 1..3 additionally
     // require atomic commitMainSelection; options/gallery write no profile.
     OriginalUiTransitionStatus50KG requestMain(const OriginalUiMainDecision50KG&) noexcept;
+    // Connects an admitted confirm/back leaf to this manager and its sole
+    // profile owner. Course launch proposals remain explicitly unavailable.
+    OriginalUiTransitionStatus50KG requestRouteDecision(const OriginalUiRouteDecision50KG&) noexcept;
 
     // Advances at most one source switch case. Only caller completion can
     // open exit/entry gates. pending/unavailable never imply completion.

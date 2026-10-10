@@ -131,6 +131,36 @@ Status OriginalUiTransitionOwner50KG::requestMain(const OriginalUiMainDecision50
     return Status::ok;
 }
 
+Status OriginalUiTransitionOwner50KG::requestRouteDecision(const OriginalUiRouteDecision50KG& suppliedDecision) noexcept {
+    auto status=ready();if (status!=Status::ok) return status;
+    // Callbacks may release/reuse their caller-owned pending decision. Retain
+    // one complete bounded snapshot through admission, commit and publication.
+    const OriginalUiRouteDecision50KG decision=suppliedDecision;
+    using Kind=OriginalUiRouteKind50KG;
+    const auto& request=decision.request;
+    if (!decision.admitted || !decision.profileProposalComplete || decision.blockers ||
+        decision.action!=OriginalUiRouteAction50KG::request ||
+        decision.profileChanges.count>decision.profileChanges.values.size() ||
+        request.sourceScreen!=state_.current.screen || request.sourcePage!=state_.current.page)
+        return Status::invalidDecision;
+    if (request.kind==Kind::courseLaunch) return Status::unsupportedLaunch;
+    if (request.kind!=Kind::changeScreen && request.kind!=Kind::changePage)
+        return Status::invalidDecision;
+    const bool sameScreen=request.kind==Kind::changePage;
+    if (sameScreen && request.targetScreen!=state_.current.screen) return Status::invalidDecision;
+    if (!callbacks_.commitRouteSelection) return Status::missingCallback;
+    status=admit(request.targetScreen,request.targetPage,sameScreen?Admission::page:Admission::screen);
+    if (status!=Status::ok) return status;
+    {
+        CallbackScope guard(inCallback_);
+        if (!callbacks_.commitRouteSelection(callbacks_.context,decision))
+            return Status::selectionNotAccepted;
+    }
+    setRequest(request.targetScreen,request.targetPage,
+        sameScreen?Life::requestPageExit:Life::requestScreenExit);
+    return Status::ok;
+}
+
 void OriginalUiTransitionOwner50KG::notify(Notice kind,OriginalUiTransitionRoute50KG route,
     std::uint32_t pc) noexcept {
     const OriginalUiTransitionNotification50KG event{kind,route,state_.lifecycle,state_.phase,pc};

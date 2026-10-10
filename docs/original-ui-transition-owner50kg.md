@@ -75,3 +75,16 @@ loading, transition durations and rendered completion remain outside scope.
 
 Source editing and static reading only. No test, build, syntax check, importer,
 asset decode, guest execution or game run was performed for this addition.
+
+## Route-leaf transaction adapter
+
+`requestRouteDecision` connects the Options/Gallery/Rider/Course-back decision
+leaves to this lifecycle. It copies the entire bounded decision before any
+callback, requires the current source screen/page and all admission flags,
+rejects course-launch proposals, and independently checks destination ownership.
+Only then may `commitRouteSelection` atomically validate freshness and commit
+all proposed profile changes. Its false return must have no effects. On true,
+the manager publishes the already-admitted route through an infallible state
+write; no launch or callback runs between commit and publication. This adapter
+supplies the lifecycle side of the transaction, not a profile/save owner or a
+finished page controller. Source review only; not compiled or executed yet.
