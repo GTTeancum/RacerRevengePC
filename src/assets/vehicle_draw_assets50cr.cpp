@@ -39,6 +39,7 @@ struct VehicleDrawAssets50CR::Storage {
         game::VehicleDrawSelection50CM selection{};
         game::VehicleDrawMesh50CM prepared{};
         std::vector<Vertex48B> staging[vehicleDrawStagingBankCount50CR];
+        std::vector<WorldNormal50HK> normalStaging[vehicleDrawStagingBankCount50CR];
     } component[vehicleDrawComponentCount50CR];
 };
 
@@ -110,6 +111,7 @@ bool VehicleDrawAssets50CR::load(const VehicleDrawAssetsInput50CR& input,
             target.selection.paletteIds = target.paletteIds.data();
             target.selection.paletteCount = source.paletteCount;
             for (auto& bank : target.staging) bank.resize(vertexCount);
+            for (auto& bank : target.normalStaging) bank.resize(vertexCount);
         }
         storage_.swap(next);
         diagnostic.component = 0;
@@ -156,7 +158,8 @@ bool VehicleDrawAssets50CR::batchInput(std::uint32_t bank, game::ModelPalettePha
         next.selection[i].phase = phase;
         next.selection[i].suppliedState = suppliedState;
         next.mesh[i] = source.prepared;
-        next.staging[i] = {source.staging[bank].data(), source.prepared.vertexCount};
+        next.staging[i] = {source.staging[bank].data(), source.prepared.vertexCount,
+            source.normalStaging[bank].data(), source.prepared.vertexCount};
     }
     output = next;
     return true;

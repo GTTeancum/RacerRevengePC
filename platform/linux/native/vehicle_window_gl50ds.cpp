@@ -853,6 +853,7 @@ struct VehicleWindowGl50DS::Storage {
     VehicleGlShaderFunctions50CZ shaderGl{};
     OwnerGl gl{};
     VehicleGlResources50CV resources{};
+    U racerNormalBuffers[2][3]{};
     std::unique_ptr<VehicleGlShader50CZ> shader;
     std::unique_ptr<VehicleGlBackend50CV> adapter;
     const std::thread::id thread = std::this_thread::get_id();
@@ -866,6 +867,7 @@ struct VehicleWindowGl50DS::Storage {
         const game::VehicleDrawMesh50CM* meshes[3]{};
         const assets::Scene48D* scenes[3]{};
         VehicleGlResources50CV resources{};
+        U normalBuffers[2][3]{};
         std::unique_ptr<Material[]> materials;
         U materialOffsets[3]{}, materialCount = 0;
         const MaterialTextureGl50EB* textures = nullptr;
@@ -880,16 +882,17 @@ struct VehicleWindowGl50DS::Storage {
         const game::VehicleDrawMesh50CM* const* meshes;
         const assets::Scene48D* const* scenes;
         const VehicleGlResources50CV* resources;
+        const U (*normalBuffers)[3];
         Material* materials;
         const U* materialOffsets;
         U materialCount;
         U cableTextureName;
     };
     RacerView racerView(U archetype) const noexcept {
-        if (!archetype) return {meshes, scenes, &resources, materials.get(),
+        if (!archetype) return {meshes, scenes, &resources, racerNormalBuffers, materials.get(),
             materialOffsets, materialCount, cableTextureName};
         const auto& source = racerArchetypes[archetype - 1];
-        return {source.meshes, source.scenes, &source.resources, source.materials.get(),
+        return {source.meshes, source.scenes, &source.resources, source.normalBuffers, source.materials.get(),
             source.materialOffsets, source.materialCount, source.cableTextureName};
     }
     std::uint64_t texturePublication = 0;
@@ -1299,6 +1302,24 @@ struct VehicleWindowGl50DS::Storage {
                 part.spans != mesh.spans || part.spanCount != mesh.spanCount || part.vertexCount != mesh.vertexCount)
                 return fail(d, VehicleWindowError50DS::assets, "batch is not the retained prepared mesh");
         }
+        return validateRacerNormals(batch, d);
+    }
+    bool validateRacerNormals(const game::VehicleDrawBatch50CO& batch,
+        VehicleWindowDiagnostic50DS& d) const noexcept {
+        for (U c = 0; c < 3; ++c) {
+            const auto& part = batch.component[c];
+            if (bool(part.sourceNormals) != bool(part.sourceNormalCount) ||
+                (part.sourceNormals && part.sourceNormalCount != part.vertexCount))
+                return fail(d, VehicleWindowError50DS::frame,
+                    "racer normal stream must match its exact live vertex count");
+            for (U n = 0; n < part.sourceNormalCount; ++n) {
+                const auto& normal = part.sourceNormals[n].xyz;
+                const double length = std::hypot(normal[0], normal[1], normal[2]);
+                if (!std::isfinite(length) || (length != 0.0 && std::abs(length - 1.0) > 0.001))
+                    return fail(d, VehicleWindowError50DS::frame,
+                        "racer normals must be finite unit vectors or explicit zero");
+            }
+        }
         return true;
     }
     bool validateOpponents(const game::VehicleDrawBatch50CO& player, const VehicleWindowFrame50DS& frame,
@@ -1378,10 +1399,13 @@ struct VehicleWindowGl50DS::Storage {
         for (U b = 0; b < 2; ++b) {
             if (targets[b] || colors[b] || depths[b] || menuTargets[b] || menuColors[b]) return true;
             for (U c = 0; c < 3; ++c)
-                if (resources.bank[b].vertexBuffer[c] || resources.bank[b].vertexArray[c]) return true;
+                if (resources.bank[b].vertexBuffer[c] || resources.bank[b].vertexArray[c] ||
+                    racerNormalBuffers[b][c]) return true;
         }
         for (const auto& index : resources.indices) if (index.buffer) return true;
         for (const auto& archetype : racerArchetypes) {
+            for (const auto& bank : archetype.normalBuffers)
+                for (U normal : bank) if (normal) return true;
             for (const auto& bank : archetype.resources.bank)
                 for (U c = 0; c < 3; ++c)
                     if (bank.vertexBuffer[c] || bank.vertexArray[c]) return true;
@@ -1792,6 +1816,34 @@ void main() {
         if (!check("verify authenticated normal offset")) return false;
         return pointer == nullptr || fail(*diagnostic, VehicleWindowError50DS::layout, "source normal attribute offset mismatch");
     }
+    bool createRacerNormals(const VehicleGlResources50CV& geometry,
+        U (&buffers)[2][3]) noexcept {
+        // Keep the compatibility mesh and all UV/color bytes unchanged. Every
+        // private VAO gets a bounded independent normal stream, initially zero.
+        static constexpr assets::WorldNormal50HK absent[game::maxRigidVertices49S]{};
+        for (U bank = 0; bank < 2; ++bank) for (U c = 0; c < 3; ++c) {
+            VehicleWindowTrack50DS source{};
+            source.sourceNormals = absent;
+            source.sourceNormalCount = geometry.bank[bank].vertexCapacity[c];
+            if (!createWorldNormals(source, buffers[bank][c],
+                geometry.bank[bank].vertexArray[c], dynamicDraw)) return false;
+        }
+        return true;
+    }
+    bool uploadRacerNormals(std::uint8_t bank, const game::VehicleDrawBatch50CO& batch,
+        U archetype = 0) noexcept {
+        const auto selected = racerView(archetype);
+        static constexpr assets::WorldNormal50HK absent[game::maxRigidVertices49S]{};
+        for (U c = 0; c < 3; ++c) {
+            const auto& part = batch.component[c];
+            drawGl.bindBuffer(arrayBuffer, selected.normalBuffers[bank][c]);
+            drawGl.bufferSubData(arrayBuffer, 0,
+                std::intptr_t(part.vertexCount) * sizeof(assets::WorldNormal50HK),
+                part.sourceNormals ? part.sourceNormals : absent);
+            if (!check("upload current per-node racer source normals")) return false;
+        }
+        return true;
+    }
     bool createTrackProjection(const VehicleWindowTrack50DS& track) noexcept {
         if (!track.sourceProjectionUvs) return true;
         const std::size_t bytes = std::size_t(track.sourceProjectionCount) * sizeof(assets::TrackProjectedUv);
@@ -2081,6 +2133,7 @@ void main() { viewerOutput = hudColor; }
         if (gl.bindSampler) gl.bindSampler(0, 0);
         gl.uniform1i(shader->uniforms().useTexture, 1);
         gl.uniform1i(shader->uniforms().image, 0);
+        gl.uniform1i(shader->uniforms().useLighting, 0); // Energy cables stay emissive.
         if (!check("upload actual current source cable vertices and bind real texture")) return false;
         drawGl.drawElementsBaseVertex(0x0004, game::podCableIndexCount50FD, 0x1405, nullptr, 0);
         if (!check("draw source cable strips after pod")) return false;
@@ -2344,9 +2397,11 @@ void main() { viewerOutput = hudColor; }
         if (!shader) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate shader owner");
         if (!shader->initialize(diagnostic->shader))
             return fail(*diagnostic, VehicleWindowError50DS::shader, "initialize 50CZ viewer shader");
-        if (!createTrackShader() || !createGeometry(resources, meshes)) return false;
+        if (!createTrackShader() || !createGeometry(resources, meshes) ||
+            !createRacerNormals(resources, racerNormalBuffers)) return false;
         for (U i = 0; i < racerArchetypeCount; ++i)
-            if (!createGeometry(racerArchetypes[i].resources, racerArchetypes[i].meshes)) return false;
+            if (!createGeometry(racerArchetypes[i].resources, racerArchetypes[i].meshes) ||
+                !createRacerNormals(racerArchetypes[i].resources, racerArchetypes[i].normalBuffers)) return false;
         if (
             !createStaticGeometry(input.track.mesh, trackVertexBuffer, trackIndexBuffer, trackVertexArray, trackIndexCount) ||
             !createWorldNormals(input.track, trackNormalBuffer, trackVertexArray) ||
@@ -2398,6 +2453,7 @@ void main() { viewerOutput = hudColor; }
         if (!s.current(*s.diagnostic) || !s.texturesCurrent(*s.diagnostic)) return false;
         if (!s.initialized || s.active || !s.frameSet || bank != (s.published ^ 1u) ||
             !s.shader->program() || !s.targets[bank]) return false;
+        if (!s.validateRacerNormals(batch, *s.diagnostic)) return false;
         if (s.trackIndexCount && (!s.trackVertexBuffer || !s.trackIndexBuffer || !s.trackVertexArray))
             return fail(*s.diagnostic, VehicleWindowError50DS::assets, "static track resources are not ready");
         for (U i = 0; i < s.trackAnimationCount; ++i) {
@@ -2526,6 +2582,7 @@ void main() { viewerOutput = hudColor; }
         gl.uniform1i(u.useTexture, 0); gl.uniform1i(u.image, 0);
         gl.uniform1i(u.effectMode, 0); gl.uniform1f(u.alphaScale, 1.f);
         gl.uniform1i(u.suppressDraw, 0); gl.uniform1i(u.useUvTransform, 0);
+        gl.uniform1i(u.useLighting, 0);
     }
     bool drawSky() noexcept {
         if (!skyIndexCount) return true;
@@ -2702,6 +2759,10 @@ void main() { viewerOutput = hudColor; }
         gl.uniform1i(u.effectMode, effectMode(material.policy));
         gl.uniform1f(u.alphaScale, material.policy.alphaScale);
         gl.uniform1i(u.suppressDraw, suppress ? 1 : 0);
+        // Retain source-alpha/additive effect appearance and explicit emissive
+        // materials. Only opaque pod surfaces opt into host illumination.
+        gl.uniform1i(u.useLighting, !material.policy.unlit &&
+            material.policy.blend == VehicleWindowBlend50DS::opaque ? 1 : 0);
         gl.uniform1i(u.useUvTransform, 1);
         const auto* uv = overrideUv ? overrideUv : material.uv;
         gl.uniform4f(u.uvScaleOffset, uv[0], uv[1], uv[2], uv[3]);
@@ -2710,6 +2771,7 @@ void main() { viewerOutput = hudColor; }
     bool uploadRacer(std::uint8_t bank, const game::VehicleDrawBatch50CO& batch,
         U archetype = 0) noexcept {
         const auto selected = racerView(archetype);
+        if (!uploadRacerNormals(bank, batch, archetype)) return false;
         // Every batch was structurally preflighted and matched to these exact
         // cold buffers before begin. Only the inactive bank is ever reused.
         for (U c = 0; c < 3; ++c) {
@@ -2800,6 +2862,7 @@ void main() { viewerOutput = hudColor; }
         s.gl.uniform1i(uniforms.useTexture, 0); s.gl.uniform1i(uniforms.image, 0);
         s.gl.uniform1i(uniforms.effectMode, 0); s.gl.uniform1f(uniforms.alphaScale, 1.f);
         s.gl.uniform1i(uniforms.suppressDraw, 0); s.gl.uniform1i(uniforms.useUvTransform, 0);
+        s.gl.uniform1i(uniforms.useLighting, 0);
         if (s.usesTextures()) {
             s.gl.activeTexture(textureUnit0);
             s.gl.bindTexture(texture2D, 0);
@@ -2812,7 +2875,7 @@ void main() { viewerOutput = hudColor; }
         if (!s.check("begin explicit private frame")) return false;
         if (!s.uploadDynamicWorld(bank) || !s.drawSky() || !s.drawTrack(false) ||
             !s.drawDynamicWorld(bank, false)) return false;
-        return true;
+        return s.uploadRacerNormals(bank, s.framePlayerBatch);
     }
     static bool bindMaterial(void* context, game::VehicleDrawComponent50CM component, U material) noexcept {
         if (!materialReady(context, component, material)) return false;
@@ -2992,9 +3055,15 @@ void main() { viewerOutput = hudColor; }
                         !deleteName(bank.vertexBuffer[c], gl.deleteBuffers, d)) goto incomplete;
                 }
             }
+            for (auto& bank : racerNormalBuffers)
+                for (auto& normal : bank)
+                    if (!deleteName(normal, gl.deleteBuffers, d)) goto incomplete;
             for (auto& index : resources.indices)
                 if (!deleteName(index.buffer, gl.deleteBuffers, d)) goto incomplete;
             for (auto& archetype : racerArchetypes) {
+                for (auto& bank : archetype.normalBuffers)
+                    for (auto& normal : bank)
+                        if (!deleteName(normal, gl.deleteBuffers, d)) goto incomplete;
                 for (auto& bank : archetype.resources.bank)
                     for (U c = 0; c < 3; ++c)
                         if (!deleteName(bank.vertexArray[c], gl.deleteVertexArrays, d) ||
@@ -3213,7 +3282,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     // Their independent source vertex/cable arrays remain borrowed only through
     // this synchronous transaction; no per-frame allocation or index upload.
     s.frameOpponentCount = frame.opponentCount;
-    if (frame.opponentCount) s.framePlayerBatch = batch;
+    s.framePlayerBatch = batch;
     for (U i = 0; i < frame.opponentCount; ++i) {
         const auto& opponent = frame.opponents[i];
         s.frameOpponentBatches[i] = *opponent.batch;

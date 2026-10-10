@@ -32,6 +32,7 @@ struct VehicleGlShaderFunctions50CZ {
 constexpr std::uint32_t vehicleGlPositionAttribute50CZ = 0;
 constexpr std::uint32_t vehicleGlUvAttribute50CZ = 1;
 constexpr std::uint32_t vehicleGlColorAttribute50CZ = 2;
+constexpr std::uint32_t vehicleGlNormalAttribute50CZ = 3;
 constexpr std::uint32_t vehicleGlColorOutput50CZ = 0;
 
 struct VehicleGlShaderUniforms50CZ {
@@ -48,6 +49,9 @@ struct VehicleGlShaderUniforms50CZ {
     std::int32_t effectMode = -1, alphaScale = -1, suppressDraw = -1;
     // UV scale/offset is ignored unless useUvTransform is explicitly nonzero.
     std::int32_t useUvTransform = -1, uvScaleOffset = -1;
+    // Opt-in host directional lighting; zero retains diagnostic/effect RGB.
+    // Authored world normals are float3 attribute 3 in a separate stream.
+    std::int32_t useLighting = -1;
 };
 
 enum class VehicleGlShaderStage50CZ : std::uint8_t {

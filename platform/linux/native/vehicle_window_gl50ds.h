@@ -56,8 +56,8 @@ struct VehicleWindowMaterialBinding50DS {
     // ONE,ONE blending implements factors above one without alpha clamping.
     float alphaScale = 1.f;
     bool fixedBlendAlpha = false;
-    // Track only: bypass host geometric lighting; retain explicit RGB exposure.
-    // Pod shading already uses unlit source RGB. No source lighting is inferred.
+    // Bypass host geometric lighting; retain explicit RGB exposure. Opaque
+    // racer bodies use source normals; nonopaque pod effects remain unlit.
     bool unlit = false;
 };
 struct VehicleWindowComponentMaterials50DS {

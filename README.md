@@ -4,9 +4,9 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This recovery branch contains an **uncompiled and untested original-AI source candidate**, now integrated into the cloud candidate with terminal world/session guards. The optional one-racer GC path has connected source owners and explicit unsupported-branch stops. Runtime readiness is unproven. See [source scope](docs/original-ai-first-slice50iv.md) and [guarded acceptance](docs/native-ai-first-slice-status.md).
+This branch preserves **uncompiled and untested racer-lighting source**, integrated centrally for a future check. Authored source normals now reach animated player/opponent normal streams and opaque racer lighting. Effects remain outside this lighting path. This is native host illumination; original PS2 shader parity is unclaimed. See [lighting scope and pending checks](docs/racer-source-lighting.md).
 
-The Linux prototype includes native rendering, physics, audio, keyboard controls, and an eight-racer development race. Clegg selection through Main, pause/resume, and a 20-second gameplay capture have passed. An earlier mode1 baseline completed a three-lap race with native timing, Dax, music, and completed-lap display. See [current validation](docs/current-validation.md) for scope.
+The inherited source is the guarded original-AI first-slice candidate. Its bounded GC check exercised Clegg as the only original-AI racer while all eight native racers advanced; it does not validate this lighting change or all-eight original AI. See [current validation](docs/current-validation.md) for earlier prototype coverage. Visual correctness, performance and cross-platform support remain unfinished.
 
 ## Build and game data
 
