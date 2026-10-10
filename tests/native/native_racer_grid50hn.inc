@@ -62,6 +62,14 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
   require50DU(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,terrainMembership,
       terrainMembershipStorage,terrainQueryRef,initialCollisionZone,ZoneMethod50CL::Second,0.f,
       terrainBounds,membershipWork).status==LiveZoneStatus50EN::Complete,"AI terrain grid attach failed");
+  if(allAiEnabled){
+   // Genuine AI controls are initialized separately for every actual slot.
+   // Grid placement owns geometry only; no HOST driver or keyboard policy.
+   lapOwner.audioDispatch=nullptr;lapOwner.audioContext=nullptr;
+   require50DU(s.fields.vehicle58==1u&&originalAi.initialized,
+       "all-original-AI grid lacks an actual AI constructor");
+   return;
+  }
   if(!racer)return; // Human keeps its own controller, lap audio, RNG and driver policy.
   lapOwner.audioDispatch=nullptr;lapOwner.audioContext=nullptr;
   autoDriveEnabled=true;autoStopReported=false;courseState={};courseOutput={};

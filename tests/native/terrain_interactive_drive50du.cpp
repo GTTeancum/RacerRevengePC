@@ -199,10 +199,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest setup failed");
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceEnabled=!(raceSetting&&std::string(raceSetting)=="0");
+ const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+ const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
  const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
- const bool originalAiEnabled=originalAiSetting&&std::string(originalAiSetting)=="1";
+ const bool originalAiEnabled=allAiEnabled||(originalAiSetting&&std::string(originalAiSetting)=="1");
  const char* dynamicContactSetting=std::getenv("RR_ORIGINAL_AI_DYNAMIC_CONTACT");
- const bool dynamicContactEnabled=dynamicContactSetting&&std::string(dynamicContactSetting)=="1";
+ const bool dynamicContactEnabled=allAiEnabled||(dynamicContactSetting&&std::string(dynamicContactSetting)=="1");
  require50DU(!dynamicContactEnabled||originalAiEnabled,
      "dynamic source contacts require the bounded original AI session");
  constexpr std::size_t originalAiSlot=1;
@@ -210,7 +212,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      "original AI first slice requires the real GC fleet");
  // Source21079C retains constructor a1;21081C stores vehicle60 and210820/24
  // formats the original Pod%02d resource prefix. Native bank slot0 is a role.
- const bool playerUsesRosterRig=playerRacer60!=1u;
+ const bool playerUsesRosterRig=allAiEnabled||playerRacer60!=1u;
  require50DU(raceEnabled||!playerUsesRosterRig,"alternate original selection requires the native race");
  const std::string playerPodId(selectedOriginal->podId);
  const auto playerArchive=std::filesystem::path("work/native/project/disc/PODS")/
@@ -234,7 +236,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!originalAiEnabled||racerContactsEnabled,
      "original AI first slice requires actual racer contacts and their source boundary");
  constexpr std::uint32_t raceRacerCount=rr::game::defaultHostRaceRacers50HT;
- constexpr std::uint32_t raceOpponentCount=raceRacerCount-1;
+ constexpr std::uint32_t raceOpponentCount=raceRacerCount-1; // Camera-relative presentation count.
+ // Native selected roster, not the retail human-dependent boot root1AE620.
+ // Counts use the original1125C layout; every AI retains its real pod/profile.
+ const std::uint32_t originalAiHumanCount=allAiEnabled?0u:1u;
+ const std::uint32_t originalAiOpponentCount=raceRacerCount-originalAiHumanCount;
+ const std::uint16_t originalAiSettings1125C=static_cast<std::uint16_t>(
+     3u|(originalAiHumanCount<<5u)|(originalAiOpponentCount<<7u));
+ std::uint64_t allAiHostDriverCalls=0,allAiControllerSamples=0,allAiKeyboardPackets=0;
  static_assert(raceRacerCount<=rr::platform::maxVehicleWindowStandings50DS);
  static_assert(maxHostRaceOpponents50HT==rr::platform::maxVehicleWindowOpponents50DS);
  static_assert(maxHostRaceRacers50HT<=native_racer_contact50HW::maxRacers);
@@ -732,6 +741,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto navigationAI=std::make_unique<TrackNavigation50EU>();
  const char* autoSetting=std::getenv("RR_AUTODRIVE");
  bool autoDriveEnabled=autoSetting&&std::string(autoSetting)=="1";
+ require50DU(!allAiEnabled||!autoDriveEnabled,
+     "all-original-AI ownership requires RR_AUTODRIVE=0; camera slot0 is an AI");
  bool autoStopReported=false;
  rr::host::CourseSpeedLimits50GK courseLimits{};
  rr::host::CourseDriverTuning50GK courseTuning{};
@@ -1335,6 +1346,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Every accepted sample is appended, genuinely dispatched and acknowledged
  // before another poll can overwrite its transitions, including pause releases.
  auto sampleController=[&](){
+  // UI capture/quit/pause paths may reach this call site, but there is no
+  // player device owner to sample in the explicitly selected all-AI roster.
+  if(allAiEnabled)return;
+  ++allAiControllerSamples;
   // The one declared source-cut pause only samples release-all packets. Keep
   // its partial native phase intact; input release is not frame continuation.
   require50DU(s.phase==VehicleFramePhase49W::Ready||(recoveryPaused&&!packetLive),
@@ -1378,6 +1393,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   requireActionStatus(controllerActions.acknowledgeComplete(),"acknowledge");
  };
  auto composePacket=[&](bool live,const platform::WindowInput50DQ& input){
+  if(allAiEnabled)return;
+  ++allAiKeyboardPackets;
   if(live&&autoDriveEnabled&&(input.down[26]||input.down[22]||input.down[82]||input.down[81])){
    autoDriveEnabled=false;courseState={};courseOutput={};
    std::cerr<<"Host course driver disabled by manual throttle/brake input.\n";
@@ -1390,6 +1407,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
 
  auto applyCourseInput=[&](std::size_t racerSlot=0){
+  require50DU(!allAiEnabled,"all-original-AI path reached forbidden HOST course driver");
+  ++allAiHostDriverCalls;
   rr::host::CourseDriverInput50GK command{};
   command.enabled=autoDriveEnabled;command.elapsedSeconds=.016f;
   command.pose=s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100;
@@ -1564,9 +1583,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   aiInput.racers=originalAiSession.observed;aiInput.racerCount=raceRacerCount;
   aiInput.raceFields=&originalAiSession.fields[originalAi.managerIndexFE0];aiInput.timing=&lapContinuity.timing;
   aiInput.actualZoneOrdinal48=mainMembership.storage.links[0].zone?mainMembership.storage.links[0].zone-1u:0u;
-  aiInput.managerHumanCount34=1u;
-  // Source fresh profile17E000/17E060 selects three laps in1125C low5.
-  aiInput.settings1125C=3u;
+  aiInput.managerHumanCount34=originalAiHumanCount;
+  // Consumers here read1125C low byte; the native roster owns the complete
+  // packed count word, with the authentic three-lap low5 selection retained.
+  aiInput.settings1125C=static_cast<std::uint8_t>(originalAiSettings1125C);
   aiInput.aiTrackLength3C=originalAiMetadata.trackLength3C;
   aiInput.raceOwnersBound=originalAiSession.rankBound&&mainMembership.storage.links[0].zone!=0;
   if(!driveOriginalAi50IV(s,x.bindings,x.parameters,navigationProgress,navigationCA0,
@@ -1969,7 +1989,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   for(std::size_t slot=0;slot<racerBank.count();++slot){
    const bool active=racerBank.active(slot);
    racerBank.visit(slot,[&](){
-    if(active&&s.phase==VehicleFramePhase49W::Ready)return;
+    if(active&&s.phase==VehicleFramePhase49W::Ready&&
+       (!allAiEnabled||(s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV&&
+          originalAi.initialized&&originalAi.managerIndexFE0==slot)))return;
     std::cerr<<"ORIGINAL AI world boundary: slot="<<slot<<" active="<<active
         <<" phase="<<static_cast<unsigned>(s.phase)<<" vehicle58="<<s.fields.vehicle58
         <<" ai_source_boundary="<<std::hex<<originalAiReceipt.sourceBoundary
@@ -1991,6 +2013,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(native_ai50IV::rank(originalAiSession,racerBank.count()),"original AI source rank/remaining boundary");
  };
  auto updateOriginalAiPacking=[&](){
+  //1A15EC belongs to the human update. With no humans it is never called;
+  // every actual AI still executes171C60 and its authentic FF8<0 return.
+  if(allAiEnabled)return;
   // Original1A15EC follows the sole human's navigation. The serial arena
   // transports its source writes before any AI frame, without nested visits.
   if((s.fields.applicationByte58&3u)!=2u)return;
@@ -2003,6 +2028,39 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(updateAiPackingReferences50IU(0,originalAiSession.rank[0].placeCCC,1,
       originalAiTuning,{},rows,racerBank.count(),diagnostic),"original AI packing-reference boundary");
   racerBank.visit(originalAiSlot,[&](){originalAi.referenceFF8=originalAiSession.packingReferences[originalAiSlot];});
+ };
+ auto reportOriginalAiFleet=[&](const char* reason){
+  if(!originalAiEnabled)return;
+  std::cerr<<"original_ai_all enabled="<<allAiEnabled<<" racer_count="<<racerBank.count()
+      <<" human_count="<<originalAiHumanCount<<" ai_count="<<(allAiEnabled?racerBank.count():1u)
+      <<" camera_slot=0 camera_racer60="<<playerRacer60
+      <<" host_driver_calls="<<allAiHostDriverCalls<<" controller_samples="<<allAiControllerSamples
+      <<" keyboard_packets="<<allAiKeyboardPackets<<" reason="<<reason<<'\n';
+  for(std::size_t slot=0;slot<racerBank.count();++slot){
+   if(!allAiEnabled&&slot!=originalAiSlot)continue;
+   const bool active=racerBank.active(slot);
+   racerBank.visit(slot,[&](){
+    const auto& fields=originalAiSession.fields[originalAi.managerIndexFE0];
+    std::cerr<<"original_ai slot="<<slot<<" source_index="<<originalAi.managerIndexFE0
+        <<" racer60="<<originalAi.racer60<<" vehicle58="<<s.fields.vehicle58
+        <<" initialized="<<originalAi.initialized<<" owners_bound="<<s.fields.nativeAiOwnersBound50IV
+        <<" active="<<active<<" phase="<<static_cast<unsigned>(s.phase)
+        <<" native_ticks="<<completedFrames<<" dispatched="<<originalAi.dispatchedFrames
+        <<" state="<<originalAi.state.aiStateFE8<<" CB8="<<lapContinuity.timing.timeCB8
+        <<" startup="<<originalAi.startupFrames<<" ordinary="<<originalAi.ordinaryFrames
+        <<" brake_commands="<<originalAi.brakingFrames<<" bound_brake_steer="<<originalAi.boundBrakeSteerFrames
+        <<" steer="<<m.controls.player.raw.values[0]<<" aeroBrakeEC="<<m.components.bindings.aeroBrakeEC
+        <<" aeroDrive="<<m.components.bindings.aeroDrive[0]<<'/'<<m.components.bindings.aeroDrive[1]
+        <<" target="<<originalAiReceipt.desiredSpeed
+        <<" B7C/B80="<<m.controls.player.actionB7C<<'/'<<m.controls.player.actionB80
+        <<" B94="<<x.parameters.rates.x<<" C80="<<navigationProgress.reset.vehicleC80
+        <<" CC4="<<fields.remainingCC4<<" CCC="<<fields.placeCCC
+        <<" FF8="<<originalAi.referenceFF8<<" FFC="<<originalAi.packing.scaleFFC
+        <<" 1038/103C="<<originalAi.lists.counts[0]<<'/'<<originalAi.lists.counts[1]
+        <<" cooldown109C="<<originalAi.boost.cooldown109C
+        <<" source_boundary="<<std::hex<<originalAiReceipt.sourceBoundary<<std::dec<<'\n';
+   });
+  }
  };
  auto advanceOriginalAiManager=[&](float factor){
   // Declared accepted-world schedule: genuine1AF9C0 clock,1AFF50 racer
@@ -2120,9 +2178,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
   racerBank.seal(raceRacerCount);
-  // The alternate human uses exactly the same original-resource cold path as
-  // the opponents, before any tick. The default retains its established POD01
-  // startup. Bank slots were sealed from the untouched cold fixture above.
+  // Alternate camera selections and every all-AI slot use their actual
+  // original-resource cold path before any tick. Only the legacy mixed POD01
+  // selection retains the fixture startup. No live identity is flipped.
   for(std::size_t racer=playerUsesRosterRig?0u:1u;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
    const auto& rig=*racerRigs[racer];const auto& collision=*racerCollisions[racer];
    coldRacerStage50DU(rig.podId,"rig installation",[&](){
@@ -2130,13 +2188,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     rig.install(s,x.bindings,x.handRecords);
    });
    auto racerSelection=selection;
-   if(originalAiEnabled&&racer==originalAiSlot)racerSelection.mode58Nonzero=true;
+   if(originalAiEnabled&&(allAiEnabled||racer==originalAiSlot))racerSelection.mode58Nonzero=true;
    const auto receipt=coldRacerStage50DU(rig.podId,"handling bind",[&](){
     return native_racer50HW::bindColdHandling(rig.phy,rig.hierarchy[1],
         rig.hierarchy[0],rig.geometry,collision.mainTarget().source,racerSelection,x,
         {boostParameters,boostCoolingCF8,settings,response,secondarySettings,secondaryResponse});
    });
-   if(originalAiEnabled&&racer==originalAiSlot){
+   if(originalAiEnabled&&(allAiEnabled||racer==originalAiSlot)){
     rr::assets::ResArchive48C source;rr::assets::DecodeError48C error;std::vector<std::uint8_t> profileText;
     const auto sourceBytes=runtime_startup50fl::readBytes(rig.resourceFile);
     std::string lowerPod=rig.podId;for(char&c:lowerPod)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -2154,7 +2212,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto* identity=original_racer_selection50IJ::findByPodId(rig.podId.c_str());
     require50DU(identity,"original AI racer60 identity unavailable");
     AiCreateIdentity50IU createIdentity{};
-    require50DU(bindAiCreateIdentity50IU(static_cast<std::uint32_t>(racer-1u),1u,
+    require50DU(bindAiCreateIdentity50IU(static_cast<std::uint32_t>(racer-originalAiHumanCount),originalAiHumanCount,
         static_cast<std::int32_t>(identity->racer60),createSelection.freshCourseRecordPod11280,createIdentity),
         "original AI create identity unavailable");
     initializeAiRuntime50IV(createIdentity.ordinalFE0,identity->racer60,
@@ -2272,12 +2330,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::array<native_dynamic_contact50IW::ManagerBinding,raceRacerCount> bindings{};
    for(std::size_t slot=0;slot<raceRacerCount;++slot){
     bindings[slot]={slot,{racerContactIds[slot]}};
-    const auto* selection=original_racer_selection50IJ::findByPodId(racerRigs[slot]->podId.c_str());
+    // Default camera POD01 may use the retained fixture in the mixed path;
+    // selectedOriginal is already authenticated before any cold installation.
+    require50DU(slot==0||racerRigs[slot]!=nullptr,"actual contact actor rig unavailable");
+    const auto* selection=slot==0?selectedOriginal:
+        original_racer_selection50IJ::findByPodId(racerRigs[slot]->podId.c_str());
     require50DU(selection,"actual contact actor original racer60 unavailable");
     dynamicRacer60[slot]=selection->racer60;
    }
    std::string error;
-   require50DU(dynamicRegistry.prepare(bindings.data(),bindings.size(),1u,error),
+   require50DU(dynamicRegistry.prepare(bindings.data(),bindings.size(),originalAiHumanCount,error),
        error.empty()?"original dynamic manager registry unavailable":error.c_str());
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     require50DU(s.phase==VehicleFramePhase49W::Ready&&m.components.body20C==0&&
@@ -2915,6 +2977,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    capturePending=false;
   };
   std::uint64_t lastStatusNs=monotonicNow50DU();
+  std::uint64_t lastAllAiStatusNs=lastStatusNs;
   std::uint64_t lastStatusRenderCount=0;
   std::cerr<<"Interactive development client: W/S left engine throttle/brake; "
                "Up/Down right engine throttle/brake; W+Up both throttle; Space boosts; "
@@ -2927,7 +2990,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
                <<terrainOwnerCount<<" original colliders with live portal memberships across "<<zoneCount<<" zones.\n"
            <<"Navigation: "<<navigationMap->track.count<<" map / "
            <<navigationAI->track.count<<" AI nodes; original gates and portal indices bound. "
-             "Live progression is tracked; automatic source-derived host checkpoint recovery is enabled.\n"
+             "Live progression is tracked; original-AI admission stops before checkpoint recovery.\n"
            <<"Repair CF4 "<<s.fields.repairCF4
            <<" from actual "<<playerPodId<<" selected authoring; profile overwrite is explicitly absent.\n";
   if(autoDriveEnabled)std::cerr<<"HOST course-check autopilot enabled; pace="
@@ -2940,6 +3003,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "Menus use down/up Up, Down, Left, Right, Enter, Escape. Audio edits apply on Start/Restart only. "
       "Restart destroys this session and repeats the authored-grid cold setup.\n";
   reportUiState("ready");
+  if(allAiEnabled){
+   requireOriginalAiFleetReady();
+   reportOriginalAiFleet("ready");
+  }
   for(;;){
    phase_timing50GK::Scope inputTiming(phaseTiming,phase_timing50GK::Phase::Input);
    if(!host.poll(hostInput,hostDiagnostic)){
@@ -3144,7 +3211,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // Recompose at GO so held race input enters this exact native frame.
     // After the human finish, the recovered source driver owns controls while
     // the ordinary coupled-body/native frame keeps advancing.
-    if(playerAdvancing){
+    if(playerAdvancing&&!allAiEnabled){
      composePacket(playerControls,input);
      if(playerControls&&autoDriveEnabled)applyCourseInput();
      sampleController();
@@ -3157,7 +3224,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      std::cerr<<"ORIGINAL AI world boundary: slot=0 phase="<<static_cast<unsigned>(s.phase)
          <<" frame_source_stage="<<std::hex<<x.diagnostic.sourceStage<<std::dec
          <<"; native partial state retained; manager was not advanced.\n";
-     require50DU(false,"original AI requires the actual human frame to complete");
+     require50DU(false,"original AI requires the camera-followed racer frame to complete");
     }
     if(frameAdvanced)require50DU(::allocations==nativeFrameAllocations,
         "successful player physics frame allocated C++ storage");
@@ -3672,6 +3739,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     captureCommitted();
    }
    const auto afterWork=monotonicNow50DU();
+   if(allAiEnabled&&afterWork-lastAllAiStatusNs>=1000000000ull){
+    reportOriginalAiFleet("status");lastAllAiStatusNs=afterWork;
+   }
    if(afterWork-lastStatusNs>=5000000000ull){
     if(phaseTiming.enabled){
      for(std::size_t phase=0;phase<phase_timing50GK::phaseCount;++phase){
@@ -3840,22 +3910,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<" music_song="<<raceMusic->currentSong()
          <<" music_starts="<<raceMusic->counters().starts<<" music_active="<<raceMusic->active()<<'\n';
     }
-    if(originalAiEnabled)racerBank.visit(originalAiSlot,[&](){
-     std::cerr<<"original_ai slot="<<originalAi.managerIndexFE0<<" vehicle58="<<s.fields.vehicle58
-         <<" state="<<originalAi.state.aiStateFE8<<" CB8="<<lapContinuity.timing.timeCB8
-         <<" startup="<<originalAi.startupFrames<<" ordinary="<<originalAi.ordinaryFrames
-         <<" brake_commands="<<originalAi.brakingFrames<<" bound_brake_steer="<<originalAi.boundBrakeSteerFrames
-         <<" steer="<<m.controls.player.raw.values[0]<<" aeroBrakeEC="<<m.components.bindings.aeroBrakeEC
-         <<" aeroDrive="<<m.components.bindings.aeroDrive[0]<<'/'<<m.components.bindings.aeroDrive[1]<<" target="<<originalAiReceipt.desiredSpeed
-         <<" B7C/B80="<<m.controls.player.actionB7C<<'/'<<m.controls.player.actionB80
-         <<" B94="<<x.parameters.rates.x<<" C80="<<navigationProgress.reset.vehicleC80
-         <<" CC4="<<originalAiSession.fields[originalAiSlot].remainingCC4
-         <<" CCC="<<originalAiSession.fields[originalAiSlot].placeCCC
-         <<" FF8="<<originalAi.referenceFF8<<" FFC="<<originalAi.packing.scaleFFC
-         <<" 1038/103C="<<originalAi.lists.counts[0]<<'/'<<originalAi.lists.counts[1]
-         <<" cooldown109C="<<originalAi.boost.cooldown109C
-         <<" source_boundary="<<std::hex<<originalAiReceipt.sourceBoundary<<std::dec<<'\n';
-    });
+    if(originalAiEnabled&&!allAiEnabled)reportOriginalAiFleet("status");
     if(raceEnabled){
      std::cerr<<"race phase="<<unsigned(race.phase)<<" countdown="<<race_session50HM::countdownNumber(race)
          <<" seconds="<<race.raceSeconds<<" player_place="<<race.racers[0].place<<"/"<<race.racerCount
@@ -3990,7 +4045,9 @@ int main(int argc,char**argv){try{
       effectiveTrack,selectedTrack,trackAdmission);
   if(exit==SessionExit50DU::Quit)break;
   const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
-  if(originalAiSetting&&std::string(originalAiSetting)=="1"){
+  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+  if((originalAiSetting&&std::string(originalAiSetting)=="1")||
+     (allAiSetting&&std::string(allAiSetting)=="1")){
    std::cerr<<"ORIGINAL AI session-rebuild boundary: exit="<<static_cast<unsigned>(exit)
        <<" session="<<sessionIndex<<"; optional first slice permits one cold session.\n";
    require50DU(false,"original AI first slice rejected session rebuild");

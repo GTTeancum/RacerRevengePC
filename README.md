@@ -4,9 +4,9 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This branch preserves an **uncompiled and untested original-AI dynamic-contact candidate**, pending independent review of the main loop, shared event FIFO and feedback prefix. The optional, default-off path connects actual contact lists, native damage/severity and reached music/event requests. See [source scope and remaining boundaries](docs/original-ai-dynamic-contact50iw.md).
+This branch preserves an **uncompiled and untested all-racer original-AI source candidate**, pending independent source review and central integration. The opt-in configuration assigns real AI owners to all eight racers, including the camera-followed slot, with zero humans. It builds on the separate dynamic-contact/music source candidate. See [ownership, admission and remaining boundaries](docs/original-ai-all-racers50ix.md).
 
-This source is staged separately from the active first-slice candidate. Authentic controller feedback, opponent speech, announcer types 1/2 and music fade retain explicit stopping boundaries; no complete collision-effects or full original-AI claim is made. See [current validation](docs/current-validation.md) for the inherited Linux baseline; those results do not validate this candidate. Earlier partial work remains in Git history.
+This source configuration has not been exercised. It rejects HOST autodrive and retains explicit combat, event, lifecycle and incomplete-GC boundaries. A short prefix or source review cannot establish a complete race. The earlier bounded Clegg-only AI result does not validate all-eight AI. Renderer lighting remains separate untested work. See [current validation](docs/current-validation.md) for inherited prototype history; it does not validate this branch.
 
 ## Build and game data
 

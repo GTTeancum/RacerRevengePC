@@ -53,10 +53,12 @@ struct AiCreateIdentity50IU {
 };
 //1AE4C4 forms opponent ordinal+human count.16E474 stores FE0,2107E8
 //uses it as vehicle5C. FE0 is an ordinal, never a manager pointer.
+// Zero humans is admitted for an explicitly selected native AI roster. This
+// does not claim the retail1AE620 human-dependent roster root supports it.
 inline bool bindAiCreateIdentity50IU(std::uint32_t actualOpponentOrdinal,
     std::uint32_t actualHumanCount,std::int32_t actualPod60,
     std::int32_t actualCourseRecordPod,AiCreateIdentity50IU& out) noexcept {
-    if(!actualHumanCount||actualHumanCount>2||actualOpponentOrdinal>=8||
+    if(actualHumanCount>2||actualOpponentOrdinal>=8||
        actualHumanCount+actualOpponentOrdinal>=8||actualPod60<=0||actualCourseRecordPod<=0)
         return false;
     out={actualOpponentOrdinal+actualHumanCount,actualPod60,
