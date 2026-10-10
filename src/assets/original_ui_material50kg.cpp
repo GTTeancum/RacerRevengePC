@@ -83,20 +83,48 @@ const OriginalUiMemberIdentity50KG* catalogMember(OriginalUiArchiveId50KG id, co
     }
     return nullptr;
 }
+struct PromptSource {
+    const char* texture;const char* member;const char* registeredName;const char* psm;
+    std::uint32_t callPC;
+};
+constexpr PromptSource promptSources[]={
+    {"icon_x","ui\\textures\\icon_x.pst","ui\\textures\\icon_x","ui\\textures\\icon_x.psm",0x1d682c},
+    {"icon_tri","ui\\textures\\icon_tri.pst","ui\\textures\\icon_tri","ui\\textures\\icon_tri.psm",0x1d68dc},
+    {"icon_sqr","ui\\textures\\icon_sqr.pst","ui\\textures\\icon_sqr","ui\\textures\\icon_sqr.psm",0x1d6994},
+    {"icon_cir","ui\\textures\\icon_cir.pst","ui\\textures\\icon_cir","ui\\textures\\icon_cir.psm",0x1d6a4c}
+};
 bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
     if (pass.provenance.origin == OriginalUiMaterialOrigin50KG::authoredPsm)
         return pass.identity != nullptr;
-    const auto& p = pass.provenance;
-    return p.origin == OriginalUiMaterialOrigin50KG::mainLogoMissingPsmFallback &&
-        pass.identity == nullptr &&
-        p.archive == originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::mainMenu) &&
-        p.fallbackTexture == catalogMember(OriginalUiArchiveId50KG::mainMenu, "ui\\textures\\mmlogo.pst") &&
-        p.fallbackWidgetSource == catalogMember(OriginalUiArchiveId50KG::mainMenu, "UI\\UIMain\\Widgets.Dat") &&
-        pass.inheritedTemplate == catalogMember(OriginalUiArchiveId50KG::appStart, "AppStart\\ScreenMT.psm") &&
-        p.registeredName == "ui\\textures\\mmlogo" &&
-        p.attemptedPsmMember == "ui\\textures\\mmlogo.psm" &&
-        p.creationPC == 0x2475c0u && pass.pass == 1 &&
-        pass.textureName == "mmlogo" && pass.authored.values.empty() && pass.authored.name.empty();
+    const auto& p=pass.provenance;
+    if(pass.identity || pass.inheritedTemplate!=catalogMember(OriginalUiArchiveId50KG::appStart,"AppStart\\ScreenMT.psm") ||
+        p.creationPC!=0x2475c0u || pass.pass!=1 || !pass.authored.values.empty() || !pass.authored.name.empty())return false;
+    if(p.origin==OriginalUiMaterialOrigin50KG::mainLogoMissingPsmFallback)
+        return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::mainMenu) &&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::mainMenu,"ui\\textures\\mmlogo.pst") &&
+            p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::mainMenu,"UI\\UIMain\\Widgets.Dat") &&
+            p.registeredName=="ui\\textures\\mmlogo" && p.attemptedPsmMember=="ui\\textures\\mmlogo.psm" &&
+            pass.textureName=="mmlogo" && !p.fallbackPageSource && !p.sourceCallerPC;
+    if(p.origin!=OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback ||
+        p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays) || p.fallbackWidgetSource ||
+        p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::mainMenu,"UI\\UIMain\\main.dat"))return false;
+    for(const auto& source:promptSources)
+        if(p.sourceCallerPC==source.callPC && p.registeredName==source.registeredName &&
+            p.attemptedPsmMember==source.psm && pass.textureName==source.texture &&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::overlays,source.member))return true;
+    return false;
+}
+// Common original2475C0 ->2476A0 NULL-config builder. There is no authored
+// shader section to synthesize, and constructor/pass defaults stay in one place.
+OriginalUiMaterial50KG screenTextureFallback(const OriginalUiMaterialProvenance50KG& provenance,
+    const char* texture,const OriginalUiMaterialTemplateState50KG& inherited,
+    const OriginalUiMaterialRuntime50KG& runtime) {
+    OriginalUiMaterial50KG result;result.provenance=provenance;
+    OriginalUiMaterialPass50KG pass;pass.provenance=provenance;
+    pass.inheritedTemplate=inherited.identity;pass.pass=1;pass.microprogram=inherited.microprogram;
+    pass.shaderPassGroup="none";pass.textureName=texture;pass.gs=inherited.gs;
+    runtimeValue(pass.gs,Field::environmentContext0or1,0,0x247c88u);
+    applyRuntimeOverrides(pass.gs,runtime);result.passes.push_back(std::move(pass));return result;
 }
 bool knownPassField(const std::string& key) noexcept {
     for (const auto& spec : specs) if (same(key, spec.name)) return true;
@@ -238,20 +266,39 @@ bool readOriginalUiMainLogoFallbackMaterial50KG(const OriginalUiArchive50KG& arc
         result.provenance.registeredName = "ui\\textures\\mmlogo";
         result.provenance.attemptedPsmMember = "ui\\textures\\mmlogo.psm";
         result.provenance.creationPC = 0x2475c0u;
-        OriginalUiMaterialPass50KG pass;
-        pass.provenance = result.provenance;
-        pass.inheritedTemplate = inherited->identity;
-        pass.pass = 1; pass.microprogram = inherited->microprogram;
-        pass.shaderPassGroup = "none"; // Constructor group ID -1, not an authored value.
-        pass.textureName = "mmlogo";
-        pass.gs = inherited->gs;
-        // 2475C0 supplies NULL config to 2476A0. No shader-section defaults
-        // are fabricated; pass-local TEX1 constructor defaults remain intact.
-        runtimeValue(pass.gs, Field::environmentContext0or1, 0, 0x247c88u);
-        applyRuntimeOverrides(pass.gs, runtime);
-        result.passes.push_back(std::move(pass));
+        result=screenTextureFallback(result.provenance,"mmlogo",*inherited,runtime);
         output = std::move(result); d = {}; return true;
     } catch (...) { d.error = Error::allocation; return false; }
+}
+bool readOriginalUiMainPromptFallbackMaterial50KG(const OriginalUiArchive50KG& mainArchive,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!mainArchive.loaded()||mainArchive.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::mainMenu)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Main and shared OVERLAYS",0x1d682c);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index>=sizeof(promptSources)/sizeof(promptSources[0]))return fail(d,Error::fallbackSource,"original page prompt");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=overlays.find(source.member);
+        const auto page=mainArchive.find("UI\\UIMain\\main.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||mainArchive.find(source.psm).identity)
+            return fail(d,Error::fallbackSource,"actual prompt texture/page and absent PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback;
+        provenance.archive=overlays.identity();provenance.fallbackTexture=texture.identity;
+        provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=source.callPC;
+        provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
+        provenance.creationPC=0x2475c0;
+        auto result=screenTextureFallback(provenance,source.texture,*inherited,runtime);
+        output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
 }
 bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
@@ -296,8 +343,12 @@ bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
             (mip.width & (mip.width - 1)) || (mip.height & (mip.height - 1)) ||
             std::uint64_t(mip.width) * mip.height * 4 != mip.rgba.size())
             return fail(d, Error::texture, "atlas dimensions");
-        for (std::size_t i = 3; i < mip.rgba.size(); i += 4)
-            if (mip.rgba[i] > 128) return fail(d, Error::unsupportedValue, "atlas alpha above128");
+        // Real Main PST palettes use the full source alpha byte (up to255).
+        // Do not rewrite or reject those authentic bytes. The native renderer
+        // cold-caches each exact atlas maximum and, before target writes,
+        // requires vertexAlpha * atlasMaximumAlpha <= 128*128 for blended
+        // spans. That joint bound admits Main's63/64 packet alpha while
+        // rejecting GS coefficients above1 that fixed-function GL cannot express.
         if (pass.maximumMipLevel != 0 || pass.magFilter < 0 || pass.magFilter > 1 ||
             pass.minFilter < 0 || pass.minFilter > 5 || pass.lodCalculationMethod < 0 ||
             pass.lodCalculationMethod > 1 || pass.lodL < 0 || pass.lodL > 3 ||

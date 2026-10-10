@@ -66,7 +66,7 @@ private:
     OriginalUiMaterialTemplateState50KG defaults_, screen_;
 };
 enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
-    authoredPsm, mainLogoMissingPsmFallback
+    authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -75,6 +75,8 @@ struct OriginalUiMaterialProvenance50KG {
     // does not become a fabricated PSM identity or authored shader section.
     const OriginalUiMemberIdentity50KG* fallbackTexture = nullptr;
     const OriginalUiMemberIdentity50KG* fallbackWidgetSource = nullptr;
+    const OriginalUiMemberIdentity50KG* fallbackPageSource = nullptr;
+    std::uint32_t sourceCallerPC = 0;
     std::string registeredName, attemptedPsmMember;
     std::uint32_t creationPC = 0;
 };
@@ -129,6 +131,18 @@ bool readOriginalUiMainLogoFallbackMaterial50KG(const OriginalUiArchive50KG& mai
     const OriginalUiMaterialRuntime50KG&, OriginalUiMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;
 
+// Shared page constructor1D682C/68DC/6994/6A4C creates these real button
+// prompts from literal names through ScreenTexture2DF0B0. Their exact PSTs
+// live in authenticated OVERLAYS; absent PSM invokes the SAME2475C0 builder.
+// Main entry74 clears the mask; openedB0 sets X only, closingB4 clears it.
+// Source caller/page/texture identities remain explicit; no general fallback.
+enum class OriginalUiMainPrompt50KG : std::uint8_t { cross,triangle,square,circle };
+bool readOriginalUiMainPromptFallbackMaterial50KG(
+    const OriginalUiArchive50KG& mainArchive,const OriginalUiArchive50KG& overlays,
+    OriginalUiMainPrompt50KG,const OriginalUiMaterialTemplates50KG&,
+    OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
+    OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
 enum class OriginalUiMaterialBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };
 enum class OriginalUiMaterialFilter50KG : std::uint8_t { nearest, linear };
 enum class OriginalUiMaterialWrap50KG : std::uint8_t { repeat, clampToEdge };
@@ -141,6 +155,8 @@ struct OriginalUiNativeMaterial50KG {
     std::uint8_t depthMethod = 0, environmentContext = 0;
     bool depthWrite = false;
     // Raw RGBA8 texture and raw original packet vertex bytes, no recoloring.
+    // Native blended admission additionally requires the exact joint alpha
+    // bound documented below; this cold policy alone has no vertex packets.
     float colorScale = 255.f / 128.f;
     float storedAlphaScale = 255.f / 128.f;
     float blendAlphaScale = (255.f / 128.f) * (255.f / 128.f);
@@ -152,6 +168,9 @@ struct OriginalUiNativeMaterial50KG {
     // CPU policy is not a certification of the existing color-only UI target.
     // Current draw's joint blendFunc/disabled-depth cannot silently satisfy it.
     bool requiresOriginalDepthOwner = true;
+    // Per-vertex ceiling only. For native fixed-function blending the draw
+    // owner must ALSO enforce vertexAlpha * exactAtlasMaximumAlpha <=16384.
+    // Full-byte original texture alpha is retained, including values above128.
     std::uint8_t maximumVertexAlpha = 128;
 };
 // Separate type: no texture atlas, MODULATE operation, or sampler exists for
@@ -176,7 +195,7 @@ bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass5
 // Strict typed policy for single-level indexed-RGBA ScreenObject MODULATE.
 // Consumes the exact selected CPU atlas; rejects tests/fog/DAT/PABE/FBA/etc.
 // Returns explicit source depth and alpha requirements, never GPU readiness.
-// Authenticated Main-logo missing-PSM provenance is supported. A zero-map
+// Authenticated Main-logo/shared-prompt missing-PSM provenance is supported. A zero-map
 // descriptor returns untexturedAdapterRequired without inspecting an atlas;
 // this texture-taking API must not fabricate a white texture for NoTexture.
 // Any authored animation still needs its own original state/frame owner.

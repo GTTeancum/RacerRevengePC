@@ -46,6 +46,7 @@ def main():
         'src/assets/original_ui_icon50kg.cpp',
         'src/assets/original_ui_localization50kg.cpp',
         'src/assets/original_ui_material50kg.cpp',
+        'src/assets/original_ui_main_material_schedule50kg.cpp',
         'src/assets/original_ui_overlay_text50kg.cpp',
         'src/assets/original_ui_pages50kg.cpp',
         'src/assets/original_ui_screen_assets50kg.cpp',
