@@ -233,6 +233,8 @@ class Recorder:
         return after
 
     def request_capture(self):
+        # This starts a new request, not a poll of the existing request. Keep
+        # the defensive invariant here; the event loop must wait while pending.
         if self.pending is not None:
             raise RuntimeError("A second capture cannot be outstanding")
         now = time.monotonic_ns()
@@ -581,7 +583,13 @@ class Recorder:
                     if self.kill_ns is not None and now - self.kill_ns >= 2_000_000_000:
                         self.problem("Process did not reap within two seconds of SIGKILL")
                         break
-                else:
+                elif self.pending is None:
+                    # Pending is normal across any number of polls/partial
+                    # reads. Only commit_capture clears it, after the commit,
+                    # capture_state, and following UI acknowledgment have been
+                    # processed and the copied frame's manifest is durable.
+                    # Until then, keep draining and checking the original ack
+                    # deadline; do not request again or refresh that deadline.
                     self.request_capture()
         except BaseException as error:
             self.problem("Recorder exception: %s: %s" % (type(error).__name__, error))

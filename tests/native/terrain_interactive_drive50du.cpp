@@ -2058,7 +2058,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         <<" cached_speed34="<<m.cachedSpeed34
         <<" engineDrive="<<m.components.bindings.engineDrive[0]<<'/'<<m.components.bindings.engineDrive[1]
         <<" brakeDragFc="<<x.parameters.bodies.main.aero.brakeDragFc
-        <<" impact_flagsCD8="<<s.fields.impactFlagsCD8
+        <<" impact_flagsCD8="<<static_cast<unsigned>(s.fields.impactFlagsCD8)
         <<" steer="<<m.controls.player.raw.values[0]<<" aeroBrakeEC="<<m.components.bindings.aeroBrakeEC
         <<" aeroDrive="<<m.components.bindings.aeroDrive[0]<<'/'<<m.components.bindings.aeroDrive[1]
         <<" target="<<originalAiReceipt.desiredSpeed
