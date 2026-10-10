@@ -2051,6 +2051,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         <<" active="<<active<<" phase="<<static_cast<unsigned>(s.phase)
         <<" native_ticks="<<completedFrames<<" dispatched="<<originalAi.dispatchedFrames
         <<" state="<<originalAi.state.aiStateFE8<<" CB8="<<lapContinuity.timing.timeCB8
+        <<" stall1090="<<originalAi.state.stallTimer1090
+        <<" wrong_way1094="<<originalAi.state.wrongWayTimer1094
+        <<" orientation10A0="<<originalAi.state.orientation10A0
         <<" startup="<<originalAi.startupFrames<<" ordinary="<<originalAi.ordinaryFrames
         <<" combat_scans="<<originalAi.combatScans<<" combat_ai_rejections="<<originalAi.combatAiRejections
         <<" target1008="<<(originalAi.target1008Present?static_cast<std::int64_t>(originalAi.target1008ManagerIndex):-1)
@@ -2064,7 +2067,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         <<" target="<<originalAiReceipt.desiredSpeed
         <<" B7C/B80="<<m.controls.player.actionB7C<<'/'<<m.controls.player.actionB80
         <<" B94="<<x.parameters.rates.x<<" C80="<<navigationProgress.reset.vehicleC80
-        <<" CC4="<<fields.remainingCC4<<" CCC="<<fields.placeCCC
+        <<" CC4="<<fields.remainingCC4<<" CC8="<<lapContinuity.state.vehicleCC8
+        <<" CCC="<<fields.placeCCC
         <<" FF8="<<originalAi.referenceFF8<<" FFC="<<originalAi.packing.scaleFFC
         <<" 1038/103C="<<originalAi.lists.counts[0]<<'/'<<originalAi.lists.counts[1]
         <<" cooldown109C="<<originalAi.boost.cooldown109C
