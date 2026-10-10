@@ -11,6 +11,7 @@ This is an inactive, unfinished native source slice. It has not been compiled or
 - `tests/native/water_resources50jc_fixture.h`: authentic cold archive/member join, stable signature/noise storage and cold projections, called inside the existing authenticated track-load scope.
 - `game/water_presentation50jc.h`: disabled-by-default, explicitly native one-view publication of original position-plus-scroll origins once per actual completed rendered frame.
 - `game/water_wake50jc.h`: original anchoring, swell/update projections, native signed lattice equations and ordered force-write proposals.
+- `game/water_vehicle_effect50jc.h`: bounded original attached-water caller with ordered force, spray-control, scene-cache and previous-position proposals.
 
 These APIs consume supplied original resources. They contain no original asset payloads. The preceding GC descriptor stage establishes the authenticated archive, actual water-member identity and original provider presence. Callers must preserve that provenance when resolving every signature frame; a filename or byte span alone does not establish ownership.
 
@@ -58,3 +59,19 @@ The wake component implements genuine signed lattices for the two original loade
 The force leaf preserves all four original bilinear writes in source order, including block crossings, zero deltas and wrapped halfword additions. Its input must come from the actual source caller. AI racers skip only the original human anchor branch; their reached force calls must still be consumed.
 
 Proposals and scratch images do not mutate canonical time, buffers, selectors or positions. The runtime owner must commit the source prefix, each completed lattice and its tail in order, then join signature time and actual native presentation. The attached vehicle effect path `22A620` still needs authentic force-point/effect inputs. No default-off guard is removed by this checkpoint.
+
+## Vehicle water caller and remaining spray ownership
+
+The native `22A620` projection preserves the original query-state/component gates, displacement-greater-than-70 early return, human-only anchor branch and all reached AI force calls. It uses the actual body speed, selected model world transforms, previous chariot position and water-query height. Each side retains its preferred/fallback model choice, direct first spray-position write, Start/Stop and position operations, followed by every positive/negative force call in source order. Zero force amplitude does not remove a source call.
+
+The shared initial step vector has a genuine application initializer at `3C9F70`: `(0,0,0,1)` is stored to `434630`. The API requires that live owner; it does not manufacture an input from observed behavior. Previous position likewise has a real cold writer using the chariot's world position.
+
+Spray controls are admitted only for the actual `19CC50` subtype whose source vtable supplies the represented Start/Stop methods. This subtype is distinct from the existing four-profile effect adapter. Construction, `podSpray.emt` loading, particle-registry resolution and `19CED0` simulation remain required. The authenticated GC archive does not contain that emitter resource; this checkpoint does not fabricate its fields or silently suppress effects. Proposal success alone does not complete the caller.
+
+Source `228B40..228B68` selects either this water caller or the plain twelve-slot stop tail. They must not both run. The existing attached-water guard remains closed until the authentic lifecycle and ordered consumers are joined.
+
+## Recovered relative root order
+
+Source game attachment `1AAD40` appends racer manager `B0` before track companion `404`. The later `1B4CA0` attachment appends provider `400` with update flags, and lap manager `B4` is appended afterward. `141960` appends at the tail; `141ED0` traverses child links in that order with the same supplied update delta. The racer manager's update is that same child traversal, and its creation appends actual AI indices in ascending order before any humans.
+
+For the explicitly selected native all-AI roster, the relevant source ordering is therefore: eight racer updates, signature time/scroll, wake lattice, then lap timing/ranking. Other root children still exist between these nodes in the original game. This relative-order proof does not claim complete retail root scheduling or change the separately declared native presentation-origin policy. Runtime wiring must keep source update receipts and failure boundaries rather than marking an unjoined root complete.
