@@ -2,6 +2,8 @@
 #include "original_racer_selection50ij.h"
 #include "native_racer_bank50hn_fixture.h"
 #include "native_racer_contact_bank50hw_fixture.h"
+#include "native_dynamic_contact_peers50iw_fixture.h"
+#include "../../src/game/dynamic_impact_events50iw.h"
 #include "native_racer_rig50hw_fixture.h"
 #include "native_racer_handling50hw_fixture.h"
 #include "original_racer_visual50hw_fixture.h"
@@ -199,6 +201,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool raceEnabled=!(raceSetting&&std::string(raceSetting)=="0");
  const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
  const bool originalAiEnabled=originalAiSetting&&std::string(originalAiSetting)=="1";
+ const char* dynamicContactSetting=std::getenv("RR_ORIGINAL_AI_DYNAMIC_CONTACT");
+ const bool dynamicContactEnabled=dynamicContactSetting&&std::string(dynamicContactSetting)=="1";
+ require50DU(!dynamicContactEnabled||originalAiEnabled,
+     "dynamic source contacts require the bounded original AI session");
  constexpr std::size_t originalAiSlot=1;
  require50DU(!originalAiEnabled||(raceEnabled&&track_session_assets50IG::codeEquals(trackSession->world->code,"GC")),
      "original AI first slice requires the real GC fleet");
@@ -284,6 +290,39 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // It is not banked or private audio RNG. Original cross-race static lifetime
  // is not claimed; the monotonic clock backend itself remains application-wide.
  LapEventRandomOwner50ID sessionLazy{};
+ // Shared source owners: never bank these along with the reused racer arena.
+ // Fresh17DF80/17F970 profile, no save/cheat/menu continuation admitted.
+ // The consumed track bits stay cold-clear only before the retained destruction
+ // and menu boundaries. They are not reset on each contact.
+ DynamicImpactProfile50IW dynamicProfile{};
+ dynamicProfile.game34=3;dynamicProfile.game10FC4=0;dynamicProfile.game10FE0=0;
+ dynamicProfile.track1B1=0;dynamicProfile.bound=dynamicContactEnabled;
+ DynamicContactProfile50IW dynamicMusicProfile{1u,dynamicContactEnabled};
+ //186644..186654 fresh initialization sets11050bit2; no options override.
+ const std::uint32_t dynamicConsumerFlags11050=4u;
+ DynamicImpactTuning50IW dynamicTuning{};
+ rr::assets::FinalImpactAuthoring49Y dynamicFinalTuning{};
+ DynamicContactEventBindings50IW dynamicEventBindings{};
+ DynamicContactRangeOwner50IW dynamicRange{};
+ DynamicContactMusicCursor50IW dynamicMusicCursor{};
+ DynamicContactEventCursor50IW dynamicEventCursor{};
+ DynamicContactPodEffect50IW dynamicPodEffect{};
+ DamageEventCursor50ID dynamicDamageCursor{};
+ RaceEventQueue50ID<128> dynamicEvents{};
+ native_dynamic_contact50IW::Registry dynamicRegistry;
+ native_dynamic_contact50IW::Snapshot dynamicPeers{};
+ std::size_t dynamicSelfSlot=0;
+ struct DynamicActors50IW {
+  std::array<RaceActorSnapshot50ID,raceRacerCount> values{};
+  std::array<bool,raceRacerCount> bound{};
+ } dynamicActors;
+ std::array<std::uint32_t,raceRacerCount> dynamicRacer60{};
+ const RaceActorResolver50ID dynamicActorResolver{&dynamicActors,
+  [](void* opaque,RaceActorId50ID id,RaceActorSnapshot50ID& out)noexcept{
+   const auto& actors=*static_cast<const DynamicActors50IW*>(opaque);
+   if(!id||id>actors.values.size()||!actors.bound[id-1])return false;
+   out=actors.values[id-1];return true;
+  }};
  // Permanent original-resource owners precede the snapshot bank and all draw
  // publications. Only their immutable borrowed views enter the live arena.
  std::array<std::unique_ptr<native_racer50HW::Rig>,raceRacerCount> racerRigs;
@@ -513,6 +552,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(rr::assets::readAiTrackTuning50IU(reinterpret_cast<const char*>(tuning.data()),
       tuning.size(),originalAiTuning,originalAiAuthoringDiagnostic),"original AI track tuning unavailable");
  }
+ if(dynamicContactEnabled){
+  require50DU(rr::assets::readDynamicImpactAuthoring50IW(reinterpret_cast<const char*>(tuning.data()),
+      tuning.size(),dynamicTuning,diagnostic),"original dynamic contact tuning unavailable");
+  require50DU(rr::assets::readFinalImpactAuthoring49Y(reinterpret_cast<const char*>(tuning.data()),
+      tuning.size(),dynamicFinalTuning,diagnostic),"original final impact tuning unavailable");
+ }
  rr::assets::DefenseAuthoring49Y defense{};require50DU(rr::assets::readDefenseAuthoring49Y(reinterpret_cast<const char*>(phy.data()),phy.size(),defense,diagnostic)&&defense.baseDefense.present,"explicit base-profile defense");s.fields.defenseCF0=defense.baseDefense.value;
  // Profile overwrite and authored class selection are separate source gates.
  // Use the same UseValues/class decision as the already-bound physics.
@@ -739,6 +784,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool audioEnabled=!(audioSetting&&std::string(audioSetting)=="0");
  require50DU(!audioEnabled||trackSession->materialAudio,
      "Selected original track material audio provider is unavailable; RR_AUDIO=0 must be explicit");
+ require50DU(!dynamicContactEnabled||audioEnabled,"dynamic source contacts require genuine audio providers");
  require50DU(!mode1Requested||audioEnabled,
      "mode1 requires original audio providers; use RR_RACE_MODE=2 explicitly for RR_AUDIO=0");
  rr::platform::AudioOutputDiagnostic50HD audioDiagnostic{};
@@ -766,18 +812,27 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(raceEnabled)require50DU(materialMixer&&raceAudio->prepare("work/native/project/disc",
       audioRoot,*materialMixer,*audioGroups,*sharedAnnouncer,audioError,playerRacer60),
       audioError.empty()?"original race audio preparation failed":audioError.c_str());
-  if(mode1Requested){
+  if(mode1Requested||dynamicContactEnabled){
    require50DU(materialMixer&&sourceAnnouncer->prepare("work/native/project/disc",audioRoot,
        *materialMixer,*audioGroups,*sharedAnnouncer,sessionLazy,applicationClock,
        s.noise.sharedRandomState,audioError,playerRacer60),
        audioError.empty()?"source Dax cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
    require50DU(materialMixer&&raceMusic->prepare("work/native/project/disc",audioRoot,
-       *materialMixer,*audioGroups,audioError),
+       *materialMixer,*audioGroups,audioError,dynamicContactEnabled),
        audioError.empty()?"source music cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
-   require50DU(sourceAnnouncer->prepared()&&raceMusic->bank().ready==race_music50IE::clipCount,
+   require50DU(sourceAnnouncer->prepared()&&raceMusic->bank().ready==
+       (dynamicContactEnabled?race_music50IE::totalClipCount:race_music50IE::clipCount),
        "mode1 source providers/music PCM incomplete; no silent fallback (RR_RACE_MODE=2 is explicit)");
    require50DU(raceAudio->setHostSpeechEnabled(false),"mode1 HOST Dax suppression binding failed");
-   mode1Enabled=true;
+   mode1Enabled=mode1Requested;
+   if(dynamicContactEnabled){
+    const auto bytes=runtime_startup50fl::readBytes(audioRoot/"SPCHPCT.INI");
+    require50DU(bindOriginalDynamicContactChances50IW(bytes.size(),
+        pod_materials50ed_fixture::detail::sha256(bytes).c_str(),dynamicEventBindings),
+        "authentic original collision speech chances unavailable");
+    //21080C..210818 vehicle33C is the same application28C->10C event owner.
+    dynamicEventBindings.eventOwner33CBound=true;
+   }
   }
   require50DU(materialMixer&&materialAudio->prepare("work/native/project/disc",audioRoot,
       *materialMixer,64,audioError,trackSession->originalStaticCandidates?material_audio50HI::Track::gc:material_audio50HI::Track::ta),
@@ -1455,6 +1510,43 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  mode1Effects.damageInput=[](void* opaque,DamageSpeechInput50HG& input)noexcept{
   auto& c=*static_cast<Mode1EffectsContext50ID*>(opaque);input=(*c.input)();return true;
  };
+ auto refreshDynamicSelfActor=[&](){
+  require50DU(dynamicSelfSlot<raceRacerCount,"dynamic actor slot unavailable");
+  dynamicActors.values[dynamicSelfSlot]={s.fields.vehicle3C,s.fields.vehicle58,
+      dynamicRacer60[dynamicSelfSlot],lapContinuity.state.vehicleCC8,
+      static_cast<std::uint32_t>(originalAiSession.rank[dynamicSelfSlot].placeCCC),s.fields.impactFlagsCD8};
+  dynamicActors.bound[dynamicSelfSlot]=true;
+ };
+ auto dynamicBoundary=[&](std::uint32_t pc,const char* owner){
+  std::cerr<<"ORIGINAL AI dynamic-contact boundary: slot="<<dynamicSelfSlot
+      <<" pc="<<std::hex<<pc<<std::dec<<" owner="<<owner
+      <<" phase="<<static_cast<unsigned>(s.phase)<<" contacts20C="<<m.components.body20C
+      <<" partner="<<s.impactSupplement.partnerId<<" partner_state="<<s.impactSupplement.partnerState
+      <<" partner_amount="<<s.impactSupplement.partnerAmount0C
+      <<" CFC="<<s.fields.vehicleCFC<<" D00="<<s.fields.vehicleD00
+      <<" event_count="<<dynamicEvents.count150<<"; reached native state retained.\n";
+  require50DU(false,owner);
+ };
+ auto fulfillDynamicMusic=[&](){
+  using Status=DynamicContactEffectStatus50IW;
+  if(beginDynamicContactMusic50IW(dynamicMusicCursor).status!=Status::Continue)
+   dynamicBoundary(0x22a400u,"collision music continuation already pending");
+  for(;;){
+   const auto step=advanceDynamicContactMusic50IW(dynamicMusicCursor,sessionLazy,dynamicRange);
+   if(step.status==Status::Complete)return;
+   if(step.status!=Status::NeedHelper)dynamicBoundary(step.sourcePC,"collision music source continuation");
+   std::uint32_t actualV0=0;bool returned=false;
+   if(step.request.kind==LapEventCall50ID::Music1A46E0){
+    returned=dynamicMusicProfile.bound&&liveAudio->outputOpen()&&
+        raceMusic->request(step.request.argumentA1,step.request.argumentA2,
+            dynamicMusicProfile.mode11258).completed();
+   }else returned=applyHostLapClockOrRandom50ID(step.request,applicationClock,
+       s.noise.sharedRandomState,actualV0);
+   if(!returned)dynamicBoundary(step.sourcePC,"collision music actual helper pending");
+   if(!acceptDynamicContactMusicReturn50IW(dynamicMusicCursor,step.request.sequence,
+       step.request.kind,actualV0))dynamicBoundary(step.sourcePC,"collision music return mismatch");
+  }
+ };
  auto advanceFrame=[&](){
  finishDriverAppliedThisFrame=false;
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame)require50DU(advanceSpeechTimers50HG(.016f,lapContinuity.prefix,speechState),
@@ -1591,7 +1683,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  else runNative([&]{return bindVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::PlayerAndBaseBefore217DE0),post,x.workspace,x.diagnostic);},"persistent binding");
  const BoostInput50FK boostInput{m.frameFactor,m.components.engine.smoothedDrive[0],
      m.components.engine.smoothedDrive[1],m.cachedSpeed34,m.controls.player.flagsB9C,
-     s.fields.vehicle58,2,0,false}; // No D40 audio/control owner in this baseline topology.
+     s.fields.vehicle58,dynamicContactEnabled?dynamicProfile.game34:2u,0,false};
+ // Fresh186EF0 index5 explicitly clears10FC0. D40 remains the existing
+ // admitted-absent native topology; no owner is synthesized here.
  // Native host subscriber at the original boost boundary; this does not claim
  // that the separate original D40 topology guard has been closed.
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame){
@@ -1606,7 +1700,35 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  x.selectors.vehicle64=boostState.vehicle64;
  runNative([&]{return graphicsVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::Base2176E0BeforeGraphics),x.workspace,x.diagnostic);},"persistent graphics");
  ImpactConsumerInput49Z consumer{};consumer.vehicle64=boostState.vehicle64;consumer.managerFlags58=s.fields.applicationByte58;consumer.profile34=2;consumer.finalDamageThreshold64=1;VehicleImpactEvents49Z consumerEvents{};
- runNative([&]{return consumeVehicleImpacts49Z(s,x.bindings,consumer,consumerEvents,x.workspace,x.diagnostic);},"persistent impact consumers");
+ if(dynamicContactEnabled){
+  consumer.profile34=dynamicProfile.game34;consumer.profile10FAC=0;
+  //186654 sets the consumed fresh profile11050 bit2; no options override.
+  consumer.profileFlags11050=dynamicConsumerFlags11050;
+  consumer.stopBeforeControllerFeedback50IW=true;
+  consumer.finalDamageThreshold64=dynamicFinalTuning.threshold64;
+  consumer.finalDamageIncrement68=dynamicFinalTuning.increment68;
+  consumer.dynamicPartnerEventsBound=true;consumer.partnerEventThresholdBound=dynamicTuning.bound;
+  consumer.partnerEventThreshold48=dynamicTuning.points3C[3];
+ }
+ const bool consumersCompleted=consumeVehicleImpacts49Z(s,x.bindings,consumer,consumerEvents,x.workspace,x.diagnostic);
+ if(dynamicContactEnabled&&(consumersCompleted||
+     (x.diagnostic.error==VehicleFrameError49W::ExternalCut&&
+      (x.diagnostic.sourceStage==0x222d70u||x.diagnostic.sourceStage==0x222d8cu)))){
+  refreshDynamicSelfActor();
+  //222CFC event0 precedes the first feedback helper. The terminal continuation
+  // returns only its exact prefix and request, never later damage/timer writes.
+  for(std::size_t index=0;index<consumerEvents.partners.count;++index){
+   const auto& event=consumerEvents.partners.values[index];
+   if(event.partnerId>=raceRacerCount)dynamicBoundary(event.sourcePC,"original partner actor index unavailable");
+   const auto appended=appendDynamicContactEvent1_50IW(dynamicEvents,dynamicActorResolver,
+       static_cast<RaceActorId50ID>(dynamicSelfSlot+1),event.partnerId+1,event.word8,
+       dynamicEventBindings.eventOwner33CBound);
+   if(!appended.helperReturned())dynamicBoundary(event.sourcePC,"original shared contact event enqueue pending");
+  }
+  if(consumerEvents.count)dynamicBoundary(consumerEvents.values[0].sourcePC,
+      "actual vehicle5C/controller registry and feedback helper are not joined");
+ }
+ runNative([&]{return consumersCompleted;},"persistent impact consumers");
  if(s.phase==VehicleFramePhase49W::PostImpactConsumers){
  runNative([&]{return repairVehicleImpacts50A(s,x.bindings,x.workspace,x.diagnostic);},"persistent repair");
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame){
@@ -1615,8 +1737,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "source repair-completion audio rejected");
   require50DU(afterRepairSpeechState50HG(s.fields.damage7D0,s.fields.damage7D4,
       s.fields.damage7DC,lapContinuity.prefix),"native repair speech state rejected");
-  const auto produced=mode1Enabled?mode1->produceDamage(speechInput()):
-      produceDamageSpeechEvent50HG(speechInput(),lapContinuity.prefix,pendingSpeech);
+  if(dynamicContactEnabled)refreshDynamicSelfActor();
+  const auto produced=dynamicContactEnabled?
+      produceQueuedDamageSpeech50ID(speechInput(),lapContinuity.prefix,1u,dynamicActorResolver,dynamicEvents):
+      (mode1Enabled?mode1->produceDamage(speechInput()):
+      produceDamageSpeechEvent50HG(speechInput(),lapContinuity.prefix,pendingSpeech));
   require50DU(produced.status==PodSpeechStatus50HG::Complete,"native damage speech enqueue rejected");
   if(produced.eventProduced)++speechEvents;
  }
@@ -1765,6 +1890,20 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  runNative([&]{return respondSecondaryStaticVehicle50J(s,x.bindings,x.parameters,secondarySettings,secondaryResponse,{78},2,secondarySpring,secondaryRecords,60,secondaryWorkspace,x.diagnostic)==VehicleStaticResponseStatus50G::Complete;},"actual secondary contact and integration");
  require50DU(s.phase==VehicleFramePhase49W::MainIntegration,"secondary response integration phase");
  }
+ if(dynamicContactEnabled){
+  native_dynamic_contact50IW::Diagnostic peerDiagnostic{};
+  if(!dynamicPeers.refreshSelfAtImpact(s,peerDiagnostic))
+   dynamicBoundary(peerDiagnostic.sourcePC,"dynamic impact live self projection unavailable");
+  DynamicVehicleImpactCursor50IW impact{};
+  auto status=beginVehicleDynamicImpact50IW(s,x.bindings,x.parameters,poseHistory,
+      dynamicPeers.managerView(),dynamicTuning,dynamicProfile,impact,x.diagnostic);
+  if(status==DynamicVehicleImpactStatus50IW::NeedFirstContact){
+   fulfillDynamicMusic();
+   status=resumeVehicleDynamicImpact50IW(s,poseHistory,impact,x.diagnostic);
+  }
+  if(status!=DynamicVehicleImpactStatus50IW::Complete)
+   dynamicBoundary(x.diagnostic.sourceStage,"original dynamic impact continuation rejected");
+ }
  runNative([&]{return integrateVehicleMain49W(s,x.bindings,x.parameters,x.workspace,x.diagnostic);},"contact-driven body integration");
  require50DU(s.phase==VehicleFramePhase49W::Query219120,"real late-query boundary");
  std::memcpy(&endpoints[0],s.bodies.main.priorPoint7B0,16);std::memcpy(&endpoints[1],s.bodies.main.currentPoint7C0,16);
@@ -1810,6 +1949,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Original racers have distinct immutable resource owners and share only the
  // serial execution arena, never tuning, poses, contacts or progression histories.
  native_racer50HN::Bank racerBank;
+ auto captureDynamicBeforeFrame=[&](std::size_t slot){
+  if(!dynamicContactEnabled)return;
+  native_dynamic_contact50IW::Diagnostic diagnostic{};
+  if(!dynamicRegistry.captureBeforeFrame(racerBank,s,slot,dynamicPeers,diagnostic))
+   dynamicBoundary(diagnostic.sourcePC,"every dynamic peer must be active and Ready");
+  dynamicSelfSlot=slot;
+  for(std::size_t actor=0;actor<racerBank.count();++actor)racerBank.visit(actor,[&](){
+   dynamicActors.values[actor]={s.fields.vehicle3C,s.fields.vehicle58,dynamicRacer60[actor],
+       lapContinuity.state.vehicleCC8,static_cast<std::uint32_t>(originalAiSession.rank[actor].placeCCC),s.fields.impactFlagsCD8};
+   dynamicActors.bound[actor]=true;
+  });
+ };
  auto requireOriginalAiFleetReady=[&](){
   // Every actual racer is an input to the joined source manager. A failed
   // native frame is retained by Bank::visit, but is not a manager observation.
@@ -1862,7 +2013,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "original AI manager clock boundary");
   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
    require50DU(!(s.fields.impactFlagsCD8&3u),"original AI first slice reached lap/finish continuation");
-   LapTimingInput50ID input{factor,2u,s.fields.vehicle58,static_cast<std::uint32_t>(slot),
+   LapTimingInput50ID input{factor,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u,s.fields.vehicle58,static_cast<std::uint32_t>(slot),
        lapContinuity.state.vehicleCC8,s.fields.impactFlagsCD8};
    const auto result=beginRacerLapTiming50ID(lapContinuity.timing,originalAiSession.manager,input,lapContinuity.timingCursor);
    require50DU(result.status==LapTimingStatus50ID::Complete,"original AI timing event boundary");
@@ -2015,7 +2166,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         originalAiMetadata,navigationProgress,tracks),"original AI cold track owners unavailable");
     s.fields.vehicle58=1u;s.fields.nativeAiOwnersBound50IV=true;s.fields.applicationByte58=0u;
     x.parameters.rates.x=4.f;
-    initializeLapTimingFields50ID(lapContinuity.timing,2u);lapContinuity.timingInitialized=true;
+    initializeLapTimingFields50ID(lapContinuity.timing,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u);lapContinuity.timingInitialized=true;
    }
    coldRacerStage50DU(rig.podId,"handling root placement",[&](){
     native_racer50HW::placeColdHandlingRoots(x);
@@ -2117,6 +2268,24 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      }
    });
   }
+  if(dynamicContactEnabled){
+   std::array<native_dynamic_contact50IW::ManagerBinding,raceRacerCount> bindings{};
+   for(std::size_t slot=0;slot<raceRacerCount;++slot){
+    bindings[slot]={slot,{racerContactIds[slot]}};
+    const auto* selection=original_racer_selection50IJ::findByPodId(racerRigs[slot]->podId.c_str());
+    require50DU(selection,"actual contact actor original racer60 unavailable");
+    dynamicRacer60[slot]=selection->racer60;
+   }
+   std::string error;
+   require50DU(dynamicRegistry.prepare(bindings.data(),bindings.size(),1u,error),
+       error.empty()?"original dynamic manager registry unavailable":error.c_str());
+   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+    require50DU(s.phase==VehicleFramePhase49W::Ready&&m.components.body20C==0&&
+        s.impactSupplement.partnerId==0xffffffffu&&s.impactSupplement.partnerState==0,
+        "dynamic owners require original fresh body/D34 state");
+    s.fields.dynamicOwnersBound50IW=true;
+   });
+  }
   // One neutral, unscored native setup tick establishes actual graphics/ground
   // before countdown rendering. After this all physics freezes until GO.
   const platform::WindowInput50DQ noKeys{};
@@ -2130,7 +2299,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   };
   for(std::size_t racer=1;racer<racerBank.count();++racer){
    opponentFrame=true;
-   try{racerBank.visit(racer,initializeGraphics);}
+   try{captureDynamicBeforeFrame(racer);racerBank.visit(racer,initializeGraphics);}
    catch(const std::exception& error){
     opponentFrame=false;
     std::throw_with_nested(std::runtime_error("Original racer "+racerRigs[racer]->podId+
@@ -2138,10 +2307,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    opponentFrame=false;
   }
-  initializeGraphics();raceSetupFrame=false;
+  captureDynamicBeforeFrame(0);initializeGraphics();raceSetupFrame=false;
   if(originalAiEnabled){
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
-    initializeLapTimingFields50ID(lapContinuity.timing,2u);lapContinuity.timingInitialized=true;
+    initializeLapTimingFields50ID(lapContinuity.timing,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u);lapContinuity.timingInitialized=true;
    });
    rankOriginalAiFleet();
   }
@@ -2177,6 +2346,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       <<"; each original main-body geometry and authored response, host world-frame scheduling. "
         "Empty-root material0 is a deterministic host policy; original padding parity is unclaimed. "
         "Secondary dynamic collision, damage attribution and opponent speech/collision/boost-event audio remain unjoined.\n";
+  if(dynamicContactEnabled)std::cerr<<"ORIGINAL AI DYNAMIC CONTACTS: ordered body20C/210 and live D34 peers, "
+      "source severity/common maxima, authentic profile11258=1 music, shared event1/event5 FIFO. "
+      "Terminal boundaries retain missing vehicle5C/controller feedback, opponent D48, collision announcer and music fade. "
+      "Native serial world timing is explicit; no full original scheduler claim.\n";
  }
 
  // Cold-selected player publications borrow stable owners through shutdown.
@@ -2201,7 +2374,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // HOST audio/world scheduling: once after each actual common16ms mix,
  // including countdown. Never rendered-frame, paused or per-racer updates.
  auto advanceSourceAudioWorld=[&](std::uint64_t beforeMix){
-  if(!mode1Enabled)return;
+  if(!mode1Enabled&&!dynamicContactEnabled)return;
   require50DU(raceMusic->pollCompletion(),"mode1 music transport ownership failed after shared mix");
   const auto afterMix=liveAudio->mixedFrames();
   require50DU(afterMix>=beforeMix&&(afterMix-beforeMix==0u||afterMix-beforeMix==768u),
@@ -2209,8 +2382,22 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(afterMix==beforeMix)return;
   // Output may fail AFTER the actual mix. Source completion/update still runs
   // exactly once for those consumed frames before surfacing the output error.
+  if(dynamicContactEnabled){
+   const auto musicUpdate=raceMusic->update(.016f);
+   if(!musicUpdate.completed())dynamicBoundary(musicUpdate.sourcePC,
+       "original collision music fade/transport helper pending");
+  }
   AnnouncerLeader50IE leader{};
-  if(race.racerCount){
+  if(dynamicContactEnabled){
+   require50DU(originalAiSession.rankBound,"dynamic audio needs actual original race rank");
+   for(std::size_t slot=0;slot<racerBank.count();++slot)
+    if(originalAiSession.rank[slot].placeCCC==1){
+     require50DU(!leader.exists,"original manager leader is not unique");
+     leader.exists=true;leader.remainingDistance34=originalAiSession.rank[slot].remainingCC4;
+     racerBank.visit(slot,[&](){leader.vehicle58=s.fields.vehicle58;leader.cachedSpeed34=m.cachedSpeed34;});
+    }
+   require50DU(leader.exists,"original manager leader is unavailable");
+  }else if(race.racerCount){
    const auto slot=race.ordered[0];leader.exists=true;
    leader.vehicle58=slot==0?0u:1u; // HOST role, not arena player-physics gate.
    leader.remainingDistance34=static_cast<float>(race.racers[slot].remainingDistance);
@@ -2408,7 +2595,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     std::cerr<<"Audio unavailable: no original samples decoded; no device or WAV opened.\n";
    }
   }
-  if(mode1Enabled)require50DU(liveAudio->outputOpen(),"mode1 needs the real shared output backend");
+  if(mode1Enabled||dynamicContactEnabled)require50DU(liveAudio->outputOpen(),"source events need the real shared output backend");
   if(audioEnabled&&raceEnabled){
    require50DU(raceAudio->observe(race).accepted,"initial race audio observation rejected");
    std::cerr<<"Race audio ready/missing/unsupported/invalid "<<raceAudio->bank().ready<<'/'
@@ -2857,7 +3044,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(sessionMenu.open()){
     composePacket(false,input);
     if(!wasPaused||!menuWasOpen)sampleController();
-    if(audioEnabled){liveAudio->pause(true);if(mode1Enabled)raceMusic->pause(true);}
+    if(audioEnabled){liveAudio->pause(true);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(true);}
     hostClock.pause(now);wasPaused=true;
     const bool drawable=!info.minimized&&info.drawableWidth>0&&info.drawableHeight>0&&
         info.drawableWidth<=maximumWidth&&info.drawableHeight<=maximumHeight;
@@ -2880,7 +3067,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(recoveryPaused){
     // Never prepare or submit a draw batch from the interrupted native state.
     // Readback uses only the renderer's already committed private target.
-    if(audioEnabled){liveAudio->pause(true);if(mode1Enabled)raceMusic->pause(true);}
+    if(audioEnabled){liveAudio->pause(true);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(true);}
     captureCommitted();hostClock.pause(now);
     std::this_thread::sleep_for(std::chrono::milliseconds(8));
     continue;
@@ -2905,13 +3092,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    composePacket(!paused&&(!raceEnabled||race_session50HM::controlsAllowed(race,0)),input);
    if(paused){
-    if(audioEnabled){liveAudio->pause(true);if(mode1Enabled)raceMusic->pause(true);}
+    if(audioEnabled){liveAudio->pause(true);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(true);}
     if(!wasPaused)sampleController(); // Publish the declared release-all sample.
     hostClock.pause(now);wasPaused=true;
     std::this_thread::sleep_for(std::chrono::milliseconds(8));
     continue;
    }
-   if(wasPaused){hostClock.pause(now);wasPaused=false;if(audioEnabled){liveAudio->pause(false);if(mode1Enabled)raceMusic->pause(false);}}
+   if(wasPaused){hostClock.pause(now);wasPaused=false;if(audioEnabled){liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);}}
    // Manual input samples every host poll. The optional host course driver
    // instead emits one ordinary packet per actual 16 ms simulation step.
    if(!autoDriveEnabled)sampleController();
@@ -2923,7 +3110,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      require50DU(race.error==race_session50HM::Error::None,"race countdown rejected");
      advanceWorldAnimations();
      if(audioEnabled){
-      liveAudio->pause(false);if(mode1Enabled)raceMusic->pause(false);
+      liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);
       require50DU(raceAudio->observe(race).accepted,"countdown/result audio observation rejected");
       updateOpponentAudio(); // Only countdown holds native vehicle updates.
       // Countdown has a real host clock while native vehicle bodies are held.
@@ -2950,7 +3137,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const bool playerFinishDriver=humanResultsActive;
     const bool manualRaceInputHeld=input.down[26]||input.down[22]||input.down[82]||
         input.down[81]||input.down[44]||input.down[21]||input.down[225];
-    if(audioEnabled){liveAudio->pause(false);if(mode1Enabled)raceMusic->pause(false);}
+    if(audioEnabled){liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);}
     // Recompose at GO so held race input enters this exact native frame.
     // After the human finish, the recovered source driver owns controls while
     // the ordinary coupled-body/native frame keeps advancing.
@@ -2961,6 +3148,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     const auto nativeFrameAllocations=::allocations;
     phase_timing50GK::Scope physicsTiming(phaseTiming,phase_timing50GK::Phase::Physics);
+    if(playerAdvancing)captureDynamicBeforeFrame(0);
     const bool frameAdvanced=!playerAdvancing||advanceFrame();
     if(originalAiEnabled&&!frameAdvanced){
      std::cerr<<"ORIGINAL AI world boundary: slot=0 phase="<<static_cast<unsigned>(s.phase)
@@ -2982,6 +3170,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       if(!racerBank.active(racer)||!race_session50HM::simulationAllowed(race,static_cast<std::uint32_t>(racer)))continue;
       opponentFrame=true;
       try {
+       captureDynamicBeforeFrame(racer);
        const bool advanced=racerBank.step(racer,true,[&](){
         if(s.fields.vehicle58==0u){composePacket(true,noKeys);applyCourseInput(racer);sampleController();}
         const auto beforeOpponentFrame=::allocations;
@@ -3025,7 +3214,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        const auto beforeRacerContacts=::allocations;
        const auto contactStatus=native_racer_contact50HW::applyAtWorldBoundary(
            racerBank,*racerContactOwner,s,x.bindings,x.parameters,racerContactIds,racerContactMaterials,
-           contactOrder.data(),contactPairCount,contactReceipt,&aiContactBoundary);
+           contactOrder.data(),contactPairCount,contactReceipt,&aiContactBoundary,
+           dynamicContactEnabled,dynamicContactEnabled?&dynamicRegistry:nullptr);
        racerContactTotals.lastStatus=contactStatus;
        if(contactStatus!=native_racer_contact50HW::Status::Complete){
         addCounter50DU(racerContactTotals.failures);
@@ -3096,7 +3286,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     if(frameAdvanced&&!raceEnabled)advanceWorldAnimations();
     physicsTiming.finish();
     if(!frameAdvanced){
-     if(audioEnabled){liveAudio->pause(true);if(mode1Enabled)raceMusic->pause(true);}
+     if(audioEnabled){liveAudio->pause(true);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(true);}
      composePacket(false,input);sampleController();
      hostClock.pause(monotonicNow50DU());wasPaused=true;
      break;
@@ -3112,7 +3302,82 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      require50DU(flushed.status==race_mode1_host50ID::Status::Complete,
          "mode1 real downstream request unresolved; refusing later world events");
     }
-    if(audioEnabled&&playerAdvancing&&!mode1Enabled){
+    if(dynamicContactEnabled){
+     // Declared accepted-world flush: all actual frames and the source manager
+     // rank pass completed. Read actors afresh, not enqueue-time snapshots.
+     captureDynamicBeforeFrame(0);
+     const auto began=beginRaceEventFlush50ID(dynamicEvents,originalAiSession.manager.flags58,0u);
+     if(began!=RaceEventStatus50ID::FlushSuppressed){
+      if(began!=RaceEventStatus50ID::Ready&&began!=RaceEventStatus50ID::Empty)
+       dynamicBoundary(0x1a4c9cu,"original shared event flush admission");
+      while(const auto* entry=frontRaceEvent50ID(dynamicEvents)){
+       const auto ticket=entry->ticket;
+       if(entry->event.type4==1u){
+        using Status=DynamicContactEffectStatus50IW;
+        if(beginDynamicContactEvent1Subscriber50IW(dynamicEvents,dynamicEventCursor).status!=Status::Continue)
+         dynamicBoundary(0x1a5940u,"contact subscriber entry pending");
+        for(;;){
+         const auto step=advanceDynamicContactEvent1Subscriber50IW(dynamicEventCursor,
+             dynamicActorResolver,dynamicEventBindings,s.noise.sharedRandomState);
+         if(step.status==Status::Complete)break;
+         if(step.status!=Status::NeedHelper)dynamicBoundary(step.sourcePC,"contact event source continuation");
+         const auto& request=step.request;
+         if(request.kind==DynamicContactEventCall50IW::PodTaunt2C1C00||
+            request.kind==DynamicContactEventCall50IW::PodCurse2C1A90){
+          // Only actor1's authentic D48 constructor/counts/speech bank have
+          // been joined. Never reuse its state for an opponent or call a miss.
+          if(request.actor!=1u)dynamicBoundary(request.callPC,"actual opponent D48 speech owner unavailable");
+          const auto live=speechInput();
+          auto selected=beginDynamicContactPodSpeech50IW(request,1u,speechCounts,
+              live.position,live.listeners,s.noise.sharedRandomState,speechState,dynamicPodEffect);
+          if(selected.status==Status::NeedHelper){
+           if(!liveAudio->outputOpen()||!liveAudio->applySourceCommand(dynamicPodEffect.command).okay())
+            dynamicBoundary(selected.sourcePC,"actual contact speech audio helper pending");
+           if(!acceptDynamicContactPodAudioReturn50IW(dynamicPodEffect,request.sequence,1u,speechState))
+            dynamicBoundary(selected.sourcePC,"contact speech audio return mismatch");
+           ++speechCues;
+          }else if(selected.status!=Status::Complete)
+           dynamicBoundary(selected.sourcePC,"actual contact speech selector pending");
+         }else if(request.kind==DynamicContactEventCall50IW::Announcer2C2C20){
+          // Provider preserves its own unsupported type1/2 boundary. Passing
+          // actual11258=1 cannot masquerade as mode2 suppression.
+          if(!sourceAnnouncer->request(request.type,request.racer60,request.variant,
+              dynamicMusicProfile.mode11258,originalAiSession.manager.flags58))
+           dynamicBoundary(request.callPC,"original collision announcer helper pending");
+         }else dynamicBoundary(request.callPC,"unknown original contact event helper");
+         if(!acceptDynamicContactEventReturn50IW(dynamicEventCursor,request.sequence,request.kind))
+          dynamicBoundary(request.callPC,"original contact event return mismatch");
+        }
+       }else if(entry->event.type4==5u){
+        if(entry->event.actor0C!=1u)dynamicBoundary(0x1a52b0u,"actual event5 D48 owner unavailable");
+        const auto started=beginDamageEvent5Subscriber50ID(dynamicEvents,speechInput(),speechCounts,
+            s.noise.sharedRandomState,speechState,dynamicDamageCursor);
+        if(started!=DamageEventStatus50ID::Complete&&started!=DamageEventStatus50ID::NeedEffect)
+         dynamicBoundary(0x1a52b0u,"original damage subscriber pending");
+        if(!dynamicDamageCursor.complete){
+         bool returned=false;
+         if(dynamicDamageCursor.pending==DamageEventEffect50ID::AudioCommand){
+          returned=liveAudio->outputOpen()&&liveAudio->applySourceCommand(dynamicDamageCursor.command).okay();
+          if(returned)++speechCues;
+         }else if(dynamicDamageCursor.pending==DamageEventEffect50ID::Announcer2C2C20){
+          const auto& request=dynamicDamageCursor.receipt;
+          returned=request.announcerArgumentKnown&&sourceAnnouncer->request(request.announcerType,
+              request.announcerRacer,request.announcerVariant,dynamicMusicProfile.mode11258,
+              originalAiSession.manager.flags58);
+         }
+         if(!returned)dynamicBoundary(0x1a52b0u,"actual damage event effect helper pending");
+         if(acceptDamageEventEffectReturn50ID(dynamicDamageCursor,ticket,dynamicDamageCursor.pending)!=
+             DamageEventStatus50ID::Complete)dynamicBoundary(0x1a52b0u,"damage event helper return mismatch");
+        }
+       }else dynamicBoundary(0x1a4d30u,"unjoined actual shared event subscriber");
+       if(acceptRaceEventReturn50ID(dynamicEvents,ticket)!=RaceEventStatus50ID::Complete)
+        dynamicBoundary(0x1a5c40u,"original FIFO acknowledgement mismatch");
+      }
+      if(finishRaceEventFlush50ID(dynamicEvents)!=RaceEventStatus50ID::Complete)
+       dynamicBoundary(0x1a5c40u,"original FIFO flush remains pending");
+     }
+    }
+    if(audioEnabled&&playerAdvancing&&!mode1Enabled&&!dynamicContactEnabled){
      AudioCommand50HE speechCommand{};std::size_t speechCount=0;
      const auto dispatched=dispatchDamageSpeechEvent50HG(speechInput(),speechCounts,pendingSpeech,
          s.noise.sharedRandomState,speechState,&speechCommand,1,speechCount);

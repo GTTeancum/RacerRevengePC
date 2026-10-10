@@ -91,7 +91,15 @@ ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
     if (lateral > 0.0f) {
         s.timers820[4] = 0.25f;
         if (!i.vehicle58 && !i.vehicle3C && (i.profileFlags11050 & 4)) {
-            pending[used++] = {0x222d8c, 0x40, i.player5C, 2, 0, 0};
+            pending[used++] = {i.stopBeforeControllerFeedback50IW&&!i.player5CBound50IW?
+                0x222d70u:0x222d8cu, 0x40, i.player5C, 2, 0, 0};
+            if(i.stopBeforeControllerFeedback50IW){
+                if(!m.valid)return ImpactConsumerStatus49Z::arithmetic;
+                if(used>capacity||!events)return ImpactConsumerStatus49Z::capacity;
+                std::memcpy(&output,&s,sizeof s);std::memcpy(events,pending,used*sizeof *events);
+                count=used;if(partnerEvents)*partnerEvents=partners;
+                return ImpactConsumerStatus49Z::pendingControllerFeedback;
+            }
             const float scale = m.mul(0.005f, lateral);
             pending[used++] = {0x222dec, 0x44, i.player5C, 2, 0, scale < 0.5f ? scale : 0.5f};
         }

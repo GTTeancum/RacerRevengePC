@@ -291,6 +291,13 @@ bool consumeVehicleImpacts49Z(S&s,const VehicleFrameBindings49W&b,const ImpactCo
  z.partnerId=after.partnerId;z.partnerState=after.partnerState;
  copyFloat(z.partnerTimer08,after.partnerTimer08);copyFloat(z.partnerAmount0C,after.partnerAmount0C);copyFloat(f.objectD34_10,after.partnerDuration10);
  copyFloat(z.environmentalD38,after.environmentalD38);copyFloat(z.environmentalD3C,after.environmentalD3C);
+ if(status==ImpactConsumerStatus49Z::pendingControllerFeedback){
+  // Source222B20 prefix is committed up to the missing player/controller
+  // binding at222D70, or up to its first virtual call when identity is bound.
+  // No2228D0 damage or later timer/clear writes were executed. Caller must
+  // fulfill the preceding22ADE0 event before surfacing this terminal cut.
+  commit(s,w,P::PostGraphics);events=next;return fail(d,E::ExternalCut,next.values[0].sourcePC);
+ }
  r.impactConsumerPending49Y=0;r.impactConsumersActive49Z=1;
  // The outer manager gate jumps to228B40, beyond repair/effects/transitions.
  // CD8's inner222B20 skip instead returns to2288BC and still reaches repair.
@@ -486,14 +493,14 @@ DynamicVehicleImpactStatus50IW beginVehicleDynamicImpact50IW(S&s,
  if(s.phase!=P::MainIntegration||!s.fields.dynamicOwnersBound50IW||s.dynamicImpactRecorded50IW){
   fail(d,E::Phase,0x219d98);return T::Rejected;}
  const auto&m=s.bodies.main;const auto&body=m.components;
- if(!body.body20C)return T::Complete;
- if(body.body20C>BodyContactCapacity48R){fail(d,E::Admission,0x223110);return T::Rejected;}
  bool impact=false;
  for(unsigned axis=0;axis<3;++axis){
   if(!std::isfinite(s.visualShared.zero434630.v[axis])){fail(d,E::Admission,0x219d98);return T::Rejected;}
   if(body.root.accumulator1c0.v[axis]!=s.visualShared.zero434630.v[axis]){impact=true;break;}
  }
  if(!impact||(s.fields.impactFlagsCD8&1u)||m.vehicleState40==3u||m.vehicleState40==4u)return T::Complete;
+ if(!body.body20C)return T::Complete;
+ if(body.body20C>BodyContactCapacity48R){fail(d,E::Admission,0x223110);return T::Rejected;}
  if(s.terrainProbe.enabled){
   if(!refreshSceneWorld49P(graph(s),b.lifecycle.main190)){fail(d,E::Graph,0x223030);return T::Rejected;}
   project(s,b);

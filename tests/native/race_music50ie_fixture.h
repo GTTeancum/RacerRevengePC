@@ -1,6 +1,6 @@
 #pragma once
-// Native cold preload and actual shared-mixer transport for category6 music.
-// This admits SIX authenticated original stereo files only. It does not widen
+// Native cold preload/shared-mixer transport for category6 and collision music.
+// Default preparation admits six originals; explicit50IW preparation adds six. It does not widen
 //50HC's generic mono admission, run the original IOP streamer, or invent music.
 #include "pod_materials50ed_fixture.h"
 #include "../../src/assets/audio_assets50hc.h"
@@ -13,9 +13,9 @@
 #include <vector>
 
 namespace race_music50IE {
-inline constexpr std::size_t voice=117,clipCount=6;
-inline constexpr std::size_t pcmByteCapacity=8u*1024u*1024u;
-inline constexpr std::size_t sourceByteCapacity=8u*1024u*1024u;
+inline constexpr std::size_t voice=117,clipCount=6,contactClipCount=6,totalClipCount=12;
+inline constexpr std::size_t pcmByteCapacity=24u*1024u*1024u;
+inline constexpr std::size_t sourceByteCapacity=16u*1024u*1024u;
 struct Definition {
     std::uint32_t song;
     const char* name;
@@ -23,7 +23,7 @@ struct Definition {
     std::uint32_t bytes,payloadBytes,frames;
     const char* sha256;
 };
-inline constexpr std::array<Definition,clipCount> catalog{{
+inline constexpr std::array<Definition,totalClipCount> catalog{{
     {26,"Music\\Race\\Finish\\bad_fin.vag","MUSIC/RACE/FINISH/BAD_FIN.VAG",
         97184,47584,83244,"092f622aa2e170d109f36a09f9f23f823789437568d1da01aba374c0f7df7849"},
     {27,"Music\\Race\\Finish\\best_fin.vag","MUSIC/RACE/FINISH/BEST_FIN.VAG",
@@ -35,7 +35,19 @@ inline constexpr std::array<Definition,clipCount> catalog{{
     {33,"Music\\Race\\FinalLap\\fin_lap3.vag","MUSIC/RACE/FINALLAP/FIN_LAP3.VAG",
         599072,298528,522396,"4dd28e6cb520f5a2e7c02ddd30ebedbc5236e176273d5fb30c36f17ab8df36d4"},
     {34,"Music\\Race\\FinalLap\\fin_lap1.vag","MUSIC/RACE/FINALLAP/FIN_LAP1.VAG",
-        582304,290144,507724,"f13c9d1449d8e4bdf9cffdf8000a1fea070ccb1df9c08d79cdd0ae4b6740ca46"}
+        582304,290144,507724,"f13c9d1449d8e4bdf9cffdf8000a1fea070ccb1df9c08d79cdd0ae4b6740ca46"},
+    {38,"Music\\Race\\Combat\\combat01.vag","MUSIC/RACE/COMBAT/COMBAT01.VAG",
+        515840,256912,449568,"57d1c9d6115949fad1b008039b63bb46435cb8827993332fdec6839b806d49d0"},
+    {39,"Music\\Race\\Combat\\combat05.vag","MUSIC/RACE/COMBAT/COMBAT05.VAG",
+        473120,235552,412188,"2f85f312bcefae061c081d19ef5f69ce877703e27ba32c75b5608a8f2e2796df"},
+    {40,"Music\\Race\\Combat\\combat04.vag","MUSIC/RACE/COMBAT/COMBAT04.VAG",
+        684416,341200,597072,"591679d0bd23daab7f5abf66c880ad4e256318d35d16cef14400627186a7e151"},
+    {41,"Music\\Race\\Combat\\combat03.vag","MUSIC/RACE/COMBAT/COMBAT03.VAG",
+        886432,442208,773836,"af5ab2479efc36b1d599331087456da019c5a11693395daf29a485ae765c8b12"},
+    {42,"Music\\Race\\Combat\\combat02.vag","MUSIC/RACE/COMBAT/COMBAT02.VAG",
+        479328,238656,417620,"50b48c1f1381331ecee0975f00eed8918f3bb1a2bbaed4e639363a05a90c6ea2"},
+    {43,"Music\\Race\\Combat\\combat06.vag","MUSIC/RACE/COMBAT/COMBAT06.VAG",
+        490112,244048,427056,"e0b49fa206c62f51620d28f9193664fc923875ea2f1967315c96cc15e3ce7b64"}
 }};
 namespace detail {
 namespace d=pod_materials50ed_fixture::detail;
@@ -120,7 +132,8 @@ inline rr::assets::AudioPcm50HC decodeSelected(const d::Bytes& bytes,
 } // namespace detail
 
 enum class Result : std::uint8_t {
-    Started,Suppressed,Unavailable,Unprepared,Paused,UnsupportedEvent,Input,Ownership,BackendRejected
+    Started,Suppressed,Unavailable,Unprepared,Paused,UnsupportedEvent,Input,Ownership,BackendRejected,
+    Refreshed,PendingFade234440,PendingPlay,Updated
 };
 struct Receipt {
     Result result=Result::Unprepared;
@@ -128,11 +141,18 @@ struct Receipt {
     bool stoppedPrevious=false;
     // A real mixer start or the recovered source admission return completed.
     // Unavailable/backend errors never acknowledge the category6 FIFO ticket.
-    bool completed()const noexcept{return result==Result::Started||result==Result::Suppressed;}
+    bool completed()const noexcept{return result==Result::Started||result==Result::Refreshed||result==Result::Suppressed;}
+};
+struct UpdateReceipt50IW {
+    Result result=Result::Unprepared;
+    std::uint32_t sourcePC=0,helperPC=0;
+    float fadeSeconds=0.f;
+    bool completed()const noexcept{return result==Result::Updated;}
 };
 struct Counters {
     std::uint64_t requests=0,starts=0,loopStarts=0,oneShotStarts=0,suppressed=0;
     std::uint64_t unavailable=0,rejected=0,stoppedPrevious=0,completions=0,resets=0;
+    std::uint64_t contactRefreshes=0,fadeRequests=0;
 };
 // Own at a stable address. The shared mixer/groups must outlive this owner.
 //117 is exclusive; no second music writer is admitted. No hot file access,
@@ -144,7 +164,7 @@ public:
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
     bool prepare(const std::filesystem::path& discRoot,const std::filesystem::path& audioRoot,
         rr::platform::AudioMixer50HD& mixer,rr::platform::RaceAudioGroups50IC& groups,
-        std::string& error) {
+        std::string& error,bool includeContactMusic=false) {
         namespace d=pod_materials50ed_fixture::detail;
         if(attempted_){error="50IE preparation requires a fresh stable owner";return false;}
         attempted_=true;
@@ -159,8 +179,9 @@ public:
                 "676a9f212a588f0c489f92e46b0c928abee578b10f93f54c5a88068a985d5ec5");
             detail::authenticate(input,audioRoot,"RACEMUS.JUB",14043,
                 "bff85d5a51a94157669be85bb90bb4d6be8bf4d802d95d08b1d2b235e9483bf1");
-            bank_.clips.resize(clipCount);std::size_t pcmBytes=0;
-            for(std::size_t i=0;i<clipCount;++i){
+            const auto selectedCount=includeContactMusic?totalClipCount:clipCount;
+            bank_.clips.resize(selectedCount);std::size_t pcmBytes=0;
+            for(std::size_t i=0;i<selectedCount;++i){
                 const auto& definition=catalog[i];auto& clip=bank_.clips[i];
                 clip.request={definition.name,false,true,true};
                 const auto path=detail::selectedPath(audioRoot,definition.path);
@@ -190,7 +211,8 @@ public:
             //1A3C50..60 supplies manager group's+118 to2C0980's music ctor.
             d::need(groups.bind(voice,rr::game::RaceAudioGroup50IC::Music118),
                 "50IE source Music118 binding rejected");
-            mixer_=&mixer;groups_=&groups;pcmBytes_=pcmBytes;error.clear();return true;
+            mixer_=&mixer;groups_=&groups;pcmBytes_=pcmBytes;
+            contactMusicEnabled_=includeContactMusic;error.clear();return true;
         }catch(const std::exception& e){error=e.what();return false;}
         catch(...){error="50IE music cold preparation failed";return false;}
     }
@@ -199,16 +221,32 @@ public:
         Receipt r;r.song=song;++counters_.requests;
         if(!mixer_)return rejected(r,Result::Unprepared);
         if(paused_)return rejected(r,Result::Paused);
-        if(!pollCompletion())return rejected(r,Result::Ownership);
-        const auto plan=rr::game::planCategory6Music50IE(state_,liveMode11258,song,argumentA2);
+        if(fadePending_)return rejected(r,Result::PendingFade234440);
+        if(playPending_){
+            if(song!=pendingSong_||argumentA2)return rejected(r,Result::Ownership);
+            return resumePlay(r);
+        }
+        const bool contact=rr::game::collisionMusicSong50IW(song);
+        if(contact&&!contactMusicEnabled_)return rejected(r,Result::UnsupportedEvent);
+        //1A46E0 reads existing mode/timer directly. Do not synthesize an
+        //activity update before collision admission or the timer refresh.
+        if(contact){
+            if(!current()||(!owned_&&mixer_->active(voice)))return rejected(r,Result::Ownership);
+        }else if(!pollCompletion())return rejected(r,Result::Ownership);
+        const auto plan=contact?rr::game::planCollisionMusic50IW(state_,liveMode11258,song,argumentA2):
+            rr::game::planCategory6Music50IE(state_,liveMode11258,song,argumentA2);
         if(plan.status==rr::game::RaceMusicPlanStatus50IE::Suppressed){
             r.result=Result::Suppressed;++counters_.suppressed;return r;
+        }
+        if(plan.status==rr::game::RaceMusicPlanStatus50IE::Refresh){
+            state_.timer128=7.f;r.result=Result::Refreshed;r.originalV0=1;
+            ++counters_.contactRefreshes;return r;
         }
         if(plan.status==rr::game::RaceMusicPlanStatus50IE::UnsupportedEvent)
             return rejected(r,Result::UnsupportedEvent);
         if(plan.status!=rr::game::RaceMusicPlanStatus50IE::Play)return rejected(r,Result::Input);
         const auto i=detail::index(song);
-        if(i==clipCount||bank_.clips[i].state!=rr::assets::AudioAssetState50HC::ready){
+        if(i>=bank_.clips.size()||bank_.clips[i].state!=rr::assets::AudioAssetState50HC::ready){
             r.result=Result::Unavailable;++counters_.unavailable;return r;
         }
         // Preflight first. Blocked/missing PCM leaves the original request and
@@ -219,23 +257,40 @@ public:
         rr::game::beginCategory6MusicPlay50IE(plan,state_);
         mixer_->stop(voice);owned_=false;
         rr::game::finishCategory6MusicStop50IE(plan,state_);
-        // Native transport: natural22050Hz PCM through the48000Hz mixer,
-        // unity per-voice gain/pitch and one independent source Music118 gain.
-        // RACEMUS Pitch1881 is original SPU units, NEVER a native ratio.
-        if(!mixer_->play(voice,clips_[i],1.0f,1.0f,plan.loop,0.0f)){
-            rr::game::observeCategory6MusicActivity50IE(false,state_);
-            return rejected(r,Result::BackendRejected);
-        }
-        owned_=true;currentSong_=song;r.result=Result::Started;
-        r.sourcePlayPC=plan.playPC;r.originalV0=1;++counters_.starts;
-        if(plan.loop)++counters_.loopStarts;else ++counters_.oneShotStarts;
-        if(r.stoppedPrevious)++counters_.stoppedPrevious;
-        return r;
+        // Retain the exact pending start after committed timer/stop/mode
+        //writes. A backend rejection must not turn a retry into a timer-only
+        //Refresh and falsely acknowledge a song which never started.
+        playPending_=true;pendingSong_=song;pendingLoop_=plan.loop;
+        pendingPlayPC_=plan.playPC;pendingStoppedPrevious_=r.stoppedPrevious;
+        pendingCallPC_=contact?0x1a47fcu:(plan.loop?0x1a482cu:0x1a48ccu);
+        return resumePlay(r);
     }
+    // Source1A4AF0 at the declared accepted-world seam, once per update.
+    // The collision timer expires into a REAL unresolved234440(1.5) request.
+    // Keep this owner and source queue held. No invented linear mixer ramp,
+    //immediate stop, timer0 store or acknowledgement substitutes for it.
+    UpdateReceipt50IW update(float sourceSeconds) noexcept {
+        if(fadePending_)return {Result::PendingFade234440,0x1a4b3cu,0x234440u,1.5f};
+        if(playPending_)return {Result::PendingPlay,pendingCallPC_,pendingPlayPC_,0.f};
+        if(!mixer_)return {Result::Unprepared,0x1a4af0u,0,0.f};
+        if(paused_)return {Result::Paused,0x1a4af0u,0,0.f};
+        if(!current()||(!owned_&&mixer_->active(voice)))return {Result::Ownership,0x1a4af0u,0,0.f};
+        const auto step=rr::game::beginRaceMusicUpdate50IW(sourceSeconds,state_);
+        if(step.status==rr::game::RaceMusicUpdateStatus50IW::InvalidInput)
+            return {Result::Input,0x1a4af0u,0,0.f};
+        if(step.status==rr::game::RaceMusicUpdateStatus50IW::NeedFade234440){
+            fadePending_=true;++counters_.fadeRequests;
+            return {Result::PendingFade234440,step.sourcePC,0x234440u,step.fadeSeconds};
+        }
+        if(!pollCompletion())return {Result::Ownership,0x1a4b48u,0,0.f};
+        return {Result::Updated,0x1a4b64u,0,0.f};
+    }
+    bool contactMusicEnabled()const noexcept{return contactMusicEnabled_;}
+    bool fadePending()const noexcept{return fadePending_;}
     // Call after a real shared-mixer committed step, also before event dispatch.
     // Completion follows actual source-frame consumption, not a guessed timer.
     bool pollCompletion()noexcept {
-        if(!current())return false;
+        if(!current()||fadePending_||playPending_)return false;
         const bool active=mixer_->active(voice);
         if(!owned_&&active)return false; // Another writer violated117 ownership.
         if(owned_&&!active){owned_=false;currentSong_=0;++counters_.completions;}
@@ -245,7 +300,9 @@ public:
     // Host race reset/close. No cumulative audio clock or other voice changes.
     void reset()noexcept {
         if(mixer_&&current()&&owned_)mixer_->stop(voice);
-        owned_=false;currentSong_=0;state_={};paused_=false;++counters_.resets;
+        owned_=false;currentSong_=0;state_={};paused_=false;fadePending_=false;playPending_=false;
+        pendingSong_=0;pendingPlayPC_=0;pendingCallPC_=0;
+        pendingLoop_=false;pendingStoppedPrevious_=false;++counters_.resets;
     }
     bool prepared()const noexcept{return mixer_!=nullptr;}
     bool current()const noexcept {
@@ -259,11 +316,28 @@ public:
     const Counters& counters()const noexcept{return counters_;}
     std::size_t pcmBytes()const noexcept{return pcmBytes_;}
 private:
+    Receipt resumePlay(Receipt r) noexcept {
+        r.sourcePlayPC=pendingPlayPC_;r.stoppedPrevious=pendingStoppedPrevious_;
+        if(!current()||(!owned_&&mixer_->active(voice)))return rejected(r,Result::Ownership);
+        const auto i=detail::index(pendingSong_);
+        if(i>=bank_.clips.size()||bank_.clips[i].state!=rr::assets::AudioAssetState50HC::ready)
+            return rejected(r,Result::Unavailable);
+        // Native transport: natural22050Hz PCM through the48000Hz mixer,
+        //unity per-voice gain/pitch, independent sourceMusic118 group gain.
+        //RACEMUS Pitch1881 is source SPU units, never a native pitch ratio.
+        if(!mixer_->play(voice,clips_[i],1.f,1.f,pendingLoop_,0.f))
+            return rejected(r,Result::BackendRejected);
+        owned_=true;currentSong_=pendingSong_;r.result=Result::Started;r.originalV0=1;
+        ++counters_.starts;if(pendingLoop_)++counters_.loopStarts;else ++counters_.oneShotStarts;
+        if(pendingStoppedPrevious_)++counters_.stoppedPrevious;
+        playPending_=false;pendingSong_=0;pendingPlayPC_=0;pendingCallPC_=0;
+        pendingLoop_=false;pendingStoppedPrevious_=false;return r;
+    }
     Receipt rejected(Receipt r,Result result)noexcept {
         r.result=result;++counters_.rejected;return r;
     }
     rr::assets::AudioBank50HC bank_{};
-    std::array<rr::platform::AudioClip50HD,clipCount> clips_{};
+    std::array<rr::platform::AudioClip50HD,totalClipCount> clips_{};
     rr::platform::AudioMixer50HD* mixer_=nullptr;
     rr::platform::RaceAudioGroups50IC* groups_=nullptr;
     rr::game::RaceMusicState50IE state_{};
@@ -271,5 +345,8 @@ private:
     std::size_t pcmBytes_=0;
     std::uint32_t currentSong_=0;
     bool attempted_=false,paused_=false,owned_=false;
+    bool contactMusicEnabled_=false,fadePending_=false,playPending_=false;
+    std::uint32_t pendingSong_=0,pendingPlayPC_=0,pendingCallPC_=0;
+    bool pendingLoop_=false,pendingStoppedPrevious_=false;
 };
 } // namespace race_music50IE

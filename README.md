@@ -4,9 +4,9 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This branch preserves **unfinished, uncompiled and untested dynamic-contact source work** on the guarded original-AI baseline. It adds native contact-owner, damage and event components. Main and grid are unchanged: optional dynamic-contact admission remains disabled and the first-slice source boundary stays active. See the [partial source scope and remaining joins](docs/original-ai-dynamic-contact50iw-partial01.md).
+This branch preserves an **uncompiled and untested original-AI dynamic-contact candidate**, pending independent review of the main loop, shared event FIFO and feedback prefix. The optional, default-off path connects actual contact lists, native damage/severity and reached music/event requests. See [source scope and remaining boundaries](docs/original-ai-dynamic-contact50iw.md).
 
-This partial is for recovery, not active integration. Cohesive cold/main wiring, real shared event/effect returns and collision music remain unfinished. Original AI and the GC world still have explicit unsupported boundaries. See [current validation](docs/current-validation.md) for the inherited tested Linux prototype's scope; those results do not validate this branch.
+This source is staged separately from the active first-slice candidate. Authentic controller feedback, opponent speech, announcer types 1/2 and music fade retain explicit stopping boundaries; no complete collision-effects or full original-AI claim is made. See [current validation](docs/current-validation.md) for the inherited Linux baseline; those results do not validate this candidate. Earlier partial work remains in Git history.
 
 ## Build and game data
 
