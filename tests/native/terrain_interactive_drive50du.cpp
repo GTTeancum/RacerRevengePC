@@ -45,6 +45,7 @@
 // retained-data loading remains, but source-word validation runs separately.
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/host_session_menu50if.h"
+#include "original_ui_main_entry50kg.h"
 #include "../../platform/linux/native/host_race_results50il.h"
 #include "../../platform/linux/native/keyboard_packet50dr.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
@@ -174,7 +175,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const rr::game::RaceAudioSettings50IC& effectiveAudioSettings,
     rr::game::RaceAudioSettings50IC& selectedAudioSettings,
     rr::platform::HostTrack50IM effectiveTrack,rr::platform::HostTrack50IM& selectedTrack,
-    const rr::platform::HostTrackAdmission50IM& trackAdmission){
+    const rr::platform::HostTrackAdmission50IM& trackAdmission,
+    const original_main_entry50KG::Application& originalMainApplication){
  // Capture the immutable loaded identity before any front-menu choice changes
  // the next-session selection. The alternate-player integration consumes it.
  const std::uint32_t playerRacer60=selectedRacer60;
@@ -2576,7 +2578,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(skyOwner->load(skyRequest,skyDiagnostic),
      skyDiagnostic.message.empty()?"actual selected-track sky load failed":skyDiagnostic.message.c_str());
  // Host is declared first so renderer destruction always precedes its context.
- platform::GameHost50ER host;
+ auto nativeVideo=std::make_shared<original_main_entry50KG::Video>(originalMainApplication.enabled);
+ auto& host=nativeVideo->host;
  gc_dynamic_window50IG::Owner gcDynamicWindow;
  gc_atm_window_fixture::Owner gcAtm;
  if(gcAnimatedWorld){
@@ -2622,12 +2625,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
  std::array<platform::MaterialTextureGl50EB,raceOpponentCount> opponentGpuTextures,opponentCableGpuTextures;
  platform::MaterialTextureGlDiagnostic50EB textureDiagnostic{};
+ original_main_entry50KG::Frontend originalMain;
  platform::VehicleWindowGl50DS renderer;
  platform::GameHostDiagnostic50ER hostDiagnostic{};
  platform::VehicleWindowDiagnostic50DS rendererDiagnostic{},completionDiagnostic{};
  bool restartRequested=false;
  auto closeWindow=[&](){
   bool clean=true;
+  // Drop all UI/session borrowers before ending renderer and texture publication.
+  originalMain.session.reset();
   if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
   opponentAudio->close(); // Release only96..109 before the live mixer closes.
@@ -2640,6 +2646,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // Never destroy a context beneath unresolved GPU ownership. Destructors may
   // retry cleanup in the same correct order; neither silently leaks resources.
   if(renderer.ownsResources())return false;
+  if(originalMain.gpu && originalMain.gpu->ownsResources() && !originalMain.gpu->close(textureDiagnostic)){
+   std::cerr<<"original Main GPU cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+  }
+  if(originalMain.gpu && originalMain.gpu->ownsResources())return false;
   if(gcDynamicWindow.ownsResources()&&!gcDynamicWindow.close(textureDiagnostic)){
    std::cerr<<"GC dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
   }
@@ -2683,11 +2693,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto& windowRequest=hostRequest.window;
   windowRequest.title=raceEnabled?"Racer Revenge | Native race | W/S + Up/Down | F5 restart | Esc menu":
       "Racer Revenge native development drive | W/S + Up/Down | F5 restart | Esc menu";
-  windowRequest.width=640;windowRequest.height=480;
+  if(originalMainApplication.enabled)windowRequest.title="Racer Revenge | Original Main | Arrows select | Enter confirm | Close quits";
+  windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
   windowRequest.major=3;windowRequest.minor=2;
   windowRequest.profile=platform::WindowGlProfile50DQ::Core;
   windowRequest.samples=0;windowRequest.swapInterval=0;windowRequest.resizable=true;
-  hostRequest.headless={platform::OffscreenGlPlatform50DC::MesaSurfaceless,640,480,3,2,platform::OffscreenGlProfile50DC::Core,8,8,8,8,24,0,0};
+  if(originalMainApplication.enabled){
+   windowRequest.redBits=windowRequest.greenBits=windowRequest.blueBits=windowRequest.alphaBits=8;
+   windowRequest.depthBits=24;windowRequest.stencilBits=0;
+  }
+  hostRequest.headless={platform::OffscreenGlPlatform50DC::MesaSurfaceless,nativeVideo->width,nativeVideo->height,3,2,platform::OffscreenGlProfile50DC::Core,8,8,8,8,24,0,0};
   if(!host.create(hostRequest,hostDiagnostic)){
    reportHost50DU(hostDiagnostic);throw std::runtime_error("window/context creation failed");
   }
@@ -2705,6 +2720,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     audioRequest.wavPath=audioWav;audioRequest.tryDevice=!headlessLive;
     const char* deviceSetting=std::getenv("RR_AUDIO_DEVICE");
     if(deviceSetting)audioRequest.tryDevice=std::string(deviceSetting)=="1";
+    if(originalMainApplication.enabled)audioRequest.tryDevice=false; // Explicit muted Main owns no audio device.
     if(!liveAudio->openOutput(audioRequest,audioDiagnostic)){
      std::cerr<<"Audio output open error="<<static_cast<unsigned>(audioDiagnostic.error)
          <<" detail="<<audioDiagnostic.detail.data()<<'\n';
@@ -2726,6 +2742,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::cerr<<"Race audio ready/missing/unsupported/invalid "<<raceAudio->bank().ready<<'/'
        <<raceAudio->bank().missing<<'/'<<raceAudio->bank().unsupported<<'/'
        <<raceAudio->bank().invalid<<" of "<<raceAudio->bank().clips.size()<<'\n';
+  }
+  if(originalMainApplication.enabled && audioEnabled){
+   liveAudio->pause(true);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(true);
   }
   using GlStringFunction=const unsigned char*(*)(unsigned int);
   const auto glString=reinterpret_cast<GlStringFunction>(host.procAddress("glGetString"));
@@ -2756,6 +2775,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const char* missingTextureProc=nullptr;
   require50DU(platform::loadMaterialTextureFunctions50EE(&host,renderRequest.procAddress,
       textureRequest.gl,missingTextureProc),"required texture GL entry point unavailable");
+  if(originalMainApplication.enabled)
+   originalMain.prepare(originalMainApplication,nativeVideo,textureRequest,renderRequest);
   std::vector<platform::MaterialTextureSampler50EB> samplers;
   std::vector<platform::VehicleWindowMaterialBinding50DS> materialBindings[3];
   if(playerUsesRosterRig){
@@ -2993,8 +3014,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::int32_t drawnMenuWidth=0,drawnMenuHeight=0;
   bool menuImagePublished=false,suppressResumeKeys=false,forceSceneRender=false;
   bool capturePending=false;int terminalInputError=0;
-  std::vector<std::uint8_t> captureBuffer(headlessLive?640u*480u*4u:0u);
-  std::vector<std::uint8_t> captureRgbRow(headlessLive?640u*3u:0u);
+  std::vector<std::uint8_t> captureBuffer(headlessLive?
+      static_cast<std::size_t>(nativeVideo->width)*nativeVideo->height*4u:0u);
+  std::vector<std::uint8_t> captureRgbRow(headlessLive?static_cast<std::size_t>(nativeVideo->width)*3u:0u);
   const char* visibilitySetting=std::getenv("RR_CAPTURE_VISIBILITY");
   const bool captureVisibility=visibilitySetting&&std::string(visibilitySetting)=="1";
   bool wasPaused=true,oversizeReported=false;
@@ -3003,6 +3025,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::uint64_t cameraAdjustedFrames=0,cameraLimitedFrames=0;
   float viewForwardX=0.f,viewForwardZ=1.f; // Host chase view, preserved at vertical attitudes.
   auto reportUiState=[&](const char* reason){
+   if(originalMainApplication.enabled){
+    originalMain.report(reason,originalMainApplication,completedFrames,liveAudio->mixedFrames());return;
+   }
    // Evidence from the actual immutable bank owner and clocks, not a synthetic
    // pause counter. Capture may request this repeatedly without any world step.
    std::cerr<<"host_ui_state {\"reason\":\""<<reason<<"\",\"session\":"<<(sessionIndex+1)
@@ -3027,14 +3052,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<",\"tick\":"<<completedFrames<<",\"mixed_frames\":"<<liveAudio->mixedFrames()<<"}\n";
   };
   auto captureCommitted=[&](){
-   if(!capturePending||(!presenter.hasPublished&&!menuImagePublished))return;
+   if(!capturePending||(!presenter.hasPublished&&!menuImagePublished&&!originalMain.imagePublished))return;
    require50DU(headlessLive,"capture path not configured");
    phase_timing50GK::Scope captureTiming(phaseTiming,phase_timing50GK::Phase::Capture);
    platform::VehicleWindowDiagnostic50DS readbackDiagnostic{};
    require50DU(renderer.readbackRgba(captureBuffer.data(),captureBuffer.size(),readbackDiagnostic),"live frame readback failed");
    const auto width=readbackDiagnostic.readbackWidth,height=readbackDiagnostic.readbackHeight;
    require50DU(width>0&&static_cast<std::size_t>(width)*3<=captureRgbRow.size(),"capture RGB row capacity");
-   std::ofstream image(capturePath,std::ios::binary);
+   const auto captureFile=std::filesystem::path(capturePath);
+   const auto writingFile=originalMainApplication.enabled?
+       std::filesystem::path(captureFile.string()+".pending"):captureFile;
+   std::ofstream image(writingFile,std::ios::binary);
    require50DU(bool(image),"capture file open failed");
    image<<"P6\n"<<width<<' '<<height<<"\n255\n";
    for(int row=height;row>0;--row){
@@ -3048,6 +3076,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    image.close(); // Publish the complete file before the capture acknowledgment.
    require50DU(bool(image),"capture file write failed");
+   if(originalMainApplication.enabled){
+    // Same-directory rename atomically publishes the completed PPM before ACK.
+    std::filesystem::rename(writingFile,captureFile);
+    J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
+        {"file",captureFile.string()},{"width",width},{"height",height}};
+    std::cerr<<"original_main_capture "<<receipt.dump()<<'\n';
+    reportUiState("capture");capturePending=false;return;
+   }
    std::cerr<<"live capture committed at tick "<<lastCommittedTick
             <<(recoveryPaused?" (retained before undertrack pause)":"")<<'\n';
    std::cerr<<"capture_state wrong_way="<<lastCommittedWrongWay<<" tick="<<lastCommittedTick
@@ -3059,6 +3095,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::uint64_t lastStatusNs=monotonicNow50DU();
   std::uint64_t lastAllAiStatusNs=lastStatusNs;
   std::uint64_t lastStatusRenderCount=0;
+  if(!originalMainApplication.enabled){
   std::cerr<<"Interactive development client: W/S left engine throttle/brake; "
                "Up/Down right engine throttle/brake; W+Up both throttle; Space boosts; "
                "S+Down both brake; hold R to repair; Left Shift powerslides; Backspace resets to checkpoint; F5 restarts the grid; Escape opens the pause menu. "
@@ -3082,10 +3119,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(headlessLive)std::cerr<<"Stdin host commands include capture, checkpoint, restart, pause, resume, menu, and quit. "
       "Menus use down/up Up, Down, Left, Right, Enter, Escape. Audio edits apply on Start/Restart only. "
       "Restart destroys this session and repeats the authored-grid cold setup.\n";
-  reportUiState("ready");
+  }
+  reportUiState(originalMainApplication.enabled?"bound":"ready");
   if(allAiEnabled){
    requireOriginalAiFleetReady();
-   reportOriginalAiFleet("ready");
+   if(!originalMainApplication.enabled)reportOriginalAiFleet("ready");
+  }
+  if(originalMainApplication.enabled){
+   std::cerr<<"Original Main controls: Up/Left/W previous(2), Down/Right/S next(3), Enter/Space confirm(4), "
+       "Escape/menu back(6; source Main does not handle back). Window Close, quit, or stdin EOF exits. "
+       "F5/restart and checkpoint have no Main destination. capture writes the existing live PPM target.\n";
   }
   for(;;){
    phase_timing50GK::Scope inputTiming(phaseTiming,phase_timing50GK::Phase::Input);
@@ -3094,6 +3137,64 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    inputTiming.finish();
    if(hostInput.inputError){terminalInputError=hostInput.inputError;std::cerr<<"stdin input error "<<terminalInputError<<'\n';}
+   if(originalMainApplication.enabled){
+    // Own the real input stream before ALL host menus, driving packets,
+    // restart/checkpoint paths and world/audio steps. No fallthrough exists.
+    if(input.quitRequested){
+     originalMain.session->requestQuit();reportUiState("quit");break;
+    }
+    capturePending=capturePending||hostInput.captureRequested;
+    if(hostInput.pauseRequested)originalMain.hostPaused=true;
+    if(hostInput.resumeRequested)originalMain.hostPaused=false;
+    if(hostInput.restartRequested||hostInput.checkpointRequested)
+     std::cerr<<"Original Main stays active: restart/checkpoint has no admitted destination.\n";
+    const auto& info=host.info();
+    const bool drawable=info.drawableWidth>0&&info.drawableHeight>0&&
+        info.drawableWidth<=maximumWidth&&info.drawableHeight<=maximumHeight;
+    const bool active=drawable&&input.focused&&!input.minimized&&!input.eventBudgetExhausted&&
+        !originalMain.hostPaused;
+    const auto mainClock=originalMain.sampleClock(applicationClock,active);
+    if(!active){
+     // Focus/pause time is not fed back as animation or world catch-up.
+     originalMain.lastUpdateNanoseconds=0;captureCommitted();
+     std::this_thread::sleep_for(std::chrono::milliseconds(8));continue;
+    }
+    if(input.pressed[82]||input.pressed[80]||input.pressed[26])originalMain.input(2);
+    if(input.pressed[81]||input.pressed[79]||input.pressed[22])originalMain.input(3);
+    if(input.pressed[40]||input.pressed[44])originalMain.input(4);
+    if(input.pressed[41]||hostInput.menuRequested)originalMain.input(6);
+    const auto uiNow=monotonicNow50DU();
+    require50DU(!originalMain.lastUpdateNanoseconds||uiNow>=originalMain.lastUpdateNanoseconds,
+        "original Main monotonic update clock moved backwards");
+    const float elapsed=originalMain.lastUpdateNanoseconds?
+        static_cast<float>(double(uiNow-originalMain.lastUpdateNanoseconds)/1000000000.0):0.f;
+    originalMain.lastUpdateNanoseconds=uiNow;
+    // Real elapsed frame delta; no synthetic fixed ticks, clamping or RNG
+    // reseed. An unsupported long stall fails through the source session gate.
+    platform::OriginalUiMainSessionUpdate50KG update;update.elapsedSeconds=elapsed;
+    // This Main-only keyboard mapping has no original debug-button bindings.
+    // Its four debug-query levels therefore remain actually released.
+    if(originalMain.session->update(update,originalMain.diagnostic)!=
+        platform::OriginalUiMainSessionStatus50KG::ok)originalMain.fail("update");
+    if(originalMain.session->render(mainClock,originalMain.diagnostic)!=
+        platform::OriginalUiMainSessionStatus50KG::ok)originalMain.fail("render");
+    const auto* draw=originalMain.session->draw();
+    require50DU(draw,"original Main session did not publish a complete native frame");
+    if(!renderer.submitOriginalUi(*draw,info.drawableWidth,info.drawableHeight,rendererDiagnostic)){
+     reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("original Main native submission rejected; not swapped");
+    }
+    if(host.hasWindow()&&!host.swapWindow(hostDiagnostic)){
+     reportHost50DU(hostDiagnostic);throw std::runtime_error("original Main window swap failed");
+    }
+    originalMain.imagePublished=true;++originalMain.frameCount;
+    if(host.hasWindow())++windowSwaps;
+    if(originalMain.frameCount==1){
+     J ready={{"native_frame",originalMain.frameCount},{"width",info.drawableWidth},{"height",info.drawableHeight}};
+     std::cerr<<"original_main_ready "<<ready.dump()<<'\n';reportUiState("ready");
+    }
+    captureCommitted();
+    std::this_thread::sleep_for(std::chrono::milliseconds(8));continue;
+   }
    // Window close, explicit stdin quit, and EOF remain terminal. Escape is
    // host navigation only, never a native vehicle action or an implicit exit.
    if(input.quitRequested){
@@ -4065,6 +4166,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(terminalInputError==0,"live input stream failed");
  }catch(...){closeWindow();throw;}
  require50DU(closeWindow(),"window/renderer cleanup reported a failure");
+ if(originalMainApplication.enabled){
+  J closed={{"native_frames",originalMain.frameCount},{"captures",originalMain.captureSequence},
+      {"world_ticks",completedFrames},{"window_swaps",windowSwaps},{"cleanup_complete",true}};
+  std::cout<<"original_main_closed "<<closed.dump()<<'\n';
+  return SessionExit50DU::Quit;
+ }
  if(raceEnabled)reportRacerContacts();
  std::cout<<(restartRequested?"Development session restarting: ticks=":"Development drive stopped: ticks=")<<completedFrames
           <<" render_commits="<<submittedDrawFrames<<" window_swaps="<<windowSwaps<<" native_calls="<<nativeCalls
@@ -4096,7 +4203,8 @@ int main(int argc,char**argv){try{
   std::cerr<<"usage: terrain_interactive_drive50du CORPUS_JSON [--headless-live CAPTURE_PPM]\n"
              "Run from the repository root. RR_RACE_MODE=1 (default with fully prepared providers); "
              "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
-             "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n";
+             "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
+             "RR_ORIGINAL_MAIN_MENU=1 selects the original Main-only frontend after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted. Destinations remain unavailable; no driving is launched.\n";
   return 2;
  }
  // Every return destroys the complete old session, including native state and
@@ -4106,6 +4214,7 @@ int main(int argc,char**argv){try{
  // One monotonic backend epoch; each cold native session explicitly resets
  // its shared selector lazy slot alongside the freshly constructed physics RNG.
  HostMonotonicClock50ID applicationClock{};
+ original_main_entry50KG::Application originalMainApplication(applicationClock);
  const char* startMenuSetting=std::getenv("RR_START_MENU");
  require50DU(!startMenuSetting||std::string(startMenuSetting)=="0"||std::string(startMenuSetting)=="1",
      "RR_START_MENU must be 0 or 1");
@@ -4135,7 +4244,7 @@ int main(int argc,char**argv){try{
   const auto exit=runSession50DU(argv[1],headlessLive,headlessLive?argv[3]:nullptr,
       useCheckpoint?&activeCheckpoint:nullptr,nextCheckpoint,lapContinuity,sessionIndex,
       applicationClock,startAtMenu,selectedRacer60,effectiveAudioSettings,selectedAudioSettings,
-      effectiveTrack,selectedTrack,trackAdmission);
+      effectiveTrack,selectedTrack,trackAdmission,originalMainApplication);
   if(exit==SessionExit50DU::Quit)break;
   const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
   const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
