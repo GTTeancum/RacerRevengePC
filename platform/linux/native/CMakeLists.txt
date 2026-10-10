@@ -53,6 +53,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/platform/linux/native/original_ui_main_audio50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_main_draw50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_main_session50kg.cpp"
+  "${RR_ROOT}/platform/linux/native/original_ui_frontend50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_options_session50kg.cpp"
   "${RR_ROOT}/src/assets/audio_assets50hc.cpp"
   "${RR_ROOT}/platform/linux/native/audio_mixer50hd.cpp"

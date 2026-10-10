@@ -83,6 +83,7 @@ def main():
         'platform/linux/native/original_ui_main_audio50kg.cpp',
         'platform/linux/native/original_ui_main_draw50kg.cpp',
         'platform/linux/native/original_ui_main_session50kg.cpp',
+        'platform/linux/native/original_ui_frontend50kg.cpp',
         'platform/linux/native/original_ui_options_session50kg.cpp',
         'src/game/original_ui_main_widget_manager50kg.cpp',
         'src/game/original_ui_options_menu_controller50kg.cpp',
