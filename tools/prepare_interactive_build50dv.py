@@ -58,6 +58,7 @@ def main():
         'src/game/original_ui_text_widget50kg.cpp',
         'src/game/original_ui_static_text_page_owner50kg.cpp',
         'src/game/original_ui_transition_owner50kg.cpp',
+        'src/game/original_ui_route_decisions50kg.cpp',
     ):
         absolute = str(ROOT / source)
         if absolute not in argv:
