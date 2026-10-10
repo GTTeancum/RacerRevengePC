@@ -67,7 +67,7 @@ private:
 };
 enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback,
-    optionsMenuPromptMissingPsmFallback, optionsGamePromptMissingPsmFallback, riderStatMissingPsmFallback
+    optionsMenuPromptMissingPsmFallback, optionsGamePromptMissingPsmFallback, riderStatMissingPsmFallback, riderPortraitMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -168,6 +168,12 @@ bool readOriginalUiGameOptionsPromptFallbackMaterial50KG(
 enum class OriginalUiRiderStatTexture50KG : std::uint8_t { podstat,podstat2,notch };
 bool readOriginalUiRiderStatFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
     OriginalUiRiderStatTexture50KG,const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Actual1E9418..1E9448 %02d_flrg ScreenTexture construction. Admits only
+// original1..26 excluding5,6,13; each genuine original portrait is distinct.
+bool readOriginalUiRiderPortraitFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    std::uint8_t riderIndex,const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
 enum class OriginalUiMaterialBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };

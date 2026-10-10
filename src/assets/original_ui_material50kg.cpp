@@ -99,6 +99,10 @@ constexpr PromptSource riderStatSources[]={
     {"podstat2","ui\\textures\\podstat2.pst","ui\\textures\\podstat2","ui\\textures\\podstat2.psm",0x1e89f0},
     {"notch","ui\\textures\\notch.pst","ui\\textures\\notch","ui\\textures\\notch.psm",0x1e8a38}
 };
+bool riderPortraitIndex(std::uint8_t rider) noexcept {return rider>=1&&rider<=26&&rider!=5&&rider!=6&&rider!=13;}
+std::string riderPortraitName(std::uint8_t rider) {
+    std::string name="00_flrg";name[0]=char('0'+rider/10);name[1]=char('0'+rider%10);return name;
+}
 bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
     if (pass.provenance.origin == OriginalUiMaterialOrigin50KG::authoredPsm)
         return pass.identity != nullptr;
@@ -118,6 +122,18 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
             if(p.sourceCallerPC==source.callPC&&p.registeredName==source.registeredName&&
                 p.attemptedPsmMember==source.psm&&pass.textureName==source.texture&&
                 p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::rider,source.member))return true;
+        return false;
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderPortraitMissingPsmFallback){
+        if(p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\uirider\\rider.dat")||
+            p.sourceCallerPC!=0x1e9448)return false;
+        for(std::uint8_t rider=1;rider<=26;++rider){
+            if(!riderPortraitIndex(rider))continue;
+            const auto name=riderPortraitName(rider);const auto registered="ui\\textures\\"+name;
+            if(p.registeredName==registered&&p.attemptedPsmMember==registered+".psm"&&pass.textureName==name&&
+                p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::rider,(registered+".pst").c_str()))return true;
+        }
         return false;
     }
     const bool main=p.origin==OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback;
@@ -410,6 +426,32 @@ bool readOriginalUiRiderStatFallbackMaterial50KG(const OriginalUiArchive50KG& ri
         provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
         provenance.creationPC=0x2475c0;
         auto result=screenTextureFallback(provenance,source.texture,*inherited,runtime);
+        output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderPortraitFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    std::uint8_t riderIndex,const OriginalUiMaterialTemplates50KG& templates,
+    OriginalUiTemplate50KG owner,const OriginalUiMaterialRuntime50KG& runtime,
+    OriginalUiMaterial50KG& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider))
+            return fail(d,Error::archive,"authenticated Rider archive",0x1e9448);
+        if(!riderPortraitIndex(riderIndex))return fail(d,Error::fallbackSource,"original Rider portrait index",0x1e8d54);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto name=riderPortraitName(riderIndex);const auto registered="ui\\textures\\"+name;
+        const auto texture=rider.find(registered+".pst");const auto page=rider.find("ui\\uirider\\rider.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||rider.find(registered+".psm").identity)
+            return fail(d,Error::fallbackSource,"actual Rider portrait and absent original PSM",0x1e9448);
+        OriginalUiMaterialProvenance50KG provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::riderPortraitMissingPsmFallback;
+        provenance.archive=rider.identity();provenance.fallbackTexture=texture.identity;
+        provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=0x1e9448;
+        provenance.registeredName=registered;provenance.attemptedPsmMember=registered+".psm";
+        provenance.creationPC=0x2475c0;
+        auto result=screenTextureFallback(provenance,name.c_str(),*inherited,runtime);
         output=std::move(result);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }
