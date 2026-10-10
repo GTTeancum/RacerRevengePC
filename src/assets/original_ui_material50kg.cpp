@@ -94,6 +94,11 @@ constexpr PromptSource promptSources[]={
     {"icon_sqr","ui\\textures\\icon_sqr.pst","ui\\textures\\icon_sqr","ui\\textures\\icon_sqr.psm",0x1d6994},
     {"icon_cir","ui\\textures\\icon_cir.pst","ui\\textures\\icon_cir","ui\\textures\\icon_cir.psm",0x1d6a4c}
 };
+constexpr PromptSource riderStatSources[]={
+    {"podstat","ui\\textures\\podstat.pst","ui\\textures\\podstat","ui\\textures\\podstat.psm",0x1e89d8},
+    {"podstat2","ui\\textures\\podstat2.pst","ui\\textures\\podstat2","ui\\textures\\podstat2.psm",0x1e89f0},
+    {"notch","ui\\textures\\notch.pst","ui\\textures\\notch","ui\\textures\\notch.psm",0x1e8a38}
+};
 bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
     if (pass.provenance.origin == OriginalUiMaterialOrigin50KG::authoredPsm)
         return pass.identity != nullptr;
@@ -106,6 +111,15 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
             p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::mainMenu,"UI\\UIMain\\Widgets.Dat") &&
             p.registeredName=="ui\\textures\\mmlogo" && p.attemptedPsmMember=="ui\\textures\\mmlogo.psm" &&
             pass.textureName=="mmlogo" && !p.fallbackPageSource && !p.sourceCallerPC;
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderStatMissingPsmFallback){
+        if(p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\uirider\\rider.dat"))return false;
+        for(const auto& source:riderStatSources)
+            if(p.sourceCallerPC==source.callPC&&p.registeredName==source.registeredName&&
+                p.attemptedPsmMember==source.psm&&pass.textureName==source.texture&&
+                p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::rider,source.member))return true;
+        return false;
+    }
     const bool main=p.origin==OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback;
     const bool options=p.origin==OriginalUiMaterialOrigin50KG::optionsMenuPromptMissingPsmFallback;
     const bool gameOptions=p.origin==OriginalUiMaterialOrigin50KG::optionsGamePromptMissingPsmFallback;
@@ -366,6 +380,32 @@ bool readOriginalUiGameOptionsPromptFallbackMaterial50KG(const OriginalUiArchive
         OriginalUiMaterialProvenance50KG provenance;
         provenance.origin=OriginalUiMaterialOrigin50KG::optionsGamePromptMissingPsmFallback;
         provenance.archive=options.identity();provenance.fallbackTexture=texture.identity;
+        provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=source.callPC;
+        provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
+        provenance.creationPC=0x2475c0;
+        auto result=screenTextureFallback(provenance,source.texture,*inherited,runtime);
+        output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderStatFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    OriginalUiRiderStatTexture50KG requested,const OriginalUiMaterialTemplates50KG& templates,
+    OriginalUiTemplate50KG owner,const OriginalUiMaterialRuntime50KG& runtime,
+    OriginalUiMaterial50KG& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider))
+            return fail(d,Error::archive,"authenticated Rider archive",0x1e89d8);
+        const auto index=static_cast<std::size_t>(requested);
+        if(index>=3)return fail(d,Error::fallbackSource,"Rider podstat/podstat2/notch only");
+        const auto& source=riderStatSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=rider.find(source.member);const auto page=rider.find("ui\\uirider\\rider.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||rider.find(source.psm).identity)
+            return fail(d,Error::fallbackSource,"actual Rider stat texture and absent original PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::riderStatMissingPsmFallback;
+        provenance.archive=rider.identity();provenance.fallbackTexture=texture.identity;
         provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=source.callPC;
         provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
         provenance.creationPC=0x2475c0;

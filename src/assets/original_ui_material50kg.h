@@ -67,7 +67,7 @@ private:
 };
 enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback,
-    optionsMenuPromptMissingPsmFallback, optionsGamePromptMissingPsmFallback
+    optionsMenuPromptMissingPsmFallback, optionsGamePromptMissingPsmFallback, riderStatMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -162,6 +162,13 @@ bool readOriginalUiGameOptionsPromptFallbackMaterial50KG(
     OriginalUiMainPrompt50KG,const OriginalUiMaterialTemplates50KG&,
     OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
     OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Exact Rider1E89D8/1E89F0/1E8A38 sprite constructors, ScreenMT owner.
+// Only these original missing-PSM textures are admitted; no arbitrary basename.
+enum class OriginalUiRiderStatTexture50KG : std::uint8_t { podstat,podstat2,notch };
+bool readOriginalUiRiderStatFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    OriginalUiRiderStatTexture50KG,const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
 enum class OriginalUiMaterialBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };
 enum class OriginalUiMaterialFilter50KG : std::uint8_t { nearest, linear };
