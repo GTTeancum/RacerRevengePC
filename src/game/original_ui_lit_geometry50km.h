@@ -56,6 +56,18 @@ OriginalUiLitGeometryStatus50KM projectOriginalUiLitVertex50KM(
     const OriginalUiLitPreamble50KM&,const std::array<float,3>& position,
     const std::array<float,3>& normal,const std::array<float,2>& uv,
     bool computeRadialFog,OriginalUiLitVertex50KM&) noexcept;
+// Actual SpecularMapCompressed33B8C0 normal-to-UV basis. In its multi-
+// palette branch this is model/rootWorld * cameraC0, then normal quantization,
+// independent of the selected node's position and diffuse-light palette rows.
+// No inverse-transpose, normalization, reflection vector or UV flip is used.
+using OriginalUiSpecularNormalAxes50KM = std::array<std::array<float,2>,3>;
+OriginalUiLitGeometryStatus50KM prepareOriginalUiSpecularNormalAxes50KM(
+    const BodyMatrix48G& sourceModelWorld,const OriginalUiLitMatrix50KM& viewC0,
+    float normalQuantization,OriginalUiSpecularNormalAxes50KM&) noexcept;
+OriginalUiLitGeometryStatus50KM projectOriginalUiSpecularMapCompressedVertex50KM(
+    const OriginalUiLitPreamble50KM&,const OriginalUiSpecularNormalAxes50KM&,
+    const std::array<float,3>& rawPosition,const std::array<float,3>& rawNormal,
+    OriginalUiLitVertex50KM&) noexcept;
 struct OriginalUiLitBinderPacket50KM {
     std::array<assets::Vertex48B,8> vertices{};
     std::array<float,8> rasterW{},fogFactors{};
@@ -92,5 +104,16 @@ struct OriginalUiLitSurfaceOutput50KM {
 OriginalUiLitGeometryStatus50KM projectOriginalUiLitSceneSurface50KM(
     const assets::Scene48D&,std::uint32_t lod,std::uint32_t surface,
     const ModelPalette49S&,const OriginalUiLitContext50KM&,bool computeRadialFog,
+    OriginalUiLitSurfaceOutput50KM&,OriginalUiLitGeometryWorkspace50KM&) noexcept;
+// Separate original SpecularMapCompressed entry: same real per-node position
+// and diffuse-light rows, but source model/root camera-normal UVs. The original
+// program emits F=255 even when the model's radial-fog bit is set. This bounded
+// entry requires the actual multi-entry identity palette (Rider pod has three).
+// One-entry/single-palette UV ownership is deliberately not inferred here.
+// Material pass ordering, destination-alpha/fixed255 blending and the native
+// framebuffer-alpha owner remain separate obligations; this is geometry only.
+OriginalUiLitGeometryStatus50KM projectOriginalUiSpecularMapCompressedSurface50KM(
+    const assets::Scene48D&,std::uint32_t lod,std::uint32_t surface,
+    const ModelPalette49S&,const OriginalUiLitContext50KM&,
     OriginalUiLitSurfaceOutput50KM&,OriginalUiLitGeometryWorkspace50KM&) noexcept;
 }

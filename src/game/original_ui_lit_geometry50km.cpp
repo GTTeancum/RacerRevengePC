@@ -181,6 +181,44 @@ Status projectOriginalUiLitVertex50KM(const OriginalUiLitPreamble50KM& in,
     }
     output=next;return Status::complete;
 }
+Status prepareOriginalUiSpecularNormalAxes50KM(const BodyMatrix48G& sourceWorld,
+    const Matrix& view,float normalQ,OriginalUiSpecularNormalAxes50KM& output) noexcept {
+    if(!ready())return Status::arithmetic;
+    Matrix world;std::copy(sourceWorld.v,sourceWorld.v+16,world.begin());
+    if(!finiteMatrix(world)||!finiteMatrix(view)||!finite(normalQ)||normalQ<=0||
+        world[3]!=0||world[7]!=0||world[11]!=0||world[15]!=1)return Status::input;
+    // Single palette33B918..33B928 uses StripPreamble's saved modelView;
+    // multi palette33BF90..33C048 recomputes rows0..3 * rows16..19.
+    // Both multiply those completed rows by qNormal before raw-normal dots.
+    const Matrix modelView=compose(world,view);
+    if(!finiteMatrix(modelView))return Status::arithmetic;
+    OriginalUiSpecularNormalAxes50KM next;
+    for(unsigned axis=0;axis<3;++axis)for(unsigned lane=0;lane<2;++lane){
+        next[axis][lane]=mul(modelView[axis*4+lane],normalQ);
+        if(!finite(next[axis][lane]))return Status::arithmetic;
+    }
+    output=next;return Status::complete;
+}
+Status projectOriginalUiSpecularMapCompressedVertex50KM(const OriginalUiLitPreamble50KM& in,
+    const OriginalUiSpecularNormalAxes50KM& axes,const std::array<float,3>& position,
+    const std::array<float,3>& normal,OriginalUiLitVertex50KM& output) noexcept {
+    if(!in.compressed)return Status::unsupportedScene;
+    if(!ready())return Status::arithmetic;
+    for(float n:normal)if(!finite(n)||n < -128.f||n > 127.f||std::trunc(n)!=n)return Status::input;
+    for(const auto& axis:axes)for(float value:axis)if(!finite(value))return Status::input;
+    std::array<float,2> uv;
+    for(unsigned lane=0;lane<2;++lane){
+        float v=mul(axes[0][lane],normal[0]);
+        v=add(v,mul(axes[1][lane],normal[1]));
+        v=add(v,mul(axes[2][lane],normal[2]));
+        uv[lane]=add(mul(v,0.5f),0.5f);
+        if(!finite(uv[lane]))return Status::arithmetic;
+    }
+    //33BAA8..33BB38 and33C228..33C308 use the same diffuse light colors and
+    // packed RGBA equation. F=255 is unconditional in this original program;
+    // the source model radial-fog bit must not select Diffuse's radial branch.
+    return projectOriginalUiLitVertex50KM(in,position,normal,uv,false,output);
+}
 Status projectOriginalUiRiderBinderPacket50KM(const OriginalUiRiderBinderQuad50KG& quad,
     const OriginalUiLitContext50KM& context,const std::array<float,4>& ambient50,
     OriginalUiLitBinderPacket50KM& output) noexcept {
@@ -211,9 +249,9 @@ Status projectOriginalUiRiderBinderPacket50KM(const OriginalUiRiderBinderQuad50K
     }
     output=next;return Status::complete;
 }
-Status projectOriginalUiLitSceneSurface50KM(const assets::Scene48D& scene,
+static Status projectSceneSurface(const assets::Scene48D& scene,
     std::uint32_t lod,std::uint32_t surfaceIndex,const ModelPalette49S& palette,
-    const OriginalUiLitContext50KM& context,bool radialFog,
+    const OriginalUiLitContext50KM& context,bool radialFog,bool specular,
     OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
     if(!ready())return Status::arithmetic;
     if(radialFog)return Status::unsupportedFog;
@@ -233,6 +271,13 @@ Status projectOriginalUiLitSceneSurface50KM(const assets::Scene48D& scene,
     const float uvQ=static_cast<float>(scene.quantization[2]);
     if(double(positionQ)!=scene.quantization[0]||double(normalQ)!=scene.quantization[1]||
         double(uvQ)!=scene.quantization[2]||!finite(uvQ)||uvQ<=0)return Status::unsupportedScene;
+    OriginalUiSpecularNormalAxes50KM specularAxes{};
+    if(specular){
+        if(palette.entryCount<=1)return Status::unsupportedScene;
+        const auto result=prepareOriginalUiSpecularNormalAxes50KM(palette.rootWorld,
+            context.viewC0,normalQ,specularAxes);
+        if(result!=Status::complete)return result;
+    }
     for(unsigned b=0;b<palette.entryCount;++b){
         const auto result=prepareOriginalUiLitPreamble50KM(palette.nodeWorld[b],context,true,
             positionQ,normalQ,work.palette[b]);
@@ -245,13 +290,16 @@ Status projectOriginalUiLitSceneSurface50KM(const assets::Scene48D& scene,
         for(unsigned c=0;c<3;++c)
             if(!raw(source.position_local[c],scene.quantization[0],-8388608,8388607,position[c])||
                 !raw(source.normal_local[c],scene.quantization[1],-128,127,normal[c]))return Status::unsupportedScene;
-        for(unsigned c=0;c<2;++c){
+        if(!specular)for(unsigned c=0;c<2;++c){
             float packed=0;
             if(!raw(source.uv[c],scene.quantization[2],-32768,32767,packed))return Status::unsupportedScene;
             uv[c]=mul(packed,uvQ);
         }
-        const auto result=projectOriginalUiLitVertex50KM(work.palette[source.bone],position,normal,uv,
-            false,work.vertices[v]);
+        const auto result=specular ?
+            projectOriginalUiSpecularMapCompressedVertex50KM(work.palette[source.bone],specularAxes,
+                position,normal,work.vertices[v]) :
+            projectOriginalUiLitVertex50KM(work.palette[source.bone],position,normal,uv,
+                false,work.vertices[v]);
         if(result!=Status::complete)return result;
     }
     for(auto index:surface.indices)if(index>=surface.vertices.size())return Status::unsupportedScene;
@@ -262,5 +310,17 @@ Status projectOriginalUiLitSceneSurface50KM(const assets::Scene48D& scene,
     }
     output.slotCount=static_cast<std::uint32_t>(triangles);output.materialIndex=surface.material_index;
     return Status::complete;
+}
+Status projectOriginalUiLitSceneSurface50KM(const assets::Scene48D& scene,
+    std::uint32_t lod,std::uint32_t surface,const ModelPalette49S& palette,
+    const OriginalUiLitContext50KM& context,bool radialFog,
+    OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
+    return projectSceneSurface(scene,lod,surface,palette,context,radialFog,false,output,work);
+}
+Status projectOriginalUiSpecularMapCompressedSurface50KM(const assets::Scene48D& scene,
+    std::uint32_t lod,std::uint32_t surface,const ModelPalette49S& palette,
+    const OriginalUiLitContext50KM& context,
+    OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
+    return projectSceneSurface(scene,lod,surface,palette,context,false,true,output,work);
 }
 }
