@@ -55,7 +55,7 @@ inline rr::game::WaterHeightResult50JC prepareWaterSignatureCold50JC(
     q.infiniteD4=static_cast<std::uint32_t>(a.tile);
     q.channelD8=static_cast<std::uint32_t>(a.channel);
     q.effect110=static_cast<std::uint32_t>(a.physicsType);
-    q.originsPublished2BEBD0=false;
+    q.originPublication=WaterOriginPublication50JC::Unbound;
     for(unsigned axis=0;axis<3;++axis)staged.authoredPosition40[axis]=
         m.read(a.position[axis],0x2be118u);
     const auto dimensionFloat=m.integer(static_cast<std::int32_t>(dimension),0x2be3a4u);

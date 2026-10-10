@@ -9,6 +9,7 @@ This is an inactive, unfinished native source slice. It has not been compiled or
 - `assets/water_signature_cold50jc.h`: consumed original signature cold fields, selected raw frame views, authored channel normalization, actual texture-size velocity scaling, and real cold origin values.
 - `assets/water_noise_cold50jc.h`: authenticated-input GC TGA projection through the original BGRA swap, bottom-origin row reversal and unchanged same-format copy.
 - `tests/native/water_resources50jc_fixture.h`: authentic cold archive/member join, stable signature/noise storage and cold projections, called inside the existing authenticated track-load scope.
+- `game/water_presentation50jc.h`: disabled-by-default, explicitly native one-view publication of original position-plus-scroll origins once per actual completed rendered frame.
 
 These APIs consume supplied original resources. They contain no original asset payloads. The preceding GC descriptor stage establishes the authenticated archive, actual water-member identity and original provider presence. Callers must preserve that provenance when resolving every signature frame; a filename or byte span alone does not establish ownership.
 
@@ -27,7 +28,7 @@ The WTT reader retains pool count, authored layout, channels and load masks. Thi
 1. Resolve every original frame and optional base-displacement texture from the same authenticated archive and original directory/search policy. Bind true raw row/pixel strides and stable native storage.
 2. Construct canonical provider/shared-global/time state in original setup order, including height-range scaling and the true shared provider pointer. Do not copy observed GC constants into runtime code.
 3. Advance wake injection and signed lattice buffers with their genuine owners. The native all-AI composition will explicitly own one presentation view, independent of zero human drivers. Its anchor may follow the actual camera-followed pod under the approved native policy; this is a composition choice, not a claim about retail zero-human bootstrap. Existing original nonempty behavior and all authored waves remain intact.
-4. Commit time and signature updates once at the actual update phase, and close or reject the real child continuation. Publish origins at the corresponding presentation phase, preserving the distinct query/time and render lists and their gates.
+4. Commit time and signature updates once at the actual update phase, and close or reject the real child continuation. Bind the explicit one-view presentation policy to actual completed rendered frames; never refresh origins per query or per simulation step.
 5. Join the present water provider to the native reset query only after those owners are complete. Existing reset admission remains closed.
 
 The selected GC WTT, signature frames and base-displacement texture are now joined to stable cold storage under the existing authenticated archive scope. The original 8888-to-8888 copy preserves all RGBA bytes and ignores the unused key. Cold row stride remains zero until the actual time update publishes it. The first remaining activation boundary is live wake/update/origin ownership; resource availability alone does not admit a query. Nothing in this checkpoint supplies fake ready flags, human racers, missing buffers or constant water heights.
@@ -38,3 +39,12 @@ The selected GC WTT, signature frames and base-displacement texture are now join
 The optional fresh-height load now parses the actual authenticated WTT and extracts its selected numbered signature members. It uses the original `tracks\` root, `Sigs\` component and zero-padded frame naming; it requires real first-priority PST hits. GC noise admission verifies the original member hash and rejects any earlier PST/IPU branch in the supplied track catalog. This is the bounded native GC mount composition, not a statement that every unrelated retail mount has been reconstructed.
 
 The resource owner is noncopyable and nonmovable, held by shared ownership outside racer banks. Texture arrays finish allocation before borrowed views are published; no live resizing is provided. Every selected signature owns actual bytes and receives its source cold fields. A missing resource or unsupported pool/channel/path stops cold admission. `waterNativeQueryBound` remains false, and no vehicle height pointer or reset guard is changed.
+
+
+## Explicit native presentation scheduling
+
+Retail `2B70F0` copies the full ordered query/time list into the render list. Its later `2B4C80` path publishes origins only after camera/frustum, water visibility and rendering gates. The native game has one actual camera-followed view and no retail water render pass. The separately approved native policy therefore publishes each real signature's original authored-position-plus-scroll arithmetic once per actual completed rendered frame. It does not claim retail visibility-dependent scheduling parity.
+
+The phase is disabled by default. Its input must come from the real renderer's completed-frame receipt, with exactly one actual view. Repeated frame IDs perform no writes; backward IDs and missing or aliased owners reject. Application pause still controls time advancement independently. Channel-4/foam skipping retains the original origin routine's initial branch.
+
+Query metadata distinguishes `OriginalRender2BEBD0` from `NativeOneViewPresentation50JC`; a native publication cannot impersonate the retail renderer. Cold records remain `Unbound`. The whole phase validates before atomic publication, then records the actual completed frame. No main/render call is enabled by this partial checkpoint, and wake/time/reset lifecycle admission remains separate.
