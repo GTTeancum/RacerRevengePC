@@ -76,6 +76,12 @@ if(request.bindFreshGameTrackHeight){
      world,archive,request.worldMember,height,heightError);
  need(heightReady,
      heightError.empty()?"fresh source height ownership rejected":heightError.c_str());
+ if(height.sourceDomain.water334==rr::game::UndertrackHeightOwner50EW::Present){
+  const bool resourcesReady=water_resources50JC::prepare(archive,request.archiveSha256,
+      height.waterMember,height.waterLogicalOffset,height.waterSource,
+      height.nativeWaterResources,heightError);
+  need(resourcesReady,heightError.empty()?"native water cold resources rejected":heightError.c_str());
+ }
 }
 for(std::size_t zone=0;zone<world.zones.size();++zone){const auto selection=assets::readZoneSearchSelection50CN(world,zone);need(selection.status==assets::ZoneSearchReadStatus50CN::Complete&&selection.selection.collisionStatic118==assets::ZoneSearchKind50CN::List&&selection.selection.collisionDynamic11C==assets::ZoneSearchKind50CN::List,"authored List collision method admission");}
 // Count placements, not distinct filenames: repeated original COL members

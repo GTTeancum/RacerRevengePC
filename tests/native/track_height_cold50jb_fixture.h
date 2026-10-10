@@ -1,5 +1,6 @@
 #pragma once
 #include "../../src/assets/track_height_descriptor50jb.h"
+#include "water_resources50jc_fixture.h"
 #include "../../src/game/undertrack_reset50ew.h"
 #include <string>
 #include <utility>
@@ -14,6 +15,8 @@ struct Owner {
     std::string sceneMember,waterMember;
     std::uint32_t waterLogicalOffset=0;
     std::vector<std::uint8_t> waterSource;
+    std::shared_ptr<water_resources50JC::Owner> nativeWaterResources;
+    // Resource storage alone never sets waterNativeQueryBound.
     bool sourceBound=false;
     bool waterNativeQueryBound=false;
 };

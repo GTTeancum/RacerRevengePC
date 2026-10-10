@@ -7,6 +7,8 @@ This is an inactive, unfinished native source slice. It has not been compiled or
 - `game/water_height50jc.h`: bounded original height query and ordered signature sampling (`2B10F0 -> 2B72B0`), plus scalar time/frame/scroll proposals (`2B6F00 -> 2BEFA0`).
 - `assets/water_authoring50jc.h`: original WTT physics/time fields and real reader defaults, bounded ASCII admission, and original raw signature texture extraction through the existing PST decoder.
 - `assets/water_signature_cold50jc.h`: consumed original signature cold fields, selected raw frame views, authored channel normalization, actual texture-size velocity scaling, and real cold origin values.
+- `assets/water_noise_cold50jc.h`: authenticated-input GC TGA projection through the original BGRA swap, bottom-origin row reversal and unchanged same-format copy.
+- `tests/native/water_resources50jc_fixture.h`: authentic cold archive/member join, stable signature/noise storage and cold projections, called inside the existing authenticated track-load scope.
 
 These APIs consume supplied original resources. They contain no original asset payloads. The preceding GC descriptor stage establishes the authenticated archive, actual water-member identity and original provider presence. Callers must preserve that provenance when resolving every signature frame; a filename or byte span alone does not establish ownership.
 
@@ -28,4 +30,11 @@ The WTT reader retains pool count, authored layout, channels and load masks. Thi
 4. Commit time and signature updates once at the actual update phase, and close or reject the real child continuation. Publish origins at the corresponding presentation phase, preserving the distinct query/time and render lists and their gates.
 5. Join the present water provider to the native reset query only after those owners are complete. Existing reset admission remains closed.
 
-The first remaining cold resource boundary is the base-displacement texture's complete raw-format projection and registry binding. Even after it closes, live wake/update/origin owners remain required. Nothing in this checkpoint supplies fake ready flags, human racers, missing buffers or constant water heights.
+The selected GC WTT, signature frames and base-displacement texture are now joined to stable cold storage under the existing authenticated archive scope. The original 8888-to-8888 copy preserves all RGBA bytes and ignores the unused key. Cold row stride remains zero until the actual time update publishes it. The first remaining activation boundary is live wake/update/origin ownership; resource availability alone does not admit a query. Nothing in this checkpoint supplies fake ready flags, human racers, missing buffers or constant water heights.
+
+
+## Cold resource join and lifetime
+
+The optional fresh-height load now parses the actual authenticated WTT and extracts its selected numbered signature members. It uses the original `tracks\` root, `Sigs\` component and zero-padded frame naming; it requires real first-priority PST hits. GC noise admission verifies the original member hash and rejects any earlier PST/IPU branch in the supplied track catalog. This is the bounded native GC mount composition, not a statement that every unrelated retail mount has been reconstructed.
+
+The resource owner is noncopyable and nonmovable, held by shared ownership outside racer banks. Texture arrays finish allocation before borrowed views are published; no live resizing is provided. Every selected signature owns actual bytes and receives its source cold fields. A missing resource or unsupported pool/channel/path stops cold admission. `waterNativeQueryBound` remains false, and no vehicle height pointer or reset guard is changed.
