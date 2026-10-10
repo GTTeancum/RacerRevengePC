@@ -181,6 +181,13 @@ OriginalUiTextWidgetStatus50KG OriginalUiTextWidget50KG::apply(
     return OriginalUiTextWidgetStatus50KG::ok;
 }
 
+OriginalUiTextWidgetStatus50KG OriginalUiTextWidget50KG::setControlEnabled(bool enabled) noexcept {
+    if (!descriptor_) return OriginalUiTextWidgetStatus50KG::notBound;
+    selected_=enabled;
+    shown_=enabled;
+    return OriginalUiTextWidgetStatus50KG::ok;
+}
+
 OriginalUiTextWidgetStatus50KG OriginalUiTextWidget50KG::setupLine(std::size_t index,
     const OriginalUiTextLineSetup50KG& setup) noexcept {
     if (!descriptor_) return OriginalUiTextWidgetStatus50KG::notBound;

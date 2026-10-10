@@ -60,6 +60,11 @@ def main():
         'src/game/original_ui_transition_owner50kg.cpp',
         'src/game/original_ui_route_decisions50kg.cpp',
         'src/game/original_ui_aperture_owner50kg.cpp',
+        'src/assets/original_ui_movement_control50kg.cpp',
+        'src/assets/original_ui_main_camera_config50kg.cpp',
+        'src/game/original_ui_movement_widget50kg.cpp',
+        'src/game/original_ui_main_camera50kg.cpp',
+        'src/game/original_ui_main_widget_manager50kg.cpp',
     ):
         absolute = str(ROOT / source)
         if absolute not in argv:
