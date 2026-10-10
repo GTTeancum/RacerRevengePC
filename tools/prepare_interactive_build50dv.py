@@ -65,6 +65,8 @@ def main():
         'src/game/original_ui_movement_widget50kg.cpp',
         'src/game/original_ui_main_camera50kg.cpp',
         'src/game/original_ui_main_particle_camera50kg.cpp',
+        'src/game/original_ui_main_scene50kg.cpp',
+        'src/game/original_ui_main_fire50kg.cpp',
         'src/game/original_ui_main_widget_manager50kg.cpp',
     ):
         absolute = str(ROOT / source)

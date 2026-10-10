@@ -1,0 +1,27 @@
+{
+  "status": "Staged source only; no compiler, syntax check, native parser/importer, tests or runtime executed",
+  "active_repo_changed": false,
+  "files": [
+    {
+      "path": "files/src/game/original_ui_main_fire50kg.cpp",
+      "bytes": 12059,
+      "sha256": "dd2aa6fce07fddbccaf4d6395ccd632e4a6cfe0d3862f580e081358fb4e567c4"
+    },
+    {
+      "path": "files/src/game/original_ui_main_fire50kg.h",
+      "bytes": 3532,
+      "sha256": "493d6a935f522e885c313cd5a7308dfd47bd0746ea1293356f0b4370e6443eb3"
+    },
+    {
+      "path": "files/src/game/original_ui_main_scene50kg.cpp",
+      "bytes": 10413,
+      "sha256": "4f6450c32ee73738dfb9b54485e446b78937824344b4f3951c1c4ceffa328006"
+    },
+    {
+      "path": "files/src/game/original_ui_main_scene50kg.h",
+      "bytes": 3355,
+      "sha256": "052e2953794feb154a6ee1ae63be7021e5e0640f4c1d62b537dce60009b8ea56"
+    }
+  ],
+  "evidence_originals_private": true
+}
