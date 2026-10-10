@@ -445,7 +445,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  groundRequest.archive=trackSession->archive;groundRequest.worldMember=trackSession->world->worldMember;
  groundRequest.mapSpline=trackSession->mapSpline;groundRequest.gridRank=trackSession->gridRank;
  groundRequest.archiveSha256=trackSession->archiveSha256;groundRequest.archiveBytes=trackSession->archiveBytes;
+ groundRequest.bindFreshGameTrackHeight=originalAiEnabled;
  auto ground=authored_runtime_ground50cp_fixture::load({4,16,32,64},groundRequest);
+ if(originalAiEnabled){
+  require50DU(ground.height.sourceBound&&ground.height.descriptor.bound,
+      "original AI track330/334 source ownership unavailable");
+  std::cerr<<"ORIGINAL AI height owners: terrain330="<<static_cast<unsigned>(ground.height.sourceDomain.terrain330)
+      <<" water334="<<static_cast<unsigned>(ground.height.sourceDomain.water334)
+      <<" source_bound="<<ground.height.sourceBound
+      <<" water_native_query="<<ground.height.waterNativeQueryBound<<'\n';
+ }
  require50DU(ground.lift==x.parameters.visual.verticalLimit7EC,"same actual Pod01 lift");
  std::vector<std::uint32_t> groundStack(ground.stackCount);
  const auto groundAllocations=::allocations;BodyMatrix48G pose=ground.pose;
@@ -1601,7 +1610,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       lapContinuity.state.vehicleCC8,boostState,originalAi,aiInput,originalAiReceipt)){
    std::cerr<<"ORIGINAL AI source boundary: slot="<<originalAi.managerIndexFE0
        <<" state="<<originalAiReceipt.stateFE8<<" pc="<<std::hex<<originalAiReceipt.sourceBoundary<<std::dec
-       <<" ai_dispatches="<<originalAi.dispatchedFrames<<" brakes="<<originalAi.brakingFrames<<'\n';
+       <<" ai_dispatches="<<originalAi.dispatchedFrames<<" brakes="<<originalAi.brakingFrames
+       <<" terrain330="<<static_cast<unsigned>(ground.height.sourceDomain.terrain330)
+       <<" water334="<<static_cast<unsigned>(ground.height.sourceDomain.water334)
+       <<" height_source_bound="<<ground.height.sourceBound
+       <<" water_native_query="<<ground.height.waterNativeQueryBound<<'\n';
    recoveryPaused=true;return false;
   }
   lapContinuity.state.vehicleCD8=s.fields.impactFlagsCD8;
