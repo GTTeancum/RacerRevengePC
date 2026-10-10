@@ -65,10 +65,19 @@ Status OriginalUiTransitionOwner50KG::bind(std::uint32_t screen,std::uint32_t pa
     return Status::ok;
 }
 
+Status OriginalUiTransitionOwner50KG::bindInitialMain(const OriginalUiTransitionCallbacks50KG& callbacks) noexcept {
+    const auto status=bind(4,1,callbacks);
+    if(status!=Status::ok)return status;
+    state_.initialRestartPending=true;
+    notify(Notice::requestedPage90,state_.current,0x2A3C44);
+    notify(Notice::pageEntry74,state_.current,0x2A3C58);
+    return Status::ok;
+}
+
 Status OriginalUiTransitionOwner50KG::ready() const noexcept {
     if (inCallback_) return Status::busy;
     if (!state_.bound) return Status::notBound;
-    if (state_.lifecycle!=Life::idle || state_.phase!=Phase::none || state_.applicationRequestQueued)
+    if (state_.lifecycle!=Life::idle || state_.phase!=Phase::none || state_.applicationRequestQueued || state_.initialRestartPending)
         return Status::busy;
     return Status::ok;
 }
@@ -174,8 +183,20 @@ Status OriginalUiTransitionOwner50KG::tick() noexcept {
     if (inCallback_) return Status::busy;
     if (!state_.bound) return Status::notBound;
     if (state_.applicationRequestQueued) return Status::noChange;
+    if(state_.initialRestartPending) {
+        state_.initialRestartPending=false;
+        state_.lifecycle=Life::initialEntry;
+        return Status::ok;
+    }
     switch (state_.lifecycle) {
     case Life::idle: return Status::noChange;
+    case Life::initialEntry:
+        //2A3D58, not the requested-page case1: do not call entry74 again.
+        notify(Notice::managerEntry84,state_.current,0x2A3D68);
+        state_.lifecycle=Life::waitPageTransition;state_.phase=Phase::entry;
+        notify(Notice::beginTransition7C,state_.current,0x2A3D8C);
+        notify(Notice::pageAuxiliary1C,state_.current,0x2A3DA4);
+        return Status::ok;
     case Life::requestScreenExit:
         state_.lifecycle=Life::waitScreenExit;state_.phase=Phase::exit;
         notify(Notice::beginTransition7C,state_.current,0x2A3DFC);

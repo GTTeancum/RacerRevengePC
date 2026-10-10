@@ -9,10 +9,10 @@ struct OriginalUiTransitionRoute50KG {
     std::uint8_t screen=0,page=0; // Original IDs; page is one-based.
 };
 
-// Original manager+0x16C values. State 2 (initial/resumed entry) is outside
-// this owner: bind adopts an already-entered native page, never enters it.
+// Original manager+0x16C values. bind adopts an already-entered page;
+// bindInitialMain owns the separate cold initial-selection/restart boundary.
 enum class OriginalUiTransitionLifecycle50KG : std::uint8_t {
-    idle=0,selectRequestedPage=1,waitScreenExit=3,waitPageTransition=4,
+    idle=0,selectRequestedPage=1,initialEntry=2,waitScreenExit=3,waitPageTransition=4,
     waitCourseExit=5,requestScreenExit=6,requestPageExit=7,
     requestCourseExit=8,queueScreen=9,queueCourse=10
 };
@@ -97,6 +97,9 @@ struct OriginalUiTransitionSnapshot50KG {
     OriginalUiTransitionPhase50KG phase=OriginalUiTransitionPhase50KG::none;
     // Native once-only handoff marker; source lifecycle remains 9 or 10.
     bool applicationRequestQueued=false;
+    // UIManager ctor2A3A40 initializes+17C=1. First update2A3FB0 clears it,
+    // sets lifecycle2 and STILL traverses children; entry begins next update.
+    bool initialRestartPending=false;
 };
 
 // Allocation-free, one manager lifecycle owner. No page factories, assets,
@@ -114,6 +117,10 @@ public:
     // Failure leaves the owner unbound and invokes no lifecycle notification.
     OriginalUiTransitionStatus50KG bind(std::uint32_t screen,std::uint32_t page,
         const OriginalUiTransitionCallbacks50KG&) noexcept;
+    // Actual Main initial manager selection2A3C10: requestedPage90, entry74,
+    // no previousPage94. First and second tick retain separate source cases.
+    // All required native callbacks are admitted before publication/calls.
+    OriginalUiTransitionStatus50KG bindInitialMain(const OriginalUiTransitionCallbacks50KG&) noexcept;
     OriginalUiTransitionSnapshot50KG snapshot() const noexcept { return state_; }
 
     // All requests reject unsupported routes before mutation or notification.

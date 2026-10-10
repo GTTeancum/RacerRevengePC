@@ -3,6 +3,7 @@
 #include <cmath>
 #include <limits>
 #include <new>
+#include <string>
 #include <utility>
 
 namespace rr::game {
@@ -70,6 +71,18 @@ Status OriginalUiApertureOwner50KG::bindMain(
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
     const OriginalUiApertureCallbacks50KG& supplied,
     OriginalUiApertureDiagnostic50KG& d) noexcept {
+    return bindMainImpl(std::move(archive),supplied,false,d);
+}
+Status OriginalUiApertureOwner50KG::bindMainEntryOnly(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
+    const OriginalUiApertureCallbacks50KG& supplied,
+    OriginalUiApertureDiagnostic50KG& d) noexcept {
+    return bindMainImpl(std::move(archive),supplied,true,d);
+}
+Status OriginalUiApertureOwner50KG::bindMainImpl(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
+    const OriginalUiApertureCallbacks50KG& supplied,bool entryOnly,
+    OriginalUiApertureDiagnostic50KG& d) noexcept {
     static_assert(sizeof(float)==4 && std::numeric_limits<float>::is_iec559,
         "Original aperture requires IEEE binary32");
     d={};
@@ -90,9 +103,11 @@ Status OriginalUiApertureOwner50KG::bindMain(
             !assets::readOriginalUiPageIndex50KG(indexDat,index,d.parse))
             return fail(d,Status::parseFailure,d.parse.sourcePC);
         if (index.pageFiles.empty()) return fail(d,Status::missingPage,0x1CEC8C);
-        // Archive's exact normalized full-name lookup supplies the path policy;
-        // do not invent basename/prefix/cross-archive fallback for PageFile.
-        if (!assets::readOriginalUiDat50KG(*archive,index.pageFiles[0],pageDat,d.parse))
+        // Pod page loader1CECA4..BC prefixes the actual manager directory
+        // before its PageFile. This is source path construction, not a search
+        // or basename fallback; Main's authored value is simply main.dat.
+        const auto pageMember=std::string("UI/UIMain/")+index.pageFiles[0];
+        if (!assets::readOriginalUiDat50KG(*archive,pageMember,pageDat,d.parse))
             return fail(d,Status::parseFailure,d.parse.sourcePC);
         const auto* info=pageDat.section("PageInfo");
         if (!info) return fail(d,Status::missingPage,0x1D64CC);
@@ -128,7 +143,7 @@ Status OriginalUiApertureOwner50KG::bindMain(
         // 2A5CCC's 1). Only the non-Closed config branch 1D654C writes it to 1.
         next.inputEnabled268=!config.startClosed;
         // No source update sample or rendered primitive is fabricated at bind.
-        archive_=std::move(archive);config_=config;callbacks_=callbacks;state_=next;
+        archive_=std::move(archive);config_=config;callbacks_=callbacks;state_=next;entryOnly_=entryOnly;
         return fail(d,Status::ok);
     } catch (const std::bad_alloc&) { return fail(d,Status::allocation); }
     catch (...) { return fail(d,Status::parseFailure); }
@@ -153,6 +168,7 @@ Status OriginalUiApertureOwner50KG::beginTransition7C(Phase phase) noexcept {
         return Status::ok;
     }
     if (phase==Phase::exit) {
+        if (entryOnly_) return Status::unavailable;
         if (state_.state==State::closed || state_.state==State::closing) return Status::noChange;
         state_.state=State::closing;state_.inputEnabled268=false;
         emit(Hook::closingB4,0x1D74B4,0x1E6960);
@@ -238,7 +254,8 @@ Completion OriginalUiApertureOwner50KG::pollCompletion(
     OperationScope operation(inOperation_);
     if (!available()) return Completion::unavailable;
     if (phase==Phase::entry) return state_.state==State::open?Completion::complete:Completion::pending;
-    if (phase==Phase::exit) return state_.state==State::closed?Completion::complete:Completion::pending;
+    if (phase==Phase::exit) return entryOnly_?Completion::unavailable:
+        (state_.state==State::closed?Completion::complete:Completion::pending);
     return Completion::pending;
 }
 } // namespace rr::game

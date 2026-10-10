@@ -114,6 +114,13 @@ public:
     OriginalUiApertureStatus50KG bindMain(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    // Explicit bounded opening-only admission. available certifies AC/B0 and
+    // both primitives, not the source +440 exit ScreenText. Every exit request
+    // and exit completion query is unavailable before any mutation. Existing
+    // bindMain retains its stricter full-hook contract unchanged.
+    OriginalUiApertureStatus50KG bindMainEntryOnly(
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
     OriginalUiApertureSnapshot50KG snapshot() const noexcept { return state_; }
     const OriginalUiApertureConfig50KG* config() const noexcept {
         return state_.bound?&config_:nullptr;
@@ -149,6 +156,11 @@ private:
     OriginalUiApertureGeometry50KG geometry_{};
     OriginalUiApertureCallbacks50KG callbacks_{};
     mutable bool inOperation_=false;
+    bool entryOnly_=false;
+    OriginalUiApertureStatus50KG bindMainImpl(
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,bool entryOnly,
+        OriginalUiApertureDiagnostic50KG&) noexcept;
     bool available() const noexcept;
     void emit(OriginalUiApertureHookKind50KG,std::uint32_t callPC,
         std::uint32_t targetPC) noexcept;
