@@ -70,7 +70,8 @@ bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
             !flag(*s,"EnableOnDeSelect",r.enableOnDeselect,d,0x2A9068) ||
             !flag(*s,"DisableOnDeSelect",r.disableOnDeselect,d,0x2A9080) ||
             !flag(*s,"WantsJoystickInput1",r.wantsJoystickInput[0],d,0x2A44C0) ||
-            !flag(*s,"WantsJoystickInput2",r.wantsJoystickInput[1],d,0x2A44C0)) return false;
+            !flag(*s,"WantsJoystickInput2",r.wantsJoystickInput[1],d,0x2A44C0) ||
+            !flag(*s,"OnTop",r.onTop,d,0x1CD890)) return false;
         if (r.x<-32768 || r.x>32767 || r.y<-32768 || r.y>32767 || r.height<-32768 || r.height>32767 ||
             !std::isfinite(r.leadingFactor) || !std::isfinite(r.depth))
             return fail(d,OriginalUiPageError50KG::unsupportedValue,*s,"XPosition",0x2A90E4);

@@ -1,0 +1,16 @@
+Static immediate +0x013C references within Pod UI family and generic UI family.
+This is a bounded xref inventory, not a proof about arbitrary alias arithmetic outside these ranges.
+Include addiu, lw/lwu, sw, ld/sd and lq/sq opcode forms.
+
+Scan [001CC8D0,00200000):
+001D6DF8 2607013C op=9 rs=16 rt=7
+001F42E8 8C44013C op=35 rs=2 rt=4
+001FD698 AFA0013C op=43 rs=29 rt=0
+001FD6A4 27A6013C op=9 rs=29 rt=6
+001FD778 8FA5013C op=35 rs=29 rt=5
+
+Scan [002A3000,002ADC00):
+002A5C90 AE00013C op=43 rs=16 rt=0
+002A5FEC 2607013C op=9 rs=16 rt=7
+
+1F42E8 is a widget-array element access: preceding 1F42E0 loads page+270 manager, 1F42E4 manager+154 table; it is not page+13C.

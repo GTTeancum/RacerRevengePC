@@ -1,0 +1,181 @@
+{
+  "base_commit": "2fab114616469a7a45e83551dc9eb58903a3a4df",
+  "elf_sha256": "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30",
+  "scope": "Static source reconstruction; staged files only; uncompiled and untested",
+  "files": [
+    {
+      "path": "src/assets/original_ui_overlay_text50kg.cpp",
+      "preimage_sha256": "0703c5d6f6433977a32a95da7ad819ca2cd48458b919c0d80e6f8e2c3dd5faa5",
+      "staged_sha256": "9df88dfe1a580864b23495984fadb2cc148b2831698063b9a652d3db52186d7e",
+      "preimage_bytes": 7493,
+      "staged_bytes": 7545
+    },
+    {
+      "path": "src/assets/original_ui_overlay_text50kg.h",
+      "preimage_sha256": "86e9c55d4932c32bc97d17ceef8921098e95e2471accfe1c2cdb9624f9a14b0c",
+      "staged_sha256": "8aba0341cf1929ababcb417c136195c292309640b73ee45018c72789ab3b2b3f",
+      "preimage_bytes": 2281,
+      "staged_bytes": 2612
+    },
+    {
+      "path": "src/assets/original_ui_pages50kg.h",
+      "preimage_sha256": "6a765587c33572faa379b0e2829dfc41c7c3578ce7a5f09c529033773621e613",
+      "staged_sha256": "8383fb6fca931b70380ec3122b352dd7e43c8eef324ae50fa3ea8d7e050ea7e2",
+      "preimage_bytes": 5915,
+      "staged_bytes": 6147
+    },
+    {
+      "path": "src/game/original_ui_static_text_page_owner50kg.cpp",
+      "preimage_sha256": "e8c38a77db924096555a97aa934256d8d8b45438c80fa28bcff4a7f3efe1afd9",
+      "staged_sha256": "cb19ce0b7fb620699296ee81c998e01c0b454e0b545b3c3b1ae69d16c238bab0",
+      "preimage_bytes": 23136,
+      "staged_bytes": 24131
+    },
+    {
+      "path": "src/game/original_ui_static_text_page_owner50kg.h",
+      "preimage_sha256": "b97d16c64482e70049fdb12a8077366995461d7ab3b709a0042af7e31fd6e1fa",
+      "staged_sha256": "895aeac5fbbe3806b1120dae6620f8d2e8a080cd8cd63174c0d41bc0f30383f7",
+      "preimage_bytes": 8840,
+      "staged_bytes": 10175
+    },
+    {
+      "path": "src/game/original_ui_text_widget50kg.h",
+      "preimage_sha256": "c55dcdf86fdf4d860b18eb2f811875b4afd0b288057fd91c7596d5f5452af361",
+      "staged_sha256": "2b7c1d85d4c7d2478cdac4b5c2afb8e2884839e8fdea6b78bfa063c58409ff59",
+      "preimage_bytes": 6224,
+      "staged_bytes": 6229
+    }
+  ],
+  "verification": {
+    "performed": [
+      "ELF hash and program-header inspection",
+      "Static original-byte/disassembly and string/vtable inspection",
+      "Manual native source and candidate diff review",
+      "Staged preimage/postimage hashing"
+    ],
+    "not_performed": [
+      "Guest instruction execution",
+      "Emulator",
+      "Project asset decoder/importer",
+      "RES decoding",
+      "Build/compile",
+      "Syntax check",
+      "Tests",
+      "Gameplay",
+      "UI activation",
+      "Repository edits"
+    ]
+  },
+  "evidence_files": [
+    {
+      "path": "evidence/container-2A6FD0-2A7650.txt",
+      "sha256": "7c0e9e81749ecb1e49babb9ed41e0eee480fe5b11e8f3b7ffe0e0358fc5f7e41",
+      "bytes": 13723
+    },
+    {
+      "path": "evidence/control-callbacks-2A5850-2A5D00.txt",
+      "sha256": "1e457cf06e531359bf1a2ea8e1707d7c9c114e58b64cabb859165b7c786754b1",
+      "bytes": 9662
+    },
+    {
+      "path": "evidence/entity-traversal-141300-141EF0.txt",
+      "sha256": "c0b2ca8e2a0208096eb796bab9da4834e0eae855f9d8b6ae751491bf96cf49b5",
+      "bytes": 24297
+    },
+    {
+      "path": "evidence/entity-update-141ED0-142040.txt",
+      "sha256": "2e3dfbe35c0405576a4b9562dfccb6c8e508ad79955edfe692f92ae05af1cbc8",
+      "bytes": 2973
+    },
+    {
+      "path": "evidence/generic-page-2A5D00-2A6730.txt",
+      "sha256": "d1e1949030ee6b7a6bb9527dfdfec1b2b448d3c6019ffaa3922ab15532a84d47",
+      "bytes": 21514
+    },
+    {
+      "path": "evidence/generic-render-2A6780-2A6FD0.txt",
+      "sha256": "508ccd12ef17d55e6589b4209a54ac634ac40fe9c160094ff1cca7c1e9318299",
+      "bytes": 17131
+    },
+    {
+      "path": "evidence/groups-2A4B70-2A5850.txt",
+      "sha256": "6696296b6e2be93ea18ac3b1f3937d7e45c9196d51d6cc2012d89cbc717e6736",
+      "bytes": 26158
+    },
+    {
+      "path": "evidence/manager-2A3D00-2A4B70.txt",
+      "sha256": "7d2a4b3f82a99b38a38ce2ef44ed4e747a05b3b54ea37cab14f33240d1ac25d6",
+      "bytes": 30474
+    },
+    {
+      "path": "evidence/manager-update-2A3C80-2A4000.txt",
+      "sha256": "f5eebac610109048af2842c1388db2ab7976896c0917d366961161e7000ba200",
+      "bytes": 7315
+    },
+    {
+      "path": "evidence/page-create-1D63B0-1D6D50.txt",
+      "sha256": "6ad540009be904b6178ea7635d3d3d177ea9a2f4cfc193e518991172c5a3c165",
+      "bytes": 20200
+    },
+    {
+      "path": "evidence/page-reader-1D6D50-1D7380.txt",
+      "sha256": "9ba606e54ad04d0b1f598a045ff58ef7749f43dbd4a9bb5e95a694fb7325eedc",
+      "bytes": 12997
+    },
+    {
+      "path": "evidence/page-render-1D7550-1D7D10.txt",
+      "sha256": "4faca8b3a17063bf81898f70c2a734594fc43729d864e79e62a9ba0ff8e61f6d",
+      "bytes": 16257
+    },
+    {
+      "path": "evidence/pod-manager-create-1CCB00-1CD160.txt",
+      "sha256": "1339b2ecafaf098c6f8083ffb650de2aa8a5eff9fedf412b88f332f0c3514d0e",
+      "bytes": 13418
+    },
+    {
+      "path": "evidence/pod-manager-deferred-1CDA70-1CDB10.txt",
+      "sha256": "8fa2b6922d972168d3a8a594d743c77c04498ca7367a707eca55638dcb75aeb1",
+      "bytes": 1234
+    },
+    {
+      "path": "evidence/pod-manager-load-1CD000-1CDAC0.txt",
+      "sha256": "678dba45c1d329be39d512c41cb0ca72f573f7b50e28b14cbf007c3c1973d23e",
+      "bytes": 23232
+    },
+    {
+      "path": "evidence/pod-manager-pages-1CEC10-1CED50.txt",
+      "sha256": "d6b592751bd2143ddf2316480b55e3b4eb2de7e59d6f9f9c6533ee6ee6ed74ce",
+      "bytes": 2612
+    },
+    {
+      "path": "evidence/read_mips_words.py",
+      "sha256": "ff5e617e0ac61ba4762709d97de66b01ed7bc3e38fecacd04ada2a74867c9b8f",
+      "bytes": 3116
+    },
+    {
+      "path": "evidence/sample-page-attach-1D03E0-1D0470.txt",
+      "sha256": "f088fee2952b4ac89191962d766306880e411f7f8ec6498ca642e9e971c5015d",
+      "bytes": 1176
+    },
+    {
+      "path": "evidence/source-data.txt",
+      "sha256": "9cbc71158147cadb5b23791004eab2a43adfd883f941edc92f910a9ee2bb251b",
+      "bytes": 6733
+    },
+    {
+      "path": "evidence/static-count-xrefs.txt",
+      "sha256": "894e718992e6fe43f23d91a026eec71f5977efc2998b6095fe08824a689304c6",
+      "bytes": 662
+    },
+    {
+      "path": "evidence/text-children-2A96E0-2A9AD0.txt",
+      "sha256": "53c8dff8f3b69c380b4d7aed1a4af8ec96e877446b3b54af8fe7161b7580b4e8",
+      "bytes": 8243
+    },
+    {
+      "path": "evidence/text-create-2A8F00-2A9710.txt",
+      "sha256": "0c598e8cdb5dcbc58889897ed84c6edf15cf92473387d7ca043f64984211f271",
+      "bytes": 17097
+    }
+  ]
+}

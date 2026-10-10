@@ -117,7 +117,7 @@ bool admitTextSchema(const Section& section,std::uint16_t id,Diagnostic& d) {
     static constexpr const char* keys[]={"Type","FontName","MaterialName","XPosition","YPosition",
         "Height","Alpha","LeadingFactor","Depth","Color","HighlightColor","DisabledColor",
         "EnableOnSelect","DisableOnSelect","EnableOnDeSelect","DisableOnDeSelect",
-        "WantsJoystickInput1","WantsJoystickInput2","Justification","TextID","NumberOfLines","Text"};
+        "WantsJoystickInput1","WantsJoystickInput2","OnTop","Justification","TextID","NumberOfLines","Text"};
     for (const auto& value:section.values) {
         if (!value.sourceValuePresent) continue;
         if (same(value.key,"TextDynamicLineLength") || same(value.key,"TextDynamicLineCount")) {
@@ -164,6 +164,7 @@ struct OriginalUiStaticTextPageOwner50KG::Storage {
     assets::OriginalUiDat50KG pageDat,widgetsDat;
     assets::OriginalUiPage50KG page;
     std::vector<assets::OriginalUiOverlayText50KG> descriptors;
+    OriginalUiStaticTextManagerOrder50KG managerOrder;
     std::unique_ptr<OriginalUiTextWidget50KG[]> widgets;
     OriginalUiNavigation50KG navigation;
 };
@@ -203,9 +204,8 @@ Status OriginalUiStaticTextPageOwner50KG::bind(
         if (!admitPageSchema(next->pageDat,next->page,d) ||
             !admitWidgetSections(next->widgetsDat,next->page.widgetCount,d)) return d.status;
         const auto* info=next->pageDat.section("PageInfo"); // Proven by successful reader.
-        if (next->page.staticWidgetCount!=0)
-            return fieldFailure(d,Status::unsupportedPageFeature,Input::page,*info,
-                "NumberOfStaticWidgets",0,0x1D6DEC);
+        // NumberOfStaticWidgets is retained source metadata, not a membership
+        // selector in these page/manager leaves. Never synthesize its list.
         if (next->page.hasPopup)
             return fieldFailure(d,Status::unsupportedPageFeature,Input::page,*info,"HasPopup",0,0x1D6570);
         if (next->page.useVideoAsTexture)
@@ -239,6 +239,18 @@ Status OriginalUiStaticTextPageOwner50KG::bind(
                 return fieldFailure(d,Status::unsupportedField,Input::widgets,*section,
                     descriptor.wantsJoystickInput[0]?"WantsJoystickInput1":"WantsJoystickInput2",id,0x2A44C0);
         }
+        // PodUIManager 1CD9F8 immediately appends ordinary widgets in load
+        // order; OnTop widgets form a head list (1CD9C8..1CD9E4), later walked
+        // at 1CDA80..1CDAA0 after original setup/page children. These immutable
+        // ID lists publish only that order, not an executable manager tree.
+        next->managerOrder.ordinaryWidgets.reserve(count);
+        next->managerOrder.onTopWidgets.reserve(count);
+        for (std::size_t i=1;i<=count;++i)
+            if (!next->descriptors[i].onTop)
+                next->managerOrder.ordinaryWidgets.push_back(static_cast<std::uint16_t>(i));
+        for (std::size_t i=count;i>0;--i)
+            if (next->descriptors[i].onTop)
+                next->managerOrder.onTopWidgets.push_back(static_cast<std::uint16_t>(i));
         next->widgets=std::make_unique<OriginalUiTextWidget50KG[]>(count+1);
         for (std::size_t i=1;i<=count;++i) {
             const auto status=next->widgets[i].bind(next->descriptors[i]);
@@ -270,6 +282,9 @@ const assets::OriginalUiPage50KG* OriginalUiStaticTextPageOwner50KG::page() cons
 }
 const OriginalUiNavigation50KG* OriginalUiStaticTextPageOwner50KG::navigation() const noexcept {
     return storage_?&storage_->navigation:nullptr;
+}
+const OriginalUiStaticTextManagerOrder50KG* OriginalUiStaticTextPageOwner50KG::managerWidgetOrder() const noexcept {
+    return storage_?&storage_->managerOrder:nullptr;
 }
 const assets::OriginalUiOverlayText50KG* OriginalUiStaticTextPageOwner50KG::descriptor(std::uint16_t id) const noexcept {
     return storage_ && id && id<=storage_->page.widgetCount ? &storage_->descriptors[id] : nullptr;

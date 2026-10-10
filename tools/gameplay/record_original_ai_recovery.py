@@ -26,7 +26,6 @@ REPO = Path("/workspace/shared/rr-recovery-git")
 ASSETS = Path("/workspace/shared/recovery-20261010/native-assets-prepared-01")
 CORPUS = Path("evidence/staticType2Producer49X/original-word/native-fixtures.json")
 EARLIEST = dt.datetime(2026, 10, 10, 15, 18, tzinfo=dt.timezone.utc)
-WINDOW_NS = 30_000_000_000
 MAX_LINE_BYTES = 1_048_576
 MAX_LOG_BYTES = 100 * 1024 * 1024
 PPM_HEADER = b"P6\n640 480\n255\n"
@@ -338,7 +337,7 @@ class Recorder:
                 return
             self.ready_fleet = group
             self.ready_ns = now
-            self.deadline_ns = now + WINDOW_NS
+            self.deadline_ns = now + int(self.args.ready_window_seconds * 1e9)
             self.event("readiness_accepted", ready_monotonic_ns=now,
                        target_deadline_monotonic_ns=self.deadline_ns,
                        fleet_group_index=group["group_index"])
@@ -674,7 +673,7 @@ class Recorder:
             and not any("SIG" in row["action"] for row in self.shutdown_actions),
             "no_reported_boundary": not self.boundaries,
             "no_recorder_or_protocol_problem": not self.problems,
-            "thirty_second_ready_window_elapsed": self.stop_reason == "window_elapsed"
+            "requested_ready_window_elapsed": self.stop_reason == "window_elapsed"
             and self.ready_ns is not None and self.stop_ns >= self.deadline_ns,
         }
         observation_complete = all(checks.values())
@@ -723,6 +722,8 @@ def main():
     parser.add_argument("--not-before", default=EARLIEST.isoformat(),
                         help="UTC launch gate, never earlier than 2026-10-10 15:18 UTC")
     parser.add_argument("--capture-hz", type=float, default=5.0)
+    parser.add_argument("--ready-window-seconds", type=float, default=30.0,
+                        help="Bounded observation after readiness, at most 180 seconds")
     parser.add_argument("--startup-timeout", type=float, default=180.0)
     parser.add_argument("--ack-timeout", type=float, default=5.0)
     parser.add_argument("--quit-timeout", type=float, default=10.0)
@@ -731,7 +732,7 @@ def main():
         parser.error("Review and explicit root launch permission are required; no process started")
     if not re.fullmatch(r"[0-9a-fA-F]{64}", args.expected_exe_sha256):
         parser.error("Expected executable identity must be a 64-digit SHA-256")
-    for name, maximum in (("capture_hz", 5), ("startup_timeout", 300), ("ack_timeout", 10), ("quit_timeout", 15)):
+    for name, maximum in (("capture_hz", 5), ("ready_window_seconds", 180), ("startup_timeout", 300), ("ack_timeout", 10), ("quit_timeout", 15)):
         if not (0 < getattr(args, name) <= maximum):
             parser.error(name + " must be positive and no greater than " + str(maximum))
     gate = dt.datetime.fromisoformat(args.not_before.replace("Z", "+00:00"))
@@ -771,7 +772,7 @@ def main():
         "corpus": corpus_identity, "cwd": str(ASSETS), "environment": environment,
         "environment_policy": "Constructed from the listed values only; no ambient RR, LD, GL, display, or wrapper variables inherited",
         "command": [str(executable), str(CORPUS), "--headless-live", str(output / "live.ppm")],
-        "allowed_stdin_commands": ["capture", "quit"], "target_ready_window_seconds": 30,
+        "allowed_stdin_commands": ["capture", "quit"], "target_ready_window_seconds": args.ready_window_seconds,
         "expected_racer60_by_slot": list(EXPECTED_RACER60), "expected_camera_racer60": 1,
         "capture_hz_maximum": args.capture_hz, "startup_timeout_seconds": args.startup_timeout,
         "capture_ack_timeout_seconds": args.ack_timeout, "quit_timeout_seconds": args.quit_timeout,

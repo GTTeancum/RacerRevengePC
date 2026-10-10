@@ -1,0 +1,182 @@
+--- a/src/assets/original_ui_overlay_text50kg.cpp
++++ b/src/assets/original_ui_overlay_text50kg.cpp
+@@ -70,7 +70,8 @@
+             !flag(*s,"EnableOnDeSelect",r.enableOnDeselect,d,0x2A9068) ||
+             !flag(*s,"DisableOnDeSelect",r.disableOnDeselect,d,0x2A9080) ||
+             !flag(*s,"WantsJoystickInput1",r.wantsJoystickInput[0],d,0x2A44C0) ||
+-            !flag(*s,"WantsJoystickInput2",r.wantsJoystickInput[1],d,0x2A44C0)) return false;
++            !flag(*s,"WantsJoystickInput2",r.wantsJoystickInput[1],d,0x2A44C0) ||
++            !flag(*s,"OnTop",r.onTop,d,0x1CD890)) return false;
+         if (r.x<-32768 || r.x>32767 || r.y<-32768 || r.y>32767 || r.height<-32768 || r.height>32767 ||
+             !std::isfinite(r.leadingFactor) || !std::isfinite(r.depth))
+             return fail(d,OriginalUiPageError50KG::unsupportedValue,*s,"XPosition",0x2A90E4);
+--- a/src/assets/original_ui_overlay_text50kg.h
++++ b/src/assets/original_ui_overlay_text50kg.h
+@@ -21,6 +21,11 @@
+     bool hasHighlightColor=false,hasDisabledColor=false;
+     bool enableOnSelect=false,disableOnSelect=false,enableOnDeselect=false,disableOnDeselect=false;
+     std::array<bool,2> wantsJoystickInput{{false,false}}; // Manager 0x2A44A0.
++    // PodUIManager 1CD890, integer default 0: nonzero defers attachment.
++    // Manager child order is ordinary widgets ascending, intervening original
++    // setup/page children, then OnTop widgets descending. This is tree order,
++    // not a material/depth/alpha override or a page membership designation.
++    bool onTop=false;
+     // Manager 0x2A44E0 recursively hides every newly created widget; initial
+     // visible membership comes from page callbacks, not a synthesized flag.
+     // Original one-byte character strings. TextID and Height-triggered Text
+--- a/src/assets/original_ui_pages50kg.h
++++ b/src/assets/original_ui_pages50kg.h
+@@ -72,7 +72,11 @@
+ struct OriginalUiPage50KG {
+     const OriginalUiMemberIdentity50KG* identity = nullptr;
+     std::uint16_t widgetCount = 0;
+-    std::int32_t pageNo = 0, staticWidgetCount = 0;
++    std::int32_t pageNo = 0;
++    // Source 1D6DEC / 2A5FE0 stores this metadata at page +0x13C.
++    // The inspected page/manager leaves never use it to create a membership
++    // list. It must not select leading widget IDs or imply Control 0.
++    std::int32_t staticWidgetCount = 0;
+     std::string background = "*INVALID*";
+     bool useVideoAsTexture = false;
+     // These vectors include entry zero: the source loops 0..count inclusive.
+--- a/src/game/original_ui_static_text_page_owner50kg.cpp
++++ b/src/game/original_ui_static_text_page_owner50kg.cpp
+@@ -117,7 +117,7 @@
+     static constexpr const char* keys[]={"Type","FontName","MaterialName","XPosition","YPosition",
+         "Height","Alpha","LeadingFactor","Depth","Color","HighlightColor","DisabledColor",
+         "EnableOnSelect","DisableOnSelect","EnableOnDeSelect","DisableOnDeSelect",
+-        "WantsJoystickInput1","WantsJoystickInput2","Justification","TextID","NumberOfLines","Text"};
++        "WantsJoystickInput1","WantsJoystickInput2","OnTop","Justification","TextID","NumberOfLines","Text"};
+     for (const auto& value:section.values) {
+         if (!value.sourceValuePresent) continue;
+         if (same(value.key,"TextDynamicLineLength") || same(value.key,"TextDynamicLineCount")) {
+@@ -164,6 +164,7 @@
+     assets::OriginalUiDat50KG pageDat,widgetsDat;
+     assets::OriginalUiPage50KG page;
+     std::vector<assets::OriginalUiOverlayText50KG> descriptors;
++    OriginalUiStaticTextManagerOrder50KG managerOrder;
+     std::unique_ptr<OriginalUiTextWidget50KG[]> widgets;
+     OriginalUiNavigation50KG navigation;
+ };
+@@ -203,9 +204,8 @@
+         if (!admitPageSchema(next->pageDat,next->page,d) ||
+             !admitWidgetSections(next->widgetsDat,next->page.widgetCount,d)) return d.status;
+         const auto* info=next->pageDat.section("PageInfo"); // Proven by successful reader.
+-        if (next->page.staticWidgetCount!=0)
+-            return fieldFailure(d,Status::unsupportedPageFeature,Input::page,*info,
+-                "NumberOfStaticWidgets",0,0x1D6DEC);
++        // NumberOfStaticWidgets is retained source metadata, not a membership
++        // selector in these page/manager leaves. Never synthesize its list.
+         if (next->page.hasPopup)
+             return fieldFailure(d,Status::unsupportedPageFeature,Input::page,*info,"HasPopup",0,0x1D6570);
+         if (next->page.useVideoAsTexture)
+@@ -239,6 +239,18 @@
+                 return fieldFailure(d,Status::unsupportedField,Input::widgets,*section,
+                     descriptor.wantsJoystickInput[0]?"WantsJoystickInput1":"WantsJoystickInput2",id,0x2A44C0);
+         }
++        // PodUIManager 1CD9F8 immediately appends ordinary widgets in load
++        // order; OnTop widgets form a head list (1CD9C8..1CD9E4), later walked
++        // at 1CDA80..1CDAA0 after original setup/page children. These immutable
++        // ID lists publish only that order, not an executable manager tree.
++        next->managerOrder.ordinaryWidgets.reserve(count);
++        next->managerOrder.onTopWidgets.reserve(count);
++        for (std::size_t i=1;i<=count;++i)
++            if (!next->descriptors[i].onTop)
++                next->managerOrder.ordinaryWidgets.push_back(static_cast<std::uint16_t>(i));
++        for (std::size_t i=count;i>0;--i)
++            if (next->descriptors[i].onTop)
++                next->managerOrder.onTopWidgets.push_back(static_cast<std::uint16_t>(i));
+         next->widgets=std::make_unique<OriginalUiTextWidget50KG[]>(count+1);
+         for (std::size_t i=1;i<=count;++i) {
+             const auto status=next->widgets[i].bind(next->descriptors[i]);
+@@ -270,6 +282,9 @@
+ }
+ const OriginalUiNavigation50KG* OriginalUiStaticTextPageOwner50KG::navigation() const noexcept {
+     return storage_?&storage_->navigation:nullptr;
++}
++const OriginalUiStaticTextManagerOrder50KG* OriginalUiStaticTextPageOwner50KG::managerWidgetOrder() const noexcept {
++    return storage_?&storage_->managerOrder:nullptr;
+ }
+ const assets::OriginalUiOverlayText50KG* OriginalUiStaticTextPageOwner50KG::descriptor(std::uint16_t id) const noexcept {
+     return storage_ && id && id<=storage_->page.widgetCount ? &storage_->descriptors[id] : nullptr;
+--- a/src/game/original_ui_static_text_page_owner50kg.h
++++ b/src/game/original_ui_static_text_page_owner50kg.h
+@@ -5,11 +5,12 @@
+ #include <cstdint>
+ #include <memory>
+ #include <string>
++#include <vector>
+ 
+ namespace rr::game {
+ // This is a static-text container owner, NOT a complete screen controller.
+ // It does not own page transitions, backgrounds, popups, font/material loads,
+-// draw ordering, depth, blending, routes, host input mapping or GPU submission.
++// complete draw scheduling, depth, blending, routes, host input mapping or GPU submission.
+ enum class OriginalUiStaticTextPageStatus50KG : std::uint8_t {
+     ok, noChange, hidden, lockedOut, unavailable,
+     notBound, alreadyBound, invalidArchive, parseFailure, allocation,
+@@ -53,6 +54,17 @@
+     OriginalUiTextLineProjection50KG line{};
+ };
+ 
++// Native immutable projection of PodUIManager child attachment order for the
++// admitted all-Overlay_Text companion Widgets DAT. Source 1CD7A0 attaches
++// ordinary widgets immediately; 1CDA70 appends the deferred head list after
++// original setup/page children, hence descending OnTop IDs. Both vectors use
++// one-based widget IDs and together contain every declared widget once.
++// Control membership/callback duplication does not duplicate tree children.
++struct OriginalUiStaticTextManagerOrder50KG {
++    std::vector<std::uint16_t> ordinaryWidgets;
++    std::vector<std::uint16_t> onTopWidgets;
++};
++
+ class OriginalUiStaticTextPageOwner50KG final {
+ public:
+     OriginalUiStaticTextPageOwner50KG() noexcept;
+@@ -66,7 +78,9 @@
+     // pins their immutable archive owners. No fabricated typed descriptor input.
+     // Every declared widget must be admitted Overlay_Text, including widgets
+     // unused by this page. Unknown fields/sections and dynamic text fail closed.
+-    // Static-widget membership, popup and video requirements are unsupported.
++    // Popup and video requirements are unsupported. NumberOfStaticWidgets is
++    // retained metadata only; no static membership is inferred from its value.
++    // Authored OnTop supplies the explicit manager order exposed below.
+     // English is borrowed only during parsing; resolved text is copied here.
+     // Archive shared_ptrs must genuinely own their pointees, not no-op aliases.
+     // On failure nothing is published and bind remains retryable.
+@@ -81,6 +95,11 @@
+     const assets::OriginalUiDat50KG* widgetsDat() const noexcept;
+     const assets::OriginalUiPage50KG* page() const noexcept;
+     const OriginalUiNavigation50KG* navigation() const noexcept;
++    // Traversal evidence only: ordinaryWidgets, then actual intervening manager
++    // children, then onTopWidgets. A page's controls are reference/callback
++    // lists, not widget ancestors. Caller must establish the full manager tree
++    // and lifecycle before dispatching any update or render. No sweep occurs.
++    const OriginalUiStaticTextManagerOrder50KG* managerWidgetOrder() const noexcept;
+     const assets::OriginalUiOverlayText50KG* descriptor(std::uint16_t widgetId) const noexcept;
+     const OriginalUiTextWidget50KG* textWidget(std::uint16_t widgetId) const noexcept;
+ 
+@@ -116,8 +135,10 @@
+     OriginalUiStaticTextPageStatus50KG stopLine(std::uint16_t widgetId,std::size_t line,
+         OriginalUiStaticTextPageDiagnostic50KG&) noexcept;
+ 
+-    // Caller supplies proven hierarchy visibility and source update/draw order.
+-    // No default page visibility, ID-order update sweep, clock or fast-forward.
++    // Caller supplies proven manager/entity ancestry and source update/draw
++    // point. Widget visibility is not gated by control/page "shown" metadata:
++    // original widgets are manager siblings of pages. Use managerWidgetOrder
++    // only with the established intervening tree. No implicit sweep or clock.
+     OriginalUiStaticTextPageStatus50KG updateStatic(std::uint16_t widgetId,
+         bool ancestorsShown,OriginalUiStaticTextPageDiagnostic50KG&) noexcept;
+     OriginalUiStaticTextPageStatus50KG positionLine(std::uint16_t widgetId,std::size_t line,
+--- a/src/game/original_ui_text_widget50kg.h
++++ b/src/game/original_ui_text_widget50kg.h
+@@ -89,7 +89,7 @@
+ 
+     // Source update's supported zero/nonpositive-duration branch, not a time
+     // fast-forward. Call at the ordinary update point. Hidden hierarchy skips
+-    // update; ancestor visibility is supplied by the owning page. Inactive
++    // update; caller supplies the established manager/entity ancestry. Inactive
+     // overlays still receive the source alpha comparison/setter projection.
+     OriginalUiTextWidgetStatus50KG updateStatic(bool ancestorsShown=true) noexcept;
+ 
