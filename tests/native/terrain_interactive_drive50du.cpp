@@ -1377,6 +1377,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Every accepted sample is appended, genuinely dispatched and acknowledged
  // before another poll can overwrite its transitions, including pause releases.
  auto sampleController=[&](){
+  require50DU(!originalMainApplication.enabled,"Main-only frontend cannot sample driving input");
   // UI capture/quit/pause paths may reach this call site, but there is no
   // player device owner to sample in the explicitly selected all-AI roster.
   if(allAiEnabled)return;
@@ -1424,6 +1425,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   requireActionStatus(controllerActions.acknowledgeComplete(),"acknowledge");
  };
  auto composePacket=[&](bool live,const platform::WindowInput50DQ& input){
+  require50DU(!originalMainApplication.enabled,"Main-only frontend cannot compose a driving packet");
   if(allAiEnabled)return;
   ++allAiKeyboardPackets;
   if(live&&autoDriveEnabled&&(input.down[26]||input.down[22]||input.down[82]||input.down[81])){
@@ -1438,6 +1440,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
 
  auto applyCourseInput=[&](std::size_t racerSlot=0){
+  require50DU(!originalMainApplication.enabled,"Main-only frontend cannot invoke a driving controller");
   require50DU(!allAiEnabled,"all-original-AI path reached forbidden HOST course driver");
   ++allAiHostDriverCalls;
   rr::host::CourseDriverInput50GK command{};
@@ -1598,6 +1601,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
  };
  auto advanceFrame=[&](){
+ require50DU(!originalMainApplication.enabled,"Main-only frontend cannot advance race physics");
  finishDriverAppliedThisFrame=false;
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame)require50DU(advanceSpeechTimers50HG(.016f,lapContinuity.prefix,speechState),
      "native speech countdown failed");
@@ -2404,6 +2408,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     s.fields.dynamicOwnersBound50IW=true;
    });
   }
+  // Race activation begins here, AFTER genuine cold rig/grid/contact/draw
+  // owners are loaded. The neutral setup tick is real native physics, not
+  // asset preparation. Main-only retains these assets but cannot activate a
+  // race, publish fabricated ranks, or sample a neutral driving packet.
+  if(!originalMainApplication.enabled){
   // One neutral, unscored native setup tick establishes actual graphics/ground
   // before countdown rendering. After this all physics freezes until GO.
   const platform::WindowInput50DQ noKeys{};
@@ -2474,6 +2483,33 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "source severity/common maxima, authentic profile11258=1 music, shared event1/event5 FIFO. "
       "Terminal boundaries retain missing vehicle5C/controller feedback, opponent D48, collision announcer and music fade. "
       "Native serial world timing is explicit; no full original scheduler claim.\n";
+  } // Native race activation; unreachable in the Main-only frontend.
+ }
+ if(originalMainApplication.enabled){
+  // Read actual retained owners without changing a counter or fabricating
+  // Ready/rank/field state. Renderer.create consumes immutable source meshes,
+  // never a VehicleDrawBatch or a completed vehicle graphics tick.
+  require50DU(race.phase==race_session50HM::Phase::Uninitialized && race.racerCount==0 &&
+      !originalAiSession.rankBound && !mode1 && !raceSetupFrame && !opponentFrame,
+      "Main-only startup unexpectedly activated a race manager");
+  require50DU(allAiControllerSamples==0 && allAiKeyboardPackets==0 && allAiHostDriverCalls==0,
+      "Main-only startup consumed driving input");
+  const auto requireUnadvancedColdRacer=[&](){
+   require50DU(completedFrames==0 && m.frameFactor==0.f && nativeCalls==0 &&
+       s.phase==VehicleFramePhase49W::Ready && originalAi.dispatchedFrames==0 &&
+       controllerPresses==0 && controllerReleases==0,
+       "Main-only startup advanced an actual cold racer");
+  };
+  requireUnadvancedColdRacer();
+  if(raceEnabled)for(std::size_t slot=0;slot<racerBank.count();++slot){
+   require50DU(!originalAiSession.observed[slot].bound && !originalAiSession.fields[slot].bound &&
+       !race.racers[slot].observedValid && !race.racers[slot].sampled,
+       "Main-only startup published a race observation");
+   racerBank.visit(slot,requireUnadvancedColdRacer);
+  }
+  std::cerr<<"ORIGINAL MAIN COLD: genuine loaded racer assets="<<(raceEnabled?racerBank.count():1u)
+      <<"; all retained native frame counts/factors and driving samples are zero; "
+      "race manager, source rank and field observations remain uninitialized.\n";
  }
 
  // Cold-selected player publications borrow stable owners through shutdown.
@@ -2737,7 +2773,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
   }
   if(mode1Enabled||dynamicContactEnabled)require50DU(liveAudio->outputOpen(),"source events need the real shared output backend");
-  if(audioEnabled&&raceEnabled){
+  // Main retained cold race PCM owners, but did not initialize/observe a race.
+  // Do not seed countdown or standings audio from an unstarted world.
+  if(audioEnabled&&raceEnabled&&!originalMainApplication.enabled){
    require50DU(raceAudio->observe(race).accepted,"initial race audio observation rejected");
    std::cerr<<"Race audio ready/missing/unsupported/invalid "<<raceAudio->bank().ready<<'/'
        <<raceAudio->bank().missing<<'/'<<raceAudio->bank().unsupported<<'/'
