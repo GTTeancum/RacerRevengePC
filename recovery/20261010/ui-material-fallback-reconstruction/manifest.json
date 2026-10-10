@@ -1,0 +1,15 @@
+{
+  "status": "staged source only; no compile/syntax/test/native execution",
+  "files": [
+    {
+      "path": "src/assets/original_ui_material50kg.h",
+      "preimage_sha256": "e4717dfd89d39f7358d8604e370f48046f1a73c0d019062f64e39a7e4de4d5d1",
+      "staged_sha256": "a144ccb3ad4eca2d783fa67dfd2d3cc8f7b801a976af039a07b87f441758f14a"
+    },
+    {
+      "path": "src/assets/original_ui_material50kg.cpp",
+      "preimage_sha256": "5ff8bc6480e2409da54691d66e2be04aafb797e899d3a20fb9d22b38836edd1e",
+      "staged_sha256": "fffb3322098e2d0b6633378c7bbfa336a9781e5c8753499717881f49260b0412"
+    }
+  ]
+}

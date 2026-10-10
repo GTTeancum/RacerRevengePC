@@ -257,6 +257,8 @@ struct VehicleWindowRequest50DS {
     // NEW opt-in reconstructed original-art renderer. Disabled by default.
     // Exact CPU/GPU bank pair is checked cold, including raw alpha <=128.
     // Both immutable owners must outlive close; no generated/font fallback.
+    // Both may be null for explicit untextured-only draws; a textured span
+    // still requires its real bank, and a partial bank pair always rejects.
     bool enableOriginalUi = false;
     const assets::MaterialTextureAssets50EA* originalUiCpuTextures = nullptr;
     const MaterialTextureGl50EB* originalUiTextures = nullptr;

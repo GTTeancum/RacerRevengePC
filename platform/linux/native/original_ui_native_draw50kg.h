@@ -4,17 +4,20 @@
 namespace rr::platform {
 // NEW reconstruction, not recovered historical bytes. No implicit material
 // defaults: caller joins authenticated material, packet-depth and pass owners.
-// Each span must first pass the recovered prepareOriginalUiNativeMaterial50KG
-// admission. The caller must preserve its blend/depth policy and exact sampler,
+// Each span must first pass prepareOriginalUiNativeMaterial50KG (textured) or
+// prepareOriginalUiNativeUntexturedMaterial50KG (zero-map vertex color).
+// The caller must preserve its blend/depth policy and any exact sampler,
 // resolve pass-group/animation enablement, and exclude every rejected source
 // state. This renderer cannot infer those owners from a texture-bank identity.
 enum class OriginalUiDepth50KG : std::uint8_t { unspecified, never, always, greaterEqual, greater };
 struct OriginalUiNativeSpan50KG {
     OriginalUiDepth50KG depth = OriginalUiDepth50KG::unspecified;
     bool depthWrite = false;
-    // Exact source policy per span, even when images repeat. The renderer
+    // Exact source policy per textured span, even when images repeat. The renderer
     // verifies actual immutable texture parameters before target writes;
     // conflicts reject instead of inheriting the first image's sampler.
+    // Untextured spans must leave every sampler field unspecified. No texture
+    // is bound as a surrogate and no irrelevant sampler policy is invented.
     MaterialTextureSampler50EB sampler{};
 };
 struct OriginalUiNativeDraw50KG {
@@ -29,7 +32,9 @@ struct OriginalUiNativeDraw50KG {
     // Vertex position[2] is the original integer packet Z in [0,16777215].
     // The vertex shader normalizes it once into native D24 reverse depth.
     // XY stays on the 640x448 source canvas; corners remain TL,TR,BR,BL.
-    // colorScale must be 255/128. Nonopaque alphaScale must be (255/128)^2;
-    // opaque retains the recovered API's alphaScale=1 (alpha is not stored).
+    // texturedModulate: colorScale=255/128, blended alphaScale=(255/128)^2.
+    // untexturedVertexColor: colorScale=1, blended alphaScale=255/128.
+    // Opaque spans retain alphaScale=1 (source framebuffer alpha is not stored).
+    // Both modes retain raw vertex alpha <=128 as a bounded native admission.
 };
 }

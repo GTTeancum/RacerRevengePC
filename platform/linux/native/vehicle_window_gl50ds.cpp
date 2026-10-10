@@ -973,7 +973,7 @@ struct VehicleWindowGl50DS::Storage {
     U uiTargets[2]{}, uiColors[2]{}, uiDepths[2]{};
     U uiProgram = 0, uiVertexShader = 0, uiFragmentShader = 0;
     U uiVertexBuffer = 0, uiIndexBuffer = 0, uiVertexArray = 0;
-    I uiCanvasUniform = -1, uiImageUniform = -1, uiAlphaUniform = -1;
+    I uiCanvasUniform = -1, uiImageUniform = -1, uiAlphaUniform = -1, uiTexturedUniform = -1;
     std::uint8_t uiPublished = 0;
     std::uint64_t uiTexturePublication = 0;
     I raceWidth = 0, raceHeight = 0;
@@ -2075,6 +2075,9 @@ void main() {
                 fail(*diagnostic, VehicleWindowError50DS::request, "UI banks require explicit original UI opt-in");
         const auto* cpu = input.originalUiCpuTextures;
         const auto* gpu = input.originalUiTextures;
+        // No bank is needed by an explicitly untextured-only UI. A missing
+        // textured resource never selects this path: each span is typed.
+        if (!cpu && !gpu) return true;
         if (!cpu || !cpu->loaded() || !gpu || !gpu->validBorrow(input.context, input.isCurrent,
             gpu->publicationToken()) || !cpu->textureCount() || cpu->textureCount() != gpu->textureCount())
             return fail(*diagnostic, VehicleWindowError50DS::material, "UI requires matching immutable CPU/GPU publication");
@@ -2109,12 +2112,19 @@ in vec2 uiUv;
 in vec4 uiColor;
 uniform sampler2D uiImage;
 uniform float uiAlphaScale;
+uniform int uiTextured;
 out vec4 viewerOutput;
 void main() {
-    vec4 raw = texture(uiImage, uiUv) * uiColor;
-    // MODULATE clamps before blend, not after addition to destination RGB.
-    viewerOutput = vec4(clamp(raw.rgb * (255.0 / 128.0), 0.0, 1.0),
-        clamp(raw.a * uiAlphaScale, 0.0, 1.0));
+    if (uiTextured != 0) {
+        vec4 raw = texture(uiImage, uiUv) * uiColor;
+        // MODULATE clamps before blend, not after addition to destination RGB.
+        viewerOutput = vec4(clamp(raw.rgb * (255.0 / 128.0), 0.0, 1.0),
+            clamp(raw.a * uiAlphaScale, 0.0, 1.0));
+    } else {
+        // TME=0 uses raw interpolated vertex color without texture modulation.
+        // Nonopaque A/128 uses one 255/128 scale; RGB retains its raw /255.
+        viewerOutput = vec4(uiColor.rgb, clamp(uiColor.a * uiAlphaScale, 0.0, 1.0));
+    }
 }
 )GLSL";
         const auto compile = [&](U type, const char* source, U& name) noexcept {
@@ -2155,8 +2165,9 @@ void main() {
         uiCanvasUniform = shaderGl.getUniformLocation(uiProgram, "canvasToClip");
         uiImageUniform = shaderGl.getUniformLocation(uiProgram, "uiImage");
         uiAlphaUniform = shaderGl.getUniformLocation(uiProgram, "uiAlphaScale");
+        uiTexturedUniform = shaderGl.getUniformLocation(uiProgram, "uiTextured");
         if (!check("locate original UI uniforms")) return false;
-        if (uiCanvasUniform < 0 || uiImageUniform < 0 || uiAlphaUniform < 0)
+        if (uiCanvasUniform < 0 || uiImageUniform < 0 || uiAlphaUniform < 0 || uiTexturedUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "original UI uniform missing");
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::none;
         constexpr std::intptr_t vertexBytes = originalUiMaximumQuads50KG * 4 * sizeof(assets::Vertex48B);
@@ -3608,7 +3619,8 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
         !native.states || native.stateCount != input.spanCount || !native.opaquePresentationAlphaOnly)
         return fail(d, VehicleWindowError50DS::frame, "original UI requires explicit native policy and bounded 640x448 draw");
     if (input.textures != s.request.originalUiTextures || input.texturePublication != s.uiTexturePublication ||
-        !input.textures || !input.textures->validBorrow(s.request.context, s.request.isCurrent, s.uiTexturePublication))
+        (input.textures && !input.textures->validBorrow(s.request.context, s.request.isCurrent, s.uiTexturePublication)) ||
+        (!input.textures && input.texturePublication != 0))
         return fail(d, VehicleWindowError50DS::material, "original UI texture publication/context/thread changed");
     for (float value : input.clearRgba)
         if (!std::isfinite(value) || value < 0.f || value > 1.f)
@@ -3630,14 +3642,28 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
     U next = 0;
     for (U i = 0; i < input.spanCount; ++i) {
         const auto& span = input.spans[i]; const auto& state = native.states[i];
+        const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate;
+        const bool untextured = span.materialMode == OriginalUiMaterialMode50KG::untexturedVertexColor;
+        const float blendAlphaScale = textured ? (255.f / 128.f) * (255.f / 128.f) : 255.f / 128.f;
         if (!span.quadCount || span.firstQuad != next || span.quadCount > input.quadCount - next ||
-            span.colorScale != 255.f / 128.f ||
+            (!textured && !untextured) || span.colorScale != (textured ? 255.f / 128.f : 1.f) ||
             (span.blend != OriginalUiBlend50KG::opaque && span.blend != OriginalUiBlend50KG::sourceAlpha &&
                 span.blend != OriginalUiBlend50KG::additive) ||
-            span.alphaScale != (span.blend == OriginalUiBlend50KG::opaque ? 1.f : (255.f / 128.f) * (255.f / 128.f)) ||
+            span.alphaScale != (span.blend == OriginalUiBlend50KG::opaque ? 1.f : blendAlphaScale) ||
             (state.depth != OriginalUiDepth50KG::never && state.depth != OriginalUiDepth50KG::always &&
                 state.depth != OriginalUiDepth50KG::greaterEqual && state.depth != OriginalUiDepth50KG::greater))
             return fail(d, VehicleWindowError50DS::material, "invalid ordered original UI material/depth policy");
+        if (untextured) {
+            if (span.textureIndex != assets::unresolvedMaterialTexture50EA ||
+                state.sampler.minification != MaterialTextureFilter50EB::unspecified ||
+                state.sampler.magnification != MaterialTextureFilter50EB::unspecified ||
+                state.sampler.s != MaterialTextureWrap50EB::unspecified ||
+                state.sampler.t != MaterialTextureWrap50EB::unspecified)
+                return fail(d, VehicleWindowError50DS::material,
+                    "untextured UI requires no texture index or sampler");
+            next += span.quadCount;
+            continue;
+        }
         const auto filter = [](MaterialTextureFilter50EB v) noexcept {
             return v == MaterialTextureFilter50EB::nearest || v == MaterialTextureFilter50EB::linear;
         };
@@ -3648,7 +3674,7 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
             state.sampler.minification != state.sampler.magnification ||
             !wrap(state.sampler.s) || !wrap(state.sampler.t))
             return fail(d, VehicleWindowError50DS::material, "UI requires explicit admitted matching min/mag source sampler");
-        const auto* texture = input.textures->asset(span.textureIndex);
+        const auto* texture = input.textures ? input.textures->asset(span.textureIndex) : nullptr;
         if (!texture || !texture->name)
             return fail(d, VehicleWindowError50DS::material, "original UI span lacks its real published texture");
         next += span.quadCount;
@@ -3662,9 +3688,11 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
     const auto pending = static_cast<std::uint8_t>(s.uiPublished ^ 1u);
     if (accepted) {
         // Sampler zero exposes the immutable published texture parameters.
-        // Check every span independently: same-image conflicting policy rejects.
+        // Check every textured span independently: same-image conflicts reject.
+        // Zero-map spans have no sampled image or texture parameters to query.
         s.gl.activeTexture(textureUnit0); if (s.gl.bindSampler) s.gl.bindSampler(0, 0);
         for (U i = 0; accepted && i < input.spanCount; ++i) {
+            if (input.spans[i].materialMode == OriginalUiMaterialMode50KG::untexturedVertexColor) continue;
             const auto& sampler = native.states[i].sampler;
             s.gl.bindTexture(texture2D, input.textures->texture(input.spans[i].textureIndex));
             constexpr U parameters[] = {0x2801, 0x2800, 0x2802, 0x2803, 0x813C, 0x813D};
@@ -3738,7 +3766,9 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
                 s.gl.blendFunc(0x0302, span.blend == OriginalUiBlend50KG::additive ? 1 : 0x0303);
             }
             s.gl.uniform1f(s.uiAlphaUniform, span.alphaScale);
-            s.gl.bindTexture(texture2D, input.textures->texture(span.textureIndex));
+            const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate;
+            s.gl.uniform1i(s.uiTexturedUniform, textured ? 1 : 0);
+            s.gl.bindTexture(texture2D, textured ? input.textures->texture(span.textureIndex) : 0);
             s.drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.quadCount * 6), 0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(span.firstQuad) * 6 * sizeof(U)), 0);
             accepted = s.check("draw ordered original UI span");
