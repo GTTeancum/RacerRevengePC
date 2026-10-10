@@ -11,6 +11,7 @@ class AllOriginalAiEvidence:
         self.contacts_enabled = False
         self.gc_normals = False
         self.observation_deadline_elapsed = None
+        self.observation_window_seconds = None
         self.ui_camera_racer60 = None
         self.source_events = []
         self.global_rows = []
@@ -233,13 +234,14 @@ class AllOriginalAiEvidence:
             'explicit_boundaries': self.boundaries,
             'contract_violations': self.contract_violations,
             'early_honest_boundary_does_not_erase_all_ai_ownership_proof': True,
-            'surviving_12_seconds_not_required_for_ownership_acceptance': True,
+            'surviving_full_selected_window_not_required_for_ownership_acceptance': True,
             'braking_and_state2_are_observations_not_forced_acceptance_requirements': True,
             'completed_lap_claim': False, 'full_original_ai_or_full_gc_claim': False,
             'retail_zero_human_bootstrap_claim': False,
             'telemetry_period_seconds': 1,
             'milestones_use_only_pre_boundary_and_pre_window_observations': True,
             'observation_deadline_elapsed': self.observation_deadline_elapsed,
+            'observation_window_seconds': self.observation_window_seconds,
             'pending_partial_group': self.pending_group,
             'actual_fleet_groups': self.groups, 'global_counter_rows': self.global_rows,
             'race_presentation_samples': self.races, 'source_events': self.source_events,

@@ -92,7 +92,7 @@ def admit(args, out):
             or old.get('source_commit') != args.source_commit or now >= earliest):
         raise RuntimeError('Requires exact recent root reservation/source commit, runtime_launches=0, and no prior runtime')
     claim = dict(old)
-    claim['capture_scope'] = 'One direct GC process/session, genuine original AI in all eight slots including camera slot 0, at most 12 seconds after ready; capture/quit only'
+    claim['capture_scope'] = ('One direct GC process/session, genuine original AI in all eight slots including camera slot 0, at most %g seconds after ready; capture/quit only' % args.seconds)
     out.mkdir(parents=True, exist_ok=False)
     (out / 'previous-test.json').write_bytes(previous)
     claim.update(status='launching', runtime_launches=1,
@@ -171,7 +171,7 @@ def main():
     parser.add_argument('--source-commit', required=True)
     parser.add_argument('--expected-slot-start', required=True)
     parser.add_argument('--cwd', type=Path, default=REPO)
-    parser.add_argument('--seconds', type=float, choices=(12.0,), default=12.0)
+    parser.add_argument('--seconds', type=float, choices=(12.0, 60.0), default=12.0)
     parser.add_argument('--fps', type=float, choices=(20.0,), default=20.0)
     parser.add_argument('--source-file', type=Path, action='append', default=[])
     parser.add_argument('--env', action='append', default=[], metavar='RR_AUDIO_ROOT=PATH')
@@ -239,6 +239,7 @@ def main():
     env = {k: v for k, v in os.environ.items() if not k.startswith('RR_')}
     env.update(overrides)
     evidence = AllOriginalAiEvidence()
+    evidence.observation_window_seconds = args.seconds
     with LEDGER.with_suffix('.lock').open('a+b') as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         claim, ledger_raw = admit(args, out)
@@ -253,7 +254,8 @@ def main():
             'early_source_boundary_is_honest_bounded_evidence': True,
             'ready_window_includes_countdown': True, 'cold_start_limit_seconds': 360,
             'window_bound_is_capture_and_quit_request_not_hard_process_kill': True,
-            'milestone_evidence_cutoff_is_ready_plus_12_seconds': True,
+            'milestone_evidence_cutoff_is_ready_plus_selected_window': True,
+            'milestone_evidence_window_seconds': args.seconds,
             'capture_ack_limit_seconds': 2, 'quit_grace_seconds': 15,
             'timing_basis': 'Actual monotonic acknowledgement-observation times, no invented frame rate',
             'audio_anchor_policy': 'Primary PCM anchor is the validated same-image capture UI mixed_frames; live WAV-size observations are diagnostic only',

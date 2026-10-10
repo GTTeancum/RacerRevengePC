@@ -51,8 +51,9 @@ def write_report(output, report):
 
 
 def select_prefix(take, receipt):
-    if receipt.get('target_max_seconds_after_ready') != 12:
-        raise ValueError('Expected the direct-GC 12-second ready-window contract')
+    window = receipt.get('target_max_seconds_after_ready')
+    if not finite(window) or window not in (12, 60):
+        raise ValueError('Expected an explicit direct-GC 12- or 60-second ready-window contract')
     # A cold failure may legitimately finish with no ready event or images.
     # Preserve that failure as a report; it cannot become a JPEG or video.
     if receipt.get('frames') == []:
@@ -71,7 +72,7 @@ def select_prefix(take, receipt):
     identity = (ready['session'], ready.get('audio_bank_id'))
     if type(identity[1]) is not int or identity[1] <= 0:
         raise ValueError('Missing actual native audio-bank identity')
-    cutoff = origin + 12
+    cutoff = origin + window
     acceptance = receipt.get('acceptance', {})
     boundaries = acceptance.get('explicit_boundaries', [])
     for boundary in boundaries + acceptance.get('contract_violations', []):
@@ -213,6 +214,7 @@ def main():
         frames, excluded, cutoff = select_prefix(take, receipt)
     except (KeyError, OSError, TypeError, ValueError) as error:
         parser.error(str(error))
+    window = receipt['target_max_seconds_after_ready']
     acceptance = receipt.get('acceptance', {})
     boundaries = acceptance.get('explicit_boundaries', [])
     source_stopped = bool(boundaries or acceptance.get('unsupported_stop_observed'))
@@ -231,6 +233,7 @@ def main():
     disclosure = (title + '. Actual captured images; incomplete GC world. '
                   'Configuration requests genuine original AI in all eight racers including camera slot 0, with no HOST/simulated driving input. '
                   'No completed lap, full original AI, or complete GC claim.')
+    disclosure += ' Requested ready-relative observation limit: %g seconds; a source stop can shorten it.' % window
     if ownership_proven:
         disclosure += ' The source receipt establishes all-eight AI ownership and native progress up to its reported stop.'
     else:
@@ -273,7 +276,8 @@ def main():
         'completed_lap_claim': False, 'full_original_ai_or_full_gc_claim': False,
         'captured_images_total': len(receipt.get('frames', [])), 'selected_source_frames': len(frames),
         'selected_files': [frame['file'] for frame in frames], 'excluded_images': excluded,
-        'selection': 'Contiguous original-order fresh paired prefix strictly before first source boundary/input-policy violation, stop request and ready+12 s; never splice',
+        'selection': ('Contiguous original-order fresh paired prefix strictly before first source boundary/input-policy violation, stop request and ready+%g s; never splice' % window),
+        'source_selected_ready_window_seconds': window,
         'selection_cutoff_elapsed': cutoff,
         'first_selected_ack_elapsed': frames[0]['ack_elapsed'] if frames else None,
         'last_selected_ack_elapsed': frames[-1]['ack_elapsed'] if frames else None,

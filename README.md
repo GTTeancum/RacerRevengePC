@@ -4,7 +4,7 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This branch preserves **unexecuted typed-observation all-eight original-AI capture tools and the retained prefix encoder**. They are bound to runtime `bf42968a`, exact existing source/ledger inputs and one centrally reserved process. Fresh images use paired native audio counters; artifact success never upgrades runtime acceptance. See the [tool README](tools/capture/all_original_ai/README.md).
+This branch preserves **unexecuted 12-or-60-second all-eight original-AI capture and matching prefix-export tools**. They are bound to runtime `bf42968a`, exact existing source/ledger inputs and one centrally reserved process. The next requested window is 60 seconds. Fresh images use paired native audio counters; artifact success never upgrades runtime acceptance. See the [tool README](tools/capture/all_original_ai/README.md).
 
 The inherited runtime is an earlier prototype, not the required all-AI candidate. Old capture tools remain available. No imports, syntax checks, gameplay or encoding were run for this backup. Source boundaries and incomplete-prefix disclosures remain explicit.
 
