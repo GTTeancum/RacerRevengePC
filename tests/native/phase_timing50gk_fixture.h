@@ -12,7 +12,8 @@
 
 namespace phase_timing50GK {
 enum class Phase : std::uint8_t {
-    Input, Physics, RenderPrepareSubmit, CompletionWait, Capture, HostSleep, Count
+    Input, Physics, RenderPrepareSubmit, CompletionWait, Capture, HostSleep,
+    CountdownService, AudioCommit, Count
 };
 constexpr std::size_t phaseCount = static_cast<std::size_t>(Phase::Count);
 
@@ -24,6 +25,8 @@ inline const char* phaseName(Phase phase) noexcept {
     case Phase::CompletionWait: return "completion_wait";
     case Phase::Capture: return "capture";
     case Phase::HostSleep: return "host_sleep";
+    case Phase::CountdownService: return "countdown_service";
+    case Phase::AudioCommit: return "audio_commit";
     default: return "invalid";
     }
 }

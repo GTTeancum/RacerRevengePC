@@ -3188,15 +3188,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    addCounter50DU(discardedHostNs,plan.discardedNanoseconds);
    for(std::uint32_t step=0;step<plan.steps;++step){
     if(raceEnabled&&!race_session50HM::advanceCountdown(race,.016)){
+     phase_timing50GK::Scope countdownTiming(phaseTiming,phase_timing50GK::Phase::CountdownService);
      require50DU(race.error==race_session50HM::Error::None,"race countdown rejected");
      advanceWorldAnimations();
      if(audioEnabled){
       liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);
       require50DU(raceAudio->observe(race).accepted,"countdown/result audio observation rejected");
       updateOpponentAudio(); // Only countdown holds native vehicle updates.
+      countdownTiming.finish(); // Keep countdown service disjoint from the actual shared mix/output.
       // Countdown has a real host clock while native vehicle bodies are held.
       // Advance the shared mixer ONCE; completed results keep normal world steps.
       if(liveAudio->outputOpen()){
+       phase_timing50GK::Scope audioTiming(phaseTiming,phase_timing50GK::Phase::AudioCommit);
        const auto beforeMix=liveAudio->mixedFrames();
        const bool mixed=liveAudio->committedStep(audioDiagnostic);
        advanceSourceAudioWorld(beforeMix);
@@ -3488,6 +3491,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // All racer/audio subscribers feed one mixer. Continue the finish clip and
     // any remaining field while the human is finished; never mix per opponent.
     if(audioEnabled&&liveAudio->outputOpen()){
+     phase_timing50GK::Scope audioTiming(phaseTiming,phase_timing50GK::Phase::AudioCommit);
      const auto beforeMix=liveAudio->mixedFrames();
      const bool mixed=liveAudio->committedStep(audioDiagnostic);
      advanceSourceAudioWorld(beforeMix);
