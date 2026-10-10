@@ -112,7 +112,8 @@ TerrainQueryStatus48M queryTerrainViewBounded48M(const TerrainQueryView48M& quer
             if(!readOnly(mesh->nodes)||!readOnly(mesh->faces)||!readOnly(mesh->vertices)||!readOnly(mesh->vertex_normals))return TerrainQueryStatus48M::InvalidInput;
         }
     }
-    TerrainQueryResult48M result{};
+    if(query.normalMode54!=1u)return TerrainQueryStatus48M::UnsupportedScope;
+    TerrainQueryResult48M result{};result.normalModeWrite.bound=query.normalMode54Bound;
     {
         result.candidateCount=count;result.terrain=query.prepared;result.queryFlagsF8=static_cast<std::uint8_t>((query.filter.flagsF8|0x10u)&~0x20u);
         bool pairFound=false;
@@ -130,6 +131,8 @@ TerrainQueryStatus48M queryTerrainViewBounded48M(const TerrainQueryView48M& quer
             if(!finite(c.sphere)||!spheres(query.sphere,c.sphere,overlap))return TerrainQueryStatus48M::InvalidInput;
             if(!overlap||!filter(query.filter,c.filter))continue;
             if(c.geometry.id!=c.filter.identity)return TerrainQueryStatus48M::InvalidInput;
+            //121438 writes even if the shape/triangle subsequently misses.
+            recordCollisionNormalMode50JA(result.normalModeWrite,query.normalMode54);
             CollisionResult48I hit{};
             std::size_t traceUsed=0;
             const CollisionWorkspace48M collision{workspace.treeStack,workspace.treeStackCapacity,nullptr,0};
@@ -169,7 +172,7 @@ TerrainQueryStatus48M queryTerrainLimitedBounded48M(const TerrainQuery48J& query
     const TerrainCandidate48J* candidates,std::size_t count,const TerrainQueryWorkspace48M& workspace,
     TerrainCandidateEffects48J* destination,std::size_t destinationCapacity,TerrainQueryResult48M& output) noexcept {
     const TerrainQueryView48M view{query.segment,query.sphere,query.filter,query.callbackMasks,query.prepared,
-        query.copied40,query.copied50,query.collisionTypeTag,query.groupTypeTag,query.terrainCallbackEnabled};
+        query.copied40,query.copied50,query.collisionTypeTag,query.groupTypeTag,query.terrainCallbackEnabled,query.normalMode54,query.normalMode54Bound};
     return queryTerrainViewBounded48M(view,candidates,count,workspace,destination,destinationCapacity,output);
 }
 TerrainPreparedQueryStatus48M prepareAndQueryTerrain48M(const TerrainPrepareInput48M& preparation,
@@ -228,7 +231,7 @@ TerrainPreparedQueryStatus48M prepareAndQueryTerrain48M(const TerrainPrepareInpu
     for(auto span:{candidateRange,scratch,stack,dest})if(overlap48M(resultRange,span))return TerrainPreparedQueryStatus48M::InvalidInput;
     for(auto span:{scratch,stack,dest})if(overlap48M(prepRange,span)||overlap48M(queryRange,span))return TerrainPreparedQueryStatus48M::InvalidInput;
     const TerrainQueryView48M view{result.state.segment,result.state.sphere,metadata.filter,metadata.callbackMasks,result.state.terrain,
-        metadata.copied40,metadata.copied50,metadata.collisionTypeTag,metadata.groupTypeTag,metadata.terrainCallbackEnabled};
+        metadata.copied40,metadata.copied50,metadata.collisionTypeTag,metadata.groupTypeTag,metadata.terrainCallbackEnabled,metadata.normalMode54,metadata.normalMode54Bound};
     const auto queried=queryTerrainViewBounded48M(view,candidates,count,workspace,destination,capacity,result.query);
     switch(queried){
         case TerrainQueryStatus48M::InvalidInput:return TerrainPreparedQueryStatus48M::InvalidInput;

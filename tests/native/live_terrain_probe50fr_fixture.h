@@ -135,7 +135,7 @@ inline Result query(Owner& owner,const TerrainPrepareState48M& prepared,
             r.status=Status::InsufficientCapacity;return r;}
     const TerrainQueryView48M view{prepared.segment,prepared.sphere,metadata.filter,
         metadata.callbackMasks,prepared.terrain,metadata.copied40,metadata.copied50,
-        metadata.collisionTypeTag,metadata.groupTypeTag,metadata.terrainCallbackEnabled};
+        metadata.collisionTypeTag,metadata.groupTypeTag,metadata.terrainCallbackEnabled,metadata.normalMode54,metadata.normalMode54Bound};
     TerrainQueryResult48M result{};
     r.queryStatus=queryTerrainViewBounded48M(view,c.selected,count,
         c.queryWork,c.effects,c.effectCapacity,result);

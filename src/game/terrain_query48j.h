@@ -1,5 +1,6 @@
 #pragma once
 #include "collision_tree48i.h"
+#include "collision_normal_mode50ja.h"
 #include "compound_collision50ij.h"
 #include "vehicle_contact48g.h"
 #include <array>
@@ -48,6 +49,9 @@ struct TerrainQuery48J {
     std::array<float,4> copied40{},copied50{};
     std::uint8_t collisionTypeTag=0,groupTypeTag=0;
     bool terrainCallbackEnabled=true;
+    // Actual348 type2 shape+54; this existing single-pair numeric seam is mode1.
+    std::uint32_t normalMode54=1;
+    bool normalMode54Bound=false;
 };
 struct TerrainCandidateEffects48J {
     std::uint32_t identity=0;
@@ -60,6 +64,7 @@ struct TerrainQueryResult48J {
     bool hasGeometryHit=false;
     struct { CollisionContact48I selected,nearestPair; } collision;
     std::vector<TerrainCandidateEffects48J> candidates;
+    CollisionNormalModeWrite50JA normalModeWrite{};
 };
 enum class TerrainQueryStatus48J { Complete,InvalidInput,UnsupportedScope,UnsupportedInterpolationBoundary };
 // Original prepared limited-list phase: 122660 / 120E70 / 126EB0,

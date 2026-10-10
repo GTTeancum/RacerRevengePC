@@ -1,5 +1,6 @@
 #pragma once
 #include "type3_state48p.h"
+#include "collision_normal_mode50ja.h"
 #include "compound_collision50ij.h"
 #include "spring_type3_callback48p.h"
 #include "terrain_query48j.h"
@@ -19,6 +20,7 @@ struct Type3QueryInput48P {
     std::uint8_t collisionTypeTag=0,groupTypeTag=0;
     bool callbackEnabled=true,bodyScenePresent=true,resetSpring=false;
     Type3QueryEntry48P entry=Type3QueryEntry48P::LimitedList;
+    bool normalModeBound50JA=false; // explicit source shape+44 binding
 };
 // 48Q additive composition seam: prepared scalars are separate from the borrowed
 // immutable template's owning filter vectors. No filter clone/growth is needed.
@@ -58,6 +60,7 @@ struct Type3QueryResult48P {
     std::uint8_t queryFlags=0;
     bool hasAnyHit=false;
     std::size_t candidateCount=0,geometryHits=0,callbacks=0,appended=0,saturated=0;
+    CollisionNormalModeWrite50JA normalModeWrite{};
 };
 enum class Type3QueryStatus48P {
     Complete,InvalidInput,UnsupportedScope,UnsupportedInterpolationBoundary,InsufficientCapacity

@@ -62,6 +62,7 @@
 #include "zone_lifecycle50cl.h"
 #include "live_portals50ep_fixture.h"
 #include "vehicle_live_query50eq.h"
+#include "collision_normal_mode50ja.h"
 #include "zone_search_views50cg.h"
 #include "vehicle_candidates50ca.h"
 #include "candidate_handles50cb.h"
@@ -169,7 +170,8 @@ enum class SessionExit50DU { Quit, Restart, Checkpoint };
 SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const char* capturePath,
     const recovery50FI::Plan* checkpointInput,recovery50FI::Plan& checkpointOutput,
     lap_drive50GJ::Continuity& lapContinuity,std::uint64_t sessionIndex,
-    HostMonotonicClock50ID& applicationClock,bool startAtMenu,std::uint32_t& selectedRacer60,
+    HostMonotonicClock50ID& applicationClock,
+    rr::game::CollisionNormalModeOwner50JA& collisionNormalMode,bool startAtMenu,std::uint32_t& selectedRacer60,
     const rr::game::RaceAudioSettings50IC& effectiveAudioSettings,
     rr::game::RaceAudioSettings50IC& selectedAudioSettings,
     rr::platform::HostTrack50IM effectiveTrack,rr::platform::HostTrack50IM& selectedTrack,
@@ -272,6 +274,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(!trackSession->originalStaticCandidates){meshes.reserve(corpus["meshes"].size());
   for(const auto&j:corpus["meshes"])meshes.push_back(cold::mesh(j));}
  auto qfilter=cold::filter(qj["filter"]);Type2StaticQuery49X query{};query.resource=&shape.view;query.filter=&qfilter;query.queryScene.value=77;
+ //21219C passes0 to11BBC0;11BBEC owns main690 shape+54.
+ query.normalMode54=0u;query.normalMode54Bound=true;
  query.collisionTypeTag=qj["collision_tag"];query.groupTypeTag=qj["group_tag"];query.callbackEnabled=qj["callback"];
  cold::words(query.copied40.data(),qj["copied40"]);cold::words(query.copied50.data(),qj["copied50"]);
  query.skipMask=row["masks"][0];query.dynamicMask=row["masks"][1];query.materialMask=row["masks"][2];
@@ -650,6 +654,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(secondaryCase,"actual chariot query present");const auto&sqj=(*secondaryCase)["query"];
  auto secondaryShape=cold::shape(corpus["shapes"][sqj["shape"].get<std::size_t>()]);auto secondaryFilter=cold::filter(sqj["filter"]);
  Type2StaticQuery49X secondaryQuery{};secondaryQuery.resource=&secondaryShape.view;secondaryQuery.filter=&secondaryFilter;secondaryQuery.queryScene.value=78;
+ //212788/21278C passes0 to the same constructor for secondary364.
+ secondaryQuery.normalMode54=0u;secondaryQuery.normalMode54Bound=true;
  secondaryQuery.collisionTypeTag=sqj["collision_tag"];secondaryQuery.groupTypeTag=sqj["group_tag"];secondaryQuery.callbackEnabled=sqj["callback"];
  cold::words(secondaryQuery.copied40.data(),sqj["copied40"]);cold::words(secondaryQuery.copied50.data(),sqj["copied50"]);
  secondaryQuery.skipMask=(*secondaryCase)["masks"][0];secondaryQuery.dynamicMask=(*secondaryCase)["masks"][1];secondaryQuery.materialMask=(*secondaryCase)["masks"][2];
@@ -690,6 +696,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Explicit diagnostic movement-query state and complete configured static order.
  // The late movement detector retains its separate explicit terrain order.
  Type3QueryInput48P movement{};movement.filter=qfilter;movement.filter.identity=0xf0000001u;movement.filter.categoryA4=2;movement.filter.acceptMaskB8=4;movement.filter.flagsF8=6;movement.filter.flags31=1;
+ //212444 constructs movement7A4 through11C710;11C898 stores shape+44=0.
+ movement.normalModeBound50JA=true;
  movement.pairCount=1;movement.normalMode=0;movement.callbackEnabled=false;movement.collisionTypeTag=query.collisionTypeTag;movement.groupTypeTag=query.groupTypeTag;movement.dynamicMask=2;movement.sentinel={{0,0,0,1}};
  movement.copied40=query.copied40;movement.copied50=query.copied50;for(unsigned i:{0u,5u,10u,15u})movement.bodyScene.v[i]=1;
  auto& movementCandidates=trackStorage.movement;
@@ -1862,6 +1870,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     recoverPortalBoundary(mainQueryAttempt.prefix,"main")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(mainQueryAttempt,query,mainMembership,mainCrossedPortals,"main");},
      "registered main terrain query");
+ require50DU(collisionNormalMode.acceptCompleted(queryResult.normalModeWrite),"source collision normal-mode binding unavailable");
  runNative([&]{return commitCandidateEffects(effects);},"commit main query candidate effects");qfilter.flagsF8=queryResult.queryFlagsF8;query.initialQueryCurrentIdentity=queryResult.currentCandidateIdentity;initial.selected=queryResult.selected;
  spring.records=queryResult.records;std::memcpy(records,queryRecords,sizeof records);
 
@@ -1875,6 +1884,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     recoverPortalBoundary(secondaryQueryAttempt.prefix,"secondary")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(secondaryQueryAttempt,secondaryQuery,secondaryMembership,secondaryCrossedPortals,"secondary");},
      "registered secondary terrain query");
+ require50DU(collisionNormalMode.acceptCompleted(secondaryResult.normalModeWrite),"source collision normal-mode binding unavailable");
  runNative([&]{return commitCandidateEffects(sde);},"commit secondary query candidate effects");secondaryFilter.flagsF8=secondaryResult.queryFlagsF8;secondaryQuery.initialQueryCurrentIdentity=secondaryResult.currentCandidateIdentity;si.selected=secondaryResult.selected;
  secondarySpring.records=secondaryResult.records;std::memcpy(secondaryRecords,secondaryQueryRecords,sizeof secondaryRecords);
  
@@ -1892,6 +1902,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<" query "<<unsigned(terrainAttempt.queryStatus)<<" prefix_committed "<<terrainAttempt.prefixCommitted<<'\n';
    return terrainAttempt.status==live_terrain_probe50fr::Status::Complete;
  },"actual registered terrain limited-list query");
+ require50DU(collisionNormalMode.acceptCompleted(terrainResult.normalModeWrite),"source collision normal-mode binding unavailable");
  for(std::size_t i=0;i<probeCount;++i){const auto index=probeIndices[i];
   const auto& source=candidates[index].candidate.collision;auto& mirror=movementCandidates[index].collision;
   mirror.filter.flagsF8=source.filter.flagsF8;mirror.copied40=source.copied40;mirror.copied50=source.copied50;
@@ -1929,6 +1940,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::memcpy(&endpoints[0],s.bodies.main.priorPoint7B0,16);std::memcpy(&endpoints[1],s.bodies.main.currentPoint7C0,16);
  runNative(gatherRegistered,"registered movement candidates");
  runNative([&]{const auto outcome=queryMovementStaticCandidates50L({true,true},movement,movementSource,registeredMovement,registeredCount,movementWorkspace,movementOutput,movementResult,movementFlag);movementFlag=outcome.vehicle7A0;return outcome.status==Type3QueryStatus48P::Complete;},"actual movement segment against terrain");
+ require50DU(collisionNormalMode.acceptCompleted(movementResult.normalModeWrite),"source collision normal-mode binding unavailable");
  runNative([&]{return commitCandidateEffects(movementEffects);},"commit movement query candidate effects");movement.filter.flagsF8=movementResult.queryFlags;movement.initial=movementResult.state;movement.initialQueryCurrent=movementResult.currentCandidate;movementInitial=movementDestination;
  MovementQueryCompletion50M completion{};completion.resultFlagsF8=movementResult.queryFlags;std::memcpy(&completion.selectedPoint,&movementResult.state.selectedPoint,16);completion.pushDistance434710=10;completion.representedStatePreserved=completion.omittedBB0WNotConsumed=true;
  runNative([&]{return finishVehicleMovementQuery50M(s,x.bindings,x.parameters,completion,x.workspace,x.diagnostic);},"native actual movement result and frame tail");
@@ -3316,6 +3328,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         reportRacerContacts();
         require50DU(false,"native racer contact world pass rejected");
        }
+       require50DU(collisionNormalMode.acceptCompleted(contactReceipt.normalModeWrite),"source collision normal-mode binding unavailable");
        require50DU(::allocations==beforeRacerContacts,"successful racer contact world pass allocated C++ storage");
        addCounter50DU(racerContactTotals.passes);
        addCounter50DU(racerContactTotals.testedPairs,contactReceipt.testedPairs);
@@ -4032,6 +4045,9 @@ int main(int argc,char**argv){try{
  // One monotonic backend epoch; each cold native session explicitly resets
  // its shared selector lazy slot alongside the freshly constructed physics RNG.
  HostMonotonicClock50ID applicationClock{};
+ // Shared3DF5B0 survives serial racer visits and native cold sessions. The
+ // value remains unbound until an actual completed121438/126FA0 writer.
+ rr::game::CollisionNormalModeOwner50JA collisionNormalMode{};
  const char* startMenuSetting=std::getenv("RR_START_MENU");
  require50DU(!startMenuSetting||std::string(startMenuSetting)=="0"||std::string(startMenuSetting)=="1",
      "RR_START_MENU must be 0 or 1");
@@ -4060,7 +4076,7 @@ int main(int argc,char**argv){try{
  for(;;){
   const auto exit=runSession50DU(argv[1],headlessLive,headlessLive?argv[3]:nullptr,
       useCheckpoint?&activeCheckpoint:nullptr,nextCheckpoint,lapContinuity,sessionIndex,
-      applicationClock,startAtMenu,selectedRacer60,effectiveAudioSettings,selectedAudioSettings,
+      applicationClock,collisionNormalMode,startAtMenu,selectedRacer60,effectiveAudioSettings,selectedAudioSettings,
       effectiveTrack,selectedTrack,trackAdmission);
   if(exit==SessionExit50DU::Quit)break;
   const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
