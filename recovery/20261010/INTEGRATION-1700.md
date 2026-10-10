@@ -1,6 +1,8 @@
 # Native Main UI integration, 2026-10-10
 
-Source integration only. None of the changes below has been compiled or run.
+Historical 17:00 integration note. For the later fresh Linux build and failed
+Main-only observation at 17:22, see `MAIN-OBSERVATION-1722.md`.
+At this note's original checkpoint, none of the changes below had been compiled or run.
 The last centralized observation remains Linux commit `17659ca`, started at
 16:19:41 UTC; its 139-second GC capture ended at the unfinished original AI
 state-5 recovery boundary. It does not validate these later changes.
