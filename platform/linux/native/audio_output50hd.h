@@ -1,5 +1,6 @@
 #pragma once
 #include "audio_mixer50hd.h"
+#include "audio_stereo_producer50hd.h"
 #include <array>
 #include <cstdint>
 
@@ -60,6 +61,11 @@ public:
     // Every WAV payload byte is copied from the SAME PCM buffer queued to SDL.
     // Device starvation/overflow are counted separately and never faked away.
     bool advanceMicroseconds(AudioMixer50HD&, std::uint32_t microseconds,
+                             AudioOutputDiagnostic50HD&) noexcept;
+    // Same output/clock/queue/capture path for policy-owning PCM transports.
+    // Invoke only after an accepted source update, with its actual interval.
+    // The reference is borrowed only for this call; never on the callback.
+    bool advanceMicroseconds(AudioStereoProducer50HD&, std::uint32_t microseconds,
                              AudioOutputDiagnostic50HD&) noexcept;
     // Main-thread pause flushes stale device data, not voices or captured PCM.
     // Stop simulation advancement while paused to keep the capture clock true.

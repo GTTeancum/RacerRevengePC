@@ -2670,6 +2670,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   bool clean=true;
   // Drop all UI/session borrowers before ending renderer and texture publication.
   originalMain.session.reset();
+  if(!originalMain.closeAudio())clean=false;
   if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
   opponentAudio->close(); // Release only96..109 before the live mixer closes.
@@ -2742,7 +2743,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(!host.create(hostRequest,hostDiagnostic)){
    reportHost50DU(hostDiagnostic);throw std::runtime_error("window/context creation failed");
   }
-  if(audioEnabled){
+  // Original Main owns a separate mixer/device/WAV. The retained cold race
+  // bank cannot open output during Main, even if RR_AUDIO is enabled.
+  if(audioEnabled&&!originalMainApplication.enabled){
    const char* audioWav=std::getenv("RR_AUDIO_WAV");
    std::string sessionAudioPath;
    if(audioWav&&sessionIndex){
@@ -2756,7 +2759,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     audioRequest.wavPath=audioWav;audioRequest.tryDevice=!headlessLive;
     const char* deviceSetting=std::getenv("RR_AUDIO_DEVICE");
     if(deviceSetting)audioRequest.tryDevice=std::string(deviceSetting)=="1";
-    if(originalMainApplication.enabled)audioRequest.tryDevice=false; // Explicit muted Main owns no audio device.
     if(!liveAudio->openOutput(audioRequest,audioDiagnostic)){
      std::cerr<<"Audio output open error="<<static_cast<unsigned>(audioDiagnostic.error)
          <<" detail="<<audioDiagnostic.detail.data()<<'\n';
@@ -2772,7 +2774,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     std::cerr<<"Audio unavailable: no original samples decoded; no device or WAV opened.\n";
    }
   }
-  if(mode1Enabled||dynamicContactEnabled)require50DU(liveAudio->outputOpen(),"source events need the real shared output backend");
+  if(!originalMainApplication.enabled&&(mode1Enabled||dynamicContactEnabled))
+   require50DU(liveAudio->outputOpen(),"source events need the real shared output backend");
   // Main retained cold race PCM owners, but did not initialize/observe a race.
   // Do not seed countdown or standings audio from an unstarted world.
   if(audioEnabled&&raceEnabled&&!originalMainApplication.enabled){
@@ -3117,8 +3120,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(originalMainApplication.enabled){
     // Same-directory rename atomically publishes the completed PPM before ACK.
     std::filesystem::rename(writingFile,captureFile);
+    const auto mainAudioInfo=originalMain.audioOutput.info();
     J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
-        {"file",captureFile.string()},{"width",width},{"height",height}};
+        {"file",captureFile.string()},{"width",width},{"height",height},
+        {"audio_mixed_frames",mainAudioInfo.mixedFrames},
+        {"audio_captured_frames",mainAudioInfo.capturedFrames},{"audio_rate",mainAudioInfo.sampleRate},
+        {"audio_clock_microseconds",mainAudioInfo.simulationMicroseconds},
+        {"audio_accepted_nanoseconds",originalMain.audioOutput.acceptedNanoseconds()}};
     std::cerr<<"original_main_capture "<<receipt.dump()<<'\n';
     reportUiState("capture");capturePending=false;return;
    }
@@ -3192,6 +3200,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const bool active=drawable&&input.focused&&!input.minimized&&!input.eventBudgetExhausted&&
         !originalMain.hostPaused;
     const auto mainClock=originalMain.sampleClock(applicationClock,active);
+    originalMain.audioOutput.pause(!active);
     if(!active){
      // Focus/pause time is not fed back as animation or world catch-up.
      originalMain.lastUpdateNanoseconds=0;captureCommitted();
@@ -3204,8 +3213,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto uiNow=monotonicNow50DU();
     require50DU(!originalMain.lastUpdateNanoseconds||uiNow>=originalMain.lastUpdateNanoseconds,
         "original Main monotonic update clock moved backwards");
-    const float elapsed=originalMain.lastUpdateNanoseconds?
-        static_cast<float>(double(uiNow-originalMain.lastUpdateNanoseconds)/1000000000.0):0.f;
+    const std::uint64_t elapsedNanoseconds=originalMain.lastUpdateNanoseconds?
+        uiNow-originalMain.lastUpdateNanoseconds:0;
+    require50DU(elapsedNanoseconds<=1000000000ull,"original Main active update stall exceeds one second");
+    const float elapsed=static_cast<float>(double(elapsedNanoseconds)/1000000000.0);
     originalMain.lastUpdateNanoseconds=uiNow;
     // Real elapsed frame delta; no synthetic fixed ticks, clamping or RNG
     // reseed. An unsupported long stall fails through the source session gate.
@@ -3214,6 +3225,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // Its four debug-query levels therefore remain actually released.
     if(originalMain.session->update(update,originalMain.diagnostic)!=
         platform::OriginalUiMainSessionStatus50KG::ok)originalMain.fail("update");
+    // Exactly once per accepted source update, independent of video capture.
+    // The typed transport preserves Main's pause gate and original PCM owner.
+    originalMain.advanceAudio(elapsedNanoseconds);
     if(originalMain.session->render(mainClock,originalMain.diagnostic)!=
         platform::OriginalUiMainSessionStatus50KG::ok)originalMain.fail("render");
     const auto* draw=originalMain.session->draw();
@@ -4205,8 +4219,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }catch(...){closeWindow();throw;}
  require50DU(closeWindow(),"window/renderer cleanup reported a failure");
  if(originalMainApplication.enabled){
+  const auto mainAudioInfo=originalMain.audioOutput.info();
   J closed={{"native_frames",originalMain.frameCount},{"captures",originalMain.captureSequence},
-      {"world_ticks",completedFrames},{"window_swaps",windowSwaps},{"cleanup_complete",true}};
+      {"world_ticks",completedFrames},{"window_swaps",windowSwaps},{"cleanup_complete",true},
+      {"audio_mixed_frames",mainAudioInfo.mixedFrames},
+      {"audio_source_mixed_frames",originalMain.audioOutput.sourceMixedFrames()},
+      {"audio_captured_frames",mainAudioInfo.capturedFrames},{"audio_rate",mainAudioInfo.sampleRate},
+      {"audio_clock_microseconds",mainAudioInfo.simulationMicroseconds},
+      {"audio_accepted_nanoseconds",originalMain.audioOutput.acceptedNanoseconds()},
+      {"audio_device_status",platform::audioDeviceStatusName50HD(mainAudioInfo.deviceStatus)},
+      {"audio_device_consumed_frames",mainAudioInfo.deviceConsumedFrames},
+      {"audio_device_underrun_frames",mainAudioInfo.deviceUnderrunFrames},
+      {"audio_device_overflow_frames",mainAudioInfo.deviceOverflowFrames}};
   std::cout<<"original_main_closed "<<closed.dump()<<'\n';
   return SessionExit50DU::Quit;
  }
@@ -4242,7 +4266,7 @@ int main(int argc,char**argv){try{
              "Run from the repository root. RR_RACE_MODE=1 (default with fully prepared providers); "
              "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
              "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
-             "RR_ORIGINAL_MAIN_MENU=1 selects the original Main-only frontend after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted. Destinations remain unavailable; no driving is launched.\n";
+             "RR_ORIGINAL_MAIN_MENU=1 selects the original Main-only frontend after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). RR_AUDIO controls race audio only in this mode. Destinations remain unavailable; no driving is launched.\n";
   return 2;
  }
  // Every return destroys the complete old session, including native state and

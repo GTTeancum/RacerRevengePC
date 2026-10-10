@@ -1,4 +1,5 @@
 #pragma once
+#include "original_ui_main_output50kg.h"
 #include "../../platform/linux/native/original_ui_main_session50kg.h"
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
@@ -25,7 +26,9 @@ inline void require(bool accepted,const char* message) {
 // not supported. The frontend cannot restart into the host driving path.
 struct Application {
     bool enabled=false;
-    std::filesystem::path assetRoot;
+    std::filesystem::path assetRoot,audioRoot;
+    rr::platform::OriginalUiMainAudioMode50KG audioMode=
+        rr::platform::OriginalUiMainAudioMode50KG::muted;
     rr::assets::OriginalUiMaterialRuntime50KG materialRuntime{};
     std::shared_ptr<rr::platform::OriginalUiMainProfile50KG> profile;
     std::shared_ptr<rr::platform::OriginalUiMainApplication50KG> state;
@@ -39,9 +42,17 @@ struct Application {
         require(root && *root,"RR_ORIGINAL_MAIN_MENU requires explicit RR_ORIGINAL_UI_ROOT");
         assetRoot=std::filesystem::path(root);
         const char* audio=std::getenv("RR_ORIGINAL_MAIN_AUDIO");
-        require(audio && std::string(audio)=="muted",
-            "Main entry currently requires explicit RR_ORIGINAL_MAIN_AUDIO=muted");
-        require(!std::getenv("RR_AUDIO_WAV"),"muted original Main cannot produce an audio proof recording");
+        require(audio && (std::string(audio)=="muted" || std::string(audio)=="enabled"),
+            "Main entry requires explicit RR_ORIGINAL_MAIN_AUDIO=muted or enabled");
+        if(std::string(audio)=="enabled"){
+            audioMode=rr::platform::OriginalUiMainAudioMode50KG::enabled;
+            const char* audioRootSetting=std::getenv("RR_ORIGINAL_MAIN_AUDIO_ROOT");
+            require(audioRootSetting && *audioRootSetting,
+                "enabled Main audio requires explicit RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO");
+            audioRoot=std::filesystem::path(audioRootSetting);
+        }else{
+            require(!std::getenv("RR_AUDIO_WAV"),"muted original Main cannot produce an audio proof recording");
+        }
         profile=std::make_shared<rr::platform::OriginalUiMainProfile50KG>();
         state=std::make_shared<rr::platform::OriginalUiMainApplication50KG>();
         // Fresh native backing starts with no imported unlocks or debug bits.
@@ -56,7 +67,7 @@ struct Application {
         materialRuntime={true,false}; // Process-owned fresh native normal-material mode.
         std::cerr<<"ORIGINAL MAIN ONLY: fresh native profile/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
-            <<"; explicit muted audio. Rider/Course/Options/Gallery are unavailable. "
+            <<"; Main audio="<<audio<<". Rider/Course/Options/Gallery are unavailable. "
             "No gameplay launch or original boot/save parity is claimed.\n";
     }
 };
@@ -107,6 +118,7 @@ struct Frontend {
     std::shared_ptr<rr::platform::OriginalUiMainDrawResources50KG> resources;
     std::shared_ptr<const rr::assets::OriginalUiArchive50KG> mainArchive;
     std::shared_ptr<rr::platform::MaterialTextureGl50EB> gpu;
+    AudioOutput audioOutput; // Destroyed after session and before GPU/host.
     std::unique_ptr<rr::platform::OriginalUiMainSession50KG> session;
     rr::platform::OriginalUiMainSessionDiagnostic50KG diagnostic{};
     std::uint64_t lastUpdateNanoseconds=0,inputCount=0,unavailableCount=0,frameCount=0;
@@ -165,7 +177,28 @@ struct Frontend {
         rr::platform::OriginalUiMainSessionCold50KG sessionCold;
         sessionCold.resources=resources;sessionCold.gpu=gpu;sessionCold.mainArchive=mainArchive;
         sessionCold.profile=application.profile;sessionCold.application=application.state;
-        sessionCold.audioMode=rr::platform::OriginalUiMainAudioMode50KG::muted;
+        sessionCold.audioMode=application.audioMode;
+        if(application.audioMode==rr::platform::OriginalUiMainAudioMode50KG::enabled){
+            rr::platform::AudioOutputRequest50HD outputRequest;
+            outputRequest.tryDevice=video->host.hasWindow();
+            outputRequest.wavPath=std::getenv("RR_AUDIO_WAV");
+            if(const char* deviceSetting=std::getenv("RR_AUDIO_DEVICE")){
+                require(std::string(deviceSetting)=="0" || std::string(deviceSetting)=="1",
+                    "Main RR_AUDIO_DEVICE must be 0 or 1");
+                outputRequest.tryDevice=std::string(deviceSetting)=="1";
+            }
+            std::string error;rr::platform::AudioOutputDiagnostic50HD outputDiagnostic;
+            if(!audioOutput.prepare(application.audioRoot,outputRequest,error,outputDiagnostic))
+                throw std::runtime_error(error);
+            sessionCold.audio=audioOutput.transport();
+            const auto outputInfo=audioOutput.info();
+            std::cerr<<"Original Main audio device="
+                <<rr::platform::audioDeviceStatusName50HD(outputInfo.deviceStatus)
+                <<" capture="<<outputInfo.captureActive<<" rate="<<outputInfo.sampleRate
+                <<" detail="<<outputInfo.deviceDetail.data()<<'\n';
+            if(outputRequest.wavPath)
+                std::cerr<<"Original Main WAV path="<<outputRequest.wavPath<<'\n';
+        }
         session=std::make_unique<rr::platform::OriginalUiMainSession50KG>();
         if(session->bind(sessionCold,diagnostic)!=rr::platform::OriginalUiMainSessionStatus50KG::ok)
             fail("session bind");
@@ -176,6 +209,21 @@ struct Frontend {
             std::to_string(diagnostic.sourcePC)+" draw="+
             std::to_string(static_cast<unsigned>(diagnostic.draw.error))+" drawSource="+
             std::to_string(diagnostic.draw.sourcePC));
+    }
+    void advanceAudio(std::uint64_t nanoseconds) {
+        rr::platform::AudioOutputDiagnostic50HD outputDiagnostic;
+        if(!audioOutput.advanceAcceptedNanoseconds(nanoseconds,outputDiagnostic))
+            throw std::runtime_error(std::string("original Main PCM advance failed: ")+
+                (outputDiagnostic.operation?outputDiagnostic.operation:"unknown")+
+                " error="+std::to_string(static_cast<unsigned>(outputDiagnostic.error))+
+                " detail="+outputDiagnostic.detail.data());
+    }
+    bool closeAudio() noexcept {
+        rr::platform::AudioOutputDiagnostic50HD outputDiagnostic;
+        const bool accepted=audioOutput.close(outputDiagnostic);
+        if(!accepted)std::cerr<<"original Main audio close error="
+            <<static_cast<unsigned>(outputDiagnostic.error)<<'\n';
+        return accepted;
     }
     void input(std::uint8_t sourceInput) {
         rr::platform::OriginalUiMainSessionInput50KG input;
@@ -198,6 +246,7 @@ struct Frontend {
         const auto* fire=session->fire();
         require(fire,"original Main particle owner missing");
         const auto* draw=session->draw();
+        const auto audioInfo=audioOutput.info();
         std::cerr<<"original_main_state {\"reason\":\""<<reason<<"\",\"updates\":"<<state.updateCount
             <<",\"renders\":"<<state.renderCount<<",\"submitted\":"<<frameCount
             <<",\"selected_slot\":"<<navigation->groups[1].selectedSlot
@@ -215,7 +264,23 @@ struct Frontend {
             <<",\"quads\":"<<(draw?draw->draw.quadCount:0)
             <<",\"spans\":"<<(draw?draw->draw.spanCount:0)
             <<",\"source_milliseconds\":"<<sourceMilliseconds
-            <<",\"audio_muted\":true,\"audio_suppressed\":"<<state.audio.suppressedByMutedMode
+            <<",\"audio_muted\":"<<(audioOutput.enabled()?"false":"true")
+            <<",\"audio_suppressed\":"<<state.audio.suppressedByMutedMode
+            <<",\"audio_submitted\":"<<state.audio.submitted
+            <<",\"audio_source_gate_suppressed\":"<<state.audio.suppressedBySourceGate
+            <<",\"audio_failed\":"<<state.audio.failed
+            <<",\"audio_source_mixed_frames\":"<<audioOutput.sourceMixedFrames()
+            <<",\"audio_mixed_frames\":"<<audioInfo.mixedFrames
+            <<",\"audio_captured_frames\":"<<audioInfo.capturedFrames
+            <<",\"audio_rate\":"<<audioInfo.sampleRate
+            <<",\"audio_accepted_nanoseconds\":"<<audioOutput.acceptedNanoseconds()
+            <<",\"audio_clock_microseconds\":"<<audioInfo.simulationMicroseconds
+            <<",\"audio_remainder_nanoseconds\":"<<audioOutput.remainderNanoseconds()
+            <<",\"audio_device_status\":\""<<rr::platform::audioDeviceStatusName50HD(audioInfo.deviceStatus)<<"\""
+            <<",\"audio_device_consumed_frames\":"<<audioInfo.deviceConsumedFrames
+            <<",\"audio_device_queued_frames\":"<<audioInfo.deviceQueuedFrames
+            <<",\"audio_device_underrun_frames\":"<<audioInfo.deviceUnderrunFrames
+            <<",\"audio_device_overflow_frames\":"<<audioInfo.deviceOverflowFrames
             <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames<<"}\n";
     }
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include "audio_mixer50hd.h"
+#include "audio_stereo_producer50hd.h"
 #include "../../../src/assets/audio_assets50hc.h"
 #include <array>
 #include <cstddef>
@@ -12,12 +13,12 @@ namespace rr::platform {
 // initialized mixer/voice array, never the live race mixer or its slot117.
 // This transport must be reset and its device output closed before race output
 // begins. Mixer/storage outlive this stable-address owner. All calls main-thread.
-class OriginalUiMainAudio50KG final {
+class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
 public:
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
     static constexpr std::size_t effectVoiceCount = 4, requiredVoices = 5;
     OriginalUiMainAudio50KG() = default;
-    ~OriginalUiMainAudio50KG() noexcept { reset(); }
+    ~OriginalUiMainAudio50KG() noexcept override { reset(); }
     OriginalUiMainAudio50KG(const OriginalUiMainAudio50KG&) = delete;
     OriginalUiMainAudio50KG& operator=(const OriginalUiMainAudio50KG&) = delete;
     OriginalUiMainAudio50KG(OriginalUiMainAudio50KG&&) = delete;
@@ -26,7 +27,10 @@ public:
     // and original VAGs before decoding. Missing/changed bytes fail; no substitute.
     bool prepare(const std::filesystem::path& audioRoot, AudioMixer50HD& dedicatedFrontendMixer,
         std::string& error) noexcept;
-    bool ready() const noexcept;
+    bool ready() const noexcept override;
+    std::uint32_t sampleRate() const noexcept override {
+        return current() ? mixer_->sampleRate() : 0;
+    }
     // Source1E68CC ->234900(stream,9,1). Session owns +44/+48 admission checks.
     // Replaces only this frontend music voice, loops original PCM [0,frames).
     bool startMainLoop9() noexcept;
@@ -44,7 +48,7 @@ public:
     bool paused() const noexcept { return paused_; }
     // Application must use this gate for the dedicated frontend mixer. Paused
     // calls write silence without consuming PCM. No device callback uses this.
-    bool mixStereo16(std::int16_t* output, std::size_t frames) noexcept;
+    bool mixStereo16(std::int16_t* output, std::size_t frames) noexcept override;
     void reset() noexcept;
     bool mainLoopActive() const noexcept;
     float mainGain() const noexcept { return musicGain_; }
