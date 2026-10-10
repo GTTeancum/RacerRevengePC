@@ -10,6 +10,7 @@ This is an inactive, unfinished native source slice. It has not been compiled or
 - `assets/water_noise_cold50jc.h`: authenticated-input GC TGA projection through the original BGRA swap, bottom-origin row reversal and unchanged same-format copy.
 - `tests/native/water_resources50jc_fixture.h`: authentic cold archive/member join, stable signature/noise storage and cold projections, called inside the existing authenticated track-load scope.
 - `game/water_presentation50jc.h`: disabled-by-default, explicitly native one-view publication of original position-plus-scroll origins once per actual completed rendered frame.
+- `game/water_wake50jc.h`: original anchoring, swell/update projections, native signed lattice equations and ordered force-write proposals.
 
 These APIs consume supplied original resources. They contain no original asset payloads. The preceding GC descriptor stage establishes the authenticated archive, actual water-member identity and original provider presence. Callers must preserve that provenance when resolving every signature frame; a filename or byte span alone does not establish ownership.
 
@@ -48,3 +49,12 @@ Retail `2B70F0` copies the full ordered query/time list into the render list. It
 The phase is disabled by default. Its input must come from the real renderer's completed-frame receipt, with exactly one actual view. Repeated frame IDs perform no writes; backward IDs and missing or aliased owners reject. Application pause still controls time advancement independently. Channel-4/foam skipping retains the original origin routine's initial branch.
 
 Query metadata distinguishes `OriginalRender2BEBD0` from `NativeOneViewPresentation50JC`; a native publication cannot impersonate the retail renderer. Cold records remain `Unbound`. The whole phase validates before atomic publication, then records the actual completed frame. No main/render call is enabled by this partial checkpoint, and wake/time/reset lifecycle admission remains separate.
+
+
+## Native wake kernel
+
+The wake component implements genuine signed lattices for the two original loader layouts: 120 cells with 15 blocks per row, or 88 cells with 11 blocks per row. The separate render texture remains 128 by 128. It preserves saturation, strict quiet-range comparisons, source one-unit subtraction, cached neighbor planes, border bytes and texture writes using ordinary native integer equations. There is no instruction dispatcher, register file or guest execution.
+
+The force leaf preserves all four original bilinear writes in source order, including block crossings, zero deltas and wrapped halfword additions. Its input must come from the actual source caller. AI racers skip only the original human anchor branch; their reached force calls must still be consumed.
+
+Proposals and scratch images do not mutate canonical time, buffers, selectors or positions. The runtime owner must commit the source prefix, each completed lattice and its tail in order, then join signature time and actual native presentation. The attached vehicle effect path `22A620` still needs authentic force-point/effect inputs. No default-off guard is removed by this checkpoint.
