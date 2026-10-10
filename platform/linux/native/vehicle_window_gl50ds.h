@@ -554,6 +554,14 @@ public:
     // Does not advance gameplay or replace the retained race publication.
     bool submitOriginalUi(const OriginalUiNativeDraw50KG&, std::int32_t width,
         std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
+    // Explicit destination resource publication between complete submissions.
+    // Authenticates every CPU/GPU texture identity and caches actual alpha
+    // maxima before replacing the retained borrow. False preserves the old
+    // bank and image. No draw, upload, route admission or gameplay work occurs.
+    // Caller retains the new immutable owners through the next replacement or
+    // close, and retains prior GPU owners until their submitted work completes.
+    bool bindOriginalUiTextures(const assets::MaterialTextureAssets50EA&,
+        const MaterialTextureGl50EB&, VehicleWindowDiagnostic50DS&) noexcept;
     // Source-compatible fail-closed boundary: recovered draw-only packets lack
     // explicit source depth and destination-alpha-consumer ownership.
     bool submitOriginalUi(const OriginalUiDraw50KG&, std::int32_t width,

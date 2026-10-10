@@ -2086,7 +2086,9 @@ void main() {
             gpu->publicationToken()) || !cpu->textureCount() ||
             cpu->textureCount() > assets::maxMaterialTextureAssets50EA || cpu->textureCount() != gpu->textureCount())
             return fail(*diagnostic, VehicleWindowError50DS::material, "UI requires matching immutable CPU/GPU publication");
-        // Cold-only scan. Owners stay alive and immutable through close.
+        // Cold publication scan. Stage maxima so a rejected destination cannot
+        // corrupt the currently retained bank's blend-admission bounds.
+        std::uint8_t maximumAlphaByTexture[assets::maxMaterialTextureAssets50EA]{};
         for (U i = 0; i < cpu->textureCount(); ++i) {
             const auto* source = cpu->texture(i); const auto* image = gpu->asset(i);
             if (!source || !image || !image->name || image->identity != source->identity)
@@ -2094,8 +2096,9 @@ void main() {
             std::uint8_t maximumAlpha = 0;
             for (std::size_t a = 3; a < source->texture.rgba.size(); a += 4)
                 maximumAlpha = std::max(maximumAlpha, source->texture.rgba[a]);
-            uiTextureMaximumAlpha[i] = maximumAlpha;
+            maximumAlphaByTexture[i] = maximumAlpha;
         }
+        std::memcpy(uiTextureMaximumAlpha, maximumAlphaByTexture, sizeof(uiTextureMaximumAlpha));
         return true;
     }
     bool createOriginalUi() noexcept {
@@ -3642,6 +3645,27 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     }
     s.frameOpponentCount = 0;
     return accepted;
+}
+
+bool VehicleWindowGl50DS::bindOriginalUiTextures(const assets::MaterialTextureAssets50EA& cpu,
+    const MaterialTextureGl50EB& gpu, VehicleWindowDiagnostic50DS& d) noexcept {
+    d = {};
+    if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
+    auto& s = *storage_;
+    if (!s.current(d)) return false;
+    if (s.active || s.frameSet || !s.request.enableOriginalUi || s.diagnostic)
+        return fail(d, VehicleWindowError50DS::frame, "UI bank replacement requires idle original UI renderer");
+    auto candidate = s.request;
+    candidate.originalUiCpuTextures = &cpu;
+    candidate.originalUiTextures = &gpu;
+    s.diagnostic = &d;
+    const bool accepted = s.validateOriginalUiBank(candidate);
+    s.diagnostic = nullptr;
+    if (!accepted) return false;
+    s.request.originalUiCpuTextures = &cpu;
+    s.request.originalUiTextures = &gpu;
+    s.uiTexturePublication = gpu.publicationToken();
+    return true;
 }
 
 bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiDraw50KG&,
