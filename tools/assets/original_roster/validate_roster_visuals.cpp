@@ -1,0 +1,18 @@
+#include "assets/scene_asset48d.h"
+#include "assets/native_asset48b.h"
+#include "native-json/json.hpp"
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <stdexcept>
+#include <set>
+namespace fs=std::filesystem;using J=nlohmann::json;using Bytes=std::vector<std::uint8_t>;
+void need(bool p,const std::string& s){if(!p)throw std::runtime_error(s);}
+Bytes read(const fs::path& p){std::ifstream f(p,std::ios::ate|std::ios::binary);need(bool(f),"Cannot read "+p.string());auto n=f.tellg();need(n>0&&n<=128*1024*1024,"Invalid asset size");Bytes b(static_cast<std::size_t>(n));f.seekg(0);f.read(reinterpret_cast<char*>(b.data()),b.size());need(bool(f),"Asset short read");return b;}
+int main(int argc,char**argv){try{need(argc==2,"Usage: validate_roster_visuals SELECTION_JSON");fs::path file=argv[1],root=file.parent_path();const auto raw=read(file);auto j=J::parse(raw);need(j["racers"].size()==8,"Eight racers required");std::set<std::string> identities,meshes;J report={{"passed",true},{"racers",J::array()}};std::size_t vertices=0,nodes=0;
+for(const auto& racer:j["racers"]){need(identities.insert(racer["container_sha256"]).second,"Duplicate pod resource identity");need(racer["components"].size()==3,"Three authored components required");J r={{"pod_id",racer["pod_id"]},{"components",J::array()}};std::string signature;
+for(const auto& c:racer["components"]){rr::assets::Scene48D scene;std::string error;auto b=read(root/c["rrscene"].get<std::string>());need(rr::assets::parseSceneAsset48D(b,scene,error),"Scene parse: "+error);need(scene.nodes.size()==c["native"]["nodes"]&&scene.materials==c["native"]["materials"].get<std::vector<std::string>>(),"Scene metadata changed");need(scene.neutral_lod0==read(root/c["rrmesh"].get<std::string>()),"Companion mesh differs");rr::assets::Mesh48B mesh;need(rr::assets::parseMesh48B(scene.neutral_lod0.data(),scene.neutral_lod0.size(),mesh,error),"Native mesh parse");need(mesh.vertices.size()==c["native"]["vertices"]&&mesh.indices.size()/3==c["native"]["triangles"],"Mesh counters changed");for(const auto& lod:scene.lods)for(const auto& s:lod.surfaces){need(s.material_index<scene.materials.size(),"Invalid material binding");for(const auto& v:s.vertices)need(v.bone<scene.nodes.size(),"Foreign skeleton bone index");for(auto i:s.indices)need(i<s.vertices.size(),"Foreign surface index");}
+J names=J::array();for(const auto& n:scene.nodes)names.push_back(n.name);r["components"].push_back({{"role",c["role"]},{"nodes",scene.nodes.size()},{"vertices",mesh.vertices.size()},{"node_names",names}});vertices+=mesh.vertices.size();nodes+=scene.nodes.size();signature+=c["native"]["scene_sha256"].get<std::string>();}
+need(meshes.insert(signature).second,"Duplicate complete pod topology");for(const auto& t:racer["textures"]){auto b=read(root/t["rrtex"].get<std::string>());rr::assets::Texture48B tex;std::string error;need(rr::assets::parseTexture48B(b.data(),b.size(),tex,error),"Native texture parse");}
+report["racers"].push_back(r);}
+report["total_lod0_vertices"]=vertices;report["total_nodes"]=nodes;report["distinct_source_containers"]=identities.size();std::cout<<report.dump(2)<<'\n';return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}}

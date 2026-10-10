@@ -1,0 +1,27 @@
+include(${CMAKE_CURRENT_LIST_DIR}/NativePc48B.cmake)
+enable_language(C)
+add_library(racer_native_zlib STATIC
+    third_party/native-zlib/adler32.c third_party/native-zlib/crc32.c
+    third_party/native-zlib/inflate.c third_party/native-zlib/inffast.c
+    third_party/native-zlib/inftrees.c third_party/native-zlib/zutil.c)
+target_include_directories(racer_native_zlib PUBLIC third_party/native-zlib)
+target_compile_definitions(racer_native_zlib PRIVATE _CRT_SECURE_NO_WARNINGS)
+add_library(racer_native_import_decode STATIC src/assets/import_decode48c.cpp)
+target_include_directories(racer_native_import_decode PUBLIC src/assets)
+target_compile_features(racer_native_import_decode PUBLIC cxx_std_17)
+target_compile_options(racer_native_import_decode PRIVATE /W4 /permissive- /fp:strict)
+target_link_libraries(racer_native_import_decode PRIVATE racer_native_zlib)
+target_sources(racer_native_pc PRIVATE
+    platform/windows/native/import_service48c.cpp platform/windows/native/import_ui48c.cpp)
+target_include_directories(racer_native_pc PRIVATE third_party/native-json)
+target_link_libraries(racer_native_pc PRIVATE racer_native_import_decode bcrypt ole32 shell32 uuid)
+add_executable(racer_native_import_check tests/native/import_decode48c.cpp)
+target_link_libraries(racer_native_import_check PRIVATE racer_native_import_decode racer_native_assets)
+target_compile_options(racer_native_import_check PRIVATE /W4 /permissive- /fp:strict)
+add_test(NAME native_import_decoder COMMAND racer_native_import_check ${CMAKE_SOURCE_DIR})
+target_sources(racer_native_game PRIVATE src/game/body_integration48c.cpp)
+add_executable(racer_native_physics_check tests/native/physics48c.cpp)
+target_link_libraries(racer_native_physics_check PRIVATE racer_native_game)
+target_compile_features(racer_native_physics_check PRIVATE cxx_std_20)
+target_compile_options(racer_native_physics_check PRIVATE /W4 /permissive- /fp:strict)
+add_test(NAME native_body_integration COMMAND racer_native_physics_check)

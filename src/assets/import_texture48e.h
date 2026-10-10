@@ -1,0 +1,64 @@
+#pragma once
+#include "import_decode48c.h"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace rr { namespace assets {
+struct TextureLimits48E {
+    std::size_t input_bytes = 8u * 1024u * 1024u;
+    // Includes retained RGBA mip bytes and base RRTEX bytes, not source input.
+    std::size_t decoded_bytes = 16u * 1024u * 1024u;
+};
+struct TextureMip48E {
+    std::uint32_t width = 0, height = 0;
+    std::size_t source_header_offset = 0, source_indices_offset = 0;
+    // Original row order, unscaled/unpremultiplied RGBA including raw alpha.
+    std::vector<std::uint8_t> rgba;
+};
+struct Texture48E {
+    std::uint16_t revision = 1, flags = 0;
+    std::uint32_t kind = 1;
+    std::array<std::array<std::uint8_t, 4>, 256> original_palette{};
+    std::vector<TextureMip48E> mips; // Original ascending dimensions; base is back().
+    std::vector<std::uint8_t> base_rrtex; // RRTEX001; no shader/alpha normalization.
+};
+struct MaterialField48E {
+    std::string name, value;
+    std::size_t source_offset = 0;
+};
+struct MaterialFields48E {
+    std::vector<MaterialField48E> authored; // Only nonempty values; no interpretation.
+    std::vector<MaterialField48E> unspecified; // Empty authored values remain empty.
+};
+struct MaterialTexture48E {
+    std::uint32_t slot = 0; // Original one-based TextureMap_N slot.
+    std::string name; // Original basename; unresolved against RES by this parser.
+};
+struct MaterialPass48E {
+    std::uint32_t pass = 0; // Original one-based ShaderPass_N section.
+    std::string microprogram;
+    bool texture_count_defaulted = false; // Proven original missing-count default 1.
+    std::vector<MaterialTexture48E> textures;
+    MaterialFields48E fields;
+};
+struct Material48E {
+    MaterialFields48E general;
+    std::vector<MaterialPass48E> passes;
+};
+
+// Bounded frozen48D subset. No files, JSON, guest execution, GS upload swizzle,
+// guessed shader/default render state, texture lookup, or platform dependency.
+// Transactional outputs on all failure/cancellation paths. Limits only reduce
+// fixed hard ceilings. Optional synchronous callbacks follow DecodeHooks48C.
+bool decodeTexture48E(const std::vector<std::uint8_t>& input, Texture48E& output,
+    DecodeError48C& error, const DecodeHooks48C* hooks = nullptr,
+    const TextureLimits48E& limits = TextureLimits48E{});
+bool encodeTextureLevel48E(const TextureMip48E& mip, std::vector<std::uint8_t>& output,
+    DecodeError48C& error);
+bool decodeMaterial48E(const std::vector<std::uint8_t>& input, Material48E& output,
+    DecodeError48C& error, const DecodeHooks48C* hooks = nullptr,
+    std::size_t maxBytes = 64u * 1024u);
+} }

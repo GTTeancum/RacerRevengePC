@@ -1,0 +1,17 @@
+#include "effect_dispatch50be.h"
+#include "json.hpp"
+#include <fstream>
+#include <iostream>
+#include <cstdlib>
+#include <new>
+using namespace rr::game;static unsigned allocations=0;
+void*operator new(std::size_t n){++allocations;if(auto*p=std::malloc(n?n:1))return p;throw std::bad_alloc();}void operator delete(void*p)noexcept{std::free(p);}void operator delete(void*p,std::size_t)noexcept{std::free(p);}
+int main(int argc,char**argv){if(argc!=2)return 2;nlohmann::json j;std::ifstream f(argv[1]);f>>j;unsigned checks=0,commands=0;EffectDispatchWorkspace50BE scratch{};
+ for(const auto&row:j["cases"]){EffectOwner50BE owners[4]{};ImpactEffectEvent50B events[48]{};for(unsigned n=0;n<4;++n){auto&o=owners[n];const auto&p=row["pre"][n];o.id=p["id"];o.profile=static_cast<EffectProfile50BE>(p["profile"].get<unsigned>());o.mode1D8=p["mode"];o.duration1E4=p["duration"];for(unsigned i=0;i<4;++i){o.state.position30[i]=p["state"][i];o.state.previous40[i]=p["state"][4+i];o.state.velocity60[i]=p["state"][8+i];}o.state.word19C=p["state"][12];o.state.intensity204=p["state"][13];o.state.flags1D4=p["state"][14].get<std::uint32_t>()&255u;}
+ for(unsigned n=0;n<48;++n){const auto&e=row["commands"][n];events[n].kind=static_cast<ImpactEffectKind50B>(e["kind"].get<unsigned>());events[n].target=e["target"];for(unsigned i=0;i<4;++i){std::uint32_t u=e["value"][i];std::memcpy(events[n].value+i,&u,4);}}
+ auto before=allocations;const auto result=consumeEffectControls50BE(events,48,owners,4,scratch);if(before!=allocations||result.status!=EffectDispatchStatus50BE::Complete||result.commands!=48||result.deferredStops!=row["deferred"])return 1;commands+=48;
+ for(unsigned n=0;n<4;++n){const auto&s=owners[n].state;const auto&post=row["post"][n];for(unsigned i=0;i<4;++i){if(s.position30[i]!=post[i]||s.previous40[i]!=post[4+i]||s.velocity60[i]!=post[8+i])return 1;checks+=3;}if(s.word19C!=post[12]||s.intensity204!=post[13]||s.flags1D4!=(post[14].get<std::uint32_t>()&255u)||owners[n].mode1D8!=row["pre"][n]["mode"]||owners[n].duration1E4!=row["pre"][n]["duration"])return 1;checks+=5;}}
+ EffectOwner50BE owners[2]{};owners[0].id=1;owners[1].id=2;owners[1].profile=EffectProfile50BE::Deferred15E800;ImpactEffectEvent50B events[2]{};events[0].kind=ImpactEffectKind50B::Start80;events[0].target=1;events[1].kind=ImpactEffectKind50B::Stop84;events[1].target=2;unsigned rejected=0;
+ auto reject=[&](std::size_t count,std::size_t n){EffectOwner50BE old[2];std::memcpy(old,owners,sizeof old);const auto before=allocations;auto result=consumeEffectControls50BE(events,count,owners,n,scratch);if(result.status==EffectDispatchStatus50BE::Complete||std::memcmp(old,owners,sizeof old)||before!=allocations)return false;++rejected;return true;};
+ events[1].target=99;if(!reject(2,2))return 1;events[1].target=2;events[1].kind=ImpactEffectKind50B::ChannelA8;if(!reject(2,2))return 1;events[1].kind=ImpactEffectKind50B::Intensity19A810;if(!reject(2,2))return 1;events[1].kind=ImpactEffectKind50B::Stop84;owners[1].state.flags1D4=2;owners[1].mode1D8=1;owners[1].duration1E4=0x7fc00000;if(!reject(2,2))return 1;owners[1].duration1E4=0;owners[1].id=1;if(!reject(2,2))return 1;owners[1].id=2;if(!reject(65,2)||!reject(2,17))return 1;owners[1].profile=static_cast<EffectProfile50BE>(99);if(!reject(2,2))return 1;
+ std::cout<<nlohmann::json{{"cases",j["cases"].size()},{"commands",commands},{"checks",checks},{"rejected",rejected},{"hot_allocations",0},{"workspace_bytes",sizeof scratch}}.dump()<<'\n';}

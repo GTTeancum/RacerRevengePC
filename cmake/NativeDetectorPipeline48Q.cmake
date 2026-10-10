@@ -1,0 +1,47 @@
+# Focused portable supplied-list detector pipeline; no renderer dependency.
+option(RR_NATIVE_DETECTOR_PIPELINE_SANITIZERS "Require address/undefined sanitizers" OFF)
+foreach(rr_fixture IN ITEMS
+        evidence/type3Query48P/native-fixtures.json
+        evidence/springDetectorPipeline48Q/native-fixtures.json)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/${rr_fixture}")
+        message(FATAL_ERROR "BLOCKED: required original-derived pipeline fixture is missing: ${rr_fixture}")
+    endif()
+endforeach()
+add_library(racer_native_detector_pipeline STATIC
+    src/game/spring_records48n.cpp src/game/spring_callback48n.cpp
+    src/game/query_prepare48o.cpp src/game/spring_detector48o.cpp
+    src/game/spring_type3_callback48p.cpp src/game/collision_type3_leaf48p.cpp
+    src/game/collision_type3_node48p.cpp src/game/type3_prepare48p.cpp
+    src/game/type3_query48p.cpp src/game/spring_detector_pipeline48q.cpp)
+set(rr_detector_pipeline_targets racer_native_detector_pipeline)
+foreach(rr_test IN ITEMS type3_context48q spring_detector_pipeline48q)
+    add_executable(racer_${rr_test}_check tests/native/${rr_test}.cpp)
+    target_link_libraries(racer_${rr_test}_check PRIVATE racer_native_detector_pipeline)
+    target_include_directories(racer_${rr_test}_check PRIVATE third_party/native-json)
+    list(APPEND rr_detector_pipeline_targets racer_${rr_test}_check)
+endforeach()
+set_property(GLOBAL APPEND PROPERTY JOB_POOLS rr_detector_pipeline_serial=1)
+foreach(rr_target IN LISTS rr_detector_pipeline_targets)
+    target_include_directories(${rr_target} PUBLIC src/game src/assets)
+    target_compile_features(${rr_target} PUBLIC cxx_std_17)
+    set_target_properties(${rr_target} PROPERTIES CXX_EXTENSIONS OFF JOB_POOL_COMPILE rr_detector_pipeline_serial JOB_POOL_LINK rr_detector_pipeline_serial)
+    if(MSVC)
+        target_compile_options(${rr_target} PRIVATE /W4 /permissive- /fp:strict)
+        if(RR_NATIVE_DETECTOR_PIPELINE_SANITIZERS)
+            message(FATAL_ERROR "This sanitizer option requires GCC/Clang; no silent fallback")
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${rr_target} PRIVATE -Wall -Wextra -Wpedantic -fno-fast-math -frounding-math -ffp-contract=off)
+        if(RR_NATIVE_DETECTOR_PIPELINE_SANITIZERS)
+            target_compile_options(${rr_target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all)
+            target_link_options(${rr_target} PRIVATE -fsanitize=address,undefined)
+        endif()
+    else()
+        message(FATAL_ERROR "Explicit strict floating-point compiler settings are required")
+    endif()
+endforeach()
+enable_testing()
+foreach(rr_test IN ITEMS type3_context48q spring_detector_pipeline48q)
+    add_test(NAME ${rr_test} COMMAND racer_${rr_test}_check ${CMAKE_SOURCE_DIR})
+    set_tests_properties(${rr_test} PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
+endforeach()

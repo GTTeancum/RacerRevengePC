@@ -1,0 +1,26 @@
+# 50EU: live undertrack navigation data
+
+## Concrete source recovery
+
+- `1A0DA0` produces the human player's live `C80/C84/C88/C8C`. The two graph projections advance their current `Next0` while the movement segment crosses the current node's widened gate. If that graph did not advance, they scan every node in ascending authored order. A different `BranchID` is skipped only when `SkipPlayerTest` is present. Every accepted scan candidate writes progression, so later authored candidates win. This is not a nearest-node search.
+- `1A08A0/1A0AA0` intersect **XZ** motion from `CA0` with the normal or widened gate. `142D00` uses separately rounded products/additions/divisions and inclusive segment fractions. Vertical tolerance is authored `NodeHeight` for the map, `800` for AI, plus `700` when main-body `+104` is zero. `ProgressNode` overrides map height to `10000`.
+- `2A1D80` prepares each target node's gates once per incoming edge, visiting source nodes ascending and each `NextN` in authored order; the last incoming edge overwrites earlier gates. It uses source `311038/302730/310440` acos (existing `sourceAcos49T`) and `142B80/13BFE0` rotation (existing `rotateVector49U`). The second, negative-angle branch deliberately does not repeat normalization.
+- `1ACF70` starts at node **1**. It obtains the source `2A26E0` predecessor, starts in that predecessor's current index, and performs two original `280D40` primary-zone crossing walks. Rising nodes go vertically then horizontally; descending/equal nodes go horizontally then vertically. It stores primary-zone `+48` into node `+78`. Node 0 remains the actual constructor's zero byte. No nearest-zone inference or fallback is used.
+- `2729E0` builds separate `4C0` visibility and `4C4` collision arrays in authored-zone order. Both zone objects receive `zone+48 = zero-based ordinal` at `272AD4/272AE4`. Portals are inserted into both tables in the same source order. `50EN` stores corresponding native zone references as ordinal+1; this pointer-to-reference translation is explicit, never a fabricated guest address.
+
+## Join to 50ET and the live client
+
+1. Read both extracted `tracks\\mta.spl` and `tracks\\ata.spl` with `readTrackNavigation50EU`. Use persistent `SourceLibmState49T` and caller scratch. The result embeds the `UndertrackTrack50ET` graph, prepared gates, and source branch flags.
+2. After `prepareLiveZoneWorld50EN`, call `bindTrackNavigationZones50EU` for both graphs. Its portal world is read-only. It projects only final primary-zone/index effects: `1ACF70`'s temporary radius-1 registration and overlap entries are created and removed without feeding primary-zone selection.
+3. Full initialization uses `initializeTrackNavigationProgress50EU`, from exact `217394..2173B8`: `C80=C88=1`, `C84=C8C=0`. Undertrack reset's `a1=0` path must **preserve** progression.
+4. Persist source `CA0`: `228724..228730` copies vehicle `340->288` **local** translation before simulation. On the next player update, `1A08A0` consumes that stored position and vehicle `190`'s then-current local translation. This is not `BasePoseHistory50Y.positionC50` and must not be overwritten with the current endpoint before navigation.
+5. `1A15E4/1A160C` calls progression before `1A25D0` at `1A162C`. Caller admission is the existing `1B0B80` gate OR vehicle `CD8` bit 0. Call `advancePlayerTrackNavigation50EU` at that source point, with main body `104`, then pass `progress.reset` and `.track` into `selectUndertrackReposition50ET`.
+6. Supply the real native world owners' stable visibility/collision table refs to `undertrackBindings50EU`; those tables have the `2729E0` ordinal ordering. Feed its returned view directly to `bindUndertrackPlacement50ET`. Do not populate tables with guest addresses. In owners using the existing 1-based per-zone references, table element `i` is their already-established reference `i+1` in that table's namespace.
+
+## Scope and validation
+
+`advancePlayerTrackNavigation50EU` is a concrete projection of progression-word effects, not the whole player update: lap/audio/UI/shortcut-flag callbacks remain outside this API. Their flags do not feed these represented graph/index stores. The AI vehicle's separate `170000/1B282C` controller is not replaced by the human-player API. All storage must be backed, aligned, mutually disjoint (except explicitly in-place state) and serially owned; consumed arithmetic must be finite and compiled strict binary32, `FE_TONEAREST`, without FMA/reassociation. No callbacks, guest/device execution, or game launches are used.
+
+Strict C++17 `-Wall -Wextra -Wpedantic -Werror -fsyntax-only` passed. A narrowly scoped native leaf smoke parsed all 141 TA map and 166 AI nodes, prepared gates, and crossed the first gate from source initialization to `C80=2,C88=2,C8C=1`. It also prepared the 9-zone/10-portal authored TA world and successfully bound all nodes, exercising every zone index 0..8. Map transition samples: node 6→8, 13→1, 14→2, 25→4, 40→5, 59→6, 78→7, 96→0, 99→3. These are produced values, not hardcoded inputs. Integration/regression checks remain with the parent task.
+
+Original ELF source SHA-256: `c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30`. Exact selected source words, slice hashes, and listings are retained in `evidence/trackNavigation50EU/`. No PC/49C48U/ee.bin data was read.

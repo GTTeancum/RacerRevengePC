@@ -1,0 +1,15 @@
+#include "reset_candidate50am.h"
+#include "json.hpp"
+#include <fstream>
+#include <iostream>
+#include <cstring>
+#include <cstdlib>
+#include <new>
+#include <cfenv>
+#include <bit>
+using namespace rr::game;static unsigned allocations=0;
+void*operator new(std::size_t n){++allocations;if(auto*p=std::malloc(n?n:1))return p;throw std::bad_alloc();}void operator delete(void*p)noexcept{std::free(p);}void operator delete(void*p,std::size_t)noexcept{std::free(p);}
+int main(int argc,char**argv){if(argc!=3)return 2;std::fesetround(FE_TONEAREST);nlohmann::json j,source;std::ifstream f(argv[1]);f>>j;std::ifstream mf(argv[2]);mf>>source;unsigned cases=0,checks=0,hits=0;
+for(const auto&row:j["cases"]){const auto&mj=source["meshes"][row["mesh"].get<unsigned>()];rr::assets::CollisionMesh48I mesh{};for(const auto&v:mj["vertices"])mesh.vertices.push_back({v[0],v[1],v[2]});for(const auto&v:mj["normals"])mesh.vertex_normals.push_back({v[0],v[1],v[2]});for(const auto&n:mj["nodes"]){rr::assets::CollisionMeshNode48I node{};node.volume=n["volume"];for(unsigned i=0;i<3;++i){node.center[i]=n["center"][i];node.half[i]=n["half"][i];}for(unsigned i=0;i<2;++i){auto c=n["children"][i].get<std::uint32_t>();node.children[i]=(c&0x7fff)|((c&0x8000)?rr::assets::collision_mesh_leaf48i:0);}mesh.nodes.push_back(node);}for(const auto&f:mj["faces"]){rr::assets::CollisionMeshFace48I face{};face.d=f["d"];for(unsigned i=0;i<3;++i){face.vertices[i]=f["vertices"][i];face.normal[i]=f["normal"][i];}mesh.faces.push_back(face);}
+SpringVector4_48N p{},q{};BodyMatrix48G m{};for(unsigned i=0;i<4;++i){p.v[i]=std::bit_cast<float>(row["start"][i].get<std::uint32_t>());q.v[i]=std::bit_cast<float>(row["end"][i].get<std::uint32_t>());}for(unsigned i=0;i<16;++i)m.v[i]=std::bit_cast<float>(row["world_matrix"][i].get<std::uint32_t>());std::vector<std::uint32_t> stack(mesh.nodes.size()+mesh.faces.size()+1);ResetCandidateResult50AM out{{{101,102,103,std::bit_cast<float>(0xdeadbeefu)}},{{201,202,203,std::bit_cast<float>(0x7fc00123u)}},0};auto count=allocations;auto mode=row["mode"].get<std::uint32_t>();Vector3_48C center{};for(unsigned i=0;i<3;++i)center.v[i]=std::bit_cast<float>(row["sphere_center"][i].get<std::uint32_t>());auto radius=std::bit_cast<float>(row["sphere_radius"].get<std::uint32_t>());auto flags=row["flags31"].get<std::uint8_t>();auto status=queryResetCandidate50AM(p,q,m,center,radius,flags,mesh,mode,stack.data(),stack.size(),out);if(status!=ResetTreeStatus50AK::Complete||allocations!=count){std::cerr<<"case "<<cases<<" status "<<int(status)<<'\n';return 1;}if(out.hit!=row["hit"]){std::cerr<<"case "<<cases<<" hit "<<out.hit<<'\n';return 1;}for(unsigned i=0;i<4;++i){if(std::bit_cast<std::uint32_t>(out.point.v[i])!=row["point"][i]||std::bit_cast<std::uint32_t>(out.normal.v[i])!=row["normal"][i]){std::cerr<<"case "<<cases<<" point/normal "<<i<<'\n';return 1;}checks+=2;}++checks;hits+=out.hit;++cases;}
+std::cout<<nlohmann::json{{"cases",cases},{"hits",hits},{"word_checks",checks},{"hot_allocations",0},{"result_bytes",sizeof(ResetCandidateResult50AM)}}.dump()<<'\n';}

@@ -1,0 +1,236 @@
+cmake_minimum_required(VERSION 3.16)
+project(RacerRevengeLinuxNative LANGUAGES CXX)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "This entry point is for the Linux native development build.")
+endif()
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+get_filename_component(RR_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+find_package(ZLIB REQUIRED)
+add_library(rr_native_gameplay50dj STATIC
+  "${RR_ROOT}/src/game/reset_model_bounds50ba.cpp"
+  "${RR_ROOT}/src/game/static_impact49y.cpp"
+  "${RR_ROOT}/src/assets/impact_authoring49y.cpp"
+  "${RR_ROOT}/src/assets/repair_authoring50a.cpp"
+  "${RR_ROOT}/src/game/impact_consumers49z.cpp"
+  "${RR_ROOT}/src/game/impact_aftermath50a.cpp"
+  "${RR_ROOT}/src/game/graph_body49w.cpp"
+  "${RR_ROOT}/src/game/pod_shape49w.cpp"
+  "${RR_ROOT}/src/assets/pod_shape49w.cpp"
+  "${RR_ROOT}/src/assets/import_collision48g.cpp"
+  "${RR_ROOT}/src/assets/import_decode48c.cpp"
+  "${RR_ROOT}/src/game/secondary_activation49v.cpp"
+  "${RR_ROOT}/src/game/chariot_blend49v.cpp"
+  "${RR_ROOT}/src/game/chariot_lifecycle49v.cpp"
+  "${RR_ROOT}/src/game/chariot_root49u.cpp"
+  "${RR_ROOT}/src/game/chariot_scene49u.cpp"
+  "${RR_ROOT}/src/assets/chariot_root_authoring49u.cpp"
+  "${RR_ROOT}/src/game/source_acos49t.cpp"
+  "${RR_ROOT}/src/game/model_motion49t.cpp"
+  "${RR_ROOT}/src/game/chariot_ik49t.cpp"
+  "${RR_ROOT}/src/game/vehicle_animation49t.cpp"
+  "${RR_ROOT}/src/game/model_palette49s.cpp"
+  "${RR_ROOT}/src/game/rigid_vertices49s.cpp"
+  "${RR_ROOT}/src/assets/scene_asset48d.cpp"
+  "${RR_ROOT}/src/assets/native_asset48b.cpp"
+  "${RR_ROOT}/src/game/vehicle_visual49r.cpp"
+  "${RR_ROOT}/src/game/visual_container49r.cpp"
+  "${RR_ROOT}/src/game/visual_response49r.cpp"
+  "${RR_ROOT}/src/assets/vehicle_visual_authoring49r.cpp"
+  "${RR_ROOT}/src/game/model_motion49q.cpp"
+  "${RR_ROOT}/src/game/engine_animation49q.cpp"
+  "${RR_ROOT}/src/game/scene_graph49p.cpp"
+  "${RR_ROOT}/src/game/chariot_projection49p.cpp"
+  "${RR_ROOT}/src/assets/model_geometry49o.cpp"
+  "${RR_ROOT}/src/assets/model_bindings49o.cpp"
+  "${RR_ROOT}/src/game/model_motion49o.cpp"
+  "${RR_ROOT}/src/game/model_bounds49o.cpp"
+  "${RR_ROOT}/src/game/authored_geometry49o.cpp"
+  "${RR_ROOT}/src/game/pod_model_geometry49o.cpp"
+  "${RR_ROOT}/src/assets/pod_physics49n.cpp"
+  "${RR_ROOT}/src/game/authored_parameters49n.cpp"
+  "${RR_ROOT}/src/game/gradient_noise49m.cpp"
+  "${RR_ROOT}/src/game/secondary_body49m.cpp"
+  "${RR_ROOT}/src/game/coupled_body_advancement49m.cpp"
+  "${RR_ROOT}/src/game/pod_sphere_constraint49l.cpp"
+  "${RR_ROOT}/src/game/advancement_selectors49k.cpp"
+  "${RR_ROOT}/src/game/body_advancement49k.cpp"
+  "${RR_ROOT}/src/game/body_integration48c.cpp"
+  "${RR_ROOT}/src/game/vehicle_forces48d.cpp"
+  "${RR_ROOT}/src/game/vehicle_aero48e.cpp"
+  "${RR_ROOT}/src/game/body_scene48g.cpp"
+  "${RR_ROOT}/src/game/body_wrapper48h.cpp"
+  "${RR_ROOT}/src/game/clock_quantization49j.cpp"
+  "${RR_ROOT}/src/game/frame_timing49i.cpp"
+  "${RR_ROOT}/src/game/tv_camera_update49f.cpp"
+  "${RR_ROOT}/src/game/camera_view49f.cpp"
+  "${RR_ROOT}/src/game/camera_frame49f.cpp"
+  "${RR_ROOT}/src/assets/tv_camera49e.cpp"
+  "${RR_ROOT}/src/game/tv_camera_selection49e.cpp"
+  "${RR_ROOT}/src/game/control_filter48b.cpp"
+  "${RR_ROOT}/src/game/control_shaping48v.cpp"
+  "${RR_ROOT}/src/game/control_binding48w.cpp"
+  "${RR_ROOT}/src/game/player_input48x.cpp"
+  "${RR_ROOT}/src/game/device_held48y.cpp"
+  "${RR_ROOT}/src/game/event_dispatch48z.cpp"
+  "${RR_ROOT}/src/game/player_events49a.cpp"
+  "${RR_ROOT}/src/game/control_presets49d.cpp"
+  "${RR_ROOT}/src/game/vehicle_static_response50g.cpp"
+  "${RR_ROOT}/src/game/static_contact_response50e.cpp"
+  "${RR_ROOT}/src/game/spring_model48k.cpp"
+  "${RR_ROOT}/src/game/spring_contact48j.cpp"
+  "${RR_ROOT}/src/game/spring_impulse48k.cpp"
+  "${RR_ROOT}/src/game/spring_force48l.cpp"
+  "${RR_ROOT}/src/game/static_type2_producer49x.cpp"
+  "${RR_ROOT}/src/game/type2_resource49x.cpp"
+  "${RR_ROOT}/src/game/type2_triangle_axes49x.cpp"
+  "${RR_ROOT}/src/game/collision_query48h.cpp"
+  "${RR_ROOT}/src/game/spring_callback48n.cpp"
+  "${RR_ROOT}/src/game/spring_records48n.cpp"
+  "${RR_ROOT}/src/assets/collision_mesh48i.cpp"
+  "${RR_ROOT}/src/assets/collision_runtime48h.cpp"
+  "${RR_ROOT}/src/assets/spring_authoring50f.cpp"
+  "${RR_ROOT}/src/game/query_prepare48o.cpp"
+  "${RR_ROOT}/src/game/vehicle_static_query50h.cpp"
+  "${RR_ROOT}/src/game/secondary_query_scene50j.cpp"
+  "${RR_ROOT}/src/game/vehicle_secondary_query50j.cpp"
+  "${RR_ROOT}/src/game/vehicle_secondary_response50j.cpp"
+  "${RR_ROOT}/src/game/base_pose_history50y.cpp"
+  "${RR_ROOT}/src/assets/pod_flame50w.cpp"
+  "${RR_ROOT}/src/assets/import_scene48d.cpp"
+  "${RR_ROOT}/src/assets/import_texture48e.cpp"
+  "${RR_ROOT}/src/game/engine_tail50t.cpp"
+  "${RR_ROOT}/src/game/flame_bindings50v.cpp"
+  "${RR_ROOT}/src/game/vehicle_frame49w.cpp"
+  "${RR_ROOT}/src/game/movement_hit_point50m.cpp"
+  "${RR_ROOT}/src/game/impact_effects50b.cpp"
+  "${RR_ROOT}/src/game/packed_vehicle_tail50r.cpp"
+  "${RR_ROOT}/src/game/float_unsigned50r.cpp"
+  "${RR_ROOT}/src/game/plain_effect_tail50q.cpp"
+  "${RR_ROOT}/src/game/optional_probe_effects50p.cpp"
+  "${RR_ROOT}/src/game/impact_transitions50c.cpp"
+  "${RR_ROOT}/src/assets/track_start50ad.cpp"
+  "${RR_ROOT}/src/game/grid_center50ac.cpp"
+  "${RR_ROOT}/src/assets/track_collider50ao.cpp"
+  "${RR_ROOT}/src/assets/track_collision_tags50an.cpp"
+  "${RR_ROOT}/src/assets/import_world48f.cpp"
+  "${RR_ROOT}/src/game/reset_lifecycle50at.cpp"
+  "${RR_ROOT}/src/game/main_reset50ar.cpp"
+  "${RR_ROOT}/src/game/group_shape48t.cpp"
+  "${RR_ROOT}/src/game/reset_probe50ag.cpp"
+  "${RR_ROOT}/src/game/reset_candidate50am.cpp"
+  "${RR_ROOT}/src/game/reset_tree50ak.cpp"
+  "${RR_ROOT}/src/game/reset_normal50ai.cpp"
+  "${RR_ROOT}/src/game/reset_box50aj.cpp"
+  "${RR_ROOT}/src/game/spring_type3_callback48p.cpp"
+  "${RR_ROOT}/src/game/collision_type3_leaf48p.cpp"
+  "${RR_ROOT}/src/game/collision_type3_node48p.cpp"
+  "${RR_ROOT}/src/game/type3_prepare48p.cpp"
+  "${RR_ROOT}/src/game/type3_query48p.cpp"
+  "${RR_ROOT}/src/game/movement_callback50l.cpp"
+  "${RR_ROOT}/src/game/movement_static_query50l.cpp"
+  "${RR_ROOT}/src/assets/effect_names50bl.cpp"
+  "${RR_ROOT}/src/assets/effect_cold50bj.cpp"
+  "${RR_ROOT}/src/assets/effect_authoring50bg.cpp"
+  "${RR_ROOT}/src/game/effect_dispatch50be.cpp"
+  "${RR_ROOT}/src/game/reset_effects50bk.cpp"
+  "${RR_ROOT}/src/game/search_cold50bu.cpp"
+  "${RR_ROOT}/src/game/search_storage50bs.cpp"
+  "${RR_ROOT}/src/game/search_view50bt.cpp"
+  "${RR_ROOT}/src/game/search_list50br.cpp"
+  "${RR_ROOT}/src/game/candidate_collection50bx.cpp"
+  "${RR_ROOT}/src/game/candidate_merge48s.cpp"
+  "${RR_ROOT}/src/game/type2_bounds50by.cpp"
+  "${RR_ROOT}/src/game/collection_bounds48s.cpp"
+  "${RR_ROOT}/src/game/vehicle_candidates50ca.cpp"
+  "${RR_ROOT}/src/game/candidate_handles50cb.cpp"
+  "${RR_ROOT}/src/game/indexed_type2_contact50cc.cpp"
+  "${RR_ROOT}/src/game/vehicle_indexed_main50cd.cpp"
+  "${RR_ROOT}/src/game/vehicle_indexed_secondary50cd.cpp"
+  "${RR_ROOT}/src/game/collection_projection50cf.cpp"
+  "${RR_ROOT}/src/game/zone_search_views50cg.cpp"
+  "${RR_ROOT}/src/game/zone_registration50cj.cpp"
+  "${RR_ROOT}/src/game/global_zone_chain50ck.cpp"
+  "${RR_ROOT}/src/game/zone_lifecycle50cl.cpp"
+  "${RR_ROOT}/src/game/live_zone_membership50en.cpp"
+  "${RR_ROOT}/src/game/vehicle_live_query50eq.cpp"
+  "${RR_ROOT}/src/game/track_navigation50eu.cpp"
+  "${RR_ROOT}/src/game/lap_progress50gf.cpp"
+  "${RR_ROOT}/src/game/lap_completion50gg.cpp"
+  "${RR_ROOT}/src/game/host_course_driver50gk.cpp"
+  "${RR_ROOT}/src/game/wrong_way_progress50go.cpp"
+  "${RR_ROOT}/src/game/type0_bounds50ew.cpp"
+  "${RR_ROOT}/src/game/undertrack_reset50ew.cpp"
+  "${RR_ROOT}/src/game/reset_visibility50ey.cpp"
+  "${RR_ROOT}/src/game/pod_scene_rebase50fb.cpp"
+  "${RR_ROOT}/src/game/pod_cables50fd.cpp"
+  "${RR_ROOT}/src/game/boost_controls50fk.cpp"
+  "${RR_ROOT}/src/game/vehicle_contact48g.cpp"
+  "${RR_ROOT}/src/game/terrain_query_workspace48m.cpp"
+  "${RR_ROOT}/src/game/collision_tree_workspace48m.cpp"
+  "${RR_ROOT}/src/game/terrain_prepare48m.cpp"
+  "${RR_ROOT}/src/game/undertrack_reposition50et.cpp"
+  "${RR_ROOT}/src/game/portal_geometry50eo.cpp"
+  "${RR_ROOT}/src/game/vehicle_draw50cm.cpp"
+  "${RR_ROOT}/src/game/vehicle_draw_batch50co.cpp"
+  "${RR_ROOT}/src/game/zone_registration_events50cq.cpp"
+  "${RR_ROOT}/src/game/vehicle_draw_submit50cs.cpp"
+  "${RR_ROOT}/src/game/controller_ingress50cx.cpp"
+  "${RR_ROOT}/src/game/controller_actions50ec.cpp"
+  "${RR_ROOT}/src/game/draw_visibility50ei.cpp"
+  "${RR_ROOT}/src/game/vehicle_present50da.cpp"
+  "${RR_ROOT}/src/assets/zone_search_authoring50cn.cpp"
+  "${RR_ROOT}/src/assets/vehicle_draw_assets50cr.cpp"
+  "${RR_ROOT}/src/assets/static_draw_assets50dw.cpp"
+  "${RR_ROOT}/src/assets/material_texture_assets50ea.cpp"
+)
+target_include_directories(rr_native_gameplay50dj PUBLIC
+  "${RR_ROOT}/src/game" "${RR_ROOT}/src/assets" "${RR_ROOT}/third_party/native-json")
+target_link_libraries(rr_native_gameplay50dj PUBLIC ZLIB::ZLIB)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(rr_native_gameplay50dj PUBLIC -fno-fast-math -frounding-math -ffp-contract=off)
+endif()
+add_executable(rr_drive_smoke50db "${RR_ROOT}/tests/native/terrain_present_drive50db.cpp")
+target_link_libraries(rr_drive_smoke50db PRIVATE rr_native_gameplay50dj)
+option(RR_BUILD_OFFSCREEN_SMOKE "Build the explicit EGL neutral-renderer smoke executable" OFF)
+if(RR_BUILD_OFFSCREEN_SMOKE)
+  find_package(Threads REQUIRED)
+  add_library(rr_linux_offscreen50dj STATIC
+    vehicle_draw_gl50cv.cpp vehicle_shader_gl50cz.cpp offscreen_gl_context50dc.cpp
+    vehicle_offscreen_gl50dd.cpp vehicle_offscreen_present50de.cpp vehicle_view_camera50dg.cpp)
+  target_link_libraries(rr_linux_offscreen50dj PUBLIC rr_native_gameplay50dj Threads::Threads ${CMAKE_DL_LIBS})
+  add_executable(rr_offscreen_smoke50dh "${RR_ROOT}/tests/native/terrain_offscreen_drive50dh.cpp")
+  target_link_libraries(rr_offscreen_smoke50dh PRIVATE rr_linux_offscreen50dj)
+endif()
+# Deliberately no CTest/aggregate auto-run target. The user permits at most one
+# explicitly selected smoke invocation per hour across the entire team.
+option(RR_BUILD_LINUX_JOYSTICK "Build explicit Linux joydev transport and packet mapping" OFF)
+if(RR_BUILD_LINUX_JOYSTICK)
+  add_library(rr_linux_joystick50dm STATIC joystick_transport50dk.cpp joystick_packet50dl.cpp)
+  target_link_libraries(rr_linux_joystick50dm PUBLIC rr_native_gameplay50dj)
+  target_include_directories(rr_linux_joystick50dm PUBLIC "${CMAKE_CURRENT_LIST_DIR}")
+endif()
+option(RR_BUILD_INTERACTIVE_CLIENT "Build the retained-fixture interactive vehicle development client" OFF)
+if(RR_BUILD_INTERACTIVE_CLIENT)
+  find_package(Threads REQUIRED)
+  add_library(rr_linux_interactive50dv STATIC
+    window_host50dq.cpp keyboard_packet50dr.cpp vehicle_window_gl50ds.cpp
+    game_host50er.cpp offscreen_gl_context50dc.cpp
+    vehicle_draw_gl50cv.cpp vehicle_shader_gl50cz.cpp vehicle_view_camera50dg.cpp
+    native_camera_view50dx.cpp material_texture_gl50eb.cpp)
+  target_link_libraries(rr_linux_interactive50dv PUBLIC rr_native_gameplay50dj Threads::Threads ${CMAKE_DL_LIBS})
+  target_include_directories(rr_linux_interactive50dv PUBLIC "${CMAKE_CURRENT_LIST_DIR}")
+  add_executable(rr_interactive_vehicle50du "${RR_ROOT}/tests/native/terrain_interactive_drive50du.cpp")
+  target_link_libraries(rr_interactive_vehicle50du PRIVATE rr_linux_interactive50dv)
+endif()
+option(RR_BUILD_SHARED_HEADLESS_CLIENT "Build the shared track/textured renderer's single headless drive" OFF)
+if(RR_BUILD_SHARED_HEADLESS_CLIENT)
+  find_package(Threads REQUIRED)
+  add_library(rr_linux_shared_headless50el STATIC
+    vehicle_draw_gl50cv.cpp vehicle_shader_gl50cz.cpp offscreen_gl_context50dc.cpp
+    vehicle_window_gl50ds.cpp vehicle_view_camera50dg.cpp material_texture_gl50eb.cpp)
+  target_link_libraries(rr_linux_shared_headless50el PUBLIC rr_native_gameplay50dj Threads::Threads ${CMAKE_DL_LIBS})
+  add_executable(rr_headless_drive50ek "${RR_ROOT}/tests/native/terrain_headless_drive50ek.cpp")
+  target_link_libraries(rr_headless_drive50ek PRIVATE rr_linux_shared_headless50el)
+endif()
