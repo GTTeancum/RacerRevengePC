@@ -23,4 +23,10 @@ bool layoutOriginalUiOptionsBackground50KG(std::uint32_t atlasWidth,std::uint32_
 // rectangle. Source quad channels/depth/UV conventions match ScreenTexture.
 bool layoutOriginalUiOptionsSelection50KG(const OriginalUiOptionsSelectionInput50KG&,
     OriginalUiOptionsSelection50KG&) noexcept;
+// Page4 source1F5F40, same numeric ScreenTexture conventions; actual value
+// widget comes from the page4 controller's group/slot mapping.
+bool layoutOriginalUiGameOptionsSelection50KG(std::uint16_t valueWidget,
+    const OriginalUiOptionsSelectionInput50KG&,OriginalUiOptionsSelection50KG&) noexcept;
+bool layoutOriginalUiGameOptionsBackground50KG(std::uint32_t,std::uint32_t,
+    OriginalUiOptionsBackground50KG&) noexcept;
 }

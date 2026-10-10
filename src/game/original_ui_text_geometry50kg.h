@@ -25,10 +25,16 @@ public:
     OriginalUiTextGeometry50KG& operator=(const OriginalUiTextGeometry50KG&)=delete;
     bool prepare(const assets::OriginalUiOverlayText50KG&,const assets::OriginalUiFont50KG&,
         const assets::Texture48B&,OriginalUiTextGeometryDiagnostic50KG&) noexcept;
+    // Source SetText geometry. Keeps the authentic dynamic descriptor identity
+    // and checks its original line count/capacity; does not invent static text.
+    bool prepareDynamic(const assets::OriginalUiOverlayText50KG&,const std::vector<std::string>&,
+        const assets::OriginalUiFont50KG&,const assets::Texture48B&,OriginalUiTextGeometryDiagnostic50KG&) noexcept;
     bool ready()const noexcept{return ready_;}
     std::uint16_t widgetId()const noexcept{return widgetId_;}
     const std::vector<OriginalUiPositionedLine50KG>& lines()const noexcept{return lines_;}
 private:
+    bool prepareLines(const assets::OriginalUiOverlayText50KG&,const std::vector<std::string>&,
+        const assets::OriginalUiFont50KG&,const assets::Texture48B&,OriginalUiTextGeometryDiagnostic50KG&) noexcept;
     bool ready_=false;
     std::uint16_t widgetId_=0;
     std::vector<OriginalUiPositionedLine50KG> lines_;

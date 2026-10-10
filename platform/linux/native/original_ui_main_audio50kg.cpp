@@ -58,13 +58,14 @@ inline std::string sha256(const Bytes& input) {
 }
 
 struct OriginalFile { const char* path; std::size_t bytes; const char* sha; std::uint32_t frames; };
-constexpr std::array<OriginalFile,6> originals{{
+constexpr std::array<OriginalFile,7> originals{{
     {"MUSIC/UI/SCREENS/UI_MAIN.VAG",441024,"50617b8f8029f3fa80744a9de62d7c1987ea0e2d4b35487b8ce7ffd34401934a",384104},
     {"SFX/UI/SELECT.VAG",19424,"6688b65b124428d51cc1e3b531426c417be1bc066a8d560ffe0e7384b48d389a",33880},
     {"SFX/UI/LEFT.VAG",736,"b351f9789f73e8a1d41c954d0238d9b7fb93e257a55fea13b798ec60abb9c8eb",1176},
     {"SFX/UI/RIGHT.VAG",608,"6f515380394424ca812087219c7dad6928c535a68dfce1fd7cbccbb0683fe206",952},
     {"SFX/UI/BADCALL.VAG",6240,"f7d9fa2932f0354a472412c8f3ceea6cf7215f702a5d2ef6abb19590170ac385",10808},
-    {"SFX/UI/BACK.VAG",11568,"3306a9ef40ab752a26a645f28f96ab61d2a7bb91b7a83c989496bd22e7a24b18",20132}
+    {"SFX/UI/BACK.VAG",11568,"3306a9ef40ab752a26a645f28f96ab61d2a7bb91b7a83c989496bd22e7a24b18",20132},
+    {"SFX/UI/ADVANCE.VAG",2864,"e49eedb1fdfdc1c1ecf13d2d34f0357a5be77835f5293b295f4811050cd077ec",4900}
 }};
 Bytes authenticatedRead(const std::filesystem::path& root, const char* relative,
     std::size_t expectedSize, const char* expectedHash) {
@@ -138,7 +139,7 @@ bool OriginalUiMainAudio50KG::prepare(const std::filesystem::path& audioRoot,
         authenticatedRead(audioRoot,"UIEVENTS.INI",790,"ed897d482c72b158f209c20baa6c4e8270a10cdbb9031315cd143a8666557115");
         authenticatedRead(audioRoot,"UI_MUSIC.JUK",1517,"4b814f8e4fec2fbcfa25807d5e147ecc164dbb0b0cb9ce5d064e2f3e3c89de98");
         authenticatedRead(audioRoot,"UI_MUSIC.JUB",3623,"f97a5cbceec8056dfc9b277501087aaa54d86a0ccdc0c71cfde73522a048c661");
-        std::array<assets::AudioPcm50HC,6> next;
+        std::array<assets::AudioPcm50HC,7> next;
         for (std::size_t i=0; i<originals.size(); ++i) {
             const auto& def=originals[i]; const auto bytes=authenticatedRead(audioRoot,def.path,def.bytes,def.sha);
             if (i==0) next[i]=decodeMainStereo(bytes);
@@ -194,6 +195,10 @@ bool OriginalUiMainAudio50KG::playMenuEffect(std::uint32_t originalId) noexcept 
 bool OriginalUiMainAudio50KG::playOptionsEffect(std::uint32_t originalId) noexcept {
     const std::size_t clip=originalId==1?1:originalId==3?2:originalId==4?3:originalId==5?5:clips_.size();
     return playEffectClip(clip);
+}
+bool OriginalUiMainAudio50KG::playGameOptionsEffect(std::uint32_t originalId) noexcept {
+    const std::size_t clip=originalId==1?1:originalId==2?6:originalId==3?2:originalId==4?3:
+        originalId==5?5:originalId==7?4:clips_.size();return playEffectClip(clip);
 }
 bool OriginalUiMainAudio50KG::playEffectClip(std::size_t clip) noexcept {
     if (!current() || paused_ || !clip || clip>=clips_.size()) return false;

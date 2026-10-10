@@ -101,6 +101,39 @@ Status moveOriginalUiControl50KG(OriginalUiNavigation50KG& nav,std::uint16_t id,
     next.groups[id].selectedSlot=static_cast<std::uint16_t>(slot);
     nav=next;output=commands;return Status::ok;
 }
+Status selectOriginalUiGroupSlot50KG(OriginalUiNavigation50KG& nav,std::uint16_t id,
+    std::uint16_t slot,OriginalUiCommands50KG& output) noexcept {
+    if(!nav.page || !valid(*nav.page))return Status::invalidPage;
+    if(id>=nav.page->groups.size())return Status::invalidGroup;
+    if(!slot || slot>nav.page->groups[id].controls.size())return Status::invalidSlot;
+    OriginalUiNavigation50KG next=nav;OriginalUiCommands50KG commands;
+    if(!selectSlot(next,commands,id,slot))return Status::commandCapacity;
+    nav=next;output=commands;return Status::ok;
+}
+Status moveOriginalUiGroup50KG(OriginalUiNavigation50KG& nav,std::uint8_t controller,
+    bool forward,OriginalUiCommands50KG& output) noexcept {
+    if(!nav.page || !valid(*nav.page))return Status::invalidPage;
+    if(controller>=nav.controllerGroup.size())return Status::invalidController;
+    const auto old=nav.controllerGroup[controller];
+    if(old<0){output={};return Status::noChange;}
+    const auto count=nav.page->groups.size()-1;
+    if(!count || !old || static_cast<std::size_t>(old)>count)return Status::invalidGroup;
+    std::size_t id=static_cast<std::size_t>(old);bool found=false;
+    for(std::size_t attempt=0;attempt<count;++attempt){
+        id=forward?(id==count?1:id+1):(id==1?count:id-1);
+        if(nav.groups[id].enabled){found=true;break;}
+    }
+    if(!found)return Status::noSelectableControl;
+    const auto slot=nav.groups[id].selectedSlot;
+    if(!slot || slot>nav.page->groups[id].controls.size())return Status::invalidSlot;
+    OriginalUiNavigation50KG next=nav;OriginalUiCommands50KG commands;
+    if(!deselectGroup(next,commands,static_cast<std::size_t>(old)))return Status::commandCapacity;
+    for(auto c:nav.page->groups[id].associations)
+        if(!command(next,commands,c,Op::select,0x2A4DFC))return Status::commandCapacity;
+    if(!selectSlot(next,commands,id,slot))return Status::commandCapacity;
+    next.controllerGroup[controller]=static_cast<std::int16_t>(id);
+    nav=next;output=commands;return Status::ok;
+}
 Status enableOriginalUiControl50KG(OriginalUiNavigation50KG& nav,std::uint16_t id,
     bool enabled,OriginalUiCommands50KG& output) noexcept {
     if (!nav.page || !valid(*nav.page) || id>=nav.page->controls.size()) return Status::invalidPage;

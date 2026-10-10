@@ -1,5 +1,5 @@
 #pragma once
-#include "original_ui_options_menu_controller50kg.h"
+#include "original_ui_game_options_controller50kg.h"
 #include "original_ui_icon_layout50kg.h"
 #include "original_ui_text_widget50kg.h"
 #include "../assets/original_ui_screen_assets50kg.h"
@@ -8,10 +8,16 @@
 #include <vector>
 
 namespace rr::game {
-// Closed menu population projection, not the whole357-widget Options manager.
-// All other pages remain unavailable. Widget3 is directly referenced by phases.
+// Authenticated menu + Game Options population projection. Widget3 has one
+// shared owner, as in the actual screen manager. Other pages stay unavailable.
 inline constexpr std::array<std::uint16_t,20> originalUiOptionsMenuWidgetIds50KG{{
     1,2,3,5,6,7,8,9,10,12,97,98,99,100,101,102,103,104,105,106}};
+
+inline constexpr std::array<std::uint16_t,37> originalUiGameOptionsWidgetIds50KG{{
+    3,15,18,19,20,37,38,48,49,50,107,108,109,110,111,112,114,116,117,118,119,120,121,122,123,125,126,127,156,157,158,159,160,161,162,165,167}};
+inline constexpr std::array<std::uint16_t,56> originalUiOptionsManagerWidgetIds50KG{{
+    1,2,3,5,6,7,8,9,10,12,15,18,19,20,37,38,48,49,50,97,98,99,100,101,102,103,104,105,106,
+    107,108,109,110,111,112,114,116,117,118,119,120,121,122,123,125,126,127,156,157,158,159,160,161,162,165,167}};
 enum class OriginalUiOptionsWidgetKind50KG : std::uint8_t { absent,text,icon,movement };
 enum class OriginalUiOptionsWidgetStatus50KG : std::uint8_t {
     ok,noChange,hidden,unavailable,notBound,alreadyBound,parseFailure,allocation,
@@ -32,8 +38,8 @@ struct OriginalUiOptionsWidgetState50KG {
     bool selected=false,shown=false,onTop=false;
 };
 struct OriginalUiOptionsWidgetOrder50KG {
-    // Relative order of admitted siblings only. Omitted Options widgets stay
-    // source-hidden in this closed menu-only session. Never navigate another page.
+    // Actual ascending ordinary / descending OnTop manager sibling order.
+    // Page callbacks, not this order, determine current visibility.
     std::vector<std::uint16_t> ordinaryWidgets,onTopWidgets;
 };
 struct OriginalUiOptionsTextProjection50KG {
@@ -81,6 +87,19 @@ public:
         void* effectsContext,bool (*pageEffects)(void*,const OriginalUiOptionsMenuPageResult50KG&) noexcept,
         OriginalUiOptionsMenuPageResult50KG&,OriginalUiMovementNotification50KG&,
         OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
+    const assets::OriginalUiPage50KG* gameOptionsPage() const noexcept;
+    const OriginalUiGameOptionsState50KG* gameOptionsState() const noexcept;
+    OriginalUiOptionsWidgetStatus50KG gameOptionsPhase(OriginalUiOptionsMenuPhase50KG,
+        const OriginalUiGameSettingsProfile50KG&,OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
+    OriginalUiOptionsWidgetStatus50KG gameOptionsInput(std::uint8_t,assets::OriginalUiMovementInput50KG,
+        bool containerReached,bool pageInputEnabled268,OriginalUiGameOptionsPlan50KG&,
+        OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
+    // Source render1F5F40 SetText calls, after ordinary widgets and before the
+    // selection arrows/aperture. Preallocated bounded strings avoid hot allocs.
+    OriginalUiOptionsWidgetStatus50KG refreshGameOptionsVolumeText(OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
+    const std::string* dynamicText(std::uint16_t) const noexcept;
+    std::int32_t gameOptionsRenderedVolume(std::uint16_t) const noexcept;
+    std::uint16_t gameOptionsSelectedValueWidget() const noexcept;
     OriginalUiOptionsWidgetStatus50KG updateText(std::uint16_t,bool ancestorsShown,
         OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
     OriginalUiOptionsWidgetStatus50KG projectText(std::uint16_t,std::size_t,float fontLineHeight,
@@ -94,6 +113,10 @@ public:
         OriginalUiOptionsIconProjection50KG&,OriginalUiOptionsWidgetDiagnostic50KG&) const noexcept;
 private:
     struct Storage;std::unique_ptr<Storage> storage_;
+    OriginalUiOptionsWidgetStatus50KG commitCallbacks(const OriginalUiOptionsMenuCallback50KG*,std::size_t,
+        OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
+    OriginalUiOptionsWidgetStatus50KG commitGameOptionsPlan(const OriginalUiGameOptionsPlan50KG&,
+        OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
     OriginalUiOptionsWidgetStatus50KG commitPlan(const OriginalUiOptionsMenuPlan50KG&,
         OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
 };

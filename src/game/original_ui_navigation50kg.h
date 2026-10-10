@@ -45,6 +45,12 @@ OriginalUiNavigationStatus50KG enterOriginalUiGroup50KG(OriginalUiNavigation50KG
 // original infinite scan when every control is ineligible; failure is atomic.
 OriginalUiNavigationStatus50KG moveOriginalUiControl50KG(OriginalUiNavigation50KG&,
     std::uint16_t groupId,bool forward,OriginalUiCommands50KG&) noexcept;
+// Source 2A6BC0: select one slot without attaching a controller or changing
+// associations. Source 2A68E0/2A69B0: move the attached group, retaining its slot.
+OriginalUiNavigationStatus50KG selectOriginalUiGroupSlot50KG(OriginalUiNavigation50KG&,
+    std::uint16_t groupId,std::uint16_t slot,OriginalUiCommands50KG&) noexcept;
+OriginalUiNavigationStatus50KG moveOriginalUiGroup50KG(OriginalUiNavigation50KG&,
+    std::uint8_t controller,bool forward,OriginalUiCommands50KG&) noexcept;
 OriginalUiNavigationStatus50KG enableOriginalUiControl50KG(OriginalUiNavigation50KG&,
     std::uint16_t controlId,bool enabled,OriginalUiCommands50KG&) noexcept;
 // Consumers expand every command through page.controls[id].widgets in listed

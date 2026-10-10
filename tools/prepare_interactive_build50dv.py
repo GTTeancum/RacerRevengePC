@@ -89,6 +89,7 @@ def main():
         'platform/linux/native/original_ui_options_session50kg.cpp',
         'src/game/original_ui_main_widget_manager50kg.cpp',
         'src/game/original_ui_options_menu_controller50kg.cpp',
+        'src/game/original_ui_game_options_controller50kg.cpp',
         'src/game/original_ui_options_menu_widgets50kg.cpp',
         'src/game/original_ui_options_menu_layout50kg.cpp',
         'src/game/original_ui_options_camera50kg.cpp',

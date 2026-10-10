@@ -21,7 +21,8 @@ void resetOriginalUiOptionsProfileFields50KG(OriginalUiOptionsProfile50KG& profi
 struct OriginalUiOptionsSession50KG::Storage {
     OriginalUiOptionsSessionCold50KG cold;
     OriginalUiOptionsDrawContribution50KG collector;
-    game::OriginalUiApertureOwner50KG aperture;
+    game::OriginalUiApertureOwner50KG aperture,gameAperture;
+    bool gamePrepared=false;
     OriginalUiOptionsSessionSnapshot50KG state;
     Diagnostic callbackFault;
     game::OriginalUiRouteDecision50KG pendingBack{};
@@ -32,17 +33,24 @@ struct OriginalUiOptionsSession50KG::Storage {
     bool operational() const noexcept {return dependenciesPrepared&&!state.faulted&&!state.quitRequested;}
     void fault(Status s,std::uint32_t pc) noexcept {if(!state.faulted){state.faulted=true;callbackFault.status=s;callbackFault.sourcePC=pc;}}
     game::OriginalUiTransitionSnapshot50KG transition() const noexcept {return cold.externalTransition->snapshot();}
-    bool currentPage() const noexcept {const auto t=transition();return t.bound&&t.current.screen==12&&t.current.page==1;}
+    std::uint8_t activePage() const noexcept {return transition().current.page;}
+    game::OriginalUiApertureOwner50KG& activeAperture() noexcept {return activePage()==4?gameAperture:aperture;}
+    const game::OriginalUiApertureOwner50KG& activeAperture() const noexcept {return activePage()==4?gameAperture:aperture;}
+    bool ownsPage(std::uint8_t page) const noexcept {return page==1||(page==4&&gamePrepared&&cold.gameSettingsProfile&&game::validOriginalUiGameSettingsProfile50KG(*cold.gameSettingsProfile));}
+    bool currentPage() const noexcept {const auto t=transition();return t.bound&&t.current.screen==12&&ownsPage(t.current.page);}
     bool idleInput() const noexcept {const auto t=transition();return currentPage()&&t.lifecycle==game::OriginalUiTransitionLifecycle50KG::idle&&
-        t.phase==game::OriginalUiTransitionPhase50KG::none&&!t.initialRestartPending&&t.requested.screen==12&&t.requested.page==1&&!t.applicationRequestQueued&&state.pageShown&&state.inputContainerShown&&
-        aperture.snapshot().inputEnabled268&&aperture.snapshot().state==game::OriginalUiApertureState50KG::open;}
-    void widgetPhase(Phase p,std::uint32_t pc) noexcept {
+        t.phase==game::OriginalUiTransitionPhase50KG::none&&!t.initialRestartPending&&t.requested.screen==12&&t.requested.page==t.current.page&&!t.applicationRequestQueued&&state.pageShown&&state.inputContainerShown&&
+        activeAperture().snapshot().inputEnabled268&&activeAperture().snapshot().state==game::OriginalUiApertureState50KG::open;}
+    void widgetPhase(Phase p,std::uint32_t pc,std::uint8_t page=0) noexcept {
+        if(!page)page=activePage();
+        if(page==4){if(!ownsPage(4)){fault(Status::unsupportedState,pc);return;}
+            if(!widgetOkay(bank().gameOptionsPhase(p,*cold.gameSettingsProfile,callbackFault.widget)))fault(Status::widget,pc);return;}
         if(!cold.profile->known||cold.profile->savedSlot6E4<1||cold.profile->savedSlot6E4>6){fault(Status::unsupportedState,pc);return;}
         if(!widgetOkay(bank().phase(p,cold.profile->known,static_cast<std::uint16_t>(cold.profile->savedSlot6E4),callbackFault.widget)))fault(Status::widget,pc);
     }
     bool audioEffect(std::uint32_t id) noexcept {
         if(cold.audioMode==OriginalUiMainAudioMode50KG::muted){++state.audio.suppressedByMutedMode;return true;}
-        if(!cold.audio||!cold.audio->ready()||!cold.audio->playOptionsEffect(id)){++state.audio.failed;fault(Status::audio,0x292360);return false;}
+        if(!cold.audio||!cold.audio->ready()||!(activePage()==4?cold.audio->playGameOptionsEffect(id):cold.audio->playOptionsEffect(id))){++state.audio.failed;fault(Status::audio,0x292360);return false;}
         ++state.audio.submitted;return true;
     }
     static bool pageEffects(void* p,const game::OriginalUiOptionsMenuPageResult50KG& result) noexcept {
@@ -60,7 +68,7 @@ struct OriginalUiOptionsSession50KG::Storage {
         case Hook::closingB4:s.widgetPhase(Phase::closingB4,event.callPC);break;
         case Hook::closingThresholdB8:
             // Options target1F9FE0 is an actual return-only leaf.
-            if(event.targetPC!=0x1F9FE0)s.fault(Status::unsupportedState,event.callPC);break;
+            if(event.targetPC!=(s.activePage()==4?0x1F5F30u:0x1F9FE0u))s.fault(Status::unsupportedState,event.callPC);break;
         case Hook::closedBC:
             // Shared1D7A00 completion is implemented in the aperture itself.
             if(event.targetPC!=0x1D7A00)s.fault(Status::unsupportedState,event.callPC);break;
@@ -106,6 +114,12 @@ Status OriginalUiOptionsSession50KG::bind(const OriginalUiOptionsSessionCold50KG
         game::OriginalUiApertureCallbacks50KG callbacks;callbacks.context=s.get();callbacks.available=&Storage::available;
         callbacks.hook=&Storage::hook;callbacks.submitOverlay=&Storage::overlay;
         if(s->aperture.bindOptionsMenu(cold.optionsArchive,callbacks,d.aperture)!=ApertureStatus::ok)return result(d,Status::aperture);
+        if(cold.gameSettingsProfile){
+            if(!game::validOriginalUiGameSettingsProfile50KG(*cold.gameSettingsProfile)||!cold.resources->gameOptionsExitText()||
+                !cold.resources->gameOptionsExitText()->prepared())return result(d,Status::unsupportedState);
+            if(s->gameAperture.bindGameOptions(cold.optionsArchive,callbacks,d.aperture)!=ApertureStatus::ok)return result(d,Status::aperture);
+            s->gamePrepared=true;
+        }
         // No manager bind, tick, widget phase, shared-profile write or music
         // start during this cold prepare. Coordinator owns the initial notices.
         s->state.bound=true;storage_=std::move(s);return result(d,Status::ok);
@@ -113,23 +127,23 @@ Status OriginalUiOptionsSession50KG::bind(const OriginalUiOptionsSessionCold50KG
 }
 Status OriginalUiOptionsSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG& event,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
-    if(!s->operational()||s->inOperation||event.route.screen!=12||event.route.page!=1)return result(d,Status::unsupportedState,event.sourcePC);
+    if(!s->operational()||s->inOperation||event.route.screen!=12||!s->ownsPage(event.route.page))return result(d,Status::unsupportedState,event.sourcePC);
     const auto t=s->transition();
     if(!t.bound||event.lifecycle!=t.lifecycle||event.phase!=t.phase||
-        !((t.current.screen==12&&t.current.page==1)||(t.requested.screen==12&&t.requested.page==1)))return result(d,Status::invalidInput,event.sourcePC);
+        !((t.current.screen==12&&t.current.page==event.route.page)||(t.requested.screen==12&&t.requested.page==event.route.page)))return result(d,Status::invalidInput,event.sourcePC);
     s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;
     switch(event.kind) {
-    case Notice::requestedPage90:s->widgetPhase(Phase::requestedPage90,event.sourcePC);s->state.pageShown=true;break;
-    case Notice::previousPage94:s->widgetPhase(Phase::previousPage94,event.sourcePC);s->state.pageShown=false;break;
+    case Notice::requestedPage90:s->widgetPhase(Phase::requestedPage90,event.sourcePC,event.route.page);s->state.pageShown=true;break;
+    case Notice::previousPage94:s->widgetPhase(Phase::previousPage94,event.sourcePC,event.route.page);s->state.pageShown=false;break;
     case Notice::pageEntry74:
-        s->widgetPhase(Phase::entry74,event.sourcePC);
+        s->widgetPhase(Phase::entry74,event.sourcePC,event.route.page);
         // Page+C4 aliases the one real manager camera(+2B0); entry enables and
         // registers that camera. Renderer uses its authenticated prepared pose.
         s->state.cameraActive=true;s->cold.application->uiObject3D8=0;break;
     case Notice::managerEntry84:break; // inherited2A4330 return-only leaf
     case Notice::beginTransition7C:
         s->state.backProposalPending=false;
-        if(!apertureOkay(s->aperture.beginTransition7C(event.phase)))s->fault(Status::aperture,event.sourcePC);break;
+        if(!apertureOkay((event.route.page==4?s->gameAperture:s->aperture).beginTransition7C(event.phase)))s->fault(Status::aperture,event.sourcePC);break;
     case Notice::pageAuxiliary1C:s->state.inputContainerShown=false;break;
     case Notice::pageAuxiliary24:s->state.inputContainerShown=true;break;
     }
@@ -137,13 +151,16 @@ Status OriginalUiOptionsSession50KG::notifyTransition(const game::OriginalUiTran
 }
 game::OriginalUiTransitionCompletion50KG OriginalUiOptionsSession50KG::pollCompletion(game::OriginalUiTransitionRoute50KG route,game::OriginalUiTransitionPhase50KG phase) const noexcept {
     const auto* s=storage_.get();
-    if(!s||!s->operational()||s->inOperation||route.screen!=12||route.page!=1)return game::OriginalUiTransitionCompletion50KG::unavailable;
+    if(!s||!s->operational()||s->inOperation||route.screen!=12||!s->ownsPage(route.page))return game::OriginalUiTransitionCompletion50KG::unavailable;
     const auto t=s->transition();
     if(!t.bound||t.current.screen!=route.screen||t.current.page!=route.page||t.phase!=phase)return game::OriginalUiTransitionCompletion50KG::unavailable;
-    return s->aperture.pollCompletion(route,phase);
+    return (route.page==4?s->gameAperture:s->aperture).pollCompletion(route,phase);
 }
 const game::OriginalUiTransitionOwner50KG* OriginalUiOptionsSession50KG::externalLifecycleOwner() const noexcept {
     return storage_?storage_->cold.externalTransition.get():nullptr;
+}
+bool OriginalUiOptionsSession50KG::ownsPreparedPage(std::uint8_t page) const noexcept {
+    const auto* s=storage_.get();return s&&s->operational()&&!s->inOperation&&s->ownsPage(page);
 }
 Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG& in,OriginalUiOptionsSessionInputReceipt50KG& receipt,Diagnostic& d) noexcept {
     d={};receipt={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
@@ -151,9 +168,28 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
     if(s->inOperation||s->updatePrepared||in.controller>1||in.originalInput>15)return result(d,Status::invalidInput);
     s->state.framePublished=false;s->state.backProposalPending=false;receipt.sourceLifecycle=s->transition();
     receipt.containerReached=s->currentPage()&&s->state.pageShown&&s->state.inputContainerShown;
-    if(!receipt.containerReached||!s->aperture.snapshot().inputEnabled268)return result(d,Status::noChange);
+    if(!receipt.containerReached||!s->activeAperture().snapshot().inputEnabled268)return result(d,Status::noChange);
     if(s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState,0x267BE0);
     s->inOperation=true;receipt.pageCallbackRan=true;
+    if(s->activePage()==4){
+        const auto ws=s->bank().gameOptionsInput(in.controller,static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),true,true,receipt.gameOptions,d.widget);
+        receipt.pageAccepted=receipt.gameOptions.pageAccepted;Status status=Status::noChange;
+        if(!widgetOkay(ws)&&ws!=WidgetStatus::unavailable){s->fault(Status::widget,0x1F50F0);status=Status::widget;}
+        else if(receipt.gameOptions.intent==game::OriginalUiGameOptionsIntent50KG::cancel&&s->idleInput()){
+            game::OriginalUiRouteDecision50KG route;route.inputPC=0x1F50F0;route.profileProposalComplete=true;
+            route.action=game::OriginalUiRouteAction50KG::unavailable;
+            route.blockers=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner);
+            route.selectedSlot=receipt.gameOptions.rememberedGroup6E8;
+            route.request.kind=game::OriginalUiRouteKind50KG::changePage;route.request.sourceScreen=12;route.request.sourcePage=4;
+            route.request.targetScreen=12;route.request.targetPage=1;route.request.sourcePC=0x1F51D8;
+            route.profileChanges.count=1;route.profileChanges.values[0]={game::OriginalUiProfileField50KG::optionsGroup6E8,
+                game::OriginalUiProfileWrite50KG::word,route.selectedSlot,0xFFFFFFFFu,0x1F51C8};
+            s->pendingBack=route;s->state.backProposalPending=true;++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;
+            receipt.routeProposal={this,s->proposalSerial,route};status=Status::pageProposed;
+        }else if(receipt.gameOptions.intent!=game::OriginalUiGameOptionsIntent50KG::none)status=Status::unavailableDestination;
+        else if(receipt.gameOptions.soundRequested)status=s->audioEffect(receipt.gameOptions.soundId)?Status::ok:Status::audio;
+        s->inOperation=false;if(s->state.faulted){d=s->callbackFault;status=d.status;}receipt.status=status;return result(d,status);
+    }
     game::OriginalUiOptionsContext50KG context;
     context.admission.sourceControllerReady=true;context.admission.selectionOwnerReady=true;
     context.admission.profileOwnerReady=s->cold.profile->known&&s->cold.commonProfile->known;
@@ -172,6 +208,12 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
             route.request.targetScreen==4&&route.request.targetPage==1&&route.blockers==static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)) {
             s->pendingBack=route;s->state.backProposalPending=true;++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;receipt.routeProposal={this,s->proposalSerial,route};status=Status::backProposed;
         }
+        if(in.originalInput==4&&s->idleInput()&&s->ownsPage(4)&&route.selectedSlot==3&&route.profileProposalComplete&&
+            route.request.kind==game::OriginalUiRouteKind50KG::changePage&&route.request.targetScreen==12&&route.request.targetPage==4&&
+            route.blockers==static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)){
+            s->pendingBack=route;s->state.backProposalPending=true;++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;
+            receipt.routeProposal={this,s->proposalSerial,route};status=Status::pageProposed;
+        }
         // Unavailable subpages and missing real popup are not successful work:
         // retain prospective audio/profile requests, but do not partially apply.
     } else if(receipt.page.soundRequested)status=Status::ok;
@@ -183,10 +225,13 @@ bool OriginalUiOptionsSession50KG::routeProposalCurrent(const OriginalUiOptionsR
     const auto& decision=proposal.decision;
     const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||!s->idleInput()||proposal.source!=this||!proposal.serial||proposal.serial!=s->proposalSerial)return false;
     const auto& expected=s->pendingBack;const auto& a=decision.request;const auto& b=expected.request;
-    const auto* nav=s->cold.resources->widgets()->navigation();
+    const auto* nav=expected.request.sourcePage==4?&s->cold.resources->widgets()->gameOptionsState()->navigation:s->cold.resources->widgets()->navigation();
+    const bool selection=expected.request.sourcePage==4?
+        (s->ownsPage(4)&&nav&&nav->controllerGroup[0]==expected.selectedSlot):
+        (nav&&nav->controllerGroup[0]==1&&nav->groups[1].selectedSlot==expected.selectedSlot);
     if(!s->cold.profile->known||!s->cold.commonProfile->known||!s->cold.application->known||
         (s->cold.application->globalFlags228&4u)||s->cold.application->transportE00!=-1||
-        !nav||nav->controllerGroup[0]!=1||nav->groups[1].selectedSlot!=expected.selectedSlot||
+        !selection||s->activePage()!=expected.request.sourcePage||
         decision.inputPC!=expected.inputPC||decision.selectedSlot!=expected.selectedSlot||decision.selectedRider!=expected.selectedRider||
         a.kind!=b.kind||a.sourceScreen!=b.sourceScreen||a.sourcePage!=b.sourcePage||a.targetScreen!=b.targetScreen||a.targetPage!=b.targetPage||a.sourcePC!=b.sourcePC||
         decision.admitted!=expected.admitted||decision.blockers!=expected.blockers||decision.action!=expected.action||
@@ -197,30 +242,35 @@ bool OriginalUiOptionsSession50KG::routeProposalCurrent(const OriginalUiOptionsR
 }
 Status OriginalUiOptionsSession50KG::notifyRouteAccepted(const OriginalUiOptionsRouteProposal50KG& proposal,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
-    if(!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||proposal.source!=this||!proposal.serial||
-        proposal.serial!=s->proposalSerial)return result(d,Status::invalidInput);
+    if(!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||proposal.source!=this||
+        !proposal.serial||proposal.serial!=s->proposalSerial)return result(d,Status::invalidInput);
     const auto& decision=proposal.decision;const auto& pending=s->pendingBack;
     const auto& r=decision.request;const auto& expected=pending.request;
     if(decision.admitted!=pending.admitted||decision.profileProposalComplete!=pending.profileProposalComplete||
         decision.blockers!=pending.blockers||decision.action!=pending.action||r.kind!=expected.kind||
-        r.sourceScreen!=12||r.sourcePage!=1||r.targetScreen!=4||r.targetPage!=1||r.sourcePC!=expected.sourcePC||
-        decision.inputPC!=pending.inputPC||decision.selectedSlot!=pending.selectedSlot||decision.selectedRider!=pending.selectedRider||
-        decision.profileChanges.count!=1)return result(d,Status::invalidInput);
-    const auto& p=decision.profileChanges.values[0];const auto& e=pending.profileChanges.values[0];
-    if(p.field!=e.field||p.operation!=e.operation||p.value!=e.value||p.replaceMask!=e.replaceMask||p.sourcePC!=e.sourcePC)
+        r.sourceScreen!=expected.sourceScreen||r.sourcePage!=expected.sourcePage||r.targetScreen!=expected.targetScreen||
+        r.targetPage!=expected.targetPage||r.sourcePC!=expected.sourcePC||decision.inputPC!=pending.inputPC||
+        decision.selectedSlot!=pending.selectedSlot||decision.selectedRider!=pending.selectedRider||decision.profileChanges.count!=1)
         return result(d,Status::invalidInput);
-    const auto t=s->transition();const auto* nav=s->bank().navigation();
-    if(!t.bound||t.current.screen!=12||t.current.page!=1||t.requested.screen!=4||t.requested.page!=1||
-        t.lifecycle!=game::OriginalUiTransitionLifecycle50KG::requestScreenExit||t.phase!=game::OriginalUiTransitionPhase50KG::none||
-        t.applicationRequestQueued||t.initialRestartPending||!nav||nav->controllerGroup[0]!=1||nav->groups[1].selectedSlot!=decision.selectedSlot||
+    const auto& p=decision.profileChanges.values[0];const auto& e=pending.profileChanges.values[0];
+    if(p.field!=e.field||p.operation!=e.operation||p.value!=e.value||p.replaceMask!=e.replaceMask||p.sourcePC!=e.sourcePC)return result(d,Status::invalidInput);
+    const bool cancel=r.sourcePage==4;const bool sameScreen=r.kind==game::OriginalUiRouteKind50KG::changePage;
+    const bool shape=cancel?(sameScreen&&r.sourceScreen==12&&r.targetScreen==12&&r.targetPage==1&&r.sourcePC==0x1F51D8&&
+        decision.inputPC==0x1F50F0&&p.field==game::OriginalUiProfileField50KG::optionsGroup6E8&&p.sourcePC==0x1F51C8):
+        (r.sourceScreen==12&&r.sourcePage==1&&p.field==game::OriginalUiProfileField50KG::optionsSlot6E4&&
+         ((sameScreen&&r.targetScreen==12&&r.targetPage==4&&decision.selectedSlot==3&&r.sourcePC==0x1F9898&&p.sourcePC==0x1F9940)||
+          (!sameScreen&&r.targetScreen==4&&r.targetPage==1&&r.sourcePC==0x1F99A4&&p.sourcePC==0x1F9994)));
+    const auto t=s->transition();const auto* nav=cancel?&s->bank().gameOptionsState()->navigation:s->bank().navigation();
+    const bool selection=cancel?(s->ownsPage(4)&&nav&&nav->controllerGroup[0]==decision.selectedSlot):
+        (nav&&nav->controllerGroup[0]==1&&nav->groups[1].selectedSlot==decision.selectedSlot);
+    const bool profile=cancel?(s->cold.gameSettingsProfile&&s->cold.gameSettingsProfile->savedGroup6E8==p.value):s->cold.profile->savedSlot6E4==p.value;
+    if(!shape||!selection||!profile||!t.bound||t.current.screen!=12||t.current.page!=r.sourcePage||t.requested.screen!=r.targetScreen||t.requested.page!=r.targetPage||
+        t.lifecycle!=(sameScreen?game::OriginalUiTransitionLifecycle50KG::requestPageExit:game::OriginalUiTransitionLifecycle50KG::requestScreenExit)||
+        t.phase!=game::OriginalUiTransitionPhase50KG::none||t.applicationRequestQueued||t.initialRestartPending||
         !s->cold.profile->known||!s->cold.commonProfile->known||!s->cold.application->known||
-        (s->cold.application->globalFlags228&4u)||s->cold.profile->savedSlot6E4!=p.value||s->cold.application->transportE00!=-1)
-        return result(d,Status::unsupportedState,0x1F99D0);
-    // Original1F9994 writes +6E4;1F999C sets lifecycle6;1F99A4/B0 sets
-    // target4/page1; only then1F99D0 plays BACK5 and1F99E8 flushes. The
-    // admitted process transportE00=-1 takes the actual no-work flush return.
+        (s->cold.application->globalFlags228&4u)||s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState);
     s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;
-    const bool okay=s->audioEffect(5);s->inOperation=false;
+    const bool okay=s->audioEffect(cancel||!sameScreen?5:1);s->inOperation=false;
     if(!okay){d=s->callbackFault;return d.status;}return result(d,Status::ok);
 }
 Status OriginalUiOptionsSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG& in,Diagnostic& d) noexcept {
@@ -245,8 +295,8 @@ Status OriginalUiOptionsSession50KG::update(const OriginalUiMainSessionUpdate50K
         in.debugChordHeld!=s->preparedUpdate.debugChordHeld){s->fault(Status::unsupportedState,0x2A3C80);d=s->callbackFault;return d.status;}
     s->updatePrepared=false;s->state.backProposalPending=false;s->inOperation=true;
     const auto* order=s->bank().order();if(!s->state.faulted)s->updateWidgets(order->ordinaryWidgets);
-    if(!s->state.faulted&&s->state.pageShown&&s->aperture.saveOptionsMenuUpdateDelta38(in.elapsedSeconds)!=ApertureStatus::ok)
-        s->fault(Status::aperture,0x1F9A74);
+    if(!s->state.faulted&&s->state.pageShown&&(s->activePage()==4?s->gameAperture.saveGameOptionsUpdateDelta38(in.elapsedSeconds):s->aperture.saveOptionsMenuUpdateDelta38(in.elapsedSeconds))!=ApertureStatus::ok)
+        s->fault(Status::aperture,s->activePage()==4?0x1F5BE4:0x1F9A74);
     if(!s->state.faulted)s->updateWidgets(order->onTopWidgets);
     // Options1D0DA0 attaches scene siblings after Pod widgets: particle manager,
     // borrowed stationary manager camera, then actual Type8 fire emitter.
@@ -266,8 +316,8 @@ Status OriginalUiOptionsSession50KG::render(const OriginalUiOptionsClock50KG& cl
     if(s->updatePrepared){s->fault(Status::unsupportedState,0x234440);d=s->callbackFault;return d.status;}
     if(!s->currentPage()||!s->state.updateCount||!s->state.cameraActive||(s->paused&&clock.advanceAnimations))return result(d,Status::invalidInput);
     s->state.backProposalPending=false;s->inOperation=true;s->rendering=true;
-    bool okay=s->collector.begin(clock,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&s->collector.projectPage(s->state.pageShown,d.draw);
-    if(okay)okay=apertureOkay(s->aperture.render48(s->transition().lifecycle));
+    bool okay=s->collector.beginPage(s->activePage(),clock,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&s->collector.projectPage(s->state.pageShown,d.draw);
+    if(okay)okay=apertureOkay(s->activeAperture().render48(s->transition().lifecycle));
     okay=okay&&!s->state.faulted;
     if(okay)okay=s->collector.projectPrompts(d.draw)&&s->collector.projectOnTopWidgets(true,d.draw)&&s->collector.projectParticles(d.draw)&&s->collector.drain(d.draw);
     s->rendering=false;s->inOperation=false;
@@ -275,7 +325,7 @@ Status OriginalUiOptionsSession50KG::render(const OriginalUiOptionsClock50KG& cl
     ++s->state.renderCount;s->state.framePublished=true;return result(d,Status::ok);
 }
 OriginalUiOptionsSessionSnapshot50KG OriginalUiOptionsSession50KG::snapshot() const noexcept {
-    if(!storage_)return {};auto out=storage_->state;out.transition=storage_->transition();out.aperture=storage_->aperture.snapshot();
+    if(!storage_)return {};auto out=storage_->state;out.transition=storage_->transition();out.aperture=storage_->activeAperture().snapshot();
     out.promptMask42C=storage_->cold.resources->widgets()->pageInputFlags42C();return out;
 }
 const OriginalUiNativeDraw50KG* OriginalUiOptionsSession50KG::draw() const noexcept {

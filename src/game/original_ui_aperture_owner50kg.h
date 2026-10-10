@@ -127,6 +127,10 @@ public:
     OriginalUiApertureStatus50KG bindOptionsMenu(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    // Actual page4/options.dat, vtable3D0D50; no alias of menu.dat state.
+    OriginalUiApertureStatus50KG bindGameOptions(
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
     OriginalUiApertureStatus50KG bindOptionsMenuEntryOnly(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
@@ -148,6 +152,7 @@ public:
     OriginalUiApertureStatus50KG saveMainUpdateDelta38(float actualDelta) noexcept;
     // Options actual+38=1F9A70 saves dt at1F9A74 before jumping to2A6BB0.
     OriginalUiApertureStatus50KG saveOptionsMenuUpdateDelta38(float actualDelta) noexcept;
+    OriginalUiApertureStatus50KG saveGameOptionsUpdateDelta38(float actualDelta) noexcept;
     // Call ONLY at the real Main render's 1E6688 -> 1D7550 point. Uses the
     // saved delta, never a new elapsed timer. Every real render may use that
     // same saved sample, as source does; no synthetic per-tick deduplication.
@@ -169,9 +174,10 @@ private:
     mutable bool inOperation_=false;
     bool entryOnly_=false;
     bool optionsMenu_=false;
+    std::uint8_t optionsPage_=1;
     OriginalUiApertureStatus50KG bindPageImpl(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
-        const OriginalUiApertureCallbacks50KG&,bool entryOnly,bool optionsMenu,
+        const OriginalUiApertureCallbacks50KG&,bool entryOnly,bool optionsMenu,std::uint8_t page,
         OriginalUiApertureDiagnostic50KG&) noexcept;
     OriginalUiApertureStatus50KG saveUpdateDelta38(float actualDelta) noexcept;
     bool available() const noexcept;
