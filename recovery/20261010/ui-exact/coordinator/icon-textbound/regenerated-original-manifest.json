@@ -1,0 +1,11 @@
+{
+  "status": "source-only Icon text-buffer correction",
+  "paths": [
+    {
+      "path": "src/assets/original_ui_icon50kg.cpp",
+      "sha256": "194220adb5b6a09cd6de7e722ef7eda1ccf1697a9d0d909bad65b1ee1c222dc5",
+      "preimage_sha256": "10f29624cbafc72f0bae99672317fdb51f3083ef44bf40b47c8f61ebb736dab6",
+      "bytes": 5276
+    }
+  ]
+}

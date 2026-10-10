@@ -1,0 +1,244 @@
+{
+  "kind": "Regenerated bounded recovery index; not an original stage manifest",
+  "tested_gate_packet_recovered": false,
+  "native_ai_113_path_packet_recovered": false,
+  "groups": [
+    {
+      "directory": "active/pre-gate-query-audit",
+      "scope": "Five historical-hash matches; vegetation header is complete Gate-containing readback without retained expected hash. Directory name does not establish its chronology.",
+      "artifacts": [
+        {
+          "path": "active/pre-gate-query-audit/EXPECTED-SHA256SUMS",
+          "bytes": 524,
+          "recovered_sha256": "46fc7c05eedc9c9f96ed19f4ef34dcd0d3d060cd7cc4d1936119a8c272f32995"
+        },
+        {
+          "path": "active/pre-gate-query-audit/RECOVERED-SHA256SUMS",
+          "bytes": 629,
+          "recovered_sha256": "53f7218259c13a73f6f2faa54796442d5da4b0e8f98f9bb7762b129dbe64335d"
+        },
+        {
+          "path": "active/pre-gate-query-audit/RECOVERY-PROVENANCE.md",
+          "bytes": 7252,
+          "recovered_sha256": "4c600887b3dd3f6c952e0664617fa3f92a849eb195d43805649b3ba84e567e5c"
+        },
+        {
+          "path": "active/pre-gate-query-audit/src/game/full_movement_query50jn.h",
+          "bytes": 3086,
+          "recovered_sha256": "903729e15369bf8346c58bbe307d6326d2294f59d189f55926fd65a72d61a0ed"
+        },
+        {
+          "path": "active/pre-gate-query-audit/src/game/group_query48u.h",
+          "bytes": 5619,
+          "recovered_sha256": "606c63fce8111f28ec9ebd70f7455370769797d24d5a749afb07c2efa669eaa7"
+        },
+        {
+          "path": "active/pre-gate-query-audit/src/game/type3_raw_cursor50jn.h",
+          "bytes": 2126,
+          "recovered_sha256": "20a616942edc5553581822b011bc881f2c673a45a91e9026612cbdf1429d88c2"
+        },
+        {
+          "path": "active/pre-gate-query-audit/src/game/vegetation_raw_dispatch50jl.h",
+          "bytes": 2937,
+          "recovered_sha256": "72bcac4269857ee35b4b4dd71ea318a4e80b9a2dddb28444c0d926cc21d84a19"
+        },
+        {
+          "path": "active/pre-gate-query-audit/tests/native/extended_fallback_world50jm_fixture.h",
+          "bytes": 30551,
+          "recovered_sha256": "4552de41b4a24dcd093755224f1545f30114ec94523671f50676b63cf30f143e"
+        },
+        {
+          "path": "active/pre-gate-query-audit/tests/native/gc_animated_candidates50ig_fixture.h",
+          "bytes": 5509,
+          "recovered_sha256": "a4b3554dd04fe31a60a2cbe62b7ef66b06c010f46fe4f57bb47b823657deb0b5"
+        }
+      ]
+    },
+    {
+      "directory": "isolated/deferred-type3-audit",
+      "scope": "Unintegrated optimization patch and exact postimage. Never tested.",
+      "artifacts": [
+        {
+          "path": "isolated/deferred-type3-audit/EXPECTED-SHA256SUMS",
+          "bytes": 123,
+          "recovered_sha256": "c4cae5f1511495d9c23bd651225d7dfa062be3f839f543015f95090d4632c2db"
+        },
+        {
+          "path": "isolated/deferred-type3-audit/RECOVERED-SHA256SUMS",
+          "bytes": 218,
+          "recovered_sha256": "3f90625ad53f7272af0de3ef6afe59262b67eb9dde1b26bfd36c03bcc505a973"
+        },
+        {
+          "path": "isolated/deferred-type3-audit/RECOVERY-PROVENANCE.md",
+          "bytes": 1651,
+          "recovered_sha256": "4ed60cda69b08574060bd76d2e06cfbcb99010ee764aa6e19c2b5152dd672210"
+        },
+        {
+          "path": "isolated/deferred-type3-audit/deferred-type3.readback.diff",
+          "bytes": 3994,
+          "recovered_sha256": "24da6e6b045f9189621778cb722f1406792de7639af2c742617b259e5686726f"
+        },
+        {
+          "path": "isolated/deferred-type3-audit/files/tests/native/extended_fallback_world50jm_fixture.h",
+          "bytes": 31376,
+          "recovered_sha256": "8d434d0c7b8de41b760c116a6ff6fad0bd39ce6a1c13bfcac951d3c787c4cc7f"
+        }
+      ]
+    },
+    {
+      "directory": "isolated/shared-query-author",
+      "scope": "Four exact isolated canonical/shared-query headers. Never a tested runtime composition.",
+      "artifacts": [
+        {
+          "path": "isolated/shared-query-author/MISSING-FILES.md",
+          "bytes": 1989,
+          "recovered_sha256": "cc63a67d96770b918856598cb148557807b377cdae9cc5260d39c52124644025"
+        },
+        {
+          "path": "isolated/shared-query-author/PROVENANCE.md",
+          "bytes": 2922,
+          "recovered_sha256": "989fe201c727da7e74f353c45dcbc7f67c4e23a84ce497c88d48145a7df9c9cb"
+        },
+        {
+          "path": "isolated/shared-query-author/SHA256SUMS",
+          "bytes": 1176,
+          "recovered_sha256": "b1eed62e70751704ff5d084efa16551f15fd7c552633e7e820efd03cc4204636"
+        },
+        {
+          "path": "isolated/shared-query-author/files/tests/native/extended_fallback_world50jm_fixture.h",
+          "bytes": 34917,
+          "recovered_sha256": "77c7d22b869b3d0265eed029013fae8126b0b6b2e7642e24f16341a99793f39e"
+        },
+        {
+          "path": "isolated/shared-query-author/files/tests/native/native_racer_frame50jq_fixture.h",
+          "bytes": 12817,
+          "recovered_sha256": "c7ac13df33c7db0f01137bf3e9ce5bfd699a256e8c41366817c6d3d5011239cc"
+        },
+        {
+          "path": "isolated/shared-query-author/files/tests/native/native_racer_physical50jq_fixture.h",
+          "bytes": 8221,
+          "recovered_sha256": "3efe9771a40510495120162c761d3b1f607a40167edc6a8e22b3076a3bd44af5"
+        },
+        {
+          "path": "isolated/shared-query-author/files/tests/native/shared_query_world50jq_fixture.h",
+          "bytes": 25154,
+          "recovered_sha256": "b04c96a4538f88f695e26cb3453056d9aee636b0bdb2cf8843d99d72ad6d8d4b"
+        },
+        {
+          "path": "isolated/shared-query-author/literal-chain/replay_extended.py",
+          "bytes": 11710,
+          "recovered_sha256": "31420db84545058428c859e15dc4c4a4258bfdb1ebbc840edf68ae345dfd8514"
+        },
+        {
+          "path": "isolated/shared-query-author/literal-chain/replay_shared.py",
+          "bytes": 12118,
+          "recovered_sha256": "bcf283e1c5d7b7da18aa30eeedafda417a2679f6d7fa582fbf8968f77c81f4c8"
+        },
+        {
+          "path": "isolated/shared-query-author/literal-chain/tests/native/extended_fallback_world50jm_fixture.h",
+          "bytes": 30138,
+          "recovered_sha256": "6dcc785230cbbe92821df621edc46f7f216e6d910a87c57df68b6a44b49aa4f9"
+        },
+        {
+          "path": "isolated/shared-query-author/literal-chain/tests/native/shared_query_world50jq_fixture.h",
+          "bytes": 18111,
+          "recovered_sha256": "86c3f7345366dab9029b5352480e1d95118a18470c4761c008470c384910e13f"
+        },
+        {
+          "path": "isolated/shared-query-author/manifest.json",
+          "bytes": 1818,
+          "recovered_sha256": "ff380748323afa48e9499c0ed5e978d6612174d38714b071cd8707a7389d4792"
+        }
+      ]
+    },
+    {
+      "directory": "owner-author",
+      "scope": "Three hash-matched author headers and four earlier complete reviewer snapshots; no tested whole-runtime claim. owners.inc differs from final hash.",
+      "artifacts": [
+        {
+          "path": "owner-author/RECOVERY_STATUS.md",
+          "bytes": 7822,
+          "recovered_sha256": "daa8981deeca9b395dca0fb676b21aa75a60682aa01fff9bf77bd33c78898d7f"
+        },
+        {
+          "path": "owner-author/SOURCE_SHA256SUMS",
+          "bytes": 868,
+          "recovered_sha256": "72d4b4dc85acd0d28ab93011823d10d3a8389814f3e2895929f2f1ef0c743c4d"
+        },
+        {
+          "path": "owner-author/frame-reviewer/PROVENANCE.md",
+          "bytes": 3198,
+          "recovered_sha256": "883c4fab33af77129c82a4fa1f23827a487e07639220f93e3f172eadde5fbbea"
+        },
+        {
+          "path": "owner-author/frame-reviewer/SHA256SUMS",
+          "bytes": 449,
+          "recovered_sha256": "934d483b01d333e2fefd4e0c2a09f18e59d6ef7b651d1d1c895d74ce9d7063cb"
+        },
+        {
+          "path": "owner-author/frame-reviewer/tests/native/native_racer_bank50hn_fixture.h",
+          "bytes": 15389,
+          "recovered_sha256": "f2c09eb174927c0bbc0096e84ab3785ad0fdff431dcd438d6b8f82600511b0e1"
+        },
+        {
+          "path": "owner-author/frame-reviewer/tests/native/native_racer_contact_bank50hw_fixture.h",
+          "bytes": 12743,
+          "recovered_sha256": "859732960543821dce76de68e14fe872a8d72dc8212008fa1a84638485655c5d"
+        },
+        {
+          "path": "owner-author/frame-reviewer/tests/native/native_racer_noise50jq_fixture.h",
+          "bytes": 5390,
+          "recovered_sha256": "359b16a6e86e221d2d207754541c85821c4b1d1e5a5cedf131725db10773f0c0"
+        },
+        {
+          "path": "owner-author/frame-reviewer/tests/native/native_racer_owners50hn.inc",
+          "bytes": 7680,
+          "recovered_sha256": "d27566eebe1ae0b137b7a43237424d92424c3aba46a43d66b5dfe0cd41d3c1c9"
+        },
+        {
+          "path": "owner-author/vector-author/PROVENANCE.md",
+          "bytes": 1274,
+          "recovered_sha256": "d3244507bc8bb1327ab4d7d8cba2fa90803f937ab9c23b18afcd535b59792b71"
+        },
+        {
+          "path": "owner-author/vector-author/SHA256SUMS",
+          "bytes": 486,
+          "recovered_sha256": "513634556367551a612ad7ad8d454a4e6d9b872bd8a85d63028f8cbf7f9de64a"
+        },
+        {
+          "path": "owner-author/vector-author/recovery-manifest.json",
+          "bytes": 3804,
+          "recovered_sha256": "f998f0b75c75e2f3b2b2a7c238b1d393e5e3d8663d4a62c7095a4c9ec3b7175a"
+        },
+        {
+          "path": "owner-author/vector-author/src/game/vegetation_raw_dispatch50jl.h",
+          "bytes": 2370,
+          "recovered_sha256": "85e6e6ec855e870ec076da62f08cbf7db7f5c65b68bcbb63fc4db0fe4a6b9837"
+        },
+        {
+          "path": "owner-author/vector-author/src/game/vehicle_live_query50eq.h",
+          "bytes": 4264,
+          "recovered_sha256": "40312f2921542fed003cc99a77d550e6a56008423d257d5d09b6fed0ab23f1ee"
+        },
+        {
+          "path": "owner-author/vector-author/tests/native/live_terrain_probe50fr_fixture.h",
+          "bytes": 9442,
+          "recovered_sha256": "a9435669cd4827d5b07ba89560ee05b3c46042b5162f871290630ebf3197fd4c"
+        }
+      ]
+    }
+  ],
+  "remaining_gaps": [
+    "Complete final Gate21-path implementation/main/build composition",
+    "Complete nativeAI113-path packet and subsequent fixes",
+    "Complete final full_movement_query50jn.cpp",
+    "Complete final raw cursor cpp and vegetation mesh implementation",
+    "Final canonical noise/Bank/contact/owners revisions and handling source; earlier snapshots are segregated",
+    "Companion shared-query helpers and ai_reset_physics preimage; see isolated/shared-query-author/MISSING-FILES.md"
+  ],
+  "constraints": [
+    "Literal bytes only; no semantic reconstruction.",
+    "No integration, builds, tests, syntax checks, importer execution or gameplay.",
+    "Historical hash matches establish file identities, not completeness or buildability of a candidate."
+  ]
+}

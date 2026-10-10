@@ -1,0 +1,608 @@
+--- /dev/null
++++ b/docs/original-ui-material50kg.md
+@@ -0,0 +1,165 @@
++# Original UI material inheritance and native CPU policy (50KG)
++
++Isolated additive source only. No active files were changed; no compiler,
++syntax check, tests, importer, game, guest code or Git was run. The original
++APPSTART and UI archives have not arrived. No missing PSM text or actual
++resolved material value is synthesized from the historical hashes.
++
++## Important corrected ownership
++
++The original executable stores pointer 443650 at 3833E8 and pointer 443720 at
++3833F0. Static initialization 3CAFAC/3CAFB8 calls constructor 24A8E0 for these
++two distinct objects. Startup 17CAE8 loads literal `AppStart\DefaultMT` into
++3833E8; 17CAFC loads literal `AppStart\ScreenMT` into 3833F0. Earlier particle
++notes identifying 3833F0 as DefaultMT were incorrect. Do not edit those frozen
++packets to obscure the correction.
++
++Both objects use the same constructor, but each is subsequently overridden by
++its own `[DefaultShaderParams]` file through 24A9A0. Required original members:
++
++- `AppStart\DefaultMT.psm`, 82 B,
++  SHA-256 `1907587ff3a8153a9f687dc43e6858ad0dff6ac3827db74d8518acad5644b4f7`.
++- `AppStart\ScreenMT.psm`, 748 B,
++  SHA-256 `34a6e34f523a4babe9e593037340ddf6c8ae15b6a7a174f349e688c2ead39982`.
++
++The prior 48E importer rejected DefaultShaderParams and repeated keys. This
++resolver uses the separately recovered authenticated DAT reader with
++`preserveInOrder`; `find()` selects the first matching PRESENT value as
++158648 does. A bare `key=` is absent; a quoted empty value is present and is
++rejected by strict integer admission rather than invented into a number.
++
++ScreenTexture at 2DF10C and ScreenText at 2DFAA0 explicitly pass the ScreenMT
++owner to wrapper/material registration. Pass creation retrieves the real
++associated template from registry+30[materialKey] through 14D5E0; a source-known
++null falls back to 3833F0. An unknown owner is not equivalent to null.
++
++## Recovered precedence and scope
++
++`OriginalUiMaterialTemplates50KG::load` accepts only authenticated APPSTART and
++loads both real files over the constructor. The 35 integer fields and every
++getter PC are explicit in `original_ui_material_fields50kg.inc`. Constructor
++defaults are executable facts, not graphics API defaults. Every resolved field
++retains its source member/byte offset/getter PC, or a null member and original
++constructor/runtime PC.
++
++`readOriginalUiMaterial50KG` requires an explicit associated owner selection
++and known original runtime flag 435670. It admits 1..8 numbered passes with
++one map each. Original one-map state builder is 2476A0. The previously cited
++2480D0 is the TWO-map, context-suffixed builder and is not silently reused for
++UI single-map materials.
++
++Pass values override the selected template. Important source exceptions:
++
++- Program name inherits the selected template string (247194..2471AC).
++- EnableThisShader and totalTextureMaps each default to 1, not template data.
++- A missing/empty TextureMap_1 uses the registered material basename.
++  RenderTarget and path-bearing texture names fail the bounded reader.
++- TextureCoordinateIndex_1 defaults to 0; ShaderPassGroup defaults to `none`.
++- `inputAlphaD` is a compatibility alias read at 247A7C, followed by
++  `inputColorD` at 247A94. A present inputColorD overrides the alias. This is
++  distinct from duplicate-spelling first-present precedence.
++- The one-map builder starts environmentContext0or1 at 0 independently of the
++  template (247C88), then reads an authored override.
++- TEX1 fields are pass-local defaults: LCM=0, MXL=0, MMAG=1, MMIN=5, L=0,
++  K=-75 (247F38..247FE8). They are not inherited template fields.
++- When actual 435670 is nonzero, the builder overwrites inputAlphaC=2,
++  fixedAlphaValue=16, fog=0, alphaBlend=1, depthMethod=1. The native caller must
++  bind a real owner for this source flag; absence is not assumed zero.
++
++The full authored pass section is retained for animation/group owners and for
++strict native-program admission. This stage does not implement material
++callbacks, ShaderPassGroup enablement/order, texture animation advancement,
++multi-map programs, fill-only materials, or generalized render-target lookup.
++
++## Typed native policy and renderer boundary
++
++`prepareOriginalUiNativeMaterial50KG` consumes a resolved pass and its exact
++decoded original Texture48E atlas. It admits enabled, single-map ScreenObject,
++UV set 0, one stored indexed-RGBA mip, and original RGBA MODULATE. Palette data
++and geometry bytes remain raw. Source policy is conservatively restricted:
++
++- COLCLAMP=1, Gouraud=1, texture=1, FST=0, FIX=0.
++- Context must be 0. The one-map builder writes TEX0_1/ALPHA_1/CLAMP_1/
++  TEST_1/TEX1_1/ZBUF_1 addresses regardless of authored PRMODE context. A
++  context-1 selection would consume the other context's separately owned state;
++  retaining its integer alone would not establish the effective native policy.
++- Fog, antialiasing, PABE, FBA, alpha testing and destination-alpha testing are
++  rejected when enabled; they do not disappear as implied UI defaults.
++- Wrap 0/1 maps to repeat/clamp-to-edge. Region clamp/repeat is rejected.
++- MXL must be 0. For the admitted one-level atlas, MMAG 0/1 is nearest/linear;
++  MMIN 0/2/3 uses nearest texels, 1/4/5 uses linear texels after level clamping.
++  Effective minification and magnification texel filters must match: MXL=0
++  does not independently prove that GS LCM/L/K chooses min versus mag in the
++  same way as desktop GL. Equal filters remove that unresolved dependency;
++  the original default MMAG=1/MMIN=5 pair qualifies as linear.
++- Opaque RGB is admitted when original ABE=0. For ABE=1 the bounded tuples are
++  (A,B,C,D)=(0,1,0,1), source-over, or (0,2,0,1), source-alpha additive.
++  Fixed/destination alpha factors and other equations are explicit failures.
++- Source texture alpha must be <=128. The caller must likewise preflight every
++  actual raw vertex alpha <=128. This keeps the original source-alpha factor
++  within the representable 0..1 native blend-factor range.
++
++The result returns exact GS depth method (0 never, 1 always, 2 GEQUAL,
++3 GREATER), depth-write enable, environment context and sampler requirements.
++Depth cannot be replaced by painter order without a separate source proof.
++The current renderer's z=0/color-only target/disabled depth is not certified by
++this CPU policy. `requiresOriginalDepthOwner` remains true unless depth is
++always and writes are disabled.
++
++For normalized raw RGBA8 vertex/texture inputs, the GS MODULATE relationship
++requires RGB scale 255/128. Raw stored fragment alpha requires the same scale,
++but the GS RGB blend coefficient divides that raw alpha by 128 rather than
++255. Therefore:
++
++- colorScale = 255/128
++- storedAlphaScale = 255/128
++- blendAlphaScale = (255/128)^2
++- alphaStoreFromBlendFactor = 128/255
++
++ScreenTexture's original RGB>>1 and alpha>>2 packet conversion is already
++performed by its source geometry owner. Do not undo those shifts separately or
++apply these scales twice. CEL/font owners likewise supply their original raw
++packet bytes.
++
++When a fragment shader emits alpha in blend-factor units, the source stores
++raw alpha independently of RGB blending. An appropriate native RGBA8 mapping
++needs separate-alpha CONSTANT_ALPHA/ZERO with constant 128/255. Opaque output
++uses storedAlphaScale directly. The existing UI span alphaScale affects both
++fragment alpha and blend factor, while current draw uses one blendFunc for all
++channels. That code does not preserve the original framebuffer alpha merely
++because its RGB looks right. The typed policy deliberately reports
++`requiresSeparateAlphaStore`; platform integration must supply the missing
++owner or explicitly reject. MODULATE color must also clamp before blending.
++
++The existing MaterialTextureGl50EB owner already accepts one explicit sampler
++per immutable bank texture; it has no inferred sampler defaults. Map this CPU
++policy's sampler enums at cold GPU creation. If the same image is required with
++conflicting policies, it needs separate compatible bindings/owners; never
++mutate the published texture's parameters during draw.
++
++These are bounded native floating-point shader/blend semantics, not a claim of
++bit-exact PS2 integer rasterization. Preparing CPU policy is not GPU readiness
++or confirmation that a pending original material/atlas has passed admission.
++
++## Immediate missing inputs and integration
++
++The smallest missing asset owner is actual APPSTART ScreenMT bytes for UI
++inheritance, plus each actual UI material and texture. Constructor-only state
++must not substitute for the real file override. Authenticated UIMAIN retains
++mmbkg and several font material identities that the historical importer
++rejected for duplicate keys. This reader supports genuine first-present keys,
++but those unseen contents may still request unsupported shader/state features.
++
++Recommended cold sequence:
++
++1. Authenticate real archives with OriginalUiArchive50KG.
++2. Load both APPSTART templates.
++3. Resolve each actual PSM with explicit source template/runtime ownership.
++4. Decode the actual named PST/ATM frame and prepare typed CPU material policy.
++5. Join actual ShaderPassGroup, animation, depth and alpha-storage owners before
++   converting policy into platform spans/samplers. Do not declare a complete
++   original frontend from the CPU resolver alone.
++
++Frozen prior catalog, atlas, ATM and pages packets remain untouched. This
++stage's patch contains only additive material files; provenance authenticates
++source intervals, static strings/pointers, catalog receipts and dependencies.
+--- /dev/null
++++ b/src/assets/original_ui_material50kg.cpp
+@@ -0,0 +1,261 @@
++#include "original_ui_material50kg.h"
++#include <utility>
++
++namespace rr::assets {
++namespace {
++using Field = OriginalUiGsField50KG;
++using Error = OriginalUiMaterialError50KG;
++struct Spec { const char* name; std::int32_t initial; std::uint32_t templatePC, passPC; };
++const Spec specs[] = {
++#include "original_ui_material_fields50kg.inc"
++};
++static_assert(sizeof(specs) / sizeof(specs[0]) == originalUiGsFieldCount50KG, "GS field schema");
++bool fail(OriginalUiMaterialDiagnostic50KG& d, Error error, const char* field,
++    std::uint32_t pc = 0) {
++    d.error = error; d.field = field; d.sourcePC = pc; return false;
++}
++bool same(const std::string& a, const char* b) noexcept {
++    std::size_t i = 0;
++    for (; i < a.size() && b[i]; ++i) {
++        const auto fold = [](char c) { return c >= 'A' && c <= 'Z' ? char(c + 32) : c; };
++        if (fold(a[i]) != fold(b[i])) return false;
++    }
++    return i == a.size() && !b[i];
++}
++bool integer(const OriginalUiDatSection50KG& section, const char* name,
++    std::int32_t fallback, std::int32_t& out, OriginalUiMaterialDiagnostic50KG& d, std::uint32_t pc) {
++    if (!originalUiInteger50KG(section, name, fallback, out, d.document, pc))
++        return fail(d, Error::value, name, pc);
++    return true;
++}
++bool string(const OriginalUiDatSection50KG& section, const char* name,
++    const std::string& fallback, std::string& out, OriginalUiMaterialDiagnostic50KG& d,
++    std::uint32_t pc, std::size_t maxBytes = 255) {
++    const auto* field = section.find(name);
++    out = field ? field->text : fallback;
++    return out.size() <= maxBytes || fail(d, Error::value, name, pc);
++}
++bool apply(const OriginalUiDatSection50KG& section, const OriginalUiMemberIdentity50KG* identity,
++    std::size_t index, OriginalUiGsState50KG& state, OriginalUiMaterialDiagnostic50KG& d,
++    bool isTemplate, const char* alias = nullptr) {
++    const auto& spec = specs[index];
++    auto& field = state.fields[index];
++    const char* name = alias ? alias : spec.name;
++    const auto pc = isTemplate ? spec.templatePC : (alias ? 0x247a7cu : spec.passPC);
++    std::int32_t resolved = field.value;
++    if (!integer(section, name, field.value, resolved, d, pc)) return false;
++    if (const auto* authored = section.find(name))
++        field = {resolved, identity, authored->valueOffset, pc};
++    return true;
++}
++bool loadTemplate(const OriginalUiArchive50KG& archive, const char* name,
++    OriginalUiMaterialTemplateState50KG& result, OriginalUiMaterialDiagnostic50KG& d) {
++    OriginalUiDat50KG data;
++    if (!readOriginalUiDat50KG(archive, name, data, d.document,
++        OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)) return fail(d, Error::document, name, 0x24aa10u);
++    const auto* section = data.section("DefaultShaderParams");
++    if (!section) return fail(d, Error::section, "DefaultShaderParams", 0x24aaacu);
++    result.identity = data.identity();
++    if (!string(*section, "microProgramName", "", result.microprogram, d, 0x24aac8u, 63)) return false;
++    for (std::size_t i = 0; i < originalUiGsFieldCount50KG; ++i) {
++        result.gs.fields[i] = {specs[i].initial, nullptr, 0, 0x24a8e0u};
++        if (!apply(*section, data.identity(), i, result.gs, d, true)) return false;
++    }
++    return true;
++}
++void runtimeValue(OriginalUiGsState50KG& state, Field field, std::int32_t value, std::uint32_t pc) {
++    state.fields[static_cast<std::size_t>(field)] = {value, nullptr, 0, pc};
++}
++bool knownPassField(const std::string& key) noexcept {
++    for (const auto& spec : specs) if (same(key, spec.name)) return true;
++    const char* names[] = {"microProgramName", "EnableThisShader", "totalTextureMaps", "TextureMap_1",
++        "TextureCoordinateIndex_1", "ShaderPassGroup", "inputAlphaD", "lodCalculationMethod",
++        "maximumMipLevel", "magFilter", "minFilter", "L", "K", "TextureAnimation",
++        "animatedMapInitialFrame", "animatedMapFramesPerSecond", "animatedMapLooping",
++        "animatedMapReverseLoopOnEnd", "animatedMapLoopOnEndToFrame"};
++    for (const auto* name : names) if (same(key, name)) return true;
++    return false;
++}
++}
++const char* originalUiGsFieldName50KG(Field field) noexcept {
++    const auto i = static_cast<std::size_t>(field);
++    return i < originalUiGsFieldCount50KG ? specs[i].name : nullptr;
++}
++bool OriginalUiMaterialTemplates50KG::load(const OriginalUiArchive50KG& archive,
++    OriginalUiMaterialDiagnostic50KG& d) noexcept {
++    d = {};
++    try {
++        if (loaded_) return fail(d, Error::alreadyLoaded, "APPSTART");
++        if (!archive.identity() || archive.identity()->id != OriginalUiArchiveId50KG::appStart)
++            return fail(d, Error::archive, "APPSTART");
++        OriginalUiMaterialTemplateState50KG defaults, screen;
++        if (!loadTemplate(archive, "AppStart\\DefaultMT.psm", defaults, d) ||
++            !loadTemplate(archive, "AppStart\\ScreenMT.psm", screen, d)) return false;
++        defaults_ = std::move(defaults); screen_ = std::move(screen); loaded_ = true;
++        return true;
++    } catch (...) { d.error = Error::allocation; return false; }
++}
++const OriginalUiMaterialTemplateState50KG* OriginalUiMaterialTemplates50KG::get(
++    OriginalUiTemplate50KG owner) const noexcept {
++    if (!loaded_) return nullptr;
++    if (owner == OriginalUiTemplate50KG::defaultMt) return &defaults_;
++    if (owner == OriginalUiTemplate50KG::screenMt || owner == OriginalUiTemplate50KG::nullOwnerScreenFallback)
++        return &screen_;
++    return nullptr;
++}
++bool readOriginalUiMaterial50KG(const OriginalUiArchive50KG& archive, const std::string& member,
++    const OriginalUiMaterialTemplates50KG& templates, OriginalUiTemplate50KG owner,
++    const OriginalUiMaterialRuntime50KG& runtime, OriginalUiMaterial50KG& output,
++    OriginalUiMaterialDiagnostic50KG& d) noexcept {
++    d = {};
++    try {
++        const auto* inherited = templates.get(owner);
++        if (!inherited || !runtime.overrideKnown) return fail(d, Error::templateOwner, "associated template/runtime override", 0x24714cu);
++        OriginalUiDat50KG data;
++        if (!readOriginalUiDat50KG(archive, member, data, d.document,
++            OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)) return fail(d, Error::document, "PSM", 0x247110u);
++        const auto* general = data.section("General");
++        if (!general) return fail(d, Error::section, "General", 0x29b700u);
++        std::int32_t count = 0;
++        if (!integer(*general, "TotalShaderPasses", 0, count, d, 0x29b718u)) return false;
++        if (count < 1 || count > 8) return fail(d, Error::passCount, "TotalShaderPasses", 0x29b718u);
++        OriginalUiMaterial50KG result; result.identity = data.identity();
++        for (std::int32_t n = 1; n <= count; ++n) {
++            d.pass = static_cast<std::uint32_t>(n);
++            const auto* section = data.section("ShaderPass_" + std::to_string(n));
++            if (!section) return fail(d, Error::section, "ShaderPass_N", 0x24718cu);
++            OriginalUiMaterialPass50KG pass;
++            pass.identity = data.identity(); pass.inheritedTemplate = inherited->identity;
++            pass.pass = static_cast<std::uint32_t>(n); pass.gs = inherited->gs; pass.authored = *section;
++            if (!string(*section, "microProgramName", inherited->microprogram, pass.microprogram, d, 0x2471a8u, 63) ||
++                !string(*section, "ShaderPassGroup", "none", pass.shaderPassGroup, d, 0x247550u, 127) ||
++                !integer(*section, "EnableThisShader", 1, pass.enabled, d, 0x2471dcu) ||
++                !integer(*section, "totalTextureMaps", 1, pass.textureCount, d, 0x247214u)) return false;
++            // This bounded typed resolver covers the actual one-map path only.
++            if (pass.textureCount != 1) return fail(d, Error::textureCount, "totalTextureMaps", 0x247490u);
++            if (!string(*section, "TextureMap_1", "", pass.textureName, d, 0x247260u) ||
++                !integer(*section, "TextureCoordinateIndex_1", 0, pass.textureCoordinateIndex, d, 0x247338u)) return false;
++            if (pass.textureName.empty()) {
++                // 247274..247298 uses the original registered material basename.
++                const auto slash = member.find_last_of("\\/");
++                pass.textureName = member.substr(slash == std::string::npos ? 0 : slash + 1);
++                const auto dot = pass.textureName.find_last_of('.');
++                if (dot != std::string::npos) pass.textureName.resize(dot);
++            }
++            if (pass.textureName.empty() || same(pass.textureName, "RenderTarget") ||
++                pass.textureName.find_first_of("\\/.:\"") != std::string::npos)
++                return fail(d, Error::textureName, "TextureMap_1", 0x2472a8u);
++            // The one-map builder explicitly uses context=0 as its missing
++            // pass value, independently of template.environmentContext0or1.
++            runtimeValue(pass.gs, Field::environmentContext0or1, 0, 0x247c88u);
++            for (std::size_t i = 0; i < originalUiGsFieldCount50KG; ++i) {
++                // Compatibility alias is read first, then inputColorD wins if
++                // present, unlike first-present duplicate spelling resolution.
++                if (i == static_cast<std::size_t>(Field::inputColorD) &&
++                    !apply(*section, data.identity(), i, pass.gs, d, false, "inputAlphaD")) return false;
++                if (!apply(*section, data.identity(), i, pass.gs, d, false)) return false;
++            }
++            struct Local { const char* name; std::int32_t* value; std::uint32_t pc; };
++            const Local local[] = {{"lodCalculationMethod", &pass.lodCalculationMethod, 0x247f70u},
++                {"maximumMipLevel", &pass.maximumMipLevel, 0x247f88u},
++                {"magFilter", &pass.magFilter, 0x247fa0u}, {"minFilter", &pass.minFilter, 0x247fb8u},
++                {"L", &pass.lodL, 0x247fd0u}, {"K", &pass.lodK, 0x247fe8u}};
++            for (const auto& field : local)
++                if (!integer(*section, field.name, *field.value, *field.value, d, field.pc)) return false;
++            if (runtime.override435670) {
++                runtimeValue(pass.gs, Field::inputAlphaC, 2, 0x247ac4u);
++                runtimeValue(pass.gs, Field::fixedAlphaValue, 16, 0x247accu);
++                runtimeValue(pass.gs, Field::foggingOnOff, 0, 0x247d6cu);
++                runtimeValue(pass.gs, Field::alphaBlendingOnOff, 1, 0x247d70u);
++                runtimeValue(pass.gs, Field::depthTestMethod, 1, 0x247ed4u);
++            }
++            result.passes.push_back(std::move(pass));
++        }
++        output = std::move(result); d = {}; return true;
++    } catch (...) { d.error = Error::allocation; return false; }
++}
++bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
++    const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
++    OriginalUiMaterialDiagnostic50KG& d) noexcept {
++    d = {}; d.pass = pass.pass;
++    try {
++        if (!pass.identity || !pass.inheritedTemplate || pass.microprogram != "ScreenObject" ||
++            pass.enabled != 1 || pass.textureCount != 1 || pass.textureCoordinateIndex != 0)
++            return fail(d, Error::profile, "enabled single-map ScreenObject", 0x2471bcu);
++        for (const auto& field : pass.authored.values)
++            if (field.sourceValuePresent && !knownPassField(field.key))
++                return fail(d, Error::unsupportedField, field.key.c_str(), 0x247110u);
++        const auto value = [&](Field field) { return pass.gs[field].value; };
++        // Original packet construction shifts/ORs integers; do not let an
++        // out-of-width value leak into a neighboring GS field while the
++        // normalized CPU policy mistakenly treats that neighbor as unchanged.
++        constexpr std::int32_t maxima[] = {1,3,255,255,1,2,2,2,2,255,
++            3,3,1023,1023,1023,1023,1,1,1,1,1,1,1,1,1,1,1,1,7,255,3,1,1,3,1};
++        static_assert(sizeof(maxima) / sizeof(maxima[0]) == originalUiGsFieldCount50KG, "GS field widths");
++        for (std::size_t i = 0; i < originalUiGsFieldCount50KG; ++i)
++            if (pass.gs.fields[i].value < 0 || pass.gs.fields[i].value > maxima[i])
++                return fail(d, Error::unsupportedValue, specs[i].name, pass.gs.fields[i].sourcePC);
++        const auto expect = [&](Field field, std::int32_t expected) {
++            return value(field) == expected || fail(d, Error::unsupportedValue,
++                originalUiGsFieldName50KG(field), pass.gs[field].sourcePC);
++        };
++        if (!expect(Field::textureColorComponent, 1) || !expect(Field::textureFunction, 0) ||
++            !expect(Field::colorClampingMethod, 1) || !expect(Field::alphaCorrectionValue, 0) ||
++            !expect(Field::alphaBlendingControlInUnitsOfPixels, 0) ||
++            !expect(Field::gouraudShadingOnOff, 1) || !expect(Field::textureMappingOnOff, 1) ||
++            !expect(Field::foggingOnOff, 0) || !expect(Field::onePassAntiAliasingOnOff, 0) ||
++            !expect(Field::textureCoordinatesSTQorUV, 0) ||
++            !expect(Field::environmentContext0or1, 0) ||
++            !expect(Field::fragmentValueControlFixedOrNot, 0) || !expect(Field::alphaTestOnOff, 0) ||
++            !expect(Field::destinationAlphaTestOnOff, 0)) return false;
++        if (texture.revision != 1 || texture.flags || texture.kind > 1 || texture.mips.size() != 1)
++            return fail(d, Error::texture, "single original indexed RGBA mip", 0x24e880u);
++        const auto& mip = texture.mips.front();
++        if (mip.width < 16 || mip.height < 16 || mip.width > 1024 || mip.height > 1024 ||
++            (mip.width & (mip.width - 1)) || (mip.height & (mip.height - 1)) ||
++            std::uint64_t(mip.width) * mip.height * 4 != mip.rgba.size())
++            return fail(d, Error::texture, "atlas dimensions");
++        for (std::size_t i = 3; i < mip.rgba.size(); i += 4)
++            if (mip.rgba[i] > 128) return fail(d, Error::unsupportedValue, "atlas alpha above128");
++        if (pass.maximumMipLevel != 0 || pass.magFilter < 0 || pass.magFilter > 1 ||
++            pass.minFilter < 0 || pass.minFilter > 5 || pass.lodCalculationMethod < 0 ||
++            pass.lodCalculationMethod > 1 || pass.lodL < 0 || pass.lodL > 3 ||
++            pass.lodK < -2048 || pass.lodK > 2047)
++            return fail(d, Error::unsupportedValue, "TEX1 sampler", 0x247f38u);
++        if (value(Field::wrapModeHorizontal) < 0 || value(Field::wrapModeHorizontal) > 1 ||
++            value(Field::wrapModeVertical) < 0 || value(Field::wrapModeVertical) > 1)
++            return fail(d, Error::unsupportedValue, "CLAMP region modes", 0x247b14u);
++        if (value(Field::depthTestMethod) < 0 || value(Field::depthTestMethod) > 3 ||
++            value(Field::zWriteDisabled) < 0 || value(Field::zWriteDisabled) > 1 ||
++            value(Field::environmentContext0or1) < 0 || value(Field::environmentContext0or1) > 1)
++            return fail(d, Error::unsupportedValue, "depth/context", 0x247ed8u);
++        OriginalUiNativeMaterial50KG policy;
++        const auto blend = value(Field::alphaBlendingOnOff);
++        if (blend == 1) {
++            if (!expect(Field::inputColorA, 0) || !expect(Field::inputAlphaC, 0) ||
++                !expect(Field::inputColorD, 1)) return false;
++            const auto b = value(Field::inputColorB);
++            if (b != 1 && b != 2) return fail(d, Error::unsupportedValue, "inputColorB", 0x247a4cu);
++            policy.blend = b == 1 ? OriginalUiMaterialBlend50KG::sourceAlpha : OriginalUiMaterialBlend50KG::additive;
++        } else if (blend != 0) return fail(d, Error::unsupportedValue, "alphaBlendingOnOff", 0x247cf0u);
++        // MXL=0 collapses all mip levels. MMAG 0/1 is nearest/linear;
++        // MMIN 0/2/3 uses nearest texels, 1/4/5 uses linear texels.
++        policy.minification = (pass.minFilter == 0 || pass.minFilter == 2 || pass.minFilter == 3)
++            ? OriginalUiMaterialFilter50KG::nearest : OriginalUiMaterialFilter50KG::linear;
++        policy.magnification = pass.magFilter ? OriginalUiMaterialFilter50KG::linear : OriginalUiMaterialFilter50KG::nearest;
++        // MXL=0 alone does not prove identical GS/native min-versus-mag
++        // selection under LCM/L/K bias. Equal texel filters remove that
++        // dependency without inventing an LOD owner (default1/5 is linear).
++        if (policy.minification != policy.magnification)
++            return fail(d, Error::unsupportedValue, "differing GS min/mag needs LOD owner", 0x247f38u);
++        policy.u = value(Field::wrapModeHorizontal) ? OriginalUiMaterialWrap50KG::clampToEdge : OriginalUiMaterialWrap50KG::repeat;
++        policy.v = value(Field::wrapModeVertical) ? OriginalUiMaterialWrap50KG::clampToEdge : OriginalUiMaterialWrap50KG::repeat;
++        policy.depthMethod = static_cast<std::uint8_t>(value(Field::depthTestMethod));
++        policy.depthWrite = value(Field::zWriteDisabled) == 0;
++        policy.environmentContext = static_cast<std::uint8_t>(value(Field::environmentContext0or1));
++        policy.requiresOriginalDepthOwner = policy.depthMethod != 1 || policy.depthWrite;
++        policy.requiresSeparateAlphaStore = blend != 0;
++        output = policy; d = {}; return true;
++    } catch (...) { d.error = Error::allocation; return false; }
++}
++}
+--- /dev/null
++++ b/src/assets/original_ui_material50kg.h
+@@ -0,0 +1,134 @@
++#pragma once
++#include "original_ui_pages50kg.h"
++#include "import_texture48e.h"
++#include <array>
++#include <cstdint>
++#include <string>
++#include <vector>
++
++namespace rr::assets {
++enum class OriginalUiGsField50KG : std::uint8_t {
++    textureColorComponent, textureFunction, sourceAlphaValueWhenAis0,
++    sourceAlphaValueWhenAis1, methodOfExpandingTextureAlpha,
++    inputColorA, inputColorB, inputAlphaC, inputColorD, fixedAlphaValue,
++    wrapModeHorizontal, wrapModeVertical, minClampParameterInUDirection,
++    maxClampParameterInUDirection, minClampParameterInVDirection,
++    maxClampParameterInVDirection, colorClampingMethod, alphaCorrectionValue,
++    alphaBlendingControlInUnitsOfPixels, gouraudShadingOnOff, textureMappingOnOff,
++    foggingOnOff, alphaBlendingOnOff, onePassAntiAliasingOnOff,
++    textureCoordinatesSTQorUV, environmentContext0or1, fragmentValueControlFixedOrNot,
++    alphaTestOnOff, alphaTestMethod, alphaReferenceValue,
++    processingMethodWhenFailedInAlphaTest, destinationAlphaTestOnOff,
++    destinationAlphaTestMode, depthTestMethod, zWriteDisabled, count
++};
++constexpr std::size_t originalUiGsFieldCount50KG = static_cast<std::size_t>(OriginalUiGsField50KG::count);
++const char* originalUiGsFieldName50KG(OriginalUiGsField50KG) noexcept;
++struct OriginalUiMaterialInteger50KG {
++    std::int32_t value = 0;
++    // Null member denotes an original executable constructor/pass default.
++    const OriginalUiMemberIdentity50KG* member = nullptr;
++    std::size_t byteOffset = 0;
++    std::uint32_t sourcePC = 0;
++};
++struct OriginalUiGsState50KG {
++    std::array<OriginalUiMaterialInteger50KG, originalUiGsFieldCount50KG> fields{};
++    const OriginalUiMaterialInteger50KG& operator[](OriginalUiGsField50KG field) const noexcept {
++        return fields[static_cast<std::size_t>(field)];
++    }
++};
++enum class OriginalUiTemplate50KG : std::uint8_t { unresolved, defaultMt, screenMt, nullOwnerScreenFallback };
++enum class OriginalUiMaterialError50KG : std::uint8_t {
++    none, alreadyLoaded, archive, templateOwner, document, section, value,
++    passCount, textureCount, textureName, profile, unsupportedField,
++    unsupportedValue, texture, allocation
++};
++struct OriginalUiMaterialDiagnostic50KG {
++    OriginalUiMaterialError50KG error = OriginalUiMaterialError50KG::none;
++    std::uint32_t pass = 0, sourcePC = 0;
++    std::string field;
++    OriginalUiPageDiagnostic50KG document;
++};
++struct OriginalUiMaterialTemplateState50KG {
++    const OriginalUiMemberIdentity50KG* identity = nullptr;
++    std::string microprogram;
++    OriginalUiGsState50KG gs;
++};
++// Only authenticated APPSTART can construct the real DefaultMT and ScreenMT
++// owners. Both start with original 24A8E0, then apply their own file overrides.
++// 3833E8 is DefaultMT; 3833F0 is ScreenMT (not DefaultMT).
++class OriginalUiMaterialTemplates50KG final {
++public:
++    bool load(const OriginalUiArchive50KG& appStart, OriginalUiMaterialDiagnostic50KG&) noexcept;
++    bool loaded() const noexcept { return loaded_; }
++    const OriginalUiMaterialTemplateState50KG* get(OriginalUiTemplate50KG) const noexcept;
++private:
++    bool loaded_ = false;
++    OriginalUiMaterialTemplateState50KG defaults_, screen_;
++};
++struct OriginalUiMaterialPass50KG {
++    const OriginalUiMemberIdentity50KG* identity = nullptr;
++    const OriginalUiMemberIdentity50KG* inheritedTemplate = nullptr;
++    std::uint32_t pass = 0;
++    std::string microprogram, textureName, shaderPassGroup;
++    std::int32_t enabled = 1, textureCount = 1, textureCoordinateIndex = 0;
++    OriginalUiGsState50KG gs;
++    // TEX1 values are pass-local source defaults, not inherited template fields.
++    // 247F38..247FE8: LCM=0,MXL=0,MMAG=1,MMIN=5,L=0,K=-75.
++    std::int32_t lodCalculationMethod = 0, maximumMipLevel = 0;
++    std::int32_t magFilter = 1, minFilter = 5, lodL = 0, lodK = -75;
++    // Full authored section preserves first-present duplicates and fields
++    // owned elsewhere (animation/groups), and allows strict shader admission.
++    OriginalUiDatSection50KG authored;
++};
++struct OriginalUiMaterial50KG {
++    const OriginalUiMemberIdentity50KG* identity = nullptr;
++    std::vector<OriginalUiMaterialPass50KG> passes;
++};
++struct OriginalUiMaterialRuntime50KG {
++    // Pass construction reads original global 435670. A missing owner must
++    // not be silently interpreted as normal mode.
++    bool overrideKnown = false;
++    bool override435670 = false;
++};
++// Explicit selection represents the actual material registry associated owner
++// (14D5E0). Only a source-known null may choose nullOwnerScreenFallback.
++// ScreenTexture 2DF10C and ScreenText 2DFAA0 explicitly supply screenMt.
++// Bounded single-map numbered-pass path 2476A0; two-map 2480D0 is rejected.
++bool readOriginalUiMaterial50KG(const OriginalUiArchive50KG&, const std::string& member,
++    const OriginalUiMaterialTemplates50KG&, OriginalUiTemplate50KG associatedOwner,
++    const OriginalUiMaterialRuntime50KG&,
++    OriginalUiMaterial50KG&, OriginalUiMaterialDiagnostic50KG&) noexcept;
++
++enum class OriginalUiMaterialBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };
++enum class OriginalUiMaterialFilter50KG : std::uint8_t { nearest, linear };
++enum class OriginalUiMaterialWrap50KG : std::uint8_t { repeat, clampToEdge };
++struct OriginalUiNativeMaterial50KG {
++    OriginalUiMaterialBlend50KG blend = OriginalUiMaterialBlend50KG::opaque;
++    OriginalUiMaterialFilter50KG minification{}, magnification{};
++    OriginalUiMaterialWrap50KG u{}, v{};
++    // Original TEST/ZBUF state. Platform must bind the proper depth owner:
++    // 0=never,1=always,2=GEQUAL,3=GREATER, with original reverse-Z conversion.
++    std::uint8_t depthMethod = 0, environmentContext = 0;
++    bool depthWrite = false;
++    // Raw RGBA8 texture and raw original packet vertex bytes, no recoloring.
++    float colorScale = 255.f / 128.f;
++    float storedAlphaScale = 255.f / 128.f;
++    float blendAlphaScale = (255.f / 128.f) * (255.f / 128.f);
++    // With fragment alpha in blend-factor units, source framebuffer alpha
++    // requires separate-alpha CONSTANT_ALPHA/ZERO with constant 128/255.
++    float alphaStoreFromBlendFactor = 128.f / 255.f;
++    bool clampModulatedColorBeforeBlend = true;
++    bool requiresSeparateAlphaStore = true;
++    // CPU policy is not a certification of the existing color-only UI target.
++    // Current draw's joint blendFunc/disabled-depth cannot silently satisfy it.
++    bool requiresOriginalDepthOwner = true;
++    std::uint8_t maximumVertexAlpha = 128;
++};
++// Strict typed policy for single-level indexed-RGBA ScreenObject MODULATE.
++// Consumes the exact selected CPU atlas; rejects tests/fog/DAT/PABE/FBA/etc.
++// Returns explicit source depth and alpha requirements, never GPU readiness.
++// Any authored animation still needs its own original state/frame owner.
++bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG&,
++    const Texture48E& exactAtlas, OriginalUiNativeMaterial50KG&,
++    OriginalUiMaterialDiagnostic50KG&) noexcept;
++}
+--- /dev/null
++++ b/src/assets/original_ui_material_fields50kg.inc
+@@ -0,0 +1,36 @@
++// Original 24A8E0 constructor and explicit 24A9A0/2476A0 getters.
++    {"textureColorComponent", 1, 0x24aaf8u, 0x247920u},
++    {"textureFunction", 0, 0x24ab10u, 0x247938u},
++    {"sourceAlphaValueWhenAis0", 255, 0x24ab28u, 0x24798cu},
++    {"sourceAlphaValueWhenAis1", 255, 0x24ab40u, 0x2479a4u},
++    {"methodOfExpandingTextureAlpha", 0, 0x24ab58u, 0x2479bcu},
++    {"inputColorA", 0, 0x24ab70u, 0x247a34u},
++    {"inputColorB", 1, 0x24ab88u, 0x247a4cu},
++    {"inputAlphaC", 0, 0x24aba0u, 0x247a64u},
++    {"inputColorD", 1, 0x24abb8u, 0x247a94u},
++    {"fixedAlphaValue", 128, 0x24abd0u, 0x247aacu},
++    {"wrapModeHorizontal", 0, 0x24abe8u, 0x247b58u},
++    {"wrapModeVertical", 0, 0x24ac00u, 0x247b70u},
++    {"minClampParameterInUDirection", 0, 0x24ac18u, 0x247b88u},
++    {"maxClampParameterInUDirection", 0, 0x24ac30u, 0x247ba0u},
++    {"minClampParameterInVDirection", 0, 0x24ac48u, 0x247bb8u},
++    {"maxClampParameterInVDirection", 0, 0x24ac60u, 0x247bd0u},
++    {"colorClampingMethod", 1, 0x24ac78u, 0x2478b0u},
++    {"alphaCorrectionValue", 0, 0x24ac90u, 0x247c40u},
++    {"alphaBlendingControlInUnitsOfPixels", 0, 0x24aca8u, 0x2478e4u},
++    {"gouraudShadingOnOff", 1, 0x24acc0u, 0x247ca8u},
++    {"textureMappingOnOff", 1, 0x24acd8u, 0x247cc0u},
++    {"foggingOnOff", 1, 0x24acf0u, 0x247cd8u},
++    {"alphaBlendingOnOff", 0, 0x24ad08u, 0x247cf0u},
++    {"onePassAntiAliasingOnOff", 0, 0x24ad20u, 0x247d08u},
++    {"textureCoordinatesSTQorUV", 0, 0x24ad38u, 0x247d20u},
++    {"environmentContext0or1", 0, 0x24ad50u, 0x247d38u},
++    {"fragmentValueControlFixedOrNot", 0, 0x24ad68u, 0x247d50u},
++    {"alphaTestOnOff", 1, 0x24ad80u, 0x247e28u},
++    {"alphaTestMethod", 6, 0x24ad98u, 0x247e40u},
++    {"alphaReferenceValue", 120, 0x24adb0u, 0x247e58u},
++    {"processingMethodWhenFailedInAlphaTest", 0, 0x24adc8u, 0x247e70u},
++    {"destinationAlphaTestOnOff", 0, 0x24ade0u, 0x247e88u},
++    {"destinationAlphaTestMode", 1, 0x24adf8u, 0x247ea0u},
++    {"depthTestMethod", 2, 0x24ae10u, 0x247eb8u},
++    {"zWriteDisabled", 0, 0x24ae28u, 0x248058u},

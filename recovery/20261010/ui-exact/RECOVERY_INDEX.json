@@ -1,0 +1,278 @@
+{
+  "kind": "Regenerated recovery index, not original aggregate manifest",
+  "historical_commit": "64a4aca3be7cd9ca565c9bde12ec07d2bfc6d14a",
+  "historical_manifest_sha256": "ae2af866e2730efe94e14c862d1cb042bfbddf9cdb10207c1a420e6b31e3da86",
+  "full_commit_or_packet_recovered": false,
+  "integrated_path_count": 38,
+  "paths_with_complete_payload": 31,
+  "missing_paths": [
+    "docs/original-ui-archive50kg.md",
+    "docs/original-ui-atlas50kg.md",
+    "platform/linux/native/vehicle_window_gl50ds.cpp",
+    "platform/linux/native/vehicle_window_gl50ds.h",
+    "src/assets/original_ui_archive50kg.cpp",
+    "src/assets/original_ui_archive50kg_catalog.inc",
+    "src/assets/original_ui_archive50kg_sha.inc"
+  ],
+  "files": [
+    {
+      "original_path": "docs/original-ui-archive50kg.md",
+      "status": "missing"
+    },
+    {
+      "original_path": "docs/original-ui-atlas50kg.md",
+      "status": "missing"
+    },
+    {
+      "original_path": "platform/linux/native/original_ui_canvas50kg.h",
+      "status": "literal_complete_expected_hash_unavailable",
+      "recovery_path": "coordinator/transcript-complete/files/platform/linux/native/original_ui_canvas50kg.h",
+      "recovered_sha256": "5c4f344bf033e4f5a17a917339df5974947d5e901fa52e204f12a5d981e777e9",
+      "bytes": 6368
+    },
+    {
+      "original_path": "platform/linux/native/original_ui_draw50kg.h",
+      "status": "literal_complete_expected_hash_unavailable",
+      "recovery_path": "coordinator/transcript-complete/files/platform/linux/native/original_ui_draw50kg.h",
+      "recovered_sha256": "c9c99d476c53bc33e6ac272449d0bd306b1b55c72025d81fa9d5fdd3a867136e",
+      "bytes": 2154
+    },
+    {
+      "original_path": "platform/linux/native/original_ui_screen_canvas50kg.cpp",
+      "status": "exact_original_manifest_match",
+      "recovery_path": "coordinator/assembly/files/platform/linux/native/original_ui_screen_canvas50kg.cpp",
+      "recovered_sha256": "05ab58d407758584033f305b75b447869603370cb9c779c2816e80b36400469b",
+      "bytes": 1312
+    },
+    {
+      "original_path": "platform/linux/native/original_ui_screen_canvas50kg.h",
+      "status": "exact_original_manifest_match",
+      "recovery_path": "coordinator/assembly/files/platform/linux/native/original_ui_screen_canvas50kg.h",
+      "recovered_sha256": "4416ddf316d26fa7f06e4e44e6ac9c68deea45c391f50f6188172eb3f9df36d1",
+      "bytes": 1631
+    },
+    {
+      "original_path": "platform/linux/native/vehicle_window_gl50ds.cpp",
+      "status": "missing"
+    },
+    {
+      "original_path": "platform/linux/native/vehicle_window_gl50ds.h",
+      "status": "missing"
+    },
+    {
+      "original_path": "src/assets/import_texture48e.cpp",
+      "status": "exact_original_file_hash_match",
+      "recovery_path": "assets-author/files/src/assets/import_texture48e.cpp",
+      "recovered_sha256": "15ffdb328539309d449f940985f03a62b917f21bfab8d50b06614429508b0d2a",
+      "bytes": 19677
+    },
+    {
+      "original_path": "src/assets/import_texture48e.h",
+      "status": "exact_original_file_hash_match",
+      "recovery_path": "assets-author/files/src/assets/import_texture48e.h",
+      "recovered_sha256": "093147ca1f6d43fa9d566dc290be019b8f8df0316d705bd9f371378f661d69f6",
+      "bytes": 3105
+    },
+    {
+      "original_path": "src/assets/original_ui_archive50kg.cpp",
+      "status": "missing"
+    },
+    {
+      "original_path": "src/assets/original_ui_archive50kg.h",
+      "status": "literal_complete_expected_hash_unavailable",
+      "recovery_path": "assets-author/files/src/assets/original_ui_archive50kg.h",
+      "recovered_sha256": "ce4643ffc01fad5c6a0fd81b8f320ce14538f165b99d03e9ac38617fb1b180ce",
+      "bytes": 3340
+    },
+    {
+      "original_path": "src/assets/original_ui_archive50kg_catalog.inc",
+      "status": "missing"
+    },
+    {
+      "original_path": "src/assets/original_ui_archive50kg_sha.inc",
+      "status": "missing"
+    },
+    {
+      "original_path": "src/assets/original_ui_atm50kg.cpp",
+      "status": "exact_original_file_hash_match",
+      "recovery_path": "assets-author/files/src/assets/original_ui_atm50kg.cpp",
+      "recovered_sha256": "7c1713ba0e6c494507fa7c6a924e8bfb68f08a87dda107805345752f0087ce0a",
+      "bytes": 6389
+    },
+    {
+      "original_path": "src/assets/original_ui_atm50kg.h",
+      "status": "exact_original_file_hash_match",
+      "recovery_path": "assets-author/files/src/assets/original_ui_atm50kg.h",
+      "recovered_sha256": "558cc9c87ac300afeedf06dc7e31edb2c5b49a770108f9f2eee42b60faafb1eb",
+      "bytes": 1504
+    },
+    {
+      "original_path": "src/assets/original_ui_font50kg.cpp",
+      "status": "exact_original_file_hash_match",
+      "recovery_path": "font-author/src/assets/original_ui_font50kg.cpp",
+      "recovered_sha256": "f68debf847501d1321710c2480eaaf5e0972612020990f5edea3e716cb7ac7c8",
+      "bytes": 5103
+    },
+    {
+      "original_path": "src/assets/original_ui_font50kg.h",
+      "status": "exact_original_file_hash_match",
+      "recovery_path": "font-author/src/assets/original_ui_font50kg.h",
+      "recovered_sha256": "058dbd2805c8e05a4ffca62bfc7d065979b8920ae3a67384323044829d99fe81",
+      "bytes": 3102
+    },
+    {
+      "original_path": "src/assets/original_ui_localization50kg.cpp",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/assets/original_ui_localization50kg.cpp",
+      "recovered_sha256": "176fb82f03157f09b1b5989daa6b0762f9541e84623ebe6714018674253b7100",
+      "bytes": 3963
+    },
+    {
+      "original_path": "src/assets/original_ui_localization50kg.h",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/assets/original_ui_localization50kg.h",
+      "recovered_sha256": "9c2cc6f36966bc17b834470ddc19fb5e55e710faadee47d57925ccbe80907ee7",
+      "bytes": 2237
+    },
+    {
+      "original_path": "src/assets/original_ui_overlay_text50kg.cpp",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/assets/original_ui_overlay_text50kg.cpp",
+      "recovered_sha256": "0703c5d6f6433977a32a95da7ad819ca2cd48458b919c0d80e6f8e2c3dd5faa5",
+      "bytes": 7493
+    },
+    {
+      "original_path": "src/assets/original_ui_overlay_text50kg.h",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/assets/original_ui_overlay_text50kg.h",
+      "recovered_sha256": "86e9c55d4932c32bc97d17ceef8921098e95e2471accfe1c2cdb9624f9a14b0c",
+      "bytes": 2281
+    },
+    {
+      "original_path": "src/assets/original_ui_pages50kg.cpp",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/assets/original_ui_pages50kg.cpp",
+      "recovered_sha256": "b2be97af3d523222813a0b87bed71aa3660492a617df3ce9e4a5139bf9588690",
+      "bytes": 16682
+    },
+    {
+      "original_path": "src/assets/original_ui_pages50kg.h",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/assets/original_ui_pages50kg.h",
+      "recovered_sha256": "6a765587c33572faa379b0e2829dfc41c7c3578ce7a5f09c529033773621e613",
+      "bytes": 5915
+    },
+    {
+      "original_path": "src/assets/original_ui_screen_assets50kg.cpp",
+      "status": "literal_complete_expected_hash_unavailable",
+      "recovery_path": "coordinator/transcript-complete/files/src/assets/original_ui_screen_assets50kg.cpp",
+      "recovered_sha256": "7a64f1858d783c3238271b3b5d1aee8ea8d662f4db8c7616f3e86230ff5adf2b",
+      "bytes": 4432
+    },
+    {
+      "original_path": "src/assets/original_ui_screen_assets50kg.h",
+      "status": "literal_complete_expected_hash_unavailable",
+      "recovery_path": "coordinator/transcript-complete/files/src/assets/original_ui_screen_assets50kg.h",
+      "recovered_sha256": "98dfa21df336d35d324d2266099db9fd8ec3d202fa9b8bb5b2c5039736039846",
+      "bytes": 2005
+    },
+    {
+      "original_path": "src/game/original_ui_main_layout50kg.cpp",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/game/original_ui_main_layout50kg.cpp",
+      "recovered_sha256": "35af8dd1f1007ff9370de7b6a598cdd327439e4a07bf81c777e793bb7815ec7e",
+      "bytes": 2537
+    },
+    {
+      "original_path": "src/game/original_ui_main_layout50kg.h",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/game/original_ui_main_layout50kg.h",
+      "recovered_sha256": "28d6b64eb87c952c5d467a94236e4755ec2b0f91eb7f5a4f4e1dbbfc6d0a087d",
+      "bytes": 2536
+    },
+    {
+      "original_path": "src/game/original_ui_navigation50kg.cpp",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/game/original_ui_navigation50kg.cpp",
+      "recovered_sha256": "45b62ca20240bec234fcf7bcb1bfa8e14778dc9e4596ae47a4e53e0153761ebf",
+      "bytes": 8828
+    },
+    {
+      "original_path": "src/game/original_ui_navigation50kg.h",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/game/original_ui_navigation50kg.h",
+      "recovered_sha256": "43cc5e615cb1f4c5b5f54df26b673d67aa4fbed4ff89201cd42a8697f9489208",
+      "bytes": 4719
+    },
+    {
+      "original_path": "src/game/original_ui_text50kg.cpp",
+      "status": "exact_older_author_version_final_zero_extent_overlay_missing",
+      "recovery_path": "font-author/src/game/original_ui_text50kg.cpp",
+      "recovered_sha256": "99c763ec1485d258b1d6cb7fa2c0b761d3091a56c1db067183fdef49d65713e0",
+      "bytes": 6151
+    },
+    {
+      "original_path": "src/game/original_ui_text50kg.h",
+      "status": "exact_original_file_hash_match",
+      "recovery_path": "font-author/src/game/original_ui_text50kg.h",
+      "recovered_sha256": "003a1d340a3877b119b0ae4cbd68f993fe5a205388ae22254f865b8862fcdd0d",
+      "bytes": 3404
+    },
+    {
+      "original_path": "src/game/original_ui_text_geometry50kg.cpp",
+      "status": "exact_original_manifest_match",
+      "recovery_path": "coordinator/assembly/files/src/game/original_ui_text_geometry50kg.cpp",
+      "recovered_sha256": "7882c11ad9edc42ed8b8c4614a21b6ed0862f0e6be06c91fa3a2f4daf9ee0d6a",
+      "bytes": 2461
+    },
+    {
+      "original_path": "src/game/original_ui_text_geometry50kg.h",
+      "status": "exact_original_manifest_match",
+      "recovery_path": "coordinator/assembly/files/src/game/original_ui_text_geometry50kg.h",
+      "recovered_sha256": "87afc659aec2b4fcfd5f552b57879a9830bc237d2f623640175aea54a06b195d",
+      "bytes": 1592
+    },
+    {
+      "original_path": "src/game/original_ui_text_position50kg.cpp",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/game/original_ui_text_position50kg.cpp",
+      "recovered_sha256": "dd6a3ec13893ae76058f52a97029a9401af8632561fc4e4d72cf7efb25039825",
+      "bytes": 3673
+    },
+    {
+      "original_path": "src/game/original_ui_text_position50kg.h",
+      "status": "exact_original_patch_match",
+      "recovery_path": "pages-author/files/src/game/original_ui_text_position50kg.h",
+      "recovered_sha256": "a3c5e4b8abf4ffa76556ce1d0c9498c2abc6f2c3f4ec72541a33b8b599756be8",
+      "bytes": 2179
+    },
+    {
+      "original_path": "src/game/original_ui_texture_animation50kg.h",
+      "status": "exact_original_file_hash_match",
+      "recovery_path": "assets-author/files/src/game/original_ui_texture_animation50kg.h",
+      "recovered_sha256": "412f0fe17906e1e10a61911bc1c963de42a2f6a60fb7b3b4be9117151f9f4dfe",
+      "bytes": 6572
+    },
+    {
+      "original_path": "tools/prepare_interactive_build50dv.py",
+      "status": "literal_complete_expected_hash_unavailable",
+      "recovery_path": "coordinator/transcript-complete/files/tools/prepare_interactive_build50dv.py",
+      "recovered_sha256": "e27dce341d4f188c0548fcff78e257f1925a96dd1f0663f6a9066583b2b7dd9e",
+      "bytes": 4380
+    }
+  ],
+  "separate_later_stages": [
+    "coordinator/icon",
+    "coordinator/icon-alpha",
+    "coordinator/icon-textbound",
+    "widget-author",
+    "assets-author material files"
+  ],
+  "limitations": [
+    "No integration or software validation performed.",
+    "The final zero-extent text correction is missing; recovered text cpp is the exact older author version.",
+    "Complete literal payloads with no historical expected hashes remain explicitly unverified.",
+    "Actual UI archive assets were not recovered.",
+    "Source author receipts retain individual expected hashes or exact aggregate patch/manifest proofs."
+  ]
+}

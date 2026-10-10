@@ -1,0 +1,52 @@
+--- /workspace/scratch/74cd1d3d7a45/racerrevenge_solo_return/RacerRevengePC/tests/native/extended_fallback_world50jm_fixture.h	2026-10-10 05:53:39.480600371 -0400
++++ /workspace/shared/rr-fallback-deferred-type3-50kg/files/tests/native/extended_fallback_world50jm_fixture.h	2026-10-10 06:27:02.937187480 -0400
+@@ -28,6 +28,9 @@
+ // A serial full121920 transaction borrows the same actual tree as50CA/50IZ.
+ // Caller configures the query/zone/bounds fields for actual7A4 and runs the
+ // incremental iterator and Type3 cursor without an implicit final close.
++// This is one synchronous serial borrow, ending at its commit or failed query.
++// No pointer/view may be consumed across another Owner operation or racer visit.
++// Only borrowFull121920 publishes fresh Type3 numeric projection storage.
+ struct Full121920Borrow50JN {
+     CandidateCollectionInput50BX input{};
+     CandidateCollectionState50BX initial{};
+@@ -240,15 +243,11 @@
+         d.input.pools=d.tree.pool();d.input.poolCount=1;d.input.poolBlocks=d.tree.poolBlocks();d.input.poolBlockCount=n.poolBlocks;d.input.poolEntryCount=n.poolEntries;
+         d.input.fallbackZone=d.fallbackZone;d.input.initialActiveTree=*d.tree.canonicalActiveTree442E18();d.input.groupPositionScale=.46875f;
+         d.input.shape0Sources=d.shapeSources.data();d.input.shape0Count=5;
+-        for(std::size_t i=0;i<d.objects.size();++i){
+-            auto& t=d.type3Candidates[i].collision;const auto& c=d.candidates[i].candidate.collision;
+-            if(t.filter.identity!=d.objects[i].identity)return false; // immutable cold identity admission
+-            t.geometry.worldMatrix=c.geometry.worldMatrix;t.sphere=c.sphere;
+-            t.filter.flagsF8=*d.flags[i];t.copied40=c.copied40;t.copied50=c.copied50;
+-            auto& state=d.type3Initial[i];state.center=d.initial.objects[i].cachedCenter;
+-            state.radius=d.initial.objects[i].cachedRadius;state.flagsF8=*d.flags[i];
+-            state.copied40=t.copied40;state.copied50=t.copied50;
+-        }
++        // Keep the original admission at the same boundary on EVERY begin.
++        // The private Type3 numeric copies are consumed only by full121920;
++        // collection, raw dispatch and ground bindings do not publish them.
++        for(std::size_t i=0;i<d.objects.size();++i)
++            if(d.type3Candidates[i].collision.filter.identity!=d.objects[i].identity)return false;
+         return true;
+     }
+     VehicleCandidateResult50CA collect(){
+@@ -316,6 +315,18 @@
+         if(!data_||!data_->tree.admit(fallback_quadtree50JK::Consumer::FullType3Query121920)||!begin())return false;
+         auto& d=*data_;const auto& membership=d.prefix->movementMembership.state;
+         if(!membership.attached||membership.object!=d.prefix->count.movementQuery||membership.lastShapeTag!=3)return false;
++        // Project immediately before the sole Type3 consumer. begin() above
++        // has refreshed every shared/prefix/prototype input and retained its
++        // original identity checks, including all intervening raw/ground writes.
++        // No existing successful Full121920Borrow may still be in use here.
++        for(std::size_t i=0;i<d.objects.size();++i){
++            auto& t=d.type3Candidates[i].collision;const auto& c=d.candidates[i].candidate.collision;
++            t.geometry.worldMatrix=c.geometry.worldMatrix;t.sphere=c.sphere;
++            t.filter.flagsF8=*d.flags[i];t.copied40=c.copied40;t.copied50=c.copied50;
++            auto& state=d.type3Initial[i];state.center=d.initial.objects[i].cachedCenter;
++            state.radius=d.initial.objects[i].cachedRadius;state.flagsF8=*d.flags[i];
++            state.copied40=t.copied40;state.copied50=t.copied50;
++        }
+         out.input=d.input;out.input.query=d.prefix->count.movementQuery;
+         out.input.zoneLinks=membership.storage.links;out.input.zoneLinkCount=membership.storage.capacity;out.input.zoneHead=1;
+         // Full121920 derives1202E0 bounds from its actual Type3 source, not

@@ -1,0 +1,194 @@
+{
+  "recovery": "Literal transcript recovery of original UI page/navigation stage",
+  "recovery_root": "/workspace/shared/recovery-20261010/ui-exact/pages-author",
+  "original_stage": "/workspace/shared/rr-original-ui-pages50kg",
+  "original_stage_status": "Previously frozen source-only additive draft; this recovery does not add implementation or claim runtime verification.",
+  "original_pins": {
+    "patch_diff_bytes": 65100,
+    "patch_diff_sha256": "42c6fb2778d3a2db74db09fdf058cfc0fc1b7b81315f4e0889b9389ba7faf524",
+    "manifest_json_sha256": "a7bad30d1083975375c1b813c3b112539b6894e9c1ef72053334a0f1388ee030",
+    "reference_elf_sha256": "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30",
+    "parent_reported_revision": "7f8d442 (historical parent report, not inspected during recovery)"
+  },
+  "patch_verification": {
+    "file": "patch.diff",
+    "expected_bytes": 65100,
+    "recovered_bytes": 65100,
+    "expected_sha256": "42c6fb2778d3a2db74db09fdf058cfc0fc1b7b81315f4e0889b9389ba7faf524",
+    "recovered_sha256": "42c6fb2778d3a2db74db09fdf058cfc0fc1b7b81315f4e0889b9389ba7faf524",
+    "status": "exact-match",
+    "recipe": "Concatenate Python difflib.unified_diff([], file UTF-8 splitlines(True), fromfile=/dev/null, tofile=b/<repo-relative path>) for the12 paths sorted lexicographically. This is the retained original recipe."
+  },
+  "files": [
+    {
+      "path": "src/assets/original_ui_localization50kg.cpp",
+      "recovered_file": "files/src/assets/original_ui_localization50kg.cpp",
+      "bytes": 3963,
+      "expected_sha256": null,
+      "recovered_sha256": "176fb82f03157f09b1b5989daa6b0762f9541e84623ebe6714018674253b7100",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Full retained literal cat-write payload and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/assets/original_ui_localization50kg.h",
+      "recovered_file": "files/src/assets/original_ui_localization50kg.h",
+      "bytes": 2237,
+      "expected_sha256": null,
+      "recovered_sha256": "9c2cc6f36966bc17b834470ddc19fb5e55e710faadee47d57925ccbe80907ee7",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Full retained literal cat-write payload and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/assets/original_ui_overlay_text50kg.cpp",
+      "recovered_file": "files/src/assets/original_ui_overlay_text50kg.cpp",
+      "bytes": 7493,
+      "expected_sha256": null,
+      "recovered_sha256": "0703c5d6f6433977a32a95da7ad819ca2cd48458b919c0d80e6f8e2c3dd5faa5",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Full retained literal cat-write payload and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/assets/original_ui_overlay_text50kg.h",
+      "recovered_file": "files/src/assets/original_ui_overlay_text50kg.h",
+      "bytes": 2281,
+      "expected_sha256": null,
+      "recovered_sha256": "86e9c55d4932c32bc97d17ceef8921098e95e2471accfe1c2cdb9624f9a14b0c",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Full retained literal cat-write payload and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/assets/original_ui_pages50kg.cpp",
+      "recovered_file": "files/src/assets/original_ui_pages50kg.cpp",
+      "bytes": 16682,
+      "expected_sha256": null,
+      "recovered_sha256": "b2be97af3d523222813a0b87bed71aa3660492a617df3ce9e4a5139bf9588690",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Initial first220-line literal readback, final tail90-line literal readback, and every intervening exact replacement; the coverage overlaps. Aggregate frozen patch hash matches.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/assets/original_ui_pages50kg.h",
+      "recovered_file": "files/src/assets/original_ui_pages50kg.h",
+      "bytes": 5915,
+      "expected_sha256": null,
+      "recovered_sha256": "6a765587c33572faa379b0e2829dfc41c7c3578ce7a5f09c529033773621e613",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Complete retained source readback coverage and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/game/original_ui_main_layout50kg.cpp",
+      "recovered_file": "files/src/game/original_ui_main_layout50kg.cpp",
+      "bytes": 2537,
+      "expected_sha256": null,
+      "recovered_sha256": "35af8dd1f1007ff9370de7b6a598cdd327439e4a07bf81c777e793bb7815ec7e",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Complete retained source readback coverage and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/game/original_ui_main_layout50kg.h",
+      "recovered_file": "files/src/game/original_ui_main_layout50kg.h",
+      "bytes": 2536,
+      "expected_sha256": null,
+      "recovered_sha256": "28d6b64eb87c952c5d467a94236e4755ec2b0f91eb7f5a4f4e1dbbfc6d0a087d",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Complete retained source readback coverage and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/game/original_ui_navigation50kg.cpp",
+      "recovered_file": "files/src/game/original_ui_navigation50kg.cpp",
+      "bytes": 8828,
+      "expected_sha256": null,
+      "recovered_sha256": "45b62ca20240bec234fcf7bcb1bfa8e14778dc9e4596ae47a4e53e0153761ebf",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Complete retained source readback coverage and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/game/original_ui_navigation50kg.h",
+      "recovered_file": "files/src/game/original_ui_navigation50kg.h",
+      "bytes": 4719,
+      "expected_sha256": null,
+      "recovered_sha256": "43cc5e615cb1f4c5b5f54df26b673d67aa4fbed4ff89201cd42a8697f9489208",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Complete retained source readback coverage and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/game/original_ui_text_position50kg.cpp",
+      "recovered_file": "files/src/game/original_ui_text_position50kg.cpp",
+      "bytes": 3673,
+      "expected_sha256": null,
+      "recovered_sha256": "dd6a3ec13893ae76058f52a97029a9401af8632561fc4e4d72cf7efb25039825",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Full retained literal cat-write payload and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    },
+    {
+      "path": "src/game/original_ui_text_position50kg.h",
+      "recovered_file": "files/src/game/original_ui_text_position50kg.h",
+      "bytes": 2179,
+      "expected_sha256": null,
+      "recovered_sha256": "a3c5e4b8abf4ffa76556ce1d0c9498c2abc6f2c3f4ec72541a33b8b599756be8",
+      "individual_hash_status": "unavailable-expected-hash",
+      "aggregate_patch_status": "exact-match",
+      "literal_coverage": "complete",
+      "provenance": "Full retained literal cat-write payload and exact recorded later replacements.",
+      "historical_preimage": "absent"
+    }
+  ],
+  "evidence_limits": {
+    "individual_expected_file_hashes": "Not separately printed in the retained historical transcript; each recovered hash is reported without inventing a historical per-file pin.",
+    "aggregate_verification": "The aggregate patch SHA256 and byte count match the retained historical pins exactly, authenticating the complete12-path source set collectively.",
+    "original_manifest_and_SHA256SUMS": "Not restored as original literal artifacts; generator and manifest hash evidence were retained, but complete original printed metadata bytes were not.",
+    "research_and_RECOVERY_md": "Not materialized in this12-path recovery. RECOVERY.md has retained complete literal coverage; research cuts have mixed full/partial coverage.",
+    "independent_off_workspace_artifact": "None created by this lane."
+  },
+  "performed": [
+    "Literal materialization exclusively under the authorized new recovery directory",
+    "Hash and byte-count verification only",
+    "Recovery metadata and historical absence-marker writes"
+  ],
+  "not_performed": [
+    "Guessed completion",
+    "New implementation",
+    "Active repository edits or reads",
+    "Git commands",
+    "Integration",
+    "Software checks",
+    "Compilation",
+    "Tests",
+    "Imports",
+    "Gameplay",
+    "Guest execution",
+    "PC access"
+  ]
+}

@@ -1,0 +1,1159 @@
+--- /dev/null
++++ b/src/assets/original_ui_localization50kg.cpp
+@@ -0,0 +1,70 @@
++#include "original_ui_localization50kg.h"
++#include <utility>
++
++namespace rr::assets {
++namespace {
++std::uint16_t u16(const std::uint8_t* p) noexcept {
++    return std::uint16_t(p[0]) | (std::uint16_t(p[1])<<8);
++}
++std::uint32_t u32(const std::uint8_t* p) noexcept {
++    return std::uint32_t(p[0]) | (std::uint32_t(p[1])<<8) |
++        (std::uint32_t(p[2])<<16) | (std::uint32_t(p[3])<<24);
++}
++bool fail(OriginalUiLocalizationDiagnostic50KG& d,OriginalUiLocalizationError50KG e,
++    std::size_t offset=0,std::size_t entry=0,std::uint32_t pc=0) noexcept {
++    d={e,offset,entry,pc};return false;
++}
++}
++const OriginalUiLocalizedEntry50KG* OriginalUiEnglish50KG::find(const std::string& name) const noexcept {
++    if (loaded()) for (const auto& e:entries_) if (e.name==name) return &e;
++    return nullptr;
++}
++const OriginalUiLocalizedEntry50KG* OriginalUiEnglish50KG::at(std::size_t index) const noexcept {
++    return loaded() && index<entries_.size() ? &entries_[index] : nullptr;
++}
++bool readOriginalUiEnglish50KG(const OriginalUiArchive50KG& archive,
++    OriginalUiEnglish50KG& output,OriginalUiLocalizationDiagnostic50KG& d) noexcept {
++    if (!archive.loaded()) return fail(d,OriginalUiLocalizationError50KG::missingArchive);
++    const auto names=archive.find("loc\\english\\UI.loc");
++    const auto texts=archive.find("loc\\english\\L_UI_ENG.bin");
++    if (!names.identity || !texts.identity || !names.data || !texts.data)
++        return fail(d,OriginalUiLocalizationError50KG::missingMember);
++    if (names.size<28 || !texts.size) return fail(d,OriginalUiLocalizationError50KG::header);
++    if (names.size>1024*1024 || texts.size>1024*1024)
++        return fail(d,OriginalUiLocalizationError50KG::capacity);
++    if (u16(names.data+26)!=originalUiLocalizedStringCount50KG)
++        return fail(d,OriginalUiLocalizationError50KG::count,26,0,0x14BDD8);
++    const std::size_t firstName=u32(names.data+4),table=u32(names.data+8);
++    if (firstName>=table || table>names.size ||
++        originalUiLocalizedStringCount50KG>(names.size-table)/8)
++        return fail(d,OriginalUiLocalizationError50KG::bounds,4,0,0x14C190);
++    // Original reads table-firstName-1 bytes for its name buffer.
++    const std::size_t namesEnd=table-1;
++    try {
++        OriginalUiEnglish50KG result;
++        std::size_t na=firstName,ta=0;
++        for (std::size_t i=0;i<originalUiLocalizedStringCount50KG;++i) {
++            auto& entry=result.entries_[i];entry.nameOffset=na;entry.textOffset=ta;
++            std::size_t ne=na;while (ne<namesEnd && names.data[ne]) ++ne;
++            std::size_t te=ta;while (te<texts.size && texts.data[te]) ++te;
++            if (ne==namesEnd || te==texts.size)
++                return fail(d,OriginalUiLocalizationError50KG::unterminated,ne==namesEnd?na:ta,i,0x14C340);
++            if (ne==na || ne-na>480 || te-ta>480)
++                return fail(d,OriginalUiLocalizationError50KG::capacity,ne==na?na:ta,i,0x14C0EC);
++            entry.name.assign(reinterpret_cast<const char*>(names.data+na),ne-na);
++            entry.text.assign(reinterpret_cast<const char*>(texts.data+ta),te-ta);
++            const auto maximum=u16(names.data+table+i*8+4);
++            if (maximum>480) return fail(d,OriginalUiLocalizationError50KG::capacity,table+i*8+4,i,0x14C0EC);
++            entry.sourceMaximumLength=static_cast<std::int16_t>(maximum);
++            for (std::size_t previous=0;previous<i;++previous)
++                if (result.entries_[previous].name==entry.name)
++                    return fail(d,OriginalUiLocalizationError50KG::duplicateName,na,i,0x14C538);
++            na=ne+1;ta=te+1;
++        }
++        // Source consumes only count entries. Authenticated trailing bytes are
++        // retained by the archive but neither interpreted nor fabricated here.
++        result.indexIdentity_=names.identity;result.textIdentity_=texts.identity;
++        output=std::move(result);d={};return true;
++    } catch (...) { return fail(d,OriginalUiLocalizationError50KG::allocation); }
++}
++}
+--- /dev/null
++++ b/src/assets/original_ui_localization50kg.h
+@@ -0,0 +1,46 @@
++#pragma once
++#include "original_ui_archive50kg.h"
++#include <array>
++#include <cstddef>
++#include <cstdint>
++#include <string>
++
++namespace rr::assets {
++constexpr std::size_t originalUiLocalizedStringCount50KG=467;
++struct OriginalUiLocalizedEntry50KG {
++    std::string name,text; // Original bytes, not UTF-8 conversion.
++    std::int16_t sourceMaximumLength=0;
++    std::size_t nameOffset=0,textOffset=0;
++};
++enum class OriginalUiLocalizationError50KG : std::uint8_t {
++    none,missingArchive,missingMember,header,count,bounds,unterminated,
++    duplicateName,capacity,allocation
++};
++struct OriginalUiLocalizationDiagnostic50KG {
++    OriginalUiLocalizationError50KG error=OriginalUiLocalizationError50KG::none;
++    std::size_t byteOffset=0,entry=0;
++    std::uint32_t sourcePC=0;
++};
++class OriginalUiEnglish50KG {
++public:
++    bool loaded() const noexcept { return indexIdentity_ && textIdentity_; }
++    const OriginalUiLocalizedEntry50KG* find(const std::string& name) const noexcept;
++    const OriginalUiLocalizedEntry50KG* at(std::size_t index) const noexcept;
++    const OriginalUiMemberIdentity50KG* indexIdentity() const noexcept { return indexIdentity_; }
++    const OriginalUiMemberIdentity50KG* textIdentity() const noexcept { return textIdentity_; }
++private:
++    const OriginalUiMemberIdentity50KG *indexIdentity_=nullptr,*textIdentity_=nullptr;
++    std::array<OriginalUiLocalizedEntry50KG,originalUiLocalizedStringCount50KG> entries_{};
++    friend bool readOriginalUiEnglish50KG(const OriginalUiArchive50KG&,
++        OriginalUiEnglish50KG&,OriginalUiLocalizationDiagnostic50KG&) noexcept;
++};
++// Source GameText 0x14BC30 / 0x14C5A0. UI.loc has count i16@26,
++// names offset u32@4 and 8-byte metadata-table offset u32@8. Names are
++// sequential NUL strings; metadata +4 is an i16 maximum length. Language
++// BIN is 467 sequential NUL strings starting at byte zero, without a header.
++// TextID comparison is case-sensitive strcmp (0x2D3AB0 -> 0x3090E8).
++// Authenticated loc\english\UI.loc and loc\english\L_UI_ENG.bin only.
++// Atomic cold parsing; no resource imports, guest execution or guessed labels.
++bool readOriginalUiEnglish50KG(const OriginalUiArchive50KG&,
++    OriginalUiEnglish50KG&,OriginalUiLocalizationDiagnostic50KG&) noexcept;
++}
+--- /dev/null
++++ b/src/assets/original_ui_overlay_text50kg.cpp
+@@ -0,0 +1,119 @@
++#include "original_ui_overlay_text50kg.h"
++#include <cmath>
++#include <utility>
++
++namespace rr::assets {
++namespace {
++bool fail(OriginalUiPageDiagnostic50KG& d,OriginalUiPageError50KG e,
++    const OriginalUiDatSection50KG& s,const std::string& key,std::uint32_t pc) noexcept {
++    const auto* v=s.find(key);d={e,v?v->valueOffset:s.sourceOffset,pc};return false;
++}
++std::uint32_t roundEven(float f) noexcept {
++    const auto n=static_cast<std::uint32_t>(f);const float fraction=f-float(n);
++    return n+(fraction>0.5f || (fraction==0.5f && (n&1u)) ? 1u : 0u);
++}
++bool color(const OriginalUiDatSection50KG& s,const char* key,float fallback,
++    std::uint32_t& output,OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
++    std::array<float,3> v{};
++    if (!originalUiTriple50KG(s,key,{{fallback,fallback,fallback}},v,d,pc)) return false;
++    for (float f:v) if (!std::isfinite(f) || f<0 || f>255)
++        return fail(d,OriginalUiPageError50KG::unsupportedValue,s,key,pc);
++    output=0xff000000u | (roundEven(v[0])<<16) | (roundEven(v[1])<<8) | roundEven(v[2]);
++    return true;
++}
++bool flag(const OriginalUiDatSection50KG& s,const char* key,bool& value,
++    OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
++    std::int32_t n=0;if (!originalUiInteger50KG(s,key,0,n,d,pc)) return false;
++    value=n!=0;return true;
++}
++bool split(const std::string& text,OriginalUiOverlayText50KG& result,
++    const OriginalUiDatSection50KG& s,const char* key,OriginalUiPageDiagnostic50KG& d) {
++    std::size_t at=0;
++    do {
++        const auto found=text.find('@',at);const auto end=found==std::string::npos?text.size():found;
++        if (end-at>255 || result.lines.size()>=64)
++            return fail(d,OriginalUiPageError50KG::capacity,s,key,0x2A9AD0);
++        result.lines.push_back(text.substr(at,end-at));
++        if (found==std::string::npos) break;
++        at=end+1;
++    } while (at<=text.size());
++    result.usesExplicitHeight=result.height!=0;return true;
++}
++}
++bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
++    std::uint16_t widgetId,const OriginalUiEnglish50KG* english,
++    OriginalUiOverlayText50KG& output,OriginalUiPageDiagnostic50KG& d) noexcept {
++    if (!widgets.identity()) {d={OriginalUiPageError50KG::missingMember,0,0x2A9000};return false;}
++    try {
++        const auto* s=widgets.section("Widget "+std::to_string(widgetId));
++        if (!s) {d={OriginalUiPageError50KG::missingSection,0,0x2A9000};return false;}
++        OriginalUiOverlayText50KG r;r.identity=widgets.identity();r.widgetId=widgetId;
++        const auto* type=s->find("Type");
++        if (!type || type->text!="Overlay_Text") return fail(d,OriginalUiPageError50KG::unsupportedValue,*s,"Type",0x2A4748);
++        const auto* font=s->find("FontName");
++        if (!font || font->text.empty()) return fail(d,OriginalUiPageError50KG::missingKey,*s,"FontName",0x2A90B0);
++        r.fontName=font->text;const auto* material=s->find("MaterialName");
++        r.materialName=material?material->text:r.fontName;
++        if (r.fontName.size()>127 || r.materialName.empty() || r.materialName.size()>127)
++            return fail(d,OriginalUiPageError50KG::capacity,*s,"FontName",0x2A90B0);
++        if (!originalUiInteger50KG(*s,"XPosition",0,r.x,d,0x2A90E4) ||
++            !originalUiInteger50KG(*s,"YPosition",0,r.y,d,0x2A90FC) ||
++            !originalUiInteger50KG(*s,"Height",0,r.height,d,0x2A9380) ||
++            !originalUiInteger50KG(*s,"Alpha",255,r.alpha,d,0x2A91D0) ||
++            !originalUiNumber50KG(*s,"LeadingFactor",1,r.leadingFactor,d,0x2A9138) ||
++            !originalUiNumber50KG(*s,"Depth",1,r.depth,d,0x2A91EC) ||
++            !color(*s,"Color",40,r.color,d,0x2A921C) ||
++            !color(*s,"HighlightColor",255,r.highlightColor,d,0x2A9290) ||
++            !color(*s,"DisabledColor",128,r.disabledColor,d,0x2A9314) ||
++            !flag(*s,"EnableOnSelect",r.enableOnSelect,d,0x2A9038) ||
++            !flag(*s,"DisableOnSelect",r.disableOnSelect,d,0x2A9050) ||
++            !flag(*s,"EnableOnDeSelect",r.enableOnDeselect,d,0x2A9068) ||
++            !flag(*s,"DisableOnDeSelect",r.disableOnDeselect,d,0x2A9080) ||
++            !flag(*s,"WantsJoystickInput1",r.wantsJoystickInput[0],d,0x2A44C0) ||
++            !flag(*s,"WantsJoystickInput2",r.wantsJoystickInput[1],d,0x2A44C0)) return false;
++        if (r.x<-32768 || r.x>32767 || r.y<-32768 || r.y>32767 || r.height<-32768 || r.height>32767 ||
++            !std::isfinite(r.leadingFactor) || !std::isfinite(r.depth))
++            return fail(d,OriginalUiPageError50KG::unsupportedValue,*s,"XPosition",0x2A90E4);
++        r.hasHighlightColor=s->find("HighlightColor")!=nullptr;r.hasDisabledColor=s->find("DisabledColor")!=nullptr;
++        if (const auto* v=s->find("Justification")) {
++            if (v->text=="Right") r.justification=OriginalUiTextJustification50KG::right;
++            else if (v->text=="CenterBoth") r.justification=OriginalUiTextJustification50KG::centerBoth;
++            else if (v->text=="CenterVertical") r.justification=OriginalUiTextJustification50KG::centerVertical;
++            else if (v->text=="CenterHorizontal") r.justification=OriginalUiTextJustification50KG::centerHorizontal;
++            // Source strcmp chain falls back to Left for any other string.
++        }
++        if (const auto* id=s->find("TextID")) {
++            r.textSource=OriginalUiTextSource50KG::localized;r.textId=id->text;
++            const auto* e=english?english->find(r.textId):nullptr;
++            if (!e) return fail(d,OriginalUiPageError50KG::reference,*s,"TextID",0x2A9458);
++            if (!split(e->text,r,*s,"TextID",d)) return false;
++        } else if (s->find("TextDynamicLineLength")) {
++            r.textSource=OriginalUiTextSource50KG::dynamic;std::int32_t count=0;
++            if (!originalUiInteger50KG(*s,"TextDynamicLineLength",0,r.dynamicLineLength,d,0x2A9174) ||
++                !originalUiInteger50KG(*s,"TextDynamicLineCount",0,count,d,0x2A9190)) return false;
++            if (count<0 || count>64 || r.dynamicLineLength<0 || r.dynamicLineLength>255)
++                return fail(d,OriginalUiPageError50KG::capacity,*s,"TextDynamicLineCount",0x2A9568);
++            r.lines.resize(static_cast<std::size_t>(count));
++        } else if (s->find("NumberOfLines")) {
++            r.textSource=OriginalUiTextSource50KG::authoredLines;std::int32_t count=0;
++            if (!originalUiInteger50KG(*s,"NumberOfLines",1,count,d,0x2A91B4)) return false;
++            if (count<0 || count>64) return fail(d,OriginalUiPageError50KG::capacity,*s,"NumberOfLines",0x2A9740);
++            for (std::int32_t i=1;i<=count;++i) {
++                const auto key="Line"+std::to_string(i);const auto* v=s->find(key);
++                if (!v) return fail(d,OriginalUiPageError50KG::missingKey,*s,key,0x2A9778);
++                if (v->text.size()>255) return fail(d,OriginalUiPageError50KG::capacity,*s,key,0x2A9778);
++                r.lines.push_back(v->text);
++            }
++        } else {
++            const auto* text=s->find("Text");
++            if (!text) return fail(d,OriginalUiPageError50KG::missingKey,*s,"Text",0x2A9950);
++            if (r.height) { if (!split(text->text,r,*s,"Text",d)) return false; }
++            else {
++                if (text->text.size()>255) return fail(d,OriginalUiPageError50KG::capacity,*s,"Text",0x2A9950);
++                r.lines.push_back(text->text);
++            }
++        }
++        output=std::move(r);d={};return true;
++    } catch (...) { d={OriginalUiPageError50KG::allocation,0,0x2A9000};return false; }
++}
++}
+--- /dev/null
++++ b/src/assets/original_ui_overlay_text50kg.h
+@@ -0,0 +1,41 @@
++#pragma once
++#include "original_ui_pages50kg.h"
++#include "original_ui_localization50kg.h"
++
++namespace rr::assets {
++enum class OriginalUiTextJustification50KG : std::uint8_t {
++    left=0,centerHorizontal=1,centerVertical=2,centerBoth=3,right=4
++};
++enum class OriginalUiTextSource50KG : std::uint8_t {
++    localized,authoredLines,authoredText,dynamic
++};
++struct OriginalUiOverlayText50KG {
++    const OriginalUiMemberIdentity50KG* identity=nullptr;
++    std::uint16_t widgetId=0;
++    std::string fontName,materialName,textId;
++    OriginalUiTextJustification50KG justification=OriginalUiTextJustification50KG::left;
++    OriginalUiTextSource50KG textSource=OriginalUiTextSource50KG::authoredText;
++    std::int32_t x=0,y=0,height=0,alpha=255,dynamicLineLength=0;
++    float leadingFactor=1,depth=1;
++    std::uint32_t color=0xff282828,highlightColor=0xffffffff,disabledColor=0xff808080;
++    bool hasHighlightColor=false,hasDisabledColor=false;
++    bool enableOnSelect=false,disableOnSelect=false,enableOnDeselect=false,disableOnDeselect=false;
++    std::array<bool,2> wantsJoystickInput{{false,false}}; // Manager 0x2A44A0.
++    // Manager 0x2A44E0 recursively hides every newly created widget; initial
++    // visible membership comes from page callbacks, not a synthesized flag.
++    // Original one-byte character strings. TextID and Height-triggered Text
++    // split at '@'; authored Line1..N do not. Dynamic lines start empty.
++    std::vector<std::string> lines;
++    bool usesExplicitHeight=false; // Only source SetText/split branch uses Height.
++};
++// Source Overlay_Text::Create 0x2A9000. Widget sections are "Widget N".
++// Actual DAT data and optional authenticated English lookup are required.
++// Missing required text/font references fail; no fallback labels are supplied.
++// Color uses source cvt.w.s ties-to-even then packed 0xFFRRGGBB. Native
++// admission restricts RGB to [0,255], coordinates to safe signed16, 64 lines,
++// and each glyph run to 255 bytes. These are bounds, not authored defaults.
++// Alpha remains authored here; source TextOverlay setter clamps to 0..255.
++bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
++    std::uint16_t widgetId,const OriginalUiEnglish50KG* english,
++    OriginalUiOverlayText50KG&,OriginalUiPageDiagnostic50KG&) noexcept;
++}
+--- /dev/null
++++ b/src/assets/original_ui_pages50kg.cpp
+@@ -0,0 +1,283 @@
++#include "original_ui_pages50kg.h"
++#include "pod_physics49n.h"
++#include <limits>
++#include <utility>
++
++namespace rr::assets {
++namespace {
++char lower(char c) noexcept { return c >= 'A' && c <= 'Z' ? char(c + 'a' - 'A') : c; }
++bool same(const std::string& a, const std::string& b) noexcept {
++    if (a.size() != b.size()) return false;
++    for (std::size_t i=0;i<a.size();++i) if (lower(a[i]) != lower(b[i])) return false;
++    return true;
++}
++bool space(char c) noexcept { return c==' ' || c=='\t' || c=='\r'; }
++bool fail(OriginalUiPageDiagnostic50KG& d, OriginalUiPageError50KG e,
++    std::size_t at=0, std::uint32_t pc=0) noexcept { d={e,at,pc}; return false; }
++bool integer(const std::string& text, std::int32_t& out) noexcept {
++    if (text.empty()) return false;
++    std::size_t at=0;
++    const bool neg=text[0]=='-';
++    if (neg || text[0]=='+') ++at;
++    if (at==text.size()) return false;
++    const std::uint64_t limit=neg ? 2147483648ull : 2147483647ull;
++    std::uint64_t n=0;
++    for (;at<text.size();++at) {
++        if (text[at]<'0' || text[at]>'9') return false;
++        const unsigned digit=unsigned(text[at]-'0');
++        if (n>(limit-digit)/10) return false;
++        n=n*10+digit;
++    }
++    out=neg ? static_cast<std::int32_t>(-static_cast<std::int64_t>(n))
++            : static_cast<std::int32_t>(n);
++    return true;
++}
++// Source DAT numbers admit an omitted integral zero (.6, -.25). This
++// bounded lexical expansion retains the existing exact decimal arithmetic;
++// source member bytes and offsets are never changed.
++bool number(const char* text, std::size_t bytes, float& out) noexcept {
++    if (!text || !bytes) return false;
++    const std::size_t sign=(text[0]=='-' || text[0]=='+') ? 1u : 0u;
++    if (sign<bytes && text[sign]=='.') {
++        if (bytes<=sign+1 || text[sign+1]<'0' || text[sign+1]>'9' || bytes>10) return false;
++        char expanded[12]{};
++        if (sign) expanded[0]=text[0];
++        expanded[sign]='0';
++        for (std::size_t i=sign;i<bytes;++i) expanded[i+1]=text[i];
++        return parsePodPhysicsNumber49N(expanded,bytes+1,out);
++    }
++    return parsePodPhysicsNumber49N(text,bytes,out);
++}
++bool count(const OriginalUiDatSection50KG& s, const char* key,
++    std::size_t limit, std::int32_t& out, OriginalUiPageDiagnostic50KG& d,
++    std::uint32_t pc) noexcept {
++    std::int32_t n=0;
++    if (!originalUiInteger50KG(s,key,0,n,d,pc)) return false;
++    if (n<0 || std::uint64_t(n)>limit) {
++        const auto* v=s.find(key);
++        return fail(d,OriginalUiPageError50KG::capacity,v?v->valueOffset:s.sourceOffset,pc);
++    }
++    out=n;return true;
++}
++std::size_t offset(const OriginalUiDatSection50KG& s, const std::string& key) noexcept {
++    const auto* v=s.find(key);return v?v->valueOffset:s.sourceOffset;
++}
++bool vector3(const OriginalUiDatValue50KG& value, std::array<float,3>& out,
++    OriginalUiPageDiagnostic50KG& d, std::uint32_t pc) noexcept {
++    const auto& s=value.text; std::array<float,3> v{};std::size_t at=0;
++    for (unsigned i=0;i<3;++i) {
++        std::size_t end=at;while (end<s.size() && s[end]!=',') ++end;
++        if ((i<2 && end==s.size()) || (i==2 && end!=s.size()))
++            return fail(d,OriginalUiPageError50KG::numberSyntax,value.valueOffset+at,pc);
++        std::size_t first=at,last=end;
++        while (first<last && space(s[first])) ++first;
++        while (last>first && space(s[last-1])) --last;
++        if (!number(s.data()+first,last-first,v[i]))
++            return fail(d,OriginalUiPageError50KG::numberSyntax,value.valueOffset+first,pc);
++        at=end+1;
++    }
++    out=v;return true;
++}
++}
++const OriginalUiDatValue50KG* OriginalUiDatSection50KG::find(const std::string& key) const noexcept {
++    for (const auto& v:values) if (v.sourceValuePresent && same(v.key,key)) return &v;
++    return nullptr;
++}
++const OriginalUiDatSection50KG* OriginalUiDat50KG::section(const std::string& name) const noexcept {
++    for (const auto& s:sections_) if (same(s.name,name)) return &s;
++    return nullptr;
++}
++const OriginalUiDatValue50KG* OriginalUiDat50KG::find(const std::string& name,
++    const std::string& key) const noexcept {
++    const auto* s=section(name);return s?s->find(key):nullptr;
++}
++bool originalUiInteger50KG(const OriginalUiDatSection50KG& s,const std::string& key,
++    std::int32_t fallback,std::int32_t& output,OriginalUiPageDiagnostic50KG& d,
++    std::uint32_t pc) noexcept {
++    const auto* v=s.find(key);std::int32_t n=fallback;
++    if (v && !integer(v->text,n)) return fail(d,OriginalUiPageError50KG::integerSyntax,v->valueOffset,pc);
++    output=n;d={};return true;
++}
++bool originalUiNumber50KG(const OriginalUiDatSection50KG& s,const std::string& key,
++    float fallback,float& output,OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
++    const auto* v=s.find(key);float n=fallback;
++    if (v && !number(v->text.data(),v->text.size(),n))
++        return fail(d,OriginalUiPageError50KG::numberSyntax,v->valueOffset,pc);
++    output=n;d={};return true;
++}
++bool originalUiTriple50KG(const OriginalUiDatSection50KG& s,const std::string& key,
++    const std::array<float,3>& fallback,std::array<float,3>& output,
++    OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
++    const auto* v=s.find(key);auto result=fallback;
++    if (v && !vector3(*v,result,d,pc)) return false;
++    output=result;d={};return true;
++}
++bool readOriginalUiDat50KG(const OriginalUiArchive50KG& archive,const std::string& name,
++    OriginalUiDat50KG& output,OriginalUiPageDiagnostic50KG& d,
++    OriginalUiRepeatedKeyPolicy50KG repeatedKeys) noexcept {
++    if (!archive.loaded()) return fail(d,OriginalUiPageError50KG::missingArchive);
++    const auto member=archive.find(name);
++    if (!member.identity || !member.data || !member.size)
++        return fail(d,OriginalUiPageError50KG::missingMember);
++    if (member.size>originalUiDatByteLimit50KG) return fail(d,OriginalUiPageError50KG::capacity);
++    const auto* p=member.data;
++    std::size_t size=member.size;
++    if (!p[size-1]) --size;
++    for (std::size_t i=0;i<size;++i)
++        if ((p[i]<32 && p[i]!=9 && p[i]!=10 && p[i]!=13) || p[i]>126)
++            return fail(d,OriginalUiPageError50KG::unsupportedEncoding,i);
++    try {
++        OriginalUiDat50KG result;result.identity_=member.identity;
++        std::size_t at=0, keyCount=0;
++        while (at<size) {
++            const std::size_t lineStart=at;
++            while (at<size && p[at]!='\n') ++at;
++            const auto lineEnd=at;if (at<size) ++at;
++            if (lineEnd-lineStart>2048) return fail(d,OriginalUiPageError50KG::capacity,lineStart);
++            std::size_t first=lineStart;
++            while (first<lineEnd && space(char(p[first]))) ++first;
++            if (first==lineEnd || p[first]==';') continue;
++            // Keep an offset for every retained character so diagnostics still
++            // name bytes in the authenticated member after source cleaning.
++            std::string line;std::vector<std::size_t> offsets;
++            bool quoted=false;int brackets=0;
++            for (std::size_t i=lineStart;i<lineEnd;++i) {
++                const char c=char(p[i]);
++                if (c=='"') quoted=!quoted;
++                else if (c=='[') ++brackets;
++                else if (c==']') --brackets;
++                if (brackets<0 || brackets>16) return fail(d,OriginalUiPageError50KG::textSyntax,i,0x159440);
++                if (space(c) && !quoted && brackets==0) continue;
++                line.push_back(c);offsets.push_back(i);
++            }
++            if (line.empty() || line[0]==';') continue;
++            if (quoted || brackets!=0) return fail(d,OriginalUiPageError50KG::textSyntax,lineStart,0x159440);
++            if (line[0]=='[') {
++                if (line.size()<3 || line.back()!=']') return fail(d,OriginalUiPageError50KG::textSyntax,lineStart);
++                const std::string sectionName=line.substr(1,line.size()-2);
++                if (sectionName.size()>127 || sectionName.find_first_of("[]=\"")!=std::string::npos)
++                    return fail(d,OriginalUiPageError50KG::textSyntax,offsets[1]);
++                if (result.section(sectionName)) return fail(d,OriginalUiPageError50KG::duplicateSection,offsets[1]);
++                if (result.sections_.size()==512) return fail(d,OriginalUiPageError50KG::capacity,lineStart);
++                result.sections_.push_back({sectionName,offsets[1],{}});continue;
++            }
++            if (result.sections_.empty()) return fail(d,OriginalUiPageError50KG::textSyntax,lineStart);
++            const auto eq=line.find('=');
++            if (eq==std::string::npos || eq==0 || eq>127)
++                return fail(d,OriginalUiPageError50KG::textSyntax,lineStart);
++            std::string key=line.substr(0,eq);
++            if (key.find_first_of("[];\"")!=std::string::npos)
++                return fail(d,OriginalUiPageError50KG::textSyntax,offsets[0]);
++            const bool present=eq+1<line.size();
++            std::size_t va=eq+1,vb=line.size();
++            if (va<vb && line[va]=='"') ++va;
++            if (va<vb && line[vb-1]=='"') --vb;
++            auto& section=result.sections_.back();
++            if (repeatedKeys==OriginalUiRepeatedKeyPolicy50KG::reject)
++                for (const auto& old:section.values) if (same(old.key,key))
++                    return fail(d,OriginalUiPageError50KG::duplicateKey,offsets[0]);
++            if (++keyCount>8192) return fail(d,OriginalUiPageError50KG::capacity,offsets[0]);
++            const auto valueOffset=va<offsets.size()?offsets[va]:offsets[eq]+1;
++            section.values.push_back({std::move(key),line.substr(va,vb-va),offsets[0],valueOffset,present});
++        }
++        if (result.sections_.empty()) return fail(d,OriginalUiPageError50KG::textSyntax);
++        output=std::move(result);d={};return true;
++    } catch (...) { return fail(d,OriginalUiPageError50KG::allocation); }
++}
++bool readOriginalUiPage50KG(const OriginalUiDat50KG& page,const OriginalUiDat50KG& widgets,
++    OriginalUiPage50KG& output,OriginalUiPageDiagnostic50KG& d) noexcept {
++    if (!page.identity() || !widgets.identity()) return fail(d,OriginalUiPageError50KG::missingMember);
++    const auto* info=page.section("PageInfo");const auto* general=widgets.section("General");
++    if (!info || !general) return fail(d,OriginalUiPageError50KG::missingSection,0,0x1D64CC);
++    try {
++        OriginalUiPage50KG result;result.identity=page.identity();
++        std::int32_t wc=0,cc=0,gc=0,n=0;
++        if (!count(*general,"NumberOfWidgets",originalUiWidgetLimit50KG,wc,d,0x2A4404) ||
++            !count(*info,"NumberOfControls",originalUiControlLimit50KG-1,cc,d,0x1D6E04) ||
++            !count(*info,"NumberOfGroups",originalUiGroupLimit50KG-1,gc,d,0x1D6E30) ||
++            !count(*info,"NumberOfStaticWidgets",originalUiWidgetLimit50KG,result.staticWidgetCount,d,0x1D6DEC) ||
++            !originalUiInteger50KG(*info,"PageNo",0,result.pageNo,d,0x1D6D94) ||
++            !originalUiInteger50KG(*info,"OpenSize",224,result.openSize,d,0x1D64DC) ||
++            !originalUiNumber50KG(*info,"Time",1.0f,result.openTime,d,0x1D64F4) ||
++            !originalUiInteger50KG(*info,"UseVideoAsTexture",0,n,d,0x1D6D74)) return false;
++        result.widgetCount=static_cast<std::uint16_t>(wc);result.useVideoAsTexture=n!=0;
++        if (result.openSize<0 || result.openSize>224 || result.openTime<=0.0f)
++            return fail(d,OriginalUiPageError50KG::unsupportedValue,info->sourceOffset,0x1D67E4);
++        if (const auto* v=info->find("Background")) result.background=v->text;
++        if (const auto* v=info->find("Start")) result.start=v->text;
++        if (const auto* v=info->find("BackgroundColor"))
++            if (!vector3(*v,result.backgroundColor,d,0x1D6D1C)) return false;
++        if (!originalUiInteger50KG(*info,"HasPopup",0,n,d,0x1D6570)) return false;
++        result.hasPopup=n!=0;
++        constexpr const char* keys[]={"PopupConfirmWidget","PopupFormatWidget","PopupFormatSuccessWidget",
++            "PopupFormatFailWidget","PopupYesWidget","PopupNoWidget","PopupAskFormatWidget",
++            "PopupNoMemcardWidget","PopupFullMemcardWidget"};
++        if (result.hasPopup) for (std::size_t i=0;i<result.popupWidgets.size();++i) {
++            if (!originalUiInteger50KG(*info,keys[i],-1,result.popupWidgets[i],d,0x1D6598+std::uint32_t(i*24))) return false;
++            if (result.popupWidgets[i]<-1 || result.popupWidgets[i]>wc)
++                return fail(d,OriginalUiPageError50KG::reference,offset(*info,keys[i]),0x1D6698);
++        }
++        result.controls.resize(std::size_t(cc)+1);result.groups.resize(std::size_t(gc)+1);
++        std::size_t memberships=0;
++        for (std::size_t i=0;i<result.controls.size();++i) {
++            const auto* section=page.section("Control "+std::to_string(i));
++            if (!section) continue;
++            auto& control=result.controls[i];control.present=true;
++            if (!count(*section,"NumberOfWidgets",originalUiMembershipLimit50KG,n,d,0x1D71FC)) return false;
++            memberships+=std::size_t(n);
++            if (memberships>originalUiMembershipLimit50KG) return fail(d,OriginalUiPageError50KG::capacity,section->sourceOffset);
++            for (std::int32_t j=1;j<=n;++j) {
++                const auto key="WidgetID"+std::to_string(j);std::int32_t id=0;
++                if (!originalUiInteger50KG(*section,key,0,id,d,0x1D7254)) return false;
++                if (id<1 || id>wc) return fail(d,OriginalUiPageError50KG::reference,offset(*section,key),0x1D7284);
++                control.widgets.push_back(static_cast<std::uint16_t>(id));
++            }
++        }
++        for (std::size_t i=0;i<result.groups.size();++i) {
++            const auto* section=page.section("Group "+std::to_string(i));
++            if (!section) continue; // Original missing section yields zero memberships/default KeepEnabled.
++            auto& group=result.groups[i];
++            if (!count(*section,"NumberOfControls",originalUiMembershipLimit50KG,n,d,0x1D6F6C)) return false;
++            memberships+=std::size_t(n);
++            if (memberships>originalUiMembershipLimit50KG) return fail(d,OriginalUiPageError50KG::capacity,section->sourceOffset);
++            for (std::int32_t j=1;j<=n;++j) {
++                const auto key="ControlID"+std::to_string(j);std::int32_t id=-1;
++                if (!originalUiInteger50KG(*section,key,-1,id,d,0x1D6FC0)) return false;
++                if (id<-1 || id>cc) return fail(d,OriginalUiPageError50KG::reference,offset(*section,key),0x1D6FFC);
++                group.controls.push_back(static_cast<std::int16_t>(id));
++            }
++            if (!count(*section,"NumberOfAssociations",originalUiMembershipLimit50KG,n,d,0x1D7060)) return false;
++            memberships+=std::size_t(n);
++            if (memberships>originalUiMembershipLimit50KG) return fail(d,OriginalUiPageError50KG::capacity,section->sourceOffset);
++            for (std::int32_t j=1;j<=n;++j) {
++                const auto key="AssociationID"+std::to_string(j);std::int32_t id=0;
++                if (!originalUiInteger50KG(*section,key,0,id,d,0x1D70B4)) return false;
++                if (id<0 || id>cc) return fail(d,OriginalUiPageError50KG::reference,offset(*section,key),0x1D70E8);
++                group.associations.push_back(static_cast<std::uint16_t>(id));
++            }
++            if (!originalUiInteger50KG(*section,"KeepEnabled",1,n,d,0x1D7110)) return false;
++            group.keepEnabled=n!=0;
++        }
++        output=std::move(result);d={};return true;
++    } catch (...) { return fail(d,OriginalUiPageError50KG::allocation); }
++}
++bool readOriginalUiPageIndex50KG(const OriginalUiDat50KG& ui,OriginalUiPageIndex50KG& output,
++    OriginalUiPageDiagnostic50KG& d) noexcept {
++    if (!ui.identity()) return fail(d,OriginalUiPageError50KG::missingMember);
++    const auto* base=ui.section("UIBase");
++    if (!base) return fail(d,OriginalUiPageError50KG::missingSection,0,0x2A4168);
++    try {
++        OriginalUiPageIndex50KG result;result.identity=ui.identity();std::int32_t n=0;
++        if (!count(*base,"TotalPages",64,n,d,0x2A417C)) return false;
++        for (std::int32_t i=1;i<=n;++i) {
++            const auto* section=ui.section("Page "+std::to_string(i));
++            if (!section) return fail(d,OriginalUiPageError50KG::missingSection,base->sourceOffset,0x2A41B8);
++            const auto* value=section->find("PageFile");
++            if (!value || value->text.empty()) return fail(d,OriginalUiPageError50KG::missingKey,section->sourceOffset,0x2A41D0);
++            if (value->text.size()>255) return fail(d,OriginalUiPageError50KG::capacity,value->valueOffset,0x2A41D0);
++            result.pageFiles.push_back(value->text);
++        }
++        output=std::move(result);d={};return true;
++    } catch (...) { return fail(d,OriginalUiPageError50KG::allocation); }
++}
++}
+--- /dev/null
++++ b/src/assets/original_ui_pages50kg.h
+@@ -0,0 +1,116 @@
++#pragma once
++#include "original_ui_archive50kg.h"
++#include <array>
++#include <cstddef>
++#include <cstdint>
++#include <string>
++#include <vector>
++
++namespace rr::assets {
++// Native admission bounds, not constants claimed to exist in the original.
++constexpr std::size_t originalUiDatByteLimit50KG = 256 * 1024;
++constexpr std::size_t originalUiControlLimit50KG = 256;
++constexpr std::size_t originalUiGroupLimit50KG = 64;
++constexpr std::size_t originalUiWidgetLimit50KG = 1024;
++constexpr std::size_t originalUiMembershipLimit50KG = 4096;
++struct OriginalUiDatValue50KG {
++    std::string key, text;
++    std::size_t keyOffset = 0, valueOffset = 0;
++    bool sourceValuePresent = true; // Foo= is absent; Foo="" is present empty.
++};
++struct OriginalUiDatSection50KG {
++    std::string name;
++    std::size_t sourceOffset = 0;
++    std::vector<OriginalUiDatValue50KG> values;
++    const OriginalUiDatValue50KG* find(const std::string& key) const noexcept;
++};
++enum class OriginalUiPageError50KG : std::uint8_t {
++    none, missingArchive, missingMember, unsupportedEncoding, capacity,
++    textSyntax, duplicateSection, duplicateKey, missingSection, missingKey,
++    integerSyntax, numberSyntax, reference, unsupportedValue, allocation
++};
++struct OriginalUiPageDiagnostic50KG {
++    OriginalUiPageError50KG error = OriginalUiPageError50KG::none;
++    std::size_t byteOffset = 0;
++    std::uint32_t sourcePC = 0;
++};
++enum class OriginalUiRepeatedKeyPolicy50KG : std::uint8_t { reject,preserveInOrder };
++class OriginalUiDat50KG {
++public:
++    const OriginalUiDatSection50KG* section(const std::string& name) const noexcept;
++    const OriginalUiDatValue50KG* find(const std::string& section,
++        const std::string& key) const noexcept;
++    const OriginalUiMemberIdentity50KG* identity() const noexcept { return identity_; }
++    const std::vector<OriginalUiDatSection50KG>& sections() const noexcept { return sections_; }
++private:
++    const OriginalUiMemberIdentity50KG* identity_ = nullptr;
++    std::vector<OriginalUiDatSection50KG> sections_;
++    friend bool readOriginalUiDat50KG(const OriginalUiArchive50KG&, const std::string&,
++        OriginalUiDat50KG&, OriginalUiPageDiagnostic50KG&,OriginalUiRepeatedKeyPolicy50KG) noexcept;
++};
++// Only authenticated original archive members enter this reader. Source
++// 0x159440 removes whitespace outside quotes and brackets; 0x158824 removes
++// one outer quote pair. Semicolons are comments only at cleaned line start.
++// Unknown fields and repeated values (when explicitly requested) retain order.
++// find() returns the first matching present value, as source 0x158648 does.
++// ASCII LF/CRLF with optional final NUL; malformed quotes/brackets, duplicate
++// sections and binary BPB fail closed. Atomic cold operations, no IO/imports.
++bool readOriginalUiDat50KG(const OriginalUiArchive50KG& archive,
++    const std::string& originalMemberName, OriginalUiDat50KG& output,
++    OriginalUiPageDiagnostic50KG& diagnostic,
++    OriginalUiRepeatedKeyPolicy50KG repeatedKeys=OriginalUiRepeatedKeyPolicy50KG::reject) noexcept;
++
++struct OriginalUiControl50KG {
++    bool present = false; // Original controls may have no matching section.
++    std::vector<std::uint16_t> widgets; // Original WidgetID: one-based.
++};
++struct OriginalUiGroup50KG {
++    std::vector<std::int16_t> controls; // Original ControlID: zero-based; -1 = hole.
++    std::vector<std::uint16_t> associations; // ControlIDs, NOT group IDs.
++    bool keepEnabled = true;
++};
++struct OriginalUiPage50KG {
++    const OriginalUiMemberIdentity50KG* identity = nullptr;
++    std::uint16_t widgetCount = 0;
++    std::int32_t pageNo = 0, staticWidgetCount = 0;
++    std::string background = "*INVALID*";
++    bool useVideoAsTexture = false;
++    // These vectors include entry zero: the source loops 0..count inclusive.
++    std::vector<OriginalUiControl50KG> controls;
++    std::vector<OriginalUiGroup50KG> groups;
++    // PodUIPageController::Create 0x1D63B0; not generic host-layout defaults.
++    std::int32_t openSize = 224;
++    float openTime = 1.0f;
++    std::string start = "Closed";
++    bool hasPopup = false;
++    // Confirm, Format, FormatSuccess, FormatFail, Yes, No, AskFormat,
++    // NoMemcard, FullMemcard, in source 0x1D6598..0x1D666C order.
++    std::array<std::int32_t, 9> popupWidgets{{-1,-1,-1,-1,-1,-1,-1,-1,-1}};
++    std::array<float, 3> backgroundColor{{0.0f,255.0f,0.0f}};
++};
++// Membership schema: 0x1D6DEC..0x1D7138 / 0x1D7180 and generic 0x2A5EA0.
++// Widget bounds come from the actual companion Widgets.Dat General section.
++// Absent group sections retain zero memberships and KeepEnabled=true.
++// Invalid references and unsafe transition divisors reject.
++bool readOriginalUiPage50KG(const OriginalUiDat50KG& page,
++    const OriginalUiDat50KG& widgets, OriginalUiPage50KG& output,
++    OriginalUiPageDiagnostic50KG& diagnostic) noexcept;
++struct OriginalUiPageIndex50KG {
++    const OriginalUiMemberIdentity50KG* identity = nullptr;
++    std::vector<std::string> pageFiles; // Original Page 1..TotalPages order.
++};
++bool readOriginalUiPageIndex50KG(const OriginalUiDat50KG& ui,
++    OriginalUiPageIndex50KG& output, OriginalUiPageDiagnostic50KG& diagnostic) noexcept;
++
++// Shared strict value readers. Missing key writes the supplied original
++// default. Invalid authored values preserve output and return a source offset.
++bool originalUiInteger50KG(const OriginalUiDatSection50KG&, const std::string& key,
++    std::int32_t originalDefault, std::int32_t& output,
++    OriginalUiPageDiagnostic50KG&, std::uint32_t sourcePC) noexcept;
++bool originalUiNumber50KG(const OriginalUiDatSection50KG&, const std::string& key,
++    float originalDefault, float& output, OriginalUiPageDiagnostic50KG&,
++    std::uint32_t sourcePC) noexcept;
++bool originalUiTriple50KG(const OriginalUiDatSection50KG&,const std::string& key,
++    const std::array<float,3>& originalDefault,std::array<float,3>& output,
++    OriginalUiPageDiagnostic50KG&,std::uint32_t sourcePC) noexcept;
++}
+--- /dev/null
++++ b/src/game/original_ui_main_layout50kg.cpp
+@@ -0,0 +1,49 @@
++#include "original_ui_main_layout50kg.h"
++#include <cmath>
++
++namespace rr::game {
++namespace {
++OriginalUiOverlayQuad50KG quad(const char* material,float x,float y,float w,float h,
++    float u0,float v0,float u1,float v1,float depth,std::uint32_t pc) noexcept {
++    OriginalUiOverlayQuad50KG q;
++    q.materialName=material;q.authoredDepth=depth;q.sourcePC=pc;
++    q.vertices={{{x,y,u0,v0},{x+w,y,u1,v0},{x,y+h,u0,v1},{x+w,y+h,u1,v1}}};
++    return q;
++}
++bool dimension(std::uint32_t x) noexcept { return x>0 && x<=16384; }
++}
++bool layoutOriginalUiMainBackground50KG(std::uint32_t width,std::uint32_t height,
++    OriginalUiMainBackground50KG& output) noexcept {
++    if (!dimension(width) || !dimension(height)) return false;
++    // Match reciprocal-then-multiply rather than collapsing to one division.
++    const float uScale=1.0f/static_cast<float>(width);
++    const float vScale=1.0f/static_cast<float>(height);
++    const float u=319.0f*uScale,v=223.0f*vScale;
++    OriginalUiMainBackground50KG result;
++    result.quadrants[0]=quad("mmbkg",0,0,320,224,0,0,u,v,15,0x1E5708);
++    result.quadrants[1]=quad("mmbkg",320,0,320,224,u,0,0,v,15,0x1E57F8);
++    result.quadrants[2]=quad("mmbkg",0,224,320,224,0,v,u,0,15,0x1E58F8);
++    result.quadrants[3]=quad("mmbkg",320,224,320,224,u,v,0,0,15,0x1E5A00);
++    output=result;return true;
++}
++bool layoutOriginalUiMainArrows50KG(const OriginalUiMainArrowInput50KG& in,
++    OriginalUiMainArrows50KG& output) noexcept {
++    if (in.selectedSlot<1 || in.selectedSlot>5 || !std::isfinite(in.textX) ||
++        !std::isfinite(in.textY) || in.sourceMeasuredTextWidth<0 ||
++        !dimension(in.rightWidth) || !dimension(in.rightHeight) ||
++        !dimension(in.leftWidth) || !dimension(in.leftHeight)) return false;
++    const float xRight=2.0f+(in.textX-static_cast<float>(in.rightWidth));
++    const float xLeft=3.0f+(in.textX+static_cast<float>(in.sourceMeasuredTextWidth));
++    const float y=in.textY-3.0f;
++    OriginalUiMainArrows50KG result;
++    result.textWidgetId=static_cast<std::uint16_t>(in.selectedSlot+4);
++    result.beforeText=quad("arrwrght",xRight,y,static_cast<float>(in.rightWidth),
++        static_cast<float>(in.rightHeight),0,0,1,1,1,0x1E6554);
++    result.afterText=quad("arrwleft",xLeft,y,static_cast<float>(in.leftWidth),
++        static_cast<float>(in.leftHeight),0,0,1,1,1,0x1E65EC);
++    for (const auto* q:{&result.beforeText,&result.afterText})
++        for (const auto& v:q->vertices)
++            if (!std::isfinite(v.x) || !std::isfinite(v.y)) return false;
++    output=result;return true;
++}
++}
+--- /dev/null
++++ b/src/game/original_ui_main_layout50kg.h
+@@ -0,0 +1,50 @@
++#pragma once
++#include <array>
++#include <cstdint>
++
++namespace rr::game {
++struct OriginalUiOverlayVertex50KG { float x=0,y=0,u=0,v=0; };
++struct OriginalUiOverlayQuad50KG {
++    // Original material lookup name, not a guessed texture/PST filename.
++    const char* materialName=nullptr;
++    // Original ScreenTexture packet order: TL, TR, BL, BR (triangle strip).
++    std::array<OriginalUiOverlayVertex50KG,4> vertices{};
++    float authoredDepth=1;
++    // Exact packet channels from 0x2DF388: (RGB >> 1), (alpha >> 2).
++    // These are NOT conventional 0..255 sRGB/alpha values. The renderer must
++    // reproduce the original material/GS blend contract before normalizing.
++    std::array<std::uint8_t,4> sourcePacketColor{{127,127,127,63}};
++    std::uint32_t sourcePC=0;
++};
++struct OriginalUiMainBackground50KG {
++    static constexpr float nativeWidth=640, nativeHeight=448;
++    std::array<OriginalUiOverlayQuad50KG,4> quadrants{};
++};
++// 0x1E5580..0x1E5B08, with reciprocal atlas dimensions from 0x2DF180.
++// Four 320x224 quads; source sample endpoints are 319 and 223, NOT texture
++// dimensions minus one. Input dimensions belong to the actual material's
++// decoded original atlas. This function never invents or supplies an atlas.
++// Original depth packet value is videoDepthMax-authoredDepth (here 15).
++// Screen coordinates are those before any native-to-window letterboxing.
++bool layoutOriginalUiMainBackground50KG(std::uint32_t atlasWidth,
++    std::uint32_t atlasHeight,OriginalUiMainBackground50KG& output) noexcept;
++struct OriginalUiMainArrows50KG {
++    std::uint16_t textWidgetId=0; // source 5..9 for group1 selection1..5
++    OriginalUiOverlayQuad50KG beforeText,afterText;
++};
++struct OriginalUiMainArrowInput50KG {
++    std::uint16_t selectedSlot=0;
++    // Original first ScreenText position (+0x20), AFTER justification. Width
++    // is the integer returned by source ScreenText::GetWidth 0x2E16F0.
++    float textX=0,textY=0;
++    std::int32_t sourceMeasuredTextWidth=0;
++    // The actual current material-frame dimensions, not placeholder sizes.
++    std::uint32_t rightWidth=0,rightHeight=0,leftWidth=0,leftHeight=0;
++};
++// 0x1E6410..0x1E6684: a right-facing material before the text and a
++// left-facing material after it, at their full actual dimensions/UVs.
++// Original arrow assets are ATM-backed materials; this does not claim a
++// standalone PST exists or implement the still-separate animation decoder.
++bool layoutOriginalUiMainArrows50KG(const OriginalUiMainArrowInput50KG&,
++    OriginalUiMainArrows50KG& output) noexcept;
++}
+--- /dev/null
++++ b/src/game/original_ui_navigation50kg.cpp
+@@ -0,0 +1,155 @@
++#include "original_ui_navigation50kg.h"
++
++namespace rr::game {
++namespace {
++using Op=OriginalUiControlOperation50KG;
++using Status=OriginalUiNavigationStatus50KG;
++bool valid(const assets::OriginalUiPage50KG& p) noexcept {
++    if (!p.identity || p.controls.empty() || p.groups.empty() ||
++        p.controls.size()>assets::originalUiControlLimit50KG ||
++        p.groups.size()>assets::originalUiGroupLimit50KG ||
++        p.widgetCount>assets::originalUiWidgetLimit50KG) return false;
++    std::size_t total=0;
++    for (const auto& c:p.controls) {
++        total+=c.widgets.size();
++        if (total>assets::originalUiMembershipLimit50KG) return false;
++        for (auto id:c.widgets) if (!id || id>p.widgetCount) return false;
++    }
++    for (const auto& g:p.groups) {
++        total+=g.controls.size()+g.associations.size();
++        if (total>assets::originalUiMembershipLimit50KG) return false;
++        for (auto id:g.controls) if (id<-1 || id>=static_cast<std::int32_t>(p.controls.size())) return false;
++        for (auto id:g.associations) if (id>=p.controls.size()) return false;
++    }
++    return true;
++}
++bool command(OriginalUiNavigation50KG& n,OriginalUiCommands50KG& c,
++    std::int32_t id,Op op,std::uint32_t pc,bool value=false) noexcept {
++    if (id<0) return true; // Original null ControlID member.
++    if (c.count==c.values.size()) return false;
++    c.values[c.count++]={static_cast<std::uint16_t>(id),op,value,pc};
++    auto& s=n.controls[std::size_t(id)];
++    if (op==Op::select) s.selected=true;
++    else if (op==Op::deselect || op==Op::clearSelection) s.selected=false;
++    else if (op==Op::show) s.shown=true;
++    else if (op==Op::hide) s.shown=false;
++    else if (op==Op::setEnabled) s.enabled=value;
++    return true;
++}
++bool deselectGroup(OriginalUiNavigation50KG& n,OriginalUiCommands50KG& c,std::size_t id) noexcept {
++    const auto& g=n.page->groups[id];
++    for (auto control:g.associations) if (!command(n,c,control,Op::deselect,0x2A4E78)) return false;
++    const auto op=g.keepEnabled?Op::clearSelection:Op::deselect;
++    for (auto control:g.controls) if (!command(n,c,control,op,g.keepEnabled?0x2A4F10:0x2A4EC4)) return false;
++    return true;
++}
++bool selectSlot(OriginalUiNavigation50KG& n,OriginalUiCommands50KG& c,
++    std::size_t id,std::uint16_t slot) noexcept {
++    const auto& g=n.page->groups[id];
++    n.groups[id].selectedSlot=slot;
++    for (auto control:g.controls) if (!command(n,c,control,Op::deselect,0x2A4FA8)) return false;
++    return command(n,c,g.controls[slot-1],Op::select,0x2A4FD4);
++}
++}
++bool bindOriginalUiNavigation50KG(const assets::OriginalUiPage50KG& p,
++    OriginalUiNavigation50KG& out) noexcept {
++    if (!valid(p)) return false;
++    OriginalUiNavigation50KG result;result.page=&p;
++    for (std::size_t i=0;i<p.controls.size();++i) result.controls[i].enabled=p.controls[i].present;
++    for (std::size_t i=0;i<p.groups.size();++i)
++        result.groups[i].selectedSlot=p.groups[i].controls.empty()?0:1;
++    out=result;return true;
++}
++Status enterOriginalUiGroup50KG(OriginalUiNavigation50KG& nav,std::uint16_t id,
++    std::uint16_t slot,std::uint8_t controller,OriginalUiCommands50KG& output) noexcept {
++    if (!nav.page || !valid(*nav.page)) return Status::invalidPage;
++    if (controller>=2) return Status::invalidController;
++    if (id>=nav.page->groups.size() || !nav.groups[id].enabled) return Status::invalidGroup;
++    if (!slot || slot>nav.page->groups[id].controls.size()) return Status::invalidSlot;
++    OriginalUiNavigation50KG next=nav;OriginalUiCommands50KG commands;
++    for (std::size_t i=1;i<nav.page->groups.size();++i) {
++        bool owned=false;for (auto group:nav.controllerGroup) if (group==static_cast<std::int16_t>(i)) owned=true;
++        if (!owned && !deselectGroup(next,commands,i)) return Status::commandCapacity;
++    }
++    for (auto c:nav.page->groups[id].associations)
++        if (!command(next,commands,c,Op::select,0x2A4DFC)) return Status::commandCapacity;
++    if (!selectSlot(next,commands,id,slot)) return Status::commandCapacity;
++    next.controllerGroup[controller]=static_cast<std::int16_t>(id);
++    nav=next;output=commands;return Status::ok;
++}
++Status moveOriginalUiControl50KG(OriginalUiNavigation50KG& nav,std::uint16_t id,
++    bool forward,OriginalUiCommands50KG& output) noexcept {
++    if (!nav.page || !valid(*nav.page)) return Status::invalidPage;
++    if (id>=nav.page->groups.size()) return Status::invalidGroup;
++    const auto& group=nav.page->groups[id];
++    const auto count=group.controls.size();const auto old=nav.groups[id].selectedSlot;
++    if (!count) { output={};return Status::noChange; }
++    if (!old || old>count) return Status::invalidSlot;
++    auto slot=std::size_t(old);bool found=false;
++    for (std::size_t attempts=0;attempts<count;++attempts) {
++        slot=forward ? (slot==count?1:slot+1) : (slot==1?count:slot-1);
++        const auto c=group.controls[slot-1];
++        if (c>=0 && nav.controls[std::size_t(c)].enabled && !nav.controls[std::size_t(c)].blocked) {
++            found=true;break;
++        }
++    }
++    if (!found) return Status::noSelectableControl;
++    OriginalUiNavigation50KG next=nav;OriginalUiCommands50KG commands;
++    if (!command(next,commands,group.controls[old-1],Op::deselect,forward?0x2A5110:0x2A51D0) ||
++        !command(next,commands,group.controls[slot-1],Op::select,forward?0x2A518C:0x2A5244))
++        return Status::commandCapacity;
++    next.groups[id].selectedSlot=static_cast<std::uint16_t>(slot);
++    nav=next;output=commands;return Status::ok;
++}
++Status enableOriginalUiControl50KG(OriginalUiNavigation50KG& nav,std::uint16_t id,
++    bool enabled,OriginalUiCommands50KG& output) noexcept {
++    if (!nav.page || !valid(*nav.page) || id>=nav.page->controls.size()) return Status::invalidPage;
++    OriginalUiCommands50KG commands;
++    if (!command(nav,commands,id,Op::setEnabled,0x2A5B60,enabled)) return Status::commandCapacity;
++    output=commands;return Status::ok;
++}
++Status dispatchOriginalUiMain50KG(OriginalUiNavigation50KG& nav,std::uint8_t controller,
++    OriginalUiMainInput50KG input,const OriginalUiMainContext50KG& context,
++    OriginalUiCommands50KG& commands,OriginalUiMainDecision50KG& decision) noexcept {
++    if (!nav.page || !valid(*nav.page) || nav.page->groups.size()<=1) return Status::invalidPage;
++    OriginalUiMainDecision50KG result;
++    result.selectedSlot=nav.groups[1].selectedSlot;result.sourcePC=0x1E5E00;
++    if (controller!=0 || context.popupActive || context.sourceInputBlocked) {
++        commands={};decision=result;return Status::noChange;
++    }
++    if (input==OriginalUiMainInput50KG::previous || input==OriginalUiMainInput50KG::next) {
++        const auto status=moveOriginalUiControl50KG(nav,1,input==OriginalUiMainInput50KG::next,commands);
++        if (status!=Status::ok && status!=Status::noChange) return status;
++        result.action=OriginalUiMainAction50KG::changedSelection;
++        result.selectedSlot=nav.groups[1].selectedSlot;decision=result;return status;
++    }
++    if (input!=OriginalUiMainInput50KG::activate) return Status::unsupportedInput;
++    if (result.selectedSlot<1 || result.selectedSlot>5 ||
++        result.selectedSlot>nav.page->groups[1].controls.size()) return Status::invalidSlot;
++    const auto control=nav.page->groups[1].controls[result.selectedSlot-1];
++    if (control<0 || !nav.controls[std::size_t(control)].enabled || nav.controls[std::size_t(control)].blocked)
++        return Status::noSelectableControl;
++    if (result.selectedSlot<=3) {
++        result.originalGameMode=static_cast<std::int8_t>(result.selectedSlot-1);
++        result.originalPlayerBits=result.selectedSlot==2?0x40:0x20;
++        result.routeArgument=1;result.targetScreen=5;
++        result.sourcePC=result.selectedSlot==1?0x1E5EC8:(result.selectedSlot==2?0x1E5F2C:0x1E60EC);
++        if (result.selectedSlot==2 && !context.secondControllerPresent)
++            result.action=OriginalUiMainAction50KG::secondControllerRequired;
++        else if (!(context.supportedGameModes&(1u<<result.originalGameMode)))
++            result.action=OriginalUiMainAction50KG::unavailableMode;
++        else result.action=OriginalUiMainAction50KG::changeScreen;
++    } else if (result.selectedSlot==4) {
++        result.routeArgument=1;result.targetScreen=12;result.sourcePC=0x1E6150;
++        result.action=context.supportsScreen12?OriginalUiMainAction50KG::changeScreen:
++            OriginalUiMainAction50KG::unavailableScreen;
++    } else {
++        result.sourcePC=0x1E6170;result.routeArgument=5; // Same current screen, new page5.
++        result.action=context.supportsPage5?OriginalUiMainAction50KG::changePage:
++            OriginalUiMainAction50KG::unavailableScreen;
++    }
++    commands={};decision=result;
++    return result.action==OriginalUiMainAction50KG::changeScreen ||
++        result.action==OriginalUiMainAction50KG::changePage ? Status::ok : Status::unavailable;
++}
++}
+--- /dev/null
++++ b/src/game/original_ui_navigation50kg.h
+@@ -0,0 +1,86 @@
++#pragma once
++#include "../assets/original_ui_pages50kg.h"
++#include <array>
++#include <cstddef>
++#include <cstdint>
++
++namespace rr::game {
++enum class OriginalUiControlOperation50KG : std::uint8_t {
++    show, hide, select, deselect, clearSelection, setEnabled, reset
++};
++struct OriginalUiControlCommand50KG {
++    std::uint16_t controlId=0;
++    OriginalUiControlOperation50KG operation=OriginalUiControlOperation50KG::deselect;
++    bool value=false;
++    std::uint32_t sourcePC=0;
++};
++constexpr std::size_t originalUiCommandLimit50KG=assets::originalUiMembershipLimit50KG*2+8;
++struct OriginalUiCommands50KG {
++    std::array<OriginalUiControlCommand50KG,originalUiCommandLimit50KG> values{};
++    std::size_t count=0;
++};
++struct OriginalUiControlState50KG { bool enabled=false, blocked=false, selected=false, shown=false; };
++struct OriginalUiGroupState50KG { bool enabled=true; std::uint16_t selectedSlot=0; };
++struct OriginalUiNavigation50KG {
++    // Immutable owner must outlive this state. No guest addresses are retained.
++    const assets::OriginalUiPage50KG* page=nullptr;
++    std::array<OriginalUiControlState50KG,assets::originalUiControlLimit50KG> controls{};
++    std::array<OriginalUiGroupState50KG,assets::originalUiGroupLimit50KG> groups{};
++    std::array<std::int16_t,2> controllerGroup{{-1,-1}};
++};
++enum class OriginalUiNavigationStatus50KG : std::uint8_t {
++    ok, noChange, invalidPage, invalidGroup, invalidSlot, invalidController,
++    noSelectableControl, commandCapacity, unsupportedInput, unavailable
++};
++// Cold bind validates the typed model again; allocation-free and atomic.
++bool bindOriginalUiNavigation50KG(const assets::OriginalUiPage50KG&,
++    OriginalUiNavigation50KG&) noexcept;
++// Source 0x2A6BE0 entry selection: deselect unowned groups 1..N, select target
++// associations, select the requested one-based slot, attach controller.
++OriginalUiNavigationStatus50KG enterOriginalUiGroup50KG(OriginalUiNavigation50KG&,
++    std::uint16_t groupId,std::uint16_t slot,std::uint8_t controller,
++    OriginalUiCommands50KG&) noexcept;
++// Source 0x2A50F0 / 0x2A51B0: wrap in group order, skipping -1 holes,
++// disabled or blocked controls. Native fail-closed bound replaces the
++// original infinite scan when every control is ineligible; failure is atomic.
++OriginalUiNavigationStatus50KG moveOriginalUiControl50KG(OriginalUiNavigation50KG&,
++    std::uint16_t groupId,bool forward,OriginalUiCommands50KG&) noexcept;
++OriginalUiNavigationStatus50KG enableOriginalUiControl50KG(OriginalUiNavigation50KG&,
++    std::uint16_t controlId,bool enabled,OriginalUiCommands50KG&) noexcept;
++// Consumers expand every command through page.controls[id].widgets in listed
++// order, preserving duplicates. Commands are callback requests, not proof
++// that a renderer/animation/sound effect has completed. The UIWidget callbacks
++// (selection textures, motions and visibility flags) remain renderer-owned.
++
++// Event indices returned by 0x2A7410; PC key mapping belongs to the host.
++enum class OriginalUiMainInput50KG : std::uint8_t { previous=2,next=3,activate=4 };
++enum class OriginalUiMainAction50KG : std::uint8_t {
++    none, changedSelection, changeScreen, changePage, secondControllerRequired,
++    unavailableMode, unavailableScreen
++};
++struct OriginalUiMainContext50KG {
++    bool popupActive=false,sourceInputBlocked=false,secondControllerPresent=false;
++    // Explicit ORIGINAL-menu admission only. This mask is NOT RR_RACE_MODE,
++    // which belongs to a separate native host timing/audio domain. Unsupported
++    // original menu items keep
++    // their authentic labels and selection positions, returning unavailable.
++    std::uint8_t supportedGameModes=0; // bits 0,1,2 correspond to original modes.
++    bool supportsScreen12=false,supportsPage5=false;
++};
++struct OriginalUiMainDecision50KG {
++    OriginalUiMainAction50KG action=OriginalUiMainAction50KG::none;
++    std::uint16_t selectedSlot=0;
++    std::int8_t originalGameMode=-1; // never remap mode0 to mode2
++    std::uint8_t originalPlayerBits=0; // source options byte bits 0x20/0x40
++    std::int16_t routeArgument=-1,targetScreen=-1;
++    std::uint32_t sourcePC=0;
++};
++// Native translation of 0x1E5E00's bounded main-menu dispatch. Navigation
++// mutates only native selection state; accepted activations return an exact
++// original route request. They do not start gameplay, modify options/save
++// files or mark a backend operation complete. Second-controller error popup
++// rendering and original sound IDs are outside this leaf.
++OriginalUiNavigationStatus50KG dispatchOriginalUiMain50KG(OriginalUiNavigation50KG&,
++    std::uint8_t controller,OriginalUiMainInput50KG,const OriginalUiMainContext50KG&,
++    OriginalUiCommands50KG&,OriginalUiMainDecision50KG&) noexcept;
++}
+--- /dev/null
++++ b/src/game/original_ui_text_position50kg.cpp
+@@ -0,0 +1,66 @@
++#include "original_ui_text_position50kg.h"
++#include <cmath>
++#include <limits>
++
++namespace rr::game {
++namespace {
++bool nearestEven(float value,std::int32_t& out) noexcept {
++    if (!std::isfinite(value)) return false;
++    const double n=std::floor(double(value));const double fraction=double(value)-n;
++    const double rounded=n+(fraction>0.5 || (fraction==0.5 && std::fmod(n,2.0)!=0.0)?1.0:0.0);
++    if (rounded<double(std::numeric_limits<std::int32_t>::min()) ||
++        rounded>double(std::numeric_limits<std::int32_t>::max())) return false;
++    out=static_cast<std::int32_t>(rounded);return true;
++}
++// Each source mul.s/add.s has its own binary32 rounding; forbid contraction.
++float mul(float a,float b) noexcept { volatile float f=a*b;return f; }
++float add(float a,float b) noexcept { volatile float f=a+b;return f; }
++}
++bool roundOriginalUiTextMetric50KG(float beforeScale,float scale,std::int32_t& output) noexcept {
++    if (!std::isfinite(beforeScale) || !std::isfinite(scale)) return false;
++    std::int32_t result=0;if (!nearestEven(mul(beforeScale,scale),result)) return false;
++    output=result;return true;
++}
++bool positionOriginalUiText50KG(const OriginalUiTextPositionInput50KG& input,
++    OriginalUiTextPosition50KG& output) noexcept {
++    if (!input.widget || input.line>=input.widget->lines.size() ||
++        !std::isfinite(input.fontLineHeight) || input.measuredWidth<0 || input.measuredHeight<0) return false;
++    const auto& w=*input.widget;OriginalUiTextPosition50KG result;
++    result.authoredLineX=w.x;
++    if (w.usesExplicitHeight) {
++        const auto y=std::int64_t(w.y)+std::int64_t(input.line)*w.height;
++        if (y<std::numeric_limits<std::int32_t>::min() || y>std::numeric_limits<std::int32_t>::max()) return false;
++        result.authoredLineY=static_cast<std::int32_t>(y);
++    } else {
++        const float advance=mul(w.leadingFactor,input.fontLineHeight);
++        const float distance=mul(float(input.line),advance);
++        if (!nearestEven(add(float(w.y),distance),result.authoredLineY)) return false;
++    }
++    result.positionedX=float(result.authoredLineX);result.positionedY=float(result.authoredLineY);
++    if (!w.lines[input.line].empty()) {
++        const auto j=w.justification;std::int32_t coordinate=0;
++        if (j==assets::OriginalUiTextJustification50KG::centerHorizontal ||
++            j==assets::OriginalUiTextJustification50KG::centerBoth) {
++            if (!nearestEven(add(result.positionedX,-mul(float(input.measuredWidth),0.5f)),coordinate)) return false;
++            result.positionedX=float(coordinate);
++        } else if (j==assets::OriginalUiTextJustification50KG::right) {
++            if (!nearestEven(add(result.positionedX,-float(input.measuredWidth)),coordinate)) return false;
++            result.positionedX=float(coordinate);
++        }
++        if (j==assets::OriginalUiTextJustification50KG::centerVertical ||
++            j==assets::OriginalUiTextJustification50KG::centerBoth) {
++            if (!nearestEven(add(result.positionedY,-mul(float(input.measuredHeight),0.5f)),coordinate)) return false;
++            result.positionedY=float(coordinate);
++        }
++    }
++    output=result;return true;
++}
++std::array<std::uint8_t,4> originalUiTextPacketColor50KG(std::uint32_t color,
++    std::int16_t alpha) noexcept {
++    // Division with explicit floor reproduces arithmetic shift even for the
++    // signed-short negative domain without relying on implementation shifts.
++    const std::int32_t a=alpha;const auto shifted=a>=0?a/4:-((-a+3)/4);
++    return {{std::uint8_t(((color>>16)&255u)>>1),std::uint8_t(((color>>8)&255u)>>1),
++        std::uint8_t((color&255u)>>1),std::uint8_t(std::uint32_t(shifted)&255u)}};
++}
++}
+--- /dev/null
++++ b/src/game/original_ui_text_position50kg.h
+@@ -0,0 +1,42 @@
++#pragma once
++#include "../assets/original_ui_overlay_text50kg.h"
++#include <array>
++#include <cstddef>
++#include <cstdint>
++
++namespace rr::game {
++struct OriginalUiTextPositionInput50KG {
++    const assets::OriginalUiOverlayText50KG* widget=nullptr;
++    std::size_t line=0;
++    float fontLineHeight=0;
++    // Source ScreenText::GetWidth/GetHeight integer results, after source
++    // metric rounding. Font layout's unrounded values are not interchangeable.
++    std::int32_t measuredWidth=0,measuredHeight=0;
++};
++struct OriginalUiTextPosition50KG {
++    std::int32_t authoredLineX=0,authoredLineY=0;
++    float positionedX=0,positionedY=0;
++    // Creation 0x29DA40 initializes scale=1, rotation=0. These positioned
++    // coordinates may therefore enter the glyph leaf as local coordinates
++    // for a settled, unanimated original main text line. Animated transforms
++    // must be separately source-updated; this function does not erase them.
++};
++// Source GetWidth/GetHeight final multiply and cvt.w.s. This closes the
++// font leaf's unrounded metric contract without depending on host fenv.
++bool roundOriginalUiTextMetric50KG(float beforeScale,float sourceScale,
++    std::int32_t& output) noexcept;
++// Line leading 0x2A9684/0x2A98A8/0x2A9D20 and justification 0x2E13A0.
++// Explicit Height only affects the localized/split branch (0x2A9CD4).
++// Integer conversion explicitly uses nearest-even; never host rounding mode.
++bool positionOriginalUiText50KG(const OriginalUiTextPositionInput50KG&,
++    OriginalUiTextPosition50KG&) noexcept;
++// Independent ScreenText packet route: 29DA10->29DCB0 stores packed color;
++// 29D484/29D6C8 ->133F20 extracts RGB and shifts each right one. Alpha
++// 29D4C4/29D70C converts float to signed16, then1D8850 arithmetic>>2,
++// masked to byte. Input here is the already-converted source signed16 alpha,
++// not authored Alpha nor an assumed final opacity. This preserves the exact
++// short-width contract; normal clamped0..255 yields0..63. GS/material
++// normalization belongs to the renderer and is not hidden in these bytes.
++std::array<std::uint8_t,4> originalUiTextPacketColor50KG(
++    std::uint32_t sourcePackedColor,std::int16_t sourceAlpha) noexcept;
++}

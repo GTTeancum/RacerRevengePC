@@ -1,0 +1,5 @@
+{
+  "expected_original_manifest_sha256": "f1ca2ed8c9d2e68b57d2dfdc0b3f1a72ed2abbd46e269d006a2e335f1c608aec",
+  "regenerated_manifest_sha256": "f1ca2ed8c9d2e68b57d2dfdc0b3f1a72ed2abbd46e269d006a2e335f1c608aec",
+  "exact_match": true
+}
