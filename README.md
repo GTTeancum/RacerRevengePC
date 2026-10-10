@@ -4,9 +4,9 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-This branch preserves an **unexecuted direct-GC original-AI capture harness**. It requires the separately guarded AI runtime and existing central reservation workflow; it permits one process and a 12-second observation window after ready. See the [harness README](tools/capture/native_ai/README.md) for prerequisites, explicit AI/brake acceptance and source-stop limits.
+This branch preserves **unexecuted all-eight original-AI capture and prefix-export tools**. They require the separate combined runtime, exact existing source/ledger inputs and one centrally reserved process. Fresh images use paired native audio counters; artifact success never upgrades runtime acceptance. See the [tool README](tools/capture/all_original_ai/README.md).
 
-The inherited runtime source is an earlier tested Linux prototype with rendering, physics, audio and eight-racer racing. It does not contain the new original-AI integration. See [current validation](docs/current-validation.md) for that baseline's scope. No runtime, parser, syntax check or encoding was performed for this helper backup.
+The inherited runtime is an earlier prototype, not the required all-AI candidate. Old capture tools remain available. No imports, syntax checks, gameplay or encoding were run for this backup. Source boundaries and incomplete-prefix disclosures remain explicit.
 
 ## Building and game data
 
