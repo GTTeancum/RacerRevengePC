@@ -1,0 +1,69 @@
+{
+  "schema": "RR_RIDER_IPUM_SOURCE_CANDIDATE_1",
+  "status": "source_only_uncompiled_unexecuted",
+  "dependency": "ScreenAssets exit provenance integrated4c8ae0e",
+  "native_decoder": "Existing unchanged50FC FFmpeg AV_CODEC_ID_IPU scalar host image decode",
+  "codec_executed": false,
+  "tests_executed": false,
+  "generated_output_catalog_available": false,
+  "supported_source_sha256": "ad0bcd92f415d65d8bf68ae9e65fe355043e297e834cdffeae4ceac7cfa60cd3",
+  "hardware_pixel_parity_verified": false,
+  "files": [
+    {
+      "path": "src/assets/import_texture48e.h",
+      "sha256": "01ebfcd78d2445a55c0f6fb6a501e09c7ccdde6ae371e8c1c6ac602d2b349536",
+      "bytes": 3639,
+      "required_preimage": "preimages/src/assets/import_texture48e.h",
+      "preimage_sha256": "093147ca1f6d43fa9d566dc290be019b8f8df0316d705bd9f371378f661d69f6"
+    },
+    {
+      "path": "src/assets/original_ui_ipum_texture_cache50kg.cpp",
+      "sha256": "01de35141ab9b6826537465d352ba7c28a4a397611d0b7fcf84fe201284942e3",
+      "bytes": 15069,
+      "required_preimage": null,
+      "preimage_sha256": null
+    },
+    {
+      "path": "src/assets/original_ui_ipum_texture_cache50kg.h",
+      "sha256": "3653025aa0c6e08b8dbb1b5bb5e1106bb745583f4c23488fa0217593b5e2cef8",
+      "bytes": 3993,
+      "required_preimage": null,
+      "preimage_sha256": null
+    },
+    {
+      "path": "src/assets/original_ui_ipum_texture_cache50kg_generated.inc",
+      "sha256": "ef0a238eac076f81c2924086f4a80c58369d6e4d77f4b6c8e9f3f4f5d74b0a73",
+      "bytes": 411,
+      "required_preimage": null,
+      "preimage_sha256": null
+    },
+    {
+      "path": "src/assets/original_ui_screen_assets50kg.cpp",
+      "sha256": "48f96b069a955da57bfeacf6755f95e6a0bd8dc8e1aebbf30618eb0d1450e801",
+      "bytes": 6179,
+      "required_preimage": "preimages-after-exit/src/assets/original_ui_screen_assets50kg.cpp",
+      "preimage_sha256": "338c3ddb8c7cacb8396f628f5b7b11d3240edc647217bdc3f261b15e4a9946bd"
+    },
+    {
+      "path": "src/assets/original_ui_screen_assets50kg.h",
+      "sha256": "75084a93e0d9a4b6d47afd5e546bbe747010d4d9e3ee86bf2613680a4052ea58",
+      "bytes": 3608,
+      "required_preimage": "preimages-after-exit/src/assets/original_ui_screen_assets50kg.h",
+      "preimage_sha256": "c928f85f81e9b62f59bda8fea27e712fd7bf9ee6cce11c2d63a8768245179509"
+    },
+    {
+      "path": "tests/native/original_ui_ipum_texture_cache50kg.cpp",
+      "sha256": "f0f8975b3b0484b1c714338986047caaa4a5eab856929345e325eab2c64ed1fa",
+      "bytes": 10283,
+      "required_preimage": null,
+      "preimage_sha256": null
+    },
+    {
+      "path": "tools/assets/recover_rider_ipum50kg.py",
+      "sha256": "6110004287240621db66e464afc87bbf53b9628843d3e051313b531c03fab646",
+      "bytes": 10469,
+      "required_preimage": null,
+      "preimage_sha256": null
+    }
+  ]
+}

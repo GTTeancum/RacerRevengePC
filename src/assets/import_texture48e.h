@@ -15,15 +15,20 @@ struct TextureLimits48E {
 struct TextureMip48E {
     std::uint32_t width = 0, height = 0;
     // The index payload is packed two texels per byte for kind0, one for kind1.
+    // A typed authenticated IPUM cache uses source_indices_offset for the
+    // whole kind2 IPUM payload (including its16-byte header), not index bytes.
     std::size_t source_header_offset = 0, source_indices_offset = 0;
-    // Original row order, unscaled/unpremultiplied RGBA including raw alpha.
+    // Original row order, unpremultiplied RGBA. Indexed kinds retain raw
+    // palette alpha. The separate kind2 cache retains source-backed RGB5
+    // high-bit expansion and TEXA255/AEM1 sampled alpha; see its provenance.
     std::vector<std::uint8_t> rgba;
 };
 struct Texture48E {
     std::uint16_t revision = 1, flags = 0;
-    std::uint32_t kind = 1; // Original PST enum:0=4-bit indexed,1=8-bit indexed.
+    std::uint32_t kind = 1; // Original PST:0=4-bit indexed,1=8-bit indexed,2=IPUM.
     // kind0 uses only the first16 entries; the unused remainder is zero-initialized
     // storage, not additional authored palette data. kind1 uses all256 entries.
+    // kind2 has no authored palette; its zero storage does not invent one.
     std::array<std::array<std::uint8_t, 4>, 256> original_palette{};
     std::vector<TextureMip48E> mips; // Original ascending dimensions; base is back().
     std::vector<std::uint8_t> base_rrtex; // RRTEX001; no shader/alpha normalization.
@@ -54,6 +59,8 @@ struct Material48E {
 
 // Bounded48D kind1 subset plus source-backed50KG kind0 packed-index expansion.
 // Revision1/flags0,1..7 ascending mips, power-of-two16..1024 remain required.
+// This function still rejects kind2; only a separate authenticated cold cache
+// may publish the supported exact source-derived IPUM Texture48E result.
 // No files, JSON, guest execution, GS upload swizzle,
 // guessed shader/default render state, texture lookup, or platform dependency.
 // Transactional outputs on all failure/cancellation paths. Limits only reduce

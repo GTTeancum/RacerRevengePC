@@ -29,11 +29,12 @@ struct OriginalUiScreenAssets50KG::Storage {
     std::vector<Texture48E> decodedTextures;
     std::vector<OriginalUiFont50KG> fonts;
     std::vector<OriginalUiImageProvenance50KG> provenance;
+    std::vector<OriginalUiIpumProvenance50KG> ipumEvidence;
 };
 OriginalUiScreenAssets50KG::OriginalUiScreenAssets50KG() noexcept=default;
 OriginalUiScreenAssets50KG::~OriginalUiScreenAssets50KG()=default;
 bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50KG>& sources,
-    OriginalUiScreenAssetDiagnostic50KG& d) noexcept {
+    OriginalUiScreenAssetDiagnostic50KG& d,const OriginalUiIpumTextureCache50KG* ipumCache) noexcept {
     d={};using Error=OriginalUiScreenAssetError50KG;
     try {
         if(storage_)return fail(d,Error::alreadyLoaded);
@@ -55,6 +56,7 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
         // the bank stay private until all decoding and bank admission succeed.
         next->decodedTextures.resize(sources.size());
         next->provenance.resize(sources.size());
+        next->ipumEvidence.resize(sources.size());
         std::vector<MaterialTextureAssetInput50EA> images(sources.size());
         std::size_t totalSource=0,totalRgba=0;
         for(std::size_t i=0;i<sources.size();++i){
@@ -62,7 +64,12 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
             next->provenance[i]={s.member.identity,s.cel.identity,s.pstOffset,s.pstBytes};
             const std::vector<std::uint8_t> pst(s.member.data+s.pstOffset,s.member.data+s.pstOffset+s.pstBytes);
             auto& decoded=next->decodedTextures[i];
-            if(!decodeTexture48E(pst,decoded,d.texture))return fail(d,Error::texture,i);
+            const auto* cached=ipumCache?ipumCache->textureFor(s.member,s.pstOffset,s.pstBytes):nullptr;
+            if(cached){
+                const auto* evidence=ipumCache->provenance();
+                if(!evidence||cached->kind!=2)return fail(d,Error::texture,i);
+                decoded=*cached;next->ipumEvidence[i]=*evidence;
+            }else if(!decodeTexture48E(pst,decoded,d.texture))return fail(d,Error::texture,i);
             if(decoded.mips.empty())return fail(d,Error::texture,i);
             const auto& base=decoded.mips.back();
             if(base.rgba.size()>maxMaterialTextureRGBABytes50EA-totalRgba||
@@ -90,6 +97,10 @@ const Texture48E* OriginalUiScreenAssets50KG::decodedTexture(std::uint32_t i) co
 }
 const OriginalUiImageProvenance50KG* OriginalUiScreenAssets50KG::sourceProvenance(std::uint32_t i) const noexcept{
     return storage_&&i<storage_->provenance.size()?&storage_->provenance[i]:nullptr;
+}
+const OriginalUiIpumProvenance50KG* OriginalUiScreenAssets50KG::ipumProvenance(std::uint32_t i) const noexcept{
+    return storage_&&i<storage_->decodedTextures.size()&&storage_->decodedTextures[i].kind==2?
+        &storage_->ipumEvidence[i]:nullptr;
 }
 const OriginalUiFont50KG* OriginalUiScreenAssets50KG::font(std::uint32_t i) const noexcept{
     return storage_&&i<storage_->fonts.size()&&storage_->fonts[i].decoded()?&storage_->fonts[i]:nullptr;

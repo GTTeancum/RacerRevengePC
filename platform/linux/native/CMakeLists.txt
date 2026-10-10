@@ -20,6 +20,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/assets/original_ui_overlay_text50kg.cpp"
   "${RR_ROOT}/src/assets/original_ui_pages50kg.cpp"
   "${RR_ROOT}/src/assets/original_ui_screen_assets50kg.cpp"
+  "${RR_ROOT}/src/assets/original_ui_ipum_texture_cache50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_icon_layout50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_main_layout50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_navigation50kg.cpp"
