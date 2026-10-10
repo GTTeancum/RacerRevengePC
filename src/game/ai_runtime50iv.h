@@ -18,7 +18,13 @@ struct AiRuntimeState50IV {
     std::int32_t referenceFF8=-1;
     std::uint32_t managerIndexFE0=0,racer60=0,fieldFE4=0;
     float engineDifference5C=0.f;
+    // Canonical supplemental1008: native stable manager identity, not a copied
+    // racer object or guest pointer. Constructor/reset null is represented by
+    // absence; a completed scan retains its last actual non-self candidate.
+    bool target1008Present=false;
+    std::uint32_t target1008ManagerIndex=0;
     bool initialized=false;
+    std::uint64_t combatScans=0,combatAiRejections=0;
     std::uint64_t dispatchedFrames=0,brakingFrames=0,startupFrames=0,ordinaryFrames=0,boundBrakeSteerFrames=0;
 };
 // This owner is populated by native1B0400 over the actual manager field. CCC
@@ -116,7 +122,37 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
         stateInput.turnSide.scene190Position[axis]=position[axis];stateInput.turnSide.scene190LocalForward[axis]=forward[axis];}
     AiStateDispatchReceipt50IV dispatch{};
     if(!advanceAiStateNoCombat50IV(stateInput,ai.state,dispatch,receipt.prefix))return stop(receipt.prefix.sourcePC);
-    if(!dispatch.complete)return stop(dispatch.boundaryPC);
+    if(!dispatch.complete){
+        if(dispatch.boundaryPC!=0x1705c8u||ai.state.aiStateFE8!=2u)
+            return stop(dispatch.boundaryPC);
+        // State2 caller16ED38, after the unchanged1704E0 early guards.
+        // Source1705C8..1706B8 visits the entire real manager in index order.
+        // Each1705F4 target store precedes its speed read and candidate guards.
+        // No callback/result is fabricated for the still-unjoined1706C0.
+        for(std::size_t index=0;index<in.racerCount;++index){
+            if(index==ai.managerIndexFE0)continue;
+            const auto& candidate=in.racers[index];
+            if(!candidate.bound||candidate.managerIndex!=index)return stop(0x1af330u);
+            ai.target1008Present=true;ai.target1008ManagerIndex=candidate.managerIndex;
+            ai_prefix_detail50IV::Math scan;
+            //17061C is the always-executed delay-slot multiply, including AI
+            // candidates that immediately return false at170620/170624.
+            const float candidateSpeed=scan.mul(ai_speed_detail50IR::word(0x3f2e8bc1u),
+                scan.read(candidate.cachedSpeed34));
+            if(!scan.valid)return stop(0x17061cu);
+            if(candidate.vehicle58==1u){++ai.combatAiRejections;continue;}
+            if(candidate.vehicle40)continue;
+            if(candidateSpeed<200.f)continue;
+            if(candidate.vehicle58!=0u)continue;
+            // Genuine eligible human candidate. Preserve1008 and the exact
+            // partial AI frame; do not pretend the geometric combat helper
+            // returned false or enter a fabricated attack mode.
+            return stop(0x170668u);
+        }
+        ++ai.combatScans;
+        // Exhaustion returns0 at1706A0. State2's caller changes neither FE8
+        // nor1008 for this return. State7 and attack-mode callers stay unjoined.
+    }
     AiPackingInput50IV packing{};packing.referenceFF8=ai.referenceFF8;
     if(ai.referenceFF8>=0){const auto index=static_cast<std::size_t>(ai.referenceFF8);
         if(index>=in.racerCount)return stop(0x1af330);const auto&r=in.racers[index];

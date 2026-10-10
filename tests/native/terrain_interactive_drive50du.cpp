@@ -2048,6 +2048,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         <<" native_ticks="<<completedFrames<<" dispatched="<<originalAi.dispatchedFrames
         <<" state="<<originalAi.state.aiStateFE8<<" CB8="<<lapContinuity.timing.timeCB8
         <<" startup="<<originalAi.startupFrames<<" ordinary="<<originalAi.ordinaryFrames
+        <<" combat_scans="<<originalAi.combatScans<<" combat_ai_rejections="<<originalAi.combatAiRejections
+        <<" target1008="<<(originalAi.target1008Present?static_cast<std::int64_t>(originalAi.target1008ManagerIndex):-1)
         <<" brake_commands="<<originalAi.brakingFrames<<" bound_brake_steer="<<originalAi.boundBrakeSteerFrames
         <<" steer="<<m.controls.player.raw.values[0]<<" aeroBrakeEC="<<m.components.bindings.aeroBrakeEC
         <<" aeroDrive="<<m.components.bindings.aeroDrive[0]<<'/'<<m.components.bindings.aeroDrive[1]
@@ -2361,7 +2363,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   };
   for(std::size_t racer=1;racer<racerBank.count();++racer){
    opponentFrame=true;
-   try{captureDynamicBeforeFrame(racer);racerBank.visit(racer,initializeGraphics);}
+   try{
+    captureDynamicBeforeFrame(racer);
+    if(originalAiEnabled)observeOriginalAiFleet();
+    racerBank.visit(racer,initializeGraphics);
+   }
    catch(const std::exception& error){
     opponentFrame=false;
     std::throw_with_nested(std::runtime_error("Original racer "+racerRigs[racer]->podId+
@@ -2369,7 +2375,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    opponentFrame=false;
   }
-  captureDynamicBeforeFrame(0);initializeGraphics();raceSetupFrame=false;
+  captureDynamicBeforeFrame(0);
+  if(originalAiEnabled)observeOriginalAiFleet();
+  initializeGraphics();raceSetupFrame=false;
   if(originalAiEnabled){
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     initializeLapTimingFields50ID(lapContinuity.timing,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u);lapContinuity.timingInitialized=true;
@@ -3218,7 +3226,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     const auto nativeFrameAllocations=::allocations;
     phase_timing50GK::Scope physicsTiming(phaseTiming,phase_timing50GK::Phase::Physics);
-    if(playerAdvancing)captureDynamicBeforeFrame(0);
+    if(playerAdvancing){
+     captureDynamicBeforeFrame(0);
+     // Source AI peer reads resolve live racers in serial update order. This
+     // copies current owners only: manager timing/CC4/CCC do not advance here.
+     if(originalAiEnabled)observeOriginalAiFleet();
+    }
     const bool frameAdvanced=!playerAdvancing||advanceFrame();
     if(originalAiEnabled&&!frameAdvanced){
      std::cerr<<"ORIGINAL AI world boundary: slot=0 phase="<<static_cast<unsigned>(s.phase)
@@ -3241,6 +3254,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       opponentFrame=true;
       try {
        captureDynamicBeforeFrame(racer);
+       // Outside Bank::step/visit: no nested arena lease, no stale earlier
+       // racer position/C80/speed after that racer completed its native frame.
+       if(originalAiEnabled)observeOriginalAiFleet();
        const bool advanced=racerBank.step(racer,true,[&](){
         if(s.fields.vehicle58==0u){composePacket(true,noKeys);applyCourseInput(racer);sampleController();}
         const auto beforeOpponentFrame=::allocations;
