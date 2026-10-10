@@ -16,7 +16,7 @@ namespace rr::platform {
 class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
 public:
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
-    static constexpr std::size_t effectVoiceCount = 4, requiredVoices = 5;
+    static constexpr std::size_t effectVoiceCount = 5, requiredVoices = 6;
     OriginalUiMainAudio50KG() = default;
     ~OriginalUiMainAudio50KG() noexcept override { reset(); }
     OriginalUiMainAudio50KG(const OriginalUiMainAudio50KG&) = delete;
@@ -43,6 +43,8 @@ public:
     // Source292810 flags1 ->233410 stops an active sound before restart.
     // One voice per original event; different IDs may overlap.
     bool playMenuEffect(std::uint32_t originalId) noexcept;
+    // Actual Options menu1F9640 admits events1,3,4,5 only. Main allowlist stays unchanged.
+    bool playOptionsEffect(std::uint32_t originalId) noexcept;
     bool update(float sourceSeconds) noexcept;
     void pause(bool value) noexcept { paused_ = value; }
     bool paused() const noexcept { return paused_; }
@@ -54,6 +56,7 @@ public:
     float mainGain() const noexcept { return musicGain_; }
 private:
     bool current() const noexcept;
+    bool playEffectClip(std::size_t) noexcept;
     bool attempted_ = false, prepared_ = false, paused_ = false;
     bool ownsMusic_ = false, fading_ = false;
     AudioMixer50HD* mixer_ = nullptr;
@@ -62,8 +65,8 @@ private:
     float musicGain_ = 0.4f, fadeStartGain_ = 0.4f;
     float fadeElapsed_ = 0.f, fadeDuration_ = 0.f, fadeRetireAt_ = 0.f;
     // Original UI setup1B7944 music40/100 and1B78D0 effects100/100.
-    std::array<assets::AudioPcm50HC, 5> pcm_{};
-    std::array<AudioClip50HD, 5> clips_{};
+    std::array<assets::AudioPcm50HC, 6> pcm_{};
+    std::array<AudioClip50HD, 6> clips_{};
     std::array<bool, effectVoiceCount> ownsEffect_{};
 };
 }
