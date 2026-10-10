@@ -4,9 +4,9 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-Recovery branch based on the verified GitHub source snapshot 51c6e707. Some newer source is recovered separately; the latest pre-reset game build has not been restored.
+Native Linux gameplay is running with eight original-AI racers. The latest capture is partial: GC still stops at an unfinished AI recovery path, and its Gate opening remains incomplete.
 
-The reconstructed original-art UI renderer and material adapter pass a focused Linux C++20 compile. Original UI is still inactive pending assets and screen wiring. No new gameplay or visual validation has run. See [recovery validation](docs/recovery-validation-20261010.md).
+Original-art UI/menu integration is in progress and is not active yet. See [current validation](recovery/20261010/VALIDATION-1619.md) for the tested build and remaining limits.
 
 ## Build and game data
 
