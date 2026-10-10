@@ -60,6 +60,9 @@ struct VehicleWindowMaterialBinding50DS {
     // Bypass host geometric lighting; retain explicit RGB exposure. Opaque
     // racer bodies use source normals; nonopaque pod effects remain unlit.
     bool unlit = false;
+    // Authenticated material program preserves precomputed vertex RGB.
+    // Bypass added host illumination without suppressing native shadow receipt.
+    bool sourcePrelit = false;
 };
 struct VehicleWindowComponentMaterials50DS {
     const VehicleWindowMaterialBinding50DS* bindings = nullptr;

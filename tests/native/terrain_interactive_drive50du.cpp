@@ -2952,6 +2952,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    binding.material.alphaScale=alpha.alphaScale;
    // These authenticated beam placements explicitly disable source lighting.
    binding.material.unlit=alpha.unlit;
+   binding.material.sourcePrelit=alpha.sourcePrelit;
    binding.discardZeroAlpha=alpha.discardZeroAlpha;
    trackBindings.push_back(binding);
   }

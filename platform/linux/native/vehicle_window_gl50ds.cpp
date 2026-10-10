@@ -2960,7 +2960,8 @@ void main() { viewerOutput = hudColor; }
                         s.gl.uniform1i(s.trackProjectionPassUniform, static_cast<I>(span.projectionPass));
                         s.gl.uniform1i(s.trackEffectModeUniform, effectMode(span.material.policy));
                         s.gl.uniform1f(s.trackAlphaScaleUniform, span.material.policy.alphaScale);
-                        s.gl.uniform1i(s.trackUnlitUniform, span.material.policy.unlit ? 1 : 0);
+                        s.gl.uniform1i(s.trackUnlitUniform,
+                            span.material.policy.unlit || span.material.policy.sourcePrelit ? 1 : 0);
                         s.gl.uniform1i(s.nativeShadowEnabledUniform, s.request.enableNativePodShadows &&
                             !transparent && span.sourcePass == 1 && span.material.policy.depthWrite && !span.material.policy.unlit ? 1 : 0);
                         if (!s.check("bind explicit source-ordered track material")) return false;
@@ -3018,7 +3019,8 @@ void main() { viewerOutput = hudColor; }
             gl.uniform1i(trackDiscardZeroAlphaUniform, span.discardZeroAlpha ? 1 : 0);
             gl.uniform1i(trackEffectModeUniform, effectMode(material.policy));
             gl.uniform1f(trackAlphaScaleUniform, material.policy.alphaScale);
-            gl.uniform1i(trackUnlitUniform, material.policy.unlit ? 1 : 0);
+            gl.uniform1i(trackUnlitUniform,
+                material.policy.unlit || material.policy.sourcePrelit ? 1 : 0);
             if (!check("bind authenticated dynamic-world material")) return false;
             drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.indexCount), 0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(span.indexStart) * sizeof(U)), 0);
@@ -3040,7 +3042,7 @@ void main() { viewerOutput = hudColor; }
         gl.uniform1i(u.suppressDraw, suppress ? 1 : 0);
         // Retain source-alpha/additive effect appearance and explicit emissive
         // materials. Only opaque pod surfaces opt into host illumination.
-        gl.uniform1i(u.useLighting, !material.policy.unlit &&
+        gl.uniform1i(u.useLighting, !material.policy.unlit && !material.policy.sourcePrelit &&
             material.policy.blend == VehicleWindowBlend50DS::opaque ? 1 : 0);
         gl.uniform1i(u.useUvTransform, 1);
         const auto* uv = overrideUv ? overrideUv : material.uv;
