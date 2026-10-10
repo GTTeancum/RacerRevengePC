@@ -108,6 +108,15 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
             pass.textureName=="mmlogo" && !p.fallbackPageSource && !p.sourceCallerPC;
     const bool main=p.origin==OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback;
     const bool options=p.origin==OriginalUiMaterialOrigin50KG::optionsMenuPromptMissingPsmFallback;
+    const bool gameOptions=p.origin==OriginalUiMaterialOrigin50KG::optionsGamePromptMissingPsmFallback;
+    if(gameOptions){
+        const auto& source=promptSources[2];
+        return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options)&&
+            !p.fallbackWidgetSource&&p.fallbackPageSource==catalogMember(OriginalUiArchiveId50KG::options,"UI\\UIOption\\options.dat")&&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::options,source.member)&&
+            p.sourceCallerPC==source.callPC&&p.registeredName==source.registeredName&&
+            p.attemptedPsmMember==source.psm&&pass.textureName==source.texture;
+    }
     if((!main&&!options) || p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays) ||
         p.fallbackWidgetSource || p.fallbackPageSource!=catalogMember(
             main?OriginalUiArchiveId50KG::mainMenu:OriginalUiArchiveId50KG::options,
@@ -328,6 +337,35 @@ bool readOriginalUiOptionsMenuPromptFallbackMaterial50KG(const OriginalUiArchive
         OriginalUiMaterialProvenance50KG provenance;
         provenance.origin=OriginalUiMaterialOrigin50KG::optionsMenuPromptMissingPsmFallback;
         provenance.archive=overlays.identity();provenance.fallbackTexture=texture.identity;
+        provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=source.callPC;
+        provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
+        provenance.creationPC=0x2475c0;
+        auto result=screenTextureFallback(provenance,source.texture,*inherited,runtime);
+        output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiGameOptionsPromptFallbackMaterial50KG(const OriginalUiArchive50KG& options,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!options.loaded()||options.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Options and shared OVERLAYS",0x1f4724);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index!=2)return fail(d,Error::fallbackSource,"Game Options local square only");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=options.find(source.member);const auto page=options.find("UI\\UIOption\\options.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||options.find(source.psm).identity)
+            return fail(d,Error::fallbackSource,"Options-local square texture and original Game Options page",source.callPC);
+        OriginalUiMaterialProvenance50KG provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::optionsGamePromptMissingPsmFallback;
+        provenance.archive=options.identity();provenance.fallbackTexture=texture.identity;
         provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=source.callPC;
         provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
         provenance.creationPC=0x2475c0;

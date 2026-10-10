@@ -67,7 +67,7 @@ private:
 };
 enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback,
-    optionsMenuPromptMissingPsmFallback
+    optionsMenuPromptMissingPsmFallback, optionsGamePromptMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -151,6 +151,15 @@ enum class OriginalUiOptionsMenuPrompt50KG : std::uint8_t { cross,triangle };
 bool readOriginalUiOptionsMenuPromptFallbackMaterial50KG(
     const OriginalUiArchive50KG& options,const OriginalUiArchive50KG& overlays,
     OriginalUiOptionsMenuPrompt50KG,const OriginalUiMaterialTemplates50KG&,
+    OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
+    OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Actual Game Options page4 create1F4724 calls the shared page constructor.
+// Its square uses the Options-local PST, with no local/shared PSM. Cross and
+// triangle remain the already-authenticated shared menu prompt owners.
+bool readOriginalUiGameOptionsPromptFallbackMaterial50KG(
+    const OriginalUiArchive50KG& options,const OriginalUiArchive50KG& overlays,
+    OriginalUiMainPrompt50KG,const OriginalUiMaterialTemplates50KG&,
     OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
     OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
