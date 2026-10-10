@@ -1,6 +1,7 @@
 #include "vehicle_base_finish50y.h"
 #include "vehicle_base_tail50x.h"
 #include "vehicle_frame49w.h"
+#include "pod_live_query50iz.h"
 #include "chariot_scene49u.h"
 #include "movement_hit_point50m.h"
 #include <cfenv>
@@ -59,7 +60,9 @@ bool admit(const S&s,const VehicleFrameBindings49W&b,VehicleFrameDiagnostic49W&d
  // Preserve the old disabled admission; enabled348 requires explicit cold opt-in.
  if(!s.terrainProbe.enabled&&m.probe100)return fail(d,E::Admission,0);
  if(s.terrainProbe.enabled&&(m.probe100!=1u||s.terrainProbe.stage>3u||c.main.components.probe348.field1E8>16u))return fail(d,E::Admission,0x1b1800);
- if(std::fegetround()!=FE_TONEAREST||s.fields.vehicle58>1u||(s.fields.vehicle58==1u&&!s.fields.nativeAiOwnersBound50IV)||s.fields.vehicle3C||s.fields.vehicle834||c.main.vehicleState40||c.main.applicationActive11C||m.body320!=1||m.bodyChildCount||b.mainDomain.firstComponentChildPresent18||m.sceneObserverCount||!m.sceneAttached||m.sceneHasParent||!m.bodyEnabled||!m.secondBodyPresent||m.override3C||m.resetRequested||m.probe120Present||m.probe124Present||z.body320!=1||z.registrationMask!=2||z.bodyChildCount||b.secondaryDomain.firstComponentChildPresent18||z.sceneObserverCount||z.sceneHasParent||!c.secondary.scenePresent||!c.secondary.enabled||s.shape.type88||s.shape.registrationE0||!emptyRoute(b.mainDomain)||!emptyRoute(b.secondaryDomain))return fail(d,E::Admission,0);
+ if(std::fegetround()!=FE_TONEAREST||s.fields.vehicle58>1u||(s.fields.vehicle58==1u&&!s.fields.nativeAiOwnersBound50IV)||s.fields.vehicle3C||s.fields.vehicle834||c.main.vehicleState40||c.main.applicationActive11C||m.body320!=1||m.bodyChildCount||b.mainDomain.firstComponentChildPresent18||m.sceneObserverCount||!m.sceneAttached||m.sceneHasParent||!m.bodyEnabled||!m.secondBodyPresent||m.override3C||m.resetRequested||m.probe120Present||m.probe124Present||z.body320!=1||z.registrationMask!=2||z.bodyChildCount||b.secondaryDomain.firstComponentChildPresent18||z.sceneObserverCount||z.sceneHasParent||!c.secondary.scenePresent||!c.secondary.enabled||s.shape.type88||(s.shape.registrationE0&&!b.podLiveQuery50IZ)||!emptyRoute(b.mainDomain)||!emptyRoute(b.secondaryDomain))return fail(d,E::Admission,0);
+ if(b.podLiveQuery50IZ&&!coherentPodLiveQuery50IZ(s.shape,*b.podLiveQuery50IZ))
+  return fail(d,E::Admission,0x12023cu);
  const SceneGraph49P g{const_cast<SceneNode49P*>(s.nodes),s.sceneNodeCount};
  if(!validVehicleSceneCount49W(s,b)||!validateSceneGraph49P(g))return fail(d,E::Graph,0);
  for(unsigned i=0;i<s.sceneNodeCount;++i){const auto&n=s.nodes[i];const auto&t=b.topology[i];if(n.parent180!=t.parent180||n.firstChild184!=t.firstChild184||n.nextSibling188!=t.nextSibling188)return fail(d,E::Graph,0);}
@@ -81,7 +84,7 @@ bool phases(const S&s) noexcept {
  case P::Post354:m=M::AwaitingResponse354;c=C::AwaitingResponse354;break;
  case P::Post368:m=M::AwaitingResponse354;c=C::AwaitingResponse368;break;
  case P::MainIntegration:m=M::AwaitingResponse354;c=C::AwaitingMainIntegration;break;
- case P::Query219120:m=M::AwaitingQuery219120;c=C::AwaitingQuery219120;break;
+ case P::Query219120:case P::PodLivePending50IZ:m=M::AwaitingQuery219120;c=C::AwaitingQuery219120;break;
  }
  return s.bodies.main.phase==m&&s.bodies.phase==c&&s.bodies.secondary.phase==(s.phase==P::Post368?SecondaryPhase49M::Response368Pending:SecondaryPhase49M::Ready);
 }
@@ -596,7 +599,23 @@ static bool finishMovementTail50M(S&s,const VehicleFrameBindings49W&b,const Vehi
  if(!detail::inverseDirection49U(graph(r),b.lifecycle.main190,r.fields.impactBA0,scratch,inverse))return fail(d,E::Arithmetic,0x219f80);
  for(unsigned i=0;i<3;++i)r.fields.inverseImpactBB0XYZ.v[i]=inverse.v[i];
  RR_VEHICLE_FRAME49W_STAGE(0x219f90);m.components.feedback=selectLateFeedback49K(m.components.probe348.field104,m.response354_3C,m.response354_44);
- RR_VEHICLE_FRAME49W_STAGE(0x219fd8);if(!transformPodShape49W(p.shape,node(r,b.lifecycle.main190).world100,r.shape))return fail(d,E::Shape,0x219fd8);
+ RR_VEHICLE_FRAME49W_STAGE(0x219fd8);
+ if(r.shape.registrationE0){
+  // Actual typed694 owner, after original movement/feedback prefix. The shape
+  // numeric preparation and live registry have distinct source commits.
+  if(!b.podLiveQuery50IZ||b.podLiveQuery50IZ->source!=&p.shape){
+   project(r,b);r.phase=P::PodLivePending50IZ;s=r;return fail(d,E::Admission,0x219fd8u);
+  }
+  const auto updated=updateRegisteredPodShape50IZ(r.shape,
+      node(r,b.lifecycle.main190).world100,*b.podLiveQuery50IZ);
+  if(updated.status!=PodLiveQueryStatus50IZ::Complete){
+   // Retain completed source-prefix work in an explicit pending phase. There
+   // is no represented resume yet: a full movement-tail replay is rejected.
+   project(r,b);r.phase=P::PodLivePending50IZ;s=r;
+   return fail(d,E::Shape,updated.sourcePC?updated.sourcePC:0x219fd8u);
+  }
+ }else if(!transformPodShape49W(p.shape,node(r,b.lifecycle.main190).world100,r.shape))
+  return fail(d,E::Shape,0x219fd8);
  project(r,b);++m.substepIndex;const bool done=m.substepIndex==m.schedule.count;
  m.phase=done?MainBodyPhase49K::FrameReady:MainBodyPhase49K::SubstepReady;r.bodies.phase=done?CoupledBodyPhase49M::FrameReady:CoupledBodyPhase49M::SubstepReady;return commit(s,w,done?P::Ready:P::SubstepReady);
 }
