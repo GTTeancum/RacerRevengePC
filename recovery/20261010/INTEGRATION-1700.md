@@ -14,9 +14,21 @@ state-5 recovery boundary. It does not validate these later changes.
 - `7072b40`: native Main particle camera projection.
 - `56af479`: original Main fire assets, emission, lifetime and packet ownership.
 - `13cf969`: actual Main ambient particle lighting.
+- `1352a6c`: original Main music/effects transport with dedicated frontend voices.
+- `36fdddd`: native Main fire geometry, actual two-state material, alpha test
+  and fog submission. Full original texture alpha bytes are retained.
+- `41492c2`: original page-button material fallbacks and sixteen-leaf registry
+  order. The renderer bounds texture/vertex alpha products rather than rejecting
+  authentic texture alpha above 128.
+- `11fd32a`: actual initial Main lifecycle and entry-only aperture callbacks.
+- `de601f7`: opt-in original Main application entry, genuine video/texture
+  ownership, native input and explicit muted opening/idle capture protocol.
 
-The frontend remains inactive. Work still joins the concrete material drain,
-particle rendering, page lifecycle, prompt icons, audio and application entry.
+The Main entry source still awaits its session, draw collector and final source
+fog/camera helper before it can be built or run. Static source inspection found
+that scene fog changes the particle camera near/far planes to 1/4000 during
+render; the earlier cold far plane of 100000 is not the final particle state.
+The first Main observation will be explicitly muted and will not launch a race.
 Parsing other page descriptors does not implement those page controllers or
 admit their routes. The existing gameplay HUD and host menu remain temporary.
 
