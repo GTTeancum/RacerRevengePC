@@ -222,3 +222,12 @@ Read in `/workspace/shared/rr-recovery-git`:
 
 Line numbers describe the inspected source and may move. The script hashes the
 current versions at launch without asserting that they are the binary's source.
+
+## Root integration amendment
+
+The repository copy at `tools/gameplay/record_original_ai_recovery.py` accepts
+`--ready-window-seconds` (default 30, maximum 180). The recorded requested window
+and elapsed-window check use that exact value. Root may select 180 seconds for
+one focused original-AI observation around the first braking/impact sequence;
+all capture serialization, source-boundary stops and one-launch limits remain.
+This amendment is source-reviewed only and has not been executed.
