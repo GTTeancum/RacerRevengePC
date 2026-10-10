@@ -13,6 +13,27 @@ static_assert(sizeof(float)==4 && std::numeric_limits<float>::is_iec559,
 float value(std::uint32_t u) noexcept { float f;std::memcpy(&f,&u,4);return f; }
 using Q=std::array<float,4>;
 using V=std::array<float,3>;
+// Original100B90 builds4096 ShortAxis half-angle entries in BSS. Reconstruct
+// that authored angular domain and binary32 operation order with native host
+// double sin/cos, explicitly not the PS2 software-double library. Last-bit
+// parity for these new entries is not claimed. Historical ByteAxis tables and
+// interpolation math below are unchanged. Fixed storage, no heap allocation.
+struct ShortAxisTables {
+    float sine[4096],cosine[4096];
+    ShortAxisTables() noexcept {
+        for(std::uint32_t i=0;i<4096;++i){
+            volatile float fraction=static_cast<float>(i)/4096.0f;
+            volatile float full=value(0x40c90fdb)*fraction;
+            volatile float half=0.5f*full;
+            sine[i]=static_cast<float>(std::sin(static_cast<double>(half)));
+            cosine[i]=static_cast<float>(std::cos(static_cast<double>(half)));
+        }
+    }
+};
+const ShortAxisTables& shortAxisTables() noexcept {
+    static const ShortAxisTables tables;
+    return tables;
+}
 struct Eval {
     ModelMotionSharedState49T& shared;
     bool valid=true;
@@ -58,14 +79,23 @@ struct Eval {
         for(unsigned i=0;i<3;++i)q[i+1]=mul(mul(value(0x3c010204),static_cast<float>(k.axis[i])),s);
         return q;
     }
-    bool rotation(const assets::MotionView49O& v,std::uint32_t ti,float time,Q& result,bool directTime=false) noexcept {
-        const auto n=v.rotation[ti].keyCount;assets::ByteAxisKey49O a{},b{};
+    Q decode(const assets::ShortAxisKey49O& k) noexcept {
+        if(k.angle>=4096){valid=false;return {};}
+        const auto& tables=shortAxisTables();
+        float s=tables.sine[k.angle];Q q{tables.cosine[k.angle],0,0,0};
+        //1010B0: signed axis conversion, multiply by0x38000100, then sine.
+        for(unsigned i=0;i<3;++i)q[i+1]=mul(mul(value(0x38000100),static_cast<float>(k.axis[i])),s);
+        return q;
+    }
+    template<class Key>
+    bool rotationKeys(const assets::MotionView49O& v,std::uint32_t ti,float time,Q& result,bool directTime) noexcept {
+        const auto n=v.rotation[ti].keyCount;Key a{},b{};
         if(n<2||n>assets::maxMotKeysPerTrack49O||!assets::readRotationKey49O(v,ti,0,a)||
            !assets::readRotationKey49O(v,ti,n-1,b)||time<a.time||(!directTime&&time>b.time))return false;
         if(time>=b.time){result=decode(b);return true;}
         // Same strict upper interval as145850, with checked finite asset view.
         std::uint32_t lo=0,hi=n-1;
-        while(hi-lo>1){auto mid=(lo+hi)/2;assets::ByteAxisKey49O k{};
+        while(hi-lo>1){auto mid=(lo+hi)/2;Key k{};
             if(!assets::readRotationKey49O(v,ti,mid,k))return false;
             if(time<k.time)hi=mid;else lo=mid;
         }
@@ -74,6 +104,11 @@ struct Eval {
         result=blend(decode(a),later,u);
         if(dot(result,later)<0)for(auto& x:result)x=-x;
         return true;
+    }
+    bool rotation(const assets::MotionView49O& v,std::uint32_t ti,float time,Q& result,bool directTime=false) noexcept {
+        if(v.rotationType==0)return rotationKeys<assets::ByteAxisKey49O>(v,ti,time,result,directTime);
+        if(v.rotationType==1)return rotationKeys<assets::ShortAxisKey49O>(v,ti,time,result,directTime);
+        return false;
     }
     bool position(const assets::MotionView49O& v,std::uint32_t ti,float time,V& p,bool directTime=false) noexcept {
         const auto n=v.position[ti].keyCount;assets::BezierKey49O a{},b{};
