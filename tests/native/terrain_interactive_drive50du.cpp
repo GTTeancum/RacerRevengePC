@@ -2884,7 +2884,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    fog.end=minimum+visibility*(maximum-minimum);
    fog.start=(fog.end-64.f)*(1.f-haziness);fog.enabled=true;
    std::cerr<<"Opt-in reconstructed native world fog: start "<<fog.start
-       <<" end "<<fog.end<<"; distance provenance pending, no retail shader parity claim\n";
+       <<" end "<<fog.end<<"; source ranges established, native world shader parity pending\n";
   }
   renderRequest.track.sourceNormals=trackNormals.data();
   renderRequest.track.sourceNormalCount=static_cast<std::uint32_t>(trackNormals.size());
