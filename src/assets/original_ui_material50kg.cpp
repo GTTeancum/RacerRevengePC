@@ -1,4 +1,5 @@
 #include "original_ui_material50kg.h"
+#include "original_ui_screen_assets50kg.h"
 #include <utility>
 
 namespace rr::assets {
@@ -337,7 +338,7 @@ bool readOriginalUiOptionsMenuPromptFallbackMaterial50KG(const OriginalUiArchive
 static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG& pass,
     const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
     OriginalUiMaterialDiagnostic50KG& d, bool litProgram,
-    bool& fogEnabled, bool& alphaTestGreaterZero) noexcept {
+    bool& fogEnabled, bool& alphaTestGreaterZero, bool authenticatedRiderIpum = false) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
@@ -383,9 +384,15 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
         if (sourceAlphaTest && (!expect(Field::alphaTestMethod, 6) ||
             !expect(Field::alphaReferenceValue, 0) ||
             !expect(Field::processingMethodWhenFailedInAlphaTest, 0))) return false;
-        if (texture.revision != 1 || texture.flags || texture.kind > 1 || texture.mips.size() != 1)
-            return fail(d, Error::texture, "single original indexed RGBA mip", 0x24e880u);
-        const auto& mip = texture.mips.front();
+        const bool textureShape = authenticatedRiderIpum ?
+            (litProgram && texture.kind == 2 && texture.mips.size() == originalUiIpumMipCount50KG) :
+            (texture.kind <= 1 && texture.mips.size() == 1);
+        if (texture.revision != 1 || texture.flags || !textureShape)
+            return fail(d, Error::texture, "admitted original texture/mip provenance", 0x24e880u);
+        // Typed kind2 path below authenticates this actual bank image. Native
+        // highest-resolution policy binds the last stored (source level0) mip;
+        // no historical residentF4 or unuploaded GPU mip levels are implied.
+        const auto& mip = texture.mips.back();
         if (mip.width < 16 || mip.height < 16 || mip.width > 1024 || mip.height > 1024 ||
             (mip.width & (mip.width - 1)) || (mip.height & (mip.height - 1)) ||
             std::uint64_t(mip.width) * mip.height * 4 != mip.rgba.size())
@@ -453,6 +460,42 @@ bool prepareOriginalUiLitMaterial50KM(const OriginalUiMaterialPass50KG& pass,
     next.program = same(pass.microprogram, "Diffuse") ? OriginalUiLitProgram50KM::diffuse :
         OriginalUiLitProgram50KM::diffuseCompressed;
     output = next; return true;
+}
+bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19IpumMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d = {}; d.pass = pass.pass;
+    try {
+        const auto* source = images.sourceProvenance(imageIndex);
+        const auto* ipum = images.ipumProvenance(imageIndex);
+        const auto* texture = images.decodedTexture(imageIndex);
+        const auto* bank = images.textures();
+        const auto* image = bank ? bank->texture(imageIndex) : nullptr;
+        const auto* member = catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19c_1.pst");
+        if (!images.loaded() || !source || !ipum || !texture || !image || !member ||
+            source->memberIdentity != member || source->celIdentity || source->pstOffset != 0 ||
+            source->pstBytes != member->bytes || ipum->sourcePstSha256 != member->sha256 ||
+            ipum->colorPolicyKind != OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1 ||
+            texture->mips.size() != originalUiIpumMipCount50KG)
+            return fail(d,Error::texture,"authenticated original Rider19 IPUM image bank",0x24e880u);
+        const auto& base=texture->mips.back();
+        if (image->texture.width != base.width || image->texture.height != base.height ||
+            image->texture.rgba != base.rgba)
+            return fail(d,Error::texture,"published native image must equal original largest mip",0x24eb90u);
+        if (pass.identity != catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19c_1.psm") ||
+            pass.pass != 1 || !same(pass.microprogram,"DiffuseCompressed") || !same(pass.textureName,"19c_1") ||
+            pass.gs[Field::alphaBlendingOnOff].value != 0 || pass.gs[Field::alphaTestOnOff].value != 0)
+            return fail(d,Error::profile,"actual opaque alpha-test-off Rider19c_1 pass",0x2476a0u);
+        OriginalUiRider19IpumMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,true)) return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIpumImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=static_cast<std::uint32_t>(texture->mips.size()-1);
+        next.sourceMipCount=static_cast<std::uint32_t>(texture->mips.size());
+        output=next;return true;
+    } catch (...) { d.error=Error::allocation; return false; }
 }
 bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     OriginalUiNativeUntexturedMaterial50KG& output,

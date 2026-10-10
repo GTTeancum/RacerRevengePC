@@ -227,5 +227,32 @@ struct OriginalUiLitMaterial50KM {
 bool prepareOriginalUiLitMaterial50KM(const OriginalUiMaterialPass50KG&,
     const Texture48E& exactTexture, OriginalUiLitMaterial50KM&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;
+class OriginalUiScreenAssets50KG;
+enum class OriginalUiNativeIpumImagePolicy50KM : std::uint8_t {
+    unavailable, highestResolutionBaseOnly
+};
+struct OriginalUiRider19IpumMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    OriginalUiNativeIpumImagePolicy50KM imagePolicy=OriginalUiNativeIpumImagePolicy50KM::unavailable;
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+    std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0;
+};
+// Separate exact Rider19c_1 entry. The ordinary Texture48E overload continues
+// to reject kind2. This consumes the immutable real image-bank owner, canonical
+// source provenance and typed original-data cache color policy. Native policy
+// chooses the highest-resolution original level0, honestly publishing only
+// that image on GPU while preserving all original mip bytes/provenance on CPU.
+// It does NOT assert historical source residencyF4 or emulate memory pressure.
+// Requires actual authored19c_1 DiffuseCompressed, MXL0/equal source texel
+// filters, opaque RGB and alpha-test OFF. These alpha gates make unresolved
+// material-versus-texture TEXA ordering irrelevant to this bounded RGB path;
+// a downstream source-alpha consumer is still forbidden by presentation.
+// The images owner must outlive this result and the renderer's publication.
+bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19IpumMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
 
 }
