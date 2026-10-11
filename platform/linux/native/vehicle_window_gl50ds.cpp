@@ -3856,8 +3856,11 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame
     frame.owner_->finishSourceSubmission(frame.frameGeneration_,d.originalUiAccepted,sourceWorkStarted);
     d.originalUiSourceFrameGeneration=frame.frameGeneration_;
     d.originalUiSourceTargetGeneration=s.uiSourceTargetGeneration;
+    // Keep the attempted owner borrowed after any potentially partial source
+    // work. Only explicit successful retirement may release that lifetime.
+    if (sourceWorkStarted || d.originalUiAccepted)s.uiSourceFrameOwner=frame.owner_;
     // A private publication stays committed even if its later window copy fails.
-    if (d.originalUiAccepted){s.uiSourceFrameOwner=frame.owner_;s.uiSourceFrameGeneration=frame.frameGeneration_;}
+    if (d.originalUiAccepted)s.uiSourceFrameGeneration=frame.frameGeneration_;
     return accepted;
 }
 bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
