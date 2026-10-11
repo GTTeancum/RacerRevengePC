@@ -47,6 +47,8 @@ enum class OriginalUiProfileField50KG : std::uint32_t {
     entrantsMode0_708=0x708,subtypeMode0_70C=0x70C,
     courseMode1_710=0x710,entrantsMode1_714=0x714,lapsMode1_718=0x718,
     gallerySlot71C=0x71C,comparisonRider100C0=0x100C0,
+    soundMode1101C=0x1101C,sfxVolume11020=0x11020,musicVolume11024=0x11024,
+    voiceVolume11028=0x11028,announcerVolume1102C=0x1102C,settingsFlags11050=0x11050,
     subtype11258=0x11258,packed1125C=0x1125C,rider1Bits1125D=0x1125D,
     rider2Bits1125E=0x1125E,trackBits1125F=0x1125F
 };

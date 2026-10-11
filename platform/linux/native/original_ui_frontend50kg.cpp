@@ -32,6 +32,7 @@ bool optionsBackShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
         p.value==d.selectedSlot&&p.replaceMask==0xFFFFFFFFu&&p.sourcePC==0x1F9994;
 }
 bool optionsPageShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
+    if(game::originalUiGameOptionsAcceptShape50KG(d))return true;
     const auto& r=d.request;
     if(r.kind!=game::OriginalUiRouteKind50KG::changePage||r.sourceScreen!=12||r.targetScreen!=12||
         !d.profileProposalComplete||d.selectedRider!=-1||d.profileChanges.count!=1)return false;
@@ -40,7 +41,7 @@ bool optionsPageShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
     if(r.sourcePage==1&&r.targetPage==4)
         return d.inputPC==0x1F9640&&d.selectedSlot==3&&r.sourcePC==0x1F9898&&
             p.field==game::OriginalUiProfileField50KG::optionsSlot6E4&&p.sourcePC==0x1F9940;
-    // Cancel only. Accept's distinct profile/apply transaction is unavailable.
+    // Cancel's one store remains distinct from the source Accept transaction.
     return r.sourcePage==4&&r.targetPage==1&&d.inputPC==0x1F50F0&&d.selectedSlot>=1&&d.selectedSlot<=8&&
         r.sourcePC==0x1F51D8&&p.field==game::OriginalUiProfileField50KG::optionsGroup6E8&&p.sourcePC==0x1F51C8;
 }
@@ -180,7 +181,10 @@ struct OriginalUiFrontend50KG::Storage {
         }else if(optionsPageShape(decision)){
             if(!optionsPageShape(proposed)||s.pending||
                 decision.request.sourcePage!=proposed.request.sourcePage||decision.request.targetPage!=proposed.request.targetPage||
+                decision.request.sourcePC!=proposed.request.sourcePC||
                 !m.ownsRoute({decision.request.targetScreen,decision.request.targetPage}))return false;
+            if(game::originalUiGameOptionsAcceptShape50KG(decision))
+                return m.options->commitGameOptionsAccept(s.optionsProposal,decision);
             if(decision.request.sourcePage==4){
                 if(!s.cold.gameSettingsProfile)return false;
                 s.cold.gameSettingsProfile->savedGroup6E8=decision.profileChanges.values[0].value;
@@ -236,7 +240,7 @@ struct OriginalUiFrontend50KG::Storage {
             }else {
                 OriginalUiOptionsSessionCold50KG input;input.resources=m.optionsResources;input.gpu=m.gpu;input.optionsArchive=cold.options;
                 input.profile=cold.optionsProfile;input.commonProfile=cold.profile;input.application=cold.application;
-                input.gameSettingsProfile=cold.gameSettingsProfile;
+                input.gameSettingsProfile=cold.gameSettingsProfile;input.soundMode=cold.soundMode;
                 input.audioMode=cold.audioMode;input.audio=cold.audio;input.externalTransition=m.transition;
                 m.options=std::make_unique<OriginalUiOptionsSession50KG>();
                 if(m.options->bind(input,d.options)!=OptionsStatus::ok){result(d,Status::session);return false;}

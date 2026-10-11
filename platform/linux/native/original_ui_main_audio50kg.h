@@ -54,6 +54,8 @@ public:
     // Actual Options menu1F9640 admits events1,3,4,5 only. Main allowlist stays unchanged.
     bool playOptionsEffect(std::uint32_t originalId) noexcept;
     // Page4 source1F50F0 additionally owns event2(defaults) and7(clamp).
+    // Read-only concrete preflight for a serialized profile/route transaction.
+    bool canPlayGameOptionsEffect(std::uint32_t originalId) const noexcept;
     bool playGameOptionsEffect(std::uint32_t originalId) noexcept;
     bool update(float sourceSeconds) noexcept;
     void pause(bool value) noexcept { paused_ = value; }
@@ -66,6 +68,7 @@ public:
     float mainGain() const noexcept { return musicGain_; }
 private:
     bool current() const noexcept;
+    bool canPlayEffectClip(std::size_t) const noexcept;
     bool playEffectClip(std::size_t) noexcept;
     bool attempted_ = false, prepared_ = false, paused_ = false;
     bool ownsMusic_ = false, fading_ = false;

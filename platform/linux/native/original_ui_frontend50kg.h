@@ -34,6 +34,9 @@ struct OriginalUiFrontendCold50KG {
     // Retained sole application profile for page4. Optional: without it only
     // Options menu1 is admitted. No reset or imported-save claim is made here.
     std::shared_ptr<game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
+    // The application's actual retained mode owner; Accept also proves that
+    // the same pointer is attached to audio's current native mixer.
+    std::shared_ptr<OriginalSoundMode50KG> soundMode;
     std::shared_ptr<OriginalUiMainApplication50KG> application;
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
     // Same actual transport/output owner throughout both screens. Caller owns

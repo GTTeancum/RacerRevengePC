@@ -1,5 +1,6 @@
 #include "original_ui_options_session50kg.h"
 #include <cmath>
+#include <limits>
 #include <new>
 #include <utility>
 namespace rr::platform {
@@ -14,6 +15,19 @@ using ApertureStatus=game::OriginalUiApertureStatus50KG;
 bool widgetOkay(WidgetStatus s) noexcept {return s==WidgetStatus::ok||s==WidgetStatus::noChange||s==WidgetStatus::hidden;}
 bool apertureOkay(ApertureStatus s) noexcept {return s==ApertureStatus::ok||s==ApertureStatus::noChange;}
 Status result(Diagnostic& d,Status s,std::uint32_t pc=0) noexcept {d.status=s;d.sourcePC=pc;return s;}
+bool sameDecision(const game::OriginalUiRouteDecision50KG& a,const game::OriginalUiRouteDecision50KG& b) noexcept {
+    const auto& x=a.request;const auto& y=b.request;
+    if(a.action!=b.action||a.blockers!=b.blockers||a.admitted!=b.admitted||
+        a.profileProposalComplete!=b.profileProposalComplete||a.selectedSlot!=b.selectedSlot||
+        a.selectedRider!=b.selectedRider||a.inputPC!=b.inputPC||x.kind!=y.kind||
+        x.sourceScreen!=y.sourceScreen||x.sourcePage!=y.sourcePage||x.targetScreen!=y.targetScreen||
+        x.targetPage!=y.targetPage||x.sourcePC!=y.sourcePC||a.profileChanges.count!=b.profileChanges.count||
+        a.profileChanges.count>a.profileChanges.values.size())return false;
+    for(std::size_t i=0;i<a.profileChanges.count;++i){const auto& p=a.profileChanges.values[i];const auto& q=b.profileChanges.values[i];
+        if(p.field!=q.field||p.operation!=q.operation||p.value!=q.value||p.replaceMask!=q.replaceMask||p.sourcePC!=q.sourcePC)return false;
+    }
+    return true;
+}
 }
 void resetOriginalUiOptionsProfileFields50KG(OriginalUiOptionsProfile50KG& profile) noexcept {
     profile.savedSlot6E4=1; //186660 li v0,1;186668 sw v0,+6E4
@@ -26,6 +40,10 @@ struct OriginalUiOptionsSession50KG::Storage {
     OriginalUiOptionsSessionSnapshot50KG state;
     Diagnostic callbackFault;
     game::OriginalUiRouteDecision50KG pendingBack{};
+    game::OriginalUiGameSettingsProfile50KG pendingGameProfile{};
+    game::OriginalUiGameSettings50KG pendingGameLocal{};
+    std::uint64_t pendingSoundRevision=0;
+    bool pendingAcceptCommitted=false;
     std::uint64_t proposalSerial=0;
     bool dependenciesPrepared=false,inOperation=false,rendering=false,paused=false,updatePrepared=false;
     OriginalUiMainSessionUpdate50KG preparedUpdate{};
@@ -41,6 +59,38 @@ struct OriginalUiOptionsSession50KG::Storage {
     bool idleInput() const noexcept {const auto t=transition();return currentPage()&&t.lifecycle==game::OriginalUiTransitionLifecycle50KG::idle&&
         t.phase==game::OriginalUiTransitionPhase50KG::none&&!t.initialRestartPending&&t.requested.screen==12&&t.requested.page==t.current.page&&!t.applicationRequestQueued&&state.pageShown&&state.inputContainerShown&&
         activeAperture().snapshot().inputEnabled268&&activeAperture().snapshot().state==game::OriginalUiApertureState50KG::open;}
+    bool canApplyGameOptions(std::uint32_t mode) const noexcept {
+        return cold.gameSettingsProfile&&game::validOriginalUiGameSettingsProfile50KG(*cold.gameSettingsProfile)&&
+            cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&cold.audio&&cold.soundMode&&
+            cold.audio->soundModeOwner50KG()==cold.soundMode.get()&&cold.soundMode->ready()&&
+            game::validOriginalSoundModeFields50KG(cold.soundMode->fields())&&
+            static_cast<std::uint32_t>(cold.soundMode->fields().profile1101C)==cold.gameSettingsProfile->soundMode1101C&&
+            cold.audio->canApplySoundMode18874050KG(mode)&&cold.audio->canPlayGameOptionsEffect(1)&&
+            state.gameOptionsAcceptCount!=std::numeric_limits<std::uint64_t>::max();
+    }
+    bool pendingAcceptCurrent() const noexcept {
+        const auto* page=cold.resources->widgets()->gameOptionsState();
+        return !pendingAcceptCommitted&&page&&page->loaded&&
+            game::sameOriginalUiGameSettings50KG(page->local,pendingGameLocal)&&
+            canApplyGameOptions(pendingGameLocal.soundMode)&&
+            game::sameOriginalUiGameSettingsProfile50KG(*cold.gameSettingsProfile,pendingGameProfile)&&
+            cold.soundMode->revision()==pendingSoundRevision;
+    }
+    bool acceptedGameSettingsCurrent() const noexcept {
+        if(!pendingAcceptCommitted||!cold.gameSettingsProfile||!cold.soundMode||!cold.audio||
+            cold.audio->soundModeOwner50KG()!=cold.soundMode.get()||
+            cold.soundMode->revision()!=pendingSoundRevision+1||
+            !game::validOriginalSoundModeFields50KG(cold.soundMode->fields())||
+            static_cast<std::uint32_t>(cold.soundMode->fields().profile1101C)!=pendingGameLocal.soundMode)return false;
+        auto expected=pendingGameProfile;expected.soundMode1101C=pendingGameLocal.soundMode;
+        expected.volume11020=pendingGameLocal.volume;expected.savedGroup6E8=pendingBack.selectedSlot;
+        expected.flags11050=static_cast<std::uint8_t>((expected.flags11050&~7u)|
+            (pendingGameLocal.autoSave?1u:0u)|(pendingGameLocal.verticalSplit?2u:0u)|(pendingGameLocal.vibration?4u:0u));
+        const auto* page=cold.resources->widgets()->gameOptionsState();
+        return page&&page->loaded&&game::sameOriginalUiGameSettings50KG(page->local,pendingGameLocal)&&
+            game::sameOriginalUiGameSettingsProfile50KG(*cold.gameSettingsProfile,expected)&&
+            cold.audio->canPlayGameOptionsEffect(1);
+    }
     void widgetPhase(Phase p,std::uint32_t pc,std::uint8_t page=0) noexcept {
         if(!page)page=activePage();
         if(page==4){if(!ownsPage(4)){fault(Status::unsupportedState,pc);return;}
@@ -166,7 +216,7 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
     d={};receipt={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
     if(s->state.faulted)return result(d,Status::faulted);if(s->state.quitRequested)return result(d,Status::quit);
     if(s->inOperation||s->updatePrepared||in.controller>1||in.originalInput>15)return result(d,Status::invalidInput);
-    s->state.framePublished=false;s->state.backProposalPending=false;receipt.sourceLifecycle=s->transition();
+    s->state.framePublished=false;s->state.backProposalPending=false;s->pendingAcceptCommitted=false;receipt.sourceLifecycle=s->transition();
     receipt.containerReached=s->currentPage()&&s->state.pageShown&&s->state.inputContainerShown;
     if(!receipt.containerReached||!s->activeAperture().snapshot().inputEnabled268)return result(d,Status::noChange);
     if(s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState,0x267BE0);
@@ -175,7 +225,18 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
         const auto ws=s->bank().gameOptionsInput(in.controller,static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),true,true,receipt.gameOptions,d.widget);
         receipt.pageAccepted=receipt.gameOptions.pageAccepted;Status status=Status::noChange;
         if(!widgetOkay(ws)&&ws!=WidgetStatus::unavailable){s->fault(Status::widget,0x1F50F0);status=Status::widget;}
-        else if(receipt.gameOptions.intent==game::OriginalUiGameOptionsIntent50KG::cancel&&s->idleInput()){
+        else if(receipt.gameOptions.intent==game::OriginalUiGameOptionsIntent50KG::accept&&s->idleInput()&&
+            s->canApplyGameOptions(receipt.gameOptions.state.local.soundMode)){
+            game::OriginalUiRouteDecision50KG route;
+            if(!game::describeOriginalUiGameOptionsAccept50KG(receipt.gameOptions.state.local,
+                receipt.gameOptions.rememberedGroup6E8,route))status=Status::unavailableDestination;
+            else{
+                s->pendingGameProfile=*s->cold.gameSettingsProfile;s->pendingGameLocal=receipt.gameOptions.state.local;
+                s->pendingSoundRevision=s->cold.soundMode->revision();
+                s->pendingBack=route;s->state.backProposalPending=true;++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;
+                receipt.routeProposal={this,s->proposalSerial,route};status=Status::pageProposed;
+            }
+        }else if(receipt.gameOptions.intent==game::OriginalUiGameOptionsIntent50KG::cancel&&s->idleInput()){
             game::OriginalUiRouteDecision50KG route;route.inputPC=0x1F50F0;route.profileProposalComplete=true;
             route.action=game::OriginalUiRouteAction50KG::unavailable;
             route.blockers=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner);
@@ -224,7 +285,7 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
 bool OriginalUiOptionsSession50KG::routeProposalCurrent(const OriginalUiOptionsRouteProposal50KG& proposal) const noexcept {
     const auto& decision=proposal.decision;
     const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||!s->idleInput()||proposal.source!=this||!proposal.serial||proposal.serial!=s->proposalSerial)return false;
-    const auto& expected=s->pendingBack;const auto& a=decision.request;const auto& b=expected.request;
+    const auto& expected=s->pendingBack;
     const auto* nav=expected.request.sourcePage==4?&s->cold.resources->widgets()->gameOptionsState()->navigation:s->cold.resources->widgets()->navigation();
     const bool selection=expected.request.sourcePage==4?
         (s->ownsPage(4)&&nav&&nav->controllerGroup[0]==expected.selectedSlot):
@@ -232,38 +293,62 @@ bool OriginalUiOptionsSession50KG::routeProposalCurrent(const OriginalUiOptionsR
     if(!s->cold.profile->known||!s->cold.commonProfile->known||!s->cold.application->known||
         (s->cold.application->globalFlags228&4u)||s->cold.application->transportE00!=-1||
         !selection||s->activePage()!=expected.request.sourcePage||
-        decision.inputPC!=expected.inputPC||decision.selectedSlot!=expected.selectedSlot||decision.selectedRider!=expected.selectedRider||
-        a.kind!=b.kind||a.sourceScreen!=b.sourceScreen||a.sourcePage!=b.sourcePage||a.targetScreen!=b.targetScreen||a.targetPage!=b.targetPage||a.sourcePC!=b.sourcePC||
-        decision.admitted!=expected.admitted||decision.blockers!=expected.blockers||decision.action!=expected.action||
-        !decision.profileProposalComplete||decision.profileChanges.count!=expected.profileChanges.count)return false;
-    for(std::size_t i=0;i<decision.profileChanges.count;++i){const auto& x=decision.profileChanges.values[i];const auto& y=expected.profileChanges.values[i];
-        if(x.field!=y.field||x.operation!=y.operation||x.value!=y.value||x.replaceMask!=y.replaceMask||x.sourcePC!=y.sourcePC)return false;}
-    return true;
+        !decision.profileProposalComplete||!sameDecision(decision,expected))return false;
+    return !game::originalUiGameOptionsAcceptShape50KG(expected)||s->pendingAcceptCurrent();
+}
+bool OriginalUiOptionsSession50KG::commitGameOptionsAccept(const OriginalUiOptionsRouteProposal50KG& proposal,
+    const game::OriginalUiRouteDecision50KG& admitted) noexcept {
+    auto* s=storage_.get();
+    if(!s||!routeProposalCurrent(proposal)||!game::originalUiGameOptionsAcceptShape50KG(proposal.decision)||
+        !game::originalUiGameOptionsAcceptShape50KG(admitted)||!admitted.admitted||admitted.blockers||
+        admitted.action!=game::OriginalUiRouteAction50KG::request||!s->ownsPage(1))return false;
+    auto original=admitted;original.admitted=false;original.action=game::OriginalUiRouteAction50KG::unavailable;
+    original.blockers=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner);
+    if(!sameDecision(original,proposal.decision)||!s->pendingAcceptCurrent())return false;
+    // Full preflight above. All owners are main-thread-only; no callback,
+    // allocation, queue operation or other fallible work may be inserted here.
+    auto& profile=*s->cold.gameSettingsProfile;const auto& local=s->pendingGameLocal;
+    profile.flags11050=static_cast<std::uint8_t>((profile.flags11050&~1u)|(local.autoSave?1u:0u)); //1F672C
+    profile.soundMode1101C=local.soundMode; //1F6744
+    profile.volume11020[0]=local.volume[0]; //1F6760
+    profile.volume11020[1]=local.volume[1]; //1F677C
+    profile.volume11020[2]=local.volume[2]; //1F6798
+    profile.volume11020[3]=local.volume[3]; //1F67B4
+    profile.flags11050=static_cast<std::uint8_t>((profile.flags11050&~2u)|(local.verticalSplit?2u:0u)); //1F67EC
+    profile.flags11050=static_cast<std::uint8_t>((profile.flags11050&~4u)|(local.vibration?4u:0u)); //1F6824
+    if(!s->cold.audio->applySoundMode18874050KG(profile.soundMode1101C)){
+        // The concrete setter can reject only before its own mutation. This
+        // defensive restore preserves all owners if the preflight contract is
+        // ever broken; no callback can observe these temporary profile stores.
+        profile=s->pendingGameProfile;return false;
+    }
+    profile.savedGroup6E8=proposal.decision.selectedSlot; //1F5158, AFTER188740
+    s->pendingAcceptCommitted=true;++s->state.gameOptionsAcceptCount;
+    s->state.lastGameOptionsSoundRevision=s->cold.soundMode->revision();
+    return true; // Actual manager request follows, then SELECT1/flush.
 }
 Status OriginalUiOptionsSession50KG::notifyRouteAccepted(const OriginalUiOptionsRouteProposal50KG& proposal,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
     if(!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||proposal.source!=this||
         !proposal.serial||proposal.serial!=s->proposalSerial)return result(d,Status::invalidInput);
     const auto& decision=proposal.decision;const auto& pending=s->pendingBack;
-    const auto& r=decision.request;const auto& expected=pending.request;
-    if(decision.admitted!=pending.admitted||decision.profileProposalComplete!=pending.profileProposalComplete||
-        decision.blockers!=pending.blockers||decision.action!=pending.action||r.kind!=expected.kind||
-        r.sourceScreen!=expected.sourceScreen||r.sourcePage!=expected.sourcePage||r.targetScreen!=expected.targetScreen||
-        r.targetPage!=expected.targetPage||r.sourcePC!=expected.sourcePC||decision.inputPC!=pending.inputPC||
-        decision.selectedSlot!=pending.selectedSlot||decision.selectedRider!=pending.selectedRider||decision.profileChanges.count!=1)
-        return result(d,Status::invalidInput);
-    const auto& p=decision.profileChanges.values[0];const auto& e=pending.profileChanges.values[0];
-    if(p.field!=e.field||p.operation!=e.operation||p.value!=e.value||p.replaceMask!=e.replaceMask||p.sourcePC!=e.sourcePC)return result(d,Status::invalidInput);
-    const bool cancel=r.sourcePage==4;const bool sameScreen=r.kind==game::OriginalUiRouteKind50KG::changePage;
-    const bool shape=cancel?(sameScreen&&r.sourceScreen==12&&r.targetScreen==12&&r.targetPage==1&&r.sourcePC==0x1F51D8&&
+    const auto& r=decision.request;
+    if(!sameDecision(decision,pending))return result(d,Status::invalidInput);
+    const bool accept=game::originalUiGameOptionsAcceptShape50KG(decision);
+    if(!accept&&decision.profileChanges.count!=1)return result(d,Status::invalidInput);
+    const auto& p=decision.profileChanges.values[accept?8:0];
+    const bool gamePage=r.sourcePage==4;const bool cancel=gamePage&&!accept;
+    const bool sameScreen=r.kind==game::OriginalUiRouteKind50KG::changePage;
+    const bool shape=accept||(cancel?(sameScreen&&r.sourceScreen==12&&r.targetScreen==12&&r.targetPage==1&&r.sourcePC==0x1F51D8&&
         decision.inputPC==0x1F50F0&&p.field==game::OriginalUiProfileField50KG::optionsGroup6E8&&p.sourcePC==0x1F51C8):
         (r.sourceScreen==12&&r.sourcePage==1&&p.field==game::OriginalUiProfileField50KG::optionsSlot6E4&&
          ((sameScreen&&r.targetScreen==12&&r.targetPage==4&&decision.selectedSlot==3&&r.sourcePC==0x1F9898&&p.sourcePC==0x1F9940)||
-          (!sameScreen&&r.targetScreen==4&&r.targetPage==1&&r.sourcePC==0x1F99A4&&p.sourcePC==0x1F9994)));
-    const auto t=s->transition();const auto* nav=cancel?&s->bank().gameOptionsState()->navigation:s->bank().navigation();
-    const bool selection=cancel?(s->ownsPage(4)&&nav&&nav->controllerGroup[0]==decision.selectedSlot):
+          (!sameScreen&&r.targetScreen==4&&r.targetPage==1&&r.sourcePC==0x1F99A4&&p.sourcePC==0x1F9994))));
+    const auto t=s->transition();const auto* nav=gamePage?&s->bank().gameOptionsState()->navigation:s->bank().navigation();
+    const bool selection=gamePage?(s->ownsPage(4)&&nav&&nav->controllerGroup[0]==decision.selectedSlot):
         (nav&&nav->controllerGroup[0]==1&&nav->groups[1].selectedSlot==decision.selectedSlot);
-    const bool profile=cancel?(s->cold.gameSettingsProfile&&s->cold.gameSettingsProfile->savedGroup6E8==p.value):s->cold.profile->savedSlot6E4==p.value;
+    const bool profile=accept?s->acceptedGameSettingsCurrent():
+        cancel?(s->cold.gameSettingsProfile&&s->cold.gameSettingsProfile->savedGroup6E8==p.value):s->cold.profile->savedSlot6E4==p.value;
     if(!shape||!selection||!profile||!t.bound||t.current.screen!=12||t.current.page!=r.sourcePage||t.requested.screen!=r.targetScreen||t.requested.page!=r.targetPage||
         t.lifecycle!=(sameScreen?game::OriginalUiTransitionLifecycle50KG::requestPageExit:game::OriginalUiTransitionLifecycle50KG::requestScreenExit)||
         t.phase!=game::OriginalUiTransitionPhase50KG::none||t.applicationRequestQueued||t.initialRestartPending||
@@ -271,6 +356,9 @@ Status OriginalUiOptionsSession50KG::notifyRouteAccepted(const OriginalUiOptions
         (s->cold.application->globalFlags228&4u)||s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState);
     s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;
     const bool okay=s->audioEffect(cancel||!sameScreen?5:1);s->inOperation=false;
+    // Accept1F51A0 reaches267BE0 only after SELECT1F5188. The preflighted
+    // shared transportE00=-1 takes its exact no-work return. No device drain,
+    // fabricated active-transport success or extra PCM advance is substituted.
     if(!okay){d=s->callbackFault;return d.status;}return result(d,Status::ok);
 }
 Status OriginalUiOptionsSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG& in,Diagnostic& d) noexcept {

@@ -82,8 +82,9 @@ struct Application {
         materialRuntime={true,false}; // Process-owned fresh native normal-material mode.
         std::cerr<<"ORIGINAL MAIN ONLY: fresh native profile/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
-            <<"; Main audio="<<audio<<". Main, Options menu and Game Options edit/Cancel routing is wired; "
-            "Game Options Accept, Rider/Course/Gallery and other Options subpages are unavailable. "
+            <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
+            "Accept requires enabled concrete audio and commits process-owned settings. "
+            "Rider/Course/Gallery and other Options subpages are unavailable. "
             "No gameplay launch or original boot/save parity is claimed.\n";
     }
 };
@@ -182,6 +183,7 @@ struct Frontend {
         cold.runtime=application.materialRuntime;cold.video=video->publication(video);
         cold.profile=application.profile;cold.application=application.state;
         cold.optionsProfile=application.optionsProfile;cold.gameSettingsProfile=application.gameSettingsProfile;
+        cold.soundMode=application.soundMode;
         cold.audioMode=application.audioMode;
         cold.textureRequest=textureRequest;
         cold.textureRequest.samplers=nullptr;cold.textureRequest.samplerCount=0;
@@ -323,6 +325,9 @@ struct Frontend {
             <<",\"selected_group\":"<<group<<",\"selected_slot\":"<<slot
             <<",\"saved_slot\":"<<(main?application.profile->savedSlot6E0:application.optionsProfile->savedSlot6E4)
             <<",\"saved_group\":"<<application.gameSettingsProfile->savedGroup6E8
+            <<",\"game_options_accepts\":"<<snapshot.options.gameOptionsAcceptCount
+            <<",\"game_sound_apply_revision\":"<<snapshot.options.lastGameOptionsSoundRevision
+            <<",\"application_sound_revision\":"<<application.soundMode->revision()
             <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount
             <<",\"source_rng\":"<<application.state->rawRandom308030<<",\"fire_serial\":"<<application.state->fireSerial433970
             <<",\"input_shown\":"<<((main?snapshot.main.inputContainerShown:snapshot.options.inputContainerShown)?"true":"false")
@@ -344,16 +349,17 @@ struct Frontend {
             <<",\"audio_device_consumed_frames\":"<<audioInfo.deviceConsumedFrames<<",\"audio_device_queued_frames\":"<<audioInfo.deviceQueuedFrames
             <<",\"audio_device_underrun_frames\":"<<audioInfo.deviceUnderrunFrames<<",\"audio_device_overflow_frames\":"<<audioInfo.deviceOverflowFrames
             <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames;
+        const auto& saved=*application.gameSettingsProfile;
+        std::cerr<<",\"game_profile_sound_mode\":"<<saved.soundMode1101C
+            <<",\"game_profile_volumes\":["<<saved.volume11020[0]<<','<<saved.volume11020[1]<<','<<saved.volume11020[2]<<','<<saved.volume11020[3]<<']'
+            <<",\"game_profile_flags\":"<<unsigned(saved.flags11050);
         if(gameOptions&&gameOptions->loaded){
-            const auto& local=gameOptions->local;const auto& saved=*application.gameSettingsProfile;
+            const auto& local=gameOptions->local;
             std::cerr<<",\"game_local_auto_save\":"<<(local.autoSave?"true":"false")
                 <<",\"game_local_sound_mode\":"<<local.soundMode
                 <<",\"game_local_volumes\":["<<local.volume[0]<<','<<local.volume[1]<<','<<local.volume[2]<<','<<local.volume[3]<<']'
                 <<",\"game_local_vertical_split\":"<<(local.verticalSplit?"true":"false")
-                <<",\"game_local_vibration\":"<<(local.vibration?"true":"false")
-                <<",\"game_profile_sound_mode\":"<<saved.soundMode1101C
-                <<",\"game_profile_volumes\":["<<saved.volume11020[0]<<','<<saved.volume11020[1]<<','<<saved.volume11020[2]<<','<<saved.volume11020[3]<<']'
-                <<",\"game_profile_flags\":"<<unsigned(saved.flags11050);
+                <<",\"game_local_vibration\":"<<(local.vibration?"true":"false");
         }
         std::cerr<<"}\n";
     }

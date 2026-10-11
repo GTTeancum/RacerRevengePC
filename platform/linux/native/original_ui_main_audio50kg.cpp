@@ -207,14 +207,29 @@ bool OriginalUiMainAudio50KG::playOptionsEffect(std::uint32_t originalId) noexce
     const std::size_t clip=originalId==1?1:originalId==3?2:originalId==4?3:originalId==5?5:clips_.size();
     return playEffectClip(clip);
 }
+bool OriginalUiMainAudio50KG::canPlayGameOptionsEffect(std::uint32_t originalId) const noexcept {
+    const std::size_t clip=originalId==1?1:originalId==2?6:originalId==3?2:originalId==4?3:
+        originalId==5?5:originalId==7?4:clips_.size();return canPlayEffectClip(clip);
+}
 bool OriginalUiMainAudio50KG::playGameOptionsEffect(std::uint32_t originalId) noexcept {
     const std::size_t clip=originalId==1?1:originalId==2?6:originalId==3?2:originalId==4?3:
         originalId==5?5:originalId==7?4:clips_.size();return playEffectClip(clip);
 }
-bool OriginalUiMainAudio50KG::playEffectClip(std::size_t clip) noexcept {
+bool OriginalUiMainAudio50KG::canPlayEffectClip(std::size_t clip) const noexcept {
     if (!current() || paused_ || !clip || clip>=clips_.size()) return false;
     const auto voice=firstEffectVoice+clip-1;
-    if (!ownsEffect_[clip-1] && mixer_->active(voice)) return false;
+    if (voice>=mixer_->count() || !AudioMixer50HD::validClip(clips_[clip]) ||
+        (!ownsEffect_[clip-1] && mixer_->active(voice))) return false;
+    if(const auto* mode=mixer_->originalSoundMode50KG()){
+        game::OriginalSoundRouting50KG routing;
+        if(!mode->ready()||!game::projectOriginalSoundRouting26CBA050KG(mode->fields(),0,100,routing)||
+            routing.phaseSelector!=0)return false;
+    }
+    return true;
+}
+bool OriginalUiMainAudio50KG::playEffectClip(std::size_t clip) noexcept {
+    if(!canPlayEffectClip(clip))return false;
+    const auto voice=firstEffectVoice+clip-1;
     // Source233458..233488 performs stop-before-play for flags1, not overlap
     // or suppression of a repeated event. AudioMixer::play restarts at frame0.
     if (ownsEffect_[clip-1]) mixer_->stop(voice);

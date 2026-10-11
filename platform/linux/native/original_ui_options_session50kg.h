@@ -1,6 +1,8 @@
 #pragma once
 #include "original_ui_options_draw_contribution50kg.h"
 #include "original_ui_main_session50kg.h"
+#include "original_sound_mode50kg.h"
+#include "../../../src/game/original_ui_game_options_apply50kg.h"
 namespace rr::platform {
 // The source +6E4 word is separate from Main's +6E0. Import/reset it only from
 // an authenticated profile owner. No implicit default or fabricated save file.
@@ -28,6 +30,9 @@ struct OriginalUiOptionsSessionCold50KG {
     // Optional sole application profile owner for page4 fields. Missing owner
     // keeps that page unavailable; known must come from real profile lifecycle.
     std::shared_ptr<game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
+    // Same process owner attached to audio's actual frontend mixer. Optional;
+    // without that exact concrete attachment, page4 Accept remains closed.
+    std::shared_ptr<OriginalSoundMode50KG> soundMode;
     std::shared_ptr<OriginalUiMainProfile50KG> commonProfile;
     std::shared_ptr<OriginalUiMainApplication50KG> application;
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
@@ -56,13 +61,14 @@ struct OriginalUiOptionsSessionSnapshot50KG {
     bool cameraActive=false,framePublished=false,backProposalPending=false;
     std::uint32_t packedBackground430=0,promptMask42C=0;
     std::uint64_t updateCount=0,renderCount=0;
+    std::uint64_t gameOptionsAcceptCount=0,lastGameOptionsSoundRevision=0;
     game::OriginalUiTransitionSnapshot50KG transition{};
     game::OriginalUiApertureSnapshot50KG aperture{};
     OriginalUiMainSessionAudioReceipt50KG audio{};
     game::OriginalUiMainFireReceipt50KG lastParticleAdvance{},lastFireEmit{};
 };
-// Options menu and bounded Game Options edit/cancel page/scene owner. Page4
-// Accept needs a genuine sound-mode application owner and stays unavailable.
+// Options menu and bounded Game Options page/scene owner. Page4 Accept needs
+// the exact shared profile and actual frontend PCM sound-mode consumer.
 // Pages2/3/5/6 and HOF remain unavailable.
 // Cross-screen admission, sole manager tick, deferred queue consumption and
 // renderer-bank publication belong to the root coordinator, not this page.
@@ -81,8 +87,8 @@ public:
     bool ownsPreparedPage(std::uint8_t page) const noexcept;
     OriginalUiOptionsSessionStatus50KG input(const OriginalUiMainSessionInput50KG&,
         OriginalUiOptionsSessionInputReceipt50KG&,OriginalUiOptionsSessionDiagnostic50KG&) noexcept;
-    // Root admits the concrete destination, commits exact +6E4 or +6E8 from the
-    // proposal in transition.commitRouteSelection, then immediately invokes
+    // Root admits the concrete destination, commits the exact profile proposal
+    // in transition.commitRouteSelection, then immediately invokes
     // notifyRouteAccepted BEFORE ticking. This verifies the real manager's
     // actual screen/page request and profile write, then emits SELECT1 or BACK5
     // once. It writes
@@ -104,6 +110,16 @@ public:
     const OriginalUiNativeDraw50KG* draw() const noexcept;
     void requestQuit() noexcept;
 private:
+    friend class OriginalUiFrontend50KG;
+    // Only the concrete coordinator's manager commit callback may call this,
+    // after destination admission. A holder of a proposal cannot manually
+    // promote its flags and invoke the transaction without that actual manager.
+    // Revalidates both decisions, full profile/local snapshot, sound owner,
+    // mixer epoch/revision and SELECT readiness. No user callback or allocation
+    // occurs between source1F66F0 writes,188740 and group6E8. Manager publishes
+    // its page request immediately after this returns; notify emits SELECT.
+    bool commitGameOptionsAccept(const OriginalUiOptionsRouteProposal50KG&,
+        const game::OriginalUiRouteDecision50KG& admittedDecision) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }
