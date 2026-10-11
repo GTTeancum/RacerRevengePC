@@ -680,12 +680,27 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
         // Propose native binding updates before sealing. Only actual source
         // publication may commit them; a composed or rejected frame is no bind.
         s.pendingHistory=s.history;
+        OriginalUiSourceTerminal50KN terminal{};
         for(const auto index:s.order){const auto leaf=s.bindings[s.packets[index].binding].leaf;
             if(leaf>=s.representatives.size()||s.representatives[leaf]>=s.bindings.size()){
                 s.failed=true;return fail(d,E::schedule);
             }
             const auto& representative=s.bindings[s.representatives[leaf]];
             if(representative.registration>=s.pendingHistory.size()) {s.failed=true;return fail(d,E::schedule);}
+            // The actual nonempty drain sequence selects the representative;
+            // never use the highest registered row or the packet's prototype.
+            const auto& source=*representative.pass;
+            const auto& registration=s.pendingHistory[representative.registration];
+            terminal.canonicalToken=registration.rank;terminal.pass=registration.pass;terminal.leaf=leaf;
+            terminal.registryGeneration=s.registryGeneration;terminal.bankGeneration=s.bankGeneration;
+            for(std::size_t field=0;field<source.gs.fields.size();++field){
+                terminal.constructionFieldSourcePC[field]=source.gs.fields[field].sourcePC;
+                terminal.constructionFieldByteOffset[field]=source.gs.fields[field].byteOffset;
+            }
+            terminal.enabled=source.enabled;terminal.textureCount=source.textureCount;
+            terminal.textureCoordinateIndex=source.textureCoordinateIndex;
+            terminal.lodCalculationMethod=source.lodCalculationMethod;terminal.maximumMipLevel=source.maximumMipLevel;
+            terminal.magFilter=source.magFilter;terminal.minFilter=source.minFilter;terminal.lodL=source.lodL;terminal.lodK=source.lodK;
             if(representative.pass->textureCount){
                 assets::OriginalUiMaterialBindingDiagnostic50KG bindingDetail;
                 // Native spans retain each actual selected ATM frame. The
@@ -695,6 +710,11 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
                 if(!s.pendingHistory[representative.registration].state.recordDrainedBinding(*s.bank,actualImage,bindingDetail)){
                     s.failed=true;return fail(d,E::schedule,bindingDetail.sourcePC);
                 }
+            }
+            // recordDrainedBinding patches effective TEXA for the actual IPUM
+            // image. The copied pass alone is not the final bound source state.
+            if(!s.pendingHistory[representative.registration].state.copyEffectiveGs(terminal.gs)){
+                s.failed=true;return fail(d,E::schedule);
             }
         }
         const auto* data=s.resources->widgets()->selectionData();const auto* page=data?data->page():nullptr;
@@ -712,7 +732,7 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
         s.draw.particleFog=s.orderedFog.data();s.draw.particleFogCount=static_cast<std::uint32_t>(s.orderedFog.size());
         s.draw.opaquePresentationAlphaOnly=false;
         s.finished=true;
-        frame_.native_=&s.draw;frame_.owner_=this;frame_.frameGeneration_=++s.frameGeneration;
+        frame_.native_=&s.draw;frame_.owner_=this;frame_.frameGeneration_=++s.frameGeneration;frame_.terminal_=terminal;
         return true;
     }catch(...){s.failed=true;return fail(d,E::allocation);}
 }
@@ -723,7 +743,7 @@ const OriginalUiSourceFrame50KM* OriginalUiRiderDrawContribution50KG::frame()con
         storage_->registryGeneration==storage_->backend->registryGeneration()&&frame_.native_?&frame_:nullptr;
 }
 void OriginalUiRiderDrawContribution50KG::drain() noexcept {
-    frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;
+    frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;frame_.terminal_={};
     if(!storage_)return;auto& s=*storage_;
     if(s.submissionPending)s.historyPoisoned=true;
     if(s.active)s.backend->endFrame();s.active=false;s.finished=false;s.draw={};s.pendingHistory.clear();

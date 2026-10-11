@@ -509,6 +509,11 @@ struct VehicleWindowDiagnostic50DS {
     // UI-only publication, never a successful native vehicle batch receipt.
     bool hostMenuAccepted = false;
     bool originalUiAccepted = false;
+    // Source acceptance is independent of opaque publication/window-copy failure.
+    // Hidden source work leaves originalUiAccepted false and readback unchanged.
+    bool originalUiSourceAccepted = false;
+    // Source-publication/snapshot sequences only; neither counts host swaps.
+    std::uint64_t originalUiPublicationGeneration = 0,originalUiSnapshotGeneration = 0;
     // Actual selected source path after successful create or for a source
     // submission. Ordinary RGB submissions leave this false.
     bool originalUiCoherentFramebufferFetch = false;
@@ -520,6 +525,37 @@ struct VehicleWindowDiagnostic50DS {
     std::uint32_t opponentRacersDrawn = 0, opponentOpaqueDraws = 0, opponentOpaqueIndices = 0;
     // maxVehicleWindowOpponents50DS denotes no opponent-specific failure.
     std::uint32_t opponentIndex = maxVehicleWindowOpponents50DS;
+};
+
+// Unforgeable renderer-issued value. The live renderer revalidates its weak
+// lifetime and exact target generation on every use; getters are observations,
+// not authority. Current-source receipts do not pin the reusable target: the
+// next source clear or owner retirement invalidates them. Completion is issued
+// only after checked glFinish. Neither
+// type claims a window swap, fresh Main route, observer/effect state, or parity.
+class OriginalUiSourceSubmission50KN final {
+public:
+    std::uint64_t frameGeneration()const noexcept{return frameGeneration_;}
+    std::uint64_t targetGeneration()const noexcept{return targetGeneration_;}
+    std::uint64_t texturePublication()const noexcept{return texturePublication_;}
+    bool completed()const noexcept{return completed_;}
+    const OriginalUiSourceTerminal50KN& terminal()const noexcept{return terminal_;}
+private:
+    friend class VehicleWindowGl50DS;
+    std::weak_ptr<const std::uint8_t> lifetime_;
+    std::uint64_t frameGeneration_=0,targetGeneration_=0,texturePublication_=0;
+    OriginalUiSourceTerminal50KN terminal_{};
+    bool completed_=false;
+};
+class OriginalUiRetainedSource50KN final {
+public:
+    std::uint64_t snapshotGeneration()const noexcept{return snapshotGeneration_;}
+    std::uint64_t publicationGeneration()const noexcept{return publicationGeneration_;}
+    const OriginalUiSourceSubmission50KN& source()const noexcept{return source_;}
+private:
+    friend class VehicleWindowGl50DS;
+    OriginalUiSourceSubmission50KN source_;
+    std::uint64_t snapshotGeneration_=0,publicationGeneration_=0;
 };
 
 // Caller-owned desktop GL >=3.2. Window output requires a double-buffered,
@@ -571,6 +607,40 @@ public:
     bool submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM&, std::int32_t width,
         std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
     bool originalUiSourceRgbaAvailable() const noexcept;
+    // Dormant slice1A. The existing combined submit above remains the default.
+    // Hidden submissions execute the whole sealed source frame and acknowledge
+    // its material history exactly once, without touching opaque publication.
+    // Output must be distinct from inputs. On false no output receipt is issued.
+    bool submitOriginalUiSourceUnpublished(const OriginalUiSourceFrame50KM&,
+        std::int32_t width,std::int32_t height,OriginalUiSourceSubmission50KN&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    // Retrieve the current successfully submitted source, including the source
+    // of a combined normal submit. No GPU completion is inferred here.
+    bool originalUiSourceSubmission(OriginalUiSourceSubmission50KN&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    bool completeOriginalUiSource(const OriginalUiSourceSubmission50KN&,
+        OriginalUiSourceSubmission50KN&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Requires the exact still-current completed source. Copies RGB to the
+    // independent opaque target and (when configured) window BACK buffer.
+    // Caller still owns the real swap. Repeated publication is not a page update.
+    bool publishOriginalUiSource(const OriginalUiSourceSubmission50KN&,
+        std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS&) noexcept;
+    // Retains the last successful renderer-published source BEFORE that source
+    // target is cleared again. Lazily allocates a distinct640x448 RGBA8 texture,
+    // copies all four channels and checks real GPU completion. One immutable
+    // snapshot at a time, preserved across hidden submissions and owner retire.
+    // This is NOT a host-displayed receipt; host swap provenance is still absent.
+    // Failed allocation/copy leaves owned names for explicit release/close retry.
+    bool retainPublishedOriginalUiSource(OriginalUiRetainedSource50KN&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    bool readRetainedOriginalUiSourceRgba(const OriginalUiRetainedSource50KN&,
+        std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS&) noexcept;
+    // Checked completion precedes deletion, including failed snapshot attempts.
+    // Failure retains the unresolved ownership obligation for retry. After a
+    // failed deletion, do not create/reuse GL names in this context (including
+    // through other texture owners) until release or close completes, matching
+    // the renderer's existing conservative failed-close ownership contract.
+    bool releaseRetainedOriginalUiSource(VehicleWindowDiagnostic50DS&) noexcept;
     // Explicit destination-lifetime retirement, while this concrete composer
     // is still alive. Requires the live context/thread and an idle renderer;
     // rejects a different retained owner, drains all preceding GL work even
@@ -624,7 +694,10 @@ public:
 private:
     bool submitOriginalUiImpl(const OriginalUiNativeDraw50KG&, std::int32_t width,
         std::int32_t height, bool sourceRgba, VehicleWindowDiagnostic50DS&,
-        bool* sourceWorkStarted=nullptr) noexcept;
+        bool* sourceWorkStarted=nullptr,bool publishSource=true) noexcept;
+    bool submitOriginalUiSourceFrame(const OriginalUiSourceFrame50KM&,std::int32_t width,
+        std::int32_t height,bool publishSource,VehicleWindowDiagnostic50DS&) noexcept;
+    bool matchesOriginalUiSource(const OriginalUiSourceSubmission50KN&)const noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

@@ -982,6 +982,17 @@ struct VehicleWindowGl50DS::Storage {
     std::uint8_t menuPublished = 0;
     U uiTargets[2]{}, uiColors[2]{}, uiDepths[2]{};
     U uiSourceTarget=0,uiSourceColor=0,uiSourceDepth=0;
+    U uiRetainedTarget=0,uiRetainedColor=0;
+    // The weak receipt identity is allocated only on first explicit slice1A use.
+    // No context ownership is fabricated: every operation still checks current().
+    std::shared_ptr<const std::uint8_t> uiSourceReceiptLifetime;
+    bool uiSourceLeaseWork=false;
+    std::uint64_t uiSourceAcceptedTargetGeneration=0,uiSourceAcceptedTexturePublication=0;
+    std::uint64_t uiSourcePublishedTargetGeneration=0,uiSourcePublicationGeneration=0;
+    std::uint64_t uiSnapshotSerial=0,uiSnapshotGeneration=0;
+    std::uint64_t uiRetainedSourceTargetGeneration=0,uiRetainedPublicationGeneration=0;
+    OriginalUiSourceTerminal50KN uiSourceTerminal{};
+    float uiSourceClear[4]{};
     bool uiSourceCoherentFramebufferFetch=false;
     const OriginalUiRiderDrawContribution50KG* uiSourceFrameOwner=nullptr;
     std::uint64_t uiSourceFrameGeneration=0,uiSourceTargetGeneration=0;
@@ -1470,7 +1481,7 @@ struct VehicleWindowGl50DS::Storage {
             uiSourceIndexBuffer) return true;
         for (U b = 0; b < 2; ++b)
             if (uiTargets[b] || uiColors[b] || uiDepths[b]) return true;
-        if (uiSourceTarget || uiSourceColor || uiSourceDepth) return true;
+        if (uiSourceTarget || uiSourceColor || uiSourceDepth || uiRetainedTarget || uiRetainedColor) return true;
         if (cableVertexBuffer || cableIndexBuffer || cableVertexArray) return true;
         if (trackVertexBuffer || trackIndexBuffer || trackVertexArray || trackNormalBuffer || trackProjectionBuffer) return true;
         if (dynamicWorldIndexBuffer) return true;
@@ -2551,6 +2562,79 @@ void main() { viewerOutput = hudColor; }
         gl.framebufferRenderbuffer(framebuffer, attachment, renderbuffer, name);
         return check("attach private staging renderbuffer");
     }
+    bool ensureUiSourceReceiptLifetime(VehicleWindowDiagnostic50DS& d) noexcept {
+        if (uiSourceReceiptLifetime)return true;
+        try {uiSourceReceiptLifetime=std::make_shared<const std::uint8_t>(0);return true;}
+        catch (...) {return fail(d,VehicleWindowError50DS::allocation,"allocate source receipt lifetime");}
+    }
+    bool createRetainedUiSourceTarget() noexcept {
+        gl.genFramebuffers(1,&uiRetainedTarget);gl.bindFramebuffer(framebuffer,uiRetainedTarget);
+        gl.genTextures(1,&uiRetainedColor);gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,uiRetainedColor);
+        gl.texParameteri(texture2D,0x2801,0x2600);gl.texParameteri(texture2D,0x2800,0x2600);
+        gl.texParameteri(texture2D,0x2802,0x812F);gl.texParameteri(texture2D,0x2803,0x812F);
+        gl.texParameteri(texture2D,0x813C,0);gl.texParameteri(texture2D,0x813D,0);
+        drawGl.bindBuffer(0x88EC,0);
+        gl.texImage2D(texture2D,0,rgba8,640,448,0,0x1908,0x1401,nullptr);
+        if (!check("allocate distinct retained source RGBA8 texture"))return false;
+        if (!uiRetainedTarget || !uiRetainedColor || uiRetainedTarget==uiSourceTarget || uiRetainedColor==uiSourceColor)
+            return fail(*diagnostic,VehicleWindowError50DS::allocation,"retained source names must be distinct");
+        I w=0,h=0,format=0;
+        gl.getTexLevelParameteriv(texture2D,0,0x1000,&w);gl.getTexLevelParameteriv(texture2D,0,0x1001,&h);
+        gl.getTexLevelParameteriv(texture2D,0,0x1003,&format);
+        if (!check("verify retained source texture"))return false;
+        if (w!=640 || h!=448 || format!=static_cast<I>(rgba8))
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"retained source texture storage mismatch");
+        gl.framebufferTexture2D(framebuffer,colorAttachment,texture2D,uiRetainedColor,0);
+        gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+        const U status=gl.checkFramebufferStatus(framebuffer);gl.bindTexture(texture2D,0);
+        if (!check("complete retained source framebuffer"))return false;
+        if (status!=framebufferComplete){diagnostic->framebufferStatus=status;
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"incomplete retained source framebuffer");}
+        return true;
+    }
+    bool publishUiSource(const float* clear,I outputWidth,I outputHeight) noexcept {
+        const auto pending=static_cast<std::uint8_t>(uiPublished^1u);
+        // Only this independent private presentation surface gets alpha1.
+        gl.disable(0x0C11);gl.disable(0x0BE2);gl.disable(0x8DB9);gl.disable(0x0BD0);
+        gl.colorMask(1,1,1,1);
+        gl.bindFramebuffer(framebuffer,uiTargets[pending]);gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+        gl.viewport(0,0,outputWidth,outputHeight);gl.clearColor(clear[0],clear[1],clear[2],1.f);gl.clear(colorBufferBit);
+        const double fit=std::min(double(outputWidth)/640.0,double(outputHeight)/448.0);
+        const I rw=std::max<I>(1,static_cast<I>(std::floor(640.0*fit)));
+        const I rh=std::max<I>(1,static_cast<I>(std::floor(448.0*fit)));
+        const I x=(outputWidth-rw)/2,y=(outputHeight-rh)/2;
+        gl.bindFramebuffer(readFramebuffer,uiSourceTarget);gl.readBuffer(colorAttachment);
+        gl.blitFramebuffer(0,0,640,448,x,y,x+rw,y+rh,colorBufferBit,0x2600);
+        gl.bindFramebuffer(framebuffer,uiTargets[pending]);
+        gl.colorMask(0,0,0,1);gl.clear(colorBufferBit);gl.colorMask(1,1,1,1);
+        const bool copied=check("copy source UI RGB to separate opaque presentation");
+        // Preserve the previous combined path's post-copy baseline, including
+        // a failed opaque copy. Source acceptance/history is already separate.
+        // Headless historically leaves this private UI FBO bound; window
+        // success reaches framebuffer0 through copyToWindow below.
+        gl.disable(0x0C11);gl.disable(0x0BE2);gl.depthMask(1);gl.depthFunc(0x0201);
+        gl.colorMask(1,1,1,1);gl.clearDepth(1.0);
+        drawGl.bindVertexArray(0);drawGl.bindBuffer(arrayBuffer,0);
+        const bool restored=check("finish source publication baseline");
+        if (!copied || !restored)return false;
+        uiPublished=pending;displayedTarget=uiTargets[pending];
+        width=committedWidth=outputWidth;height=committedHeight=outputHeight;
+        imageCommitted=true;diagnostic->originalUiAccepted=true;
+        // Private publication may survive a failed window copy, as before.
+        // Such a partial window operation must not mint a retained publication.
+        uiSourcePublishedTargetGeneration=0;
+        bool accepted=true;
+        if (request.output==VehicleWindowOutput50DS::defaultBackBuffer){
+            accepted=copyToWindow();
+            if (!accepted && diagnostic->error==VehicleWindowError50DS::gl)
+                diagnostic->error=VehicleWindowError50DS::presentation;
+        }
+        if (accepted){
+            uiSourcePublishedTargetGeneration=uiSourceTargetGeneration;
+            diagnostic->originalUiPublicationGeneration=++uiSourcePublicationGeneration;
+        }
+        return accepted;
+    }
     bool createOriginalUiSourceTarget() noexcept {
         if (!request.enableOriginalUiSourceRgba)return true;
         I textureLimit=0;gl.getIntegerv(0x0D33,&textureLimit);
@@ -3424,6 +3508,7 @@ void main() { viewerOutput = hudColor; }
         s.committedWidth = s.width; s.committedHeight = s.height;
         s.raceWidth = s.width; s.raceHeight = s.height;
         s.displayedTarget = s.targets[bank];
+        s.uiSourcePublishedTargetGeneration=0;
         s.imageCommitted = true; s.active = false;
         return true;
     }
@@ -3445,9 +3530,10 @@ void main() { viewerOutput = hudColor; }
         gl.bindFramebuffer(framebuffer, 0);
         return check("restore default framebuffer bindings");
     }
-    bool copyRgba(std::uint8_t* destination) noexcept {
+    bool copyRgba(std::uint8_t* destination,U target=0,I readWidth=0,I readHeight=0) noexcept {
+        if (!target){target=displayedTarget;readWidth=committedWidth;readHeight=committedHeight;}
         if (!check("before committed RGBA readback")) return false;
-        gl.bindFramebuffer(readFramebuffer, displayedTarget);
+        gl.bindFramebuffer(readFramebuffer,target);
         gl.readBuffer(colorAttachment);
         // A caller pointer must never be interpreted as an offset into a PBO.
         // Explicit pack state keeps all writes inside the validated tight extent.
@@ -3469,7 +3555,7 @@ void main() { viewerOutput = hudColor; }
                 "committed readback framebuffer is incomplete");
         }
         diagnostic->readbackBufferMayBeModified = true;
-        gl.readPixels(0, 0, committedWidth, committedHeight, rgba, unsignedByte, destination);
+        gl.readPixels(0,0,readWidth,readHeight,rgba,unsignedByte,destination);
         return check("read committed viewport RGBA bytes");
     }
     bool drainCleanupErrors(VehicleWindowDiagnostic50DS& d) noexcept {
@@ -3516,6 +3602,15 @@ void main() { viewerOutput = hudColor; }
             d.cleanupIncomplete = true;
             return fail(d, VehicleWindowError50DS::cleanup, "GL error state will not clear for cleanup");
         }
+        // Explicit slice1A leases add a real completion obligation. Never
+        // confuse a CPU generation increment or deferred GL deletion with it.
+        if (uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor){
+            gl.finish();const U error=drawGl.getError();
+            if (error){if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
+                return fail(d,VehicleWindowError50DS::cleanup,"complete source leases before cleanup");}
+            uiSourceLeaseWork=false;
+        }
+        uiSourceReceiptLifetime.reset();uiSnapshotGeneration=0;
         gl.useProgram(0); drawGl.bindVertexArray(0); drawGl.bindBuffer(arrayBuffer, 0);
         gl.bindFramebuffer(framebuffer, 0); gl.bindRenderbuffer(renderbuffer, 0);
         if (usesTextures()) {
@@ -3555,6 +3650,8 @@ void main() { viewerOutput = hudColor; }
                 if (!deleteName(uiTargets[b], gl.deleteFramebuffers, d) ||
                     !deleteName(uiColors[b], gl.deleteRenderbuffers, d) ||
                     !deleteName(uiDepths[b], gl.deleteRenderbuffers, d)) goto incomplete;
+            if (!deleteName(uiRetainedTarget,gl.deleteFramebuffers,d) ||
+                !deleteName(uiRetainedColor,gl.deleteTextures,d))goto incomplete;
             if (!deleteName(uiSourceTarget,gl.deleteFramebuffers,d) ||
                 !deleteName(uiSourceColor,gl.deleteTextures,d) ||
                 !deleteName(uiSourceDepth,gl.deleteRenderbuffers,d))goto incomplete;
@@ -3907,29 +4004,193 @@ bool VehicleWindowGl50DS::originalUiSourceRgbaAvailable() const noexcept {
 }
 bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM& frame,
     std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d) noexcept {
+    return submitOriginalUiSourceFrame(frame,width,height,true,d);
+}
+bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFrame50KM& frame,
+    std::int32_t width,std::int32_t height,bool publishSource,VehicleWindowDiagnostic50DS& d) noexcept {
     d={};
     if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;
     if (!frame.native_ || !frame.owner_ || !frame.frameGeneration_ ||
         (s.uiSourceFrameOwner && frame.owner_!=s.uiSourceFrameOwner) ||
         (frame.owner_==s.uiSourceFrameOwner && frame.frameGeneration_<=s.uiSourceFrameGeneration) ||
-        s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max())
+        s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max() ||
+        (publishSource && s.uiSourcePublicationGeneration==std::numeric_limits<std::uint64_t>::max()))
         return fail(d,VehicleWindowError50DS::frame,"unsealed or stale complete Rider frame");
     if (!frame.owner_->beginSourceSubmission(frame.frameGeneration_))
         return fail(d,VehicleWindowError50DS::frame,"Rider source binding-history receipt rejected");
     bool sourceWorkStarted=false;
     const auto sourceTargetBefore=s.uiSourceTargetGeneration;
-    const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted);
-    frame.owner_->finishSourceSubmission(frame.frameGeneration_,d.originalUiAccepted,sourceWorkStarted);
+    const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted,publishSource);
+    frame.owner_->finishSourceSubmission(frame.frameGeneration_,d.originalUiSourceAccepted,sourceWorkStarted);
     d.originalUiSourceFrameGeneration=frame.frameGeneration_;
     d.originalUiSourceTargetGeneration=s.uiSourceTargetGeneration;
     // Keep the attempted owner borrowed after any potentially partial source
     // work. Only explicit successful retirement may release that lifetime.
-    if (sourceWorkStarted || d.originalUiAccepted || s.uiSourceTargetGeneration!=sourceTargetBefore)
+    if (sourceWorkStarted || d.originalUiSourceAccepted || s.uiSourceTargetGeneration!=sourceTargetBefore)
         s.uiSourceFrameOwner=frame.owner_;
-    // A private publication stays committed even if its later window copy fails.
-    if (d.originalUiAccepted)s.uiSourceFrameGeneration=frame.frameGeneration_;
+    // Only the actual successful complete source drain seals these values.
+    // A later opaque copy failure does not undo a completed material bind.
+    if (d.originalUiSourceAccepted){
+        s.uiSourceFrameGeneration=frame.frameGeneration_;
+        s.uiSourceAcceptedTargetGeneration=s.uiSourceTargetGeneration;
+        s.uiSourceAcceptedTexturePublication=frame.native_->draw.texturePublication;
+        s.uiSourceTerminal=frame.terminal_;
+        for(unsigned i=0;i<4;++i)s.uiSourceClear[i]=frame.native_->draw.clearRgba[i];
+    }
     return accepted;
+}
+bool VehicleWindowGl50DS::matchesOriginalUiSource(const OriginalUiSourceSubmission50KN& receipt)const noexcept {
+    if (!storage_)return false;const auto& s=*storage_;
+    const auto lifetime=receipt.lifetime_.lock();
+    return lifetime && lifetime==s.uiSourceReceiptLifetime && receipt.targetGeneration_ &&
+        receipt.targetGeneration_==s.uiSourceTargetGeneration &&
+        receipt.targetGeneration_==s.uiSourceAcceptedTargetGeneration &&
+        receipt.frameGeneration_==s.uiSourceFrameGeneration &&
+        receipt.texturePublication_==s.uiSourceAcceptedTexturePublication;
+}
+bool VehicleWindowGl50DS::originalUiSourceSubmission(OriginalUiSourceSubmission50KN& receipt,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    receipt={};d={};
+    if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !s.uiSourceFrameOwner || !s.uiSourceFrameGeneration ||
+        !s.uiSourceAcceptedTargetGeneration || s.uiSourceAcceptedTargetGeneration!=s.uiSourceTargetGeneration)
+        return fail(d,VehicleWindowError50DS::frame,"no current accepted source drain for receipt");
+    if(!s.ensureUiSourceReceiptLifetime(d))return false;
+    receipt.lifetime_=s.uiSourceReceiptLifetime;receipt.frameGeneration_=s.uiSourceFrameGeneration;
+    receipt.targetGeneration_=s.uiSourceAcceptedTargetGeneration;receipt.texturePublication_=s.uiSourceAcceptedTexturePublication;
+    receipt.terminal_=s.uiSourceTerminal;s.uiSourceLeaseWork=true;
+    d.originalUiSourceAccepted=true;d.originalUiSourceFrameGeneration=receipt.frameGeneration_;
+    d.originalUiSourceTargetGeneration=receipt.targetGeneration_;return true;
+}
+bool VehicleWindowGl50DS::submitOriginalUiSourceUnpublished(const OriginalUiSourceFrame50KM& frame,
+    std::int32_t width,std::int32_t height,OriginalUiSourceSubmission50KN& receipt,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    receipt={};d={};
+    if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;
+    if(!s.current(d) || !s.ensureUiSourceReceiptLifetime(d))return false;
+    s.uiSourceLeaseWork=true;
+    if(!submitOriginalUiSourceFrame(frame,width,height,false,d))return false;
+    VehicleWindowDiagnostic50DS receiptDiagnostic;
+    if(!originalUiSourceSubmission(receipt,receiptDiagnostic)){d=receiptDiagnostic;return false;}
+    return true;
+}
+bool VehicleWindowGl50DS::completeOriginalUiSource(const OriginalUiSourceSubmission50KN& input,
+    OriginalUiSourceSubmission50KN& completed,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(&input==&completed)return fail(d,VehicleWindowError50DS::request,"source completion input and output must be distinct");
+    completed={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !matchesOriginalUiSource(input))
+        return fail(d,VehicleWindowError50DS::frame,"source completion requires the exact current accepted target");
+    s.diagnostic=&d;bool accepted=s.check("before explicit source completion");
+    if(accepted){s.gl.finish();accepted=s.check("complete exact source target work");}
+    s.diagnostic=nullptr;
+    if(accepted){completed=input;completed.completed_=true;d.submittedWorkCompleted=true;
+        d.originalUiSourceAccepted=true;d.originalUiSourceFrameGeneration=input.frameGeneration_;
+        d.originalUiSourceTargetGeneration=input.targetGeneration_;}
+    return accepted;
+}
+bool VehicleWindowGl50DS::publishOriginalUiSource(const OriginalUiSourceSubmission50KN& source,
+    std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !source.completed_ || !matchesOriginalUiSource(source) ||
+        width<=0 || height<=0 || width>s.maximumWidth || height>s.maximumHeight ||
+        s.uiSourcePublicationGeneration==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,"source publication requires exact completed target and bounded viewport");
+    s.diagnostic=&d;
+    bool accepted=s.check("before separate source publication") &&
+        (s.request.output==VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
+    if(accepted)accepted=s.publishUiSource(s.uiSourceClear,width,height);
+    s.diagnostic=nullptr;
+    d.originalUiSourceAccepted=true;d.originalUiSourceFrameGeneration=source.frameGeneration_;
+    d.originalUiSourceTargetGeneration=source.targetGeneration_;
+    return accepted;
+}
+bool VehicleWindowGl50DS::retainPublishedOriginalUiSource(OriginalUiRetainedSource50KN& retained,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    retained={};d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || s.uiRetainedTarget || s.uiRetainedColor ||
+        !s.uiSourcePublishedTargetGeneration || s.uiSourcePublishedTargetGeneration!=s.uiSourceAcceptedTargetGeneration ||
+        s.uiSourcePublishedTargetGeneration!=s.uiSourceTargetGeneration ||
+        !s.imageCommitted || s.displayedTarget!=s.uiTargets[s.uiPublished] ||
+        s.uiSnapshotSerial==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,"retain requires the current successful source publication and no prior snapshot");
+    OriginalUiSourceSubmission50KN source;
+    if(!originalUiSourceSubmission(source,d))return false;
+    s.diagnostic=&d;bool accepted=s.check("before retaining renderer-published source RGBA");
+    if(accepted)accepted=s.createRetainedUiSourceTarget();
+    if(accepted){
+        // Blit all four raw channels before any later ordinary source clear.
+        // Scissor must not crop the source rightmost column or bottom row.
+        ++s.uiSnapshotSerial;s.gl.disable(0x0C11);s.gl.disable(0x8DB9);
+        s.gl.bindFramebuffer(readFramebuffer,s.uiSourceTarget);s.gl.readBuffer(colorAttachment);
+        s.gl.bindFramebuffer(drawFramebuffer,s.uiRetainedTarget);s.gl.drawBuffer(colorAttachment);
+        s.gl.blitFramebuffer(0,0,640,448,0,0,640,448,colorBufferBit,0x2600);
+        accepted=s.check("copy immutable retained source RGBA");
+    }
+    if(accepted){s.gl.finish();accepted=s.check("complete retained source RGBA copy");}
+    // Failed attempts keep every unresolved name; release/close owns retirement.
+    // No partial snapshot or fabricated completion receipt is published.
+    if(accepted){
+        s.gl.bindFramebuffer(framebuffer,0);accepted=s.check("finish retained source copy bindings");
+    }
+    if(accepted){
+        s.uiSnapshotGeneration=s.uiSnapshotSerial;s.uiRetainedSourceTargetGeneration=source.targetGeneration_;
+        s.uiRetainedPublicationGeneration=s.uiSourcePublicationGeneration;
+        source.completed_=true;retained.source_=source;retained.snapshotGeneration_=s.uiSnapshotGeneration;
+        retained.publicationGeneration_=s.uiRetainedPublicationGeneration;
+        d.submittedWorkCompleted=true;d.originalUiSnapshotGeneration=s.uiSnapshotGeneration;
+        d.originalUiPublicationGeneration=s.uiRetainedPublicationGeneration;
+    }
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::readRetainedOriginalUiSourceRgba(const OriginalUiRetainedSource50KN& retained,
+    std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    const auto lifetime=retained.source_.lifetime_.lock();
+    if(s.active || s.frameSet || s.diagnostic || !lifetime || lifetime!=s.uiSourceReceiptLifetime ||
+        !retained.snapshotGeneration_ || retained.snapshotGeneration_!=s.uiSnapshotGeneration ||
+        retained.publicationGeneration_!=s.uiRetainedPublicationGeneration ||
+        retained.source_.targetGeneration_!=s.uiRetainedSourceTargetGeneration ||
+        !s.uiRetainedTarget || !s.uiRetainedColor)
+        return fail(d,VehicleWindowError50DS::frame,"retained source readback requires its exact live immutable snapshot");
+    d.readbackWidth=640;d.readbackHeight=448;d.readbackBytes=std::size_t(640)*448*4;
+    if(!rgba || capacityBytes<d.readbackBytes)
+        return fail(d,VehicleWindowError50DS::readback,"retained RGBA readback requires full640x448 destination");
+    s.diagnostic=&d;const bool accepted=s.copyRgba(rgba,s.uiRetainedTarget,640,448);s.diagnostic=nullptr;
+    d.originalUiSnapshotGeneration=retained.snapshotGeneration_;return accepted;
+}
+bool VehicleWindowGl50DS::releaseRetainedOriginalUiSource(VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"retained source release requires idle renderer");
+    if(!s.uiRetainedTarget && !s.uiRetainedColor)return true;
+    s.diagnostic=&d;
+    bool accepted=s.check("before retained source retirement");
+    if(accepted){s.gl.finish();accepted=s.check("complete retained source work before deletion");}
+    if(accepted){
+        d.submittedWorkCompleted=true;s.uiSnapshotGeneration=0;
+        s.gl.bindFramebuffer(framebuffer,0);s.gl.activeTexture(textureUnit0);s.gl.bindTexture(texture2D,0);
+        accepted=s.check("unbind retained source before deletion");
+        if(accepted)accepted=s.deleteName(s.uiRetainedTarget,s.gl.deleteFramebuffers,d) &&
+            s.deleteName(s.uiRetainedColor,s.gl.deleteTextures,d);
+        if(!accepted && d.error==VehicleWindowError50DS::none)
+            fail(d,VehicleWindowError50DS::cleanup,"retained source deletion requires retry");
+        if(accepted){s.uiRetainedSourceTargetGeneration=0;s.uiRetainedPublicationGeneration=0;}
+    }
+    s.diagnostic=nullptr;return accepted;
 }
 bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
     const OriginalUiRiderDrawContribution50KG& owner,VehicleWindowDiagnostic50DS& d) noexcept {
@@ -3948,13 +4209,14 @@ bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
         accepted=s.check("drain prior GL work before source UI owner retirement");
     }
     d.submittedWorkCompleted=accepted;
-    if (accepted){s.uiSourceFrameOwner=nullptr;s.uiSourceFrameGeneration=0;}
+    if (accepted){s.uiSourceFrameOwner=nullptr;s.uiSourceFrameGeneration=0;
+        s.uiSourceAcceptedTargetGeneration=0;s.uiSourcePublishedTargetGeneration=0;}
     s.diagnostic=nullptr;
     return accepted;
 }
 bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& native,
     std::int32_t width,std::int32_t height,bool sourceRgba,VehicleWindowDiagnostic50DS& d,
-    bool* sourceWorkStarted) noexcept {
+    bool* sourceWorkStarted,bool publishSource) noexcept {
     d = {};
     if(sourceWorkStarted)*sourceWorkStarted=false;
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
@@ -4134,7 +4396,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
 
     s.diagnostic = &d;
     bool accepted = s.check("before original UI submission") &&
-        (s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
+        ((sourceRgba && !publishSource) || s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
     const auto pending = static_cast<std::uint8_t>(s.uiPublished ^ 1u);
     if (accepted) {
         // Sampler zero exposes the immutable published texture parameters.
@@ -4195,7 +4457,9 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.gl.polygonMode(0x0408, 0x1B02);
         s.gl.clearColor(input.clearRgba[0],input.clearRgba[1],input.clearRgba[2],sourceRgba?128.f/255.f:1.f);
         s.gl.clear(colorBufferBit | depthBufferBit);
-        if(sourceRgba)++s.uiSourceTargetGeneration;
+        if(sourceRgba){++s.uiSourceTargetGeneration;s.uiSourceAcceptedTargetGeneration=0;
+            s.uiSourcePublishedTargetGeneration=0;}
+
         if (input.retainRaceImage) {
             // Preserve the race aspect ratio too; blit bounds are whole pixels.
             const double fit = std::min(double(width) / s.raceWidth, double(height) / s.raceHeight);
@@ -4324,25 +4588,6 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             if(s.gl.bindSampler)s.gl.bindSampler(1,0);
             s.gl.activeTexture(textureUnit0);
         }
-        if(sourceRgba && accepted){
-            // Source RGBA survives untouched. Only this independent private
-            // presentation surface gets alpha1, after its final source consumer.
-            s.gl.disable(0x0C11);s.gl.disable(0x0BE2);s.gl.colorMask(1,1,1,1);
-            s.gl.bindFramebuffer(framebuffer,s.uiTargets[pending]);
-            s.gl.drawBuffer(colorAttachment);s.gl.readBuffer(colorAttachment);
-            s.gl.viewport(0,0,width,height);
-            s.gl.clearColor(input.clearRgba[0],input.clearRgba[1],input.clearRgba[2],1.f);
-            s.gl.clear(colorBufferBit);
-            const double fit=std::min(double(width)/640.0,double(height)/448.0);
-            const I rw=std::max<I>(1,static_cast<I>(std::floor(640.0*fit)));
-            const I rh=std::max<I>(1,static_cast<I>(std::floor(448.0*fit)));
-            const I x=(width-rw)/2,y=(height-rh)/2;
-            s.gl.bindFramebuffer(readFramebuffer,s.uiSourceTarget);s.gl.readBuffer(colorAttachment);
-            s.gl.blitFramebuffer(0,0,640,448,x,y,x+rw,y+rh,colorBufferBit,0x2600);
-            s.gl.bindFramebuffer(framebuffer,s.uiTargets[pending]);
-            s.gl.colorMask(0,0,0,1);s.gl.clear(colorBufferBit);s.gl.colorMask(1,1,1,1);
-            accepted=s.check("copy source UI RGB to separate opaque presentation");
-        }
         // Restore renderer-owned baseline state even on draw failure. The next
         // world begin supplies its own program, matrix, viewport and geometry.
         s.gl.disable(0x0C11); s.gl.disable(0x0BE2); s.gl.depthMask(1); s.gl.depthFunc(0x0201);
@@ -4353,7 +4598,11 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.drawGl.bindVertexArray(0); s.drawGl.bindBuffer(arrayBuffer, 0);
         const bool restored = s.check("finish private original UI frame");
         accepted = accepted && restored;
-        if (accepted) {
+        if (accepted && sourceRgba){
+            d.originalUiSourceAccepted=true;
+            if(publishSource)accepted=s.publishUiSource(input.clearRgba,width,height);
+        }else if (accepted) {
+            s.uiSourcePublishedTargetGeneration=0;
             s.uiPublished = pending; s.displayedTarget = s.uiTargets[pending];
             s.width = s.committedWidth = width; s.height = s.committedHeight = height;
             s.imageCommitted = true; d.originalUiAccepted = true;
@@ -4425,6 +4674,7 @@ bool VehicleWindowGl50DS::submitHostMenu(const VehicleWindowHostMenu50DS& input,
         s.frameHostHud = false;
         if (accepted) {
             s.menuPublished = pending; s.displayedTarget = s.menuTargets[pending];
+            s.uiSourcePublishedTargetGeneration=0;
             s.width = s.committedWidth = width; s.height = s.committedHeight = height;
             s.imageCommitted = true; d.hostMenuAccepted = true;
             if (s.request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
