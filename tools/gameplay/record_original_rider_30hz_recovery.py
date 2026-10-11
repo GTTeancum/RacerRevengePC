@@ -1094,6 +1094,8 @@ def main():
     parser.add_argument('--root-reviewed-one-check', action='store_true')
     parser.add_argument('--not-before', required=True)
     parser.add_argument('--capture-hz', type=float, default=30.0)
+    parser.add_argument('--trace-stages', action='store_true',
+                        help='Enable RR_TRACE_ORIGINAL_UI_STAGES=1 in the native child (default: off)')
     parser.add_argument('--startup-timeout', type=float, default=180.0)
     parser.add_argument('--ack-timeout', type=float, default=5.0)
     parser.add_argument('--quit-timeout', type=float, default=10.0)
@@ -1152,6 +1154,8 @@ def main():
                    'XDG_CACHE_HOME': str(out / 'cache'), **ENV,
                    'RR_AUDIO_WAV': str(out / 'original-ui.wav'),
                    'RR_ORIGINAL_RIDER_IPUM_CACHE': str(cache)}
+    if args.trace_stages:
+        environment['RR_TRACE_ORIGINAL_UI_STAGES'] = '1'
     sources = ('tests/native/terrain_interactive_drive50du.cpp', 'tests/native/original_ui_main_entry50kg.h',
                'platform/linux/native/game_host50er.cpp', 'platform/linux/native/game_host50er.h',
                'platform/linux/native/vehicle_window_gl50ds.cpp',
@@ -1181,6 +1185,7 @@ def main():
                 'current_source_files': [identity(REPO / path) for path in sources],
                 'source_warning': 'Source hashes do not independently prove executable build provenance',
                 'cwd': str(ASSETS), 'environment': environment,
+                'trace_stages_enabled': args.trace_stages,
                 'argv': [str(executable), str(CORPUS), '--headless-live', str(out / 'live.ppm')],
                 'allowed_stdin': ALLOWED_COMMANDS, 'maximum_window_seconds': WINDOW_NS / 1e9,
                 'stable_return_tail_seconds': SEQUENCE_TAIL_NS / 1e9, 'capture_hz': args.capture_hz,
