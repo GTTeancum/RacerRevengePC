@@ -31,6 +31,9 @@ struct OriginalUiFrontendCold50KG {
     assets::OriginalUiMaterialRuntime50KG runtime{};
     std::shared_ptr<OriginalUiMainProfile50KG> profile;
     std::shared_ptr<OriginalUiOptionsProfile50KG> optionsProfile;
+    // Retained sole application profile for page4. Optional: without it only
+    // Options menu1 is admitted. No reset or imported-save claim is made here.
+    std::shared_ptr<game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
     std::shared_ptr<OriginalUiMainApplication50KG> application;
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
     // Same actual transport/output owner throughout both screens. Caller owns
@@ -76,10 +79,11 @@ struct OriginalUiFrontendSnapshot50KG {
     OriginalUiOptionsSessionSnapshot50KG options{};
     std::uint64_t updates=0,renders=0,submissions=0,switches=0;
 };
-// Concrete native Main4/1 <-> Options12/1 owner. No generic destination-ready
+// Concrete native Main4/1 <-> Options12/{1,4} owner. No generic destination-ready
 // callbacks, guest execution, gameplay entry, fallback UI or profile reset.
 // One freshly prepared bank/session/manager per screen lifetime; shared process
-// profile/application/audio remain the same. All calls serialized/non-reentrant.
+// profile/application/audio remain the same. Options page changes retain that
+// screen's one bank/session/manager. All calls serialized/non-reentrant.
 class OriginalUiFrontend50KG final {
 public:
     OriginalUiFrontend50KG() noexcept;

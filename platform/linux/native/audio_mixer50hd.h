@@ -1,8 +1,10 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 namespace rr::platform {
+class OriginalSoundMode50KG;
 inline constexpr std::size_t audioMaximumVoices50HD = 128;
 
 // Borrowed decoded, signed PCM16. Samples and the voice array must outlive use.
@@ -28,6 +30,19 @@ class AudioMixer50HD final {
 public:
     bool initialize(AudioVoice50HD* voices, std::size_t count,
                     std::uint32_t outputRate = 48000) noexcept;
+    // Cold bind to the real shared source-mode owner, before any playback.
+    // Legacy behavior remains exact when no mode owner is installed. With a
+    // bound owner, ordinary play/controls represent actual centered routing;
+    // nonzero host pan is rejected rather than inventing a source azimuth.
+    bool bindOriginalSoundMode50KG(std::shared_ptr<OriginalSoundMode50KG>) noexcept;
+    OriginalSoundMode50KG* originalSoundMode50KG() noexcept {return soundMode50KG_.get();}
+    const OriginalSoundMode50KG* originalSoundMode50KG() const noexcept {return soundMode50KG_.get();}
+    // Explicit engine-angle controls26CBA0. Source233950 orientation is a
+    // separate projection. Unknown native phase selectors reject atomically.
+    bool playOriginalAngle50KG(std::size_t slot,const AudioClip50HD&,float gain,
+        float pitch,bool loop,std::int32_t engineAngle) noexcept;
+    bool controlsOriginalAngle50KG(std::size_t slot,float gain,float pitch,
+        std::int32_t engineAngle) noexcept;
     bool play(std::size_t slot, const AudioClip50HD&, float gain = 1.0f,
               float pitch = 1.0f, bool loop = false, float pan = 0.0f) noexcept;
     bool controls(std::size_t slot, float gain, float pitch,
@@ -59,6 +74,10 @@ public:
     std::uint64_t clippedSamples() const noexcept { return clippedSamples_; }
     static bool validClip(const AudioClip50HD&) noexcept;
 private:
+    bool originalRouting50KG(std::int32_t engineAngle,float& left,float& right) const noexcept;
+    std::shared_ptr<OriginalSoundMode50KG> soundMode50KG_;
+    float originalLeft50KG_[audioMaximumVoices50HD]{};
+    float originalRight50KG_[audioMaximumVoices50HD]{};
     AudioVoice50HD* voices_ = nullptr;
     std::size_t count_ = 0;
     std::uint32_t rate_ = 0;

@@ -2747,7 +2747,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto& windowRequest=hostRequest.window;
   windowRequest.title=raceEnabled?"Racer Revenge | Native race | W/S + Up/Down | F5 restart | Esc menu":
       "Racer Revenge native development drive | W/S + Up/Down | F5 restart | Esc menu";
-  if(originalMainApplication.enabled)windowRequest.title="Racer Revenge | Original Main | Arrows select | Enter confirm | Close quits";
+  if(originalMainApplication.enabled)windowRequest.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
   windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
   windowRequest.major=3;windowRequest.minor=2;
   windowRequest.profile=platform::WindowGlProfile50DQ::Core;
@@ -3141,8 +3141,23 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     std::filesystem::rename(writingFile,captureFile);
     const auto mainAudioInfo=originalMain.audioOutput.info();
     const auto capturedUi=originalMain.coordinator.snapshot();
+    const auto* capturedNavigation=originalMain.navigation();
+    require50DU(capturedNavigation,"original UI capture navigation missing");
+    const auto capturedGroup=capturedNavigation->controllerGroup[0];
+    const auto capturedSlot=capturedGroup>0&&static_cast<std::size_t>(capturedGroup)<capturedNavigation->groups.size()?
+        capturedNavigation->groups[capturedGroup].selectedSlot:0;
+    const auto capturedAperture=capturedUi.route.screen==4?capturedUi.main.aperture:capturedUi.options.aperture;
     J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
         {"screen",capturedUi.route.screen},{"page",capturedUi.route.page},{"switches",capturedUi.switches},
+        {"requested_screen",capturedUi.transition.requested.screen},{"requested_page",capturedUi.transition.requested.page},
+        {"selected_group",capturedGroup},{"selected_slot",capturedSlot},
+        {"saved_group",originalMainApplication.gameSettingsProfile->savedGroup6E8},
+        {"lifecycle",static_cast<unsigned>(capturedUi.transition.lifecycle)},
+        {"phase",static_cast<unsigned>(capturedUi.transition.phase)},
+        {"aperture_state",static_cast<unsigned>(capturedAperture.state)},
+        {"aperture_input_enabled",capturedAperture.inputEnabled268},
+        {"gpu_publication",originalMain.coordinator.gpu()->publicationToken()},
+        {"accepted_update_sequence",originalMain.lastAudioSequence},
         {"file",captureFile.string()},{"width",width},{"height",height},
         {"audio_mixed_frames",mainAudioInfo.mixedFrames},
         {"audio_captured_frames",mainAudioInfo.capturedFrames},{"audio_rate",mainAudioInfo.sampleRate},
@@ -3193,8 +3208,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(!originalMainApplication.enabled)reportOriginalAiFleet("ready");
   }
   if(originalMainApplication.enabled){
-   std::cerr<<"Original UI controls: Up/Left/W previous(2), Down/Right/S next(3), Enter/Space confirm(4), "
+   std::cerr<<"Original UI controls: Main/Options menu Up/Left/W previous(2), Down/Right/S next(3); "
+       "Game Options Up/W previous group(2), Down/S next group(3), Left/Right change value(0/1), R defaults(5). Enter/Space confirm(4), "
        "Escape/menu back(6; source Main does not handle back). Window Close, quit, or stdin EOF exits. "
+       "Game Options Accept remains unavailable; Cancel remembers the group without applying local edits. "
        "F5/restart and checkpoint have no original UI destination. capture writes the existing live PPM target.\n";
   }
   for(;;){
@@ -3227,9 +3244,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      originalMain.lastUpdateNanoseconds=0;captureCommitted();
      std::this_thread::sleep_for(std::chrono::milliseconds(8));continue;
     }
-    if(input.pressed[82]||input.pressed[80]||input.pressed[26])originalMain.input(2);
-    if(input.pressed[81]||input.pressed[79]||input.pressed[22])originalMain.input(3);
+    const auto inputRoute=originalMain.coordinator.snapshot().route;
+    const bool gameOptionsInput=inputRoute.screen==12&&inputRoute.page==4;
+    if(gameOptionsInput){
+     if(input.pressed[80])originalMain.input(0);
+     if(input.pressed[79])originalMain.input(1);
+     if(input.pressed[82]||input.pressed[26])originalMain.input(2);
+     if(input.pressed[81]||input.pressed[22])originalMain.input(3);
+    }else{
+     if(input.pressed[82]||input.pressed[80]||input.pressed[26])originalMain.input(2);
+     if(input.pressed[81]||input.pressed[79]||input.pressed[22])originalMain.input(3);
+    }
     if(input.pressed[40]||input.pressed[44])originalMain.input(4);
+    if(gameOptionsInput&&input.pressed[21])originalMain.input(5); // Native R => original square/defaults event.
     if(input.pressed[41]||hostInput.menuRequested)originalMain.input(6);
     const auto uiNow=monotonicNow50DU();
     const std::uint64_t elapsedNanoseconds=originalMain.acceptedElapsed(uiNow);

@@ -1,10 +1,12 @@
 #pragma once
 #include "../../platform/linux/native/original_ui_main_audio50kg.h"
 #include "../../platform/linux/native/audio_output50hd.h"
+#include "../../platform/linux/native/original_sound_mode50kg.h"
 #include <array>
 #include <limits>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace original_main_entry50KG {
 // Dedicated frontend device/WAV ownership. No reference to a race mixer, live
@@ -22,11 +24,15 @@ public:
     }
     bool prepare(const std::filesystem::path& root,
         const rr::platform::AudioOutputRequest50HD& request,std::string& error,
-        rr::platform::AudioOutputDiagnostic50HD& diagnostic) {
+        rr::platform::AudioOutputDiagnostic50HD& diagnostic,
+        std::shared_ptr<rr::platform::OriginalSoundMode50KG> soundMode={}) {
         if(attempted_ || closed_){error="Main output requires a fresh stable owner";return false;}
         attempted_=true;
         if(!mixer_.initialize(voices_.data(),voices_.size(),request.sampleRate)){
             error="Main dedicated mixer initialization failed";return false;
+        }
+        if(soundMode&&!mixer_.bindOriginalSoundMode50KG(std::move(soundMode))){
+            error="Main source sound-mode consumer binding failed";return false;
         }
         transport_=std::make_shared<rr::platform::OriginalUiMainAudio50KG>();
         if(!transport_->prepare(root,mixer_,error))return false;
@@ -39,6 +45,17 @@ public:
         return transport_;
     }
     bool enabled() const noexcept { return enabled_; }
+    // Checks this dedicated output's exact prepared transport and mixer. A
+    // muted/closed output has no capability; mode storage alone is insufficient.
+    const rr::platform::OriginalSoundMode50KG* soundModeOwner50KG() const noexcept {
+        return enabled_&&!closed_&&transport_?transport_->soundModeOwner50KG():nullptr;
+    }
+    bool canApplySoundMode18874050KG(std::uint32_t mode) const noexcept {
+        return enabled_&&!closed_&&transport_&&transport_->canApplySoundMode18874050KG(mode);
+    }
+    bool applySoundMode18874050KG(std::uint32_t mode) noexcept {
+        return canApplySoundMode18874050KG(mode)&&transport_->applySoundMode18874050KG(mode);
+    }
     void pause(bool value) noexcept {
         if(!enabled_ || closed_)return;
         transport_->pause(value);

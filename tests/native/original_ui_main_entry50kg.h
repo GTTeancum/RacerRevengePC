@@ -32,6 +32,9 @@ struct Application {
         rr::platform::OriginalUiMainAudioMode50KG::muted;
     rr::assets::OriginalUiMaterialRuntime50KG materialRuntime{};
     std::shared_ptr<rr::platform::OriginalUiMainProfile50KG> profile;
+    std::shared_ptr<rr::platform::OriginalUiOptionsProfile50KG> optionsProfile;
+    std::shared_ptr<rr::game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
+    std::shared_ptr<rr::platform::OriginalSoundMode50KG> soundMode;
     std::shared_ptr<rr::platform::OriginalUiMainApplication50KG> state;
     explicit Application(rr::game::HostMonotonicClock50ID& clock) {
         const char* enabledSetting=std::getenv("RR_ORIGINAL_MAIN_MENU");
@@ -55,11 +58,22 @@ struct Application {
             require(!std::getenv("RR_AUDIO_WAV"),"muted original Main cannot produce an audio proof recording");
         }
         profile=std::make_shared<rr::platform::OriginalUiMainProfile50KG>();
+        optionsProfile=std::make_shared<rr::platform::OriginalUiOptionsProfile50KG>();
+        gameSettingsProfile=std::make_shared<rr::game::OriginalUiGameSettingsProfile50KG>();
+        soundMode=std::make_shared<rr::platform::OriginalSoundMode50KG>();
         state=std::make_shared<rr::platform::OriginalUiMainApplication50KG>();
         // Fresh native backing starts with no imported unlocks or debug bits.
         // Source1864B0/186EF0 reset only its proven Main fields.
-        profile->known=true;
         rr::platform::resetOriginalUiMainProfileFields50KG(*profile);
+        rr::platform::resetOriginalUiOptionsProfileFields50KG(*optionsProfile);
+        rr::game::resetOriginalUiGameSettingsProfileFields50KG(*gameSettingsProfile);
+        // These are explicit fresh process-owned profile fields. Construct and
+        // reset once here, never on page entry, Defaults, Cancel or bank switch.
+        profile->known=true;optionsProfile->known=true;gameSettingsProfile->known=true;
+        require(rr::game::validOriginalUiGameSettingsProfile50KG(*gameSettingsProfile),
+            "fresh original Game Options profile rejected");
+        require(soundMode->initializeFromProfile1101C(gameSettingsProfile->soundMode1101C),
+            "fresh original sound mode initialization rejected");
         // One native startup seed from the existing process clock, never per
         // frame, capture or focus change. Exact original boot seeding unclaimed.
         require(rr::game::sampleHostTimestamp50ID(clock,state->rawRandom308030),
@@ -68,7 +82,8 @@ struct Application {
         materialRuntime={true,false}; // Process-owned fresh native normal-material mode.
         std::cerr<<"ORIGINAL MAIN ONLY: fresh native profile/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
-            <<"; Main audio="<<audio<<". Main and Options menu routing is wired; Rider/Course/Gallery and Options subpages are unavailable. "
+            <<"; Main audio="<<audio<<". Main, Options menu and Game Options edit/Cancel routing is wired; "
+            "Game Options Accept, Rider/Course/Gallery and other Options subpages are unavailable. "
             "No gameplay launch or original boot/save parity is claimed.\n";
     }
 };
@@ -118,7 +133,6 @@ struct Frontend {
     AudioOutput audioOutput;
     rr::platform::OriginalUiFrontend50KG coordinator;
     rr::platform::OriginalUiFrontendDiagnostic50KG diagnostic{};
-    std::shared_ptr<rr::platform::OriginalUiOptionsProfile50KG> optionsProfile;
     std::uint64_t lastUpdateNanoseconds=0,inputCount=0,unavailableCount=0,frameCount=0;
     std::uint64_t captureSequence=0,lastAudioSequence=0;
     std::uint64_t lastSourceNanoseconds=0,activeSourceNanoseconds=0;
@@ -167,12 +181,8 @@ struct Frontend {
         cold.localization=readArchive(application.assetRoot,Id::localization);
         cold.runtime=application.materialRuntime;cold.video=video->publication(video);
         cold.profile=application.profile;cold.application=application.state;
-        // This is the same explicit fresh native profile lifecycle as Main.
-        // Original reset186660/186668 writes only the proven Options word.
-        optionsProfile=std::make_shared<rr::platform::OriginalUiOptionsProfile50KG>();
-        optionsProfile->known=true;
-        rr::platform::resetOriginalUiOptionsProfileFields50KG(*optionsProfile);
-        cold.optionsProfile=optionsProfile;cold.audioMode=application.audioMode;
+        cold.optionsProfile=application.optionsProfile;cold.gameSettingsProfile=application.gameSettingsProfile;
+        cold.audioMode=application.audioMode;
         cold.textureRequest=textureRequest;
         cold.textureRequest.samplers=nullptr;cold.textureRequest.samplerCount=0;
         cold.textureRequest.maximumGpuBytes=32u*1024u*1024u;
@@ -184,7 +194,9 @@ struct Frontend {
                 outputRequest.tryDevice=std::string(setting)=="1";
             }
             std::string error;rr::platform::AudioOutputDiagnostic50HD outputDiagnostic;
-            if(!audioOutput.prepare(application.audioRoot,outputRequest,error,outputDiagnostic))throw std::runtime_error(error);
+            if(!audioOutput.prepare(application.audioRoot,outputRequest,error,outputDiagnostic,application.soundMode))throw std::runtime_error(error);
+            require(audioOutput.soundModeOwner50KG()==application.soundMode.get(),
+                "original UI output did not retain the application sound mode owner");
             cold.audio=audioOutput.transport();
             const auto info=audioOutput.info();
             std::cerr<<"Original UI audio device="<<rr::platform::audioDeviceStatusName50HD(info.deviceStatus)
@@ -215,6 +227,7 @@ struct Frontend {
         }
         if(status==Status::unavailableDestination||status==Status::secondControllerRequired){
             ++unavailableCount;std::cerr<<"original_ui_destination unavailable screen="<<unsigned(receipt.source.screen)
+                <<" page="<<unsigned(receipt.source.page)
                 <<" status="<<unsigned(status)<<" source="<<diagnostic.sourcePC
                 <<" main="<<unsigned(diagnostic.main.status)<<" options="<<unsigned(diagnostic.options.status)
                 <<" options_resource="<<unsigned(diagnostic.optionsResources.error)
@@ -263,12 +276,29 @@ struct Frontend {
         rr::platform::AudioOutputDiagnostic50HD d;const bool okay=audioOutput.close(d);
         if(!okay)std::cerr<<"original UI audio close error="<<unsigned(d.error)<<'\n';return okay;
     }
+    const rr::game::OriginalUiNavigation50KG* navigation() const noexcept {
+        const auto route=coordinator.snapshot().route;
+        if(route.screen==4&&route.page==1){
+            const auto* resources=coordinator.mainResources();
+            return resources&&resources->manager()?resources->manager()->navigation(1):nullptr;
+        }
+        if(route.screen==12){
+            const auto* resources=coordinator.optionsResources();
+            const auto* widgets=resources?resources->widgets():nullptr;
+            if(!widgets)return nullptr;
+            if(route.page==1)return widgets->navigation();
+            if(route.page==4){const auto* state=widgets->gameOptionsState();return state?&state->navigation:nullptr;}
+        }
+        return nullptr;
+    }
     void report(const char* reason,const Application& application,std::uint64_t worldTicks,std::uint64_t mixedFrames) const {
         const auto snapshot=coordinator.snapshot();const bool main=snapshot.route.screen==4;
-        const auto* mainResources=coordinator.mainResources();const auto* optionsResources=coordinator.optionsResources();
-        const auto* navigation=main?(mainResources?mainResources->manager()->navigation(1):nullptr):
-            (optionsResources?optionsResources->widgets()->navigation():nullptr);
-        require(navigation,"original UI live navigation missing");
+        const auto* optionsResources=coordinator.optionsResources();
+        const auto* nav=navigation();require(nav,"original UI live navigation missing");
+        const auto group=nav->controllerGroup[0];
+        const auto slot=group>0&&static_cast<std::size_t>(group)<nav->groups.size()?nav->groups[group].selectedSlot:0;
+        const auto* gameOptions=snapshot.route.screen==12&&snapshot.route.page==4&&optionsResources?
+            optionsResources->widgets()->gameOptionsState():nullptr;
         const auto* mainSession=coordinator.mainSession();
         const auto* fire=main?(mainSession?mainSession->fire():nullptr):(optionsResources?optionsResources->fire():nullptr);
         require(fire,"original UI live particle owner missing");
@@ -277,13 +307,19 @@ struct Frontend {
         const auto* draw=coordinator.draw();const auto audioInfo=audioOutput.info();
         std::cerr<<"original_main_state {\"reason\":\""<<reason<<"\",\"screen\":"<<unsigned(snapshot.route.screen)
             <<",\"page\":"<<unsigned(snapshot.route.page)<<",\"switches\":"<<snapshot.switches
+            <<",\"requested_screen\":"<<unsigned(snapshot.transition.requested.screen)
+            <<",\"requested_page\":"<<unsigned(snapshot.transition.requested.page)
+            <<",\"gpu_publication\":"<<(coordinator.gpu()?coordinator.gpu()->publicationToken():0)
             <<",\"updates\":"<<snapshot.updates<<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<frameCount
-            <<",\"selected_slot\":"<<navigation->groups[1].selectedSlot
-            <<",\"saved_slot\":"<<(main?application.profile->savedSlot6E0:optionsProfile->savedSlot6E4)
+            <<",\"selected_group\":"<<group<<",\"selected_slot\":"<<slot
+            <<",\"saved_slot\":"<<(main?application.profile->savedSlot6E0:application.optionsProfile->savedSlot6E4)
+            <<",\"saved_group\":"<<application.gameSettingsProfile->savedGroup6E8
             <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount
             <<",\"source_rng\":"<<application.state->rawRandom308030<<",\"fire_serial\":"<<application.state->fireSerial433970
             <<",\"input_shown\":"<<((main?snapshot.main.inputContainerShown:snapshot.options.inputContainerShown)?"true":"false")
-            <<",\"lifecycle\":"<<unsigned(snapshot.transition.lifecycle)<<",\"aperture_state\":"<<unsigned(aperture.state)
+            <<",\"lifecycle\":"<<unsigned(snapshot.transition.lifecycle)<<",\"phase\":"<<unsigned(snapshot.transition.phase)
+            <<",\"prompt_mask\":"<<(main?snapshot.main.promptMask42C:snapshot.options.promptMask42C)
+            <<",\"aperture_state\":"<<unsigned(aperture.state)
             <<",\"aperture_top\":"<<aperture.top284<<",\"aperture_bottom\":"<<aperture.bottom28C
             <<",\"aperture_input_enabled\":"<<(aperture.inputEnabled268?"true":"false")
             <<",\"particles\":"<<fire->particleCount()<<",\"source_packets\":"<<fire->packetCount()
@@ -298,7 +334,19 @@ struct Frontend {
             <<",\"audio_device_status\":\""<<rr::platform::audioDeviceStatusName50HD(audioInfo.deviceStatus)<<"\""
             <<",\"audio_device_consumed_frames\":"<<audioInfo.deviceConsumedFrames<<",\"audio_device_queued_frames\":"<<audioInfo.deviceQueuedFrames
             <<",\"audio_device_underrun_frames\":"<<audioInfo.deviceUnderrunFrames<<",\"audio_device_overflow_frames\":"<<audioInfo.deviceOverflowFrames
-            <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames<<"}\n";
+            <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames;
+        if(gameOptions&&gameOptions->loaded){
+            const auto& local=gameOptions->local;const auto& saved=*application.gameSettingsProfile;
+            std::cerr<<",\"game_local_auto_save\":"<<(local.autoSave?"true":"false")
+                <<",\"game_local_sound_mode\":"<<local.soundMode
+                <<",\"game_local_volumes\":["<<local.volume[0]<<','<<local.volume[1]<<','<<local.volume[2]<<','<<local.volume[3]<<']'
+                <<",\"game_local_vertical_split\":"<<(local.verticalSplit?"true":"false")
+                <<",\"game_local_vibration\":"<<(local.vibration?"true":"false")
+                <<",\"game_profile_sound_mode\":"<<saved.soundMode1101C
+                <<",\"game_profile_volumes\":["<<saved.volume11020[0]<<','<<saved.volume11020[1]<<','<<saved.volume11020[2]<<','<<saved.volume11020[3]<<']'
+                <<",\"game_profile_flags\":"<<unsigned(saved.flags11050);
+        }
+        std::cerr<<"}\n";
     }
 };
 }

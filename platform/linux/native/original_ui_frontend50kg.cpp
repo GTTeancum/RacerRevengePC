@@ -31,11 +31,26 @@ bool optionsBackShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
     return p.field==game::OriginalUiProfileField50KG::optionsSlot6E4&&p.operation==game::OriginalUiProfileWrite50KG::word&&
         p.value==d.selectedSlot&&p.replaceMask==0xFFFFFFFFu&&p.sourcePC==0x1F9994;
 }
+bool optionsPageShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
+    const auto& r=d.request;
+    if(r.kind!=game::OriginalUiRouteKind50KG::changePage||r.sourceScreen!=12||r.targetScreen!=12||
+        !d.profileProposalComplete||d.selectedRider!=-1||d.profileChanges.count!=1)return false;
+    const auto& p=d.profileChanges.values[0];
+    if(p.operation!=game::OriginalUiProfileWrite50KG::word||p.value!=d.selectedSlot||p.replaceMask!=0xFFFFFFFFu)return false;
+    if(r.sourcePage==1&&r.targetPage==4)
+        return d.inputPC==0x1F9640&&d.selectedSlot==3&&r.sourcePC==0x1F9898&&
+            p.field==game::OriginalUiProfileField50KG::optionsSlot6E4&&p.sourcePC==0x1F9940;
+    // Cancel only. Accept's distinct profile/apply transaction is unavailable.
+    return r.sourcePage==4&&r.targetPage==1&&d.inputPC==0x1F50F0&&d.selectedSlot>=1&&d.selectedSlot<=8&&
+        r.sourcePC==0x1F51D8&&p.field==game::OriginalUiProfileField50KG::optionsGroup6E8&&p.sourcePC==0x1F51C8;
+}
 }
 struct OriginalUiFrontend50KG::Storage {
     struct Manager {
         Storage* owner=nullptr;
-        Route route{};
+        // Cold screen identity, never used as a replacement for the manager's
+        // authoritative current/requested page after initial activation.
+        Route initialRoute{};
         std::shared_ptr<OriginalUiMainDrawResources50KG> mainResources;
         std::shared_ptr<OriginalUiOptionsDrawResources50KG> optionsResources;
         std::shared_ptr<MaterialTextureGl50EB> gpu;
@@ -43,19 +58,27 @@ struct OriginalUiFrontend50KG::Storage {
         std::shared_ptr<game::OriginalUiTransitionOwner50KG> transition;
         std::unique_ptr<OriginalUiMainSession50KG> main;
         std::unique_ptr<OriginalUiOptionsSession50KG> options;
+        Route currentRoute() const noexcept {
+            return transition&&transition->snapshot().bound?transition->snapshot().current:initialRoute;
+        }
+        bool ownsRoute(Route route) const noexcept {
+            return route.screen==initialRoute.screen&&
+                (main?same(route,{4,1}):(options&&options->ownsPreparedPage(route.page)));
+        }
         const assets::MaterialTextureAssets50EA* textures() const noexcept {
             return mainResources?mainResources->textures():(optionsResources?optionsResources->textures():nullptr);
         }
         bool prepared() const noexcept {
             if(!owner||!transition||!gpu||!publication||!textures()||!gpu->initialized()||
                 !gpu->validBorrow(owner->cold.textureRequest.context,owner->cold.textureRequest.isCurrent,publication))return false;
-            if(route.screen==4&&route.page==1&&main&&mainResources&&!options&&!optionsResources){
+            if(same(initialRoute,{4,1})&&main&&mainResources&&!options&&!optionsResources){
                 const auto s=main->snapshot();return s.bound&&!s.faulted&&!s.quitRequested&&mainResources->loaded()&&
                     main->externalLifecycleOwner()==transition.get()&&mainResources->exitText()&&mainResources->exitText()->prepared();
             }
-            if(route.screen==12&&route.page==1&&options&&optionsResources&&!main&&!mainResources){
+            if(same(initialRoute,{12,1})&&options&&optionsResources&&!main&&!mainResources){
                 const auto s=options->snapshot();return s.bound&&!s.faulted&&!s.quitRequested&&optionsResources->loaded()&&
-                    options->externalLifecycleOwner()==transition.get()&&optionsResources->exitText()&&optionsResources->exitText()->prepared();
+                    options->externalLifecycleOwner()==transition.get()&&options->ownsPreparedPage(1)&&
+                    optionsResources->exitText()&&optionsResources->exitText()->prepared();
             }
             return false;
         }
@@ -84,15 +107,16 @@ struct OriginalUiFrontend50KG::Storage {
     bool processReady() const noexcept {
         return cold.profile&&cold.profile->known&&cold.profile->savedSlot6E0>=1&&cold.profile->savedSlot6E0<=5&&
             cold.optionsProfile&&cold.optionsProfile->known&&cold.optionsProfile->savedSlot6E4>=1&&cold.optionsProfile->savedSlot6E4<=6&&
+            (!cold.gameSettingsProfile||game::validOriginalUiGameSettingsProfile50KG(*cold.gameSettingsProfile))&&
             cold.application&&cold.application->known&&!(cold.application->globalFlags228&4u)&&cold.application->transportE00==-1&&
             (cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:(cold.audio&&cold.audio->ready()));
     }
     bool sourceCurrent() const noexcept {
         return activated&&renderer&&renderer->initialized()&&bank==active.get()&&active&&active->prepared()&&
-            active->transition->snapshot().bound&&same(active->transition->snapshot().current,active->route);
+            active->transition->snapshot().bound&&active->ownsRoute(active->transition->snapshot().current);
     }
     bool destination(Route route) const noexcept {
-        return pending&&same(pending->route,route)&&pending->prepared()&&!pending->transition->snapshot().bound&&processReady();
+        return pending&&same(pending->initialRoute,route)&&pending->prepared()&&!pending->transition->snapshot().bound&&processReady();
     }
     bool sourceProposalCurrent() const noexcept {
         return active&&(active->main?active->main->routeProposalCurrent(mainProposal):active->options->routeProposalCurrent(optionsProposal));
@@ -103,10 +127,18 @@ struct OriginalUiFrontend50KG::Storage {
         if(s.faulted||s.quit||s.closing||!s.processReady())return false;
         if(kind==Admission::initialPage)
             return (&m==s.activating)&&m.prepared()&&!m.transition->snapshot().bound&&
-                &screen==game::findOriginalUiScreenFactory50KG(m.route.screen)&&
-                &page==game::findOriginalUiBoundedPageFactory50KG(m.route.screen,m.route.page);
-        if(kind!=Admission::screen||&m!=s.active.get()||!s.sourceCurrent()||!s.sourceProposalCurrent())return false;
-        const Route target{static_cast<std::uint8_t>(m.route.screen==4?12:4),1};
+                &screen==game::findOriginalUiScreenFactory50KG(m.initialRoute.screen)&&
+                &page==game::findOriginalUiBoundedPageFactory50KG(m.initialRoute.screen,m.initialRoute.page);
+        if(&m!=s.active.get()||!s.sourceCurrent()||!s.sourceProposalCurrent())return false;
+        if(kind==Admission::page){
+            if(!m.options||s.pending||!optionsPageShape(s.optionsProposal.decision))return false;
+            const auto& r=s.optionsProposal.decision.request;
+            return same(m.currentRoute(),{r.sourceScreen,r.sourcePage})&&m.ownsRoute({r.targetScreen,r.targetPage})&&
+                &screen==game::findOriginalUiScreenFactory50KG(r.targetScreen)&&
+                &page==game::findOriginalUiBoundedPageFactory50KG(r.targetScreen,r.targetPage);
+        }
+        if(kind!=Admission::screen)return false;
+        const Route target{static_cast<std::uint8_t>(m.currentRoute().screen==4?12:4),1};
         return s.destination(target)&& &screen==game::findOriginalUiScreenFactory50KG(target.screen)&&
             &page==game::findOriginalUiBoundedPageFactory50KG(target.screen,target.page);
     }
@@ -114,7 +146,12 @@ struct OriginalUiFrontend50KG::Storage {
         auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
         if(s.faulted)return;
         Diagnostic d;
-        if((&m!=s.active.get()&& &m!=s.activating)||!same(event.route,m.route)){
+        const auto t=m.transition->snapshot();
+        // requestedPage90 is delivered BEFORE current-page publication. Every
+        // other notice belongs to the actual current page, including previous94.
+        const auto expected=event.kind==game::OriginalUiTransitionNotificationKind50KG::requestedPage90?t.requested:t.current;
+        if((&m!=s.active.get()&& &m!=s.activating)||!t.bound||!same(event.route,expected)||
+            event.lifecycle!=t.lifecycle||event.phase!=t.phase||!m.ownsRoute(event.route)){
             s.fault(d,Status::transition,event.sourcePC);return;
         }
         const bool okay=m.main?m.main->notifyTransition(event,d.main)==MainStatus::ok:
@@ -123,19 +160,32 @@ struct OriginalUiFrontend50KG::Storage {
     }
     static game::OriginalUiTransitionCompletion50KG poll(void* p,Route route,Phase phase) noexcept {
         auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
-        if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!same(route,m.route))
+        const auto t=m.transition->snapshot();
+        if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!same(route,t.current)||phase!=t.phase)
             return game::OriginalUiTransitionCompletion50KG::unavailable;
         return m.main?m.main->pollCompletion(route,phase):m.options->pollCompletion(route,phase);
     }
     static bool commitOptions(void* p,const game::OriginalUiRouteDecision50KG& decision) noexcept {
         auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
-        // Exact private typed proposal was revalidated after cold preparation.
+        // Exact private typed proposal was revalidated after destination admission.
         // No generic profile patch interpreter and no arbitrary admitted flags.
-        if(s.faulted||s.quit||&m!=s.active.get()||!m.options||!s.destination({4,1})||
-            !m.options->routeProposalCurrent(s.optionsProposal)||!optionsBackShape(decision)||
+        if(s.faulted||s.quit||&m!=s.active.get()||!m.options||!s.sourceCurrent()||!s.processReady()||
+            !m.options->routeProposalCurrent(s.optionsProposal)||
             !decision.admitted||decision.blockers||decision.action!=game::OriginalUiRouteAction50KG::request||
             decision.selectedSlot!=s.optionsProposal.decision.selectedSlot)return false;
-        s.cold.optionsProfile->savedSlot6E4=decision.profileChanges.values[0].value;
+        const auto& proposed=s.optionsProposal.decision;
+        if(optionsBackShape(decision)){
+            if(!optionsBackShape(proposed)||!s.destination({4,1}))return false;
+            s.cold.optionsProfile->savedSlot6E4=decision.profileChanges.values[0].value;
+        }else if(optionsPageShape(decision)){
+            if(!optionsPageShape(proposed)||s.pending||
+                decision.request.sourcePage!=proposed.request.sourcePage||decision.request.targetPage!=proposed.request.targetPage||
+                !m.ownsRoute({decision.request.targetScreen,decision.request.targetPage}))return false;
+            if(decision.request.sourcePage==4){
+                if(!s.cold.gameSettingsProfile)return false;
+                s.cold.gameSettingsProfile->savedGroup6E8=decision.profileChanges.values[0].value;
+            }else s.cold.optionsProfile->savedSlot6E4=decision.profileChanges.values[0].value;
+        }else return false;
         return true;
     }
     static bool enqueue(void* p,const game::OriginalUiApplicationRequest50KG& q) noexcept {
@@ -154,7 +204,7 @@ struct OriginalUiFrontend50KG::Storage {
     bool build(std::unique_ptr<Manager>& out,Route route,Diagnostic& d) noexcept {
         if(out){result(d,Status::invalidInput);return false;}
         try {
-            out=std::make_unique<Manager>();auto& m=*out;m.owner=this;m.route=route;
+            out=std::make_unique<Manager>();auto& m=*out;m.owner=this;m.initialRoute=route;
             m.transition=std::make_shared<game::OriginalUiTransitionOwner50KG>();
             const std::vector<MaterialTextureSampler50EB>* samplers=nullptr;
             if(same(route,{4,1})){
@@ -186,6 +236,7 @@ struct OriginalUiFrontend50KG::Storage {
             }else {
                 OriginalUiOptionsSessionCold50KG input;input.resources=m.optionsResources;input.gpu=m.gpu;input.optionsArchive=cold.options;
                 input.profile=cold.optionsProfile;input.commonProfile=cold.profile;input.application=cold.application;
+                input.gameSettingsProfile=cold.gameSettingsProfile;
                 input.audioMode=cold.audioMode;input.audio=cold.audio;input.externalTransition=m.transition;
                 m.options=std::make_unique<OriginalUiOptionsSession50KG>();
                 if(m.options->bind(input,d.options)!=OptionsStatus::ok){result(d,Status::session);return false;}
@@ -266,7 +317,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
     if(s->queued||s->updates!=s->submittedUpdate)return result(d,Status::busy);
     Operation operation(s->inOperation);s->frameRendered=false;s->frameSubmitted=false;
     if(!s->sourceCurrent()||!s->processReady())return s->fault(d,Status::session);
-    receipt.source=s->active->route;s->mainProposal={};s->optionsProposal={};
+    receipt.source=s->active->currentRoute();s->mainProposal={};s->optionsProposal={};
     if(s->active->main){
         const auto status=s->active->main->input(input,receipt.main,d.main);
         if(status==MainStatus::routeProposed){
@@ -288,10 +339,16 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         }
     }else {
         const auto status=s->active->options->input(input,receipt.options,d.options);
-        if(status==OptionsStatus::backProposed){
+        if(status==OptionsStatus::backProposed||status==OptionsStatus::pageProposed){
             s->optionsProposal=receipt.options.routeProposal;
-            if(!optionsBackShape(s->optionsProposal.decision)||s->pending||!s->active->options->routeProposalCurrent(s->optionsProposal))return s->fault(d,Status::transition);
-            if(!s->prepareDestination({4,1},receipt,d))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+            const auto& proposal=s->optionsProposal.decision;
+            const bool pageChange=status==OptionsStatus::pageProposed;
+            if(!(pageChange?optionsPageShape(proposal):optionsBackShape(proposal))||s->pending||
+                !s->active->options->routeProposalCurrent(s->optionsProposal))return s->fault(d,Status::transition);
+            if(pageChange){
+                if(!s->active->ownsRoute({proposal.request.targetScreen,proposal.request.targetPage}))
+                    return result(d,receipt.status=Status::unavailableDestination);
+            }else if(!s->prepareDestination({4,1},receipt,d))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
             if(!s->active->options->routeProposalCurrent(s->optionsProposal))return s->fault(d,Status::transition);
             auto admitted=s->optionsProposal.decision;
             // Concrete destination now exists. Only its previously missing
@@ -300,8 +357,8 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
                 admitted.action!=game::OriginalUiRouteAction50KG::unavailable)return s->fault(d,Status::transition);
             admitted.blockers=0;admitted.admitted=true;admitted.action=game::OriginalUiRouteAction50KG::request;
             d.transition=s->active->transition->requestRouteDecision(admitted);
-            if(d.transition!=Transition::ok)return s->fault(d,Status::transition,0x1F9994);
-            if(s->active->options->notifyRouteAccepted(s->optionsProposal,d.options)!=OptionsStatus::ok)return s->fault(d,Status::session,0x1F99D0);
+            if(d.transition!=Transition::ok)return s->fault(d,Status::transition,proposal.request.sourcePC);
+            if(s->active->options->notifyRouteAccepted(s->optionsProposal,d.options)!=OptionsStatus::ok)return s->fault(d,Status::session,d.options.sourcePC);
         }else {
             const auto mapped=status==OptionsStatus::ok?Status::ok:status==OptionsStatus::noChange?Status::noChange:
                 status==OptionsStatus::unavailableDestination?Status::unavailableDestination:status==OptionsStatus::secondControllerRequired?Status::secondControllerRequired:Status::session;
@@ -331,7 +388,7 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
         return s->fault(d,Status::transition,0x2A3C80);
     const bool updated=m.main?m.main->update(input,d.main)==MainStatus::ok:m.options->update(input,d.options)==OptionsStatus::ok;
     if(!updated)return s->fault(d,Status::session);
-    ++s->updates;receipt.accepted=true;receipt.sequence=s->updates;receipt.update=input;receipt.source=m.route;
+    ++s->updates;receipt.accepted=true;receipt.sequence=s->updates;receipt.update=input;receipt.source=m.currentRoute();
     return result(d,Status::ok);
 }
 Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,Diagnostic& d) noexcept {
@@ -408,9 +465,9 @@ OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshot() const noexcept
     out.prepared=s->prepared;out.active=s->activated;out.faulted=s->faulted;out.quitRequested=s->quit;
     out.deferredQueue=s->queued;out.frameSubmitted=s->frameSubmitted;out.queuedRequest=s->queue;
     out.updates=s->updates;out.renders=s->renders;out.submissions=s->submissions;out.switches=s->switches;
-    if(s->active){out.route=s->active->route;if(s->active->transition)out.transition=s->active->transition->snapshot();
+    if(s->active){out.route=s->active->currentRoute();if(s->active->transition)out.transition=s->active->transition->snapshot();
         if(s->active->main)out.main=s->active->main->snapshot();if(s->active->options)out.options=s->active->options->snapshot();}
-    if(s->pending)out.preparedDestination=s->pending->route;return out;
+    if(s->pending)out.preparedDestination=s->pending->initialRoute;return out;
 }
 const OriginalUiMainSession50KG* OriginalUiFrontend50KG::mainSession() const noexcept {return storage_&&storage_->active?storage_->active->main.get():nullptr;}
 const OriginalUiOptionsSession50KG* OriginalUiFrontend50KG::optionsSession() const noexcept {return storage_&&storage_->active?storage_->active->options.get():nullptr;}

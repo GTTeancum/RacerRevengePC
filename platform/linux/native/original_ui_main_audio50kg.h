@@ -28,6 +28,11 @@ public:
     bool prepare(const std::filesystem::path& audioRoot, AudioMixer50HD& dedicatedFrontendMixer,
         std::string& error) noexcept;
     bool ready() const noexcept override;
+    // Concrete source-mode application through THIS transport's actual mixer.
+    // No attached owner, stale mixer, or paused transport can certify Accept.
+    const OriginalSoundMode50KG* soundModeOwner50KG() const noexcept;
+    bool canApplySoundMode18874050KG(std::uint32_t mode) const noexcept;
+    bool applySoundMode18874050KG(std::uint32_t mode) noexcept;
     std::uint32_t sampleRate() const noexcept override {
         return current() ? mixer_->sampleRate() : 0;
     }

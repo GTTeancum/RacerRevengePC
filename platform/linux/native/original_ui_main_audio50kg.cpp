@@ -1,4 +1,5 @@
 #include "original_ui_main_audio50kg.h"
+#include "original_sound_mode50kg.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -166,6 +167,16 @@ bool OriginalUiMainAudio50KG::current() const noexcept {
         !mixer_->requiresVoiceGroupGains50IC();
 }
 bool OriginalUiMainAudio50KG::ready() const noexcept { return current(); }
+const OriginalSoundMode50KG* OriginalUiMainAudio50KG::soundModeOwner50KG() const noexcept {
+    return current()?mixer_->originalSoundMode50KG():nullptr;
+}
+bool OriginalUiMainAudio50KG::canApplySoundMode18874050KG(std::uint32_t mode) const noexcept {
+    const auto* owner=soundModeOwner50KG();
+    return !paused_&&owner&&owner->canApply188740(*mixer_,mode);
+}
+bool OriginalUiMainAudio50KG::applySoundMode18874050KG(std::uint32_t mode) noexcept {
+    return canApplySoundMode18874050KG(mode)&&mixer_->originalSoundMode50KG()->apply188740(*mixer_,mode);
+}
 bool OriginalUiMainAudio50KG::startMainLoop9() noexcept {
     if (!current() || paused_) return false;
     if (!ownsMusic_ && mixer_->active(musicVoice)) return false;
