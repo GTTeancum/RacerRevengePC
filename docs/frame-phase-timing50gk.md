@@ -34,8 +34,41 @@ timing50GK::Interval phaseTiming{enabled}; // Default constructor is disabled.
 ```
 
 The phases are `Input`, `Physics`, `RenderPrepareSubmit`, `CompletionWait`,
-`Capture`, and optional `HostSleep`. Storage is a fixed `totals[phaseCount]`
+`Capture`, optional `HostSleep`, `CountdownService`, and `AudioCommit`.
+Storage is a fixed `totals[phaseCount]`
 array indexed by the enum. `phaseName(phase)` returns a static printable name.
+
+### Additional countdown and shared-audio observations
+
+The native client enables these through the same exact `RR_TRACE_PHASES=1`
+cold flag. The new enum entries are appended, preserving the existing six
+phase values. They add observations only: native 16 ms steps, actual 768-frame
+mixes, event order, pauses, and the bounded host catch-up policy are unchanged.
+
+- `countdown_service` begins after the existing countdown gate selects its
+  held-world branch. It measures world animation, countdown/race audio event
+  observation, and opponent-audio control updates. It ends before the shared
+  mix/output; with audio disabled it ends when the branch exits. The gate's
+  small `advanceCountdown` call itself is not included.
+- `audio_commit` surrounds each existing shared audio commit in countdown and
+  active gameplay. It includes announcer ownership/completion checks, actual
+  mixer work, synchronous PCM WAV writes, optional device-ring submission,
+  and the existing subsequent source music/announcer world update. It is not
+  a measurement of speaker playback. It is disjoint from `physics` and
+  `countdown_service`; no extra audio commit is introduced.
+
+Post-physics event dispatch and the active-world opponent-audio control update
+still precede `audio_commit` and are not included in it. Native `capture`
+already includes readback, RGB conversion, PPM write/close, and acknowledgement
+output. External capture-process image copying, hashing, JSON writes, and
+acknowledgement observation delays are outside native phase scopes. Therefore
+the phase sums are not a complete whole-loop accounting. A low main-thread
+CPU/high-wall result does not distinguish llvmpipe worker CPU from waits or
+host scheduling.
+
+The existing generic five-second logger emits both new names and the same
+validity, total, and associated-maximum fields as the original phases. There
+is no new final-tail flush at exit and no new hot-path logging or allocation.
 `Scope::finish()` explicitly closes a scope, is idempotent, and permits
 boundaries without changing existing variable lifetimes. Destruction closes
 early-exit paths too. Scopes cannot be copied or moved.

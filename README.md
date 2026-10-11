@@ -4,9 +4,11 @@ A native PC reimplementation of Star Wars: Racer Revenge, with shared code desig
 
 ## Status
 
-Native Linux gameplay is running with eight original-AI racers. The latest capture is partial: GC still stops at an unfinished AI recovery path, and its Gate opening remains incomplete.
+Native host CPU/GPU reimplementation is in progress. Linux is a temporary validation platform; portable gameplay and Windows releases are the priority. All driving validation requires original in-game AI for every racer, including the camera-followed player.
 
-The authentic original Main menu opens and navigates on native Linux. The latest focused check on October 11, 2026 built successfully but stopped when Options resource preparation failed. The original DAT loading fix, Game Options editing/Cancel/Accept, and newer Rider rendering/resource work are implemented in source and await runtime validation. Rider selection and the original menu-to-race flow are not yet available. See the [latest observation](recovery/20261011/MAIN-OPTIONS-OBSERVATION-0216.md) and [earlier gameplay validation](recovery/20261010/VALIDATION-1619.md) for their separate evidence and limits.
+The last completed focused check was the native Linux Rider19 menu opening, unavailable-direction/Confirm handling, and Back sequence on October 11, 2026 at 10:27 UTC. It passed on source commit `03df3c8`; later UI resource/lifetime/audio changes and this branch consolidation remain unbuilt and untested. Rider switching and the original menu-to-race flow are still closed. Historical GC gameplay remains partial at an unfinished original-AI recovery boundary; the newer opt-in Gate asset join has no fresh gameplay validation.
+
+Main consolidation preserves the optional [native audio timing observations](docs/native-audio-phase-observation.md). Those observations do not fix or validate simulation/audio drift. Build and capture identities must be rebound to the final merged source before any new validation.
 
 ## Build and game data
 
