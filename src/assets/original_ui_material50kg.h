@@ -303,6 +303,22 @@ bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19BodyMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
+// Exact original pod_wndw DiffuseCompressed passes1 and3. Both retain their
+// source-alpha blend, alpha test and depth write. The distinct specular pass2
+// is not replaced or omitted. Native policy publishes the real64x64 original
+// base image while keeping all three indexed mips and palette bytes on CPU.
+struct OriginalUiRiderWindowMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    OriginalUiNativeIndexedImagePolicy50KM imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::unavailable;
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+    std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0,sourcePass=0;
+};
+bool prepareOriginalUiRiderWindowMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRiderWindowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
 // Successful result names the exact published one-map specmap1 image and the
 // unchanged source pass. Only original19_1,19_2 and pod_wndw pass2 are admitted.
 // Destination-alpha and FIX255 policies are accepted solely by the separate

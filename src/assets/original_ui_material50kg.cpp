@@ -459,7 +459,8 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
     const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
     OriginalUiMaterialDiagnostic50KG& d, bool litProgram,
     bool& fogEnabled, bool& alphaTestGreaterZero, bool authenticatedRiderIpum = false,
-    bool authenticatedRiderIndexedBody = false, bool authenticatedRiderSpecular = false) noexcept {
+    bool authenticatedRiderIndexedBody = false, bool authenticatedRiderSpecular = false,
+    bool authenticatedRiderWindow = false) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
@@ -509,6 +510,7 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
         const bool textureShape = authenticatedRiderIpum ?
             (litProgram && texture.kind == 2 && texture.mips.size() == originalUiIpumMipCount50KG) :
             authenticatedRiderIndexedBody ? (litProgram && texture.kind == 1 && texture.mips.size() == 5) :
+            authenticatedRiderWindow ? (litProgram && texture.kind == 1 && texture.mips.size() == 3) :
             (texture.kind <= 1 && texture.mips.size() == 1);
         if (texture.revision != 1 || texture.flags || !textureShape)
             return fail(d, Error::texture, "admitted original texture/mip provenance", 0x24e880u);
@@ -661,6 +663,41 @@ bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG& 
         next.imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly;
         next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
         next.sourceStoredMipIndex=4;next.sourceMipCount=5;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
+}
+bool prepareOriginalUiRiderWindowMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRiderWindowMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        if (pass.identity!=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\pod_wndw.psm") ||
+            (pass.pass!=1 && pass.pass!=3) || !same(pass.microprogram,"DiffuseCompressed") ||
+            !same(pass.textureName,"pod_wndw") || pass.gs[Field::alphaBlendingOnOff].value!=1 ||
+            pass.gs[Field::inputColorA].value!=0 || pass.gs[Field::inputColorB].value!=1 ||
+            pass.gs[Field::inputAlphaC].value!=0 || pass.gs[Field::inputColorD].value!=1 ||
+            pass.gs[Field::alphaTestOnOff].value!=1 || pass.gs[Field::foggingOnOff].value!=1 ||
+            pass.gs[Field::depthTestMethod].value!=2 || pass.gs[Field::zWriteDisabled].value!=0)
+            return fail(d,Error::profile,"actual pod_wndw DiffuseCompressed pass1 or3",0x2476a0u);
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\pod_wndw.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=3)
+            return fail(d,Error::texture,"authenticated original three-mip pod_wndw image",0x24e880u);
+        const auto& base=texture->mips.back();
+        if (base.width!=64 || base.height!=64 || image->texture.width!=base.width ||
+            image->texture.height!=base.height || image->texture.rgba!=base.rgba)
+            return fail(d,Error::texture,"published native window image must equal original largest mip",0x24eb90u);
+        OriginalUiRiderWindowMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=2;next.sourceMipCount=3;next.sourcePass=pass.pass;
         output=next;return true;
     } catch (...) {d.error=Error::allocation;return false;}
 }

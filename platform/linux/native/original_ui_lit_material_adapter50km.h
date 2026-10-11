@@ -63,6 +63,27 @@ inline bool convertOriginalUiRider19BodyMaterialSpan50KM(
         material.material.alphaTestGreaterZero)return false;
     return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
 }
+// Exact combined-bank/index/identity binding for original pod_wndw passes1/3.
+// Caller must preserve both passes and the intervening authentic specular leaf
+// in the source registry schedule; this local conversion cannot certify it.
+inline bool convertOriginalUiRiderWindowMaterialSpan50KM(
+    const assets::OriginalUiRiderWindowMaterial50KM& material,
+    const assets::OriginalUiScreenAssets50KG& publishedImages,
+    const OriginalUiMaterialSpanBinding50KG& binding,
+    OriginalUiMaterialSpan50KG& output) noexcept {
+    const auto* bank=publishedImages.textures();
+    const auto* image=bank?bank->texture(binding.textureIndex):nullptr;
+    if(material.imagePolicy!=assets::OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly ||
+        material.images!=&publishedImages || !publishedImages.loaded() || !image ||
+        binding.textureIndex!=material.imageIndex || binding.textureCount!=bank->textureCount() ||
+        image->identity!=material.imageIdentity || material.sourceStoredMipIndex!=2 ||
+        material.sourceMipCount!=3 || (material.sourcePass!=1 && material.sourcePass!=3) ||
+        material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed ||
+        material.material.raster.blend!=assets::OriginalUiMaterialBlend50KG::sourceAlpha ||
+        !material.material.raster.depthWrite || material.material.raster.depthMethod!=2 ||
+        !material.material.fogEnabled || !material.material.alphaTestGreaterZero)return false;
+    return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
+}
 // Separate admission for source-RGBA composition only. The common converter
 // still rejects both new blend kinds, and the RGB-only renderer rejects this
 // program identity. Reusing its bounded sampler/depth conversion below does
