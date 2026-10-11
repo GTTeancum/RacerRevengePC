@@ -2670,11 +2670,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  bool restartRequested=false;
  auto closeWindow=[&](){
   bool clean=true;
-  // Drop all UI/session borrowers before ending renderer and texture publication.
-  // Close renderer borrowers before coordinator-owned GPU banks, including
-  // renderer-create failure before coordinator activation.
+  // The coordinator retires Rider source owners through its live renderer,
+  // then closes the renderer before releasing session/texture owners. A host
+  // pre-close would make source retirement impossible during exception cleanup.
   if(originalMainApplication.enabled){
-   if(renderer.ownsResources()&&!renderer.close(rendererDiagnostic)){
+   // Before activation, renderer.create may retain a bank borrow even on
+   // failure. With no coordinator borrow, preserve renderer-first cleanup.
+   if(!originalMain.coordinator.borrowsRenderer(renderer)&&
+      renderer.ownsResources()&&!renderer.close(rendererDiagnostic)){
     clean=false;
     // Retry cleanup while its context and both texture owners are still live.
     // Never unwind into bank destructors while the renderer retains a borrow.

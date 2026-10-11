@@ -141,9 +141,13 @@ public:
     // Never invoked inside a manager callback or before the source frame ends.
     OriginalUiFrontendStatus50KG commitDeferred(VehicleWindowGl50DS&,
         OriginalUiFrontendDiagnostic50KG&) noexcept;
-    // Closes the borrowed renderer first, then sessions and GPU owners. May be
-    // retried only for unresolved cleanup; no source work can resume after it.
+    // Retires source-frame owners through the live borrowed renderer, closes
+    // that renderer, then releases sessions and GPU owners. May be retried only
+    // for unresolved cleanup; no source work can resume after it.
     OriginalUiFrontendStatus50KG close(OriginalUiFrontendDiagnostic50KG&) noexcept;
+    // Includes a retained borrow after failed activation or partial close. The
+    // host must use close above before independently closing this renderer.
+    bool borrowsRenderer(const VehicleWindowGl50DS&) const noexcept;
     void requestQuit() noexcept;
     OriginalUiFrontendSnapshot50KG snapshot() const noexcept;
     const OriginalUiMainSession50KG* mainSession() const noexcept;

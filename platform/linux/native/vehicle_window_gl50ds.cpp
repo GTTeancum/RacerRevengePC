@@ -2172,8 +2172,9 @@ void main() {
         }
         vec3 result=source.rgb;
         if (uiSourceBlend!=0) {
-            // ARB_texture_barrier: one actual triangle per draw, one same-pixel
-            // read/write per covered texel, barrier before every subsequent draw.
+            // ARB_texture_barrier: feedback uses one actual triangle per draw,
+            // one same-pixel read/write per texel, with a barrier before each.
+            // Opaque spans never enter this destination-fetch branch.
             vec4 destination=floor(texelFetch(uiSourceTarget,ivec2(gl_FragCoord.xy),0)*255.0+0.5);
             float coefficient=uiSourceBlend==3 ? destination.a : uiSourceBlend==4 ? 255.0 : source.a;
             // Exact shadow ALPHA A=2 selects zero, B=1 selects destination.
@@ -4168,23 +4169,61 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             s.gl.uniform1i(s.uiSourceAlphaTestUniform, (particle || state.sourceAlphaTestGreaterZero) ? 1 : 0);
             s.gl.bindTexture(texture2D, textured ? input.textures->texture(span.textureIndex) : 0);
             if(sourceRgba){
-                // A single triangle cannot self-overlap. Two-triangle quads
-                // and source surfaces are never submitted together to feedback.
+                // Opaque source writes do not sample destination RGBA. Unbind
+                // that target while preserving the same shader, raw source
+                // alpha, depth, fog and indexed primitive order. Feedback
+                // spans still require one real triangle and barrier per draw.
+                const bool feedback=span.blend!=OriginalUiBlend50KG::opaque;
+                s.gl.activeTexture(textureUnit0+1);
+                s.gl.bindTexture(texture2D,feedback?s.uiSourceColor:0);
+                s.gl.activeTexture(textureUnit0);
                 constexpr U corners[2][3]={{0,1,2},{0,2,3}};
-                for(U q=span.firstQuad;accepted && q<span.firstQuad+span.quadCount;++q)
-                    for(U t=0;accepted && t<2;++t){
+                U sourceTriangles=0,sourceDraws=0;
+                bool batchOpaque=!feedback;
+                // Actual model slots are [a,b,c,c], including the same Z/W.
+                // Admit their harmless duplicate half to the contiguous draw.
+                // Equal XY alone is not enough for this optimization: retain
+                // the old skip/submission path for any uncertain Z/W case.
+                for(U q=span.firstQuad;batchOpaque && q<span.firstQuad+span.quadCount;++q)
+                    for(U t=0;batchOpaque && t<2;++t){
+                        const auto* v=&input.vertices[q*4];
+                        const auto samePoint=[&](U a,U b){return v[a].position[0]==v[b].position[0] &&
+                            v[a].position[1]==v[b].position[1];};
+                        const auto* c=corners[t];
+                        if(samePoint(c[0],c[1]) || samePoint(c[1],c[2]) || samePoint(c[0],c[2])){
+                            const auto samePosition=[&](U a,U b){return samePoint(a,b) &&
+                                v[a].position[2]==v[b].position[2] && (!sourceRaster ||
+                                native.sourceRasterW[q*4+a]==native.sourceRasterW[q*4+b]);};
+                            batchOpaque=samePosition(c[0],c[1]) || samePosition(c[1],c[2]) || samePosition(c[0],c[2]);
+                        }else ++sourceTriangles;
+                    }
+                if(batchOpaque){
+                    if(sourceTriangles){
+                        s.drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(span.quadCount*6),0x1405,
+                            reinterpret_cast<const void*>(std::uintptr_t(span.firstQuad)*6*sizeof(U)),0);
+                        sourceDraws=1;
+                    }
+                }else{
+                    sourceTriangles=0;
+                    for(U q=span.firstQuad;q<span.firstQuad+span.quadCount;++q)
+                        for(U t=0;t<2;++t){
                         const auto* v=&input.vertices[q*4];
                         const auto samePoint=[&](U a,U b){return v[a].position[0]==v[b].position[0] &&
                             v[a].position[1]==v[b].position[1];};
                         const auto* c=corners[t];
                         if(samePoint(c[0],c[1]) || samePoint(c[1],c[2]) || samePoint(c[0],c[2]))continue;
-                        s.gl.textureBarrier();++d.originalUiTextureBarriers;
+                        if(feedback){s.gl.textureBarrier();++d.originalUiTextureBarriers;}
                         s.drawGl.drawElementsBaseVertex(0x0004,3,0x1405,
                             reinterpret_cast<const void*>((std::uintptr_t(q)*6+t*3)*sizeof(U)),0);
-                        accepted=s.check("draw one ordered source-RGBA triangle after texture barrier");
-                        if(accepted){++d.originalUiDraws;++d.originalUiSourceTriangles;}
+                        ++sourceDraws;++sourceTriangles;
                     }
-                if(accepted)d.originalUiQuads+=span.quadCount;
+                }
+                // GL errors remain sticky until this span boundary. A failed
+                // span publishes no successful counters; partial source work
+                // still poisons its pending history through the existing receipt.
+                accepted=s.check("draw ordered source-RGBA span");
+                if(accepted){d.originalUiDraws+=sourceDraws;d.originalUiSourceTriangles+=sourceTriangles;
+                    d.originalUiQuads+=span.quadCount;}
             }else{
                 s.drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.quadCount * 6), 0x1405,
                     reinterpret_cast<const void*>(std::uintptr_t(span.firstQuad) * 6 * sizeof(U)), 0);
