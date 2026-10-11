@@ -136,6 +136,38 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
         }
         return false;
     }
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderNameBlurMissingPsmFallback)
+        return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)&&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\nameblur.pst")&&
+            p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::rider,"UI\\UIRider\\Widgets.Dat")&&
+            !p.fallbackPageSource&&p.sourceCallerPC==0x2ac6b0&&
+            p.registeredName=="ui\\textures\\nameblur"&&p.attemptedPsmMember=="ui\\textures\\nameblur.psm"&&
+            pass.textureName=="nameblur";
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderBackgroundMissingPsmFallback){
+        if(p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::backgrounds)||p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::rider,"UI\\UIRider\\rider.dat")||
+            p.sourceCallerPC!=0x1e8dc0)return false;
+        for(std::uint8_t rider=1;rider<=26;++rider){
+            if(!riderPortraitIndex(rider))continue;
+            std::string name="00_bkg";name[0]=char('0'+rider/10);name[1]=char('0'+rider%10);
+            const auto registered="ui\\textures\\"+name;
+            if(p.registeredName==registered&&p.attemptedPsmMember==registered+".psm"&&pass.textureName==name&&
+                p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::backgrounds,(registered+".pst").c_str()))return true;
+        }
+        return false;
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderPromptMissingPsmFallback){
+        if(p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::rider,"UI\\UIRider\\rider.dat"))return false;
+        for(std::size_t i=0;i<4;++i){
+            const auto& source=promptSources[i];
+            const auto archive=i<2?OriginalUiArchiveId50KG::overlays:OriginalUiArchiveId50KG::rider;
+            if(p.archive==originalUiArchiveIdentity50KG(archive)&&p.sourceCallerPC==source.callPC&&
+                p.registeredName==source.registeredName&&p.attemptedPsmMember==source.psm&&
+                pass.textureName==source.texture&&p.fallbackTexture==catalogMember(archive,source.member))return true;
+        }
+        return false;
+    }
     const bool main=p.origin==OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback;
     const bool options=p.origin==OriginalUiMaterialOrigin50KG::optionsMenuPromptMissingPsmFallback;
     const bool gameOptions=p.origin==OriginalUiMaterialOrigin50KG::optionsGamePromptMissingPsmFallback;
@@ -453,6 +485,87 @@ bool readOriginalUiRiderPortraitFallbackMaterial50KG(const OriginalUiArchive50KG
         provenance.creationPC=0x2475c0;
         auto result=screenTextureFallback(provenance,name.c_str(),*inherited,runtime);
         output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider))
+            return fail(d,Error::archive,"authenticated Rider",0x2ac6b0);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=rider.find("ui\\textures\\nameblur.pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||
+            rider.find("ui\\textures\\nameblur.psm").identity)
+            return fail(d,Error::fallbackSource,"actual Rider nameblur and absent PSM",0x29b638);
+        OriginalUiDat50KG widgets;
+        if(!readOriginalUiDat50KG(rider,"UI\\UIRider\\Widgets.Dat",widgets,d.document,
+            OriginalUiRepeatedKeyPolicy50KG::preserveInOrder))return fail(d,Error::document,"Rider widgets",0x2ac650);
+        const auto* type=widgets.find("Widget 88","Type");const auto* name=widgets.find("Widget 88","Texture");
+        if(!type||type->text!="Icon"||!name||name->text!="nameblur")
+            return fail(d,Error::fallbackSource,"Rider Icon88 nameblur",0x2ac650);
+        OriginalUiMaterialProvenance50KG p;
+        p.origin=OriginalUiMaterialOrigin50KG::riderNameBlurMissingPsmFallback;
+        p.archive=rider.identity();p.fallbackTexture=texture.identity;p.fallbackWidgetSource=widgets.identity();
+        p.sourceCallerPC=0x2ac6b0;p.registeredName="ui\\textures\\nameblur";
+        p.attemptedPsmMember="ui\\textures\\nameblur.psm";p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,"nameblur",*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderBackgroundFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiArchive50KG& backgrounds,std::uint8_t riderIndex,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
+            !backgrounds.loaded()||backgrounds.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::backgrounds))
+            return fail(d,Error::archive,"authenticated Rider and UIBKG",0x1e8dc0);
+        if(!riderPortraitIndex(riderIndex))return fail(d,Error::fallbackSource,"original Rider background index",0x1e8d58);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        std::string name="00_bkg";name[0]=char('0'+riderIndex/10);name[1]=char('0'+riderIndex%10);
+        const auto registered="ui\\textures\\"+name;
+        const auto texture=backgrounds.find(registered+".pst");const auto page=rider.find("UI\\UIRider\\rider.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            rider.find(registered+".psm").identity||backgrounds.find(registered+".psm").identity)
+            return fail(d,Error::fallbackSource,"actual UIBKG image and absent PSM",0x1e8dc0);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::riderBackgroundMissingPsmFallback;
+        p.archive=backgrounds.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=0x1e8dc0;p.registeredName=registered;p.attemptedPsmMember=registered+".psm";p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,name.c_str(),*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderPromptFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Rider and OVERLAYS",0x1e8074);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index>=4)return fail(d,Error::fallbackSource,"original shared Rider page prompt");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto& textureOwner=index<2?overlays:rider;
+        const auto texture=textureOwner.find(source.member);const auto page=rider.find("UI\\UIRider\\rider.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||rider.find(source.psm).identity||(index<2&&rider.find(source.member).identity))
+            return fail(d,Error::fallbackSource,"actual shared/local Rider prompt and absent PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::riderPromptMissingPsmFallback;
+        p.archive=textureOwner.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=source.callPC;p.registeredName=source.registeredName;p.attemptedPsmMember=source.psm;p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }
 static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG& pass,
