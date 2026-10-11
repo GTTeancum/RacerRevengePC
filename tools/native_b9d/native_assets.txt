@@ -1,0 +1,14 @@
+evidence/authoredGeometry49O/asset-reader/fixtures/48-englt1.psg
+evidence/authoredGeometry49O/asset-reader/fixtures/43-engrt1.psg
+evidence/authoredGeometry49O/asset-reader/fixtures/52-chariot.psg
+evidence/authoredGeometry49O/asset-reader/fixtures/49-englt1.vut
+evidence/authoredGeometry49O/asset-reader/fixtures/44-engrt1.vut
+evidence/authoredGeometry49O/asset-reader/fixtures/53-chariot.vut
+evidence/authoredGeometry49O/asset-reader/fixtures/50-englt1.mot
+evidence/authoredGeometry49O/asset-reader/fixtures/45-engrt1.mot
+evidence/authoredGeometry49O/asset-reader/fixtures/54-01_brklt.mot
+evidence/authoredGeometry49O/asset-reader/fixtures/55-01_brkrt.mot
+evidence/authoredGeometry49O/asset-reader/fixtures/56-01_forwd.mot
+evidence/authoredGeometry49O/asset-reader/fixtures/57-01_back.mot
+evidence/authoredInitialization49N/authoring-source/Pod01.phy
+evidence/frameBridge49W/shape/podboxf.col
