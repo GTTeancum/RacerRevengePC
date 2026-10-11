@@ -3280,9 +3280,21 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        "Game Options Accept requires the live enabled audio owner and commits process settings; Cancel remembers the group without applying local edits. "
        "F5/restart and checkpoint have no original UI destination. capture writes the existing live PPM target.\n";
   }
+  // Opt-in host observations only; each receipt is bounded to this session.
+  bool firstMainPollReported=false,firstMainActivityGateReported=false;
   for(;;){
    phase_timing50GK::Scope inputTiming(phaseTiming,phase_timing50GK::Phase::Input);
-   if(!host.poll(hostInput,hostDiagnostic)){
+   const bool traceFirstMainPoll=originalMainApplication.enabled&&originalMain.traceStages&&
+       !firstMainPollReported;
+   if(traceFirstMainPoll){
+    firstMainPollReported=true;
+    std::cerr<<"original_ui_first_poll {\"phase\":\"enter\"}\n";
+   }
+   const bool polled=host.poll(hostInput,hostDiagnostic);
+   if(traceFirstMainPoll)
+    std::cerr<<"original_ui_first_poll {\"phase\":\"return\",\"okay\":"
+        <<(polled?"true":"false")<<"}\n";
+   if(!polled){
     reportHost50DU(hostDiagnostic);throw std::runtime_error("window event pump failed");
    }
    inputTiming.finish();
@@ -3303,6 +3315,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         info.drawableWidth<=maximumWidth&&info.drawableHeight<=maximumHeight;
     const bool active=drawable&&input.focused&&!input.minimized&&!input.eventBudgetExhausted&&
         !originalMain.hostPaused;
+    if(originalMain.traceStages&&!firstMainActivityGateReported){
+     firstMainActivityGateReported=true;
+     std::cerr<<"original_ui_first_activity_gate {\"drawable_width\":"<<info.drawableWidth
+         <<",\"drawable_height\":"<<info.drawableHeight<<",\"drawable\":"<<(drawable?"true":"false")
+         <<",\"focused\":"<<(input.focused?"true":"false")
+         <<",\"minimized\":"<<(input.minimized?"true":"false")
+         <<",\"event_budget_exhausted\":"<<(input.eventBudgetExhausted?"true":"false")
+         <<",\"host_paused\":"<<(originalMain.hostPaused?"true":"false")
+         <<",\"active\":"<<(active?"true":"false")<<"}\n";
+    }
     const auto mainClock=originalMain.sampleClock(applicationClock,active);
     originalMain.audioOutput.pause(!active);
     if(!active){
