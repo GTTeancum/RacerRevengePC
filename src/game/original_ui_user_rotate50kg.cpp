@@ -22,6 +22,50 @@ bool normalize(V& v) noexcept {
     return finite(v);
 }
 }
+bool originalUiRiderPodOrientationPose50KG(const V& position,
+    const OriginalUiRiderPodOrientation50KG& orientation,BodyMatrix48G& output) noexcept {
+    if (std::fegetround()!=FE_TONEAREST||!finite(position)||
+        !finite(orientation.look)||!finite(orientation.up)) return false;
+    //289F90 skips289F9C..289FC8 for a3=0. Unlike1D3B60's rotation path,
+    // neither captured vector is replaced by a cross/cross correction.
+    V normalUp=orientation.up,normalLook=orientation.look;
+    if (!normalize(normalUp)||!normalize(normalLook)) return false;
+    const auto right=cross(normalUp,normalLook);
+    if (!finite(right)) return false;
+    BodyMatrix48G result{};
+    for (unsigned i=0;i<3;++i) {
+        result.v[i]=right[i];result.v[4+i]=normalUp[i];
+        result.v[8+i]=normalLook[i];result.v[12+i]=position[i];
+    }
+    //28A014..28A028 clear basis W and set translation W=1 explicitly.
+    result.v[15]=1;output=result;return true;
+}
+bool captureOriginalUiRiderPodOrientation50KG(const SceneGraph49P& graph,
+    SceneNodeIndex49P root,OriginalUiRiderPodOrientation50KG& output) noexcept {
+    const auto index=static_cast<std::int32_t>(root);
+    if (!validateSceneGraph49P(graph)||index<0||
+        static_cast<std::uint32_t>(index)>=graph.count) return false;
+    const auto& local=graph.nodes[static_cast<std::size_t>(index)].localC0;
+    OriginalUiRiderPodOrientation50KG saved;
+    //28A538..28A56C are copies, including signed zeros and opaque FP bits.
+    std::memcpy(saved.look.data(),local.v+8,sizeof(float)*3);
+    std::memcpy(saved.up.data(),local.v+4,sizeof(float)*3);
+    std::memcpy(&output,&saved,sizeof saved);return true;
+}
+bool restoreOriginalUiRiderPodOrientation50KG(const SceneGraph49P& graph,
+    SceneNodeIndex49P root,const OriginalUiRiderPodOrientation50KG& orientation) noexcept {
+    const auto index=static_cast<std::int32_t>(root);
+    if (!validateSceneGraph49P(graph)||index<0||
+        static_cast<std::uint32_t>(index)>=graph.count) return false;
+    const auto& local=graph.nodes[static_cast<std::size_t>(index)].localC0;
+    V position;std::memcpy(position.data(),local.v+12,sizeof(float)*3);
+    BodyMatrix48G restored;
+    if (!originalUiRiderPodOrientationPose50KG(position,orientation,restored)) return false;
+    // Source28A03C..28A074 exactly matches this existing setter's post-write
+    // continuation: mark node/ancestors80, then clear ready01 and descend only
+    // if this target was ready. It does not eagerly recompute any world matrix.
+    return setLocalMatrix49P(graph,root,restored);
+}
 bool originalUiUserRotatePose50KG(const V& position,const V& look,const V& up,
     BodyMatrix48G& output) noexcept {
     if (std::fegetround()!=FE_TONEAREST||!finite(position)||!finite(look)||!finite(up)) return false;

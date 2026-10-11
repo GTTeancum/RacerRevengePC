@@ -3,6 +3,34 @@
 #include <array>
 
 namespace rr::game {
+// Value-only snapshot of source28A530 local look/up. It retains no graph,
+// asset, material, registry, renderer packet or source-lifetime ownership.
+// W is deliberately absent: Rider initializes both saved W lanes to1, and
+// source289EC0 later explicitly writes basis W=0 and translation W=1.
+struct OriginalUiRiderPodOrientation50KG {
+    std::array<float,3> look{};
+    std::array<float,3> up{};
+};
+// Directional Rider restore ONLY: source289EC0(a3=0,t0=1,t1=0).
+// Normalize Up then Look independently and form Right=Up cross Look. Do not
+// cross-correct Look or normalize Right. This pure builder can preflight the
+// captured axes before destructive outgoing callbacks. False leaves output
+// untouched. Native sqrt/binary32 policy, FE_TONEAREST, no guest/VU execution;
+// finite XYZ and nonzero finite squared axis lengths are native admission.
+// Nonzero parallel axes are not orthogonalized or rejected by this branch.
+bool originalUiRiderPodOrientationPose50KG(const std::array<float,3>& position,
+    const OriginalUiRiderPodOrientation50KG&,BodyMatrix48G& output) noexcept;
+// Capture copies local+C0 look/up XYZ exactly, without refreshing world caches
+// or doing arithmetic. False leaves output unchanged. Restore reads position
+// from the INCOMING local matrix, writes its complete local matrix, then uses
+// source28C4F0/ready-gated289A20 propagation; cached worlds stay lazy.
+// Coherent caller-owned graph, valid node, serial access and disjoint snapshot
+// storage are required. No attachment, visibility/cache membership, material
+// lifetime, navigation, renderer fence or source callback is supplied here.
+bool captureOriginalUiRiderPodOrientation50KG(const SceneGraph49P&,
+    SceneNodeIndex49P,OriginalUiRiderPodOrientation50KG& output) noexcept;
+bool restoreOriginalUiRiderPodOrientation50KG(const SceneGraph49P&,
+    SceneNodeIndex49P,const OriginalUiRiderPodOrientation50KG&) noexcept;
 struct OriginalUiUserRotateParameters50KG {
     std::array<bool,3> enabled{};
     std::array<float,3> revolutionsPerSecond{};
