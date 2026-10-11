@@ -1,5 +1,6 @@
 #pragma once
 #include "original_ui_options_session50kg.h"
+#include "original_ui_rider_session50kg.h"
 #include "vehicle_window_gl50ds.h"
 #include "../../../src/assets/original_ui_localization50kg.h"
 #include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
@@ -18,6 +19,10 @@ struct OriginalUiFrontendDiagnostic50KG {
     OriginalUiMainSessionDiagnostic50KG main{};
     OriginalUiOptionsSessionDiagnostic50KG options{};
     OriginalUiOptionsDrawDiagnostic50KG optionsResources{};
+    OriginalUiRiderSessionDiagnostic50KG rider{};
+    OriginalUiRiderDrawResourceDiagnostic50KG riderResources{};
+    assets::OriginalUiRiderStatAssetDiagnostic50KG riderStats{};
+    assets::OriginalUiRiderBinderAssetDiagnostic50KG riderBinder{};
     assets::OriginalUiLocalizationDiagnostic50KG localization{};
     game::OriginalUiLightManagerLifetimeDiagnostic50KG lightManager{};
     MaterialTextureGlDiagnostic50EB gpu{};
@@ -29,6 +34,11 @@ struct OriginalUiFrontendCold50KG {
     // English is decoded once from localization and retained for every lifetime.
     std::shared_ptr<const assets::OriginalUiArchive50KG> appStart,mainMenu,options,
         fonts,controllerPopup,overlays,localization;
+    // Optional concrete Rider inputs. Missing any leaves Main's genuine Rider
+    // action unavailable; a cache flag or remembered rider is not readiness.
+    std::shared_ptr<const assets::OriginalUiArchive50KG> rider,backgrounds,podTextures;
+    std::shared_ptr<const assets::OriginalUiIpumTextureCache50KG> riderIpumCache;
+    std::shared_ptr<OriginalUiRiderProfileOwner50KG> riderProfile;
     OriginalUiMainVideoOwner50KG video{};
     assets::OriginalUiMaterialRuntime50KG runtime{};
     std::shared_ptr<OriginalUiMainProfile50KG> profile;
@@ -44,7 +54,7 @@ struct OriginalUiFrontendCold50KG {
     // across every screen/frontend lifetime. Never created by a destination.
     std::shared_ptr<game::OriginalUiLightManagerLifetime50KG> lightManager;
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
-    // Same actual transport/output owner throughout both screens. Caller owns
+    // Same actual transport/output owner throughout Main/Options. Caller owns
     // mixer/device and advances PCM only for an accepted update receipt.
     std::shared_ptr<OriginalUiMainAudio50KG> audio;
     // Exact live context/functions and explicit per-bank GPU budget. Samplers
@@ -67,6 +77,7 @@ struct OriginalUiFrontendInputReceipt50KG {
     OriginalUiFrontendColdInterval50KG coldInterval{};
     OriginalUiMainSessionInputReceipt50KG main{};
     OriginalUiOptionsSessionInputReceipt50KG options{};
+    OriginalUiRiderSessionInputReceipt50KG rider{};
 };
 struct OriginalUiFrontendUpdateReceipt50KG {
     // True only after exactly one audio preparation, actual manager switch
@@ -85,12 +96,14 @@ struct OriginalUiFrontendSnapshot50KG {
     game::OriginalUiApplicationRequest50KG queuedRequest{};
     OriginalUiMainSessionSnapshot50KG main{};
     OriginalUiOptionsSessionSnapshot50KG options{};
+    OriginalUiRiderSessionSnapshot50KG rider{};
     std::uint64_t updates=0,renders=0,submissions=0,switches=0;
     game::OriginalUiLightCacheState50KG lightCacheState=game::OriginalUiLightCacheState50KG::notConstructed;
     std::uint64_t lightManagerGeneration=0;
     bool lightManagerEntered=false;
 };
-// Concrete native Main4/1 <-> Options12/{1,4} owner. No generic destination-ready
+// Concrete native Main4/1 <-> Options12/{1,4}, plus muted Rider5/1 for
+// authenticated initial Rider19. No generic destination-ready
 // callbacks, guest execution, gameplay entry, fallback UI or profile reset.
 // One freshly prepared bank/session/manager per screen lifetime; shared process
 // profile/application/audio/light manager remain the same. Options page changes
@@ -134,6 +147,7 @@ public:
     OriginalUiFrontendSnapshot50KG snapshot() const noexcept;
     const OriginalUiMainSession50KG* mainSession() const noexcept;
     const OriginalUiOptionsSession50KG* optionsSession() const noexcept;
+    const OriginalUiRiderSession50KG* riderSession() const noexcept;
     const OriginalUiMainDrawResources50KG* mainResources() const noexcept;
     const OriginalUiOptionsDrawResources50KG* optionsResources() const noexcept;
     const assets::MaterialTextureAssets50EA* textures() const noexcept;

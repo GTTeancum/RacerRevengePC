@@ -68,6 +68,9 @@ constexpr std::array<OriginalFile,7> originals{{
     {"SFX/UI/BACK.VAG",11568,"3306a9ef40ab752a26a645f28f96ab61d2a7bb91b7a83c989496bd22e7a24b18",20132},
     {"SFX/UI/ADVANCE.VAG",2864,"e49eedb1fdfdc1c1ecf13d2d34f0357a5be77835f5293b295f4811050cd077ec",4900}
 }};
+constexpr OriginalFile riderOriginal{
+    "MUSIC/UI/SCREENS/UI_PEOPL.VAG",709504,
+    "2ac7db7a81ebcad40afa37998ac3e1dba16d5cd774d0da464db03faa411ed9e4",619024};
 Bytes authenticatedRead(const std::filesystem::path& root, const char* relative,
     std::size_t expectedSize, const char* expectedHash) {
     need(!std::filesystem::is_symlink(root) && std::filesystem::is_directory(root), "Main audio root is not a real directory");
@@ -89,13 +92,14 @@ Bytes authenticatedRead(const std::filesystem::path& root, const char* relative,
 std::uint32_t be32(const std::uint8_t* p) noexcept {
     return (std::uint32_t(p[0]) << 24) | (std::uint32_t(p[1]) << 16) | (std::uint32_t(p[2]) << 8) | p[3];
 }
-assets::AudioPcm50HC decodeMainStereo(const Bytes& data) {
-    constexpr std::size_t prefix = 0x7e0, payload = 219504, frames = 384104;
+assets::AudioPcm50HC decodeMenuStereo(const Bytes& data,const OriginalFile& original,std::size_t payload) {
+    constexpr std::size_t prefix = 0x7e0;
+    const auto frames=original.frames;
     need(data.size() == prefix + 2 * payload && be32(data.data()+12) == payload && be32(data.data()+16) == 22050,
         "Main stereo source framing differs");
     for (std::size_t i=0; i<prefix; ++i)
         if (i<12 || i>=20) need(data[i]==0, "Main stereo source prefix differs");
-    constexpr auto blocks = payload / 16;
+    const auto blocks = payload / 16;
     for (std::size_t i=0; i<blocks; ++i) {
         const auto at=prefix+i*32;
         const auto flag=static_cast<std::uint8_t>(i+2==blocks ? 1 : 0);
@@ -120,7 +124,7 @@ assets::AudioPcm50HC decodeMainStereo(const Bytes& data) {
     }
     assets::AudioPcm50HC result;
     result.channels=2; result.sampleRate=22050; result.frames=frames;
-    result.sourceSha256=originals[0].sha; result.samples.resize(frames*2);
+    result.sourceSha256=original.sha; result.samples.resize(frames*2);
     for (std::size_t n=0; n<frames; ++n) {
         result.samples[n*2]=channels[0].samples[n]; result.samples[n*2+1]=channels[1].samples[n];
     }
@@ -143,7 +147,7 @@ bool OriginalUiMainAudio50KG::prepare(const std::filesystem::path& audioRoot,
         std::array<assets::AudioPcm50HC,7> next;
         for (std::size_t i=0; i<originals.size(); ++i) {
             const auto& def=originals[i]; const auto bytes=authenticatedRead(audioRoot,def.path,def.bytes,def.sha);
-            if (i==0) next[i]=decodeMainStereo(bytes);
+            if (i==0) next[i]=decodeMenuStereo(bytes,def,219504);
             else {
                 std::string decodeError;
                 need(assets::decodeVagMono50HC(bytes.data(),bytes.size(),next[i],decodeError), "Original Main effect decode rejected");
@@ -162,11 +166,40 @@ bool OriginalUiMainAudio50KG::prepare(const std::filesystem::path& audioRoot,
     catch (...) { error="Main audio cold preparation failed"; }
     return false;
 }
+bool OriginalUiMainAudio50KG::prepareRiderMenu(const std::filesystem::path& audioRoot,
+    std::string& error) noexcept {
+    if(riderAttempted_){error="Rider music needs a fresh cold preparation";return false;}
+    riderAttempted_=true;
+    try {
+        need(current()&&!paused_&&!ownsMusic_&&!mixer_->mixedFrames(),
+            "Rider music requires the prepared cold frontend transport");
+        for(std::size_t i=0;i<mixer_->count();++i)
+            need(!mixer_->active(i),"Rider music preparation cannot alter live playback");
+        // The optional AUDIO root must carry the exact same original menu
+        // authoring. No parsed index, filename guess or alternative sample.
+        authenticatedRead(audioRoot,"UI_MUSIC.JUK",1517,"4b814f8e4fec2fbcfa25807d5e147ecc164dbb0b0cb9ce5d064e2f3e3c89de98");
+        authenticatedRead(audioRoot,"UI_MUSIC.JUB",3623,"f97a5cbceec8056dfc9b277501087aaa54d86a0ccdc0c71cfde73522a048c661");
+        const auto bytes=authenticatedRead(audioRoot,riderOriginal.path,riderOriginal.bytes,riderOriginal.sha);
+        auto pcm=decodeMenuStereo(bytes,riderOriginal,353744);
+        need(pcm.frames==riderOriginal.frames&&pcm.channels==2&&pcm.sampleRate==22050&&!pcm.hasEmbeddedLoop,
+            "Original Rider music PCM metadata differs");
+        const AudioClip50HD clip{pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,0,0};
+        need(AudioMixer50HD::validClip(clip),"Original Rider music rejected by native mixer");
+        riderPcm_=std::move(pcm);
+        riderClip_={riderPcm_.samples.data(),riderPcm_.frames,riderPcm_.sampleRate,riderPcm_.channels,0,0};
+        riderPrepared_=true;error.clear();return true;
+    }catch(const std::exception& e){error=e.what();}
+    catch(...){error="Rider music cold preparation failed";}
+    return false;
+}
 bool OriginalUiMainAudio50KG::current() const noexcept {
     return prepared_ && mixer_ && mixer_->groupEpoch50IC()==mixerEpoch_ && mixer_->count()==mixerCount_ &&
         !mixer_->requiresVoiceGroupGains50IC();
 }
 bool OriginalUiMainAudio50KG::ready() const noexcept { return current(); }
+bool OriginalUiMainAudio50KG::riderMenuReady() const noexcept {
+    return current()&&riderPrepared_&&AudioMixer50HD::validClip(riderClip_);
+}
 const OriginalSoundMode50KG* OriginalUiMainAudio50KG::soundModeOwner50KG() const noexcept {
     return current()?mixer_->originalSoundMode50KG():nullptr;
 }
@@ -178,11 +211,30 @@ bool OriginalUiMainAudio50KG::applySoundMode18874050KG(std::uint32_t mode) noexc
     return canApplySoundMode18874050KG(mode)&&mixer_->originalSoundMode50KG()->apply188740(*mixer_,mode);
 }
 bool OriginalUiMainAudio50KG::startMainLoop9() noexcept {
+    return startMusicLoop(clips_[0],9);
+}
+bool OriginalUiMainAudio50KG::startRiderLoop7() noexcept {
+    return riderMenuReady()&&startMusicLoop(riderClip_,7);
+}
+bool OriginalUiMainAudio50KG::startMusicLoop(const AudioClip50HD& clip,std::uint32_t song) noexcept {
     if (!current() || paused_) return false;
     if (!ownsMusic_ && mixer_->active(musicVoice)) return false;
-    if (!mixer_->play(musicVoice,clips_[0],0.4f,1.f,true,0.f)) return false;
-    ownsMusic_=true; fading_=false; musicGain_=0.4f; fadeElapsed_=fadeDuration_=fadeRetireAt_=0.f;
+    //234900(restart1) replaces the outgoing music, including any pending
+    //234440 retirement, before beginning the selected original clip at0.
+    if (!mixer_->play(musicVoice,clip,0.4f,1.f,true,0.f)) return false;
+    ownsMusic_=true; fading_=false; musicSong_=song;
+    musicGain_=0.4f; fadeElapsed_=fadeDuration_=fadeRetireAt_=0.f;
     return true;
+}
+bool OriginalUiMainAudio50KG::fadeRiderMusic() noexcept {
+    if(!riderMenuReady()||(ownsMusic_&&musicSong_!=7))return false;
+    return fadeMain(1.f);
+}
+bool OriginalUiMainAudio50KG::canPlayRiderBack5() const noexcept {
+    return riderMenuReady()&&canPlayEffectClip(5);
+}
+bool OriginalUiMainAudio50KG::playRiderBack5() noexcept {
+    return canPlayRiderBack5()&&playEffectClip(5);
 }
 bool OriginalUiMainAudio50KG::fadeMain(float seconds) noexcept {
     if (!current() || paused_ || (seconds!=0.f && seconds!=1.f)) return false;
@@ -192,7 +244,7 @@ bool OriginalUiMainAudio50KG::fadeMain(float seconds) noexcept {
     if (!ownsMusic_ && !mixer_->active(musicVoice)) return true;
     if (!ownsMusic_ || !mixer_->active(musicVoice)) return false;
     if (seconds==0.f) {
-        mixer_->stop(musicVoice); ownsMusic_=false; fading_=false; musicGain_=0.f; return true;
+        mixer_->stop(musicVoice); ownsMusic_=false; fading_=false; musicSong_=0; musicGain_=0.f; return true;
     }
     fadeStartGain_=musicGain_; fadeElapsed_=0.f; fadeDuration_=seconds;
     volatile float retirement=seconds+0.35f; fadeRetireAt_=retirement;
@@ -244,13 +296,13 @@ bool OriginalUiMainAudio50KG::update(float seconds) noexcept {
         if (!ownsEffect_[i] && mixer_->active(firstEffectVoice+i)) return false;
         if (ownsEffect_[i] && !mixer_->active(firstEffectVoice+i)) ownsEffect_[i]=false;
     }
-    if (ownsMusic_ && !mixer_->active(musicVoice)) { ownsMusic_=false; fading_=false; }
+    if (ownsMusic_ && !mixer_->active(musicVoice)) { ownsMusic_=false; fading_=false; musicSong_=0; }
     if (!fading_) return true;
     volatile float elapsed=fadeElapsed_+seconds; fadeElapsed_=elapsed;
     musicGain_=fadeStartGain_*std::max(0.f,1.f-fadeElapsed_/fadeDuration_);
     if (!mixer_->controls(musicVoice,musicGain_,1.f,0.f)) return false;
     if (fadeElapsed_>=fadeRetireAt_) {
-        mixer_->stop(musicVoice); ownsMusic_=false; fading_=false; musicGain_=0.f;
+        mixer_->stop(musicVoice); ownsMusic_=false; fading_=false; musicSong_=0; musicGain_=0.f;
     }
     return true;
 }
@@ -263,7 +315,13 @@ bool OriginalUiMainAudio50KG::mixStereo16(std::int16_t* output, std::size_t fram
     return mixer_->mixStereo16(output,frames);
 }
 bool OriginalUiMainAudio50KG::mainLoopActive() const noexcept {
-    return current() && ownsMusic_ && mixer_->active(musicVoice);
+    return activeMusicSong()==9;
+}
+bool OriginalUiMainAudio50KG::riderLoopActive() const noexcept {
+    return activeMusicSong()==7;
+}
+std::uint32_t OriginalUiMainAudio50KG::activeMusicSong() const noexcept {
+    return current()&&ownsMusic_&&mixer_->active(musicVoice)?musicSong_:0;
 }
 void OriginalUiMainAudio50KG::reset() noexcept {
     if (current()) {
@@ -271,7 +329,7 @@ void OriginalUiMainAudio50KG::reset() noexcept {
         for (std::size_t i=0; i<effectVoiceCount; ++i)
             if (ownsEffect_[i]) mixer_->stop(firstEffectVoice+i);
     }
-    prepared_=false; mixer_=nullptr; ownsMusic_=false; fading_=false; paused_=false;
+    prepared_=false; riderPrepared_=false; mixer_=nullptr; ownsMusic_=false; fading_=false; paused_=false; musicSong_=0;
     ownsEffect_.fill(false); musicGain_=0.f;
 }
 }

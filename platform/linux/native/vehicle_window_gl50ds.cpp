@@ -1,4 +1,5 @@
 #include "vehicle_window_gl50ds.h"
+#include "original_ui_rider_draw_contribution50kg.h"
 #include "native_pod_shadow50hm.h"
 #include "native_pod_shadow_glsl50hm.h"
 #include "../../../src/game/pod_cables50fd.h"
@@ -2259,13 +2260,14 @@ void main() {
             uiSourceCompositionUniform < 0 || uiSourceTargetUniform < 0 || uiSourceBlendUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "original UI uniform missing");
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::none;
-        constexpr std::intptr_t vertexBytes = originalUiMaximumQuads50KG * 4 * sizeof(assets::Vertex48B);
+        const U uiCapacity=request.enableOriginalUiSourceRgba?originalUiMaximumSourceQuads50KM:originalUiMaximumQuads50KG;
+        const std::intptr_t vertexBytes = uiCapacity * 4 * sizeof(assets::Vertex48B);
         gl.genBuffers(1, &uiVertexBuffer); drawGl.bindBuffer(arrayBuffer, uiVertexBuffer);
         gl.bufferData(arrayBuffer, vertexBytes, nullptr, dynamicDraw);
         if (!check("allocate bounded original UI vertices")) return false;
         if (!uiVertexBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI vertex buffer");
         if (!verifyBuffer(arrayBuffer, vertexBytes, dynamicDraw)) return false;
-        constexpr std::intptr_t fogBytes = originalUiMaximumQuads50KG * 4 * sizeof(float);
+        const std::intptr_t fogBytes = uiCapacity * 4 * sizeof(float);
         gl.genBuffers(1, &uiParticleFogBuffer); drawGl.bindBuffer(arrayBuffer, uiParticleFogBuffer);
         gl.bufferData(arrayBuffer, fogBytes, nullptr, dynamicDraw);
         if (!check("allocate bounded original UI particle fog")) return false;
@@ -2277,19 +2279,19 @@ void main() {
         if (!uiSourceRasterWBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI source W buffer");
         if (!verifyBuffer(arrayBuffer, fogBytes, dynamicDraw)) return false;
         // Heap allocation is cold-only; no large transient frame stack.
-        std::unique_ptr<U[]> indices(new (std::nothrow) U[originalUiMaximumQuads50KG * 6]);
+        std::unique_ptr<U[]> indices(new (std::nothrow) U[uiCapacity * 6]);
         if (!indices) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate original UI quad indices");
         constexpr U corners[] = {0, 1, 2, 0, 2, 3};
-        for (U i = 0; i < originalUiMaximumQuads50KG * 6; ++i) indices[i] = (i / 6) * 4 + corners[i % 6];
-        constexpr std::intptr_t indexBytes = originalUiMaximumQuads50KG * 6 * sizeof(U);
+        for (U i = 0; i < uiCapacity * 6; ++i) indices[i] = (i / 6) * 4 + corners[i % 6];
+        const std::intptr_t indexBytes = uiCapacity * 6 * sizeof(U);
         gl.genBuffers(1, &uiIndexBuffer); drawGl.bindBuffer(arrayBuffer, uiIndexBuffer);
         gl.bufferData(arrayBuffer, indexBytes, indices.get(), staticDraw);
         if (!check("upload original UI quad indices")) return false;
         if (!uiIndexBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI index buffer");
         if (!verifyBuffer(arrayBuffer, indexBytes, staticDraw)) return false;
         U uploaded[256];
-        for (U i = 0; i < originalUiMaximumQuads50KG * 6; i += 256) {
-            const auto bytes = std::min<U>(256, originalUiMaximumQuads50KG * 6 - i) * sizeof(U);
+        for (U i = 0; i < uiCapacity * 6; i += 256) {
+            const auto bytes = std::min<U>(256, uiCapacity * 6 - i) * sizeof(U);
             gl.getBufferSubData(arrayBuffer, std::intptr_t(i) * sizeof(U), bytes, uploaded);
             if (!check("verify original UI index bytes")) return false;
             if (std::memcmp(indices.get() + i, uploaded, bytes))
@@ -3847,11 +3849,20 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame
         (frame.owner_==s.uiSourceFrameOwner && frame.frameGeneration_<=s.uiSourceFrameGeneration) ||
         s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max())
         return fail(d,VehicleWindowError50DS::frame,"unsealed or stale complete Rider frame");
-    const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d);
+    if (!frame.owner_->beginSourceSubmission(frame.frameGeneration_))
+        return fail(d,VehicleWindowError50DS::frame,"Rider source binding-history receipt rejected");
+    bool sourceWorkStarted=false;
+    const auto sourceTargetBefore=s.uiSourceTargetGeneration;
+    const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted);
+    frame.owner_->finishSourceSubmission(frame.frameGeneration_,d.originalUiAccepted,sourceWorkStarted);
     d.originalUiSourceFrameGeneration=frame.frameGeneration_;
     d.originalUiSourceTargetGeneration=s.uiSourceTargetGeneration;
+    // Keep the attempted owner borrowed after any potentially partial source
+    // work. Only explicit successful retirement may release that lifetime.
+    if (sourceWorkStarted || d.originalUiAccepted || s.uiSourceTargetGeneration!=sourceTargetBefore)
+        s.uiSourceFrameOwner=frame.owner_;
     // A private publication stays committed even if its later window copy fails.
-    if (d.originalUiAccepted){s.uiSourceFrameOwner=frame.owner_;s.uiSourceFrameGeneration=frame.frameGeneration_;}
+    if (d.originalUiAccepted)s.uiSourceFrameGeneration=frame.frameGeneration_;
     return accepted;
 }
 bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
@@ -3876,8 +3887,10 @@ bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
     return accepted;
 }
 bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& native,
-    std::int32_t width,std::int32_t height,bool sourceRgba,VehicleWindowDiagnostic50DS& d) noexcept {
+    std::int32_t width,std::int32_t height,bool sourceRgba,VehicleWindowDiagnostic50DS& d,
+    bool* sourceWorkStarted) noexcept {
     d = {};
+    if(sourceWorkStarted)*sourceWorkStarted=false;
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_; const auto& input = native.draw;
     if (!s.current(d)) return false;
@@ -3886,7 +3899,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         !s.uiTargets[0] || !s.uiTargets[1] ||
         width <= 0 || height <= 0 || width > s.maximumWidth || height > s.maximumHeight ||
         input.canvasWidth != 640.f || input.canvasHeight != 448.f ||
-        !input.quadCount || input.quadCount > originalUiMaximumQuads50KG || !input.vertices ||
+        !input.quadCount || input.quadCount > (sourceRgba?originalUiMaximumSourceQuads50KM:originalUiMaximumQuads50KG) || !input.vertices ||
         !input.spanCount || input.spanCount > originalUiMaximumSpans50KG || !input.spans ||
         !native.states || native.stateCount != input.spanCount ||
         (sourceRgba ? native.opaquePresentationAlphaOnly : !native.opaquePresentationAlphaOnly))
@@ -4112,6 +4125,10 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         }
         s.drawGl.bindBuffer(elementBuffer, s.uiIndexBuffer);
         accepted = s.check("prepare authenticated original UI frame");
+        // No material representative has bound before this point. Read-only
+        // preflight/context/window failures remain retryable with the same
+        // composer generation. A later partial source pass failure is unknown.
+        if(sourceRgba&&accepted&&input.spanCount&&sourceWorkStarted)*sourceWorkStarted=true;
         for (U i = 0; accepted && i < input.spanCount; ++i) {
             const auto& span = input.spans[i]; const auto& state = native.states[i];
             const U depth = state.depth == OriginalUiDepth50KG::never ? 0x0200 :

@@ -27,7 +27,12 @@ public:
     // and original VAGs before decoding. Missing/changed bytes fail; no substitute.
     bool prepare(const std::filesystem::path& audioRoot, AudioMixer50HD& dedicatedFrontendMixer,
         std::string& error) noexcept;
+    // Optional additional cold original Song7. Call after prepare and BEFORE
+    // any playback/mixing. Main/Options require no Rider music bytes. Failure
+    // leaves their already prepared transport intact and Rider unavailable.
+    bool prepareRiderMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
     bool ready() const noexcept override;
+    bool riderMenuReady() const noexcept;
     // Concrete source-mode application through THIS transport's actual mixer.
     // No attached owner, stale mixer, or paused transport can certify Accept.
     const OriginalSoundMode50KG* soundModeOwner50KG() const noexcept;
@@ -39,6 +44,15 @@ public:
     // Source1E68CC ->234900(stream,9,1). Session owns +44/+48 admission checks.
     // Replaces only this frontend music voice, loops original PCM [0,frames).
     bool startMainLoop9() noexcept;
+    // Rider1EA060 ->234900(stream,7,1). Replaces the SAME music voice and
+    // cancels its outgoing fade; no new stream, clock, RNG or music overlap.
+    bool startRiderLoop7() noexcept;
+    // Source1EA3C0 invokes the same234440(1.0) fade on that shared stream.
+    bool fadeRiderMusic() noexcept;
+    // Bounded Rider5/1 normal Back only:1EA848 ->292360(event5,1,0).
+    // Read-only preflight is required before the actual profile/route commit.
+    bool canPlayRiderBack5() const noexcept;
+    bool playRiderBack5() noexcept;
     // Source loop-mode234540, targetvolume0, duration1000ms for Main B4.
     // Bounded source calls admitted: zero immediate stop or exactly1 second.
     // Native policy: linear gain at accepted source-update boundaries, followed
@@ -65,21 +79,28 @@ public:
     bool mixStereo16(std::int16_t* output, std::size_t frames) noexcept override;
     void reset() noexcept;
     bool mainLoopActive() const noexcept;
+    bool riderLoopActive() const noexcept;
+    std::uint32_t activeMusicSong() const noexcept;
     float mainGain() const noexcept { return musicGain_; }
 private:
     bool current() const noexcept;
+    bool startMusicLoop(const AudioClip50HD&, std::uint32_t song) noexcept;
     bool canPlayEffectClip(std::size_t) const noexcept;
     bool playEffectClip(std::size_t) noexcept;
     bool attempted_ = false, prepared_ = false, paused_ = false;
+    bool riderAttempted_ = false, riderPrepared_ = false;
     bool ownsMusic_ = false, fading_ = false;
     AudioMixer50HD* mixer_ = nullptr;
     std::uint64_t mixerEpoch_ = 0;
     std::size_t mixerCount_ = 0;
     float musicGain_ = 0.4f, fadeStartGain_ = 0.4f;
     float fadeElapsed_ = 0.f, fadeDuration_ = 0.f, fadeRetireAt_ = 0.f;
+    std::uint32_t musicSong_ = 0;
     // Original UI setup1B7944 music40/100 and1B78D0 effects100/100.
     std::array<assets::AudioPcm50HC, 7> pcm_{};
     std::array<AudioClip50HD, 7> clips_{};
+    assets::AudioPcm50HC riderPcm_{};
+    AudioClip50HD riderClip_{};
     std::array<bool, effectVoiceCount> ownsEffect_{};
 };
 }

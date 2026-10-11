@@ -41,12 +41,20 @@ public:
     bool beginFrame() noexcept;
     void endFrame() noexcept;
     std::uint64_t generation() const noexcept;
+    // Actual model attachment's parent+A4 resource synchronization event.
+    // Image-bank remaps, show/hide and GPU replacement are not14D440 rebuilds.
+    std::uint64_t registryGeneration() const noexcept;
     std::shared_ptr<const assets::OriginalUiImageBank50KG> bank() const noexcept;
     const assets::OriginalUiImageBankMapping50KG* staticImage(std::uint32_t owner,std::uint32_t image) const noexcept;
     const assets::OriginalUiImageBankMapping50KG* modelImage(std::uint16_t widget,std::uint32_t image) const noexcept;
     const assets::OriginalUiImageBankMapping50KG* binderImage(std::uint32_t image) const noexcept;
     const assets::OriginalUiRiderModelMaterials50KG* materials(std::uint16_t) const noexcept;
     const OriginalUiRiderVisibilityHandle50KG* membership(std::uint16_t) const noexcept;
+    // Actual source14D370/14D440 population reached by parent+A4, not cold
+    // image/policy preflight or current visibility. Loaded PSM pointers survive
+    // model detach until the real resource registry is destroyed with this UI.
+    bool materialsRegistered(std::uint16_t) const noexcept;
+    bool binderMaterialRegistered() const noexcept;
     bool attached(std::uint16_t) const noexcept;
     bool shown(std::uint16_t) const noexcept;
     // Children are visited after their actual widget, then model, then binder

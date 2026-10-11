@@ -15,6 +15,7 @@ struct OriginalUiMaterialEquivalenceDiagnostic50KG {
     const char* field=nullptr;
     OriginalUiPageDiagnostic50KG document;
 };
+class OriginalUiMaterialBindingState50KG;
 class OriginalUiMaterialEquivalenceKey50KG;
 bool prepareOriginalUiMaterialEquivalence50KG(const OriginalUiMaterialPass50KG&,
     const OriginalUiImageProvenance50KG* textureOrNull,
@@ -39,6 +40,7 @@ public:
     bool prepared() const noexcept {return prepared_;}
     bool excludesMerging() const noexcept {return prepared_&&(uniqueAnimation_||uniqueGroup_);}
 private:
+    friend class OriginalUiMaterialBindingState50KG;
     bool prepared_=false,enabled_=false,fillColor_=false;
     bool uniqueAnimation_=false,uniqueGroup_=false;
     std::uint8_t program_=0,mapCount_=0,uvIndex_=0;

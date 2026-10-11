@@ -3141,12 +3141,21 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     std::filesystem::rename(writingFile,captureFile);
     const auto mainAudioInfo=originalMain.audioOutput.info();
     const auto capturedUi=originalMain.coordinator.snapshot();
-    const auto* capturedNavigation=originalMain.navigation();
-    require50DU(capturedNavigation,"original UI capture navigation missing");
-    const auto capturedGroup=capturedNavigation->controllerGroup[0];
-    const auto capturedSlot=capturedGroup>0&&static_cast<std::size_t>(capturedGroup)<capturedNavigation->groups.size()?
-        capturedNavigation->groups[capturedGroup].selectedSlot:0;
-    const auto capturedAperture=capturedUi.route.screen==4?capturedUi.main.aperture:capturedUi.options.aperture;
+    J capturedGroup=nullptr;
+    std::int32_t capturedSlot=0;
+    const bool capturedRider=capturedUi.route.screen==5&&capturedUi.route.page==1;
+    if(capturedRider){
+     require50DU(originalMain.coordinator.riderSession(),"original Rider capture session missing");
+     capturedSlot=capturedUi.rider.slot4C8;
+    }else{
+     const auto* capturedNavigation=originalMain.navigation();
+     require50DU(capturedNavigation,"original UI capture navigation missing");
+     const auto group=capturedNavigation->controllerGroup[0];capturedGroup=group;
+     capturedSlot=group>0&&static_cast<std::size_t>(group)<capturedNavigation->groups.size()?
+         capturedNavigation->groups[group].selectedSlot:0;
+    }
+    const auto capturedAperture=capturedUi.route.screen==4?capturedUi.main.aperture:
+        capturedRider?capturedUi.rider.aperture:capturedUi.options.aperture;
     J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
         {"screen",capturedUi.route.screen},{"page",capturedUi.route.page},{"switches",capturedUi.switches},
         {"requested_screen",capturedUi.transition.requested.screen},{"requested_page",capturedUi.transition.requested.page},
@@ -3163,6 +3172,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         {"audio_captured_frames",mainAudioInfo.capturedFrames},{"audio_rate",mainAudioInfo.sampleRate},
         {"audio_clock_microseconds",mainAudioInfo.simulationMicroseconds},
         {"audio_accepted_nanoseconds",originalMain.audioOutput.acceptedNanoseconds()}};
+    if(capturedRider){
+     const bool sourceAccepted=originalMain.submittedScreen==5&&originalMain.sourceFrameGeneration!=0&&
+         originalMain.submittedPublication==originalMain.coordinator.gpu()->publicationToken();
+     receipt["selected_rider"]=capturedUi.rider.rider4C4;
+     receipt["selection_attached"]=capturedUi.rider.selectionAttached;
+     receipt["accepted_source_frame"]=sourceAccepted;
+     receipt["source_frame_generation"]=sourceAccepted?originalMain.sourceFrameGeneration:0;
+     receipt["source_target_generation"]=sourceAccepted?originalMain.sourceTargetGeneration:0;
+     receipt["source_quads"]=sourceAccepted?originalMain.submittedQuads:0;
+     receipt["source_draws"]=sourceAccepted?originalMain.submittedDraws:0;
+     receipt["source_triangles"]=sourceAccepted?originalMain.submittedTriangles:0;
+    }
     std::cerr<<"original_main_capture "<<receipt.dump()<<'\n';
     reportUiState("capture");capturePending=false;return;
    }
@@ -3246,7 +3267,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     const auto inputRoute=originalMain.coordinator.snapshot().route;
     const bool gameOptionsInput=inputRoute.screen==12&&inputRoute.page==4;
-    if(gameOptionsInput){
+    const bool riderInput=inputRoute.screen==5&&inputRoute.page==1;
+    if(gameOptionsInput||riderInput){
      if(input.pressed[80])originalMain.input(0);
      if(input.pressed[79])originalMain.input(1);
      if(input.pressed[82]||input.pressed[26])originalMain.input(2);
@@ -4300,7 +4322,7 @@ int main(int argc,char**argv){try{
              "Run from the repository root. RR_RACE_MODE=1 (default with fully prepared providers); "
              "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
              "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
-             "RR_ORIGINAL_MAIN_MENU=1 selects the original Main-only frontend after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). RR_AUDIO controls race audio only in this mode. Destinations remain unavailable; no driving is launched.\n";
+             "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits only authenticated Rider19/Back when its compiled cache is available. Other Rider selections and course entry remain unavailable. RR_AUDIO controls race audio only; no driving is launched.\n";
   return 2;
  }
  // Every return destroys the complete old session, including native state and

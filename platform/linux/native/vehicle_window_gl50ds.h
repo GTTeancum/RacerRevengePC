@@ -619,7 +619,8 @@ public:
     bool ownsResources() const noexcept;
 private:
     bool submitOriginalUiImpl(const OriginalUiNativeDraw50KG&, std::int32_t width,
-        std::int32_t height, bool sourceRgba, VehicleWindowDiagnostic50DS&) noexcept;
+        std::int32_t height, bool sourceRgba, VehicleWindowDiagnostic50DS&,
+        bool* sourceWorkStarted=nullptr) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };
