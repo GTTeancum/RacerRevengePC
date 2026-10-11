@@ -3191,6 +3191,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      receipt["source_quads"]=sourceAccepted?originalMain.submittedQuads:0;
      receipt["source_draws"]=sourceAccepted?originalMain.submittedDraws:0;
      receipt["source_triangles"]=sourceAccepted?originalMain.submittedTriangles:0;
+     receipt["source_coherent_framebuffer_fetch"]=sourceAccepted&&originalMain.submittedCoherentFramebufferFetch;
+     receipt["source_texture_barriers"]=sourceAccepted?originalMain.submittedTextureBarriers:0;
     }
     std::cerr<<"original_main_capture "<<receipt.dump()<<'\n';
     reportUiState("capture");capturePending=false;return;

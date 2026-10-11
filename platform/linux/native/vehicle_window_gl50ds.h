@@ -265,7 +265,8 @@ struct VehicleWindowRequest50DS {
     // Both may be null for explicit untextured-only draws; a textured span
     // still requires its real bank, and a partial bank pair always rejects.
     bool enableOriginalUi = false;
-    // Cold opt-in: requires GL4.5 or advertised ARB_texture_barrier.
+    // Cold opt-in: uses advertised coherent EXT_shader_framebuffer_fetch,
+    // otherwise requires GL4.5 or advertised ARB_texture_barrier.
     // Allocates a separate fixed640x448 raw-RGBA8/D24 source target.
     bool enableOriginalUiSourceRgba = false;
     const assets::MaterialTextureAssets50EA* originalUiCpuTextures = nullptr;
@@ -508,6 +509,9 @@ struct VehicleWindowDiagnostic50DS {
     // UI-only publication, never a successful native vehicle batch receipt.
     bool hostMenuAccepted = false;
     bool originalUiAccepted = false;
+    // Actual selected source path after successful create or for a source
+    // submission. Ordinary RGB submissions leave this false.
+    bool originalUiCoherentFramebufferFetch = false;
     std::uint32_t originalUiDraws = 0, originalUiQuads = 0;
     std::uint32_t originalUiSourceTriangles = 0, originalUiTextureBarriers = 0;
     std::uint64_t originalUiSourceFrameGeneration = 0, originalUiSourceTargetGeneration = 0;
