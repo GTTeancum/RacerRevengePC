@@ -4049,26 +4049,43 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
     const auto pending = static_cast<std::uint8_t>(s.uiPublished ^ 1u);
     if (accepted) {
         // Sampler zero exposes the immutable published texture parameters.
-        // Check every textured span independently: same-image conflicts reject.
+        // Cache only this submission's actual GL image observations. Compare
+        // every span's expectations independently: same-image conflicts reject.
         // Zero-map spans have no sampled image or texture parameters to query.
+        struct SamplerObservation { U image; I values[6]; };
+        SamplerObservation observed[originalUiMaximumSpans50KG];
+        U observedCount = 0;
+        constexpr U parameters[] = {0x2801, 0x2800, 0x2802, 0x2803, 0x813C, 0x813D};
         s.gl.activeTexture(textureUnit0); if (s.gl.bindSampler) s.gl.bindSampler(0, 0);
         for (U i = 0; accepted && i < input.spanCount; ++i) {
             if (input.spans[i].materialMode == OriginalUiMaterialMode50KG::untexturedVertexColor) continue;
             const auto& sampler = native.states[i].sampler;
-            s.gl.bindTexture(texture2D, input.textures->texture(input.spans[i].textureIndex));
-            constexpr U parameters[] = {0x2801, 0x2800, 0x2802, 0x2803, 0x813C, 0x813D};
+            const U image = input.textures->texture(input.spans[i].textureIndex);
+            U observation = 0;
+            while (observation < observedCount && observed[observation].image != image) ++observation;
+            const bool firstObservation = observation == observedCount;
+            // At most one new entry per span; spanCount was bounded above.
+            auto& actual = observed[observation];
+            if (firstObservation) {
+                actual.image = image;
+                s.gl.bindTexture(texture2D, image);
+            }
             const I expected[] = {
                 sampler.minification == MaterialTextureFilter50EB::nearest ? 0x2600 : 0x2601,
                 sampler.magnification == MaterialTextureFilter50EB::nearest ? 0x2600 : 0x2601,
                 sampler.s == MaterialTextureWrap50EB::repeat ? 0x2901 : 0x812F,
                 sampler.t == MaterialTextureWrap50EB::repeat ? 0x2901 : 0x812F, 0, 0};
             for (U p = 0; accepted && p < 6; ++p) {
-                I actual = -1; s.gl.getTexParameteriv(texture2D, parameters[p], &actual);
-                accepted = s.check("verify per-span original UI sampler");
-                if (accepted && actual != expected[p])
+                if (firstObservation) {
+                    actual.values[p] = -1;
+                    s.gl.getTexParameteriv(texture2D, parameters[p], &actual.values[p]);
+                    accepted = s.check("verify per-span original UI sampler");
+                }
+                if (accepted && actual.values[p] != expected[p])
                     accepted = fail(d, VehicleWindowError50DS::material,
                         "UI span source sampler differs from immutable bank texture parameters");
             }
+            if (firstObservation && accepted) ++observedCount;
         }
     }
     if (accepted) {
