@@ -69,6 +69,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/platform/linux/native/original_ui_rider_profile50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_rider_stat_draw50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_rider_draw_contribution50kg.cpp"
+  "${RR_ROOT}/platform/linux/native/original_ui_rider_session50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_options_draw_contribution50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_selection50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_game_options_controller50kg.cpp"

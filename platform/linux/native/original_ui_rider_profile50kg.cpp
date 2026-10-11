@@ -127,8 +127,13 @@ OriginalUiRiderProfileStamp50KG OriginalUiRiderProfileOwner50KG::stamp() const n
     return storage_?OriginalUiRiderProfileStamp50KG{storage_->generation,storage_->common->mode34}:OriginalUiRiderProfileStamp50KG{};
 }
 bool OriginalUiRiderProfileOwner50KG::selectionSnapshot(game::OriginalUiRiderSelectionProfile50KG& out) const noexcept {
-    if(!storage_||!storage_->readable())return false;const auto& s=*storage_;
-    game::OriginalUiRiderSelectionProfile50KG result;result.ownerReady=true;result.mode34=s.common->mode34;
+    if(!storage_||!storage_->readable())return false;
+    return selectionSnapshotForMode(storage_->common->mode34,out);
+}
+bool OriginalUiRiderProfileOwner50KG::selectionSnapshotForMode(std::uint32_t mode,
+    game::OriginalUiRiderSelectionProfile50KG& out) const noexcept {
+    if(!storage_||!storage_->common||!storage_->common->known||mode>2)return false;const auto& s=*storage_;
+    game::OriginalUiRiderSelectionProfile50KG result;result.ownerReady=true;result.mode34=mode;
     result.remembered6F0=s.remembered[0];result.remembered6F4=s.remembered[1];
     result.remembered6F8=s.remembered[2];result.remembered6FC=s.remembered[3];
     for(unsigned rider=0;rider<27;++rider){auto& row=result.riders[rider];

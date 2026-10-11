@@ -68,6 +68,12 @@ public:
     // Borrowed strings remain valid until setDynamicLines or owner destruction.
     const std::vector<std::string>* textLines(std::uint16_t)const noexcept;
     const std::array<std::int32_t,2>* textPosition(std::uint16_t)const noexcept;
+    // Expands the SAME callback batch as commitNavigation and asks the real
+    // dynamic/backend owners to retain cold assets and capacity only. Does not
+    // attach models, select/show widgets, consume RNG, or publish navigation.
+    bool preflightNavigation(std::uint8_t player,const OriginalUiNavigation50KG& next,
+        const OriginalUiCommands50KG&,const OriginalUiRiderDynamicHooks50KG&,
+        OriginalUiRiderWidgetDiagnostic50KG&) noexcept;
     // Expands actual control memberships, preserves duplicates, applies real
     // dynamic callbacks in order; only then publishes next navigation. It does
     // NOT execute page appearance/lighting/popup/sound/transform side effects.
@@ -91,6 +97,9 @@ public:
     bool projectIcon(std::uint16_t,bool ancestorsShown,OriginalUiRiderIconProjection50KG&,
         OriginalUiRiderWidgetDiagnostic50KG&)const noexcept;
 private:
+    bool expandNavigation(std::uint8_t,const OriginalUiNavigation50KG&,
+        const OriginalUiCommands50KG&,std::vector<OriginalUiRiderWidgetCallback50KG>&,
+        OriginalUiRiderWidgetDiagnostic50KG&) const noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

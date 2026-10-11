@@ -100,6 +100,7 @@ def main():
         'platform/linux/native/original_ui_rider_profile50kg.cpp',
         'platform/linux/native/original_ui_rider_stat_draw50kg.cpp',
         'platform/linux/native/original_ui_rider_draw_contribution50kg.cpp',
+        'platform/linux/native/original_ui_rider_session50kg.cpp',
         'platform/linux/native/original_ui_options_draw_contribution50kg.cpp',
         'src/game/original_ui_rider_selection50kg.cpp',
         'src/game/original_ui_rider_widgets50kg.cpp',

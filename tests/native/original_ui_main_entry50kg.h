@@ -1,6 +1,7 @@
 #pragma once
 #include "original_ui_main_output50kg.h"
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
+#include "../../platform/linux/native/original_ui_rider_profile50kg.h"
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
 #include "../../src/assets/original_ui_localization50kg.h"
@@ -15,11 +16,14 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace original_main_entry50KG {
 inline void require(bool accepted,const char* message) {
     if(!accepted)throw std::runtime_error(message);
 }
+inline std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
+    const std::filesystem::path&,rr::assets::OriginalUiArchiveId50KG);
 // NEW native application startup for the original-UI opt-in. This is a real
 // process owner, not an imported save or a reconstruction of retail boot.
 // The otherwise loaded gameplay world is never advanced in this mode. A
@@ -28,11 +32,13 @@ inline void require(bool accepted,const char* message) {
 // not supported. The frontend cannot restart into the host driving path.
 struct Application {
     bool enabled=false;
-    std::filesystem::path assetRoot,audioRoot;
+    std::filesystem::path assetRoot,audioRoot,riderCacheRoot;
     rr::platform::OriginalUiMainAudioMode50KG audioMode=
         rr::platform::OriginalUiMainAudioMode50KG::muted;
     rr::assets::OriginalUiMaterialRuntime50KG materialRuntime{};
     std::shared_ptr<rr::platform::OriginalUiMainProfile50KG> profile;
+    // One fresh application profile owner; destinations only borrow it.
+    std::shared_ptr<rr::platform::OriginalUiRiderProfileOwner50KG> riderProfile;
     std::shared_ptr<rr::platform::OriginalUiOptionsProfile50KG> optionsProfile;
     std::shared_ptr<rr::game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
     std::shared_ptr<rr::platform::OriginalSoundMode50KG> soundMode;
@@ -82,6 +88,20 @@ struct Application {
         // These are explicit fresh process-owned profile fields. Construct and
         // reset once here, never on page entry, Defaults, Cancel or bank switch.
         profile->known=true;optionsProfile->known=true;gameSettingsProfile->known=true;
+        //17F970/1870B0: read the authenticated authored ability tables once
+        // at explicit new-profile startup, sharing the actual Main profile.
+        // No missing-save fallback and no reset on Rider entry or Back.
+        if(const char* cacheRoot=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE")){
+            require(*cacheRoot,"RR_ORIGINAL_RIDER_IPUM_CACHE must name a nonempty directory");
+            require(audioMode==rr::platform::OriginalUiMainAudioMode50KG::muted,
+                "initial original Rider ownership requires explicit muted UI audio");
+            riderCacheRoot=std::filesystem::path(cacheRoot);
+            riderProfile=std::make_shared<rr::platform::OriginalUiRiderProfileOwner50KG>();
+            rr::platform::OriginalUiRiderProfileDiagnostic50KG riderProfileDiagnostic;
+            require(riderProfile->initializeAtApplicationStartup(profile,
+                readArchive(assetRoot,rr::assets::OriginalUiArchiveId50KG::podPhysics),riderProfileDiagnostic),
+                "fresh original Rider profile initialization rejected");
+        }
         require(rr::game::validOriginalUiGameSettingsProfile50KG(*gameSettingsProfile),
             "fresh original Game Options profile rejected");
         require(soundMode->initializeFromProfile1101C(gameSettingsProfile->soundMode1101C),
@@ -96,7 +116,8 @@ struct Application {
             "one clock-derived native RNG seed="<<state->rawRandom308030
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
             "Accept requires enabled concrete audio and commits process-owned settings. "
-            "Rider/Course/Gallery and other Options subpages are unavailable. "
+            "Muted Rider19 entry additionally requires the authenticated compiled IPUM cache; "
+            "other riders, Course/Gallery and other Options subpages remain unavailable. "
             "No gameplay launch or original boot/save parity is claimed.\n";
     }
 };
@@ -148,6 +169,10 @@ struct Frontend {
     rr::platform::OriginalUiFrontendDiagnostic50KG diagnostic{};
     std::uint64_t lastUpdateNanoseconds=0,inputCount=0,unavailableCount=0,frameCount=0;
     std::uint64_t captureSequence=0,lastAudioSequence=0;
+    // Actual accepted renderer receipt; diagnostic is reused by later calls.
+    std::uint8_t submittedScreen=0;
+    std::uint64_t submittedPublication=0,sourceFrameGeneration=0,sourceTargetGeneration=0;
+    std::uint32_t submittedDraws=0,submittedQuads=0,submittedTriangles=0;
     std::uint64_t lastSourceNanoseconds=0,activeSourceNanoseconds=0;
     std::uint64_t pendingUpdateColdNanoseconds=0,pendingMaterialColdNanoseconds=0;
     std::uint32_t sourceMilliseconds=0;
@@ -195,6 +220,43 @@ struct Frontend {
         cold.runtime=application.materialRuntime;cold.video=video->publication(video);
         cold.profile=application.profile;cold.application=application.state;
         cold.lightManager=application.lightManager;
+        cold.riderProfile=application.riderProfile;
+        // Explicit, optional native codec-cache input. This is not a readiness
+        // switch: the compiled output catalog, each retained mip, every source
+        // archive and the complete destination must still authenticate.
+        if(!application.riderCacheRoot.empty()){
+            require(application.riderProfile && application.riderProfile->initialized(),
+                "original Rider application profile owner unavailable");
+            require(application.audioMode==rr::platform::OriginalUiMainAudioMode50KG::muted,
+                "initial original Rider ownership requires explicit muted UI audio");
+            using Cache=rr::assets::OriginalUiIpumTextureCache50KG;
+            require(Cache::catalogAvailable(),"original Rider IPUM output catalog is unavailable");
+            cold.rider=readArchive(application.assetRoot,Id::rider);
+            cold.backgrounds=readArchive(application.assetRoot,Id::backgrounds);
+            cold.podTextures=readArchive(application.assetRoot,Id::podTextures);
+            std::vector<std::vector<std::uint8_t>> mips;
+            mips.reserve(rr::assets::originalUiIpumMipCount50KG);
+            for(std::size_t mip=0;mip<rr::assets::originalUiIpumMipCount50KG;++mip){
+                const char* filename=Cache::retainedMipFilename(mip);
+                require(filename && *filename,"original Rider IPUM retained filename unavailable");
+                const auto path=application.riderCacheRoot/filename;
+                std::ifstream input(path,std::ios::binary|std::ios::ate);
+                if(!input)throw std::runtime_error("cannot open original Rider IPUM mip: "+path.string());
+                const std::streamoff size=input.tellg();
+                require(size>0 && static_cast<std::uint64_t>(size)<=16u*1024u*1024u,
+                    "original Rider IPUM retained mip size rejected");
+                std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
+                input.seekg(0);input.read(reinterpret_cast<char*>(bytes.data()),
+                    static_cast<std::streamsize>(bytes.size()));
+                require(static_cast<bool>(input),"original Rider IPUM retained mip read failed");
+                mips.push_back(std::move(bytes));
+            }
+            auto cache=std::make_shared<Cache>();
+            rr::assets::OriginalUiIpumCacheDiagnostic50KG cacheDiagnostic;
+            require(cache->load(cold.rider,mips,cacheDiagnostic),
+                "original Rider IPUM retained mip authentication rejected");
+            cold.riderIpumCache=std::move(cache);
+        }
         cold.optionsProfile=application.optionsProfile;cold.gameSettingsProfile=application.gameSettingsProfile;
         cold.soundMode=application.soundMode;
         cold.audioMode=application.audioMode;
@@ -285,6 +347,12 @@ struct Frontend {
         rr::platform::VehicleWindowGl50DS& renderer,std::int32_t width,std::int32_t height) {
         if(coordinator.render(clock,diagnostic)!=Status::ok)fail("render");
         if(coordinator.submit(renderer,width,height,diagnostic)!=Status::ok)fail("submission");
+        submittedScreen=coordinator.snapshot().route.screen;
+        submittedPublication=coordinator.gpu()?coordinator.gpu()->publicationToken():0;
+        submittedDraws=diagnostic.renderer.originalUiDraws;submittedQuads=diagnostic.renderer.originalUiQuads;
+        submittedTriangles=diagnostic.renderer.originalUiSourceTriangles;
+        sourceFrameGeneration=diagnostic.renderer.originalUiSourceFrameGeneration;
+        sourceTargetGeneration=diagnostic.renderer.originalUiSourceTargetGeneration;
     }
     void commitDeferred(rr::platform::VehicleWindowGl50DS& renderer) {
         const auto status=coordinator.commitDeferred(renderer,diagnostic);
@@ -317,6 +385,36 @@ struct Frontend {
     }
     void report(const char* reason,const Application& application,std::uint64_t worldTicks,std::uint64_t mixedFrames) const {
         const auto snapshot=coordinator.snapshot();const bool main=snapshot.route.screen==4;
+        if(snapshot.route.screen==5){
+            require(snapshot.route.page==1&&coordinator.riderSession(),"original Rider session report unavailable");
+            const auto& rider=snapshot.rider;const auto& aperture=rider.aperture;
+            const auto publication=coordinator.gpu()?coordinator.gpu()->publicationToken():0;
+            const bool accepted=submittedScreen==5&&submittedPublication==publication&&sourceFrameGeneration!=0;
+            std::cerr<<"original_rider_state {\"reason\":\""<<reason<<"\",\"screen\":5,\"page\":1"
+                <<",\"switches\":"<<snapshot.switches<<",\"gpu_publication\":"<<publication
+                <<",\"updates\":"<<snapshot.updates<<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<snapshot.submissions
+                <<",\"selected_slot\":"<<rider.slot4C8<<",\"selected_rider\":"<<rider.rider4C4
+                <<",\"selection_attached\":"<<(rider.selectionAttached?"true":"false")
+                <<",\"input_shown\":"<<(rider.inputContainerShown?"true":"false")
+                <<",\"input_blocked\":"<<(rider.blocked4E0?"true":"false")<<",\"panel_y\":"<<rider.panelY4DC
+                <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount
+                <<",\"lifecycle\":"<<unsigned(snapshot.transition.lifecycle)<<",\"phase\":"<<unsigned(snapshot.transition.phase)
+                <<",\"requested_screen\":"<<unsigned(snapshot.transition.requested.screen)
+                <<",\"requested_page\":"<<unsigned(snapshot.transition.requested.page)
+                <<",\"prompt_mask\":"<<rider.promptMask42C<<",\"aperture_state\":"<<unsigned(aperture.state)
+                <<",\"aperture_top\":"<<aperture.top284<<",\"aperture_bottom\":"<<aperture.bottom28C
+                <<",\"aperture_input_enabled\":"<<(aperture.inputEnabled268?"true":"false")
+                <<",\"source_rng\":"<<application.state->rawRandom308030<<",\"source_milliseconds\":"<<sourceMilliseconds
+                <<",\"accepted_source_frame\":"<<(accepted?"true":"false")
+                <<",\"source_frame_generation\":"<<(accepted?sourceFrameGeneration:0)
+                <<",\"source_target_generation\":"<<(accepted?sourceTargetGeneration:0)
+                <<",\"quads\":"<<(accepted?submittedQuads:0)<<",\"draws\":"<<(accepted?submittedDraws:0)
+                <<",\"source_triangles\":"<<(accepted?submittedTriangles:0)
+                <<",\"audio_muted\":true,\"audio_suppressed\":"<<rider.audio.suppressedByMutedMode
+                <<",\"audio_submitted\":"<<rider.audio.submitted<<",\"audio_failed\":"<<rider.audio.failed
+                <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames<<"}\n";
+            return;
+        }
         const auto* optionsResources=coordinator.optionsResources();
         const auto* nav=navigation();require(nav,"original UI live navigation missing");
         const auto group=nav->controllerGroup[0];

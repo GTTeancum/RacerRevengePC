@@ -25,6 +25,9 @@ struct Binding {
     const assets::OriginalUiImageProvenance50KG* provenance=nullptr;
     std::uint32_t image=unresolved,leaf=unresolved,registration=unresolved;
     OriginalUiMaterialSpan50KG prototype{};
+    // Real PSM registry existence, independent of cold sampler/image policy.
+    // False bindings can be uploaded but cannot redirect or receive packets.
+    bool sourceRegistered=false;
 };
 struct Packet {std::uint32_t first=0,count=0,binding=0,ordinal=0;};
 struct Registration {
@@ -105,7 +108,7 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
     bool submissionPending=false,historyPoisoned=false;
     std::uint8_t apertures=0;
     std::uint32_t find(const assets::OriginalUiMaterialPass50KG* pass,std::uint32_t image)const noexcept {
-        for(std::size_t i=0;i<bindings.size();++i)if(bindings[i].pass==pass&&bindings[i].image==image)return static_cast<std::uint32_t>(i);
+        for(std::size_t i=0;i<bindings.size();++i)if(bindings[i].sourceRegistered&&bindings[i].leaf!=unresolved&&bindings[i].pass==pass&&bindings[i].image==image)return static_cast<std::uint32_t>(i);
         return unresolved;
     }
     bool capacity(std::size_t quads)const noexcept {
@@ -113,8 +116,8 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
     }
     bool add(const std::string& name,const assets::OriginalUiMaterialPass50KG& pass,
         const assets::OriginalUiScreenAssets50KG& source,std::uint32_t image,
-        const assets::OriginalUiImageBankMapping50KG* map,std::vector<Binding>& out,D& d)const {
-        Binding b;b.registeredName=name;b.pass=&pass;
+        const assets::OriginalUiImageBankMapping50KG* map,std::vector<Binding>& out,D& d,bool registered=true)const {
+        Binding b;b.registeredName=name;b.pass=&pass;b.sourceRegistered=registered;
         if(pass.textureCount){
             const auto* from=source.sourceProvenance(image);
             const auto* to=map?bank->images()->sourceProvenance(map->combinedIndex):nullptr;
@@ -143,8 +146,8 @@ bool OriginalUiRiderDrawContribution50KG::bind(std::shared_ptr<OriginalUiRiderDr
     const std::array<const game::OriginalUiApertureOwner50KG*,2>& apertures,D& d) noexcept {
     d={};if(storage_)return fail(d,E::alreadyBound);
     if(!resources||!resources->loaded()||!stat||!stat->loaded()||!binder||!binder->loaded()||
-        !backend.bank()||dynamic.poisoned()||!transition||!apertures[0]||!apertures[1]||
-        !apertures[0]->snapshot().bound||!apertures[1]->snapshot().bound)return fail(d,E::input);
+        !backend.bank()||dynamic.poisoned()||!transition||!apertures[0]||
+        !apertures[0]->snapshot().bound||(apertures[1]&&!apertures[1]->snapshot().bound))return fail(d,E::input);
     try {
         const assets::OriginalUiMemberIdentity50KG* indexIdentity=nullptr;
         const auto* archiveIdentity=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::rider);
@@ -153,7 +156,7 @@ bool OriginalUiRiderDrawContribution50KG::bind(std::shared_ptr<OriginalUiRiderDr
             if(member&&std::strcmp(member->name,"UI\\UIRider\\ui.dat")==0)indexIdentity=member;
         }
         const auto* selection=resources->widgets()->selectionData();const auto* page=selection?selection->page():nullptr;
-        for(const auto* aperture:apertures){const auto* config=aperture->config();
+        for(const auto* aperture:apertures){if(!aperture)continue;const auto* config=aperture->config();
             if(!indexIdentity||!page||!config||config->indexIdentity!=indexIdentity||config->pageIdentity!=page->identity)return fail(d,E::resource);
         }
         auto s=std::make_unique<Storage>();s->resources=std::move(resources);s->statAssets=std::move(stat);s->binderAssets=std::move(binder);
@@ -216,20 +219,33 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
             for(std::uint32_t slot=0;slot<m->materialCount();++slot)for(std::uint32_t p=0;p<m->passCount(slot);++p){
                 const auto* pass=m->pass(slot,p);if(!pass)return fail(d,E::material);
                 const auto* map=pass->imageIndex==unresolved?nullptr:s.backend->modelImage(id,pass->imageIndex);
-                if(!s.add("ui/textures/"+scene->materials[slot],pass->source,*m->images(),pass->imageIndex,map,bindings,d))return false;
+                if(!s.add("ui/textures/"+scene->materials[slot],pass->source,*m->images(),pass->imageIndex,map,bindings,d,s.backend->materialsRegistered(id)))return false;
             }
         }
         const auto* binderImages=s.binderAssets->images();const auto* binderPass=s.binderAssets->pass();
         if(!binderImages||!binderImages->textures()||!binderPass)return fail(d,E::resource);
         for(std::uint32_t i=0;i<binderImages->textures()->textureCount();++i)
-            if(!s.add("ui/textures/binder",*binderPass,*binderImages,i,s.backend->binderImage(i),bindings,d))return false;
+            if(!s.add("ui/textures/binder",*binderPass,*binderImages,i,s.backend->binderImage(i),bindings,d,s.backend->binderMaterialRegistered()))return false;
+        // A source material is one registry row, even when multiple native
+        //cold owners/ATM frames refer to it. If any real owner populated the
+        //row, all exact aliases share that row; other preflight-only PSMs stay
+        //outside source grouping while retaining their genuine upload policy.
+        for(auto& binding:bindings)if(!binding.sourceRegistered){
+            for(const auto& owner:bindings)if(owner.sourceRegistered&&owner.pass->pass==binding.pass->pass&&
+                same(owner.registeredName,binding.registeredName.c_str())){
+                if(owner.pass->identity!=binding.pass->identity||owner.pass->inheritedTemplate!=binding.pass->inheritedTemplate||
+                   owner.pass->provenance.origin!=binding.pass->provenance.origin||owner.pass->provenance.archive!=binding.pass->provenance.archive||
+                   owner.pass->provenance.fallbackTexture!=binding.pass->provenance.fallbackTexture)return fail(d,E::schedule,0x14D370);
+                binding.sourceRegistered=true;break;
+            }
+        }
         if(s.registryGeneration==s.backend->registryGeneration()&&!s.bindings.empty()){
             // GPU/CPU bank changes alone preserve the existing source group
             // graph, including redirects chosen before the last actual draw.
-            for(auto& binding:bindings){const Binding* previous=nullptr;
+            for(auto& binding:bindings){if(!binding.sourceRegistered)continue;const Binding* previous=nullptr;
                 for(const auto& old:s.bindings)if(same(old.registeredName,binding.registeredName.c_str())&&
                     old.pass->pass==binding.pass->pass){previous=&old;break;}
-                if(!previous||previous->pass->identity!=binding.pass->identity||
+                if(!previous||!previous->sourceRegistered||previous->pass->identity!=binding.pass->identity||
                    previous->pass->provenance.fallbackTexture!=binding.pass->provenance.fallbackTexture)return fail(d,E::schedule,0x14D440);
                 binding.leaf=previous->leaf;binding.registration=previous->registration;
             }
@@ -277,6 +293,9 @@ bool OriginalUiRiderDrawContribution50KG::begin(const OriginalUiRiderDrawClock50
     const auto lifecycle=s.transition->snapshot();
     if(!lifecycle.bound||lifecycle.current.screen!=5||lifecycle.current.page<1||lifecycle.current.page>2)return fail(d,E::phase);
     const auto player=static_cast<std::uint8_t>(lifecycle.current.page-1);
+    // Unsupported page2 has no fabricated hook owner. Page1 is mandatory at
+    // bind; every optional supplied owner was provenance-checked there.
+    if(!s.pageApertures[player])return fail(d,E::phase);
     const auto aperture=s.pageApertures[player]->snapshot();
     if(!aperture.bound)return fail(d,E::phase);
     game::OriginalUiRiderVisibilityDiagnostic50KG visibility;
@@ -520,7 +539,7 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
         }
     }
     if(!table.identity||!table.data||table.size!=70962)return fail(d,E::schedule);
-    std::vector<std::uint32_t> ranks(input.size(),unresolved),sequence(input.size());
+    std::vector<std::uint32_t> ranks(input.size(),unresolved),sequence;sequence.reserve(input.size());
     std::size_t cursor=0;std::uint32_t ordinal=0;
     const auto delimiter=[](std::uint8_t c){return c==' '||c=='\r'||c=='\n';};
     while(cursor<table.size){
@@ -539,7 +558,7 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
     if(ordinal!=3235)return fail(d,E::schedule);
     for(std::size_t i=0;i<input.size();++i){
         if(ranks[i]==unresolved||!input[i].pass)return fail(d,E::schedule);
-        sequence[i]=static_cast<std::uint32_t>(i);
+        if(input[i].sourceRegistered)sequence.push_back(static_cast<std::uint32_t>(i));
     }
     std::sort(sequence.begin(),sequence.end(),[&](std::uint32_t a,std::uint32_t b){
         if(ranks[a]!=ranks[b])return ranks[a]<ranks[b];
@@ -594,6 +613,7 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
         binding.leaf=current;binding.registration=groups[current].registration;previousRank=ranks[index];previousPass=pass.pass;previousGroup=current;
     }
     for(auto& binding:input){
+        if(!binding.sourceRegistered){binding.leaf=unresolved;binding.registration=unresolved;continue;}
         std::size_t visits=0;
         while(binding.leaf<groups.size()&&groups[binding.leaf].redirect!=unresolved){
             const auto next=groups[binding.leaf].redirect;
@@ -625,7 +645,7 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
     try {
         s.order.clear();
         for(std::size_t i=0;i<s.packets.size();++i){const auto& p=s.packets[i];
-            if(p.binding>=s.bindings.size()||s.bindings[p.binding].leaf==unresolved||!p.count||
+            if(p.binding>=s.bindings.size()||!s.bindings[p.binding].sourceRegistered||s.bindings[p.binding].leaf==unresolved||!p.count||
                p.first>=s.vertices.size()/4||p.count>s.vertices.size()/4-p.first){s.failed=true;return fail(d,E::schedule);}
             s.order.push_back(static_cast<std::uint32_t>(i));
         }

@@ -136,22 +136,40 @@ bool OriginalUiRiderWidgets50KG::apply(const OriginalUiRiderWidgetCallback50KG* 
     }
     s.inCallback=false;d={};return true;
 }
-bool OriginalUiRiderWidgets50KG::commitNavigation(std::uint8_t player,const OriginalUiNavigation50KG& next,
-    const OriginalUiCommands50KG& commands,const OriginalUiRiderDynamicHooks50KG& hooks,D& d)noexcept {
+bool OriginalUiRiderWidgets50KG::expandNavigation(std::uint8_t player,const OriginalUiNavigation50KG& next,
+    const OriginalUiCommands50KG& commands,std::vector<OriginalUiRiderWidgetCallback50KG>& output,D& d)const noexcept {
     d={};if(!storage_)return fail(d,E::notBound);
+    if(storage_->poisoned||storage_->inCallback)return fail(d,E::poisoned);
     if(player>1||next.page!=storage_->selection.page()||commands.count>commands.values.size())return fail(d,E::callback);
     try {
         std::vector<OriginalUiRiderWidgetCallback50KG> calls;
         for(std::size_t i=0;i<commands.count;++i){const auto& c=commands.values[i];
-            if(c.controlId>=next.page->controls.size())return fail(d,E::callback);
+            if(c.controlId>=next.page->controls.size()||!operation(c.operation))return fail(d,E::callback);
             for(auto id:next.page->controls[c.controlId].widgets){
-                if(calls.size()==32768)return fail(d,E::callback);
+                d.widget=id;d.callback=calls.size();
+                if(calls.size()==32768||!idOk(id)||storage_->states[id].kind==K::empty||
+                   storage_->states[id].kind==K::absent)return fail(d,E::callback);
                 calls.push_back({id,c.operation,c.value,c.sourcePC});
             }
         }
-        if(!apply(calls.data(),calls.size(),hooks,d))return false;
-        storage_->navigation[player]=next;return true;
+        output=std::move(calls);d={};return true;
     }catch(...){return fail(d,E::allocation);}
+}
+bool OriginalUiRiderWidgets50KG::preflightNavigation(std::uint8_t player,const OriginalUiNavigation50KG& next,
+    const OriginalUiCommands50KG& commands,const OriginalUiRiderDynamicHooks50KG& hooks,D& d)noexcept {
+    std::vector<OriginalUiRiderWidgetCallback50KG> calls;
+    if(!expandNavigation(player,next,commands,calls,d))return false;
+    bool needs=false;for(const auto& call:calls)needs=needs||dynamic(storage_->states[call.widget].kind);
+    if(!needs)return true;
+    if(!hooks.preflight||!hooks.apply)return fail(d,E::missingDynamicOwner);
+    storage_->inCallback=true;const bool okay=hooks.preflight(hooks.context,calls.data(),calls.size());storage_->inCallback=false;
+    return okay?true:fail(d,E::missingDynamicOwner);
+}
+bool OriginalUiRiderWidgets50KG::commitNavigation(std::uint8_t player,const OriginalUiNavigation50KG& next,
+    const OriginalUiCommands50KG& commands,const OriginalUiRiderDynamicHooks50KG& hooks,D& d)noexcept {
+    std::vector<OriginalUiRiderWidgetCallback50KG> calls;
+    if(!expandNavigation(player,next,commands,calls,d)||!apply(calls.data(),calls.size(),hooks,d))return false;
+    storage_->navigation[player]=next;return true;
 }
 bool OriginalUiRiderWidgets50KG::planMovement(std::uint8_t player,std::uint8_t controller,assets::OriginalUiMovementInput50KG input,
     bool reached,bool enabled,bool accepted,OriginalUiRiderMovementPlan50KG& output)const noexcept {

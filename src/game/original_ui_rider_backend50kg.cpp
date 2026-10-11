@@ -19,7 +19,7 @@ struct OriginalUiRiderBackend50KG::Storage {
         OriginalUiRiderVisibilityHandle50KG membership{};
         std::array<std::unique_ptr<OriginalUiRiderBinderAnimation50KG>,2> binders;
         std::uint32_t imageOwner=noOwner;
-        bool attached=false,shown=false;
+        bool attached=false,shown=false,materialsRegistered=false;
     };
     OriginalUiRiderBackendInput50KG input;
     OriginalUiRiderVisibilityOwner50KG visibility;
@@ -28,7 +28,7 @@ struct OriginalUiRiderBackend50KG::Storage {
     std::uint32_t binderOwner=noOwner;
     std::uint64_t generation=1;
     std::uint64_t registryGeneration=1;
-    bool frame=false;
+    bool frame=false,binderMaterialRegistered=false;
 };
 OriginalUiRiderBackend50KG::OriginalUiRiderBackend50KG() noexcept=default;
 OriginalUiRiderBackend50KG::~OriginalUiRiderBackend50KG()=default;
@@ -72,7 +72,7 @@ bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG
     try {
         std::array<bool,120> included{};
         std::array<std::shared_ptr<const assets::OriginalUiRiderModelMaterials50KG>,120> candidates{};
-        for(std::uint16_t id=1;id<120;++id){included[id]=s.entries[id].attached;candidates[id]=s.entries[id].materials;}
+        for(std::uint16_t id=1;id<120;++id){included[id]=s.entries[id].attached||bool(s.entries[id].materials);candidates[id]=s.entries[id].materials;}
         for(std::size_t i=0;i<count;++i){const auto& call=calls[i];diagnostic_.widget=call.widget;
             if(!valid(call.widget))return fail(E::input);
             const auto state=owner.state(call.widget);
@@ -100,6 +100,16 @@ bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG
             indices[id]=static_cast<std::uint32_t>(population.owners.size());
             population.owners.push_back(candidates[id]->images());
         }
+        // Cold retained materials are actual resource owners, not live model
+        // attachments. Keep them through reset/show/hide before opening and
+        // after detach; source registry disappearance is not implied by that.
+        // Unchanged owner pointers and deterministic indices prove that the
+        // exact existing immutable bank remains valid. No image decode, bank
+        // allocation, GPU generation or registry synchronization is invented.
+        bool unchanged=binderOwner==s.binderOwner;
+        for(std::uint16_t id=1;id<120&&unchanged;++id)
+            unchanged=candidates[id]==s.entries[id].materials&&indices[id]==s.entries[id].imageOwner;
+        if(unchanged){diagnostic_={};return true;}
         auto bank=std::make_shared<assets::OriginalUiImageBank50KG>();
         if(!bank->load(population,diagnostic_.bank))return fail(E::bank);
         // Actual CPU resource population completes before attachment and IK
@@ -138,6 +148,11 @@ bool OriginalUiRiderBackend50KG::attach(std::uint16_t id,OriginalUiRiderDynamicO
         // Source successful attachment calls the real parent+A4 resource
         // synchronization before character capture/IK registration. Publish
         // that rebuild event separately from CPU image-bank generations.
+        //14D370 constructs only positively referenced, still-missing PSM
+        //objects. This actual parent+A4 boundary creates their source registry
+        //lifetime; earlier native cold preflight was policy/image validation.
+        entry.materialsRegistered=true;
+        if(entry.binders[0]||entry.binders[1])s.binderMaterialRegistered=true;
         ++s.registryGeneration;diagnostic_={};return true;
     }catch(...){return fail(E::allocation);}
 }
@@ -182,6 +197,12 @@ const assets::OriginalUiRiderModelMaterials50KG* OriginalUiRiderBackend50KG::mat
 }
 const OriginalUiRiderVisibilityHandle50KG* OriginalUiRiderBackend50KG::membership(std::uint16_t id)const noexcept {
     return attached(id)?&storage_->entries[id].membership:nullptr;
+}
+bool OriginalUiRiderBackend50KG::materialsRegistered(std::uint16_t id)const noexcept {
+    return storage_&&valid(id)&&storage_->entries[id].materialsRegistered;
+}
+bool OriginalUiRiderBackend50KG::binderMaterialRegistered()const noexcept {
+    return storage_&&storage_->binderMaterialRegistered;
 }
 bool OriginalUiRiderBackend50KG::attached(std::uint16_t id)const noexcept{return storage_&&valid(id)&&storage_->entries[id].attached;}
 bool OriginalUiRiderBackend50KG::shown(std::uint16_t id)const noexcept{return storage_&&valid(id)&&storage_->entries[id].shown;}

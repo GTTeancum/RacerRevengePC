@@ -49,6 +49,12 @@ public:
     bool colors(std::uint32_t rider,OriginalUiRiderProfileColors50KG&) const noexcept;
 private:
     friend class OriginalUiFrontend50KG;
+    friend class OriginalUiRiderSession50KG;
+    // Read-only cold resource planning from a genuine Main proposal. Main's
+    // live mode4 is preserved; only this returned snapshot uses the proposed
+    // mode. Actual Rider entry and every profile commit still read live mode.
+    bool selectionSnapshotForMode(std::uint32_t prospectiveMode,
+        game::OriginalUiRiderSelectionProfile50KG&) const noexcept;
     // Concrete frontend commit boundary only. Public snapshots/stamps cannot
     // authorize mutation. No public adapter may forward into this method.
     // Only exact already-admitted Back decisions: one remembered-rider write,
