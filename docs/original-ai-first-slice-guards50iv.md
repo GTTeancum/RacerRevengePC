@@ -1,6 +1,8 @@
 # Original-AI first slice: terminal world/session guards
 
-This source-only overlay applies after the frozen full first-slice candidate (local Git 947e5e89689a88d4c122ade0766f91eecfeeb639; remote 731a78e14d414c18c1bfb6e882b8ea75eff874dc). It has not been compiled, syntax-checked, tested or played. The active GC candidate is separate and was not edited.
+Historical scope: this page describes the guarded one-racer source and its 2026-10-10 00:20 UTC observation, before the later all-eight original-AI continuation. Statements about HOST-controlled peers, unjoined owners, disabled paths and future work belong to that first-slice snapshot. See the [dated Clegg-only receipt](history/original-ai-first-slice-20261010-0020.md), the later [all-racer integration](native-ai-lighting-integration.md), and [current project status](../README.md). The one-racer configuration is not an approved current driving-test entry point, and this merge adds no runtime validation.
+
+This overlay was incorporated into guarded source `93201627`, which compiled, linked and passed one bounded direct-GC observation on 2026-10-10. See [dated Clegg-only receipt](history/original-ai-first-slice-20261010-0020.md). That successful prefix did not trigger a failed requisite frame, recovery or session rebuild, so those terminal branches remain runtime-unverified. The original overlay and its frozen predecessor remain in Git history.
 
 ## Corrected world ownership boundary
 
@@ -43,4 +45,4 @@ The existing terminal exception handler returns exit code 1. Ordinary Quit remai
 - Packing/repair caller return values are intentionally unused: original16E9E8 calls171C60;16E9F4 calls1734C0;16E9FC immediately loadsFE8. No helper return-result branch occurs.
 - No wrongWayTimer1094 update was invented. The recovered AI constructor/reset clear it and173C6C starts it with the prepared factor when zero. No additional AI increment writer was established by this review; an apparently inert source timer is not evidence permitting a fabricated update.
 
-All existing combat, route-choice, reset, lap/finish, dynamic-contact and incomplete-world limitations remain. Bounded runtime acceptance belongs to the parent integration step: verify startup4 then genuine CB8>5/state2 only if no earlier exact source boundary occurs; verify a failed requisite frame cannot advance the manager or start another session. No such runtime verification was performed for this overlay.
+All existing combat, route-choice, reset, lap/finish, dynamic-contact and incomplete-world limitations remain. Bounded runtime acceptance belongs to the parent integration step: verify startup4 then genuine CB8>5/state2 only if no earlier exact source boundary occurs; verify a failed requisite frame cannot advance the manager or start another session. The successful bounded run observed startup 4→2; failure-trigger, recovery and second-session rejection were not exercised.

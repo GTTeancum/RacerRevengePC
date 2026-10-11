@@ -1,8 +1,10 @@
 # Original native AI: first joined driving slice
 
+Historical scope: this page describes the guarded one-racer source and its 2026-10-10 00:20 UTC observation, before the later all-eight original-AI continuation. Statements about HOST-controlled peers, unjoined owners, disabled paths and future work belong to that first-slice snapshot. See the [dated Clegg-only receipt](history/original-ai-first-slice-20261010-0020.md), the later [all-racer integration](native-ai-lighting-integration.md), and [current project status](../README.md). The one-racer configuration is not an approved current driving-test entry point, and this merge adds no runtime validation.
+
 ## Status
 
-This is one staged source feature based on GC candidate `53d44876`, using the frozen original-AI arithmetic/provider work from `c8da53bad`. It has not been compiled, syntax-checked, tested or run. The active GC source and hourly test candidate were not edited. The optional path is disabled unless `RR_ORIGINAL_AI_FIRST_SLICE=1` is supplied by a later authorized integration.
+This feature originated on GC source `53d44876`. Guarded source `93201627` compiled, linked and passed one bounded direct-GC first-slice observation on 2026-10-10, with Clegg as the sole original-AI racer. See [dated Clegg-only receipt](history/original-ai-first-slice-20261010-0020.md) for the measured state/brake milestones and limits. The optional path remains disabled unless `RR_ORIGINAL_AI_FIRST_SLICE=1` is supplied; the subsequent all-eight continuation is documented separately in [all-racer integration](native-ai-lighting-integration.md).
 
 The feature targets the actual original racer in native bank slot 1. With the default human that is POD03/Clegg, whose original profile supplies `StartRaceNoCombatTime=9`, `CollisionRadius=141` and `MyMinSpeed=200`. Every other actual racer remains present and observed; their existing HOST drivers are unchanged. This is a bounded original-AI slice, not a claim of complete original AI or original race-root scheduling.
 
