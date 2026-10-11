@@ -64,6 +64,10 @@ public:
     const assets::OriginalUiOverlayText50KG* textDescriptor(std::uint16_t)const noexcept;
     const assets::OriginalUiIcon50KG* iconDescriptor(std::uint16_t)const noexcept;
     bool poisoned()const noexcept;
+    // Read-only measurement input; never project a stateful text line twice.
+    // Borrowed strings remain valid until setDynamicLines or owner destruction.
+    const std::vector<std::string>* textLines(std::uint16_t)const noexcept;
+    const std::array<std::int32_t,2>* textPosition(std::uint16_t)const noexcept;
     // Expands actual control memberships, preserves duplicates, applies real
     // dynamic callbacks in order; only then publishes next navigation. It does
     // NOT execute page appearance/lighting/popup/sound/transform side effects.

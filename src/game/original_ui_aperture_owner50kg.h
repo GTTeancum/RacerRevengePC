@@ -134,6 +134,14 @@ public:
     OriginalUiApertureStatus50KG bindOptionsMenuEntryOnly(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    // Authenticated Rider factory page1/page2, both owning the original rider.dat.
+    // This binds only shared aperture arithmetic. The real Rider controller
+    // defers EXIT beginTransition7C until panel140/readiness1ECFE0 permits it.
+    // available must own actual Rider AC/B0/B4/B8 and shared +440 effects.
+    OriginalUiApertureStatus50KG bindRider(
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint8_t factoryPage,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    OriginalUiApertureStatus50KG saveRiderUpdateDelta38(float actualDelta) noexcept;
     OriginalUiApertureSnapshot50KG snapshot() const noexcept { return state_; }
     const OriginalUiApertureConfig50KG* config() const noexcept {
         return state_.bound?&config_:nullptr;
@@ -173,12 +181,12 @@ private:
     OriginalUiApertureCallbacks50KG callbacks_{};
     mutable bool inOperation_=false;
     bool entryOnly_=false;
-    bool optionsMenu_=false;
+    bool optionsMenu_=false,rider_=false;
     std::uint8_t optionsPage_=1;
     OriginalUiApertureStatus50KG bindPageImpl(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,bool entryOnly,bool optionsMenu,std::uint8_t page,
-        OriginalUiApertureDiagnostic50KG&) noexcept;
+        OriginalUiApertureDiagnostic50KG&,bool rider=false) noexcept;
     OriginalUiApertureStatus50KG saveUpdateDelta38(float actualDelta) noexcept;
     bool available() const noexcept;
     void emit(OriginalUiApertureHookKind50KG,std::uint32_t callPC,

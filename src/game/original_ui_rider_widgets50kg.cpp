@@ -189,6 +189,14 @@ bool OriginalUiRiderWidgets50KG::updateText(std::uint16_t id,bool shown,D& d)noe
     const auto status=storage_->textWidgets[id].updateStatic(shown);
     return status==OriginalUiTextWidgetStatus50KG::ok?true:fail(d,status==OriginalUiTextWidgetStatus50KG::hidden?E::hidden:E::text);
 }
+const std::vector<std::string>* OriginalUiRiderWidgets50KG::textLines(std::uint16_t id)const noexcept {
+    const auto* descriptor=textDescriptor(id);
+    if(!descriptor||storage_->poisoned||storage_->inCallback)return nullptr;
+    return descriptor->textSource==assets::OriginalUiTextSource50KG::dynamic?&storage_->dynamicLines[id]:&descriptor->lines;
+}
+const std::array<std::int32_t,2>* OriginalUiRiderWidgets50KG::textPosition(std::uint16_t id)const noexcept {
+    return textDescriptor(id)&&!storage_->poisoned&&!storage_->inCallback?&storage_->positions[id]:nullptr;
+}
 bool OriginalUiRiderWidgets50KG::projectText(std::uint16_t id,std::size_t line,float fontHeight,std::int32_t width,
     std::int32_t height,bool shown,OriginalUiRiderTextProjection50KG& out,D& d)noexcept{
     d={};d.widget=id;const auto* text=textDescriptor(id);if(!text||storage_->poisoned||storage_->inCallback||line>=text->lines.size())return fail(d,E::text);

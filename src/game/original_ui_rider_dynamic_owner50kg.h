@@ -9,8 +9,8 @@ struct OriginalUiRiderDynamicBackend50KG {
     // bank, scene-list and callback capacity for the COMPLETE ordered batch.
     bool (*preflight)(void*,const OriginalUiRiderDynamicOwner50KG&,
         const OriginalUiRiderWidgetCallback50KG*,std::size_t) noexcept=nullptr;
-    // Actual priority2 entity attachment +28E8A0 visibility/cache membership,
-    // optional real binders at100A, then parent+A4 resource synchronization.
+    // Actual entity-mask2 attachment +28E8A0 visibility/cache membership,
+    // optional real binders with entity mask100A, then parent+A4 resource synchronization.
     // Character's entry.001 sample already exists; capture/IK follows success.
     bool (*attach)(void*,std::uint16_t,OriginalUiRiderDynamicOwner50KG&) noexcept=nullptr;
     // Must drain borrowed packets, disable/remove actual model and binder
