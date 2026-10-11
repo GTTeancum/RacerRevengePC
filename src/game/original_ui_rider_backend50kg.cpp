@@ -19,6 +19,7 @@ struct OriginalUiRiderBackend50KG::Storage {
         OriginalUiRiderVisibilityHandle50KG membership{};
         std::array<std::unique_ptr<OriginalUiRiderBinderAnimation50KG>,2> binders;
         std::uint32_t imageOwner=noOwner;
+        const void* coldModel=nullptr;
         bool attached=false,shown=false,materialsRegistered=false;
     };
     OriginalUiRiderBackendInput50KG input;
@@ -28,7 +29,7 @@ struct OriginalUiRiderBackend50KG::Storage {
     std::uint32_t binderOwner=noOwner;
     std::uint64_t generation=1;
     std::uint64_t registryGeneration=1;
-    bool frame=false,binderMaterialRegistered=false;
+    bool coldSealed=false,frame=false,binderMaterialRegistered=false;
 };
 OriginalUiRiderBackend50KG::OriginalUiRiderBackend50KG() noexcept=default;
 OriginalUiRiderBackend50KG::~OriginalUiRiderBackend50KG()=default;
@@ -48,12 +49,9 @@ bool OriginalUiRiderBackend50KG::bind(const OriginalUiRiderBackendInput50KG& inp
             bool found=false;for(const auto& existing:next->input.staticImages.archives)if(existing==archive)found=true;
             if(!found)next->input.staticImages.archives.push_back(archive);
         }
-        auto population=next->input.staticImages;
-        next->binderOwner=static_cast<std::uint32_t>(population.owners.size());
-        population.owners.emplace_back(input.binder,input.binder->images());
-        auto bank=std::make_shared<assets::OriginalUiImageBank50KG>();
-        if(!bank->load(population,d.bank))return fail(E::bank);
-        next->bank=std::move(bank);storage_=std::move(next);diagnostic_={};return true;
+        // No partial bank escapes bind. The private candidate's exact model
+        // descriptors must exist before its single complete bank is sealed.
+        storage_=std::move(next);diagnostic_={};return true;
     }catch(...){return fail(E::allocation);}
 }
 OriginalUiRiderDynamicBackend50KG OriginalUiRiderBackend50KG::callbacks() noexcept {
@@ -63,60 +61,76 @@ OriginalUiRiderDynamicBackend50KG OriginalUiRiderBackend50KG::callbacks() noexce
         [](void* p,std::uint16_t id,OriginalUiRiderDynamicOwner50KG& o) noexcept{static_cast<OriginalUiRiderBackend50KG*>(p)->detach(id,o);},
         [](void* p,std::uint16_t id,bool v) noexcept{return static_cast<OriginalUiRiderBackend50KG*>(p)->setShown(id,v);}};
 }
-bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG& owner,
-    const OriginalUiRiderWidgetCallback50KG* calls,std::size_t count) noexcept {
-    diagnostic_={};const auto fail=[&](E e){diagnostic_.error=e;return false;};
-    if(!storage_||(count&&!calls)||count>32768)return fail(E::input);
-    auto& s=*storage_;if(s.frame)return fail(E::busy);
-    if(s.generation==std::numeric_limits<std::uint64_t>::max())return fail(E::input);
+bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamicOwner50KG& owner,
+    OriginalUiRiderBackendDiagnostic50KG& d) noexcept {
+    d={};const auto fail=[&](E e){d.error=e;diagnostic_=d;return false;};
+    if(!storage_)return fail(E::input);auto& s=*storage_;
+    if(s.coldSealed||s.bank||s.frame||s.binderMaterialRegistered||s.registryGeneration!=1||
+       s.generation==std::numeric_limits<std::uint64_t>::max())return fail(E::input);
+    for(const auto& entry:s.entries)if(entry.attached||entry.shown||entry.materialsRegistered||
+       entry.materials||entry.coldModel||entry.binders[0]||entry.binders[1])return fail(E::input);
     try {
-        std::array<bool,120> included{};
         std::array<std::shared_ptr<const assets::OriginalUiRiderModelMaterials50KG>,120> candidates{};
-        for(std::uint16_t id=1;id<120;++id){included[id]=s.entries[id].attached||bool(s.entries[id].materials);candidates[id]=s.entries[id].materials;}
-        for(std::size_t i=0;i<count;++i){const auto& call=calls[i];diagnostic_.widget=call.widget;
-            if(!valid(call.widget))return fail(E::input);
-            const auto state=owner.state(call.widget);
-            if(state.kind!=K::pod&&state.kind!=K::character)continue;
-            const bool needs=call.operation==O::select||(state.kind==K::character&&call.operation==O::clearSelection);
-            if(!needs)continue;included[call.widget]=true;
-            if(candidates[call.widget])continue;
+        std::array<const void*,120> modelSources{};
+        const bool pod20=bool(owner.podAssets(28)),character20=bool(owner.characterAssets(54));
+        if(!owner.podAssets(27)||!owner.characterAssets(53)||pod20!=character20)return fail(E::input);
+        for(std::uint16_t id=1;id<120;++id){
+            const auto pod=owner.podAssets(id);const auto character=owner.characterAssets(id);
+            const auto state=owner.state(id);d.widget=id;
+            if((state.kind==K::pod||state.kind==K::character)&&(state.selected||state.shown))return fail(E::input);
+            if(!pod&&!character)continue;
+            if((pod&&character)||(pod&&(id!=27&&id!=28))||(character&&(id!=53&&id!=54))||
+               (pod&&state.kind!=K::pod)||(character&&state.kind!=K::character))return fail(E::input);
             auto materials=std::make_shared<assets::OriginalUiRiderModelMaterials50KG>();
-            const bool loaded=state.kind==K::character?
-                materials->loadCharacter(owner.characterAssets(call.widget),s.input.rider,s.input.appStart,
-                    s.input.materialRuntime,s.input.staticImages.ipumCache,diagnostic_.material):
-                materials->loadPod(owner.podAssets(call.widget),s.input.appStart,s.input.podTextures,
-                    s.input.materialRuntime,s.input.staticImages.ipumCache,diagnostic_.material);
+            const bool loaded=character?
+                materials->loadCharacter(character,s.input.rider,s.input.appStart,
+                    s.input.materialRuntime,s.input.staticImages.ipumCache,d.material):
+                materials->loadPod(pod,s.input.appStart,s.input.podTextures,
+                    s.input.materialRuntime,s.input.staticImages.ipumCache,d.material);
             if(!loaded)return fail(E::material);
-            candidates[call.widget]=std::move(materials);
+            modelSources[id]=character?static_cast<const void*>(character.get()):static_cast<const void*>(pod.get());
+            candidates[id]=std::move(materials);
         }
         auto population=s.input.staticImages;
         const auto binderOwner=static_cast<std::uint32_t>(population.owners.size());
         population.owners.emplace_back(s.input.binder,s.input.binder->images());
         std::array<std::uint32_t,120> indices{};indices.fill(noOwner);
-        // This order is a deterministic BANK remap only, never render order.
-        // Keep current and newly-needed models for the entire callback batch.
-        for(std::uint16_t id=1;id<120;++id)if(included[id]){
-            if(!candidates[id]||!candidates[id]->images())return fail(E::material);
+        // This order is a deterministic cold BANK remap only. No model graph,
+        // helper, source registration, selected owner or render order changes.
+        for(std::uint16_t id=1;id<120;++id)if(candidates[id]){
+            if(!candidates[id]->images())return fail(E::material);
             indices[id]=static_cast<std::uint32_t>(population.owners.size());
             population.owners.push_back(candidates[id]->images());
         }
-        // Cold retained materials are actual resource owners, not live model
-        // attachments. Keep them through reset/show/hide before opening and
-        // after detach; source registry disappearance is not implied by that.
-        // Unchanged owner pointers and deterministic indices prove that the
-        // exact existing immutable bank remains valid. No image decode, bank
-        // allocation, GPU generation or registry synchronization is invented.
-        bool unchanged=binderOwner==s.binderOwner;
-        for(std::uint16_t id=1;id<120&&unchanged;++id)
-            unchanged=candidates[id]==s.entries[id].materials&&indices[id]==s.entries[id].imageOwner;
-        if(unchanged){diagnostic_={};return true;}
         auto bank=std::make_shared<assets::OriginalUiImageBank50KG>();
-        if(!bank->load(population,diagnostic_.bank))return fail(E::bank);
-        // Actual CPU resource population completes before attachment and IK
-        // capture. GPU publication remains a separate complete-frame operation.
-        for(std::uint16_t id=1;id<120;++id){s.entries[id].materials=std::move(candidates[id]);s.entries[id].imageOwner=indices[id];}
-        s.bank=std::move(bank);s.binderOwner=binderOwner;++s.generation;diagnostic_={};return true;
+        if(!bank->load(population,d.bank))return fail(E::bank);
+        // Commit only to the still-private candidate. Collector policies and
+        // actual GPU admission must succeed before the manager can escape.
+        // No source material reference/lifetime is acquired by these caches.
+        for(std::uint16_t id=1;id<120;++id){s.entries[id].materials=std::move(candidates[id]);
+            s.entries[id].imageOwner=indices[id];s.entries[id].coldModel=modelSources[id];}
+        s.bank=std::move(bank);s.binderOwner=binderOwner;s.coldSealed=true;
+        ++s.generation;diagnostic_={};d={};return true;
     }catch(...){return fail(E::allocation);}
+}
+bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG& owner,
+    const OriginalUiRiderWidgetCallback50KG* calls,std::size_t count) noexcept {
+    diagnostic_={};const auto fail=[&](E e){diagnostic_.error=e;return false;};
+    if(!storage_||!storage_->coldSealed||!storage_->bank||(count&&!calls)||count>32768)return fail(E::input);
+    const auto& s=*storage_;if(s.frame)return fail(E::busy);
+    if(s.generation==std::numeric_limits<std::uint64_t>::max())return fail(E::input);
+    for(std::size_t i=0;i<count;++i){const auto& call=calls[i];diagnostic_.widget=call.widget;
+        if(!valid(call.widget))return fail(E::input);const auto state=owner.state(call.widget);
+        if(state.kind!=K::pod&&state.kind!=K::character)continue;
+        const bool needs=call.operation==O::select||(state.kind==K::character&&call.operation==O::clearSelection);
+        if(!needs)continue;const auto& entry=s.entries[call.widget];
+        const void* source=state.kind==K::character?static_cast<const void*>(owner.characterAssets(call.widget).get()):
+            static_cast<const void*>(owner.podAssets(call.widget).get());
+        if(!source||source!=entry.coldModel||!entry.materials||entry.imageOwner==noOwner||
+           !s.bank->mapping(entry.imageOwner,0))return fail(E::material);
+    }
+    // No new descriptors, images, mappings, bank or generation publication.
+    diagnostic_={};return true;
 }
 bool OriginalUiRiderBackend50KG::attach(std::uint16_t id,OriginalUiRiderDynamicOwner50KG& owner) noexcept {
     diagnostic_={};diagnostic_.widget=id;
@@ -124,7 +138,7 @@ bool OriginalUiRiderBackend50KG::attach(std::uint16_t id,OriginalUiRiderDynamicO
     if(!storage_||!valid(id))return fail(E::input);
     auto& s=*storage_;auto& entry=s.entries[id];
     if(s.frame)return fail(E::busy);
-    if(entry.attached||!entry.materials||entry.imageOwner==noOwner||
+    if(!s.coldSealed||entry.attached||!entry.materials||entry.imageOwner==noOwner||
        s.registryGeneration==std::numeric_limits<std::uint64_t>::max())return fail(E::input);
     const auto state=owner.state(id);
     try {
@@ -183,14 +197,14 @@ std::uint64_t OriginalUiRiderBackend50KG::generation()const noexcept{return stor
 std::uint64_t OriginalUiRiderBackend50KG::registryGeneration()const noexcept{return storage_?storage_->registryGeneration:0;}
 std::shared_ptr<const assets::OriginalUiImageBank50KG> OriginalUiRiderBackend50KG::bank()const noexcept{return storage_?storage_->bank:nullptr;}
 const assets::OriginalUiImageBankMapping50KG* OriginalUiRiderBackend50KG::staticImage(std::uint32_t owner,std::uint32_t image)const noexcept {
-    return storage_&&owner<storage_->input.staticImages.owners.size()?storage_->bank->mapping(owner,image):nullptr;
+    return storage_&&storage_->bank&&owner<storage_->input.staticImages.owners.size()?storage_->bank->mapping(owner,image):nullptr;
 }
 const assets::OriginalUiImageBankMapping50KG* OriginalUiRiderBackend50KG::modelImage(std::uint16_t id,std::uint32_t image)const noexcept {
-    return storage_&&valid(id)&&storage_->entries[id].imageOwner!=noOwner?
+    return storage_&&storage_->bank&&valid(id)&&storage_->entries[id].imageOwner!=noOwner?
         storage_->bank->mapping(storage_->entries[id].imageOwner,image):nullptr;
 }
 const assets::OriginalUiImageBankMapping50KG* OriginalUiRiderBackend50KG::binderImage(std::uint32_t image)const noexcept {
-    return storage_?storage_->bank->mapping(storage_->binderOwner,image):nullptr;
+    return storage_&&storage_->bank?storage_->bank->mapping(storage_->binderOwner,image):nullptr;
 }
 const assets::OriginalUiRiderModelMaterials50KG* OriginalUiRiderBackend50KG::materials(std::uint16_t id)const noexcept {
     return storage_&&valid(id)?storage_->entries[id].materials.get():nullptr;
