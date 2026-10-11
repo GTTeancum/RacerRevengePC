@@ -1,11 +1,14 @@
 #include "game_host50er.h"
-#include <cerrno>
 #include <exception>
+
+#if defined(__linux__)
+#include <cerrno>
 #include <fcntl.h>
 #include <unistd.h>
-
-#if !defined(__linux__)
-#error "GameHost50ER supports Linux only"
+#elif defined(_WIN32) && (defined(_M_X64) || defined(__x86_64__))
+// Windows x64 uses WindowHost50DQ's SDL2/native desktop OpenGL path only.
+#else
+#error "GameHost50ER supports Linux and windowed Windows x64 only"
 #endif
 
 namespace rr::platform {
@@ -17,6 +20,7 @@ bool fail(GameHostDiagnostic50ER& d, GameHostError50ER error,
     d.systemError = systemError;
     return false;
 }
+#if defined(__linux__)
 struct Token { const char* bytes = nullptr; std::size_t count = 0; };
 bool matches(Token token, const char* lower) noexcept {
     std::size_t i = 0;
@@ -43,6 +47,7 @@ std::uint16_t scancode(Token key) noexcept {
     if (matches(key, "enter") || matches(key, "return")) return 40;
     return 0;
 }
+#endif
 void copyCleanup(GameHostDiagnostic50ER& d, const GameHostDiagnostic50ER& c) noexcept {
     d.cleanupError = c.error;
     d.cleanupOperation = c.operation;
@@ -61,35 +66,54 @@ bool GameHost50ER::ownerThread() const noexcept {
     return thread_ == std::this_thread::get_id();
 }
 bool GameHost50ER::created() const noexcept {
-    return ownerThread() && ready_ &&
-        (mode_ == GameHostMode50ER::Window ? window_.created() :
-         mode_ == GameHostMode50ER::HeadlessLive && headless_.created());
+    if (!ownerThread() || !ready_) return false;
+    if (mode_ == GameHostMode50ER::Window) return window_.created();
+#if defined(__linux__)
+    return mode_ == GameHostMode50ER::HeadlessLive && headless_.created();
+#else
+    return false;
+#endif
 }
 bool GameHost50ER::ownsResources() const noexcept {
-    return ownerThread() && (window_.ownsResources() ||
-        headless_.ownsResources() || restoreStdinFlags_);
+    return ownerThread() && (window_.ownsResources()
+#if defined(__linux__)
+        || headless_.ownsResources() || restoreStdinFlags_
+#endif
+    );
 }
 bool GameHost50ER::current() const noexcept {
-    return created() && (mode_ == GameHostMode50ER::Window ?
-        window_.current() : headless_.current());
+    if (!created()) return false;
+    if (mode_ == GameHostMode50ER::Window) return window_.current();
+#if defined(__linux__)
+    return headless_.current();
+#else
+    return false;
+#endif
 }
 GameHostGlProc50ER GameHost50ER::procAddress(const char* name) const noexcept {
     if (!current()) return nullptr;
-    return mode_ == GameHostMode50ER::Window ?
-        window_.procAddress(name) : headless_.procAddress(name);
+    if (mode_ == GameHostMode50ER::Window) return window_.procAddress(name);
+#if defined(__linux__)
+    return headless_.procAddress(name);
+#else
+    return nullptr;
+#endif
 }
 void GameHost50ER::refreshInfo() noexcept {
     if (mode_ == GameHostMode50ER::Window) {
         const auto& source = window_.info();
         info_ = {source.width, source.height, source.drawableWidth, source.drawableHeight,
             source.focused, source.minimized, window_.created()};
+#if defined(__linux__)
     } else if (mode_ == GameHostMode50ER::HeadlessLive) {
         const auto& source = headless_.info();
         const bool connected = ready_ && !inputEnded_ && !quitRequested_;
         info_ = {source.width, source.height, source.width, source.height,
             connected, false, connected};
+#endif
     } else info_ = {};
 }
+#if defined(__linux__)
 void GameHost50ER::resetInput() noexcept {
     down_.fill(0);
     command_.fill(0);
@@ -98,14 +122,23 @@ void GameHost50ER::resetInput() noexcept {
     inputError_ = 0;
 }
 
+#endif
+
 bool GameHost50ER::create(const GameHostRequest50ER& r, GameHostDiagnostic50ER& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, GameHostError50ER::WrongThread, "create");
     if (ready_ || ownsResources()) return fail(d, GameHostError50ER::AlreadyOwned, "create");
     if (r.mode != GameHostMode50ER::Window && r.mode != GameHostMode50ER::HeadlessLive)
         return fail(d, GameHostError50ER::InvalidMode, "create/explicit mode required");
+#if defined(_WIN32)
+    if (r.mode == GameHostMode50ER::HeadlessLive)
+        return fail(d, GameHostError50ER::UnsupportedMode,
+            "create/HeadlessLive is unsupported on Windows; select Window");
+#endif
     mode_ = r.mode;
+#if defined(__linux__)
     resetInput();
+#endif
     const auto cleanup = [&]() noexcept {
         GameHostDiagnostic50ER c;
         if (!closeOwned(c)) copyCleanup(d, c);
@@ -116,7 +149,9 @@ bool GameHost50ER::create(const GameHostRequest50ER& r, GameHostDiagnostic50ER& 
             fail(d, GameHostError50ER::Window, "WindowHost50DQ::create");
             return cleanup();
         }
-    } else {
+    }
+#if defined(__linux__)
+    else {
         originalStdinFlags_ = ::fcntl(STDIN_FILENO, F_GETFL);
         if (originalStdinFlags_ < 0) {
             fail(d, GameHostError50ER::StdinFlags, "fcntl(stdin,F_GETFL)", errno);
@@ -134,6 +169,7 @@ bool GameHost50ER::create(const GameHostRequest50ER& r, GameHostDiagnostic50ER& 
             return cleanup();
         }
     }
+#endif
     ready_ = true;
     refreshInfo();
     return true;
@@ -144,7 +180,11 @@ bool GameHost50ER::bind(GameHostDiagnostic50ER& d) noexcept {
     if (!created()) return fail(d, GameHostError50ER::NotCreated, "bind");
     if (mode_ == GameHostMode50ER::Window)
         return window_.bind(d.window) || fail(d, GameHostError50ER::Window, "WindowHost50DQ::bind");
+#if defined(__linux__)
     return headless_.bind(d.headless) || fail(d, GameHostError50ER::Headless, "OffscreenGlContext50DC::bind");
+#else
+    return fail(d, GameHostError50ER::UnsupportedMode, "bind/HeadlessLive is unsupported on Windows");
+#endif
 }
 bool GameHost50ER::release(GameHostDiagnostic50ER& d) noexcept {
     d = {};
@@ -152,8 +192,13 @@ bool GameHost50ER::release(GameHostDiagnostic50ER& d) noexcept {
     if (!created()) return fail(d, GameHostError50ER::NotCreated, "release");
     if (mode_ == GameHostMode50ER::Window)
         return window_.release(d.window) || fail(d, GameHostError50ER::Window, "WindowHost50DQ::release");
+#if defined(__linux__)
     return headless_.release(d.headless) || fail(d, GameHostError50ER::Headless, "OffscreenGlContext50DC::release");
+#else
+    return fail(d, GameHostError50ER::UnsupportedMode, "release/HeadlessLive is unsupported on Windows");
+#endif
 }
+#if defined(__linux__)
 void GameHost50ER::releaseKeys(WindowInput50DQ& keys) noexcept {
     for (std::size_t key = 0; key < down_.size(); ++key) {
         if (down_[key]) keys.released[key] = 1;
@@ -203,6 +248,8 @@ void GameHost50ER::consumeCommand(GameHostInput50ER& input) noexcept {
     } else { ++input.commandsRejected; return; }
     ++input.commandsAccepted;
 }
+#endif
+
 bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, GameHostError50ER::WrongThread, "poll");
@@ -219,6 +266,7 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
         refreshInfo();
         return true;
     }
+#if defined(__linux__)
     if (!quitRequested_) {
         std::array<char, gameHostInputByteBudget50ER> bytes{};
         const auto received = ::read(STDIN_FILENO, bytes.data(), bytes.size());
@@ -262,6 +310,9 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
     input.keys.focused = info_.focused;
     input.keys.minimized = info_.minimized;
     return true;
+#else
+    return fail(d, GameHostError50ER::UnsupportedMode, "poll/HeadlessLive is unsupported on Windows");
+#endif
 }
 bool GameHost50ER::swapWindow(GameHostDiagnostic50ER& d) noexcept {
     d = {};
@@ -281,6 +332,7 @@ bool GameHost50ER::closeOwned(GameHostDiagnostic50ER& d) noexcept {
     bool okay = true;
     if (window_.ownsResources() && !window_.close(d.window))
         okay = fail(d, GameHostError50ER::Window, "WindowHost50DQ::close");
+#if defined(__linux__)
     if (headless_.ownsResources() && !headless_.close(d.headless))
         okay = fail(d, GameHostError50ER::Headless, "OffscreenGlContext50DC::close");
     if (restoreStdinFlags_) {
@@ -294,10 +346,13 @@ bool GameHost50ER::closeOwned(GameHostDiagnostic50ER& d) noexcept {
             okay = false;
         } else restoreStdinFlags_ = false;
     }
+#endif
     if (!ownsResources()) {
         mode_ = GameHostMode50ER::Unspecified;
         info_ = {};
+#if defined(__linux__)
         resetInput();
+#endif
     }
     return okay;
 }

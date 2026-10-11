@@ -1,6 +1,6 @@
 #pragma once
 #include "window_host50dq.h"
-#include "offscreen_gl_context50dc.h"
+#include "offscreen_gl_context50dc.h" // Shared request/diagnostic types; no Windows EGL owner.
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -47,7 +47,7 @@ struct GameHostInput50ER {
 };
 enum class GameHostError50ER : std::uint8_t {
     None, WrongThread, InvalidMode, AlreadyOwned, NotCreated, NotWindow,
-    Window, Headless, StdinFlags
+    Window, Headless, StdinFlags, UnsupportedMode
 };
 struct GameHostDiagnostic50ER {
     GameHostError50ER error = GameHostError50ER::None;
@@ -63,7 +63,9 @@ struct GameHostDiagnostic50ER {
 };
 using GameHostGlProc50ER = void (*)();
 
-// One existing GL owner, explicitly windowed or live stdin + offscreen EGL.
+// One existing GL owner: native Window on Linux/Windows x64, or explicitly
+// selected live stdin + offscreen EGL on Linux only. Windows HeadlessLive
+// requests fail with UnsupportedMode before acquiring any resources.
 // This facade never renders, advances physics, synthesizes sampled native
 // input, captures images, or claims a headless render was a window swap.
 // Construct/use/destroy on one thread (the main thread for Window mode).
@@ -110,20 +112,27 @@ private:
     bool ownerThread() const noexcept;
     bool closeOwned(GameHostDiagnostic50ER&) noexcept;
     void refreshInfo() noexcept;
+#if defined(__linux__)
     void releaseKeys(WindowInput50DQ&) noexcept;
     void consumeCommand(GameHostInput50ER&) noexcept;
     void resetInput() noexcept;
+#endif
     const std::thread::id thread_;
     WindowHost50DQ window_;
+#if defined(__linux__)
     OffscreenGlContext50DC headless_;
+#endif
     GameHostMode50ER mode_ = GameHostMode50ER::Unspecified;
     GameHostInfo50ER info_{};
-    bool ready_ = false, restoreStdinFlags_ = false;
+    bool ready_ = false;
+#if defined(__linux__)
+    bool restoreStdinFlags_ = false;
     int originalStdinFlags_ = 0;
     std::array<std::uint8_t, windowScancodeCount50DQ> down_{};
     std::array<char, gameHostCommandCapacity50ER> command_{};
     std::size_t commandLength_ = 0;
     bool rejectCommand_ = false, quitRequested_ = false, inputEnded_ = false;
     int inputError_ = 0;
+#endif
 };
 }

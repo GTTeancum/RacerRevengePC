@@ -1,28 +1,45 @@
 #include "window_host50dq.h"
 #include <cstring>
-#include <dlfcn.h>
+#include "native_dynamic_library50win.h"
 #include <exception>
 #include <new>
-
-#if !defined(__linux__)
-#error "WindowHost50DQ supports the Linux SDL2 ABI only"
+#if defined(_WIN32)
+#include <SDL_events.h>
+#include <SDL_version.h>
 #endif
 
 namespace rr::platform {
 namespace {
 using Int = std::int32_t;
 using UInt = std::uint32_t;
+#if defined(_WIN32)
+// The Windows build supplies the official SDL2 headers. Validate every public
+// event offset used by the common memcpy decoder against those declarations.
+using SdlWindow = SDL_Window;
+using SdlVersion = SDL_version;
+using SdlEvent = SDL_Event;
+static_assert(SDL_MAJOR_VERSION == 2, "SDL2 development headers required");
+static_assert(sizeof(void*) == 8 && alignof(SdlEvent) == 8, "Windows x64 SDL2 ABI");
+static_assert(offsetof(SDL_CommonEvent, type) == 0 &&
+    offsetof(SDL_WindowEvent, windowID) == 8 && offsetof(SDL_WindowEvent, event) == 12 &&
+    offsetof(SDL_KeyboardEvent, windowID) == 8 && offsetof(SDL_KeyboardEvent, repeat) == 13 &&
+    offsetof(SDL_KeyboardEvent, keysym) + offsetof(SDL_Keysym, scancode) == 16 &&
+    sizeof(SDL_Scancode) == 4 && offsetof(SDL_DropEvent, file) == 8 &&
+    offsetof(SDL_TextEditingExtEvent, text) == 16, "SDL2 event decoder offsets");
+#else
 struct SdlWindow;
 struct SdlVersion { std::uint8_t major, minor, patch; };
-// Public SDL2 event ABI on ordinary 32/64-bit Linux. Read fields with memcpy,
-// avoiding type-punning a foreign C union. No SDL development headers required.
+// Public SDL2 event ABI on ordinary 32/64-bit Linux. No SDL headers required.
 struct alignas(8) SdlEvent { unsigned char bytes[56]; };
+#endif
+// Windows x86/ARM64 are rejected by native_dynamic_library50win.h; the GL
+// procedure tables rely on the x64 ABI. Read foreign events through memcpy.
 static_assert(sizeof(int) == 4 && (sizeof(void*) == 4 || sizeof(void*) == 8),
-    "SDL2 host requires the standard Linux 32/64-bit scalar/pointer ABI");
+    "SDL2 host requires the standard 32/64-bit scalar/pointer ABI");
 static_assert(sizeof(SdlEvent) == 56 && sizeof(SdlVersion) == 3, "SDL2 public ABI");
 template<class T> T field(const SdlEvent& e, std::size_t offset) noexcept {
     T result{};
-    std::memcpy(&result, e.bytes + offset, sizeof(result));
+    std::memcpy(&result, reinterpret_cast<const unsigned char*>(&e) + offset, sizeof(result));
     return result;
 }
 constexpr UInt videoInit = 0x20, windowOpenGl = 0x2, windowShown = 0x4;
@@ -66,49 +83,56 @@ bool valid(const WindowHostRequest50DQ& r) noexcept {
 }
 
 struct WindowHost50DQ::State {
-    void* library = nullptr;
+    native_library50win::Handle library = nullptr;
     SdlWindow* window = nullptr;
     void* context = nullptr;
     UInt windowId = 0;
     bool initAttempted = false, ready = false, quitRequested = false;
     std::array<std::uint8_t, windowScancodeCount50DQ> down{};
-    Int (*init)(UInt) = nullptr;
-    void (*quit)() = nullptr;
-    UInt (*wasInit)(UInt) = nullptr;
-    void (*getVersion)(SdlVersion*) = nullptr;
-    const char* (*getError)() = nullptr;
-    void (*freeMemory)(void*) = nullptr;
-    SdlWindow* (*createWindow)(const char*, Int, Int, Int, Int, UInt) = nullptr;
-    void (*destroyWindow)(SdlWindow*) = nullptr;
-    UInt (*getWindowId)(SdlWindow*) = nullptr;
-    UInt (*getWindowFlags)(SdlWindow*) = nullptr;
-    void (*getWindowSize)(SdlWindow*, Int*, Int*) = nullptr;
-    void (*getDrawableSize)(SdlWindow*, Int*, Int*) = nullptr;
-    void (*resetAttributes)() = nullptr;
-    Int (*setAttribute)(Int, Int) = nullptr;
-    Int (*getAttribute)(Int, Int*) = nullptr;
-    void* (*createContext)(SdlWindow*) = nullptr;
-    void (*deleteContext)(void*) = nullptr;
-    Int (*makeCurrent)(SdlWindow*, void*) = nullptr;
-    void* (*getCurrentContext)() = nullptr;
-    SdlWindow* (*getCurrentWindow)() = nullptr;
-    void* (*getProcAddress)(const char*) = nullptr;
-    Int (*setSwapInterval)(Int) = nullptr;
-    Int (*getSwapInterval)() = nullptr;
-    void (*swapWindow)(SdlWindow*) = nullptr;
-    void (*pumpEvents)() = nullptr;
-    Int (*peepEvents)(SdlEvent*, Int, Int, UInt, UInt) = nullptr;
-    std::uint8_t (*eventState)(UInt, Int) = nullptr;
-    void (*stopTextInput)() = nullptr;
+    Int (RR_SDL50WIN_CALL *init)(UInt) = nullptr;
+    void (RR_SDL50WIN_CALL *quit)() = nullptr;
+    UInt (RR_SDL50WIN_CALL *wasInit)(UInt) = nullptr;
+    void (RR_SDL50WIN_CALL *getVersion)(SdlVersion*) = nullptr;
+    const char* (RR_SDL50WIN_CALL *getError)() = nullptr;
+    void (RR_SDL50WIN_CALL *freeMemory)(void*) = nullptr;
+    SdlWindow* (RR_SDL50WIN_CALL *createWindow)(const char*, Int, Int, Int, Int, UInt) = nullptr;
+    void (RR_SDL50WIN_CALL *destroyWindow)(SdlWindow*) = nullptr;
+    UInt (RR_SDL50WIN_CALL *getWindowId)(SdlWindow*) = nullptr;
+    UInt (RR_SDL50WIN_CALL *getWindowFlags)(SdlWindow*) = nullptr;
+    void (RR_SDL50WIN_CALL *getWindowSize)(SdlWindow*, Int*, Int*) = nullptr;
+    void (RR_SDL50WIN_CALL *getDrawableSize)(SdlWindow*, Int*, Int*) = nullptr;
+    void (RR_SDL50WIN_CALL *resetAttributes)() = nullptr;
+    Int (RR_SDL50WIN_CALL *setAttribute)(Int, Int) = nullptr;
+    Int (RR_SDL50WIN_CALL *getAttribute)(Int, Int*) = nullptr;
+    void* (RR_SDL50WIN_CALL *createContext)(SdlWindow*) = nullptr;
+    void (RR_SDL50WIN_CALL *deleteContext)(void*) = nullptr;
+    Int (RR_SDL50WIN_CALL *makeCurrent)(SdlWindow*, void*) = nullptr;
+    void* (RR_SDL50WIN_CALL *getCurrentContext)() = nullptr;
+    SdlWindow* (RR_SDL50WIN_CALL *getCurrentWindow)() = nullptr;
+    void* (RR_SDL50WIN_CALL *getProcAddress)(const char*) = nullptr;
+    Int (RR_SDL50WIN_CALL *setSwapInterval)(Int) = nullptr;
+    Int (RR_SDL50WIN_CALL *getSwapInterval)() = nullptr;
+    void (RR_SDL50WIN_CALL *swapWindow)(SdlWindow*) = nullptr;
+    void (RR_SDL50WIN_CALL *pumpEvents)() = nullptr;
+    Int (RR_SDL50WIN_CALL *peepEvents)(SdlEvent*, Int, Int, UInt, UInt) = nullptr;
+    std::uint8_t (RR_SDL50WIN_CALL *eventState)(UInt, Int) = nullptr;
+    void (RR_SDL50WIN_CALL *stopTextInput)() = nullptr;
+
+#if defined(_WIN32)
+    void (RR_SDL50WIN_CALL *setMainReady)() = nullptr;
+#endif
 
     bool load(WindowHostDiagnostic50DQ& d) noexcept {
-        library = dlopen("libSDL2-2.0.so.0", RTLD_NOW | RTLD_LOCAL);
-        if (!library) library = dlopen("libSDL2.so", RTLD_NOW | RTLD_LOCAL);
+        char loaderDetail[256]{};
+        library = native_library50win::openSdl2(loaderDetail);
         if (!library) return fail(d, WindowHostError50DQ::LibraryUnavailable,
-            "dlopen(SDL2)", dlerror());
-#define RR_SDL50DQ(member, symbol) \
-        member = reinterpret_cast<decltype(member)>(dlsym(library, symbol)); \
-        if (!member) return fail(d, WindowHostError50DQ::MissingEntryPoint, symbol, dlerror())
+            native_library50win::openOperation, loaderDetail);
+#define RR_SDL50DQ(member, entry) \
+        member = reinterpret_cast<decltype(member)>(native_library50win::symbol(library, entry, loaderDetail)); \
+        if (!member) return fail(d, WindowHostError50DQ::MissingEntryPoint, entry, loaderDetail)
+#if defined(_WIN32)
+        RR_SDL50DQ(setMainReady, "SDL_SetMainReady");
+#endif
         RR_SDL50DQ(init, "SDL_Init");
         RR_SDL50DQ(quit, "SDL_Quit");
         RR_SDL50DQ(wasInit, "SDL_WasInit");
@@ -205,6 +229,10 @@ bool WindowHost50DQ::create(const WindowHostRequest50DQ& r, WindowHostDiagnostic
         fail(d, WindowHostError50DQ::ForeignCurrentContext, "create/preexisting SDL GL context");
         return cleanup();
     }
+#if defined(_WIN32)
+    // This host owns main and dynamically loads SDL; it does not use SDL2main.
+    s.setMainReady();
+#endif
     s.initAttempted = true;
     if (s.init(videoInit) != 0) return sdlFail(WindowHostError50DQ::VideoFailure, "SDL_Init(video)");
     s.stopTextInput(); // Keyboard controls only; no IME/text-input consumer.
@@ -408,8 +436,10 @@ bool WindowHost50DQ::closeOwned(WindowHostDiagnostic50DQ& d) noexcept {
         s.initAttempted = false;
     }
     if (s.library) {
-        if (dlclose(s.library) != 0)
-            return fail(d, WindowHostError50DQ::LibraryCloseFailure, "dlclose(SDL2)", dlerror());
+        char loaderDetail[256]{};
+        if (!native_library50win::close(s.library, loaderDetail))
+            return fail(d, WindowHostError50DQ::LibraryCloseFailure,
+                native_library50win::closeOperation, loaderDetail);
         s.library = nullptr;
     }
     delete state_;

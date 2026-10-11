@@ -1,0 +1,166 @@
+# Single native x64 development-client build. Never launches the client or tests.
+# Run only after the consolidated source and dependencies are approved.
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory=$true)][string]$SourceRoot,
+    [Parameter(Mandatory=$true)][string]$BuildDirectory,
+    [Parameter(Mandatory=$true)][string]$Compiler,
+    [Parameter(Mandatory=$true)][string]$Linker,
+    [Parameter(Mandatory=$true)][string]$SDL2IncludeDirectory,
+    [string]$SDL2RuntimeDll,
+    [string]$SourceRevision = 'unverified-working-tree'
+)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+if ($env:OS -ne 'Windows_NT') { throw 'Windows x64 MSVC environment required.' }
+# Compiler include/library lookup is inherited only from an already configured
+# x64 MSVC developer shell. This script installs and initializes nothing.
+if ($env:VSCMD_ARG_TGT_ARCH -ne 'x64') { throw 'Use an already authorized x64 MSVC developer shell.' }
+if ($env:CL -or $env:_CL_ -or $env:LINK -or $env:_LINK_) {
+    throw 'Clear CL, _CL_, LINK and _LINK_ override variables; build flags must be explicit.'
+}
+function ExistingFile([string]$Path) {
+    $p = (Resolve-Path -LiteralPath $Path).Path
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { throw "Not a file: $p" }
+    return $p
+}
+function ExistingDirectory([string]$Path) {
+    $p = (Resolve-Path -LiteralPath $Path).Path
+    if (-not (Test-Path -LiteralPath $p -PathType Container)) { throw "Not a directory: $p" }
+    return $p
+}
+function RspQuote([string]$Value) {
+    if ($Value.Contains('"') -or $Value.Contains("`r") -or $Value.Contains("`n")) { throw 'Invalid response-file path.' }
+    return '"' + $Value + '"'
+}
+function RequireAmd64PE([string]$Path) {
+    $stream = [IO.File]::OpenRead($Path)
+    $reader = New-Object IO.BinaryReader($stream)
+    try {
+        if ($reader.ReadUInt16() -ne 0x5a4d) { throw "Not PE: $Path" }
+        $stream.Position = 0x3c
+        $offset = $reader.ReadUInt32()
+        if ($offset -gt $stream.Length - 26) { throw "Invalid PE offset: $Path" }
+        $stream.Position = $offset
+        if ($reader.ReadUInt32() -ne 0x4550 -or $reader.ReadUInt16() -ne 0x8664) { throw "Expected AMD64 PE: $Path" }
+        $stream.Position = $offset + 24
+        if ($reader.ReadUInt16() -ne 0x20b) { throw "Expected PE32+: $Path" }
+    } finally { $reader.Dispose() }
+}
+$root = ExistingDirectory $SourceRoot
+$compilerPath = ExistingFile $Compiler
+$linkerPath = ExistingFile $Linker
+$zlibInclude = ExistingDirectory (Join-Path $root 'third_party/native-zlib')
+$null = ExistingFile (Join-Path $zlibInclude 'zlib.h')
+$null = ExistingFile (Join-Path $zlibInclude 'zconf.h')
+$sdlInclude = ExistingDirectory $SDL2IncludeDirectory
+foreach ($header in @('SDL_audio.h', 'SDL_events.h', 'SDL_version.h')) {
+    $null = ExistingFile (Join-Path $sdlInclude $header)
+}
+$runtimeDlls = @()
+if ($SDL2RuntimeDll) {
+    $sdlDll = ExistingFile $SDL2RuntimeDll
+    if ([IO.Path]::GetFileName($sdlDll) -cne 'SDL2.dll') { throw 'Provide the approved runtime with exact name SDL2.dll.' }
+    RequireAmd64PE $sdlDll
+    $runtimeDlls += $sdlDll
+}
+$manifestPath = ExistingFile (Join-Path $PSScriptRoot 'interactive50du.sources.json')
+$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+if ($manifest.schema -ne 1 -or $manifest.sources.Count -ne 277 -or $manifest.nativeDependencySources.Count -ne 6) { throw 'Review changed source manifest before changing this gate.' }
+foreach ($entry in (@($manifest.sourceListProvenance.PSObject.Properties) + @($manifest.nativeDependencySourceProvenance.PSObject.Properties))) {
+    $actual = (Get-FileHash -LiteralPath (Join-Path $root $entry.Name) -Algorithm SHA256).Hash
+    if ($actual -ine $entry.Value) { throw "Generator source changed; reconcile manifest first: $($entry.Name)" }
+}
+$sources = @()
+$seen = @{}
+foreach ($relative in (@($manifest.sources) + @($manifest.nativeDependencySources))) {
+    if ($relative -notmatch '^((src/(game|assets)|platform/linux/native|tests/native)/[A-Za-z0-9_]+\.cpp|third_party/native-zlib/(adler32|crc32|inflate|inffast|inftrees|zutil)\.c)$') { throw "Unexpected source path: $relative" }
+    if ($relative -match '(offscreen|joystick_transport|pcsx2)' -or $seen.ContainsKey($relative)) { throw "Forbidden or duplicate source: $relative" }
+    $seen[$relative] = $true
+    $sources += ExistingFile (Join-Path $root $relative)
+}
+$includes = @((Join-Path $root 'src/assets'), (Join-Path $root 'src/game'), (Join-Path $root 'third_party/native-json'), $zlibInclude, $sdlInclude)
+foreach ($inc in $includes) { $null = ExistingDirectory $inc }
+$null = ExistingFile (Join-Path $root 'platform/linux/native/native_dynamic_library50win.h')
+$out = [IO.Path]::GetFullPath($BuildDirectory)
+if (Test-Path -LiteralPath $out) { throw 'BuildDirectory must be new; existing outputs are never reused or deleted.' }
+# Capture source and header inputs, including local retained fixture headers.
+$inputFiles = @($sources) + @($manifestPath, $PSCommandPath, $compilerPath, $linkerPath) + $runtimeDlls
+foreach ($dir in @('src', 'tests/native', 'platform/linux/native', 'platform/windows/native', 'third_party/native-json', 'third_party/native-zlib')) {
+    $inputFiles += Get-ChildItem -LiteralPath (Join-Path $root $dir) -Recurse -File | Where-Object { $_.Extension -in '.h', '.hpp', '.inc' } | ForEach-Object { $_.FullName }
+}
+$inputFiles += Get-ChildItem -LiteralPath $sdlInclude -Recurse -File | Where-Object { $_.Extension -in '.h', '.hpp', '.inc' } | ForEach-Object { $_.FullName }
+$inputHashes = @($inputFiles | Sort-Object -Unique | ForEach-Object { Get-FileHash -LiteralPath $_ -Algorithm SHA256 } | Select-Object Path, Hash)
+$null = New-Item -ItemType Directory -Path $out
+$null = New-Item -ItemType Directory -Path (Join-Path $out 'obj')
+$receiptPath = Join-Path $out 'build-receipt.json'
+$receipt = [ordered]@{
+    status = 'started'; requestedSourceRevision = $SourceRevision
+    reviewedManifestRevision = $manifest.reviewedSourceRevision
+    sourceRevisionVerifiedByScript = $false; sourceRoot = $root
+    architecture = 'x64'; configuration = 'Release'; floatingPoint = '/fp:strict'
+    runtime = '/MD'; stackReserveBytes = 8388608; compiler = $compilerPath; linker = $linkerPath
+    inputHashes = $inputHashes; compilerIncludeEnvironment = $env:INCLUDE
+    linkerLibraryEnvironment = $env:LIB; sourceCount = $sources.Count
+    acceptance = 'not run'; runtimeDependencyClosureVerified = $false
+    sdlRuntimeStaged = ($runtimeDlls.Count -gt 0); zlib = 'six vendored inflate C sources, same /MD runtime'
+}
+$receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $receiptPath -Encoding UTF8
+$guard = Join-Path $out 'native-x64-guard.h'
+@'
+#if !defined(_MSC_VER) || !defined(_M_X64) || defined(_M_ARM64EC)
+#error This entry requires native MSVC AMD64; x86 and ARM64 are unsupported.
+#endif
+#ifdef __cplusplus
+#include <limits>
+static_assert(sizeof(void*) == 8 && sizeof(float) == 4 &&
+    std::numeric_limits<float>::is_iec559 && std::numeric_limits<float>::digits == 24,
+    "Requires native x64 and IEEE binary32");
+#endif
+'@ | Set-Content -LiteralPath $guard -Encoding ASCII
+$common = @('/nologo', '/c', '/std:c++20', '/EHsc', '/O2', '/MD', '/fp:strict', '/bigobj', '/utf-8', '/Zc:__cplusplus', '/DNDEBUG', '/DNOMINMAX', '/DWIN32_LEAN_AND_MEAN', ('/FI' + (RspQuote $guard)))
+$common += $includes | ForEach-Object { '/I' + (RspQuote $_) }
+$cCommon = @('/nologo', '/c', '/TC', '/O2', '/MD', '/fp:strict', '/utf-8', '/DNDEBUG', '/D_CRT_SECURE_NO_WARNINGS', ('/FI' + (RspQuote $guard)))
+$cCommon += $includes | ForEach-Object { '/I' + (RspQuote $_) }
+$objects = @()
+try {
+    for ($i = 0; $i -lt $sources.Count; ++$i) {
+        # Unique object names avoid collisions between same-name asset/game owners.
+        $stem = '{0:D4}-{1}' -f $i, [IO.Path]::GetFileNameWithoutExtension($sources[$i])
+        $obj = Join-Path $out ('obj/' + $stem + '.obj')
+        $rsp = Join-Path $out ($stem + '.rsp')
+        $flags = $common
+        if ([IO.Path]::GetExtension($sources[$i]) -eq '.c') { $flags = $cCommon }
+        $compileArgs = @($flags)
+        $compileArgs += '/Fo' + (RspQuote $obj)
+        $compileArgs += RspQuote $sources[$i]
+        $compileArgs | Set-Content -LiteralPath $rsp -Encoding Unicode
+        & $compilerPath ('@' + $rsp) 2>&1 | Tee-Object -FilePath (Join-Path $out ($stem + '.log'))
+        if ($LASTEXITCODE -ne 0) { throw "Compilation failed ($LASTEXITCODE): $($sources[$i])" }
+        $objects += $obj
+    }
+    $exe = Join-Path $out 'rr_interactive_vehicle50du.exe'
+    $linkRsp = Join-Path $out 'link.rsp'
+    $linkArgs = @('/NOLOGO', '/MACHINE:X64', '/SUBSYSTEM:CONSOLE', '/STACK:8388608', '/INCREMENTAL:NO', ('/OUT:' + (RspQuote $exe)))
+    $linkArgs += $objects | ForEach-Object { RspQuote $_ }
+    $linkArgs += 'kernel32.lib'
+    $linkArgs | Set-Content -LiteralPath $linkRsp -Encoding Unicode
+    & $linkerPath ('@' + $linkRsp) 2>&1 | Tee-Object -FilePath (Join-Path $out 'link.log')
+    if ($LASTEXITCODE -ne 0) { throw "Link failed ($LASTEXITCODE)." }
+    RequireAmd64PE $exe
+    foreach ($input in $inputHashes) {
+        if ((Get-FileHash -LiteralPath $input.Path -Algorithm SHA256).Hash -ne $input.Hash) { throw "Input changed during build: $($input.Path)" }
+    }
+    foreach ($dll in $runtimeDlls) { Copy-Item -LiteralPath $dll -Destination $out }
+    $receipt.status = 'built-not-run'
+    $receipt['executable'] = $exe
+    $receipt['executableSha256'] = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
+    if ($runtimeDlls.Count -eq 0) { Write-Warning 'SDL2.dll was not supplied. Build-only output is not runnable until the approved x64 runtime is staged.' }
+    Write-Host "Built only: $exe. No tests or client execution performed; acceptance remains pending."
+} catch {
+    $receipt.status = 'failed'
+    $receipt['error'] = $_.Exception.Message
+    throw
+} finally {
+    $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $receiptPath -Encoding UTF8
+}

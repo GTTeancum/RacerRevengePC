@@ -18,7 +18,7 @@ The [registered-pod query partial](docs/registered-pod-query50iz.md) is retained
 
 Supply your own original game data and generate local caches. Assets, executables, and memory dumps are excluded; some source-comparison fixtures also require local generation.
 
-Start with the [interactive build guide](docs/interactive-build50dv.md). Linux requires C++20, Python 3, zlib, SDL2, and desktop OpenGL. See [input requirements](docs/source-only-exclusions.md). Windows source is retained.
+Start with the [interactive build guide](docs/interactive-build50dv.md). Linux requires C++20, Python 3, zlib, SDL2, and desktop OpenGL. See [input requirements](docs/source-only-exclusions.md). A source-only [Windows x64 integrated build entry](platform/windows/native/README-interactive50du.md) now retains the same native UI/gameplay owners with SDL2/OpenGL window and audio adapters. It has not been compiled or run; it is not a validated release.
 
 ## Controls and frontend modes
 

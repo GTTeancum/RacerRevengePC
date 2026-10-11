@@ -1,17 +1,22 @@
 #include "audio_output50hd.h"
+#include "native_dynamic_library50win.h"
 #include <algorithm>
 #include <atomic>
 #include <bit>
 #include <cerrno>
+#include <cstddef>
+#include <cstdio>
 #include <cstring>
-#include <dlfcn.h>
 #include <fcntl.h>
 #include <limits>
 #include <new>
+#if defined(_WIN32)
+#include <SDL_audio.h>
+#include <io.h>
+#include <share.h>
+#include <sys/stat.h>
+#else
 #include <unistd.h>
-
-#if !defined(__linux__)
-#error "AudioOutput50HD implements the Linux SDL2 runtime ABI"
 #endif
 namespace rr::platform {
 namespace {
@@ -19,17 +24,26 @@ constexpr std::uint32_t sdlAudioInit = 0x10;
 constexpr std::uint16_t sdlS16LittleEndian = 0x8010;
 constexpr std::size_t queueFrames = 32768, blockFrames = 1024;
 constexpr std::uint64_t maximumWavFrames = (std::uint64_t{0xffffffff} - 36) / 4;
-// SDL2's documented public SDL_AudioSpec layout; no SDK headers required.
+// Use the official SDL2 audio ABI on Windows. Linux retains its existing
+// SDK-independent declaration. The shared loader rejects non-x64 Windows.
+#if defined(_WIN32)
+using SdlAudioSpec = SDL_AudioSpec;
+#else
 struct SdlAudioSpec {
     int freq;
     std::uint16_t format;
     std::uint8_t channels, silence;
     std::uint16_t samples, padding;
     std::uint32_t size;
-    void (*callback)(void*, std::uint8_t*, int);
+    void (RR_SDL50WIN_CALL *callback)(void*, std::uint8_t*, int);
     void* userdata;
 };
-static_assert(sizeof(int) == 4 && offsetof(SdlAudioSpec, callback) == 16);
+#endif
+static_assert(sizeof(int) == 4 && offsetof(SdlAudioSpec, format) == 4);
+static_assert(offsetof(SdlAudioSpec, channels) == 6 && offsetof(SdlAudioSpec, silence) == 7);
+static_assert(offsetof(SdlAudioSpec, samples) == 8 && offsetof(SdlAudioSpec, padding) == 10);
+static_assert(offsetof(SdlAudioSpec, size) == 12 && offsetof(SdlAudioSpec, callback) == 16);
+static_assert(offsetof(SdlAudioSpec, userdata) == 16 + sizeof(void*));
 static_assert(sizeof(SdlAudioSpec) == (sizeof(void*) == 8 ? 32 : 24));
 static_assert(std::endian::native == std::endian::little,
               "PCM capture and SDL must share the same little-endian bytes");
@@ -61,12 +75,60 @@ std::array<std::uint8_t, 44> wavHeader(std::uint32_t rate, std::uint64_t frames)
     std::memcpy(header.data() + 36, "data", 4); little32(header.data() + 40, bytes);
     return header;
 }
+// Capture descriptors never enter the SDL callback. Keep exact byte writes and
+// exclusive creation on both hosts; Windows CRT paths use its native narrow
+// filename encoding, just like the other char-path file APIs in this host.
+int openCapture(const char* path) noexcept {
+#if defined(_WIN32)
+    int fd = -1;
+    const auto error = ::_sopen_s(&fd, path,
+        _O_WRONLY | _O_CREAT | _O_EXCL | _O_BINARY | _O_NOINHERIT,
+        _SH_DENYWR, _S_IREAD | _S_IWRITE);
+    if (error) { errno = error; return -1; }
+    return fd;
+#else
+    return ::open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+#endif
+}
+bool seekCaptureStart(int fd) noexcept {
+#if defined(_WIN32)
+    return ::_lseeki64(fd, 0, SEEK_SET) >= 0;
+#else
+    return ::lseek(fd, 0, SEEK_SET) >= 0;
+#endif
+}
+bool truncateCapture(int fd, std::uint64_t size) noexcept {
+#if defined(_WIN32)
+    // The RIFF bound is below 2^32, but the CRT long is only 32 bits on x64.
+    const auto error = ::_chsize_s(fd, static_cast<__int64>(size));
+    if (error) { errno = error; return false; }
+    return true;
+#else
+    return ::ftruncate(fd, static_cast<off_t>(size)) == 0;
+#endif
+}
+int closeCapture(int fd) noexcept {
+#if defined(_WIN32)
+    return ::_close(fd);
+#else
+    return ::close(fd);
+#endif
+}
 bool writeAll(int fd, const void* bytes, std::size_t size) noexcept {
     const auto* source = static_cast<const std::uint8_t*>(bytes);
     while (size) {
+#if defined(_WIN32)
+        // _write accepts unsigned int but returns signed int. Bound each call
+        // before narrowing, even if a future caller submits a larger buffer.
+        const auto chunk = static_cast<unsigned int>(std::min<std::size_t>(
+            size, static_cast<std::size_t>((std::numeric_limits<int>::max)())));
+        const auto written = ::_write(fd, source, chunk);
+#else
         const auto written = ::write(fd, source, size);
+#endif
         if (written < 0 && errno == EINTR) continue;
-        if (written <= 0) return false;
+        if (written == 0) { errno = EIO; return false; }
+        if (written < 0) return false;
         source += written; size -= static_cast<std::size_t>(written);
     }
     return true;
@@ -84,7 +146,7 @@ const char* audioDeviceStatusName50HD(AudioDeviceStatus50HD status) noexcept {
 struct AudioOutput50HD::State {
     AudioOutputInfo50HD info{};
     AudioSampleClock50HD clock{};
-    void* library = nullptr;
+    native_library50win::Handle library = nullptr;
     std::uint32_t device = 0;
     int capture = -1;
     bool subsystemOwned = false, started = false, failed = false;
@@ -92,18 +154,18 @@ struct AudioOutput50HD::State {
     std::array<std::int16_t, queueFrames * 2> ring{};
     std::array<std::int16_t, blockFrames * 2> mixed{};
     std::atomic<std::uint64_t> read{0}, write{0}, consumed{0}, underruns{0};
-    int (*initSubsystem)(std::uint32_t) = nullptr;
-    void (*quitSubsystem)(std::uint32_t) = nullptr;
-    const char* (*getError)() = nullptr;
-    const char* (*getDriver)() = nullptr;
-    std::uint32_t (*openDevice)(const char*, int, const SdlAudioSpec*, SdlAudioSpec*, int) = nullptr;
-    void (*closeDevice)(std::uint32_t) = nullptr;
-    void (*pauseDevice)(std::uint32_t, int) = nullptr;
-    void (*lockDevice)(std::uint32_t) = nullptr;
-    void (*unlockDevice)(std::uint32_t) = nullptr;
-    int (*deviceStatus)(std::uint32_t) = nullptr;
+    int (RR_SDL50WIN_CALL *initSubsystem)(std::uint32_t) = nullptr;
+    void (RR_SDL50WIN_CALL *quitSubsystem)(std::uint32_t) = nullptr;
+    const char* (RR_SDL50WIN_CALL *getError)() = nullptr;
+    const char* (RR_SDL50WIN_CALL *getDriver)() = nullptr;
+    std::uint32_t (RR_SDL50WIN_CALL *openDevice)(const char*, int, const SdlAudioSpec*, SdlAudioSpec*, int) = nullptr;
+    void (RR_SDL50WIN_CALL *closeDevice)(std::uint32_t) = nullptr;
+    void (RR_SDL50WIN_CALL *pauseDevice)(std::uint32_t, int) = nullptr;
+    void (RR_SDL50WIN_CALL *lockDevice)(std::uint32_t) = nullptr;
+    void (RR_SDL50WIN_CALL *unlockDevice)(std::uint32_t) = nullptr;
+    int (RR_SDL50WIN_CALL *deviceStatus)(std::uint32_t) = nullptr;
 
-    static void callback(void* opaque, std::uint8_t* output, int bytes) noexcept {
+    static void RR_SDL50WIN_CALL callback(void* opaque, std::uint8_t* output, int bytes) noexcept {
         if (!opaque || !output || bytes <= 0) return;
         auto& s = *static_cast<State*>(opaque);
         std::memset(output, 0, static_cast<std::size_t>(bytes));
@@ -126,7 +188,10 @@ struct AudioOutput50HD::State {
         device = 0; started = false;
         if (subsystemOwned && quitSubsystem) quitSubsystem(sdlAudioInit);
         subsystemOwned = false;
-        if (library) dlclose(library);
+        if (library) {
+            char detail[256]{};
+            native_library50win::close(library, detail);
+        }
         library = nullptr;
     }
     void deviceFailure(const char* detail,
@@ -135,12 +200,17 @@ struct AudioOutput50HD::State {
     }
     void prepareDevice(const AudioOutputRequest50HD& request) noexcept {
         info.deviceStatus = AudioDeviceStatus50HD::Unavailable;
-        library = dlopen("libSDL2-2.0.so.0", RTLD_NOW | RTLD_LOCAL);
-        if (!library) library = dlopen("libSDL2.so", RTLD_NOW | RTLD_LOCAL);
-        if (!library) { deviceFailure(dlerror()); return; }
-#define RR_AUDIO50HD_LOAD(member, symbol) \
-        member = reinterpret_cast<decltype(member)>(dlsym(library, symbol)); \
-        if (!member) { deviceFailure("Missing SDL2 entry point: " symbol); return; }
+        char loaderDetail[256]{};
+        library = native_library50win::openSdl2(loaderDetail);
+        if (!library) { deviceFailure(loaderDetail); return; }
+#define RR_AUDIO50HD_LOAD(member, entryName) \
+        member = reinterpret_cast<decltype(member)>(native_library50win::symbol(library, entryName, loaderDetail)); \
+        if (!member) { deviceFailure(loaderDetail); return; }
+#if defined(_WIN32)
+        // This host owns main rather than linking SDL2main's entry-point shim.
+        void (RR_SDL50WIN_CALL *setMainReady)() = nullptr;
+        RR_AUDIO50HD_LOAD(setMainReady, "SDL_SetMainReady");
+#endif
         RR_AUDIO50HD_LOAD(initSubsystem, "SDL_InitSubSystem");
         RR_AUDIO50HD_LOAD(quitSubsystem, "SDL_QuitSubSystem");
         RR_AUDIO50HD_LOAD(getError, "SDL_GetError");
@@ -152,6 +222,9 @@ struct AudioOutput50HD::State {
         RR_AUDIO50HD_LOAD(unlockDevice, "SDL_UnlockAudioDevice");
         RR_AUDIO50HD_LOAD(deviceStatus, "SDL_GetAudioDeviceStatus");
 #undef RR_AUDIO50HD_LOAD
+#if defined(_WIN32)
+        setMainReady();
+#endif
         if (initSubsystem(sdlAudioInit) != 0) { deviceFailure(getError()); return; }
         subsystemOwned = true;
         const char* driver = getDriver();
@@ -213,7 +286,7 @@ bool AudioOutput50HD::open(const AudioOutputRequest50HD& request,
     s.info.sampleRate = request.sampleRate; s.prebuffer = request.prebufferFrames;
     s.clock.initialize(request.sampleRate);
     if (request.wavPath) {
-        s.capture = ::open(request.wavPath, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+        s.capture = openCapture(request.wavPath);
         if (s.capture < 0) {
             fail(d, AudioOutputError50HD::CaptureOpen, "audio.open/WAV", std::strerror(errno));
             delete state_; state_ = nullptr; return false;
@@ -221,7 +294,7 @@ bool AudioOutput50HD::open(const AudioOutputRequest50HD& request,
         const auto header = wavHeader(request.sampleRate, 0);
         if (!writeAll(s.capture, header.data(), header.size())) {
             fail(d, AudioOutputError50HD::CaptureWrite, "audio.open/WAV header", std::strerror(errno));
-            ::close(s.capture); delete state_; state_ = nullptr; return false;
+            closeCapture(s.capture); delete state_; state_ = nullptr; return false;
         }
         s.info.captureActive = true;
     }
@@ -311,12 +384,12 @@ bool AudioOutput50HD::close(AudioOutputDiagnostic50HD& d) noexcept {
     bool ok = true;
     if (s.capture >= 0) {
         const auto header = wavHeader(s.info.sampleRate, s.info.capturedFrames);
-        if (::lseek(s.capture, 0, SEEK_SET) < 0 || !writeAll(s.capture, header.data(), header.size()))
+        if (!seekCaptureStart(s.capture) || !writeAll(s.capture, header.data(), header.size()))
             ok = fail(d, AudioOutputError50HD::CaptureFinalize, "audio.close/WAV header", std::strerror(errno));
         // A failed partial write is excluded from RIFF's advertised data range.
-        if (::ftruncate(s.capture, static_cast<off_t>(44 + s.info.capturedFrames * 4)) != 0 && ok)
+        if (!truncateCapture(s.capture, 44 + s.info.capturedFrames * 4) && ok)
             ok = fail(d, AudioOutputError50HD::CaptureFinalize, "audio.close/WAV length", std::strerror(errno));
-        if (::close(s.capture) != 0 && ok)
+        if (closeCapture(s.capture) != 0 && ok)
             ok = fail(d, AudioOutputError50HD::CaptureFinalize, "audio.close/WAV file", std::strerror(errno));
     }
     finalInfo_.captureActive = false;

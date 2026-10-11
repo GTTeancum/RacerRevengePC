@@ -58,7 +58,7 @@ struct WindowHostDiagnostic50DQ {
 };
 using WindowGlProc50DQ = void (*)();
 
-// Linux SDL2 window + desktop GL owner. Construct/use/destroy on the process's
+// Linux/Windows x64 SDL2 window + desktop GL owner. Construct/use/destroy on the process's
 // main thread. Requires exclusive SDL subsystem/event-queue ownership for its
 // lifetime, and a dedicated rendering thread with no foreign GL/EGL/GLX owner.
 // Does not render, select a camera, advance gameplay, map keys, pace simulation,
