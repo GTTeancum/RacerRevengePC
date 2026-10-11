@@ -84,6 +84,32 @@ inline bool convertOriginalUiRiderWindowMaterialSpan50KM(
         !material.material.fogEnabled || !material.material.alphaTestGreaterZero)return false;
     return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
 }
+// Exact original shadow image binding. Common conversion supplies only the
+// unchanged sampler/depth fields; the dedicated attenuation blend never enters
+// the ordinary RGB-only renderer or generic Diffuse admission.
+inline bool convertOriginalUiRider19ShadowMaterialSpan50KM(
+    const assets::OriginalUiRider19ShadowMaterial50KM& material,
+    const assets::OriginalUiScreenAssets50KG& publishedImages,
+    const OriginalUiMaterialSpanBinding50KG& binding,
+    OriginalUiMaterialSpan50KG& output) noexcept {
+    const auto* bank=publishedImages.textures();
+    const auto* image=bank?bank->texture(binding.textureIndex):nullptr;
+    if(material.images!=&publishedImages || !publishedImages.loaded() || !image ||
+        binding.textureIndex!=material.imageIndex || binding.textureCount!=bank->textureCount() ||
+        image->identity!=material.imageIdentity || material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed ||
+        material.material.raster.blend!=assets::OriginalUiMaterialBlend50KG::destinationSourceAlphaAttenuation ||
+        !material.material.raster.depthWrite || material.material.raster.depthMethod!=2 ||
+        !material.material.fogEnabled || !material.material.alphaTestGreaterZero)return false;
+    auto commonRaster=material.material.raster;commonRaster.blend=assets::OriginalUiMaterialBlend50KG::sourceAlpha;
+    OriginalUiMaterialSpan50KG next;
+    if(!convertOriginalUiMaterialSpan50KG(commonRaster,binding,next))return false;
+    next.span.materialMode=OriginalUiMaterialMode50KG::sourceDiffuseCompressed;
+    next.span.blend=OriginalUiBlend50KG::destinationSourceAlphaAttenuation;
+    next.span.alphaScale=1.f; // Explicit source byte coefficient in sealed RGBA route.
+    next.native.sourceFogEnabled=material.material.fogEnabled;
+    next.native.sourceAlphaTestGreaterZero=material.material.alphaTestGreaterZero;
+    output=next;return true;
+}
 // Separate admission for source-RGBA composition only. The common converter
 // still rejects both new blend kinds, and the RGB-only renderer rejects this
 // program identity. Reusing its bounded sampler/depth conversion below does

@@ -2176,7 +2176,11 @@ void main() {
             // read/write per covered texel, barrier before every subsequent draw.
             vec4 destination=floor(texelFetch(uiSourceTarget,ivec2(gl_FragCoord.xy),0)*255.0+0.5);
             float coefficient=uiSourceBlend==3 ? destination.a : uiSourceBlend==4 ? 255.0 : source.a;
-            vec3 difference=uiSourceBlend==1 ? source.rgb-destination.rgb : source.rgb;
+            // Exact shadow ALPHA A=2 selects zero, B=1 selects destination.
+            // Floor the signed product before adding Cd, as for other ALPHA
+            // modes; never replace the original shadow texture or source A.
+            vec3 difference=uiSourceBlend==5 ? -destination.rgb :
+                uiSourceBlend==1 ? source.rgb-destination.rgb : source.rgb;
             result=floor(difference*coefficient/128.0)+destination.rgb;
         }
         // ALPHA changes RGB only. Every surviving fragment replaces stored A;
@@ -3935,9 +3939,15 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         const bool specular=span.materialMode==OriginalUiMaterialMode50KG::sourceSpecularMapCompressed;
         const bool sourceRaster = span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuse ||
             span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed || specular;
-        const bool sourceSpecialBlend=span.blend==OriginalUiBlend50KG::destinationAlphaAdditive ||
+        const bool specularBlend=span.blend==OriginalUiBlend50KG::destinationAlphaAdditive ||
             span.blend==OriginalUiBlend50KG::fixed255Additive;
-        if ((specular && !sourceRgba) || sourceSpecialBlend!=specular ||
+        const bool shadowBlend=span.blend==OriginalUiBlend50KG::destinationSourceAlphaAttenuation;
+        const bool sourceSpecialBlend=specularBlend||shadowBlend;
+        if (shadowBlend && (!sourceRgba || span.materialMode!=OriginalUiMaterialMode50KG::sourceDiffuseCompressed ||
+            state.depth!=OriginalUiDepth50KG::greaterEqual || !state.depthWrite ||
+            !state.sourceFogEnabled || !state.sourceAlphaTestGreaterZero))
+            return fail(d,VehicleWindowError50DS::material,"shadow requires actual typed source-RGBA policy");
+        if ((specular && !sourceRgba) || specularBlend!=specular ||
             (specular && (state.depth!=OriginalUiDepth50KG::greaterEqual || state.depthWrite ||
                 !state.sourceFogEnabled || !state.sourceAlphaTestGreaterZero)))
             return fail(d,VehicleWindowError50DS::material,"specular requires actual typed source-RGBA policy");
@@ -4144,7 +4154,8 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             const I sourceBlend=span.blend==OriginalUiBlend50KG::opaque?0:
                 span.blend==OriginalUiBlend50KG::sourceAlpha?1:
                 span.blend==OriginalUiBlend50KG::additive?2:
-                span.blend==OriginalUiBlend50KG::destinationAlphaAdditive?3:4;
+                span.blend==OriginalUiBlend50KG::destinationAlphaAdditive?3:
+                span.blend==OriginalUiBlend50KG::fixed255Additive?4:5;
             s.gl.uniform1i(s.uiSourceBlendUniform,sourceBlend);
             const bool particle = span.materialMode == OriginalUiMaterialMode50KG::mainParticle;
             const bool sourceRaster = span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuse ||
