@@ -1,4 +1,5 @@
 #include "original_ui_material50kg.h"
+#include "original_ui_screen_assets50kg.h"
 #include <utility>
 
 namespace rr::assets {
@@ -93,6 +94,15 @@ constexpr PromptSource promptSources[]={
     {"icon_sqr","ui\\textures\\icon_sqr.pst","ui\\textures\\icon_sqr","ui\\textures\\icon_sqr.psm",0x1d6994},
     {"icon_cir","ui\\textures\\icon_cir.pst","ui\\textures\\icon_cir","ui\\textures\\icon_cir.psm",0x1d6a4c}
 };
+constexpr PromptSource riderStatSources[]={
+    {"podstat","ui\\textures\\podstat.pst","ui\\textures\\podstat","ui\\textures\\podstat.psm",0x1e89d8},
+    {"podstat2","ui\\textures\\podstat2.pst","ui\\textures\\podstat2","ui\\textures\\podstat2.psm",0x1e89f0},
+    {"notch","ui\\textures\\notch.pst","ui\\textures\\notch","ui\\textures\\notch.psm",0x1e8a38}
+};
+bool riderPortraitIndex(std::uint8_t rider) noexcept {return rider>=1&&rider<=26&&rider!=5&&rider!=6&&rider!=13;}
+std::string riderPortraitName(std::uint8_t rider) {
+    std::string name="00_flrg";name[0]=char('0'+rider/10);name[1]=char('0'+rider%10);return name;
+}
 bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
     if (pass.provenance.origin == OriginalUiMaterialOrigin50KG::authoredPsm)
         return pass.identity != nullptr;
@@ -105,8 +115,70 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
             p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::mainMenu,"UI\\UIMain\\Widgets.Dat") &&
             p.registeredName=="ui\\textures\\mmlogo" && p.attemptedPsmMember=="ui\\textures\\mmlogo.psm" &&
             pass.textureName=="mmlogo" && !p.fallbackPageSource && !p.sourceCallerPC;
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderStatMissingPsmFallback){
+        if(p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\uirider\\rider.dat"))return false;
+        for(const auto& source:riderStatSources)
+            if(p.sourceCallerPC==source.callPC&&p.registeredName==source.registeredName&&
+                p.attemptedPsmMember==source.psm&&pass.textureName==source.texture&&
+                p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::rider,source.member))return true;
+        return false;
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderPortraitMissingPsmFallback){
+        if(p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\uirider\\rider.dat")||
+            p.sourceCallerPC!=0x1e9448)return false;
+        for(std::uint8_t rider=1;rider<=26;++rider){
+            if(!riderPortraitIndex(rider))continue;
+            const auto name=riderPortraitName(rider);const auto registered="ui\\textures\\"+name;
+            if(p.registeredName==registered&&p.attemptedPsmMember==registered+".psm"&&pass.textureName==name&&
+                p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::rider,(registered+".pst").c_str()))return true;
+        }
+        return false;
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderNameBlurMissingPsmFallback)
+        return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)&&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\nameblur.pst")&&
+            p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::rider,"UI\\UIRider\\Widgets.Dat")&&
+            !p.fallbackPageSource&&p.sourceCallerPC==0x2ac6b0&&
+            p.registeredName=="ui\\textures\\nameblur"&&p.attemptedPsmMember=="ui\\textures\\nameblur.psm"&&
+            pass.textureName=="nameblur";
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderBackgroundMissingPsmFallback){
+        if(p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::backgrounds)||p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::rider,"UI\\UIRider\\rider.dat")||
+            p.sourceCallerPC!=0x1e8dc0)return false;
+        for(std::uint8_t rider=1;rider<=26;++rider){
+            if(!riderPortraitIndex(rider))continue;
+            std::string name="00_bkg";name[0]=char('0'+rider/10);name[1]=char('0'+rider%10);
+            const auto registered="ui\\textures\\"+name;
+            if(p.registeredName==registered&&p.attemptedPsmMember==registered+".psm"&&pass.textureName==name&&
+                p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::backgrounds,(registered+".pst").c_str()))return true;
+        }
+        return false;
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::riderPromptMissingPsmFallback){
+        if(p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::rider,"UI\\UIRider\\rider.dat"))return false;
+        for(std::size_t i=0;i<4;++i){
+            const auto& source=promptSources[i];
+            const auto archive=i<2?OriginalUiArchiveId50KG::overlays:OriginalUiArchiveId50KG::rider;
+            if(p.archive==originalUiArchiveIdentity50KG(archive)&&p.sourceCallerPC==source.callPC&&
+                p.registeredName==source.registeredName&&p.attemptedPsmMember==source.psm&&
+                pass.textureName==source.texture&&p.fallbackTexture==catalogMember(archive,source.member))return true;
+        }
+        return false;
+    }
     const bool main=p.origin==OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback;
     const bool options=p.origin==OriginalUiMaterialOrigin50KG::optionsMenuPromptMissingPsmFallback;
+    const bool gameOptions=p.origin==OriginalUiMaterialOrigin50KG::optionsGamePromptMissingPsmFallback;
+    if(gameOptions){
+        const auto& source=promptSources[2];
+        return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options)&&
+            !p.fallbackWidgetSource&&p.fallbackPageSource==catalogMember(OriginalUiArchiveId50KG::options,"UI\\UIOption\\options.dat")&&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::options,source.member)&&
+            p.sourceCallerPC==source.callPC&&p.registeredName==source.registeredName&&
+            p.attemptedPsmMember==source.psm&&pass.textureName==source.texture;
+    }
     if((!main&&!options) || p.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays) ||
         p.fallbackWidgetSource || p.fallbackPageSource!=catalogMember(
             main?OriginalUiArchiveId50KG::mainMenu:OriginalUiArchiveId50KG::options,
@@ -334,16 +406,188 @@ bool readOriginalUiOptionsMenuPromptFallbackMaterial50KG(const OriginalUiArchive
         output=std::move(result);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }
-bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
-    const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
+bool readOriginalUiGameOptionsPromptFallbackMaterial50KG(const OriginalUiArchive50KG& options,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
     OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!options.loaded()||options.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Options and shared OVERLAYS",0x1f4724);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index!=2)return fail(d,Error::fallbackSource,"Game Options local square only");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=options.find(source.member);const auto page=options.find("UI\\UIOption\\options.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||options.find(source.psm).identity)
+            return fail(d,Error::fallbackSource,"Options-local square texture and original Game Options page",source.callPC);
+        OriginalUiMaterialProvenance50KG provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::optionsGamePromptMissingPsmFallback;
+        provenance.archive=options.identity();provenance.fallbackTexture=texture.identity;
+        provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=source.callPC;
+        provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
+        provenance.creationPC=0x2475c0;
+        auto result=screenTextureFallback(provenance,source.texture,*inherited,runtime);
+        output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderStatFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    OriginalUiRiderStatTexture50KG requested,const OriginalUiMaterialTemplates50KG& templates,
+    OriginalUiTemplate50KG owner,const OriginalUiMaterialRuntime50KG& runtime,
+    OriginalUiMaterial50KG& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider))
+            return fail(d,Error::archive,"authenticated Rider archive",0x1e89d8);
+        const auto index=static_cast<std::size_t>(requested);
+        if(index>=3)return fail(d,Error::fallbackSource,"Rider podstat/podstat2/notch only");
+        const auto& source=riderStatSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=rider.find(source.member);const auto page=rider.find("ui\\uirider\\rider.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||rider.find(source.psm).identity)
+            return fail(d,Error::fallbackSource,"actual Rider stat texture and absent original PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::riderStatMissingPsmFallback;
+        provenance.archive=rider.identity();provenance.fallbackTexture=texture.identity;
+        provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=source.callPC;
+        provenance.registeredName=source.registeredName;provenance.attemptedPsmMember=source.psm;
+        provenance.creationPC=0x2475c0;
+        auto result=screenTextureFallback(provenance,source.texture,*inherited,runtime);
+        output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderPortraitFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    std::uint8_t riderIndex,const OriginalUiMaterialTemplates50KG& templates,
+    OriginalUiTemplate50KG owner,const OriginalUiMaterialRuntime50KG& runtime,
+    OriginalUiMaterial50KG& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider))
+            return fail(d,Error::archive,"authenticated Rider archive",0x1e9448);
+        if(!riderPortraitIndex(riderIndex))return fail(d,Error::fallbackSource,"original Rider portrait index",0x1e8d54);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto name=riderPortraitName(riderIndex);const auto registered="ui\\textures\\"+name;
+        const auto texture=rider.find(registered+".pst");const auto page=rider.find("ui\\uirider\\rider.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||rider.find(registered+".psm").identity)
+            return fail(d,Error::fallbackSource,"actual Rider portrait and absent original PSM",0x1e9448);
+        OriginalUiMaterialProvenance50KG provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::riderPortraitMissingPsmFallback;
+        provenance.archive=rider.identity();provenance.fallbackTexture=texture.identity;
+        provenance.fallbackPageSource=page.identity;provenance.sourceCallerPC=0x1e9448;
+        provenance.registeredName=registered;provenance.attemptedPsmMember=registered+".psm";
+        provenance.creationPC=0x2475c0;
+        auto result=screenTextureFallback(provenance,name.c_str(),*inherited,runtime);
+        output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider))
+            return fail(d,Error::archive,"authenticated Rider",0x2ac6b0);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=rider.find("ui\\textures\\nameblur.pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||
+            rider.find("ui\\textures\\nameblur.psm").identity)
+            return fail(d,Error::fallbackSource,"actual Rider nameblur and absent PSM",0x29b638);
+        OriginalUiDat50KG widgets;
+        if(!readOriginalUiDat50KG(rider,"UI\\UIRider\\Widgets.Dat",widgets,d.document,
+            OriginalUiRepeatedKeyPolicy50KG::preserveInOrder))return fail(d,Error::document,"Rider widgets",0x2ac650);
+        const auto* type=widgets.find("Widget 88","Type");const auto* name=widgets.find("Widget 88","Texture");
+        if(!type||type->text!="Icon"||!name||name->text!="nameblur")
+            return fail(d,Error::fallbackSource,"Rider Icon88 nameblur",0x2ac650);
+        OriginalUiMaterialProvenance50KG p;
+        p.origin=OriginalUiMaterialOrigin50KG::riderNameBlurMissingPsmFallback;
+        p.archive=rider.identity();p.fallbackTexture=texture.identity;p.fallbackWidgetSource=widgets.identity();
+        p.sourceCallerPC=0x2ac6b0;p.registeredName="ui\\textures\\nameblur";
+        p.attemptedPsmMember="ui\\textures\\nameblur.psm";p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,"nameblur",*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderBackgroundFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiArchive50KG& backgrounds,std::uint8_t riderIndex,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
+            !backgrounds.loaded()||backgrounds.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::backgrounds))
+            return fail(d,Error::archive,"authenticated Rider and UIBKG",0x1e8dc0);
+        if(!riderPortraitIndex(riderIndex))return fail(d,Error::fallbackSource,"original Rider background index",0x1e8d58);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        std::string name="00_bkg";name[0]=char('0'+riderIndex/10);name[1]=char('0'+riderIndex%10);
+        const auto registered="ui\\textures\\"+name;
+        const auto texture=backgrounds.find(registered+".pst");const auto page=rider.find("UI\\UIRider\\rider.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            rider.find(registered+".psm").identity||backgrounds.find(registered+".psm").identity)
+            return fail(d,Error::fallbackSource,"actual UIBKG image and absent PSM",0x1e8dc0);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::riderBackgroundMissingPsmFallback;
+        p.archive=backgrounds.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=0x1e8dc0;p.registeredName=registered;p.attemptedPsmMember=registered+".psm";p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,name.c_str(),*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiRiderPromptFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!rider.loaded()||rider.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Rider and OVERLAYS",0x1e8074);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index>=4)return fail(d,Error::fallbackSource,"original shared Rider page prompt");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto& textureOwner=index<2?overlays:rider;
+        const auto texture=textureOwner.find(source.member);const auto page=rider.find("UI\\UIRider\\rider.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||rider.find(source.psm).identity||(index<2&&rider.find(source.member).identity))
+            return fail(d,Error::fallbackSource,"actual shared/local Rider prompt and absent PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::riderPromptMissingPsmFallback;
+        p.archive=textureOwner.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=source.callPC;p.registeredName=source.registeredName;p.attemptedPsmMember=source.psm;p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d, bool litProgram,
+    bool& fogEnabled, bool& alphaTestGreaterZero, bool authenticatedRiderIpum = false,
+    bool authenticatedRiderIndexedBody = false, bool authenticatedRiderSpecular = false,
+    bool authenticatedRiderWindow = false) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
             return fail(d, Error::untexturedAdapterRequired, "zero-map requires untextured material policy", 0x2474b8u);
-        if (!sourceIdentityKnown(pass) || !pass.inheritedTemplate || pass.microprogram != "ScreenObject" ||
+        const bool programMatches = litProgram ?
+            ((same(pass.microprogram, "Diffuse") || same(pass.microprogram, "DiffuseCompressed") ||
+              (authenticatedRiderSpecular && same(pass.microprogram,"SpecularMapCompressed"))) &&
+             pass.provenance.origin == OriginalUiMaterialOrigin50KG::authoredPsm &&
+             pass.inheritedTemplate == catalogMember(OriginalUiArchiveId50KG::appStart,
+                 "AppStart\\DefaultMT.psm")) : pass.microprogram == "ScreenObject";
+        if (!sourceIdentityKnown(pass) || !pass.inheritedTemplate || !programMatches ||
             pass.enabled != 1 || pass.textureCount != 1 || pass.textureCoordinateIndex != 0)
-            return fail(d, Error::profile, "enabled single-map ScreenObject", 0x2471bcu);
+            return fail(d, Error::profile, litProgram ? "authored DefaultMT Diffuse/Compressed" :
+                "enabled single-map ScreenObject", 0x2471bcu);
         for (const auto& field : pass.authored.values)
             if (field.sourceValuePresent && !knownPassField(field.key))
                 return fail(d, Error::unsupportedField, field.key.c_str(), 0x247110u);
@@ -365,24 +609,39 @@ bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
             !expect(Field::colorClampingMethod, 1) || !expect(Field::alphaCorrectionValue, 0) ||
             !expect(Field::alphaBlendingControlInUnitsOfPixels, 0) ||
             !expect(Field::gouraudShadingOnOff, 1) || !expect(Field::textureMappingOnOff, 1) ||
-            !expect(Field::foggingOnOff, 0) || !expect(Field::onePassAntiAliasingOnOff, 0) ||
+            (!litProgram && !expect(Field::foggingOnOff, 0)) || !expect(Field::onePassAntiAliasingOnOff, 0) ||
             !expect(Field::textureCoordinatesSTQorUV, 0) ||
             !expect(Field::environmentContext0or1, 0) ||
-            !expect(Field::fragmentValueControlFixedOrNot, 0) || !expect(Field::alphaTestOnOff, 0) ||
+            !expect(Field::fragmentValueControlFixedOrNot, 0) ||
+            (!litProgram && !expect(Field::alphaTestOnOff, 0)) ||
             !expect(Field::destinationAlphaTestOnOff, 0)) return false;
-        if (texture.revision != 1 || texture.flags || texture.kind > 1 || texture.mips.size() != 1)
-            return fail(d, Error::texture, "single original indexed RGBA mip", 0x24e880u);
-        const auto& mip = texture.mips.front();
+        const bool sourceFog = litProgram && value(Field::foggingOnOff) != 0;
+        const bool sourceAlphaTest = litProgram && value(Field::alphaTestOnOff) != 0;
+        if (sourceAlphaTest && (!expect(Field::alphaTestMethod, 6) ||
+            !expect(Field::alphaReferenceValue, 0) ||
+            !expect(Field::processingMethodWhenFailedInAlphaTest, 0))) return false;
+        const bool textureShape = authenticatedRiderIpum ?
+            (litProgram && texture.kind == 2 && texture.mips.size() == originalUiIpumMipCount50KG) :
+            authenticatedRiderIndexedBody ? (litProgram && texture.kind == 1 && texture.mips.size() == 5) :
+            authenticatedRiderWindow ? (litProgram && texture.kind == 1 && texture.mips.size() == 3) :
+            (texture.kind <= 1 && texture.mips.size() == 1);
+        if (texture.revision != 1 || texture.flags || !textureShape)
+            return fail(d, Error::texture, "admitted original texture/mip provenance", 0x24e880u);
+        // Typed kind2 path below authenticates this actual bank image. Native
+        // highest-resolution policy binds the last stored (source level0) mip;
+        // no historical residentF4 or unuploaded GPU mip levels are implied.
+        const auto& mip = texture.mips.back();
         if (mip.width < 16 || mip.height < 16 || mip.width > 1024 || mip.height > 1024 ||
             (mip.width & (mip.width - 1)) || (mip.height & (mip.height - 1)) ||
             std::uint64_t(mip.width) * mip.height * 4 != mip.rgba.size())
             return fail(d, Error::texture, "atlas dimensions");
         // Real Main PST palettes use the full source alpha byte (up to255).
         // Do not rewrite or reject those authentic bytes. The native renderer
-        // cold-caches each exact atlas maximum and, before target writes,
-        // requires vertexAlpha * atlasMaximumAlpha <= 128*128 for blended
-        // spans. That joint bound admits Main's63/64 packet alpha while
-        // rejecting GS coefficients above1 that fixed-function GL cannot express.
+        // cold-caches each exact atlas maximum. The ordinary RGB-only route
+        // requires vertexAlpha * atlasMaximumAlpha <= 128*128 before blended
+        // writes; its fixed-function factor cannot express larger values.
+        // The sealed source-RGBA route instead evaluates admitted byte factors
+        // explicitly and preserves independent source-alpha replacement.
         if (pass.maximumMipLevel != 0 || pass.magFilter < 0 || pass.magFilter > 1 ||
             pass.minFilter < 0 || pass.minFilter > 5 || pass.lodCalculationMethod < 0 ||
             pass.lodCalculationMethod > 1 || pass.lodL < 0 || pass.lodL > 3 ||
@@ -397,7 +656,15 @@ bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
             return fail(d, Error::unsupportedValue, "depth/context", 0x247ed8u);
         OriginalUiNativeMaterial50KG policy;
         const auto blend = value(Field::alphaBlendingOnOff);
-        if (blend == 1) {
+        if (authenticatedRiderSpecular) {
+            if (!expect(Field::alphaBlendingOnOff,1) || !expect(Field::inputColorA,0) ||
+                !expect(Field::inputColorB,2) || !expect(Field::inputColorD,1) ||
+                !expect(Field::zWriteDisabled,1))return false;
+            if (value(Field::inputAlphaC)==1)policy.blend=OriginalUiMaterialBlend50KG::destinationAlphaAdditive;
+            else if (value(Field::inputAlphaC)==2 && expect(Field::fixedAlphaValue,255))
+                policy.blend=OriginalUiMaterialBlend50KG::fixed255Additive;
+            else return fail(d,Error::unsupportedValue,"actual Rider specular ALPHA.C/FIX",0x247a64u);
+        } else if (blend == 1) {
             if (!expect(Field::inputColorA, 0) || !expect(Field::inputAlphaC, 0) ||
                 !expect(Field::inputColorD, 1)) return false;
             const auto b = value(Field::inputColorB);
@@ -421,8 +688,163 @@ bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
         policy.environmentContext = static_cast<std::uint8_t>(value(Field::environmentContext0or1));
         policy.requiresOriginalDepthOwner = policy.depthMethod != 1 || policy.depthWrite;
         policy.requiresSeparateAlphaStore = blend != 0;
-        output = policy; d = {}; return true;
+        output = policy; fogEnabled = sourceFog; alphaTestGreaterZero = sourceAlphaTest;
+        d = {}; return true;
     } catch (...) { d.error = Error::allocation; return false; }
+}
+bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
+    const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    bool fog = false, alphaTest = false;
+    return prepareOriginalUiOneMapMaterial50KM(pass, texture, output, d, false, fog, alphaTest);
+}
+bool prepareOriginalUiLitMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const Texture48E& texture, OriginalUiLitMaterial50KM& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    OriginalUiLitMaterial50KM next;
+    if (!prepareOriginalUiOneMapMaterial50KM(pass, texture, next.raster, d, true,
+        next.fogEnabled, next.alphaTestGreaterZero)) return false;
+    next.program = same(pass.microprogram, "Diffuse") ? OriginalUiLitProgram50KM::diffuse :
+        OriginalUiLitProgram50KM::diffuseCompressed;
+    output = next; return true;
+}
+bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19IpumMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d = {}; d.pass = pass.pass;
+    try {
+        const auto* source = images.sourceProvenance(imageIndex);
+        const auto* ipum = images.ipumProvenance(imageIndex);
+        const auto* texture = images.decodedTexture(imageIndex);
+        const auto* bank = images.textures();
+        const auto* image = bank ? bank->texture(imageIndex) : nullptr;
+        const auto* member = catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19c_1.pst");
+        if (!images.loaded() || !source || !ipum || !texture || !image || !member ||
+            source->memberIdentity != member || source->celIdentity || source->pstOffset != 0 ||
+            source->pstBytes != member->bytes || ipum->sourcePstSha256 != member->sha256 ||
+            ipum->colorPolicyKind != OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1 ||
+            texture->mips.size() != originalUiIpumMipCount50KG)
+            return fail(d,Error::texture,"authenticated original Rider19 IPUM image bank",0x24e880u);
+        const auto& base=texture->mips.back();
+        if (image->texture.width != base.width || image->texture.height != base.height ||
+            image->texture.rgba != base.rgba)
+            return fail(d,Error::texture,"published native image must equal original largest mip",0x24eb90u);
+        if (pass.identity != catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19c_1.psm") ||
+            pass.pass != 1 || !same(pass.microprogram,"DiffuseCompressed") || !same(pass.textureName,"19c_1") ||
+            pass.gs[Field::alphaBlendingOnOff].value != 0 || pass.gs[Field::alphaTestOnOff].value != 0)
+            return fail(d,Error::profile,"actual opaque alpha-test-off Rider19c_1 pass",0x2476a0u);
+        OriginalUiRider19IpumMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,true)) return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIpumImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=static_cast<std::uint32_t>(texture->mips.size()-1);
+        next.sourceMipCount=static_cast<std::uint32_t>(texture->mips.size());
+        output=next;return true;
+    } catch (...) { d.error=Error::allocation; return false; }
+}
+bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19BodyMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        const bool body1=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_1.psm");
+        const bool body2=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_2.psm");
+        if ((!body1&&!body2) || pass.pass!=1 || !same(pass.microprogram,"DiffuseCompressed") ||
+            !same(pass.textureName,body1?"19_1":"19_2") ||
+            pass.gs[Field::alphaBlendingOnOff].value!=0 || pass.gs[Field::alphaTestOnOff].value!=0)
+            return fail(d,Error::profile,"actual opaque alpha-test-off Rider19 body pass",0x2476a0u);
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::podTextures,
+            body1?"ui\\textures\\19_1.pst":"ui\\textures\\19_2.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();
+        const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=5)
+            return fail(d,Error::texture,"authenticated original UIPODTEX body image bank",0x24e880u);
+        const auto& base=texture->mips.back();
+        if (base.width!=256 || base.height!=256 || image->texture.width!=base.width ||
+            image->texture.height!=base.height || image->texture.rgba!=base.rgba)
+            return fail(d,Error::texture,"published native body image must equal original largest mip",0x24eb90u);
+        OriginalUiRider19BodyMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=4;next.sourceMipCount=5;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
+}
+bool prepareOriginalUiRiderWindowMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRiderWindowMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        if (pass.identity!=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\pod_wndw.psm") ||
+            (pass.pass!=1 && pass.pass!=3) || !same(pass.microprogram,"DiffuseCompressed") ||
+            !same(pass.textureName,"pod_wndw") || pass.gs[Field::alphaBlendingOnOff].value!=1 ||
+            pass.gs[Field::inputColorA].value!=0 || pass.gs[Field::inputColorB].value!=1 ||
+            pass.gs[Field::inputAlphaC].value!=0 || pass.gs[Field::inputColorD].value!=1 ||
+            pass.gs[Field::alphaTestOnOff].value!=1 || pass.gs[Field::foggingOnOff].value!=1 ||
+            pass.gs[Field::depthTestMethod].value!=2 || pass.gs[Field::zWriteDisabled].value!=0)
+            return fail(d,Error::profile,"actual pod_wndw DiffuseCompressed pass1 or3",0x2476a0u);
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\pod_wndw.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=3)
+            return fail(d,Error::texture,"authenticated original three-mip pod_wndw image",0x24e880u);
+        const auto& base=texture->mips.back();
+        if (base.width!=64 || base.height!=64 || image->texture.width!=base.width ||
+            image->texture.height!=base.height || image->texture.rgba!=base.rgba)
+            return fail(d,Error::texture,"published native window image must equal original largest mip",0x24eb90u);
+        OriginalUiRiderWindowMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=2;next.sourceMipCount=3;next.sourcePass=pass.pass;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
+}
+bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19SpecularMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        const bool body=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_1.psm") ||
+            pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_2.psm");
+        const bool window=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\pod_wndw.psm");
+        if ((!body&&!window) || pass.pass!=2 || !same(pass.microprogram,"SpecularMapCompressed") ||
+            !same(pass.textureName,"specmap1") || pass.gs[Field::inputAlphaC].value!=(window?2:1) ||
+            (window && pass.gs[Field::fixedAlphaValue].value!=255))
+            return fail(d,Error::profile,"actual Rider19 single-map specular pass2",0x2476a0u);
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\specmap1.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=1)
+            return fail(d,Error::texture,"authenticated original Rider specmap1 image",0x24e880u);
+        const auto& mip=texture->mips.front();
+        if (mip.width!=256 || mip.height!=256 || image->texture.width!=mip.width ||
+            image->texture.height!=mip.height || image->texture.rgba!=mip.rgba)
+            return fail(d,Error::texture,"published source specmap1 image");
+        OriginalUiRider19SpecularMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::specularMapCompressed;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
 }
 bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     OriginalUiNativeUntexturedMaterial50KG& output,

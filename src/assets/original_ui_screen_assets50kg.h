@@ -3,6 +3,7 @@
 #include "original_ui_font50kg.h"
 #include "material_texture_assets50ea.h"
 #include "import_texture48e.h"
+#include "original_ui_ipum_texture_cache50kg.h"
 #include <memory>
 #include <vector>
 
@@ -47,17 +48,22 @@ public:
     OriginalUiScreenAssets50KG(const OriginalUiScreenAssets50KG&)=delete;
     OriginalUiScreenAssets50KG& operator=(const OriginalUiScreenAssets50KG&)=delete;
     bool load(const std::vector<OriginalUiImageSource50KG>&,
-        OriginalUiScreenAssetDiagnostic50KG&) noexcept;
+        OriginalUiScreenAssetDiagnostic50KG&,
+        const OriginalUiIpumTextureCache50KG* ipumCache=nullptr) noexcept;
     bool loaded() const noexcept;
     const MaterialTextureAssets50EA* textures() const noexcept;
-    // Exact decodeTexture48E result, including original format, palette, all
-    // mips and raw alpha. Index matches sources[index] and textures()->texture(index),
+    // Exact indexed decodeTexture48E result, or an explicitly provided typed
+    // cache's authenticated kind2 result. Preserve format/palette/all mips and
+    // each path's documented alpha. Index matches sources[index] and textures()->texture(index),
     // whose Texture48B is parsed from this same result's base_rrtex bytes.
     // Null means unloaded or invalid index. Immutable borrowed access; keep
     // this owner alive. No material admission or GPU readiness is implied.
     const Texture48E* decodedTexture(std::uint32_t index) const noexcept;
     const OriginalUiFont50KG* font(std::uint32_t index) const noexcept;
     const OriginalUiImageProvenance50KG* sourceProvenance(std::uint32_t index) const noexcept;
+    // Non-null only for an authenticated IPUM cache result. Copied alongside
+    // pixels, so destroying the input cache does not invalidate this evidence.
+    const OriginalUiIpumProvenance50KG* ipumProvenance(std::uint32_t index) const noexcept;
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;

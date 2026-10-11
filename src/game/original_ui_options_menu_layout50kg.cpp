@@ -25,18 +25,33 @@ bool layoutOriginalUiOptionsBackground50KG(std::uint32_t width,std::uint32_t hei
     b.quadrants[3]=quad("mmbkg",320,224,320,224,u,v,0,0,15,0x1F9ABC);
     output=b;return true;
 }
-bool layoutOriginalUiOptionsSelection50KG(const OriginalUiOptionsSelectionInput50KG& in,
-    OriginalUiOptionsSelection50KG& output) noexcept {
-    const auto widget=originalUiOptionsSelectedText50KG(in.selectedSlot);
+namespace {
+bool selection(std::uint16_t widget,const OriginalUiOptionsSelectionInput50KG& in,
+    std::uint32_t beforePC,std::uint32_t afterPC,OriginalUiOptionsSelection50KG& output) noexcept {
     if(!widget||!std::isfinite(in.textX)||!std::isfinite(in.textY)||in.sourceMeasuredTextWidth<0||
         !dimension(in.rightWidth)||!dimension(in.rightHeight)||!dimension(in.leftWidth)||!dimension(in.leftHeight))return false;
     const float before=2.f+(in.textX-static_cast<float>(in.rightWidth));
     const float after=3.f+(in.textX+static_cast<float>(in.sourceMeasuredTextWidth));
     const float y=in.textY-3.f;OriginalUiOptionsSelection50KG q;q.textWidgetId=widget;
-    q.beforeText=quad("arrwrght",before,y,static_cast<float>(in.rightWidth),static_cast<float>(in.rightHeight),0,0,1,1,1,0x1F9C48);
-    q.afterText=quad("arrwleft",after,y,static_cast<float>(in.leftWidth),static_cast<float>(in.leftHeight),0,0,1,1,1,0x1F9CE4);
+    q.beforeText=quad("arrwrght",before,y,static_cast<float>(in.rightWidth),static_cast<float>(in.rightHeight),0,0,1,1,1,beforePC);
+    q.afterText=quad("arrwleft",after,y,static_cast<float>(in.leftWidth),static_cast<float>(in.leftHeight),0,0,1,1,1,afterPC);
     for(const auto* part:{&q.beforeText,&q.afterText})for(const auto& v:part->vertices)
         if(!std::isfinite(v.x)||!std::isfinite(v.y))return false;
     output=q;return true;
+}
+}
+bool layoutOriginalUiOptionsSelection50KG(const OriginalUiOptionsSelectionInput50KG& in,
+    OriginalUiOptionsSelection50KG& output) noexcept {
+    return selection(originalUiOptionsSelectedText50KG(in.selectedSlot),in,0x1F9C48,0x1F9CE4,output);
+}
+bool layoutOriginalUiGameOptionsSelection50KG(std::uint16_t widget,const OriginalUiOptionsSelectionInput50KG& in,
+    OriginalUiOptionsSelection50KG& output) noexcept {
+    switch(widget){case 19:case 20:case 38:case 112:case 114:case 116:case 117:
+        case 118:case 119:case 121:case 122:case 123:case 165:break;default:return false;}
+    return selection(widget,in,0x1F6374,0x1F6410,output);
+}
+bool layoutOriginalUiGameOptionsBackground50KG(std::uint32_t w,std::uint32_t h,OriginalUiOptionsBackground50KG& output) noexcept {
+    OriginalUiOptionsBackground50KG b;if(!layoutOriginalUiOptionsBackground50KG(w,h,b))return false;
+    for(auto& q:b.quadrants)q.sourcePC=0x1F5F7C;output=b;return true;
 }
 }

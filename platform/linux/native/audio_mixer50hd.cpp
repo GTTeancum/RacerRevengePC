@@ -1,7 +1,9 @@
 #include "audio_mixer50hd.h"
+#include "original_sound_mode50kg.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 namespace rr::platform {
 namespace {
@@ -32,21 +34,60 @@ bool AudioMixer50HD::initialize(AudioVoice50HD* voices, std::size_t count,
         groupEpoch50IC_ == std::numeric_limits<std::uint64_t>::max())
         return false;
     voices_ = voices; count_ = count; rate_ = outputRate;
+    soundMode50KG_.reset();
     masterGain_ = 1.0f; mixedFrames_ = clippedSamples_ = 0;
     ++groupEpoch50IC_; requireGroups50IC_ = false;
     for (std::size_t i = 0; i < count_; ++i) {
         voices_[i] = {}; groupGains50IC_[i] = 1.0f; groupKnown50IC_[i] = false;
+        originalLeft50KG_[i] = originalRight50KG_[i] = 1.0f;
     }
     return true;
 }
+bool AudioMixer50HD::bindOriginalSoundMode50KG(std::shared_ptr<OriginalSoundMode50KG> owner) noexcept {
+    if(!owner||!owner->ready()||soundMode50KG_||!voices_||!count_||mixedFrames_)return false;
+    for(std::size_t i=0;i<count_;++i)if(voices_[i].active)return false;
+    soundMode50KG_=std::move(owner);return true;
+}
+bool AudioMixer50HD::originalRouting50KG(std::int32_t angle,float& left,float& right) const noexcept {
+    if(!soundMode50KG_||!soundMode50KG_->ready())return false;
+    game::OriginalSoundRouting50KG routing;
+    if(!game::projectOriginalSoundRouting26CBA050KG(soundMode50KG_->fields(),angle,100,routing))return false;
+    // Original source proves packet selectors0/1/L/R, but the retained inputs
+    // do not include their IOP consumer. Only selector0 is admitted to PCM.
+    // In particular no rear-phase interpretation or fake surround is invented.
+    if(routing.phaseSelector!=0)return false;
+    left=static_cast<float>(routing.leftPercent)/100.f;
+    right=static_cast<float>(routing.rightPercent)/100.f;
+    return true;
+}
+bool AudioMixer50HD::playOriginalAngle50KG(std::size_t slot,const AudioClip50HD& clip,
+    float gain,float pitch,bool loop,std::int32_t engineAngle) noexcept {
+    float left=0.f,right=0.f;
+    if(slot>=count_||!validClip(clip)||!validControls(gain,pitch,0.f)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||
+       !originalRouting50KG(engineAngle,left,right))return false;
+    voices_[slot]={clip,0.0,gain,pitch,0.f,true,loop};
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
+}
+bool AudioMixer50HD::controlsOriginalAngle50KG(std::size_t slot,float gain,float pitch,
+    std::int32_t engineAngle) noexcept {
+    float left=0.f,right=0.f;
+    if(slot>=count_||!validControls(gain,pitch,0.f)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||
+       !originalRouting50KG(engineAngle,left,right))return false;
+    auto& voice=voices_[slot];voice.gain=gain;voice.pitch=pitch;voice.pan=0.f;
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
+}
 bool AudioMixer50HD::play(std::size_t slot, const AudioClip50HD& clip, float gain,
                         float pitch, bool loop, float pan) noexcept {
+    if(soundMode50KG_)return pan==0.f&&playOriginalAngle50KG(slot,clip,gain,pitch,loop,0);
     if (slot >= count_ || !validClip(clip) || !validControls(gain, pitch, pan) ||
         (requireGroups50IC_ && !groupKnown50IC_[slot])) return false;
     voices_[slot] = {clip, 0.0, gain, pitch, pan, true, loop};
     return true;
 }
 bool AudioMixer50HD::controls(std::size_t slot, float gain, float pitch, float pan) noexcept {
+    if(soundMode50KG_)return pan==0.f&&controlsOriginalAngle50KG(slot,gain,pitch,0);
     if (slot >= count_ || !validControls(gain, pitch, pan) ||
         (requireGroups50IC_ && !groupKnown50IC_[slot])) return false;
     auto& voice = voices_[slot];
@@ -124,8 +165,12 @@ bool AudioMixer50HD::mixStereo16(std::int16_t* output, std::size_t frames) noexc
                 (static_cast<double>(clip.samples[b + rightChannel]) - clip.samples[a + rightChannel]) * fraction;
             // Exactly one retained group multiplier; Controls changes only
             // voice.gain. Unbound legacy voices retain unity until strict mode.
-            left += sampleLeft * voice.gain * groupGains50IC_[i] * (1.0f - std::max(voice.pan, 0.0f));
-            right += sampleRight * voice.gain * groupGains50IC_[i] * (1.0f + std::min(voice.pan, 0.0f));
+            // Mode is consumed at source play/controls, not by retroactively
+            // remapping active voices when188740 changes the manager fields.
+            const float panLeft=soundMode50KG_?originalLeft50KG_[i]:(1.0f-std::max(voice.pan,0.0f));
+            const float panRight=soundMode50KG_?originalRight50KG_[i]:(1.0f+std::min(voice.pan,0.0f));
+            left += sampleLeft * voice.gain * groupGains50IC_[i] * panLeft;
+            right += sampleRight * voice.gain * groupGains50IC_[i] * panRight;
             voice.sourceFrame += static_cast<double>(clip.sampleRate) / rate_ * voice.pitch;
             if (voice.loop && voice.sourceFrame >= static_cast<double>(loopEnd))
                 voice.sourceFrame = static_cast<double>(loopStart) +

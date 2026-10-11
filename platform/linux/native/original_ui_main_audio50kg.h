@@ -16,7 +16,7 @@ namespace rr::platform {
 class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
 public:
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
-    static constexpr std::size_t effectVoiceCount = 5, requiredVoices = 6;
+    static constexpr std::size_t effectVoiceCount = 6, requiredVoices = 7;
     OriginalUiMainAudio50KG() = default;
     ~OriginalUiMainAudio50KG() noexcept override { reset(); }
     OriginalUiMainAudio50KG(const OriginalUiMainAudio50KG&) = delete;
@@ -28,6 +28,11 @@ public:
     bool prepare(const std::filesystem::path& audioRoot, AudioMixer50HD& dedicatedFrontendMixer,
         std::string& error) noexcept;
     bool ready() const noexcept override;
+    // Concrete source-mode application through THIS transport's actual mixer.
+    // No attached owner, stale mixer, or paused transport can certify Accept.
+    const OriginalSoundMode50KG* soundModeOwner50KG() const noexcept;
+    bool canApplySoundMode18874050KG(std::uint32_t mode) const noexcept;
+    bool applySoundMode18874050KG(std::uint32_t mode) noexcept;
     std::uint32_t sampleRate() const noexcept override {
         return current() ? mixer_->sampleRate() : 0;
     }
@@ -48,6 +53,10 @@ public:
     bool playMenuEffect(std::uint32_t originalId) noexcept;
     // Actual Options menu1F9640 admits events1,3,4,5 only. Main allowlist stays unchanged.
     bool playOptionsEffect(std::uint32_t originalId) noexcept;
+    // Page4 source1F50F0 additionally owns event2(defaults) and7(clamp).
+    // Read-only concrete preflight for a serialized profile/route transaction.
+    bool canPlayGameOptionsEffect(std::uint32_t originalId) const noexcept;
+    bool playGameOptionsEffect(std::uint32_t originalId) noexcept;
     bool update(float sourceSeconds) noexcept;
     void pause(bool value) noexcept { paused_ = value; }
     bool paused() const noexcept { return paused_; }
@@ -59,6 +68,7 @@ public:
     float mainGain() const noexcept { return musicGain_; }
 private:
     bool current() const noexcept;
+    bool canPlayEffectClip(std::size_t) const noexcept;
     bool playEffectClip(std::size_t) noexcept;
     bool attempted_ = false, prepared_ = false, paused_ = false;
     bool ownsMusic_ = false, fading_ = false;
@@ -68,8 +78,8 @@ private:
     float musicGain_ = 0.4f, fadeStartGain_ = 0.4f;
     float fadeElapsed_ = 0.f, fadeDuration_ = 0.f, fadeRetireAt_ = 0.f;
     // Original UI setup1B7944 music40/100 and1B78D0 effects100/100.
-    std::array<assets::AudioPcm50HC, 6> pcm_{};
-    std::array<AudioClip50HD, 6> clips_{};
+    std::array<assets::AudioPcm50HC, 7> pcm_{};
+    std::array<AudioClip50HD, 7> clips_{};
     std::array<bool, effectVoiceCount> ownsEffect_{};
 };
 }

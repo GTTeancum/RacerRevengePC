@@ -33,6 +33,9 @@ public:
     bool bindFrame(std::shared_ptr<OriginalUiOptionsDrawResources50KG>,
         std::shared_ptr<const MaterialTextureGl50EB>,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool begin(const OriginalUiOptionsClock50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
+    // Typed source page choice for the same Options manager resource bank.
+    // Supported only for actual menu1 and Game Options4.
+    bool beginPage(std::uint8_t,const OriginalUiOptionsClock50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectOrdinaryWidgets(bool ancestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     // Exact page1F9A80 draw point. Page visibility gates whole contribution.
     bool projectPage(bool pageAncestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
@@ -40,7 +43,7 @@ public:
     // Wire only to real shared-aperture submitOverlay, original+424 then+428.
     bool projectAperture(std::uint8_t,const game::OriginalUiApertureRectangle50KG&,
         OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
-    // Reads the same bank's genuine source mask42C (0 or3), no caller mask.
+    // Reads the same bank's genuine source mask42C (menu0/3, Game Options0/7).
     bool projectPrompts(OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectOnTopWidgets(bool ancestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectParticles(OriginalUiOptionsContributionDiagnostic50KG&) noexcept;

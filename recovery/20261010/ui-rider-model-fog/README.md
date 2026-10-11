@@ -11,7 +11,7 @@ latter. Single-node route remains explicitly unsupported by this narrow adapter.
 26F070 distance is length((center160-camera180)+modelWorldTranslationF0), not
 camera-space Z. 241320 sets model1B2 bit1 unless distance+radius is below actual
 render-context fogStartB0. Equality enables radial fog. Materials retain their
-independent inherited FGE; the no-radial-fog packet still carries source F254.
+independent inherited FGE; the no-radial-fog packet still carries source F255.
 
 Current post-motion PSG locals, original authored bounds and source flags feed
 existing shared26F4B0/28DAF0 aggregate owner. Actual root world is refreshed on a

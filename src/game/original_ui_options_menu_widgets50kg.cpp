@@ -12,7 +12,7 @@ using Text=OriginalUiTextWidgetStatus50KG;
 using Diagnostic=OriginalUiOptionsWidgetDiagnostic50KG;
 Status finish(Diagnostic& d,Status s) noexcept {d.status=s;return s;}
 bool admitted(std::uint16_t id) noexcept {
-    for(auto known:originalUiOptionsMenuWidgetIds50KG)if(id==known)return true;
+    for(auto known:originalUiOptionsManagerWidgetIds50KG)if(id==known)return true;
     return false;
 }
 bool valid(Op op) noexcept {
@@ -27,13 +27,17 @@ Status textResult(Diagnostic& d,Text s) noexcept {
 struct OriginalUiOptionsMenuWidgets50KG::Storage {
     OriginalUiOptionsMenuController50KG controller;
     OriginalUiNavigation50KG navigation;
-    std::array<OriginalUiOptionsWidgetState50KG,107> state{};
-    std::array<assets::OriginalUiOverlayText50KG,107> texts;
-    std::array<assets::OriginalUiIcon50KG,107> icons;
-    std::array<OriginalUiTextWidget50KG,107> textWidgets;
+    OriginalUiGameOptionsController50KG gameController;
+    OriginalUiGameOptionsState50KG gameState;
+    std::array<std::string,168> dynamic;
+    std::array<std::int32_t,168> renderedVolume;
+    std::array<OriginalUiOptionsWidgetState50KG,168> state{};
+    std::array<assets::OriginalUiOverlayText50KG,168> texts;
+    std::array<assets::OriginalUiIcon50KG,168> icons;
+    std::array<OriginalUiTextWidget50KG,168> textWidgets;
     struct Image {std::shared_ptr<const assets::OriginalUiScreenAssets50KG> owner;
         std::uint32_t index=0;OriginalUiIconLayout50KG layout{};};
-    std::array<Image,107> images;
+    std::array<Image,168> images;
     OriginalUiOptionsWidgetOrder50KG order;
     std::uint32_t flags42C=0;
 };
@@ -43,14 +47,16 @@ Status OriginalUiOptionsMenuWidgets50KG::bind(std::shared_ptr<const assets::Orig
     const assets::OriginalUiEnglish50KG* english,Diagnostic& d) noexcept {
     d={};if(storage_)return finish(d,Status::alreadyBound);
     try {
-        auto s=std::make_unique<Storage>();
-        d.controller=s->controller.bind(std::move(archive),d.parse);
+        auto s=std::make_unique<Storage>();s->renderedVolume.fill(-1);
+        d.controller=s->controller.bind(archive,d.parse);
         if(d.controller!=Control::ok || !s->controller.initialNavigation(s->navigation))
             return finish(d,Status::controllerFailure);
+        d.controller=s->gameController.bind(std::move(archive),d.parse);
+        if(d.controller!=Control::ok||!s->gameController.initialState(s->gameState))return finish(d,Status::controllerFailure);
         const auto& dat=*s->controller.widgetsDat();
-        for(auto id:originalUiOptionsMenuWidgetIds50KG) {
+        for(auto id:originalUiOptionsManagerWidgetIds50KG) {
             d.widgetId=id;auto& state=s->state[id];
-            state.kind=id==5?Kind::movement:(id==98||id==99||id==105)?Kind::icon:Kind::text;
+            state.kind=id==5?Kind::movement:(id==98||id==99||id==105||id==107||id==108||id==109)?Kind::icon:Kind::text;
             const auto* section=dat.section("Widget "+std::to_string(id));
             if(!section)return finish(d,Status::parseFailure);
             if(!assets::originalUiBoolean50KG(*section,"OnTop",false,state.onTop,d.parse,0x1CD890))
@@ -59,8 +65,11 @@ Status OriginalUiOptionsMenuWidgets50KG::bind(std::shared_ptr<const assets::Orig
                 if(!assets::readOriginalUiOverlayText50KG(dat,id,english,s->texts[id],d.parse))
                     return finish(d,Status::parseFailure);
                 const auto& text=s->texts[id];
-                if(text.textSource==assets::OriginalUiTextSource50KG::dynamic ||
-                    text.wantsJoystickInput[0] || text.wantsJoystickInput[1])return finish(d,Status::invalidInput);
+                if(text.wantsJoystickInput[0]||text.wantsJoystickInput[1])return finish(d,Status::invalidInput);
+                if(text.textSource==assets::OriginalUiTextSource50KG::dynamic){
+                    if((id!=38&&id!=112&&id!=114&&id!=165)||text.lines.size()!=1||text.dynamicLineLength!=4)return finish(d,Status::invalidInput);
+                    s->dynamic[id].reserve(4);
+                }
                 d.text=s->textWidgets[id].bind(text);
                 if(d.text!=Text::ok)return finish(d,Status::textFailure);
             } else if(state.kind==Kind::icon) {
@@ -70,7 +79,7 @@ Status OriginalUiOptionsMenuWidgets50KG::bind(std::shared_ptr<const assets::Orig
             // Widget5 descriptor and exact input mappings were admitted by controller.bind.
             if(!state.onTop)s->order.ordinaryWidgets.push_back(id);
         }
-        for(auto it=originalUiOptionsMenuWidgetIds50KG.rbegin();it!=originalUiOptionsMenuWidgetIds50KG.rend();++it)
+        for(auto it=originalUiOptionsManagerWidgetIds50KG.rbegin();it!=originalUiOptionsManagerWidgetIds50KG.rend();++it)
             if(s->state[*it].onTop)s->order.onTopWidgets.push_back(*it);
         std::size_t movementRegistrations=0;
         for(const auto& control:s->controller.page()->controls)for(auto id:control.widgets) {
@@ -109,12 +118,19 @@ const OriginalUiTextWidget50KG* OriginalUiOptionsMenuWidgets50KG::textWidget(std
 std::uint32_t OriginalUiOptionsMenuWidgets50KG::pageInputFlags42C() const noexcept {return storage_?storage_->flags42C:0;}
 Status OriginalUiOptionsMenuWidgets50KG::commitPlan(const OriginalUiOptionsMenuPlan50KG& p,Diagnostic& d) noexcept {
     if(p.navigation.page!=page()||p.callbackCount>p.callbacks.size())return finish(d,Status::invalidCommand);
-    for(std::size_t i=0;i<p.callbackCount;++i) {
-        const auto& c=p.callbacks[i];d.widgetId=c.widgetId;d.callbackIndex=i;d.sourcePC=c.sourcePC;
+    const auto status=commitCallbacks(p.callbacks.data(),p.callbackCount,d);if(status!=Status::ok)return status;
+    storage_->navigation=p.navigation;
+    if(p.writesPageInputFlags42C)storage_->flags42C=p.pageInputFlags42C;
+    return finish(d,Status::ok);
+}
+Status OriginalUiOptionsMenuWidgets50KG::commitCallbacks(const OriginalUiOptionsMenuCallback50KG* callbacks,std::size_t count,Diagnostic& d) noexcept {
+    if((!callbacks&&count)||count>256)return finish(d,Status::invalidCommand);
+    for(std::size_t i=0;i<count;++i) {
+        const auto& c=callbacks[i];d.widgetId=c.widgetId;d.callbackIndex=i;d.sourcePC=c.sourcePC;
         if(!admitted(c.widgetId)||!valid(c.operation))return finish(d,Status::invalidCommand);
     }
-    for(std::size_t i=0;i<p.callbackCount;++i) {
-        const auto& c=p.callbacks[i];auto& state=storage_->state[c.widgetId];
+    for(std::size_t i=0;i<count;++i) {
+        const auto& c=callbacks[i];auto& state=storage_->state[c.widgetId];
         if(state.kind==Kind::text) {
             auto& text=storage_->textWidgets[c.widgetId];
             if(c.operation==Op::setEnabled)(void)text.setControlEnabled(c.value);
@@ -137,8 +153,6 @@ Status OriginalUiOptionsMenuWidgets50KG::commitPlan(const OriginalUiOptionsMenuP
             }
         }
     }
-    storage_->navigation=p.navigation;
-    if(p.writesPageInputFlags42C)storage_->flags42C=p.pageInputFlags42C;
     return finish(d,Status::ok);
 }
 Status OriginalUiOptionsMenuWidgets50KG::phase(OriginalUiOptionsMenuPhase50KG phase,bool known,
@@ -172,6 +186,55 @@ Status OriginalUiOptionsMenuWidgets50KG::inputWithPageEffects(std::uint8_t contr
     return finish(d,status==Control::unavailable?Status::unavailable:
         (status==Control::noChange&&movement==Control::noChange)?Status::noChange:Status::ok);
 }
+const assets::OriginalUiPage50KG* OriginalUiOptionsMenuWidgets50KG::gameOptionsPage() const noexcept {return storage_?storage_->gameController.page():nullptr;}
+const OriginalUiGameOptionsState50KG* OriginalUiOptionsMenuWidgets50KG::gameOptionsState() const noexcept {return storage_?&storage_->gameState:nullptr;}
+Status OriginalUiOptionsMenuWidgets50KG::commitGameOptionsPlan(const OriginalUiGameOptionsPlan50KG& p,Diagnostic& d) noexcept {
+    if(p.state.navigation.page!=gameOptionsPage()||p.callbackCount>p.callbacks.size())return finish(d,Status::invalidCommand);
+    const auto status=commitCallbacks(p.callbacks.data(),p.callbackCount,d);if(status!=Status::ok)return status;
+    storage_->gameState=p.state;if(p.writesPageInputFlags42C)storage_->flags42C=p.pageInputFlags42C;return Status::ok;
+}
+Status OriginalUiOptionsMenuWidgets50KG::gameOptionsPhase(OriginalUiOptionsMenuPhase50KG phase,
+    const OriginalUiGameSettingsProfile50KG& profile,Diagnostic& d) noexcept {
+    d={};if(!storage_)return finish(d,Status::notBound);OriginalUiGameOptionsPlan50KG p;
+    d.controller=storage_->gameController.phase(storage_->gameState,phase,profile,p);
+    if(d.controller!=Control::ok)return finish(d,Status::controllerFailure);return commitGameOptionsPlan(p,d);
+}
+Status OriginalUiOptionsMenuWidgets50KG::gameOptionsInput(std::uint8_t controller,assets::OriginalUiMovementInput50KG input,
+    bool reached,bool enabled,OriginalUiGameOptionsPlan50KG& out,Diagnostic& d) noexcept {
+    d={};if(!storage_)return finish(d,Status::notBound);OriginalUiGameOptionsPlan50KG p;
+    d.controller=storage_->gameController.input(storage_->gameState,controller,input,reached,enabled,p);
+    if(d.controller!=Control::ok&&d.controller!=Control::noChange&&d.controller!=Control::unavailable)return finish(d,Status::controllerFailure);
+    const auto status=commitGameOptionsPlan(p,d);if(status!=Status::ok)return status;out=p;
+    return finish(d,d.controller==Control::unavailable?Status::unavailable:d.controller==Control::noChange?Status::noChange:Status::ok);
+}
+Status OriginalUiOptionsMenuWidgets50KG::refreshGameOptionsVolumeText(Diagnostic& d) noexcept {
+    d={};if(!storage_)return finish(d,Status::notBound);
+    if(!storage_->gameState.loaded)return finish(d,Status::invalidInput);
+    for(auto value:storage_->gameState.local.volume)if(value>100)return finish(d,Status::invalidInput);
+    constexpr std::array<std::uint16_t,4> ids{{38,112,114,165}};
+    for(auto id:ids)if(!storage_->textWidgets[id].line(0))return finish(d,Status::invalidWidget);
+    // ELF3AFFF0 "%d%%", SetText1F5FB8/1F5FE4/1F6010/1F603C.
+    for(std::size_t i=0;i<ids.size();++i){const auto v=storage_->gameState.local.volume[i];
+        // 2A9FF0 ->2A9DE0 calls29D940 then29DA40(255,indefinite), even
+        // for an unchanged string. Both have the same original +CC lock gate.
+        auto& text=storage_->textWidgets[ids[i]];if(text.line(0)->locked)continue;
+        char bytes[4];std::size_t count=0;
+        if(v>=100)bytes[count++]='1';if(v>=10)bytes[count++]=char('0'+(v/10)%10);
+        bytes[count++]=char('0'+v%10);bytes[count++]='%';storage_->dynamic[ids[i]].assign(bytes,count);storage_->renderedVolume[ids[i]]=static_cast<std::int32_t>(v);
+        d.text=text.setupLine(0,OriginalUiTextLineSetup50KG{});
+        if(d.text!=Text::ok)return finish(d,Status::textFailure);
+    }
+    return Status::ok;
+}
+const std::string* OriginalUiOptionsMenuWidgets50KG::dynamicText(std::uint16_t id) const noexcept {
+    const auto* d=textDescriptor(id);return d&&d->textSource==assets::OriginalUiTextSource50KG::dynamic?&storage_->dynamic[id]:nullptr;
+}
+std::int32_t OriginalUiOptionsMenuWidgets50KG::gameOptionsRenderedVolume(std::uint16_t id) const noexcept {
+    return dynamicText(id)?storage_->renderedVolume[id]:-1;
+}
+std::uint16_t OriginalUiOptionsMenuWidgets50KG::gameOptionsSelectedValueWidget() const noexcept {
+    return storage_?storage_->gameController.selectedValueWidget(storage_->gameState):0;
+}
 Status OriginalUiOptionsMenuWidgets50KG::updateText(std::uint16_t id,bool shown,Diagnostic& d) noexcept {
     d={};d.widgetId=id;if(!storage_)return finish(d,Status::notBound);
     if(!textDescriptor(id))return finish(d,Status::invalidWidget);
@@ -182,9 +245,11 @@ Status OriginalUiOptionsMenuWidgets50KG::projectText(std::uint16_t id,std::size_
     d={};d.widgetId=id;if(!storage_)return finish(d,Status::notBound);
     const auto* text=textDescriptor(id);if(!text)return finish(d,Status::invalidWidget);
     OriginalUiOptionsTextProjection50KG projected;
+    if(text->textSource==assets::OriginalUiTextSource50KG::dynamic&&text->justification!=assets::OriginalUiTextJustification50KG::left)return finish(d,Status::invalidInput);
     if(!positionOriginalUiText50KG({text,line,fontHeight,width,height},projected.position))return finish(d,Status::invalidInput);
     const auto result=storage_->textWidgets[id].projectLine(line,projected.line,shown);
     if(result!=Text::ok)return textResult(d,result);
+    if(text->textSource==assets::OriginalUiTextSource50KG::dynamic)projected.line.text=&storage_->dynamic[id];
     projected.descriptor=text;projected.widgetId=id;projected.lineIndex=line;output=projected;return textResult(d,Text::ok);
 }
 Status OriginalUiOptionsMenuWidgets50KG::prepareIcon(std::uint16_t id,

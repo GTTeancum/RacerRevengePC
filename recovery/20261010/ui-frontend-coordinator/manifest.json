@@ -1,0 +1,25 @@
+{
+  "scope": "source-only; no builds, tests, syntax checks or project execution",
+  "review_base": "15ac82a",
+  "new_translation_units": [
+    "platform/linux/native/original_ui_frontend50kg.cpp"
+  ],
+  "files": [
+    {
+      "path": "platform/linux/native/original_ui_frontend50kg.cpp",
+      "new": true,
+      "preimage_sha256": null,
+      "candidate_sha256": "e1440ef02092e9b8cec5a12e78a134344e71dd074246fbda16401b4b9609707c",
+      "preimage_matches_current_active": true
+    },
+    {
+      "path": "platform/linux/native/original_ui_frontend50kg.h",
+      "new": true,
+      "preimage_sha256": null,
+      "candidate_sha256": "a8c221ceace7cd9c04700ae485b8d1c27ab56da90a63798cf508beff2f6a8ee2",
+      "preimage_matches_current_active": true
+    }
+  ],
+  "frozen_at": "2026-10-10T18:17Z",
+  "review": "Manual source/lifetime review plus independent Options transaction review; no execution"
+}

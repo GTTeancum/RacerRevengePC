@@ -29,6 +29,7 @@ struct OriginalUiOptionsDrawContribution50KG::Storage {
     std::array<float,3> fogColor{};
     bool scene=false,drained=false,exitText=false;
     OriginalUiOptionsClock50KG clock;
+    std::uint8_t sourcePage=1;
     bool active=false,ordinary=false,page=false,pageShown=false,prompts=false,top=false,finished=false,failed=false;
     std::uint8_t apertureCount=0;
 };
@@ -63,8 +64,13 @@ bool OriginalUiOptionsDrawContribution50KG::bindFrame(std::shared_ptr<OriginalUi
     storage_->publication=gpu->publicationToken();storage_->gpu=std::move(gpu);return true;
 }
 bool OriginalUiOptionsDrawContribution50KG::begin(const OriginalUiOptionsClock50KG& clock,Diagnostic& d) noexcept {
+    return beginPage(1,clock,d);
+}
+bool OriginalUiOptionsDrawContribution50KG::beginPage(std::uint8_t sourcePage,const OriginalUiOptionsClock50KG& clock,Diagnostic& d) noexcept {
+    if(sourcePage!=1&&sourcePage!=4){d={};return fail(d,Error::input);}
     d={};if(!storage_)return fail(d,Error::notBound);if(!clock.known)return fail(d,Error::clock);
     auto& s=*storage_;if(s.gpu&&(!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication))return fail(d,Error::publication);
+    s.sourcePage=sourcePage;
     s.scene=s.drained=s.exitText=false;s.fog.clear();s.drainedFog.clear();s.drainedVertices.clear();s.order.clear();s.spans.clear();s.states.clear();s.clock=clock;s.active=true;s.ordinary=s.page=s.pageShown=s.prompts=s.top=s.finished=s.failed=false;
     s.apertureCount=0;s.vertices.clear();s.packets.clear();
     const auto& materials=*s.resources->materials();
@@ -110,7 +116,7 @@ bool OriginalUiOptionsDrawContribution50KG::widgets(bool top,bool shown,Diagnost
                 if(status==WidgetStatus::hidden)continue;if(status!=WidgetStatus::ok)return fail(d,Error::projection);
                 if(live.line.scale!=1||live.line.rotation!=0||live.line.packetColor[3]>128||
                     live.position.positionedX!=line.position.positionedX||live.position.positionedY!=line.position.positionedY||
-                    live.line.text!=&descriptor->lines[lineIndex])return fail(d,Error::projection);
+                    live.line.text!=(descriptor->textSource==assets::OriginalUiTextSource50KG::dynamic?bank->dynamicText(id):&descriptor->lines[lineIndex]))return fail(d,Error::projection);
                 if(!line.glyphs.count)continue;
                 if(s.vertices.size()/4+line.glyphs.count>originalUiMaximumQuads50KG||s.packets.size()>=originalUiMaximumSpans50KG)
                     return fail(d,Error::capacity);
@@ -143,10 +149,13 @@ bool OriginalUiOptionsDrawContribution50KG::projectPage(bool shown,Diagnostic& d
     if(!s.active||!s.ordinary||s.page||s.top||s.finished||s.failed)return fail(d,Error::sourceOrder);
     s.page=true;s.pageShown=shown;if(!shown)return true;
     const auto background=s.resources->materialIndex("ui/textures/mmbkg");
-    for(const auto& q:s.resources->background()->quadrants)
+    const auto* bg=s.sourcePage==4?s.resources->gameOptionsBackground():s.resources->background();
+    if(!bg){s.failed=true;return fail(d,Error::geometry);}
+    for(const auto& q:bg->quadrants)
         if(!append(q,background,16777200.f,Segment::page,0,d)){s.failed=true;return false;}
+    if(s.sourcePage==4&&s.resources->widgets()->refreshGameOptionsVolumeText(d.widgets)!=WidgetStatus::ok){s.failed=true;return fail(d,Error::projection);}
     game::OriginalUiOptionsSelection50KG selection;
-    if(!s.resources->selection(selection,d.resource)){s.failed=true;return fail(d,Error::geometry);}
+    if(!(s.sourcePage==4?s.resources->gameOptionsSelection(selection,d.resource):s.resources->selection(selection,d.resource))){s.failed=true;return fail(d,Error::geometry);}
     if(!append(selection.beforeText,s.resources->materialIndex("ui/textures/arrwrght"),16777214.f,Segment::page,selection.textWidgetId,d)||
         !append(selection.afterText,s.resources->materialIndex("ui/textures/arrwleft"),16777214.f,Segment::page,selection.textWidgetId,d))
         {s.failed=true;return false;}
@@ -165,7 +174,8 @@ bool OriginalUiOptionsDrawContribution50KG::projectExitText(const game::Original
     const auto& binding=(*s.resources->materials())[m];
     if(binding.images.size()!=1)return fail(d,Error::material);
     game::OriginalUiExitTextProjection50KG live;
-    if(s.resources->exitText()->projectRender2E0170(hook,live)!=game::OriginalUiExitTextStatus50KG::ok||
+    auto* exitText=s.sourcePage==4?s.resources->gameOptionsExitText():s.resources->exitText();
+    if(!exitText||exitText->projectRender2E0170(hook,live)!=game::OriginalUiExitTextStatus50KG::ok||
         !live.glyphs||live.images!=s.resources->images()||live.imageIndex!=binding.images[0]||
         live.materialIdentity!=binding.material.identity||live.assignedDepth!=1||live.packetColor[3]>128||live.glyphs->count>10)
         {s.failed=true;return fail(d,Error::projection,0x2E0170);}
@@ -193,10 +203,12 @@ bool OriginalUiOptionsDrawContribution50KG::projectAperture(std::uint8_t ordinal
 bool OriginalUiOptionsDrawContribution50KG::projectPrompts(Diagnostic& d) noexcept {
     d={};if(!storage_)return fail(d,Error::notBound);auto& s=*storage_;
     if(!s.active||!s.page||!s.pageShown||s.apertureCount!=2||s.prompts||s.top||s.failed||s.finished)return fail(d,Error::sourceOrder);
-    const auto mask=s.resources->widgets()->pageInputFlags42C();if(mask!=0&&mask!=3)return fail(d,Error::projection,0x1F9E30);
-    constexpr const char* names[]={"ui/textures/icon_x","ui/textures/icon_tri"};constexpr float x[]={484,397};
-    constexpr std::uint32_t pc[]={0x1D7A2C,0x1D7A44};
-    for(unsigned i=0;i<2;++i)if(mask&(1u<<i)) {
+    const auto mask=s.resources->widgets()->pageInputFlags42C();
+    if(mask!=0&&mask!=(s.sourcePage==4?7u:3u))return fail(d,Error::projection,s.sourcePage==4?0x1F5D30:0x1F9E30);
+    constexpr const char* names[]={"ui/textures/icon_x","ui/textures/icon_tri","ui/textures/icon_sqr"};
+    constexpr float menuX[]={484,397,0},gameX[]={514,410,280};const auto* x=s.sourcePage==4?gameX:menuX;
+    constexpr std::uint32_t pc[]={0x1D7A2C,0x1D7A44,0x1D7A5C};
+    for(unsigned i=0;i<(s.sourcePage==4?3u:2u);++i)if(mask&(1u<<i)) {
         const auto m=s.resources->materialIndex(names[i]);if(m>=s.resources->materials()->size())return fail(d,Error::material);
         const auto& b=(*s.resources->materials())[m];if(b.images.size()!=1)return fail(d,Error::material);
         const auto* atlas=s.resources->textures()->texture(b.images[0]);if(!atlas)return fail(d,Error::geometry);
@@ -312,7 +324,7 @@ bool OriginalUiOptionsDrawContribution50KG::drain(Diagnostic& d) noexcept {
     s.draw.draw.spans=s.spans.data();s.draw.draw.spanCount=static_cast<std::uint32_t>(s.spans.size());
     s.draw.draw.canvasWidth=640;s.draw.draw.canvasHeight=448;
     // Actual Options PageInfo background, retained in the authenticated page owner.
-    const auto* page=s.resources->widgets()->page();
+    const auto* page=s.sourcePage==4?s.resources->widgets()->gameOptionsPage():s.resources->widgets()->page();
     for(unsigned c=0;c<3;++c)s.draw.draw.clearRgba[c]=page->backgroundColor[c]/255.f;
     s.draw.draw.clearRgba[3]=1;s.draw.draw.retainRaceImage=false;
     s.draw.states=s.states.data();s.draw.stateCount=static_cast<std::uint32_t>(s.states.size());

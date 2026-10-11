@@ -7,15 +7,13 @@ float add(float a,float b) noexcept {volatile float r=a+b;return r;}
 float sub(float a,float b) noexcept {volatile float r=a-b;return r;}
 float mul(float a,float b) noexcept {volatile float r=a*b;return r;}
 }
-bool prepareOriginalUiRiderModelFog50KG(const assets::PsgHierarchyView49O& psg,
-    const SceneGraph49P& graph,const std::array<float,3>& camera,float fogStart,
-    OriginalUiRiderModelFog50KG& output) noexcept {
-    if(std::fegetround()!=FE_TONEAREST||!std::isfinite(fogStart)||
+bool prepareOriginalUiRiderModelBounds50KG(const assets::PsgHierarchyView49O& psg,
+    const SceneGraph49P& graph,ModelBoundsResult49O& output) noexcept {
+    if(std::fegetround()!=FE_TONEAREST||
         psg.nodeCount<2||psg.nodeCount>assets::maxModelNodes49O||
         graph.count!=psg.nodeCount+1||graph.count>maxSceneNodes49P||
         !validateSceneGraph49P(graph)||graph.nodes[0].parent180!=SceneNodeIndex49P::none)
         return false;
-    for(float c:camera)if(!std::isfinite(c))return false;
     std::array<SceneNode49P,maxSceneNodes49P> snapshot{};
     for(std::uint32_t n=0;n<graph.count;++n)snapshot[n]=graph.nodes[n];
     SceneGraph49P working{snapshot.data(),graph.count};
@@ -40,13 +38,28 @@ bool prepareOriginalUiRiderModelFog50KG(const assets::PsgHierarchyView49O& psg,
             row.halfExtent150.v[axis]=source.bounds[axis+3];
         }
     }
-    OriginalUiRiderModelFog50KG next{};ModelBoundsWorkspace49O workspace{};
-    if(!computeModelBounds49O(nodes.data(),psg.nodeCount,context,workspace,next.bounds)||
-        !next.bounds.seeded)return false;
+    ModelBoundsResult49O next{};ModelBoundsWorkspace49O workspace{};
+    if(!computeModelBounds49O(nodes.data(),psg.nodeCount,context,workspace,next)||
+        !next.seeded)return false;
+    output=next;return true;
+}
+bool prepareOriginalUiRiderModelFog50KG(const assets::PsgHierarchyView49O& psg,
+    const SceneGraph49P& graph,const std::array<float,3>& camera,float fogStart,
+    OriginalUiRiderModelFog50KG& output) noexcept {
+    if(std::fegetround()!=FE_TONEAREST||!std::isfinite(fogStart))return false;
+    for(float c:camera)if(!std::isfinite(c))return false;
+    OriginalUiRiderModelFog50KG next{};
+    if(!prepareOriginalUiRiderModelBounds50KG(psg,graph,next.bounds))return false;
+    // Preserve the pre-existing snapshot-only world getter. The native model
+    // owner normally refreshed root0 in240C00 before this selected-only step.
+    std::array<SceneNode49P,maxSceneNodes49P> snapshot{};
+    for(std::uint32_t n=0;n<graph.count;++n)snapshot[n]=graph.nodes[n];
+    SceneGraph49P working{snapshot.data(),graph.count};
+    if(!refreshSceneWorld49P(working,static_cast<SceneNodeIndex49P>(0)))return false;
     float displacement[3];
     for(unsigned axis=0;axis<3;++axis)
         displacement[axis]=add(sub(next.bounds.center160[axis],camera[axis]),
-            context.rootWorld100.v[12+axis]);
+            snapshot[0].world100.v[12+axis]);
     //26F160..26F170: X*X + Y*Y then Z*Z, followed by source SQRT.
     const float xy=add(mul(displacement[0],displacement[0]),mul(displacement[1],displacement[1]));
     const float xyz=add(xy,mul(displacement[2],displacement[2]));

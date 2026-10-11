@@ -1,6 +1,8 @@
 #pragma once
 #include "original_ui_options_draw_contribution50kg.h"
 #include "original_ui_main_session50kg.h"
+#include "original_sound_mode50kg.h"
+#include "../../../src/game/original_ui_game_options_apply50kg.h"
 namespace rr::platform {
 // The source +6E4 word is separate from Main's +6E0. Import/reset it only from
 // an authenticated profile owner. No implicit default or fabricated save file.
@@ -9,7 +11,7 @@ struct OriginalUiOptionsProfile50KG {bool known=false;std::uint32_t savedSlot6E4
 // Does not assert the caller imported/created a valid profile lifecycle.
 void resetOriginalUiOptionsProfileFields50KG(OriginalUiOptionsProfile50KG&) noexcept;
 enum class OriginalUiOptionsSessionStatus50KG : std::uint8_t {
-    ok,noChange,backProposed,unavailableDestination,secondControllerRequired,
+    ok,noChange,backProposed,pageProposed,unavailableDestination,secondControllerRequired,
     notBound,alreadyBound,invalidInput,unsupportedState,resource,widget,aperture,
     transition,particle,audio,draw,allocation,faulted,quit
 };
@@ -25,6 +27,12 @@ struct OriginalUiOptionsSessionCold50KG {
     std::shared_ptr<const MaterialTextureGl50EB> gpu;
     std::shared_ptr<const assets::OriginalUiArchive50KG> optionsArchive;
     std::shared_ptr<OriginalUiOptionsProfile50KG> profile;
+    // Optional sole application profile owner for page4 fields. Missing owner
+    // keeps that page unavailable; known must come from real profile lifecycle.
+    std::shared_ptr<game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
+    // Same process owner attached to audio's actual frontend mixer. Optional;
+    // without that exact concrete attachment, page4 Accept remains closed.
+    std::shared_ptr<OriginalSoundMode50KG> soundMode;
     std::shared_ptr<OriginalUiMainProfile50KG> commonProfile;
     std::shared_ptr<OriginalUiMainApplication50KG> application;
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
@@ -43,6 +51,7 @@ struct OriginalUiOptionsSessionInputReceipt50KG {
     bool containerReached=false,pageCallbackRan=false,pageAccepted=false;
     game::OriginalUiOptionsMenuPageResult50KG page{};
     game::OriginalUiMovementNotification50KG movement{};
+    game::OriginalUiGameOptionsPlan50KG gameOptions{};
     game::OriginalUiTransitionSnapshot50KG sourceLifecycle{};
     OriginalUiOptionsRouteProposal50KG routeProposal{};
     OriginalUiOptionsSessionStatus50KG status=OriginalUiOptionsSessionStatus50KG::noChange;
@@ -52,13 +61,15 @@ struct OriginalUiOptionsSessionSnapshot50KG {
     bool cameraActive=false,framePublished=false,backProposalPending=false;
     std::uint32_t packedBackground430=0,promptMask42C=0;
     std::uint64_t updateCount=0,renderCount=0;
+    std::uint64_t gameOptionsAcceptCount=0,lastGameOptionsSoundRevision=0;
     game::OriginalUiTransitionSnapshot50KG transition{};
     game::OriginalUiApertureSnapshot50KG aperture{};
     OriginalUiMainSessionAudioReceipt50KG audio{};
     game::OriginalUiMainFireReceipt50KG lastParticleAdvance{},lastFireEmit{};
 };
-// Complete closed Options MENU page/scene frame owner. Options pages2..6 and
-// HOF remain unavailable; their existence in ui.dat is not route readiness.
+// Options menu and bounded Game Options page/scene owner. Page4 Accept needs
+// the exact shared profile and actual frontend PCM sound-mode consumer.
+// Pages2/3/5/6 and HOF remain unavailable.
 // Cross-screen admission, sole manager tick, deferred queue consumption and
 // renderer-bank publication belong to the root coordinator, not this page.
 class OriginalUiOptionsSession50KG final {
@@ -73,12 +84,14 @@ public:
         OriginalUiOptionsSessionDiagnostic50KG&) noexcept;
     game::OriginalUiTransitionCompletion50KG pollCompletion(game::OriginalUiTransitionRoute50KG,game::OriginalUiTransitionPhase50KG) const noexcept;
     const game::OriginalUiTransitionOwner50KG* externalLifecycleOwner() const noexcept;
+    bool ownsPreparedPage(std::uint8_t page) const noexcept;
     OriginalUiOptionsSessionStatus50KG input(const OriginalUiMainSessionInput50KG&,
         OriginalUiOptionsSessionInputReceipt50KG&,OriginalUiOptionsSessionDiagnostic50KG&) noexcept;
-    // Root admits the concrete Main owner, commits exact +6E4 from the
-    // proposal in transition.commitRouteSelection, then immediately invokes
+    // Root admits the concrete destination, commits the exact profile proposal
+    // in transition.commitRouteSelection, then immediately invokes
     // notifyRouteAccepted BEFORE ticking. This verifies the real manager's
-    // requested4/1 and profile write, then emits source BACK5 once. It writes
+    // actual screen/page request and profile write, then emits SELECT1 or BACK5
+    // once. It writes
     // neither profile nor route. Intervening input/update/render/notice makes
     // the source proposal stale; its flags never certify a destination.
     bool routeProposalCurrent(const OriginalUiOptionsRouteProposal50KG&) const noexcept;
@@ -97,6 +110,16 @@ public:
     const OriginalUiNativeDraw50KG* draw() const noexcept;
     void requestQuit() noexcept;
 private:
+    friend class OriginalUiFrontend50KG;
+    // Only the concrete coordinator's manager commit callback may call this,
+    // after destination admission. A holder of a proposal cannot manually
+    // promote its flags and invoke the transaction without that actual manager.
+    // Revalidates both decisions, full profile/local snapshot, sound owner,
+    // mixer epoch/revision and SELECT readiness. No user callback or allocation
+    // occurs between source1F66F0 writes,188740 and group6E8. Manager publishes
+    // its page request immediately after this returns; notify emits SELECT.
+    bool commitGameOptionsAccept(const OriginalUiOptionsRouteProposal50KG&,
+        const game::OriginalUiRouteDecision50KG& admittedDecision) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

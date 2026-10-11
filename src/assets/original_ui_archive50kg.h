@@ -9,10 +9,10 @@
 namespace rr::assets {
 // NEW reconstruction: identities transcribed from the retained Full48F manifest.
 // These IDs identify exact US-disc originals, not arbitrary files.
-// Original seven ordinal values are preserved; three verified identities appended.
+// Existing archive ordinals are preserved; authenticated menu pod physics appended.
 enum class OriginalUiArchiveId50KG : std::uint8_t {
     appStart = 0, localization = 1, overlays = 2, fonts = 3, mainMenu = 4,
-    backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9
+    backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11
 };
 struct OriginalUiArchiveIdentity50KG {
     OriginalUiArchiveId50KG id;

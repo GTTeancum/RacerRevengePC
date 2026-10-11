@@ -51,6 +51,12 @@ Matrix multiply(Arithmetic& a,const Matrix& x,const Matrix& y) noexcept {
     return result;
 }
 }
+bool originalUiSourceTangent50KG(float radians,float& output) noexcept {
+    if(std::fegetround()!=FE_TONEAREST||!std::isfinite(radians))return false;
+    Arithmetic a;const float result=sourceTangent(a,radians);
+    if(!a.ok)return false;
+    output=result;return true;
+}
 OriginalUiMainParticleCameraStatus50KG prepareOriginalUiParticleCameraFromView50KG(
     const CameraViewOutput49F& core,float originalWidth,float originalHeight,
     OriginalUiMainParticleCamera50KG& output) noexcept {

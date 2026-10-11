@@ -2663,15 +2663,34 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
  std::array<platform::MaterialTextureGl50EB,raceOpponentCount> opponentGpuTextures,opponentCableGpuTextures;
  platform::MaterialTextureGlDiagnostic50EB textureDiagnostic{};
- original_main_entry50KG::Frontend originalMain;
  platform::VehicleWindowGl50DS renderer;
+ original_main_entry50KG::Frontend originalMain;
  platform::GameHostDiagnostic50ER hostDiagnostic{};
  platform::VehicleWindowDiagnostic50DS rendererDiagnostic{},completionDiagnostic{};
  bool restartRequested=false;
  auto closeWindow=[&](){
   bool clean=true;
   // Drop all UI/session borrowers before ending renderer and texture publication.
-  originalMain.session.reset();
+  // Close renderer borrowers before coordinator-owned GPU banks, including
+  // renderer-create failure before coordinator activation.
+  if(originalMainApplication.enabled){
+   if(renderer.ownsResources()&&!renderer.close(rendererDiagnostic)){
+    clean=false;
+    // Retry cleanup while its context and both texture owners are still live.
+    // Never unwind into bank destructors while the renderer retains a borrow.
+    if(!renderer.close(rendererDiagnostic)){
+     std::cerr<<"original UI renderer cleanup remains unresolved; terminating before owner teardown\n";
+     std::terminate();
+    }
+   }
+   if(!originalMain.closeUi()){
+    clean=false;
+    if(!originalMain.closeUi()){
+     std::cerr<<"original UI bank cleanup remains unresolved; terminating with context retained\n";
+     std::terminate();
+    }
+   }
+  }
   if(!originalMain.closeAudio())clean=false;
   if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
@@ -2685,10 +2704,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // Never destroy a context beneath unresolved GPU ownership. Destructors may
   // retry cleanup in the same correct order; neither silently leaks resources.
   if(renderer.ownsResources())return false;
-  if(originalMain.gpu && originalMain.gpu->ownsResources() && !originalMain.gpu->close(textureDiagnostic)){
-   std::cerr<<"original Main GPU cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
-  }
-  if(originalMain.gpu && originalMain.gpu->ownsResources())return false;
   if(gcDynamicWindow.ownsResources()&&!gcDynamicWindow.close(textureDiagnostic)){
    std::cerr<<"GC dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
   }
@@ -2732,7 +2747,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto& windowRequest=hostRequest.window;
   windowRequest.title=raceEnabled?"Racer Revenge | Native race | W/S + Up/Down | F5 restart | Esc menu":
       "Racer Revenge native development drive | W/S + Up/Down | F5 restart | Esc menu";
-  if(originalMainApplication.enabled)windowRequest.title="Racer Revenge | Original Main | Arrows select | Enter confirm | Close quits";
+  if(originalMainApplication.enabled)windowRequest.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
   windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
   windowRequest.major=3;windowRequest.minor=2;
   windowRequest.profile=platform::WindowGlProfile50DQ::Core;
@@ -3037,6 +3052,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(!renderer.create(renderRequest,playerDrawAssets,rendererDiagnostic)){
    reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("window vehicle renderer creation failed");
   }
+  if(originalMainApplication.enabled)originalMain.activate(renderer);
   // Renderer owns its cold GPU copy; release CPU-only track staging promptly.
   if(!headlessLive)trackMesh=rr::assets::Mesh48B{}; // Capture-only VM geometry evidence.
   materialOwner.reset();
@@ -3124,7 +3140,24 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // Same-directory rename atomically publishes the completed PPM before ACK.
     std::filesystem::rename(writingFile,captureFile);
     const auto mainAudioInfo=originalMain.audioOutput.info();
+    const auto capturedUi=originalMain.coordinator.snapshot();
+    const auto* capturedNavigation=originalMain.navigation();
+    require50DU(capturedNavigation,"original UI capture navigation missing");
+    const auto capturedGroup=capturedNavigation->controllerGroup[0];
+    const auto capturedSlot=capturedGroup>0&&static_cast<std::size_t>(capturedGroup)<capturedNavigation->groups.size()?
+        capturedNavigation->groups[capturedGroup].selectedSlot:0;
+    const auto capturedAperture=capturedUi.route.screen==4?capturedUi.main.aperture:capturedUi.options.aperture;
     J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
+        {"screen",capturedUi.route.screen},{"page",capturedUi.route.page},{"switches",capturedUi.switches},
+        {"requested_screen",capturedUi.transition.requested.screen},{"requested_page",capturedUi.transition.requested.page},
+        {"selected_group",capturedGroup},{"selected_slot",capturedSlot},
+        {"saved_group",originalMainApplication.gameSettingsProfile->savedGroup6E8},
+        {"lifecycle",static_cast<unsigned>(capturedUi.transition.lifecycle)},
+        {"phase",static_cast<unsigned>(capturedUi.transition.phase)},
+        {"aperture_state",static_cast<unsigned>(capturedAperture.state)},
+        {"aperture_input_enabled",capturedAperture.inputEnabled268},
+        {"gpu_publication",originalMain.coordinator.gpu()->publicationToken()},
+        {"accepted_update_sequence",originalMain.lastAudioSequence},
         {"file",captureFile.string()},{"width",width},{"height",height},
         {"audio_mixed_frames",mainAudioInfo.mixedFrames},
         {"audio_captured_frames",mainAudioInfo.capturedFrames},{"audio_rate",mainAudioInfo.sampleRate},
@@ -3175,9 +3208,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(!originalMainApplication.enabled)reportOriginalAiFleet("ready");
   }
   if(originalMainApplication.enabled){
-   std::cerr<<"Original Main controls: Up/Left/W previous(2), Down/Right/S next(3), Enter/Space confirm(4), "
+   std::cerr<<"Original UI controls: Main/Options menu Up/Left/W previous(2), Down/Right/S next(3); "
+       "Game Options Up/W previous group(2), Down/S next group(3), Left/Right change value(0/1), R defaults(5). Enter/Space confirm(4), "
        "Escape/menu back(6; source Main does not handle back). Window Close, quit, or stdin EOF exits. "
-       "F5/restart and checkpoint have no Main destination. capture writes the existing live PPM target.\n";
+       "Game Options Accept requires the live enabled audio owner and commits process settings; Cancel remembers the group without applying local edits. "
+       "F5/restart and checkpoint have no original UI destination. capture writes the existing live PPM target.\n";
   }
   for(;;){
    phase_timing50GK::Scope inputTiming(phaseTiming,phase_timing50GK::Phase::Input);
@@ -3190,7 +3225,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // Own the real input stream before ALL host menus, driving packets,
     // restart/checkpoint paths and world/audio steps. No fallthrough exists.
     if(input.quitRequested){
-     originalMain.session->requestQuit();reportUiState("quit");break;
+     originalMain.requestQuit();reportUiState("quit");break;
     }
     capturePending=capturePending||hostInput.captureRequested;
     if(hostInput.pauseRequested)originalMain.hostPaused=true;
@@ -3209,35 +3244,30 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      originalMain.lastUpdateNanoseconds=0;captureCommitted();
      std::this_thread::sleep_for(std::chrono::milliseconds(8));continue;
     }
-    if(input.pressed[82]||input.pressed[80]||input.pressed[26])originalMain.input(2);
-    if(input.pressed[81]||input.pressed[79]||input.pressed[22])originalMain.input(3);
+    const auto inputRoute=originalMain.coordinator.snapshot().route;
+    const bool gameOptionsInput=inputRoute.screen==12&&inputRoute.page==4;
+    if(gameOptionsInput){
+     if(input.pressed[80])originalMain.input(0);
+     if(input.pressed[79])originalMain.input(1);
+     if(input.pressed[82]||input.pressed[26])originalMain.input(2);
+     if(input.pressed[81]||input.pressed[22])originalMain.input(3);
+    }else{
+     if(input.pressed[82]||input.pressed[80]||input.pressed[26])originalMain.input(2);
+     if(input.pressed[81]||input.pressed[79]||input.pressed[22])originalMain.input(3);
+    }
     if(input.pressed[40]||input.pressed[44])originalMain.input(4);
+    if(gameOptionsInput&&input.pressed[21])originalMain.input(5); // Native R => original square/defaults event.
     if(input.pressed[41]||hostInput.menuRequested)originalMain.input(6);
     const auto uiNow=monotonicNow50DU();
-    require50DU(!originalMain.lastUpdateNanoseconds||uiNow>=originalMain.lastUpdateNanoseconds,
-        "original Main monotonic update clock moved backwards");
-    const std::uint64_t elapsedNanoseconds=originalMain.lastUpdateNanoseconds?
-        uiNow-originalMain.lastUpdateNanoseconds:0;
-    require50DU(elapsedNanoseconds<=1000000000ull,"original Main active update stall exceeds one second");
+    const std::uint64_t elapsedNanoseconds=originalMain.acceptedElapsed(uiNow);
     const float elapsed=static_cast<float>(double(elapsedNanoseconds)/1000000000.0);
-    originalMain.lastUpdateNanoseconds=uiNow;
     // Real elapsed frame delta; no synthetic fixed ticks, clamping or RNG
     // reseed. An unsupported long stall fails through the source session gate.
     platform::OriginalUiMainSessionUpdate50KG update;update.elapsedSeconds=elapsed;
-    // This Main-only keyboard mapping has no original debug-button bindings.
+    // This original-UI keyboard mapping has no original debug-button bindings.
     // Its four debug-query levels therefore remain actually released.
-    if(originalMain.session->update(update,originalMain.diagnostic)!=
-        platform::OriginalUiMainSessionStatus50KG::ok)originalMain.fail("update");
-    // Exactly once per accepted source update, independent of video capture.
-    // The typed transport preserves Main's pause gate and original PCM owner.
-    originalMain.advanceAudio(elapsedNanoseconds);
-    if(originalMain.session->render(mainClock,originalMain.diagnostic)!=
-        platform::OriginalUiMainSessionStatus50KG::ok)originalMain.fail("render");
-    const auto* draw=originalMain.session->draw();
-    require50DU(draw,"original Main session did not publish a complete native frame");
-    if(!renderer.submitOriginalUi(*draw,info.drawableWidth,info.drawableHeight,rendererDiagnostic)){
-     reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("original Main native submission rejected; not swapped");
-    }
+    originalMain.update(update,elapsedNanoseconds);
+    originalMain.render(mainClock,renderer,info.drawableWidth,info.drawableHeight);
     if(host.hasWindow()&&!host.swapWindow(hostDiagnostic)){
      reportHost50DU(hostDiagnostic);throw std::runtime_error("original Main window swap failed");
     }
@@ -3248,6 +3278,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      std::cerr<<"original_main_ready "<<ready.dump()<<'\n';reportUiState("ready");
     }
     captureCommitted();
+    originalMain.commitDeferred(renderer);
     std::this_thread::sleep_for(std::chrono::milliseconds(8));continue;
    }
    // Window close, explicit stdin quit, and EOF remain terminal. Escape is

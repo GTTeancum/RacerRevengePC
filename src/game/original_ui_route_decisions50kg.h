@@ -41,12 +41,14 @@ struct OriginalUiRouteRequest50KG {
 // native memory offsets or guest addresses. word writes replace all 32 bits;
 // maskedByte/maskedHalfword preserve every bit outside replaceMask.
 enum class OriginalUiProfileField50KG : std::uint32_t {
-    mode34=0x34,previousMode38=0x38,optionsSlot6E4=0x6E4,
+    mode34=0x34,previousMode38=0x38,optionsSlot6E4=0x6E4,optionsGroup6E8=0x6E8,
     riderMode0_6F0=0x6F0,rider1Mode1_6F4=0x6F4,rider2_6F8=0x6F8,
     riderOtherMode6FC=0x6FC,courseMode0_700=0x700,lapsMode0_704=0x704,
     entrantsMode0_708=0x708,subtypeMode0_70C=0x70C,
     courseMode1_710=0x710,entrantsMode1_714=0x714,lapsMode1_718=0x718,
     gallerySlot71C=0x71C,comparisonRider100C0=0x100C0,
+    soundMode1101C=0x1101C,sfxVolume11020=0x11020,musicVolume11024=0x11024,
+    voiceVolume11028=0x11028,announcerVolume1102C=0x1102C,settingsFlags11050=0x11050,
     subtype11258=0x11258,packed1125C=0x1125C,rider1Bits1125D=0x1125D,
     rider2Bits1125E=0x1125E,trackBits1125F=0x1125F
 };

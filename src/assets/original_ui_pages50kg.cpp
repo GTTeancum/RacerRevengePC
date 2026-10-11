@@ -167,7 +167,14 @@ bool readOriginalUiDat50KG(const OriginalUiArchive50KG& archive,const std::strin
         while (at<size) {
             const std::size_t lineStart=at;
             while (at<size && p[at]!='\n') ++at;
-            const auto lineEnd=at;if (at<size) ++at;
+            auto lineEnd=at;
+            if (at<size) {
+                ++at;
+                // File::ReadLine 12F224..244 normalizes CRLF to LF before
+                // cleaning. GetString's newline delimiter removes that LF,
+                // even when an authored value has no closing quote.
+                if (lineEnd>lineStart && p[lineEnd-1]=='\r') --lineEnd;
+            }
             if (lineEnd-lineStart>2048) return fail(d,OriginalUiPageError50KG::capacity,lineStart);
             std::size_t first=lineStart;
             while (first<lineEnd && space(char(p[first]))) ++first;
@@ -192,7 +199,11 @@ bool readOriginalUiDat50KG(const OriginalUiArchive50KG& archive,const std::strin
                 line.push_back(c);offsets.push_back(i);
             }
             if (line.empty() || line[0]==';') continue;
-            if (quoted || brackets!=0) return fail(d,OriginalUiPageError50KG::textSyntax,lineStart,0x159440);
+            // 159440 tracks quotes only to preserve whitespace within this
+            // line; it does not require a closing quote. GetString 158824
+            // and 158858 strip leading/trailing quotes independently. Actual
+            // Options Widgets311/251 author opening-only Text quotes.
+            if (brackets!=0) return fail(d,OriginalUiPageError50KG::textSyntax,lineStart,0x159440);
             if (line[0]=='[') {
                 if (line.size()<3 || line.back()!=']') return fail(d,OriginalUiPageError50KG::textSyntax,lineStart);
                 const std::string sectionName=line.substr(1,line.size()-2);

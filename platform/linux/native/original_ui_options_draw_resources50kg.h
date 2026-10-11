@@ -57,7 +57,7 @@ struct OriginalUiOptionsMaterialBinding50KG {
     std::uint32_t registryToken=0;
     const assets::OriginalUiMemberIdentity50KG* registryIdentity=nullptr;
 };
-// Native cold resource owner for the closed Options MENU contribution.
+// Native cold resource owner for the menu + Game Options widget population.
 // Exact Options PSMs, Options background/ATMs, real shared fonts/overlay/prompts.
 // No GPU publication, page/scene admission, source route or save effect implied.
 class OriginalUiOptionsDrawResources50KG final {
@@ -69,6 +69,7 @@ public:
     bool load(const OriginalUiOptionsColdInput50KG&,OriginalUiOptionsDrawDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
     game::OriginalUiExitText50KG* exitText() noexcept;
+    game::OriginalUiExitText50KG* gameOptionsExitText() noexcept;
     game::OriginalUiOptionsMenuWidgets50KG* widgets() noexcept;
     const game::OriginalUiOptionsMenuWidgets50KG* widgets() const noexcept;
     const assets::OriginalUiScreenAssets50KG* images() const noexcept;
@@ -80,15 +81,18 @@ public:
     std::uint32_t widgetMaterial(std::uint16_t) const noexcept;
     std::uint32_t materialIndex(const char*) const noexcept;
     const game::OriginalUiOptionsBackground50KG* background() const noexcept;
+    const game::OriginalUiOptionsBackground50KG* gameOptionsBackground() const noexcept;
     const game::OriginalUiOptionsCamera50KG* camera() const noexcept;
     const game::OriginalUiMainSceneOwner50KG* scene() const noexcept;
     game::OriginalUiMainFireOwner50KG* fire() noexcept;
+    const game::OriginalUiMainFireOwner50KG* fire() const noexcept;
     const game::OriginalUiOptionsParticleRenderState50KG* particleRenderState() const noexcept;
     const assets::OriginalUiMainParticleMaterial50KG* particleMaterial() const noexcept;
     std::uint32_t particleImageIndex() const noexcept;
     // Current selection's original first-line coordinates/width and cold arrow
     // dimensions. Does not change the animated frame or sample a clock.
     bool selection(game::OriginalUiOptionsSelection50KG&,OriginalUiOptionsDrawDiagnostic50KG&) const noexcept;
+    bool gameOptionsSelection(game::OriginalUiOptionsSelection50KG&,OriginalUiOptionsDrawDiagnostic50KG&) const noexcept;
 private:
     struct Storage;std::unique_ptr<Storage> storage_;
 };

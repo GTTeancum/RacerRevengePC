@@ -9,11 +9,16 @@ namespace rr::platform {
 // substitutes a screen nor generates glyphs from a host font.
 inline constexpr std::uint32_t originalUiMaximumQuads50KG = 8192;
 inline constexpr std::uint32_t originalUiMaximumSpans50KG = 2048;
-enum class OriginalUiBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };
+enum class OriginalUiBlend50KG : std::uint8_t {
+    opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive
+};
 enum class OriginalUiMaterialMode50KG : std::uint8_t {
     unspecified, texturedModulate, untexturedVertexColor,
     // Actual Main ParticleCode: MODULATE, alpha GREATER 0, source fog.
-    mainParticle
+    mainParticle,
+    // Actual DefaultMT Diffuse identities. CPU owner supplies original packet
+    // RGB, source fixed-point XY/Z and perspective W; no generic relighting.
+    sourceDiffuse, sourceDiffuseCompressed, sourceSpecularMapCompressed
 };
 struct OriginalUiSpan50KG {
     // Contiguous quad partition in the caller's source-resolved draw order.

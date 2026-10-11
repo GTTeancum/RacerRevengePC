@@ -67,7 +67,8 @@ private:
 };
 enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback,
-    optionsMenuPromptMissingPsmFallback
+    optionsMenuPromptMissingPsmFallback, optionsGamePromptMissingPsmFallback, riderStatMissingPsmFallback, riderPortraitMissingPsmFallback,
+    riderNameBlurMissingPsmFallback, riderBackgroundMissingPsmFallback, riderPromptMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -154,7 +155,48 @@ bool readOriginalUiOptionsMenuPromptFallbackMaterial50KG(
     OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
     OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
-enum class OriginalUiMaterialBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };
+// Actual Game Options page4 create1F4724 calls the shared page constructor.
+// Its square uses the Options-local PST, with no local/shared PSM. Cross and
+// triangle remain the already-authenticated shared menu prompt owners.
+bool readOriginalUiGameOptionsPromptFallbackMaterial50KG(
+    const OriginalUiArchive50KG& options,const OriginalUiArchive50KG& overlays,
+    OriginalUiMainPrompt50KG,const OriginalUiMaterialTemplates50KG&,
+    OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
+    OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Exact Rider1E89D8/1E89F0/1E8A38 sprite constructors, ScreenMT owner.
+// Only these original missing-PSM textures are admitted; no arbitrary basename.
+enum class OriginalUiRiderStatTexture50KG : std::uint8_t { podstat,podstat2,notch };
+bool readOriginalUiRiderStatFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    OriginalUiRiderStatTexture50KG,const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Actual1E9418..1E9448 %02d_flrg ScreenTexture construction. Admits only
+// original1..26 excluding5,6,13; each genuine original portrait is distinct.
+bool readOriginalUiRiderPortraitFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    std::uint8_t riderIndex,const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Rider Icon88 is the authenticated nameblur widget, through2AC6B0.
+// Shared page prompts use OVERLAYS cross/triangle and Rider-local square/circle.
+// Backgrounds are actual UIBKG %02d_bkg constructors1E8DC0, never portraits.
+// Each bounded missing-PSM reader retains distinct source provenance and the
+// genuine common ScreenMT constructor. No general fallback entry is exposed.
+bool readOriginalUiRiderNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+bool readOriginalUiRiderBackgroundFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiArchive50KG& backgrounds,std::uint8_t riderIndex,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+bool readOriginalUiRiderPromptFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+enum class OriginalUiMaterialBlend50KG : std::uint8_t {
+    opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive
+};
 enum class OriginalUiMaterialFilter50KG : std::uint8_t { nearest, linear };
 enum class OriginalUiMaterialWrap50KG : std::uint8_t { repeat, clampToEdge };
 struct OriginalUiNativeMaterial50KG {
@@ -213,4 +255,99 @@ bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass5
 bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG&,
     const Texture48E& exactAtlas, OriginalUiNativeMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;
+// Separate original 3D programs. These do not become ScreenObject passes.
+enum class OriginalUiLitProgram50KM : std::uint8_t { diffuse, diffuseCompressed, specularMapCompressed };
+struct OriginalUiLitMaterial50KM {
+    OriginalUiNativeMaterial50KG raster{};
+    OriginalUiLitProgram50KM program = OriginalUiLitProgram50KM::diffuseCompressed;
+    bool fogEnabled = false, alphaTestGreaterZero = false;
+};
+// Actual authored, DefaultMT-associated one-map Diffuse/Compressed only.
+// Requires original normal/light/projection producers and a real fog-byte
+// stream when enabled. This CPU admission is not those owners or GPU readiness.
+// Kind2/IPUM, multiple mips, destination-alpha factors and unknown tests reject.
+bool prepareOriginalUiLitMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const Texture48E& exactTexture, OriginalUiLitMaterial50KM&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+class OriginalUiScreenAssets50KG;
+enum class OriginalUiNativeIpumImagePolicy50KM : std::uint8_t {
+    unavailable, highestResolutionBaseOnly
+};
+struct OriginalUiRider19IpumMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    OriginalUiNativeIpumImagePolicy50KM imagePolicy=OriginalUiNativeIpumImagePolicy50KM::unavailable;
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+    std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0;
+};
+// Separate exact Rider19c_1 entry. The ordinary Texture48E overload continues
+// to reject kind2. This consumes the immutable real image-bank owner, canonical
+// source provenance and typed original-data cache color policy. Native policy
+// chooses the highest-resolution original level0, honestly publishing only
+// that image on GPU while preserving all original mip bytes/provenance on CPU.
+// It does NOT assert historical source residencyF4 or emulate memory pressure.
+// Requires actual authored19c_1 DiffuseCompressed, MXL0/equal source texel
+// filters, opaque RGB and alpha-test OFF, matching the actual original pass.
+// Its one-map bind249818..24983C patches material TEXA to TA0/TA1=255,AEM1
+// before packet submission24B39C, agreeing with the typed cache alpha policy.
+// A downstream alpha consumer still requires the separate sealed source-RGBA
+// frame lifetime; the ordinary RGB-only presentation promise is unchanged.
+// The images owner must outlive this result and the renderer's publication.
+bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19IpumMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+enum class OriginalUiNativeIndexedImagePolicy50KM : std::uint8_t {
+    unavailable, highestResolutionBaseOnly
+};
+struct OriginalUiRider19BodyMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    OriginalUiNativeIndexedImagePolicy50KM imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::unavailable;
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+    std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0;
+};
+// Exact Rider19_1/19_2 first DiffuseCompressed passes and original UIPODTEX
+// indexed images only. The ordinary one-mip overload remains unchanged. This
+// explicit native policy binds the actual bank's largest original mip, keeps
+// all five source mips/palette on CPU, and does not claim historical residentF4.
+// MXL0, equal original texel filters, opaque RGB and alpha-test OFF are required.
+// Original alpha bytes remain intact. The bodies' later destination-alpha
+// specular passes still need a source framebuffer-alpha owner; this admission
+// cannot establish the existing presentation-only alpha-disposability promise.
+bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19BodyMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Exact original pod_wndw DiffuseCompressed passes1 and3. Both retain their
+// source-alpha blend, alpha test and depth write. The distinct specular pass2
+// is not replaced or omitted. Native policy publishes the real64x64 original
+// base image while keeping all three indexed mips and palette bytes on CPU.
+struct OriginalUiRiderWindowMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    OriginalUiNativeIndexedImagePolicy50KM imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::unavailable;
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+    std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0,sourcePass=0;
+};
+bool prepareOriginalUiRiderWindowMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRiderWindowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Successful result names the exact published one-map specmap1 image and the
+// unchanged source pass. Only original19_1,19_2 and pod_wndw pass2 are admitted.
+// Destination-alpha and FIX255 policies are accepted solely by the separate
+// sealed source-RGBA frame route; ordinary RGB-only span conversion rejects.
+struct OriginalUiRider19SpecularMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+};
+bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19SpecularMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 }
