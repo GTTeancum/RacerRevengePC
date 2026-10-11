@@ -816,7 +816,7 @@ struct OwnerGl {
     void (*uniform4f)(I, float, float, float, float) = nullptr;
     void (*blendFunc)(U, U) = nullptr;
     void (*blendEquation)(U) = nullptr;
-    // Resolved only for explicit source-RGBA composition after capability proof.
+    // Resolved only for source-RGBA texture-feedback fallback after capability proof.
     void (*textureBarrier)() = nullptr;
     void (*clipControl)(U,U) = nullptr;
     void (*genTextures)(I,U*) = nullptr;
@@ -982,6 +982,7 @@ struct VehicleWindowGl50DS::Storage {
     std::uint8_t menuPublished = 0;
     U uiTargets[2]{}, uiColors[2]{}, uiDepths[2]{};
     U uiSourceTarget=0,uiSourceColor=0,uiSourceDepth=0;
+    bool uiSourceCoherentFramebufferFetch=false;
     const OriginalUiRiderDrawContribution50KG* uiSourceFrameOwner=nullptr;
     std::uint64_t uiSourceFrameGeneration=0,uiSourceTargetGeneration=0;
     U uiProgram = 0, uiVertexShader = 0, uiFragmentShader = 0;
@@ -2158,7 +2159,12 @@ void main() {
     uiUv = rrUv; uiColor = rrColor; uiParticleFog = rrParticleFog;
 }
 )GLSL";
-        constexpr const char* fragmentSource = R"GLSL(#version 150 core
+        constexpr const char* fragmentPrefix = "#version 150 core\n";
+        constexpr const char* coherentFragmentPrefix =
+            "#version 150 core\n"
+            "#extension GL_EXT_shader_framebuffer_fetch : require\n"
+            "#define RR_UI_COHERENT_FRAMEBUFFER_FETCH 1\n";
+        constexpr const char* fragmentSource = R"GLSL(
 in vec2 uiUv;
 noperspective in vec4 uiColor;
 noperspective in float uiParticleFog;
@@ -2168,10 +2174,16 @@ uniform int uiTextured;
 uniform int uiSourceFogEnabled;
 uniform int uiSourceAlphaTest;
 uniform vec4 uiParticleFogColor;
+#ifndef RR_UI_COHERENT_FRAMEBUFFER_FETCH
 uniform sampler2D uiSourceTarget;
+#endif
 uniform int uiSourceComposition;
 uniform int uiSourceBlend;
+#ifdef RR_UI_COHERENT_FRAMEBUFFER_FETCH
+inout vec4 viewerOutput;
+#else
 out vec4 viewerOutput;
+#endif
 void main() {
     if (uiSourceComposition != 0) {
         // Explicit native byte representation. Native GL sampling/interpolation
@@ -2187,10 +2199,16 @@ void main() {
         }
         vec3 result=source.rgb;
         if (uiSourceBlend!=0) {
+            // Opaque spans never enter this destination-fetch branch.
+#ifdef RR_UI_COHERENT_FRAMEBUFFER_FETCH
+            // Coherent EXT fetch observes prior writes in API primitive order,
+            // including overlapping triangles within this indexed span draw.
+            vec4 destination=floor(viewerOutput*255.0+0.5);
+#else
             // ARB_texture_barrier: feedback uses one actual triangle per draw,
             // one same-pixel read/write per texel, with a barrier before each.
-            // Opaque spans never enter this destination-fetch branch.
             vec4 destination=floor(texelFetch(uiSourceTarget,ivec2(gl_FragCoord.xy),0)*255.0+0.5);
+#endif
             float coefficient=uiSourceBlend==3 ? destination.a : uiSourceBlend==4 ? 255.0 : source.a;
             // Exact shadow ALPHA A=2 selects zero, B=1 selects destination.
             // Floor the signed product before adding Cd, as for other ALPHA
@@ -2225,11 +2243,13 @@ void main() {
     }
 }
 )GLSL";
-        const auto compile = [&](U type, const char* source, U& name) noexcept {
+        const auto compile = [&](U type, const char* source, U& name, const char* prefix=nullptr) noexcept {
             name = shaderGl.createShader(type);
             if (!check("create original UI shader")) return false;
             if (!name) return fail(*diagnostic, VehicleWindowError50DS::shader, "zero original UI shader");
-            shaderGl.shaderSource(name, 1, &source, nullptr); shaderGl.compileShader(name);
+            const char* sources[] = {prefix, source};
+            shaderGl.shaderSource(name, prefix ? 2 : 1, prefix ? sources : &source, nullptr);
+            shaderGl.compileShader(name);
             I compiled = 0; shaderGl.getShaderiv(name, 0x8B81, &compiled);
             if (!check("compile original UI shader")) return false;
             if (compiled) return true;
@@ -2241,7 +2261,8 @@ void main() {
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::vertex;
         if (!compile(0x8B31, vertexSource, uiVertexShader)) return false;
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::fragment;
-        if (!compile(0x8B30, fragmentSource, uiFragmentShader)) return false;
+        if (!compile(0x8B30, fragmentSource, uiFragmentShader,
+            uiSourceCoherentFramebufferFetch ? coherentFragmentPrefix : fragmentPrefix)) return false;
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::link;
         uiProgram = shaderGl.createProgram();
         if (!check("create original UI program")) return false;
@@ -2271,13 +2292,15 @@ void main() {
         uiSourceFogEnabledUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceFogEnabled");
         uiSourceAlphaTestUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceAlphaTest");
         uiSourceCompositionUniform=shaderGl.getUniformLocation(uiProgram,"uiSourceComposition");
-        uiSourceTargetUniform=shaderGl.getUniformLocation(uiProgram,"uiSourceTarget");
+        if (!uiSourceCoherentFramebufferFetch)
+            uiSourceTargetUniform=shaderGl.getUniformLocation(uiProgram,"uiSourceTarget");
         uiSourceBlendUniform=shaderGl.getUniformLocation(uiProgram,"uiSourceBlend");
         if (!check("locate original UI uniforms")) return false;
         if (uiCanvasUniform < 0 || uiImageUniform < 0 || uiAlphaUniform < 0 || uiTexturedUniform < 0 ||
             uiParticleFogColorUniform < 0 || uiSourceRasterUniform < 0 ||
             uiSourceFogEnabledUniform < 0 || uiSourceAlphaTestUniform < 0 ||
-            uiSourceCompositionUniform < 0 || uiSourceTargetUniform < 0 || uiSourceBlendUniform < 0)
+            uiSourceCompositionUniform < 0 || (!uiSourceCoherentFramebufferFetch && uiSourceTargetUniform < 0) ||
+            uiSourceBlendUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "original UI uniform missing");
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::none;
         const U uiCapacity=request.enableOriginalUiSourceRgba?originalUiMaximumSourceQuads50KM:originalUiMaximumQuads50KG;
@@ -2668,24 +2691,32 @@ void main() { viewerOutput = hudColor; }
     bool checkOriginalUiSourceSupport(I major,I minor) noexcept {
         if (!request.enableOriginalUiSourceRgba)return true;
         I units=0;gl.getIntegerv(0x8872,&units);
-        if (!check("query source UI feedback texture units"))return false;
-        if (units<2)return fail(*diagnostic,VehicleWindowError50DS::context,"source UI requires two fragment texture units");
+        if (!check("query source UI composition texture units"))return false;
         bool supported=major>4 || (major==4 && minor>=5);
         bool clipControl=supported;
+        bool coherentFetch=false;
         if (!load(gl.getStringi,"glGetStringi"))return false;
         I count=0;gl.getIntegerv(0x821D,&count);
         if (!check("query source UI extension count"))return false;
         if (count<0 || count>65536)return fail(*diagnostic,VehicleWindowError50DS::limits,"invalid extension count");
         for (I i=0;i<count;++i) {
             const auto* extension=gl.getStringi(0x1F03,static_cast<U>(i));
-            if (!check("query source UI texture barrier and clip capabilities"))return false;
+            if (!check("query source UI fetch, texture barrier and clip capabilities"))return false;
             if (!extension)return fail(*diagnostic,VehicleWindowError50DS::context,"null extension name");
             const auto* name=reinterpret_cast<const char*>(extension);
             if (!std::strcmp(name,"GL_ARB_texture_barrier"))supported=true;
             if (!std::strcmp(name,"GL_ARB_clip_control"))clipControl=true;
+            // The non_coherent extension alone cannot order overlapping triangles.
+            if (!std::strcmp(name,"GL_EXT_shader_framebuffer_fetch"))coherentFetch=true;
         }
-        if (!supported)return fail(*diagnostic,VehicleWindowError50DS::context,"source UI requires GL4.5 or ARB_texture_barrier");
-        return load(gl.textureBarrier,"glTextureBarrier") && (!clipControl || load(gl.clipControl,"glClipControl"));
+        if (units<(coherentFetch?1:2))return fail(*diagnostic,VehicleWindowError50DS::context,
+            "source UI has insufficient fragment texture units");
+        if (!coherentFetch && !supported)return fail(*diagnostic,VehicleWindowError50DS::context,
+            "source UI requires coherent EXT_shader_framebuffer_fetch, GL4.5 or ARB_texture_barrier");
+        if ((!coherentFetch && !load(gl.textureBarrier,"glTextureBarrier")) ||
+            (clipControl && !load(gl.clipControl,"glClipControl")))return false;
+        uiSourceCoherentFramebufferFetch=coherentFetch;
+        return true;
     }
     bool checkContext() noexcept {
         const auto* version = gl.getString(0x1F02); // GL_VERSION
@@ -2867,6 +2898,7 @@ void main() { viewerOutput = hudColor; }
             gl.bindFramebuffer(framebuffer, 0);
         if (!check("finish cold renderer creation")) return false;
         initialized = true;
+        diagnostic->originalUiCoherentFramebufferFetch=uiSourceCoherentFramebufferFetch;
         return true;
     }
     // Only use a retained, preflighted batch and its own cold material bank.
@@ -3869,7 +3901,8 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
 }
 bool VehicleWindowGl50DS::originalUiSourceRgbaAvailable() const noexcept {
     return initialized() && storage_->request.enableOriginalUiSourceRgba &&
-        storage_->gl.textureBarrier && storage_->uiSourceTarget && storage_->uiSourceColor && storage_->uiSourceDepth &&
+        (storage_->uiSourceCoherentFramebufferFetch || storage_->gl.textureBarrier) &&
+        storage_->uiSourceTarget && storage_->uiSourceColor && storage_->uiSourceDepth &&
         storage_->uiSourceIndexBuffer && storage_->uiSourceIndices;
 }
 bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM& frame,
@@ -3926,6 +3959,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
     if(sourceWorkStarted)*sourceWorkStarted=false;
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_; const auto& input = native.draw;
+    d.originalUiCoherentFramebufferFetch=sourceRgba && s.uiSourceCoherentFramebufferFetch;
     if (!s.current(d)) return false;
     if (s.active || s.frameSet || !s.request.enableOriginalUi || !s.uiProgram ||
         !s.uiVertexBuffer || !s.uiIndexBuffer || !s.uiVertexArray || !s.uiParticleFogBuffer || !s.uiSourceRasterWBuffer ||
@@ -4187,8 +4221,8 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.gl.uniform4f(s.uiCanvasUniform,float(2.0*scale/rasterWidth),float(-2.0*scale/rasterHeight),
             float(2.0*ox/rasterWidth-1.0),float(1.0-2.0*oy/rasterHeight));
         s.gl.uniform1i(s.uiSourceCompositionUniform,sourceRgba?1:0);
-        s.gl.uniform1i(s.uiSourceTargetUniform,1);
-        if(sourceRgba){
+        if(!s.uiSourceCoherentFramebufferFetch)s.gl.uniform1i(s.uiSourceTargetUniform,1);
+        if(sourceRgba && !s.uiSourceCoherentFramebufferFetch){
             s.gl.activeTexture(textureUnit0+1);if(s.gl.bindSampler)s.gl.bindSampler(1,0);
             s.gl.bindTexture(texture2D,s.uiSourceColor);
         }
@@ -4244,18 +4278,19 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             s.gl.uniform1i(s.uiSourceAlphaTestUniform, (particle || state.sourceAlphaTestGreaterZero) ? 1 : 0);
             s.gl.bindTexture(texture2D, textured ? input.textures->texture(span.textureIndex) : 0);
             if(sourceRgba){
-                // Opaque source writes do not sample destination RGBA. Unbind
-                // that target while preserving the same shader, raw source
-                // alpha, depth, fog and indexed primitive order. Feedback
-                // spans still require one real triangle and barrier per draw.
+                // Coherent fetch reads the framebuffer directly. Fallback
+                // opaque writes unbind destination RGBA; only fallback feedback
+                // requires one real triangle and texture barrier per draw.
                 const bool feedback=span.blend!=OriginalUiBlend50KG::opaque;
-                s.gl.activeTexture(textureUnit0+1);
-                s.gl.bindTexture(texture2D,feedback?s.uiSourceColor:0);
-                s.gl.activeTexture(textureUnit0);
+                if(!s.uiSourceCoherentFramebufferFetch){
+                    s.gl.activeTexture(textureUnit0+1);
+                    s.gl.bindTexture(texture2D,feedback?s.uiSourceColor:0);
+                    s.gl.activeTexture(textureUnit0);
+                }
                 const auto& range=s.uiSourceIndices->spans[i];
                 const U sourceTriangles=range.indexCount/3;
                 U sourceDraws=0;
-                if(!feedback){
+                if(s.uiSourceCoherentFramebufferFetch || !feedback){
                     // Only retained original triples enter the batched draw;
                     // discarded equal-XY halves are never submitted to GL.
                     if(range.indexCount){
@@ -4284,7 +4319,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                 if (accepted) { ++d.originalUiDraws; d.originalUiQuads += span.quadCount; }
             }
         }
-        if(sourceRgba){
+        if(sourceRgba && !s.uiSourceCoherentFramebufferFetch){
             s.gl.activeTexture(textureUnit0+1);s.gl.bindTexture(texture2D,0);
             if(s.gl.bindSampler)s.gl.bindSampler(1,0);
             s.gl.activeTexture(textureUnit0);

@@ -171,7 +171,8 @@ struct Frontend {
     StageClock::time_point stageStart() const noexcept {
         return traceStages?StageClock::now():StageClock::time_point{};
     }
-    void reportStage(const char* stage,StageClock::time_point start,bool okay=true) const {
+    void reportStage(const char* stage,StageClock::time_point start,bool okay=true,
+        const rr::platform::VehicleWindowDiagnostic50DS* renderer=nullptr) const {
         if(!traceStages)return;
         const auto elapsed=std::chrono::duration_cast<std::chrono::nanoseconds>(StageClock::now()-start).count();
         const auto snapshot=coordinator.snapshot();const auto& route=snapshot.route;
@@ -180,7 +181,11 @@ struct Frontend {
         std::cerr<<"original_ui_stage {\"stage\":\""<<stage<<"\",\"completed_frame\":"<<frameCount
             <<",\"accepted_update_sequence\":"<<snapshot.updates<<",\"screen\":"<<unsigned(route.screen)
             <<",\"page\":"<<unsigned(route.page)<<",\"wall_nanoseconds\":"<<elapsed
-            <<",\"okay\":"<<(okay?"true":"false")<<"}\n";
+            <<",\"okay\":"<<(okay?"true":"false");
+        if(renderer)std::cerr<<",\"source_coherent_framebuffer_fetch\":"<<(renderer->originalUiCoherentFramebufferFetch?"true":"false")
+            <<",\"draws\":"<<renderer->originalUiDraws<<",\"source_triangles\":"<<renderer->originalUiSourceTriangles
+            <<",\"source_texture_barriers\":"<<renderer->originalUiTextureBarriers;
+        std::cerr<<"}\n";
     }
     AudioOutput audioOutput;
     rr::platform::OriginalUiFrontend50KG coordinator;
@@ -191,6 +196,8 @@ struct Frontend {
     std::uint8_t submittedScreen=0;
     std::uint64_t submittedPublication=0,sourceFrameGeneration=0,sourceTargetGeneration=0;
     std::uint32_t submittedDraws=0,submittedQuads=0,submittedTriangles=0;
+    std::uint32_t submittedTextureBarriers=0;
+    bool submittedCoherentFramebufferFetch=false;
     std::uint64_t lastSourceNanoseconds=0,activeSourceNanoseconds=0;
     std::uint64_t pendingUpdateColdNanoseconds=0,pendingMaterialColdNanoseconds=0;
     std::uint32_t sourceMilliseconds=0;
@@ -424,12 +431,14 @@ struct Frontend {
         if(!rendered)fail("render");
         const auto submitStart=stageStart();
         const bool submitted=coordinator.submit(renderer,width,height,diagnostic)==Status::ok;
-        reportStage("native_submit",submitStart,submitted);
+        reportStage("native_submit",submitStart,submitted,&diagnostic.renderer);
         if(!submitted)fail("submission");
         submittedScreen=coordinator.snapshot().route.screen;
         submittedPublication=coordinator.gpu()?coordinator.gpu()->publicationToken():0;
         submittedDraws=diagnostic.renderer.originalUiDraws;submittedQuads=diagnostic.renderer.originalUiQuads;
         submittedTriangles=diagnostic.renderer.originalUiSourceTriangles;
+        submittedTextureBarriers=diagnostic.renderer.originalUiTextureBarriers;
+        submittedCoherentFramebufferFetch=diagnostic.renderer.originalUiCoherentFramebufferFetch;
         sourceFrameGeneration=diagnostic.renderer.originalUiSourceFrameGeneration;
         sourceTargetGeneration=diagnostic.renderer.originalUiSourceTargetGeneration;
     }
@@ -522,6 +531,8 @@ struct Frontend {
                 <<",\"source_target_generation\":"<<(accepted?sourceTargetGeneration:0)
                 <<",\"quads\":"<<(accepted?submittedQuads:0)<<",\"draws\":"<<(accepted?submittedDraws:0)
                 <<",\"source_triangles\":"<<(accepted?submittedTriangles:0)
+                <<",\"source_coherent_framebuffer_fetch\":"<<(accepted&&submittedCoherentFramebufferFetch?"true":"false")
+                <<",\"source_texture_barriers\":"<<(accepted?submittedTextureBarriers:0)
                 <<",\"audio_muted\":"<<(audioOutput.enabled()?"false":"true")
                 <<",\"audio_suppressed\":"<<rider.audio.suppressedByMutedMode
                 <<",\"audio_submitted\":"<<rider.audio.submitted<<",\"audio_failed\":"<<rider.audio.failed
