@@ -999,6 +999,9 @@ struct VehicleWindowGl50DS::Storage {
     // Distinct from ordinary source publication and sample generation. A
     // private opaque copy does not imply a window copy or actual host swap.
     std::uint64_t uiPrivatePublicationSerial=0,uiPrivatePublicationGeneration=0;
+    // Historical successful BACK copies only, independent of every private
+    // publication/source/sample sequence. Never a live swap-authority epoch.
+    std::uint64_t uiWindowBackBufferCopySerial=0;
     // The weak receipt identity is allocated only on first explicit slice1A use.
     // No context ownership is fabricated: every operation still checks current().
     std::shared_ptr<const std::uint8_t> uiSourceReceiptLifetime;
@@ -3676,7 +3679,8 @@ void main() {
         // Previous private target remains untouched. Never blit or swap here.
         static_cast<Storage*>(context)->active = false;
     }
-    bool copyToWindow() noexcept {
+    bool copyToWindow() noexcept { return copyToWindow(width,height); }
+    bool copyToWindow(I copyWidth,I copyHeight) noexcept {
         gl.bindFramebuffer(readFramebuffer, displayedTarget);
         gl.readBuffer(colorAttachment);
         gl.bindFramebuffer(drawFramebuffer, 0);
@@ -3685,7 +3689,7 @@ void main() {
         // No atomicity claim for default framebuffer writes. On any later
         // error the host must not swap this potentially partial back buffer.
         diagnostic->defaultFramebufferMayBeModified = true;
-        gl.blitFramebuffer(0, 0, width, height, 0, 0, width, height, colorBufferBit, 0x2600); // NEAREST
+        gl.blitFramebuffer(0, 0, copyWidth, copyHeight, 0, 0, copyWidth, copyHeight, colorBufferBit, 0x2600); // NEAREST
         if (!check("blit vehicle color to default back buffer")) return false;
         gl.bindFramebuffer(framebuffer, 0);
         return check("restore default framebuffer bindings");
@@ -4613,6 +4617,42 @@ bool VehicleWindowGl50DS::completeOriginalUiPrivatePublication(const OriginalUiP
         d.originalUiByteBlendGeneration=input.blendGeneration_;
         d.originalUiByteBlendSampleGeneration=input.sampleGeneration_;
     }else s.uiPrivatePublicationGeneration=0;
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::copyOriginalUiPrivatePublicationToWindow(const OriginalUiPrivatePublication50KP& publication,
+    OriginalUiWindowBackBufferCopy& copied,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(&publication==&copied.publication_)
+        return fail(d,VehicleWindowError50DS::request,"window copy input and output must be distinct");
+    copied={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic ||
+        s.request.output!=VehicleWindowOutput50DS::defaultBackBuffer ||
+        !publication.completed_ || !matchesOriginalUiPrivatePublication(publication) ||
+        publication.width_<=0 || publication.height_<=0 ||
+        publication.width_>s.maximumWidth || publication.height_>s.maximumHeight ||
+        s.uiWindowBackBufferCopySerial==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,
+            "window copy requires idle window renderer, exact completed private image, bounded viewport and copy sequence");
+    s.diagnostic=&d;
+    bool accepted=s.check("before private publication window copy") && s.checkDefaultFramebuffer();
+    if(accepted){
+        // Working frame dimensions may differ after a failed later submit.
+        // Copy only the authenticated selected image's exact recorded extent,
+        // without changing working dimensions or any private image ownership.
+        // The helper checks restoration of framebuffer0 before it succeeds.
+        accepted=s.copyToWindow(publication.width_,publication.height_);
+        if(!accepted && d.error==VehicleWindowError50DS::gl)d.error=VehicleWindowError50DS::presentation;
+    }
+    if(accepted){
+        copied.lifetime_=s.uiSourceReceiptLifetime;copied.publication_=publication;
+        copied.sequence_=++s.uiWindowBackBufferCopySerial;
+        copied.kind_=OriginalUiWindowBackBufferCopyKind::windowBack;copied.commandsAccepted_=true;
+    }
+    // Failed blits preserve the selected private image and its completion.
+    // The helper retains possible partial BACK modification in d; no receipt
+    // or completion fence is issued and this renderer never swaps the window.
     s.diagnostic=nullptr;return accepted;
 }
 bool VehicleWindowGl50DS::readOriginalUiPrivatePublicationRgba(const OriginalUiPrivatePublication50KP& publication,

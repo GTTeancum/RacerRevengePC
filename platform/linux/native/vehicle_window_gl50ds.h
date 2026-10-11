@@ -645,6 +645,32 @@ private:
     std::int32_t width_=0,height_=0;
     bool completed_=false;
 };
+enum class OriginalUiWindowBackBufferCopyKind : std::uint8_t {
+    none, windowBack
+};
+// Historical renderer-issued observation of an accepted default BACK blit.
+// The copied publication records the exact prior completed PRIVATE image and
+// its lineage; that completion does not cover this later window copy. Neither
+// this value nor its nonwrapping sequence is a current permission to swap: the
+// renderer cannot observe host swaps or intervening window writes. No window
+// copy completion, swap submission, presentation event or scanout is certified.
+// Retaining this value pins neither GPU pixels nor the renderer's lifetime.
+class OriginalUiWindowBackBufferCopy final {
+public:
+    OriginalUiWindowBackBufferCopyKind kind()const noexcept{return kind_;}
+    std::uint64_t sequence()const noexcept{return sequence_;}
+    bool commandsAccepted()const noexcept{return commandsAccepted_;}
+    const OriginalUiPrivatePublication50KP& publication()const noexcept{return publication_;}
+    std::int32_t width()const noexcept{return publication_.width();}
+    std::int32_t height()const noexcept{return publication_.height();}
+private:
+    friend class VehicleWindowGl50DS;
+    std::weak_ptr<const std::uint8_t> lifetime_;
+    OriginalUiPrivatePublication50KP publication_;
+    std::uint64_t sequence_=0;
+    OriginalUiWindowBackBufferCopyKind kind_=OriginalUiWindowBackBufferCopyKind::none;
+    bool commandsAccepted_=false;
+};
 // Immutable full incoming RGBA ownership transferred out of the blend, not a
 // new submission into the reusable ordinary source target. Its original source
 // receipt remains a historical observation with the existing freshness rules.
@@ -788,6 +814,18 @@ public:
     // the independently owned raw incoming image or fabricates a host receipt.
     bool completeOriginalUiPrivatePublication(const OriginalUiPrivatePublication50KP&,
         OriginalUiPrivatePublication50KP&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Dormant bridge: exact current completed PRIVATE publication to window
+    // BACK at its recorded viewport. Requires window output and the exact live
+    // context/drawable/thread. The host must separately verify live drawable
+    // dimensions still equal this viewport; no live-size getter exists here.
+    // No private publication, sample, source, completion barrier or swap occurs.
+    // On false, do not swap: defaultFramebufferMayBeModified preserves possible
+    // partial BACK writes. Private/raw ownership and completion stay unchanged.
+    // Input and output must be distinct, including output.publication(). An
+    // alias is rejected before clearing the output; other failures clear it.
+    // Success issues only the historical command-acceptance observation above.
+    bool copyOriginalUiPrivatePublicationToWindow(const OriginalUiPrivatePublication50KP&,
+        OriginalUiWindowBackBufferCopy&,VehicleWindowDiagnostic50DS&) noexcept;
     // Current completed opaque publication, output viewport RGBA, alpha255.
     bool readOriginalUiPrivatePublicationRgba(const OriginalUiPrivatePublication50KP&,
         std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS&) noexcept;
