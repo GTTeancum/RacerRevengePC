@@ -986,6 +986,20 @@ struct VehicleWindowGl50DS::Storage {
     std::uint64_t uiSourceFrameGeneration=0,uiSourceTargetGeneration=0;
     U uiProgram = 0, uiVertexShader = 0, uiFragmentShader = 0;
     U uiVertexBuffer = 0, uiIndexBuffer = 0, uiVertexArray = 0, uiParticleFogBuffer = 0, uiSourceRasterWBuffer = 0;
+    struct UiSourceIndexStream {
+        static_assert(std::uint64_t(originalUiMaximumSourceQuads50KM) * 6 <=
+            std::uint64_t(std::numeric_limits<I>::max()), "source UI draw count must fit GLsizei");
+        static_assert(std::uint64_t(originalUiMaximumSourceQuads50KM) * 6 * sizeof(U) <=
+            std::uint64_t(std::numeric_limits<std::intptr_t>::max()) &&
+            std::uint64_t(originalUiMaximumSourceQuads50KM) * 6 * sizeof(U) <=
+            std::numeric_limits<std::size_t>::max(), "source UI index bytes must fit buffer sizes");
+        struct Span { U firstIndex = 0, indexCount = 0; };
+        U indices[originalUiMaximumSourceQuads50KM * 6];
+        Span spans[originalUiMaximumSpans50KG];
+    };
+    // Source-only cold storage; the ordinary RGB quad index buffer stays immutable.
+    std::unique_ptr<UiSourceIndexStream> uiSourceIndices;
+    U uiSourceIndexBuffer = 0;
     I uiCanvasUniform = -1, uiImageUniform = -1, uiAlphaUniform = -1, uiTexturedUniform = -1;
     I uiParticleFogColorUniform = -1, uiSourceRasterUniform = -1;
     I uiSourceFogEnabledUniform = -1, uiSourceAlphaTestUniform = -1;
@@ -1451,7 +1465,8 @@ struct VehicleWindowGl50DS::Storage {
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
             hostHudVertexBuffer || hostHudIndexBuffer || hostHudVertexArray) return true;
         if (uiProgram || uiVertexShader || uiFragmentShader ||
-            uiVertexBuffer || uiIndexBuffer || uiVertexArray || uiParticleFogBuffer || uiSourceRasterWBuffer) return true;
+            uiVertexBuffer || uiIndexBuffer || uiVertexArray || uiParticleFogBuffer || uiSourceRasterWBuffer ||
+            uiSourceIndexBuffer) return true;
         for (U b = 0; b < 2; ++b)
             if (uiTargets[b] || uiColors[b] || uiDepths[b]) return true;
         if (uiSourceTarget || uiSourceColor || uiSourceDepth) return true;
@@ -2301,6 +2316,17 @@ void main() {
             if (!check("verify original UI index bytes")) return false;
             if (std::memcmp(indices.get() + i, uploaded, bytes))
                 return fail(*diagnostic, VehicleWindowError50DS::indices, "original UI GPU index mismatch");
+        }
+        if (request.enableOriginalUiSourceRgba) {
+            uiSourceIndices.reset(new (std::nothrow) UiSourceIndexStream);
+            if (!uiSourceIndices) return fail(*diagnostic, VehicleWindowError50DS::allocation,
+                "allocate bounded original UI source indices and span ranges");
+            gl.genBuffers(1, &uiSourceIndexBuffer); drawGl.bindBuffer(arrayBuffer, uiSourceIndexBuffer);
+            gl.bufferData(arrayBuffer, indexBytes, nullptr, dynamicDraw);
+            if (!check("allocate bounded original UI source index buffer")) return false;
+            if (!uiSourceIndexBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation,
+                "zero UI source index buffer");
+            if (!verifyBuffer(arrayBuffer, indexBytes, dynamicDraw)) return false;
         }
         gl.genVertexArrays(1, &uiVertexArray); drawGl.bindVertexArray(uiVertexArray);
         drawGl.bindBuffer(arrayBuffer, uiVertexBuffer); drawGl.bindBuffer(elementBuffer, uiIndexBuffer);
@@ -3491,6 +3517,7 @@ void main() { viewerOutput = hudColor; }
                 !deleteName(uiVertexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(uiParticleFogBuffer, gl.deleteBuffers, d) ||
                 !deleteName(uiSourceRasterWBuffer, gl.deleteBuffers, d) ||
+                !deleteName(uiSourceIndexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(uiIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
             for (U b = 0; b < 2; ++b)
                 if (!deleteName(uiTargets[b], gl.deleteFramebuffers, d) ||
@@ -3842,7 +3869,8 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
 }
 bool VehicleWindowGl50DS::originalUiSourceRgbaAvailable() const noexcept {
     return initialized() && storage_->request.enableOriginalUiSourceRgba &&
-        storage_->gl.textureBarrier && storage_->uiSourceTarget && storage_->uiSourceColor && storage_->uiSourceDepth;
+        storage_->gl.textureBarrier && storage_->uiSourceTarget && storage_->uiSourceColor && storage_->uiSourceDepth &&
+        storage_->uiSourceIndexBuffer && storage_->uiSourceIndices;
 }
 bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM& frame,
     std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d) noexcept {
@@ -4043,6 +4071,33 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         if (!std::isfinite(value) || value < 0.f || value > 1.f)
             return fail(d, VehicleWindowError50DS::frame, "invalid authored particle fog color");
 
+    U sourceIndexCount = 0;
+    if (sourceRgba) {
+        // Keep exactly the old source triangle sequence and equal-XY skip.
+        // No projection, Z/W, clipping or raster bounds enter this decision.
+        // Validated spans partition at most the cold source quad capacity;
+        // each quad writes at most six indices, with no frame allocation.
+        constexpr U corners[2][3] = {{0, 1, 2}, {0, 2, 3}};
+        for (U i = 0; i < input.spanCount; ++i) {
+            const auto& span = input.spans[i];
+            auto& range = s.uiSourceIndices->spans[i];
+            range.firstIndex = sourceIndexCount;
+            for (U q = span.firstQuad; q < span.firstQuad + span.quadCount; ++q) {
+                const auto* v = &input.vertices[q * 4];
+                const auto samePointXY = [&](U a, U b) {
+                    return v[a].position[0] == v[b].position[0] &&
+                        v[a].position[1] == v[b].position[1];
+                };
+                for (const auto& c : corners) {
+                    if (samePointXY(c[0], c[1]) || samePointXY(c[1], c[2]) ||
+                        samePointXY(c[0], c[2])) continue;
+                    for (U corner : c) s.uiSourceIndices->indices[sourceIndexCount++] = q * 4 + corner;
+                }
+            }
+            range.indexCount = sourceIndexCount - range.firstIndex;
+        }
+    }
+
     s.diagnostic = &d;
     bool accepted = s.check("before original UI submission") &&
         (s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
@@ -4151,7 +4206,10 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             s.drawGl.bindBuffer(arrayBuffer, s.uiSourceRasterWBuffer);
             s.drawGl.bufferSubData(arrayBuffer, 0, std::intptr_t(native.sourceRasterWCount) * sizeof(float), native.sourceRasterW);
         }
-        s.drawGl.bindBuffer(elementBuffer, s.uiIndexBuffer);
+        s.drawGl.bindBuffer(elementBuffer, sourceRgba ? s.uiSourceIndexBuffer : s.uiIndexBuffer);
+        if (sourceRgba)
+            s.drawGl.bufferSubData(elementBuffer, 0, std::intptr_t(sourceIndexCount) * sizeof(U),
+                s.uiSourceIndices->indices);
         accepted = s.check("prepare authenticated original UI frame");
         // No material representative has bound before this point. Read-only
         // preflight/context/window failures remain retryable with the same
@@ -4194,45 +4252,23 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                 s.gl.activeTexture(textureUnit0+1);
                 s.gl.bindTexture(texture2D,feedback?s.uiSourceColor:0);
                 s.gl.activeTexture(textureUnit0);
-                constexpr U corners[2][3]={{0,1,2},{0,2,3}};
-                U sourceTriangles=0,sourceDraws=0;
-                bool batchOpaque=!feedback;
-                // Actual model slots are [a,b,c,c], including the same Z/W.
-                // Admit their harmless duplicate half to the contiguous draw.
-                // Equal XY alone is not enough for this optimization: retain
-                // the old skip/submission path for any uncertain Z/W case.
-                for(U q=span.firstQuad;batchOpaque && q<span.firstQuad+span.quadCount;++q)
-                    for(U t=0;batchOpaque && t<2;++t){
-                        const auto* v=&input.vertices[q*4];
-                        const auto samePoint=[&](U a,U b){return v[a].position[0]==v[b].position[0] &&
-                            v[a].position[1]==v[b].position[1];};
-                        const auto* c=corners[t];
-                        if(samePoint(c[0],c[1]) || samePoint(c[1],c[2]) || samePoint(c[0],c[2])){
-                            const auto samePosition=[&](U a,U b){return samePoint(a,b) &&
-                                v[a].position[2]==v[b].position[2] && (!sourceRaster ||
-                                native.sourceRasterW[q*4+a]==native.sourceRasterW[q*4+b]);};
-                            batchOpaque=samePosition(c[0],c[1]) || samePosition(c[1],c[2]) || samePosition(c[0],c[2]);
-                        }else ++sourceTriangles;
-                    }
-                if(batchOpaque){
-                    if(sourceTriangles){
-                        s.drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(span.quadCount*6),0x1405,
-                            reinterpret_cast<const void*>(std::uintptr_t(span.firstQuad)*6*sizeof(U)),0);
+                const auto& range=s.uiSourceIndices->spans[i];
+                const U sourceTriangles=range.indexCount/3;
+                U sourceDraws=0;
+                if(!feedback){
+                    // Only retained original triples enter the batched draw;
+                    // discarded equal-XY halves are never submitted to GL.
+                    if(range.indexCount){
+                        s.drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(range.indexCount),0x1405,
+                            reinterpret_cast<const void*>(std::uintptr_t(range.firstIndex)*sizeof(U)),0);
                         sourceDraws=1;
                     }
                 }else{
-                    sourceTriangles=0;
-                    for(U q=span.firstQuad;q<span.firstQuad+span.quadCount;++q)
-                        for(U t=0;t<2;++t){
-                        const auto* v=&input.vertices[q*4];
-                        const auto samePoint=[&](U a,U b){return v[a].position[0]==v[b].position[0] &&
-                            v[a].position[1]==v[b].position[1];};
-                        const auto* c=corners[t];
-                        if(samePoint(c[0],c[1]) || samePoint(c[1],c[2]) || samePoint(c[0],c[2]))continue;
-                        if(feedback){s.gl.textureBarrier();++d.originalUiTextureBarriers;}
+                    for(U index=range.firstIndex;index<range.firstIndex+range.indexCount;index+=3){
+                        s.gl.textureBarrier();++d.originalUiTextureBarriers;
                         s.drawGl.drawElementsBaseVertex(0x0004,3,0x1405,
-                            reinterpret_cast<const void*>((std::uintptr_t(q)*6+t*3)*sizeof(U)),0);
-                        ++sourceDraws;++sourceTriangles;
+                            reinterpret_cast<const void*>(std::uintptr_t(index)*sizeof(U)),0);
+                        ++sourceDraws;
                     }
                 }
                 // GL errors remain sticky until this span boundary. A failed
@@ -4276,6 +4312,9 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         // world begin supplies its own program, matrix, viewport and geometry.
         s.gl.disable(0x0C11); s.gl.disable(0x0BE2); s.gl.depthMask(1); s.gl.depthFunc(0x0201);
         s.gl.colorMask(1, 1, 1, 1); s.gl.clearDepth(1.0);
+        // Element binding belongs to the VAO. Restore its immutable RGB bank
+        // while the UI VAO is still current, including after source failures.
+        if(sourceRgba)s.drawGl.bindBuffer(elementBuffer,s.uiIndexBuffer);
         s.drawGl.bindVertexArray(0); s.drawGl.bindBuffer(arrayBuffer, 0);
         const bool restored = s.check("finish private original UI frame");
         accepted = accepted && restored;
