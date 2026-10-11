@@ -23,7 +23,7 @@ bool genuine(const OriginalUiRiderLighting50KG& s) noexcept {
     if (!a||!s.uiIdentity) return false;
     for (std::size_t i=0;i<a->memberCount;++i) {
         const auto* p=assets::originalUiMemberIdentity50KG(a->id,i);
-        if (p==s.uiIdentity&&std::strcmp(p->name,"ui\\uirider\\ui.dat")==0) {
+        if (p==s.uiIdentity&&std::strcmp(p->name,"UI\\UIRider\\ui.dat")==0) {
             for (float x:s.directionalLook78) if (!std::isfinite(x)) return false;
             return color(s.ambient50)&&color(s.directional3C);
         }

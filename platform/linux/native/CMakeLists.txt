@@ -70,6 +70,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/assets/original_ui_image_bank50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_widgets50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_visibility50kg.cpp"
+  "${RR_ROOT}/src/game/original_ui_light_manager_lifetime50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_stat_owner50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_model_packet50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_dynamic_owner50kg.cpp"
