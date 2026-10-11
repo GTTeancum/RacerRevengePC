@@ -685,6 +685,9 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
     }
     storage_.reset();return result(d,Status::ok);
 }
+bool OriginalUiFrontend50KG::borrowsRenderer(const VehicleWindowGl50DS& renderer) const noexcept {
+    return storage_&&storage_->renderer==&renderer;
+}
 void OriginalUiFrontend50KG::requestQuit() noexcept {
     auto* s=storage_.get();if(!s||s->inOperation)return;
     s->quit=true;s->frameRendered=false;s->frameSubmitted=false;
