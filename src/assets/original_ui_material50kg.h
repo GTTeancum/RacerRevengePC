@@ -195,7 +195,8 @@ bool readOriginalUiRiderPromptFallbackMaterial50KG(const OriginalUiArchive50KG& 
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
 enum class OriginalUiMaterialBlend50KG : std::uint8_t {
-    opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive
+    opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive,
+    destinationSourceAlphaAttenuation
 };
 enum class OriginalUiMaterialFilter50KG : std::uint8_t { nearest, linear };
 enum class OriginalUiMaterialWrap50KG : std::uint8_t { repeat, clampToEdge };
@@ -336,6 +337,21 @@ struct OriginalUiRiderWindowMaterial50KM {
 bool prepareOriginalUiRiderWindowMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRiderWindowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Exact original19_shdw pass1 and its authenticated128x128 indexed image.
+// ALPHA=(2,1,0,1) subtracts Cd*As/128 from Cd; it does not blend shadow RGB.
+// Preserve source fog, alpha GREATER0, reverse-Z GEQUAL and depth writes.
+// The ordinary indexed/lit entry stays closed to this blend. Only the sealed
+// source-RGBA renderer admits this result, retaining source-alpha replacement.
+struct OriginalUiRider19ShadowMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+};
+bool prepareOriginalUiRider19ShadowMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19ShadowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
 // Successful result names the exact published one-map specmap1 image and the
 // unchanged source pass. Only original19_1,19_2 and pod_wndw pass2 are admitted.

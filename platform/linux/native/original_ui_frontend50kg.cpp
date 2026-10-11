@@ -418,6 +418,7 @@ struct OriginalUiFrontend50KG::Storage {
         receipt.coldInterval.measured=true;receipt.coldInterval.begin=std::chrono::steady_clock::now();
         const bool okay=build(pending,target,d,prospectiveMode);
         if(!okay){
+            d.preparationStatus=d.status; // Preserve actual failed cold stage before public unavailable mapping.
             Diagnostic cleanup;
             if(!release(pending,cleanup)){d.gpu=cleanup.gpu;fault(d,Status::cleanup);}
         }

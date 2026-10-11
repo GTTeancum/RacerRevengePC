@@ -15,7 +15,8 @@ inline constexpr std::uint32_t originalUiMaximumQuads50KG = 8192;
 inline constexpr std::uint32_t originalUiMaximumSourceQuads50KM = 17408;
 inline constexpr std::uint32_t originalUiMaximumSpans50KG = 2048;
 enum class OriginalUiBlend50KG : std::uint8_t {
-    opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive
+    opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive,
+    destinationSourceAlphaAttenuation
 };
 enum class OriginalUiMaterialMode50KG : std::uint8_t {
     unspecified, texturedModulate, untexturedVertexColor,
