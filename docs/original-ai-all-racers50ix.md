@@ -18,7 +18,7 @@ AI constructor16E2A0 initializes FF8=-1. The recovered live setter171B70 is call
 
 Dynamic contact registry humanCount34 is0 and includes every actual body. Canonical body20C/partner IDs, geometry, D28/yaw/D2C/D30/D34, real tuning and shared RNG use the frozen join. Both participants having58!=0 genuinely suppresses the original event1 branch; no human first-contact music or controller feedback is forced. This does not establish all-racer speech coverage. The mixed path's null slot0 rig access is also corrected by using the already-authenticated selectedOriginal identity.
 
-The frozen fresh profile keeps game10FE0=0, so its unbound B9D-setting continuation remains unreachable. The earlier dynamic adapter's high-byte placeholder is not claimed as a genuine B9D owner and does not authorize widening that profile. General haptic/backend and speech owners remain separate work.
+The frozen fresh profile keeps game10FE0=0, so the B9D-setting continuation remains unreachable in this admission. Source B9D bit0 now has an independent per-vehicle canonical owner, `VehicleFrameFields49W::flagB9D0`, cold-clear from20F658. Dynamic impact projects/installs that bit, and the damage tail plus checkpoint reinspection read the same owner. B9C remains eight-bit and separate. B9D upper bits are unrepresented; no zero raw byte is inferred. Ordinary reset(a1=0) preserves the bit; a reached set bit still selects the unsupported225D10->2261B0 destruction boundary. This binding does not authorize widening the profile or claim a full reset/destruction continuation. General haptic/backend and speech owners remain separate work.
 
 ## Native source order and boundaries
 

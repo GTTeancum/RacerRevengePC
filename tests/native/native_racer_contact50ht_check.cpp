@@ -80,15 +80,26 @@ int main(){
  VehicleFrameParameters49W parameters{};parameters.bodies.main.body=four[0].physical.body.parameters;
  parameters.bodies.main.centerOffset=four[0].physical.body.localCenter;
  arena.phase=VehicleFramePhase49W::Ready;
+ need(!arena.fields.flagB9D0,"fresh bank arena has constructor-clear B9D bit0");
+ const std::uint8_t bankB9C[4]={0x00u,0x01u,0x80u,0xffu};
+ const bool bankB9D[4]={false,true,true,true};
  native_racer50HN::Bank bank;bank.owner(arena);bank.seal(4);
  for(std::size_t i=0;i<4;++i)bank.visit(i,[&](){arena.bodies.main.components.root=four[i].physical.body.state;
   arena.nodes[0].world100=four[i].physical.body.state.scene;
-  arena.bodies.secondary.root.scene=pose(123.f+static_cast<float>(i),456);});
+  arena.bodies.secondary.root.scene=pose(123.f+static_cast<float>(i),456);
+  arena.bodies.main.controls.player.flagsB9C=bankB9C[i];arena.fields.flagB9D0=bankB9D[i];});
+ const auto b9cRead=bank.bindRead(arena.bodies.main.controls.player.flagsB9C);
+ const auto b9dRead=bank.bindRead(arena.fields.flagB9D0);
+ for(std::size_t i=0;i<4;++i){
+  need(bank.read(i,b9cRead)==bankB9C[i],"bank retains each independent B9C byte");
+  need(bank.read(i,b9dRead)==bankB9D[i],"bank retains each independent B9D bit");
+ }
  c::Receipt bankReceipt{};watch=true;
  status=c::applyAtWorldBoundary(bank,owner,arena,bindings,parameters,{{100,101,102,103}},{{0,0,0,0}},order,12,settings,response,bankReceipt);
  watch=false;
  need(status==c::Status::Complete&&bankReceipt.respondedPairs==fourReceipt.respondedPairs,"whole bank contact pass");
  for(std::size_t i=0;i<4;++i)bank.visit(i,[&](){
+  need(arena.bodies.main.controls.player.flagsB9C==bankB9C[i]&&arena.fields.flagB9D0==bankB9D[i],"contact pass and bank switching preserve independent flags");
   need(!std::memcmp(&arena.bodies.main.components.root,&fourOutput[i].physical.body.state,sizeof(RootBodyState48H)),"all bank impulse results match standalone pass");
   const auto untouched=pose(123.f+static_cast<float>(i),456);
   need(!std::memcmp(&arena.bodies.secondary.root.scene,&untouched,sizeof untouched),"secondary body untouched");
@@ -99,7 +110,16 @@ int main(){
  watch=true;status=c::applyAtWorldBoundary(bank,owner,arena,bindings,parameters,{{100,101,102,103}},{{0,0,0,0}},onePair,1,settings,response,bankReceipt);watch=false;
  need(status==c::Status::Complete,"excluded non-Ready racer does not abort participants");
  bank.visit(3,[&](){need(arena.phase==VehicleFramePhase49W::Post354&&
-  !std::memcmp(&stoppedBefore,&arena.bodies.main.components.root,sizeof stoppedBefore),"excluded failed racer unchanged");});
+  !std::memcmp(&stoppedBefore,&arena.bodies.main.components.root,sizeof stoppedBefore),"excluded failed racer unchanged");
+  need(arena.bodies.main.controls.player.flagsB9C==bankB9C[3]&&arena.fields.flagB9D0==bankB9D[3],"excluded failed racer preserves both flag owners");});
+ // Exercise independent scalar changes through the same established bank;
+ // these are storage inputs, not claims of original gameplay producers.
+ bank.visit(1,[&](){arena.bodies.main.controls.player.flagsB9C=0x5au;});
+ need(bank.read(1,b9cRead)==0x5au&&bank.read(1,b9dRead),"banked B9C update preserves set B9D");
+ bank.visit(2,[&](){arena.fields.flagB9D0=false;});
+ need(bank.read(2,b9cRead)==bankB9C[2]&&!bank.read(2,b9dRead),"banked B9D update preserves B9C");
+ need(bank.read(0,b9cRead)==bankB9C[0]&&bank.read(0,b9dRead)==bankB9D[0]&&
+      bank.read(3,b9cRead)==bankB9C[3]&&bank.read(3,b9dRead)==bankB9D[3],"flag updates do not leak into other racer slots");
  std::array<c::Body,8> eight{},eightOutput{};std::array<c::Pair,56> eightOrder{};
  std::size_t eightPairCount=0;
  for(std::size_t i=0;i<8;++i){eight[i]=four[i%4];eight[i].physical.identity=static_cast<std::uint32_t>(200+i);

@@ -227,15 +227,15 @@ inline bool prepare(const TrackNavigation50EU& map,
 
 // Separate HOST policy for a failed decideVehicleImpacts50P. Admit only an
 // actual selected destructive50C target at its real reached frame phase. The
-// thresholdBits/flagsB9D must be exactly those supplied to that native call;
-// reinspection of the unchanged canonical fields must reproduce the receipt.
+// thresholdBits must be exactly that supplied to the native call; reinspection
+// reads the unchanged canonical damage, BA8 and B9D bit0 and reproduces its receipt.
 // Source checkpoint/zone/ground semantics are identical to undertrack recovery,
 // but the NEW vehicle intentionally starts with four zero damage lanes. The old
 // damaged frame is untouched. This is not native wreck/detachment continuation.
 inline bool prepareDamageRecovery(const TrackNavigation50EU& map,
     const TrackNavigationProgress50EU& progress,const VehicleFrameState49W& state,
     const VehicleFrameBindings49W& bindings,const ImpactTransitionResult50C& decision,
-    const VehicleFrameDiagnostic49W& cut,std::uint32_t thresholdBits,std::uint8_t flagsB9D,
+    const VehicleFrameDiagnostic49W& cut,std::uint32_t thresholdBits,
     float lift,const LiveZoneWorld50EN& world,Plan& out,Diagnostic& d) noexcept {
     d={};
     if(std::fegetround()!=FE_TONEAREST||!std::isfinite(lift)||lift<=0.f)
@@ -249,7 +249,9 @@ inline bool prepareDamageRecovery(const TrackNavigation50EU& map,
                            &state.fields.damage7D8,&state.fields.damage7DC};
     for(unsigned i=0;i<4;++i)std::memcpy(input.damage7D0+i,damage[i],4);
     std::memcpy(&input.impactBA8,&state.fields.impactBA0.v[2],4);
-    std::memcpy(&input.threshold50,&thresholdBits,4);input.flagsB9D=flagsB9D;
+    std::memcpy(&input.threshold50,&thresholdBits,4);
+    //225CF8 consumes bit0 only, represented by this same canonical frame owner.
+    input.flagsB9D=static_cast<std::uint32_t>(state.fields.flagB9D0);
     const auto actual=inspectImpactTransition50C(input);
     if(actual.status!=decision.status||actual.sourcePC!=decision.sourcePC||
        actual.vtableSlot!=decision.vtableSlot||actual.originalTarget!=decision.originalTarget)

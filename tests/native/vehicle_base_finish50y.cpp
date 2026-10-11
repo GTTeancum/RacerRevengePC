@@ -32,12 +32,12 @@ int main(int argc,char**argv){try{if(argc!=3)return 2;std::fesetround(FE_TONEARE
   }else{f::require(!okay&&x.diagnostic.error==VehicleFrameError49W::ExternalCut&&x.diagnostic.sourceStage==0x217a40,"active original path stops before write");f::words(&s,&before,sizeof s,"unsupported optional state");f::words(&result,&savedResult,sizeof result,"unsupported optional output");++rejections;}++optionalCases;
  }
  s=base;OptionalProbeOwners50P absent{};OptionalProbeResult50P optional{};x.hot([&]{return optionalProbeVehicleImpacts50P(s,x.bindings,absent,optional,x.workspace,x.diagnostic);},"genuine no-owner fixture branch");const auto ready=s;
- for(unsigned n=0;n<5;++n){s=ready;std::uint32_t threshold=0x7f800001u;std::uint8_t flagsB9D=0;
-  if(n==1)flagsB9D=1;
+ for(unsigned n=0;n<5;++n){s=ready;std::uint32_t threshold=0x7f800001u;s.fields.flagB9D0=false;
+  if(n==1)s.fields.flagB9D0=true;
   if(n>=2){s.fields.damage7D4=1.f;s.fields.impactBA0.v[2]=.2f;threshold=0x3f000000u;}
   if(n==3)s.fields.damage7D0=1.f;if(n==4)threshold=0x7f800001u;
-  const auto before=s;ImpactTransitionInput50C input{};input.damage7D0[0]=s.fields.damage7D0;input.damage7D0[1]=s.fields.damage7D4;input.damage7D0[2]=s.fields.damage7D8;input.damage7D0[3]=s.fields.damage7DC;std::memcpy(&input.impactBA8,&s.fields.impactBA0.v[2],4);std::memcpy(&input.threshold50,&threshold,4);input.flagsB9D=flagsB9D;const auto expected=inspectImpactTransition50C(input);
-  ImpactTransitionResult50C result{};const auto a=::allocations;const bool okay=decideVehicleImpacts50P(s,x.bindings,threshold,flagsB9D,result,x.workspace,x.diagnostic);f::require(::allocations==a,"decision no allocation");f::words(&result,&expected,sizeof result,"canonical transition inputs");
+  const auto before=s;ImpactTransitionInput50C input{};input.damage7D0[0]=s.fields.damage7D0;input.damage7D0[1]=s.fields.damage7D4;input.damage7D0[2]=s.fields.damage7D8;input.damage7D0[3]=s.fields.damage7DC;std::memcpy(&input.impactBA8,&s.fields.impactBA0.v[2],4);std::memcpy(&input.threshold50,&threshold,4);input.flagsB9D=static_cast<std::uint32_t>(s.fields.flagB9D0);const auto expected=inspectImpactTransition50C(input);
+  ImpactTransitionResult50C result{};const auto a=::allocations;const bool okay=decideVehicleImpacts50P(s,x.bindings,threshold,result,x.workspace,x.diagnostic);f::require(::allocations==a,"decision no allocation");f::words(&result,&expected,sizeof result,"canonical transition inputs");
   if(!n){f::require(okay&&s.phase==VehicleFramePhase49W::AfterImpactBlock,"healthy original no-transition route");auto out=before;out.phase=VehicleFramePhase49W::AfterImpactBlock;f::words(&s,&out,sizeof s,"ordinary decision preserves gameplay");f::require(!refreshMainVehicleFrame49W(s,x.bindings,f::cut(PreservingCut49W::BaseAfterGraphicsThroughBA0ResetBeforeChildren),x.workspace,x.diagnostic),"remaining base tail not bypassed");++rejections;
    const auto afterDecision=s;J plainFixture;std::ifstream plainFile(argv[2]);plainFile>>plainFixture;
    for(const auto&row:plainFixture["cases"]){s=afterDecision;PlainEffectOwners50Q owners{};for(unsigned i=0;i<12;++i)owners.slots[i]={row["ids"][i],row["flags"][i]};PlainEffectResult50Q plain{};

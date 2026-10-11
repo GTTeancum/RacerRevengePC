@@ -1,7 +1,9 @@
-// ONE controlled component check, not an end-to-end TA gameplay failure replay.
+// Controlled component checks, not end-to-end TA gameplay failure replays.
 // A finite synthetic world produces a real native50EN failure receipt. That
 // receipt then exercises the HOST policy with native50FL state and actual TA
 // checkpoint/ground assets. No guest Machine, PC client, or ee.bin is used.
+// B9D cases below reach the native damage decision through the existing cold
+// frame fixture and reuse the real TA checkpoint resources for reinspection.
 #include "checkpoint_recovery50fi_fixture.h"
 #include "live_portals50ep_fixture.h"
 #include "runtime_startup50fl_fixture.h"
@@ -97,6 +99,84 @@ static LiveZoneResult50EN realCounterexample() {
              <<"update x=0.25 -> UnsupportedLinkRemoval, transactional state preserved.\n";
     return receipt;
 }
+static void checkB9DCheckpointJoin(const TrackNavigation50EU& map,
+    const TrackNavigationProgress50EU& progress,float lift,const LiveZoneWorld50EN& world) {
+    auto owner=std::make_unique<startup::Fixture>(0);auto& state=owner->state;
+    check(!state.fields.flagB9D0,"B9D checkpoint fixture starts constructor-clear");
+    state.impactSupplement.partnerId=0xffffffffu;
+    // Same explicit no-action/no-effect-owner fixture domain as the existing
+    // post-impact frame test. Advance via native APIs, never assign a phase or
+    // fabricate an unsupported-transition receipt to enter the HOST adapter.
+    FrameReader49K read{};read.packet={128,128,128,128};read.preparedFactor=.016f;
+    read.codes=owner->actionCodes;
+    read.actions={nullptr,+[](void*,std::int32_t,std::uint32_t) noexcept {
+        return PlayerActionResult48X::NoMatch;
+    }};
+    check(readVehicleFrame49W(state,owner->bindings,read,owner->workspace,owner->diagnostic),"B9D fixture native input prefix");
+    PostPlayerAt217DE0_49K post{};post.player=state.bodies.main.controls.player;
+    post.bindingContext.configurationEntryNonzero=true;
+    check(bindVehicleFrame49W(state,owner->bindings,owner->parameters,
+        startup::cut(PreservingCut49W::PlayerAndBaseBefore217DE0),post,
+        owner->workspace,owner->diagnostic),"B9D fixture native control prefix");
+    check(graphicsVehicleFrame49W(state,owner->bindings,owner->parameters,
+        startup::cut(PreservingCut49W::Base2176E0BeforeGraphics),
+        owner->workspace,owner->diagnostic),"B9D fixture native graphics prefix");
+    ImpactConsumerInput49Z consumer{};consumer.managerFlags58=2;consumer.profile34=2;
+    consumer.finalDamageThreshold64=1;VehicleImpactEvents49Z consumerEvents{};
+    check(consumeVehicleImpacts49Z(state,owner->bindings,consumer,consumerEvents,
+        owner->workspace,owner->diagnostic),"B9D fixture native impact consumers");
+    check(consumerEvents.count==0&&consumerEvents.partners.count==0,"B9D fixture has no unconsumed impact events");
+    check(repairVehicleImpacts50A(state,owner->bindings,owner->workspace,owner->diagnostic),"B9D fixture native repair prefix");
+    ImpactEffectsInput50B effects{};effects.models[0].node=owner->bindings.visual.left1BC;
+    effects.models[1].node=owner->bindings.visual.right1B8;
+    effects.models[2].node=effects.models[3].node=SceneNodeIndex49P::none;
+    ImpactEffectsWorkspace50B effectWork{};std::size_t effectCount=0;
+    check(effectsVehicleImpacts50O(state,owner->bindings,effects,effectWork,nullptr,0,
+        effectCount,owner->workspace,owner->diagnostic)&&effectCount==0,"B9D fixture genuine absent-owner effect prefix");
+    OptionalProbeOwners50P absent{};OptionalProbeResult50P optional{};
+    check(optionalProbeVehicleImpacts50P(state,owner->bindings,absent,optional,
+        owner->workspace,owner->diagnostic)&&optional.count==0,"B9D fixture native optional-probe prefix");
+    check(state.phase==VehicleFramePhase49W::PostOptionalProbeEffects50P,"B9D checkpoint phase genuinely reached");
+    // These healthy damage lanes and flag choices are controlled component
+    // inputs, not a claim that a gameplay collision or destruction ran.
+    state.fields.damage7D0=state.fields.damage7D4=state.fields.damage7D8=state.fields.damage7DC=0.f;
+    const auto ready=std::make_unique<VehicleFrameState49W>(state);
+    auto before=std::make_unique<VehicleFrameState49W>(state);
+    auto stale=std::make_unique<VehicleFrameState49W>(state);
+    const std::uint8_t bytes[]={0x00u,0x01u,0x80u,0xffu};
+    for(const auto byte:bytes) {
+        state=*ready;state.bodies.main.controls.player.flagsB9C=byte;
+        state.fields.flagB9D0=false;ImpactTransitionResult50C decision{};
+        check(decideVehicleImpacts50P(state,owner->bindings,0x3f800000u,decision,
+            owner->workspace,owner->diagnostic)&&decision.status==ImpactTransitionStatus50C::noTransition,
+            "checkpoint fixture B9C alone cannot select destruction");
+        state=*ready;state.bodies.main.controls.player.flagsB9C=byte;state.fields.flagB9D0=true;
+        *before=state;
+        check(!decideVehicleImpacts50P(state,owner->bindings,0x3f800000u,decision,
+            owner->workspace,owner->diagnostic),"canonical B9D reaches actual unsupported decision");
+        check(decision.status==ImpactTransitionStatus50C::unsupportedTransition&&decision.sourcePC==0x225d10&&
+            decision.vtableSlot==0x88&&decision.originalTarget==0x2261b0&&
+            owner->diagnostic.error==VehicleFrameError49W::ExternalCut&&owner->diagnostic.sourceStage==0x225d10,
+            "B9D checkpoint uses the real225D10 receipt and diagnostic");
+        const auto cut=owner->diagnostic;
+        same(state,*before,"unsupported B9D decision preserves its complete canonical frame");
+        recovery::Plan plan{};recovery::Diagnostic diagnostic{};
+        check(recovery::prepareDamageRecovery(map,progress,state,owner->bindings,decision,cut,
+            0x3f800000u,lift,world,plan,diagnostic),"canonical B9D reinspection accepts genuine decision");
+        check(plan.prepared&&plan.policy==recovery::Policy::DamageFreshVehicle,"B9D still selects separate HOST fresh-vehicle policy");
+        same(plan.damageDecision,decision,"checkpoint retains exact unsupported destruction receipt");
+        same(plan.progress,progress,"B9D checkpoint preserves actual navigation");
+        same(state,*before,"checkpoint reinspection does not clear B9D or change the stopped native frame");
+        *stale=state;stale->fields.flagB9D0=false;
+        const auto savedPlan=plan;
+        check(!recovery::prepareDamageRecovery(map,progress,*stale,owner->bindings,decision,cut,
+            0x3f800000u,lift,world,plan,diagnostic)&&diagnostic.error==recovery::Error::DamageDecision,
+            "stale225D10 receipt rejects when canonical B9D is now clear");
+        same(plan,savedPlan,"rejected canonical B9D reinspection preserves checkpoint output");
+        same(state,*before,"stale negative case leaves authentic stopped frame untouched");
+    }
+    std::cout<<"B9D checkpoint join: 8 native tail cases, 4 actual-receipt preparations, 4 stale-bit rejections; unsupported225D10 retained.\n";
+}
 int main() {try {
     check(std::fesetround(FE_TONEAREST)==0,"round-to-nearest");
     const auto receipt=realCounterexample();
@@ -183,6 +263,7 @@ int main() {try {
     wrong=receipt;wrong.registryStatus=SearchStorageStatus50BS::GrowthBoundary;
     reject(state,wrong,recovery::Error::PortalDecision);
     same(state,*originalState,"all policy checks preserve old frame");same(progress,originalProgress,"all policy checks preserve old navigation");
+    checkB9DCheckpointJoin(*map,progress,scene.lift,world);
     std::cout<<"TA checkpoint anchor="<<plan.selection.anchorNode<<" next="<<plan.selection.selectedNextNode
              <<" zone="<<plan.primaryZone<<" grounded="<<grounded.v[12]<<','<<grounded.v[13]<<','<<grounded.v[14]
              <<" ground_attempts="<<groundAttempts<<" candidates="<<groundCandidates<<'\n';

@@ -458,14 +458,14 @@ DynamicImpactState50IW dynamicImpactState50IW(const S&s,const BasePoseHistorySta
  n.vehicleCFC=f.vehicleCFC;n.vehicleD00=f.vehicleD00;n.fieldD04=z.fieldD04;
  n.timerD2CBits=h.timerD2C;n.markerD30=h.markerD30;n.partnerId=z.partnerId;n.partnerState=z.partnerState;
  n.partnerTimer08=z.partnerTimer08;n.partnerAmount0C=z.partnerAmount0C;n.partnerDuration10=f.objectD34_10;
- n.flagsB9D=static_cast<std::uint8_t>(s.bodies.main.controls.player.flagsB9C>>8u);return n;
+ n.flagB9D0=f.flagB9D0;return n;
 }
 void installDynamicImpactState50IW(S&s,BasePoseHistoryState50Y&h,const DynamicImpactState50IW&n) noexcept {
  auto&f=s.fields;auto&z=s.impactSupplement;
  f.vehicleCFC=n.vehicleCFC;f.vehicleD00=n.vehicleD00;z.fieldD04=n.fieldD04;
  h.timerD2C=n.timerD2CBits;h.markerD30=n.markerD30;z.partnerId=n.partnerId;z.partnerState=n.partnerState;
  z.partnerTimer08=n.partnerTimer08;z.partnerAmount0C=n.partnerAmount0C;f.objectD34_10=n.partnerDuration10;
- auto&flags=s.bodies.main.controls.player.flagsB9C;flags=(flags&~0xff00u)|(static_cast<std::uint32_t>(n.flagsB9D)<<8u);
+ f.flagB9D0=n.flagB9D0;
 }
 DynamicVehicleImpactStatus50IW finishDynamicImpact50IW(S&s,BasePoseHistoryState50Y&h,
  DynamicVehicleImpactCursor50IW&call,const DynamicImpactResult50IW&result,
@@ -683,13 +683,15 @@ bool optionalProbeVehicleImpacts50P(S&s,const VehicleFrameBindings49W&b,const Op
  if(result.status!=OptionalProbeStatus50P::Complete)return fail(d,result.status==OptionalProbeStatus50P::Arithmetic?E::Arithmetic:result.status==OptionalProbeStatus50P::Binding?E::Admission:E::ExternalCut,result.sourcePC);
  commit(s,w,P::PostOptionalProbeEffects50P);output=result;return true;
 }
-bool decideVehicleImpacts50P(S&s,const VehicleFrameBindings49W&b,std::uint32_t thresholdBits,std::uint8_t flagsB9D,
+bool decideVehicleImpacts50P(S&s,const VehicleFrameBindings49W&b,std::uint32_t thresholdBits,
  ImpactTransitionResult50C&decision,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(overlap(&decision,sizeof decision,&s,sizeof s)||overlap(&decision,sizeof decision,&w,sizeof w)||overlap(&decision,sizeof decision,&d,sizeof d)||overlap(&decision,sizeof decision,&b,sizeof b))return false;
  if(!start(s,b,P::PostOptionalProbeEffects50P,w,d))return false;
  auto&r=w.next;ImpactTransitionInput50C input{};
  const float*damage[]={&r.fields.damage7D0,&r.fields.damage7D4,&r.fields.damage7D8,&r.fields.damage7DC};for(unsigned i=0;i<4;++i)std::memcpy(input.damage7D0+i,damage[i],4);
- std::memcpy(&input.impactBA8,&r.fields.impactBA0.v[2],4);std::memcpy(&input.threshold50,&thresholdBits,4);input.flagsB9D=flagsB9D;
+ std::memcpy(&input.impactBA8,&r.fields.impactBA0.v[2],4);std::memcpy(&input.threshold50,&thresholdBits,4);
+ //225CF8 consumes bit0 only: this is a bit representative, not a raw B9D byte.
+ input.flagsB9D=static_cast<std::uint32_t>(r.fields.flagB9D0);
  RR_VEHICLE_FRAME49W_STAGE(0x228904);decision=inspectImpactTransition50C(input);
  if(decision.status!=ImpactTransitionStatus50C::noTransition)return fail(d,decision.status==ImpactTransitionStatus50C::arithmetic?E::Arithmetic:E::ExternalCut,decision.sourcePC);
  return commit(s,w,P::AfterImpactBlock);

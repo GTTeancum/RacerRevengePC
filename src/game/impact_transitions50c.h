@@ -4,7 +4,9 @@ namespace rr::game {
 struct ImpactTransitionInput50C {
     float damage7D0[4]; // Ascending7D0,7D4,7D8,7DC, actual canonical damage.
     float impactBA8, threshold50; // BA0.Z and actual vehicle50, not defaults.
-    std::uint32_t flagsB9D; // Actual canonical player flag byte.
+    // Only source B9D bit0 is consumed. A canonical bit-only owner may supply
+    // 0/1 here as its representative; this projection does not own a raw byte.
+    std::uint32_t flagsB9D;
 };
 enum class ImpactTransitionStatus50C : std::uint32_t { noTransition, unsupportedTransition, arithmetic };
 struct ImpactTransitionResult50C {

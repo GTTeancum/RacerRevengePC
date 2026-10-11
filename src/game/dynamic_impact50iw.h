@@ -11,7 +11,7 @@
 namespace rr::game {
 
 // All records below are bounded call projections of existing canonical owners.
-// They must never become an alternative persistent D34/D28/pose-history owner.
+// They must never become an alternative persistent D34/D28/B9D0/pose-history owner.
 // Peer observations are freshly collected at this racer's serial impact point.
 struct DynamicImpactPeer50IW {
     bool present=false;
@@ -34,7 +34,8 @@ struct DynamicImpactState50IW {
     std::uint32_t timerD2CBits=0,markerD30=0xffffffffu;
     std::uint32_t partnerId=0xffffffffu,partnerState=0;
     float partnerTimer08=0,partnerAmount0C=0,partnerDuration10=0;
-    std::uint8_t flagsB9D=0;
+    // Bit-only projection of the canonical frame owner; upper bits absent.
+    bool flagB9D0=false;
 };
 struct DynamicImpactSelf50IW {
     std::uint32_t vehicle58=0;
@@ -385,7 +386,7 @@ inline DynamicImpactResult50IW podSeverity(
         }
         chosen=f.mul(chosen,multiplier,0x2226fcu);
         if(in.profile.game34!=2&&in.profile.game10FE0!=0)
-            s.flagsB9D=std::uint8_t(s.flagsB9D|1u);
+            s.flagB9D0=true; //222714..222728 sets only source B9D bit0.
     }
     const float remainingShare=f.sub(1.0f,s.partnerAmount0C,0x22273cu);
     const float remainingDefense=f.sub(1.0f,in.self.reductionCF0,0x22274cu);

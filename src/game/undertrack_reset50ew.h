@@ -58,6 +58,7 @@ UndertrackResetResult50EW placeInitialUndertrackPhysics50EW(VehicleFrameState49W
 // span/output. Uses50BA's real dirty-descendant domain; never coerces cache bits.
 // Applies source scene/bounds order, main reset, prior7B0/850, real50BK effect
 // stops/timer clears and final canonicalD28 clear. Secondary pose stays lazy.
+// a1=0 skips2173E8..2173F4: canonical fields.flagB9D0 is preserved.
 // Requires unchanged X/Z from placement and probe's actual lift/terminal state.
 // All outputs commit together. Workspace may change on error. No frame advance.
 UndertrackResetResult50EW finishUndertrackPhysics50EW(VehicleFrameState49W&,

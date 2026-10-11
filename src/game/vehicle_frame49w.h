@@ -81,6 +81,10 @@ struct VehicleFrameFields49W {
     float defenseCF0; // current authored/profile-selected Defense, not a default
     float repairCF4; // current authored/profile-selected BaseRepairAmount
     std::uint8_t impactFlagsCD8;
+    // Sole source B9D bit0 owner; constructor20F658 clears this bit only.
+    // Upper B9D bits are unrepresented, not assumed zero. Ordinary a1=0
+    // reset216A30 preserves it; only a reached2173F4 full-reset store clears it.
+    bool flagB9D0=false;
     // Native admission receipt set only by the original-AI cold/runtime join.
     bool nativeAiOwnersBound50IV=false;
     // Exact dynamic-contact registry/list/runtime join, independent of AI role.
@@ -340,14 +344,14 @@ bool effectsVehicleImpacts50O(VehicleFrameState49W&,const VehicleFrameBindings49
 bool optionalProbeVehicleImpacts50P(VehicleFrameState49W&,const VehicleFrameBindings49W&,
  const OptionalProbeOwners50P&,OptionalProbeResult50P&,VehicleFrameWorkspace49W&,
  VehicleFrameDiagnostic49W&) noexcept;
-// Executes ordinary225C50. Damage and BA8 derive from canonical frame owners.
-// B9D is a separate byte, absent from the legacy frame; its sole current owner
-// is explicit here. It must not be inferred from the eight-bit B9C input field.
+// Executes ordinary225C50. Damage, BA8 and source B9D bit0 derive from
+// canonical frame owners. fields.flagB9D0 is independent of eight-bit B9C;
+// unrepresented B9D upper bits are not consumed by this decision.
 // Threshold50 is an explicit live raw word, not a guessed default. Diagnostic
 // decision may change on rejection; frame does not. A selected gameplay handler
 // remains unsupported and is never emitted as a deferred effect/backend event.
 bool decideVehicleImpacts50P(VehicleFrameState49W&,const VehicleFrameBindings49W&,
- std::uint32_t liveThresholdBits50,std::uint8_t liveFlagsB9D,ImpactTransitionResult50C&,VehicleFrameWorkspace49W&,
+ std::uint32_t liveThresholdBits50,ImpactTransitionResult50C&,VehicleFrameWorkspace49W&,
  VehicleFrameDiagnostic49W&) noexcept;
 
 // Ordinary228B40 attachment-null branch. Current effects flags must be refreshed

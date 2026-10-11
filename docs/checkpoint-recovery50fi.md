@@ -217,13 +217,15 @@ the unsupported transition receipt as an executable native event.
 
 ```cpp
 prepareDamageRecovery(*navigationMap, navigationProgress, s, x.bindings,
-                      decision, x.diagnostic, thresholdBits, flagsB9D,
+                      decision, x.diagnostic, thresholdBits,
                       ground.lift, liveWorld, next, diagnostic);
 ```
 
-`thresholdBits` and `flagsB9D` must be exactly the arguments supplied to the
-failed `decideVehicleImpacts50P` call. The current client uses `0x3f800000u` and
-`0`. The adapter requires all of:
+`thresholdBits` must be exactly the argument supplied to the failed
+`decideVehicleImpacts50P` call; the current client uses `0x3f800000u`. Both
+operations read B9D bit 0 from the same unchanged `state.fields.flagB9D0` owner.
+The integer passed to the decision leaf is only a bit-0 representative, not a
+recovered raw B9D byte. The adapter requires all of:
 
 - Frame phase `PostOptionalProbeEffects50P`, the actual phase preserved by that
   failed native call

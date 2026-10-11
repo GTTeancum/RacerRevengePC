@@ -1848,7 +1848,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  OptionalProbeOwners50P optionalOwners{}; // Development topology has no optional dust owner.
  OptionalProbeResult50P optional{};
  runNative([&]{return optionalProbeVehicleImpacts50P(s,x.bindings,optionalOwners,optional,x.workspace,x.diagnostic);},"explicit absent optional dust-owner context");runNative([&]{return consumeEffects(optional.events,optional.count);},"consume dust stop controls");ImpactTransitionResult50C decision{};
- const bool damageReady=decideVehicleImpacts50P(s,x.bindings,0x3f800000u,0,
+ const bool damageReady=decideVehicleImpacts50P(s,x.bindings,0x3f800000u,
      decision,x.workspace,x.diagnostic);
  if(!damageReady&&x.diagnostic.error==VehicleFrameError49W::ExternalCut&&
     decision.status==ImpactTransitionStatus50C::unsupportedTransition){
@@ -1863,7 +1863,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
   BodyMatrix48G groundedCheckpoint{};
   const bool prepared=recovery50FI::prepareDamageRecovery(*navigationMap,navigationProgress,s,
-      x.bindings,decision,x.diagnostic,0x3f800000u,0,x.parameters.visual.verticalLimit7EC,liveWorld,
+      x.bindings,decision,x.diagnostic,0x3f800000u,x.parameters.visual.verticalLimit7EC,liveWorld,
       nextCheckpoint,recoveryDiagnostic);
   const bool grounded=prepared&&recovery50FI::resolveGround(ground,nextCheckpoint,16,0,
       groundStack.data(),groundStack.size(),groundedCheckpoint,recoveryDiagnostic);
