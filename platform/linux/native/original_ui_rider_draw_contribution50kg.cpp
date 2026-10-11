@@ -46,7 +46,7 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
     if(same(pass.microprogram,"ScreenObject")){assets::OriginalUiNativeMaterial50KG policy{};
         return assets::prepareOriginalUiNativeMaterial50KG(pass,*texture,policy,d.materialDetail)&&
             convertOriginalUiMaterialSpan50KG(policy,range,output);}
-    if(same(pass.textureName,"19_shdw")){assets::OriginalUiRider19ShadowMaterial50KM policy{};
+    if(same(pass.textureName,"19_shdw")||same(pass.textureName,"20_shdw")){assets::OriginalUiRider19ShadowMaterial50KM policy{};
         return assets::prepareOriginalUiRider19ShadowMaterial50KM(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19ShadowMaterialSpan50KM(policy,images,range,output);}
     if(same(pass.microprogram,"SpecularMapCompressed")){assets::OriginalUiRider19SpecularMaterial50KM policy{};

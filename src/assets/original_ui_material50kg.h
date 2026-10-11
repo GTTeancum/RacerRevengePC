@@ -338,7 +338,8 @@ bool prepareOriginalUiRiderWindowMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRiderWindowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
-// Exact original19_shdw pass1 and its authenticated128x128 indexed image.
+// Exact original19_shdw/20_shdw pass1 and each PSM's own authenticated128x128
+// indexed image. The legacy19 API name remains; no other shadow is admitted.
 // ALPHA=(2,1,0,1) subtracts Cd*As/128 from Cd; it does not blend shadow RGB.
 // Preserve source fog, alpha GREATER0, reverse-Z GEQUAL and depth writes.
 // The ordinary indexed/lit entry stays closed to this blend. Only the sealed
@@ -354,7 +355,9 @@ bool prepareOriginalUiRider19ShadowMaterial50KM(const OriginalUiMaterialPass50KG
     OriginalUiRider19ShadowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
 // Successful result names the exact published one-map specmap1 image and the
-// unchanged source pass. Only original19_1,19_2 and pod_wndw pass2 are admitted.
+// unchanged source pass. Only original19_1,19_2,20_1,20_2 and pod_wndw pass2
+// are admitted under this legacy19 API name. No dormant character pass2 or
+// unreferenced20_4 pass is admitted; body20 requires its real fog/ATE/GEQUAL.
 // Destination-alpha and FIX255 policies are accepted solely by the separate
 // sealed source-RGBA frame route; ordinary RGB-only span conversion rejects.
 struct OriginalUiRider19SpecularMaterial50KM {
