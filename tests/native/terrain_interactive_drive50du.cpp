@@ -3282,17 +3282,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   // Opt-in host observations only; each receipt is bounded to this session.
   bool firstMainPollReported=false,firstMainActivityGateReported=false;
+  bool secondMainPollReported=false,firstMainInactiveReported=false;
   for(;;){
    phase_timing50GK::Scope inputTiming(phaseTiming,phase_timing50GK::Phase::Input);
    const bool traceFirstMainPoll=originalMainApplication.enabled&&originalMain.traceStages&&
        !firstMainPollReported;
+   const bool traceSecondMainPoll=originalMainApplication.enabled&&originalMain.traceStages&&
+       firstMainPollReported&&!secondMainPollReported;
    if(traceFirstMainPoll){
     firstMainPollReported=true;
     std::cerr<<"original_ui_first_poll {\"phase\":\"enter\"}\n";
+   }else if(traceSecondMainPoll){
+    secondMainPollReported=true;
+    std::cerr<<"original_ui_second_poll {\"phase\":\"enter\"}\n";
    }
    const bool polled=host.poll(hostInput,hostDiagnostic);
    if(traceFirstMainPoll)
     std::cerr<<"original_ui_first_poll {\"phase\":\"return\",\"okay\":"
+        <<(polled?"true":"false")<<"}\n";
+   else if(traceSecondMainPoll)
+    std::cerr<<"original_ui_second_poll {\"phase\":\"return\",\"okay\":"
         <<(polled?"true":"false")<<"}\n";
    if(!polled){
     reportHost50DU(hostDiagnostic);throw std::runtime_error("window event pump failed");
@@ -3325,12 +3334,35 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<",\"host_paused\":"<<(originalMain.hostPaused?"true":"false")
          <<",\"active\":"<<(active?"true":"false")<<"}\n";
     }
+    // At most eight receipts for the first inactive iteration, plus the two
+    // second-poll receipts above. Logging never supplies a source-clock value.
+    const bool traceFirstMainInactive=originalMain.traceStages&&!active&&!firstMainInactiveReported;
+    if(traceFirstMainInactive){
+     firstMainInactiveReported=true;
+     std::cerr<<"original_ui_first_inactive_step {\"step\":\"sample_clock\",\"phase\":\"enter\"}\n";
+    }
     const auto mainClock=originalMain.sampleClock(applicationClock,active);
+    if(traceFirstMainInactive){
+     std::cerr<<"original_ui_first_inactive_step {\"step\":\"sample_clock\",\"phase\":\"return\"}\n";
+     std::cerr<<"original_ui_first_inactive_step {\"step\":\"audio_pause\",\"phase\":\"enter\"}\n";
+    }
     originalMain.audioOutput.pause(!active);
+    if(traceFirstMainInactive)
+     std::cerr<<"original_ui_first_inactive_step {\"step\":\"audio_pause\",\"phase\":\"return\"}\n";
     if(!active){
      // Focus/pause time is not fed back as animation or world catch-up.
-     originalMain.lastUpdateNanoseconds=0;captureCommitted();
-     std::this_thread::sleep_for(std::chrono::milliseconds(8));continue;
+     originalMain.lastUpdateNanoseconds=0;
+     if(traceFirstMainInactive)
+      std::cerr<<"original_ui_first_inactive_step {\"step\":\"capture_committed\",\"phase\":\"enter\"}\n";
+     captureCommitted();
+     if(traceFirstMainInactive){
+      std::cerr<<"original_ui_first_inactive_step {\"step\":\"capture_committed\",\"phase\":\"return\"}\n";
+      std::cerr<<"original_ui_first_inactive_step {\"step\":\"sleep_8ms\",\"phase\":\"enter\"}\n";
+     }
+     std::this_thread::sleep_for(std::chrono::milliseconds(8));
+     if(traceFirstMainInactive)
+      std::cerr<<"original_ui_first_inactive_step {\"step\":\"sleep_8ms\",\"phase\":\"return\"}\n";
+     continue;
     }
     const auto inputRoute=originalMain.coordinator.snapshot().route;
     const bool gameOptionsInput=inputRoute.screen==12&&inputRoute.page==4;
