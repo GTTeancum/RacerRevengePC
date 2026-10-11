@@ -82,6 +82,7 @@ public:
         std::array<Body,maxRacers> staged{};
         std::memcpy(staged.data(),input,count*sizeof(Body));
         std::array<ProcessedList,maxRacers> processed{};Receipt result{};
+        result.normalModeWrite.bound=true; // prepared main690 query owners, including zero-pair pass
         for(std::size_t p=0;p<pairCount;++p){
             const auto a=order[p].primary,b=order[p].other;
             auto& primary=staged[a].physical;auto& other=staged[b].physical;
@@ -110,6 +111,7 @@ public:
             for(unsigned k=0;k<3;++k)query.sphere.center.v[k]=sphere.center.v[k];
             query.queryScene={primary.identity};query.collisionTypeTag=1;query.groupTypeTag=2;
             query.callbackEnabled=false;
+            query.normalMode54=0u;query.normalMode54Bound=true; // authentic main690 constructor21219C/11BBEC
             Type2StaticInitial49X initial{};initial.pairs=emptyPairs_.data();initial.metadata=emptyMetadata_.data();
             initial.pairSlots=resource.rayCount;
             Type2StaticWorkspace49X workspace{scratchPairs_.data(),scratchPairs_.size(),scratchMetadata_.data(),scratchMetadata_.size(),
@@ -118,6 +120,9 @@ public:
             Type2StaticResult49X geometry{};
             if(produceStaticType2Contacts49X(query,&candidate_,1,initial,workspace,destination,geometry)!=Type2StaticStatus49X::Complete)
                 return Status::GeometryRejected;
+            if(!geometry.normalModeWrite.bound)return Status::GeometryRejected;
+            result.normalModeWrite.bound=true;
+            if(geometry.normalModeWrite.reached)result.normalModeWrite=geometry.normalModeWrite;
             if(!geometry.hasGeometryHit)continue;
             ++result.geometryPairs;
             // 294C34 checks PRIMARY's +238 list. A prior accepted query by the

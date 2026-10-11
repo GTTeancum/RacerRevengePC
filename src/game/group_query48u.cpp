@@ -124,6 +124,8 @@ struct Run {
             if(!ref(object.shape0,groups.shapeCount))return Status::InvalidInput;
             mesh=groups.shapes[object.shape0-1].mesh;matrix=&b.shapes[object.shape0-1].composed00;
         }
+        // Same126FA0 writer, after actual group/direct eligibility.
+        recordCollisionNormalMode50JA(result.normalModeWrite,input.normalMode);
         bool hit=false;
         const auto status=detail::dispatchType3Borrowed48U(input,context,candidate,sphere(state),mesh,*matrix,object.hasShape,
             b.rays,workspace.treeStack,workspace.treeStackCapacity,result.state,hit);
@@ -194,7 +196,7 @@ struct Run {
         return Status::Complete;
     }
     Status run() noexcept {
-        result.state=input.initial;result.spring=context.spring;
+        result.normalModeWrite.bound=input.normalModeBound50JA;result.state=input.initial;result.spring=context.spring;
         result.currentCandidate=input.initialQueryCurrent;result.queryFlags=input.filter.flagsF8;
         result.candidateCount=groups.outerCount;springCategory=input.initialSpringCurrentCategory;
         if(context.resetSpring)resetSpringRecords48N(result.spring);

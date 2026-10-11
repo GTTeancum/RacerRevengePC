@@ -279,8 +279,9 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
     Type2StaticResult49X& output) noexcept {
     const auto checked=validate(query,candidates,ownerCount,indices,count,initial,w,d,output);
     if(checked!=Status::Complete)return checked;
+    if(query.normalMode54!=0u)return Status::UnsupportedScope;
     const auto& resource=*query.resource;
-    Type2StaticResult49X result{};std::memcpy(&result.selected,&initial.selected,sizeof(result.selected));result.selected.fraction=1.f;
+    Type2StaticResult49X result{};result.normalModeWrite.bound=query.normalMode54Bound;std::memcpy(&result.selected,&initial.selected,sizeof(result.selected));result.selected.fraction=1.f;
     result.selected.first={{0.f,0.f,0.f,1.f}};result.selected.second={{0.f,0.f,0.f,1.f}};
     result.records=initial.records;if(query.resetRecordsBefore)resetSpringRecords48N(result.records);
     std::memcpy(w.pairs,initial.pairs,initial.pairSlots*sizeof(*w.pairs));
@@ -311,6 +312,9 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
         if((!sphereOverlap&&!(candidate.shapeType==5&&query.nativeGateHasPrevious))||
            !filter(*query.filter,c.filter))continue;
         if(c.geometry.id!=c.filter.identity)return Status::InvalidInput;
+        //121438 follows the genuine outer sphere/filter gate and precedes
+        // target-shape dispatch, including a later coarse/triangle miss.
+        recordCollisionNormalMode50JA(result.normalModeWrite,query.normalMode54);
         bool candidateHit=false;
         const auto visitMesh=[&](const assets::CollisionMesh48I& mesh,const BodyMatrix48G& worldMatrix,
             const float* radii) noexcept -> Status {

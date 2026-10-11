@@ -277,7 +277,7 @@ Type3QueryStatus48P queryStaticType3WithContextBounded48P(const Type3QueryInput4
         }
     }
     copyRays(source.rays,scratch.rays);copy(scratch.records,source.records,source.recordCount);
-    Type3QueryResult48P result{};result.state=input.initial;result.spring=context.spring;
+    Type3QueryResult48P result{};result.normalModeWrite.bound=input.normalModeBound50JA;result.state=input.initial;result.spring=context.spring;
     result.currentCandidate=input.initialQueryCurrent;result.queryFlags=input.filter.flagsF8;result.candidateCount=count;
     if(!direct){
         if(context.resetSpring)resetSpringRecords48N(result.spring);
@@ -305,6 +305,8 @@ Type3QueryStatus48P queryStaticType3WithContextBounded48P(const Type3QueryInput4
             if(sphere!=Status::Complete)return sphere;
             if(!overlap||!eligible(input.filter,c.filter,c.filter.flagsF8))continue;
         }
+        //126FA0 is reached at dispatch entry before flags31/inner sphere.
+        recordCollisionNormalMode50JA(result.normalModeWrite,input.normalMode);
         bool hit=false;const auto queried=dispatch(input,context,candidates[i],scratch.rays,workspace.treeStack,
             workspace.treeStackCapacity,result.state,hit);
         if(queried!=Status::Complete)return queried;

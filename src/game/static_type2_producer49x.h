@@ -1,5 +1,6 @@
 #pragma once
 #include "type2_resource49x.h"
+#include "collision_normal_mode50ja.h"
 #include "compound_collision50ij.h"
 #include "spring_query48n.h"
 #include "gate_trigger_action50kg.h"
@@ -35,6 +36,9 @@ struct Type2StaticQuery49X {
     // the preceding accepted per-racer matrix before preparing the current one.
     bool nativeGatePolicy=false,nativeGateHasPrevious=false;
     BodyMatrix48G nativeGatePreviousWorld{};
+    // Actual shape+54. The retained producer admits only its existing mode0 seam.
+    std::uint32_t normalMode54=0;
+    bool normalMode54Bound=false; // legacy numeric-only calls publish no source owner
 };
 struct Type2StaticCandidate49X {
     SpringStaticCandidate48N candidate;
@@ -85,6 +89,7 @@ struct Type2StaticResult49X {
     std::uint32_t currentCandidateIdentity=0;
     std::uint8_t queryFlagsF8=0;
     bool hasGeometryHit=false;
+    CollisionNormalModeWrite50JA normalModeWrite{};
 };
 enum class Type2StaticStatus49X { Complete,InvalidInput,UnsupportedScope,InsufficientCapacity };
 // Original type2/mode0 numerical seam, explicit ordered static0/compound1 owners and

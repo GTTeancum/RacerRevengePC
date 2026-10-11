@@ -178,7 +178,10 @@ inline bool prepare(Owner& out,const Type2StaticQuery49X& main690,
     staged.initial.segment.worldMatrix=detail::identity();
     //1B106C..1B1098: initial normal170=up; prior normal190 and point180=zero.
     staged.initial.terrain.surface.normal170={{0,1,0}};
-    auto& q=staged.metadata;q.filter.identity=binding.identity;q.filter.categoryA4=0;q.filter.acceptMaskB8=0xffffffffu;
+    auto& q=staged.metadata;
+    //1B1468/1B16CC pass1 to11C3F0;11C524 stores the actual348 shape+54.
+    q.normalMode54=1u;q.normalMode54Bound=true;
+    q.filter.identity=binding.identity;q.filter.categoryA4=0;q.filter.acceptMaskB8=0xffffffffu;
     q.filter.flags31=static_cast<std::uint8_t>((binding.flags31&0xf0u)|3u);
     q.filter.flagsF8=static_cast<std::uint8_t>((binding.preservedFlagsF8&0xc0u)|6u);
     q.filter.identityLists[0].mode=q.filter.identityLists[1].mode=1;q.filter.categoryModeD4=0;q.filter.categoryMasks.push_back(binding.floorCategory);

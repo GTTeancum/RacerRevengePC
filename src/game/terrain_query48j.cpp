@@ -50,7 +50,8 @@ TerrainQueryStatus48J queryTerrainLimited48J(const TerrainQuery48J& query,
     const TerrainCandidate48J* candidates,std::size_t count,TerrainQueryResult48J& output) noexcept {
     if((count&&!candidates)||query.prepared.collectedCount>16||!finite(query.sphere)||
        !finite(query.prepared.surface.point150)||!finite(query.prepared.surface.normal170))return TerrainQueryStatus48J::InvalidInput;
-    TerrainQueryResult48J result{};
+    if(query.normalMode54!=1u)return TerrainQueryStatus48J::UnsupportedScope;
+    TerrainQueryResult48J result{};result.normalModeWrite.bound=query.normalMode54Bound;
     try {
         result.terrain=query.prepared;result.queryFlagsF8=static_cast<std::uint8_t>((query.filter.flagsF8|0x10u)&~0x20u);
         result.candidates.reserve(count);
@@ -70,6 +71,7 @@ TerrainQueryStatus48J queryTerrainLimited48J(const TerrainQuery48J& query,
             if(!overlap||!filter(query.filter,c.filter))continue;
             if(c.geometry.id!=c.filter.identity)return TerrainQueryStatus48J::InvalidInput;
             if(c.shapeType!=0)return TerrainQueryStatus48J::UnsupportedScope; // bounded48M supplies compound1
+            recordCollisionNormalMode50JA(result.normalModeWrite,query.normalMode54);
             CollisionResult48I hit{};
             const auto status=queryOrderedCollision48I(query.segment,&c.geometry,1,hit);
             if(status==CollisionQueryStatus48I::InvalidInput)return TerrainQueryStatus48J::InvalidInput;

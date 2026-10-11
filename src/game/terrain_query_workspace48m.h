@@ -15,6 +15,7 @@ struct TerrainQueryResult48M {
     bool hasGeometryHit=false;
     struct { CollisionContact48I selected,nearestPair; } collision;
     std::size_t candidateCount=0;
+    CollisionNormalModeWrite50JA normalModeWrite{};
 };
 enum class TerrainQueryStatus48M {
     Complete,InvalidInput,UnsupportedScope,UnsupportedInterpolationBoundary,InsufficientCapacity
@@ -31,6 +32,8 @@ struct TerrainQueryView48M {
     const std::array<float,4>& copied50;
     std::uint8_t collisionTypeTag,groupTypeTag;
     bool terrainCallbackEnabled;
+    std::uint32_t normalMode54=1;
+    bool normalMode54Bound=false;
 };
 TerrainQueryStatus48M queryTerrainViewBounded48M(const TerrainQueryView48M&,
     const TerrainCandidate48J*,std::size_t,const TerrainQueryWorkspace48M&,
