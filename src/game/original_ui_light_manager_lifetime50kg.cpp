@@ -69,11 +69,11 @@ bool OriginalUiLightManagerLifetime50KG::publishRiderRegistry(const OriginalUiRi
         return fail(d,Error::registry,0x148F30);
     for(float x:lighting.directionalLook78)if(!std::isfinite(x))return fail(d,Error::registry,0x147200);
     original_racer_lighting50KM::SmallDirectionalRegistry next{};
-    next.count=2;next.registered[0].type=4;next.registered[0].diffuse3C=lighting.ambient50;
-    next.registered[0].specular4C=lighting.ambient50;
+    next.count=2;next.registered[0].type=4;next.registered[0].diffuse3C={lighting.ambient50[0],lighting.ambient50[1],lighting.ambient50[2]};
+    next.registered[0].specular4C=next.registered[0].diffuse3C;
     auto& directional=next.registered[1];directional.type=2;
-    directional.direction78=lighting.directionalLook78;directional.diffuse3C=lighting.directional3C;
-    directional.specular4C=lighting.directional3C; //146C40 mirrors3C into4C.
+    directional.direction78=lighting.directionalLook78;directional.diffuse3C={lighting.directional3C[0],lighting.directional3C[1],lighting.directional3C[2]};
+    directional.specular4C=directional.diffuse3C; //146C40 mirrors3C into4C.
     next.selectedZoneAmbient=lighting.ambientSlot60;
     riderRegistry_=next;riderRegistryReady_=true;return true;
 }
