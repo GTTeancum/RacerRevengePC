@@ -23,13 +23,14 @@ ASSETS = Path('/workspace/shared/recovery-20261010/native-assets-prepared-01')
 UI_ROOT = Path('/workspace/shared/recovery-20261010/ui-inputs/game-files')
 AUDIO_ROOT = Path('/workspace/shared/recovery-20261010/asset-inputs/extracted/RacerRevenge-original-AUDIO/AUDIO')
 CORPUS = Path('evidence/staticType2Producer49X/original-word/native-fixtures.json')
-EARLIEST = dt.datetime(2026, 10, 11, 5, 19, 42, 970824, tzinfo=dt.timezone.utc)
+EARLIEST = dt.datetime(2026, 10, 11, 6, 21, 12, tzinfo=dt.timezone.utc)
 PPM_HEADER = b'P6\n640 448\n255\n'
 PPM_BYTES = len(PPM_HEADER) + 640 * 448 * 3
 MAX_LOG = 32 * 1024 * 1024
 MAX_EVENTS = 64 * 1024 * 1024
 MAX_FRAME_LOG = 16 * 1024 * 1024
 MAX_LINE = 256 * 1024
+MAX_TERMINAL_TEXT = 8192
 MAX_CAPTURES = 920
 MAX_STDIN_BYTES = 16384
 WINDOW_NS = 30_000_000_000
@@ -157,6 +158,14 @@ class Recorder:
         self.ready = self.closed = self.last_state = self.first_frame = self.last_frame = None
         self.pending = None; self.last_request = None
         self.requests = self.captures = 0
+        # Native image-commit ACKs precede source-state validation and image
+        # preservation. A failed image/state observation must not erase its ACK.
+        self.capture_ack_lines_received = self.capture_acks_matched = 0
+        self.last_matched_capture_ack = None
+        self.terminal_receipts = {'quit': [], 'closed': []}
+        self.terminal_receipt_counts = {'quit': 0, 'closed': 0}
+        self.current_terminal_receipt = None
+        self.quit_observation = None
         self.reason = None; self.problems = []; self.signals = []
         self.interrupted = None; self.event_io_failed = False
         self.states = []
@@ -210,6 +219,39 @@ class Recorder:
         if self.reason is None:
             self.reason = reason; self.stop_ns = time.monotonic_ns()
             self.event('stop', reason=reason)
+
+    def retain_terminal_receipt(self, kind, text, now):
+        # Retain before JSON or sequence validation. Complete bytes remain in
+        # game.log even when a terminal report is malformed or oversized.
+        self.terminal_receipt_counts[kind] += 1
+        entry = {'monotonic_ns': now, 'text': text[:MAX_TERMINAL_TEXT],
+                 'text_truncated': len(text) > MAX_TERMINAL_TEXT,
+                 'complete_text_location': 'game.log',
+                 'parsed_report_omitted_if_over_text_bound': len(text) > MAX_TERMINAL_TEXT,
+                 'parsed_report': None, 'validation': 'not_accepted'}
+        if len(text) <= MAX_TERMINAL_TEXT:
+            try:
+                entry['parsed_report'] = json.loads(text.split(' ', 1)[1])
+            except (ValueError, TypeError, IndexError, RecursionError) as error:
+                entry['parse_error'] = str(error)[:2048]
+        self.terminal_receipts[kind].append(entry)
+        self.terminal_receipts[kind] = self.terminal_receipts[kind][-2:]
+        self.current_terminal_receipt = entry
+        self.event('native_terminal_receipt_received', terminal_kind=kind, receipt=entry)
+        return entry
+
+    def check_terminal_quit(self, row):
+        # This confirms terminal safety/audio facts, not the requested route.
+        # Used only after an outcome that already cannot be a successful run.
+        if self.quit_ns is None or row.get('reason') != 'quit':
+            raise ValueError('Unrequested or malformed native quit report')
+        if uint(row, 'world_ticks') != 0 or uint(row, 'mixed_frames') != 0:
+            raise ValueError('Native quit report contains gameplay activity')
+        self.check_audio(row)
+        if uint(row, 'audio_remainder_nanoseconds') != row['audio_accepted_nanoseconds'] % 1000:
+            raise ValueError('Native quit audio remainder differs from its accepted clock')
+        if uint(row, 'audio_device_queued_frames') != 0:
+            raise ValueError('Native quit report contains queued physical-device PCM')
 
     def problem(self, message):
         message = message[:2048]
@@ -606,7 +648,27 @@ class Recorder:
             self.problem('Acknowledgment completed beyond original deadline')
 
     def line(self, text, now):
+        self.current_terminal_receipt = None
+        try:
+            self.process_line(text, now)
+        except Exception as error:
+            # All malformed/repeated/wrong-owner/invalid terminal reports keep
+            # their raw and bounded decoded evidence plus a precise rejection.
+            if self.current_terminal_receipt is not None:
+                self.current_terminal_receipt['validation'] = 'rejected'
+                self.current_terminal_receipt['validation_error'] = type(error).__name__ + ': ' + str(error)[:2048]
+            raise
+
+    def process_line(self, text, now):
         self.event('stdout_line', received_ns=now, text=text)
+        terminal = None
+        if text.startswith('original_main_capture '):
+            self.capture_ack_lines_received += 1
+        if text.startswith('original_main_closed '):
+            terminal = self.retain_terminal_receipt('closed', text, now)
+        elif (text.startswith(('original_main_state ', 'original_rider_state '))
+                and re.search(r'"reason"\s*:\s*"quit"', text)):
+            terminal = self.retain_terminal_receipt('quit', text, now)
         if self.reason is None and self.pending is not None and 'ack' in self.pending:
             expected_prefix = 'original_rider_state ' if self.pending['ack']['screen'] == 5 else 'original_main_state '
             if not text.startswith(expected_prefix):
@@ -647,6 +709,8 @@ class Recorder:
                 raise ValueError('Unsolicited or repeated capture receipt')
             if uint(row, 'sequence') != self.pending['request_index']:
                 raise ValueError('Capture sequence differs from request sequence')
+            if row['sequence'] != self.capture_acks_matched + 1:
+                raise ValueError('Native capture ACK sequence is not contiguous')
             if uint(row, 'width') != 640 or uint(row, 'height') != 448 or row.get('file') != str(self.out / 'live.ppm'):
                 raise ValueError('Capture target or dimensions differ from launched target')
             for key in ('screen', 'page', 'switches'):
@@ -655,6 +719,8 @@ class Recorder:
             if uint(row, 'native_frame') < 1 or self.last_frame and row['native_frame'] < self.last_frame['ack']['native_frame']:
                 raise ValueError('Capture native frame missing or regressed')
             self.pending['ack'] = row; self.pending['commit_ack_monotonic_ns'] = now
+            self.capture_acks_matched += 1
+            self.last_matched_capture_ack = {'monotonic_ns': now, 'report': row}
         elif text.startswith(('original_main_state ', 'original_rider_state ')):
             row = json.loads(text.split(' ', 1)[1])
             if isinstance(row, dict) and (text.startswith('original_rider_state ') != (row.get('screen') == 5)):
@@ -666,10 +732,33 @@ class Recorder:
                     snapshot[field] = value if type(value) in (bool, int, float, type(None)) else str(value)[:256]
                 self.diagnostic_states.append({'received_ns': now, 'state': snapshot})
                 self.diagnostic_states = self.diagnostic_states[-32:]
+            if isinstance(row, dict) and row.get('reason') == 'quit':
+                if 'quit' in self.seen_state_reasons:
+                    raise ValueError('Repeated lifecycle state receipt')
+                self.seen_state_reasons.add('quit')
+                already_failed = self.primary_problem is not None or self.reason not in (None, 'sequence_complete')
+                if already_failed:
+                    self.check_terminal_quit(row)
+                    if terminal is not None:
+                        terminal['validation'] = 'terminal_safety_and_audio_only_after_sequence_failure'
+                    self.quit_observation = {'monotonic_ns': now, 'report': row,
+                                             'sequence_validated': False,
+                                             'validation_scope': 'terminal_safety_and_audio_only_after_sequence_failure'}
+                    return
+                # Successful completion still requires every original route,
+                # profile, input, ownership and audio assertion at quit.
+                self.check_state(row)
+                if terminal is not None:
+                    terminal['validation'] = 'full_requested_sequence_state'
+                self.quit_observation = {'monotonic_ns': now, 'report': row,
+                                         'sequence_validated': True,
+                                         'validation_scope': 'full_requested_sequence_state'}
+                self.states.append({'monotonic_ns': now, 'state': row})
+                return
             self.check_state(row)
             if row.get('reason') == 'capture':
                 self.preserve(row, now)
-            elif row.get('reason') in ('ready', 'bound', 'quit'):
+            elif row.get('reason') in ('ready', 'bound'):
                 if row['reason'] in self.seen_state_reasons:
                     raise ValueError('Repeated lifecycle state receipt')
                 self.seen_state_reasons.add(row['reason'])
@@ -677,17 +766,25 @@ class Recorder:
             else:
                 raise ValueError('Unrecognized original UI source state reason')
         elif text.startswith('original_main_closed '):
+            row = json.loads(text[len('original_main_closed '):])
             if self.closed is not None or self.quit_ns is None:
                 raise ValueError('Unexpected or repeated Main close receipt')
-            row = json.loads(text[len('original_main_closed '):])
             if row.get('cleanup_complete') is not True or uint(row, 'world_ticks') != 0 or uint(row, 'window_swaps') != 0:
                 raise ValueError('Main cleanup or headless no-driving ownership failed')
-            if uint(row, 'captures') != self.captures or uint(row, 'native_frames') < 1:
-                raise ValueError('Main cleanup receipt does not match acknowledged captures')
+            if uint(row, 'captures') != self.capture_acks_matched or uint(row, 'native_frames') < 1:
+                raise ValueError('Main cleanup receipt does not match structurally matched native capture ACKs')
+            if (self.last_matched_capture_ack
+                    and row['native_frames'] < self.last_matched_capture_ack['report']['native_frame']):
+                raise ValueError('Main final frame count precedes its last native capture ACK')
             if self.last_frame and row['native_frames'] < self.last_frame['ack']['native_frame']:
                 raise ValueError('Main final frame count regressed')
             self.check_audio(row)
-            self.closed = {'monotonic_ns': now, 'report': row}
+            if terminal is not None:
+                terminal['validation'] = 'native_cleanup_and_audio_matched_to_received_capture_ACKs'
+            self.closed = {'monotonic_ns': now, 'report': row,
+                           'matched_capture_acks': self.capture_acks_matched,
+                           'preserved_images': self.captures,
+                           'unpreserved_acknowledged_captures': self.capture_acks_matched - self.captures}
 
     def drain(self, delay):
         for key, _ in self.selector.select(delay):
@@ -895,6 +992,11 @@ class Recorder:
                 self.inputs_sent == self.releases_sent == self.action_index == len(ACTIONS)
                 and len(self.action_receipts) == len(ACTIONS) and self.active_action is None,
             'no_pending_capture': self.pending is None,
+            'all_requested_native_capture_ACKs_validated_and_images_preserved':
+                self.capture_ack_lines_received == self.capture_acks_matched == self.requests == self.captures
+                and self.closed is not None and self.closed['report']['captures'] == self.captures,
+            'quit_state_passed_full_requested_sequence_validation':
+                self.quit_observation is not None and self.quit_observation['sequence_validated'] is True,
             'successful_main_cleanup_receipt': self.closed is not None,
             'explicit_quit_sent': self.quit_ns is not None,
             'native_process_exit_zero': returncode == 0,
@@ -919,6 +1021,13 @@ class Recorder:
                    'ready_ns': self.ready_ns, 'deadline_ns': self.deadline_ns, 'stop_ns': self.stop_ns,
                    'finished_ns': time.monotonic_ns(), 'finished_utc': utc(), 'return_code': returncode,
                    'requests': self.requests, 'frames': self.captures, 'pending': self.pending,
+                   'capture_ack_lines_received': self.capture_ack_lines_received,
+                   'capture_acks_matched': self.capture_acks_matched,
+                   'unpreserved_acknowledged_captures': self.capture_acks_matched - self.captures,
+                   'last_matched_capture_ack': self.last_matched_capture_ack,
+                   'native_terminal_receipt_counts': self.terminal_receipt_counts,
+                   'native_terminal_receipts': self.terminal_receipts,
+                   'quit_observation': self.quit_observation,
                    'ready': self.ready, 'closed': self.closed, 'first_frame': self.first_frame,
                    'last_frame': self.last_frame, 'lifecycle_states': self.states, 'problems': self.problems,
                    'source_observations': self.observations, 'completed_actions': self.action_receipts,
@@ -960,6 +1069,8 @@ class Recorder:
                               'Thirty hertz is a request ceiling/target, not a measured thirty-frame-per-second result.',
                               'Every source-produced duplicate image is preserved; no interpolation, resampling or video mux.',
                               'A release barrier proves ordered host consumption; the current entry exposes no independent key-up receipt.',
+                              'Native capture ACK receipt and cleanup are distinct from validated/preserved images; successful cleanup cannot turn a sequence failure into success.',
+                              'After failure, quit is checked only for terminal safety/audio and retained separately; a passing result still requires full requested-sequence quit validation.',
                               'Visual quality and animation must be reviewed from retained frames and source state.',
                               'live.ppm alone is untrusted without its complete frames.jsonl record.']}
         atomic_json(self.out / 'summary.json', summary)

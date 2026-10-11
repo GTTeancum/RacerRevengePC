@@ -174,7 +174,9 @@ bool OriginalUiRiderDrawResources50KG::load(const OriginalUiRiderColdInput50KG& 
         for(std::uint8_t rider=1;rider<=26;++rider){
             if(!riderIndex(rider))continue;
             const auto name=backgroundName(rider);OriginalUiRiderMaterialBinding50KG b;b.registeredName="ui/textures/"+name;
-            if(!assets::readOriginalUiRiderBackgroundFallbackMaterial50KG(*in.rider,*in.backgrounds,rider,s->templates,
+            // UIRIDER supplies every authored %02d_bkg.psm; UIBKG supplies
+            // the corresponding image. Preserve that real cross-archive pair.
+            if(!assets::readOriginalUiMaterial50KG(*in.rider,b.registeredName+".psm",s->templates,
                 assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material))return fail(d,Error::material);
             if(!addImages(b,*in.backgrounds,name,false,false))return false;
             s->backgrounds[rider].rider=rider;s->backgrounds[rider].material=static_cast<std::uint32_t>(s->bindings.size());
