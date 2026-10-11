@@ -4322,7 +4322,7 @@ int main(int argc,char**argv){try{
              "Run from the repository root. RR_RACE_MODE=1 (default with fully prepared providers); "
              "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
              "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
-             "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits only authenticated muted Rider19/Back when its compiled cache is available. Other Rider selections and course entry remain unavailable. RR_AUDIO controls race audio only; no driving is launched.\n";
+             "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits only authenticated Rider19/Back when its compiled cache is available. Other Rider selections and course entry remain unavailable. RR_AUDIO controls race audio only; no driving is launched.\n";
   return 2;
  }
  // Every return destroys the complete old session, including native state and

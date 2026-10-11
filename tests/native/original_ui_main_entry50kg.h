@@ -93,8 +93,6 @@ struct Application {
         // No missing-save fallback and no reset on Rider entry or Back.
         if(const char* cacheRoot=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE")){
             require(*cacheRoot,"RR_ORIGINAL_RIDER_IPUM_CACHE must name a nonempty directory");
-            require(audioMode==rr::platform::OriginalUiMainAudioMode50KG::muted,
-                "initial original Rider ownership requires explicit muted UI audio");
             riderCacheRoot=std::filesystem::path(cacheRoot);
             riderProfile=std::make_shared<rr::platform::OriginalUiRiderProfileOwner50KG>();
             rr::platform::OriginalUiRiderProfileDiagnostic50KG riderProfileDiagnostic;
@@ -116,7 +114,7 @@ struct Application {
             "one clock-derived native RNG seed="<<state->rawRandom308030
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
             "Accept requires enabled concrete audio and commits process-owned settings. "
-            "Muted Rider19 entry additionally requires the authenticated compiled IPUM cache; "
+            "Rider19 entry additionally requires the authenticated compiled IPUM cache; enabled audio uses original Song7. "
             "other riders, Course/Gallery and other Options subpages remain unavailable. "
             "No gameplay launch or original boot/save parity is claimed.\n";
     }
@@ -227,8 +225,6 @@ struct Frontend {
         if(!application.riderCacheRoot.empty()){
             require(application.riderProfile && application.riderProfile->initialized(),
                 "original Rider application profile owner unavailable");
-            require(application.audioMode==rr::platform::OriginalUiMainAudioMode50KG::muted,
-                "initial original Rider ownership requires explicit muted UI audio");
             using Cache=rr::assets::OriginalUiIpumTextureCache50KG;
             require(Cache::catalogAvailable(),"original Rider IPUM output catalog is unavailable");
             cold.rider=readArchive(application.assetRoot,Id::rider);
@@ -275,6 +271,8 @@ struct Frontend {
             require(audioOutput.soundModeOwner50KG()==application.soundMode.get(),
                 "original UI output did not retain the application sound mode owner");
             cold.audio=audioOutput.transport();
+            if(!application.riderCacheRoot.empty()&&!cold.audio->prepareRiderMenu(application.audioRoot,error))
+                throw std::runtime_error(error);
             const auto info=audioOutput.info();
             std::cerr<<"Original UI audio device="<<rr::platform::audioDeviceStatusName50HD(info.deviceStatus)
                 <<" capture="<<info.captureActive<<" rate="<<info.sampleRate<<" detail="<<info.deviceDetail.data()<<'\n';
@@ -410,8 +408,18 @@ struct Frontend {
                 <<",\"source_target_generation\":"<<(accepted?sourceTargetGeneration:0)
                 <<",\"quads\":"<<(accepted?submittedQuads:0)<<",\"draws\":"<<(accepted?submittedDraws:0)
                 <<",\"source_triangles\":"<<(accepted?submittedTriangles:0)
-                <<",\"audio_muted\":true,\"audio_suppressed\":"<<rider.audio.suppressedByMutedMode
+                <<",\"audio_muted\":"<<(audioOutput.enabled()?"false":"true")
+                <<",\"audio_suppressed\":"<<rider.audio.suppressedByMutedMode
                 <<",\"audio_submitted\":"<<rider.audio.submitted<<",\"audio_failed\":"<<rider.audio.failed
+                <<",\"audio_source_gate_suppressed\":"<<rider.audio.suppressedBySourceGate
+                <<",\"audio_music_song\":"<<(audioOutput.transport()?audioOutput.transport()->activeMusicSong():0)
+                <<",\"audio_source_mixed_frames\":"<<audioOutput.sourceMixedFrames()
+                <<",\"audio_mixed_frames\":"<<audioOutput.info().mixedFrames
+                <<",\"audio_captured_frames\":"<<audioOutput.info().capturedFrames
+                <<",\"audio_rate\":"<<audioOutput.info().sampleRate
+                <<",\"audio_accepted_nanoseconds\":"<<audioOutput.acceptedNanoseconds()
+                <<",\"audio_clock_microseconds\":"<<audioOutput.info().simulationMicroseconds
+                <<",\"audio_remainder_nanoseconds\":"<<audioOutput.remainderNanoseconds()
                 <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames<<"}\n";
             return;
         }

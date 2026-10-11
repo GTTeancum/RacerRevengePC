@@ -180,7 +180,8 @@ struct OriginalUiFrontend50KG::Storage {
     }
     bool riderInputsReady() const noexcept {
         using Id=assets::OriginalUiArchiveId50KG;
-        return cold.audioMode==OriginalUiMainAudioMode50KG::muted&&!cold.audio&&
+        return (cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:
+                cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&cold.audio&&cold.audio->riderMenuReady())&&
             archive(cold.rider,Id::rider)&&archive(cold.backgrounds,Id::backgrounds)&&archive(cold.podTextures,Id::podTextures)&&
             cold.riderIpumCache&&cold.riderIpumCache->loaded()&&cold.riderProfile&&cold.riderProfile->initialized()&&
             cold.riderProfile->commonProfile()==cold.profile.get();
@@ -342,7 +343,7 @@ struct OriginalUiFrontend50KG::Storage {
                 session.binderAssets=m.riderBinder;session.riderArchive=cold.rider;session.appStart=cold.appStart;
                 session.podTextures=cold.podTextures;session.ipumCache=cold.riderIpumCache;session.materialRuntime=cold.runtime;
                 session.english=&english;session.profile=cold.riderProfile;session.commonProfile=cold.profile;session.application=cold.application;
-                session.lightManager=cold.lightManager;session.externalTransition=m.transition;session.audioMode=cold.audioMode;
+                session.lightManager=cold.lightManager;session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;
                 session.prospectiveMode=prospectiveMode;session.previousScreen=4;
                 m.rider=std::make_unique<OriginalUiRiderSession50KG>();
                 if(m.rider->bind(session,d.rider)!=RiderStatus::ok||!m.rider->canEnterMode(prospectiveMode)||

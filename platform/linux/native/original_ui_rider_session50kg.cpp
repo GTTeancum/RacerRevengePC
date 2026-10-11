@@ -104,10 +104,24 @@ struct OriginalUiRiderSession50KG::Storage {
     const game::OriginalUiNavigation50KG* nav() const noexcept {return widgets().navigation(0);}
     const game::OriginalUiRiderSelectionData50KG* selection() const noexcept {return widgets().selectionData();}
     bool operational() const noexcept {return dependenciesPrepared&&!state.faulted&&!state.quitRequested&&!dynamic.poisoned()&&!widgets().poisoned();}
+    bool audioReady() const noexcept {
+        return cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:
+            cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&cold.audio&&cold.audio->riderMenuReady();
+    }
+    bool backAudioReady() const noexcept {
+        return audioReady()&&(cold.audioMode==OriginalUiMainAudioMode50KG::muted||cold.audio->canPlayRiderBack5());
+    }
+    bool backAudio() noexcept {
+        if(cold.audioMode==OriginalUiMainAudioMode50KG::muted){++state.audio.suppressedByMutedMode;return true;}
+        if(!audioReady()||!cold.audio->playRiderBack5()){
+            ++state.audio.failed;fault(Status::audio,0x1EA848);return false;
+        }
+        ++state.audio.submitted;return true;
+    }
     bool processCurrent() const noexcept {
         return cold.application->known&&cold.commonProfile->known&&cold.profile->commonProfile()==cold.commonProfile.get()&&
             !(cold.application->globalFlags228&4u)&&cold.application->transportE00==-1&&
-            &cold.application->rawRandom308030==&cold.application->sharedNoise308030.sharedRandomState;
+            &cold.application->rawRandom308030==&cold.application->sharedNoise308030.sharedRandomState&&audioReady();
     }
     bool liveProfile(game::OriginalUiRiderSelectionProfile50KG& p) const noexcept {
         return processCurrent()&&cold.commonProfile->mode34==cold.prospectiveMode&&cold.profile->selectionSnapshot(p);
@@ -194,9 +208,14 @@ struct OriginalUiRiderSession50KG::Storage {
            !dynamic.characterScene(ids[3])->attached()){fault(Status::model,0x1E9FD4);return false;}
         state.selectionAttached=true;
         if(!appearance())return false;state.promptMask42C=0;
-        //234900(7,1) is the genuine looping menu music. Muting suppresses only
-        //this audio call, with no replacement animation or random-state step.
-        if(cold.previousScreen!=5)++state.audio.suppressedByMutedMode;else ++state.audio.suppressedBySourceGate;
+        // Source1EA03C checks the actual predecessor.234900(7,1) restarts
+        // the shared menu stream after appearance, before Group2 disable.
+        // Initial entry starts no character voice and consumes no audio RNG.
+        if(cold.previousScreen==5)++state.audio.suppressedBySourceGate;
+        else if(cold.audioMode==OriginalUiMainAudioMode50KG::muted)++state.audio.suppressedByMutedMode;
+        else if(!audioReady()||!cold.audio->startRiderLoop7()){
+            ++state.audio.failed;fault(Status::audio,0x1EA060);return false;
+        }else ++state.audio.submitted;
         if(!groupEnabled(2,false,0x1EA070))return false;opening=true;return true;
     }
     bool openedB0() noexcept {
@@ -216,7 +235,12 @@ struct OriginalUiRiderSession50KG::Storage {
         if(control<0||std::size_t(control)>=n->page->controls.size()||n->page->controls[control].widgets.size()<2){fault(Status::widget,0x1EA394);return false;}
         // Exact SECOND widget, the selected rider's ordinary name text.
         if(!widget(n->page->controls[control].widgets[1],Operation::setEnabled,false,0x1EA39C))return false;
-        if(state.fadeMusic4E8)++state.audio.suppressedByMutedMode; //234440 fade(1.0)
+        if(state.fadeMusic4E8){
+            if(cold.audioMode==OriginalUiMainAudioMode50KG::muted)++state.audio.suppressedByMutedMode;
+            else if(!audioReady()||!cold.audio->fadeRiderMusic()){
+                ++state.audio.failed;fault(Status::audio,0x1EA3C0);return false;
+            }else ++state.audio.submitted;
+        }
         closing=true;return true;
     }
     bool restoreB8() noexcept {
@@ -237,7 +261,7 @@ struct OriginalUiRiderSession50KG::Storage {
     }
     static bool available(void* context) noexcept {
         auto& s=*static_cast<Storage*>(context);const auto* exit=s.cold.resources->exitText(0);
-        return s.operational()&&exit&&exit->prepared()&&s.cold.audioMode==OriginalUiMainAudioMode50KG::muted;
+        return s.operational()&&exit&&exit->prepared()&&s.audioReady();
     }
     static void hook(void* context,const game::OriginalUiApertureHook50KG& e) noexcept {
         auto& s=*static_cast<Storage*>(context);if(!s.operational())return;
@@ -282,7 +306,10 @@ Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& co
        &cold.application->rawRandom308030!=&cold.application->sharedNoise308030.sharedRandomState||
        !cold.lightManager||cold.lightManager->cacheState()!=game::OriginalUiLightCacheState50KG::absentSinceApplicationConstruction||
        !cold.externalTransition||cold.externalTransition->snapshot().bound)return result(d,Status::unsupportedState);
-    if(cold.audioMode!=OriginalUiMainAudioMode50KG::muted)return result(d,Status::unavailableDestination,0x234900);
+    if((cold.audioMode==OriginalUiMainAudioMode50KG::muted&&cold.audio)||
+       (cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&(!cold.audio||!cold.audio->riderMenuReady()))||
+       (cold.audioMode!=OriginalUiMainAudioMode50KG::muted&&cold.audioMode!=OriginalUiMainAudioMode50KG::enabled))
+        return result(d,Status::unavailableDestination,0x234900);
     try {
         auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;
         const auto* page=s->selection()?s->selection()->page():nullptr;
@@ -435,7 +462,7 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     if(routed!=game::OriginalUiRouteStatus50KG::unavailable)return finish(Status::unsupportedState,0x1EA460);
     if(in.originalInput==4)return finish(Status::unavailableDestination,receipt.decision.request.sourcePC);
     const auto& r=receipt.decision;
-    if(!s->idleInput()||!r.profileProposalComplete||r.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
+    if(!s->idleInput()||!s->backAudioReady()||!r.profileProposalComplete||r.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
        r.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||r.request.targetScreen!=4||r.request.targetPage!=1||
        r.profileChanges.count!=1||r.selectedRider!=19)return finish(Status::unavailableDestination,0x1EA810);
     s->pendingProfile=profile;s->pendingCommon=*s->cold.commonProfile;s->pendingStamp=s->cold.profile->stamp();
@@ -444,7 +471,7 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
 }
 bool OriginalUiRiderSession50KG::routeProposalCurrent(const OriginalUiRiderRouteProposal50KG& p) const noexcept {
     const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||
-       p.source!=this||!p.serial||p.serial!=s->proposalSerial||!s->idleInput()||!s->lightCurrent()||!s->processCurrent()||
+       p.source!=this||!p.serial||p.serial!=s->proposalSerial||!s->idleInput()||!s->lightCurrent()||!s->processCurrent()||!s->backAudioReady()||
        s->cold.application->uiObject3D8||!sameDecision(p.decision,s->pendingBack)||!sameStamp(p.profileStamp,s->pendingStamp)||
        !sameStamp(s->cold.profile->stamp(),s->pendingStamp)||!sameCommon(*s->cold.commonProfile,s->pendingCommon)||
        !sameLife(s->transition(),s->pendingLifecycle)||s->state.rider4C4!=19||s->nav()->controllerGroup[0]!=1||
@@ -455,7 +482,7 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
     if(!s->operational()||s->inOperation||s->updatePrepared||s->backAccepted||!s->state.backProposalPending||p.source!=this||
        !p.serial||p.serial!=s->proposalSerial||!sameDecision(p.decision,s->pendingBack)||!sameStamp(p.profileStamp,s->pendingStamp)||
-       !s->processCurrent()||!s->lightCurrent()||s->cold.application->uiObject3D8||!sameCommon(*s->cold.commonProfile,s->pendingCommon)||
+       !s->processCurrent()||!s->lightCurrent()||!s->backAudioReady()||s->cold.application->uiObject3D8||!sameCommon(*s->cold.commonProfile,s->pendingCommon)||
        s->state.rider4C4!=19||s->nav()->controllerGroup[0]!=1||s->nav()->groups[1].selectedSlot!=s->state.slot4C8)
         return result(d,Status::invalidInput,0x1EA810);
     const auto t=s->transition();auto expectedLife=s->pendingLifecycle;
@@ -476,9 +503,14 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
     game::OriginalUiRiderSelectionProfile50KG current;
     if(!s->liveProfile(current)||!sameProfile(current,expected))return result(d,Status::profile,0x1EA810);
     s->cpuDrain();s->state.backProposalPending=false;s->backAccepted=true;
-    // Real page1 Back1EA7DC/1EA7E0 sets fade4E8 and bypass4E4. These cannot
+    // Real page1 Back1EA82C/1EA830 sets fade4E8 and bypass4E4. These cannot
     // certify Main readiness and are not published for an unaccepted proposal.
-    s->state.fadeMusic4E8=true;s->panel.acceptedBack();++s->state.audio.suppressedByMutedMode;
+    s->state.fadeMusic4E8=true;s->panel.acceptedBack();
+    if(!s->backAudio()){d=s->callbackFault;return d.status;}
+    // Retail233410 queues a backend play command before267BE0 submits it.
+    // Our concrete native mixer applies that play directly, without a guest
+    // command buffer. The retained transportE00==-1 represents no projected
+    // pending work; do not add a device flush or another PCM advance here.
     return result(d,Status::ok);
 }
 Status OriginalUiRiderSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG& in,Diagnostic& d) noexcept {
@@ -491,10 +523,16 @@ Status OriginalUiRiderSession50KG::prepareUpdateAudio(const OriginalUiMainSessio
     if(!s->processCurrent()||!s->lightCurrent()||s->cold.application->uiObject3D8||s->state.deferred4EC)
         return result(d,Status::unsupportedState,0x267BE0);
     s->cpuDrain();if(!s->invalidateProposal()){d=s->callbackFault;return d.status;}
-    // No audio/mixer object exists in the explicit muted scope. The scheduler
-    // still consumes one exact receipt; muting does not alter source update dt
-    // or the shared process random/motion/IK state used by child traversal.
-    s->preparedUpdate=in;s->paused=in.paused;s->updatePrepared=true;return result(d,Status::ok);
+    // Shared native transport service precedes the sole manager tick, exactly
+    // once, as for Main/Options. Character traversal and its genuine shared
+    // motion RNG stay in update below. No voice/RNG draw is added for silence.
+    s->inOperation=true;s->paused=in.paused;
+    if(s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled){
+        s->cold.audio->pause(in.paused);
+        if(!s->cold.audio->update(in.elapsedSeconds))s->fault(Status::audio,0x234440);
+    }
+    s->inOperation=false;if(s->state.faulted){d=s->callbackFault;return d.status;}
+    s->preparedUpdate=in;s->updatePrepared=true;return result(d,Status::ok);
 }
 Status OriginalUiRiderSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);

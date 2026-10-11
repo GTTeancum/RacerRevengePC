@@ -8,7 +8,7 @@ namespace rr::platform {
 enum class OriginalUiRiderSessionStatus50KG : std::uint8_t {
     ok,noChange,backProposed,unavailableDestination,notBound,alreadyBound,
     invalidInput,unsupportedState,profile,resource,widget,backend,model,
-    camera,lighting,aperture,transition,draw,allocation,faulted,quit
+    camera,lighting,aperture,transition,draw,audio,allocation,faulted,quit
 };
 struct OriginalUiRiderSessionDiagnostic50KG {
     OriginalUiRiderSessionStatus50KG status=OriginalUiRiderSessionStatus50KG::ok;
@@ -43,8 +43,11 @@ struct OriginalUiRiderSessionCold50KG {
     std::uint32_t prospectiveMode=0;
     // Source1CCF90 predecessor screen. This bounded entry is from Main4 only.
     std::uint8_t previousScreen=0;
-    // Explicit muted-audio scope. Enabled audio is unavailable before effects.
+    // Same concrete application frontend transport used by Main/Options.
+    // Enabled initial19/Back needs its optional authenticated Song7. Muted
+    // mode owns no transport. Neither mode admits confirm/voice paths.
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
+    std::shared_ptr<OriginalUiMainAudio50KG> audio;
 };
 class OriginalUiRiderSession50KG;
 struct OriginalUiRiderRouteProposal50KG {
@@ -104,8 +107,9 @@ public:
     // request, then performs only source Back bypass/fade/effect fields once.
     OriginalUiRiderSessionStatus50KG notifyRouteAccepted(const OriginalUiRiderRouteProposal50KG&,
         OriginalUiRiderSessionDiagnostic50KG&) noexcept;
-    // Same one-use scheduling boundary as Main/Options, with audio explicitly
-    // muted. Actual external manager.tick occurs between these calls.
+    // Same one-use audio scheduling boundary as Main/Options. Actual external
+    // manager.tick occurs between these calls; shared PCM is mixed only by
+    // the application after its accepted source interval, never by a page.
     OriginalUiRiderSessionStatus50KG prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG&,
         OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     OriginalUiRiderSessionStatus50KG update(const OriginalUiMainSessionUpdate50KG&,
