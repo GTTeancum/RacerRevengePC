@@ -5,6 +5,9 @@
 #include <cstdint>
 
 namespace rr::game {
+// Shared native13BCA0 scalar tangent. Caller owns the source angle's exact
+// arithmetic grouping. Finite nearest-even binary32; output unchanged on fail.
+bool originalUiSourceTangent50KG(float radians,float& tangent) noexcept;
 enum class OriginalUiMainParticleCameraStatus50KG : std::uint8_t {
     ok,invalidCamera,unsupportedArithmetic
 };

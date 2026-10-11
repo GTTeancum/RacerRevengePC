@@ -4,6 +4,11 @@
 #include "../assets/model_geometry49o.h"
 #include <array>
 namespace rr::game {
+// Shared current aggregate-box projection used by both original visibility
+//240C00 and distance/fog. Additional root0, original PSG nodes1..N. Snapshot
+// only; actual root refresh remains the live owner's responsibility.
+bool prepareOriginalUiRiderModelBounds50KG(const assets::PsgHierarchyView49O&,
+    const SceneGraph49P&,ModelBoundsResult49O&) noexcept;
 struct OriginalUiRiderModelFog50KG {
     ModelBoundsResult49O bounds;
     float distance1BC=0;
