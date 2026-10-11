@@ -16,6 +16,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/assets/original_ui_icon50kg.cpp"
   "${RR_ROOT}/src/assets/original_ui_localization50kg.cpp"
   "${RR_ROOT}/src/assets/original_ui_material50kg.cpp"
+  "${RR_ROOT}/src/assets/original_ui_material_equivalence50kg.cpp"
   "${RR_ROOT}/src/assets/original_ui_main_material_schedule50kg.cpp"
   "${RR_ROOT}/src/assets/original_ui_overlay_text50kg.cpp"
   "${RR_ROOT}/src/assets/original_ui_pages50kg.cpp"
