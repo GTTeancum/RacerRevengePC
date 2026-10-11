@@ -7,6 +7,8 @@
 #include "../../../src/game/original_ui_main_particle_render_state50kg.h"
 #include "../../../src/game/original_ui_main_particle_lighting50kg.h"
 #include "../../../src/game/original_ui_main_fire50kg.h"
+#include "../../../src/game/model_playback50kg.h"
+#include "../../../src/game/coupled_body_advancement49m.h"
 #include <memory>
 
 namespace rr::platform {
@@ -22,9 +24,26 @@ struct OriginalUiMainProfile50KG {
 // Preserve the high unlock bit and every other caller-owned profile field.
 void resetOriginalUiMainProfileFields50KG(OriginalUiMainProfile50KG&) noexcept;
 struct OriginalUiMainApplication50KG {
+    OriginalUiMainApplication50KG() noexcept=default;
+    OriginalUiMainApplication50KG(const OriginalUiMainApplication50KG&)=delete;
+    OriginalUiMainApplication50KG& operator=(const OriginalUiMainApplication50KG&)=delete;
+    OriginalUiMainApplication50KG(OriginalUiMainApplication50KG&&)=delete;
+    OriginalUiMainApplication50KG& operator=(OriginalUiMainApplication50KG&&)=delete;
     // Must be the process owners shared with all other native consumers.
     bool known=false;
-    std::uint32_t rawRandom308030=0,fireSerial433970=0;
+    // The Main fire leaf's uint32 reference and Rider's CoupledNoise context
+    // designate the SAME raw RNG word. No copy-in/out, shadow RNG, new seed,
+    // or destination-local reset occurs. Application startup writes the same
+    // clock seed through rawRandom308030 as before. This address stays stable.
+    game::CoupledNoiseContext49M sharedNoise308030{};
+    std::uint32_t& rawRandom308030=sharedNoise308030.sharedRandomState;
+    std::uint32_t fireSerial433970=0;
+    // Process-wide lazy playback/IK/libm owners survive page/model destruction.
+    // Native application startup initializes them once, alongside this sole
+    // RNG owner; model-specific graph, capture and chain records stay per model.
+    game::ModelMotionSharedState49T modelMotion{};
+    game::ModelMode0IkShared50KG modelMode0Ik{};
+    game::SourceLibmState49T modelLibm{};
     std::uint32_t globalFlags228=0;
     std::int32_t musicState44=0,musicState48=0;
     // Pending267BE0 transport is unsupported. Source -1 is a proven early

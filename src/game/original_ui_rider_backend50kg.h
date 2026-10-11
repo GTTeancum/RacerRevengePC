@@ -41,6 +41,9 @@ public:
     bool beginFrame() noexcept;
     void endFrame() noexcept;
     std::uint64_t generation() const noexcept;
+    // Actual model attachment's parent+A4 resource synchronization event.
+    // Image-bank remaps, show/hide and GPU replacement are not14D440 rebuilds.
+    std::uint64_t registryGeneration() const noexcept;
     std::shared_ptr<const assets::OriginalUiImageBank50KG> bank() const noexcept;
     const assets::OriginalUiImageBankMapping50KG* staticImage(std::uint32_t owner,std::uint32_t image) const noexcept;
     const assets::OriginalUiImageBankMapping50KG* modelImage(std::uint16_t widget,std::uint32_t image) const noexcept;

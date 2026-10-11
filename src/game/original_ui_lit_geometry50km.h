@@ -79,7 +79,9 @@ struct OriginalUiLitBinderPacket50KM {
 OriginalUiLitGeometryStatus50KM projectOriginalUiRiderBinderPacket50KM(
     const OriginalUiRiderBinderQuad50KG&,const OriginalUiLitContext50KM&,
     const std::array<float,4>& currentAmbient50,OriginalUiLitBinderPacket50KM&) noexcept;
-inline constexpr std::uint32_t originalUiLitMaximumSurfaceVertices50KM=4096;
+// Actual Rider19 pod surface0 has6126 authored vertices. Retain the complete
+// original surface; this is native scratch capacity, not a simplified mesh.
+inline constexpr std::uint32_t originalUiLitMaximumSurfaceVertices50KM=8192;
 inline constexpr std::uint32_t originalUiLitMaximumTriangles50KM=8192;
 struct OriginalUiLitGeometryWorkspace50KM {
     // Long-lived caller storage; do not create this on a hot frame stack.

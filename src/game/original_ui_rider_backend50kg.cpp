@@ -27,6 +27,7 @@ struct OriginalUiRiderBackend50KG::Storage {
     std::shared_ptr<const assets::OriginalUiImageBank50KG> bank;
     std::uint32_t binderOwner=noOwner;
     std::uint64_t generation=1;
+    std::uint64_t registryGeneration=1;
     bool frame=false;
 };
 OriginalUiRiderBackend50KG::OriginalUiRiderBackend50KG() noexcept=default;
@@ -113,7 +114,8 @@ bool OriginalUiRiderBackend50KG::attach(std::uint16_t id,OriginalUiRiderDynamicO
     if(!storage_||!valid(id))return fail(E::input);
     auto& s=*storage_;auto& entry=s.entries[id];
     if(s.frame)return fail(E::busy);
-    if(entry.attached||!entry.materials||entry.imageOwner==noOwner)return fail(E::input);
+    if(entry.attached||!entry.materials||entry.imageOwner==noOwner||
+       s.registryGeneration==std::numeric_limits<std::uint64_t>::max())return fail(E::input);
     const auto state=owner.state(id);
     try {
         std::array<std::unique_ptr<OriginalUiRiderBinderAnimation50KG>,2> binders;
@@ -132,7 +134,11 @@ bool OriginalUiRiderBackend50KG::attach(std::uint16_t id,OriginalUiRiderDynamicO
         // Native entity ownership is fixed: widget -> model -> binder0,binder1.
         // Only actual named pairs create helpers. No sorting by source masks.
         entry.binders=std::move(binders);entry.membership=membership;
-        entry.shown=state.shown;entry.attached=true;diagnostic_={};return true;
+        entry.shown=state.shown;entry.attached=true;
+        // Source successful attachment calls the real parent+A4 resource
+        // synchronization before character capture/IK registration. Publish
+        // that rebuild event separately from CPU image-bank generations.
+        ++s.registryGeneration;diagnostic_={};return true;
     }catch(...){return fail(E::allocation);}
 }
 void OriginalUiRiderBackend50KG::detach(std::uint16_t id,OriginalUiRiderDynamicOwner50KG&) noexcept {
@@ -159,6 +165,7 @@ bool OriginalUiRiderBackend50KG::beginFrame() noexcept {
 }
 void OriginalUiRiderBackend50KG::endFrame() noexcept{if(storage_)storage_->frame=false;}
 std::uint64_t OriginalUiRiderBackend50KG::generation()const noexcept{return storage_?storage_->generation:0;}
+std::uint64_t OriginalUiRiderBackend50KG::registryGeneration()const noexcept{return storage_?storage_->registryGeneration:0;}
 std::shared_ptr<const assets::OriginalUiImageBank50KG> OriginalUiRiderBackend50KG::bank()const noexcept{return storage_?storage_->bank:nullptr;}
 const assets::OriginalUiImageBankMapping50KG* OriginalUiRiderBackend50KG::staticImage(std::uint32_t owner,std::uint32_t image)const noexcept {
     return storage_&&owner<storage_->input.staticImages.owners.size()?storage_->bank->mapping(owner,image):nullptr;
