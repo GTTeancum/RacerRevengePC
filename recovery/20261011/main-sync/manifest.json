@@ -1,0 +1,89 @@
+{
+  "purpose": "Exact source/history backup and authorized Git transport; no execution. Historical HOST driving modules retained as source only; all driving tests require original AI for every racer. All builds remain held until final main synchronization.",
+  "commit": "3c993cd061addcab25e262b20102c0d3a328dfef",
+  "tree": "687b0fe4f9be66b586acadc09f21e0afbee2f3a6",
+  "bundle_bytes": 756756,
+  "bundle_sha256": "dc5e7d26e2ab6a664e35c41137b082392f21f29d46458e69ad672497d587c1e6",
+  "parts": [
+    {
+      "path": "main-3c993cd.bundle.part000",
+      "bytes": 49152,
+      "sha256": "fc0470e136f8145666470f0d4ff5dec4fc3ad0d3d68254834b05b39e4d65a89d"
+    },
+    {
+      "path": "main-3c993cd.bundle.part001",
+      "bytes": 49152,
+      "sha256": "cf32ffc31019d535fde31ce6730934b3cd5477d9e402405248554aab29f01098"
+    },
+    {
+      "path": "main-3c993cd.bundle.part002",
+      "bytes": 49152,
+      "sha256": "383a76f890d2529cfc35cdcc8cb28e57dd972ab3756ff378c3aeae016a21ad9b"
+    },
+    {
+      "path": "main-3c993cd.bundle.part003",
+      "bytes": 49152,
+      "sha256": "903aa6d0fd93acb5654beac9dbe62e67e824803b101281c80505a7047c4819fe"
+    },
+    {
+      "path": "main-3c993cd.bundle.part004",
+      "bytes": 49152,
+      "sha256": "de82c5817eb0b7907bcd9c68a6981b2037ca437756ae43b9de09a57e07fb3a40"
+    },
+    {
+      "path": "main-3c993cd.bundle.part005",
+      "bytes": 49152,
+      "sha256": "7f414d28c5f8e57d1b3b91365b0791c7f53ee0493e2579f30912607aae4a70a0"
+    },
+    {
+      "path": "main-3c993cd.bundle.part006",
+      "bytes": 49152,
+      "sha256": "68303d5c669d739992b4a058d8d680757f7490e67659670e0d3b6251c4155363"
+    },
+    {
+      "path": "main-3c993cd.bundle.part007",
+      "bytes": 49152,
+      "sha256": "2bbade2010eaf263712ad4f044794bc55e33ae9b188b35ad4f389ed9f96d1798"
+    },
+    {
+      "path": "main-3c993cd.bundle.part008",
+      "bytes": 49152,
+      "sha256": "8aa40ef5cedab65e10d6bffc24d4ddb59571c1127adee1a25e9b5da9f0a0f647"
+    },
+    {
+      "path": "main-3c993cd.bundle.part009",
+      "bytes": 49152,
+      "sha256": "04a1cd6d1d5c571d7337726c3f5fd0de8a4aa93fb0158774d29376f16bf236fd"
+    },
+    {
+      "path": "main-3c993cd.bundle.part010",
+      "bytes": 49152,
+      "sha256": "2a5c09581ae4751c1d30d6bfd54b9511972225500658a17520318e00b692a5b6"
+    },
+    {
+      "path": "main-3c993cd.bundle.part011",
+      "bytes": 49152,
+      "sha256": "8a4b3f25e667ed7ec4c880eaabd420dbad74bb0f936a7ad6ad48bccd7c785c3c"
+    },
+    {
+      "path": "main-3c993cd.bundle.part012",
+      "bytes": 49152,
+      "sha256": "fe7a5cabd0667368b2930522b1dede91827f9aefb5c1aa216a7e14f057ee24a0"
+    },
+    {
+      "path": "main-3c993cd.bundle.part013",
+      "bytes": 49152,
+      "sha256": "c9d4b062e6ef75437431d45881579959809dab15278222a189a1846a9d7b5d18"
+    },
+    {
+      "path": "main-3c993cd.bundle.part014",
+      "bytes": 49152,
+      "sha256": "2a5013a0794a9f7b3771d6779ad171b6f7b2902ca9c2c21c6a6fdcf29632062e"
+    },
+    {
+      "path": "main-3c993cd.bundle.part015",
+      "bytes": 19476,
+      "sha256": "a3f636c34ff99a1d4516e3afbc2c64f2beb574df95f25589f9751f93119c3ca2"
+    }
+  ]
+}
