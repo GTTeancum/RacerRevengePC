@@ -553,7 +553,15 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
             if(name.size()!=cursor-start)continue;std::size_t j=0;
             for(;j<name.size()&&fold(name[j])==fold(static_cast<char>(table.data[start+j]));++j){}
             if(j!=name.size())continue;
-            if(ranks[i]!=unresolved)return fail(d,E::schedule);
+            if(ranks[i]!=unresolved){
+                // Authenticated Mat_Stbl repeats pod_wndw. Original298C80
+                // returns the first matching row;299CAC retains that token.
+                // Admit only this exact later occurrence, never a new owner
+                // or a replacement rank. Other duplicate names still reject.
+                if(!same(name,"ui/textures/pod_wndw")||ranks[i]!=2490||
+                   ordinal!=3221||start!=70650)return fail(d,E::schedule,0x298C80);
+                continue;
+            }
             ranks[i]=ordinal;
         }
         ++ordinal;
