@@ -1,12 +1,16 @@
 #pragma once
 #include "original_ui_rider_widgets50kg.h"
 #include "original_ui_rider_model_scene50kg.h"
+namespace rr::platform {class OriginalUiRiderSession50KG;}
 namespace rr::game {
+// Immutable descriptor population only. Neither value authorizes source
+// selection, graph creation, material registration or a destination change.
+enum class OriginalUiRiderColdPopulation50KG : std::uint8_t {selected19,rider19And20};
 class OriginalUiRiderDynamicOwner50KG;
 struct OriginalUiRiderDynamicBackend50KG {
     void* context=nullptr;
-    // Cold resources exist before this call. Must admit actual material/image
-    // bank, scene-list and callback capacity for the COMPLETE ordered batch.
+    // Cold resources and bank are sealed before this call. Validate the whole
+    // ordered batch without allocating or changing resource publication.
     bool (*preflight)(void*,const OriginalUiRiderDynamicOwner50KG&,
         const OriginalUiRiderWidgetCallback50KG*,std::size_t) noexcept=nullptr;
     // Actual entity-mask2 attachment +28E8A0 visibility/cache membership,
@@ -61,6 +65,10 @@ public:
     std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG> characterAssets(std::uint16_t) const noexcept;
     std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> podAssets(std::uint16_t) const noexcept;
 private:
+    friend class rr::platform::OriginalUiRiderSession50KG;
+    // The session invokes this once while its candidate is still private.
+    // Local candidates commit together; no dynamic/source callback is run.
+    bool prepareCold(OriginalUiRiderColdPopulation50KG,OriginalUiRiderDynamicDiagnostic50KG&) noexcept;
     bool preflight(const OriginalUiRiderWidgetCallback50KG*,std::size_t) noexcept;
     bool apply(const OriginalUiRiderWidgetCallback50KG&,OriginalUiRiderWidgetState50KG&) noexcept;
     bool loadModel(std::uint16_t) noexcept;

@@ -10,7 +10,7 @@ struct OriginalUiRiderBackendInput50KG {
     std::shared_ptr<const assets::OriginalUiRiderBinderAssets50KG> binder;
     assets::OriginalUiMaterialRuntime50KG materialRuntime;
     // Actual static widget/font/stat/background image owners and every archive
-    // they use. Backend appends binder and live/new model owners, never merges IDs.
+    // they use. Private cold preparation appends binder/model descriptor owners.
     assets::OriginalUiImageBankInput50KG staticImages;
 };
 enum class OriginalUiRiderBackendError50KG : std::uint8_t {
@@ -50,9 +50,9 @@ public:
     const assets::OriginalUiImageBankMapping50KG* binderImage(std::uint32_t image) const noexcept;
     const assets::OriginalUiRiderModelMaterials50KG* materials(std::uint16_t) const noexcept;
     const OriginalUiRiderVisibilityHandle50KG* membership(std::uint16_t) const noexcept;
-    // Actual source14D370/14D440 population reached by parent+A4, not cold
-    // image/policy preflight or current visibility. Loaded PSM pointers survive
-    // model detach until the real resource registry is destroyed with this UI.
+    // Existing bounded source14D370/14D440 registration bookkeeping, never
+    // cold descriptor/image admission. This is not a row-lifetime ledger and
+    // cannot authorize a detach/reselect extension without explicit epochs.
     bool materialsRegistered(std::uint16_t) const noexcept;
     bool binderMaterialRegistered() const noexcept;
     bool attached(std::uint16_t) const noexcept;
@@ -61,6 +61,10 @@ public:
     // pair0/pair1. 141960 appends siblings; 2/100A/8 are entity MASKS, not sort keys.
     OriginalUiRiderBinderAnimation50KG* binder(std::uint16_t,std::uint8_t pair) noexcept;
 private:
+    friend class rr::platform::OriginalUiRiderSession50KG;
+    // One private construction transaction. No live owner/bank may consume
+    // this backend until the sealed bank and collector/GPU policies succeed.
+    bool prepareColdAndSeal(const OriginalUiRiderDynamicOwner50KG&,OriginalUiRiderBackendDiagnostic50KG&) noexcept;
     bool preflight(const OriginalUiRiderDynamicOwner50KG&,const OriginalUiRiderWidgetCallback50KG*,std::size_t) noexcept;
     bool attach(std::uint16_t,OriginalUiRiderDynamicOwner50KG&) noexcept;
     void detach(std::uint16_t,OriginalUiRiderDynamicOwner50KG&) noexcept;

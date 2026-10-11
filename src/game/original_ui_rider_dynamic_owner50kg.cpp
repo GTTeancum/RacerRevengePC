@@ -23,7 +23,7 @@ struct OriginalUiRiderDynamicOwner50KG::Storage {
     ModelMotionSharedState49T* motion=nullptr;ModelMode0IkShared50KG* ik=nullptr;
     SourceLibmState49T* libm=nullptr;CoupledNoiseContext49M* rng=nullptr;
     OriginalUiRiderDynamicBackend50KG backend;
-    bool poisoned=false,inCallback=false,drained=false;
+    bool coldPrepared=false,poisoned=false,inCallback=false,drained=false;
 };
 OriginalUiRiderDynamicOwner50KG::OriginalUiRiderDynamicOwner50KG() noexcept=default;
 OriginalUiRiderDynamicOwner50KG::~OriginalUiRiderDynamicOwner50KG(){drain();}
@@ -68,28 +68,65 @@ bool OriginalUiRiderDynamicOwner50KG::poisoned()const noexcept{return storage_&&
 OriginalUiRiderWidgetState50KG OriginalUiRiderDynamicOwner50KG::state(std::uint16_t id)const noexcept {
     return storage_&&idOk(id)?storage_->entries[id].state:OriginalUiRiderWidgetState50KG{};
 }
-bool OriginalUiRiderDynamicOwner50KG::preflight(const OriginalUiRiderWidgetCallback50KG* calls,std::size_t count) noexcept {
-    diagnostic_={};if(!storage_||storage_->poisoned||storage_->drained||storage_->inCallback||
-        (count&&!calls)||count>32768){diagnostic_.error=E::input;return false;}
-    auto& s=*storage_;s.inCallback=true;bool ok=true;
+bool OriginalUiRiderDynamicOwner50KG::prepareCold(OriginalUiRiderColdPopulation50KG population,
+    OriginalUiRiderDynamicDiagnostic50KG& d) noexcept {
+    d={};const auto fail=[&](E e){d.error=e;diagnostic_=d;return false;};
+    if(!storage_||storage_->coldPrepared||storage_->poisoned||storage_->drained||storage_->inCallback||
+       (population!=OriginalUiRiderColdPopulation50KG::selected19&&
+        population!=OriginalUiRiderColdPopulation50KG::rider19And20))return fail(E::input);
+    auto& s=*storage_;
+    for(const auto& e:s.entries)if(e.everLoaded||e.registered||e.characterAssets||e.podAssets||
+       (dynamic(e.state.kind)&&(e.state.selected||e.state.shown)))return fail(E::input);
     try {
-        for(std::size_t i=0;i<count&&ok;++i){const auto& c=calls[i];diagnostic_.widget=c.widget;
-            if(!idOk(c.widget)){ok=false;break;}auto& e=s.entries[c.widget];
-            if(!dynamic(e.state.kind))continue;
-            const bool needs=c.operation==O::select||(e.state.kind==K::character&&c.operation==O::clearSelection);
-            if(!needs)continue;
-            if(e.state.kind==K::character&&!e.characterAssets){
-                auto a=std::make_shared<assets::OriginalUiRiderCharacterAssets50KG>();
-                if(!a->load(s.archive,c.widget,diagnostic_.character)){diagnostic_.error=E::cold;ok=false;break;}
-                e.characterAssets=std::move(a);
-            }else if(e.state.kind==K::pod&&!e.podAssets){
+        std::array<std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG>,120> characters{};
+        std::array<std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG>,120> pods{};
+        const bool include20=population==OriginalUiRiderColdPopulation50KG::rider19And20;
+        // Original Control16/17 membership is verified by the private session.
+        // This order fixes only cold bank remapping, never source callbacks.
+        for(const std::uint16_t id:{27,28,53,54}){
+            if(!include20&&(id==28||id==54))continue;d.widget=id;
+            const auto kind=s.entries[id].state.kind;
+            if(id==27||id==28){
+                if(kind!=K::pod)return fail(E::input);
                 auto a=std::make_shared<assets::OriginalUiRiderPodAssets50KG>();
-                if(!a->load(s.archive,c.widget,diagnostic_.pod)){diagnostic_.error=E::cold;ok=false;break;}
-                e.podAssets=std::move(a);
+                if(!a->load(s.archive,id,d.pod))return fail(E::cold);
+                if(a->widgetId()!=id||a->widgetSource()!=s.archive->find("UI/UIRider/Widgets.Dat").identity||
+                   a->modelSource().identity!=s.archive->find(id==27?"UI/Geometry/19.psg":"UI/Geometry/20.psg").identity)
+                    return fail(E::cold);
+                pods[id]=std::move(a);
+            }else{
+                if(kind!=K::character)return fail(E::input);
+                auto a=std::make_shared<assets::OriginalUiRiderCharacterAssets50KG>();
+                if(!a->load(s.archive,id,d.character))return fail(E::cold);
+                if(a->widgetId()!=id||!a->baseName()||*a->baseName()!=(id==53?"19c":"20c")||
+                   a->widgetSource()!=s.archive->find("UI/UIRider/Widgets.Dat").identity||
+                   a->mcfSource()!=s.archive->find(id==53?"UI/Anim/19c.mcf":"UI/Anim/20c.mcf").identity)
+                    return fail(E::cold);
+                characters[id]=std::move(a);
             }
         }
-        if(ok&&!s.backend.preflight(s.backend.context,*this,calls,count)){diagnostic_.error=E::backend;ok=false;}
-    }catch(...){diagnostic_.error=E::allocation;ok=false;}
+        // These are immutable files/geometry/motions only. No graph, entry
+        // sample, attachment, IK, visibility, binder clock or source row exists.
+        for(std::uint16_t id=1;id<120;++id){s.entries[id].characterAssets=std::move(characters[id]);
+            s.entries[id].podAssets=std::move(pods[id]);}
+        s.coldPrepared=true;diagnostic_={};d={};return true;
+    }catch(...){return fail(E::allocation);}
+}
+bool OriginalUiRiderDynamicOwner50KG::preflight(const OriginalUiRiderWidgetCallback50KG* calls,std::size_t count) noexcept {
+    diagnostic_={};if(!storage_||!storage_->coldPrepared||storage_->poisoned||storage_->drained||storage_->inCallback||
+        (count&&!calls)||count>32768){diagnostic_.error=E::input;return false;}
+    auto& s=*storage_;s.inCallback=true;bool ok=true;
+    // Resource-read-only after private preparation. A missing cold owner
+    // rejects before callbacks; a live preflight never widens the population.
+    for(std::size_t i=0;i<count&&ok;++i){const auto& c=calls[i];diagnostic_.widget=c.widget;
+        if(!idOk(c.widget)){ok=false;break;}const auto& e=s.entries[c.widget];
+        if(!dynamic(e.state.kind))continue;
+        const bool needs=c.operation==O::select||(e.state.kind==K::character&&c.operation==O::clearSelection);
+        if(needs&&((e.state.kind==K::character&&!e.characterAssets)||(e.state.kind==K::pod&&!e.podAssets))){
+            diagnostic_.error=E::cold;ok=false;
+        }
+    }
+    if(ok&&!s.backend.preflight(s.backend.context,*this,calls,count)){diagnostic_.error=E::backend;ok=false;}
     s.inCallback=false;if(!ok&&diagnostic_.error==E::none)diagnostic_.error=E::input;
     return ok;
 }

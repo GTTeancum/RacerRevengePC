@@ -132,6 +132,11 @@ public:
     void requestQuit() noexcept;
 private:
     friend class OriginalUiFrontend50KG;
+    // Only an explicit private candidate-builder call may request the19+20
+    // immutable union. Public bind retains19-only preparation. Neither mode
+    // changes source selection/registration, movement, Confirm or Back gates.
+    OriginalUiRiderSessionStatus50KG bindCold(const OriginalUiRiderSessionCold50KG&,
+        game::OriginalUiRiderColdPopulation50KG,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     const OriginalUiRiderDrawContribution50KG* rendererOwner() const noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };

@@ -293,7 +293,13 @@ struct OriginalUiRiderSession50KG::Storage {
 OriginalUiRiderSession50KG::OriginalUiRiderSession50KG() noexcept=default;
 OriginalUiRiderSession50KG::~OriginalUiRiderSession50KG()=default;
 Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& cold,Diagnostic& d) noexcept {
+    return bindCold(cold,game::OriginalUiRiderColdPopulation50KG::selected19,d);
+}
+Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG& cold,
+    game::OriginalUiRiderColdPopulation50KG population,Diagnostic& d) noexcept {
     d={};if(storage_)return result(d,Status::alreadyBound);
+    if(population!=game::OriginalUiRiderColdPopulation50KG::selected19&&
+       population!=game::OriginalUiRiderColdPopulation50KG::rider19And20)return result(d,Status::invalidInput);
     if(!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->bankInput()||
        !cold.resources->exitText(0)||!cold.resources->exitText(0)->prepared()||!cold.statAssets||!cold.statAssets->loaded()||
        !cold.binderAssets||!cold.binderAssets->loaded()||!genuine(cold.riderArchive,assets::OriginalUiArchiveId50KG::rider)||
@@ -317,6 +323,21 @@ Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& co
            page->useVideoAsTexture||page->background!="*INVALID*"||!cold.resources->background(19)||
            !cold.statAssets->portrait(19)||cold.resources->bankInput()->owners.size()!=1||
            cold.resources->bankInput()->owners[0]!=cold.resources->images())return result(d,Status::resource,0x1D63B0);
+        const auto coldControl=[&](std::size_t slot,std::uint16_t control,std::int32_t rider,
+            const std::array<std::uint16_t,4>& expected){
+            if(slot>=page->groups[1].controls.size()||page->groups[1].controls[slot]!=control||
+               control>=page->controls.size()||s->selection()->controlRider(control)!=rider)return false;
+            const auto& widgets=page->controls[control].widgets;if(widgets.size()!=expected.size())return false;
+            for(std::size_t i=0;i<expected.size();++i)if(widgets[i]!=expected[i])return false;
+            return true;
+        };
+        // Verify actual source memberships without changing navigation or
+        // inventing select callbacks to warm a second rider. Public bind
+        // retains the exact original19 descriptor/image population.
+        if(!coldControl(0,16,19,{{27,79,109,53}})||
+           (population==game::OriginalUiRiderColdPopulation50KG::rider19And20&&
+            (!coldControl(1,17,20,{{28,80,110,54}})||!cold.resources->background(20)||!cold.statAssets->portrait(20))))
+            return result(d,Status::resource,0x1D63B0);
         const unsigned indices[]={167,168,172};
         for(unsigned i=0;i<3;++i){const auto* entry=cold.english->at(indices[i]);
             if(!entry||entry->text.size()>20||entry->text.find('\0')!=std::string::npos)return result(d,Status::resource,0x1EA158);
@@ -344,6 +365,11 @@ Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& co
         if(!cold.profile->selectionSnapshotForMode(cold.prospectiveMode,copiedProfile)||
            game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),0,copiedProfile,coldPlan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
            coldPlan.rider4C4!=19)return result(d,Status::unavailableDestination,0x1E9C50);
+        // This local session has not escaped. Prepare genuine immutable
+        // descriptor candidates, then one complete bank and irreversible seal.
+        // Subsequent callback preflight only reads that sealed population.
+        if(!s->dynamic.prepareCold(population,d.dynamic))return result(d,Status::resource,d.dynamic.sourcePC);
+        if(!s->backend.prepareColdAndSeal(s->dynamic,d.backend))return result(d,Status::backend);
         if(!s->widgets().preflightNavigation(0,coldPlan.nextNavigation,coldPlan.navigationCommands,s->dynamic.hooks(),d.widget)){
             d.dynamic=s->dynamic.diagnostic();d.backend=s->backend.diagnostic();return result(d,Status::resource,0x1E9FD4);}
         // All callback implementations and their original cold resources now
