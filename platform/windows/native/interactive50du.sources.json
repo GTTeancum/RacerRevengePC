@@ -5,7 +5,7 @@
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "32c4e2f16a6178f37799076de52bf65a751159be320bcad0560b9960dc593b38"
+    "tools/prepare_interactive_build50dv.py": "ccf71e83260aa397fd40de9f732b1909358ec08c1c4a9d4a0318e22024672967"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -177,6 +177,7 @@
     "src/assets/material_texture_assets50ea.cpp",
     "src/assets/audio_assets50hc.cpp",
     "src/assets/material_audio50hi.cpp",
+    "src/assets/original_audio_directory50kx.cpp",
     "src/game/material_audio50hi.cpp",
     "src/game/gameplay_audio50he.cpp",
     "src/game/pod_speech50hg.cpp",

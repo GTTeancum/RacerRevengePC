@@ -38,6 +38,10 @@ def main():
         absolute = str(ROOT / source)
         if absolute not in argv:
             argv.insert(argv.index('-lz'), absolute)
+    # Immutable audio metadata; source registration does not bind live providers.
+    audio_directory = str(ROOT / 'src/assets/original_audio_directory50kx.cpp')
+    if audio_directory not in argv:
+        argv.insert(argv.index('-lz'), audio_directory)
     # Inactive original UI modules; source registration does not enable frontend.
     for source in (
         'src/assets/original_ui_archive50kg.cpp',
