@@ -4,6 +4,6 @@ The centralized hourly check started at 03:17:17.443011 UTC against local commit
 
 No executable was linked, no native UI process launched, and no new video, audio or gameplay evidence was produced. Incremental compilation stopped at its first failure; no complete-build object count or prior build receipt is reported as a new result. Existing Options edits, Cancel, Accept and audio remain runtime-unverified.
 
-The source correction explicitly copies RGB lanes 0..2 to diffuse/specular fields. It preserves all four selected-zone ambient lanes and the existing three-lane direction. This correction received source review only and was not rebuilt. The next centralized check is no earlier than 04:18:17.443011 UTC.
+The source correction explicitly copies directional RGB lanes 0..2 to diffuse/specular fields. The ambient type4 registry RGB fields remain constructor-zero, matching146C80; its actual ambient color is supplied through the zone ambient row. It preserves all four selected-zone ambient lanes and the existing three-lane direction. This correction received source review only and was not rebuilt. The next centralized check is no earlier than 04:18:17.443011 UTC.
 
 Rider composer/session work staged separately was not included in this check. Native host execution only; no PS2/VU emulation or guest execution. Historical Windows results are unrelated to this Linux failure.
