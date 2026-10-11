@@ -8,6 +8,7 @@
 #include "../../src/game/lap_host_clock50id.h"
 #include "../../src/game/original_ui_light_manager_lifetime50kg.h"
 #include <filesystem>
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -162,6 +163,25 @@ inline std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
 }
 struct Frontend {
     using Status=rr::platform::OriginalUiFrontendStatus50KG;
+    using StageClock=std::chrono::steady_clock;
+    // Host observation only. These samples never feed a source/accepted clock,
+    // cold-time exclusion, frame delta or the unchanged one-second stall gate.
+    const bool traceStages=[](){const char* v=std::getenv("RR_TRACE_ORIGINAL_UI_STAGES");
+        return v&&v[0]=='1'&&v[1]=='\0';}();
+    StageClock::time_point stageStart() const noexcept {
+        return traceStages?StageClock::now():StageClock::time_point{};
+    }
+    void reportStage(const char* stage,StageClock::time_point start,bool okay=true) const {
+        if(!traceStages)return;
+        const auto elapsed=std::chrono::duration_cast<std::chrono::nanoseconds>(StageClock::now()-start).count();
+        const auto snapshot=coordinator.snapshot();const auto& route=snapshot.route;
+        // End the observation before formatting/output; logging overhead still
+        // remains real work in the next accepted update interval.
+        std::cerr<<"original_ui_stage {\"stage\":\""<<stage<<"\",\"completed_frame\":"<<frameCount
+            <<",\"accepted_update_sequence\":"<<snapshot.updates<<",\"screen\":"<<unsigned(route.screen)
+            <<",\"page\":"<<unsigned(route.page)<<",\"wall_nanoseconds\":"<<elapsed
+            <<",\"okay\":"<<(okay?"true":"false")<<"}\n";
+    }
     AudioOutput audioOutput;
     rr::platform::OriginalUiFrontend50KG coordinator;
     rr::platform::OriginalUiFrontendDiagnostic50KG diagnostic{};
@@ -381,19 +401,31 @@ struct Frontend {
     }
     void update(const rr::platform::OriginalUiMainSessionUpdate50KG& in,std::uint64_t elapsedNanoseconds) {
         rr::platform::OriginalUiFrontendUpdateReceipt50KG receipt;
-        if(coordinator.update(in,receipt,diagnostic)!=Status::ok||!receipt.accepted||receipt.sequence!=lastAudioSequence+1)
+        const auto updateStart=stageStart();
+        const bool updated=coordinator.update(in,receipt,diagnostic)==Status::ok&&receipt.accepted&&receipt.sequence==lastAudioSequence+1;
+        reportStage("source_update",updateStart,updated);
+        if(!updated)
             fail("update");
         // One PCM advance for this exact accepted source update; never for
         // loading, rejected updates, or a second screen's copied clock.
         rr::platform::AudioOutputDiagnostic50HD outputDiagnostic;
-        if(!audioOutput.advanceAcceptedNanoseconds(elapsedNanoseconds,outputDiagnostic))
+        const auto audioStart=stageStart();
+        const bool advanced=audioOutput.advanceAcceptedNanoseconds(elapsedNanoseconds,outputDiagnostic);
+        reportStage("pcm_advance",audioStart,advanced);
+        if(!advanced)
             throw std::runtime_error(std::string("original UI PCM advance failed: ")+outputDiagnostic.detail.data());
         lastAudioSequence=receipt.sequence;
     }
     void render(const rr::platform::OriginalUiMainFrameClock50KG& clock,
         rr::platform::VehicleWindowGl50DS& renderer,std::int32_t width,std::int32_t height) {
-        if(coordinator.render(clock,diagnostic)!=Status::ok)fail("render");
-        if(coordinator.submit(renderer,width,height,diagnostic)!=Status::ok)fail("submission");
+        const auto buildStart=stageStart();
+        const bool rendered=coordinator.render(clock,diagnostic)==Status::ok;
+        reportStage("source_build",buildStart,rendered);
+        if(!rendered)fail("render");
+        const auto submitStart=stageStart();
+        const bool submitted=coordinator.submit(renderer,width,height,diagnostic)==Status::ok;
+        reportStage("native_submit",submitStart,submitted);
+        if(!submitted)fail("submission");
         submittedScreen=coordinator.snapshot().route.screen;
         submittedPublication=coordinator.gpu()?coordinator.gpu()->publicationToken():0;
         submittedDraws=diagnostic.renderer.originalUiDraws;submittedQuads=diagnostic.renderer.originalUiQuads;
@@ -402,7 +434,9 @@ struct Frontend {
         sourceTargetGeneration=diagnostic.renderer.originalUiSourceTargetGeneration;
     }
     void commitDeferred(rr::platform::VehicleWindowGl50DS& renderer) {
+        const auto deferredStart=stageStart();
         const auto status=coordinator.commitDeferred(renderer,diagnostic);
+        reportStage("deferred_commit",deferredStart,status==Status::ok||status==Status::noChange);
         if(status==Status::ok){imagePublished=false;std::cerr<<"original_ui_screen_activated "<<unsigned(coordinator.snapshot().route.screen)<<'\n';}
         else if(status!=Status::noChange)fail("deferred activation");
     }

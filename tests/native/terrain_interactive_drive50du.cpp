@@ -3119,7 +3119,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(headlessLive,"capture path not configured");
    phase_timing50GK::Scope captureTiming(phaseTiming,phase_timing50GK::Phase::Capture);
    platform::VehicleWindowDiagnostic50DS readbackDiagnostic{};
-   require50DU(renderer.readbackRgba(captureBuffer.data(),captureBuffer.size(),readbackDiagnostic),"live frame readback failed");
+   const auto readbackStart=originalMain.stageStart();
+   const bool readbackOkay=renderer.readbackRgba(captureBuffer.data(),captureBuffer.size(),readbackDiagnostic);
+   if(originalMainApplication.enabled)originalMain.reportStage("capture_readback",readbackStart,readbackOkay);
+   require50DU(readbackOkay,"live frame readback failed");
+   const auto fileStart=originalMain.stageStart();
    const auto width=readbackDiagnostic.readbackWidth,height=readbackDiagnostic.readbackHeight;
    require50DU(width>0&&static_cast<std::size_t>(width)*3<=captureRgbRow.size(),"capture RGB row capacity");
    const auto captureFile=std::filesystem::path(capturePath);
@@ -3142,6 +3146,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(originalMainApplication.enabled){
     // Same-directory rename atomically publishes the completed PPM before ACK.
     std::filesystem::rename(writingFile,captureFile);
+    originalMain.reportStage("capture_file_publication",fileStart);
     const auto mainAudioInfo=originalMain.audioOutput.info();
     const auto capturedUi=originalMain.coordinator.snapshot();
     J capturedGroup=nullptr;
@@ -3293,9 +3298,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // Its four debug-query levels therefore remain actually released.
     originalMain.update(update,elapsedNanoseconds);
     originalMain.render(mainClock,renderer,info.drawableWidth,info.drawableHeight);
+    const auto swapStart=originalMain.stageStart();
     if(host.hasWindow()&&!host.swapWindow(hostDiagnostic)){
+     originalMain.reportStage("window_swap",swapStart,false);
      reportHost50DU(hostDiagnostic);throw std::runtime_error("original Main window swap failed");
     }
+    if(host.hasWindow())originalMain.reportStage("window_swap",swapStart);
     originalMain.imagePublished=true;++originalMain.frameCount;
     if(host.hasWindow())++windowSwaps;
     if(originalMain.frameCount==1){
