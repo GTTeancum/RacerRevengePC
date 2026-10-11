@@ -106,6 +106,7 @@ def main():
         'src/game/original_ui_rider_widgets50kg.cpp',
         'src/game/original_ui_rider_visibility50kg.cpp',
         'src/game/original_ui_rider_backend50kg.cpp',
+        'src/game/original_ui_rider_material_lifetime50kg.cpp',
         'src/game/original_ui_rider_panel50kg.cpp',
         'src/game/original_ui_rider_selected_packet50kg.cpp',
         'src/game/original_ui_light_manager_lifetime50kg.cpp',
