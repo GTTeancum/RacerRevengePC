@@ -187,6 +187,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const char* trackSelectionError=nullptr;
  const auto* trackSession=track_session_assets50IG::select(rr::platform::hostTrackCode50IM(loadedTrack),trackSelectionError);
  require50DU(trackSession,trackSelectionError?trackSelectionError:"original track admission failed");
+ // Retained HOST trigger source is dormant; native Gate has independent ownership.
+ const char* hostTriggerSetting=std::getenv("RR_GC_HOST_TRIGGERS");
+ require50DU(!hostTriggerSetting||std::string(hostTriggerSetting)=="0",
+     "RR_GC_HOST_TRIGGERS is dormant and cannot replace original-AI/native Gate ownership");
  const char* gateSetting=std::getenv("RR_GC_NATIVE_GATE");
  const bool gcNativeGate=trackSession->originalStaticCandidates&&gateSetting&&std::string(gateSetting)=="1";
  if(trackSession->originalStaticCandidates){
