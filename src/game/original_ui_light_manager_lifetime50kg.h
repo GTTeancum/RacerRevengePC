@@ -57,6 +57,9 @@ public:
     void destroyApplication() noexcept;
     OriginalUiLightCacheState50KG cacheState() const noexcept {return cacheState_;}
     std::uint64_t managerGeneration() const noexcept {return managerGeneration_;}
+    // Read-only scope identity for the application coordinator's generation
+    // lease. It cannot create, reset or substitute a cache/lifetime.
+    const assets::OriginalUiArchiveIdentity50KG* activeUiIdentity() const noexcept {return activeUi_;}
     bool riderRegistryReady() const noexcept {return riderRegistryReady_;}
 private:
     OriginalUiLightCacheState50KG cacheState_=OriginalUiLightCacheState50KG::notConstructed;

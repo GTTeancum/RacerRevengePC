@@ -96,6 +96,11 @@ struct OriginalUiFrontend50KG::Storage {
     VehicleWindowGl50DS* renderer=nullptr;
     bool prepared=false,activated=false,faulted=false,quit=false,inOperation=false,closing=false;
     bool queued=false,frameRendered=false,frameSubmitted=false;
+    // This coordinator's current UI-manager lease on the shared APPLICATION
+    // object. Cold/pending resource owners never enter or release it.
+    bool lightManagerEntered=false;
+    const assets::OriginalUiArchiveIdentity50KG* lightManagerUi=nullptr;
+    std::uint64_t lightManagerGeneration=0;
     game::OriginalUiApplicationRequest50KG queue{};
     OriginalUiMainRouteProposal50KG mainProposal{};
     OriginalUiOptionsRouteProposal50KG optionsProposal{};
@@ -105,15 +110,42 @@ struct OriginalUiFrontend50KG::Storage {
         if(!faulted){result(d,s,pc);failure=d;faulted=true;}
         frameRendered=false;frameSubmitted=false;d=failure;return d.status;
     }
+    bool ownsLightManager() const noexcept {
+        return lightManagerEntered&&cold.lightManager&&lightManagerUi&&lightManagerGeneration&&
+            cold.lightManager->activeUiIdentity()==lightManagerUi&&
+            cold.lightManager->managerGeneration()==lightManagerGeneration;
+    }
+    bool enterLightManager(const assets::OriginalUiArchive50KG& source,Diagnostic& d) noexcept {
+        if(lightManagerEntered||!cold.lightManager){
+            d.lightManager={game::OriginalUiLightManagerLifetimeError50KG::phase,0x1CCD88};return false;
+        }
+        if(!cold.lightManager->beginUiManager(source,d.lightManager))return false;
+        lightManagerUi=source.identity();lightManagerGeneration=cold.lightManager->managerGeneration();
+        lightManagerEntered=true;return true;
+    }
+    bool releaseLightManager(Diagnostic& d) noexcept {
+        if(!lightManagerEntered)return true;
+        const bool owned=ownsLightManager();
+        const bool released=owned&&cold.lightManager->releaseUiManager();
+        // If external work broke the lease, do not release another owner's
+        // manager or turn unknown history into a fresh absent-cache claim.
+        // Native consumers have already drained before this helper is reached.
+        if(!released&&cold.lightManager)cold.lightManager->invalidateForUntrackedScene();
+        lightManagerEntered=false;lightManagerUi=nullptr;lightManagerGeneration=0;
+        if(!released){d.lightManager={game::OriginalUiLightManagerLifetimeError50KG::phase,0x148110};return false;}
+        return true;
+    }
     bool processReady() const noexcept {
-        return cold.profile&&cold.profile->known&&cold.profile->savedSlot6E0>=1&&cold.profile->savedSlot6E0<=5&&
+        return cold.lightManager&&cold.lightManager->cacheState()==game::OriginalUiLightCacheState50KG::absentSinceApplicationConstruction&&
+            (!lightManagerEntered||ownsLightManager())&&
+            cold.profile&&cold.profile->known&&cold.profile->savedSlot6E0>=1&&cold.profile->savedSlot6E0<=5&&
             cold.optionsProfile&&cold.optionsProfile->known&&cold.optionsProfile->savedSlot6E4>=1&&cold.optionsProfile->savedSlot6E4<=6&&
             (!cold.gameSettingsProfile||game::validOriginalUiGameSettingsProfile50KG(*cold.gameSettingsProfile))&&
             cold.application&&cold.application->known&&!(cold.application->globalFlags228&4u)&&cold.application->transportE00==-1&&
             (cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:(cold.audio&&cold.audio->ready()));
     }
     bool sourceCurrent() const noexcept {
-        return activated&&renderer&&renderer->initialized()&&bank==active.get()&&active&&active->prepared()&&
+        return activated&&ownsLightManager()&&processReady()&&renderer&&renderer->initialized()&&bank==active.get()&&active&&active->prepared()&&
             active->transition->snapshot().bound&&active->ownsRoute(active->transition->snapshot().current);
     }
     bool destination(Route route) const noexcept {
@@ -269,14 +301,22 @@ struct OriginalUiFrontend50KG::Storage {
     }
 };
 OriginalUiFrontend50KG::OriginalUiFrontend50KG() noexcept=default;
-OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept=default;
+OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept {
+    // Explicit close is still required for GPU cleanup. Destruction without a
+    // completed close cannot certify a reusable process light lifetime.
+    if(storage_&&storage_->lightManagerEntered&&storage_->cold.lightManager)
+        storage_->cold.lightManager->invalidateForUntrackedScene();
+}
 Status OriginalUiFrontend50KG::prepare(const OriginalUiFrontendCold50KG& cold,Diagnostic& d) noexcept {
     d={};if(storage_)return result(d,Status::alreadyPrepared);
     using Id=assets::OriginalUiArchiveId50KG;
     if(!archive(cold.appStart,Id::appStart)||!archive(cold.mainMenu,Id::mainMenu)||!archive(cold.options,Id::options)||
         !archive(cold.fonts,Id::fonts)||!archive(cold.controllerPopup,Id::controllerPopup)||!archive(cold.overlays,Id::overlays)||
         !archive(cold.localization,Id::localization))return result(d,Status::resource);
-    if(!cold.video.lifetime||!cold.textureRequest.context||!cold.textureRequest.isCurrent||
+    if(!cold.lightManager||
+        cold.lightManager->cacheState()!=game::OriginalUiLightCacheState50KG::absentSinceApplicationConstruction||
+        cold.lightManager->activeUiIdentity()||
+        !cold.video.lifetime||!cold.textureRequest.context||!cold.textureRequest.isCurrent||
         !cold.textureRequest.isCurrent(cold.textureRequest.context)||!cold.textureRequest.maximumGpuBytes||
         cold.textureRequest.samplers||cold.textureRequest.samplerCount||
         (cold.audioMode!=OriginalUiMainAudioMode50KG::enabled&&cold.audioMode!=OriginalUiMainAudioMode50KG::muted))return result(d,Status::invalidInput);
@@ -305,6 +345,7 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
     if(s->activated||s->renderer||s->closing||s->quit)return result(d,Status::busy);
     Operation operation(s->inOperation);s->renderer=&renderer;
     if(!s->active->prepared()||!renderer.bindOriginalUiTextures(*s->active->textures(),*s->active->gpu,d.renderer))return s->fault(d,Status::renderer);
+    if(!s->enterLightManager(*s->cold.mainMenu,d))return s->fault(d,Status::session,d.lightManager.sourcePC);
     s->bank=s->active.get();s->activating=s->active.get();
     d.transition=s->active->transition->bindInitialPage(4,1,s->callbacks(*s->active));s->activating=nullptr;
     if(d.transition!=Transition::ok||s->faulted)return s->fault(d,Status::transition,0x2A3C10);
@@ -416,6 +457,7 @@ Status OriginalUiFrontend50KG::submit(VehicleWindowGl50DS& renderer,std::int32_t
     if(&renderer!=s->renderer||s->bank!=s->active.get()||!s->frameRendered||s->frameSubmitted||s->renderedUpdate!=s->updates)
         return result(d,Status::invalidInput);
     Operation operation(s->inOperation);
+    if(!s->sourceCurrent())return s->fault(d,Status::session);
     const auto* draw=s->active->draw();
     if(!draw||!renderer.submitOriginalUi(*draw,width,height,d.renderer)||!d.renderer.originalUiAccepted)return s->fault(d,Status::renderer);
     s->frameSubmitted=true;s->submittedUpdate=s->updates;++s->submissions;return result(d,Status::ok);
@@ -430,8 +472,18 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,Diag
     Operation operation(s->inOperation);
     const auto old=s->active->transition->snapshot();const Route target{static_cast<std::uint8_t>(s->queue.screen),static_cast<std::uint8_t>(s->queue.page)};
     if(!old.applicationRequestQueued||old.lifecycle!=Life::queueScreen||!same(old.requested,target)||!s->destination(target))return s->fault(d,Status::transition);
+    if(!s->ownsLightManager())return s->fault(d,Status::session,0x148110);
+    const auto* destinationArchive=s->pending->main?s->cold.mainMenu.get():
+        (s->pending->options?s->cold.options.get():nullptr);
+    if(!destinationArchive)return s->fault(d,Status::unavailableDestination,0x1CCD88);
     if(!renderer.finishSubmittedWork(d.renderer)||!d.renderer.submittedWorkCompleted)return s->fault(d,Status::renderer);
     if(!renderer.bindOriginalUiTextures(*s->pending->textures(),*s->pending->gpu,d.renderer))return s->fault(d,Status::renderer);
+    // All outgoing source submissions have completed. Switch the shared light
+    // manager BEFORE incoming page callbacks, while retaining old cold/GPU
+    // resources for the existing retirement boundary. Page-only Options
+    // changes never call this function and keep the same manager generation.
+    if(!s->releaseLightManager(d))return s->fault(d,Status::cleanup,d.lightManager.sourcePC);
+    if(!s->enterLightManager(*destinationArchive,d))return s->fault(d,Status::session,d.lightManager.sourcePC);
     s->bank=s->pending.get();s->activating=s->pending.get();
     d.transition=s->pending->transition->bindInitialPage(target.screen,target.page,s->callbacks(*s->pending));s->activating=nullptr;
     if(d.transition!=Transition::ok||s->faulted)return s->fault(d,Status::transition,0x2A3C10);
@@ -456,6 +508,9 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
         if(!s->release(s->retiring,d))return result(d,Status::cleanup);
         if(!s->release(s->pending,d))return result(d,Status::cleanup);
         if(!s->release(s->active,d))return result(d,Status::cleanup);
+        // Cleanup retries retain this lease until every renderer/session/GPU
+        // consumer is gone. Per-manager release above must not touch it.
+        if(!s->releaseLightManager(d))return result(d,Status::cleanup,d.lightManager.sourcePC);
     }
     storage_.reset();return result(d,Status::ok);
 }
@@ -469,6 +524,9 @@ OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshot() const noexcept
     out.prepared=s->prepared;out.active=s->activated;out.faulted=s->faulted;out.quitRequested=s->quit;
     out.deferredQueue=s->queued;out.frameSubmitted=s->frameSubmitted;out.queuedRequest=s->queue;
     out.updates=s->updates;out.renders=s->renders;out.submissions=s->submissions;out.switches=s->switches;
+    if(s->cold.lightManager){out.lightCacheState=s->cold.lightManager->cacheState();
+        out.lightManagerGeneration=s->cold.lightManager->managerGeneration();}
+    out.lightManagerEntered=s->ownsLightManager();
     if(s->active){out.route=s->active->currentRoute();if(s->active->transition)out.transition=s->active->transition->snapshot();
         if(s->active->main)out.main=s->active->main->snapshot();if(s->active->options)out.options=s->active->options->snapshot();}
     if(s->pending)out.preparedDestination=s->pending->initialRoute;return out;

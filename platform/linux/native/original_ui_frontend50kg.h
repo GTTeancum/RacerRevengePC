@@ -2,6 +2,7 @@
 #include "original_ui_options_session50kg.h"
 #include "vehicle_window_gl50ds.h"
 #include "../../../src/assets/original_ui_localization50kg.h"
+#include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
 #include <chrono>
 #include <memory>
 
@@ -18,6 +19,7 @@ struct OriginalUiFrontendDiagnostic50KG {
     OriginalUiOptionsSessionDiagnostic50KG options{};
     OriginalUiOptionsDrawDiagnostic50KG optionsResources{};
     assets::OriginalUiLocalizationDiagnostic50KG localization{};
+    game::OriginalUiLightManagerLifetimeDiagnostic50KG lightManager{};
     MaterialTextureGlDiagnostic50EB gpu{};
     VehicleWindowDiagnostic50DS renderer{};
     game::OriginalUiTransitionStatus50KG transition=game::OriginalUiTransitionStatus50KG::ok;
@@ -38,6 +40,9 @@ struct OriginalUiFrontendCold50KG {
     // the same pointer is attached to audio's current native mixer.
     std::shared_ptr<OriginalSoundMode50KG> soundMode;
     std::shared_ptr<OriginalUiMainApplication50KG> application;
+    // Constructed once by the native APPLICATION before initial Main, retained
+    // across every screen/frontend lifetime. Never created by a destination.
+    std::shared_ptr<game::OriginalUiLightManagerLifetime50KG> lightManager;
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
     // Same actual transport/output owner throughout both screens. Caller owns
     // mixer/device and advances PCM only for an accepted update receipt.
@@ -81,12 +86,15 @@ struct OriginalUiFrontendSnapshot50KG {
     OriginalUiMainSessionSnapshot50KG main{};
     OriginalUiOptionsSessionSnapshot50KG options{};
     std::uint64_t updates=0,renders=0,submissions=0,switches=0;
+    game::OriginalUiLightCacheState50KG lightCacheState=game::OriginalUiLightCacheState50KG::notConstructed;
+    std::uint64_t lightManagerGeneration=0;
+    bool lightManagerEntered=false;
 };
 // Concrete native Main4/1 <-> Options12/{1,4} owner. No generic destination-ready
 // callbacks, guest execution, gameplay entry, fallback UI or profile reset.
 // One freshly prepared bank/session/manager per screen lifetime; shared process
-// profile/application/audio remain the same. Options page changes retain that
-// screen's one bank/session/manager. All calls serialized/non-reentrant.
+// profile/application/audio/light manager remain the same. Options page changes
+// retain that screen's one bank/session/manager. All calls serialized/non-reentrant.
 class OriginalUiFrontend50KG final {
 public:
     OriginalUiFrontend50KG() noexcept;

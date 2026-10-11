@@ -5,6 +5,7 @@
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
 #include "../../src/assets/original_ui_localization50kg.h"
 #include "../../src/game/lap_host_clock50id.h"
+#include "../../src/game/original_ui_light_manager_lifetime50kg.h"
 #include <filesystem>
 #include <cstdlib>
 #include <fstream>
@@ -36,6 +37,8 @@ struct Application {
     std::shared_ptr<rr::game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
     std::shared_ptr<rr::platform::OriginalSoundMode50KG> soundMode;
     std::shared_ptr<rr::platform::OriginalUiMainApplication50KG> state;
+    //140084/147FF8 application lifetime, shared by every frontend incarnation.
+    std::shared_ptr<rr::game::OriginalUiLightManagerLifetime50KG> lightManager;
     explicit Application(rr::game::HostMonotonicClock50ID& clock) {
         const char* enabledSetting=std::getenv("RR_ORIGINAL_MAIN_MENU");
         require(!enabledSetting || std::string(enabledSetting)=="0" || std::string(enabledSetting)=="1",
@@ -62,6 +65,15 @@ struct Application {
         gameSettingsProfile=std::make_shared<rr::game::OriginalUiGameSettingsProfile50KG>();
         soundMode=std::make_shared<rr::platform::OriginalSoundMode50KG>();
         state=std::make_shared<rr::platform::OriginalUiMainApplication50KG>();
+        // The last shared owner performs application destruction. A frontend
+        // pins this same object until its consumers/cleanup have finished, so
+        // even exceptional unwinding cannot destroy it under live borrowers.
+        using LightManager=rr::game::OriginalUiLightManagerLifetime50KG;
+        lightManager=std::shared_ptr<LightManager>(new LightManager,
+            [](LightManager* manager) noexcept {manager->destroyApplication();delete manager;});
+        rr::game::OriginalUiLightManagerLifetimeDiagnostic50KG lightDiagnostic;
+        require(lightManager->constructAtApplicationStartup(lightDiagnostic),
+            "original shared LightManager startup rejected");
         // Fresh native backing starts with no imported unlocks or debug bits.
         // Source1864B0/186EF0 reset only its proven Main fields.
         rr::platform::resetOriginalUiMainProfileFields50KG(*profile);
@@ -182,6 +194,7 @@ struct Frontend {
         cold.localization=readArchive(application.assetRoot,Id::localization);
         cold.runtime=application.materialRuntime;cold.video=video->publication(video);
         cold.profile=application.profile;cold.application=application.state;
+        cold.lightManager=application.lightManager;
         cold.optionsProfile=application.optionsProfile;cold.gameSettingsProfile=application.gameSettingsProfile;
         cold.soundMode=application.soundMode;
         cold.audioMode=application.audioMode;
