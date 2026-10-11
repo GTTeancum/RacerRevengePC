@@ -345,6 +345,7 @@ struct OriginalUiFrontend50KG::Storage {
                 session.english=&english;session.profile=cold.riderProfile;session.commonProfile=cold.profile;session.application=cold.application;
                 session.lightManager=cold.lightManager;session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;
                 session.prospectiveMode=prospectiveMode;session.previousScreen=4;
+                session.predecessorResources=active&&active->main?active->mainResources.get():nullptr;
                 m.rider=std::make_unique<OriginalUiRiderSession50KG>();
                 if(m.rider->bind(session,d.rider)!=RiderStatus::ok||!m.rider->canEnterMode(prospectiveMode)||
                    m.rider->prepareBank(d.rider)!=RiderStatus::ok){result(d,Status::session);return false;}
@@ -378,10 +379,11 @@ struct OriginalUiFrontend50KG::Storage {
     }
     bool retireRider(Manager& m,Diagnostic& d) noexcept {
         if(!m.rider||m.riderRetired)return true;
-        const auto* owner=m.rider->rendererOwner();
-        if(!owner)return true; // A failed cold bind never constructed a composer.
-        if(!renderer||!renderer->retireOriginalUiSourceOwner(*owner,d.renderer)){result(d,Status::cleanup);return false;}
-        m.rider->drain();m.riderRetired=true;return true;
+        // The private session path obtains actual renderer retirement and
+        // binds it to this collector's attempted generation/event frontier.
+        // All dynamic releases and retirement consumption precede reset().
+        if(m.rider->teardownSource(renderer,d.renderer,d.rider)!=RiderStatus::ok){result(d,Status::cleanup);return false;}
+        m.riderRetired=true;return true;
     }
     bool refreshRiderBank(Manager& m,Diagnostic& d) noexcept {
         if(!m.rider)return true;
@@ -434,6 +436,14 @@ OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept {
     // completed close cannot certify a reusable process light lifetime.
     if(storage_&&storage_->lightManagerEntered&&storage_->cold.lightManager)
         storage_->cold.lightManager->invalidateForUntrackedScene();
+    if(storage_)for(const auto* manager:{storage_->retiring.get(),storage_->pending.get(),storage_->active.get()})
+        if(manager&&manager->rider&&manager->rider->sourceTeardownPending()){
+            // Terminal misuse after omitted/failed explicit close. Keep the
+            // Manager callback context, session, ledger and every cold/GPU/
+            // application owner together. This leaks deliberately; it does
+            // not report cleanup success and cannot replace a close retry.
+            storage_.release();break;
+        }
 }
 Status OriginalUiFrontend50KG::prepare(const OriginalUiFrontendCold50KG& cold,Diagnostic& d) noexcept {
     d={};if(storage_)return result(d,Status::alreadyPrepared);

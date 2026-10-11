@@ -509,6 +509,19 @@ struct VehicleWindowDiagnostic50DS {
     // UI-only publication, never a successful native vehicle batch receipt.
     bool hostMenuAccepted = false;
     bool originalUiAccepted = false;
+    // Source acceptance is independent of opaque publication/window-copy failure.
+    // Hidden source work leaves originalUiAccepted false and readback unchanged.
+    bool originalUiSourceAccepted = false;
+    // Source-publication/snapshot sequences only; neither counts host swaps.
+    std::uint64_t originalUiPublicationGeneration = 0,originalUiSnapshotGeneration = 0;
+    // Private byte-blend results only. No source/page update or publication.
+    bool originalUiByteBlendAccepted = false;
+    std::uint64_t originalUiByteBlendGeneration = 0, originalUiByteBlendSampleGeneration = 0;
+    // Explicit dormant PRIVATE opaque publication only, never a source/page
+    // acceptance, window back-buffer copy, host swap or display receipt.
+    bool originalUiPrivatePublicationAccepted = false;
+    std::uint64_t originalUiPrivatePublicationGeneration = 0;
+    std::uint64_t originalUiPromotedIncomingGeneration = 0;
     // Actual selected source path after successful create or for a source
     // submission. Ordinary RGB submissions leave this false.
     bool originalUiCoherentFramebufferFetch = false;
@@ -520,6 +533,157 @@ struct VehicleWindowDiagnostic50DS {
     std::uint32_t opponentRacersDrawn = 0, opponentOpaqueDraws = 0, opponentOpaqueIndices = 0;
     // maxVehicleWindowOpponents50DS denotes no opponent-specific failure.
     std::uint32_t opponentIndex = maxVehicleWindowOpponents50DS;
+};
+
+// Unforgeable renderer-issued value. The live renderer revalidates its weak
+// lifetime and exact target generation on every use; getters are observations,
+// not authority. Current-source receipts do not pin the reusable target: the
+// next source clear or owner retirement invalidates them. Completion is issued
+// only after checked glFinish. Neither
+// type claims a window swap, fresh Main route, observer/effect state, or parity.
+class OriginalUiSourceSubmission50KN final {
+public:
+    std::uint64_t frameGeneration()const noexcept{return frameGeneration_;}
+    std::uint64_t targetGeneration()const noexcept{return targetGeneration_;}
+    std::uint64_t texturePublication()const noexcept{return texturePublication_;}
+    bool completed()const noexcept{return completed_;}
+    const OriginalUiSourceTerminal50KN& terminal()const noexcept{return terminal_;}
+private:
+    friend class VehicleWindowGl50DS;
+    std::weak_ptr<const std::uint8_t> lifetime_;
+    std::uint64_t frameGeneration_=0,targetGeneration_=0,texturePublication_=0;
+    OriginalUiSourceTerminal50KN terminal_{};
+    bool completed_=false;
+};
+class OriginalUiRetainedSource50KN final {
+public:
+    std::uint64_t snapshotGeneration()const noexcept{return snapshotGeneration_;}
+    std::uint64_t publicationGeneration()const noexcept{return publicationGeneration_;}
+    const OriginalUiSourceSubmission50KN& source()const noexcept{return source_;}
+private:
+    friend class VehicleWindowGl50DS;
+    OriginalUiSourceSubmission50KN source_;
+    std::uint64_t snapshotGeneration_=0,publicationGeneration_=0;
+};
+
+// Closed documented native sprite semantics, not a GS executor or measured
+// silicon DDA parity claim. Source top-down639x447 coverage excludes its final
+// column/row; all1087 border pixels preserve old RGBA on EVERY sample.
+struct OriginalUiByteBlendContract50KO final {
+    static constexpr std::int32_t width=640,height=448,coveredWidth=639,coveredHeight=447;
+    static constexpr std::uint32_t coveredPixels=285633,preservedPixels=1087;
+    static constexpr std::int32_t xyz0X=0,xyz0Y=0,xyz1X=639,xyz1Y=447;
+    static constexpr std::int32_t uv0U16=1,uv0V16=1,uv1U16=10240,uv1V16=7168;
+    static constexpr std::int32_t textureWidth=1024,textureHeight=512,bufferWidth=640;
+    static constexpr std::uint32_t tex1=0,textureColorComponent=0,textureFunction=0;
+    static constexpr std::uint32_t clampU=1,clampV=1,modulationRgb=128,minimumAlpha=0,maximumAlpha=128;
+    static constexpr std::uint32_t psm=0,prim=0x156,test=0x31001;
+    static constexpr std::uint64_t inheritedAlpha=0x0000008000000044ULL,inheritedClamp=0x5;
+};
+// Renderer-owned immutable pair: existing retained old snapshot plus a PRIVATE
+// completed copy of incoming, not a pin of the reusable ordinary source target.
+// Explicit release/close retires GPU ownership; destroying this value does not.
+// It certifies no route history, observers, popup state, host swap or movement.
+class OriginalUiByteBlend50KO final {
+public:
+    std::uint64_t generation()const noexcept{return generation_;}
+    const OriginalUiRetainedSource50KN& oldSource()const noexcept{return old_;}
+    const OriginalUiSourceSubmission50KN& incomingSource()const noexcept{return incoming_;}
+private:
+    friend class VehicleWindowGl50DS;
+    OriginalUiRetainedSource50KN old_;
+    OriginalUiSourceSubmission50KN incoming_;
+    std::uint64_t generation_=0;
+};
+// Only the most recently accepted effect sample remains readable. An admitted
+// sample attempt invalidates it BEFORE any target write, including on failure.
+// Accepted is not completed. Neither state implies publication or a host swap.
+class OriginalUiByteBlendSample50KO final {
+public:
+    std::uint64_t blendGeneration()const noexcept{return blendGeneration_;}
+    std::uint64_t sampleGeneration()const noexcept{return sampleGeneration_;}
+    std::uint32_t alpha()const noexcept{return alpha_;}
+    bool completed()const noexcept{return completed_;}
+private:
+    friend class VehicleWindowGl50DS;
+    std::weak_ptr<const std::uint8_t> lifetime_;
+    std::uint64_t blendGeneration_=0,sampleGeneration_=0;
+    std::uint32_t alpha_=0;
+    bool completed_=false;
+};
+
+enum class OriginalUiPrivatePublicationKind50KP : std::uint8_t {
+    none, byteBlendSample, immutableIncoming
+};
+// A separate opaque RGB copy selected for renderer readback. Completion refers
+// only to that copy. Immutable lineage fields observe the original source;
+// they never mint a new source submission or certify a transition schedule.
+// A later sample or blend retirement does not overwrite this independent copy.
+// Any later successful image publication invalidates this publication receipt.
+// No default framebuffer operation or host display/swap is represented here.
+class OriginalUiPrivatePublication50KP final {
+public:
+    OriginalUiPrivatePublicationKind50KP kind()const noexcept{return kind_;}
+    std::uint64_t generation()const noexcept{return generation_;}
+    std::uint64_t blendGeneration()const noexcept{return blendGeneration_;}
+    std::uint64_t sampleGeneration()const noexcept{return sampleGeneration_;}
+    std::uint64_t oldSnapshotGeneration()const noexcept{return oldSnapshotGeneration_;}
+    std::uint64_t incomingFrameGeneration()const noexcept{return incomingFrameGeneration_;}
+    std::uint64_t incomingTargetGeneration()const noexcept{return incomingTargetGeneration_;}
+    // Meaningful only for byteBlendSample; immutableIncoming has no effect alpha.
+    std::uint32_t alpha()const noexcept{return alpha_;}
+    std::int32_t width()const noexcept{return width_;}
+    std::int32_t height()const noexcept{return height_;}
+    bool completed()const noexcept{return completed_;}
+private:
+    friend class VehicleWindowGl50DS;
+    std::weak_ptr<const std::uint8_t> lifetime_;
+    OriginalUiPrivatePublicationKind50KP kind_=OriginalUiPrivatePublicationKind50KP::none;
+    std::uint64_t generation_=0,blendGeneration_=0,sampleGeneration_=0,oldSnapshotGeneration_=0;
+    std::uint64_t incomingFrameGeneration_=0,incomingTargetGeneration_=0;
+    std::uint32_t alpha_=0;
+    std::int32_t width_=0,height_=0;
+    bool completed_=false;
+};
+enum class OriginalUiWindowBackBufferCopyKind : std::uint8_t {
+    none, windowBack
+};
+// Historical renderer-issued observation of an accepted default BACK blit.
+// The copied publication records the exact prior completed PRIVATE image and
+// its lineage; that completion does not cover this later window copy. Neither
+// this value nor its nonwrapping sequence is a current permission to swap: the
+// renderer cannot observe host swaps or intervening window writes. No window
+// copy completion, swap submission, presentation event or scanout is certified.
+// Retaining this value pins neither GPU pixels nor the renderer's lifetime.
+class OriginalUiWindowBackBufferCopy final {
+public:
+    OriginalUiWindowBackBufferCopyKind kind()const noexcept{return kind_;}
+    std::uint64_t sequence()const noexcept{return sequence_;}
+    bool commandsAccepted()const noexcept{return commandsAccepted_;}
+    const OriginalUiPrivatePublication50KP& publication()const noexcept{return publication_;}
+    std::int32_t width()const noexcept{return publication_.width();}
+    std::int32_t height()const noexcept{return publication_.height();}
+private:
+    friend class VehicleWindowGl50DS;
+    std::weak_ptr<const std::uint8_t> lifetime_;
+    OriginalUiPrivatePublication50KP publication_;
+    std::uint64_t sequence_=0;
+    OriginalUiWindowBackBufferCopyKind kind_=OriginalUiWindowBackBufferCopyKind::none;
+    bool commandsAccepted_=false;
+};
+// Immutable full incoming RGBA ownership transferred out of the blend, not a
+// new submission into the reusable ordinary source target. Its original source
+// receipt remains a historical observation with the existing freshness rules.
+// This raw image survives later opaque publications and blend retirement until
+// explicit promoted-image release/close. Destroying the value does not release.
+class OriginalUiPromotedIncoming50KP final {
+public:
+    std::uint64_t generation()const noexcept{return generation_;}
+    const OriginalUiSourceSubmission50KN& source()const noexcept{return source_;}
+private:
+    friend class VehicleWindowGl50DS;
+    OriginalUiSourceSubmission50KN source_;
+    std::uint64_t generation_=0;
 };
 
 // Caller-owned desktop GL >=3.2. Window output requires a double-buffered,
@@ -571,6 +735,113 @@ public:
     bool submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM&, std::int32_t width,
         std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
     bool originalUiSourceRgbaAvailable() const noexcept;
+    // Dormant slice1A. The existing combined submit above remains the default.
+    // Hidden submissions execute the whole sealed source frame and acknowledge
+    // its material history exactly once, without touching opaque publication.
+    // Output must be distinct from inputs. On false no output receipt is issued.
+    bool submitOriginalUiSourceUnpublished(const OriginalUiSourceFrame50KM&,
+        std::int32_t width,std::int32_t height,OriginalUiSourceSubmission50KN&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    // Retrieve the current successfully submitted source, including the source
+    // of a combined normal submit. No GPU completion is inferred here.
+    bool originalUiSourceSubmission(OriginalUiSourceSubmission50KN&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    bool completeOriginalUiSource(const OriginalUiSourceSubmission50KN&,
+        OriginalUiSourceSubmission50KN&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Requires the exact still-current completed source. Copies RGB to the
+    // independent opaque target and (when configured) window BACK buffer.
+    // Caller still owns the real swap. Repeated publication is not a page update.
+    bool publishOriginalUiSource(const OriginalUiSourceSubmission50KN&,
+        std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS&) noexcept;
+    // Retains the last successful renderer-published source BEFORE that source
+    // target is cleared again. Lazily allocates a distinct640x448 RGBA8 texture,
+    // copies all four channels and checks real GPU completion. One immutable
+    // snapshot at a time, preserved across hidden submissions and owner retire.
+    // This is NOT a host-displayed receipt; host swap provenance is still absent.
+    // Failed allocation/copy leaves owned names for explicit release/close retry.
+    bool retainPublishedOriginalUiSource(OriginalUiRetainedSource50KN&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    bool readRetainedOriginalUiSourceRgba(const OriginalUiRetainedSource50KN&,
+        std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS&) noexcept;
+    // Checked completion precedes deletion, including failed snapshot attempts.
+    // Failure retains the unresolved ownership obligation for retry. After a
+    // failed deletion, do not create/reuse GL names in this context (including
+    // through other texture owners) until release or close completes, matching
+    // the renderer's existing conservative failed-close ownership contract.
+    bool releaseRetainedOriginalUiSource(VehicleWindowDiagnostic50DS&) noexcept;
+    // Dormant renderer-only byte operation. Incoming must be a still-current
+    // completed sealed ordinary Rider source newer than retained old, with the
+    // actual terminal icon_x/pass1 ALPHA/CLAMP/COLCLAMP/PABE/FBA state. Copies
+    // incoming into distinct640x448 RGBA8 and completes that copy before issuing
+    // a lease. Retained old cannot be released until the blend is retired.
+    // This is NOT full transition admission: closed route/host-swap ownership
+    // must be supplied by a future integration. No frontend caller or enable flag is added.
+    bool beginOriginalUiByteBlend(const OriginalUiRetainedSource50KN& oldSource,
+        const OriginalUiSourceSubmission50KN& incoming,OriginalUiByteBlend50KO&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    // Every real sample starts from the immutable pair. Integer signed-floor
+    // RGB, alpha byte0..128 on covered pixels, unchanged old RGBA on borders.
+    // Even alpha0/128 execute a real draw. Source target and opaque publication
+    // remain unchanged; this never updates a page, clock, audio or host swap.
+    bool renderOriginalUiByteBlendSample(const OriginalUiByteBlend50KO&,
+        std::uint32_t alpha,OriginalUiByteBlendSample50KO&,VehicleWindowDiagnostic50DS&) noexcept;
+    bool completeOriginalUiByteBlendSample(const OriginalUiByteBlendSample50KO&,
+        OriginalUiByteBlendSample50KO&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Full source/effect RGBA, bottom row first; requires a completed current
+    // sample, distinct writable output and640*448*4 bytes. No publication.
+    bool readOriginalUiByteBlendSampleRgba(const OriginalUiByteBlendSample50KO&,
+        std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS&) noexcept;
+    // Copies a completed current sample into the independent opaque private UI
+    // target. No window copy occurs, even for a defaultBackBuffer renderer.
+    // Letterbox RGB comes from the incoming source clear captured at begin.
+    // It neither renders another sample nor changes source/page acceptance.
+    bool publishOriginalUiByteBlendSample(const OriginalUiByteBlend50KO&,
+        const OriginalUiByteBlendSample50KO&,std::int32_t width,std::int32_t height,
+        OriginalUiPrivatePublication50KP&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Copies the ENTIRE immutable incoming image, including every border, to
+    // opaque publication; then transfers its unchanged completed raw RGBA names
+    // to a separate promoted owner. No alpha128 sample or ordinary source draw
+    // is substituted. A successful transfer invalidates all blend/sample use;
+    // explicit blend release still retires effect names and unlocks old.
+    // Before success a failed copy preserves incoming ownership and the lease,
+    // issues neither output, and leaves the prior private publication intact.
+    // One promoted raw owner at a time; release it before another promotion.
+    bool promoteOriginalUiByteBlendIncoming(const OriginalUiByteBlend50KO&,
+        std::int32_t width,std::int32_t height,OriginalUiPrivatePublication50KP&,
+        OriginalUiPromotedIncoming50KP&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Private publication acceptance and actual checked glFinish are separate.
+    // Completion failure invalidates its publication authority; it never drops
+    // the independently owned raw incoming image or fabricates a host receipt.
+    bool completeOriginalUiPrivatePublication(const OriginalUiPrivatePublication50KP&,
+        OriginalUiPrivatePublication50KP&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Dormant bridge: exact current completed PRIVATE publication to window
+    // BACK at its recorded viewport. Requires window output and the exact live
+    // context/drawable/thread. The host must separately verify live drawable
+    // dimensions still equal this viewport; no live-size getter exists here.
+    // No private publication, sample, source, completion barrier or swap occurs.
+    // On false, do not swap: defaultFramebufferMayBeModified preserves possible
+    // partial BACK writes. Private/raw ownership and completion stay unchanged.
+    // Input and output must be distinct, including output.publication(). An
+    // alias is rejected before clearing the output; other failures clear it.
+    // Success issues only the historical command-acceptance observation above.
+    bool copyOriginalUiPrivatePublicationToWindow(const OriginalUiPrivatePublication50KP&,
+        OriginalUiWindowBackBufferCopy&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Current completed opaque publication, output viewport RGBA, alpha255.
+    bool readOriginalUiPrivatePublicationRgba(const OriginalUiPrivatePublication50KP&,
+        std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS&) noexcept;
+    // Full original incoming640x448 RGBA, including original alpha and borders.
+    // Raw completion came from begin's actual copy, independently of opaque
+    // publication completion. No current ordinary source or composer is needed.
+    bool readPromotedOriginalUiIncomingRgba(const OriginalUiPromotedIncoming50KP&,
+        std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS&) noexcept;
+    // Completes outstanding reads/copies before deletion. Failure preserves
+    // unresolved names for retry/close, with the same no-name-reuse rule below.
+    bool releasePromotedOriginalUiIncoming(VehicleWindowDiagnostic50DS&) noexcept;
+    // Also retires partial/failed begin or sample work. Checked glFinish and
+    // successful name deletion precede unlocking retained old. On failure,
+    // keep the renderer/context alive and retry release/close. After ambiguous
+    // deletion, no owner may create/reuse GL names until retirement succeeds.
+    bool releaseOriginalUiByteBlend(VehicleWindowDiagnostic50DS&) noexcept;
     // Explicit destination-lifetime retirement, while this concrete composer
     // is still alive. Requires the live context/thread and an idle renderer;
     // rejects a different retained owner, drains all preceding GL work even
@@ -624,7 +895,16 @@ public:
 private:
     bool submitOriginalUiImpl(const OriginalUiNativeDraw50KG&, std::int32_t width,
         std::int32_t height, bool sourceRgba, VehicleWindowDiagnostic50DS&,
-        bool* sourceWorkStarted=nullptr) noexcept;
+        bool* sourceWorkStarted=nullptr,bool publishSource=true) noexcept;
+    bool submitOriginalUiSourceFrame(const OriginalUiSourceFrame50KM&,std::int32_t width,
+        std::int32_t height,bool publishSource,VehicleWindowDiagnostic50DS&) noexcept;
+    bool matchesOriginalUiSource(const OriginalUiSourceSubmission50KN&)const noexcept;
+    bool matchesOriginalUiByteBlend(const OriginalUiByteBlend50KO&)const noexcept;
+    bool matchesOriginalUiByteBlendSample(const OriginalUiByteBlendSample50KO&)const noexcept;
+    bool matchesOriginalUiPrivatePublication(const OriginalUiPrivatePublication50KP&)const noexcept;
+    bool publishOriginalUiBlendImage(const OriginalUiByteBlend50KO&,
+        const OriginalUiByteBlendSample50KO*,std::int32_t width,std::int32_t height,
+        OriginalUiPrivatePublication50KP&,VehicleWindowDiagnostic50DS&) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

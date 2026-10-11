@@ -19,6 +19,16 @@ bool same(const std::string& a,const char* b) noexcept {
 bool samplerSame(const MaterialTextureSampler50EB& a,const MaterialTextureSampler50EB& b) noexcept {
     return a.minification==b.minification&&a.magnification==b.magnification&&a.s==b.s&&a.t==b.t;
 }
+enum class RegistrationKind : std::uint8_t {existingStatic,ledgerDynamic};
+using LiveMaterial=game::OriginalUiRiderLiveMaterial50KG;
+using Lifetime=game::OriginalUiRiderMaterialLifetime50KG;
+using MaterialRow=game::OriginalUiRiderMaterialRow50KG;
+bool compatible(const assets::OriginalUiMaterialPass50KG& a,
+    const assets::OriginalUiMaterialPass50KG& b) noexcept {
+    return a.pass==b.pass&&a.identity==b.identity&&a.inheritedTemplate==b.inheritedTemplate&&
+        a.provenance.origin==b.provenance.origin&&a.provenance.archive==b.provenance.archive&&
+        a.provenance.fallbackTexture==b.provenance.fallbackTexture;
+}
 struct Binding {
     std::string registeredName;
     const assets::OriginalUiMaterialPass50KG* pass=nullptr;
@@ -28,12 +38,27 @@ struct Binding {
     // Real PSM registry existence, independent of cold sampler/image policy.
     // False bindings can be uploaded but cannot redirect or receive packets.
     bool sourceRegistered=false;
+    RegistrationKind kind=RegistrationKind::existingStatic;
+    MaterialRow row{};
+    std::shared_ptr<LiveMaterial> live;
 };
 struct Packet {std::uint32_t first=0,count=0,binding=0,ordinal=0;};
 struct Registration {
     std::uint32_t rank=0,pass=0;
     const assets::OriginalUiMaterialPass50KG* source=nullptr;
     assets::OriginalUiMaterialBindingState50KG state;
+    RegistrationKind kind=RegistrationKind::existingStatic;
+    const Lifetime* ledger=nullptr;
+    MaterialRow row{};
+    std::uint64_t epoch=0;
+    std::shared_ptr<LiveMaterial> live;
+};
+struct MaterialObservation {
+    MaterialRow row{};std::uint64_t epoch=0;std::uint32_t owners=0;
+};
+struct PendingLiveMaterial {
+    std::shared_ptr<LiveMaterial> live;
+    std::vector<assets::OriginalUiMaterialBindingState50KG> states;
 };
 bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::OriginalUiScreenAssets50KG& images,
     std::uint32_t index,OriginalUiMaterialSpan50KG& output,D& d) noexcept {
@@ -92,7 +117,12 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
     std::shared_ptr<const MaterialTextureGl50EB> gpu;
     std::uint64_t bankGeneration=0,publication=0,frameGeneration=0;
     std::uint64_t registryGeneration=0;
-    std::uint64_t acknowledgedGeneration=0;
+    std::uint64_t acknowledgedGeneration=0,attemptedGeneration=0;
+    const VehicleWindowGl50DS* submittedRenderer=nullptr;
+    std::uint64_t lifecycleSequence=0,groupingFrontier=0;
+    bool awaitingGroupRecord=false,groupsValid=false;
+    std::vector<MaterialObservation> materialObservations;
+    std::vector<PendingLiveMaterial> pendingLive;
     std::vector<Binding> bindings;
     std::vector<Registration> history,pendingHistory;
     std::vector<std::uint32_t> representatives;
@@ -119,8 +149,11 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
     }
     bool add(const std::string& name,const assets::OriginalUiMaterialPass50KG& pass,
         const assets::OriginalUiScreenAssets50KG& source,std::uint32_t image,
-        const assets::OriginalUiImageBankMapping50KG* map,std::vector<Binding>& out,D& d,bool registered=true)const {
-        Binding b;b.registeredName=name;b.pass=&pass;b.sourceRegistered=registered;
+        const assets::OriginalUiImageBankMapping50KG* map,std::vector<Binding>& out,D& d,
+        RegistrationKind kind=RegistrationKind::existingStatic)const {
+        Binding b;b.registeredName=name;b.pass=&pass;b.kind=kind;
+        b.sourceRegistered=kind==RegistrationKind::existingStatic;
+        if(kind==RegistrationKind::ledgerDynamic&&!backend->canonicalMaterialRow(name,b.row))return fail(d,E::schedule,0x298C80);
         if(pass.textureCount){
             const auto* from=source.sourceProvenance(image);
             const auto* to=map?bank->images()->sourceProvenance(map->combinedIndex):nullptr;
@@ -136,7 +169,21 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
     }
     // Defined below after source-backed pass key preparation. This always
     // resolves actual registry/pass barriers, never an arbitrary caller rank.
-    bool schedule(std::vector<Binding>&,D&);
+    bool schedule(std::vector<Binding>&,const std::vector<Registration>&,
+        std::vector<Registration>&,std::vector<std::uint32_t>&,D&)const;
+    bool registrationCurrent(const Registration& record)const noexcept {
+        if(!record.state.initialized())return false;
+        if(record.kind==RegistrationKind::existingStatic)return !record.ledger&&!record.row.prepared()&&!record.epoch&&!record.live;
+        const auto& ledger=backend->materialLifetime();game::OriginalUiRiderMaterialRowState50KG state;
+        return record.ledger==&ledger&&record.live&&record.live->ledger==&ledger&&record.epoch&&
+            record.live->row.same(record.row)&&record.live->epoch==record.epoch&&
+            ledger.rowState(record.row,state)&&state.ownerPresence&&state.epoch==record.epoch&&
+            backend->materialInstance(record.row,record.epoch)==record.live&&
+            record.pass&&record.pass<=record.live->sources.size()&&
+            record.live->sources.size()==record.live->states.size()&&
+            record.source&&record.live->sources[record.pass-1]&&
+            compatible(*record.source,*record.live->sources[record.pass-1]);
+    }
 };
 OriginalUiRiderDrawContribution50KG::OriginalUiRiderDrawContribution50KG() noexcept=default;
 OriginalUiRiderDrawContribution50KG::~OriginalUiRiderDrawContribution50KG(){drain();}
@@ -182,13 +229,18 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
     if(s.active||frame_.native_)return fail(d,E::phase);
     if(s.historyPoisoned||s.submissionPending)return fail(d,E::schedule,0x249814);
     const auto bank=s.backend->bank();if(!bank||!bank->loaded()||!bank->images())return fail(d,E::bank);
-    if(s.bankGeneration==s.backend->generation()&&s.registryGeneration==s.backend->registryGeneration()&&s.bank==bank&&!s.bindings.empty())return true;
+    if(s.bank){
+        // The sealed cold bank is immutable for this entire manager lifetime.
+        // Source lifecycle consumption never rolls back through this method.
+        return s.bankGeneration==s.backend->generation()&&s.bank==bank&&!s.bindings.empty()
+            ?true:fail(d,E::bank);
+    }
+    if(s.backend->materialLifetime().sequence()!=0)return fail(d,E::schedule,0x14D370);
     try {
         struct Rollback {
-            Storage& s;std::shared_ptr<const assets::OriginalUiImageBank50KG> bank;
-            std::vector<Registration> history;std::vector<std::uint32_t> representatives;bool committed=false;
-            ~Rollback(){if(!committed){s.bank=std::move(bank);s.history=std::move(history);s.representatives=std::move(representatives);}}
-        } rollback{s,s.bank,s.history,s.representatives};
+            Storage& s;bool committed=false;
+            ~Rollback(){if(!committed)s.bank.reset();}
+        } rollback{s};
         s.bank=bank;
         std::vector<Binding> bindings;
         const auto& materials=*s.resources->materials();
@@ -210,9 +262,9 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
             if(!addStat(s.statAssets->resource(static_cast<assets::OriginalUiRiderStatAsset50KG>(i))))return fail(d,E::material);
         for(std::uint8_t rider=1;rider<=26;++rider)if(const auto* portrait=s.statAssets->portrait(rider))
             if(!addStat(portrait))return fail(d,E::material);
-        // Bank preflight retained current+new model images through callbacks.
-        // Include those exact resource owners even if a model was just detached;
-        // they supply sampler policy for every real image in this bank.
+        // The privately sealed bank retains every admitted cold descriptor.
+        // Include each exact owner for upload policy without acquiring a row,
+        // initializing a dynamic state, or granting permission to emit geometry.
         for(std::uint16_t id=1;id<120;++id){
             const auto* m=s.backend->materials(id);if(!m||!s.backend->modelImage(id,0))continue;
             const assets::Scene48D* scene=nullptr;
@@ -222,45 +274,18 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
             for(std::uint32_t slot=0;slot<m->materialCount();++slot)for(std::uint32_t p=0;p<m->passCount(slot);++p){
                 const auto* pass=m->pass(slot,p);if(!pass)return fail(d,E::material);
                 const auto* map=pass->imageIndex==unresolved?nullptr:s.backend->modelImage(id,pass->imageIndex);
-                if(!s.add("ui/textures/"+scene->materials[slot],pass->source,*m->images(),pass->imageIndex,map,bindings,d,s.backend->materialsRegistered(id)))return false;
+                if(!s.add("ui/textures/"+scene->materials[slot],pass->source,*m->images(),pass->imageIndex,map,bindings,d,RegistrationKind::ledgerDynamic))return false;
             }
         }
         const auto* binderImages=s.binderAssets->images();const auto* binderPass=s.binderAssets->pass();
         if(!binderImages||!binderImages->textures()||!binderPass)return fail(d,E::resource);
         for(std::uint32_t i=0;i<binderImages->textures()->textureCount();++i)
-            if(!s.add("ui/textures/binder",*binderPass,*binderImages,i,s.backend->binderImage(i),bindings,d,s.backend->binderMaterialRegistered()))return false;
-        // A source material is one registry row, even when multiple native
-        //cold owners/ATM frames refer to it. If any real owner populated the
-        //row, all exact aliases share that row; other preflight-only PSMs stay
-        //outside source grouping while retaining their genuine upload policy.
-        for(auto& binding:bindings)if(!binding.sourceRegistered){
-            for(const auto& owner:bindings)if(owner.sourceRegistered&&owner.pass->pass==binding.pass->pass&&
-                same(owner.registeredName,binding.registeredName.c_str())){
-                if(owner.pass->identity!=binding.pass->identity||owner.pass->inheritedTemplate!=binding.pass->inheritedTemplate||
-                   owner.pass->provenance.origin!=binding.pass->provenance.origin||owner.pass->provenance.archive!=binding.pass->provenance.archive||
-                   owner.pass->provenance.fallbackTexture!=binding.pass->provenance.fallbackTexture)return fail(d,E::schedule,0x14D370);
-                binding.sourceRegistered=true;break;
-            }
-        }
-        if(s.registryGeneration==s.backend->registryGeneration()&&!s.bindings.empty()){
-            // GPU/CPU bank changes alone preserve the existing source group
-            // graph, including redirects chosen before the last actual draw.
-            for(auto& binding:bindings){if(!binding.sourceRegistered)continue;const Binding* previous=nullptr;
-                for(const auto& old:s.bindings)if(same(old.registeredName,binding.registeredName.c_str())&&
-                    old.pass->pass==binding.pass->pass){previous=&old;break;}
-                if(!previous||!previous->sourceRegistered||previous->pass->identity!=binding.pass->identity||
-                   previous->pass->provenance.fallbackTexture!=binding.pass->provenance.fallbackTexture)return fail(d,E::schedule,0x14D440);
-                binding.leaf=previous->leaf;binding.registration=previous->registration;
-            }
-            std::vector<std::uint32_t> remapped(s.representatives.size(),unresolved);
-            for(std::size_t leaf=0;leaf<s.representatives.size();++leaf){
-                if(s.representatives[leaf]>=s.bindings.size())return fail(d,E::schedule);
-                const auto& old=s.bindings[s.representatives[leaf]];
-                for(std::size_t i=0;i<bindings.size();++i)if(bindings[i].registration==old.registration){remapped[leaf]=static_cast<std::uint32_t>(i);break;}
-                if(remapped[leaf]==unresolved)return fail(d,E::schedule,0x14D440);
-            }
-            s.representatives=std::move(remapped);
-        }else if(!s.schedule(bindings,d))return false;
+            if(!s.add("ui/textures/binder",*binderPass,*binderImages,i,s.backend->binderImage(i),bindings,d,RegistrationKind::ledgerDynamic))return false;
+        // Cold aliases carry canonical identity and policy only. A live epoch
+        // may later promote every exact alias, irrespective of cold ownership.
+        std::vector<Registration> history;
+        std::vector<std::uint32_t> representatives;
+        if(!s.schedule(bindings,s.history,history,representatives,d))return false;
         std::vector<MaterialTextureSampler50EB> samplers(bank->images()->textures()->textureCount());
         std::vector<bool> assigned(samplers.size(),false);
         for(const auto& binding:bindings)if(binding.image!=unresolved){
@@ -271,13 +296,160 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
         }
         for(bool known:assigned)if(!known)return fail(d,E::material);
         s.bindings=std::move(bindings);s.samplers=std::move(samplers);s.bankGeneration=s.backend->generation();
+        s.history=std::move(history);s.representatives=std::move(representatives);s.groupsValid=true;
         s.registryGeneration=s.backend->registryGeneration();s.gpu.reset();s.publication=0;
         rollback.committed=true;return true;
     }catch(...){return fail(d,E::allocation);}
 }
+bool OriginalUiRiderDrawContribution50KG::consumeMaterials(bool rebuild,D& d) noexcept {
+    d={};if(!storage_)return fail(d,E::input);auto& s=*storage_;
+    if(s.active||frame_.native_||s.submissionPending||!s.bank||s.bank!=s.backend->bank()||
+       s.bankGeneration!=s.backend->generation()||(rebuild&&s.historyPoisoned))return fail(d,E::phase);
+    const auto& ledger=s.backend->materialLifetime();const auto frontier=ledger.sequence();
+    if(frontier<s.lifecycleSequence||ledger.acknowledgedSequence()>s.lifecycleSequence)return fail(d,E::schedule,0x14D370);
+    if(rebuild&&(s.awaitingGroupRecord||frontier==s.lifecycleSequence))return fail(d,E::schedule,0x14D440);
+    try {
+        // No source effect can be undone here. Stage only this consumer's
+        // projection; failed validation leaves its cursor and state unchanged.
+        auto history=s.history;auto bindings=s.bindings;auto observations=s.materialObservations;
+        auto representatives=s.representatives;
+        bool identityChanged=false,awaiting=s.awaitingGroupRecord,groupAccepted=false;
+        std::uint64_t populationBoundary=0;
+        for(auto sequence=s.lifecycleSequence;sequence<frontier;){
+            game::OriginalUiRiderMaterialEvent50KG event;
+            if(!ledger.event(++sequence,event)||event.sequence!=sequence)return fail(d,E::schedule,0x14D370);
+            using Kind=game::OriginalUiRiderMaterialEventKind50KG;
+            if(event.kind==Kind::populationBoundary){
+                if(awaiting||event.row.prepared())return fail(d,E::schedule,0x14D370);
+                for(const auto& observation:observations)if(observation.owners&&!observation.epoch)return fail(d,E::schedule,0x14D370);
+                populationBoundary=sequence;continue;
+            }
+            if(event.kind==Kind::groupRebuilt){
+                if(rebuild||!awaiting||sequence!=s.groupingFrontier+1||groupAccepted)return fail(d,E::schedule,0x14D440);
+                awaiting=false;groupAccepted=true;continue;
+            }
+            if(!event.row.prepared())return fail(d,E::schedule,0x298C80);
+            bool admitted=false;
+            for(const auto& binding:bindings)if(binding.kind==RegistrationKind::ledgerDynamic&&binding.row.same(event.row)){admitted=true;break;}
+            if(!admitted)return fail(d,E::schedule,0x298C80);
+            std::size_t index=0;for(;index<observations.size();++index)if(observations[index].row.same(event.row))break;
+            if(index==observations.size())observations.push_back({event.row,0,0});
+            auto& observation=observations[index];
+            if(event.kind==Kind::ownerAcquired){
+                if(!event.ownerSerial||!event.sourceSlotOccurrences||observation.owners==std::numeric_limits<std::uint32_t>::max()||
+                   event.ownerPresenceAfter!=observation.owners+1||event.epoch!=observation.epoch)return fail(d,E::schedule,0x26E7D8);
+                observation.owners=event.ownerPresenceAfter;
+            }else if(event.kind==Kind::ownerReleased){
+                if(!event.ownerSerial||!event.sourceSlotOccurrences||!observation.owners||
+                   event.ownerPresenceAfter!=observation.owners-1||event.epoch!=observation.epoch)return fail(d,E::schedule,0x26EB90);
+                observation.owners=event.ownerPresenceAfter;
+            }else if(event.kind==Kind::rowPopulated){
+                if(!observation.owners||observation.epoch||!event.epoch||event.ownerPresenceAfter!=observation.owners)return fail(d,E::schedule,0x14D370);
+                const auto live=s.backend->materialInstance(event.row,event.epoch);
+                if(!live||live->ledger!=&ledger||!live->row.same(event.row)||live->epoch!=event.epoch||
+                   live->sources.empty()||live->sources.size()!=live->states.size())return fail(d,E::schedule,0x14D370);
+                for(std::size_t pass=0;pass<live->sources.size();++pass){const auto* source=live->sources[pass];
+                    if(!source||source->pass!=pass+1||!live->states[pass].initialized()||live->states[pass].bound())return fail(d,E::schedule,0x14D370);
+                    bool alias=false;
+                    for(const auto& binding:bindings)if(binding.kind==RegistrationKind::ledgerDynamic&&binding.row.same(event.row)&&
+                       binding.pass&&binding.pass->pass==source->pass){
+                        if(!compatible(*source,*binding.pass))return fail(d,E::schedule,0x14D370);alias=true;
+                    }
+                    if(!alias)return fail(d,E::schedule,0x14D370);
+                    for(const auto& record:history)if(record.rank==event.row.rank()&&record.pass==source->pass)return fail(d,E::schedule,0x14D370);
+                    Registration record;record.rank=event.row.rank();record.pass=source->pass;record.source=source;
+                    record.kind=RegistrationKind::ledgerDynamic;record.ledger=&ledger;record.row=event.row;record.epoch=event.epoch;
+                    record.live=live;record.state=live->states[pass];history.push_back(std::move(record));
+                }
+                observation.epoch=event.epoch;identityChanged=true;
+            }else if(event.kind==Kind::rowRetired){
+                if(observation.owners||!observation.epoch||observation.epoch!=event.epoch||event.ownerPresenceAfter||
+                   !event.retirement.row().same(event.row)||event.retirement.epoch()!=event.epoch||
+                   event.retirement.sequence()!=sequence||!ledger.retirementCurrent(event.retirement))return fail(d,E::schedule,0x14D440);
+                const auto retired=s.backend->materialInstance(event.row,event.epoch);
+                if(!retired||retired->ledger!=&ledger||!retired->row.same(event.row)||retired->epoch!=event.epoch)
+                    return fail(d,E::schedule,0x14D440);
+                std::size_t removed=0;
+                for(auto i=history.begin();i!=history.end();){
+                    if(i->kind==RegistrationKind::ledgerDynamic&&i->ledger==&ledger&&i->row.same(event.row)&&i->epoch==event.epoch){
+                        i=history.erase(i);++removed;
+                    }else ++i;
+                }
+                if(!removed||removed!=retired->sources.size())return fail(d,E::schedule,0x14D440);
+                observation.epoch=0;identityChanged=true;
+            }else return fail(d,E::schedule,0x14D370);
+        }
+        for(const auto& observation:observations){game::OriginalUiRiderMaterialRowState50KG state;
+            if(!ledger.rowState(observation.row,state)||state.ownerPresence!=observation.owners||state.epoch!=observation.epoch)
+                return fail(d,E::schedule,0x14D370);
+        }
+        for(std::size_t i=0;i<bindings.size();++i){auto& binding=bindings[i];
+            const auto& old=s.bindings[i];std::uint32_t rank=unresolved;
+            if(binding.kind==RegistrationKind::ledgerDynamic){
+                binding.live=s.backend->liveMaterial(binding.registeredName);binding.sourceRegistered=bool(binding.live);
+                rank=binding.row.rank();
+                if(binding.live){const auto& live=*binding.live;
+                    if(live.ledger!=&ledger||!live.row.same(binding.row)||!live.epoch||!binding.pass||!binding.pass->pass||
+                       binding.pass->pass>live.sources.size()||live.sources.size()!=live.states.size()||
+                       !live.sources[binding.pass->pass-1]||!compatible(*binding.pass,*live.sources[binding.pass->pass-1]))return fail(d,E::schedule,0x14D370);
+                }
+                if(old.live!=binding.live){
+                    // An absent or changed handle requires the old exact epoch
+                    // to have disappeared through an authenticated retirement.
+                    if(old.live)for(const auto& record:history)if(record.kind==RegistrationKind::ledgerDynamic&&
+                       record.ledger==old.live->ledger&&record.row.same(old.live->row)&&record.epoch==old.live->epoch)
+                        return fail(d,E::schedule,0x14D440);
+                    identityChanged=true;
+                }
+            }else{
+                if(old.registration>=s.history.size()||s.history[old.registration].kind!=RegistrationKind::existingStatic)return fail(d,E::schedule);
+                rank=s.history[old.registration].rank;
+            }
+            binding.registration=unresolved;
+            if(!binding.sourceRegistered){binding.leaf=unresolved;continue;}
+            for(std::size_t registration=0;registration<history.size();++registration){const auto& record=history[registration];
+                if(record.kind!=binding.kind||record.rank!=rank||record.pass!=binding.pass->pass)continue;
+                if(binding.kind==RegistrationKind::ledgerDynamic&&
+                   (record.ledger!=&ledger||!record.row.same(binding.row)||record.epoch!=binding.live->epoch||record.live!=binding.live))continue;
+                if(!record.source||!compatible(*record.source,*binding.pass)||!s.registrationCurrent(record))return fail(d,E::schedule);
+                binding.registration=static_cast<std::uint32_t>(registration);break;
+            }
+            if(binding.registration==unresolved)return fail(d,E::schedule,0x14D370);
+        }
+        bool valid=s.groupsValid;
+        if(rebuild){
+            if(populationBoundary!=frontier||awaiting)return fail(d,E::schedule,0x14D440);
+            std::vector<Registration> scheduled;std::vector<std::uint32_t> grouped;
+            if(!s.schedule(bindings,history,scheduled,grouped,d))return false;
+            history=std::move(scheduled);representatives=std::move(grouped);valid=true;awaiting=true;
+        }else if(identityChanged){
+            // Retirement is not14D440. Removing a redirect target cannot leave
+            // old indices pointing at another compacted registration. Preserve
+            // retained states but invalidate scheduling until a genuine rebuild.
+            representatives.clear();for(auto& binding:bindings)binding.leaf=unresolved;valid=false;
+        }
+        s.history.swap(history);s.bindings.swap(bindings);s.materialObservations.swap(observations);
+        s.representatives.swap(representatives);s.pendingHistory.clear();s.pendingLive.clear();
+        s.lifecycleSequence=frontier;s.groupsValid=valid;s.awaitingGroupRecord=awaiting;
+        if(rebuild)s.groupingFrontier=frontier;
+        if(groupAccepted)s.registryGeneration=s.backend->registryGeneration();
+        return true;
+    }catch(...){return fail(d,E::allocation);}
+}
+std::uint64_t OriginalUiRiderDrawContribution50KG::materialSequence()const noexcept {
+    return storage_?storage_->lifecycleSequence:0;
+}
+std::uint64_t OriginalUiRiderDrawContribution50KG::sourceSubmissionWatermark()const noexcept {
+    return storage_?storage_->attemptedGeneration:0;
+}
+bool OriginalUiRiderDrawContribution50KG::hasSourceSubmission()const noexcept {
+    return sourceSubmissionWatermark()!=0;
+}
+const VehicleWindowGl50DS* OriginalUiRiderDrawContribution50KG::sourceRenderer()const noexcept {
+    return storage_?storage_->submittedRenderer:nullptr;
+}
 std::shared_ptr<const assets::OriginalUiImageBank50KG> OriginalUiRiderDrawContribution50KG::bank()const noexcept {
-    return storage_&&storage_->bankGeneration==storage_->backend->generation()&&
-        storage_->registryGeneration==storage_->backend->registryGeneration()?storage_->bank:nullptr;
+    return storage_&&storage_->bankGeneration==storage_->backend->generation()?storage_->bank:nullptr;
 }
 const std::vector<MaterialTextureSampler50EB>* OriginalUiRiderDrawContribution50KG::samplers()const noexcept {
     return bank()?&storage_->samplers:nullptr;
@@ -292,7 +464,8 @@ bool OriginalUiRiderDrawContribution50KG::bindPublishedBank(std::shared_ptr<cons
 bool OriginalUiRiderDrawContribution50KG::begin(const OriginalUiRiderDrawClock50KG& clock,
     const game::OriginalUiRiderRenderContext50KG& render,const game::OriginalUiRiderLighting50KG& lighting,D& d) noexcept {
     d={};if(!storage_||!clock.known)return fail(d,E::input);auto& s=*storage_;
-    if(s.active||frame_.native_||s.historyPoisoned||s.submissionPending||!bank()||!s.gpu||!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication)return fail(d,E::publication);
+    if(s.active||frame_.native_||s.historyPoisoned||s.submissionPending||!s.groupsValid||s.awaitingGroupRecord||
+       s.lifecycleSequence!=s.backend->materialLifetime().sequence()||s.registryGeneration!=s.backend->registryGeneration()||!bank()||!s.gpu||!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication)return fail(d,E::publication);
     const auto lifecycle=s.transition->snapshot();
     if(!lifecycle.bound||lifecycle.current.screen!=5||lifecycle.current.page<1||lifecycle.current.page>2)return fail(d,E::phase);
     const auto player=static_cast<std::uint8_t>(lifecycle.current.page-1);
@@ -529,7 +702,9 @@ bool OriginalUiRiderDrawContribution50KG::projectOnTopWidgets(bool shown,D& d) n
     if(!widgets(true,shown,d)){s.failed=true;return false;}s.top=true;return true;
 }
 
-bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>& input,D& d) {
+bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>& input,
+    const std::vector<Registration>& previous,std::vector<Registration>& output,
+    std::vector<std::uint32_t>& outputRepresentatives,D& d)const {
     // The cold resources pin the same authenticated APPSTART used by every
     // actual pass. Tokenization is source269B20: only space/CR/LF delimit.
     assets::OriginalUiMemberView50KG table{};
@@ -569,6 +744,9 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
     if(ordinal!=3235)return fail(d,E::schedule);
     for(std::size_t i=0;i<input.size();++i){
         if(ranks[i]==unresolved||!input[i].pass)return fail(d,E::schedule);
+        if(input[i].kind==RegistrationKind::ledgerDynamic&&
+           (!input[i].row.prepared()||input[i].row.rank()!=ranks[i]||input[i].row.tableIdentity()!=table.identity))return fail(d,E::schedule);
+        for(std::size_t j=0;j<i;++j)if(ranks[j]==ranks[i]&&input[j].kind!=input[i].kind)return fail(d,E::schedule,0x14D370);
         if(input[i].sourceRegistered)sequence.push_back(static_cast<std::uint32_t>(i));
     }
     std::sort(sequence.begin(),sequence.end(),[&](std::uint32_t a,std::uint32_t b){
@@ -580,29 +758,34 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
         std::uint32_t binding=0,redirect=unresolved,limit=unresolved,rank=0,registration=unresolved;
     };
     std::vector<Group> groups;groups.reserve(sequence.size());
-    auto nextHistory=history;
+    auto nextHistory=previous;
     std::uint32_t previousRank=unresolved,previousPass=0,previousGroup=unresolved;
     for(const auto index:sequence){auto& binding=input[index];const auto& pass=*binding.pass;
         // A repeated PSG slot or ATM frame is a reference to an existing
         // registry material/pass, never a second 29BED0 registration.
         if(previousRank==ranks[index]&&previousPass==pass.pass){
-            const auto& original=*input[groups[previousGroup].binding].pass;
-            if(pass.identity!=original.identity||pass.inheritedTemplate!=original.inheritedTemplate||
-               pass.provenance.origin!=original.provenance.origin||pass.provenance.archive!=original.provenance.archive||
-               pass.provenance.fallbackTexture!=original.provenance.fallbackTexture)return fail(d,E::schedule);
+            const auto& original=input[groups[previousGroup].binding];
+            if(binding.kind!=original.kind||!compatible(pass,*original.pass)||
+               (binding.kind==RegistrationKind::ledgerDynamic&&binding.live!=original.live))return fail(d,E::schedule);
             binding.leaf=previousGroup;binding.registration=groups[previousGroup].registration;continue;
         }
         if((previousRank!=ranks[index]&&pass.pass!=1)||
            (previousRank==ranks[index]&&pass.pass!=previousPass+1))return fail(d,E::schedule,0x29BED0);
         Group next;next.binding=index;next.rank=ranks[index];
-        for(std::size_t i=0;i<nextHistory.size();++i)if(nextHistory[i].rank==ranks[index]&&nextHistory[i].pass==pass.pass){
-            const auto* prior=nextHistory[i].source;
-            if(!prior||prior->identity!=pass.identity||prior->inheritedTemplate!=pass.inheritedTemplate||
-               prior->provenance.archive!=pass.provenance.archive||prior->provenance.origin!=pass.provenance.origin||
-               prior->provenance.fallbackTexture!=pass.provenance.fallbackTexture)return fail(d,E::schedule);
+        for(std::size_t i=0;i<nextHistory.size();++i){const auto& record=nextHistory[i];
+            if(record.rank!=ranks[index]||record.pass!=pass.pass)continue;
+            if(record.kind!=binding.kind)return fail(d,E::schedule);
+            if(binding.kind==RegistrationKind::ledgerDynamic&&
+               (!binding.live||record.ledger!=binding.live->ledger||!record.row.same(binding.row)||
+                record.epoch!=binding.live->epoch))continue;
+            if(!record.source||!compatible(*record.source,pass)||!registrationCurrent(record))return fail(d,E::schedule);
             next.registration=static_cast<std::uint32_t>(i);break;
         }
         if(next.registration==unresolved){
+            // Dynamic states were constructed by the population issuer and
+            // copied when its exact rowPopulated event was accepted. Scheduling
+            // is never permitted to manufacture a replacement dynamic state.
+            if(binding.kind!=RegistrationKind::existingStatic)return fail(d,E::schedule,0x14D370);
             assets::OriginalUiMaterialEquivalenceKey50KG key;assets::OriginalUiMaterialEquivalenceDiagnostic50KG detail;
             if(!assets::prepareOriginalUiMaterialEquivalence50KG(pass,binding.provenance,key,detail))return fail(d,E::schedule,detail.sourcePC);
             Registration record;record.rank=ranks[index];record.pass=pass.pass;record.source=&pass;
@@ -633,16 +816,15 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
         }
         if(binding.leaf>=groups.size())return fail(d,E::schedule);
     }
-    // Bank membership is not proof that a retained registry object unloaded.
-    // Until that lifecycle is supplied, never silently omit an earlier loaded
-    // representative just because its model's images left the current bank.
-    for(std::size_t i=0;i<history.size();++i){bool present=false;
+    // Only consumeMaterials may remove an authenticated retired epoch before
+    // this call. Every remaining static or dynamic registration must survive.
+    for(std::size_t i=0;i<previous.size();++i){bool present=false;
         for(const auto& group:groups)if(group.registration==i){present=true;break;}
         if(!present)return fail(d,E::schedule,0x14D440);
     }
     std::vector<std::uint32_t> nextRepresentatives;nextRepresentatives.reserve(groups.size());
     for(const auto& group:groups)nextRepresentatives.push_back(group.binding);
-    history=std::move(nextHistory);representatives=std::move(nextRepresentatives);return true;
+    output=std::move(nextHistory);outputRepresentatives=std::move(nextRepresentatives);return true;
 }
 
 bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
@@ -678,8 +860,10 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
             s.failed=true;return fail(d,E::capacity);
         }
         // Propose native binding updates before sealing. Only actual source
-        // publication may commit them; a composed or rejected frame is no bind.
-        s.pendingHistory=s.history;
+        // acceptance may commit them; a composed or rejected frame is no bind.
+        s.pendingHistory=s.history;s.pendingLive.clear();
+        OriginalUiSourceTerminal50KN terminal{};
+        std::uint32_t terminalLeaf=unresolved;
         for(const auto index:s.order){const auto leaf=s.bindings[s.packets[index].binding].leaf;
             if(leaf>=s.representatives.size()||s.representatives[leaf]>=s.bindings.size()){
                 s.failed=true;return fail(d,E::schedule);
@@ -696,6 +880,48 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
                     s.failed=true;return fail(d,E::schedule,bindingDetail.sourcePC);
                 }
             }
+            // initialize() admits only a prepared key; recordDrainedBinding
+            // preserves it. Keep each packet's state rejection without copying
+            // arrays that a later actual drain would immediately overwrite.
+            if(!s.pendingHistory[representative.registration].state.initialized()){
+                s.failed=true;return fail(d,E::schedule);
+            }
+            terminalLeaf=leaf;
+        }
+        if(terminalLeaf!=unresolved){
+            const auto& representative=s.bindings[s.representatives[terminalLeaf]];
+            // The actual nonempty drain sequence selects the representative;
+            // never use the highest registered row or the packet's prototype.
+            const auto& source=*representative.pass;
+            const auto& registration=s.pendingHistory[representative.registration];
+            terminal.canonicalToken=registration.rank;terminal.pass=registration.pass;terminal.leaf=terminalLeaf;
+            terminal.registryGeneration=s.registryGeneration;terminal.bankGeneration=s.bankGeneration;
+            for(std::size_t field=0;field<source.gs.fields.size();++field){
+                terminal.constructionFieldSourcePC[field]=source.gs.fields[field].sourcePC;
+                terminal.constructionFieldByteOffset[field]=source.gs.fields[field].byteOffset;
+            }
+            terminal.enabled=source.enabled;terminal.textureCount=source.textureCount;
+            terminal.textureCoordinateIndex=source.textureCoordinateIndex;
+            terminal.lodCalculationMethod=source.lodCalculationMethod;terminal.maximumMipLevel=source.maximumMipLevel;
+            terminal.magFilter=source.magFilter;terminal.minFilter=source.minFilter;terminal.lodL=source.lodL;terminal.lodK=source.lodK;
+            // All binding updates have completed, including the final actual
+            // image's IPUM TEXA mutation. Copy the final effective state once.
+            if(!registration.state.copyEffectiveGs(terminal.gs)){
+                s.failed=true;return fail(d,E::schedule);
+            }
+        }
+        // Prepare duplicate accepted-state vectors while allocation can still
+        // reject this proposed frame. finishSourceSubmission only swaps these
+        // vectors into the exact issuer handles after real source acceptance.
+        for(const auto& record:s.pendingHistory){
+            if(!s.registrationCurrent(record)){s.failed=true;return fail(d,E::schedule,0x14D370);}
+            if(record.kind!=RegistrationKind::ledgerDynamic)continue;
+            std::size_t index=0;for(;index<s.pendingLive.size();++index)if(s.pendingLive[index].live==record.live)break;
+            if(index==s.pendingLive.size())s.pendingLive.push_back({record.live,record.live->states});
+            if(!record.pass||record.pass>s.pendingLive[index].states.size()){
+                s.failed=true;return fail(d,E::schedule,0x14D370);
+            }
+            s.pendingLive[index].states[record.pass-1]=record.state;
         }
         const auto* data=s.resources->widgets()->selectionData();const auto* page=data?data->page():nullptr;
         if(!page){s.failed=true;return fail(d,E::resource);}
@@ -712,32 +938,51 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
         s.draw.particleFog=s.orderedFog.data();s.draw.particleFogCount=static_cast<std::uint32_t>(s.orderedFog.size());
         s.draw.opaquePresentationAlphaOnly=false;
         s.finished=true;
-        frame_.native_=&s.draw;frame_.owner_=this;frame_.frameGeneration_=++s.frameGeneration;
+        frame_.native_=&s.draw;frame_.owner_=this;frame_.frameGeneration_=++s.frameGeneration;frame_.terminal_=terminal;
         return true;
     }catch(...){s.failed=true;return fail(d,E::allocation);}
 }
 const OriginalUiSourceFrame50KM* OriginalUiRiderDrawContribution50KG::frame()const noexcept {
     return storage_&&storage_->active&&storage_->finished&&!storage_->failed&&
-        !storage_->historyPoisoned&&!storage_->submissionPending&&
+        !storage_->historyPoisoned&&!storage_->submissionPending&&storage_->groupsValid&&!storage_->awaitingGroupRecord&&
+        storage_->lifecycleSequence==storage_->backend->materialLifetime().sequence()&&
         storage_->bankGeneration==storage_->backend->generation()&&
         storage_->registryGeneration==storage_->backend->registryGeneration()&&frame_.native_?&frame_:nullptr;
 }
 void OriginalUiRiderDrawContribution50KG::drain() noexcept {
-    frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;
+    frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;frame_.terminal_={};
     if(!storage_)return;auto& s=*storage_;
     if(s.submissionPending)s.historyPoisoned=true;
-    if(s.active)s.backend->endFrame();s.active=false;s.finished=false;s.draw={};s.pendingHistory.clear();
+    if(s.active)s.backend->endFrame();s.active=false;s.finished=false;s.draw={};s.pendingHistory.clear();s.pendingLive.clear();
 }
-bool OriginalUiRiderDrawContribution50KG::beginSourceSubmission(std::uint64_t generation)const noexcept {
+bool OriginalUiRiderDrawContribution50KG::beginSourceSubmission(std::uint64_t generation,const VehicleWindowGl50DS& renderer)const noexcept {
     if(!storage_||!frame()||generation!=frame_.frameGeneration_)return false;
-    auto& s=*storage_;if(s.submissionPending||s.historyPoisoned||generation<=s.acknowledgedGeneration||s.pendingHistory.size()!=s.history.size())return false;
-    s.submissionPending=true;return true;
+    auto& s=*storage_;if((s.submittedRenderer&&s.submittedRenderer!=&renderer)||s.submissionPending||s.historyPoisoned||generation<=s.acknowledgedGeneration||
+       generation<=s.attemptedGeneration||s.pendingHistory.size()!=s.history.size())return false;
+    for(const auto& record:s.pendingHistory)if(!s.registrationCurrent(record))return false;
+    if(!s.backend->sourceSubmissionStarted(this,generation))return false;
+    s.submittedRenderer=&renderer;s.attemptedGeneration=generation;s.submissionPending=true;return true;
 }
 void OriginalUiRiderDrawContribution50KG::finishSourceSubmission(std::uint64_t generation,bool accepted,bool started)const noexcept {
     if(!storage_)return;auto& s=*storage_;
     if(!s.submissionPending||generation!=frame_.frameGeneration_){s.historyPoisoned=true;return;}
     s.submissionPending=false;
-    if(accepted){s.history.swap(s.pendingHistory);s.acknowledgedGeneration=generation;s.pendingHistory.clear();}
-    else if(started)s.historyPoisoned=true;
+    if(accepted){
+        // Validate the whole transaction before the first nonallocating swap.
+        // Synchronous backend submission ownership forbids source destruction
+        // in between; an invariant failure poisons rather than partially commits.
+        if(s.lifecycleSequence!=s.backend->materialLifetime().sequence()||s.pendingHistory.size()!=s.history.size()){
+            s.historyPoisoned=true;return;
+        }
+        for(const auto& record:s.pendingHistory)if(!s.registrationCurrent(record)){s.historyPoisoned=true;return;}
+        for(const auto& pending:s.pendingLive){
+            if(!pending.live||pending.live->states.size()!=pending.states.size()) {s.historyPoisoned=true;return;}
+            for(const auto& state:pending.states)if(!state.initialized()){s.historyPoisoned=true;return;}
+        }
+        for(auto& pending:s.pendingLive)pending.live->states.swap(pending.states);
+        s.history.swap(s.pendingHistory);s.acknowledgedGeneration=generation;s.pendingHistory.clear();s.pendingLive.clear();
+    }else{
+        s.pendingLive.clear();if(started)s.historyPoisoned=true;
+    }
 }
 } // namespace rr::platform

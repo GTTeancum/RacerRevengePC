@@ -23,6 +23,15 @@ struct AudioVoice50HD {
     float gain = 1.0f, pitch = 1.0f, pan = 0.0f;
     bool active = false, loop = false;
 };
+// Main-thread copied observation only. Playback identity changes on every
+// successful play/restart, including an identical clip in the same slot.
+// Natural PCM cursor advance and one-shot completion change neither revision.
+struct AudioVoiceObservation50HD {
+    AudioVoice50HD voice{};
+    std::uint64_t playbackRevision = 0;
+    float groupGain = 1.0f, originalLeft = 1.0f, originalRight = 1.0f;
+    bool groupKnown = false;
+};
 
 // Single producer/main-thread mixer. It never allocates, loads assets, opens a
 // device, synthesizes a substitute effect, or touches the SDL callback thread.
@@ -62,6 +71,16 @@ public:
     void stop(std::size_t slot) noexcept;
     void stopAll() noexcept;
     bool active(std::size_t slot) const noexcept;
+    bool inspectVoice(std::size_t slot, AudioVoiceObservation50HD&) const noexcept;
+    float masterGain() const noexcept { return masterGain_; }
+    std::uint64_t controlRevision() const noexcept { return controlRevision_; }
+    std::uint64_t playbackRevision(std::size_t slot) const noexcept {
+        return slot<count_ ? playbackRevisions_[slot] : 0;
+    }
+    // Overflow permanently invalidates observation identities, never wraps.
+    // Existing playback/stop behavior is preserved even after exhaustion;
+    // new capability commands preflight the required revision capacity.
+    bool canRecordControlChanges(std::uint64_t count = 0) const noexcept;
     // Returns count() if there is no free slot within [first, first+count).
     std::size_t availableVoice(std::size_t first = 0,
                               std::size_t count = audioMaximumVoices50HD) const noexcept;
@@ -74,6 +93,7 @@ public:
     std::uint64_t clippedSamples() const noexcept { return clippedSamples_; }
     static bool validClip(const AudioClip50HD&) noexcept;
 private:
+    void noteControlChange() noexcept;
     bool originalRouting50KG(std::int32_t engineAngle,float& left,float& right) const noexcept;
     std::shared_ptr<OriginalSoundMode50KG> soundMode50KG_;
     float originalLeft50KG_[audioMaximumVoices50HD]{};
@@ -87,6 +107,9 @@ private:
     bool groupKnown50IC_[audioMaximumVoices50HD]{};
     bool requireGroups50IC_ = false;
     std::uint64_t groupEpoch50IC_ = 0;
+    std::uint64_t controlRevision_ = 0;
+    std::uint64_t playbackRevisions_[audioMaximumVoices50HD]{};
+    bool controlRevisionExhausted_ = false;
 };
 
 // Integer cumulative sample clock: floor(total microseconds * rate / 1e6).

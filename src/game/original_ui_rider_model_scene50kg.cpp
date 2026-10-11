@@ -8,6 +8,44 @@ using I=SceneNodeIndex49P;
 using D=OriginalUiRiderModelDiagnostic50KG;
 using E=OriginalUiRiderModelError50KG;
 bool fail(D& d,E e,std::uint32_t pc) noexcept {d.error=e;d.sourcePC=pc;return false;}
+struct MaterialDomain {
+    enum class Phase : std::uint8_t {absent,live,invalidated};
+    OriginalUiRiderMaterialLifetime50KG* ledger=nullptr;
+    OriginalUiRiderMaterialFootprint50KG footprint{};
+    OriginalUiRiderMaterialOwnerToken50KG token{};
+    Phase phase=Phase::absent;
+    bool pending()const noexcept{return phase!=Phase::absent;}
+    bool active()const noexcept{return phase==Phase::live&&ledger&&ledger->owns(token);}
+    bool adopt(OriginalUiRiderMaterialLifetime50KG& owner,
+        const OriginalUiRiderMaterialFootprint50KG& source,D& d) noexcept {
+        if(pending())return fail(d,E::phase,0x26E7D8);
+        OriginalUiRiderMaterialMutation50KG mutation;
+        if(!owner.acquire(source,owner.sequence(),token,mutation,d.lifetime))return fail(d,E::lifetime,0x26E7D8);
+        ledger=&owner;footprint=source;phase=Phase::live;return true;
+    }
+    bool beforeInvalidation(D& d)const noexcept {
+        if(!pending())return true;
+        if(!ledger||!ledger->owns(token)){
+            d.lifetime.error=OriginalUiRiderMaterialLifetimeError50KG::invariant;
+            d.cleanupPending=true;
+            return d.error==E::none?fail(d,E::lifetime,0x26E7D8):false;
+        }
+        if(ledger->canRelease(token,ledger->sequence(),d.lifetime))return true;
+        d.cleanupPending=true;return d.error==E::none?fail(d,E::lifetime,0x26E7D8):false;
+    }
+    void invalidated()noexcept{if(pending())phase=Phase::invalidated;}
+    bool release(D& d)noexcept {
+        if(!pending())return true;
+        OriginalUiRiderMaterialMutation50KG mutation;
+        if(phase!=Phase::invalidated||!ledger||
+           !ledger->release(token,ledger->sequence(),mutation,d.lifetime)){
+            d.cleanupPending=true;return d.error==E::none?fail(d,E::lifetime,0x26E7D8):false;
+        }
+        // release consumes only the ledger's owner; it never clears our copy.
+        token={};footprint={};ledger=nullptr;phase=Phase::absent;
+        d.cleanupPending=false;return true;
+    }
+};
 struct ModelGraph {
     std::array<SceneNode49P,maxSceneNodes49P> nodes{};
     std::array<I,assets::maxModelNodes49O> sources{};
@@ -76,6 +114,7 @@ struct ModelGraph {
 }
 struct OriginalUiRiderCharacterScene50KG::Storage {
     std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG> sourceAssets;
+    MaterialDomain material;
     ModelGraph model;
     assets::MotionNodeBindings49O bindings{};
     OriginalUiRiderCharacter50KG lifecycle;
@@ -83,34 +122,59 @@ struct OriginalUiRiderCharacterScene50KG::Storage {
     ModelMode0IkContext50KG context{};
     ModelPlaybackIk50KG ik{};
     bool attached=false,destroyed=false;
+    bool destroy(D& d)noexcept {
+        if(!material.beforeInvalidation(d))return false;
+        // This runs only for an unpublished candidate or AFTER actual detach.
+        // Clear every mutable graph/IK/playback reference before its domain.
+        if(!destroyed){lifecycle.modelDestroyed();attached=false;destroyed=true;
+            model={};ik={};context={};chains={};}
+        material.invalidated();return material.release(d);
+    }
 };
 OriginalUiRiderCharacterScene50KG::OriginalUiRiderCharacterScene50KG() noexcept=default;
-OriginalUiRiderCharacterScene50KG::~OriginalUiRiderCharacterScene50KG()=default;
+OriginalUiRiderCharacterScene50KG::~OriginalUiRiderCharacterScene50KG(){
+    // Explicit owner teardown must precede destruction. Preserve an invariant
+    // failure instead of dropping graph storage while its token remains live.
+    if(requiresModelCleanup())(void)storage_.release();
+}
 bool OriginalUiRiderCharacterScene50KG::beginLoad(
     std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG> assets,
-    ModelMotionSharedState49T& shared,ModelMode0IkShared50KG& ikShared,D& d) noexcept {
+    ModelMotionSharedState49T& shared,ModelMode0IkShared50KG& ikShared,
+    OriginalUiRiderMaterialLifetime50KG& ledger,const OriginalUiRiderMaterialFootprint50KG& footprint,D& d) noexcept {
     d={};if (storage_) return fail(d,E::alreadyPrepared,0x1D22A0);
     if (!assets||!assets->loaded()||!assets->hierarchy()||!assets->bindings()||
         !assets->position()||!assets->look()||!assets->up()) return fail(d,E::asset,0x1D22A0);
+    if(assets->widgetId()!=53||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::characterGraph||
+       footprint.widget()!=assets->widgetId()||footprint.source()!=assets->mcfSource())return fail(d,E::asset,0x1D22A0);
+    if(!ledger.canAcquire(footprint,ledger.sequence(),d.lifetime))return fail(d,E::lifetime,0x1D22A0);
+    std::unique_ptr<Storage> next;
+    const auto reject=[&](E error,std::uint32_t pc)noexcept {
+        fail(d,error,pc);
+        if(next&&!next->destroy(d))storage_=std::move(next);
+        return false;
+    };
     try {
-        auto next=std::make_unique<Storage>();next->sourceAssets=std::move(assets);
+        next=std::make_unique<Storage>();next->sourceAssets=std::move(assets);
         if (!next->model.build(*next->sourceAssets->hierarchy(),*next->sourceAssets->position(),
-            *next->sourceAssets->look(),*next->sourceAssets->up(),true)) return fail(d,E::graph,0x1D2438);
+            *next->sourceAssets->look(),*next->sourceAssets->up(),true)) return reject(E::graph,0x1D2438);
+        // The complete graph's projected mesh/geometry/wrapper domain starts
+        // here, before binding or the entry sample can fail.
+        if(!next->material.adopt(ledger,footprint,d))return reject(E::lifetime,0x26E7D8);
         next->bindings=*next->sourceAssets->bindings();
         for (std::uint32_t row=0;row<next->bindings.count;++row) {
             auto& index=next->bindings.rows[row].sceneNode;
-            if (index>=next->model.count) return fail(d,E::binding,0x153218);
+            if (index>=next->model.count) return reject(E::binding,0x153218);
             ++index;
         }
-        if (!next->lifecycle.bind(*next->sourceAssets)) return fail(d,E::binding,0x1D244C);
+        if (!next->lifecycle.bind(*next->sourceAssets)) return reject(E::binding,0x1D244C);
         ModelPlaybackWorkspace50KG workspace{};
         if (!next->lifecycle.startEntry(next->bindings,next->model.view(),shared,ikShared,workspace,d.playback))
-            return fail(d,E::playback,0x1D2478);
+            return reject(E::playback,0x1D2478);
         storage_=std::move(next);return true;
-    } catch (...) {return fail(d,E::allocation,0x1D22A0);}
+    } catch (...) {return reject(E::allocation,0x1D22A0);}
 }
 bool OriginalUiRiderCharacterScene50KG::finishAttachment(SourceLibmState49T& libm,D& d) noexcept {
-    d={};if (!storage_||storage_->attached||storage_->destroyed) return fail(d,E::phase,0x1D24A8);
+    d={};if (!storage_||storage_->attached||storage_->destroyed||!storage_->material.active()) return fail(d,E::phase,0x1D24A8);
     auto& s=*storage_;
     if (!s.lifecycle.captureAfterAttachment(s.bindings,s.model.view(),d.playback)) return fail(d,E::playback,0x1D24A8);
     std::array<I,2> endpoints{};std::uint32_t count=0;
@@ -128,23 +192,31 @@ bool OriginalUiRiderCharacterScene50KG::finishAttachment(SourceLibmState49T& lib
     if (!s.lifecycle.modelAttached()) return fail(d,E::phase,0x1D251C);
     s.attached=true;return true;
 }
-void OriginalUiRiderCharacterScene50KG::modelDestroyedAfterDetach() noexcept {
-    if (!storage_) return;
-    auto& s=*storage_;s.lifecycle.modelDestroyed();s.attached=false;s.destroyed=true;
-    s.model={};s.ik={};s.context={};s.chains={};
+bool OriginalUiRiderCharacterScene50KG::modelDestroyedAfterDetach(D& d) noexcept {
+    d={};return !storage_||storage_->destroy(d);
+}
+bool OriginalUiRiderCharacterScene50KG::requiresModelCleanup() const noexcept {
+    return storage_&&(!storage_->destroyed||storage_->material.pending());
 }
 bool OriginalUiRiderCharacterScene50KG::reload(ModelMotionSharedState49T& shared,
-    ModelMode0IkShared50KG& ikShared,D& d) noexcept {
-    d={};if (!storage_||!storage_->destroyed) return fail(d,E::phase,0x1D22A0);
+    ModelMode0IkShared50KG& ikShared,OriginalUiRiderMaterialLifetime50KG& ledger,
+    const OriginalUiRiderMaterialFootprint50KG& footprint,D& d) noexcept {
+    d={};if (!storage_||!storage_->destroyed||storage_->material.pending()) return fail(d,E::phase,0x1D22A0);
     auto& s=*storage_;
+    if(s.sourceAssets->widgetId()!=53||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::characterGraph||
+       footprint.widget()!=s.sourceAssets->widgetId()||footprint.source()!=s.sourceAssets->mcfSource())return fail(d,E::asset,0x1D22A0);
+    if(!ledger.canAcquire(footprint,ledger.sequence(),d.lifetime))return fail(d,E::lifetime,0x1D22A0);
+    s.destroyed=false;
+    const auto reject=[&](E error,std::uint32_t pc)noexcept {fail(d,error,pc);s.destroy(d);return false;};
     if (!s.model.build(*s.sourceAssets->hierarchy(),*s.sourceAssets->position(),*s.sourceAssets->look(),*s.sourceAssets->up(),true))
-        return fail(d,E::graph,0x1D2438);
+        return reject(E::graph,0x1D2438);
+    if(!s.material.adopt(ledger,footprint,d))return reject(E::lifetime,0x26E7D8);
     ModelPlaybackWorkspace50KG scratch{};
     if (!s.lifecycle.startEntry(s.bindings,s.model.view(),shared,ikShared,scratch,d.playback))
-        return fail(d,E::playback,0x1D2478);
-    s.destroyed=false;return true;
+        return reject(E::playback,0x1D2478);
+    return true;
 }
-bool OriginalUiRiderCharacterScene50KG::attached() const noexcept {return storage_&&storage_->attached;}
+bool OriginalUiRiderCharacterScene50KG::attached() const noexcept {return storage_&&storage_->attached&&storage_->material.active();}
 void OriginalUiRiderCharacterScene50KG::selected() noexcept {if (storage_) storage_->lifecycle.selected();}
 bool OriginalUiRiderCharacterScene50KG::confirm(D& d) noexcept {
     d={};if (!attached()) return fail(d,E::phase,0x1D2690);
@@ -161,47 +233,76 @@ bool OriginalUiRiderCharacterScene50KG::projectPalette(std::uint8_t flags,ModelP
     d={};if (!attached()) return fail(d,E::phase,0x2412E4);return storage_->model.project(flags,output,d);
 }
 bool OriginalUiRiderCharacterScene50KG::sourceReadiness() const noexcept {
-    return storage_&&storage_->attached&&storage_->lifecycle.sourceReadiness1D2710();
+    return attached()&&storage_->lifecycle.sourceReadiness1D2710();
 }
 const assets::Scene48D* OriginalUiRiderCharacterScene50KG::scene() const noexcept {return storage_?storage_->sourceAssets->scene():nullptr;}
 SceneGraph49P OriginalUiRiderCharacterScene50KG::graph() noexcept {return storage_?storage_->model.view():SceneGraph49P{nullptr,0};}
 const OriginalUiRiderCharacter50KG* OriginalUiRiderCharacterScene50KG::lifecycle() const noexcept {return storage_?&storage_->lifecycle:nullptr;}
 struct OriginalUiRiderPodScene50KG::Storage {
     std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> sourceAssets;
+    MaterialDomain material;
     ModelGraph model;
     OriginalUiUserRotateParameters50KG rotation{};
     std::array<std::array<I,2>,2> binders{};
     bool paused=true,destroyed=false;
+    bool destroy(D& d)noexcept {
+        if(!material.beforeInvalidation(d))return false;
+        if(!destroyed){model={};destroyed=true;paused=true;
+            for(auto& pair:binders)pair={{I::none,I::none}};}
+        material.invalidated();return material.release(d);
+    }
 };
 OriginalUiRiderPodScene50KG::OriginalUiRiderPodScene50KG() noexcept=default;
-OriginalUiRiderPodScene50KG::~OriginalUiRiderPodScene50KG()=default;
-bool OriginalUiRiderPodScene50KG::load(std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> assets,D& d) noexcept {
+OriginalUiRiderPodScene50KG::~OriginalUiRiderPodScene50KG(){
+    // Never perform first fallible detach/release from a destructor.
+    if(requiresModelCleanup())(void)storage_.release();
+}
+bool OriginalUiRiderPodScene50KG::load(std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> assets,
+    OriginalUiRiderMaterialLifetime50KG& ledger,const OriginalUiRiderMaterialFootprint50KG& footprint,D& d) noexcept {
     d={};if (storage_) return fail(d,E::alreadyPrepared,0x1D3590);
     if (!assets||!assets->loaded()||!assets->hierarchy()||!assets->config()) return fail(d,E::asset,0x1D3590);
+    if(assets->widgetId()!=27||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::podGraph||
+       footprint.widget()!=assets->widgetId()||footprint.source()!=assets->modelSource().identity)return fail(d,E::asset,0x1D3590);
+    if(!ledger.canAcquire(footprint,ledger.sequence(),d.lifetime))return fail(d,E::lifetime,0x1D3590);
+    std::unique_ptr<Storage> next;
+    const auto reject=[&](E error,std::uint32_t pc)noexcept {
+        fail(d,error,pc);
+        if(next&&!next->destroy(d))storage_=std::move(next);
+        return false;
+    };
     try {
-        auto next=std::make_unique<Storage>();next->sourceAssets=std::move(assets);
+        next=std::make_unique<Storage>();next->sourceAssets=std::move(assets);
         const auto& c=*next->sourceAssets->config();
-        if (!next->model.build(*next->sourceAssets->hierarchy(),c.position,c.look,c.up,false)) return fail(d,E::graph,0x1D3678);
+        if (!next->model.build(*next->sourceAssets->hierarchy(),c.position,c.look,c.up,false)) return reject(E::graph,0x1D3678);
+        if(!next->material.adopt(ledger,footprint,d))return reject(E::lifetime,0x26E7D8);
         next->rotation={c.rotate,c.velocity,c.position};next->paused=c.startPaused;
         next->binders={{{{next->model.find("binderleft1"),next->model.find("binderright1")}},
             {{next->model.find("binderleft2"),next->model.find("binderright2")}}}};
         storage_=std::move(next);return true;
-    } catch (...) {return fail(d,E::allocation,0x1D3590);}
+    } catch (...) {return reject(E::allocation,0x1D3590);}
 }
-void OriginalUiRiderPodScene50KG::modelDestroyedAfterDetach() noexcept {
-    if (!storage_) return;
-    storage_->model={};storage_->destroyed=true;storage_->paused=true;
-    for (auto& pair:storage_->binders) pair={{I::none,I::none}};
+bool OriginalUiRiderPodScene50KG::modelDestroyedAfterDetach(D& d) noexcept {
+    d={};return !storage_||storage_->destroy(d);
 }
-bool OriginalUiRiderPodScene50KG::reload(D& d) noexcept {
-    d={};if (!storage_||!storage_->destroyed) return fail(d,E::phase,0x1D3590);
+bool OriginalUiRiderPodScene50KG::requiresModelCleanup() const noexcept {
+    return storage_&&(!storage_->destroyed||storage_->material.pending());
+}
+bool OriginalUiRiderPodScene50KG::reload(OriginalUiRiderMaterialLifetime50KG& ledger,
+    const OriginalUiRiderMaterialFootprint50KG& footprint,D& d) noexcept {
+    d={};if (!storage_||!storage_->destroyed||storage_->material.pending()) return fail(d,E::phase,0x1D3590);
     auto& s=*storage_;const auto& c=*s.sourceAssets->config();
-    if (!s.model.build(*s.sourceAssets->hierarchy(),c.position,c.look,c.up,false)) return fail(d,E::graph,0x1D3678);
+    if(s.sourceAssets->widgetId()!=27||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::podGraph||
+       footprint.widget()!=s.sourceAssets->widgetId()||footprint.source()!=s.sourceAssets->modelSource().identity)return fail(d,E::asset,0x1D3590);
+    if(!ledger.canAcquire(footprint,ledger.sequence(),d.lifetime))return fail(d,E::lifetime,0x1D3590);
+    s.destroyed=false;
+    const auto reject=[&](E error,std::uint32_t pc)noexcept {fail(d,error,pc);s.destroy(d);return false;};
+    if (!s.model.build(*s.sourceAssets->hierarchy(),c.position,c.look,c.up,false)) return reject(E::graph,0x1D3678);
+    if(!s.material.adopt(ledger,footprint,d))return reject(E::lifetime,0x26E7D8);
     s.binders={{{{s.model.find("binderleft1"),s.model.find("binderright1")}},
         {{s.model.find("binderleft2"),s.model.find("binderright2")}}}};
-    s.destroyed=false;return true;
+    return true;
 }
-bool OriginalUiRiderPodScene50KG::loaded() const noexcept {return storage_&&!storage_->destroyed;}
+bool OriginalUiRiderPodScene50KG::loaded() const noexcept {return storage_&&!storage_->destroyed&&storage_->material.active();}
 bool OriginalUiRiderPodScene50KG::captureDirectionalOrientation(
     OriginalUiRiderPodOrientation50KG& output,D& d) const noexcept {
     d={};if (!loaded()) return fail(d,E::phase,0x28A530);
@@ -226,7 +327,7 @@ bool OriginalUiRiderPodScene50KG::projectPalette(std::uint8_t flags,ModelPalette
     d={};if (!loaded()) return fail(d,E::phase,0x2412E4);return storage_->model.project(flags,output,d);
 }
 bool OriginalUiRiderPodScene50KG::binderPresent(std::size_t pair) const noexcept {
-    return storage_&&pair<2&&storage_->binders[pair][0]!=I::none&&storage_->binders[pair][1]!=I::none;
+    return loaded()&&pair<2&&storage_->binders[pair][0]!=I::none&&storage_->binders[pair][1]!=I::none;
 }
 bool OriginalUiRiderPodScene50KG::projectBinder(std::size_t pair,const std::array<float,3>& camera,
     OriginalUiRiderBinderQuad50KG& output,D& d) noexcept {

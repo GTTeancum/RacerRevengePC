@@ -2,13 +2,14 @@
 #include "original_ui_rider_character50kg.h"
 #include "original_ui_user_rotate50kg.h"
 #include "original_ui_rider_binder50kg.h"
+#include "original_ui_rider_material_lifetime50kg.h"
 #include "model_palette49s.h"
 #include "../assets/original_ui_rider_pod_assets50kg.h"
 #include <memory>
 
 namespace rr::game {
 enum class OriginalUiRiderModelError50KG : std::uint8_t {
-    none,alreadyPrepared,asset,graph,binding,pose,phase,playback,ik,palette,binder,allocation
+    none,alreadyPrepared,asset,graph,binding,pose,phase,playback,ik,palette,binder,allocation,lifetime
 };
 struct OriginalUiRiderModelDiagnostic50KG {
     OriginalUiRiderModelError50KG error=OriginalUiRiderModelError50KG::none;
@@ -16,6 +17,10 @@ struct OriginalUiRiderModelDiagnostic50KG {
     ModelPlaybackDiagnostic50KG playback{};
     ChariotIkDiagnostic49T ik{};
     ModelPaletteDiagnostic49S palette{};
+    OriginalUiRiderMaterialLifetimeDiagnostic50KG lifetime{};
+    // A failed cleanup retains the exact domain, including its invalidated
+    // phase. The original load/playback error remains the primary diagnostic.
+    bool cleanupPending=false;
 };
 // One real model graph per dynamic widget. PSG nodes retain their original
 // hierarchy/order beneath the actual additional model root. No vehicle-part
@@ -27,15 +32,20 @@ public:
     OriginalUiRiderCharacterScene50KG(const OriginalUiRiderCharacterScene50KG&)=delete;
     OriginalUiRiderCharacterScene50KG& operator=(const OriginalUiRiderCharacterScene50KG&)=delete;
     bool beginLoad(std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG>,
-        ModelMotionSharedState49T&,ModelMode0IkShared50KG&,OriginalUiRiderModelDiagnostic50KG&) noexcept;
+        ModelMotionSharedState49T&,ModelMode0IkShared50KG&,OriginalUiRiderMaterialLifetime50KG&,
+        const OriginalUiRiderMaterialFootprint50KG&,OriginalUiRiderModelDiagnostic50KG&) noexcept;
     // Call at actual observer-attachment + parent callback completion boundary.
     // Captures155730, constructs optional l_IK/r_IK chains in source order from
     // sampled graph, binds endpoints, installs real mode0 solver, sets IK204.
     bool finishAttachment(SourceLibmState49T&,OriginalUiRiderModelDiagnostic50KG&) noexcept;
     // Source widget survives model destruction. Retain idle counter/last idle and
     // ready across real unload/reload, rather than constructing a fresh widget.
-    void modelDestroyedAfterDetach() noexcept;
+    // Only after successful backend drain/detach with completion entitlement.
+    // The exact domain survives false; this does not acquire that entitlement.
+    bool modelDestroyedAfterDetach(OriginalUiRiderModelDiagnostic50KG&) noexcept;
+    bool requiresModelCleanup() const noexcept;
     bool reload(ModelMotionSharedState49T&,ModelMode0IkShared50KG&,
+        OriginalUiRiderMaterialLifetime50KG&,const OriginalUiRiderMaterialFootprint50KG&,
         OriginalUiRiderModelDiagnostic50KG&) noexcept;
     bool attached() const noexcept;
     void selected() noexcept;
@@ -59,9 +69,14 @@ public:
     OriginalUiRiderPodScene50KG(const OriginalUiRiderPodScene50KG&)=delete;
     OriginalUiRiderPodScene50KG& operator=(const OriginalUiRiderPodScene50KG&)=delete;
     bool load(std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG>,
+        OriginalUiRiderMaterialLifetime50KG&,const OriginalUiRiderMaterialFootprint50KG&,
         OriginalUiRiderModelDiagnostic50KG&) noexcept;
-    void modelDestroyedAfterDetach() noexcept;
-    bool reload(OriginalUiRiderModelDiagnostic50KG&) noexcept;
+    // Only after successful backend drain/detach with completion entitlement.
+    // The exact domain survives false; this does not acquire that entitlement.
+    bool modelDestroyedAfterDetach(OriginalUiRiderModelDiagnostic50KG&) noexcept;
+    bool requiresModelCleanup() const noexcept;
+    bool reload(OriginalUiRiderMaterialLifetime50KG&,const OriginalUiRiderMaterialFootprint50KG&,
+        OriginalUiRiderModelDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
     // Rider direction choreography captures BEFORE outgoing deselection, then
     // restores AFTER final incoming SELECT has loaded and attached this pod.

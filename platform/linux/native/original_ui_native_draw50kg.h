@@ -1,5 +1,6 @@
 #pragma once
 #include "original_ui_draw50kg.h"
+#include "../../../src/assets/original_ui_material50kg.h"
 
 namespace rr::platform {
 // NEW reconstruction, not recovered historical bytes. No implicit material
@@ -62,6 +63,20 @@ struct OriginalUiNativeDraw50KG {
     // Main alpha255) are valid with source packet alpha63/64. This joint bound
     // prevents native blend-factor clamping from hiding a source factor >1.
 };
+// Owned source material values from the final nonempty canonical drain leaf.
+// Inactive FIX and all clamp-region limits survive native enum conversion.
+// This value alone is NOT a submission/completion or closed-route certificate.
+struct OriginalUiSourceTerminal50KN {
+    std::uint32_t canonicalToken=0,pass=0,leaf=0;
+    std::uint64_t registryGeneration=0,bankGeneration=0;
+    std::array<std::int32_t,assets::originalUiGsFieldCount50KG> gs{};
+    // Construction locations; gs itself additionally includes the actual
+    // retained binding's texture-alpha mutation, if present (249818..24983C).
+    std::array<std::uint32_t,assets::originalUiGsFieldCount50KG> constructionFieldSourcePC{};
+    std::array<std::size_t,assets::originalUiGsFieldCount50KG> constructionFieldByteOffset{};
+    std::int32_t enabled=0,textureCount=0,textureCoordinateIndex=0;
+    std::int32_t lodCalculationMethod=0,maximumMipLevel=0,magFilter=0,minFilter=0,lodL=0,lodK=0;
+};
 class OriginalUiRiderDrawContribution50KG;
 class VehicleWindowGl50DS;
 // Sealed by the concrete complete Rider frame composer only, after every real
@@ -87,5 +102,6 @@ private:
     // Nonzero, increasing for this live composer; written only after a whole
     // frame has assembled successfully. Borrowed arrays and owner remain live.
     std::uint64_t frameGeneration_=0;
+    OriginalUiSourceTerminal50KN terminal_{};
 };
 }

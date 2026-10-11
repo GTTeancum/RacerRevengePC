@@ -42,6 +42,14 @@ public:
     OriginalUiMaterialEquivalence50KG compare(const OriginalUiMaterialBindingState50KG&) const noexcept;
     bool initialized() const noexcept {return initialized_;}
     bool bound() const noexcept {return bound_;}
+    // Pointer-free observation of this exact retained semantic state. Includes
+    // actual249818..24983C TEXA mutation after recordDrainedBinding. This is
+    // not a GPU receipt: the composer must stage it and seal only after the
+    // complete representative drain is accepted by its renderer.
+    bool copyEffectiveGs(std::array<std::int32_t,originalUiGsFieldCount50KG>& out)const noexcept {
+        if(!initialized_ || !effective_.prepared_)return false;
+        out=effective_.state_;return true;
+    }
 private:
     OriginalUiMaterialEquivalenceKey50KG construction_,effective_;
     bool initialized_=false,bound_=false;

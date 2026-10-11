@@ -78,6 +78,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/original_ui_rider_widgets50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_visibility50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_backend50kg.cpp"
+  "${RR_ROOT}/src/game/original_ui_rider_material_lifetime50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_panel50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_selected_packet50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_light_manager_lifetime50kg.cpp"

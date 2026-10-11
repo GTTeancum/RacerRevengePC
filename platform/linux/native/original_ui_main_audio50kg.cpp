@@ -71,6 +71,29 @@ constexpr std::array<OriginalFile,7> originals{{
 constexpr OriginalFile riderOriginal{
     "MUSIC/UI/SCREENS/UI_PEOPL.VAG",709504,
     "2ac7db7a81ebcad40afa37998ac3e1dba16d5cd774d0da464db03faa411ed9e4",619024};
+bool sameClip(const AudioClip50HD& a,const AudioClip50HD& b) noexcept {
+    return a.samples==b.samples&&a.frames==b.frames&&a.sampleRate==b.sampleRate&&
+        a.channels==b.channels&&a.loopStart==b.loopStart&&a.loopEnd==b.loopEnd;
+}
+bool preparedClipMatches(const AudioClip50HD& clip,const assets::AudioPcm50HC& pcm,
+    const OriginalFile& original,std::uint8_t channels) noexcept {
+    // Retained authentication/PCM ownership facts only; no load or decode.
+    return AudioMixer50HD::validClip(clip)&&pcm.sourceSha256==original.sha&&
+        pcm.frames==original.frames&&pcm.sampleRate==22050&&pcm.channels==channels&&
+        !pcm.hasEmbeddedLoop&&!pcm.loopStart&&!pcm.loopEnd&&
+        pcm.samples.size()==static_cast<std::size_t>(original.frames)*channels&&
+        clip.samples==pcm.samples.data()&&clip.frames==pcm.frames&&clip.sampleRate==pcm.sampleRate&&
+        clip.channels==pcm.channels&&!clip.loopStart&&!clip.loopEnd;
+}
+bool fixedVoiceMatches(const AudioVoiceObservation50HD& observed,const AudioClip50HD& clip,
+    std::uint64_t playbackRevision,float gain,bool loop) noexcept {
+    const auto& voice=observed.voice;
+    return playbackRevision&&observed.playbackRevision==playbackRevision&&sameClip(voice.clip,clip)&&
+        voice.gain==gain&&voice.pitch==1.f&&voice.pan==0.f&&voice.loop==loop&&
+        observed.originalLeft==1.f&&observed.originalRight==1.f&&
+        std::isfinite(voice.sourceFrame)&&voice.sourceFrame>=0.0&&
+        voice.sourceFrame<static_cast<double>(clip.frames);
+}
 Bytes authenticatedRead(const std::filesystem::path& root, const char* relative,
     std::size_t expectedSize, const char* expectedHash) {
     need(!std::filesystem::is_symlink(root) && std::filesystem::is_directory(root), "Main audio root is not a real directory");
@@ -161,6 +184,8 @@ bool OriginalUiMainAudio50KG::prepare(const std::filesystem::path& audioRoot,
             need(AudioMixer50HD::validClip(clips_[i]), "Original Main PCM rejected by native mixer");
         }
         mixer_=&mixer; mixerEpoch_=mixer.groupEpoch50IC(); mixerCount_=mixer.count();
+        mixerRate_=mixer.sampleRate();preparedSoundMode_=mixer.originalSoundMode50KG();
+        noteControlChange();
         prepared_=true; error.clear(); return true;
     } catch (const std::exception& e) { error=e.what(); }
     catch (...) { error="Main audio cold preparation failed"; }
@@ -187,7 +212,7 @@ bool OriginalUiMainAudio50KG::prepareRiderMenu(const std::filesystem::path& audi
         need(AudioMixer50HD::validClip(clip),"Original Rider music rejected by native mixer");
         riderPcm_=std::move(pcm);
         riderClip_={riderPcm_.samples.data(),riderPcm_.frames,riderPcm_.sampleRate,riderPcm_.channels,0,0};
-        riderPrepared_=true;error.clear();return true;
+        riderPrepared_=true;noteControlChange();error.clear();return true;
     }catch(const std::exception& e){error=e.what();}
     catch(...){error="Rider music cold preparation failed";}
     return false;
@@ -195,6 +220,13 @@ bool OriginalUiMainAudio50KG::prepareRiderMenu(const std::filesystem::path& audi
 bool OriginalUiMainAudio50KG::current() const noexcept {
     return prepared_ && mixer_ && mixer_->groupEpoch50IC()==mixerEpoch_ && mixer_->count()==mixerCount_ &&
         !mixer_->requiresVoiceGroupGains50IC();
+}
+bool OriginalUiMainAudio50KG::canRecordControlChange() const noexcept {
+    return !controlRevisionExhausted_&&controlRevision_!=std::numeric_limits<std::uint64_t>::max();
+}
+void OriginalUiMainAudio50KG::noteControlChange() noexcept {
+    if(canRecordControlChange())++controlRevision_;
+    else controlRevisionExhausted_=true;
 }
 bool OriginalUiMainAudio50KG::ready() const noexcept { return current(); }
 bool OriginalUiMainAudio50KG::riderMenuReady() const noexcept {
@@ -208,7 +240,8 @@ bool OriginalUiMainAudio50KG::canApplySoundMode18874050KG(std::uint32_t mode) co
     return !paused_&&owner&&owner->canApply188740(*mixer_,mode);
 }
 bool OriginalUiMainAudio50KG::applySoundMode18874050KG(std::uint32_t mode) noexcept {
-    return canApplySoundMode18874050KG(mode)&&mixer_->originalSoundMode50KG()->apply188740(*mixer_,mode);
+    if(!canApplySoundMode18874050KG(mode)||!mixer_->originalSoundMode50KG()->apply188740(*mixer_,mode))return false;
+    noteControlChange();return true;
 }
 bool OriginalUiMainAudio50KG::startMainLoop9() noexcept {
     return startMusicLoop(clips_[0],9);
@@ -222,6 +255,7 @@ bool OriginalUiMainAudio50KG::startMusicLoop(const AudioClip50HD& clip,std::uint
     //234900(restart1) replaces the outgoing music, including any pending
     //234440 retirement, before beginning the selected original clip at0.
     if (!mixer_->play(musicVoice,clip,0.4f,1.f,true,0.f)) return false;
+    musicPlaybackRevision_=mixer_->playbackRevision(musicVoice);noteControlChange();
     ownsMusic_=true; fading_=false; musicSong_=song;
     musicGain_=0.4f; fadeElapsed_=fadeDuration_=fadeRetireAt_=0.f;
     return true;
@@ -236,6 +270,91 @@ bool OriginalUiMainAudio50KG::canPlayRiderBack5() const noexcept {
 bool OriginalUiMainAudio50KG::playRiderBack5() noexcept {
     return canPlayRiderBack5()&&playEffectClip(5);
 }
+bool OriginalUiMainAudio50KG::inspectSteadyRiderTransport(SteadyTransportObservation& out) const noexcept {
+    out={};out.transport=this;out.mixer=mixer_;out.controlRevision=controlRevision_;
+    out.paused=paused_;out.ownsMusic=ownsMusic_;out.fading=fading_;
+    out.musicSong=musicSong_;out.musicGain=musicGain_;
+    auto reject=[&](SteadyRiderError error,const char* detail,std::size_t voice=requiredVoices) noexcept {
+        out.error=error;out.detail=detail;out.rejectedVoice=voice;return false;
+    };
+    if(!prepared_||!riderPrepared_)
+        return reject(SteadyRiderError::preparationUnavailable,"Original Rider PCM preparation unavailable");
+    if(!mixer_)return reject(SteadyRiderError::mixerUnavailable,"Rider mixer unavailable");
+    out.mixerEpoch=mixer_->groupEpoch50IC();out.voiceCount=mixer_->count();out.outputRate=mixer_->sampleRate();
+    out.mixerControlRevision=mixer_->controlRevision();out.sourceMixedFrames=mixer_->mixedFrames();
+    out.masterGain=mixer_->masterGain();out.soundMode=mixer_->originalSoundMode50KG();
+    if(out.mixerEpoch!=mixerEpoch_)
+        return reject(SteadyRiderError::mixerEpochChanged,"Rider mixer initialization changed");
+    if(out.voiceCount!=requiredVoices||out.voiceCount!=mixerCount_||out.outputRate!=mixerRate_||!out.outputRate)
+        return reject(SteadyRiderError::mixerShapeChanged,"Rider requires its exact dedicated seven-voice mixer/rate");
+    if(controlRevisionExhausted_||!controlRevision_||!mixer_->canRecordControlChanges())
+        return reject(SteadyRiderError::revisionUnavailable,"Rider control identity exhausted or unavailable");
+    if(paused_)return reject(SteadyRiderError::paused,"Rider transport paused");
+    if(!out.soundMode||!out.soundMode->ready())
+        return reject(SteadyRiderError::soundModeUnavailable,"Rider requires the installed application sound-mode owner");
+    if(out.soundMode!=preparedSoundMode_)
+        return reject(SteadyRiderError::soundModeOwnerChanged,"Rider prepared sound-mode owner changed");
+    out.soundModeRevision=out.soundMode->revision();
+    out.profileSoundMode=static_cast<std::uint32_t>(out.soundMode->fields().profile1101C);
+    game::OriginalSoundRouting50KG routing;
+    if(!game::projectOriginalSoundRouting26CBA050KG(out.soundMode->fields(),0,100,routing)||
+        routing.phaseSelector!=0||routing.positional||routing.leftPercent!=100||routing.rightPercent!=100)
+        return reject(SteadyRiderError::unsupportedRouting,"Rider requires supported source centered routing");
+    if(out.masterGain!=1.f||mixer_->requiresVoiceGroupGains50IC())
+        return reject(SteadyRiderError::unsupportedGainLayer,"Rider master/group gain layer differs");
+    for(std::size_t voice=0;voice<requiredVoices;++voice){
+        auto& observed=voice==musicVoice?out.music:out.effects[voice-firstEffectVoice];
+        if(!mixer_->inspectVoice(voice,observed))
+            return reject(SteadyRiderError::revisionUnavailable,"Rider live voice inspection unavailable",voice);
+        if(observed.groupKnown||observed.groupGain!=1.f)
+            return reject(SteadyRiderError::unsupportedGainLayer,"Rider foreign per-voice group gain layer",voice);
+    }
+    if(!ownsMusic_||musicSong_!=7||!out.music.voice.active)
+        return reject(SteadyRiderError::wrongMusic,"Rider requires owned active Song7",musicVoice);
+    if(fading_||musicGain_!=0.4f||fadeElapsed_!=0.f||fadeDuration_!=0.f||fadeRetireAt_!=0.f)
+        return reject(SteadyRiderError::nonsteadyEnvelope,"Rider Song7 envelope is not the settled start state",musicVoice);
+    if(!preparedClipMatches(riderClip_,riderPcm_,riderOriginal,2))
+        return reject(SteadyRiderError::invalidMusicClip,"Rider authenticated Song7 PCM identity/metadata differs",musicVoice);
+    if(!fixedVoiceMatches(out.music,riderClip_,musicPlaybackRevision_,0.4f,true))
+        return reject(SteadyRiderError::musicVoiceChanged,"Rider Song7 live playback identity/controls/routing differs",musicVoice);
+    for(std::size_t i=0;i<effectVoiceCount;++i){
+        const auto& observed=out.effects[i];
+        // The actual mixer ends one-shots. Bookkeeping may await a real page
+        // update; inspecting or servicing PCM must not clear/restart them.
+        if(!observed.voice.active)continue;
+        const auto voice=firstEffectVoice+i,clip=i+1;
+        if(!ownsEffect_[i]||observed.playbackRevision!=effectPlaybackRevisions_[i])
+            return reject(SteadyRiderError::foreignEffect,"Rider active effect is not this transport's playback",voice);
+        if(!preparedClipMatches(clips_[clip],pcm_[clip],originals[clip],1))
+            return reject(SteadyRiderError::invalidEffectClip,"Rider authenticated effect PCM identity/metadata differs",voice);
+        if(!fixedVoiceMatches(observed,clips_[clip],effectPlaybackRevisions_[i],1.f,false))
+            return reject(SteadyRiderError::effectVoiceChanged,"Rider live one-shot controls/routing differs",voice);
+    }
+    out.error=SteadyRiderError::none;out.detail="Owned steady Rider Song7 and bounded effects observed";return true;
+}
+bool OriginalUiMainAudio50KG::canPlayRiderAdvance2() const noexcept {
+    SteadyTransportObservation observed;
+    return inspectSteadyRiderTransport(observed)&&canRecordControlChange()&&
+        mixer_->canRecordControlChanges(2)&&
+        preparedClipMatches(clips_[6],pcm_[6],originals[6],1)&&canPlayEffectClip(6);
+}
+bool OriginalUiMainAudio50KG::playRiderAdvance2(RiderAdvanceCommandReceipt& receipt) noexcept {
+    receipt={};
+    if(!canPlayRiderAdvance2())return false;
+    RiderAdvanceCommandObservation observed;
+    observed.transport=this;observed.mixer=mixer_;observed.soundMode=mixer_->originalSoundMode50KG();
+    observed.controlRevisionBefore=controlRevision_;observed.mixerControlRevisionBefore=mixer_->controlRevision();
+    // Exactly the existing authenticated ADVANCE.VAG stop-before-play path.
+    // The preflight reserves both mixer control identities before any stop.
+    if(!playEffectClip(6))return false;
+    observed.controlRevisionAfter=controlRevision_;observed.mixerControlRevisionAfter=mixer_->controlRevision();
+    observed.mixerEpoch=mixerEpoch_;observed.soundModeRevision=observed.soundMode->revision();
+    observed.sourceMixedFrames=mixer_->mixedFrames();observed.eventId=2;observed.voiceSlot=6;
+    // Guaranteed by the capacity preflight and exclusive main-thread owner.
+    // A violation cannot be rolled back or retried as an unplayed command.
+    if(!mixer_->inspectVoice(6,observed.voice))return false;
+    receipt.observation_=observed;receipt.issued_=true;return true;
+}
 bool OriginalUiMainAudio50KG::fadeMain(float seconds) noexcept {
     if (!current() || paused_ || (seconds!=0.f && seconds!=1.f)) return false;
     // Source234480: inactive stream(+5C==-1) returns without effects; Main
@@ -244,11 +363,12 @@ bool OriginalUiMainAudio50KG::fadeMain(float seconds) noexcept {
     if (!ownsMusic_ && !mixer_->active(musicVoice)) return true;
     if (!ownsMusic_ || !mixer_->active(musicVoice)) return false;
     if (seconds==0.f) {
-        mixer_->stop(musicVoice); ownsMusic_=false; fading_=false; musicSong_=0; musicGain_=0.f; return true;
+        mixer_->stop(musicVoice); ownsMusic_=false; fading_=false; musicSong_=0; musicGain_=0.f;
+        noteControlChange();return true;
     }
     fadeStartGain_=musicGain_; fadeElapsed_=0.f; fadeDuration_=seconds;
     volatile float retirement=seconds+0.35f; fadeRetireAt_=retirement;
-    fading_=true; return true;
+    fading_=true;noteControlChange();return true;
 }
 bool OriginalUiMainAudio50KG::playMenuEffect(std::uint32_t originalId) noexcept {
     if (!current() || paused_) return false;
@@ -282,11 +402,16 @@ bool OriginalUiMainAudio50KG::canPlayEffectClip(std::size_t clip) const noexcept
 bool OriginalUiMainAudio50KG::playEffectClip(std::size_t clip) noexcept {
     if(!canPlayEffectClip(clip))return false;
     const auto voice=firstEffectVoice+clip-1;
+    const auto revision=mixer_->controlRevision();
     // Source233458..233488 performs stop-before-play for flags1, not overlap
     // or suppression of a repeated event. AudioMixer::play restarts at frame0.
     if (ownsEffect_[clip-1]) mixer_->stop(voice);
-    if (!mixer_->play(voice,clips_[clip],1.f,1.f,false,0.f)) return false;
-    ownsEffect_[clip-1]=true; return true;
+    if (!mixer_->play(voice,clips_[clip],1.f,1.f,false,0.f)) {
+        if(revision!=mixer_->controlRevision()||!mixer_->canRecordControlChanges())noteControlChange();
+        return false;
+    }
+    ownsEffect_[clip-1]=true;effectPlaybackRevisions_[clip-1]=mixer_->playbackRevision(voice);
+    noteControlChange();return true;
 }
 bool OriginalUiMainAudio50KG::update(float seconds) noexcept {
     if (!current() || !std::isfinite(seconds) || seconds<0.f || seconds>1.f) return false;
@@ -298,12 +423,19 @@ bool OriginalUiMainAudio50KG::update(float seconds) noexcept {
     }
     if (ownsMusic_ && !mixer_->active(musicVoice)) { ownsMusic_=false; fading_=false; musicSong_=0; }
     if (!fading_) return true;
+    const auto previousElapsed=fadeElapsed_,previousGain=musicGain_;
+    const auto revision=mixer_->controlRevision();
     volatile float elapsed=fadeElapsed_+seconds; fadeElapsed_=elapsed;
     musicGain_=fadeStartGain_*std::max(0.f,1.f-fadeElapsed_/fadeDuration_);
-    if (!mixer_->controls(musicVoice,musicGain_,1.f,0.f)) return false;
+    if (!mixer_->controls(musicVoice,musicGain_,1.f,0.f)) {
+        if(previousElapsed!=fadeElapsed_||previousGain!=musicGain_)noteControlChange();
+        return false;
+    }
     if (fadeElapsed_>=fadeRetireAt_) {
         mixer_->stop(musicVoice); ownsMusic_=false; fading_=false; musicSong_=0; musicGain_=0.f;
     }
+    if(previousElapsed!=fadeElapsed_||previousGain!=musicGain_||revision!=mixer_->controlRevision()||
+        !mixer_->canRecordControlChanges())noteControlChange();
     return true;
 }
 bool OriginalUiMainAudio50KG::mixStereo16(std::int16_t* output, std::size_t frames) noexcept {
@@ -324,6 +456,7 @@ std::uint32_t OriginalUiMainAudio50KG::activeMusicSong() const noexcept {
     return current()&&ownsMusic_&&mixer_->active(musicVoice)?musicSong_:0;
 }
 void OriginalUiMainAudio50KG::reset() noexcept {
+    const bool changed=prepared_||riderPrepared_||mixer_||ownsMusic_||fading_||paused_||musicSong_;
     if (current()) {
         if (ownsMusic_) mixer_->stop(musicVoice);
         for (std::size_t i=0; i<effectVoiceCount; ++i)
@@ -331,5 +464,6 @@ void OriginalUiMainAudio50KG::reset() noexcept {
     }
     prepared_=false; riderPrepared_=false; mixer_=nullptr; ownsMusic_=false; fading_=false; paused_=false; musicSong_=0;
     ownsEffect_.fill(false); musicGain_=0.f;
+    if(changed)noteControlChange();
 }
 }

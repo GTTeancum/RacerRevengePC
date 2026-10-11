@@ -1,4 +1,6 @@
 #include "original_ui_rider_session50kg.h"
+#include "original_ui_main_draw50kg.h"
+#include "vehicle_window_gl50ds.h"
 #include <cmath>
 #include <limits>
 #include <new>
@@ -98,12 +100,21 @@ struct OriginalUiRiderSession50KG::Storage {
     bool dependenciesPrepared=false,inOperation=false,rendering=false,paused=false,updatePrepared=false;
     bool requested=false,entered=false,managerEntered=false,opening=false,opened=false,closing=false,restored=false,closed=false;
     bool backAccepted=false,entryAuxiliarySeen=false,entryCompleted=false;
-    ~Storage(){collector.drain();dynamic.drain();}
+    bool backendBound=false,collectorBound=false,sourceClosing=false,sourceTornDown=false;
+    // No fallible source destruction is first attempted by a destructor.
+    // Failed private cold bind has never acquired a graph/helper domain.
+    static bool consumeMaterialEvents(void* context,bool rebuild) noexcept {
+        auto& s=*static_cast<Storage*>(context);
+        if(!s.collector.consumeMaterials(rebuild,s.callbackFault.draw)){
+            s.state.faulted=true;s.callbackFault.status=Status::draw;return false;
+        }
+        return true;
+    }
     game::OriginalUiRiderWidgets50KG& widgets() noexcept {return *cold.resources->widgets();}
     const game::OriginalUiRiderWidgets50KG& widgets() const noexcept {return *cold.resources->widgets();}
     const game::OriginalUiNavigation50KG* nav() const noexcept {return widgets().navigation(0);}
     const game::OriginalUiRiderSelectionData50KG* selection() const noexcept {return widgets().selectionData();}
-    bool operational() const noexcept {return dependenciesPrepared&&!state.faulted&&!state.quitRequested&&!dynamic.poisoned()&&!widgets().poisoned();}
+    bool operational() const noexcept {return dependenciesPrepared&&!sourceClosing&&!state.faulted&&!state.quitRequested&&!dynamic.poisoned()&&!widgets().poisoned();}
     bool audioReady() const noexcept {
         return cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:
             cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&cold.audio&&cold.audio->riderMenuReady();
@@ -291,7 +302,16 @@ struct OriginalUiRiderSession50KG::Storage {
     }
 };
 OriginalUiRiderSession50KG::OriginalUiRiderSession50KG() noexcept=default;
-OriginalUiRiderSession50KG::~OriginalUiRiderSession50KG()=default;
+OriginalUiRiderSession50KG::~OriginalUiRiderSession50KG(){
+    if(sourceTeardownPending()){
+        // Terminal contract misuse, not successful cleanup or a retry. Retain
+        // every callback/graph/token dependency instead of freeing an object
+        // still borrowed by the renderer. Normal frontend close retains the
+        // accessible session and reports the exact failure until retry succeeds.
+        storage_.release();
+    }
+}
+
 Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& cold,Diagnostic& d) noexcept {
     return bindCold(cold,game::OriginalUiRiderColdPopulation50KG::selected19,d);
 }
@@ -300,7 +320,8 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
     d={};if(storage_)return result(d,Status::alreadyBound);
     if(population!=game::OriginalUiRiderColdPopulation50KG::selected19&&
        population!=game::OriginalUiRiderColdPopulation50KG::rider19And20)return result(d,Status::invalidInput);
-    if(!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->bankInput()||
+    if(!cold.predecessorResources||!cold.predecessorResources->loaded()||!cold.predecessorResources->materials()||
+       !cold.predecessorResources->particleMaterial()||!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->bankInput()||
        !cold.resources->exitText(0)||!cold.resources->exitText(0)->prepared()||!cold.statAssets||!cold.statAssets->loaded()||
        !cold.binderAssets||!cold.binderAssets->loaded()||!genuine(cold.riderArchive,assets::OriginalUiArchiveId50KG::rider)||
        !genuine(cold.appStart,assets::OriginalUiArchiveId50KG::appStart)||!genuine(cold.podTextures,assets::OriginalUiArchiveId50KG::podTextures)||
@@ -317,7 +338,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
        (cold.audioMode!=OriginalUiMainAudioMode50KG::muted&&cold.audioMode!=OriginalUiMainAudioMode50KG::enabled))
         return result(d,Status::unavailableDestination,0x234900);
     try {
-        auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;
+        auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->cold.predecessorResources=nullptr;
         const auto* page=s->selection()?s->selection()->page():nullptr;
         if(!page||page->groups.size()!=3||page->groups[1].controls.size()!=23||!s->nav()||
            page->useVideoAsTexture||page->background!="*INVALID*"||!cold.resources->background(19)||
@@ -356,7 +377,32 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         backend.podTextures=cold.podTextures;backend.binder=cold.binderAssets;backend.materialRuntime=cold.materialRuntime;
         backend.staticImages=*cold.resources->bankInput();backend.staticImages.ipumCache=cold.ipumCache.get();
         backend.staticImages.owners.push_back(cold.statAssets->images());
+        // Canonical closure comes from actual retained material records, not
+        // hand-written basename/image lists. Inventories never acquire owners.
+        const auto addStaticRow=[&](const std::string& name){
+            game::OriginalUiRiderMaterialRow50KG row;
+            if(!game::OriginalUiRiderMaterialRow50KG::prepare(*cold.appStart,name,row,d.backend.lifetime))return false;
+            for(const auto& prior:backend.staticRows)if(prior.same(row))return true;
+            backend.staticRows.push_back(row);return true;
+        };
+        if(!cold.resources->materials())return result(d,Status::resource);
+        for(const auto& material:*cold.resources->materials())if(!addStaticRow(material.registeredName))return result(d,Status::resource);
+        for(unsigned i=0;i<=static_cast<unsigned>(assets::OriginalUiRiderStatAsset50KG::labelFont);++i){
+            const auto* material=cold.statAssets->resource(static_cast<assets::OriginalUiRiderStatAsset50KG>(i));
+            if(!material||!addStaticRow(material->registeredName))return result(d,Status::resource);
+        }
+        for(std::uint8_t rider=1;rider<=26;++rider)if(const auto* material=cold.statAssets->portrait(rider))
+            if(!addStaticRow(material->registeredName))return result(d,Status::resource);
+        for(const auto& material:*cold.predecessorResources->materials())
+            if(!addStaticRow(material.registeredName))return result(d,Status::resource);
+        const auto* particle=cold.predecessorResources->particleMaterial();
+        if(!particle->identity||!particle->identity->name)return result(d,Status::resource);
+        std::string particleName=particle->identity->name;
+        if(particleName.size()<4||particleName.substr(particleName.size()-4)!=".psm")return result(d,Status::resource);
+        particleName.resize(particleName.size()-4);
+        if(!addStaticRow(particleName))return result(d,Status::resource);
         if(!s->backend.bind(backend,d.backend))return result(d,Status::backend);
+        s->backendBound=true;
         if(!s->dynamic.bind(cold.riderArchive,s->widgets(),cold.application->modelMotion,cold.application->modelMode0Ik,
             cold.application->modelLibm,cold.application->sharedNoise308030,s->backend.callbacks(),d.dynamic))return result(d,Status::model,d.dynamic.sourcePC);
         game::OriginalUiRiderSelectionProfile50KG copiedProfile;game::OriginalUiRiderSelectionPlan50KG coldPlan;
@@ -382,10 +428,12 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         const std::array<const game::OriginalUiApertureOwner50KG*,2> apertures{{&s->aperture,nullptr}};
         if(!s->collector.bind(cold.resources,cold.statAssets,cold.binderAssets,s->backend,s->dynamic,*cold.lightManager,
             0,1,cold.externalTransition,apertures,d.draw))return result(d,Status::draw,d.draw.sourcePC);
+        s->collectorBound=true;
         // Every material/pass/image policy is admitted before the coordinator
         // can approve entry. This warms real retained owners only: no model is
         // attached, no navigation/widget state changes and no RNG is consumed.
         if(!s->collector.prepareBank(d.draw))return result(d,Status::draw,d.draw.sourcePC);
+        if(!s->backend.bindMaterialConsumer(&s->collector,s.get(),&Storage::consumeMaterialEvents))return result(d,Status::backend);
         s->state.bound=true;storage_=std::move(s);return result(d,Status::ok);
     }catch(const std::bad_alloc&){return result(d,Status::allocation);}catch(...){return result(d,Status::resource);}
 }
@@ -651,4 +699,31 @@ void OriginalUiRiderSession50KG::drain() noexcept {if(storage_)storage_->cpuDrai
 void OriginalUiRiderSession50KG::requestQuit() noexcept {
     if(!storage_)return;storage_->cpuDrain();storage_->state.backProposalPending=false;storage_->state.quitRequested=true;
 }
+bool OriginalUiRiderSession50KG::sourceTeardownPending()const noexcept {
+    return storage_&&!storage_->sourceTornDown&&storage_->backendBound&&
+        (storage_->collector.hasSourceSubmission()||storage_->backend.materialLifetime().hasOwners()||
+         storage_->backend.materialLifetime().pendingEvents());
+}
+Status OriginalUiRiderSession50KG::teardownSource(VehicleWindowGl50DS* renderer,
+    VehicleWindowDiagnostic50DS& rendererDiagnostic,Diagnostic& d) noexcept {
+    d={};if(!storage_||storage_->sourceTornDown)return result(d,Status::ok);
+    auto& s=*storage_;if(s.inOperation||s.rendering)return result(d,Status::invalidInput);
+    s.sourceClosing=true;
+    const auto generation=s.collector.sourceSubmissionWatermark();
+    const auto frontier=s.backend.materialLifetime().sequence();
+    // This proof is recorded by beginSourceSubmission on the exact collector.
+    // A never-submitted private candidate may clean up without GL work.
+    if(s.collector.hasSourceSubmission()){
+        if(!renderer||s.collector.sourceRenderer()!=renderer||!renderer->retireOriginalUiSourceOwner(s.collector,rendererDiagnostic)||
+           !rendererDiagnostic.submittedWorkCompleted)return result(d,Status::backend);
+    }
+    s.collector.drain();s.state.framePublished=false;
+    if(!s.backend.acceptSourceRetirement(&s.collector,generation,frontier))return result(d,Status::backend);
+    if(!s.dynamic.drain()){d.dynamic=s.dynamic.diagnostic();d.backend=s.backend.diagnostic();return result(d,Status::model);}
+    s.state.selectionAttached=false; // dynamic cleanup completed even if a later consumer must retry
+    if(!s.collector.consumeMaterials(false,d.draw))return result(d,Status::draw,d.draw.sourcePC);
+    if(!s.backend.finalizeTeardown(s.collector.materialSequence(),d.backend))return result(d,Status::backend);
+    s.sourceTornDown=true;s.dependenciesPrepared=false;s.state.selectionAttached=false;return result(d,Status::ok);
+}
+
 } // namespace rr::platform

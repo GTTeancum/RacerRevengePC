@@ -13,7 +13,7 @@ struct OriginalUiRiderDynamicOwner50KG::Storage {
     struct Entry {
         OriginalUiRiderWidgetState50KG state;
         bool enableSelect=false,disableSelect=false,enableDeselect=false,disableDeselect=false;
-        bool everLoaded=false,registered=false;
+        bool everLoaded=false,registered=false,detachComplete=false;
         std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG> characterAssets;
         std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> podAssets;
         OriginalUiRiderCharacterScene50KG character;OriginalUiRiderPodScene50KG pod;
@@ -26,7 +26,15 @@ struct OriginalUiRiderDynamicOwner50KG::Storage {
     bool coldPrepared=false,poisoned=false,inCallback=false,drained=false;
 };
 OriginalUiRiderDynamicOwner50KG::OriginalUiRiderDynamicOwner50KG() noexcept=default;
-OriginalUiRiderDynamicOwner50KG::~OriginalUiRiderDynamicOwner50KG(){drain();}
+OriginalUiRiderDynamicOwner50KG::~OriginalUiRiderDynamicOwner50KG(){
+    if(!storage_)return;
+    // The session owns explicit fallible cleanup and keeps the backend alive.
+    // Never invoke detach for the first time from a destructor. On misuse,
+    // preserve every graph/token together instead of silently destroying them.
+    for(const auto& e:storage_->entries)if(e.registered||e.character.requiresModelCleanup()||e.pod.requiresModelCleanup()){
+        (void)storage_.release();return;
+    }
+}
 bool OriginalUiRiderDynamicOwner50KG::bind(std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
     const OriginalUiRiderWidgets50KG& widgets,ModelMotionSharedState49T& motion,ModelMode0IkShared50KG& ik,
     SourceLibmState49T& libm,CoupledNoiseContext49M& rng,const OriginalUiRiderDynamicBackend50KG& backend,
@@ -35,7 +43,7 @@ bool OriginalUiRiderDynamicOwner50KG::bind(std::shared_ptr<const assets::Origina
     if(storage_)return fail(E::alreadyBound);
     if(!archive||!archive->loaded()||archive->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::rider)||
         !widgets.selectionData()||widgets.poisoned()||!backend.preflight||!backend.attach||
-        !backend.drainAndDetach||!backend.setShown)return fail(E::input);
+        !backend.drainAndDetach||!backend.setShown||!backend.materialLifetime||!backend.graphFootprint)return fail(E::input);
     try {
         assets::OriginalUiDat50KG dat;
         if(!assets::readOriginalUiDat50KG(*archive,"UI/UIRider/Widgets.Dat",dat,d.parse,
@@ -122,6 +130,9 @@ bool OriginalUiRiderDynamicOwner50KG::preflight(const OriginalUiRiderWidgetCallb
         if(!idOk(c.widget)){ok=false;break;}const auto& e=s.entries[c.widget];
         if(!dynamic(e.state.kind))continue;
         const bool needs=c.operation==O::select||(e.state.kind==K::character&&c.operation==O::clearSelection);
+        // Cold20 descriptors may be sealed for source review, but cannot
+        // authorize an actual20 graph/helper or source callback here.
+        if(needs&&c.widget!=27&&c.widget!=53){diagnostic_.error=E::input;ok=false;break;}
         if(needs&&((e.state.kind==K::character&&!e.characterAssets)||(e.state.kind==K::pod&&!e.podAssets))){
             diagnostic_.error=E::cold;ok=false;
         }
@@ -143,17 +154,24 @@ bool OriginalUiRiderDynamicOwner50KG::generic(std::uint16_t id,bool selected) no
     return !disable||shown(id,false);
 }
 bool OriginalUiRiderDynamicOwner50KG::loadModel(std::uint16_t id) noexcept {
-    auto& s=*storage_;auto& e=s.entries[id];if(e.registered)return true;
+    auto& s=*storage_;auto& e=s.entries[id];
+    if(id!=27&&id!=53){diagnostic_.error=E::input;return false;}
+    if(e.registered)return true;
+    auto* ledger=s.backend.materialLifetime(s.backend.context);
+    const auto* footprint=s.backend.graphFootprint(s.backend.context,id);
+    if(!ledger||!footprint){diagnostic_.error=E::backend;return false;}
+    e.detachComplete=false;
     bool ok=false;
     if(e.state.kind==K::character){
         if(!e.characterAssets){diagnostic_.error=E::cold;return false;}
-        ok=e.everLoaded?e.character.reload(*s.motion,*s.ik,diagnostic_.model):
-            e.character.beginLoad(e.characterAssets,*s.motion,*s.ik,diagnostic_.model);
+        ok=e.everLoaded?e.character.reload(*s.motion,*s.ik,*ledger,*footprint,diagnostic_.model):
+            e.character.beginLoad(e.characterAssets,*s.motion,*s.ik,*ledger,*footprint,diagnostic_.model);
     }else{
         if(!e.podAssets){diagnostic_.error=E::cold;return false;}
-        ok=e.everLoaded?e.pod.reload(diagnostic_.model):e.pod.load(e.podAssets,diagnostic_.model);
+        ok=e.everLoaded?e.pod.reload(*ledger,*footprint,diagnostic_.model):
+            e.pod.load(e.podAssets,*ledger,*footprint,diagnostic_.model);
     }
-    if(!ok){diagnostic_.error=E::model;return false;}
+    if(!ok){diagnostic_.error=E::model;unloadModel(id);return false;}
     e.everLoaded=true;e.registered=true; // Cleanup owns even a partial attach.
     if(!s.backend.attach(s.backend.context,id,*this)){diagnostic_.error=E::backend;unloadModel(id);return false;}
     if(e.state.kind==K::character&&!e.character.finishAttachment(*s.libm,diagnostic_.model)){
@@ -161,11 +179,32 @@ bool OriginalUiRiderDynamicOwner50KG::loadModel(std::uint16_t id) noexcept {
     }
     return true;
 }
-void OriginalUiRiderDynamicOwner50KG::unloadModel(std::uint16_t id) noexcept {
-    auto& s=*storage_;auto& e=s.entries[id];if(!e.registered)return;
-    s.backend.drainAndDetach(s.backend.context,id,*this);e.registered=false;
-    if(e.state.kind==K::character)e.character.modelDestroyedAfterDetach();
-    else e.pod.modelDestroyedAfterDetach();
+bool OriginalUiRiderDynamicOwner50KG::unloadModel(std::uint16_t id) noexcept {
+    auto& s=*storage_;auto& e=s.entries[id];
+    const bool pending=e.character.requiresModelCleanup()||e.pod.requiresModelCleanup();
+    if(!e.registered&&!pending)return true;
+    if(!e.detachComplete){
+        // Backend verifies the actual source/renderer completion entitlement
+        // BEFORE removing borrows/membership/helpers. False cannot clear our
+        // registered state or authorize graph destruction.
+        if(!s.backend.drainAndDetach(s.backend.context,id,*this)){
+            diagnostic_.cleanupPending=true;
+            diagnostic_.cleanupWidget=id;diagnostic_.cleanupPhase=OriginalUiRiderDynamicCleanupPhase50KG::detach;
+            if(diagnostic_.error==E::none)diagnostic_.error=E::backend;
+            s.poisoned=true;return false;
+        }
+        e.detachComplete=true;
+    }
+    OriginalUiRiderModelDiagnostic50KG cleanup;
+    const bool cleaned=e.state.kind==K::character?e.character.modelDestroyedAfterDetach(cleanup):
+        e.pod.modelDestroyedAfterDetach(cleanup);
+    if(!cleaned){
+        diagnostic_.cleanupPending=true;diagnostic_.cleanupModel=cleanup;
+        diagnostic_.cleanupWidget=id;diagnostic_.cleanupPhase=OriginalUiRiderDynamicCleanupPhase50KG::graphRelease;
+        if(diagnostic_.error==E::none)diagnostic_.error=E::model;
+        s.poisoned=true;return false;
+    }
+    e.registered=false;return true;
 }
 bool OriginalUiRiderDynamicOwner50KG::apply(const OriginalUiRiderWidgetCallback50KG& c,
     OriginalUiRiderWidgetState50KG& actual) noexcept {
@@ -188,11 +227,11 @@ bool OriginalUiRiderDynamicOwner50KG::apply(const OriginalUiRiderWidgetCallback5
         }
         break;
     case O::deselect:
-        if(e.state.kind==K::character){unloadModel(c.widget);ok=generic(c.widget,false);}
+        if(e.state.kind==K::character)ok=unloadModel(c.widget)&&generic(c.widget,false);
         else{
             ok=generic(c.widget,false);
-            if(ok){if(e.podAssets&&e.podAssets->config()->cleanFromMemory)unloadModel(c.widget);
-                ok=generic(c.widget,false);}
+            if(ok){if(e.podAssets&&e.podAssets->config()->cleanFromMemory)ok=unloadModel(c.widget);
+                if(ok)ok=generic(c.widget,false);}
             if(ok){e.pod.deselected();ok=shown(c.widget,false);}
         }
         break;
@@ -210,11 +249,16 @@ bool OriginalUiRiderDynamicOwner50KG::apply(const OriginalUiRiderWidgetCallback5
     if(!ok){s.poisoned=true;if(diagnostic_.error==E::none)diagnostic_.error=E::backend;return false;}
     actual=e.state;return true;
 }
-void OriginalUiRiderDynamicOwner50KG::drain() noexcept {
-    if(!storage_||storage_->drained)return;auto& s=*storage_;
+bool OriginalUiRiderDynamicOwner50KG::drain() noexcept {
+    if(!storage_||storage_->drained)return true;auto& s=*storage_;
+    if(s.inCallback){diagnostic_.cleanupPending=true;
+        diagnostic_.cleanupPhase=OriginalUiRiderDynamicCleanupPhase50KG::callbackActive;s.poisoned=true;return false;}
     // Explicit teardown, never retry a partly executed selection batch.
-    for(std::uint16_t id=1;id<120;++id)unloadModel(id);
-    s.drained=true;
+    // A completed detach phase is retained so a graph-release failure cannot
+    // replay membership/helper destruction. Unregistered tokens count too.
+    for(std::uint16_t id=1;id<120;++id)if(!unloadModel(id))return false;
+    diagnostic_.cleanupPending=false;diagnostic_.cleanupWidget=0;
+    diagnostic_.cleanupPhase=OriginalUiRiderDynamicCleanupPhase50KG::none;s.drained=true;return true;
 }
 bool OriginalUiRiderDynamicOwner50KG::advanceWidget(std::uint16_t id,float dt,bool ancestorsShown) noexcept {
     diagnostic_={};diagnostic_.widget=id;

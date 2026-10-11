@@ -848,6 +848,8 @@ struct OwnerGl {
     void (*pixelStorei)(U, I) = nullptr;
     void (*readPixels)(I, I, I, I, U, U, void*) = nullptr;
     void (*finish)() = nullptr;
+    // Dormant blend-only lookup; normal renderer creation is unchanged.
+    void (*drawArrays)(U,I,I) = nullptr;
     const unsigned char* (*getString)(U) = nullptr;
     void (*blitFramebuffer)(I, I, I, I, I, I, I, I, U, U) = nullptr;
 };
@@ -982,6 +984,34 @@ struct VehicleWindowGl50DS::Storage {
     std::uint8_t menuPublished = 0;
     U uiTargets[2]{}, uiColors[2]{}, uiDepths[2]{};
     U uiSourceTarget=0,uiSourceColor=0,uiSourceDepth=0;
+    U uiRetainedTarget=0,uiRetainedColor=0;
+    U uiBlendIncomingTarget=0,uiBlendIncomingColor=0,uiBlendEffectTarget=0,uiBlendEffectColor=0;
+    U uiBlendProgram=0,uiBlendVertexShader=0,uiBlendFragmentShader=0,uiBlendVertexArray=0;
+    I uiBlendOldUniform=-1,uiBlendIncomingUniform=-1,uiBlendAlphaUniform=-1;
+    // Nonzero borrow also guards failed begin/deletion until explicit retirement.
+    std::uint64_t uiBlendOldSnapshot=0,uiBlendIncomingSource=0;
+    std::uint64_t uiBlendSerial=0,uiBlendGeneration=0,uiBlendSampleSerial=0,uiBlendSampleGeneration=0;
+    std::uint32_t uiBlendAlpha=0;
+    bool uiBlendPoisoned=false;
+    float uiBlendClear[4]{}; // Captured incoming clear, never a later source's.
+    U uiPromotedIncomingTarget=0,uiPromotedIncomingColor=0;
+    std::uint64_t uiPromotedIncomingGeneration=0;
+    // Distinct from ordinary source publication and sample generation. A
+    // private opaque copy does not imply a window copy or actual host swap.
+    std::uint64_t uiPrivatePublicationSerial=0,uiPrivatePublicationGeneration=0;
+    // Historical successful BACK copies only, independent of every private
+    // publication/source/sample sequence. Never a live swap-authority epoch.
+    std::uint64_t uiWindowBackBufferCopySerial=0;
+    // The weak receipt identity is allocated only on first explicit slice1A use.
+    // No context ownership is fabricated: every operation still checks current().
+    std::shared_ptr<const std::uint8_t> uiSourceReceiptLifetime;
+    bool uiSourceLeaseWork=false;
+    std::uint64_t uiSourceAcceptedTargetGeneration=0,uiSourceAcceptedTexturePublication=0;
+    std::uint64_t uiSourcePublishedTargetGeneration=0,uiSourcePublicationGeneration=0;
+    std::uint64_t uiSnapshotSerial=0,uiSnapshotGeneration=0;
+    std::uint64_t uiRetainedSourceTargetGeneration=0,uiRetainedPublicationGeneration=0;
+    OriginalUiSourceTerminal50KN uiSourceTerminal{};
+    float uiSourceClear[4]{};
     bool uiSourceCoherentFramebufferFetch=false;
     const OriginalUiRiderDrawContribution50KG* uiSourceFrameOwner=nullptr;
     std::uint64_t uiSourceFrameGeneration=0,uiSourceTargetGeneration=0;
@@ -1470,7 +1500,10 @@ struct VehicleWindowGl50DS::Storage {
             uiSourceIndexBuffer) return true;
         for (U b = 0; b < 2; ++b)
             if (uiTargets[b] || uiColors[b] || uiDepths[b]) return true;
-        if (uiSourceTarget || uiSourceColor || uiSourceDepth) return true;
+        if (uiSourceTarget || uiSourceColor || uiSourceDepth || uiRetainedTarget || uiRetainedColor) return true;
+        if (uiBlendIncomingTarget || uiBlendIncomingColor || uiBlendEffectTarget || uiBlendEffectColor ||
+            uiBlendProgram || uiBlendVertexShader || uiBlendFragmentShader || uiBlendVertexArray) return true;
+        if (uiPromotedIncomingTarget || uiPromotedIncomingColor) return true;
         if (cableVertexBuffer || cableIndexBuffer || cableVertexArray) return true;
         if (trackVertexBuffer || trackIndexBuffer || trackVertexArray || trackNormalBuffer || trackProjectionBuffer) return true;
         if (dynamicWorldIndexBuffer) return true;
@@ -2551,6 +2584,219 @@ void main() { viewerOutput = hudColor; }
         gl.framebufferRenderbuffer(framebuffer, attachment, renderbuffer, name);
         return check("attach private staging renderbuffer");
     }
+    bool ensureUiSourceReceiptLifetime(VehicleWindowDiagnostic50DS& d) noexcept {
+        if (uiSourceReceiptLifetime)return true;
+        try {uiSourceReceiptLifetime=std::make_shared<const std::uint8_t>(0);return true;}
+        catch (...) {return fail(d,VehicleWindowError50DS::allocation,"allocate source receipt lifetime");}
+    }
+    bool createRetainedUiSourceTarget() noexcept {
+        gl.genFramebuffers(1,&uiRetainedTarget);gl.bindFramebuffer(framebuffer,uiRetainedTarget);
+        gl.genTextures(1,&uiRetainedColor);gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,uiRetainedColor);
+        gl.texParameteri(texture2D,0x2801,0x2600);gl.texParameteri(texture2D,0x2800,0x2600);
+        gl.texParameteri(texture2D,0x2802,0x812F);gl.texParameteri(texture2D,0x2803,0x812F);
+        gl.texParameteri(texture2D,0x813C,0);gl.texParameteri(texture2D,0x813D,0);
+        drawGl.bindBuffer(0x88EC,0);
+        gl.texImage2D(texture2D,0,rgba8,640,448,0,0x1908,0x1401,nullptr);
+        if (!check("allocate distinct retained source RGBA8 texture"))return false;
+        if (!uiRetainedTarget || !uiRetainedColor || uiRetainedTarget==uiSourceTarget || uiRetainedColor==uiSourceColor)
+            return fail(*diagnostic,VehicleWindowError50DS::allocation,"retained source names must be distinct");
+        I w=0,h=0,format=0;
+        gl.getTexLevelParameteriv(texture2D,0,0x1000,&w);gl.getTexLevelParameteriv(texture2D,0,0x1001,&h);
+        gl.getTexLevelParameteriv(texture2D,0,0x1003,&format);
+        if (!check("verify retained source texture"))return false;
+        if (w!=640 || h!=448 || format!=static_cast<I>(rgba8))
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"retained source texture storage mismatch");
+        gl.framebufferTexture2D(framebuffer,colorAttachment,texture2D,uiRetainedColor,0);
+        gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+        const U status=gl.checkFramebufferStatus(framebuffer);gl.bindTexture(texture2D,0);
+        if (!check("complete retained source framebuffer"))return false;
+        if (status!=framebufferComplete){diagnostic->framebufferStatus=status;
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"incomplete retained source framebuffer");}
+        return true;
+    }
+    bool hasUiByteBlendNames()const noexcept {
+        return uiBlendIncomingTarget || uiBlendIncomingColor || uiBlendEffectTarget || uiBlendEffectColor ||
+            uiBlendProgram || uiBlendVertexShader || uiBlendFragmentShader || uiBlendVertexArray;
+    }
+    bool createUiByteBlendTarget(U& target,U& color) noexcept {
+        gl.genFramebuffers(1,&target);
+        if(!check("allocate byte-blend framebuffer name"))return false;
+        if(!target || target==uiSourceTarget || target==uiRetainedTarget ||
+            (&target==&uiBlendEffectTarget && target==uiBlendIncomingTarget))
+            return fail(*diagnostic,VehicleWindowError50DS::allocation,"byte-blend framebuffer must be distinct");
+        gl.genTextures(1,&color);
+        if(!check("allocate byte-blend texture name"))return false;
+        if(!color || color==uiSourceColor || color==uiRetainedColor ||
+            (&color==&uiBlendEffectColor && color==uiBlendIncomingColor))
+            return fail(*diagnostic,VehicleWindowError50DS::allocation,"byte-blend texture must be distinct");
+        gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,color);
+        if(gl.bindSampler)gl.bindSampler(0,0);
+        gl.texParameteri(texture2D,0x2801,0x2600);gl.texParameteri(texture2D,0x2800,0x2600);
+        gl.texParameteri(texture2D,0x2802,0x812F);gl.texParameteri(texture2D,0x2803,0x812F);
+        gl.texParameteri(texture2D,0x813C,0);gl.texParameteri(texture2D,0x813D,0);
+        drawGl.bindBuffer(0x88EC,0);
+        gl.texImage2D(texture2D,0,rgba8,640,448,0,rgba,unsignedByte,nullptr);
+        if(!check("allocate immutable-pair byte-blend RGBA8 storage"))return false;
+        I w=0,h=0,format=0;
+        gl.getTexLevelParameteriv(texture2D,0,0x1000,&w);gl.getTexLevelParameteriv(texture2D,0,0x1001,&h);
+        gl.getTexLevelParameteriv(texture2D,0,0x1003,&format);
+        if(!check("verify byte-blend RGBA8 storage"))return false;
+        if(w!=640 || h!=448 || format!=static_cast<I>(rgba8))
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"byte-blend storage must be640x448 RGBA8");
+        gl.bindFramebuffer(framebuffer,target);
+        gl.framebufferTexture2D(framebuffer,colorAttachment,texture2D,color,0);
+        gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+        const U status=gl.checkFramebufferStatus(framebuffer);
+        if(!check("verify byte-blend framebuffer"))return false;
+        if(status!=framebufferComplete){diagnostic->framebufferStatus=status;
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"incomplete byte-blend framebuffer");}
+        return true;
+    }
+    bool createUiByteBlendProgram() noexcept {
+        // No new loader, shader, VAO or allocation on the normal UI path.
+        if(!load(gl.drawArrays,"glDrawArrays"))return false;
+        static const char* vertexSource=R"GLSL(#version 150 core
+void main() {
+    vec2 p=gl_VertexID==0 ? vec2(-1.0,-1.0) :
+           gl_VertexID==1 ? vec2(3.0,-1.0) : vec2(-1.0,3.0);
+    gl_Position=vec4(p,0.0,1.0);
+}
+)GLSL";
+        static const char* fragmentSource=R"GLSL(#version 150 core
+uniform sampler2D oldImage;
+uniform sampler2D incomingImage;
+uniform int sourceAlpha;
+out vec4 viewerOutput;
+int signedFloor128(int value) {
+    return value>=0 ? value/128 : -((-value+127)/128);
+}
+void main() {
+    // Both source textures have identical lower-left GL orientation. Source
+    // top-down639x447 coverage excludes GL row0 and column639. No UV mix,
+    // rescaling, filtering, gamma conversion or preceding-effect feedback.
+    ivec2 q=ivec2(gl_FragCoord.xy);
+    ivec4 oldByte=ivec4(floor(texelFetch(oldImage,q,0)*255.0+0.5));
+    if(q.x==639 || q.y==0) {
+        viewerOutput=vec4(oldByte)/255.0;
+        return;
+    }
+    ivec3 incomingByte=ivec3(floor(texelFetch(incomingImage,q,0).rgb*255.0+0.5));
+    ivec3 product=(incomingByte-oldByte.rgb)*sourceAlpha;
+    ivec3 result=oldByte.rgb+ivec3(signedFloor128(product.r),
+        signedFloor128(product.g),signedFloor128(product.b));
+    // Alpha is the raw source byte, not alpha/128. Endpoints still draw.
+    viewerOutput=vec4(vec3(result),float(sourceAlpha))/255.0;
+}
+)GLSL";
+        const auto compile=[&](U type,const char* source,U& name) noexcept {
+            name=shaderGl.createShader(type);
+            if(!check("create byte-blend shader"))return false;
+            if(!name)return fail(*diagnostic,VehicleWindowError50DS::shader,"zero byte-blend shader");
+            shaderGl.shaderSource(name,1,&source,nullptr);shaderGl.compileShader(name);
+            I compiled=0;shaderGl.getShaderiv(name,0x8B81,&compiled);
+            if(!check("compile byte-blend shader"))return false;
+            if(compiled)return true;
+            shaderGl.getShaderInfoLog(name,static_cast<I>(sizeof(diagnostic->shader.log)),nullptr,diagnostic->shader.log);
+            diagnostic->shader.log[sizeof(diagnostic->shader.log)-1]='\0';
+            check("read byte-blend shader log");
+            return fail(*diagnostic,VehicleWindowError50DS::shader,"byte-blend shader compilation failed");
+        };
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::vertex;
+        if(!compile(0x8B31,vertexSource,uiBlendVertexShader))return false;
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::fragment;
+        if(!compile(0x8B30,fragmentSource,uiBlendFragmentShader))return false;
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::link;
+        uiBlendProgram=shaderGl.createProgram();
+        if(!check("create byte-blend program"))return false;
+        if(!uiBlendProgram)return fail(*diagnostic,VehicleWindowError50DS::shader,"zero byte-blend program");
+        shaderGl.attachShader(uiBlendProgram,uiBlendVertexShader);shaderGl.attachShader(uiBlendProgram,uiBlendFragmentShader);
+        shaderGl.bindFragDataLocation(uiBlendProgram,vehicleGlColorOutput50CZ,"viewerOutput");
+        shaderGl.linkProgram(uiBlendProgram);
+        I linked=0;shaderGl.getProgramiv(uiBlendProgram,0x8B82,&linked);
+        if(!check("link byte-blend program"))return false;
+        if(!linked){
+            shaderGl.getProgramInfoLog(uiBlendProgram,static_cast<I>(sizeof(diagnostic->shader.log)),nullptr,diagnostic->shader.log);
+            diagnostic->shader.log[sizeof(diagnostic->shader.log)-1]='\0';
+            check("read byte-blend program log");
+            return fail(*diagnostic,VehicleWindowError50DS::shader,"byte-blend program link failed");
+        }
+        uiBlendOldUniform=shaderGl.getUniformLocation(uiBlendProgram,"oldImage");
+        uiBlendIncomingUniform=shaderGl.getUniformLocation(uiBlendProgram,"incomingImage");
+        uiBlendAlphaUniform=shaderGl.getUniformLocation(uiBlendProgram,"sourceAlpha");
+        if(!check("locate byte-blend uniforms"))return false;
+        if(uiBlendOldUniform<0 || uiBlendIncomingUniform<0 || uiBlendAlphaUniform<0)
+            return fail(*diagnostic,VehicleWindowError50DS::shader,"missing byte-blend uniform");
+        gl.genVertexArrays(1,&uiBlendVertexArray);
+        if(!check("allocate byte-blend vertex array"))return false;
+        if(!uiBlendVertexArray)return fail(*diagnostic,VehicleWindowError50DS::allocation,"zero byte-blend vertex array");
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::none;return true;
+    }
+    bool restoreUiByteBlendBindings() noexcept {
+        // Explicit renderer baseline, not restoration of arbitrary foreign GL
+        // state. No EBO is touched and no source depth clear is performed here.
+        gl.useProgram(0);drawGl.bindVertexArray(0);drawGl.bindBuffer(arrayBuffer,0);
+        for(U unit=0;unit<2;++unit){gl.activeTexture(textureUnit0+unit);gl.bindTexture(texture2D,0);
+            if(gl.bindSampler)gl.bindSampler(unit,0);}
+        gl.activeTexture(textureUnit0);gl.bindFramebuffer(framebuffer,0);
+        gl.disable(0x0BE2);gl.disable(0x0C11);gl.enable(0x0B71);
+        gl.depthMask(1);gl.depthFunc(0x0201);gl.clearDepth(1.0);gl.colorMask(1,1,1,1);
+        return check("restore byte-blend renderer bindings without depth clear");
+    }
+    bool deleteUiByteBlendNames(VehicleWindowDiagnostic50DS& d) noexcept {
+        return deleteShaderName(uiBlendProgram,true,d) &&
+            deleteShaderName(uiBlendVertexShader,false,d) && deleteShaderName(uiBlendFragmentShader,false,d) &&
+            deleteName(uiBlendVertexArray,gl.deleteVertexArrays,d) &&
+            deleteName(uiBlendEffectTarget,gl.deleteFramebuffers,d) && deleteName(uiBlendEffectColor,gl.deleteTextures,d) &&
+            deleteName(uiBlendIncomingTarget,gl.deleteFramebuffers,d) && deleteName(uiBlendIncomingColor,gl.deleteTextures,d);
+    }
+    bool copyUiSourceToOpaque(U sourceTarget,const float* clear,I outputWidth,I outputHeight) noexcept {
+        const auto pending=static_cast<std::uint8_t>(uiPublished^1u);
+        // Only this independent private presentation surface gets alpha1.
+        gl.disable(0x0C11);gl.disable(0x0BE2);gl.disable(0x8DB9);gl.disable(0x0BD0);
+        gl.colorMask(1,1,1,1);
+        gl.bindFramebuffer(framebuffer,uiTargets[pending]);gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+        gl.viewport(0,0,outputWidth,outputHeight);gl.clearColor(clear[0],clear[1],clear[2],1.f);gl.clear(colorBufferBit);
+        const double fit=std::min(double(outputWidth)/640.0,double(outputHeight)/448.0);
+        const I rw=std::max<I>(1,static_cast<I>(std::floor(640.0*fit)));
+        const I rh=std::max<I>(1,static_cast<I>(std::floor(448.0*fit)));
+        const I x=(outputWidth-rw)/2,y=(outputHeight-rh)/2;
+        gl.bindFramebuffer(readFramebuffer,sourceTarget);gl.readBuffer(colorAttachment);
+        gl.blitFramebuffer(0,0,640,448,x,y,x+rw,y+rh,colorBufferBit,0x2600);
+        gl.bindFramebuffer(framebuffer,uiTargets[pending]);
+        gl.colorMask(0,0,0,1);gl.clear(colorBufferBit);gl.colorMask(1,1,1,1);
+        const bool copied=check("copy source UI RGB to separate opaque presentation");
+        // Preserve the previous combined path's post-copy baseline, including
+        // a failed opaque copy. Source acceptance/history is already separate.
+        // Headless historically leaves this private UI FBO bound; window
+        // success reaches framebuffer0 through copyToWindow below.
+        gl.disable(0x0C11);gl.disable(0x0BE2);gl.depthMask(1);gl.depthFunc(0x0201);
+        gl.colorMask(1,1,1,1);gl.clearDepth(1.0);
+        drawGl.bindVertexArray(0);drawGl.bindBuffer(arrayBuffer,0);
+        const bool restored=check("finish source publication baseline");
+        return copied && restored;
+    }
+    bool publishUiSource(const float* clear,I outputWidth,I outputHeight) noexcept {
+        const auto pending=static_cast<std::uint8_t>(uiPublished^1u);
+        if(!copyUiSourceToOpaque(uiSourceTarget,clear,outputWidth,outputHeight))return false;
+        uiPrivatePublicationGeneration=0;
+        uiPublished=pending;displayedTarget=uiTargets[pending];
+        width=committedWidth=outputWidth;height=committedHeight=outputHeight;
+        imageCommitted=true;diagnostic->originalUiAccepted=true;
+        // Private publication may survive a failed window copy, as before.
+        // Such a partial window operation must not mint a retained publication.
+        uiSourcePublishedTargetGeneration=0;
+        bool accepted=true;
+        if (request.output==VehicleWindowOutput50DS::defaultBackBuffer){
+            accepted=copyToWindow();
+            if (!accepted && diagnostic->error==VehicleWindowError50DS::gl)
+                diagnostic->error=VehicleWindowError50DS::presentation;
+        }
+        if (accepted){
+            uiSourcePublishedTargetGeneration=uiSourceTargetGeneration;
+            diagnostic->originalUiPublicationGeneration=++uiSourcePublicationGeneration;
+        }
+        return accepted;
+    }
     bool createOriginalUiSourceTarget() noexcept {
         if (!request.enableOriginalUiSourceRgba)return true;
         I textureLimit=0;gl.getIntegerv(0x0D33,&textureLimit);
@@ -3424,6 +3670,8 @@ void main() { viewerOutput = hudColor; }
         s.committedWidth = s.width; s.committedHeight = s.height;
         s.raceWidth = s.width; s.raceHeight = s.height;
         s.displayedTarget = s.targets[bank];
+        s.uiPrivatePublicationGeneration=0;
+        s.uiSourcePublishedTargetGeneration=0;
         s.imageCommitted = true; s.active = false;
         return true;
     }
@@ -3431,7 +3679,8 @@ void main() { viewerOutput = hudColor; }
         // Previous private target remains untouched. Never blit or swap here.
         static_cast<Storage*>(context)->active = false;
     }
-    bool copyToWindow() noexcept {
+    bool copyToWindow() noexcept { return copyToWindow(width,height); }
+    bool copyToWindow(I copyWidth,I copyHeight) noexcept {
         gl.bindFramebuffer(readFramebuffer, displayedTarget);
         gl.readBuffer(colorAttachment);
         gl.bindFramebuffer(drawFramebuffer, 0);
@@ -3440,14 +3689,15 @@ void main() { viewerOutput = hudColor; }
         // No atomicity claim for default framebuffer writes. On any later
         // error the host must not swap this potentially partial back buffer.
         diagnostic->defaultFramebufferMayBeModified = true;
-        gl.blitFramebuffer(0, 0, width, height, 0, 0, width, height, colorBufferBit, 0x2600); // NEAREST
+        gl.blitFramebuffer(0, 0, copyWidth, copyHeight, 0, 0, copyWidth, copyHeight, colorBufferBit, 0x2600); // NEAREST
         if (!check("blit vehicle color to default back buffer")) return false;
         gl.bindFramebuffer(framebuffer, 0);
         return check("restore default framebuffer bindings");
     }
-    bool copyRgba(std::uint8_t* destination) noexcept {
+    bool copyRgba(std::uint8_t* destination,U target=0,I readWidth=0,I readHeight=0) noexcept {
+        if (!target){target=displayedTarget;readWidth=committedWidth;readHeight=committedHeight;}
         if (!check("before committed RGBA readback")) return false;
-        gl.bindFramebuffer(readFramebuffer, displayedTarget);
+        gl.bindFramebuffer(readFramebuffer,target);
         gl.readBuffer(colorAttachment);
         // A caller pointer must never be interpreted as an offset into a PBO.
         // Explicit pack state keeps all writes inside the validated tight extent.
@@ -3469,7 +3719,7 @@ void main() { viewerOutput = hudColor; }
                 "committed readback framebuffer is incomplete");
         }
         diagnostic->readbackBufferMayBeModified = true;
-        gl.readPixels(0, 0, committedWidth, committedHeight, rgba, unsignedByte, destination);
+        gl.readPixels(0,0,readWidth,readHeight,rgba,unsignedByte,destination);
         return check("read committed viewport RGBA bytes");
     }
     bool drainCleanupErrors(VehicleWindowDiagnostic50DS& d) noexcept {
@@ -3509,6 +3759,7 @@ void main() { viewerOutput = hudColor; }
         frameCables = nullptr; frameHostHud = false;
         committedWidth = committedHeight = raceWidth = raceHeight = 0;
         displayedTarget = 0;
+        uiPrivatePublicationGeneration=0;
         adapter.reset();
         if (!hasGlResources()) { shader.reset(); d.cleanupIncomplete = false; return true; }
         // All functions were loaded before the first name could be allocated.
@@ -3516,6 +3767,18 @@ void main() { viewerOutput = hudColor; }
             d.cleanupIncomplete = true;
             return fail(d, VehicleWindowError50DS::cleanup, "GL error state will not clear for cleanup");
         }
+        // Explicit slice1A leases add a real completion obligation. Never
+        // confuse a CPU generation increment or deferred GL deletion with it.
+        if (uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
+            uiPromotedIncomingTarget || uiPromotedIncomingColor){
+            gl.finish();const U error=drawGl.getError();
+            if (error){if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
+                return fail(d,VehicleWindowError50DS::cleanup,"complete source leases before cleanup");}
+            uiSourceLeaseWork=false;
+        }
+        uiSourceReceiptLifetime.reset();uiSnapshotGeneration=0;
+        uiBlendGeneration=uiBlendSampleGeneration=0;
+        uiPromotedIncomingGeneration=0;
         gl.useProgram(0); drawGl.bindVertexArray(0); drawGl.bindBuffer(arrayBuffer, 0);
         gl.bindFramebuffer(framebuffer, 0); gl.bindRenderbuffer(renderbuffer, 0);
         if (usesTextures()) {
@@ -3542,6 +3805,10 @@ void main() { viewerOutput = hudColor; }
         // failing deletion instead of conflating it with subsequent objects.
         if (!drainCleanupErrors(d)) complete = false;
         else {
+            if (!deleteUiByteBlendNames(d))goto incomplete;
+            uiBlendOldSnapshot=uiBlendIncomingSource=0;
+            if (!deleteName(uiPromotedIncomingTarget,gl.deleteFramebuffers,d) ||
+                !deleteName(uiPromotedIncomingColor,gl.deleteTextures,d))goto incomplete;
             if (!deleteShaderName(uiProgram, true, d) ||
                 !deleteShaderName(uiVertexShader, false, d) ||
                 !deleteShaderName(uiFragmentShader, false, d) ||
@@ -3555,6 +3822,8 @@ void main() { viewerOutput = hudColor; }
                 if (!deleteName(uiTargets[b], gl.deleteFramebuffers, d) ||
                     !deleteName(uiColors[b], gl.deleteRenderbuffers, d) ||
                     !deleteName(uiDepths[b], gl.deleteRenderbuffers, d)) goto incomplete;
+            if (!deleteName(uiRetainedTarget,gl.deleteFramebuffers,d) ||
+                !deleteName(uiRetainedColor,gl.deleteTextures,d))goto incomplete;
             if (!deleteName(uiSourceTarget,gl.deleteFramebuffers,d) ||
                 !deleteName(uiSourceColor,gl.deleteTextures,d) ||
                 !deleteName(uiSourceDepth,gl.deleteRenderbuffers,d))goto incomplete;
@@ -3907,29 +4176,556 @@ bool VehicleWindowGl50DS::originalUiSourceRgbaAvailable() const noexcept {
 }
 bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM& frame,
     std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d) noexcept {
+    return submitOriginalUiSourceFrame(frame,width,height,true,d);
+}
+bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFrame50KM& frame,
+    std::int32_t width,std::int32_t height,bool publishSource,VehicleWindowDiagnostic50DS& d) noexcept {
     d={};
     if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;
     if (!frame.native_ || !frame.owner_ || !frame.frameGeneration_ ||
         (s.uiSourceFrameOwner && frame.owner_!=s.uiSourceFrameOwner) ||
         (frame.owner_==s.uiSourceFrameOwner && frame.frameGeneration_<=s.uiSourceFrameGeneration) ||
-        s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max())
+        s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max() ||
+        (publishSource && s.uiSourcePublicationGeneration==std::numeric_limits<std::uint64_t>::max()))
         return fail(d,VehicleWindowError50DS::frame,"unsealed or stale complete Rider frame");
-    if (!frame.owner_->beginSourceSubmission(frame.frameGeneration_))
+    if (!frame.owner_->beginSourceSubmission(frame.frameGeneration_,*this))
         return fail(d,VehicleWindowError50DS::frame,"Rider source binding-history receipt rejected");
     bool sourceWorkStarted=false;
     const auto sourceTargetBefore=s.uiSourceTargetGeneration;
-    const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted);
-    frame.owner_->finishSourceSubmission(frame.frameGeneration_,d.originalUiAccepted,sourceWorkStarted);
+    const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted,publishSource);
+    frame.owner_->finishSourceSubmission(frame.frameGeneration_,d.originalUiSourceAccepted,sourceWorkStarted);
     d.originalUiSourceFrameGeneration=frame.frameGeneration_;
     d.originalUiSourceTargetGeneration=s.uiSourceTargetGeneration;
     // Keep the attempted owner borrowed after any potentially partial source
     // work. Only explicit successful retirement may release that lifetime.
-    if (sourceWorkStarted || d.originalUiAccepted || s.uiSourceTargetGeneration!=sourceTargetBefore)
+    if (sourceWorkStarted || d.originalUiSourceAccepted || s.uiSourceTargetGeneration!=sourceTargetBefore)
         s.uiSourceFrameOwner=frame.owner_;
-    // A private publication stays committed even if its later window copy fails.
-    if (d.originalUiAccepted)s.uiSourceFrameGeneration=frame.frameGeneration_;
+    // Only the actual successful complete source drain seals these values.
+    // A later opaque copy failure does not undo a completed material bind.
+    if (d.originalUiSourceAccepted){
+        s.uiSourceFrameGeneration=frame.frameGeneration_;
+        s.uiSourceAcceptedTargetGeneration=s.uiSourceTargetGeneration;
+        s.uiSourceAcceptedTexturePublication=frame.native_->draw.texturePublication;
+        s.uiSourceTerminal=frame.terminal_;
+        for(unsigned i=0;i<4;++i)s.uiSourceClear[i]=frame.native_->draw.clearRgba[i];
+    }
     return accepted;
+}
+bool VehicleWindowGl50DS::matchesOriginalUiSource(const OriginalUiSourceSubmission50KN& receipt)const noexcept {
+    if (!storage_)return false;const auto& s=*storage_;
+    const auto lifetime=receipt.lifetime_.lock();
+    return lifetime && lifetime==s.uiSourceReceiptLifetime && receipt.targetGeneration_ &&
+        receipt.targetGeneration_==s.uiSourceTargetGeneration &&
+        receipt.targetGeneration_==s.uiSourceAcceptedTargetGeneration &&
+        receipt.frameGeneration_==s.uiSourceFrameGeneration &&
+        receipt.texturePublication_==s.uiSourceAcceptedTexturePublication;
+}
+bool VehicleWindowGl50DS::originalUiSourceSubmission(OriginalUiSourceSubmission50KN& receipt,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    receipt={};d={};
+    if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !s.uiSourceFrameOwner || !s.uiSourceFrameGeneration ||
+        !s.uiSourceAcceptedTargetGeneration || s.uiSourceAcceptedTargetGeneration!=s.uiSourceTargetGeneration)
+        return fail(d,VehicleWindowError50DS::frame,"no current accepted source drain for receipt");
+    if(!s.ensureUiSourceReceiptLifetime(d))return false;
+    receipt.lifetime_=s.uiSourceReceiptLifetime;receipt.frameGeneration_=s.uiSourceFrameGeneration;
+    receipt.targetGeneration_=s.uiSourceAcceptedTargetGeneration;receipt.texturePublication_=s.uiSourceAcceptedTexturePublication;
+    receipt.terminal_=s.uiSourceTerminal;s.uiSourceLeaseWork=true;
+    d.originalUiSourceAccepted=true;d.originalUiSourceFrameGeneration=receipt.frameGeneration_;
+    d.originalUiSourceTargetGeneration=receipt.targetGeneration_;return true;
+}
+bool VehicleWindowGl50DS::submitOriginalUiSourceUnpublished(const OriginalUiSourceFrame50KM& frame,
+    std::int32_t width,std::int32_t height,OriginalUiSourceSubmission50KN& receipt,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    receipt={};d={};
+    if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;
+    if(!s.current(d) || !s.ensureUiSourceReceiptLifetime(d))return false;
+    s.uiSourceLeaseWork=true;
+    if(!submitOriginalUiSourceFrame(frame,width,height,false,d))return false;
+    VehicleWindowDiagnostic50DS receiptDiagnostic;
+    if(!originalUiSourceSubmission(receipt,receiptDiagnostic)){d=receiptDiagnostic;return false;}
+    return true;
+}
+bool VehicleWindowGl50DS::completeOriginalUiSource(const OriginalUiSourceSubmission50KN& input,
+    OriginalUiSourceSubmission50KN& completed,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(&input==&completed)return fail(d,VehicleWindowError50DS::request,"source completion input and output must be distinct");
+    completed={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !matchesOriginalUiSource(input))
+        return fail(d,VehicleWindowError50DS::frame,"source completion requires the exact current accepted target");
+    s.diagnostic=&d;bool accepted=s.check("before explicit source completion");
+    if(accepted){s.gl.finish();accepted=s.check("complete exact source target work");}
+    s.diagnostic=nullptr;
+    if(accepted){completed=input;completed.completed_=true;d.submittedWorkCompleted=true;
+        d.originalUiSourceAccepted=true;d.originalUiSourceFrameGeneration=input.frameGeneration_;
+        d.originalUiSourceTargetGeneration=input.targetGeneration_;}
+    return accepted;
+}
+bool VehicleWindowGl50DS::publishOriginalUiSource(const OriginalUiSourceSubmission50KN& source,
+    std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !source.completed_ || !matchesOriginalUiSource(source) ||
+        width<=0 || height<=0 || width>s.maximumWidth || height>s.maximumHeight ||
+        s.uiSourcePublicationGeneration==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,"source publication requires exact completed target and bounded viewport");
+    s.diagnostic=&d;
+    bool accepted=s.check("before separate source publication") &&
+        (s.request.output==VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
+    if(accepted)accepted=s.publishUiSource(s.uiSourceClear,width,height);
+    s.diagnostic=nullptr;
+    d.originalUiSourceAccepted=true;d.originalUiSourceFrameGeneration=source.frameGeneration_;
+    d.originalUiSourceTargetGeneration=source.targetGeneration_;
+    return accepted;
+}
+bool VehicleWindowGl50DS::retainPublishedOriginalUiSource(OriginalUiRetainedSource50KN& retained,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    retained={};d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || s.uiRetainedTarget || s.uiRetainedColor ||
+        !s.uiSourcePublishedTargetGeneration || s.uiSourcePublishedTargetGeneration!=s.uiSourceAcceptedTargetGeneration ||
+        s.uiSourcePublishedTargetGeneration!=s.uiSourceTargetGeneration ||
+        !s.imageCommitted || s.displayedTarget!=s.uiTargets[s.uiPublished] ||
+        s.uiSnapshotSerial==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,"retain requires the current successful source publication and no prior snapshot");
+    OriginalUiSourceSubmission50KN source;
+    if(!originalUiSourceSubmission(source,d))return false;
+    s.diagnostic=&d;bool accepted=s.check("before retaining renderer-published source RGBA");
+    if(accepted)accepted=s.createRetainedUiSourceTarget();
+    if(accepted){
+        // Blit all four raw channels before any later ordinary source clear.
+        // Scissor must not crop the source rightmost column or bottom row.
+        ++s.uiSnapshotSerial;s.gl.disable(0x0C11);s.gl.disable(0x8DB9);
+        s.gl.bindFramebuffer(readFramebuffer,s.uiSourceTarget);s.gl.readBuffer(colorAttachment);
+        s.gl.bindFramebuffer(drawFramebuffer,s.uiRetainedTarget);s.gl.drawBuffer(colorAttachment);
+        s.gl.blitFramebuffer(0,0,640,448,0,0,640,448,colorBufferBit,0x2600);
+        accepted=s.check("copy immutable retained source RGBA");
+    }
+    if(accepted){s.gl.finish();accepted=s.check("complete retained source RGBA copy");}
+    // Failed attempts keep every unresolved name; release/close owns retirement.
+    // No partial snapshot or fabricated completion receipt is published.
+    if(accepted){
+        s.gl.bindFramebuffer(framebuffer,0);accepted=s.check("finish retained source copy bindings");
+    }
+    if(accepted){
+        s.uiSnapshotGeneration=s.uiSnapshotSerial;s.uiRetainedSourceTargetGeneration=source.targetGeneration_;
+        s.uiRetainedPublicationGeneration=s.uiSourcePublicationGeneration;
+        source.completed_=true;retained.source_=source;retained.snapshotGeneration_=s.uiSnapshotGeneration;
+        retained.publicationGeneration_=s.uiRetainedPublicationGeneration;
+        d.submittedWorkCompleted=true;d.originalUiSnapshotGeneration=s.uiSnapshotGeneration;
+        d.originalUiPublicationGeneration=s.uiRetainedPublicationGeneration;
+    }
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::readRetainedOriginalUiSourceRgba(const OriginalUiRetainedSource50KN& retained,
+    std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    const auto lifetime=retained.source_.lifetime_.lock();
+    if(s.active || s.frameSet || s.diagnostic || !lifetime || lifetime!=s.uiSourceReceiptLifetime ||
+        !retained.snapshotGeneration_ || retained.snapshotGeneration_!=s.uiSnapshotGeneration ||
+        retained.publicationGeneration_!=s.uiRetainedPublicationGeneration ||
+        retained.source_.targetGeneration_!=s.uiRetainedSourceTargetGeneration ||
+        !s.uiRetainedTarget || !s.uiRetainedColor)
+        return fail(d,VehicleWindowError50DS::frame,"retained source readback requires its exact live immutable snapshot");
+    d.readbackWidth=640;d.readbackHeight=448;d.readbackBytes=std::size_t(640)*448*4;
+    if(!rgba || capacityBytes<d.readbackBytes)
+        return fail(d,VehicleWindowError50DS::readback,"retained RGBA readback requires full640x448 destination");
+    s.diagnostic=&d;const bool accepted=s.copyRgba(rgba,s.uiRetainedTarget,640,448);s.diagnostic=nullptr;
+    d.originalUiSnapshotGeneration=retained.snapshotGeneration_;return accepted;
+}
+bool VehicleWindowGl50DS::releaseRetainedOriginalUiSource(VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || s.uiBlendOldSnapshot)
+        return fail(d,VehicleWindowError50DS::frame,"retained source release requires idle renderer without a blend borrow");
+    if(!s.uiRetainedTarget && !s.uiRetainedColor)return true;
+    s.diagnostic=&d;
+    bool accepted=s.check("before retained source retirement");
+    if(accepted){s.gl.finish();accepted=s.check("complete retained source work before deletion");}
+    if(accepted){
+        d.submittedWorkCompleted=true;s.uiSnapshotGeneration=0;
+        s.gl.bindFramebuffer(framebuffer,0);s.gl.activeTexture(textureUnit0);s.gl.bindTexture(texture2D,0);
+        accepted=s.check("unbind retained source before deletion");
+        if(accepted)accepted=s.deleteName(s.uiRetainedTarget,s.gl.deleteFramebuffers,d) &&
+            s.deleteName(s.uiRetainedColor,s.gl.deleteTextures,d);
+        if(!accepted && d.error==VehicleWindowError50DS::none)
+            fail(d,VehicleWindowError50DS::cleanup,"retained source deletion requires retry");
+        if(accepted){s.uiRetainedSourceTargetGeneration=0;s.uiRetainedPublicationGeneration=0;}
+    }
+    s.diagnostic=nullptr;return accepted;
+}
+namespace {
+bool exactUiByteBlendTerminal(const OriginalUiSourceTerminal50KN& terminal) noexcept {
+    using F=assets::OriginalUiGsField50KG;
+    const auto value=[&](F field) noexcept {return terminal.gs[static_cast<std::size_t>(field)];};
+    // Authenticated Mat_Stbl first-match token3217 is ui/textures/icon_x.
+    // Read the real completed drain's owned fields, including inactive FIX and
+    // clamp limits. Effect TEX1=0 is separate from this ordinary sampler state.
+    return terminal.canonicalToken==3217 && terminal.pass==1 &&
+        terminal.registryGeneration && terminal.bankGeneration && terminal.enabled==1 &&
+        terminal.textureCount==1 && terminal.textureCoordinateIndex==0 &&
+        value(F::environmentContext0or1)==0 &&
+        value(F::inputColorA)==0 && value(F::inputColorB)==1 && value(F::inputAlphaC)==0 &&
+        value(F::inputColorD)==1 && value(F::fixedAlphaValue)==128 &&
+        value(F::wrapModeHorizontal)==1 && value(F::wrapModeVertical)==1 &&
+        value(F::minClampParameterInUDirection)==0 && value(F::maxClampParameterInUDirection)==0 &&
+        value(F::minClampParameterInVDirection)==0 && value(F::maxClampParameterInVDirection)==0 &&
+        value(F::colorClampingMethod)==1 && value(F::alphaBlendingControlInUnitsOfPixels)==0 &&
+        value(F::alphaCorrectionValue)==0;
+}
+}
+bool VehicleWindowGl50DS::matchesOriginalUiByteBlend(const OriginalUiByteBlend50KO& blend)const noexcept {
+    if(!storage_)return false;const auto& s=*storage_;
+    const auto oldLifetime=blend.old_.source_.lifetime_.lock();
+    const auto incomingLifetime=blend.incoming_.lifetime_.lock();
+    return oldLifetime && oldLifetime==s.uiSourceReceiptLifetime && incomingLifetime==oldLifetime &&
+        !s.uiBlendPoisoned && blend.generation_ && blend.generation_==s.uiBlendGeneration &&
+        blend.old_.snapshotGeneration_==s.uiBlendOldSnapshot && s.uiBlendOldSnapshot==s.uiSnapshotGeneration &&
+        blend.old_.publicationGeneration_==s.uiRetainedPublicationGeneration &&
+        blend.old_.source_.targetGeneration_==s.uiRetainedSourceTargetGeneration &&
+        blend.incoming_.targetGeneration_==s.uiBlendIncomingSource &&
+        s.uiRetainedTarget && s.uiRetainedColor && s.uiBlendIncomingTarget && s.uiBlendIncomingColor &&
+        s.uiBlendEffectTarget && s.uiBlendEffectColor && s.uiBlendProgram && s.uiBlendVertexArray;
+}
+bool VehicleWindowGl50DS::matchesOriginalUiByteBlendSample(const OriginalUiByteBlendSample50KO& sample)const noexcept {
+    if(!storage_)return false;const auto& s=*storage_;
+    const auto lifetime=sample.lifetime_.lock();
+    return lifetime && lifetime==s.uiSourceReceiptLifetime && !s.uiBlendPoisoned &&
+        sample.blendGeneration_ && sample.blendGeneration_==s.uiBlendGeneration &&
+        sample.sampleGeneration_ && sample.sampleGeneration_==s.uiBlendSampleGeneration &&
+        sample.alpha_==s.uiBlendAlpha && s.uiBlendOldSnapshot &&
+        s.uiBlendOldSnapshot==s.uiSnapshotGeneration && s.uiBlendEffectTarget && s.uiBlendEffectColor;
+}
+bool VehicleWindowGl50DS::beginOriginalUiByteBlend(const OriginalUiRetainedSource50KN& oldSource,
+    const OriginalUiSourceSubmission50KN& incoming,OriginalUiByteBlend50KO& blend,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(&oldSource==&blend.old_ || &incoming==&blend.incoming_ || &incoming==&blend.old_.source_)
+        return fail(d,VehicleWindowError50DS::request,"byte-blend input and output storage must be distinct");
+    blend={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    const auto oldLifetime=oldSource.source_.lifetime_.lock();
+    if(s.active || s.frameSet || s.diagnostic || s.uiBlendOldSnapshot || s.hasUiByteBlendNames() ||
+        !oldLifetime || oldLifetime!=s.uiSourceReceiptLifetime || !oldSource.source_.completed_ ||
+        !oldSource.snapshotGeneration_ || oldSource.snapshotGeneration_!=s.uiSnapshotGeneration ||
+        oldSource.publicationGeneration_!=s.uiRetainedPublicationGeneration ||
+        oldSource.source_.targetGeneration_!=s.uiRetainedSourceTargetGeneration ||
+        !s.uiRetainedTarget || !s.uiRetainedColor || !incoming.completed_ || !matchesOriginalUiSource(incoming) ||
+        incoming.targetGeneration_<=oldSource.source_.targetGeneration_ ||
+        s.uiBlendSerial==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,"byte-blend requires live retained old and newer exact completed incoming");
+    if(!exactUiByteBlendTerminal(incoming.terminal_))
+        return fail(d,VehicleWindowError50DS::material,"byte-blend requires actual terminal icon_x/pass1 and exact inherited GS state");
+    s.diagnostic=&d;
+    bool accepted=s.check("before immutable byte-blend pair creation");
+    if(accepted){
+        // This borrow is installed BEFORE any fallible allocation/copy. It
+        // survives failure and cannot be replaced until explicit retirement.
+        s.uiBlendOldSnapshot=oldSource.snapshotGeneration_;s.uiBlendPoisoned=true;s.uiSourceLeaseWork=true;
+        accepted=s.createUiByteBlendTarget(s.uiBlendIncomingTarget,s.uiBlendIncomingColor) &&
+            s.createUiByteBlendTarget(s.uiBlendEffectTarget,s.uiBlendEffectColor) && s.createUiByteBlendProgram();
+        if(accepted){
+            s.gl.disable(0x0C11);s.gl.disable(0x8DB9);
+            s.gl.bindFramebuffer(readFramebuffer,s.uiSourceTarget);s.gl.readBuffer(colorAttachment);
+            s.gl.bindFramebuffer(drawFramebuffer,s.uiBlendIncomingTarget);s.gl.drawBuffer(colorAttachment);
+            s.gl.blitFramebuffer(0,0,640,448,0,0,640,448,colorBufferBit,0x2600);
+            accepted=s.check("copy actual completed incoming into private immutable byte-blend image");
+        }
+        if(accepted){s.gl.finish();accepted=s.check("complete immutable incoming byte-blend copy");}
+        const bool restored=s.restoreUiByteBlendBindings();accepted=accepted && restored;
+    }
+    if(accepted){
+        s.uiBlendIncomingSource=incoming.targetGeneration_;s.uiBlendGeneration=++s.uiBlendSerial;
+        s.uiBlendSampleGeneration=0;s.uiBlendPoisoned=false;
+        for(unsigned i=0;i<4;++i)s.uiBlendClear[i]=s.uiSourceClear[i];
+        blend.old_=oldSource;blend.incoming_=incoming;blend.generation_=s.uiBlendGeneration;
+        d.submittedWorkCompleted=true;d.originalUiByteBlendGeneration=s.uiBlendGeneration;
+    }
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::renderOriginalUiByteBlendSample(const OriginalUiByteBlend50KO& blend,
+    std::uint32_t alpha,OriginalUiByteBlendSample50KO& sample,VehicleWindowDiagnostic50DS& d) noexcept {
+    sample={};d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || alpha>OriginalUiByteBlendContract50KO::maximumAlpha ||
+        !matchesOriginalUiByteBlend(blend) || s.uiBlendSampleSerial==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,"byte-blend sample requires exact live immutable pair and alpha0..128");
+    // Invalidate previous sample authority before any attempted write. Failed
+    // samples poison the pair until real retirement; never publish partial E.
+    s.uiBlendSampleGeneration=0;s.diagnostic=&d;
+    bool accepted=s.check("before byte-blend sample");
+    if(accepted){
+        const auto generation=++s.uiBlendSampleSerial;
+        s.gl.bindFramebuffer(framebuffer,s.uiBlendEffectTarget);s.gl.drawBuffer(colorAttachment);s.gl.readBuffer(colorAttachment);
+        if(s.gl.clipControl)s.gl.clipControl(0x8CA1,0x935E);
+        s.gl.viewport(0,0,640,448);
+        constexpr U disabled[]={0x0BE2,0x0B44,0x0C11,0x0B90,0x8037,0x0B20,
+            0x8F9D,0x0BD0,0x809D,0x80A0,0x809E,0x809F,0x8E51,0x8C89,0x8DB9,0x864F,0x0BF2,0x0B71};
+        for(U capability:disabled)s.gl.disable(capability);
+        for(I i=0;i<s.clipDistances;++i)s.gl.disable(0x3000+static_cast<U>(i));
+        s.gl.colorMask(1,1,1,1);s.gl.depthMask(0);s.gl.polygonMode(0x0408,0x1B02);
+        s.gl.useProgram(s.uiBlendProgram);s.drawGl.bindVertexArray(s.uiBlendVertexArray);
+        s.gl.activeTexture(textureUnit0);s.gl.bindTexture(texture2D,s.uiRetainedColor);
+        if(s.gl.bindSampler)s.gl.bindSampler(0,0);
+        s.gl.activeTexture(textureUnit0+1);s.gl.bindTexture(texture2D,s.uiBlendIncomingColor);
+        if(s.gl.bindSampler)s.gl.bindSampler(1,0);
+        s.gl.uniform1i(s.uiBlendOldUniform,0);s.gl.uniform1i(s.uiBlendIncomingUniform,1);
+        s.gl.uniform1i(s.uiBlendAlphaUniform,static_cast<I>(alpha));
+        accepted=s.check("bind immutable inputs and exact byte-blend state");
+        if(accepted){s.gl.drawArrays(0x0004,0,3);accepted=s.check("draw documented byte-blend sample");}
+        const bool restored=s.restoreUiByteBlendBindings();accepted=accepted && restored;
+        if(accepted){
+            s.uiBlendSampleGeneration=generation;s.uiBlendAlpha=alpha;
+            sample.lifetime_=s.uiSourceReceiptLifetime;sample.blendGeneration_=s.uiBlendGeneration;
+            sample.sampleGeneration_=generation;sample.alpha_=alpha;
+            d.originalUiByteBlendAccepted=true;d.originalUiByteBlendGeneration=s.uiBlendGeneration;
+            d.originalUiByteBlendSampleGeneration=generation;
+        }
+    }
+    if(!accepted)s.uiBlendPoisoned=true;
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::completeOriginalUiByteBlendSample(const OriginalUiByteBlendSample50KO& input,
+    OriginalUiByteBlendSample50KO& completed,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(&input==&completed)return fail(d,VehicleWindowError50DS::request,"byte-blend completion input and output must be distinct");
+    completed={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !matchesOriginalUiByteBlendSample(input))
+        return fail(d,VehicleWindowError50DS::frame,"byte-blend completion requires exact accepted sample");
+    s.diagnostic=&d;bool accepted=s.check("before byte-blend sample completion");
+    if(accepted){s.gl.finish();accepted=s.check("complete byte-blend sample GPU work");}
+    if(accepted){
+        completed=input;completed.completed_=true;d.submittedWorkCompleted=true;d.originalUiByteBlendAccepted=true;
+        d.originalUiByteBlendGeneration=input.blendGeneration_;d.originalUiByteBlendSampleGeneration=input.sampleGeneration_;
+    }else{s.uiBlendPoisoned=true;s.uiBlendSampleGeneration=0;}
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::readOriginalUiByteBlendSampleRgba(const OriginalUiByteBlendSample50KO& sample,
+    std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !sample.completed_ || !matchesOriginalUiByteBlendSample(sample))
+        return fail(d,VehicleWindowError50DS::frame,"byte-blend readback requires exact current completed sample");
+    d.readbackWidth=640;d.readbackHeight=448;d.readbackBytes=std::size_t(640)*448*4;
+    if(!rgba || capacityBytes<d.readbackBytes)
+        return fail(d,VehicleWindowError50DS::readback,"byte-blend readback requires full640x448 RGBA destination");
+    s.diagnostic=&d;const bool accepted=s.copyRgba(rgba,s.uiBlendEffectTarget,640,448);s.diagnostic=nullptr;
+    d.originalUiByteBlendGeneration=sample.blendGeneration_;d.originalUiByteBlendSampleGeneration=sample.sampleGeneration_;
+    return accepted;
+}
+bool VehicleWindowGl50DS::matchesOriginalUiPrivatePublication(const OriginalUiPrivatePublication50KP& publication)const noexcept {
+    if(!storage_)return false;const auto& s=*storage_;
+    const auto lifetime=publication.lifetime_.lock();
+    return lifetime && lifetime==s.uiSourceReceiptLifetime && publication.generation_ &&
+        publication.generation_==s.uiPrivatePublicationGeneration && s.imageCommitted &&
+        s.displayedTarget==s.uiTargets[s.uiPublished] &&
+        publication.width_==s.committedWidth && publication.height_==s.committedHeight;
+}
+bool VehicleWindowGl50DS::publishOriginalUiBlendImage(const OriginalUiByteBlend50KO& blend,
+    const OriginalUiByteBlendSample50KO* sample,std::int32_t width,std::int32_t height,
+    OriginalUiPrivatePublication50KP& publication,VehicleWindowDiagnostic50DS& d) noexcept {
+    publication={};d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !matchesOriginalUiByteBlend(blend) ||
+        width<=0 || height<=0 || width>s.maximumWidth || height>s.maximumHeight ||
+        s.uiPrivatePublicationSerial==std::numeric_limits<std::uint64_t>::max() ||
+        (sample && (!sample->completed_ || !matchesOriginalUiByteBlendSample(*sample))) ||
+        (!sample && (s.uiPromotedIncomingTarget || s.uiPromotedIncomingColor)))
+        return fail(d,VehicleWindowError50DS::frame,"private publication requires live immutable pair, completed sample or unowned promotion, and bounded viewport");
+    const auto pending=static_cast<std::uint8_t>(s.uiPublished^1u);
+    s.diagnostic=&d;
+    bool accepted=s.check("before private immutable-image publication");
+    if(accepted)accepted=s.copyUiSourceToOpaque(sample?s.uiBlendEffectTarget:s.uiBlendIncomingTarget,
+        s.uiBlendClear,width,height);
+    // The pending surface is independent of the last committed image. Failed
+    // copies neither transfer incoming ownership nor invalidate that prior
+    // image. Inputs remain immutable and an explicit retry can overwrite the
+    // whole pending surface. No default framebuffer is checked or written.
+    if(accepted){
+        s.uiPublished=pending;s.displayedTarget=s.uiTargets[pending];
+        s.width=s.committedWidth=width;s.height=s.committedHeight=height;s.imageCommitted=true;
+        s.uiSourcePublishedTargetGeneration=0;
+        s.uiPrivatePublicationGeneration=++s.uiPrivatePublicationSerial;
+        publication.lifetime_=s.uiSourceReceiptLifetime;
+        publication.kind_=sample?OriginalUiPrivatePublicationKind50KP::byteBlendSample:
+            OriginalUiPrivatePublicationKind50KP::immutableIncoming;
+        publication.generation_=s.uiPrivatePublicationGeneration;publication.blendGeneration_=blend.generation_;
+        publication.oldSnapshotGeneration_=blend.old_.snapshotGeneration_;
+        publication.incomingFrameGeneration_=blend.incoming_.frameGeneration_;
+        publication.incomingTargetGeneration_=blend.incoming_.targetGeneration_;
+        publication.width_=width;publication.height_=height;
+        if(sample){publication.sampleGeneration_=sample->sampleGeneration_;publication.alpha_=sample->alpha_;}
+        d.originalUiPrivatePublicationAccepted=true;d.originalUiPrivatePublicationGeneration=publication.generation_;
+        d.originalUiByteBlendGeneration=publication.blendGeneration_;
+        d.originalUiByteBlendSampleGeneration=publication.sampleGeneration_;
+    }
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::publishOriginalUiByteBlendSample(const OriginalUiByteBlend50KO& blend,
+    const OriginalUiByteBlendSample50KO& sample,std::int32_t width,std::int32_t height,
+    OriginalUiPrivatePublication50KP& publication,VehicleWindowDiagnostic50DS& d) noexcept {
+    return publishOriginalUiBlendImage(blend,&sample,width,height,publication,d);
+}
+bool VehicleWindowGl50DS::promoteOriginalUiByteBlendIncoming(const OriginalUiByteBlend50KO& blend,
+    std::int32_t width,std::int32_t height,OriginalUiPrivatePublication50KP& publication,
+    OriginalUiPromotedIncoming50KP& incoming,VehicleWindowDiagnostic50DS& d) noexcept {
+    incoming={};
+    if(!publishOriginalUiBlendImage(blend,nullptr,width,height,publication,d))return false;
+    auto& s=*storage_;
+    // Nothing fallible follows the successful private copy: this is a CPU
+    // ownership move of the already completed immutable incoming names, not a
+    // new GPU copy, source submission, completion barrier or host presentation.
+    s.uiPromotedIncomingTarget=s.uiBlendIncomingTarget;s.uiBlendIncomingTarget=0;
+    s.uiPromotedIncomingColor=s.uiBlendIncomingColor;s.uiBlendIncomingColor=0;
+    s.uiPromotedIncomingGeneration=blend.generation_;
+    incoming.source_=blend.incoming_;incoming.generation_=s.uiPromotedIncomingGeneration;
+    // No sample or promotion retry is legal after transfer. The old borrow and
+    // remaining effect objects stay owned until explicit blend retirement.
+    s.uiBlendGeneration=s.uiBlendSampleGeneration=0;s.uiBlendPoisoned=true;
+    d.originalUiPromotedIncomingGeneration=incoming.generation_;return true;
+}
+bool VehicleWindowGl50DS::completeOriginalUiPrivatePublication(const OriginalUiPrivatePublication50KP& input,
+    OriginalUiPrivatePublication50KP& completed,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(&input==&completed)return fail(d,VehicleWindowError50DS::request,"publication completion input and output must be distinct");
+    completed={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !matchesOriginalUiPrivatePublication(input))
+        return fail(d,VehicleWindowError50DS::frame,"publication completion requires exact current private image");
+    s.diagnostic=&d;bool accepted=s.check("before private publication completion");
+    if(accepted){s.gl.finish();accepted=s.check("complete private opaque publication GPU work");}
+    if(accepted){
+        completed=input;completed.completed_=true;d.submittedWorkCompleted=true;
+        d.originalUiPrivatePublicationAccepted=true;d.originalUiPrivatePublicationGeneration=input.generation_;
+        d.originalUiByteBlendGeneration=input.blendGeneration_;
+        d.originalUiByteBlendSampleGeneration=input.sampleGeneration_;
+    }else s.uiPrivatePublicationGeneration=0;
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::copyOriginalUiPrivatePublicationToWindow(const OriginalUiPrivatePublication50KP& publication,
+    OriginalUiWindowBackBufferCopy& copied,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(&publication==&copied.publication_)
+        return fail(d,VehicleWindowError50DS::request,"window copy input and output must be distinct");
+    copied={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic ||
+        s.request.output!=VehicleWindowOutput50DS::defaultBackBuffer ||
+        !publication.completed_ || !matchesOriginalUiPrivatePublication(publication) ||
+        publication.width_<=0 || publication.height_<=0 ||
+        publication.width_>s.maximumWidth || publication.height_>s.maximumHeight ||
+        s.uiWindowBackBufferCopySerial==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,
+            "window copy requires idle window renderer, exact completed private image, bounded viewport and copy sequence");
+    s.diagnostic=&d;
+    bool accepted=s.check("before private publication window copy") && s.checkDefaultFramebuffer();
+    if(accepted){
+        // Working frame dimensions may differ after a failed later submit.
+        // Copy only the authenticated selected image's exact recorded extent,
+        // without changing working dimensions or any private image ownership.
+        // The helper checks restoration of framebuffer0 before it succeeds.
+        accepted=s.copyToWindow(publication.width_,publication.height_);
+        if(!accepted && d.error==VehicleWindowError50DS::gl)d.error=VehicleWindowError50DS::presentation;
+    }
+    if(accepted){
+        copied.lifetime_=s.uiSourceReceiptLifetime;copied.publication_=publication;
+        copied.sequence_=++s.uiWindowBackBufferCopySerial;
+        copied.kind_=OriginalUiWindowBackBufferCopyKind::windowBack;copied.commandsAccepted_=true;
+    }
+    // Failed blits preserve the selected private image and its completion.
+    // The helper retains possible partial BACK modification in d; no receipt
+    // or completion fence is issued and this renderer never swaps the window.
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::readOriginalUiPrivatePublicationRgba(const OriginalUiPrivatePublication50KP& publication,
+    std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic || !publication.completed_ || !matchesOriginalUiPrivatePublication(publication))
+        return fail(d,VehicleWindowError50DS::frame,"private readback requires exact current completed publication");
+    d.readbackWidth=publication.width_;d.readbackHeight=publication.height_;
+    d.readbackBytes=std::size_t(publication.width_)*std::size_t(publication.height_)*4;
+    if(!rgba || capacityBytes<d.readbackBytes)
+        return fail(d,VehicleWindowError50DS::readback,"private publication readback requires full viewport RGBA destination");
+    s.diagnostic=&d;const bool accepted=s.copyRgba(rgba,s.displayedTarget,publication.width_,publication.height_);
+    s.diagnostic=nullptr;d.originalUiPrivatePublicationGeneration=publication.generation_;
+    d.originalUiByteBlendGeneration=publication.blendGeneration_;
+    d.originalUiByteBlendSampleGeneration=publication.sampleGeneration_;return accepted;
+}
+bool VehicleWindowGl50DS::readPromotedOriginalUiIncomingRgba(const OriginalUiPromotedIncoming50KP& incoming,
+    std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    const auto lifetime=incoming.source_.lifetime_.lock();
+    if(s.active || s.frameSet || s.diagnostic || !lifetime || lifetime!=s.uiSourceReceiptLifetime ||
+        !incoming.generation_ || incoming.generation_!=s.uiPromotedIncomingGeneration ||
+        !s.uiPromotedIncomingTarget || !s.uiPromotedIncomingColor)
+        return fail(d,VehicleWindowError50DS::frame,"promoted incoming readback requires its exact immutable raw owner");
+    d.readbackWidth=640;d.readbackHeight=448;d.readbackBytes=std::size_t(640)*448*4;
+    if(!rgba || capacityBytes<d.readbackBytes)
+        return fail(d,VehicleWindowError50DS::readback,"promoted incoming readback requires full640x448 RGBA destination");
+    s.diagnostic=&d;const bool accepted=s.copyRgba(rgba,s.uiPromotedIncomingTarget,640,448);s.diagnostic=nullptr;
+    d.originalUiPromotedIncomingGeneration=incoming.generation_;return accepted;
+}
+bool VehicleWindowGl50DS::releasePromotedOriginalUiIncoming(VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"promoted incoming retirement requires idle renderer");
+    if(!s.uiPromotedIncomingTarget && !s.uiPromotedIncomingColor)return true;
+    s.diagnostic=&d;bool accepted=s.check("before promoted incoming retirement");
+    if(accepted){s.gl.finish();accepted=s.check("complete promoted incoming reads before retirement");}
+    if(accepted){
+        d.submittedWorkCompleted=true;s.uiPromotedIncomingGeneration=0;
+        accepted=s.restoreUiByteBlendBindings();
+        if(accepted)accepted=s.deleteName(s.uiPromotedIncomingTarget,s.gl.deleteFramebuffers,d) &&
+            s.deleteName(s.uiPromotedIncomingColor,s.gl.deleteTextures,d);
+        if(!accepted && d.error==VehicleWindowError50DS::none)
+            fail(d,VehicleWindowError50DS::cleanup,"promoted incoming name retirement requires retry");
+    }
+    if(!accepted)d.cleanupIncomplete=true;
+    s.diagnostic=nullptr;return accepted;
+}
+bool VehicleWindowGl50DS::releaseOriginalUiByteBlend(VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"byte-blend retirement requires idle renderer");
+    if(!s.uiBlendOldSnapshot && !s.hasUiByteBlendNames())return true;
+    s.diagnostic=&d;bool accepted=s.check("before byte-blend retirement");
+    if(accepted){s.gl.finish();accepted=s.check("complete all byte-blend work before retirement");}
+    if(accepted){
+        d.submittedWorkCompleted=true;s.uiBlendGeneration=s.uiBlendSampleGeneration=0;s.uiBlendPoisoned=true;
+        accepted=s.restoreUiByteBlendBindings();
+        if(accepted)accepted=s.deleteUiByteBlendNames(d);
+        if(!accepted && d.error==VehicleWindowError50DS::none)
+            fail(d,VehicleWindowError50DS::cleanup,"byte-blend name retirement requires retry");
+        if(accepted){s.uiBlendOldSnapshot=s.uiBlendIncomingSource=0;s.uiBlendPoisoned=false;}
+    }
+    if(!accepted)d.cleanupIncomplete=true;
+    s.diagnostic=nullptr;return accepted;
 }
 bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
     const OriginalUiRiderDrawContribution50KG& owner,VehicleWindowDiagnostic50DS& d) noexcept {
@@ -3948,13 +4744,14 @@ bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
         accepted=s.check("drain prior GL work before source UI owner retirement");
     }
     d.submittedWorkCompleted=accepted;
-    if (accepted){s.uiSourceFrameOwner=nullptr;s.uiSourceFrameGeneration=0;}
+    if (accepted){s.uiSourceFrameOwner=nullptr;s.uiSourceFrameGeneration=0;
+        s.uiSourceAcceptedTargetGeneration=0;s.uiSourcePublishedTargetGeneration=0;}
     s.diagnostic=nullptr;
     return accepted;
 }
 bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& native,
     std::int32_t width,std::int32_t height,bool sourceRgba,VehicleWindowDiagnostic50DS& d,
-    bool* sourceWorkStarted) noexcept {
+    bool* sourceWorkStarted,bool publishSource) noexcept {
     d = {};
     if(sourceWorkStarted)*sourceWorkStarted=false;
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
@@ -4134,7 +4931,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
 
     s.diagnostic = &d;
     bool accepted = s.check("before original UI submission") &&
-        (s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
+        ((sourceRgba && !publishSource) || s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
     const auto pending = static_cast<std::uint8_t>(s.uiPublished ^ 1u);
     if (accepted) {
         // Sampler zero exposes the immutable published texture parameters.
@@ -4195,7 +4992,9 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.gl.polygonMode(0x0408, 0x1B02);
         s.gl.clearColor(input.clearRgba[0],input.clearRgba[1],input.clearRgba[2],sourceRgba?128.f/255.f:1.f);
         s.gl.clear(colorBufferBit | depthBufferBit);
-        if(sourceRgba)++s.uiSourceTargetGeneration;
+        if(sourceRgba){++s.uiSourceTargetGeneration;s.uiSourceAcceptedTargetGeneration=0;
+            s.uiSourcePublishedTargetGeneration=0;}
+
         if (input.retainRaceImage) {
             // Preserve the race aspect ratio too; blit bounds are whole pixels.
             const double fit = std::min(double(width) / s.raceWidth, double(height) / s.raceHeight);
@@ -4324,25 +5123,6 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             if(s.gl.bindSampler)s.gl.bindSampler(1,0);
             s.gl.activeTexture(textureUnit0);
         }
-        if(sourceRgba && accepted){
-            // Source RGBA survives untouched. Only this independent private
-            // presentation surface gets alpha1, after its final source consumer.
-            s.gl.disable(0x0C11);s.gl.disable(0x0BE2);s.gl.colorMask(1,1,1,1);
-            s.gl.bindFramebuffer(framebuffer,s.uiTargets[pending]);
-            s.gl.drawBuffer(colorAttachment);s.gl.readBuffer(colorAttachment);
-            s.gl.viewport(0,0,width,height);
-            s.gl.clearColor(input.clearRgba[0],input.clearRgba[1],input.clearRgba[2],1.f);
-            s.gl.clear(colorBufferBit);
-            const double fit=std::min(double(width)/640.0,double(height)/448.0);
-            const I rw=std::max<I>(1,static_cast<I>(std::floor(640.0*fit)));
-            const I rh=std::max<I>(1,static_cast<I>(std::floor(448.0*fit)));
-            const I x=(width-rw)/2,y=(height-rh)/2;
-            s.gl.bindFramebuffer(readFramebuffer,s.uiSourceTarget);s.gl.readBuffer(colorAttachment);
-            s.gl.blitFramebuffer(0,0,640,448,x,y,x+rw,y+rh,colorBufferBit,0x2600);
-            s.gl.bindFramebuffer(framebuffer,s.uiTargets[pending]);
-            s.gl.colorMask(0,0,0,1);s.gl.clear(colorBufferBit);s.gl.colorMask(1,1,1,1);
-            accepted=s.check("copy source UI RGB to separate opaque presentation");
-        }
         // Restore renderer-owned baseline state even on draw failure. The next
         // world begin supplies its own program, matrix, viewport and geometry.
         s.gl.disable(0x0C11); s.gl.disable(0x0BE2); s.gl.depthMask(1); s.gl.depthFunc(0x0201);
@@ -4353,7 +5133,12 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.drawGl.bindVertexArray(0); s.drawGl.bindBuffer(arrayBuffer, 0);
         const bool restored = s.check("finish private original UI frame");
         accepted = accepted && restored;
-        if (accepted) {
+        if (accepted && sourceRgba){
+            d.originalUiSourceAccepted=true;
+            if(publishSource)accepted=s.publishUiSource(input.clearRgba,width,height);
+        }else if (accepted) {
+            s.uiPrivatePublicationGeneration=0;
+            s.uiSourcePublishedTargetGeneration=0;
             s.uiPublished = pending; s.displayedTarget = s.uiTargets[pending];
             s.width = s.committedWidth = width; s.height = s.committedHeight = height;
             s.imageCommitted = true; d.originalUiAccepted = true;
@@ -4425,6 +5210,8 @@ bool VehicleWindowGl50DS::submitHostMenu(const VehicleWindowHostMenu50DS& input,
         s.frameHostHud = false;
         if (accepted) {
             s.menuPublished = pending; s.displayedTarget = s.menuTargets[pending];
+            s.uiPrivatePublicationGeneration=0;
+            s.uiSourcePublishedTargetGeneration=0;
             s.width = s.committedWidth = width; s.height = s.committedHeight = height;
             s.imageCommitted = true; d.hostMenuAccepted = true;
             if (s.request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
