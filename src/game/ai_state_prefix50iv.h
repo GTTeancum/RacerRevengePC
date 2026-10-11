@@ -127,7 +127,9 @@ inline bool advanceAiStateNoCombat50IV(const AiNoCombatInput50IV& i,AiStatePrefi
     case 4:if(!(f.read(i.timerCB8)<=5.f))n.aiStateFE8=2;break;
     case 5:
         //16EDA8 targets16EDBC: the low-timer branch skips BOTH stores.
-        if(n.stallTimer1090<1.5f){boundary(0x16ea94);break;}
+        //16EB00 itself is complete here. Its caller must still run171C60 and
+        //1734C0 before dispatching state5 at16EA94; do not stop ahead of them.
+        if(n.stallTimer1090<1.5f)break;
         n.stallTimer1090=1.5f;n.aiStateFE8=2;break;
     case 2:
         if((i.applicationFlags58&1u)&&i.managerRacer0Present&&!i.managerRacer0State40&&

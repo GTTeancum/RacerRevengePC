@@ -23,7 +23,18 @@ struct AiRuntimeState50IV {
     // absence; a completed scan retains its last actual non-self candidate.
     bool target1008Present=false;
     std::uint32_t target1008ManagerIndex=0;
+    // Canonical source scalar owners, constructor16E2B8..16E2C0/16E2F8/
+    //16E348. Their combat consumers remain bounded; reset16E830 still owns
+    // these writes.1050 is an integer mode (171254), not a float timer.
+    float timer100C=0.f,timer1010=0.f,timer1014=0.f,field104C=-1.f;
+    std::uint32_t mode1050=0;
     bool initialized=false;
+    // Native continuation marker, not an original vehicle field. Once the
+    // real16E830 has run, FE8 is0 even though2255B0 is still pending. Retain
+    // this marker so another call cannot mistake that partial reset for an
+    // ordinary state0 frame. Only a complete physical-reset join can clear it.
+    bool physicalReset2255B0Pending=false;
+    std::uint64_t scalarResets16E830=0;
     std::uint64_t combatScans=0,combatAiRejections=0;
     std::uint64_t dispatchedFrames=0,brakingFrames=0,startupFrames=0,ordinaryFrames=0,boundBrakeSteerFrames=0;
 };
@@ -55,6 +66,7 @@ struct AiRuntimeInput50IV {
 };
 struct AiRuntimeReceipt50IV {
     bool dispatched=false,attemptedBoost=false,boostHandled=false,braking=false;
+    bool scalarResetCompleted=false,physicalResetPending=false;
     std::uint32_t sourceBoundary=0,stateFE8=0;
     float desiredSpeed=0.f;
     AiDrivingDiagnostic50IV driving{};
@@ -69,6 +81,37 @@ inline void initializeAiRuntime50IV(std::uint32_t managerIndex,std::uint32_t rac
     n.managerIndexFE0=managerIndex;n.racer60=racer60;n.fieldFE4=racer60==actualCourseRecordPod60?1u:0u;
     n.engineDifference5C=engineDifference;n.profile=profile;n.initialized=true;out=n;
 }
+// Complete source16E830..16E8B0 on the SAME initialized runtime and B9C owner.
+// This is narrower than construction. It preserves1004, all five racer lists,
+// profile/identity/track/progress/timing/thermal/body/scene owners, input axes,
+// B7C/B80, every other B9C bit and native observation counters. Clearing1008's
+// presence makes its native manager-index payload inactive; no racer is reset.
+// This leaf does not perform2255B0 or finish an AI dispatch. All stores are
+// exact constants/bit operations and have no arithmetic-domain dependency.
+inline void resetAiRuntimeScalars50IV(AiRuntimeState50IV& ai,
+    std::uint8_t& flagsB9C) noexcept {
+    ai.state.aiStateFE8=0;                     //16E834
+    ai.referenceFF8=-1;                       //16E838
+    ai.packing.scaleFFC=1.f;                  //16E840
+    ai.packing.policy1000=0;                  //16E844
+    ai.target1008Present=false;               //16E848
+    ai.timer100C=0.f;                         //16E84C
+    ai.timer1010=0.f;                         //16E850
+    ai.timer1014=0.f;                         //16E854
+    ai.repair.cooldown1018=0.f;               //16E858
+    ai.repair.duration101C=0.f;               //16E85C
+    ai.mode1050=0;                           //16E860
+    ai.navigation.choice1080=-1;             //16E864
+    ai.navigation.choice1084=-1;             //16E868
+    ai.field104C=-1.f;                       //16E870
+    ai.boost.cooldown109C=6.f;                //16E878
+    ai.state.stallTimer1090=1.5f;             //16E880
+    ai.state.wrongWayTimer1094=0.f;           //16E884
+    ai.state.turnSide1098=0;                  //16E888
+    flagsB9C=static_cast<std::uint8_t>(flagsB9C&0xfdu); //16E8A4
+    ai.state.orientation10A0=0;              //16E8A8
+    ai.repair.repairFEC=0;                    //16E8B0 return delay slot
+}
 //16E8C0's native controller span, called after readAiVehicleFrame50IV and
 //before228724 capturesCA0/bindAiVehicleFrame50IV. Prefix failures stop the live
 //source boundary; no caller may replay the same frame as if it never started.
@@ -77,7 +120,11 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
     const float previousCA0[4],std::uint32_t&lapCC8,BoostState50FK&thermal,
     AiRuntimeState50IV&ai,const AiRuntimeInput50IV&in,AiRuntimeReceipt50IV&receipt) noexcept {
     using namespace ai_driving_detail50IV;receipt={};
-    auto stop=[&](std::uint32_t pc) noexcept {receipt.sourceBoundary=pc;receipt.stateFE8=ai.state.aiStateFE8;return false;};
+    auto stop=[&](std::uint32_t pc) noexcept {receipt.sourceBoundary=pc;receipt.stateFE8=ai.state.aiStateFE8;
+        receipt.physicalResetPending=ai.physicalReset2255B0Pending;return false;};
+    // A failed prior state5 dispatch owns a partial source frame. Never replay
+    // navigation, packing, repair or16E830 after its physical-reset boundary.
+    if(ai.physicalReset2255B0Pending)return stop(0x2255b0u);
     if(!ai.initialized||frame.fields.vehicle58!=1u||!frame.fields.nativeAiOwnersBound50IV||
        frame.phase!=VehicleFramePhase49W::PostPlayer)return stop(0x16e8c0);
     parameters.rates.x=4.f; //16E8D4 owns live B94 even when dispatch is skipped.
@@ -180,6 +227,20 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
     repair.trackThreshold74=in.tuning->repairEnvThreshold74;
     AiRepairReceipt50IV repaired{};
     if(!updateAiRepair50IV(repair,ai.repair,m.controls.player.flagsB9C,repaired,receipt.prefix))return stop(receipt.prefix.sourcePC);
+    if(ai.state.aiStateFE8==5u){
+        //3A7C34 dispatches to16EA94 only AFTER171C60 and1734C0. The first
+        //real operation is16EA98->16E830, followed by16EAA0->2255B0.
+        //2255B0's AI virtual78 is216A30 (3CE258), not the player override.
+        resetAiRuntimeScalars50IV(ai,m.controls.player.flagsB9C);
+        ++ai.scalarResets16E830;receipt.scalarResetCompleted=true;
+        ai.physicalReset2255B0Pending=true;
+        // Retain the exact physical-reset boundary. Existing50ET/50EW leaves
+        // still lack the live AI/PostPlayer owner chain. Registered694 and
+        // reset124CB0 implementations exist in50IZ, but their live bindings
+        // remain absent. No drive/boost/brake or dispatch credit is produced,
+        // and the canonical frame phase remains PostPlayer.
+        return stop(0x2255b0u);
+    }
     PlayerReadResult48X actions=m.controls.player;Math f;V target{{0,0,0,1}},direction{{0,0,0,1}};
     bool attemptBoost=true;float boostFactor=m.frameFactor;
     if(ai.state.aiStateFE8==4u){
