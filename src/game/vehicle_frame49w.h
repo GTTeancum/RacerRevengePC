@@ -21,7 +21,7 @@ constexpr std::uint32_t vehicleFrameNodeCount49W=maxSceneNodes49P;
 enum class VehicleFramePhase49W : std::uint32_t {
     Ready, PostPlayer, BeforeGraphics, PostGraphics, PostImpactConsumers, PostImpactRepair, AfterImpactBlock, BetweenBodyChildren,
     AfterBodyChildren, SubstepReady, PostWorld, Post354, Post368,
-    MainIntegration, Query219120, PostImpactEffects50O, PostOptionalProbeEffects50P, PostPlainEffects50Q, PostPackedBytes50S, PostEngineBase50X
+    MainIntegration, Query219120, PostImpactEffects50O, PostOptionalProbeEffects50P, PostPlainEffects50Q, PostPackedBytes50S, PostEngineBase50X, PodLivePending50IZ
 };
 // These are supplied source-completed stages, never callbacks invented by the
 // native implementation. All unrepresented effects are outside this bridge;
@@ -42,6 +42,7 @@ struct SceneTopology49W {
     SceneNodeIndex49P firstChild184=SceneNodeIndex49P::none;
     SceneNodeIndex49P nextSibling188=SceneNodeIndex49P::none;
 };
+struct PodLiveQueryContext50IZ;
 struct VehicleFrameBindings49W {
     VehicleAnimationBindings49T animation;
     VisualSceneBindings49R visual;
@@ -49,6 +50,10 @@ struct VehicleFrameBindings49W {
     SceneTopology49W topology[vehicleFrameNodeCount49W];
     GraphBodyDomain49W mainDomain,secondaryDomain;
     std::uint32_t sceneNodeCount=53; // Legacy Anakin default; capacity is larger.
+    // Optional real registered694 lifecycle, bound to stable native owners.
+    // Null retains the old current-null admission. No boolean can stand in
+    // for its actual object/membership/source context.
+    const PodLiveQueryContext50IZ* podLiveQuery50IZ=nullptr;
 };
 struct VehicleFrameParameters49W {
     CoupledBodyParameters49M bodies;

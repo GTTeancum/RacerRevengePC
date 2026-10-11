@@ -21,6 +21,14 @@ struct PodShapeState49W {
     std::uint32_t type88 = 0;
     std::uint32_t registrationE0 = 1;
 };
+// Exact11F680 type0 numeric preparation, before120230. Does not inspect or
+// clear registrationE0 and never claims the live membership update completed.
+// Numeric failure preserves state; success commits histories/matrices/sphere
+// while retaining the caller's actual E0. The registered adapter must perform
+// the real120230 next, preserving this completed prefix on a later boundary.
+bool preparePodShape50IZ(const PodShapeSource49W& source,
+    const BodyMatrix48G& mainCachedWorld100,PodShapeState49W& state) noexcept;
+
 // Exact bounded11FF90 ->11F680 type0 ->120230 E0-null projection. Input is
 // actual main190.cachedWorld100 AFTER the source tail getters; this function
 // performs no graph refresh. All16 old world80 words become previousC0, then

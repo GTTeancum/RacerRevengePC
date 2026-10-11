@@ -28,12 +28,11 @@ struct Math {
     }
 };
 }
-bool transformPodShape49W(const PodShapeSource49W& source,
+bool preparePodShape50IZ(const PodShapeSource49W& source,
     const BodyMatrix48G& mainCachedWorld100, PodShapeState49W& state) noexcept {
-    // Admission happens before even the historical copies. Constructor E0=0
-    // proves initialization only; it never supplies this current-state fact.
-    if (state.type88 != 0 || state.registrationE0 != 0 ||
-        std::fegetround() != FE_TONEAREST) return false;
+    //11F680 owns numeric preparation regardless of the actual E0. Its caller
+    // separately owns120230, so registration is neither cleared nor completed.
+    if (state.type88 != 0 || std::fegetround() != FE_TONEAREST) return false;
     PodShapeState49W next = state;
     Math f;
     RR_POD_SHAPE49W_STAGE(0x11f6d8u);
@@ -65,10 +64,18 @@ bool transformPodShape49W(const PodShapeSource49W& source,
         value = f.add(value, f.mul(world.v[8 + lane], source.rootCenter.v[2]));
         next.center60.v[lane] = f.add(value, world.v[12 + lane]);
     }
-    RR_POD_SHAPE49W_STAGE(0x12023cu);
-    // The actual120240 branch returns without deriving registration bounds.
     if (!f.valid) return false;
     state = next;
     return true;
 }
+bool transformPodShape49W(const PodShapeSource49W& source,
+    const BodyMatrix48G& mainCachedWorld100,PodShapeState49W& state) noexcept {
+    // Preserve the existing current-null admission before any historical copy.
+    if(state.registrationE0!=0)return false;
+    if(!preparePodShape50IZ(source,mainCachedWorld100,state))return false;
+    RR_POD_SHAPE49W_STAGE(0x12023cu);
+    // Actual120240 null branch: no bounds or live registry operation.
+    return true;
+}
+
 }

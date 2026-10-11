@@ -12,6 +12,8 @@ Main consolidation preserves the optional [native audio timing observations](doc
 
 Historical [all-original-AI capture tooling](tools/capture/all_original_ai/README.md) is retained with its original runtime identity and incomplete-prefix limits. It has not been rebound or executed against consolidated main. Older capture helpers are retained for provenance and are not approved driving-test entry points.
 
+The [registered-pod query partial](docs/registered-pod-query50iz.md) is retained as an optional native owner path, uncompiled and untested. No original-AI state-5/reset activation is implied.
+
 ## Build and game data
 
 Supply your own original game data and generate local caches. Assets, executables, and memory dumps are excluded; some source-comparison fixtures also require local generation.
