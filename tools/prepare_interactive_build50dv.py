@@ -42,6 +42,10 @@ def main():
     audio_directory = str(ROOT / 'src/assets/original_audio_directory50kx.cpp')
     if audio_directory not in argv:
         argv.insert(argv.index('-lz'), audio_directory)
+    # Detached cold ownership only; no event attachment or playback admission.
+    cold_audio = str(ROOT / 'src/game/cold_logical_audio_domain50ky.cpp')
+    if cold_audio not in argv:
+        argv.insert(argv.index('-lz'), cold_audio)
     # Inactive original UI modules; source registration does not enable frontend.
     for source in (
         'src/assets/original_ui_archive50kg.cpp',

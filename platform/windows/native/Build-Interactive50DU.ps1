@@ -66,7 +66,7 @@ if ($SDL2RuntimeDll) {
 }
 $manifestPath = ExistingFile (Join-Path $PSScriptRoot 'interactive50du.sources.json')
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.schema -ne 1 -or $manifest.sources.Count -ne 278 -or $manifest.nativeDependencySources.Count -ne 6) { throw 'Review changed source manifest before changing this gate.' }
+if ($manifest.schema -ne 1 -or $manifest.sources.Count -ne 279 -or $manifest.nativeDependencySources.Count -ne 6) { throw 'Review changed source manifest before changing this gate.' }
 foreach ($entry in (@($manifest.sourceListProvenance.PSObject.Properties) + @($manifest.nativeDependencySourceProvenance.PSObject.Properties))) {
     $actual = (Get-FileHash -LiteralPath (Join-Path $root $entry.Name) -Algorithm SHA256).Hash
     if ($actual -ine $entry.Value) { throw "Generator source changed; reconcile manifest first: $($entry.Name)" }
