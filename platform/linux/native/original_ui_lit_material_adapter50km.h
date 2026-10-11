@@ -63,4 +63,32 @@ inline bool convertOriginalUiRider19BodyMaterialSpan50KM(
         material.material.alphaTestGreaterZero)return false;
     return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
 }
+// Separate admission for source-RGBA composition only. The common converter
+// still rejects both new blend kinds, and the RGB-only renderer rejects this
+// program identity. Reusing its bounded sampler/depth conversion below does
+// not relabel the original authored material or change any source field.
+inline bool convertOriginalUiRider19SpecularMaterialSpan50KM(
+    const assets::OriginalUiRider19SpecularMaterial50KM& material,
+    const assets::OriginalUiScreenAssets50KG& publishedImages,
+    const OriginalUiMaterialSpanBinding50KG& binding,
+    OriginalUiMaterialSpan50KG& output) noexcept {
+    const auto* bank=publishedImages.textures();
+    const auto* image=bank?bank->texture(binding.textureIndex):nullptr;
+    const auto blend=material.material.raster.blend;
+    if(material.images!=&publishedImages || !publishedImages.loaded() || !image ||
+        binding.textureIndex!=material.imageIndex || binding.textureCount!=bank->textureCount() ||
+        image->identity!=material.imageIdentity || material.material.program!=assets::OriginalUiLitProgram50KM::specularMapCompressed ||
+        (blend!=assets::OriginalUiMaterialBlend50KG::destinationAlphaAdditive &&
+         blend!=assets::OriginalUiMaterialBlend50KG::fixed255Additive) || material.material.raster.depthWrite)return false;
+    auto commonRaster=material.material.raster;commonRaster.blend=assets::OriginalUiMaterialBlend50KG::additive;
+    OriginalUiMaterialSpan50KG next;
+    if(!convertOriginalUiMaterialSpan50KG(commonRaster,binding,next))return false;
+    next.span.materialMode=OriginalUiMaterialMode50KG::sourceSpecularMapCompressed;
+    next.span.blend=blend==assets::OriginalUiMaterialBlend50KG::destinationAlphaAdditive ?
+        OriginalUiBlend50KG::destinationAlphaAdditive : OriginalUiBlend50KG::fixed255Additive;
+    next.span.alphaScale=1.f; // Typed programmable blend uses source byte units.
+    next.native.sourceFogEnabled=material.material.fogEnabled;
+    next.native.sourceAlphaTestGreaterZero=material.material.alphaTestGreaterZero;
+    output=next;return true;
+}
 }

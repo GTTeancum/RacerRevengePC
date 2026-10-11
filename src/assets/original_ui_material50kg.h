@@ -176,7 +176,9 @@ bool readOriginalUiRiderPortraitFallbackMaterial50KG(const OriginalUiArchive50KG
     std::uint8_t riderIndex,const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
-enum class OriginalUiMaterialBlend50KG : std::uint8_t { opaque, sourceAlpha, additive };
+enum class OriginalUiMaterialBlend50KG : std::uint8_t {
+    opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive
+};
 enum class OriginalUiMaterialFilter50KG : std::uint8_t { nearest, linear };
 enum class OriginalUiMaterialWrap50KG : std::uint8_t { repeat, clampToEdge };
 struct OriginalUiNativeMaterial50KG {
@@ -236,7 +238,7 @@ bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG&,
     const Texture48E& exactAtlas, OriginalUiNativeMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;
 // Separate original 3D programs. These do not become ScreenObject passes.
-enum class OriginalUiLitProgram50KM : std::uint8_t { diffuse, diffuseCompressed };
+enum class OriginalUiLitProgram50KM : std::uint8_t { diffuse, diffuseCompressed, specularMapCompressed };
 struct OriginalUiLitMaterial50KM {
     OriginalUiNativeMaterial50KG raster{};
     OriginalUiLitProgram50KM program = OriginalUiLitProgram50KM::diffuseCompressed;
@@ -268,9 +270,11 @@ struct OriginalUiRider19IpumMaterial50KM {
 // that image on GPU while preserving all original mip bytes/provenance on CPU.
 // It does NOT assert historical source residencyF4 or emulate memory pressure.
 // Requires actual authored19c_1 DiffuseCompressed, MXL0/equal source texel
-// filters, opaque RGB and alpha-test OFF. These alpha gates make unresolved
-// material-versus-texture TEXA ordering irrelevant to this bounded RGB path;
-// a downstream source-alpha consumer is still forbidden by presentation.
+// filters, opaque RGB and alpha-test OFF, matching the actual original pass.
+// Its one-map bind249818..24983C patches material TEXA to TA0/TA1=255,AEM1
+// before packet submission24B39C, agreeing with the typed cache alpha policy.
+// A downstream alpha consumer still requires the separate sealed source-RGBA
+// frame lifetime; the ordinary RGB-only presentation promise is unchanged.
 // The images owner must outlive this result and the renderer's publication.
 bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
@@ -299,4 +303,17 @@ bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19BodyMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
+// Successful result names the exact published one-map specmap1 image and the
+// unchanged source pass. Only original19_1,19_2 and pod_wndw pass2 are admitted.
+// Destination-alpha and FIX255 policies are accepted solely by the separate
+// sealed source-RGBA frame route; ordinary RGB-only span conversion rejects.
+struct OriginalUiRider19SpecularMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+};
+bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19SpecularMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 }

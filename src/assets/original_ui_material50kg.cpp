@@ -459,13 +459,14 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
     const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
     OriginalUiMaterialDiagnostic50KG& d, bool litProgram,
     bool& fogEnabled, bool& alphaTestGreaterZero, bool authenticatedRiderIpum = false,
-    bool authenticatedRiderIndexedBody = false) noexcept {
+    bool authenticatedRiderIndexedBody = false, bool authenticatedRiderSpecular = false) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
             return fail(d, Error::untexturedAdapterRequired, "zero-map requires untextured material policy", 0x2474b8u);
         const bool programMatches = litProgram ?
-            ((same(pass.microprogram, "Diffuse") || same(pass.microprogram, "DiffuseCompressed")) &&
+            ((same(pass.microprogram, "Diffuse") || same(pass.microprogram, "DiffuseCompressed") ||
+              (authenticatedRiderSpecular && same(pass.microprogram,"SpecularMapCompressed"))) &&
              pass.provenance.origin == OriginalUiMaterialOrigin50KG::authoredPsm &&
              pass.inheritedTemplate == catalogMember(OriginalUiArchiveId50KG::appStart,
                  "AppStart\\DefaultMT.psm")) : pass.microprogram == "ScreenObject";
@@ -521,10 +522,11 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
             return fail(d, Error::texture, "atlas dimensions");
         // Real Main PST palettes use the full source alpha byte (up to255).
         // Do not rewrite or reject those authentic bytes. The native renderer
-        // cold-caches each exact atlas maximum and, before target writes,
-        // requires vertexAlpha * atlasMaximumAlpha <= 128*128 for blended
-        // spans. That joint bound admits Main's63/64 packet alpha while
-        // rejecting GS coefficients above1 that fixed-function GL cannot express.
+        // cold-caches each exact atlas maximum. The ordinary RGB-only route
+        // requires vertexAlpha * atlasMaximumAlpha <= 128*128 before blended
+        // writes; its fixed-function factor cannot express larger values.
+        // The sealed source-RGBA route instead evaluates admitted byte factors
+        // explicitly and preserves independent source-alpha replacement.
         if (pass.maximumMipLevel != 0 || pass.magFilter < 0 || pass.magFilter > 1 ||
             pass.minFilter < 0 || pass.minFilter > 5 || pass.lodCalculationMethod < 0 ||
             pass.lodCalculationMethod > 1 || pass.lodL < 0 || pass.lodL > 3 ||
@@ -539,7 +541,15 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
             return fail(d, Error::unsupportedValue, "depth/context", 0x247ed8u);
         OriginalUiNativeMaterial50KG policy;
         const auto blend = value(Field::alphaBlendingOnOff);
-        if (blend == 1) {
+        if (authenticatedRiderSpecular) {
+            if (!expect(Field::alphaBlendingOnOff,1) || !expect(Field::inputColorA,0) ||
+                !expect(Field::inputColorB,2) || !expect(Field::inputColorD,1) ||
+                !expect(Field::zWriteDisabled,1))return false;
+            if (value(Field::inputAlphaC)==1)policy.blend=OriginalUiMaterialBlend50KG::destinationAlphaAdditive;
+            else if (value(Field::inputAlphaC)==2 && expect(Field::fixedAlphaValue,255))
+                policy.blend=OriginalUiMaterialBlend50KG::fixed255Additive;
+            else return fail(d,Error::unsupportedValue,"actual Rider specular ALPHA.C/FIX",0x247a64u);
+        } else if (blend == 1) {
             if (!expect(Field::inputColorA, 0) || !expect(Field::inputAlphaC, 0) ||
                 !expect(Field::inputColorD, 1)) return false;
             const auto b = value(Field::inputColorB);
@@ -651,6 +661,38 @@ bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG& 
         next.imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly;
         next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
         next.sourceStoredMipIndex=4;next.sourceMipCount=5;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
+}
+bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19SpecularMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        const bool body=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_1.psm") ||
+            pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_2.psm");
+        const bool window=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\pod_wndw.psm");
+        if ((!body&&!window) || pass.pass!=2 || !same(pass.microprogram,"SpecularMapCompressed") ||
+            !same(pass.textureName,"specmap1") || pass.gs[Field::inputAlphaC].value!=(window?2:1) ||
+            (window && pass.gs[Field::fixedAlphaValue].value!=255))
+            return fail(d,Error::profile,"actual Rider19 single-map specular pass2",0x2476a0u);
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\specmap1.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=1)
+            return fail(d,Error::texture,"authenticated original Rider specmap1 image",0x24e880u);
+        const auto& mip=texture->mips.front();
+        if (mip.width!=256 || mip.height!=256 || image->texture.width!=mip.width ||
+            image->texture.height!=mip.height || image->texture.rgba!=mip.rgba)
+            return fail(d,Error::texture,"published source specmap1 image");
+        OriginalUiRider19SpecularMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::specularMapCompressed;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
         output=next;return true;
     } catch (...) {d.error=Error::allocation;return false;}
 }

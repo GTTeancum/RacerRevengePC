@@ -19,7 +19,7 @@ struct OriginalUiNativeSpan50KG {
     // Untextured spans must leave every sampler field unspecified. No texture
     // is bound as a surrogate and no irrelevant sampler policy is invented.
     MaterialTextureSampler50EB sampler{};
-    // Only the two explicit source Diffuse modes consume these fields. The
+    // Only explicit source 3D program modes consume these fields. The
     // material owner supplies FGE and the admitted GREATER/AREF0/KEEP test.
     bool sourceFogEnabled = false;
     bool sourceAlphaTestGreaterZero = false;
@@ -28,6 +28,8 @@ struct OriginalUiNativeDraw50KG {
     OriginalUiDraw50KG draw{};
     const OriginalUiNativeSpan50KG* states = nullptr;
     std::uint32_t stateCount = 0; // Exactly one per ordered draw span.
+    // Ordinary submitOriginalUi requires this proof; the sealed source-RGBA
+    // entry instead requires false and owns the real source alpha separately.
     // Must explicitly prove no destination-alpha test/factor or downstream
     // consumer expects source framebuffer alpha. This presentation target is
     // cleared to alpha 1 and RGB-only writes preserve that value. RGBA readback
@@ -41,7 +43,7 @@ struct OriginalUiNativeDraw50KG {
     std::uint32_t particleFogCount = 0;
     float particleFogColor[3] = {0.f,0.f,0.f}; // authored source RGB /255
     // Original pre-divide projected W, parallel to all vertices. Required for
-    // Diffuse/Compressed spans; consumed only by those modes. Ordinary screen
+    // Diffuse/Compressed/SpecularMapCompressed spans; consumed only by those modes. Ordinary screen
     // and particle spans retain W=1. Preserves source perspective ST/Q while
     // packet RGB and fog remain screen-linear. No reconstruction from depth.
     const float* sourceRasterW = nullptr;
@@ -52,11 +54,38 @@ struct OriginalUiNativeDraw50KG {
     // particle corners BL,TL,TR,BR preserve the source strip's BL--TR diagonal.
     // texturedModulate: colorScale=255/128, blended alphaScale=(255/128)^2.
     // untexturedVertexColor: colorScale=1, blended alphaScale=255/128.
-    // Opaque spans retain alphaScale=1 (source framebuffer alpha is not stored).
-    // Both modes retain raw vertex alpha <=128 as a bounded native admission.
-    // Blended textured spans additionally require each vertex alpha times the
+    // Opaque spans retain alphaScale=1. The RGB-only route does not store source
+    // alpha; the sealed source route independently computes/replaces raw bytes.
+    // Both routes retain raw vertex alpha <=128 as a bounded native admission.
+    // RGB-only blended spans additionally require each vertex alpha times the
     // real texture's maximum alpha <=16384. Full-byte atlases (including actual
     // Main alpha255) are valid with source packet alpha63/64. This joint bound
     // prevents native blend-factor clamping from hiding a source factor >1.
+};
+class OriginalUiRiderDrawContribution50KG;
+class VehicleWindowGl50DS;
+// Sealed by the concrete complete Rider frame composer only, after every real
+// widget/model/material pass has joined its source order and combined bank.
+// Source target is fresh PSMCT32/context0/mask0,640x448,clear alpha128,reverseD24.
+// No retained race image, unhandled group target, later source sampler or other
+// source-alpha consumer may survive this frame. The renderer supplies the real
+// source allocation/clear and retains its alpha until a subsequent fresh clear;
+// opaque display/readback uses a separate presentation surface. The live owner
+// must retire through VehicleWindowGl50DS before destination destruction; a
+// failed retirement retains that lifetime obligation for an explicit retry.
+class OriginalUiSourceFrame50KM final {
+public:
+    ~OriginalUiSourceFrame50KM() noexcept=default;
+private:
+    friend class OriginalUiRiderDrawContribution50KG;
+    friend class VehicleWindowGl50DS;
+    OriginalUiSourceFrame50KM() noexcept=default;
+    OriginalUiSourceFrame50KM(const OriginalUiSourceFrame50KM&)=delete;
+    OriginalUiSourceFrame50KM& operator=(const OriginalUiSourceFrame50KM&)=delete;
+    const OriginalUiNativeDraw50KG* native_=nullptr;
+    const OriginalUiRiderDrawContribution50KG* owner_=nullptr;
+    // Nonzero, increasing for this live composer; written only after a whole
+    // frame has assembled successfully. Borrowed arrays and owner remain live.
+    std::uint64_t frameGeneration_=0;
 };
 }

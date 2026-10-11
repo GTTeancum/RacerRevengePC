@@ -815,6 +815,15 @@ struct OwnerGl {
     void (*uniform4f)(I, float, float, float, float) = nullptr;
     void (*blendFunc)(U, U) = nullptr;
     void (*blendEquation)(U) = nullptr;
+    // Resolved only for explicit source-RGBA composition after capability proof.
+    void (*textureBarrier)() = nullptr;
+    void (*clipControl)(U,U) = nullptr;
+    void (*genTextures)(I,U*) = nullptr;
+    void (*deleteTextures)(I,const U*) = nullptr;
+    void (*texImage2D)(U,I,I,I,I,I,U,U,const void*) = nullptr;
+    void (*texParameteri)(U,U,I) = nullptr;
+    void (*getTexLevelParameteriv)(U,I,U,I*) = nullptr;
+    void (*framebufferTexture2D)(U,U,U,U,I) = nullptr;
     void (*activeTexture)(U) = nullptr;
     void (*bindTexture)(U, U) = nullptr;
     void (*getTexParameteriv)(U, U, I*) = nullptr;
@@ -971,11 +980,15 @@ struct VehicleWindowGl50DS::Storage {
     U menuTargets[2]{}, menuColors[2]{}, displayedTarget = 0;
     std::uint8_t menuPublished = 0;
     U uiTargets[2]{}, uiColors[2]{}, uiDepths[2]{};
+    U uiSourceTarget=0,uiSourceColor=0,uiSourceDepth=0;
+    const OriginalUiRiderDrawContribution50KG* uiSourceFrameOwner=nullptr;
+    std::uint64_t uiSourceFrameGeneration=0,uiSourceTargetGeneration=0;
     U uiProgram = 0, uiVertexShader = 0, uiFragmentShader = 0;
     U uiVertexBuffer = 0, uiIndexBuffer = 0, uiVertexArray = 0, uiParticleFogBuffer = 0, uiSourceRasterWBuffer = 0;
     I uiCanvasUniform = -1, uiImageUniform = -1, uiAlphaUniform = -1, uiTexturedUniform = -1;
     I uiParticleFogColorUniform = -1, uiSourceRasterUniform = -1;
     I uiSourceFogEnabledUniform = -1, uiSourceAlphaTestUniform = -1;
+    I uiSourceCompositionUniform=-1,uiSourceTargetUniform=-1,uiSourceBlendUniform=-1;
     // Cold immutable atlas maxima; native blend admission is a joint texture
     // and vertex bound. Real Main atlases legitimately contain raw alpha255.
     std::uint8_t uiTextureMaximumAlpha[assets::maxMaterialTextureAssets50EA]{};
@@ -1440,6 +1453,7 @@ struct VehicleWindowGl50DS::Storage {
             uiVertexBuffer || uiIndexBuffer || uiVertexArray || uiParticleFogBuffer || uiSourceRasterWBuffer) return true;
         for (U b = 0; b < 2; ++b)
             if (uiTargets[b] || uiColors[b] || uiDepths[b]) return true;
+        if (uiSourceTarget || uiSourceColor || uiSourceDepth) return true;
         if (cableVertexBuffer || cableIndexBuffer || cableVertexArray) return true;
         if (trackVertexBuffer || trackIndexBuffer || trackVertexArray || trackNormalBuffer || trackProjectionBuffer) return true;
         if (dynamicWorldIndexBuffer) return true;
@@ -1526,6 +1540,12 @@ struct VehicleWindowGl50DS::Storage {
         }
         if (usesTextures()) {
             LOAD(gl, activeTexture, ActiveTexture); LOAD(gl, bindTexture, BindTexture);
+        }
+        if (request.enableOriginalUiSourceRgba) {
+            LOAD(gl, genTextures, GenTextures); LOAD(gl, deleteTextures, DeleteTextures);
+            LOAD(gl, texImage2D, TexImage2D); LOAD(gl, texParameteri, TexParameteri);
+            LOAD(gl, getTexLevelParameteriv, GetTexLevelParameteriv);
+            LOAD(gl, framebufferTexture2D, FramebufferTexture2D);
         }
 #undef LOAD
         return true;
@@ -2132,8 +2152,37 @@ uniform int uiTextured;
 uniform int uiSourceFogEnabled;
 uniform int uiSourceAlphaTest;
 uniform vec4 uiParticleFogColor;
+uniform sampler2D uiSourceTarget;
+uniform int uiSourceComposition;
+uniform int uiSourceBlend;
 out vec4 viewerOutput;
 void main() {
+    if (uiSourceComposition != 0) {
+        // Explicit native byte representation. Native GL sampling/interpolation
+        // remains separately documented; no PS2 rasterizer/device is executed.
+        vec4 vertexByte=clamp(uiColor*255.0,0.0,255.0);
+        vec4 source=uiTextured!=0 ?
+            floor(clamp(texture(uiImage,uiUv)*255.0*vertexByte/128.0,0.0,255.0)) :
+            floor(vertexByte);
+        if (uiSourceAlphaTest!=0 && source.a<1.0) discard;
+        if (uiSourceFogEnabled!=0) {
+            float f=clamp(uiParticleFog*256.0,0.0,255.0);
+            source.rgb=floor((source.rgb*f+uiParticleFogColor.rgb*255.0*(255.0-f))/256.0);
+        }
+        vec3 result=source.rgb;
+        if (uiSourceBlend!=0) {
+            // ARB_texture_barrier: one actual triangle per draw, one same-pixel
+            // read/write per covered texel, barrier before every subsequent draw.
+            vec4 destination=floor(texelFetch(uiSourceTarget,ivec2(gl_FragCoord.xy),0)*255.0+0.5);
+            float coefficient=uiSourceBlend==3 ? destination.a : uiSourceBlend==4 ? 255.0 : source.a;
+            vec3 difference=uiSourceBlend==1 ? source.rgb-destination.rgb : source.rgb;
+            result=floor(difference*coefficient/128.0)+destination.rgb;
+        }
+        // ALPHA changes RGB only. Every surviving fragment replaces stored A;
+        // it never accumulates source-over alpha or clamps a FIX255 factor to1.
+        viewerOutput=vec4(clamp(result,0.0,255.0),source.a)/255.0;
+        return;
+    }
     if (uiTextured != 0) {
         vec4 raw = texture(uiImage, uiUv) * uiColor;
         // MODULATE clamps before blend, not after addition to destination RGB.
@@ -2200,10 +2249,14 @@ void main() {
         uiSourceRasterUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceRaster");
         uiSourceFogEnabledUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceFogEnabled");
         uiSourceAlphaTestUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceAlphaTest");
+        uiSourceCompositionUniform=shaderGl.getUniformLocation(uiProgram,"uiSourceComposition");
+        uiSourceTargetUniform=shaderGl.getUniformLocation(uiProgram,"uiSourceTarget");
+        uiSourceBlendUniform=shaderGl.getUniformLocation(uiProgram,"uiSourceBlend");
         if (!check("locate original UI uniforms")) return false;
         if (uiCanvasUniform < 0 || uiImageUniform < 0 || uiAlphaUniform < 0 || uiTexturedUniform < 0 ||
             uiParticleFogColorUniform < 0 || uiSourceRasterUniform < 0 ||
-            uiSourceFogEnabledUniform < 0 || uiSourceAlphaTestUniform < 0)
+            uiSourceFogEnabledUniform < 0 || uiSourceAlphaTestUniform < 0 ||
+            uiSourceCompositionUniform < 0 || uiSourceTargetUniform < 0 || uiSourceBlendUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "original UI uniform missing");
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::none;
         constexpr std::intptr_t vertexBytes = originalUiMaximumQuads50KG * 4 * sizeof(assets::Vertex48B);
@@ -2442,13 +2495,51 @@ void main() { viewerOutput = hudColor; }
         gl.framebufferRenderbuffer(framebuffer, attachment, renderbuffer, name);
         return check("attach private staging renderbuffer");
     }
+    bool createOriginalUiSourceTarget() noexcept {
+        if (!request.enableOriginalUiSourceRgba)return true;
+        I textureLimit=0;gl.getIntegerv(0x0D33,&textureLimit);
+        if (!check("query source UI texture limits"))return false;
+        if (textureLimit<640)return fail(*diagnostic,VehicleWindowError50DS::limits,"source UI texture dimensions unavailable");
+        gl.genFramebuffers(1,&uiSourceTarget);gl.bindFramebuffer(framebuffer,uiSourceTarget);
+        gl.genTextures(1,&uiSourceColor);gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,uiSourceColor);
+        gl.texParameteri(texture2D,0x2801,0x2600);gl.texParameteri(texture2D,0x2800,0x2600);
+        gl.texParameteri(texture2D,0x2802,0x812F);gl.texParameteri(texture2D,0x2803,0x812F);
+        gl.texParameteri(texture2D,0x813C,0);gl.texParameteri(texture2D,0x813D,0);
+        drawGl.bindBuffer(0x88EC,0); // Null data is allocation, never an inherited unpack-PBO offset.
+        gl.texImage2D(texture2D,0,rgba8,640,448,0,0x1908,0x1401,nullptr);
+        if (!check("allocate fixed source UI RGBA8 texture") || !uiSourceTarget || !uiSourceColor)
+            return fail(*diagnostic,VehicleWindowError50DS::allocation,"source UI framebuffer/texture allocation");
+        I w=0,h=0,format=0;
+        gl.getTexLevelParameteriv(texture2D,0,0x1000,&w);gl.getTexLevelParameteriv(texture2D,0,0x1001,&h);
+        gl.getTexLevelParameteriv(texture2D,0,0x1003,&format);
+        if (!check("verify source UI texture") || w!=640 || h!=448 || format!=static_cast<I>(rgba8))
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"source UI texture storage mismatch");
+        gl.framebufferTexture2D(framebuffer,colorAttachment,texture2D,uiSourceColor,0);
+        gl.genRenderbuffers(1,&uiSourceDepth);gl.bindRenderbuffer(renderbuffer,uiSourceDepth);
+        gl.renderbufferStorage(renderbuffer,depth24,640,448);
+        I samples=0;gl.getRenderbufferParameteriv(renderbuffer,0x8D42,&w);
+        gl.getRenderbufferParameteriv(renderbuffer,0x8D43,&h);gl.getRenderbufferParameteriv(renderbuffer,0x8D44,&format);
+        gl.getRenderbufferParameteriv(renderbuffer,0x8CAB,&samples);
+        if (!check("allocate source UI depth") || !uiSourceDepth || w!=640 || h!=448 ||
+            format!=static_cast<I>(depth24) || samples)
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"source UI depth storage mismatch");
+        gl.framebufferRenderbuffer(framebuffer,depthAttachment,renderbuffer,uiSourceDepth);
+        gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+        const U status=gl.checkFramebufferStatus(framebuffer);
+        gl.bindTexture(texture2D,0);
+        if (!check("complete source UI framebuffer"))return false;
+        if (status!=framebufferComplete){diagnostic->framebufferStatus=status;
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"incomplete source UI framebuffer");}
+        return true;
+    }
     bool createTargets() noexcept {
         I maximum = 0, viewportLimits[2]{};
         gl.getIntegerv(0x84E8, &maximum); // GL_MAX_RENDERBUFFER_SIZE
         gl.getIntegerv(0x0D3A, viewportLimits); // GL_MAX_VIEWPORT_DIMS
         if (!check("query target limits")) return false;
         if (maximumWidth > maximum || maximumHeight > maximum ||
-            maximumWidth > viewportLimits[0] || maximumHeight > viewportLimits[1])
+            maximumWidth > viewportLimits[0] || maximumHeight > viewportLimits[1] ||
+            (request.enableOriginalUiSourceRgba && (maximum<640 || viewportLimits[0]<640 || viewportLimits[1]<448)))
             return fail(*diagnostic, VehicleWindowError50DS::limits, "explicit resolution exceeds GL limits");
         for (U b = 0; b < 2; ++b) {
             gl.genFramebuffers(1, &targets[b]);
@@ -2495,7 +2586,7 @@ void main() { viewerOutput = hudColor; }
                 }
             }
         }
-        return true;
+        return createOriginalUiSourceTarget();
     }
     bool checkDefaultFramebuffer() noexcept {
         gl.bindFramebuffer(framebuffer, 0);
@@ -2541,6 +2632,28 @@ void main() { viewerOutput = hudColor; }
         }
         return !samplerObjects || load(gl.bindSampler, "glBindSampler");
     }
+    bool checkOriginalUiSourceSupport(I major,I minor) noexcept {
+        if (!request.enableOriginalUiSourceRgba)return true;
+        I units=0;gl.getIntegerv(0x8872,&units);
+        if (!check("query source UI feedback texture units"))return false;
+        if (units<2)return fail(*diagnostic,VehicleWindowError50DS::context,"source UI requires two fragment texture units");
+        bool supported=major>4 || (major==4 && minor>=5);
+        bool clipControl=supported;
+        if (!load(gl.getStringi,"glGetStringi"))return false;
+        I count=0;gl.getIntegerv(0x821D,&count);
+        if (!check("query source UI extension count"))return false;
+        if (count<0 || count>65536)return fail(*diagnostic,VehicleWindowError50DS::limits,"invalid extension count");
+        for (I i=0;i<count;++i) {
+            const auto* extension=gl.getStringi(0x1F03,static_cast<U>(i));
+            if (!check("query source UI texture barrier and clip capabilities"))return false;
+            if (!extension)return fail(*diagnostic,VehicleWindowError50DS::context,"null extension name");
+            const auto* name=reinterpret_cast<const char*>(extension);
+            if (!std::strcmp(name,"GL_ARB_texture_barrier"))supported=true;
+            if (!std::strcmp(name,"GL_ARB_clip_control"))clipControl=true;
+        }
+        if (!supported)return fail(*diagnostic,VehicleWindowError50DS::context,"source UI requires GL4.5 or ARB_texture_barrier");
+        return load(gl.textureBarrier,"glTextureBarrier") && (!clipControl || load(gl.clipControl,"glClipControl"));
+    }
     bool checkContext() noexcept {
         const auto* version = gl.getString(0x1F02); // GL_VERSION
         I major = 0, minor = 0;
@@ -2549,7 +2662,7 @@ void main() { viewerOutput = hudColor; }
         if (!version || std::strncmp(reinterpret_cast<const char*>(version), "OpenGL ES", 9) == 0 ||
             major < 3 || (major == 3 && minor < 2))
             return fail(*diagnostic, VehicleWindowError50DS::context, "desktop OpenGL 3.2 or newer required");
-        if (!checkTextureSampling(major, minor)) return false;
+        if (!checkTextureSampling(major, minor) || !checkOriginalUiSourceSupport(major,minor)) return false;
         if (request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
             if (!checkDefaultFramebuffer()) return false;
             I doubleBuffered = 0, stereo = 0, sampleBuffers = 0, samples = 0;
@@ -2639,6 +2752,8 @@ void main() { viewerOutput = hudColor; }
     bool initialize(const VehicleWindowRequest50DS& input,
         const assets::VehicleDrawAssets50CR& owner) noexcept {
         request = input;
+        if (input.enableOriginalUiSourceRgba && !input.enableOriginalUi)
+            return fail(*diagnostic,VehicleWindowError50DS::request,"source UI requires original UI opt-in");
         if (!validateOriginalUiBank(input)) return false;
         uiTexturePublication = input.originalUiTextures ? input.originalUiTextures->publicationToken() : 0;
         request.racerArchetypes = nullptr; // Cold descriptors are never retained.
@@ -3339,6 +3454,10 @@ void main() { viewerOutput = hudColor; }
         gl.useProgram(0); drawGl.bindVertexArray(0); drawGl.bindBuffer(arrayBuffer, 0);
         gl.bindFramebuffer(framebuffer, 0); gl.bindRenderbuffer(renderbuffer, 0);
         if (usesTextures()) {
+            if (request.enableOriginalUiSourceRgba) {
+                gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
+                if (gl.bindSampler)gl.bindSampler(1,0);
+            }
             gl.activeTexture(textureUnit0); gl.bindTexture(texture2D, 0);
             if (gl.bindSampler) gl.bindSampler(0, 0);
         }
@@ -3370,6 +3489,9 @@ void main() { viewerOutput = hudColor; }
                 if (!deleteName(uiTargets[b], gl.deleteFramebuffers, d) ||
                     !deleteName(uiColors[b], gl.deleteRenderbuffers, d) ||
                     !deleteName(uiDepths[b], gl.deleteRenderbuffers, d)) goto incomplete;
+            if (!deleteName(uiSourceTarget,gl.deleteFramebuffers,d) ||
+                !deleteName(uiSourceColor,gl.deleteTextures,d) ||
+                !deleteName(uiSourceDepth,gl.deleteRenderbuffers,d))goto incomplete;
             if (!deleteShaderName(trackProgram, true, d) ||
                 !deleteShaderName(trackVertexShader, false, d) ||
                 !deleteShaderName(trackFragmentShader, false, d)) goto incomplete;
@@ -3709,6 +3831,52 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiDraw50KG&,
 
 bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& native,
     std::int32_t width, std::int32_t height, VehicleWindowDiagnostic50DS& d) noexcept {
+    return submitOriginalUiImpl(native,width,height,false,d);
+}
+bool VehicleWindowGl50DS::originalUiSourceRgbaAvailable() const noexcept {
+    return initialized() && storage_->request.enableOriginalUiSourceRgba &&
+        storage_->gl.textureBarrier && storage_->uiSourceTarget && storage_->uiSourceColor && storage_->uiSourceDepth;
+}
+bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM& frame,
+    std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;
+    if (!frame.native_ || !frame.owner_ || !frame.frameGeneration_ ||
+        (s.uiSourceFrameOwner && frame.owner_!=s.uiSourceFrameOwner) ||
+        (frame.owner_==s.uiSourceFrameOwner && frame.frameGeneration_<=s.uiSourceFrameGeneration) ||
+        s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,"unsealed or stale complete Rider frame");
+    const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d);
+    d.originalUiSourceFrameGeneration=frame.frameGeneration_;
+    d.originalUiSourceTargetGeneration=s.uiSourceTargetGeneration;
+    // A private publication stays committed even if its later window copy fails.
+    if (d.originalUiAccepted){s.uiSourceFrameOwner=frame.owner_;s.uiSourceFrameGeneration=frame.frameGeneration_;}
+    return accepted;
+}
+bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
+    const OriginalUiRiderDrawContribution50KG& owner,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if (!originalUiSourceRgbaAvailable())
+        return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
+    auto& s=*storage_;
+    if (!s.current(d))return false;
+    if (s.active || s.frameSet || s.diagnostic ||
+        (s.uiSourceFrameOwner && s.uiSourceFrameOwner!=&owner))
+        return fail(d,VehicleWindowError50DS::frame,"source UI retirement requires idle matching live owner");
+    s.diagnostic=&d;
+    bool accepted=s.check("before explicit source UI owner retirement");
+    if (accepted){
+        s.gl.finish();
+        accepted=s.check("drain prior GL work before source UI owner retirement");
+    }
+    d.submittedWorkCompleted=accepted;
+    if (accepted){s.uiSourceFrameOwner=nullptr;s.uiSourceFrameGeneration=0;}
+    s.diagnostic=nullptr;
+    return accepted;
+}
+bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& native,
+    std::int32_t width,std::int32_t height,bool sourceRgba,VehicleWindowDiagnostic50DS& d) noexcept {
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_; const auto& input = native.draw;
@@ -3720,8 +3888,11 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
         input.canvasWidth != 640.f || input.canvasHeight != 448.f ||
         !input.quadCount || input.quadCount > originalUiMaximumQuads50KG || !input.vertices ||
         !input.spanCount || input.spanCount > originalUiMaximumSpans50KG || !input.spans ||
-        !native.states || native.stateCount != input.spanCount || !native.opaquePresentationAlphaOnly)
+        !native.states || native.stateCount != input.spanCount ||
+        (sourceRgba ? native.opaquePresentationAlphaOnly : !native.opaquePresentationAlphaOnly))
         return fail(d, VehicleWindowError50DS::frame, "original UI requires explicit native policy and bounded 640x448 draw");
+    if (sourceRgba && (!originalUiSourceRgbaAvailable() || input.retainRaceImage))
+        return fail(d,VehicleWindowError50DS::frame,"source UI requires fresh native source target, never retained race alpha");
     if (input.textures != s.request.originalUiTextures || input.texturePublication != s.uiTexturePublication ||
         (input.textures && !input.textures->validBorrow(s.request.context, s.request.isCurrent, s.uiTexturePublication)) ||
         (!input.textures && input.texturePublication != 0))
@@ -3748,16 +3919,23 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
     for (U i = 0; i < input.spanCount; ++i) {
         const auto& span = input.spans[i]; const auto& state = native.states[i];
         const bool particle = span.materialMode == OriginalUiMaterialMode50KG::mainParticle;
+        const bool specular=span.materialMode==OriginalUiMaterialMode50KG::sourceSpecularMapCompressed;
         const bool sourceRaster = span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuse ||
-            span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed;
+            span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed || specular;
+        const bool sourceSpecialBlend=span.blend==OriginalUiBlend50KG::destinationAlphaAdditive ||
+            span.blend==OriginalUiBlend50KG::fixed255Additive;
+        if ((specular && !sourceRgba) || sourceSpecialBlend!=specular ||
+            (specular && (state.depth!=OriginalUiDepth50KG::greaterEqual || state.depthWrite ||
+                !state.sourceFogEnabled || !state.sourceAlphaTestGreaterZero)))
+            return fail(d,VehicleWindowError50DS::material,"specular requires actual typed source-RGBA policy");
         const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate || particle || sourceRaster;
         const bool untextured = span.materialMode == OriginalUiMaterialMode50KG::untexturedVertexColor;
         const float blendAlphaScale = textured ? (255.f / 128.f) * (255.f / 128.f) : 255.f / 128.f;
         if (!span.quadCount || span.firstQuad != next || span.quadCount > input.quadCount - next ||
             (!textured && !untextured) || span.colorScale != (textured ? 255.f / 128.f : 1.f) ||
             (span.blend != OriginalUiBlend50KG::opaque && span.blend != OriginalUiBlend50KG::sourceAlpha &&
-                span.blend != OriginalUiBlend50KG::additive) ||
-            span.alphaScale != (span.blend == OriginalUiBlend50KG::opaque ? 1.f : blendAlphaScale) ||
+                span.blend != OriginalUiBlend50KG::additive && !sourceSpecialBlend) ||
+            span.alphaScale != (span.blend == OriginalUiBlend50KG::opaque || sourceSpecialBlend ? 1.f : blendAlphaScale) ||
             (state.depth != OriginalUiDepth50KG::never && state.depth != OriginalUiDepth50KG::always &&
                 state.depth != OriginalUiDepth50KG::greaterEqual && state.depth != OriginalUiDepth50KG::greater))
             return fail(d, VehicleWindowError50DS::material, "invalid ordered original UI material/depth policy");
@@ -3798,7 +3976,7 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
             return fail(d, VehicleWindowError50DS::material, "original UI span lacks its real published texture");
         if (span.textureIndex >= assets::maxMaterialTextureAssets50EA)
             return fail(d, VehicleWindowError50DS::material, "UI texture alpha metadata index out of bounds");
-        if (span.blend != OriginalUiBlend50KG::opaque) {
+        if (!sourceRgba && span.blend != OriginalUiBlend50KG::opaque) {
             const U maximumAlpha = s.uiTextureMaximumAlpha[span.textureIndex];
             const U firstVertex = span.firstQuad * 4, endVertex = (span.firstQuad + span.quadCount) * 4;
             for (U v = firstVertex; v < endVertex; ++v)
@@ -3832,7 +4010,8 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
         if (!particle && !state.sourceFogEnabled) continue;
         for (U v = span.firstQuad * 4; v < (span.firstQuad + span.quadCount) * 4; ++v) {
             const float f = native.particleFog[v];
-            if ((particle && f > 254.f / 256.f) || (!particle && std::floor(f * 256.f) != f * 256.f))
+            if ((particle && f > 254.f / 256.f) || (!particle && std::floor(f * 256.f) != f * 256.f) ||
+                (span.materialMode==OriginalUiMaterialMode50KG::sourceSpecularMapCompressed && f!=255.f/256.f))
                 return fail(d, VehicleWindowError50DS::frame, "fog stream does not match source program byte domain");
         }
     }
@@ -3869,9 +4048,14 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
         }
     }
     if (accepted) {
-        s.gl.bindFramebuffer(framebuffer, s.uiTargets[pending]);
+        s.gl.bindFramebuffer(framebuffer,sourceRgba?s.uiSourceTarget:s.uiTargets[pending]);
+        if(sourceRgba){
+            s.gl.disable(0x0BF2); // No inherited color-logic operation on raw source bytes.
+            if(s.gl.clipControl)s.gl.clipControl(0x8CA1,0x935E); // Conventional lower-left/-1..1.
+        }
         s.gl.drawBuffer(colorAttachment); s.gl.readBuffer(colorAttachment);
-        s.gl.viewport(0, 0, width, height);
+        const I rasterWidth=sourceRgba?640:width,rasterHeight=sourceRgba?448:height;
+        s.gl.viewport(0,0,rasterWidth,rasterHeight);
         constexpr U disabled[] = {0x0BE2, 0x0B44, 0x0C11, 0x0B90, 0x8037, 0x0B20,
             0x8F9D, 0x0BD0, 0x809D, 0x80A0, 0x809E, 0x8C89, 0x8DB9, 0x864F};
         for (U capability : disabled) s.gl.disable(capability);
@@ -3879,8 +4063,9 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
         s.gl.colorMask(1, 1, 1, 1); s.gl.depthMask(1);
         s.gl.depthRange(0.0, 1.0); s.gl.clearDepth(0.0);
         s.gl.polygonMode(0x0408, 0x1B02);
-        s.gl.clearColor(input.clearRgba[0], input.clearRgba[1], input.clearRgba[2], 1.f);
+        s.gl.clearColor(input.clearRgba[0],input.clearRgba[1],input.clearRgba[2],sourceRgba?128.f/255.f:1.f);
         s.gl.clear(colorBufferBit | depthBufferBit);
+        if(sourceRgba)++s.uiSourceTargetGeneration;
         if (input.retainRaceImage) {
             // Preserve the race aspect ratio too; blit bounds are whole pixels.
             const double fit = std::min(double(width) / s.raceWidth, double(height) / s.raceHeight);
@@ -3893,19 +4078,24 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
             // Blit ignores color masks. Reset only presentation alpha afterward.
             s.gl.colorMask(0, 0, 0, 1); s.gl.clear(colorBufferBit);
         }
-        s.gl.colorMask(1, 1, 1, 0); // Explicit non-source opaque presentation alpha.
-        const double scale = std::min(double(width) / 640.0, double(height) / 448.0);
-        const double ox = (width - 640.0 * scale) * 0.5;
-        const double oy = (height - 448.0 * scale) * 0.5;
+        s.gl.colorMask(1,1,1,sourceRgba?1:0);
+        const double scale = std::min(double(rasterWidth)/640.0,double(rasterHeight)/448.0);
+        const double ox=(rasterWidth-640.0*scale)*0.5,oy=(rasterHeight-448.0*scale)*0.5;
         // One scale for both axes. Raster scissor encloses fractional boundaries;
         // shader geometry is never rounded, stretched, or half-pixel adjusted.
         const I sx = static_cast<I>(std::floor(ox)), sy = static_cast<I>(std::floor(oy));
-        const I ex = std::min<I>(width, static_cast<I>(std::ceil(ox + 640.0 * scale)));
-        const I ey = std::min<I>(height, static_cast<I>(std::ceil(oy + 448.0 * scale)));
+        const I ex = std::min<I>(rasterWidth, static_cast<I>(std::ceil(ox + 640.0 * scale)));
+        const I ey = std::min<I>(rasterHeight, static_cast<I>(std::ceil(oy + 448.0 * scale)));
         s.gl.scissor(sx, sy, ex - sx, ey - sy); s.gl.enable(0x0C11);
         s.gl.enable(0x0B71); s.gl.useProgram(s.uiProgram);
-        s.gl.uniform4f(s.uiCanvasUniform, float(2.0 * scale / width), float(-2.0 * scale / height),
-            float(2.0 * ox / width - 1.0), float(1.0 - 2.0 * oy / height));
+        s.gl.uniform4f(s.uiCanvasUniform,float(2.0*scale/rasterWidth),float(-2.0*scale/rasterHeight),
+            float(2.0*ox/rasterWidth-1.0),float(1.0-2.0*oy/rasterHeight));
+        s.gl.uniform1i(s.uiSourceCompositionUniform,sourceRgba?1:0);
+        s.gl.uniform1i(s.uiSourceTargetUniform,1);
+        if(sourceRgba){
+            s.gl.activeTexture(textureUnit0+1);if(s.gl.bindSampler)s.gl.bindSampler(1,0);
+            s.gl.bindTexture(texture2D,s.uiSourceColor);
+        }
         s.gl.activeTexture(textureUnit0); if (s.gl.bindSampler) s.gl.bindSampler(0, 0);
         s.gl.uniform1i(s.uiImageUniform, 0);
         s.gl.uniform4f(s.uiParticleFogColorUniform, native.particleFogColor[0],
@@ -3928,25 +4118,75 @@ bool VehicleWindowGl50DS::submitOriginalUi(const OriginalUiNativeDraw50KG& nativ
                 state.depth == OriginalUiDepth50KG::always ? 0x0207 :
                 state.depth == OriginalUiDepth50KG::greaterEqual ? 0x0206 : 0x0204;
             s.gl.depthFunc(depth); s.gl.depthMask(state.depthWrite ? 1 : 0);
-            if (span.blend == OriginalUiBlend50KG::opaque) s.gl.disable(0x0BE2);
+            if (sourceRgba || span.blend == OriginalUiBlend50KG::opaque) s.gl.disable(0x0BE2);
             else {
                 s.gl.enable(0x0BE2); s.gl.blendEquation(0x8006);
                 s.gl.blendFunc(0x0302, span.blend == OriginalUiBlend50KG::additive ? 1 : 0x0303);
             }
             s.gl.uniform1f(s.uiAlphaUniform, span.alphaScale);
+            const I sourceBlend=span.blend==OriginalUiBlend50KG::opaque?0:
+                span.blend==OriginalUiBlend50KG::sourceAlpha?1:
+                span.blend==OriginalUiBlend50KG::additive?2:
+                span.blend==OriginalUiBlend50KG::destinationAlphaAdditive?3:4;
+            s.gl.uniform1i(s.uiSourceBlendUniform,sourceBlend);
             const bool particle = span.materialMode == OriginalUiMaterialMode50KG::mainParticle;
             const bool sourceRaster = span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuse ||
-                span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed;
+                span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed ||
+                span.materialMode == OriginalUiMaterialMode50KG::sourceSpecularMapCompressed;
             const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate || particle || sourceRaster;
             s.gl.uniform1i(s.uiTexturedUniform, textured ? 1 : 0);
             s.gl.uniform1i(s.uiSourceRasterUniform, sourceRaster ? 1 : 0);
             s.gl.uniform1i(s.uiSourceFogEnabledUniform, (particle || state.sourceFogEnabled) ? 1 : 0);
             s.gl.uniform1i(s.uiSourceAlphaTestUniform, (particle || state.sourceAlphaTestGreaterZero) ? 1 : 0);
             s.gl.bindTexture(texture2D, textured ? input.textures->texture(span.textureIndex) : 0);
-            s.drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.quadCount * 6), 0x1405,
-                reinterpret_cast<const void*>(std::uintptr_t(span.firstQuad) * 6 * sizeof(U)), 0);
-            accepted = s.check("draw ordered original UI span");
-            if (accepted) { ++d.originalUiDraws; d.originalUiQuads += span.quadCount; }
+            if(sourceRgba){
+                // A single triangle cannot self-overlap. Two-triangle quads
+                // and source surfaces are never submitted together to feedback.
+                constexpr U corners[2][3]={{0,1,2},{0,2,3}};
+                for(U q=span.firstQuad;accepted && q<span.firstQuad+span.quadCount;++q)
+                    for(U t=0;accepted && t<2;++t){
+                        const auto* v=&input.vertices[q*4];
+                        const auto samePoint=[&](U a,U b){return v[a].position[0]==v[b].position[0] &&
+                            v[a].position[1]==v[b].position[1];};
+                        const auto* c=corners[t];
+                        if(samePoint(c[0],c[1]) || samePoint(c[1],c[2]) || samePoint(c[0],c[2]))continue;
+                        s.gl.textureBarrier();++d.originalUiTextureBarriers;
+                        s.drawGl.drawElementsBaseVertex(0x0004,3,0x1405,
+                            reinterpret_cast<const void*>((std::uintptr_t(q)*6+t*3)*sizeof(U)),0);
+                        accepted=s.check("draw one ordered source-RGBA triangle after texture barrier");
+                        if(accepted){++d.originalUiDraws;++d.originalUiSourceTriangles;}
+                    }
+                if(accepted)d.originalUiQuads+=span.quadCount;
+            }else{
+                s.drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.quadCount * 6), 0x1405,
+                    reinterpret_cast<const void*>(std::uintptr_t(span.firstQuad) * 6 * sizeof(U)), 0);
+                accepted = s.check("draw ordered original UI span");
+                if (accepted) { ++d.originalUiDraws; d.originalUiQuads += span.quadCount; }
+            }
+        }
+        if(sourceRgba){
+            s.gl.activeTexture(textureUnit0+1);s.gl.bindTexture(texture2D,0);
+            if(s.gl.bindSampler)s.gl.bindSampler(1,0);
+            s.gl.activeTexture(textureUnit0);
+        }
+        if(sourceRgba && accepted){
+            // Source RGBA survives untouched. Only this independent private
+            // presentation surface gets alpha1, after its final source consumer.
+            s.gl.disable(0x0C11);s.gl.disable(0x0BE2);s.gl.colorMask(1,1,1,1);
+            s.gl.bindFramebuffer(framebuffer,s.uiTargets[pending]);
+            s.gl.drawBuffer(colorAttachment);s.gl.readBuffer(colorAttachment);
+            s.gl.viewport(0,0,width,height);
+            s.gl.clearColor(input.clearRgba[0],input.clearRgba[1],input.clearRgba[2],1.f);
+            s.gl.clear(colorBufferBit);
+            const double fit=std::min(double(width)/640.0,double(height)/448.0);
+            const I rw=std::max<I>(1,static_cast<I>(std::floor(640.0*fit)));
+            const I rh=std::max<I>(1,static_cast<I>(std::floor(448.0*fit)));
+            const I x=(width-rw)/2,y=(height-rh)/2;
+            s.gl.bindFramebuffer(readFramebuffer,s.uiSourceTarget);s.gl.readBuffer(colorAttachment);
+            s.gl.blitFramebuffer(0,0,640,448,x,y,x+rw,y+rh,colorBufferBit,0x2600);
+            s.gl.bindFramebuffer(framebuffer,s.uiTargets[pending]);
+            s.gl.colorMask(0,0,0,1);s.gl.clear(colorBufferBit);s.gl.colorMask(1,1,1,1);
+            accepted=s.check("copy source UI RGB to separate opaque presentation");
         }
         // Restore renderer-owned baseline state even on draw failure. The next
         // world begin supplies its own program, matrix, viewport and geometry.

@@ -265,6 +265,9 @@ struct VehicleWindowRequest50DS {
     // Both may be null for explicit untextured-only draws; a textured span
     // still requires its real bank, and a partial bank pair always rejects.
     bool enableOriginalUi = false;
+    // Cold opt-in: requires GL4.5 or advertised ARB_texture_barrier.
+    // Allocates a separate fixed640x448 raw-RGBA8/D24 source target.
+    bool enableOriginalUiSourceRgba = false;
     const assets::MaterialTextureAssets50EA* originalUiCpuTextures = nullptr;
     const MaterialTextureGl50EB* originalUiTextures = nullptr;
     VehicleWindowSky50DS sky{};
@@ -488,7 +491,8 @@ struct VehicleWindowDiagnostic50DS {
     // Source order per pass, not reconstructed original global sorting.
     std::uint32_t transparentTrackDraws = 0, transparentPodDraws = 0;
     std::uint32_t transparentPodIndices = 0, skyDraws = 0, skyIndices = 0;
-    // finishSubmittedWork only: glFinish returned with no reported GL error.
+    // Explicit finishSubmittedWork or source-owner retirement: glFinish
+    // returned with no reported GL error.
     // This is not a measured duration, presented swap, or hardware-GPU claim.
     bool submittedWorkCompleted = false;
     // Readback only: last committed viewport and required tightly packed RGBA8
@@ -505,6 +509,8 @@ struct VehicleWindowDiagnostic50DS {
     bool hostMenuAccepted = false;
     bool originalUiAccepted = false;
     std::uint32_t originalUiDraws = 0, originalUiQuads = 0;
+    std::uint32_t originalUiSourceTriangles = 0, originalUiTextureBarriers = 0;
+    std::uint64_t originalUiSourceFrameGeneration = 0, originalUiSourceTargetGeneration = 0;
     // Checked opaque opponent commands, not visible pixels. Require accepted
     // publication. Opponent effects are included in transparentPodDraws above.
     std::uint32_t opponentRacersDrawn = 0, opponentOpaqueDraws = 0, opponentOpaqueIndices = 0;
@@ -556,6 +562,19 @@ public:
     // Does not advance gameplay or replace the retained race publication.
     bool submitOriginalUi(const OriginalUiNativeDraw50KG&, std::int32_t width,
         std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
+    // Complete sealed Rider frame, fresh source RGBA, then opaque presentation.
+    // Ordinary submitOriginalUi retains its existing RGB-only contract.
+    bool submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM&, std::int32_t width,
+        std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
+    bool originalUiSourceRgbaAvailable() const noexcept;
+    // Explicit destination-lifetime retirement, while this concrete composer
+    // is still alive. Requires the live context/thread and an idle renderer;
+    // rejects a different retained owner, drains all preceding GL work even
+    // after a failed/unpublished attempt, then releases the generation borrow.
+    // On failure the owner must stay alive for retry. A reconstructed Rider
+    // destination can then begin its own nonzero generation sequence safely.
+    bool retireOriginalUiSourceOwner(const OriginalUiRiderDrawContribution50KG&,
+        VehicleWindowDiagnostic50DS&) noexcept;
     // Explicit destination resource publication between complete submissions.
     // Authenticates every CPU/GPU texture identity and caches actual alpha
     // maxima before replacing the retained borrow. False preserves the old
@@ -599,6 +618,8 @@ public:
     bool initialized() const noexcept;
     bool ownsResources() const noexcept;
 private:
+    bool submitOriginalUiImpl(const OriginalUiNativeDraw50KG&, std::int32_t width,
+        std::int32_t height, bool sourceRgba, VehicleWindowDiagnostic50DS&) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };
