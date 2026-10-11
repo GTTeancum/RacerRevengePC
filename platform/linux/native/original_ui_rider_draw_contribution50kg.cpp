@@ -678,29 +678,16 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
             s.failed=true;return fail(d,E::capacity);
         }
         // Propose native binding updates before sealing. Only actual source
-        // publication may commit them; a composed or rejected frame is no bind.
+        // acceptance may commit them; a composed or rejected frame is no bind.
         s.pendingHistory=s.history;
         OriginalUiSourceTerminal50KN terminal{};
+        std::uint32_t terminalLeaf=unresolved;
         for(const auto index:s.order){const auto leaf=s.bindings[s.packets[index].binding].leaf;
             if(leaf>=s.representatives.size()||s.representatives[leaf]>=s.bindings.size()){
                 s.failed=true;return fail(d,E::schedule);
             }
             const auto& representative=s.bindings[s.representatives[leaf]];
             if(representative.registration>=s.pendingHistory.size()) {s.failed=true;return fail(d,E::schedule);}
-            // The actual nonempty drain sequence selects the representative;
-            // never use the highest registered row or the packet's prototype.
-            const auto& source=*representative.pass;
-            const auto& registration=s.pendingHistory[representative.registration];
-            terminal.canonicalToken=registration.rank;terminal.pass=registration.pass;terminal.leaf=leaf;
-            terminal.registryGeneration=s.registryGeneration;terminal.bankGeneration=s.bankGeneration;
-            for(std::size_t field=0;field<source.gs.fields.size();++field){
-                terminal.constructionFieldSourcePC[field]=source.gs.fields[field].sourcePC;
-                terminal.constructionFieldByteOffset[field]=source.gs.fields[field].byteOffset;
-            }
-            terminal.enabled=source.enabled;terminal.textureCount=source.textureCount;
-            terminal.textureCoordinateIndex=source.textureCoordinateIndex;
-            terminal.lodCalculationMethod=source.lodCalculationMethod;terminal.maximumMipLevel=source.maximumMipLevel;
-            terminal.magFilter=source.magFilter;terminal.minFilter=source.minFilter;terminal.lodL=source.lodL;terminal.lodK=source.lodK;
             if(representative.pass->textureCount){
                 assets::OriginalUiMaterialBindingDiagnostic50KG bindingDetail;
                 // Native spans retain each actual selected ATM frame. The
@@ -711,9 +698,33 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
                     s.failed=true;return fail(d,E::schedule,bindingDetail.sourcePC);
                 }
             }
-            // recordDrainedBinding patches effective TEXA for the actual IPUM
-            // image. The copied pass alone is not the final bound source state.
-            if(!s.pendingHistory[representative.registration].state.copyEffectiveGs(terminal.gs)){
+            // initialize() admits only a prepared key; recordDrainedBinding
+            // preserves it. Keep each packet's state rejection without copying
+            // arrays that a later actual drain would immediately overwrite.
+            if(!s.pendingHistory[representative.registration].state.initialized()){
+                s.failed=true;return fail(d,E::schedule);
+            }
+            terminalLeaf=leaf;
+        }
+        if(terminalLeaf!=unresolved){
+            const auto& representative=s.bindings[s.representatives[terminalLeaf]];
+            // The actual nonempty drain sequence selects the representative;
+            // never use the highest registered row or the packet's prototype.
+            const auto& source=*representative.pass;
+            const auto& registration=s.pendingHistory[representative.registration];
+            terminal.canonicalToken=registration.rank;terminal.pass=registration.pass;terminal.leaf=terminalLeaf;
+            terminal.registryGeneration=s.registryGeneration;terminal.bankGeneration=s.bankGeneration;
+            for(std::size_t field=0;field<source.gs.fields.size();++field){
+                terminal.constructionFieldSourcePC[field]=source.gs.fields[field].sourcePC;
+                terminal.constructionFieldByteOffset[field]=source.gs.fields[field].byteOffset;
+            }
+            terminal.enabled=source.enabled;terminal.textureCount=source.textureCount;
+            terminal.textureCoordinateIndex=source.textureCoordinateIndex;
+            terminal.lodCalculationMethod=source.lodCalculationMethod;terminal.maximumMipLevel=source.maximumMipLevel;
+            terminal.magFilter=source.magFilter;terminal.minFilter=source.minFilter;terminal.lodL=source.lodL;terminal.lodK=source.lodK;
+            // All binding updates have completed, including the final actual
+            // image's IPUM TEXA mutation. Copy the final effective state once.
+            if(!registration.state.copyEffectiveGs(terminal.gs)){
                 s.failed=true;return fail(d,E::schedule);
             }
         }
