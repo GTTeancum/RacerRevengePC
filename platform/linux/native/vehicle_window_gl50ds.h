@@ -514,6 +514,9 @@ struct VehicleWindowDiagnostic50DS {
     bool originalUiSourceAccepted = false;
     // Source-publication/snapshot sequences only; neither counts host swaps.
     std::uint64_t originalUiPublicationGeneration = 0,originalUiSnapshotGeneration = 0;
+    // Private byte-blend results only. No source/page update or publication.
+    bool originalUiByteBlendAccepted = false;
+    std::uint64_t originalUiByteBlendGeneration = 0, originalUiByteBlendSampleGeneration = 0;
     // Actual selected source path after successful create or for a source
     // submission. Ordinary RGB submissions leave this false.
     bool originalUiCoherentFramebufferFetch = false;
@@ -556,6 +559,52 @@ private:
     friend class VehicleWindowGl50DS;
     OriginalUiSourceSubmission50KN source_;
     std::uint64_t snapshotGeneration_=0,publicationGeneration_=0;
+};
+
+// Closed documented native sprite semantics, not a GS executor or measured
+// silicon DDA parity claim. Source top-down639x447 coverage excludes its final
+// column/row; all1087 border pixels preserve old RGBA on EVERY sample.
+struct OriginalUiByteBlendContract50KO final {
+    static constexpr std::int32_t width=640,height=448,coveredWidth=639,coveredHeight=447;
+    static constexpr std::uint32_t coveredPixels=285633,preservedPixels=1087;
+    static constexpr std::int32_t xyz0X=0,xyz0Y=0,xyz1X=639,xyz1Y=447;
+    static constexpr std::int32_t uv0U16=1,uv0V16=1,uv1U16=10240,uv1V16=7168;
+    static constexpr std::int32_t textureWidth=1024,textureHeight=512,bufferWidth=640;
+    static constexpr std::uint32_t tex1=0,textureColorComponent=0,textureFunction=0;
+    static constexpr std::uint32_t clampU=1,clampV=1,modulationRgb=128,minimumAlpha=0,maximumAlpha=128;
+    static constexpr std::uint32_t psm=0,prim=0x156,test=0x31001;
+    static constexpr std::uint64_t inheritedAlpha=0x0000008000000044ULL,inheritedClamp=0x5;
+};
+// Renderer-owned immutable pair: existing retained old snapshot plus a PRIVATE
+// completed copy of incoming, not a pin of the reusable ordinary source target.
+// Explicit release/close retires GPU ownership; destroying this value does not.
+// It certifies no route history, observers, popup state, host swap or movement.
+class OriginalUiByteBlend50KO final {
+public:
+    std::uint64_t generation()const noexcept{return generation_;}
+    const OriginalUiRetainedSource50KN& oldSource()const noexcept{return old_;}
+    const OriginalUiSourceSubmission50KN& incomingSource()const noexcept{return incoming_;}
+private:
+    friend class VehicleWindowGl50DS;
+    OriginalUiRetainedSource50KN old_;
+    OriginalUiSourceSubmission50KN incoming_;
+    std::uint64_t generation_=0;
+};
+// Only the most recently accepted effect sample remains readable. An admitted
+// sample attempt invalidates it BEFORE any target write, including on failure.
+// Accepted is not completed. Neither state implies publication or a host swap.
+class OriginalUiByteBlendSample50KO final {
+public:
+    std::uint64_t blendGeneration()const noexcept{return blendGeneration_;}
+    std::uint64_t sampleGeneration()const noexcept{return sampleGeneration_;}
+    std::uint32_t alpha()const noexcept{return alpha_;}
+    bool completed()const noexcept{return completed_;}
+private:
+    friend class VehicleWindowGl50DS;
+    std::weak_ptr<const std::uint8_t> lifetime_;
+    std::uint64_t blendGeneration_=0,sampleGeneration_=0;
+    std::uint32_t alpha_=0;
+    bool completed_=false;
 };
 
 // Caller-owned desktop GL >=3.2. Window output requires a double-buffered,
@@ -641,6 +690,33 @@ public:
     // through other texture owners) until release or close completes, matching
     // the renderer's existing conservative failed-close ownership contract.
     bool releaseRetainedOriginalUiSource(VehicleWindowDiagnostic50DS&) noexcept;
+    // Dormant renderer-only byte operation. Incoming must be a still-current
+    // completed sealed ordinary Rider source newer than retained old, with the
+    // actual terminal icon_x/pass1 ALPHA/CLAMP/COLCLAMP/PABE/FBA state. Copies
+    // incoming into distinct640x448 RGBA8 and completes that copy before issuing
+    // a lease. Retained old cannot be released until the blend is retired.
+    // This is NOT full transition admission: closed route/host-swap ownership
+    // must be supplied by a future integration. No frontend caller or enable flag is added.
+    bool beginOriginalUiByteBlend(const OriginalUiRetainedSource50KN& oldSource,
+        const OriginalUiSourceSubmission50KN& incoming,OriginalUiByteBlend50KO&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    // Every real sample starts from the immutable pair. Integer signed-floor
+    // RGB, alpha byte0..128 on covered pixels, unchanged old RGBA on borders.
+    // Even alpha0/128 execute a real draw. Source target and opaque publication
+    // remain unchanged; this never updates a page, clock, audio or host swap.
+    bool renderOriginalUiByteBlendSample(const OriginalUiByteBlend50KO&,
+        std::uint32_t alpha,OriginalUiByteBlendSample50KO&,VehicleWindowDiagnostic50DS&) noexcept;
+    bool completeOriginalUiByteBlendSample(const OriginalUiByteBlendSample50KO&,
+        OriginalUiByteBlendSample50KO&,VehicleWindowDiagnostic50DS&) noexcept;
+    // Full source/effect RGBA, bottom row first; requires a completed current
+    // sample, distinct writable output and640*448*4 bytes. No publication.
+    bool readOriginalUiByteBlendSampleRgba(const OriginalUiByteBlendSample50KO&,
+        std::uint8_t* rgba,std::size_t capacityBytes,VehicleWindowDiagnostic50DS&) noexcept;
+    // Also retires partial/failed begin or sample work. Checked glFinish and
+    // successful name deletion precede unlocking retained old. On failure,
+    // keep the renderer/context alive and retry release/close. After ambiguous
+    // deletion, no owner may create/reuse GL names until retirement succeeds.
+    bool releaseOriginalUiByteBlend(VehicleWindowDiagnostic50DS&) noexcept;
     // Explicit destination-lifetime retirement, while this concrete composer
     // is still alive. Requires the live context/thread and an idle renderer;
     // rejects a different retained owner, drains all preceding GL work even
@@ -698,6 +774,8 @@ private:
     bool submitOriginalUiSourceFrame(const OriginalUiSourceFrame50KM&,std::int32_t width,
         std::int32_t height,bool publishSource,VehicleWindowDiagnostic50DS&) noexcept;
     bool matchesOriginalUiSource(const OriginalUiSourceSubmission50KN&)const noexcept;
+    bool matchesOriginalUiByteBlend(const OriginalUiByteBlend50KO&)const noexcept;
+    bool matchesOriginalUiByteBlendSample(const OriginalUiByteBlendSample50KO&)const noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };
