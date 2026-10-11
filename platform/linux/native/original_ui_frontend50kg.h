@@ -15,6 +15,7 @@ enum class OriginalUiFrontendStatus50KG : std::uint8_t {
 };
 struct OriginalUiFrontendDiagnostic50KG {
     OriginalUiFrontendStatus50KG status=OriginalUiFrontendStatus50KG::ok;
+    OriginalUiFrontendStatus50KG preparationStatus=OriginalUiFrontendStatus50KG::ok;
     std::uint32_t sourcePC=0;
     OriginalUiMainSessionDiagnostic50KG main{};
     OriginalUiOptionsSessionDiagnostic50KG options{};

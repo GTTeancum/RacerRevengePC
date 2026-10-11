@@ -315,6 +315,27 @@ struct Frontend {
                 <<" options_widget_parse_pc="<<diagnostic.optionsResources.widgets.parse.sourcePC
                 <<" options_widget_text="<<unsigned(diagnostic.optionsResources.widgets.text)
                 <<" options_widget_icon="<<unsigned(diagnostic.optionsResources.widgets.icon)
+                <<" preparation_status="<<unsigned(diagnostic.preparationStatus)
+                <<" rider="<<unsigned(diagnostic.rider.status)<<" rider_pc="<<diagnostic.rider.sourcePC
+                <<" rider_resource="<<unsigned(diagnostic.riderResources.error)
+                <<" rider_resource_widget="<<diagnostic.riderResources.widgetId
+                <<" rider_resource_material="<<diagnostic.riderResources.materialIndex
+                <<" rider_resource_image="<<diagnostic.riderResources.imageIndex
+                <<" rider_widget="<<unsigned(diagnostic.riderResources.widgets.error)
+                <<" rider_widget_id="<<diagnostic.riderResources.widgets.widget
+                <<" rider_parse="<<unsigned(diagnostic.riderResources.widgets.parse.error)
+                <<" rider_parse_offset="<<diagnostic.riderResources.widgets.parse.byteOffset
+                <<" rider_material="<<unsigned(diagnostic.riderResources.material.error)
+                <<" rider_material_field="<<diagnostic.riderResources.material.field
+                <<" rider_images="<<unsigned(diagnostic.riderResources.resource.error)
+                <<" rider_stats="<<unsigned(diagnostic.riderStats.error)
+                <<" rider_binder="<<unsigned(diagnostic.riderBinder.error)
+                <<" rider_draw="<<unsigned(diagnostic.rider.draw.error)
+                <<" rider_draw_material="<<unsigned(diagnostic.rider.draw.materialDetail.error)
+                <<" rider_draw_field="<<diagnostic.rider.draw.materialDetail.field
+                <<" rider_dynamic="<<unsigned(diagnostic.rider.dynamic.error)
+                <<" rider_dynamic_widget="<<diagnostic.rider.dynamic.widget
+                <<" rider_backend="<<unsigned(diagnostic.rider.backend.error)
                 <<" gpu="<<unsigned(diagnostic.gpu.error)<<" renderer="<<unsigned(diagnostic.renderer.error)
                 <<"; no destination or gameplay entered.\n";
         }else if(status!=Status::ok&&status!=Status::noChange&&status!=Status::routeAccepted)fail("input");
