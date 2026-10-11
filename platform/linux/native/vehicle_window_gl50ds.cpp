@@ -3852,13 +3852,15 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame
     if (!frame.owner_->beginSourceSubmission(frame.frameGeneration_))
         return fail(d,VehicleWindowError50DS::frame,"Rider source binding-history receipt rejected");
     bool sourceWorkStarted=false;
+    const auto sourceTargetBefore=s.uiSourceTargetGeneration;
     const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted);
     frame.owner_->finishSourceSubmission(frame.frameGeneration_,d.originalUiAccepted,sourceWorkStarted);
     d.originalUiSourceFrameGeneration=frame.frameGeneration_;
     d.originalUiSourceTargetGeneration=s.uiSourceTargetGeneration;
     // Keep the attempted owner borrowed after any potentially partial source
     // work. Only explicit successful retirement may release that lifetime.
-    if (sourceWorkStarted || d.originalUiAccepted)s.uiSourceFrameOwner=frame.owner_;
+    if (sourceWorkStarted || d.originalUiAccepted || s.uiSourceTargetGeneration!=sourceTargetBefore)
+        s.uiSourceFrameOwner=frame.owner_;
     // A private publication stays committed even if its later window copy fails.
     if (d.originalUiAccepted)s.uiSourceFrameGeneration=frame.frameGeneration_;
     return accepted;
