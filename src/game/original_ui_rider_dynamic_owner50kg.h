@@ -19,15 +19,21 @@ struct OriginalUiRiderDynamicBackend50KG {
     bool (*attach)(void*,std::uint16_t,OriginalUiRiderDynamicOwner50KG&) noexcept=nullptr;
     // Must drain borrowed packets, disable/remove actual model and binder
     // registrations, remove28E8A0 membership, detach entities. Called even
-    // after failed partial attach. Must finish cleanup before returning.
-    void (*drainAndDetach)(void*,std::uint16_t,OriginalUiRiderDynamicOwner50KG&) noexcept=nullptr;
+    // after failed partial attach. False preserves all remaining owners and
+    // forbids graph destruction; caller may perform explicit cleanup later.
+    bool (*drainAndDetach)(void*,std::uint16_t,OriginalUiRiderDynamicOwner50KG&) noexcept=nullptr;
     // Actual141630/1415A0 recursive enable/disable, including attached children.
     // Valid even when the dynamic widget has no loaded model.
     bool (*setShown)(void*,std::uint16_t,bool) noexcept=nullptr;
+    // Stable backend ledger plus privately sealed graph provenance. Accessors
+    // cannot acquire owners or widen the admitted runtime population.
+    OriginalUiRiderMaterialLifetime50KG* (*materialLifetime)(void*) noexcept=nullptr;
+    const OriginalUiRiderMaterialFootprint50KG* (*graphFootprint)(void*,std::uint16_t) noexcept=nullptr;
 };
 enum class OriginalUiRiderDynamicError50KG : std::uint8_t {
     none,alreadyBound,input,parse,cold,model,backend,poisoned,allocation
 };
+enum class OriginalUiRiderDynamicCleanupPhase50KG : std::uint8_t {none,callbackActive,detach,graphRelease};
 struct OriginalUiRiderDynamicDiagnostic50KG {
     OriginalUiRiderDynamicError50KG error=OriginalUiRiderDynamicError50KG::none;
     std::uint16_t widget=0;std::uint32_t sourcePC=0;
@@ -35,6 +41,11 @@ struct OriginalUiRiderDynamicDiagnostic50KG {
     assets::OriginalUiRiderCharacterAssetDiagnostic50KG character;
     assets::OriginalUiRiderPodDiagnostic50KG pod;
     OriginalUiRiderModelDiagnostic50KG model;
+    // Cleanup failure is secondary to the original callback/load failure.
+    bool cleanupPending=false;
+    std::uint16_t cleanupWidget=0;
+    OriginalUiRiderDynamicCleanupPhase50KG cleanupPhase=OriginalUiRiderDynamicCleanupPhase50KG::none;
+    OriginalUiRiderModelDiagnostic50KG cleanupModel;
 };
 // Concrete dynamic callbacks for the shared119-widget population. The backend
 // remains an explicit REQUIRED live renderer/entity/cache owner, never a success
@@ -54,7 +65,7 @@ public:
     const OriginalUiRiderDynamicDiagnostic50KG& diagnostic() const noexcept;
     bool poisoned() const noexcept;
     OriginalUiRiderWidgetState50KG state(std::uint16_t) const noexcept;
-    void drain() noexcept;
+    bool drain() noexcept;
     // Invoked in actual widget traversal order, after ancestor enable gates.
     // Caller continues child traversal afterwards. Does not invent a wall clock.
     bool advanceWidget(std::uint16_t,float elapsedSeconds,bool ancestorsShown) noexcept;
@@ -72,7 +83,7 @@ private:
     bool preflight(const OriginalUiRiderWidgetCallback50KG*,std::size_t) noexcept;
     bool apply(const OriginalUiRiderWidgetCallback50KG&,OriginalUiRiderWidgetState50KG&) noexcept;
     bool loadModel(std::uint16_t) noexcept;
-    void unloadModel(std::uint16_t) noexcept;
+    bool unloadModel(std::uint16_t) noexcept;
     bool shown(std::uint16_t,bool) noexcept;
     bool generic(std::uint16_t,bool) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;

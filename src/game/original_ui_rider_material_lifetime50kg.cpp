@@ -137,7 +137,10 @@ struct OriginalUiRiderMaterialLifetime50KG::Storage {
         std::array<std::uint16_t,originalUiRiderMaterialRows50KG> rows{};
     };
     struct Population {
-        std::size_t count=0;
+        enum class Phase : std::uint8_t {idle,scanning,awaitingGroup};
+        Phase phase=Phase::idle;
+        std::size_t count=0,next=0,reserved=0;
+        std::uint64_t firstSequence=0;
         std::array<std::uint16_t,originalUiRiderMaterialRows50KG> rows{};
     };
     std::shared_ptr<const assets::OriginalUiArchive50KG> app;
@@ -145,20 +148,30 @@ struct OriginalUiRiderMaterialLifetime50KG::Storage {
     std::array<Row,originalUiRiderMaterialRows50KG> rows{};
     std::array<Owner,originalUiRiderMaterialOwners50KG> owners{};
     std::array<Event,originalUiRiderMaterialEvents50KG> journal{};
-    std::size_t rowCount=0,head=0,eventCount=0;
+    std::size_t rowCount=0,head=0,eventCount=0,cleanupReserved=0;
     std::uint64_t sequence=0,ownerSerial=0,epochSerial=0,acknowledged=0;
+    Population population{};
+    bool aborted=false;
     bool expected(std::uint64_t prior,D& d)const noexcept {
         return prior==sequence||fail(d,E::staleSequence);
     }
-    bool room(std::size_t count,D& d)const noexcept {
-        if(count>journal.size()-eventCount)return fail(d,E::journalCapacity);
-        return count<=maximum-sequence||fail(d,E::overflow);
+    bool populationActive()const noexcept {return population.phase!=Population::Phase::idle;}
+    // Reserve every future cleanup event in both bounded spaces. Acknowledging
+    // journal entries frees slots but does not restore consumed sequence values.
+    bool room(std::size_t count,std::size_t reservedAfter,D& d)const noexcept {
+        if(eventCount>journal.size())return fail(d,E::invariant);
+        const auto slots=journal.size()-eventCount;
+        if(count>slots||reservedAfter>slots-count)return fail(d,E::journalCapacity);
+        const auto sequences=maximum-sequence;
+        return (count<=sequences&&reservedAfter<=sequences-count)||fail(d,E::overflow);
     }
     void append(Event e) noexcept {
         e.sequence=++sequence;journal[(head+eventCount)%journal.size()]=e;++eventCount;
     }
     bool acquire(const OriginalUiRiderMaterialFootprint50KG& f,std::uint64_t prior,Acquire& plan,D& d)const noexcept {
         if(!expected(prior,d))return false;
+        if(aborted)return fail(d,E::aborted);
+        if(populationActive())return fail(d,E::populationActive);
         if(!f.prepared()||!f.source()||!f.rowCount()||f.rowCount()>rows.size()||!f.materialSlotCount()||
            f.materialSlotCount()>rows.size())return fail(d,E::footprint);
         plan={};plan.count=f.rowCount();plan.owner=owners.size();
@@ -179,26 +192,35 @@ struct OriginalUiRiderMaterialLifetime50KG::Storage {
             plan.rows[i]=static_cast<std::uint16_t>(row);
         }
         if(slots!=f.materialSlotCount())return fail(d,E::footprint);
-        return room(plan.count,d);
+        return room(plan.count,cleanupReserved+2*plan.count,d);
     }
     bool release(std::size_t owner,std::uint64_t prior,std::size_t& events,D& d)const noexcept {
         if(!expected(prior,d))return false;const auto& token=owners[owner];
+        if(populationActive())return fail(d,E::populationActive);
         if(!token.active||!token.count||token.count>rows.size())return fail(d,E::invariant);
+        if(cleanupReserved<2*token.count)return fail(d,E::invariant);
         events=token.count;
         for(std::size_t i=0;i<token.count;++i){const auto row=token.rows[i];
             if(row>=rowCount||!rows[row].owners)return fail(d,E::invariant);
             if(rows[row].owners==1&&rows[row].epoch)++events;
         }
-        return room(events,d);
+        // This domain spends only its own already-guaranteed reservation.
+        // An aborted population cannot take away any other owner's cleanup.
+        return room(events,cleanupReserved-2*token.count,d);
     }
     bool populate(std::uint64_t prior,Population& plan,D& d)const noexcept {
-        if(!expected(prior,d))return false;plan={};
+        if(!expected(prior,d))return false;
+        if(aborted)return fail(d,E::aborted);
+        if(populationActive())return fail(d,E::populationActive);
+        plan={};
         for(std::size_t i=0;i<rowCount;++i){
             if(!rows[i].owners&&rows[i].epoch)return fail(d,E::invariant);
             if(rows[i].owners&&!rows[i].epoch)plan.rows[plan.count++]=static_cast<std::uint16_t>(i);
         }
         if(plan.count>maximum-epochSerial)return fail(d,E::overflow);
-        if(!room(plan.count+1,d))return false;
+        // Lock capacity for each exact row plus distinct14D370 and14D440
+        // boundaries. The caller constructs nothing until this succeeds.
+        if(!room(0,cleanupReserved+plan.count+2,d))return false;
         // Bounded allocation-free table-order population, independent of
         // native footprint/owner acquisition order.
         for(std::size_t i=1;i<plan.count;++i){const auto row=plan.rows[i];std::size_t j=i;
@@ -207,6 +229,8 @@ struct OriginalUiRiderMaterialLifetime50KG::Storage {
             }
             plan.rows[j]=row;
         }
+        plan.phase=Population::Phase::scanning;plan.reserved=plan.count+2;
+        plan.firstSequence=sequence+1;
         return true;
     }
 };
@@ -220,7 +244,14 @@ bool OriginalUiRiderMaterialLifetime50KG::bind(std::shared_ptr<const assets::Ori
     }catch(...){return fail(d,E::allocation);}
 }
 std::uint64_t OriginalUiRiderMaterialLifetime50KG::sequence()const noexcept{return storage_?storage_->sequence:0;}
+std::uint64_t OriginalUiRiderMaterialLifetime50KG::acknowledgedSequence()const noexcept{return storage_?storage_->acknowledged:0;}
 std::size_t OriginalUiRiderMaterialLifetime50KG::pendingEvents()const noexcept{return storage_?storage_->eventCount:0;}
+bool OriginalUiRiderMaterialLifetime50KG::hasOwners()const noexcept {
+    if(storage_)for(const auto& owner:storage_->owners)if(owner.active)return true;
+    return false;
+}
+bool OriginalUiRiderMaterialLifetime50KG::populationActive()const noexcept{return storage_&&storage_->populationActive();}
+bool OriginalUiRiderMaterialLifetime50KG::aborted()const noexcept{return storage_&&storage_->aborted;}
 bool OriginalUiRiderMaterialLifetime50KG::canAcquire(const OriginalUiRiderMaterialFootprint50KG& f,
     std::uint64_t prior,D& d)const noexcept {
     d={};if(!storage_)return fail(d,E::notBound);Storage::Acquire plan;
@@ -245,6 +276,7 @@ bool OriginalUiRiderMaterialLifetime50KG::acquire(const OriginalUiRiderMaterialF
     auto& s=*storage_;Storage::Acquire plan;if(!s.acquire(f,prior,plan,d))return false;
     const auto first=s.sequence+1;const auto serial=s.ownerSerial+1;auto& owner=s.owners[plan.owner];
     owner={};owner.serial=serial;owner.count=plan.count;owner.active=true;
+    s.cleanupReserved+=2*plan.count;
     for(std::size_t i=0;i<plan.count;++i){const auto index=plan.rows[i];auto& row=s.rows[index];
         if(index>=s.rowCount)row.key=*f.row(i);
         ++row.owners;owner.rows[i]=index;owner.occurrences[i]=f.slotOccurrences(i);
@@ -260,6 +292,7 @@ bool OriginalUiRiderMaterialLifetime50KG::release(const OriginalUiRiderMaterialO
     d={};if(!storage_)return fail(d,E::notBound);if(!owns(token))return fail(d,E::staleOwner);
     auto& s=*storage_;std::size_t events=0;if(!s.release(token.slot_,prior,events,d))return false;
     const auto first=s.sequence+1;auto& owner=s.owners[token.slot_];
+    s.cleanupReserved-=2*owner.count;
     for(std::size_t i=0;i<owner.count;++i){auto& row=s.rows[owner.rows[i]];
         Event e;e.kind=EventKind::ownerReleased;e.row=row.key;e.ownerSerial=owner.serial;e.epoch=row.epoch;
         e.ownerPresenceAfter=--row.owners;e.sourceSlotOccurrences=owner.occurrences[i];s.append(e);
@@ -272,15 +305,80 @@ bool OriginalUiRiderMaterialLifetime50KG::release(const OriginalUiRiderMaterialO
     }
     owner.active=false;receipt={first,s.sequence,static_cast<std::uint32_t>(events)};d={};return true;
 }
+bool OriginalUiRiderMaterialLifetime50KG::beginPopulation(std::uint64_t prior,D& d) noexcept {
+    d={};if(!storage_)return fail(d,E::notBound);auto& s=*storage_;Storage::Population plan;
+    if(!s.populate(prior,plan,d))return false;
+    s.population=plan;return true;
+}
+const OriginalUiRiderMaterialRow50KG* OriginalUiRiderMaterialLifetime50KG::nextPopulationRow()const noexcept {
+    if(!storage_)return nullptr;const auto& s=*storage_;const auto& p=s.population;
+    return p.phase==Storage::Population::Phase::scanning&&p.next<p.count?
+        &s.rows[p.rows[p.next]].key:nullptr;
+}
+bool OriginalUiRiderMaterialLifetime50KG::commitConstructedRow(const OriginalUiRiderMaterialRow50KG& key,
+    std::uint64_t prior,OriginalUiRiderMaterialRowState50KG& out,
+    OriginalUiRiderMaterialMutation50KG& receipt,D& d) noexcept {
+    d={};if(!storage_)return fail(d,E::notBound);auto& s=*storage_;auto& p=s.population;
+    if(!s.expected(prior,d))return false;
+    if(s.aborted)return fail(d,E::aborted);
+    if(p.phase!=Storage::Population::Phase::scanning)return fail(d,E::populationInactive);
+    if(p.next>=p.count)return fail(d,E::populationOrder);
+    const auto index=p.rows[p.next];
+    if(index>=s.rowCount)return fail(d,E::invariant);
+    auto& row=s.rows[index];d.row=row.key.rank();
+    if(!row.key.same(key))return fail(d,E::populationOrder);
+    if(!row.owners||row.epoch||p.reserved!=p.count-p.next+2)return fail(d,E::invariant);
+    if(s.epochSerial==maximum)return fail(d,E::overflow);
+    if(!s.room(1,s.cleanupReserved+p.reserved-1,d))return false;
+    row.epoch=++s.epochSerial;
+    Event e;e.kind=EventKind::rowPopulated;e.row=row.key;e.epoch=row.epoch;e.ownerPresenceAfter=row.owners;
+    s.append(e);++p.next;--p.reserved;
+    out={row.key,row.owners,row.epoch};receipt={s.sequence,s.sequence,1};d={};return true;
+}
+bool OriginalUiRiderMaterialLifetime50KG::finishPopulation(std::uint64_t prior,
+    OriginalUiRiderMaterialMutation50KG& receipt,D& d) noexcept {
+    d={};if(!storage_)return fail(d,E::notBound);auto& s=*storage_;auto& p=s.population;
+    if(!s.expected(prior,d))return false;
+    if(s.aborted)return fail(d,E::aborted);
+    if(p.phase!=Storage::Population::Phase::scanning)return fail(d,E::populationInactive);
+    if(p.next!=p.count)return fail(d,E::populationIncomplete);
+    if(p.reserved!=2)return fail(d,E::invariant);
+    if(!s.room(1,s.cleanupReserved+1,d))return false;
+    Event boundary;boundary.kind=EventKind::populationBoundary;s.append(boundary);
+    --p.reserved;p.phase=Storage::Population::Phase::awaitingGroup;
+    receipt={p.firstSequence,s.sequence,static_cast<std::uint32_t>(p.count+1)};return true;
+}
+bool OriginalUiRiderMaterialLifetime50KG::recordGroupRebuilt(std::uint64_t prior,
+    OriginalUiRiderMaterialMutation50KG& receipt,D& d) noexcept {
+    d={};if(!storage_)return fail(d,E::notBound);auto& s=*storage_;auto& p=s.population;
+    if(!s.expected(prior,d))return false;
+    if(s.aborted)return fail(d,E::aborted);
+    if(p.phase!=Storage::Population::Phase::awaitingGroup)return fail(d,E::populationInactive);
+    if(p.next!=p.count||p.reserved!=1)return fail(d,E::invariant);
+    if(!s.room(1,s.cleanupReserved,d))return false;
+    Event boundary;boundary.kind=EventKind::groupRebuilt;s.append(boundary);
+    p={};receipt={s.sequence,s.sequence,1};return true;
+}
+bool OriginalUiRiderMaterialLifetime50KG::abortPopulation(std::uint64_t prior,D& d) noexcept {
+    d={};if(!storage_)return fail(d,E::notBound);auto& s=*storage_;
+    if(!s.expected(prior,d))return false;
+    if(s.aborted&&!s.populationActive())return true;
+    if(!s.populationActive())return fail(d,E::populationInactive);
+    // Successful prefix epochs/events remain authoritative. The only released
+    // capacity is this scan's still-unused reservation; owner cleanup survives.
+    s.population={};s.aborted=true;return true;
+}
 bool OriginalUiRiderMaterialLifetime50KG::populate(std::uint64_t prior,
     OriginalUiRiderMaterialMutation50KG& receipt,D& d) noexcept {
-    d={};if(!storage_)return fail(d,E::notBound);auto& s=*storage_;Storage::Population plan;
-    if(!s.populate(prior,plan,d))return false;const auto first=s.sequence+1;
-    for(std::size_t i=0;i<plan.count;++i){auto& row=s.rows[plan.rows[i]];row.epoch=++s.epochSerial;
-        Event e;e.kind=EventKind::rowPopulated;e.row=row.key;e.epoch=row.epoch;e.ownerPresenceAfter=row.owners;s.append(e);
+    if(!beginPopulation(prior,d))return false;
+    while(const auto* row=nextPopulationRow()){
+        OriginalUiRiderMaterialRowState50KG state;OriginalUiRiderMaterialMutation50KG committed;
+        if(!commitConstructedRow(*row,sequence(),state,committed,d)){
+            D ignored;abortPopulation(sequence(),ignored);return false;
+        }
     }
-    Event boundary;boundary.kind=EventKind::populationBoundary;s.append(boundary);
-    receipt={first,s.sequence,static_cast<std::uint32_t>(plan.count+1)};d={};return true;
+    if(finishPopulation(sequence(),receipt,d))return true;
+    D ignored;abortPopulation(sequence(),ignored);return false;
 }
 bool OriginalUiRiderMaterialLifetime50KG::rowState(const OriginalUiRiderMaterialRow50KG& key,
     OriginalUiRiderMaterialRowState50KG& out)const noexcept {

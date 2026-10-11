@@ -5,6 +5,7 @@
 #include "../../../src/game/original_ui_rider_selected_packet50kg.h"
 #include "../../../src/game/original_ui_aperture_owner50kg.h"
 namespace rr::platform {
+class VehicleWindowGl50DS;
 struct OriginalUiRiderDrawClock50KG {bool known=false,advanceAnimations=false;std::uint32_t milliseconds=0;};
 enum class OriginalUiRiderContributionError50KG : std::uint8_t {
     none,input,alreadyBound,resource,bank,publication,phase,clock,widget,stat,model,geometry,
@@ -45,8 +46,8 @@ private:
         const std::array<const game::OriginalUiApertureOwner50KG*,2>&,
         OriginalUiRiderContributionDiagnostic50KG&) noexcept;
 public:
-    // Cold native policies and source pass schedule for the CURRENT backend
-    // bank generation. Old submitted GPU owners must be drained before replace.
+    // One-time immutable bank/sampler admission. Dynamic row instances are
+    // constructed only by the backend parent+A4 issuer, never this cold path.
     bool prepareBank(OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     std::shared_ptr<const assets::OriginalUiImageBank50KG> bank()const noexcept;
     const std::vector<MaterialTextureSampler50EB>* samplers()const noexcept;
@@ -66,11 +67,19 @@ public:
     // this instance lives, and keep it alive for retry if that operation fails.
     void drain() noexcept;
 private:
+    // Synchronous parent+A4 grouping or authenticated retirement consumption.
+    // Lifecycle acceptance is independent from source-frame acceptance. Only
+    // the backend acknowledges the prefix after both consumers accepted it.
+    bool consumeMaterials(bool rebuild,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
+    std::uint64_t materialSequence()const noexcept;
+    std::uint64_t sourceSubmissionWatermark()const noexcept;
+    bool hasSourceSubmission()const noexcept;
+    const VehicleWindowGl50DS* sourceRenderer()const noexcept;
     friend class VehicleWindowGl50DS;
     // Actual renderer calls only. A partial failed submission invalidates the
     // binding history; accepted source publication commits the staged native
     // representatives even when a later presentation copy fails.
-    bool beginSourceSubmission(std::uint64_t) const noexcept;
+    bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept;
     void finishSourceSubmission(std::uint64_t,bool sourceAccepted,bool sourceWorkStarted) const noexcept;
     bool widgets(bool,bool,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool model(std::uint16_t,OriginalUiRiderContributionDiagnostic50KG&) noexcept;

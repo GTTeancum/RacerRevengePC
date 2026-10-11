@@ -5,6 +5,9 @@
 #include "../../../src/game/original_ui_rider_render_context50kg.h"
 #include "../../../src/assets/original_ui_ipum_texture_cache50kg.h"
 namespace rr::platform {
+class OriginalUiMainDrawResources50KG;
+class VehicleWindowGl50DS;
+struct VehicleWindowDiagnostic50DS;
 enum class OriginalUiRiderSessionStatus50KG : std::uint8_t {
     ok,noChange,backProposed,unavailableDestination,notBound,alreadyBound,
     invalidInput,unsupportedState,profile,resource,widget,backend,model,
@@ -25,6 +28,9 @@ struct OriginalUiRiderSessionDiagnostic50KG {
 };
 struct OriginalUiRiderSessionCold50KG {
     std::shared_ptr<OriginalUiRiderDrawResources50KG> resources;
+    // Actual Main4 predecessor records, copied to canonical row inventory
+    // synchronously. Never extends the predecessor's native widget lifetime.
+    const OriginalUiMainDrawResources50KG* predecessorResources=nullptr;
     std::shared_ptr<const assets::OriginalUiRiderStatAssets50KG> statAssets;
     std::shared_ptr<const assets::OriginalUiRiderBinderAssets50KG> binderAssets;
     std::shared_ptr<const assets::OriginalUiArchive50KG> riderArchive,appStart,podTextures;
@@ -138,6 +144,12 @@ private:
     OriginalUiRiderSessionStatus50KG bindCold(const OriginalUiRiderSessionCold50KG&,
         game::OriginalUiRiderColdPopulation50KG,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     const OriginalUiRiderDrawContribution50KG* rendererOwner() const noexcept;
+    bool sourceTeardownPending()const noexcept;
+    // Frontend-only: obtains genuine completion directly from its renderer,
+    // then destroys dynamic domains and consumes their exact retirements while
+    // both ledger and collector still live. Failure retains unfinished owners.
+    OriginalUiRiderSessionStatus50KG teardownSource(VehicleWindowGl50DS*,
+        VehicleWindowDiagnostic50DS&,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

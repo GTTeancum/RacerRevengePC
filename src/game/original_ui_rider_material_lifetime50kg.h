@@ -10,7 +10,8 @@
 namespace rr::game {
 enum class OriginalUiRiderMaterialLifetimeError50KG : std::uint8_t {
     none,input,archive,table,row,footprint,alreadyBound,notBound,staleSequence,
-    staleOwner,rowCapacity,ownerCapacity,journalCapacity,overflow,invariant,allocation
+    staleOwner,rowCapacity,ownerCapacity,journalCapacity,overflow,invariant,allocation,
+    populationActive,populationInactive,populationOrder,populationIncomplete,aborted
 };
 struct OriginalUiRiderMaterialLifetimeDiagnostic50KG {
     OriginalUiRiderMaterialLifetimeError50KG error=OriginalUiRiderMaterialLifetimeError50KG::none;
@@ -70,6 +71,7 @@ private:
     OriginalUiRiderMaterialOwnerKind50KG kind_=OriginalUiRiderMaterialOwnerKind50KG::absent;
 };
 class OriginalUiRiderMaterialLifetime50KG;
+class OriginalUiRiderBackend50KG;
 class OriginalUiRiderMaterialOwnerToken50KG final {
 public:
     bool issued()const noexcept{return ledger_!=nullptr;}
@@ -95,7 +97,7 @@ private:
     std::uint64_t epoch_=0,sequence_=0;
 };
 enum class OriginalUiRiderMaterialEventKind50KG : std::uint8_t {
-    ownerAcquired,ownerReleased,rowPopulated,rowRetired,populationBoundary
+    ownerAcquired,ownerReleased,rowPopulated,rowRetired,populationBoundary,groupRebuilt
 };
 struct OriginalUiRiderMaterialEvent50KG {
     OriginalUiRiderMaterialEventKind50KG kind=OriginalUiRiderMaterialEventKind50KG::ownerAcquired;
@@ -115,9 +117,10 @@ struct OriginalUiRiderMaterialRowState50KG {
     // Zero means no constructed PSM, including positive pending references.
     std::uint64_t epoch=0;
 };
-// INACTIVE primitive. No runtime caller is wired. Cold descriptors/footprints
-// never acquire a token. Actual future callers must prove domain containment,
-// source callback order,14D370 population and real borrower/renderer drain.
+// Dynamic owner-domain ledger. Cold descriptors/footprints never acquire a
+// token. Callers must prove domain containment, source callback order,14D370
+// construction and real borrower/renderer drain. Only the backend may issue
+// constructed-row population and successful14D440 group rebuild records.
 // The ledger must outlive EVERY token copy and consumer, including released
 // tokens. It cannot be reset/moved. Destroying/recreating a ledger at the same
 // address while any old token survives is forbidden; these are scoped handles.
@@ -133,7 +136,11 @@ public:
     bool bind(std::shared_ptr<const assets::OriginalUiArchive50KG> appStart,
         OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
     std::uint64_t sequence()const noexcept;
+    std::uint64_t acknowledgedSequence()const noexcept;
     std::size_t pendingEvents()const noexcept;
+    bool hasOwners()const noexcept;
+    bool populationActive()const noexcept;
+    bool aborted()const noexcept;
     // Nonmutating capacity/identity previews for the same exact operation.
     // Recheck the unchanged sequence immediately before real source effects.
     bool canAcquire(const OriginalUiRiderMaterialFootprint50KG&,std::uint64_t expectedSequence,
@@ -144,18 +151,16 @@ public:
     // Explicit ordered owner events. Both outputs and all ledger state remain
     // unchanged on failure. Every operation checks its expected prior sequence.
     // Acquiring refs does NOT create/populate a PSM or assign a live epoch.
+    // It reserves journal AND sequence capacity for this domain's worst-case
+    // release (ownerReleased+rowRetired per distinct row). Other operations
+    // cannot consume that reserve. Release remains legal after scan abort.
+    // No acquire/release can interleave with a scan or awaited group rebuild.
     // Acquire's output owner token must be default/unissued, never overwritten.
     bool acquire(const OriginalUiRiderMaterialFootprint50KG&,std::uint64_t expectedSequence,
         OriginalUiRiderMaterialOwnerToken50KG&,OriginalUiRiderMaterialMutation50KG&,
         OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
     bool release(const OriginalUiRiderMaterialOwnerToken50KG&,std::uint64_t expectedSequence,
         OriginalUiRiderMaterialMutation50KG&,OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
-    // Invoke only AFTER the real successful14D370 population of referenced
-    // missing rows. Emits fresh row epochs in table order, then a boundary.
-    // Capacity/overflow must be preflighted before source work; no rollback of
-    // already-created source PSMs is implied by this primitive's atomicity.
-    bool populate(std::uint64_t expectedSequence,OriginalUiRiderMaterialMutation50KG&,
-        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
     bool owns(const OriginalUiRiderMaterialOwnerToken50KG&)const noexcept;
     bool rowState(const OriginalUiRiderMaterialRow50KG&,OriginalUiRiderMaterialRowState50KG&)const noexcept;
     bool event(std::uint64_t sequence,OriginalUiRiderMaterialEvent50KG&)const noexcept;
@@ -164,6 +169,34 @@ public:
     // exact lifecycle events. Does not mutate rows/epochs or source sequence.
     bool acknowledgeThrough(std::uint64_t sequence,OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
 private:
+    friend class OriginalUiRiderBackend50KG;
+    // Fix the exact sorted pending plan and reserve its row events, one
+    // population boundary and one later group rebuild before construction.
+    // A successful finish stays locked until recordGroupRebuilt or abort.
+    bool beginPopulation(std::uint64_t expectedSequence,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    const OriginalUiRiderMaterialRow50KG* nextPopulationRow()const noexcept;
+    // Backend invokes only AFTER the complete native row candidate exists.
+    // One new epoch is committed immediately; later failure never rolls it back.
+    bool commitConstructedRow(const OriginalUiRiderMaterialRow50KG&,std::uint64_t expectedSequence,
+        OriginalUiRiderMaterialRowState50KG&,OriginalUiRiderMaterialMutation50KG&,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    // Receipt covers this scan's row events and its success boundary.
+    bool finishPopulation(std::uint64_t expectedSequence,OriginalUiRiderMaterialMutation50KG&,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    // Issue only after actual synchronous collector grouping has succeeded.
+    bool recordGroupRebuilt(std::uint64_t expectedSequence,OriginalUiRiderMaterialMutation50KG&,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    // No event or epoch is fabricated. Permanently poisons new acquisition
+    // and population, drops only the unfinished scan reservation, and permits
+    // reserved cleanup releases of every still-active domain.
+    bool abortPopulation(std::uint64_t expectedSequence,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    // Dormant all-success wrapper. Only the private issuer can assert that
+    // every planned native row already exists. Uses the same plan/lock and
+    // still requires a separate actual group rebuild, never a public shortcut.
+    bool populate(std::uint64_t expectedSequence,OriginalUiRiderMaterialMutation50KG&,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

@@ -4189,7 +4189,7 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
         s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max() ||
         (publishSource && s.uiSourcePublicationGeneration==std::numeric_limits<std::uint64_t>::max()))
         return fail(d,VehicleWindowError50DS::frame,"unsealed or stale complete Rider frame");
-    if (!frame.owner_->beginSourceSubmission(frame.frameGeneration_))
+    if (!frame.owner_->beginSourceSubmission(frame.frameGeneration_,*this))
         return fail(d,VehicleWindowError50DS::frame,"Rider source binding-history receipt rejected");
     bool sourceWorkStarted=false;
     const auto sourceTargetBefore=s.uiSourceTargetGeneration;
