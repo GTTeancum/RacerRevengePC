@@ -10,6 +10,8 @@ The last completed focused check was the native Linux Rider19 menu opening, unav
 
 Main consolidation preserves the optional [native audio timing observations](docs/native-audio-phase-observation.md). Those observations do not fix or validate simulation/audio drift. Build and capture identities must be rebound to the final merged source before any new validation.
 
+Historical [all-original-AI capture tooling](tools/capture/all_original_ai/README.md) is retained with its original runtime identity and incomplete-prefix limits. It has not been rebound or executed against consolidated main. Older capture helpers are retained for provenance and are not approved driving-test entry points.
+
 ## Build and game data
 
 Supply your own original game data and generate local caches. Assets, executables, and memory dumps are excluded; some source-comparison fixtures also require local generation.
