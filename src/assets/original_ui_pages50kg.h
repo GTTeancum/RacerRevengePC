@@ -50,12 +50,14 @@ private:
         OriginalUiDat50KG&, OriginalUiPageDiagnostic50KG&,OriginalUiRepeatedKeyPolicy50KG) noexcept;
 };
 // Only authenticated original archive members enter this reader. Source
-// 0x159440 removes whitespace outside quotes and brackets; 0x158824 removes
-// one outer quote pair. Semicolons begin comments at cleaned line start or
-// after a section's closing bracket; value semicolons remain value bytes.
+// 0x159440 removes whitespace outside quotes and brackets, without requiring
+// a closing quote. 0x158824/0x158858 remove leading/trailing quotes independently.
+// CRLF is normalized before value extraction, including opening-only quotes.
+// Semicolons begin comments at cleaned line start or after a section's closing
+// bracket; value semicolons remain value bytes.
 // Unknown fields and repeated values (when explicitly requested) retain order.
 // find() returns the first matching present value, as source 0x158648 does.
-// ASCII LF/CRLF with optional final NUL; malformed quotes/brackets, duplicate
+// ASCII LF/CRLF with optional final NUL; malformed brackets, duplicate
 // sections and binary BPB fail closed. Atomic cold operations, no IO/imports.
 bool readOriginalUiDat50KG(const OriginalUiArchive50KG& archive,
     const std::string& originalMemberName, OriginalUiDat50KG& output,

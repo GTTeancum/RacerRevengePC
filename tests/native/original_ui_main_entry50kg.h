@@ -231,6 +231,15 @@ struct Frontend {
                 <<" status="<<unsigned(status)<<" source="<<diagnostic.sourcePC
                 <<" main="<<unsigned(diagnostic.main.status)<<" options="<<unsigned(diagnostic.options.status)
                 <<" options_resource="<<unsigned(diagnostic.optionsResources.error)
+                <<" options_resource_widget="<<diagnostic.optionsResources.widgetId
+                <<" options_widget_status="<<unsigned(diagnostic.optionsResources.widgets.status)
+                <<" options_widget_id="<<diagnostic.optionsResources.widgets.widgetId
+                <<" options_widget_controller="<<unsigned(diagnostic.optionsResources.widgets.controller)
+                <<" options_widget_parse="<<unsigned(diagnostic.optionsResources.widgets.parse.error)
+                <<" options_widget_parse_offset="<<diagnostic.optionsResources.widgets.parse.byteOffset
+                <<" options_widget_parse_pc="<<diagnostic.optionsResources.widgets.parse.sourcePC
+                <<" options_widget_text="<<unsigned(diagnostic.optionsResources.widgets.text)
+                <<" options_widget_icon="<<unsigned(diagnostic.optionsResources.widgets.icon)
                 <<" gpu="<<unsigned(diagnostic.gpu.error)<<" renderer="<<unsigned(diagnostic.renderer.error)
                 <<"; no destination or gameplay entered.\n";
         }else if(status!=Status::ok&&status!=Status::noChange&&status!=Status::routeAccepted)fail("input");
