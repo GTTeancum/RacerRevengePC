@@ -383,6 +383,36 @@ struct Frontend {
     }
     void report(const char* reason,const Application& application,std::uint64_t worldTicks,std::uint64_t mixedFrames) const {
         const auto snapshot=coordinator.snapshot();const bool main=snapshot.route.screen==4;
+        // Observation only: do not force a Rider-readable mode while Main owns
+        // mode4. The public read-only snapshot legitimately returns false then.
+        const auto reportRiderProfile=[&]() {
+            if(!application.riderProfile)return;
+            rr::game::OriginalUiRiderSelectionProfile50KG profile;
+            const bool readable=application.riderProfile->selectionSnapshot(profile);
+            const auto stamp=application.riderProfile->stamp();
+            const auto& common=*application.profile;
+            const auto& settings=*application.gameSettingsProfile;
+            std::cerr<<",\"rider_profile_initialized\":"<<(application.riderProfile->initialized()?"true":"false")
+                <<",\"rider_profile_readable\":"<<(readable?"true":"false")
+                <<",\"rider_profile_common_link\":"<<(application.riderProfile->commonProfile()==application.profile.get()?"true":"false")
+                <<",\"rider_profile_generation\":"<<stamp.generation<<",\"rider_profile_mode\":"<<stamp.mode34
+                <<",\"rider_profile_remembered\":";
+            if(readable)std::cerr<<'['<<profile.remembered6F0<<','<<profile.remembered6F4<<','
+                <<profile.remembered6F8<<','<<profile.remembered6FC<<']';
+            else std::cerr<<"null";
+            std::cerr<<",\"main_profile_mode\":"<<common.mode34<<",\"main_profile_previous_mode\":"<<common.previousMode38
+                <<",\"main_profile_saved_slot\":"<<common.savedSlot6E0
+                <<",\"main_profile_availability\":"<<unsigned(common.availability11018)
+                <<",\"main_profile_flags\":"<<unsigned(common.flags11054)
+                <<",\"main_profile_player_bits\":"<<unsigned(common.playerBits1125C)
+                <<",\"application_game_profile\":{\"sound_mode\":"<<settings.soundMode1101C
+                <<",\"volumes\":["<<settings.volume11020[0]<<','<<settings.volume11020[1]<<','
+                <<settings.volume11020[2]<<','<<settings.volume11020[3]<<']'
+                <<",\"flags\":"<<unsigned(settings.flags11050)<<",\"saved_group\":"<<settings.savedGroup6E8
+                <<",\"sound_revision\":"<<application.soundMode->revision()<<'}'
+                <<",\"light_manager_generation\":"<<application.lightManager->managerGeneration()
+                <<",\"light_cache_state\":"<<unsigned(application.lightManager->cacheState());
+        };
         if(snapshot.route.screen==5){
             require(snapshot.route.page==1&&coordinator.riderSession(),"original Rider session report unavailable");
             const auto& rider=snapshot.rider;const auto& aperture=rider.aperture;
@@ -393,6 +423,7 @@ struct Frontend {
                 <<",\"updates\":"<<snapshot.updates<<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<snapshot.submissions
                 <<",\"selected_slot\":"<<rider.slot4C8<<",\"selected_rider\":"<<rider.rider4C4
                 <<",\"selection_attached\":"<<(rider.selectionAttached?"true":"false")
+                <<",\"bank_generation\":"<<rider.bankGeneration<<",\"registry_generation\":"<<rider.registryGeneration
                 <<",\"input_shown\":"<<(rider.inputContainerShown?"true":"false")
                 <<",\"input_blocked\":"<<(rider.blocked4E0?"true":"false")<<",\"panel_y\":"<<rider.panelY4DC
                 <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount
@@ -420,7 +451,13 @@ struct Frontend {
                 <<",\"audio_accepted_nanoseconds\":"<<audioOutput.acceptedNanoseconds()
                 <<",\"audio_clock_microseconds\":"<<audioOutput.info().simulationMicroseconds
                 <<",\"audio_remainder_nanoseconds\":"<<audioOutput.remainderNanoseconds()
-                <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames<<"}\n";
+                <<",\"audio_device_status\":\""<<rr::platform::audioDeviceStatusName50HD(audioOutput.info().deviceStatus)<<"\""
+                <<",\"audio_device_consumed_frames\":"<<audioOutput.info().deviceConsumedFrames
+                <<",\"audio_device_queued_frames\":"<<audioOutput.info().deviceQueuedFrames
+                <<",\"audio_device_underrun_frames\":"<<audioOutput.info().deviceUnderrunFrames
+                <<",\"audio_device_overflow_frames\":"<<audioOutput.info().deviceOverflowFrames
+                <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames;
+            reportRiderProfile();std::cerr<<"}\n";
             return;
         }
         const auto* optionsResources=coordinator.optionsResources();
@@ -480,7 +517,8 @@ struct Frontend {
                 <<",\"game_local_vertical_split\":"<<(local.verticalSplit?"true":"false")
                 <<",\"game_local_vibration\":"<<(local.vibration?"true":"false");
         }
-        std::cerr<<"}\n";
+        if(application.riderProfile)std::cerr<<",\"audio_music_song\":"<<(audioOutput.transport()?audioOutput.transport()->activeMusicSong():0);
+        reportRiderProfile();std::cerr<<"}\n";
     }
 };
 }
