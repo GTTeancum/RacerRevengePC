@@ -100,6 +100,13 @@ public:
     const std::array<ResourceRow, eventCount>& rows() const noexcept { return rows_; }
     std::uint32_t size() const noexcept { return count_; }
     bool prepared() const noexcept { return boundOwner_ != nullptr; }
+    // Cold registration keeps this noncopyable owner at its stable address.
+    // Snapshot only fixed storage and bindings, never the enclosing object.
+    template<class Bank> void registerRacerState(Bank& bank) {
+        bank.owner(rows_);
+        bank.owner(count_);
+        bank.owner(boundOwner_);
+    }
 private:
     std::array<ResourceRow, eventCount> rows_{};
     std::uint32_t count_ = 0;
@@ -126,6 +133,15 @@ struct Owner {
     Owner(Owner&&) = delete;
     Owner& operator=(Owner&&) = delete;
     bool prepared() const noexcept { return provider_ != nullptr; }
+    // Every slot restores these fields into the same live execution arena;
+    // entries and provider bindings keep their original stable addresses.
+    template<class Bank> void registerRacerState(Bank& bank) {
+        bank.owner(sounds);
+        bank.owner(entries200);
+        bank.owner(selectedOwner1F0);
+        bank.owner(receipt);
+        bank.owner(provider_);
+    }
 private:
     DisabledAudioProvider* provider_ = nullptr;
     friend bool prepareDisabledFromPod01(Owner&, DisabledAudioProvider&,

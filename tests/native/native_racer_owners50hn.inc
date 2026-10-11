@@ -55,8 +55,9 @@ racerBank.owner(lapOwner.pending);
 racerBank.owner(lapOwner.diagnostic);
 racerBank.owner(lapOwner.completion);
 racerBank.owner(lapOwner.completionResult);
-racerBank.owner(lapOwner.sound);
-racerBank.owner(lapOwner.provider);
+// These owners are noncopyable; register their complete fixed member state.
+lapOwner.sound.registerRacerState(racerBank);
+lapOwner.provider.registerRacerState(racerBank);
 racerBank.owner(lapOwner.audioContext);
 racerBank.owner(lapOwner.audioDispatch);
 racerBank.owner(lapOwner.audibleStarts);
@@ -73,10 +74,10 @@ racerBank.owner(courseTuning);
 racerBank.owner(autoDriveEnabled);
 racerBank.owner(autoStopReported);
 // Complete native device/action ownership, switched only after acknowledgement.
-// These fixed-storage classes are trivially copyable, despite deleted public
-// copying. Their borrowed providers/references always point to the same arena.
-racerBank.owner(controller);
-racerBank.owner(controllerActions);
+// These owners are noncopyable; register their fixed member state. Borrowed
+// providers/references stay bound to the same permanent execution arena.
+controller.registerRacerState(racerBank);
+controllerActions.registerRacerState(racerBank);
 racerBank.owner(controllerEventStorage);
 racerBank.owner(controllerEvents);
 racerBank.owner(playerEvents);

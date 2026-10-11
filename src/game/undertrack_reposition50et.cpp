@@ -252,8 +252,11 @@ void resetUndertrackController50ET(UndertrackController50ET& s) noexcept {
 
 bool resetUndertrackBasePrefix50ET(std::uint8_t* flags,std::uint32_t* field24C) noexcept {
     if(!flags)return true;
-    if(!field24C||overlap(flags,1,field24C,sizeof(*field24C)))return false;
+    if(field24C&&overlap(flags,1,field24C,sizeof(*field24C)))return false;
+    //216A78 commits before216A7C reads D44 and216A80 calls2C2810.
+    // A missing later owner stops that call; it cannot undo the D40 store.
     *flags=static_cast<std::uint8_t>(*flags&0xfbu);
+    if(!field24C)return false;
     *field24C=0;return true;
 }
 

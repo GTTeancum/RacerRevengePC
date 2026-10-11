@@ -110,7 +110,10 @@ struct UndertrackController50ET {
 void resetUndertrackController50ET(UndertrackController50ET&) noexcept;
 //216A50..216A84: present D40 clears22C bit2 and its associated D44 receives
 //2C2810(a1=0), which stores24C=0 and skips its virtualA8. Missing D44 for a
-//present D40 rejects. Both null means the source optional branch is absent.
+//present D40 returns false AFTER the216A78 flags store; retain that prefix.
+//Overlapping fields reject before entry. Null D40 skips the entire branch
+//without reading/writing D44. Caller must establish actual owner presence;
+//an unbound owner is not source-proved absence.
 bool resetUndertrackBasePrefix50ET(std::uint8_t* d40Flags22C,
     std::uint32_t* d44Field24C) noexcept;
 

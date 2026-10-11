@@ -43,6 +43,18 @@ public:
     ControllerActions50EC(ControllerActions50EC&&)=delete;
     ControllerActions50EC& operator=(ControllerActions50EC&&)=delete;
 
+    // Cold registration only, before the bank is sealed. The ingress/queue
+    // references stay bound to the same live owners, registered separately.
+    // Keep every owned field, including acknowledged lease diagnostics.
+    template<class Bank> void registerRacerState(Bank& bank) {
+        bank.owner(deviceIndex_);
+        bank.owner(phase_);
+        bank.owner(leasedEvents_);
+        bank.owner(leasedCapacity_);
+        bank.owner(leasedCount_);
+        bank.owner(last_);
+    }
+
     // Idle only. A successful poll owns its complete batch until acknowledged;
     // even NotReady/ReadFailed require the append/dispatch/acknowledge sequence.
     // Inspect ingress.deviceSample().status independently of this native status.

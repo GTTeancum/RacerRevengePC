@@ -15,6 +15,15 @@ public:
     ControllerIngress50CX(ControllerIngress50CX&&) = delete;
     ControllerIngress50CX& operator=(ControllerIngress50CX&&) = delete;
 
+    // Cold registration only, before the bank is sealed. Restore these fixed
+    // fields into the same live owner; provider_.buttons keeps its stable
+    // binding to sample_.buttons and borrowed readers still target provider_.
+    template<class Bank> void registerRacerState(Bank& bank) {
+        bank.owner(sample_);
+        bank.owner(packet_);
+        bank.owner(provider_);
+    }
+
     // Apply exactly one caller-supplied poll using48Y, retaining its complete
     // ordered transition batch. True includes NotReady and ReadFailed; inspect
     // deviceSample().status. NotReady preserves records; ReadFailed clears only
