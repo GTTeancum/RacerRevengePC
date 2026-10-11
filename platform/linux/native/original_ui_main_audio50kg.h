@@ -17,6 +17,52 @@ class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
 public:
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
     static constexpr std::size_t effectVoiceCount = 6, requiredVoices = 7;
+    enum class SteadyRiderError : std::uint8_t {
+        none, preparationUnavailable, mixerUnavailable, mixerEpochChanged,
+        mixerShapeChanged, revisionUnavailable, paused, soundModeUnavailable,
+        soundModeOwnerChanged, unsupportedRouting, unsupportedGainLayer,
+        wrongMusic, nonsteadyEnvelope, invalidMusicClip, musicVoiceChanged,
+        foreignEffect, invalidEffectClip, effectVoiceChanged
+    };
+    // Read-only owner facts, not a caller-writable admission flag or a lease.
+    // A future application lease must retain this exact transport/output
+    // lifetime, match its actual application mode owner, and revalidate all
+    // three control revisions at every checkpoint. PCM cursors may progress.
+    struct SteadyTransportObservation {
+        const OriginalUiMainAudio50KG* transport = nullptr;
+        const AudioMixer50HD* mixer = nullptr;
+        const OriginalSoundMode50KG* soundMode = nullptr;
+        std::uint64_t controlRevision = 0, mixerControlRevision = 0;
+        std::uint64_t mixerEpoch = 0, soundModeRevision = 0, sourceMixedFrames = 0;
+        std::size_t voiceCount = 0, rejectedVoice = requiredVoices;
+        std::uint32_t outputRate = 0, musicSong = 0, profileSoundMode = 0;
+        float masterGain = 0.f, musicGain = 0.f;
+        bool paused = false, ownsMusic = false, fading = false;
+        AudioVoiceObservation50HD music{};
+        std::array<AudioVoiceObservation50HD, effectVoiceCount> effects{};
+        SteadyRiderError error = SteadyRiderError::preparationUnavailable;
+        const char* detail = "Rider steady transport not observed";
+    };
+    struct RiderAdvanceCommandObservation {
+        const OriginalUiMainAudio50KG* transport = nullptr;
+        const AudioMixer50HD* mixer = nullptr;
+        const OriginalSoundMode50KG* soundMode = nullptr;
+        std::uint64_t controlRevisionBefore = 0, controlRevisionAfter = 0;
+        std::uint64_t mixerControlRevisionBefore = 0, mixerControlRevisionAfter = 0;
+        std::uint64_t mixerEpoch = 0, soundModeRevision = 0, sourceMixedFrames = 0;
+        std::uint32_t eventId = 0;
+        std::size_t voiceSlot = requiredVoices;
+        AudioVoiceObservation50HD voice{};
+    };
+    class RiderAdvanceCommandReceipt final {
+    public:
+        bool issued() const noexcept { return issued_; }
+        const RiderAdvanceCommandObservation& observation() const noexcept { return observation_; }
+    private:
+        friend class OriginalUiMainAudio50KG;
+        bool issued_ = false;
+        RiderAdvanceCommandObservation observation_{};
+    };
     OriginalUiMainAudio50KG() = default;
     ~OriginalUiMainAudio50KG() noexcept override { reset(); }
     OriginalUiMainAudio50KG(const OriginalUiMainAudio50KG&) = delete;
@@ -53,6 +99,13 @@ public:
     // Read-only preflight is required before the actual profile/route commit.
     bool canPlayRiderBack5() const noexcept;
     bool playRiderBack5() noexcept;
+    // Dormant Rider direction event2 ->292360(2,1,0), the authenticated
+    // ADVANCE.VAG clip6/voice6 operation. No page/session invokes this yet.
+    // Receipt certifies one successful command, never current audibility,
+    // continued effect activity, movement, a page update or presentation.
+    bool canPlayRiderAdvance2() const noexcept;
+    bool playRiderAdvance2(RiderAdvanceCommandReceipt&) noexcept;
+    bool inspectSteadyRiderTransport(SteadyTransportObservation&) const noexcept;
     // Source loop-mode234540, targetvolume0, duration1000ms for Main B4.
     // Bounded source calls admitted: zero immediate stop or exactly1 second.
     // Native policy: linear gain at accepted source-update boundaries, followed
@@ -72,7 +125,9 @@ public:
     bool canPlayGameOptionsEffect(std::uint32_t originalId) const noexcept;
     bool playGameOptionsEffect(std::uint32_t originalId) noexcept;
     bool update(float sourceSeconds) noexcept;
-    void pause(bool value) noexcept { paused_ = value; }
+    void pause(bool value) noexcept {
+        if(paused_!=value){paused_=value;noteControlChange();}
+    }
     bool paused() const noexcept { return paused_; }
     // Application must use this gate for the dedicated frontend mixer. Paused
     // calls write silence without consuming PCM. No device callback uses this.
@@ -83,6 +138,8 @@ public:
     std::uint32_t activeMusicSong() const noexcept;
     float mainGain() const noexcept { return musicGain_; }
 private:
+    bool canRecordControlChange() const noexcept;
+    void noteControlChange() noexcept;
     bool current() const noexcept;
     bool startMusicLoop(const AudioClip50HD&, std::uint32_t song) noexcept;
     bool canPlayEffectClip(std::size_t) const noexcept;
@@ -93,6 +150,11 @@ private:
     AudioMixer50HD* mixer_ = nullptr;
     std::uint64_t mixerEpoch_ = 0;
     std::size_t mixerCount_ = 0;
+    std::uint32_t mixerRate_ = 0;
+    const OriginalSoundMode50KG* preparedSoundMode_ = nullptr;
+    std::uint64_t controlRevision_ = 0, musicPlaybackRevision_ = 0;
+    std::array<std::uint64_t, effectVoiceCount> effectPlaybackRevisions_{};
+    bool controlRevisionExhausted_ = false;
     float musicGain_ = 0.4f, fadeStartGain_ = 0.4f;
     float fadeElapsed_ = 0.f, fadeDuration_ = 0.f, fadeRetireAt_ = 0.f;
     std::uint32_t musicSong_ = 0;

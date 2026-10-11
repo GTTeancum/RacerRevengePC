@@ -28,6 +28,14 @@ bool AudioMixer50HD::validClip(const AudioClip50HD& clip) noexcept {
            ((!clip.loopStart && !clip.loopEnd) ||
             (clip.loopStart < clip.loopEnd && clip.loopEnd <= clip.frames));
 }
+bool AudioMixer50HD::canRecordControlChanges(std::uint64_t count) const noexcept {
+    return !controlRevisionExhausted_ &&
+        count<=std::numeric_limits<std::uint64_t>::max()-controlRevision_;
+}
+void AudioMixer50HD::noteControlChange() noexcept {
+    if (canRecordControlChanges(1)) ++controlRevision_;
+    else controlRevisionExhausted_=true; // Never expose a reused terminal identity.
+}
 bool AudioMixer50HD::initialize(AudioVoice50HD* voices, std::size_t count,
                               std::uint32_t outputRate) noexcept {
     if (!voices || !count || count > audioMaximumVoices50HD || !validRate(outputRate) ||
@@ -37,16 +45,18 @@ bool AudioMixer50HD::initialize(AudioVoice50HD* voices, std::size_t count,
     soundMode50KG_.reset();
     masterGain_ = 1.0f; mixedFrames_ = clippedSamples_ = 0;
     ++groupEpoch50IC_; requireGroups50IC_ = false;
+    noteControlChange();
     for (std::size_t i = 0; i < count_; ++i) {
         voices_[i] = {}; groupGains50IC_[i] = 1.0f; groupKnown50IC_[i] = false;
         originalLeft50KG_[i] = originalRight50KG_[i] = 1.0f;
+        playbackRevisions_[i] = 0;
     }
     return true;
 }
 bool AudioMixer50HD::bindOriginalSoundMode50KG(std::shared_ptr<OriginalSoundMode50KG> owner) noexcept {
     if(!owner||!owner->ready()||soundMode50KG_||!voices_||!count_||mixedFrames_)return false;
     for(std::size_t i=0;i<count_;++i)if(voices_[i].active)return false;
-    soundMode50KG_=std::move(owner);return true;
+    soundMode50KG_=std::move(owner);noteControlChange();return true;
 }
 bool AudioMixer50HD::originalRouting50KG(std::int32_t angle,float& left,float& right) const noexcept {
     if(!soundMode50KG_||!soundMode50KG_->ready())return false;
@@ -66,6 +76,7 @@ bool AudioMixer50HD::playOriginalAngle50KG(std::size_t slot,const AudioClip50HD&
     if(slot>=count_||!validClip(clip)||!validControls(gain,pitch,0.f)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        !originalRouting50KG(engineAngle,left,right))return false;
+    noteControlChange();playbackRevisions_[slot]=controlRevision_;
     voices_[slot]={clip,0.0,gain,pitch,0.f,true,loop};
     originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
 }
@@ -75,7 +86,10 @@ bool AudioMixer50HD::controlsOriginalAngle50KG(std::size_t slot,float gain,float
     if(slot>=count_||!validControls(gain,pitch,0.f)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        !originalRouting50KG(engineAngle,left,right))return false;
-    auto& voice=voices_[slot];voice.gain=gain;voice.pitch=pitch;voice.pan=0.f;
+    auto& voice=voices_[slot];
+    if(voice.gain!=gain||voice.pitch!=pitch||voice.pan!=0.f||
+        originalLeft50KG_[slot]!=left||originalRight50KG_[slot]!=right)noteControlChange();
+    voice.gain=gain;voice.pitch=pitch;voice.pan=0.f;
     originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
 }
 bool AudioMixer50HD::play(std::size_t slot, const AudioClip50HD& clip, float gain,
@@ -83,6 +97,7 @@ bool AudioMixer50HD::play(std::size_t slot, const AudioClip50HD& clip, float gai
     if(soundMode50KG_)return pan==0.f&&playOriginalAngle50KG(slot,clip,gain,pitch,loop,0);
     if (slot >= count_ || !validClip(clip) || !validControls(gain, pitch, pan) ||
         (requireGroups50IC_ && !groupKnown50IC_[slot])) return false;
+    noteControlChange();playbackRevisions_[slot]=controlRevision_;
     voices_[slot] = {clip, 0.0, gain, pitch, pan, true, loop};
     return true;
 }
@@ -91,20 +106,24 @@ bool AudioMixer50HD::controls(std::size_t slot, float gain, float pitch, float p
     if (slot >= count_ || !validControls(gain, pitch, pan) ||
         (requireGroups50IC_ && !groupKnown50IC_[slot])) return false;
     auto& voice = voices_[slot];
+    if(voice.gain!=gain||voice.pitch!=pitch||voice.pan!=pan)noteControlChange();
     voice.gain = gain; voice.pitch = pitch; voice.pan = pan;
     return true;
 }
 bool AudioMixer50HD::setLoop(std::size_t slot, bool loop) noexcept {
     if (slot >= count_) return false;
+    if(voices_[slot].loop!=loop)noteControlChange();
     voices_[slot].loop = loop;
     return true;
 }
 bool AudioMixer50HD::setMasterGain(float gain) noexcept {
     if (!std::isfinite(gain) || gain < 0.0f || gain > 4.0f) return false;
+    if(masterGain_!=gain)noteControlChange();
     masterGain_ = gain; return true;
 }
 bool AudioMixer50HD::setVoiceGroupGain50IC(std::size_t slot, float gain) noexcept {
     if (slot >= count_ || !std::isfinite(gain) || gain < 0.0f || gain > 1.0f) return false;
+    if(!groupKnown50IC_[slot]||groupGains50IC_[slot]!=gain)noteControlChange();
     groupGains50IC_[slot] = gain; groupKnown50IC_[slot] = true; return true;
 }
 bool AudioMixer50HD::hasVoiceGroupGain50IC(std::size_t slot) const noexcept {
@@ -114,16 +133,31 @@ bool AudioMixer50HD::requireVoiceGroupGains50IC() noexcept {
     if (!voices_ || !count_) return false;
     for (std::size_t i = 0; i < count_; ++i)
         if (voices_[i].active && !groupKnown50IC_[i]) return false;
+    if(!requireGroups50IC_)noteControlChange();
     requireGroups50IC_ = true; return true;
 }
 void AudioMixer50HD::stop(std::size_t slot) noexcept {
-    if (slot < count_) voices_[slot].active = false;
+    if (slot < count_ && voices_[slot].active) {
+        noteControlChange();voices_[slot].active = false;
+    }
 }
 void AudioMixer50HD::stopAll() noexcept {
-    for (std::size_t i = 0; i < count_; ++i) voices_[i].active = false;
+    bool changed=false;
+    for (std::size_t i = 0; i < count_; ++i) {
+        changed=changed||voices_[i].active;voices_[i].active = false;
+    }
+    if(changed)noteControlChange();
 }
 bool AudioMixer50HD::active(std::size_t slot) const noexcept {
     return slot < count_ && voices_[slot].active;
+}
+bool AudioMixer50HD::inspectVoice(std::size_t slot, AudioVoiceObservation50HD& out) const noexcept {
+    out={};
+    if(!voices_||slot>=count_||!canRecordControlChanges())return false;
+    out.voice=voices_[slot];out.playbackRevision=playbackRevisions_[slot];
+    out.groupGain=groupGains50IC_[slot];out.groupKnown=groupKnown50IC_[slot];
+    out.originalLeft=originalLeft50KG_[slot];out.originalRight=originalRight50KG_[slot];
+    return true;
 }
 std::size_t AudioMixer50HD::availableVoice(std::size_t first, std::size_t count) const noexcept {
     if (first >= count_) return count_;
