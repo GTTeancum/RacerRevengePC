@@ -95,6 +95,7 @@ def main():
         'src/game/original_ui_options_camera50kg.cpp',
         'platform/linux/native/original_ui_options_draw_resources50kg.cpp',
         'platform/linux/native/original_ui_rider_draw_resources50kg.cpp',
+        'platform/linux/native/original_ui_rider_profile50kg.cpp',
         'platform/linux/native/original_ui_rider_stat_draw50kg.cpp',
         'platform/linux/native/original_ui_options_draw_contribution50kg.cpp',
         'src/game/original_ui_rider_selection50kg.cpp',
