@@ -202,6 +202,18 @@ bool OriginalUiRiderPodScene50KG::reload(D& d) noexcept {
     s.destroyed=false;return true;
 }
 bool OriginalUiRiderPodScene50KG::loaded() const noexcept {return storage_&&!storage_->destroyed;}
+bool OriginalUiRiderPodScene50KG::captureDirectionalOrientation(
+    OriginalUiRiderPodOrientation50KG& output,D& d) const noexcept {
+    d={};if (!loaded()) return fail(d,E::phase,0x28A530);
+    return captureOriginalUiRiderPodOrientation50KG(storage_->model.view(),static_cast<I>(0),output)||
+        fail(d,E::graph,0x28A530);
+}
+bool OriginalUiRiderPodScene50KG::restoreDirectionalOrientation(
+    const OriginalUiRiderPodOrientation50KG& orientation,D& d) noexcept {
+    d={};if (!loaded()) return fail(d,E::phase,0x289EC0);
+    return restoreOriginalUiRiderPodOrientation50KG(storage_->model.view(),static_cast<I>(0),orientation)||
+        fail(d,E::pose,0x289EC0);
+}
 void OriginalUiRiderPodScene50KG::selected() noexcept {if (storage_) storage_->paused=false;}
 void OriginalUiRiderPodScene50KG::deselected() noexcept {if (storage_) storage_->paused=true;}
 bool OriginalUiRiderPodScene50KG::advance(float dt,D& d) noexcept {

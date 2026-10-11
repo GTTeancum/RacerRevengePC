@@ -63,6 +63,15 @@ public:
     void modelDestroyedAfterDetach() noexcept;
     bool reload(OriginalUiRiderModelDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
+    // Rider direction choreography captures BEFORE outgoing deselection, then
+    // restores AFTER final incoming SELECT has loaded and attached this pod.
+    // Only a copied value crosses those graph lifetimes. Caller must establish
+    // actual attachment/selection and drain outstanding graph/packet borrows;
+    // these operations neither detach owners nor alter cache membership.
+    bool captureDirectionalOrientation(OriginalUiRiderPodOrientation50KG&,
+        OriginalUiRiderModelDiagnostic50KG&) const noexcept;
+    bool restoreDirectionalOrientation(const OriginalUiRiderPodOrientation50KG&,
+        OriginalUiRiderModelDiagnostic50KG&) noexcept;
     void selected() noexcept;void deselected() noexcept;
     bool advance(float elapsedSeconds,OriginalUiRiderModelDiagnostic50KG&) noexcept;
     bool projectPalette(std::uint8_t modelFlags191,ModelPalette49S&,

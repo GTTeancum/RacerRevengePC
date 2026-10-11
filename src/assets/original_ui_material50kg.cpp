@@ -824,8 +824,11 @@ bool prepareOriginalUiRider19ShadowMaterial50KM(const OriginalUiMaterialPass50KG
     OriginalUiRider19ShadowMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
     d={};d.pass=pass.pass;
     try {
-        if (pass.identity!=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_shdw.psm") ||
-            pass.pass!=1 || !same(pass.microprogram,"DiffuseCompressed") || !same(pass.textureName,"19_shdw") ||
+        if (!pass.identity)return fail(d,Error::profile,"canonical Rider shadow PSM identity",0x2476a0u);
+        const bool shadow19=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_shdw.psm");
+        const bool shadow20=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\20_shdw.psm");
+        if ((!shadow19&&!shadow20) || pass.pass!=1 || !same(pass.microprogram,"DiffuseCompressed") ||
+            !same(pass.textureName,shadow19?"19_shdw":"20_shdw") ||
             pass.gs[Field::alphaBlendingOnOff].value!=1 || pass.gs[Field::inputColorA].value!=2 ||
             pass.gs[Field::inputColorB].value!=1 || pass.gs[Field::inputAlphaC].value!=0 ||
             pass.gs[Field::inputColorD].value!=1 || pass.gs[Field::alphaTestOnOff].value!=1 ||
@@ -833,19 +836,22 @@ bool prepareOriginalUiRider19ShadowMaterial50KM(const OriginalUiMaterialPass50KG
             pass.gs[Field::processingMethodWhenFailedInAlphaTest].value!=0 ||
             pass.gs[Field::foggingOnOff].value!=1 || pass.gs[Field::depthTestMethod].value!=2 ||
             pass.gs[Field::zWriteDisabled].value!=0)
-            return fail(d,Error::profile,"actual Rider19 shadow attenuation pass1",0x2476a0u);
-        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_shdw.pst");
+            return fail(d,Error::profile,"actual Rider19/20 shadow attenuation pass1",0x2476a0u);
+        // The PSM selects its own exact image. Matching layout or an _shdw
+        // suffix never admits another rider or substitutes the19 image for20.
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,
+            shadow19?"ui\\textures\\19_shdw.pst":"ui\\textures\\20_shdw.pst");
         const auto* source=images.sourceProvenance(imageIndex);
         const auto* texture=images.decodedTexture(imageIndex);
         const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
         if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
             source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
             source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=1)
-            return fail(d,Error::texture,"authenticated original Rider19 shadow image",0x24e880u);
+            return fail(d,Error::texture,"authenticated original Rider19/20 shadow image",0x24e880u);
         const auto& mip=texture->mips.front();
         if (mip.width!=128 || mip.height!=128 || image->texture.width!=mip.width ||
             image->texture.height!=mip.height || image->texture.rgba!=mip.rgba)
-            return fail(d,Error::texture,"published source Rider19 shadow image");
+            return fail(d,Error::texture,"published source Rider19/20 shadow image");
         OriginalUiRider19ShadowMaterial50KM next;
         if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
             next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,false,false,true))return false;
@@ -859,13 +865,26 @@ bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50
     OriginalUiRider19SpecularMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
     d={};d.pass=pass.pass;
     try {
-        const bool body=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_1.psm") ||
+        if (!pass.identity)return fail(d,Error::profile,"canonical Rider specular PSM identity",0x2476a0u);
+        const bool body19=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_1.psm") ||
             pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\19_2.psm");
+        const bool body20=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\20_1.psm") ||
+            pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\20_2.psm");
         const bool window=pass.identity==catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\pod_wndw.psm");
-        if ((!body&&!window) || pass.pass!=2 || !same(pass.microprogram,"SpecularMapCompressed") ||
+        if ((!body19&&!body20&&!window) || pass.pass!=2 || !same(pass.microprogram,"SpecularMapCompressed") ||
             !same(pass.textureName,"specmap1") || pass.gs[Field::inputAlphaC].value!=(window?2:1) ||
             (window && pass.gs[Field::fixedAlphaValue].value!=255))
-            return fail(d,Error::profile,"actual Rider19 single-map specular pass2",0x2476a0u);
+            return fail(d,Error::profile,"actual Rider19/20 single-map specular pass2",0x2476a0u);
+        // Only these two new body PSMs are admitted. Keep their actual inherited
+        // fog/ATE/GEQUAL state; the common gate below retains ALPHA(0,2,1,1),
+        // enabled blending and disabled depth writes. Existing19 admission is
+        // unchanged, including the distinct pod_wndw FIX255 pass.
+        if (body20 && (pass.gs[Field::foggingOnOff].value!=1 ||
+            pass.gs[Field::alphaTestOnOff].value!=1 || pass.gs[Field::alphaTestMethod].value!=6 ||
+            pass.gs[Field::alphaReferenceValue].value!=0 ||
+            pass.gs[Field::processingMethodWhenFailedInAlphaTest].value!=0 ||
+            pass.gs[Field::depthTestMethod].value!=2))
+            return fail(d,Error::profile,"actual Rider20 specular fog alpha-test depth state",0x2476a0u);
         const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,"ui\\textures\\specmap1.pst");
         const auto* source=images.sourceProvenance(imageIndex);
         const auto* texture=images.decodedTexture(imageIndex);
