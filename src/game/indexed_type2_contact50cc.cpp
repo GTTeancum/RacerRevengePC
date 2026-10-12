@@ -167,21 +167,32 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
        !write(w.effects,w.effectCapacity)||!write(w.stack,w.stackCapacity)||!write(w.trace,w.traceCapacity)||
        !write(d.pairs,d.pairCapacity)||!write(d.metadata,d.metadataCapacity)||!write(d.records,d.recordCapacity)||
        !write(d.effects,d.effectCapacity)||!write(&result,1))return Status::InvalidInput;
-    // The exact GC scope has one shared Gate. Admit its writable bytes before
-    // checking every immutable span. Duplicate visits may share that binding.
-    Range ownerRange{},indexRange{};GateTriggerBinding50KG* gateOwner=nullptr;
+    // Admit one shared GC Gate OR one shared GA trigger group as a writable
+    // track owner before all immutable spans. Mixing these schemas is rejected;
+    // duplicate candidate visits may share the same owner.
+    Range ownerRange{},indexRange{};GateTriggerBinding50KG* gateOwner=nullptr;NativeTriggerGroup50GA* triggerOwner=nullptr;
     if(!aligned(candidates,ownerCount)||!range(candidates,ownerCount,sizeof(*candidates),ownerRange)||
        !aligned(indices,count)||!range(indices,count,sizeof(*indices),indexRange))return Status::InvalidInput;
     for(std::size_t i=0;i<count;++i){
         if(indices[i]>=ownerCount)return Status::InvalidInput;
         const auto& candidate=candidates[indices[i]];
+        // Native trigger state belongs only to an admitted shape5 owner.
+        // Reject stray pointers/indices before any group dereference or write.
+        if((candidate.nativeTriggers&&candidate.shapeType!=5)||
+           (!candidate.nativeTriggers&&candidate.nativeTriggerIndex!=0))return Status::InvalidInput;
         if(candidate.shapeType==5){
-            if(!candidate.gate)return Status::InvalidInput;
-            if(gateOwner&&gateOwner!=candidate.gate)return Status::UnsupportedScope;
-            gateOwner=candidate.gate;
+            if(bool(candidate.gate)==bool(candidate.nativeTriggers))return Status::InvalidInput;
+            if(candidate.gate){
+                if(triggerOwner||(gateOwner&&gateOwner!=candidate.gate))return Status::UnsupportedScope;
+                gateOwner=candidate.gate;
+            }else{
+                if(gateOwner||(triggerOwner&&triggerOwner!=candidate.nativeTriggers))return Status::UnsupportedScope;
+                triggerOwner=candidate.nativeTriggers;
+            }
         }
     }
     if(gateOwner&&!write(gateOwner,1))return Status::InvalidInput;
+    if(triggerOwner&&(!write(triggerOwner,1)||!validNativeTriggerGroup50GA(*triggerOwner)))return Status::InvalidInput;
     const auto read=[&](const auto* p,std::size_t n) noexcept {
         Range input{};if(!aligned(p,n)||!range(p,n,sizeof(*p),input))return false;
         for(unsigned i=0;i<nw;++i)if(overlap(input,writes[i]))return false;
@@ -261,8 +272,13 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
         }else if(candidate.shapeType==5){
             if(!q.nativeGatePolicy||!q.callbackEnabled||q.skipMask!=8u||
                c.shapeType!=5||c.compound||c.geometry.mesh||c.filter.categoryA4!=8u||
-               !c.hasResponseCallbackE8||candidate.gate!=gateOwner||
-               !candidate.gate->callbacks.activateAnimation)return Status::UnsupportedScope;
+               !c.hasResponseCallbackE8)return Status::UnsupportedScope;
+            if(candidate.gate){
+                if(candidate.gate!=gateOwner||!candidate.gate->callbacks.activateAnimation)return Status::UnsupportedScope;
+            }else if(candidate.nativeTriggers!=triggerOwner||!triggerOwner||
+                candidate.nativeTriggerIndex>=triggerOwner->triggers.size()||
+                c.filter.identity!=triggerOwner->triggers[candidate.nativeTriggerIndex].collider.identity||
+                nativeTriggerCollider50GA(*triggerOwner,q.filter->identity)==triggerOwner->colliders.size())return Status::UnsupportedScope;
             if(q.nativeGateHasPrevious&&!affine(q.nativeGatePreviousWorld))return Status::InvalidInput;
         }else return Status::UnsupportedScope;
     }
@@ -311,6 +327,11 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
         // narrowphase may cross while the current endpoint sphere is outside.
         if((!sphereOverlap&&!(candidate.shapeType==5&&query.nativeGateHasPrevious))||
            !filter(*query.filter,c.filter))continue;
+        // validate() admitted this exact shape5 group's writable range and
+        // identity/index before scratch or shared action state can be changed.
+        if(candidate.shapeType==5&&candidate.nativeTriggers&&
+           !nativeTriggerPairAllowed50GA(*candidate.nativeTriggers,
+            candidate.nativeTriggerIndex,query.filter->identity))continue;
         if(c.geometry.id!=c.filter.identity)return Status::InvalidInput;
         //121438 follows the genuine outer sphere/filter gate and precedes
         // target-shape dispatch, including a later coarse/triangle miss.
@@ -468,11 +489,16 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
             }
         }
         if(c.hasResponseCallbackE8){
-            if(candidate.shapeType!=5||!candidate.gate)return Status::UnsupportedScope;
+            if(candidate.shapeType!=5)return Status::UnsupportedScope;
             //122860..88: E4 skips TRIGGER8 first; E8 then commits its action
             // synchronously. A later numerical failure cannot undo this event.
-            const auto receipt=dispatchGateContact50KG(*candidate.gate,query.filter->identity);
-            if(receipt.status==GateTriggerStatus50KG::ActionCallbackFailed)return Status::UnsupportedScope;
+            if(candidate.nativeTriggers){
+                const auto receipt=dispatchNativeTriggerContact50GA(*candidate.nativeTriggers,candidate.nativeTriggerIndex,query.filter->identity);
+                if(receipt.status!=TriggerEntryStatus50IN::Complete||receipt.randomConsumed)return Status::UnsupportedScope;
+            }else{
+                const auto receipt=dispatchGateContact50KG(*candidate.gate,query.filter->identity);
+                if(receipt.status==GateTriggerStatus50KG::ActionCallbackFailed)return Status::UnsupportedScope;
+            }
         }
     }
     std::memcpy(d.pairs,w.pairs,initial.pairSlots*sizeof(*d.pairs));

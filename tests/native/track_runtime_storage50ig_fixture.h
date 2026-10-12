@@ -316,7 +316,7 @@ public:
                 if(binding.trigger){
                     need(!binding.animated&&binding.originalOwner==std::numeric_limits<std::size_t>::max()&&
                         binding.authoredZone&&binding.authoredZone<=n.zones&&binding.method==ZoneMethod50CL::First&&
-                        binding.candidate->shapeType==5&&binding.candidate->gate&&c.shapeType==5&&
+                        binding.candidate->shapeType==5&&(bool(binding.candidate->gate)!=bool(binding.candidate->nativeTriggers))&&c.shapeType==5&&
                         !c.geometry.mesh&&!c.compound&&c.hasResponseCallbackE8&&c.filter.categoryA4==8u&&
                         c.filter.identity&&c.geometry.id==c.filter.identity&&c.ownerIdentity9C,
                         "original Gate sphere binding is incomplete");

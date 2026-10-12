@@ -5,7 +5,7 @@
 
 namespace rr::platform {
 class OriginalSoundMode50KG;
-inline constexpr std::size_t audioMaximumVoices50HD = 128;
+inline constexpr std::size_t audioMaximumVoices50HD = 160;
 
 // Borrowed decoded, signed PCM16. Samples and the voice array must outlive use.
 // Mono or interleaved stereo; frame counts are not scalar sample counts.

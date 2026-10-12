@@ -59,17 +59,28 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
        !g.write(w.stack,w.stackCapacity)||!g.write(w.trace,w.traceCapacity)||
        !g.write(d.pairs,d.pairCapacity)||!g.write(d.metadata,d.metadataCapacity)||
        !g.write(d.records,d.recordCapacity)||!g.write(d.effects,d.effectCapacity)||!g.write(&result,1))return false;
-    Span ownerSpan{},indexSpan{};GateTriggerBinding50KG* gateOwner=nullptr;
+    Span ownerSpan{},indexSpan{};GateTriggerBinding50KG* gateOwner=nullptr;NativeTriggerGroup50GA* triggerOwner=nullptr;
     if(!span(owners,ownerCount,ownerSpan)||!span(indices,count,indexSpan))return false;
     for(std::size_t i=0;i<count;++i){
         if(indices[i]>=ownerCount)return false;
         const auto& owner=owners[indices[i]];
+        // Apply the same shape ownership rule before the live membership
+        // prefix can mutate buffers or hand this owner to indexed50CC.
+        if((owner.nativeTriggers&&owner.shapeType!=5)||
+           (!owner.nativeTriggers&&owner.nativeTriggerIndex!=0))return false;
         if(owner.shapeType==5){
-            if(!owner.gate||(gateOwner&&gateOwner!=owner.gate))return false;
-            gateOwner=owner.gate;
+            if(bool(owner.gate)==bool(owner.nativeTriggers))return false;
+            if(owner.gate){
+                if(triggerOwner||(gateOwner&&gateOwner!=owner.gate))return false;
+                gateOwner=owner.gate;
+            }else{
+                if(gateOwner||(triggerOwner&&triggerOwner!=owner.nativeTriggers))return false;
+                triggerOwner=owner.nativeTriggers;
+            }
         }
     }
     if(gateOwner&&!g.write(gateOwner,1))return false;
+    if(triggerOwner&&(!g.write(triggerOwner,1)||!validNativeTriggerGroup50GA(*triggerOwner)))return false;
     if(!g.read(&frame,1)||!g.read(&bindings,1)||!g.read(&admission,1)||!g.read(&live,1)||
        !g.read(&source,1)||!g.read(&initial,1)||!g.read(&w,1)||!g.read(&d,1)||
        !g.read(&world,1)||!g.read(world.portalHeads,world.zoneCount)||!g.read(world.portals,world.portalCount)||
@@ -101,8 +112,13 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
                 if(!readMesh(part.mesh,part.nodeRadii,part.nodeRadiusCount))return false;
             }
         }else if(owner.shapeType==5){
-            if(!source.nativeGatePolicy||owner.gate!=gateOwner||
-               !owner.gate->callbacks.activateAnimation)return false;
+            if(!source.nativeGatePolicy)return false;
+            if(owner.gate){
+                if(owner.gate!=gateOwner||!owner.gate->callbacks.activateAnimation)return false;
+            }else if(owner.nativeTriggers!=triggerOwner||!triggerOwner||
+                owner.nativeTriggerIndex>=triggerOwner->triggers.size()||
+                candidate.collision.filter.identity!=triggerOwner->triggers[owner.nativeTriggerIndex].collider.identity||
+                nativeTriggerCollider50GA(*triggerOwner,source.filter->identity)==triggerOwner->colliders.size())return false;
         }else return false;
     }
     return true;

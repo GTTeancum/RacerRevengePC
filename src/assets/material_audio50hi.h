@@ -11,7 +11,7 @@ struct MaterialAudioCatalog50HI {
     std::uint32_t materialCount=0,defaultMaterial=0;
     rr::game::MaterialAudioParameters50HI parameters{};
 };
-// Cold original selected AUB decoder (bounded8/12-row profiles). Uses actual SoundResourceFile and six drive
+// Cold original selected AUB decoder (bounded8/12/20-row profiles). Uses actual SoundResourceFile and six drive
 // parameters; no guessed VAG names, generic impacts or timing thresholds.
 bool readMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
     MaterialAudioCatalog50HI&,std::vector<AudioRequest50HC>& uniqueRequests,std::string&error);

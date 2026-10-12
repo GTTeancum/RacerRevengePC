@@ -56,7 +56,7 @@ public:
         const g::original_gc_gameplay_lighting_candidate::Owner& lights)noexcept {
         if(slot>=8||!source_.bindings(slot))return false;
         std::array<float,4> ambient;
-        if(!lights.currentGcGlobalAmbient50(ambient))return false;
+        if(!lights.currentSourceGlobalAmbient50(ambient))return false;
         g::OriginalUiRiderBinderQuad50KG quad;
         const std::array<float,3> camera{{cameraBackward.v[0],cameraBackward.v[1],cameraBackward.v[2]}};
         if(core::project(state,frame,*source_.bindings(slot),camera,quad,workspace_)!=core::Status::complete||

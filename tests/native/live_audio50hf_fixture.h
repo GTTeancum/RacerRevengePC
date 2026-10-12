@@ -15,7 +15,7 @@
 #include <vector>
 
 namespace live_audio50HF {
-inline constexpr std::size_t voiceCount=128,providerFirstVoice=0,lapFirstVoice=60,lapVoiceCount=4;
+inline constexpr std::size_t voiceCount=160,providerFirstVoice=0,lapFirstVoice=60,lapVoiceCount=4;
 inline constexpr std::uint32_t sampleRate=48000,stepMicroseconds=16000,stepFrames=768;
 static_assert(gameplay_audio50HE::cueCount==lapFirstVoice);
 static_assert(lapFirstVoice+lapVoiceCount<=voiceCount);

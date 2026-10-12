@@ -1,6 +1,7 @@
 #pragma once
 #include "authored_parameters49n.h"
 #include "track_navigation50eu.h"
+#include <cstddef>
 #include <cstdint>
 
 namespace rr::game {
@@ -29,7 +30,46 @@ inline bool applyAiCreateClass50IU(AuthoredClass49N actualRaceClass,
     if(actualRaceClass==AuthoredClass49N::A)profile.repairTime1064=2.f;
     return true;
 }
-// Fresh ORIGINAL profile metadata for the currently admitted GC route only.
+// Fresh ORIGINAL metadata, not a loaded save or a live menu/profile owner.
+// Track IDs index the descriptor table at11278 with stride12; the class uses
+// the independent course-order table at100C4 with stride40 (187B10).
+// GA WatchtowerRun: ID8, course order3, AI class1, course-record pod10.
+// GC TheCitadel: ID10, course order10, AI class3, course-record pod17.
+// Neither the visible Course control number nor the selected player pod may
+// substitute for those source fields. Other tracks are deliberately rejected.
+struct AiFreshCreateSelection50IU {
+    std::uint8_t selectedTrackId1125F=0xff;
+    std::int32_t selectedOrder187B10=-1;
+    AuthoredClass49N actualRaceClass=AuthoredClass49N::A;
+    std::int32_t freshCourseRecordPod11280=0;
+    bool bound=false;
+};
+inline bool bindFreshAiCreateSelection50IU(const char* trackCode,
+    std::size_t bytes,AiFreshCreateSelection50IU& out) noexcept {
+    if(!trackCode||bytes!=2||(trackCode[0]!='g'&&trackCode[0]!='G'))return false;
+    const bool ga=trackCode[1]=='a'||trackCode[1]=='A';
+    const bool gc=trackCode[1]=='c'||trackCode[1]=='C';
+    if(!ga&&!gc)return false;
+    AiFreshCreateSelection50IU next{};
+    //17EB0C..17EB44: "ga" at112D8 and pod10 at112E0.
+    //17EE2C..17EE64: "gc" at112F0 and pod17 at112F8.
+    next.selectedTrackId1125F=ga?8u:10u;
+    next.freshCourseRecordPod11280=ga?10:17;
+    // Original fresh byte stores17EF00..17F6EC. The187B10 scan compares
+    // (1125F&15) with these entries; it does not use the track ID as order.
+    constexpr std::uint8_t freshCourseOrder[]{0,11,4,8,7,1,5,9,12,6,10,3,2};
+    for(std::size_t i=0;i<sizeof(freshCourseOrder);++i)
+        if(freshCourseOrder[i]==next.selectedTrackId1125F){
+            next.selectedOrder187B10=static_cast<std::int32_t>(i);break;
+        }
+    if(next.selectedOrder187B10<0)return false;
+    //16E590..16E5B4, independent of the PHY filename/class exceptions49N.
+    next.actualRaceClass=next.selectedOrder187B10<5?AuthoredClass49N::A:
+        next.selectedOrder187B10<9?AuthoredClass49N::B:AuthoredClass49N::C;
+    next.bound=true;out=next;return true;
+}
+// Retained strict GC-only compatibility API. Existing callers keep their
+// defaults and cannot accidentally admit GA under a GC-shaped selection.
 //17EE2C stores "gc" at112F0: descriptor11278 +12*10.17F5A0 writes
 //trackID10 at100C4 +40*10;187B10 returns10;16E590/5A4 select class3.
 //17EE64 writes its course-record pod17 at112F8. This is NOT the current

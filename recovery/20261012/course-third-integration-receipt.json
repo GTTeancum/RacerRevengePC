@@ -1,0 +1,65 @@
+{
+  "status": "failed",
+  "commit": "c6814e73ccfd179c26c700a4337f5005a1d8b0b2",
+  "tree": "17de86ae87f767082ee4f3225128d33e7d3dbcbb",
+  "started_at_utc": "2026-10-12T17:23:15.603099+00:00",
+  "finished_at_utc": "2026-10-12T17:24:36.029660+00:00",
+  "next_eligible_utc": "2026-10-12T18:24:36.029660+00:00",
+  "runner_sha256": "d408a65c988c4b174049d9629a6bf69ae47fc68e39020bee2131e8b895122ff7",
+  "recorder_sha256": "20ea8d291ee7f3d7f87916b722f2f9ab79cb6d0d3d329ec4d52465846bfe64b0",
+  "executable_sha256": "76f4856889c406c0f8ae7deb46520b5d47cd8fdaccae905bec83ef2069c23974",
+  "kernel_child_proof": {
+    "kernel_waitpid_echild": true,
+    "reaped": []
+  },
+  "remaining_descendants": [],
+  "error": "RuntimeError: one-menu-observation failed; no retry authorized",
+  "platform": "Linux",
+  "build": {
+    "compiled": 7,
+    "reused": 292,
+    "link_exit": 0
+  },
+  "observation": {
+    "outcome": "failed",
+    "frames": 35,
+    "matched_acks": 36,
+    "presses": 2,
+    "releases": 1,
+    "returncode": 0,
+    "native_closed": {
+      "audio_accepted_nanoseconds": 0,
+      "audio_captured_frames": 0,
+      "audio_clock_microseconds": 0,
+      "audio_device_consumed_frames": 0,
+      "audio_device_overflow_frames": 0,
+      "audio_device_status": "not_requested",
+      "audio_device_underrun_frames": 0,
+      "audio_mixed_frames": 0,
+      "audio_rate": 0,
+      "audio_source_mixed_frames": 0,
+      "captures": 36,
+      "cleanup_complete": true,
+      "native_frames": 414,
+      "window_swaps": 0,
+      "world_ticks": 0
+    },
+    "native_quit_state": null
+  },
+  "observed_activation": [
+    5
+  ],
+  "world_ticks": 0,
+  "forced_signals": [],
+  "failure": "Course preparation rejected: preparation_status=10, course_resource=8, course_resource_pc=0. Main and settled Rider19 reached; Course and return to Rider were not reached.",
+  "scope": "Single bounded native menu observation. Rider initial dynamic graph acquisition fix compiled and opening validated. Binder compiled but not gameplay-rendered. No driving, gameplay, audio playback or Windows validation.",
+  "evidence_sha256": {
+    "central-session.json": "f4f1ba1e25c5985f39f3b86fdfcbfd6b9cdd5e9540417fe589aa44d27433723b",
+    "build-receipt.json": "b0be869c561943ba597dc807c7870d1ec71f8f6f752ad6080b5b5304f4470302",
+    "take-01/summary.json": "f9761fdcdd4b602ded235f6719180f72de6ce57b38667e89610a8d0be4d01ac6",
+    "take-01/game.log": "32f145cd1de7ddf921c26464814495d32960f00e6ba80a12e809576b4ce83217",
+    "take-01/frames.jsonl": "86d739a32c1333c1a4c262905ab75021be3c932cb5a951a94915417e32848d78",
+    "take-01/events.jsonl": "c9cdd7dc86f560440c8de842bd1fb2365a0275907cbf13485c896c48176aec41",
+    "take-01/frames/frame-000025.ppm": "b4f4cc29888547b779f43c85970c84b916c78e55ad1d4e3d26b7dba366fbce13"
+  }
+}

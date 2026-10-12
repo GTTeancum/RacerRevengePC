@@ -175,7 +175,11 @@ public:
         try {
             d = {};
             const auto& profile = track_visual_profile_fixture::get(request.track);
-            const bool gc = request.track == track_source_fixture::Track::gc;
+            const bool ga = request.track == track_source_fixture::Track::ga;
+            // Both authenticated Gamorr profiles preserve world-space roots,
+            // all authored passes and source wrap policy. This is not an alias
+            // of archive/profile identities or static texture selection.
+            const bool gc = request.track == track_source_fixture::Track::gc || ga;
             need(!gc || request.includeAllAuthoredPasses, "GC requires every authored material pass");
             need(!storage_, "Track materials already loaded");
             need(std::fegetround() == FE_TONEAREST, "Track parity requires FE_TONEAREST");
@@ -402,7 +406,8 @@ public:
                             out.textureKey = tr.at("key").get<std::string>();
                             const auto& textureRecord = inputs.record(out.textureKey);
                             need(textureRecord == tr.at("native") && textureRecord.at("type") == "texture" &&
-                                textureRecord.at("converter") == "rr-native-texture-48E-v1" &&
+                                (textureRecord.at("converter") == "rr-native-texture-48E-v1" ||
+                                 (ga && textureRecord.at("converter") == "rr-original-texture-50FC-v1")) &&
                                 textureRecord.at("source_sha256") == tr.at("selected").at("source_sha256"),
                                 "Track texture source record mismatch");
                             const auto& mips = textureRecord.at("mips");

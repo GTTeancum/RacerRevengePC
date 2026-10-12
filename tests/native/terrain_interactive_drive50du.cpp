@@ -85,7 +85,13 @@
 #include "gc_animated_candidates50ig_fixture.h"
 #include "gc_gate_candidates50kg_fixture.h"
 #include "gc_dynamic_window50ig_fixture.h"
+#include "ga_animated_candidates_fixture.h"
+#include "ga_dynamic_window_fixture.h"
+#include "ga_trigger_authoring_fixture.h"
+#include "ga_trigger_actions_fixture.h"
+#include "ga_trigger_candidates_fixture.h"
 #include "gc_atm_window_fixture.h"
+#include "ga_atm_window_fixture.h"
 #include "gameplay_binder_window_candidate_fixture.h"
 #include "source_grid50ig_fixture.h"
 #include "track_session_assets50ig_fixture.h"
@@ -189,13 +195,22 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const char* trackSelectionError=nullptr;
  const auto* trackSession=track_session_assets50IG::select(rr::platform::hostTrackCode50IM(loadedTrack),trackSelectionError);
  require50DU(trackSession,trackSelectionError?trackSelectionError:"original track admission failed");
+ const bool isGcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GC");
+ const bool isGaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GA");
+ // This delta does not admit GA. These explicit identities prevent a future
+ // asset binding from selecting GC-only dynamic owners through a generic
+ // static-collision feature flag.
+ // This source-only native trigger extension awaits independent review.
+ // It uses the unchanged actual-COL endpoint/sphere predicate already used
+ // by GC. Original reverse108E90 leaf/descriptor parity remains unclaimed.
+ require50DU(!isGaTrack,"GA native world candidate awaits independent source review and authorized validation");
  // Retained HOST trigger source is dormant; native Gate has independent ownership.
  const char* hostTriggerSetting=std::getenv("RR_GC_HOST_TRIGGERS");
  require50DU(!hostTriggerSetting||std::string(hostTriggerSetting)=="0",
      "RR_GC_HOST_TRIGGERS is dormant and cannot replace original-AI/native Gate ownership");
  const char* gateSetting=std::getenv("RR_GC_NATIVE_GATE");
- const bool gcNativeGate=trackSession->originalStaticCandidates&&gateSetting&&std::string(gateSetting)=="1";
- if(trackSession->originalStaticCandidates){
+ const bool gcNativeGate=isGcTrack&&gateSetting&&std::string(gateSetting)=="1";
+ if(isGcTrack){
   const char* incomplete=std::getenv("RR_GC_INCOMPLETE_WORLD");
   require50DU(incomplete&&std::string(incomplete)=="1",
       "GC native world is incomplete: authored LostAI branch triggers and Gate sound are unjoined; opening needs explicit RR_GC_NATIVE_GATE=1 native geometry policy; RR_GC_INCOMPLETE_WORLD=1 accepts these limits");
@@ -221,6 +236,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const char* taLightingSetting=std::getenv("RR_NATIVE_TA_SELECTED_LIGHTS");
  require50DU(!taLightingSetting||std::string(taLightingSetting)=="0"||
      std::string(taLightingSetting)=="1","RR_NATIVE_TA_SELECTED_LIGHTS must be 0 or 1");
+ const char* gaLightingSetting=std::getenv("RR_NATIVE_GA_SELECTED_LIGHTS");
+ require50DU(!gaLightingSetting||std::string(gaLightingSetting)=="0"||
+     std::string(gaLightingSetting)=="1","RR_NATIVE_GA_SELECTED_LIGHTS must be 0 or 1");
  // Authored level illumination is the native fresh-race default. Explicit 0
  // remains a diagnostic opt-out; Main/checkpoint paths retain their own policy.
  const bool freshLevelLighting=raceEnabled&&!checkpointInput&&!originalMainApplication.enabled;
@@ -228,11 +246,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      freshLevelLighting&&track_session_assets50IG::codeEquals(trackSession->world->code,"GC");
  const bool nativeTaSelection=taLightingSetting?std::string(taLightingSetting)=="1":
      freshLevelLighting&&track_session_assets50IG::codeEquals(trackSession->world->code,"TA");
- require50DU(!(nativeGcSelection&&nativeTaSelection),"choose exactly one native track-light policy");
- const bool nativeSelectedLights=nativeGcSelection||nativeTaSelection;
+ const bool nativeGaSelection=gaLightingSetting?std::string(gaLightingSetting)=="1":
+     freshLevelLighting&&isGaTrack;
+ require50DU(unsigned(nativeGcSelection)+unsigned(nativeTaSelection)+unsigned(nativeGaSelection)<=1u,
+     "choose exactly one native track-light policy");
+ const bool nativeSelectedLights=nativeGcSelection||nativeTaSelection||nativeGaSelection;
  require50DU(!nativeSelectedLights||(raceEnabled&&!checkpointInput&&
      !originalMainApplication.enabled&&track_session_assets50IG::codeEquals(
-        trackSession->world->code,nativeTaSelection?"TA":"GC")),
+        trackSession->world->code,nativeGaSelection?"GA":nativeTaSelection?"TA":"GC")),
      "native selected lights require their matching fresh authenticated race; checkpoint/Main unsupported");
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
@@ -243,8 +264,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!dynamicContactEnabled||originalAiEnabled,
      "dynamic source contacts require the bounded original AI session");
  constexpr std::size_t originalAiSlot=1;
- require50DU(!originalAiEnabled||(raceEnabled&&track_session_assets50IG::codeEquals(trackSession->world->code,"GC")),
-     "original AI first slice requires the real GC fleet");
+ const bool watchtowerOriginalAi=track_session_assets50IG::codeEquals(trackSession->world->code,"GA");
+ require50DU(!watchtowerOriginalAi||(raceEnabled&&allAiEnabled&&!checkpointInput&&
+     !startAtMenu&&!originalMainApplication.enabled),
+     "GA WatchtowerRun requires a fresh all-eight-original-AI race, including camera slot0; menu/checkpoint/mixed control unsupported");
+ const auto originalAiCreateSelection=[&](){
+  AiFreshCreateSelection50IU selected{};
+  require50DU(!originalAiEnabled||(raceEnabled&&bindFreshAiCreateSelection50IU(
+      trackSession->world->code,2,selected)),
+      "original AI requires authenticated fresh GA/GC course/class/record selection");
+  return selected;
+ }();
  // Source21079C retains constructor a1;21081C stores vehicle60 and210820/24
  // formats the original Pod%02d resource prefix. Native bank slot0 is a role.
  const bool playerUsesRosterRig=allAiEnabled||playerRacer60!=1u;
@@ -289,6 +319,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  static_assert(opponent_audio50HX::boostFirstVoice+opponent_audio50HX::boostVoiceCount<=race_music50IE::voice);
  static_assert(race_music50IE::voice<material_audio50HI::extraFirstVoice);
  static_assert(material_audio50HI::extraFirstVoice+material_audio50HI::maximumExtraVoices<=live_audio50HF::voiceCount);
+ static_assert(material_audio50HI::gaExtraFirstVoice+material_audio50HI::gaMaximumExtraVoices<=live_audio50HF::voiceCount);
  if(raceEnabled){
   require50DU(!checkpointInput,"a race must restart every racer together from the grid");
   lapContinuity={};
@@ -519,11 +550,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  require50DU(candidates.size()==trackSession->terrainOwners&&ground.owners.size()==candidates.size(),
      "original track binding must cover every retained terrain owner");
+ std::unique_ptr<ga_animated_world::Owner> gaAnimatedWorld;
+ ga_animated_world::Diagnostic gaAnimationDiagnostic{};
+ std::unique_ptr<ga_trigger_authoring::Owner> gaTriggerAuthoring;
+ std::unique_ptr<ga_trigger_actions::Owner> gaTriggerActions;
+ std::size_t gaTriggerCandidateFirst=std::numeric_limits<std::size_t>::max();
  std::unique_ptr<gc_animated_world50IG::Owner> gcAnimatedWorld;
  gc_animated_world50IG::Diagnostic gcAnimationDiagnostic{};
  const std::size_t animatedCandidateFirst=candidates.size();
  std::size_t gcGateCandidate=std::numeric_limits<std::size_t>::max();
- if(trackSession->originalStaticCandidates){
+ if(isGcTrack){
   gcAnimatedWorld=std::make_unique<gc_animated_world50IG::Owner>();
   require50DU(gcAnimatedWorld->load(trackSession->archive,s.animationShared.libm,
       s.animationShared.motion,gcAnimationDiagnostic),
@@ -535,6 +571,25 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   for(const auto& candidate:candidates)stackCount=std::max(stackCount,1+shape.view.maxDepth+candidate.maxDepth);
   std::cerr<<"GC ANIMATED WORLD: original opening/windmill owners=2, vertices=1195, indices=2337, surfaces=6, "
       "COL1 children=4, CHARACTER native mask=1, source node mappings=1/2 and 0/1; opening inactive, windmill loop15s.\n";
+ }
+ if(isGaTrack){
+  gaAnimatedWorld=std::make_unique<ga_animated_world::Owner>();
+  const bool loaded=gaAnimatedWorld->load(trackSession->archive,s.animationShared.libm,
+      s.animationShared.motion,gaAnimationDiagnostic);
+  require50DU(loaded,gaAnimationDiagnostic.message.empty()?"original GA animated resource load failed":gaAnimationDiagnostic.message.c_str());
+  ga_animated_candidates::prepare(*gaAnimatedWorld,candidates,trackBindings,
+      query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
+  for(const auto& candidate:candidates)stackCount=std::max(stackCount,1+shape.view.maxDepth+candidate.maxDepth);
+  gaTriggerAuthoring=std::make_unique<ga_trigger_authoring::Owner>();std::string triggerError;
+  // Exact authenticated tracks/aga.spl header: NumNodes107. Recheck against
+  // the canonical live navigation owner before actions become ready below.
+  const bool triggersLoaded=gaTriggerAuthoring->load(trackSession->archive,107u,12u,triggerError);
+  require50DU(triggersLoaded,triggerError.empty()?"GA original trigger authoring failed":triggerError.c_str());
+  gaTriggerActions=std::make_unique<ga_trigger_actions::Owner>();
+  gaTriggerCandidateFirst=ga_trigger_candidates::prepare(*gaTriggerAuthoring,*gaTriggerActions,
+      candidates,trackBindings,query.collisionTypeTag,qfilter.flags31,qfilter.flagsF8);
+  std::cerr<<"GA ANIMATED WORLD: original Defensegate/opening,2 owners,605 vertices,6 surfaces,5 COL children; "
+      "root-inclusive mappings1/2/3 and1/2, CHARACTER1, zones11/7, both authored inactive/nonlooping.\n";
  }
  ground.audit=J{};
  // Cold, immovable, count-derived storage. Candidate order and every borrowed
@@ -548,6 +603,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const auto& trackCounts=trackStorage.count;
  std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,gc_animated_world50IG::ownerCount> gcAnimatedMembership;
  if(gcAnimatedWorld)for(auto& membership:gcAnimatedMembership)
+  membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ga_animated_world::ownerCount> gaAnimatedMembership;
+ if(gaAnimatedWorld)for(auto& membership:gaAnimatedMembership)
+  membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
+ std::array<std::unique_ptr<track_runtime_storage50IG::Membership>,ga_trigger_authoring::count> gaTriggerMembership;
+ if(gaAnimatedWorld)for(auto& membership:gaTriggerMembership)
   membership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
  std::unique_ptr<track_runtime_storage50IG::Membership> gcGateMembership;
  if(gcNativeGate)gcGateMembership=std::make_unique<track_runtime_storage50IG::Membership>(trackCounts.membership);
@@ -704,10 +765,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  secondaryQuery.collisionTypeTag=sqj["collision_tag"];secondaryQuery.groupTypeTag=sqj["group_tag"];secondaryQuery.callbackEnabled=sqj["callback"];
  cold::words(secondaryQuery.copied40.data(),sqj["copied40"]);cold::words(secondaryQuery.copied50.data(),sqj["copied50"]);
  secondaryQuery.skipMask=(*secondaryCase)["masks"][0];secondaryQuery.dynamicMask=(*secondaryCase)["masks"][1];secondaryQuery.materialMask=(*secondaryCase)["masks"][2];
- query.nativeGatePolicy=secondaryQuery.nativeGatePolicy=gcNativeGate;
+ query.nativeGatePolicy=secondaryQuery.nativeGatePolicy=gcNativeGate||isGaTrack;
  if(gcAnimatedWorld)require50DU(gc_animated_candidates50IG::admitNonBodyResponse(*gcAnimatedWorld,
      candidates.data(),candidates.size(),animatedCandidateFirst,query,secondaryQuery),
      "GC original CHARACTER non-body spring response routing differs");
+ if(gaAnimatedWorld)require50DU(ga_animated_candidates::admitNonBodyResponse(*gaAnimatedWorld,
+     candidates.data(),candidates.size(),animatedCandidateFirst,query,secondaryQuery),
+     "GA original CHARACTER non-body spring response routing differs");
  if(!trackSession->originalStaticCandidates)require50DU((*secondaryCase)["order"]==row["order"]&&(*secondaryCase)["candidates"]==row["candidates"],"same explicit ordered terrain inputs");
  StaticSpringState50G secondarySpring{};secondarySpring.records.generatedCapacity88=60;
  SpringRecord48N secondaryRecords[60]{},secondaryQueryRecords[60]{},secondaryScratchRecords[60]{};
@@ -863,6 +927,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::uint64_t engineDamageReturns=0,engineDamageCompletions=0;
  DamageSpeechEvent50HG pendingSpeech{};
  float playerSpeechChance=0.f;
+ std::unique_ptr<gc_gate_audio50IN::Owner> gaGateAudio;
  SpeechPosition50HG audioListener{};bool audioListenerReady=false;
  std::uint64_t speechEvents=0,speechCues=0,announcerRequestsUnjoined=0;
  if(audioEnabled){
@@ -876,6 +941,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto* audioGroups=liveAudio->groupsForProviders();
   auto* sharedAnnouncer=liveAudio->sharedAnnouncer();
   require50DU(audioGroups&&sharedAnnouncer,"shared native audio group/episode owner unavailable");
+  if(isGaTrack){
+   gaGateAudio=std::make_unique<gc_gate_audio50IN::Owner>();
+   const bool prepared=materialMixer&&audioGroups&&gaGateAudio->prepare(*materialMixer,*audioGroups,audioRoot,audioError);
+   require50DU(prepared&&gaGateAudio->available(),audioError.empty()?"GA original BIGDOOR PCM/World4D8 voice unavailable":audioError.c_str());
+  }
   if(raceEnabled)require50DU(materialMixer&&raceAudio->prepare("work/native/project/disc",
       audioRoot,*materialMixer,*audioGroups,*sharedAnnouncer,audioError,playerRacer60),
       audioError.empty()?"original race audio preparation failed":audioError.c_str());
@@ -902,7 +972,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
   }
   require50DU(materialMixer&&materialAudio->prepare("work/native/project/disc",audioRoot,
-      *materialMixer,64,audioError,trackSession->originalStaticCandidates?material_audio50HI::Track::gc:material_audio50HI::Track::ta),
+      *materialMixer,64,audioError,track_session_assets50IG::codeEquals(trackSession->world->code,"GA")?
+      material_audio50HI::Track::ga:trackSession->originalStaticCandidates?material_audio50HI::Track::gc:material_audio50HI::Track::ta),
       audioError.empty()?"native material audio preparation failed":audioError.c_str());
   if(trackSession->originalStaticCandidates){
    //271600 applies actual AUB assignments before the creator publishes A9.
@@ -921,7 +992,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       race_audio_groups50IC::ProviderRole::MaterialCollision,64,material_audio50HI::soundCount),
       "material group ownership rejected");
   if(materialAudio->extraVoiceCount())require50DU(race_audio_groups50IC::bindProviderRange(*audioGroups,
-      race_audio_groups50IC::ProviderRole::MaterialCollision,material_audio50HI::extraFirstVoice,
+      race_audio_groups50IC::ProviderRole::MaterialCollision,materialAudio->extraVoiceFirst(),
       materialAudio->extraVoiceCount()),"extra original material sound group ownership rejected");
   if(raceEnabled){
    std::array<opponent_audio50HX::Source,opponent_audio50HX::maxOpponents> sources{};
@@ -1096,6 +1167,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
       bounds,membershipWork),"GC original animation cold update"),"GC original animation cold membership failed");
  }
+ if(gaAnimatedWorld)for(std::size_t i=0;i<gaAnimatedMembership.size();++i){
+  auto& membership=*gaAnimatedMembership[i];const auto bounds=ga_animated_candidates::bounds(*gaAnimatedWorld,i);
+  const auto ref=static_cast<CollectionRef50BX>(animatedCandidateFirst+i+1);
+  //2D93F0 ->120070(method2,radius0), then2D94B0 ->120230 after cold pose.
+  require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
+      membership.storage(),ref,gaAnimatedWorld->source(i).startingZone,ZoneMethod50CL::Second,0.f,
+      bounds,membershipWork),"GA original animation initial attachment"),"GA original animation zone attachment failed");
+  require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
+      bounds,membershipWork),"GA original animation cold update"),"GA original animation cold membership failed");
+ }
+ if(gaAnimatedWorld)for(std::size_t i=0;i<gaTriggerMembership.size();++i){
+  auto& membership=*gaTriggerMembership[i];const auto& authored=gaTriggerAuthoring->source(i);
+  const auto bounds=ga_trigger_candidates::bounds(authored);
+  const auto ref=static_cast<CollectionRef50BX>(gaTriggerCandidateFirst+i+1);
+  require50DU(reportMembership(attachLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
+      membership.storage(),ref,authored.zone,ZoneMethod50CL::First,0.f,bounds,membershipWork),
+      "GA authored trigger initial attachment"),"GA trigger zone attachment failed");
+  require50DU(reportMembership(updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,membership.state,
+      bounds,membershipWork),"GA authored trigger cold update"),"GA trigger membership failed");
+ }
  if(gcGateMembership){
   const auto bounds=gc_gate_candidates50KG::bounds(*gcAnimatedWorld);
   const auto ref=static_cast<CollectionRef50BX>(gcGateCandidate+1);
@@ -1109,7 +1200,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "native approximation, registered-list scope, PodSound unavailable.\n";
  }
  auto refreshAnimatedCandidates=[&](){
-  if(!gcAnimatedWorld)return true;
+  if(gcAnimatedWorld){
   gc_animated_candidates50IG::sync(*gcAnimatedWorld,candidates.data(),candidates.size(),animatedCandidateFirst);
   for(std::size_t i=0;i<gcAnimatedMembership.size();++i){
    const auto bounds=gc_animated_candidates50IG::bounds(*gcAnimatedWorld,i);
@@ -1118,6 +1209,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    const auto index=animatedCandidateFirst+i;auto& mirror=movementCandidates[index].collision;
    mirror.geometry.worldMatrix=candidates[index].candidate.collision.geometry.worldMatrix;
    mirror.sphere=candidates[index].candidate.collision.sphere;
+  }
+  }
+  if(gaAnimatedWorld){
+  ga_animated_candidates::sync(*gaAnimatedWorld,candidates.data(),candidates.size(),animatedCandidateFirst);
+  for(std::size_t i=0;i<gaAnimatedMembership.size();++i){
+   const auto bounds=ga_animated_candidates::bounds(*gaAnimatedWorld,i);
+   const auto result=updateLiveZoneMembership50EN(zoneLifecycle,liveWorld,gaAnimatedMembership[i]->state,bounds,membershipWork);
+   if(!reportMembership(result,"GA original animation live update"))return false;
+   const auto index=animatedCandidateFirst+i;auto& mirror=movementCandidates[index].collision;
+   mirror.geometry.worldMatrix=candidates[index].candidate.collision.geometry.worldMatrix;
+   mirror.sphere=candidates[index].candidate.collision.sphere;
+  }
   }
   return true;
  };
@@ -1166,6 +1269,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    source.worldMatrix=membership.lastShapeWorld;
    for(unsigned i=0;i<3;++i)source.sphere.center.v[i]=membership.bounds.cachedCenter.v[i];
    source.sphere.radius=membership.bounds.cachedRadius;
+   if(gaTriggerActions&&gaTriggerActions->ready())require50DU(gaTriggerActions->observePrepared(
+       source.filter->identity,*source.resource,source.worldMatrix),"GA trigger lifecycle query pose unavailable");
   }
   if(gcNativeGate&&gcAnimatedWorld->gateBinding().dispatches!=reportedGateDispatches){
    const auto& gate=gcAnimatedWorld->gateBinding();reportedGateDispatches=gate.dispatches;
@@ -1296,15 +1401,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // This count advances at actual graphics success, before later failure cuts.
  std::array<std::uint64_t,raceRacerCount> gcGraphicsSequence{};
  std::array<NativeGcSelectedLightsCandidate,raceRacerCount> gcDrawLights{};
- const auto nativeLightingPolicy=nativeTaSelection?
+ const auto nativeLightingPolicy=nativeGaSelection?
+     gcLighting::CachePolicy::nativeGaAuthoredZoneSpotSelection:nativeTaSelection?
      gcLighting::CachePolicy::nativeTaAuthoredZoneSpotSelection:
      gcLighting::CachePolicy::inactiveCandidateNativePerPublicationRecompute;
  if(nativeSelectedLights){
   const auto& bytes=ground.world.parameters.original_bytes;
-  require50DU(nativeTaSelection?gcLightOwner.prepareTaNative(bytes,raceRacerCount,gcLightDiagnostic):
+  require50DU(nativeGaSelection?gcLightOwner.prepareGaNative(bytes,raceRacerCount,gcLightDiagnostic):
+      nativeTaSelection?gcLightOwner.prepareTaNative(bytes,raceRacerCount,gcLightDiagnostic):
       gcLightOwner.prepare(bytes,raceRacerCount,gcLightDiagnostic),
       "authenticated track light/visibility owner preparation failed");
-  std::cerr<<(nativeTaSelection?
+  std::cerr<<(nativeGaSelection?
+      "NATIVE GA SELECTED LIGHTS: authentic olive ambient/sun and all36 authored spotlights including original Light9 defaults; actual racer visibility; explicit native zone scan/top-two selection; ":nativeTaSelection?
       "NATIVE TA SELECTED LIGHTS: authored zone/portal colors and 17 spotlights; actual racer visibility; explicit native zone scan/top-two selection; ":
       "NATIVE GC SELECTED LIGHTS: actual registered ambient/directional colors and real racer visibility; ")
       <<"native per-publication selection and host world-normal Lambert; existing material/alpha/fog/specular limits retained.\n";
@@ -1974,7 +2082,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  runNative([&]{return beginVehicleSubstep49W(s,x.bindings,x.selectors,x.workspace,x.diagnostic);},"native selector");
  MainStaticDetectorAdmission50H admission{true,true,true,false,false,false,true,true,2,mainQueryRef,x.bindings.lifecycle.main190};
  runNative(collectRegistered,"ordered prepared-list vehicle candidates");
+ Vector3_48C mainTriggerListener{{audioListener.x,0.f,audioListener.z}};
+ ga_trigger_actions::ActionLease mainTriggerLease{qfilter.identity,&navigationProgress.reset.vehicleC80,
+     audioListenerReady?&mainTriggerListener:nullptr,audioListenerReady?1u:0u};
+ if(gaTriggerActions)require50DU(gaTriggerActions->beginQuery(mainTriggerLease),"GA main trigger arena lease unavailable");
  const auto mainQueryAttempt=queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainLiveQuery,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);
+ if(gaTriggerActions)require50DU(gaTriggerActions->endQuery(),"GA main source trigger action failed after contact commit");
  if(mainQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(mainQueryAttempt.prefix,"main")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(mainQueryAttempt,query,mainMembership,mainCrossedPortals,"main");},
@@ -1988,7 +2101,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  runNative([&]{return prepareSecondaryLiveQueryScene50EQ(s,x.bindings,secondaryAdmission,secondaryLiveQuery,x.workspace)==SecondaryQuerySceneStatus50J::Ready;},"registered original secondary scene getter");
  // Secondary uses the same first-substep merged list, without recollection.
 
+ Vector3_48C secondaryTriggerListener{{audioListener.x,0.f,audioListener.z}};
+ ga_trigger_actions::ActionLease secondaryTriggerLease{qfilter.identity,&navigationProgress.reset.vehicleC80,
+     audioListenerReady?&secondaryTriggerListener:nullptr,audioListenerReady?1u:0u};
+ if(gaTriggerActions)require50DU(gaTriggerActions->beginQuery(secondaryTriggerLease),"GA secondary trigger arena lease unavailable");
  const auto secondaryQueryAttempt=querySecondaryLiveIndexedStaticVehicle50EQ(s,x.bindings,secondaryAdmission,secondaryLiveQuery,secondaryQuery,candidates.data(),candidates.size(),registeredIndices,registeredCount,si,sw,sd,secondaryResult);
+ if(gaTriggerActions)require50DU(gaTriggerActions->endQuery(),"GA secondary source trigger action failed after contact commit");
  if(secondaryQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(secondaryQueryAttempt.prefix,"secondary")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(secondaryQueryAttempt,secondaryQuery,secondaryMembership,secondaryCrossedPortals,"secondary");},
@@ -2114,11 +2232,22 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // never synthesize Ready or silently remove a failed racer from the field.
   for(std::size_t slot=0;slot<racerBank.count();++slot){
    const bool active=racerBank.active(slot);
+   bool selectedAiMetadataReady=true;
+   if(allAiEnabled){
+    const auto sourceRacer60=racerBank.read(slot,originalAiReads.racer60);
+    const auto expectedRecordMatch=sourceRacer60==static_cast<std::uint32_t>(
+        originalAiCreateSelection.freshCourseRecordPod11280)?1u:0u;
+    selectedAiMetadataReady=originalAiCreateSelection.bound&&
+        racerBank.read(slot,originalAiReads.fieldFE4)==expectedRecordMatch&&
+        (originalAiCreateSelection.actualRaceClass!=AuthoredClass49N::A||
+         racerBank.read(slot,originalAiReads.repairTime1064)==2.f);
+   }
    if(active&&racerBank.read(slot,racerFrameReads.phase)==VehicleFramePhase49W::Ready&&
       (!allAiEnabled||(racerBank.read(slot,racerFrameReads.vehicle58)==1u&&
          racerBank.read(slot,racerFrameReads.aiOwnersBound)&&
          racerBank.read(slot,originalAiReads.initialized)&&
-         racerBank.read(slot,originalAiReads.managerIndexFE0)==slot)))continue;
+         racerBank.read(slot,originalAiReads.managerIndexFE0)==slot&&
+         selectedAiMetadataReady)))continue;
    std::cerr<<"ORIGINAL AI world boundary: slot="<<slot<<" active="<<active
        <<" phase="<<static_cast<unsigned>(racerBank.read(slot,racerFrameReads.phase))
        <<" vehicle58="<<racerBank.read(slot,racerFrameReads.vehicle58)
@@ -2156,6 +2285,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
  auto reportOriginalAiFleet=[&](const char* reason){
   if(!originalAiEnabled)return;
+  std::cerr<<"original_ai_selection track="<<trackSession->world->code
+      <<" track_id1125F="<<static_cast<unsigned>(originalAiCreateSelection.selectedTrackId1125F)
+      <<" course_order187B10="<<originalAiCreateSelection.selectedOrder187B10
+      <<" create_class="<<static_cast<unsigned>(originalAiCreateSelection.actualRaceClass)
+      <<" course_record_pod11280="<<originalAiCreateSelection.freshCourseRecordPod11280
+      <<" fresh_profile="<<originalAiCreateSelection.bound<<" loaded_save=0 reason="<<reason<<'\n';
   std::cerr<<"original_ai_all enabled="<<allAiEnabled<<" racer_count="<<racerBank.count()
       <<" human_count="<<originalAiHumanCount<<" ai_count="<<(allAiEnabled?racerBank.count():1u)
       <<" camera_slot=0 camera_racer60="<<playerRacer60
@@ -2168,6 +2303,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto& fields=originalAiSession.fields[originalAi.managerIndexFE0];
     std::cerr<<"original_ai slot="<<slot<<" source_index="<<originalAi.managerIndexFE0
         <<" racer60="<<originalAi.racer60<<" vehicle58="<<s.fields.vehicle58
+        <<" record_matchFE4="<<originalAi.fieldFE4<<" repair_time1064="<<originalAi.profile.repairTime1064
         <<" initialized="<<originalAi.initialized<<" owners_bound="<<s.fields.nativeAiOwnersBound50IV
         <<" active="<<active<<" phase="<<static_cast<unsigned>(s.phase)
         <<" native_ticks="<<completedFrames<<" dispatched="<<originalAi.dispatchedFrames
@@ -2316,6 +2452,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
+  for(auto& membership:gaAnimatedMembership)if(membership){
+   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
+   racerBank.elements(membership->entries.data(),membership->entries.size());
+  }
+  for(auto& membership:gaTriggerMembership)if(membership){
+   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
+   racerBank.elements(membership->entries.data(),membership->entries.size());
+  }
+  // GC historically shares two query IDs across its serial arena. GA needs
+  // stable, distinct actual collider identities for reciprocal trigger lists.
+  // Only these scalar IDs are added to the per-racer bank; world contacts are
+  // shared and never rolled back by another racer visit.
+  if(isGaTrack){racerBank.owner(qfilter.identity);racerBank.owner(secondaryFilter.identity);}
   racerBank.seal(raceRacerCount);
   if(originalAiEnabled){
    // Handles bind registered locations only. Actual values are read afresh
@@ -2351,11 +2500,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     AiProfile50IU profile{};
     require50DU(rr::assets::readAiProfile50IU(reinterpret_cast<const char*>(profileText.data()),profileText.size(),
         profile,originalAiAuthoringDiagnostic),"selected original AI profile rejected");
-    // Original GC track ID10 ->187B10 result10 ->16E5B8 class3. This is
-    // independent of the PHY filename/class exceptions used by49N.
-    AiGcCreateSelection50IU createSelection{};
-    require50DU(bindFreshGcAiCreateSelection50IU(trackSession->world->code,2,createSelection)&&
-        applyAiCreateClass50IU(createSelection.actualRaceClass,profile),"original GC AI create class unavailable");
+    // The immutable fresh selected course supplies creation class/record pod.
+    // GA ID8 -> order3 -> class1 overwrites RepairTime1064 to2 AFTER the
+    // real pod profile load; GC ID10 -> order10 -> class3 preserves it.
+    const auto& createSelection=originalAiCreateSelection;
+    require50DU(createSelection.bound&&applyAiCreateClass50IU(createSelection.actualRaceClass,profile),
+        "selected original AI create class unavailable");
     const auto* identity=original_racer_selection50IJ::findByPodId(rig.podId.c_str());
     require50DU(identity,"original AI racer60 identity unavailable");
     AiCreateIdentity50IU createIdentity{};
@@ -2365,6 +2515,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     initializeAiRuntime50IV(createIdentity.ordinalFE0,identity->racer60,
         static_cast<std::uint32_t>(createSelection.freshCourseRecordPod11280),
         profile,receipt.authored.engineDifference5C,originalAi);
+    require50DU(originalAi.fieldFE4==createIdentity.courseRecordMatchFE4,
+        "selected course-record identity differs from original AI FE4");
     originalAiSession.packingReferences[racer]=-1;
     AiColdTrackBindings50IU tracks{};
     require50DU(bindAiColdTracks50IU(*navigationMap,*navigationAI,originalAiMapMetadata,
@@ -2383,6 +2535,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    });
    coldRacerStage50DU(rig.podId,"effect name binding",[&](){rig.buildEffectNames(s,namesForEffects);});
    query.resource=&collision.main();secondaryQuery.resource=&collision.secondary();
+   if(isGaTrack){qfilter.identity=0x30000000u+static_cast<std::uint32_t>(racer*2);
+    secondaryFilter.identity=qfilter.identity+1u;}
    terrain_probe_authoring50fq_fixture::Owner ownProbe{};std::string probeError;
    coldRacerStage50DU(rig.podId,"terrain probe authoring",[&](){
     const bool probeReady=terrain_probe_authoring50fq_fixture::prepare(ownProbe,query,x.parameters,
@@ -2452,6 +2606,28 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   });
   for(std::size_t racer=1;racer<racerBank.count();++racer)
    coldRacerStage50DU(racerRigs[racer]->podId,"grounded grid placement",[&](){placeOpponentAtGrid50HN(racer);});
+  // The neutral setup tick below performs genuine live trigger queries.
+  // Bind the shared action owner only after every actual rig and final grid
+  // pose exists, but before any tick can acquire its synchronous C80 lease.
+  // Material/GPU preparation remains at the later renderer boundary.
+  if(gaAnimatedWorld){
+   require50DU(allAiEnabled&&originalAiEnabled&&racerBank.count()==8&&navigationAI->track.count==107,
+       "GA native triggers require all eight original-AI racers and canonical107-node navigation");
+   std::array<ga_trigger_actions::RacerIdentities,ga_trigger_actions::racers> triggerIdentities{};
+   for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
+    triggerIdentities[racer]={qfilter.identity,secondaryFilter.identity};
+   });
+   require50DU(gaTriggerActions->prepare(*gaTriggerAuthoring,*gaAnimatedWorld,triggerIdentities,
+       navigationAI->track.count,gaGateAudio.get(),!audioEnabled),"GA actual trigger/action destinations unavailable");
+   for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
+    require50DU(gaTriggerActions->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
+        gaTriggerActions->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+        "GA trigger lifecycle cold actual COL poses unavailable");
+   });
+   std::cerr<<"GA NATIVE TRIGGERS:10 authored spheres, method1 zones,16 actual racer COL identities; "
+       "unchanged GC endpoint/swept-surface geometry policy, original action/lifecycle semantics; reverse108E90 parity unresolved.\n";
+   if(audioEnabled)std::cerr<<"GA BIGDOOR uses the existing shared accepted-camera native listener in XZ and real World4D8 PCM; original listener-object parity is not claimed.\n";
+  }
   if(nativeSelectedLights)for(std::size_t racer=0;racer<racerBank.count();++racer)
    racerBank.visit(racer,[&](){
     // Only this genuine unadvanced cold generation owns source C30=4C0[0].
@@ -2678,8 +2854,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(trackLoaded,trackLoadError.empty()?"selected-track visual mesh load failed":trackLoadError.c_str());
  namespace trackTextures=track_materials50fa_fixture;
  auto trackMaterialOwner=std::make_unique<trackTextures::Owner>();
- const auto trackSource=trackSession->originalStaticCandidates?
-     track_source_fixture::Track::gc:track_source_fixture::Track::ta;
+ const auto trackSource=isGaTrack?track_source_fixture::Track::ga:
+     isGcTrack?track_source_fixture::Track::gc:track_source_fixture::Track::ta;
  trackTextures::Request trackMaterialRequest{};
  trackMaterialRequest.track=trackSource;
  trackMaterialRequest.root=trackSession->visualRoot;
@@ -2689,11 +2865,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      trackTextures::MipMode::largestRetained,0};
  trackMaterialRequest.coldSourceByteCapacity=32u*1024u*1024u;
  trackMaterialRequest.sourceArchive=trackSession->archive;
- trackMaterialRequest.decodeSourceTexture=trackSession->originalStaticCandidates?
-     &source_texture50fc_fixture::decodeSourceTextureGc:&source_texture50fc_fixture::decodeSourceTexture;
+ trackMaterialRequest.decodeSourceTexture=isGaTrack?&source_texture50fc_fixture::decodeSourceTextureGa:
+     isGcTrack?&source_texture50fc_fixture::decodeSourceTextureGc:&source_texture50fc_fixture::decodeSourceTexture;
  trackMaterialRequest.includeAllAuthoredPasses=trackSession->originalStaticCandidates;
  trackMaterialRequest.allowStaticAnimationFrame=true;
- trackMaterialRequest.textureBudgets={trackSession->originalStaticCandidates?64u:32u,1024,8u*1024u*1024u,8u*1024u*1024u,1024};
+ trackMaterialRequest.textureBudgets={isGaTrack?128u:trackSession->originalStaticCandidates?64u:32u,1024,
+     isGaTrack?32u*1024u*1024u:8u*1024u*1024u,isGaTrack?32u*1024u*1024u:8u*1024u*1024u,1024};
  trackTextures::Diagnostic trackMaterialDiagnostic{};
  require50DU(trackMaterialOwner->load(trackMaterialRequest,trackMesh,trackMaterialDiagnostic),
      trackMaterialDiagnostic.message.empty()?"selected-track material load failed":trackMaterialDiagnostic.message.c_str());
@@ -2715,18 +2892,20 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto nativeVideo=std::make_shared<original_main_entry50KG::Video>(originalMainApplication.enabled);
  auto& host=nativeVideo->host;
  gc_dynamic_window50IG::Owner gcDynamicWindow;
+ ga_dynamic_window::Owner gaDynamicWindow;
  gc_atm_window_fixture::Owner gcAtm;
+ ga_atm_window_fixture::Owner gaAtm;
  gameplay_binder_window_candidate_fixture::Owner gameplayBinder;
  // Same real process normal-material owner as Main. Cold APPSTART templates
  // are authenticated from the admitted native disc tree; there is no second
  // overrideKnown setting, UI material, or UI unique animation instance.
- const bool gameplayBinderEnabled=raceEnabled&&playerUsesRosterRig&&nativeGcSelection&&
+ const bool gameplayBinderEnabled=raceEnabled&&playerUsesRosterRig&&(nativeGcSelection||nativeGaSelection)&&
      !checkpointInput&&!originalMainApplication.enabled;
  rr::assets::OriginalUiMaterialTemplates50KG gameplayBinderTemplates;
  std::shared_ptr<const rr::assets::OriginalUiArchive50KG> gameplayBinderAppStart;
  if(gameplayBinderEnabled){
-  require50DU(gcAnimatedWorld&&racerBank.count()==8,
-      "Binder candidate requires actual eight-racer GC ordinary session");
+  require50DU(((isGaTrack&&gaAnimatedWorld)||(isGcTrack&&gcAnimatedWorld))&&racerBank.count()==8,
+      "Binder candidate requires an actual eight-racer authenticated GC/GA ordinary session");
   gameplayBinderAppStart=original_main_entry50KG::readArchive("work/native/project/disc",
       rr::assets::OriginalUiArchiveId50KG::appStart);
   rr::assets::OriginalUiMaterialDiagnostic50KG materialDiagnostic;
@@ -2765,23 +2944,50 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(gcAtmLoaded,
       atmDiagnostic.message.empty()?"original GC ATM source bank rejected":atmDiagnostic.message.c_str());
  }
+ if(gaAnimatedWorld){
+  ga_dynamic_materials::Diagnostic materialDiagnostic{};
+  const bool loaded=gaDynamicWindow.loadSource(trackSession->archive,*gaAnimatedWorld,materialDiagnostic);
+  if(!loaded)std::cerr<<"GA dynamic material load diagnostic material="<<materialDiagnostic.material
+      <<" source_code="<<materialDiagnostic.source.code<<" source_offset="<<materialDiagnostic.source.offset
+      <<" source_detail="<<materialDiagnostic.source.detail
+      <<" bank_error="<<static_cast<unsigned>(materialDiagnostic.bank.error)<<'\n';
+  require50DU(loaded,materialDiagnostic.message.empty()?"original GA dynamic materials rejected":materialDiagnostic.message.c_str());
+
+ }
+ if(isGaTrack){
+  ga_atm_animation_fixture::Diagnostic atmDiagnostic{};
+  const bool loaded=gaAtm.loadSource(trackSession->archive,*trackMaterialOwner,atmDiagnostic);
+  if(!loaded)std::cerr<<"GA ATM load diagnostic animation="<<atmDiagnostic.animation<<" frame="<<atmDiagnostic.frame
+      <<" source_code="<<atmDiagnostic.source.code<<" source_offset="<<atmDiagnostic.source.offset
+      <<" source_detail="<<atmDiagnostic.source.detail<<'\n';
+  require50DU(loaded,atmDiagnostic.message.empty()?"original GA ATM source bank rejected":atmDiagnostic.message.c_str());
+ }
  std::uint32_t sourceApplicationTimestamp=0;
  bool sourceApplicationTimestampPublished=false;
- std::uint64_t gcAnimatedWorldSteps=0;
+ std::uint64_t gcAnimatedWorldSteps=0,gaAnimatedWorldSteps=0;
  auto advanceWorldAnimations=[&](){
-  if(!gcAnimatedWorld)return;
+  if(!gcAnimatedWorld&&!gaAnimatedWorld&&!gaAtm.loaded())return;
   // Source1AAD98 registers the complete racer group before1B4A58's animation
   // service. Current HOST participant order stays explicit; world service runs
   // once after that group, including enabled countdown world traversal.
   const auto before=::allocations;
   require50DU(sampleHostTimestamp50ID(applicationClock,sourceApplicationTimestamp),"shared source application timestamp rejected");
   sourceApplicationTimestampPublished=true;
-  require50DU(gcAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noise.sharedRandomState,
+  if(gcAnimatedWorld)require50DU(gcAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noise.sharedRandomState,
       sessionRandom,s.animationShared.motion,gcAnimationDiagnostic),
       gcAnimationDiagnostic.message.empty()?"original GC world animation rejected":gcAnimationDiagnostic.message.c_str());
+  if(gaAnimatedWorld){
+   const bool advanced=gaAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noise.sharedRandomState,
+       sessionRandom,s.animationShared.motion,gaAnimationDiagnostic);
+   require50DU(advanced,gaAnimationDiagnostic.message.empty()?"original GA world animation rejected":gaAnimationDiagnostic.message.c_str());
+  }
   if(gcAtm.loaded())require50DU(gcAtm.advance(sourceApplicationTimestamp),"original GC ATM time update rejected");
-  require50DU(::allocations==before,"successful GC world animation allocated C++ storage");
-  ++gcAnimatedWorldSteps;
+  if(gaAtm.loaded())require50DU(gaAtm.advance(sourceApplicationTimestamp),"original GA ATM time update rejected");
+  if(gaTriggerActions)require50DU(gaTriggerActions->serviceWorld()==ga_trigger_actions::Status::Complete,
+      "GA original coarse trigger exit service rejected actual COL poses");
+  require50DU(::allocations==before,"successful original world animation allocated C++ storage");
+  if(gcAnimatedWorld)++gcAnimatedWorldSteps;
+  if(gaAnimatedWorld)++gaAnimatedWorldSteps;
  };
  platform::MaterialTextureGl50EB gpuTextures,trackGpuTextures,cableGpuTextures,skyGpuTextures;
  std::array<platform::MaterialTextureGl50EB,raceOpponentCount> opponentGpuTextures,opponentCableGpuTextures;
@@ -2820,6 +3026,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(!originalMain.closeAudio())clean=false;
   if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
+  gaGateAudio.reset(); // Stop voice126 while its real mixer/groups still live.
   opponentAudio->close(); // Release96..116 before the live mixer/shared PCM closes.
   if(!liveAudio->close(audioDiagnostic)){
    std::cerr<<"audio close failed "<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=false;
@@ -2834,10 +3041,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::cerr<<"GC dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
   }
   if(gcDynamicWindow.ownsResources())return false;
+  if(gaDynamicWindow.ownsResources()&&!gaDynamicWindow.close(textureDiagnostic)){
+   std::cerr<<"GA dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+  }
+  if(gaDynamicWindow.ownsResources())return false;
   if(gcAtm.ownsResources()&&!gcAtm.close(textureDiagnostic)){
    std::cerr<<"GC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
   }
   if(gcAtm.ownsResources())return false;
+  if(gaAtm.ownsResources()&&!gaAtm.close(textureDiagnostic)){
+   std::cerr<<"GA ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+  }
+  if(gaAtm.ownsResources())return false;
   if(gameplayBinder.ownsResources()&&!gameplayBinder.close(textureDiagnostic))clean=false;
   if(gameplayBinder.ownsResources())return false;
   for(std::size_t index=0;index<raceOpponentCount;++index){
@@ -3022,13 +3237,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       std::string(authoredFogSetting)=="1","RR_AUTHORED_WORLD_FOG must be 0 or 1");
   if(!authoredFogSetting||std::string(authoredFogSetting)=="1"){
    require50DU(trackSource==track_source_fixture::Track::ta||
-       trackSource==track_source_fixture::Track::gc,"unsupported reconstructed fog track");
+       (trackSource==track_source_fixture::Track::gc||trackSource==track_source_fixture::Track::ga),"unsupported reconstructed fog track");
    auto& fog=renderRequest.track.worldFog;
    const float* color=skyOwner->clearRgba();
    require50DU(color,"authenticated world fog RGB missing");
    for(unsigned i=0;i<3;++i)fog.color[i]=color[i];
    constexpr float minimum=1333.300048828125f,maximum=4000.f,haziness=.5f;
-   const float visibility=trackSource==track_source_fixture::Track::ta?1.f:.5f;
+   // GA source Fog.Visibility0.4 is authenticated with its own SCB.
+   const float visibility=trackSource==track_source_fixture::Track::ta?1.f:isGaTrack?.4f:.5f;
    fog.end=minimum+visibility*(maximum-minimum);
    fog.start=(fog.end-64.f)*(1.f-haziness);fog.enabled=true;
    std::cerr<<"Authored native world fog: start "<<fog.start
@@ -3036,7 +3252,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   renderRequest.track.sourceNormals=trackNormals.data();
   renderRequest.track.sourceNormalCount=static_cast<std::uint32_t>(trackNormals.size());
-  renderRequest.track.maximumNormalBytes=trackSession->originalStaticCandidates?4u*1024u*1024u:2u*1024u*1024u;
+  renderRequest.track.maximumNormalBytes=isGaTrack?8u*1024u*1024u:
+      trackSession->originalStaticCandidates?4u*1024u*1024u:2u*1024u*1024u;
   if(trackSession->originalStaticCandidates){
    const auto* projectionUvs=trackMaterialOwner->projectionUvs();
    require50DU(projectionUvs,"original GC projected UV publication missing");
@@ -3048,8 +3265,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // the same scene and physics available for comparisons.
   const char* disableCulling=std::getenv("RR_DISABLE_TRACK_CULLING");
   renderRequest.track.enableFrustumCulling=!(disableCulling&&std::string(disableCulling)=="1");
-  renderRequest.track.maximumVertexBytes=trackSession->originalStaticCandidates?8u*1024u*1024u:4u*1024u*1024u;
-  renderRequest.track.maximumIndexBytes=2u*1024u*1024u;
+  renderRequest.track.maximumVertexBytes=isGaTrack?16u*1024u*1024u:
+      trackSession->originalStaticCandidates?8u*1024u*1024u:4u*1024u*1024u;
+  renderRequest.track.maximumIndexBytes=isGaTrack?8u*1024u*1024u:2u*1024u*1024u;
   const auto* trackBank=trackMaterialOwner->bank();
   const auto* trackSpans=trackMaterialOwner->spans();
   require50DU(trackBank&&trackSpans,"selected-track material publication missing");
@@ -3069,7 +3287,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto trackTextureRequest=textureRequest;
   trackTextureRequest.samplers=trackSamplers.data();
   trackTextureRequest.samplerCount=static_cast<std::uint32_t>(trackSamplers.size());
-  trackTextureRequest.maximumGpuBytes=8u*1024u*1024u;
+  trackTextureRequest.maximumGpuBytes=isGaTrack?32u*1024u*1024u:8u*1024u*1024u;
   require50DU(trackGpuTextures.create(trackTextureRequest,*trackBank,textureDiagnostic),
       "actual selected-track texture upload failed");
   std::vector<platform::VehicleWindowTrackSpan50DS> trackBindings;
@@ -3180,6 +3398,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(gcDynamicWindow.bindRequest(renderRequest,*gcAnimatedWorld),"original GC dynamic renderer publication failed");
    require50DU(gcAtm.createGpu(textureRequest,textureDiagnostic),"original GC ATM GPU bank rejected");
    require50DU(gcAtm.bindRequest(renderRequest),"original GC ATM render binding rejected");
+  }
+  if(gaAnimatedWorld){
+   require50DU(gaDynamicWindow.createGpu(textureRequest,*gaAnimatedWorld,textureDiagnostic),"original GA dynamic texture upload failed");
+   require50DU(gaDynamicWindow.bindRequest(renderRequest,*gaAnimatedWorld),"original GA dynamic renderer publication failed");
+  }
+  if(gaAtm.loaded()){
+   require50DU(gaAtm.createGpu(textureRequest,textureDiagnostic),"original GA ATM GPU bank rejected");
+   require50DU(gaAtm.bindRequest(renderRequest),"original GA ATM render binding rejected");
   }
   if(!renderer.create(renderRequest,playerDrawAssets,rendererDiagnostic)){
    reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("window vehicle renderer creation failed");
@@ -4160,6 +4386,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      require50DU(gcDynamicWindow.bindFrame(renderFrame,*gcAnimatedWorld),"original GC dynamic frame publication failed");
      require50DU(gcAtm.bindFrame(renderFrame),"original GC ATM frame selection rejected");
     }
+    if(gaAnimatedWorld)require50DU(gaDynamicWindow.bindFrame(renderFrame,*gaAnimatedWorld),"original GA dynamic frame publication failed");
+    if(gaAtm.loaded())require50DU(gaAtm.bindFrame(renderFrame),"original GA ATM frame selection rejected");
     renderFrame.materialUvs=playerFlameUvs.data();
     renderFrame.materialUvCount=static_cast<std::uint32_t>(playerFlameUvs.size());
     renderFrame.skyWorldViewProjection=skyView.worldViewProjection;

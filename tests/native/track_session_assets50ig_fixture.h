@@ -78,6 +78,21 @@ inline constexpr SessionAssets retainedGC{
     "69dcbd97f010e462895f8712056e0ac9a21fe56dbae6d6b6c090c97c5e7a4cc9",4205067,
     true,true,false,true
 };
+// Authenticated Watchtower source binding, intentionally NOT returned by
+// sessionAssets yet. The native GA providers below must be completed before
+// host/menu admission: dynamic Defensegate/opening, LostAI route triggers,
+// source trigger geometry/action dispatch and GA motion/collision ownership. A static metadata row or
+// prepared texture cache alone cannot authorize gameplay.
+inline constexpr SessionAssets retainedGA{
+    &worlds[1],"work/native/project/disc/TRACKS/GA.RES",
+    "tracks\\mga.spl","tracks\\aga.spl","tracks\\ga.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "evidence/visualGA","evidence/visualGA/export-placed-normal/ga-world.rrmesh",
+    "evidence/visualGA/export-placed-normal/export-report.json","evidence/skyGA",4,1,450,
+    "063b65cc9a0410ba0393362309fb3f80c4516a3c65ffee2b9f7bc76d1afe25d9",2834942,
+    true,true,false,true
+};
 inline bool codeEquals(const char* requested,const char* code) noexcept {
     if(!requested||!requested[0]||!requested[1]||requested[2])return false;
     for(unsigned i=0;i<2;++i){

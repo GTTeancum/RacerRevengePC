@@ -1,10 +1,10 @@
 #pragma once
 #include "pod_materials50ed_fixture.h"
 
-// Cold-only adapters for authenticated TA/GC source textures.
+// Cold-only adapters for authenticated TA/GC/GA source textures.
 // No codec runs in the client. The generated table pins original member bytes
 // and genuine decoded output bytes; this adapter authenticates both. ATM uses
-// genuine retained source frames, not fabricated replacements or animation.
+// genuine retained source frames; their live timing belongs to the separate owner.
 namespace source_texture50fc_fixture {
 namespace detail {
 namespace shared = pod_materials50ed_fixture::detail;
@@ -23,6 +23,12 @@ inline constexpr Entry gcEntries[] = {
 #include "source_texture_gc_index.inc"
 };
 static_assert(sizeof(gcEntries) / sizeof(gcEntries[0]) == 4, "Exact retained GC source animation closure");
+#if __has_include("source_texture_ga_index.inc")
+inline constexpr Entry gaEntries[] = {
+#include "source_texture_ga_index.inc"
+};
+static_assert(sizeof(gaEntries)/sizeof(gaEntries[0])==9,"Exact GA four-ATM/five-dynamic-PST closure");
+#endif
 } // namespace detail
 
 // Matches track_materials50fa_fixture::SourceTextureDecoder. Root explicitly
@@ -76,5 +82,18 @@ inline bool decodeSourceTextureGc(const char* sourceMember,
     std::uint32_t& mipIndex, std::string& error) {
     return decodeRetainedSource(detail::gcEntries, sizeof(detail::gcEntries)/sizeof(detail::gcEntries[0]),
         "evidence/texturesGC", sourceMember, source, rrtex, mipIndex, error);
+}
+// GA has its own authenticated four-ATM/five-dynamic-PST table. No source
+// member or pixel aliases another track; full ATM timing has a separate owner.
+inline bool decodeSourceTextureGa(const char* sourceMember,
+    const std::vector<std::uint8_t>& source, std::vector<std::uint8_t>& rrtex,
+    std::uint32_t& mipIndex, std::string& error) {
+#if __has_include("source_texture_ga_index.inc")
+    return decodeRetainedSource(detail::gaEntries, sizeof(detail::gaEntries)/sizeof(detail::gaEntries[0]),
+        "evidence/texturesGA", sourceMember, source, rrtex, mipIndex, error);
+#else
+    (void)sourceMember;(void)source;(void)rrtex;(void)mipIndex;
+    error="GA original source frames have not been cold-prepared and pinned";return false;
+#endif
 }
 } // namespace source_texture50fc_fixture

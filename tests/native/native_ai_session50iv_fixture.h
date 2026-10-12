@@ -56,7 +56,8 @@ inline bool rank(Session&session,std::size_t count) noexcept {
 struct ObservationReads {
     template<class T> using Read=native_racer50HN::Bank::ReadHandle<T>;
     Read<bool> initialized;
-    Read<std::uint32_t> managerIndexFE0,sourceBoundary,frameSourceStage;
+    Read<std::uint32_t> managerIndexFE0,racer60,fieldFE4,sourceBoundary,frameSourceStage;
+    Read<float> repairTime1064;
     Read<std::uint32_t> vehicleC80,vehicleC88,lapCC8,retirementCD4;
     Read<SceneNodeIndex49P> main190,bodyScene288;
     void bind(const native_racer50HN::Bank& bank,const VehicleFrameBindings49W& bindings,
@@ -64,6 +65,8 @@ struct ObservationReads {
         const std::uint32_t& retirement,const AiRuntimeState50IV& ai,
         const AiRuntimeReceipt50IV& receipt,const VehicleFrameDiagnostic49W& diagnostic) {
         initialized=bank.bindRead(ai.initialized);managerIndexFE0=bank.bindRead(ai.managerIndexFE0);
+        racer60=bank.bindRead(ai.racer60);fieldFE4=bank.bindRead(ai.fieldFE4);
+        repairTime1064=bank.bindRead(ai.profile.repairTime1064);
         sourceBoundary=bank.bindRead(receipt.sourceBoundary);frameSourceStage=bank.bindRead(diagnostic.sourceStage);
         vehicleC80=bank.bindRead(progress.reset.vehicleC80);vehicleC88=bank.bindRead(progress.reset.vehicleC88);
         lapCC8=bank.bindRead(laps);retirementCD4=bank.bindRead(retirement);

@@ -15,7 +15,7 @@ std::string filename(const ParameterBlock48F&b){auto n=field(b,"soundresourcefil
 bool readMaterialAudioCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50HI&out,std::vector<AudioRequest50HC>&requests,std::string&error){
     try{ParameterDocument48F p;DecodeError48C d;WorldLimits48F limits{};limits.retainDuplicateLabels=true;need(decodeParameters48F(aub,p,d,nullptr,limits),"50HI AUB parameter decode failed");
         const auto&s=block(p,"sounds");const int rows=number(field(s,"nummaterialcollisionsounds"));
-        need((rows==8||rows==12)&&number(field(s,"nummaterialdriveonsounds"))==rows,"50HI unsupported material row count");
+        need((rows==8||rows==12||rows==20)&&number(field(s,"nummaterialdriveonsounds"))==rows,"50HI unsupported material row count");
         MaterialAudioCatalog50HI next;std::vector<AudioRequest50HC> unique;
         next.parameters.rowCount=static_cast<std::uint32_t>(rows);
         const int materials=number(field(s,"nummaterials"));need(materials>=1&&materials<=4,"50HI unsupported material assignment count");

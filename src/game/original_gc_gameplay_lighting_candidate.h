@@ -12,7 +12,8 @@
 #include <vector>
 
 namespace rr::game::original_gc_gameplay_lighting_candidate {
-constexpr std::uint32_t maximumRacers=8, gcZones=12, gcPortals=13;
+constexpr std::uint32_t maximumRacers=8, gcZones=12, gcPortals=13,
+    gaPortals=18, maximumPortals=gaPortals;
 enum class Status : std::uint8_t {
     complete, unprepared, alreadyPrepared, sourceIdentity, sourceShape,
     sourceFields, unsupportedScene, phase, identity, bounds, registration,
@@ -30,7 +31,10 @@ enum class CachePolicy : std::uint8_t {
     // lookup14A860 missed, or shared UI lifetime became tracked again.
     inactiveCandidateNativePerPublicationRecompute,
     // Explicit TA authored-zone scan policy; not original light-volume query.
-    nativeTaAuthoredZoneSpotSelection
+    nativeTaAuthoredZoneSpotSelection,
+    // Exact GA authoring with original Light9 defaults; same explicit native
+    // zone scan/top-two policy, not recovered retail light-volume ownership.
+    nativeGaAuthoredZoneSpotSelection
 };
 class Owner;
 // Semantic equivalent of229E08..229EF4's temporary component scene+19C
@@ -61,7 +65,7 @@ class Owner final {
     std::unique_ptr<Storage> storage_;
     bool invalidated_=false; // Terminal even before a successful cold prepare.
     void endDraw(DrawLease&) noexcept;
-    bool prepareScene(const std::vector<std::uint8_t>&,std::uint32_t,bool,Diagnostic&) noexcept;
+    bool prepareScene(const std::vector<std::uint8_t>&,std::uint32_t,bool,bool,Diagnostic&) noexcept;
 public:
     Owner() noexcept;
     ~Owner();
@@ -76,7 +80,15 @@ public:
     // racer visibility, native zone scan. No source light-D0/manager+88 claim.
     bool prepareTaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
         Diagnostic&) noexcept;
+    // Exact GA SCB,12 zones,18 portals,38 original lights. Its malformed
+    // authoring section remains intact; Light9 retains genuine reader/Init
+    // defaults. Uses the declared native spotlight selection policy.
+    bool prepareGaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+        Diagnostic&) noexcept;
     const assets::World48F* world() const noexcept;
+    // Authenticated GC or GA source global ambient+50 with no flash authoring.
+    // A separate method preserves currentGcGlobalAmbient50's GC-only contract.
+    bool currentSourceGlobalAmbient50(std::array<float,4>&) const noexcept;
     // Bound GC global148F90..148FFC ambient50, independent of per-racer zones.
     // Only available when authenticated SCB omits the ambient-flash enabling
     // key270E9C and this original-lighting lifetime is still valid. TA and

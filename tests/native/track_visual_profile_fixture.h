@@ -24,9 +24,22 @@ inline const Profile& get(track_source_fixture::Track track) {
     static constexpr Profile gc{
 #include "gc_visual_profile.inc"
     };
+#if __has_include("ga_visual_profile.inc")
+    // Produced only by authenticated original GA cold preparation. Missing
+    // generated pins are an explicit unavailable asset profile, never TA/GC.
+    static constexpr Profile ga{
+#include "ga_visual_profile.inc"
+    };
+#endif
     switch (track) {
     case track_source_fixture::Track::ta: return ta;
     case track_source_fixture::Track::gc: return gc;
+    case track_source_fixture::Track::ga:
+#if __has_include("ga_visual_profile.inc")
+        return ga;
+#else
+        throw std::runtime_error("GA native visual assets have not been cold-prepared and pinned");
+#endif
     default: throw std::runtime_error("Unsupported original visual track identity");
     }
 }

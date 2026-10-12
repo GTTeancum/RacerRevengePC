@@ -1,0 +1,201 @@
+{
+  "source_commit": "c6814e73ccfd179c26c700a4337f5005a1d8b0b2",
+  "inventory_sha256": "2b38daec15875e8bbb6a348169d0bc56b845260eebac191cb3518e1cad3792ab",
+  "sources": [
+    {
+      "base": "candidate",
+      "path": "assemble_ga_visual.py",
+      "sha256": "714cf1b8bb31850c94e4241bd05cc302fbf4c9b889ff701e22a4f8393b68f835"
+    },
+    {
+      "base": "candidate",
+      "path": "inventory_ga_atm_frames.py",
+      "sha256": "932b5b4dd7bb63cd7a0496196360830d6fc27065952ce5f658b6f119b0f32740"
+    },
+    {
+      "base": "candidate",
+      "path": "prepare_ga_assets.py",
+      "sha256": "790368bc225207436523b4521c71eaa29bb235080769307cfe3c0e2074a919a8"
+    },
+    {
+      "base": "candidate",
+      "path": "recover_ga_sky.py",
+      "sha256": "3693291717d56559c2443fd7e1f4e6ac97c3123ce4749cf6f90ede526caa421e"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_decode48c.cpp",
+      "sha256": "99feffba580821d63187dd12f7a61ed1685b9c9ded0bf962c120f1f4cb5c53f2"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_decode48c.h",
+      "sha256": "b334a60a0a5794cdb3ac5e7492e06045f93b40927ce3b6cecfbf7291abde2230"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_scene48d.cpp",
+      "sha256": "d7468393a90890818eded112b02ab967fb1d4cd31881569ed6f8ef56f947cb73"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_scene48d.h",
+      "sha256": "a6077121f9492e91634a962036e8a41c262876c67f131f61e2e0b820bf50117d"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_texture48e.cpp",
+      "sha256": "15ffdb328539309d449f940985f03a62b917f21bfab8d50b06614429508b0d2a"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_texture48e.h",
+      "sha256": "01ebfcd78d2445a55c0f6fb6a501e09c7ccdde6ae371e8c1c6ac602d2b349536"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/native_asset48b.cpp",
+      "sha256": "2f4f798d1c7621188ddc0ef3a9b0e62b051ee6a50f3956bb2e0260ba99a2424f"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/native_asset48b.h",
+      "sha256": "c192664663b2e8885a437703995ec2a04c22f506538ffe8eb9279e0508cb3038"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/pod_physics49n.cpp",
+      "sha256": "47beb4459a72d7422ff9b62112e9ffab4fffcd16f1c9e5e7697ee16ccabef5a9"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/pod_physics49n.h",
+      "sha256": "a1ddbadd24e97d874e6040aa3cb63093cfdf8436c3ec4f36f763bfcb71ddcbdd"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/scene_asset48d.cpp",
+      "sha256": "b9fac29eb3247f28e807e6dd90bf7a4879113674ffa17474f493e3ca0b795b07"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/scene_asset48d.h",
+      "sha256": "516a3a0655f9c289df02b0c8a4ce549c0e84c6f1fce596bcb147a9d69d17b71e"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/advancement_selectors49k.h",
+      "sha256": "f2af8bf68d3a61901cd6e4f89bef395570740fe5be2327b2f72c745fe625481e"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/authored_parameters49n.h",
+      "sha256": "d1923aa3d1cccd31a997fdd6137685382553c928c5a3700e89466a8b27a9a9d8"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/body_advancement49k.h",
+      "sha256": "a54f0cfa788cbe70d0aebc043c0e77c065002cd8eab397f3351647d14d1d9df1"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/body_integration48c.h",
+      "sha256": "5da2c9c06d65e59ba037b9d434386d4ba212ba77a8585855c803dbfaf6e55363"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/body_scene48g.h",
+      "sha256": "b0a968fcbdcaf195a5adc1a461ca10b00f8feb0ac03f29a588aaa18e8d213805"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/body_wrapper48h.h",
+      "sha256": "55a912b66be48153af29b5d85adfab5ab4dd6099e420061f31a2d7c1e844baf5"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/control_binding48w.h",
+      "sha256": "ed593491aeb0f356e55e011f3742ae3dec73e3f10a0c18670239fe99c4279a39"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/control_filter48b.h",
+      "sha256": "0f3ff1cbacd4df34887dad6db353008384105525d7e5eecea5332d012ce6b38b"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/control_shaping48v.h",
+      "sha256": "dcc8a71d1a154bf0e7e91dec7e738aad32c53f0b5e984a10cafa0930ddf19273"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/coupled_body_advancement49m.h",
+      "sha256": "a1297366f62996cc140e5e03cfb060e72c6b35561952b17df9adee4d33eb7c36"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/gradient_noise49m.h",
+      "sha256": "e6d9dd686c603dd4c62562e83e2986493dd21f955905d700b933d4d3d2c941ec"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/player_input48x.h",
+      "sha256": "bf34b8eab78099945b664febdf3d8fe20adeaacee220f96f07698fdefe01f2ac"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/pod_sphere_constraint49l.h",
+      "sha256": "1a754359d82f4817d0be8b11f934469da37a300b62698395b9148f00e9368802"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/secondary_body49m.h",
+      "sha256": "2c03b7d8b5f893cd927fb4184b411d8285561567f2eade8d95a856bc10f0d133"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/vehicle_aero48e.h",
+      "sha256": "b0ac4ee3aba1baf810e8f9396837bdf1af9f67e7467fae6fe7f7295498cfe2ab"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/vehicle_forces48d.h",
+      "sha256": "4cdf174e6469aae3a58671fac83f1a708cc6cdf6640b366b929c033802b772fe"
+    },
+    {
+      "base": "repo",
+      "path": "tests/native/recover_sky50gw.py",
+      "sha256": "1132b789720a8d9eb8480e7922513a1d4b7759c27f18fde04487c4c219c74cef"
+    },
+    {
+      "base": "repo",
+      "path": "third_party/native-json/json.hpp",
+      "sha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/decode_scene48c.py",
+      "sha256": "e0b6811443c46cd05c621e1915134a031a457b1a66db18751e2956ed7d68af1a"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/decode_source_textures50fc.py",
+      "sha256": "e482393f6b384863d17c7cc84aa930affd466eb6c6718dfd1292713408bf9efe"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/decode_static48b.py",
+      "sha256": "875946365699396aaa0dd594a8e2b9cf1c4319cfc6079c53d686db98b998668a"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/decode_world48e.py",
+      "sha256": "f073107368ff6b5f5e398e74126834d585e8c8f965bb3e87718f5d9a7a166f21"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/original_roster/import_original_pods.cpp",
+      "sha256": "b1a4bf0a5451a07e7986afdd6c1efaf47acb9113b33ce6475e84ea6c07725af5"
+    }
+  ]
+}

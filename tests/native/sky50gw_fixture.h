@@ -4,7 +4,7 @@
 #include "../../src/assets/import_decode48c.h"
 #include <cfenv>
 
-// Cold authenticated bridge for original TA/GC sky members. Cube geometry is the direct
+// Cold authenticated bridge for original TA/GC/GA sky members. Cube geometry is the direct
 // 12A8A0 source constructor, not an invented enclosing mesh. Only authored
 // face/tile mask bits produce geometry. Images are genuine decoded IPUM bytes.
 namespace sky50gw_fixture {
@@ -42,6 +42,12 @@ inline constexpr Entry gcEntries[] = {
 #include "sky_gc_index.inc"
 };
 static_assert(sizeof(gcEntries) / sizeof(gcEntries[0]) == tileCount, "Actual authored GC tile count");
+#if __has_include("sky_ga_index.inc")
+inline constexpr Entry gaEntries[] = {
+#include "sky_ga_index.inc"
+};
+static_assert(sizeof(gaEntries) / sizeof(gaEntries[0]) == tileCount, "Actual authored GA tile count");
+#endif
 struct Source {
     std::size_t archiveBytes, decodedCapacity, cubBytes, sceneBytes;
     std::uint32_t archiveEntries;
@@ -62,9 +68,22 @@ inline const Source& source(track_source_fixture::Track track) {
         "skies\\sky21.cub","676a6601d962d66210d80f0ca97f2d6ad7a7b6eb43d7ba55c164a4792d6b392c",
         "tracks\\gc.scb","d47a83f4b50812609c923381f3a9038328c81d9a50563b68fb4de022a9be210d",
         27716,"151,160,177",gcEntries};
+#if __has_include("sky_ga_index.inc")
+    static const Source ga{2834942,32u*1024u*1024u,193885,292650,970,
+        "063b65cc9a0410ba0393362309fb3f80c4516a3c65ffee2b9f7bc76d1afe25d9",
+        "skies\\ga.cub","a7a39f4efab6ff032293846f90429d4235cfc3ec9d16aea178b59108faf67141",
+        "tracks\\ga.scb","ad38b0d47efdda92e36bf36f9b380f7f3111698cb068532068a19229097de5d7",
+        21908,"117,107,66",gaEntries};
+#endif
     switch (track) {
     case track_source_fixture::Track::ta: return ta;
     case track_source_fixture::Track::gc: return gc;
+    case track_source_fixture::Track::ga:
+#if __has_include("sky_ga_index.inc")
+        return ga;
+#else
+        throw std::runtime_error("GA sky bytes have not been decoded and pinned by authorized cold preparation");
+#endif
     default: throw std::runtime_error("Unsupported original sky track identity");
     }
 }
@@ -172,13 +191,22 @@ public:
             // reversible parameter decoder. Full member authentication makes
             // this a bounded fixed fixture field, not a permissive text parser.
             const auto fogRgbOffset = selected.fogRgbOffset;
-            need(fogRgbOffset+12 <= sceneParameters.size() &&
-                std::memcmp(sceneParameters.data()+fogRgbOffset, selected.fogRgb, 12) == 0,
+            const auto colorBytes=std::strlen(selected.fogRgb)+1u;
+            need(fogRgbOffset<=sceneParameters.size() && colorBytes<=sceneParameters.size()-fogRgbOffset &&
+                std::memcmp(sceneParameters.data()+fogRgbOffset, selected.fogRgb, colorBytes) == 0,
                 "Original Fog.ColorRGB field");
+            // Authenticated GA has a two-digit blue channel. Never read a
+            // fixed three-digit stride through the next field's value bytes.
+            const char* digit=selected.fogRgb;
             for (unsigned channel = 0; channel < 3; ++channel) {
-                const auto* digits = sceneParameters.data()+fogRgbOffset+channel*4;
-                const unsigned value = (digits[0]-'0')*100u+(digits[1]-'0')*10u+(digits[2]-'0');
+                unsigned value=0,count=0;
+                while(*digit>='0'&&*digit<='9'){
+                    need(++count<=3u,"Original fog channel width");
+                    value=value*10u+static_cast<unsigned>(*digit++-'0');
+                }
+                need(count&&value<=255u&&*digit==(channel<2?',':'\0'),"Original fog channel syntax");
                 next->clearRgba[channel] = static_cast<float>(value)/255.0f;
+                if(channel<2)++digit;
             }
             next->clearRgba[3] = 1.0f;
             next->mesh.vertices.reserve(vertexCount); next->mesh.indices.reserve(indexCount);

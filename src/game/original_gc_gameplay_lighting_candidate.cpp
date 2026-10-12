@@ -1,5 +1,6 @@
 #include "original_gc_gameplay_lighting_candidate.h"
 #include "../assets/track_start50ad.h"
+#include "../assets/original_light_pose_defaults_candidate.h"
 #include "../assets/zone_search_authoring50cn.h"
 #include <cmath>
 #include <cstring>
@@ -87,8 +88,8 @@ void shaBlock(const std::uint8_t* block, std::array<std::uint32_t, 8>& h) noexce
     }
     h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d; h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=v;
 }
-bool authenticScb(const std::vector<std::uint8_t>& input,bool ta) noexcept {
-    if (input.size() != (ta?130511u:359830u)) return false;
+bool authenticScb(const std::vector<std::uint8_t>& input,bool ta,bool ga) noexcept {
+    if ((ta&&ga)||input.size() != (ga?292650u:ta?130511u:359830u)) return false;
     std::array<std::uint32_t, 8> h{{0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
         0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19}};
     std::size_t at = 0;
@@ -103,7 +104,8 @@ bool authenticScb(const std::vector<std::uint8_t>& input,bool ta) noexcept {
         tail[padded - 1 - i] = static_cast<std::uint8_t>(bits >> (i * 8));
     shaBlock(tail.data(), h);
     if (padded == 128) shaBlock(tail.data() + 64, h);
-    const char* expected = ta ?
+    const char* expected = ga ?
+        "ad38b0d47efdda92e36bf36f9b380f7f3111698cb068532068a19229097de5d7" : ta ?
         "c3431a55c1f44ae704dae5b031a51f4b7907dbfc3e7787aba4c7ccbf9969031d" :
         "d47a83f4b50812609c923381f3a9038328c81d9a50563b68fb4de022a9be210d";
     constexpr char hex[] = "0123456789abcdef";
@@ -140,11 +142,13 @@ struct Owner::Storage {
         float innerCos=0,outerCos=0;
         std::uint32_t zone=0;
     };
-    bool taNative=false;
-    std::array<AuthoredSpot,17> spots{};
+    bool taNative=false,gaNative=false;
+    std::uint32_t spotCount=0;
+    std::array<AuthoredSpot,36> spots{};
     light::Vec3 sunLook{};
     std::array<light::Vec4,gcZones> sun44{};
     bool prepareTa(Diagnostic&);
+    bool prepareGa(Diagnostic&);
     bool selectTa(const LiveZoneMembership50EN&,const light::Vec3&,
         light::LightMatrices&,Diagnostic&) const noexcept;
 
@@ -161,15 +165,15 @@ struct Owner::Storage {
     std::array<CollectionZone50BX,gcZones> zones{};
     std::array<SearchListBlock50BR,gcZones*4> blocks{};
     std::array<CollectionRef50BX,gcZones> portalHeads{};
-    std::array<LiveZonePortalLink50EN,gcPortals*2> portalLinks{},scratchPortalLinks{};
-    std::array<PortalGeometry50EO,gcPortals> portalGeometry{};
-    std::array<CollectionZoneLink50BX,gcPortals+1> scratchLinks{};
-    std::array<LiveZoneEntry50EN,gcPortals+1> scratchEntries{};
+    std::array<LiveZonePortalLink50EN,maximumPortals*2> portalLinks{},scratchPortalLinks{};
+    std::array<PortalGeometry50EO,maximumPortals> portalGeometry{};
+    std::array<CollectionZoneLink50BX,maximumPortals+1> scratchLinks{};
+    std::array<LiveZoneEntry50EN,maximumPortals+1> scratchEntries{};
     LiveZoneWorkspace50EN workspace{};
     struct Vehicle {
         LiveZoneMembership50EN member{};
-        std::array<CollectionZoneLink50BX,gcPortals+1> links{};
-        std::array<LiveZoneEntry50EN,gcPortals+1> entries{};
+        std::array<CollectionZoneLink50BX,maximumPortals+1> links{};
+        std::array<LiveZoneEntry50EN,maximumPortals+1> entries{};
         PodShapeSource49W source{};
         PodShapeState49W preparedPrefix{};
         SceneNodeIndex49P mainRoot=SceneNodeIndex49P::none;
@@ -196,6 +200,7 @@ struct Owner::Storage {
     }
 };
 bool Owner::Storage::prepareTa(Diagnostic& d) {
+    spotCount=17;
     const auto& params=world.parameters;
     const auto* lights=block(params,"lights");
     if(!lights||!textField(*lights,"numberoflights","26"))return fail(d,Status::sourceFields,0x2783d0);
@@ -256,6 +261,71 @@ bool Owner::Storage::prepareTa(Diagnostic& d) {
     }
     return true;
 }
+bool Owner::Storage::prepareGa(Diagnostic& d) {
+    const auto& params=world.parameters;
+    const auto* lights=block(params,"lights");
+    const auto* ambient=block(params,"light1");
+    const auto* sun=block(params,"light2");
+    const auto* environment=block(params,"environment");
+    if(!lights||!ambient||!sun||!environment||
+       !textField(*lights,"numberoflights","38")||
+       !textField(*ambient,"type","Ambient")||!textField(*sun,"type","Directional")||
+       field(*ambient,"initialzone")||field(*sun,"initialzone")||
+       !textField(*sun,"emitslight","T")||!textField(*sun,"placelightatinfinity","T")||
+       field(*environment,"ambientcolorflashminidletime"))
+        return fail(d,Status::sourceFields,0x277390);
+    light::Vec3 ambientRgb{},sunRgb{},sunPosition{},sunTarget{};
+    if(!triple(*ambient,"colorrgb",ambientRgb)||!triple(*sun,"colorrgb",sunRgb)||
+       !triple(*sun,"position",sunPosition)||!triple(*sun,"targetposition",sunTarget))
+        return fail(d,Status::sourceFields,0x277494);
+    for(unsigned c=0;c<3;++c)sunLook[c]=sub(sunTarget[c],sunPosition[c]);
+    if(!normalizeOnce(sunLook))return fail(d,Status::arithmetic,0x147200);
+    light::Vec4 ambientRow{{mul(ambientRgb[0],.5f),mul(ambientRgb[1],.5f),mul(ambientRgb[2],.5f),64.f}};
+    for(auto& row:ambient60)row=ambientRow;
+    for(auto& row:sun44)row={{mul(sunRgb[0],.5f),mul(sunRgb[1],.5f),mul(sunRgb[2],.5f),0.f}};
+    // Original148F90..148FFC also writes the same first ambient to global+50.
+    // Exact GA SCB has no ambient-flash enabling field; only source+50 is
+    // published to Binder, never the selected negative-light-adjusted row.
+    globalAmbient50=ambientRow;fixedGcGlobalAmbient=true;
+    auto scalar=[](const assets::ParameterBlock48F& b,const char* key,float& value){
+        const auto* f=field(b,key);
+        return f&&assets::parseTrackNumber50AD(f->value.data(),f->value.size(),value);
+    };
+    spotCount=36;
+    for(std::uint32_t index=0;index<spotCount;++index){
+        const auto ordinal=index+3u;
+        const auto name="light"+std::to_string(ordinal);const auto* b=block(params,name.c_str());
+        if(!b||!textField(*b,"type","Spotlight")||field(*b,"hasflasher"))
+            return fail(d,Status::sourceFields,0x277390);
+        auto& spot=spots[index];light::Vec3 rgb{};float inner=0.f,outer=0.f;
+        if(!triple(*b,"colorrgb",rgb)||!triple(*b,"attenuation",spot.attenuation)||
+           !scalar(*b,"innerconeangle",inner)||!scalar(*b,"outerconeangle",outer)||
+           inner<0.f||inner>=outer||outer>180.f)
+            return fail(d,Status::sourceFields,0x277390);
+        namespace poseSource=assets::original_light_pose_defaults_candidate;
+        poseSource::FreshPose pose;poseSource::Diagnostic poseDiagnostic;
+        if(!poseSource::readFreshPose(*b,static_cast<std::uint32_t>(world.zones.size()),pose,poseDiagnostic))
+            return fail(d,Status::sourceFields,poseDiagnostic.sourcePC);
+        if(ordinal==9u){
+            // Authenticate the actual missing-field branch. The helper retains
+            // reader look18/B0 zero and cached effective78 +X separately.
+            if(pose.positionAuthored||pose.zoneAuthored||
+               pose.lookSource!=poseSource::LookSource::constructorDefault||pose.lookWasNormalized)
+                return fail(d,Status::sourceFields,0x277390);
+        }else if(!pose.positionAuthored||!pose.zoneAuthored||
+                 pose.lookSource!=poseSource::LookSource::lookVector)
+            return fail(d,Status::sourceFields,0x277390);
+        for(unsigned c=0;c<3;++c)spot.position[c]=pose.positionA0[c];
+        spot.look=pose.effectiveLook78; // Already initialized; never normalize again.
+        spot.zone=pose.initialZone;
+        for(unsigned c=0;c<3;++c)spot.rgb[c]=mul(rgb[c],.5f);
+        for(float a:spot.attenuation)if(!std::isfinite(a)||a<0.f)return fail(d,Status::sourceFields,0x146f60);
+        constexpr float halfDegree=3.14159265358979323846f/360.f;
+        spot.innerCos=std::cos(mul(inner,halfDegree));spot.outerCos=std::cos(mul(outer,halfDegree));
+        if(!(spot.innerCos>spot.outerCos))return fail(d,Status::arithmetic,0x149fe4);
+    }
+    return true;
+}
 bool Owner::Storage::selectTa(const LiveZoneMembership50EN& member,
     const light::Vec3& position,light::LightMatrices& output,Diagnostic& d) const noexcept {
     for(float x:position)if(!std::isfinite(x))return fail(d,Status::arithmetic,0x2413a8);
@@ -301,7 +371,9 @@ bool Owner::Storage::selectTa(const LiveZoneMembership50EN& member,
     // attenuation, ties retain earlier authored lights. Sun reserves slot0.
     std::array<float,2> scores{{std::numeric_limits<float>::infinity(),std::numeric_limits<float>::infinity()}};
     std::array<light::Vec3,2> directions{},colors{};
-    for(const auto& spot:spots){
+    if(spotCount>spots.size())return fail(d,Status::bounds,0x14a118);
+    for(std::uint32_t spotIndex=0;spotIndex<spotCount;++spotIndex){
+        const auto& spot=spots[spotIndex];
         bool eligible=false;auto memberLink=CollectionRef50BX{1};std::size_t count=0;
         while(memberLink){
             if(memberLink>member.storage.capacity||++count>member.storage.capacity)
@@ -350,25 +422,29 @@ Owner::~Owner(){if(storage_&&storage_->activeLease)
 DrawLease::~DrawLease(){if(owner_)owner_->endDraw(*this);}
 const assets::World48F* Owner::world() const noexcept {return storage_?&storage_->world:nullptr;}
 bool Owner::prepare(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
-    return prepareScene(scb,racers,false,d);
+    return prepareScene(scb,racers,false,false,d);
 }
 bool Owner::prepareTaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
-    return prepareScene(scb,racers,true,d);
+    return prepareScene(scb,racers,true,false,d);
 }
-bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t racers,bool ta,Diagnostic& d) noexcept {
+bool Owner::prepareGaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
+    return prepareScene(scb,racers,false,true,d);
+}
+bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t racers,bool ta,bool ga,Diagnostic& d) noexcept {
     d={};if(invalidated_)return fail(d,Status::unprepared,0x272a48);
     if(storage_)return fail(d,Status::alreadyPrepared,0x272a48);
     if(!racers||racers>maximumRacers)return fail(d,Status::identity,0x1ae578);
-    if(!authenticScb(scb,ta))return fail(d,Status::sourceIdentity,0x270b10);
+    if(!authenticScb(scb,ta,ga))return fail(d,Status::sourceIdentity,0x270b10);
     if(!light::selection_detail::arithmeticReady())return fail(d,Status::arithmetic,0x146f60);
     try {
         auto next=std::make_unique<Storage>();
         if(!assets::decodeWorld48F(scb,next->world,d.decode))return fail(d,Status::sourceShape,0x270b10);
         const auto& w=next->world;
-        if(w.zones.size()!=(ta?9u:gcZones)||w.portals.size()!=(ta?10u:gcPortals))
+        if(w.zones.size()!=(ta?9u:gcZones)||w.portals.size()!=(ga?gaPortals:ta?10u:gcPortals))
             return fail(d,Status::unsupportedScene,0x272a48);
-        next->taNative=ta;
-        if(ta){if(!next->prepareTa(d))return false;}else{
+        next->taNative=ta;next->gaNative=ga;
+        if(ga){if(!next->prepareGa(d))return false;}
+        else if(ta){if(!next->prepareTa(d))return false;}else{
         const auto* first=block(w.parameters,"light1");const auto* second=block(w.parameters,"light2");
         const auto* lights=block(w.parameters,"lights");
         if(!first||!second||!lights||!textField(*lights,"numberoflights","2")||
@@ -417,7 +493,7 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
         if(initializeZoneLifecycle50CL(next->lifecycle,lifeStorage,w.zones.size(),racers,1024,
             next->workspace.transfer)!=SearchStorageStatus50BS::Complete)
             return fail(d,Status::registration,0x272a58);
-        std::array<LiveZonePortalInput50EN,gcPortals> input{};
+        std::array<LiveZonePortalInput50EN,maximumPortals> input{};
         for(std::size_t i=0;i<w.portals.size();++i){
             input[i].zoneA=w.portals[i].zones[0];input[i].zoneB=w.portals[i].zones[1];
             const auto index=w.portals[i].parameter_block;
@@ -539,14 +615,15 @@ bool Owner::select(const DrawLease& lease,std::uint32_t component,SceneNodeIndex
        lease.roots_[component]!=root||
        o.vehicles[lease.racer_].member.revision!=lease.membershipRevision_)
         return fail(d,Status::stalePublication,0x2413d0);
-    if(policy!=(o.taNative?CachePolicy::nativeTaAuthoredZoneSpotSelection:
+    if(policy!=(o.gaNative?CachePolicy::nativeGaAuthoredZoneSpotSelection:
+        o.taNative?CachePolicy::nativeTaAuthoredZoneSpotSelection:
         CachePolicy::inactiveCandidateNativePerPublicationRecompute))
         return fail(d,Status::unsupportedPolicy,0x14a0e8);
     // INTENTIONALLY INACTIVE NATIVE POLICY: do not reproduce retail A4 hits.
     // It can differ from14A860's membership-key retained matrix. No source
     // null/miss/completeness assertion is manufactured by choosing this branch.
     if(!o.selectedReady[component]){
-        if(o.taNative){
+        if(o.taNative||o.gaNative){
             if(!lease.frame_||!validRoot(root,lease.frame_->sceneNodeCount))
                 return fail(d,Status::identity,0x2413d0);
             const auto& node=lease.frame_->nodes[static_cast<std::uint32_t>(root)];
@@ -629,6 +706,13 @@ bool recoverCompressedNormal(const std::array<double,3>& expanded,double normalQ
 
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 bool Owner::currentGcGlobalAmbient50(std::array<float,4>& out) const noexcept {
+    if(!storage_||invalidated_||storage_->taNative||storage_->gaNative||!storage_->fixedGcGlobalAmbient)return false;
+    out=storage_->globalAmbient50;return true;
+}
+}
+
+namespace rr::game::original_gc_gameplay_lighting_candidate {
+bool Owner::currentSourceGlobalAmbient50(std::array<float,4>& out) const noexcept {
     if(!storage_||invalidated_||storage_->taNative||!storage_->fixedGcGlobalAmbient)return false;
     out=storage_->globalAmbient50;return true;
 }

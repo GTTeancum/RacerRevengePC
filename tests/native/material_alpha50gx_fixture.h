@@ -71,7 +71,8 @@ inline std::string lower(std::string value) {
 // added. Unspecified blend fields keep an explicit opaque host policy pending
 // the separately retained startup default-template identity.
 inline bool selectGc(const track_materials50fa_fixture::Selection& selection, Policy& output) {
-    if (selection.track != track_source_fixture::Track::gc || selection.slot != 1 ||
+    if ((selection.track != track_source_fixture::Track::gc &&
+         selection.track != track_source_fixture::Track::ga) || selection.slot != 1 ||
         !selection.pass || selection.pass > selection.passCount || selection.passCount > 2)
         return false;
     const auto& fields = selection.sourcePassFields;
@@ -123,7 +124,8 @@ inline bool selectGc(const track_materials50fa_fixture::Selection& selection, Po
 // they are not claimed as recovered original defaults. Alpha scaling below is
 // a declared GS-style host modulation policy, not original microprogram parity.
 inline bool select(const track_materials50fa_fixture::Selection& selection, Policy& output) {
-    if (selection.track == track_source_fixture::Track::gc) return selectGc(selection, output);
+    if (selection.track == track_source_fixture::Track::gc ||
+        selection.track == track_source_fixture::Track::ga) return selectGc(selection, output);
     if (selection.track != track_source_fixture::Track::ta) return false;
     if (selection.pass != 1 || selection.slot != 1) return false;
     for (const auto& material : detail::materials) {
