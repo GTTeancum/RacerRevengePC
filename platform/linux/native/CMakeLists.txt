@@ -173,7 +173,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/tv_camera_update49f.cpp"
   "${RR_ROOT}/src/game/camera_view49f.cpp"
   "${RR_ROOT}/src/game/camera_frame49f.cpp"
-  # Reviewed original camera source kernels; no runtime activation.
+  # Original camera source kernels and intro lifecycle.
   "${RR_ROOT}/src/game/original_attached_camera.cpp"
   "${RR_ROOT}/src/game/original_camera_query_cold.cpp"
   "${RR_ROOT}/src/game/original_camera_query_owner.cpp"
@@ -186,6 +186,8 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/original_follow_camera.cpp"
   "${RR_ROOT}/src/game/original_follow_collision.cpp"
   "${RR_ROOT}/src/game/original_race_start_camera.cpp"
+  "${RR_ROOT}/src/game/original_camera_start_effects.cpp"
+  "${RR_ROOT}/src/game/original_camera_start_authoring.cpp"
   "${RR_ROOT}/src/assets/tv_camera49e.cpp"
   "${RR_ROOT}/src/game/tv_camera_selection49e.cpp"
   "${RR_ROOT}/src/game/control_filter48b.cpp"
@@ -338,7 +340,8 @@ if(RR_BUILD_INTERACTIVE_CLIENT)
     window_host50dq.cpp keyboard_packet50dr.cpp vehicle_window_gl50ds.cpp
     game_host50er.cpp offscreen_gl_context50dc.cpp
     vehicle_draw_gl50cv.cpp vehicle_shader_gl50cz.cpp vehicle_view_camera50dg.cpp
-    native_camera_view50dx.cpp material_texture_gl50eb.cpp)
+    native_camera_view50dx.cpp material_texture_gl50eb.cpp
+    original_video_blocking_native.cpp original_gameplay_blur_display.cpp)
   target_link_libraries(rr_linux_interactive50dv PUBLIC rr_native_gameplay50dj Threads::Threads ${CMAKE_DL_LIBS})
   target_include_directories(rr_linux_interactive50dv PUBLIC "${CMAKE_CURRENT_LIST_DIR}")
   add_executable(rr_interactive_vehicle50du "${RR_ROOT}/tests/native/terrain_interactive_drive50du.cpp")

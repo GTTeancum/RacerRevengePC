@@ -12,7 +12,7 @@
 namespace original_main_entry50KG {
 // Dedicated frontend device/WAV ownership. No reference to a race mixer, live
 // owner or race voice is accepted. Close this owner BEFORE any future race
-// output opens. Main currently has no admitted gameplay destination.
+// output opens. The Course race handoff uses this same close boundary.
 class AudioOutput final {
 public:
     AudioOutput() = default;
@@ -207,7 +207,7 @@ private:
     }
     // Reverse destruction: output, transport/PCM, mixer, borrowed voice array.
     std::array<rr::platform::AudioVoice50HD,
-        rr::platform::OriginalUiMainAudio50KG::requiredVoices> voices_{};
+        rr::platform::OriginalUiMainAudio50KG::courseRequiredVoices> voices_{};
     rr::platform::AudioMixer50HD mixer_;
     std::shared_ptr<rr::platform::OriginalUiMainAudio50KG> transport_;
     rr::platform::AudioOutput50HD output_;

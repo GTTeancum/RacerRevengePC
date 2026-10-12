@@ -38,7 +38,7 @@ def main():
         absolute = str(ROOT / source)
         if absolute not in argv:
             argv.insert(argv.index('-lz'), absolute)
-    # Reviewed original camera kernels; registration does not activate a camera.
+    # Original camera kernels and concrete native display/intro integration.
     for source in (
         'src/game/original_attached_camera.cpp',
         'src/game/original_camera_query_cold.cpp',
@@ -52,6 +52,11 @@ def main():
         'src/game/original_follow_camera.cpp',
         'src/game/original_follow_collision.cpp',
         'src/game/original_race_start_camera.cpp',
+        'src/game/original_camera_start_effects.cpp',
+        'src/game/original_camera_start_authoring.cpp',
+        'platform/linux/native/original_video_blocking_native.cpp',
+        'platform/linux/native/original_gameplay_blur_display.cpp',
+        'platform/linux/native/native_camera_view50dx.cpp',
     ):
         absolute = str(ROOT / source)
         if absolute not in argv:

@@ -64,9 +64,18 @@ struct OriginalUiCourseSession50KG::Storage {
     game::OriginalUiCourseWidgets50KG& widgets()noexcept{return *cold.resources->widgets();}
     bool exitAccepted()const noexcept{return state.backAccepted||state.launchAccepted;}
     bool operational()const noexcept{return !state.faulted&&!state.quitRequested;}
+    bool audioReady()const noexcept{return cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:
+        cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&cold.audio&&cold.audio->courseMenuReady();}
+    bool effectReady(std::uint32_t id)const noexcept{return audioReady()&&
+        (cold.audioMode==OriginalUiMainAudioMode50KG::muted||cold.audio->canPlayCourseEffect(id));}
+    bool effect(std::uint32_t id,std::uint32_t pc)noexcept{
+        if(cold.audioMode==OriginalUiMainAudioMode50KG::muted&&!cold.audio){++state.audio.suppressedByMutedMode;return true;}
+        if(!audioReady()||!cold.audio->playCourseEffect(id)){++state.audio.failed;fault(S::audio,pc);return false;}
+        ++state.audio.submitted;return true;
+    }
     bool processCurrent()const noexcept{return cold.application->known&&cold.commonProfile->known&&
-        cold.profile->commonProfile()==cold.commonProfile.get()&&cold.audioMode==OriginalUiMainAudioMode50KG::muted&&
-        !cold.audio&&!(cold.application->globalFlags228&4)&&cold.application->transportE00==-1&&
+        cold.profile->commonProfile()==cold.commonProfile.get()&&audioReady()&&
+        !(cold.application->globalFlags228&4)&&cold.application->transportE00==-1&&
         &cold.application->rawRandom308030==&cold.application->sharedNoise308030.sharedRandomState;}
     auto transition()const noexcept{return cold.externalTransition->snapshot();}
     bool currentPage()const noexcept{const auto t=transition();return t.bound&&t.current.screen==6&&t.current.page==1;}
@@ -114,6 +123,9 @@ struct OriginalUiCourseSession50KG::Storage {
     static bool preflight(void* context,const game::OriginalUiCourseWidgetStep50KG* steps,std::size_t count)noexcept{
         auto& s=*static_cast<Storage*>(context);if(!s.operational()||!s.processCurrent()||(!steps&&count))return false;
         for(std::size_t i=0;i<count;++i){const auto& step=steps[i];
+            if(s.cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
+               ((step.kind==game::OriginalUiCourseWidgetStepKind50KG::audioStartLoop11&&!s.cold.audio->canStartCourseLoop11())||
+                (step.kind==game::OriginalUiCourseWidgetStepKind50KG::audioFade1&&!s.cold.audio->canFadeCourseMusic())))return false;
             if(step.kind==game::OriginalUiCourseWidgetStepKind50KG::widget&&s.widgets().state(step.widget).kind==WK::character){
                 auto* model=s.cold.holograms->model(step.widget);
                 if(!model||!model->preflightApply(step.operation,step.value,s.cold.application->modelMotion,
@@ -128,9 +140,12 @@ struct OriginalUiCourseSession50KG::Storage {
     }
     static bool audio(void* context,const game::OriginalUiCourseWidgetStep50KG& step)noexcept{
         auto& s=*static_cast<Storage*>(context);
-        if(s.cold.audioMode!=OriginalUiMainAudioMode50KG::muted||s.cold.audio||
-            (step.kind!=game::OriginalUiCourseWidgetStepKind50KG::audioStartLoop11&&step.kind!=game::OriginalUiCourseWidgetStepKind50KG::audioFade1))return false;
-        ++s.state.audio.suppressedByMutedMode;return true;
+        const bool start=step.kind==game::OriginalUiCourseWidgetStepKind50KG::audioStartLoop11;
+        if(!start&&step.kind!=game::OriginalUiCourseWidgetStepKind50KG::audioFade1)return false;
+        if(s.cold.audioMode==OriginalUiMainAudioMode50KG::muted&&!s.cold.audio){++s.state.audio.suppressedByMutedMode;return true;}
+        if(!s.audioReady()||!(start?s.cold.audio->startCourseLoop11():s.cold.audio->fadeCourseMusic())){
+            ++s.state.audio.failed;s.fault(S::audio,step.sourcePC);return false;}
+        ++s.state.audio.submitted;return true;
     }
     game::OriginalUiCourseWidgetHooks50KG hooks()noexcept{return {this,&preflight,&character,&audio};}
     bool widgetPhase(WP phase)noexcept{
@@ -183,8 +198,11 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
        !cold.resources->widgets()->popupTemplatesHidden438()||cold.resources->widgets()->popupEnabled438()||!cold.resources->video()||
        !cold.holograms||!cold.holograms->loaded()||!cold.courseArchive||!cold.english||!cold.english->loaded()||
        !cold.profile||!cold.profile->initialized()||!cold.commonProfile||!cold.application||!cold.lightManager||
-       !cold.externalTransition||cold.externalTransition->snapshot().bound||cold.previousScreen!=5||
-       cold.audioMode!=OriginalUiMainAudioMode50KG::muted||cold.audio)return result(d,S::unsupportedState);
+       !cold.externalTransition||cold.externalTransition->snapshot().bound||cold.previousScreen!=5)return result(d,S::unsupportedState);
+    if((cold.audioMode==OriginalUiMainAudioMode50KG::muted&&cold.audio)||
+       (cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&(!cold.audio||!cold.audio->courseMenuReady()))||
+       (cold.audioMode!=OriginalUiMainAudioMode50KG::muted&&cold.audioMode!=OriginalUiMainAudioMode50KG::enabled))
+        return result(d,S::audio,0x1DA924);
     try{
         auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->coldStamp=cold.profile->stamp();
         if(!s->processCurrent()||!s->profileCurrent()||s->coldStamp.generation>std::numeric_limits<std::uint64_t>::max()-2)return result(d,S::profile);
@@ -303,6 +321,7 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
            !assets::originalUiCourseBackgroundName50KG(move.selectedControl.planet40)||
            s->cold.resources->backgroundImage(move.selectedControl.planet40)==assets::unresolvedMaterialTexture50EA||
            stamp.generation==std::numeric_limits<std::uint64_t>::max())return result(d,S::unsupportedState,move.sourcePC);
+        if(!s->effectReady(forward?4u:3u))return result(d,S::audio,forward?0x1DF480:0x1DF1C8);
         // Every image/model was genuinely prepared and published at cold bind.
         // CPU packets own copied vertices; drain before model reset, keep the
         // immutable GPU bank and all resources through the whole menu lifetime.
@@ -314,7 +333,7 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
             s->liveStamp=s->cold.profile->stamp();s->state.courseSlot14E4=move.courseSlot14E4;
             s->state.selectedPlanet40=move.selectedControl.planet40;s->state.selectedCourse44=move.selectedControl.course44;
             s->state.deferred14D0=move.deferred14D0;s->selectionRefreshCompleted=false;
-            ++s->state.audio.suppressedByMutedMode; //292360 effect3/4, explicit muted owner.
+            s->effect(forward?4u:3u,forward?0x1DF480:0x1DF1C8);
             out.selectionChanged=true;
         }
         s->inOperation=false;if(s->state.faulted){d.status=s->faultDetail.status;d.sourcePC=s->faultDetail.sourcePC;return d.status;}
@@ -325,6 +344,7 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
     // Do not change the selected model/background while its real deferred
     // publication is pending. A fresh Confirm edge can retry after update3.
     if(confirm&&s->state.deferred14D0)return result(d,S::noChange,0x1DFDF0);
+    if(!s->effectReady(confirm?1u:5u))return result(d,S::audio,confirm?0x1DEF18:0x1DF0E0);
     game::OriginalUiCourseContext50KG context;if(!s->context(context))return result(d,S::profile);
     game::OriginalUiRouteDecision50KG decision;
     const auto status=game::dispatchOriginalUiCourse50KG(0,confirm?game::OriginalUiRouteInput50KG::activate:game::OriginalUiRouteInput50KG::back,context,decision);
@@ -344,6 +364,7 @@ bool OriginalUiCourseSession50KG::routeProposalCurrent(const OriginalUiCourseRou
         !s->state.backProposalPending||p.source!=this||!p.serial||p.serial!=s->proposalSerial||!s->idleInput()||
         !s->processCurrent()||!s->lightCurrent()||!s->profileCurrent()||!sameStamp(p.profileStamp,s->pendingStamp)||
         !sameStamp(s->cold.profile->stamp(),s->pendingStamp)||!sameLife(s->transition(),s->pendingLifecycle)||!sameDecision(p.decision,s->pendingDecision))return false;
+    if(!s->effectReady(s->pendingDecision.request.kind==game::OriginalUiRouteKind50KG::courseLaunch?1u:5u))return false;
     game::OriginalUiCourseContext50KG context;game::OriginalUiRouteDecision50KG current;
     return s->context(context)&&game::dispatchOriginalUiCourse50KG(0,
         s->pendingDecision.request.kind==game::OriginalUiRouteKind50KG::courseLaunch?game::OriginalUiRouteInput50KG::activate:game::OriginalUiRouteInput50KG::back,context,current)==
@@ -358,6 +379,7 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
         p.source!=this||p.serial!=s->proposalSerial||!sameDecision(p.decision,s->pendingDecision)||
         !sameStamp(p.profileStamp,s->pendingStamp)||!s->processCurrent()||!s->lightCurrent())return result(d,S::invalidInput);
     const bool launch=p.decision.request.kind==game::OriginalUiRouteKind50KG::courseLaunch;
+    if(!s->effectReady(launch?1u:5u))return result(d,S::audio,launch?0x1DEF18:0x1DF0E0);
     auto expected=s->pendingLifecycle;if(!launch)expected.requested={5,1};
     expected.lifecycle=launch?Life::requestCourseExit:Life::requestScreenExit;
     const auto stamp=s->cold.profile->stamp();game::OriginalUiCourseRememberedProfile50KG profile;
@@ -367,7 +389,8 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
         profile.laps704!=s->pendingContext.laps14EC||profile.entrants708!=s->pendingContext.entrants14F0||profile.subtype70C!=s->pendingContext.subtypeSlot14F4)
         return result(d,S::profile,0x1DEFCC);
     s->cpuDrain();s->liveStamp=stamp;s->state.backProposalPending=false;s->state.backAccepted=!launch;s->state.launchAccepted=launch;
-    ++s->state.audio.suppressedByMutedMode;return result(d,S::ok,0x1DF0E0);
+    if(!s->effect(launch?1u:5u,launch?0x1DEF18:0x1DF0E0)){d=s->faultDetail;return d.status;}
+    return result(d,S::ok,launch?0x1DEF18:0x1DF0E0);
 }
 S OriginalUiCourseSession50KG::completeSelectionRefresh(D& d)noexcept{
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
@@ -382,7 +405,15 @@ S OriginalUiCourseSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpd
     if(!std::isfinite(in.elapsedSeconds)||in.elapsedSeconds<0||in.elapsedSeconds>1||(in.paused&&in.elapsedSeconds!=0))return result(d,S::invalidInput);
     for(bool held:in.debugChordHeld)if(held)return result(d,S::unsupportedState);
     if(!s->processCurrent()||!s->profileCurrent()||!s->lightCurrent()||!s->popupCurrent()||s->cold.application->uiObject3D8)return result(d,S::unsupportedState);
-    s->cpuDrain();s->state.backProposalPending=false;s->preparedDelta=in.elapsedSeconds;s->paused=in.paused;s->updatePrepared=true;return result(d,S::ok);
+    s->cpuDrain();s->state.backProposalPending=false;s->paused=in.paused;s->inOperation=true;
+    // The same shared transport service as Main/Rider, exactly once before
+    // the manager tick. Only the application advances PCM for accepted time.
+    if(s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled){
+        s->cold.audio->pause(in.paused);
+        if(!s->cold.audio->update(in.elapsedSeconds)){++s->state.audio.failed;s->fault(S::audio,0x234440);}
+    }
+    s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}
+    s->preparedDelta=in.elapsedSeconds;s->updatePrepared=true;return result(d,S::ok);
 }
 S OriginalUiCourseSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,D& d)noexcept{
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);

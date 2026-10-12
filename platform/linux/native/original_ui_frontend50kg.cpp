@@ -17,7 +17,7 @@ using MainStatus=OriginalUiMainSessionStatus50KG;
 using OptionsStatus=OriginalUiOptionsSessionStatus50KG;
 using RiderStatus=OriginalUiRiderSessionStatus50KG;
 using CourseStatus=OriginalUiCourseSessionStatus50KG;
-// Root admits only the reviewed muted Rider19 -> fixed Course -> Back slice.
+// Bounded Rider19 -> Course -> Back/native race, with the shared audio owner.
 // Real archive, profile, popup visibility and resource predicates remain required.
 constexpr bool boundedCourseAdmissionEnabled=true;
 Status result(Diagnostic& d,Status s,std::uint32_t pc=0) noexcept {d.status=s;d.sourcePC=pc;return s;}
@@ -208,7 +208,9 @@ struct OriginalUiFrontend50KG::Storage {
     }
     bool courseInputsReady() const noexcept {
         using Id=assets::OriginalUiArchiveId50KG;
-        if(!boundedCourseAdmissionEnabled||cold.audioMode!=OriginalUiMainAudioMode50KG::muted||cold.audio||
+        if(!boundedCourseAdmissionEnabled||
+           (cold.audioMode==OriginalUiMainAudioMode50KG::muted?bool(cold.audio):
+            cold.audioMode!=OriginalUiMainAudioMode50KG::enabled||!cold.audio||!cold.audio->courseMenuReady())||
            !archive(cold.course,Id::course)||!archive(cold.backgrounds,Id::backgrounds)||!cold.riderProfile||
            !cold.riderProfile->initialized()||cold.riderProfile->commonProfile()!=cold.profile.get()||
            !cold.profile||!cold.profile->known||cold.profile->mode34!=0||

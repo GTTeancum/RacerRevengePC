@@ -17,6 +17,9 @@ class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
 public:
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
     static constexpr std::size_t effectVoiceCount = 6, requiredVoices = 7;
+    // One accepted Rider19 Confirm per page lifetime. Its UIACCEPT stream
+    // borrows a separate native voice; it cannot replace an active utterance.
+    static constexpr std::size_t riderConfirmVoice = requiredVoices, courseRequiredVoices = requiredVoices + 1;
     enum class SteadyRiderError : std::uint8_t {
         none, preparationUnavailable, mixerUnavailable, mixerEpochChanged,
         mixerShapeChanged, revisionUnavailable, paused, soundModeUnavailable,
@@ -34,7 +37,7 @@ public:
         const OriginalSoundMode50KG* soundMode = nullptr;
         std::uint64_t controlRevision = 0, mixerControlRevision = 0;
         std::uint64_t mixerEpoch = 0, soundModeRevision = 0, sourceMixedFrames = 0;
-        std::size_t voiceCount = 0, rejectedVoice = requiredVoices;
+        std::size_t voiceCount = 0, rejectedVoice = courseRequiredVoices;
         std::uint32_t outputRate = 0, musicSong = 0, profileSoundMode = 0;
         float masterGain = 0.f, musicGain = 0.f;
         bool paused = false, ownsMusic = false, fading = false;
@@ -51,7 +54,7 @@ public:
         std::uint64_t mixerControlRevisionBefore = 0, mixerControlRevisionAfter = 0;
         std::uint64_t mixerEpoch = 0, soundModeRevision = 0, sourceMixedFrames = 0;
         std::uint32_t eventId = 0;
-        std::size_t voiceSlot = requiredVoices;
+        std::size_t voiceSlot = courseRequiredVoices;
         AudioVoiceObservation50HD voice{};
     };
     class RiderAdvanceCommandReceipt final {
@@ -62,6 +65,14 @@ public:
         friend class OriginalUiMainAudio50KG;
         bool issued_ = false;
         RiderAdvanceCommandObservation observation_{};
+    };
+    class RiderConfirmPlayback final {
+    public:
+        bool issued() const noexcept { return transport_ != nullptr; }
+    private:
+        friend class OriginalUiMainAudio50KG;
+        const OriginalUiMainAudio50KG* transport_ = nullptr;
+        std::uint64_t revision_ = 0;
     };
     OriginalUiMainAudio50KG() = default;
     ~OriginalUiMainAudio50KG() noexcept override { reset(); }
@@ -77,8 +88,25 @@ public:
     // any playback/mixing. Main/Options require no Rider music bytes. Failure
     // leaves their already prepared transport intact and Rider unavailable.
     bool prepareRiderMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
+    // Optional Course destination, before any playback: original Song11 and
+    // all five Rider19 Confirm choices. Native preload of authored IsStream=1
+    // speech uses the existing decoder/mixer, with no IOP streamer emulation.
+    bool prepareCourseMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
     bool ready() const noexcept override;
     bool riderMenuReady() const noexcept;
+    bool courseMenuReady() const noexcept;
+    bool canStartCourseLoop11() const noexcept;
+    bool startCourseLoop11() noexcept;
+    bool canFadeCourseMusic() const noexcept;
+    bool fadeCourseMusic() noexcept;
+    // Actual Course input1DEF18/1DF0E0/1DF1C8/1DF480: IDs1,5,3,4.
+    bool canPlayCourseEffect(std::uint32_t originalId) const noexcept;
+    bool playCourseEffect(std::uint32_t originalId) noexcept;
+    // Preflight every possible choice BEFORE the real shared RNG draw.
+    bool canPlayRiderConfirm() const noexcept;
+    bool playRiderConfirmVoice(std::uint32_t soundId, RiderConfirmPlayback&) noexcept;
+    bool playRiderConfirmSelection1() noexcept;
+    bool releaseRiderConfirmVoice(RiderConfirmPlayback&) noexcept;
     // Concrete source-mode application through THIS transport's actual mixer.
     // No attached owner, stale mixer, or paused transport can certify Accept.
     const OriginalSoundMode50KG* soundModeOwner50KG() const noexcept;
@@ -138,7 +166,7 @@ public:
     std::uint32_t activeMusicSong() const noexcept;
     float mainGain() const noexcept { return musicGain_; }
 private:
-    bool canRecordControlChange() const noexcept;
+    bool canRecordControlChange(std::uint64_t count = 1) const noexcept;
     void noteControlChange() noexcept;
     bool current() const noexcept;
     bool startMusicLoop(const AudioClip50HD&, std::uint32_t song) noexcept;
@@ -146,6 +174,7 @@ private:
     bool playEffectClip(std::size_t) noexcept;
     bool attempted_ = false, prepared_ = false, paused_ = false;
     bool riderAttempted_ = false, riderPrepared_ = false;
+    bool courseAttempted_ = false, coursePrepared_ = false;
     bool ownsMusic_ = false, fading_ = false;
     AudioMixer50HD* mixer_ = nullptr;
     std::uint64_t mixerEpoch_ = 0;
@@ -163,6 +192,12 @@ private:
     std::array<AudioClip50HD, 7> clips_{};
     assets::AudioPcm50HC riderPcm_{};
     AudioClip50HD riderClip_{};
+    assets::AudioPcm50HC coursePcm_{};
+    AudioClip50HD courseClip_{};
+    std::array<assets::AudioPcm50HC, 5> riderConfirmPcm_{};
+    std::array<AudioClip50HD, 5> riderConfirmClips_{};
+    std::uint64_t riderConfirmPlaybackRevision_ = 0;
+    bool ownsRiderConfirm_ = false;
     std::array<bool, effectVoiceCount> ownsEffect_{};
 };
 }

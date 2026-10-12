@@ -112,6 +112,7 @@ struct OriginalUiRiderSession50KG::Storage {
     OriginalUiRiderProfileStamp50KG pendingStamp;
     game::OriginalUiTransitionSnapshot50KG pendingLifecycle;
     OriginalUiMainSessionUpdate50KG preparedUpdate;
+    OriginalUiMainAudio50KG::RiderConfirmPlayback confirmPlayback;
     std::uint64_t proposalSerial=0,lightGeneration=0;
     bool dependenciesPrepared=false,inOperation=false,rendering=false,paused=false,updatePrepared=false;
     bool requested=false,entered=false,managerEntered=false,opening=false,opened=false,closing=false,restored=false,closed=false;
@@ -168,18 +169,26 @@ struct OriginalUiRiderSession50KG::Storage {
         return boundedRiderConfirmEnabled&&cold.application->clock101A50&&
             cold.application->riderVoiceChoice.preflightRider19(diagnostic);
     }
+    bool confirmAudioReady() const noexcept {
+        return audioReady()&&(cold.audioMode==OriginalUiMainAudioMode50KG::muted||cold.audio->canPlayRiderConfirm());
+    }
     bool applyConfirmVoiceChronology() noexcept {
-        if(!confirmVoiceChronologyReady()||cold.audioMode!=OriginalUiMainAudioMode50KG::muted||cold.audio){
+        if(!confirmVoiceChronologyReady()||!confirmAudioReady()){
             fault(Status::unsupportedState,0x1EA694);return false;}
         if(!cold.application->riderVoiceChoice.chooseRider19(*cold.application->clock101A50,
             cold.application->sharedNoise308030,cold.application->sharedRandomSelectors,
             state.voice,callbackFault.voice)){
             fault(Status::audio,callbackFault.voice.sourcePC);return false;}
-        // Actual1EA780 voice playback is muted AFTER the real seed/draw/choice.
-        ++state.audio.suppressedByMutedMode;return true;
+        // The actual choice precedes1EA780 in both modes. Enabled output plays
+        // that exact original UIACCEPT event, without an extra RNG draw.
+        if(cold.audioMode==OriginalUiMainAudioMode50KG::muted)++state.audio.suppressedByMutedMode;
+        else if(!cold.audio->playRiderConfirmVoice(state.voice.soundId,confirmPlayback)){
+            ++state.audio.failed;fault(Status::audio,0x1EA780);return false;
+        }else ++state.audio.submitted;
+        return true;
     }
     bool confirmReady(game::OriginalUiRiderDynamicDiagnostic50KG& d) const noexcept {
-        return cold.audioMode==OriginalUiMainAudioMode50KG::muted&&!cold.audio&&cold.prospectiveMode==0&&
+        return confirmAudioReady()&&cold.prospectiveMode==0&&
             cold.commonProfile->mode34==0&&(cold.commonProfile->playerBits1125C&0x60)==0x20&&
             confirmAnimationPreflight(d)&&confirmVoiceChronologyReady();
     }
@@ -670,9 +679,11 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
         s->cpuDrain();s->state.fadeMusic4E8=true; //1EA620, after actual route/profile commit.
         if(!s->applyConfirmVoiceChronology()){d=s->callbackFault;return d.status;}
         if(!s->dynamic.confirmCharacter(character)){d.dynamic=s->dynamic.diagnostic();s->fault(Status::model,0x1D2690);return result(d,Status::model,0x1D2690);}
-        // Native muted output suppresses the source effect1 only; any voice
-        // choice/RNG chronology must already have run through its real owner.
-        ++s->state.audio.suppressedByMutedMode;
+        //1EA7B0 follows the actual voice command and character _sel action.
+        if(s->cold.audioMode==OriginalUiMainAudioMode50KG::muted)++s->state.audio.suppressedByMutedMode;
+        else if(!s->cold.audio->playRiderConfirmSelection1()){
+            ++s->state.audio.failed;s->fault(Status::audio,0x1EA7B0);d=s->callbackFault;return d.status;
+        }else ++s->state.audio.submitted;
         s->state.confirmProposalPending=false;s->confirmAccepted=true;
         // Do NOT call acceptedBack/confirmWhileClosing or set bypass4E4. The
         // panel waits for actual _sel >80% readiness before closing aperture.
@@ -833,6 +844,10 @@ Status OriginalUiRiderSession50KG::teardownSource(VehicleWindowGl50DS* renderer,
     d={};if(!storage_||storage_->sourceTornDown)return result(d,Status::ok);
     auto& s=*storage_;if(s.inOperation||s.rendering)return result(d,Status::invalidInput);
     s.sourceClosing=true;
+    // Retire only the utterance issued by this Rider page. A private unentered
+    // candidate holds no playback receipt and cannot stop the active page.
+    if(s.confirmPlayback.issued()&&(!s.cold.audio||!s.cold.audio->releaseRiderConfirmVoice(s.confirmPlayback)))
+        return result(d,Status::audio,0x2924A0);
     const auto generation=s.collector.sourceSubmissionWatermark();
     const auto frontier=s.backend.materialLifetime().sequence();
     // This proof is recorded by beginSourceSubmission on the exact collector.

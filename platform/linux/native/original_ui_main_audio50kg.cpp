@@ -71,6 +71,17 @@ constexpr std::array<OriginalFile,7> originals{{
 constexpr OriginalFile riderOriginal{
     "MUSIC/UI/SCREENS/UI_PEOPL.VAG",709504,
     "2ac7db7a81ebcad40afa37998ac3e1dba16d5cd774d0da464db03faa411ed9e4",619024};
+constexpr OriginalFile courseOriginal{
+    "MUSIC/UI/SCREENS/UI_TRKS.VAG",448480,
+    "b00ea0f7d26f88970eaa87899b5e185b821d82a2bd01a07a33ccf14ded42b40d",390628};
+// UIACCEPT.INI Event39..43, the genuine Rider19 constructor range.
+constexpr std::array<OriginalFile,5> riderConfirmOriginals{{
+    {"SPEECH/UI/A2ASEL01.VAG",25488,"854e09eaf3d5eb28bfccfc35e8a869b5fc10515b6e6c4a3a8dc11dee50cde698",44492},
+    {"SPEECH/UI/A2ASEL02.VAG",19232,"7d11a96798382bde857a80d994317e92ec3a4fc57108c2de9b253e21ad519393",33544},
+    {"SPEECH/UI/A2ASEL03.VAG",18096,"f79ef5212c57bb313c88002bb595352054a2dbb54e059deb8d2dd071ef65ec8c",31556},
+    {"SPEECH/UI/A2ASEL04.VAG",27520,"36f8c4c4c756a36ad6b21c9cd2f4bd083efc53e22f31aa022a8ab1e456e921df",48048},
+    {"SPEECH/UI/A2ASEL05.VAG",17296,"d70fd36cdc0981560f940ad9d74eed809c44cc0a7b05fd8d73e869727a890034",30156}
+}};
 bool sameClip(const AudioClip50HD& a,const AudioClip50HD& b) noexcept {
     return a.samples==b.samples&&a.frames==b.frames&&a.sampleRate==b.sampleRate&&
         a.channels==b.channels&&a.loopStart==b.loopStart&&a.loopEnd==b.loopEnd;
@@ -221,8 +232,46 @@ bool OriginalUiMainAudio50KG::current() const noexcept {
     return prepared_ && mixer_ && mixer_->groupEpoch50IC()==mixerEpoch_ && mixer_->count()==mixerCount_ &&
         !mixer_->requiresVoiceGroupGains50IC();
 }
-bool OriginalUiMainAudio50KG::canRecordControlChange() const noexcept {
-    return !controlRevisionExhausted_&&controlRevision_!=std::numeric_limits<std::uint64_t>::max();
+bool OriginalUiMainAudio50KG::prepareCourseMenu(const std::filesystem::path& audioRoot,
+    std::string& error) noexcept {
+    if(courseAttempted_){error="Course audio needs a fresh cold preparation";return false;}
+    courseAttempted_=true;
+    try {
+        need(riderMenuReady()&&!paused_&&!ownsMusic_&&!mixer_->mixedFrames()&&
+            mixer_->count()==courseRequiredVoices,"Course audio requires the cold extended frontend transport");
+        for(std::size_t i=0;i<mixer_->count();++i)
+            need(!mixer_->active(i),"Course audio preparation cannot alter live playback");
+        authenticatedRead(audioRoot,"UI_MUSIC.JUK",1517,"4b814f8e4fec2fbcfa25807d5e147ecc164dbb0b0cb9ce5d064e2f3e3c89de98");
+        authenticatedRead(audioRoot,"UI_MUSIC.JUB",3623,"f97a5cbceec8056dfc9b277501087aaa54d86a0ccdc0c71cfde73522a048c661");
+        authenticatedRead(audioRoot,"UIACCEPT.INI",4411,"245b0bd530e6797637ac72bbf2de8f101f3b1da280e00e8fc24e4b4930d79f3b");
+        auto song=decodeMenuStereo(authenticatedRead(audioRoot,courseOriginal.path,courseOriginal.bytes,courseOriginal.sha),
+            courseOriginal,223232);
+        std::array<assets::AudioPcm50HC,5> speech;
+        for(std::size_t i=0;i<speech.size();++i){
+            const auto& original=riderConfirmOriginals[i];
+            const auto bytes=authenticatedRead(audioRoot,original.path,original.bytes,original.sha);
+            std::string decodeError;
+            need(assets::decodeVagMono50HC(bytes.data(),bytes.size(),speech[i],decodeError),
+                "Original Rider19 Confirm speech decode rejected");
+            const auto& pcm=speech[i];
+            const AudioClip50HD clip{pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,0,0};
+            need(preparedClipMatches(clip,pcm,original,1),"Original Rider19 Confirm PCM metadata differs");
+        }
+        coursePcm_=std::move(song);
+        courseClip_={coursePcm_.samples.data(),coursePcm_.frames,coursePcm_.sampleRate,coursePcm_.channels,0,0};
+        need(preparedClipMatches(courseClip_,coursePcm_,courseOriginal,2),"Original Course Song11 PCM metadata differs");
+        riderConfirmPcm_=std::move(speech);
+        for(std::size_t i=0;i<speech.size();++i){
+            const auto& pcm=riderConfirmPcm_[i];
+            riderConfirmClips_[i]={pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,0,0};
+        }
+        coursePrepared_=true;noteControlChange();error.clear();return true;
+    }catch(const std::exception& e){error=e.what();}
+    catch(...){error="Course audio cold preparation failed";}
+    return false;
+}
+bool OriginalUiMainAudio50KG::canRecordControlChange(std::uint64_t count) const noexcept {
+    return !controlRevisionExhausted_&&count<=std::numeric_limits<std::uint64_t>::max()-controlRevision_;
 }
 void OriginalUiMainAudio50KG::noteControlChange() noexcept {
     if(canRecordControlChange())++controlRevision_;
@@ -231,6 +280,61 @@ void OriginalUiMainAudio50KG::noteControlChange() noexcept {
 bool OriginalUiMainAudio50KG::ready() const noexcept { return current(); }
 bool OriginalUiMainAudio50KG::riderMenuReady() const noexcept {
     return current()&&riderPrepared_&&AudioMixer50HD::validClip(riderClip_);
+}
+bool OriginalUiMainAudio50KG::courseMenuReady() const noexcept {
+    return riderMenuReady()&&coursePrepared_&&mixerCount_==courseRequiredVoices&&
+        preparedClipMatches(courseClip_,coursePcm_,courseOriginal,2);
+}
+bool OriginalUiMainAudio50KG::canStartCourseLoop11() const noexcept {
+    return courseMenuReady()&&!paused_&&canRecordControlChange()&&mixer_->canRecordControlChanges(1)&&
+        (!mixer_->active(musicVoice)||(ownsMusic_&&mixer_->playbackRevision(musicVoice)==musicPlaybackRevision_))&&
+        canPlayEffectClip(1); // Same real centered routing owner, no effect command.
+}
+bool OriginalUiMainAudio50KG::startCourseLoop11() noexcept {
+    return canStartCourseLoop11()&&startMusicLoop(courseClip_,11);
+}
+bool OriginalUiMainAudio50KG::canFadeCourseMusic() const noexcept {
+    return courseMenuReady()&&!paused_&&canRecordControlChange()&&
+        ((!ownsMusic_&&!mixer_->active(musicVoice))||
+         (ownsMusic_&&musicSong_==11&&mixer_->active(musicVoice)&&
+          mixer_->playbackRevision(musicVoice)==musicPlaybackRevision_));
+}
+bool OriginalUiMainAudio50KG::fadeCourseMusic() noexcept {
+    return canFadeCourseMusic()&&fadeMain(1.f);
+}
+bool OriginalUiMainAudio50KG::canPlayCourseEffect(std::uint32_t id) const noexcept {
+    const auto clip=id==1?1u:id==3?2u:id==4?3u:id==5?5u:0u;
+    return courseMenuReady()&&canRecordControlChange()&&mixer_->canRecordControlChanges(2)&&canPlayEffectClip(clip);
+}
+bool OriginalUiMainAudio50KG::playCourseEffect(std::uint32_t id) noexcept {
+    if(!canPlayCourseEffect(id))return false;
+    return playEffectClip(id==1?1u:id==3?2u:id==4?3u:5u);
+}
+bool OriginalUiMainAudio50KG::canPlayRiderConfirm() const noexcept {
+    if(!courseMenuReady()||paused_||ownsRiderConfirm_||mixer_->active(riderConfirmVoice)||
+       !canRecordControlChange(2)||!mixer_->canRecordControlChanges(3)||!canPlayEffectClip(1))return false;
+    for(std::size_t i=0;i<riderConfirmClips_.size();++i)
+        if(!preparedClipMatches(riderConfirmClips_[i],riderConfirmPcm_[i],riderConfirmOriginals[i],1))return false;
+    return true;
+}
+bool OriginalUiMainAudio50KG::playRiderConfirmVoice(std::uint32_t id,RiderConfirmPlayback& out) noexcept {
+    if(out.issued()||id<39||id>43||!canPlayRiderConfirm())return false;
+    // Source1EA780 uses flags0. Bounded Confirm has no earlier utterance:
+    // never stop/restart a live speech voice or consume a replacement choice.
+    if(!mixer_->play(riderConfirmVoice,riderConfirmClips_[id-39],1.f,1.f,false,0.f))return false;
+    riderConfirmPlaybackRevision_=mixer_->playbackRevision(riderConfirmVoice);ownsRiderConfirm_=true;
+    out.transport_=this;out.revision_=riderConfirmPlaybackRevision_;noteControlChange();return true;
+}
+bool OriginalUiMainAudio50KG::playRiderConfirmSelection1() noexcept {
+    return courseMenuReady()&&canRecordControlChange()&&mixer_->canRecordControlChanges(2)&&playEffectClip(1);
+}
+bool OriginalUiMainAudio50KG::releaseRiderConfirmVoice(RiderConfirmPlayback& playback) noexcept {
+    if(!playback.issued())return true;
+    if(!current()||playback.transport_!=this||!ownsRiderConfirm_||
+       playback.revision_!=riderConfirmPlaybackRevision_||
+       mixer_->playbackRevision(riderConfirmVoice)!=playback.revision_||
+       !canRecordControlChange()||!mixer_->canRecordControlChanges(mixer_->active(riderConfirmVoice)?1u:0u))return false;
+    mixer_->stop(riderConfirmVoice);ownsRiderConfirm_=false;playback={};noteControlChange();return true;
 }
 const OriginalSoundMode50KG* OriginalUiMainAudio50KG::soundModeOwner50KG() const noexcept {
     return current()?mixer_->originalSoundMode50KG():nullptr;
@@ -274,7 +378,7 @@ bool OriginalUiMainAudio50KG::inspectSteadyRiderTransport(SteadyTransportObserva
     out={};out.transport=this;out.mixer=mixer_;out.controlRevision=controlRevision_;
     out.paused=paused_;out.ownsMusic=ownsMusic_;out.fading=fading_;
     out.musicSong=musicSong_;out.musicGain=musicGain_;
-    auto reject=[&](SteadyRiderError error,const char* detail,std::size_t voice=requiredVoices) noexcept {
+    auto reject=[&](SteadyRiderError error,const char* detail,std::size_t voice=courseRequiredVoices) noexcept {
         out.error=error;out.detail=detail;out.rejectedVoice=voice;return false;
     };
     if(!prepared_||!riderPrepared_)
@@ -285,8 +389,9 @@ bool OriginalUiMainAudio50KG::inspectSteadyRiderTransport(SteadyTransportObserva
     out.masterGain=mixer_->masterGain();out.soundMode=mixer_->originalSoundMode50KG();
     if(out.mixerEpoch!=mixerEpoch_)
         return reject(SteadyRiderError::mixerEpochChanged,"Rider mixer initialization changed");
-    if(out.voiceCount!=requiredVoices||out.voiceCount!=mixerCount_||out.outputRate!=mixerRate_||!out.outputRate)
-        return reject(SteadyRiderError::mixerShapeChanged,"Rider requires its exact dedicated seven-voice mixer/rate");
+    if((out.voiceCount!=requiredVoices&&out.voiceCount!=courseRequiredVoices)||
+       out.voiceCount!=mixerCount_||out.outputRate!=mixerRate_||!out.outputRate)
+        return reject(SteadyRiderError::mixerShapeChanged,"Rider requires its exact dedicated frontend mixer/rate");
     if(controlRevisionExhausted_||!controlRevision_||!mixer_->canRecordControlChanges())
         return reject(SteadyRiderError::revisionUnavailable,"Rider control identity exhausted or unavailable");
     if(paused_)return reject(SteadyRiderError::paused,"Rider transport paused");
@@ -308,6 +413,12 @@ bool OriginalUiMainAudio50KG::inspectSteadyRiderTransport(SteadyTransportObserva
             return reject(SteadyRiderError::revisionUnavailable,"Rider live voice inspection unavailable",voice);
         if(observed.groupKnown||observed.groupGain!=1.f)
             return reject(SteadyRiderError::unsupportedGainLayer,"Rider foreign per-voice group gain layer",voice);
+    }
+    if(out.voiceCount==courseRequiredVoices){
+        AudioVoiceObservation50HD speech;
+        if(!mixer_->inspectVoice(riderConfirmVoice,speech)||speech.groupKnown||speech.groupGain!=1.f||
+           ownsRiderConfirm_||speech.voice.active)
+            return reject(SteadyRiderError::foreignEffect,"Rider Confirm speech cannot certify steady navigation",riderConfirmVoice);
     }
     if(!ownsMusic_||musicSong_!=7||!out.music.voice.active)
         return reject(SteadyRiderError::wrongMusic,"Rider requires owned active Song7",musicVoice);
@@ -421,6 +532,8 @@ bool OriginalUiMainAudio50KG::update(float seconds) noexcept {
         if (!ownsEffect_[i] && mixer_->active(firstEffectVoice+i)) return false;
         if (ownsEffect_[i] && !mixer_->active(firstEffectVoice+i)) ownsEffect_[i]=false;
     }
+    if(mixerCount_==courseRequiredVoices&&mixer_->active(riderConfirmVoice)&&
+       (!ownsRiderConfirm_||mixer_->playbackRevision(riderConfirmVoice)!=riderConfirmPlaybackRevision_))return false;
     if (ownsMusic_ && !mixer_->active(musicVoice)) { ownsMusic_=false; fading_=false; musicSong_=0; }
     if (!fading_) return true;
     const auto previousElapsed=fadeElapsed_,previousGain=musicGain_;
@@ -456,13 +569,16 @@ std::uint32_t OriginalUiMainAudio50KG::activeMusicSong() const noexcept {
     return current()&&ownsMusic_&&mixer_->active(musicVoice)?musicSong_:0;
 }
 void OriginalUiMainAudio50KG::reset() noexcept {
-    const bool changed=prepared_||riderPrepared_||mixer_||ownsMusic_||fading_||paused_||musicSong_;
+    const bool changed=prepared_||riderPrepared_||coursePrepared_||mixer_||ownsMusic_||ownsRiderConfirm_||fading_||paused_||musicSong_;
     if (current()) {
         if (ownsMusic_) mixer_->stop(musicVoice);
         for (std::size_t i=0; i<effectVoiceCount; ++i)
             if (ownsEffect_[i]) mixer_->stop(firstEffectVoice+i);
+        if(ownsRiderConfirm_&&mixer_->playbackRevision(riderConfirmVoice)==riderConfirmPlaybackRevision_)
+            mixer_->stop(riderConfirmVoice);
     }
-    prepared_=false; riderPrepared_=false; mixer_=nullptr; ownsMusic_=false; fading_=false; paused_=false; musicSong_=0;
+    prepared_=false; riderPrepared_=false; coursePrepared_=false; mixer_=nullptr;
+    ownsMusic_=false; ownsRiderConfirm_=false; fading_=false; paused_=false; musicSong_=0;
     ownsEffect_.fill(false); musicGain_=0.f;
     if(changed)noteControlChange();
 }

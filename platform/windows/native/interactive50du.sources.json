@@ -5,7 +5,7 @@
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "03dac1ad8da989b7d1e43a206d15ba72688f12237f59372d369fe9b291f2231b"
+    "tools/prepare_interactive_build50dv.py": "1c217afeb08b9e3682f804da7bd750553d2fc01c5d46f532656c66fd2d904320"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -322,7 +322,12 @@
     "src/assets/original_ui_rider_binder_assets50kg.cpp",
     "src/game/original_ui_rider_binder_animation50kg.cpp",
     "src/game/original_ui_rider_model_scene50kg.cpp",
-    "src/game/original_ui_rider_lighting50kg.cpp"
+    "src/game/original_ui_rider_lighting50kg.cpp",
+    "src/game/original_camera_start_effects.cpp",
+    "src/game/original_camera_start_authoring.cpp",
+    "platform/linux/native/original_video_blocking_native.cpp",
+    "platform/linux/native/original_gameplay_blur_display.cpp",
+    "platform/linux/native/native_camera_view50dx.cpp"
   ],
   "nativeDependencySources": [
     "third_party/native-zlib/adler32.c",
@@ -335,5 +340,5 @@
   "nativeDependencySourceProvenance": {
     "cmake/NativePc48C.cmake": "28c21d124da2000a8f44272b7d37eb5d02a092e863a9965c50deabec93d4fbff"
   },
-  "sourceListReviewNote": "Original gameplay Binder plus twelve reviewed original camera kernel source units; source-text reconciliation only. Camera source registration does not activate its runtime route. The central interactive list includes one additional Linux-only offscreen context; Windows excludes it."
+  "sourceListReviewNote": "Original camera activation adds two lifecycle units, concrete display fade and blur completion units, and the existing native camera projection adapter. Central interactive source closure has316 C++ units; Windows excludes the Linux offscreen context for315 plus6 vendored C units. Source-list editing only; no build executed."
 }

@@ -55,13 +55,13 @@ there is no installer, download, PATH-wide runtime lookup or asset copier.
 
 ## Source reconciliation and limits
 
-`interactive50du.sources.json` freezes 310 C++ owners from the actual layered
+`interactive50du.sources.json` freezes 315 C++ owners from the actual layered
 `prepare_interactive_build50dv.py` / `prepare_offscreen_build50do.py` /
 `check_terrain_registered_drive50bv.py` declarative lists at
 baseline `2e8389641cfad48b72212c08490b2b0384fa6294` plus the native gameplay
-Binder and twelve reviewed original camera kernel integrations, with six additional
-vendored zlib C files. The matching PowerShell count gate is 310. The central
-interactive list has 311 C++ units because it retains the Linux offscreen context;
+Binder, twelve original camera kernels and five camera/display activation dependencies, with six additional
+vendored zlib C files. The matching PowerShell count gate is 315. The central
+interactive list has 316 C++ units because it retains the Linux offscreen context;
 Windows excludes that unit as described below. Source registration alone does
 not activate the original camera route.
 Those generator files were read, not run or imported. Hash gates require renewed
@@ -71,8 +71,8 @@ The Windows closure excludes `offscreen_gl_context50dc.cpp`,
 `vehicle_offscreen_gl50dd.cpp`, and `vehicle_offscreen_present50de.cpp`.
 GameHost must reject headless operation explicitly; no offscreen fallback or
 success stub is allowed. `joystick_transport50dk.cpp` is not in the direct
-integrated closure. `native_camera_view50dx.cpp` is in the old CMake closure but
-has no callers in this client and is intentionally absent, matching the generator.
+integrated closure. `native_camera_view50dx.cpp` now has a concrete original-camera caller and is
+included in both central and Windows source closures.
 Audio, material-audio, speech, original UI, Options/Game Options, Rider, rendering,
 physics and original-AI owners in the direct generator are retained.
 

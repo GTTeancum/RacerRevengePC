@@ -1,4 +1,6 @@
 #include "vehicle_window_gl50ds.h"
+#include "original_gameplay_blur_native_pass.h"
+#include "original_video_blocking_native.h"
 #include "original_ui_rider_draw_contribution50kg.h"
 #include "native_pod_shadow50hm.h"
 #include "native_pod_shadow_glsl50hm.h"
@@ -814,6 +816,8 @@ struct OwnerGl {
     void (*uniformMatrix4fv)(I, I, std::uint8_t, const float*) = nullptr;
     void (*uniform1i)(I, I) = nullptr;
     void (*uniform1f)(I, float) = nullptr;
+    void (*uniform2i)(I, I, I) = nullptr;
+    void (*uniform4i)(I, I, I, I, I) = nullptr;
     void (*uniform4f)(I, float, float, float, float) = nullptr;
     void (*blendFunc)(U, U) = nullptr;
     void (*blendEquation)(U) = nullptr;
@@ -985,6 +989,15 @@ struct VehicleWindowGl50DS::Storage {
     I nativeShadowCenterUniforms[nativeShadowCasterCount]{}, nativeShadowShapeUniforms[nativeShadowCasterCount]{};
     I nativeShadowOpponentBoundsUniforms[maxVehicleWindowOpponents50DS]{};
     U targets[2]{}, colors[2]{}, depths[2]{};
+    // Distinct native RACE display-fade storage. These are never UI receipts
+    // or gameplay blur/history surfaces. Names remain renderer-owned after
+    // retirement so the last complete sample stays available for readback.
+    OriginalVideoBlockingNativeBackend* displayFadeOwner=nullptr;
+    U displayFadeSourceTarget=0,displayFadeSourceColor=0;
+    U displayFadeTargets[2]{},displayFadeColors[2]{};
+    U displayFadeProgram=0,displayFadeVertexShader=0,displayFadeFragmentShader=0,displayFadeVertexArray=0;
+    I displayFadeImageUniform=-1,displayFadeColorUniform=-1;
+    bool displayFadeDeletionPending=false;
     U menuTargets[2]{}, menuColors[2]{}, displayedTarget = 0;
     std::uint8_t menuPublished = 0;
     U uiTargets[2]{}, uiColors[2]{}, uiDepths[2]{};
@@ -1052,8 +1065,14 @@ struct VehicleWindowGl50DS::Storage {
     VehicleWindowDiagnostic50DS* diagnostic = nullptr; // Only during synchronous calls.
     std::uint8_t published = 0;
     bool initialized = false, active = false, frameSet = false, imageCommitted = false;
+    std::uint64_t contextDrainGeneration = 0;
 
-    bool current(VehicleWindowDiagnostic50DS& d) const noexcept {
+#include "original_gameplay_blur_storage.inl"
+
+    bool current(VehicleWindowDiagnostic50DS& d,
+        const OriginalVideoBlockingNativeBackend* fadeOwner=nullptr) const noexcept {
+        if(displayFadeOwner && displayFadeOwner!=fadeOwner)
+            return fail(d,VehicleWindowError50DS::frame,"blocking display fade owns renderer until retirement");
         if (thread != std::this_thread::get_id())
             return fail(d, VehicleWindowError50DS::wrongThread, "renderer requires creating thread");
         return (request.isCurrent && request.isCurrent(request.context)) ||
@@ -1125,7 +1144,8 @@ struct VehicleWindowGl50DS::Storage {
             if (racerArchetypes[i].cables.textures) return true;
         return request.mode == VehicleWindowMode50DS::callerMaterialTextures ||
             request.track.mode == VehicleWindowMode50DS::callerMaterialTextures || request.cables.textures ||
-            request.sky.textures || request.dynamicWorld.textures || request.enableOriginalUi;
+            request.sky.textures || request.dynamicWorld.textures || request.enableOriginalUi ||
+            request.enableOriginalGameplayBlur;
     }
     bool usesTrackShader() const noexcept {
         return request.track.mode == VehicleWindowMode50DS::sourceVertexColors ||
@@ -1589,7 +1609,141 @@ struct VehicleWindowGl50DS::Storage {
         d.component = 3;
         return true;
     }
+    bool hasDisplayFadeNames() const noexcept {
+        return displayFadeSourceTarget || displayFadeSourceColor ||
+            displayFadeTargets[0] || displayFadeTargets[1] || displayFadeColors[0] || displayFadeColors[1] ||
+            displayFadeProgram || displayFadeVertexShader || displayFadeFragmentShader || displayFadeVertexArray;
+    }
+    bool loadDisplayFadeFunctions() noexcept {
+        // Dormant on normal create/submit, independent of every UI opt-in.
+        // All required pointers exist before the first name is allocated.
+        return load(gl.activeTexture,"glActiveTexture") && load(gl.bindTexture,"glBindTexture") &&
+            load(gl.genTextures,"glGenTextures") && load(gl.deleteTextures,"glDeleteTextures") &&
+            load(gl.texImage2D,"glTexImage2D") && load(gl.texParameteri,"glTexParameteri") &&
+            load(gl.getTexLevelParameteriv,"glGetTexLevelParameteriv") &&
+            load(gl.framebufferTexture2D,"glFramebufferTexture2D") &&
+            load(gl.blitFramebuffer,"glBlitFramebuffer") && load(gl.drawArrays,"glDrawArrays");
+    }
+    bool createDisplayFadeTarget(U& target,U& color,I w,I h) noexcept {
+        gl.genFramebuffers(1,&target);
+        if(!check("allocate display-fade framebuffer") || !target)
+            return fail(*diagnostic,VehicleWindowError50DS::allocation,"zero display-fade framebuffer");
+        gl.genTextures(1,&color);
+        if(!check("allocate display-fade texture") || !color)
+            return fail(*diagnostic,VehicleWindowError50DS::allocation,"zero display-fade texture");
+        gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,color);
+        if(gl.bindSampler)gl.bindSampler(0,0);
+        gl.texParameteri(texture2D,0x2801,0x2600);gl.texParameteri(texture2D,0x2800,0x2600);
+        gl.texParameteri(texture2D,0x2802,0x812F);gl.texParameteri(texture2D,0x2803,0x812F);
+        gl.texParameteri(texture2D,0x813C,0);gl.texParameteri(texture2D,0x813D,0);
+        drawGl.bindBuffer(0x88EC,0);
+        gl.texImage2D(texture2D,0,rgba8,w,h,0,rgba,unsignedByte,nullptr);
+        if(!check("allocate actual-size display-fade RGBA8 storage"))return false;
+        I actualW=0,actualH=0,format=0;
+        gl.getTexLevelParameteriv(texture2D,0,0x1000,&actualW);
+        gl.getTexLevelParameteriv(texture2D,0,0x1001,&actualH);
+        gl.getTexLevelParameteriv(texture2D,0,0x1003,&format);
+        if(!check("verify display-fade texture storage"))return false;
+        if(actualW!=w || actualH!=h || format!=static_cast<I>(rgba8))
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"display-fade texture storage mismatch");
+        gl.bindFramebuffer(framebuffer,target);
+        gl.framebufferTexture2D(framebuffer,colorAttachment,texture2D,color,0);
+        gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+        const U status=gl.checkFramebufferStatus(framebuffer);
+        if(!check("verify display-fade framebuffer"))return false;
+        if(status!=framebufferComplete){diagnostic->framebufferStatus=status;
+            return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"incomplete display-fade framebuffer");}
+        return true;
+    }
+    bool createDisplayFadeProgram() noexcept {
+        static const char* vertex=R"GLSL(#version 150 core
+void main() {
+    vec2 p=gl_VertexID==0 ? vec2(-1.0,-1.0) :
+           gl_VertexID==1 ? vec2(3.0,-1.0) : vec2(-1.0,3.0);
+    gl_Position=vec4(p,0.0,1.0);
+}
+)GLSL";
+        static const char* fragment=R"GLSL(#version 150 core
+uniform sampler2D immutableRaceImage;
+uniform vec4 rgbaqBytes;
+out vec4 viewerOutput;
+int signedFloor128(int value) {
+    return value>=0 ? value/128 : -((-value+127)/128);
+}
+void main() {
+    // Source PRIM0x46 is an untextured full-size sprite. ALPHA0x8000000044
+    // supplies (Cs-Cd)*As/128+Cd. RGBAQ low bytes are used verbatim, including
+    // source packing's signed-lane OR effects; Q is irrelevant to this sprite.
+    // Integer byte policy avoids normalized-GL-alpha255 interpolation.
+    ivec4 source=ivec4(rgbaqBytes);
+    ivec3 destination=ivec3(floor(texelFetch(immutableRaceImage,
+        ivec2(gl_FragCoord.xy),0).rgb*255.0+0.5));
+    ivec3 product=(source.rgb-destination)*source.a;
+    ivec3 rgb=destination+ivec3(signedFloor128(product.r),
+        signedFloor128(product.g),signedFloor128(product.b));
+    viewerOutput=vec4(vec3(clamp(rgb,ivec3(0),ivec3(255))),float(source.a))/255.0;
+}
+)GLSL";
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::vertex;
+        if(!compileTrackShader(0x8B31,vertex,displayFadeVertexShader))return false;
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::fragment;
+        if(!compileTrackShader(0x8B30,fragment,displayFadeFragmentShader))return false;
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::link;
+        displayFadeProgram=shaderGl.createProgram();
+        if(!check("create display-fade program") || !displayFadeProgram)
+            return fail(*diagnostic,VehicleWindowError50DS::shader,"zero display-fade program");
+        shaderGl.attachShader(displayFadeProgram,displayFadeVertexShader);
+        shaderGl.attachShader(displayFadeProgram,displayFadeFragmentShader);
+        shaderGl.bindFragDataLocation(displayFadeProgram,vehicleGlColorOutput50CZ,"viewerOutput");
+        shaderGl.linkProgram(displayFadeProgram);
+        I linked=0;shaderGl.getProgramiv(displayFadeProgram,0x8B82,&linked);
+        if(!check("link display-fade program"))return false;
+        if(!linked){
+            shaderGl.getProgramInfoLog(displayFadeProgram,static_cast<I>(sizeof(diagnostic->shader.log)),nullptr,diagnostic->shader.log);
+            diagnostic->shader.log[sizeof(diagnostic->shader.log)-1]='\0';
+            check("read display-fade program log");
+            return fail(*diagnostic,VehicleWindowError50DS::shader,"display-fade program link failed");
+        }
+        displayFadeImageUniform=shaderGl.getUniformLocation(displayFadeProgram,"immutableRaceImage");
+        displayFadeColorUniform=shaderGl.getUniformLocation(displayFadeProgram,"rgbaqBytes");
+        if(!check("locate display-fade uniforms"))return false;
+        if(displayFadeImageUniform<0 || displayFadeColorUniform<0)
+            return fail(*diagnostic,VehicleWindowError50DS::shader,"missing display-fade uniform");
+        gl.genVertexArrays(1,&displayFadeVertexArray);
+        if(!check("allocate display-fade vertex array") || !displayFadeVertexArray)
+            return fail(*diagnostic,VehicleWindowError50DS::allocation,"zero display-fade vertex array");
+        diagnostic->shader.stage=VehicleGlShaderStage50CZ::none;return true;
+    }
+    bool restoreDisplayFadeBindings(I w,I h) noexcept {
+        // The existing native renderer forbids unrelated foreign GL state.
+        // Restore its normal binding/depth baseline, never clear source depth.
+        gl.useProgram(0);drawGl.bindVertexArray(0);drawGl.bindBuffer(arrayBuffer,0);
+        gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,0);
+        if(gl.bindSampler)gl.bindSampler(0,0);
+        gl.bindFramebuffer(framebuffer,0);gl.viewport(0,0,w,h);
+        gl.disable(0x0BE2);gl.disable(0x0C11);gl.enable(0x0B71);
+        gl.depthMask(1);gl.depthFunc(0x0201);gl.depthRange(0,1);gl.clearDepth(1);
+        gl.colorMask(1,1,1,1);
+        return check("restore native display-fade renderer state without clearing depth");
+    }
+    bool deleteDisplayFadeNames(VehicleWindowDiagnostic50DS& d) noexcept {
+        // Last complete publication may point at an effect surface. Call only
+        // after a newer race publication or after close has invalidated it.
+        displayFadeDeletionPending=true;
+        if(!deleteShaderName(displayFadeProgram,true,d) ||
+           !deleteShaderName(displayFadeVertexShader,false,d) ||
+           !deleteShaderName(displayFadeFragmentShader,false,d) ||
+           !deleteName(displayFadeVertexArray,gl.deleteVertexArrays,d))return false;
+        for(U i=0;i<2;++i)
+            if(!deleteName(displayFadeTargets[i],gl.deleteFramebuffers,d) ||
+               !deleteName(displayFadeColors[i],gl.deleteTextures,d))return false;
+        if(!deleteName(displayFadeSourceTarget,gl.deleteFramebuffers,d) ||
+           !deleteName(displayFadeSourceColor,gl.deleteTextures,d))return false;
+        displayFadeDeletionPending=false;return true;
+    }
     bool hasGlResources() const noexcept {
+        if(hasDisplayFadeNames())return true;
+        if (hasGameplayBlurResources()) return true;
         if (shader && shader->hasResources()) return true;
         if (trackProgram || trackVertexShader || trackFragmentShader) return true;
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
@@ -1681,7 +1835,7 @@ struct VehicleWindowGl50DS::Storage {
         LOAD(gl, getString, GetString);
         // Host pause menus copy the retained race image between private FBOs
         // in headless mode too. Resolve before exposing either blit path.
-        if (request.output == VehicleWindowOutput50DS::defaultBackBuffer || request.enableHostHud || request.enableOriginalUi) {
+        if (request.output == VehicleWindowOutput50DS::defaultBackBuffer || request.enableHostHud || request.enableOriginalUi || request.enableOriginalGameplayBlur) {
             LOAD(gl, blitFramebuffer, BlitFramebuffer);
         }
         if (request.enableOriginalUi) {
@@ -1690,11 +1844,14 @@ struct VehicleWindowGl50DS::Storage {
         if (usesTextures()) {
             LOAD(gl, activeTexture, ActiveTexture); LOAD(gl, bindTexture, BindTexture);
         }
-        if (request.enableOriginalUiSourceRgba) {
+        if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur) {
             LOAD(gl, genTextures, GenTextures); LOAD(gl, deleteTextures, DeleteTextures);
             LOAD(gl, texImage2D, TexImage2D); LOAD(gl, texParameteri, TexParameteri);
             LOAD(gl, getTexLevelParameteriv, GetTexLevelParameteriv);
             LOAD(gl, framebufferTexture2D, FramebufferTexture2D);
+        }
+        if (request.enableOriginalGameplayBlur) {
+            LOAD(gl, drawArrays, DrawArrays); LOAD(gl, uniform2i, Uniform2i); LOAD(gl, uniform4i, Uniform4i);
         }
 #undef LOAD
         return true;
@@ -3277,7 +3434,7 @@ void main() {
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
-            !createTargets()) return false;
+            !createTargets() || !createGameplayBlur()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         hooks.begin = begin; hooks.bindMaterial = bindMaterial; hooks.commit = commit; hooks.abort = abort;
@@ -3845,7 +4002,7 @@ void main() {
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.resetPodState();
         if (!s.drawGameplayBinders()) return false;
-        if (!s.drawHostHud()) return false;
+        if (!s.drawHostHud() || !s.drawGameplayBlur(bank)) return false;
         if (!s.check("accept private vehicle frame")) return false;
         // 50CV publication is CPU-only. The fallible window copy is deliberately
         // OUTSIDE this transaction, after submitVehicleDrawBatch50CS succeeds.
@@ -3864,6 +4021,8 @@ void main() {
     }
     bool copyToWindow() noexcept { return copyToWindow(width,height); }
     bool copyToWindow(I copyWidth,I copyHeight) noexcept {
+        // An unsuccessful or superseded copy must not authorize a later swap.
+        if(request.enableOriginalGameplayBlur)gameplayAwaitingTarget=0;
         gl.bindFramebuffer(readFramebuffer, displayedTarget);
         gl.readBuffer(colorAttachment);
         gl.bindFramebuffer(drawFramebuffer, 0);
@@ -3875,7 +4034,9 @@ void main() {
         gl.blitFramebuffer(0, 0, copyWidth, copyHeight, 0, 0, copyWidth, copyHeight, colorBufferBit, 0x2600); // NEAREST
         if (!check("blit vehicle color to default back buffer")) return false;
         gl.bindFramebuffer(framebuffer, 0);
-        return check("restore default framebuffer bindings");
+        const bool accepted=check("restore default framebuffer bindings");
+        if(accepted)noteGameplayDisplayPending(displayedTarget,copyWidth,copyHeight);
+        return accepted;
     }
     bool copyRgba(std::uint8_t* destination,U target=0,I readWidth=0,I readHeight=0) noexcept {
         if (!target){target=displayedTarget;readWidth=committedWidth;readHeight=committedHeight;}
@@ -3942,6 +4103,9 @@ void main() {
         frameCables = nullptr; frameHostHud = false;
         committedWidth = committedHeight = raceWidth = raceHeight = 0;
         displayedTarget = 0;
+        gameplayHistoryValid=gameplayHistoryStaged=frameGameplayBlurEnabled=false;
+        gameplayAwaitingTarget=0;frameGameplayBlur={};
+        game::clearGameplayBlurVideoStrengths(gameplayBlurVideo);
         uiPrivatePublicationGeneration=0;
         adapter.reset();
         if (!hasGlResources()) { shader.reset(); d.cleanupIncomplete = false; return true; }
@@ -3950,10 +4114,10 @@ void main() {
             d.cleanupIncomplete = true;
             return fail(d, VehicleWindowError50DS::cleanup, "GL error state will not clear for cleanup");
         }
-        // Explicit slice1A leases add a real completion obligation. Never
+        // Explicit source/display leases add a real completion obligation. Never
         // confuse a CPU generation increment or deferred GL deletion with it.
-        if (uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
-            uiPromotedIncomingTarget || uiPromotedIncomingColor){
+        if (hasDisplayFadeNames() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
+            uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources()){
             gl.finish();const U error=drawGl.getError();
             if (error){if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
                 return fail(d,VehicleWindowError50DS::cleanup,"complete source leases before cleanup");}
@@ -3964,8 +4128,8 @@ void main() {
         uiPromotedIncomingGeneration=0;
         gl.useProgram(0); drawGl.bindVertexArray(0); drawGl.bindBuffer(arrayBuffer, 0);
         gl.bindFramebuffer(framebuffer, 0); gl.bindRenderbuffer(renderbuffer, 0);
-        if (usesTextures()) {
-            if (request.enableOriginalUiSourceRgba) {
+        if (usesTextures() || hasDisplayFadeNames()) {
+            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur) {
                 gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
                 if (gl.bindSampler)gl.bindSampler(1,0);
             }
@@ -3979,6 +4143,7 @@ void main() {
             return fail(d, VehicleWindowError50DS::cleanup, "unbind renderer resources before cleanup");
         }
         bool complete = true;
+        if(!deleteGameplayBlurNames(d))goto incomplete;
         if (shader && !shader->release(d.cleanupShader)) {
             if (!d.cleanupGlError) d.cleanupGlError = d.cleanupShader.glError ?
                 d.cleanupShader.glError : d.cleanupShader.cleanupGlError;
@@ -3988,6 +4153,7 @@ void main() {
         // failing deletion instead of conflating it with subsequent objects.
         if (!drainCleanupErrors(d)) complete = false;
         else {
+            if(!deleteDisplayFadeNames(d))goto incomplete;
             if (!deleteUiByteBlendNames(d))goto incomplete;
             uiBlendOldSnapshot=uiBlendIncomingSource=0;
             if (!deleteName(uiPromotedIncomingTarget,gl.deleteFramebuffers,d) ||
@@ -4107,7 +4273,8 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
         request.maximumWidth <= 0 || request.maximumHeight <= 0 ||
         std::uint64_t(request.maximumWidth) * std::uint64_t(request.maximumHeight) >
             std::numeric_limits<std::size_t>::max() /
-                (16u + (request.enableHostHud ? 8u : 0u) + (request.enableOriginalUi ? 16u : 0u)))
+                (16u + (request.enableHostHud ? 8u : 0u) + (request.enableOriginalUi ? 16u : 0u) +
+                 (request.enableOriginalGameplayBlur ? 12u : 0u)))
         return fail(d, VehicleWindowError50DS::request,
             "context callbacks, valid output/vehicle shading modes and positive target bounds required");
     if (!assets.loaded()) return fail(d, VehicleWindowError50DS::assets, "50CR assets are not loaded");
@@ -4140,12 +4307,33 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     return true;
 }
 
+bool VehicleWindowGl50DS::updateWorldFog(const VehicleWindowWorldFog50DS& fog,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"world-fog update requires initialized renderer");
+    auto& s=*storage_;
+    if(!s.current(d))return false;
+    if(s.active || s.frameSet || s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"world-fog update requires idle renderer");
+    if(!std::isfinite(fog.start) || !std::isfinite(fog.end) || fog.start<0.f || fog.end<=fog.start)
+        return fail(d,VehicleWindowError50DS::request,"world-fog update requires finite ordered nonnegative range");
+    for(float value:fog.color)
+        if(!std::isfinite(value) || value<0.f || value>1.f)
+            return fail(d,VehicleWindowError50DS::request,"world-fog update color outside finite [0,1]");
+    if(fog.enabled && (s.request.track.mode!=VehicleWindowMode50DS::callerMaterialTextures ||
+       s.trackIndexCount<=0 || !s.trackProgram || !s.trackVertexArray || !s.trackSpanCount))
+        return fail(d,VehicleWindowError50DS::request,"world-fog enable requires actual retained textured track");
+    s.request.track.worldFog=fog;
+    return true;
+}
+
 bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     const VehicleWindowFrame50DS& frame, VehicleWindowDiagnostic50DS& d) noexcept {
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
     if (!s.current(d) || !s.texturesCurrent(d)) return false;
+    if(!s.validateGameplayBlurFrame(frame.gameplayBlur,d))return false;
     // A cold bank may remain resident in Main. Only active race frames supply
     // meshes; absence never requests an animation clock or a lighting owner.
     if((frame.gameplayBinderCount&&!s.request.gameplayBinderTextures)||
@@ -4331,6 +4519,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     for (U i = 0; i < s.trackAnimationCount; ++i)
         s.trackAnimations[i].selectedFrame = frame.trackAnimationFrames[i];
     s.frameHostHud = frame.hostHud != nullptr;
+    s.frameGameplayBlurEnabled=frame.gameplayBlur!=nullptr;
+    s.frameGameplayBlur=frame.gameplayBlur?*frame.gameplayBlur:GameplayBlurFrame50DS{};
     s.frameSet = true; s.diagnostic = &d;
     s.prepareTrackVisibility();
     bool accepted = s.check("before private submission") &&
@@ -4345,6 +4535,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             fail(d, VehicleWindowError50DS::submission, "50CS/50CV submission rejected");
         } else {
             d.batchAccepted = true;
+            if(s.request.output==VehicleWindowOutput50DS::headless)
+                s.noteGameplayDisplayPending(s.displayedTarget,s.committedWidth,s.committedHeight);
             if (s.request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
                 accepted = s.copyToWindow();
                 if (!accepted && d.error == VehicleWindowError50DS::gl)
@@ -4353,6 +4545,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         }
     }
     s.frameSet = false; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
+    s.frameGameplayBlurEnabled=false;s.frameGameplayBlur={};
     s.frameGameplayBinders=nullptr;s.frameGameplayBinderCount=0;s.frameGameplayBinderImage=0;
     s.framePlayerBatch = {};
     s.framePlayerLights = {};
@@ -5447,6 +5640,8 @@ bool VehicleWindowGl50DS::submitHostMenu(const VehicleWindowHostMenu50DS& input,
             s.uiSourcePublishedTargetGeneration=0;
             s.width = s.committedWidth = width; s.height = s.committedHeight = height;
             s.imageCommitted = true; d.hostMenuAccepted = true;
+            if(s.request.output==VehicleWindowOutput50DS::headless)
+                s.noteGameplayDisplayPending(s.displayedTarget,width,height);
             if (s.request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
                 accepted = s.copyToWindow();
                 if (!accepted && d.error == VehicleWindowError50DS::gl)
@@ -5495,6 +5690,299 @@ bool VehicleWindowGl50DS::finishSubmittedWork(VehicleWindowDiagnostic50DS& d) no
     d.submittedWorkCompleted = result;
     s.diagnostic = nullptr;
     return result;
+}
+
+namespace {
+bool sameDisplayFadeSample(const game::OriginalVideoBlockingSample& a,
+    const game::OriginalVideoBlockingSample& b) noexcept {
+    return a.direction==b.direction && a.ordinal==b.ordinal && a.gsRgbaq==b.gsRgbaq &&
+        a.alpha==b.alpha && a.sourceCopyPC==b.sourceCopyPC;
+}
+}
+OriginalVideoBlockingNativeBackend::~OriginalVideoBlockingNativeBackend() noexcept {
+    // Teardown is cancellation, never successful completion of the fade.
+    if(!cancelAndRetire())std::terminate();
+}
+game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::failure(std::uint32_t pc) const noexcept {
+    return {diagnostic_.error==VehicleWindowError50DS::noImage?
+        game::OriginalCameraStartStatus::rendererNoImage:game::OriginalCameraStartStatus::videoBackend,pc};
+}
+bool OriginalVideoBlockingNativeBackend::ownersCurrent() noexcept {
+    if(!renderer_.initialized())return fail(diagnostic_,VehicleWindowError50DS::notInitialized,"display fade requires live renderer");
+    auto& s=*renderer_.storage_;
+    if(!s.current(diagnostic_,this))return false;
+    if(s.request.context!=&host_ || ((s.request.output==VehicleWindowOutput50DS::defaultBackBuffer)!=window_))
+        return fail(diagnostic_,VehicleWindowError50DS::context,"display fade requires renderer's exact current GameHost50ER");
+    if(s.active || s.frameSet || s.diagnostic)
+        return fail(diagnostic_,VehicleWindowError50DS::frame,"display fade requires idle non-reentrant renderer");
+    return checkHost_(host_,window_,width_,height_,diagnostic_);
+}
+game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::begin(
+    game::OriginalVideoFadeDirection direction,const game::OriginalVideoFadeState& video) {
+    using S=game::OriginalCameraStartStatus;
+    const bool async=use_==OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0;
+    const auto pc=async?0x25e610u:(direction==game::OriginalVideoFadeDirection::out260850?0x260850u:0x261630u);
+    if(phase_==OriginalVideoNativePhase::failed)return failure(pc);
+    diagnostic_={};hostDiagnostic_={};
+    if(phase_==OriginalVideoNativePhase::sourceReady && direction==direction_)
+        return ownersCurrent()?game::OriginalCameraStartResult{S::complete,pc}:failure(pc);
+    if((phase_!=OriginalVideoNativePhase::idle && phase_!=OriginalVideoNativePhase::retired) ||
+       (use_!=OriginalVideoNativeUse::blockingSourceLoops && !async) ||
+       (direction!=game::OriginalVideoFadeDirection::out260850 && direction!=game::OriginalVideoFadeDirection::in261630) ||
+       (async?(direction!=game::OriginalVideoFadeDirection::in261630 || (video.flags404Low6&7u)!=6u):
+           bool(video.flags404Low6&4u)) ||
+       !(video.flags404Low6&(direction==game::OriginalVideoFadeDirection::out260850?1u:2u)) ||
+       (direction==game::OriginalVideoFadeDirection::out260850 && (video.flags404Low6&32u)))
+        return {S::sourcePath,pc};
+    if(phase_==OriginalVideoNativePhase::retired)width_=height_=0;
+    if(!ownersCurrent())return failure(pc);
+    auto& s=*renderer_.storage_;
+    if(!s.imageCommitted || !s.raceWidth || !s.raceHeight ||
+       s.displayedTarget!=s.targets[s.published] || s.committedWidth!=s.raceWidth || s.committedHeight!=s.raceHeight){
+        fail(diagnostic_,VehicleWindowError50DS::noImage,"display fade requires current real race image, never UI or invented cold image");
+        return failure(pc);
+    }
+    width_=s.raceWidth;height_=s.raceHeight;
+    if(!ownersCurrent()){width_=height_=0;return failure(pc);}
+    s.diagnostic=&diagnostic_;
+    bool accepted=s.check("before native display-fade begin") && s.loadDisplayFadeFunctions();
+    if(!accepted){s.diagnostic=nullptr;width_=height_=0;return failure(pc);}
+    // Install the exclusive borrow before every fallible allocation/copy.
+    // Failed work retains it; only real retirement/cancellation unlocks it.
+    direction_=direction;nextOrdinal_=windowSwaps_=headlessCompletions_=0;last_={};pending_={};pendingBank_=0;
+    s.displayFadeOwner=this;phase_=OriginalVideoNativePhase::failed;
+    s.gl.finish();accepted=s.check("complete race source before display-fade snapshot");
+    if(accepted && !s.deleteDisplayFadeNames(diagnostic_))
+        accepted=fail(diagnostic_,VehicleWindowError50DS::cleanup,"display-fade cached name deletion remains pending");
+    I textureLimit=0,textureUnits=0;
+    if(accepted){
+        s.gl.getIntegerv(0x0D33,&textureLimit);s.gl.getIntegerv(0x8872,&textureUnits);
+        accepted=s.check("query native display-fade texture limits");
+        if(accepted && (width_>textureLimit || height_>textureLimit || textureUnits<1))
+            accepted=fail(diagnostic_,VehicleWindowError50DS::limits,"display-fade texture dimensions or unit unavailable");
+    }
+    if(accepted)accepted=s.createDisplayFadeTarget(s.displayFadeSourceTarget,s.displayFadeSourceColor,width_,height_) &&
+        s.createDisplayFadeTarget(s.displayFadeTargets[0],s.displayFadeColors[0],width_,height_) &&
+        s.createDisplayFadeTarget(s.displayFadeTargets[1],s.displayFadeColors[1],width_,height_) && s.createDisplayFadeProgram();
+    if(accepted){
+        s.gl.disable(0x0C11);s.gl.disable(0x8DB9);
+        s.gl.bindFramebuffer(readFramebuffer,s.targets[s.published]);s.gl.readBuffer(colorAttachment);
+        s.gl.bindFramebuffer(drawFramebuffer,s.displayFadeSourceTarget);s.gl.drawBuffer(colorAttachment);
+        s.gl.blitFramebuffer(0,0,width_,height_,0,0,width_,height_,colorBufferBit,0x2600);
+        accepted=s.check("snapshot actual committed race into distinct immutable display-fade source");
+    }
+    const bool restored=s.restoreDisplayFadeBindings(width_,height_);accepted=accepted && restored;
+    if(accepted){s.gl.finish();accepted=s.check("complete immutable display-fade source snapshot");}
+    if(accepted){diagnostic_.submittedWorkCompleted=true;phase_=OriginalVideoNativePhase::sourceReady;}
+    s.diagnostic=nullptr;
+    return accepted?game::OriginalCameraStartResult{S::complete,pc}:failure(pc);
+}
+game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::copyDrawAndComplete(
+    const game::OriginalVideoBlockingSample& sample) {
+    using S=game::OriginalCameraStartStatus;
+    const bool async=use_==OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0;
+    const auto pc=async?0x25e610u:(direction_==game::OriginalVideoFadeDirection::out260850?0x262c70u:0x262d80u);
+    if(phase_==OriginalVideoNativePhase::failed)return failure(pc);
+    diagnostic_={};hostDiagnostic_={};
+    if(sample.direction!=direction_ || sample.sourceCopyPC!=(async?0u:pc) ||
+       (phase_!=OriginalVideoNativePhase::sourceReady && phase_!=OriginalVideoNativePhase::presentationPending))
+        return {S::owner,pc};
+    // An acknowledged exact retry never recopies, redraws, or swaps twice.
+    if(nextOrdinal_ && sameDisplayFadeSample(sample,last_))return {S::complete,pc};
+    if(sample.ordinal!=nextOrdinal_ || nextOrdinal_==std::numeric_limits<std::uint64_t>::max() ||
+       (phase_==OriginalVideoNativePhase::presentationPending && !sameDisplayFadeSample(sample,pending_)))
+        return {S::owner,pc};
+    if(!ownersCurrent())return failure(pc);
+    auto& s=*renderer_.storage_;
+    if(s.displayFadeOwner!=this)return {S::owner,pc};
+    if(phase_==OriginalVideoNativePhase::sourceReady){
+        pending_=sample;pendingBank_=static_cast<std::uint8_t>(nextOrdinal_&1u);
+        s.diagnostic=&diagnostic_;
+        bool accepted=s.check("before display-fade source recopy");
+        if(accepted){
+            // Blocking262C70/262D80 or explicit native async retained-image
+            // recopy EVERY sample. Async sourceCopyPC=0 makes no blocking-PC
+            // attribution. Never sample an effect or previous sample.
+            s.gl.disable(0x0C11);s.gl.disable(0x8DB9);
+            s.gl.bindFramebuffer(readFramebuffer,s.displayFadeSourceTarget);s.gl.readBuffer(colorAttachment);
+            s.gl.bindFramebuffer(drawFramebuffer,s.displayFadeTargets[pendingBank_]);s.gl.drawBuffer(colorAttachment);
+            s.gl.blitFramebuffer(0,0,width_,height_,0,0,width_,height_,colorBufferBit,0x2600);
+            accepted=s.check("recopy immutable race source for display-fade sample");
+        }
+        if(accepted){
+            s.gl.bindFramebuffer(framebuffer,s.displayFadeTargets[pendingBank_]);
+            s.gl.drawBuffer(colorAttachment);s.gl.readBuffer(colorAttachment);
+            if(s.gl.clipControl)s.gl.clipControl(0x8CA1,0x935E);
+            s.gl.viewport(0,0,width_,height_);
+            constexpr U disabled[]={0x0BE2,0x0B44,0x0C11,0x0B90,0x8037,0x0B20,
+                0x8F9D,0x0BD0,0x809D,0x80A0,0x809E,0x809F,0x8E51,0x8C89,0x8DB9,0x864F,0x0BF2,0x0B71};
+            for(U capability:disabled)s.gl.disable(capability);
+            for(I i=0;i<s.clipDistances;++i)s.gl.disable(0x3000+static_cast<U>(i));
+            s.gl.colorMask(1,1,1,1);s.gl.depthMask(0);s.gl.polygonMode(0x0408,0x1B02);
+            s.gl.useProgram(s.displayFadeProgram);s.drawGl.bindVertexArray(s.displayFadeVertexArray);
+            s.gl.activeTexture(textureUnit0);s.gl.bindTexture(texture2D,s.displayFadeSourceColor);
+            if(s.gl.bindSampler)s.gl.bindSampler(0,0);
+            s.gl.uniform1i(s.displayFadeImageUniform,0);
+            s.gl.uniform4f(s.displayFadeColorUniform,float(sample.gsRgbaq&255u),float((sample.gsRgbaq>>8)&255u),
+                float((sample.gsRgbaq>>16)&255u),float((sample.gsRgbaq>>24)&255u));
+            accepted=s.check("bind immutable race source and actual packed RGBAQ bytes");
+            if(accepted){s.gl.drawArrays(0x0004,0,3);accepted=s.check("draw native full-race display-fade sample");}
+        }
+        // Exact final effect image, staged before its real finish/swap.
+        if(accepted)accepted=s.stageGameplayDisplayedHistory(s.displayFadeTargets[pendingBank_],width_,height_);
+        const bool restored=s.restoreDisplayFadeBindings(width_,height_);accepted=accepted && restored;
+        if(accepted){s.gl.finish();accepted=s.check("complete private display-fade sample");}
+        if(accepted && window_){
+            accepted=s.checkDefaultFramebuffer();
+            if(accepted){
+                s.gl.bindFramebuffer(readFramebuffer,s.displayFadeTargets[pendingBank_]);s.gl.readBuffer(colorAttachment);
+                s.gl.bindFramebuffer(drawFramebuffer,0);s.gl.drawBuffer(backBuffer);
+                accepted=s.check("bind completed display-fade sample for window copy");
+            }
+            if(accepted){
+                diagnostic_.defaultFramebufferMayBeModified=true;
+                s.gl.blitFramebuffer(0,0,width_,height_,0,0,width_,height_,colorBufferBit,0x2600);
+                accepted=s.check("copy completed display-fade sample to real window back buffer");
+            }
+            const bool windowRestored=s.restoreDisplayFadeBindings(width_,height_);accepted=accepted && windowRestored;
+            if(accepted){s.gl.finish();accepted=s.check("complete display-fade back-buffer copy before swap");}
+        }
+        s.diagnostic=nullptr;
+        if(!accepted){phase_=OriginalVideoNativePhase::failed;return failure(pc);}
+        diagnostic_.submittedWorkCompleted=true;phase_=OriginalVideoNativePhase::presentationPending;
+    }
+    if(window_){
+        // Actual50DQ swap returns false only before SDL_GL_SwapWindow is
+        // called. A false result therefore leaves this SAME sample pending;
+        // it may retry the swap, without repeating draw or back-buffer copy.
+        if(!swapHost_(host_,hostDiagnostic_)){
+            fail(diagnostic_,VehicleWindowError50DS::presentation,"GameHost50ER display-fade swap not performed");
+            return failure(pc);
+        }
+        ++windowSwaps_;
+    }else ++headlessCompletions_;
+    // CPU-only acceptance after actual display completion, never another swap.
+    s.acceptGameplayDisplayedHistory();
+    // No fallible operation follows a successful swap. Publish only a fully
+    // completed image; alternating surfaces preserve the previous committed
+    // sample across every failed write. Source race banks remain untouched.
+    s.displayedTarget=s.displayFadeTargets[pendingBank_];s.imageCommitted=true;
+    s.width=s.committedWidth=width_;s.height=s.committedHeight=height_;
+    s.uiPrivatePublicationGeneration=0;s.uiSourcePublishedTargetGeneration=0;
+    last_=sample;++nextOrdinal_;phase_=OriginalVideoNativePhase::sourceReady;
+    return {S::complete,pc};
+}
+bool OriginalVideoBlockingNativeBackend::retire(bool cancelled) noexcept {
+    if(!renderer_.storage_ || renderer_.storage_->displayFadeOwner!=this){
+        if(phase_==OriginalVideoNativePhase::idle || phase_==OriginalVideoNativePhase::retired ||
+           phase_==OriginalVideoNativePhase::cancelled)return true;
+        return fail(diagnostic_,VehicleWindowError50DS::frame,"display-fade retirement lost its actual renderer owner");
+    }
+    auto& s=*renderer_.storage_;
+    // Cancellation must remain possible after a resize. It changes no window
+    // or private publication; it only drains work and restores native state.
+    if(!renderer_.initialized() || !s.current(diagnostic_,this) || s.active || s.frameSet || s.diagnostic)return false;
+    s.diagnostic=&diagnostic_;
+    bool accepted=s.check("before display-fade retirement");
+    if(accepted)accepted=s.restoreDisplayFadeBindings(width_,height_);
+    if(accepted){s.gl.finish();accepted=s.check("complete display-fade state restoration and retirement");}
+    if(accepted && s.displayFadeDeletionPending && !s.deleteDisplayFadeNames(diagnostic_))
+        accepted=fail(diagnostic_,VehicleWindowError50DS::cleanup,"display-fade retirement still owns unresolved deleted names");
+    s.diagnostic=nullptr;
+    if(!accepted)return false;
+    diagnostic_.submittedWorkCompleted=true;s.displayFadeOwner=nullptr;
+    phase_=cancelled?OriginalVideoNativePhase::cancelled:OriginalVideoNativePhase::retired;
+    return true;
+}
+game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::restoreAndComplete(
+    game::OriginalVideoFadeDirection direction) {
+    using S=game::OriginalCameraStartStatus;
+    const auto pc=use_==OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0?0x25e610u:
+        (direction_==game::OriginalVideoFadeDirection::out260850?0x261594u:0x261df0u);
+    if(direction!=direction_)return {S::owner,pc};
+    if(phase_==OriginalVideoNativePhase::retired)return {S::complete,pc};
+    // Failed/unpublished samples must never let the numeric owner publish
+    // final alpha/flags. Only the separate cancellation method can retire it.
+    if(phase_==OriginalVideoNativePhase::failed)return failure(pc);
+    if(phase_!=OriginalVideoNativePhase::sourceReady && phase_!=OriginalVideoNativePhase::restoring)
+        return {S::owner,pc};
+    diagnostic_={};phase_=OriginalVideoNativePhase::restoring;
+    return retire(false)?game::OriginalCameraStartResult{S::complete,pc}:failure(pc);
+}
+bool OriginalVideoBlockingNativeBackend::cancelAndRetire() noexcept {
+    diagnostic_={};return retire(true);
+}
+
+bool VehicleWindowGl50DS::finishInitializedContextWork(VehicleWindowDiagnostic50DS& d) noexcept {
+    d = {};
+    if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
+    auto& s = *storage_;
+    if (!s.current(d)) return false;
+    if (s.contextDrainGeneration == std::numeric_limits<std::uint64_t>::max())
+        return fail(d, VehicleWindowError50DS::submission, "context drain generation exhausted");
+    s.diagnostic = &d;
+    bool result = s.check("before explicit initialized-context completion");
+    if (result) {
+        s.gl.finish();
+        result = s.check("complete prior initialized-context GL work");
+    }
+    if (result) {
+        ++s.contextDrainGeneration;
+        d.contextWorkCompleted = true;
+        d.contextDrainGeneration = s.contextDrainGeneration;
+    }
+    s.diagnostic = nullptr;
+    return result;
+}
+
+bool VehicleWindowGl50DS::completeGameplayDisplayImpl(GameHost50ER& host,
+    GameHostDiagnostic50ER& hostDiagnostic,
+    bool (*checkHost)(GameHost50ER&,bool,I,I,VehicleWindowDiagnostic50DS&) noexcept,
+    bool (*swapHost)(GameHost50ER&,GameHostDiagnostic50ER&) noexcept,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"gameplay display requires initialized renderer");
+    auto& s=*storage_;
+    if(!s.current(d))return false;
+    const bool window=s.request.output==VehicleWindowOutput50DS::defaultBackBuffer;
+    if(!s.request.enableOriginalGameplayBlur || s.request.context!=static_cast<void*>(&host) ||
+        !checkHost || !swapHost)
+        return fail(d,VehicleWindowError50DS::context,"gameplay display requires opted-in renderer's exact current GameHost");
+    if(s.active || s.frameSet || s.diagnostic || !s.imageCommitted ||
+        !s.gameplayAwaitingTarget || s.gameplayAwaitingTarget!=s.displayedTarget ||
+        s.gameplayAwaitingWidth!=s.committedWidth || s.gameplayAwaitingHeight!=s.committedHeight ||
+        (s.displayedTarget!=s.targets[s.published] && s.displayedTarget!=s.menuTargets[s.menuPublished]))
+        return fail(d,VehicleWindowError50DS::frame,"gameplay display needs new successful race or host-menu publication");
+    if(!checkHost(host,window,s.committedWidth,s.committedHeight,d))return false;
+    s.diagnostic=&d;
+    bool accepted=s.check("before actual gameplay display completion") &&
+        s.stageGameplayDisplayedHistory(s.displayedTarget,s.committedWidth,s.committedHeight);
+    // All fallible GPU work precedes the real swap. The staged image is an
+    // independent copy, so no subsequent frame can mutate accepted history.
+    s.gl.bindFramebuffer(framebuffer,0);
+    const bool restored=s.check("restore framebuffer before gameplay display completion");
+    accepted=accepted && restored;
+    if(accepted){s.gl.finish();accepted=s.check("complete final gameplay image and staged history before display");}
+    d.submittedWorkCompleted=accepted;
+    s.diagnostic=nullptr;
+    if(!accepted)return false;
+    if(window && !swapHost(host,hostDiagnostic))
+        return fail(d,VehicleWindowError50DS::presentation,"GameHost gameplay window swap was not submitted");
+    s.acceptGameplayDisplayedHistory();
+    d.gameplayDisplayHistoryAccepted=true;
+    d.gameplayDisplayHistoryGeneration=s.gameplayHistoryGeneration;
+    d.gameplayWindowSwapSubmitted=window;d.gameplayHeadlessDisplayCompleted=!window;
+    return true;
+}
+
+bool VehicleWindowGl50DS::clearGameplayBlurStrengths(VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"gameplay blur clear requires initialized renderer");
+    auto& s=*storage_;
+    if(!s.current(d))return false;
+    if(!s.request.enableOriginalGameplayBlur || s.active || s.frameSet || s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"gameplay blur clear requires idle opted-in renderer");
+    game::clearGameplayBlurVideoStrengths(s.gameplayBlurVideo);
+    return true;
 }
 
 bool VehicleWindowGl50DS::close(VehicleWindowDiagnostic50DS& d) noexcept {

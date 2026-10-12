@@ -9,6 +9,7 @@
 #include "../../../src/assets/vehicle_draw_assets50cr.h"
 #include "../../../src/game/draw_visibility50ei.h"
 #include "../../../src/game/host_race_limits50ht.h"
+#include "../../../src/game/original_gameplay_blur_leaf.h"
 #include "../../../src/game/native_gc_selected_lights_candidate.h"
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +17,9 @@
 
 namespace rr::game { struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::platform {
+class GameHost50ER;
+struct GameHostDiagnostic50ER;
+class OriginalVideoBlockingNativeBackend;
 using VehicleWindowGlProc50DS = void (*)();
 enum class VehicleWindowMode50DS : std::uint8_t {
     unspecified, viewerNeutralUntextured, callerMaterialTextures,
@@ -263,6 +267,11 @@ struct VehicleWindowRequest50DS {
     // Cold opt-in allocates bounded glyph/rectangle storage and two color-only
     // menu targets, independent of the two native frame targets. Default unchanged.
     bool enableHostHud = false;
+    // Cold native displayed-history resources. Only a recovered producer may
+    // supply a frame request. Adds three RGBA8 images at the maximum extent.
+    // Actual history advances only through completeGameplayDisplay or the
+    // original display-fade owner, never through submit/readback alone.
+    bool enableOriginalGameplayBlur = false;
     // NEW opt-in reconstructed original-art renderer. Disabled by default.
     // Exact CPU/GPU bank pair is checked cold; actual atlas alpha maxima are
     // combined with vertex alpha during draw admission (atlases may reach255).
@@ -416,6 +425,14 @@ struct VehicleWindowHostMenu50DS {
     // native geometry. False shows a plain host backdrop, including at startup.
     bool retainRaceImage = false;
 };
+// Single-view native join of the recovered manager request at Render3D.
+// No host strength, speed, boost or elapsed-render-time input exists here.
+struct GameplayBlurFrame50DS {
+    game::GameplayBlurPending* pending = nullptr; // Synchronous borrowed producer owner.
+    std::int32_t originalWidth = 0, originalHeight = 0;
+    std::int32_t logicalView = 0, physicalView = 0; // Current join admits 0/0.
+    game::GameplayBlurRect cameraRectangle{}; // Exact original top-left viewport.
+};
 struct VehicleWindowFrame50DS {
     // Pixel viewport. Window output requires actual default-framebuffer drawable
     // dimensions, not logical window dimensions; skip minimized/zero drawables.
@@ -473,6 +490,9 @@ struct VehicleWindowFrame50DS {
     // player first. Borrowed only through submit. Alpha/RGB are source packets.
     const game::original_gameplay_binder_candidate::Mesh* gameplayBinders = nullptr;
     std::uint32_t gameplayBinderCount = 0, gameplayBinderFrame = 0;
+    // Null is for non-gameplay/legacy paths: no queue consumption or effect.
+    // No-request queue retains the video owner's previous coefficient/rectangle.
+    const GameplayBlurFrame50DS* gameplayBlur = nullptr;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,
@@ -520,6 +540,14 @@ struct VehicleWindowDiagnostic50DS {
     // draw renders both actual cable strips, after the pod, before commit.
     std::uint32_t cableDraws = 0, cableVertices = 0, cableIndices = 0;
     std::uint32_t gameplayBinderDraws = 0;
+    std::uint32_t gameplayBlurDraws = 0;
+    std::uint8_t gameplayBlurFixed = 0;
+    bool gameplayBlurRequestConsumed = false;
+    // Actual successful native swap submission or completed headless frame,
+    // distinct from batch acceptance and physical display/scanout claims.
+    bool gameplayDisplayHistoryAccepted = false, gameplayWindowSwapSubmitted = false;
+    bool gameplayHeadlessDisplayCompleted = false;
+    std::uint64_t gameplayDisplayHistoryGeneration = 0;
     // Checked effect commands, included in trackDraws when track effects.
     // Source order per pass, not reconstructed original global sorting.
     std::uint32_t transparentTrackDraws = 0, transparentPodDraws = 0;
@@ -528,6 +556,8 @@ struct VehicleWindowDiagnostic50DS {
     // returned with no reported GL error.
     // This is not a measured duration, presented swap, or hardware-GPU claim.
     bool submittedWorkCompleted = false;
+    bool contextWorkCompleted = false;
+    std::uint64_t contextDrainGeneration = 0;
     // Readback only: last committed viewport and required tightly packed RGBA8
     // bytes, supplied even for a null/undersized destination after currentness
     // and image checks. They do not report how many bytes were actually written.
@@ -720,7 +750,9 @@ private:
 
 // Caller-owned desktop GL >=3.2. Window output requires a double-buffered,
 // nonstereo, nonmultisampled window surface; headless output does not.
-// Owns GPU storage only; never creates/binds/releases a context, polls, or swaps.
+// Owns GPU storage; never creates/binds/releases a context or polls.
+// submit never swaps. The opt-in completeGameplayDisplay uses the exact supplied
+// GameHost for the real swap, with transactional completed-image history.
 // Both modes use the same transactional 50CV targets and real geometry/material
 // path. Window output separately blits to framebuffer 0's BACK buffer. Submit
 // success is command acceptance only. On false, DO NOT swap: a window back
@@ -735,7 +767,8 @@ private:
 // 50EB publication when selected, with its exact context callbacks, until this
 // renderer is closed. Use one thread, one unshared context, and no reentrant or
 // concurrent calls. Host event processing
-// and swap between calls are allowed. No other code may mutate these private
+// and swap between calls are allowed for legacy paths. Opted-in gameplay uses
+// completeGameplayDisplay for every race/menu swap. No other code may mutate these private
 // GL objects; no unrelated rendering/state changes are supported. State is not
 // saved/restored. Inputs, readback output and diagnostics must be distinct live
 // storage. Readback output is borrowed only during its synchronous call.
@@ -758,6 +791,11 @@ public:
     // in explicit neutral mode. A matrix/size/structural rejection does not blit.
     bool submit(const game::VehicleDrawBatch50CO&, const VehicleWindowFrame50DS&,
         VehicleWindowDiagnostic50DS&) noexcept;
+    // Copy admitted shared scene fog after its real owner updates it. Requires
+    // initialized/current idle renderer outside a display fade. CPU-only:
+    // existing draw uniforms consume these values on the next real submit.
+    // No image/publication/completion change, source recomputation or GL call.
+    bool updateWorldFog(const VehicleWindowWorldFog50DS&,VehicleWindowDiagnostic50DS&) noexcept;
     // Ordered authenticated original quads, separate RGBA8/D24 transaction.
     // Does not advance gameplay or replace the retained race publication.
     bool submitOriginalUi(const OriginalUiNativeDraw50KG&, std::int32_t width,
@@ -919,12 +957,29 @@ public:
     // allocation, readback, swap, image publication change, or implicit timing.
     // Normal submit/window paths never call this barrier automatically.
     bool finishSubmittedWork(VehicleWindowDiagnostic50DS&) noexcept;
+    // Complete the latest successful native race/host-menu publication. The
+    // exact renderer GameHost is required. Stages immutable final history,
+    // completes GPU work and submits the real window swap (headless: completes
+    // without swapping), then accepts history with no later fallible action.
+    // Call instead of host.swapWindow for this cold opt-in. Failed work never
+    // advances history. Repeated completion without a new publication rejects.
+    bool completeGameplayDisplay(GameHost50ER&, GameHostDiagnostic50ER&,
+        VehicleWindowDiagnostic50DS&) noexcept;
+    // Original manager destruction clears all four strength bytes. Retains
+    // actual displayed image and rectangle, including across a race restart.
+    bool clearGameplayBlurStrengths(VehicleWindowDiagnostic50DS&) noexcept;
+    bool finishInitializedContextWork(VehicleWindowDiagnostic50DS&) noexcept;
     // Failed cleanup retains unresolved ownership for a retry. If cleanup is
     // complete the instance is empty even when stale GL errors were reported.
     bool close(VehicleWindowDiagnostic50DS&) noexcept;
     bool initialized() const noexcept;
     bool ownsResources() const noexcept;
 private:
+    // Only the concrete optional GameHost adapter may supply these bindings.
+    bool completeGameplayDisplayImpl(GameHost50ER&, GameHostDiagnostic50ER&,
+        bool (*checkHost)(GameHost50ER&, bool, std::int32_t, std::int32_t, VehicleWindowDiagnostic50DS&) noexcept,
+        bool (*swapHost)(GameHost50ER&, GameHostDiagnostic50ER&) noexcept, VehicleWindowDiagnostic50DS&) noexcept;
+    friend class OriginalVideoBlockingNativeBackend;
     bool submitOriginalUiImpl(const OriginalUiNativeDraw50KG&, std::int32_t width,
         std::int32_t height, bool sourceRgba, VehicleWindowDiagnostic50DS&,
         bool* sourceWorkStarted=nullptr,bool publishSource=true) noexcept;

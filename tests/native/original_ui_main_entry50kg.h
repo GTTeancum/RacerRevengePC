@@ -134,7 +134,7 @@ struct Application {
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
             "Accept requires enabled concrete audio and commits process-owned settings. "
             "Rider19 entry additionally requires the authenticated compiled IPUM cache; enabled audio uses original Song7. "
-            "Muted mode0 Rider19 Confirm to Course and Back is integrated but unvalidated; Course Left/Right selects the four fresh unlocked tracks; "
+            "Mode0 Rider19 Confirm to Course and Back supports explicit mute or the original Confirm voice/Song11 owner; this join is unvalidated. Course Left/Right selects the four fresh unlocked tracks; "
             "other riders, Gallery and other Options subpages remain unavailable. "
             "Course race entry requires the exact prepared GA/POD19 all-original-AI native destination; other tracks remain unavailable. No original boot/save parity is claimed.\n";
     }
@@ -278,14 +278,12 @@ struct Frontend {
             // Course is an optional destination. A missing archive must not
             // remove existing Main/Options/Rider Back capability. If supplied,
             // its bytes still authenticate normally; malformed input is fatal.
-            if(application.audioMode==rr::platform::OriginalUiMainAudioMode50KG::muted){
-                const auto* courseIdentity=rr::assets::originalUiArchiveIdentity50KG(Id::course);
-                require(courseIdentity,"original Course archive identity missing");
-                if(std::filesystem::exists(application.assetRoot/std::filesystem::path(courseIdentity->discPath)))
-                    cold.course=readArchive(application.assetRoot,Id::course);
-                else
-                    std::cerr<<"Original Course archive absent; Course destination remains unavailable.\n";
-            }
+            const auto* courseIdentity=rr::assets::originalUiArchiveIdentity50KG(Id::course);
+            require(courseIdentity,"original Course archive identity missing");
+            if(std::filesystem::exists(application.assetRoot/std::filesystem::path(courseIdentity->discPath)))
+                cold.course=readArchive(application.assetRoot,Id::course);
+            else
+                std::cerr<<"Original Course archive absent; Course destination remains unavailable.\n";
             cold.backgrounds=readArchive(application.assetRoot,Id::backgrounds);
             cold.podTextures=readArchive(application.assetRoot,Id::podTextures);
             std::vector<std::vector<std::uint8_t>> mips;
@@ -330,6 +328,8 @@ struct Frontend {
                 "original UI output did not retain the application sound mode owner");
             cold.audio=audioOutput.transport();
             if(!application.riderCacheRoot.empty()&&!cold.audio->prepareRiderMenu(application.audioRoot,error))
+                throw std::runtime_error(error);
+            if(cold.course&&!cold.audio->prepareCourseMenu(application.audioRoot,error))
                 throw std::runtime_error(error);
             const auto info=audioOutput.info();
             std::cerr<<"Original UI audio device="<<rr::platform::audioDeviceStatusName50HD(info.deviceStatus)
@@ -614,6 +614,14 @@ struct Frontend {
                 <<",\"source_rng\":"<<application.state->rawRandom308030<<",\"source_milliseconds\":"<<sourceMilliseconds
                 <<",\"audio_muted\":"<<(audioOutput.enabled()?"false":"true")
                 <<",\"audio_suppressed\":"<<course.audio.suppressedByMutedMode
+                <<",\"audio_submitted\":"<<course.audio.submitted<<",\"audio_failed\":"<<course.audio.failed
+                <<",\"audio_music_song\":"<<(audioOutput.transport()?audioOutput.transport()->activeMusicSong():0)
+                <<",\"audio_source_mixed_frames\":"<<audioOutput.sourceMixedFrames()
+                <<",\"audio_mixed_frames\":"<<audioOutput.info().mixedFrames
+                <<",\"audio_captured_frames\":"<<audioOutput.info().capturedFrames
+                <<",\"audio_rate\":"<<audioOutput.info().sampleRate
+                <<",\"audio_accepted_nanoseconds\":"<<audioOutput.acceptedNanoseconds()
+                <<",\"audio_device_status\":\""<<rr::platform::audioDeviceStatusName50HD(audioOutput.info().deviceStatus)<<"\""
                 <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames;
             reportRiderProfile();std::cerr<<"}\n";return;
         }

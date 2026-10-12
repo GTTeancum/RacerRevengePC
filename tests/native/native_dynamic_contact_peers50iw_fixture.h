@@ -4,6 +4,7 @@
 // execution arena addresses. It does not invent original all-body scheduling.
 #include "native_racer_bank50hn_fixture.h"
 #include "native_racer_observation50iz_fixture.h"
+#include "original_all8_two_phase_schedule.h"
 #include "../../src/game/dynamic_impact50iw.h"
 #include "../../src/game/vehicle_frame49w.h"
 #include <array>
@@ -139,6 +140,22 @@ public:
     bool captureBeforeFrame(const native_racer50HN::Bank& bank,
         const native_racer50IZ::FrameReads& live,std::size_t selfBankSlot,
         Snapshot& destination,Diagnostic& diagnostic) {
+        return captureAtBoundary(bank,live,selfBankSlot,destination,diagnostic,nullptr);
+    }
+    // The source two-phase adapter verifies the exact current mixed phases:
+    // previous physics racers Ready, current/later racers AfterBodyChildren.
+    // This uses the SAME actual registry identities and observation serial.
+    // It is not a second peer owner or a broad relaxation of Ready admission.
+    bool captureBeforeScheduledPhysics(const original_all8_frame::Schedule& schedule,
+        const native_racer50HN::Bank& bank,const native_racer50IZ::FrameReads& live,
+        std::size_t selfBankSlot,Snapshot& destination,Diagnostic& diagnostic) {
+        return captureAtBoundary(bank,live,selfBankSlot,destination,diagnostic,&schedule);
+    }
+private:
+    bool captureAtBoundary(const native_racer50HN::Bank& bank,
+        const native_racer50IZ::FrameReads& live,std::size_t selfBankSlot,
+        Snapshot& destination,Diagnostic& diagnostic,
+        const original_all8_frame::Schedule* schedule) {
         diagnostic={};
         const auto reject=[&](Error error,std::uint32_t pc,std::size_t slot,
                               std::int32_t index){
@@ -147,6 +164,8 @@ public:
         if(!ready_)return reject(Error::Unprepared,0x22a280u,selfBankSlot,-1);
         if(bank.count()!=count_||selfBankSlot>=count_)
             return reject(Error::Roster,0x1af330u,selfBankSlot,-1);
+        if(schedule&&!schedule->admitsPhysicsObservation(bank,live,selfBankSlot))
+            return reject(Error::Phase,0x219810u,selfBankSlot,indexBySlot_[selfBankSlot]);
         if(observationSerial_==std::numeric_limits<std::uint64_t>::max())
             return reject(Error::ObservationOverflow,0x22a280u,selfBankSlot,-1);
         Snapshot staged{};staged.total30=static_cast<std::int32_t>(count_);
@@ -155,7 +174,7 @@ public:
         for(std::size_t index=0;index<count_;++index){
             const auto slot=bindings_[index].bankSlot;
             if(!bank.active(slot))return reject(Error::Inactive,0x1af330u,slot,static_cast<std::int32_t>(index));
-            if(bank.read(slot,live.phase)!=VehicleFramePhase49W::Ready)
+            if(!schedule&&bank.read(slot,live.phase)!=VehicleFramePhase49W::Ready)
                 return reject(Error::Phase,0x219d98u,slot,static_cast<std::int32_t>(index));
             if(!bank.read(slot,live.dynamicOwnersBound))
                 return reject(Error::Owners,0x223110u,slot,static_cast<std::int32_t>(index));
