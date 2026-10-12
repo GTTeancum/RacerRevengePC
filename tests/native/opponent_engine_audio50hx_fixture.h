@@ -8,6 +8,7 @@
 #include "../../src/game/gameplay_audio50he.h"
 #include "../../src/game/host_race_limits50ht.h"
 #include "../../platform/linux/native/audio_mixer50hd.h"
+#include "../../platform/linux/native/logical_audio_owner.h"
 #include <array>
 #include <charconv>
 #include <cmath>
@@ -243,6 +244,12 @@ public:
                     rr::platform::AudioMixer50HD::validClip(boostSound.clip),"50HX ready global boost PCM invalid");
             }
             for(std::size_t i=0;i<maxOpponents;++i)sounds_[voiceCount+i]=boostSound;
+            d::need(channels_.bind(mixer,firstVoice,ownedVoiceCount),
+                "AI native logical channel range unavailable");
+            for(std::size_t i=0;i<ownedVoiceCount;++i)
+                d::need(channels_.registerClip(i,sounds_[i].clip,
+                    sounds_[i].availability==a::AudioAssetState50HC::ready),
+                    "AI native logical sound registration rejected");
             policy_=policy;mixer_=&mixer;error.clear();return true;
         }catch(const std::exception& e){error=e.what();return false;}
         catch(...){error="50HX original opponent audio preparation failed";return false;}
@@ -281,7 +288,7 @@ public:
             const bool onset=input.boostSerial>boostSerials_[i];
             if(onset&&input.boostSerial-boostSerials_[i]!=1u)return reject();
             const auto index=voiceCount+i;
-            if(onset||mixer_->active(firstVoice+index)){
+            if(onset||channels_.active(*channels_.sound(index))){
                 const auto& command=onset?input.boostCommand:boostCommands_[i];
                 if(command.operation!=rr::game::AudioOperation50HE::Start||
                     command.cue.bank!=rr::game::AudioBank50HE::PodEngine||command.cue.key!=3||
@@ -308,10 +315,12 @@ public:
             ++counters_.boostOnsets;
         }
         for(std::size_t index=0;index<ownedVoiceCount;++index) {
-            const auto slot=firstVoice+index;const auto& control=plan[index];
+            const auto& control=plan[index];auto& sound=*channels_.sound(index);
             auto& result=receipt.results[index];
             if(!control.active) {
-                if(mixer_->active(slot)){mixer_->stop(slot);result=Result::Stopped;++counters_.stops;}
+                const bool active=channels_.active(sound);
+                channels_.stop233670(sound);
+                if(active){result=Result::Stopped;++counters_.stops;}
                 continue;
             }
             if(sounds_[index].availability!=rr::assets::AudioAssetState50HC::ready) {
@@ -321,10 +330,11 @@ public:
                 continue;
             }
             const float gain=control.gain*receipt.normalization;
-            const bool wasActive=mixer_->active(slot);
+            const bool wasActive=channels_.active(sound);
             const bool continuing=wasActive&&!control.restart;
-            const bool accepted=continuing?mixer_->controls(slot,gain,control.pitch,0.f):
-                mixer_->play(slot,sounds_[index].clip,gain,control.pitch,control.loop,0.f);
+            const auto applied=continuing?channels_.controls(sound,gain,control.pitch):
+                channels_.start(sound,gain,control.pitch,control.loop);
+            const bool accepted=applied==rr::platform::LogicalAudioOwner::Result::complete;
             if(!accepted){result=Result::Rejected;receipt.status=Status::ApplyRejected;++counters_.rejected;}
             else if(continuing){result=Result::Controlled;++counters_.controls;}
             else {result=Result::Started;++counters_.starts;if(index>=voiceCount)++counters_.boostStarts;}
@@ -337,10 +347,10 @@ public:
     // but retain consumed boost serials: only a new genuine onset can replay it.
     void reset()noexcept {
         if(!mixer_)return;
-        for(std::size_t v=0;v<ownedVoiceCount;++v)mixer_->stop(firstVoice+v);
+        for(std::size_t v=0;v<ownedVoiceCount;++v)channels_.stop233670(*channels_.sound(v));
         ++counters_.resets;
     }
-    void close()noexcept{reset();mixer_=nullptr;}
+    void close()noexcept{reset();channels_.close();mixer_=nullptr;}
     bool prepared()const noexcept{return mixer_!=nullptr;}
     const rr::assets::AudioBank50HC& bank()const noexcept{return bank_;}
     const std::array<Mapping,maxOpponents>& mappings()const noexcept{return mappings_;}
@@ -362,6 +372,7 @@ private:
     std::array<rr::game::AudioCommand50HE,maxOpponents> boostCommands_{};
     std::array<std::uint64_t,maxOpponents> boostSerials_{};
     rr::platform::AudioMixer50HD* mixer_=nullptr;
+    rr::platform::LogicalAudioOwner channels_{};
     DistancePolicy policy_{};Counters counters_{};bool attempted_=false;
 };
 }
