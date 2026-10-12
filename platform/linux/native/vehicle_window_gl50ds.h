@@ -9,6 +9,7 @@
 #include "../../../src/assets/vehicle_draw_assets50cr.h"
 #include "../../../src/game/draw_visibility50ei.h"
 #include "../../../src/game/host_race_limits50ht.h"
+#include "../../../src/game/native_gc_selected_lights_candidate.h"
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -24,6 +25,11 @@ enum class VehicleWindowMode50DS : std::uint8_t {
 };
 enum class VehicleWindowOutput50DS : std::uint8_t {
     defaultBackBuffer, headless
+};
+// Explicit native replacement of the existing opaque-textured host light.
+// This does not claim original material, normal, fog, alpha or specular parity.
+enum class NativeRacerLightingPolicy50DS : std::uint8_t {
+    unchangedHost, nativeGcSelectedLights
 };
 constexpr std::uint32_t maxVehicleWindowMaterials50DS = 4096; // RRSCENE1 per-component cap.
 constexpr std::uint32_t maxVehicleWindowTrackSpans50DS = 65536;
@@ -381,6 +387,14 @@ struct VehicleWindowOpponent50DS {
     // Zero selects the player bank; 1..request.racerArchetypeCount select the
     // explicitly supplied original geometry, material and cable banks.
     std::uint32_t racerArchetype = 0;
+    // Borrowed synchronously, then copied by value before GL. Requested
+    // packets must be genuine owner publications for real roster slot i+1,
+    // where i is this entry's fixed opponent index. Keep the packet paired
+    // with its actual retained batch, including stopped opponents.
+    // Any nonempty opaque host-lit untextured span rejects before GL; unlit,
+    // sourcePrelit and nonopaque spans do not participate in this policy.
+    NativeRacerLightingPolicy50DS lightingPolicy = NativeRacerLightingPolicy50DS::unchangedHost;
+    const game::NativeGcSelectedLightsCandidate* selectedLights = nullptr;
 };
 // Explicit HOST interface, independent of a native vehicle frame. Strings are
 // borrowed only during submitHostMenu; each must terminate within 48 ASCII
@@ -442,6 +456,14 @@ struct VehicleWindowFrame50DS {
     // Required iff track.worldFog.enabled. Three finite world-space camera
     // coordinates, copied during submit. Never derived from clip-space depth.
     const float* worldFogCamera = nullptr;
+    // Player roster slot 0, independently selected for this exact real batch.
+    // Requested policy requires a ready packet; unchangedHost requires null.
+    // Owner/graphics/publication identity is copied with its three components.
+    // Runtime owns the current-batch/packet pairing and invalidation boundary.
+    // Every nonempty opaque host-lit span must name its real required texture;
+    // unsupported untextured spans reject before GL instead of falling back.
+    NativeRacerLightingPolicy50DS lightingPolicy = NativeRacerLightingPolicy50DS::unchangedHost;
+    const game::NativeGcSelectedLightsCandidate* selectedLights = nullptr;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,

@@ -51,6 +51,10 @@ uniform int effectMode;
 uniform float alphaScale;
 uniform int suppressDraw;
 uniform int useLighting;
+uniform int useNativeGcSelectedLights;
+uniform vec4 nativeGcAmbient;
+uniform vec4 nativeGcDiffuse[3];
+uniform vec4 nativeGcDirection[3];
 out vec4 viewerOutput;
 void main() {
     // Evaluate derivatives before any discard. Source normals retain their
@@ -72,10 +76,21 @@ void main() {
     if (effectMode == 1) alpha = clamp(texel.a * viewerColor.a * alphaScale, 0.0, 1.0);
     if (effectMode == 2) color *= alphaScale;
     if (useLighting != 0) {
-        vec3 lightDirection = normalize(vec3(0.35, 0.85, 0.30));
-        float illumination = 0.32 + 0.16 * max(normal.y, 0.0) +
-            0.52 * max(dot(normal, lightDirection), 0.0);
-        color *= illumination;
+        if (useNativeGcSelectedLights != 0) {
+            // Native Lambert evaluation using current selected source RGB.
+            // Columns already point toward the lights: do not negate or
+            // normalize them, and do not add the old host hemisphere again.
+            vec3 illumination = nativeGcAmbient.rgb;
+            for (int i = 0; i < 3; ++i)
+                illumination += nativeGcDiffuse[i].rgb *
+                    max(dot(normal, nativeGcDirection[i].xyz), 0.0);
+            color *= illumination;
+        } else {
+            vec3 lightDirection = normalize(vec3(0.35, 0.85, 0.30));
+            float illumination = 0.32 + 0.16 * max(normal.y, 0.0) +
+                0.52 * max(dot(normal, lightDirection), 0.0);
+            color *= illumination;
+        }
     }
     viewerOutput = vec4(color, alpha);
 }
@@ -201,9 +216,24 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic) 
     uniforms_.useUvTransform = gl_.getUniformLocation(program_, "useUvTransform");
     uniforms_.uvScaleOffset = gl_.getUniformLocation(program_, "uvScaleOffset");
     uniforms_.useLighting = gl_.getUniformLocation(program_, "useLighting");
+    uniforms_.useNativeGcSelectedLights = gl_.getUniformLocation(program_, "useNativeGcSelectedLights");
+    uniforms_.nativeGcAmbient = gl_.getUniformLocation(program_, "nativeGcAmbient");
+    constexpr const char* diffuseNames[] = {
+        "nativeGcDiffuse[0]", "nativeGcDiffuse[1]", "nativeGcDiffuse[2]"
+    };
+    constexpr const char* directionNames[] = {
+        "nativeGcDirection[0]", "nativeGcDirection[1]", "nativeGcDirection[2]"
+    };
+    for (unsigned i = 0; i < 3; ++i) {
+        uniforms_.nativeGcDiffuse[i] = gl_.getUniformLocation(program_, diffuseNames[i]);
+        uniforms_.nativeGcDirection[i] = gl_.getUniformLocation(program_, directionNames[i]);
+        if (!noGlError(diagnostic) || uniforms_.nativeGcDiffuse[i] < 0 ||
+            uniforms_.nativeGcDirection[i] < 0) return fail();
+    }
     if (!noGlError(diagnostic) || uniforms_.effectMode < 0 || uniforms_.alphaScale < 0 ||
         uniforms_.suppressDraw < 0 || uniforms_.useUvTransform < 0 || uniforms_.uvScaleOffset < 0 ||
-        uniforms_.useLighting < 0)
+        uniforms_.useLighting < 0 || uniforms_.useNativeGcSelectedLights < 0 ||
+        uniforms_.nativeGcAmbient < 0)
         return fail();
     ready_ = true;
     diagnostic.stage = VehicleGlShaderStage50CZ::none;

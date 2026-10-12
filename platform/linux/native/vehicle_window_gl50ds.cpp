@@ -955,6 +955,10 @@ struct VehicleWindowGl50DS::Storage {
     U cableTextureName = 0, cableVertexBuffer = 0, cableIndexBuffer = 0, cableVertexArray = 0;
     const game::PodCableMesh50FD* frameCables = nullptr;
     game::VehicleDrawBatch50CO framePlayerBatch{}, frameOpponentBatches[maxVehicleWindowOpponents50DS]{};
+    // Immutable value snapshots travel with the corresponding real batch for
+    // this one unpublished frame. No source owner/lease pointer is borrowed.
+    game::NativeGcSelectedLightsCandidate framePlayerLights{};
+    game::NativeGcSelectedLightsCandidate frameOpponentLights[maxVehicleWindowOpponents50DS]{};
     const game::PodCableMesh50FD* frameOpponentCables[maxVehicleWindowOpponents50DS]{};
     U frameOpponentCount = 0;
     U frameOpponentArchetypes[maxVehicleWindowOpponents50DS]{};
@@ -1488,6 +1492,94 @@ struct VehicleWindowGl50DS::Storage {
             }
         }
         d.opponentIndex = maxVehicleWindowOpponents50DS;
+        return true;
+    }
+    bool copyNativeGcLights(NativeRacerLightingPolicy50DS policy,
+        const game::NativeGcSelectedLightsCandidate* input, U expectedRacerSlot,
+        const game::VehicleDrawBatch50CO& batch, U archetype,
+        std::uintptr_t& fleetOwner, game::NativeGcSelectedLightsCandidate& output,
+        VehicleWindowDiagnostic50DS& d) const noexcept {
+        output = {};
+        if (policy == NativeRacerLightingPolicy50DS::unchangedHost) {
+            if (input)
+                return fail(d, VehicleWindowError50DS::frame,
+                    "unchanged host lighting requires no selected-light packet");
+            return true;
+        }
+        if (policy != NativeRacerLightingPolicy50DS::nativeGcSelectedLights || !input ||
+            request.mode != VehicleWindowMode50DS::callerMaterialTextures)
+            return fail(d, VehicleWindowError50DS::frame,
+                "native GC lighting requires explicit textured policy and a selected-light packet");
+        // Copy once, then validate/use that copy only. A retained stopped racer
+        // may legitimately have an older graphics sequence than another racer;
+        // runtime must retain it with the exact geometry batch it describes.
+        const game::NativeGcSelectedLightsCandidate packet = *input;
+        if (!packet.ready() || !packet.graphicsSequence() || packet.racerSlot() != expectedRacerSlot ||
+            !packet.publication() || !packet.ownerIdentity() ||
+            (fleetOwner && fleetOwner != packet.ownerIdentity()))
+            return fail(d, VehicleWindowError50DS::frame,
+                "native GC packet requires ready matching racer and shared owner identity");
+        if (archetype > racerArchetypeCount)
+            return fail(d, VehicleWindowError50DS::frame,
+                "native GC packet requires the actual prepared racer archetype");
+        if (!retainedMesh(batch, d, archetype)) return false;
+        const auto selected = racerView(archetype);
+        if (!selected.materials)
+            return fail(d, VehicleWindowError50DS::material,
+                "native GC lighting requires the actual retained material bank");
+        for (U c = 0; c < 3; ++c) {
+            d.component = c;
+            // Inspect actual nonempty draw spans only, not unused material
+            // table entries. A requested lit opaque untextured surface cannot
+            // silently fall back to the fixed-gray host light. Existing unlit,
+            // source-prelit and transparent/additive paths remain excluded.
+            const auto& geometry = batch.component[c];
+            for (U i = 0; i < geometry.spanCount; ++i) {
+                const auto& span = geometry.spans[i];
+                if (!span.index_count) continue;
+                if (span.material_index >= selected.scenes[c]->materials.size())
+                    return fail(d, VehicleWindowError50DS::material,
+                        "native GC draw span material is outside its actual racer scene");
+                const auto& material = selected.materials[selected.materialOffsets[c] + span.material_index];
+                const auto& binding = material.policy;
+                if (binding.unlit || binding.sourcePrelit ||
+                    binding.blend != VehicleWindowBlend50DS::opaque) continue;
+                if (binding.mode != VehicleWindowMaterialMode50DS::requiredTexture ||
+                    !material.name || material.textureIndex == assets::unresolvedMaterialTexture50EA) {
+                    d.material = span.material_index;
+                    d.texture = material.textureIndex;
+                    return fail(d, VehicleWindowError50DS::material,
+                        "native GC lit opaque draw requires its real retained texture; no host-light fallback");
+                }
+            }
+            const auto* light = packet.component(c);
+            if (!light)
+                return fail(d, VehicleWindowError50DS::frame,
+                    "native GC packet is missing the actual component selection");
+            for (U row = 0; row < 4; ++row) {
+                for (U lane = 0; lane < 4; ++lane) {
+                    const float direction = light->directions[row][lane];
+                    const float diffuse = light->diffuse[row][lane];
+                    const float specular = light->specular[row][lane];
+                    if (!std::isfinite(direction) || !std::isfinite(diffuse) ||
+                        !std::isfinite(specular) || std::abs(direction) > 1.f ||
+                        diffuse < 0.f || diffuse > 127.5f ||
+                        specular < 0.f || specular > 127.5f)
+                        return fail(d, VehicleWindowError50DS::frame,
+                            "native GC selected matrices exceed finite admitted color/direction bounds");
+                    if ((row == 3 || lane == 3) && direction != 0.f)
+                        return fail(d, VehicleWindowError50DS::frame,
+                            "native GC selected direction fourth row and column must be zero");
+                    if ((lane == 3 && diffuse != (row == 3 ? 64.f : 0.f)) ||
+                        ((row == 3 || lane == 3) && specular != 0.f))
+                        return fail(d, VehicleWindowError50DS::frame,
+                            "native GC selected color rows do not match admitted source layout");
+                }
+            }
+        }
+        fleetOwner = packet.ownerIdentity();
+        output = packet;
+        d.component = 3;
         return true;
     }
     bool hasGlResources() const noexcept {
@@ -2514,6 +2606,7 @@ void main() { viewerOutput = hudColor; }
     }
     bool drawHostHud() noexcept {
         if (!frameHostHud) return true;
+        resetNativeGcLighting();
         // Same pending color target; depth is neither tested nor modified.
         // No texture access, blending, framebuffer change, or heap allocation.
         gl.disable(0x0B71); gl.depthMask(0);
@@ -2559,6 +2652,7 @@ void main() { viewerOutput = hudColor; }
         gl.uniform1i(shader->uniforms().useTexture, 1);
         gl.uniform1i(shader->uniforms().image, 0);
         gl.uniform1i(shader->uniforms().useLighting, 0); // Energy cables stay emissive.
+        resetNativeGcLighting();
         if (!check("upload actual current source cable vertices and bind real texture")) return false;
         drawGl.drawElementsBaseVertex(0x0004, game::podCableIndexCount50FD, 0x1405, nullptr, 0);
         if (!check("draw source cable strips after pod")) return false;
@@ -3300,6 +3394,18 @@ void main() {
                 policy.blend == VehicleWindowBlend50DS::additive ? 1 : 0x0303);
         }
     }
+    void resetNativeGcLighting() noexcept {
+        // The selector and coefficients are all explicitly cleared at renderer
+        // transitions, including after an aborted racer frame followed by UI.
+        gl.useProgram(shader->program());
+        const auto& u = shader->uniforms();
+        gl.uniform1i(u.useNativeGcSelectedLights, 0);
+        gl.uniform4f(u.nativeGcAmbient, 0.f, 0.f, 0.f, 0.f);
+        for (U i = 0; i < 3; ++i) {
+            gl.uniform4f(u.nativeGcDiffuse[i], 0.f, 0.f, 0.f, 0.f);
+            gl.uniform4f(u.nativeGcDirection[i], 0.f, 0.f, 0.f, 0.f);
+        }
+    }
     void resetPodState() noexcept {
         // Explicitly clear the shared world shader before any pod/sky/UI path.
         if (trackProgram) {
@@ -3314,6 +3420,7 @@ void main() {
         gl.uniform1i(u.effectMode, 0); gl.uniform1f(u.alphaScale, 1.f);
         gl.uniform1i(u.suppressDraw, 0); gl.uniform1i(u.useUvTransform, 0);
         gl.uniform1i(u.useLighting, 0);
+        resetNativeGcLighting();
     }
     bool drawSky() noexcept {
         if (!skyIndexCount) return true;
@@ -3340,6 +3447,7 @@ void main() {
     }
     bool drawTrack(bool transparent) noexcept {
         auto& s = *this;
+        resetNativeGcLighting();
         if (s.frameTrackDrawCount && (!transparent || s.trackSpanCount)) {
             // The entire draw is still unpublished and abortable. The following
             // vehicle draws retain this exact target, matrix, and written depth.
@@ -3452,6 +3560,7 @@ void main() {
     }
     bool drawDynamicWorld(U bank, bool transparent) noexcept {
         if (!dynamicWorldSpanCount) return true;
+        resetNativeGcLighting();
         gl.useProgram(trackProgram);
         gl.uniform1i(worldFogEnabledUniform, 0);
         gl.uniformMatrix4fv(trackMatrixUniform, 1, 0, matrix);
@@ -3492,7 +3601,8 @@ void main() {
         resetPodState();
         return check("restore pod state after dynamic-world pass");
     }
-    bool applyPodMaterial(const Material& material, bool suppress, const float* overrideUv = nullptr) noexcept {
+    bool applyPodMaterial(const Material& material, bool suppress, const float* overrideUv = nullptr,
+        const game::original_racer_lighting50KM::LightMatrices* selectedLights = nullptr) noexcept {
         configureBlend(material.policy);
         const auto& u = shader->uniforms();
         gl.bindTexture(texture2D, material.name);
@@ -3502,8 +3612,27 @@ void main() {
         gl.uniform1i(u.suppressDraw, suppress ? 1 : 0);
         // Retain source-alpha/additive effect appearance and explicit emissive
         // materials. Only opaque pod surfaces opt into host illumination.
-        gl.uniform1i(u.useLighting, !material.policy.unlit && !material.policy.sourcePrelit &&
-            material.policy.blend == VehicleWindowBlend50DS::opaque ? 1 : 0);
+        const bool hostLit = !material.policy.unlit && !material.policy.sourcePrelit &&
+            material.policy.blend == VehicleWindowBlend50DS::opaque;
+        gl.uniform1i(u.useLighting, hostLit ? 1 : 0);
+        const bool nativeGc = selectedLights && hostLit && !suppress && material.name &&
+            material.policy.mode == VehicleWindowMaterialMode50DS::requiredTexture;
+        gl.uniform1i(u.useNativeGcSelectedLights, nativeGc ? 1 : 0);
+        if (nativeGc) {
+            // Source byte MODULATE neutral 128 is the explicit native RGB
+            // coefficient convention. No exposure scalar or specular term.
+            constexpr float coefficient = 1.f / 128.f;
+            const auto& ambient = selectedLights->diffuse[3];
+            gl.uniform4f(u.nativeGcAmbient, ambient[0] * coefficient,
+                ambient[1] * coefficient, ambient[2] * coefficient, 0.f);
+            for (U i = 0; i < 3; ++i) {
+                const auto& diffuse = selectedLights->diffuse[i];
+                gl.uniform4f(u.nativeGcDiffuse[i], diffuse[0] * coefficient,
+                    diffuse[1] * coefficient, diffuse[2] * coefficient, 0.f);
+                gl.uniform4f(u.nativeGcDirection[i], selectedLights->directions[0][i],
+                    selectedLights->directions[1][i], selectedLights->directions[2][i], 0.f);
+            }
+        }
         gl.uniform1i(u.useUvTransform, 1);
         const auto* uv = overrideUv ? overrideUv : material.uv;
         gl.uniform4f(u.uvScaleOffset, uv[0], uv[1], uv[2], uv[3]);
@@ -3537,7 +3666,8 @@ void main() {
                     const U material = selected.materialOffsets[c] + span.material_index;
                     if (selected.materials[material].policy.blend != VehicleWindowBlend50DS::opaque) continue;
                     if (!applyPodMaterial(selected.materials[material], false,
-                        opponentMaterialUvs[opponent * opponentMaterialStride + material].value)) return false;
+                        opponentMaterialUvs[opponent * opponentMaterialStride + material].value,
+                        frameOpponentLights[opponent].component(c))) return false;
                 }
                 drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.index_count), 0x1405,
                     reinterpret_cast<const void*>(std::uintptr_t(span.index_start) * sizeof(U)), 0);
@@ -3604,6 +3734,7 @@ void main() {
         s.gl.uniform1i(uniforms.effectMode, 0); s.gl.uniform1f(uniforms.alphaScale, 1.f);
         s.gl.uniform1i(uniforms.suppressDraw, 0); s.gl.uniform1i(uniforms.useUvTransform, 0);
         s.gl.uniform1i(uniforms.useLighting, 0);
+        s.resetNativeGcLighting();
         if (s.usesTextures()) {
             s.gl.activeTexture(textureUnit0);
             s.gl.bindTexture(texture2D, 0);
@@ -3626,9 +3757,11 @@ void main() {
             // 50CV keeps its exact original submission/provenance contract. A
             // selected effect issues a discard-only first-pass draw, then the
             // retained source range is rendered once at commit after opaques.
-            return s.applyPodMaterial(binding, binding.policy.blend != VehicleWindowBlend50DS::opaque);
+            return s.applyPodMaterial(binding, binding.policy.blend != VehicleWindowBlend50DS::opaque,
+                nullptr, s.framePlayerLights.component(componentIndex(component)));
         }
         s.gl.uniform1i(s.shader->uniforms().useTexture, 0);
+        s.gl.uniform1i(s.shader->uniforms().useNativeGcSelectedLights, 0);
         return s.check("bind explicit neutral vehicle material policy");
     }
     static bool commit(void* context, std::uint8_t bank) noexcept {
@@ -3979,6 +4112,20 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     if (!s.validateMaterialUvs(frame.materialUvs, frame.materialUvCount, d) ||
         !s.validateOpponents(batch, frame, d) || !s.validateDynamicWorldFrame(frame.dynamicWorld, d) ||
         !s.validateTrackAnimationFrames(frame, d)) return false;
+    // All selected-light validation and value copying precedes the first GL
+    // call. Missing/invalid requested packets never fall back to generic light.
+    game::NativeGcSelectedLightsCandidate playerLights{};
+    game::NativeGcSelectedLightsCandidate opponentLights[maxVehicleWindowOpponents50DS]{};
+    std::uintptr_t fleetLightOwner = 0;
+    if (!s.copyNativeGcLights(frame.lightingPolicy, frame.selectedLights, 0,
+        batch, 0, fleetLightOwner, playerLights, d)) return false;
+    for (U i = 0; i < frame.opponentCount; ++i) {
+        d.opponentIndex = i;
+        const auto& opponent = frame.opponents[i];
+        if (!s.copyNativeGcLights(opponent.lightingPolicy, opponent.selectedLights, i + 1,
+            *opponent.batch, opponent.racerArchetype, fleetLightOwner, opponentLights[i], d)) return false;
+    }
+    d.opponentIndex = maxVehicleWindowOpponents50DS;
     if (bool(s.request.cables.textures) != bool(frame.cables))
         return fail(d, VehicleWindowError50DS::frame, "cable frame presence must match explicit cold cable request");
     if (frame.cables && !validateCableFrame(*frame.cables, d)) return false;
@@ -4075,9 +4222,11 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     // this synchronous transaction; no per-frame allocation or index upload.
     s.frameOpponentCount = frame.opponentCount;
     s.framePlayerBatch = batch;
+    s.framePlayerLights = playerLights;
     for (U i = 0; i < frame.opponentCount; ++i) {
         const auto& opponent = frame.opponents[i];
         s.frameOpponentBatches[i] = *opponent.batch;
+        s.frameOpponentLights[i] = opponentLights[i];
         s.frameOpponentCables[i] = opponent.cables;
         s.frameOpponentArchetypes[i] = opponent.racerArchetype;
         const auto selected = s.racerView(opponent.racerArchetype);
@@ -4126,9 +4275,11 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     }
     s.frameSet = false; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
     s.framePlayerBatch = {};
+    s.framePlayerLights = {};
     s.frameDynamicWorld = {};
     for (U i = 0; i < s.frameOpponentCount; ++i) {
         s.frameOpponentBatches[i] = {};
+        s.frameOpponentLights[i] = {};
         s.frameOpponentCables[i] = nullptr;
         s.frameOpponentArchetypes[i] = 0;
     }
@@ -4476,6 +4627,7 @@ bool VehicleWindowGl50DS::renderOriginalUiByteBlendSample(const OriginalUiByteBl
         for(U capability:disabled)s.gl.disable(capability);
         for(I i=0;i<s.clipDistances;++i)s.gl.disable(0x3000+static_cast<U>(i));
         s.gl.colorMask(1,1,1,1);s.gl.depthMask(0);s.gl.polygonMode(0x0408,0x1B02);
+        s.resetNativeGcLighting();
         s.gl.useProgram(s.uiBlendProgram);s.drawGl.bindVertexArray(s.uiBlendVertexArray);
         s.gl.activeTexture(textureUnit0);s.gl.bindTexture(texture2D,s.uiRetainedColor);
         if(s.gl.bindSampler)s.gl.bindSampler(0,0);
@@ -5016,6 +5168,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         const I ex = std::min<I>(rasterWidth, static_cast<I>(std::ceil(ox + 640.0 * scale)));
         const I ey = std::min<I>(rasterHeight, static_cast<I>(std::ceil(oy + 448.0 * scale)));
         s.gl.scissor(sx, sy, ex - sx, ey - sy); s.gl.enable(0x0C11);
+        s.resetNativeGcLighting();
         s.gl.enable(0x0B71); s.gl.useProgram(s.uiProgram);
         s.gl.uniform4f(s.uiCanvasUniform,float(2.0*scale/rasterWidth),float(-2.0*scale/rasterHeight),
             float(2.0*ox/rasterWidth-1.0),float(1.0-2.0*oy/rasterHeight));

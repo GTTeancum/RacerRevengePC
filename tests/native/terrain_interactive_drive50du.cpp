@@ -10,6 +10,7 @@
 #include "native_racer_cables50hw_fixture.h"
 #include "native_racer_grid50hn_fixture.h"
 #include "native_racer_draw50hn_fixture.h"
+#include "../../src/game/original_gc_gameplay_lighting_candidate.h"
 #include "race_session50hm_fixture.h"
 #include "race_audio50hq_fixture.h"
 #include "race_mode1_host50id_fixture.h"
@@ -211,6 +212,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest setup failed");
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceEnabled=!(raceSetting&&std::string(raceSetting)=="0");
+ // Explicit INACTIVE-by-default native rendering policy. The original UI
+ // manager lifetime is never reset or declared cache-absent by this option.
+ const char* gcLightingSetting=std::getenv("RR_NATIVE_GC_SELECTED_LIGHTS");
+ require50DU(!gcLightingSetting||std::string(gcLightingSetting)=="0"||
+     std::string(gcLightingSetting)=="1","RR_NATIVE_GC_SELECTED_LIGHTS must be 0 or 1");
+ const bool nativeGcSelectedLights=gcLightingSetting&&std::string(gcLightingSetting)=="1";
+ require50DU(!nativeGcSelectedLights||(raceEnabled&&!checkpointInput&&
+     !originalMainApplication.enabled&&track_session_assets50IG::codeEquals(trackSession->world->code,"GC")),
+     "nativeGcSelectedLights requires a fresh authenticated GC race; checkpoint/Main-only/TA unsupported");
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
  const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
@@ -1269,6 +1279,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   addCounter50DU(effectCommands,count);return true;
  };
  std::uint64_t completedFrames=0,mainContactFrames=0,secondaryContactFrames=0,repairActiveTicks=0;
+ namespace gcLighting=rr::game::original_gc_gameplay_lighting_candidate;
+ gcLighting::Owner gcLightOwner;
+ gcLighting::Diagnostic gcLightDiagnostic{};
+ // Session owners are deliberately OUTSIDE the transient native racer bank.
+ // This count advances at actual graphics success, before later failure cuts.
+ std::array<std::uint64_t,raceRacerCount> gcGraphicsSequence{};
+ std::array<NativeGcSelectedLightsCandidate,raceRacerCount> gcDrawLights{};
+ if(nativeGcSelectedLights){
+  require50DU(gcLightOwner.prepare(ground.world.parameters.original_bytes,raceRacerCount,
+      gcLightDiagnostic),"authentic GC light/visibility owner preparation failed");
+  std::cerr<<"NATIVE GC SELECTED LIGHTS: actual registered ambient/directional colors and real racer visibility; "
+      "native per-publication selection and host world-normal Lambert; existing material/alpha/fog/specular limits retained.\n";
+ }
  std::uint64_t submittedDrawFrames=0,windowSwaps=0,nativeCalls=0,discardedHostNs=0;
  auto runNative=[&](auto&&fn,const char*label){
   const bool ok=fn();addCounter50DU(nativeCalls);
@@ -1624,8 +1647,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        step.request.kind,actualV0))dynamicBoundary(step.sourcePC,"collision music return mismatch");
   }
  };
- auto advanceFrame=[&](){
+ auto advanceFrame=[&](std::size_t actualRacerSlot){
  require50DU(!originalMainApplication.enabled,"Main-only frontend cannot advance race physics");
+ require50DU(!nativeGcSelectedLights||actualRacerSlot<gcGraphicsSequence.size(),
+     "GC light update requires the actual native racer slot");
  finishDriverAppliedThisFrame=false;
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame)require50DU(advanceSpeechTimers50HG(.016f,lapContinuity.prefix,speechState),
      "native speech countdown failed");
@@ -1784,6 +1809,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      advancePlayerBoost50FK(boostInput,boostParameters,boostState,boostState,boostDiagnostic);},"native boost controller");
  x.selectors.vehicle64=boostState.vehicle64;
  runNative([&]{return graphicsVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::Base2176E0BeforeGraphics),x.workspace,x.diagnostic);},"persistent graphics");
+ if(nativeGcSelectedLights){
+  auto& sequence=gcGraphicsSequence[actualRacerSlot];
+  require50DU(sequence!=std::numeric_limits<std::uint64_t>::max(),"GC graphics publication overflow");
+  ++sequence;
+  //228844..228884 consumes EXISTING694 immediately after graphics. Neither
+  // later physics nor the current draw model substitutes for that cache.
+  require50DU(gcLightOwner.updateAfterGraphics(static_cast<std::uint32_t>(actualRacerSlot),
+      s,x.bindings,x.parameters,sequence,gcLightDiagnostic),
+      "actual GC visibility update failed; requested selected-light frame cannot publish");
+ }
  ImpactConsumerInput49Z consumer{};consumer.vehicle64=boostState.vehicle64;consumer.managerFlags58=s.fields.applicationByte58;consumer.profile34=2;consumer.finalDamageThreshold64=1;VehicleImpactEvents49Z consumerEvents{};
  if(dynamicContactEnabled){
   consumer.profile34=dynamicProfile.game34;consumer.profile10FAC=0;
@@ -2400,6 +2435,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   });
   for(std::size_t racer=1;racer<racerBank.count();++racer)
    coldRacerStage50DU(racerRigs[racer]->podId,"grounded grid placement",[&](){placeOpponentAtGrid50HN(racer);});
+  if(nativeGcSelectedLights)for(std::size_t racer=0;racer<racerBank.count();++racer)
+   racerBank.visit(racer,[&](){
+    // Only this genuine unadvanced cold generation owns source C30=4C0[0].
+    // Rig installation and final per-racer grid placement already completed.
+    require50DU(completedFrames==0&&m.frameFactor==0.f&&gcGraphicsSequence[racer]==0,
+        "GC visibility creation requires final fresh grid before first graphics");
+    require50DU(gcLightOwner.attachFreshVehicle(static_cast<std::uint32_t>(racer),s,
+        x.bindings,x.parameters,gcLightDiagnostic),"actual cold GC racer7F0 registration failed");
+   });
   if(racerContactsEnabled){
    racerContactOwner=std::make_unique<native_racer_contact50HW::Owner>();
    std::string error;
@@ -2454,9 +2498,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   raceSetupFrame=true;
   if(originalAiEnabled)for(std::size_t slot=0;slot<racerBank.count();++slot)
    racerBank.visit(slot,[&](){s.fields.applicationByte58=originalAiSession.manager.flags58;});
-  auto initializeGraphics=[&](){
+  auto initializeGraphics=[&](std::size_t actualRacerSlot){
    if(s.fields.vehicle58==0u){composePacket(false,noKeys);sampleController();}
-   require50DU(advanceFrame(),"native race grid setup tick rejected");
+   require50DU(advanceFrame(actualRacerSlot),"native race grid setup tick rejected");
    require50DU(lapContinuity.state.vehicleCC8==0,"cold race setup unexpectedly completed a lap");
   };
   for(std::size_t racer=1;racer<racerBank.count();++racer){
@@ -2464,7 +2508,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    try{
     captureDynamicBeforeFrame(racer);
     if(originalAiEnabled)observeOriginalAiFleet();
-    racerBank.visit(racer,initializeGraphics);
+    racerBank.visit(racer,[&](){initializeGraphics(racer);});
    }
    catch(const std::exception& error){
     opponentFrame=false;
@@ -2475,7 +2519,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   captureDynamicBeforeFrame(0);
   if(originalAiEnabled)observeOriginalAiFleet();
-  initializeGraphics();raceSetupFrame=false;
+  initializeGraphics(0);raceSetupFrame=false;
   if(originalAiEnabled){
    for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
     initializeLapTimingFields50ID(lapContinuity.timing,dynamicContactEnabled?dynamicMusicProfile.mode11258:2u);lapContinuity.timingInitialized=true;
@@ -3618,7 +3662,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      // copies current owners only: manager timing/CC4/CCC do not advance here.
      if(originalAiEnabled)observeOriginalAiFleet();
     }
-    const bool frameAdvanced=!playerAdvancing||advanceFrame();
+    const bool frameAdvanced=!playerAdvancing||advanceFrame(0);
     if(originalAiEnabled&&!frameAdvanced){
      std::cerr<<"ORIGINAL AI world boundary: slot=0 phase="<<static_cast<unsigned>(s.phase)
          <<" frame_source_stage="<<std::hex<<x.diagnostic.sourceStage<<std::dec
@@ -3646,7 +3690,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        const bool advanced=racerBank.step(racer,true,[&](){
         if(s.fields.vehicle58==0u){composePacket(true,noKeys);applyCourseInput(racer);sampleController();}
         const auto beforeOpponentFrame=::allocations;
-        const bool completed=advanceFrame();
+        const bool completed=advanceFrame(racer);
         if(completed)require50DU(::allocations==beforeOpponentFrame,
             "successful opponent physics frame allocated C++ storage");
         return completed;
@@ -3896,11 +3940,20 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     bankTiming.finish();
     render_diagnostics50GQ::Scope projectionTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::VehicleProjection);
     VehicleDrawBatch50CO next{};VehicleDrawBatchDiagnostic50CO drawDiagnostic{};
+    {
+    gcLighting::DrawLease lightLease;
+    if(nativeGcSelectedLights)require50DU(gcLightOwner.beginDraw(0,s,x.bindings,
+        gcGraphicsSequence[0],lightLease,gcLightDiagnostic),
+        "actual player GC visibility publication unavailable");
     if(!buildVehicleDrawBatch50CO(s,x.bindings,drawInput,next,drawWorkspace,drawDiagnostic)){
      std::cerr<<"draw preparation component "<<drawDiagnostic.component<<" error "
               <<static_cast<unsigned>(drawDiagnostic.detail.error)<<'\n';
      throw std::runtime_error("actual vehicle mesh preparation failed");
     }
+    if(nativeGcSelectedLights)require50DU(gcLightOwner.publishNativeDraw(lightLease,
+        gcLighting::CachePolicy::inactiveCandidateNativePerPublicationRecompute,
+        gcDrawLights[0],gcLightDiagnostic),"actual player selected GC lights unavailable");
+    } //229EF4 semantic publication ends; only completed copied packet survives.
     projectionTiming.finish();
     render_diagnostics50GQ::Scope cameraTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::HostCamera);
     platform::VehicleViewCamera50DG camera{};
@@ -4034,6 +4087,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     platform::VehicleWindowFrame50DS renderFrame{info.drawableWidth,info.drawableHeight,
         view.worldViewProjection,clearColor,&cableMesh,&hud};
+    if(nativeGcSelectedLights){
+     renderFrame.lightingPolicy=platform::NativeRacerLightingPolicy50DS::nativeGcSelectedLights;
+     renderFrame.selectedLights=&gcDrawLights[0];
+    }
     if(gcAnimatedWorld){
      require50DU(gcDynamicWindow.bindFrame(renderFrame,*gcAnimatedWorld),"original GC dynamic frame publication failed");
      require50DU(gcAtm.bindFrame(renderFrame),"original GC ATM frame selection rejected");
@@ -4052,8 +4109,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       if(race.racers[racer].finished)++nextRacePresentation.submittedFinishedOpponents;
       if(racerBank.active(racer))racerBank.visit(racer,[&](){
        VehicleDrawBatchDiagnostic50CO opponentDiagnostic{};
+       gcLighting::DrawLease lightLease;
+       if(nativeGcSelectedLights)require50DU(gcLightOwner.beginDraw(static_cast<std::uint32_t>(racer),
+           s,x.bindings,gcGraphicsSequence[racer],lightLease,gcLightDiagnostic),
+           "actual opponent GC visibility publication unavailable");
        require50DU(opponentDraw[index].prepare(s,x.bindings,drawWorkspace,opponentDiagnostic),
            "actual opponent component projection failed");
+       if(nativeGcSelectedLights)require50DU(gcLightOwner.publishNativeDraw(lightLease,
+           gcLighting::CachePolicy::inactiveCandidateNativePerPublicationRecompute,
+           gcDrawLights[racer],gcLightDiagnostic),"actual opponent selected GC lights unavailable");
        require50DU(buildPodCables50FD(s,x.bindings,racerCables[racer]->bindings(),cameraBackward,
            opponentDraw[index].cables,cableWorkspace,cableDiagnostic),"actual opponent cable mesh failed");
        EngineFlareDiagnostic50GV flareDiagnostic{};
@@ -4076,6 +4140,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       opponents[nextRacePresentation.submittedOpponents++]={opponentDraw[index].batch(),&opponentDraw[index].cables,
           opponentUvs[index].data(),static_cast<std::uint32_t>(opponentUvs[index].size()),
           static_cast<std::uint32_t>(racer)};
+      if(nativeGcSelectedLights){
+       // Stopped racers retain BOTH their last complete geometry and its exact
+       // light publication. Never select from their later interrupted frame.
+       require50DU(gcDrawLights[racer].ready()&&gcDrawLights[racer].racerSlot()==racer,
+           "retained opponent batch has no matching GC light publication");
+       auto& submitted=opponents[nextRacePresentation.submittedOpponents-1u];
+       submitted.lightingPolicy=platform::NativeRacerLightingPolicy50DS::nativeGcSelectedLights;
+       submitted.selectedLights=&gcDrawLights[racer];
+      }
      }
      require50DU(nextRacePresentation.submittedOpponents==raceOpponentCount,
          "native continuation must submit the complete opponent field");

@@ -5,7 +5,7 @@
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "b9af05bbfdbe7e30d1dc7d3168bf1313f4711bab82985a73d9c6d30615d53e28"
+    "tools/prepare_interactive_build50dv.py": "14b480c927a0884c0ce06dc7b4372dd7fb2d5cdb3baca367e78153757b5b924d"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -240,6 +240,7 @@
     "src/game/original_ui_main_camera50kg.cpp",
     "src/game/original_ui_main_particle_camera50kg.cpp",
     "src/game/original_ui_lit_geometry50km.cpp",
+    "src/game/original_gc_gameplay_lighting_candidate.cpp",
     "src/game/original_ui_rider_camera50kg.cpp",
     "src/game/original_ui_rider_render_context50kg.cpp",
     "src/game/original_ui_rider_model_fog50kg.cpp",

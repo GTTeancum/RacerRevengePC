@@ -1,0 +1,432 @@
+#include "original_gc_gameplay_lighting_candidate.h"
+#include "../assets/track_start50ad.h"
+#include "../assets/zone_search_authoring50cn.h"
+#include <cmath>
+#include <cstring>
+#include <limits>
+#include <new>
+#include <utility>
+
+#if defined(__FAST_MATH__) || (defined(__FINITE_MATH_ONLY__) && __FINITE_MATH_ONLY__ > 0)
+#error "GC source lighting candidate requires strict finite IEEE arithmetic"
+#endif
+
+namespace rr::game::original_gc_gameplay_lighting_candidate {
+namespace {
+namespace light=original_racer_lighting50KM;
+bool fail(Diagnostic& d,Status s,std::uint32_t pc) noexcept {d.status=s;d.sourcePC=pc;return false;}
+float add(float a,float b) noexcept {volatile float r=a+b;return r;}
+float mul(float a,float b) noexcept {volatile float r=a*b;return r;}
+float sub(float a,float b) noexcept {volatile float r=a-b;return r;}
+bool normalizeOnce(light::Vec3& v) noexcept {
+    const float square=add(add(mul(v[0],v[0]),mul(v[1],v[1])),mul(v[2],v[2]));
+    if(!std::isfinite(square)||square<std::numeric_limits<float>::min())return false;
+    // Explicit ordinary native binary32 normalization. This is not a VU RSQRT
+    // exceptional-mode/bit-parity claim. GC scene reader does NOT normalize first.
+    volatile float inverse=1.f/std::sqrt(square);
+    for(float& x:v){x=mul(x,inverse);if(!std::isfinite(x))return false;}
+    return true;
+}
+const assets::ParameterBlock48F* block(const assets::ParameterDocument48F& p,const char* name) noexcept {
+    const assets::ParameterBlock48F* found=nullptr;
+    for(const auto& b:p.blocks)if(b.name==name){if(found)return nullptr;found=&b;}
+    return found;
+}
+const assets::ParameterField48F* field(const assets::ParameterBlock48F& b,const char* name) noexcept {
+    const assets::ParameterField48F* found=nullptr;
+    for(const auto& f:b.fields)if(f.name==name){if(found)return nullptr;found=&f;}
+    return found;
+}
+bool textField(const assets::ParameterBlock48F& b,const char* key,const char* text) noexcept {
+    const auto* f=field(b,key);return f&&f->value==text;
+}
+bool triple(const assets::ParameterBlock48F& b,const char* key,light::Vec3& out) noexcept {
+    const auto* f=field(b,key);if(!f)return false;std::size_t at=0;
+    for(unsigned c=0;c<3;++c){const auto comma=f->value.find(',',at);
+        if((c<2)==(comma==std::string::npos))return false;
+        const auto end=c<2?comma:f->value.size();
+        auto first=at,last=end;
+        while(first<last&&f->value[first]==' ')++first;
+        while(last>first&&f->value[last-1]==' ')--last;
+        if(!assets::parseTrackNumber50AD(f->value.data()+first,last-first,out[c]))return false;
+        at=end+1;
+    }
+    return true;
+}
+std::uint32_t rotateRight(std::uint32_t x, unsigned n) noexcept {
+    return (x >> n) | (x << (32u - n));
+}
+void shaBlock(const std::uint8_t* block, std::array<std::uint32_t, 8>& h) noexcept {
+    constexpr std::uint32_t k[64] = {
+        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+    };
+    std::uint32_t w[64]{};
+    for (unsigned i = 0; i < 16; ++i)
+        for (unsigned j = 0; j < 4; ++j) w[i] = (w[i] << 8) | block[i * 4 + j];
+    for (unsigned i = 16; i < 64; ++i) {
+        const auto s0 = rotateRight(w[i-15],7) ^ rotateRight(w[i-15],18) ^ (w[i-15] >> 3);
+        const auto s1 = rotateRight(w[i-2],17) ^ rotateRight(w[i-2],19) ^ (w[i-2] >> 10);
+        w[i] = w[i-16] + s0 + w[i-7] + s1;
+    }
+    auto a=h[0], b=h[1], c=h[2], d=h[3], e=h[4], f=h[5], g=h[6], v=h[7];
+    for (unsigned i = 0; i < 64; ++i) {
+        const auto s1 = rotateRight(e,6) ^ rotateRight(e,11) ^ rotateRight(e,25);
+        const auto ch = (e & f) ^ (~e & g);
+        const auto t1 = v + s1 + ch + k[i] + w[i];
+        const auto s0 = rotateRight(a,2) ^ rotateRight(a,13) ^ rotateRight(a,22);
+        const auto maj = (a & b) ^ (a & c) ^ (b & c);
+        const auto t2 = s0 + maj;
+        v=g; g=f; f=e; e=d+t1; d=c; c=b; b=a; a=t1+t2;
+    }
+    h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d; h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=v;
+}
+bool authenticGcScb(const std::vector<std::uint8_t>& input) noexcept {
+    if (input.size() != 359830u) return false;
+    std::array<std::uint32_t, 8> h{{0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+        0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19}};
+    std::size_t at = 0;
+    for (; input.size() - at >= 64; at += 64) shaBlock(input.data() + at, h);
+    std::array<std::uint8_t, 128> tail{};
+    const std::size_t remainder = input.size() - at;
+    if (remainder) std::memcpy(tail.data(), input.data() + at, remainder);
+    tail[remainder] = 0x80;
+    const std::size_t padded = remainder < 56 ? 64 : 128;
+    const std::uint64_t bits = static_cast<std::uint64_t>(input.size()) * 8u;
+    for (unsigned i = 0; i < 8; ++i)
+        tail[padded - 1 - i] = static_cast<std::uint8_t>(bits >> (i * 8));
+    shaBlock(tail.data(), h);
+    if (padded == 128) shaBlock(tail.data() + 64, h);
+    constexpr char expected[] =
+        "d47a83f4b50812609c923381f3a9038328c81d9a50563b68fb4de022a9be210d";
+    constexpr char hex[] = "0123456789abcdef";
+    for (unsigned i = 0; i < 64; ++i)
+        if (expected[i] != hex[(h[i / 8] >> ((7u - i % 8) * 4)) & 15u]) return false;
+    return true;
+}
+bool validRoot(SceneNodeIndex49P root,std::uint32_t count) noexcept {
+    const auto i=static_cast<std::int32_t>(root);return i>=0&&static_cast<std::uint32_t>(i)<count;
+}
+std::array<SceneNodeIndex49P,3> modelRoots(const VehicleFrameBindings49W& b) noexcept {
+    return {b.lifecycle.model1B4,b.visual.left1BC,b.visual.right1B8};
+}
+bool frameBinding(const VehicleFrameState49W& s,const VehicleFrameBindings49W& b) noexcept {
+    if(!validVehicleSceneCount49W(s,b)||!validRoot(b.lifecycle.main190,s.sceneNodeCount))return false;
+    const auto roots=modelRoots(b);
+    for(auto root:roots)if(!validRoot(root,s.sceneNodeCount))return false;
+    return roots[0]==b.animation.chariot1B4&&roots[1]==b.animation.left1BC&&
+        roots[1]==b.lifecycle.left1BC&&roots[2]==b.animation.right1B8&&roots[2]==b.lifecycle.right1B8&&
+        roots[0]!=roots[1]&&roots[0]!=roots[2]&&roots[1]!=roots[2];
+}
+LiveZoneBounds50EN shapeBounds(const PodShapeState49W& shape,const PodShapeSource49W& source) noexcept {
+    LiveZoneBounds50EN bounds{};bounds.bounds.shapeTag=0;bounds.bounds.shapeWorld=shape.composed00;
+    bounds.bounds.cachedCenter=shape.center60;bounds.bounds.cachedRadius=shape.radius80;
+    bounds.type0Resource=&source;return bounds;
+}
+}
+
+struct Owner::Storage {
+    assets::World48F world;
+    light::SmallDirectionalRegistry registry{};
+    std::array<light::Vec4,gcZones> ambient60{};
+    ZoneLifecycle50CL lifecycle{};
+    LiveZoneWorld50EN portals{};
+    std::array<SearchStorage50BS,gcZones*2> registries{},scratchRegistries{};
+    std::array<ZoneRegistration50CJ,maximumRacers> registrations{};
+    std::array<CollectionTree50BX,gcZones*2> methods{};
+    std::array<CollectionZone50BX,gcZones> zones{};
+    std::array<SearchListBlock50BR,gcZones*4> blocks{};
+    std::array<CollectionRef50BX,gcZones> portalHeads{};
+    std::array<LiveZonePortalLink50EN,gcPortals*2> portalLinks{},scratchPortalLinks{};
+    std::array<PortalGeometry50EO,gcPortals> portalGeometry{};
+    std::array<CollectionZoneLink50BX,gcPortals+1> scratchLinks{};
+    std::array<LiveZoneEntry50EN,gcPortals+1> scratchEntries{};
+    LiveZoneWorkspace50EN workspace{};
+    struct Vehicle {
+        LiveZoneMembership50EN member{};
+        std::array<CollectionZoneLink50BX,gcPortals+1> links{};
+        std::array<LiveZoneEntry50EN,gcPortals+1> entries{};
+        PodShapeSource49W source{};
+        PodShapeState49W preparedPrefix{};
+        SceneNodeIndex49P mainRoot=SceneNodeIndex49P::none;
+        std::array<SceneNodeIndex49P,3> roots{};
+        std::uint64_t graphicsSequence=0;
+        bool pendingInitial=false,attached=false;
+    };
+    std::array<Vehicle,maximumRacers> vehicles{};
+    std::array<light::LightMatrices,3> selected{};
+    std::array<bool,3> selectedReady{};
+    std::uint32_t racerCount=0;
+    std::uint64_t drawGeneration=0;
+    const DrawLease* activeLease=nullptr;
+    bool bound(std::uint32_t slot) const noexcept {
+        if(slot>=racerCount)return false;
+        const auto& v=vehicles[slot];const auto& m=v.member;
+        if(!v.attached||!m.attached||m.object!=slot+1u||m.method!=ZoneMethod50CL::Second||
+           m.storage.links!=v.links.data()||m.storage.entries!=v.entries.data()||
+           m.storage.capacity!=v.links.size()||!v.entries[0].used)return false;
+        const auto zone=v.links[0].zone;if(!zone||zone>gcZones)return false;
+        const auto& r=registrations[slot];const auto& e=v.entries[0].registration;
+        return r.owner==&registries[(zone-1u)*2u+1u]&&r.encodedObject==((slot+1u)<<2u)&&
+            r.owner==e.owner&&r.slot==e.slot&&r.encodedObject==e.encodedObject;
+    }
+};
+Owner::Owner() noexcept=default;
+Owner::~Owner(){if(storage_&&storage_->activeLease)
+    endDraw(*const_cast<DrawLease*>(storage_->activeLease));}
+DrawLease::~DrawLease(){if(owner_)owner_->endDraw(*this);}
+const assets::World48F* Owner::world() const noexcept {return storage_?&storage_->world:nullptr;}
+bool Owner::prepare(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
+    d={};if(invalidated_)return fail(d,Status::unprepared,0x272a48);
+    if(storage_)return fail(d,Status::alreadyPrepared,0x272a48);
+    if(!racers||racers>maximumRacers)return fail(d,Status::identity,0x1ae578);
+    if(!authenticGcScb(scb))return fail(d,Status::sourceIdentity,0x270b10);
+    if(!light::selection_detail::arithmeticReady())return fail(d,Status::arithmetic,0x146f60);
+    try {
+        auto next=std::make_unique<Storage>();
+        if(!assets::decodeWorld48F(scb,next->world,d.decode))return fail(d,Status::sourceShape,0x270b10);
+        const auto& w=next->world;
+        if(w.zones.size()!=gcZones||w.portals.size()!=gcPortals)
+            return fail(d,Status::unsupportedScene,0x272a48);
+        const auto* first=block(w.parameters,"light1");const auto* second=block(w.parameters,"light2");
+        const auto* lights=block(w.parameters,"lights");
+        if(!first||!second||!lights||!textField(*lights,"numberoflights","2")||
+            !textField(*first,"type","Ambient")||!textField(*second,"type","Directional")||
+            field(*first,"initialzone")||field(*second,"initialzone")||field(*second,"lookvector")||
+            !textField(*second,"emitslight","T")||!textField(*second,"placelightatinfinity","T"))
+            return fail(d,Status::sourceFields,0x277390);
+        light::Vec3 ambient{},diffuse{},position{},target{};
+        if(!triple(*first,"colorrgb",ambient)||!triple(*second,"colorrgb",diffuse)||
+            !triple(*second,"position",position)||!triple(*second,"targetposition",target))
+            return fail(d,Status::sourceFields,0x277494);
+        next->registry.count=2;next->registry.registered[0].type=4;
+        auto& directional=next->registry.registered[1];directional.type=2;
+        light::Vec4 row{};
+        for(unsigned c=0;c<3;++c){
+            row[c]=mul(ambient[c],.5f);
+            directional.diffuse3C[c]=directional.specular4C[c]=mul(diffuse[c],.5f);
+            directional.direction78[c]=sub(target[c],position[c]);
+        }
+        if(!normalizeOnce(directional.direction78))return fail(d,Status::arithmetic,0x147200);
+        row[3]=64.f;
+        //2774C8 default1,2774FC subtract1 -> source ordinal0.148F30 first
+        // registers ambient,149000..149040 copies it into EVERY actual row.
+        for(auto& zoneAmbient:next->ambient60)zoneAmbient=row;
+        next->registry.selectedZoneAmbient=row;
+        next->racerCount=racers;
+        for(std::size_t z=0;z<gcZones;++z){
+            const auto read=assets::readZoneSearchSelection50CN(w,z);
+            if(w.zones[z].zone!=z+1||read.status!=assets::ZoneSearchReadStatus50CN::Complete||
+               read.selection.visibilityDynamic114!=assets::ZoneSearchKind50CN::List)
+                return fail(d,Status::unsupportedScene,0x272a58);
+        }
+        const ZoneLifecycleStorage50CL lifeStorage{next->registries.data(),next->registries.size(),
+            next->registrations.data(),next->registrations.size(),
+            {next->methods.data(),next->methods.size(),next->zones.data(),next->zones.size(),
+             next->blocks.data(),next->blocks.size()}};
+        if(initializeZoneLifecycle50CL(next->lifecycle,lifeStorage,gcZones,racers,1024,
+            next->workspace.transfer)!=SearchStorageStatus50BS::Complete)
+            return fail(d,Status::registration,0x272a58);
+        std::array<LiveZonePortalInput50EN,gcPortals> input{};
+        for(std::size_t i=0;i<gcPortals;++i){
+            input[i].zoneA=w.portals[i].zones[0];input[i].zoneB=w.portals[i].zones[1];
+            const auto index=w.portals[i].parameter_block;
+            if(index>=w.parameters.blocks.size())return fail(d,Status::sourceShape,0x272b3c);
+            constexpr const char* keys[]={"vertex1","vertex2","vertex3","vertex4"};
+            for(unsigned v=0;v<4;++v){
+                light::Vec3 value{};
+                // Parse exact retained source text with50AD, not World48F's
+                // host-parser float projection, even when it round-trips.
+                if(!triple(w.parameters.blocks[index],keys[v],value))
+                    return fail(d,Status::sourceFields,0x272b3c);
+                for(unsigned c=0;c<3;++c)input[i].vertices[v].v[c]=value[c];
+            }
+        }
+        const LiveZoneWorldStorage50EN portalStorage{next->portalHeads.data(),next->portalHeads.size(),
+            next->portalLinks.data(),next->portalLinks.size(),next->portalGeometry.data(),next->portalGeometry.size()};
+        if(prepareLiveZoneWorld50EN(input.data(),input.size(),gcZones,portalStorage,next->portals)!=LiveZoneStatus50EN::Complete)
+            return fail(d,Status::registration,0x272bc8);
+        next->workspace.registries=next->scratchRegistries.data();next->workspace.registryCapacity=next->scratchRegistries.size();
+        next->workspace.links=next->scratchLinks.data();next->workspace.entries=next->scratchEntries.data();
+        next->workspace.membershipCapacity=next->scratchLinks.size();
+        next->workspace.portalLinks=next->scratchPortalLinks.data();next->workspace.portalLinkCapacity=next->scratchPortalLinks.size();
+        storage_=std::move(next);return true;
+    }catch(...){return fail(d,Status::allocation,0x272a48);}
+}
+bool Owner::attachFreshVehicle(std::uint32_t slot,VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,Diagnostic& d) noexcept {
+    d={};d.racer=slot;
+    if(!storage_||invalidated_)return fail(d,Status::unprepared,0x229f20);
+    auto& o=*storage_;
+    if(o.activeLease)return fail(d,Status::activeDraw,0x2167a0);
+    if(slot>=o.racerCount||!frameBinding(s,b))return fail(d,Status::identity,0x2167a0);
+    auto& v=o.vehicles[slot];
+    if(v.attached||v.member.attached)return fail(d,Status::alreadyPrepared,0x229f30);
+    if(s.phase!=VehicleFramePhase49W::Ready||s.bodies.main.frameFactor!=0.f)
+        return fail(d,Status::phase,0x229f44);
+    const auto& main=s.nodes[static_cast<std::uint32_t>(b.lifecycle.main190)];
+    if(!(main.sceneFlags190&1u)||main.parent180!=SceneNodeIndex49P::none||
+       s.shape.registrationE0||s.shape.type88||
+       std::memcmp(&main.world100,&s.bodies.main.components.root.scene,sizeof(BodyMatrix48G)))
+        return fail(d,Status::identity,0x21684c);
+    if(v.pendingInitial){
+        if(v.mainRoot!=b.lifecycle.main190||v.roots!=modelRoots(b)||
+           std::memcmp(&v.source,&p.shape,sizeof(p.shape))||
+           std::memcmp(&v.preparedPrefix,&s.shape,sizeof(s.shape))||
+           std::memcmp(&main.world100,&s.shape.world80,sizeof(BodyMatrix48G)))
+            return fail(d,Status::identity,0x21684c);
+    }else{
+        PodShapeState49W prepared=s.shape;
+        if(!transformPodShape49W(p.shape,main.world100,prepared))
+            return fail(d,Status::bounds,0x21684c);
+        // Source-completed11FE50 numeric prefix survives a later registration
+        // boundary. This is the actual frame's694, not a parallel shape cache.
+        s.shape=prepared;v.preparedPrefix=prepared;v.source=p.shape;
+        v.mainRoot=b.lifecycle.main190;v.roots=modelRoots(b);v.pendingInitial=true;
+    }
+    const auto bounds=shapeBounds(s.shape,p.shape);
+    const LiveZoneStorage50EN backing{v.links.data(),v.entries.data(),v.links.size()};
+    // Source C30 was ACTUALLY initialized from visibility4C0[0] at1AE578;
+    // sourceRef1 is that same first row in this owner's separate namespace.
+    d.membership=attachLiveZoneMembership50EN(o.lifecycle,o.portals,v.member,backing,
+        slot+1u,1u,ZoneMethod50CL::Second,s.shape.radius80,bounds,o.workspace);
+    if(d.membership.status!=LiveZoneStatus50EN::Complete)
+        return fail(d,Status::registration,0x21688c);
+    v.attached=true;v.pendingInitial=false;return true;
+}
+bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
+    std::uint64_t graphicsSequence,Diagnostic& d) noexcept {
+    d={};d.racer=slot;
+    if(!storage_||invalidated_)return fail(d,Status::unprepared,0x228844);
+    auto& o=*storage_;
+    if(o.activeLease)return fail(d,Status::activeDraw,0x228844);
+    if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot))
+        return fail(d,Status::identity,0x228858);
+    auto& v=o.vehicles[slot];
+    if(s.phase!=VehicleFramePhase49W::PostGraphics||!graphicsSequence||
+       v.graphicsSequence==std::numeric_limits<std::uint64_t>::max()||
+       graphicsSequence!=v.graphicsSequence+1u)return fail(d,Status::phase,0x228844);
+    if(v.mainRoot!=b.lifecycle.main190||v.roots!=modelRoots(b)||s.shape.type88||
+       std::memcmp(&v.source,&p.shape,sizeof(p.shape)))
+        return fail(d,Status::identity,0x228844);
+    // Deliberately do not compare694.world80 to current main.world100 and do
+    // not reprepare694.228844 calls1202E0 directly on its EXISTING cached state.
+    // A later219FD8 can advance694 without advancing7F0 until the next graphics.
+    const auto bounds=shapeBounds(s.shape,p.shape);
+    d.membership=updateLiveZoneMembership50EN(o.lifecycle,o.portals,v.member,bounds,o.workspace);
+    if(d.membership.status!=LiveZoneStatus50EN::Complete)
+        return fail(d,Status::registration,0x228884);
+    v.graphicsSequence=graphicsSequence;return true;
+}
+bool Owner::beginDraw(std::uint32_t slot,const VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,std::uint64_t expectedGraphicsSequence,
+    DrawLease& lease,Diagnostic& d) noexcept {
+    d={};d.racer=slot;
+    if(!storage_||invalidated_)return fail(d,Status::unprepared,0x229e08);
+    auto& o=*storage_;
+    if(o.activeLease||lease.owner_)return fail(d,Status::activeDraw,0x229e08);
+    if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot))
+        return fail(d,Status::identity,0x229e08);
+    if(s.phase!=VehicleFramePhase49W::Ready&&s.phase!=VehicleFramePhase49W::PostGraphics)
+        return fail(d,Status::phase,0x229e08);
+    const auto& v=o.vehicles[slot];
+    if(v.mainRoot!=b.lifecycle.main190||v.roots!=modelRoots(b)||!v.graphicsSequence||
+       v.graphicsSequence!=expectedGraphicsSequence||
+       o.drawGeneration==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,Status::identity,0x229e08);
+    lease.owner_=this;lease.generation_=++o.drawGeneration;
+    lease.membershipRevision_=v.member.revision;lease.racer_=slot;lease.roots_=v.roots;
+    o.selectedReady.fill(false);o.activeLease=&lease;return true;
+}
+bool Owner::select(const DrawLease& lease,std::uint32_t component,SceneNodeIndex49P root,
+    CachePolicy policy,light::LightMatrices& output,Diagnostic& d) noexcept {
+    d={};d.racer=lease.racer_;
+    if(!storage_||invalidated_)return fail(d,Status::unprepared,0x2413a8);
+    auto& o=*storage_;
+    if(lease.owner_!=this||o.activeLease!=&lease||lease.generation_!=o.drawGeneration||
+       lease.racer_>=o.racerCount||!o.bound(lease.racer_)||component>=3u||
+       lease.roots_[component]!=root||
+       o.vehicles[lease.racer_].member.revision!=lease.membershipRevision_)
+        return fail(d,Status::stalePublication,0x2413d0);
+    if(policy!=CachePolicy::inactiveCandidateNativePerPublicationRecompute)
+        return fail(d,Status::unsupportedPolicy,0x14a0e8);
+    // INTENTIONALLY INACTIVE NATIVE POLICY: do not reproduce retail A4 hits.
+    // It can differ from14A860's membership-key retained matrix. No source
+    // null/miss/completeness assertion is manufactured by choosing this branch.
+    if(!o.selectedReady[component]){
+        const auto zone=o.vehicles[lease.racer_].links[0].zone;
+        auto selected=o.registry;selected.selectedZoneAmbient=o.ambient60[zone-1u];
+        light::LightMatrices next{};
+        if(light::projectSmallDirectionalRegistry(selected,next)!=light::Status::complete)
+            return fail(d,Status::arithmetic,0x149bb0);
+        o.selected[component]=next;o.selectedReady[component]=true;
+    }
+    output=o.selected[component];return true;
+}
+bool Owner::publishNativeDraw(const DrawLease& lease,CachePolicy policy,
+    NativeGcSelectedLightsCandidate& output,Diagnostic& d) noexcept {
+    NativeGcSelectedLightsCandidate next{};
+    for(unsigned c=0;c<3;++c)
+        if(!select(lease,c,lease.roots_[c],policy,next.matrices_[c],d))return false;
+    next.ownerIdentity_=reinterpret_cast<std::uintptr_t>(this);
+    next.graphicsSequence_=storage_->vehicles[lease.racer_].graphicsSequence;
+    next.publication_=lease.generation_;next.racerSlot_=lease.racer_;
+    output=next;return true;
+}
+void Owner::endDraw(DrawLease& lease) noexcept {
+    if(storage_&&storage_->activeLease==&lease){
+        storage_->selectedReady.fill(false);storage_->activeLease=nullptr;
+    }
+    lease.owner_=nullptr;lease.generation_=0;lease.membershipRevision_=0;
+    lease.racer_=0;lease.roots_={};
+}
+void Owner::invalidate() noexcept {
+    invalidated_=true;
+    if(storage_)storage_->selectedReady.fill(false);
+}
+light::Status prepareDiffuseNormalAxes(const BodyMatrix48G& world,float normalQ,
+    const light::LightMatrices& selected,light::DiffuseProgramInputs& output) noexcept {
+    if(!light::selection_detail::arithmeticReady())return light::Status::arithmetic;
+    for(float v:world.v)if(!std::isfinite(v))return light::Status::input;
+    if(!std::isfinite(normalQ)||normalQ<=0||world.v[3]!=0||world.v[7]!=0||
+       world.v[11]!=0||world.v[15]!=1)return light::Status::input;
+    for(const auto& row:selected.directions)for(float v:row)
+        if(!std::isfinite(v))return light::Status::input;
+    for(const auto& row:selected.diffuse)for(float v:row)
+        if(!std::isfinite(v))return light::Status::input;
+    light::DiffuseProgramInputs next{};
+    //3400D0..3400E0 scales direction lanes before3400E8..340140's basis
+    // composition. Preserve each separate operation, including the zero term.
+    for(unsigned axis=0;axis<3;++axis)for(unsigned lane=0;lane<3;++lane){
+        float value=mul(mul(selected.directions[0][lane],normalQ),world.v[axis*4]);
+        value=add(value,mul(mul(selected.directions[1][lane],normalQ),world.v[axis*4+1]));
+        value=add(value,mul(mul(selected.directions[2][lane],normalQ),world.v[axis*4+2]));
+        value=add(value,mul(0.f,world.v[axis*4+3]));
+        if(!std::isfinite(value))return light::Status::arithmetic;
+        next.normalAxes[axis][lane]=value;
+    }
+    for(unsigned row=0;row<4;++row)for(unsigned c=0;c<3;++c)
+        next.colorRows[row][c]=selected.diffuse[row][c];
+    output=next;return light::Status::complete;
+}
+bool recoverCompressedNormal(const std::array<double,3>& expanded,double normalQ,
+    light::CompressedNormal& output) noexcept {
+    if(!std::isfinite(normalQ)||normalQ<=0||static_cast<double>(static_cast<float>(normalQ))!=normalQ)
+        return false;
+    light::CompressedNormal next{};
+    for(unsigned c=0;c<3;++c){
+        const double raw=expanded[c]/normalQ;
+        if(!std::isfinite(expanded[c])||!std::isfinite(raw)||raw<-128.||raw>127.||
+           std::trunc(raw)!=raw||raw*normalQ!=expanded[c])return false;
+        next[c]=static_cast<std::int8_t>(raw);
+    }
+    output=next;return true;
+}
+} // namespace rr::game::original_gc_gameplay_lighting_candidate

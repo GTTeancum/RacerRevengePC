@@ -52,6 +52,13 @@ struct VehicleGlShaderUniforms50CZ {
     // Opt-in host directional lighting; zero retains diagnostic/effect RGB.
     // Authored world normals are float3 attribute 3 in a separate stream.
     std::int32_t useLighting = -1;
+    // Explicit native GC selected-light policy, independently disabled for
+    // every nonadmitted material. RGB coefficients are source colors / 128;
+    // direction XYZ is the selected world-space column, already toward light.
+    // Padded vec4 uniforms use the existing uniform4f entry point only.
+    std::int32_t useNativeGcSelectedLights = -1, nativeGcAmbient = -1;
+    std::int32_t nativeGcDiffuse[3] = {-1, -1, -1};
+    std::int32_t nativeGcDirection[3] = {-1, -1, -1};
 };
 
 enum class VehicleGlShaderStage50CZ : std::uint8_t {
