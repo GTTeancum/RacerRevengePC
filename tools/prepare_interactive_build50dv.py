@@ -49,11 +49,14 @@ def main():
     cold_audio = str(ROOT / 'src/game/cold_logical_audio_domain50ky.cpp')
     if cold_audio not in argv:
         argv.insert(argv.index('-lz'), cold_audio)
-    # Source registration only. Runtime's nativeGcSelectedLights policy stays
-    # off unless explicitly requested; this does not enable a capture or run.
+    # Native selected lighting defaults on in matching fresh gameplay. Build
+    # registration does not itself execute the client or enable a menu policy.
     gc_lighting = str(ROOT / 'src/game/original_gc_gameplay_lighting_candidate.cpp')
     if gc_lighting not in argv:
         argv.insert(argv.index('-lz'), gc_lighting)
+    gameplay_binder = str(ROOT / 'src/game/original_gameplay_binder_candidate.cpp')
+    if gameplay_binder not in argv:
+        argv.insert(argv.index('-lz'), gameplay_binder)
     # Inactive original UI modules; source registration does not enable frontend.
     for source in (
         'src/assets/original_ui_archive50kg.cpp',

@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "description": "MSVC x64 window-only integrated UI/gameplay development client; build only, never launch or run tests.",
-  "reviewedSourceRevision": "bfe1552d0fddbae5a1a0da7900e73782926992e4",
+  "reviewedSourceRevision": "2e8389641cfad48b72212c08490b2b0384fa6294",
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "3d3e099239224e5d25c6d543bb53589e82de1189ee6d79e6d264026a3224877a"
+    "tools/prepare_interactive_build50dv.py": "b6ced6031117ce5f8612516eab8502e7d4d9dab968a7a165e4085c452f4e7acb"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -241,6 +241,7 @@
     "src/game/original_ui_main_particle_camera50kg.cpp",
     "src/game/original_ui_lit_geometry50km.cpp",
     "src/game/original_gc_gameplay_lighting_candidate.cpp",
+    "src/game/original_gameplay_binder_candidate.cpp",
     "src/game/original_ui_rider_camera50kg.cpp",
     "src/game/original_ui_rider_render_context50kg.cpp",
     "src/game/original_ui_rider_model_fog50kg.cpp",
@@ -322,5 +323,5 @@
   "nativeDependencySourceProvenance": {
     "cmake/NativePc48C.cmake": "28c21d124da2000a8f44272b7d37eb5d02a092e863a9965c50deabec93d4fbff"
   },
-  "sourceListReviewNote": "Base revision plus the source-reviewed bounded Course integration in this manifest commit; runtime acceptance pending."
+  "sourceListReviewNote": "Base revision plus the original gameplay Binder source integration; source-reviewed only, no new build or runtime acceptance."
 }

@@ -44,13 +44,19 @@ and matching level lighting on; --no-native-track-fog and
 --no-native-level-lights are explicit comparison opt-outs. Menu-specific capture
 tools retain their independent UI policy.
 
-This default change is source-reviewed, not yet runtime-validated. The earlier
-01:26 GC observation had fog off and does not validate this revision. Existing
-Euclidean/interpolation/material/quantization limits below remain. Enabling the
-authored fog and light colors alone does not certify the requested green visual
-hue: GC's retained Fog RGB is blue-gray. The original world material, texture,
-vertex-color and environment composition must be traced against the user's
-reference before claiming a correct match.
+The 2026-10-12 03:31–03:35 UTC Linux observation on bfe1552 validated
+that the native GC default lighting/fog path runs with all eight original AI
+racers: 138 acknowledged frames, zero driving input, normal exit. It does not
+validate Windows, full-lap completion, original camera or pixel parity. The
+earlier 01:26 GC observation had fog off. Existing interpolation, material and
+quantization limits below remain.
+
+The user's reference video is Watchtower Run (GA), while these captures are
+The Citadel (GC), confirmed against authenticated original track localization
+and UICourse data. GA authors olive fog RGB117,107,66 and visibility0.4; GC
+authors blue-gray RGB151,160,177 and visibility0.5. Do not apply a blanket green
+GC tint to imitate GA. GA gameplay, sky, routes, collision and AI are not yet
+integrated; the reference's appearance has not been reproduced in gameplay.
 
 ## Native rendering path
 

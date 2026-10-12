@@ -151,6 +151,8 @@ struct Owner::Storage {
     assets::World48F world;
     light::SmallDirectionalRegistry registry{};
     std::array<light::Vec4,gcZones> ambient60{};
+    light::Vec4 globalAmbient50{};
+    bool fixedGcGlobalAmbient=false;
     ZoneLifecycle50CL lifecycle{};
     LiveZoneWorld50EN portals{};
     std::array<SearchStorage50BS,gcZones*2> registries{},scratchRegistries{};
@@ -392,6 +394,14 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
         // registers ambient,149000..149040 copies it into EVERY actual row.
         for(auto& zoneAmbient:next->ambient60)zoneAmbient=row;
         next->registry.selectedZoneAmbient=row;
+        //148F90/FB4/FD8/FFC publishes this SAME registered row to+50.
+        //270E9C enables Scene390bit0 only if this actual key is present;
+        //275544 then overrides149900, and275558 restores149950. The exact
+        //authenticated GC SCB has no key, so this fixed lifetime closes.
+        const auto* environment=block(w.parameters,"environment");
+        if(!environment||field(*environment,"ambientcolorflashminidletime"))
+            return fail(d,Status::sourceFields,0x270e9c);
+        next->globalAmbient50=row;next->fixedGcGlobalAmbient=true;
         }
         next->racerCount=racers;
         for(std::size_t z=0;z<w.zones.size();++z){
@@ -616,3 +626,10 @@ bool recoverCompressedNormal(const std::array<double,3>& expanded,double normalQ
     output=next;return true;
 }
 } // namespace rr::game::original_gc_gameplay_lighting_candidate
+
+namespace rr::game::original_gc_gameplay_lighting_candidate {
+bool Owner::currentGcGlobalAmbient50(std::array<float,4>& out) const noexcept {
+    if(!storage_||invalidated_||storage_->taNative||!storage_->fixedGcGlobalAmbient)return false;
+    out=storage_->globalAmbient50;return true;
+}
+}

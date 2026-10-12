@@ -3,6 +3,7 @@
 #include "native_pod_shadow50hm.h"
 #include "native_pod_shadow_glsl50hm.h"
 #include "../../../src/game/pod_cables50fd.h"
+#include "../../../src/game/original_gameplay_binder_candidate.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -1058,7 +1059,13 @@ struct VehicleWindowGl50DS::Storage {
         return (request.isCurrent && request.isCurrent(request.context)) ||
             fail(d, VehicleWindowError50DS::notCurrent, "caller context/host surface is not current");
     }
+    std::uint64_t gameplayBinderPublication=0;
+    const game::original_gameplay_binder_candidate::Mesh* frameGameplayBinders=nullptr;
+    U frameGameplayBinderCount=0,frameGameplayBinderImage=0;
     bool texturesCurrent(VehicleWindowDiagnostic50DS& d) const noexcept {
+        if(request.gameplayBinderTextures&&!request.gameplayBinderTextures->validBorrow(
+            request.context,request.isCurrent,gameplayBinderPublication))
+            return fail(d,VehicleWindowError50DS::material,"Binder immutable texture publication expired");
         if (request.mode == VehicleWindowMode50DS::callerMaterialTextures &&
             (!request.materials.textures || !request.materials.textures->validBorrow(
                 request.context, request.isCurrent, texturePublication)))
@@ -2661,6 +2668,47 @@ void main() { viewerOutput = hudColor; }
         diagnostic->cableIndices += game::podCableIndexCount50FD;
         return true;
     }
+    bool drawGameplayBinders() noexcept {
+        if(!frameGameplayBinderCount)return true;
+        // Native semantic Diffuse material: packetRGBA and original ATM pixels.
+        // Existing native world shader handles fog/clipping; exact source
+        // raster quantization, framebuffer-alpha and group ordering remain open.
+        const auto* bank=request.gameplayBinderTextures;
+        if(!bank||!trackProgram||!cableVertexArray)return false;
+        const U texture=bank->texture(frameGameplayBinderImage);if(!texture)return false;
+        resetPodState();
+        gl.useProgram(trackProgram);gl.uniformMatrix4fv(trackMatrixUniform,1,0,matrix);
+        gl.uniform1f(trackColorScaleUniform,255.f/128.f);
+        gl.uniform1i(trackUseTextureUniform,1);gl.uniform1i(trackImageUniform,0);
+        gl.uniform1i(trackDiscardZeroAlphaUniform,1); // DefaultMT: ATE1,ATST6,AREF0.
+        gl.uniform1i(trackEffectModeUniform,1);
+        gl.uniform1f(trackAlphaScaleUniform,(255.f/128.f)*(255.f/128.f));
+        gl.uniform1i(trackUnlitUniform,1); // Diffuse ambient is already source-packed on CPU.
+        gl.uniform1i(trackUseSourceNormalsUniform,0);gl.uniform1i(trackProjectionPassUniform,0);
+        gl.uniform1i(nativeShadowEnabledUniform,0);gl.uniform1i(nativeShadowOpponentCountUniform,0);
+        const auto& fog=request.track.worldFog;
+        // Authored fog is on by default; retain the explicit scene-fog
+        // diagnostic opt-out without dropping the actual Binder geometry.
+        gl.uniform1i(worldFogEnabledUniform,fog.enabled?1:0);
+        gl.uniform4f(worldFogCameraUniform,worldFogCamera[0],worldFogCamera[1],worldFogCamera[2],0.f);
+        gl.uniform4f(worldFogColorUniform,fog.color[0],fog.color[1],fog.color[2],1.f);
+        gl.uniform4f(worldFogRangeUniform,fog.start,fog.end,0.f,0.f);
+        gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,texture);
+        if(gl.bindSampler)gl.bindSampler(0,0);
+        gl.enable(0x0BE2);gl.blendEquation(0x8006);gl.blendFunc(0x0302,0x0303);
+        gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);gl.disable(0x0B44);
+        drawGl.bindVertexArray(cableVertexArray);drawGl.bindBuffer(arrayBuffer,cableVertexBuffer);
+        drawGl.bindBuffer(elementBuffer,cableIndexBuffer);
+        for(U i=0;i<frameGameplayBinderCount;++i){
+            drawGl.bufferSubData(arrayBuffer,0,sizeof(frameGameplayBinders[i].vertices),frameGameplayBinders[i].vertices.data());
+            // The first canonical cable segment has the SAME source quad
+            // triangles0,1,2 /2,1,3; its cold36-vertex storage is ample for4.
+            drawGl.drawElementsBaseVertex(0x0004,6,0x1405,nullptr,0);
+            if(!check("draw original gameplay Binder quad"))return false;
+            ++diagnostic->gameplayBinderDraws;
+        }
+        resetPodState();return check("restore native world state after Binder");
+    }
     bool createAttachment(U& name, U format, U attachment) noexcept {
         gl.genRenderbuffers(1, &name);
         gl.bindRenderbuffer(renderbuffer, name);
@@ -3182,6 +3230,7 @@ void main() {
         dynamicWorldTexturePublication = input.dynamicWorld.textures ? input.dynamicWorld.textures->publicationToken() : 0;
         trackAnimationTexturePublication = input.trackAnimationTextures ? input.trackAnimationTextures->publicationToken() : 0;
         cableTexturePublication = input.cables.textures ? input.cables.textures->publicationToken() : 0;
+        gameplayBinderPublication=input.gameplayBinderTextures?input.gameplayBinderTextures->publicationToken():0;
         skyTexturePublication = input.sky.textures ? input.sky.textures->publicationToken() : 0;
         cableTextureName = input.cables.textures ? input.cables.textures->texture(input.cables.textureIndex) : 0;
         maximumWidth = request.maximumWidth; maximumHeight = request.maximumHeight;
@@ -3795,6 +3844,7 @@ void main() {
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.resetPodState();
+        if (!s.drawGameplayBinders()) return false;
         if (!s.drawHostHud()) return false;
         if (!s.check("accept private vehicle frame")) return false;
         // 50CV publication is CPU-only. The fallible window copy is deliberately
@@ -4037,6 +4087,17 @@ VehicleWindowGl50DS::~VehicleWindowGl50DS() noexcept {
 bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     const assets::VehicleDrawAssets50CR& assets, VehicleWindowDiagnostic50DS& d) noexcept {
     d = {};
+    if(request.gameplayBinderTextures){
+        if(!request.cables.textures||request.track.mode!=VehicleWindowMode50DS::callerMaterialTextures||
+            !request.track.mesh||
+            request.gameplayBinderTextures->textureCount()!=10||
+            !request.gameplayBinderTextures->validBorrow(request.context,request.isCurrent,
+                request.gameplayBinderTextures->publicationToken()))
+            return fail(d,VehicleWindowError50DS::request,"Binder needs exact cold bank, world material program and shared geometry storage");
+        for(U i=0;i<10;++i)if(!request.gameplayBinderTextures->texture(i))
+            return fail(d,VehicleWindowError50DS::material,"Binder stored frame missing");
+    }
+
     if (storage_) return fail(d, VehicleWindowError50DS::alreadyOwned, "renderer already owns resources");
     if (!request.procAddress || !request.isCurrent ||
         (request.mode != VehicleWindowMode50DS::viewerNeutralUntextured &&
@@ -4085,6 +4146,22 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
     if (!s.current(d) || !s.texturesCurrent(d)) return false;
+    // A cold bank may remain resident in Main. Only active race frames supply
+    // meshes; absence never requests an animation clock or a lighting owner.
+    if((frame.gameplayBinderCount&&!s.request.gameplayBinderTextures)||
+        bool(frame.gameplayBinders)!=bool(frame.gameplayBinderCount))
+        return fail(d,VehicleWindowError50DS::frame,"Binder cold/frame presence differs");
+    if(frame.gameplayBinderCount){
+        if(frame.gameplayBinderCount!=frame.opponentCount+1u||frame.gameplayBinderCount>8u||frame.gameplayBinderFrame>=10u)
+            return fail(d,VehicleWindowError50DS::frame,"Binder racer/frame extent differs");
+        constexpr float uv[4][2]={{0,0},{0,1},{1,0},{1,1}};
+        for(U i=0;i<frame.gameplayBinderCount;++i)for(U v=0;v<4;++v){
+            const auto& vertex=frame.gameplayBinders[i].vertices[v];
+            for(float x:vertex.position)if(!std::isfinite(x))return fail(d,VehicleWindowError50DS::frame,"Nonfinite Binder position");
+            for(U c=0;c<2;++c)if(vertex.uv[c]!=uv[v][c])return fail(d,VehicleWindowError50DS::frame,"Binder source UV order differs");
+            if(vertex.color[3]!=64)return fail(d,VehicleWindowError50DS::frame,"Binder source global ambient alpha differs");
+        }
+    }
     if (frame.width <= 0 || frame.height <= 0 ||
         frame.width > s.maximumWidth || frame.height > s.maximumHeight ||
         !frame.worldViewProjection || !frame.clearRgba)
@@ -4248,6 +4325,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     std::memcpy(s.clearRgba, frame.clearRgba, sizeof(s.clearRgba));
     s.width = frame.width; s.height = frame.height;
     s.frameCables = frame.cables;
+    s.frameGameplayBinders=frame.gameplayBinders;s.frameGameplayBinderCount=frame.gameplayBinderCount;
+    s.frameGameplayBinderImage=frame.gameplayBinderFrame;
     s.frameDynamicWorld = frame.dynamicWorld;
     for (U i = 0; i < s.trackAnimationCount; ++i)
         s.trackAnimations[i].selectedFrame = frame.trackAnimationFrames[i];
@@ -4274,6 +4353,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         }
     }
     s.frameSet = false; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
+    s.frameGameplayBinders=nullptr;s.frameGameplayBinderCount=0;s.frameGameplayBinderImage=0;
     s.framePlayerBatch = {};
     s.framePlayerLights = {};
     s.frameDynamicWorld = {};

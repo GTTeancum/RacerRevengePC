@@ -1,0 +1,47 @@
+{
+  "status": "failed",
+  "commit": "2e8389641cfad48b72212c08490b2b0384fa6294",
+  "tree": "c2aa97719f99dfc65ae8374957b1d014410914b3",
+  "started_at_utc": "2026-10-12T16:22:25.070559+00:00",
+  "finished_at_utc": "2026-10-12T16:22:32.320233+00:00",
+  "next_eligible_utc": "2026-10-12T17:22:32.320233+00:00",
+  "runner_sha256": "4840264ceed0a5d103057676c6ae775c2975bcaab745b84b50c4acbb2eae2773",
+  "recorder_sha256": "717749e1089dc2c865de99177e83675f6e62f416f31db775abf0e5c709734c0c",
+  "executable_sha256": "ed295d7490dcb3668ba6dc7d25a4d701d2c144f33b0702848dd07f5862b6e59c",
+  "kernel_child_proof": {
+    "kernel_waitpid_echild": true,
+    "reaped": []
+  },
+  "remaining_descendants": [],
+  "error": "RuntimeError: one-menu-observation failed; no retry authorized",
+  "platform": "Linux",
+  "build": {
+    "compiled": 0,
+    "reused": 298,
+    "link_exit": 0
+  },
+  "observation": {
+    "outcome": "failed",
+    "frames": 14,
+    "matched_acks": 14,
+    "presses": 1,
+    "releases": 1,
+    "returncode": 1,
+    "native_closed": null,
+    "native_quit_state": null
+  },
+  "observed_activation": [
+    5
+  ],
+  "world_ticks": 0,
+  "forced_signals": [],
+  "failure": "Rider activation followed by original UI update rejection: status=13 source=2768268; Course was not reached.",
+  "scope": "Single bounded menu check. No driving, no gameplay or Windows validation. Binder integration occurred afterward and is unbuilt.",
+  "evidence_sha256": {
+    "central-session.json": "f4ddf3835894468982c76c970b8a4081ac3fef6ceed230c3cb198510dc489ecb",
+    "take-01/summary.json": "e956af3efaa15a3427b73700eb0116cf10ffaeedbc853097b9eb39f189dc4437",
+    "take-01/game.log": "2d2c233a749e5081b2a69a0f8c2fdcf0cc6ebd99b62a3282ccb8068a9ca80b14",
+    "take-01/frames.jsonl": "b2d83021339336a55c31fdf24ebb203374f11b73f369b95e4e1afa675de57004",
+    "take-01/events.jsonl": "4e2bb3eefb69f677ea318c8b69bd2acebbb35d52113b8a0c69bebe57503ee49c"
+  }
+}

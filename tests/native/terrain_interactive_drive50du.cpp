@@ -86,6 +86,7 @@
 #include "gc_gate_candidates50kg_fixture.h"
 #include "gc_dynamic_window50ig_fixture.h"
 #include "gc_atm_window_fixture.h"
+#include "gameplay_binder_window_candidate_fixture.h"
 #include "source_grid50ig_fixture.h"
 #include "track_session_assets50ig_fixture.h"
 #include "track_start50ad.h"
@@ -2715,6 +2716,31 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto& host=nativeVideo->host;
  gc_dynamic_window50IG::Owner gcDynamicWindow;
  gc_atm_window_fixture::Owner gcAtm;
+ gameplay_binder_window_candidate_fixture::Owner gameplayBinder;
+ // Same real process normal-material owner as Main. Cold APPSTART templates
+ // are authenticated from the admitted native disc tree; there is no second
+ // overrideKnown setting, UI material, or UI unique animation instance.
+ const bool gameplayBinderEnabled=raceEnabled&&playerUsesRosterRig&&nativeGcSelection&&
+     !checkpointInput&&!originalMainApplication.enabled;
+ rr::assets::OriginalUiMaterialTemplates50KG gameplayBinderTemplates;
+ std::shared_ptr<const rr::assets::OriginalUiArchive50KG> gameplayBinderAppStart;
+ if(gameplayBinderEnabled){
+  require50DU(gcAnimatedWorld&&racerBank.count()==8,
+      "Binder candidate requires actual eight-racer GC ordinary session");
+  gameplayBinderAppStart=original_main_entry50KG::readArchive("work/native/project/disc",
+      rr::assets::OriginalUiArchiveId50KG::appStart);
+  rr::assets::OriginalUiMaterialDiagnostic50KG materialDiagnostic;
+  require50DU(gameplayBinderTemplates.load(*gameplayBinderAppStart,materialDiagnostic),
+      "Binder authentic DefaultMT owner rejected");
+  const gameplay_binder_window_candidate_fixture::SourceDependencies gameplayBinderDependencies{
+      gameplayBinderTemplates,originalMainApplication.materialRuntime};
+  gameplay_binder_candidate_fixture::Diagnostic diagnostic;
+  for(std::size_t racer=0;racer<racerBank.count();++racer)racerBank.visit(racer,[&](){
+   const bool bound=gameplayBinder.bindRacer(static_cast<std::uint32_t>(racer),*racerRigs[racer],s,x.bindings,
+       gameplayBinderDependencies,diagnostic);
+   require50DU(bound,diagnostic.message.empty()?"actual racer Binder source join failed":diagnostic.message.c_str());
+  });
+ }
  if(gcAnimatedWorld){
   gc_dynamic_materials_fixture::Diagnostic materialDiagnostic{};
   // Finish each cold call before reading its diagnostic: function argument
@@ -2740,6 +2766,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       atmDiagnostic.message.empty()?"original GC ATM source bank rejected":atmDiagnostic.message.c_str());
  }
  std::uint32_t sourceApplicationTimestamp=0;
+ bool sourceApplicationTimestampPublished=false;
  std::uint64_t gcAnimatedWorldSteps=0;
  auto advanceWorldAnimations=[&](){
   if(!gcAnimatedWorld)return;
@@ -2748,6 +2775,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // once after that group, including enabled countdown world traversal.
   const auto before=::allocations;
   require50DU(sampleHostTimestamp50ID(applicationClock,sourceApplicationTimestamp),"shared source application timestamp rejected");
+  sourceApplicationTimestampPublished=true;
   require50DU(gcAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noise.sharedRandomState,
       sessionRandom,s.animationShared.motion,gcAnimationDiagnostic),
       gcAnimationDiagnostic.message.empty()?"original GC world animation rejected":gcAnimationDiagnostic.message.c_str());
@@ -2810,6 +2838,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::cerr<<"GC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
   }
   if(gcAtm.ownsResources())return false;
+  if(gameplayBinder.ownsResources()&&!gameplayBinder.close(textureDiagnostic))clean=false;
+  if(gameplayBinder.ownsResources())return false;
   for(std::size_t index=0;index<raceOpponentCount;++index){
    for(auto* texture:{&opponentGpuTextures[index],&opponentCableGpuTextures[index]}){
     if(texture->ownsResources()&&!texture->close(textureDiagnostic)){
@@ -3083,6 +3113,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "actual cable texture upload failed");
   renderRequest.cables.textures=&cableGpuTextures;
   renderRequest.cables.textureIndex=0;
+  if(gameplayBinder.loaded()){
+   require50DU(gameplayBinder.createGpu(textureRequest,textureDiagnostic),"original Binder GPU bank rejected");
+   require50DU(gameplayBinder.bindRequest(renderRequest),"original Binder cold renderer join rejected");
+  }
   renderRequest.track.textures=&trackGpuTextures;
   renderRequest.track.spans=trackBindings.data();
   renderRequest.track.spanCount=static_cast<std::uint32_t>(trackBindings.size());
@@ -4028,6 +4062,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     render_diagnostics50GQ::Scope cablesTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::SourceCables);
     runNative([&]{return buildPodCables50FD(s,x.bindings,playerCableBindings,cameraBackward,
         cableMesh,cableWorkspace,cableDiagnostic);},"source cable mesh generation");
+    if(gameplayBinder.loaded())require50DU(gameplayBinder.stageRacer(0,s,x.bindings,cameraBackward,gcLightOwner),
+        "actual player Binder attachments or global ambient unavailable");
     cablesTiming.finish();
     render_diagnostics50GQ::Scope hudTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::HostHud);
     platform::VehicleWindowHostHud50DS hud{};
@@ -4149,6 +4185,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
            gcDrawLights[racer],gcLightDiagnostic),"actual opponent selected GC lights unavailable");
        require50DU(buildPodCables50FD(s,x.bindings,racerCables[racer]->bindings(),cameraBackward,
            opponentDraw[index].cables,cableWorkspace,cableDiagnostic),"actual opponent cable mesh failed");
+       if(gameplayBinder.loaded())require50DU(gameplayBinder.stageRacer(static_cast<std::uint32_t>(racer),
+           s,x.bindings,cameraBackward,gcLightOwner),"actual opponent Binder attachment projection failed");
        EngineFlareDiagnostic50GV flareDiagnostic{};
        require50DU(advanceEngineFlare50GV(s,baseTail,coldFlame,
            static_cast<std::uint32_t>(submittedDrawFrames%0xffffffffull),opponentFlames[index],flareDiagnostic),
@@ -4186,6 +4224,22 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      // Preserve the renderer's null/zero invariant; this eight-racer session
      // retains all seven opponent descriptors after their results seal.
      renderFrame.opponents=renderFrame.opponentCount?opponents:nullptr;
+    }
+    if(gameplayBinder.loaded()){
+     //24A740/24A758 advances the canonical material controller during render
+     // preparation, not229B40's texture-residency refresh. Consume the actual
+     // existing application publication; do not create another timer/epoch.
+     // A first presentation may precede a world step. Sample the SAME actual
+     // application clock in that case; literal zero is not a clock receipt.
+     // This samples time only, without advancing world state or consuming RNG.
+     if(!sourceApplicationTimestampPublished){
+      require50DU(sampleHostTimestamp50ID(applicationClock,sourceApplicationTimestamp),
+          "first Binder render application timestamp unavailable");
+      sourceApplicationTimestampPublished=true;
+     }
+     require50DU(gameplayBinder.advanceRaceRender(sourceApplicationTimestamp),
+         "original Binder render-time controller rejected application publication");
+     require50DU(gameplayBinder.bindRaceFrame(renderFrame),"Binder complete eight-racer frame join rejected");
     }
     render_diagnostics50GQ::Scope submitTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::DriverSubmit);
     if(!renderer.submit(next,renderFrame,rendererDiagnostic)){
@@ -4327,6 +4381,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
              <<rendererDiagnostic.trackRetainedDraws<<'/'<<rendererDiagnostic.trackCulledDraws<<'/'<<rendererDiagnostic.trackCullingFallback
              <<" cable_draws/vertices/indices "<<rendererDiagnostic.cableDraws<<'/'
              <<rendererDiagnostic.cableVertices<<'/'<<rendererDiagnostic.cableIndices
+             <<" binder_loaded/draws "<<gameplayBinder.loaded()<<'/'<<rendererDiagnostic.gameplayBinderDraws
+             <<" binder_clock_published "<<sourceApplicationTimestampPublished
              <<" camera_adjusted/limited "<<cameraAdjustedFrames<<'/'<<cameraLimitedFrames
              <<" camera_shift "<<cameraFraming.right<<','<<cameraFraming.up<<','<<cameraFraming.retreat
              <<" terrain_queries/hits/supported "<<terrainQueries<<'/'<<terrainHitFrames<<'/'<<terrainSupportedFrames

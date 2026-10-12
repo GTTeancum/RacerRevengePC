@@ -1,5 +1,7 @@
 #pragma once
-// INACTIVE SOURCE-ONLY CANDIDATE. No renderer activation or retail cache claim.
+// Limited native selected-light policy, already joined to gameplay.
+// No original cache or camera parity claim. The new Binder +50 accessor is
+// source-only and has not been built or tested.
 #include "vehicle_frame49w.h"
 #include "live_zone_membership50en.h"
 #include "original_racer_material50km.h"
@@ -75,6 +77,11 @@ public:
     bool prepareTaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
         Diagnostic&) noexcept;
     const assets::World48F* world() const noexcept;
+    // Bound GC global148F90..148FFC ambient50, independent of per-racer zones.
+    // Only available when authenticated SCB omits the ambient-flash enabling
+    // key270E9C and this original-lighting lifetime is still valid. TA and
+    // untracked scene changes reject. No white/selected-zone fallback.
+    bool currentGcGlobalAmbient50(std::array<float,4>&) const noexcept;
     // Actual fresh-grid229F20->2167A0 slice after the final real grid placement.
     // Source1AE578..1AE594 supplied4C0[0] to2169C0, whose216A20 stores C30.
     // This owner binds its actual first visibility row, never collision C34.

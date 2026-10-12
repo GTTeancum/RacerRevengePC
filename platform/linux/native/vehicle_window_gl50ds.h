@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <memory>
 
-namespace rr::game { struct PodCableMesh50FD; }
+namespace rr::game { struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::platform {
 using VehicleWindowGlProc50DS = void (*)();
 enum class VehicleWindowMode50DS : std::uint8_t {
@@ -302,6 +302,11 @@ struct VehicleWindowRequest50DS {
     const MaterialTextureGl50EB* trackAnimationTextures = nullptr;
     const VehicleWindowTrackAnimation50DS* trackAnimations = nullptr;
     std::uint32_t trackAnimationCount = 0;
+    // Source-only ordinary gameplay Binder candidate. Exact ten-frame cold
+    // source bank, shared immutable images; timing remains CPU-owned.
+    // Requires caller-material track program and cable storage. Uses authored
+    // world fog by default and honors its explicit diagnostic opt-out.
+    const MaterialTextureGl50EB* gameplayBinderTextures = nullptr;
 };
 struct VehicleWindowStanding50DS {
     // Exact cold-verified original display name, including its terminator.
@@ -464,6 +469,10 @@ struct VehicleWindowFrame50DS {
     // unsupported untextured spans reject before GL instead of falling back.
     NativeRacerLightingPolicy50DS lightingPolicy = NativeRacerLightingPolicy50DS::unchangedHost;
     const game::NativeGcSelectedLightsCandidate* selectedLights = nullptr;
+    // One live/retained source four-vertex Binder mesh per submitted racer,
+    // player first. Borrowed only through submit. Alpha/RGB are source packets.
+    const game::original_gameplay_binder_candidate::Mesh* gameplayBinders = nullptr;
+    std::uint32_t gameplayBinderCount = 0, gameplayBinderFrame = 0;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,
@@ -510,6 +519,7 @@ struct VehicleWindowDiagnostic50DS {
     // Same checked-command/commit distinction as track receipts. One indexed
     // draw renders both actual cable strips, after the pod, before commit.
     std::uint32_t cableDraws = 0, cableVertices = 0, cableIndices = 0;
+    std::uint32_t gameplayBinderDraws = 0;
     // Checked effect commands, included in trackDraws when track effects.
     // Source order per pass, not reconstructed original global sorting.
     std::uint32_t transparentTrackDraws = 0, transparentPodDraws = 0;

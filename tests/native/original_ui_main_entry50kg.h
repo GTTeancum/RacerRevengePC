@@ -36,7 +36,10 @@ struct Application {
     std::filesystem::path assetRoot,audioRoot,riderCacheRoot;
     rr::platform::OriginalUiMainAudioMode50KG audioMode=
         rr::platform::OriginalUiMainAudioMode50KG::muted;
-    rr::assets::OriginalUiMaterialRuntime50KG materialRuntime{};
+    // One process-owned fresh normal-material setting for Main AND gameplay.
+    // Original100008..100030 clears435670 in BSS. Native debug overrides are
+    // not admitted; never reinitialize this owner on page/race/session entry.
+    rr::assets::OriginalUiMaterialRuntime50KG materialRuntime{true,false};
     std::shared_ptr<rr::platform::OriginalUiMainProfile50KG> profile;
     // One fresh application profile owner; destinations only borrow it.
     std::shared_ptr<rr::platform::OriginalUiRiderProfileOwner50KG> riderProfile;
@@ -112,7 +115,6 @@ struct Application {
         require(rr::game::sampleHostTimestamp50ID(*state->clock101A50,state->rawRandom308030),
             "Main startup shared application timestamp unavailable");
         state->known=true;
-        materialRuntime={true,false}; // Process-owned fresh native normal-material mode.
         std::cerr<<"ORIGINAL MAIN ONLY: fresh native profile/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "

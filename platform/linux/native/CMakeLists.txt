@@ -40,8 +40,9 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/original_ui_main_camera50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_main_particle_camera50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_lit_geometry50km.cpp"
-  # Explicit native GC selected-light policy; inactive unless requested.
+  # Mode-aware native GC selected lighting and original gameplay Binder.
   "${RR_ROOT}/src/game/original_gc_gameplay_lighting_candidate.cpp"
+  "${RR_ROOT}/src/game/original_gameplay_binder_candidate.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_camera50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_render_context50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_rider_model_fog50kg.cpp"
