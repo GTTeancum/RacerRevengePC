@@ -21,6 +21,9 @@ struct OriginalUiCourseColdInput50KG {std::shared_ptr<const assets::OriginalUiAr
 struct OriginalUiCourseMaterialBinding50KG {
  std::string registeredName;assets::OriginalUiMaterial50KG material;std::vector<std::uint32_t> images;
  std::vector<assets::OriginalUiNativeMaterial50KG> policies;assets::OriginalUiNativeUntexturedMaterial50KG untextured{};
+ // Retained authored unique-controller metadata, including disabled-arrow
+ // PST declarations. Only animated (stored ATM frames) receives a live native
+ // numeric controller; static PST controller-phase parity is not claimed.
  game::OriginalUiTextureAnimationConfig50KG animation{};bool animated=false;std::uint32_t registryToken=0;std::size_t registryByteOffset=0;const assets::OriginalUiMemberIdentity50KG* registryIdentity=nullptr;
 };
 struct OriginalUiCoursePrompt50KG {std::uint8_t mask=0;std::uint32_t material=assets::unresolvedMaterialTexture50EA;game::OriginalUiOverlayQuad50KG quad{};};

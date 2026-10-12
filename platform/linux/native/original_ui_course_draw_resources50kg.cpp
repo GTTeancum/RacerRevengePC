@@ -17,8 +17,36 @@ bool registry(const assets::OriginalUiMemberView50KG& t,std::vector<OriginalUiCo
  for(std::size_t i=0;i<b.size();++i){auto& row=b[i];if(row.registeredName.size()!=cursor-start)continue;std::size_t j=0;for(;j<row.registeredName.size()&&fold(char(t.data[start+j]))==fold(row.registeredName[j]);++j){}if(j!=row.registeredName.size())continue;if(found[i])return false;found[i]=true;row.registryToken=token;row.registryByteOffset=start;row.registryIdentity=t.identity;}++token;}
  if(token!=3235)return false;for(bool f:found)if(!f)return false;return true;}
 bool animation(const assets::OriginalUiMaterialPass50KG& p,game::OriginalUiTextureAnimationConfig50KG& out,Diagnostic& d){const auto* mode=p.authored.find("TextureAnimation");if(!mode||!same(mode->text,"unique"))return fail(d,Error::animation,0x29b950);game::OriginalUiTextureAnimationConfig50KG c;assets::OriginalUiPageDiagnostic50KG pd;std::int32_t looping=1,reverse=0,loopTo=-1;
- if(!assets::originalUiNumber50KG(p.authored,"animatedMapInitialFrame",0,c.initialFrame,pd,0x29b950)||!assets::originalUiNumber50KG(p.authored,"animatedMapFramesPerSecond",1,c.framesPerSecond,pd,0x29b950)||!assets::originalUiInteger50KG(p.authored,"animatedMapLooping",1,looping,pd,0x29b950)||!assets::originalUiInteger50KG(p.authored,"animatedMapReverseLoopOnEnd",0,reverse,pd,0x29b950)||!assets::originalUiInteger50KG(p.authored,"animatedMapLoopOnEndToFrame",-1,loopTo,pd,0x29b950))return fail(d,Error::animation);
+ if(!assets::originalUiNumber50KG(p.authored,"animatedMapInitialFrame",0,c.initialFrame,pd,0x29b950)||!assets::originalUiNumber50KG(p.authored,"animatedMapFramesPerSecond",1,c.framesPerSecond,pd,0x29b950)||!assets::originalUiInteger50KG(p.authored,"animatedMapLooping",1,looping,pd,0x29b950)||!assets::originalUiInteger50KG(p.authored,"animatedMapReverseLoopOnEnd",0,reverse,pd,0x29b950)||!assets::originalUiInteger50KG(p.authored,"animatedMapLoopOnEndToFrame",-1,loopTo,pd,0x29b950))return fail(d,Error::animation,0x29b950);
  c.looping=looping!=0;c.reverseLoopOnEnd=reverse!=0;c.loopOnEndToFrame=loopTo;out=c;return true;}
+bool disabledArrowAnimationMetadata(OriginalUiCourseMaterialBinding50KG& b,
+ const assets::OriginalUiArchive50KG& owner,const assets::OriginalUiMemberView50KG& image,
+ const std::string& texture,Diagnostic& d){
+ // These four authenticated PSMs declare a unique controller, but their two
+ // actual texture resources are PSTs. A declaration does not imply an ATM:
+ // PST accessor29C6D0 always returns the same texture;
+ // ATM accessor102050 alone indexes an authored frame array. Do not invent a
+ // one-frame ATM, borrow the enabled arrow, or discard the unique PSM data.
+ // Retain metadata only here. No native numeric controller is initialized or
+ // ticked for a PST, and original layout-dependent controller phase is not
+ // claimed. The existing draw owner advances only genuine stored ATM frames.
+ float fps=0;
+ if(same(b.registeredName,"ui/textures/arrwlefttop_d")&&same(texture,"arrwleft_d"))fps=8;
+ else if(same(b.registeredName,"ui/textures/arrwleft_d")&&same(texture,"arrwleft_d"))fps=16;
+ else if((same(b.registeredName,"ui/textures/arrwrghttop_d")||same(b.registeredName,"ui/textures/arrwrght_d"))&&same(texture,"arrwrght_d"))fps=8;
+ else return fail(d,Error::animation,0x29b950);
+ const auto psm=owner.find(b.registeredName+".psm");
+ if(owner.identity()!=assets::originalUiArchiveIdentity50KG(Archive::course)||
+    b.animated||b.images.size()!=1||!psm.identity||b.material.identity!=psm.identity||
+    image.identity!=owner.find("ui/textures/"+texture+".pst").identity||
+    owner.find("ui/textures/"+texture+".atm").identity)
+     return fail(d,Error::animation,0x29b950);
+ if(!animation(b.material.passes[0],b.animation,d))return false;
+ if(b.animation.initialFrame!=0||b.animation.framesPerSecond!=fps||!b.animation.looping||
+    !b.animation.reverseLoopOnEnd||b.animation.loopOnEndToFrame!=0)
+     return fail(d,Error::animation,0x29b950);
+ return true;
+}
 game::OriginalUiOverlayQuad50KG quad(const char* m,float x,float y,float w,float h,float u0,float v0,float u1,float v1,float depth,std::uint32_t pc)noexcept{game::OriginalUiOverlayQuad50KG q;q.materialName=m;q.authoredDepth=depth;q.sourcePC=pc;q.vertices={{{x,y,u0,v0},{x+w,y,u1,v0},{x,y+h,u0,v1},{x+w,y+h,u1,v1}}};return q;}
 }
 struct OriginalUiCourseDrawResources50KG::Storage {OriginalUiCourseColdInput50KG owners;assets::OriginalUiMaterialTemplates50KG templates;std::shared_ptr<assets::OriginalUiScreenAssets50KG> images;assets::OriginalUiImageBankInput50KG bankInput;game::OriginalUiCourseWidgets50KG widgets;std::vector<OriginalUiCourseMaterialBinding50KG> bindings;std::vector<MaterialTextureSampler50EB> samplers;std::array<std::unique_ptr<game::OriginalUiTextGeometry50KG>,85> text;std::array<std::array<std::uint32_t,2>,85> widgetMaterial{};std::uint32_t backgroundImage=unresolved;std::array<OriginalUiCoursePrompt50KG,4> prompts{};game::OriginalUiExitText50KG exitText;};
@@ -31,7 +59,10 @@ bool OriginalUiCourseDrawResources50KG::load(const OriginalUiCourseColdInput50KG
  const auto member=owner.find((font?"font/":"ui/textures/")+name+(animated?".atm":".pst"));if(!member.identity||!member.data)return fail(d,Error::resource);b.animated=animated;
  if(animated){assets::OriginalUiAtm50KG atm;if(!assets::splitOriginalUiAtm50KG(member.data,member.size,atm,d.atm))return fail(d,Error::resource);for(const auto& f:atm.frames){const auto identity=imageIdentity(owner.identity()->id,member,f.pstOffset);if(!identity)return fail(d,Error::resource);b.images.push_back(addSource({identity,member,f.pstOffset,f.pstBytes,{}}));}}
  else{const auto cel=font?owner.find("font/"+name+".cel"):assets::OriginalUiMemberView50KG{};if(font&&(!cel.identity||!cel.data))return fail(d,Error::resource);const auto identity=imageIdentity(owner.identity()->id,member,0);if(!identity)return fail(d,Error::resource);b.images.push_back(addSource({identity,member,0,member.size,cel}));}
- if(b.material.passes.size()!=1)return fail(d,Error::material);const auto& pass=b.material.passes[0];if(pass.textureCount!=1||!same(pass.textureName,name))return fail(d,Error::material);if(animated){if(!animation(pass,b.animation,d)||!game::validOriginalUiTextureAnimationConfig50KG(b.animation,static_cast<std::uint32_t>(b.images.size())))return fail(d,Error::animation);}else if(pass.authored.find("TextureAnimation"))return fail(d,Error::animation);return true;};
+ if(b.material.passes.size()!=1)return fail(d,Error::material);const auto& pass=b.material.passes[0];if(pass.textureCount!=1||!same(pass.textureName,name))return fail(d,Error::material);
+ if(animated){if(!animation(pass,b.animation,d))return false;if(!game::validOriginalUiTextureAnimationConfig50KG(b.animation,static_cast<std::uint32_t>(b.images.size())))return fail(d,Error::animation,0x29b950);}
+ else if(pass.authored.find("TextureAnimation")&&!disabledArrowAnimationMetadata(b,owner,member,name,d))return false;
+ return true;};
  const auto authored=[&](const char* material,const char* texture,bool font,bool animated)->bool{OriginalUiCourseMaterialBinding50KG b;b.registeredName=material;if(!assets::readOriginalUiMaterial50KG(*in.course,b.registeredName+".psm",s->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material))return fail(d,Error::material);if(texture&&!addImages(b,font?*in.fonts:same(texture,"overlay1")?*in.controllerPopup:*in.course,texture,font,animated))return false;if(!texture&&(b.material.passes.size()!=1||b.material.passes[0].textureCount!=0))return fail(d,Error::material);s->bindings.push_back(std::move(b));return true;};
  if(!authored("font/denmrk16top","denmrk16",true,false)||!authored("font/denmrk16","denmrk16",true,false)||!authored("font/denmrk14","denmrk14",true,false)||!authored("font/denmrk14top","denmrk14",true,false)||!authored("font/venus16top","venus16",true,false)||!authored("ui/textures/arrwlefttop","arrwleft",false,true)||!authored("ui/textures/arrwlefttop_d","arrwleft_d",false,false)||!authored("ui/textures/arrwrghttop","arrwrght",false,true)||!authored("ui/textures/arrwrghttop_d","arrwrght_d",false,false)||!authored("ui/textures/arrwleft","arrwleft",false,true)||!authored("ui/textures/arrwleft_d","arrwleft_d",false,false)||!authored("ui/textures/arrwrght","arrwrght",false,true)||!authored("ui/textures/arrwrght_d","arrwrght_d",false,false)||!authored("ui/textures/overlay1","overlay1",false,false)||!authored("ui/textures/notexture",nullptr,false,false))return false;
  {OriginalUiCourseMaterialBinding50KG b;b.registeredName="ui/textures/nameblur";if(!assets::readOriginalUiCourseNameBlurFallbackMaterial50KG(*in.course,s->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material))return fail(d,Error::material);if(!addImages(b,*in.course,"nameblur",false,false))return false;s->bindings.push_back(std::move(b));}
