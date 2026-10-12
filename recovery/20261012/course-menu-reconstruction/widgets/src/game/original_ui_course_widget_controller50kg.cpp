@@ -1,0 +1,53 @@
+#include "original_ui_course_widget_controller50kg.h"
+#include <utility>
+namespace rr::game { namespace {
+using S=OriginalUiCourseWidgetControllerStatus50KG;using P=OriginalUiCourseWidgetPlan50KG;
+using O=OriginalUiControlOperation50KG;using K=OriginalUiCourseWidgetStepKind50KG;
+bool step(P& p,std::uint16_t widget,O op,bool value,std::uint32_t pc)noexcept {
+ if(!widget||widget>84||p.count==p.steps.size())return false;p.steps[p.count++]={K::widget,widget,op,value,pc};return true;}
+bool control(P& p,std::int32_t id,O op,bool value,std::uint32_t pc)noexcept {
+ if(id==-1)return true;if(id<0||std::size_t(id)>=p.navigation.page->controls.size())return false;
+ for(auto widget:p.navigation.page->controls[std::size_t(id)].widgets)if(!step(p,widget,op,value,pc))return false;
+ auto& s=p.navigation.controls[std::size_t(id)];switch(op){case O::select:s.selected=true;break;case O::deselect:case O::clearSelection:s.selected=false;break;case O::show:s.shown=true;break;case O::hide:s.shown=false;break;case O::setEnabled:s.enabled=value;break;case O::reset:break;}return true;}
+bool group(P& p,std::size_t id,O op,bool value,std::uint32_t pc,std::uint32_t assoc)noexcept {
+ if(id>=p.navigation.page->groups.size())return false;const auto& g=p.navigation.page->groups[id];
+ for(auto c:g.controls)if(!control(p,c,op,value,pc))return false;for(auto c:g.associations)if(!control(p,c,op,value,assoc))return false;return true;}
+bool enable(P& p,std::size_t id,bool v)noexcept {p.navigation.groups[id].enabled=v;return group(p,id,O::setEnabled,v,0x2A5044,0x2A5088);}
+bool expand(P& p,const OriginalUiCommands50KG& c)noexcept {for(std::size_t i=0;i<c.count;++i){const auto& s=c.values[i];if(!control(p,s.controlId,s.operation,s.value,s.sourcePC))return false;}return true;}
+bool audio(P& p,K k,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return false;p.steps[p.count++]={k,0,O::hide,false,pc};return true;}
+bool prompt(P& p,std::uint32_t mask,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return false;p.steps[p.count++]={K::promptMask42C,0,O::hide,false,pc,mask};p.writesPromptMask42C=true;p.promptMask42C=mask;return true;}
+bool bounded(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
+ constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
+ return p.mode34==0&&p.course700==1&&p.subtype70C==1&&!(p.flags100BC&1)&&(p.flags11018&31)==4&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
+}
+struct OriginalUiCourseWidgetController50KG::Storage {std::shared_ptr<const assets::OriginalUiArchive50KG> archive;assets::OriginalUiDat50KG pageDat,widgets;assets::OriginalUiPage50KG page;std::array<std::int32_t,24> courseIndex{};};
+OriginalUiCourseWidgetController50KG::OriginalUiCourseWidgetController50KG()noexcept=default;
+OriginalUiCourseWidgetController50KG::~OriginalUiCourseWidgetController50KG()=default;
+S OriginalUiCourseWidgetController50KG::bind(std::shared_ptr<const assets::OriginalUiArchive50KG> archive,assets::OriginalUiPageDiagnostic50KG& d)noexcept {
+ d={};if(storage_)return S::alreadyBound;if(!archive||!archive->loaded()||archive->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::course))return S::archive;
+ try{auto s=std::make_unique<Storage>();s->archive=std::move(archive);
+ if(!assets::readOriginalUiDat50KG(*s->archive,"UI/UICourse/track.dat",s->pageDat,d)||!assets::readOriginalUiDat50KG(*s->archive,"UI/UICourse/Widgets.Dat",s->widgets,d,assets::OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)||!assets::readOriginalUiPage50KG(s->pageDat,s->widgets,s->page,d))return S::parse;
+ if(s->page.pageNo!=1||s->page.widgetCount!=84||s->page.controls.size()!=24||s->page.groups.size()!=6||s->page.groups[1].controls.size()!=13||s->page.groups[2].controls.size()!=3||!s->page.groups[3].controls.empty()||s->page.groups[4].controls!=std::vector<std::int16_t>{22}||s->page.groups[5].controls!=std::vector<std::int16_t>{23})return S::page;
+ s->courseIndex.fill(-1);for(auto c:s->page.groups[1].controls){if(c<0||std::size_t(c)>=s->courseIndex.size())return S::page;const auto* item=s->pageDat.section("Control "+std::to_string(c));if(!item||!item->find("CourseIndex")||!assets::originalUiInteger50KG(*item,"CourseIndex",-1,s->courseIndex[std::size_t(c)],d,0x1DA380))return S::parse;}
+ if(s->courseIndex[std::size_t(s->page.groups[1].controls[0])]!=0)return S::page;storage_=std::move(s);return S::ok;
+ }catch(...){return S::allocation;}}
+const assets::OriginalUiPage50KG* OriginalUiCourseWidgetController50KG::page()const noexcept{return storage_?&storage_->page:nullptr;}
+const assets::OriginalUiDat50KG* OriginalUiCourseWidgetController50KG::widgetsDat()const noexcept{return storage_?&storage_->widgets:nullptr;}
+bool OriginalUiCourseWidgetController50KG::initialNavigation(OriginalUiNavigation50KG& n)const noexcept{return storage_&&bindOriginalUiNavigation50KG(storage_->page,n);}
+S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,OriginalUiCourseWidgetPhase50KG phase,const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept {
+ if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
+ P p;p.navigation=n;bool ok=true;switch(phase){
+ case OriginalUiCourseWidgetPhase50KG::requestedPage90:p.navigation.controllerGroup={{-1,-1}};for(std::size_t i=0;i<6&&ok;++i)ok=group(p,i,O::reset,false,0x2A57D8,0x2A5818);break;
+ case OriginalUiCourseWidgetPhase50KG::previousPage94:for(std::size_t i=0;i<6&&ok;++i)ok=group(p,i,O::hide,false,0x2A4D58,0x2A4D8C);break;
+ case OriginalUiCourseWidgetPhase50KG::entry74:ok=prompt(p,0,0x1DA4AC);for(std::size_t i=1;i<6&&ok;++i)ok=enable(p,i,false);break;
+ case OriginalUiCourseWidgetPhase50KG::openingAC:{ok=enable(p,1,true);for(auto c:page()->groups[1].controls)if(ok)ok=control(p,c,O::setEnabled,false,0x1E0380);
+ for(std::size_t i=0;ok&&i<(profile.flags11018&31);++i)for(auto c:page()->groups[1].controls)if(storage_->courseIndex[std::size_t(c)]==profile.courseRecords100C4[i]){ok=control(p,c,O::setEnabled,true,0x1E03F0);break;}
+ if(ok)ok=enable(p,2,true);OriginalUiCommands50KG commands;if(ok){if(selectOriginalUiGroupSlot50KG(p.navigation,2,1,commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
+ if(ok)ok=enable(p,3,true);if(ok){if(enterOriginalUiGroup50KG(p.navigation,1,1,0,commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
+ if(ok)ok=audio(p,K::audioStartLoop11,0x1DA924);if(ok)ok=enable(p,4,false);break;}
+ case OriginalUiCourseWidgetPhase50KG::openedB0:ok=enable(p,4,true);if(ok)ok=prompt(p,3,0x1DA974);break;
+ case OriginalUiCourseWidgetPhase50KG::closingB4:ok=prompt(p,0,0x1DAA7C);if(ok)ok=enable(p,4,false);if(ok)ok=audio(p,K::audioFade1,0x1DAAA4);break;
+ case OriginalUiCourseWidgetPhase50KG::closedB8:break;
+ default:return S::invalidNavigation;}
+ if(!ok)return S::capacity;out=p;return S::ok;}
+}

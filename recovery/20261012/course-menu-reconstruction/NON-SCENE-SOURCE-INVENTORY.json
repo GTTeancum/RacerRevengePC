@@ -1,0 +1,219 @@
+[
+  {
+    "candidate": "core/platform/linux/native/original_ui_rider_profile50kg.cpp",
+    "source": "platform/linux/native/original_ui_rider_profile50kg.cpp",
+    "kind": "replacement",
+    "sha256": "9b080f01f1720de08b5849518f5076000b3f2164351a135a6f7526e92bef2b0c",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "core/platform/linux/native/original_ui_rider_profile50kg.h",
+    "source": "platform/linux/native/original_ui_rider_profile50kg.h",
+    "kind": "replacement",
+    "sha256": "a01d98750484dd4c24500ee7ae751a05407d2fd22fb6848dc73fafb8a73f1daf",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "core/src/game/original_ui_course_selection50kg.cpp",
+    "source": "src/game/original_ui_course_selection50kg.cpp",
+    "kind": "new",
+    "sha256": "2575005ab875f6bfae49b066e90228e99d031f61b2e8cbb9188d3c4149451527",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "core/src/game/original_ui_course_selection50kg.h",
+    "source": "src/game/original_ui_course_selection50kg.h",
+    "kind": "new",
+    "sha256": "819288d62ff76d485185ffcf87c40fda5efb2e62de0ad69bfa0d4d724c1eafeb",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "session/platform/linux/native/original_ui_course_session50kg.cpp",
+    "source": "platform/linux/native/original_ui_course_session50kg.cpp",
+    "kind": "new",
+    "sha256": "77fd75b4023a8486541c9f9cb88bf4467f4316833b7d5fea82b83b41cde8d217",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "session/platform/linux/native/original_ui_course_session50kg.h",
+    "source": "platform/linux/native/original_ui_course_session50kg.h",
+    "kind": "new",
+    "sha256": "23983dfc846893c8783efd867f651a9ba1062d466cb09f1a9767a8f8629dba09",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "aperture/src/game/original_ui_aperture_owner50kg.cpp",
+    "source": "src/game/original_ui_aperture_owner50kg.cpp",
+    "kind": "replacement",
+    "sha256": "b1575d26b347031b363316ab5fa69a587785435c3a18c9a3a001d567553425c3",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "aperture/src/game/original_ui_aperture_owner50kg.h",
+    "source": "src/game/original_ui_aperture_owner50kg.h",
+    "kind": "replacement",
+    "sha256": "2bffcd6808b12b887242d6ab6b7e3b60ef563383bb32fb2bdbbc24b815fc4328",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "widgets/platform/linux/native/original_ui_course_draw_resources50kg.cpp",
+    "source": "platform/linux/native/original_ui_course_draw_resources50kg.cpp",
+    "kind": "new",
+    "sha256": "3169155a9ef24ac7e3aeaf2221e5a1ccc5a2f6f621b4b8060b1ded98b47bf0ef",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "widgets/platform/linux/native/original_ui_course_draw_resources50kg.h",
+    "source": "platform/linux/native/original_ui_course_draw_resources50kg.h",
+    "kind": "new",
+    "sha256": "c4451121dddb7b57d44a41aca796b67fc745df5abacd21c96d9ad3142f866116",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_course_widget_controller50kg.cpp",
+    "source": "src/game/original_ui_course_widget_controller50kg.cpp",
+    "kind": "new",
+    "sha256": "adc4d7dc54bf13e44774a563aa55ab7ce9e4d89d98b36fff7645a2a82253d677",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_course_widget_controller50kg.h",
+    "source": "src/game/original_ui_course_widget_controller50kg.h",
+    "kind": "new",
+    "sha256": "d99edce61453c4a7d5c0dd0cefaac6fc86aaf0069ea693b3c39b927adacd1de9",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_course_widgets50kg.cpp",
+    "source": "src/game/original_ui_course_widgets50kg.cpp",
+    "kind": "new",
+    "sha256": "6ad104c2180132d26b28b95e54e610fcc9b651cd694f12b85de05e4b4b41c874",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_course_widgets50kg.h",
+    "source": "src/game/original_ui_course_widgets50kg.h",
+    "kind": "new",
+    "sha256": "64afb0c97dbe634618d56ecbd40b9e596d45bcb80f492c8ae14945d2faf4bb2e",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_light_manager_lifetime50kg.cpp",
+    "source": "src/game/original_ui_light_manager_lifetime50kg.cpp",
+    "kind": "replacement",
+    "sha256": "70fe53972f8ac8e45126dd1d3af57f5c5e1617b9d5cc2f7179aa6b552005a89c",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_light_manager_lifetime50kg.h",
+    "source": "src/game/original_ui_light_manager_lifetime50kg.h",
+    "kind": "replacement",
+    "sha256": "dcc86bc747ab93497547b288c2d6b8b6693119a59c8fd8fcba987966c38d664b",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "page/src/game/original_ui_course_page_draw50kg.cpp",
+    "source": "src/game/original_ui_course_page_draw50kg.cpp",
+    "kind": "new",
+    "sha256": "b0fd28579c69b8f0faf31df560b7891d114620ae1b3882c81f3b198e8a2ac5c5",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "page/src/game/original_ui_course_page_draw50kg.h",
+    "source": "src/game/original_ui_course_page_draw50kg.h",
+    "kind": "new",
+    "sha256": "169be72ac5be54d9104d85ac0ed2e4621e94cba54c0073901de0f5b8dfb4aa62",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "frontend/platform/linux/native/original_ui_frontend50kg.cpp",
+    "source": "platform/linux/native/original_ui_frontend50kg.cpp",
+    "kind": "replacement",
+    "sha256": "c24f1d7e51a3ef33ef377bb156f085f09f619fa784c3116daba723489805a05c",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "frontend/platform/linux/native/original_ui_frontend50kg.h",
+    "source": "platform/linux/native/original_ui_frontend50kg.h",
+    "kind": "replacement",
+    "sha256": "5e1b35a250a1e49702ed7f8c8144a71eefdc002ec709edffa055a98aeff59ae4",
+    "review": "frozen source checkpoint; no runtime validation"
+  },
+  {
+    "candidate": "rider/platform/linux/native/original_ui_main_session50kg.h",
+    "source": "platform/linux/native/original_ui_main_session50kg.h",
+    "kind": "replacement",
+    "sha256": "d24c4dcdace2cbfcc12a859fae05b07e694c57db05837a8b581bc8c1f96fc6fb",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/platform/linux/native/original_ui_rider_session50kg.cpp",
+    "source": "platform/linux/native/original_ui_rider_session50kg.cpp",
+    "kind": "replacement",
+    "sha256": "91a82727cc1f24609eba2d47a669b383d06929d2c9fb7238a20f46645d4836a9",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/platform/linux/native/original_ui_rider_session50kg.h",
+    "source": "platform/linux/native/original_ui_rider_session50kg.h",
+    "kind": "replacement",
+    "sha256": "865b8d7379fb1570ca489785481c75911cbe87d4a9705b549468db3d2562a8dd",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_character50kg.cpp",
+    "source": "src/game/original_ui_rider_character50kg.cpp",
+    "kind": "replacement",
+    "sha256": "d14da73b077346b9839f2d0388162733bdd8e76b27b36757499c66998021433c",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_character50kg.h",
+    "source": "src/game/original_ui_rider_character50kg.h",
+    "kind": "replacement",
+    "sha256": "aa1b8d0d83230eff226a09007b9dfa686300f03ca76dbe476253eb0b0018b804",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_dynamic_owner50kg.cpp",
+    "source": "src/game/original_ui_rider_dynamic_owner50kg.cpp",
+    "kind": "replacement",
+    "sha256": "37b4362328963837393e3028d1dbdae440ca6b6eb1bdeae512004fb4d1876f41",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_dynamic_owner50kg.h",
+    "source": "src/game/original_ui_rider_dynamic_owner50kg.h",
+    "kind": "replacement",
+    "sha256": "196d3eec2e89ec244d3c46f2e7f89d86cdbec126fa2f12c3d4ed2dce2dc5567b",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_model_scene50kg.cpp",
+    "source": "src/game/original_ui_rider_model_scene50kg.cpp",
+    "kind": "replacement",
+    "sha256": "5e99469d247d181471436954a70ce0f75495d6458106c30cba83c6e959cb7f28",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_model_scene50kg.h",
+    "source": "src/game/original_ui_rider_model_scene50kg.h",
+    "kind": "replacement",
+    "sha256": "a9dc3df2926e27bb3a11e6ba68858d1be50e3212e7fe21137b9e27bf45305809",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_voice_choice50kg.cpp",
+    "source": "src/game/original_ui_rider_voice_choice50kg.cpp",
+    "kind": "new",
+    "sha256": "13afc27fcb6823f937fbe1c94c9d6d3bf6955620251b614da7dd4632f973595b",
+    "review": "Confirm/clock independent review pending"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_voice_choice50kg.h",
+    "source": "src/game/original_ui_rider_voice_choice50kg.h",
+    "kind": "new",
+    "sha256": "fc08fcbb3215ffe22b1c46ffcabe12c9a3df7713dd78c2d1642f0b3b363d30ad",
+    "review": "Confirm/clock independent review pending"
+  }
+]

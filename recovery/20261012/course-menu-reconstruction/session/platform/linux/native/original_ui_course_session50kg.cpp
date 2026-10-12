@@ -1,5 +1,6 @@
 // RECONSTRUCTED FROM VISIBLE TASK CONTEXT AFTER WORKSPACE ROLLBACK.
-// Not byte-verified against lost candidate. Pending popup-ancestor review.
+// Not byte-verified against lost candidate. Popup cloning/disable owner joined;
+// source-only review still required before destination admission.
 #include "original_ui_course_session50kg.h"
 #include <cmath>
 #include <limits>
@@ -69,6 +70,10 @@ struct OriginalUiCourseSession50KG::Storage {
     bool lightCurrent()const noexcept{return cold.lightManager->activeUiIdentity()==cold.courseArchive->identity()&&
         cold.lightManager->cacheState()==game::OriginalUiLightCacheState50KG::absentSinceApplicationConstruction&&
         state.registryGeneration&&cold.lightManager->managerGeneration()==state.registryGeneration&&cold.lightManager->courseRegistryReady();}
+    bool popupCurrent()const noexcept{
+        const auto* w=cold.resources->widgets();
+        return w&&w->popupClones438()&&w->popupTemplatesHidden438()&&!w->popupEnabled438();
+    }
     bool profileCurrent()const noexcept{game::OriginalUiCourseRememberedProfile50KG p;
         return cold.profile->courseSnapshot(p)&&bounded(p,*cold.commonProfile)&&
             (!entered||sameStamp(cold.profile->stamp(),liveStamp))&&(!entered||(p.packed1125E>>5)==0);}
@@ -131,13 +136,13 @@ struct OriginalUiCourseSession50KG::Storage {
     }
     static bool available(void* context)noexcept{
         auto& s=*static_cast<Storage*>(context);auto* exit=s.cold.resources->exitText();
-        return s.operational()&&s.processCurrent()&&s.page.prepared()&&exit&&exit->prepared();
+        return s.operational()&&s.processCurrent()&&s.popupCurrent()&&s.page.prepared()&&exit&&exit->prepared();
     }
     static void hook(void* context,const game::OriginalUiApertureHook50KG& e)noexcept{
         auto& s=*static_cast<Storage*>(context);if(!s.operational())return;
         switch(e.kind){
         case Hook::openingAC:
-            if(e.targetPC!=0x1DA7A0||!s.entered||s.opening||s.state.popupEnabled438)s.fault(S::aperture,e.callPC);
+            if(e.targetPC!=0x1DA7A0||!s.entered||s.opening||s.widgets().popupEnabled438())s.fault(S::aperture,e.callPC);
             else if(s.widgetPhase(WP::openingAC))s.opening=true;break;
         case Hook::openedB0:
             if(e.targetPC!=0x1DA950||!s.opening||s.opened)s.fault(S::aperture,e.callPC);
@@ -170,7 +175,8 @@ OriginalUiCourseSession50KG::OriginalUiCourseSession50KG()noexcept=default;
 OriginalUiCourseSession50KG::~OriginalUiCourseSession50KG()=default;
 S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,D& d)noexcept{
     d={};if(storage_)return result(d,S::alreadyBound);
-    if(!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->video()||
+    if(!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->widgets()->popupClones438()||
+       !cold.resources->widgets()->popupTemplatesHidden438()||cold.resources->widgets()->popupEnabled438()||!cold.resources->video()||
        !cold.holograms||!cold.holograms->loaded()||!cold.courseArchive||!cold.english||!cold.english->loaded()||
        !cold.profile||!cold.profile->initialized()||!cold.commonProfile||!cold.application||!cold.lightManager||
        !cold.externalTransition||cold.externalTransition->snapshot().bound||cold.previousScreen!=5||
@@ -199,7 +205,7 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
     }catch(...){return result(d,S::allocation);}
 }
 bool OriginalUiCourseSession50KG::ownsPreparedPage(std::uint8_t page)const noexcept{
-    return page==1&&storage_&&storage_->operational()&&storage_->published&&storage_->page.prepared()&&storage_->processCurrent()&&storage_->profileCurrent();
+    return page==1&&storage_&&storage_->operational()&&storage_->published&&storage_->page.prepared()&&storage_->processCurrent()&&storage_->profileCurrent()&&storage_->popupCurrent();
 }
 bool OriginalUiCourseSession50KG::canEnterMode(std::uint32_t mode)const noexcept{return mode==0&&ownsPreparedPage(1);}
 const game::OriginalUiTransitionOwner50KG* OriginalUiCourseSession50KG::externalLifecycleOwner()const noexcept{return storage_?storage_->cold.externalTransition.get():nullptr;}
@@ -229,8 +235,10 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         s->liveStamp=s->cold.profile->stamp();s->state.courseSlot14E4=entry.courseSlot14E4;s->state.subtypeSlot14F4=entry.subtypeSlot14F4;
         s->state.laps14EC=entry.laps14EC;s->state.entrants14F0=entry.entrants14F0;
         if(!s->widgetPhase(WP::entry74))break;
-        // REVIEW BLOCKER: replace/justify this with actual popup ancestor owner.
-        s->state.popupEnabled438=false;s->state.cameraActive=true;s->state.pageShown=true;
+        // Source1DA714 disables the actual popup clone entity. Source template
+        // widgets stay manager-owned and hidden; no invented reparenting.
+        if(!s->widgets().disableFreshPopup438(s->faultDetail.widget)){s->fault(S::widget,0x1DA714);break;}
+        s->state.popupEnabled438=s->widgets().popupEnabled438();s->state.cameraActive=true;s->state.pageShown=true;
         s->cold.application->uiObject3D8=0;s->entered=true;break;}
     case Notice::managerEntry84:
         valid=s->entered&&!s->managerEntered&&t.lifecycle==Life::initialEntry&&t.phase==Phase::none&&e.sourcePC==0x2A3D68;
@@ -315,13 +323,13 @@ S OriginalUiCourseSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpd
     if(!s->operational()||!s->currentPage()||s->inOperation||s->rendering||s->updatePrepared)return result(d,S::unsupportedState);
     if(!std::isfinite(in.elapsedSeconds)||in.elapsedSeconds<0||in.elapsedSeconds>1||(in.paused&&in.elapsedSeconds!=0))return result(d,S::invalidInput);
     for(bool held:in.debugChordHeld)if(held)return result(d,S::unsupportedState);
-    if(!s->processCurrent()||!s->profileCurrent()||!s->lightCurrent()||s->cold.application->uiObject3D8)return result(d,S::unsupportedState);
+    if(!s->processCurrent()||!s->profileCurrent()||!s->lightCurrent()||!s->popupCurrent()||s->cold.application->uiObject3D8)return result(d,S::unsupportedState);
     s->cpuDrain();s->state.backProposalPending=false;s->preparedDelta=in.elapsedSeconds;s->paused=in.paused;s->updatePrepared=true;return result(d,S::ok);
 }
 S OriginalUiCourseSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,D& d)noexcept{
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
     if(!s->operational()||!s->updatePrepared||in.elapsedSeconds!=s->preparedDelta||in.paused!=s->paused||
-        !s->profileCurrent()||!s->lightCurrent()||s->rendering||s->inOperation)return result(d,S::unsupportedState);
+        !s->profileCurrent()||!s->lightCurrent()||!s->popupCurrent()||s->rendering||s->inOperation)return result(d,S::unsupportedState);
     s->updatePrepared=false;s->inOperation=true;const auto saved=s->aperture.saveCourseUpdateDelta38(in.elapsedSeconds);
     if(!apertureOkay(saved)){s->faultDetail.aperture.status=saved;s->fault(S::aperture,0x1E02BC);}
     const auto* ordinary=s->widgets().order(false);const auto* top=s->widgets().order(true);
@@ -333,7 +341,7 @@ S OriginalUiCourseSession50KG::render(const OriginalUiCourseDrawClock50KG& clock
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
     if(!s->operational()||s->inOperation||s->rendering||s->updatePrepared||!clock.known||(s->paused&&clock.advanceAnimations)||
         !s->currentPage()||!s->profileCurrent()||!s->lightCurrent()||!s->state.cameraActive||!s->state.pageShown||
-        s->state.popupEnabled438||!s->aperture.snapshot().hasUpdateDelta)return result(d,S::unsupportedState);
+        !s->popupCurrent()||!s->aperture.snapshot().hasUpdateDelta)return result(d,S::unsupportedState);
     game::OriginalUiCourseRememberedProfile50KG p;if(!s->cold.profile->courseSnapshot(p))return result(d,S::profile);
     s->cpuDrain();s->state.backProposalPending=false;s->inOperation=true;s->rendering=true;
     bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw);
@@ -361,7 +369,8 @@ S OriginalUiCourseSession50KG::bindPublishedBank(std::shared_ptr<const MaterialT
 }
 const OriginalUiNativeDraw50KG* OriginalUiCourseSession50KG::draw()const noexcept{return storage_&&storage_->state.framePublished?storage_->collector.draw():nullptr;}
 OriginalUiCourseSessionSnapshot50KG OriginalUiCourseSession50KG::snapshot()const noexcept{
-    if(!storage_)return {};auto result=storage_->state;result.transition=storage_->transition();result.aperture=storage_->aperture.snapshot();return result;
+    if(!storage_)return {};auto result=storage_->state;result.transition=storage_->transition();result.aperture=storage_->aperture.snapshot();
+    result.popupEnabled438=storage_->cold.resources->widgets()->popupEnabled438();return result;
 }
 void OriginalUiCourseSession50KG::drain()noexcept{if(storage_)storage_->cpuDrain();}
 void OriginalUiCourseSession50KG::requestQuit()noexcept{if(storage_){storage_->state.quitRequested=true;storage_->cpuDrain();}}

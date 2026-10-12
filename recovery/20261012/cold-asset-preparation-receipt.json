@@ -1,0 +1,28 @@
+{
+  "status": "cold_asset_preparation_passed",
+  "source_commit": "355523f7f932fcd35c39f33c56687df8a4bea5a1",
+  "started_at_utc": "2026-10-12T02:30:42.041457+00:00",
+  "finished_at_utc": "2026-10-12T02:31:05.599140+00:00",
+  "next_eligible_utc": "2026-10-12T03:31:05.599140+00:00",
+  "exit_code": 0,
+  "archive_sha256": {
+    "RacerRevenge-50HS-Race-LinuxRuntime-20261009.zip": "8d7da47006c2ba4900ea9558b9874c617d1fc166de9a1d2640ba85cc634db49c",
+    "RacerRevenge-Checkpoint48F-NativeWorldCacheAndRendering-Evidence.zip": "60c041bd1acd58f7e19cea50b0c2f6d3ae1083f18d82bcbb591b3182d115aa0c",
+    "RacerRevenge-original-AUDIO.zip": "c246ad58020726d92a65a56e09e4cd9b68ba60cdcc9aa697d2cb48e51275aafb",
+    "RacerRevenge-original-GC-track.zip": "4b24307f08ce6a73a169d73425f03be11c7c82782bb8f77205d95a81bb87562c",
+    "racer-revenge-original-pods-03-04-07-08-09-10-11.zip": "d844ce6548265ebff52eeaef0332b46b67898d0cb4c8cc7c6c6f0e14f7c28d82"
+  },
+  "indexes": {
+    "source_texture_gc_index.inc": "7f9556badebce6c7e42168ca33aa1db76bcc5214b9f46bc2e4fc27e2b3728e0d",
+    "sky_gc_index.inc": "16a4e4e36555f927e3e8a54504b9db0ffbec8ee6bc7723d77ac2aecca2b60b3e",
+    "gc_atm_animation_index.inc": "dba689af4cd8c76fb6730db4a157f14ce4403d04790f7273362683706e4919c6",
+    "gc_atm_frame_index.inc": "77ae07b5dfcd846bd6bb6b2deb3a86fd9d79e2313d55b447de37afba985f6396"
+  },
+  "gameplay_validated": false,
+  "runtime_build_run": false,
+  "windows_execution_run": false,
+  "limitations": [
+    "No runtime build or gameplay checks run.",
+    "GC incomplete-world limitations remain; no guest execution."
+  ]
+}

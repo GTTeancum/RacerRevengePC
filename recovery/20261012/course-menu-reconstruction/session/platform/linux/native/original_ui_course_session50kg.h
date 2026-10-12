@@ -1,5 +1,5 @@
 // RECONSTRUCTED FROM VISIBLE TASK CONTEXT AFTER WORKSPACE ROLLBACK.
-// Not byte-verified against lost candidate. Pending popup-ancestor review.
+// Not byte-verified against lost candidate. Source-only integration review pending.
 #pragma once
 #include "original_ui_course_draw_contribution50kg.h"
 #include "original_ui_rider_profile50kg.h"

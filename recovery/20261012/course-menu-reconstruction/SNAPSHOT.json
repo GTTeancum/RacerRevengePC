@@ -32,6 +32,81 @@
       "sha256": "819288d62ff76d485185ffcf87c40fda5efb2e62de0ad69bfa0d4d724c1eafeb"
     },
     {
+      "path": "frontend/platform/linux/native/original_ui_frontend50kg.cpp",
+      "bytes": 68173,
+      "sha256": "c24f1d7e51a3ef33ef377bb156f085f09f619fa784c3116daba723489805a05c"
+    },
+    {
+      "path": "frontend/platform/linux/native/original_ui_frontend50kg.h",
+      "bytes": 10411,
+      "sha256": "5e1b35a250a1e49702ed7f8c8144a71eefdc002ec709edffa055a98aeff59ae4"
+    },
+    {
+      "path": "page/src/game/original_ui_course_page_draw50kg.cpp",
+      "bytes": 8793,
+      "sha256": "b0fd28579c69b8f0faf31df560b7891d114620ae1b3882c81f3b198e8a2ac5c5"
+    },
+    {
+      "path": "page/src/game/original_ui_course_page_draw50kg.h",
+      "bytes": 3411,
+      "sha256": "169be72ac5be54d9104d85ac0ed2e4621e94cba54c0073901de0f5b8dfb4aa62"
+    },
+    {
+      "path": "rider/platform/linux/native/original_ui_main_session50kg.h",
+      "bytes": 12175,
+      "sha256": "d24c4dcdace2cbfcc12a859fae05b07e694c57db05837a8b581bc8c1f96fc6fb"
+    },
+    {
+      "path": "rider/platform/linux/native/original_ui_rider_session50kg.cpp",
+      "bytes": 65309,
+      "sha256": "91a82727cc1f24609eba2d47a669b383d06929d2c9fb7238a20f46645d4836a9"
+    },
+    {
+      "path": "rider/platform/linux/native/original_ui_rider_session50kg.h",
+      "bytes": 10334,
+      "sha256": "865b8d7379fb1570ca489785481c75911cbe87d4a9705b549468db3d2562a8dd"
+    },
+    {
+      "path": "rider/src/game/original_ui_rider_character50kg.cpp",
+      "bytes": 6125,
+      "sha256": "d14da73b077346b9839f2d0388162733bdd8e76b27b36757499c66998021433c"
+    },
+    {
+      "path": "rider/src/game/original_ui_rider_character50kg.h",
+      "bytes": 3768,
+      "sha256": "aa1b8d0d83230eff226a09007b9dfa686300f03ca76dbe476253eb0b0018b804"
+    },
+    {
+      "path": "rider/src/game/original_ui_rider_dynamic_owner50kg.cpp",
+      "bytes": 19040,
+      "sha256": "37b4362328963837393e3028d1dbdae440ca6b6eb1bdeae512004fb4d1876f41"
+    },
+    {
+      "path": "rider/src/game/original_ui_rider_dynamic_owner50kg.h",
+      "bytes": 6057,
+      "sha256": "196d3eec2e89ec244d3c46f2e7f89d86cdbec126fa2f12c3d4ed2dce2dc5567b"
+    },
+    {
+      "path": "rider/src/game/original_ui_rider_model_scene50kg.cpp",
+      "bytes": 21011,
+      "sha256": "5e99469d247d181471436954a70ce0f75495d6458106c30cba83c6e959cb7f28"
+    },
+    {
+      "path": "rider/src/game/original_ui_rider_model_scene50kg.h",
+      "bytes": 6062,
+      "sha256": "a9dc3df2926e27bb3a11e6ba68858d1be50e3212e7fe21137b9e27bf45305809"
+    },
+    {
+      "path": "rider/src/game/original_ui_rider_voice_choice50kg.cpp",
+      "bytes": 2506,
+      "sha256": "13afc27fcb6823f937fbe1c94c9d6d3bf6955620251b614da7dd4632f973595b"
+    },
+    {
+      "path": "rider/src/game/original_ui_rider_voice_choice50kg.h",
+      "bytes": 1553,
+      "sha256": "fc08fcbb3215ffe22b1c46ffcabe12c9a3df7713dd78c2d1642f0b3b363d30ad"
+    },
+    {
       "path": "scene/platform/linux/native/original_ui_course_background_adapter50kg.h",
       "bytes": 2113,
       "sha256": "1b7f83453c8002831609a66294171a789c0db88d2c9d24d45fc5b5d3adb722ca"
@@ -143,13 +218,53 @@
     },
     {
       "path": "session/platform/linux/native/original_ui_course_session50kg.cpp",
-      "bytes": 31715,
-      "sha256": "e3b5560d5e67204b353e053c16d3b4549c92a9fc682265a40b7e6d6f40b6411c"
+      "bytes": 32500,
+      "sha256": "77fd75b4023a8486541c9f9cb88bf4467f4316833b7d5fea82b83b41cde8d217"
     },
     {
       "path": "session/platform/linux/native/original_ui_course_session50kg.h",
-      "bytes": 6206,
-      "sha256": "b20a51e01f468ca00c881f04e5767e6e9b398d0ed03222010a637a30c28aa6d7"
+      "bytes": 6215,
+      "sha256": "23983dfc846893c8783efd867f651a9ba1062d466cb09f1a9767a8f8629dba09"
+    },
+    {
+      "path": "widgets/platform/linux/native/original_ui_course_draw_resources50kg.cpp",
+      "bytes": 18787,
+      "sha256": "3169155a9ef24ac7e3aeaf2221e5a1ccc5a2f6f621b4b8060b1ded98b47bf0ef"
+    },
+    {
+      "path": "widgets/platform/linux/native/original_ui_course_draw_resources50kg.h",
+      "bytes": 4124,
+      "sha256": "c4451121dddb7b57d44a41aca796b67fc745df5abacd21c96d9ad3142f866116"
+    },
+    {
+      "path": "widgets/src/game/original_ui_course_widget_controller50kg.cpp",
+      "bytes": 6929,
+      "sha256": "adc4d7dc54bf13e44774a563aa55ab7ce9e4d89d98b36fff7645a2a82253d677"
+    },
+    {
+      "path": "widgets/src/game/original_ui_course_widget_controller50kg.h",
+      "bytes": 2248,
+      "sha256": "d99edce61453c4a7d5c0dd0cefaac6fc86aaf0069ea693b3c39b927adacd1de9"
+    },
+    {
+      "path": "widgets/src/game/original_ui_course_widgets50kg.cpp",
+      "bytes": 20867,
+      "sha256": "6ad104c2180132d26b28b95e54e610fcc9b651cd694f12b85de05e4b4b41c874"
+    },
+    {
+      "path": "widgets/src/game/original_ui_course_widgets50kg.h",
+      "bytes": 5487,
+      "sha256": "64afb0c97dbe634618d56ecbd40b9e596d45bcb80f492c8ae14945d2faf4bb2e"
+    },
+    {
+      "path": "widgets/src/game/original_ui_light_manager_lifetime50kg.cpp",
+      "bytes": 8133,
+      "sha256": "70fe53972f8ac8e45126dd1d3af57f5c5e1617b9d5cc2f7179aa6b552005a89c"
+    },
+    {
+      "path": "widgets/src/game/original_ui_light_manager_lifetime50kg.h",
+      "bytes": 4851,
+      "sha256": "dcc86bc747ab93497547b288c2d6b8b6693119a59c8fd8fcba987966c38d664b"
     }
   ]
 }
