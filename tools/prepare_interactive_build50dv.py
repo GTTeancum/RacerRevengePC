@@ -42,6 +42,9 @@ def main():
     audio_directory = str(ROOT / 'src/assets/original_audio_directory50kx.cpp')
     if audio_directory not in argv:
         argv.insert(argv.index('-lz'), audio_directory)
+    stream_metadata = str(ROOT / 'src/assets/original_stream_metadata50kz.cpp')
+    if stream_metadata not in argv:
+        argv.insert(argv.index('-lz'), stream_metadata)
     # Detached cold ownership only; no event attachment or playback admission.
     cold_audio = str(ROOT / 'src/game/cold_logical_audio_domain50ky.cpp')
     if cold_audio not in argv:
