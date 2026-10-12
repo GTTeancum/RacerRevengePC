@@ -145,6 +145,8 @@ struct OriginalUiFrontend50KG::Storage {
     VehicleWindowGl50DS* renderer=nullptr;
     bool prepared=false,activated=false,faulted=false,quit=false,inOperation=false,closing=false;
     bool queued=false,frameRendered=false,frameSubmitted=false;
+    bool courseLaunchReady=false,courseLaunchTaken=false;
+    OriginalUiRiderProfileOwner50KG::CourseRaceSelection launchSelection{};
     // This coordinator's current UI-manager lease on the shared APPLICATION
     // object. Cold/pending resource owners never enter or release it.
     bool lightManagerEntered=false;
@@ -292,10 +294,38 @@ struct OriginalUiFrontend50KG::Storage {
         profile.playerBits1125C=static_cast<std::uint8_t>((profile.playerBits1125C&~0x60u)|decision.originalPlayerBits);
         return true;
     }
+    bool courseLaunchProposal(OriginalUiRiderProfileOwner50KG::CourseRaceSelection& selection)const noexcept {
+        if(!cold.courseRaceDestination||!active||!active->course||pending||
+           !active->course->routeProposalCurrent(courseProposal)||
+           courseProposal.decision.request.kind!=game::OriginalUiRouteKind50KG::courseLaunch)return false;
+        game::OriginalUiCourseContext50KG c;std::uint8_t rider=0;std::uint32_t comparison=0;
+        if(!active->course->routeContext(courseProposal,c)||!cold.riderProfile->riderConfirmSnapshot(rider,comparison)||
+           c.mode34!=0||c.selectedControlWord44!=8||c.courseSlot14E4!=4||c.subtypeSlot14F4!=1||
+           c.laps14EC!=3||c.entrants14F0!=8||(rider>>3)!=19||comparison!=19||
+           ((c.packed1125C>>5)&3)!=1)return false;
+        selection={8,1,19,1,3,8,static_cast<std::uint16_t>(3u|(1u<<5)|(7u<<7)|(19u<<11))};
+        return cold.courseRaceDestination->admits(selection);
+    }
+    static bool admitCourse(void* p) noexcept {
+        auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
+        OriginalUiRiderProfileOwner50KG::CourseRaceSelection selection;
+        return !s.faulted&&!s.quit&&!s.closing&& &m==s.active.get()&&s.sourceCurrent()&&s.courseLaunchProposal(selection);
+    }
     static bool commitOptions(void* p,const game::OriginalUiRouteDecision50KG& decision) noexcept {
         auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
         if(m.course){
             const auto& proposed=s.courseProposal.decision;
+            if(proposed.request.kind==game::OriginalUiRouteKind50KG::courseLaunch){
+                OriginalUiRiderProfileOwner50KG::CourseRaceSelection selection;
+                game::OriginalUiCourseContext50KG context;
+                if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.courseLaunchProposal(selection)||
+                   proposed.admitted||proposed.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::courseLaunchOwner)||
+                   !decision.admitted||decision.blockers||decision.action!=game::OriginalUiRouteAction50KG::request||
+                   !sameRouteProposal(decision,proposed)||!m.course->routeContext(s.courseProposal,context)||
+                   !s.cold.riderProfile->commitCourseLaunch(decision,context,s.courseProposal.profileStamp))return false;
+                s.cold.application->courseUi474=0;s.cold.application->courseUi478=0;
+                s.launchSelection=selection;return true;
+            }
             if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.courseInputsReady()||!s.riderInputsReady()||
                !m.course->routeProposalCurrent(s.courseProposal)||!s.destination({5,1})||!s.pending->rider||
                !s.pending->rider->canEnterMode(0)||s.pending->rider->intendedMode()!=0||
@@ -350,6 +380,17 @@ struct OriginalUiFrontend50KG::Storage {
     }
     static bool enqueue(void* p,const game::OriginalUiApplicationRequest50KG& q) noexcept {
         auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
+        if(q.flags==9){
+            const auto t=m.transition->snapshot();const auto a=m.aperture();
+            OriginalUiRiderProfileOwner50KG::CourseRaceSelection actual;
+            if(s.faulted||s.quit||s.queued||&m!=s.active.get()||!s.sourceCurrent()||!m.course||s.pending||
+               !m.course->snapshot().launchAccepted||q.screen||q.page||q.sourcePC!=0x2A3F98||
+               t.lifecycle!=Life::queueCourse||t.phase!=Phase::none||t.applicationRequestQueued||
+               a.state!=game::OriginalUiApertureState50KG::closed||a.inputEnabled268||
+               !s.cold.riderProfile->courseRaceSnapshot(actual)||!s.cold.courseRaceDestination||
+               !s.cold.courseRaceDestination->admits(actual))return false;
+            s.queue=q;s.queued=true;return true;
+        }
         if(s.faulted||s.quit||s.queued||&m!=s.active.get()||!s.sourceCurrent()||q.flags!=2||q.sourcePC!=0x2A3F70||
             q.screen>255||q.page!=1||!s.destination({static_cast<std::uint8_t>(q.screen),1}))return false;
         const auto t=m.transition->snapshot();const auto a=m.aperture();
@@ -359,7 +400,7 @@ struct OriginalUiFrontend50KG::Storage {
     }
     game::OriginalUiTransitionCallbacks50KG callbacks(Manager& m) noexcept {
         game::OriginalUiTransitionCallbacks50KG c;c.context=&m;c.admitDestination=&admit;c.notify=&notify;
-        c.pollCompletion=&poll;c.commitMainSelection=&commitMain;c.commitRouteSelection=&commitOptions;c.queueApplication=&enqueue;return c;
+        c.pollCompletion=&poll;c.admitCourseLaunch=&admitCourse;c.commitMainSelection=&commitMain;c.commitRouteSelection=&commitOptions;c.queueApplication=&enqueue;return c;
     }
     bool build(std::unique_ptr<Manager>& out,Route route,Diagnostic& d,std::uint32_t prospectiveMode=0) noexcept {
         if(out){result(d,Status::invalidInput);return false;}
@@ -675,7 +716,19 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         }
     }else if(s->active->course){
         const auto status=s->active->course->input(input,receipt.course,d.course);
-        if(status==CourseStatus::backProposed){
+        if(status==CourseStatus::confirmProposed){
+            s->courseProposal=receipt.course.routeProposal;
+            OriginalUiRiderProfileOwner50KG::CourseRaceSelection selection;
+            if(!s->courseLaunchProposal(selection))return result(d,receipt.status=Status::unavailableDestination,0x1DED58);
+            auto admitted=s->courseProposal.decision;
+            if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
+               admitted.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::courseLaunchOwner))
+                return s->fault(d,Status::transition);
+            admitted.blockers=0;admitted.admitted=true;admitted.action=game::OriginalUiRouteAction50KG::request;
+            d.transition=s->active->transition->requestRouteDecision(admitted);
+            if(d.transition!=Transition::ok||s->active->course->notifyRouteAccepted(s->courseProposal,d.course)!=CourseStatus::ok)
+                return s->fault(d,Status::transition,0x1DED58);
+        }else if(status==CourseStatus::backProposed){
             s->courseProposal=receipt.course.routeProposal;const auto& proposal=s->courseProposal.decision;
             if(s->pending||!s->active->course->routeProposalCurrent(s->courseProposal)||
                proposal.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||proposal.request.sourceScreen!=6||
@@ -779,6 +832,21 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,Diag
         return result(d,Status::invalidInput);
     Operation operation(s->inOperation);
     const auto old=s->active->transition->snapshot();const Route target{static_cast<std::uint8_t>(s->queue.screen),static_cast<std::uint8_t>(s->queue.page)};
+    if(s->queue.flags==9){
+        OriginalUiRiderProfileOwner50KG::CourseRaceSelection actual;
+        if(!old.applicationRequestQueued||old.lifecycle!=Life::queueCourse||!s->active->course||s->pending||
+           !s->active->course->snapshot().launchAccepted||!s->ownsLightManager()||
+           !s->cold.riderProfile->courseRaceSnapshot(actual)||!s->cold.courseRaceDestination||
+           !s->cold.courseRaceDestination->admits(actual))return s->fault(d,Status::transition,0x2A3F98);
+        if(!renderer.finishSubmittedWork(d.renderer)||!d.renderer.submittedWorkCompleted)return s->fault(d,Status::renderer);
+        s->active->course->drain();
+        if(!s->releaseLightManager(d))return s->fault(d,Status::cleanup,d.lightManager.sourcePC);
+        // Keep immutable texture/model owners pinned because the same renderer
+        // retains their bank pointers. close() retires them after the race.
+        s->launchSelection=actual;s->courseLaunchReady=true;s->activated=false;
+        s->queued=false;s->frameRendered=false;s->frameSubmitted=false;
+        return result(d,Status::courseLaunchReady,0x2A3F98);
+    }
     if(!old.applicationRequestQueued||old.lifecycle!=Life::queueScreen||!same(old.requested,target)||!s->destination(target))return s->fault(d,Status::transition);
     if(!s->ownsLightManager())return s->fault(d,Status::session,0x148110);
     const auto* destinationArchive=s->pending->main?s->cold.mainMenu.get():
@@ -827,6 +895,10 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
     }
     storage_.reset();return result(d,Status::ok);
 }
+bool OriginalUiFrontend50KG::takeCourseLaunch(OriginalUiRiderProfileOwner50KG::CourseRaceSelection& out)noexcept{
+    auto* s=storage_.get();if(!s||s->faulted||s->quit||s->closing||s->inOperation||!s->courseLaunchReady||s->courseLaunchTaken)return false;
+    out=s->launchSelection;s->courseLaunchTaken=true;return true;
+}
 bool OriginalUiFrontend50KG::borrowsRenderer(const VehicleWindowGl50DS& renderer) const noexcept {
     return storage_&&storage_->renderer==&renderer;
 }
@@ -839,7 +911,7 @@ void OriginalUiFrontend50KG::requestQuit() noexcept {
 OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshot() const noexcept {
     OriginalUiFrontendSnapshot50KG out;const auto* s=storage_.get();if(!s)return out;
     out.prepared=s->prepared;out.active=s->activated;out.faulted=s->faulted;out.quitRequested=s->quit;
-    out.deferredQueue=s->queued;out.frameSubmitted=s->frameSubmitted;out.queuedRequest=s->queue;
+    out.courseLaunchReady=s->courseLaunchReady;out.deferredQueue=s->queued;out.frameSubmitted=s->frameSubmitted;out.queuedRequest=s->queue;
     out.updates=s->updates;out.renders=s->renders;out.submissions=s->submissions;out.switches=s->switches;
     if(s->cold.lightManager){out.lightCacheState=s->cold.lightManager->cacheState();
         out.lightManagerGeneration=s->cold.lightManager->managerGeneration();}

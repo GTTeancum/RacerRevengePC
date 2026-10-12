@@ -24,7 +24,9 @@ inline std::uint32_t drawOriginalSharedRng50IU(CoupledNoiseContext49M& shared) n
 // records raw POD spans. It already rejects overlapping ranges. Excluding the
 // whole shared noise owner preserves one RNG/table chronology across every
 // save/restore, including inspect-only visits and failures. Existing consumers
-// referencing frame.noise need no copy-in/out or shadow random state.
+// use frame.noiseOwner(). Optional application borrowing preserves the same
+// owner address across frontend/native-frame consumers. Transactional frame
+// leaves stage noise in their existing scratch and publish only on success.
 // Call before seal(), exactly once for the frame. Other owner registrations
 // must not include this frame or this shared subobject again.
 template<class RacerBank>

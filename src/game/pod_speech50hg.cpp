@@ -18,7 +18,11 @@ bool countsValid(const PodSpeechCounts50HG& c) noexcept {
     // per selected archive. Their actual category filenames remain distinct.
     const bool otherRetained=c.lowDamage==2&&c.wallHit==3&&c.passed==3&&c.attacked==3&&
         c.passing==4&&c.attacking==4&&c.death==3&&c.win==3&&c.lose==3;
-    return pod01||otherRetained;
+    // Own POD19 SOUNDS.INI SHA24c40bf4...fdfaa3ec; these are different
+    // category lengths, not an alias of POD01's voice or selection cursors.
+    const bool pod19=c.lowDamage==5&&c.wallHit==6&&c.passed==7&&c.attacked==6&&
+        c.passing==6&&c.attacking==6&&c.death==3&&c.win==4&&c.lose==4;
+    return pod01||otherRetained||pod19;
 }
 std::uint32_t draw(std::uint32_t& raw) noexcept {
     raw=raw*0x41c64e6du+0x3039u;return raw&0x7fffffffu;

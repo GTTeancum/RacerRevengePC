@@ -62,7 +62,8 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     std::array<std::uint32_t,27> unlock10FAC{},hidden0730{};
     std::array<std::uint32_t,4> remembered{};
     std::array<std::uint32_t,7> rememberedCourse{};
-    std::uint8_t packed1125D=0,packed1125E=0;
+    std::uint8_t packed1125D=0,packed1125E=0,packed1125F=0;
+    std::uint32_t subtype11258=1;
     std::uint32_t comparison100C0=0;
     bool cardFlag100BC=false;
     std::array<OriginalUiCourseProfileColors50KG,6> planetColors{};
@@ -251,6 +252,40 @@ bool OriginalUiRiderProfileOwner50KG::commitCourseMove(const game::OriginalUiCou
     const auto& change=exact.planetProfileChange;
     storage_->packed1125E=static_cast<std::uint8_t>((storage_->packed1125E&~change.replaceMask)|(change.value&change.replaceMask));
     ++storage_->generation;return true; //Remembered700 changes only at actual Back/Confirm.
+}
+bool OriginalUiRiderProfileOwner50KG::courseRaceSnapshot(CourseRaceSelection& out)const noexcept{
+    if(!storage_||!storage_->readable())return false;const auto& s=*storage_;
+    out={std::uint32_t(s.packed1125F&15u),std::uint32_t(s.packed1125E>>5),
+        std::uint32_t(s.packed1125D>>3),s.subtype11258,
+        std::uint32_t(s.common->playerBits1125C&31u),s.rememberedCourse[2],
+        static_cast<std::uint16_t>(s.common->playerBits1125C|(std::uint16_t(s.packed1125D)<<8))};return true;
+}
+bool OriginalUiRiderProfileOwner50KG::commitCourseLaunch(const game::OriginalUiRouteDecision50KG& d,
+    const game::OriginalUiCourseContext50KG& source,OriginalUiRiderProfileStamp50KG expected)noexcept{
+    if(!storage_||!storage_->readable()||storage_->common->mode34!=0||expected.mode34!=0||source.mode34!=0||
+       expected.generation!=storage_->generation||storage_->generation==std::numeric_limits<std::uint64_t>::max()||
+       !d.admitted||!d.profileProposalComplete||d.blockers||d.action!=game::OriginalUiRouteAction50KG::request||
+       d.request.sourceScreen!=6||d.request.sourcePage!=1||d.profileChanges.count!=8||
+       source.subtypeSlot14F4!=1||source.laps14EC!=3||source.entrants14F0!=8||
+       source.selectedControlWord44!=8||source.courseSlot14E4!=4||storage_->packed1125D>>3!=19||
+       storage_->packed1125E>>5!=1||((storage_->common->playerBits1125C>>5)&3)!=1)return false;
+    auto c=source;c.admission={};c.admission.sourceControllerReady=true;
+    c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;
+    game::OriginalUiRouteDecision50KG exact;
+    if(game::dispatchOriginalUiCourse50KG(0,game::OriginalUiRouteInput50KG::activate,c,exact)!=game::OriginalUiRouteStatus50KG::unavailable||
+       exact.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::courseLaunchOwner)||
+       exact.inputPC!=d.inputPC||exact.selectedSlot!=d.selectedSlot||exact.request.kind!=d.request.kind||
+       exact.request.targetScreen!=d.request.targetScreen||exact.request.targetPage!=d.request.targetPage||
+       exact.request.sourcePC!=d.request.sourcePC||exact.profileChanges.count!=8)return false;
+    for(std::size_t i=0;i<8;++i)if(!sameChange(exact.profileChanges.values[i],d.profileChanges.values[i]))return false;
+    auto& s=*storage_;auto packed=std::uint16_t(s.common->playerBits1125C|(std::uint16_t(s.packed1125D)<<8));
+    // Exact source field writes, preserving all unrelated rider and packed bits.
+    s.packed1125F=static_cast<std::uint8_t>((s.packed1125F&0xf0u)|(c.selectedControlWord44&15u));
+    packed=static_cast<std::uint16_t>((packed&~0x780u)|(7u<<7));
+    packed=static_cast<std::uint16_t>((packed&~31u)|c.laps14EC);
+    s.common->playerBits1125C=static_cast<std::uint8_t>(packed);s.packed1125D=static_cast<std::uint8_t>(packed>>8);
+    s.subtype11258=c.subtypeSlot14F4;s.rememberedCourse[0]=c.courseSlot14E4;s.rememberedCourse[1]=c.laps14EC;
+    s.rememberedCourse[2]=c.entrants14F0;s.rememberedCourse[3]=c.subtypeSlot14F4;++s.generation;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitCourseBack(const game::OriginalUiRouteDecision50KG& d,const game::OriginalUiCourseContext50KG& source,
     OriginalUiRiderProfileStamp50KG expected)noexcept{

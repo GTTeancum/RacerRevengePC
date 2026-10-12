@@ -1,5 +1,6 @@
 #pragma once
-// Cold identities for the eight retained originals. Digests identify source
+// Cold identities for retained originals and the exact Course POD19 resource.
+// Digests identify source
 // bytes, not generated output. Constructor21079C/21081C/210820 binds racer60
 // to Pod%02d; the human's host slot never determines its resource/audio ID.
 #include "../../src/game/original_racer_selection50ij.h"
@@ -24,7 +25,7 @@ struct Identity {
     unsigned announcerEvents;
     const char* announcerSha256;
 };
-inline constexpr std::array<Identity,8> originals{{
+inline constexpr std::array<Identity,9> originals{{
     {1,"POD01",349110,
      "08b4d7655cb796da8a29d9b9a5318c0364561c659794ac9de6c9dfed7416eca3",
      "47fcfbaab278d10506b302520adc51af4e3388ceb601daa3dbd588aea1f39a1b",
@@ -80,7 +81,14 @@ inline constexpr std::array<Identity,8> originals{{
      "31ba56ca84e4aaf1dc70e8c9e4ef6b575eb236528651df1fbb293e101bcc0ca0",
      "26b025acda37d462ac5f83c02957ef332a513f34e83c7f27d4c5534d83b99ac6",
      "4cb7d5f99b1b61470ed7f7d409ecbdb92d2fbae0a4a30a1e1e32189118d6ed4b",
-     2403,29,"128a15666d6a71f78be27e82624fe8694ca936836fcd8cc8e984ddf6d8a02939"}
+     2403,29,"128a15666d6a71f78be27e82624fe8694ca936836fcd8cc8e984ddf6d8a02939"},
+    {19,"POD19",388750,
+     "7fd2b69f04351dc73d563527df8b67a1ed896c7d47f6a47fe9ee753f2394e826",
+     "6267bb1fb33bd798a589c5afd64f7197211fa47a1a78a495f2859d150bd28874",
+     "480758ea0adeeca293db02ccc197d9760acbe3faaf08cd216b5f281af312e388",
+     "71177c4e7dee02bbc31ac0bb12958ba4a8df4e4f62e84755913454f8511b4670",
+     "24a47cd627c6070ca586c699133373e7383971aa4fe006e277cfb107f6c344fa",
+     2496,30,"464c99a77c4b7970e96e4c823d782971f6140d86570c76a00638d0c542c89cf0"}
 }};
 inline constexpr const Identity* find(std::uint32_t racer60) noexcept {
     for(const auto& entry:originals)if(entry.racer60==racer60)return &entry;
@@ -99,10 +107,12 @@ inline std::filesystem::path announcerPath(const std::filesystem::path& discRoot
 // Seven independently retained originals author byte-identical counts. This
 // does not make their category names/PCM interchangeable: those hashes differ.
 inline constexpr std::array<std::uint8_t,9> speechCounts(const Identity& identity) noexcept {
+    if(identity.racer60==19)return {5,6,7,6,6,6,3,4,4};
     return identity.racer60==1?std::array<std::uint8_t,9>{4,4,6,5,6,6,4,3,2}:
         std::array<std::uint8_t,9>{2,3,3,3,4,4,3,3,3};
 }
 inline constexpr const char* speechCountsSha256(const Identity& identity) noexcept {
+    if(identity.racer60==19)return "24c40bf4fc181e88c0361742dec94c76d91c522ba358c5533bde2769fdfaa3ec";
     return identity.racer60==1?"57639f26df9b7eac14d08e1aa0b67689cfe1674a03e52c1dbd856ba523a6834e":
         "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2";
 }

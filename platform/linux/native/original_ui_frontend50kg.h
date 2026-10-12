@@ -10,10 +10,18 @@
 #include <memory>
 
 namespace rr::platform {
+// Concrete native host implementation retains its actual cold world, roster,
+// original AI and renderer owners. This read-only gate must inspect those live
+// instances; archive names or a caller-set ready flag never admit a race.
+class OriginalUiCourseRaceDestination50KG {
+public:
+    virtual ~OriginalUiCourseRaceDestination50KG()=default;
+    virtual bool admits(const OriginalUiRiderProfileOwner50KG::CourseRaceSelection&)const noexcept=0;
+};
 enum class OriginalUiFrontendStatus50KG : std::uint8_t {
     ok,noChange,unavailableDestination,secondControllerRequired,routeAccepted,
     notPrepared,alreadyPrepared,notActive,busy,invalidInput,resource,localization,
-    gpu,session,transition,renderer,cleanup,allocation,faulted,quit
+    gpu,session,transition,renderer,cleanup,allocation,faulted,quit,courseLaunchReady
 };
 struct OriginalUiFrontendDiagnostic50KG {
     OriginalUiFrontendStatus50KG status=OriginalUiFrontendStatus50KG::ok;
@@ -45,6 +53,7 @@ struct OriginalUiFrontendCold50KG {
     std::shared_ptr<const assets::OriginalUiArchive50KG> rider,backgrounds,podTextures,course;
     std::shared_ptr<const assets::OriginalUiIpumTextureCache50KG> riderIpumCache;
     std::shared_ptr<OriginalUiRiderProfileOwner50KG> riderProfile;
+    std::shared_ptr<const OriginalUiCourseRaceDestination50KG> courseRaceDestination;
     OriginalUiMainVideoOwner50KG video{};
     assets::OriginalUiMaterialRuntime50KG runtime{};
     std::shared_ptr<OriginalUiMainProfile50KG> profile;
@@ -97,7 +106,7 @@ struct OriginalUiFrontendUpdateReceipt50KG {
 };
 struct OriginalUiFrontendSnapshot50KG {
     bool prepared=false,active=false,faulted=false,quitRequested=false;
-    bool deferredQueue=false,frameSubmitted=false;
+    bool deferredQueue=false,frameSubmitted=false,courseLaunchReady=false;
     game::OriginalUiTransitionRoute50KG route{},preparedDestination{};
     game::OriginalUiTransitionSnapshot50KG transition{};
     game::OriginalUiApplicationRequest50KG queuedRequest{};
@@ -112,8 +121,8 @@ struct OriginalUiFrontendSnapshot50KG {
 };
 // Concrete native Main4/1 <-> Options12/{1,4}, plus muted Rider5/1 for
 // authenticated initial Rider19, with muted mode0 Confirm -> fixed Course6/1
-// and Back. Runtime acceptance is pending. No generic destination-ready
-// callbacks, guest execution, gameplay entry, fallback UI or profile reset.
+// and Back. Course Confirm additionally requires the concrete native race lease.
+// No guest execution, fallback UI or profile reset. Runtime acceptance is pending.
 // One freshly prepared bank/session/manager per screen lifetime; shared process
 // profile/application/audio/light manager remain the same. Options page changes
 // retain that screen's one bank/session/manager. All calls serialized/non-reentrant.
@@ -155,6 +164,9 @@ public:
     OriginalUiFrontendStatus50KG close(OriginalUiFrontendDiagnostic50KG&) noexcept;
     // Includes a retained borrow after failed activation or partial close. The
     // host must use close above before independently closing this renderer.
+    // Read once after the actual source queue9 frame has completed on GPU.
+    // Retains every UI/GPU bank through close; no native world is launched here.
+    bool takeCourseLaunch(OriginalUiRiderProfileOwner50KG::CourseRaceSelection&)noexcept;
     bool borrowsRenderer(const VehicleWindowGl50DS&) const noexcept;
     void requestQuit() noexcept;
     OriginalUiFrontendSnapshot50KG snapshot() const noexcept;

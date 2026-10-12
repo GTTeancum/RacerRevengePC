@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a genuine eight-pod native asset bank from retained RES files only.
+"""Prepare a genuine eight-pod field and optional Course asset from own RES files.
 
 The importer runs off the hot path. Every pod uses its own authored scene,
 material/texture set and exact PHY bytes. Missing resources cause failure.
@@ -38,6 +38,10 @@ def strip_quote(value):
 
 def prepare_pod(importer, resource, out):
     source_hash = sha(resource)
+    if resource.stem.upper() == 'POD19':
+        require(resource.stat().st_size == 388750 and source_hash ==
+                '7fd2b69f04351dc73d563527df8b67a1ed896c7d47f6a47fe9ee753f2394e826',
+                'POD19 requires its exact original RES; another pod or UI archive is not a substitute')
     subprocess.run([str(importer), str(resource), str(out)], check=True, stdout=subprocess.DEVNULL)
     require(sha(resource) == source_hash, 'Original resource changed during import')
     report = json.loads((out / 'import.json').read_text())
@@ -93,15 +97,20 @@ def main():
     parser.add_argument('--importer', required=True, type=Path)
     parser.add_argument('--disc', required=True, type=Path)
     parser.add_argument('--pods', nargs='+', default=['POD%02d' % i for i in (1, 3, 4, 7, 8, 9, 10, 11)])
+    parser.add_argument('--additional-pods', nargs='+', choices=['POD19'], default=[],
+                        help='Prepare own Course-selected resources without enlarging the eight-racer field')
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--expected-visual-selection', type=Path)
     args = parser.parse_args()
+    args.pods = [p.upper() for p in args.pods]
     require(not args.output.exists(), 'Output must be new; source/cache files are never overwritten')
     require(len(set(args.pods)) == len(args.pods) and args.pods[0].upper() == 'POD01', 'Player must be POD01 and opponents distinct')
     require(all(re.fullmatch(r'POD\d{2}', p.upper()) for p in args.pods), 'Invalid POD identifier')
+    selected_pods = args.pods + args.additional_pods
+    require(len(set(selected_pods)) == len(selected_pods), 'Duplicate field/additional POD identifier')
     source_index = {norm(str(p.relative_to(args.disc))): p for p in args.disc.rglob('*') if p.is_file()}
     resources = []
-    for pod in args.pods:
+    for pod in selected_pods:
         expected = f'pods/{pod.lower()}/{pod.lower()}.res'
         require(expected in source_index, 'Missing retained original resource: ' + expected)
         resources.append(source_index[expected])
@@ -109,7 +118,7 @@ def main():
     if args.expected_visual_selection:
         expected = {r['pod_id']: r for r in json.loads(args.expected_visual_selection.read_text())['racers']}
     args.output.mkdir(parents=True)
-    roster = []
+    roster, additional = [], []
     for resource in resources:
         directory = resource.stem.lower()
         pod = prepare_pod(args.importer.resolve(), resource.resolve(), args.output / directory)
@@ -121,7 +130,8 @@ def main():
                 require(actual['rrscene_sha256'] == old['native']['scene_sha256'] and actual['rrmesh_sha256'] == old['native']['mesh_sha256'], 'Fresh native scene differs from authenticated cache')
             physics = [r for r in reference['missing_authoring'] if norm(r['member']).endswith('.phy')]
             require(len(physics) == 1 and pod['phy']['source_sha256'] == physics[0]['source_sha256'], 'Original PHY identity mismatch')
-        roster.append({'pod_id': pod['pod_id'], 'name': pod['name'], 'path': directory + '/pod.json',
+        rows = additional if pod['pod_id'] in args.additional_pods else roster
+        rows.append({'pod_id': pod['pod_id'], 'name': pod['name'], 'path': directory + '/pod.json',
                        'resource_sha256': pod['resource_sha256'], 'phy_sha256': pod['phy']['source_sha256'],
                        'component_node_counts': [r['nodes'] for r in pod['components']],
                        'component_vertex_counts': [r['vertices'] for r in pod['components']]})
@@ -131,6 +141,8 @@ def main():
               'boundaries': ['Original component scenes retain independent topology and source material assignments.',
                              'The runtime must animate each pod with its own original rig and motion resources.',
                              'No original gameplay equivalence is implied merely by importing its assets.']}
+    if additional:
+        result['additional_racers'] = additional
     (args.output / 'roster.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result))
 

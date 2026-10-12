@@ -20,6 +20,20 @@
 #include <utility>
 
 namespace original_main_entry50KG {
+// Concrete host lease: the predicate captures stable native owner references,
+// performs read-only exact identity/state checks, and never fabricates assets
+// or activates physics from a UI callback. The containing session outlives it.
+template<class Predicate> class CourseRaceDestination final:public rr::platform::OriginalUiCourseRaceDestination50KG {
+    Predicate predicate_;
+public:
+    explicit CourseRaceDestination(Predicate predicate):predicate_(std::move(predicate)){}
+    bool admits(const rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection& selection)const noexcept override {
+        try{return predicate_(selection);}catch(...){return false;}
+    }
+};
+template<class Predicate> auto courseRaceDestination(Predicate predicate){
+    return std::make_shared<CourseRaceDestination<Predicate>>(std::move(predicate));
+}
 inline void require(bool accepted,const char* message) {
     if(!accepted)throw std::runtime_error(message);
 }
@@ -27,10 +41,10 @@ inline std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
     const std::filesystem::path&,rr::assets::OriginalUiArchiveId50KG);
 // NEW native application startup for the original-UI opt-in. This is a real
 // process owner, not an imported save or a reconstruction of retail boot.
-// The otherwise loaded gameplay world is never advanced in this mode. A
-// future gameplay destination MUST join this same application RNG owner before
-// it is admitted; copying these fields into an independently running RNG is
-// not supported. The frontend cannot restart into the host driving path.
+// The cold gameplay world stays unadvanced while the frontend owns input.
+// An admitted Course destination borrows this same application RNG/selector
+// owner and starts that exact prepared world after source exit and GPU drain.
+// No copied seed, replacement selected racer or process restart is supported.
 struct Application {
     bool enabled=false;
     std::filesystem::path assetRoot,audioRoot,riderCacheRoot;
@@ -115,14 +129,14 @@ struct Application {
         require(rr::game::sampleHostTimestamp50ID(*state->clock101A50,state->rawRandom308030),
             "Main startup shared application timestamp unavailable");
         state->known=true;
-        std::cerr<<"ORIGINAL MAIN ONLY: fresh native profile/application ownership; "
+        std::cerr<<"ORIGINAL MAIN: fresh native profile/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
             "Accept requires enabled concrete audio and commits process-owned settings. "
             "Rider19 entry additionally requires the authenticated compiled IPUM cache; enabled audio uses original Song7. "
             "Muted mode0 Rider19 Confirm to Course and Back is integrated but unvalidated; Course Left/Right selects the four fresh unlocked tracks; "
             "other riders, Gallery and other Options subpages remain unavailable. "
-            "No gameplay launch or original boot/save parity is claimed.\n";
+            "Course race entry requires the exact prepared GA/POD19 all-original-AI native destination; other tracks remain unavailable. No original boot/save parity is claimed.\n";
     }
 };
 // Owns the actual host/context and its native source-canvas mode together.
@@ -237,7 +251,8 @@ struct Frontend {
     }
     void prepare(const Application& application,const std::shared_ptr<Video>& video,
         const rr::platform::MaterialTextureGlRequest50EB& textureRequest,
-        rr::platform::VehicleWindowRequest50DS& rendererRequest) {
+        rr::platform::VehicleWindowRequest50DS& rendererRequest,
+        std::shared_ptr<const rr::platform::OriginalUiCourseRaceDestination50KG> raceDestination={}) {
         using Id=rr::assets::OriginalUiArchiveId50KG;
         rr::platform::OriginalUiFrontendCold50KG cold;
         cold.appStart=readArchive(application.assetRoot,Id::appStart);
@@ -248,7 +263,7 @@ struct Frontend {
         cold.overlays=readArchive(application.assetRoot,Id::overlays);
         cold.localization=readArchive(application.assetRoot,Id::localization);
         cold.runtime=application.materialRuntime;cold.video=video->publication(video);
-        cold.profile=application.profile;cold.application=application.state;
+        cold.profile=application.profile;cold.application=application.state;cold.courseRaceDestination=std::move(raceDestination);
         cold.lightManager=application.lightManager;
         cold.riderProfile=application.riderProfile;
         // Explicit, optional native codec-cache input. This is not a readiness
@@ -506,7 +521,8 @@ struct Frontend {
     void commitDeferred(rr::platform::VehicleWindowGl50DS& renderer) {
         const auto deferredStart=stageStart();
         const auto status=coordinator.commitDeferred(renderer,diagnostic);
-        reportStage("deferred_commit",deferredStart,status==Status::ok||status==Status::noChange);
+        reportStage("deferred_commit",deferredStart,status==Status::ok||status==Status::noChange||status==Status::courseLaunchReady);
+        if(status==Status::courseLaunchReady){imagePublished=false;return;}
         if(status==Status::ok){imagePublished=false;std::cerr<<"original_ui_screen_activated "<<unsigned(coordinator.snapshot().route.screen)<<'\n';}
         else if(status!=Status::noChange)fail("deferred activation");
     }

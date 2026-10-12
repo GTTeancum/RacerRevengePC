@@ -155,7 +155,7 @@ OriginalUiRouteStatus50KG dispatchOriginalUiRider50KG(std::uint8_t controller,
     OriginalUiRouteDecision50KG&) noexcept;
 // Course back routes and remembered fields are closed. Activate can describe
 // source-proven profile changes, but always returns unavailable/courseLaunchOwner:
-// the complete native course-commit/launch owner is not implemented here.
+// only the concrete frontend/native host transaction may discharge that blocker.
 OriginalUiRouteStatus50KG dispatchOriginalUiCourse50KG(std::uint8_t controller,
     OriginalUiRouteInput50KG,const OriginalUiCourseContext50KG&,
     OriginalUiRouteDecision50KG&) noexcept;

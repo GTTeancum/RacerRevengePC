@@ -145,6 +145,12 @@ struct VehicleFrameState49W {
     // Native sequencing receipt:223030 dynamic branch/common maxima completed
     // at MainIntegration; the immediately following body integration consumes it.
     bool dynamicImpactRecorded50IW=false;
+    // Optional native application borrow, bound once before racer-bank sealing.
+    // The application outlives every serial frame consumer. Per-racer snapshots
+    // retain this unchanged pointer, never the borrowed RNG/table contents.
+    CoupledNoiseContext49M* borrowedNoise50KG=nullptr;
+    CoupledNoiseContext49M& noiseOwner() noexcept {return borrowedNoise50KG?*borrowedNoise50KG:noise;}
+    const CoupledNoiseContext49M& noiseOwner() const noexcept {return borrowedNoise50KG?*borrowedNoise50KG:noise;}
 };
 inline bool validVehicleSceneCount49W(const VehicleFrameState49W& state,
     const VehicleFrameBindings49W& bindings) noexcept {

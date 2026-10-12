@@ -1,6 +1,7 @@
 #pragma once
 // Source-only cold/runtime join candidate. No synthetic band or UI material reuse.
 #include "native_racer_rig50hw_fixture.h"
+#include "original_player_identity50ik_fixture.h"
 #include "../../src/assets/original_ui_atm50kg.h"
 #include "../../src/assets/original_ui_material50kg.h"
 #include "../../src/game/original_ui_texture_animation50kg.h"
@@ -80,22 +81,13 @@ public:
             const auto section=phy.find("binder");
             need(section==phy.end()||!section->second.count("bindermeshhalfheight"),
                 "Unadmitted BinderMeshHalfHeight override");
-            // All eight verified PHY files omit it;215BC8 supplies float2.25.
+            // The selected PHY must omit it;215BC8 supplies float2.25.
             binding.halfHeight25C=2.25f;
-            static constexpr const char* ids[]={"POD01","POD03","POD04","POD07","POD08","POD09","POD10","POD11"};
-            static constexpr const char* hashes[]={
-                "08b4d7655cb796da8a29d9b9a5318c0364561c659794ac9de6c9dfed7416eca3",
-                "4ad6a07ac02bc9ef65e336777ff27e6823060d333b0a885e99f14f58bd3ee26e",
-                "fd6546c9b05646b4f30462e973550abffd6249d8688e09173251fbd09aaac17a",
-                "0cde5fac5d9a379e1ca426409809ba5c04eec6895013577f03639c69859fd8a8",
-                "9873d6cf7ce8b01fd76184859e043c1334d84b3962f987910e3d5b9ba4ccd86a",
-                "5dc7b33724f703057f633794a51ae130cb8a976106a814f5777ddd1578416827",
-                "8a29e7e26074d3549343d025317f754df6259fb6099e7b824f37463b30593a3c",
-                "ce2a122c117137cae6cab2b20cc6132758c319186d79da5d0d26593d0713a81c"};
-            const char* hash=nullptr;for(unsigned i=0;i<8;++i)if(rig.podId==ids[i])hash=hashes[i];
-            need(hash,"Unadmitted original pod for Binder");
+            const auto* identity=original_player_identity50IK::find(rig.podId);
+            need(identity,"Unadmitted original pod for Binder");
             const auto bytes=native_racer50HW::f::readBytes(rig.resourceFile);
-            need(bytes.size()<=1024u*1024u&&shared::sha256(bytes)==hash,"Binder original POD archive identity differs");
+            need(bytes.size()==identity->archiveBytes&&shared::sha256(bytes)==identity->archiveSha256,
+                "Binder original POD archive identity differs");
             a::ResArchive48C archive;
             need(a::decodeResource48C(bytes,archive,d.decode),"Binder original POD RES decode");
             std::vector<std::uint8_t> psm,atm;

@@ -1,5 +1,5 @@
 #pragma once
-// Cold audio selection for the eight retained originals. The sixty semantic
+// Cold audio selection for the retained originals, including POD19. Semantic
 // slots retain bank/key identity; absent original keys reject commands. Every
 // pod-owned member and engine parameter comes from that pod's authenticated RES.
 #include "gameplay_audio_provider50he_fixture.h"
@@ -107,7 +107,8 @@ inline bool read(const std::filesystem::path& discRoot,std::uint32_t racer60,
             }
             if(!exists)next.requests.push_back(request);
         }
-        d::need(authoredSlots==(racer60==1?60u:48u),"50IK selected semantic catalog count differs");
+        std::size_t speechSlots=0;for(const auto count:expected)speechSlots+=count;
+        d::need(authoredSlots==20u+speechSlots,"50IK selected semantic catalog count differs");
         out=std::move(next);error.clear();return true;
     }catch(const std::exception& e){try{error=e.what();}catch(...){}return false;}
     catch(...){try{error="50IK selected original audio preparation failed";}catch(...){}return false;}

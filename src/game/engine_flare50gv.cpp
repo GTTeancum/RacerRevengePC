@@ -42,7 +42,7 @@ bool advanceEngineFlare50GV(const VehicleFrameState49W& frame,
     if(!owners.records[2].words[1]||owners.records[2].words[1]!=owners.records[3].words[1]||
        owners.records[2].words[0]!=0x20f110u||owners.records[3].words[0]!=0x20ee90u)
         return fail(EngineFlareError50GV::binding,0,0x29acec);
-    EngineFlareOutput50GV next{};next.sharedRandomState=frame.noise.sharedRandomState;
+    EngineFlareOutput50GV next{};next.sharedRandomState=frame.noiseOwner().sharedRandomState;
     const bool steering=main.components.aero.lowSpeedDc&&(frame.fields.applicationByte58&2u);
     for(unsigned side=0;side<2;++side){
         next.uniforms[side]=owners.uniforms[side+2];next.flameAC4[side]=tail.flameAC4[side];
@@ -96,6 +96,6 @@ void commitEngineFlare50GV(const EngineFlareOutput50GV& result,VehicleFrameState
     BaseTailState50X& tail,assets::PodFlameOwners50W& owners) noexcept {
     for(unsigned side=0;side<2;++side){tail.flameAC4[side]=result.flameAC4[side];
         owners.uniforms[side+2]=result.uniforms[side];owners.records[side+2].words[2]=result.frameStamp[side];}
-    frame.noise.sharedRandomState=result.sharedRandomState;
+    frame.noiseOwner().sharedRandomState=result.sharedRandomState;
 }
 }

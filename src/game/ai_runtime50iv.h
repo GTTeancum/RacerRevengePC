@@ -142,7 +142,7 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
     }
     ++in.applicationGlobals->navigationCalls433CC0;
     const AiRouteChoiceOwners50IY routeOwners{*in.aiMetadata,ai.fieldFE4,
-        ai.state.aiStateFE8,ai.packing.policy1000,frame.noise.sharedRandomState};
+        ai.state.aiStateFE8,ai.packing.policy1000,frame.noiseOwner().sharedRandomState};
     if(!advanceAiNavigation50IV(*in.mapFF0,*in.aiFF4,*in.aiMetadata,previousCA0,position,
         in.actualZoneOrdinal48,progress,lapCC8,frame.fields.impactFlagsCD8,ai.navigation,ai.boost,routeOwners,receipt.driving))return stop(receipt.driving.sourcePC);
     const auto current=progress.reset.vehicleC80,previous=progress.vehicleC84;
@@ -285,7 +285,7 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
     if(attemptBoost){AiBoostDecisionInput50IT boost{boostFactor,receipt.desiredSpeed,thermal.heat7C,m.cachedSpeed34,
         ai.state.aiStateFE8,ai.lists.counts[0],ai.lists.counts[1],m.components.probe348.field10C,false,0};
         AiBoostDecisionReceipt50IT boosted{};
-        if(!decideAiBoost50IT(boost,actions,actions,ai.boost,frame.noise.sharedRandomState,boosted,receipt.boost))return stop(receipt.boost.sourcePC);
+        if(!decideAiBoost50IT(boost,actions,actions,ai.boost,frame.noiseOwner().sharedRandomState,boosted,receipt.boost))return stop(receipt.boost.sourcePC);
         receipt.attemptedBoost=true;receipt.boostHandled=boosted.handled;
     }
     if(!receipt.boostHandled){AiNonBoostSpeedReceipt50IR braking{};

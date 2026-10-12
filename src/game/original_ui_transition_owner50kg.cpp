@@ -156,7 +156,17 @@ Status OriginalUiTransitionOwner50KG::requestRouteDecision(const OriginalUiRoute
         decision.profileChanges.count>decision.profileChanges.values.size() ||
         request.sourceScreen!=state_.current.screen || request.sourcePage!=state_.current.page)
         return Status::invalidDecision;
-    if (request.kind==Kind::courseLaunch) return Status::unsupportedLaunch;
+    if (request.kind==Kind::courseLaunch) {
+        if(state_.current.screen!=6||state_.current.page!=1||request.targetScreen||request.targetPage||
+           request.sourcePC!=0x1DED58||decision.inputPC!=0x1DEB90||decision.profileChanges.count!=8)
+            return Status::invalidDecision;
+        if(!callbacks_.admitCourseLaunch||!callbacks_.commitRouteSelection||!callbacks_.queueApplication)
+            return Status::missingCallback;
+        CallbackScope guard(inCallback_);
+        if(!callbacks_.admitCourseLaunch(callbacks_.context))return Status::unsupportedLaunch;
+        if(!callbacks_.commitRouteSelection(callbacks_.context,decision))return Status::selectionNotAccepted;
+        state_.lifecycle=Life::requestCourseExit;return Status::ok;
+    }
     if (request.kind!=Kind::changeScreen && request.kind!=Kind::changePage)
         return Status::invalidDecision;
     const bool sameScreen=request.kind==Kind::changePage;

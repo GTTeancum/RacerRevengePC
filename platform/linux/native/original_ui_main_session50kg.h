@@ -45,7 +45,7 @@ struct OriginalUiMainApplication50KG {
     std::shared_ptr<game::HostMonotonicClock50ID> clock101A50;
     // Original shared statics80A8/3D6B30 and80AC/3D6B38. Startup raw
     // seeding does not initialize these caches. Survive every menu page.
-    // Menu-to-race remains disabled; no copy to the separate race session.
+    // Course native race entry borrows this exact owner; no destination copy.
     game::SharedRandomOwner50ID sharedRandomSelectors{};
     game::OriginalUiRiderVoiceChoice50KG riderVoiceChoice;
     // Process-wide lazy playback/IK/libm owners survive page/model destruction.
@@ -60,6 +60,9 @@ struct OriginalUiMainApplication50KG {
     // return, not a caller-certified successful no-op for an active request.
     std::int32_t transportE00=-1;
     std::uint32_t uiObject3D8=0;
+    // Source1DEEFC/1DEF08 Course Confirm resets these represented global UI
+    // handles. Native fresh startup has no borrowed object at either handle.
+    std::uint32_t courseUi474=0,courseUi478=0;
 };
 enum class OriginalUiMainAudioMode50KG : std::uint8_t { enabled,muted };
 enum class OriginalUiMainSessionStatus50KG : std::uint8_t {

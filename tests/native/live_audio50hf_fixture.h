@@ -17,7 +17,9 @@
 namespace live_audio50HF {
 inline constexpr std::size_t voiceCount=160,providerFirstVoice=0,lapFirstVoice=60,lapVoiceCount=4;
 inline constexpr std::uint32_t sampleRate=48000,stepMicroseconds=16000,stepFrames=768;
-static_assert(gameplay_audio50HE::cueCount==lapFirstVoice);
+static_assert(gameplay_audio50HE::legacyCueCount==lapFirstVoice);
+static_assert(gameplay_audio50HE::extraFirstVoice+gameplay_audio50HE::cueCount-
+    gameplay_audio50HE::legacyCueCount<=voiceCount);
 static_assert(lapFirstVoice+lapVoiceCount<=voiceCount);
 
 enum class EventStatus : std::uint8_t { Complete,Unprepared,Paused,Closed,Input,Capacity,ApplyRejected };
@@ -38,7 +40,7 @@ inline bool hasJoinedTrigger(rr::game::AudioCue50HE cue) noexcept {
     return (cue.bank==rr::game::AudioBank50HE::PodEvent&&cue.key>=1&&cue.key<=6)||
         (cue.bank==rr::game::AudioBank50HE::PodEngine&&cue.key>=1&&cue.key<=3);
 }
-inline constexpr std::size_t unsupportedTriggerCues() noexcept{return gameplay_audio50HE::cueCount-9;}
+inline constexpr std::size_t unsupportedTriggerCues() noexcept{return gameplay_audio50HE::legacyCueCount-9;}
 
 // Own this at a stable address. PCM, voices, mixer and both providers are never
 // moved or exposed mutably; their borrowed references stay valid until close.
@@ -54,7 +56,8 @@ public:
     // Cold only, once per owner, before any gameplay work. All authenticated
     // selected requests remain present, including unavailable records.
     // POD01 has60 authored semantic slots; the other seven have48. All use the
-    // same sixty-slot layout, with immutable PCM aliases resolved only once.
+    // same legacy sixty-slot layout; POD19 adds seven slots152..158. Immutable
+    // PCM aliases are resolved only once, never across different original names.
     // discRoot supplies retained originals; audioRoot is the explicit AUDIO
     // directory. No search of another computer or guessed external path occurs.
     bool prepare(const std::filesystem::path& discRoot,const std::filesystem::path& audioRoot,
@@ -78,7 +81,7 @@ public:
             // Original reset defaults remain the default for other callers.
             // Next-session menu edits never mutate this owner's restore target.
             if(!groups_.initialize(mixer_,audioSettings)||
-               !race_audio_groups50IC::bindGameplayCatalog(groups_,providerFirstVoice).complete||
+               !race_audio_groups50IC::bindGameplayCatalog(groups_,providerFirstVoice,playerRacer60==19).complete||
                !race_audio_groups50IC::bindProviderRange(groups_,
                    race_audio_groups50IC::ProviderRole::LapPodEvent,lapFirstVoice,lapVoiceCount)) {
                 error="50IC source group ownership initialization failed";return false;

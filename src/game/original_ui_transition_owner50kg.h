@@ -143,7 +143,7 @@ public:
     // require atomic commitMainSelection; options/gallery write no profile.
     OriginalUiTransitionStatus50KG requestMain(const OriginalUiMainDecision50KG&) noexcept;
     // Connects an admitted confirm/back leaf to this manager and its sole
-    // profile owner. Course launch proposals remain explicitly unavailable.
+    // profile owner. Course launch requires its concrete destination gate and exact private profile transaction.
     OriginalUiTransitionStatus50KG requestRouteDecision(const OriginalUiRouteDecision50KG&) noexcept;
 
     // Advances at most one source switch case. Only caller completion can

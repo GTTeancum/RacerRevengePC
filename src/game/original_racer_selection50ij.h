@@ -25,12 +25,19 @@ inline constexpr std::array<Entry,8> entries{{
     {10,"POD10","Alder Bedo","pod10/pod.json",true,"RACER: ALDER BEDO"},
     {11,"POD11","Ody Mandell","pod11/pod.json",true,"RACER: ODY MANDELL"}
 }};
+// The Course handoff can select this ninth resource identity while retaining
+// an eight-racer field. It is deliberately outside the legacy host-menu cycle
+// and permutation; the cold Course owner replaces only camera slot0.
+inline constexpr Entry coursePod19{19,"POD19","Anakin Skywalker","pod19/pod.json",
+    true,"RACER: ANAKIN SKYWALKER"};
 inline constexpr const Entry* findByRacer60(std::uint32_t value) noexcept {
     for(const auto& entry:entries)if(entry.racer60==value)return &entry;
+    if(value==coursePod19.racer60)return &coursePod19;
     return nullptr;
 }
 inline constexpr const Entry* findByPodId(std::string_view value) noexcept {
     for(const auto& entry:entries)if(entry.podId==value)return &entry;
+    if(value==coursePod19.podId)return &coursePod19;
     return nullptr;
 }
 inline constexpr bool canSelectHuman(std::uint32_t value) noexcept {
@@ -65,7 +72,7 @@ inline constexpr bool cancel(Selection& state) noexcept {
 // the source ID, including POD01 when it moves into the selected pod's bot slot.
 inline constexpr bool buildRosterOrder(std::uint32_t humanRacer60,
     std::array<std::size_t,entries.size()>& out) noexcept {
-    if(!canSelectHuman(humanRacer60))return false;
+    if(!canSelectHuman(humanRacer60)||humanRacer60==coursePod19.racer60)return false;
     std::array<std::size_t,entries.size()> order{};std::size_t selected=0;
     for(std::size_t i=0;i<entries.size();++i){order[i]=i;if(entries[i].racer60==humanRacer60)selected=i;}
     order[0]=selected;order[selected]=0;out=order;return true;

@@ -260,7 +260,7 @@ Status dispatchOriginalUiCourse50KG(std::uint8_t controller,Input input,
     }
     route(d,Kind::courseLaunch,0,0,0x1DED58);
     // This is a prospective state8 request, never an admitted native launch.
-    // The original global-manager474/478 and complete load owner are unresolved.
+    // A concrete frontend must commit the profile/global handles and native load owner.
     block(d,Blocker::courseLaunchOwner);
     if (!context.courseControlDataReady) {
         block(d,Blocker::courseControlData);d.profileProposalComplete=false;

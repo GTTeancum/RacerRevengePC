@@ -11,22 +11,27 @@ struct CatalogBindingReceipt {
     std::array<bool,gameplay_audio50HE::cueCount> supported{};
 };
 inline CatalogBindingReceipt bindGameplayCatalog(
-    rr::platform::RaceAudioGroups50IC& groups,std::size_t firstVoice)noexcept {
+    rr::platform::RaceAudioGroups50IC& groups,std::size_t firstVoice,bool extraSpeech=false)noexcept {
     using namespace rr::game;
     CatalogBindingReceipt receipt;
+    const auto count=extraSpeech?gameplay_audio50HE::cueCount:gameplay_audio50HE::legacyCueCount;
     if(firstVoice>rr::platform::audioMaximumVoices50HD||
-       gameplay_audio50HE::cueCount>rr::platform::audioMaximumVoices50HD-firstVoice)return receipt;
+       gameplay_audio50HE::legacyCueCount>rr::platform::audioMaximumVoices50HD-firstVoice)return receipt;
     // Whole represented catalog is preflighted before any mapping is changed.
-    for(std::size_t i=0;i<gameplay_audio50HE::cueCount;++i){
+    for(std::size_t i=0;i<count;++i){
         const auto& cue=gameplay_audio50HE::catalog[i];
         const auto group=gameplayAudioGroup50IC({cue.bank,cue.key});
         if(group==RaceAudioGroup50IC::Unrepresented){++receipt.unsupported;continue;}
-        if(!groups.canBind(firstVoice+i,group))return {};
+        const auto voice=gameplay_audio50HE::cueVoice(firstVoice,i);
+        if(voice>=rr::platform::audioMaximumVoices50HD||
+            (i>=gameplay_audio50HE::legacyCueCount&&voice>=firstVoice&&
+             voice-firstVoice<gameplay_audio50HE::legacyCueCount)||!groups.canBind(voice,group))return {};
         receipt.supported[i]=true;++receipt.represented;
     }
     for(std::size_t i=0;i<gameplay_audio50HE::cueCount;++i)if(receipt.supported[i]){
         const auto& cue=gameplay_audio50HE::catalog[i];
-        if(!groups.bind(firstVoice+i,gameplayAudioGroup50IC({cue.bank,cue.key})))return {};
+        if(!groups.bind(gameplay_audio50HE::cueVoice(firstVoice,i),
+            gameplayAudioGroup50IC({cue.bank,cue.key})))return {};
     }
     receipt.complete=true;return receipt;
 }

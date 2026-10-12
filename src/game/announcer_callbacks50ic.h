@@ -140,16 +140,16 @@ inline AnnouncerDuckingReceipt50IC endAnnouncerDucking50IC(
     groups=next;state=flags;r.complete=true;return r;
 }
 
-// Source-constructor bindings for the currently authored Pod01 gameplay
+// Source-constructor bindings for the authenticated selected gameplay
 // banks. Unknown inactive categories are explicit, never assigned by filename.
 inline RaceAudioGroup50IC gameplayAudioGroup50IC(AudioCue50HE cue)noexcept {
     if(cue.bank==AudioBank50HE::PodEvent&&cue.key>=1&&cue.key<=6)
         return RaceAudioGroup50IC::Effects110;
     if(cue.bank==AudioBank50HE::PodEngine&&cue.key>=1&&cue.key<=3)
         return RaceAudioGroup50IC::Engines114;
-    if((cue.bank==AudioBank50HE::PodCurses&&cue.key>=1&&cue.key<=19)||
+    if((cue.bank==AudioBank50HE::PodCurses&&cue.key>=1&&cue.key<=24)||
        (cue.bank==AudioBank50HE::PodTaunts&&cue.key>=1&&cue.key<=12)||
-       (cue.bank==AudioBank50HE::PodSpecial&&cue.key>=1&&cue.key<=9))
+       (cue.bank==AudioBank50HE::PodSpecial&&cue.key>=1&&cue.key<=11))
         return RaceAudioGroup50IC::Character11C;
     return RaceAudioGroup50IC::Unrepresented;
 }

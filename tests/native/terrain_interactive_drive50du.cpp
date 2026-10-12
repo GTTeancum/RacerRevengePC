@@ -1,5 +1,6 @@
 #include "runtime_allocations50fl.h"
 #include "original_racer_selection50ij.h"
+#include "original_course_roster50kg_fixture.h"
 #include "native_racer_bank50hn_fixture.h"
 #include "native_racer_contact_bank50hw_fixture.h"
 #include "native_dynamic_contact_peers50iw_fixture.h"
@@ -176,6 +177,8 @@ void reportRenderer50DU(const rr::platform::VehicleWindowDiagnostic50DS& diagnos
 #include <cctype>
 
 namespace recovery50FI=checkpoint_recovery50fi_fixture;
+#include <functional>
+
 enum class SessionExit50DU { Quit, Restart, Checkpoint };
 SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const char* capturePath,
     const recovery50FI::Plan* checkpointInput,recovery50FI::Plan& checkpointOutput,
@@ -187,6 +190,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     rr::platform::HostTrack50IM effectiveTrack,rr::platform::HostTrack50IM& selectedTrack,
     const rr::platform::HostTrackAdmission50IM& trackAdmission,
     const original_main_entry50KG::Application& originalMainApplication){
+ const bool originalUiStarted=originalMainApplication.enabled;
+ bool originalUiActive=originalUiStarted,courseRaceLaunched=false;
  // Capture the immutable loaded identity before any front-menu choice changes
  // the next-session selection. The alternate-player integration consumes it.
  const std::uint32_t playerRacer60=selectedRacer60;
@@ -197,13 +202,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(trackSession,trackSelectionError?trackSelectionError:"original track admission failed");
  const bool isGcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GC");
  const bool isGaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GA");
- // GA is a one-shot native-window or headless preview, never a menu-launched or saved race.
+ const bool courseRaceCold=isGaTrack&&originalUiStarted;
+ // GA permits its explicit direct preview or this exact same-session Course
+ // handoff. No arbitrary menu track, saved race or rebuild is admitted.
  // All eight genuine AI owners and mode2 are checked below before cold setup.
  // Native actual-COL endpoint/sphere triggers retain their disclosed geometry
  // policy; original reverse108E90 leaf/descriptor parity remains unclaimed.
  require50DU(!isGaTrack||(trackAdmission.gaOriginalAiCandidate&&
-     sessionIndex==0&&!checkpointInput&&!startAtMenu&&!originalMainApplication.enabled),
-     "GA requires explicit one-shot fresh original-AI preview; startup menu/checkpoint/restart unsupported");
+     sessionIndex==0&&!checkpointInput&&!startAtMenu),
+     "GA requires explicit fresh original-AI admission; host startup menu/checkpoint/restart unsupported");
  if(isGaTrack)std::cerr<<"GA CANDIDATE: explicit fresh all-eight-original-AI observation; "
      "native trigger geometry, authored-zone light selection, host chase camera/listener and mode2 timing; "
      "retail geometry/light-cache/camera/listener parity and complete-track support unproved.\n";
@@ -244,7 +251,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      std::string(gaLightingSetting)=="1","RR_NATIVE_GA_SELECTED_LIGHTS must be 0 or 1");
  // Authored level illumination is the native fresh-race default. Explicit 0
  // remains a diagnostic opt-out; Main/checkpoint paths retain their own policy.
- const bool freshLevelLighting=raceEnabled&&!checkpointInput&&!originalMainApplication.enabled;
+ const bool freshLevelLighting=raceEnabled&&!checkpointInput&&(!originalUiActive||courseRaceCold);
  const bool nativeGcSelection=gcLightingSetting?std::string(gcLightingSetting)=="1":
      freshLevelLighting&&track_session_assets50IG::codeEquals(trackSession->world->code,"GC");
  const bool nativeTaSelection=taLightingSetting?std::string(taLightingSetting)=="1":
@@ -255,7 +262,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      "choose exactly one native track-light policy");
  const bool nativeSelectedLights=nativeGcSelection||nativeTaSelection||nativeGaSelection;
  require50DU(!nativeSelectedLights||(raceEnabled&&!checkpointInput&&
-     !originalMainApplication.enabled&&track_session_assets50IG::codeEquals(
+     (!originalUiActive||courseRaceCold)&&track_session_assets50IG::codeEquals(
         trackSession->world->code,nativeGaSelection?"GA":nativeTaSelection?"TA":"GC")),
      "native selected lights require their matching fresh authenticated race; checkpoint/Main unsupported");
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
@@ -269,7 +276,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  constexpr std::size_t originalAiSlot=1;
  const bool watchtowerOriginalAi=track_session_assets50IG::codeEquals(trackSession->world->code,"GA");
  require50DU(!watchtowerOriginalAi||(raceEnabled&&allAiEnabled&&!checkpointInput&&
-     !startAtMenu&&!originalMainApplication.enabled),
+     !startAtMenu),
      "GA WatchtowerRun requires a fresh all-eight-original-AI race, including camera slot0; menu/checkpoint/mixed control unsupported");
  const auto originalAiCreateSelection=[&](){
   AiFreshCreateSelection50IU selected{};
@@ -323,6 +330,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  static_assert(race_music50IE::voice<material_audio50HI::extraFirstVoice);
  static_assert(material_audio50HI::extraFirstVoice+material_audio50HI::maximumExtraVoices<=live_audio50HF::voiceCount);
  static_assert(material_audio50HI::gaExtraFirstVoice+material_audio50HI::gaMaximumExtraVoices<=live_audio50HF::voiceCount);
+ static_assert(material_audio50HI::gaExtraFirstVoice+material_audio50HI::gaMaximumExtraVoices<=gameplay_audio50HE::extraFirstVoice);
  if(raceEnabled){
   require50DU(!checkpointInput,"a race must restart every racer together from the grid");
   lapContinuity={};
@@ -360,7 +368,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  } // TA retained diagnostic candidate inputs only.
  f::Fixture x(0);auto&s=x.state;auto&m=s.bodies.main;
- native_ai50IV::NoiseLifetime originalNoiseLifetime(s.noise,originalAiEnabled);
+ if(originalUiStarted){
+  require50DU(originalMainApplication.state&&originalMainApplication.state->known,
+      "native Course entry requires the actual application RNG owner");
+  s.borrowedNoise50KG=&originalMainApplication.state->sharedNoise308030;
+ }
+ native_ai50IV::NoiseLifetime originalNoiseLifetime(s.noiseOwner(),originalAiEnabled&&!originalUiStarted);
  AiRuntimeState50IV originalAi{};AiRuntimeReceipt50IV originalAiReceipt{};
  native_ai50IV::Session originalAiSession{};
  AiTrackMetadata50IU originalAiMapMetadata{},originalAiMetadata{};
@@ -371,7 +384,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // boundary. Dax, category6, contact music and GC animation borrow this ONE
  // owner, outside racer snapshots. Original cross-race static lifetime is not
  // claimed; the monotonic clock backend itself remains application-wide.
- SharedRandomOwner50ID sessionRandom{};
+ SharedRandomOwner50ID directSessionRandom{};
+ auto& sessionRandom=originalUiStarted?originalMainApplication.state->sharedRandomSelectors:directSessionRandom;
  // Shared source owners: never bank these along with the reused racer arena.
  // Fresh17DF80/17F970 profile, no save/cheat/menu continuation admitted.
  // The consumed track bits stay cold-clear only before the retained destruction
@@ -439,6 +453,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "original roster must contain the player and seven original opponents");
   require50DU(roster.at("racers").at(0).at("pod_id")=="POD01",
       "retained original roster player identity differs");
+  if(courseRaceCold){
+   std::string rosterError;
+   const bool selected=original_course_roster50KG::selectPod19(".",rosterRoot,roster,rosterError);
+   require50DU(selected,rosterError.empty()?"Course selected POD19 cold owner is unavailable":rosterError.c_str());
+  }
   std::size_t selectedSlot=raceRacerCount;
   for(std::size_t racer=0;racer<raceRacerCount;++racer)
    if(roster.at("racers").at(racer).at("pod_id")==playerPodId){
@@ -955,7 +974,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(mode1Requested||dynamicContactEnabled){
    require50DU(materialMixer&&sourceAnnouncer->prepare("work/native/project/disc",audioRoot,
        *materialMixer,*audioGroups,*sharedAnnouncer,sessionRandom.seed,applicationClock,
-       s.noise.sharedRandomState,audioError,playerRacer60),
+       s.noiseOwner().sharedRandomState,audioError,playerRacer60),
        audioError.empty()?"source Dax cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
    require50DU(materialMixer&&raceMusic->prepare("work/native/project/disc",audioRoot,
        *materialMixer,*audioGroups,audioError,dynamicContactEnabled),
@@ -1018,7 +1037,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   speechCounts=liveAudio->speechCounts();
   require50DU(pod_speech50HG::readPlayerSpeechChance(playerSpeechChance,audioError,
       audioRoot/"SPCHPCT.INI"),audioError.empty()?"actual speech probability missing":audioError.c_str());
-  require50DU(initializePodSpeech50HG(speechCounts,s.noise.sharedRandomState,speechState)==
+  if(!originalUiActive)require50DU(initializePodSpeech50HG(speechCounts,s.noiseOwner().sharedRandomState,speechState)==
       PodSpeechStatus50HG::Complete,"native speech cursor initialization failed");
   const auto& bank=liveAudio->bank();
   std::cerr<<"Audio bank ready/missing/unsupported/invalid "<<bank.ready<<'/'<<bank.missing
@@ -1552,7 +1571,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Every accepted sample is appended, genuinely dispatched and acknowledged
  // before another poll can overwrite its transitions, including pause releases.
  auto sampleController=[&](){
-  require50DU(!originalMainApplication.enabled,"Main-only frontend cannot sample driving input");
+  require50DU(!originalUiActive,"Main-only frontend cannot sample driving input");
   // UI capture/quit/pause paths may reach this call site, but there is no
   // player device owner to sample in the explicitly selected all-AI roster.
   if(allAiEnabled)return;
@@ -1600,7 +1619,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   requireActionStatus(controllerActions.acknowledgeComplete(),"acknowledge");
  };
  auto composePacket=[&](bool live,const platform::WindowInput50DQ& input){
-  require50DU(!originalMainApplication.enabled,"Main-only frontend cannot compose a driving packet");
+  require50DU(!originalUiActive,"Main-only frontend cannot compose a driving packet");
   if(allAiEnabled)return;
   ++allAiKeyboardPackets;
   if(live&&autoDriveEnabled&&(input.down[26]||input.down[22]||input.down[82]||input.down[81])){
@@ -1615,7 +1634,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
 
  auto applyCourseInput=[&](std::size_t racerSlot=0){
-  require50DU(!originalMainApplication.enabled,"Main-only frontend cannot invoke a driving controller");
+  require50DU(!originalUiActive,"Main-only frontend cannot invoke a driving controller");
   require50DU(!allAiEnabled,"all-original-AI path reached forbidden HOST course driver");
   ++allAiHostDriverCalls;
   rr::host::CourseDriverInput50GK command{};
@@ -1769,14 +1788,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         raceMusic->request(step.request.argumentA1,step.request.argumentA2,
             dynamicMusicProfile.mode11258).completed();
    }else returned=applyHostLapClockOrRandom50ID(step.request,applicationClock,
-       s.noise.sharedRandomState,actualV0);
+       s.noiseOwner().sharedRandomState,actualV0);
    if(!returned)dynamicBoundary(step.sourcePC,"collision music actual helper pending");
    if(!acceptDynamicContactMusicReturn50IW(dynamicMusicCursor,step.request.sequence,
        step.request.kind,actualV0))dynamicBoundary(step.sourcePC,"collision music return mismatch");
   }
  };
  auto advanceFrame=[&](std::size_t actualRacerSlot){
- require50DU(!originalMainApplication.enabled,"Main-only frontend cannot advance race physics");
+ require50DU(!originalUiActive,"Main-only frontend cannot advance race physics");
  require50DU(!nativeSelectedLights||actualRacerSlot<gcGraphicsSequence.size(),
      "GC light update requires the actual native racer slot");
  finishDriverAppliedThisFrame=false;
@@ -2005,7 +2024,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    const auto& p=m.components.root.body.position;
    materialInput.listenerDistance=std::hypot(p.v[0]-audioListener.x,p.v[2]-audioListener.z);
   }
-  require50DU(materialAudio->update(materialInput,s.noise.sharedRandomState).okay(),
+  require50DU(materialAudio->update(materialInput,s.noiseOwner().sharedRandomState).okay(),
       "native material audio subscriber rejected");
  }
  OptionalProbeOwners50P optionalOwners{}; // Development topology has no optional dust owner.
@@ -2183,7 +2202,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const EngineDamageInput50IA damageInput{m.frameFactor,s.fields.damage7D0,
       s.fields.damage7D4,s.fields.damage7DC};
   const auto damageReceipt=updateEngineDamageAudio50IA(damageInput,engineDamage,
-      engineDamage,s.noise.sharedRandomState);
+      engineDamage,s.noiseOwner().sharedRandomState);
   require50DU(damageReceipt.okay(),"original engine damage modulation rejected");
   ++engineDamageUpdates;engineDamageDraws+=damageReceipt.randomDraws;
   if(damageReceipt.damageDipStarted)++engineDamageDips;
@@ -2442,6 +2461,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(receipt.okay(),"original opponent engine audio world update rejected");
   require50DU(::allocations==beforeOpponentAudio,"opponent engine audio update allocated C++ storage");
  };
+ std::function<void()> activateColdRace;
  if(raceEnabled){
   std::array<native_racer_contact50HW::Binding,raceRacerCount> contactBindings{};
   contactBindings[0]={racerCollisions[0].get(),settings,response};
@@ -2687,7 +2707,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // owners are loaded. The neutral setup tick is real native physics, not
   // asset preparation. Main-only retains these assets but cannot activate a
   // race, publish fabricated ranks, or sample a neutral driving packet.
-  if(!originalMainApplication.enabled){
+  activateColdRace=[&](){
+  require50DU(!originalUiActive&&race.phase==race_session50HM::Phase::Uninitialized,
+      "native cold race activation is one-shot after Course input ownership ends");
+  if(originalUiStarted&&audioEnabled)require50DU(initializePodSpeech50HG(speechCounts,
+      s.noiseOwner().sharedRandomState,speechState)==PodSpeechStatus50HG::Complete,
+      "selected original speech cursor initialization failed");
   // One neutral, unscored native setup tick establishes actual graphics/ground
   // before countdown rendering. After this all physics freezes until GO.
   const platform::WindowInput50DQ noKeys{};
@@ -2760,9 +2785,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "source severity/common maxima, authentic profile11258=1 music, shared event1/event5 FIFO. "
       "Terminal boundaries retain missing vehicle5C/controller feedback, opponent D48, collision announcer and music fade. "
       "Native serial world timing is explicit; no full original scheduler claim.\n";
-  } // Native race activation; unreachable in the Main-only frontend.
+  };
+  if(!originalUiActive)activateColdRace();
  }
- if(originalMainApplication.enabled){
+ if(originalUiActive){
   // Read actual retained owners without changing a counter or fabricating
   // Ready/rank/field state. Renderer.create consumes immutable source meshes,
   // never a VehicleDrawBatch or a completed vehicle graphics tick.
@@ -2892,7 +2918,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(skyOwner->load(skyRequest,skyDiagnostic),
      skyDiagnostic.message.empty()?"actual selected-track sky load failed":skyDiagnostic.message.c_str());
  // Host is declared first so renderer destruction always precedes its context.
- auto nativeVideo=std::make_shared<original_main_entry50KG::Video>(originalMainApplication.enabled);
+ auto nativeVideo=std::make_shared<original_main_entry50KG::Video>(originalUiActive);
  auto& host=nativeVideo->host;
  gc_dynamic_window50IG::Owner gcDynamicWindow;
  ga_dynamic_window::Owner gaDynamicWindow;
@@ -2903,7 +2929,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // are authenticated from the admitted native disc tree; there is no second
  // overrideKnown setting, UI material, or UI unique animation instance.
  const bool gameplayBinderEnabled=raceEnabled&&playerUsesRosterRig&&(nativeGcSelection||nativeGaSelection)&&
-     !checkpointInput&&!originalMainApplication.enabled;
+     !checkpointInput&&(!originalUiActive||courseRaceCold);
  rr::assets::OriginalUiMaterialTemplates50KG gameplayBinderTemplates;
  std::shared_ptr<const rr::assets::OriginalUiArchive50KG> gameplayBinderAppStart;
  if(gameplayBinderEnabled){
@@ -2976,11 +3002,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const auto before=::allocations;
   require50DU(sampleHostTimestamp50ID(applicationClock,sourceApplicationTimestamp),"shared source application timestamp rejected");
   sourceApplicationTimestampPublished=true;
-  if(gcAnimatedWorld)require50DU(gcAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noise.sharedRandomState,
+  if(gcAnimatedWorld)require50DU(gcAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
       sessionRandom,s.animationShared.motion,gcAnimationDiagnostic),
       gcAnimationDiagnostic.message.empty()?"original GC world animation rejected":gcAnimationDiagnostic.message.c_str());
   if(gaAnimatedWorld){
-   const bool advanced=gaAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noise.sharedRandomState,
+   const bool advanced=gaAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
        sessionRandom,s.animationShared.motion,gaAnimationDiagnostic);
    require50DU(advanced,gaAnimationDiagnostic.message.empty()?"original GA world animation rejected":gaAnimationDiagnostic.message.c_str());
   }
@@ -3005,7 +3031,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // The coordinator retires Rider source owners through its live renderer,
   // then closes the renderer before releasing session/texture owners. A host
   // pre-close would make source retirement impossible during exception cleanup.
-  if(originalMainApplication.enabled){
+  if(originalUiStarted){
    // Before activation, renderer.create may retain a bank borrow even on
    // failure. With no coordinator borrow, preserve renderer-first cleanup.
    if(!originalMain.coordinator.borrowsRenderer(renderer)&&
@@ -3094,12 +3120,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   windowRequest.title=raceEnabled?"Racer Revenge | Native race | W/S + Up/Down | F5 restart | Esc menu":
       "Racer Revenge native development drive | W/S + Up/Down | F5 restart | Esc menu";
   if(isGaTrack)windowRequest.title="Racer Revenge | GA incomplete preview | All 8 original AI | Esc pause/menu";
-  if(originalMainApplication.enabled)windowRequest.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
+  if(originalUiActive)windowRequest.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
   windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
   windowRequest.major=3;windowRequest.minor=2;
   windowRequest.profile=platform::WindowGlProfile50DQ::Core;
   windowRequest.samples=0;windowRequest.swapInterval=0;windowRequest.resizable=true;
-  if(originalMainApplication.enabled){
+  if(originalUiActive){
    windowRequest.redBits=windowRequest.greenBits=windowRequest.blueBits=windowRequest.alphaBits=8;
    windowRequest.depthBits=24;windowRequest.stencilBits=0;
   }
@@ -3109,7 +3135,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   // Original Main owns a separate mixer/device/WAV. The retained cold race
   // bank cannot open output during Main, even if RR_AUDIO is enabled.
-  if(audioEnabled&&!originalMainApplication.enabled){
+  auto activateRaceAudio=[&](){
+   require50DU(!originalUiActive,"race output cannot open while Course owns input");
+  if(audioEnabled){
    const char* audioWav=std::getenv("RR_AUDIO_WAV");
    std::string sessionAudioPath;
    if(audioWav&&sessionIndex){
@@ -3138,17 +3166,20 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     std::cerr<<"Audio unavailable: no original samples decoded; no device or WAV opened.\n";
    }
   }
-  if(!originalMainApplication.enabled&&(mode1Enabled||dynamicContactEnabled))
+  if((mode1Enabled||dynamicContactEnabled))
    require50DU(liveAudio->outputOpen(),"source events need the real shared output backend");
   // Main retained cold race PCM owners, but did not initialize/observe a race.
   // Do not seed countdown or standings audio from an unstarted world.
-  if(audioEnabled&&raceEnabled&&!originalMainApplication.enabled){
+  if(audioEnabled&&raceEnabled){
    require50DU(raceAudio->observe(race).accepted,"initial race audio observation rejected");
    std::cerr<<"Race audio ready/missing/unsupported/invalid "<<raceAudio->bank().ready<<'/'
        <<raceAudio->bank().missing<<'/'<<raceAudio->bank().unsupported<<'/'
        <<raceAudio->bank().invalid<<" of "<<raceAudio->bank().clips.size()<<'\n';
   }
-  if(originalMainApplication.enabled && audioEnabled){
+   if(audioEnabled){liveAudio->pause(false);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(false);}
+  };
+  if(!originalUiActive)activateRaceAudio();
+  if(originalUiActive && audioEnabled){
    liveAudio->pause(true);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(true);
   }
   using GlStringFunction=const unsigned char*(*)(unsigned int);
@@ -3180,8 +3211,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const char* missingTextureProc=nullptr;
   require50DU(platform::loadMaterialTextureFunctions50EE(&host,renderRequest.procAddress,
       textureRequest.gl,missingTextureProc),"required texture GL entry point unavailable");
-  if(originalMainApplication.enabled)
-   originalMain.prepare(originalMainApplication,nativeVideo,textureRequest,renderRequest);
+  if(originalUiActive){
+   auto destination=original_main_entry50KG::courseRaceDestination([&](const platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection& selected){
+    if(!courseRaceCold||!originalUiActive||courseRaceLaunched||!raceEnabled||!allAiEnabled||!originalAiEnabled||
+       selected.course!=8||selected.planet!=1||selected.rider!=19||selected.subtype!=1||selected.laps!=3||selected.entrants!=8||
+       ((selected.packed1125C>>5)&3)!=1||((selected.packed1125C>>7)&15)!=7||
+       playerRacer60!=19||playerPodId!="POD19"||race.phase!=race_session50HM::Phase::Uninitialized||racerBank.count()!=8||
+       !renderer.initialized()||!trackGpuTextures.initialized()||!skyGpuTextures.initialized()||
+       !gaAnimatedWorld||!gaAnimatedWorld->ready()||!gaDynamicWindow.loaded()||!gaDynamicWindow.ownsResources()||
+       !gaTriggerActions||!gaTriggerActions->ready()||!gaAtm.loaded()||!gaAtm.ownsResources()||
+       !gameplayBinder.loaded()||!gameplayBinder.ownsResources()||!activateColdRace||
+       &s.noiseOwner()!=&originalMainApplication.state->sharedNoise308030||
+       &sessionRandom!=&originalMainApplication.state->sharedRandomSelectors)return false;
+    for(std::size_t slot=0;slot<racerBank.count();++slot){
+     if(!racerBank.active(slot)||!racerRigs[slot]||!racerCollisions[slot]||!racerVisuals[slot]||!racerCables[slot]||
+        !racerBank.read(slot,originalAiReads.initialized)||!racerBank.read(slot,racerFrameReads.vehicle58))return false;
+    }
+    return true;
+   });
+   originalMain.prepare(originalMainApplication,nativeVideo,textureRequest,renderRequest,std::move(destination));
+  }
   std::vector<platform::MaterialTextureSampler50EB> samplers;
   std::vector<platform::VehicleWindowMaterialBinding50DS> materialBindings[3];
   if(playerUsesRosterRig){
@@ -3427,7 +3476,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<" binder_bound="<<(renderRequest.gameplayBinderTextures!=nullptr)
        <<" camera_policy=host_chase_framePod listener_policy=accepted_camera_xz\n";
   }
-  if(originalMainApplication.enabled)originalMain.activate(renderer);
+  if(originalUiActive)originalMain.activate(renderer);
   // Renderer owns its cold GPU copy; release CPU-only track staging promptly.
   if(!headlessLive)trackMesh=rr::assets::Mesh48B{}; // Capture-only VM geometry evidence.
   materialOwner.reset();
@@ -3460,7 +3509,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::uint64_t cameraAdjustedFrames=0,cameraLimitedFrames=0;
   float viewForwardX=0.f,viewForwardZ=1.f; // Host chase view, preserved at vertical attitudes.
   auto reportUiState=[&](const char* reason){
-   if(originalMainApplication.enabled){
+   if(originalUiActive){
     originalMain.report(reason,originalMainApplication,completedFrames,liveAudio->mixedFrames());return;
    }
    // Evidence from the actual immutable bank owner and clocks, not a synthetic
@@ -3494,13 +3543,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    platform::VehicleWindowDiagnostic50DS readbackDiagnostic{};
    const auto readbackStart=originalMain.stageStart();
    const bool readbackOkay=renderer.readbackRgba(captureBuffer.data(),captureBuffer.size(),readbackDiagnostic);
-   if(originalMainApplication.enabled)originalMain.reportStage("capture_readback",readbackStart,readbackOkay);
+   if(originalUiActive)originalMain.reportStage("capture_readback",readbackStart,readbackOkay);
    require50DU(readbackOkay,"live frame readback failed");
    const auto fileStart=originalMain.stageStart();
    const auto width=readbackDiagnostic.readbackWidth,height=readbackDiagnostic.readbackHeight;
    require50DU(width>0&&static_cast<std::size_t>(width)*3<=captureRgbRow.size(),"capture RGB row capacity");
    const auto captureFile=std::filesystem::path(capturePath);
-   const auto writingFile=originalMainApplication.enabled?
+   const auto writingFile=originalUiActive?
        std::filesystem::path(captureFile.string()+".pending"):captureFile;
    std::ofstream image(writingFile,std::ios::binary);
    require50DU(bool(image),"capture file open failed");
@@ -3516,7 +3565,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    image.close(); // Publish the complete file before the capture acknowledgment.
    require50DU(bool(image),"capture file write failed");
-   if(originalMainApplication.enabled){
+   if(originalUiActive){
     // Same-directory rename atomically publishes the completed PPM before ACK.
     std::filesystem::rename(writingFile,captureFile);
     originalMain.reportStage("capture_file_publication",fileStart);
@@ -3599,7 +3648,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        "Exit and relaunch for a fresh preview. Focus loss/minimize pauses.\n";
    if(headlessLive)std::cerr<<"GA stdin commands: capture, pause, resume, menu (Pause), quit; "
        "up/down keys and Enter navigate the host menu. Restart/checkpoint requests are ignored.\n";
-  }else if(!originalMainApplication.enabled){
+  }else if(!originalUiActive){
   std::cerr<<"Interactive development client: W/S left engine throttle/brake; "
                "Up/Down right engine throttle/brake; W+Up both throttle; Space boosts; "
                "S+Down both brake; hold R to repair; Left Shift powerslides; Backspace resets to checkpoint; F5 restarts the grid; Escape opens the pause menu. "
@@ -3624,12 +3673,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "Menus use down/up Up, Down, Left, Right, Enter, Escape. Audio edits apply on Start/Restart only. "
       "Restart destroys this session and repeats the authored-grid cold setup.\n";
   }
-  reportUiState(originalMainApplication.enabled?"bound":"ready");
+  reportUiState(originalUiActive?"bound":"ready");
   if(allAiEnabled){
    requireOriginalAiFleetReady();
-   if(!originalMainApplication.enabled)reportOriginalAiFleet("ready");
+   if(!originalUiActive)reportOriginalAiFleet("ready");
   }
-  if(originalMainApplication.enabled){
+  if(originalUiActive){
    std::cerr<<"Original UI controls: Main/Options menu Up/Left/W previous(2), Down/Right/S next(3); "
        "Game Options Up/W previous group(2), Down/S next group(3), Left/Right change value(0/1), R defaults(5). Enter/Space confirm(4), "
        "Escape/menu back(6; source Main does not handle back). Window Close, quit, or stdin EOF exits. "
@@ -3642,9 +3691,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   bool secondMainPollReported=false,firstMainInactiveReported=false;
   for(;;){
    phase_timing50GK::Scope inputTiming(phaseTiming,phase_timing50GK::Phase::Input);
-   const bool traceFirstMainPoll=originalMainApplication.enabled&&originalMain.traceStages&&
+   const bool traceFirstMainPoll=originalUiActive&&originalMain.traceStages&&
        !firstMainPollReported;
-   const bool traceSecondMainPoll=originalMainApplication.enabled&&originalMain.traceStages&&
+   const bool traceSecondMainPoll=originalUiActive&&originalMain.traceStages&&
        firstMainPollReported&&!secondMainPollReported;
    if(traceFirstMainPoll){
     firstMainPollReported=true;
@@ -3665,7 +3714,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    inputTiming.finish();
    if(hostInput.inputError){terminalInputError=hostInput.inputError;std::cerr<<"stdin input error "<<terminalInputError<<'\n';}
-   if(originalMainApplication.enabled){
+   if(originalUiActive){
     // Own the real input stream before ALL host menus, driving packets,
     // restart/checkpoint paths and world/audio steps. No fallthrough exists.
     if(input.quitRequested){
@@ -3761,6 +3810,28 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     captureCommitted();
     originalMain.commitDeferred(renderer);
+    platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection selected;
+    if(originalMain.coordinator.takeCourseLaunch(selected)){
+     require50DU(courseRaceCold&&!courseRaceLaunched&&selected.course==8&&selected.rider==playerRacer60,
+         "Course queue selected a different native world or racer");
+     require50DU(originalMain.closeAudio(),"muted Course output cleanup failed");
+     originalUiActive=false;courseRaceLaunched=true;capturePending=false;
+     // Consume the real committed menu profile, keeping the existing native
+     // all-AI role/count policy explicit rather than rewriting its human bits.
+     dynamicProfile.game34=originalMainApplication.profile->mode34;
+     dynamicProfile.game1125F=static_cast<std::uint8_t>(selected.course);
+     dynamicMusicProfile.mode11258=selected.subtype;
+     activateColdRace();activateRaceAudio();
+     // Same context/world/roster and actual shared owners; no cold reload,
+     // source profile reset, synthetic input packet or host driving takeover.
+     originalMain.imagePublished=false;menuImagePublished=false;forceSceneRender=true;
+     suppressResumeKeys=true;wasPaused=true;
+     require50DU(hostClock.initialize(monotonicNow50DU(),stepNs,4),"Course race host clock entry failed");
+     std::cerr<<"original_course_race_entered course=8 track=GA rider=19 pod=POD19 original_ai=8 profile_humans=1 "
+         "native_control_policy=all_original_ai shared_application_rng=1 shared_application_selectors=1\n";
+     reportOriginalAiFleet("course_entry");reportUiState("course_entry");
+     continue;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(8));continue;
    }
    // Window close, explicit stdin quit, and EOF remain terminal. Escape is
@@ -4130,7 +4201,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     // Source player speech runs only on the human's accepted native step.
     if(mode1Enabled&&mode1->phase==race_mode1_host50ID::Phase::Flush){
-     const auto flushed=mode1->flush(applicationClock,sessionRandom.seed,s.noise.sharedRandomState,
+     const auto flushed=mode1->flush(applicationClock,sessionRandom.seed,s.noiseOwner().sharedRandomState,
          speechCounts,speechState,mode1Effects);
      if(flushed.status!=race_mode1_host50ID::Status::Complete)
       std::cerr<<"MODE1 FIFO BLOCKED: source_pc=0x"<<std::hex<<flushed.sourcePC<<std::dec
@@ -4155,7 +4226,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          dynamicBoundary(0x1a5940u,"contact subscriber entry pending");
         for(;;){
          const auto step=advanceDynamicContactEvent1Subscriber50IW(dynamicEventCursor,
-             dynamicActorResolver,dynamicEventBindings,s.noise.sharedRandomState);
+             dynamicActorResolver,dynamicEventBindings,s.noiseOwner().sharedRandomState);
          if(step.status==Status::Complete)break;
          if(step.status!=Status::NeedHelper)dynamicBoundary(step.sourcePC,"contact event source continuation");
          const auto& request=step.request;
@@ -4166,7 +4237,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
           if(request.actor!=1u)dynamicBoundary(request.callPC,"actual opponent D48 speech owner unavailable");
           const auto live=speechInput();
           auto selected=beginDynamicContactPodSpeech50IW(request,1u,speechCounts,
-              live.position,live.listeners,s.noise.sharedRandomState,speechState,dynamicPodEffect);
+              live.position,live.listeners,s.noiseOwner().sharedRandomState,speechState,dynamicPodEffect);
           if(selected.status==Status::NeedHelper){
            if(!liveAudio->outputOpen()||!liveAudio->applySourceCommand(dynamicPodEffect.command).okay())
             dynamicBoundary(selected.sourcePC,"actual contact speech audio helper pending");
@@ -4188,7 +4259,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        }else if(entry->event.type4==5u){
         if(entry->event.actor0C!=1u)dynamicBoundary(0x1a52b0u,"actual event5 D48 owner unavailable");
         const auto started=beginDamageEvent5Subscriber50ID(dynamicEvents,speechInput(),speechCounts,
-            s.noise.sharedRandomState,speechState,dynamicDamageCursor);
+            s.noiseOwner().sharedRandomState,speechState,dynamicDamageCursor);
         if(started!=DamageEventStatus50ID::Complete&&started!=DamageEventStatus50ID::NeedEffect)
          dynamicBoundary(0x1a52b0u,"original damage subscriber pending");
         if(!dynamicDamageCursor.complete){
@@ -4217,7 +4288,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     if(audioEnabled&&playerAdvancing&&!mode1Enabled&&!dynamicContactEnabled){
      AudioCommand50HE speechCommand{};std::size_t speechCount=0;
      const auto dispatched=dispatchDamageSpeechEvent50HG(speechInput(),speechCounts,pendingSpeech,
-         s.noise.sharedRandomState,speechState,&speechCommand,1,speechCount);
+         s.noiseOwner().sharedRandomState,speechState,&speechCommand,1,speechCount);
      require50DU(dispatched.status==PodSpeechStatus50HG::Complete,"native damage speech dispatch rejected");
      if(dispatched.announcerRequested)++announcerRequestsUnjoined;
      if(speechCount){
@@ -4799,7 +4870,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(terminalInputError==0,"live input stream failed");
  }catch(...){closeWindow();throw;}
  require50DU(closeWindow(),"window/renderer cleanup reported a failure");
- if(originalMainApplication.enabled){
+ if(originalUiActive){
   const auto mainAudioInfo=originalMain.audioOutput.info();
   J closed={{"native_frames",originalMain.frameCount},{"captures",originalMain.captureSequence},
       {"world_ticks",completedFrames},{"window_swaps",windowSwaps},{"cleanup_complete",true},
@@ -4847,8 +4918,8 @@ int main(int argc,char**argv){try{
              "Run from the repository root. RR_RACE_MODE=1 (default with fully prepared providers); "
              "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
              "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
-             "GA preview uses RR_TRACK=GA RR_GA_ORIGINAL_AI_CANDIDATE=1 RR_ORIGINAL_AI_ALL_RACERS=1 RR_RACE_MODE=2 RR_START_MENU=0. Window or headless, fresh session only; all 8 racers use original AI. GA disables manual driving, restart/checkpoint, track launch and human Results actions. Original Main must remain disabled.\n"
-             "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits only authenticated Rider19/Back when its compiled cache is available. Other Rider selections remain unavailable. Muted mode0 Rider19 Confirm to fixed Course and Back is integrated but unvalidated; Course directions and race launch remain unavailable. RR_AUDIO controls race audio only; no driving is launched.\n";
+             "GA preview uses RR_TRACK=GA RR_GA_ORIGINAL_AI_CANDIDATE=1 RR_ORIGINAL_AI_ALL_RACERS=1 RR_RACE_MODE=2 RR_START_MENU=0. Window or headless, fresh session only; all 8 racers use original AI. GA disables manual driving, restart/checkpoint and human Results actions. Original Main may hand off only its GA selection with separately prepared POD19 resources.\n"
+             "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits only authenticated Rider19/Back when its compiled cache is available. Other Rider selections remain unavailable. Muted mode0 Rider19 Confirm opens Course, Left/Right selects the first four, and Back returns. Course Confirm can start only the exact cold GA/POD19 eight-original-AI destination (requires RR_TRACK=GA, its explicit admission and supplemental POD19 assets); TA/SA/MA remain unavailable. RR_AUDIO controls race audio.\n";
   return 2;
  }
  // Every return destroys the complete old session, including native state and
@@ -4884,8 +4955,8 @@ int main(int argc,char**argv){try{
  require50DU(initialTrack,initialTrackError?initialTrackError:"original track admission failed");
  const bool initialGa=track_session_assets50IG::codeEquals(initialTrack->world->code,"GA");
  require50DU(!gaCandidate||initialGa,"GA candidate admission cannot select another track");
- require50DU(!initialGa||(gaCandidate&&!startAtMenu&&!originalMainApplication.enabled),
-     "GA requires explicit original-AI preview admission, RR_START_MENU=0 and original Main disabled");
+ require50DU(!initialGa||(gaCandidate&&!startAtMenu),
+     "GA requires explicit original-AI admission and RR_START_MENU=0");
  require50DU(track_session_assets50IG::codeEquals(initialTrack->world->code,"TA")||
      track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")||initialGa,
      "track is not in the explicit native admission list");
@@ -4893,6 +4964,9 @@ int main(int argc,char**argv){try{
      track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")?
      rr::platform::HostTrack50IM::GC:rr::platform::HostTrack50IM::TA;
  auto selectedTrack=effectiveTrack;
+ // Source UI starts on real Rider19. GA Course entry prepares that exact pod
+ // in camera slot0; the old eight-racer direct preview remains unchanged.
+ if(initialGa&&originalMainApplication.enabled)selectedRacer60=19;
  const char* incompleteWorldSetting=std::getenv("RR_GC_INCOMPLETE_WORLD");
  const char* selectedModeSetting=std::getenv("RR_RACE_MODE");
  const rr::platform::HostTrackAdmission50IM trackAdmission{

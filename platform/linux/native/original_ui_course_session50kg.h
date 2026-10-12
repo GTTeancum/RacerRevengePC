@@ -8,7 +8,7 @@ namespace rr::platform {
 enum class OriginalUiCourseSessionStatus50KG : std::uint8_t {
     ok,noChange,backProposed,unavailableDestination,notBound,alreadyBound,invalidInput,
     unsupportedState,profile,resource,widget,model,camera,lighting,aperture,
-    transition,draw,audio,allocation,faulted,quit
+    transition,draw,audio,allocation,faulted,quit,confirmProposed
 };
 struct OriginalUiCourseSessionDiagnostic50KG {
     OriginalUiCourseSessionStatus50KG status=OriginalUiCourseSessionStatus50KG::ok;
@@ -53,7 +53,7 @@ struct OriginalUiCourseSessionInputReceipt50KG {
 struct OriginalUiCourseSessionSnapshot50KG {
     bool bound=false,faulted=false,quitRequested=false,pageShown=false;
     bool inputContainerShown=false,cameraActive=false,framePublished=false;
-    bool backProposalPending=false,backAccepted=false;
+    bool backProposalPending=false,backAccepted=false,launchAccepted=false;
     bool popupEnabled438=false;
     std::uint32_t courseSlot14E4=0,subtypeSlot14F4=0,laps14EC=0,entrants14F0=0;
     std::uint32_t promptMask42C=0,selectedPlanet40=0,selectedCourse44=0,deferred14D0=0;
@@ -64,7 +64,8 @@ struct OriginalUiCourseSessionSnapshot50KG {
 };
 // Bounded mode0/subtype1/laps3/entrants8, fresh unlocked Course slots1..4.
 // Left/right uses genuine authored controls/models/text/backgrounds. Original
-// Back creates a fresh Rider owner; group changes and race launch stay closed.
+// Back creates a fresh Rider owner; Confirm proposes only the source launch transaction.
+// The frontend independently admits its actual cold native race destination.
 class OriginalUiCourseSession50KG final {
 public:
     OriginalUiCourseSession50KG()noexcept;~OriginalUiCourseSession50KG();

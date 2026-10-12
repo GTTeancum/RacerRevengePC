@@ -54,6 +54,11 @@ public:
     bool colors(std::uint32_t rider,OriginalUiRiderProfileColors50KG&) const noexcept;
     bool coursePlanetColors(std::uint32_t planet,OriginalUiCourseProfileColors50KG&)const noexcept;
     bool courseSnapshot(game::OriginalUiCourseRememberedProfile50KG&)const noexcept;
+    struct CourseRaceSelection {
+        std::uint32_t course=0,planet=0,rider=0,subtype=0,laps=0,entrants=0;
+        std::uint16_t packed1125C=0;
+    };
+    bool courseRaceSnapshot(CourseRaceSelection&)const noexcept;
     bool riderConfirmSnapshot(std::uint8_t& packed1125D,std::uint32_t& comparison100C0)const noexcept;
 private:
     friend class OriginalUiCourseSession50KG;
@@ -61,6 +66,7 @@ private:
     bool commitCourseEntry(const game::OriginalUiCourseSelectionData50KG&,const game::OriginalUiCourseEntryPrefix50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     bool commitCourseMove(const game::OriginalUiCourseSelectionData50KG&,const game::OriginalUiNavigation50KG& before,
         bool forward,const game::OriginalUiCourseMove50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
+    bool commitCourseLaunch(const game::OriginalUiRouteDecision50KG&,const game::OriginalUiCourseContext50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     bool commitCourseBack(const game::OriginalUiRouteDecision50KG&,const game::OriginalUiCourseContext50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     friend class OriginalUiFrontend50KG;
     friend class OriginalUiRiderSession50KG;

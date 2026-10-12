@@ -95,10 +95,18 @@ bool start(S&s,const VehicleFrameBindings49W&b,P phase,VehicleFrameWorkspace49W&
  if(s.phase!=phase||!phases(s))return fail(d,E::Phase,0);
  if(!admit(s,b,d))return false;
  if(phase>=P::SubstepReady&&phase<=P::Query219120){Schedule49K q{};if(!selectSchedule49K(s.bodies.main.frameFactor,s.bodies.main.liveSubstepScale,q)||q.count!=s.bodies.main.schedule.count||bits(q.factorPerSubstep)!=bits(s.bodies.main.schedule.factorPerSubstep)||s.bodies.main.substepIndex>=q.count)return fail(d,E::Phase,0);}
- w.next=s;return true;
+ w.next=s;
+ // Stage the real shared owner only for this transactional leaf. Failure must
+ // preserve application RNG/tables just as it preserves the frame. This is
+ // scratch, never a destination-owned stream or a cross-page seed transfer.
+ w.next.noise=s.noiseOwner();w.next.borrowedNoise50KG=nullptr;return true;
 }
 bool preserving(const PreservingStage49W&x,PreservingCut49W p,VehicleFrameDiagnostic49W&d) noexcept {return (x.point==p&&x.representedStatePreserved&&x.omittedBB0WNotConsumed)||fail(d,E::ExternalCut,0);}
-bool commit(S&s,VehicleFrameWorkspace49W&w,P p) noexcept {w.next.phase=p;s=w.next;return true;}
+bool commit(S&s,VehicleFrameWorkspace49W&w,P p) noexcept {
+ auto* shared=s.borrowedNoise50KG;w.next.phase=p;
+ if(shared)*shared=w.next.noise;
+ s=w.next;s.borrowedNoise50KG=shared;return true;
+}
 BodyContactEffects49W effects(const RootBodyState48H&r,float v,float a,float f,float t,const GraphBodyExtraLanes49W&e,std::uint32_t c) noexcept {return {r.body.velocity,r.body.angularVelocity,r.loads,r.positionCorrection1a0,r.rotationCorrection1b0,r.accumulator1c0,r.accumulator1d0,v,a,f,t,e.positionCorrection1A0W,e.rotationCorrection1B0W,e.accumulator1C0W,e.accumulator1D0W,c};}
 void install(RootBodyState48H&r,float&v,float&a,float&f,float&t,GraphBodyExtraLanes49W&e,std::uint32_t&c,const BodyContactEffects49W&x) noexcept {r.body.velocity=x.velocity70;r.body.angularVelocity=x.angularVelocityB0;r.loads=x.loads;r.positionCorrection1a0=x.positionCorrection1A0;r.rotationCorrection1b0=x.rotationCorrection1B0;r.accumulator1c0=x.accumulator1C0;r.accumulator1d0=x.accumulator1D0;v=x.velocity70W;a=x.angularVelocityB0W;f=x.force180W;t=x.torque190W;e.positionCorrection1A0W=x.positionCorrection1A0W;e.rotationCorrection1B0W=x.rotationCorrection1B0W;e.accumulator1C0W=x.accumulator1C0W;e.accumulator1D0W=x.accumulator1D0W;c=x.body20C;}
 bool sameEffects(const ContactEffects49W&a,const ContactEffects49W&b) noexcept {
