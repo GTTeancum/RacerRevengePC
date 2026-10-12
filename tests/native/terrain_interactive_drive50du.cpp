@@ -217,10 +217,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const char* gcLightingSetting=std::getenv("RR_NATIVE_GC_SELECTED_LIGHTS");
  require50DU(!gcLightingSetting||std::string(gcLightingSetting)=="0"||
      std::string(gcLightingSetting)=="1","RR_NATIVE_GC_SELECTED_LIGHTS must be 0 or 1");
- const bool nativeGcSelectedLights=gcLightingSetting&&std::string(gcLightingSetting)=="1";
- require50DU(!nativeGcSelectedLights||(raceEnabled&&!checkpointInput&&
-     !originalMainApplication.enabled&&track_session_assets50IG::codeEquals(trackSession->world->code,"GC")),
-     "nativeGcSelectedLights requires a fresh authenticated GC race; checkpoint/Main-only/TA unsupported");
+ const char* taLightingSetting=std::getenv("RR_NATIVE_TA_SELECTED_LIGHTS");
+ require50DU(!taLightingSetting||std::string(taLightingSetting)=="0"||
+     std::string(taLightingSetting)=="1","RR_NATIVE_TA_SELECTED_LIGHTS must be 0 or 1");
+ const bool nativeGcSelection=gcLightingSetting&&std::string(gcLightingSetting)=="1";
+ const bool nativeTaSelection=taLightingSetting&&std::string(taLightingSetting)=="1";
+ require50DU(!(nativeGcSelection&&nativeTaSelection),"choose exactly one native track-light policy");
+ const bool nativeSelectedLights=nativeGcSelection||nativeTaSelection;
+ require50DU(!nativeSelectedLights||(raceEnabled&&!checkpointInput&&
+     !originalMainApplication.enabled&&track_session_assets50IG::codeEquals(
+        trackSession->world->code,nativeTaSelection?"TA":"GC")),
+     "native selected lights require their matching fresh authenticated race; checkpoint/Main unsupported");
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
  const char* originalAiSetting=std::getenv("RR_ORIGINAL_AI_FIRST_SLICE");
@@ -1286,11 +1293,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // This count advances at actual graphics success, before later failure cuts.
  std::array<std::uint64_t,raceRacerCount> gcGraphicsSequence{};
  std::array<NativeGcSelectedLightsCandidate,raceRacerCount> gcDrawLights{};
- if(nativeGcSelectedLights){
-  require50DU(gcLightOwner.prepare(ground.world.parameters.original_bytes,raceRacerCount,
-      gcLightDiagnostic),"authentic GC light/visibility owner preparation failed");
-  std::cerr<<"NATIVE GC SELECTED LIGHTS: actual registered ambient/directional colors and real racer visibility; "
-      "native per-publication selection and host world-normal Lambert; existing material/alpha/fog/specular limits retained.\n";
+ const auto nativeLightingPolicy=nativeTaSelection?
+     gcLighting::CachePolicy::nativeTaAuthoredZoneSpotSelection:
+     gcLighting::CachePolicy::inactiveCandidateNativePerPublicationRecompute;
+ if(nativeSelectedLights){
+  const auto& bytes=ground.world.parameters.original_bytes;
+  require50DU(nativeTaSelection?gcLightOwner.prepareTaNative(bytes,raceRacerCount,gcLightDiagnostic):
+      gcLightOwner.prepare(bytes,raceRacerCount,gcLightDiagnostic),
+      "authenticated track light/visibility owner preparation failed");
+  std::cerr<<(nativeTaSelection?
+      "NATIVE TA SELECTED LIGHTS: authored zone/portal colors and 17 spotlights; actual racer visibility; explicit native zone scan/top-two selection; ":
+      "NATIVE GC SELECTED LIGHTS: actual registered ambient/directional colors and real racer visibility; ")
+      <<"native per-publication selection and host world-normal Lambert; existing material/alpha/fog/specular limits retained.\n";
  }
  std::uint64_t submittedDrawFrames=0,windowSwaps=0,nativeCalls=0,discardedHostNs=0;
  auto runNative=[&](auto&&fn,const char*label){
@@ -1649,7 +1663,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  };
  auto advanceFrame=[&](std::size_t actualRacerSlot){
  require50DU(!originalMainApplication.enabled,"Main-only frontend cannot advance race physics");
- require50DU(!nativeGcSelectedLights||actualRacerSlot<gcGraphicsSequence.size(),
+ require50DU(!nativeSelectedLights||actualRacerSlot<gcGraphicsSequence.size(),
      "GC light update requires the actual native racer slot");
  finishDriverAppliedThisFrame=false;
  if(audioEnabled&&!opponentFrame&&!raceSetupFrame)require50DU(advanceSpeechTimers50HG(.016f,lapContinuity.prefix,speechState),
@@ -1809,7 +1823,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      advancePlayerBoost50FK(boostInput,boostParameters,boostState,boostState,boostDiagnostic);},"native boost controller");
  x.selectors.vehicle64=boostState.vehicle64;
  runNative([&]{return graphicsVehicleFrame49W(s,x.bindings,x.parameters,f::cut(PreservingCut49W::Base2176E0BeforeGraphics),x.workspace,x.diagnostic);},"persistent graphics");
- if(nativeGcSelectedLights){
+ if(nativeSelectedLights){
   auto& sequence=gcGraphicsSequence[actualRacerSlot];
   require50DU(sequence!=std::numeric_limits<std::uint64_t>::max(),"GC graphics publication overflow");
   ++sequence;
@@ -2435,7 +2449,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   });
   for(std::size_t racer=1;racer<racerBank.count();++racer)
    coldRacerStage50DU(racerRigs[racer]->podId,"grounded grid placement",[&](){placeOpponentAtGrid50HN(racer);});
-  if(nativeGcSelectedLights)for(std::size_t racer=0;racer<racerBank.count();++racer)
+  if(nativeSelectedLights)for(std::size_t racer=0;racer<racerBank.count();++racer)
    racerBank.visit(racer,[&](){
     // Only this genuine unadvanced cold generation owns source C30=4C0[0].
     // Rig installation and final per-racer grid placement already completed.
@@ -3942,7 +3956,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     VehicleDrawBatch50CO next{};VehicleDrawBatchDiagnostic50CO drawDiagnostic{};
     {
     gcLighting::DrawLease lightLease;
-    if(nativeGcSelectedLights)require50DU(gcLightOwner.beginDraw(0,s,x.bindings,
+    if(nativeSelectedLights)require50DU(gcLightOwner.beginDraw(0,s,x.bindings,
         gcGraphicsSequence[0],lightLease,gcLightDiagnostic),
         "actual player GC visibility publication unavailable");
     if(!buildVehicleDrawBatch50CO(s,x.bindings,drawInput,next,drawWorkspace,drawDiagnostic)){
@@ -3950,8 +3964,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
               <<static_cast<unsigned>(drawDiagnostic.detail.error)<<'\n';
      throw std::runtime_error("actual vehicle mesh preparation failed");
     }
-    if(nativeGcSelectedLights)require50DU(gcLightOwner.publishNativeDraw(lightLease,
-        gcLighting::CachePolicy::inactiveCandidateNativePerPublicationRecompute,
+    if(nativeSelectedLights)require50DU(gcLightOwner.publishNativeDraw(lightLease,
+        nativeLightingPolicy,
         gcDrawLights[0],gcLightDiagnostic),"actual player selected GC lights unavailable");
     } //229EF4 semantic publication ends; only completed copied packet survives.
     projectionTiming.finish();
@@ -4087,7 +4101,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     platform::VehicleWindowFrame50DS renderFrame{info.drawableWidth,info.drawableHeight,
         view.worldViewProjection,clearColor,&cableMesh,&hud};
-    if(nativeGcSelectedLights){
+    if(nativeSelectedLights){
      renderFrame.lightingPolicy=platform::NativeRacerLightingPolicy50DS::nativeGcSelectedLights;
      renderFrame.selectedLights=&gcDrawLights[0];
     }
@@ -4110,13 +4124,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       if(racerBank.active(racer))racerBank.visit(racer,[&](){
        VehicleDrawBatchDiagnostic50CO opponentDiagnostic{};
        gcLighting::DrawLease lightLease;
-       if(nativeGcSelectedLights)require50DU(gcLightOwner.beginDraw(static_cast<std::uint32_t>(racer),
+       if(nativeSelectedLights)require50DU(gcLightOwner.beginDraw(static_cast<std::uint32_t>(racer),
            s,x.bindings,gcGraphicsSequence[racer],lightLease,gcLightDiagnostic),
            "actual opponent GC visibility publication unavailable");
        require50DU(opponentDraw[index].prepare(s,x.bindings,drawWorkspace,opponentDiagnostic),
            "actual opponent component projection failed");
-       if(nativeGcSelectedLights)require50DU(gcLightOwner.publishNativeDraw(lightLease,
-           gcLighting::CachePolicy::inactiveCandidateNativePerPublicationRecompute,
+       if(nativeSelectedLights)require50DU(gcLightOwner.publishNativeDraw(lightLease,
+           nativeLightingPolicy,
            gcDrawLights[racer],gcLightDiagnostic),"actual opponent selected GC lights unavailable");
        require50DU(buildPodCables50FD(s,x.bindings,racerCables[racer]->bindings(),cameraBackward,
            opponentDraw[index].cables,cableWorkspace,cableDiagnostic),"actual opponent cable mesh failed");
@@ -4140,7 +4154,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       opponents[nextRacePresentation.submittedOpponents++]={opponentDraw[index].batch(),&opponentDraw[index].cables,
           opponentUvs[index].data(),static_cast<std::uint32_t>(opponentUvs[index].size()),
           static_cast<std::uint32_t>(racer)};
-      if(nativeGcSelectedLights){
+      if(nativeSelectedLights){
        // Stopped racers retain BOTH their last complete geometry and its exact
        // light publication. Never select from their later interrupted frame.
        require50DU(gcDrawLights[racer].ready()&&gcDrawLights[racer].racerSlot()==racer,

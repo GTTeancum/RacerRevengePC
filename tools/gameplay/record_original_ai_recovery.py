@@ -177,6 +177,7 @@ class Recorder:
         self.ready_ui = None
         self.ready_fleet = None
         self.native_gc_lighting = None
+        self.native_ta_lighting = None
         self.audio_output = None
         self.sample_rate = None
         self.group = None
@@ -268,10 +269,12 @@ class Recorder:
 
     def check_ui(self, ui):
         wanted = {
-            "session": 1, "menu": False, "loaded_track": "GC",
+            "session": 1, "menu": False, "loaded_track": self.args.track,
             "loaded_racer": 1,
-            "selected_track": "GC", "track_pending": False,
-            "loaded_track_incomplete": True, "gc_incomplete_opt_in": True,
+            "selected_track": self.args.track, "track_pending": False,
+            "loaded_track_incomplete": self.args.track == "GC", "gc_incomplete_opt_in": self.args.track == "GC",
+            # Runtime publishes the explicit RR_RACE_MODE=2 admission flag,
+            # independently of loaded track, so this remains True for TA.
             "gc_mode2_admitted": True, "audio_enabled": True,
             "audio_pending": False,
         }
@@ -345,6 +348,8 @@ class Recorder:
                 raise ValueError("Complete ready fleet lacks ready UI/audio evidence")
             if self.args.native_gc_selected_lights and self.native_gc_lighting is None:
                 raise ValueError("Requested native GC light-owner policy was not observed before ready")
+            if self.args.native_ta_selected_lights and self.native_ta_lighting is None:
+                raise ValueError("Requested native TA light-owner policy was not observed before ready")
             startup_deadline = self.launch_ns + int(self.args.startup_timeout * 1e9)
             if now >= startup_deadline:
                 self.stop("startup_timeout", "Ready report arrived after startup deadline")
@@ -442,6 +447,12 @@ class Recorder:
             if self.native_gc_lighting is not None:
                 raise ValueError("Duplicate native GC light-owner initialization")
             self.native_gc_lighting = {"monotonic_ns": now, "line": line}
+        if line.startswith("NATIVE TA SELECTED LIGHTS:"):
+            if not self.args.native_ta_selected_lights:
+                raise ValueError("Unexpected native TA selected-light policy")
+            if self.native_ta_lighting is not None:
+                raise ValueError("Duplicate native TA light-owner initialization")
+            self.native_ta_lighting = {"monotonic_ns": now, "line": line}
         if BOUNDARY_RE.match(line):
             self.boundaries.append({"monotonic_ns": now, "line": line})
             self.stop("source_boundary", line)
@@ -696,6 +707,8 @@ class Recorder:
             "all_eight_readiness_observed": self.ready_fleet is not None,
             "requested_native_gc_light_owner_observed": not self.args.native_gc_selected_lights
             or self.native_gc_lighting is not None,
+            "requested_native_ta_light_owner_observed": not self.args.native_ta_selected_lights
+            or self.native_ta_lighting is not None,
             "no_partial_fleet_report": self.group is None,
             "all_observed_driver_controller_keyboard_counters_zero": observed_zero,
             "all_eight_native_tick_and_dispatch_growth_observed": len(growth) == 8
@@ -730,9 +743,10 @@ class Recorder:
             "normal_stop_receipt": self.normal_stop_receipt, "wav": wav,
             "lighting_policy": self.manifest["lighting_policy"],
             "native_gc_light_owner_observation": self.native_gc_lighting,
+            "native_ta_light_owner_observation": self.native_ta_lighting,
             "ending_executable_identity": ending_executable,
             "limitations": [
-                "This is incomplete-world GC in mode 2, not complete-track acceptance.",
+                "This is a bounded " + self.args.track + " mode2 observation, not complete-track acceptance.",
                 "The native_ticks fleet field is shared completedFrames, not an independent per-racer timer.",
                 "Per-racer dispatched counts are reported separately and must be inspected alongside native_ticks.",
                 "No final all-AI fleet row is emitted by quit; zero counters are verified only at logged snapshots.",
@@ -740,6 +754,7 @@ class Recorder:
                 "Frame timestamps measure host observations of complete log lines, not native GPU presentation time.",
                 "WAV uses the simulation/mixer clock and may include unmatched prefix/suffix; no mux or stretching performed.",
                 "live.ppm without a complete recorded three-part acknowledgment is untrusted partial output.",
+                "TA lighting uses an explicit authored-zone top-two host spotlight scan; source light-volume query, cache and specular parity are not claimed.",
                 "Native GC selected-light mode retains host normals/material/alpha/fog/specular limits; its startup line is owner-policy evidence, not original shader or pixel parity.",
             ],
         }
@@ -762,6 +777,9 @@ def main():
     parser.add_argument("--not-before", default=EARLIEST.isoformat(),
                         help="UTC launch gate, never earlier than 2026-10-10 15:18 UTC")
     parser.add_argument("--capture-hz", type=float, default=5.0)
+    parser.add_argument("--track", choices=("GC", "TA"), default="GC")
+    parser.add_argument("--native-ta-selected-lights", action="store_true",
+                        help="Explicit native TA authored-zone spotlight scan and portal-color host lighting; requires --track TA and owner receipt")
     parser.add_argument("--native-gc-gate", action="store_true",
                         help="Opt into native swept collider/ authored Gate sphere contact; records the compatibility policy")
     parser.add_argument("--native-track-fog", action="store_true",
@@ -774,6 +792,14 @@ def main():
     parser.add_argument("--ack-timeout", type=float, default=5.0)
     parser.add_argument("--quit-timeout", type=float, default=10.0)
     args = parser.parse_args()
+    if args.native_gc_selected_lights and args.native_ta_selected_lights:
+        parser.error("Select only one native lighting policy")
+    if args.native_gc_selected_lights and args.track != "GC":
+        parser.error("GC lighting requires --track GC")
+    if args.native_ta_selected_lights and args.track != "TA":
+        parser.error("TA lighting requires --track TA")
+    if args.native_gc_gate and args.track != "GC":
+        parser.error("GC Gate policy requires --track GC")
     if not args.root_reviewed_one_check:
         parser.error("Review and explicit root launch permission are required; no process started")
     if not re.fullmatch(r"[0-9a-fA-F]{64}", args.expected_exe_sha256):
@@ -799,7 +825,7 @@ def main():
     if output.parent.resolve() != STAGING.resolve() or output.exists() or output.is_symlink():
         parser.error("Output must be a completely new direct child of staging")
     corpus_identity = file_identity(ASSETS / CORPUS)
-    source_paths = SOURCE_PATHS + (GC_LIGHT_SOURCE_PATHS if args.native_gc_selected_lights else ())
+    source_paths = SOURCE_PATHS + (GC_LIGHT_SOURCE_PATHS if (args.native_gc_selected_lights or args.native_ta_selected_lights) else ())
     source_identities = [file_identity(REPO / name) for name in source_paths]
     output.mkdir(mode=0o700, exist_ok=False)
     for name in ("frames", "home", "tmp", "cache"):
@@ -808,10 +834,13 @@ def main():
         "PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C", "TZ": "UTC",
         "HOME": str(output / "home"), "TMPDIR": str(output / "tmp"),
         "XDG_CACHE_HOME": str(output / "cache"),
-        **RR_ENV, "RR_AUDIO_WAV": str(output / "audio.wav"),
+        **RR_ENV, "RR_TRACK": args.track,
+        "RR_GC_INCOMPLETE_WORLD": "1" if args.track == "GC" else "0",
+        "RR_AUDIO_WAV": str(output / "audio.wav"),
         "RR_GC_NATIVE_GATE": "1" if args.native_gc_gate else "0",
         "RR_AUTHORED_WORLD_FOG": "1" if args.native_track_fog else "0",
         "RR_NATIVE_GC_SELECTED_LIGHTS": "1" if args.native_gc_selected_lights else "0",
+        "RR_NATIVE_TA_SELECTED_LIGHTS": "1" if args.native_ta_selected_lights else "0",
     }
     manifest = {
         "prepared_candidate_validation": "Source-only; not executed or syntax-checked during authoring",
@@ -830,8 +859,10 @@ def main():
         "not_before": gate.isoformat(), "single_process_attempt": True,
         "gc_gate_contact_policy": "native_swept_type2_segments" if args.native_gc_gate else "disabled",
         "track_fog_policy": "reconstructed_native_track_fog" if args.native_track_fog else "disabled",
-        "lighting_policy": "nativeGcSelectedLights" if args.native_gc_selected_lights else "unchangedHost",
-        "lighting_scope": "Actual registered GC colors/directions and racer visibility, native per-publication reevaluation and existing host normals/material/alpha/fog; no full original shader/cache/specular parity",
+        "lighting_policy": "nativeTaAuthoredZoneSpotSelection" if args.native_ta_selected_lights else
+        "nativeGcSelectedLights" if args.native_gc_selected_lights else "unchangedHost",
+        "lighting_scope": "Authenticated TA authored colors, genuine racer visibility/pose, native zone scan/top-two spots and portal blend; host material/normal limits, no retail light query/cache parity" if args.native_ta_selected_lights else
+        "Actual registered GC colors/directions and racer visibility, native per-publication reevaluation and existing host normals/material/alpha/fog; no full original shader/cache/specular parity",
     }
     json_write(output / "launch.json", manifest)
     return Recorder(args, output, manifest).run()

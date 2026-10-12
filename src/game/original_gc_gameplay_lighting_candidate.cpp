@@ -87,8 +87,8 @@ void shaBlock(const std::uint8_t* block, std::array<std::uint32_t, 8>& h) noexce
     }
     h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d; h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=v;
 }
-bool authenticGcScb(const std::vector<std::uint8_t>& input) noexcept {
-    if (input.size() != 359830u) return false;
+bool authenticScb(const std::vector<std::uint8_t>& input,bool ta) noexcept {
+    if (input.size() != (ta?130511u:359830u)) return false;
     std::array<std::uint32_t, 8> h{{0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
         0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19}};
     std::size_t at = 0;
@@ -103,7 +103,8 @@ bool authenticGcScb(const std::vector<std::uint8_t>& input) noexcept {
         tail[padded - 1 - i] = static_cast<std::uint8_t>(bits >> (i * 8));
     shaBlock(tail.data(), h);
     if (padded == 128) shaBlock(tail.data() + 64, h);
-    constexpr char expected[] =
+    const char* expected = ta ?
+        "c3431a55c1f44ae704dae5b031a51f4b7907dbfc3e7787aba4c7ccbf9969031d" :
         "d47a83f4b50812609c923381f3a9038328c81d9a50563b68fb4de022a9be210d";
     constexpr char hex[] = "0123456789abcdef";
     for (unsigned i = 0; i < 64; ++i)
@@ -132,6 +133,21 @@ LiveZoneBounds50EN shapeBounds(const PodShapeState49W& shape,const PodShapeSourc
 }
 
 struct Owner::Storage {
+    // Frozen authenticated authored TA session, deliberately not a projection
+    // of source Light+D0 or LightManager+88. No updates are invented.
+    struct AuthoredSpot {
+        light::Vec3 position{},look{},rgb{},attenuation{};
+        float innerCos=0,outerCos=0;
+        std::uint32_t zone=0;
+    };
+    bool taNative=false;
+    std::array<AuthoredSpot,17> spots{};
+    light::Vec3 sunLook{};
+    std::array<light::Vec4,gcZones> sun44{};
+    bool prepareTa(Diagnostic&);
+    bool selectTa(const LiveZoneMembership50EN&,const light::Vec3&,
+        light::LightMatrices&,Diagnostic&) const noexcept;
+
     assets::World48F world;
     light::SmallDirectionalRegistry registry{};
     std::array<light::Vec4,gcZones> ambient60{};
@@ -171,29 +187,186 @@ struct Owner::Storage {
         if(!v.attached||!m.attached||m.object!=slot+1u||m.method!=ZoneMethod50CL::Second||
            m.storage.links!=v.links.data()||m.storage.entries!=v.entries.data()||
            m.storage.capacity!=v.links.size()||!v.entries[0].used)return false;
-        const auto zone=v.links[0].zone;if(!zone||zone>gcZones)return false;
+        const auto zone=v.links[0].zone;if(!zone||zone>world.zones.size())return false;
         const auto& r=registrations[slot];const auto& e=v.entries[0].registration;
         return r.owner==&registries[(zone-1u)*2u+1u]&&r.encodedObject==((slot+1u)<<2u)&&
             r.owner==e.owner&&r.slot==e.slot&&r.encodedObject==e.encodedObject;
     }
 };
+bool Owner::Storage::prepareTa(Diagnostic& d) {
+    const auto& params=world.parameters;
+    const auto* lights=block(params,"lights");
+    if(!lights||!textField(*lights,"numberoflights","26"))return fail(d,Status::sourceFields,0x2783d0);
+    auto scalar=[](const assets::ParameterBlock48F& b,const char* key,float& value){
+        const auto* f=field(b,key);
+        return f&&assets::parseTrackNumber50AD(f->value.data(),f->value.size(),value);
+    };
+    auto zoneOf=[&](const assets::ParameterBlock48F& b,std::uint32_t& zone){
+        float raw=1.f;
+        if(field(b,"initialzone")&&!scalar(b,"initialzone",raw))return false;
+        if(raw<1.f||raw>world.zones.size()||std::trunc(raw)!=raw)return false;
+        zone=static_cast<std::uint32_t>(raw);return true;
+    };
+    // Source construction order is numeric Light1..Light26, never lexical.
+    for(unsigned i=1;i<=26;++i){
+        const auto name="light"+std::to_string(i);const auto* b=block(params,name.c_str());
+        if(!b||field(*b,"hasflasher"))return fail(d,Status::sourceFields,0x277390);
+        light::Vec3 rgb{};std::uint32_t zone=0;
+        if(!triple(*b,"colorrgb",rgb)||!zoneOf(*b,zone))return fail(d,Status::sourceFields,0x277494);
+        for(float& c:rgb)c=mul(c,.5f); //146FDC..147014, not RGB normalization.
+        if(i==1){
+            light::Vec3 position{},target{};
+            if(!textField(*b,"type","Directional")||zone!=1||
+               !triple(*b,"position",position)||!triple(*b,"targetposition",target))
+                return fail(d,Status::sourceFields,0x2775fc);
+            for(unsigned c=0;c<3;++c)sunLook[c]=sub(target[c],position[c]);
+            if(!normalizeOnce(sunLook))return fail(d,Status::arithmetic,0x147200);
+            for(auto& row:sun44)row={{rgb[0],rgb[1],rgb[2],0.f}};
+        }else if(i<=9){
+            if(!textField(*b,"type","Ambient"))return fail(d,Status::sourceFields,0x148f30);
+            const light::Vec4 row{{rgb[0],rgb[1],rgb[2],64.f}};
+            if(zone==1)for(auto& current:ambient60)current=row;
+            else ambient60[zone-1]=row;
+        }else{
+            auto& spot=spots[i-10];float inner=0,outer=0;
+            if(!textField(*b,"type","Spotlight")||!triple(*b,"position",spot.position)||
+               !triple(*b,"lookvector",spot.look)||!triple(*b,"attenuation",spot.attenuation)||
+               !scalar(*b,"innerconeangle",inner)||!scalar(*b,"outerconeangle",outer)||
+               !normalizeOnce(spot.look)||inner<0.f||inner>=outer||outer>180.f)
+                return fail(d,Status::sourceFields,0x277390);
+            for(float a:spot.attenuation)if(!std::isfinite(a)||a<0.f)return fail(d,Status::sourceFields,0x146f60);
+            // Ordinary native trigonometry from authored full-angle degrees.
+            // Mathematical conversion, not recovered EE cosine bit parity.
+            constexpr float halfDegree=3.14159265358979323846f/360.f;
+            spot.innerCos=std::cos(mul(inner,halfDegree));spot.outerCos=std::cos(mul(outer,halfDegree));
+            spot.zone=zone;spot.rgb=rgb;
+            if(!(spot.innerCos>spot.outerCos))return fail(d,Status::arithmetic,0x149fe4);
+        }
+    }
+    // Unlike Light::Init RGB, source override reader278370..2783A4 and
+    // setter1498A0 copy these values DIRECTLY. Do not halve30,32,32 again.
+    for(std::size_t z=0;z<world.zones.size();++z){
+        const auto key="directionallightcolorforzone"+std::to_string(z+1);
+        if(field(*lights,key.c_str())){
+            light::Vec3 rgb{};if(!triple(*lights,key.c_str(),rgb))return fail(d,Status::sourceFields,0x278370);
+            for(unsigned c=0;c<3;++c)sun44[z][c]=rgb[c];
+        }
+    }
+    return true;
+}
+bool Owner::Storage::selectTa(const LiveZoneMembership50EN& member,
+    const light::Vec3& position,light::LightMatrices& output,Diagnostic& d) const noexcept {
+    for(float x:position)if(!std::isfinite(x))return fail(d,Status::arithmetic,0x2413a8);
+    if(!member.attached||!member.storage.links||!member.storage.capacity)
+        return fail(d,Status::identity,0x14a118);
+    const auto primary=member.storage.links[0].zone;
+    if(!primary||primary>world.zones.size())return fail(d,Status::identity,0x14a120);
+    light::LightMatrices next{};
+    next.diffuse[3]=ambient60[primary-1];next.diffuse[0]=sun44[primary-1];
+    next.specular[0]=sun44[0]; // Native host renderer currently ignores specular.
+    for(unsigned c=0;c<3;++c)next.directions[c][0]=-sunLook[c];
+    //149680 exact high-level portal color blend, actual visibility-zone links.
+    //500 is original14A698's radius, not a visual calibration constant.
+    light::Vec3 ambientSum{},sunSum{};float total=0.f;
+    auto link=portals.portalHeads[primary-1];std::size_t visited=0;
+    const Vector3_48C center{{position[0],position[1],position[2]}};
+    while(link){
+        if(link>portals.portalLinkCount||++visited>portals.portalLinkCount)
+            return fail(d,Status::registration,0x149700);
+        const auto& edge=portals.portalLinks[link-1];bool hit=false;float distance=0.f;
+        if(!edge.zone||edge.zone>world.zones.size()||!edge.portal||edge.portal>portals.portalCount)
+            return fail(d,Status::registration,0x149720);
+        if(overlapPortal231150_50EO(portals.portals[edge.portal-1],center,500.f,hit,distance)!=PortalGeometryStatus50EO::Complete)
+            return fail(d,Status::arithmetic,0x14970c);
+        if(hit){
+            volatile float weight=sub(500.f,distance)/500.f;
+            total=add(total,weight);
+            for(unsigned c=0;c<3;++c){
+                ambientSum[c]=add(ambientSum[c],mul(weight,ambient60[edge.zone-1][c]));
+                sunSum[c]=add(sunSum[c],mul(weight,sun44[edge.zone-1][c]));
+            }
+        }
+        link=edge.next;
+    }
+    volatile float reciprocal=1.f/add(1.f,total);
+    for(unsigned c=0;c<3;++c){
+        next.diffuse[3][c]=mul(reciprocal,add(next.diffuse[3][c],ambientSum[c]));
+        next.diffuse[0][c]=mul(reciprocal,add(next.diffuse[0][c],sunSum[c]));
+    }
+    // DELIBERATE HOST QUERY: authored initial-zone matches any genuine current
+    // racer membership zone. No fake source Light+D0 or manager+88 registry.
+    // Bounded scan in numeric authored order; retain two strongest by reciprocal
+    // attenuation, ties retain earlier authored lights. Sun reserves slot0.
+    std::array<float,2> scores{{std::numeric_limits<float>::infinity(),std::numeric_limits<float>::infinity()}};
+    std::array<light::Vec3,2> directions{},colors{};
+    for(const auto& spot:spots){
+        bool eligible=false;auto memberLink=CollectionRef50BX{1};std::size_t count=0;
+        while(memberLink){
+            if(memberLink>member.storage.capacity||++count>member.storage.capacity)
+                return fail(d,Status::registration,0x14a118);
+            const auto& current=member.storage.links[memberLink-1];
+            if(!current.zone||current.zone>world.zones.size())return fail(d,Status::registration,0x14a120);
+            eligible=eligible||current.zone==spot.zone;memberLink=current.next;
+        }
+        if(!eligible)continue;
+        light::Vec3 toward{};float square=0.f;
+        for(unsigned c=0;c<3;++c){toward[c]=sub(spot.position[c],position[c]);square=add(square,mul(toward[c],toward[c]));}
+        if(!std::isfinite(square))return fail(d,Status::arithmetic,0x14a2dc);
+        // No arbitrary epsilon or substituted normal. At exact coincidence the
+        // native directional Lambert contribution is undefined and is omitted.
+        if(square==0.f)continue;
+        const float distance=std::sqrt(square);if(!normalizeOnce(toward))return fail(d,Status::arithmetic,0x14a5cc);
+        float cosine=0.f;for(unsigned c=0;c<3;++c)cosine=add(cosine,mul(toward[c],-spot.look[c]));
+        float penalty=1.f;
+        if(cosine<spot.outerCos)penalty=5.f;
+        else if(cosine<=spot.innerCos){
+            volatile float fraction=sub(spot.innerCos,cosine)/sub(spot.innerCos,spot.outerCos);
+            penalty=add(sub(1.f,fraction),mul(5.f,fraction));
+        }
+        const float denominator=mul(penalty,add(add(spot.attenuation[0],mul(spot.attenuation[1],distance)),mul(spot.attenuation[2],square)));
+        if(!std::isfinite(denominator)||denominator<=0.f)return fail(d,Status::arithmetic,0x14a37c);
+        const unsigned slot=denominator<scores[0]?0u:denominator<scores[1]?1u:2u;
+        if(slot==2)continue;
+        if(slot==0){scores[1]=scores[0];directions[1]=directions[0];colors[1]=colors[0];}
+        scores[slot]=denominator;directions[slot]=toward;
+        for(unsigned c=0;c<3;++c){volatile float color=spot.rgb[c]/denominator;colors[slot][c]=color;}
+    }
+    for(unsigned slot=0;slot<2;++slot)if(std::isfinite(scores[slot]))for(unsigned c=0;c<3;++c){
+        next.directions[c][slot+1]=directions[slot][c];
+        next.diffuse[slot+1][c]=next.specular[slot+1][c]=colors[slot][c];
+    }
+    // Source149A50: only selected negative contributions affect sun/ambient.
+    // Folding every authored negative light globally would be incorrect.
+    if(light::foldSelectedNegativeLights(next,0,output)!=light::Status::complete)
+        return fail(d,Status::arithmetic,0x149a50);
+    return true;
+}
+
 Owner::Owner() noexcept=default;
 Owner::~Owner(){if(storage_&&storage_->activeLease)
     endDraw(*const_cast<DrawLease*>(storage_->activeLease));}
 DrawLease::~DrawLease(){if(owner_)owner_->endDraw(*this);}
 const assets::World48F* Owner::world() const noexcept {return storage_?&storage_->world:nullptr;}
 bool Owner::prepare(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
+    return prepareScene(scb,racers,false,d);
+}
+bool Owner::prepareTaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
+    return prepareScene(scb,racers,true,d);
+}
+bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t racers,bool ta,Diagnostic& d) noexcept {
     d={};if(invalidated_)return fail(d,Status::unprepared,0x272a48);
     if(storage_)return fail(d,Status::alreadyPrepared,0x272a48);
     if(!racers||racers>maximumRacers)return fail(d,Status::identity,0x1ae578);
-    if(!authenticGcScb(scb))return fail(d,Status::sourceIdentity,0x270b10);
+    if(!authenticScb(scb,ta))return fail(d,Status::sourceIdentity,0x270b10);
     if(!light::selection_detail::arithmeticReady())return fail(d,Status::arithmetic,0x146f60);
     try {
         auto next=std::make_unique<Storage>();
         if(!assets::decodeWorld48F(scb,next->world,d.decode))return fail(d,Status::sourceShape,0x270b10);
         const auto& w=next->world;
-        if(w.zones.size()!=gcZones||w.portals.size()!=gcPortals)
+        if(w.zones.size()!=(ta?9u:gcZones)||w.portals.size()!=(ta?10u:gcPortals))
             return fail(d,Status::unsupportedScene,0x272a48);
+        next->taNative=ta;
+        if(ta){if(!next->prepareTa(d))return false;}else{
         const auto* first=block(w.parameters,"light1");const auto* second=block(w.parameters,"light2");
         const auto* lights=block(w.parameters,"lights");
         if(!first||!second||!lights||!textField(*lights,"numberoflights","2")||
@@ -219,8 +392,9 @@ bool Owner::prepare(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Di
         // registers ambient,149000..149040 copies it into EVERY actual row.
         for(auto& zoneAmbient:next->ambient60)zoneAmbient=row;
         next->registry.selectedZoneAmbient=row;
+        }
         next->racerCount=racers;
-        for(std::size_t z=0;z<gcZones;++z){
+        for(std::size_t z=0;z<w.zones.size();++z){
             const auto read=assets::readZoneSearchSelection50CN(w,z);
             if(w.zones[z].zone!=z+1||read.status!=assets::ZoneSearchReadStatus50CN::Complete||
                read.selection.visibilityDynamic114!=assets::ZoneSearchKind50CN::List)
@@ -230,11 +404,11 @@ bool Owner::prepare(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Di
             next->registrations.data(),next->registrations.size(),
             {next->methods.data(),next->methods.size(),next->zones.data(),next->zones.size(),
              next->blocks.data(),next->blocks.size()}};
-        if(initializeZoneLifecycle50CL(next->lifecycle,lifeStorage,gcZones,racers,1024,
+        if(initializeZoneLifecycle50CL(next->lifecycle,lifeStorage,w.zones.size(),racers,1024,
             next->workspace.transfer)!=SearchStorageStatus50BS::Complete)
             return fail(d,Status::registration,0x272a58);
         std::array<LiveZonePortalInput50EN,gcPortals> input{};
-        for(std::size_t i=0;i<gcPortals;++i){
+        for(std::size_t i=0;i<w.portals.size();++i){
             input[i].zoneA=w.portals[i].zones[0];input[i].zoneB=w.portals[i].zones[1];
             const auto index=w.portals[i].parameter_block;
             if(index>=w.parameters.blocks.size())return fail(d,Status::sourceShape,0x272b3c);
@@ -250,7 +424,7 @@ bool Owner::prepare(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Di
         }
         const LiveZoneWorldStorage50EN portalStorage{next->portalHeads.data(),next->portalHeads.size(),
             next->portalLinks.data(),next->portalLinks.size(),next->portalGeometry.data(),next->portalGeometry.size()};
-        if(prepareLiveZoneWorld50EN(input.data(),input.size(),gcZones,portalStorage,next->portals)!=LiveZoneStatus50EN::Complete)
+        if(prepareLiveZoneWorld50EN(input.data(),w.portals.size(),w.zones.size(),portalStorage,next->portals)!=LiveZoneStatus50EN::Complete)
             return fail(d,Status::registration,0x272bc8);
         next->workspace.registries=next->scratchRegistries.data();next->workspace.registryCapacity=next->scratchRegistries.size();
         next->workspace.links=next->scratchLinks.data();next->workspace.entries=next->scratchEntries.data();
@@ -341,7 +515,7 @@ bool Owner::beginDraw(std::uint32_t slot,const VehicleFrameState49W& s,
        v.graphicsSequence!=expectedGraphicsSequence||
        o.drawGeneration==std::numeric_limits<std::uint64_t>::max())
         return fail(d,Status::identity,0x229e08);
-    lease.owner_=this;lease.generation_=++o.drawGeneration;
+    lease.owner_=this;lease.frame_=&s;lease.generation_=++o.drawGeneration;
     lease.membershipRevision_=v.member.revision;lease.racer_=slot;lease.roots_=v.roots;
     o.selectedReady.fill(false);o.activeLease=&lease;return true;
 }
@@ -355,18 +529,30 @@ bool Owner::select(const DrawLease& lease,std::uint32_t component,SceneNodeIndex
        lease.roots_[component]!=root||
        o.vehicles[lease.racer_].member.revision!=lease.membershipRevision_)
         return fail(d,Status::stalePublication,0x2413d0);
-    if(policy!=CachePolicy::inactiveCandidateNativePerPublicationRecompute)
+    if(policy!=(o.taNative?CachePolicy::nativeTaAuthoredZoneSpotSelection:
+        CachePolicy::inactiveCandidateNativePerPublicationRecompute))
         return fail(d,Status::unsupportedPolicy,0x14a0e8);
     // INTENTIONALLY INACTIVE NATIVE POLICY: do not reproduce retail A4 hits.
     // It can differ from14A860's membership-key retained matrix. No source
     // null/miss/completeness assertion is manufactured by choosing this branch.
     if(!o.selectedReady[component]){
+        if(o.taNative){
+            if(!lease.frame_||!validRoot(root,lease.frame_->sceneNodeCount))
+                return fail(d,Status::identity,0x2413d0);
+            const auto& node=lease.frame_->nodes[static_cast<std::uint32_t>(root)];
+            if(!(node.sceneFlags190&1u))return fail(d,Status::phase,0x2412e4);
+            const light::Vec3 position{{node.world100.v[12],node.world100.v[13],node.world100.v[14]}};
+            light::LightMatrices next{};
+            if(!o.selectTa(o.vehicles[lease.racer_].member,position,next,d))return false;
+            o.selected[component]=next;o.selectedReady[component]=true;
+        }else{
         const auto zone=o.vehicles[lease.racer_].links[0].zone;
         auto selected=o.registry;selected.selectedZoneAmbient=o.ambient60[zone-1u];
         light::LightMatrices next{};
         if(light::projectSmallDirectionalRegistry(selected,next)!=light::Status::complete)
             return fail(d,Status::arithmetic,0x149bb0);
         o.selected[component]=next;o.selectedReady[component]=true;
+        }
     }
     output=o.selected[component];return true;
 }
@@ -384,7 +570,7 @@ void Owner::endDraw(DrawLease& lease) noexcept {
     if(storage_&&storage_->activeLease==&lease){
         storage_->selectedReady.fill(false);storage_->activeLease=nullptr;
     }
-    lease.owner_=nullptr;lease.generation_=0;lease.membershipRevision_=0;
+    lease.owner_=nullptr;lease.frame_=nullptr;lease.generation_=0;lease.membershipRevision_=0;
     lease.racer_=0;lease.roots_={};
 }
 void Owner::invalidate() noexcept {

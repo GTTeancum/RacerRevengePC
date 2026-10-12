@@ -26,7 +26,9 @@ enum class CachePolicy : std::uint8_t {
     unspecified,
     // Deliberate native policy. NEVER asserts source manager+A4 is null,
     // lookup14A860 missed, or shared UI lifetime became tracked again.
-    inactiveCandidateNativePerPublicationRecompute
+    inactiveCandidateNativePerPublicationRecompute,
+    // Explicit TA authored-zone scan policy; not original light-volume query.
+    nativeTaAuthoredZoneSpotSelection
 };
 class Owner;
 // Semantic equivalent of229E08..229EF4's temporary component scene+19C
@@ -35,6 +37,7 @@ class Owner;
 class DrawLease final {
     friend class Owner;
     Owner* owner_=nullptr;
+    const VehicleFrameState49W* frame_=nullptr; // Borrow only within actual draw lease.
     std::uint64_t generation_=0, membershipRevision_=0;
     std::uint32_t racer_=0;
     std::array<SceneNodeIndex49P,3> roots_{};
@@ -56,6 +59,7 @@ class Owner final {
     std::unique_ptr<Storage> storage_;
     bool invalidated_=false; // Terminal even before a successful cold prepare.
     void endDraw(DrawLease&) noexcept;
+    bool prepareScene(const std::vector<std::uint8_t>&,std::uint32_t,bool,Diagnostic&) noexcept;
 public:
     Owner() noexcept;
     ~Owner();
@@ -65,6 +69,10 @@ public:
     // Actual roster count is supplied by the native roster owner, never inferred
     // from geometry. Cold-only. Failure leaves an empty owner retryable.
     bool prepare(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+        Diagnostic&) noexcept;
+    // Exact TA bytes, explicit host policy: frozen authored lights, genuine
+    // racer visibility, native zone scan. No source light-D0/manager+88 claim.
+    bool prepareTaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
         Diagnostic&) noexcept;
     const assets::World48F* world() const noexcept;
     // Actual fresh-grid229F20->2167A0 slice after the final real grid placement.
