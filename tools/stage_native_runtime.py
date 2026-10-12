@@ -12,6 +12,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import struct
 
 
 def require(ok, message):
@@ -44,6 +45,34 @@ def regular(root, name):
         require(not result.is_symlink(), 'Symlink input: ' + str(result))
     require(result.is_file(), 'Missing input: ' + str(result))
     return result
+
+
+def native_executable(path, platform):
+    """Inspect host format only; never load or execute the supplied binary."""
+    require(path.is_file() and not path.is_symlink(), 'Missing native executable')
+    with path.open('rb') as source:
+        header = source.read(64)
+        if platform == 'linux':
+            require(len(header) == 64 and header[:6] == b'\x7fELF\x02\x01'
+                    and struct.unpack_from('<H', header, 18)[0] == 62,
+                    'Linux package requires a native x86-64 ELF executable')
+            require(struct.unpack_from('<H', header, 16)[0] in (2, 3),
+                    'ELF input is not an executable or PIE image')
+        else:
+            require(len(header) == 64 and header[:2] == b'MZ',
+                    'Windows package requires a native PE executable')
+            offset = struct.unpack_from('<I', header, 60)[0]
+            require(64 <= offset <= path.stat().st_size - 26,
+                    'Invalid PE header location')
+            source.seek(offset)
+            pe = source.read(26)
+            require(pe[:4] == b'PE\0\0'
+                    and struct.unpack_from('<H', pe, 4)[0] == 0x8664
+                    and struct.unpack_from('<H', pe, 24)[0] == 0x20b,
+                    'Windows package requires a native x86-64 PE32+ image')
+            flags = struct.unpack_from('<H', pe, 22)[0]
+            require(flags & 2 and not flags & 0x2000,
+                    'PE input is not an application executable')
 
 
 def main():
@@ -102,7 +131,7 @@ def main():
         for row in json.loads(Path(filename).read_text(encoding='utf-8'))['files']:
             add(Path(root), row)
     executable = args.native_executable
-    require(executable.is_file() and not executable.is_symlink(), 'Missing native executable')
+    native_executable(executable, args.platform)
     name = 'rr-native.exe' if args.platform == 'windows' else 'rr-native'
     require(name not in entries, 'Native executable collides with asset manifest')
     entries[name] = (executable, {'path': name, 'bytes': executable.stat().st_size,

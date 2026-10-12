@@ -17,7 +17,9 @@ python3 tools/stage_native_runtime.py \
 ```
 
 Use `--platform windows` with the actual Windows native executable. Never
-rename a Linux binary to create a Windows package. Required native system
+rename a Linux binary to create a Windows package. The packager inspects the
+actual x86-64 ELF or PE32+ header and rejects a mismatched host format without
+executing it. Required native system
 libraries remain a platform dependency; this script does not install them.
 
 The original camera input root contains `manifest.json` and all 23 transferred
@@ -56,8 +58,9 @@ RR_AUDIO=1
 Leave lighting at its authored default. Do not supply a tint override. This
 route uses original AI for all eight racers, including the camera-followed
 racer. The direct preview currently supports Resume, Controls and Exit;
-restart and checkpoint relaunch are unavailable. Original menu-to-race entry
-and original camera activation are separate integration changes in progress.
+restart and checkpoint relaunch are unavailable. Original menu-to-race entry,
+original camera intro/Attached view and enabled Course audio were integrated
+in commit `56ec194`; their new basic smoke is pending.
 
 The Linux build and basic initialization smoke passed on commit `8288704` on
 October 12, 2026. This is not a Windows build claim, visual acceptance, or

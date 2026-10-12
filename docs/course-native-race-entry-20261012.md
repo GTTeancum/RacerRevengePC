@@ -10,4 +10,4 @@ The continuing frame borrows the real application's noise and selector owners. T
 
 Prepare the original roster with --additional-pods POD19 and visual selection with --additional-pods 19. Keep the original eight rows and add POD19 as additional_racers, not a ninth live racer. Use a fresh runtime output. The optional asset validator is not part of the prescribed basic smoke.
 
-Original camera activation is still a separate pending integration. Career/save, additional Riders/tracks, menu group editing, enabled Course audio, race-to-original-menu return and restart remain open code work. Human testers own broad visual and playthrough acceptance.
+Original camera intro/Attached activation and enabled Course audio are integrated in `56ec194`, with their basic smoke pending. Career/save, additional Riders/tracks, menu group editing, race-to-original-menu return and restart remain open code work. Human testers own broad visual and playthrough acceptance.

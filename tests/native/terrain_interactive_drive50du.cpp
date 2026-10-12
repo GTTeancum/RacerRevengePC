@@ -3858,7 +3858,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        "Game Options Up/W previous group(2), Down/S next group(3), Left/Right change value(0/1), R defaults(5). Enter/Space confirm(4), "
        "Escape/menu back(6; source Main does not handle back). Window Close, quit, or stdin EOF exits. "
        "Game Options Accept requires the live enabled audio owner and commits process settings; Cancel remembers the group without applying local edits. "
-       "Muted mode0 Rider19 Confirm to fixed Course and Back is integrated but unvalidated; Course directions and race launch remain unavailable. "
+       "Mode0 Rider19 Confirm opens Course with original enabled audio or explicit mute; Left/Right selects four tracks, and Back returns. GA Confirm starts the prepared POD19 original-AI race. "
        "F5/restart and checkpoint have no original UI destination. capture writes the existing live PPM target.\n";
   }
   // Opt-in host observations only; each receipt is bounded to this session.
