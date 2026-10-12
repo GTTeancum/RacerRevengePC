@@ -73,10 +73,11 @@ bool AudioMixer50HD::bindOriginalSoundMode50KG(std::shared_ptr<OriginalSoundMode
     for(std::size_t i=0;i<count_;++i)if(voices_[i].active)return false;
     soundMode50KG_=std::move(owner);noteControlChange();return true;
 }
-bool AudioMixer50HD::originalRouting50KG(std::int32_t angle,float& left,float& right) const noexcept {
+bool AudioMixer50HD::originalRouting50KG(std::int32_t angle,float& left,float& right,
+    std::int32_t volume) const noexcept {
     if(!soundMode50KG_||!soundMode50KG_->ready())return false;
     game::OriginalSoundRouting50KG routing;
-    if(!game::projectOriginalSoundRouting26CBA050KG(soundMode50KG_->fields(),angle,100,routing))return false;
+    if(!game::projectOriginalSoundRouting26CBA050KG(soundMode50KG_->fields(),angle,volume,routing))return false;
     // Original source proves packet selectors0/1/L/R, but the retained inputs
     // do not include their IOP consumer. Only selector0 is admitted to PCM.
     // In particular no rear-phase interpretation or fake surround is invented.
@@ -147,6 +148,28 @@ bool AudioMixer50HD::controlsSourceRate(std::size_t slot,float gain,float pitch,
     if(voice.gain!=gain||voice.pitch!=pitch||voice.pan!=0.f||
        originalLeft50KG_[slot]!=left||originalRight50KG_[slot]!=right)noteControlChange();
     voice.gain=gain;voice.pitch=pitch;voice.pan=0.f;
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
+}
+bool AudioMixer50HD::playSourceVolume(std::size_t slot,const AudioClip50HD& clip,
+    std::int32_t volume,float pitch,bool loop,std::int32_t engineAngle) noexcept {
+    float left=0.f,right=0.f;
+    if(slot>=count_||!validSourceRate(clip,rate_,1.f,pitch)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||
+       !originalRouting50KG(engineAngle,left,right,volume))return false;
+    noteControlChange();playbackRevisions_[slot]=controlRevision_;
+    voices_[slot]={clip,0.0,1.f,pitch,0.f,true,loop};
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
+}
+bool AudioMixer50HD::controlsSourceVolume(std::size_t slot,std::int32_t volume,
+    float pitch,std::int32_t engineAngle) noexcept {
+    float left=0.f,right=0.f;
+    if(slot>=count_||!validSourceRate(voices_[slot].clip,rate_,1.f,pitch)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||
+       !originalRouting50KG(engineAngle,left,right,volume))return false;
+    auto& voice=voices_[slot];
+    if(voice.gain!=1.f||voice.pitch!=pitch||voice.pan!=0.f||
+       originalLeft50KG_[slot]!=left||originalRight50KG_[slot]!=right)noteControlChange();
+    voice.gain=1.f;voice.pitch=pitch;voice.pan=0.f;
     originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
 }
 bool AudioMixer50HD::setLoop(std::size_t slot, bool loop) noexcept {

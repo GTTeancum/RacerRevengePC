@@ -65,6 +65,14 @@ public:
                         float pitch,bool loop,std::int32_t engineAngle=0) noexcept;
     bool controlsSourceRate(std::size_t slot,float gain,float pitch,
                             std::int32_t engineAngle=0) noexcept;
+    // Actual integer source volume enters26CBA0 BEFORE directional integer
+    // division. Requires the real mode owner. The resulting L/R percentages
+    // include volume; voice.gain is unity, so volume is never applied twice.
+    // Legacy gain APIs above retain their existing normalization policy.
+    bool playSourceVolume(std::size_t slot,const AudioClip50HD&,std::int32_t volume,
+                          float pitch,bool loop,std::int32_t engineAngle) noexcept;
+    bool controlsSourceVolume(std::size_t slot,std::int32_t volume,float pitch,
+                              std::int32_t engineAngle) noexcept;
     bool setLoop(std::size_t slot, bool loop) noexcept;
     bool setMasterGain(float gain) noexcept;
     // 50IC persistent group layer. These gains are independent of voice.gain:
@@ -103,7 +111,8 @@ public:
     static bool validClip(const AudioClip50HD&) noexcept;
 private:
     void noteControlChange() noexcept;
-    bool originalRouting50KG(std::int32_t engineAngle,float& left,float& right) const noexcept;
+    bool originalRouting50KG(std::int32_t engineAngle,float& left,float& right,
+                            std::int32_t volume=100) const noexcept;
     std::shared_ptr<OriginalSoundMode50KG> soundMode50KG_;
     float originalLeft50KG_[audioMaximumVoices50HD]{};
     float originalRight50KG_[audioMaximumVoices50HD]{};

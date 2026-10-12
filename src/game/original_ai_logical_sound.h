@@ -42,7 +42,7 @@ inline AiLogicalSoundReceipt startAiLogicalSound233410(
     if(volume<0||volume>100||pitch<=0||pitch>=16384){
         r.status=AiLogicalSoundStatus::nativeBackend;r.sourcePC=0x233514u;return r;
     }
-    const auto applied=owner.startSourceRate(s,static_cast<float>(volume)/100.f,
+    const auto applied=owner.startSourceVolume(s,volume,
         static_cast<float>(pitch)/4096.f,s.loop1B0!=0,angle);
     if(applied!=platform::LogicalAudioOwner::Result::complete){
         r.status=AiLogicalSoundStatus::nativeBackend;r.sourcePC=0x233544u;return r;
@@ -95,7 +95,7 @@ inline AiLogicalSoundReceipt spatialAiLogicalSound233AE0(
     if(s.channel2C<0){r.sourceReturned=true;r.sourcePC=0x233d50u;return r;}
     // Positive-rate native backend. Zero/-1 source transport semantics need
     // their own backend handling; never substitute a clamped audible pitch.
-    if(word<=0||owner.controlsSourceRate(s,static_cast<float>(s.volume44)/100.f,
+    if(word<=0||owner.controlsSourceVolume(s,s.volume44,
         static_cast<float>(word)/4096.f,s.angle48)!=platform::LogicalAudioOwner::Result::complete){
         r.status=AiLogicalSoundStatus::nativeBackend;r.sourcePC=0x233d78u;return r;
     }

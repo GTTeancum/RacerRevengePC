@@ -72,9 +72,18 @@ public:
         if(!active(s))return Result::owner;
         return mixer_->controlsSourceRate(s.slot,gain,pitch,angle)?Result::complete:Result::backend;
     }
+    Result startSourceVolume(Sound& s,std::int32_t volume,float pitch,bool loop,
+        std::int32_t angle) noexcept {
+        if(volume<0||volume>100)return Result::backend;
+        return startWithRatePolicy(s,1.f,pitch,loop,true,angle,volume);
+    }
+    Result controlsSourceVolume(Sound& s,std::int32_t volume,float pitch,std::int32_t angle) noexcept {
+        if(!active(s))return Result::owner;
+        return mixer_->controlsSourceVolume(s.slot,volume,pitch,angle)?Result::complete:Result::backend;
+    }
 private:
     Result startWithRatePolicy(Sound& s,float gain,float pitch,bool loop,bool sourceRate,
-        std::int32_t angle) noexcept {
+        std::int32_t angle,std::int32_t sourceVolume=-1) noexcept {
         if(!owns(s))return Result::owner;
         if(!s.available)return Result::unavailable;
         // An active foreign revision is never stolen. Inactive slots are
@@ -82,7 +91,8 @@ private:
         if(mixer_->active(s.slot)&&!active(s))return Result::owner;
         if(nextToken_==std::numeric_limits<std::int32_t>::max())return Result::exhausted;
         if(!mixer_->canRecordControlChanges(1))return Result::exhausted;
-        const bool started=sourceRate?mixer_->playSourceRate(s.slot,s.clip,gain,pitch,loop,angle):
+        const bool started=sourceVolume>=0?mixer_->playSourceVolume(s.slot,s.clip,sourceVolume,pitch,loop,angle):
+            sourceRate?mixer_->playSourceRate(s.slot,s.clip,gain,pitch,loop,angle):
             mixer_->play(s.slot,s.clip,gain,pitch,loop,0.f);
         if(!started)return Result::backend;
         s.token=++nextToken_;s.channel2C=s.token;s.revision=mixer_->playbackRevision(s.slot);
