@@ -7,6 +7,9 @@
 
 namespace rr::platform {
 namespace {
+bool supportedRider(std::uint32_t rider) noexcept {
+    switch(rider){case 2:case 4:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+}
 using Diagnostic=OriginalUiRiderProfileDiagnostic50KG;
 using Error=Diagnostic::Error;
 bool fail(Diagnostic& d,Error e,std::uint32_t pc) noexcept {d.error=e;d.sourcePC=pc;return false;}
@@ -213,7 +216,7 @@ bool OriginalUiRiderProfileOwner50KG::riderConfirmSnapshot(std::uint8_t& packed,
 bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToCourse(const game::OriginalUiRouteDecision50KG& d,OriginalUiRiderProfileStamp50KG expected)noexcept{
     if(!storage_||!storage_->readable()||storage_->common->mode34!=0||expected.mode34!=0||expected.generation!=storage_->generation||
        storage_->generation==std::numeric_limits<std::uint64_t>::max()||!d.admitted||!d.profileProposalComplete||d.blockers||
-       d.action!=game::OriginalUiRouteAction50KG::request||d.request.sourceScreen!=5||d.request.sourcePage!=1||(d.selectedRider!=19&&d.selectedRider!=20)||d.profileChanges.count!=3)return false;
+       d.action!=game::OriginalUiRouteAction50KG::request||d.request.sourceScreen!=5||d.request.sourcePage!=1||!supportedRider(d.selectedRider)||d.profileChanges.count!=3)return false;
     game::OriginalUiRiderContext50KG c;c.mode34=0;c.selectedRider=d.selectedRider;c.playerIndex=0;c.packed1125C=storage_->common->playerBits1125C;
     c.unlockOwnerReady=true;c.selectedUnlockWord10FAC=storage_->unlock10FAC[d.selectedRider];c.comparisonRider100C0=storage_->comparison100C0;
     c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;c.admission.nativePageMasks[6]=1u<<1;

@@ -8,15 +8,16 @@ namespace rr::platform {
 // all geometry, text, material state and navigation. This interface neither
 // substitutes a screen nor generates glyphs from a host font.
 inline constexpr std::uint32_t originalUiMaximumQuads50KG = 8192;
-// Genuine Rider19 models alone emit15956 original triangle slots across
-// authored passes; all authenticated UI capacities bound the full frame16989.
-// The sealed source-RGBA route gets a distinct bounded17408-slot bank;
-// ordinary Main/Options draw admission and allocations retain8192.
-inline constexpr std::uint32_t originalUiMaximumSourceQuads50KM = 17408;
+// Authenticated default-unlocked PSG surface headers, weighted by actual PSM
+// pass counts, bound the largest selected pair (Rider12) to19120 slots. The
+// existing full static UI/helper allowance1033 gives20153; round to20480.
+// Header strip continuations only reduce this bound. No geometry is dropped.
+// See docs/rider-unlocked-capacity50km.md. Main/Options retain8192.
+inline constexpr std::uint32_t originalUiMaximumSourceQuads50KM = 20480;
 inline constexpr std::uint32_t originalUiMaximumSpans50KG = 2048;
 enum class OriginalUiBlend50KG : std::uint8_t {
     opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive,
-    destinationSourceAlphaAttenuation
+    destinationSourceAlphaAttenuation, fixed64Additive
 };
 enum class OriginalUiMaterialMode50KG : std::uint8_t {
     unspecified, texturedModulate, untexturedVertexColor,

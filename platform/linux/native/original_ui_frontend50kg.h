@@ -137,7 +137,7 @@ struct OriginalUiFrontendSnapshot50KG {
     bool lightManagerEntered=false;
 };
 // Concrete native Main4/1 <-> Options12/{1,4}, plus Rider5/1 for
-// authenticated Rider19/20 selection, with mode0 Confirm -> bounded Course6/1
+// authenticated default-unlocked Rider selection, with mode0 Confirm -> bounded Course6/1
 // and Back. Course Confirm additionally requires the concrete native race lease.
 // No guest execution, fallback UI or profile reset. Runtime acceptance is pending.
 // One freshly prepared bank/session/manager per screen lifetime; shared process

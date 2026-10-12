@@ -369,6 +369,30 @@ struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
             rr::assets::OriginalUiIpumCacheDiagnostic50KG cacheDiagnostic;
             require(cache->load(cold.rider,mips,cacheDiagnostic),
                 "original Rider IPUM retained mip authentication rejected");
+            // A compiled additional catalog requires its real retained bytes.
+            // With no extra catalog, no additional images are fabricated.
+            for(std::size_t source=0;source<Cache::additionalCatalogSourceCount();++source){
+                std::vector<std::vector<std::uint8_t>> additionalMips;
+                const auto count=Cache::additionalMipCount(source);
+                additionalMips.reserve(count);
+                for(std::size_t mip=0;mip<count;++mip){
+                    const char* filename=Cache::additionalRetainedMipFilename(source,mip);
+                    require(filename && *filename,"additional Rider IPUM filename unavailable");
+                    const auto path=application.riderCacheRoot/filename;
+                    std::ifstream input(path,std::ios::binary|std::ios::ate);
+                    if(!input)throw std::runtime_error("cannot open additional Rider IPUM mip: "+path.string());
+                    const std::streamoff size=input.tellg();
+                    require(size>0 && static_cast<std::uint64_t>(size)<=16u*1024u*1024u,
+                        "additional Rider IPUM retained mip size rejected");
+                    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
+                    input.seekg(0);input.read(reinterpret_cast<char*>(bytes.data()),
+                        static_cast<std::streamsize>(bytes.size()));
+                    require(static_cast<bool>(input),"additional Rider IPUM retained mip read failed");
+                    additionalMips.push_back(std::move(bytes));
+                }
+                require(cache->loadAdditional(source,cold.rider,additionalMips,cacheDiagnostic),
+                    "additional Rider IPUM retained mip authentication rejected");
+            }
             cold.riderIpumCache=std::move(cache);
         }
         cold.optionsProfile=application.optionsProfile;cold.gameSettingsProfile=application.gameSettingsProfile;

@@ -25,6 +25,13 @@ const assets::OriginalUiMemberIdentity50KG* member(assets::OriginalUiArchiveId50
         if(m&&std::strcmp(m->name,name)==0)return m;}
     return nullptr;
 }
+bool riderMember(const assets::OriginalUiMemberIdentity50KG* identity) noexcept {
+    const auto* archive=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::rider);
+    if(!identity||!archive)return false;
+    for(std::size_t i=0;i<archive->memberCount;++i)
+        if(identity==assets::originalUiMemberIdentity50KG(assets::OriginalUiArchiveId50KG::rider,i))return true;
+    return false;
+}
 bool table(const assets::OriginalUiArchive50KG& app,assets::OriginalUiMemberView50KG& out) noexcept {
     if(!app.loaded()||app.identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::appStart))return false;
     const auto* identity=member(assets::OriginalUiArchiveId50KG::appStart,"AppStart\\Mat_Stbl.txt");
@@ -90,10 +97,9 @@ bool OriginalUiRiderMaterialFootprint50KG::pod(const assets::OriginalUiArchive50
     const assets::OriginalUiRiderPodAssets50KG& asset,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {
     d={};const auto id=asset.widgetId();
     const auto* widget=member(assets::OriginalUiArchiveId50KG::rider,"UI\\UIRider\\Widgets.Dat");
-    const auto* modelSource=member(assets::OriginalUiArchiveId50KG::rider,
-        id==27?"ui\\geometry\\19.psg":"ui\\geometry\\20.psg");
-    if(!widget||!modelSource||!asset.loaded()||!asset.scene()||(id!=27&&id!=28)||
-       asset.widgetSource()!=widget||asset.modelSource().identity!=modelSource)return fail(d,E::footprint,0x26E640);
+    // The immutable asset owner authenticated the widget's actual SLT reference.
+    if(!widget||!asset.loaded()||!asset.scene()||!id||id>=120||
+       asset.widgetSource()!=widget||!riderMember(asset.modelSource().identity))return fail(d,E::footprint,0x26E640);
     OriginalUiRiderMaterialFootprint50KG next;
     if(!next.model(app,*asset.scene(),d))return false;
     next.kind_=Kind::podGraph;next.widget_=id;next.source_=asset.modelSource().identity;out=next;return true;
@@ -102,10 +108,9 @@ bool OriginalUiRiderMaterialFootprint50KG::character(const assets::OriginalUiArc
     const assets::OriginalUiRiderCharacterAssets50KG& asset,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {
     d={};const auto id=asset.widgetId();
     const auto* widget=member(assets::OriginalUiArchiveId50KG::rider,"UI\\UIRider\\Widgets.Dat");
-    const auto* mcf=member(assets::OriginalUiArchiveId50KG::rider,
-        id==53?"UI\\Anim\\19c.mcf":"ui\\anim\\20c.mcf");
-    if(!widget||!mcf||!asset.loaded()||!asset.scene()||(id!=53&&id!=54)||!asset.baseName()||
-       *asset.baseName()!=(id==53?"19c":"20c")||asset.widgetSource()!=widget||asset.mcfSource()!=mcf)
+    // The immutable asset owner authenticated the widget's actual MCF reference.
+    if(!widget||!asset.loaded()||!asset.scene()||!id||id>=120||!asset.baseName()||
+       asset.baseName()->empty()||asset.widgetSource()!=widget||!riderMember(asset.mcfSource()))
         return fail(d,E::footprint,0x1538B0);
     OriginalUiRiderMaterialFootprint50KG next;
     if(!next.model(app,*asset.scene(),d))return false;

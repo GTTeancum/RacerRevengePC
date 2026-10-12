@@ -6,7 +6,7 @@ namespace rr::platform {class OriginalUiRiderSession50KG;}
 namespace rr::game {
 // Immutable descriptor population only. Neither value authorizes source
 // selection, graph creation, material registration or a destination change.
-enum class OriginalUiRiderColdPopulation50KG : std::uint8_t {selected19,rider19And20};
+enum class OriginalUiRiderColdPopulation50KG : std::uint8_t {selected19,rider19And20,defaultUnlocked};
 class OriginalUiRiderDynamicOwner50KG;
 struct OriginalUiRiderDynamicBackend50KG {
     void* context=nullptr;
@@ -65,6 +65,8 @@ public:
     OriginalUiRiderDynamicHooks50KG hooks() noexcept;
     const OriginalUiRiderDynamicDiagnostic50KG& diagnostic() const noexcept;
     bool poisoned() const noexcept;
+    std::uint16_t podWidget(std::uint32_t rider) const noexcept;
+    std::uint16_t characterWidget(std::uint32_t rider) const noexcept;
     OriginalUiRiderWidgetState50KG state(std::uint16_t) const noexcept;
     bool drain() noexcept;
     // Invoked in actual widget traversal order, after ancestor enable gates.

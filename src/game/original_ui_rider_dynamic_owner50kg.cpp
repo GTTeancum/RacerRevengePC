@@ -20,6 +20,7 @@ struct OriginalUiRiderDynamicOwner50KG::Storage {
         OriginalUiRiderCharacterScene50KG character;OriginalUiRiderPodScene50KG pod;
     };
     std::array<Entry,120> entries;
+    std::array<std::uint16_t,32> pods{},characters{};
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive;
     ModelMotionSharedState49T* motion=nullptr;ModelMode0IkShared50KG* ik=nullptr;
     SourceLibmState49T* libm=nullptr;CoupledNoiseContext49M* rng=nullptr;
@@ -62,6 +63,21 @@ bool OriginalUiRiderDynamicOwner50KG::bind(std::shared_ptr<const assets::Origina
             // actual manager cold construction, before selection publication.
             if(e.state.selected||e.state.shown)return fail(E::input);
         }
+        // Bind identities from the authenticated rider.dat control membership.
+        // Numeric rider IDs do not imply a widget offset or an asset filename.
+        const auto* selection=widgets.selectionData();const auto* page=selection->page();
+        if(!page||page->groups.size()<=1)return fail(E::input);
+        for(const auto control:page->groups[1].controls){
+            if(control<0||static_cast<std::size_t>(control)>=page->controls.size())return fail(E::input);
+            const auto rider=selection->controlRider(static_cast<std::uint16_t>(control));
+            if(rider<0||rider>=32)return fail(E::input);
+            if(rider!=2&&rider!=4&&rider!=10&&rider!=11&&rider!=12&&rider!=15&&rider!=19&&rider!=20)continue;
+            const auto& ids=page->controls[control].widgets;
+            if(ids.size()!=4||!idOk(ids[0])||!idOk(ids[3])||
+               next->entries[ids[0]].state.kind!=K::pod||next->entries[ids[3]].state.kind!=K::character||
+               next->pods[rider]||next->characters[rider])return fail(E::input);
+            next->pods[rider]=ids[0];next->characters[rider]=ids[3];
+        }
         storage_=std::move(next);diagnostic_={};d={};return true;
     }catch(...){return fail(E::allocation);}
 }
@@ -74,6 +90,12 @@ OriginalUiRiderDynamicHooks50KG OriginalUiRiderDynamicOwner50KG::hooks() noexcep
 }
 const OriginalUiRiderDynamicDiagnostic50KG& OriginalUiRiderDynamicOwner50KG::diagnostic()const noexcept{return diagnostic_;}
 bool OriginalUiRiderDynamicOwner50KG::poisoned()const noexcept{return storage_&&storage_->poisoned;}
+std::uint16_t OriginalUiRiderDynamicOwner50KG::podWidget(std::uint32_t rider)const noexcept {
+    return storage_&&rider<storage_->pods.size()?storage_->pods[rider]:0;
+}
+std::uint16_t OriginalUiRiderDynamicOwner50KG::characterWidget(std::uint32_t rider)const noexcept {
+    return storage_&&rider<storage_->characters.size()?storage_->characters[rider]:0;
+}
 OriginalUiRiderWidgetState50KG OriginalUiRiderDynamicOwner50KG::state(std::uint16_t id)const noexcept {
     return storage_&&idOk(id)?storage_->entries[id].state:OriginalUiRiderWidgetState50KG{};
 }
@@ -82,37 +104,31 @@ bool OriginalUiRiderDynamicOwner50KG::prepareCold(OriginalUiRiderColdPopulation5
     d={};const auto fail=[&](E e){d.error=e;diagnostic_=d;return false;};
     if(!storage_||storage_->coldPrepared||storage_->poisoned||storage_->drained||storage_->inCallback||
        (population!=OriginalUiRiderColdPopulation50KG::selected19&&
-        population!=OriginalUiRiderColdPopulation50KG::rider19And20))return fail(E::input);
+        population!=OriginalUiRiderColdPopulation50KG::rider19And20&&
+        population!=OriginalUiRiderColdPopulation50KG::defaultUnlocked))return fail(E::input);
     auto& s=*storage_;
     for(const auto& e:s.entries)if(e.everLoaded||e.registered||e.characterAssets||e.podAssets||
        (dynamic(e.state.kind)&&(e.state.selected||e.state.shown)))return fail(E::input);
     try {
         std::array<std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG>,120> characters{};
         std::array<std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG>,120> pods{};
-        const bool include20=population==OriginalUiRiderColdPopulation50KG::rider19And20;
-        // Original Control16/17 membership is verified by the private session.
-        // This order fixes only cold bank remapping, never source callbacks.
-        for(const std::uint16_t id:{27,28,53,54}){
-            if(!include20&&(id==28||id==54))continue;d.widget=id;
-            const auto kind=s.entries[id].state.kind;
-            if(id==27||id==28){
-                if(kind!=K::pod)return fail(E::input);
-                auto a=std::make_shared<assets::OriginalUiRiderPodAssets50KG>();
-                if(!a->load(s.archive,id,d.pod))return fail(E::cold);
-                if(a->widgetId()!=id||a->widgetSource()!=s.archive->find("UI/UIRider/Widgets.Dat").identity||
-                   a->modelSource().identity!=s.archive->find(id==27?"UI/Geometry/19.psg":"UI/Geometry/20.psg").identity)
-                    return fail(E::cold);
-                pods[id]=std::move(a);
-            }else{
-                if(kind!=K::character)return fail(E::input);
-                auto a=std::make_shared<assets::OriginalUiRiderCharacterAssets50KG>();
-                if(!a->load(s.archive,id,d.character))return fail(E::cold);
-                if(a->widgetId()!=id||!a->baseName()||*a->baseName()!=(id==53?"19c":"20c")||
-                   a->widgetSource()!=s.archive->find("UI/UIRider/Widgets.Dat").identity||
-                   a->mcfSource()!=s.archive->find(id==53?"UI/Anim/19c.mcf":"UI/Anim/20c.mcf").identity)
-                    return fail(E::cold);
-                characters[id]=std::move(a);
-            }
+        for(const std::uint32_t rider:{2u,4u,10u,11u,12u,15u,19u,20u}){
+            if(population==OriginalUiRiderColdPopulation50KG::selected19&&rider!=19)continue;
+            if(population==OriginalUiRiderColdPopulation50KG::rider19And20&&rider!=19&&rider!=20)continue;
+            const auto pod=s.pods[rider],character=s.characters[rider];
+            if(!pod||!character||pods[pod]||characters[character])return fail(E::input);
+            d.widget=pod;
+            auto p=std::make_shared<assets::OriginalUiRiderPodAssets50KG>();
+            if(!p->load(s.archive,pod,d.pod))return fail(E::cold);
+            if(p->widgetId()!=pod||p->widgetSource()!=s.archive->find("UI/UIRider/Widgets.Dat").identity||
+               !p->modelSource().identity)return fail(E::cold);
+            d.widget=character;
+            auto c=std::make_shared<assets::OriginalUiRiderCharacterAssets50KG>();
+            if(!c->load(s.archive,character,d.character))return fail(E::cold);
+            if(c->widgetId()!=character||!c->baseName()||
+               c->widgetSource()!=s.archive->find("UI/UIRider/Widgets.Dat").identity||
+               c->mcfSource()!=s.archive->find("UI/Anim/"+*c->baseName()+".mcf").identity)return fail(E::cold);
+            pods[pod]=std::move(p);characters[character]=std::move(c);
         }
         // These are immutable files/geometry/motions only. No graph, entry
         // sample, attachment, IK, visibility, binder clock or source row exists.
@@ -131,9 +147,7 @@ bool OriginalUiRiderDynamicOwner50KG::preflight(const OriginalUiRiderWidgetCallb
         if(!idOk(c.widget)){ok=false;break;}const auto& e=s.entries[c.widget];
         if(!dynamic(e.state.kind))continue;
         const bool needs=c.operation==O::select||(e.state.kind==K::character&&c.operation==O::clearSelection);
-        // Only the exact sealed19/20 descriptors can acquire a live graph.
-        // Backend preflight additionally requires real renderer retirement.
-        if(needs&&c.widget!=27&&c.widget!=28&&c.widget!=53&&c.widget!=54){diagnostic_.error=E::input;ok=false;break;}
+        // Only a retained cold descriptor and sealed backend pair can acquire a graph.
         if(needs&&((e.state.kind==K::character&&!e.characterAssets)||(e.state.kind==K::pod&&!e.podAssets))){
             diagnostic_.error=E::cold;ok=false;
         }
@@ -156,7 +170,7 @@ bool OriginalUiRiderDynamicOwner50KG::generic(std::uint16_t id,bool selected) no
 }
 bool OriginalUiRiderDynamicOwner50KG::loadModel(std::uint16_t id) noexcept {
     auto& s=*storage_;auto& e=s.entries[id];
-    if(id!=27&&id!=28&&id!=53&&id!=54){diagnostic_.error=E::input;return false;}
+    if(!dynamic(e.state.kind)||(!e.characterAssets&&!e.podAssets)){diagnostic_.error=E::input;return false;}
     if(e.registered)return true;
     auto* ledger=s.backend.materialLifetime(s.backend.context);
     const auto* footprint=s.backend.graphFootprint(s.backend.context,id);

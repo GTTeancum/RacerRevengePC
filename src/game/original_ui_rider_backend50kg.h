@@ -48,7 +48,7 @@ private:
     std::vector<const assets::OriginalUiMaterialPass50KG*> sources;
     std::vector<assets::OriginalUiMaterialBindingState50KG> states;
 };
-// Exact19/20 graph/helper ownership with renderer-first retirement. Source
+// Authenticated prepared graph/helper ownership with renderer-first retirement. Source
 // mutation is synchronous and nonreentrant. Session admission still owns the
 // complete direction/appearance/deferred/audio transaction; cold data alone
 // never authorizes callbacks or replacement of a live source generation.
@@ -62,6 +62,7 @@ public:
     const OriginalUiRiderBackendDiagnostic50KG& diagnostic() const noexcept;
     OriginalUiRiderVisibilityOwner50KG* visibility() noexcept;
     std::shared_ptr<const assets::OriginalUiArchive50KG> riderArchive()const noexcept;
+    bool preparedRider(std::uint32_t rider) const noexcept;
     bool beginFrame() noexcept;
     void endFrame() noexcept;
     std::uint64_t generation() const noexcept;

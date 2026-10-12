@@ -67,7 +67,7 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
             auto& decoded=next->decodedTextures[i];
             const auto* cached=ipumCache?ipumCache->textureFor(s.member,s.pstOffset,s.pstBytes):nullptr;
             if(cached){
-                const auto* evidence=ipumCache->provenance();
+                const auto* evidence=ipumCache->provenanceFor(s.member,s.pstOffset,s.pstBytes);
                 if(!evidence||cached->kind!=2)return fail(d,Error::texture,i);
                 decoded=*cached;next->ipumEvidence[i]=*evidence;
             }else if(!s.cel.identity&&!s.pstOffset&&s.pstBytes==s.member.size&&

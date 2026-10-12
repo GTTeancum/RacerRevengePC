@@ -74,16 +74,45 @@ constexpr OriginalFile riderOriginal{
 constexpr OriginalFile courseOriginal{
     "MUSIC/UI/SCREENS/UI_TRKS.VAG",448480,
     "b00ea0f7d26f88970eaa87899b5e185b821d82a2bd01a07a33ccf14ded42b40d",390628};
-// UIACCEPT.INI Event39..43 (Rider19) and44..45 (Rider20), original constructor ranges.
-constexpr std::array<OriginalFile,7> riderConfirmOriginals{{
-    {"SPEECH/UI/A2ASEL01.VAG",25488,"854e09eaf3d5eb28bfccfc35e8a869b5fc10515b6e6c4a3a8dc11dee50cde698",44492},
-    {"SPEECH/UI/A2ASEL02.VAG",19232,"7d11a96798382bde857a80d994317e92ec3a4fc57108c2de9b253e21ad519393",33544},
-    {"SPEECH/UI/A2ASEL03.VAG",18096,"f79ef5212c57bb313c88002bb595352054a2dbb54e059deb8d2dd071ef65ec8c",31556},
-    {"SPEECH/UI/A2ASEL04.VAG",27520,"36f8c4c4c756a36ad6b21c9cd2f4bd083efc53e22f31aa022a8ab1e456e921df",48048},
-    {"SPEECH/UI/A2ASEL05.VAG",17296,"d70fd36cdc0981560f940ad9d74eed809c44cc0a7b05fd8d73e869727a890034",30156},
-    {"SPEECH/UI/OCCSEL01.VAG",24384,"f826ff76992d67646856ce9baa455400e807766edf77716d228ef9f7b6931f85",42560},
-    {"SPEECH/UI/OCCSEL02.VAG",29712,"d0c0af3755a80d7840aa3f52b2f1903e3191c4ace12fe9b6c060bcb8573ce41e",51884}
+// UIACCEPT.INI exact events for the default-unlocked constructor ranges.
+// Retained 48-byte zero-header VAGs, 22050 Hz mono: frames include the
+// first end-flag block (28 samples each), excluding the final padding block.
+// Counts and SHA256s come from raw headers/end flags and original bytes.
+struct OriginalRiderConfirmFile { std::uint32_t eventId; OriginalFile file; };
+constexpr std::array<OriginalRiderConfirmFile,OriginalUiMainAudio50KG::riderConfirmClipCount> riderConfirmOriginals{{
+    // Rider2: Ben Quadinaros, Event5..6.
+    {5,{"SPEECH/UI/BENSEL01.VAG",18736,"b74f9db0200e94509e85e5c2280c8e7fa5ecb49aa0de721f31b2e4a5a78ed9b2",32676}},
+    {6,{"SPEECH/UI/BENSEL02.VAG",14304,"5a90c499cf9e04ee270ea1bb435ee53790c8464b244bd4846843e34223049646",24920}},
+    // Rider4: Dud Bolt, Event9..10.
+    {9,{"SPEECH/UI/DUDSEL01.VAG",31696,"4b711f32ba5d299a728fe04f0b2dc802caeceae955de94727986a39118cf84b6",55356}},
+    {10,{"SPEECH/UI/DUDSEL02.VAG",13664,"ebeaa61ec7190e7b6d97d7c8ea83b563ab3c853062481e619be3bd7445f621f4",23800}},
+    // Rider10: Aldar Beedo, Event21..22.
+    {21,{"SPEECH/UI/ALDSEL01.VAG",36496,"029332c4f2eba4b37dad0a6fb007f849a607b08bdd686d6976714d3164eab748",63756}},
+    {22,{"SPEECH/UI/ALDSEL02.VAG",18208,"71a6c0b1e4fd790d81d4580a0903dac2d846961a7c99e520ff5512264982560d",31752}},
+    // Rider11: Ody Mandrell, Event23..24.
+    {23,{"SPEECH/UI/ODYSEL01.VAG",14288,"3c8261022bd7aa5417ba9a84e72d5a48b9bdc65b7c760b3e6320b2a54a5c7303",24892}},
+    {24,{"SPEECH/UI/ODYSEL02.VAG",17440,"af414fcc3607a2f5710b2c76c4926c1bdef623bd4f8e5667e72b2f6245c27fec",30408}},
+    // Rider12: Shrivel Braittrand, Event25..26.
+    {25,{"SPEECH/UI/SHRSEL01.VAG",25472,"2c4eb20e3d383daee86599a28ed8d1e7ff190fa6dd3ea46ffe8f919ef1906f52",44464}},
+    {26,{"SPEECH/UI/SHRSEL02.VAG",28704,"333c3f5953c731de3ec02535d56f7c810225d6600883e833bfe7f83dee109345",50120}},
+    // Rider15: Teemto Pagalies, Event31..32.
+    {31,{"SPEECH/UI/TEESEL01.VAG",27008,"40a3f4dda0aae7ef846fa8c49311b17dfbeec7a9eea586d0113933dca6d3f826",47152}},
+    {32,{"SPEECH/UI/TEESEL02.VAG",32176,"e93fa4c842954cbb59792b56cc56a8b04314fbffeb1283a2e5706eee8813e0cf",56196}},
+    // Rider19: Anakin Skywalker, Event39..43.
+    {39,{"SPEECH/UI/A2ASEL01.VAG",25488,"854e09eaf3d5eb28bfccfc35e8a869b5fc10515b6e6c4a3a8dc11dee50cde698",44492}},
+    {40,{"SPEECH/UI/A2ASEL02.VAG",19232,"7d11a96798382bde857a80d994317e92ec3a4fc57108c2de9b253e21ad519393",33544}},
+    {41,{"SPEECH/UI/A2ASEL03.VAG",18096,"f79ef5212c57bb313c88002bb595352054a2dbb54e059deb8d2dd071ef65ec8c",31556}},
+    {42,{"SPEECH/UI/A2ASEL04.VAG",27520,"36f8c4c4c756a36ad6b21c9cd2f4bd083efc53e22f31aa022a8ab1e456e921df",48048}},
+    {43,{"SPEECH/UI/A2ASEL05.VAG",17296,"d70fd36cdc0981560f940ad9d74eed809c44cc0a7b05fd8d73e869727a890034",30156}},
+    // Rider20: Occo Ninebar, Event44..45.
+    {44,{"SPEECH/UI/OCCSEL01.VAG",24384,"f826ff76992d67646856ce9baa455400e807766edf77716d228ef9f7b6931f85",42560}},
+    {45,{"SPEECH/UI/OCCSEL02.VAG",29712,"d0c0af3755a80d7840aa3f52b2f1903e3191c4ace12fe9b6c060bcb8573ce41e",51884}},
 }};
+std::size_t riderConfirmClipIndex(std::uint32_t eventId) noexcept {
+    for(std::size_t i=0;i<riderConfirmOriginals.size();++i)
+        if(riderConfirmOriginals[i].eventId==eventId)return i;
+    return riderConfirmOriginals.size();
+}
 bool sameClip(const AudioClip50HD& a,const AudioClip50HD& b) noexcept {
     return a.samples==b.samples&&a.frames==b.frames&&a.sampleRate==b.sampleRate&&
         a.channels==b.channels&&a.loopStart==b.loopStart&&a.loopEnd==b.loopEnd;
@@ -248,16 +277,16 @@ bool OriginalUiMainAudio50KG::prepareCourseMenu(const std::filesystem::path& aud
         authenticatedRead(audioRoot,"UIACCEPT.INI",4411,"245b0bd530e6797637ac72bbf2de8f101f3b1da280e00e8fc24e4b4930d79f3b");
         auto song=decodeMenuStereo(authenticatedRead(audioRoot,courseOriginal.path,courseOriginal.bytes,courseOriginal.sha),
             courseOriginal,223232);
-        std::array<assets::AudioPcm50HC,7> speech;
+        std::array<assets::AudioPcm50HC,riderConfirmClipCount> speech;
         for(std::size_t i=0;i<speech.size();++i){
-            const auto& original=riderConfirmOriginals[i];
+            const auto& original=riderConfirmOriginals[i].file;
             const auto bytes=authenticatedRead(audioRoot,original.path,original.bytes,original.sha);
             std::string decodeError;
             need(assets::decodeVagMono50HC(bytes.data(),bytes.size(),speech[i],decodeError),
-                "Original Rider19/20 Confirm speech decode rejected");
+                "Original default-unlocked Rider Confirm speech decode rejected");
             const auto& pcm=speech[i];
             const AudioClip50HD clip{pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,0,0};
-            need(preparedClipMatches(clip,pcm,original,1),"Original Rider19/20 Confirm PCM metadata differs");
+            need(preparedClipMatches(clip,pcm,original,1),"Original default-unlocked Rider Confirm PCM metadata differs");
         }
         coursePcm_=std::move(song);
         courseClip_={coursePcm_.samples.data(),coursePcm_.frames,coursePcm_.sampleRate,coursePcm_.channels,0,0};
@@ -316,14 +345,15 @@ bool OriginalUiMainAudio50KG::canPlayRiderConfirm() const noexcept {
     if(!courseMenuReady()||paused_||ownsRiderConfirm_||mixer_->active(riderConfirmVoice)||
        !canRecordControlChange(2)||!mixer_->canRecordControlChanges(3)||!canPlayEffectClip(1))return false;
     for(std::size_t i=0;i<riderConfirmClips_.size();++i)
-        if(!preparedClipMatches(riderConfirmClips_[i],riderConfirmPcm_[i],riderConfirmOriginals[i],1))return false;
+        if(!preparedClipMatches(riderConfirmClips_[i],riderConfirmPcm_[i],riderConfirmOriginals[i].file,1))return false;
     return true;
 }
 bool OriginalUiMainAudio50KG::playRiderConfirmVoice(std::uint32_t id,RiderConfirmPlayback& out) noexcept {
-    if(out.issued()||id<39||id>45||!canPlayRiderConfirm())return false;
+    const auto clip=riderConfirmClipIndex(id);
+    if(out.issued()||clip==riderConfirmOriginals.size()||!canPlayRiderConfirm())return false;
     // Source1EA780 uses flags0. Bounded Confirm has no earlier utterance:
     // never stop/restart a live speech voice or consume a replacement choice.
-    if(!mixer_->play(riderConfirmVoice,riderConfirmClips_[id-39],1.f,1.f,false,0.f))return false;
+    if(!mixer_->play(riderConfirmVoice,riderConfirmClips_[clip],1.f,1.f,false,0.f))return false;
     riderConfirmPlaybackRevision_=mixer_->playbackRevision(riderConfirmVoice);ownsRiderConfirm_=true;
     out.transport_=this;out.revision_=riderConfirmPlaybackRevision_;noteControlChange();return true;
 }

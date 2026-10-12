@@ -22,7 +22,9 @@ using Kind=game::OriginalUiRiderWidgetKind50KG;
 // Paired with bounded frontend admission; actual animation and RNG ownership
 // predicates are still required. Runtime acceptance is pending.
 constexpr bool boundedRiderConfirmEnabled=true;
-bool preparedRider(std::uint32_t rider) noexcept{return rider==19||rider==20;}
+bool supportedRider(std::uint32_t rider) noexcept {
+    switch(rider){case 2:case 4:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+}
 Status result(Diagnostic& d,Status s,std::uint32_t pc=0) noexcept {d.status=s;d.sourcePC=pc;return s;}
 bool apertureOkay(ApertureStatus s) noexcept {return s==ApertureStatus::ok||s==ApertureStatus::noChange;}
 bool genuine(const std::shared_ptr<const assets::OriginalUiArchive50KG>& a,assets::OriginalUiArchiveId50KG id) noexcept {
@@ -60,7 +62,7 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
 }
 bool confirmShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
     using F=game::OriginalUiProfileField50KG;using W=game::OriginalUiProfileWrite50KG;
-    if(d.inputPC!=0x1EA460||!preparedRider(d.selectedRider)||!d.profileProposalComplete||d.profileChanges.count!=3||
+    if(d.inputPC!=0x1EA460||!supportedRider(d.selectedRider)||!d.profileProposalComplete||d.profileChanges.count!=3||
        d.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||d.request.sourceScreen!=5||d.request.sourcePage!=1||
        d.request.targetScreen!=6||d.request.targetPage!=1||d.request.sourcePC!=0x1EA604)return false;
     const auto& a=d.profileChanges.values[0];const auto& b=d.profileChanges.values[1];const auto& c=d.profileChanges.values[2];
@@ -147,16 +149,50 @@ struct OriginalUiRiderSession50KG::Storage {
         }
         ++state.audio.submitted;return true;
     }
+    bool preparedRider(std::uint32_t rider) const noexcept {
+        return supportedRider(rider)&&backend.preparedRider(rider);
+    }
+    bool controlWidgets(std::uint16_t slot,std::uint32_t rider,std::array<std::uint16_t,4>& out) const noexcept {
+        const auto* n=nav();
+        if(!n||!n->page||!selection()||n->page->groups.size()<=1||!slot||
+           slot>n->page->groups[1].controls.size())return false;
+        const auto control=n->page->groups[1].controls[slot-1];
+        if(control<0||static_cast<std::size_t>(control)>=n->page->controls.size()||
+           selection()->controlRider(static_cast<std::uint16_t>(control))!=static_cast<std::int32_t>(rider))return false;
+        const auto& ids=n->page->controls[control].widgets;
+        if(ids.size()!=4||widgets().state(ids[0]).kind!=Kind::pod||widgets().state(ids[3]).kind!=Kind::character)return false;
+        for(std::size_t i=0;i<out.size();++i)out[i]=ids[i];
+        return true;
+    }
+    bool preparedMovement(const game::OriginalUiRiderSelectionPlan50KG& plan) const noexcept {
+        const auto* n=nav();
+        if(!n||!n->page||!selection()||plan.nextNavigation.page!=n->page||
+           !plan.navigationCommands.count||plan.navigationCommands.count>plan.navigationCommands.values.size())return false;
+        // Read every authored intermediate callback before the frontend retains
+        // or retires the outgoing source. A prepared final rider cannot stand
+        // in for a hidden intermediate character/pod that SELECT really loads.
+        for(std::size_t i=0;i<plan.navigationCommands.count;++i){
+            const auto& command=plan.navigationCommands.values[i];
+            if(command.controlId>=n->page->controls.size())return false;
+            for(const auto id:n->page->controls[command.controlId].widgets){
+                const auto kind=widgets().state(id).kind;
+                const bool needs=(command.operation==Operation::select&&(kind==Kind::pod||kind==Kind::character))||
+                    (command.operation==Operation::clearSelection&&kind==Kind::character);
+                if(!needs)continue;
+                const auto rider=selection()->controlRider(command.controlId);
+                if(rider<0||!preparedRider(static_cast<std::uint32_t>(rider))||
+                   id!=(kind==Kind::pod?dynamic.podWidget(rider):dynamic.characterWidget(rider)))return false;
+            }
+        }
+        return true;
+    }
     bool selectedConfirmCharacter(std::uint16_t& character) const noexcept {
         const auto* n=nav();if(!n||!n->page||n->page->groups.size()<=1||n->controllerGroup[0]!=1||
            !state.slot4C8||n->groups[1].selectedSlot!=state.slot4C8||
            state.slot4C8>n->page->groups[1].controls.size()||!preparedRider(state.rider4C4))return false;
-        const auto control=n->page->groups[1].controls[state.slot4C8-1];
-        if(control<0||static_cast<std::size_t>(control)>=n->page->controls.size())return false;
-        const auto& ids=n->page->controls[control].widgets;
-        // 1ECF40 tests size4; 1ECF70 returns the exact fourth member.
-        if(ids.size()!=4||ids[3]!=(state.rider4C4==19?53:54)||widgets().state(ids[3]).kind!=Kind::character||
-           !backend.attached(ids[3]))return false;
+        std::array<std::uint16_t,4> ids{};
+        // 1ECF40 tests size4; 1ECF70 returns the actual fourth control member.
+        if(!controlWidgets(state.slot4C8,state.rider4C4,ids)||!backend.attached(ids[3]))return false;
         const auto actual=dynamic.state(ids[3]);
         if(actual.kind!=Kind::character||!actual.selected||!actual.shown)return false;
         character=ids[3];return true;
@@ -377,13 +413,14 @@ OriginalUiRiderSession50KG::~OriginalUiRiderSession50KG(){
 }
 
 Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& cold,Diagnostic& d) noexcept {
-    return bindCold(cold,game::OriginalUiRiderColdPopulation50KG::rider19And20,d);
+    return bindCold(cold,game::OriginalUiRiderColdPopulation50KG::defaultUnlocked,d);
 }
 Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG& cold,
     game::OriginalUiRiderColdPopulation50KG population,Diagnostic& d) noexcept {
     d={};if(storage_)return result(d,Status::alreadyBound);
     if(population!=game::OriginalUiRiderColdPopulation50KG::selected19&&
-       population!=game::OriginalUiRiderColdPopulation50KG::rider19And20)return result(d,Status::invalidInput);
+       population!=game::OriginalUiRiderColdPopulation50KG::rider19And20&&
+       population!=game::OriginalUiRiderColdPopulation50KG::defaultUnlocked)return result(d,Status::invalidInput);
     const bool fromMain=cold.previousScreen==4&&cold.predecessorResources&&
         !cold.predecessorCourseResources&&!cold.predecessorCourseHolograms&&
         cold.predecessorResources->loaded()&&cold.predecessorResources->materials()&&cold.predecessorResources->particleMaterial();
@@ -416,21 +453,23 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
            page->useVideoAsTexture||page->background!="*INVALID*"||!cold.resources->background(19)||
            !cold.statAssets->portrait(19)||cold.resources->bankInput()->owners.size()!=1||
            cold.resources->bankInput()->owners[0]!=cold.resources->images())return result(d,Status::resource,0x1D63B0);
-        const auto coldControl=[&](std::size_t slot,std::uint16_t control,std::int32_t rider,
-            const std::array<std::uint16_t,4>& expected){
-            if(slot>=page->groups[1].controls.size()||page->groups[1].controls[slot]!=control||
-               control>=page->controls.size()||s->selection()->controlRider(control)!=rider)return false;
-            const auto& widgets=page->controls[control].widgets;if(widgets.size()!=expected.size())return false;
-            for(std::size_t i=0;i<expected.size();++i)if(widgets[i]!=expected[i])return false;
-            return true;
-        };
-        // Verify actual source memberships without changing navigation or
-        // inventing select callbacks to warm a second rider. Both original
-        // descriptors remain immutable until actual source selection.
-        if(!coldControl(0,16,19,{{27,79,109,53}})||
-           (population==game::OriginalUiRiderColdPopulation50KG::rider19And20&&
-            (!coldControl(1,17,20,{{28,80,110,54}})||!cold.resources->background(20)||!cold.statAssets->portrait(20))))
-            return result(d,Status::resource,0x1D63B0);
+        // Resolve original group membership and widget IDs from authenticated
+        // rider.dat. No rider arithmetic or compact substitute roster.
+        for(const auto rider:{2u,4u,10u,11u,12u,15u,19u,20u}){
+            if(population==game::OriginalUiRiderColdPopulation50KG::selected19&&rider!=19)continue;
+            if(population==game::OriginalUiRiderColdPopulation50KG::rider19And20&&rider!=19&&rider!=20)continue;
+            std::size_t matches=0;
+            for(std::size_t slot=1;slot<=page->groups[1].controls.size();++slot){
+                const auto control=page->groups[1].controls[slot-1];
+                if(control<0||static_cast<std::size_t>(control)>=page->controls.size())return result(d,Status::resource,0x1D63B0);
+                if(s->selection()->controlRider(static_cast<std::uint16_t>(control))!=static_cast<std::int32_t>(rider))continue;
+                std::array<std::uint16_t,4> ids{};
+                if(!s->controlWidgets(static_cast<std::uint16_t>(slot),rider,ids))return result(d,Status::resource,0x1D63B0);
+                ++matches;
+            }
+            if(matches!=1||!cold.resources->background(rider)||!cold.statAssets->portrait(rider))
+                return result(d,Status::resource,0x1D63B0);
+        }
         const unsigned indices[]={167,168,172};
         for(unsigned i=0;i<3;++i){const auto* entry=cold.english->at(indices[i]);
             if(!entry||entry->text.size()>20||entry->text.find('\0')!=std::string::npos)return result(d,Status::resource,0x1EA158);
@@ -501,12 +540,15 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         // sees the exact prospective source decision; the shared word is untouched.
         if(!cold.profile->selectionSnapshotForMode(cold.prospectiveMode,copiedProfile)||
            game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),0,copiedProfile,coldPlan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
-           !preparedRider(coldPlan.rider4C4))return result(d,Status::unavailableDestination,0x1E9C50);
+           !supportedRider(coldPlan.rider4C4))return result(d,Status::unavailableDestination,0x1E9C50);
         // This local session has not escaped. Prepare genuine immutable
         // descriptor candidates, then one complete bank and irreversible seal.
         // Subsequent callback preflight only reads that sealed population.
         if(!s->dynamic.prepareCold(population,d.dynamic))return result(d,Status::resource,d.dynamic.sourcePC);
         if(!s->backend.prepareColdAndSeal(s->dynamic,d.backend))return result(d,Status::backend);
+        if(population!=game::OriginalUiRiderColdPopulation50KG::selected19&&
+           (!s->preparedRider(19)||!s->preparedRider(20)))return result(d,Status::unavailableDestination,0x1E9C50);
+        if(!s->preparedRider(coldPlan.rider4C4))return result(d,Status::unavailableDestination,0x1E9C50);
         if(!s->widgets().preflightNavigation(0,coldPlan.nextNavigation,coldPlan.navigationCommands,s->dynamic.hooks(),d.widget)){
             d.dynamic=s->dynamic.diagnostic();d.backend=s->backend.diagnostic();return result(d,Status::resource,0x1E9FD4);}
         // All callback implementations and their original cold resources now
@@ -533,7 +575,7 @@ bool OriginalUiRiderSession50KG::canEnterMode(std::uint32_t mode) const noexcept
     game::OriginalUiRiderSelectionProfile50KG profile;game::OriginalUiRiderSelectionPlan50KG plan;
     return s->cold.profile->selectionSnapshotForMode(mode,profile)&&
         game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),0,profile,plan)==game::OriginalUiRiderSelectionStatus50KG::ok&&
-        preparedRider(plan.rider4C4);
+        s->preparedRider(plan.rider4C4);
 }
 std::uint32_t OriginalUiRiderSession50KG::intendedMode() const noexcept {
     return storage_?storage_->cold.prospectiveMode:std::numeric_limits<std::uint32_t>::max();
@@ -612,10 +654,11 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
             in.popupActive,s->panel.inputBlocked4E0(),profile,receipt.selection);
         if(planned==game::OriginalUiRiderSelectionStatus50KG::noChange)return finish(Status::noChange);
         if(planned!=game::OriginalUiRiderSelectionStatus50KG::ok)return finish(Status::unsupportedState,0x1EB1F0);
-        // Preserve authored order. Do not wrap a two-rider substitute roster:
-        // a next/previous reaching any other rider remains unavailable.
-        if(!s->idleInput()||receipt.selection.visitedControls!=1||!preparedRider(receipt.selection.rider4C4)||
-           !preparedRider(s->state.rider4C4)||!s->audioReady()||
+        // Preserve the original planner's order and hidden-control traversal.
+        // Never retry the plan to skip a visible but unprepared neighbor.
+        if(!s->idleInput()||!receipt.selection.visitedControls||!s->preparedMovement(receipt.selection)||
+           !s->preparedRider(receipt.selection.rider4C4)||
+           !s->preparedRider(s->state.rider4C4)||!s->audioReady()||
            (s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&!s->cold.audio->canPlayRiderAdvance2()))
             return finish(Status::unavailableDestination,receipt.selection.sourcePC);
         receipt.moveSerial=s->proposalSerial;receipt.moveEvent=in.originalInput;
@@ -658,11 +701,15 @@ Status OriginalUiRiderSession50KG::commitMove(const OriginalUiRiderSessionInputR
     game::OriginalUiRiderSelectionProfile50KG profile;game::OriginalUiRiderSelectionPlan50KG plan;
     if(!s->liveProfile(profile)||game::planOriginalUiRiderMove50KG(*s->selection(),*s->nav(),0,0,
        receipt.moveEvent,false,false,profile,plan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
-       plan.visitedControls!=1||!preparedRider(plan.rider4C4)||plan.rider4C4!=receipt.selection.rider4C4||
+       !plan.visitedControls||!s->preparedMovement(plan)||!s->preparedRider(plan.rider4C4)||plan.rider4C4!=receipt.selection.rider4C4||
        plan.slot4C8!=receipt.selection.slot4C8||!plan.captureAndRestorePodTransform||!plan.resetSelectedControl||plan.deferred4EC!=3)
         return result(d,Status::unavailableDestination,0x1EB1F0);
-    const auto outgoing=static_cast<std::uint16_t>(s->state.rider4C4==19?27:28);
-    const auto incoming=static_cast<std::uint16_t>(plan.rider4C4==19?27:28);
+    std::array<std::uint16_t,4> outgoingIds{},incomingIds{};
+    if(!s->preparedRider(s->state.rider4C4)||
+       !s->controlWidgets(s->state.slot4C8,s->state.rider4C4,outgoingIds)||
+       !s->controlWidgets(plan.slot4C8,plan.rider4C4,incomingIds))
+        return result(d,Status::unavailableDestination,0x1EB1F0);
+    const auto outgoing=outgoingIds[0],incoming=incomingIds[0];
     auto* old=s->dynamic.podScene(outgoing);const auto asset=s->dynamic.podAssets(incoming);
     game::OriginalUiRiderPodOrientation50KG orientation;game::BodyMatrix48G pose;
     if(!old||!s->backend.attached(outgoing)||!asset||!asset->config()||!s->cold.resources->background(plan.rider4C4)||
@@ -676,14 +723,18 @@ Status OriginalUiRiderSession50KG::commitMove(const OriginalUiRiderSessionInputR
        !rd.submittedWorkCompleted)return result(d,Status::backend);
     s->cpuDrain();
     if(!s->backend.acceptSourceRetirement(&s->collector,generation,frontier))return result(d,Status::backend);
-    if(!s->widgets().preflightNavigation(0,plan.nextNavigation,plan.navigationCommands,s->dynamic.hooks(),d.widget))
-        return result(d,Status::unavailableDestination,plan.sourcePC);
+    if(!s->widgets().preflightNavigation(0,plan.nextNavigation,plan.navigationCommands,s->dynamic.hooks(),d.widget)){
+        // Retirement is irreversible. An unexpected allocation/backend failure
+        // here is a cleanup-owned fault, never a usable unchanged destination.
+        s->callbackFault.widget=d.widget;s->fault(Status::widget,plan.sourcePC);d=s->callbackFault;return d.status;
+    }
     auto selected=plan.nextNavigation;game::OriginalUiCommands50KG repeat;
     const auto control=selected.page->groups[1].controls[plan.slot4C8-1];
     // 2A5A00 dispatches widget+78: repeated SELECT, never generic reset/show.
     if(!appendControl(selected,repeat,control,Operation::select,false,receipt.moveEvent?0x1EB304:0x1EB484)||
-       !s->widgets().preflightNavigation(0,selected,repeat,s->dynamic.hooks(),d.widget))
-        return result(d,Status::unavailableDestination,0x2A5A00);
+       !s->widgets().preflightNavigation(0,selected,repeat,s->dynamic.hooks(),d.widget)){
+        s->callbackFault.widget=d.widget;s->fault(Status::widget,0x2A5A00);d=s->callbackFault;return d.status;
+    }
     s->inOperation=true;
     bool okay=s->navigate(plan.nextNavigation,plan.navigationCommands,plan.sourcePC);
     if(okay){s->state.rider4C4=plan.rider4C4;s->state.slot4C8=plan.slot4C8;okay=s->appearance();}
@@ -709,7 +760,7 @@ bool OriginalUiRiderSession50KG::routeProposalCurrent(const OriginalUiRiderRoute
        p.source!=this||!p.serial||p.serial!=s->proposalSerial||!s->idleInput()||!s->lightCurrent()||!s->processCurrent()||
        s->cold.application->uiObject3D8||!sameDecision(p.decision,s->pendingBack)||!sameStamp(p.profileStamp,s->pendingStamp)||
        !sameStamp(s->cold.profile->stamp(),s->pendingStamp)||!sameCommon(*s->cold.commonProfile,s->pendingCommon)||
-       !sameLife(s->transition(),s->pendingLifecycle)||!preparedRider(s->state.rider4C4)||s->nav()->controllerGroup[0]!=1||
+       !sameLife(s->transition(),s->pendingLifecycle)||!s->preparedRider(s->state.rider4C4)||s->nav()->controllerGroup[0]!=1||
        s->nav()->groups[1].selectedSlot!=s->state.slot4C8)return false;
     if(s->state.confirmProposalPending){
         game::OriginalUiRiderDynamicDiagnostic50KG preflight;std::uint8_t packed=0;std::uint32_t comparison=0;
@@ -753,7 +804,7 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
     if(!s->operational()||s->inOperation||s->updatePrepared||s->backAccepted||!s->state.backProposalPending||p.source!=this||
        !p.serial||p.serial!=s->proposalSerial||!sameDecision(p.decision,s->pendingBack)||!sameStamp(p.profileStamp,s->pendingStamp)||
        !s->processCurrent()||!s->lightCurrent()||!s->backAudioReady()||s->cold.application->uiObject3D8||!sameCommon(*s->cold.commonProfile,s->pendingCommon)||
-       !preparedRider(s->state.rider4C4)||s->nav()->controllerGroup[0]!=1||s->nav()->groups[1].selectedSlot!=s->state.slot4C8)
+       !s->preparedRider(s->state.rider4C4)||s->nav()->controllerGroup[0]!=1||s->nav()->groups[1].selectedSlot!=s->state.slot4C8)
         return result(d,Status::invalidInput,0x1EA810);
     const auto t=s->transition();auto expectedLife=s->pendingLifecycle;
     expectedLife.requested={4,1};expectedLife.lifecycle=Life::requestScreenExit;

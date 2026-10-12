@@ -95,10 +95,10 @@ struct OriginalUiRiderSessionSnapshot50KG {
     OriginalUiMainSessionAudioReceipt50KG audio{};
     game::OriginalUiRiderVoiceChoiceReceipt50KG voice{};
 };
-// Actual bounded Rider5/1 lifecycle and frame owner. Exact19/20 entry,
+// Actual bounded Rider5/1 lifecycle and frame owner. Default-unlocked entry,
 // directional selection, normal Back and mode0 Confirm use real resource,
 // renderer-retirement, profile, animation and shared voice-RNG owners. Other
-// roster entries, page2 and reset popup remain unavailable before mutation.
+// unprepared roster entries, page2 and reset popup remain unavailable before mutation.
 // The frontend owns sole manager.tick, profile commit, GPU upload/publication,
 // source-renderer retirement, and application queue consumption.
 class OriginalUiRiderSession50KG final {
@@ -153,7 +153,7 @@ private:
     friend class OriginalUiFrontend50KG;
     OriginalUiRiderSessionStatus50KG commitMove(const OriginalUiRiderSessionInputReceipt50KG&,
         VehicleWindowGl50DS&,VehicleWindowDiagnostic50DS&,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
-    // Public bind prepares the exact19+20 immutable union. A cold population
+    // Public bind prepares the default-unlocked immutable union. A cold population
     // never selects or registers a model; real callbacks and renderer-first
     // retirement remain required at each entry/direction boundary.
     OriginalUiRiderSessionStatus50KG bindCold(const OriginalUiRiderSessionCold50KG&,

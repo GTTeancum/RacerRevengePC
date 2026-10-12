@@ -71,7 +71,10 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
     if(same(pass.microprogram,"ScreenObject")){assets::OriginalUiNativeMaterial50KG policy{};
         return assets::prepareOriginalUiNativeMaterial50KG(pass,*texture,policy,d.materialDetail)&&
             convertOriginalUiMaterialSpan50KG(policy,range,output);}
-    if(same(pass.textureName,"19_shdw")||same(pass.textureName,"20_shdw")){assets::OriginalUiRider19ShadowMaterial50KM policy{};
+    if(same(pass.textureName,"02_shdw")||same(pass.textureName,"04_shdw")||
+       same(pass.textureName,"10_shdw")||same(pass.textureName,"11_shdw")||
+       same(pass.textureName,"12_shdw")||same(pass.textureName,"15_shdw")||
+       same(pass.textureName,"19_shdw")||same(pass.textureName,"20_shdw")){assets::OriginalUiRider19ShadowMaterial50KM policy{};
         return assets::prepareOriginalUiRider19ShadowMaterial50KM(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19ShadowMaterialSpan50KM(policy,images,range,output);}
     if(same(pass.microprogram,"SpecularMapCompressed")){assets::OriginalUiRider19SpecularMaterial50KM policy{};
@@ -81,7 +84,7 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
         return assets::prepareOriginalUiRider19IpumMaterial50KM(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19IpumMaterialSpan50KM(policy,images,range,output);}
     if(texture->mips.size()>1){
-        if(same(pass.textureName,"pod_wndw")){assets::OriginalUiRiderWindowMaterial50KM policy{};
+        if(same(pass.textureName,"pod_wndw")||same(pass.textureName,"12c_4")){assets::OriginalUiRiderWindowMaterial50KM policy{};
             return assets::prepareOriginalUiRiderWindowMaterial50KM(pass,images,index,policy,d.materialDetail)&&
                 convertOriginalUiRiderWindowMaterialSpan50KM(policy,images,range,output);}
         assets::OriginalUiRider19BodyMaterial50KM policy{};
@@ -262,7 +265,8 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
             if(!addStat(s.statAssets->resource(static_cast<assets::OriginalUiRiderStatAsset50KG>(i))))return fail(d,E::material);
         for(std::uint8_t rider=1;rider<=26;++rider)if(const auto* portrait=s.statAssets->portrait(rider))
             if(!addStat(portrait))return fail(d,E::material);
-        // The privately sealed bank retains every admitted cold descriptor.
+        // Only sealed material pairs participate. Cold descriptors whose exact
+        // kind2 cache is absent have no backend material owner and are omitted.
         // Include each exact owner for upload policy without acquiring a row,
         // initializing a dynamic state, or granting permission to emit geometry.
         for(std::uint16_t id=1;id<120;++id){

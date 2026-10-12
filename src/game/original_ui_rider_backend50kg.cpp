@@ -3,6 +3,7 @@
 #include <array>
 #include <limits>
 #include <utility>
+#include "../assets/original_ui_ipum_texture_cache50kg.h"
 namespace rr::game {
 namespace {
 using E=OriginalUiRiderBackendError50KG;
@@ -10,10 +11,52 @@ using K=OriginalUiRiderWidgetKind50KG;
 using O=OriginalUiControlOperation50KG;
 constexpr std::uint32_t noOwner=std::numeric_limits<std::uint32_t>::max();
 bool valid(std::uint16_t id) noexcept{return id>0&&id<120;}
-bool preparedModel(std::uint16_t id) noexcept{return id==27||id==28||id==53||id==54;}
 bool genuine(const std::shared_ptr<const assets::OriginalUiArchive50KG>& a,assets::OriginalUiArchiveId50KG id) noexcept {
     return a&&a->loaded()&&a->identity()==assets::originalUiArchiveIdentity50KG(id);
 }
+// Inspect actual authored material references before widening the immutable
+// bank. Only absent authenticated kind2 cache entries make an optional rider
+// unavailable; malformed materials or ambiguous source members remain errors.
+bool materialCacheReady(const assets::Scene48D& scene,bool pod,
+    const OriginalUiRiderBackendInput50KG& input,bool& ready,
+    assets::OriginalUiRiderModelMaterialDiagnostic50KG& d) {
+    ready=true;d={};
+    assets::OriginalUiMaterialTemplates50KG templates;
+    if(!templates.load(*input.appStart,d.materialDetail))return false;
+    const auto simple=[](const std::string& value){
+        if(value.empty()||value.size()>127||value=="."||value=="..")return false;
+        for(unsigned char c:value)if(c<32||c>=127||c=='/'||c=='\\'||c==':')return false;
+        return true;
+    };
+    if(scene.materials.empty()||scene.materials.size()>256)return false;
+    for(std::size_t i=0;i<scene.materials.size();++i){
+        d.material=static_cast<std::uint32_t>(i);const auto& name=scene.materials[i];
+        if(!simple(name))return false;
+        assets::OriginalUiMaterial50KG material;
+        if(!assets::readOriginalUiMaterial50KG(*input.rider,"ui/textures/"+name+".psm",templates,
+            assets::OriginalUiTemplate50KG::defaultMt,input.materialRuntime,material,d.materialDetail))return false;
+        for(std::size_t j=0;j<material.passes.size();++j){
+            d.pass=static_cast<std::uint32_t>(j);const auto& pass=material.passes[j];
+            if(!pass.textureCount)continue;
+            if(pass.textureCount!=1||!simple(pass.textureName))return false;
+            const auto prefix="ui/textures/"+pass.textureName;
+            if(input.rider->find(prefix+".atm").identity||
+               (pod&&input.podTextures->find(prefix+".atm").identity))return false;
+            auto member=input.rider->find(prefix+".pst");
+            const auto shared=pod?input.podTextures->find(prefix+".pst"):assets::OriginalUiMemberView50KG{};
+            if(member.identity&&shared.identity)return false;
+            if(shared.identity)member=shared;
+            if(!member.identity||!member.data||member.size!=member.identity->bytes||member.size<8)return false;
+            const auto* bytes=member.data;
+            const std::uint32_t kind=std::uint32_t(bytes[4])|(std::uint32_t(bytes[5])<<8)|
+                (std::uint32_t(bytes[6])<<16)|(std::uint32_t(bytes[7])<<24);
+            if(kind==2&&(!input.staticImages.ipumCache||
+               !input.staticImages.ipumCache->textureFor(member,0,member.size)))ready=false;
+        }
+    }
+    return true;
+}
+
 }
 struct OriginalUiRiderBackend50KG::Storage {
     struct Entry {
@@ -50,6 +93,7 @@ struct OriginalUiRiderBackend50KG::Storage {
 
     OriginalUiRiderVisibilityOwner50KG visibility;
     std::array<Entry,120> entries;
+    std::array<std::uint16_t,32> pods{},characters{};
     std::shared_ptr<const assets::OriginalUiImageBank50KG> bank;
     std::uint32_t binderOwner=noOwner;
     std::uint64_t generation=1;
@@ -134,14 +178,33 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
             if(pass.pass!=at->sources.size()+1)return false;
             at->sources.push_back(&pass);at->keys.push_back(std::move(key));at->images.push_back(image);return true;
         };
-        const bool pod20=bool(owner.podAssets(28)),character20=bool(owner.characterAssets(54));
-        if(!owner.podAssets(27)||!owner.characterAssets(53)||pod20!=character20)return fail(E::input);
+        std::array<bool,120> included{};
+        std::array<std::uint16_t,32> pods{},characters{};
+        std::size_t pairCount=0;
+        for(const std::uint32_t rider:{2u,4u,10u,11u,12u,15u,19u,20u}){
+            const auto pod=owner.podWidget(rider),character=owner.characterWidget(rider);
+            const auto p=owner.podAssets(pod);const auto c=owner.characterAssets(character);
+            if(bool(p)!=bool(c))return fail(E::input);
+            if(!p){if(rider==19)return fail(E::input);continue;}
+            if(!valid(pod)||!valid(character)||!p->loaded()||!c->loaded()||!p->scene()||!c->scene())return fail(E::input);
+            bool podReady=false,characterReady=false;
+            d.widget=pod;
+            if(!materialCacheReady(*p->scene(),true,s.input,podReady,d.material))return fail(E::material);
+            d.widget=character;
+            if(!materialCacheReady(*c->scene(),false,s.input,characterReady,d.material))return fail(E::material);
+            if(!podReady||!characterReady){
+                if(rider==19||rider==20)return fail(E::material);
+                continue;
+            }
+            if(included[pod]||included[character])return fail(E::input);
+            included[pod]=included[character]=true;pods[rider]=pod;characters[rider]=character;++pairCount;
+        }
         for(std::uint16_t id=1;id<120;++id){
             const auto pod=owner.podAssets(id);const auto character=owner.characterAssets(id);
             const auto state=owner.state(id);d.widget=id;
             if((state.kind==K::pod||state.kind==K::character)&&(state.selected||state.shown))return fail(E::input);
-            if(!pod&&!character)continue;
-            if((pod&&character)||(pod&&(id!=27&&id!=28))||(character&&(id!=53&&id!=54))||
+            if(!included[id])continue;
+            if((pod&&character)||
                (pod&&state.kind!=K::pod)||(character&&state.kind!=K::character))return fail(E::input);
             auto materials=std::make_shared<assets::OriginalUiRiderModelMaterials50KG>();
             const bool loaded=character?
@@ -167,14 +230,14 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         if(!OriginalUiRiderMaterialFootprint50KG::binder(*s.input.appStart,*s.input.binder,binderFootprint,d.lifetime)||
            !s.input.binder->pass()||!addCold("ui/textures/binder",*s.input.binder->pass(),s.input.binder->images()->sourceProvenance(0)))
             return fail(E::lifetime);
-        // Each admitted movement has one outgoing and one incoming exact
-        // authored control. Reserve both complete graph/helper domains. Events
-        // are consumed and acknowledged at each real parent+A4 synchronization;
-        // repeated selections reuse journal capacity, never live row epochs.
-        const auto ownerRows19=footprints[27].rowCount()+footprints[53].rowCount()+2*binderFootprint.rowCount();
-        const auto ownerRows20=pod20?footprints[28].rowCount()+footprints[54].rowCount()+2*binderFootprint.rowCount():0;
-        const auto batchEvents=4*(ownerRows19+ownerRows20)+8;
-        if(ownerRows19!=9||batchEvents>originalUiRiderMaterialEvents50KG||originalUiRiderMaterialOwners50KG<8||
+        // Bound every prepared graph and both optional helpers, including pods
+        // authored to remain resident after deselection. Events are consumed at
+        // each real parent+A4 boundary; no unbounded journal accumulates per move.
+        std::size_t ownerRows=0;
+        for(std::size_t rider=0;rider<pods.size();++rider)if(pods[rider])
+            ownerRows+=footprints[pods[rider]].rowCount()+footprints[characters[rider]].rowCount()+2*binderFootprint.rowCount();
+        const auto batchEvents=4*ownerRows+4*pairCount;
+        if(!pairCount||batchEvents>originalUiRiderMaterialEvents50KG||4*pairCount>originalUiRiderMaterialOwners50KG||
            coldRows.size()>originalUiRiderMaterialRows50KG)return fail(E::lifetime);
         s.instances.reserve(coldRows.size());
         auto population=s.input.staticImages;
@@ -195,7 +258,7 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         // No source material reference/lifetime is acquired by these caches.
         for(std::uint16_t id=1;id<120;++id){s.entries[id].materials=std::move(candidates[id]);
             s.entries[id].imageOwner=indices[id];s.entries[id].coldModel=modelSources[id];s.entries[id].footprint=footprints[id];}
-        s.coldRows=std::move(coldRows);s.binderFootprint=binderFootprint;
+        s.coldRows=std::move(coldRows);s.binderFootprint=binderFootprint;s.pods=pods;s.characters=characters;
         s.bank=std::move(bank);s.binderOwner=binderOwner;s.coldSealed=true;
         ++s.generation;diagnostic_={};d={};return true;
     }catch(...){return fail(E::allocation);}
@@ -211,7 +274,7 @@ bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG
         if(state.kind!=K::pod&&state.kind!=K::character)continue;
         const bool needs=call.operation==O::select||(state.kind==K::character&&call.operation==O::clearSelection);
         if(!needs)continue;const auto& entry=s.entries[call.widget];
-        if(!preparedModel(call.widget)||(s.submittedDynamicFrontier&&!cleanupEntitled()))return fail(E::input);
+        if(!s.entries[call.widget].coldModel||(s.submittedDynamicFrontier&&!cleanupEntitled()))return fail(E::input);
         const void* source=state.kind==K::character?static_cast<const void*>(owner.characterAssets(call.widget).get()):
             static_cast<const void*>(owner.podAssets(call.widget).get());
         if(!source||source!=entry.coldModel||!entry.materials||entry.imageOwner==noOwner||
@@ -223,7 +286,7 @@ bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG
 bool OriginalUiRiderBackend50KG::attach(std::uint16_t id,OriginalUiRiderDynamicOwner50KG& owner) noexcept {
     diagnostic_={};diagnostic_.widget=id;
     const auto fail=[&](E e){diagnostic_.error=e;if(storage_)storage_->poisoned=true;return false;};
-    if(!storage_||!preparedModel(id))return fail(E::input);
+    if(!storage_||!valid(id)||!storage_->entries[id].coldModel)return fail(E::input);
     auto& s=*storage_;auto& entry=s.entries[id];
     if(s.frame||(s.submittedDynamicFrontier&&!cleanupEntitled())||s.poisoned||s.tornDown)return fail(E::busy);
     if(!s.coldSealed||!s.consume||entry.attached||!entry.materials||entry.imageOwner==noOwner||
@@ -290,6 +353,16 @@ bool OriginalUiRiderBackend50KG::setShown(std::uint16_t id,bool shown) noexcept 
 const OriginalUiRiderBackendDiagnostic50KG& OriginalUiRiderBackend50KG::diagnostic()const noexcept{return diagnostic_;}
 OriginalUiRiderVisibilityOwner50KG* OriginalUiRiderBackend50KG::visibility() noexcept{return storage_?&storage_->visibility:nullptr;}
 std::shared_ptr<const assets::OriginalUiArchive50KG> OriginalUiRiderBackend50KG::riderArchive()const noexcept{return storage_?storage_->input.rider:nullptr;}
+bool OriginalUiRiderBackend50KG::preparedRider(std::uint32_t rider)const noexcept {
+    if(!storage_||!storage_->coldSealed||!storage_->bank||storage_->poisoned||storage_->tornDown||rider>=storage_->pods.size())return false;
+    const auto pod=storage_->pods[rider],character=storage_->characters[rider];
+    if(!pod||!character)return false;
+    for(const auto id:{pod,character}){const auto& entry=storage_->entries[id];
+        if(!entry.coldModel||!entry.materials||!entry.materials->loaded()||!entry.footprint.prepared()||
+           entry.imageOwner==noOwner||!storage_->bank->mapping(entry.imageOwner,0))return false;
+    }
+    return true;
+}
 bool OriginalUiRiderBackend50KG::beginFrame() noexcept {
     if(!storage_||storage_->frame||!storage_->bank||storage_->poisoned||storage_->tornDown)return false;storage_->frame=true;return true;
 }
@@ -319,7 +392,7 @@ OriginalUiRiderBinderAnimation50KG* OriginalUiRiderBackend50KG::binder(std::uint
     return attached(id)&&pair<2?storage_->entries[id].binders[pair].get():nullptr;
 }
 const OriginalUiRiderMaterialFootprint50KG* OriginalUiRiderBackend50KG::graphFootprint(std::uint16_t id)const noexcept {
-    if(!storage_||!storage_->coldSealed||!preparedModel(id)||storage_->poisoned||storage_->tornDown||
+    if(!storage_||!storage_->coldSealed||!valid(id)||!storage_->entries[id].coldModel||storage_->poisoned||storage_->tornDown||
        (storage_->submittedDynamicFrontier&&!cleanupEntitled())||storage_->entries[id].attached)return nullptr;
     const auto& footprint=storage_->entries[id].footprint;return footprint.prepared()?&footprint:nullptr;
 }

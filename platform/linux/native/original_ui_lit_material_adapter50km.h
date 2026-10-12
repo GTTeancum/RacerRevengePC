@@ -35,16 +35,17 @@ inline bool convertOriginalUiRider19IpumMaterialSpan50KM(
     OriginalUiMaterialSpan50KG& output) noexcept {
     const auto* bank=publishedImages.textures();
     const auto* image=bank?bank->texture(binding.textureIndex):nullptr;
+    const auto* decoded=publishedImages.decodedTexture(binding.textureIndex);
     if(material.imagePolicy!=assets::OriginalUiNativeIpumImagePolicy50KM::highestResolutionBaseOnly ||
-        material.images!=&publishedImages || !publishedImages.loaded() || !image ||
+        material.images!=&publishedImages || !publishedImages.loaded() || !image || !decoded ||
         binding.textureIndex!=material.imageIndex || binding.textureCount!=bank->textureCount() ||
-        image->identity!=material.imageIdentity || material.sourceStoredMipIndex!=4 ||
-        material.sourceMipCount!=5 || material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed ||
-        material.material.raster.blend!=assets::OriginalUiMaterialBlend50KG::opaque ||
-        material.material.alphaTestGreaterZero)return false;
+        image->identity!=material.imageIdentity || !material.sourceMipCount || material.sourceMipCount>5 ||
+        decoded->kind!=2 || decoded->mips.size()!=material.sourceMipCount ||
+        material.sourceStoredMipIndex!=material.sourceMipCount-1 ||
+        material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed)return false;
     return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
 }
-// Same concrete publication check for authentic five-mip indexed pod bodies.
+// Same concrete publication check for authentic indexed pod bodies.
 // This converts their first pass only, and cannot discard or approve the later
 // destination-alpha specular pass or assert an alpha-disposable frame.
 inline bool convertOriginalUiRider19BodyMaterialSpan50KM(
@@ -54,16 +55,17 @@ inline bool convertOriginalUiRider19BodyMaterialSpan50KM(
     OriginalUiMaterialSpan50KG& output) noexcept {
     const auto* bank=publishedImages.textures();
     const auto* image=bank?bank->texture(binding.textureIndex):nullptr;
+    const auto* decoded=publishedImages.decodedTexture(binding.textureIndex);
     if(material.imagePolicy!=assets::OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly ||
-        material.images!=&publishedImages || !publishedImages.loaded() || !image ||
+        material.images!=&publishedImages || !publishedImages.loaded() || !image || !decoded ||
         binding.textureIndex!=material.imageIndex || binding.textureCount!=bank->textureCount() ||
-        image->identity!=material.imageIdentity || material.sourceStoredMipIndex!=4 ||
-        material.sourceMipCount!=5 || material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed ||
-        material.material.raster.blend!=assets::OriginalUiMaterialBlend50KG::opaque ||
-        material.material.alphaTestGreaterZero)return false;
+        image->identity!=material.imageIdentity || !material.sourceMipCount || material.sourceMipCount>5 ||
+        decoded->kind!=1 || decoded->mips.size()!=material.sourceMipCount ||
+        material.sourceStoredMipIndex!=material.sourceMipCount-1 ||
+        material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed)return false;
     return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
 }
-// Exact combined-bank/index/identity binding for original pod_wndw passes1/3.
+// Exact bank/index/identity for original pod_wndw and12c_4 passes1/3.
 // Caller must preserve both passes and the intervening authentic specular leaf
 // in the source registry schedule; this local conversion cannot certify it.
 inline bool convertOriginalUiRiderWindowMaterialSpan50KM(
@@ -73,11 +75,13 @@ inline bool convertOriginalUiRiderWindowMaterialSpan50KM(
     OriginalUiMaterialSpan50KG& output) noexcept {
     const auto* bank=publishedImages.textures();
     const auto* image=bank?bank->texture(binding.textureIndex):nullptr;
+    const auto* decoded=publishedImages.decodedTexture(binding.textureIndex);
     if(material.imagePolicy!=assets::OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly ||
-        material.images!=&publishedImages || !publishedImages.loaded() || !image ||
+        material.images!=&publishedImages || !publishedImages.loaded() || !image || !decoded ||
+        decoded->kind!=1 || decoded->mips.size()!=material.sourceMipCount ||
         binding.textureIndex!=material.imageIndex || binding.textureCount!=bank->textureCount() ||
-        image->identity!=material.imageIdentity || material.sourceStoredMipIndex!=2 ||
-        material.sourceMipCount!=3 || (material.sourcePass!=1 && material.sourcePass!=3) ||
+        image->identity!=material.imageIdentity || material.sourceStoredMipIndex!=material.sourceMipCount-1 ||
+        (material.sourceMipCount!=3&&material.sourceMipCount!=4) || (material.sourcePass!=1 && material.sourcePass!=3) ||
         material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed ||
         material.material.raster.blend!=assets::OriginalUiMaterialBlend50KG::sourceAlpha ||
         !material.material.raster.depthWrite || material.material.raster.depthMethod!=2 ||
@@ -126,13 +130,17 @@ inline bool convertOriginalUiRider19SpecularMaterialSpan50KM(
         binding.textureIndex!=material.imageIndex || binding.textureCount!=bank->textureCount() ||
         image->identity!=material.imageIdentity || material.material.program!=assets::OriginalUiLitProgram50KM::specularMapCompressed ||
         (blend!=assets::OriginalUiMaterialBlend50KG::destinationAlphaAdditive &&
-         blend!=assets::OriginalUiMaterialBlend50KG::fixed255Additive) || material.material.raster.depthWrite)return false;
+         blend!=assets::OriginalUiMaterialBlend50KG::fixed255Additive&&
+         blend!=assets::OriginalUiMaterialBlend50KG::fixed64Additive) ||
+        material.material.raster.depthWrite!=(blend==assets::OriginalUiMaterialBlend50KG::fixed64Additive))return false;
     auto commonRaster=material.material.raster;commonRaster.blend=assets::OriginalUiMaterialBlend50KG::additive;
     OriginalUiMaterialSpan50KG next;
     if(!convertOriginalUiMaterialSpan50KG(commonRaster,binding,next))return false;
     next.span.materialMode=OriginalUiMaterialMode50KG::sourceSpecularMapCompressed;
     next.span.blend=blend==assets::OriginalUiMaterialBlend50KG::destinationAlphaAdditive ?
-        OriginalUiBlend50KG::destinationAlphaAdditive : OriginalUiBlend50KG::fixed255Additive;
+        OriginalUiBlend50KG::destinationAlphaAdditive :
+        blend==assets::OriginalUiMaterialBlend50KG::fixed64Additive?OriginalUiBlend50KG::fixed64Additive:
+        OriginalUiBlend50KG::fixed255Additive;
     next.span.alphaScale=1.f; // Typed programmable blend uses source byte units.
     next.native.sourceFogEnabled=material.material.fogEnabled;
     next.native.sourceAlphaTestGreaterZero=material.material.alphaTestGreaterZero;

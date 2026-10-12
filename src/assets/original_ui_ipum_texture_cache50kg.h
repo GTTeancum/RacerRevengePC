@@ -57,11 +57,24 @@ public:
     // True means a generated output catalog was compiled, never that cache
     // bytes, material, sampler, renderer or original hardware were verified.
     static bool catalogAvailable() noexcept;
+    // Finite optional source catalog. Zero means unavailable, not an empty
+    // authenticated cache. Indexes are compiled identities, never caller pins.
+    static std::size_t additionalCatalogSourceCount() noexcept;
+    static const char* additionalSourceMember(std::size_t source) noexcept;
+    static std::size_t additionalMipCount(std::size_t source) noexcept;
+    static const char* additionalRetainedMipFilename(std::size_t source,std::size_t mip) noexcept;
+    // Independently transactional, load once per source; existing19 ownership
+    // and any earlier additional source remain unchanged on failure.
+    bool loadAdditional(std::size_t source,std::shared_ptr<const OriginalUiArchive50KG>,
+        const std::vector<std::vector<std::uint8_t>>& retainedMipRrtex,
+        OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C* =nullptr,
+        const TextureLimits48E& =TextureLimits48E{}) noexcept;
     static const char* retainedMipFilename(std::size_t mip) noexcept;
     bool load(std::shared_ptr<const OriginalUiArchive50KG>,
         const std::vector<std::vector<std::uint8_t>>& retainedMipRrtex,
         OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C* =nullptr,
         const TextureLimits48E& =TextureLimits48E{}) noexcept;
+    // True when at least one exact source has authenticated successfully.
     bool loaded() const noexcept;
     // Only the successfully authenticated fixed-catalog owner can return this
     // admitted format. The provenance prose is descriptive, not authority.
@@ -70,9 +83,13 @@ public:
     // a copied identity, same-name file or unrelated archive does not qualify.
     const Texture48E* textureFor(const OriginalUiMemberView50KG&,
         std::size_t pstOffset,std::size_t pstBytes) const noexcept;
+    // Legacy accessor remains specifically19c_1; use provenanceFor for others.
     const OriginalUiIpumProvenance50KG* provenance() const noexcept;
+    const OriginalUiIpumProvenance50KG* provenanceFor(const OriginalUiMemberView50KG&,
+        std::size_t pstOffset,std::size_t pstBytes) const noexcept;
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
+    std::array<std::unique_ptr<Storage>,8> additional_{};
 };
 } // namespace rr::assets

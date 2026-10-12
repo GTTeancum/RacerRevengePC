@@ -205,7 +205,7 @@ bool readOriginalUiCoursePromptFallbackMaterial50KG(const OriginalUiArchive50KG&
 
 enum class OriginalUiMaterialBlend50KG : std::uint8_t {
     opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive,
-    destinationSourceAlphaAttenuation
+    destinationSourceAlphaAttenuation, fixed64Additive
 };
 enum class OriginalUiMaterialFilter50KG : std::uint8_t { nearest, linear };
 enum class OriginalUiMaterialWrap50KG : std::uint8_t { repeat, clampToEdge };
@@ -291,19 +291,15 @@ struct OriginalUiRider19IpumMaterial50KM {
     std::uint64_t imageIdentity=0;
     std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0;
 };
-// Separate exact Rider19c_1 entry. The ordinary Texture48E overload continues
-// to reject kind2. This consumes the immutable real image-bank owner, canonical
-// source provenance and typed original-data cache color policy. Native policy
-// chooses the highest-resolution original level0, honestly publishing only
-// that image on GPU while preserving all original mip bytes/provenance on CPU.
-// It does NOT assert historical source residencyF4 or emulate memory pressure.
-// Requires actual authored19c_1 DiffuseCompressed, MXL0/equal source texel
-// filters, opaque RGB and alpha-test OFF, matching the actual original pass.
-// Its one-map bind249818..24983C patches material TEXA to TA0/TA1=255,AEM1
-// before packet submission24B39C, agreeing with the typed cache alpha policy.
-// A downstream alpha consumer still requires the separate sealed source-RGBA
-// frame lifetime; the ordinary RGB-only presentation promise is unchanged.
-// The images owner must outlive this result and the renderer's publication.
+// Legacy19 API retained for a finite canonical original IPUM set:19c_1,
+// 04c_1/2,10c_1/2,12c_1,15c_1/2. Each pass must name its own authenticated
+// original PST and per-source typed cache provenance. Actual1..5 source mips
+// remain on CPU; native presentation publishes only the largest original mip.
+// Missing evidence fails closed; no19 replacement or hardware parity claim.
+// First DiffuseCompressed pass only; all actual IPUM passes are opaque and
+// alpha-test-off, with source-backed lit raster/sampler validation.
+// Actual authored additional passes still require their own admitted owners.
+// The images owner must outlive this result and renderer publication.
 bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19IpumMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
@@ -319,22 +315,20 @@ struct OriginalUiRider19BodyMaterial50KM {
     std::uint64_t imageIdentity=0;
     std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0;
 };
-// Exact Rider19_1/19_2 first DiffuseCompressed passes and original UIPODTEX
-// indexed images only. The ordinary one-mip overload remains unchanged. This
-// explicit native policy binds the actual bank's largest original mip, keeps
-// all five source mips/palette on CPU, and does not claim historical residentF4.
-// MXL0, equal original texel filters, opaque RGB and alpha-test OFF are required.
-// Original alpha bytes remain intact. The bodies' later destination-alpha
-// specular passes still need a source framebuffer-alpha owner; this admission
-// cannot establish the existing presentation-only alpha-disposability promise.
+// Legacy19 API retained for original body _1/_2 identities of riders
+// 2,4,10,11,12,15,19,20. Each requires its own canonical UIPODTEX PST.
+// Retains actual1..5 indexed mips on CPU and publishes the largest original.
+// Existing19 dimensions/mip/state contract remains; added first diffuse
+// passes must satisfy the common source-backed lit policy, without substitutes.
+// Later specular passes need the separate source framebuffer-alpha owner.
 bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19BodyMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
-// Exact original pod_wndw DiffuseCompressed passes1 and3. Both retain their
+// Exact pod_wndw and12c_4 DiffuseCompressed passes1/3. Both retain their
 // source-alpha blend, alpha test and depth write. The distinct specular pass2
 // is not replaced or omitted. Native policy publishes the real64x64 original
-// base image while keeping all three indexed mips and palette bytes on CPU.
+// base image (12c_4:128x128/four mips), retaining indexed mips/palette on CPU.
 struct OriginalUiRiderWindowMaterial50KM {
     OriginalUiLitMaterial50KM material{};
     OriginalUiNativeIndexedImagePolicy50KM imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::unavailable;
@@ -347,8 +341,8 @@ bool prepareOriginalUiRiderWindowMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRiderWindowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
-// Exact original19_shdw/20_shdw pass1 and each PSM's own authenticated128x128
-// indexed image. The legacy19 API name remains; no other shadow is admitted.
+// Exact original _shdw pass1 for riders2,4,10,11,12,15,19,20, each with
+// its own authenticated128x128 indexed image. Legacy19 API name retained.
 // ALPHA=(2,1,0,1) subtracts Cd*As/128 from Cd; it does not blend shadow RGB.
 // Preserve source fog, alpha GREATER0, reverse-Z GEQUAL and depth writes.
 // The ordinary indexed/lit entry stays closed to this blend. Only the sealed
@@ -363,10 +357,11 @@ bool prepareOriginalUiRider19ShadowMaterial50KM(const OriginalUiMaterialPass50KG
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19ShadowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
-// Successful result names the exact published one-map specmap1 image and the
-// unchanged source pass. Only original19_1,19_2,20_1,20_2 and pod_wndw pass2
-// are admitted under this legacy19 API name. No dormant character pass2 or
-// unreferenced20_4 pass is admitted; body20 requires its real fog/ATE/GEQUAL.
+// Exact published specmap1 and unchanged original pass2: finite body _1/_2
+// identities of riders2,4,10,11,12,15,19,20 plus pod_wndw. Legacy19 API kept.
+// Actual12c_4 pass2 additionally requires FIX64 and depth writes; dormant
+// character passes and unreferenced20_4 remain excluded. Existing
+//19/20/window contracts stay; additions require common validated specular state.
 // Destination-alpha and FIX255 policies are accepted solely by the separate
 // sealed source-RGBA frame route; ordinary RGB-only span conversion rejects.
 struct OriginalUiRider19SpecularMaterial50KM {

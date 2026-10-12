@@ -8,6 +8,9 @@
 
 namespace rr::platform {
 namespace {
+bool supportedRider(std::uint32_t rider) noexcept {
+    switch(rider){case 2:case 4:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+}
 using Status=OriginalUiFrontendStatus50KG;
 using Diagnostic=OriginalUiFrontendDiagnostic50KG;
 using Route=game::OriginalUiTransitionRoute50KG;
@@ -19,7 +22,8 @@ using MainStatus=OriginalUiMainSessionStatus50KG;
 using OptionsStatus=OriginalUiOptionsSessionStatus50KG;
 using RiderStatus=OriginalUiRiderSessionStatus50KG;
 using CourseStatus=OriginalUiCourseSessionStatus50KG;
-// Bounded Rider19 -> Course -> Back/native race, with the shared audio owner.
+// Default-unlocked Rider -> Course -> Back, with the shared audio owner.
+// Prepared native race admission remains the original Rider19-only boundary.
 // Real archive, profile, popup visibility and resource predicates remain required.
 constexpr bool boundedCourseAdmissionEnabled=true;
 Status result(Diagnostic& d,Status s,std::uint32_t pc=0) noexcept {d.status=s;d.sourcePC=pc;return s;}
@@ -403,7 +407,7 @@ struct OriginalUiFrontend50KG::Storage {
             if(decision.request.targetScreen==4&&s.destination({4,1}))
                 return s.cold.riderProfile->commitBack(decision,s.riderProposal.profileStamp);
             if(decision.request.targetScreen!=6||!s.courseInputsReady()||!s.destination({6,1})||!s.pending->course||
-               !s.pending->course->canEnterMode(0)||(decision.selectedRider!=19&&decision.selectedRider!=20)||decision.profileChanges.count!=3||
+               !s.pending->course->canEnterMode(0)||!supportedRider(decision.selectedRider)||decision.profileChanges.count!=3||
                decision.request.sourcePC!=0x1EA604)return false;
             return s.cold.riderProfile->commitRiderConfirmToCourse(decision,s.riderProposal.profileStamp);
         }
@@ -567,7 +571,7 @@ struct OriginalUiFrontend50KG::Storage {
            textures->textureCount()!=m.gpu->textureCount()||samplers->size()!=m.gpuSamplers.size()||samplers->size()!=m.gpu->textureCount()){
             result(d,Status::resource);return false;
         }
-        // Initial Rider19 cold admission preloads every real image. This
+        // Default-unlocked cold admission preloads every real image. This
         // bounded screen never replaces a GPU image with an unadmitted rider.
         // Reuse requires exact canonical identities AND actual sampler policy.
         for(std::uint32_t i=0;i<m.gpu->textureCount();++i){const auto* gpu=m.gpu->asset(i);const auto* cpu=textures->texture(i);
@@ -775,7 +779,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
                proposal.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||proposal.request.sourceScreen!=5||
                proposal.request.sourcePage!=1||proposal.request.targetScreen!=(confirm?6:4)||proposal.request.targetPage!=1)
                 return s->fault(d,Status::transition);
-            if(confirm&&(!s->courseInputsReady()||(proposal.selectedRider!=19&&proposal.selectedRider!=20)||proposal.profileChanges.count!=3||
+            if(confirm&&(!s->courseInputsReady()||!supportedRider(proposal.selectedRider)||proposal.profileChanges.count!=3||
                proposal.request.sourcePC!=0x1EA604))return result(d,receipt.status=Status::unavailableDestination);
             if(!s->prepareDestination({static_cast<std::uint8_t>(confirm?6:4),1},receipt,d))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
             if(!s->active->rider->routeProposalCurrent(s->riderProposal))return s->fault(d,Status::transition);
