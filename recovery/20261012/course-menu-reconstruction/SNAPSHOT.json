@@ -98,8 +98,8 @@
     },
     {
       "path": "rider/src/game/original_ui_rider_voice_choice50kg.cpp",
-      "bytes": 2506,
-      "sha256": "13afc27fcb6823f937fbe1c94c9d6d3bf6955620251b614da7dd4632f973595b"
+      "bytes": 2803,
+      "sha256": "18e2fc7d853fc7dcfba655fdae79a7b008bf96a94f2b06ccebbb692851d5cd6c"
     },
     {
       "path": "rider/src/game/original_ui_rider_voice_choice50kg.h",

@@ -1,7 +1,6 @@
 // NEW unverified source-only reconstruction. Native clock mapping, not EE MMIO.
 #include "original_ui_rider_voice_choice50kg.h"
 #include <cfenv>
-#include <cmath>
 namespace rr::game {
 namespace {
 bool fail(OriginalUiRiderVoiceChoiceDiagnostic50KG& d,OriginalUiRiderVoiceChoiceError50KG e,std::uint32_t pc)noexcept{
@@ -27,15 +26,19 @@ bool OriginalUiRiderVoiceChoice50KG::chooseRider19(HostMonotonicClock50ID& clock
     out.seedCache3D6B30=seedCache3D6B30_;
     const auto random=drawOriginalSharedRng50IU(shared); // Exactly one308030 at1EA6B8.
     out.draw308030=random;out.rawRandomAfter=shared.sharedRandomState;
-    volatile float asFloat=static_cast<float>(random);
-    volatile float normalized=asFloat*0x1p-31f;
-    volatile float chosen=static_cast<float>(count)*normalized;
-    if(!std::isfinite(chosen)||chosen<0||chosen>static_cast<float>(count))
-        return fail(d,OriginalUiRiderVoiceChoiceError50KG::range,0x1EA6E0);
-    out.choice=static_cast<std::int32_t>(chosen); // Source CVT.W.S truncation.
+    // Fixed-domain native evaluation of the source positive conversion and
+    // choice, not a general EE arithmetic emulator or a host rounding change.
+    // CVT.S.W toward zero drops low bits beyond24 significant binary bits.
+    std::uint32_t quantized=random,shift=0;
+    for(auto magnitude=random;magnitude>=0x01000000u;magnitude>>=1)++shift;
+    if(shift)quantized&=~((std::uint32_t{1}<<shift)-1u);
+    // *2^-31 is exact. Multiplication by5 and final positive truncation can
+    // be evaluated as this rational: every integer0..5 is representable,
+    // so positive toward-zero binary32 reduction cannot cross its integer
+    // floor. No intermediate float rounding can manufacture a choice5.
+    out.choice=static_cast<std::int32_t>((std::uint64_t{quantized}*count)>>31);
     if(!rangeGuardGp80AC_){rangeAssert3D6B38_=1;rangeGuardGp80AC_=true;}
-    // Binary32 may round the largest random values to1.0 and produce5.
-    // Original assertion range0..4 is retained as fail-closed, never clamped.
+    // Retain the source range assertion as fail-closed, never clamp/modulo.
     if(rangeAssert3D6B38_&&(out.choice<0||out.choice>=count))
         return fail(d,OriginalUiRiderVoiceChoiceError50KG::range,0x1EA734);
     out.soundId=first+static_cast<std::uint32_t>(out.choice);out.accepted=true;return true;

@@ -9,6 +9,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -64,6 +65,10 @@ COMMIT_RE = re.compile(
     r"^live capture committed at tick (\d+)( \(retained before undertrack pause\))?$"
 )
 BOUNDARY_RE = re.compile(r"^ORIGINAL AI .*\bboundary:")
+FOG_INITIALIZATION_RE = re.compile(
+    r"Authored native world fog: start ([^ ]+) end ([^; ]+); "
+    r"source ranges established, native world shader parity pending"
+)
 COUNTERS = ("host_driver_calls", "controller_samples", "keyboard_packets")
 EXPECTED_RACER60 = (1, 3, 4, 7, 8, 9, 10, 11)
 
@@ -178,6 +183,7 @@ class Recorder:
         self.ready_fleet = None
         self.native_gc_lighting = None
         self.native_ta_lighting = None
+        self.native_track_fog = None
         self.audio_output = None
         self.sample_rate = None
         self.group = None
@@ -350,6 +356,8 @@ class Recorder:
                 raise ValueError("Requested native GC light-owner policy was not observed before ready")
             if self.args.native_ta_selected_lights and self.native_ta_lighting is None:
                 raise ValueError("Requested native TA light-owner policy was not observed before ready")
+            if self.args.native_track_fog and self.native_track_fog is None:
+                raise ValueError("Requested authored native fog initialization was not observed before ready")
             startup_deadline = self.launch_ns + int(self.args.startup_timeout * 1e9)
             if now >= startup_deadline:
                 self.stop("startup_timeout", "Ready report arrived after startup deadline")
@@ -441,6 +449,20 @@ class Recorder:
 
     def process_line(self, line, now):
         # The raw log and timestamped line event are saved before parsing.
+        if line.startswith("Authored native world fog:"):
+            if not self.args.native_track_fog:
+                raise ValueError("Unexpected authored native fog initialization while disabled")
+            if self.native_track_fog is not None:
+                raise ValueError("Duplicate authored native fog initialization")
+            fog = FOG_INITIALIZATION_RE.fullmatch(line)
+            if fog is None:
+                raise ValueError("Malformed authored native fog initialization receipt")
+            start, end = (float(value) for value in fog.groups())
+            if not (math.isfinite(start) and math.isfinite(end) and 0 <= start < end):
+                raise ValueError("Invalid authored native fog initialization range")
+            self.native_track_fog = {
+                "monotonic_ns": now, "line": line, "start": start, "end": end,
+            }
         if line.startswith("NATIVE GC SELECTED LIGHTS:"):
             if not self.args.native_gc_selected_lights:
                 raise ValueError("Unexpected native GC selected-light policy")
@@ -709,6 +731,8 @@ class Recorder:
             or self.native_gc_lighting is not None,
             "requested_native_ta_light_owner_observed": not self.args.native_ta_selected_lights
             or self.native_ta_lighting is not None,
+            "requested_native_track_fog_initialization_observed": not self.args.native_track_fog
+            or self.native_track_fog is not None,
             "no_partial_fleet_report": self.group is None,
             "all_observed_driver_controller_keyboard_counters_zero": observed_zero,
             "all_eight_native_tick_and_dispatch_growth_observed": len(growth) == 8
@@ -744,6 +768,8 @@ class Recorder:
             "lighting_policy": self.manifest["lighting_policy"],
             "native_gc_light_owner_observation": self.native_gc_lighting,
             "native_ta_light_owner_observation": self.native_ta_lighting,
+            "track_fog_policy": self.manifest["track_fog_policy"],
+            "native_track_fog_observation": self.native_track_fog,
             "ending_executable_identity": ending_executable,
             "limitations": [
                 "This is a bounded " + self.args.track + " mode2 observation, not complete-track acceptance.",
@@ -754,6 +780,7 @@ class Recorder:
                 "Frame timestamps measure host observations of complete log lines, not native GPU presentation time.",
                 "WAV uses the simulation/mixer clock and may include unmatched prefix/suffix; no mux or stretching performed.",
                 "live.ppm without a complete recorded three-part acknowledgment is untrusted partial output.",
+                "Authored fog receipt proves native initialization only; logged ranges are rounded, and visible fog or original shader parity requires separate frame review.",
                 "TA lighting uses an explicit authored-zone top-two host spotlight scan; source light-volume query, cache and specular parity are not claimed.",
                 "Native GC selected-light mode retains host normals/material/alpha/fog/specular limits; its startup line is owner-policy evidence, not original shader or pixel parity.",
             ],

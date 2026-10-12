@@ -75,4 +75,8 @@ Visual acceptance, later and only by root:
 - Capture sampling was capped at 5 frames/s; it is evidence of the bounded gameplay slice, not a smooth-video or performance benchmark. The separate source WAV is 22.528 seconds; it must not be stretched to claim wall-time audio synchronization.
 - Native Gate and authored fog options were off. Full original material/alpha, specular, fog, other-track lighting, complete-track traversal and Windows UI remain outside this pass.
 
-Retained evidence set: `gc-lighting-validation-01` (command, build and session receipts) and `gc-lighting-validation-20261012-01` (summary, frame ledger, original PPM captures and source WAV). No second game execution or software check was performed to prepare the presentation artifacts.
+Historical evidence set names: `gc-lighting-validation-01` and `gc-lighting-validation-20261012-01`. Their local raw receipts, PPM frames and WAV were lost in the 2026-10-12 workspace rollback. The previously delivered silent gameplay video remains saved separately in Library; do not claim the raw take is still available locally. No second game execution or software check was performed to prepare that presentation artifact.
+
+## Next default-on fog observation
+
+Runtime assets were regenerated successfully on 2026-10-12 at 02:31:05.599140 UTC; see `recovery/20261012/cold-asset-preparation-receipt.json`. That was cold preparation only. The recorder now requires the actual authored native fog initialization line, finite ordered start/end values, and its existing actual selected-light startup receipt before accepting Ready when those policies are enabled. The new recorder guard is unexecuted. It proves initialization when observed, not visible fog, a green-hue reference match or original shader parity. No default-on fog gameplay result is claimed yet.
