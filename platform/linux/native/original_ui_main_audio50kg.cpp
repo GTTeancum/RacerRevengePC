@@ -74,13 +74,15 @@ constexpr OriginalFile riderOriginal{
 constexpr OriginalFile courseOriginal{
     "MUSIC/UI/SCREENS/UI_TRKS.VAG",448480,
     "b00ea0f7d26f88970eaa87899b5e185b821d82a2bd01a07a33ccf14ded42b40d",390628};
-// UIACCEPT.INI Event39..43, the genuine Rider19 constructor range.
-constexpr std::array<OriginalFile,5> riderConfirmOriginals{{
+// UIACCEPT.INI Event39..43 (Rider19) and44..45 (Rider20), original constructor ranges.
+constexpr std::array<OriginalFile,7> riderConfirmOriginals{{
     {"SPEECH/UI/A2ASEL01.VAG",25488,"854e09eaf3d5eb28bfccfc35e8a869b5fc10515b6e6c4a3a8dc11dee50cde698",44492},
     {"SPEECH/UI/A2ASEL02.VAG",19232,"7d11a96798382bde857a80d994317e92ec3a4fc57108c2de9b253e21ad519393",33544},
     {"SPEECH/UI/A2ASEL03.VAG",18096,"f79ef5212c57bb313c88002bb595352054a2dbb54e059deb8d2dd071ef65ec8c",31556},
     {"SPEECH/UI/A2ASEL04.VAG",27520,"36f8c4c4c756a36ad6b21c9cd2f4bd083efc53e22f31aa022a8ab1e456e921df",48048},
-    {"SPEECH/UI/A2ASEL05.VAG",17296,"d70fd36cdc0981560f940ad9d74eed809c44cc0a7b05fd8d73e869727a890034",30156}
+    {"SPEECH/UI/A2ASEL05.VAG",17296,"d70fd36cdc0981560f940ad9d74eed809c44cc0a7b05fd8d73e869727a890034",30156},
+    {"SPEECH/UI/OCCSEL01.VAG",24384,"f826ff76992d67646856ce9baa455400e807766edf77716d228ef9f7b6931f85",42560},
+    {"SPEECH/UI/OCCSEL02.VAG",29712,"d0c0af3755a80d7840aa3f52b2f1903e3191c4ace12fe9b6c060bcb8573ce41e",51884}
 }};
 bool sameClip(const AudioClip50HD& a,const AudioClip50HD& b) noexcept {
     return a.samples==b.samples&&a.frames==b.frames&&a.sampleRate==b.sampleRate&&
@@ -246,16 +248,16 @@ bool OriginalUiMainAudio50KG::prepareCourseMenu(const std::filesystem::path& aud
         authenticatedRead(audioRoot,"UIACCEPT.INI",4411,"245b0bd530e6797637ac72bbf2de8f101f3b1da280e00e8fc24e4b4930d79f3b");
         auto song=decodeMenuStereo(authenticatedRead(audioRoot,courseOriginal.path,courseOriginal.bytes,courseOriginal.sha),
             courseOriginal,223232);
-        std::array<assets::AudioPcm50HC,5> speech;
+        std::array<assets::AudioPcm50HC,7> speech;
         for(std::size_t i=0;i<speech.size();++i){
             const auto& original=riderConfirmOriginals[i];
             const auto bytes=authenticatedRead(audioRoot,original.path,original.bytes,original.sha);
             std::string decodeError;
             need(assets::decodeVagMono50HC(bytes.data(),bytes.size(),speech[i],decodeError),
-                "Original Rider19 Confirm speech decode rejected");
+                "Original Rider19/20 Confirm speech decode rejected");
             const auto& pcm=speech[i];
             const AudioClip50HD clip{pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,0,0};
-            need(preparedClipMatches(clip,pcm,original,1),"Original Rider19 Confirm PCM metadata differs");
+            need(preparedClipMatches(clip,pcm,original,1),"Original Rider19/20 Confirm PCM metadata differs");
         }
         coursePcm_=std::move(song);
         courseClip_={coursePcm_.samples.data(),coursePcm_.frames,coursePcm_.sampleRate,coursePcm_.channels,0,0};
@@ -318,7 +320,7 @@ bool OriginalUiMainAudio50KG::canPlayRiderConfirm() const noexcept {
     return true;
 }
 bool OriginalUiMainAudio50KG::playRiderConfirmVoice(std::uint32_t id,RiderConfirmPlayback& out) noexcept {
-    if(out.issued()||id<39||id>43||!canPlayRiderConfirm())return false;
+    if(out.issued()||id<39||id>45||!canPlayRiderConfirm())return false;
     // Source1EA780 uses flags0. Bounded Confirm has no earlier utterance:
     // never stop/restart a live speech voice or consume a replacement choice.
     if(!mixer_->play(riderConfirmVoice,riderConfirmClips_[id-39],1.f,1.f,false,0.f))return false;

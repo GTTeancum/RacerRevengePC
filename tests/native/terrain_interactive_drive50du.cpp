@@ -14,6 +14,7 @@
 #include "../../src/game/original_gc_gameplay_lighting_candidate.h"
 #include "race_session50hm_fixture.h"
 #include "original_camera_assets50kx.h"
+#include "original_camera_input50kx.h"
 #include "../../platform/linux/native/original_camera_presentation.h"
 #include "../../platform/linux/native/original_video_blocking_native.h"
 #include "race_audio50hq_fixture.h"
@@ -291,6 +292,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Source21079C retains constructor a1;21081C stores vehicle60 and210820/24
  // formats the original Pod%02d resource prefix. Native bank slot0 is a role.
  const bool playerUsesRosterRig=allAiEnabled||playerRacer60!=1u;
+ const bool originalCameraEnabled=allAiEnabled&&originalAiEnabled&&raceEnabled&&
+     playerUsesRosterRig&&(nativeGcSelection||nativeGaSelection)&&!checkpointInput;
  require50DU(raceEnabled||!playerUsesRosterRig,"alternate original selection requires the native race");
  const std::string playerPodId(selectedOriginal->podId);
  const auto playerArchive=std::filesystem::path("work/native/project/disc/PODS")/
@@ -326,6 +329,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  static_assert(maxHostRaceOpponents50HT==rr::platform::maxVehicleWindowOpponents50DS);
  static_assert(maxHostRaceRacers50HT<=native_racer_contact50HW::maxRacers);
  static_assert(live_audio50HF::lapFirstVoice+live_audio50HF::lapVoiceCount<=64);
+ static_assert(gameplay_audio50HE::extraFirstVoice+gameplay_audio50HE::cueCount-
+     gameplay_audio50HE::legacyCueCount==original_camera_cycle_audio50KX::Owner::voice);
+ static_assert(original_camera_cycle_audio50KX::Owner::voice<live_audio50HF::voiceCount);
  static_assert(64+material_audio50HI::soundCount<=race_audio50HQ::firstVoice);
  static_assert(race_audio50HQ::firstVoice+race_audio50HQ::voiceCount<=opponent_audio50HX::firstVoice);
  static_assert(opponent_audio50HX::firstVoice+opponent_audio50HX::voiceCount<=opponent_audio50HX::boostFirstVoice);
@@ -621,7 +627,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // source mesh/radius remain owned above; publication checks complete coverage.
  track_runtime_storage50IG::Owner trackStorageOwner;
  track_runtime_storage50IG::Diagnostic trackStorageDiagnostic{};
- require50DU(trackStorageOwner.prepare(ground,trackBindings.data(),trackBindings.size(),{},
+ track_runtime_storage50IG::Limits trackStorageLimits;trackStorageLimits.originalCameraQueries=originalCameraEnabled;
+ require50DU(trackStorageOwner.prepare(ground,trackBindings.data(),trackBindings.size(),trackStorageLimits,
      trackStorageDiagnostic),trackStorageDiagnostic.message.empty()?"original track storage preparation failed":
      trackStorageDiagnostic.message.c_str());
  auto& trackStorage=*trackStorageOwner.get();
@@ -927,6 +934,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  constexpr std::uint32_t applicationWrongWayBypass34C=0;
  lap_drive50GJ::Owner lapOwner;lapOwner.continuity=&lapContinuity;lapOwner.fields=&s.fields;
  auto liveAudio=std::make_unique<live_audio50HF::Owner>();
+ original_camera_cycle_audio50KX::Owner sourceCameraCycleAudio;
  auto raceAudio=std::make_unique<race_audio50HQ::Owner>();
  auto sourceAnnouncer=std::make_unique<source_announcer50IE::Owner>();
  auto raceMusic=std::make_unique<race_music50IE::Owner>();
@@ -955,6 +963,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::unique_ptr<gc_gate_audio50IN::Owner> gaGateAudio;
  SpeechPosition50HG audioListener{};bool audioListenerReady=false;
  std::uint64_t speechEvents=0,speechCues=0,announcerRequestsUnjoined=0;
+ if(originalCameraEnabled&&!audioEnabled)require50DU(sourceCameraCycleAudio.prepareMuted(),
+     "explicit muted camera cycle owner rejected");
  if(audioEnabled){
   const char* suppliedAudioRoot=std::getenv("RR_AUDIO_ROOT");
   const std::filesystem::path audioRoot=suppliedAudioRoot?suppliedAudioRoot:
@@ -966,6 +976,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto* audioGroups=liveAudio->groupsForProviders();
   auto* sharedAnnouncer=liveAudio->sharedAnnouncer();
   require50DU(audioGroups&&sharedAnnouncer,"shared native audio group/episode owner unavailable");
+  if(originalCameraEnabled)require50DU(materialMixer&&sourceCameraCycleAudio.prepare(
+      "work/native/project/disc",audioRoot,*materialMixer,*audioGroups,audioError),
+      audioError.empty()?"original camera cycle audio owner unavailable":audioError.c_str());
   if(isGaTrack){
    gaGateAudio=std::make_unique<gc_gate_audio50IN::Owner>();
    const bool prepared=materialMixer&&audioGroups&&gaGateAudio->prepare(*materialMixer,*audioGroups,audioRoot,audioError);
@@ -1321,6 +1334,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto collectionInitial=trackStorage.initialCollection();
  auto collectionWork=trackStorage.collectionWorkspace();
  std::uint64_t collectedCalls=0;std::size_t peakCollected=0;
+ std::unique_ptr<original_follow_query_bridge::QueryBridge> sourceFollowQueries;
+ if(originalCameraEnabled)sourceFollowQueries=std::make_unique<original_follow_query_bridge::QueryBridge>(
+     trackStorage,ground,collisionNormalMode,query,qfilter,secondaryQuery,secondaryFilter,terrainOwner.metadata);
  auto collectRegistered=[&](){
   // Each HOST racer bank restores its own collection cache. Before it queries,
   // publish the one shared world's latest accepted compound pose/membership.
@@ -1378,6 +1394,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   for(std::size_t i=0;i<terrainOwnerCount;++i)candidates[i].candidate.collision.filter.flagsF8=collectionSecond[i].flagsF8;
   qfilter.flagsF8=collectionSecond[mainQueryRef-1].flagsF8;
   secondaryFilter.flagsF8=collectionSecond[secondaryQueryRef-1].flagsF8;query.initialQueryCurrentIdentity=result.second.currentIdentity;
+  if(sourceFollowQueries&&!sourceFollowQueries->publishCollection(collectionSecond,collectionInput.objectCount))return false;
   std::memcpy(treeSource,treeSecond,trackCounts.methods*sizeof(*treeSource));return true;
  };
  auto commitCandidateEffects=[&](const std::vector<TerrainCandidateEffects48J>&changed){
@@ -3115,8 +3132,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Explicit native root policy: genuine ALL8 controls, recovered single-view
  // camera lifecycle, existing world/audio/HUD services. Other admitted clients
  // keep the existing camera route; no full retail root chronology is claimed.
- const bool originalCameraEnabled=allAiEnabled&&originalAiEnabled&&raceEnabled&&
-     playerUsesRosterRig&&(nativeGcSelection||nativeGaSelection)&&!checkpointInput;
  OriginalVideoFadeState sourceVideo;
  OriginalRendererDispatchFields sourceRendererDispatch{1,2,0,0,0};
  // Native GL has no guest DMA packet queues/callbacks. Its real submissions
@@ -3129,6 +3144,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  sourceCamera::AuthoredStorage sourceCameraAssets;
  std::unique_ptr<sourceCamera::DisplayInputs> sourceCameraDisplay;
  std::unique_ptr<sourceCamera::Session> sourceCameraSession;
+ original_camera_input50KX::Owner sourceCameraInput;
  original_all8_frame::Schedule sourceFrameSchedule;
  std::unique_ptr<platform::OriginalVideoBlockingNativeBackend> sourceFadeOut,sourceFadeIn;
  std::uint64_t sourceCameraTick=0,renderedCameraPublication=0;
@@ -3174,6 +3190,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
   gaGateAudio.reset(); // Stop voice126 while its real mixer/groups still live.
   opponentAudio->close(); // Release96..116 before the live mixer/shared PCM closes.
+  sourceCameraCycleAudio.close(); //Retire exclusive voice159 before its actual mixer/output.
   if(!liveAudio->close(audioDiagnostic)){
    std::cerr<<"audio close failed "<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=false;
   }
@@ -3352,7 +3369,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     return true;
    });
-   originalMain.prepare(originalMainApplication,nativeVideo,textureRequest,renderRequest,std::move(destination));
+   originalMain.prepare(originalMainApplication,nativeVideo,textureRequest,renderRequest,std::move(destination),&monotonicNow50DU);
   }
   std::vector<platform::MaterialTextureSampler50EB> samplers;
   std::vector<platform::VehicleWindowMaterialBinding50DS> materialBindings[3];
@@ -3634,9 +3651,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    sourceCameraSession=std::make_unique<sourceCamera::Session>(sourceCamera::ActualOwners{
        racerBank,s,x.bindings,baseTail,originalAi,lapContinuity.timing,originalAiSession.manager,race,
        sessionRandom,sourceAttachedGlobals,applicationClock,controlPresets,nativeOrdinaryLaunch11258,
-       gcLightOwner,zoneLifecycle,mainMembership,sourceBlur});
+       gcLightOwner,zoneLifecycle,mainMembership,sourceBlur,*sourceFollowQueries,poseHistory,boostState,sourceCameraCycleAudio});
    const auto prepared=sourceCameraSession->prepare(sessionIndex+1,sourceCameraAssets.inputs,*sourceCameraDisplay);
+   if(prepared.status!=sourceCamera::Status::complete)std::cerr<<"original_camera_cold_rejected status="
+       <<static_cast<unsigned>(prepared.status)<<" source_pc="<<prepared.sourcePC
+       <<" follow_query_pc="<<sourceFollowQueries->diagnostic().sourcePC
+       <<" follow_query="<<sourceFollowQueries->diagnostic().message<<'\n';
    require50DU(prepared.status==sourceCamera::Status::complete,"original camera cold source join rejected");
+   require50DU(sourceCameraInput.bind(*sourceCameraSession,controlPresets),"original camera input bind rejected");
    std::array<original_all8_frame::RacerBinding,8> cameraRoster{};
    for(std::size_t slot=0;slot<cameraRoster.size();++slot)
     cameraRoster[slot]={slot,sourceCameraSession->racerKey(slot)};
@@ -3644,7 +3666,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        sourceCameraSession->sessionGeneration()),"original camera ALL8 scheduler binding rejected");
    publishSourceCameraFog();
    std::cerr<<"ORIGINAL CAMERA: source mode4 intro then saved mode5; ALL8 original AI; "
-       "native root/world/audio policy, one actual RNG owner, source640x448 projection.\n";
+       "native root/world/audio policy, one actual RNG owner, source640x448 projection; C cycles original Attached/Follow presets.\n";
   };
   if(!originalUiActive)prepareSourceCamera();
   if(originalUiActive)originalMain.activate(renderer);
@@ -3858,7 +3880,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        "Game Options Up/W previous group(2), Down/S next group(3), Left/Right change value(0/1), R defaults(5). Enter/Space confirm(4), "
        "Escape/menu back(6; source Main does not handle back). Window Close, quit, or stdin EOF exits. "
        "Game Options Accept requires the live enabled audio owner and commits process settings; Cancel remembers the group without applying local edits. "
-       "Mode0 Rider19 Confirm opens Course with original enabled audio or explicit mute; Left/Right selects four tracks, and Back returns. GA Confirm starts the prepared POD19 original-AI race. "
+       "Mode0 Rider19/20 Confirm opens Course with original enabled audio or explicit mute; Left/Right selects four tracks, and Back returns. GA Confirm starts the prepared POD19 original-AI race. "
        "F5/restart and checkpoint have no original UI destination. capture writes the existing live PPM target.\n";
   }
   // Opt-in host observations only; each receipt is bounded to this session.
@@ -3971,19 +3993,24 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // Its four debug-query levels therefore remain actually released.
     originalMain.update(update,elapsedNanoseconds);
     originalMain.render(mainClock,renderer,info.drawableWidth,info.drawableHeight);
-    const auto swapStart=originalMain.stageStart();
-    if(host.hasWindow()&&!host.swapWindow(hostDiagnostic)){
-     originalMain.reportStage("window_swap",swapStart,false);
-     reportHost50DU(hostDiagnostic);throw std::runtime_error("original Main window swap failed");
+    // video+84 suspends publication while the two genuine hidden incoming
+    // frames are prepared. Do not swap stale/undefined window BACK contents or
+    // report a hidden source submission as a newly captured displayed frame.
+    if(!originalMain.coordinator.snapshot().rider.deferred4EC){
+     const auto swapStart=originalMain.stageStart();
+     if(host.hasWindow()&&!host.swapWindow(hostDiagnostic)){
+      originalMain.reportStage("window_swap",swapStart,false);
+      reportHost50DU(hostDiagnostic);throw std::runtime_error("original Main window swap failed");
+     }
+     if(host.hasWindow())originalMain.reportStage("window_swap",swapStart);
+     originalMain.imagePublished=true;++originalMain.frameCount;
+     if(host.hasWindow())++windowSwaps;
+     if(originalMain.frameCount==1){
+      J ready={{"native_frame",originalMain.frameCount},{"width",info.drawableWidth},{"height",info.drawableHeight}};
+      std::cerr<<"original_main_ready "<<ready.dump()<<'\n';reportUiState("ready");
+     }
+     captureCommitted();
     }
-    if(host.hasWindow())originalMain.reportStage("window_swap",swapStart);
-    originalMain.imagePublished=true;++originalMain.frameCount;
-    if(host.hasWindow())++windowSwaps;
-    if(originalMain.frameCount==1){
-     J ready={{"native_frame",originalMain.frameCount},{"width",info.drawableWidth},{"height",info.drawableHeight}};
-     std::cerr<<"original_main_ready "<<ready.dump()<<'\n';reportUiState("ready");
-    }
-    captureCommitted();
     originalMain.commitDeferred(renderer);
     platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection selected;
     if(originalMain.coordinator.takeCourseLaunch(selected)){
@@ -4016,6 +4043,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     break;
    }
    if(sourceCameraSession&&(sourceCameraSession->blockingVideoPending()||sourceCameraSession->asyncVideoPending())){
+    require50DU(sourceCameraInput.sample(input,false,sourceCameraDisplay->rootFlags228),
+        "camera-only fade release failed");
     const bool asynchronous=sourceCameraSession->asyncVideoPending();
     const auto result=asynchronous?sourceCameraSession->advanceAsyncVideo(sourceFadeIn.get()):
         sourceCameraSession->advanceBlockingVideo(sourceFadeOut.get());
@@ -4133,6 +4162,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    const auto now=monotonicNow50DU();
    const auto& info=host.info();
    if(sessionMenu.open()){
+    if(sourceCameraSession)require50DU(sourceCameraInput.sample(input,false,sourceCameraDisplay->rootFlags228),
+        "camera-only menu release failed");
     composePacket(false,input);
     if(!wasPaused||!menuWasOpen)sampleController();
     if(audioEnabled){liveAudio->pause(true);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(true);}
@@ -4186,6 +4217,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    composePacket(!paused&&(!raceEnabled||race_session50HM::controlsAllowed(race,0)),input);
    if(paused){
+    if(sourceCameraSession)require50DU(sourceCameraInput.sample(input,false,sourceCameraDisplay->rootFlags228),
+        "camera-only pause release failed");
     if(audioEnabled){liveAudio->pause(true);if(mode1Enabled||dynamicContactEnabled)raceMusic->pause(true);}
     if(!wasPaused)sampleController(); // Publish the declared release-all sample.
     hostClock.pause(now);wasPaused=true;
@@ -4196,6 +4229,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    // Manual input samples every host poll. The optional host course driver
    // instead emits one ordinary packet per actual 16 ms simulation step.
    if(!autoDriveEnabled)sampleController();
+   if(sourceCameraSession)require50DU(sourceCameraInput.sample(input,!sourceCameraSession->pendingDisplayWork(),sourceCameraDisplay->rootFlags228),
+       "original camera input source dispatch failed");
    platform::FixedStepPlan50DT plan{};
    require50DU(hostClock.plan(now,plan),"fixed-step host clock planning failed");
    addCounter50DU(discardedHostNs,plan.discardedNanoseconds);
@@ -4212,6 +4247,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       require50DU(sourceCameraSession->advanceSceneChild(frame,sourceCamera::Cut::heldBeforeStart,.016f).status==
           sourceCamera::Status::sceneChildComplete,"held original scene child rejected");
       advanceWorldAnimations();
+      if(sourceCameraSession->cameraMode()==0)require50DU(racerBank.visit(0,[&](){return refreshAnimatedCandidates();}),
+          "Follow held frame actual animated collision refresh failed");
       require50DU(sourceCameraSession->advanceCameraChild(frame,sourceCamera::Cut::heldBeforeStart).status==
           sourceCamera::Status::framePublished,"held original camera child rejected");
       publishSourceCameraFog();forceSceneRender=true;
@@ -4285,6 +4322,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
                  sourceCamera::Status::sceneChildComplete,"original scene missed racer-prefix cut");
              advanceWorldAnimations();
              advanceOriginalAiManager(.016f,&schedule);
+             if(sourceCameraSession->cameraMode()==0)require50DU(racerBank.visit(0,[&](){return refreshAnimatedCandidates();}),
+                 "Follow actual animated collision refresh failed");
              require50DU(sourceCameraSession->advanceCameraChild(frame,sourceCamera::Cut::afterAllRacerPrefixes).status==
                  sourceCamera::Status::framePublished,"original camera missed pre-physics cut");
              publishSourceCameraFog();return true;
@@ -5215,7 +5254,7 @@ int main(int argc,char**argv){try{
              "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
              "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
              "GA preview uses RR_TRACK=GA RR_GA_ORIGINAL_AI_CANDIDATE=1 RR_ORIGINAL_AI_ALL_RACERS=1 RR_RACE_MODE=2 RR_START_MENU=0. Window or headless, fresh session only; all 8 racers use original AI. GA disables manual driving, restart/checkpoint and human Results actions. Original Main may hand off only its GA selection with separately prepared POD19 resources.\n"
-             "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits only authenticated Rider19/Back when its compiled cache is available. Other Rider selections remain unavailable. Mode0 Rider19 Confirm opens Course with original enabled audio or explicit mute, Left/Right selects the first four, and Back returns. Course Confirm can start only the exact cold GA/POD19 eight-original-AI destination (requires RR_TRACK=GA, its explicit admission and supplemental POD19 assets); TA/SA/MA remain unavailable. RR_AUDIO controls race audio. With RR_AUDIO_WAV, frontend captures use the supplied filename and Course-launched race captures add -race before the extension.\n";
+             "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits authenticated Rider19 and Rider20 selection when its compiled cache is available. Native-window Left/Right moves between that adjacent pair with original transitions; other Rider selections remain unavailable. Mode0 Rider19/20 Confirm opens Course with original enabled audio or explicit mute, Left/Right selects the first four, and Back returns. Course Confirm can start only the exact cold GA/POD19 eight-original-AI destination (requires RR_TRACK=GA, its explicit admission and supplemental POD19 assets); TA/SA/MA remain unavailable. RR_AUDIO controls race audio. With RR_AUDIO_WAV, frontend captures use the supplied filename and Course-launched race captures add -race before the extension.\n";
   return 2;
  }
  // Every return destroys the complete old session, including native state and

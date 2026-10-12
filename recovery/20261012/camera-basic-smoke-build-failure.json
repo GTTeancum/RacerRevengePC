@@ -1,0 +1,16 @@
+{
+  "source_commit": "8d7ce4b5026af14d1ca86a6cc0338a744260e863",
+  "source_tree": "ab0a07ac11f13e394c1143c47ccaeff4cdd8d435",
+  "started_at_utc": "2026-10-12T19:33:38.611059+00:00",
+  "finished_at_utc": "2026-10-12T19:33:54.760715+00:00",
+  "next_eligible_at_utc": "2026-10-12T20:33:54.760715+00:00",
+  "status": "failed",
+  "runtime_launch_attempted": false,
+  "remaining_descendants": [],
+  "platform": "Linux",
+  "asset_preparation": "Original POD19 preparation succeeded before build",
+  "result": "Build stopped in camera DisplayInputs: platform namespace not qualified; no game launch",
+  "source_correction": "Both DisplayInputs fields now use rr::platform. Correction and subsequent camera/Rider integration have not been built.",
+  "scope": "One centralized basic startup smoke session; no gameplay, capture, or Windows execution",
+  "build_log_sha256": "94574ac3bde6c852dcf94eedc24e514804934b088a0ba7b79a5220cbc5589d8e"
+}

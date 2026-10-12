@@ -43,6 +43,20 @@ struct OriginalUiFrontendDiagnostic50KG {
     VehicleWindowDiagnostic50DS renderer{};
     game::OriginalUiTransitionStatus50KG transition=game::OriginalUiTransitionStatus50KG::ok;
 };
+// Native application presentation/audio owner. The window implementation uses
+// a verified swap-interval1 context; no page update, RNG draw or synthetic
+// timestamp is allowed while servicing the original blocking Rider effect.
+class OriginalUiRiderPresentationHost50KG {
+public:
+    virtual ~OriginalUiRiderPresentationHost50KG()=default;
+    virtual bool available()const noexcept=0;
+    virtual bool begin()noexcept=0;
+    virtual bool end()noexcept=0;
+    virtual bool present(VehicleWindowGl50DS&,const OriginalUiPrivatePublication50KP&,
+        VehicleWindowDiagnostic50DS&)noexcept=0;
+    virtual bool checkpointAudio()noexcept=0;
+    virtual bool materialClock(OriginalUiMainFrameClock50KG&)noexcept=0;
+};
 struct OriginalUiFrontendCold50KG {
     // Already-authenticated immutable original archives, retained by this owner.
     // English is decoded once from localization and retained for every lifetime.
@@ -76,6 +90,9 @@ struct OriginalUiFrontendCold50KG {
     // must be empty here: every fresh bank supplies its authenticated policies.
     // video.lifetime must retain the actual context/callback storage.
     MaterialTextureGlRequest50EB textureRequest{};
+    // Borrowed stable application owner, outliving this frontend. Absence keeps
+    // Left/Right unavailable before any model, image or profile mutation.
+    OriginalUiRiderPresentationHost50KG* riderPresentation=nullptr;
 };
 struct OriginalUiFrontendColdInterval50KG {
     // Host loading interval only; no source clock is sampled or advanced here.
@@ -120,7 +137,7 @@ struct OriginalUiFrontendSnapshot50KG {
     bool lightManagerEntered=false;
 };
 // Concrete native Main4/1 <-> Options12/{1,4}, plus Rider5/1 for
-// authenticated initial Rider19, with mode0 Confirm -> bounded Course6/1
+// authenticated Rider19/20 selection, with mode0 Confirm -> bounded Course6/1
 // and Back. Course Confirm additionally requires the concrete native race lease.
 // No guest execution, fallback UI or profile reset. Runtime acceptance is pending.
 // One freshly prepared bank/session/manager per screen lifetime; shared process

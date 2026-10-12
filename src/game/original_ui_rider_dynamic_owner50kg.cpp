@@ -131,9 +131,9 @@ bool OriginalUiRiderDynamicOwner50KG::preflight(const OriginalUiRiderWidgetCallb
         if(!idOk(c.widget)){ok=false;break;}const auto& e=s.entries[c.widget];
         if(!dynamic(e.state.kind))continue;
         const bool needs=c.operation==O::select||(e.state.kind==K::character&&c.operation==O::clearSelection);
-        // Cold20 descriptors may be sealed for source review, but cannot
-        // authorize an actual20 graph/helper or source callback here.
-        if(needs&&c.widget!=27&&c.widget!=53){diagnostic_.error=E::input;ok=false;break;}
+        // Only the exact sealed19/20 descriptors can acquire a live graph.
+        // Backend preflight additionally requires real renderer retirement.
+        if(needs&&c.widget!=27&&c.widget!=28&&c.widget!=53&&c.widget!=54){diagnostic_.error=E::input;ok=false;break;}
         if(needs&&((e.state.kind==K::character&&!e.characterAssets)||(e.state.kind==K::pod&&!e.podAssets))){
             diagnostic_.error=E::cold;ok=false;
         }
@@ -156,7 +156,7 @@ bool OriginalUiRiderDynamicOwner50KG::generic(std::uint16_t id,bool selected) no
 }
 bool OriginalUiRiderDynamicOwner50KG::loadModel(std::uint16_t id) noexcept {
     auto& s=*storage_;auto& e=s.entries[id];
-    if(id!=27&&id!=53){diagnostic_.error=E::input;return false;}
+    if(id!=27&&id!=28&&id!=53&&id!=54){diagnostic_.error=E::input;return false;}
     if(e.registered)return true;
     auto* ledger=s.backend.materialLifetime(s.backend.context);
     const auto* footprint=s.backend.graphFootprint(s.backend.context,id);

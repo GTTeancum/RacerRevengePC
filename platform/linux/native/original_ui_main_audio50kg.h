@@ -17,7 +17,7 @@ class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
 public:
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
     static constexpr std::size_t effectVoiceCount = 6, requiredVoices = 7;
-    // One accepted Rider19 Confirm per page lifetime. Its UIACCEPT stream
+    // One accepted Rider19/20 Confirm per page lifetime. Its UIACCEPT stream
     // borrows a separate native voice; it cannot replace an active utterance.
     static constexpr std::size_t riderConfirmVoice = requiredVoices, courseRequiredVoices = requiredVoices + 1;
     enum class SteadyRiderError : std::uint8_t {
@@ -89,7 +89,7 @@ public:
     // leaves their already prepared transport intact and Rider unavailable.
     bool prepareRiderMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
     // Optional Course destination, before any playback: original Song11 and
-    // all five Rider19 Confirm choices. Native preload of authored IsStream=1
+    // all seven Rider19/20 Confirm choices. Native preload of authored IsStream=1
     // speech uses the existing decoder/mixer, with no IOP streamer emulation.
     bool prepareCourseMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
     bool ready() const noexcept override;
@@ -194,8 +194,8 @@ private:
     AudioClip50HD riderClip_{};
     assets::AudioPcm50HC coursePcm_{};
     AudioClip50HD courseClip_{};
-    std::array<assets::AudioPcm50HC, 5> riderConfirmPcm_{};
-    std::array<AudioClip50HD, 5> riderConfirmClips_{};
+    std::array<assets::AudioPcm50HC, 7> riderConfirmPcm_{};
+    std::array<AudioClip50HD, 7> riderConfirmClips_{};
     std::uint64_t riderConfirmPlaybackRevision_ = 0;
     bool ownsRiderConfirm_ = false;
     std::array<bool, effectVoiceCount> ownsEffect_{};

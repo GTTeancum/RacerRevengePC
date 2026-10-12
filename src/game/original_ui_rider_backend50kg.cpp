@@ -10,6 +10,7 @@ using K=OriginalUiRiderWidgetKind50KG;
 using O=OriginalUiControlOperation50KG;
 constexpr std::uint32_t noOwner=std::numeric_limits<std::uint32_t>::max();
 bool valid(std::uint16_t id) noexcept{return id>0&&id<120;}
+bool preparedModel(std::uint16_t id) noexcept{return id==27||id==28||id==53||id==54;}
 bool genuine(const std::shared_ptr<const assets::OriginalUiArchive50KG>& a,assets::OriginalUiArchiveId50KG id) noexcept {
     return a&&a->loaded()&&a->identity()==assets::originalUiArchiveIdentity50KG(id);
 }
@@ -166,13 +167,14 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         if(!OriginalUiRiderMaterialFootprint50KG::binder(*s.input.appStart,*s.input.binder,binderFootprint,d.lifetime)||
            !s.input.binder->pass()||!addCold("ui/textures/binder",*s.input.binder->pass(),s.input.binder->images()->sourceProvenance(0)))
             return fail(E::lifetime);
-        // The only runtime batch can acquire graph27, its at-most-two named
-        // helpers, and graph53 once. No callback/foreign factory can expand it.
-        // Reserve fixed live-handle storage and prove the complete worst-case
-        // journal/sequence budget before any graph or helper is constructed.
-        const auto ownerRows=footprints[27].rowCount()+footprints[53].rowCount()+2*binderFootprint.rowCount();
-        const auto batchEvents=4*ownerRows+4; // acquire + populate + worst cleanup + two distinct boundaries per attach
-        if(ownerRows!=9||batchEvents>originalUiRiderMaterialEvents50KG||originalUiRiderMaterialOwners50KG<4||
+        // Each admitted movement has one outgoing and one incoming exact
+        // authored control. Reserve both complete graph/helper domains. Events
+        // are consumed and acknowledged at each real parent+A4 synchronization;
+        // repeated selections reuse journal capacity, never live row epochs.
+        const auto ownerRows19=footprints[27].rowCount()+footprints[53].rowCount()+2*binderFootprint.rowCount();
+        const auto ownerRows20=pod20?footprints[28].rowCount()+footprints[54].rowCount()+2*binderFootprint.rowCount():0;
+        const auto batchEvents=4*(ownerRows19+ownerRows20)+8;
+        if(ownerRows19!=9||batchEvents>originalUiRiderMaterialEvents50KG||originalUiRiderMaterialOwners50KG<8||
            coldRows.size()>originalUiRiderMaterialRows50KG)return fail(E::lifetime);
         s.instances.reserve(coldRows.size());
         auto population=s.input.staticImages;
@@ -209,7 +211,7 @@ bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG
         if(state.kind!=K::pod&&state.kind!=K::character)continue;
         const bool needs=call.operation==O::select||(state.kind==K::character&&call.operation==O::clearSelection);
         if(!needs)continue;const auto& entry=s.entries[call.widget];
-        if((call.widget!=27&&call.widget!=53)||s.submittedDynamicFrontier||(!entry.attached&&entry.everAttached))return fail(E::input);
+        if(!preparedModel(call.widget)||(s.submittedDynamicFrontier&&!cleanupEntitled()))return fail(E::input);
         const void* source=state.kind==K::character?static_cast<const void*>(owner.characterAssets(call.widget).get()):
             static_cast<const void*>(owner.podAssets(call.widget).get());
         if(!source||source!=entry.coldModel||!entry.materials||entry.imageOwner==noOwner||
@@ -221,10 +223,10 @@ bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG
 bool OriginalUiRiderBackend50KG::attach(std::uint16_t id,OriginalUiRiderDynamicOwner50KG& owner) noexcept {
     diagnostic_={};diagnostic_.widget=id;
     const auto fail=[&](E e){diagnostic_.error=e;if(storage_)storage_->poisoned=true;return false;};
-    if(!storage_||(id!=27&&id!=53))return fail(E::input);
+    if(!storage_||!preparedModel(id))return fail(E::input);
     auto& s=*storage_;auto& entry=s.entries[id];
-    if(s.frame||s.submittedDynamicFrontier||s.poisoned||s.tornDown)return fail(E::busy);
-    if(!s.coldSealed||!s.consume||entry.attached||entry.everAttached||!entry.materials||entry.imageOwner==noOwner||
+    if(s.frame||(s.submittedDynamicFrontier&&!cleanupEntitled())||s.poisoned||s.tornDown)return fail(E::busy);
+    if(!s.coldSealed||!s.consume||entry.attached||!entry.materials||entry.imageOwner==noOwner||
        s.registryGeneration==std::numeric_limits<std::uint64_t>::max())return fail(E::input);
     const auto state=owner.state(id);
     // Each local candidate owns its wrapper token immediately. If later helper
@@ -317,8 +319,8 @@ OriginalUiRiderBinderAnimation50KG* OriginalUiRiderBackend50KG::binder(std::uint
     return attached(id)&&pair<2?storage_->entries[id].binders[pair].get():nullptr;
 }
 const OriginalUiRiderMaterialFootprint50KG* OriginalUiRiderBackend50KG::graphFootprint(std::uint16_t id)const noexcept {
-    if(!storage_||!storage_->coldSealed||(id!=27&&id!=53)||storage_->poisoned||storage_->tornDown||
-       storage_->submittedDynamicFrontier||storage_->entries[id].everAttached)return nullptr;
+    if(!storage_||!storage_->coldSealed||!preparedModel(id)||storage_->poisoned||storage_->tornDown||
+       (storage_->submittedDynamicFrontier&&!cleanupEntitled())||storage_->entries[id].attached)return nullptr;
     const auto& footprint=storage_->entries[id].footprint;return footprint.prepared()?&footprint:nullptr;
 }
 const OriginalUiRiderMaterialLifetime50KG& OriginalUiRiderBackend50KG::materialLifetime()const noexcept {
@@ -348,12 +350,15 @@ bool OriginalUiRiderBackend50KG::bindMaterialConsumer(
 bool OriginalUiRiderBackend50KG::sourceSubmissionStarted(
     const rr::platform::OriginalUiRiderDrawContribution50KG* owner,std::uint64_t generation) noexcept {
     if(!storage_||owner!=storage_->consumer||!generation||generation<=storage_->submittedWatermark||
-       storage_->poisoned||storage_->tornDown||!storage_->frame||storage_->retiredWatermark||
+       storage_->poisoned||storage_->tornDown||!storage_->frame||
        storage_->lifetime.populationActive()||storage_->lifetime.aborted())return false;
     // Derived here from the real ledger at the authenticated renderer entry,
     // never from widget visibility, a cold cache, or a caller readiness flag.
     // Sequence is monotonic, so a failed dynamic attempt also closes the gate.
     storage_->submittedDynamicFrontier=storage_->lifetime.sequence();
+    // The new submission closes the prior exact renderer retirement. A stale
+    // completion cannot authorize destruction of this generation's graphs.
+    storage_->retiredWatermark=0;storage_->retiredFrontier=0;
     storage_->submittedWatermark=generation;return true;
 }
 bool OriginalUiRiderBackend50KG::acceptSourceRetirement(
@@ -374,7 +379,11 @@ bool OriginalUiRiderBackend50KG::synchronizeMaterials() noexcept {
         if(s.lifetime.populationActive())s.lifetime.abortPopulation(s.lifetime.sequence(),abort);
         s.poisoned=true;diagnostic_.error=error;return false;
     };
-    if(!s.consume||s.frame||s.submittedDynamicFrontier||s.poisoned||s.tornDown)return fail(E::input);
+    if(!s.consume||s.frame||(s.submittedDynamicFrontier&&!cleanupEntitled())||s.poisoned||s.tornDown)return fail(E::input);
+    // Deselect may have retired the outgoing rows. Consume their exact epochs
+    // before beginPopulation can construct replacement rows at the same rank.
+    // Otherwise vector capacity and mutable pass histories retain dead owners.
+    if(!s.consume(s.consumerContext,false)||!finalizeMaterialEvents(s.lifetime.sequence()))return fail(E::lifetime);
     if(!s.lifetime.beginPopulation(s.lifetime.sequence(),diagnostic_.lifetime))return fail(E::lifetime);
     try {
         while(const auto* row=s.lifetime.nextPopulationRow()){

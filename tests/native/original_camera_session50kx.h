@@ -5,6 +5,11 @@
 #include "native_racer_bank50hn_fixture.h"
 #include "race_session50hm_fixture.h"
 #include "original_camera_async_fade50kx.h"
+#include "original_follow_query_bridge50kx.h"
+#include "original_camera_cycle_audio50kx.h"
+#include "../../src/game/boost_controls50fk.h"
+#include "../../src/game/original_follow_race_frame.h"
+#include "../../src/game/original_camera_mode_input.h"
 #include "../../src/game/ai_runtime50iv.h"
 #include "../../src/game/control_presets49d.h"
 #include "../../src/game/frame_timing49i.h"
@@ -38,8 +43,8 @@ struct AuthoredInputs {
 struct DisplayInputs {
     OriginalVideoFadeState& video;
     OriginalRendererDispatchFields& rendererDispatch;
-    platform::VehicleWindowGl50DS& renderer;
-    platform::VehicleWindowDiagnostic50DS& diagnostic;
+    rr::platform::VehicleWindowGl50DS& renderer;
+    rr::platform::VehicleWindowDiagnostic50DS& diagnostic;
     std::uint32_t rendererBufferCount0C;
     std::int32_t rendererWidth4,rendererHeight8;
     std::int32_t& fadeManagerA8;
@@ -77,6 +82,10 @@ struct ActualOwners {
     const ZoneLifecycle50CL& collisionWorld;
     LiveZoneMembership50EN& mainMembership690;
     GameplayBlurPending& blur;
+    original_follow_query_bridge::QueryBridge& followQueries;
+    BasePoseHistoryState50Y& poseHistory;
+    const BoostState50FK& boost;
+    original_camera_cycle_audio50KX::Owner& cycleAudio;
 };
 enum class Cut : std::uint8_t {
     // Native hold: use real current final-grid/last-published body state while
@@ -156,6 +165,7 @@ class Session final {
     // APPLICATION1B0's unrelated modal/event gate. UI1E4 is a native HUD gate:
     // hidden during intro, revealed by the actual199770 numeric write.
     std::uint8_t raceFlags1B0_=1,uiFlags1E4_=1,sceneFlags29_=3;
+    std::uint8_t raceEntityFlags29_=1; //Enabled native race entity, distinct from scene flags29.
     OriginalRaceCameraOwner controller_;
     OriginalFollowCamera follow_;
     OriginalAttachedCamera attached_;
@@ -170,6 +180,7 @@ class Session final {
     std::array<std::uint64_t,3> childOrder_{};
     OriginalStartChildBinding introChild_;
     OriginalAttachedChildRegistry attachedChild_;
+    OriginalFollowChildRegistry followChild_;
     OriginalCameraObjectChildHeads objectChildren_;
     OriginalCameraControllerEntityFields controllerEntity_;
     OriginalCameraSceneOwner spatial_;
@@ -190,6 +201,7 @@ class Session final {
     AsyncRetainedFade asyncFade_;
     bool fadeInRequested_=false;
     Result result_;
+    OriginalCameraModeInputResult lastInput_{};
 
     template<class T> static std::uint64_t key(const T& owner) noexcept {
         return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&owner));
@@ -452,6 +464,8 @@ public:
                     static_cast<std::int32_t>(i.pod60)};
                 result_.follow=prepareOriginalFollowCamera(follow_,f,presetBank_);
                 if(result_.follow.status!=OriginalFollowStatus::ok)return set(Status::numeric,result_.follow.sourcePC);
+                if(!actual_.bank.visit(0,[&](){return actual_.followQueries.prepare(follow_.queryRadius178);}))
+                    return fail(Status::owner,0x179a80);
                 ++coldPhase_;break;}
             case 4:{
                 const auto& i=identity_[0];
@@ -486,6 +500,7 @@ public:
                 if(!bindFreshOriginalCameraChildRegistry(collection_,generation_,key(controller_),key(scene_),
                     childOrder_.data(),childOrder_.size()))return set(Status::owner);
                 introChild_={&start_,key(start_),&collection_};attachedChild_={&attached_,key(attached_),&collection_};
+                followChild_={&follow_,key(follow_),&collection_};
                 objectChildren_={generation_,key(controller_),key(scene_),0,0};
                 controllerEntity_.controllerKey=key(controller_);display_.controllers48[0]=&controllerEntity_;
                 ++coldPhase_;break;}
@@ -577,6 +592,39 @@ public:
                 }
                 frameStage_=FrameStage::lateTick;break;
             }
+            if(controller_.mode44==0){
+                lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
+                if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
+                   !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_)))return fail(Status::visibility);
+                auto* world=lease.world();auto* work=lease.workspace();if(!world||!work)return fail(Status::owner);
+                auto zones=visibilityKeys_.view();
+                const auto r=actual_.bank.visit(0,[&](){
+                    OriginalFollowRaceFrameResult failed;
+                    if(!actual_.followQueries.sync())return failed;
+                    const auto& velocity=actual_.arena.bodies.main.components.root.body.velocity.v;
+                    const OriginalFollowIdentity identity{generation_,key(identity_[0].racerTag),
+                        key(identity_[0].mainBodyTag),key(identity_[0].containerTag),static_cast<std::int32_t>(identity_[0].pod60)};
+                    const SceneGraph49P graph{actual_.arena.nodes,actual_.arena.sceneNodeCount};
+                    OriginalFollowSubject subject;
+                    const auto subjectResult=readOriginalFollowSubject(identity,graph,
+                        actual_.bindings.visual.container194,static_cast<std::int32_t>(actual_.boost.vehicle64),
+                        {velocity[0],velocity[1],velocity[2],0.f}, //W is unconsumed by the source velocity paths.
+                        actual_.arena.bodies.main.components.root.worldAngularVelocityA0.v[1],subject);
+                    if(subjectResult.status!=OriginalFollowStatus::ok)return failed;
+                    const OriginalFollowCollisionSources sources{&graph,actual_.bindings.lifecycle.main190,&actual_.poseHistory};
+                    auto result=advanceOriginalStableFollowRaceFrame(controller_,follow_,attached_,followChild_,objectChildren_,
+                        current,subject,graph,sources,actual_.followQueries.pairOwner(),actual_.arena.noiseOwner(),
+                        actual_.blur,scene_,pose_,matrices_,tick_,*world,spatial_,zones,sceneBinding_,*work,
+                        displayInputs_->rootFlags228,sceneFlags29_);
+                    // Publish every completed world-query prefix to its actual
+                    // banked filter/copy aliases, even when a later pose fails.
+                    if(!actual_.followQueries.commit())result.status=OriginalFollowRaceFrameStatus::owner;
+                    return result;
+                });
+                result_.follow=r.pose;
+                if(r.status!=OriginalFollowRaceFrameStatus::complete)return fail(Status::sourcePath,r.pose.sourcePC);
+                frameStage_=FrameStage::stableMatrix;break;
+            }
             if(controller_.mode44!=5)return fail(Status::sourcePath,0x177ab0);
             lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
             if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
@@ -623,6 +671,51 @@ public:
         default:return set(Status::order);
         }}
     }
+
+    // Native camera-only device press. Root dispatches real237DF0 transitions
+    // through12815C/application routing before the next fixed simulation step.
+    // This does not route driving input or sample a Player device for ALL8.
+    EventCallbackResult48Z press(const ManagerHeldSources49A& held,
+        InputEvent48Z& event,DeviceButtonRecord48Y& record) noexcept {
+        if(!coldBound_||abandoned_||pendingDisplayWork()||
+           (frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published))return {false,0};
+        std::array<std::uint32_t,8> viewState{};
+        for(std::size_t i=0;i<viewState.size();++i)viewState[i]=actual_.bank.read(i,reads_.retirementCD4);
+        OriginalCameraModeInputEnvironment environment{held,actual_.preferences,viewState.data(),viewState.size(),
+            actual_.bank.read(0,reads_.class58),0,raceEntityFlags29_,actual_.all8Manager.flags58,raceFlags1B0_};
+        lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
+        if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic)||
+           !visibilityKeys_.matches(actual_.visibility,lease,generation_,key(scene_)))return {false,0};
+        auto* world=lease.world();auto* work=lease.workspace();if(!world||!work)return {false,0};
+        auto zones=visibilityKeys_.view();OriginalFollowSceneTransitionInput transition;
+        const OriginalFollowIdentity identity{generation_,key(identity_[0].racerTag),key(identity_[0].mainBodyTag),
+            key(identity_[0].containerTag),static_cast<std::int32_t>(identity_[0].pod60)};
+        if(!actual_.bank.visit(0,[&](){return readOriginalFollowSceneTransitionInput(identity,key(scene_),
+            {actual_.arena.nodes,actual_.arena.sceneNodeCount},actual_.bindings.animation.bodyScene288,
+            actual_.collisionWorld,actual_.mainMembership690,zones,transition);}))return {false,0};
+        lastInput_=advanceOriginalCameraCyclePress176DF0({controller_,follow_,attached_,sceneBinding_,followChild_,
+            attachedChild_,*world,spatial_,zones,*work},environment,transition);
+        if(lastInput_.status==OriginalCameraModeInputStatus::needsCycleAudio1A4B90){
+            pose_.position=sceneBinding_.position180; //Actual177AB0 scene180 write.
+            const auto sound=actual_.cycleAudio.dispatchEvent4();
+            using AudioResult=original_camera_cycle_audio50KX::Owner::Result;
+            if(sound!=AudioResult::started&&sound!=AudioResult::unavailable&&sound!=AudioResult::muted)return {false,0};
+            if(!saveOriginalCameraModePreference178670(controller_,follow_,actual_.preferences,0))return {false,0};
+        }else if(lastInput_.status!=OriginalCameraModeInputStatus::needsChildRoute142350)return {false,0};
+        //Actual reduced native object graph has no controller18 descendants;
+        //these are NOT the camera collection38 whose selected child owns pose.
+        if(objectChildren_.controllerChild18)return {false,0};
+        const EventChildRouter48Z children{0x600u,noEventChild48Z,nullptr,0};
+        const auto routed=routeChildInputEvent48Z(children,true,event,record,nullptr,nullptr,0);
+        return {routed.status==EventRouteStatus48Z::Complete,routed.handled?1u:0u};
+    }
+    EventCallbackResult48Z release(InputEvent48Z& event,DeviceButtonRecord48Y& record) noexcept {
+        if(objectChildren_.controllerChild18)return {false,0};
+        const EventChildRouter48Z children{0x600u,noEventChild48Z,nullptr,0};
+        const auto routed=routeChildInputEvent48Z(children,false,event,record,nullptr,nullptr,0);
+        return {routed.status==EventRouteStatus48Z::Complete,routed.handled?1u:0u};
+    }
+    const OriginalCameraModeInputResult& lastInput()const noexcept{return lastInput_;}
 
     //ONE existing host countdown. Root calls once per unpaused planned native
     //tick instead of its former advanceCountdown call; never call both. Intro
@@ -704,6 +797,7 @@ public:
         if(pendingDisplayWork())return set(Status::videoPending);
         if(frameStage_!=FrameStage::idle&&frameStage_!=FrameStage::published&&
            frameStage_!=FrameStage::failed)return set(Status::order);
+        if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);
         if(spatial_.registration34.attached){
             lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
             if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic))return set(Status::visibility);
@@ -723,6 +817,7 @@ public:
     Result abandonAndCloseSpatial(){
         abandoned_=true;frameStage_=FrameStage::failed;
         if(closed_)return set(Status::abandoned);
+        if(!actual_.bank.visit(0,[&](){return actual_.followQueries.close();}))return set(Status::owner,0x120290);
         if(spatial_.registration34.attached){
             lighting::CameraVisibilityLease lease;lighting::Diagnostic diagnostic;
             if(!actual_.visibility.beginCameraVisibility(0,lease,diagnostic))return set(Status::visibility);

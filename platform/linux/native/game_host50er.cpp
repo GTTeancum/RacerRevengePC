@@ -103,7 +103,7 @@ void GameHost50ER::refreshInfo() noexcept {
     if (mode_ == GameHostMode50ER::Window) {
         const auto& source = window_.info();
         info_ = {source.width, source.height, source.drawableWidth, source.drawableHeight,
-            source.focused, source.minimized, window_.created()};
+            source.focused, source.minimized, window_.created(),source.swapInterval};
 #if defined(__linux__)
     } else if (mode_ == GameHostMode50ER::HeadlessLive) {
         const auto& source = headless_.info();
@@ -321,6 +321,13 @@ bool GameHost50ER::swapWindow(GameHostDiagnostic50ER& d) noexcept {
     if (mode_ != GameHostMode50ER::Window)
         return fail(d, GameHostError50ER::NotWindow, "swapWindow/headless has no window swap");
     return window_.swap(d.window) || fail(d, GameHostError50ER::Window, "WindowHost50DQ::swap");
+}
+bool GameHost50ER::setSwapInterval(std::int32_t interval,GameHostDiagnostic50ER& d) noexcept {
+    d={};
+    if(!ownerThread())return fail(d,GameHostError50ER::WrongThread,"setSwapInterval");
+    if(!created()||mode_!=GameHostMode50ER::Window)return fail(d,GameHostError50ER::NotWindow,"setSwapInterval");
+    const bool accepted=window_.setSwapInterval(interval,d.window);refreshInfo();
+    return accepted||fail(d,GameHostError50ER::Window,"WindowHost50DQ::setSwapInterval");
 }
 bool GameHost50ER::close(GameHostDiagnostic50ER& d) noexcept {
     d = {};

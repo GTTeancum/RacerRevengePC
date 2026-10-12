@@ -213,9 +213,9 @@ bool OriginalUiRiderProfileOwner50KG::riderConfirmSnapshot(std::uint8_t& packed,
 bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToCourse(const game::OriginalUiRouteDecision50KG& d,OriginalUiRiderProfileStamp50KG expected)noexcept{
     if(!storage_||!storage_->readable()||storage_->common->mode34!=0||expected.mode34!=0||expected.generation!=storage_->generation||
        storage_->generation==std::numeric_limits<std::uint64_t>::max()||!d.admitted||!d.profileProposalComplete||d.blockers||
-       d.action!=game::OriginalUiRouteAction50KG::request||d.request.sourceScreen!=5||d.request.sourcePage!=1||d.selectedRider!=19||d.profileChanges.count!=3)return false;
-    game::OriginalUiRiderContext50KG c;c.mode34=0;c.selectedRider=19;c.playerIndex=0;c.packed1125C=storage_->common->playerBits1125C;
-    c.unlockOwnerReady=true;c.selectedUnlockWord10FAC=storage_->unlock10FAC[19];c.comparisonRider100C0=storage_->comparison100C0;
+       d.action!=game::OriginalUiRouteAction50KG::request||d.request.sourceScreen!=5||d.request.sourcePage!=1||(d.selectedRider!=19&&d.selectedRider!=20)||d.profileChanges.count!=3)return false;
+    game::OriginalUiRiderContext50KG c;c.mode34=0;c.selectedRider=d.selectedRider;c.playerIndex=0;c.packed1125C=storage_->common->playerBits1125C;
+    c.unlockOwnerReady=true;c.selectedUnlockWord10FAC=storage_->unlock10FAC[d.selectedRider];c.comparisonRider100C0=storage_->comparison100C0;
     c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;c.admission.nativePageMasks[6]=1u<<1;
     game::OriginalUiRouteDecision50KG exact;
     if(game::dispatchOriginalUiRider50KG(0,game::OriginalUiRouteInput50KG::activate,c,exact)!=game::OriginalUiRouteStatus50KG::ok||
@@ -223,8 +223,8 @@ bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToCourse(const game::Ori
        exact.request.kind!=d.request.kind||exact.request.targetScreen!=d.request.targetScreen||exact.request.targetPage!=d.request.targetPage||
        exact.request.sourcePC!=d.request.sourcePC||exact.profileChanges.count!=3)return false;
     for(std::size_t i=0;i<3;++i)if(!sameChange(exact.profileChanges.values[i],d.profileChanges.values[i]))return false;
-    storage_->remembered[0]=19;storage_->packed1125D=static_cast<std::uint8_t>((storage_->packed1125D&7u)|(19u<<3));
-    storage_->comparison100C0=19;++storage_->generation;return true;
+    storage_->remembered[0]=d.selectedRider;storage_->packed1125D=static_cast<std::uint8_t>((storage_->packed1125D&7u)|(d.selectedRider<<3));
+    storage_->comparison100C0=d.selectedRider;++storage_->generation;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitCourseEntry(const game::OriginalUiCourseSelectionData50KG& data,
     const game::OriginalUiCourseEntryPrefix50KG& plan,OriginalUiRiderProfileStamp50KG expected)noexcept{

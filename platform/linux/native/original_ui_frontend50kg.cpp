@@ -1,5 +1,7 @@
 // Source-reviewed bounded Course integration; runtime acceptance is pending.
 #include "original_ui_frontend50kg.h"
+#include <thread>
+#include <algorithm>
 #include "../../../src/assets/original_ui_course_background50kg.h"
 #include <new>
 #include <utility>
@@ -146,6 +148,10 @@ struct OriginalUiFrontend50KG::Storage {
     bool prepared=false,activated=false,faulted=false,quit=false,inOperation=false,closing=false;
     bool queued=false,frameRendered=false,frameSubmitted=false;
     bool courseLaunchReady=false,courseLaunchTaken=false;
+    bool riderMoving=false;
+    OriginalUiRetainedSource50KN riderOldImage;
+    std::int32_t riderWidth=0,riderHeight=0;
+
     OriginalUiRiderProfileOwner50KG::CourseRaceSelection launchSelection{};
     // This coordinator's current UI-manager lease on the shared APPLICATION
     // object. Cold/pending resource owners never enter or release it.
@@ -197,6 +203,51 @@ struct OriginalUiFrontend50KG::Storage {
             (!cold.gameSettingsProfile||game::validOriginalUiGameSettingsProfile50KG(*cold.gameSettingsProfile))&&
             cold.application&&cold.application->known&&!(cold.application->globalFlags228&4u)&&cold.application->transportE00==-1&&
             (cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:(cold.audio&&cold.audio->ready()));
+    }
+    bool finishRiderMovement(Diagnostic& d) noexcept {
+        if(!riderMoving||!active||!active->rider||active->rider->snapshot().deferred4EC||
+           !renderer||!cold.riderPresentation||!cold.riderPresentation->available()||!cold.application->clock101A50)return false;
+        // Third update1EB534 resumes video,244D60(1)/245090 drains the
+        // preceding queued render;25A9C0 runs the effect BEFORE the next draw.
+        // Therefore use the previous hidden source, not a newly rendered third
+        // frame or a speculative re-render that would advance material state.
+        OriginalUiSourceSubmission50KN incoming,completed;
+        if(!renderer->originalUiSourceSubmission(incoming,d.renderer)||
+           !renderer->completeOriginalUiSource(incoming,completed,d.renderer))return false;
+        OriginalUiByteBlend50KO blend;
+        if(!renderer->beginOriginalUiByteBlend(riderOldImage,completed,blend,d.renderer))return false;
+        auto& clock=*cold.application->clock101A50;
+        std::uint32_t alpha=0,step=1;
+        for(;;){
+            std::uint32_t begin=0,end=0;
+            if(!game::sampleHostTimestamp50ID(clock,begin)||!cold.riderPresentation->available())return false;
+            OriginalUiByteBlendSample50KO sample,done;
+            OriginalUiPrivatePublication50KP publication,published;
+            if(!renderer->renderOriginalUiByteBlendSample(blend,alpha,sample,d.renderer)||
+               !renderer->completeOriginalUiByteBlendSample(sample,done,d.renderer)||
+               !renderer->publishOriginalUiByteBlendSample(blend,done,riderWidth,riderHeight,publication,d.renderer)||
+               !renderer->completeOriginalUiPrivatePublication(publication,published,d.renderer)||
+               !cold.riderPresentation->present(*renderer,published,d.renderer))return false;
+            // Genuine alpha128 draw precedes whole-incoming promotion. Borders
+            // remain old during samples, including128, exactly as the source.
+            if(alpha==128)break;
+            alpha=std::min(128u,alpha+step);
+            if(!game::sampleHostTimestamp50ID(clock,end))return false;
+            const auto elapsed=static_cast<std::uint32_t>(end-begin);
+            if(elapsed>2)++step; //261F00(250):cvt.w.s(0.5+250/128)=2
+            else while(static_cast<std::uint32_t>(end-begin)<2){
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                if(!cold.riderPresentation->checkpointAudio()||!game::sampleHostTimestamp50ID(clock,end))return false;
+            }
+        }
+        OriginalUiPrivatePublication50KP publication,published;OriginalUiPromotedIncoming50KP promoted;
+        if(!renderer->promoteOriginalUiByteBlendIncoming(blend,riderWidth,riderHeight,publication,promoted,d.renderer)||
+           !renderer->completeOriginalUiPrivatePublication(publication,published,d.renderer)||
+           !cold.riderPresentation->present(*renderer,published,d.renderer)||
+           !renderer->releaseOriginalUiByteBlend(d.renderer)||!renderer->releaseRetainedOriginalUiSource(d.renderer)||
+           !renderer->releasePromotedOriginalUiIncoming(d.renderer))return false;
+        if(!cold.riderPresentation->end())return false;
+        riderOldImage={};riderMoving=false;return true;
     }
     bool riderInputsReady() const noexcept {
         using Id=assets::OriginalUiArchiveId50KG;
@@ -352,7 +403,7 @@ struct OriginalUiFrontend50KG::Storage {
             if(decision.request.targetScreen==4&&s.destination({4,1}))
                 return s.cold.riderProfile->commitBack(decision,s.riderProposal.profileStamp);
             if(decision.request.targetScreen!=6||!s.courseInputsReady()||!s.destination({6,1})||!s.pending->course||
-               !s.pending->course->canEnterMode(0)||decision.selectedRider!=19||decision.profileChanges.count!=3||
+               !s.pending->course->canEnterMode(0)||(decision.selectedRider!=19&&decision.selectedRider!=20)||decision.profileChanges.count!=3||
                decision.request.sourcePC!=0x1EA604)return false;
             return s.cold.riderProfile->commitRiderConfirmToCourse(decision,s.riderProposal.profileStamp);
         }
@@ -635,6 +686,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
     if(s->quit||s->closing)return result(d,Status::quit);
     // Do not discard an accepted source frame, especially the unique +440
     // endpoint. Its actual renderer submission precedes any next source tick.
+    if(s->riderMoving)return result(d,receipt.status=Status::noChange);
     if(s->queued||s->updates!=s->submittedUpdate)return result(d,Status::busy);
     Operation operation(s->inOperation);s->frameRendered=false;s->frameSubmitted=false;
     if(!s->sourceCurrent()||!s->processReady())return s->fault(d,Status::session);
@@ -693,6 +745,29 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         }
     }else if(s->active->rider){
         const auto status=s->active->rider->input(input,receipt.rider,d.rider);
+        if(status==RiderStatus::moveProposed){
+            if(!s->cold.riderPresentation||!s->cold.riderPresentation->available()||!s->renderer||
+               !s->cold.application->clock101A50||!s->riderWidth||!s->riderHeight)
+                return result(d,receipt.status=Status::unavailableDestination);
+            if(!s->cold.riderPresentation->begin()){
+                if(!s->cold.riderPresentation->end())return s->fault(d,Status::cleanup);
+                return result(d,receipt.status=Status::unavailableDestination);
+            }
+            // Preserve exactly the prior published RGBA image before native
+            // hidden incoming submissions reuse the source render target.
+            if(!s->renderer->retainPublishedOriginalUiSource(s->riderOldImage,d.renderer))
+                return s->fault(d,Status::renderer);
+            const auto moved=s->active->rider->commitMove(receipt.rider,*s->renderer,d.renderer,d.rider);
+            if(moved!=RiderStatus::ok){
+                if(!s->renderer->releaseRetainedOriginalUiSource(d.renderer))return s->fault(d,Status::cleanup);
+                s->riderOldImage={};
+                if(!s->cold.riderPresentation->end())return s->fault(d,Status::cleanup);
+                if(moved==RiderStatus::unavailableDestination)return result(d,receipt.status=Status::unavailableDestination);
+                return s->fault(d,Status::session,d.rider.sourcePC);
+            }
+            s->riderMoving=true;
+            return result(d,receipt.status=Status::ok);
+        }
         if(status==RiderStatus::backProposed||status==RiderStatus::confirmProposed){
             const bool confirm=status==RiderStatus::confirmProposed;
             s->riderProposal=receipt.rider.routeProposal;const auto& proposal=s->riderProposal.decision;
@@ -700,7 +775,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
                proposal.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||proposal.request.sourceScreen!=5||
                proposal.request.sourcePage!=1||proposal.request.targetScreen!=(confirm?6:4)||proposal.request.targetPage!=1)
                 return s->fault(d,Status::transition);
-            if(confirm&&(!s->courseInputsReady()||proposal.selectedRider!=19||proposal.profileChanges.count!=3||
+            if(confirm&&(!s->courseInputsReady()||(proposal.selectedRider!=19&&proposal.selectedRider!=20)||proposal.profileChanges.count!=3||
                proposal.request.sourcePC!=0x1EA604))return result(d,receipt.status=Status::unavailableDestination);
             if(!s->prepareDestination({static_cast<std::uint8_t>(confirm?6:4),1},receipt,d))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
             if(!s->active->rider->routeProposalCurrent(s->riderProposal))return s->fault(d,Status::transition);
@@ -802,9 +877,17 @@ Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,
     if(!s->updates||s->renderedUpdate==s->updates)return result(d,Status::invalidInput);
     Operation operation(s->inOperation);s->frameRendered=false;s->frameSubmitted=false;
     if(!s->sourceCurrent())return s->fault(d,Status::session);
-    auto& m=*s->active;const bool rendered=m.main?m.main->render(clock,d.main)==MainStatus::ok:m.options?
+    auto& m=*s->active;auto renderClock=clock;
+    if(s->riderMoving&&m.rider&&!m.rider->snapshot().deferred4EC){
+        if(!s->finishRiderMovement(d))return s->fault(d,Status::renderer,0x25D2F0);
+        // The source samples material time only after the blocking video
+        // effect returns. Keep the application's active/cold exclusions rather
+        // than copying raw wall time or advancing the page a second time.
+        if(!s->cold.riderPresentation->materialClock(renderClock))return s->fault(d,Status::session);
+    }
+    const bool rendered=m.main?m.main->render(clock,d.main)==MainStatus::ok:m.options?
         m.options->render({clock.known,clock.advanceAnimations,clock.milliseconds},d.options)==OptionsStatus::ok:
-        m.rider?m.rider->render({clock.known,clock.advanceAnimations,clock.milliseconds},d.rider)==RiderStatus::ok:
+        m.rider?m.rider->render({renderClock.known,renderClock.advanceAnimations,renderClock.milliseconds},d.rider)==RiderStatus::ok:
         m.course&&m.course->render({clock.known,clock.advanceAnimations,clock.milliseconds},d.course)==CourseStatus::ok;
     if(!rendered||(m.rider?!m.rider->sourceFrame():!m.draw()))return s->fault(d,Status::session);
     s->renderedUpdate=s->updates;++s->renders;s->frameRendered=true;return result(d,Status::ok);
@@ -819,7 +902,13 @@ Status OriginalUiFrontend50KG::submit(VehicleWindowGl50DS& renderer,std::int32_t
     Operation operation(s->inOperation);
     if(!s->sourceCurrent())return s->fault(d,Status::session);
     if(s->active->rider){const auto* frame=s->active->rider->sourceFrame();
-        if(!frame||!renderer.submitOriginalUiSourceRgba(*frame,width,height,d.renderer)||!d.renderer.originalUiAccepted)return s->fault(d,Status::renderer);
+        if(!frame)return s->fault(d,Status::renderer);
+        if(s->riderMoving){OriginalUiSourceSubmission50KN hidden;
+            if(!renderer.submitOriginalUiSourceUnpublished(*frame,width,height,hidden,d.renderer)||!d.renderer.originalUiAccepted)
+                return s->fault(d,Status::renderer);
+        }else if(!renderer.submitOriginalUiSourceRgba(*frame,width,height,d.renderer)||!d.renderer.originalUiAccepted)
+            return s->fault(d,Status::renderer);
+        s->riderWidth=width;s->riderHeight=height;
     }else{const auto* draw=s->active->draw();
         if(!draw||!renderer.submitOriginalUi(*draw,width,height,d.renderer)||!d.renderer.originalUiAccepted)return s->fault(d,Status::renderer);
     }
@@ -878,6 +967,7 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
     if(s->inOperation)return result(d,Status::busy);
     {
         Operation operation(s->inOperation);s->closing=true;s->frameRendered=false;s->frameSubmitted=false;
+        if(s->cold.riderPresentation&&!s->cold.riderPresentation->end())return result(d,Status::cleanup);
         if(s->renderer){
             // Source owner retirement must occur while the exact live renderer
             // context exists. Failed retirement retains every owner for retry.

@@ -167,6 +167,12 @@ bool query(OriginalCameraQueryPairOwner& o,bool sphere,OriginalCameraCollisionCa
     auto& q=sphere?s.sphere24:s.ray190;
     const auto status=queryOriginalCameraWorld(in,o.mutableWorld,o.queryWorkspace,q,camera,out.world);
     if(status!=OriginalCameraWorldStatus::Complete){fail(out,S::WorldQuery,out.world.sourcePC);return false;}
+    // Both native query-state flags alias their actual object.F8 fields. The
+    // iterator can mark the OTHER camera query visited even though its target
+    // bit is clear. In particular, a ray hit skips the following sphere query;
+    // preserve that accepted candidate write before the next pair admission.
+    s.sphere24.flagsF8=o.mutableWorld.objects[o.sphereObject-1].flagsF8;
+    s.ray190.flagsF8=o.mutableWorld.objects[o.rayObject-1].flagsF8;
     const CollisionNormalModeWrite50JA normalWrite{out.world.normalMode3DF5B0,out.world.normalModeWritten,true};
     if(!o.normalMode3DF5B0->acceptCompleted(normalWrite)){fail(out,S::Binding,0x121438u);return false;}
     ++out.queriesCommitted;return true;

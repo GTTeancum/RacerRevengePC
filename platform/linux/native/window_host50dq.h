@@ -83,6 +83,7 @@ public:
     bool poll(WindowInput50DQ&, WindowHostDiagnostic50DQ&) noexcept;
     // Submission only: SDL's void swap API cannot prove presentation/completion.
     bool swap(WindowHostDiagnostic50DQ&) noexcept;
+    bool setSwapInterval(std::int32_t,WindowHostDiagnostic50DQ&) noexcept;
     bool close(WindowHostDiagnostic50DQ&) noexcept;
     bool created() const noexcept;
     bool ownsResources() const noexcept;

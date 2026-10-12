@@ -415,6 +415,15 @@ bool WindowHost50DQ::swap(WindowHostDiagnostic50DQ& d) noexcept {
     state_->swapWindow(state_->window);
     return true;
 }
+bool WindowHost50DQ::setSwapInterval(std::int32_t interval,WindowHostDiagnostic50DQ& d) noexcept {
+    d={};
+    if(!ownerThread())return fail(d,WindowHostError50DQ::WrongThread,"setSwapInterval");
+    if(!created()||!current())return fail(d,WindowHostError50DQ::NotCurrent,"setSwapInterval");
+    if(interval < -1||interval > 1)return fail(d,WindowHostError50DQ::InvalidRequest,"setSwapInterval");
+    const auto accepted=state_->setSwapInterval(interval)==0;
+    info_.swapInterval=state_->getSwapInterval();
+    return (accepted&&info_.swapInterval==interval)||fail(d,WindowHostError50DQ::SwapIntervalFailure,"SDL_GL_SetSwapInterval");
+}
 bool WindowHost50DQ::close(WindowHostDiagnostic50DQ& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, WindowHostError50DQ::WrongThread, "close");

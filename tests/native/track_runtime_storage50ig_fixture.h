@@ -40,6 +40,9 @@ struct Limits {
     // Requested native element payload, including reserved filter elements.
     // Excludes allocator bookkeeping and independently owned mesh/radii bytes.
     std::size_t coldPayloadBytes=32u*1024u*1024u;
+    // Only the explicitly selected original-camera route reserves its actual
+    // sphere24/ray190 records. Legacy callers retain the exact three refs.
+    bool originalCameraQueries=false;
 };
 struct Binding {
     // Caller order is authoritative (TA may retain its existing corpus order).
@@ -58,6 +61,7 @@ struct Counts {
     std::size_t terrain=0,zones=0,portals=0,methods=0,blocks=0,objects=0;
     std::size_t portalLinks=0,membership=0,selected=0,events=0;
     CollectionRef50BX mainQuery=0,secondaryQuery=0,terrainQuery=0;
+    CollectionRef50BX cameraSphere=0,cameraRay=0;
 };
 struct Diagnostic {
     std::string message;
@@ -291,12 +295,20 @@ public:
                 "track storage requires every original loaded COL owner exactly once");
             Counts n{};n.terrain=count;n.zones=ground.world.zones.size();n.portals=ground.world.portals.size();
             need(n.zones&&n.zones<=limits.zones&&n.portals<=limits.portals,"original world exceeds storage bounds");
-            n.methods=n.zones*2;n.blocks=n.zones*4;n.objects=count+runtimeDynamicReferenceReserve;n.portalLinks=n.portals*2;
+            n.methods=n.zones*2;n.blocks=n.zones*4;
+            const std::size_t references=runtimeDynamicReferenceReserve+(limits.originalCameraQueries?2u:0u);
+            need(count<=runtimeSearchSlotLimit-references,
+                "original camera query pair exceeds the one-block SearchList ceiling");
+            n.objects=count+references;n.portalLinks=n.portals*2;
             n.membership=n.portals+1;n.selected=std::max(count,sourceSelectionCapacity);
             n.events=std::max<std::size_t>(128,n.objects);
             n.mainQuery=static_cast<CollectionRef50BX>(count+1);
             n.secondaryQuery=static_cast<CollectionRef50BX>(count+2);
             n.terrainQuery=static_cast<CollectionRef50BX>(count+3);
+            if(limits.originalCameraQueries){
+                n.cameraSphere=static_cast<CollectionRef50BX>(count+4);
+                n.cameraRay=static_cast<CollectionRef50BX>(count+5);
+            }
             Budget budget{limits.coldPayloadBytes};account(budget,n);
             std::array<std::size_t,3> filterMaximum{};
             for(std::size_t z=0;z<n.zones;++z){
@@ -407,7 +419,11 @@ public:
             next->membershipWork={next->membershipScratchRegistries.data(),n.methods,
                 next->membershipScratchLinks.data(),next->membershipScratchEntries.data(),n.membership,
                 next->portalScratchLinks.data(),n.portalLinks,{}};
-            auto& input=next->collectionInput;input.objects=next->objects.data();input.objectCount=n.objects;
+            auto& input=next->collectionInput;input.objects=next->objects.data();
+            // The optional pair does not exist in opponent-bank worlds. Its
+            // concrete bank0 preparation alone expands this BANKED active
+            // domain; backing and lifecycle capacities already include it.
+            input.objectCount=n.terrain+runtimeDynamicReferenceReserve;
             input.trees=next->trees.data();input.treeCount=n.methods;input.zones=next->zones.data();input.zoneCount=n.zones;
             // Query owner, bounds, actual E0 membership and type tags remain
             // explicitly unbound until the caller has prepared each real query.

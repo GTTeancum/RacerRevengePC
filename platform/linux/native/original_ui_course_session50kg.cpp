@@ -251,7 +251,8 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         game::OriginalUiCourseRememberedProfile50KG p;game::OriginalUiCourseEntryPrefix50KG entry;
         const auto stamp=s->cold.profile->stamp();std::uint8_t packed=0;std::uint32_t comparison=0;
         valid=s->profileCurrent()&&stamp.mode34==0&&stamp.generation==s->coldStamp.generation+1&&
-            s->cold.profile->riderConfirmSnapshot(packed,comparison)&&(packed>>3)==19&&comparison==19&&
+            s->cold.profile->riderConfirmSnapshot(packed,comparison)&&
+            ((packed>>3)==19||(packed>>3)==20)&&comparison==static_cast<std::uint32_t>(packed>>3)&&
             s->cold.profile->courseSnapshot(p)&&game::planOriginalUiCourseEntryPrefix50KG(s->selection,p,entry)==game::OriginalUiCourseSelectionStatus50KG::ok&&
             !entry.showPopup438&&entry.courseSlot14E4<=4&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);
         if(!valid){s->fault(S::profile,0x1DA4A0);break;}

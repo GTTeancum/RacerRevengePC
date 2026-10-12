@@ -23,6 +23,10 @@ public:
     OriginalUiRiderVoiceChoice50KG()noexcept=default;
     OriginalUiRiderVoiceChoice50KG(const OriginalUiRiderVoiceChoice50KG&)=delete;
     OriginalUiRiderVoiceChoice50KG& operator=(const OriginalUiRiderVoiceChoice50KG&)=delete;
+    // Bounded original constructor rows: Rider19 (39..43), Rider20 (44..45).
+    bool preflight(std::uint32_t rider,OriginalUiRiderVoiceChoiceDiagnostic50KG&)const noexcept;
+    bool choose(std::uint32_t rider,HostMonotonicClock50ID&,CoupledNoiseContext49M&,SharedRandomOwner50ID&,
+        OriginalUiRiderVoiceChoiceReceipt50KG&,OriginalUiRiderVoiceChoiceDiagnostic50KG&)noexcept;
     bool preflightRider19(OriginalUiRiderVoiceChoiceDiagnostic50KG&)const noexcept;
     bool chooseRider19(HostMonotonicClock50ID&,CoupledNoiseContext49M&,SharedRandomOwner50ID&,
         OriginalUiRiderVoiceChoiceReceipt50KG&,OriginalUiRiderVoiceChoiceDiagnostic50KG&)noexcept;

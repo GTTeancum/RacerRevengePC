@@ -145,7 +145,7 @@ bool OriginalUiRiderCharacterScene50KG::beginLoad(
     d={};if (storage_) return fail(d,E::alreadyPrepared,0x1D22A0);
     if (!assets||!assets->loaded()||!assets->hierarchy()||!assets->bindings()||
         !assets->position()||!assets->look()||!assets->up()) return fail(d,E::asset,0x1D22A0);
-    if(assets->widgetId()!=53||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::characterGraph||
+    if((assets->widgetId()!=53&&assets->widgetId()!=54)||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::characterGraph||
        footprint.widget()!=assets->widgetId()||footprint.source()!=assets->mcfSource())return fail(d,E::asset,0x1D22A0);
     if(!ledger.canAcquire(footprint,ledger.sequence(),d.lifetime))return fail(d,E::lifetime,0x1D22A0);
     std::unique_ptr<Storage> next;
@@ -204,7 +204,7 @@ bool OriginalUiRiderCharacterScene50KG::reload(ModelMotionSharedState49T& shared
     const OriginalUiRiderMaterialFootprint50KG& footprint,D& d) noexcept {
     d={};if (!storage_||!storage_->destroyed||storage_->material.pending()) return fail(d,E::phase,0x1D22A0);
     auto& s=*storage_;
-    if(s.sourceAssets->widgetId()!=53||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::characterGraph||
+    if((s.sourceAssets->widgetId()!=53&&s.sourceAssets->widgetId()!=54)||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::characterGraph||
        footprint.widget()!=s.sourceAssets->widgetId()||footprint.source()!=s.sourceAssets->mcfSource())return fail(d,E::asset,0x1D22A0);
     if(!ledger.canAcquire(footprint,ledger.sequence(),d.lifetime))return fail(d,E::lifetime,0x1D22A0);
     s.destroyed=false;
@@ -270,7 +270,7 @@ bool OriginalUiRiderPodScene50KG::load(std::shared_ptr<const assets::OriginalUiR
     OriginalUiRiderMaterialLifetime50KG& ledger,const OriginalUiRiderMaterialFootprint50KG& footprint,D& d) noexcept {
     d={};if (storage_) return fail(d,E::alreadyPrepared,0x1D3590);
     if (!assets||!assets->loaded()||!assets->hierarchy()||!assets->config()) return fail(d,E::asset,0x1D3590);
-    if(assets->widgetId()!=27||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::podGraph||
+    if((assets->widgetId()!=27&&assets->widgetId()!=28)||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::podGraph||
        footprint.widget()!=assets->widgetId()||footprint.source()!=assets->modelSource().identity)return fail(d,E::asset,0x1D3590);
     if(!ledger.canAcquire(footprint,ledger.sequence(),d.lifetime))return fail(d,E::lifetime,0x1D3590);
     std::unique_ptr<Storage> next;
@@ -300,7 +300,7 @@ bool OriginalUiRiderPodScene50KG::reload(OriginalUiRiderMaterialLifetime50KG& le
     const OriginalUiRiderMaterialFootprint50KG& footprint,D& d) noexcept {
     d={};if (!storage_||!storage_->destroyed||storage_->material.pending()) return fail(d,E::phase,0x1D3590);
     auto& s=*storage_;const auto& c=*s.sourceAssets->config();
-    if(s.sourceAssets->widgetId()!=27||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::podGraph||
+    if((s.sourceAssets->widgetId()!=27&&s.sourceAssets->widgetId()!=28)||footprint.kind()!=OriginalUiRiderMaterialOwnerKind50KG::podGraph||
        footprint.widget()!=s.sourceAssets->widgetId()||footprint.source()!=s.sourceAssets->modelSource().identity)return fail(d,E::asset,0x1D3590);
     if(!ledger.canAcquire(footprint,ledger.sequence(),d.lifetime))return fail(d,E::lifetime,0x1D3590);
     s.destroyed=false;

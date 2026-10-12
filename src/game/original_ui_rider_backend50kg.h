@@ -48,9 +48,10 @@ private:
     std::vector<const assets::OriginalUiMaterialPass50KG*> sources;
     std::vector<assets::OriginalUiMaterialBindingState50KG> states;
 };
-// Closed one-player Rider19 initial graph/helper attachment and whole-manager
-// teardown. Cold20 may supply policy, never a live domain. Source mutation is
-// synchronous and nonreentrant; this does not admit movement or Confirm.
+// Exact19/20 graph/helper ownership with renderer-first retirement. Source
+// mutation is synchronous and nonreentrant. Session admission still owns the
+// complete direction/appearance/deferred/audio transaction; cold data alone
+// never authorizes callbacks or replacement of a live source generation.
 class OriginalUiRiderBackend50KG final {
 public:
     OriginalUiRiderBackend50KG() noexcept;~OriginalUiRiderBackend50KG();

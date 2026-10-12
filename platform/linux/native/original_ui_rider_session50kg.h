@@ -13,7 +13,7 @@ struct VehicleWindowDiagnostic50DS;
 enum class OriginalUiRiderSessionStatus50KG : std::uint8_t {
     ok,noChange,backProposed,confirmProposed,unavailableDestination,notBound,alreadyBound,
     invalidInput,unsupportedState,profile,resource,widget,backend,model,
-    camera,lighting,aperture,transition,draw,audio,allocation,faulted,quit
+    camera,lighting,aperture,transition,draw,audio,allocation,faulted,quit,moveProposed
 };
 struct OriginalUiRiderSessionDiagnostic50KG {
     OriginalUiRiderSessionStatus50KG status=OriginalUiRiderSessionStatus50KG::ok;
@@ -74,6 +74,8 @@ struct OriginalUiRiderSessionInputReceipt50KG {
     // Source1EA460 always returns0, including a handled Back or direction.
     // Never use our native status to forward an accepted Movement_Control8.
     bool pageAccepted=false;
+    std::uint64_t moveSerial=0;
+    std::uint8_t moveEvent=0;
     game::OriginalUiRiderSelectionPlan50KG selection{};
     game::OriginalUiRouteDecision50KG decision{};
     OriginalUiRiderRouteProposal50KG routeProposal{};
@@ -93,10 +95,10 @@ struct OriginalUiRiderSessionSnapshot50KG {
     OriginalUiMainSessionAudioReceipt50KG audio{};
     game::OriginalUiRiderVoiceChoiceReceipt50KG voice{};
 };
-// Actual bounded Rider5/1 lifecycle and frame owner. Rider19 entry + normal
-// Back and staged muted Confirm transaction. Confirm remains unavailable until
-// its shared voice-RNG/clock and complete transaction review is closed. Other-rider movement, page2, reset popup and active
-//267BE0 transport remain unavailable BEFORE any widget/model/profile mutation.
+// Actual bounded Rider5/1 lifecycle and frame owner. Exact19/20 entry,
+// directional selection, normal Back and mode0 Confirm use real resource,
+// renderer-retirement, profile, animation and shared voice-RNG owners. Other
+// roster entries, page2 and reset popup remain unavailable before mutation.
 // The frontend owns sole manager.tick, profile commit, GPU upload/publication,
 // source-renderer retirement, and application queue consumption.
 class OriginalUiRiderSession50KG final {
@@ -149,9 +151,11 @@ public:
     void requestQuit() noexcept;
 private:
     friend class OriginalUiFrontend50KG;
-    // Only an explicit private candidate-builder call may request the19+20
-    // immutable union. Public bind retains19-only preparation. Neither mode
-    // changes source selection/registration, movement, Confirm or Back gates.
+    OriginalUiRiderSessionStatus50KG commitMove(const OriginalUiRiderSessionInputReceipt50KG&,
+        VehicleWindowGl50DS&,VehicleWindowDiagnostic50DS&,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
+    // Public bind prepares the exact19+20 immutable union. A cold population
+    // never selects or registers a model; real callbacks and renderer-first
+    // retirement remain required at each entry/direction boundary.
     OriginalUiRiderSessionStatus50KG bindCold(const OriginalUiRiderSessionCold50KG&,
         game::OriginalUiRiderColdPopulation50KG,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     const OriginalUiRiderDrawContribution50KG* rendererOwner() const noexcept;

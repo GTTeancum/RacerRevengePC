@@ -22,6 +22,7 @@ struct GameHostInfo50ER {
     // In HeadlessLive, focused means its explicit stdin control stream remains
     // connected. It does not assert that a window or OS focus exists.
     bool focused = false, minimized = false, inputConnected = false;
+    std::int32_t swapInterval=0; // Actual queried native window setting; headless stays0.
 };
 struct GameHostInput50ER {
     WindowInput50DQ keys{};
@@ -100,6 +101,7 @@ public:
     // Window mode only. HeadlessLive explicitly rejects this operation.
     // Renderer submit/commit is separate and never performed by this facade.
     bool swapWindow(GameHostDiagnostic50ER&) noexcept;
+    bool setSwapInterval(std::int32_t,GameHostDiagnostic50ER&) noexcept;
     bool close(GameHostDiagnostic50ER&) noexcept;
     bool created() const noexcept;
     bool ownsResources() const noexcept;

@@ -180,7 +180,7 @@ inline std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
             " member="+std::to_string(diagnostic.member));
     return archive;
 }
-struct Frontend {
+struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
     using Status=rr::platform::OriginalUiFrontendStatus50KG;
     using StageClock=std::chrono::steady_clock;
     // Host observation only. These samples never feed a source/accepted clock,
@@ -205,6 +205,63 @@ struct Frontend {
             <<",\"draws\":"<<renderer->originalUiDraws<<",\"source_triangles\":"<<renderer->originalUiSourceTriangles
             <<",\"source_texture_barriers\":"<<renderer->originalUiTextureBarriers;
         std::cerr<<"}\n";
+    }
+    rr::platform::GameHost50ER* presentationHost=nullptr;
+    std::uint64_t (*presentationNow)()noexcept=nullptr;
+    bool presentationActive=false;
+    rr::game::HostMonotonicClock50ID* presentationClock=nullptr;
+    std::int32_t savedSwapInterval=0;
+    std::uint64_t riderPresentationSwaps=0;
+    bool available()const noexcept override {
+        if(!presentationHost||!presentationNow||!presentationHost->hasWindow()||!presentationHost->current()||hostPaused)return false;
+        const auto& info=presentationHost->info();
+        return info.focused&&!info.minimized&&info.drawableWidth>0&&info.drawableHeight>0&&
+            (!presentationActive||info.swapInterval==1);
+    }
+    bool begin()noexcept override {
+        if(presentationActive||!available())return false;
+        savedSwapInterval=presentationHost->info().swapInterval;
+        // Keep ownership even after a failed setter: restoring the old native
+        // setting is an explicit cleanup obligation, not an assumed rollback.
+        presentationActive=true;rr::platform::GameHostDiagnostic50ER d;
+        if(presentationHost->setSwapInterval(1,d))return true;
+        if(presentationHost->setSwapInterval(savedSwapInterval,d))presentationActive=false;
+        return false;
+    }
+    bool end()noexcept override {
+        if(!presentationActive)return true;
+        rr::platform::GameHostDiagnostic50ER d;
+        if(!presentationHost||!presentationHost->setSwapInterval(savedSwapInterval,d))return false;
+        presentationActive=false;return true;
+    }
+    bool materialClock(rr::platform::OriginalUiMainFrameClock50KG& out)noexcept override {
+        if(!presentationClock)return false;
+        try{out=sampleClock(*presentationClock,true);return true;}catch(...){return false;}
+    }
+    bool checkpointAudio()noexcept override {
+        if(!presentationActive||!available())return false;
+        const auto now=presentationNow();
+        if(now<lastUpdateNanoseconds||now-lastUpdateNanoseconds>1000000000ull)return false;
+        rr::platform::AudioOutputDiagnostic50HD d;
+        if(!audioOutput.advanceAcceptedNanoseconds(now-lastUpdateNanoseconds,d))return false;
+        // These actual steady-clock intervals are mixed exactly once during
+        // blocking native presentation. They are excluded from next page dt;
+        // material timestamps retain their normal advancing application clock.
+        lastUpdateNanoseconds=now;return true;
+    }
+    bool present(rr::platform::VehicleWindowGl50DS& renderer,
+        const rr::platform::OriginalUiPrivatePublication50KP& image,
+        rr::platform::VehicleWindowDiagnostic50DS& d)noexcept override {
+        if(!presentationActive||!available()||!image.completed())return false;
+        rr::platform::GameHostInput50ER input;rr::platform::GameHostDiagnostic50ER hostDiagnostic;
+        if(!presentationHost->poll(input,hostDiagnostic)||input.keys.quitRequested||!available())return false;
+        const auto& info=presentationHost->info();
+        if(info.drawableWidth!=image.width()||info.drawableHeight!=image.height())return false;
+        rr::platform::OriginalUiWindowBackBufferCopy copy;
+        if(!renderer.copyOriginalUiPrivatePublicationToWindow(image,copy,d)||!copy.commandsAccepted()||
+           !presentationHost->swapWindow(hostDiagnostic))return false;
+        ++riderPresentationSwaps;
+        return checkpointAudio();
     }
     AudioOutput audioOutput;
     rr::platform::OriginalUiFrontend50KG coordinator;
@@ -252,7 +309,8 @@ struct Frontend {
     void prepare(const Application& application,const std::shared_ptr<Video>& video,
         const rr::platform::MaterialTextureGlRequest50EB& textureRequest,
         rr::platform::VehicleWindowRequest50DS& rendererRequest,
-        std::shared_ptr<const rr::platform::OriginalUiCourseRaceDestination50KG> raceDestination={}) {
+        std::shared_ptr<const rr::platform::OriginalUiCourseRaceDestination50KG> raceDestination={},
+        std::uint64_t (*nativeNow)()noexcept=nullptr) {
         using Id=rr::assets::OriginalUiArchiveId50KG;
         rr::platform::OriginalUiFrontendCold50KG cold;
         cold.appStart=readArchive(application.assetRoot,Id::appStart);
@@ -264,6 +322,8 @@ struct Frontend {
         cold.localization=readArchive(application.assetRoot,Id::localization);
         cold.runtime=application.materialRuntime;cold.video=video->publication(video);
         cold.profile=application.profile;cold.application=application.state;cold.courseRaceDestination=std::move(raceDestination);
+        presentationHost=&video->host;presentationNow=nativeNow;
+        presentationClock=application.state->clock101A50.get();cold.riderPresentation=this;
         cold.lightManager=application.lightManager;
         cold.riderProfile=application.riderProfile;
         // Explicit, optional native codec-cache input. This is not a readiness
