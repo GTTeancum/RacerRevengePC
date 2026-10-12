@@ -1,0 +1,47 @@
+--- a/run-root-session.py
++++ b/run-root-session.py
+@@ -229,6 +229,22 @@
+          'Child-subreaper ownership was not established')
+ 
+ 
++def kernel_no_children():
++    # Call only after Popen has handled its phase leader, or during final
++    # terminal cleanup when no Popen result remains to be consumed. A /proc
++    # snapshot can race reparenting; verified subreaper + kernel ECHILD cannot.
++    reaped = []
++    for _ in range(65536):
++        try:
++            pid, status = os.waitpid(-1, os.WNOHANG)
++        except ChildProcessError:
++            return {'kernel_waitpid_echild':True, 'reaped':reaped}
++        if pid == 0:
++            return {'kernel_waitpid_echild':False, 'reaped':reaped}
++        reaped.append({'pid':pid, 'wait_status':status})
++    return {'kernel_waitpid_echild':False, 'reaped':reaped[:128], 'reap_bound_reached':True}
++
++
+ class Session:
+     def __init__(self, state):
+         self.state = state
+@@ -295,6 +311,9 @@
+                         drain(0.02)
+                     reap_adopted()
+                     need(not owned_descendants(), name + ' left descendants after leader exit')
++                    phase['kernel_child_proof'] = kernel_no_children()
++                    need(phase['kernel_child_proof']['kernel_waitpid_echild'],
++                         name + ' retains a kernel-owned child after leader exit')
+                     need(phase['exit_code'] == 0, name + ' failed; no retry authorized')
+                 except BaseException as error:
+                     failed = error
+@@ -606,6 +625,11 @@
+                         break
+                 reap_adopted()
+                 remaining = owned_descendants()
++                state['kernel_child_proof'] = kernel_no_children()
++                if state['kernel_child_proof']['kernel_waitpid_echild']:
++                    remaining = []
++                elif not remaining:
++                    remaining = [{'ownership':'kernel reports an unreaped/live child; /proc identity unavailable'}]
+             except BaseException as error:
+                 cleanup_error = str(error)
+                 remaining = [{'ownership':'unknown'}]

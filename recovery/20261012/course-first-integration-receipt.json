@@ -1,0 +1,99 @@
+{
+  "status": "failed",
+  "commit": "f62504351fc63f4749ff68aa45eb89803f46ad4e",
+  "tree": "d87e917652a5048abaa4c9aa4c837c5ae0bee500",
+  "started_at_utc": "2026-10-12T15:20:05.430604+00:00",
+  "finished_at_utc": "2026-10-12T15:22:19.242379+00:00",
+  "next_eligible_utc": "2026-10-12T16:22:19.242379+00:00",
+  "runner_sha256": "e78794db0684c3134f4b94acd89d85dfcf0d17f23eba284707b1e9f6e9f76c23",
+  "executable_sha256": "ed295d7490dcb3668ba6dc7d25a4d701d2c144f33b0702848dd07f5862b6e59c",
+  "entry_header_sha256": "7183336a7adf81ef68423e846383df97667865c0277e85926db17702d006f210",
+  "recorder_sha256": "18fb2086d49b55074773ca72448a08f50580db4b6f9adaf8b101f86ecd60475a",
+  "generated_catalog_matches_committed": true,
+  "verified_cache": [
+    {
+      "bytes": 1040,
+      "path": "/workspace/shared/recovery-20261012/course-validation-01/ipum-cold/evidence/ui-rider-ipum50kg/19c_1-mip0.rrtex",
+      "sha256": "fe3d1143c277222cb007cd8135cf6cddb79558a6280c318378a329ef99b66575"
+    },
+    {
+      "bytes": 4112,
+      "path": "/workspace/shared/recovery-20261012/course-validation-01/ipum-cold/evidence/ui-rider-ipum50kg/19c_1-mip1.rrtex",
+      "sha256": "9698ecfcc57039c0f2556a2e64eb0e9b7353d9400b3f7624111a912919ac48bd"
+    },
+    {
+      "bytes": 16400,
+      "path": "/workspace/shared/recovery-20261012/course-validation-01/ipum-cold/evidence/ui-rider-ipum50kg/19c_1-mip2.rrtex",
+      "sha256": "1eeb1faf0a0379d50a02faefd99d47b1d7fce3d523bf51243e2c0a6a1e4ee114"
+    },
+    {
+      "bytes": 65552,
+      "path": "/workspace/shared/recovery-20261012/course-validation-01/ipum-cold/evidence/ui-rider-ipum50kg/19c_1-mip3.rrtex",
+      "sha256": "c02fc660a81ade4c0016fa5f9739b8ebffd8ca470b0b3a9ab89aeb5dd6730afb"
+    },
+    {
+      "bytes": 262160,
+      "path": "/workspace/shared/recovery-20261012/course-validation-01/ipum-cold/evidence/ui-rider-ipum50kg/19c_1-mip4.rrtex",
+      "sha256": "57c5076fb52f906996b8d74726e7089bb08344463e377063a480c566c6c56bae"
+    }
+  ],
+  "remaining_descendants": [],
+  "error": "RuntimeError: one-menu-observation failed; no retry authorized",
+  "platform": "Linux",
+  "build": {
+    "compiled": 51,
+    "reused": 247,
+    "link_exit": 0
+  },
+  "observation": {
+    "audio_policy": "explicit mute; no PCM or playback claim",
+    "checkpoints": {},
+    "created_utc": "2026-10-12T15:22:19.230501+00:00",
+    "ending_executable": {
+      "path": "/workspace/shared/recovery-20261012/course-validation-01/rr-native-course",
+      "sha256": "ed295d7490dcb3668ba6dc7d25a4d701d2c144f33b0702848dd07f5862b6e59c",
+      "stat": {
+        "st_ctime_ns": 1791818538907298365,
+        "st_dev": 27,
+        "st_ino": 1462682,
+        "st_mtime_ns": 1791818538904658817,
+        "st_size": 5893840
+      }
+    },
+    "forced_signals": [],
+    "frames": 0,
+    "held_at_stop": null,
+    "last_frame": null,
+    "launch_ns": 47878949962161,
+    "limits": [
+      "This observes native integrated Main4/1 -> Rider5/1 initial19 -> Course6/1 -> fresh Rider5/1 only.",
+      "Exactly Enter, Enter, Escape; zero driving/controller packets; world_ticks must stay zero.",
+      "Course is native_host_rgb. Accepted frames do not establish original GS ordering or retail pixel parity.",
+      "Muted effects can still advance the real shared RNG; no seed, pose or input is synthesized.",
+      "Capture rate is a ceiling/target. Actual timing is retained per frame; duplicates are preserved.",
+      "Release capture is an ordered host-consumption barrier, not a separate exposed key-up receipt.",
+      "Destination activation traverses mandatory renderer retirement; no independent retirement ACK exists.",
+      "No video encoding, frame interpolation, audio fabrication, restart, retry, or second launch.",
+      "Visual layout, Tatooine colors, animation, and return quality need review of retained acknowledged frames."
+    ],
+    "matched_acks": 0,
+    "native_closed": null,
+    "native_quit_state": null,
+    "outcome": "failed",
+    "pending_capture": null,
+    "presses": 0,
+    "problems": [
+      "Rejected receipt: Unexpected failure/gameplay/host-menu receipt: interactive drive: native selected lights require their matching fresh authenticated race; checkpoint/Main unsupported",
+      "Quit write failed: [Errno 32] Broken pipe"
+    ],
+    "quit_ns": 47878959036086,
+    "ready_ns": null,
+    "releases": 0,
+    "requests": 0,
+    "returncode": 1,
+    "screen_activations": [],
+    "stop_reason": "failed",
+    "terminal_receipts": []
+  },
+  "scope": "Asset restoration and integrated compile/link passed; runtime exited before Ready or a single menu frame. No menu round-trip or Windows acceptance."
+}

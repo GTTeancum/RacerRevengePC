@@ -2,7 +2,7 @@
 
 ## Status on 2026-10-12
 
-The previously excluded 53-file source reconstruction is now integrated into the native client with 16 new translation units in the Linux, Windows and centralized build lists. Root activated both admission gates together after the popup visibility, shared selector ownership and complete source join reviews. This is an uncompiled, unexecuted integration; it is not menu completion or visual acceptance.
+The previously excluded 53-file source reconstruction is now integrated into the native client with 16 new translation units in the Linux, Windows and centralized build lists. Root activated both admission gates together after the popup visibility, shared selector ownership and complete source join reviews. The first integrated build passed; the first runtime attempt stopped before Ready because its recorder incorrectly forced a race-only lighting option in Main mode. Menu completion and visual acceptance remain unverified.
 
 The supported candidate route is Main -> Rider19 -> original Confirm -> fixed Course screen 6/page 1 -> original Back -> freshly prepared Rider19. It requires muted audio, mode 0, one human menu profile, authenticated archives and Rider IPUM cache, Course slot 1, subtype 1, three laps, eight entrants and Planet 0. A missing Course archive leaves the destination unavailable while preserving existing Main/Options/Rider Back startup; a supplied malformed archive fails authentication. Directions, race launch, career/save/card flows, active popups, other Riders and enabled Course audio remain unavailable. The menu profile's human count does not authorize human driving; this route cannot launch a race.
 
@@ -16,4 +16,12 @@ The excluded source snapshot and prior reviews remain in `recovery/20261012/cour
 
 Native presentation limits remain explicit: host clock mapping, native resource/raster policies, two current Course lights and possible first-frame ordinary widget color packets preceding palette setters. The aperture alpha of 63/128 does not provide opaque concealment. None of these limits is asserted to match the original shader pipeline exactly.
 
-The preceding 03:31–03:35 UTC GC lighting/fog check tested parent `bfe1552d0fddbae5a1a0da7900e73782926992e4` with Course excluded. It does not validate this integration. No additional software check accompanied these source edits. The next centralized focused build/test may start no earlier than 04:35:12.454092 UTC, after root reviews the current test ledger and the bounded menu plan. Helpers must not run independent checks.
+The preceding 03:31–03:35 UTC GC lighting/fog check tested parent `bfe1552d0fddbae5a1a0da7900e73782926992e4` with Course excluded. It does not validate this integration. No additional software check accompanied these source edits. At that source-integration checkpoint the next eligible time was 04:35:12.454092 UTC. The later attempted session and its new gate are recorded below. Helpers must not run independent checks.
+
+## First integrated session result: 15:20–15:22 UTC
+
+Source `f62504351fc63f4749ff68aa45eb89803f46ad4e` compiled and linked successfully: 298 C++ units, 51 compiled and 247 dependency-checked reused objects. All five recovered Rider19 mip images and the generated catalog matched the existing committed hashes. The native executable SHA-256 is `ed295d7490dcb3668ba6dc7d25a4d701d2c144f33b0702848dd07f5862b6e59c`.
+
+The one menu launch exited with code 1 before Ready, without any captured frame or menu input. It rejected explicit `RR_NATIVE_GC_SELECTED_LIGHTS=1` because selected racer lighting requires a fresh race and is unsupported in original Main mode. The recorded snapshot is preserved unchanged. The corrected recorder `tools/gameplay/record_original_course_roundtrip.py` omits that override, allowing the existing mode-appropriate default; fresh gameplay lighting and fog defaults are unchanged. This correction is not yet executed.
+
+The recorder did not force termination; the runner recorded no remaining descendants, and a root post-session process lookup found no matching native executable. Receipt: `recovery/20261012/course-first-integration-receipt.json`. Next centralized execution is eligible at 16:22:19.242379 UTC, subject to the current ledger and root assignment.

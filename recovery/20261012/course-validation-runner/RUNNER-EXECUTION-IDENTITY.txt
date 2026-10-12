@@ -1,0 +1,36 @@
+Execution provenance, recorded2026-10-12 around15:23 UTC.
+
+EXECUTED BY ROOT at15:20:05 UTC:
+  run-root-session.executed-e78794.py
+  SHA256 e78794db0684c3134f4b94acd89d85dfcf0d17f23eba284707b1e9f6e9f76c23
+This file is an exact byte reconstruction of the runner loaded by root's active
+Python process, made by copying the later on-disk version and reverting only the
+precise kernel-child-proof delta. Its SHA256 independently matches the reviewed
+pre-launch hash. Its original source-only authoring comments are preserved for
+exact identity; this sidecar records the subsequent root execution.
+
+REVISED RUNNER, NOT EXECUTED:
+  run-root-session.py
+  SHA256 a6c188e08dbf1e634f1646b26fd49d042a251456103f46fb1c2a0d961347f085
+A narrow kernel waitpid/ECHILD cleanup-proof edit completed after root launched
+the prior runner and immediately before root's stop-edit message arrived. The
+already-running Python process had loaded the e78794 version. No runtime, build,
+recorder, extractor, committed main or source asset was changed by that edit.
+The revised on-disk file has remained untouched since root's stop-edit message.
+
+Precise source difference:
+  cleanup-kernel-proof.NOT-EXECUTED.patch
+The patch is relative to executed e78794 and produces revised a6c188. It adds a
+kernel no-children/ECHILD proof after handled phase leaders and before ledger
+release, supplementing the non-atomic /proc descendant scan.
+
+ADDITIONAL PROPOSAL ONLY, NOT APPLIED TO EITHER RUNNER:
+If final fallback cleanup discovers any residual process and sends TERM/KILL,
+mark success=False and record forced_final_cleanup/error even if all processes
+eventually stop. Otherwise an unexpected forced final cleanup following a prior
+success could be mislabeled completed. Root owns any future integration/review.
+
+Root has explicitly elected to independently verify terminal processes before
+any ledger reuse. There is no second launch or retry. This worker has run no
+project script, import, syntax check, compiler, conversion, test, menu, gameplay
+or encoder; only source file writes/copies, comparisons and SHA256 integrity reads.
