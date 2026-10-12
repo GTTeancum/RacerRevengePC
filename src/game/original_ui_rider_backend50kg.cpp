@@ -40,6 +40,11 @@ struct OriginalUiRiderBackend50KG::Storage {
     void* consumerContext=nullptr;
     bool (*consume)(void*,bool) noexcept=nullptr;
     std::uint64_t submittedWatermark=0,retiredWatermark=0,retiredFrontier=0;
+    // The source restart tick submits a closed, static-only Rider frame before
+    // openingAC creates either graph. Freeze initial acquisition only after a
+    // submission has observed actual dynamic lifetime events. Keep the total
+    // submission watermark above intact for renderer-first destruction.
+    std::uint64_t submittedDynamicFrontier=0;
     bool poisoned=false,tornDown=false;
 
     OriginalUiRiderVisibilityOwner50KG visibility;
@@ -204,7 +209,7 @@ bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG
         if(state.kind!=K::pod&&state.kind!=K::character)continue;
         const bool needs=call.operation==O::select||(state.kind==K::character&&call.operation==O::clearSelection);
         if(!needs)continue;const auto& entry=s.entries[call.widget];
-        if((call.widget!=27&&call.widget!=53)||s.submittedWatermark||(!entry.attached&&entry.everAttached))return fail(E::input);
+        if((call.widget!=27&&call.widget!=53)||s.submittedDynamicFrontier||(!entry.attached&&entry.everAttached))return fail(E::input);
         const void* source=state.kind==K::character?static_cast<const void*>(owner.characterAssets(call.widget).get()):
             static_cast<const void*>(owner.podAssets(call.widget).get());
         if(!source||source!=entry.coldModel||!entry.materials||entry.imageOwner==noOwner||
@@ -218,7 +223,7 @@ bool OriginalUiRiderBackend50KG::attach(std::uint16_t id,OriginalUiRiderDynamicO
     const auto fail=[&](E e){diagnostic_.error=e;if(storage_)storage_->poisoned=true;return false;};
     if(!storage_||(id!=27&&id!=53))return fail(E::input);
     auto& s=*storage_;auto& entry=s.entries[id];
-    if(s.frame||s.submittedWatermark||s.poisoned||s.tornDown)return fail(E::busy);
+    if(s.frame||s.submittedDynamicFrontier||s.poisoned||s.tornDown)return fail(E::busy);
     if(!s.coldSealed||!s.consume||entry.attached||entry.everAttached||!entry.materials||entry.imageOwner==noOwner||
        s.registryGeneration==std::numeric_limits<std::uint64_t>::max())return fail(E::input);
     const auto state=owner.state(id);
@@ -313,7 +318,7 @@ OriginalUiRiderBinderAnimation50KG* OriginalUiRiderBackend50KG::binder(std::uint
 }
 const OriginalUiRiderMaterialFootprint50KG* OriginalUiRiderBackend50KG::graphFootprint(std::uint16_t id)const noexcept {
     if(!storage_||!storage_->coldSealed||(id!=27&&id!=53)||storage_->poisoned||storage_->tornDown||
-       storage_->submittedWatermark||storage_->entries[id].everAttached)return nullptr;
+       storage_->submittedDynamicFrontier||storage_->entries[id].everAttached)return nullptr;
     const auto& footprint=storage_->entries[id].footprint;return footprint.prepared()?&footprint:nullptr;
 }
 const OriginalUiRiderMaterialLifetime50KG& OriginalUiRiderBackend50KG::materialLifetime()const noexcept {
@@ -345,6 +350,10 @@ bool OriginalUiRiderBackend50KG::sourceSubmissionStarted(
     if(!storage_||owner!=storage_->consumer||!generation||generation<=storage_->submittedWatermark||
        storage_->poisoned||storage_->tornDown||!storage_->frame||storage_->retiredWatermark||
        storage_->lifetime.populationActive()||storage_->lifetime.aborted())return false;
+    // Derived here from the real ledger at the authenticated renderer entry,
+    // never from widget visibility, a cold cache, or a caller readiness flag.
+    // Sequence is monotonic, so a failed dynamic attempt also closes the gate.
+    storage_->submittedDynamicFrontier=storage_->lifetime.sequence();
     storage_->submittedWatermark=generation;return true;
 }
 bool OriginalUiRiderBackend50KG::acceptSourceRetirement(
@@ -365,7 +374,7 @@ bool OriginalUiRiderBackend50KG::synchronizeMaterials() noexcept {
         if(s.lifetime.populationActive())s.lifetime.abortPopulation(s.lifetime.sequence(),abort);
         s.poisoned=true;diagnostic_.error=error;return false;
     };
-    if(!s.consume||s.frame||s.submittedWatermark||s.poisoned||s.tornDown)return fail(E::input);
+    if(!s.consume||s.frame||s.submittedDynamicFrontier||s.poisoned||s.tornDown)return fail(E::input);
     if(!s.lifetime.beginPopulation(s.lifetime.sequence(),diagnostic_.lifetime))return fail(E::lifetime);
     try {
         while(const auto* row=s.lifetime.nextPopulationRow()){

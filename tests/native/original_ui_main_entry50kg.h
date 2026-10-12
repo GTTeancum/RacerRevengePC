@@ -331,6 +331,12 @@ struct Frontend {
             std::to_string(static_cast<unsigned>(diagnostic.status))+" source="+std::to_string(diagnostic.sourcePC)+
             " main="+std::to_string(static_cast<unsigned>(diagnostic.main.status))+
             " options="+std::to_string(static_cast<unsigned>(diagnostic.options.status))+
+            " rider="+std::to_string(static_cast<unsigned>(diagnostic.rider.status))+
+            " rider_pc="+std::to_string(diagnostic.rider.sourcePC)+
+            " rider_widget="+std::to_string(static_cast<unsigned>(diagnostic.rider.widget.error))+
+            " rider_dynamic="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.error))+
+            " rider_backend="+std::to_string(static_cast<unsigned>(diagnostic.rider.backend.error))+
+            " rider_draw="+std::to_string(static_cast<unsigned>(diagnostic.rider.draw.error))+
             " course="+std::to_string(static_cast<unsigned>(diagnostic.course.status))+
             " course_pc="+std::to_string(diagnostic.course.sourcePC)+
             " renderer="+std::to_string(static_cast<unsigned>(diagnostic.renderer.error)));

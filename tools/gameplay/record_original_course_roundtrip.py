@@ -25,9 +25,9 @@ import time
 
 REPO = Path('/workspace/shared/rr-recovery-git')
 ASSETS = Path('/workspace/shared/recovery-20261010/native-assets-prepared-01')
-STAGE = Path('/workspace/shared/recovery-20261012/course-validation-02')
+STAGE = Path('/workspace/shared/recovery-20261012/course-validation-03')
 CORPUS = Path('evidence/staticType2Producer49X/original-word/native-fixtures.json')
-EARLIEST = dt.datetime.fromisoformat('2026-10-12T16:22:19.242379+00:00')
+EARLIEST = dt.datetime.fromisoformat('2026-10-12T17:22:32.320233+00:00')
 HEADER = b'P6\n640 448\n255\n'
 IMAGE_BYTES = len(HEADER) + 640 * 448 * 3
 MAX_FRAMES = 920
