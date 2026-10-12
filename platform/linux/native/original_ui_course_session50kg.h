@@ -45,7 +45,7 @@ struct OriginalUiCourseRouteProposal50KG {
     OriginalUiRiderProfileStamp50KG profileStamp{};
 };
 struct OriginalUiCourseSessionInputReceipt50KG {
-    bool containerReached=false,pageCallbackRan=false,pageAccepted=false;
+    bool containerReached=false,pageCallbackRan=false,pageAccepted=false,selectionChanged=false;
     game::OriginalUiRouteDecision50KG decision{};
     OriginalUiCourseRouteProposal50KG routeProposal{};
     OriginalUiCourseSessionStatus50KG status=OriginalUiCourseSessionStatus50KG::noChange;
@@ -56,14 +56,15 @@ struct OriginalUiCourseSessionSnapshot50KG {
     bool backProposalPending=false,backAccepted=false;
     bool popupEnabled438=false;
     std::uint32_t courseSlot14E4=0,subtypeSlot14F4=0,laps14EC=0,entrants14F0=0;
-    std::uint32_t promptMask42C=0;
+    std::uint32_t promptMask42C=0,selectedPlanet40=0,selectedCourse44=0,deferred14D0=0;
     std::uint64_t updates=0,renders=0,registryGeneration=0;
     game::OriginalUiTransitionSnapshot50KG transition{};
     game::OriginalUiApertureSnapshot50KG aperture{};
     OriginalUiMainSessionAudioReceipt50KG audio{};
 };
-// Bounded mode0/subtype1/laps3/entrants8/Course1/planet0, explicit muted.
-// Original Back requires a fresh native Rider owner; directions/launch closed.
+// Bounded mode0/subtype1/laps3/entrants8, fresh unlocked Course slots1..4.
+// Left/right uses genuine authored controls/models/text/backgrounds. Original
+// Back creates a fresh Rider owner; group changes and race launch stay closed.
 class OriginalUiCourseSession50KG final {
 public:
     OriginalUiCourseSession50KG()noexcept;~OriginalUiCourseSession50KG();
@@ -92,6 +93,10 @@ public:
     OriginalUiCourseSessionSnapshot50KG snapshot()const noexcept;
     void drain()noexcept;void requestQuit()noexcept;
 private:
+    friend class OriginalUiFrontend50KG;
+    // Called only by the frontend after actual finishSubmittedWork and exact
+    // immutable-bank rebind. No public callback can mint completion.
+    OriginalUiCourseSessionStatus50KG completeSelectionRefresh(OriginalUiCourseSessionDiagnostic50KG&)noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

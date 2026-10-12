@@ -4,6 +4,7 @@
 // source-only and has not been built or tested.
 #include "vehicle_frame49w.h"
 #include "live_zone_membership50en.h"
+#include "reset_visibility50ey.h"
 #include "original_racer_material50km.h"
 #include "native_gc_selected_lights_candidate.h"
 #include "../assets/import_world48f.h"
@@ -55,16 +56,47 @@ public:
     std::uint64_t generation() const noexcept {return generation_;}
 };
 
+// Serial access to the SAME application4C0 namespace used by all racers.
+// It grants no camera activation or completed-frame receipt. Borrowed pointers
+// are valid only during this lease; no draw, racer membership operation, reset
+// or scene traversal may overlap it. The retained original camera session owns
+// its distinct scene30 membership/backing, using cameraObject30() below.
+class CameraVisibilityLease final {
+    friend class Owner;
+    Owner* owner_=nullptr;
+    std::uint64_t generation_=0;
+    std::uint32_t racer_=0;
+public:
+    CameraVisibilityLease() noexcept=default;
+    ~CameraVisibilityLease();
+    CameraVisibilityLease(const CameraVisibilityLease&)=delete;
+    CameraVisibilityLease& operator=(const CameraVisibilityLease&)=delete;
+    CameraVisibilityLease(CameraVisibilityLease&&)=delete;
+    CameraVisibilityLease& operator=(CameraVisibilityLease&&)=delete;
+    ResetVisibilityWorld50EY* world() noexcept;
+    LiveZoneWorkspace50EN* workspace() noexcept;
+    const LiveZoneMembership50EN* racerVisibility7F0() const noexcept;
+    CollectionRef50BX cameraObject30() const noexcept;
+    // Native stable identities of actual authored-ordinal visibility rows.
+    // Their source namespace is4C0; collision690 mapping still uses its actual
+    // ordinal, never a collision pointer re-labelled as a visibility pointer.
+    std::uint64_t zoneKey4C0(std::size_t ordinal) const noexcept;
+    std::size_t zoneCount() const noexcept;
+};
+
 // Stable SESSION owner, outside the transient native racer bank. Cold prepare
 // authenticates actual GC SCB bytes and owns a fresh decoded world, real small
 // registry, and a separate4C0 visibility namespace. It never borrows collision
 //4C4 membership or resets OriginalUiLightManagerLifetime50KG.
 class Owner final {
     friend class DrawLease;
+    friend class CameraVisibilityLease;
     struct Storage;
     std::unique_ptr<Storage> storage_;
     bool invalidated_=false; // Terminal even before a successful cold prepare.
     void endDraw(DrawLease&) noexcept;
+    void endCameraVisibility(CameraVisibilityLease&) noexcept;
+    bool cameraLeaseCurrent(const CameraVisibilityLease&) const noexcept;
     bool prepareScene(const std::vector<std::uint8_t>&,std::uint32_t,bool,bool,Diagnostic&) noexcept;
 public:
     Owner() noexcept;
@@ -114,6 +146,15 @@ public:
         const VehicleFrameState49W&,const VehicleFrameBindings49W&,
         const VehicleFrameParameters49W&,std::uint64_t graphicsSequence,
         Diagnostic&) noexcept;
+    // Borrow canonical4C0 after the selected racer's actual7F0 attachment.
+    // One extra registration identity is reserved during fresh preparation;
+    // racer1..N references and all existing registrations remain unchanged.
+    // This never attaches or selects a camera. Cold175224 uses the borrowed
+    // actual7F0; later114C44/177AB0 use this SAME world and scratch. Camera
+    // state and membership must remain outside every racer-bank snapshot.
+    // Current original-camera source closure is GC/GA; TA rejects this lease.
+    bool beginCameraVisibility(std::uint32_t actualRosterSlot,
+        CameraVisibilityLease&,Diagnostic&) noexcept;
     // Call around the real three-component draw preparation, inside that same
     // racer's visit, with its canonical current frame/bindings. Owns an increasing
     // draw publication generation. No lighting cache policy is selected here.

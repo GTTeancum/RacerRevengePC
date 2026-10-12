@@ -41,7 +41,7 @@ public:
  const std::vector<OriginalUiCourseMaterialBinding50KG>* materials()const noexcept;const OriginalUiCourseVideoOwner50KG* video()const noexcept;
  std::uint32_t widgetMaterial(std::uint16_t,bool selected=false)const noexcept;std::uint32_t materialIndex(const char*)const noexcept;
  const game::OriginalUiTextGeometry50KG* textGeometry(std::uint16_t)const noexcept;const assets::OriginalUiFont50KG* textFont(std::uint16_t)const noexcept;const assets::Texture48B* textAtlas(std::uint16_t)const noexcept;
- std::uint32_t backgroundImage()const noexcept;const std::array<OriginalUiCoursePrompt50KG,4>* prompts()const noexcept;
+ std::uint32_t backgroundImage(std::uint32_t planet=0)const noexcept;const std::array<OriginalUiCoursePrompt50KG,4>* prompts()const noexcept;
  game::OriginalUiExitText50KG* exitText()noexcept;bool textPacketDepth(std::uint16_t,float&)const noexcept;
 private:struct Storage;std::unique_ptr<Storage> storage_;
 };

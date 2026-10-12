@@ -31,6 +31,8 @@ public:
     const assets::OriginalUiPage50KG* page()const noexcept;
     const assets::OriginalUiDat50KG* widgetsDat()const noexcept;
     bool initialNavigation(OriginalUiNavigation50KG&)const noexcept;
+    OriginalUiCourseWidgetControllerStatus50KG moveCourse(const OriginalUiNavigation50KG&,bool forward,
+        const OriginalUiCourseWidgetProfile50KG&,OriginalUiCourseWidgetPlan50KG&)const noexcept;
     OriginalUiCourseWidgetControllerStatus50KG phase(const OriginalUiNavigation50KG&,OriginalUiCourseWidgetPhase50KG,
         const OriginalUiCourseWidgetProfile50KG&,OriginalUiCourseWidgetPlan50KG&)const noexcept;
 private:struct Storage;std::unique_ptr<Storage> storage_;

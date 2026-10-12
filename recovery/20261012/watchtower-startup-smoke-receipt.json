@@ -1,0 +1,32 @@
+{
+  "status": "completed",
+  "started_at_utc": "2026-10-12T18:28:31.814307+00:00",
+  "finished_at_utc": "2026-10-12T18:33:12.539974+00:00",
+  "next_eligible_utc": "2026-10-12T19:33:12.539974+00:00",
+  "freeze_b": {
+    "acceptance_sha256": "e3233c9bc2b95bb8f90df68e58b80d82f2de694eb5e220a9de218c0a1d85297a",
+    "commit": "8288704c1d25c35ed35f84048728143e612bcfbc",
+    "tree": "ce58749248d856d17a42fc9ba6c9b7ad1a2ef34c"
+  },
+  "executable_sha256": "981a1ffb6a7e8462d38c7002b9001bf6a76faefaf048fc74a79f8ce28549e825",
+  "build_receipt_sha256": "d0f9b301ace94de08fca86b0acb830b62b100d24ebb664beb492955918dcbdb8",
+  "smoke_result": "native_ready_then_normal_eof_quit",
+  "smoke_scope": "Build/cold initialization/cleanup only; no captured frames, WAV, gameplay duration or visual acceptance",
+  "smoke_log_sha256": "b1971aee2adff71ef18ab75f96e1f66bc48de40067850273ac848836719ddfd2",
+  "smoke_normal_stop_markers": [
+    "Development drive stopped: ticks=1 render_commits=0 window_swaps=0 native_calls=30 collected_calls=1 peak_collected=3 main_contact_ticks=0 secondary_contact_ticks=0 repair_active_ticks=0 main_primary_zone=1 secondary_primary_zone=1 main_crossed_portals=0 secondary_crossed_portals=0 nav_C80=1 nav_C84=0 nav_C88=1 nav_C8C=0 nav_anchor_index78=0 nav_updates=0 nav_gate_skips=0 nav_CA0_copies=1 nav_map_sequential=0 nav_AI_sequential=0 nav_map_scan=0 nav_AI_scan=0 controller_presses=0 controller_releases=0 effect_commands=0 discarded_host_ns=0"
+  ],
+  "kernel_child_proof": {
+    "kernel_waitpid_echild": true,
+    "reaped": []
+  },
+  "remaining_descendants": [],
+  "build_summary": {
+    "compiled": 55,
+    "reused": 256,
+    "cpp_total": 311,
+    "link_exit": 0
+  },
+  "platform": "Linux",
+  "video_requested_or_recorded": false
+}

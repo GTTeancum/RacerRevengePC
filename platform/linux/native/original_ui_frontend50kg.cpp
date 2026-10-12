@@ -1,5 +1,6 @@
 // Source-reviewed bounded Course integration; runtime acceptance is pending.
 #include "original_ui_frontend50kg.h"
+#include "../../../src/assets/original_ui_course_background50kg.h"
 #include <new>
 #include <utility>
 
@@ -211,8 +212,8 @@ struct OriginalUiFrontend50KG::Storage {
            !cold.profile||!cold.profile->known||cold.profile->mode34!=0||
            (cold.profile->playerBits1125C&0x60)!=0x20)return false;
         game::OriginalUiCourseRememberedProfile50KG p;
-        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&p.course700==1&&p.subtype70C==1&&
-            p.laps704==3&&p.entrants708==8&&!p.cardFlag100BC&&(p.packed1125E>>5)==0&&
+        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&p.course700>=1&&p.course700<=4&&p.subtype70C==1&&
+            p.laps704==3&&p.entrants708==8&&!p.cardFlag100BC&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
             p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
     }
     bool sourceCurrent() const noexcept {
@@ -712,6 +713,16 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
     Operation operation(s->inOperation);s->frameRendered=false;s->frameSubmitted=false;
     if(!s->sourceCurrent()||!s->processReady())return s->fault(d,Status::session);
     auto& m=*s->active;
+    if(m.course&&m.course->snapshot().deferred14D0==1){
+        // Native equivalent of1DFE18..1DFE78: all Course images/materials are
+        // already resident in the exact immutable bank. Retire submitted GPU
+        // work and rebind that real bank; do not fake original DMA completion,
+        // replace images, reconstruct the manager or emulate video registers.
+        if(!s->renderer||s->bank!=&m||!s->verifyCourseBank(m,d)||
+           !s->renderer->finishSubmittedWork(d.renderer)||!d.renderer.submittedWorkCompleted||
+           !s->renderer->bindOriginalUiTextures(*m.textures(),*m.gpu,d.renderer))return s->fault(d,Status::renderer,0x1DFE18);
+        if(m.course->completeSelectionRefresh(d.course)!=CourseStatus::ok)return s->fault(d,Status::session,0x1DFE58);
+    }
     const bool prepared=m.main?m.main->prepareUpdateAudio(input,d.main)==MainStatus::ok:m.options?
         m.options->prepareUpdateAudio(input,d.options)==OptionsStatus::ok:m.rider?m.rider->prepareUpdateAudio(input,d.rider)==RiderStatus::ok:
         m.course&&m.course->prepareUpdateAudio(input,d.course)==CourseStatus::ok;

@@ -18,7 +18,7 @@ bool audio(P& p,K k,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return
 bool prompt(P& p,std::uint32_t mask,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return false;p.steps[p.count++]={K::promptMask42C,0,O::hide,false,pc,mask};p.writesPromptMask42C=true;p.promptMask42C=mask;return true;}
 bool bounded(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
  constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
- return p.mode34==0&&p.course700==1&&p.subtype70C==1&&!(p.flags100BC&1)&&(p.flags11018&31)==4&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
+ return p.mode34==0&&p.course700>=1&&p.course700<=4&&p.subtype70C==1&&!(p.flags100BC&1)&&(p.flags11018&31)==4&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
 }
 struct OriginalUiCourseWidgetController50KG::Storage {std::shared_ptr<const assets::OriginalUiArchive50KG> archive;assets::OriginalUiDat50KG pageDat,widgets;assets::OriginalUiPage50KG page;std::array<std::int32_t,24> courseIndex{};};
 OriginalUiCourseWidgetController50KG::OriginalUiCourseWidgetController50KG()noexcept=default;
@@ -34,6 +34,16 @@ S OriginalUiCourseWidgetController50KG::bind(std::shared_ptr<const assets::Origi
 const assets::OriginalUiPage50KG* OriginalUiCourseWidgetController50KG::page()const noexcept{return storage_?&storage_->page:nullptr;}
 const assets::OriginalUiDat50KG* OriginalUiCourseWidgetController50KG::widgetsDat()const noexcept{return storage_?&storage_->widgets:nullptr;}
 bool OriginalUiCourseWidgetController50KG::initialNavigation(OriginalUiNavigation50KG& n)const noexcept{return storage_&&bindOriginalUiNavigation50KG(storage_->page,n);}
+S OriginalUiCourseWidgetController50KG::moveCourse(const OriginalUiNavigation50KG& n,bool forward,
+    const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept{
+    if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
+    if(n.controllerGroup[0]!=1||!n.groups[1].enabled)return S::invalidNavigation;
+    P p;p.navigation=n;OriginalUiCommands50KG commands;
+    if(moveOriginalUiControl50KG(p.navigation,1,forward,commands)!=OriginalUiNavigationStatus50KG::ok||!expand(p,commands))return S::invalidNavigation;
+    const auto slot=p.navigation.groups[1].selectedSlot;
+    if(!slot||slot>4||!control(p,page()->groups[1].controls[slot-1],O::reset,false,0x2A5A38))return S::invalidNavigation;
+    out=p;return S::ok;
+}
 S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,OriginalUiCourseWidgetPhase50KG phase,const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept {
  if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
  P p;p.navigation=n;bool ok=true;switch(phase){
@@ -42,8 +52,8 @@ S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,
  case OriginalUiCourseWidgetPhase50KG::entry74:ok=prompt(p,0,0x1DA4AC);for(std::size_t i=1;i<6&&ok;++i)ok=enable(p,i,false);break;
  case OriginalUiCourseWidgetPhase50KG::openingAC:{ok=enable(p,1,true);for(auto c:page()->groups[1].controls)if(ok)ok=control(p,c,O::setEnabled,false,0x1E0380);
  for(std::size_t i=0;ok&&i<(profile.flags11018&31);++i)for(auto c:page()->groups[1].controls)if(storage_->courseIndex[std::size_t(c)]==profile.courseRecords100C4[i]){ok=control(p,c,O::setEnabled,true,0x1E03F0);break;}
- if(ok)ok=enable(p,2,true);OriginalUiCommands50KG commands;if(ok){if(selectOriginalUiGroupSlot50KG(p.navigation,2,1,commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
- if(ok)ok=enable(p,3,true);if(ok){if(enterOriginalUiGroup50KG(p.navigation,1,1,0,commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
+ if(ok)ok=enable(p,2,true);OriginalUiCommands50KG commands;if(ok){if(selectOriginalUiGroupSlot50KG(p.navigation,2,static_cast<std::uint16_t>(profile.subtype70C),commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
+ if(ok)ok=enable(p,3,true);if(ok){if(enterOriginalUiGroup50KG(p.navigation,1,static_cast<std::uint16_t>(profile.course700),0,commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
  if(ok)ok=audio(p,K::audioStartLoop11,0x1DA924);if(ok)ok=enable(p,4,false);break;}
  case OriginalUiCourseWidgetPhase50KG::openedB0:ok=enable(p,4,true);if(ok)ok=prompt(p,3,0x1DA974);break;
  case OriginalUiCourseWidgetPhase50KG::closingB4:ok=prompt(p,0,0x1DAA7C);if(ok)ok=enable(p,4,false);if(ok)ok=audio(p,K::audioFade1,0x1DAAA4);break;

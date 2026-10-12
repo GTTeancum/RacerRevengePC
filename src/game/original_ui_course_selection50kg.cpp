@@ -46,6 +46,24 @@ bool OriginalUiCourseSelectionData50KG::control(std::uint16_t slot,OriginalUiCou
 bool OriginalUiCourseSelectionData50KG::authoredCourseIndex(std::uint16_t slot,std::uint32_t& out)const noexcept{
     OriginalUiCourseControl50KG c;if(!control(slot,c))return false;out=c.course44;return true;
 }
+S planOriginalUiCourseMove50KG(const OriginalUiCourseSelectionData50KG& data,
+    const OriginalUiNavigation50KG& navigation,const OriginalUiCourseRememberedProfile50KG& p,
+    bool forward,OriginalUiCourseMove50KG& out)noexcept{
+    if(!p.ownerReady)return S::missingProfile;if(p.mode34!=0)return S::unsupportedMode;
+    const auto* page=data.page();if(!page||!navigation.page||navigation.page->identity!=page->identity||
+        navigation.page->groups.size()<2||navigation.controllerGroup[0]!=1||!navigation.groups[1].enabled)
+        return S::invalidNavigation;
+    if((p.availability11018&31)<2)return S::noChange; //1DF154/1DF40C
+    OriginalUiCourseMove50KG next;next.navigation=navigation;
+    if(moveOriginalUiControl50KG(next.navigation,1,forward,next.commands)!=OriginalUiNavigationStatus50KG::ok)
+        return S::invalidNavigation;
+    next.courseSlot14E4=next.navigation.groups[1].selectedSlot;
+    if(!data.control(next.courseSlot14E4,next.selectedControl)||next.commands.count==next.commands.values.size())return S::invalidSelection;
+    next.commands.values[next.commands.count++]={next.selectedControl.controlId,OriginalUiControlOperation50KG::reset,false,0x2A5A38};
+    next.planetProfileChange={OriginalUiProfileField50KG::rider2Bits1125E,OriginalUiProfileWrite50KG::maskedByte,
+        next.selectedControl.planet40<<5,0xe0,forward?0x1DFA44u:0x1DFC54u};
+    next.sourcePC=forward?0x1DF9C0:0x1DFBD0;out=next;return S::ok;
+}
 S planOriginalUiCourseEntryPrefix50KG(const OriginalUiCourseSelectionData50KG& data,const OriginalUiCourseRememberedProfile50KG& p,OriginalUiCourseEntryPrefix50KG& out)noexcept{
     if(!p.ownerReady)return S::missingProfile;if(p.mode34>1)return S::unsupportedMode;
     const auto* page=data.page();if(!page||page->groups.size()<4)return S::invalidPage;

@@ -5,7 +5,7 @@
 #include <memory>
 namespace rr::game {
 enum class OriginalUiCourseSelectionStatus50KG : std::uint8_t {
-    ok,alreadyLoaded,invalidArchive,invalidPage,parseFailure,allocation,missingProfile,unsupportedMode,invalidSelection
+    ok,alreadyLoaded,invalidArchive,invalidPage,parseFailure,allocation,missingProfile,unsupportedMode,invalidSelection,noChange,invalidNavigation
 };
 struct OriginalUiCourseSelectionDiagnostic50KG {
     OriginalUiCourseSelectionStatus50KG status=OriginalUiCourseSelectionStatus50KG::ok;
@@ -43,6 +43,20 @@ struct OriginalUiCourseEntryPrefix50KG {
     OriginalUiProfileChange50KG planetProfileChange{};
     bool showPopup438=false;std::uint32_t sourcePC=0x1DA4A0;
 };
+struct OriginalUiCourseMove50KG {
+    OriginalUiNavigation50KG navigation{};
+    OriginalUiCommands50KG commands{};
+    OriginalUiCourseControl50KG selectedControl{};
+    OriginalUiProfileChange50KG planetProfileChange{};
+    std::uint16_t courseSlot14E4=0;
+    std::uint32_t deferred14D0=3,sourcePC=0;
+};
+// Original events 0/1: backward/forward in authenticated group order, skipping
+// disabled controls. Includes selected-control reset2A5A00 after select.
+// The caller must retain real profile, model, background and renderer owners.
+OriginalUiCourseSelectionStatus50KG planOriginalUiCourseMove50KG(
+    const OriginalUiCourseSelectionData50KG&,const OriginalUiNavigation50KG&,
+    const OriginalUiCourseRememberedProfile50KG&,bool forward,OriginalUiCourseMove50KG&)noexcept;
 OriginalUiCourseSelectionStatus50KG planOriginalUiCourseEntryPrefix50KG(
     const OriginalUiCourseSelectionData50KG&,const OriginalUiCourseRememberedProfile50KG&,OriginalUiCourseEntryPrefix50KG&)noexcept;
 }

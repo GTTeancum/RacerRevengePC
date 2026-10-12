@@ -28,7 +28,7 @@ public:
  std::shared_ptr<const assets::OriginalUiImageBank50KG> bank()const noexcept;
  const std::vector<MaterialTextureSampler50EB>* samplers()const noexcept;
  bool bindPublishedBank(std::shared_ptr<const MaterialTextureGl50EB>,OriginalUiCourseContributionDiagnostic50KG&)noexcept;
- bool begin(const OriginalUiCourseDrawClock50KG&,const game::OriginalUiCourseRenderContext50KG&,const game::OriginalUiCourseLighting50KG&,OriginalUiCourseContributionDiagnostic50KG&)noexcept;
+ bool begin(const OriginalUiCourseDrawClock50KG&,const game::OriginalUiCourseRenderContext50KG&,const game::OriginalUiCourseLighting50KG&,OriginalUiCourseContributionDiagnostic50KG&,std::uint32_t planet=0)noexcept;
  bool projectOrdinaryWidgets(bool,OriginalUiCourseContributionDiagnostic50KG&)noexcept;
  bool projectPage(const game::OriginalUiCoursePageDraw50KG&,OriginalUiCourseContributionDiagnostic50KG&)noexcept;
  bool projectExitText(const game::OriginalUiApertureHook50KG&,OriginalUiCourseContributionDiagnostic50KG&)noexcept;

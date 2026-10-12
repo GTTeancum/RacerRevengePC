@@ -39,7 +39,7 @@ struct OriginalUiCoursePageDrawDiagnostic50KG {
     OriginalUiCourseWidgetDiagnostic50KG widget{};
 };
 // Embedded ScreenText / ScreenTexture objects created by 1D8F10, not DAT
-// widgets. Bounded mode0, subtype1, laps3, Course1, planet0. The caller must
+// widgets. Bounded mode0, subtype1, laps3, fresh Course slots1..4. The caller must
 // enforce retained profile/selection and apply palette before collection.
 class OriginalUiCoursePageDraw50KG final {
 public:

@@ -65,7 +65,7 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     std::uint8_t packed1125D=0,packed1125E=0;
     std::uint32_t comparison100C0=0;
     bool cardFlag100BC=false;
-    std::uint32_t planet0Primary79C=0,planet0Secondary7A0=0;
+    std::array<OriginalUiCourseProfileColors50KG,6> planetColors{};
     std::array<std::uint8_t,13> courseOrder100C4{};
     std::uint64_t generation=1;
     bool readable() const noexcept {return common&&common->known&&common->mode34<=2;}
@@ -129,7 +129,9 @@ bool OriginalUiRiderProfileOwner50KG::initializeAtApplicationStartup(
         next->comparison100C0=0xffffffffu; //17E17C
         next->cardFlag100BC=false; //17E2C0
         next->courseOrder100C4={{0,11,4,8,7,1,5,9,12,6,10,3,2}};
-        next->planet0Primary79C=0xc2a684;next->planet0Secondary7A0=0x80674a;
+        //17E7D8..17E880 ->17F800..17F884; stride12, primary+79C/secondary+7A0.
+        next->planetColors={{{0xc2a684,0x80674a},{0x8cc46e,0x628036},{0xc0b5a5,0x8c8479},
+            {0xf4f1a2,0xa8a66f},{0xce766d,0xffbab2},{0xb26a36,0xe5a373}}};
         storage_=std::move(next);d={};return true;
     }catch(...){return fail(d,Error::allocation,0x17F970);}
 }
@@ -192,13 +194,17 @@ bool OriginalUiRiderProfileOwner50KG::commitBack(const game::OriginalUiRouteDeci
     const unsigned remembered=context.playerIndex?2:(context.mode34==0?0:(context.mode34==1?1:3));
     storage_->remembered[remembered]=context.selectedRider;++storage_->generation;return true;
 }
+bool OriginalUiRiderProfileOwner50KG::coursePlanetColors(std::uint32_t planet,OriginalUiCourseProfileColors50KG& out)const noexcept{
+    if(!storage_||!storage_->readable()||planet>=storage_->planetColors.size())return false;
+    out=storage_->planetColors[planet];return true;
+}
 bool OriginalUiRiderProfileOwner50KG::courseSnapshot(game::OriginalUiCourseRememberedProfile50KG& out)const noexcept{
     if(!storage_||!storage_->readable())return false;const auto& s=*storage_;
     game::OriginalUiCourseRememberedProfile50KG p;p.ownerReady=true;p.mode34=s.common->mode34;
     p.course700=s.rememberedCourse[0];p.laps704=s.rememberedCourse[1];p.entrants708=s.rememberedCourse[2];p.subtype70C=s.rememberedCourse[3];
     p.course710=s.rememberedCourse[4];p.entrants714=s.rememberedCourse[5];p.laps718=s.rememberedCourse[6];
     p.packed1125E=s.packed1125E;p.cardFlag100BC=s.cardFlag100BC;p.availability11018=s.common->availability11018;
-    p.planet0Primary79C=s.planet0Primary79C;p.planet0Secondary7A0=s.planet0Secondary7A0;p.courseOrder100C4=s.courseOrder100C4;out=p;return true;
+    p.planet0Primary79C=s.planetColors[0].primary79C;p.planet0Secondary7A0=s.planetColors[0].secondary7A0;p.courseOrder100C4=s.courseOrder100C4;out=p;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::riderConfirmSnapshot(std::uint8_t& packed,std::uint32_t& comparison)const noexcept{
     if(!storage_||!storage_->readable())return false;packed=storage_->packed1125D;comparison=storage_->comparison100C0;return true;
@@ -231,6 +237,20 @@ bool OriginalUiRiderProfileOwner50KG::commitCourseEntry(const game::OriginalUiCo
        plan.selectedControl.course44!=exact.selectedControl.course44||plan.showPopup438!=exact.showPopup438||!sameChange(plan.planetProfileChange,exact.planetProfileChange))return false;
     const auto& change=exact.planetProfileChange;
     storage_->packed1125E=static_cast<std::uint8_t>((storage_->packed1125E&~change.replaceMask)|(change.value&change.replaceMask));++storage_->generation;return true;
+}
+bool OriginalUiRiderProfileOwner50KG::commitCourseMove(const game::OriginalUiCourseSelectionData50KG& data,
+    const game::OriginalUiNavigation50KG& before,bool forward,const game::OriginalUiCourseMove50KG& plan,
+    OriginalUiRiderProfileStamp50KG expected)noexcept{
+    if(!storage_||!storage_->readable()||storage_->common->mode34!=0||expected.mode34!=0||
+       expected.generation!=storage_->generation||storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
+    game::OriginalUiCourseRememberedProfile50KG p;game::OriginalUiCourseMove50KG exact;
+    if(!courseSnapshot(p)||game::planOriginalUiCourseMove50KG(data,before,p,forward,exact)!=game::OriginalUiCourseSelectionStatus50KG::ok||
+       plan.sourcePC!=exact.sourcePC||plan.courseSlot14E4!=exact.courseSlot14E4||plan.deferred14D0!=exact.deferred14D0||
+       plan.selectedControl.controlId!=exact.selectedControl.controlId||plan.selectedControl.planet40!=exact.selectedControl.planet40||
+       plan.selectedControl.course44!=exact.selectedControl.course44||!sameChange(plan.planetProfileChange,exact.planetProfileChange))return false;
+    const auto& change=exact.planetProfileChange;
+    storage_->packed1125E=static_cast<std::uint8_t>((storage_->packed1125E&~change.replaceMask)|(change.value&change.replaceMask));
+    ++storage_->generation;return true; //Remembered700 changes only at actual Back/Confirm.
 }
 bool OriginalUiRiderProfileOwner50KG::commitCourseBack(const game::OriginalUiRouteDecision50KG& d,const game::OriginalUiCourseContext50KG& source,
     OriginalUiRiderProfileStamp50KG expected)noexcept{

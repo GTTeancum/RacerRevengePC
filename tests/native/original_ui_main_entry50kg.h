@@ -120,7 +120,7 @@ struct Application {
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
             "Accept requires enabled concrete audio and commits process-owned settings. "
             "Rider19 entry additionally requires the authenticated compiled IPUM cache; enabled audio uses original Song7. "
-            "Muted mode0 Rider19 Confirm to fixed Course and Back is integrated but unvalidated; "
+            "Muted mode0 Rider19 Confirm to Course and Back is integrated but unvalidated; Course Left/Right selects the four fresh unlocked tracks; "
             "other riders, Gallery and other Options subpages remain unavailable. "
             "No gameplay launch or original boot/save parity is claimed.\n";
     }
@@ -580,6 +580,8 @@ struct Frontend {
                 <<",\"gpu_publication\":"<<publication<<",\"updates\":"<<snapshot.updates
                 <<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<snapshot.submissions
                 <<",\"course_slot\":"<<course.courseSlot14E4<<",\"subtype_slot\":"<<course.subtypeSlot14F4
+                <<",\"selected_planet\":"<<course.selectedPlanet40<<",\"selected_course_index\":"<<course.selectedCourse44
+                <<",\"selection_refresh_updates\":"<<course.deferred14D0
                 <<",\"laps\":"<<course.laps14EC<<",\"entrants\":"<<course.entrants14F0
                 <<",\"input_shown\":"<<(course.inputContainerShown?"true":"false")
                 <<",\"popup_enabled\":"<<(course.popupEnabled438?"true":"false")

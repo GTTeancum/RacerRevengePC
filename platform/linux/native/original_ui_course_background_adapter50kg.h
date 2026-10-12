@@ -13,7 +13,7 @@ inline bool prepareOriginalUiCourseBackgroundSpan50KG(
     const auto* source=images.sourceProvenance(image);const auto* decoded=images.decodedTexture(image);
     const auto* bank=images.textures();const auto* texture=bank?bank->texture(image):nullptr;
     if(!source||!decoded||!texture||!source->memberIdentity||source->celIdentity||source->pstOffset||
-       source->pstBytes!=287772||std::strcmp(source->memberIdentity->name,"UI\\Textures\\tat_bkg.pst")!=0||
+       source->pstBytes!=287772||!assets::isOriginalUiCourseBackgroundIdentity50KG(source->memberIdentity)||
        decoded->kind!=1||decoded->mips.size()!=1||texture->texture.width!=640||texture->texture.height!=448)return false;
     bool canonical=false;const auto* archive=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::course);
     if(!archive)return false;for(std::size_t i=0;i<archive->memberCount;++i)

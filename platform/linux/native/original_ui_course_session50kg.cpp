@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <utility>
+#include "../../../src/assets/original_ui_course_background50kg.h"
 namespace rr::platform {
 namespace {
 using S=OriginalUiCourseSessionStatus50KG;using D=OriginalUiCourseSessionDiagnostic50KG;
@@ -32,7 +33,7 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
 }
 bool bounded(const game::OriginalUiCourseRememberedProfile50KG& p,const OriginalUiMainProfile50KG& common)noexcept{
     constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
-    return p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700==1&&p.subtype70C==1&&
+    return p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700>=1&&p.course700<=4&&p.subtype70C==1&&
         p.laps704==3&&p.entrants708==8&&!p.cardFlag100BC&&(p.availability11018&31)==4&&
         ((common.playerBits1125C>>5)&3)==1&&p.courseOrder100C4==order&&
         p.planet0Primary79C==0xc2a684&&p.planet0Secondary7A0==0x80674a;
@@ -58,7 +59,8 @@ struct OriginalUiCourseSession50KG::Storage {
     OriginalUiRiderProfileStamp50KG pendingStamp{};
     bool rendering=false,inOperation=false,updatePrepared=false,paused=false;
     float preparedDelta=0;
-    std::string planetNameBA0;
+    std::array<std::string,6> planetNamesBA0;
+    bool selectionRefreshCompleted=false;
     game::OriginalUiCourseWidgets50KG& widgets()noexcept{return *cold.resources->widgets();}
     bool operational()const noexcept{return !state.faulted&&!state.quitRequested;}
     bool processCurrent()const noexcept{return cold.application->known&&cold.commonProfile->known&&
@@ -76,7 +78,7 @@ struct OriginalUiCourseSession50KG::Storage {
     }
     bool profileCurrent()const noexcept{game::OriginalUiCourseRememberedProfile50KG p;
         return cold.profile->courseSnapshot(p)&&bounded(p,*cold.commonProfile)&&
-            (!entered||sameStamp(cold.profile->stamp(),liveStamp))&&(!entered||(p.packed1125E>>5)==0);}
+            (!entered||sameStamp(cold.profile->stamp(),liveStamp))&&(!entered||(p.packed1125E>>5)==state.selectedPlanet40);}
     void fault(S status,std::uint32_t pc)noexcept{if(!state.faulted){faultDetail.status=status;faultDetail.sourcePC=pc;}state.faulted=true;state.framePublished=false;}
     void cpuDrain()noexcept{collector.drain();state.framePublished=false;}
     bool idleInput()const noexcept{
@@ -91,7 +93,8 @@ struct OriginalUiCourseSession50KG::Storage {
         if(n->controllerGroup[0]!=1||n->groups[1].selectedSlot!=state.courseSlot14E4||
             n->groups[2].selectedSlot!=state.subtypeSlot14F4)return false;
         game::OriginalUiCourseControl50KG control;
-        if(!selection.control(static_cast<std::uint16_t>(state.courseSlot14E4),control))return false;
+        if(!selection.control(static_cast<std::uint16_t>(state.courseSlot14E4),control)||
+            control.planet40!=state.selectedPlanet40||control.course44!=state.selectedCourse44)return false;
         c={};c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;
         c.mode34=0;c.packed1125C=cold.commonProfile->playerBits1125C;c.firstControllerPresent=true;
         c.confirmEnabled42C=(state.promptMask42C&1)!=0;c.courseSlot14E4=static_cast<std::uint16_t>(state.courseSlot14E4);
@@ -187,7 +190,7 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         if(!s->selection.load(cold.courseArchive,d.selection))return result(d,S::resource);
         game::OriginalUiCourseRememberedProfile50KG p;game::OriginalUiCourseEntryPrefix50KG entry;
         if(!cold.profile->courseSnapshot(p)||game::planOriginalUiCourseEntryPrefix50KG(s->selection,p,entry)!=game::OriginalUiCourseSelectionStatus50KG::ok||
-            entry.selectedControl.planet40!=0||entry.selectedControl.course44!=0||entry.showPopup438)return result(d,S::profile,0x1DA618);
+            entry.courseSlot14E4>4||!assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40)||entry.showPopup438)return result(d,S::profile,0x1DA618);
         if(!game::prepareOriginalUiCourseCamera50KG(*cold.courseArchive,s->camera,d.camera)||
            !game::prepareOriginalUiCourseRenderContext50KG(*cold.courseArchive,s->camera,s->renderContext,d.renderContext))return result(d,S::camera);
         if(!game::prepareOriginalUiCourseLighting50KG(*cold.courseArchive,s->lighting,d.lighting))return result(d,S::lighting);
@@ -197,7 +200,12 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         game::OriginalUiCoursePageDrawDiagnostic50KG pd;
         if(!s->page.prepare(cold.courseArchive,*cold.english,cold.resources->images(),(*mats)[font].images[0],(*mats)[overlay].images[0],
             cold.resources->video()->packetZMaximum,pd))return result(d,S::resource,pd.sourcePC);
-        const auto* planet=cold.english->at(11);if(!planet)return result(d,S::resource,0x1DDF64);s->planetNameBA0=planet->text.substr(0,40);
+        //1DDF00 stores BA0 from the actual English owner, capacity40. Visible
+        // course names remain their authored control text widgets27/31/32/28.
+        constexpr std::uint32_t ids[]={11,15,12,16,14,13};
+        for(auto planet:{0u,1u,4u,5u}){const auto* text=cold.english->at(ids[planet]);if(!text)return result(d,S::resource,0x1DDF64);
+            s->planetNamesBA0[planet]=text->text.substr(0,40);
+            if(cold.resources->backgroundImage(planet)==assets::unresolvedMaterialTexture50EA)return result(d,S::resource,0x1DDF00);}
         if(!s->collector.bind(cold.resources,cold.holograms,d.draw)||!s->collector.prepareBank(d.draw))return result(d,S::draw);
         game::OriginalUiApertureCallbacks50KG callbacks{s.get(),&Storage::available,&Storage::hook,&Storage::overlay};
         if(s->aperture.bindCourse(cold.courseArchive,callbacks,d.aperture)!=AS::ok)return result(d,S::aperture);
@@ -226,7 +234,7 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         valid=s->profileCurrent()&&stamp.mode34==0&&stamp.generation==s->coldStamp.generation+1&&
             s->cold.profile->riderConfirmSnapshot(packed,comparison)&&(packed>>3)==19&&comparison==19&&
             s->cold.profile->courseSnapshot(p)&&game::planOriginalUiCourseEntryPrefix50KG(s->selection,p,entry)==game::OriginalUiCourseSelectionStatus50KG::ok&&
-            !entry.showPopup438&&entry.selectedControl.planet40==0&&entry.selectedControl.course44==0;
+            !entry.showPopup438&&entry.courseSlot14E4<=4&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);
         if(!valid){s->fault(S::profile,0x1DA4A0);break;}
         if(s->cold.lightManager->activeUiIdentity()!=s->cold.courseArchive->identity()||
             !s->cold.lightManager->publishCourseRegistry(s->lighting,s->faultDetail.lightManager)){s->fault(S::lighting,0x1CDB10);break;}
@@ -234,6 +242,7 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         if(!s->cold.profile->commitCourseEntry(s->selection,entry,stamp)){s->fault(S::profile,0x1DA618);break;}
         s->liveStamp=s->cold.profile->stamp();s->state.courseSlot14E4=entry.courseSlot14E4;s->state.subtypeSlot14F4=entry.subtypeSlot14F4;
         s->state.laps14EC=entry.laps14EC;s->state.entrants14F0=entry.entrants14F0;
+        s->state.selectedPlanet40=entry.selectedControl.planet40;s->state.selectedCourse44=entry.selectedControl.course44;
         if(!s->widgetPhase(WP::entry74))break;
         // Source1DA714 disables the actual popup clone entity. Source template
         // widgets stay manager-owned and hidden; no invented reparenting.
@@ -278,7 +287,36 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
     s->state.backProposalPending=false;
     if(!s->idleInput()||in.popupActive||in.sourceInputBlocked||in.controller!=0)return result(d,S::noChange);
     out.containerReached=true;out.pageCallbackRan=true;out.pageAccepted=true; // source1DF9A4
-    if(in.originalInput!=6){out.status=in.originalInput>=1&&in.originalInput<=5?S::unavailableDestination:S::noChange;return result(d,out.status,0x1DEB90);}
+    if(in.originalInput<=1){
+        const bool forward=in.originalInput==1;
+        game::OriginalUiCourseRememberedProfile50KG profile;game::OriginalUiCourseMove50KG move;
+        const auto* navigation=s->widgets().navigation();game::OriginalUiCourseWidgetProfile50KG widgetProfile;
+        if(!navigation||!s->cold.profile->courseSnapshot(profile)||!s->widgetProfile(widgetProfile))return result(d,S::profile);
+        const auto before=*navigation;const auto stamp=s->cold.profile->stamp();
+        const auto planned=game::planOriginalUiCourseMove50KG(s->selection,before,profile,forward,move);
+        if(planned==game::OriginalUiCourseSelectionStatus50KG::noChange)return result(d,S::noChange);
+        if(planned!=game::OriginalUiCourseSelectionStatus50KG::ok||move.courseSlot14E4>4||
+           !assets::originalUiCourseBackgroundName50KG(move.selectedControl.planet40)||
+           s->cold.resources->backgroundImage(move.selectedControl.planet40)==assets::unresolvedMaterialTexture50EA||
+           stamp.generation==std::numeric_limits<std::uint64_t>::max())return result(d,S::unsupportedState,move.sourcePC);
+        // Every image/model was genuinely prepared and published at cold bind.
+        // CPU packets own copied vertices; drain before model reset, keep the
+        // immutable GPU bank and all resources through the whole menu lifetime.
+        s->cpuDrain();s->inOperation=true;
+        if(!s->widgets().moveCourse(forward,widgetProfile,s->hooks(),d.widget))s->fault(S::widget,move.sourcePC);
+        else if(s->widgets().navigation()->groups[1].selectedSlot!=move.courseSlot14E4||
+            !s->cold.profile->commitCourseMove(s->selection,before,forward,move,stamp))s->fault(S::profile,move.planetProfileChange.sourcePC);
+        else{
+            s->liveStamp=s->cold.profile->stamp();s->state.courseSlot14E4=move.courseSlot14E4;
+            s->state.selectedPlanet40=move.selectedControl.planet40;s->state.selectedCourse44=move.selectedControl.course44;
+            s->state.deferred14D0=move.deferred14D0;s->selectionRefreshCompleted=false;
+            ++s->state.audio.suppressedByMutedMode; //292360 effect3/4, explicit muted owner.
+            out.selectionChanged=true;
+        }
+        s->inOperation=false;if(s->state.faulted){d.status=s->faultDetail.status;d.sourcePC=s->faultDetail.sourcePC;return d.status;}
+        out.status=S::ok;return result(d,S::ok,move.sourcePC);
+    }
+    if(in.originalInput!=6){out.status=in.originalInput>=2&&in.originalInput<=4?S::unavailableDestination:S::noChange;return result(d,out.status,0x1DEB90);}
     game::OriginalUiCourseContext50KG context;if(!s->context(context))return result(d,S::profile);
     game::OriginalUiRouteDecision50KG decision;
     const auto status=game::dispatchOriginalUiCourse50KG(0,game::OriginalUiRouteInput50KG::back,context,decision);
@@ -318,6 +356,13 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
     s->cpuDrain();s->liveStamp=stamp;s->state.backProposalPending=false;s->state.backAccepted=true;
     ++s->state.audio.suppressedByMutedMode;return result(d,S::ok,0x1DF0E0);
 }
+S OriginalUiCourseSession50KG::completeSelectionRefresh(D& d)noexcept{
+    d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
+    if(!s->operational()||s->inOperation||s->rendering||s->updatePrepared||!s->currentPage()||
+       !s->profileCurrent()||!s->lightCurrent()||s->state.deferred14D0!=1||s->selectionRefreshCompleted)
+        return result(d,S::unsupportedState,0x1DFE18);
+    s->selectionRefreshCompleted=true;return result(d,S::ok,0x1DFE58);
+}
 S OriginalUiCourseSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG& in,D& d)noexcept{
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
     if(!s->operational()||!s->currentPage()||s->inOperation||s->rendering||s->updatePrepared)return result(d,S::unsupportedState);
@@ -330,7 +375,14 @@ S OriginalUiCourseSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
     if(!s->operational()||!s->updatePrepared||in.elapsedSeconds!=s->preparedDelta||in.paused!=s->paused||
         !s->profileCurrent()||!s->lightCurrent()||!s->popupCurrent()||s->rendering||s->inOperation)return result(d,S::unsupportedState);
-    s->updatePrepared=false;s->inOperation=true;const auto saved=s->aperture.saveCourseUpdateDelta38(in.elapsedSeconds);
+    s->updatePrepared=false;s->inOperation=true;
+    // Source1DFDF0: refresh on the third actual update, not a wall-time guess.
+    // Native frontend performs a real GL finish and retained-bank rebind.
+    if(s->state.deferred14D0){
+        if(s->state.deferred14D0==1&&!s->selectionRefreshCompleted){s->inOperation=false;return result(d,S::unsupportedState,0x1DFE18);}
+        --s->state.deferred14D0;if(!s->state.deferred14D0)s->selectionRefreshCompleted=false;
+    }
+    const auto saved=s->aperture.saveCourseUpdateDelta38(in.elapsedSeconds);
     if(!apertureOkay(saved)){s->faultDetail.aperture.status=saved;s->fault(S::aperture,0x1E02BC);}
     const auto* ordinary=s->widgets().order(false);const auto* top=s->widgets().order(true);
     if(!ordinary||!top)s->fault(S::widget,0x2A6BB0);
@@ -342,11 +394,11 @@ S OriginalUiCourseSession50KG::render(const OriginalUiCourseDrawClock50KG& clock
     if(!s->operational()||s->inOperation||s->rendering||s->updatePrepared||!clock.known||(s->paused&&clock.advanceAnimations)||
         !s->currentPage()||!s->profileCurrent()||!s->lightCurrent()||!s->state.cameraActive||!s->state.pageShown||
         !s->popupCurrent()||!s->aperture.snapshot().hasUpdateDelta)return result(d,S::unsupportedState);
-    game::OriginalUiCourseRememberedProfile50KG p;if(!s->cold.profile->courseSnapshot(p))return result(d,S::profile);
+    OriginalUiCourseProfileColors50KG colors;if(!s->cold.profile->coursePlanetColors(s->state.selectedPlanet40,colors))return result(d,S::profile);
     s->cpuDrain();s->state.backProposalPending=false;s->inOperation=true;s->rendering=true;
-    bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw);
+    bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw,s->state.selectedPlanet40)&&s->collector.projectOrdinaryWidgets(true,d.draw);
     game::OriginalUiCoursePageDrawDiagnostic50KG pageDiagnostic;
-    if(okay&&!s->page.applyPlanetPalette(s->widgets(),p.planet0Primary79C,p.planet0Secondary7A0,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
+    if(okay&&!s->page.applyPlanetPalette(s->widgets(),colors.primary79C,colors.secondary7A0,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
     if(okay)okay=s->collector.projectPage(s->page,d.draw);
     if(okay){const auto status=s->aperture.beginCourseEntryAtRender48(s->transition().phase);
         if(!apertureOkay(status)){s->faultDetail.aperture.status=status;s->fault(S::aperture,0x1DEB60);okay=false;}}

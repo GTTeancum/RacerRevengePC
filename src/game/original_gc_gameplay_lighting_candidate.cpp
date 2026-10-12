@@ -157,10 +157,9 @@ struct Owner::Storage {
     std::array<light::Vec4,gcZones> ambient60{};
     light::Vec4 globalAmbient50{};
     bool fixedGcGlobalAmbient=false;
-    ZoneLifecycle50CL lifecycle{};
-    LiveZoneWorld50EN portals{};
+    ResetVisibilityWorld50EY visibility{};
     std::array<SearchStorage50BS,gcZones*2> registries{},scratchRegistries{};
-    std::array<ZoneRegistration50CJ,maximumRacers> registrations{};
+    std::array<ZoneRegistration50CJ,maximumRacers+1u> registrations{};
     std::array<CollectionTree50BX,gcZones*2> methods{};
     std::array<CollectionZone50BX,gcZones> zones{};
     std::array<SearchListBlock50BR,gcZones*4> blocks{};
@@ -187,6 +186,8 @@ struct Owner::Storage {
     std::uint32_t racerCount=0;
     std::uint64_t drawGeneration=0;
     const DrawLease* activeLease=nullptr;
+    const CameraVisibilityLease* activeCamera=nullptr;
+    std::uint64_t cameraGeneration=0;
     bool bound(std::uint32_t slot) const noexcept {
         if(slot>=racerCount)return false;
         const auto& v=vehicles[slot];const auto& m=v.member;
@@ -340,15 +341,15 @@ bool Owner::Storage::selectTa(const LiveZoneMembership50EN& member,
     //149680 exact high-level portal color blend, actual visibility-zone links.
     //500 is original14A698's radius, not a visual calibration constant.
     light::Vec3 ambientSum{},sunSum{};float total=0.f;
-    auto link=portals.portalHeads[primary-1];std::size_t visited=0;
+    auto link=visibility.portals.portalHeads[primary-1];std::size_t visited=0;
     const Vector3_48C center{{position[0],position[1],position[2]}};
     while(link){
-        if(link>portals.portalLinkCount||++visited>portals.portalLinkCount)
+        if(link>visibility.portals.portalLinkCount||++visited>visibility.portals.portalLinkCount)
             return fail(d,Status::registration,0x149700);
-        const auto& edge=portals.portalLinks[link-1];bool hit=false;float distance=0.f;
-        if(!edge.zone||edge.zone>world.zones.size()||!edge.portal||edge.portal>portals.portalCount)
+        const auto& edge=visibility.portals.portalLinks[link-1];bool hit=false;float distance=0.f;
+        if(!edge.zone||edge.zone>world.zones.size()||!edge.portal||edge.portal>visibility.portals.portalCount)
             return fail(d,Status::registration,0x149720);
-        if(overlapPortal231150_50EO(portals.portals[edge.portal-1],center,500.f,hit,distance)!=PortalGeometryStatus50EO::Complete)
+        if(overlapPortal231150_50EO(visibility.portals.portals[edge.portal-1],center,500.f,hit,distance)!=PortalGeometryStatus50EO::Complete)
             return fail(d,Status::arithmetic,0x14970c);
         if(hit){
             volatile float weight=sub(500.f,distance)/500.f;
@@ -417,8 +418,10 @@ bool Owner::Storage::selectTa(const LiveZoneMembership50EN& member,
 }
 
 Owner::Owner() noexcept=default;
-Owner::~Owner(){if(storage_&&storage_->activeLease)
-    endDraw(*const_cast<DrawLease*>(storage_->activeLease));}
+Owner::~Owner(){
+    if(storage_&&storage_->activeLease)endDraw(*const_cast<DrawLease*>(storage_->activeLease));
+    if(storage_&&storage_->activeCamera)endCameraVisibility(*const_cast<CameraVisibilityLease*>(storage_->activeCamera));
+}
 DrawLease::~DrawLease(){if(owner_)owner_->endDraw(*this);}
 const assets::World48F* Owner::world() const noexcept {return storage_?&storage_->world:nullptr;}
 bool Owner::prepare(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
@@ -490,7 +493,7 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
             next->registrations.data(),next->registrations.size(),
             {next->methods.data(),next->methods.size(),next->zones.data(),next->zones.size(),
              next->blocks.data(),next->blocks.size()}};
-        if(initializeZoneLifecycle50CL(next->lifecycle,lifeStorage,w.zones.size(),racers,1024,
+        if(initializeZoneLifecycle50CL(next->visibility.lifecycle,lifeStorage,w.zones.size(),racers+(ta?0u:1u),1024,
             next->workspace.transfer)!=SearchStorageStatus50BS::Complete)
             return fail(d,Status::registration,0x272a58);
         std::array<LiveZonePortalInput50EN,maximumPortals> input{};
@@ -510,7 +513,7 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
         }
         const LiveZoneWorldStorage50EN portalStorage{next->portalHeads.data(),next->portalHeads.size(),
             next->portalLinks.data(),next->portalLinks.size(),next->portalGeometry.data(),next->portalGeometry.size()};
-        if(prepareLiveZoneWorld50EN(input.data(),w.portals.size(),w.zones.size(),portalStorage,next->portals)!=LiveZoneStatus50EN::Complete)
+        if(prepareLiveZoneWorld50EN(input.data(),w.portals.size(),w.zones.size(),portalStorage,next->visibility.portals)!=LiveZoneStatus50EN::Complete)
             return fail(d,Status::registration,0x272bc8);
         next->workspace.registries=next->scratchRegistries.data();next->workspace.registryCapacity=next->scratchRegistries.size();
         next->workspace.links=next->scratchLinks.data();next->workspace.entries=next->scratchEntries.data();
@@ -524,7 +527,7 @@ bool Owner::attachFreshVehicle(std::uint32_t slot,VehicleFrameState49W& s,
     d={};d.racer=slot;
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x229f20);
     auto& o=*storage_;
-    if(o.activeLease)return fail(d,Status::activeDraw,0x2167a0);
+    if(o.activeLease||o.activeCamera)return fail(d,Status::activeDraw,0x2167a0);
     if(slot>=o.racerCount||!frameBinding(s,b))return fail(d,Status::identity,0x2167a0);
     auto& v=o.vehicles[slot];
     if(v.attached||v.member.attached)return fail(d,Status::alreadyPrepared,0x229f30);
@@ -554,7 +557,7 @@ bool Owner::attachFreshVehicle(std::uint32_t slot,VehicleFrameState49W& s,
     const LiveZoneStorage50EN backing{v.links.data(),v.entries.data(),v.links.size()};
     // Source C30 was ACTUALLY initialized from visibility4C0[0] at1AE578;
     // sourceRef1 is that same first row in this owner's separate namespace.
-    d.membership=attachLiveZoneMembership50EN(o.lifecycle,o.portals,v.member,backing,
+    d.membership=attachLiveZoneMembership50EN(o.visibility.lifecycle,o.visibility.portals,v.member,backing,
         slot+1u,1u,ZoneMethod50CL::Second,s.shape.radius80,bounds,o.workspace);
     if(d.membership.status!=LiveZoneStatus50EN::Complete)
         return fail(d,Status::registration,0x21688c);
@@ -566,7 +569,7 @@ bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s
     d={};d.racer=slot;
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x228844);
     auto& o=*storage_;
-    if(o.activeLease)return fail(d,Status::activeDraw,0x228844);
+    if(o.activeLease||o.activeCamera)return fail(d,Status::activeDraw,0x228844);
     if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot))
         return fail(d,Status::identity,0x228858);
     auto& v=o.vehicles[slot];
@@ -580,10 +583,55 @@ bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s
     // not reprepare694.228844 calls1202E0 directly on its EXISTING cached state.
     // A later219FD8 can advance694 without advancing7F0 until the next graphics.
     const auto bounds=shapeBounds(s.shape,p.shape);
-    d.membership=updateLiveZoneMembership50EN(o.lifecycle,o.portals,v.member,bounds,o.workspace);
+    d.membership=updateLiveZoneMembership50EN(o.visibility.lifecycle,o.visibility.portals,v.member,bounds,o.workspace);
     if(d.membership.status!=LiveZoneStatus50EN::Complete)
         return fail(d,Status::registration,0x228884);
     v.graphicsSequence=graphicsSequence;return true;
+}
+CameraVisibilityLease::~CameraVisibilityLease(){if(owner_)owner_->endCameraVisibility(*this);}
+bool Owner::cameraLeaseCurrent(const CameraVisibilityLease& lease) const noexcept {
+    if(!storage_||invalidated_||lease.owner_!=this)return false;
+    const auto& o=*storage_;
+    return o.activeCamera==&lease&&!o.activeLease&&!o.taNative&&
+        lease.generation_&&lease.generation_==o.cameraGeneration&&
+        lease.racer_<o.racerCount&&o.bound(lease.racer_);
+}
+bool Owner::beginCameraVisibility(std::uint32_t slot,CameraVisibilityLease& lease,
+    Diagnostic& d) noexcept {
+    d={};d.racer=slot;
+    if(!storage_||invalidated_)return fail(d,Status::unprepared,0x175224);
+    auto& o=*storage_;
+    if(o.activeLease||o.activeCamera||lease.owner_)return fail(d,Status::activeDraw,0x175224);
+    if(o.taNative)return fail(d,Status::unsupportedScene,0x175224);
+    if(slot>=o.racerCount||!o.bound(slot)||o.visibility.lifecycle.objectCount!=o.racerCount+1u)
+        return fail(d,Status::identity,0x175224);
+    if(o.cameraGeneration==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,Status::stalePublication,0x175224);
+    lease.owner_=this;lease.generation_=++o.cameraGeneration;lease.racer_=slot;
+    o.activeCamera=&lease;return true;
+}
+void Owner::endCameraVisibility(CameraVisibilityLease& lease) noexcept {
+    if(storage_&&storage_->activeCamera==&lease)storage_->activeCamera=nullptr;
+    lease.owner_=nullptr;lease.generation_=0;lease.racer_=0;
+}
+ResetVisibilityWorld50EY* CameraVisibilityLease::world() noexcept {
+    return owner_&&owner_->cameraLeaseCurrent(*this)?&owner_->storage_->visibility:nullptr;
+}
+LiveZoneWorkspace50EN* CameraVisibilityLease::workspace() noexcept {
+    return owner_&&owner_->cameraLeaseCurrent(*this)?&owner_->storage_->workspace:nullptr;
+}
+const LiveZoneMembership50EN* CameraVisibilityLease::racerVisibility7F0() const noexcept {
+    return owner_&&owner_->cameraLeaseCurrent(*this)?&owner_->storage_->vehicles[racer_].member:nullptr;
+}
+CollectionRef50BX CameraVisibilityLease::cameraObject30() const noexcept {
+    return owner_&&owner_->cameraLeaseCurrent(*this)?owner_->storage_->racerCount+1u:0u;
+}
+std::uint64_t CameraVisibilityLease::zoneKey4C0(std::size_t ordinal) const noexcept {
+    if(!owner_||!owner_->cameraLeaseCurrent(*this)||ordinal>=owner_->storage_->visibility.lifecycle.zoneCount)return 0;
+    return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&owner_->storage_->zones[ordinal]));
+}
+std::size_t CameraVisibilityLease::zoneCount() const noexcept {
+    return owner_&&owner_->cameraLeaseCurrent(*this)?owner_->storage_->visibility.lifecycle.zoneCount:0u;
 }
 bool Owner::beginDraw(std::uint32_t slot,const VehicleFrameState49W& s,
     const VehicleFrameBindings49W& b,std::uint64_t expectedGraphicsSequence,
@@ -591,7 +639,7 @@ bool Owner::beginDraw(std::uint32_t slot,const VehicleFrameState49W& s,
     d={};d.racer=slot;
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x229e08);
     auto& o=*storage_;
-    if(o.activeLease||lease.owner_)return fail(d,Status::activeDraw,0x229e08);
+    if(o.activeLease||o.activeCamera||lease.owner_)return fail(d,Status::activeDraw,0x229e08);
     if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot))
         return fail(d,Status::identity,0x229e08);
     if(s.phase!=VehicleFramePhase49W::Ready&&s.phase!=VehicleFramePhase49W::PostGraphics)

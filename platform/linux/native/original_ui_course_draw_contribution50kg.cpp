@@ -98,8 +98,8 @@ bool OriginalUiCourseDrawContribution50KG::prepareBank(D& d)noexcept{
      if(index==missing||!assets::prepareOriginalUiLitMaterial50KM(m->passes[p],*images->decodedTexture(index),policy,d.materialDetail)||!convertOriginalUiLitMaterialSpan50KM(policy,{0,1,1,index,textures->textureCount()},converted)||!assign(index,converted.native.sampler))return fail(d,E::material);}
    }
   }
-  OriginalUiSpan50KG bg;OriginalUiNativeSpan50KG bgState;auto bgImage=s.mapped(0,s.resources->backgroundImage());
-  if(!prepareOriginalUiCourseBackgroundSpan50KG(*images,bgImage,bg,bgState)||!assign(bgImage,bgState.sampler))return fail(d,E::material);
+  for(auto planet:{0u,1u,4u,5u}){OriginalUiSpan50KG bg;OriginalUiNativeSpan50KG bgState;auto bgImage=s.mapped(0,s.resources->backgroundImage(planet));
+   if(!prepareOriginalUiCourseBackgroundSpan50KG(*images,bgImage,bg,bgState)||!assign(bgImage,bgState.sampler))return fail(d,E::material);}
   for(const auto& p:s.samplers)if(p.minification==MaterialTextureFilter50EB::unspecified)return fail(d,E::material);
   s.bankPrepared=true;return true;
  }catch(...){return fail(d,E::allocation);}
@@ -111,7 +111,7 @@ bool OriginalUiCourseDrawContribution50KG::bindPublishedBank(std::shared_ptr<con
  if(gpu->textureCount()!=images->textureCount())return fail(d,E::publication);for(std::uint32_t i=0;i<gpu->textureCount();++i)if(!gpu->asset(i)||gpu->asset(i)->identity!=images->texture(i)->identity)return fail(d,E::publication);
  s.publication=gpu->publicationToken();s.gpu=std::move(gpu);return true;
 }
-bool OriginalUiCourseDrawContribution50KG::begin(const OriginalUiCourseDrawClock50KG& clock,const game::OriginalUiCourseRenderContext50KG& render,const game::OriginalUiCourseLighting50KG& lights,D& d)noexcept{
+bool OriginalUiCourseDrawContribution50KG::begin(const OriginalUiCourseDrawClock50KG& clock,const game::OriginalUiCourseRenderContext50KG& render,const game::OriginalUiCourseLighting50KG& lights,D& d,std::uint32_t planet)noexcept{
  d={};if(!storage_||!storage_->bankPrepared||!storage_->gpu||!clock.known)return fail(d,E::phase);auto& s=*storage_;drain();
  if(!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication)return fail(d,E::publication);
  if(!s.resources->widgets()->popupTemplatesHidden438()||s.resources->widgets()->popupEnabled438())return fail(d,E::widget,0x1DA714);
@@ -122,7 +122,7 @@ bool OriginalUiCourseDrawContribution50KG::begin(const OriginalUiCourseDrawClock
  s.lit.viewC0=render.cameraAfterFog.core.view;s.lit.projection80=render.cameraAfterFog.core.projection;s.lit.clipProjection290=clip.clipProjection290;s.lit.screen140=render.cameraAfterFog.sourceScreen.sourceScreen140;s.lit.cameraPosition180=render.cameraAfterFog.position;s.lit.fogEnd33Z=render.packetFogStart33Z;s.lit.fogSlope33W=render.packetFogScale33W;s.lit.canvasOffset=render.sourceCanvasOffset;s.render=render;s.clock=clock;
  try{if(clock.advanceAnimations&&!s.holo->advanceTextureAnimations(clock.milliseconds,d.hologram))return fail(d,E::clock);
   s.active=true;s.ordinary=s.page=s.exit=s.prompts=s.top=s.finished=s.failed=false;s.aperture=0;s.vertices.clear();s.w.clear();s.fog.clear();s.spans.clear();s.states.clear();s.orders.clear();
-  OriginalUiMaterialSpan50KG material;if(!prepareOriginalUiCourseBackgroundSpan50KG(*s.bank->images(),s.mapped(0,s.resources->backgroundImage()),material.span,material.native))return fail(d,E::material);
+  OriginalUiMaterialSpan50KG material;if(!prepareOriginalUiCourseBackgroundSpan50KG(*s.bank->images(),s.mapped(0,s.resources->backgroundImage(planet)),material.span,material.native))return fail(d,E::material);
   std::array<assets::Vertex48B,4> v{};constexpr float xy[4][2]={{0,0},{640,0},{640,448},{0,448}};
   for(unsigned i=0;i<4;++i){v[i].position[0]=xy[i][0];v[i].position[1]=xy[i][1];v[i].position[2]=0;v[i].uv[0]=(i==1||i==2)?1.f:1.f/640;v[i].uv[1]=i>=2?1.f:1.f/448;v[i].color[0]=v[i].color[1]=v[i].color[2]=128;v[i].color[3]=64;}
   if(!s.add(v.data(),4,nullptr,nullptr,material,nullptr,d)){s.failed=true;return false;}return true;
