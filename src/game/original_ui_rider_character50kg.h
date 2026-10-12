@@ -1,3 +1,4 @@
+// NEW unverified source reconstruction: read-only Confirm preflight.
 #pragma once
 #include "../assets/original_ui_rider_character_assets50kg.h"
 #include "model_playback50kg.h"
@@ -31,6 +32,9 @@ public:
     void selected() noexcept {selectionRequested_=false;}
     // Only after drain/disable/observer removal/detach/destruction completed.
     void modelDestroyed() noexcept {loaded_=false;entryStarted_=false;captured_=false;playback_={};}
+    // Executes the real transition leaf on copied playback; no live state or RNG writes.
+    bool preflightConfirm(const assets::MotionNodeBindings49O&,const SceneGraph49P&,
+        ModelPlaybackDiagnostic50KG&) const noexcept;
     bool confirm(const assets::MotionNodeBindings49O&,const SceneGraph49P&,
         ModelPlaybackDiagnostic50KG&) noexcept;
     // Poll >80% BEFORE advance, real shared RNG, then shared native playback.

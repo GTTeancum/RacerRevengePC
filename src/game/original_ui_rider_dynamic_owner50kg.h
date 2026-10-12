@@ -1,3 +1,4 @@
+// NEW unverified source reconstruction: read-only Confirm preflight.
 #pragma once
 #include "original_ui_rider_widgets50kg.h"
 #include "original_ui_rider_model_scene50kg.h"
@@ -69,6 +70,7 @@ public:
     // Invoked in actual widget traversal order, after ancestor enable gates.
     // Caller continues child traversal afterwards. Does not invent a wall clock.
     bool advanceWidget(std::uint16_t,float elapsedSeconds,bool ancestorsShown) noexcept;
+    bool preflightConfirmCharacter(std::uint16_t,OriginalUiRiderDynamicDiagnostic50KG&) const noexcept;
     bool confirmCharacter(std::uint16_t) noexcept;
     bool sourceCharacterReadiness(std::uint16_t) const noexcept;
     OriginalUiRiderCharacterScene50KG* characterScene(std::uint16_t) noexcept;

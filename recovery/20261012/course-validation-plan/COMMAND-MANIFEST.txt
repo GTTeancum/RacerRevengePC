@@ -1,0 +1,81 @@
+NOT EXECUTED. ROOT-ONLY PROPOSED COMMANDS FOR ONE ASSIGNED SESSION.
+Earliest UTC: 2026-10-12T04:35:12.454092+00:00. Consult/update shared ledger and
+own /workspace/shared/rr-central-test.lock before any phase. Freeze final Course
+main commit. Stop on first failure. No automatic retry or extra runtime launch.
+
+Paths below are proposals; SESSION must not already exist. Source drafts live
+outside main. Root chooses whether to integrate them before assigning the slot.
+
+REPO=/workspace/shared/rr-recovery-git
+DRAFT=/workspace/shared/course-validation-plan-20261012
+SESSION=/workspace/shared/recovery-20261012/course-validation-01
+INPUT=/workspace/shared/input-recovery-20261012/extracted
+ASSETS=/workspace/shared/recovery-20261010/native-assets-prepared-01
+OBJECTS=/workspace/shared/recovery-20261012/gc-light-fog-validation-01/objects
+
+1. Staging within assigned session (all destinations new; no recovery overwrite):
+mkdir "$SESSION"
+mkdir "$SESSION/ui-root"
+cp -a "$INPUT/RacerRevenge-original-game-UI-menu-and-videos/UI" "$SESSION/ui-root/UI"
+cp "$INPUT/RacerRevenge-original-game-APPSTART-LOC/APPSTART.RES" "$SESSION/ui-root/APPSTART.RES"
+cp "$INPUT/RacerRevenge-original-game-APPSTART-LOC/LOC.RES" "$SESSION/ui-root/LOC.RES"
+
+2. One narrow native cold extractor compile. Suggested phase ceiling120seconds.
+g++ -std=c++20 -O2 -I"$REPO/src" "$DRAFT/extract_rider19_pst_candidate.cpp" \
+  "$REPO/src/assets/original_ui_archive50kg.cpp" \
+  "$REPO/src/assets/import_decode48c.cpp" -lz -o "$SESSION/extract-rider19-pst"
+
+3. Authenticate/decode archive and extract ONE member. Suggested ceiling30seconds.
+"$SESSION/extract-rider19-pst" \
+  "$INPUT/RacerRevenge-original-game-UI-menu-and-videos/UI/UIRIDER/UIRIDER.RES" \
+  "$SESSION/pst"
+
+4. Existing authentic IPUM conversion. Suggested overall phase ceiling180seconds.
+python3 -B "$REPO/tools/assets/recover_rider_ipum50kg.py" \
+  --repo "$REPO" --source-pst "$SESSION/pst/19c_1.pst" \
+  --rider-archive "$INPUT/RacerRevenge-original-game-UI-menu-and-videos/UI/UIRIDER/UIRIDER.RES" \
+  --elf "$ASSETS/work/native/project/disc/SLUS_202.68" \
+  --output-root "$SESSION/ipum-cold" --execute-cold-conversion
+
+Preserve all output/logs. Root compares five output RRTEX hashes with the existing
+compiled catalog pins listed in VALIDATION-PLAN.md. Do NOT overwrite that catalog
+with newly generated source. Any mismatch ends the attempt without a menu launch.
+
+5. Prepare root's actual integrated runtime build argv, then build once.
+cd "$REPO"
+python3 -B tools/prepare_interactive_build50dv.py \
+  "$SESSION/command.json" "$SESSION/rr-native-course"
+python3 -B tools/build_focused_incremental50ci.py "$SESSION/command.json" "$OBJECTS"
+cp "$OBJECTS/last-build.json" "$SESSION/build-receipt.json"
+
+Suggested build phase ceiling900seconds; retain both stdout and stderr and the
+full source/argv/build provenance. Cache reuse is dependency/hash checked. The
+previous GC binary is insufficient. Root records final source commit, final
+native executable SHA256, current report-header SHA256, recorder SHA256 and
+asset/cache identities. These hashes are actual post-build values, not guesses.
+
+6. Exactly one native menu launch through the reviewed source-only candidate.
+The following angle-bracket values MUST be supplied from the completed build.
+python3 -B "$DRAFT/record_course_roundtrip_candidate.py" "$SESSION/rr-native-course" \
+  --expected-exe-sha256 <ACTUAL_FINAL_NATIVE_ELF_SHA256> \
+  --expected-entry-sha256 <ACTUAL_ORIGINAL_UI_MAIN_ENTRY_HEADER_SHA256> \
+  --source-commit <ROOT_FROZEN_FINAL_COURSE_MAIN_COMMIT_40_HEX> \
+  --build-provenance "$SESSION/build-receipt.json" \
+  --ui-root "$SESSION/ui-root" \
+  --rider-ipum-cache "$SESSION/ipum-cold/evidence/ui-rider-ipum50kg" \
+  --output "$SESSION/take-01" --root-reviewed-one-check \
+  --not-before <ACTUAL_ROOT_ASSIGNED_SLOT_TIME_NOT_EARLIER_THAN_2026-10-12T04:35:12.454092Z> \
+  --capture-hz 10 --startup-timeout 180 --ack-timeout 5 \
+  --navigation-timeout 12 --quit-timeout 10
+
+Recorder startup is at most180seconds and its observed sequence at most30seconds;
+bounded cleanup follows. Root retains its return code, summary, launch manifest,
+raw log, frames.jsonl, events.jsonl, all acknowledged PPMs and any failure data.
+Do not treat an old/stale live.ppm as accepted evidence. Review visually only the
+PPMs matched to accepted state receipts. No video encoding required for this
+minimum focused session.
+
+After all owned processes are confirmed stopped, root closes the ledger with
+actual finish time and next eligibility one hour after that finish. A failed
+preparation/build still consumed this assigned session. Do not advance next
+eligibility from a scheduled start or an assumed duration.

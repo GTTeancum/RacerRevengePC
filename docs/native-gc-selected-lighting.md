@@ -77,6 +77,12 @@ Visual acceptance, later and only by root:
 
 Historical evidence set names: `gc-lighting-validation-01` and `gc-lighting-validation-20261012-01`. Their local raw receipts, PPM frames and WAV were lost in the 2026-10-12 workspace rollback. The previously delivered silent gameplay video remains saved separately in Library; do not claim the raw take is still available locally. No second game execution or software check was performed to prepare that presentation artifact.
 
-## Next default-on fog observation
+## Default-on lighting and fog observation: 2026-10-12 UTC
 
-Runtime assets were regenerated successfully on 2026-10-12 at 02:31:05.599140 UTC; see `recovery/20261012/cold-asset-preparation-receipt.json`. That was cold preparation only. The recorder now requires the actual authored native fog initialization line, finite ordered start/end values, and its existing actual selected-light startup receipt before accepting Ready when those policies are enabled. The new recorder guard is unexecuted. It proves initialization when observed, not visible fog, a green-hue reference match or original shader parity. No default-on fog gameplay result is claimed yet.
+The next centralized Linux build and 30-second ready-window GC observation passed on source `bfe1552d0fddbae5a1a0da7900e73782926992e4`, from 03:31:26.528886 to 03:35:12.454092 UTC. All 282 C++ translation units were compiled fresh and linked successfully. See `recovery/20261012/gc-default-lighting-fog-receipt.json` for hashes, checks and exact session times.
+
+Both native selected lighting and authored native world fog were enabled by default. The recorder accepted the actual selected-light owner receipt and the actual fog initialization receipt (start 1301.32, end 2666.65) before Ready. All eight original-AI racers advanced, including camera slot zero; every observed host-driver, controller-sample and keyboard-packet counter was zero. The recorder acknowledged 138 frames, reported no boundary, partial fleet, pending capture or protocol problem, and quit normally with process exit zero.
+
+Root inspected frames 1, 69 and 138. They show actual GC grid/racing with visible distance haze and incomplete world scenery. The delivered silent video uses those 138 acknowledged frames at their measured variable timing (29.211570 seconds); it is a bounded gameplay record, not a performance benchmark. The separate 29.12-second source WAV was not stretched or muxed.
+
+This confirms the bounded GC execution and observed initialization of both policies. It does not establish original shader parity, a matched green-hue reference, local fog-particle rendering, TA, Windows, a complete lap or complete-track traversal. No arbitrary green overlay was added. Course reconstruction was excluded from this build. The shared RNG owner correction was included but this was not an isolated numeric RNG regression check.

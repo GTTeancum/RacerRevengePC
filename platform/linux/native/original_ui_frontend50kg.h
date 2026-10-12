@@ -1,6 +1,8 @@
+// Source-reviewed bounded Course integration; runtime acceptance is pending.
 #pragma once
 #include "original_ui_options_session50kg.h"
 #include "original_ui_rider_session50kg.h"
+#include "original_ui_course_session50kg.h"
 #include "vehicle_window_gl50ds.h"
 #include "../../../src/assets/original_ui_localization50kg.h"
 #include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
@@ -22,6 +24,9 @@ struct OriginalUiFrontendDiagnostic50KG {
     OriginalUiOptionsDrawDiagnostic50KG optionsResources{};
     OriginalUiRiderSessionDiagnostic50KG rider{};
     OriginalUiRiderDrawResourceDiagnostic50KG riderResources{};
+    OriginalUiCourseSessionDiagnostic50KG course{};
+    OriginalUiCourseDrawResourceDiagnostic50KG courseResources{};
+    OriginalUiCourseHologramDrawDiagnostic50KG courseHolograms{};
     assets::OriginalUiRiderStatAssetDiagnostic50KG riderStats{};
     assets::OriginalUiRiderBinderAssetDiagnostic50KG riderBinder{};
     assets::OriginalUiLocalizationDiagnostic50KG localization{};
@@ -37,7 +42,7 @@ struct OriginalUiFrontendCold50KG {
         fonts,controllerPopup,overlays,localization;
     // Optional concrete Rider inputs. Missing any leaves Main's genuine Rider
     // action unavailable; a cache flag or remembered rider is not readiness.
-    std::shared_ptr<const assets::OriginalUiArchive50KG> rider,backgrounds,podTextures;
+    std::shared_ptr<const assets::OriginalUiArchive50KG> rider,backgrounds,podTextures,course;
     std::shared_ptr<const assets::OriginalUiIpumTextureCache50KG> riderIpumCache;
     std::shared_ptr<OriginalUiRiderProfileOwner50KG> riderProfile;
     OriginalUiMainVideoOwner50KG video{};
@@ -79,6 +84,7 @@ struct OriginalUiFrontendInputReceipt50KG {
     OriginalUiMainSessionInputReceipt50KG main{};
     OriginalUiOptionsSessionInputReceipt50KG options{};
     OriginalUiRiderSessionInputReceipt50KG rider{};
+    OriginalUiCourseSessionInputReceipt50KG course{};
 };
 struct OriginalUiFrontendUpdateReceipt50KG {
     // True only after exactly one audio preparation, actual manager switch
@@ -98,13 +104,15 @@ struct OriginalUiFrontendSnapshot50KG {
     OriginalUiMainSessionSnapshot50KG main{};
     OriginalUiOptionsSessionSnapshot50KG options{};
     OriginalUiRiderSessionSnapshot50KG rider{};
+    OriginalUiCourseSessionSnapshot50KG course{};
     std::uint64_t updates=0,renders=0,submissions=0,switches=0;
     game::OriginalUiLightCacheState50KG lightCacheState=game::OriginalUiLightCacheState50KG::notConstructed;
     std::uint64_t lightManagerGeneration=0;
     bool lightManagerEntered=false;
 };
 // Concrete native Main4/1 <-> Options12/{1,4}, plus muted Rider5/1 for
-// authenticated initial Rider19. No generic destination-ready
+// authenticated initial Rider19, with muted mode0 Confirm -> fixed Course6/1
+// and Back. Runtime acceptance is pending. No generic destination-ready
 // callbacks, guest execution, gameplay entry, fallback UI or profile reset.
 // One freshly prepared bank/session/manager per screen lifetime; shared process
 // profile/application/audio/light manager remain the same. Options page changes
@@ -153,6 +161,8 @@ public:
     const OriginalUiMainSession50KG* mainSession() const noexcept;
     const OriginalUiOptionsSession50KG* optionsSession() const noexcept;
     const OriginalUiRiderSession50KG* riderSession() const noexcept;
+    const OriginalUiCourseSession50KG* courseSession() const noexcept;
+    const OriginalUiCourseDrawResources50KG* courseResources() const noexcept;
     const OriginalUiMainDrawResources50KG* mainResources() const noexcept;
     const OriginalUiOptionsDrawResources50KG* optionsResources() const noexcept;
     const assets::MaterialTextureAssets50EA* textures() const noexcept;

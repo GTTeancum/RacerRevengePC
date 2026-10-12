@@ -1,3 +1,4 @@
+// NEW unverified source reconstruction: read-only Confirm preflight.
 #include "original_ui_rider_model_scene50kg.h"
 #include <cstring>
 #include <new>
@@ -218,6 +219,14 @@ bool OriginalUiRiderCharacterScene50KG::reload(ModelMotionSharedState49T& shared
 }
 bool OriginalUiRiderCharacterScene50KG::attached() const noexcept {return storage_&&storage_->attached&&storage_->material.active();}
 void OriginalUiRiderCharacterScene50KG::selected() noexcept {if (storage_) storage_->lifecycle.selected();}
+bool OriginalUiRiderCharacterScene50KG::preflightConfirm(D& d) const noexcept {
+    d={};if(!attached())return fail(d,E::phase,0x1D2690);
+    // SceneGraph49P is mutable by type; use actual copied native nodes so the
+    // preflight cannot modify live matrices even if a shared leaf evolves.
+    auto staged=storage_->model;
+    return storage_->lifecycle.preflightConfirm(storage_->bindings,staged.view(),d.playback)||
+        fail(d,E::playback,0x1D2690);
+}
 bool OriginalUiRiderCharacterScene50KG::confirm(D& d) noexcept {
     d={};if (!attached()) return fail(d,E::phase,0x1D2690);
     return storage_->lifecycle.confirm(storage_->bindings,storage_->model.view(),d.playback)||fail(d,E::playback,0x1D2690);

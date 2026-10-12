@@ -5,6 +5,7 @@
 #include <cstdint>
 
 namespace rr::game {
+struct OriginalUiCourseLighting50KG;
 enum class OriginalUiLightManagerLifetimeError50KG : std::uint8_t {
     none,phase,archive,untrackedLifetime,registry,membership,arithmetic
 };
@@ -18,7 +19,7 @@ enum class OriginalUiLightCacheState50KG : std::uint8_t {
 // Shared APPLICATION lifetime, not a Rider-local convenience owner. Source
 //140084 constructs147ED0 once and attaches the LightManager with entity mask0402.
 //147FF8 initializesA4=null.148110 UI teardown and148B60 zone setup preserveA4.
-// The recovered Main/Options/Rider population has no cache installation path.
+// The recovered Main/Options/Rider/Course population has no cache installation path.
 //
 // This bounded native owner carries that actual constructor-absent state across
 // the tracked UI flow. It must be created at native application startup, before
@@ -35,7 +36,7 @@ public:
     OriginalUiLightManagerLifetime50KG& operator=(const OriginalUiLightManagerLifetime50KG&)=delete;
     bool constructAtApplicationStartup(OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
     // Actual UI manager entry, not cold resource preparation. First manager
-    // must be authenticated Main. Later entries admit Main/Options/Rider only;
+    // must be authenticated Main. Later entries admit Main/Options/Rider/Course only;
     // release previous manager after its packets/lights are drained.
     bool beginUiManager(const assets::OriginalUiArchive50KG&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
@@ -45,6 +46,8 @@ public:
     // current146C40/149900 color changes. First call installs the two original
     // rows in Ambient,Directional order; later calls update those same rows.
     bool publishRiderRegistry(const OriginalUiRiderLighting50KG&,
+        OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
+    bool publishCourseRegistry(const OriginalUiCourseLighting50KG&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
     //14A0E8 tests this shared owner's real absentA4 state BEFORE entering
     //149BB0. No invented cache miss, per-frame cache bypass or global-row
@@ -61,13 +64,16 @@ public:
     // lease. It cannot create, reset or substitute a cache/lifetime.
     const assets::OriginalUiArchiveIdentity50KG* activeUiIdentity() const noexcept {return activeUi_;}
     bool riderRegistryReady() const noexcept {return riderRegistryReady_;}
+    bool courseRegistryReady() const noexcept {return courseRegistryReady_;}
 private:
     OriginalUiLightCacheState50KG cacheState_=OriginalUiLightCacheState50KG::notConstructed;
     const assets::OriginalUiArchiveIdentity50KG* activeUi_=nullptr;
     const assets::OriginalUiMemberIdentity50KG* riderUiIdentity_=nullptr;
     const assets::OriginalUiMemberIdentity50KG* riderWidgetIdentity_=nullptr;
     original_racer_lighting50KM::SmallDirectionalRegistry riderRegistry_{};
+    const assets::OriginalUiMemberIdentity50KG* courseUiIdentity_=nullptr;
+    original_racer_lighting50KM::SmallDirectionalRegistry courseRegistry_{};
     std::uint64_t managerGeneration_=0;
-    bool enteredFirstMain_=false,riderRegistryReady_=false;
+    bool enteredFirstMain_=false,riderRegistryReady_=false,courseRegistryReady_=false;
 };
 }

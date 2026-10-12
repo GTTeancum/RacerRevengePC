@@ -6,10 +6,12 @@
 #include "../../../src/assets/original_ui_ipum_texture_cache50kg.h"
 namespace rr::platform {
 class OriginalUiMainDrawResources50KG;
+class OriginalUiCourseDrawResources50KG;
+class OriginalUiCourseHologramDraw50KG;
 class VehicleWindowGl50DS;
 struct VehicleWindowDiagnostic50DS;
 enum class OriginalUiRiderSessionStatus50KG : std::uint8_t {
-    ok,noChange,backProposed,unavailableDestination,notBound,alreadyBound,
+    ok,noChange,backProposed,confirmProposed,unavailableDestination,notBound,alreadyBound,
     invalidInput,unsupportedState,profile,resource,widget,backend,model,
     camera,lighting,aperture,transition,draw,audio,allocation,faulted,quit
 };
@@ -25,12 +27,16 @@ struct OriginalUiRiderSessionDiagnostic50KG {
     game::OriginalUiRiderLightingDiagnostic50KG lighting{};
     game::OriginalUiLightManagerLifetimeDiagnostic50KG lightManager{};
     game::OriginalUiApertureDiagnostic50KG aperture{};
+    game::OriginalUiRiderVoiceChoiceDiagnostic50KG voice{};
 };
 struct OriginalUiRiderSessionCold50KG {
     std::shared_ptr<OriginalUiRiderDrawResources50KG> resources;
     // Actual Main4 predecessor records, copied to canonical row inventory
     // synchronously. Never extends the predecessor's native widget lifetime.
     const OriginalUiMainDrawResources50KG* predecessorResources=nullptr;
+    // Course6 pair is mutually exclusive with Main4; copied synchronously.
+    const OriginalUiCourseDrawResources50KG* predecessorCourseResources=nullptr;
+    const OriginalUiCourseHologramDraw50KG* predecessorCourseHolograms=nullptr;
     std::shared_ptr<const assets::OriginalUiRiderStatAssets50KG> statAssets;
     std::shared_ptr<const assets::OriginalUiRiderBinderAssets50KG> binderAssets;
     std::shared_ptr<const assets::OriginalUiArchive50KG> riderArchive,appStart,podTextures;
@@ -47,11 +53,12 @@ struct OriginalUiRiderSessionCold50KG {
     // Exactly the prospective source Main decision, before its mode commit.
     // It may override a copied cold snapshot ONLY; never writes the profile.
     std::uint32_t prospectiveMode=0;
-    // Source1CCF90 predecessor screen. This bounded entry is from Main4 only.
+    // Source1CCF90 predecessor screen. Main4 or genuine mode0 Course6 Back.
     std::uint8_t previousScreen=0;
     // Same concrete application frontend transport used by Main/Options.
     // Enabled initial19/Back needs its optional authenticated Song7. Muted
-    // mode owns no transport. Neither mode admits confirm/voice paths.
+    // mode owns no transport. New muted Confirm retains real shared voice RNG
+    // and suppresses only output; its independent review gate stays closed.
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
     std::shared_ptr<OriginalUiMainAudio50KG> audio;
 };
@@ -75,6 +82,7 @@ struct OriginalUiRiderSessionInputReceipt50KG {
 struct OriginalUiRiderSessionSnapshot50KG {
     bool bound=false,faulted=false,quitRequested=false,pageShown=false,inputContainerShown=false;
     bool cameraActive=false,selectionAttached=false,framePublished=false,backProposalPending=false;
+    bool confirmProposalPending=false;
     bool blocked4E0=false,bypass4E4=false,fadeMusic4E8=true;
     std::uint32_t rider4C4=0,promptMask42C=0,packedBackground430=0,deferred4EC=0;
     std::uint16_t slot4C8=0;
@@ -83,9 +91,11 @@ struct OriginalUiRiderSessionSnapshot50KG {
     game::OriginalUiTransitionSnapshot50KG transition{};
     game::OriginalUiApertureSnapshot50KG aperture{};
     OriginalUiMainSessionAudioReceipt50KG audio{};
+    game::OriginalUiRiderVoiceChoiceReceipt50KG voice{};
 };
 // Actual bounded Rider5/1 lifecycle and frame owner. Rider19 entry + normal
-// Back only; other-rider movement, page2, confirm/course, reset popup and active
+// Back and staged muted Confirm transaction. Confirm remains unavailable until
+// its shared voice-RNG/clock and complete transaction review is closed. Other-rider movement, page2, reset popup and active
 //267BE0 transport remain unavailable BEFORE any widget/model/profile mutation.
 // The frontend owns sole manager.tick, profile commit, GPU upload/publication,
 // source-renderer retirement, and application queue consumption.
@@ -110,7 +120,8 @@ public:
     bool routeProposalCurrent(const OriginalUiRiderRouteProposal50KG&) const noexcept;
     // Called immediately AFTER actual manager admission + private profile
     // commit. Revalidates the exact one-generation profile change and manager
-    // request, then performs only source Back bypass/fade/effect fields once.
+    // request, then performs source route-specific effects once. Confirm never
+    // borrows Back bypass; original selected-animation readiness remains real.
     OriginalUiRiderSessionStatus50KG notifyRouteAccepted(const OriginalUiRiderRouteProposal50KG&,
         OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     // Same one-use audio scheduling boundary as Main/Options. Actual external

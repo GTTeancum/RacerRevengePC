@@ -1,0 +1,30 @@
+Source-only review completed 2026-10-12 around04:00 UTC.
+No project source was executed, imported, syntax-checked, compiled or tested.
+No menu/gameplay/video-encoding run occurred. Main and the centralized ledger
+were not edited. This record is not validation evidence.
+
+Independent read-only review found no remaining must-fix in its narrow second
+pass after these concrete corrections:
+- Settled shared profile generations1,1,3,4.
+- Fresh Rider initial-entry image can legally precede actual model attachment;
+  require model attachment/geometry at settled input gates and retain transitions.
+- Real native frame and update advance plus per-owner Rider source/target advance.
+- Shared light generation equals switches+1; cache absence remains source-owned.
+- Navigation deadline ends at acknowledged input-open destination, not after dwell.
+- Dwell is supported by both retained first/last host receipts and source time.
+- Explicit muted UI leaves audio time0; mandatory actual mute fields are checked.
+- Terminal raw receipts survive sequence rejection and exception-path final drain.
+- Running owned native executable is hashed through its kernel /proc executable link.
+- Extractor uses authenticated OriginalUiArchive50KG, fixed member/output, and
+  only the two existing archive/import implementations with zlib.
+
+Remaining preparation is explicit: five real Rider RRTEX files plus manifest
+are absent and no Library cache was located. Authentic source archives/ELF and
+compiled expected image hashes exist. Root must schedule the cold extractor
+compile/run, retained conversion, integrated runtime build and one bounded
+observation inside the next assigned session, never before04:35:12.454092 UTC.
+
+Review scope limitations: no parser/compiler/runtime confirmation; no proof of
+future FFmpeg output identity; no guarantee of successful source one-second stall
+or navigation bounds; no visual or retail-pixel parity claim. Any of these can
+honestly fail the centralized attempt without allowing retries or fake evidence.

@@ -1,3 +1,4 @@
+// NEW unverified application clock/voice-static join; other declarations preserved.
 #pragma once
 #include "original_ui_main_draw50kg.h"
 #include "original_ui_main_audio50kg.h"
@@ -8,6 +9,7 @@
 #include "../../../src/game/original_ui_main_particle_lighting50kg.h"
 #include "../../../src/game/original_ui_main_fire50kg.h"
 #include "../../../src/game/model_playback50kg.h"
+#include "../../../src/game/original_ui_rider_voice_choice50kg.h"
 #include "../../../src/game/coupled_body_advancement49m.h"
 #include <memory>
 
@@ -38,6 +40,14 @@ struct OriginalUiMainApplication50KG {
     game::CoupledNoiseContext49M sharedNoise308030{};
     std::uint32_t& rawRandom308030=sharedNoise308030.sharedRandomState;
     std::uint32_t fireSerial433970=0;
+    // Same actual host101A50 backend retained by native application startup.
+    // Shared ownership prevents any screen/manager from creating a new epoch.
+    std::shared_ptr<game::HostMonotonicClock50ID> clock101A50;
+    // Original shared statics80A8/3D6B30 and80AC/3D6B38. Startup raw
+    // seeding does not initialize these caches. Survive every menu page.
+    // Menu-to-race remains disabled; no copy to the separate race session.
+    game::SharedRandomOwner50ID sharedRandomSelectors{};
+    game::OriginalUiRiderVoiceChoice50KG riderVoiceChoice;
     // Process-wide lazy playback/IK/libm owners survive page/model destruction.
     // Native application startup initializes them once, alongside this sole
     // RNG owner; model-specific graph, capture and chain records stay per model.

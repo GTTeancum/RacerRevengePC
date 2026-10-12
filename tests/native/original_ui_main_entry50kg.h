@@ -46,7 +46,7 @@ struct Application {
     std::shared_ptr<rr::platform::OriginalUiMainApplication50KG> state;
     //140084/147FF8 application lifetime, shared by every frontend incarnation.
     std::shared_ptr<rr::game::OriginalUiLightManagerLifetime50KG> lightManager;
-    explicit Application(rr::game::HostMonotonicClock50ID& clock) {
+    explicit Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock) {
         const char* enabledSetting=std::getenv("RR_ORIGINAL_MAIN_MENU");
         require(!enabledSetting || std::string(enabledSetting)=="0" || std::string(enabledSetting)=="1",
             "RR_ORIGINAL_MAIN_MENU must be 0 or 1");
@@ -72,6 +72,8 @@ struct Application {
         gameSettingsProfile=std::make_shared<rr::game::OriginalUiGameSettingsProfile50KG>();
         soundMode=std::make_shared<rr::platform::OriginalSoundMode50KG>();
         state=std::make_shared<rr::platform::OriginalUiMainApplication50KG>();
+        require(bool(clock),"original application source clock owner missing");
+        state->clock101A50=clock; // Same retained epoch for startup, materials and Rider voice seed.
         // The last shared owner performs application destruction. A frontend
         // pins this same object until its consumers/cleanup have finished, so
         // even exceptional unwinding cannot destroy it under live borrowers.
@@ -107,7 +109,7 @@ struct Application {
             "fresh original sound mode initialization rejected");
         // One native startup seed from the existing process clock, never per
         // frame, capture or focus change. Exact original boot seeding unclaimed.
-        require(rr::game::sampleHostTimestamp50ID(clock,state->rawRandom308030),
+        require(rr::game::sampleHostTimestamp50ID(*state->clock101A50,state->rawRandom308030),
             "Main startup shared application timestamp unavailable");
         state->known=true;
         materialRuntime={true,false}; // Process-owned fresh native normal-material mode.
@@ -116,7 +118,8 @@ struct Application {
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
             "Accept requires enabled concrete audio and commits process-owned settings. "
             "Rider19 entry additionally requires the authenticated compiled IPUM cache; enabled audio uses original Song7. "
-            "other riders, Course/Gallery and other Options subpages remain unavailable. "
+            "Muted mode0 Rider19 Confirm to fixed Course and Back is integrated but unvalidated; "
+            "other riders, Gallery and other Options subpages remain unavailable. "
             "No gameplay launch or original boot/save parity is claimed.\n";
     }
 };
@@ -255,6 +258,17 @@ struct Frontend {
             using Cache=rr::assets::OriginalUiIpumTextureCache50KG;
             require(Cache::catalogAvailable(),"original Rider IPUM output catalog is unavailable");
             cold.rider=readArchive(application.assetRoot,Id::rider);
+            // Course is an optional destination. A missing archive must not
+            // remove existing Main/Options/Rider Back capability. If supplied,
+            // its bytes still authenticate normally; malformed input is fatal.
+            if(application.audioMode==rr::platform::OriginalUiMainAudioMode50KG::muted){
+                const auto* courseIdentity=rr::assets::originalUiArchiveIdentity50KG(Id::course);
+                require(courseIdentity,"original Course archive identity missing");
+                if(std::filesystem::exists(application.assetRoot/std::filesystem::path(courseIdentity->discPath)))
+                    cold.course=readArchive(application.assetRoot,Id::course);
+                else
+                    std::cerr<<"Original Course archive absent; Course destination remains unavailable.\n";
+            }
             cold.backgrounds=readArchive(application.assetRoot,Id::backgrounds);
             cold.podTextures=readArchive(application.assetRoot,Id::podTextures);
             std::vector<std::vector<std::uint8_t>> mips;
@@ -315,6 +329,8 @@ struct Frontend {
             std::to_string(static_cast<unsigned>(diagnostic.status))+" source="+std::to_string(diagnostic.sourcePC)+
             " main="+std::to_string(static_cast<unsigned>(diagnostic.main.status))+
             " options="+std::to_string(static_cast<unsigned>(diagnostic.options.status))+
+            " course="+std::to_string(static_cast<unsigned>(diagnostic.course.status))+
+            " course_pc="+std::to_string(diagnostic.course.sourcePC)+
             " renderer="+std::to_string(static_cast<unsigned>(diagnostic.renderer.error)));
     }
     void input(std::uint8_t sourceInput) {
@@ -344,6 +360,10 @@ struct Frontend {
                 <<" options_widget_icon="<<unsigned(diagnostic.optionsResources.widgets.icon)
                 <<" preparation_status="<<unsigned(diagnostic.preparationStatus)
                 <<" rider="<<unsigned(diagnostic.rider.status)<<" rider_pc="<<diagnostic.rider.sourcePC
+                <<" course="<<unsigned(diagnostic.course.status)<<" course_pc="<<diagnostic.course.sourcePC
+                <<" course_resource="<<unsigned(diagnostic.courseResources.error)
+                <<" course_resource_pc="<<diagnostic.courseResources.sourcePC
+                <<" course_hologram_pc="<<diagnostic.courseHolograms.sourcePC
                 <<" rider_resource="<<unsigned(diagnostic.riderResources.error)
                 <<" rider_resource_widget="<<diagnostic.riderResources.widgetId
                 <<" rider_resource_material="<<diagnostic.riderResources.materialIndex
@@ -464,6 +484,10 @@ struct Frontend {
             const auto* resources=coordinator.mainResources();
             return resources&&resources->manager()?resources->manager()->navigation(1):nullptr;
         }
+        if(route.screen==6&&route.page==1){
+            const auto* resources=coordinator.courseResources();
+            return resources&&resources->widgets()?resources->widgets()->navigation():nullptr;
+        }
         if(route.screen==12){
             const auto* resources=coordinator.optionsResources();
             const auto* widgets=resources?resources->widgets():nullptr;
@@ -505,6 +529,35 @@ struct Frontend {
                 <<",\"light_manager_generation\":"<<application.lightManager->managerGeneration()
                 <<",\"light_cache_state\":"<<unsigned(application.lightManager->cacheState());
         };
+        if(snapshot.route.screen==6){
+            require(snapshot.route.page==1&&coordinator.courseSession(),"original Course session report unavailable");
+            const auto& course=snapshot.course;const auto& aperture=course.aperture;
+            const auto publication=coordinator.gpu()?coordinator.gpu()->publicationToken():0;
+            const bool accepted=submittedScreen==6&&submittedPublication==publication&&snapshot.frameSubmitted;
+            std::cerr<<"original_course_state {\"reason\":\""<<reason<<"\",\"screen\":6,\"page\":1"
+                <<",\"presentation\":\"native_host_rgb\",\"switches\":"<<snapshot.switches
+                <<",\"gpu_publication\":"<<publication<<",\"updates\":"<<snapshot.updates
+                <<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<snapshot.submissions
+                <<",\"course_slot\":"<<course.courseSlot14E4<<",\"subtype_slot\":"<<course.subtypeSlot14F4
+                <<",\"laps\":"<<course.laps14EC<<",\"entrants\":"<<course.entrants14F0
+                <<",\"input_shown\":"<<(course.inputContainerShown?"true":"false")
+                <<",\"popup_enabled\":"<<(course.popupEnabled438?"true":"false")
+                <<",\"prompt_mask\":"<<course.promptMask42C
+                <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount
+                <<",\"lifecycle\":"<<unsigned(snapshot.transition.lifecycle)<<",\"phase\":"<<unsigned(snapshot.transition.phase)
+                <<",\"requested_screen\":"<<unsigned(snapshot.transition.requested.screen)
+                <<",\"requested_page\":"<<unsigned(snapshot.transition.requested.page)
+                <<",\"aperture_state\":"<<unsigned(aperture.state)
+                <<",\"aperture_top\":"<<aperture.top284<<",\"aperture_bottom\":"<<aperture.bottom28C
+                <<",\"aperture_input_enabled\":"<<(aperture.inputEnabled268?"true":"false")
+                <<",\"accepted_native_frame\":"<<(accepted?"true":"false")
+                <<",\"quads\":"<<(accepted?submittedQuads:0)<<",\"draws\":"<<(accepted?submittedDraws:0)
+                <<",\"source_rng\":"<<application.state->rawRandom308030<<",\"source_milliseconds\":"<<sourceMilliseconds
+                <<",\"audio_muted\":"<<(audioOutput.enabled()?"false":"true")
+                <<",\"audio_suppressed\":"<<course.audio.suppressedByMutedMode
+                <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames;
+            reportRiderProfile();std::cerr<<"}\n";return;
+        }
         if(snapshot.route.screen==5){
             require(snapshot.route.page==1&&coordinator.riderSession(),"original Rider session report unavailable");
             const auto& rider=snapshot.rider;const auto& aperture=rider.aperture;

@@ -1,3 +1,4 @@
+// NEW unverified source reconstruction: read-only Confirm preflight.
 #include "original_ui_rider_character50kg.h"
 #include <cfenv>
 #include <cmath>
@@ -56,6 +57,12 @@ bool OriginalUiRiderCharacter50KG::captureAfterAttachment(const assets::MotionNo
 bool OriginalUiRiderCharacter50KG::modelAttached() noexcept {
     if (!entryStarted_||!captured_||loaded_) return false;
     loaded_=true;return true;
+}
+bool OriginalUiRiderCharacter50KG::preflightConfirm(const assets::MotionNodeBindings49O& bindings,
+    const SceneGraph49P& graph,ModelPlaybackDiagnostic50KG& diagnostic) const noexcept {
+    diagnostic={};if(!loaded_)return true;
+    auto staged=playback_;
+    return transitionModelPlayback50KG(motions_[1],1.0f,bindings,graph,staged,diagnostic);
 }
 bool OriginalUiRiderCharacter50KG::confirm(const assets::MotionNodeBindings49O& bindings,
     const SceneGraph49P& graph,ModelPlaybackDiagnostic50KG& diagnostic) noexcept {

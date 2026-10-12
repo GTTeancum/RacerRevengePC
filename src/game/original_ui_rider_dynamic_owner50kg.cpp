@@ -1,3 +1,4 @@
+// NEW unverified source reconstruction: read-only Confirm preflight.
 #include "original_ui_rider_dynamic_owner50kg.h"
 #include <cmath>
 #include <string>
@@ -267,6 +268,14 @@ bool OriginalUiRiderDynamicOwner50KG::advanceWidget(std::uint16_t id,float dt,bo
     if(!ancestorsShown||!e.state.shown||!e.registered)return true;
     const bool ok=e.state.kind==K::character?e.character.advance(dt,*s.rng,*s.motion,*s.ik,diagnostic_.model):e.pod.advance(dt,diagnostic_.model);
     if(!ok){diagnostic_.error=E::model;s.poisoned=true;}return ok;
+}
+bool OriginalUiRiderDynamicOwner50KG::preflightConfirmCharacter(std::uint16_t id,
+    OriginalUiRiderDynamicDiagnostic50KG& d) const noexcept {
+    d={};d.widget=id;
+    if(!storage_||storage_->poisoned||storage_->drained||storage_->inCallback||!idOk(id)||
+       storage_->entries[id].state.kind!=K::character){d.error=E::input;return false;}
+    const auto& e=storage_->entries[id];if(!e.registered)return true;
+    if(!e.character.preflightConfirm(d.model)){d.error=E::model;return false;}return true;
 }
 bool OriginalUiRiderDynamicOwner50KG::confirmCharacter(std::uint16_t id) noexcept {
     diagnostic_={};diagnostic_.widget=id;

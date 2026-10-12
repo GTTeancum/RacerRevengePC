@@ -1,5 +1,7 @@
 #include "original_ui_rider_session50kg.h"
 #include "original_ui_main_draw50kg.h"
+#include "original_ui_course_draw_resources50kg.h"
+#include "original_ui_course_hologram_draw50kg.h"
 #include "vehicle_window_gl50ds.h"
 #include <cmath>
 #include <limits>
@@ -17,6 +19,9 @@ using Hook=game::OriginalUiApertureHookKind50KG;
 using ApertureStatus=game::OriginalUiApertureStatus50KG;
 using Operation=game::OriginalUiControlOperation50KG;
 using Kind=game::OriginalUiRiderWidgetKind50KG;
+// Paired with bounded frontend admission; actual animation and RNG ownership
+// predicates are still required. Runtime acceptance is pending.
+constexpr bool boundedRiderConfirmEnabled=true;
 Status result(Diagnostic& d,Status s,std::uint32_t pc=0) noexcept {d.status=s;d.sourcePC=pc;return s;}
 bool apertureOkay(ApertureStatus s) noexcept {return s==ApertureStatus::ok||s==ApertureStatus::noChange;}
 bool genuine(const std::shared_ptr<const assets::OriginalUiArchive50KG>& a,assets::OriginalUiArchiveId50KG id) noexcept {
@@ -51,6 +56,16 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
     return a.bound==b.bound&&a.current.screen==b.current.screen&&a.current.page==b.current.page&&
         a.requested.screen==b.requested.screen&&a.requested.page==b.requested.page&&a.lifecycle==b.lifecycle&&a.phase==b.phase&&
         a.applicationRequestQueued==b.applicationRequestQueued&&a.initialRestartPending==b.initialRestartPending;
+}
+bool confirmShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
+    using F=game::OriginalUiProfileField50KG;using W=game::OriginalUiProfileWrite50KG;
+    if(d.inputPC!=0x1EA460||d.selectedRider!=19||!d.profileProposalComplete||d.profileChanges.count!=3||
+       d.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||d.request.sourceScreen!=5||d.request.sourcePage!=1||
+       d.request.targetScreen!=6||d.request.targetPage!=1||d.request.sourcePC!=0x1EA604)return false;
+    const auto& a=d.profileChanges.values[0];const auto& b=d.profileChanges.values[1];const auto& c=d.profileChanges.values[2];
+    return a.field==F::riderMode0_6F0&&a.operation==W::word&&a.value==19&&a.replaceMask==0xFFFFFFFFu&&a.sourcePC==0x1EA538&&
+        b.field==F::rider1Bits1125D&&b.operation==W::maskedByte&&b.value==(19u<<3)&&b.replaceMask==0xF8&&b.sourcePC==0x1EA58C&&
+        c.field==F::comparisonRider100C0&&c.operation==W::word&&c.value==19&&c.replaceMask==0xFFFFFFFFu&&c.sourcePC==0x1EA5A8;
 }
 void controlState(game::OriginalUiControlState50KG& s,Operation op,bool value) noexcept {
     if(op==Operation::show||op==Operation::reset)s.shown=true;
@@ -93,13 +108,14 @@ struct OriginalUiRiderSession50KG::Storage {
     game::OriginalUiRiderSelectionProfile50KG pendingProfile;
     OriginalUiMainProfile50KG pendingCommon;
     game::OriginalUiRouteDecision50KG pendingBack;
+    std::uint8_t pendingPacked1125D=0;std::uint32_t pendingComparison100C0=0;
     OriginalUiRiderProfileStamp50KG pendingStamp;
     game::OriginalUiTransitionSnapshot50KG pendingLifecycle;
     OriginalUiMainSessionUpdate50KG preparedUpdate;
     std::uint64_t proposalSerial=0,lightGeneration=0;
     bool dependenciesPrepared=false,inOperation=false,rendering=false,paused=false,updatePrepared=false;
     bool requested=false,entered=false,managerEntered=false,opening=false,opened=false,closing=false,restored=false,closed=false;
-    bool backAccepted=false,entryAuxiliarySeen=false,entryCompleted=false;
+    bool backAccepted=false,confirmAccepted=false,entryAuxiliarySeen=false,entryCompleted=false;
     bool backendBound=false,collectorBound=false,sourceClosing=false,sourceTornDown=false;
     // No fallible source destruction is first attempted by a destructor.
     // Failed private cold bind has never acquired a graph/helper domain.
@@ -129,6 +145,44 @@ struct OriginalUiRiderSession50KG::Storage {
         }
         ++state.audio.submitted;return true;
     }
+    bool selectedConfirmCharacter(std::uint16_t& character) const noexcept {
+        const auto* n=nav();if(!n||!n->page||n->page->groups.size()<=1||n->controllerGroup[0]!=1||
+           !state.slot4C8||n->groups[1].selectedSlot!=state.slot4C8||
+           state.slot4C8>n->page->groups[1].controls.size()||state.rider4C4!=19)return false;
+        const auto control=n->page->groups[1].controls[state.slot4C8-1];
+        if(control<0||static_cast<std::size_t>(control)>=n->page->controls.size())return false;
+        const auto& ids=n->page->controls[control].widgets;
+        // 1ECF40 tests size4; 1ECF70 returns the exact fourth member.
+        if(ids.size()!=4||ids[3]!=53||widgets().state(ids[3]).kind!=Kind::character||
+           !backend.attached(ids[3]))return false;
+        const auto actual=dynamic.state(ids[3]);
+        if(actual.kind!=Kind::character||!actual.selected||!actual.shown)return false;
+        character=ids[3];return true;
+    }
+    bool confirmAnimationPreflight(game::OriginalUiRiderDynamicDiagnostic50KG& d) const noexcept {
+        std::uint16_t character=0;
+        return selectedConfirmCharacter(character)&&dynamic.preflightConfirmCharacter(character,d);
+    }
+    bool confirmVoiceChronologyReady() const noexcept {
+        game::OriginalUiRiderVoiceChoiceDiagnostic50KG diagnostic;
+        return boundedRiderConfirmEnabled&&cold.application->clock101A50&&
+            cold.application->riderVoiceChoice.preflightRider19(diagnostic);
+    }
+    bool applyConfirmVoiceChronology() noexcept {
+        if(!confirmVoiceChronologyReady()||cold.audioMode!=OriginalUiMainAudioMode50KG::muted||cold.audio){
+            fault(Status::unsupportedState,0x1EA694);return false;}
+        if(!cold.application->riderVoiceChoice.chooseRider19(*cold.application->clock101A50,
+            cold.application->sharedNoise308030,cold.application->sharedRandomSelectors,
+            state.voice,callbackFault.voice)){
+            fault(Status::audio,callbackFault.voice.sourcePC);return false;}
+        // Actual1EA780 voice playback is muted AFTER the real seed/draw/choice.
+        ++state.audio.suppressedByMutedMode;return true;
+    }
+    bool confirmReady(game::OriginalUiRiderDynamicDiagnostic50KG& d) const noexcept {
+        return cold.audioMode==OriginalUiMainAudioMode50KG::muted&&!cold.audio&&cold.prospectiveMode==0&&
+            cold.commonProfile->mode34==0&&(cold.commonProfile->playerBits1125C&0x60)==0x20&&
+            confirmAnimationPreflight(d)&&confirmVoiceChronologyReady();
+    }
     bool processCurrent() const noexcept {
         return cold.application->known&&cold.commonProfile->known&&cold.profile->commonProfile()==cold.commonProfile.get()&&
             !(cold.application->globalFlags228&4u)&&cold.application->transportE00==-1&&
@@ -146,20 +200,20 @@ struct OriginalUiRiderSession50KG::Storage {
     }
     bool idleInput() const noexcept {
         const auto t=transition();const auto a=aperture.snapshot();
-        return currentPage()&&entryCompleted&&opened&&!closing&&!backAccepted&&state.pageShown&&state.inputContainerShown&&
+        return currentPage()&&entryCompleted&&opened&&!closing&&!backAccepted&&!confirmAccepted&&state.pageShown&&state.inputContainerShown&&
             t.requested.screen==5&&t.requested.page==1&&t.lifecycle==Life::idle&&t.phase==Phase::none&&!t.initialRestartPending&&
             !t.applicationRequestQueued&&a.inputEnabled268&&a.state==game::OriginalUiApertureState50KG::open&&
             !panel.inputBlocked4E0()&&panel.offset4DC()==0;
     }
     bool invalidateProposal() noexcept {
-        state.backProposalPending=false;
+        state.backProposalPending=false;state.confirmProposalPending=false;
         if(proposalSerial==std::numeric_limits<std::uint64_t>::max()){fault(Status::unsupportedState,0x1EA460);return false;}
         ++proposalSerial;return true;
     }
     void cpuDrain() noexcept {collector.drain();state.framePublished=false;}
     void fault(Status status,std::uint32_t pc) noexcept {
         if(!state.faulted){state.faulted=true;callbackFault.status=status;callbackFault.sourcePC=pc;}
-        state.backProposalPending=false;state.framePublished=false;
+        state.backProposalPending=false;state.confirmProposalPending=false;state.framePublished=false;
     }
     bool navigate(const game::OriginalUiNavigation50KG& next,const game::OriginalUiCommands50KG& commands,std::uint32_t pc) noexcept {
         if(!widgets().commitNavigation(0,next,commands,dynamic.hooks(),callbackFault.widget)){
@@ -238,7 +292,7 @@ struct OriginalUiRiderSession50KG::Storage {
         if(!appearance())return false;opened=true;return true;
     }
     bool closingB4() noexcept {
-        if(!opening||closing||!backAccepted){fault(Status::unsupportedState,0x1EA360);return false;}
+        if(!opening||closing||(!backAccepted&&!confirmAccepted)){fault(Status::unsupportedState,0x1EA360);return false;}
         state.promptMask42C=0;
         if(!groupEnabled(2,false,0x1EA37C))return false;
         const auto* n=nav();if(!state.slot4C8||state.slot4C8>n->page->groups[1].controls.size()){fault(Status::widget,0x1EA38C);return false;}
@@ -320,8 +374,15 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
     d={};if(storage_)return result(d,Status::alreadyBound);
     if(population!=game::OriginalUiRiderColdPopulation50KG::selected19&&
        population!=game::OriginalUiRiderColdPopulation50KG::rider19And20)return result(d,Status::invalidInput);
-    if(!cold.predecessorResources||!cold.predecessorResources->loaded()||!cold.predecessorResources->materials()||
-       !cold.predecessorResources->particleMaterial()||!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->bankInput()||
+    const bool fromMain=cold.previousScreen==4&&cold.predecessorResources&&
+        !cold.predecessorCourseResources&&!cold.predecessorCourseHolograms&&
+        cold.predecessorResources->loaded()&&cold.predecessorResources->materials()&&cold.predecessorResources->particleMaterial();
+    const bool fromCourse=cold.previousScreen==6&&!cold.predecessorResources&&
+        cold.predecessorCourseResources&&cold.predecessorCourseHolograms&&
+        cold.predecessorCourseResources->loaded()&&cold.predecessorCourseResources->widgets()&&
+        cold.predecessorCourseResources->materials()&&cold.predecessorCourseHolograms->loaded()&&
+        cold.prospectiveMode==0&&population==game::OriginalUiRiderColdPopulation50KG::selected19;
+    if((!fromMain&&!fromCourse)||!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->bankInput()||
        !cold.resources->exitText(0)||!cold.resources->exitText(0)->prepared()||!cold.statAssets||!cold.statAssets->loaded()||
        !cold.binderAssets||!cold.binderAssets->loaded()||!genuine(cold.riderArchive,assets::OriginalUiArchiveId50KG::rider)||
        !genuine(cold.appStart,assets::OriginalUiArchiveId50KG::appStart)||!genuine(cold.podTextures,assets::OriginalUiArchiveId50KG::podTextures)||
@@ -329,7 +390,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         return result(d,Status::resource);
     if(!cold.profile||!cold.profile->initialized()||!cold.commonProfile||!cold.commonProfile->known||
        cold.profile->commonProfile()!=cold.commonProfile.get()||!cold.application||!cold.application->known||
-       (cold.application->globalFlags228&4u)||cold.application->transportE00!=-1||cold.prospectiveMode>2||cold.previousScreen!=4||
+       (cold.application->globalFlags228&4u)||cold.application->transportE00!=-1||cold.prospectiveMode>2||(fromCourse&&cold.commonProfile->mode34!=0)||
        &cold.application->rawRandom308030!=&cold.application->sharedNoise308030.sharedRandomState||
        !cold.lightManager||cold.lightManager->cacheState()!=game::OriginalUiLightCacheState50KG::absentSinceApplicationConstruction||
        !cold.externalTransition||cold.externalTransition->snapshot().bound)return result(d,Status::unsupportedState);
@@ -339,6 +400,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         return result(d,Status::unavailableDestination,0x234900);
     try {
         auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->cold.predecessorResources=nullptr;
+        s->cold.predecessorCourseResources=nullptr;s->cold.predecessorCourseHolograms=nullptr;
         const auto* page=s->selection()?s->selection()->page():nullptr;
         if(!page||page->groups.size()!=3||page->groups[1].controls.size()!=23||!s->nav()||
            page->useVideoAsTexture||page->background!="*INVALID*"||!cold.resources->background(19)||
@@ -393,14 +455,33 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         }
         for(std::uint8_t rider=1;rider<=26;++rider)if(const auto* material=cold.statAssets->portrait(rider))
             if(!addStaticRow(material->registeredName))return result(d,Status::resource);
-        for(const auto& material:*cold.predecessorResources->materials())
-            if(!addStaticRow(material.registeredName))return result(d,Status::resource);
-        const auto* particle=cold.predecessorResources->particleMaterial();
-        if(!particle->identity||!particle->identity->name)return result(d,Status::resource);
-        std::string particleName=particle->identity->name;
-        if(particleName.size()<4||particleName.substr(particleName.size()-4)!=".psm")return result(d,Status::resource);
-        particleName.resize(particleName.size()-4);
-        if(!addStaticRow(particleName))return result(d,Status::resource);
+        if(fromMain){
+            for(const auto& material:*cold.predecessorResources->materials())
+                if(!addStaticRow(material.registeredName))return result(d,Status::resource);
+            const auto* particle=cold.predecessorResources->particleMaterial();
+            if(!particle->identity||!particle->identity->name)return result(d,Status::resource);
+            std::string particleName=particle->identity->name;
+            if(particleName.size()<4||particleName.substr(particleName.size()-4)!=".psm")return result(d,Status::resource);
+            particleName.resize(particleName.size()-4);
+            if(!addStaticRow(particleName))return result(d,Status::resource);
+        }else{
+            // Actual Course inventory, no predecessor image/epoch/session replay.
+            for(const auto& material:*cold.predecessorCourseResources->materials())
+                if(!addStaticRow(material.registeredName))return result(d,Status::resource);
+            const auto* widgets=cold.predecessorCourseResources->widgets();std::size_t count=0;
+            for(std::uint16_t id=1;id<85;++id){
+                if(widgets->state(id).kind!=game::OriginalUiCourseWidgetKind50KG::character)continue;
+                const auto* asset=cold.predecessorCourseHolograms->modelAssets(id);
+                const auto* material=cold.predecessorCourseHolograms->material(id);
+                if(!asset||!asset->loaded()||asset->widgetId()!=id||!asset->scene()||!material||
+                   !material->identity||!material->identity->name||material->passes.size()!=2)return result(d,Status::resource);
+                std::string name=material->identity->name;
+                if(name.size()<4||name.substr(name.size()-4)!=".psm")return result(d,Status::resource);
+                name.resize(name.size()-4);if(!addStaticRow(name))return result(d,Status::resource);++count;
+            }
+            // Two passes share one PSM row. Raw background has no material row.
+            if(count!=13)return result(d,Status::resource);
+        }
         if(!s->backend.bind(backend,d.backend))return result(d,Status::backend);
         s->backendBound=true;
         if(!s->dynamic.bind(cold.riderArchive,s->widgets(),cold.application->modelMotion,cold.application->modelMode0Ik,
@@ -475,11 +556,11 @@ Status OriginalUiRiderSession50KG::notifyTransition(const game::OriginalUiTransi
         if(valid)s->managerEntered=true;break; // Actual inherited2A4330 return.
     case Notice::beginTransition7C:
         if(t.phase==Phase::entry){valid=s->managerEntered&&!s->opening&&t.lifecycle==Life::waitPageTransition&&e.sourcePC==0x2A3D8C;}
-        else valid=t.phase==Phase::exit&&s->backAccepted&&!s->closing&&t.lifecycle==Life::waitScreenExit&&e.sourcePC==0x2A3DFC;
+        else valid=t.phase==Phase::exit&&(s->backAccepted||s->confirmAccepted)&&!s->closing&&t.lifecycle==Life::waitScreenExit&&e.sourcePC==0x2A3DFC;
         if(valid&&!apertureOkay(s->panel.begin7C(t.phase)))s->fault(Status::aperture,e.sourcePC);break;
     case Notice::pageAuxiliary1C:
         if(e.sourcePC==0x2A3DA4)valid=s->opening&&!s->entryAuxiliarySeen&&t.lifecycle==Life::waitPageTransition&&t.phase==Phase::entry;
-        else valid=e.sourcePC==0x2A3E8C&&s->closed&&s->backAccepted&&t.lifecycle==Life::waitScreenExit&&t.phase==Phase::exit;
+        else valid=e.sourcePC==0x2A3E8C&&s->closed&&(s->backAccepted||s->confirmAccepted)&&t.lifecycle==Life::waitScreenExit&&t.phase==Phase::exit;
         if(valid){s->state.inputContainerShown=false;if(e.sourcePC==0x2A3DA4)s->entryAuxiliarySeen=true;}break;
     case Notice::pageAuxiliary24:
         valid=e.sourcePC==0x2A3EE0&&s->entryAuxiliarySeen&&!s->entryCompleted&&s->opened&&
@@ -498,7 +579,7 @@ Completion OriginalUiRiderSession50KG::pollCompletion(game::OriginalUiTransition
         !s->processCurrent()||!s->lightCurrent())return Completion::unavailable;
     const auto t=s->transition();if(t.phase!=phase)return Completion::unavailable;
     if(phase==Phase::entry&&!s->opening)return Completion::unavailable;
-    if(phase==Phase::exit&&!s->backAccepted)return Completion::unavailable;
+    if(phase==Phase::exit&&!s->backAccepted&&!s->confirmAccepted)return Completion::unavailable;
     return s->panel.pollCompletion(phase);
 }
 Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& in,OriginalUiRiderSessionInputReceipt50KG& receipt,Diagnostic& d) noexcept {
@@ -534,7 +615,17 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     const auto routed=game::dispatchOriginalUiRider50KG(in.controller,static_cast<game::OriginalUiRouteInput50KG>(in.originalInput),context,receipt.decision);
     if(routed==game::OriginalUiRouteStatus50KG::noChange)return finish(Status::noChange);
     if(routed!=game::OriginalUiRouteStatus50KG::unavailable)return finish(Status::unsupportedState,0x1EA460);
-    if(in.originalInput==4)return finish(Status::unavailableDestination,receipt.decision.request.sourcePC);
+    if(in.originalInput==4){
+        const auto& r=receipt.decision;
+        if(!s->idleInput()||!confirmShape(r)||r.admitted||r.action!=game::OriginalUiRouteAction50KG::unavailable||
+           r.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
+           !s->confirmReady(d.dynamic))return finish(Status::unavailableDestination,0x1EA694);
+        if(!s->cold.profile->riderConfirmSnapshot(s->pendingPacked1125D,s->pendingComparison100C0))
+            return finish(Status::profile,0x1EA58C);
+        s->pendingProfile=profile;s->pendingCommon=*s->cold.commonProfile;s->pendingStamp=s->cold.profile->stamp();
+        s->pendingBack=r;s->pendingLifecycle=s->transition();s->state.confirmProposalPending=true;
+        receipt.routeProposal={this,s->proposalSerial,r,s->pendingStamp};return finish(Status::confirmProposed,0x1EA604);
+    }
     const auto& r=receipt.decision;
     if(!s->idleInput()||!s->backAudioReady()||!r.profileProposalComplete||r.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
        r.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||r.request.targetScreen!=4||r.request.targetPage!=1||
@@ -544,16 +635,49 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     receipt.routeProposal={this,s->proposalSerial,r,s->pendingStamp};return finish(Status::backProposed,0x1EA810);
 }
 bool OriginalUiRiderSession50KG::routeProposalCurrent(const OriginalUiRiderRouteProposal50KG& p) const noexcept {
-    const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||
-       p.source!=this||!p.serial||p.serial!=s->proposalSerial||!s->idleInput()||!s->lightCurrent()||!s->processCurrent()||!s->backAudioReady()||
+    const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||(!s->state.backProposalPending&&!s->state.confirmProposalPending)||
+       p.source!=this||!p.serial||p.serial!=s->proposalSerial||!s->idleInput()||!s->lightCurrent()||!s->processCurrent()||
        s->cold.application->uiObject3D8||!sameDecision(p.decision,s->pendingBack)||!sameStamp(p.profileStamp,s->pendingStamp)||
        !sameStamp(s->cold.profile->stamp(),s->pendingStamp)||!sameCommon(*s->cold.commonProfile,s->pendingCommon)||
        !sameLife(s->transition(),s->pendingLifecycle)||s->state.rider4C4!=19||s->nav()->controllerGroup[0]!=1||
        s->nav()->groups[1].selectedSlot!=s->state.slot4C8)return false;
+    if(s->state.confirmProposalPending){
+        game::OriginalUiRiderDynamicDiagnostic50KG preflight;std::uint8_t packed=0;std::uint32_t comparison=0;
+        if(s->state.backProposalPending||!confirmShape(p.decision)||!s->confirmReady(preflight)||
+           !s->cold.profile->riderConfirmSnapshot(packed,comparison)||packed!=s->pendingPacked1125D||
+           comparison!=s->pendingComparison100C0)return false;
+    }else if(!s->backAudioReady())return false;
     game::OriginalUiRiderSelectionProfile50KG current;return s->liveProfile(current)&&sameProfile(current,s->pendingProfile);
 }
 Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRouteProposal50KG& p,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
+    if(s->state.confirmProposalPending){
+        if(!s->operational()||s->inOperation||s->updatePrepared||s->backAccepted||s->confirmAccepted||s->state.backProposalPending||
+           p.source!=this||!p.serial||p.serial!=s->proposalSerial||!sameDecision(p.decision,s->pendingBack)||
+           !confirmShape(p.decision)||!sameStamp(p.profileStamp,s->pendingStamp)||!s->processCurrent()||!s->lightCurrent()||
+           !s->confirmReady(d.dynamic)||s->cold.application->uiObject3D8||!sameCommon(*s->cold.commonProfile,s->pendingCommon))
+            return result(d,Status::invalidInput,0x1EA604);
+        auto expectedLife=s->pendingLifecycle;expectedLife.requested={6,1};expectedLife.lifecycle=Life::requestScreenExit;
+        const auto stamp=s->cold.profile->stamp();std::uint8_t packed=0;std::uint32_t comparison=0;
+        if(!sameLife(s->transition(),expectedLife)||s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
+           stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=0||
+           !s->cold.profile->riderConfirmSnapshot(packed,comparison)||
+           packed!=static_cast<std::uint8_t>((s->pendingPacked1125D&7u)|(19u<<3))||comparison!=19)
+            return result(d,Status::profile,0x1EA58C);
+        auto expected=s->pendingProfile;expected.remembered6F0=19;game::OriginalUiRiderSelectionProfile50KG actual;
+        if(!s->liveProfile(actual)||!sameProfile(actual,expected))return result(d,Status::profile,0x1EA538);
+        std::uint16_t character=0;if(!s->selectedConfirmCharacter(character))return result(d,Status::model,0x1ECF70);
+        s->cpuDrain();s->state.fadeMusic4E8=true; //1EA620, after actual route/profile commit.
+        if(!s->applyConfirmVoiceChronology()){d=s->callbackFault;return d.status;}
+        if(!s->dynamic.confirmCharacter(character)){d.dynamic=s->dynamic.diagnostic();s->fault(Status::model,0x1D2690);return result(d,Status::model,0x1D2690);}
+        // Native muted output suppresses the source effect1 only; any voice
+        // choice/RNG chronology must already have run through its real owner.
+        ++s->state.audio.suppressedByMutedMode;
+        s->state.confirmProposalPending=false;s->confirmAccepted=true;
+        // Do NOT call acceptedBack/confirmWhileClosing or set bypass4E4. The
+        // panel waits for actual _sel >80% readiness before closing aperture.
+        return result(d,Status::ok);
+    }
     if(!s->operational()||s->inOperation||s->updatePrepared||s->backAccepted||!s->state.backProposalPending||p.source!=this||
        !p.serial||p.serial!=s->proposalSerial||!sameDecision(p.decision,s->pendingBack)||!sameStamp(p.profileStamp,s->pendingStamp)||
        !s->processCurrent()||!s->lightCurrent()||!s->backAudioReady()||s->cold.application->uiObject3D8||!sameCommon(*s->cold.commonProfile,s->pendingCommon)||
@@ -576,7 +700,7 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
     }
     game::OriginalUiRiderSelectionProfile50KG current;
     if(!s->liveProfile(current)||!sameProfile(current,expected))return result(d,Status::profile,0x1EA810);
-    s->cpuDrain();s->state.backProposalPending=false;s->backAccepted=true;
+    s->cpuDrain();s->state.backProposalPending=false;s->state.confirmProposalPending=false;s->backAccepted=true;
     // Real page1 Back1EA82C/1EA830 sets fade4E8 and bypass4E4. These cannot
     // certify Main readiness and are not published for an unaccepted proposal.
     s->state.fadeMusic4E8=true;s->panel.acceptedBack();
@@ -697,7 +821,7 @@ OriginalUiRiderSessionSnapshot50KG OriginalUiRiderSession50KG::snapshot() const 
 }
 void OriginalUiRiderSession50KG::drain() noexcept {if(storage_)storage_->cpuDrain();}
 void OriginalUiRiderSession50KG::requestQuit() noexcept {
-    if(!storage_)return;storage_->cpuDrain();storage_->state.backProposalPending=false;storage_->state.quitRequested=true;
+    if(!storage_)return;storage_->cpuDrain();storage_->state.backProposalPending=false;storage_->state.confirmProposalPending=false;storage_->state.quitRequested=true;
 }
 bool OriginalUiRiderSession50KG::sourceTeardownPending()const noexcept {
     return storage_&&!storage_->sourceTornDown&&storage_->backendBound&&

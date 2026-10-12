@@ -1,0 +1,217 @@
+{
+  "outcome": "bounded_window_observed",
+  "acknowledged_frames": 138,
+  "capture_requests": 138,
+  "lighting_policy": "nativeGcSelectedLights",
+  "track_fog_policy": "reconstructed_native_track_fog",
+  "native_gc_light_owner_observation": {
+    "line": "NATIVE GC SELECTED LIGHTS: actual registered ambient/directional colors and real racer visibility; native per-publication selection and host world-normal Lambert; existing material/alpha/fog/specular limits retained.",
+    "monotonic_ns": 5419765046692
+  },
+  "native_track_fog_observation": {
+    "end": 2666.65,
+    "line": "Authored native world fog: start 1301.32 end 2666.65; source ranges established, native world shader parity pending",
+    "monotonic_ns": 5422010038393,
+    "start": 1301.32
+  },
+  "per_slot_observed_growth": {
+    "0": {
+      "advanced": true,
+      "dispatched_first": 0,
+      "dispatched_last": 1601,
+      "native_ticks_first": 1,
+      "native_ticks_last": 1602,
+      "ordinary_last_observed": 1288
+    },
+    "1": {
+      "advanced": true,
+      "dispatched_first": 0,
+      "dispatched_last": 1601,
+      "native_ticks_first": 1,
+      "native_ticks_last": 1602,
+      "ordinary_last_observed": 1288
+    },
+    "2": {
+      "advanced": true,
+      "dispatched_first": 0,
+      "dispatched_last": 1601,
+      "native_ticks_first": 1,
+      "native_ticks_last": 1602,
+      "ordinary_last_observed": 1288
+    },
+    "3": {
+      "advanced": true,
+      "dispatched_first": 0,
+      "dispatched_last": 1601,
+      "native_ticks_first": 1,
+      "native_ticks_last": 1602,
+      "ordinary_last_observed": 1288
+    },
+    "4": {
+      "advanced": true,
+      "dispatched_first": 0,
+      "dispatched_last": 1601,
+      "native_ticks_first": 1,
+      "native_ticks_last": 1602,
+      "ordinary_last_observed": 1288
+    },
+    "5": {
+      "advanced": true,
+      "dispatched_first": 0,
+      "dispatched_last": 1601,
+      "native_ticks_first": 1,
+      "native_ticks_last": 1602,
+      "ordinary_last_observed": 1288
+    },
+    "6": {
+      "advanced": true,
+      "dispatched_first": 0,
+      "dispatched_last": 1601,
+      "native_ticks_first": 1,
+      "native_ticks_last": 1602,
+      "ordinary_last_observed": 1288
+    },
+    "7": {
+      "advanced": true,
+      "dispatched_first": 0,
+      "dispatched_last": 1601,
+      "native_ticks_first": 1,
+      "native_ticks_last": 1602,
+      "ordinary_last_observed": 1288
+    }
+  },
+  "recording_checks": {
+    "all_eight_native_tick_and_dispatch_growth_observed": true,
+    "all_eight_readiness_observed": true,
+    "all_observed_driver_controller_keyboard_counters_zero": true,
+    "at_least_two_acknowledged_frames": true,
+    "no_forced_termination": true,
+    "no_partial_fleet_report": true,
+    "no_pending_capture": true,
+    "no_recorder_or_protocol_problem": true,
+    "no_reported_boundary": true,
+    "normal_process_exit": true,
+    "normal_quit_receipt_observed": true,
+    "requested_native_gc_light_owner_observed": true,
+    "requested_native_ta_light_owner_observed": true,
+    "requested_native_track_fog_initialization_observed": true,
+    "requested_ready_window_elapsed": true,
+    "reviewed_executable_identity_unchanged": true,
+    "valid_source_wav": true
+  },
+  "process_return_code": 0,
+  "problems": [],
+  "boundaries": [],
+  "partial_fleet_report": null,
+  "pending_capture": null,
+  "shutdown_actions": [
+    {
+      "action": "quit",
+      "monotonic_ns": 5452067870590
+    }
+  ],
+  "limitations": [
+    "This is a bounded GC mode2 observation, not complete-track acceptance.",
+    "The native_ticks fleet field is shared completedFrames, not an independent per-racer timer.",
+    "Per-racer dispatched counts are reported separately and must be inspected alongside native_ticks.",
+    "No final all-AI fleet row is emitted by quit; zero counters are verified only at logged snapshots.",
+    "Ordinary counts are observations only; no ordinary-driving or lap acceptance is inferred.",
+    "Frame timestamps measure host observations of complete log lines, not native GPU presentation time.",
+    "WAV uses the simulation/mixer clock and may include unmatched prefix/suffix; no mux or stretching performed.",
+    "live.ppm without a complete recorded three-part acknowledgment is untrusted partial output.",
+    "Authored fog receipt proves native initialization only; logged ranges are rounded, and visible fog or original shader parity requires separate frame review.",
+    "TA lighting uses an explicit authored-zone top-two host spotlight scan; source light-volume query, cache and specular parity are not claimed.",
+    "Native GC selected-light mode retains host normals/material/alpha/fog/specular limits; its startup line is owner-policy evidence, not original shader or pixel parity."
+  ],
+  "tested_commit": "bfe1552d0fddbae5a1a0da7900e73782926992e4",
+  "session": {
+    "started_at_utc": "2026-10-12T03:31:26.528886+00:00",
+    "finished_at_utc": "2026-10-12T03:35:12.454092+00:00",
+    "next_eligible_utc": "2026-10-12T04:35:12.454092+00:00",
+    "compiler_argv_sha256": "f014e39f117c101bfd77069b7141b01b582d6b9064c630ab8f710fa40c9bae1a",
+    "executable_sha256": "75680e5f1abd27078bf762a15048b7a7692917d48dfbf3497187c8cd3f347747",
+    "recorder_sha256": "396ef6dfa53942cbbed79db670328115263502bb1dcced0ce67fe653bcf37759",
+    "phases": [
+      {
+        "name": "prepare",
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "/workspace/shared/rr-recovery-git/tools/prepare_interactive_build50dv.py",
+          "/workspace/shared/recovery-20261012/gc-light-fog-validation-01/command.json",
+          "/workspace/shared/recovery-20261012/gc-light-fog-validation-01/rr-native-gc-light-fog"
+        ],
+        "started_at_utc": "2026-10-12T03:31:26.539919+00:00",
+        "exit_code": 0,
+        "finished_at_utc": "2026-10-12T03:31:26.583756+00:00"
+      },
+      {
+        "name": "build",
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "/workspace/shared/rr-recovery-git/tools/build_focused_incremental50ci.py",
+          "/workspace/shared/recovery-20261012/gc-light-fog-validation-01/command.json",
+          "/workspace/shared/recovery-20261012/gc-light-fog-validation-01/objects"
+        ],
+        "started_at_utc": "2026-10-12T03:31:26.584671+00:00",
+        "exit_code": 0,
+        "finished_at_utc": "2026-10-12T03:34:38.109937+00:00"
+      },
+      {
+        "name": "recorder",
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "/workspace/shared/rr-recovery-git/tools/gameplay/record_original_ai_recovery.py",
+          "/workspace/shared/recovery-20261012/gc-light-fog-validation-01/rr-native-gc-light-fog",
+          "--expected-exe-sha256",
+          "75680e5f1abd27078bf762a15048b7a7692917d48dfbf3497187c8cd3f347747",
+          "--output",
+          "/workspace/shared/recovery-20261010/ai-capture-reconstruction/gc-light-fog-validation-20261012-01",
+          "--root-reviewed-one-check",
+          "--not-before",
+          "2026-10-12T03:31:26.528886+00:00",
+          "--track",
+          "GC",
+          "--ready-window-seconds",
+          "30",
+          "--capture-hz",
+          "5",
+          "--startup-timeout",
+          "180",
+          "--ack-timeout",
+          "5",
+          "--quit-timeout",
+          "10"
+        ],
+        "started_at_utc": "2026-10-12T03:34:38.127909+00:00",
+        "exit_code": 0,
+        "finished_at_utc": "2026-10-12T03:35:12.453772+00:00"
+      }
+    ]
+  },
+  "platform": "Linux",
+  "build": {
+    "translation_units": 282,
+    "compiled": 282,
+    "reused": 0
+  },
+  "presentation": {
+    "library_file_id": "libfile_974084cd01d0819190318a7d76cc1985",
+    "version": 1,
+    "sha256": "bbb95e0894426d6ede71cf00b2c1f0067b5d785d2ee211606913863dc7c8b435",
+    "frames": 138,
+    "duration_seconds": 29.21157,
+    "silent": true,
+    "timing": "Actual commit acknowledgement deltas; variable frame rate; no interpolation"
+  },
+  "scope_limits": [
+    "No TA or Windows execution in this session.",
+    "No complete lap or full-track acceptance.",
+    "No matched policy-off/policy-on comparison or user green-hue reference match.",
+    "Course reconstruction remained excluded from this build.",
+    "Shared RNG ownership fix ran, but no isolated numeric sequence regression was executed.",
+    "World scenery remains visibly incomplete."
+  ]
+}

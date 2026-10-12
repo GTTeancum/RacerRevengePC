@@ -3247,6 +3247,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     J capturedGroup=nullptr;
     std::int32_t capturedSlot=0;
     const bool capturedRider=capturedUi.route.screen==5&&capturedUi.route.page==1;
+    const bool capturedCourse=capturedUi.route.screen==6&&capturedUi.route.page==1;
     if(capturedRider){
      require50DU(originalMain.coordinator.riderSession(),"original Rider capture session missing");
      capturedSlot=capturedUi.rider.slot4C8;
@@ -3258,7 +3259,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          capturedNavigation->groups[group].selectedSlot:0;
     }
     const auto capturedAperture=capturedUi.route.screen==4?capturedUi.main.aperture:
-        capturedRider?capturedUi.rider.aperture:capturedUi.options.aperture;
+        capturedRider?capturedUi.rider.aperture:capturedCourse?capturedUi.course.aperture:capturedUi.options.aperture;
     J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
         {"screen",capturedUi.route.screen},{"page",capturedUi.route.page},{"switches",capturedUi.switches},
         {"requested_screen",capturedUi.transition.requested.screen},{"requested_page",capturedUi.transition.requested.page},
@@ -3288,6 +3289,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      receipt["source_triangles"]=sourceAccepted?originalMain.submittedTriangles:0;
      receipt["source_coherent_framebuffer_fetch"]=sourceAccepted&&originalMain.submittedCoherentFramebufferFetch;
      receipt["source_texture_barriers"]=sourceAccepted?originalMain.submittedTextureBarriers:0;
+    }
+    if(capturedCourse){
+     const bool nativeAccepted=originalMain.submittedScreen==6&&capturedUi.frameSubmitted&&
+         originalMain.submittedPublication==originalMain.coordinator.gpu()->publicationToken();
+     receipt["presentation"]="native_host_rgb";
+     receipt["course_slot"]=capturedUi.course.courseSlot14E4;receipt["subtype_slot"]=capturedUi.course.subtypeSlot14F4;
+     receipt["laps"]=capturedUi.course.laps14EC;receipt["entrants"]=capturedUi.course.entrants14F0;
+     receipt["popup_enabled"]=capturedUi.course.popupEnabled438;receipt["accepted_native_frame"]=nativeAccepted;
+     receipt["native_quads"]=nativeAccepted?originalMain.submittedQuads:0;
+     receipt["native_draws"]=nativeAccepted?originalMain.submittedDraws:0;
     }
     std::cerr<<"original_main_capture "<<receipt.dump()<<'\n';
     reportUiState("capture");capturePending=false;return;
@@ -3338,6 +3349,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        "Game Options Up/W previous group(2), Down/S next group(3), Left/Right change value(0/1), R defaults(5). Enter/Space confirm(4), "
        "Escape/menu back(6; source Main does not handle back). Window Close, quit, or stdin EOF exits. "
        "Game Options Accept requires the live enabled audio owner and commits process settings; Cancel remembers the group without applying local edits. "
+       "Muted mode0 Rider19 Confirm to fixed Course and Back is integrated but unvalidated; Course directions and race launch remain unavailable. "
        "F5/restart and checkpoint have no original UI destination. capture writes the existing live PPM target.\n";
   }
   // Opt-in host observations only; each receipt is bounded to this session.
@@ -3427,7 +3439,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto inputRoute=originalMain.coordinator.snapshot().route;
     const bool gameOptionsInput=inputRoute.screen==12&&inputRoute.page==4;
     const bool riderInput=inputRoute.screen==5&&inputRoute.page==1;
-    if(gameOptionsInput||riderInput){
+    const bool courseInput=inputRoute.screen==6&&inputRoute.page==1;
+    if(gameOptionsInput||riderInput||courseInput){
      if(input.pressed[80])originalMain.input(0);
      if(input.pressed[79])originalMain.input(1);
      if(input.pressed[82]||input.pressed[26])originalMain.input(2);
@@ -4519,7 +4532,7 @@ int main(int argc,char**argv){try{
              "Run from the repository root. RR_RACE_MODE=1 (default with fully prepared providers); "
              "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
              "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
-             "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits only authenticated Rider19/Back when its compiled cache is available. Other Rider selections and course entry remain unavailable. RR_AUDIO controls race audio only; no driving is launched.\n";
+             "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits only authenticated Rider19/Back when its compiled cache is available. Other Rider selections remain unavailable. Muted mode0 Rider19 Confirm to fixed Course and Back is integrated but unvalidated; Course directions and race launch remain unavailable. RR_AUDIO controls race audio only; no driving is launched.\n";
   return 2;
  }
  // Every return destroys the complete old session, including native state and
@@ -4528,8 +4541,9 @@ int main(int argc,char**argv){try{
  lap_drive50GJ::Continuity lapContinuity{};
  // One monotonic backend epoch; each cold native session explicitly resets
  // its shared selector lazy slot alongside the freshly constructed physics RNG.
- HostMonotonicClock50ID applicationClock{};
- original_main_entry50KG::Application originalMainApplication(applicationClock);
+ auto applicationClockOwner=std::make_shared<HostMonotonicClock50ID>();
+ auto& applicationClock=*applicationClockOwner;
+ original_main_entry50KG::Application originalMainApplication(applicationClockOwner);
  // Shared3DF5B0 survives serial racer visits and native cold sessions. The
  // value remains unbound until an actual completed121438/126FA0 writer.
  rr::game::CollisionNormalModeOwner50JA collisionNormalMode{};

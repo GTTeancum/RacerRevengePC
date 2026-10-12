@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "description": "MSVC x64 window-only integrated UI/gameplay development client; build only, never launch or run tests.",
-  "reviewedSourceRevision": "f4b3393f6b8b72c49f640c2c56facacabb63f0f7",
+  "reviewedSourceRevision": "bfe1552d0fddbae5a1a0da7900e73782926992e4",
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "14b480c927a0884c0ce06dc7b4372dd7fb2d5cdb3baca367e78153757b5b924d"
+    "tools/prepare_interactive_build50dv.py": "3d3e099239224e5d25c6d543bb53589e82de1189ee6d79e6d264026a3224877a"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -270,6 +270,22 @@
     "platform/linux/native/original_ui_rider_stat_draw50kg.cpp",
     "platform/linux/native/original_ui_rider_draw_contribution50kg.cpp",
     "platform/linux/native/original_ui_rider_session50kg.cpp",
+    "platform/linux/native/original_ui_course_draw_contribution50kg.cpp",
+    "platform/linux/native/original_ui_course_draw_resources50kg.cpp",
+    "platform/linux/native/original_ui_course_hologram_draw50kg.cpp",
+    "platform/linux/native/original_ui_course_session50kg.cpp",
+    "src/assets/original_ui_course_background50kg.cpp",
+    "src/assets/original_ui_course_hologram_assets50kg.cpp",
+    "src/game/original_ui_course_camera50kg.cpp",
+    "src/game/original_ui_course_clip_camera50kg.cpp",
+    "src/game/original_ui_course_hologram_scene50kg.cpp",
+    "src/game/original_ui_course_lighting50kg.cpp",
+    "src/game/original_ui_course_page_draw50kg.cpp",
+    "src/game/original_ui_course_render_context50kg.cpp",
+    "src/game/original_ui_course_selection50kg.cpp",
+    "src/game/original_ui_course_widget_controller50kg.cpp",
+    "src/game/original_ui_course_widgets50kg.cpp",
+    "src/game/original_ui_rider_voice_choice50kg.cpp",
     "platform/linux/native/original_ui_options_draw_contribution50kg.cpp",
     "src/game/original_ui_rider_selection50kg.cpp",
     "src/game/original_ui_rider_widgets50kg.cpp",
@@ -305,5 +321,6 @@
   ],
   "nativeDependencySourceProvenance": {
     "cmake/NativePc48C.cmake": "28c21d124da2000a8f44272b7d37eb5d02a092e863a9965c50deabec93d4fbff"
-  }
+  },
+  "sourceListReviewNote": "Base revision plus the source-reviewed bounded Course integration in this manifest commit; runtime acceptance pending."
 }

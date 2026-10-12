@@ -68,7 +68,8 @@ private:
 enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback,
     optionsMenuPromptMissingPsmFallback, optionsGamePromptMissingPsmFallback, riderStatMissingPsmFallback, riderPortraitMissingPsmFallback,
-    riderNameBlurMissingPsmFallback, riderBackgroundMissingPsmFallback, riderPromptMissingPsmFallback
+    riderNameBlurMissingPsmFallback, riderBackgroundMissingPsmFallback, riderPromptMissingPsmFallback,
+    courseNameBlurMissingPsmFallback, coursePromptMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -190,6 +191,14 @@ bool readOriginalUiRiderBackgroundFallbackMaterial50KG(const OriginalUiArchive50
     const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 bool readOriginalUiRiderPromptFallbackMaterial50KG(const OriginalUiArchive50KG& rider,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+bool readOriginalUiCourseNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG& course,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+bool readOriginalUiCoursePromptFallbackMaterial50KG(const OriginalUiArchive50KG& course,
     const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG,
     const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;

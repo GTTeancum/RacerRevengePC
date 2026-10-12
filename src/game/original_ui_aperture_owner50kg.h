@@ -1,3 +1,4 @@
+// New reconstruction after rollback; source-only, unverified.
 #pragma once
 #include "original_ui_transition_owner50kg.h"
 #include "../assets/original_ui_pages50kg.h"
@@ -142,6 +143,13 @@ public:
         std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint8_t factoryPage,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
     OriginalUiApertureStatus50KG saveRiderUpdateDelta38(float actualDelta) noexcept;
+    // Genuine Course6/1 owner. Entry opens only at normal render1DEB20.
+    OriginalUiApertureStatus50KG bindCourse(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&)noexcept;
+    OriginalUiApertureStatus50KG bindCourseEntryOnly(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&)noexcept;
+    OriginalUiApertureStatus50KG saveCourseUpdateDelta38(float actualDelta)noexcept;
+    OriginalUiApertureStatus50KG beginCourseEntryAtRender48(OriginalUiTransitionPhase50KG actualManagerPhase170)noexcept;
     OriginalUiApertureSnapshot50KG snapshot() const noexcept { return state_; }
     const OriginalUiApertureConfig50KG* config() const noexcept {
         return state_.bound?&config_:nullptr;
@@ -181,12 +189,12 @@ private:
     OriginalUiApertureCallbacks50KG callbacks_{};
     mutable bool inOperation_=false;
     bool entryOnly_=false;
-    bool optionsMenu_=false,rider_=false;
+    bool optionsMenu_=false,rider_=false,course_=false;
     std::uint8_t optionsPage_=1;
     OriginalUiApertureStatus50KG bindPageImpl(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,bool entryOnly,bool optionsMenu,std::uint8_t page,
-        OriginalUiApertureDiagnostic50KG&,bool rider=false) noexcept;
+        OriginalUiApertureDiagnostic50KG&,bool rider=false,bool course=false) noexcept;
     OriginalUiApertureStatus50KG saveUpdateDelta38(float actualDelta) noexcept;
     bool available() const noexcept;
     void emit(OriginalUiApertureHookKind50KG,std::uint32_t callPC,

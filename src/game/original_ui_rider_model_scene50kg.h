@@ -1,3 +1,4 @@
+// NEW unverified source reconstruction: read-only Confirm preflight.
 #pragma once
 #include "original_ui_rider_character50kg.h"
 #include "original_ui_user_rotate50kg.h"
@@ -49,6 +50,7 @@ public:
         OriginalUiRiderModelDiagnostic50KG&) noexcept;
     bool attached() const noexcept;
     void selected() noexcept;
+    bool preflightConfirm(OriginalUiRiderModelDiagnostic50KG&) const noexcept;
     bool confirm(OriginalUiRiderModelDiagnostic50KG&) noexcept;
     bool advance(float elapsedSeconds,CoupledNoiseContext49M&,ModelMotionSharedState49T&,
         ModelMode0IkShared50KG&,OriginalUiRiderModelDiagnostic50KG&) noexcept;

@@ -1,5 +1,7 @@
+// New reconstruction after rollback; source-only, unverified.
 #pragma once
 #include "original_ui_main_session50kg.h"
+#include "../../../src/game/original_ui_course_selection50kg.h"
 #include "../../../src/game/original_ui_rider_selection50kg.h"
 #include "../../../src/game/original_ui_rider_stat_projection50kg.h"
 #include "../../../src/game/original_ui_route_decisions50kg.h"
@@ -47,7 +49,13 @@ public:
     bool statSnapshot(std::uint32_t selectedRider,float panelY4DC,
         game::OriginalUiRiderStatInput50KG&) const noexcept;
     bool colors(std::uint32_t rider,OriginalUiRiderProfileColors50KG&) const noexcept;
+    bool courseSnapshot(game::OriginalUiCourseRememberedProfile50KG&)const noexcept;
+    bool riderConfirmSnapshot(std::uint8_t& packed1125D,std::uint32_t& comparison100C0)const noexcept;
 private:
+    friend class OriginalUiCourseSession50KG;
+    bool commitRiderConfirmToCourse(const game::OriginalUiRouteDecision50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
+    bool commitCourseEntry(const game::OriginalUiCourseSelectionData50KG&,const game::OriginalUiCourseEntryPrefix50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
+    bool commitCourseBack(const game::OriginalUiRouteDecision50KG&,const game::OriginalUiCourseContext50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     friend class OriginalUiFrontend50KG;
     friend class OriginalUiRiderSession50KG;
     // Read-only cold resource planning from a genuine Main proposal. Main's

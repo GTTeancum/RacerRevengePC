@@ -168,6 +168,25 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
         }
         return false;
     }
+    if(p.origin==OriginalUiMaterialOrigin50KG::courseNameBlurMissingPsmFallback)
+        return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::course)&&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::course,"ui\\textures\\nameblur.pst")&&
+            p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::course,"UI\\UICourse\\Widgets.Dat")&&
+            !p.fallbackPageSource&&p.sourceCallerPC==0x2ac6b0&&
+            p.registeredName=="ui\\textures\\nameblur"&&p.attemptedPsmMember=="ui\\textures\\nameblur.psm"&&
+            pass.textureName=="nameblur";
+    if(p.origin==OriginalUiMaterialOrigin50KG::coursePromptMissingPsmFallback){
+        if(p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::course,"UI\\UICourse\\track.dat"))return false;
+        for(std::size_t i=0;i<4;++i){
+            const auto& source=promptSources[i];
+            const auto archive=i<2?OriginalUiArchiveId50KG::overlays:OriginalUiArchiveId50KG::course;
+            if(p.archive==originalUiArchiveIdentity50KG(archive)&&p.sourceCallerPC==source.callPC&&
+                p.registeredName==source.registeredName&&p.attemptedPsmMember==source.psm&&
+                pass.textureName==source.texture&&p.fallbackTexture==catalogMember(archive,source.member))return true;
+        }
+        return false;
+    }
     const bool main=p.origin==OriginalUiMaterialOrigin50KG::mainPromptMissingPsmFallback;
     const bool options=p.origin==OriginalUiMaterialOrigin50KG::optionsMenuPromptMissingPsmFallback;
     const bool gameOptions=p.origin==OriginalUiMaterialOrigin50KG::optionsGamePromptMissingPsmFallback;
@@ -563,6 +582,61 @@ bool readOriginalUiRiderPromptFallbackMaterial50KG(const OriginalUiArchive50KG& 
             overlays.find(source.psm).identity||rider.find(source.psm).identity||(index<2&&rider.find(source.member).identity))
             return fail(d,Error::fallbackSource,"actual shared/local Rider prompt and absent PSM",source.callPC);
         OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::riderPromptMissingPsmFallback;
+        p.archive=textureOwner.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=source.callPC;p.registeredName=source.registeredName;p.attemptedPsmMember=source.psm;p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiCourseNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG& course,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!course.loaded()||course.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::course))
+            return fail(d,Error::archive,"authenticated Course",0x2ac6b0);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=course.find("ui\\textures\\nameblur.pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||
+            course.find("ui\\textures\\nameblur.psm").identity)
+            return fail(d,Error::fallbackSource,"actual Course nameblur and absent PSM",0x29b638);
+        OriginalUiDat50KG widgets;
+        if(!readOriginalUiDat50KG(course,"UI\\UICourse\\Widgets.Dat",widgets,d.document,
+            OriginalUiRepeatedKeyPolicy50KG::preserveInOrder))return fail(d,Error::document,"Course widgets",0x2ac650);
+        const auto* type=widgets.find("Widget 6","Type");const auto* name=widgets.find("Widget 6","Texture");
+        if(!type||type->text!="Icon"||!name||name->text!="nameblur")
+            return fail(d,Error::fallbackSource,"Course Icon6 nameblur",0x2ac650);
+        OriginalUiMaterialProvenance50KG p;
+        p.origin=OriginalUiMaterialOrigin50KG::courseNameBlurMissingPsmFallback;
+        p.archive=course.identity();p.fallbackTexture=texture.identity;p.fallbackWidgetSource=widgets.identity();
+        p.sourceCallerPC=0x2ac6b0;p.registeredName="ui\\textures\\nameblur";
+        p.attemptedPsmMember="ui\\textures\\nameblur.psm";p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,"nameblur",*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiCoursePromptFallbackMaterial50KG(const OriginalUiArchive50KG& course,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!course.loaded()||course.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::course)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Course and OVERLAYS",0x1d8f10);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index>=4)return fail(d,Error::fallbackSource,"original shared Course page prompt");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto& textureOwner=index<2?overlays:course;
+        const auto texture=textureOwner.find(source.member);const auto page=course.find("UI\\UICourse\\track.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||course.find(source.psm).identity||(index<2&&course.find(source.member).identity))
+            return fail(d,Error::fallbackSource,"actual shared/local Course prompt and absent PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::coursePromptMissingPsmFallback;
         p.archive=textureOwner.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
         p.sourceCallerPC=source.callPC;p.registeredName=source.registeredName;p.attemptedPsmMember=source.psm;p.creationPC=0x2475c0;
         auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
