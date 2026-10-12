@@ -42,6 +42,7 @@ def main():
     for source in (
         'src/game/original_attached_camera.cpp',
         'src/game/original_camera_query_cold.cpp',
+        'src/game/original_ai_engine_emitter.cpp',
         'src/game/original_camera_query_owner.cpp',
         'src/game/original_camera_racer_history.cpp',
         'src/game/original_camera_scene_owner.cpp',

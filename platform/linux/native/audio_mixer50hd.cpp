@@ -13,6 +13,21 @@ bool validControls(float gain, float pitch, float pan) noexcept {
            std::isfinite(pitch) && pitch >= 0.125f && pitch <= 8.0f &&
            std::isfinite(pan) && pan >= -1.0f && pan <= 1.0f;
 }
+bool validSourceRate(const AudioClip50HD& clip,std::uint32_t rate,
+                     float gain,float pitch) noexcept {
+    if(!AudioMixer50HD::validClip(clip)||!validRate(rate)||
+       !std::isfinite(gain)||gain<0.f||gain>8.f||
+       !std::isfinite(pitch)||!(pitch>0.f))return false;
+    const double end=static_cast<double>(clip.frames);
+    const double step=static_cast<double>(clip.sampleRate)/rate*pitch;
+    // Largest source-coordinate ULP in this clip. One full ULP guarantees
+    // progress even with round-to-nearest ties at the largest coordinate.
+    const double minimum=std::nextafter(end,std::numeric_limits<double>::infinity())-end;
+    // The sampler normalizes/stops before indexing after an advance. Bound
+    // that intermediate sum below2^52 to retain exact integer coordinates;
+    // validClip already bounds the actual indexed extent by2^40.
+    return std::isfinite(step)&&step>=minimum&&step<=0x1p52-end;
+}
 std::int16_t quantize(double value, std::uint64_t& clipped) noexcept {
     if (value > 32767.0) { ++clipped; return 32767; }
     if (value < -32768.0) { ++clipped; return -32768; }
@@ -109,6 +124,30 @@ bool AudioMixer50HD::controls(std::size_t slot, float gain, float pitch, float p
     if(voice.gain!=gain||voice.pitch!=pitch||voice.pan!=pan)noteControlChange();
     voice.gain = gain; voice.pitch = pitch; voice.pan = pan;
     return true;
+}
+bool AudioMixer50HD::playSourceRate(std::size_t slot,const AudioClip50HD& clip,
+    float gain,float pitch,bool loop,std::int32_t engineAngle) noexcept {
+    float left=1.f,right=1.f;
+    if(slot>=count_||!validSourceRate(clip,rate_,gain,pitch)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||
+       (!soundMode50KG_&&engineAngle!=0)||
+       (soundMode50KG_&&!originalRouting50KG(engineAngle,left,right)))return false;
+    noteControlChange();playbackRevisions_[slot]=controlRevision_;
+    voices_[slot]={clip,0.0,gain,pitch,0.f,true,loop};
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
+}
+bool AudioMixer50HD::controlsSourceRate(std::size_t slot,float gain,float pitch,
+    std::int32_t engineAngle) noexcept {
+    float left=1.f,right=1.f;
+    if(slot>=count_||!validSourceRate(voices_[slot].clip,rate_,gain,pitch)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||
+       (!soundMode50KG_&&engineAngle!=0)||
+       (soundMode50KG_&&!originalRouting50KG(engineAngle,left,right)))return false;
+    auto& voice=voices_[slot];
+    if(voice.gain!=gain||voice.pitch!=pitch||voice.pan!=0.f||
+       originalLeft50KG_[slot]!=left||originalRight50KG_[slot]!=right)noteControlChange();
+    voice.gain=gain;voice.pitch=pitch;voice.pan=0.f;
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
 }
 bool AudioMixer50HD::setLoop(std::size_t slot, bool loop) noexcept {
     if (slot >= count_) return false;

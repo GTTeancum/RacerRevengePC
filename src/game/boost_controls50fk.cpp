@@ -18,10 +18,9 @@ struct Math {
     float div(float a,float b) noexcept {volatile float value=a/b;return keep(value);}
 };
 }
-bool advancePlayerBoost50FK(const BoostInput50FK& i,const BoostParameters50FK& p,
+bool projectBoostThermalNumbers50FK(const BoostInput50FK& i,const BoostParameters50FK& p,
     const BoostState50FK& previous,BoostState50FK& output,BoostDiagnostic50FK& d) noexcept {
     d={BoostError50FK::None,0};
-    if(i.d40Present)return fail(d,BoostError50FK::AudioOwner,0x217760);
     if(std::fegetround()!=FE_TONEAREST||i.frameFactor<0.f||previous.vehicle64>2u||
        previous.vehicle68>2u)return fail(d,BoostError50FK::Input,0x2176e0);
     for(float value:{i.frameFactor,i.engine70,i.engine74,i.cachedSpeed34,
@@ -55,5 +54,10 @@ bool advancePlayerBoost50FK(const BoostInput50FK& i,const BoostParameters50FK& p
     else if(next.vehicle64==0u)next.duration6C=0.f;
     if(!f.valid)return fail(d,BoostError50FK::Arithmetic,0x2176e0);
     output=next;return true;
+}
+bool advancePlayerBoost50FK(const BoostInput50FK& i,const BoostParameters50FK& p,
+    const BoostState50FK& previous,BoostState50FK& output,BoostDiagnostic50FK& d) noexcept {
+    if(i.d40Present)return fail(d,BoostError50FK::AudioOwner,0x217760);
+    return projectBoostThermalNumbers50FK(i,p,previous,output,d);
 }
 }

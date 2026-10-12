@@ -35,4 +35,11 @@ struct BoostDiagnostic50FK { BoostError50FK error; std::uint32_t sourceStage; };
 // state/output; previous and output may alias.
 bool advancePlayerBoost50FK(const BoostInput50FK&,const BoostParameters50FK&,
     const BoostState50FK& previous,BoostState50FK& output,BoostDiagnostic50FK&) noexcept;
+// Numeric value projection ONLY, for a real D40-aware source owner that must
+// perform217774/2177D0 between the prefix68/64 writes and the remaining heat,
+// ratio/duration writes. It does not assert D40 absence or execute callbacks.
+// Never substitute this projection alone for a completed2176E0 invocation.
+// Existing advancePlayerBoost50FK retains its strict absent-D40 admission.
+bool projectBoostThermalNumbers50FK(const BoostInput50FK&,const BoostParameters50FK&,
+    const BoostState50FK& previous,BoostState50FK& output,BoostDiagnostic50FK&) noexcept;
 }

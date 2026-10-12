@@ -288,6 +288,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/pod_scene_rebase50fb.cpp"
   "${RR_ROOT}/src/game/pod_cables50fd.cpp"
   "${RR_ROOT}/src/game/boost_controls50fk.cpp"
+  "${RR_ROOT}/src/game/original_ai_engine_emitter.cpp"
   "${RR_ROOT}/src/game/vehicle_contact48g.cpp"
   "${RR_ROOT}/src/game/terrain_query_workspace48m.cpp"
   "${RR_ROOT}/src/game/collision_tree_workspace48m.cpp"

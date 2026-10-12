@@ -5,7 +5,7 @@
 
 namespace rr::platform {
 class OriginalSoundMode50KG;
-inline constexpr std::size_t audioMaximumVoices50HD = 160;
+inline constexpr std::size_t audioMaximumVoices50HD = 192;
 
 // Borrowed decoded, signed PCM16. Samples and the voice array must outlive use.
 // Mono or interleaved stereo; frame counts are not scalar sample counts.
@@ -56,6 +56,15 @@ public:
               float pitch = 1.0f, bool loop = false, float pan = 0.0f) noexcept;
     bool controls(std::size_t slot, float gain, float pitch,
                   float pan = 0.0f) noexcept;
+    // Source-owned rates can be below the legacy .125 presentation limit.
+    // Positive finite rates are admitted only if double source coordinates
+    // keep advancing throughout this actual clip and remain in the precise
+    // integer-index domain. Existing clients keep their legacy controls.
+    // Centered original-mode routing/group ownership are still enforced.
+    bool playSourceRate(std::size_t slot,const AudioClip50HD&,float gain,
+                        float pitch,bool loop,std::int32_t engineAngle=0) noexcept;
+    bool controlsSourceRate(std::size_t slot,float gain,float pitch,
+                            std::int32_t engineAngle=0) noexcept;
     bool setLoop(std::size_t slot, bool loop) noexcept;
     bool setMasterGain(float gain) noexcept;
     // 50IC persistent group layer. These gains are independent of voice.gain:

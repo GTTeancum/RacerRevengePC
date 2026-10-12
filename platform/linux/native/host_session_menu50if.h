@@ -12,7 +12,7 @@ namespace rr::platform {
 // The session owner admits each result at a whole-world boundary.
 class HostSessionMenu50IF final {
 public:
-    enum class Result : std::uint8_t { None, StartPrepared, Restart, Quit };
+    enum class Result : std::uint8_t { None, StartPrepared, Restart, Quit, ReturnOriginalMain };
     enum class Page : std::uint8_t { Closed, Main, Pause, Controls, Restart, Leave, Exit, Audio, Tracks, IncompleteGC };
 
     explicit HostSessionMenu50IF(bool startAtMenu, bool race, std::uint32_t loadedRacer60,
@@ -20,16 +20,19 @@ public:
         const game::RaceAudioSettings50IC& loadedAudio = game::freshOriginalAudioSettings50IC(),
         const game::RaceAudioSettings50IC& selectedAudio = game::freshOriginalAudioSettings50IC(),
         HostTrack50IM loadedTrack = HostTrack50IM::TA, HostTrack50IM selectedTrack = HostTrack50IM::TA,
-        const HostTrackAdmission50IM& trackAdmission = {}) noexcept
+        const HostTrackAdmission50IM& trackAdmission = {},
+        bool nativeAllAiRestart = false, bool returnOriginalMain = false) noexcept
         : page_(startAtMenu ? Page::Main : Page::Closed),
           loadedRacer60_(loadedRacer60), selectedRacer60_(loadedRacer60),
           race_(race), started_(!startAtMenu), racerChoice_(race && racerSelectionAvailable),
           audioChoice_(audioOptionsAvailable), audioOptions_(loadedAudio, selectedAudio),
-          loadedTrack_(loadedTrack), selectedTrack_(selectedTrack), trackAdmission_(trackAdmission) {
+          loadedTrack_(loadedTrack), selectedTrack_(selectedTrack), trackAdmission_(trackAdmission),
+          nativeAllAiRestart_(nativeAllAiRestart), returnOriginalMain_(nativeAllAiRestart&&returnOriginalMain) {
         audioChoice_ = audioChoice_ && audioOptions_.valid();
-        if (loadedTrack_ == HostTrack50IM::GA) {
-            // A GA preview owns one fresh all-AI session. No pending choices
-            // or front-menu route may request a second cold session.
+        if (nativeAllAiRestart_ || loadedTrack_ == HostTrack50IM::GA) {
+            // Whole-world ALL8 restarts keep the loaded track/racer/audio.
+            // Original Main is a separate application destination, never the
+            // old host track menu or a mutation of the live source race.
             racerChoice_ = audioChoice_ = false;
             selectedTrack_ = loadedTrack_;
             returnPage_ = Page::Pause;
@@ -51,7 +54,7 @@ public:
         const auto& key = input.keys.pressed;
         const bool back = key[41] != 0;
         if (input.menuRequested) {
-            if (loadedTrack_ == HostTrack50IM::GA) { change(Page::Pause); return Result::None; }
+            if (nativeAllAiRestart_ || loadedTrack_ == HostTrack50IM::GA) { change(Page::Pause); return Result::None; }
             staleSession_ = started_;
             change(Page::Main);
             return Result::None;
@@ -89,7 +92,8 @@ public:
             return Result::None;
         }
         const std::uint32_t count = page_ == Page::Main ? 4u + unsigned(racerChoice_) + unsigned(audioChoice_) :
-            page_ == Page::Pause ? (loadedTrack_ == HostTrack50IM::GA ? 3u : 5u + unsigned(audioChoice_)) : page_ == Page::Audio ? 6u :
+            page_ == Page::Pause ? (nativeAllAiRestart_ ? 4u+unsigned(returnOriginalMain_) :
+                loadedTrack_ == HostTrack50IM::GA ? 3u : 5u + unsigned(audioChoice_)) : page_ == Page::Audio ? 6u :
             page_ == Page::Tracks ? 2u + unsigned(trackAdmission_.gcIncompleteWorld) : 2u;
         if (up != down) {
             selected_ = up ? (selected_ + count - 1u) % count : (selected_ + 1u) % count;
@@ -147,6 +151,12 @@ public:
             else confirm(Page::Exit);
         } else if (page_ == Page::Pause) {
             if (selected_ == 0) { if (canResume) change(Page::Closed); }
+            else if (nativeAllAiRestart_) {
+                if (selected_ == 1) confirm(Page::Restart);
+                else if (returnOriginalMain_ && selected_ == 2) confirm(Page::Leave);
+                else if (selected_ == 2u+unsigned(returnOriginalMain_)) { returnPage_ = Page::Pause; change(Page::Controls); }
+                else confirm(Page::Exit);
+            }
             else if (loadedTrack_ == HostTrack50IM::GA) {
                 if (selected_ == 1) { returnPage_ = Page::Pause; change(Page::Controls); }
                 else confirm(Page::Exit);
@@ -158,7 +168,10 @@ public:
             else confirm(Page::Exit);
         } else if (selected_ == 0) change(returnPage_);
         else if (page_ == Page::Restart) return Result::Restart;
-        else if (page_ == Page::Leave) { staleSession_ = true; change(Page::Main); }
+        else if (page_ == Page::Leave) {
+            if(returnOriginalMain_)return Result::ReturnOriginalMain;
+            staleSession_ = true; change(Page::Main);
+        }
         else if (page_ == Page::Exit) return Result::Quit;
         return Result::None;
     }
@@ -170,6 +183,34 @@ public:
         out.retainRaceImage = page_ == Page::Pause ||
             (page_ != Page::Main && returnPage_ == Page::Pause);
         out.selectedRow = selected_;
+        if (nativeAllAiRestart_) {
+            out.title = "NATIVE ALL-AI RACE";
+            out.subtitle = canResume ? "ALL 8 RACERS USE ORIGINAL AI" : "SESSION STOPPED. RESTART TO CONTINUE.";
+            if(page_==Page::Controls){
+                out.title="ALL-AI RACE CONTROLS";
+                out.rows[0]="C          CYCLE ORIGINAL CAMERA";
+                out.rows[1]="ESC        PAUSE / RESUME";
+                out.rows[2]="F5         RESTART RACE FROM GRID";
+                out.rows[3]="UP / DOWN  MENU SELECTION; ENTER CONFIRMS";
+                out.rows[4]="ALL 8 RACERS RETAIN ORIGINAL AI CONTROLS";
+                out.rows[5]="CHECKPOINT RESTORE UNAVAILABLE";
+                out.rows[6]="BACK";out.rowCount=7;out.selectedRow=6;
+                out.footer="ENTER OR ESC RETURNS TO THE MENU";
+            }else if(page_==Page::Restart||page_==Page::Leave||page_==Page::Exit){
+                out.title=page_==Page::Restart?"RESTART RACE":page_==Page::Leave?"RETURN TO ORIGINAL MAIN":"EXIT GAME";
+                out.subtitle="CURRENT RACE PROGRESS WILL BE LOST";
+                out.rows[0]="CANCEL";
+                out.rows[1]=page_==Page::Restart?"RESTART FROM GRID":page_==Page::Leave?"RETURN TO ORIGINAL MAIN":"EXIT";
+                out.rowCount=2;
+            }else{
+                out.rows[0]=canResume?"RESUME":"RESUME UNAVAILABLE";
+                out.rows[1]="RESTART RACE";
+                std::uint32_t row=2;
+                if(returnOriginalMain_)out.rows[row++]="ORIGINAL MAIN MENU";
+                out.rows[row++]="CONTROLS";out.rows[row++]="EXIT";out.rowCount=row;
+            }
+            return out;
+        }
         if (loadedTrack_ == HostTrack50IM::GA) {
             out.title = "GA NATIVE PREVIEW";
             out.subtitle = canResume ? "INCOMPLETE TRACK. ALL 8 RACERS USE ORIGINAL AI." : "SESSION STOPPED. EXIT TO START FRESH.";
@@ -274,5 +315,6 @@ private:
     HostAudioOptions50IK audioOptions_;
     HostTrack50IM loadedTrack_ = HostTrack50IM::TA, selectedTrack_ = HostTrack50IM::TA;
     HostTrackAdmission50IM trackAdmission_{};
+    bool nativeAllAiRestart_=false,returnOriginalMain_=false;
 };
 }

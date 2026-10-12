@@ -5,7 +5,7 @@
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "1c217afeb08b9e3682f804da7bd750553d2fc01c5d46f532656c66fd2d904320"
+    "tools/prepare_interactive_build50dv.py": "71076ae7c4889f5f401c9ee502a75fa79cbf5e3edb8fc9e6d2d17107fba1ea2d"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -219,6 +219,7 @@
     "src/game/pod_scene_rebase50fb.cpp",
     "src/game/pod_cables50fd.cpp",
     "src/game/boost_controls50fk.cpp",
+    "src/game/original_ai_engine_emitter.cpp",
     "src/game/undertrack_reposition50et.cpp",
     "src/assets/original_ui_archive50kg.cpp",
     "src/assets/original_ui_atm50kg.cpp",
@@ -340,5 +341,5 @@
   "nativeDependencySourceProvenance": {
     "cmake/NativePc48C.cmake": "28c21d124da2000a8f44272b7d37eb5d02a092e863a9965c50deabec93d4fbff"
   },
-  "sourceListReviewNote": "Original camera activation adds two lifecycle units, concrete display fade and blur completion units, and the existing native camera projection adapter. Central interactive source closure has316 C++ units; Windows excludes the Linux offscreen context for315 plus6 vendored C units. Source-list editing only; no build executed."
+  "sourceListReviewNote": "Original camera activation adds two lifecycle units, concrete display fade and blur completion units, and the existing native camera projection adapter. Native ALL8 D40 audio adds original_ai_engine_emitter.cpp. Central interactive source closure has317 C++ units; Windows excludes the Linux offscreen context for316 plus6 vendored C units. Source-list editing only; no build executed."
 }

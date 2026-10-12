@@ -44,7 +44,8 @@ inline std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
 // The cold gameplay world stays unadvanced while the frontend owns input.
 // An admitted Course destination borrows this same application RNG/selector
 // owner and starts that exact prepared world after source exit and GPU drain.
-// No copied seed, replacement selected racer or process restart is supported.
+// Native whole-race restart/return keeps this same process owner. No copied
+// seed or replacement selected racer is used.
 struct Application {
     bool enabled=false;
     std::filesystem::path assetRoot,audioRoot,riderCacheRoot;
@@ -268,6 +269,7 @@ struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
     rr::platform::OriginalUiFrontendDiagnostic50KG diagnostic{};
     std::uint64_t lastUpdateNanoseconds=0,inputCount=0,unavailableCount=0,frameCount=0;
     std::uint64_t captureSequence=0,lastAudioSequence=0;
+    std::string sessionWavPath;
     // Actual accepted renderer receipt; diagnostic is reused by later calls.
     std::uint8_t submittedScreen=0;
     std::uint64_t submittedPublication=0,sourceFrameGeneration=0,sourceTargetGeneration=0;
@@ -310,7 +312,7 @@ struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
         const rr::platform::MaterialTextureGlRequest50EB& textureRequest,
         rr::platform::VehicleWindowRequest50DS& rendererRequest,
         std::shared_ptr<const rr::platform::OriginalUiCourseRaceDestination50KG> raceDestination={},
-        std::uint64_t (*nativeNow)()noexcept=nullptr) {
+        std::uint64_t (*nativeNow)()noexcept=nullptr,std::uint64_t nativeSessionIndex=0) {
         using Id=rr::assets::OriginalUiArchiveId50KG;
         rr::platform::OriginalUiFrontendCold50KG cold;
         cold.appStart=readArchive(application.assetRoot,Id::appStart);
@@ -378,6 +380,12 @@ struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
         if(application.audioMode==rr::platform::OriginalUiMainAudioMode50KG::enabled){
             rr::platform::AudioOutputRequest50HD outputRequest;
             outputRequest.tryDevice=video->host.hasWindow();outputRequest.wavPath=std::getenv("RR_AUDIO_WAV");
+            if(outputRequest.wavPath&&*outputRequest.wavPath&&nativeSessionIndex){
+                const std::filesystem::path requested(outputRequest.wavPath);
+                sessionWavPath=(requested.parent_path()/(requested.stem().string()+"-menu-session-"+
+                    std::to_string(nativeSessionIndex+1)+requested.extension().string())).string();
+                outputRequest.wavPath=sessionWavPath.c_str();
+            }
             if(const char* setting=std::getenv("RR_AUDIO_DEVICE")){
                 require(std::string(setting)=="0"||std::string(setting)=="1","UI RR_AUDIO_DEVICE must be 0 or 1");
                 outputRequest.tryDevice=std::string(setting)=="1";

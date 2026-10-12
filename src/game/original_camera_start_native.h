@@ -201,6 +201,7 @@ struct OriginalGcIntroExitBindings {
     OriginalAttachedCamera& attached6C;
     OriginalAttachedChildRegistry& attachedChild;
     OriginalFollowCamera& follow64;
+    OriginalFollowChildRegistry& followChild;
     OriginalFollowSceneBinding& numericScene;
     ResetVisibilityWorld50EY& visibility;
     OriginalCameraSceneOwner& spatialScene;
@@ -242,14 +243,14 @@ public:
         const auto* registry=b.introChild.collection;
         if(!b.controller.bound||!b.start7C.prepared||!b.start7C.active||!b.start7C.complete240||
            b.introChild.start7C!=&b.start7C||!registry||!registry->bound||
-           registry!=b.attachedChild.collection||registry->sessionGeneration!=b.controller.binding.sessionGeneration||
+           registry!=b.attachedChild.collection||registry!=b.followChild.collection||registry->sessionGeneration!=b.controller.binding.sessionGeneration||
            registry->sceneKey!=b.controller.binding.sceneKey||b.start7C.sessionGeneration!=registry->sessionGeneration||
            !registry->controllerKey||!registry->registered38||registry->selected34>=registry->count30||bank.count()!=8||
            b.display.sessionGeneration!=registry->sessionGeneration||b.display.controllers48[0]==nullptr||
            b.display.controllers48[0]->controllerKey!=registry->controllerKey||!b.follow64.prepared||
            b.follow64.sessionGeneration!=registry->sessionGeneration||b.follow64.racerKey!=b.controller.binding.racerKey)
             return {S::owner,0x176654};
-        if(b.actualLaunch11258!=1||b.actualPreference11030!=5||b.actualVariant11038!=0||
+        if(b.actualLaunch11258!=1||(b.actualPreference11030!=5&&b.actualPreference11030!=0)||
            b.actualRacerState40!=0||b.actualIntroAudio80||b.controller.flags62&0xe0u||
            (b.raceFlags1B0&3u)!=1u||!b.startActions.authenticated())return {S::sourcePath,0x176664};
         if(!begun_){
@@ -270,11 +271,15 @@ public:
             case 2:r=requestOriginalCameraExitFade2AED60(b.actualFadeManagerA8,b.actualApplicationMode22C,b.video,b.sharedClock);break;
             case 3:b.raceFlags1B0|=8u;break;
             case 4:
-                //178700 prefix precedes177AB0. Single-view fresh variant0
-                //needs no destructive multi-view configuration clamp.
+                //178700 reads the actual saved mode AND Follow preset ID.
+                //Single view skips17878C's destructive multi-view clamp.
+                //Mode7 reaches178810, with the real ID pointer passed to177AB0.
                 b.controller.flags63Low5&=static_cast<std::uint8_t>(~2u);b.controller.specialDelayA4=1;
-                {const auto switched=transitionOriginalAttached177AB0(b.controller,b.attached6C,b.numericScene,
-                    b.attachedChild,b.visibility,b.spatialScene,b.zoneKeys,b.workspace,5,b.transitionInput);
+                {const auto switched=b.actualPreference11030==0?
+                    transitionOriginalFollow177AB0(b.controller,b.follow64,b.numericScene,b.followChild,
+                        b.visibility,b.spatialScene,b.zoneKeys,b.workspace,0,&b.actualVariant11038,b.transitionInput):
+                    transitionOriginalAttached177AB0(b.controller,b.attached6C,b.numericScene,b.attachedChild,
+                        b.visibility,b.spatialScene,b.zoneKeys,b.workspace,5,b.transitionInput);
                  if(switched.status!=OriginalFollowControllerStatus::complete)return {S::sourcePath,switched.sourcePC};}
                 break;
             case 5:
@@ -287,7 +292,7 @@ public:
             case 9:b.controller.cooldown8C=1;break;
             case 10:b.controller.flags63Low5|=1u;break;
             case 11:
-                //Actual80==null and racer40==0,mode44==5:2924A0 and
+                //Actual80==null and racer40==0,mode44==0/5:2924A0 and
                 //176728..1767C4's mode correction both genuinely skip.
                 completed_=true;return {S::complete,0x1767c4};
             default:return {S::owner,0x176664};

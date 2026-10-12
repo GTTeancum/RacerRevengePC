@@ -320,7 +320,7 @@ class Session final {
         //177AB0 writes actual scene180 before the exit viewport rebuild.
         //That is the spatial/numeric scene binding, not the prior intro output.
         exitScene.position180=&sceneBinding_.position180;
-        OriginalGcGaIntroExitBindings bindings{controller_,start_,introChild_,attached_,attachedChild_,follow_,
+        OriginalGcGaIntroExitBindings bindings{controller_,start_,introChild_,attached_,attachedChild_,follow_,followChild_,
             sceneBinding_,*world,spatial_,zones,*work,transition,display_,exitScene,app.video,
             actual_.applicationClock,countdown_,actual_.all8Manager,startActions_,raceFlags1B0_,uiFlags1E4_,
             app.fadeManagerA8,app.applicationMode22C,app.application33C,
@@ -357,6 +357,9 @@ public:
     bool abandoned()const noexcept{return abandoned_;}
     bool countdownInstalled()const noexcept{return countdownInstalled_;}
     bool introExitReady()const noexcept{return controller_.mode44==7&&start_.complete240;}
+    bool willUseFollowPose()const noexcept {
+        return controller_.mode44==0||(introExitReady()&&actual_.preferences.slots[0].field11030==0);
+    }
     std::int32_t cameraMode()const noexcept{return controller_.mode44;}
     std::uint64_t sessionGeneration()const noexcept{return generation_;}
     std::uint64_t racerKey(std::size_t i)const noexcept{return i<8?key(identity_[i].racerTag):0;}
@@ -643,13 +646,37 @@ public:
         case FrameStage::exit:{
             const auto r=advanceExit();if(r.status!=Status::complete)return r;break;}
         case FrameStage::exitPose:{
-            //Same175D70 handoff frame reaches115CB0 after177AB0. Its common
-            //timer prefix already ran; do not run stable mode5 control again.
-            const auto body=attachedFrame();
-            result_.attached=actual_.bank.visit(0,[&](){return advanceOriginalAttachedCameraView(attached_,body,
-                {actual_.arena.nodes,actual_.arena.sceneNodeCount},actual_.attachedGlobals,actual_.arena.noiseOwner(),
-                pose_,scene_,matrices_,displayInputs_->rootFlags228,sceneFlags29_);});
-            if(result_.attached.status!=OriginalAttachedStatus::ok)return fail(Status::numeric,result_.attached.sourcePC);
+            //Same175D70 handoff frame reaches115CB0 after177AB0. The common
+            //timer prefix already ran; execute only the selected pose child.
+            if(controller_.mode44==0){
+                result_.follow=actual_.bank.visit(0,[&](){
+                    OriginalFollowResult result{OriginalFollowStatus::owner,0x17a870,0};
+                    if(!actual_.followQueries.sync())return result;
+                    const auto& velocity=actual_.arena.bodies.main.components.root.body.velocity.v;
+                    const OriginalFollowIdentity identity{generation_,key(identity_[0].racerTag),
+                        key(identity_[0].mainBodyTag),key(identity_[0].containerTag),static_cast<std::int32_t>(identity_[0].pod60)};
+                    const SceneGraph49P graph{actual_.arena.nodes,actual_.arena.sceneNodeCount};
+                    OriginalFollowSubject subject;
+                    result=readOriginalFollowSubject(identity,graph,actual_.bindings.visual.container194,
+                        static_cast<std::int32_t>(actual_.boost.vehicle64),{velocity[0],velocity[1],velocity[2],0.f},
+                        actual_.arena.bodies.main.components.root.worldAngularVelocityA0.v[1],subject);
+                    if(result.status!=OriginalFollowStatus::ok)return result;
+                    const OriginalFollowCollisionSources sources{&graph,actual_.bindings.lifecycle.main190,&actual_.poseHistory};
+                    OriginalFollowCollisionResult collision;
+                    result=advanceOriginalFollowCameraView(follow_,subject,frameDelta_,raceFlags1B0_,sources,
+                        actual_.followQueries.pairOwner(),actual_.arena.noiseOwner(),pose_,scene_,matrices_,collision,
+                        displayInputs_->rootFlags228,sceneFlags29_);
+                    if(!actual_.followQueries.commit())return OriginalFollowResult{OriginalFollowStatus::owner,0x17a870,0};
+                    return result;
+                });
+                if(result_.follow.status!=OriginalFollowStatus::ok)return fail(Status::numeric,result_.follow.sourcePC);
+            }else if(controller_.mode44==5){
+                const auto body=attachedFrame();
+                result_.attached=actual_.bank.visit(0,[&](){return advanceOriginalAttachedCameraView(attached_,body,
+                    {actual_.arena.nodes,actual_.arena.sceneNodeCount},actual_.attachedGlobals,actual_.arena.noiseOwner(),
+                    pose_,scene_,matrices_,displayInputs_->rootFlags228,sceneFlags29_);});
+                if(result_.attached.status!=OriginalAttachedStatus::ok)return fail(Status::numeric,result_.attached.sourcePC);
+            }else return fail(Status::sourcePath,0x115cb0);
             frameStage_=FrameStage::lateTick;break;}
         case FrameStage::lateTick:
             if(advanceOriginalCameraSceneTick114AE0(tick_,generation_,key(scene_),pose_.position,scene_.look,sceneFlags29_)!=
@@ -751,7 +778,7 @@ public:
     }
     //Next reached race-prefix1A7BD0..1A7C18 and real manager-state8 child.
     //Call only after fade-out retirement and publication of the actual first
-    //Attached base image. Root owns that real renderer publication, not this
+    //restored camera base image. Root owns that real renderer publication, not this
     //numeric camera counter. The backend will capture/validate the image.
     Result advanceRaceFadeInPrefix(){
         if(abandoned_)return set(Status::abandoned);

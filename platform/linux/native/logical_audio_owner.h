@@ -17,8 +17,13 @@ public:
         // Actual232ED0 logical fields, consumed by233670 and the AI emitter.
         std::int32_t channel2C=-1;
         std::uint32_t elapsedBits24=0,word7C=0;
+        std::int32_t volume38=100,angle3C=0,pitch40=4096;
+        std::int32_t volume44=100,angle48=0,pitch4C=4096;
+        std::uint32_t loop1B0=0;
         float multiplier54=1.f;
+        float multiplier58=1.f,sensitivity5C=.25f;
         std::array<float,4> position60{{0.f,0.f,0.f,1.f}};
+        std::array<float,4> relative90{{0.f,0.f,0.f,1.f}};
     private:
         LogicalAudioOwner* owner=nullptr;
         std::size_t slot=0;
@@ -58,6 +63,18 @@ public:
             mixer_->playbackRevision(s.slot)==s.revision&&mixer_->active(s.slot);
     }
     Result start(Sound& s,float gain,float pitch,bool loop) noexcept {
+        return startWithRatePolicy(s,gain,pitch,loop,false,0);
+    }
+    Result startSourceRate(Sound& s,float gain,float pitch,bool loop,std::int32_t angle=0) noexcept {
+        return startWithRatePolicy(s,gain,pitch,loop,true,angle);
+    }
+    Result controlsSourceRate(Sound& s,float gain,float pitch,std::int32_t angle=0) noexcept {
+        if(!active(s))return Result::owner;
+        return mixer_->controlsSourceRate(s.slot,gain,pitch,angle)?Result::complete:Result::backend;
+    }
+private:
+    Result startWithRatePolicy(Sound& s,float gain,float pitch,bool loop,bool sourceRate,
+        std::int32_t angle) noexcept {
         if(!owns(s))return Result::owner;
         if(!s.available)return Result::unavailable;
         // An active foreign revision is never stolen. Inactive slots are
@@ -65,10 +82,13 @@ public:
         if(mixer_->active(s.slot)&&!active(s))return Result::owner;
         if(nextToken_==std::numeric_limits<std::int32_t>::max())return Result::exhausted;
         if(!mixer_->canRecordControlChanges(1))return Result::exhausted;
-        if(!mixer_->play(s.slot,s.clip,gain,pitch,loop,0.f))return Result::backend;
+        const bool started=sourceRate?mixer_->playSourceRate(s.slot,s.clip,gain,pitch,loop,angle):
+            mixer_->play(s.slot,s.clip,gain,pitch,loop,0.f);
+        if(!started)return Result::backend;
         s.token=++nextToken_;s.channel2C=s.token;s.revision=mixer_->playbackRevision(s.slot);
         return Result::complete;
     }
+public:
     Result controls(Sound& s,float gain,float pitch) noexcept {
         if(!active(s))return Result::owner;
         return mixer_->controls(s.slot,gain,pitch,0.f)?Result::complete:Result::backend;

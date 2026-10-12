@@ -38,7 +38,7 @@ bool OriginalUiLightManagerLifetime50KG::beginUiManager(const assets::OriginalUi
     Diagnostic& d) noexcept {
     d={};if(cacheState_!=Cache::absentSinceApplicationConstruction)
         return fail(d,Error::untrackedLifetime,0x14A0E8);
-    if(activeUi_||managerGeneration_==std::numeric_limits<std::uint64_t>::max())
+    if(activeUi_||nativeGameplayGeneration_||managerGeneration_==std::numeric_limits<std::uint64_t>::max())
         return fail(d,Error::phase,0x1CCD88);
     const auto* identity=archive.identity();
     if(!archive.loaded()||!(same(identity,Archive::mainMenu)||same(identity,Archive::options)||same(identity,Archive::rider)||same(identity,Archive::course)))
@@ -123,11 +123,26 @@ bool OriginalUiLightManagerLifetime50KG::selectRiderCharacter(
         return fail(d,status==original_racer_lighting50KM::Status::arithmetic?Error::arithmetic:Error::registry,0x149BB0);
     return true;
 }
+bool OriginalUiLightManagerLifetime50KG::beginNativeGameplay(std::uint64_t generation,Diagnostic& d) noexcept {
+    d={};if(cacheState_!=Cache::absentSinceApplicationConstruction)
+        return fail(d,Error::untrackedLifetime,0);
+    if(!generation||nativeGameplayGeneration_||activeUi_||!enteredFirstMain_||
+       riderRegistryReady_||courseRegistryReady_)return fail(d,Error::phase,0);
+    nativeGameplayGeneration_=generation;return true;
+}
+bool OriginalUiLightManagerLifetime50KG::endNativeGameplay(std::uint64_t generation,Diagnostic& d) noexcept {
+    d={};if(cacheState_!=Cache::absentSinceApplicationConstruction)
+        return fail(d,Error::untrackedLifetime,0);
+    if(!generation||generation!=nativeGameplayGeneration_||activeUi_)
+        return fail(d,Error::phase,0);
+    nativeGameplayGeneration_=0;return true;
+}
 void OriginalUiLightManagerLifetime50KG::invalidateForUntrackedScene() noexcept {
     if(cacheState_==Cache::absentSinceApplicationConstruction)cacheState_=Cache::untracked;
     riderRegistryReady_=false;courseRegistryReady_=false;
 }
 void OriginalUiLightManagerLifetime50KG::destroyApplication() noexcept {
+    nativeGameplayGeneration_=0;
     activeUi_=nullptr;riderUiIdentity_=nullptr;riderWidgetIdentity_=nullptr;
     riderRegistry_={};riderRegistryReady_=false;
     courseUiIdentity_=nullptr;courseRegistry_={};courseRegistryReady_=false;cacheState_=Cache::destroyed;

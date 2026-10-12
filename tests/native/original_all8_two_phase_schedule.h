@@ -18,12 +18,13 @@ using Reads=native_racer50IZ::FrameReads;
 using Frame=rr::game::VehicleFrameState49W;
 using Phase=rr::game::VehicleFramePhase49W;
 inline constexpr std::size_t count=8;
-// Mandatory on the new client entry. Neither choice certifies full original
+// Mandatory on the new client entry. No choice certifies full original
 // application/audio RNG chronology. The retained suffix policy is explicitly
 // host-selected Player-derived audio over genuine unchanged ALL8 AI driving.
 enum class AudioIntegrationPolicy : std::uint8_t {
     requireHostAudioDisabled,
-    retainHostSelectedPlayerDerivedSuffixPolicy
+    retainHostSelectedPlayerDerivedSuffixPolicy,
+    nativeAiD40AtNativeAudioPhase
 };
 enum class Stage { Unbound,Idle,RacerChildren,RemainingRaceChildren,Physics,Complete,Blocked };
 enum class Error { None,Binding,Order,Inactive,Phase,Factor,Operation,OneSubstepBoundary,Overflow };

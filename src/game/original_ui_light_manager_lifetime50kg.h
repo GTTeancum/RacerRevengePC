@@ -24,8 +24,10 @@ enum class OriginalUiLightCacheState50KG : std::uint8_t {
 // This bounded native owner carries that actual constructor-absent state across
 // the tracked UI flow. It must be created at native application startup, before
 // first Main, and retained until application teardown. It rejects unknown or
-// already-running histories; entering gameplay or another unjoined manager
-// MUST call invalidateForUntrackedScene before leaving the tracked scope.
+// already-running histories. Retail gameplay or another unjoined manager
+// MUST call invalidateForUntrackedScene. The explicitly separate native race
+// lighting owner may borrow a dormant application scope through the checked
+// begin/endNativeGameplay methods; it cannot install or query this cache.
 // Never construct a new instance when opening Rider or returning from gameplay
 // to manufacture absence. A future shared cache implementation can replace
 // this bounded owner once its real creation/counter/invalidation path is joined.
@@ -56,6 +58,16 @@ public:
         const OriginalUiRiderModelSelection50KG&,
         original_racer_lighting50KM::LightMatrices&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) const noexcept;
+    // Native integration policy only: the complete native race uses a separate
+    // canonical lighting manager with no borrow of this application cacheA4.
+    // Begin after actual UI-manager release; end only after the full native
+    // race call has returned and destroyed its world/renderer/lighting owners.
+    // These methods never reset cache state and never admit untracked history.
+    bool beginNativeGameplay(std::uint64_t raceGeneration,
+        OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
+    bool endNativeGameplay(std::uint64_t raceGeneration,
+        OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
+    std::uint64_t nativeGameplayGeneration()const noexcept{return nativeGameplayGeneration_;}
     void invalidateForUntrackedScene() noexcept;
     void destroyApplication() noexcept;
     OriginalUiLightCacheState50KG cacheState() const noexcept {return cacheState_;}
@@ -73,7 +85,7 @@ private:
     original_racer_lighting50KM::SmallDirectionalRegistry riderRegistry_{};
     const assets::OriginalUiMemberIdentity50KG* courseUiIdentity_=nullptr;
     original_racer_lighting50KM::SmallDirectionalRegistry courseRegistry_{};
-    std::uint64_t managerGeneration_=0;
+    std::uint64_t managerGeneration_=0,nativeGameplayGeneration_=0;
     bool enteredFirstMain_=false,riderRegistryReady_=false,courseRegistryReady_=false;
 };
 }
