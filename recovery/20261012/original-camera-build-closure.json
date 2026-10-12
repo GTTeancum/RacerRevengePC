@@ -1,0 +1,141 @@
+{
+  "operation": "Static source-text/JSON packaging only; no builder/import/compiler or gameplay execution.",
+  "cameraUnits": [
+    "src/game/original_attached_camera.cpp",
+    "src/game/original_camera_query_cold.cpp",
+    "src/game/original_camera_query_owner.cpp",
+    "src/game/original_camera_racer_history.cpp",
+    "src/game/original_camera_scene_owner.cpp",
+    "src/game/original_camera_scene_tick.cpp",
+    "src/game/original_camera_sphere_query.cpp",
+    "src/game/original_camera_world_query.cpp",
+    "src/game/original_follow_cam.cpp",
+    "src/game/original_follow_camera.cpp",
+    "src/game/original_follow_collision.cpp",
+    "src/game/original_race_start_camera.cpp"
+  ],
+  "windowsCppBefore": 298,
+  "windowsCppAfter": 310,
+  "windowsCDependencies": 6,
+  "files": [
+    {
+      "path": "tools/prepare_interactive_build50dv.py",
+      "beforeSha256": "b6ced6031117ce5f8612516eab8502e7d4d9dab968a7a165e4085c452f4e7acb",
+      "afterSha256": "03dac1ad8da989b7d1e43a206d15ba72688f12237f59372d369fe9b291f2231b"
+    },
+    {
+      "path": "platform/windows/native/interactive50du.sources.json",
+      "beforeSha256": "1d02ae6934aefca70e4ed4264ea061751297483618258f7254abca66d767b1d3",
+      "afterSha256": "b2f6b8188f46bec2a2131ab9eec4a6ddbd7ca692802201b2d1661e737b9fd5b1"
+    },
+    {
+      "path": "platform/windows/native/Build-Interactive50DU.ps1",
+      "beforeSha256": "784867ab0451057b3629306a9f70c1081c3879bcf0320cffa85c251cce7718b4",
+      "afterSha256": "9ed41b1c0533a8b9829a7aaf320c67a181b66663eb4661e54b05ad81c6430f1c"
+    },
+    {
+      "path": "platform/windows/native/README-interactive50du.md",
+      "beforeSha256": "3cea000b8528efea4709c6969a45ec9f39341679b56834f3478fac24e0e8313b",
+      "afterSha256": "d970b3fc7e60e37a1bff3182974754de94f99e2ba30caf74be7c22d170134e0a"
+    },
+    {
+      "path": "platform/linux/native/CMakeLists.txt",
+      "beforeSha256": "05135b0d69b43d353450fd535e3c80b034ac1b2ca72dc9292233d77b1e34b8b9",
+      "afterSha256": "143621749d76e26f6d13ebba02117c2e212d6bfdc9007ea25ec2b8eedac53a7a"
+    }
+  ],
+  "staticLiteralInventory": {
+    "centralInteractiveCppAfter": 311,
+    "centralInteractiveCppBefore": 299,
+    "windowsOnlyComparedToCentral": [],
+    "centralOnlyComparedToWindows": [],
+    "windowsDuplicateCount": 0,
+    "newUnitsInAllThree": [
+      {
+        "source": "src/game/original_attached_camera.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_camera_query_cold.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_camera_query_owner.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_camera_racer_history.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_camera_scene_owner.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_camera_scene_tick.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_camera_sphere_query.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_camera_world_query.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_follow_cam.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_follow_camera.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_follow_collision.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      },
+      {
+        "source": "src/game/original_race_start_camera.cpp",
+        "centralLiteral": true,
+        "windowsManifest": true,
+        "cmakeLiteralCount": 1
+      }
+    ],
+    "currentOtherProvenance": [
+      {
+        "path": "tools/check_terrain_registered_drive50bv.py",
+        "expected": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
+        "actual": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa"
+      },
+      {
+        "path": "tools/prepare_offscreen_build50do.py",
+        "expected": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
+        "actual": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833"
+      }
+    ]
+  },
+  "patchSha256": "052f5b22d92aa8359559fd32c86fbc33e79aebd1841c8388075f2411bd64d768"
+}

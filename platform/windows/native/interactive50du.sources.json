@@ -5,7 +5,7 @@
   "sourceListProvenance": {
     "tools/check_terrain_registered_drive50bv.py": "22ac85b024b7639cce293624fc7f1bdebcf86a0c0d363f84560fb173861dd1aa",
     "tools/prepare_offscreen_build50do.py": "050e81276ecc51dab310df4f64b4de527c92626bbc79630857f457a8d86f6833",
-    "tools/prepare_interactive_build50dv.py": "b6ced6031117ce5f8612516eab8502e7d4d9dab968a7a165e4085c452f4e7acb"
+    "tools/prepare_interactive_build50dv.py": "03dac1ad8da989b7d1e43a206d15ba72688f12237f59372d369fe9b291f2231b"
   },
   "excludedPlatformSources": [
     "platform/linux/native/offscreen_gl_context50dc.cpp",
@@ -71,6 +71,18 @@
     "src/game/tv_camera_update49f.cpp",
     "src/game/camera_view49f.cpp",
     "src/game/camera_frame49f.cpp",
+    "src/game/original_attached_camera.cpp",
+    "src/game/original_camera_query_cold.cpp",
+    "src/game/original_camera_query_owner.cpp",
+    "src/game/original_camera_racer_history.cpp",
+    "src/game/original_camera_scene_owner.cpp",
+    "src/game/original_camera_scene_tick.cpp",
+    "src/game/original_camera_sphere_query.cpp",
+    "src/game/original_camera_world_query.cpp",
+    "src/game/original_follow_cam.cpp",
+    "src/game/original_follow_camera.cpp",
+    "src/game/original_follow_collision.cpp",
+    "src/game/original_race_start_camera.cpp",
     "src/assets/tv_camera49e.cpp",
     "src/game/tv_camera_selection49e.cpp",
     "src/game/control_filter48b.cpp",
@@ -323,5 +335,5 @@
   "nativeDependencySourceProvenance": {
     "cmake/NativePc48C.cmake": "28c21d124da2000a8f44272b7d37eb5d02a092e863a9965c50deabec93d4fbff"
   },
-  "sourceListReviewNote": "Base revision plus the original gameplay Binder source integration; source-reviewed only, no new build or runtime acceptance."
+  "sourceListReviewNote": "Original gameplay Binder plus twelve reviewed original camera kernel source units; source-text reconciliation only. Camera source registration does not activate its runtime route. The central interactive list includes one additional Linux-only offscreen context; Windows excludes it."
 }

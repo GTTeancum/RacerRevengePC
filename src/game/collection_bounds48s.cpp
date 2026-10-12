@@ -60,8 +60,9 @@ CollectionBoundsStatus48S prepareCollectionBounds48S(
         // parented spheres remain outside this adapter.
         if(!std::isfinite(in.cachedRadius)||in.cachedRadius<=0)return Status::InvalidInput;
         for(unsigned i=0;i<16;++i)if(in.shapeWorld.v[i]!=(i%5==0?1.f:0.f))return Status::UnsupportedBounds;
-        for(unsigned i=0;i<3;++i)if(in.localCenter.v[i]!=in.cachedCenter.v[i]||
-            in.localHalf.v[i]!=in.cachedRadius)return Status::UnsupportedBounds;
+        //1208E4 reads the current shape center, not cached60. In179A80 the
+        //11C1F0 setter precedes120070 without11FF60, so these can differ.
+        for(unsigned i=0;i<3;++i)if(in.localHalf.v[i]!=in.cachedRadius)return Status::UnsupportedBounds;
     }
     CollectionBoundsResult48S result{};
     std::memcpy(&result.cachedCenter,&in.cachedCenter,sizeof(result.cachedCenter));

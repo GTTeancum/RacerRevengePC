@@ -1,0 +1,330 @@
+{
+  "status": "Reviewed source kernels only; no camera/blur activation and no execution claims",
+  "baseline_commit": "1499e840b29d5a968ae7c58d4f252d8a7e7e2d41",
+  "original_elf_sha256": "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30",
+  "files": [
+    {
+      "path": "src/game/collection_bounds48s.cpp",
+      "sha256": "850c10208f4a08f7a0003dd7d1234e4f927a9f3ce8b57f6e36005210ad378d9f",
+      "bytes": 6231,
+      "operation": "modify",
+      "baseline_sha256": "2b88a50d954f20e4f741bcd54bd910ebbdc32515e59bc9c9a380ac1a4e5d7bfd"
+    },
+    {
+      "path": "src/game/collection_bounds48s.h",
+      "sha256": "66d0efa61bcb3a78429a5757ee16382b7a98e0171b7d073d45aa425f7cb9fb24",
+      "bytes": 2750,
+      "operation": "modify",
+      "baseline_sha256": "7150effecae4133635d0183f3f1d70bc83ae4257b6c3aa100e177145050b7500"
+    },
+    {
+      "path": "src/game/original_attached_camera.cpp",
+      "sha256": "7c1f5b84c4205f4aec66549ad1a3cb8821f2d1608af9db280aafebe6b8008720",
+      "bytes": 13079,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_attached_camera.h",
+      "sha256": "61d77805decae7de62efeef29908fc107fab6d7cc17ee9c6231a1344f00fad0d",
+      "bytes": 4727,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_attached_camera_controller.h",
+      "sha256": "c5b7fa8df32514cfe2f60ac9ab0e727d116dd0f7c98613e910dae0b0656acfe9",
+      "bytes": 6182,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_attached_race_frame.h",
+      "sha256": "3ae05814af6daa962f6150a21eb1b005bcd6df6bb4ff355c2e0903cd6febf2c5",
+      "bytes": 8471,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_child_registry.h",
+      "sha256": "d3e9041fd2be915bf00ea6f63707760c746ea6a51569d5b57335b588cbae6d1a",
+      "bytes": 1294,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_query_cold.cpp",
+      "sha256": "e1d5f2e3bc0cb5a3f94db2be0243f87631c5cd6ee1afabab4071fd40c40b9ae9",
+      "bytes": 4968,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_query_cold.h",
+      "sha256": "91f0186e4c39d39537de624509918ec0b6466ff5cd3087adf4b1503531b0b8a2",
+      "bytes": 3227,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_query_owner.cpp",
+      "sha256": "148249ee1aeb5643a397fc632dcd9de8212f7bf80f7b13c4eddb15d1c8c3d9d4",
+      "bytes": 13854,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_query_owner.h",
+      "sha256": "d0f21adbfe0d5eb7d68d4fb8d360651dec640c82fb01feb7bc08b2d0f2dbd062",
+      "bytes": 3762,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_racer_fields.h",
+      "sha256": "1149055dee56739f3de1bd33f3b52ab0f7eb46ba2a4a6d47e90ec4a00b2e119a",
+      "bytes": 896,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_racer_history.cpp",
+      "sha256": "80fe0b77d4f027faf907597e260179a21ce3a9a5ddb4a331c45ee82516843bac",
+      "bytes": 4243,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_racer_history.h",
+      "sha256": "62bf20ec910f37cae86bb6d924209cb8872258de85194e7b52fff3d0aa0bff65",
+      "bytes": 2055,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_scene_owner.cpp",
+      "sha256": "32d41b39e1686a6ce97688d664f9241d620c55f8aaee0d418fd360017173d080",
+      "bytes": 27730,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_scene_owner.h",
+      "sha256": "1b00952e81316a4e0a76ef58cce9db55da7d466326ce99501a43b5da96ee0410",
+      "bytes": 3859,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_scene_tick.cpp",
+      "sha256": "0a5ebffe4a09db9bd5eab1e3385020d9ac9b80ef756af8345a9835e72dabc876",
+      "bytes": 3315,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_scene_tick.h",
+      "sha256": "c26c242c84debc2f6d01226eceb32291bc7c4b18604d04b3cf1ffba789193ea6",
+      "bytes": 2039,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_sphere_query.cpp",
+      "sha256": "b6cd62c8297c80608ae2589cb047f0f63da4184b9fb17c68d44860be9cc98bb5",
+      "bytes": 12536,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_sphere_query.h",
+      "sha256": "56282ac582b4d0938ca2df7f236b5d89c36cbc3a565c23ddb7c7460f2be08f8f",
+      "bytes": 2800,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_world_query.cpp",
+      "sha256": "920dc185b3bee581b2cde225aed47483440d17caad3e6f9ca45676e5cb2cb74c",
+      "bytes": 20399,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_camera_world_query.h",
+      "sha256": "6f240e8790dfeb2ed897f11875650f6280bf97ccff9f7823ff280775b059f68a",
+      "bytes": 4736,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_follow_cam.cpp",
+      "sha256": "1e63d56dbbce3a4d923c6f9ba7b98103103483cb8044b718150c22dda046c02a",
+      "bytes": 5986,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_follow_cam_catalog.inc",
+      "sha256": "d446562a0ca150d6d9178f25f2486c7faf66c2628d52d6041b98c47f79c08c11",
+      "bytes": 2048,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_follow_camera.cpp",
+      "sha256": "b77a93fd60a00f32e568167a95d44293627b1c395c2f4a7ff0d69086f87b3a75",
+      "bytes": 21919,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_follow_camera.h",
+      "sha256": "337c8d549dd37f9309ffabcf1266463a43b21547e5a625a584a2f4d695246eb1",
+      "bytes": 8918,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_follow_collision.cpp",
+      "sha256": "235482924c26457b56f55bb32cb1a793cbc0819e9935188e48d3e419fb6eae16",
+      "bytes": 9440,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_follow_collision.h",
+      "sha256": "7844656f9be8c638d42a883e150aa742e6001d047a2fdccab083e79bcdb996da",
+      "bytes": 2291,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_follow_controller.h",
+      "sha256": "da48ce30db5546024edb49c65a724007af7c89486519bd7631a19072d923a11f",
+      "bytes": 15459,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_gameplay_blur_leaf.h",
+      "sha256": "26ddc28c8202d2b24ba5b749b61a8cab4642577f78920d2faf9172a894a7ff4b",
+      "bytes": 6016,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_gc_camera_start_lifecycle.h",
+      "sha256": "c20b42abea72a92bc06a271388d47711f3b79d56ffaac5b209dc0342724f5caa",
+      "bytes": 11124,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_race_camera_owner.h",
+      "sha256": "0181ba9dc47d2411ce37bba9bc2a5ee906faabf1c23948c9c833f54e89edf14a",
+      "bytes": 13948,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_race_start_camera.cpp",
+      "sha256": "68305ea652c111ae720fafa196f786d9531053c7eba3f01defd9795d9920f854",
+      "bytes": 18616,
+      "operation": "add",
+      "baseline_sha256": null
+    },
+    {
+      "path": "src/game/original_race_start_camera.h",
+      "sha256": "7f2eb31b9b7845ab25974c9b9f41fd9d93e9975db40d77512a6baeac19f843c2",
+      "bytes": 5445,
+      "operation": "add",
+      "baseline_sha256": null
+    }
+  ],
+  "new_cpp_sources": [
+    "src/game/original_attached_camera.cpp",
+    "src/game/original_camera_query_cold.cpp",
+    "src/game/original_camera_query_owner.cpp",
+    "src/game/original_camera_racer_history.cpp",
+    "src/game/original_camera_scene_owner.cpp",
+    "src/game/original_camera_scene_tick.cpp",
+    "src/game/original_camera_sphere_query.cpp",
+    "src/game/original_camera_world_query.cpp",
+    "src/game/original_follow_cam.cpp",
+    "src/game/original_follow_camera.cpp",
+    "src/game/original_follow_collision.cpp",
+    "src/game/original_race_start_camera.cpp"
+  ],
+  "baseline_native_cmake_sha256": "05135b0d69b43d353450fd535e3c80b034ac1b2ca72dc9292233d77b1e34b8b9",
+  "patches": {
+    "camera-kernels.patch": "6802b68af6c981ab4e5f5d526f5641e051760be52733bd1d1d7fdbb2584bb3db",
+    "native-build-list.patch": "561597e602642d0f1095edcaf98e17f8456ffb0ed3455b67777d7d10a85f5fd8"
+  },
+  "review_reports": [
+    {
+      "path": "reviews/class-ownership/SOURCE-REVIEW.md",
+      "sha256": "bb3b8793a2d6ea3a9d20ca510ef511f36ca347d0fe59a128cbf30ae8c46bd819"
+    },
+    {
+      "path": "reviews/intro-lifecycle/SOURCE-REVIEW.md",
+      "sha256": "74644897fb48b42e8ddd7ad608b8941a373703f4df6286eb96405367cac5dec6"
+    },
+    {
+      "path": "reviews/follow-pose/SPHERE-REVIEW.md",
+      "sha256": "a98fe3474e3cbb167f4ddbf81124782ced557a1b4f552648fdd7e757a4416428"
+    },
+    {
+      "path": "reviews/follow-pose/WORLD-QUERY-REVIEW.md",
+      "sha256": "7b1df04b3885c93457ce8fb3cb291336f833122329531a78c930047db4aed5f5"
+    },
+    {
+      "path": "reviews/follow-pose/PAIR-COLLISION-REVIEW.md",
+      "sha256": "fab415c1e7fbb04cb053cb8a5f0b0288ad31043012e00ff9ee8afcd267366d4d"
+    },
+    {
+      "path": "reviews/follow-pose/QUERY-COLD-REVIEW.md",
+      "sha256": "9683e594cbabf3148d338679904ca6b04eaa2b274be52317700817f248e24737"
+    },
+    {
+      "path": "reviews/follow-pose/RACER-HISTORY-OWNERSHIP.md",
+      "sha256": "8951a1d1c3f2dbaf13dbefeeaf68764fab2c08150a7e21a1f83c01b19f424849"
+    },
+    {
+      "path": "reviews/follow-pose/FOLLOW-INDEPENDENT-REVIEW.md",
+      "sha256": "8dcb28659f4f7d4f2d9bf7ae44db9170a4fdbb59430f83d2df414b06112d42fd"
+    },
+    {
+      "path": "reviews/follow-pose/SCENE-INDEPENDENT-REVIEW.md",
+      "sha256": "9839c6e9e3dc55f1d2d5c1bc86907bc54a0dbd5008d926bf22558de02db2fa30"
+    },
+    {
+      "path": "reviews/frame-owner/ATTACHED-INDEPENDENT-REVIEW.md",
+      "sha256": "f25a87525ea2b82b473ffbfea25b5257695f38fb6148c23d7226ff41d9a8f15c"
+    },
+    {
+      "path": "reviews/frame-owner/SCENE-FRAME-INDEPENDENT-REVIEW.md",
+      "sha256": "a32e9bf297409f689f58257b4e082971debe23874ccc7c36320ecbaba24c503d"
+    },
+    {
+      "path": "reviews/BLUR-LEAF-SOURCE-REVIEW.md",
+      "sha256": "94018ebff358b7e7a716f6fef24d17b8735800a7dbc2aba43875b6d03813ca7d"
+    }
+  ],
+  "required_corrections": [
+    "Procedural scalar MIN/MAX retain signed-zero ordering through scalar_minmax48o.h",
+    "Intro ordinary handoff23C is cleared after the real2D6A68 draw, preserving later conditional RNG draws",
+    "Source17A870 scalar RSQRT uses one-rounded reciprocal root then separate inverse",
+    "Scene alias admission adds every writable span before checking borrowed read spans",
+    "Follow/attached/intro share one canonical child selected34/list owner",
+    "Nondecaying camera timer terminal zero still requests75 and does not implicitly clear persistent video strength"
+  ],
+  "blur_leaf_dependency": {
+    "source": "/workspace/shared/gameplay-blur-candidate-20261012/original_gameplay_blur_leaf.h",
+    "copied_unchanged_sha256": "26ddc28c8202d2b24ba5b749b61a8cab4642577f78920d2faf9172a894a7ff4b"
+  },
+  "cam_asset_zip_sha256": "28942268fc81fcc84757b81ad4cd96b9c523bd9f8137b568e8ed51f4939d25a2",
+  "static_quoted_include_file_count": 126,
+  "static_quoted_include_missing": [],
+  "validation": "Independent static source reviews only. No build, test, syntax/import/compiler probe, gameplay, renderer, guest/VU execution."
+}

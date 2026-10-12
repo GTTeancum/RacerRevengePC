@@ -55,12 +55,15 @@ there is no installer, download, PATH-wide runtime lookup or asset copier.
 
 ## Source reconciliation and limits
 
-`interactive50du.sources.json` freezes 298 C++ owners from the actual layered
+`interactive50du.sources.json` freezes 310 C++ owners from the actual layered
 `prepare_interactive_build50dv.py` / `prepare_offscreen_build50do.py` /
 `check_terrain_registered_drive50bv.py` declarative lists at
 baseline `2e8389641cfad48b72212c08490b2b0384fa6294` plus the native gameplay
-Binder integration, with six additional vendored zlib C files. The matching
-PowerShell count gate is 298; older 277/281 documentation/gates were stale.
+Binder and twelve reviewed original camera kernel integrations, with six additional
+vendored zlib C files. The matching PowerShell count gate is 310. The central
+interactive list has 311 C++ units because it retains the Linux offscreen context;
+Windows excludes that unit as described below. Source registration alone does
+not activate the original camera route.
 Those generator files were read, not run or imported. Hash gates require renewed
 review if they change. Linux CMake was not used as the integrated source truth.
 

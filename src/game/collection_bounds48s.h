@@ -25,7 +25,7 @@ enum class CollectionBoundsStatus48S {
     Complete,UnsupportedBounds,InvalidInput,InsufficientCapacity,NonFinite
 };
 // Bounded original1202E0 tags1/6 and3, plus the unparented/unit-scale
-// shape5 sphere constructor path: identity matrix, localCenter=cachedCenter,
+// shape5 sphere constructor path: identity matrix, independently retained cache,
 // localHalf=(cachedRadius,cachedRadius,cachedRadius), positive radius.
 // Tags1/6 use shapeWorld/localCenter/
 // localHalf and preserve every cachedCenter/cachedRadius bit. Tag3 requires

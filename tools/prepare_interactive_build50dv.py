@@ -38,6 +38,24 @@ def main():
         absolute = str(ROOT / source)
         if absolute not in argv:
             argv.insert(argv.index('-lz'), absolute)
+    # Reviewed original camera kernels; registration does not activate a camera.
+    for source in (
+        'src/game/original_attached_camera.cpp',
+        'src/game/original_camera_query_cold.cpp',
+        'src/game/original_camera_query_owner.cpp',
+        'src/game/original_camera_racer_history.cpp',
+        'src/game/original_camera_scene_owner.cpp',
+        'src/game/original_camera_scene_tick.cpp',
+        'src/game/original_camera_sphere_query.cpp',
+        'src/game/original_camera_world_query.cpp',
+        'src/game/original_follow_cam.cpp',
+        'src/game/original_follow_camera.cpp',
+        'src/game/original_follow_collision.cpp',
+        'src/game/original_race_start_camera.cpp',
+    ):
+        absolute = str(ROOT / source)
+        if absolute not in argv:
+            argv.insert(argv.index('-lz'), absolute)
     # Immutable audio metadata; source registration does not bind live providers.
     audio_directory = str(ROOT / 'src/assets/original_audio_directory50kx.cpp')
     if audio_directory not in argv:
