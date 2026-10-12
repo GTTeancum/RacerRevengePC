@@ -78,11 +78,9 @@ inline constexpr SessionAssets retainedGC{
     "69dcbd97f010e462895f8712056e0ac9a21fe56dbae6d6b6c090c97c5e7a4cc9",4205067,
     true,true,false,true
 };
-// Authenticated Watchtower source binding, intentionally NOT returned by
-// sessionAssets yet. The native GA providers below must be completed before
-// host/menu admission: dynamic Defensegate/opening, LostAI route triggers,
-// source trigger geometry/action dispatch and GA motion/collision ownership. A static metadata row or
-// prepared texture cache alone cannot authorize gameplay.
+// Authenticated Watchtower source binding. Runtime admission separately requires
+// explicit fresh all-eight-original-AI preview admission. A static metadata row
+// or prepared texture cache alone cannot authorize gameplay or a menu launch.
 inline constexpr SessionAssets retainedGA{
     &worlds[1],"work/native/project/disc/TRACKS/GA.RES",
     "tracks\\mga.spl","tracks\\aga.spl","tracks\\ga.tun",
@@ -111,7 +109,8 @@ inline const WorldMetadata* findWorld(const char* code) noexcept {
 // An unbound row must never launch or display TA under another track name.
 inline const SessionAssets* sessionAssets(const WorldMetadata& world) noexcept {
     return codeEquals(world.code,"TA")?&retainedTA:
-        codeEquals(world.code,"GC")?&retainedGC:nullptr;
+        codeEquals(world.code,"GC")?&retainedGC:
+        codeEquals(world.code,"GA")?&retainedGA:nullptr;
 }
 inline const SessionAssets* select(const char* code,const char*& error) noexcept {
     const auto* world=findWorld(code);

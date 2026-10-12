@@ -197,13 +197,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(trackSession,trackSelectionError?trackSelectionError:"original track admission failed");
  const bool isGcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GC");
  const bool isGaTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GA");
- // This delta does not admit GA. These explicit identities prevent a future
- // asset binding from selecting GC-only dynamic owners through a generic
- // static-collision feature flag.
- // This source-only native trigger extension awaits independent review.
- // It uses the unchanged actual-COL endpoint/sphere predicate already used
- // by GC. Original reverse108E90 leaf/descriptor parity remains unclaimed.
- require50DU(!isGaTrack,"GA native world candidate awaits independent source review and authorized validation");
+ // GA is a one-shot native-window or headless preview, never a menu-launched or saved race.
+ // All eight genuine AI owners and mode2 are checked below before cold setup.
+ // Native actual-COL endpoint/sphere triggers retain their disclosed geometry
+ // policy; original reverse108E90 leaf/descriptor parity remains unclaimed.
+ require50DU(!isGaTrack||(trackAdmission.gaOriginalAiCandidate&&
+     sessionIndex==0&&!checkpointInput&&!startAtMenu&&!originalMainApplication.enabled),
+     "GA requires explicit one-shot fresh original-AI preview; startup menu/checkpoint/restart unsupported");
+ if(isGaTrack)std::cerr<<"GA CANDIDATE: explicit fresh all-eight-original-AI observation; "
+     "native trigger geometry, authored-zone light selection, host chase camera/listener and mode2 timing; "
+     "retail geometry/light-cache/camera/listener parity and complete-track support unproved.\n";
  // Retained HOST trigger source is dormant; native Gate has independent ownership.
  const char* hostTriggerSetting=std::getenv("RR_GC_HOST_TRIGGERS");
  require50DU(!hostTriggerSetting||std::string(hostTriggerSetting)=="0",
@@ -287,9 +290,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      "RR_RACE_MODE must be 1 (source events) or 2 (HOST fallback)");
  const bool mode1Requested=raceEnabled&&(!raceModeSetting||std::string(raceModeSetting)=="1");
  require50DU(!mode1Requested||trackSession->nativeMode1,
-     "GC original record-row/selection configuration is unjoined; choose RR_RACE_MODE=2 explicitly");
+     "Selected original track record-row/selection configuration is unjoined; choose RR_RACE_MODE=2 explicitly");
  require50DU(rr::platform::hostTrackAdmitted50IM(loadedTrack,trackAdmission),
-     "GC track selection requires RR_GC_INCOMPLETE_WORLD=1 and RR_RACE_MODE=2 explicitly");
+     "Track requires its explicit candidate admission and RR_RACE_MODE=2; GC also requires RR_GC_INCOMPLETE_WORLD=1");
  // Default mode1 is committed only after ALL required providers cold-prepare.
  // Failure is explicit; RR_RACE_MODE=2 is the selectable existing fallback.
  bool mode1Enabled=false;
@@ -3090,6 +3093,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto& windowRequest=hostRequest.window;
   windowRequest.title=raceEnabled?"Racer Revenge | Native race | W/S + Up/Down | F5 restart | Esc menu":
       "Racer Revenge native development drive | W/S + Up/Down | F5 restart | Esc menu";
+  if(isGaTrack)windowRequest.title="Racer Revenge | GA incomplete preview | All 8 original AI | Esc pause/menu";
   if(originalMainApplication.enabled)windowRequest.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
   windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
   windowRequest.major=3;windowRequest.minor=2;
@@ -3410,6 +3414,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(!renderer.create(renderRequest,playerDrawAssets,rendererDiagnostic)){
    reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("window vehicle renderer creation failed");
   }
+  if(isGaTrack){
+   // Actual cold owner/GPU state after successful renderer creation. No
+   // fabricated trigger hits or rendered-frame counts enter this receipt.
+   std::cerr<<"ga_native_ready dynamic_ready="<<(gaAnimatedWorld&&gaAnimatedWorld->ready())
+       <<" dynamic_loaded="<<gaDynamicWindow.loaded()<<" dynamic_gpu="<<gaDynamicWindow.ownsResources()
+       <<" trigger_ready="<<(gaTriggerActions&&gaTriggerActions->ready())
+       <<" atm_loaded="<<gaAtm.loaded()<<" atm_gpu="<<gaAtm.ownsResources()
+       <<" atm_bindings="<<renderRequest.trackAnimationCount
+       <<" binder_enabled="<<gameplayBinderEnabled<<" binder_loaded="<<gameplayBinder.loaded()
+       <<" binder_gpu="<<gameplayBinder.ownsResources()
+       <<" binder_bound="<<(renderRequest.gameplayBinderTextures!=nullptr)
+       <<" camera_policy=host_chase_framePod listener_policy=accepted_camera_xz\n";
+  }
   if(originalMainApplication.enabled)originalMain.activate(renderer);
   // Renderer owns its cold GPU copy; release CPU-only track staging promptly.
   if(!headlessLive)trackMesh=rr::assets::Mesh48B{}; // Capture-only VM geometry evidence.
@@ -3455,10 +3472,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<",\"loaded_track\":\""<<platform::hostTrackCode50IM(loadedTrack)
        <<"\",\"selected_track\":\""<<platform::hostTrackCode50IM(selectedTrack)<<'"'
        <<",\"track_pending\":"<<(sessionMenu.trackChangesPending()?"true":"false")
-       <<",\"loaded_track_incomplete\":"<<(loadedTrack==platform::HostTrack50IM::GC?"true":"false")
+       <<",\"loaded_track_incomplete\":"<<((loadedTrack==platform::HostTrack50IM::GC||isGaTrack)?"true":"false")
        <<",\"gc_incomplete_opt_in\":"<<(trackAdmission.gcIncompleteWorld?"true":"false")
        <<",\"gc_mode2_admitted\":"<<(trackAdmission.gcMode2?"true":"false")
-       <<",\"results_visible\":"<<(humanResultsReady&&!sessionMenu.open()?"true":"false")
+       <<",\"ga_candidate_admitted\":"<<(isGaTrack&&trackAdmission.gaOriginalAiCandidate?"true":"false")
+       <<",\"results_visible\":"<<(!isGaTrack&&humanResultsReady&&!sessionMenu.open()?"true":"false")
        <<",\"results_action\":"<<resultsUi.selectedAction()
        <<",\"results_confirming\":"<<(resultsUi.confirming()?"true":"false")
        <<",\"audio_enabled\":"<<(audioEnabled?"true":"false")
@@ -3574,7 +3592,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::uint64_t lastStatusNs=monotonicNow50DU();
   std::uint64_t lastAllAiStatusNs=lastStatusNs;
   std::uint64_t lastStatusRenderCount=0;
-  if(!originalMainApplication.enabled){
+  if(isGaTrack){
+   std::cerr<<"GA native preview: all eight racers use original AI, including camera slot0; no manual driving. "
+       "Escape opens/closes Pause; menu choices are Resume, Controls and Exit. "
+       "F5/restart, Backspace/checkpoint, track launch and next-session audio changes are disabled. "
+       "Exit and relaunch for a fresh preview. Focus loss/minimize pauses.\n";
+   if(headlessLive)std::cerr<<"GA stdin commands: capture, pause, resume, menu (Pause), quit; "
+       "up/down keys and Enter navigate the host menu. Restart/checkpoint requests are ignored.\n";
+  }else if(!originalMainApplication.enabled){
   std::cerr<<"Interactive development client: W/S left engine throttle/brake; "
                "Up/Down right engine throttle/brake; W+Up both throttle; Space boosts; "
                "S+Down both brake; hold R to repair; Left Shift powerslides; Backspace resets to checkpoint; F5 restarts the grid; Escape opens the pause menu. "
@@ -3744,13 +3769,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     composePacket(false,input);sampleController(); // Route a final held release before cleanup.
     break;
    }
+   // Reject host rebuild commands before either the F5/restart branch or the
+   // later Backspace/checkpoint branch can leave this sole admitted session.
+   if(isGaTrack&&(hostInput.restartRequested||hostInput.checkpointRequested)){
+    std::cerr<<"GA preview: restart/checkpoint disabled; exit and relaunch for a fresh preview.\n";
+    hostInput.restartRequested=false;hostInput.checkpointRequested=false;
+   }
    if(hostInput.restartRequested){
     composePacket(false,input);sampleController();
     restartRequested=true;
     break;
    }
    const auto resultsRevision=resultsUi.revision();
-   const bool resultsAvailable=humanResultsReady&&!sessionMenu.open()&&!recoveryPaused&&
+   const bool resultsAvailable=!isGaTrack&&humanResultsReady&&!sessionMenu.open()&&!recoveryPaused&&
        s.phase==VehicleFramePhase49W::Ready&&input.focused&&!input.minimized&&!input.eventBudgetExhausted;
    const bool resultsBack=resultsAvailable&&resultsUi.confirming()&&input.pressed[41]&&
        !hostInput.menuRequested&&!hostInput.pauseRequested;
@@ -3772,7 +3803,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      break;
     }
    }
-   if(humanResultsReady&&!sessionMenu.open()){
+   if(!isGaTrack&&humanResultsReady&&!sessionMenu.open()){
     // These keys belong to Results navigation. Native finish controls retain
     // sole ownership; UI arrows/Space never count as attempted manual driving.
     constexpr std::uint16_t gameplayKeys[]={26,22,82,81,44,21,225};
@@ -4307,8 +4338,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      hud.raceEnabled=true;
      hud.raceCountdown=race_session50HM::countdownNumber(race);
      hud.raceGo=race.phase==race_session50HM::Phase::Racing&&race.raceSeconds<1.0;
-     hud.raceFinished=race.racers[0].finished;hud.raceResultsReady=humanResultsReady;
-     if(humanResultsReady){
+     hud.raceFinished=race.racers[0].finished;hud.raceResultsReady=humanResultsReady&&!isGaTrack;
+     if(humanResultsReady&&!isGaTrack){
       require50DU(race.resultsClosed&&race.racers[0].finished,"results overlay requires the sealed human finish");
       hud.resultsPanelVisible=true;
       hud.resultsFinishPlace=race.racers[0].finishPlace;
@@ -4816,6 +4847,7 @@ int main(int argc,char**argv){try{
              "Run from the repository root. RR_RACE_MODE=1 (default with fully prepared providers); "
              "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
              "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
+             "GA preview uses RR_TRACK=GA RR_GA_ORIGINAL_AI_CANDIDATE=1 RR_ORIGINAL_AI_ALL_RACERS=1 RR_RACE_MODE=2 RR_START_MENU=0. Window or headless, fresh session only; all 8 racers use original AI. GA disables manual driving, restart/checkpoint, track launch and human Results actions. Original Main must remain disabled.\n"
              "RR_ORIGINAL_MAIN_MENU=1 selects original Main/Options after real cold asset loading; requires RR_ORIGINAL_UI_ROOT and RR_ORIGINAL_MAIN_AUDIO=muted or enabled (enabled also requires RR_ORIGINAL_MAIN_AUDIO_ROOT pointing to AUDIO). Optional RR_ORIGINAL_RIDER_IPUM_CACHE admits only authenticated Rider19/Back when its compiled cache is available. Other Rider selections remain unavailable. Muted mode0 Rider19 Confirm to fixed Course and Back is integrated but unvalidated; Course directions and race launch remain unavailable. RR_AUDIO controls race audio only; no driving is launched.\n";
   return 2;
  }
@@ -4844,18 +4876,28 @@ int main(int argc,char**argv){try{
  // Resolve the process default once. Pending menu selection never mutates the
  // environment or rebinds a live world. Unknown/unbound metadata still fails.
  const char* initialTrackError=nullptr;
+ const char* gaCandidateSetting=std::getenv("RR_GA_ORIGINAL_AI_CANDIDATE");
+ require50DU(!gaCandidateSetting||std::string(gaCandidateSetting)=="0"||
+     std::string(gaCandidateSetting)=="1","RR_GA_ORIGINAL_AI_CANDIDATE must be 0 or 1");
+ const bool gaCandidate=gaCandidateSetting&&std::string(gaCandidateSetting)=="1";
  const auto* initialTrack=track_session_assets50IG::select(std::getenv("RR_TRACK"),initialTrackError);
  require50DU(initialTrack,initialTrackError?initialTrackError:"original track admission failed");
+ const bool initialGa=track_session_assets50IG::codeEquals(initialTrack->world->code,"GA");
+ require50DU(!gaCandidate||initialGa,"GA candidate admission cannot select another track");
+ require50DU(!initialGa||(gaCandidate&&!startAtMenu&&!originalMainApplication.enabled),
+     "GA requires explicit original-AI preview admission, RR_START_MENU=0 and original Main disabled");
  require50DU(track_session_assets50IG::codeEquals(initialTrack->world->code,"TA")||
-     track_session_assets50IG::codeEquals(initialTrack->world->code,"GC"),"track is not in the explicit menu admission list");
- auto effectiveTrack=track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")?
+     track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")||initialGa,
+     "track is not in the explicit native admission list");
+ auto effectiveTrack=initialGa?rr::platform::HostTrack50IM::GA:
+     track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")?
      rr::platform::HostTrack50IM::GC:rr::platform::HostTrack50IM::TA;
  auto selectedTrack=effectiveTrack;
  const char* incompleteWorldSetting=std::getenv("RR_GC_INCOMPLETE_WORLD");
  const char* selectedModeSetting=std::getenv("RR_RACE_MODE");
  const rr::platform::HostTrackAdmission50IM trackAdmission{
      incompleteWorldSetting&&std::string(incompleteWorldSetting)=="1",
-     selectedModeSetting&&std::string(selectedModeSetting)=="2"};
+     selectedModeSetting&&std::string(selectedModeSetting)=="2",gaCandidate};
  std::uint64_t sessionIndex=0;
  for(;;){
   const auto exit=runSession50DU(argv[1],headlessLive,headlessLive?argv[3]:nullptr,

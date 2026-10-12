@@ -27,6 +27,14 @@ public:
           audioChoice_(audioOptionsAvailable), audioOptions_(loadedAudio, selectedAudio),
           loadedTrack_(loadedTrack), selectedTrack_(selectedTrack), trackAdmission_(trackAdmission) {
         audioChoice_ = audioChoice_ && audioOptions_.valid();
+        if (loadedTrack_ == HostTrack50IM::GA) {
+            // A GA preview owns one fresh all-AI session. No pending choices
+            // or front-menu route may request a second cold session.
+            racerChoice_ = audioChoice_ = false;
+            selectedTrack_ = loadedTrack_;
+            returnPage_ = Page::Pause;
+            if (startAtMenu) page_ = Page::Pause;
+        }
     }
     bool open() const noexcept { return page_ != Page::Closed; }
     Page page() const noexcept { return page_; }
@@ -43,6 +51,7 @@ public:
         const auto& key = input.keys.pressed;
         const bool back = key[41] != 0;
         if (input.menuRequested) {
+            if (loadedTrack_ == HostTrack50IM::GA) { change(Page::Pause); return Result::None; }
             staleSession_ = started_;
             change(Page::Main);
             return Result::None;
@@ -80,7 +89,7 @@ public:
             return Result::None;
         }
         const std::uint32_t count = page_ == Page::Main ? 4u + unsigned(racerChoice_) + unsigned(audioChoice_) :
-            page_ == Page::Pause ? 5u + unsigned(audioChoice_) : page_ == Page::Audio ? 6u :
+            page_ == Page::Pause ? (loadedTrack_ == HostTrack50IM::GA ? 3u : 5u + unsigned(audioChoice_)) : page_ == Page::Audio ? 6u :
             page_ == Page::Tracks ? 2u + unsigned(trackAdmission_.gcIncompleteWorld) : 2u;
         if (up != down) {
             selected_ = up ? (selected_ + count - 1u) % count : (selected_ + 1u) % count;
@@ -138,6 +147,10 @@ public:
             else confirm(Page::Exit);
         } else if (page_ == Page::Pause) {
             if (selected_ == 0) { if (canResume) change(Page::Closed); }
+            else if (loadedTrack_ == HostTrack50IM::GA) {
+                if (selected_ == 1) { returnPage_ = Page::Pause; change(Page::Controls); }
+                else confirm(Page::Exit);
+            }
             else if (selected_ == 1) confirm(Page::Restart);
             else if (selected_ == 2) confirm(Page::Leave);
             else if (selected_ == 3) { returnPage_ = Page::Pause; change(Page::Controls); }
@@ -157,6 +170,30 @@ public:
         out.retainRaceImage = page_ == Page::Pause ||
             (page_ != Page::Main && returnPage_ == Page::Pause);
         out.selectedRow = selected_;
+        if (loadedTrack_ == HostTrack50IM::GA) {
+            out.title = "GA NATIVE PREVIEW";
+            out.subtitle = canResume ? "INCOMPLETE TRACK. ALL 8 RACERS USE ORIGINAL AI." : "SESSION STOPPED. EXIT TO START FRESH.";
+            if (page_ == Page::Controls) {
+                out.title = "GA PREVIEW CONTROLS";
+                out.rows[0] = "ALL 8 RACERS USE ORIGINAL AI";
+                out.rows[1] = "CAMERA RACER 0 ALSO USES ORIGINAL AI";
+                out.rows[2] = "ESC        PAUSE / RESUME";
+                out.rows[3] = "UP / DOWN  MENU SELECTION; ENTER CONFIRMS";
+                out.rows[4] = "F5 / RESTART AND BACKSPACE / CHECKPOINT DISABLED";
+                out.rows[5] = "NO MANUAL DRIVING OR TRACK LAUNCH";
+                out.rows[6] = "EXIT AND RELAUNCH FOR A FRESH PREVIEW";
+                out.rows[7] = "BACK"; out.rowCount = 8; out.selectedRow = 7;
+                out.footer = "ENTER OR ESC RETURNS TO THE MENU";
+            } else if (page_ == Page::Exit) {
+                out.title = "EXIT GA PREVIEW";
+                out.subtitle = "CURRENT SESSION PROGRESS WILL BE LOST";
+                out.rows[0] = "CANCEL"; out.rows[1] = "EXIT"; out.rowCount = 2;
+            } else {
+                out.rows[0] = canResume ? "RESUME" : "RESUME UNAVAILABLE";
+                out.rows[1] = "CONTROLS"; out.rows[2] = "EXIT"; out.rowCount = 3;
+            }
+            return out;
+        }
         if (page_ == Page::Main) {
             out.title = "RACER REVENGE";
             out.subtitle = staleSession_ ? (race_ ? "START A NEW RACE" : "START A NEW DRIVE") :
@@ -171,7 +208,8 @@ public:
             }
             out.rows[row++] = "CONTROLS";
             if (audioChoice_) out.rows[row++] = "AUDIO OPTIONS (NEXT SESSION)";
-            out.rows[row++] = selectedTrack_ == HostTrack50IM::GC ? "TRACK: GC EXPERIMENTAL INCOMPLETE" : "TRACK: TA";
+            out.rows[row++] = selectedTrack_ == HostTrack50IM::GC ? "TRACK: GC EXPERIMENTAL INCOMPLETE" :
+                selectedTrack_ == HostTrack50IM::GA ? "TRACK: GA CANDIDATE (NO MENU LAUNCH)" : "TRACK: TA";
             out.rows[row++] = "EXIT"; out.rowCount = row;
         } else if (page_ == Page::Pause) {
             out.title = "PAUSED";
