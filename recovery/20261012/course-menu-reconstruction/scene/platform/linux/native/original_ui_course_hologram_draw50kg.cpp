@@ -39,7 +39,7 @@ bool OriginalUiCourseHologramDraw50KG::load(std::shared_ptr<const assets::Origin
    if(!m.assets->load(course,ids[i],d.asset)||!m.scene.load(m.assets,d.scene))return fail(0x2A8770);
    const auto* scene=m.assets->scene();if(scene->materials.size()!=1||scene->lods.size()!=1)return fail(0x240C00);
    std::string name=scene->materials[0];
-   if(!assets::readOriginalUiMaterial50KG(*course,name+".psm",templates,assets::OriginalUiTemplate50KG::defaultMt,runtime,m.material,d.material)||m.material.passes.size()!=2)return fail(0x2476A0);
+   if(!assets::readOriginalUiMaterial50KG(*course,"ui/textures/"+name+".psm",templates,assets::OriginalUiTemplate50KG::defaultMt,runtime,m.material,d.material)||m.material.passes.size()!=2)return fail(0x2476A0);
    for(std::uint32_t pass=0;pass<2;++pass){const auto& p=m.material.passes[pass];
     if(p.microprogram!="DiffuseCompressed"||p.textureCount!=1||p.textureCoordinateIndex!=0)return fail(0x2476A0);
     if(pass==0){auto pst=course->find("UI/Textures/"+p.textureName+".pst");if(!pst.identity)return fail(0x24DA30);m.images[pass].push_back(image(pst,0,pst.size));}

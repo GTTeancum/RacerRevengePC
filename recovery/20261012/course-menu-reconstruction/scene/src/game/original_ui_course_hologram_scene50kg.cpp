@@ -25,7 +25,7 @@ struct ModelGraph {
         // replaces local through native289EC0-equivalent branch. PSG source
         // loader supplies its original local matrices and flagsA4.
         auto& root=nodes[0];root={};
-        root.sceneFlags190=character?0x88:0x80; // character1D23DC adds08
+        root.sceneFlags190=character?0x88:0x80; // common character root retains its character flag
         if (!originalUiUserRotatePose50KG(position,look,up,root.localC0)) return false;
         for (std::uint32_t n=0;n<count;++n) {
             assets::PsgNode49O source{};if (!assets::readPsgNode49O(psg,n,source)) return false;
@@ -80,14 +80,15 @@ struct OriginalUiCourseHologramScene50KG::Storage {
  std::shared_ptr<const assets::OriginalUiCourseHologramAssets50KG> assets;
  ModelGraph model;assets::MotionNodeBindings49O bindings{};
  ModelPlaybackMotion50KG motion{};ModelPlayback50KG playback{};
- bool shown=true,selected=false;
+ bool shown=false,selected=false;
  bool apply(OriginalUiControlOperation50KG op,bool value,ModelMotionSharedState49T& shared,ModelMode0IkShared50KG& ik,D& d)noexcept {
   using O=OriginalUiControlOperation50KG;
   if(op==O::show){shown=true;return true;}
   if(op==O::hide){shown=false;return true;}
   if(op==O::setEnabled){selected=value;shown=value;return true;}
   if(op==O::reset){
-   if(!model.build(*assets->hierarchy(),*assets->position(),*assets->look(),*assets->up(),false))return fail(d,E::graph,0x2A8C90);
+   BodyMatrix48G root;
+   if(!originalUiUserRotatePose50KG(*assets->position(),*assets->look(),*assets->up(),root)||!setLocalMatrix49P(model.view(),static_cast<I>(0),root))return fail(d,E::graph,0x2A8C90);
    shown=true;return true;
   }
   if(op!=O::select&&op!=O::deselect&&op!=O::clearSelection)return fail(d,E::operation,0x2A8D30);
@@ -108,7 +109,7 @@ bool OriginalUiCourseHologramScene50KG::load(std::shared_ptr<const assets::Origi
  if(!a||!a->loaded()||!a->hierarchy()||!a->bindings()||!a->motion(0))return fail(d,E::asset,0x2A8770);
  try{
   auto n=std::make_unique<Storage>();n->assets=std::move(a);
-  if(!n->model.build(*n->assets->hierarchy(),*n->assets->position(),*n->assets->look(),*n->assets->up(),false)||
+  if(!n->model.build(*n->assets->hierarchy(),*n->assets->position(),*n->assets->look(),*n->assets->up(),true)||
      n->model.find("l_IK")!=I::none||n->model.find("r_IK")!=I::none)return fail(d,E::graph,0x2A8770);
   n->bindings=*n->assets->bindings();
   for(std::uint32_t i=0;i<n->bindings.count;++i){auto& index=n->bindings.rows[i].sceneNode;if(index>=n->model.count)return fail(d,E::binding,0x153218);++index;}
@@ -125,13 +126,19 @@ bool OriginalUiCourseHologramScene50KG::preflightApply(OriginalUiControlOperatio
  }catch(...){return fail(d,E::allocation,0x2A8770);}
 }
 bool OriginalUiCourseHologramScene50KG::apply(OriginalUiControlOperation50KG op,bool value,ModelMotionSharedState49T& shared,ModelMode0IkShared50KG& ik,D& d)noexcept{
- d={};return storage_?storage_->apply(op,value,shared,ik,d):fail(d,E::asset,0x2A8770);
+ d={};if(!storage_)return fail(d,E::asset,0x2A8770);
+ try{auto n=std::make_unique<Storage>(*storage_);
+  if(n->playback.current18)n->playback.current18=&n->motion;
+  if(n->playback.previous1C)n->playback.previous1C=&n->motion;
+  auto ms=shared;auto is=ik;if(!n->apply(op,value,ms,is,d))return false;
+  storage_=std::move(n);shared=ms;ik=is;return true;
+ }catch(...){return fail(d,E::allocation,0x2A8770);}
 }
 bool OriginalUiCourseHologramScene50KG::advance(float dt,ModelMotionSharedState49T& shared,ModelMode0IkShared50KG& ik,D& d)noexcept{
- d={};if(!storage_||!std::isfinite(dt)||dt<0)return fail(d,E::asset,0x2A8F00);
+ d={};if(!storage_||!std::isfinite(dt)||dt<0)return fail(d,E::asset,0x2A8770);
  auto& s=*storage_;if(!s.shown||!s.playback.current18)return true;
  ModelPlaybackWorkspace50KG w{};ModelPlaybackIk50KG noIk{};
- return advanceModelPlayback50KG(dt,s.bindings,s.model.view(),noIk,s.playback,shared,ik,w,d.playback)||fail(d,E::playback,0x2A8F00);
+ return advanceModelPlayback50KG(dt,s.bindings,s.model.view(),noIk,s.playback,shared,ik,w,d.playback)||fail(d,E::playback,0x2A8770);
 }
 bool OriginalUiCourseHologramScene50KG::projectPalette(std::uint8_t flags,ModelPalette49S& out,D& d)noexcept{d={};return storage_?storage_->model.project(flags,out,d):fail(d,E::asset,0x2412E4);}
 bool OriginalUiCourseHologramScene50KG::loaded()const noexcept{return !!storage_;}

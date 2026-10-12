@@ -19,7 +19,7 @@ struct OriginalUiCourseCameraDiagnostic50KG {
     std::uint32_t sourcePC=0;
 };
 // Course vtable3D1450+C4=1D7A90, invoked during shared page create. Creates
-// page+4BC from course.dat PageInfo Camera*1; this page uses its own
+// page+4BC from track.dat PageInfo Camera*1; this page uses its own
 // authenticated file. Course entry attaches this camera. Not the manager default.
 // Only normal pose/matrix path; native caller must retain source debug gates.
 bool prepareOriginalUiCourseCamera50KG(const assets::OriginalUiArchive50KG&,

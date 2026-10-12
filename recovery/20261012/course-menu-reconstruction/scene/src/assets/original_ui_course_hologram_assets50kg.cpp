@@ -72,10 +72,10 @@ bool OriginalUiCourseHologramAssets50KG::load(std::shared_ptr<const OriginalUiAr
         next->mcfSource=mcf.identity();
         // Actual Course files author every transform; admit no guessed axes.
         if (!section->find("Position") || !section->find("LookVector") || !section->find("UpVector") ||
-            !originalUiTriple50KG(*section,"Position",{},next->position,d.text,0x1D2214) ||
-            !originalUiTriple50KG(*section,"LookVector",{},next->look,d.text,0x1D2240) ||
-            !originalUiTriple50KG(*section,"UpVector",{},next->up,d.text,0x1D226C))
-            return fail(d,E::widget,0x1D2214);
+            !originalUiTriple50KG(*section,"Position",{},next->position,d.text,0x2A8770) ||
+            !originalUiTriple50KG(*section,"LookVector",{},next->look,d.text,0x2A8770) ||
+            !originalUiTriple50KG(*section,"UpVector",{},next->up,d.text,0x2A8770))
+            return fail(d,E::widget,0x2A8770);
         const auto* general=mcf.section("General info");
         if (!general) return fail(d,E::config,0x1538B0);
         std::int32_t count=0;

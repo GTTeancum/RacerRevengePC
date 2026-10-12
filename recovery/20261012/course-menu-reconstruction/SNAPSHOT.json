@@ -37,9 +37,19 @@
       "sha256": "1b7f83453c8002831609a66294171a789c0db88d2c9d24d45fc5b5d3adb722ca"
     },
     {
+      "path": "scene/platform/linux/native/original_ui_course_draw_contribution50kg.cpp",
+      "bytes": 27459,
+      "sha256": "2842e212484117cfd3f9338ff21efae2a27bb1db8ea3f568ca836ea51632231c"
+    },
+    {
+      "path": "scene/platform/linux/native/original_ui_course_draw_contribution50kg.h",
+      "bytes": 3502,
+      "sha256": "9b11331b605fdcf0293376698b5d65b52388c56eaff6cf6bae77385d72ce0b1f"
+    },
+    {
       "path": "scene/platform/linux/native/original_ui_course_hologram_draw50kg.cpp",
-      "bytes": 7962,
-      "sha256": "0448474f696566ac51c419c457896064aa832cd7b1a5196c84ffaad27f1eff88"
+      "bytes": 7977,
+      "sha256": "72e58a66d3992cd1e8f8293b1a5c9788a9ce2d0917c6d39595bb48dcd79eccae"
     },
     {
       "path": "scene/platform/linux/native/original_ui_course_hologram_draw50kg.h",
@@ -59,12 +69,22 @@
     {
       "path": "scene/src/assets/original_ui_course_hologram_assets50kg.cpp",
       "bytes": 10018,
-      "sha256": "2a10a0782ff520a80458bafd29a022502574e2b5429540068641f99e6797ddb0"
+      "sha256": "070d7288c9b557cf1495281972a379a556263c970953d6d181d1bdffcf7e2989"
     },
     {
       "path": "scene/src/assets/original_ui_course_hologram_assets50kg.h",
       "bytes": 2773,
       "sha256": "cc9603868652f4bdf08676f468b71dceb7714be5c866c581294383b0879ad19d"
+    },
+    {
+      "path": "scene/src/assets/original_ui_material50kg.cpp",
+      "bytes": 75307,
+      "sha256": "8e6f47d47930ff1ecae6b50923b84b016fe29fad1963dd582b6f5f66a1c971b8"
+    },
+    {
+      "path": "scene/src/assets/original_ui_material50kg.h",
+      "bytes": 22836,
+      "sha256": "7b1e5aab5c2d8beb044fb28b64933866f069bbff54fc7f610232e20a113aa784"
     },
     {
       "path": "scene/src/assets/original_ui_screen_assets50kg.cpp",
@@ -78,8 +98,8 @@
     },
     {
       "path": "scene/src/game/original_ui_course_camera50kg.h",
-      "bytes": 1406,
-      "sha256": "471091e4092dd508334ea8c24b34f4b41b9cea586c72683f0a860d42d6b44bc9"
+      "bytes": 1405,
+      "sha256": "a3ba3065e1d0ccde9a1d619303cd246f4612bc76d33c6cf1b84a2c367c0849fe"
     },
     {
       "path": "scene/src/game/original_ui_course_clip_camera50kg.cpp",
@@ -93,8 +113,8 @@
     },
     {
       "path": "scene/src/game/original_ui_course_hologram_scene50kg.cpp",
-      "bytes": 8652,
-      "sha256": "65c6f2ec8cfbb29d30b5818fed065d3a1f89115903bf2fee6d157c328366f27c"
+      "bytes": 9072,
+      "sha256": "6e29f6f29e60ab647c97fcb1632d70214e6af03d341ca0fb3df5771dcfdba1a0"
     },
     {
       "path": "scene/src/game/original_ui_course_hologram_scene50kg.h",
