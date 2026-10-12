@@ -4,7 +4,7 @@
 
 Keep the genuine GC registry/visibility candidate independent, then add an explicitly named `nativeGcSelectedLights` rendering policy. Replace only the currently hard-coded scalar light in the existing racer shader with RGB illumination from the current selected GC matrices. This is an honest, bounded native rendering improvement. It does not need original alpha/fog/clipping/specular parity before it can be useful, because it does not claim to execute the original material program or replace its entire composition.
 
-The reviewed policy is integrated as a default-off option. Set RR_NATIVE_GC_SELECTED_LIGHTS=1 only for an admitted fresh GC race. No build or runtime validation has been performed for this integration.
+The reviewed policy is integrated as a default-off option. Set RR_NATIVE_GC_SELECTED_LIGHTS=1 only for an admitted fresh GC race. The first integrated Linux build and bounded original-AI observation passed on 2026-10-12; see the validation receipt below. This does not establish Windows behavior or full rendering parity.
 
 ## What this policy means
 
@@ -35,7 +35,7 @@ This route does not need to modify `buildVehicleDraw50CM`, regenerate vertex RGB
 
 ## Scope of the claim
 
-After later root validation, an accurate claim would be: “GC racers now use the level's actual registered ambient and directional light colors/direction, selected with their real visibility ownership, in the native renderer.”
+The bounded integrated observation supports this claim for the captured GC slice: “GC racers now use the level's actual registered ambient and directional light colors/direction, selected with their real visibility ownership, in the native renderer.”
 
 Do not claim full original DiffuseCompressed rendering, original cache behavior, original normal arithmetic/quantization, generated RGBA/alpha override, PS2 rasterization, original fog, specular or TA lighting. Do not call the packet `sourcePrelit`: the shader is evaluating native lighting and retains existing material composition.
 
@@ -61,4 +61,18 @@ Visual acceptance, later and only by root:
 - Same authenticated GC racer/position/camera/frame before/after, clearly labeled native policy.
 - Check both player and at least one real opponent, chariot and both engines; no geometry/UV/alpha regression.
 - Verify cooler ambient and authored sun orientation rather than claiming dramatic color from a level whose full-sun RGB is nearly neutral.
-- Report remaining material, fog, specular and TA limitations with the result. No screenshots or visible improvement have been produced by this source-only work.
+- Report remaining material, fog, specular and TA limitations with the result. The integrated observation captured real gameplay frames, but no matched-position policy-off/policy-on comparison was run; visual improvement or full parity is not certified.
+
+
+## Integrated validation: 2026-10-12 UTC
+
+- Tested source: `0f1c905a8100ec0701dc0cc2326ff55edc2902c0`.
+- Linux native client build: 282 C++ translation units (86 compiled, 196 reused), exit 0, completed 01:25:46 UTC.
+- Executable SHA-256: `04dd578dc35a144f2aeb6cd7663a0b08d7a8a1e3ff94bbde6367874842f96e7c`.
+- One 30-second wall-ready GC observation with this option enabled, completed 01:26:22 UTC. Original in-game AI controlled all eight racers, including camera slot 0. All eight dispatcher/tick counters advanced; all observed host-driver, controller-sample and keyboard-packet counters were zero.
+- Recorder acknowledged 126 frames, with no pending capture, reported boundary, partial fleet or recorder/protocol problem. Quit and process exit were normal, exit 0, with no forced termination. The actual selected-light owner startup receipt was observed.
+- Root inspected the first, middle and final captured frames. These show the starting grid and racing on GC terrain, including the camera racer and opponents. The world remains incomplete. These views do not independently certify numerical lighting correctness, matched before/after appearance, absence of every visual defect, or a complete lap.
+- Capture sampling was capped at 5 frames/s; it is evidence of the bounded gameplay slice, not a smooth-video or performance benchmark. The separate source WAV is 22.528 seconds; it must not be stretched to claim wall-time audio synchronization.
+- Native Gate and authored fog options were off. Full original material/alpha, specular, fog, other-track lighting, complete-track traversal and Windows UI remain outside this pass.
+
+Retained evidence set: `gc-lighting-validation-01` (command, build and session receipts) and `gc-lighting-validation-20261012-01` (summary, frame ledger, original PPM captures and source WAV). No second game execution or software check was performed to prepare the presentation artifacts.
