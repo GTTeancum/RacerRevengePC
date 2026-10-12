@@ -868,7 +868,8 @@ def main():
         "track_fog_policy": "reconstructed_native_track_fog" if args.native_track_fog else "disabled",
         "lighting_policy": "nativeTaAuthoredZoneSpotSelection" if args.native_ta_selected_lights else
         "nativeGcSelectedLights" if args.native_gc_selected_lights else "unchangedHost",
-        "lighting_scope": "Authenticated TA authored colors, genuine racer visibility/pose, native zone scan/top-two spots and portal blend; host material/normal limits, no retail light query/cache parity" if args.native_ta_selected_lights else
+        "lighting_scope": "Native authored level lights explicitly disabled; unchanged host lighting" if not args.native_level_lights else
+        "Authenticated TA authored colors, genuine racer visibility/pose, native zone scan/top-two spots and portal blend; host material/normal limits, no retail light query/cache parity" if args.native_ta_selected_lights else
         "Actual registered GC colors/directions and racer visibility, native per-publication reevaluation and existing host normals/material/alpha/fog; no full original shader/cache/specular parity",
     }
     json_write(output / "launch.json", manifest)
