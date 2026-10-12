@@ -2,6 +2,7 @@
 #pragma once
 #include "lap_host_clock50id.h"
 #include "original_shared_rng50iu.h"
+#include "shared_random_owner50id.h"
 namespace rr::game {
 enum class OriginalUiRiderVoiceChoiceError50KG : std::uint8_t {none,input,clock,range};
 struct OriginalUiRiderVoiceChoiceDiagnostic50KG {
@@ -14,19 +15,16 @@ struct OriginalUiRiderVoiceChoiceReceipt50KG {
     std::int32_t choice=0;
     std::uint32_t soundId=0;
 };
-// Application-lifetime function statics of1EA658..1EA784. Retain across every
-// Rider/Course screen lifetime. There is no private RNG: mutations target the
-// SAME application CoupledNoise owner as particles and character idles.
+// Stateless selector of1EA658..1EA784. Borrow the application lifetime lazy
+// seed/range owner, actual clock and SAME CoupledNoise RNG as other consumers.
+// Neither screen destruction nor raw startup seeding resets the lazy fields.
 class OriginalUiRiderVoiceChoice50KG final {
 public:
     OriginalUiRiderVoiceChoice50KG()noexcept=default;
     OriginalUiRiderVoiceChoice50KG(const OriginalUiRiderVoiceChoice50KG&)=delete;
     OriginalUiRiderVoiceChoice50KG& operator=(const OriginalUiRiderVoiceChoice50KG&)=delete;
     bool preflightRider19(OriginalUiRiderVoiceChoiceDiagnostic50KG&)const noexcept;
-    bool chooseRider19(HostMonotonicClock50ID&,CoupledNoiseContext49M&,
+    bool chooseRider19(HostMonotonicClock50ID&,CoupledNoiseContext49M&,SharedRandomOwner50ID&,
         OriginalUiRiderVoiceChoiceReceipt50KG&,OriginalUiRiderVoiceChoiceDiagnostic50KG&)noexcept;
-private:
-    bool seedGuardGp80A8_=false,rangeGuardGp80AC_=false;
-    std::uint32_t seedCache3D6B30_=0,rangeAssert3D6B38_=0;
 };
 }

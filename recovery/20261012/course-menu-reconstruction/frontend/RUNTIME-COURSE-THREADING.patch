@@ -117,7 +117,7 @@
              const auto& rider=snapshot.rider;const auto& aperture=rider.aperture;
 --- a/tests/native/terrain_interactive_drive50du.cpp
 +++ b/tests/native/terrain_interactive_drive50du.cpp
-@@ -3250,6 +3250,7 @@
+@@ -3247,6 +3247,7 @@
      J capturedGroup=nullptr;
      std::int32_t capturedSlot=0;
      const bool capturedRider=capturedUi.route.screen==5&&capturedUi.route.page==1;
@@ -125,7 +125,7 @@
      if(capturedRider){
       require50DU(originalMain.coordinator.riderSession(),"original Rider capture session missing");
       capturedSlot=capturedUi.rider.slot4C8;
-@@ -3261,7 +3262,7 @@
+@@ -3258,7 +3259,7 @@
           capturedNavigation->groups[group].selectedSlot:0;
      }
      const auto capturedAperture=capturedUi.route.screen==4?capturedUi.main.aperture:
@@ -134,7 +134,7 @@
      J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
          {"screen",capturedUi.route.screen},{"page",capturedUi.route.page},{"switches",capturedUi.switches},
          {"requested_screen",capturedUi.transition.requested.screen},{"requested_page",capturedUi.transition.requested.page},
-@@ -3291,6 +3292,16 @@
+@@ -3288,6 +3289,16 @@
       receipt["source_triangles"]=sourceAccepted?originalMain.submittedTriangles:0;
       receipt["source_coherent_framebuffer_fetch"]=sourceAccepted&&originalMain.submittedCoherentFramebufferFetch;
       receipt["source_texture_barriers"]=sourceAccepted?originalMain.submittedTextureBarriers:0;
@@ -151,7 +151,7 @@
      }
      std::cerr<<"original_main_capture "<<receipt.dump()<<'\n';
      reportUiState("capture");capturePending=false;return;
-@@ -3341,6 +3352,7 @@
+@@ -3338,6 +3349,7 @@
         "Game Options Up/W previous group(2), Down/S next group(3), Left/Right change value(0/1), R defaults(5). Enter/Space confirm(4), "
         "Escape/menu back(6; source Main does not handle back). Window Close, quit, or stdin EOF exits. "
         "Game Options Accept requires the live enabled audio owner and commits process settings; Cancel remembers the group without applying local edits. "
@@ -159,7 +159,7 @@
         "F5/restart and checkpoint have no original UI destination. capture writes the existing live PPM target.\n";
    }
    // Opt-in host observations only; each receipt is bounded to this session.
-@@ -3430,7 +3442,8 @@
+@@ -3427,7 +3439,8 @@
      const auto inputRoute=originalMain.coordinator.snapshot().route;
      const bool gameOptionsInput=inputRoute.screen==12&&inputRoute.page==4;
      const bool riderInput=inputRoute.screen==5&&inputRoute.page==1;
@@ -169,7 +169,7 @@
       if(input.pressed[80])originalMain.input(0);
       if(input.pressed[79])originalMain.input(1);
       if(input.pressed[82]||input.pressed[26])originalMain.input(2);
-@@ -4522,7 +4535,7 @@
+@@ -4519,7 +4532,7 @@
               "Run from the repository root. RR_RACE_MODE=1 (default with fully prepared providers); "
               "RR_RACE_MODE=2 selects the existing HOST audio/timing fallback. W/S: left throttle/brake; "
               "Up/Down: right throttle/brake; Space: boost; R: hold repair; Left Shift: powerslide; Backspace/checkpoint: current checkpoint; F5/restart: new grid session; Escape: menu; quit: exit. RR_START_MENU=1/0 overrides initial front-menu display.\n"
@@ -178,7 +178,7 @@
    return 2;
   }
   // Every return destroys the complete old session, including native state and
-@@ -4531,8 +4544,9 @@
+@@ -4528,8 +4541,9 @@
   lap_drive50GJ::Continuity lapContinuity{};
   // One monotonic backend epoch; each cold native session explicitly resets
   // its shared selector lazy slot alongside the freshly constructed physics RNG.

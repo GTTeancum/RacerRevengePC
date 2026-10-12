@@ -171,7 +171,8 @@ struct OriginalUiRiderSession50KG::Storage {
         if(!confirmVoiceChronologyReady()||cold.audioMode!=OriginalUiMainAudioMode50KG::muted||cold.audio){
             fault(Status::unsupportedState,0x1EA694);return false;}
         if(!cold.application->riderVoiceChoice.chooseRider19(*cold.application->clock101A50,
-            cold.application->sharedNoise308030,state.voice,callbackFault.voice)){
+            cold.application->sharedNoise308030,cold.application->sharedRandomSelectors,
+            state.voice,callbackFault.voice)){
             fault(Status::audio,callbackFault.voice.sourcePC);return false;}
         // Actual1EA780 voice playback is muted AFTER the real seed/draw/choice.
         ++state.audio.suppressedByMutedMode;return true;

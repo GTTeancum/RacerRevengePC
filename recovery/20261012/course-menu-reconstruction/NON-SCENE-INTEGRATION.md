@@ -100,3 +100,9 @@ Existing replacement CPP paths are already in the manifests; do not duplicate th
 ## Final delivery artifacts
 
 COMPLETE-SOURCE-INVENTORY.json maps all 53 candidate source files to repository paths with hashes and new/replacement status. BUILD-MANIFEST-ADDITIONS.patch supplies the 16 new translation units for all three explicit source lists. It deliberately leaves Windows provenance/revision pins for root to refresh from the actual integrated script/revision. frontend/RUNTIME-COURSE-THREADING.patch contains only the two targeted runtime/header edits. Copy source files by the inventory, apply targeted patches centrally, and retain gates closed until root admits the route. No patch application or build validation was performed.
+
+## Shared selector correction, 03:11 UTC
+
+The original lazy80A8/seed3D6B30 and lazy80AC/range3D6B38 are shared application statics, not private voice state. The candidate now retains one SharedRandomOwner50ID in OriginalUiMainApplication50KG. The stateless voice selector borrows that owner with the same application clock and sharedNoise308030. Main startup raw seeding does not initialize either lazy projection. Source mutation prefixes, cached-zero reseeding, exactly one draw and the accepted bounded integer choice formula are unchanged. This uses main 9fba56eb's existing shared_random_owner50id.h and adds no translation unit. Independent source review accepted all four hash-pinned changes at 03:11 UTC: ownership only, with unchanged chronology, arithmetic and failure prefixes.
+
+The live runtime retains its separate fresh-race sessionRandom owner unchanged. Menu-to-race remains disabled; these ownership domains are not falsely joined. Both Course admission gates remain false. COMPLETE-INTEGRATION.patch and source preimage manifest are refreshed against current main; no patch/build/test/syntax or gameplay execution occurred.

@@ -53,13 +53,13 @@
     },
     {
       "path": "rider/platform/linux/native/original_ui_main_session50kg.h",
-      "bytes": 12175,
-      "sha256": "d24c4dcdace2cbfcc12a859fae05b07e694c57db05837a8b581bc8c1f96fc6fb"
+      "bytes": 12452,
+      "sha256": "3ad2a17957dfb52d8da26f6e7be05fc7cfe42d40fd7d32af4b156fe56b0633fd"
     },
     {
       "path": "rider/platform/linux/native/original_ui_rider_session50kg.cpp",
-      "bytes": 65309,
-      "sha256": "91a82727cc1f24609eba2d47a669b383d06929d2c9fb7238a20f46645d4836a9"
+      "bytes": 65362,
+      "sha256": "fe16e18236ae914f3e87fef2b1d2126a05db6e69c3985ecceaeaacb02a772cb4"
     },
     {
       "path": "rider/platform/linux/native/original_ui_rider_session50kg.h",
@@ -98,13 +98,13 @@
     },
     {
       "path": "rider/src/game/original_ui_rider_voice_choice50kg.cpp",
-      "bytes": 2803,
-      "sha256": "18e2fc7d853fc7dcfba655fdae79a7b008bf96a94f2b06ccebbb692851d5cd6c"
+      "bytes": 2894,
+      "sha256": "7985815fcf15737c0c879f85ef056c72dc96a293dd1900b654517ae916611220"
     },
     {
       "path": "rider/src/game/original_ui_rider_voice_choice50kg.h",
-      "bytes": 1553,
-      "sha256": "fc08fcbb3215ffe22b1c46ffcabe12c9a3df7713dd78c2d1642f0b3b363d30ad"
+      "bytes": 1492,
+      "sha256": "226345eceeb203234039da88fca747e87e50e3bd852ad7169edc8a8f285d373c"
     },
     {
       "path": "scene/platform/linux/native/original_ui_course_background_adapter50kg.h",

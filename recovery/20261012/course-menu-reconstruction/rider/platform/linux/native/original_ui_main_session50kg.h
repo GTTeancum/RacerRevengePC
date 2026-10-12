@@ -43,6 +43,10 @@ struct OriginalUiMainApplication50KG {
     // Same actual host101A50 backend retained by native application startup.
     // Shared ownership prevents any screen/manager from creating a new epoch.
     std::shared_ptr<game::HostMonotonicClock50ID> clock101A50;
+    // Original shared statics80A8/3D6B30 and80AC/3D6B38. Startup raw
+    // seeding does not initialize these caches. Survive every menu page.
+    // Menu-to-race remains disabled; no copy to the separate race session.
+    game::SharedRandomOwner50ID sharedRandomSelectors{};
     game::OriginalUiRiderVoiceChoice50KG riderVoiceChoice;
     // Process-wide lazy playback/IK/libm owners survive page/model destruction.
     // Native application startup initializes them once, alongside this sole
