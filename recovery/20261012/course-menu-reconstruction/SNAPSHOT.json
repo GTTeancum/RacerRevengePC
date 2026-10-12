@@ -1,0 +1,45 @@
+{
+  "status": "new uncompiled source reconstruction after workspace rollback; not prior-byte recovery; excluded from build",
+  "files": [
+    {
+      "path": "scene/src/game/original_ui_course_camera50kg.h",
+      "bytes": 1406,
+      "sha256": "471091e4092dd508334ea8c24b34f4b41b9cea586c72683f0a860d42d6b44bc9"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_camera50kg.cpp",
+      "bytes": 3171,
+      "sha256": "fb4c37244671f0062b7f6f30ea29c5289063d0bc10717fe6ec880ec18a8a6fb8"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_clip_camera50kg.h",
+      "bytes": 746,
+      "sha256": "586c4eb7a5016d360661931acce0857ed7dd24734db766c10b78b73d25d51cff"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_clip_camera50kg.cpp",
+      "bytes": 2189,
+      "sha256": "9242e7e26b36fd8f04dac6692731a267ea0838f5060c7624ab5b695ddbc6c993"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_render_context50kg.h",
+      "bytes": 1527,
+      "sha256": "2ea5d2f3b3201c0d3e9705344d4643d8f695a8fcaa04fb6f21262d34f8f65db9"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_render_context50kg.cpp",
+      "bytes": 4129,
+      "sha256": "99947f5403126afb642ebe42c907b64c278a40ffa4313a8644da6459ee8d5ce1"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_lighting50kg.h",
+      "bytes": 1242,
+      "sha256": "c8e651da0f73e06ca2e34563489cf1272c27fbd84d44deaced7136555c308b8b"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_lighting50kg.cpp",
+      "bytes": 3358,
+      "sha256": "ffc2053ae0c029cfae70c697df1cbab4f5ff7911b9a8a2530165669f06e10556"
+    }
+  ]
+}
