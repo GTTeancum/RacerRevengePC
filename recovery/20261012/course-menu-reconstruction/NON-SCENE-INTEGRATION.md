@@ -1,6 +1,6 @@
 # Ready non-scene source checkpoint
 
-New reconstructed WIP; hashes identify current reconstructed bytes only, never pre-rollback originals. No builds/tests/syntax checks. Root exclusively integrates. All31 non-scene source files are saved; Rider Confirm/clock review is pending and its internal admission gate remains false. Frontend gate update may change its checkpoint hash after review.
+New reconstructed WIP; hashes identify current reconstructed bytes only, never pre-rollback originals. No builds/tests/syntax checks. Root exclusively integrates. All 31 non-scene source files are saved. Independent source review is complete for the bounded muted Rider19 → Course6/1 → fresh Rider19 Back route. Both admission constants remain false by root scheduling decision until after the focused GC lighting/fog observation and central integration.
 
 ## core
 
@@ -65,7 +65,7 @@ frontend/RUNTIME-COURSE-THREADING.patch patches tests/native/original_ui_main_en
 - Widgets owns the actual inactive popup cloned ScreenTexts/resources and real flags29 disable; session and collector read this actual owner. Active/card popup remains unavailable.
 - Rider cold predecessor extension consumes actual Course static/hologram material inventory; Main predecessor behavior is retained.
 - New voice-choice owner shares original application rawRandom308030 and retains lifetime guard/cache plus the SAME shared actual HostMonotonicClock backend already used by native loop consumers. Existing lap_host_clock50id.h supplies explicit native101A50 mapping; no chip parity claim.
-- Independent Confirm review must finish before changing riderConfirmReviewClosed=false. Source snapshots are durable WIP, not destination-readiness evidence.
+- Independent Confirm review accepted the retained clock/shared-RNG owner and corrected truncating voice arithmetic. Both admission constants deliberately remain false. Source review does not establish runtime readiness.
 
 ## Explicit build source lists to update after root integration
 
@@ -96,3 +96,7 @@ New scene translation units (complements22-file scene snapshot):
 - src/game/original_ui_course_render_context50kg.cpp
 
 Existing replacement CPP paths are already in the manifests; do not duplicate them. Header-only changes require no new compilation unit. If root’s validation pin manifests track the explicit lists/new headers, their exact source hashes also need central refresh; this inventory does not execute that workflow.
+
+## Final delivery artifacts
+
+COMPLETE-SOURCE-INVENTORY.json maps all 53 candidate source files to repository paths with hashes and new/replacement status. BUILD-MANIFEST-ADDITIONS.patch supplies the 16 new translation units for all three explicit source lists. It deliberately leaves Windows provenance/revision pins for root to refresh from the actual integrated script/revision. frontend/RUNTIME-COURSE-THREADING.patch contains only the two targeted runtime/header edits. Copy source files by the inventory, apply targeted patches centrally, and retain gates closed until root admits the route. No patch application or build validation was performed.

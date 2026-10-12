@@ -6,6 +6,7 @@
 #include "../../src/assets/model_bindings49o.h"
 #include "../../src/assets/world_normals50hk.h"
 #include "../../src/game/model_motion49t.h"
+#include "../../src/game/shared_random_owner50id.h"
 #include "../../src/game/rigid_vertices49s.h"
 #include "../../src/game/compound_collision50ij.h"
 #include "../../src/game/static_type2_producer49x.h"
@@ -30,7 +31,8 @@ struct Sequence {
 struct PlaybackShared {
  std::uint8_t guard844C=0;std::uint32_t value433468=0;
 };
-struct ServiceShared {std::uint8_t guard80A8=0,guard80AC=0;std::uint32_t seed3D6B30=0,rangeCheck3D6B38=0;};
+// Existing service API name; the caller must borrow its common selector owner.
+using ServiceShared=g::SharedRandomOwner50ID;
 struct CollisionState {
  std::array<g::CompoundCollisionPart50IJ,2> parts{};
  std::array<g::BodyMatrix48G,2> nodeWorld{},previousNodeWorld{};
@@ -296,14 +298,16 @@ public:
  //enabled service advances the same C RNG once, even with probability100.
  bool service(float delta,std::uint32_t sourceTimestamp,std::uint32_t& sharedRaw,
       ServiceShared& lazy,g::ModelMotionSharedState49T& shared,Diagnostic& d){
+  // Retain the existing native failure staging; this ownership-only change
+  // does not yet preserve original RNG mutation prefixes when advance fails.
   auto next=lazy;auto raw=sharedRaw;
-  if(!next.guard80A8){next.seed3D6B30=0;next.guard80A8=1;}
-  if(!next.seed3D6B30){next.seed3D6B30=sourceTimestamp;raw=sourceTimestamp;}
+  if(!next.seed.lazy80A8){next.seed.seed3D6B30=0;next.seed.lazy80A8=true;}
+  if(!next.seed.seed3D6B30){next.seed.seed3D6B30=sourceTimestamp;raw=sourceTimestamp;}
   raw=raw*0x41c64e6du+0x3039u;
   volatile float converted=static_cast<float>(raw&0x7fffffffu);
   volatile float unit=converted*0x1p-31f;
   volatile float percent=101.f*unit;
-  if(!next.guard80AC){next.rangeCheck3D6B38=1;next.guard80AC=1;}
+  if(!next.range.lazy80AC){next.range.rangeCheck3D6B38=1;next.range.lazy80AC=true;}
   if(!std::isfinite(percent)||percent<0.f||percent>=101.f){d.message="GC animation source RNG range";return false;}
   if(!advance(delta,shared,d))return false;
   sharedRaw=raw;lazy=next;return true;

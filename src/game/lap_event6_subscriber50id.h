@@ -1,5 +1,6 @@
 #pragma once
 #include "race_event_queue50id.h"
+#include "shared_random_owner50id.h"
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -31,10 +32,6 @@ struct LapEventCursor50ID {
     std::uint32_t place=0,lap=0,racer60=0,lastReturn=0;
     bool finished=false;
 };
-// Shared source-static state, OUTSIDE per-racer snapshots, initially BSS-zero.
-// The original last-lap route seeds the shared RNG through its own lazy slot;
-// previous RNG use elsewhere does NOT prove this slot is initialized.
-struct LapEventRandomOwner50ID {bool lazy80A8=false;std::uint32_t seed3D6B30=0;};
 enum class LapEventStatus50ID : std::uint8_t {
     Complete,Continue,NeedHelper,AlreadyActive,WrongReturn,ActorUnavailable,
     UnsupportedEvent,UnsupportedNumeric,RandomRange,SequenceExhausted

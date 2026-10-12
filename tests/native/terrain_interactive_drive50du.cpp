@@ -332,10 +332,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  AiTrackTuning50IU originalAiTuning{};
  rr::assets::AiAuthoringDiagnostic50IU originalAiAuthoringDiagnostic{};
  // Explicit HOST fresh-session policy: this Fixture reconstructs the native
- // raw RNG, so reset its shared Dax/category6 lazy slot at that SAME boundary.
- // It is not banked or private audio RNG. Original cross-race static lifetime
- // is not claimed; the monotonic clock backend itself remains application-wide.
- LapEventRandomOwner50ID sessionLazy{};
+ // raw RNG, so reset BOTH shared selector guard/cache pairs at that SAME
+ // boundary. Dax, category6, contact music and GC animation borrow this ONE
+ // owner, outside racer snapshots. Original cross-race static lifetime is not
+ // claimed; the monotonic clock backend itself remains application-wide.
+ SharedRandomOwner50ID sessionRandom{};
  // Shared source owners: never bank these along with the reused racer arena.
  // Fresh17DF80/17F970 profile, no save/cheat/menu continuation admitted.
  // The consumed track bits stay cold-clear only before the retained destruction
@@ -349,7 +350,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  DynamicImpactTuning50IW dynamicTuning{};
  rr::assets::FinalImpactAuthoring49Y dynamicFinalTuning{};
  DynamicContactEventBindings50IW dynamicEventBindings{};
- DynamicContactRangeOwner50IW dynamicRange{};
  DynamicContactMusicCursor50IW dynamicMusicCursor{};
  DynamicContactEventCursor50IW dynamicEventCursor{};
  DynamicContactPodEffect50IW dynamicPodEffect{};
@@ -520,9 +520,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      "original track binding must cover every retained terrain owner");
  std::unique_ptr<gc_animated_world50IG::Owner> gcAnimatedWorld;
  gc_animated_world50IG::Diagnostic gcAnimationDiagnostic{};
- // Explicit same fresh-session lifetime as the reconstructed native RNG and
- // existing Dax sessionLazy. This is not a claim of original cross-race statics.
- gc_animated_world50IG::ServiceShared gcAnimationLazy{};
  const std::size_t animatedCandidateFirst=candidates.size();
  std::size_t gcGateCandidate=std::numeric_limits<std::size_t>::max();
  if(trackSession->originalStaticCandidates){
@@ -883,7 +880,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       audioError.empty()?"original race audio preparation failed":audioError.c_str());
   if(mode1Requested||dynamicContactEnabled){
    require50DU(materialMixer&&sourceAnnouncer->prepare("work/native/project/disc",audioRoot,
-       *materialMixer,*audioGroups,*sharedAnnouncer,sessionLazy,applicationClock,
+       *materialMixer,*audioGroups,*sharedAnnouncer,sessionRandom.seed,applicationClock,
        s.noise.sharedRandomState,audioError,playerRacer60),
        audioError.empty()?"source Dax cold preparation failed; explicit fallback RR_RACE_MODE=2":audioError.c_str());
    require50DU(materialMixer&&raceMusic->prepare("work/native/project/disc",audioRoot,
@@ -1651,7 +1648,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(beginDynamicContactMusic50IW(dynamicMusicCursor).status!=Status::Continue)
    dynamicBoundary(0x22a400u,"collision music continuation already pending");
   for(;;){
-   const auto step=advanceDynamicContactMusic50IW(dynamicMusicCursor,sessionLazy,dynamicRange);
+   const auto step=advanceDynamicContactMusic50IW(dynamicMusicCursor,sessionRandom.seed,sessionRandom.range);
    if(step.status==Status::Complete)return;
    if(step.status!=Status::NeedHelper)dynamicBoundary(step.sourcePC,"collision music source continuation");
    std::uint32_t actualV0=0;bool returned=false;
@@ -2752,7 +2749,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const auto before=::allocations;
   require50DU(sampleHostTimestamp50ID(applicationClock,sourceApplicationTimestamp),"shared source application timestamp rejected");
   require50DU(gcAnimatedWorld->service(.016f,sourceApplicationTimestamp,s.noise.sharedRandomState,
-      gcAnimationLazy,s.animationShared.motion,gcAnimationDiagnostic),
+      sessionRandom,s.animationShared.motion,gcAnimationDiagnostic),
       gcAnimationDiagnostic.message.empty()?"original GC world animation rejected":gcAnimationDiagnostic.message.c_str());
   if(gcAtm.loaded())require50DU(gcAtm.advance(sourceApplicationTimestamp),"original GC ATM time update rejected");
   require50DU(::allocations==before,"successful GC world animation allocated C++ storage");
@@ -3829,7 +3826,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     // Source player speech runs only on the human's accepted native step.
     if(mode1Enabled&&mode1->phase==race_mode1_host50ID::Phase::Flush){
-     const auto flushed=mode1->flush(applicationClock,sessionLazy,s.noise.sharedRandomState,
+     const auto flushed=mode1->flush(applicationClock,sessionRandom.seed,s.noise.sharedRandomState,
          speechCounts,speechState,mode1Effects);
      if(flushed.status!=race_mode1_host50ID::Status::Complete)
       std::cerr<<"MODE1 FIFO BLOCKED: source_pc=0x"<<std::hex<<flushed.sourcePC<<std::dec

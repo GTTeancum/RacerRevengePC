@@ -1,0 +1,373 @@
+[
+  {
+    "candidate": "core/platform/linux/native/original_ui_rider_profile50kg.cpp",
+    "source": "platform/linux/native/original_ui_rider_profile50kg.cpp",
+    "kind": "replacement",
+    "sha256": "9b080f01f1720de08b5849518f5076000b3f2164351a135a6f7526e92bef2b0c",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "core/platform/linux/native/original_ui_rider_profile50kg.h",
+    "source": "platform/linux/native/original_ui_rider_profile50kg.h",
+    "kind": "replacement",
+    "sha256": "a01d98750484dd4c24500ee7ae751a05407d2fd22fb6848dc73fafb8a73f1daf",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "core/src/game/original_ui_course_selection50kg.cpp",
+    "source": "src/game/original_ui_course_selection50kg.cpp",
+    "kind": "new",
+    "sha256": "2575005ab875f6bfae49b066e90228e99d031f61b2e8cbb9188d3c4149451527",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "core/src/game/original_ui_course_selection50kg.h",
+    "source": "src/game/original_ui_course_selection50kg.h",
+    "kind": "new",
+    "sha256": "819288d62ff76d485185ffcf87c40fda5efb2e62de0ad69bfa0d4d724c1eafeb",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "session/platform/linux/native/original_ui_course_session50kg.cpp",
+    "source": "platform/linux/native/original_ui_course_session50kg.cpp",
+    "kind": "new",
+    "sha256": "77fd75b4023a8486541c9f9cb88bf4467f4316833b7d5fea82b83b41cde8d217",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "session/platform/linux/native/original_ui_course_session50kg.h",
+    "source": "platform/linux/native/original_ui_course_session50kg.h",
+    "kind": "new",
+    "sha256": "23983dfc846893c8783efd867f651a9ba1062d466cb09f1a9767a8f8629dba09",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "aperture/src/game/original_ui_aperture_owner50kg.cpp",
+    "source": "src/game/original_ui_aperture_owner50kg.cpp",
+    "kind": "replacement",
+    "sha256": "b1575d26b347031b363316ab5fa69a587785435c3a18c9a3a001d567553425c3",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "aperture/src/game/original_ui_aperture_owner50kg.h",
+    "source": "src/game/original_ui_aperture_owner50kg.h",
+    "kind": "replacement",
+    "sha256": "2bffcd6808b12b887242d6ab6b7e3b60ef563383bb32fb2bdbbc24b815fc4328",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "widgets/platform/linux/native/original_ui_course_draw_resources50kg.cpp",
+    "source": "platform/linux/native/original_ui_course_draw_resources50kg.cpp",
+    "kind": "new",
+    "sha256": "3169155a9ef24ac7e3aeaf2221e5a1ccc5a2f6f621b4b8060b1ded98b47bf0ef",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "widgets/platform/linux/native/original_ui_course_draw_resources50kg.h",
+    "source": "platform/linux/native/original_ui_course_draw_resources50kg.h",
+    "kind": "new",
+    "sha256": "c4451121dddb7b57d44a41aca796b67fc745df5abacd21c96d9ad3142f866116",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_course_widget_controller50kg.cpp",
+    "source": "src/game/original_ui_course_widget_controller50kg.cpp",
+    "kind": "new",
+    "sha256": "adc4d7dc54bf13e44774a563aa55ab7ce9e4d89d98b36fff7645a2a82253d677",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_course_widget_controller50kg.h",
+    "source": "src/game/original_ui_course_widget_controller50kg.h",
+    "kind": "new",
+    "sha256": "d99edce61453c4a7d5c0dd0cefaac6fc86aaf0069ea693b3c39b927adacd1de9",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_course_widgets50kg.cpp",
+    "source": "src/game/original_ui_course_widgets50kg.cpp",
+    "kind": "new",
+    "sha256": "6ad104c2180132d26b28b95e54e610fcc9b651cd694f12b85de05e4b4b41c874",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_course_widgets50kg.h",
+    "source": "src/game/original_ui_course_widgets50kg.h",
+    "kind": "new",
+    "sha256": "64afb0c97dbe634618d56ecbd40b9e596d45bcb80f492c8ae14945d2faf4bb2e",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_light_manager_lifetime50kg.cpp",
+    "source": "src/game/original_ui_light_manager_lifetime50kg.cpp",
+    "kind": "replacement",
+    "sha256": "70fe53972f8ac8e45126dd1d3af57f5c5e1617b9d5cc2f7179aa6b552005a89c",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "widgets/src/game/original_ui_light_manager_lifetime50kg.h",
+    "source": "src/game/original_ui_light_manager_lifetime50kg.h",
+    "kind": "replacement",
+    "sha256": "dcc86bc747ab93497547b288c2d6b8b6693119a59c8fd8fcba987966c38d664b",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "page/src/game/original_ui_course_page_draw50kg.cpp",
+    "source": "src/game/original_ui_course_page_draw50kg.cpp",
+    "kind": "new",
+    "sha256": "b0fd28579c69b8f0faf31df560b7891d114620ae1b3882c81f3b198e8a2ac5c5",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "page/src/game/original_ui_course_page_draw50kg.h",
+    "source": "src/game/original_ui_course_page_draw50kg.h",
+    "kind": "new",
+    "sha256": "169be72ac5be54d9104d85ac0ed2e4621e94cba54c0073901de0f5b8dfb4aa62",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "frontend/platform/linux/native/original_ui_frontend50kg.cpp",
+    "source": "platform/linux/native/original_ui_frontend50kg.cpp",
+    "kind": "replacement",
+    "sha256": "c24f1d7e51a3ef33ef377bb156f085f09f619fa784c3116daba723489805a05c",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "frontend/platform/linux/native/original_ui_frontend50kg.h",
+    "source": "platform/linux/native/original_ui_frontend50kg.h",
+    "kind": "replacement",
+    "sha256": "5e1b35a250a1e49702ed7f8c8144a71eefdc002ec709edffa055a98aeff59ae4",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/platform/linux/native/original_ui_main_session50kg.h",
+    "source": "platform/linux/native/original_ui_main_session50kg.h",
+    "kind": "replacement",
+    "sha256": "d24c4dcdace2cbfcc12a859fae05b07e694c57db05837a8b581bc8c1f96fc6fb",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/platform/linux/native/original_ui_rider_session50kg.cpp",
+    "source": "platform/linux/native/original_ui_rider_session50kg.cpp",
+    "kind": "replacement",
+    "sha256": "91a82727cc1f24609eba2d47a669b383d06929d2c9fb7238a20f46645d4836a9",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/platform/linux/native/original_ui_rider_session50kg.h",
+    "source": "platform/linux/native/original_ui_rider_session50kg.h",
+    "kind": "replacement",
+    "sha256": "865b8d7379fb1570ca489785481c75911cbe87d4a9705b549468db3d2562a8dd",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_character50kg.cpp",
+    "source": "src/game/original_ui_rider_character50kg.cpp",
+    "kind": "replacement",
+    "sha256": "d14da73b077346b9839f2d0388162733bdd8e76b27b36757499c66998021433c",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_character50kg.h",
+    "source": "src/game/original_ui_rider_character50kg.h",
+    "kind": "replacement",
+    "sha256": "aa1b8d0d83230eff226a09007b9dfa686300f03ca76dbe476253eb0b0018b804",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_dynamic_owner50kg.cpp",
+    "source": "src/game/original_ui_rider_dynamic_owner50kg.cpp",
+    "kind": "replacement",
+    "sha256": "37b4362328963837393e3028d1dbdae440ca6b6eb1bdeae512004fb4d1876f41",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_dynamic_owner50kg.h",
+    "source": "src/game/original_ui_rider_dynamic_owner50kg.h",
+    "kind": "replacement",
+    "sha256": "196d3eec2e89ec244d3c46f2e7f89d86cdbec126fa2f12c3d4ed2dce2dc5567b",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_model_scene50kg.cpp",
+    "source": "src/game/original_ui_rider_model_scene50kg.cpp",
+    "kind": "replacement",
+    "sha256": "5e99469d247d181471436954a70ce0f75495d6458106c30cba83c6e959cb7f28",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_model_scene50kg.h",
+    "source": "src/game/original_ui_rider_model_scene50kg.h",
+    "kind": "replacement",
+    "sha256": "a9dc3df2926e27bb3a11e6ba68858d1be50e3212e7fe21137b9e27bf45305809",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_voice_choice50kg.cpp",
+    "source": "src/game/original_ui_rider_voice_choice50kg.cpp",
+    "kind": "new",
+    "sha256": "18e2fc7d853fc7dcfba655fdae79a7b008bf96a94f2b06ccebbb692851d5cd6c",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "rider/src/game/original_ui_rider_voice_choice50kg.h",
+    "source": "src/game/original_ui_rider_voice_choice50kg.h",
+    "kind": "new",
+    "sha256": "fc08fcbb3215ffe22b1c46ffcabe12c9a3df7713dd78c2d1642f0b3b363d30ad",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/platform/linux/native/original_ui_course_background_adapter50kg.h",
+    "source": "platform/linux/native/original_ui_course_background_adapter50kg.h",
+    "kind": "new",
+    "sha256": "1b7f83453c8002831609a66294171a789c0db88d2c9d24d45fc5b5d3adb722ca",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/platform/linux/native/original_ui_course_draw_contribution50kg.cpp",
+    "source": "platform/linux/native/original_ui_course_draw_contribution50kg.cpp",
+    "kind": "new",
+    "sha256": "2842e212484117cfd3f9338ff21efae2a27bb1db8ea3f568ca836ea51632231c",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/platform/linux/native/original_ui_course_draw_contribution50kg.h",
+    "source": "platform/linux/native/original_ui_course_draw_contribution50kg.h",
+    "kind": "new",
+    "sha256": "9b11331b605fdcf0293376698b5d65b52388c56eaff6cf6bae77385d72ce0b1f",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/platform/linux/native/original_ui_course_hologram_draw50kg.cpp",
+    "source": "platform/linux/native/original_ui_course_hologram_draw50kg.cpp",
+    "kind": "new",
+    "sha256": "72e58a66d3992cd1e8f8293b1a5c9788a9ce2d0917c6d39595bb48dcd79eccae",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/platform/linux/native/original_ui_course_hologram_draw50kg.h",
+    "source": "platform/linux/native/original_ui_course_hologram_draw50kg.h",
+    "kind": "new",
+    "sha256": "62235cb441196d0d513afdfae1df64ef04851e99a178b9e317a125fc20952356",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/assets/original_ui_course_background50kg.cpp",
+    "source": "src/assets/original_ui_course_background50kg.cpp",
+    "kind": "new",
+    "sha256": "29f5f6930a6d022d066c633fe9aeba8fedd1fc1f51e5329035944a0766a3171c",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/assets/original_ui_course_background50kg.h",
+    "source": "src/assets/original_ui_course_background50kg.h",
+    "kind": "new",
+    "sha256": "8a8c8ace7c479835a1d605633b7974fd9135424d2623bb1dfc3e82062ec2ab84",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/assets/original_ui_course_hologram_assets50kg.cpp",
+    "source": "src/assets/original_ui_course_hologram_assets50kg.cpp",
+    "kind": "new",
+    "sha256": "070d7288c9b557cf1495281972a379a556263c970953d6d181d1bdffcf7e2989",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/assets/original_ui_course_hologram_assets50kg.h",
+    "source": "src/assets/original_ui_course_hologram_assets50kg.h",
+    "kind": "new",
+    "sha256": "cc9603868652f4bdf08676f468b71dceb7714be5c866c581294383b0879ad19d",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/assets/original_ui_material50kg.cpp",
+    "source": "src/assets/original_ui_material50kg.cpp",
+    "kind": "replacement",
+    "sha256": "8e6f47d47930ff1ecae6b50923b84b016fe29fad1963dd582b6f5f66a1c971b8",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/assets/original_ui_material50kg.h",
+    "source": "src/assets/original_ui_material50kg.h",
+    "kind": "replacement",
+    "sha256": "7b1e5aab5c2d8beb044fb28b64933866f069bbff54fc7f610232e20a113aa784",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/assets/original_ui_screen_assets50kg.cpp",
+    "source": "src/assets/original_ui_screen_assets50kg.cpp",
+    "kind": "replacement",
+    "sha256": "cccbc60024d6e1202f418d69aedc51efec39715c97d073614c1582ffdcbbd490",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_camera50kg.cpp",
+    "source": "src/game/original_ui_course_camera50kg.cpp",
+    "kind": "new",
+    "sha256": "fb4c37244671f0062b7f6f30ea29c5289063d0bc10717fe6ec880ec18a8a6fb8",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_camera50kg.h",
+    "source": "src/game/original_ui_course_camera50kg.h",
+    "kind": "new",
+    "sha256": "a3ba3065e1d0ccde9a1d619303cd246f4612bc76d33c6cf1b84a2c367c0849fe",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_clip_camera50kg.cpp",
+    "source": "src/game/original_ui_course_clip_camera50kg.cpp",
+    "kind": "new",
+    "sha256": "9242e7e26b36fd8f04dac6692731a267ea0838f5060c7624ab5b695ddbc6c993",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_clip_camera50kg.h",
+    "source": "src/game/original_ui_course_clip_camera50kg.h",
+    "kind": "new",
+    "sha256": "586c4eb7a5016d360661931acce0857ed7dd24734db766c10b78b73d25d51cff",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_hologram_scene50kg.cpp",
+    "source": "src/game/original_ui_course_hologram_scene50kg.cpp",
+    "kind": "new",
+    "sha256": "5586cb111cc953e842c76bde6c24fc16e2dc019c9317495c0837a3939d86f322",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_hologram_scene50kg.h",
+    "source": "src/game/original_ui_course_hologram_scene50kg.h",
+    "kind": "new",
+    "sha256": "d40ae5297b59acbdfc01dce18880a0bb6fac18e4da6154306ee1ac2d15230a2f",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_lighting50kg.cpp",
+    "source": "src/game/original_ui_course_lighting50kg.cpp",
+    "kind": "new",
+    "sha256": "ffc2053ae0c029cfae70c697df1cbab4f5ff7911b9a8a2530165669f06e10556",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_lighting50kg.h",
+    "source": "src/game/original_ui_course_lighting50kg.h",
+    "kind": "new",
+    "sha256": "c8e651da0f73e06ca2e34563489cf1272c27fbd84d44deaced7136555c308b8b",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_render_context50kg.cpp",
+    "source": "src/game/original_ui_course_render_context50kg.cpp",
+    "kind": "new",
+    "sha256": "99947f5403126afb642ebe42c907b64c278a40ffa4313a8644da6459ee8d5ce1",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  },
+  {
+    "candidate": "scene/src/game/original_ui_course_render_context50kg.h",
+    "source": "src/game/original_ui_course_render_context50kg.h",
+    "kind": "new",
+    "sha256": "2ea5d2f3b3201c0d3e9705344d4643d8f695a8fcaa04fb6f21262d34f8f65db9",
+    "status": "source-reviewed bounded route; admission gates closed; unbuilt"
+  }
+]

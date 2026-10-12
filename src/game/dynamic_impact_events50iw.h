@@ -11,10 +11,6 @@ namespace rr::game {
 // Native source continuations only. These shared owners/cursors are OUTSIDE
 // racer snapshots. The caller must serialize them with every existing RNG,
 // lap-event, announcer and animated-world consumer. Never shadow sharedRaw.
-struct DynamicContactRangeOwner50IW {
-    bool lazy80AC=false;
-    std::uint32_t rangeCheck3D6B38=0;
-};
 // A live projection of the real profile field, NOT RR_RACE_MODE or a timing
 // declaration. Set bound only after joining the actual application profile.
 struct DynamicContactProfile50IW {std::uint32_t mode11258=0;bool bound=false;};

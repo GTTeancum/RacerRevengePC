@@ -1,0 +1,46 @@
+{
+  "base_commit": "c8e53dfd95c5e9cddb84349cd3de9bc1c1bd24c0",
+  "scope": "Source-only ownership candidate; optional-completed-prefix.patch is excluded. No builds/tests/compiler/syntax/project-script/gameplay checks.",
+  "files": [
+    {
+      "path": "src/game/dynamic_impact_events50iw.h",
+      "action": "modify",
+      "preimage_sha256": "48fd069c8cb6f1282c8dbf2653218b4d1e4230fb5c923cc1c5a3c72e0cb3415a",
+      "candidate_sha256": "26c123f9eb6b732d95c8a68e45ed3bdb30cac9cba1390a7a76d7d3ff0e8affdd",
+      "preimage_bytes": 22025,
+      "candidate_bytes": 21921
+    },
+    {
+      "path": "src/game/lap_event6_subscriber50id.h",
+      "action": "modify",
+      "preimage_sha256": "f55c556b05440d80b409dfbb24d055962d59906b95bb6f57952ead7d2cd79799",
+      "candidate_sha256": "07995500dbe7930dbdb112f5e871ca87ce6895c0d6edc8a1425d3dc0b1d46a13",
+      "preimage_bytes": 7625,
+      "candidate_bytes": 7350
+    },
+    {
+      "path": "src/game/shared_random_owner50id.h",
+      "action": "add",
+      "preimage_sha256": null,
+      "candidate_sha256": "1f210028ef529605d72e64a253db118f5a8ee62113587c1e7ed8ecd6a2d77471",
+      "preimage_bytes": null,
+      "candidate_bytes": 1304
+    },
+    {
+      "path": "tests/native/gc_animated_world50ig_fixture.h",
+      "action": "modify",
+      "preimage_sha256": "13a5f187636452944128ce55ddad17b8734e35c06fce96675f9f3d8701cbbd06",
+      "candidate_sha256": "b9947d53938c12a7a82b7336dec10985e7df6a730badd5c48c5b80643b84af31",
+      "preimage_bytes": 24883,
+      "candidate_bytes": 25152
+    },
+    {
+      "path": "tests/native/terrain_interactive_drive50du.cpp",
+      "action": "modify",
+      "preimage_sha256": "a94dc5177fe8e524bdedd0d6a458627b808f7f2befcb30bc8a3602d0f317e54e",
+      "candidate_sha256": "585bf57dcf84acab278dbb9e72c825f7602b01d82e33e067605eec2c519d5d4f",
+      "preimage_bytes": 316541,
+      "candidate_bytes": 316369
+    }
+  ]
+}
