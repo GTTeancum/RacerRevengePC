@@ -2,7 +2,7 @@
 
 Status: integrated candidate; uncompiled and untested. The successful GC observation on 2026-10-12 tested source 0f1c905a, before this change, and does not validate TA or this revision.
 
-Use RR_TRACK=TA and RR_NATIVE_TA_SELECTED_LIGHTS=1 for an explicitly admitted fresh native race. Default is off. GC retains its separate option. Both options together, wrong track, checkpoint restore or Main-only mode reject.
+The authored native lighting policy now defaults on for admitted fresh RR_TRACK=TA races, per the user's 2026-10-12 direction. RR_NATIVE_TA_SELECTED_LIGHTS=0 is an explicit diagnostic opt-out. GC retains its separate option. Both options together, wrong track, checkpoint restore or Main-only mode reject.
 
 The native owner authenticates TA SCB SHA-256 c3431a55c1f44ae704dae5b031a51f4b7907dbfc3e7787aba4c7ccbf9969031d, owns its nine zones and ten portals, and retains all 26 authored lights: one sun, eight ambient records, and 17 spotlights including 14 negative lights. First-zone ambient initializes every zone before later overrides; zone 9 retains that first ambient. Authored zone 3/4 sun overrides are copied directly, without a second halving.
 

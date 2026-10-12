@@ -4,7 +4,7 @@
 
 Keep the genuine GC registry/visibility candidate independent, then add an explicitly named `nativeGcSelectedLights` rendering policy. Replace only the currently hard-coded scalar light in the existing racer shader with RGB illumination from the current selected GC matrices. This is an honest, bounded native rendering improvement. It does not need original alpha/fog/clipping/specular parity before it can be useful, because it does not claim to execute the original material program or replace its entire composition.
 
-The reviewed policy is integrated as a default-off option. Set RR_NATIVE_GC_SELECTED_LIGHTS=1 only for an admitted fresh GC race. The first integrated Linux build and bounded original-AI observation passed on 2026-10-12; see the validation receipt below. This does not establish Windows behavior or full rendering parity.
+The reviewed policy now defaults on for an admitted fresh GC race, per the user's 2026-10-12 direction. RR_NATIVE_GC_SELECTED_LIGHTS=0 is an explicit diagnostic opt-out. Main/checkpoint sessions do not implicitly enable it. The first integrated Linux build and bounded original-AI observation passed on 2026-10-12; see the validation receipt below. This does not establish Windows behavior or full rendering parity.
 
 ## What this policy means
 

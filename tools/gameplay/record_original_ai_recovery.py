@@ -41,7 +41,7 @@ RR_ENV = {
     "RR_DISABLE_RACER_CONTACTS": "0",
     "RR_AUDIO": "1",
     "RR_AUDIO_DEVICE": "0",
-    "RR_AUTHORED_WORLD_FOG": "0",
+    "RR_AUTHORED_WORLD_FOG": "1",
 }
 SOURCE_PATHS = (
     "tests/native/terrain_interactive_drive50du.cpp",
@@ -782,8 +782,8 @@ def main():
                         help="Explicit native TA authored-zone spotlight scan and portal-color host lighting; requires --track TA and owner receipt")
     parser.add_argument("--native-gc-gate", action="store_true",
                         help="Opt into native swept collider/ authored Gate sphere contact; records the compatibility policy")
-    parser.add_argument("--native-track-fog", action="store_true",
-                        help="Opt into reconstructed native track fog with authenticated track color; distance provenance remains documented separately")
+    parser.add_argument("--native-track-fog", action=argparse.BooleanOptionalAction, default=True,
+                        help="Authored native track fog defaults on; --no-native-track-fog is a diagnostic opt-out")
     parser.add_argument("--native-gc-selected-lights", action="store_true",
                         help="Explicit native GC selected ambient/directional host-Lambert policy; records limits and requires its owner initialization before readiness")
     parser.add_argument("--ready-window-seconds", type=float, default=30.0,
@@ -791,7 +791,14 @@ def main():
     parser.add_argument("--startup-timeout", type=float, default=180.0)
     parser.add_argument("--ack-timeout", type=float, default=5.0)
     parser.add_argument("--quit-timeout", type=float, default=10.0)
+    parser.add_argument("--native-level-lights", action=argparse.BooleanOptionalAction, default=True,
+                        help="Use authored native track lighting by default; --no-native-level-lights is a diagnostic opt-out")
     args = parser.parse_args()
+    if not args.native_level_lights and (args.native_gc_selected_lights or args.native_ta_selected_lights):
+        parser.error("Explicit lighting selection conflicts with --no-native-level-lights")
+    if args.native_level_lights and not (args.native_gc_selected_lights or args.native_ta_selected_lights):
+        args.native_gc_selected_lights = args.track == "GC"
+        args.native_ta_selected_lights = args.track == "TA"
     if args.native_gc_selected_lights and args.native_ta_selected_lights:
         parser.error("Select only one native lighting policy")
     if args.native_gc_selected_lights and args.track != "GC":

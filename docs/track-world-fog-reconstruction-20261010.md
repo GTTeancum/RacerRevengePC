@@ -37,11 +37,20 @@ reset13F910 restores1/100000; scene proxy13FA20 reinstates the fog owner's range
 See recovery/20261010/track-fog-source-closure/README.md and its byte evidence
 for gameplay ownership, authoring offsets, exact defaults and camera phases.
 
-RR_AUTHORED_WORLD_FOG=1 remains required: the Euclidean native shader and its
-material/interpolation/quantization policies below are still reconstruction,
-not source-closed retail world shader behavior. Unset or0 disables it; other
-values fail clearly. Numeric range provenance is now established, but this
-alone does not justify default-on or a retail shader parity claim.
+Per the user's 2026-10-12 instruction, authored native world fog now defaults on.
+RR_AUTHORED_WORLD_FOG=0 remains a diagnostic opt-out; unset or1 enables it and
+other values reject. The integrated all-original-AI recorder also defaults fog
+and matching level lighting on; --no-native-track-fog and
+--no-native-level-lights are explicit comparison opt-outs. Menu-specific capture
+tools retain their independent UI policy.
+
+This default change is source-reviewed, not yet runtime-validated. The earlier
+01:26 GC observation had fog off and does not validate this revision. Existing
+Euclidean/interpolation/material/quantization limits below remain. Enabling the
+authored fog and light colors alone does not certify the requested green visual
+hue: GC's retained Fog RGB is blue-gray. The original world material, texture,
+vertex-color and environment composition must be traced against the user's
+reference before claiming a correct match.
 
 ## Native rendering path
 
@@ -96,4 +105,4 @@ TA/GC enabled captures with actual camera positions near/start/end distances;
 paired ProjectedPrelit surfaces and unchanged alpha; blended/electrical/sky/UI
 exclusion; camera validation rejecting null/nonfinite before GL work; switching
 between fogged spans, excluded spans and frames without state leakage; prior UI
-checks. Close the actual track material fog coordinate/quantization path and native camera-phase fidelity before considering default-on.
+checks. Further close the actual track material fog coordinate/quantization path and native camera-phase fidelity; default-on does not establish parity.
