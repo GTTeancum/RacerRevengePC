@@ -1,10 +1,75 @@
 {
-  "status": "new uncompiled source reconstruction after workspace rollback; not prior-byte recovery; excluded from build",
+  "status": "New uncompiled reconstruction after rollback; excluded from build; no prior candidate byte identity claimed",
   "files": [
     {
-      "path": "scene/src/game/original_ui_course_camera50kg.h",
-      "bytes": 1406,
-      "sha256": "471091e4092dd508334ea8c24b34f4b41b9cea586c72683f0a860d42d6b44bc9"
+      "path": "aperture/src/game/original_ui_aperture_owner50kg.cpp",
+      "bytes": 18233,
+      "sha256": "b1575d26b347031b363316ab5fa69a587785435c3a18c9a3a001d567553425c3"
+    },
+    {
+      "path": "aperture/src/game/original_ui_aperture_owner50kg.h",
+      "bytes": 12029,
+      "sha256": "2bffcd6808b12b887242d6ab6b7e3b60ef563383bb32fb2bdbbc24b815fc4328"
+    },
+    {
+      "path": "core/platform/linux/native/original_ui_rider_profile50kg.cpp",
+      "bytes": 18392,
+      "sha256": "9b080f01f1720de08b5849518f5076000b3f2164351a135a6f7526e92bef2b0c"
+    },
+    {
+      "path": "core/platform/linux/native/original_ui_rider_profile50kg.h",
+      "bytes": 4632,
+      "sha256": "a01d98750484dd4c24500ee7ae751a05407d2fd22fb6848dc73fafb8a73f1daf"
+    },
+    {
+      "path": "core/src/game/original_ui_course_selection50kg.cpp",
+      "bytes": 5225,
+      "sha256": "2575005ab875f6bfae49b066e90228e99d031f61b2e8cbb9188d3c4149451527"
+    },
+    {
+      "path": "core/src/game/original_ui_course_selection50kg.h",
+      "bytes": 2626,
+      "sha256": "819288d62ff76d485185ffcf87c40fda5efb2e62de0ad69bfa0d4d724c1eafeb"
+    },
+    {
+      "path": "scene/platform/linux/native/original_ui_course_background_adapter50kg.h",
+      "bytes": 2113,
+      "sha256": "1b7f83453c8002831609a66294171a789c0db88d2c9d24d45fc5b5d3adb722ca"
+    },
+    {
+      "path": "scene/platform/linux/native/original_ui_course_hologram_draw50kg.cpp",
+      "bytes": 7962,
+      "sha256": "0448474f696566ac51c419c457896064aa832cd7b1a5196c84ffaad27f1eff88"
+    },
+    {
+      "path": "scene/platform/linux/native/original_ui_course_hologram_draw50kg.h",
+      "bytes": 2302,
+      "sha256": "62235cb441196d0d513afdfae1df64ef04851e99a178b9e317a125fc20952356"
+    },
+    {
+      "path": "scene/src/assets/original_ui_course_background50kg.cpp",
+      "bytes": 2367,
+      "sha256": "29f5f6930a6d022d066c633fe9aeba8fedd1fc1f51e5329035944a0766a3171c"
+    },
+    {
+      "path": "scene/src/assets/original_ui_course_background50kg.h",
+      "bytes": 455,
+      "sha256": "8a8c8ace7c479835a1d605633b7974fd9135424d2623bb1dfc3e82062ec2ab84"
+    },
+    {
+      "path": "scene/src/assets/original_ui_course_hologram_assets50kg.cpp",
+      "bytes": 10018,
+      "sha256": "2a10a0782ff520a80458bafd29a022502574e2b5429540068641f99e6797ddb0"
+    },
+    {
+      "path": "scene/src/assets/original_ui_course_hologram_assets50kg.h",
+      "bytes": 2773,
+      "sha256": "cc9603868652f4bdf08676f468b71dceb7714be5c866c581294383b0879ad19d"
+    },
+    {
+      "path": "scene/src/assets/original_ui_screen_assets50kg.cpp",
+      "bytes": 6485,
+      "sha256": "cccbc60024d6e1202f418d69aedc51efec39715c97d073614c1582ffdcbbd490"
     },
     {
       "path": "scene/src/game/original_ui_course_camera50kg.cpp",
@@ -12,9 +77,9 @@
       "sha256": "fb4c37244671f0062b7f6f30ea29c5289063d0bc10717fe6ec880ec18a8a6fb8"
     },
     {
-      "path": "scene/src/game/original_ui_course_clip_camera50kg.h",
-      "bytes": 746,
-      "sha256": "586c4eb7a5016d360661931acce0857ed7dd24734db766c10b78b73d25d51cff"
+      "path": "scene/src/game/original_ui_course_camera50kg.h",
+      "bytes": 1406,
+      "sha256": "471091e4092dd508334ea8c24b34f4b41b9cea586c72683f0a860d42d6b44bc9"
     },
     {
       "path": "scene/src/game/original_ui_course_clip_camera50kg.cpp",
@@ -22,14 +87,24 @@
       "sha256": "9242e7e26b36fd8f04dac6692731a267ea0838f5060c7624ab5b695ddbc6c993"
     },
     {
-      "path": "scene/src/game/original_ui_course_render_context50kg.h",
-      "bytes": 1527,
-      "sha256": "2ea5d2f3b3201c0d3e9705344d4643d8f695a8fcaa04fb6f21262d34f8f65db9"
+      "path": "scene/src/game/original_ui_course_clip_camera50kg.h",
+      "bytes": 746,
+      "sha256": "586c4eb7a5016d360661931acce0857ed7dd24734db766c10b78b73d25d51cff"
     },
     {
-      "path": "scene/src/game/original_ui_course_render_context50kg.cpp",
-      "bytes": 4129,
-      "sha256": "99947f5403126afb642ebe42c907b64c278a40ffa4313a8644da6459ee8d5ce1"
+      "path": "scene/src/game/original_ui_course_hologram_scene50kg.cpp",
+      "bytes": 8652,
+      "sha256": "65c6f2ec8cfbb29d30b5818fed065d3a1f89115903bf2fee6d157c328366f27c"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_hologram_scene50kg.h",
+      "bytes": 2020,
+      "sha256": "d40ae5297b59acbdfc01dce18880a0bb6fac18e4da6154306ee1ac2d15230a2f"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_lighting50kg.cpp",
+      "bytes": 3358,
+      "sha256": "ffc2053ae0c029cfae70c697df1cbab4f5ff7911b9a8a2530165669f06e10556"
     },
     {
       "path": "scene/src/game/original_ui_course_lighting50kg.h",
@@ -37,9 +112,24 @@
       "sha256": "c8e651da0f73e06ca2e34563489cf1272c27fbd84d44deaced7136555c308b8b"
     },
     {
-      "path": "scene/src/game/original_ui_course_lighting50kg.cpp",
-      "bytes": 3358,
-      "sha256": "ffc2053ae0c029cfae70c697df1cbab4f5ff7911b9a8a2530165669f06e10556"
+      "path": "scene/src/game/original_ui_course_render_context50kg.cpp",
+      "bytes": 4129,
+      "sha256": "99947f5403126afb642ebe42c907b64c278a40ffa4313a8644da6459ee8d5ce1"
+    },
+    {
+      "path": "scene/src/game/original_ui_course_render_context50kg.h",
+      "bytes": 1527,
+      "sha256": "2ea5d2f3b3201c0d3e9705344d4643d8f695a8fcaa04fb6f21262d34f8f65db9"
+    },
+    {
+      "path": "session/platform/linux/native/original_ui_course_session50kg.cpp",
+      "bytes": 31715,
+      "sha256": "e3b5560d5e67204b353e053c16d3b4549c92a9fc682265a40b7e6d6f40b6411c"
+    },
+    {
+      "path": "session/platform/linux/native/original_ui_course_session50kg.h",
+      "bytes": 6206,
+      "sha256": "b20a51e01f468ca00c881f04e5767e6e9b398d0ed03222010a637a30c28aa6d7"
     }
   ]
 }
