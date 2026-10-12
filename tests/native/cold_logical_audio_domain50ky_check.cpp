@@ -137,7 +137,8 @@ void registrationAndClear(const Inputs& inputs) {
     require(actualGroup && actualGroup->id().value == 2 && actualGroup->soundCount() == 0 &&
         actualGroup->soundCapacity() == 8, "first isolated dynamic ID2 with real initial8-slot storage");
     const auto& gf = actualGroup->fields();
-    require(gf.referenceCount0 == 1 && !gf.previous10 && !gf.next14 && !gf.firstChild18 && !gf.parent1C &&
+    require(gf.referenceCount0 == 1 && gf.previous10 == nullptr && gf.next14 == nullptr &&
+        gf.firstChild18 == nullptr && gf.parent1C == nullptr &&
         gf.mask20 == 0 && gf.mask24 == 0 && gf.byte28 == 0xff &&
         gf.flags29.mask == 0x0f && gf.flags29.value == 3 &&
         gf.flags30.mask == 1 && gf.flags30.value == 1 && gf.volume38 == 100 && gf.state44 == 0,

@@ -3,8 +3,10 @@
 `ColdLogicalAudioDomain50KY` is an owned, source-derived cold component whose
 completed endpoint is **PendingRegistration**. It is not AuralScape, the source
 sound interface, an event-attached Effects110 group, a sample provider or a
-playback owner. Source candidate only: this change and its prospective check
-have not been compiled, syntax-checked, tested or run.
+playback owner. The focused Linux build on c840b434 failed on 2026-10-12
+at the regression's null-only link comparisons; no test executable ran.
+Those comparisons now use explicit equality to nullptr. The correction has
+not been rebuilt or tested; production behavior remains unvalidated.
 
 ## Real ownership and admission
 
