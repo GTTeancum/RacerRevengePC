@@ -66,7 +66,7 @@ Live progress is ordinary stdout: each `compile-progress ` prefix is followed by
 one compact JSON record containing the job bound and started, completed, failed,
 cancelled, running and not-started source counts. Records occur at initialization,
 source transitions, compilation completion and cleanup, never on idle polls:
-at most `2 * sourceCount + 3` records (703 for the current source gate).
+at most `2 * sourceCount + 3` records (719 for the current source gate).
 Completed means exit zero with an object present; failed includes launch failure,
 a nonzero compiler exit or a missing object; cancelled means the script terminated
 an active compiler. Counts do not certify build acceptance.
@@ -95,23 +95,20 @@ there is no installer, download, PATH-wide runtime lookup or asset copier.
 
 ## Source reconciliation and limits
 
-`interactive50du.sources.json` freezes 344 C++ owners from the actual layered
+`interactive50du.sources.json` freezes 352 C++ owners from the actual layered
 `prepare_interactive_build50dv.py` / `prepare_offscreen_build50do.py` /
-`check_terrain_registered_drive50bv.py` declarative lists at
-baseline `2e8389641cfad48b72212c08490b2b0384fa6294` plus the native gameplay
-Binder, twelve original camera kernels, five camera/display activation dependencies,
-and the native original-AI physical recovery ground-query unit
-`reset_ground_query50iz.cpp`, plus nine native GC particle/material/render and
-active-emitter units and four original Options Controls controller/model/assets/
-specmap units, plus seven canonical Standard model/material/texture asset units
-for the bounded TA consumer, plus the one shared AIDamage ScreenMT-reference
-unit required by the actual native racer cold-prefix caller. Six additional
-vendored zlib C files remain unchanged. The matching PowerShell count gate is 344.
-The central interactive list has 345 C++ units because it retains the Linux offscreen context;
-Windows excludes that unit as described below. Source registration alone does
-not activate the original camera route.
-Those generator files were read, not run or imported. Hash gates require renewed
-review if they change. Linux CMake was not used as the integrated source truth.
+`check_terrain_registered_drive50bv.py` declarative lists. Six additional
+vendored zlib C files bring the build total to 358. The matching PowerShell
+C++ count gate is 352. The three generator provenance hashes still match the
+source reviewed on October 16; generators were read, not executed or imported.
+
+The passing Linux Ryloth build uses 354 C++ units. It contains all 352 Windows
+units plus the Linux-only offscreen EGL context and the additional unused
+`static_draw_assets50dw.cpp` library unit. The dedicated RA renderer and session
+owners are included by existing translation units. This is source-list coverage,
+not evidence of a Windows build or smoke at the Ryloth revision. See the
+[October 16 source review](../../../docs/recovery/windows-ryloth-source-review-20261016.md).
+Hash gates require renewed review if their generator files change.
 
 The Windows closure excludes `offscreen_gl_context50dc.cpp`,
 `vehicle_offscreen_gl50dd.cpp`, and `vehicle_offscreen_present50de.cpp`.

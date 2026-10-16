@@ -5952,8 +5952,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        {"all_original_ai",allAiEnabled},{"host_driver_calls",allAiHostDriverCalls},
        {"controller_samples",allAiControllerSamples},{"keyboard_packets",allAiKeyboardPackets},
        {"native_pod_shadows",renderRequest.enableNativePodShadows},
+       {"world_renderer",renderRequest.raStaticWorld?"native_ra_aggregate":"legacy_track_adapter"},
+       // Keep existing keys stable for receipt readers, but identify their
+       // scope: RA uses its own camera fog and conservative clip rejection.
+       {"track_adapter_settings_apply",!bool(renderRequest.raStaticWorld)},
        {"track_frustum_culling",renderRequest.track.enableFrustumCulling},
        {"authored_world_fog",renderRequest.track.worldFog.enabled},
+       {"ra_authored_material_fog",bool(renderRequest.raStaticWorld)},
+       {"ra_conservative_clip_rejection",bool(renderRequest.raStaticWorld)},
+       {"ra_internal_coverage_samples",renderRequest.raStaticWorld?4:0},
        {"original_gameplay_blur",renderRequest.enableOriginalGameplayBlur},
        {"logical_audio_enabled",audioEnabled},{"audio_output_requested",audioOutputRequested},
        {"native_step_ns",stepNs},{"maximum_catchup_steps",4},{"msaa_samples_requested",requestedWindowSamples},

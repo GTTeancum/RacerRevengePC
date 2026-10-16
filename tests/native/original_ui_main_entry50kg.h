@@ -1,5 +1,8 @@
 #pragma once
-namespace rr::game { class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA; }
+namespace rr::game { class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
+struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
+namespace original_camera_session50KX { class Session; }
+namespace native_ai50IV { struct Session; }
 #include "original_ui_main_output50kg.h"
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
@@ -224,6 +227,17 @@ public:
         PositionStatsPrimitiveResult50LA&) const noexcept;
     bool stagePositionStatsResources50LA(const std::filesystem::path& originalRoot,
         PositionStatsResourceResult50LA&) const noexcept;
+    // Synchronous same-owner observation only; no retained camera borrow or draw grant.
+    bool capturePositionStatsNumbers50LA(const rr::game::OriginalPositionStatsResources50LA&,
+        const original_camera_session50KX::Session&,const native_ai50IV::Session&,
+        rr::game::OriginalPositionStatsNumbers50LA&,
+        rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
+    bool preparePositionStatsLayout50LA(rr::game::OriginalPositionStatsResources50LA&,
+        const original_camera_session50KX::Session&,const native_ai50IV::Session&,
+        rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
+    bool preparePositionStatsText50LA(rr::game::OriginalPositionStatsResources50LA&,
+        const original_camera_session50KX::Session&,const native_ai50IV::Session&,
+        rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
     const std::shared_ptr<rr::game::OriginalApplicationEntities50LA>& entities() const noexcept {
         return entitiesOwner_;
     }

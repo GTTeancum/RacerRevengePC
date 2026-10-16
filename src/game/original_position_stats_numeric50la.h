@@ -3,6 +3,7 @@
 // snapshot, scheduling, geometry or renderer readiness is established here.
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 namespace rr::game::position_stats_detail50LA {
 struct LayoutOffsets {float x=0,y=0;};
 //191290..1912E8: only the source mode0/1/2 and one-based view1/2 domain.
@@ -59,5 +60,53 @@ inline bool observePositionNumbers191F00(std::int32_t actualRecord3C,
     PositionNumbers& out)noexcept {
     if(actualManagerCount30>8||actualActiveCount50>actualManagerCount30)return false;
     out={actualRecord3C,actualActiveCount50};return true;
+}
+
+//1922B0: native scalar projection of an actual world point into the existing
+//PositionStats radar. Inputs are observations of owner32C0/32C8,32D4/32D8,
+//32DC and32E4/32E8, not a replacement camera, route or racer driver.
+struct RadarProjectionInputs {
+    float centerX=0,centerZ=0,cosine=0,sine=0,scale=0,screenX=0,screenY=0;
+};
+struct RadarProjectedPoint {
+    float x=0,y=0;
+    std::uint32_t alpha=0;
+    bool outside=false;
+};
+inline bool projectRadarPoint1922B0(const RadarProjectionInputs& p,
+    float worldX,float worldZ,RadarProjectedPoint& output)noexcept {
+    const float inputs[]={p.centerX,p.centerZ,p.cosine,p.sine,p.scale,
+        p.screenX,p.screenY,worldX,worldZ};
+    for(float value:inputs)if(!std::isfinite(value))return false;
+    // Keep source single-precision multiply/add boundaries separate. These
+    // native arithmetic operations do not execute source instructions.
+    const auto add=[](float a,float b)noexcept{volatile float r=a+b;return r;};
+    const auto sub=[](float a,float b)noexcept{volatile float r=a-b;return r;};
+    const auto mul=[](float a,float b)noexcept{volatile float r=a*b;return r;};
+    const float dx=sub(worldX,p.centerX),dz=sub(worldZ,p.centerZ);
+    const float rotatedX=add(mul(dx,p.cosine),mul(dz,p.sine));
+    const float rotatedY=-add(-mul(dx,p.sine),mul(dz,p.cosine));
+    const float x=mul(p.scale,rotatedX),y=mul(p.scale,rotatedY);
+    if(!std::isfinite(x)||!std::isfinite(y))return false;
+    const auto outside=[&](float halfWidth,float top,float bottom)noexcept{
+        return x>halfWidth||x< -halfWidth||y>top||y<bottom;
+    };
+    RadarProjectedPoint next;
+    next.outside=outside(45.f,21.f,-57.f);
+    if(!next.outside){
+        next.alpha=255;
+        if(outside(39.f,15.f,-51.f)){
+            next.alpha=192;
+            if(outside(41.f,17.f,-53.f)){
+                next.alpha=128;
+                if(outside(43.f,19.f,-55.f))next.alpha=64;
+            }
+        }
+    }
+    //The original writes projected coordinates even for an outside point;
+    //the caller may still clip its segment against the same radar bounds.
+    next.x=add(x,p.screenX);next.y=add(y,p.screenY);
+    if(!std::isfinite(next.x)||!std::isfinite(next.y))return false;
+    output=next;return true;
 }
 } //namespace rr::game::position_stats_detail50LA

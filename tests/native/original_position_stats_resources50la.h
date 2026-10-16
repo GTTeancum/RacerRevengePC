@@ -1,7 +1,13 @@
 #pragma once
 #include "original_position_stats_primitives50la.h"
+#include "original_position_stats_adapter50la.h"
+#include "../../src/game/original_position_stats_numeric50la.h"
 #include "../../src/game/original_position_stats_clip50la.h"
 #include "../../src/game/original_position_stats_loader_data50la.h"
+#include "../../src/game/original_ui_text_position50kg.h"
+#include <algorithm>
+#include <charconv>
+#include <cmath>
 #include <optional>
 #include <cstring>
 
@@ -14,8 +20,9 @@ struct OriginalPositionStatsResourceDiagnostic50LA {
     OriginalCameraStartResult drain;
     OriginalPositionStatsPrimitiveDiagnostic50LA primitive;
 };
-//Detached cold18FF80/190190 resource owner. No race+CC hierarchy, view adapter,
-//demand, collector, predraw or draw API. Renderer must NEVER strongly retain it.
+//Detached cold18FF80/190190 resource owner with Application-mediated scalar
+//observation. No race+CC hierarchy, demand, collector, predraw or draw API.
+//Renderer must NEVER strongly retain it.
 class OriginalPositionStatsResources50LA final {
     friend struct original_main_entry50KG::Application;
     using Domain=assets::OriginalStandardMaterialDomain50LA;
@@ -63,7 +70,7 @@ class OriginalPositionStatsResources50LA final {
         PacketVertex* packet=nullptr; //2DFBA0/2E03F0 first-copy alias, no overlap here.
     };
     struct Glyph {std::array<SourceVertex,2> vertices;}; //Original stride60 pair.
-    struct Packet {std::unique_ptr<PacketVertex[]> vertices;std::size_t count=0;};
+    struct Packet {std::unique_ptr<PacketVertex[]> vertices;std::size_t count=0,activeVertices=0;};
     struct Primitive {Material material;Packet* packet10=nullptr;};
     struct Text {
         //2E02F0 constructor; storage is allocated only by2DFD90/2DF8E0.
@@ -89,14 +96,15 @@ class OriginalPositionStatsResources50LA final {
     Entity entity_;
     std::shared_ptr<Domain> domain_;
     std::shared_ptr<const Context> context_;
-    std::shared_ptr<const Archive> overlays_;
+    std::shared_ptr<const Archive> overlays_,localization_;
+    std::shared_ptr<const assets::OriginalUiEnglish50KG> english_;
     std::array<Text,5> texts_{}; //Original order:5,9,118,clip.
     std::array<Texture,9> fixed_{};
     std::array<Texture,118> map_{};
     std::optional<OriginalPositionStatsClip50LA> clip_{std::in_place};
     std::shared_ptr<OriginalPositionStatsPrimitiveOwner50LA> primitives_;
     const void* race30_=nullptr; //Detached: no fabricated original race+CC/30 join.
-    std::uint32_t field32B0_=0,field32B4_=0;
+    float field32B0_=0,field32B4_=0;
     std::array<float,4> field32C0_{{0,0,0,1}}; //3C9790 initializes433EB0.
     float field32D0_=0,field32D4_=0,field32D8_=0;
     float field32B8_=7,field32DC_=0,field32E0_=0,field32E4_=0,field32E8_=0;
@@ -233,6 +241,161 @@ class OriginalPositionStatsResources50LA final {
             stage_=Stage::texts;return true;
         }catch(...){return stop(d,E::allocation,0x2df8e0);}
     }
+    static void assignText191DB0(Text& t,const char* bytes,std::size_t length)noexcept {
+        if(t.length5C==length&&std::memcmp(t.string8.get(),bytes,length)==0)return;
+        const auto count=std::min<std::size_t>(length,t.capacity5B);
+        t.length5C=static_cast<std::uint8_t>(count);
+        std::memcpy(t.string8.get(),bytes,count);t.string8[count]=0;t.flags5A|=3;
+    }
+    static void justifyText191DB0(Text& t,std::uint32_t value)noexcept {
+        if(t.justification50!=value){t.justification50=value;t.flags5A|=3;}
+    }
+    // Bounded zero-rotation2E0F50 CPU leaf. Reads the actual font281F90 atlas
+    // dimensions, just as2E0A88 does; it does not fabricate a decoded pixel
+    // image to satisfy a host quad builder. Native upload is still separate.
+    bool prepareText2E0F50(std::size_t index,std::uint32_t depth,D& d)noexcept {
+        auto& t=texts_[index];d.offset=0x40+std::uint32_t(index)*0x70;
+        const auto reject=[&](std::uint32_t pc)noexcept{d.error=E::font;d.sourcePC=pc;return false;};
+        if(!t.font4C||!t.string8||!t.glyphsC||!t.packets64||t.length5C>t.capacity5B||
+           t.capacity5B!=40||t.string8[t.length5C]||t.field44!=0||t.field40<=0||
+           !std::isfinite(t.field40)||(t.justification50!=0&&t.justification50!=4)||
+           !std::isfinite(t.x10)||!std::isfinite(t.y14)||depth!=0xffffffu)return reject(0x2e0f50);
+        if(!(t.flags5A&3u))return true;
+        const auto* atlas=t.font4C->texture281F90();
+        if(!atlas||!atlas->sourceWidth14()||!atlas->sourceHeight18()||
+           *atlas->sourceWidth14()<=0||*atlas->sourceHeight18()<=0)return reject(0x2e0a88);
+        const float width=static_cast<float>(*atlas->sourceWidth14());
+        const float height=static_cast<float>(*atlas->sourceHeight18());
+        std::array<const assets::OriginalUiGlyph50KG*,40> glyphs{};
+        float measured=0,firstHeight=0;bool pixel=false;
+        for(std::size_t n=0;n<t.length5C;++n){
+            const auto* g=t.font4C->metrics().glyph(static_cast<std::uint8_t>(t.string8[n]));
+            if(!g||g->widthMinusOne< -1||g->heightMinusOne< -1)return reject(0x2e0b18);
+            if(n==0)pixel=g->hasPixelMetrics;
+            else if(pixel!=g->hasPixelMetrics)return reject(0x2e18a8); //Bounded mixed-run rejection.
+            glyphs[n]=g;
+            measured=measured+(pixel?float(int(g->leftBearing)+int(g->advanceAfterBearing)):(g->right-g->left));
+            if(n==0)firstHeight=pixel?float(int(g->heightMinusOne)+1):height*(g->bottom-g->top);
+            for(std::size_t v=0;v<2;++v){const auto batch=n/36,vertex=(n%36)*2+v;
+                if(!t.packets64[batch].vertices||t.glyphsC[n].vertices[v].packet!=
+                    &t.packets64[batch].vertices[vertex])return reject(0x2e03f0);}
+        }
+        if(!pixel)measured=measured*width;
+        float x=t.x20,y=t.y24;
+        if(t.flags5A&1u){
+            x=t.x10;y=t.y14;
+            if(t.length5C&&t.justification50==4){
+                std::int32_t w=0,h=0,position=0;
+                if(!roundOriginalUiTextMetric50KG(measured,t.field40,w)||
+                   !roundOriginalUiTextMetric50KG(firstHeight,t.field40,h)||
+                   !roundOriginalUiTextMetric50KG(t.x10-static_cast<float>(w),1.f,position))return reject(0x2e153c);
+                x=static_cast<float>(position);
+            }
+        }
+        //2E13A0 sets bit2 when positioning changes;2E0AD0 divides the local
+        //copies, not persistent20/24. Preserve original division then multiply.
+        const bool inverse=(t.flags5A&5u)!=0;
+        float pen=inverse?x/t.field40:x;
+        const float localY=inverse?y/t.field40:y;
+        struct Pair {std::array<std::array<float,2>,2> xy,uv;};
+        std::array<Pair,40> prepared{};
+        for(std::size_t n=0;n<t.length5C;++n){const auto& g=*glyphs[n];auto& p=prepared[n];
+            if(pixel){
+                pen=pen+float(g.leftBearing);
+                p.xy[0]={{pen-.5f,localY-.5f}};
+                p.xy[1]={{p.xy[0][0]+float(int(g.widthMinusOne)+1),p.xy[0][1]+float(int(g.heightMinusOne)+1)}};
+                p.uv[0]={{(g.left*(width-1.f))/width,(g.top*(height-1.f))/height}};
+                p.uv[1]={{(g.right*(width-1.f))/width,(g.bottom*(height-1.f))/height}};
+                pen=pen+float(g.advanceAfterBearing);
+            }else{
+                p.xy[0]={{pen,localY}};pen=pen+width*(g.right-g.left);
+                p.xy[1]={{pen-1.f,localY+height*(g.bottom-g.top)}};
+                p.uv[0]={{g.left,g.top}};p.uv[1]={{g.right,g.bottom}};
+            }
+            for(std::size_t v=0;v<2;++v)for(std::size_t axis=0;axis<2;++axis)
+                if(!std::isfinite(p.xy[v][axis])||!std::isfinite(p.uv[v][axis])||
+                   !std::isfinite(t.field40*p.xy[v][axis]))return reject(0x2e1240);
+        }
+        t.active5E=std::uint8_t((t.length5C+35u)/36u);t.x20=x;t.y24=y;
+        for(std::size_t batch=0;batch<2;++batch)t.packets64[batch].activeVertices=
+            2*std::min<std::size_t>(36,t.length5C>batch*36?t.length5C-batch*36:0);
+        const float z=static_cast<float>(depth)-t.field48; //Source-admitted positive field48=1.
+        for(std::size_t n=0;n<t.length5C;++n)for(std::size_t v=0;v<2;++v){
+            auto& source=t.glyphsC[n].vertices[v];const auto& p=prepared[n];
+            source.authored[0]=p.xy[v][0];source.authored[1]=p.xy[v][1];source.authored[2]=z;
+            //2E0A30 writes only S/T. Preserve Q and all RGBA lanes from the
+            //actual packet allocation/setters; never synthesize an atlas quad.
+            source.packet->stq[0]=p.uv[v][0];source.packet->stq[1]=p.uv[v][1];
+            source.packet->xyz=source.authored;
+            source.packet->xyz[0]=t.field40*p.xy[v][0];source.packet->xyz[1]=t.field40*p.xy[v][1];
+        }
+        t.flags5A=std::uint8_t(t.flags5A&~7u);return true;
+    }
+    bool prepareText191DB0(const OriginalPositionStatsNumbers50LA& observation,std::uint32_t depth,D& d)noexcept {
+        bool visible=false;position_stats_detail50LA::Visibility preference;
+        if(!english_||!english_->loaded()||!position_stats_detail50LA::ownLeafVisible191BE0(
+                observation.viewIndex,observation.raceFlags1B0,observation.raceEntityFlags29,observation.uiFlags1E4,visible)||
+           !position_stats_detail50LA::preferenceVisibility17FB90(observation.preference10F9C,
+                observation.viewState40,observation.subtype11258,preference)){
+            d.error=E::phase;d.sourcePC=0x191be0;return false;}
+        if(!visible)return true;
+        const auto number=[&](std::size_t index,std::int32_t value,bool slash)noexcept{
+            std::array<char,16> bytes{};char* first=bytes.data();if(slash)*first++='/';
+            const auto result=std::to_chars(first,bytes.data()+bytes.size(),value);
+            if(result.ec!=std::errc{}){d.error=E::phase;d.sourcePC=0x308c90;return false;}
+            assignText191DB0(texts_[index],bytes.data(),std::size_t(result.ptr-bytes.data()));return true;
+        };
+        if(preference.position){
+            const auto* label=english_->at(455);if(!label){d.error=E::font;d.sourcePC=0x191e1c;return false;}
+            assignText191DB0(texts_[0],label->text.data(),label->text.size());justifyText191DB0(texts_[0],0);
+            if(!prepareText2E0F50(0,depth,d)||!number(2,static_cast<std::int32_t>(observation.activeCount50),true))return false;
+            justifyText191DB0(texts_[2],0);
+            if(!prepareText2E0F50(2,depth,d)||!number(1,observation.placeCCC,false))return false;
+            justifyText191DB0(texts_[1],4);if(!prepareText2E0F50(1,depth,d))return false;
+        }
+        if(preference.countCD0){
+            const auto* label=english_->at(457);if(!label){d.error=E::font;d.sourcePC=0x192130;return false;}
+            assignText191DB0(texts_[3],label->text.data(),label->text.size());
+            if(!prepareText2E0F50(3,depth,d)||!number(4,std::bit_cast<std::int32_t>(observation.viewCountCD0),false)||
+               !prepareText2E0F50(4,depth,d))return false;
+        }
+        return true;
+    }
+    // Complete191290..191AE8 predraw position/dirty writes. This updates the
+    // actual resource fields, never a host panel or replacement geometry.
+    // Source191150 obtains3210 from race8C;191BB0 supplies Application268+1.
+    bool layout191290(const OriginalPositionStatsNumbers50LA& observation,D& d)noexcept {
+        position_stats_detail50LA::LayoutOffsets offsets;
+        if(!observationDisplay()||observation.viewIndex!=0||
+           !position_stats_detail50LA::layoutOffsets191290(observation.raceMode8C,
+                observation.viewIndex+1,offsets)){
+            d.error=E::phase;d.sourcePC=0x191290;return false;
+        }
+        field32B0_=offsets.x;field32B4_=offsets.y;
+        constexpr std::array<float,9> x{{485,517,522,554,586,505,546,485,517}};
+        constexpr std::array<float,9> y{{52,52,52,52,52,74,134,30,30}};
+        for(std::size_t i=0;i<fixed_.size();++i){
+            auto& t=fixed_[i];const float nextX=x[i]+field32B0_,nextY=y[i]+field32B4_;
+            if(t.x10==nextX&&t.y14==nextY)continue;
+            t.x10=nextX;t.y14=nextY;t.flags5C=std::uint8_t((t.flags5C&~1u)|1u);
+            if(t.field3C==0.f)t.flags5C=std::uint8_t((t.flags5C&~2u)|2u);
+        }
+        constexpr std::array<float,5> tx{{500,570,571,500,590}};
+        constexpr std::array<float,5> ty{{53,51,53,31,31}};
+        for(std::size_t i=0;i<texts_.size();++i){
+            auto& t=texts_[i];const float nextX=tx[i]+field32B0_,nextY=ty[i]+field32B4_;
+            if(t.x10==nextX&&t.y14==nextY)continue;
+            t.x10=nextX;t.y14=nextY;
+            t.flags5A=std::uint8_t((t.flags5A&~1u)|1u);
+            t.flags5A=std::uint8_t((t.flags5A&~2u)|2u);
+        }
+        return true;
+    }
+    const original_main_entry50KG::RaceDisplayLifetime50LA* observationDisplay()const noexcept {
+        return stage_==Stage::complete&&entity_.detached()&&lease_&&
+            !lease_->retirementStarted_&&primitives_&&primitives_->resourceFragmentLoaded()?
+            lease_->owner_.get():nullptr;
+    }
     static void destroyTexture(Texture& t)noexcept {
         t.buffer58.reset(); //2DF038 BEFORE clearing10 and destroying54.
         if(t.primitive54){t.primitive54->packet10=nullptr;release(t.primitive54->material);t.primitive54.reset();}
@@ -271,6 +434,53 @@ public:
 };
 }
 namespace original_main_entry50KG {
+// A synchronous borrow: all camera/manager checks and bank reads finish before
+// return. Neither the resource owner nor Application stores the adapter/camera.
+inline bool Application::capturePositionStatsNumbers50LA(
+    const rr::game::OriginalPositionStatsResources50LA& resources,
+    const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,
+    rr::game::OriginalPositionStatsNumbers50LA& output,
+    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d)const noexcept {
+    using Adapter=original_position_stats_adapter50LA::Owner;
+    using Error=rr::game::OriginalPositionStatsResourceDiagnostic50LA::Error;
+    d={};
+    const auto reject=[&]()noexcept{d.error=Error::phase;d.sourcePC=0x191db0;return false;};
+    const auto owner=positionStatsResourcesOwner50LA_.lock();
+    const auto display=raceDisplayOwner50LA_.lock();
+    if(!enabled||owner.get()!=&resources||!display||display->application_!=this||
+       display->video_!=videoOwner_||!display->canRetain()||
+       resources.observationDisplay()!=display.get()||
+       resources.entity_.application!=entitiesOwner_||
+       resources.domain_!=standardMaterialDomainOwner_||
+       resources.context_!=materialContextOwner_||!materialContextOwner_||
+       !materialContextOwner_->live()||materialContextOwner_->videoIdentity()!=videoOwner_.get()||
+       !standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared())return reject();
+    const auto table=standardMaterialDomainOwner_->materials382B38();
+    if(!table||!Adapter::belongsToApplication(camera,entitiesOwner_.get(),table.get(),
+        &materialDirectory36B970_,&display->renderer_,&display->dispatch_))return reject();
+    Adapter observation;Adapter::Diagnostic adapterDiagnostic;
+    rr::game::OriginalPositionStatsNumbers50LA next;
+    if(!observation.bind(camera,manager,adapterDiagnostic)||
+       !observation.capture(next,adapterDiagnostic))return reject();
+    output=next;return true;
+}
+inline bool Application::preparePositionStatsLayout50LA(
+    rr::game::OriginalPositionStatsResources50LA& resources,
+    const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,
+    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d)const noexcept {
+    rr::game::OriginalPositionStatsNumbers50LA observation;
+    return capturePositionStatsNumbers50LA(resources,camera,manager,observation,d)&&
+        resources.layout191290(observation,d);
+}
+inline bool Application::preparePositionStatsText50LA(
+    rr::game::OriginalPositionStatsResources50LA& resources,
+    const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,
+    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d)const noexcept {
+    rr::game::OriginalPositionStatsNumbers50LA observation;
+    return capturePositionStatsNumbers50LA(resources,camera,manager,observation,d)&&
+        resources.layout191290(observation,d)&&
+        resources.prepareText191DB0(observation,std::uint32_t(videoOwner_->packetZMaximum),d);
+}
 struct PositionStatsResourceResult50LA {
     bool attempted=false,coldResourcesLoaded=false;
     std::shared_ptr<rr::game::OriginalPositionStatsResources50LA> owner;
@@ -279,6 +489,7 @@ struct PositionStatsResourceResult50LA {
     rr::assets::OriginalStandardMaterialDiagnostic50LA material;
     rr::assets::OriginalUiPageDiagnostic50KG source;
     rr::assets::OriginalApplicationFontDiagnostic50LA font;
+    rr::assets::OriginalUiLocalizationDiagnostic50KG localization;
     PositionStatsPrimitiveResult50LA primitive;
     std::string failure;
 };
@@ -344,6 +555,13 @@ inline bool Application::stagePositionStatsResources50LA(const std::filesystem::
             return fail("PositionStats original one-font stage failed; retain partial owner");
         if(!out.owner->stageTexts(*fonts328Owner_,materialDirectory36B970_,out.diagnostic))
             return fail("PositionStats text/clip stage failed; retain partial owner");
+        //Native retained localization bridge, matching existing TimeStats/SpeedBoost
+        //ownership. Runtime191DB0 still selects the original numeric IDs455/457.
+        out.owner->localization_=readArchive(originalRoot,OriginalUiArchiveId50KG::localization);
+        auto english=std::make_shared<OriginalUiEnglish50KG>();
+        if(!readOriginalUiEnglish50KG(*out.owner->localization_,*english,out.localization))
+            return fail("PositionStats authentic English localization rejected; retain partial owner");
+        out.owner->english_=std::move(english);
         //Only after127 textures, font,5 texts and119F60: original191118->191180.
         const bool okay=stagePositionStatsPrimitives50LA(originalRoot,out.primitive);
         out.owner->primitives_=out.primitive.owner; //Retain even a failed partial16 array.

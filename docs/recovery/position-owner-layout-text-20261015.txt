@@ -1,0 +1,78 @@
+PositionStats same-owner observation, layout and glyph CPU candidate
+Base cfa6748. UNTESTED. Root owns all integration and every validation run.
+No build, syntax check, test, sanitizer, converter, gameplay or guest execution.
+No central worktree, original binary, body-owner fixture or lighting edits.
+
+Implemented in actual existing retained resources:
+- Application-mediated synchronous capture checks its weak resource owner, its
+  actual display/application/Video, the fixed lease's exact display, its same
+  Entity/material/context owners, and the camera's renderer/dispatch, Entity,
+  material table and material-directory address. Only then existing ALL8/view0
+  adapter reads the current published canonical rank/retirement/common racer
+  state. No comparison of unrelated camera/display generation counters; no
+  persistent borrowed camera, no public scalar setter or readiness grant.
+- Whole191290..191AE8 writes actual nine fixed Texture10/14/5C and five
+  Text10/14/5A fields plus32B0/32B4. Source float constants and bit writes remain
+  ordered. Texture dirty bit2 is set only when field3C equals zero. No packet
+  alias or allocation is replaced. Source191150 mode comes from observed race8C;
+  admitted ALL8 view0 maps to source Application268+1 =1.
+- Retains authenticated English archive/index using existing TimeStats/SpeedBoost
+  native ownership precedent.191DB0 uses original IDs455/457, formats signed
+  placeCCC unchanged, actual activeCount50 with slash, and signed32 CD0. Strings
+  truncate to actual capacity40 and write flags only when source strings differ.
+  Source visibility gates retained. Text order0,2,1,3,4. Original constants
+  3C4738=0 and3C4758=4 select justification: large position is RIGHT aligned.
+- Private2E0F50 CPU glyph path uses actual font Entry/CEL and its canonical
+  texture281F90 width14/height18, as original2E0A88 does. No fake decoded atlas.
+  Uses real40 glyph-pair storage, verifies each actual first packet alias, writes
+  source local XY/Z then actual aliased packet XY/Z, preserving authored W and
+  existing RGBA and untouched STQ lanes. Native active vertex counts describe
+  original36/4 batches. Original two corners remain two corners, not new quads.
+  Source pixel metrics and homogeneous UV-only runs supported. Mixed metric
+  runs reject instead of guessing original aggregate measurement. Layout checks
+  precede geometry publication; earlier source string/justification changes may
+  remain on failure. Returned failure is NOT a drawable receipt.
+  Scale1.7 on text1 is retained: measured width/height multiply and truncate,
+  right position truncates, local position divides by scale and final XY
+  multiply separately. Zero-rotation original domain only. Depth comes from
+  actual Application Video, not a supplied overlay Z.
+
+Exact source evidence:
+position-owner-layout-source-20261015.txt:191150, complete191290,191BB0.
+position-owner-text-source-20261015.txt:191DB0..1922AC,2E0880..2E133C,
+2E13A0..2E15AC and original justification words. Raw static LE words read from
+original SLUS_202.68 at VA-0xFFF80; existing docs identify binary SHA256
+c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30.
+Existing original_ui_text50kg.cpp and original_ui_text_position50kg implement
+matching glyph math/truncation; this owner preserves actual pair aliases rather
+than importing their expanded quad output. No original instructions executed.
+
+Hard remaining runtime boundary / activation deliberately absent:
+- Full root does not invoke stagePositionStatsResources50LA or new prepare APIs.
+- Fixed ScreenTexture2DF550 geometry/submission not joined.191290 only sets
+  its genuine dirty fields, not packet XY or renderer queue readiness.
+-191AF0 demand, canonical population after final primitive references, collector
+  registration and effective native pass binding still need actual root order.
+-1924C0/192C70 map owner/clip emission and RadarOverlay zero-map ScreenObject
+  lowering/submission remain missing. Cannot use map0 preparation for zero maps.
+- Text CPU preparation does not run2E0170 renderer checks/submission, viewport
+  header writes, or child Entity141D70 scheduling. No GPU, visual or full original
+  HUD claim. No replacement of TimeStats/SpeedBoost or host panels.
+- Actual ALL8 ranking/AI/physics/lap ownership and all reverse renderer-drain
+  resource destruction remain unchanged. No renderer strong PositionStats owner.
+
+Root review targets, not performed here:
+Reject foreign Application/resource/display/camera/manager, stale/unpublished
+camera, closing lease/context and non-ALL8 view0. Check full layout constants,
+first/repeated text updates, visibility omissions, position scale/right alignment,
+36/4 packet boundary aliases and partial failure/ordered close. Review numeric
+and geometry source order against raw words before runtime activation.
+
+Root integration, 2026-10-16 04:30 UTC:
+The retained helper patch was applied to the central source after the passing
+Ryloth checkpoint. Existing Application changes were preserved by contextual
+patch application. Camera friendship and same-Application accessors were read
+against the current session owner. This remains source-only, untested and
+inactive. It does not change the passing screenshots or claim a PositionStats
+runtime result. Next activation work still requires the map/zero-map renderer
+path and complete original draw gates above.

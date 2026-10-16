@@ -1,11 +1,21 @@
 #pragma once
-// Uncalled actual ALL8 view0 numeric observation. UNTESTED.
+// Actual ALL8 view0 numeric observation. No scheduling or drawing is implied.
+namespace original_main_entry50KG { struct Application; }
 #include "original_camera_session50kx.h"
 #include "native_ai_session50iv_fixture.h"
 #include "../../src/game/original_position_stats_frame50la.h"
 namespace original_position_stats_adapter50LA {
 class Owner final {
+    friend struct original_main_entry50KG::Application;
     using Camera=original_camera_session50KX::Session;
+    // Only Application supplies these identities, taken from its real display
+    // and canonical owners. Equality of camera/display counters is not proof.
+    static bool belongsToApplication(const Camera& camera,
+        const rr::game::OriginalApplicationEntities50LA* entities,
+        const rr::assets::OriginalStandardMaterialTable50LA* materials,
+        const std::string* directory,const rr::platform::VehicleWindowGl50DS* renderer,
+        const rr::game::OriginalRendererDispatchFields* dispatch)noexcept;
+
     using Manager=native_ai50IV::Session;
     using Bank=native_racer50HN::Bank;
     const Camera* camera_=nullptr;
@@ -85,4 +95,16 @@ public:
         }catch(...){d.status=Status::read;return false;}
     }
 };
+inline bool Owner::belongsToApplication(const Camera& camera,
+    const rr::game::OriginalApplicationEntities50LA* entities,
+    const rr::assets::OriginalStandardMaterialTable50LA* materials,
+    const std::string* directory,const rr::platform::VehicleWindowGl50DS* renderer,
+    const rr::game::OriginalRendererDispatchFields* dispatch)noexcept {
+    return entities&&materials&&directory&&renderer&&dispatch&&camera.displayInputs_&&
+        camera.actual_.applicationEntities.get()==entities&&
+        camera.actual_.applicationMaterials.get()==materials&&
+        camera.actual_.actualMaterialDirectory36B970==directory&&
+        &camera.displayInputs_->renderer==renderer&&
+        &camera.displayInputs_->rendererDispatch==dispatch;
+}
 }
