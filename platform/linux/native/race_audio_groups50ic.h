@@ -4,6 +4,7 @@
 #include "audio_mixer50hd.h"
 #include "../../../src/game/announcer_callbacks50ic.h"
 #include <array>
+#include <exception>
 
 namespace rr::platform {
 class RaceAudioGroups50IC final {
@@ -47,6 +48,7 @@ public:
         if(!canBind(slot,group))return false;
         if(bindings_[slot]==group)return true;
         if(!mixer_->setVoiceGroupGain50IC(slot,normalized(groups_,group)))return false;
+        if(!mixer_->setVoiceGroupPaused50IC(slot,groups_.state44[static_cast<std::size_t>(group)]!=0))return false;
         bindings_[slot]=group;return true;
     }
     bool bindRange(std::size_t first,std::size_t count,game::RaceAudioGroup50IC group)noexcept {
@@ -82,8 +84,28 @@ public:
         if(!receipt.complete||!synchronize(groups,receipt))return {};
         groups_=groups;duck_=duck;return receipt;
     }
+    // Audio suffix2356EC..700 reached by actual1ACF50 World4D8 setter.
+    // The original caller must first perform Entity142040 propagation; this
+    // method is not a receipt for that prefix or a full Pause open/close.
+    bool pauseWorld2356EC(bool requested)noexcept {
+        if(!current()||!groups_.initialized)return false;
+        constexpr auto group=game::RaceAudioGroup50IC::World4D8;
+        auto& state=groups_.state44[static_cast<std::size_t>(group)];
+        if((state!=0)==requested)return true; //2356BC..6E4: no lower command.
+        std::uint64_t changes=0;
+        for(std::size_t i=0;i<count_;++i)if(bindings_[i]==group){
+            if(!mixer_->hasVoiceGroupGain50IC(i)||mixer_->groupPaused50IC_[i]!=(state!=0))return false;
+            ++changes;
+        }
+        if(!mixer_->canRecordControlChanges(changes))return false;
+        state=requested?1u:0u; //2356EC precedes lower26D380(group2).
+        // Every setter is now infallible on the real serial mixer owner.
+        for(std::size_t i=0;i<count_;++i)if(bindings_[i]==group)
+            if(!mixer_->setVoiceGroupPaused50IC(i,requested))std::terminate();
+        return true;
+    }
     // Borrow the SAME initialized group word for source logical-sound
-    // inhibition. Future original group-pause setters must update this owner.
+    // inhibition. The original world pause suffix updates this SAME owner.
     const std::uint32_t* sourceState44(game::RaceAudioGroup50IC group)const noexcept {
         return current()&&groups_.initialized&&represented(group)?
             &groups_.state44[static_cast<std::size_t>(group)]:nullptr;

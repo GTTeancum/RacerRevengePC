@@ -90,3 +90,9 @@ shape release11AEE0. E8 shape3 frees its seven shape arrays before the common
 result-array sequence; E0 shape2 frees4C/50. See
 `original-wreck-query-cold-retirement50la.md` for the exact retained addresses.
 The resource-cache/reference owner remains part of the published retirement gap.
+
+Canonical migration follow-up: `original-wreck-canonical-model50la.md` supersedes
+this projected full-route constructor phase. It replaces model/PSG rows with
+the actual ModelSceneOwner and stops at the earlier genuine fresh material-load
+boundary26EE1C (or warm geometry-acquisition boundary26E9F0). Consequently the
+new full route cannot claim D0/gravity construction before resource/packet load.

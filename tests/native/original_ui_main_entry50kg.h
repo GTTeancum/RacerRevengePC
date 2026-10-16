@@ -1,5 +1,5 @@
 #pragma once
-namespace rr::game { class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
+namespace rr::game { class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
 namespace original_camera_session50KX { class Session; }
 namespace native_ai50IV { struct Session; }
@@ -135,6 +135,7 @@ private:
     friend struct Video;
     friend class NativeCollectorFifo50LA;
     mutable std::weak_ptr<RaceDisplayLifetime50LA> raceDisplayOwner50LA_;
+    mutable std::weak_ptr<rr::game::OriginalPauseStorage50LA> pauseColdOwner50LA_;
     // Process443848 FIFO identity. Scene/display close cannot silently reset it.
     mutable std::shared_ptr<NativeCollectorFifo50LA> nativeCollectorFifoOwner_;
     mutable std::uint64_t raceDisplayGeneration50LA_=0;
@@ -271,6 +272,10 @@ public:
     bool preparePositionStatsText50LA(rr::game::OriginalPositionStatsResources50LA&,
         const original_camera_session50KX::Session&,const native_ai50IV::Session&,
         rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
+    // Source-only detached ownership. Definitions are in original_pause_entity50la.h.
+    std::shared_ptr<rr::game::OriginalPauseStorage50LA> constructPauseCold1A8AB0(
+        std::uint64_t actualSessionGeneration)const noexcept;
+    bool finishPauseEntityCold1A8ADC(rr::game::OriginalPauseStorage50LA&)const noexcept;
     const std::shared_ptr<rr::game::OriginalApplicationEntities50LA>& entities() const noexcept {
         return entitiesOwner_;
     }

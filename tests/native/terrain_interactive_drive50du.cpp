@@ -1,7 +1,10 @@
+#include "../../src/game/original_entity_chains50la.h" // Inactive source-faithful Entity chain operations.
 #include "runtime_allocations50fl.h"
 #include "../../src/game/original_pause_storage50la.h" // Inactive concrete Pause cold storage.
 #include "../../src/game/original_pause_text_geometry50la.h" // Inactive original CPU glyph leaf.
 #include "../../src/game/original_pause_texture_geometry50la.h" // Inactive original CPU texture leaf.
+#include "../../src/game/original_pause_material_admission50la.h" // Inactive canonical FINAL admission.
+#include "../../src/game/original_pause_native_resources50la.h" // Inactive genuine pixels/native policies.
 #include "../../src/assets/original_pause_source_data50la.h" // Inactive original Pause cold data.
 #include "../../src/assets/original_pause_authored_materials50la.h" // Compile visibility only.
 #include "../../src/assets/original_pause_primitive_references50la.h" // No runtime Pause activation.

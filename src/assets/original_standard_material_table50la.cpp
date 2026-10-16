@@ -903,7 +903,7 @@ struct OriginalStandardMaterialReferences50LA::Storage {
     std::uint32_t count1C0=0;
     std::vector<std::int32_t> handles;
     std::size_t stored=0,retained=0;
-    bool complete=false,released=false;
+    bool complete=false,released=false,allocationFreed=false;
 };
 OriginalStandardMaterialReferences50LA::OriginalStandardMaterialReferences50LA() noexcept=default;
 OriginalStandardMaterialReferences50LA::~OriginalStandardMaterialReferences50LA(){
@@ -1004,11 +1004,20 @@ bool OriginalStandardMaterialReferences50LA::release26E4C0(D& d) noexcept {
 bool OriginalStandardMaterialReferences50LA::released26E4C0() const noexcept {
     return storage_&&storage_->released;
 }
+bool OriginalStandardMaterialReferences50LA::freeAllocation26E5EC() noexcept {
+    if(!storage_||!storage_->released)return false;
+    if(storage_->allocationFreed)return true;
+    std::vector<std::int32_t>().swap(storage_->handles);
+    storage_->allocationFreed=true;return true;
+}
 bool OriginalStandardMaterialReferences50LA::started() const noexcept {return bool(storage_);}
 bool OriginalStandardMaterialReferences50LA::complete() const noexcept {return storage_&&storage_->complete&&!storage_->released;}
 const std::uint32_t* OriginalStandardMaterialReferences50LA::count1C0() const noexcept {return storage_?&storage_->count1C0:nullptr;}
 const std::int32_t* OriginalStandardMaterialReferences50LA::handle1C4(std::size_t ordinal) const noexcept {
-    return storage_&&ordinal<storage_->stored?&storage_->handles[ordinal]:nullptr;
+    return storage_&&!storage_->allocationFreed&&ordinal<storage_->stored?&storage_->handles[ordinal]:nullptr;
+}
+const std::int32_t* OriginalStandardMaterialReferences50LA::allocationBase1C4() const noexcept {
+    return storage_&&!storage_->allocationFreed?storage_->handles.data():nullptr;
 }
 const OriginalStandardMaterialTable50LA* OriginalStandardMaterialReferences50LA::table382B38() const noexcept {
     return storage_?storage_->table.get():nullptr;

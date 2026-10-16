@@ -7,7 +7,7 @@ namespace original_position_stats_prestage50LA { class Owner; }
 #include <memory>
 
 namespace ra_static_world50LA {class Owner;}
-namespace rr::game {class OriginalPositionStatsResources50LA;}
+namespace rr::game {class OriginalPositionStatsResources50LA;class OriginalPauseMaterialAdmission50LA;}
 namespace rr::assets {
 // A partial CPU callback outcome, never a renderer capability. The first
 // enabled pass cannot return until24B9B0; subsequent passes remain untouched.
@@ -197,6 +197,7 @@ public:
         OriginalStandardMaterialDiagnostic50LA&) const noexcept;
 private:
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
+    friend class rr::game::OriginalPauseMaterialAdmission50LA;
     bool pinNativeCollector(const OriginalStandardMaterialCollectorReceipt50LA&) noexcept;
     void unpinNativeCollector() noexcept;
     friend class ::ra_static_world50LA::Owner;
@@ -290,10 +291,15 @@ public:
     bool canRelease26E4C0() const noexcept;
     bool release26E4C0(OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool released26E4C0() const noexcept;
+    //26E5EC after geometry release and source-row-table disposal. Keeps the
+    // model's source1C4 value stale; native slot inspection ends here.
+    bool freeAllocation26E5EC() noexcept;
     bool started() const noexcept;
     bool complete() const noexcept;
     const std::uint32_t* count1C0() const noexcept;
     const std::int32_t* handle1C4(std::size_t surfaceOrdinal) const noexcept;
+    //26E684 allocation identity only; unwritten slots are not valid handles.
+    const std::int32_t* allocationBase1C4() const noexcept;
     const OriginalStandardMaterialTable50LA* table382B38() const noexcept;
 private:
     struct Storage;

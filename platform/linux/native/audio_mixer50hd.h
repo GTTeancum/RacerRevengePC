@@ -5,6 +5,7 @@
 
 namespace rr::platform {
 class OriginalSoundMode50KG;
+class RaceAudioGroups50IC;
 // Existing0..219 reservations plus the eight distinct original D44 arrays.
 // Each admitted track has at most44 collision+drive rows (SA32+12). These
 // are native exclusive playback slots, never guest hardware channel IDs.
@@ -44,6 +45,7 @@ struct AudioVoiceObservation50HD {
     std::uint64_t playbackRevision = 0;
     float groupGain = 1.0f, originalLeft = 1.0f, originalRight = 1.0f;
     bool groupKnown = false;
+    bool groupPaused = false;
 };
 
 // Single producer/main-thread mixer. It never allocates, loads assets, opens a
@@ -126,6 +128,9 @@ public:
     std::uint64_t clippedSamples() const noexcept { return clippedSamples_; }
     static bool validClip(const AudioClip50HD&) noexcept;
 private:
+    friend class RaceAudioGroups50IC;
+    // Actual group owner only; independent of gain, pitch and playback token.
+    bool setVoiceGroupPaused50IC(std::size_t slot,bool paused) noexcept;
     void noteControlChange() noexcept;
     bool originalRouting50KG(std::int32_t engineAngle,float& left,float& right,
                             std::int32_t volume=100) const noexcept;
@@ -139,6 +144,7 @@ private:
     std::uint64_t mixedFrames_ = 0, clippedSamples_ = 0;
     float groupGains50IC_[audioMaximumVoices50HD]{};
     bool groupKnown50IC_[audioMaximumVoices50HD]{};
+    bool groupPaused50IC_[audioMaximumVoices50HD]{};
     bool requireGroups50IC_ = false;
     std::uint64_t groupEpoch50IC_ = 0;
     std::uint64_t controlRevision_ = 0;

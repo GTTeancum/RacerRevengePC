@@ -6,22 +6,76 @@
 #include <bit>
 #include <cstring>
 #include "control_presets49d.h"
+#include "original_application_entities50la.h"
 #include "original_application_animation_clock50kg.h"
 #include "original_ui_game_options_controller50kg.h"
 #include <memory>
 #include <utility>
 
 namespace original_pause_observation50LA { class Owner; }
+namespace original_main_entry50KG { struct Application; }
 namespace rr::game {
+class OriginalPauseLayout50LA;
 class OriginalPauseTextGeometry50LA;
 class OriginalPauseTextureGeometry50LA;
+class OriginalPauseMaterialAdmission50LA;
+class OriginalPauseNativeResources50LA;
 // Concrete cold storage for shared Pause load1B8810 and derived1BA390:
 // original textures, polygons and texts with canonical references. No Entity attachment
 // or draw API. Progress stages are not original full-Pause-load receipts.
 class OriginalPauseStorage50LA final {
     friend class original_pause_observation50LA::Owner;
+    friend class OriginalPauseLayout50LA;
     friend class OriginalPauseTextGeometry50LA;
     friend class OriginalPauseTextureGeometry50LA;
+    friend class OriginalPauseMaterialAdmission50LA;
+    friend class OriginalPauseNativeResources50LA;
+    friend struct original_main_entry50KG::Application;
+    // Genuine1BA140->141300 prefix, constructed before resource members and
+    // released after them. Detached only until the actual race forest is joined.
+    struct EntityPrefix {
+        std::shared_ptr<OriginalApplicationEntities50LA> application;
+        OriginalWreckComponent50LA component;
+        bool initialized=false,releasing=false,disabledAfterLoad=false;
+        EntityPrefix(std::shared_ptr<OriginalApplicationEntities50LA> a,std::uint64_t session)noexcept
+            :application(std::move(a)) {
+            if(!application||!application->application10()||!session)return;
+            const auto key=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&component));
+            const auto r=initializeOriginalWreckComponent50LA(component,
+                OriginalWreckComponentKind50LA::entity141300,session,key,true,
+                application->objectCount423F60()); //Actual1A8AAC A1=1.
+            initialized=r.status==OriginalWreckComponentStatus50LA::complete;
+        }
+        bool detached()const noexcept {
+            return initialized&&application&&application->application10()&&
+                component.kind==OriginalWreckComponentKind50LA::entity141300&&
+                component.sessionGeneration&&component.objectKey==
+                    static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&component))&&
+                component.reference00==(releasing?0u:1u)&&!component.previous10&&
+                !component.next14&&!component.firstChild18&&!component.parent1C&&
+                !component.mask20&&!component.descendants24&&component.category28==0xffu&&
+                (component.flags29&15u)==(disabledAfterLoad?0u:3u);
+        }
+        bool disable1A8ADC()noexcept {
+            if(!detached()||releasing||disabledAfterLoad)return false;
+            // Actual table3CF420+1C=1415A0. No children exist in this bounded
+            // concrete load; no external recursive callback is skipped.
+            component.flags29=std::uint8_t(component.flags29&~3u);
+            disabledAfterLoad=true;return true;
+        }
+        void beginRelease104970()noexcept {
+            if(!initialized)return;
+            if(releasing||!detached())std::terminate();
+            --component.reference00;releasing=true;
+        }
+        ~EntityPrefix(){
+            if(!initialized)return;
+            if(!releasing)beginRelease104970();
+            if(!detached())std::terminate();
+            --application->objectCount423F60(); //1BA2C0->1B8730->1413E0.
+        }
+    };
+    std::unique_ptr<EntityPrefix> entity_;
 public:
     enum class Stage : std::uint8_t { fresh,baseBackdrops,basePolygons,baseText,derivedResources,failed,closed };
     struct Diagnostic {
@@ -82,6 +136,8 @@ public:
         std::int16_t alpha58=-1;
         float x10=0,y14=0,x20=0,y24=0,field30=0,field34=0,field40=1,field44=0,field48=1;
     };
+    // Resource-only cold construction remains available; it has no Entity
+    // and cannot be admitted by the new actual Application ownership route.
     OriginalPauseStorage50LA()noexcept=default;
     OriginalPauseStorage50LA(const OriginalPauseStorage50LA&)=delete;
     OriginalPauseStorage50LA& operator=(const OriginalPauseStorage50LA&)=delete;
@@ -311,7 +367,9 @@ public:
     //Future drawable extension must replace this cold-only release with actual
     //retirement gating BEFORE exposing a frame/submission API.
     void closeCold()noexcept {
+        if(materialAdmissionBorrows_)std::terminate();
         if(stage_==Stage::closed)return;
+        if(entity_)entity_->beginRelease104970();
         //1BA2C0 derived destruction precedes shared1B8730. Array text
         //destruction reverses object order, each text releases batches forward.
         closeTexture(icon_,7);
@@ -333,9 +391,13 @@ public:
             references_.release299AC0(i);
             backdrops_[i].primitive54.reset();backdrops_[i].buffer58.reset();backdrops_[i].atlas=nullptr;
         }
-        fonts_.reset();stage_=Stage::closed;
+        fonts_.reset();stage_=Stage::closed;entity_.reset();
     }
 private:
+    OriginalPauseStorage50LA(std::shared_ptr<OriginalApplicationEntities50LA> application,
+        std::uint64_t session):entity_(std::make_unique<EntityPrefix>(std::move(application),session)) {
+        if(!entity_->initialized)stage_=Stage::failed;
+    }
     // Geometry/state segment1B9324..1B9C20 only. The eventual original parent
     // must admit the last actual Application camera before calling this, then
     // execute the1B9C24..1B9F3C draw tail in source order. Not a callback receipt.
@@ -621,6 +683,9 @@ private:
     //1BA1C4/1DC/1E4 constructor stores; parent callbacks alone own transitions.
     float opening30_=.25f,transition164_=0.f;
     std::uint32_t hidden160_=0;
+    std::uint32_t materialAdmissionBorrows_=0; // Native CPU lifetime guard, never a guest field.
+    //Actual constructor1BA1F4/1FC color words.
+    std::uint32_t normalColor16C_=0x00e5d96c,selectedColor170_=0x00cccccc;
     std::uint32_t mode1F0_=0;
     std::array<std::unique_ptr<Polygon>,2> polygons_{};
     std::array<Texture,3> backdrops_{}; //Source+A0,+100,+40 allocation/load order.

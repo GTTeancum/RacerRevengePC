@@ -493,10 +493,17 @@ Retained derived table names resolve through their actual pointer tables:
 world74=PodScene,world540=PSXMesh,raceBC=TunnelTrack,
 race100=PodPauseMenu,race104=PodEndRaceMenu.
 
-Pause100.slot1C is1415A0. Its complete retained body sets flags29 bit0
+Pause100.slot1C is1415A0. Its complete retained body clears flags29 bit0
 and bit1 before recursive child slot1C calls (excluding hidden-bit3 children).
-Thus the freshly constructed pause owner is enabled for1A8500's flag-bit0
-render gate. The native host pause overlay cannot replace its callback.
+The exact operand at1415B4 is30070001, ANDI a3,zero,1, producing zero;
+1415BC/1415C0 clear bit0 and1415CC/1415D0/1415D4 clear bit1. In contrast,
+141630 uses64070001, DADDIU a3,zero,1 at141644, and sets both bits.
+Evidence: recovery/20261010/ui-static-membership-reconstruction/evidence/
+entity-traversal-141300-141EF0.txt, addresses1415A0..1416BC.
+Thus the constructor caller's slot1C leaves Pause disabled for1A8500's bit0
+render gate. Genuine open1BE8A0 invokes slot24=141630 to enable it;
+close1BE830 invokes slot1C=1415A0 to disable it. The native host pause overlay
+cannot replace these callbacks or their Entity lifetime.
 
 Complete1B9220..1B9F5C is substantial shared menu rendering: retained
 resource-controller382B20 initialization, geometry/cache preparation,

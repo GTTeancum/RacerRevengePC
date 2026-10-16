@@ -99,6 +99,7 @@ struct OriginalWreckAssetReceipt50LA {
 class OriginalWreckAssetInventory50LA;
 class OriginalWreckAssets50LA final {
     friend class OriginalWreckAssetInventory50LA;
+    friend class OriginalWreckRacerStorage50LA;
 public:
     OriginalWreckAssets50LA()=default;
     OriginalWreckAssets50LA(const OriginalWreckAssets50LA&)=delete;
@@ -181,7 +182,7 @@ private:
         std::vector<rr::assets::PsgNode49O> sourceNodes;
         ModelBoundsResult49O bounds{};
         ModelBoundsResult49O cachedBounds{};
-        bool cachedBoundsReady=false;
+        bool cachedBoundsReady=false,canonicalGraphBacking=false;
         std::array<float,4> position50{},look60{},up70{};
     };
     static bool fail(std::string& error,const char* why){error=why;return false;}

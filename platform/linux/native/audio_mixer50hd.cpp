@@ -67,6 +67,7 @@ bool AudioMixer50HD::initialize(AudioVoice50HD* voices, std::size_t count,
     noteControlChange();
     for (std::size_t i = 0; i < count_; ++i) {
         voices_[i] = {}; groupGains50IC_[i] = 1.0f; groupKnown50IC_[i] = false;
+        groupPaused50IC_[i] = false;
         originalLeft50KG_[i] = originalRight50KG_[i] = 1.0f;
         playbackRevisions_[i] = 0;
     }
@@ -192,6 +193,11 @@ bool AudioMixer50HD::setVoiceGroupGain50IC(std::size_t slot, float gain) noexcep
     if(!groupKnown50IC_[slot]||groupGains50IC_[slot]!=gain)noteControlChange();
     groupGains50IC_[slot] = gain; groupKnown50IC_[slot] = true; return true;
 }
+bool AudioMixer50HD::setVoiceGroupPaused50IC(std::size_t slot,bool paused) noexcept {
+    if(slot>=count_||!groupKnown50IC_[slot])return false;
+    if(groupPaused50IC_[slot]!=paused)noteControlChange();
+    groupPaused50IC_[slot]=paused;return true;
+}
 bool AudioMixer50HD::hasVoiceGroupGain50IC(std::size_t slot) const noexcept {
     return slot < count_ && groupKnown50IC_[slot];
 }
@@ -222,6 +228,7 @@ bool AudioMixer50HD::inspectVoice(std::size_t slot, AudioVoiceObservation50HD& o
     if(!voices_||slot>=count_||!canRecordControlChanges())return false;
     out.voice=voices_[slot];out.playbackRevision=playbackRevisions_[slot];
     out.groupGain=groupGains50IC_[slot];out.groupKnown=groupKnown50IC_[slot];
+    out.groupPaused=groupPaused50IC_[slot];
     out.originalLeft=originalLeft50KG_[slot];out.originalRight=originalRight50KG_[slot];
     return true;
 }
@@ -239,6 +246,9 @@ bool AudioMixer50HD::mixStereo16(std::int16_t* output, std::size_t frames) noexc
         for (std::size_t i = 0; i < count_; ++i) {
             auto& voice = voices_[i];
             if (!voice.active) continue;
+            // Original group pause is distinct from volume ducking: preserve
+            // cursor, loop boundary, active token and pitch while output is silent.
+            if (groupPaused50IC_[i]) continue;
             // Zero-rate native source-volume policy: do not sample, advance,
             // retire, or replace the token; later positive controls resume.
             if (voice.pitch==0.f) continue;

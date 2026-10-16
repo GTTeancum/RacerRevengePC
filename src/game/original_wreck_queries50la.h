@@ -138,6 +138,19 @@ public:
         const OriginalWreckQueryWorld50LA& world,
         OriginalWreckComponent50LA& actualModelStorage,
         const std::array<OriginalWreckComponent50LA*,3>& actualQueryStorage) noexcept {
+        return prepareColdImpl(piece,world,actualModelStorage,actualQueryStorage,true);
+    }
+    // Full canonical-model route: allocate/capture actual world backing only.
+    // Initial model histories cannot be staged before genuine model loading.
+    OriginalWreckQueryResult50LA prepareBackingCold(OriginalWreckPieceQueryOwner50LA& piece,
+        const OriginalWreckQueryWorld50LA& world,OriginalWreckComponent50LA& actualModelStorage,
+        const std::array<OriginalWreckComponent50LA*,3>& actualQueryStorage)noexcept {
+        return prepareColdImpl(piece,world,actualModelStorage,actualQueryStorage,false);
+    }
+private:
+    OriginalWreckQueryResult50LA prepareColdImpl(OriginalWreckPieceQueryOwner50LA& piece,
+        const OriginalWreckQueryWorld50LA& world,OriginalWreckComponent50LA& actualModelStorage,
+        const std::array<OriginalWreckComponent50LA*,3>& actualQueryStorage,bool stageModelShapes)noexcept {
         using S=OriginalWreckQueryStatus50LA;
         if(!piece.boundCold())return {S::binding,0x165e90u};
         auto& assets=piece.assets();auto& physical=piece.physical();const auto sessionGeneration=piece.sessionGeneration();
@@ -224,20 +237,8 @@ public:
                     // and are not exposed as a completed126F40 query.
                 }
             }
-            //165E90 calls11F570 for E0 and E4 immediately after loading.
-            //11ED60 seeds both type0 world histories from the ACTUAL model
-            //world, then11F680 computes the first shape/sphere. These are not
-            //zero or identity histories. The reached getter's graph refresh
-            //survives a later cold rejection, matching its source prefix.
-            if(!refreshSceneWorld49P(graph,model))return {S::graph,0x28b550u};
-            const auto& coldWorld=graph.nodes[modelIndex].world100;
-            QuerySpherePrepareOutput48O sphere{};
-            if(!prepareType2(assets.queryE0(),coldWorld,sphere))return {S::preparation,0x11f680u};
-            next->queries[0].type2World80=sphere.world;
-            states[0].cachedCenter=sphere.center;states[0].cachedRadius=sphere.radius;
-            auto& shape=next->queries[1].type0;shape.world80=coldWorld;shape.previousC0=coldWorld;
-            if(!preparePodShape50IZ(assets.targetE4().source,coldWorld,shape))return {S::preparation,0x11f680u};
-            states[1].cachedCenter=shape.center60;states[1].cachedRadius=shape.radius80;
+            if(stageModelShapes){const auto initial=stageInitialModelShapes(*next);
+                if(initial.status!=S::complete)return initial;}
             //11BBE8..11BD18 owns result90 and its pair arrays in THIS E0.
             // No second provider can own result90 for the same query. Scratch
             // derives from actual cold resource depths, never a frame budget.
@@ -275,7 +276,15 @@ public:
             return {S::complete,0u};
         }catch(...){return {S::allocation,0x165ec8u};}
     }
+public:
+    OriginalWreckQueryResult50LA prepareInitialModelQueries11F570()noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!storage_||storage_->initialShapesAttempted||storage_->initialShapesReady||!storage_->piece->coherent()||
+           storage_->published[0]||storage_->published[1]||storage_->published[2])return {S::binding,0x11f570u};
+        storage_->initialShapesAttempted=true;return stageInitialModelShapes(*storage_);
+    }
     bool prepared()const noexcept{return bool(storage_);}
+    bool initialModelQueriesPrepared()const noexcept{return storage_&&storage_->initialShapesReady;}
     // Terminal native cancellation BEFORE the first source11B190 publication.
     // prepareCold owns backing only; no shared table field or Entity has been
     // published by this owner yet. This is not11B4A0 or active-piece retirement.
@@ -319,7 +328,7 @@ public:
     OriginalWreckQueryResult50LA publishColdQuery(unsigned i,OriginalWreckComponent50LA& component,
         OriginalWreckComponent50LA& actualModel,SpringSceneId48N actualModelIdentity) noexcept {
         using S=OriginalWreckQueryStatus50LA;
-        if(!storage_||i>2||storage_->published[i]||!storage_->piece->coherent()||
+        if(!storage_||i>2||storage_->published[i]||!storage_->initialShapesReady||!storage_->piece->coherent()||
            storage_->plannedModel!=&actualModel||storage_->plannedQueries[i]!=&component||
            component.kind!=OriginalWreckComponentKind50LA::collision11B190||
            !component.objectKey||!component.sessionGeneration||
@@ -505,7 +514,7 @@ public:
         return result;
     }
     bool coherent(unsigned i)const noexcept {
-        if(!storage_||i>2||!storage_->published[i]||!storage_->piece->coherent()||
+        if(!storage_||i>2||!storage_->published[i]||!storage_->initialShapesReady||!storage_->piece->coherent()||
            (i==0&&!modelSceneIdentity().value))return false;
         const auto& w=storage_->world;const auto& q=query(i);
         if(object(i).identity!=w.identities[i]||object(i).shapeTag!=(i==0?2u:i==1?0u:3u)||
@@ -543,12 +552,26 @@ private:
         std::array<std::uint32_t,2> categoryD8{};
         std::uint32_t waterCategoryE0=0;
         bool collectionFilterApplied=false;
-        bool published[3]{},contactBound=false,mutualBound=false,derivedBound=false;
+        bool published[3]{},contactBound=false,mutualBound=false,derivedBound=false,initialShapesReady=false,initialShapesAttempted=false;
         std::array<OriginalWreckComponent50LA*,3> components{};
         std::array<CollectionObject50BX,3> coldDefinitions{};
         std::array<CollectionObjectState50BX,3> coldStates{};
         std::array<Query,3> queries;
     };
+    static OriginalWreckQueryResult50LA stageInitialModelShapes(Storage& storage)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        auto& assets=*storage.assets;auto graph=assets.graph();const auto model=assets.model14C();
+        if(!refreshSceneWorld49P(graph,model))return {S::graph,0x28b550u};
+        const auto& world=graph.nodes[static_cast<std::int32_t>(model)].world100;
+        QuerySpherePrepareOutput48O sphere{};
+        if(!prepareType2(assets.queryE0(),world,sphere))return {S::preparation,0x11f680u};
+        storage.queries[0].type2World80=sphere.world;
+        storage.coldStates[0].cachedCenter=sphere.center;storage.coldStates[0].cachedRadius=sphere.radius;
+        auto& shape=storage.queries[1].type0;shape.world80=world;shape.previousC0=world;
+        if(!preparePodShape50IZ(assets.targetE4().source,world,shape))return {S::preparation,0x11f680u};
+        storage.coldStates[1].cachedCenter=shape.center60;storage.coldStates[1].cachedRadius=shape.radius80;
+        storage.initialShapesReady=true;return {S::complete,0};
+    }
     std::unique_ptr<Storage> storage_;
     bool retired_=false; // terminal cancellation cannot prepare/rebind again
     static bool prepareType2(const Type2ResourceView49X& resource,const BodyMatrix48G& world,

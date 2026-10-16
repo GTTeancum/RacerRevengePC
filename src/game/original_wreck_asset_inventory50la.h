@@ -45,6 +45,7 @@ class OriginalWreckAssetInventory50LA final {
         std::vector<OriginalWreckCollectionInventory50LA> inventory;
         // Outlives every per-occurrence file identity and future geometry borrow.
         std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA> modelResolver;
+        std::shared_ptr<rr::assets::OriginalStandardMaterialTable50LA> modelMaterials;
         std::vector<std::vector<std::unique_ptr<Assets>>> assets;
         bool modelBindingAttempted=false,modelSourcesBound=false;
     };
@@ -157,6 +158,7 @@ public:
         if(!complete()||storage_->modelBindingAttempted||!domain.prepared()||!domain.resolver3E1A70())
             return {S::binding,0,0,0};
         storage_->modelBindingAttempted=true;storage_->modelResolver=domain.resolver3E1A70();
+        storage_->modelMaterials=domain.materials382B38();
         std::size_t bound=0;
         for(std::size_t c=0;c<storage_->assets.size();++c)
             for(std::size_t p=0;p<storage_->assets[c].size();++p){
@@ -172,6 +174,9 @@ public:
     bool modelSourcesBound()const noexcept{return storage_&&storage_->modelSourcesBound;}
     const rr::assets::OriginalStandardTextureResolver50LA* modelResolverIdentity()const noexcept {
         return storage_?storage_->modelResolver.get():nullptr;
+    }
+    const rr::assets::OriginalStandardMaterialTable50LA* modelMaterialsIdentity()const noexcept {
+        return storage_?storage_->modelMaterials.get():nullptr;
     }
     OriginalWreckInventoryResult50LA loadNextCold(const OriginalWreckInventoryEndpointPolicy50LA& endpoint,
                                                 std::string& error) {

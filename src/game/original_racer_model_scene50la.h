@@ -102,6 +102,7 @@ struct OriginalRacerModelFields50LA {
 // materials1C4, quantization and packet1F0 belong to their concrete owners.
 // Destruction is deliberately split at the real source call boundaries.
 class OriginalRacerModelSceneOwner50LA final {
+    friend class OriginalWreckRacerStorage50LA;
     friend class OriginalRacerColdScenes50LA;
     friend class ::ra_static_model_cold50LA::Owner;
     friend class original_gc_gameplay_lighting_candidate::Owner;
@@ -115,6 +116,13 @@ class OriginalRacerModelSceneOwner50LA final {
     using O=OriginalRacerSceneObject50LA;
     static constexpr I none=I::none;
     enum class RootMode { separate, direct };
+    // Only the allocating wreck owner can capture this stable cold identity.
+    // It is not evidence that2403A0 or a PSG row constructor has executed.
+    C* wreckModelStorage()noexcept{return &model_.entity8;}
+    C* wreckRowStorage(std::uint32_t row)noexcept {
+        auto* object=sourceRowObject(row);return object?&object->entity8:nullptr;
+    }
+
 public:
     OriginalRacerModelSceneOwner50LA()=default;
     OriginalRacerModelSceneOwner50LA(const OriginalRacerModelSceneOwner50LA&)=delete;
