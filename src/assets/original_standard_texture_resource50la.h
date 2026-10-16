@@ -6,7 +6,7 @@
 
 namespace ra_crowd_image50LA { class Verifier; }
 namespace ra_tga_source50LA { class Verifier; }
-namespace rr::game { class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; }
+namespace rr::game { class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; }
 namespace rr::assets {
 class OriginalStandardMaterialContext50LA;
 class OriginalStandardMaterialObject50LA;
@@ -295,6 +295,7 @@ private:
     friend class rr::game::OriginalSpeedBoost50LA;
     friend class rr::game::OriginalDamage50LA;
     friend class rr::game::OriginalPositionStatsHud50LA;
+    friend class rr::game::OriginalPauseStorage50LA;
     static std::shared_ptr<OriginalStandardTextureResource50LA> allocate();
     bool construct24DA30(std::shared_ptr<OriginalStandardTextureResolver50LA>,std::size_t,
         const std::string& resolvedName,
@@ -319,6 +320,9 @@ private:
         OriginalStandardTextureDiagnostic50LA&) noexcept;
     //191AF0 stats/13ingame floors, reached through the retained HUD owner.
     bool demandPositionStats191AF0(std::uint32_t storePC,bool& written,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
+    // Exact1BAE00 stores; the Pause owner proves each original resource lease.
+    bool demandPause1BAE00(std::uint32_t storePC,bool& written,
         OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool demandSelection249580(bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool demand104A00(float,bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;

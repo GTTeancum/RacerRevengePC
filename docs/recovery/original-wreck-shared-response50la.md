@@ -92,3 +92,7 @@ retirement remain prerequisites for destructive gameplay/death/KO activation.
 
 The new header is included through racer storage for the next parent-owned
 full native driver build. No active driver caller or gameplay guard is changed.
+
+Follow-up: `original-wreck-scene-domain50la.md` adds the actual query publication
+and shared producer/response identity domain. Nonzero scenes remain rejected
+unless that live authoritative binding exists; full constructor gates remain.

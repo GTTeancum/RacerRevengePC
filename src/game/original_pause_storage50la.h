@@ -1,21 +1,29 @@
 #pragma once
 #include "../assets/original_pause_primitive_references50la.h"
+#include "../assets/original_application_fonts50la.h"
 #include <array>
+#include <algorithm>
 #include <bit>
+#include <cstring>
+#include "control_presets49d.h"
+#include "original_ui_game_options_controller50kg.h"
 #include <memory>
 #include <utility>
 
+namespace original_pause_observation50LA { class Owner; }
 namespace rr::game {
-// Concrete cold storage for shared Pause load1B8810's three ScreenTextures
-// and1B8DB0's two original polygons. No Entity attachment, text completion or
-// draw API. Progress stages are not original full-load completion receipts.
+// Concrete cold storage for shared Pause load1B8810 and derived1BA390:
+// original textures, polygons and texts with canonical references. No Entity attachment
+// or draw API. Progress stages are not original full-Pause-load receipts.
 class OriginalPauseStorage50LA final {
+    friend class original_pause_observation50LA::Owner;
 public:
-    enum class Stage : std::uint8_t { fresh,baseBackdrops,basePolygons,failed,closed };
+    enum class Stage : std::uint8_t { fresh,baseBackdrops,basePolygons,baseText,derivedResources,failed,closed };
     struct Diagnostic {
         std::uint32_t sourcePC=0;
         std::size_t object=0;
         assets::OriginalStandardMaterialDiagnostic50LA material{};
+        assets::OriginalApplicationFontDiagnostic50LA font{};
     };
     struct PacketVertex {
         std::array<std::uint32_t,4> rgba{};
@@ -50,6 +58,24 @@ public:
         std::unique_ptr<Packet[]> packets44;
         std::uint32_t count34=0,owns38=0,dirty3C=0,count48=0,capacity4C=0;
         std::uint8_t flags40=3;
+    };
+    struct TextVertex {
+        std::array<float,4> authored00{{0,0,1,1}}; //2DFBA0.
+        PacketVertex* packet=nullptr;
+    };
+    struct Glyph {std::array<TextVertex,2> vertices;};
+    struct TextPacket {std::unique_ptr<PacketVertex[]> vertices;std::size_t count=0;};
+    struct TextPrimitive {TextPacket* packet10=nullptr;std::size_t reference=0;};
+    struct Text {
+        std::unique_ptr<char[]> string8;
+        std::unique_ptr<Glyph[]> glyphsC;
+        std::unique_ptr<std::unique_ptr<TextPrimitive>[]> primitives4;
+        std::unique_ptr<TextPacket[]> packets64;
+        std::shared_ptr<const assets::OriginalApplicationFonts50LA::Entry> font4C;
+        std::uint32_t count0=0,justification50=0,color54=0;
+        std::uint8_t capacity5B=0,length5C=0,packetCount5D=0,active5E=0,flags5A=3;
+        std::int16_t alpha58=-1;
+        float x10=0,y14=0,x20=0,y24=0,field30=0,field34=0,field40=1,field44=0,field48=1;
     };
     OriginalPauseStorage50LA()noexcept=default;
     OriginalPauseStorage50LA(const OriginalPauseStorage50LA&)=delete;
@@ -144,6 +170,136 @@ public:
             stage_=Stage::basePolygons;return true;
         }catch(...){return stop(d,0x2E1AE0);}
     }
+    bool loadBaseText1B8B9C(std::shared_ptr<assets::OriginalApplicationFonts50LA> fonts,
+        std::string& actualDirectory36B970,const std::string& actualFontDirectory36B420,
+        Diagnostic& d)noexcept {
+        d={};if(stage_!=Stage::basePolygons)return false;
+        if(!fonts||fonts->terminal()||fonts->domain_!=domain_||fonts->context_!=context_)
+            return stop(d,0x1B8BC4);
+        fonts_=std::move(fonts);mode1F0_=0; //1B8BA4 before source font load.
+        try {
+            //Aliasing shared ownership pins the SAME authenticated archive
+            //already retained by data_; it neither clones nor remounts bytes.
+            std::shared_ptr<const assets::OriginalUiArchive50KG> overlays(data_,data_->overlays());
+            if(!fonts_->loadPauseBase1B8BC4(std::move(overlays),actualDirectory36B970,
+                    actualFontDirectory36B420,d.font))return stop(d,0x1B8BC4);
+            const auto font=fonts_->find282210(assets::OriginalApplicationFonts50LA::Name::denmark16);
+            if(!font||!font->metrics().decoded()||!font->texture281F90()||
+               font->celIdentity()!=data_->member(assets::OriginalPauseSourceMember50LA::ingameFontCells).identity||
+               font->atlasIdentity()!=data_->member(assets::OriginalPauseSourceMember50LA::ingameFontPixels).identity)
+                return stop(d,0x1B8BDC);
+            auto& t=baseText_;t.flags5A|=8;t.font4C=font;
+            t.capacity5B=40;t.packetCount5D=t.active5E=2;
+            t.string8=std::unique_ptr<char[]>(new char[41]);
+            t.glyphsC=std::make_unique<Glyph[]>(40);
+            struct DirectoryScope {
+                std::string& actual;std::string saved;
+                explicit DirectoryScope(std::string& a):actual(a),saved(a){actual="font\\";}
+                ~DirectoryScope(){actual.swap(saved);}
+            };
+            {
+                DirectoryScope directory(actualDirectory36B970);
+                t.count0=2;t.primitives4=std::make_unique<std::unique_ptr<TextPrimitive>[]>(2);
+                t.packets64=std::make_unique<TextPacket[]>(2);
+                for(std::size_t p=0;p<2;++p){auto& packet=t.packets64[p];packet.count=p?8:72;
+                    packet.vertices=std::make_unique<PacketVertex[]>(packet.count);
+                    for(std::size_t v=0;v<packet.count;++v){
+                        packet.vertices[v].xyz={{0,0,1,0}};
+                        t.glyphsC[p*36+v/2].vertices[v%2].packet=&packet.vertices[v];
+                    }
+                    t.primitives4[p]=std::make_unique<TextPrimitive>();t.primitives4[p]->reference=5+p;
+                    if(!references_.acquireNext(domain_,context_->materialApplication(),data_,
+                            actualDirectory36B970,d.material))return stop(d,0x2DFAB0);
+                    t.primitives4[p]->packet10=&packet;
+                }
+            } //2DFB10 restores the real directory even on partial failure.
+            t.string8[0]=0;t.length5C=0;t.alpha58=255;t.color54=0xffffffff;
+            for(std::size_t p=0;p<2;++p)for(std::size_t v=0;v<t.packets64[p].count;++v)
+                t.packets64[p].vertices[v].rgba={{127,127,127,63}};
+            //2E0108..144 preserves bit3; it sets bits0/1 and clears bit2.
+            t.flags5A=static_cast<std::uint8_t>((t.flags5A|3u)&~4u);
+            //1B8C50/5C,1B8CA4,1B8D30,1B8D58. These are load values;
+            //positions remain dirty and no glyph draw projection runs here.
+            t.x10=320;t.y14=200;t.justification50=3;t.color54=0x00cccccc;
+            t.field40=std::bit_cast<float>(std::uint32_t{0x3f99999a});t.flags5A|=3;
+            for(std::size_t p=0;p<2;++p)for(std::size_t v=0;v<t.packets64[p].count;++v){
+                auto& c=t.packets64[p].vertices[v].rgba;c[0]=c[1]=c[2]=102;
+            }
+            stage_=Stage::baseText;return true;
+        }catch(...){return stop(d,0x2DFD90);}
+    }
+    //Caller supplies the actual Application+2DC subtype11258 sampled at this
+    //load boundary, not a host menu selection. No route is activated here.
+    bool loadDerived1BA390(std::string& actualDirectory36B970,
+        const std::string& actualFontDirectory36B420,std::int32_t actualSubtype11258,
+        std::uint32_t actualVideoMaximum60,Diagnostic& d)noexcept {
+        d={};if(stage_!=Stage::baseText)return false;
+        if(!fonts_||fonts_->terminal()||!context_||!context_->live()||actualVideoMaximum60!=0xffffffu)
+            return stop(d,0x1BA390);
+        try {
+            std::shared_ptr<const assets::OriginalUiArchive50KG> overlays(data_,data_->overlays());
+            if(!fonts_->loadPauseDerived1BA3E4(std::move(overlays),actualDirectory36B970,
+                    actualFontDirectory36B420,d.font))return stop(d,0x1BA3E4);
+            if(!loadAuthoredTexture(icon_,7,actualDirectory36B970,actualVideoMaximum60,d))return false;
+            icon_.x10=std::bit_cast<float>(std::uint32_t{0x43e70000});
+            icon_.y14=std::bit_cast<float>(std::uint32_t{0x43bf0000});
+            icon_.flags5C|=1;if(icon_.field3C!=0)icon_.flags5C|=2;
+            const auto font=fonts_->find282210(assets::OriginalApplicationFonts50LA::Name::denmark16);
+            if(!font||font!=baseText_.font4C)return stop(d,0x1BA4AC);
+            if(!loadDerivedText(derivedTexts_[0],60,8,font,actualDirectory36B970,d))return false;
+            auto& title=derivedTexts_[0];title.justification50=3;setTextColor(title,0x00e5d96c);
+            title.field40=std::bit_cast<float>(std::uint32_t{0x3f99999a});title.flags5A|=3;
+            if(!loadDerivedText(derivedTexts_[1],40,10,font,actualDirectory36B970,d))return false;
+            auto& prompt=derivedTexts_[1];prompt.justification50=0;
+            prompt.field40=std::bit_cast<float>(std::uint32_t{0x3f99999a});prompt.flags5A|=3;
+            prompt.x10=std::bit_cast<float>(std::uint32_t{0x43f68000});
+            prompt.y14=std::bit_cast<float>(std::uint32_t{0x43c28000});prompt.flags5A|=3;
+            if(!assignLocalized(prompt,4,d))return false;
+            prompt.field40=1;prompt.flags5A|=3;setTextColor(prompt,0x00669bcc);
+            for(std::size_t i=0;i<11;++i){auto& t=derivedTexts_[2+i];
+                if(!loadDerivedText(t,40,12+2*i,font,actualDirectory36B970,d))return false;
+                t.justification50=3;t.field40=std::bit_cast<float>(std::uint32_t{0x3f99999a});t.flags5A|=3;
+            }
+            if(!assignLocalized(derivedTexts_[2],8,d)||!assignLocalized(derivedTexts_[3],401,d)||
+               !assignLocalized(derivedTexts_[11],424,d))return false;
+            if(actualSubtype11258==3)assignText(derivedTexts_[12],"END TIME TRIAL",14);
+            else if(!assignLocalized(derivedTexts_[12],425,d))return false;
+            for(std::size_t i=0;i<2;++i){
+                if(!loadAuthoredTexture(arrows_[i],34+i,actualDirectory36B970,actualVideoMaximum60,d))return false;
+                auto& t=arrows_[i];
+                if(t.color44!=0x00ffffff){
+                    for(auto& v:t.buffer58->vertices)v.rgba[0]=v.rgba[1]=v.rgba[2]=127;
+                    t.color44=0x00ffffff;
+                }
+            }
+            subtype11258_=actualSubtype11258;
+            stage_=Stage::derivedResources;return true;
+        }catch(...){return stop(d,0x1BA390);}
+    }
+    // Source1BAE00 leaf only. The caller must bind actual Application+0C and
+    // +264, not a host pause/menu flag. No Entity141C30 receipt is published.
+    bool demandResources1BAE00(std::uint32_t actualCameraIndex0C,
+        std::uint32_t actualCameraCount264,Diagnostic& d)noexcept {
+        d={};if(stage_!=Stage::derivedResources)return false;
+        if(!context_||!context_->live())return stop(d,0x1BAE00);
+        // Source addiu wraps the32-bit count, then xor/sltiu tests equality.
+        if(actualCameraIndex0C!=actualCameraCount264-1u)return true;
+        try {
+            const auto font=fonts_->find282210(assets::OriginalApplicationFonts50LA::Name::denmark16);
+            bool written=false;
+            if(font){
+                if(font!=baseText_.font4C)return stop(d,0x1BAE44);
+                if(!demandTexture(font->texture408_,font->texture281F90(),0x1BAE90,written,d))return false;
+            }
+            if(!demandScreenTexture(7,icon_.atlas,0x1BAEC0,written,d))return false;
+            //1BAF10 bc1tl targets1BAF24: taken delay slot1BAF14 increments
+            //once and skips1BAF20; untaken annuls14 and increments20.
+            for(std::size_t i=0;i<2;++i){
+                if(!demandScreenTexture(i,backdrops_[i].atlas,0x1BAF18,written,d))return false;
+            }
+            return true;
+        }catch(...){return stop(d,0x1BAE00);}
+    }
     Stage stage()const noexcept{return stage_;}
     const Texture* backdrop(std::size_t i)const noexcept{return i<3?&backdrops_[i]:nullptr;}
     //This bounded owner cannot submit any geometry, so it has no GPU users.
@@ -151,19 +307,188 @@ public:
     //retirement gating BEFORE exposing a frame/submission API.
     void closeCold()noexcept {
         if(stage_==Stage::closed)return;
+        //1BA2C0 derived destruction precedes shared1B8730. Array text
+        //destruction reverses object order, each text releases batches forward.
+        closeTexture(icon_,7);
+        for(std::size_t i=11;i>0;--i)closeText(derivedTexts_[1+i],12+2*(i-1));
+        closeText(derivedTexts_[1],10);closeText(derivedTexts_[0],8);
+        closeTexture(arrows_[1],35);closeTexture(arrows_[0],34);
         //Base1B8768 loop releases +38 then+3C before base text/textures.
         for(std::size_t i=0;i<2;++i){references_.release299AC0(3+i);polygons_[i].reset();}
+        //1B8794 ->2E1340/2DFC60: string/glyph storage, primitives in
+        //ascending order, then packet storage. Font is a native lifetime borrow.
+        baseText_.string8.reset();baseText_.glyphsC.reset();
+        for(std::size_t i=0;i<2;++i){
+            references_.release299AC0(5+i);
+            if(baseText_.primitives4)baseText_.primitives4[i].reset();
+        }
+        baseText_.primitives4.reset();baseText_.packets64.reset();baseText_.font4C.reset();
         //Base1B87AC array destruction of+A0/+100, then+40 at1B87B8.
         for(auto i:std::array<std::size_t,3>{{1,0,2}}){
             references_.release299AC0(i);
             backdrops_[i].primitive54.reset();backdrops_[i].buffer58.reset();backdrops_[i].atlas=nullptr;
         }
-        stage_=Stage::closed;
+        fonts_.reset();stage_=Stage::closed;
     }
 private:
+    // Only the actual Application observation facet may refresh this bounded
+    // settings segment. It is not the complete1BB010 render callback.
+    bool refreshSettings1BB590(const ControlPresets49D& controls,
+        const OriginalUiGameSettingsProfile50KG& profile,Diagnostic& d)noexcept {
+        d={};if(stage_!=Stage::derivedResources||!context_||!context_->live())return false;
+        if(controller884_>=controlPresetSlots49D||!validOriginalUiGameSettingsProfile50KG(profile))
+            return stop(d,0x1BB590);
+        try {
+            const auto& slot=controls.slots[controller884_];
+            // Invalid switch indices leave the source stack string unspecified;
+            // reject that unsupported state rather than inventing a label.
+            if(slot.field10F94>=8||slot.field10F9C>=8)return stop(d,0x1BB5B4);
+            const auto text=[&](std::size_t id)->const std::string* {
+                const auto* e=data_->english()->at(id);return e?&e->text:nullptr;
+            };
+            const auto join=[&](std::size_t row,std::size_t label,std::size_t value)->bool {
+                const auto* a=text(label);const auto* b=text(value);
+                if(!a||!b)return stop(d,0x18AC60);
+                const auto bytes=*a+" "+*b;assignText(derivedTexts_[2+row],bytes.data(),bytes.size());return true;
+            };
+            constexpr std::size_t firstValues[]={410,412,413,414,415,416,417,411};
+            constexpr std::size_t secondValues[]={410,418,419,420,421,422,423,411};
+            const auto option=slot.field10F94;
+            if((subtype11258_==2||subtype11258_==3)&&(option==3||option==5||option==6)){
+                const auto* label=text(403);if(!label)return stop(d,0x18AC60);
+                const auto bytes=*label+(option==3?" LAP/BEST":option==5?" TIME/BEST":" BEST");
+                assignText(derivedTexts_[4],bytes.data(),bytes.size());
+            }else if(!join(2,403,firstValues[option]))return false;
+            if(!join(3,404,secondValues[slot.field10F9C])||
+               !join(4,405,slot.field10FA4?2:3))return false;
+            for(std::size_t i=0;i<4;++i){
+                const auto* label=text(406+i);if(!label)return stop(d,0x18AC60);
+                // Original3ACB10 '%s %d%%', actual32-bit race audio fields.
+                const auto bytes=*label+" "+std::to_string(std::bit_cast<std::int32_t>(profile.volume11020[i]))+"%";
+                assignText(derivedTexts_[7+i],bytes.data(),bytes.size());
+            }
+            return true;
+        }catch(...){return stop(d,0x1BB590);}
+    }
+    bool demandScreenTexture(std::size_t ref,
+        const assets::OriginalStandardTextureResource50LA* expected,
+        std::uint32_t storePC,bool& written,Diagnostic& d)noexcept {
+        const auto* reference=references_.reference(ref);
+        const assets::OriginalStandardMaterialObject50LA* material=nullptr;
+        assets::OriginalStandardMaterialPassView50LA pass;
+        if(!reference||!reference->retained||
+           !domain_->materials382B38()->resolve298E60(reference->material00,material,d.material)||
+           !material||!material->constructed29B550()||!material->pass4C(0,pass)||
+           !pass.mapCount20||!*pass.mapCount20||!pass.texture1A)
+            return stop(d,0x2DF8A0);
+        return demandTexture((*pass.texture1A)[0],expected,storePC,written,d);
+    }
+    bool demandTexture(std::int16_t token,
+        const assets::OriginalStandardTextureResource50LA* expected,
+        std::uint32_t storePC,bool& written,Diagnostic& d)noexcept {
+        assets::OriginalStandardTextureResource50LA* actual=nullptr;
+        if(!expected||!domain_->textures383400()->resolve298E60(token,actual,d.material.texture)||actual!=expected)
+            return stop(d,storePC);
+        if(!actual->demandPause1BAE00(storePC,written,d.material.texture))return stop(d,storePC);
+        return true;
+    }
     bool stop(Diagnostic& d,std::uint32_t pc)noexcept{d.sourcePC=pc;stage_=Stage::failed;return false;}
     static void setDimension(Texture& t,float& field,float value)noexcept {
         if(field==value)return;field=value;t.flags5C|=1;if(t.field3C!=0)t.flags5C|=2;
+    }
+    void closeTexture(Texture& t,std::size_t ref)noexcept {
+        references_.release299AC0(ref);t.primitive54.reset();t.buffer58.reset();t.atlas=nullptr;
+    }
+    void closeText(Text& t,std::size_t first)noexcept {
+        t.string8.reset();t.glyphsC.reset();
+        for(std::size_t i=0;i<2;++i){references_.release299AC0(first+i);if(t.primitives4)t.primitives4[i].reset();}
+        t.primitives4.reset();t.packets64.reset();t.font4C.reset();
+    }
+    static void setTextColor(Text& t,std::uint32_t color)noexcept {
+        if(t.color54==color)return;
+        for(std::size_t p=0;p<2;++p)for(std::size_t v=0;v<t.packets64[p].count;++v){
+            auto& c=t.packets64[p].vertices[v].rgba;
+            c[0]=((color>>16)&255u)>>1;c[1]=((color>>8)&255u)>>1;c[2]=(color&255u)>>1;
+        }
+        t.color54=color;
+    }
+    static void assignText(Text& t,const char* bytes,std::size_t length)noexcept {
+        if(t.length5C==length&&!std::memcmp(t.string8.get(),bytes,length))return;
+        const auto n=std::min<std::size_t>(length,t.capacity5B);
+        t.length5C=static_cast<std::uint8_t>(n);std::memcpy(t.string8.get(),bytes,n);
+        t.string8[n]=0;t.flags5A|=3;
+    }
+    bool assignLocalized(Text& t,std::size_t id,Diagnostic& d)noexcept {
+        const auto* entry=data_->english()?data_->english()->at(id):nullptr;
+        if(!entry)return stop(d,0x18AC60);
+        assignText(t,entry->text.data(),entry->text.size());return true;
+    }
+    bool loadDerivedText(Text& t,std::uint8_t capacity,std::size_t first,
+        std::shared_ptr<const assets::OriginalApplicationFonts50LA::Entry> font,
+        std::string& actualDirectory,Diagnostic& d) {
+        t.flags5A|=8;t.font4C=std::move(font);t.capacity5B=capacity;t.packetCount5D=t.active5E=2;
+        t.string8=std::unique_ptr<char[]>(new char[std::size_t(capacity)+1]);
+        t.glyphsC=std::make_unique<Glyph[]>(capacity);
+        struct Scope {std::string& actual;std::string old;
+            explicit Scope(std::string& a):actual(a),old(a){actual="font\\";}
+            ~Scope(){actual.swap(old);}};
+        {
+            Scope scope(actualDirectory);t.count0=2;
+            t.primitives4=std::make_unique<std::unique_ptr<TextPrimitive>[]>(2);
+            t.packets64=std::make_unique<TextPacket[]>(2);
+            for(std::size_t p=0;p<2;++p){auto& packet=t.packets64[p];packet.count=2*(p?capacity-36:36);
+                packet.vertices=std::make_unique<PacketVertex[]>(packet.count);
+                for(std::size_t v=0;v<packet.count;++v){
+                    packet.vertices[v].xyz={{0,0,1,0}};
+                    t.glyphsC[p*36+v/2].vertices[v%2].packet=&packet.vertices[v];
+                }
+                t.primitives4[p]=std::make_unique<TextPrimitive>();t.primitives4[p]->reference=first+p;
+                if(!references_.acquireNext(domain_,context_->materialApplication(),data_,actualDirectory,d.material))
+                    return stop(d,0x2DFAB0);
+                t.primitives4[p]->packet10=&packet;
+            }
+        }
+        t.string8[0]=0;t.length5C=0;t.alpha58=255;t.color54=0xffffffff;t.flags5A=0x0b;
+        for(std::size_t p=0;p<2;++p)for(std::size_t v=0;v<t.packets64[p].count;++v)
+            t.packets64[p].vertices[v].rgba={{127,127,127,63}};
+        return true;
+    }
+    bool loadAuthoredTexture(Texture& t,std::size_t ref,const std::string& directory,
+        std::uint32_t depth,Diagnostic& d) {
+        using namespace assets;d.object=ref;
+        t.primitive54=std::make_unique<Primitive>();t.primitive54->reference=ref;
+        if(!references_.acquireNext(domain_,context_->materialApplication(),data_,directory,d.material))return stop(d,0x2DF11C);
+        if(!domain_->populateTimeStatsResources2DF144(context_,d.material))return stop(d,0x2DF144);
+        const auto* reference=references_.reference(ref);const auto spec=references_.source(ref);
+        const auto* screen=context_->materialApplication()->templates().get(OriginalUiTemplate50KG::screenMt);
+        OriginalStandardMaterialRowView50LA row;const OriginalStandardMaterialObject50LA* object=nullptr;
+        if(!reference||!reference->retained||!screen||
+           !domain_->materials382B38()->row(reference->material00,row)||
+           !row.references08||*row.references08<=0||row.associated30!=screen||
+           !domain_->materials382B38()->resolve298E60(reference->material00,object,d.material)||
+           !object||!object->constructed29B550()||!object->source()||
+           object->textures383400()!=domain_->textures383400().get()||!object->passCount48()||*object->passCount48()<1)
+            return stop(d,0x2DF164);
+        const auto psm=data_->overlays()->find(std::string("ui\\textures\\")+spec.name+".psm");
+        const auto* bytes=object->source()->originalBytes();
+        if(!psm.identity||!psm.data||!bytes||bytes->size()!=psm.size||std::memcmp(bytes->data(),psm.data,psm.size))
+            return stop(d,0x2DF164);
+        OriginalStandardMaterialPassView50LA pass;OriginalStandardTextureRowView50LA texture;
+        //Original2DF164/174 reads first pass/map, not a guessed icon/ATM name.
+        //All authored passes and animation owners remain on the canonical object.
+        if(!object->pass4C(0,pass)||!pass.mapCount20||!*pass.mapCount20||!pass.texture1A||
+           (*pass.texture1A)[0]<0||!domain_->textures383400()->row((*pass.texture1A)[0],texture)||
+           !texture.object04||!texture.references08||*texture.references08<=0)return stop(d,0x2DF174);
+        t.atlas=texture.object04;const auto* w=t.atlas->sourceWidth14();const auto* h=t.atlas->sourceHeight18();
+        if(!w||!h||*w<=0||*h<=0)return stop(d,0x2DF180);
+        t.width34=static_cast<float>(*w);t.height38=static_cast<float>(*h);
+        t.invWidth4C=1.f/t.width34;t.invHeight50=1.f/t.height38;
+        t.buffer58=std::make_unique<Packet>();t.primitive54->packet10=t.buffer58.get();
+        for(std::size_t v=0;v<4;++v){auto& p=t.buffer58->vertices[v];
+            p.rgba={{127,127,127,63}};p.xyz={{0,0,static_cast<float>(depth)-t.field40,1}};
+            p.stq={{(v&1)?1.f:0.f,(v&2)?1.f:0.f,1,0}};
+        }
+        t.flags5C|=1;return true;
     }
     bool resolveBackdrop(std::size_t i,const assets::OriginalStandardTextureResource50LA*& atlas,
         Diagnostic& d)const {
@@ -199,6 +524,16 @@ private:
     std::shared_ptr<const assets::OriginalStandardMaterialContext50LA> context_;
     std::shared_ptr<const assets::OriginalPauseSourceData50LA> data_;
     assets::OriginalPausePrimitiveReferences50LA references_;
+    std::shared_ptr<assets::OriginalApplicationFonts50LA> fonts_;
+    Text baseText_; //Original+180.
+    Texture icon_; //+890.
+    std::array<Texture,2> arrows_{}; //+210,+270.
+    std::array<Text,13> derivedTexts_{}; //+2D0,+340,eleven+3B0.
+    //1BA130 initializes both genuine Pause fields to zero. Future input
+    //callbacks own changes; no public host-selection/player setter exists.
+    std::uint32_t selection880_=0,controller884_=0;
+    std::int32_t subtype11258_=0; //Actual value consumed during derived load.
+    std::uint32_t mode1F0_=0;
     std::array<std::unique_ptr<Polygon>,2> polygons_{};
     std::array<Texture,3> backdrops_{}; //Source+A0,+100,+40 allocation/load order.
     Stage stage_=Stage::fresh;

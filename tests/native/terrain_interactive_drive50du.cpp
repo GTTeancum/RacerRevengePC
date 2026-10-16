@@ -100,6 +100,7 @@
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/host_session_menu50if.h"
 #include "original_ui_main_entry50kg.h"
+#include "original_pause_observation50la.h" // Inactive source-only settings observer.
 #include "original_race_display_lifetime50la.h"
 #include "original_position_stats_primitives50la.h"
 #include "original_position_stats_resources50la.h"

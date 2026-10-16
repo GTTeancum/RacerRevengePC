@@ -123,6 +123,11 @@ public:
             storage_=std::move(next);error.clear();return result(S::inventoried);
         }catch(const std::bad_alloc&){error="original wreck inventory cold allocation failed";return result(S::allocation);}
     }
+    // Same application-owned constructor vectors used while loading every
+    // retained PSG occurrence. This is a borrow, not a synthesized default.
+    const OriginalWreckConstructorVectors50LA* constructorVectors()const noexcept {
+        return storage_?storage_->binding.constructorVectors:nullptr;
+    }
     bool inventoried()const noexcept{return bool(storage_);}
     bool complete()const noexcept{return storage_&&storage_->nextCollection==storage_->inventory.size();}
     const OriginalWreckAuthoring50LA& authoring()const noexcept{return storage_->authoring;}

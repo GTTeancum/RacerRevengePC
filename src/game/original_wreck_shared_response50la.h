@@ -5,14 +5,18 @@
 
 namespace rr::game {
 namespace original_wreck_response_detail50LA {
-// No response-only scene-ID table. The full query/POINT producer's shared
-// identity domain is not constructed yet; unknown nonzero IDs remain rejected.
+// The optional domain is the SAME privately published query-shape identity
+// authority consumed by POINT/294BB0 producers, never a response-only map.
 struct GroupContactContext {
     OriginalWreckPhysical50LA& contactOwner;
     OriginalWreckPhysical50LA& bodyOwner;
     OriginalWreckAssetInventory50LA& inventory;
     std::size_t collection;
     const SpringVector4_48N& actualZero4435A0;
+    const OriginalWreckSceneDomain50LA* scenes=nullptr;
+    std::uint64_t generation=0;
+    VisualLazyWord49R* pointSentinel=nullptr;
+    VisualLazyWord49R* generatedSentinel=nullptr;
     OriginalWreckAssets50LA* bodyAssets=nullptr;
     OriginalWreckAssets50LA* contactAssets=nullptr;
     OriginalWreckPhysical50LA& contact()noexcept{return contactOwner;}
@@ -55,11 +59,20 @@ struct GroupContactContext {
            !span(&actualZero4435A0,1,ranges[count++]))return false;
         for(std::size_t i=0;i<count;++i)for(std::size_t j=0;j<i;++j)
             if(overlap(ranges[i],ranges[j]))return false;
-        return true;
+        pointSentinel=&a;generatedSentinel=&b;return true;
     }
     bool recordFrame(SpringSceneId48N id,SceneGraph49P& g,SceneNodeIndex49P& model)noexcept {
-        if(id.value)return false; // reached296884: actual producer scene-domain join remains
-        g=bodyAssets->graph();model=bodyOwner.model288;return true; //2968CC zero fallback
+        if(!id.value){g=bodyAssets->graph();model=bodyOwner.model288;return true;} //2968CC
+        OriginalWreckSceneView50LA view;
+        if(!scenes||scenes!=contactOwner.modelSceneDomain||!scenes->publishedFor(contactOwner,generation)||
+           !scenes->resolve(id,generation,view)||!view.physical||
+           occurrence(*view.physical)!=view.assets||!pointSentinel||!generatedSentinel)return false;
+        Span scene{},ranges[5];
+        if(!span(view.graph.nodes,view.graph.count,scene)||!span(&contactOwner,1,ranges[0])||
+           !span(&bodyOwner,1,ranges[1])||!span(pointSentinel,1,ranges[2])||
+           !span(generatedSentinel,1,ranges[3])||!span(&actualZero4435A0,1,ranges[4]))return false;
+        for(const auto& range:ranges)if(overlap(scene,range))return false;
+        g=view.graph;model=view.model;return true; //296884, no refresh or matrix copy
     }
 };
 }
@@ -68,13 +81,14 @@ struct GroupContactContext {
 // Existing state/records are consumed in place. This neither binds/attaches a
 // member nor enables bodies, creates records, or certifies query/effect lifetime.
 // No-record completion does not read inventory, graph, or scene identities.
-// Nonzero scene40 stops at its reached source branch until the actual producer
-// shares a model-identity domain. Earlier source prefix writes remain committed.
+// Nonzero scene40 requires the actual query/producer domain; null, stale or
+// unknown bindings stop at296884. Earlier source prefix writes remain committed.
 inline OriginalWreckResponseResult50LA advanceOriginalWreckGroupContact2964C0_50LA(
     OriginalWreckGroupArrays50LA& group,std::size_t memberSlot,
     OriginalWreckAssetInventory50LA& inventory,std::size_t collectionIndex,
     const SpringVector4_48N& actualZero4435A0,VisualLazyWord49R& pointSentinel4435E0,
-    VisualLazyWord49R& generatedSentinel4435E8)noexcept {
+    VisualLazyWord49R& generatedSentinel4435E8,
+    const OriginalWreckSceneDomain50LA* actualProducerScenes=nullptr)noexcept {
     using S=OriginalWreckResponseStatus50LA;
     const auto* member=group.member(memberSlot);const auto* primary=group.primary();
     if(!member||!primary||!member->piece||!member->physical||!member->component||
@@ -92,7 +106,8 @@ inline OriginalWreckResponseResult50LA advanceOriginalWreckGroupContact2964C0_50
     else if(child.contactBody30==&primary->physical->body)target=primary->physical;
     if(!target)return {S::owner,0x2964c0u};
     original_wreck_response_detail50LA::GroupContactContext context{
-        child,*target,inventory,collectionIndex,actualZero4435A0};
+        child,*target,inventory,collectionIndex,actualZero4435A0,actualProducerScenes,
+        member->component->sessionGeneration};
     return original_wreck_response_detail50LA::advanceContact2964C0(
         context,pointSentinel4435E0,generatedSentinel4435E8);
 }

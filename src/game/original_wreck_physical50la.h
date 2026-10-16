@@ -9,6 +9,7 @@
 #include <cstring>
 
 namespace rr::game {
+class OriginalWreckSceneDomain50LA;
 
 // The one genuine D0 body.49M supplies its canonical root, caches, full70/B0
 // and load lanes, enabled204 and body20C. Its vehicle-only time864/phase are
@@ -27,6 +28,9 @@ struct OriginalWreckPhysical50LA final {
     // alone cannot distinguish distinct retained PartN asset occurrences.
     const SceneNode49P* modelGraphNodes=nullptr;
     std::uint32_t modelGraphCount=0;
+    // Native provenance of actual E0.shape44 publication. Compare-only borrow;
+    // response also requires a live supplied domain and its unrevoked entry.
+    const OriginalWreckSceneDomain50LA* modelSceneDomain=nullptr;
     SpringRecordState48N spring{};
     //295C20 allocates two separate50-record arrays. Their unused payload is
     //not source-initialized; only reached records written by real producers
@@ -126,7 +130,7 @@ inline bool initializeOriginalWreckBody50LA(OriginalWreckPhysical50LA& p,
     std::memcpy(q.inverseInertiaExtra,extraInverse,sizeof extraInverse);
     copy(q.centerOffset,q.centerOffsetW,g.bodyVector433AD0);
     p.linkedCount268=0;p.model288=SceneNodeIndex49P::none;b.scenePresent=false;
-    p.modelGraphNodes=nullptr;p.modelGraphCount=0;
+    p.modelGraphNodes=nullptr;p.modelGraphCount=0;p.modelSceneDomain=nullptr;
     b.body20C=0;r.callbackState238=0;
     for(unsigned i=0;i<3;++i){q.body.translationEnabled[i]=true;q.body.rotationEnabled[i]=true;}
     //167920 calls its genuine slotAC167A50, including167AD0 histories.

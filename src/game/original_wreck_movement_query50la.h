@@ -36,7 +36,7 @@ inline OriginalWreckMovementQueryResult50LA queryOriginalWreckMovement50LA(
        pieceComponent.kind!=OriginalWreckComponentKind50LA::piece2CB4B0||
        !pieceComponent.objectKey||!pieceComponent.sessionGeneration)return fail(S::owner,0x16688cu);
     const auto& w=queries.worldBinding();auto& q=queries.query(2);
-    if(!q.owner9C||q.bodyA0||!q.membership.attached||
+    if(!q.owner9C||&q.owner9C->component()!=&pieceComponent||q.bodyA0||!q.membership.attached||
        !w.normalMode3DF5B0||!w.sentinel3E02C0||!w.copies||!w.geometry||
        w.worldQuery.objects!=w.objects||w.worldQuery.geometry!=w.geometry||
        w.worldQuery.objectCount!=w.objectCount||w.mutableQuery.objects!=w.states||

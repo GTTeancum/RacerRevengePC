@@ -1077,6 +1077,19 @@ bool OriginalStandardTextureResource50LA::demandTimeStats194E20(
     if(!(10.f<=demand10_)){demand10_=10.f;written=true;}
     return true;
 }
+bool OriginalStandardTextureResource50LA::demandPause1BAE00(
+    std::uint32_t storePC,bool& written,D& d) noexcept {
+    written=false;
+    if(storePC!=0x1BAE90u&&storePC!=0x1BAEC0u&&storePC!=0x1BAF18u)
+        return fail(d,E::unsupported,storePC);
+    if(aggregate_||!constructed_||references00_<=0||!construction_||!construction_->live())
+        return fail(d,E::phase,storePC);
+    using Math=detail::StandardTextureDemandMath50LA;
+    if(!Math::supported()||!Math::ordinary(demand10_)||demand10_<0.f)
+        return fail(d,E::number,storePC);
+    if(!(10.f<=demand10_)){demand10_=10.f;written=true;}
+    return true;
+}
 bool OriginalStandardTextureResource50LA::demandPositionStats191AF0(
     std::uint32_t storePC,bool& written,D& d) noexcept {
     written=false;

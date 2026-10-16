@@ -104,6 +104,7 @@ public:
     OriginalWreckPieceFields50LA piece;
     OriginalWreckSingleGroupFields50LA group;
     OriginalWreckGravity50LA gravity;
+    OriginalWreckPieceQueryOwner50LA queryOwner;
     OriginalWreckQueries50LA queries;
     OriginalWreckVisibility50LA visibility;
     OriginalWreckDetector50LA detector;
@@ -166,7 +167,12 @@ public:
             for(std::size_t i=0;i<capacity_;++i){componentPointers[i]=&components[i];keys_[i]=binding.componentKeys[i];}
             domain={binding.sessionGeneration,componentPointers.get(),0};
         }catch(...){return result(S::allocation,0x22c084u);}
-        const auto q=queries.prepareCold(assets,*this,physical,binding.queryWorld);
+        const auto body=bodyIndex();
+        const std::array<OriginalWreckComponent50LA*,3> queryComponents{{
+            &components[body+2],&components[body+5],&components[body+6]}};
+        if(!queryOwner.bindCold(assets,physical,piece,components[1],binding.sessionGeneration))
+            return result(S::binding,0x165e90u);
+        const auto q=queries.prepareCold(queryOwner,binding.queryWorld,components[2],queryComponents);
         if(q.status!=OriginalWreckQueryStatus50LA::complete)return result(S::queries,q.sourcePC);
         if(!visibility.prepareCold(assets,binding.visibilityWorld))return result(S::visibility,0x28e8a0u);
         if(hasEffects_){
@@ -183,7 +189,7 @@ public:
     bool prepared()const noexcept{return constructed_&&coherent();}
     // Same source model identity already used by the authentic DC POINT
     // producer. The world contact callback may not supply a second scene key.
-    SpringSceneId48N modelSceneIdentity()const noexcept{return binding_.actualModelSceneIdentity;}
+    SpringSceneId48N modelSceneIdentity()const noexcept{return queries.modelSceneIdentity();}
     const SpringVector4_48N* contactVector4435A0()const noexcept{return binding_.actualVector4435A0;}
     const SpringVector4_48N* groupVector4441F0()const noexcept{return binding_.actualVector4441F0;}
     std::size_t componentCapacity()const noexcept{return capacity_;}
@@ -409,11 +415,11 @@ private:
         components[index].flags29=w.objects[w.refs[i]-1u].filter.flags31;
         if(!initialize(index,OriginalWreckComponentKind50LA::collision11B190))return false;
         components[index].category28=*w.collisionTypeGp8010;
-        return queries.publishColdQuery(i,components[index]).status==OriginalWreckQueryStatus50LA::complete;
+        return queries.publishColdQuery(i,components[index],components[2],binding_.actualModelSceneIdentity).status==OriginalWreckQueryStatus50LA::complete;
     }
     bool constructContactPoints()noexcept {
         const auto& resource=assets.queryE0();
-        if(!pointStackCapacity_||!pointStack_||physical.spring.pointCount7C||
+        if(!modelSceneIdentity().value||!pointStackCapacity_||!pointStack_||physical.spring.pointCount7C||
            physical.spring.generatedCapacity88!=50)return false;
         std::size_t top=0,remaining=resource.nodeCount+resource.rayCount;
         pointStack_[top++]=resource.root;
@@ -438,10 +444,10 @@ private:
         if(s.pointCount7C>=50u)return true; //295E18 saturation precedes duplicate search
         for(std::size_t i=0;i<s.pointCount7C;++i){const auto& old=physical.pointRecords[i];
             if(old.localPoint10.v[0]==point.v[0]&&old.localPoint10.v[1]==point.v[1]&&
-               old.localPoint10.v[2]==point.v[2]&&old.scene40.value==binding_.actualModelSceneIdentity.value)return true;
+               old.localPoint10.v[2]==point.v[2]&&old.scene40.value==modelSceneIdentity().value)return true;
         }
         auto& next=physical.pointRecords[s.pointCount7C];
-        next.scene40=binding_.actualModelSceneIdentity;next.localPoint10=point;
+        next.scene40=modelSceneIdentity();next.localPoint10=point;
         next.flags50=static_cast<std::uint8_t>((next.flags50&~1u)|1u);next.margin48=0.f;
         next.normal20=*binding_.actualVector4435A0;next.surfacePoint30=*binding_.actualVector4435A0;
         ++s.pointCount7C;return true;

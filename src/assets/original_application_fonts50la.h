@@ -28,10 +28,12 @@ struct OriginalApplicationFontDiagnostic50LA {
 // pointers safe; they do NOT add source texture references on every copy.
 class OriginalApplicationFonts50LA final {
     friend struct original_main_entry50KG::Application;
+    friend class rr::game::OriginalPauseStorage50LA;
 public:
     enum class Name : std::uint8_t { eurostile13=0, denmark16=1, eurostileItalic26=2 };
     class Entry final {
         friend class OriginalApplicationFonts50LA;
+        friend class rr::game::OriginalPauseStorage50LA;
         std::shared_ptr<OriginalStandardMaterialDomain50LA> domain_;
         std::shared_ptr<const OriginalStandardMaterialContext50LA> context_;
         std::shared_ptr<const OriginalUiArchive50KG> archive_;
@@ -109,6 +111,21 @@ private:
         OriginalApplicationFontDiagnostic50LA& d)noexcept {
         return loadNames282430<2>(std::move(archive),actualDirectory36B970,fontDirectory36B420,
             {{Name::eurostile13,Name::denmark16}},0x193A0C,d);
+    }
+    // Source382C70 ->3AC9B0, one denmark16 request, reload0 at1B8BC4.
+    // Separate from TimeStats' two-name list; preserves actual insertion order.
+    bool loadPauseBase1B8BC4(std::shared_ptr<const OriginalUiArchive50KG> archive,
+        std::string& actualDirectory36B970,const std::string& fontDirectory36B420,
+        OriginalApplicationFontDiagnostic50LA& d)noexcept {
+        return loadNames282430<1>(std::move(archive),actualDirectory36B970,fontDirectory36B420,
+            {{Name::denmark16}},0x1B8BC4,d);
+    }
+    // Source382C78 also points to denmark16: derived1BA3E4, count1/reload0.
+    bool loadPauseDerived1BA3E4(std::shared_ptr<const OriginalUiArchive50KG> archive,
+        std::string& actualDirectory36B970,const std::string& fontDirectory36B420,
+        OriginalApplicationFontDiagnostic50LA& d)noexcept {
+        return loadNames282430<1>(std::move(archive),actualDirectory36B970,fontDirectory36B420,
+            {{Name::denmark16}},0x1BA3E4,d);
     }
     // Actual382C08 pair at18A99C: italic26, then existing13, reload0.
     bool loadSpeedBoost18A99C(std::shared_ptr<const OriginalUiArchive50KG> archive,

@@ -9,6 +9,9 @@
 #include "collision_normal_mode50ja.h"
 #include "original_wreck_type2_storage50la.h"
 #include "original_wreck_exclusion50la.h"
+#include "original_wreck_scene_domain50la.h"
+#include "original_wreck_piece_query_owner50la.h"
+#include "original_wreck_contact50la.h"
 #include <array>
 #include <algorithm>
 #include <cstring>
@@ -16,7 +19,6 @@
 #include <memory>
 
 namespace rr::game {
-class OriginalOnePieceWreckOwner50LA;
 
 // Actual shared collision namespace and canonical collector slots. All three
 // slots are reserved COLD for this particular piece, before any world/query
@@ -51,6 +53,9 @@ struct OriginalWreckQueryWorld50LA {
     // Actual authored collection size, cold capacity only. E0 needs own E4/E8
     // plus every other piece E4. Existing one-piece owners retain capacity2.
     std::size_t groupPieceCapacity=1;
+    // Optional actual shared domain, prepared cold for this session. It must
+    // outlive all query owners. Null retains a private one-piece domain.
+    OriginalWreckSceneDomain50LA* modelScenes=nullptr;
 };
 enum class OriginalWreckQueryStatus50LA : std::uint8_t {
     complete,binding,allocation,graph,preparation,registration
@@ -62,6 +67,12 @@ struct OriginalWreckQueryResult50LA {
     LiveZoneResult50EN registration{};
 };
 
+enum class OriginalWreckQueryCallbackStatus50LA : std::uint8_t {complete,binding,continuation};
+struct OriginalWreckQueryCallbackResult50LA {
+    OriginalWreckQueryCallbackStatus50LA status=OriginalWreckQueryCallbackStatus50LA::binding;
+    std::uint32_t sourcePC=0x2cb420u;
+    OriginalWreckContactResult50LA callback{};
+};
 // Native owner of the THREE actual collision objects allocated by165E90.
 // It owns fixed membership backing, exclusions and prepared shapes; geometry
 // and the model are borrowed from the real immutable/mutable asset owner.
@@ -88,7 +99,7 @@ public:
         // One source9C slot with two typed alternatives.2955F0 overwrites
         // E0's initial piece owner with the actual DC contact owner and
         // installs294BB0 in E4. E4/E8 retain their piece owner9C.
-        OriginalOnePieceWreckOwner50LA* owner9C=nullptr;
+        OriginalWreckPieceQueryOwner50LA* owner9C=nullptr;
         OriginalWreckPhysical50LA* contactOwner9C=nullptr;
         QueryCallback queryE4=QueryCallback::none;
         RootBodyState48H* bodyA0=nullptr; // E8 source ctor leaves this null
@@ -123,11 +134,16 @@ public:
     // state, copy word or shared invalidation byte is written here. Uses
     // actual application-owned named PHYSICSBODY bit, not 11B570's argument:
     //11B570(3/5) selects F8 flags, NOT the category. Exclusion order is exact.
-    OriginalWreckQueryResult50LA prepareCold(OriginalWreckAssets50LA& assets,
-        OriginalOnePieceWreckOwner50LA& piece,OriginalWreckPhysical50LA& physical,
-        const OriginalWreckQueryWorld50LA& world) noexcept {
+    OriginalWreckQueryResult50LA prepareCold(OriginalWreckPieceQueryOwner50LA& piece,
+        const OriginalWreckQueryWorld50LA& world,
+        OriginalWreckComponent50LA& actualModelStorage,
+        const std::array<OriginalWreckComponent50LA*,3>& actualQueryStorage) noexcept {
         using S=OriginalWreckQueryStatus50LA;
-        if(retired_||storage_||!world.groupPieceCapacity||world.groupPieceCapacity>512u||
+        if(!piece.boundCold())return {S::binding,0x165e90u};
+        auto& assets=piece.assets();auto& physical=piece.physical();const auto sessionGeneration=piece.sessionGeneration();
+        if(retired_||storage_||!sessionGeneration||
+           (world.modelScenes&&(!world.modelScenes->prepared()||world.modelScenes->sessionGeneration()!=sessionGeneration))||
+           !world.groupPieceCapacity||world.groupPieceCapacity>512u||
            !assets.prepared()||!world.lifecycle||!world.world||!world.workspace||
            !world.objects||!world.states||!world.copies||!world.geometry||!world.objectCount||
            world.objectCount!=world.lifecycle->objectCount||!world.physicsBodyCategory3E0718||
@@ -137,6 +153,10 @@ public:
            world.lifecycle->storage.registrationCapacity<world.objectCount||
            world.world->portalCount==std::numeric_limits<std::size_t>::max())
             return {S::binding,0x165e90u};
+        for(unsigned i=0;i<3;++i){
+            if(!actualQueryStorage[i]||actualQueryStorage[i]==&actualModelStorage)return {S::binding,0x11bbc0u};
+            for(unsigned j=0;j<i;++j)if(actualQueryStorage[i]==actualQueryStorage[j])return {S::binding,0x11bbc0u};
+        }
         const SpringVector4_48N vf0{{0.f,0.f,0.f,1.f}};
         if(std::memcmp(world.sentinel3E02C0,&vf0,sizeof vf0))return {S::binding,0x11b444u};
         auto graph=assets.graph();const auto model=assets.model14C();
@@ -154,6 +174,10 @@ public:
         }
         try {
             auto next=std::make_unique<Storage>();next->assets=&assets;next->world=world;
+            next->plannedModel=&actualModelStorage;next->plannedQueries=actualQueryStorage;
+            if(world.modelScenes)next->sceneDomain=world.modelScenes;
+            else {if(!next->localScenes.prepareCold(sessionGeneration,1u))return {S::allocation,0x11bbc0u};
+                next->sceneDomain=&next->localScenes;}
             next->piece=&piece;next->physical=&physical;
             next->capacity=world.world->portalCount+1u;
             const auto category=*world.physicsBodyCategory3E0718;
@@ -292,9 +316,11 @@ public:
     // Source165E90 constructor publication. Component141300 has already run
     // on this actual +8 subobject, so flags31 borrows its authoritative29.
     // Source-specific later fields (2955F0 and2CB5A0) are separate methods.
-    OriginalWreckQueryResult50LA publishColdQuery(unsigned i,OriginalWreckComponent50LA& component) noexcept {
+    OriginalWreckQueryResult50LA publishColdQuery(unsigned i,OriginalWreckComponent50LA& component,
+        OriginalWreckComponent50LA& actualModel,SpringSceneId48N actualModelIdentity) noexcept {
         using S=OriginalWreckQueryStatus50LA;
-        if(!storage_||i>2||storage_->published[i]||
+        if(!storage_||i>2||storage_->published[i]||!storage_->piece->coherent()||
+           storage_->plannedModel!=&actualModel||storage_->plannedQueries[i]!=&component||
            component.kind!=OriginalWreckComponentKind50LA::collision11B190||
            !component.objectKey||!component.sessionGeneration||
            !storage_->physical->bodyConstructorFieldsApplied||
@@ -303,6 +329,10 @@ public:
         auto& w=storage_->world;const auto index=w.refs[i]-1u;
         const auto& registered=w.lifecycle->storage.registrations[index];
         if(registered.owner||registered.slot||registered.encodedObject)return {S::binding,0x11b190u};
+        OriginalWreckSceneDomain50LA::Entry scenePublication{};
+        if(i==0&&!storage_->sceneDomain->preparePublication(actualModelIdentity,*storage_->assets,
+           *storage_->physical,actualModel,component,w.identities[0],scenePublication))
+            return {S::binding,0x1253f0u};
         auto definition=storage_->coldDefinitions[i];definition.filter.flags31=component.flags29;
         w.objects[index]=definition;w.states[index]=storage_->coldStates[i];
         w.copies[index].copied40=*w.sentinel3E02C0;w.copies[index].copied50=*w.sentinel3E02C0;
@@ -310,7 +340,16 @@ public:
         if(i==1)w.geometry[index]={&storage_->assets->targetE4().mesh,query(1).type0.composed00,nullptr,true};
         *w.globalValid3E0730=0; //Actual11B570 invalidates the same application cache byte.
         storage_->components[i]=&component;storage_->published[i]=true;
+        if(i==0)storage_->modelScene44=storage_->sceneDomain->publish1253F0(scenePublication,w.objects[index]);
         return {S::complete,0u};
+    }
+    // Source model/shape identity is available immediately after E0 publication,
+    // before DC/POINT/detector construction. No prepared-owner shortcut.
+    SpringSceneId48N modelSceneIdentity()const noexcept {
+        return storage_&&storage_->published[0]?storage_->sceneDomain->identity(storage_->modelScene44):SpringSceneId48N{};
+    }
+    const OriginalWreckSceneDomain50LA* modelSceneDomain()const noexcept {
+        return storage_?storage_->sceneDomain:nullptr;
     }
     // Exact2955F0 final detector binding: E0.9C=DC, A0=DC.30 and E4=294BB0.
     bool bindContactQuery() noexcept {
@@ -351,6 +390,31 @@ public:
     bool bindDerivedResponse() noexcept {
         if(!coherent(1)||!storage_->published[2]||!storage_->mutualBound||storage_->derivedBound)return false;
         query(1).responseE8=ResponseCallback::wreck2CB420;storage_->derivedBound=true;return true;
+    }
+    //121D28/122878 dispatch candidate.E8(receiver=candidate,other=querying
+    // object), after querying object's E4 callback. Caller owns that sequencing.
+    // This bounded adapter accepts a real querying wreck E0/E4/E8 in the SAME
+    // canonical world. Other body families require their actual typed resolver.
+    OriginalWreckQueryCallbackResult50LA respondFromQuery2CB420(
+        const OriginalWreckQueries50LA& actualQueryingOwner,unsigned queryingIndex)noexcept {
+        using S=OriginalWreckQueryCallbackStatus50LA;OriginalWreckQueryCallbackResult50LA out;
+        if(!coherent(1)||!storage_->derivedBound||query(1).responseE8!=ResponseCallback::wreck2CB420||
+           !actualQueryingOwner.coherent(queryingIndex)||
+           storage_->world.world!=actualQueryingOwner.storage_->world.world||
+           storage_->world.objects!=actualQueryingOwner.storage_->world.objects||
+           storage_->piece->sessionGeneration()!=actualQueryingOwner.storage_->piece->sessionGeneration())return out;
+        auto& receiver=*query(1).owner9C;auto& physical=receiver.physical();
+        if(!physical.contactConstructorFieldsApplied||query(1).bodyA0!=&physical.body.root)return out;
+        const auto* other=actualQueryingOwner.query(queryingIndex).bodyA0;
+        // Existing scalar leaf requires disjoint consumed body inputs. Do not
+        // fabricate a null other or an enabled receiver to bypass that boundary.
+        if(!receiver.fields().wake30&&!physical.body.enabled&&other==&physical.body.root)return out;
+        out.callback=respondOriginalWreckContact50LA(receiver.fields().wake30,physical.body.enabled,
+            query(1).bodyA0->body,physical.body.velocity70W,other?&other->body:nullptr,
+            physical.generated.impact.restitutionC0);
+        out.sourcePC=out.callback.sourcePC;
+        out.status=out.callback.status==OriginalWreckContactStatus50LA::complete?S::complete:S::continuation;
+        return out;
     }
     Query& query(unsigned i) noexcept{return storage_->queries[i];}
     const Query& query(unsigned i)const noexcept{return storage_->queries[i];}
@@ -441,7 +505,9 @@ public:
         return result;
     }
     bool coherent(unsigned i)const noexcept {
-        if(!storage_||i>2||!storage_->published[i])return false;const auto& w=storage_->world;const auto& q=query(i);
+        if(!storage_||i>2||!storage_->published[i]||!storage_->piece->coherent()||
+           (i==0&&!modelSceneIdentity().value))return false;
+        const auto& w=storage_->world;const auto& q=query(i);
         if(object(i).identity!=w.identities[i]||object(i).shapeTag!=(i==0?2u:i==1?0u:3u)||
            object(i).filter.categoryA4!=*w.physicsBodyCategory3E0718||
            object(i).typeTag!=*w.collisionTypeGp8010||!object(i).hasShape)return false;
@@ -461,8 +527,14 @@ public:
     }
 private:
     struct Storage {
+        OriginalWreckComponent50LA* plannedModel=nullptr;
+        std::array<OriginalWreckComponent50LA*,3> plannedQueries{};
+        OriginalWreckSceneDomain50LA localScenes;
+        OriginalWreckSceneDomain50LA* sceneDomain=nullptr;
+        OriginalWreckSceneDomain50LA::Handle modelScene44{};
+        ~Storage(){if(sceneDomain)sceneDomain->revokeNative(modelScene44);}
         OriginalWreckAssets50LA* assets=nullptr;
-        OriginalOnePieceWreckOwner50LA* piece=nullptr;
+        OriginalWreckPieceQueryOwner50LA* piece=nullptr;
         OriginalWreckPhysical50LA* physical=nullptr;
         OriginalWreckQueryWorld50LA world{};
         std::size_t capacity=0;
