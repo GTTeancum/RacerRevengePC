@@ -10,11 +10,18 @@
         const auto& span=surfaces_[surfaceIndex];
         if(span.placement>=placements_.size()||!placements_[span.placement])return reject(d,"owned placement missing");
         const auto& actual=*placements_[span.placement];const auto* scene=actual.payload?actual.payload->scene():nullptr;
-        if(!scene||span.sourceLod!=0||scene->lods.empty()||span.sourceSurface>=scene->lods[0].surfaces.size()||
+        if(!scene||span.sourceLod>=scene->lods.size()||actual.lodRanges.size()!=scene->lods.size()||
+           span.sourceSurface>=scene->lods[span.sourceLod].surfaces.size()||
            span.worldInstance!=actual.worldInstance||surfaceIndex<actual.firstSurface||
            surfaceIndex-actual.firstSurface>=actual.surfaceCount||!actual.materials.complete()||
            actual.materials.table382B38()!=domain_->materials382B38().get())return reject(d,"actual source surface owner differs");
-        const auto& original=scene->lods[0].surfaces[span.sourceSurface];
+        const auto& range=actual.lodRanges[span.sourceLod];
+        if(range.firstSurface<actual.firstSurface||range.firstSurface>surfaces_.size()||
+           range.surfaceCount>surfaces_.size()-range.firstSurface||
+           range.surfaceCount!=scene->lods[span.sourceLod].surfaces.size()||
+           surfaceIndex<range.firstSurface||surfaceIndex-range.firstSurface!=span.sourceSurface)
+            return reject(d,"actual crowd LOD range differs");
+        const auto& original=scene->lods[span.sourceLod].surfaces[span.sourceSurface];
         const auto* token=actual.materials.handle1C4(original.material_index);
         if(original.material_index!=span.materialSlot||!token||*token!=span.materialRow||
            original.material_index>=scene->materials.size()||normalized(scene->materials[original.material_index])!="crowd")

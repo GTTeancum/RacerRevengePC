@@ -2,6 +2,7 @@
 #include "original_position_stats_primitives50la.h"
 #include "original_position_stats_adapter50la.h"
 #include "../../src/game/original_position_stats_numeric50la.h"
+#include "../../src/game/original_position_stats_radar_route50la.h"
 #include "../../src/game/original_position_stats_clip50la.h"
 #include "../../src/game/original_position_stats_loader_data50la.h"
 #include "../../src/game/original_ui_text_position50kg.h"
@@ -19,12 +20,14 @@ struct OriginalPositionStatsResourceDiagnostic50LA {
     platform::VehicleWindowDiagnostic50DS renderer;
     OriginalCameraStartResult drain;
     OriginalPositionStatsPrimitiveDiagnostic50LA primitive;
+    position_stats_detail50LA::RadarRouteProgress route;
 };
 //Detached cold18FF80/190190 resource owner with Application-mediated scalar
 //observation. No race+CC hierarchy, demand, collector, predraw or draw API.
 //Renderer must NEVER strongly retain it.
 class OriginalPositionStatsResources50LA final {
     friend struct original_main_entry50KG::Application;
+    friend class OriginalPositionStatsHud50LA;
     using Domain=assets::OriginalStandardMaterialDomain50LA;
     using Context=assets::OriginalStandardMaterialContext50LA;
     using Archive=assets::OriginalUiArchive50KG;
@@ -104,6 +107,9 @@ class OriginalPositionStatsResources50LA final {
     std::optional<OriginalPositionStatsClip50LA> clip_{std::in_place};
     std::shared_ptr<OriginalPositionStatsPrimitiveOwner50LA> primitives_;
     const void* race30_=nullptr; //Detached: no fabricated original race+CC/30 join.
+    std::array<std::size_t,8> radarMarkerIndices_{};
+    std::size_t radarMarkerCount_=0;
+    position_stats_detail50LA::RadarRouteProgress radarRoute_; //CPU geometry only; not draw readiness.
     float field32B0_=0,field32B4_=0;
     std::array<float,4> field32C0_{{0,0,0,1}}; //3C9790 initializes433EB0.
     float field32D0_=0,field32D4_=0,field32D8_=0;
@@ -391,6 +397,86 @@ class OriginalPositionStatsResources50LA final {
         }
         return true;
     }
+    bool prepareRadarRoute1924C0(const TrackNavigation50EU& map,
+        const std::array<float,3>& center,float heading,D& d)noexcept {
+        radarRoute_={};
+        float cosine=0,sine=0;
+        if(!observationDisplay()||!position_stats_detail50LA::radarHeading1924C0(heading,cosine,sine)){
+            d.error=E::phase;d.sourcePC=0x19252c;return false;}
+        for(float value:center)if(!std::isfinite(value)){d.error=E::phase;d.sourcePC=0x192518;return false;}
+        //28B1A0 writes XYZ only; preserve owner32CC's original constructor W.
+        for(std::size_t axis=0;axis<3;++axis)field32C0_[axis]=center[axis];
+        field32D0_=heading;field32D4_=cosine;field32D8_=sine;
+        const auto emit=[&](std::size_t element,std::size_t point,float x,float z,std::uint32_t& alpha)noexcept{
+            return appendRadarPoint192C70(element,point,x,z,alpha,d);
+        };
+        const auto finish=[&](std::size_t element,std::size_t points)noexcept{
+            if(primitives_->finishRadarElement192624(element,points,d.primitive))return true;
+            d.error=E::phase;d.sourcePC=d.primitive.sourcePC;return false;
+        };
+        if(!position_stats_detail50LA::traverseRadar1924C0(map,emit,finish,d.route)){
+            if(d.error==E::none){d.error=E::phase;d.sourcePC=d.route.sourcePC;}return false;}
+        radarRoute_=d.route;return true;
+    }
+    //1927F0..192A4C: original ordinary ALL8 rival markers. Source skips
+    //the current view racer, never changes its AI, and preserves manager order.
+    bool prepareRadarMarkers1927F0(const std::array<std::array<float,3>,8>& positions,
+        const std::array<std::uint32_t,8>& states,std::uint32_t subtype,D& d)noexcept {
+        radarMarkerCount_=0;
+        //Subtype3's separate manager+40 entity is not the ALL8 view0 racer.
+        //Do not silently alias it to a bank slot or draw a fabricated self dot.
+        if(subtype==3){d.error=E::phase;d.sourcePC=0x192a60;return false;}
+        const position_stats_detail50LA::RadarProjectionInputs projection{
+            field32C0_[0],field32C0_[2],field32D4_,field32D8_,field32DC_,field32E4_,field32E8_};
+        const auto add=[](float a,float b)noexcept{volatile float r=a+b;return r;};
+        const auto sub=[](float a,float b)noexcept{volatile float r=a-b;return r;};
+        for(std::size_t slot=1;slot<8;++slot){
+            if(states[slot]!=0)continue;
+            position_stats_detail50LA::RadarProjectedPoint point;
+            if(!position_stats_detail50LA::projectRadarPoint1922B0(projection,
+                    positions[slot][0],positions[slot][2],point)){
+                d.error=E::phase;d.sourcePC=0x192844;return false;}
+            const std::size_t index=117-slot;auto& t=map_[index];
+            if(!t.buffer58||!t.buffer58->vertices||t.buffer58->count!=4){
+                d.error=E::phase;d.sourcePC=0x192938;return false;}
+            const float x=add(sub(point.x,3.f),field32B0_),y=add(sub(point.y,3.f),field32B4_);
+            if(t.x10!=x||t.y14!=y){t.x10=x;t.y14=y;t.flags5C=std::uint8_t(t.flags5C|1u);
+                if(t.field3C==0.f)t.flags5C=std::uint8_t(t.flags5C|2u);}
+            if(t.alpha48!=static_cast<std::int16_t>(point.alpha)){
+                t.alpha48=static_cast<std::int16_t>(point.alpha);
+                for(std::size_t vertex=0;vertex<4;++vertex)t.buffer58->vertices[vertex].rgba[3]=point.alpha>>2;
+            }
+            if(t.color44!=0x00d6122eu){
+                t.color44=0x00d6122eu;
+                for(std::size_t vertex=0;vertex<4;++vertex){auto& rgba=t.buffer58->vertices[vertex].rgba;
+                    rgba[0]=107;rgba[1]=9;rgba[2]=23;}
+            }
+            radarMarkerIndices_[radarMarkerCount_++]=index;
+        }
+        return true;
+    }
+    bool lowerRadarGeometry2E21D0(std::uint32_t videoMaximum,D& d)noexcept {
+        if(!observationDisplay()){d.error=E::phase;d.sourcePC=0x2e21d0;return false;}
+        for(std::size_t element=0;element<radarRoute_.completedElements;++element)
+            if(!primitives_->lowerRadarElement2E2ED0(element,videoMaximum,d.primitive)){
+                d.error=E::phase;d.sourcePC=d.primitive.sourcePC;return false;}
+        return true;
+    }
+    //Bounded native tail of192C70. Kept private until1924C0 supplies its
+    //actual route lookup/order and owner32C0/32D4/32D8 pose. Never accepts a
+    //caller-provided readiness flag or publishes a drawable element count.
+    bool appendRadarPoint192C70(std::size_t element,std::size_t point,
+        float worldX,float worldZ,std::uint32_t& alpha,D& d)noexcept {
+        if(!observationDisplay()||!clip_){d.error=E::phase;d.sourcePC=0x192c70;return false;}
+        const position_stats_detail50LA::RadarProjectionInputs projection{
+            field32C0_[0],field32C0_[2],field32D4_,field32D8_,field32DC_,field32E4_,field32E8_};
+        position_stats_detail50LA::RadarProjectedPoint projected;
+        if(!position_stats_detail50LA::projectRadarPoint1922B0(projection,worldX,worldZ,projected)){
+            d.error=E::phase;d.sourcePC=0x1922b0;return false;}
+        if(!primitives_->appendProjected192C70(element,point,projected,*clip_,alpha,d.primitive)){
+            d.error=E::phase;d.sourcePC=d.primitive.sourcePC;return false;}
+        return true;
+    }
     const original_main_entry50KG::RaceDisplayLifetime50LA* observationDisplay()const noexcept {
         return stage_==Stage::complete&&entity_.detached()&&lease_&&
             !lease_->retirementStarted_&&primitives_&&primitives_->resourceFragmentLoaded()?
@@ -480,6 +566,35 @@ inline bool Application::preparePositionStatsText50LA(
     return capturePositionStatsNumbers50LA(resources,camera,manager,observation,d)&&
         resources.layout191290(observation,d)&&
         resources.prepareText191DB0(observation,std::uint32_t(videoOwner_->packetZMaximum),d);
+}
+//RA-only same-owner radar geometry preparation. The factory binds the actual
+//retained map; the adapter borrows it synchronously with the actual view racer.
+//No scheduling, renderer submission, marker textures or host panel replacement.
+inline bool Application::preparePositionStatsRadar50LA(
+    rr::game::OriginalPositionStatsResources50LA& resources,
+    const original_camera_session50KX::Session& camera,const native_ai50IV::Session& manager,
+    rr::game::OriginalPositionStatsResourceDiagnostic50LA& d)const noexcept {
+    namespace detail=rr::game::position_stats_detail50LA;
+    using Adapter=original_position_stats_adapter50LA::Owner;
+    using Error=rr::game::OriginalPositionStatsResourceDiagnostic50LA::Error;
+    resources.radarRoute_={};resources.radarMarkerCount_=0;
+    rr::game::OriginalPositionStatsNumbers50LA observation;
+    if(!capturePositionStatsNumbers50LA(resources,camera,manager,observation,d)||
+       !resources.layout191290(observation,d))return false;
+    bool visible=false;detail::Visibility preference;
+    if(!detail::ownLeafVisible191BE0(observation.viewIndex,observation.raceFlags1B0,
+            observation.raceEntityFlags29,observation.uiFlags1E4,visible)||
+       !detail::preferenceVisibility17FB90(observation.preference10F9C,
+            observation.viewState40,observation.subtype11258,preference)){
+        d.error=Error::phase;d.sourcePC=0x191be0;return false;}
+    if(!visible||!preference.map)return true;
+    Adapter adapter;Adapter::Diagnostic diagnostic;Adapter::RadarObservation radar;
+    if(!adapter.bind(camera,manager,diagnostic)||!adapter.captureRadar1924C0(radar,diagnostic)||
+       radar.publication!=observation.cameraPublication||!radar.map){
+        d.error=Error::phase;d.sourcePC=0x1924fc;return false;}
+    return resources.prepareRadarRoute1924C0(*radar.map,radar.center,radar.headingE4,d)&&
+        resources.lowerRadarGeometry2E21D0(static_cast<std::uint32_t>(videoOwner_->packetZMaximum),d)&&
+        resources.prepareRadarMarkers1927F0(radar.racerCenters,radar.racerStates,observation.subtype11258,d);
 }
 struct PositionStatsResourceResult50LA {
     bool attempted=false,coldResourcesLoaded=false;

@@ -558,6 +558,18 @@ public:
             staticFog_=std::move(next);return true;
         }catch(...){d.failure="RA fog observation allocation failed";return false;}
     }
+    bool prepareNativeStaticDrawPublication(Diagnostic& d)noexcept {
+        d={};
+        if(terminal_||closed_||!world_||!world_->drawPlanCurrent()||!runtimeQueries_||
+           !runtimeQueries_->prepareNativeStaticDraw(d.runtimeQueries)){
+            d.failure="current RA native static draw publication unavailable";return false;}
+        return true;
+    }
+    const std::vector<g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA>*
+    nativeStaticDrawPublication()const noexcept {
+        return !terminal_&&!closed_&&world_&&world_->drawPlanCurrent()&&runtimeQueries_?
+            runtimeQueries_->nativeStaticDraw():nullptr;
+    }
     bool readNativeStaticFogObservation(std::size_t placement,
         ra_static_fog50LA::CameraObservation& camera,ra_static_fog50LA::PlacementObservation& out)const noexcept {
         return !terminal_&&!closed_&&staticFog_&&staticFog_->read(placement,camera,out);

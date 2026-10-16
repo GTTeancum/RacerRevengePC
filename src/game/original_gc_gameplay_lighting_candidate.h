@@ -86,6 +86,14 @@ struct AuthoredRenderZone {
     std::uint32_t exclusionCount=0;
     bool environmentNodeVisible=true;
 };
+// Native value publication for actual retained RA static models. This does
+// not complete the separate original callback/FIFO traversal.
+struct NativeRaStaticDraw50LA {
+    std::size_t worldInstance=0;
+    std::uint32_t sourceLod=0,zone=0;
+    std::array<std::uint32_t,4> scissor{}; // inclusive original Xmin,Xmax,Ymin,Ymax
+    std::array<std::int32_t,4> viewport{}; // original X,Y,width,height
+};
 // Semantic equivalent of229E08..229EF4's temporary component scene+19C
 // borrowing. This is not a generic success Boolean or persistent scene field.
 // Serial, stack-scoped lease; use inside the actual selected racer's bank visit.
@@ -211,6 +219,10 @@ class Owner final {
     bool drawRaZonePrefix27FEE0(CameraVisibilityLease&,OriginalApplicationEntities50LA&,
         std::uint32_t actualParent38,const OriginalCameraViewportFields&,
         OriginalZoneScissorPublication50LA&,Diagnostic&) noexcept;
+    bool prepareNativeRaStaticDraw(const CameraVisibilityLease&,
+        const OriginalApplicationEntities50LA&,const CameraViewOutput49F&,
+        std::uint32_t actualParent38,const OriginalCameraViewportFields&,
+        std::vector<NativeRaStaticDraw50LA>&,Diagnostic&) const noexcept;
     bool drawRaSelectedMethod48(const CameraVisibilityLease&,std::uint32_t,Diagnostic&) noexcept;
     bool prepareRaZoneScissor280230(const CameraVisibilityLease&,std::uint32_t,
         const OriginalApplicationEntities50LA&,const OriginalCameraViewportFields&,Diagnostic&) noexcept;

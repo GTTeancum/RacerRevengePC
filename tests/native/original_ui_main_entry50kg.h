@@ -235,6 +235,9 @@ public:
     bool preparePositionStatsLayout50LA(rr::game::OriginalPositionStatsResources50LA&,
         const original_camera_session50KX::Session&,const native_ai50IV::Session&,
         rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
+    bool preparePositionStatsRadar50LA(rr::game::OriginalPositionStatsResources50LA&,
+        const original_camera_session50KX::Session&,const native_ai50IV::Session&,
+        rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
     bool preparePositionStatsText50LA(rr::game::OriginalPositionStatsResources50LA&,
         const original_camera_session50KX::Session&,const native_ai50IV::Session&,
         rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;

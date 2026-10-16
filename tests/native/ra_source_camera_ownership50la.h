@@ -138,6 +138,47 @@ class OwnershipBridge final {
         next.screen=current.screen;next.guardProjection=current.guardProjection;
         id={base,current.owner,current.revision};out=next;return true;
     }
+    StaticFogPublication nativeStaticDrawIdentity_{};
+    std::vector<g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA> nativeStaticDraw_;
+    bool nativeStaticDrawPrepared_=false;
+    const std::vector<g::original_gc_gameplay_lighting_candidate::NativeRaStaticDraw50LA>*
+    nativeStaticDraw()const noexcept {
+        StaticFogPublication now;ra_static_fog50LA::CameraObservation observation;
+        if(!nativeStaticDrawPrepared_||!readStaticFogPublication(now,observation)||
+           now.camera.session!=nativeStaticDrawIdentity_.camera.session||
+           now.camera.generation!=nativeStaticDrawIdentity_.camera.generation||
+           now.camera.publication!=nativeStaticDrawIdentity_.camera.publication||
+           now.camera.frame!=nativeStaticDrawIdentity_.camera.frame||
+           now.fog!=nativeStaticDrawIdentity_.fog||now.revision!=nativeStaticDrawIdentity_.revision)return nullptr;
+        return &nativeStaticDraw_;
+    }
+    bool prepareNativeStaticDraw(Diagnostic& d)noexcept {
+        d={};nativeStaticDrawPrepared_=false;
+        StaticFogPublication id;ra_static_fog50LA::CameraObservation observation;
+        if(!readStaticFogPublication(id,observation)){
+            d.message="current actual RA camera/fog required for native static selection";return false;}
+        auto& session=*camera_->session;
+        if(!session.actual_.applicationEntities||!session.actual_.applicationMaterials||
+           session.display_.rendererCurrentScene0!=&session.viewport_||
+           &session.actual_.visibility!=freshLighting_.get()||!session.spatial_.registration34.attached||
+           !session.spatial_.parent38||session.spatial_.parent38>session.visibilityKeys_.count){
+            d.message="actual RA camera registered parent and viewport required";return false;}
+        g::original_gc_gameplay_lighting_candidate::CameraVisibilityLease lease;
+        g::original_gc_gameplay_lighting_candidate::Diagnostic detail;
+        if(!freshLighting_->beginCameraVisibility(0,lease,detail)||
+           !session.visibilityKeys_.matches(*freshLighting_,lease,session.generation_,session.key(session.scene_))){
+            d.message="actual RA static selection camera lease unavailable";return false;}
+        if(!freshLighting_->prepareNativeRaStaticDraw(lease,*session.actual_.applicationEntities,
+            observation.camera,session.spatial_.parent38,session.viewport_,nativeStaticDraw_,detail)){
+            d.camera.sourcePC=detail.sourcePC;d.message="native RA portal/model/LOD selection failed";return false;}
+        // End the real visibility borrow before validating the idle Bank /
+        // camera publication again. This is a value snapshot, not selected18.
+        freshLighting_->endCameraVisibility(lease);
+        nativeStaticDrawIdentity_=id;nativeStaticDrawPrepared_=true;
+        if(!nativeStaticDraw()){nativeStaticDrawPrepared_=false;
+            d.message="RA camera/fog changed during native static selection";return false;}
+        return true;
+    }
     // Inactive partial callback implementation, deliberately not exposed on
     // the aggregate or invoked by pose/fog publication. The eventual real
     //114D00 dispatch must call this from the retained application traversal.

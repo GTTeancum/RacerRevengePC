@@ -1,6 +1,7 @@
 #pragma once
 // Source-only PositionStats numeric subset. UNTESTED; no owner, resource,
 // snapshot, scheduling, geometry or renderer readiness is established here.
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
@@ -62,6 +63,29 @@ inline bool observePositionNumbers191F00(std::int32_t actualRecord3C,
     out={actualRecord3C,actualActiveCount50};return true;
 }
 
+//19252C/192538 call original13BBA0 then13BAD0 on actual body+E4.
+//Separate native binary32 polynomial operations; no host trigonometry, VU
+//runtime or angle inferred from a camera/route direction. Finite heading in
+//[-pi,pi] is the bounded native domain. Output is unchanged on rejection.
+inline bool radarHeading1924C0(float heading,float& cosine,float& sine)noexcept {
+    const auto fp=[](std::uint32_t v)noexcept{return std::bit_cast<float>(v);};
+    if(!std::isfinite(heading)||heading<fp(0xc0490fdbu)||heading>fp(0x40490fdbu))return false;
+    const auto add=[](float a,float b)noexcept{volatile float r=a+b;return r;};
+    const auto sub=[](float a,float b)noexcept{volatile float r=a-b;return r;};
+    const auto mul=[](float a,float b)noexcept{volatile float r=a*b;return r;};
+    float x=heading,sign=1.f;
+    if(x>fp(0x3fc90fdbu)){x=sub(fp(0x40490fdbu),x);sign=-1.f;}
+    else if(x<fp(0xbfc90fdbu)){x=sub(fp(0xc0490fdbu),x);sign=-1.f;}
+    const float square=mul(x,x);
+    float c=add(fp(0x37d00d01u),mul(fp(0xb493f27eu),square));
+    c=add(fp(0xbab60b61u),mul(square,c));c=add(fp(0x3d2aaaabu),mul(square,c));
+    c=add(-.5f,mul(square,c));c=mul(sign,add(1.f,mul(square,c)));
+    float s=add(fp(0xb9500d01u),mul(fp(0x3638ef1du),square));
+    s=add(fp(0x3c088889u),mul(square,s));s=add(fp(0xbe2aaaabu),mul(square,s));
+    s=add(x,mul(mul(x,square),s));
+    if(!std::isfinite(c)||!std::isfinite(s))return false;
+    cosine=c;sine=s;return true;
+}
 //1922B0: native scalar projection of an actual world point into the existing
 //PositionStats radar. Inputs are observations of owner32C0/32C8,32D4/32D8,
 //32DC and32E4/32E8, not a replacement camera, route or racer driver.

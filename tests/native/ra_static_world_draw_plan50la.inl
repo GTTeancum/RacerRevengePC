@@ -97,11 +97,19 @@ private:
             for(std::size_t si=0;si<surfaces_.size();++si){const auto& span=surfaces_[si];
                 if(span.placement>=placements_.size()||!placements_[span.placement])return failed("draw surface has no owned placement");
                 const auto& placement=*placements_[span.placement];const auto* scene=placement.payload?placement.payload->scene():nullptr;
-                if(!scene||span.sourceLod!=0||scene->lods.empty()||span.sourceSurface>=scene->lods[0].surfaces.size()||
+                if(!scene||span.sourceLod>=scene->lods.size()||placement.lodRanges.size()!=scene->lods.size()||
+                   span.sourceSurface>=scene->lods[span.sourceLod].surfaces.size()||
                    span.worldInstance!=placement.worldInstance||si<placement.firstSurface||si-placement.firstSurface>=placement.surfaceCount||
                    !placement.materials.complete()||placement.materials.table382B38()!=table.get())return failed("draw source surface/placement proof differs");
-                const auto& original=scene->lods[0].surfaces[span.sourceSurface];const auto* token=placement.materials.handle1C4(original.material_index);
+                const auto& range=placement.lodRanges[span.sourceLod];
+                if(range.firstSurface<placement.firstSurface||range.firstSurface>surfaces_.size()||
+                   range.surfaceCount>surfaces_.size()-range.firstSurface||
+                   range.surfaceCount!=scene->lods[span.sourceLod].surfaces.size()||
+                   si<range.firstSurface||si-range.firstSurface!=span.sourceSurface)
+                    return failed("draw authentic LOD range differs");
+                const auto& original=scene->lods[span.sourceLod].surfaces[span.sourceSurface];const auto* token=placement.materials.handle1C4(original.material_index);
                 if(original.material_index!=span.materialSlot||!token||*token!=span.materialRow||
+                   original.vertices.size()!=span.vertexCount||original.indices.size()!=span.indexCount||
                    span.vertexStart>vertices_.size()||span.vertexCount>vertices_.size()-span.vertexStart||
                    span.indexStart>indices_.size()||span.indexCount>indices_.size()-span.indexStart||!span.indexCount||span.indexCount%3)
                     return failed("draw source slot/range differs");

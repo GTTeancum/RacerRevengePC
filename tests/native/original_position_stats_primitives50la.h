@@ -1,5 +1,9 @@
 #pragma once
 #include "original_race_display_lifetime50la.h"
+#include "../../src/game/original_position_stats_clip50la.h"
+#include "../../src/game/original_position_stats_numeric50la.h"
+#include "../../src/game/original_ui_text_position50kg.h"
+#include <limits>
 #include "../../src/assets/original_radar_overlay_material_reference50la.h"
 #include <array>
 #include <cstdint>
@@ -9,18 +13,21 @@
 
 namespace rr::game {
 struct OriginalPositionStatsPrimitiveDiagnostic50LA {
-    enum class Error:std::uint8_t {none,owner,phase,allocation,material,renderer} error=Error::none;
+    enum class Error:std::uint8_t {none,owner,phase,allocation,material,renderer,geometry} error=Error::none;
     std::uint32_t sourcePC=0;
     std::size_t element=0,packet=0;
     assets::OriginalStandardMaterialDiagnostic50LA material;
     platform::VehicleWindowDiagnostic50DS renderer;
     OriginalCameraStartResult drain;
+    OriginalPositionStatsClip50LA::Result clip=OriginalPositionStatsClip50LA::Result::accepted;
 };
 // Genuine191180 resource fragment only. No PositionStats Entity, full190190
 // loader, visibility, collector submission, population or draw readiness claim.
 // Root retains this owner; renderer MUST NOT retain it (display-lease cycle).
 class OriginalPositionStatsPrimitiveOwner50LA final {
     friend struct original_main_entry50KG::Application;
+    friend class OriginalPositionStatsResources50LA;
+    friend class OriginalPositionStatsHud50LA;
     using D=OriginalPositionStatsPrimitiveDiagnostic50LA;
     using E=D::Error;
     using Domain=assets::OriginalStandardMaterialDomain50LA;
@@ -41,7 +48,7 @@ class OriginalPositionStatsPrimitiveOwner50LA final {
     };
     struct Packet {
         std::unique_ptr<PacketVertex[]> vertices;
-        std::size_t first=0,count=0;
+        std::size_t first=0,count=0,activeCount=0;
     };
     struct Primitive {
         Reference material;
@@ -112,6 +119,151 @@ class OriginalPositionStatsPrimitiveOwner50LA final {
             for(auto* rgba:v.rgba1C)if(rgba)for(unsigned c=0;c<3;++c)(*rgba)[c]=127;
         }
         return true;
+    }
+    //192C70 after the actual route-point lookup/project1922B0. Native writes
+    //target the existing type5 pair's FIRST vertex and every packet alias.
+    //No active-count publication, dirty lowering or renderer submission here.
+    bool appendProjected192C70(std::size_t element,std::size_t point,
+        const position_stats_detail50LA::RadarProjectedPoint& projected,
+        const OriginalPositionStatsClip50LA& clip,std::uint32_t& alpha,D& d)noexcept {
+        d={};d.element=element;
+        if(!resourceFragmentLoaded()||element>=16||point>=118||
+           !std::isfinite(projected.x)||!std::isfinite(projected.y)||
+           projected.alpha>255||(projected.outside&&projected.alpha!=0))
+            return fail(d,E::geometry,0x192c70);
+        auto& e=elements_[element];
+        if(e.type0C!=5||!e.vertices00||e.count04!=236)return fail(d,E::phase,0x192d20);
+        auto& current=e.vertices00[point*2];
+        Vertex* previous=point?&e.vertices00[(point-1)*2]:nullptr;
+        const auto valid=[](const Vertex& v)noexcept {
+            if(!v.copies10||v.copies10>2)return false;
+            for(std::size_t i=0;i<v.copies10;++i)if(!v.stq14[i]||!v.rgba1C[i])return false;
+            return true;
+        };
+        if(!valid(current)||(previous&&!valid(*previous)))return fail(d,E::phase,0x193040);
+        std::array<float,4> next{{projected.x,projected.y,0.f,0.f}};
+        std::array<float,4> revisedPrevious{};
+        bool revisePrevious=false;
+        std::uint32_t nextAlpha=projected.alpha;
+        if(previous){
+            //192D60/192E60 reads the first packet alpha byte, then shifts2.
+            const auto previousAlpha=((*previous->rgba1C[0])[3]&255u)<<2;
+            const bool exiting=projected.outside&&previousAlpha>0;
+            const bool entering=!projected.outside&&nextAlpha>0&&previousAlpha==0;
+            if(exiting||entering){
+                OriginalPositionStatsClip50LA::Segment input,output{};
+                input=exiting?OriginalPositionStatsClip50LA::Segment{{previous->authored00,next}}:
+                    OriginalPositionStatsClip50LA::Segment{{next,previous->authored00}};
+                d.clip=clip.clip119FC0(input,output);
+                //Retail ignores the clip return. The admitted transition must
+                //intersect; unsupported/rejected clipping is a visible native
+                //failure, never silently emitted zero scratch coordinates.
+                if(d.clip!=OriginalPositionStatsClip50LA::Result::accepted)
+                    return fail(d,E::geometry,exiting?0x192de8:0x192ef0);
+                if(exiting){next=output[1];nextAlpha=0;}
+                else {revisedPrevious=output[1];revisePrevious=true;}
+            }
+        }
+        const auto write=[](Vertex& vertex,const std::array<float,4>& value,std::uint32_t a)noexcept {
+            vertex.authored00=value;
+            for(std::size_t i=0;i<vertex.copies10;++i){
+                *vertex.stq14[i]=value; //193044/193060: STQ aliases, not XYZ.
+                (*vertex.rgba1C[i])[3]=a;
+            }
+        };
+        if(revisePrevious)write(*previous,revisedPrevious,0); //192F50..192FE8.
+        write(current,next,(nextAlpha>>2)&255u); //1930B4..1930DC.
+        alpha=nextAlpha;return true;
+    }
+    //192620/1927B4 plus the type5 validation in2E2450. The subsequent
+    //2E21D0 draw is not replaced by publishing these CPU geometry fields.
+    bool finishRadarElement192624(std::size_t element,std::size_t points,D& d)noexcept {
+        d={};d.element=element;
+        if(!resourceFragmentLoaded()||element>=16||points<2||points>118)
+            return fail(d,E::geometry,0x2e25e4);
+        auto& e=elements_[element];
+        if(e.type0C!=5||!e.vertices00||e.count04!=236)return fail(d,E::phase,0x192610);
+        e.count08=static_cast<std::uint32_t>(points*2);e.dirty3C=1;
+        //2E26A0..2E27A0: ceil(count08/72) active primitives; each packet
+        //count is min(remaining,72). Keep actual allocation/alias boundaries.
+        e.capacity4C=(e.count08+71u)/72u;
+        std::size_t remaining=e.count08;
+        for(std::size_t p=0;p<e.count48;++p){
+            auto& packet=e.packets44[p];packet.activeCount=0;
+            if(p<e.capacity4C){packet.activeCount=remaining>72?72:remaining;
+                if(packet.activeCount>packet.count)return fail(d,E::geometry,0x2e2780);
+                remaining-=packet.activeCount;}
+        }
+        return true;
+    }
+    //2E2ED0 type5, native CPU screen geometry. Original constructor domain:
+    //scale10=1, rotation14=0, depth18=1, width flags40=3. Geometry lands in
+    //the genuine packet STQ aliases; this does not execute or emulate VU code.
+    bool lowerRadarElement2E2ED0(std::size_t element,std::uint32_t videoMaximum,D& d)noexcept {
+        d={};d.element=element;
+        if(!resourceFragmentLoaded()||element>=16||videoMaximum!=0xffffffu)
+            return fail(d,E::geometry,0x2e2ed0);
+        auto& e=elements_[element];
+        if(e.type0C!=5||e.count08<4||e.count08>236||(e.count08&1u)||
+           e.scale10!=1.f||e.field14!=0.f||e.field18!=1.f||e.flags40!=3||
+           !e.vertices00||!e.packets44)return fail(d,E::geometry,0x2e3050);
+        if(!e.dirty3C)return true;
+        const auto add=[](float a,float b)noexcept{volatile float r=a+b;return r;};
+        const auto sub=[](float a,float b)noexcept{volatile float r=a-b;return r;};
+        const auto mul=[](float a,float b)noexcept{volatile float r=a*b;return r;};
+        std::array<std::array<float,4>,118> centers{};
+        const auto points=std::size_t(e.count08/2);
+        const float depth=sub(static_cast<float>(videoMaximum),e.field18);
+        //Preflight before any writes; source-compatible finite conversion uses
+        //the existing shared EE CVT.W.S native contract, never host lrint/fenv.
+        for(std::size_t i=0;i<points;++i){
+            auto& even=e.vertices00[i*2];auto& odd=e.vertices00[i*2+1];
+            std::int32_t x=0,y=0;
+            if(!roundOriginalUiTextMetric50KG(even.authored00[0],e.scale10,x)||
+               !roundOriginalUiTextMetric50KG(even.authored00[1],e.scale10,y))
+                return fail(d,E::geometry,0x2e30dc);
+            centers[i]={{static_cast<float>(x),static_cast<float>(y),depth,0.f}};
+            for(auto* v:{&even,&odd}){
+                if(!v->copies10||v->copies10>2)return fail(d,E::geometry,0x2e31d0);
+                for(std::size_t alias=0;alias<v->copies10;++alias)
+                    if(!v->stq14[alias]||!v->rgba1C[alias]||!v->xyz24[alias])
+                        return fail(d,E::geometry,0x2e31d0);
+            }
+        }
+        //2E30F0..2E3300: source Z, paired source/STQ, odd RGBA and XYZ.xy.
+        for(std::size_t i=0;i<points;++i){
+            auto& even=e.vertices00[i*2];auto& odd=e.vertices00[i*2+1];
+            even.authored00[2]=depth;odd.authored00=even.authored00;
+            const auto color=*even.rgba1C[0];const auto xyz=*even.xyz24[0];
+            for(std::size_t alias=0;alias<even.copies10;++alias)*even.stq14[alias]=centers[i];
+            for(std::size_t alias=0;alias<odd.copies10;++alias){
+                *odd.stq14[alias]=odd.authored00;
+                for(std::size_t lane=0;lane<4;++lane)(*odd.rgba1C[alias])[lane]=color[lane]&255u;
+                (*odd.xyz24[alias])[0]=xyz[0];(*odd.xyz24[alias])[1]=xyz[1];
+            }
+        }
+        const auto writePair=[&](std::size_t i,float nx,float ny)noexcept{
+            std::array<float,4> plus{{add(centers[i][0],nx),add(centers[i][1],ny),add(depth,3.f),1.f}};
+            std::array<float,4> minus{{sub(centers[i][0],nx),sub(centers[i][1],ny),sub(depth,3.f),1.f}};
+            for(std::size_t alias=0;alias<e.vertices00[i*2].copies10;++alias)
+                *e.vertices00[i*2].stq14[alias]=plus;
+            for(std::size_t alias=0;alias<e.vertices00[i*2+1].copies10;++alias)
+                *e.vertices00[i*2+1].stq14[alias]=minus;
+        };
+        for(std::size_t i=0;i+1<points;++i){
+            const float dx=sub(centers[i+1][0],centers[i][0]);
+            const float dy=sub(centers[i+1][1],centers[i][1]);
+            const float squared=add(add(mul(dx,dx),mul(dy,dy)),0.f);
+            if(!std::isfinite(squared))return fail(d,E::geometry,0x2e33b0);
+            float inverse=std::numeric_limits<float>::max();
+            if(squared!=0.f){volatile float length=std::sqrt(squared);volatile float reciprocal=1.f/length;inverse=reciprocal;}
+            //13E3F0 native normalization: a zero segment remains zero XY.
+            const float nx=mul(-mul(dy,inverse),3.f),ny=mul(mul(dx,inverse),3.f);
+            if(!std::isfinite(nx)||!std::isfinite(ny))return fail(d,E::geometry,0x2e3410);
+            if(!i)writePair(0,nx,ny); //Source does not average joins.
+            writePair(i+1,nx,ny);
+        }
+        e.dirty3C=0;return true;
     }
     bool stage191180(const std::shared_ptr<original_main_entry50KG::RaceDisplayLifetime50LA>& display,
         const std::string& directory,D& d)noexcept {

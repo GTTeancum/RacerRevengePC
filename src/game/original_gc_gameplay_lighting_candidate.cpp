@@ -1514,3 +1514,5 @@ const original_world_environment50KG::SpatialBounds* Owner::sceneBounds534(const
         storage_->environment3A4->spatialBounds534():nullptr;
 }
 }
+
+#include "original_ra_native_static_draw50la.inl"

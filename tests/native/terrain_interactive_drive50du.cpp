@@ -95,6 +95,8 @@
 #include "original_race_display_lifetime50la.h"
 #include "original_position_stats_primitives50la.h"
 #include "original_position_stats_resources50la.h"
+#include "original_position_stats_hud50la.h"
+#include "original_position_stats_prestage50la.h"
 #include "original_racer_cable_allocation50la.h" // Uncalled allocation prefix.
 #include "original_cable_selection50la.h" // Uncalled ordinary source update.
 #include "../../src/game/original_position_stats_clip50la.h" // Uncalled numeric owner.
@@ -712,6 +714,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }};
  // Permanent original-resource owners precede the snapshot bank and all draw
  // publications. Only their immutable borrowed views enter the live arena.
+ original_position_stats_prestage50LA::Owner sourcePositionStatsPrestage;
+ original_position_stats_prestage50LA::Diagnostic sourcePositionStatsPrestageDiagnostic;
  auto raRosterOwners=std::make_shared<ra_cold_roster50LA::SharedOwners>();
  auto& racerRigs=raRosterOwners->rigs;
  auto& racerCollisions=raRosterOwners->collisions;
@@ -3990,6 +3994,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        originalMainApplication.assetRoot,sessionIndex+1,sourceSpeedBoost),"RA Speed/Boost source staging failed");
    require50DU(originalMainApplication.stageTimeStatsNativeCold50LA(
        originalMainApplication.assetRoot,sessionIndex+1,sourceTimeStats,true),"RA TimeStats source staging failed");
+   require50DU(sourcePositionStatsPrestage.stage(originalMainApplication,
+       originalMainApplication.assetRoot,raMaterialContext,sourcePositionStatsPrestageDiagnostic),
+       sourcePositionStatsPrestageDiagnostic.failure?sourcePositionStatsPrestageDiagnostic.failure:
+       "RA PositionStats native source preload rejected");
    require50DU(raWorld->mountRetainedRuntimeRosterArchives(originalMainApplication,raDiagnostic),
        raDiagnostic.failure?raDiagnostic.failure:"RA roster archive mounting rejected");
    std::array<std::vector<std::uint8_t>,6> crowdImages;
@@ -4018,6 +4026,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    require50DU(originalMainApplication.finishTimeStatsNativeCold50LA(sourceTimeStats),
        "RA TimeStats final shared material verification failed");
+   require50DU(sourcePositionStatsPrestage.verify(sourcePositionStatsPrestageDiagnostic),
+       "RA PositionStats preloaded canonical sources changed during construction");
    require50DU(originalMainApplication.finishSpeedBoostNativeCold50LA(sourceSpeedBoost),
        "RA Speed/Boost final shared material verification failed");
    contactBindings=nativeRosterOwners->contacts;
@@ -4843,7 +4853,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto& sourceRendererDispatch=sourceDisplayLifetime->dispatch();
  //Root-owned only; staging/drawing remains inactive. Never retain via renderer.
  original_main_entry50KG::PositionStatsPrimitiveResult50LA sourcePositionStatsPrimitives;
- original_main_entry50KG::PositionStatsResourceResult50LA sourcePositionStatsResources; // No staging call.
+ original_main_entry50KG::PositionStatsResourceResult50LA sourcePositionStatsResources;
+ std::shared_ptr<OriginalPositionStatsHud50LA> sourcePositionStatsHud;
+ bool sourcePositionStatsRendering=false,sourcePositionStatsDisplayReported=false;
  // Native GL has no guest DMA packet queues/callbacks. Its real submissions
  // are retired by the context API, never certified by these empty source lists.
  std::int32_t sourceFadeManagerA8=0,sourceFadeDuration98=0;
@@ -4936,6 +4948,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // Release canonical UI refs before later model retirement invalidates leaves.
   sourceTimeStatsRendering=false;
   sourceTimeStats.owner.reset();sourceTimeStats.pixels.reset();
+  sourcePositionStatsRendering=false;sourcePositionStatsHud.reset();
   sourceSpeedBoostRendering=false;sourceSpeedBoost.owner.reset();sourceSpeedBoost.pixels.reset();
   if(gcDynamicWindow.ownsResources()&&!gcDynamicWindow.close(textureDiagnostic)){
    std::cerr<<"GC dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
@@ -5674,6 +5687,32 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        static_cast<std::uint8_t>(originalUiStarted?originalMainApplication.state->globalFlags228:applicationEvents.rootFlags228),
        OriginalCameraDrainPolicy::initializedContext,
        isRaTrack?nullptr:&sourceTrackFog});
+   if(isRaTrack){
+    const auto domain=originalMainApplication.standardMaterialDomain();
+    const auto collector=domain->coldCollector14D440();
+    const auto provider=domain->archiveProvider3E1A70();
+    const auto revision=provider->revision();
+    const bool staged=originalMainApplication.stagePositionStatsResources50LA(
+        originalMainApplication.assetRoot,sourcePositionStatsResources);
+    if(!staged)std::cerr<<"original_position_stats_stage_rejected message="
+        <<sourcePositionStatsResources.failure<<" source_pc="<<sourcePositionStatsResources.diagnostic.sourcePC
+        <<" material_pc="<<sourcePositionStatsResources.material.sourcePC<<'\n';
+    require50DU(staged,"original PositionStats full resource construction failed");
+    require50DU(provider->sealed()&&provider->revision()==revision&&
+        domain->materials382B38()->coldCollectorCurrent(collector)&&
+        sourcePositionStatsPrestage.verify(sourcePositionStatsPrestageDiagnostic),
+        "PositionStats construction changed the retained RA canonical publication");
+    sourcePositionStatsHud=std::make_shared<OriginalPositionStatsHud50LA>();
+    const bool initialized=sourcePositionStatsHud->initialize(sourcePositionStatsResources.owner,
+        sourceTimeStats.pixels,sourcePositionStatsResources.diagnostic);
+    if(!initialized)std::cerr<<"original_position_stats_adapter_rejected source_pc="
+        <<sourcePositionStatsResources.diagnostic.sourcePC<<" material_pc="
+        <<sourcePositionStatsResources.diagnostic.material.sourcePC<<'\n';
+    require50DU(initialized,"original PositionStats native adapter rejected");
+    sourcePositionStatsRendering=renderer.bindOriginalPositionStats(sourcePositionStatsHud,rendererDiagnostic);
+    if(!sourcePositionStatsRendering)reportRenderer50DU(rendererDiagnostic);
+    require50DU(sourcePositionStatsRendering,"original PositionStats GPU source join rejected");
+   }
    if(humanCourseEnabled){
     OriginalRaceHudDiagnostic50KG hudDiagnostic;
     require50DU(sourceRaceHud.load(
@@ -6386,6 +6425,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    if(hostInput.restartRequested){
     composePacket(false,input);sampleController();
+    // F5/stdin restart bypasses menu.poll, including its accepted-departure
+    // pause clear below. Retire an open Pause/Controls/confirmation transaction
+    // here too: Application11C survives whole-world destruction and otherwise
+    // leaves the rebuilt race's original animation consumers paused.
+    if(sessionMenu.open())originalMainApplication.setExplicitAnimationPause(false);
     restartRequested=true;
     break;
    }
@@ -7378,6 +7422,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          "original TimeStats display preparation rejected");
      renderFrame.originalTimeStats=sourceTimeStats.owner.get();
     }
+    if(sourcePositionStatsRendering&&sourceCameraSession&&originalAiSession.managerBound&&
+       originalAiSession.rankBound&&originalAiSession.retired40.bound){
+     const bool prepared=sourcePositionStatsHud->prepareNativeDisplay(originalMainApplication,
+         *sourceCameraSession,originalAiSession,sourcePositionStatsResources.diagnostic);
+     if(!prepared)std::cerr<<"original_position_stats_display_rejected source_pc="
+         <<sourcePositionStatsResources.diagnostic.sourcePC<<" material_pc="
+         <<sourcePositionStatsResources.diagnostic.material.sourcePC<<'\n';
+     require50DU(prepared,"original PositionStats display preparation rejected");
+     renderFrame.originalPositionStats=sourcePositionStatsHud.get();
+     // All three original HUD owners now provide this admitted race view.
+     // Do not cover them with the host standings/navigation/status panels.
+     if(renderFrame.originalTimeStats&&renderFrame.originalSpeedBoost)renderFrame.hostHud=nullptr;
+    }
     if(nativeGcWater){
      require50DU(nativeGcWater->active()&&sourceCameraSession,
          "GC particle render requires the actual active gameplay camera");
@@ -7649,7 +7706,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
             racerBank.count()==8&&rendererDiagnostic.trackDraws>0);
     // Discard BEFORE readback or observation: even a capture at the exact FPS
     // threshold must not complete an interval containing readback latency.
-    if(captureWindowImage){requireOriginalAiFleetReady();discardTrackBaseline();}
+    if(captureWindowImage){
+     requireOriginalAiFleetReady();discardTrackBaseline();
+     renderer.logRaCapturePixelProvenance();
+    }
 #else
     const bool captureWindowImage=false;
 #endif
@@ -7721,6 +7781,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<" leaves="<<rendererDiagnostic.originalTimeStatsLeaves
          <<" timing=original_bank rank=original_ai_manager scheduling=native_host"<<'\n';
      sourceTimeStatsDisplayReported=true;
+    }
+    if(actualGameplayImageCompleted&&rendererDiagnostic.originalPositionStatsQuads&&!sourcePositionStatsDisplayReported){
+     std::cerr<<"ORIGINAL POSITION STATS: actual completed display quads="<<rendererDiagnostic.originalPositionStatsQuads
+         <<" leaves="<<rendererDiagnostic.originalPositionStatsLeaves
+         <<" rank=original_ai_manager radar=original_map markers=original_bank scheduling=native_host"<<'\n';
+     sourcePositionStatsDisplayReported=true;
     }
     if(nativeGcWater){
      platform::VehicleWindowTrackVisibilityReceipt50DS visibilityReceipt;

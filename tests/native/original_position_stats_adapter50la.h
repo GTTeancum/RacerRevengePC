@@ -4,6 +4,8 @@ namespace original_main_entry50KG { struct Application; }
 #include "original_camera_session50kx.h"
 #include "native_ai_session50iv_fixture.h"
 #include "../../src/game/original_position_stats_frame50la.h"
+#include <array>
+#include <cmath>
 namespace original_position_stats_adapter50LA {
 class Owner final {
     friend struct original_main_entry50KG::Application;
@@ -90,6 +92,51 @@ public:
             next.raceFlags1B0=c.raceFlags1B0_;next.raceEntityFlags29=c.raceEntityFlags29_;
             next.uiFlags1E4=c.uiFlags1E4_;
             if(c.frameStage_!=Camera::FrameStage::published||c.publicationCount_!=next.cameraPublication||
+               !identityCurrent()){d.status=Status::phase;return false;}
+            output=next;d.status=Status::complete;return true;
+        }catch(...){d.status=Status::read;return false;}
+    }
+private:
+    struct RadarObservation {
+        const rr::game::TrackNavigation50EU* map=nullptr;
+        std::array<float,3> center{};
+        float headingE4=0;
+        std::array<std::array<float,3>,8> racerCenters{};
+        std::array<std::uint32_t,8> racerStates{};
+        std::uint64_t publication=0;
+    };
+    //1924C0 resolves managerB0[Application268], body340->scene288 and E4.
+    //Use that same current view0 racer. The bank visit performs the original
+    //lazy world-cache refresh; its canonical cache effects are not rolled back
+    //if a later numeric admission fails. No local/world or camera-pose shortcut.
+    bool captureRadar1924C0(RadarObservation& output,Diagnostic& d)const noexcept {
+        rr::game::OriginalPositionStatsNumbers50LA observation;
+        if(!capture(observation,d))return false;
+        const auto& c=*camera_;
+        if(!c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapB8->gatesPrepared){
+            d.status=Status::owner;return false;}
+        try {
+            RadarObservation next;next.map=c.actual_.actualRadarMapB8;
+            next.publication=observation.cameraPublication;
+            for(std::size_t slot=0;slot<8;++slot){
+            next.racerStates[slot]=c.actual_.bank.read(slot,c.reads_.state40);
+            if(slot!=observation.viewIndex&&next.racerStates[slot]!=0)continue;
+            const bool read=c.actual_.bank.visit(slot,[&]()noexcept {
+                auto& arena=c.actual_.arena;
+                const auto index=c.actual_.bindings.animation.bodyScene288;
+                const auto node=static_cast<std::int32_t>(index);
+                if(node<0||static_cast<std::uint32_t>(node)>=arena.sceneNodeCount)return false;
+                if(!rr::game::refreshSceneWorld49P({arena.nodes,arena.sceneNodeCount},index))return false;
+                const auto& world=arena.nodes[static_cast<std::size_t>(node)].world100;
+                for(std::size_t axis=0;axis<3;++axis)next.racerCenters[slot][axis]=world.v[12+axis];
+                if(slot==observation.viewIndex){next.center=next.racerCenters[slot];
+                    next.headingE4=arena.bodies.main.cachedAnglesE0.v[1];}
+                for(float value:next.racerCenters[slot])if(!std::isfinite(value))return false;
+                return std::isfinite(next.headingE4);
+            });
+            if(!read){d.status=Status::read;return false;}
+            }
+            if(c.frameStage_!=Camera::FrameStage::published||c.publicationCount_!=next.publication||
                !identityCurrent()){d.status=Status::phase;return false;}
             output=next;d.status=Status::complete;return true;
         }catch(...){d.status=Status::read;return false;}

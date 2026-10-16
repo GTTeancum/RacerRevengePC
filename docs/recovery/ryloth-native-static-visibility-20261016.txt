@@ -1,0 +1,26 @@
+Native RA current static visibility publication
+Base: 4c5647158150987495e09c8e357a2b9c2ff3cc50
+Patch: /workspace/shared/ryloth-native-static-visibility.patch
+Six files. Exact five existing-file preimages are under preimages/. New file src/game/original_ra_native_static_draw50la.inl has no preimage.
+Requires the separate all-authentic-LOD patch already integrated by root as f7764b0; none of its three files is included here.
+
+Finding and implementation
+The old prepareRaWorldFrame/drawRaWorld loops submit every cold surface, without portal visibility, actual enabled/hidden flags, source box selection, selected LOD, or per-zone scissor. Correct CPU triangle projection therefore exposed more of that full-world workload. This patch replaces those loops with ordered current-camera native records. It does not attribute any particular screenshot geometry to that defect or remove any authored asset.
+
+Current actual CameraVisibilityLease, camera session generation/publication/frame, fog owner/revision, current registered camera parent, source viewport and actual static model/registry/membership owners supply inputs. Current portal traversal uses original projectPortal230880_50EO/intersectPortalViewport263260_50EO, incoming polygons (not accumulated boxes), root first-hop exclusion and linked order. Draw ordering is child-first, respects root exclusions on all draw links and depth filtering, then actual registry block/slot order, then selected LOD's original surface order. Enabled flags03&1, hidden flags03&4 and entity flags29&1 are honored. Real box arithmetic and every original LOD cutoff are evaluated. All LOD ranges must have exact retained geometry; there is no LOD0 or full-plan fallback.
+
+Explicit native policies
+This is a separate value publication. It neither consumes nor completes original selected18/FIFO/callback paths, does not update original flags191, demand-material counters or dispatch stamps, and leaves actual racer/AI and genuine sky paths intact. Native records flatten actual registry blocks rather than reproducing selected18's per-block reset/repeated-dispatch buffer mechanics.
+Original 240CAC can read membership bounds/matrices retained from an older traversal. The new current-frame publication uses only this camera's admitted membership viewports, with actual draw-zone membership required. It does not copy the old adapter's admission failure guard or invent stale bounds. It retains original X/X multi-membership union arithmetic and the source row-reuse Y-pair behavior. This is an explicit current-native visibility policy, not original stale-matrix bit parity.
+The global original environment443108 callback owner remains outside this static-model value publication; this patch does not claim that unfinished callback was completed. Existing genuine authored sky submission is untouched.
+Native OpenGL clipping/MSAA/sampling remains the existing disclosed host policy, not console raster bit parity.
+
+Scissor review
+OriginalZoneScissor50LA explicitly documents endpoints as inclusive x0,x1,y0,y1. Original280230 computes X from (1+NDC x)/2 and Ymin from (1-NDC ymax)/2, Ymax from (1-NDC ymin)/2, with sequential binary32 arithmetic and truncation. No source endpoint shrink is introduced.
+Convert source inclusive endpoints to half-open: [xmin,xmax+1), [ymin,ymax+1). Subtract source viewport origin, divide by original viewport width/height, multiply by actual framebuffer extent. For GL bottom-origin lower Y use (viewportY+viewportHeight-ymax-1)/viewportHeight*frameHeight; upper Y uses (viewportY+viewportHeight-ymin)/viewportHeight*frameHeight. Floor lower/ceil upper and clamp to framebuffer. This conservative rescaling admits boundary samples rather than shrinking the original inclusive rectangle. Full-source-viewport endpoints clamp to the full native target. Both opaque drawing and every blended triangle's snapshot/payload clear/composition use that same zone rectangle, with blended rectangles intersected against conservative triangle coverage. Scissor is disabled on draw exit.
+
+Lifetime/failure review
+Frame-prepared is cleared before construction. Selection is transactional in a local vector; bridge publishes only after the real visibility lease has ended and current camera/fog identity is revalidated. It is revalidated after CPU frame preparation and again immediately before GPU use. Empty selected visibility is valid but still requires current camera/fog and exact submitted matrix identity. Exceptions, invalid graph/registry references, unsupported genuinely selected model type, absent LOD geometry or invalid numeric input fail, never fall back to the full plan. Existing GPU resource lifetime/retirement paths are unchanged.
+
+Review only
+No builds, tests, syntax checks, shader validation, decoder runs, sanitizer runs, gameplay runs or image inspection were performed. Runtime behavior, capacity of the separately expanded all-LOD bank and visual acceptance require root's combined integration build/review.

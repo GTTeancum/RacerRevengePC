@@ -28,6 +28,7 @@ namespace original_cable_selection50LA { class Binding; }
 #include "../../src/game/original_race_hud_blink50la.h"
 #include "../../src/game/original_application_animation_clock50kg.h"
 #include "../../src/game/undertrack_reposition50et.h"
+#include "../../src/game/track_navigation50eu.h"
 #include "../../src/game/original_racer_entity_cold50la.h"
 #include "../../src/game/original_racer_animation_cold50la.h"
 #include "../../src/game/original_track_particle_cold50la.h"
@@ -134,6 +135,7 @@ struct ActualOwners {
     const std::array<std::unique_ptr<native_racer_model50LA::Owner>,8>* actualBottomLeftModels=nullptr;
     OriginalApplicationAnimationClockView50KG applicationAnimation; //Same Application pause11C owner.
     const std::array<native_racer50HW::Cables*,8>* actualCables=nullptr; // RA factory pins every concrete owner.
+    const TrackNavigation50EU* actualRadarMapB8=nullptr; // Borrow of the same retained authored map; RA factory only.
 };
 enum class Cut : std::uint8_t {
     // Native hold: use real current final-grid/last-published body state while

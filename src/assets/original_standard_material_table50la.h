@@ -1,6 +1,7 @@
 #pragma once
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 namespace original_cable_selection50LA { class Binding; }
+namespace original_position_stats_prestage50LA { class Owner; }
 #include "original_standard_model_resource50la.h"
 #include "original_standard_material_object50la.h"
 #include <memory>
@@ -231,6 +232,7 @@ private:
     friend class OriginalStandardScreenMaterialReference50LA;
     friend class OriginalRadarOverlayMaterialReference50LA;
     friend class rr::game::OriginalPositionStatsResources50LA;
+    friend class ::original_position_stats_prestage50LA::Owner;
     friend class OriginalTimeStatsMaterialReference50LA;
     friend class OriginalSpeedBoostMaterialReference50LA;
     friend class OriginalDamageMaterialReference50LA;

@@ -90,7 +90,7 @@ inline bool Owner::constructRuntimeSourceCamera(
             &application.materialDirectory36B970(),&actual.actualRigs,camera.particles.get(),
             &source->height.sourceDomain,&actual.actualRightModels,&actual.actualLeftModels,
             &actual.actualChariotModels,actual.actualBottomRightModels,actual.actualBottomLeftModels,
-            application.animationClock(),&camera.cables}));
+            application.animationClock(),&camera.cables,&source->map}));
         // No prepare, pose, viewport publication, RNG/clock sampling or
         // source-ready flag. Only an actual retained Session now exists.
         return true;

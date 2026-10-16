@@ -46,6 +46,9 @@ public:
         std::uint32_t vertexStart=0,vertexCount=0,indexStart=0,indexCount=0;
         bool hasOriginalColors=false,worldSpaceRootBypassed=false;
     };
+    struct LodRange {
+        std::size_t firstSurface=0,surfaceCount=0;
+    };
     struct Placement {
         std::size_t worldInstance=0;
         std::uint32_t zone=0,ordinal=0;
@@ -53,6 +56,9 @@ public:
         a::OriginalStandardMaterialReferences50LA materials;
         std::array<double,16> authoredMatrix{},visualMatrix{};
         std::size_t firstSurface=0,surfaceCount=0;
+        // Indexed by the authentic source LOD; empty source LODs stay empty.
+        // Surface and draw-plan indices share this contiguous range.
+        std::vector<LodRange> lodRanges;
         bool sourceUseLighting=false;
     };
     struct CollisionOnly {
@@ -162,36 +168,42 @@ private:
         if(out.authoredMatrix[3]!=0||out.authoredMatrix[7]!=0||out.authoredMatrix[11]!=0||out.authoredMatrix[15]!=1)
             return reject(d,"nonaffine actual SCB matrix");
         out.firstSurface=surfaces_.size();
-        for(std::size_t si=0;si<scene.lods[0].surfaces.size();++si){
-            d.surface=si;const auto& surface=scene.lods[0].surfaces[si];
-            const auto* token=out.materials.handle1C4(surface.material_index);
-            if(!token||surface.material_index>=scene.materials.size()||surface.vertices.empty()||surface.indices.empty()||
-               surface.indices.size()%3||surface.vertices.size()>a::max_mesh_vertices-vertices_.size()||
-               surface.indices.size()>a::max_mesh_indices-indices_.size()||surfaces_.size()>=a::max_mesh_indices/3)
-                return reject(d,"source surface/material or native geometry capacity rejected");
-            Surface span;span.placement=placement;span.worldInstance=out.worldInstance;
-            span.sourceSurface=static_cast<std::uint32_t>(si);span.materialSlot=surface.material_index;span.materialRow=*token;
-            span.vertexStart=static_cast<std::uint32_t>(vertices_.size());span.vertexCount=static_cast<std::uint32_t>(surface.vertices.size());
-            span.indexStart=static_cast<std::uint32_t>(indices_.size());span.indexCount=static_cast<std::uint32_t>(surface.indices.size());
-            span.hasOriginalColors=surface.has_original_colors;span.worldSpaceRootBypassed=scene.world_space;
-            for(const auto& v:surface.vertices){
-                if(v.bone!=0)return reject(d,"actual static vertex has unjoined bone");
-                Vertex vertex;
-                for(unsigned axis=0;axis<3;++axis){
-                    double value=0;for(unsigned k=0;k<3;++k)value+=v.position_local[k]*out.visualMatrix[k*4+axis];
-                    value+=out.visualMatrix[12+axis];vertex.worldPosition[axis]=static_cast<float>(value);
-                    if(!std::isfinite(value)||!std::isfinite(vertex.worldPosition[axis])||!std::isfinite(v.normal_local[axis]))
-                        return reject(d,"nonfinite source vertex/normal");
-                    vertex.sourceNormal[axis]=v.normal_local[axis];
+        out.lodRanges.reserve(scene.lods.size());
+        for(std::size_t li=0;li<scene.lods.size();++li){
+            LodRange range;range.firstSurface=surfaces_.size();
+            for(std::size_t si=0;si<scene.lods[li].surfaces.size();++si){
+                d.surface=si;const auto& surface=scene.lods[li].surfaces[si];
+                const auto* token=out.materials.handle1C4(surface.material_index);
+                if(!token||surface.material_index>=scene.materials.size()||surface.vertices.empty()||surface.indices.empty()||
+                   surface.indices.size()%3||surface.vertices.size()>a::max_mesh_vertices-vertices_.size()||
+                   surface.indices.size()>a::max_mesh_indices-indices_.size()||surfaces_.size()>=a::max_mesh_indices/3)
+                    return reject(d,"source surface/material or native geometry capacity rejected");
+                Surface span;span.placement=placement;span.worldInstance=out.worldInstance;
+                span.sourceLod=static_cast<std::uint32_t>(li);
+                span.sourceSurface=static_cast<std::uint32_t>(si);span.materialSlot=surface.material_index;span.materialRow=*token;
+                span.vertexStart=static_cast<std::uint32_t>(vertices_.size());span.vertexCount=static_cast<std::uint32_t>(surface.vertices.size());
+                span.indexStart=static_cast<std::uint32_t>(indices_.size());span.indexCount=static_cast<std::uint32_t>(surface.indices.size());
+                span.hasOriginalColors=surface.has_original_colors;span.worldSpaceRootBypassed=scene.world_space;
+                for(const auto& v:surface.vertices){
+                    if(v.bone!=0)return reject(d,"actual static vertex has unjoined bone");
+                    Vertex vertex;
+                    for(unsigned axis=0;axis<3;++axis){
+                        double value=0;for(unsigned k=0;k<3;++k)value+=v.position_local[k]*out.visualMatrix[k*4+axis];
+                        value+=out.visualMatrix[12+axis];vertex.worldPosition[axis]=static_cast<float>(value);
+                        if(!std::isfinite(value)||!std::isfinite(vertex.worldPosition[axis])||!std::isfinite(v.normal_local[axis]))
+                            return reject(d,"nonfinite source vertex/normal");
+                        vertex.sourceNormal[axis]=v.normal_local[axis];
+                    }
+                    for(unsigned j=0;j<2;++j){vertex.sourceUv[j]=static_cast<float>(v.uv[j]);
+                        if(!std::isfinite(v.uv[j])||!std::isfinite(vertex.sourceUv[j]))return reject(d,"nonfinite original UV");}
+                    if(surface.has_original_colors)vertex.sourceColor=v.color;
+                    vertices_.push_back(vertex);
                 }
-                for(unsigned j=0;j<2;++j){vertex.sourceUv[j]=static_cast<float>(v.uv[j]);
-                    if(!std::isfinite(v.uv[j])||!std::isfinite(vertex.sourceUv[j]))return reject(d,"nonfinite original UV");}
-                if(surface.has_original_colors)vertex.sourceColor=v.color;
-                vertices_.push_back(vertex);
+                for(auto index:surface.indices){if(index>=surface.vertices.size())return reject(d,"actual triangle index outside surface");
+                    indices_.push_back(span.vertexStart+index);}
+                surfaces_.push_back(span);++out.surfaceCount;++range.surfaceCount;
             }
-            for(auto index:surface.indices){if(index>=surface.vertices.size())return reject(d,"actual triangle index outside surface");
-                indices_.push_back(span.vertexStart+index);}
-            surfaces_.push_back(span);++out.surfaceCount;
+            out.lodRanges.push_back(range);
         }
         return true;
     }

@@ -21,7 +21,7 @@
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
-namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
+namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; }
 namespace rr::platform {
 class GameHost50ER;
@@ -616,6 +616,7 @@ struct VehicleWindowFrame50DS {
     // only this layer; no empty batch counts as an original GPU submission.
     const game::OriginalRaceHud50KG* originalRaceHud = nullptr;
     const game::OriginalTimeStats50LA* originalTimeStats = nullptr;
+    const game::OriginalPositionStatsNativeOwner50LA* originalPositionStats = nullptr;
     const game::OriginalSpeedBoost50LA* originalSpeedBoost = nullptr;
     // Current successful source camera publication, including stopped racers.
     // The converted combined matrix must equal worldViewProjection exactly at
@@ -722,6 +723,8 @@ struct VehicleWindowDiagnostic50DS {
     bool originalRaceHudRejected = false;
     std::uint32_t originalTimeStatsQuads=0,originalTimeStatsLeaves=0;
     bool originalTimeStatsRejected=false;
+    std::uint32_t originalPositionStatsQuads=0,originalPositionStatsLeaves=0;
+    bool originalPositionStatsRejected=false;
     std::uint32_t originalSpeedBoostPrimitives=0,originalSpeedBoostLeaves=0;
     bool originalSpeedBoostRejected=false;
     // UI-only publication, never a successful native vehicle batch receipt.
@@ -963,6 +966,10 @@ public:
     bool bindOriginalRaceHud(const game::OriginalRaceHud50KG&,VehicleWindowDiagnostic50DS&) noexcept;
     // Strong canonical TimeStats owner retained through checked GPU cleanup.
     // Two real atlases; requested invalid frames reject the frame transaction.
+    // Retains the typed presentation adapter through real GPU retirement.
+    // The adapter weak-borrows the display-pinned genuine resource owner.
+    bool bindOriginalPositionStats(std::shared_ptr<game::OriginalPositionStatsNativeOwner50LA>,
+        VehicleWindowDiagnostic50DS&) noexcept;
     bool bindOriginalTimeStats(std::shared_ptr<game::OriginalTimeStats50LA>,VehicleWindowDiagnostic50DS&) noexcept;
     bool bindOriginalSpeedBoost(std::shared_ptr<game::OriginalSpeedBoost50LA>,VehicleWindowDiagnostic50DS&) noexcept;
     // Copy admitted shared scene fog after its real owner updates it. Requires
@@ -1145,6 +1152,11 @@ public:
     // allocation, readback, swap, image publication change, or implicit timing.
     // Normal submit/window paths never call this barrier automatically.
     bool finishSubmittedWork(VehicleWindowDiagnostic50DS&) noexcept;
+    // Optional source/GPU-storage provenance of the retained accepted RA frame. Call at
+    // capture selection, after excluding capture work from FPS measurement.
+    // RR_RA_PIXEL_PROVENANCE=1 enables a bounded log and six fog buffer reads; no draws.
+    // Reports conservative candidates, never final GPU pixel ownership.
+    void logRaCapturePixelProvenance() noexcept;
     // Current GPU-completed native FireP0t publication. No caller supplies
     // span bits, generation or completion evidence; no particle activation.
     bool completedRaStaticFire(ra_static_fire_visual50LA::CompletedDrawReceipt&,
