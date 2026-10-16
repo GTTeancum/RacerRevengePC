@@ -56,3 +56,14 @@ endpoints, but the current GLSL150 shader admission does not establish a
 portable ULP bound for CPU prediction of transformed/snap-side orientation.
 Existing heuristic projection margins are not promoted into such a proof.
 This patch makes no new geometric or numeric approximation.
+
+## Scheduled smoke result and isolation
+
+The combined sampler-hoist/group-restoration revision aebf7de passed the Linux
+basic smoke with Pause/Continue and clean shutdown on 2026-10-16. Its five-swap
+baseline was 0.824194 FPS versus 0.871192 for fb53f6a. These single runs do not
+establish causality or statistical confidence, and no speedup is claimed.
+The group-restoration implementation is reverted in 77b0f39 to isolate the
+sampler-hoist change in the next permitted central cycle. This note preserves
+the reviewed proposal and observed result; it does not imply the group
+optimization remains enabled.
