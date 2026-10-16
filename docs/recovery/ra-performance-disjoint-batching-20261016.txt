@@ -1,0 +1,80 @@
+RA native rendering source-only performance audit, 52993dd
+
+Existing evidence only:
+linux-validation-52993dd/smoke-attempt1/{stderr,stdout}.log
+The accepted five-swap baseline is 0.8401285768 FPS, elapsed5.951469975s,
+8 original AI, no human controller,640x448, software Mesa, internal4 samples.
+All238 stage records include startup/countdown and are NOT baseline-aligned:
+ opaque_opponents mean380861us,max871100
+ ra_world mean57995us,max170271
+ hud_blur mean10787us,max146735
+ coverage_resolve mean1345us,max75907
+ cables206us,transparent853us,binders875us,legacy32us mean.
+Recent steady frames: opponents541059..871100us,RA88702..102368us.
+The last printed five-render phase aggregate: render_prepare_submit5.9088s
+wall/1.9712s calling-thread CPU; physics20calls106.8ms wall. Existing accepted
+baseline finish_wait totals12.859us,host_swap4.822ms,history1.381ms. These
+measurements support renderer submission work as first target; they do not
+separate llvmpipe worker cost from API synchronization or player rendering.
+Player opaque rendering falls between begin and commit and is not included
+in the named opaque_opponents stage. Do not sum stage means into a full FPS.
+
+Dominant source-backed work:
+vehicle_window_gl50ds.cpp drawOpaqueOpponent uploads each live racer and
+calls drawSpecularSpan50LA. Each actual enabled map-2 group emits its base
+first, then every map-2 triangle invokes native_coverage_storage.inl bridge:
+VAO query,AA0 scratch clear/raster,current destination4-sample blit,4-sample
+composition with exact integer byte formula/per-sample depth,state restore.
+Conservative screen rectangles already reduce these operations. W-crossing
+or uncertain bounds correctly fall back to full target; fully clipped source
+triangles already skip. Each real triangle causes this ordered bridge because
+map2 reads current destination alpha and writes independent source alpha.
+
+Fast-path exclusions:
+Map2 resultRGB=floor(sourceRGB*destinationA/128)+destinationRGB,clamped;
+resultA=sourceA. SourceRGB0 cannot skip A write. SourceA128 does not make RGB
+destination-independent. Alpha0 only proves no-op if actual GREATER0/KEEP
+alpha test is enabled and zero is proved after interpolation/texture. No
+current log proves sufficient triangle incidence for that optimization.
+RA uses a different source-alpha blend;post-MODULATE A128 eliminates its RGB
+destination dependency, but vertex A128 alone does not prove sampled A128.
+No fast path assuming a texture's alpha or disabling specular is proposed.
+
+Delivered bounded patch:
+Consecutive map-2 triangles in the same original MSCNT group may share bridge
+only when their existing conservative integer pixel rectangles are pairwise
+disjoint. Runs cap14 triangles; union area <=2*sum constituent rectangle areas.
+Full-target/uncertain rectangles force singleton. Empty triangles retain the
+existing proven skip. Contiguous EBO order and every original group boundary
+are unchanged. Payload clear covers union; original triangles raster once in
+source order. Disjoint support means at most one triangle supplies each pixel,
+so one current-destination snapshot equals each separate snapshot at every
+consumed sample. Original source alpha,byte floor/clamp,fog,alpha-test,texture
+sampling,AA0 center raster and4-sample LEQUAL/no-write composition unchanged.
+No draw reordering,geometry merging,source group accounting changes or AI changes.
+Each singleton uses the same previous bridge commands. Previous-array restore
+and failure handling remain in bridge. Cached rejected lookahead avoids double
+CPU rectangle computation. Existing RA stage telemetry gains per-frame checked
+runs,triangles,coalesced_triangles,saved_bridges,empty_triangles,full_singletons;
+counts include player plus opaque opponents,are not visible-fragment counts,
+and still require final accepted frame publication. No GPU timing claim.
+
+Next priorities:
+1. Root's next authorized basic run should inspect saved_bridges and full_singletons
+   before claiming a benefit. Connected strip triangle rectangles may overlap
+   frequently; if no coalescing, retain useful incidence evidence and reconsider.
+2. If full_singletons dominates, conservative homogeneous clipping for racer
+   region bounds could avoid large fallback copies. It requires explicit error
+   bounds and must preserve source/GPU clipping; do not guess or drop crossing triangles.
+3. One owned group can retain the source VAO value and fixed program/sampler
+   uniforms rather than requery/rewrite each bridge; preserve state restoration
+   on all failures. Smaller overhead than removing bridge invocations.
+4. Stream uploads can serialize when archetypes share inactive VBOs; source
+   currently reuploads normals,vertices,specular UVs per actual racer. No timing
+   evidence isolates this. A per-racer upload arena is larger lifecycle work;
+   never reuse another racer's geometry or skip original AI preparation.
+5. RA world is second measured stage. Existing opaque batching already applies.
+   Do not merge destination-dependent overlapping primitive spans or reorder
+   canonical materials to manufacture throughput.
+
+No build,test,syntax check,gameplay,screenshot or decoder execution performed.

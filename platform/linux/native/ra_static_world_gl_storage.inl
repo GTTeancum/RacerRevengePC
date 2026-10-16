@@ -83,11 +83,11 @@
         constexpr const char* vertex=R"GLSL(#version 400 core
 in vec3 position;in vec2 uv;in vec4 color;in float fogByte;
 uniform mat4 worldViewProjection;
-out vec2 sourceUv;noperspective out vec4 packetColor;smooth out float packetFogTimesClipW;
-void main(){gl_Position=vec4(position,1.0)*worldViewProjection;sourceUv=uv;packetColor=color;packetFogTimesClipW=fogByte*gl_Position.w;}
+out vec2 sourceUv;smooth out vec4 packetColorTimesClipW;smooth out float packetFogTimesClipW;
+void main(){gl_Position=vec4(position,1.0)*worldViewProjection;sourceUv=uv;packetColorTimesClipW=color*gl_Position.w;packetFogTimesClipW=fogByte*gl_Position.w;}
 )GLSL";
         constexpr const char* fragment=R"GLSL(
-in vec2 sourceUv;noperspective in vec4 packetColor;smooth in float packetFogTimesClipW;
+in vec2 sourceUv;smooth in vec4 packetColorTimesClipW;smooth in float packetFogTimesClipW;
 uniform sampler2D image;uniform vec4 fogColorAndEnable;uniform float alphaReference;
 #ifndef RA_SAMPLE_DESTINATION
 uniform int payload;
@@ -100,7 +100,9 @@ void main(){
     // Texture bank already incorporates source TEXA. Native base-level linear
     // sampling; packet Gouraud/fog are screen-linear, UV is perspective-correct.
     vec4 sampled=floor(clamp(texture(image,sourceUv)*255.0,0.0,255.0));
-    vec4 packet=floor(clamp(packetColor,0.0,255.0));
+    // Carry all original RGBA lanes homogeneously, as with fog below.
+    // Reconstruct screen-linear color before the unchanged byte operations.
+    vec4 packet=floor(clamp(packetColorTimesClipW*gl_FragCoord.w,0.0,255.0));
     vec4 bytes=floor(clamp(sampled*packet/128.0,0.0,255.0));
     if(alphaReference>=0.0 && bytes.a<=alphaReference)discard;
     if(fogColorAndEnable.w!=0.0){

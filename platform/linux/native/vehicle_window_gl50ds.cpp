@@ -4858,13 +4858,11 @@ void main() {
             // the optional GREATER0/KEEP test can only narrow that coverage.
             // Source sampling/clipping/depth remain the admitted native policy.
             if (accepted) {
-                for (U i = group.indexStart; i < group.indexStart + group.indexCount; i += 3) {
-                    if (coverageDemand) {
-                        if (!drawCoveragePairTriangle(bank, i, material->specularName50LA,
-                            racerTriangleRasterRegion(slot,component,i))) {
-                            accepted = false; break;
-                        }
-                    } else {
+                if (coverageDemand) {
+                    accepted = drawCoveragePairGroup(bank, slot, component,
+                        group.indexStart, group.indexCount, material->specularName50LA);
+                } else {
+                    for (U i = group.indexStart; i < group.indexStart + group.indexCount; i += 3) {
                         gl.textureBarrier();
                         drawGl.drawElementsBaseVertex(0x0004, 3, 0x1405,
                             reinterpret_cast<const void*>(std::uintptr_t(i) * sizeof(U)), 0);
@@ -4972,6 +4970,8 @@ void main() {
     static bool begin(void* context, std::uint8_t bank) noexcept {
         auto& s = *static_cast<Storage*>(context);
         s.active = true;
+        s.coveragePairRuns=s.coveragePairTriangles=s.coveragePairCoalescedTriangles=0;
+        s.coveragePairEmptyTriangles=s.coveragePairFullSingletons=0;
         // Same-context GL ordering protects buffer/target reuse after prior
         // commands, including aborted work. No mapping or cross-context sharing.
         s.gl.bindFramebuffer(framebuffer, s.coverageDemand ? s.coverageLive.scene[bank] : s.targets[bank]);
@@ -5047,6 +5047,14 @@ void main() {
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.traceRaStage("opaque_opponents",stageStart);
+        if(s.request.raStaticWorld&&s.request.enableGameplayDisplayWallTiming)
+            std::fprintf(stderr,"ra_pair_batches scope=player_and_opaque_opponents runs=%llu triangles=%llu coalesced_triangles=%llu saved_bridges=%llu empty_triangles=%llu full_singletons=%llu\n",
+                static_cast<unsigned long long>(s.coveragePairRuns),
+                static_cast<unsigned long long>(s.coveragePairTriangles),
+                static_cast<unsigned long long>(s.coveragePairCoalescedTriangles),
+                static_cast<unsigned long long>(s.coveragePairTriangles-s.coveragePairRuns),
+                static_cast<unsigned long long>(s.coveragePairEmptyTriangles),
+                static_cast<unsigned long long>(s.coveragePairFullSingletons));
         // Cable/HUD failure still aborts the unpublished combined frame.
         s.resetPodState();
         if (!s.drawCables(s.frameCables, s.cableTextureName)) return false;

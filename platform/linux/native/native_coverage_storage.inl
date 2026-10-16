@@ -2,6 +2,9 @@
 // no source admission, context creation, quality fallback or GPU receipt here.
     static constexpr U coverageTexture = 0x9100; // TEXTURE_2D_MULTISAMPLE
     bool coverageDemand = false;
+    // Per-frame checked bridge submissions, not visible-pixel/GPU-time counts.
+    std::uint64_t coveragePairRuns=0,coveragePairTriangles=0,coveragePairCoalescedTriangles=0;
+    std::uint64_t coveragePairEmptyTriangles=0,coveragePairFullSingletons=0;
     struct CoverageExtent {
         U scene[2]{}, color[2]{}, depth[2]{};
         U snapshot=0, snapshotColor=0, raster=0, payload=0, rasterDepth=0;
@@ -196,7 +199,7 @@ void main(){
             return fail(*diagnostic,VehicleWindowError50DS::shader,"coverage composition inputs unavailable");
         return true;
     }
-    bool drawCoveragePairTriangle(U bank,U first,U image,const std::array<I,4>& region) noexcept {
+    bool drawCoveragePairTriangle(U bank,U first,U image,const std::array<I,4>& region,U triangleCount=1) noexcept {
         // A proven empty native clip region cannot touch any destination
         // sample. Preserve source group order/accounting without GPU work.
         if(region[2]<=region[0]||region[3]<=region[1])return true;
@@ -215,7 +218,7 @@ void main(){
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);
         bool accepted=check("bind AA0 original triangle payload target");
         if(accepted){
-            drawGl.drawElementsBaseVertex(0x0004,3,0x1405,
+            drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(triangleCount*3),0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
             accepted=check("raster original AA0 map-2 payload and center depth");
         }
@@ -249,6 +252,62 @@ void main(){
         gl.disable(0x0C11);
         const bool restored=check("restore source-pair state after native coverage bridge");
         return accepted&&restored;
+    }
+    bool drawCoveragePairGroup(U bank,U slot,U component,U first,U count,U image) noexcept {
+        // Never cross the original base/map-2 MSCNT group boundary. A run
+        // retains contiguous EBO order and admits only pairwise-disjoint
+        // conservative pixel rectangles. Thus no sample can consume another
+        // run member's color/alpha or compete with its depth. The unchanged
+        // byte shader and per-sample depth comparison can share one snapshot.
+        constexpr U maximumRun=14;
+        const U end=first+count;
+        const auto fullRegion=[&](const std::array<I,4>& r) noexcept {
+            return r[0]==0&&r[1]==0&&r[2]==width&&r[3]==height;
+        };
+        // A rejected lookahead becomes the next run's first triangle; avoid
+        // evaluating its clip rectangle twice in the common singleton case.
+        U pendingFirst=end;std::array<I,4> pending{};
+        while(first<end){
+            const auto initial=pendingFirst==first?pending:racerTriangleRasterRegion(slot,component,first);
+            if(initial[2]<=initial[0]||initial[3]<=initial[1]){++coveragePairEmptyTriangles;first+=3;continue;}
+            std::array<std::array<I,4>,maximumRun> regions{};
+            regions[0]=initial;auto united=initial;U run=1;
+            const auto area=[](const std::array<I,4>& r) noexcept -> std::uint64_t {
+                return std::uint64_t(r[2]-r[0])*std::uint64_t(r[3]-r[1]);
+            };
+            std::uint64_t summedArea=area(initial);
+            while(!fullRegion(initial)&&run<maximumRun&&first+run*3<end){
+                pendingFirst=first+run*3;
+                const auto next=racerTriangleRasterRegion(slot,component,pendingFirst);
+                pending=next;
+                // Flush before an empty primitive rather than create a hole
+                // in this contiguous source range. The next iteration skips it.
+                if(next[2]<=next[0]||next[3]<=next[1]||fullRegion(next))break;
+                bool disjoint=true;
+                for(U i=0;i<run;++i){const auto& old=regions[i];
+                    if(next[0]<old[2]&&old[0]<next[2]&&next[1]<old[3]&&old[1]<next[3]){
+                        disjoint=false;break;
+                    }
+                }
+                if(!disjoint)break;
+                auto candidate=united;
+                for(U axis=0;axis<2;++axis){candidate[axis]=std::min(candidate[axis],next[axis]);
+                    candidate[axis+2]=std::max(candidate[axis+2],next[axis+2]);}
+                const auto nextArea=summedArea+area(next);
+                // Avoid a sparse run expanding scratch/copy/composition work
+                // to an arbitrarily large rectangle. Extents are GL-limited.
+                if(area(candidate)>nextArea*2u)break;
+                regions[run++]=next;united=candidate;summedArea=nextArea;
+            }
+            // Singleton uses the same bridge and triangle count as before.
+            // Full/uncertain clip fallback always remains its own run.
+            if(!drawCoveragePairTriangle(bank,first,image,united,run))return false;
+            ++coveragePairRuns;coveragePairTriangles+=run;
+            if(run>1)coveragePairCoalescedTriangles+=run;
+            if(fullRegion(initial))++coveragePairFullSingletons;
+            first+=run*3;
+        }
+        return true;
     }
     bool resolveCoverage(U bank) noexcept {
         if(!coverageDemand)return true;
