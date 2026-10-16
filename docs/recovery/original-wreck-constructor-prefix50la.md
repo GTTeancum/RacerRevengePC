@@ -28,7 +28,9 @@ inactive writes are used to make the partial owner appear complete.
 
 The first piece is still not appended to the collection. Its setup has not
 returned to22BFD0, so the second piece and every later collection remain
-unreached. The planned ordered38/374 arrays are still native planning storage.
+unreached. The full prefilled ordered38/374 arrays remain native planning storage. The
+first source collection38 slot has nevertheless been stored at22C16C before
+setup; reachedSourcePieceSlotCount records that separate extent of one.
 The API has no ordinal selector that could skip this unresolved first suffix.
 
 All component keys are checked before source writes. Existing64-component

@@ -6,17 +6,22 @@
 #include <bit>
 #include <cstring>
 #include "control_presets49d.h"
+#include "original_application_animation_clock50kg.h"
 #include "original_ui_game_options_controller50kg.h"
 #include <memory>
 #include <utility>
 
 namespace original_pause_observation50LA { class Owner; }
 namespace rr::game {
+class OriginalPauseTextGeometry50LA;
+class OriginalPauseTextureGeometry50LA;
 // Concrete cold storage for shared Pause load1B8810 and derived1BA390:
 // original textures, polygons and texts with canonical references. No Entity attachment
 // or draw API. Progress stages are not original full-Pause-load receipts.
 class OriginalPauseStorage50LA final {
     friend class original_pause_observation50LA::Owner;
+    friend class OriginalPauseTextGeometry50LA;
+    friend class OriginalPauseTextureGeometry50LA;
 public:
     enum class Stage : std::uint8_t { fresh,baseBackdrops,basePolygons,baseText,derivedResources,failed,closed };
     struct Diagnostic {
@@ -331,6 +336,86 @@ public:
         fonts_.reset();stage_=Stage::closed;
     }
 private:
+    // Geometry/state segment1B9324..1B9C20 only. The eventual original parent
+    // must admit the last actual Application camera before calling this, then
+    // execute the1B9C24..1B9F3C draw tail in source order. Not a callback receipt.
+    bool advanceGeometry1B9324(const OriginalApplicationAnimationClockView50KG& clock,
+        Diagnostic& d)noexcept {
+        d={};OriginalApplicationUpdateClockSample50KG sample;
+        if(stage_!=Stage::derivedResources||!context_||!context_->live()||
+           !clock.readUpdate250(sample)){d.sourcePC=0x1B9324;return false;}
+        // Concrete storage was created by the original kind1 four-vertex load.
+        // Validate before mutation so a failed cold owner cannot partially tick.
+        for(const auto& p:polygons_)if(!p||p->type0C!=1||p->count04!=4||!p->vertices00){
+            d.sourcePC=0x1B9324;return false;
+        }
+        for(const auto& t:backdrops_)if(!t.buffer58){d.sourcePC=0x1B9324;return false;}
+        if(opening30_>=0.f){
+            const float ratio=opening30_/.25f;
+            const float progress=1.f-ratio;
+            animateBackdrops1B938C(progress);
+            const float band=65.f*progress;
+            const float y=448.f-band;
+            polygonY1B95E0(*polygons_[0],0,y);
+            polygonY1B95E0(*polygons_[0],1,y);
+            advanceCountdown1B971C(opening30_,sample.elapsed250);
+        }else if(transition164_>=0.f){
+            const float ratio=transition164_/.25f;
+            const float progress=hidden160_?ratio:1.f-ratio;
+            animateBackdrops1B938C(progress);
+            const float inverse=1.f-progress;
+            const float y=65.f*inverse;
+            polygonY1B95E0(*polygons_[1],2,y);
+            polygonY1B95E0(*polygons_[1],3,y);
+            advanceCountdown1B971C(transition164_,sample.elapsed250);
+        }
+        //1B9BF4..1B9C20 runs even when both countdowns are negative.
+        for(auto& p:polygons_){p->field18=1.f;p->dirty3C=1;}
+        return true;
+    }
+    // Exact shared callback1BA120. Its source callers/parent input dispatch
+    // remain unbound; there is intentionally no host-visible toggle or setter.
+    void reveal1BA120()noexcept {transition164_=.25f;hidden160_=0;}
+    static void advanceCountdown1B971C(float& value,float actual250)noexcept {
+        if(value>0.f){value=value-actual250;if(value<=0.f)value=0.f;}
+        else if(value==0.f)value=-1.f;
+    }
+    static void polygonY1B95E0(Polygon& p,std::size_t index,float y)noexcept {
+        auto& v=p.vertices00[index];v.authored00[1]=y;
+        // Concrete kind1 has one STQ alias; no optional source+18 alias was
+        // allocated by2E1AE0 for these polygons. Preserve authored X/Z/W.
+        *v.stq14=v.authored00;p.dirty3C=1;
+    }
+    void animateBackdrops1B938C(float progress)noexcept {
+        const float scaled=128.f*progress;
+        const float extent=std::min(128.f,scaled); //1B9368/1B97E0 MIN.S; no lower clamp.
+        const float top=196.f-extent,bottom=196.f+extent;
+        auto& center=backdrops_[2];
+        setDimension(center,center.x10,0.f);setDimension(center,center.y14,top);
+        setDimension(center,center.height38,bottom-top);
+        center.field40=1.f;
+        for(auto& v:center.buffer58->vertices)v.xyz[2]=16777214.f;
+        auto& upper=backdrops_[0];
+        setDimension(upper,upper.x10,0.f);setDimension(upper,upper.y14,top-16.f);
+        auto& lower=backdrops_[1];
+        setDimension(lower,lower.x10,0.f);setDimension(lower,lower.y14,bottom);
+    }
+    bool refreshTitle1BB010(std::uint8_t actualRaceFlags1B0,
+        std::size_t actualTrackTextId,Diagnostic& d)noexcept {
+        d={};if(stage_!=Stage::derivedResources||controller884_>=2)return false;
+        try {
+            const auto* track=data_->english()->at(actualTrackTextId);
+            if(!track)return stop(d,0x187390);
+            std::string bytes;
+            if((actualRaceFlags1B0&3u)==1u)bytes=track->text; //3ACAD0 '%s'.
+            else {
+                const auto* prefix=data_->english()->at(controller884_?173:172);
+                if(!prefix)return stop(d,0x18AC60);
+                bytes=prefix->text+" - "+track->text; //3ACAD8 '%s - %s'.
+            }
+            assignText(derivedTexts_[0],bytes.data(),bytes.size());return true;
+        }catch(...){return stop(d,0x1BB010);}
+    }
     // Only the actual Application observation facet may refresh this bounded
     // settings segment. It is not the complete1BB010 render callback.
     bool refreshSettings1BB590(const ControlPresets49D& controls,
@@ -533,6 +618,9 @@ private:
     //callbacks own changes; no public host-selection/player setter exists.
     std::uint32_t selection880_=0,controller884_=0;
     std::int32_t subtype11258_=0; //Actual value consumed during derived load.
+    //1BA1C4/1DC/1E4 constructor stores; parent callbacks alone own transitions.
+    float opening30_=.25f,transition164_=0.f;
+    std::uint32_t hidden160_=0;
     std::uint32_t mode1F0_=0;
     std::array<std::unique_ptr<Polygon>,2> polygons_{};
     std::array<Texture,3> backdrops_{}; //Source+A0,+100,+40 allocation/load order.

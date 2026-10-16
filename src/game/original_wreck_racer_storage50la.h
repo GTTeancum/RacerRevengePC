@@ -48,6 +48,7 @@ class OriginalWreckCollectionStorage50LA final {
     friend class OriginalWreckRacerStorage50LA;
     std::size_t ordinal_=0,count_=0;
     std::uint32_t sourceCount30_=0;
+    std::size_t sourceSlots38_=0;
     OriginalWreckComponent50LA collectionComponent_,groupComponent_;
     std::unique_ptr<OriginalWreckPieceStorage50LA[]> pieces_;
     // Genuine planned pointer order for collection38, not yet a source
@@ -64,6 +65,9 @@ public:
     const OriginalWreckGroupArrays50LA& groupBacking()const noexcept{return group_;}
     std::size_t ordinal()const noexcept{return ordinal_;}
     std::size_t plannedPieceCount()const noexcept{return count_;}
+    //22C16C publishes each source array slot before its piece setup; Entity
+    //append22C1B8 is a distinct later phase. This extent is not activation.
+    std::size_t reachedSourcePieceSlotCount()const noexcept{return sourceSlots38_;}
     const OriginalWreckPieceStorage50LA* piece(std::size_t i)const noexcept {
         return i<count_?ordered38_[i]:nullptr;
     }
@@ -98,6 +102,7 @@ struct OriginalWreckConstructorPrefixBinding50LA {
     std::uint64_t sessionGeneration=0,racerKey=0,collectionKey=0;
     const std::uint64_t* pieceComponentKeys=nullptr;
     std::size_t pieceComponentKeyCount=0;
+    // These same application fields are retained through source retirement.
     std::uint32_t* actualObjectCount423F60=nullptr;
     const std::uint32_t* actualAttachmentLock423F58=nullptr;
     const OriginalWreckConstructorGlobals50LA* constructorGlobals=nullptr;
@@ -115,6 +120,14 @@ struct OriginalWreckConstructorPrefixResult50LA {
     std::size_t initializedComponents=0;
     bool sourcePrefixCommitted=false;
 };
+enum class OriginalWreckPrefixRetirementStatus50LA : std::uint8_t {
+    binding,attachmentLocked,topology,modelRetirementRequired
+};
+struct OriginalWreckPrefixRetirementResult50LA {
+    OriginalWreckPrefixRetirementStatus50LA status=OriginalWreckPrefixRetirementStatus50LA::binding;
+    std::uint32_t sourcePC=0x142590u;
+    std::size_t referencesReleased=0,objectsDestroyed=0;
+};
 // Own the complete original inventory and the nested native arrays together.
 // The inventory outlives every borrower by declaration/destruction order.
 // This class cannot publish an active racer374/death-camera view. It has no
@@ -129,7 +142,10 @@ class OriginalWreckRacerStorage50LA final {
         OriginalWreckSceneDomain50LA modelScenes;
         bool queryPreparationAttempted=false,queriesColdPrepared=false,queryBorrowsReleased=false;
         std::size_t preparedQueries=0;
-        bool constructorAttempted=false;
+        bool constructorAttempted=false,retirementAttempted=false;
+        std::uint32_t* actualObjectCount423F60=nullptr;
+        const std::uint32_t* actualAttachmentLock423F58=nullptr;
+        OriginalWreckPrefixRetirementResult50LA retirementResult{};
         std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> prefixComponents{};
         OriginalWreckComponentDomain50LA prefixDomain{};
         OriginalWreckConstructorPrefixResult50LA prefixResult{};
@@ -311,6 +327,8 @@ public:
             for(std::size_t j=0;j<i;++j)if(key==binding.pieceComponentKeys[j])return out;
         }
         storage_->constructorAttempted=true;
+        storage_->actualObjectCount423F60=binding.actualObjectCount423F60;
+        storage_->actualAttachmentLock423F58=binding.actualAttachmentLock423F58;
         auto& domain=storage_->prefixDomain;
         domain={storage_->sessionGeneration,storage_->prefixComponents.data(),0};
         auto finish=[&](S status,std::uint32_t pc){
@@ -333,6 +351,7 @@ public:
             return finish(S::components,0x1659ccu);
         initializeOriginalWreckPieceFields50LA(piece.piece_,*binding.constructorGlobals);
         piece.effects_.dustActive178=0;piece.effects_.dustTime17C=0.f;
+        collection.sourceSlots38_=1; //22C16C, before setup2CB5A0/165C30.
         std::memcpy(piece.piece_.authored50.v,vectors->position434830.data(),16);
         std::memcpy(piece.piece_.look60.v,vectors->look434860.data(),16);
         std::memcpy(piece.piece_.up70.v,vectors->up434850.data(),16);
@@ -357,6 +376,59 @@ public:
                 *binding.actualVector4431C0))return finish(S::physical,0x165f58u);
         if(!append(body+1u,0u))return finish(S::components,0x165f94u);
         return finish(S::publishedLifetimeRequired,0x166018u);
+    }
+    // Reached142590 child suffix of the complete pre-E0 constructor prefix.
+    // This does not pretend the unjoined model destructor or enclosing piece
+    // has retired. Original sibling/reference/count writes survive the stop.
+    OriginalWreckPrefixRetirementResult50LA retireFirstOrderedPrefixChildren()noexcept {
+        using S=OriginalWreckPrefixRetirementStatus50LA;using K=OriginalWreckComponentKind50LA;
+        OriginalWreckPrefixRetirementResult50LA out;
+        if(!storage_||!storage_->constructorAttempted||
+           storage_->prefixResult.status!=OriginalWreckConstructorPrefixStatus50LA::publishedLifetimeRequired||
+           !storage_->actualObjectCount423F60||!storage_->actualAttachmentLock423F58)return out;
+        if(storage_->retirementAttempted)return storage_->retirementResult;
+        if(*storage_->actualAttachmentLock423F58){out.status=S::attachmentLocked;out.sourcePC=0x1425a8u;return out;}
+        auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
+        auto& root=piece.components_[0];auto& model=piece.components_[1];
+        auto& d0=piece.components_[body];auto& gravity=piece.components_[body+1u];
+        // No generic source destructor is admitted: only this exact private,
+        // never-published constructor route has known NULL body28C and the
+        // one-target gravity allocation represented by gravity_.
+        if(!original_wreck_component_detail50LA::domain(storage_->prefixDomain)||
+           root.parent1C||root.previous10||root.next14||root.firstChild18!=&model||
+           model.parent1C!=&root||model.previous10||model.next14!=&d0||
+           d0.parent1C!=&root||d0.previous10!=&model||d0.next14!=&gravity||d0.firstChild18||
+           gravity.parent1C!=&root||gravity.previous10!=&d0||gravity.next14||gravity.firstChild18||
+           d0.kind!=K::body167920||gravity.kind!=K::gravity282670||
+           piece.physical_.linkedCount268||piece.gravity_.target50!=&piece.physical_||
+           piece.gravity_.count30!=1u||piece.gravity_.capacity34!=1u||
+           piece.queries_.modelSceneIdentity().value){out.status=S::topology;return out;}
+        storage_->retirementAttempted=true;
+        //1424E0 tail recursion first severs predecessor.next and self.next.
+        //142590 then repairs adjacent links and104970 decrements exactly once.
+        auto releaseLeaf=[&](OriginalWreckComponent50LA& leaf){
+            if(leaf.previous10)leaf.previous10->next14=nullptr;
+            leaf.next14=nullptr;
+            if(leaf.parent1C&&leaf.parent1C->firstChild18==&leaf)
+                leaf.parent1C->firstChild18=leaf.next14;
+            --leaf.reference00;++out.referencesReleased;
+            if(!leaf.reference00){
+                //2826D0 frees only its pointer-array backing, not the borrowed
+                //body.1679D0->165260 sees actual constructor28C=NULL. Neither
+                //route clears canonical numeric fields or stale source links.
+                // Their final1413E0 transitions the type and decrements423F60.
+                if(leaf.kind==K::body167920)leaf.kind=K::body164ED0;
+                // The one-target native gravity slot is embedded, so source
+                // pointer-array disposal needs no host heap allocation/free.
+                leaf.kind=K::entity141300;--*storage_->actualObjectCount423F60;
+                ++out.objectsDestroyed;
+            }
+        };
+        releaseLeaf(gravity);releaseLeaf(d0);
+        // Do not decrement model before its actual slot10/slot08 and PSG/cache
+        // ownership are implemented. Piece and collection references remain.
+        out.status=S::modelRetirementRequired;out.sourcePC=0x1425fcu;
+        storage_->retirementResult=out;return out;
     }
     bool coldBackingPrepared()const noexcept{return bool(storage_);}
     std::uint64_t sessionGeneration()const noexcept{return storage_?storage_->sessionGeneration:0;}

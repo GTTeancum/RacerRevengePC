@@ -215,6 +215,36 @@ public:
             !publishAnimationTimestamp(*animationClockBackend_,sampled))return false;
         out=sampled;return true;
     }
+    // Inactive source boundary APIs: the real outer Application/UI scheduler
+    // must call these, not each fixed world tick. No delta/ready flag supplied.
+    bool beginUpdateClock140AC0()const noexcept {
+        auto& clock=*animationClockOwner_;
+        if(!clock.applicationAlive_||clock.updateInProgress_||clock.updatePublication_==std::numeric_limits<std::uint64_t>::max())return false;
+        std::uint32_t sampled=0;
+        if(!sampleAnimationTimestamp(sampled))return false;
+        //140B10..28 calls140D70 when234==0. That reset samples once into
+        //both230/234 and this first update therefore computes zero elapsed.
+        if(!clock.previous234_)clock.previous234_=sampled;
+        clock.elapsed250_=rr::game::OriginalApplicationAnimationClock50KG::delta140BEC(
+            clock.value_.current230,clock.previous234_);
+        ++clock.updatePublication_;clock.updateInProgress_=true;return true;
+    }
+    bool commitUpdateClock140D30()const noexcept {
+        auto& clock=*animationClockOwner_;
+        if(!clock.applicationAlive_||!clock.updateInProgress_)return false;
+        //Source reloads230 here AFTER callbacks. Do not commit a cached entry
+        //timestamp if an intervening authentic source sampler updated230.
+        clock.previous234_=clock.value_.current230;clock.updateInProgress_=false;return true;
+    }
+    bool resetUpdateClock140D70()const noexcept {
+        auto& clock=*animationClockOwner_;
+        if(!clock.applicationAlive_||clock.updateInProgress_)return false;
+        std::uint32_t sampled=0;
+        if(!sampleAnimationTimestamp(sampled))return false;
+        clock.previous234_=sampled; //140E38/3C same sampled value into234/230.
+        //140D70 does not write250. Preserve it, with no active publication.
+        return true;
+    }
     bool animationPaused()const noexcept {return animationClockOwner_->value_.pause11C!=0;}
     // Native explicit pause/resume mapping, not17CC64 input-matcher parity.
     // No single-step120 writer is joined here; constructor120 remains zero.

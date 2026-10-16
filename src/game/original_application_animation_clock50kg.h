@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <bit>
 #include <memory>
 #include <utility>
 
@@ -9,6 +10,13 @@ namespace rr::game {
 struct OriginalApplicationAnimationClockSample50KG {
     std::uint32_t current230=0,pause11C=0,pending120=0;
 };
+// Actual140C50 uncapped Application250 publication, valid only between the
+// original update begin/commit boundaries. No caller-supplied delta is accepted.
+struct OriginalApplicationUpdateClockSample50KG {
+    std::uint32_t current230=0,previous234=0;
+    float elapsed250=0;
+    std::uint64_t publication=0;
+};
 class OriginalApplicationAnimationClockView50KG;
 class OriginalApplicationAnimationClock50KG final {
     friend struct original_main_entry50KG::Application;
@@ -17,6 +25,23 @@ class OriginalApplicationAnimationClock50KG final {
     //13FC44/4C/50 initialize the words. Zero alone is not a sampled timestamp.
     OriginalApplicationAnimationClockSample50KG value_{};
     bool published_=false,applicationAlive_=true;
+    std::uint32_t previous234_=0; //13FC40.
+    float elapsed250_=0; //13FCBC; distinct from capped world/update factor23C.
+    std::uint64_t updatePublication_=0;
+    bool updateInProgress_=false;
+    static float delta140BEC(std::uint32_t current,std::uint32_t previous)noexcept {
+        const std::uint32_t delta=current-previous; //Original unsigned wrapping difference.
+        float converted=0;
+        if(!(delta&0x80000000u))converted=static_cast<float>(delta);
+        else {
+            //140C04..1C: logical half OR low bit, signed-positive CVT.S.W,
+            //then add the converted value to itself. Preserve this source path.
+            volatile float half=static_cast<float>((delta>>1)|(delta&1u));
+            volatile float doubled=half+half;converted=doubled;
+        }
+        volatile float result=converted*std::bit_cast<float>(std::uint32_t{0x3a83126f});
+        return result;
+    }
 public:
     ~OriginalApplicationAnimationClock50KG()=default;
     OriginalApplicationAnimationClock50KG(const OriginalApplicationAnimationClock50KG&)=delete;
@@ -35,6 +60,11 @@ class OriginalApplicationAnimationClockView50KG final {
         :owner_(std::move(owner)) {}
 public:
     OriginalApplicationAnimationClockView50KG() noexcept=default;
+    bool readUpdate250(OriginalApplicationUpdateClockSample50KG& out)const noexcept {
+        if(!owner_||!owner_->applicationAlive_||!owner_->updateInProgress_||!owner_->updatePublication_)return false;
+        out={owner_->value_.current230,owner_->previous234_,owner_->elapsed250_,owner_->updatePublication_};
+        return true;
+    }
     //13FC4C initialized this lane independently of timestamp publication.
     // Read the actual shared pause owner; never invent a sampled timestamp.
     bool readPause11C(std::uint32_t& out)const noexcept {

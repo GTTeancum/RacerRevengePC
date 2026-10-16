@@ -1,5 +1,6 @@
 #pragma once
 #include "original_wreck_assets50la.h"
+#include "../assets/original_standard_material_domain50la.h"
 
 namespace rr::game {
 // The opaque endpoint words belong to the actual source owner, not the COL.
@@ -21,7 +22,7 @@ struct OriginalWreckCollectionInventory50LA {
     std::vector<OriginalWreckPieceInventory50LA> pieces;
 };
 enum class OriginalWreckInventoryStatus50LA : std::uint8_t {
-    inventoried,pieceLoaded,complete,binding,archive,authoring,allocation,piece
+    inventoried,pieceLoaded,complete,binding,archive,authoring,allocation,piece,modelSourcesBound
 };
 struct OriginalWreckInventoryResult50LA {
     OriginalWreckInventoryStatus50LA status=OriginalWreckInventoryStatus50LA::binding;
@@ -42,7 +43,10 @@ class OriginalWreckAssetInventory50LA final {
         std::size_t archiveBytes=0,loaded=0,nextCollection=0,nextPiece=0,retainedPieceBytes=0;
         OriginalWreckAuthoring50LA authoring;
         std::vector<OriginalWreckCollectionInventory50LA> inventory;
+        // Outlives every per-occurrence file identity and future geometry borrow.
+        std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA> modelResolver;
         std::vector<std::vector<std::unique_ptr<Assets>>> assets;
+        bool modelBindingAttempted=false,modelSourcesBound=false;
     };
     std::unique_ptr<Storage> storage_;
     struct Endpoints {
@@ -141,6 +145,33 @@ public:
     const Assets* pieceAssets(std::size_t collection,std::size_t piece)const noexcept {
         return storage_&&collection<storage_->assets.size()&&piece<storage_->assets[collection].size()?
             storage_->assets[collection][piece].get():nullptr;
+    }
+    // Publish exact authenticated PSG file rows into the same application
+    //3E1A70 resolver used by materials/textures. No geometry association,
+    //104960 retain, material acquisition or240740 packet is manufactured.
+    // A failed serial prefix remains retained and cannot be rebound/replayed.
+    OriginalWreckInventoryResult50LA bindModelSources(
+        rr::assets::OriginalStandardMaterialDomain50LA& domain,
+        rr::assets::OriginalStandardTextureDiagnostic50LA& diagnostic)noexcept {
+        using S=OriginalWreckInventoryStatus50LA;diagnostic={};
+        if(!complete()||storage_->modelBindingAttempted||!domain.prepared()||!domain.resolver3E1A70())
+            return {S::binding,0,0,0};
+        storage_->modelBindingAttempted=true;storage_->modelResolver=domain.resolver3E1A70();
+        std::size_t bound=0;
+        for(std::size_t c=0;c<storage_->assets.size();++c)
+            for(std::size_t p=0;p<storage_->assets[c].size();++p){
+                auto& asset=*storage_->assets[c][p];auto& payload=asset.storage_->standardModel;
+                if(!payload||!payload->prepared()||!payload->member()||!payload->originalBytes()||
+                   !storage_->modelResolver->bindModelMember(*payload->member(),
+                        rr::assets::OriginalStandardModelFileKind50LA::psg,*payload->originalBytes(),
+                        asset.storage_->modelFile,diagnostic))return {S::piece,c+1u,p+1u,bound};
+                ++bound;
+            }
+        storage_->modelSourcesBound=true;return {S::modelSourcesBound,0,0,bound};
+    }
+    bool modelSourcesBound()const noexcept{return storage_&&storage_->modelSourcesBound;}
+    const rr::assets::OriginalStandardTextureResolver50LA* modelResolverIdentity()const noexcept {
+        return storage_?storage_->modelResolver.get():nullptr;
     }
     OriginalWreckInventoryResult50LA loadNextCold(const OriginalWreckInventoryEndpointPolicy50LA& endpoint,
                                                 std::string& error) {

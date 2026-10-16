@@ -66,4 +66,12 @@ struct OriginalUiTextDiagnostic50KG {
 // Failure preserves output. Input/output/diagnostic storage must be distinct.
 bool layoutOriginalUiText50KG(const OriginalUiTextInput50KG& input,
     OriginalUiTextLayout50KG& output, OriginalUiTextDiagnostic50KG& diagnostic) noexcept;
+// Same original glyph arithmetic with actual281F90 resource dimensions. This
+// CPU-only entry does not require or fabricate decoded pixels. output.atlas is
+// null; callers must independently admit genuine pixels before GPU submission.
+// input.atlas is ignored. Existing pixel-backed API retains all its validation.
+bool layoutOriginalUiTextDimensions50LA(const OriginalUiTextInput50KG& input,
+    std::uint32_t atlasWidth,std::uint32_t atlasHeight,
+    OriginalUiTextLayout50KG& output,OriginalUiTextDiagnostic50KG& diagnostic) noexcept;
+
 }

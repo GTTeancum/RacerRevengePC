@@ -41,6 +41,7 @@ namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace original_time_stats_adapter50LA { class Owner; }
 namespace original_speed_boost_adapter50LA { class Owner; }
 namespace original_position_stats_adapter50LA { class Owner; }
+namespace original_pause_observation50LA { class Owner; }
 namespace original_camera_session50KX {
 using namespace rr::game;
 using Bank=native_racer50HN::Bank;
@@ -175,6 +176,7 @@ class Session final {
     friend class original_time_stats_adapter50LA::Owner;
     friend class original_speed_boost_adapter50LA::Owner;
     friend class original_position_stats_adapter50LA::Owner;
+    friend class original_pause_observation50LA::Owner;
     friend class rr::game::OriginalDamageObservation50LA;
     template<class T> using Read=Bank::ReadHandle<T>;
     // Stable native binding descriptors identify actual (bank,managerSlot)

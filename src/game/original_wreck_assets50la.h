@@ -9,6 +9,7 @@
 #include "../assets/import_decode48c.h"
 #include "../assets/import_collision48g.h"
 #include "../assets/import_scene48d.h"
+#include "../assets/original_standard_model_resource50la.h"
 #include "../assets/import_world48f.h"
 #include "../assets/model_geometry49o.h"
 #include "../assets/pod_physics49n.h"
@@ -148,7 +149,13 @@ public:
     const std::array<float,4>& authored50()const noexcept{return storage_->position50;}
     const std::array<float,4>& look60()const noexcept{return storage_->look60;}
     const std::array<float,4>& up70()const noexcept{return storage_->up70;}
-    const rr::assets::Scene48D& scene()const noexcept{return storage_->scene;}
+    const rr::assets::Scene48D& scene()const noexcept{return *storage_->standardModel->scene();}
+    // Immutable authentic PSG payload used by the real Standard geometry
+    // owner. This payload is not a source240110 reference or live model.
+    const std::shared_ptr<const rr::assets::OriginalStandardModelResource50LA>& standardModelPayload()const noexcept {
+        return storage_->standardModel;
+    }
+    rr::assets::OriginalStandardModelFileId50LA modelFileIdentity()const noexcept{return storage_->modelFile;}
     const rr::assets::PsgHierarchyView49O& hierarchy()const noexcept{return storage_->hierarchy;}
     const OriginalWreckAssetReceipt50LA& receipt()const noexcept{return storage_->receipt;}
     const std::array<std::vector<std::uint8_t>,4>& originalMembers()const noexcept{return storage_->raw;}
@@ -168,7 +175,8 @@ private:
         Query query;
         OriginalWreckTarget50LA target;
         rr::assets::PsgHierarchyView49O hierarchy{};
-        rr::assets::Scene48D scene;
+        std::shared_ptr<const rr::assets::OriginalStandardModelResource50LA> standardModel;
+        rr::assets::OriginalStandardModelFileId50LA modelFile{};
         std::vector<SceneNode49P> nodes;
         std::vector<rr::assets::PsgNode49O> sourceNodes;
         ModelBoundsResult49O bounds{};
@@ -467,19 +475,24 @@ private:
         for(const auto* v:{&constructor.position434830,&constructor.look434860,
                            &constructor.up434850,&constructor.zero433B10})
             for(float lane:*v)if(!std::isfinite(lane))return fail(error,"nonfinite original wreck constructor vector");
-        rr::assets::GeometryDiagnostic49O diagnostic;rr::assets::DecodeError48C why;
-        if(!rr::assets::readPsgHierarchy49O(out.raw[1].data(),out.raw[1].size(),out.hierarchy,diagnostic)||
-           !rr::assets::decodeScene48D(out.raw[1],out.scene,why))
-            return fail(error,"original wreck PSG hierarchy/geometry unsupported");
-        const auto count=out.hierarchy.nodeCount;
-        if(!count||count>maxSceneNodes49P||out.scene.nodes.size()!=count)
+        rr::assets::GeometryDiagnostic49O diagnostic;
+        rr::assets::OriginalStandardResourceDiagnostic50LA resourceDiagnostic;
+        auto resource=std::make_shared<rr::assets::OriginalStandardModelResource50LA>();
+        // The exact resolved archive name and retained bytes already passed
+        // the occurrence inventory checks. The existing Standard loader owns
+        // immutable geometry/hierarchy; no second decoded Scene48D is kept.
+        if(!resource->prepare(out.receipt.members[1].name,out.raw[1],resourceDiagnostic)||
+           !rr::assets::readPsgHierarchy49O(out.raw[1].data(),out.raw[1].size(),out.hierarchy,diagnostic))
+            return fail(error,"original wreck Standard PSG hierarchy/geometry unsupported");
+        const auto count=resource->nodeCount();out.standardModel=std::move(resource);
+        if(!count||count>maxSceneNodes49P||out.standardModel->scene()->nodes.size()!=count)
             return fail(error,"original wreck model graph extent invalid");
         out.nodes.resize(count);
         out.sourceNodes.resize(count);auto& originals=out.sourceNodes;
         for(std::uint32_t i=0;i<count;++i){
             auto& original=originals[i];
-            if(!rr::assets::readPsgNode49O(out.hierarchy,i,original)||
-               (i==0?original.parent!=-1:original.parent<0))
+            original=out.standardModel->sourceNodes()[i];
+            if(i==0?original.parent!=-1:original.parent<0)
                 return fail(error,"original wreck model requires one actual PSG root");
             auto& node=out.nodes[i];node={};
             std::memcpy(node.localC0.v,original.local,sizeof original.local);

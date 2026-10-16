@@ -28,20 +28,34 @@ bool layoutOriginalUiText50KG(const OriginalUiTextInput50KG& input,
         atlas.height > assets::max_texture_dimension ||
         atlas.rgba.size() != std::size_t(atlas.width) * atlas.height * 4u)
         return fail(diagnostic, OriginalUiTextError50KG::atlasShape, 0x2E0A88u);
+    OriginalUiTextLayout50KG next;
+    if (!layoutOriginalUiTextDimensions50LA(input,atlas.width,atlas.height,next,diagnostic))return false;
+    next.atlas=input.atlas;output=next;return true;
+}
+
+bool layoutOriginalUiTextDimensions50LA(const OriginalUiTextInput50KG& input,
+    std::uint32_t atlasWidth,std::uint32_t atlasHeight,
+    OriginalUiTextLayout50KG& output,OriginalUiTextDiagnostic50KG& diagnostic) noexcept {
+    diagnostic={};
+    if (!input.font || !input.font->decoded())
+        return fail(diagnostic, OriginalUiTextError50KG::missingCel, 0x2817D0u);
+    if (!atlasWidth || !atlasHeight || atlasWidth>assets::max_texture_dimension ||
+        atlasHeight>assets::max_texture_dimension)
+        return fail(diagnostic, OriginalUiTextError50KG::atlasShape, 0x2E0A88u);
     if ((!input.text && input.length != 0) ||
         !std::isfinite(input.localX) || !std::isfinite(input.localY))
         return fail(diagnostic, OriginalUiTextError50KG::input, 0x2E0A94u);
     if (input.length > originalUiTextCapacity50KG)
         return fail(diagnostic, OriginalUiTextError50KG::textCapacity, 0x2E0F00u);
 
-    const float width = static_cast<float>(atlas.width);
-    const float height = static_cast<float>(atlas.height);
+    const float width = static_cast<float>(atlasWidth);
+    const float height = static_cast<float>(atlasHeight);
     // Source multiplies UV by integer (dimension-1), then divides by dimension.
     // Retain those two operations instead of precomputing a scale factor.
-    const float widthMinusOne = static_cast<float>(atlas.width - 1u);
-    const float heightMinusOne = static_cast<float>(atlas.height - 1u);
+    const float widthMinusOne = static_cast<float>(atlasWidth - 1u);
+    const float heightMinusOne = static_cast<float>(atlasHeight - 1u);
     OriginalUiTextLayout50KG next;
-    next.atlas = input.atlas;
+    next.atlas = nullptr; // CPU dimensions are not a decoded-image receipt.
     next.endLocalX = input.localX;
     for (std::size_t ascii = 0; ascii < assets::originalUiFontGlyphCapacity50KG; ++ascii) {
         const auto* glyph = input.font->glyph(static_cast<std::uint8_t>(ascii));
