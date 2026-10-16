@@ -135,6 +135,9 @@ bool preparePauseDerivedFrame(const game::OriginalPauseNativeDraw50LA* owner) no
     h.quads=source.quadCount;h.packetCount=source.packetCount;h.frame=h.quads!=0;return true;
 }
 bool drawPauseDerived(U bank) noexcept {
+    return drawPauseDerivedTargets(targets[bank],targets[bank]);
+}
+bool drawPauseDerivedTargets(U sourceTarget,U destinationTarget) noexcept {
     if(!pauseDerived||!pauseDerived->frame)return true;
     auto& h=*pauseDerived;
     if(!h.ready||!h.owner||!h.owner->current()||
@@ -144,7 +147,7 @@ bool drawPauseDerived(U bank) noexcept {
     // Keep the native image at its real drawable resolution. Only this private
     // scratch target receives raw source alpha and a separate UI depth plane.
     gl.disable(0x0C11);gl.disable(0x0BE2);gl.disable(0x8DB9);gl.disable(0x0BD0);gl.disable(0x0B44);
-    gl.bindFramebuffer(readFramebuffer,targets[bank]);gl.readBuffer(colorAttachment);
+    gl.bindFramebuffer(readFramebuffer,sourceTarget);gl.readBuffer(colorAttachment);
     gl.bindFramebuffer(drawFramebuffer,h.target);gl.drawBuffer(colorAttachment);
     gl.blitFramebuffer(0,0,width,height,0,0,width,height,colorBufferBit,0x2600);
     gl.bindFramebuffer(framebuffer,h.target);gl.viewport(0,0,width,height);
@@ -194,11 +197,11 @@ bool drawPauseDerived(U bank) noexcept {
         // This is the sole write to the pending gameplay color target. A blit
         // failure aborts the existing whole-frame transaction before publish.
         gl.bindFramebuffer(readFramebuffer,h.target);gl.readBuffer(colorAttachment);
-        gl.bindFramebuffer(drawFramebuffer,targets[bank]);gl.drawBuffer(colorAttachment);
+        gl.bindFramebuffer(drawFramebuffer,destinationTarget);gl.drawBuffer(colorAttachment);
         gl.blitFramebuffer(0,0,width,height,0,0,width,height,colorBufferBit,0x2600);
         okay=check("copy authentic original PauseDerived into pending gameplay image");
     }
-    gl.bindFramebuffer(framebuffer,targets[bank]);gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+    gl.bindFramebuffer(framebuffer,destinationTarget);gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
     // This native presentation owns opaque alpha. Source Ad stays private and
     // never becomes the input to a later gameplay effect or retained UI frame.
     gl.colorMask(0,0,0,1);gl.clearColor(0,0,0,1);gl.clear(colorBufferBit);gl.colorMask(1,1,1,1);

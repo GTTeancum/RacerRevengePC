@@ -141,6 +141,7 @@ public:
 private:
     // Concrete2356A0 for this owner's actual counted group. Only the real
     // race/world owner friends can call it; no synthetic component is accepted.
+    bool canPauseColdGroup2356A0(game::RaceAudioGroup50IC,bool)const noexcept;
     bool pauseColdGroup2356A0(game::RaceAudioGroup50IC,bool)noexcept;
     bool canPauseGroupSuffix2356EC(game::RaceAudioGroup50IC group,bool requested)const noexcept {
         if(!current()||!groups_.initialized||!represented(group))return false;

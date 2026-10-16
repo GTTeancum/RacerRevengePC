@@ -1134,6 +1134,10 @@ public:
     // Success includes a window-back-buffer copy when configured; caller swaps.
     bool submitHostMenu(const VehicleWindowHostMenu50DS&, std::int32_t width,
         std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
+    // Frozen completed race image plus the bound authentic Pause frame. Exact
+    // retained extent only; caller completes display through completeGameplayDisplay.
+    bool submitRetainedOriginalPause(const game::OriginalPauseNativeDraw50LA&,
+        std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS&) noexcept;
     // Both modes: read the last privately committed race, host-menu or original-UI viewport,
     // including a frame whose later window blit failed. No image exists before
     // the first successful private commit from a submission path.

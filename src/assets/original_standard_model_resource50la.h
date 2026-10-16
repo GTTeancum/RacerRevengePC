@@ -87,6 +87,7 @@ public:
     const std::int32_t* surfaceMaterial00(std::size_t lod,std::size_t surface) const noexcept;
     bool retain104960(const rr::game::OriginalRacerModelSceneOwner50LA*,
         OriginalStandardResourceDiagnostic50LA&) noexcept;
+    bool holdsModelReference(const rr::game::OriginalRacerModelSceneOwner50LA*) const noexcept;
     bool canReleaseForModel(const rr::game::OriginalRacerModelSceneOwner50LA*) const noexcept;
     //After this model's actual26E4C0 material release: when last, reset every
     //surface00 to-1, execute resource104970/240150/26E0A0, then1327D0.

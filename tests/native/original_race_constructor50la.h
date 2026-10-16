@@ -7,7 +7,7 @@
 
 namespace rr::game {
 // Actual counted1A65C0 prefix, admitted only by consumed Course ownership.
-// No Application28C publication or complete race-load callback is available.
+// Application28C publication is a separate same-owner facet; full load remains gated.
 class OriginalRaceConstructor50LA final {
     friend struct ::original_main_entry50KG::Application;
     std::shared_ptr<OriginalApplicationEntities50LA> application_;
@@ -45,6 +45,14 @@ class OriginalRaceConstructor50LA final {
     bool loadPrefixAttempted_=false,loadPrefixReached_=false;
     std::shared_ptr<ra_cold_aggregate50LA::Owner> world74_;
     bool worldAttempted_=false;
+    std::shared_ptr<OriginalPauseStorage50LA> pause100_;
+    bool nativeRootAttached_=false,nativeRootMaskReached_=false;
+    bool canRetainPause100()const noexcept;
+    bool attachNativePauseParent()noexcept;
+    bool retireNativePauseParent()noexcept;
+    bool retireNativeWorldAndGroups(std::uint32_t&)noexcept;
+    bool pauseWorld1ACF50(bool)noexcept;
+    bool pauseEntity142040(bool)noexcept;
     bool constructWorld1A6BC0(const original_main_entry50KG::Application&,
         std::shared_ptr<ra_cold_aggregate50LA::Owner>,std::uint32_t&)noexcept;
     bool populateResources1AA5A0(std::shared_ptr<assets::OriginalStandardMaterialDomain50LA> domain,
@@ -79,12 +87,17 @@ class OriginalRaceConstructor50LA final {
         if(!application_->entityAuthority_.enroll(entity_))std::terminate();
         return true;
     }
+    bool canPublish28C()const noexcept {
+        return detachedPrefix()&&constructorSuffix_&&!loadPrefixAttempted_&&
+            !resourcesAttempted_&&!raceGroupsAttempted_&&
+            !application_->attachmentLock423F58()&&application_->entityAuthority_.canRetire(entity_);
+    }
     bool detachedPrefix()const noexcept {
         return counted_&&!rolledBack_&&application_&&entity_.reference00==1&&
             entity_.kind==OriginalWreckComponentKind50LA::entity141300&&
             entity_.objectKey==std::uint64_t(reinterpret_cast<std::uintptr_t>(&entity_))&&
             entity_.sessionGeneration&&!entity_.previous10&&!entity_.next14&&!entity_.parent1C&&
-            !entity_.firstChild18&&!entity_.mask20&&
+            !entity_.firstChild18&&entity_.mask20==(nativeRootMaskReached_?0xffffffffu:0u)&&
             entity_.descendants24==((constructorSuffix_&&!raceMaskRecomputed_)?0xffffffffu:0u)&&
             entity_.category28==0xffu&&(entity_.flags29&15u)==3u;
     }
@@ -161,7 +174,7 @@ public:
         sourcePC=0x1a65cc;
         if(rolledBack_)return true;
         if(!counted_){rolledBack_=true;return true;}
-        if(world74_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
+        if(pause100_||nativeRootAttached_||world74_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
            !application_->objectCount423F60()||!application_->entityAuthority_.retire(entity_))return false;
         --entity_.reference00;--application_->objectCount423F60();
         rolledBack_=true;profile_.reset();resourceContext_.reset();resourceDomain_.reset();return true;
@@ -187,7 +200,7 @@ inline std::shared_ptr<rr::game::OriginalRaceConstructor50LA> Application::const
     using T=rr::game::OriginalRaceConstructor50LA;
     sourcePC=0x1a65c0;
     if(!enabled||!profile||!riderProfile||!entitiesOwner_||!entitiesOwner_->application10()||
-       entitiesOwner_->attachmentLock423F58()||!raceConstructorColdOwner50LA_.expired()||
+       entitiesOwner_->attachmentLock423F58()||sourceRace28COwner_||!raceConstructorColdOwner50LA_.expired()||
        launch.raceConstructorClaimed_||!launch.target_||
        !launch.matches(*riderProfile,session,launch.target_->track,launch.selection_.rider))return {};
     std::shared_ptr<T> owner;

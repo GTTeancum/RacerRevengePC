@@ -38,6 +38,7 @@ namespace native_ai50IV { struct Session; }
 #include <vector>
 #include <utility>
 
+namespace original_pause_cold50LA { class Owner; }
 namespace original_main_entry50KG {
 // Concrete host lease: the predicate captures stable native owner references,
 // performs read-only exact identity/state checks. An authenticated cold-load
@@ -152,6 +153,10 @@ private:
     mutable std::array<std::weak_ptr<rr::game::OriginalTunnelTrack50LA>,2> tunnelTrackColdOwners50LA_;
     mutable std::weak_ptr<rr::game::OriginalRaceTuning50LA> raceTuningColdOwner50LA_;
     mutable std::weak_ptr<rr::game::OriginalRaceConstructor50LA> raceConstructorColdOwner50LA_;
+    // Actual Application28C publication. Native backing is retained through
+    // partial load/cleanup; only explicit completed native retirement clears it.
+    mutable std::shared_ptr<rr::game::OriginalRaceConstructor50LA> sourceRace28COwner_;
+    bool clearNativeRetiredRace28C(rr::game::OriginalRaceConstructor50LA&)const noexcept;
     // Process443848 FIFO identity. Scene/display close cannot silently reset it.
     mutable std::shared_ptr<NativeCollectorFifo50LA> nativeCollectorFifoOwner_;
     mutable std::uint64_t raceDisplayGeneration50LA_=0;
@@ -298,18 +303,31 @@ public:
         original_course_targets50KX::ConsumedLaunch&,std::uint64_t session,std::uint32_t& sourcePC)const noexcept;
     bool populateConsumedRaceResources1AA5A0(rr::game::OriginalRaceConstructor50LA&,
         rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool publishConsumedRace28C(const std::shared_ptr<rr::game::OriginalRaceConstructor50LA>&)const noexcept;
+    const rr::game::OriginalRaceConstructor50LA* race28C()const noexcept{return sourceRace28COwner_.get();}
     bool beginConsumedRaceLoad1A6AA0(rr::game::OriginalRaceConstructor50LA&,
         rr::game::OriginalRacerModelRenderGlobals50LA&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool closeNativeConsumedRace(rr::game::OriginalRaceConstructor50LA&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     bool rollbackNativeRaceLoadPrefix(rr::game::OriginalRaceConstructor50LA&,
         rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool pauseConsumedRaceEntity142040(rr::game::OriginalRaceConstructor50LA&,bool)const noexcept;
+    bool pauseConsumedRaceWorld1ACF50(rr::game::OriginalRaceConstructor50LA&,bool)const noexcept;
     bool constructConsumedRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
         std::shared_ptr<ra_cold_aggregate50LA::Owner>,std::uint32_t& sourcePC)const noexcept;
     std::int32_t applicationMode22C()const noexcept{return sourceApplicationMode22C_;}
     // Exact conditional443848 typed destruction leaf; never an implicit drain.
     bool retireNativeCollector1A6948(rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     // Source-only detached ownership. Definitions are in original_pause_entity50la.h.
+    bool prewarmPauseCold50LA(original_pause_cold50LA::Owner&)const noexcept;
+    bool loadConsumedPauseCold50LA(rr::game::OriginalRaceConstructor50LA&,original_pause_cold50LA::Owner&)const noexcept;
+    bool finishPauseDrawCold50LA(original_pause_cold50LA::Owner&)const noexcept;
     std::shared_ptr<rr::game::OriginalPauseStorage50LA> constructPauseCold1A8AB0(
         std::uint64_t actualSessionGeneration)const noexcept;
+    std::shared_ptr<rr::game::OriginalPauseStorage50LA> constructConsumedRacePause1A8AB0(
+        rr::game::OriginalRaceConstructor50LA&)const noexcept;
+    bool attachNativeConsumedRacePause(rr::game::OriginalRaceConstructor50LA&,
+        const std::shared_ptr<original_camera_session50KX::Session>&)const noexcept;
     bool finishPauseEntityCold1A8ADC(rr::game::OriginalPauseStorage50LA&)const noexcept;
     const std::shared_ptr<rr::game::OriginalApplicationEntities50LA>& entities() const noexcept {
         return entitiesOwner_;
@@ -424,7 +442,12 @@ public:
     std::shared_ptr<rr::game::OriginalUiLightManagerLifetime50KG> lightManager;
     Application(const Application&)=delete;
     Application& operator=(const Application&)=delete;
-    ~Application() {animationClockOwner_->applicationAlive_=false;}
+    ~Application() {
+        // A live source slot may still own renderer/context and counted state.
+        // Application destruction cannot substitute for its checked retirement.
+        if(sourceRace28COwner_)std::terminate();
+        animationClockOwner_->applicationAlive_=false;
+    }
     explicit Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock,
         std::shared_ptr<rr::game::ControlPresets49D> controls={})
         :animationClockBackend_(clock),controlsProfile(std::move(controls)) {

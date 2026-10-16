@@ -1,5 +1,5 @@
 #pragma once
-#include "original_race_constructor50la.h"
+#include "original_application_race_slot50la.h"
 #include "original_native_collector_fifo50la.h"
 #include "../../src/game/original_racer_model_view50la.h"
 
@@ -11,7 +11,7 @@ inline bool Application::beginConsumedRaceLoad1A6AA0(rr::game::OriginalRaceConst
     d={};d.sourcePC=0x1a6aa0;
     const auto display=raceDisplayOwner50LA_.lock();
     rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection selected;
-    if(raceConstructorColdOwner50LA_.lock().get()!=&owner||owner.application_!=entitiesOwner_||
+    if(sourceRace28COwner_.get()!=&owner||raceConstructorColdOwner50LA_.lock().get()!=&owner||owner.application_!=entitiesOwner_||
        owner.profile_!=riderProfile||!owner.detachedPrefix()||!owner.constructorSuffix_||
        owner.loadPrefixAttempted_||owner.resourcesAttempted_||owner.raceGroupsAttempted_||
        !riderProfile||!riderProfile->courseRaceSnapshot(selected)||

@@ -5,7 +5,7 @@ Source-only native integration; no build, syntax, gameplay or decoder execution.
 ## Reached source and owner
 
 The retained `rr-clock-full-static-fields.txt` words at1ACF50..1ACF64 load
-race74, then world4D8, then tail-dispatch that group's virtual50. This override
+race74, then world4D8, then tail-dispatch that group's virtual50. This direct function
 **does not call142040 on the race or its six audio children**. A separate direct
 base142040 call would have its own traversal semantics and cannot replace this
 route.
@@ -38,7 +38,7 @@ public `pauseWorld2356EC` remains an audio-suffix-only API for its legacy caller
 
 There is no driver call or completed Pause callback. The actual retained race
 must authenticate its same world74 and world4D8 ownership before calling this
-leaf from its1ACF50 override. Parent attachment, actual opening device suffix,
+leaf through direct1ACF50. Parent attachment, actual opening device suffix,
 source lifecycle clock and scheduler admission remain separate. Nonempty group
 Entity children or logical members are rejected until their concrete source
 callbacks are represented. General141630/1415A0 traversal is not supplied by

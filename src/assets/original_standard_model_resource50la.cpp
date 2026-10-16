@@ -201,6 +201,12 @@ bool OriginalStandardModelGeometry50LA::retain104960(
     catch(...){return fail(d,S::allocation,0x104960);}
     ++storage_->references;return true;
 }
+bool OriginalStandardModelGeometry50LA::holdsModelReference(
+    const rr::game::OriginalRacerModelSceneOwner50LA* model) const noexcept {
+    if(!storage_||!model)return false;
+    for(const auto* retained:storage_->models)if(retained==model)return true;
+    return false;
+}
 bool OriginalStandardModelGeometry50LA::canReleaseForModel(
     const rr::game::OriginalRacerModelSceneOwner50LA* model) const noexcept {
     if(!constructed240110()||!model||storage_->references<=0||

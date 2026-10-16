@@ -4,8 +4,8 @@ namespace rr::platform {
 //2356A0 calls142040 first, even when state44 already has the requested value.
 // This counted route admits only the actually empty child topology currently
 // constructed by2350D0/2351F0. Future children need their concrete slot50 calls.
-inline bool RaceAudioGroups50IC::pauseColdGroup2356A0(
-    game::RaceAudioGroup50IC group,bool requested)noexcept {
+inline bool RaceAudioGroups50IC::canPauseColdGroup2356A0(
+    game::RaceAudioGroup50IC group,bool requested)const noexcept {
     if(!represented(group)||!coldStarted_||coldRetiring_||nativeBindingsRetired_||
        !coldApplication_||coldThread_!=std::this_thread::get_id()||
        !coldMixer_||coldMixer_!=mixer_||coldEpoch_!=epoch_||
@@ -21,6 +21,12 @@ inline bool RaceAudioGroups50IC::pauseColdGroup2356A0(
     // Canonical parent/sibling links may be present. Validate them without
     // detaching or substituting another per-session Entity namespace.
     if(!game::original_entity_chain_detail50LA::forest(coldApplication_->entityAuthority_.view()))return false;
+    return true;
+}
+inline bool RaceAudioGroups50IC::pauseColdGroup2356A0(
+    game::RaceAudioGroup50IC group,bool requested)noexcept {
+    if(!canPauseColdGroup2356A0(group,requested))return false;
+    auto& e=coldGroups_[static_cast<std::size_t>(group)].entity;
     e.flags29=static_cast<std::uint8_t>((e.flags29&~4u)|(requested?4u:0u)); //142050..6C.
     // descendants24==0 proves142078 takes the no-child branch. Preserve the
     // original prefix-before-audio order; preflight makes suffix infallible.

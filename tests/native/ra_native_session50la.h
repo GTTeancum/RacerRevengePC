@@ -3,6 +3,7 @@
 #include "ra_track_particle_manager50la.h"
 #include "ra_static_model_factory50la.h"
 #include "track_session_assets50ig_fixture.h"
+#include "original_pause_cold_driver50la.h"
 
 // Concrete synchronous composition of the existing native session owners.
 // The caller keeps Application, the execution arena and Bank alive; this class
@@ -44,9 +45,12 @@ public:
         const ra_source_camera50LA::FreshRecoveryArenaOwners& recovery,
         std::shared_ptr<const a::OriginalStandardMaterialContext50LA> context,
         const std::array<std::vector<std::uint8_t>,6>& crowdImages,Diagnostic& d,
-        std::shared_ptr<ra_cold_roster50LA::RuntimeOwners> owners={})noexcept {
+        std::shared_ptr<ra_cold_roster50LA::RuntimeOwners> owners={},
+        g::OriginalRaceConstructor50LA* consumedRace=nullptr,
+        original_pause_cold50LA::Owner* pause=nullptr)noexcept {
         d={};
-        if(attempted_||retired_||!aggregate_||!generation_||bank_.count()!=8u)
+        if(attempted_||retired_||!aggregate_||!generation_||bank_.count()!=8u||
+           bool(consumedRace)!=bool(pause))
             return fail(d,"RA construction requires the same fresh sealed eight-racer session");
         attempted_=true;
         try {
@@ -89,6 +93,11 @@ public:
             d.operation="single combined world image population";
             if(!aggregate_->prepareStaticWorldImages(crowdImages,d.aggregate)||
                !aggregate_->prepareStaticWorldDrawPlan(d.aggregate))return false;
+            if(pause){
+                d.operation="actual original Pause load on the same prewarmed FINAL rows";
+                if(!application_.loadConsumedPauseCold50LA(*consumedRace,*pause))
+                    return fail(d,"same counted race Pause load rejected; actual partial owner retained");
+            }
             // This is a completed cold join, not a running-race receipt. The
             // existing frame/manager/start-gate path still owns activation.
             return true;

@@ -1344,6 +1344,8 @@ struct VehicleWindowGl50DS::Storage {
     std::uint8_t uiPublished = 0;
     std::uint64_t uiTexturePublication = 0;
     I raceWidth = 0, raceHeight = 0;
+    bool retainedRaceDisplayCompleted=false,retainedRaceContainsPause=false;
+    std::uint64_t pendingRaceCameraPublication=0,retainedRaceCameraPublication=0;
     I maximumWidth = 0, maximumHeight = 0, width = 0, height = 0, clipDistances = 0;
     I committedWidth = 0, committedHeight = 0;
     float matrix[16]{}, clearRgba[4]{};
@@ -5105,6 +5107,9 @@ void main() {
         if (!s.check("accept private vehicle frame")) return false;
         // 50CV publication is CPU-only. The fallible window copy is deliberately
         // OUTSIDE this transaction, after submitVehicleDrawBatch50CS succeeds.
+        s.retainedRaceDisplayCompleted=false;
+        s.retainedRaceContainsPause=s.pauseDerived&&s.pauseDerived->frame;
+        s.retainedRaceCameraPublication=s.pendingRaceCameraPublication;
         s.published = bank;
         s.committedWidth = s.width; s.committedHeight = s.height;
         s.raceWidth = s.width; s.raceHeight = s.height;
@@ -5205,6 +5210,8 @@ void main() {
         initialized = false; active = frameSet = imageCommitted = false;
         frameCables = nullptr; frameHostHud = false;frameGcParticles=nullptr;
         committedWidth = committedHeight = raceWidth = raceHeight = 0;
+        retainedRaceDisplayCompleted=retainedRaceContainsPause=false;
+        pendingRaceCameraPublication=retainedRaceCameraPublication=0;
         displayedTarget = 0;
         trackVisibilityPendingTarget=0;trackVisibilityCompletedValid=false;
         gameplayHistoryValid=gameplayHistoryStaged=frameGameplayBlurEnabled=false;
@@ -5896,6 +5903,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         std::memcpy(s.worldFogCamera, frame.worldFogCamera, sizeof(s.worldFogCamera));
     std::memcpy(s.matrix, frame.worldViewProjection, sizeof(s.matrix));
     std::memcpy(s.clearRgba, frame.clearRgba, sizeof(s.clearRgba));
+    s.pendingRaceCameraPublication=frame.sourceBodyCameraPublication50LA;
     s.width = frame.width; s.height = frame.height;
     s.frameCables = frame.cables;
     s.frameGameplayBinders=frame.gameplayBinders;s.frameGameplayBinderCount=frame.gameplayBinderCount;
@@ -7062,6 +7070,57 @@ bool VehicleWindowGl50DS::submitHostMenu(const VehicleWindowHostMenu50DS& input,
     return accepted;
 }
 
+bool VehicleWindowGl50DS::submitRetainedOriginalPause(
+    const game::OriginalPauseNativeDraw50LA& owner,I width,I height,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"Pause requires initialized renderer");
+    auto& s=*storage_;
+    if(!s.current(d))return false;
+    if(s.frontendOnly||s.active||s.frameSet||s.diagnostic||s.uiBlendOldSnapshot||s.hasUiByteBlendNames()||
+       s.pauseDerivedUiCreationFailed||!s.request.enableOriginalGameplayBlur||
+       !s.retainedRaceDisplayCompleted||s.retainedRaceContainsPause||!s.imageCommitted||
+       !s.retainedRaceCameraPublication||s.gameplayAwaitingTarget||
+       width<=0||height<=0||width!=s.raceWidth||height!=s.raceHeight||
+       width>s.maximumWidth||height>s.maximumHeight||!s.targets[s.published]||
+       !s.menuTargets[0]||!s.menuTargets[1]||!s.gl.blitFramebuffer||
+       !owner.frame()||owner.frame()->cameraPublication!=s.retainedRaceCameraPublication)
+        return fail(d,VehicleWindowError50DS::frame,"Pause requires completed unchanged race extent and camera publication");
+    if(!s.preparePauseDerivedFrame(&owner)||!s.pauseDerived||!s.pauseDerived->frame){
+        d.originalPauseDerivedRejected=true;
+        return fail(d,VehicleWindowError50DS::frame,"authentic bound Pause frame rejected");
+    }
+    s.diagnostic=&d;
+    const auto oldWidth=s.width,oldHeight=s.height;
+    s.width=width;s.height=height;
+    const auto pending=static_cast<std::uint8_t>(s.menuPublished^1u);
+    bool accepted=s.check("before retained original Pause")&&
+        (s.request.output==VehicleWindowOutput50DS::headless||s.checkDefaultFramebuffer());
+    if(accepted){
+        // Normalize raster state without touching world/material/flame preparation.
+        constexpr U disabled[]={0x0BE2,0x0B44,0x0C11,0x0B90,0x8037,0x0B20,
+            0x8F9D,0x0BD0,0x809D,0x80A0,0x809E,0x8C89,0x8DB9,0x864F};
+        for(U capability:disabled)s.gl.disable(capability);
+        for(I i=0;i<s.clipDistances;++i)s.gl.disable(0x3000+static_cast<U>(i));
+        s.gl.polygonMode(0x0408,0x1B02);
+        accepted=s.drawPauseDerivedTargets(s.targets[s.published],s.menuTargets[pending])&&
+            s.check("accept retained original Pause");
+    }
+    s.pauseDerived->frame=false;
+    if(accepted){
+        s.menuPublished=pending;s.displayedTarget=s.menuTargets[pending];
+        s.uiPrivatePublicationGeneration=0;s.uiSourcePublishedTargetGeneration=0;
+        s.committedWidth=width;s.committedHeight=height;s.imageCommitted=true;
+        if(s.request.output==VehicleWindowOutput50DS::headless)
+            s.noteGameplayDisplayPending(s.displayedTarget,width,height);
+        else {
+            accepted=s.copyToWindow();
+            if(!accepted&&d.error==VehicleWindowError50DS::gl)d.error=VehicleWindowError50DS::presentation;
+        }
+    }else{s.width=oldWidth;s.height=oldHeight;}
+    s.diagnostic=nullptr;return accepted;
+}
+
 bool VehicleWindowGl50DS::readbackRgba(std::uint8_t* destination, std::size_t capacityBytes,
     VehicleWindowDiagnostic50DS& d) noexcept {
     d = {};
@@ -7518,6 +7577,7 @@ bool VehicleWindowGl50DS::completeGameplayDisplayImpl(GameHost50ER& host,
         s.trackVisibilityPendingTarget=0;
         return fail(d,VehicleWindowError50DS::presentation,"GameHost gameplay window swap was not submitted");
     }
+    if(s.displayedTarget==s.targets[s.published])s.retainedRaceDisplayCompleted=true;
     s.acceptGameplayDisplayedHistory();
     s.acceptCompletedTrackVisibility();
     d.gameplayDisplayHistoryAccepted=true;

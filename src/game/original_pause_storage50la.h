@@ -27,6 +27,7 @@ class OriginalPausePolygonGeometry50LA;
 // or draw API. Progress stages are not original full-Pause-load receipts.
 class OriginalPauseStorage50LA final {
     friend class original_pause_observation50LA::Owner;
+    friend class OriginalRaceConstructor50LA;
     friend class OriginalPauseLayout50LA;
     friend class OriginalPauseTextGeometry50LA;
     friend class OriginalPauseTextureGeometry50LA;
@@ -41,6 +42,8 @@ class OriginalPauseStorage50LA final {
         std::shared_ptr<OriginalApplicationEntities50LA> application;
         OriginalWreckComponent50LA component;
         bool initialized=false,releasing=false,disabledAfterLoad=false;
+        // Native history of the actual141860 mask store; never clears source mask.
+        std::uint32_t retainedAttachmentMask20=0;
         EntityPrefix(std::shared_ptr<OriginalApplicationEntities50LA> a,std::uint64_t session)noexcept
             :application(std::move(a)) {
             if(!application||!application->application10()||!session)return;
@@ -60,15 +63,30 @@ class OriginalPauseStorage50LA final {
                     static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&component))&&
                 component.reference00==(releasing?0u:1u)&&!component.previous10&&
                 !component.next14&&!component.firstChild18&&!component.parent1C&&
-                !component.mask20&&!component.descendants24&&component.category28==0xffu&&
+                component.mask20==retainedAttachmentMask20&&!component.descendants24&&component.category28==0xffu&&
                 (component.flags29&15u)==(disabledAfterLoad?0u:3u);
+        }
+        // Private concrete slots24/1C of the actual Pause table3CF420.
+        // Parent/sibling attachment is allowed, but this owner's source child
+        // tree is genuinely empty. Reject future children rather than skipping
+        // their potentially overriding enable/disable callbacks.
+        bool setActivity141630(bool enabled)noexcept {
+            if(!initialized||releasing||!application||!application->application10()||
+               application->attachmentLock423F58()||component.firstChild18||
+               component.descendants24||component.category28!=0xffu||
+               component.kind!=OriginalWreckComponentKind50LA::entity141300||
+               component.objectKey!=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&component))||
+               !application->entityAuthority_.canRetire(component)||
+               !original_entity_chain_detail50LA::forest(application->entityAuthority_.view()))return false;
+            //141630 sets both bits;1415A0 clears both. All other lanes and
+            // actual graph links/masks remain unchanged. No callbacks are
+            // reached because firstChild18 is genuinely null.
+            component.flags29=std::uint8_t((component.flags29&~3u)|(enabled?3u:0u));
+            disabledAfterLoad=!enabled;return true;
         }
         bool disable1A8ADC()noexcept {
             if(!detached()||releasing||disabledAfterLoad)return false;
-            // Actual table3CF420+1C=1415A0. No children exist in this bounded
-            // concrete load; no external recursive callback is skipped.
-            component.flags29=std::uint8_t(component.flags29&~3u);
-            disabledAfterLoad=true;return true;
+            return setActivity141630(false);
         }
         void beginRelease104970()noexcept {
             if(!initialized)return;

@@ -110,7 +110,12 @@
 #include "original_world_cold_prefix50la.h" // Inactive same-scene world constructor prefix.
 #include "original_race_constructor50la.h" // Inactive consumed-launch race constructor ownership.
 #include "original_race_load_prefix50la.h" // Inactive actual early load-owner join.
+#include "original_pause_cold_driver50la.h" // Same-Application two-phase Pause resources.
 #include "original_race_world_join50la.h" // Inactive same-aggregate race world ownership.
+#include "original_consumed_ra_stage50du.h" // Compiled consumed-RA prefix; activation remains gated.
+#include "../../platform/linux/native/original_spectator_menu_input50la.h" // Physical spectator UI edges; inactive until lifecycle join.
+#include "original_race_native_retirement50la.h" // Explicit native ownership close, inactive.
+#include "original_race_pause_forward50la.h" // Actual same-world group pause forwarding, inactive.
 #include "original_pause_observation50la.h" // Inactive source-only settings observer.
 #include "original_race_display_lifetime50la.h"
 #include "original_position_stats_primitives50la.h"
@@ -394,7 +399,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     bool enterOriginalUi,ControlPresets49D& controlPresets,SharedRandomOwner50ID& directApplicationRandom,
     const std::int32_t& cameraStartup350,original_course_targets50KX::ColdLoadRequest& courseColdLoad,
     native_gc_water_session50KG::Application& nativeWaterApplication,windows_capture50LD::Run& captureRun,
-    const original_course_targets50KX::ConsumedLaunch* consumedLaunch){
+    original_course_targets50KX::ConsumedLaunch* consumedLaunch){
  const bool originalUiStarted=originalMainApplication.enabled;
  bool originalUiActive=originalUiStarted&&enterOriginalUi,courseRaceLaunched=false;
  // Capture the immutable loaded identity before any front-menu choice changes
@@ -738,6 +743,43 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(!id||id>actors.values.size()||!actors.bound[id-1])return false;
    out=actors.values[id-1];return true;
   }};
+ // Same owners are available before any RA counted Storage construction.
+ // Merely declaring the open lambda does not create a window or activate a race.
+ auto nativeVideo=originalMainApplication.videoForSession();
+ auto sourceDisplayLifetime=originalMainApplication.raceDisplayForSession50LA();
+ auto liveAudio=std::make_unique<live_audio50HF::Owner>();
+ std::uint32_t nativeOrdinaryLaunch11258=1;
+ std::unique_ptr<OriginalRacerModelRenderGlobals50LA> sourceModelRenderGlobals;
+ auto& host=nativeVideo->host;
+ rr::platform::GameHostDiagnostic50ER hostDiagnostic{};
+ constexpr int requestedWindowSamples=0;
+ auto openNativeVideo=[&](){
+  if(host.created()){require50DU(host.current(),"same native Video lost its current context");return;}
+  rr::platform::GameHostRequest50ER hostRequest{};
+  hostRequest.mode=headlessLive?rr::platform::GameHostMode50ER::HeadlessLive:rr::platform::GameHostMode50ER::Window;
+  auto& windowRequest=hostRequest.window;
+  windowRequest.title=raceEnabled?"Racer Revenge | Native race | W/S + Up/Down | F5 restart | Esc menu":
+      "Racer Revenge native development drive | W/S + Up/Down | F5 restart | Esc menu";
+  if(isGaTrack)windowRequest.title="Racer Revenge | GA incomplete preview | All 8 original AI | Esc pause/menu";
+  if(originalUiActive)windowRequest.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
+  windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
+  windowRequest.major=3;windowRequest.minor=2;
+  windowRequest.profile=rr::platform::WindowGlProfile50DQ::Core;
+  windowRequest.samples=requestedWindowSamples;windowRequest.swapInterval=0;windowRequest.resizable=true;
+  // Frontend navigation borrows actual SDL button edges independently of
+  // human driving. ALL8 keeps usePhysicalGameController false. No second-pad
+  // popup/presence capability or source racing action is admitted here.
+  windowRequest.gameControllers=usePhysicalGameController||(originalUiStarted&&!headlessLive);
+  if(originalUiActive){
+   windowRequest.redBits=windowRequest.greenBits=windowRequest.blueBits=windowRequest.alphaBits=8;
+   windowRequest.depthBits=24;windowRequest.stencilBits=0;
+  }
+  hostRequest.headless={rr::platform::OffscreenGlPlatform50DC::MesaSurfaceless,nativeVideo->width,nativeVideo->height,3,2,rr::platform::OffscreenGlProfile50DC::Core,8,8,8,8,24,0,0};
+  if(!host.create(hostRequest,hostDiagnostic)){
+   reportHost50DU(hostDiagnostic);throw std::runtime_error("window/context creation failed");
+  }
+ };
+ original_consumed_ra_stage50DU::Owner consumedRaStage(originalMainApplication,*liveAudio);
  // Permanent original-resource owners precede the snapshot bank and all draw
  // publications. Only their immutable borrowed views enter the live arena.
  original_position_stats_prestage50LA::Owner sourcePositionStatsPrestage;
@@ -924,10 +966,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       s.animationShared.libm,{4,16,32,64},raDiagnostic)&&
       raWorld->prepareStaticCandidates(raNames,raDiagnostic)&&
       raWorld->prepareAuthoring(raDiagnostic)&&raWorld->prepareNativeTriggers(raDiagnostic)&&
-      raWorld->prepareLighting(static_cast<std::uint32_t>(racerRigs.size()),raDiagnostic)&&
+      raWorld->prepareLighting(static_cast<std::uint32_t>(racerRigs.size()),raDiagnostic);
+  // Compiled real prefix initializer, intentionally not invoked until the
+  // remaining slot30 load, scheduler/parent and retirement joins are reviewed.
+  [[maybe_unused]] auto beginConsumedRaPrefix=[&](){
+   if(!consumedLaunch||!allAiEnabled||!originalCameraEnabled)return false;
+   openNativeVideo();
+   originalMainApplication.appStart(originalMainApplication.assetRoot);
+   originalMainApplication.enterGameplayMaterialDirectory17D7A0();
+   const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
+   if(!context)return false;
+   if(!sourceModelRenderGlobals)sourceModelRenderGlobals=
+       std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
+   rr::assets::OriginalStandardMaterialDiagnostic50LA d;std::uint32_t pc=0;
+   return consumedRaStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
+       *sourceModelRenderGlobals,raWorld,d,pc);
+  };
+  const bool raStorageReady=raColdReady&&
       raWorld->prepareRuntimeRosterQueryStorage(originalMainApplication.entities(),roster,&recoveryQueryOwners,recoveryGlobals,
           terrainOwner,movement,{},raDiagnostic);
-  if(!raColdReady){
+  if(!raStorageReady){
    std::cerr<<"RA cold failure stage="<<unsigned(raDiagnostic.stage)
        <<" source="<<(raDiagnostic.source.failure?raDiagnostic.source.failure:"")
        <<" detail="<<raDiagnostic.source.message
@@ -1404,7 +1462,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  OriginalRaceHud50KG sourceRaceHud; //Actual source text/gleam ownership; native gauges remain until joined.
  bool sourceRaceHudRendering=false;
  bool sourceRaceHudDisplayReported=false,sourceRaceHudRejectionReported=false;
- auto liveAudio=std::make_unique<live_audio50HF::Owner>();
  original_camera_cycle_audio50KX::Owner sourceCameraCycleAudio;
  auto raceAudio=std::make_unique<race_audio50HQ::Owner>();
  auto sourceAnnouncer=std::make_unique<source_announcer50IE::Owner>();
@@ -2713,18 +2770,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // below remains for unchanged diagnostics until the root joins the real race
  // child traversal through original_all8_frame::Schedule.
  enum class NativeRacerFramePart { Children,Physics };
- // Claim the actual display while Video is still closed. RA material/model
- // construction opens this same context early. Declare before Bank/Join so
- // their retained native model owners retire before the display on unwind.
- auto nativeVideo=originalMainApplication.videoForSession();
- auto sourceDisplayLifetime=originalMainApplication.raceDisplayForSession50LA();
+ // The earlier same display/audio stage outlives Bank/Join and their retained
+ // native model owners on unwind. RA opens that same Video context below.
  original_main_entry50KG::SpeedBoostColdResult50LA sourceSpeedBoost;
  original_main_entry50KG::TimeStatsColdResult50LA sourceTimeStats;
  original_main_entry50KG::DamageColdResult50LA sourceDamage;
  native_racer50HN::Bank racerBank;
  std::unique_ptr<ra_native_session50LA::Join> raSession;
  ra_native_session50LA::Diagnostic raSessionDiagnostic;
- std::uint32_t nativeOrdinaryLaunch11258=1;
  auto advanceFramePart=[&](std::size_t actualRacerSlot,NativeRacerFramePart part,
      float preparedOuterFactor,float liveSubstepScale){
  require50DU(preparedOuterFactor==.016f&&liveSubstepScale==60.f,
@@ -3431,35 +3484,6 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       advanceFramePart(actualRacerSlot,NativeRacerFramePart::Physics,.016f,60.f);
  };
 
- auto& host=nativeVideo->host;
- platform::GameHostDiagnostic50ER hostDiagnostic{};
- constexpr int requestedWindowSamples=0;
- auto openNativeVideo=[&](){
-  if(host.created()){require50DU(host.current(),"same native Video lost its current context");return;}
-  platform::GameHostRequest50ER hostRequest{};
-  hostRequest.mode=headlessLive?platform::GameHostMode50ER::HeadlessLive:platform::GameHostMode50ER::Window;
-  auto& windowRequest=hostRequest.window;
-  windowRequest.title=raceEnabled?"Racer Revenge | Native race | W/S + Up/Down | F5 restart | Esc menu":
-      "Racer Revenge native development drive | W/S + Up/Down | F5 restart | Esc menu";
-  if(isGaTrack)windowRequest.title="Racer Revenge | GA incomplete preview | All 8 original AI | Esc pause/menu";
-  if(originalUiActive)windowRequest.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
-  windowRequest.width=nativeVideo->width;windowRequest.height=nativeVideo->height;
-  windowRequest.major=3;windowRequest.minor=2;
-  windowRequest.profile=platform::WindowGlProfile50DQ::Core;
-  windowRequest.samples=requestedWindowSamples;windowRequest.swapInterval=0;windowRequest.resizable=true;
-  // Frontend navigation borrows actual SDL button edges independently of
-  // human driving. ALL8 keeps usePhysicalGameController false. No second-pad
-  // popup/presence capability or source racing action is admitted here.
-  windowRequest.gameControllers=usePhysicalGameController||(originalUiStarted&&!headlessLive);
-  if(originalUiActive){
-   windowRequest.redBits=windowRequest.greenBits=windowRequest.blueBits=windowRequest.alphaBits=8;
-   windowRequest.depthBits=24;windowRequest.stencilBits=0;
-  }
-  hostRequest.headless={platform::OffscreenGlPlatform50DC::MesaSurfaceless,nativeVideo->width,nativeVideo->height,3,2,platform::OffscreenGlProfile50DC::Core,8,8,8,8,24,0,0};
-  if(!host.create(hostRequest,hostDiagnostic)){
-   reportHost50DU(hostDiagnostic);throw std::runtime_error("window/context creation failed");
-  }
- };
  // Original racers have distinct immutable resource owners and share only the
  // serial execution arena, never tuning, poses, contacts or progression histories.
 
@@ -4891,8 +4915,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Native GL has no guest DMA packet queues/callbacks. Its real submissions
  // are retired by the context API, never certified by these empty source lists.
  std::int32_t sourceFadeManagerA8=0,sourceFadeDuration98=0;
- // nativeOrdinaryLaunch11258 is the same cold constructor owner retained above.
- OriginalRacerModelRenderGlobals50LA sourceModelRenderGlobals(nativeOrdinaryLaunch11258);
+ // Preserve legacy construction after actual native launch subtype binding.
+ // A reached counted prefix already owns and populated this same draw owner.
+ if(!sourceModelRenderGlobals)sourceModelRenderGlobals=
+     std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
  OriginalAttachedGlobals sourceAttachedGlobals;
  OriginalRaceFogFields sourceTrackFog;
  sourceCamera::AuthoredStorage sourceCameraAssets;
@@ -7447,7 +7473,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      renderFrame.sourceBodyCameraOwner50LA=reinterpret_cast<std::uintptr_t>(sourceCameraSession.get());
      renderFrame.sourceBodyCameraPublication50LA=sourceCameraSession->publicationCount();
      renderFrame.sourceBodyFog50LA=&sourceTrackFog;
-     renderFrame.sourceBodyGlobals50LA=&sourceModelRenderGlobals;
+     renderFrame.sourceBodyGlobals50LA=sourceModelRenderGlobals.get();
      renderFrame.sourceBodyModelPackets50LA={{nativeLeftModels[0]->modelPackets(),
          nativeRightModels[0]->modelPackets()}};
      if(racerRigs[0]->modelCount==5){
