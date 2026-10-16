@@ -149,7 +149,7 @@ struct OriginalWreckContactConstructorBinding50LA {
     const OriginalWreckTerrainProvider50LA* const* actualTerrain330Field=nullptr;
 };
 enum class OriginalWreckConstructorPrefixStatus50LA : std::uint8_t {
-    binding,capacity,allocation,components,physical,publishedLifetimeRequired,stopped,modelLoadRequired,warmModelRequired,modelAppendRequired,geometryAdmission,pieceSetupRequired,queryPublicationRequired,queryConstructionFailed,contactConstructorRequired,contactConstructionFailed,e4ConstructorRequired
+    binding,capacity,allocation,components,physical,publishedLifetimeRequired,stopped,modelLoadRequired,warmModelRequired,modelAppendRequired,geometryAdmission,pieceSetupRequired,queryPublicationRequired,queryConstructionFailed,contactConstructorRequired,contactConstructionFailed,e4ConstructorRequired,e4ConstructionFailed,e4PreparationRequired,e4PreparationFailed,e8ConstructorRequired,e8ConstructionFailed,mutualFiltersRequired
 };
 struct OriginalWreckConstructorPrefixResult50LA {
     OriginalWreckConstructorPrefixStatus50LA status=OriginalWreckConstructorPrefixStatus50LA::binding;
@@ -186,6 +186,8 @@ class OriginalWreckRacerStorage50LA final {
         bool e0ConstructorAttempted=false,e0PrefixRetired=false,e0PublicationAttempted=false;
         bool contactSuffixAttempted=false,contactSuffixRetired=false,dcReached=false,d8Reached=false;
         std::size_t contactSuffixDestroyed=0;
+        bool e4ConstructorAttempted=false,e4PrefixRetired=false,e4PublicationAttempted=false;
+        bool e8ConstructorAttempted=false,e8PrefixRetired=false;
         bool constructorAttempted=false,retirementAttempted=false,freshModelLoadAttempted=false,modelAppendAttempted=false,pieceSetupAttempted=false;
         const OriginalWreckConstructorGlobals50LA* actualConstructorGlobals=nullptr;
         const SpringVector4_48N* actualGravityVector4431C0=nullptr;
@@ -774,15 +776,164 @@ public:
         if(appended.status!=OriginalWreckComponentStatus50LA::complete)return finish(S::contactConstructionFailed,0x1661d0u);
         return finish(S::e4ConstructorRequired,0x1661d8u);
     }
+    // Real E4 Entity11B190,11B570(5),categoryA4, and11B920 type0
+    // loader. Stop at1662A0 BEFORE response callback,9C/A0,11F570 or append.
+    OriginalWreckConstructorPrefixResult50LA constructFirstE4ToPreparation(
+        rr::assets::OriginalStandardMaterialDomain50LA& application,
+        rr::assets::OriginalStandardTextureDiagnostic50LA& diagnostic)noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;using K=OriginalWreckComponentKind50LA;
+        OriginalWreckConstructorPrefixResult50LA rejected;diagnostic={};
+        if(!storage_||storage_->e4ConstructorAttempted||storage_->contactSuffixRetired||storage_->retirementAttempted||
+           storage_->prefixResult.status!=S::e4ConstructorRequired||storage_->prefixResult.sourcePC!=0x1661d8u||
+           !storage_->actualObjectCount423F60||!application.prepared()||
+           application.resolver3E1A70().get()!=storage_->inventory->modelResolverIdentity()||
+           !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
+           storage_->prefixDomain.count==maxOriginalWreckComponents50LA||
+           !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return rejected;
+        auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
+        auto& e4=*piece.componentSlots_[body+5u];
+        if(!piece.queries_.canConstructE4Prefix11B190()||e4.reference00||e4.kind!=K::unbound||
+           e4.objectKey||e4.parent1C||e4.previous10||e4.next14||e4.firstChild18)return rejected;
+        storage_->e4ConstructorAttempted=true;
+        auto finish=[&](S status,std::uint32_t pc){storage_->prefixResult={status,pc,storage_->prefixDomain.count,true};return storage_->prefixResult;};
+        const auto initialized=initializeOriginalWreckComponent50LA(e4,K::collision11B190,
+            storage_->sessionGeneration,static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&e4)),
+            true,*storage_->actualObjectCount423F60);
+        if(initialized.status!=OriginalWreckComponentStatus50LA::complete)return finish(S::e4ConstructionFailed,initialized.sourcePC);
+        storage_->prefixComponents[storage_->prefixDomain.count++]=&e4;
+        if(!piece.queries_.constructE4Prefix11B190(e4))std::terminate();
+        if(!piece.queries_.loadFullE4Type0(application.resolver3E1A70(),diagnostic)){
+            const auto pc=piece.queries_.query(1).type0Owners.sourceBoundary();
+            return finish(S::e4ConstructionFailed,pc?pc:0x11b920u);
+        }
+        return finish(S::e4PreparationRequired,0x1662a0u);
+    }
+    //1662A0 callback/body binding ->11F570/11ED60 -> actual141960 append.
+    //Leaves E8 allocation1662E4 and all activation/effect stages unreached.
+    OriginalWreckConstructorPrefixResult50LA preparePublishAppendFirstE4()noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        OriginalWreckConstructorPrefixResult50LA rejected;
+        if(!storage_||storage_->e4PublicationAttempted||storage_->e4PrefixRetired||storage_->contactSuffixRetired||
+           storage_->retirementAttempted||storage_->prefixResult.status!=S::e4PreparationRequired||
+           storage_->prefixResult.sourcePC!=0x1662a0u||!storage_->actualAttachmentLock423F58||
+           *storage_->actualAttachmentLock423F58||!original_wreck_component_detail50LA::domain(storage_->prefixDomain))return rejected;
+        auto& piece=storage_->collections[0].pieces_[0];auto& e4=*piece.componentSlots_[6u+piece.sceneCount_];
+        if(e4.parent1C||e4.previous10||e4.next14||e4.firstChild18)return rejected;
+        storage_->e4PublicationAttempted=true;
+        auto finish=[&](S status,std::uint32_t pc){storage_->prefixResult={status,pc,storage_->prefixDomain.count,true};return storage_->prefixResult;};
+        const auto prepared=piece.queries_.preparePublishFullE411F570();
+        if(prepared.status!=OriginalWreckQueryStatus50LA::complete)return finish(S::e4PreparationFailed,prepared.sourcePC);
+        const auto appended=appendOriginalWreckComponent50LA(storage_->prefixDomain,*piece.componentSlots_[0],e4,
+            0u,*storage_->actualAttachmentLock423F58);
+        if(appended.status!=OriginalWreckComponentStatus50LA::complete)return finish(S::e4PreparationFailed,appended.sourcePC);
+        return finish(S::e8ConstructorRequired,0x1662e4u);
+    }
+    //E8 append166324 precedes owner/category and11C710. This order matters
+    //on allocation failure: the actual reached E8 may already be a child.
+    OriginalWreckConstructorPrefixResult50LA constructFirstE8ToMutualFilters()noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;using K=OriginalWreckComponentKind50LA;
+        OriginalWreckConstructorPrefixResult50LA rejected;
+        if(!storage_||storage_->e8ConstructorAttempted||storage_->e4PrefixRetired||storage_->retirementAttempted||
+           storage_->prefixResult.status!=S::e8ConstructorRequired||storage_->prefixResult.sourcePC!=0x1662e4u||
+           !storage_->actualObjectCount423F60||!storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
+           storage_->prefixDomain.count==maxOriginalWreckComponents50LA||
+           *storage_->actualObjectCount423F60==std::numeric_limits<std::uint32_t>::max()||
+           !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return rejected;
+        auto& piece=storage_->collections[0].pieces_[0];auto& e8=*piece.componentSlots_[7u+piece.sceneCount_];
+        if(!piece.queries_.canConstructE8Prefix11B190()||e8.reference00||e8.kind!=K::unbound||e8.objectKey||
+           e8.parent1C||e8.previous10||e8.next14||e8.firstChild18)return rejected;
+        auto finish=[&](S status,std::uint32_t pc){storage_->prefixResult={status,pc,storage_->prefixDomain.count,true};return storage_->prefixResult;};
+        auto initialized=initializeOriginalWreckComponent50LA(e8,K::collision11B190,storage_->sessionGeneration,
+            static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&e8)),true,*storage_->actualObjectCount423F60);
+        if(initialized.status!=OriginalWreckComponentStatus50LA::complete)return rejected;
+        storage_->e8ConstructorAttempted=true;
+        storage_->prefixComponents[storage_->prefixDomain.count++]=&e8;
+        if(!piece.queries_.constructE8Prefix11B190(e8))std::terminate();
+        const auto appended=appendOriginalWreckComponent50LA(storage_->prefixDomain,*piece.componentSlots_[0],e8,
+            0u,*storage_->actualAttachmentLock423F58);
+        if(appended.status!=OriginalWreckComponentStatus50LA::complete)return finish(S::e8ConstructionFailed,appended.sourcePC);
+        const auto loaded=piece.queries_.loadPublishFullE811C710();
+        if(loaded.status!=OriginalWreckQueryStatus50LA::complete)return finish(S::e8ConstructionFailed,loaded.sourcePC);
+        return finish(S::mutualFiltersRequired,0x166390u);
+    }
+    bool retireFirstE8Prefix()noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        if(!storage_||!storage_->e8ConstructorAttempted)return false;
+        if(storage_->e8PrefixRetired)return true;
+        if(storage_->retirementAttempted||storage_->e4PrefixRetired||!storage_->actualObjectCount423F60||
+           !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
+           (storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed)||
+           !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return false;
+        auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
+        auto& root=*piece.componentSlots_[0];auto& e4=*piece.componentSlots_[body+5u];auto& e8=*piece.componentSlots_[body+6u];
+        const bool linked=e8.parent1C==&root&&e8.previous10==&e4&&e4.next14==&e8;
+        const bool unlinked=!e8.parent1C&&!e8.previous10&&!e4.next14;
+        if((!linked&&!unlinked)||e8.next14||!piece.queries_.canRetireFullE811B4A0(e8))return false;
+        if(linked)e4.next14=nullptr;e8.next14=nullptr;--e8.reference00;
+        if(!piece.queries_.retireFullE811B4A0(e8,*storage_->actualObjectCount423F60))std::terminate();
+        storage_->e8PrefixRetired=true;return true;
+    }
+    bool retireFirstPreparedE4()noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        if(!storage_||!storage_->e4PublicationAttempted)return false;
+        if(storage_->e4PrefixRetired)return true;
+        if(storage_->retirementAttempted||storage_->contactSuffixRetired||
+           (storage_->e8ConstructorAttempted&&!storage_->e8PrefixRetired)||!storage_->actualObjectCount423F60||
+           !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
+           (storage_->prefixResult.status!=S::e8ConstructorRequired&&storage_->prefixResult.status!=S::e4PreparationFailed&&
+            storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed))return false;
+        auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
+        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> live{};
+        OriginalWreckComponentDomain50LA domain{storage_->sessionGeneration,live.data(),0};
+        for(std::size_t i=0;i<storage_->prefixDomain.count;++i){auto* c=storage_->prefixComponents[i];
+            if(storage_->e8PrefixRetired&&c==piece.componentSlots_[body+6u]){if(c->reference00||c->kind!=OriginalWreckComponentKind50LA::entity141300)return false;continue;}
+            live[domain.count++]=c;
+        }
+        if(!original_wreck_component_detail50LA::domain(domain))return false;
+        auto& root=*piece.componentSlots_[0];auto& d8=*piece.componentSlots_[body+4u];auto& e4=*piece.componentSlots_[body+5u];
+        const bool linked=e4.parent1C==&root&&e4.previous10==&d8&&d8.next14==&e4;
+        const bool unlinked=!e4.parent1C&&!e4.previous10&&!d8.next14;
+        if((!linked&&!unlinked)||e4.next14||!piece.queries_.canRetireFullE411B4A0(e4))return false;
+        if(linked)d8.next14=nullptr; //1424E0 tail unlink; retain source parent/previous words
+        e4.next14=nullptr;--e4.reference00; //104970
+        if(!piece.queries_.retireFullE411B4A0(e4,*storage_->actualObjectCount423F60))std::terminate();
+        storage_->e4PrefixRetired=true;return true;
+    }
+    bool retireFirstE4Prefix()noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        if(!storage_||!storage_->e4ConstructorAttempted||storage_->e4PublicationAttempted)return false;
+        if(storage_->e4PrefixRetired)return true;
+        if(storage_->retirementAttempted||storage_->contactSuffixRetired||
+           !storage_->actualObjectCount423F60||!storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
+           (storage_->prefixResult.status!=S::e4PreparationRequired&&storage_->prefixResult.status!=S::e4ConstructionFailed))return false;
+        auto& piece=storage_->collections[0].pieces_[0];auto& e4=*piece.componentSlots_[6u+piece.sceneCount_];
+        if(!piece.queries_.canRetireE4Prefix11B4A0(e4))return false;
+        --e4.reference00; //104970, unlinked leaf; no sibling writes
+        if(!piece.queries_.retireE4Prefix11B4A0(e4,*storage_->actualObjectCount423F60))std::terminate();
+        storage_->e4PrefixRetired=true;return true;
+    }
     bool retireFirstContactSuffix()noexcept {
         using S=OriginalWreckConstructorPrefixStatus50LA;using K=OriginalWreckComponentKind50LA;
         if(!storage_||!storage_->contactSuffixAttempted||!storage_->dcReached)return false;
         if(storage_->contactSuffixRetired)return true;
-        if(storage_->e0PrefixRetired||storage_->retirementAttempted||!storage_->actualObjectCount423F60||
+        if(storage_->e0PrefixRetired||storage_->retirementAttempted||
+           (storage_->e4ConstructorAttempted&&!storage_->e4PrefixRetired)||!storage_->actualObjectCount423F60||
            !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
-           (storage_->prefixResult.status!=S::e4ConstructorRequired&&storage_->prefixResult.status!=S::contactConstructionFailed)||
-           !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return false;
+           (storage_->prefixResult.status!=S::e4ConstructorRequired&&storage_->prefixResult.status!=S::contactConstructionFailed&&
+            storage_->prefixResult.status!=S::e4PreparationRequired&&storage_->prefixResult.status!=S::e4ConstructionFailed&&
+            storage_->prefixResult.status!=S::e8ConstructorRequired&&storage_->prefixResult.status!=S::e4PreparationFailed&&
+            storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed)||
+           !storage_->prefixDomain.count)return false;
         auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
+        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> liveObjects{};
+        OriginalWreckComponentDomain50LA liveDomain{storage_->sessionGeneration,liveObjects.data(),0};
+        for(std::size_t i=0;i<storage_->prefixDomain.count;++i){auto* c=storage_->prefixComponents[i];
+            if((storage_->e4PrefixRetired&&c==piece.componentSlots_[body+5u])||
+               (storage_->e8PrefixRetired&&c==piece.componentSlots_[body+6u])){
+                if(c->reference00||c->kind!=K::entity141300)return false;continue;}
+            liveObjects[liveDomain.count++]=c;
+        }
+        if(!original_wreck_component_detail50LA::domain(liveDomain))return false;
         auto& root=*piece.componentSlots_[0];auto& e0=*piece.componentSlots_[body+2u];
         auto& dc=*piece.componentSlots_[body+3u];auto& d8=*piece.componentSlots_[body+4u];
         if(!piece.queries_.canRetireFullContactSuffix())return false;
@@ -821,13 +972,18 @@ public:
            !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
            (storage_->prefixResult.status!=S::contactConstructorRequired&&
             storage_->prefixResult.status!=S::queryConstructionFailed&&
-            storage_->prefixResult.status!=S::e4ConstructorRequired&&storage_->prefixResult.status!=S::contactConstructionFailed)||
+            storage_->prefixResult.status!=S::e4ConstructorRequired&&storage_->prefixResult.status!=S::contactConstructionFailed&&
+            storage_->prefixResult.status!=S::e4PreparationRequired&&storage_->prefixResult.status!=S::e4ConstructionFailed&&
+            storage_->prefixResult.status!=S::e8ConstructorRequired&&storage_->prefixResult.status!=S::e4PreparationFailed&&
+            storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed)||
            !storage_->prefixDomain.count)return false;
         auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
         std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> live{};
         OriginalWreckComponentDomain50LA domain{storage_->sessionGeneration,live.data(),0};
         for(std::size_t i=0;i<storage_->prefixDomain.count;++i){auto* c=storage_->prefixComponents[i];
-            if(storage_->contactSuffixRetired&&(c==piece.componentSlots_[body+3u]||c==piece.componentSlots_[body+4u])){
+            if((storage_->e4PrefixRetired&&c==piece.componentSlots_[body+5u])||
+               (storage_->e8PrefixRetired&&c==piece.componentSlots_[body+6u])||
+               (storage_->contactSuffixRetired&&(c==piece.componentSlots_[body+3u]||c==piece.componentSlots_[body+4u]))){
                 if(c->reference00)return false;continue;}
             live[domain.count++]=c;
         }
@@ -874,6 +1030,12 @@ public:
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::contactConstructorRequired||
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::queryConstructionFailed||
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e4ConstructorRequired||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e4PreparationRequired||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e4ConstructionFailed||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e8ConstructorRequired||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::mutualFiltersRequired||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e8ConstructionFailed||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e4PreparationFailed||
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::contactConstructionFailed)&&storage_->e0PrefixRetired))||
            !storage_->actualObjectCount423F60||!storage_->actualAttachmentLock423F58)return out;
         if(storage_->retirementAttempted)return storage_->retirementResult;
@@ -889,7 +1051,9 @@ public:
         for(std::size_t i=0;i<storage_->prefixDomain.count;++i){
             auto* object=storage_->prefixComponents[i];
             if((storage_->e0PrefixRetired&&object==piece.componentSlots_[body+2u])||
-               (storage_->contactSuffixRetired&&(object==piece.componentSlots_[body+3u]||object==piece.componentSlots_[body+4u]))){
+               (storage_->contactSuffixRetired&&(object==piece.componentSlots_[body+3u]||object==piece.componentSlots_[body+4u]))||
+               (storage_->e4PrefixRetired&&object==piece.componentSlots_[body+5u])||
+               (storage_->e8PrefixRetired&&object==piece.componentSlots_[body+6u])){
                 if(object->reference00){out.status=S::topology;return out;}
                 continue;
             }
@@ -905,7 +1069,7 @@ public:
            piece.gravity_.count30!=1u||piece.gravity_.capacity34!=1u||
            piece.queries_.modelSceneIdentity().value){out.status=S::topology;return out;}
         storage_->retirementAttempted=true;
-        if(storage_->e0PrefixRetired){out.referencesReleased=1u+storage_->contactSuffixDestroyed;out.objectsDestroyed=out.referencesReleased;}
+        if(storage_->e0PrefixRetired){out.referencesReleased=1u+storage_->contactSuffixDestroyed+(storage_->e4PrefixRetired?1u:0u)+(storage_->e8PrefixRetired?1u:0u);out.objectsDestroyed=out.referencesReleased;}
         //1424E0 tail recursion first severs predecessor.next and self.next.
         //142590 then repairs adjacent links and104970 decrements exactly once.
         auto releaseLeaf=[&](OriginalWreckComponent50LA& leaf){

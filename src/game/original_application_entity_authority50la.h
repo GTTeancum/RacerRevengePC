@@ -3,6 +3,8 @@
 #include <array>
 #include <exception>
 
+namespace ra_pod_scene50LA { class Owner; }
+namespace rr::platform { class RaceAudioGroups50IC; }
 namespace rr::game {
 class OriginalTunnelTrack50LA;
 class OriginalApplicationEntities50LA;
@@ -14,6 +16,9 @@ class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalApplicationEntities50LA;
     friend class OriginalPauseStorage50LA;
     friend class OriginalTunnelTrack50LA;
+    friend class OriginalRaceConstructor50LA;
+    friend class rr::platform::RaceAudioGroups50IC;
+    friend class ::ra_pod_scene50LA::Owner;
     using C=OriginalWreckComponent50LA;
     struct Entry { C* node=nullptr;std::uint64_t generation=0,key=0; };
     std::array<Entry,maxOriginalWreckComponents50LA> entries_{};

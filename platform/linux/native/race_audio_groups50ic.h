@@ -4,12 +4,19 @@
 #include "audio_mixer50hd.h"
 #include "../../../src/game/announcer_callbacks50ic.h"
 #include <array>
+#include <memory>
+#include <thread>
+#include "../../../src/game/original_application_entities50la.h"
 #include <exception>
 
+namespace rr::game { class OriginalRaceConstructor50LA; }
 namespace rr::platform {
 class RaceAudioGroups50IC final {
+    friend class ::ra_pod_scene50LA::Owner;
+    friend class rr::game::OriginalRaceConstructor50LA;
 public:
     RaceAudioGroups50IC() noexcept { bindings_.fill(game::RaceAudioGroup50IC::Unrepresented); }
+    ~RaceAudioGroups50IC()noexcept { for(const auto& p:coldGroups_)if(p.constructed)std::terminate(); }
     RaceAudioGroups50IC(const RaceAudioGroups50IC&)=delete;
     RaceAudioGroups50IC& operator=(const RaceAudioGroups50IC&)=delete;
     RaceAudioGroups50IC(RaceAudioGroups50IC&&)=delete;
@@ -19,6 +26,8 @@ public:
     // previously group-bound voices. Settings must come from the shared config
     // owner. Fresh defaults are an explicit separate source operation.
     bool initialize(AudioMixer50HD& mixer,const game::RaceAudioSettings50IC& settings) noexcept {
+        if(coldStarted_&&(coldRetiring_||coldNext_!=game::raceAudioGroupCount50IC||coldMixer_!=&mixer||
+           coldThread_!=std::this_thread::get_id()||coldEpoch_!=mixer.groupEpoch50IC()))return false;
         if(mixer_||!mixer.count()||mixer.requiresVoiceGroupGains50IC())return false;
         for(std::size_t i=0;i<mixer.count();++i)
             if(mixer.active(i)||mixer.hasVoiceGroupGain50IC(i))return false;
@@ -29,7 +38,7 @@ public:
         settings_=settings;groups_=next;duck_={};return true;
     }
     bool current()const noexcept {
-        return mixer_&&mixer_->groupEpoch50IC()==epoch_&&mixer_->count()==count_&&
+        return !coldRetiring_&&mixer_&&mixer_->groupEpoch50IC()==epoch_&&mixer_->count()==count_&&
             mixer_->requiresVoiceGroupGains50IC();
     }
     bool uses(const AudioMixer50HD& mixer)const noexcept {return current()&&mixer_==&mixer;}
@@ -37,7 +46,9 @@ public:
         return static_cast<std::size_t>(group)<game::raceAudioGroupCount50IC;
     }
     bool canBind(std::size_t slot,game::RaceAudioGroup50IC group)const noexcept {
-        if(!current()||slot>=count_||!represented(group))return false;
+        // Cold counted owners have no logical-sound membership join yet.
+        // Never permit provider voices to outgrow their genuinely empty lists.
+        if(coldStarted_||!current()||slot>=count_||!represented(group))return false;
         if(bindings_[slot]==group)return mixer_->hasVoiceGroupGain50IC(slot);
         return bindings_[slot]==game::RaceAudioGroup50IC::Unrepresented&&
             !mixer_->active(slot)&&!mixer_->hasVoiceGroupGain50IC(slot);
@@ -113,7 +124,27 @@ public:
     const game::RaceAudioGroups50IC& levels()const noexcept{return groups_;}
     const game::RaceAudioSettings50IC& configuredLevels()const noexcept{return settings_;}
     const game::AnnouncerDuckingState50IC& ducking()const noexcept{return duck_;}
+    // Inactive source constructor/load leaves. Caller must interleave actual
+    // world141300 before the seventh group and attach the six groups as race children itself.
+    bool constructNextCold2350D0(AudioMixer50HD&,
+        std::shared_ptr<game::OriginalApplicationEntities50LA>,std::uint64_t session,
+        game::RaceAudioGroup50IC)noexcept;
+    bool releaseEmptyCold142590(game::RaceAudioGroup50IC)noexcept;
 private:
+    struct ColdGroup {
+        game::OriginalWreckComponent50LA entity;
+        std::unique_ptr<game::OriginalWreckComponent50LA*[]> logicalMembers4C;
+        std::uint32_t count48=0,growth50=0,capacity54=0;
+        std::int32_t slot40=2;
+        bool constructed=false,loaded=false,enabled30=false,allocated58=false;
+    };
+    std::array<ColdGroup,game::raceAudioGroupCount50IC> coldGroups_;
+    std::shared_ptr<game::OriginalApplicationEntities50LA> coldApplication_;
+    AudioMixer50HD* coldMixer_=nullptr;
+    std::uint64_t coldEpoch_=0,coldSession_=0;
+    std::thread::id coldThread_{};
+    std::size_t coldNext_=0;
+    bool coldStarted_=false,coldRetiring_=false;
     static float normalized(const game::RaceAudioGroups50IC& groups,
                             game::RaceAudioGroup50IC group)noexcept {
         return static_cast<float>(groups.volume38[static_cast<std::size_t>(group)])/100.f;
@@ -143,3 +174,5 @@ private:
     std::array<game::RaceAudioGroup50IC,audioMaximumVoices50HD> bindings_{};
 };
 } // namespace rr::platform
+
+#include "race_audio_groups_cold50la.inl"

@@ -13,6 +13,7 @@ class OriginalStandardMaterialContext50LA;
 class OriginalStandardMaterialObject50LA;
 class OriginalStandardTextureResolver50LA;
 class OriginalStandardModelGeometry50LA;
+class OriginalStandardCollisionType0Resource50LA;
 class OriginalStandardArchiveProvider50LA;
 class OriginalStandardIpumCompressedFrames50LA;
 // Private fixed-source image leases/sets are minted only by the concrete
@@ -20,7 +21,7 @@ class OriginalStandardIpumCompressedFrames50LA;
 class OriginalStandardIpumImageLease50LA;
 class OriginalStandardIpumImageSet50LA;
 
-enum class OriginalStandardModelFileKind50LA : std::uint8_t { mcf,psg };
+enum class OriginalStandardModelFileKind50LA : std::uint8_t { mcf,psg,colType0 };
 //Native stable row identity, not an original archive offset or retail index.
 //Both parts are checked; a row from another application cannot be adopted.
 struct OriginalStandardModelFileId50LA {
@@ -36,6 +37,8 @@ struct OriginalStandardModelFileView50LA {
     //Pins native backing only; source reference00 is retained separately by
     //the model's actual26E9F4 call, never by this lookup or shared_ptr copy.
     std::shared_ptr<OriginalStandardModelGeometry50LA> geometry240110;
+    //132820 lookup pins backing only;12559C owns the separate signed ref60.
+    std::shared_ptr<OriginalStandardCollisionType0Resource50LA> collision125014;
 };
 
 // Exact decompressed original PST/TGA/ATM already selected/authenticated by the actual
@@ -82,7 +85,7 @@ struct OriginalStandardTextureLevelView50LA {
     const OriginalStandardIpumImageLease50LA* hostImage=nullptr;
 };
 
-// Native cold projection of resolved PST/TGA/ATM/MCF/PSG entries in source3E1A70. Owns
+// Native cold projection of resolved PST/TGA/ATM/MCF/PSG/COL entries in source3E1A70. Owns
 // immutable original bytes and the actual non-owning1326A0 cache association.
 // Full names compare case-insensitively, without slash conversion. Conflicting
 // duplicate names reject; one shared resolver is required across the whole population
@@ -140,7 +143,8 @@ public:
     //and remains valid across later texture/model corpus appends.
     const OriginalStandardTextureSourceFormat50LA* sourceFormat(std::size_t) const noexcept;
     //Same actual3E1A70 owner and name/association rows used by PST above.
-    //The application provider authenticates each exact MCF/PSG member. This
+    //The application provider authenticates each exact MCF/PSG member. COL
+    //requires a sealed mounted-provider name/bytes match on admission/lookup. This
     //only retains its positive resolution; absent input remains unresolved,
     //never a missing-file/fallback result. Rebinding identical bytes is safe.
     //ASCII case folds only; slash spelling is significant. Existing PST
@@ -159,6 +163,10 @@ public:
         const rr::game::OriginalRacerAnimationCold50LA*,OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool publishGeometry1326A0(OriginalStandardModelFileId50LA,
         const std::shared_ptr<OriginalStandardModelGeometry50LA>&,OriginalStandardTextureDiagnostic50LA&) noexcept;
+    bool publishCollision1326A0(OriginalStandardModelFileId50LA,
+        const std::shared_ptr<OriginalStandardCollisionType0Resource50LA>&,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
+    void clearCollision1327D0(const OriginalStandardCollisionType0Resource50LA*) noexcept;
     void clearAnimation1327D0(const rr::game::OriginalRacerAnimationCold50LA*) noexcept;
     void clearGeometry1327D0(const OriginalStandardModelGeometry50LA*) noexcept;
 private:

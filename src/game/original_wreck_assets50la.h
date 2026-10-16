@@ -157,6 +157,7 @@ public:
         return storage_->standardModel;
     }
     rr::assets::OriginalStandardModelFileId50LA modelFileIdentity()const noexcept{return storage_->modelFile;}
+    rr::assets::OriginalStandardModelFileId50LA targetFileIdentity()const noexcept{return storage_->targetFile;}
     const rr::assets::PsgHierarchyView49O& hierarchy()const noexcept{return storage_->hierarchy;}
     const OriginalWreckAssetReceipt50LA& receipt()const noexcept{return storage_->receipt;}
     const std::array<std::vector<std::uint8_t>,4>& originalMembers()const noexcept{return storage_->raw;}
@@ -177,7 +178,7 @@ private:
         OriginalWreckTarget50LA target;
         rr::assets::PsgHierarchyView49O hierarchy{};
         std::shared_ptr<const rr::assets::OriginalStandardModelResource50LA> standardModel;
-        rr::assets::OriginalStandardModelFileId50LA modelFile{};
+        rr::assets::OriginalStandardModelFileId50LA modelFile{},targetFile{};
         std::vector<SceneNode49P> nodes;
         std::vector<rr::assets::PsgNode49O> sourceNodes;
         ModelBoundsResult49O bounds{};

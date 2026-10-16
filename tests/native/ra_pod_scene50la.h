@@ -5,6 +5,7 @@
 #include <array>
 #include <limits>
 #include <memory>
+#include "../../platform/linux/native/race_audio_groups50ic.h"
 
 namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_pod_scene50LA {
@@ -20,6 +21,17 @@ protected:
     std::shared_ptr<ra_source_camera50LA::OwnershipBridge> runtimeQueries_;
     std::shared_ptr<g::OriginalTrackParticleCold50LA> trackParticles_;
 private:
+    // Constructor-only prefix on this SAME concrete scene. No second world.
+    Entity worldEntity_;
+    std::shared_ptr<g::OriginalApplicationEntities50LA> worldApplication_;
+    rr::platform::RaceAudioGroups50IC* worldAudio_=nullptr; //Caller lifetime through rollback/retirement.
+    std::unique_ptr<Entity*[]> worldList500_;
+    std::uint32_t worldListCount50C_=0,worldListCapacity504_=0,worldListGrowth508_=0;
+    std::uint32_t worldMode30_=0,worldMode524_=0;
+    bool worldColdConstructed_=false,worldColdAttempted_=false;
+    bool constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicationEntities50LA>,
+        rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
+    bool rollbackNativeWorldConstructionFailure(std::uint32_t&)noexcept;
     struct SearchNode {
         Entity entity;
         // Exact stable canonical row. This borrow does NOT claim the source
@@ -58,6 +70,8 @@ private:
         std::uint64_t generation,std::uint32_t& pc)noexcept {
         pc=0;
         if(topologyAttempted_||topologyClosed_)return fail(pc,0x2729e0);
+        if(worldColdConstructed_&&(application!=worldApplication_||generation!=worldEntity_.sessionGeneration))
+            return fail(pc,0x2729e0);
         if(!application||!generation||!application->application10()||
            application->attachmentLock423F58()||!lighting_||!runtimeQueries_||
            !runtimeQueries_->candidates_||!runtimeQueries_->candidates_->decodedSource()||
@@ -223,7 +237,7 @@ private:
     }
 protected:
     Owner()=default;
-    ~Owner(){if(topologyAttempted_&&!topologyClosed_)std::terminate();}
+    ~Owner(){if(worldColdConstructed_||(topologyAttempted_&&!topologyClosed_))std::terminate();}
     Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
 };
 }

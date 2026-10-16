@@ -85,6 +85,11 @@ private:
 class OriginalApplicationEntities50LA final {
     friend class OriginalPauseStorage50LA;
     friend class OriginalTunnelTrack50LA;
+    friend class OriginalRaceConstructor50LA;
+    friend class rr::platform::RaceAudioGroups50IC;
+    // Actual process434A10 slot authority. BSS startup initializes all25 free.
+    std::array<OriginalWreckComponent50LA*,25> soundGroups434A10_{};
+    std::uint32_t worldRegistration434320_=0; //BSS startup;1B28D0 clears on actual world construction.
     OriginalApplicationEntityAuthority50LA entityAuthority_;
     friend class ::ra_pod_scene50LA::Owner;
     friend class OriginalVisibilityQuadTree50LA;

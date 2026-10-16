@@ -56,8 +56,8 @@ inline OriginalWreckMovementQueryResult50LA queryOriginalWreckMovement50LA(
     in.shapeTag=3;in.bounds={};in.bounds.shapeTag=3;
     in.bounds.cachedCenter=queries.state(2).cachedCenter;
     in.bounds.cachedRadius=queries.state(2).cachedRadius;
-    in.bounds.pairCount=1;in.bounds.endpoints=q.endpoints;in.bounds.endpointCount=2;
-    in.bounds.endpointScenes=q.endpointMetadata;in.bounds.endpointSceneCount=2;
+    in.bounds.pairCount=1;in.bounds.endpoints=q.movementEndpoints();in.bounds.endpointCount=2;
+    in.bounds.endpointScenes=q.movementMetadata();in.bounds.endpointSceneCount=2;
     in.sentinel3E02C0=*w.sentinel3E02C0;in.type3NormalMode44=q.normalMode;
     OriginalCameraWorldQueryState stage{};
     stage.flagsF8=queries.state(2).flagsF8;stage.currentCandidateIdentity=q.currentIdentity94;

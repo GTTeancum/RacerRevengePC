@@ -1,6 +1,7 @@
 #pragma once
+namespace original_course_targets50KX { class ConsumedLaunch; }
 namespace ra_cold_sources50LA { class ColdNavigationLease; }
-namespace rr::game { class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
+namespace rr::game { class OriginalRaceConstructor50LA; class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
 namespace original_camera_session50KX { class Session; }
 namespace native_ai50IV { struct Session; }
@@ -148,6 +149,7 @@ private:
     mutable std::weak_ptr<rr::game::OriginalPauseStorage50LA> pauseColdOwner50LA_;
     mutable std::array<std::weak_ptr<rr::game::OriginalTunnelTrack50LA>,2> tunnelTrackColdOwners50LA_;
     mutable std::weak_ptr<rr::game::OriginalRaceTuning50LA> raceTuningColdOwner50LA_;
+    mutable std::weak_ptr<rr::game::OriginalRaceConstructor50LA> raceConstructorColdOwner50LA_;
     // Process443848 FIFO identity. Scene/display close cannot silently reset it.
     mutable std::shared_ptr<NativeCollectorFifo50LA> nativeCollectorFifoOwner_;
     mutable std::uint64_t raceDisplayGeneration50LA_=0;
@@ -290,6 +292,8 @@ public:
         std::shared_ptr<const ra_cold_sources50LA::ColdNavigationLease>)const noexcept;
     bool bindTunnelTrackColdProjection2A1260(rr::game::OriginalTunnelTrack50LA&)const noexcept;
     std::shared_ptr<rr::game::OriginalRaceTuning50LA> retainRaceTuningCold1A7184()const noexcept;
+    std::shared_ptr<rr::game::OriginalRaceConstructor50LA> constructConsumedRaceCold1A65C0(
+        original_course_targets50KX::ConsumedLaunch&,std::uint64_t session,std::uint32_t& sourcePC)const noexcept;
     // Exact conditional443848 typed destruction leaf; never an implicit drain.
     bool retireNativeCollector1A6948(rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     // Source-only detached ownership. Definitions are in original_pause_entity50la.h.

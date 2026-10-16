@@ -147,8 +147,9 @@ public:
         return storage_&&collection<storage_->assets.size()&&piece<storage_->assets[collection].size()?
             storage_->assets[collection][piece].get():nullptr;
     }
-    // Publish exact authenticated PSG file rows into the same application
-    //3E1A70 resolver used by materials/textures. No geometry association,
+    // Publish exact authenticated PSG and target f.COL file rows into the same application
+    //3E1A70 resolver used by materials/textures. COL additionally requires the
+    //same sealed mounted provider to resolve those exact bytes. No geometry association,
     //104960 retain, material acquisition or240740 packet is manufactured.
     // A failed serial prefix remains retained and cannot be rebound/replayed.
     OriginalWreckInventoryResult50LA bindModelSources(
@@ -167,6 +168,9 @@ public:
                    !storage_->modelResolver->bindModelMember(*payload->member(),
                         rr::assets::OriginalStandardModelFileKind50LA::psg,*payload->originalBytes(),
                         asset.storage_->modelFile,diagnostic))return {S::piece,c+1u,p+1u,bound};
+                if(!storage_->modelResolver->bindModelMember(asset.storage_->receipt.targetMember,
+                    rr::assets::OriginalStandardModelFileKind50LA::colType0,asset.storage_->raw[3],
+                    asset.storage_->targetFile,diagnostic))return {S::piece,c+1u,p+1u,bound};
                 ++bound;
             }
         storage_->modelSourcesBound=true;return {S::modelSourcesBound,0,0,bound};

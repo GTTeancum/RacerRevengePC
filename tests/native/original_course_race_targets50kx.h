@@ -1,4 +1,5 @@
 #pragma once
+namespace original_main_entry50KG { struct Application; }
 #include "track_session_assets50ig_fixture.h"
 #include "original_course_roster50kg_fixture.h"
 #include "../../src/game/original_ui_course_race_domain50kg.h"
@@ -12,6 +13,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -148,6 +151,29 @@ public:
 // Publish only after takeCourseLaunch: its original queue9 and renderer drain
 // have really completed. The outer owner consumes after old-world destruction,
 // rechecking the SAME actual profile before selecting the next cold loader.
+// Native retained result of a real Course request consumption. This carries
+// no Entity, parent, scheduler or constructor completion. Only ColdLoadRequest
+// can mint it, after validating the actual outgoing request and profile.
+class ConsumedLaunch final {
+    friend class ColdLoadRequest;
+    friend struct ::original_main_entry50KG::Application;
+    bool raceConstructorClaimed_=false;
+    std::shared_ptr<const rr::platform::OriginalUiRiderProfileOwner50KG> profile_;
+    Selection selection_{};
+    const Target* target_=nullptr;
+    std::uint64_t nextGeneration_=0;
+    ConsumedLaunch()=default;
+public:
+    ConsumedLaunch(const ConsumedLaunch&)=delete;
+    ConsumedLaunch& operator=(const ConsumedLaunch&)=delete;
+    bool matches(const rr::platform::OriginalUiRiderProfileOwner50KG& actual,
+        std::uint64_t generation,Track loadedTrack,std::uint32_t loadedRacer)const noexcept {
+        Selection current;
+        return profile_.get()==&actual&&target_&&generation==nextGeneration_&&
+            target_->track==loadedTrack&&selection_.rider==loadedRacer&&
+            actual.courseRaceSnapshot(current)&&same(selection_,current)&&target(current)==target_;
+    }
+};
 class ColdLoadRequest final {
     Selection selection_{};
     const Target* target_=nullptr;
@@ -166,6 +192,22 @@ public:
            !same(selection_,current)||target(current)!=target_)return false;
         nextTrack=target_->track;nextRacer=current.rider;
         target_=nullptr;outgoingGeneration_=0;return true;
+    }
+    // Compatibility: the existing consume above retains its exact behavior.
+    // Allocate before consuming so native allocation failure cannot lose an
+    // authenticated request. Publication below is infallible after consume.
+    bool consumeForNextSession(
+        std::shared_ptr<const rr::platform::OriginalUiRiderProfileOwner50KG> actual,
+        std::uint64_t destroyedGeneration,Track& nextTrack,std::uint32_t& nextRacer,
+        std::unique_ptr<ConsumedLaunch>& result)noexcept {
+        if(!actual||result||destroyedGeneration==std::numeric_limits<std::uint64_t>::max())return false;
+        std::unique_ptr<ConsumedLaunch> retained;
+        try {retained.reset(new ConsumedLaunch);}catch(...){return false;}
+        const auto selected=selection_;const auto* destination=target_;
+        if(!consume(*actual,destroyedGeneration,nextTrack,nextRacer))return false;
+        retained->profile_=std::move(actual);retained->selection_=selected;
+        retained->target_=destination;retained->nextGeneration_=destroyedGeneration+1;
+        result=std::move(retained);return true;
     }
 };
 }

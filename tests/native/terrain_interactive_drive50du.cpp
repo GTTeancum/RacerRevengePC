@@ -107,6 +107,8 @@
 #include "original_ui_main_entry50kg.h"
 #include "original_race_tuning50la.h" // Inactive same-source C0 ownership.
 #include "original_tunnel_track50la.h" // Inactive genuine spline Entity ownership.
+#include "original_world_cold_prefix50la.h" // Inactive same-scene world constructor prefix.
+#include "original_race_constructor50la.h" // Inactive consumed-launch race constructor ownership.
 #include "original_pause_observation50la.h" // Inactive source-only settings observer.
 #include "original_race_display_lifetime50la.h"
 #include "original_position_stats_primitives50la.h"
@@ -389,13 +391,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const original_main_entry50KG::Application& originalMainApplication,
     bool enterOriginalUi,ControlPresets49D& controlPresets,SharedRandomOwner50ID& directApplicationRandom,
     const std::int32_t& cameraStartup350,original_course_targets50KX::ColdLoadRequest& courseColdLoad,
-    native_gc_water_session50KG::Application& nativeWaterApplication,windows_capture50LD::Run& captureRun){
+    native_gc_water_session50KG::Application& nativeWaterApplication,windows_capture50LD::Run& captureRun,
+    const original_course_targets50KX::ConsumedLaunch* consumedLaunch){
  const bool originalUiStarted=originalMainApplication.enabled;
  bool originalUiActive=originalUiStarted&&enterOriginalUi,courseRaceLaunched=false;
  // Capture the immutable loaded identity before any front-menu choice changes
  // the next-session selection. The alternate-player integration consumes it.
  const std::uint32_t playerRacer60=selectedRacer60;
  const auto loadedTrack=effectiveTrack;
+ // A real Course consumption may reach only this next cold session. Direct
+ // startup has no such owner; this check does not activate a counted race.
+ if(consumedLaunch)require50DU(originalMainApplication.enabled&&originalMainApplication.riderProfile&&
+     consumedLaunch->matches(*originalMainApplication.riderProfile,sessionIndex+1,loadedTrack,playerRacer60),
+     "consumed Course launch lost its same-profile next-session identity");
  require50DU(rr::platform::validHostTrack50IM(loadedTrack),"unsupported loaded track identity");
  const char* trackSelectionError=nullptr;
  const auto* selectedTrackAssets=track_session_assets50IG::select(rr::platform::hostTrackCode50IM(loadedTrack),trackSelectionError);
@@ -8356,6 +8364,7 @@ int main(int argc,char**argv){try{
      incompleteWorldSetting&&std::string(incompleteWorldSetting)=="1",
      selectedModeSetting&&std::string(selectedModeSetting)=="2",gaCandidate,gcNativeWorldRequested,raNativeWorldRequested};
  std::uint64_t sessionIndex=0;
+ std::unique_ptr<original_course_targets50KX::ConsumedLaunch> consumedCourseLaunch;
  for(;;){
   if(captureRun.deadlineExpired())break;
   const auto exit=enterOriginalUi?
@@ -8364,7 +8373,10 @@ int main(int argc,char**argv){try{
       runSession50DU(resolvedCorpusPath.c_str(),headlessLive,headlessLive?argv[3]:nullptr,
       useCheckpoint?&activeCheckpoint:nullptr,nextCheckpoint,lapContinuity,sessionIndex,
       applicationClock,collisionNormalMode,startAtMenu,selectedRacer60,effectiveAudioSettings,selectedAudioSettings,
-      effectiveTrack,selectedTrack,trackAdmission,originalMainApplication,enterOriginalUi,applicationControls,directApplicationRandom,cameraStartup350,courseColdLoad,nativeWaterApplication,captureRun);
+      effectiveTrack,selectedTrack,trackAdmission,originalMainApplication,enterOriginalUi,applicationControls,directApplicationRandom,cameraStartup350,courseColdLoad,nativeWaterApplication,captureRun,consumedCourseLaunch.get());
+  // Expire even on restart/return: only a new actual Course consumption can
+  // create another owner. Stack unwinding also releases it on session failure.
+  consumedCourseLaunch.reset();
   // The selected frontend/race session has returned: its local GL, audio and
   // race resource owners have closed and been destroyed. Application retains
   // the same Video object, with its real host closed before the next session.
@@ -8379,7 +8391,8 @@ int main(int argc,char**argv){try{
   const bool allOriginalAi=allAiSetting&&std::string(allAiSetting)=="1";
   if(exit==SessionExit50DU::CourseColdLoad){
    require50DU(originalMainApplication.enabled&&originalMainApplication.riderProfile&&
-       courseColdLoad.consume(*originalMainApplication.riderProfile,sessionIndex+1,effectiveTrack,selectedRacer60),
+       courseColdLoad.consumeForNextSession(originalMainApplication.riderProfile,
+           sessionIndex+1,effectiveTrack,selectedRacer60,consumedCourseLaunch),
        "Course cold-load request lost its real application/profile lifetime");
    selectedTrack=effectiveTrack;
   }else require50DU(!courseColdLoad.pending(),"unconsumed Course cold-load request");

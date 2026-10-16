@@ -1,5 +1,6 @@
 #include "original_standard_texture_resource50la.h"
 #include "original_standard_model_resource50la.h"
+#include "original_standard_collision_type0_resource50la.h"
 #include "original_standard_material_context50la.h"
 #include "original_standard_texture_demand_math50la.h"
 #include "original_standard_archive_provider50la.h"
@@ -126,7 +127,7 @@ void scalar24D6F0(const std::uint8_t* source,std::size_t width,std::size_t heigh
 }
 }
 struct OriginalStandardTextureResolver50LA::Storage {
-    enum class FileKind : std::uint8_t { pst,tga,atm,mcf,psg };
+    enum class FileKind : std::uint8_t { pst,tga,atm,mcf,psg,colType0 };
     struct File {
         std::string member;
         std::vector<std::uint8_t> bytes;
@@ -138,6 +139,8 @@ struct OriginalStandardTextureResolver50LA::Storage {
         const rr::game::OriginalRacerAnimationCold50LA* animation=nullptr;
         std::weak_ptr<OriginalStandardModelGeometry50LA> geometry;
         const OriginalStandardModelGeometry50LA* geometryIdentity=nullptr;
+        std::weak_ptr<OriginalStandardCollisionType0Resource50LA> collision;
+        const OriginalStandardCollisionType0Resource50LA* collisionIdentity=nullptr;
     };
     struct Level {
         std::int32_t width=0,height=0;
@@ -374,7 +377,8 @@ OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
     //can remain when the final resolver owner goes away.
     if(storage_)for(const auto& file:storage_->files)
         if(file->cacheIdentity||!file->cached.expired()||file->animation||
-           file->geometryIdentity||!file->geometry.expired())
+           file->geometryIdentity||!file->geometry.expired()||
+           file->collisionIdentity||!file->collision.expired())
             std::terminate();
 }
 bool OriginalStandardTextureResolver50LA::prepareFresh(
@@ -577,7 +581,8 @@ bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& nam
     OriginalStandardModelFileId50LA& out,D& d) noexcept {
     d={};out={};
     const char* extension=kind==OriginalStandardModelFileKind50LA::mcf?".mcf":
-        kind==OriginalStandardModelFileKind50LA::psg?".psg":nullptr;
+        kind==OriginalStandardModelFileKind50LA::psg?".psg":
+        kind==OriginalStandardModelFileKind50LA::colType0?".col":nullptr;
     if(!extension||name.empty()||name.size()>259||name.size()<4||bytes.empty())
         return fail(d,E::input,0x132820);
     for(unsigned char c:name)if(c<32||c>=127)return fail(d,E::input,0x132820);
@@ -588,8 +593,18 @@ bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& nam
         try {storage_=std::make_unique<Storage>();}
         catch(...){return fail(d,E::allocation,0x132820);}
     }
+    if(kind==OriginalStandardModelFileKind50LA::colType0){
+        using Provider=OriginalStandardArchiveProvider50LA;Provider::MemberView actual;
+        if(!storage_->provider||!storage_->provider->sealed()||
+           storage_->provider->lookup132820(name,actual)!=Provider::Lookup::present)
+            return fail(d,E::unresolved,0x132820);
+        if(!actual.member||!same(name,*actual.member)||!actual.data||actual.size!=bytes.size()||
+           actual.revision!=storage_->provider->revision()||!std::equal(bytes.begin(),bytes.end(),actual.data))
+            return fail(d,E::source,0x132820);
+    }
     const auto fileKind=kind==OriginalStandardModelFileKind50LA::mcf?
-        Storage::FileKind::mcf:Storage::FileKind::psg;
+        Storage::FileKind::mcf:kind==OriginalStandardModelFileKind50LA::psg?
+        Storage::FileKind::psg:Storage::FileKind::colType0;
     for(std::size_t i=0;i<storage_->files.size();++i){const auto& file=*storage_->files[i];
         if(!same(file.member,name))continue;
         if(file.kind!=fileKind||file.bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
@@ -612,9 +627,24 @@ bool OriginalStandardTextureResolver50LA::modelFile(OriginalStandardModelFileId5
     if(!storage_)return fail(d,E::unprepared,0x132820);
     if(id.resolver!=this||id.row>=storage_->files.size())return fail(d,E::range,0x1329A0);
     const auto& file=*storage_->files[id.row];d.source=id.row;
-    if((file.kind!=Storage::FileKind::mcf&&file.kind!=Storage::FileKind::psg)||file.cacheIdentity||!file.cached.expired())
+    if((file.kind!=Storage::FileKind::mcf&&file.kind!=Storage::FileKind::psg&&file.kind!=Storage::FileKind::colType0)||file.cacheIdentity||!file.cached.expired())
         return fail(d,E::phase,0x1329A0);
+    if(file.kind==Storage::FileKind::colType0){
+        using Provider=OriginalStandardArchiveProvider50LA;Provider::MemberView actual;
+        if(!storage_->provider||!storage_->provider->sealed()||
+           storage_->provider->lookup132820(file.member,actual)!=Provider::Lookup::present)
+            return fail(d,E::unresolved,0x132820);
+        if(!actual.member||!same(file.member,*actual.member)||!actual.data||actual.size!=file.bytes.size()||
+           actual.revision!=storage_->provider->revision()||!std::equal(file.bytes.begin(),file.bytes.end(),actual.data))
+            return fail(d,E::source,0x132820);
+    }
     const auto geometry=file.geometry.lock();
+    const auto collision=file.collision.lock();
+    if(file.collisionIdentity!=collision.get()||
+       (file.kind!=Storage::FileKind::colType0&&collision)||
+       (file.kind==Storage::FileKind::colType0&&(geometry||file.animation)))return fail(d,E::phase,0x1329A0);
+    if(collision&&(!collision->live()||collision->fileId().resolver!=this||
+       collision->fileId().row!=id.row))return fail(d,E::phase,0x1329A0);
     if(file.geometryIdentity!=geometry.get())return fail(d,E::phase,0x1329A0);
     if((file.kind==Storage::FileKind::mcf&&geometry)||
        (file.kind==Storage::FileKind::psg&&file.animation))return fail(d,E::phase,0x1329A0);
@@ -622,9 +652,10 @@ bool OriginalStandardTextureResolver50LA::modelFile(OriginalStandardModelFileId5
        geometry->fileId().resolver!=this||geometry->fileId().row!=id.row))
         return fail(d,E::phase,0x1329A0);
     out.id=id;out.kind=file.kind==Storage::FileKind::mcf?
-        OriginalStandardModelFileKind50LA::mcf:OriginalStandardModelFileKind50LA::psg;
+        OriginalStandardModelFileKind50LA::mcf:file.kind==Storage::FileKind::psg?
+        OriginalStandardModelFileKind50LA::psg:OriginalStandardModelFileKind50LA::colType0;
     out.member=&file.member;out.bytes=&file.bytes;
-    out.animation1536F0=file.animation;out.geometry240110=geometry;return true;
+    out.animation1536F0=file.animation;out.geometry240110=geometry;out.collision125014=collision;return true;
 }
 bool OriginalStandardTextureResolver50LA::lookupModel132820(const std::string& name,
     OriginalStandardModelFileKind50LA kind,OriginalStandardModelFileView50LA& out,D& d) const noexcept {
@@ -657,6 +688,25 @@ bool OriginalStandardTextureResolver50LA::publishGeometry1326A0(OriginalStandard
        file.animation1536F0||file.geometry240110)return fail(d,E::phase,0x1327B0);
     storage_->files[id.row]->geometry=geometry;
     storage_->files[id.row]->geometryIdentity=geometry.get();d.sourceEffectsCommitted=true;return true;
+}
+bool OriginalStandardTextureResolver50LA::publishCollision1326A0(OriginalStandardModelFileId50LA id,
+    const std::shared_ptr<OriginalStandardCollisionType0Resource50LA>& resource,D& d) noexcept {
+    OriginalStandardModelFileView50LA file;
+    if(!modelFile(id,file,d))return false;
+    if(!resource||!resource->live()||resource->fileId().resolver!=this||resource->fileId().row!=id.row||
+       file.kind!=OriginalStandardModelFileKind50LA::colType0||file.collision125014||
+       file.animation1536F0||file.geometry240110)return fail(d,E::phase,0x1327B0);
+    storage_->files[id.row]->collision=resource;
+    storage_->files[id.row]->collisionIdentity=resource.get();d.sourceEffectsCommitted=true;return true;
+}
+void OriginalStandardTextureResolver50LA::clearCollision1327D0(
+    const OriginalStandardCollisionType0Resource50LA* resource) noexcept {
+    if(!storage_||!resource)return;
+    //11B650 clears by resource identity BEFORE11AEE0, even if ref60 remains
+    //positive. A later cold resource at the same file must survive old users.
+    for(auto& file:storage_->files)if(file->collisionIdentity==resource){
+        file->collision.reset();file->collisionIdentity=nullptr;return;
+    }
 }
 void OriginalStandardTextureResolver50LA::clearAnimation1327D0(
     const rr::game::OriginalRacerAnimationCold50LA* animation) noexcept {

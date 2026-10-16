@@ -126,6 +126,11 @@ class Owner final : private ra_pod_scene50LA::Owner {
         attempted=true;return true;
     }
 public:
+    bool constructWorldCold1B2870(const original_main_entry50KG::Application&,
+        rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
+    bool rollbackNativeWorldConstructionFailure(std::uint32_t& pc)noexcept {
+        return ra_pod_scene50LA::Owner::rollbackNativeWorldConstructionFailure(pc);
+    }
     Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
     ~Owner(){if(!close())std::terminate();}
@@ -621,6 +626,9 @@ public:
     }
     bool close() noexcept {
         if(closed_)return true;
+        // A real counted world prefix needs its original loaded teardown or
+        // explicit native failure rollback; aggregate close cannot certify it.
+        if(worldColdConstructed_)return false;
         if(runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
         staticFog_.reset();
         staticLighting_.reset(); // Retire typed camera/world/light borrows before preflight.
