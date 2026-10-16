@@ -716,7 +716,6 @@ void main(){
                     gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,coverageLive.payload);
                     gl.activeTexture(textureUnit0+1);if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
                     gl.activeTexture(textureUnit0+2);if(gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
-                    gl.uniform1i(coveragePayloadUniform,0);gl.uniform1i(coverageDepthUniform,1);gl.uniform1i(coverageDestinationUniform,2);
                     gl.uniform1i(coverageRaCompositionUniform,1);gl.drawArrays(0x0004,0,3);
                 }else {
                     gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.drawBuffer(colorAttachment);

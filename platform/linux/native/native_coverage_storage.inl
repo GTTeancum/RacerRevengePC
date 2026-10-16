@@ -199,7 +199,22 @@ void main(){
         if(!check("locate coverage composition inputs and array")||!coverageArray||
            coverageRaCompositionUniform<0||coveragePayloadUniform<0||coverageDepthUniform<0||coverageDestinationUniform<0)
             return fail(*diagnostic,VehicleWindowError50DS::shader,"coverage composition inputs unavailable");
-        return true;
+        // These private program sampler assignments never vary between RA and
+        // racer composition. Uniform values survive binds and extent changes;
+        // initialize once per link rather than three writes per coverage run.
+        I previousProgram=0;gl.getIntegerv(0x8B8D,&previousProgram); // GL_CURRENT_PROGRAM
+        if(!check("retain program before coverage sampler initialization"))return false;
+        gl.useProgram(coverageProgram);
+        bool initialized=check("bind coverage program for fixed sampler initialization");
+        if(initialized){
+            gl.uniform1i(coveragePayloadUniform,0);gl.uniform1i(coverageDepthUniform,1);gl.uniform1i(coverageDestinationUniform,2);
+            initialized=check("initialize fixed coverage sampler assignments");
+        }
+        // Restore the actual prior program even when binding or uniforms fail.
+        // Never write uniforms if the coverage program could not be bound.
+        gl.useProgram(static_cast<U>(previousProgram));
+        const bool restored=check("restore program after coverage sampler initialization");
+        return initialized&&restored;
     }
     bool drawCoveragePairTriangle(U bank,U first,U image,const std::array<I,4>& region,U sourceArray,U triangleCount) noexcept {
         // A proven empty native clip region cannot touch any destination
@@ -217,7 +232,13 @@ void main(){
         gl.viewport(0,0,width,height);
         gl.colorMask(1,1,1,1);gl.disable(0x0B71);gl.depthMask(0);
         const float invalid[]={0.f,0.f,0.f,-1.f};gl.clearBufferfv(0x1800,0,invalid);
-        gl.useProgram(shader->program());gl.uniform1i(shader->uniforms().sourcePairPass50LA,3);
+        // The caller checked the source program at group entry; each prior
+        // run rebinds and checks it before returning. Never write this program's
+        // uniform after an unchecked switch from the composition program.
+        gl.uniform1i(shader->uniforms().sourcePairPass50LA,3);
+        // The preceding run can leave the composition VAO bound. The actual
+        // group-entry source VAO is retained once, never inferred from state.
+        drawGl.bindVertexArray(sourceArray);
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);
         bool accepted=check("bind AA0 original triangle payload target");
         if(accepted){
@@ -239,22 +260,29 @@ void main(){
             gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
             gl.activeTexture(textureUnit0+1);if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
             gl.activeTexture(textureUnit0+2);if(gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
-            gl.uniform1i(coveragePayloadUniform,0);gl.uniform1i(coverageDepthUniform,1);gl.uniform1i(coverageDestinationUniform,2);
             accepted=check("bind sample-specific original destination-alpha composition");
             if(accepted){gl.drawArrays(0x0004,0,3);accepted=check("compose ordered map-2 triangle per destination sample");}
         }
-        // Restore even on rejection. The caller still owns group/span accounting
-        // and aborts before publication. No sampled texture remains attached.
+        // Unbind feedback even on rejection, before another payload target
+        // becomes writable. Keep this per-run error boundary. The sole caller
+        // restores pass/VAO/coverage/depth once at the group boundary.
         gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
         gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);
+        gl.useProgram(shader->program());
+        const bool unbound=check("restore source program and unbind feedback after native coverage bridge");
+        return accepted&&unbound;
+    }
+    bool restoreCoveragePairGroup(U bank,U sourceArray) noexcept {
         gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
-        gl.useProgram(shader->program());gl.uniform1i(shader->uniforms().sourcePairPass50LA,2);
+        gl.useProgram(shader->program());
+        const bool program=check("restore source-pair program at coverage group boundary");
+        if(program)gl.uniform1i(shader->uniforms().sourcePairPass50LA,2);
         drawGl.bindVertexArray(sourceArray);
         coverageAa0();gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);
         gl.disable(0x0C11);
-        const bool restored=check("restore source-pair state after native coverage bridge");
-        return accepted&&restored;
+        const bool restored=check("restore source-pair state after native coverage group");
+        return program&&restored;
     }
     bool drawCoveragePairGroup(U bank,U slot,U component,U first,U count,U image) noexcept {
         // Never cross the original base/map-2 MSCNT group boundary. A run
@@ -271,10 +299,10 @@ void main(){
         // evaluating its clip rectangle twice in the common singleton case.
         U pendingFirst=end;std::array<I,4> pending{};
         // The sole caller owns one VAO for the entire original MSCNT group.
-        // Each bridge restores it on success AND rejection; region lookahead
-        // is CPU-only. Retain the actual binding once, lazily, so all-empty
+        // Each payload rebinds it; the group restores it on success AND
+        // rejection. Region lookahead is CPU-only. Retain it lazily, so all-empty
         // groups still issue no GL queries or bridge operations.
-        bool sourceArrayRetained=false;I sourceArray=0;
+        bool sourceArrayRetained=false;I sourceArray=0;bool accepted=true;
         while(first<end){
             const auto initial=pendingFirst==first?pending:racerTriangleRasterRegion(slot,component,first);
             if(initial[2]<=initial[0]||initial[3]<=initial[1]){++coveragePairEmptyTriangles;first+=3;continue;}
@@ -314,13 +342,20 @@ void main(){
                 if(!check("retain source-pair vertex array for coverage group"))return false;
                 sourceArrayRetained=true;
             }
-            if(!drawCoveragePairTriangle(bank,first,image,united,static_cast<U>(sourceArray),run))return false;
+            if(!drawCoveragePairTriangle(bank,first,image,united,static_cast<U>(sourceArray),run)){
+                accepted=false;break; // Every reached bridge flows through restoration below.
+            }
             ++coveragePairRuns;coveragePairTriangles+=run;
             if(run>1)coveragePairCoalescedTriangles+=run;
             if(fullRegion(initial))++coveragePairFullSingletons;
             first+=run*3;
         }
-        return true;
+        // Empty groups have changed no GL state. Otherwise restore on both
+        // success and failure before the caller can bind another base group.
+        // No callback or external GL consumer runs between these owned runs.
+        if(!sourceArrayRetained)return accepted;
+        const bool restored=restoreCoveragePairGroup(bank,static_cast<U>(sourceArray));
+        return accepted&&restored;
     }
     bool resolveCoverage(U bank) noexcept {
         if(!coverageDemand)return true;
