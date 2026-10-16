@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../src/game/original_application_animation_clock50kg.h"
 #include "original_ui_course_draw_resources50kg.h"
 #include "original_ui_course_hologram_draw50kg.h"
 #include "original_ui_native_draw50kg.h"
@@ -7,7 +8,8 @@
 #include "../../../src/game/original_ui_course_page_draw50kg.h"
 #include "../../../src/game/original_ui_aperture_owner50kg.h"
 namespace rr::platform {
-struct OriginalUiCourseDrawClock50KG {bool known=false,advanceAnimations=false;std::uint32_t milliseconds=0;};
+struct OriginalUiCourseDrawClock50KG {bool known=false,advanceAnimations=false;std::uint32_t milliseconds=0;
+    game::OriginalApplicationAnimationClockView50KG applicationAnimation{};};
 enum class OriginalUiCourseContributionError50KG : std::uint8_t {none,input,alreadyBound,resource,bank,publication,phase,clock,widget,model,geometry,material,schedule,capacity,allocation,unfinished};
 struct OriginalUiCourseContributionDiagnostic50KG {
  OriginalUiCourseContributionError50KG error=OriginalUiCourseContributionError50KG::none;

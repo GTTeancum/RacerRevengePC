@@ -28,6 +28,10 @@ struct RaceAudioGroups50IC {
     // Source volume+38 is signed64 storage. The admitted original setter domain
     // is integer0..100; int32 exactly represents every supported value.
     std::array<std::int32_t,raceAudioGroupCount50IC> volume38{};
+    // Actual2350D0/102620 fresh SoundGroup+44 state, shared by every
+    // logical sound in this group. Known only once initialized is true.
+    // Volume ducking preserves it; host pause does not dispatch source setters.
+    std::array<std::uint32_t,raceAudioGroupCount50IC> state44{};
     bool initialized=false;
 };
 struct AnnouncerDuckingState50IC {

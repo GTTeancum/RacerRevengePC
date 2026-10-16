@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../src/game/original_application_animation_clock50kg.h"
 #include "original_ui_rider_draw_resources50kg.h"
 #include "original_ui_rider_stat_draw50kg.h"
 #include "original_ui_lit_material_adapter50km.h"
@@ -6,7 +7,8 @@
 #include "../../../src/game/original_ui_aperture_owner50kg.h"
 namespace rr::platform {
 class VehicleWindowGl50DS;
-struct OriginalUiRiderDrawClock50KG {bool known=false,advanceAnimations=false;std::uint32_t milliseconds=0;};
+struct OriginalUiRiderDrawClock50KG {bool known=false,advanceAnimations=false;std::uint32_t milliseconds=0;
+    game::OriginalApplicationAnimationClockView50KG applicationAnimation{};};
 enum class OriginalUiRiderContributionError50KG : std::uint8_t {
     none,input,alreadyBound,resource,bank,publication,phase,clock,widget,stat,model,geometry,
     material,schedule,capacity,allocation,unfinished
@@ -22,12 +24,12 @@ struct OriginalUiRiderContributionDiagnostic50KG {
     game::OriginalUiRiderModelDiagnostic50KG model;
     game::OriginalUiTextDiagnostic50KG text;
 };
-// Complete native Rider frame owner. Sole creator of OriginalUiSourceFrame50KM.
+// Complete native Rider frame owner. One sealed OriginalUiSourceFrame50KM composer.
 // It owns every projected vertex/W/fog stream and all pass/bank lifetime pins.
 // Session must preserve this exact source order: ordinary widgets/models,
 // page stats then four background sprites, aperture0/1, prompts, top widgets,
 // and group drain. No partial contribution can obtain a source-frame seal.
-class OriginalUiRiderDrawContribution50KG final {
+class OriginalUiRiderDrawContribution50KG final : public OriginalUiSourceOwner50KM {
 public:
     OriginalUiRiderDrawContribution50KG() noexcept;~OriginalUiRiderDrawContribution50KG();
     OriginalUiRiderDrawContribution50KG(const OriginalUiRiderDrawContribution50KG&)=delete;
@@ -79,8 +81,8 @@ private:
     // Actual renderer calls only. A partial failed submission invalidates the
     // binding history; accepted source publication commits the staged native
     // representatives even when a later presentation copy fails.
-    bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept;
-    void finishSourceSubmission(std::uint64_t,bool sourceAccepted,bool sourceWorkStarted) const noexcept;
+    bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept override;
+    void finishSourceSubmission(std::uint64_t,bool sourceAccepted,bool sourceWorkStarted) const noexcept override;
     bool widgets(bool,bool,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool model(std::uint16_t,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     bool append(const game::OriginalUiOverlayQuad50KG&,std::uint32_t material,float packetZ,

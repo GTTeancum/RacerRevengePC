@@ -1,4 +1,5 @@
 #pragma once
+#include "runtime_asset_paths50lb.h"
 // Native-only cold owner for the development client. This preserves the explicit
 // supplied development context of frame49w_test::Fixture(0); geometry, IK,
 // visual/root/physics parameters and joints are computed by native production
@@ -18,6 +19,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <vector>
+#include <type_traits>
 
 namespace runtime_startup50fl {
 using namespace rr::game;
@@ -33,7 +35,8 @@ inline BodyMatrix48G matrix(float angle=0,float tx=0,float ty=0,float tz=0){
     return {{cosine,0,-sine,0,0,1,0,0,sine,0,cosine,0,tx,ty,tz,1}};
 }
 inline BodyMatrix48G identity(){BodyMatrix48G m{};for(unsigned i=0;i<16;i+=5)m.v[i]=1;return m;}
-inline std::vector<std::uint8_t> readBytes(const std::filesystem::path& path){
+inline std::vector<std::uint8_t> readBytes(const std::filesystem::path& requested){
+    const auto path=runtime_asset_paths50LB::resolve(requested);
     std::ifstream file(path,std::ios::binary|std::ios::ate);
     if(!file)throw std::runtime_error("native startup asset missing: "+path.string());
     const auto size=file.tellg();require(size>=0,"native startup asset size");
@@ -191,10 +194,12 @@ struct Fixture {
 // Same native49N/49O operations as the old diagnostic binder, without its
 // source-word execution and comparisons. Outputs retain exactly one canonical
 // parameter/state owner and the existing serial fresh-initialization contract.
+template<class ColdOwner=std::nullptr_t>
 inline AuthoredBinding49N bind(const std::vector<std::uint8_t>& phy,
     const FreshPodGeometryResult49O& geometry,const AuthoredSelectionContext49N& selection,
     VehicleFrameParameters49W& parameters,State& state,
-    SubstepSelectionContext49K& gravity,SecondaryInputs49M& secondary){
+    SubstepSelectionContext49K& gravity,SecondaryInputs49M& secondary,
+    ColdOwner* retained=nullptr,Fixture* actual=nullptr){
     AuthoredParameters49N raw{};rr::assets::PodPhysicsDiagnostic49N diagnostic{};
     require(rr::assets::readPodPhysics49N(reinterpret_cast<const char*>(phy.data()),phy.size(),raw,diagnostic),"native authored PHY admission");
     AuthoredBinding49N previous{},binding{};previous.main=parameters.bodies.main;
@@ -204,7 +209,12 @@ inline AuthoredBinding49N bind(const std::vector<std::uint8_t>& phy,
     require(projectAuthoredCoupledParameters49N(binding,parameters.bodies,parameters.bodies),"native authored parameter projection");
     parameters.control=binding.controls;parameters.rates=binding.rates;
     require(projectAuthoredGravity49N(binding,gravity,secondary,gravity,secondary),"native authored gravity projection");
-    require(projectAuthoredGeometry49O(geometry.parameters,parameters.bodies,secondary,parameters.bodies,secondary),"native authored secondary geometry projection");
+    auto projectedGeometry=geometry.parameters;
+    if constexpr(!std::is_same_v<ColdOwner,std::nullptr_t>){
+        if(retained){require(actual,"retained cold geometry requires its actual Fixture");
+            retained->preserveColdTargetForHandling(*actual,projectedGeometry);}
+    }
+    require(projectAuthoredGeometry49O(projectedGeometry,parameters.bodies,secondary,parameters.bodies,secondary),"native authored secondary geometry projection");
     SecondaryBodyState49M mainView{};mainView.root=state.bodies.main.components.root;
     mainView.scenePresent=state.bodies.main.domain.sceneAttached;mainView.sceneFlags190=state.bodies.mainSphere.sceneFlags190;
     mainView.velocity70W=state.bodies.mainSphere.velocity70W;mainView.angularVelocityB0W=state.bodies.mainSphere.angularVelocityB0W;
@@ -213,7 +223,14 @@ inline AuthoredBinding49N bind(const std::vector<std::uint8_t>& phy,
     mainParameters.centerOffset=parameters.bodies.main.centerOffset;mainParameters.centerOffsetW=parameters.bodies.mainSphere.centerOffsetW;
     std::memcpy(mainParameters.inverseInertiaExtra,parameters.bodies.mainSphere.inverseInertiaExtra,sizeof mainParameters.inverseInertiaExtra);
     PodSphereBody49L mainSphere{};makeSecondarySphereBody49M(mainView,mainParameters,mainSphere);
-    require(setupAuthoredPodSphere49O(geometry.parameters,mainSphere,state.bodies.joint,state.bodies.joint),"native authored sphere setup");
+    if constexpr(!std::is_same_v<ColdOwner,std::nullptr_t>){
+        if(retained){
+            retained->setupColdJoint2126(*actual,projectedGeometry,mainSphere,state.bodies.joint);
+            // Preserve the actual partial858 publication in the working state
+            // that handling will commit; the canonical owner was written first.
+            state.fields.length858=actual->state.fields.length858;
+        }else require(setupAuthoredPodSphere49O(geometry.parameters,mainSphere,state.bodies.joint,state.bodies.joint),"native authored sphere setup");
+    }else require(setupAuthoredPodSphere49O(geometry.parameters,mainSphere,state.bodies.joint,state.bodies.joint),"native authored sphere setup");
     return binding;
 }
 }

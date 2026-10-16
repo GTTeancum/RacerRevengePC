@@ -1,0 +1,113 @@
+PositionStats full-loader recovery -- PARTIAL DELIVERABLE, activation held
+UNTESTED. No builds, tests, syntax checks, sanitizers, converters, gameplay,
+guest execution or central/original-disc edits. Two additive, uncalled headers;
+both preimages absent. Existing integrated display/primitive candidates unchanged.
+This packet DOES NOT implement the full entity/resource owner. It supplies the
+bounded clipping owner and exact loader operands, with the concrete native API
+gaps below. Do not present it as full PositionStats loading or activate staging.
+
+RECOVERED CONSTRUCTION / ACTUAL ORDER
+18FF80 calls Entity141300, constructs5 ScreenTexts via2E02F0 stride70 at+40,
+then9 ScreenTextures via2DEF40 stride60 at+270, then118 via2DEF40 at+5D0,
+then embedded clip object119E50 at+3220. Dynamic primitive pointer32EC starts0.
+Fields30/32B0/32B4 zero;32B8=7;32C0 copies original433EB0;32D0..32EC zero.
+The original initializer3C9790..3C980C writes433EB0=(0,0,0,1), resolving its
+fresh-start value. It is not an invented host vector. Runtime use must still
+respect the actual original field's ownership and later updates.
+
+190190 begins with Entity141C20 (call1901B0). It then loads the9 textures at
+1901DC,190318,190454,19058C,1906C8,190804,190940,190A78,190BB4.
+CORRECTION: the+4B0 object (190940) is maptop, not stats. Other8 are stats.
+The118-object loop190CFC uses maptop for every object, width/height8/8.
+Authored dimensions and raw buffer UV stores are preserved in loader_data header.
+Names are literal3A8FA8=stats and3A8FB0=maptop. Addresses use signed addiu:
+LUI003B + immediate8FA8 resolves3A8FA8, not3B8FA8.
+Every2DF0B0 call allocates its primitive, acquires material, calls canonical
+14D370 then29E340 at2DF144/150, resolves first texture through actual material
+and texture tables, computes reciprocal original atlas width/height, then owns
+its buffer58. Deferring all127 population operations is NOT this loader order.
+maptop PSM genuinely refers to stats atlas; do not use same-name maptop.pst.
+
+After127 textures,190E64 calls282430 with ONE name from382C18;190E7C looks up
+eurostileboldbold13ingame at282210.190EB0 loads5 texts through2DFD90 with capacity40.
+Each text receivesRGB FFE5D96C, initial empty string at3A8F20; text1 field40 gets
+bits3FD9999A, text4 justification50 gets4 from3C4758. Other constructor values
+must remain original. Text scale/justification changes are dirty-state writes,
+not permission to build an invented screen layout.
+191098 onward sets map fields and191110 calls119F60, then191118 calls191180,
+which owns the already-integrated16x236 kind5 fragment. No primitive load may
+be moved earlier than these required owner/font/clip stages.
+
+EXACT DESTRUCTION AND FIRST CONCRETE API GAP
+1900B0 order: dynamic16 array reverse via2E1980; embedded clip119F10;
+118 ScreenTextures reverse;9 ScreenTextures reverse;5 ScreenTexts reverse;
+Entity1413E0 last. Crucially2DEFE0 ALWAYS calls real renderer slot20(1) at2DF018
+and slot24 at2DF030 before inspecting buffer58/primitive54. Thus all127 texture
+objects, INCLUDING constructed-but-unloaded objects, each need both actual drains.
+Then buffer58 frees FIRST; primitive10 is cleared; primitive/material releases.
+The current private PositionStatsRendererLease50LA covers ONLY16 kind5 elements
+and unpins after element0. Reusing it for textures or dropping its pin before
+their cleanup would violate this source order and guarded-context lifetime.
+Required bounded API: a separate full-owner-only127-texture lease acquired before
+fixed-array construction, or one typed full-owner retirement sequence. It must
+remain pinned through clip/texture/text lifetime, support retry phases per texture,
+and permit reverse offsets31B0..5D0, then570..270, after the primitive16 closes.
+This is a missing native lifetime API, NOT missing source evidence or a ready flag.
+
+SECOND CONCRETE API GAP: ONE-NAME FONT LOAD
+OriginalApplicationFonts50LA currently exposes loadPair282430 with fixed array2,
+used by TimeStats and SpeedBoost. PositionStats requests only the13ingame font.
+Calling either pair loads an extra font/changes manager insertion order and is
+not faithful. Required change: a private shared fixed-count implementation plus
+a one-name PositionStats190E64 wrapper, retaining the same actual Application328,
+directory restoration, provider, pending-entry/terminal effects and insertion order.
+Do not invent a font pointer, reload a copy, or substitute TimeStats's two fonts.
+
+TEXT DESTRUCTOR DETAILS PREVENT SIMPLE WRAPPER REUSE
+ScreenText2E1340 calls2DFC60. It frees string8, vertex arrayC via2DFB50, then
+primitive array4 ascending, then optional packet buffers64 ascending and table.
+No renderer calls occur in2DFC60. Therefore do not import an unrelated resource
+wrapper whose implicit C++ member order releases material references first.
+Full-owner implementation still needs actual2DFD90 allocations/partial stages,
+authentic font leases, the preceding127 population calls and explicit teardown.
+The full constructor's ALL8/view0 association must use the existing actual adapter;
+no selected-slot override or fabricated owner/race+CC is supplied in this packet.
+
+DELIVERED119FC0 CLIP
+original_position_stats_clip50la.h translates outcodes, original-anchored segment
+intersection arithmetic and XYZ-only publication. Horizontal boundary has priority,
+then vertical; endpoint0 is processed until inside before endpoint1. Every step
+uses ORIGINAL endpoint deltas, not previously clipped deltas. Separate volatile
+float results preserve operation boundaries and avoid fused expressions.
+Accepted output writes onlyXYZ; both W lanes remain untouched. Source reject and
+unsupported native domain preserve output. Finite ordered bounds/finiteXYZ,
+nonzero divisors, finite results and8-iteration cap are explicit bounded native
+admission, not claimed retail validations. iterationLimit is NOT invisible/rejected.
+This owner is uncalled; no geometry is submitted and no original layout invented.
+
+CORRECTION TO EARLIER +3220 CANDIDATE
+1048E0 wordF8800000 is SQC2 vf0, NOT integer SQ zero.119E50 retains W=1 in all
+eight corners. The earlier held bounds subset claimed W=0 and must not be merged.
+This new clip owner corrects that interpretation. Bounds+88 is still written
+twice and+8C still unwritten until119F60; constructor-only bounds cannot be read.
+119F10 has no resource drain/free for embedded argument-1.
+
+BOUNDED FOLLOW-UP / HOLD
+1. Add actual127-texture pin/retirement API, preserving16 primitive lease separately.
+2. Add single-name font wrapper to the SAME Application328 owner.
+3. Implement one detached/full source-backed PositionStats Entity owner constructing
+   5/9/118/clip before resources; load in exact order above with canonical facets
+   for stats/maptop/font, each2DF0B0 population and actual atlas resolution.
+4. Nest actual primitive fragment LAST; close it FIRST. Then clip,127 texture
+   drains/resources,5 text storage in exact order, Entity last. Retain all on failure.
+5. Bind existing actual ALL8/view0 snapshot/session identity before any activation.
+No new staging or drawing call is enabled. Root owns all integration/testing.
+
+SOURCE REVIEW CHECKLIST
+[ ] Two new paths absent in central tree; manifest exact SHA256 supplied.
+[ ] Review original119FC0 arithmetic/control flow, XYZ-only output and native bounds.
+[ ] Discard prior W=0 bounds interpretation; vf0 retains W=1.
+[ ] Preserve maptop at+4B0 and all118-map loop operands without UV remapping.
+[ ] Implement127 real per-texture drains and single-font route before full loader.
+[ ] Keep active diagnostics, ALL8 simulation/ranking/lap authority unchanged.
+[ ] No test/check evidence exists; root alone validates later.

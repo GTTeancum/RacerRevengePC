@@ -21,7 +21,8 @@ struct Diagnostic {
 class Owner final {
     struct Storage {
         a::MaterialTextureAssets50EA bank;
-        std::array<core::Bindings,8> bindings{};
+        std::array<std::array<core::Bindings,2>,8> bindings{};
+        std::array<std::uint32_t,8> bindingCount{};
         std::array<bool,8> bound{};
         //213C20 ->298C80 and229B24 ->298E60 resolve the same canonical
         // textures\\binder material. 29B950 leaves named animation+18 clear;
@@ -36,8 +37,12 @@ public:
     Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     bool loaded()const noexcept{return bool(storage_);}
     const a::MaterialTextureAssets50EA* bank()const noexcept{return storage_?&storage_->bank:nullptr;}
-    const core::Bindings* bindings(std::uint32_t slot)const noexcept {
-        return storage_&&slot<8&&storage_->bound[slot]?&storage_->bindings[slot]:nullptr;
+    const core::Bindings* bindings(std::uint32_t slot,std::uint32_t pair=0)const noexcept {
+        return storage_&&slot<8&&storage_->bound[slot]&&pair<storage_->bindingCount[slot]?
+            &storage_->bindings[slot][pair]:nullptr;
+    }
+    std::uint32_t bindingCount(std::uint32_t slot)const noexcept {
+        return storage_&&slot<8&&storage_->bound[slot]?storage_->bindingCount[slot]:0;
     }
     std::uint32_t selectedFrame()const noexcept{return storage_?storage_->frame:0xffffffffu;}
     // Invoke at24A758's material/render preparation with the SAME application
@@ -72,17 +77,32 @@ public:
             need(g::validVehicleSceneCount49W(state,frame)&&state.sceneNodeCount==rig.nodeCount&&
                 frame.lifecycle.left1BC==rig.roots[native_racer50HW::Rig::left]&&
                 frame.lifecycle.right1B8==rig.roots[native_racer50HW::Rig::right],"Binder source/current rig differs");
-            core::Bindings binding;
-            binding.left230=rig.find(native_racer50HW::Rig::left,"binderleft1");
-            binding.right238=rig.find(native_racer50HW::Rig::right,"binderright1");
-            need(binding.left230!=native_racer50HW::Index::none&&binding.right238!=native_racer50HW::Index::none,
-                "Original Binder named endpoint missing");
+            std::array<core::Bindings,2> binding;
+            const std::uint32_t pairCount=rig.modelCount==5?2u:1u;
+            if(pairCount==2){
+                // Original213AE8..213B34 anchor ownership, then229DB4..229DE8 draw order.
+                binding[0].left230=rig.find(native_racer50HW::Rig::bottomLeft,"binderleft1");
+                binding[0].right238=rig.find(native_racer50HW::Rig::right,"binderright1");
+                binding[0].pair=core::Pair::bottomLeftToPrimaryRight;
+                binding[1].left230=rig.find(native_racer50HW::Rig::left,"binderleft2");
+                binding[1].right238=rig.find(native_racer50HW::Rig::bottomRight,"binderright2");
+                binding[1].pair=core::Pair::primaryLeftToBottomRight;
+                need(frame.visual.bottomLeft1C4==rig.roots[native_racer50HW::Rig::bottomLeft]&&
+                    frame.visual.bottomRight1C0==rig.roots[native_racer50HW::Rig::bottomRight],
+                    "Binder optional source/current rig differs");
+            }else{
+                binding[0].left230=rig.find(native_racer50HW::Rig::left,"binderleft1");
+                binding[0].right238=rig.find(native_racer50HW::Rig::right,"binderright1");
+            }
+            for(unsigned pair=0;pair<pairCount;++pair)
+                need(binding[pair].left230!=native_racer50HW::Index::none&&
+                    binding[pair].right238!=native_racer50HW::Index::none,"Original Binder named endpoint missing");
             const auto phy=native_racer50HW::rig_detail::ini(rig.phy);
             const auto section=phy.find("binder");
             need(section==phy.end()||!section->second.count("bindermeshhalfheight"),
                 "Unadmitted BinderMeshHalfHeight override");
             // The selected PHY must omit it;215BC8 supplies float2.25.
-            binding.halfHeight25C=2.25f;
+            for(auto& pair:binding)pair.halfHeight25C=2.25f;
             const auto* identity=original_player_identity50IK::find(rig.podId);
             need(identity,"Unadmitted original pod for Binder");
             const auto bytes=native_racer50HW::f::readBytes(rig.resourceFile);
@@ -117,8 +137,8 @@ public:
                 need(next->bank.load(input,d.bank),"Binder immutable ten-frame bank");
                 g::OriginalUiTextureAnimationConfig50KG config;config.framesPerSecond=16.f;config.loopOnEndToFrame=0;
                 need(g::initializeOriginalUiTextureAnimation50KG(next->animation,config,10),"Binder original animation defaults");
-                next->bindings[slot]=binding;next->bound[slot]=true;storage_=std::move(next);
-            }else{storage_->bindings[slot]=binding;storage_->bound[slot]=true;}
+                next->bindings[slot]=binding;next->bindingCount[slot]=pairCount;next->bound[slot]=true;storage_=std::move(next);
+            }else{storage_->bindings[slot]=binding;storage_->bindingCount[slot]=pairCount;storage_->bound[slot]=true;}
             return true;
         }catch(const std::exception& e){d.message=e.what();return false;}
         catch(...){d.message="Binder cold owner failure";return false;}

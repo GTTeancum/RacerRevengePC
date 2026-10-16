@@ -15,9 +15,12 @@ std::string filename(const ParameterBlock48F&b){auto n=field(b,"soundresourcefil
 bool readMaterialAudioCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50HI&out,std::vector<AudioRequest50HC>&requests,std::string&error){
     try{ParameterDocument48F p;DecodeError48C d;WorldLimits48F limits{};limits.retainDuplicateLabels=true;need(decodeParameters48F(aub,p,d,nullptr,limits),"50HI AUB parameter decode failed");
         const auto&s=block(p,"sounds");const int rows=number(field(s,"nummaterialcollisionsounds"));
-        need((rows==8||rows==12||rows==20)&&number(field(s,"nummaterialdriveonsounds"))==rows,"50HI unsupported material row count");
+        const int driveRows=number(field(s,"nummaterialdriveonsounds"));
+        need(((rows==8||rows==12||rows==20)&&driveRows==rows)||
+            ((rows==16||rows==32)&&driveRows==12),"50HI unsupported independent material row counts");
         MaterialAudioCatalog50HI next;std::vector<AudioRequest50HC> unique;
         next.parameters.rowCount=static_cast<std::uint32_t>(rows);
+        next.parameters.driveRowCount=static_cast<std::uint32_t>(driveRows);
         const int materials=number(field(s,"nummaterials"));need(materials>=1&&materials<=4,"50HI unsupported material assignment count");
         next.materialCount=static_cast<std::uint32_t>(materials);
         const auto* defaultText=optionalField(s,"defaultmaterial");const int fallback=defaultText?number(*defaultText):0;
@@ -35,9 +38,31 @@ bool readMaterialAudioCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAu
             }
         }
         auto add=[&](const std::string&name,bool loop){for(auto&r:unique)if(r.name==name){need(r.loop==loop,"50HI conflicting duplicate clip flags");return;}unique.push_back({name,loop,false,false});};
-        for(unsigned i=0;i<static_cast<unsigned>(rows);++i){const auto&c=block(p,"materialcollisionsound"+std::to_string(i+1));const auto&b=block(p,"materialdriveonsound"+std::to_string(i+1));next.collision[i]=filename(c);next.drive[i]=filename(b);add(next.collision[i],false);add(next.drive[i],true);
+        //279B60 and279E50 allocate and traverse their own authored count.
+        //157D00/157DD0 returns on a missing section WITHOUT replacing the
+        //current section.279C1C/279F04 ignore that return and still read it.
+        //Keep the last selected section, not a fabricated numbered filename.
+        const ParameterBlock48F* selected=&s;std::uint32_t selectedKey=0;
+        for(unsigned i=0;i<static_cast<unsigned>(rows);++i){
+            if(const auto* row=optionalBlock(p,"materialcollisionsound"+std::to_string(i+1))){selected=row;selectedKey=i+1;}
+            need(selectedKey!=0,"50HI initial collision source section absent");
+            next.collision[i]=filename(*selected);next.collisionSectionKeys[i]=selectedKey;
+        }
+        // The drive loader selects Sounds again before its independent loop.
+        selected=&s;selectedKey=0;
+        for(unsigned i=0;i<static_cast<unsigned>(driveRows);++i){
+            if(const auto* row=optionalBlock(p,"materialdriveonsound"+std::to_string(i+1))){selected=row;selectedKey=i+1;}
+            need(selectedKey!=0,"50HI initial drive source section absent");
+            const auto& b=*selected;next.drive[i]=filename(b);next.driveSectionKeys[i]=selectedKey;
             auto&v=next.parameters.drive[i];v.sampleSpeed=number(field(b,"materialsamplespeed"));v.minVolume=number(field(b,"materialminvolume"));v.minSpeed=number(field(b,"materialminspeed"));v.maxSpeed=number(field(b,"materialmaxspeed"));v.resonantSpeed=number(field(b,"materialresonantfreqspeed"));const auto&t=field(b,"materialfreqslope");const auto r=std::from_chars(t.data(),t.data()+t.size(),v.frequencySlope);need(r.ec==std::errc{}&&r.ptr==t.data()+t.size()&&std::isfinite(v.frequencySlope),"50HI invalid material frequency slope");
-            need(v.sampleSpeed>0&&v.minVolume>=0&&v.minVolume<=100&&v.minSpeed!=v.resonantSpeed&&v.maxSpeed!=v.resonantSpeed&&v.frequencySlope>=0,"50HI invalid material control authoring");}
+            need(v.sampleSpeed>0&&v.minVolume>=0&&v.minVolume<=100&&v.minSpeed!=v.resonantSpeed&&v.maxSpeed!=v.resonantSpeed&&v.frequencySlope>=0,"50HI invalid material control authoring");
+        }
+        // Keep the legacy unique-bank request order. Only PCM filenames are
+        // deduplicated; every collision/drive owner above stays independent.
+        for(unsigned i=0;i<static_cast<unsigned>(std::max(rows,driveRows));++i){
+            if(i<static_cast<unsigned>(rows))add(next.collision[i],false);
+            if(i<static_cast<unsigned>(driveRows))add(next.drive[i],true);
+        }
         out=std::move(next);requests=std::move(unique);error.clear();return true;
     }catch(const std::exception&e){error=e.what();return false;}
 }
@@ -56,7 +81,7 @@ bool applyTrackMaterialAssignments50HI(const MaterialAudioCatalog50HI& catalog,c
             if(name==item.object)material=item.material;
             else if(catalog.defaultMaterial&&material==0)material=catalog.defaultMaterial;
         }
-        need(material<=255&&material<catalog.parameters.rowCount/4u,"50HI assigned material lacks a complete authored sound family");
+        need(material<=255&&material<catalog.parameters.rowCount/4u,"50HI assigned material lacks a complete collision sound family");
         value.materialA9=static_cast<std::uint8_t>(material);error.clear();return true;
     }catch(const std::exception& e){error=e.what();return false;}
 }

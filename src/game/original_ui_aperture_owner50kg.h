@@ -132,6 +132,10 @@ public:
     OriginalUiApertureStatus50KG bindGameOptions(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    // Actual config.dat shared by factory pages2/3, with distinct lifetimes.
+    OriginalUiApertureStatus50KG bindControls(
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint8_t factoryPage,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
     OriginalUiApertureStatus50KG bindOptionsMenuEntryOnly(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
@@ -150,6 +154,19 @@ public:
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&)noexcept;
     OriginalUiApertureStatus50KG saveCourseUpdateDelta38(float actualDelta)noexcept;
     OriginalUiApertureStatus50KG beginCourseEntryAtRender48(OriginalUiTransitionPhase50KG actualManagerPhase170)noexcept;
+    // Tournament1F2E30 entry is a no-op; render1F2DF8 begins opening.
+    // This is the aperture owner, not a completed Tournament screen.
+    OriginalUiApertureStatus50KG bindTournament(
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    OriginalUiApertureStatus50KG saveTournamentUpdateDelta38(float actualDelta) noexcept;
+    // Call at entry74 reset point1EEAB8/1EEAD0 after actual popup setup.
+    // Resets only4060; the session owns timer4064 and remaining entry effects.
+    OriginalUiApertureStatus50KG resetTournamentExitRequestedAtEntry74() noexcept;
+    // Render1F2DB8 also follows active popup when actual4060 is nonzero.
+    OriginalUiApertureStatus50KG beginTournamentEntryAtRender48(
+        OriginalUiTransitionPhase50KG actualManagerPhase170,std::uint8_t actualPopupFlags29) noexcept;
+    bool tournamentExitRequested4060() const noexcept {return tournament_&&tournamentExitRequested4060_;}
     OriginalUiApertureSnapshot50KG snapshot() const noexcept { return state_; }
     const OriginalUiApertureConfig50KG* config() const noexcept {
         return state_.bound?&config_:nullptr;
@@ -169,6 +186,7 @@ public:
     // Options actual+38=1F9A70 saves dt at1F9A74 before jumping to2A6BB0.
     OriginalUiApertureStatus50KG saveOptionsMenuUpdateDelta38(float actualDelta) noexcept;
     OriginalUiApertureStatus50KG saveGameOptionsUpdateDelta38(float actualDelta) noexcept;
+    OriginalUiApertureStatus50KG saveControlsUpdateDelta38(float actualDelta) noexcept;
     // Call ONLY at the real Main render's 1E6688 -> 1D7550 point. Uses the
     // saved delta, never a new elapsed timer. Every real render may use that
     // same saved sample, as source does; no synthetic per-tick deduplication.
@@ -176,7 +194,8 @@ public:
     // a subsequent real render observes it. Close crossing invokes B8 first.
     // No implicit entity update or manager tick; no GPU-fence interpretation.
     OriginalUiApertureStatus50KG render48(OriginalUiTransitionLifecycle50KG) noexcept;
-    // Read-only source phase predicate. Wrong route or lost dependency is
+    // Source phase predicate; Tournament also records pending exit4060.
+    // Wrong route or lost dependency is
     // unavailable. Unknown/none phase is pending. Repeated polls never move.
     OriginalUiTransitionCompletion50KG pollCompletion(
         OriginalUiTransitionRoute50KG,OriginalUiTransitionPhase50KG) const noexcept;
@@ -189,15 +208,17 @@ private:
     OriginalUiApertureCallbacks50KG callbacks_{};
     mutable bool inOperation_=false;
     bool entryOnly_=false;
-    bool optionsMenu_=false,rider_=false,course_=false;
+    bool optionsMenu_=false,rider_=false,course_=false,tournament_=false;
+    mutable bool tournamentExitRequested4060_=false;
     std::uint8_t optionsPage_=1;
     OriginalUiApertureStatus50KG bindPageImpl(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,bool entryOnly,bool optionsMenu,std::uint8_t page,
-        OriginalUiApertureDiagnostic50KG&,bool rider=false,bool course=false) noexcept;
+        OriginalUiApertureDiagnostic50KG&,bool rider=false,bool course=false,bool tournament=false) noexcept;
     OriginalUiApertureStatus50KG saveUpdateDelta38(float actualDelta) noexcept;
     bool available() const noexcept;
     void emit(OriginalUiApertureHookKind50KG,std::uint32_t callPC,
         std::uint32_t targetPC) noexcept;
 };
 } // namespace rr::game
+

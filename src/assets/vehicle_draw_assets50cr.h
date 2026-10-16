@@ -6,10 +6,10 @@
 #include <vector>
 
 namespace rr::assets {
-constexpr std::uint32_t vehicleDrawComponentCount50CR = 3;
+constexpr std::uint32_t vehicleDrawComponentCount50CR = game::maxVehicleDrawComponents50CM;
 constexpr std::uint32_t vehicleDrawStagingBankCount50CR = 2;
 
-// Cold input, in chariot/left-engine/right-engine order. RRSCENE1 already
+// Cold input: chariot/left/right, then optional bottom-left/bottom-right. RRSCENE1 already
 // contains its matching neutral_lod0 RRMESH01 bytes. The source table must be
 // the actual model+1B8 PSG source-index table, and paletteIds must be the actual
 // selected PSG palette. Neither table is inferred from node names or ranges.
@@ -20,9 +20,15 @@ struct VehicleDrawAssetInput50CR {
     std::uint32_t sourceNodeCount = 0;
     const std::uint8_t* paletteIds = nullptr;
     std::uint32_t paletteCount = 0;
+    // Optional exact original PSG authenticated by the actual caller. When
+    // present, retain its decoded groups/strips/continuations, which RRSCENE1
+    // does not serialize. Its complete encoded scene must equal sceneBytes.
+    // Borrowed only during load; no topology is inferred from triangle indices.
+    const std::vector<std::uint8_t>* sourcePsgBytes = nullptr;
 };
 struct VehicleDrawAssetsInput50CR {
     VehicleDrawAssetInput50CR component[vehicleDrawComponentCount50CR]{};
+    std::uint32_t componentCount = game::defaultVehicleDrawComponents50CM;
 };
 enum class VehicleDrawAssetError50CR : std::uint8_t {
     none, alreadyLoaded, input, scene, compatibilityMesh, binding,
@@ -36,7 +42,7 @@ struct VehicleDrawAssetDiagnostic50CR {
     game::VehicleDrawDiagnostic50CM draw{};
 };
 
-// A caller-owned, load-once lifetime anchor for the three immutable assets,
+// A caller-owned, load-once lifetime anchor for the active immutable assets,
 // copied source/palette tables and two separately writable vertex banks.
 // Noncopyable/nonmovable: prepared descriptors never need pointer rebasing.
 // There is no reload/reset operation. Destroy only after every borrowed view,
@@ -50,10 +56,11 @@ public:
     VehicleDrawAssets50CR(VehicleDrawAssets50CR&&) = delete;
     VehicleDrawAssets50CR& operator=(VehicleDrawAssets50CR&&) = delete;
 
-    // Cold only: reuses parseSceneAsset48D, parseMesh48B and
+    // Cold only: uses parseSceneAsset48D, or decodeScene48D plus exact cache
+    // equality when sourcePsgBytes is supplied, then parseMesh48B and
     // prepareVehicleDrawMesh50CM. Allocates only before publication, including
     // exact-sized local-vertex storage and both vertex banks for each model.
-    // All three components commit together; failure leaves this owner empty
+    // All active components commit together; failure leaves this owner empty
     // and retryable. An already-loaded owner rejects without invalidating it.
     // Inputs/descriptors/diagnostic are distinct live storage. Array extents
     // and authentic provenance of the supplied binding tables are caller
@@ -62,6 +69,7 @@ public:
         VehicleDrawAssetDiagnostic50CR&) noexcept;
 
     bool loaded() const noexcept;
+    std::uint32_t componentCount() const noexcept;
     // Const access preserves original material names/indices, semantic data,
     // compatibility UV/color bytes and prepared descriptors. Null if unloaded
     // or passed an invalid component enum. No material policy is added.

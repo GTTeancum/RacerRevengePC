@@ -1,5 +1,7 @@
 #pragma once
-// Cold identities for retained originals and the exact Course POD19 resource.
+// Authenticated original identities, including four default-unlocked riders.
+// Identity metadata does not imply source bytes are installed or admit a
+// Course/roster destination; those owners retain separate readiness gates.
 // Digests identify source
 // bytes, not generated output. Constructor21079C/21081C/210820 binds racer60
 // to Pod%02d; the human's host slot never determines its resource/audio ID.
@@ -25,7 +27,7 @@ struct Identity {
     unsigned announcerEvents;
     const char* announcerSha256;
 };
-inline constexpr std::array<Identity,9> originals{{
+inline constexpr std::array<Identity,13> originals{{
     {1,"POD01",349110,
      "08b4d7655cb796da8a29d9b9a5318c0364561c659794ac9de6c9dfed7416eca3",
      "47fcfbaab278d10506b302520adc51af4e3388ceb601daa3dbd588aea1f39a1b",
@@ -88,7 +90,35 @@ inline constexpr std::array<Identity,9> originals{{
      "480758ea0adeeca293db02ccc197d9760acbe3faaf08cd216b5f281af312e388",
      "71177c4e7dee02bbc31ac0bb12958ba4a8df4e4f62e84755913454f8511b4670",
      "24a47cd627c6070ca586c699133373e7383971aa4fe006e277cfb107f6c344fa",
-     2496,30,"464c99a77c4b7970e96e4c823d782971f6140d86570c76a00638d0c542c89cf0"}
+     2496,30,"464c99a77c4b7970e96e4c823d782971f6140d86570c76a00638d0c542c89cf0"},
+    {2,"POD02",385218,
+     "7cee08d049a47d088e8329ab63d622471299945d32f76ce9c9fb21b358e845e0",
+     "cd5822d6a8a8ebde0bacf5849788540ef20b4a57f2abb9a71f9b8376fa7b869b",
+     "68485fc4691a0294e70974a39b6ffa26eeaf8689ca81f3b28179b19029fdba70",
+     "0d18fb1534e1744d3314d115473a752055506cc8d9dfa29b6aed7de205afef40",
+     "ce4c18dac55809ce173309ecdb8bf2284046d2720d29ef63f76a9e3e5cf82ea7",
+     2496,30,"40132dddcf4801ae128be8ffa82398489efec49e7b65f9036516a1667378eb62"},
+    {12,"POD12",389534,
+     "de144b1067eefd3037f4f0a7325beedc5c1c98e806b3802a08cdfec91bbf6f19",
+     "7711c1d6523f6a6366e2cf29def88b51f5945dc7788528f970941b814b3d4ae0",
+     "a1ea8aa445414ea7a5e3dacb1360a973d969ee4b07d8d15e504a2935f5cefeca",
+     "b87553b5cbe9850cfcd412a64ed8c9eb3d5448758c56d067772a862b577a818b",
+     "05eab8c605d0be40796c9681ca1cd2ecc04e2949b6b946f7d6bb1ecf983a61b7",
+     2403,29,"ff89c669b057ba170f837685040ac9eb414ef73de25ed755d5fbb8db3246f8b9"},
+    {15,"POD15",324173,
+     "3501ca0a81e0485575c7a5ff217f3ac6a9248c15824d8dff9bbd1bc2f7aae326",
+     "e1402abbadcc67420a10466392e8a3db18c9aa5196b7baf60c8e256746afa23a",
+     "74822ac1b18a776ec62f6aa1032ca244da93b783aefd3b44a802035fa86d9c28",
+     "c6f4f0b0eafc3a3829858f828b38544a2fabfdf6bdcbda0926737d1f9ca5ce51",
+     "0ac3f057abb9bb8503d5c73cb49709598e6f2b74d0c4ace5bdebf8f953dc6be2",
+     2478,30,"e089aff382fb352d8c62aa7f0eb288ec32d490886f05e0d05b393d298d7f1ee4"},
+    {20,"POD20",309724,
+     "8c5f282b53c230861e26acf797b8ab2ba1ef8856b8b476e3cfea55b48e3040ec",
+     "a047bb90bb1275ad5d31e596cea5eaa02fd63ba9bbdc4ef931835f567c87d19d",
+     "5e76e78f9deaec2af43a67baabb0005c778f874beb57e6d3999bc11d15e31d11",
+     "8e01cc5d2a95859a9269d49bf217f2da1e75f64af7d621aaa74d4a63fed2b3fd",
+     "f7f92d8446f162ada65cb0dfac270d292208e0cce00fb250f9252cb3118ff6d7",
+     2403,29,"9a0f88d81772acda11fdbb7ed89285a09ebef0e600e6d5049d71cb7efac62efa"}
 }};
 inline constexpr const Identity* find(std::uint32_t racer60) noexcept {
     for(const auto& entry:originals)if(entry.racer60==racer60)return &entry;
@@ -104,7 +134,7 @@ inline std::filesystem::path archivePath(const std::filesystem::path& discRoot,c
 inline std::filesystem::path announcerPath(const std::filesystem::path& discRoot,const Identity& identity) {
     return discRoot/"AUDIO/SPEECH/DAX/INRACE"/(std::string(identity.podId)+"ANN.INI");
 }
-// Seven independently retained originals author byte-identical counts. This
+// Eleven independently authored originals have byte-identical counts. This
 // does not make their category names/PCM interchangeable: those hashes differ.
 inline constexpr std::array<std::uint8_t,9> speechCounts(const Identity& identity) noexcept {
     if(identity.racer60==19)return {5,6,7,6,6,6,3,4,4};

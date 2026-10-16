@@ -1,0 +1,146 @@
+{
+  "schema": "RR_ADDITIONAL_POD_IDENTITIES_V1",
+  "source_generation_sha256": "3cf500075d2f31e3930d5e74896a3068ca596fba3f47475ba9c4643bcbf60b39",
+  "pods": {
+    "POD02": {
+      "racer60": 2,
+      "resource_path": "PODS/POD02/POD02.RES",
+      "resource_bytes": 385218,
+      "resource_sha256": "7cee08d049a47d088e8329ab63d622471299945d32f76ce9c9fb21b358e845e0",
+      "phy_sha256": "cd5822d6a8a8ebde0bacf5849788540ef20b4a57f2abb9a71f9b8376fa7b869b",
+      "speech_sha256": {
+        "curses": "68485fc4691a0294e70974a39b6ffa26eeaf8689ca81f3b28179b19029fdba70",
+        "taunts": "0d18fb1534e1744d3314d115473a752055506cc8d9dfa29b6aed7de205afef40",
+        "special": "ce4c18dac55809ce173309ecdb8bf2284046d2720d29ef63f76a9e3e5cf82ea7",
+        "sounds": "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2"
+      },
+      "speech_counts": [
+        2,
+        3,
+        3,
+        3,
+        4,
+        4,
+        3,
+        3,
+        3
+      ],
+      "announcer_path": "AUDIO/SPEECH/DAX/INRACE/POD02ANN.INI",
+      "announcer_bytes": 2496,
+      "announcer_events": 30,
+      "announcer_sha256": "40132dddcf4801ae128be8ffa82398489efec49e7b65f9036516a1667378eb62"
+    },
+    "POD12": {
+      "racer60": 12,
+      "resource_path": "PODS/POD12/POD12.RES",
+      "resource_bytes": 389534,
+      "resource_sha256": "de144b1067eefd3037f4f0a7325beedc5c1c98e806b3802a08cdfec91bbf6f19",
+      "phy_sha256": "7711c1d6523f6a6366e2cf29def88b51f5945dc7788528f970941b814b3d4ae0",
+      "speech_sha256": {
+        "curses": "a1ea8aa445414ea7a5e3dacb1360a973d969ee4b07d8d15e504a2935f5cefeca",
+        "taunts": "b87553b5cbe9850cfcd412a64ed8c9eb3d5448758c56d067772a862b577a818b",
+        "special": "05eab8c605d0be40796c9681ca1cd2ecc04e2949b6b946f7d6bb1ecf983a61b7",
+        "sounds": "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2"
+      },
+      "speech_counts": [
+        2,
+        3,
+        3,
+        3,
+        4,
+        4,
+        3,
+        3,
+        3
+      ],
+      "announcer_path": "AUDIO/SPEECH/DAX/INRACE/POD12ANN.INI",
+      "announcer_bytes": 2403,
+      "announcer_events": 29,
+      "announcer_sha256": "ff89c669b057ba170f837685040ac9eb414ef73de25ed755d5fbb8db3246f8b9"
+    },
+    "POD15": {
+      "racer60": 15,
+      "resource_path": "PODS/POD15/POD15.RES",
+      "resource_bytes": 324173,
+      "resource_sha256": "3501ca0a81e0485575c7a5ff217f3ac6a9248c15824d8dff9bbd1bc2f7aae326",
+      "phy_sha256": "e1402abbadcc67420a10466392e8a3db18c9aa5196b7baf60c8e256746afa23a",
+      "speech_sha256": {
+        "curses": "74822ac1b18a776ec62f6aa1032ca244da93b783aefd3b44a802035fa86d9c28",
+        "taunts": "c6f4f0b0eafc3a3829858f828b38544a2fabfdf6bdcbda0926737d1f9ca5ce51",
+        "special": "0ac3f057abb9bb8503d5c73cb49709598e6f2b74d0c4ace5bdebf8f953dc6be2",
+        "sounds": "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2"
+      },
+      "speech_counts": [
+        2,
+        3,
+        3,
+        3,
+        4,
+        4,
+        3,
+        3,
+        3
+      ],
+      "announcer_path": "AUDIO/SPEECH/DAX/INRACE/POD15ANN.INI",
+      "announcer_bytes": 2478,
+      "announcer_events": 30,
+      "announcer_sha256": "e089aff382fb352d8c62aa7f0eb288ec32d490886f05e0d05b393d298d7f1ee4"
+    },
+    "POD19": {
+      "racer60": 19,
+      "resource_path": "PODS/POD19/POD19.RES",
+      "resource_bytes": 388750,
+      "resource_sha256": "7fd2b69f04351dc73d563527df8b67a1ed896c7d47f6a47fe9ee753f2394e826",
+      "phy_sha256": "6267bb1fb33bd798a589c5afd64f7197211fa47a1a78a495f2859d150bd28874",
+      "speech_sha256": {
+        "curses": "480758ea0adeeca293db02ccc197d9760acbe3faaf08cd216b5f281af312e388",
+        "taunts": "71177c4e7dee02bbc31ac0bb12958ba4a8df4e4f62e84755913454f8511b4670",
+        "special": "24a47cd627c6070ca586c699133373e7383971aa4fe006e277cfb107f6c344fa",
+        "sounds": "24c40bf4fc181e88c0361742dec94c76d91c522ba358c5533bde2769fdfaa3ec"
+      },
+      "speech_counts": [
+        5,
+        6,
+        7,
+        6,
+        6,
+        6,
+        3,
+        4,
+        4
+      ],
+      "announcer_path": "AUDIO/SPEECH/DAX/INRACE/POD19ANN.INI",
+      "announcer_bytes": 2496,
+      "announcer_events": 30,
+      "announcer_sha256": "464c99a77c4b7970e96e4c823d782971f6140d86570c76a00638d0c542c89cf0"
+    },
+    "POD20": {
+      "racer60": 20,
+      "resource_path": "PODS/POD20/POD20.RES",
+      "resource_bytes": 309724,
+      "resource_sha256": "8c5f282b53c230861e26acf797b8ab2ba1ef8856b8b476e3cfea55b48e3040ec",
+      "phy_sha256": "a047bb90bb1275ad5d31e596cea5eaa02fd63ba9bbdc4ef931835f567c87d19d",
+      "speech_sha256": {
+        "curses": "5e76e78f9deaec2af43a67baabb0005c778f874beb57e6d3999bc11d15e31d11",
+        "taunts": "8e01cc5d2a95859a9269d49bf217f2da1e75f64af7d621aaa74d4a63fed2b3fd",
+        "special": "f7f92d8446f162ada65cb0dfac270d292208e0cce00fb250f9252cb3118ff6d7",
+        "sounds": "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2"
+      },
+      "speech_counts": [
+        2,
+        3,
+        3,
+        3,
+        4,
+        4,
+        3,
+        3,
+        3
+      ],
+      "announcer_path": "AUDIO/SPEECH/DAX/INRACE/POD20ANN.INI",
+      "announcer_bytes": 2403,
+      "announcer_events": 29,
+      "announcer_sha256": "9a0f88d81772acda11fdbb7ed89285a09ebef0e600e6d5049d71cb7efac62efa"
+    }
+  }
+}

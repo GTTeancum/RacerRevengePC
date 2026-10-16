@@ -1,0 +1,532 @@
+{
+  "archive": "/workspace/scratch/74cd1d3d7a45/ra-audio-originals/RacerRevenge-original-AUDIO.zip",
+  "archiveBytes": 79019408,
+  "archiveSha256": "c246ad58020726d92a65a56e09e4cd9b68ba60cdcc9aa697d2cb48e51275aafb",
+  "method": "Original ZIP member identity and raw48-byte header words only; no audio decoding",
+  "clips": [
+    {
+      "requested": "audio/sfx/race/catwalk.vag",
+      "sourceUses": [
+        "soultreesound39",
+        "soultreesound40"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/CATWALK.VAG",
+      "bytes": 20848,
+      "sha256": "a02c3e3d4554d53e07234b564f44c7f24e7d6aac266aa5d20632ed9ef1bc6bee",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 20800,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/cnyncry1.vag",
+      "sourceUses": [
+        "soultreesound34"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/CNYNCRY1.VAG",
+      "bytes": 39904,
+      "sha256": "fd33a11bd1bb48e5e291fcc4afa1860ffcd892a168f265a4e52787736548e661",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 39856,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/cnyncry2.vag",
+      "sourceUses": [
+        "soultreesound35",
+        "soultreesound37"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/CNYNCRY2.VAG",
+      "bytes": 28720,
+      "sha256": "8aa7f99d04e55db8327cd1b9429ecd710353893bb114643499a01655ac9c3fff",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 28672,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/cnyncry3.vag",
+      "sourceUses": [
+        "soultreesound33",
+        "soultreesound42"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/CNYNCRY3.VAG",
+      "bytes": 40448,
+      "sha256": "40ffe5ee17f1f083f331fe2969ad2f0d58f207f1d2dfc22898256da8e4ee4b54",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 40400,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/headston.vag",
+      "sourceUses": [
+        "soultreesound38",
+        "soultreesound41"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/HEADSTON.VAG",
+      "bytes": 45312,
+      "sha256": "0a0578363967428a6c92b3f9983771a665da12b1a8d06dd7d300e0dd778e048e",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 45264,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/metlhit1.vag",
+      "sourceUses": [
+        "materialcollisionsound9"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/METLHIT1.VAG",
+      "bytes": 5888,
+      "sha256": "7670d1e0c33ae3662ce221329adeff5201000ece5964e1d335af9386740b4698",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 5840,
+      "sampleRateBE": 19500
+    },
+    {
+      "requested": "audio/sfx/race/metlhit2.vag",
+      "sourceUses": [
+        "materialcollisionsound10"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/METLHIT2.VAG",
+      "bytes": 7040,
+      "sha256": "b0a8a062db4f0294dca2d9a95e0130dacc9a885a0564dee606a2a85b73d52577",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 6992,
+      "sampleRateBE": 19500
+    },
+    {
+      "requested": "audio/sfx/race/metlhit3.vag",
+      "sourceUses": [
+        "materialcollisionsound11"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/METLHIT3.VAG",
+      "bytes": 6720,
+      "sha256": "75481691c79fa4f07917649f1042325d6754ff619d1dfb23e5d6adf2a864e401",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 6672,
+      "sampleRateBE": 19500
+    },
+    {
+      "requested": "audio/sfx/race/metlhit4.vag",
+      "sourceUses": [
+        "materialcollisionsound12"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/METLHIT4.VAG",
+      "bytes": 8208,
+      "sha256": "7ad246b513b721e24e0aa894d9b1eaa4e227f213c44220485e9a0591e83de03f",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 8160,
+      "sampleRateBE": 19500
+    },
+    {
+      "requested": "audio/sfx/race/metlwsh1.vag",
+      "sourceUses": [
+        "soultreesound29"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/METLWSH1.VAG",
+      "bytes": 6016,
+      "sha256": "8b146edbee3426e83f07c1c663bcea26690e6b30006e0494f123c2c8e70082f0",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 5968,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/metlwsh2.vag",
+      "sourceUses": [
+        "soultreesound28",
+        "soultreesound30"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/METLWSH2.VAG",
+      "bytes": 5088,
+      "sha256": "196db3d760409f0669d4d8c9bbf296e5266eb461e3b26b505f38ef4da5187445",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 5040,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/mtlscrp1.vag",
+      "sourceUses": [
+        "materialdriveonsound9"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/MTLSCRP1.VAG",
+      "bytes": 28800,
+      "sha256": "ad176b5a9cb3302f0f8ac727a33da1e5662e7db38da65e2f01963d89c4bde452",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 28752,
+      "sampleRateBE": 19000
+    },
+    {
+      "requested": "audio/sfx/race/mtlscrp2.vag",
+      "sourceUses": [
+        "materialdriveonsound10"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/MTLSCRP2.VAG",
+      "bytes": 25760,
+      "sha256": "b0233fbb2b5aa3df74e3747ad79d63e2781d73df42132ce63a605497edaa1304",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 25712,
+      "sampleRateBE": 18000
+    },
+    {
+      "requested": "audio/sfx/race/mtlscrp3.vag",
+      "sourceUses": [
+        "materialdriveonsound11"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/MTLSCRP3.VAG",
+      "bytes": 31552,
+      "sha256": "d13aa67eed6adc6c111fcb6bbc6c16aec5b771c5bd77a5025df2f32767013c1f",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 31504,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/mtlscrp4.vag",
+      "sourceUses": [
+        "materialdriveonsound12"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/MTLSCRP4.VAG",
+      "bytes": 31552,
+      "sha256": "d13aa67eed6adc6c111fcb6bbc6c16aec5b771c5bd77a5025df2f32767013c1f",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 31504,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/pod_coll.vag",
+      "sourceUses": [
+        "materialcollisionsound1",
+        "materialcollisionsound2",
+        "materialcollisionsound3",
+        "materialcollisionsound4"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/POD_COLL.VAG",
+      "bytes": 14704,
+      "sha256": "4bcd3f33e1fc5c47b921a565a334566464d649b7d69972bdc8d6d58dfc5669a7",
+      "headerMagicHex": "56414770",
+      "declaredPayloadBE": 14656,
+      "sampleRateBE": 44100
+    },
+    {
+      "requested": "audio/sfx/race/podscrp1.vag",
+      "sourceUses": [
+        "materialdriveonsound1"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/PODSCRP1.VAG",
+      "bytes": 6544,
+      "sha256": "546b0afbea0edab78ddafd2d37a987c314bed4ab93545c2162125f0c0d77b05e",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 6496,
+      "sampleRateBE": 18000
+    },
+    {
+      "requested": "audio/sfx/race/podscrp2.vag",
+      "sourceUses": [
+        "materialdriveonsound2"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/PODSCRP2.VAG",
+      "bytes": 8016,
+      "sha256": "6bb95c1d1225594b086619a791e9eba3b85674d7ce74c1b1f870b07e4fa897dd",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 7968,
+      "sampleRateBE": 19500
+    },
+    {
+      "requested": "audio/sfx/race/podscrp3.vag",
+      "sourceUses": [
+        "materialdriveonsound3"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/PODSCRP3.VAG",
+      "bytes": 8624,
+      "sha256": "adfc070933aa60444d290a62cbdf193408a803fe3b8b66e20c1f02d65f583448",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 8576,
+      "sampleRateBE": 18000
+    },
+    {
+      "requested": "audio/sfx/race/podscrp4.vag",
+      "sourceUses": [
+        "materialdriveonsound4"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/PODSCRP4.VAG",
+      "bytes": 6048,
+      "sha256": "7d52c97c392a0a0525ac78dc1096d77641aa0e9a78b79d620ef2bf0943bb5946",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 6000,
+      "sampleRateBE": 18000
+    },
+    {
+      "requested": "audio/sfx/race/pump.vag",
+      "sourceUses": [
+        "soultreesound12",
+        "soultreesound14",
+        "soultreesound15",
+        "soultreesound20"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/PUMP.VAG",
+      "bytes": 38656,
+      "sha256": "8e26f982409d861afa579d68c2df06683ab669eef20651eb4e6b8c20ae4103cf",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 38608,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/rckscrp1.vag",
+      "sourceUses": [
+        "materialdriveonsound5"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/RCKSCRP1.VAG",
+      "bytes": 37376,
+      "sha256": "848272a0ab9a381e47865dec41f17b0d504f713e982957e727579b4554013ab3",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 37328,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/rckscrp2.vag",
+      "sourceUses": [
+        "materialdriveonsound6"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/RCKSCRP2.VAG",
+      "bytes": 37376,
+      "sha256": "848272a0ab9a381e47865dec41f17b0d504f713e982957e727579b4554013ab3",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 37328,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/rckscrp3.vag",
+      "sourceUses": [
+        "materialdriveonsound7"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/RCKSCRP3.VAG",
+      "bytes": 37376,
+      "sha256": "848272a0ab9a381e47865dec41f17b0d504f713e982957e727579b4554013ab3",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 37328,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/rckscrp4.vag",
+      "sourceUses": [
+        "materialdriveonsound8"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/RCKSCRP4.VAG",
+      "bytes": 37376,
+      "sha256": "848272a0ab9a381e47865dec41f17b0d504f713e982957e727579b4554013ab3",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 37328,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/rockhit1.vag",
+      "sourceUses": [
+        "materialcollisionsound5"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/ROCKHIT1.VAG",
+      "bytes": 11664,
+      "sha256": "8549689b0eb7d1ec415d8ce092a6101927b19a324cf73cc2fe7a4011e4626912",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 11616,
+      "sampleRateBE": 18000
+    },
+    {
+      "requested": "audio/sfx/race/rockhit2.vag",
+      "sourceUses": [
+        "materialcollisionsound6"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/ROCKHIT2.VAG",
+      "bytes": 10400,
+      "sha256": "17fb766a6f38c969c6726db2092222bc9e4a633810b9f7ba4c6ff17157ab63b0",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 10352,
+      "sampleRateBE": 18000
+    },
+    {
+      "requested": "audio/sfx/race/rockhit3.vag",
+      "sourceUses": [
+        "materialcollisionsound7"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/ROCKHIT3.VAG",
+      "bytes": 12416,
+      "sha256": "465be3afd0b990d193871d3bd5b0d1cf63d9abb084abf2594daaa1fe04e4ffca",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 12368,
+      "sampleRateBE": 18000
+    },
+    {
+      "requested": "audio/sfx/race/rockhit4.vag",
+      "sourceUses": [
+        "materialcollisionsound8"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/ROCKHIT4.VAG",
+      "bytes": 11664,
+      "sha256": "162885fe6bef97696a041b72ea7293654b8eac542d24429e7d56991c992f8d0d",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 11616,
+      "sampleRateBE": 18000
+    },
+    {
+      "requested": "audio/sfx/race/rockhum.vag",
+      "sourceUses": [
+        "soultreesound24",
+        "soultreesound25",
+        "soultreesound26",
+        "soultreesound36"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/ROCKHUM.VAG",
+      "bytes": 13856,
+      "sha256": "e0455ae2be460e59bdb5372a9e6d0043d9891d6639f007e4a9f03fb9d140649b",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 13808,
+      "sampleRateBE": 8611
+    },
+    {
+      "requested": "audio/sfx/race/rockwsh1.vag",
+      "sourceUses": [
+        "soultreesound31",
+        "soultreesound32"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/ROCKWSH1.VAG",
+      "bytes": 4544,
+      "sha256": "af59577c39beed190e49493c24063a9f2a9fc3f31236e7bc3e8f985c180a3ccd",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 4496,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/rockwsh2.vag",
+      "sourceUses": [
+        "soultreesound27"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/ROCKWSH2.VAG",
+      "bytes": 7536,
+      "sha256": "4c8c50b7e835c9bf49223d37a916cf2963f159901c3ba59a6a818a540140d43d",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 7488,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/rylcrowd.vag",
+      "sourceUses": [
+        "soultreesound1",
+        "soultreesound2",
+        "soultreesound3",
+        "soultreesound4",
+        "soultreesound5",
+        "soultreesound6",
+        "soultreesound7"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/RYLCROWD.VAG",
+      "bytes": 41120,
+      "sha256": "29b870df4cb3fb0a9395b9e49be7359dff23c17531513453d99871305009e57d",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 41072,
+      "sampleRateBE": 16000
+    },
+    {
+      "requested": "audio/sfx/race/steam02.vag",
+      "sourceUses": [
+        "soultreesound13",
+        "soultreesound18",
+        "soultreesound19",
+        "soultreesound21",
+        "soultreesound22",
+        "soultreesound23"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/STEAM02.VAG",
+      "bytes": 32208,
+      "sha256": "79cb1e7ca7142b28620a91ef028e62d13592f0777011d4bd58beb25814872406",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 32160,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/torch.vag",
+      "sourceUses": [
+        "soultreesound10",
+        "soultreesound11",
+        "soultreesound8",
+        "soultreesound9"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/TORCH.VAG",
+      "bytes": 32320,
+      "sha256": "2be8564dd9b2e14a6bc364e3db805ce53b1a24ae402fbee864cee9123ea42381",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 32272,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/sfx/race/vats.vag",
+      "sourceUses": [
+        "soultreesound16",
+        "soultreesound17"
+      ],
+      "available": true,
+      "member": "AUDIO/SFX/RACE/VATS.VAG",
+      "bytes": 37936,
+      "sha256": "3e28c39754c8c3a11a3c0034b5953a3d55c5268e48be83e9d6081d1aa3efcd51",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 37888,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/speech/dax/tracks/ryloth/daxrya37.vag",
+      "sourceUses": [
+        "introAud.Event1"
+      ],
+      "available": true,
+      "member": "AUDIO/SPEECH/DAX/TRACKS/RYLOTH/DAXRYA37.VAG",
+      "bytes": 183472,
+      "sha256": "0bf2151b189c085429c7b7113867ace94c300cff2aff6b152ee7ae75683fae5f",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 183424,
+      "sampleRateBE": 22050
+    },
+    {
+      "requested": "audio/speech/dax/tracks/ryloth/daxrya38.vag",
+      "sourceUses": [
+        "introAud.Event2"
+      ],
+      "available": true,
+      "member": "AUDIO/SPEECH/DAX/TRACKS/RYLOTH/DAXRYA38.VAG",
+      "bytes": 313936,
+      "sha256": "3a2f9d44f4e64af0d0049fa2dc6d92971267343c38ab9dc87395aca6f7f85204",
+      "headerMagicHex": "00000000",
+      "declaredPayloadBE": 313888,
+      "sampleRateBE": 22050
+    }
+  ]
+}

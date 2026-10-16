@@ -1,0 +1,44 @@
+SOURCE REVIEW ONLY -- UNTESTED
+Base commit: abbf73d740ef23b8529448755d7494c234033e8b
+Base tree: 12c4ffb473a0804bf09ba0e3d269b27cdd1c0ef8
+Input: rr-source-abbf73d-helpers.zip, 11547167 bytes
+Input SHA256: a9b83d548bb8f1609d1605ad90abab2ef204e30dcbe5c889dbb84ec16eaeca45
+Patch SHA256: f3be8e999a77aade4c770bd48b0f98f1397cbd42916d8dbc01339e3c90288f12
+
+Exact source ownership:
+- tests/native/track_fps_baseline50la.h
+- tests/native/terrain_interactive_drive50du.cpp
+
+Review checklist (source inspection, not executed verification):
+- Optional Baseline transition output leaves existing FPS eligibility, warmup,
+  duration thresholds, swap/tick counters, original receipt and completion intact.
+- No timestamp reads added. The original observer timestamp remains the boundary.
+- Measurement-start swap and its timings excluded; subsequent successful swaps
+  included once, including final accepted swap before sealing the receipt.
+- Internal settings/backward-counter reset carries both discarded and warmupAnchor.
+- All nine external discard sites route through the paired accumulator reset:
+  eligibility; input/activity/resize/capture/quit; unattended invalid drawable;
+  original fade; host menu; recovery before simulation; pause/controller-neutral;
+  recovery after simulation; actual Windows capture.
+- Duplicate callbacks contribute nothing. Counter gaps, missing completion/history
+  identity or missing diagnostics mark alignment failure without changing FPS.
+- Missing/invalid/overflowed timing samples mark timing_complete=false.
+  Aggregate overflow includes both sample-count and component totals.
+- Begin/end ns, swap and native tick identities are compared with the FPS receipt.
+  Count agreement requires accepted sample count == end swaps - begin swaps.
+- Accumulator is per-session and independent of periodic telemetry resets.
+  Completed receipts are sealed, matching existing one-baseline-per-session rules.
+- Existing history_stage, finish_wait and host_swap samples are nested children of
+  completion_wait. They are NOT additive to that parent, not GPU-only timings,
+  and not a complete decomposition of elapsed FPS time. Parent wall time is not
+  newly measured/aligned. Existing periodic telemetry remains baseline_aligned=0.
+- Diagnostic JSON is emitted only with phase timing and baseline enabled.
+- Existing render/simulation/synchronization/pacing and sample scopes untouched.
+
+Integration limits:
+No builds, tests, syntax checks, application runs, profiling, gameplay, converters,
+or project executables were run. Root owns all integration and software tests.
+No actual runtime alignment/performance claim. Apply only to the supplied snapshot;
+review concurrent caller edits before integration. Original disc and central checkout
+untouched. Prior partial patch/clone preserved. This incremental patch does not
+include prior renderer display instrumentation already present in abbf73d.

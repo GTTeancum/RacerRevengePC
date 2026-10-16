@@ -14,10 +14,14 @@ bool validControls(float gain, float pitch, float pan) noexcept {
            std::isfinite(pan) && pan >= -1.0f && pan <= 1.0f;
 }
 bool validSourceRate(const AudioClip50HD& clip,std::uint32_t rate,
-                     float gain,float pitch) noexcept {
+                     float gain,float pitch,bool allowNativeSilentZero=false) noexcept {
     if(!AudioMixer50HD::validClip(clip)||!validRate(rate)||
        !std::isfinite(gain)||gain<0.f||gain>8.f||
-       !std::isfinite(pitch)||!(pitch>0.f))return false;
+       !std::isfinite(pitch)||pitch<0.f)return false;
+    // Explicit native source-volume rendering policy. A zero normalized rate
+    // keeps the logical voice active and freezes its cursor, producing silence.
+    // It is not a claim about IOP/SPU output at source pitch zero.
+    if(pitch==0.f)return allowNativeSilentZero;
     const double end=static_cast<double>(clip.frames);
     const double step=static_cast<double>(clip.sampleRate)/rate*pitch;
     // Largest source-coordinate ULP in this clip. One full ULP guarantees
@@ -153,7 +157,7 @@ bool AudioMixer50HD::controlsSourceRate(std::size_t slot,float gain,float pitch,
 bool AudioMixer50HD::playSourceVolume(std::size_t slot,const AudioClip50HD& clip,
     std::int32_t volume,float pitch,bool loop,std::int32_t engineAngle) noexcept {
     float left=0.f,right=0.f;
-    if(slot>=count_||!validSourceRate(clip,rate_,1.f,pitch)||
+    if(slot>=count_||!validSourceRate(clip,rate_,1.f,pitch,true)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        !originalRouting50KG(engineAngle,left,right,volume))return false;
     noteControlChange();playbackRevisions_[slot]=controlRevision_;
@@ -163,7 +167,7 @@ bool AudioMixer50HD::playSourceVolume(std::size_t slot,const AudioClip50HD& clip
 bool AudioMixer50HD::controlsSourceVolume(std::size_t slot,std::int32_t volume,
     float pitch,std::int32_t engineAngle) noexcept {
     float left=0.f,right=0.f;
-    if(slot>=count_||!validSourceRate(voices_[slot].clip,rate_,1.f,pitch)||
+    if(slot>=count_||!validSourceRate(voices_[slot].clip,rate_,1.f,pitch,true)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        !originalRouting50KG(engineAngle,left,right,volume))return false;
     auto& voice=voices_[slot];
@@ -235,6 +239,9 @@ bool AudioMixer50HD::mixStereo16(std::int16_t* output, std::size_t frames) noexc
         for (std::size_t i = 0; i < count_; ++i) {
             auto& voice = voices_[i];
             if (!voice.active) continue;
+            // Zero-rate native source-volume policy: do not sample, advance,
+            // retire, or replace the token; later positive controls resume.
+            if (voice.pitch==0.f) continue;
             const auto& clip = voice.clip;
             const std::uint64_t loopStart = clip.loopEnd ? clip.loopStart : 0;
             const std::uint64_t loopEnd = clip.loopEnd ? clip.loopEnd : clip.frames;

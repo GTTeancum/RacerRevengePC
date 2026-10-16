@@ -25,7 +25,7 @@
 namespace authored_runtime_ground50cp_fixture {
 using namespace rr;using namespace rr::game;
 inline void need(bool x,const char*m){if(!x){std::cerr<<m<<'\n';std::exit(1);}}
-inline std::vector<std::uint8_t> read(const char*p){std::ifstream f(p,std::ios::binary);need(bool(f),p);return{std::istreambuf_iterator<char>(f),{}};}
+inline std::vector<std::uint8_t> read(const char*p){std::ifstream f(runtime_asset_paths50LB::resolve(p),std::ios::binary);need(bool(f),p);return{std::istreambuf_iterator<char>(f),{}};}
 inline std::string lower(std::string s){for(auto&c:s)if(c>='A'&&c<='Z')c+=32;return s;}
 inline std::array<float,3> vec(const assets::ParameterBlock48F&b,const char*key){const std::string*s=nullptr;for(const auto&f:b.fields)if(f.name==key)s=&f.value;need(s,"missing authored vector");std::array<float,3> v{};std::size_t begin=0;for(unsigned i=0;i<3;++i){auto end=s->find(',',begin);if(end==std::string::npos)end=s->size();auto a=begin,z=end;while(a<z&&(*s)[a]==' ')++a;while(z>a&&(*s)[z-1]==' ')--z;need(assets::parseTrackNumber50AD(s->data()+a,z-a,v[i]),"original numeric parser");begin=end+1;}need(begin==s->size()+1,"vector trailing");return v;}
 struct Owner{assets::CollisionMesh48I mesh;assets::TrackCollider50AO instance;std::string name;std::uint32_t zone=0,ordinal=0;};
@@ -36,6 +36,9 @@ struct ColdScene {std::vector<Owner> owners;BodyMatrix48G pose;float lift;std::s
 // and every dynamic reference is registered in the same method/zone.
 inline constexpr std::size_t runtimeSearchSlotLimit50IG=1024;
 inline constexpr std::size_t runtimeDynamicReferenceReserve50IG=3;
+// Optional actual694/7A4 refs are charged by track_runtime_storage50IG after
+// admission, along with its optional real Follow pair. Do not add fake owners.
+inline constexpr std::size_t runtimeRecoveryReferenceReserve50IG=2;
 inline constexpr std::size_t hardCollisionOwners50IG=
  runtimeSearchSlotLimit50IG-runtimeDynamicReferenceReserve50IG;
 // Keep the existing original-member admission: absent collision members do

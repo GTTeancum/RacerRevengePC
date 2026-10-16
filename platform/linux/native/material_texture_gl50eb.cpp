@@ -1,4 +1,6 @@
+#include "../../../tests/native/ra_static_fire_visual50la.h"
 #include "material_texture_gl50eb.h"
+#include "../../../tests/native/ra_cold_aggregate50la.h"
 #include <exception>
 #include <limits>
 #include <new>
@@ -261,11 +263,142 @@ bool MaterialTextureGl50EB::create(const MaterialTextureGlRequest50EB& request,
     ++lastPublication_;
     return true;
 }
+bool MaterialTextureGl50EB::createRaStaticWorld(const MaterialTextureGlRequest50EB& request,
+    const ra_cold_aggregate50LA::Owner& aggregate,MaterialTextureGlDiagnostic50EB& d) noexcept {
+    d={};
+    if(storage_||raStaticFire_||raStaticWorld_||aggregate.closed_||aggregate.terminal_||
+       !aggregate.prefix_.staticWorldImages||!aggregate.world_)
+        return fail(d,MaterialTextureGlError50EB::assets,"actual unpublished full RA world required");
+    auto owner=aggregate.world_;
+    try {
+        if(owner->modelServiceTerminal_||!owner->coldImagesCurrent()||owner->imageFamilies_.size()!=44||
+           owner->coldImages_.size()!=49||owner->pixelBank_.textureCount()!=49)
+            return fail(d,MaterialTextureGlError50EB::assets,"current 44-family/49-image RA closure required");
+        std::array<MaterialTextureSampler50EB,49> samplers{};
+        std::array<bool,49> assigned{};
+        const auto& table=owner->domain_->materials382B38();
+        for(std::size_t fi=0;fi<owner->imageFamilies_.size();++fi){
+            const auto& family=owner->imageFamilies_[fi];
+            assets::OriginalStandardMaterialCollectorEntryView50LA leaf;
+            assets::OriginalStandardMaterialPassView50LA pass;
+            assets::OriginalStandardMaterialMapBindingView50LA map;
+            assets::OriginalStandardMaterialDiagnostic50LA md;
+            if(!table->coldCollectorPass(owner->imageCollector_,family.materialRow,0,leaf)||
+               leaf.registration!=family.collector.registration||leaf.finalLeaf!=family.collector.finalLeaf||
+               !leaf.material||!leaf.material->source()||!leaf.material->source()->originalBytes()||
+               *leaf.material->source()->originalBytes()!=*owner->psms_.at(owner->normalized(family.materialMember))->originalBytes()||
+               !leaf.material->pass4C(0,pass)||!pass.texture1A||!pass.mapCount20||*pass.mapCount20!=1||
+               (*pass.texture1A)[0]!=family.textureToken||
+               pass.constructionTemplate!=owner->context_->materialApplication()->templates().get(assets::OriginalUiTemplate50KG::defaultMt))
+                return fail(d,MaterialTextureGlError50EB::assets,"actual RA canonical material/collector changed");
+            assets::OriginalStandardTextureRowView50LA row;
+            if(!owner->domain_->textures383400()->row(family.textureToken,row)||!row.references08||*row.references08<=0||
+               !row.object04||!row.object04->constructed24DA30()||!row.object04->originalBytes()||
+               *row.object04->originalBytes()!=family.sourceBytes||!row.object04->sourceMember()||
+               owner->normalized(*row.object04->sourceMember())!=owner->normalized(family.sourceMember))
+                return fail(d,MaterialTextureGlError50EB::assets,"actual RA canonical texture source changed");
+            const bool crowd=family.animatedCurrentMapPending;
+            if(crowd){
+                // Real owned placement proof selects the current actual child;
+                // image publication does not advance Application time or phase.
+                bool found=false;
+                for(std::size_t si=0;si<owner->surfaces_.size();++si)if(owner->surfaces_[si].materialRow==family.materialRow){
+                    ra_static_world50LA::Owner::ModelCrowdMap selected;
+                    ra_static_world50LA::Owner::Diagnostic wd;
+                    if(!owner->currentCrowdSurfaceMap24B26C(si,selected,wd))
+                        return fail(d,MaterialTextureGlError50EB::assets,"actual retained crowd map/leases rejected");
+                    map=selected.binding;found=true;break;
+                }
+                if(!found||family.imageCount!=6)return fail(d,MaterialTextureGlError50EB::assets,"actual crowd placement/six-set missing");
+            }else if(family.imageCount!=1||row.object04->animated102070()||pass.textureAnimation10||
+                !table->prepareColdRepresentativeMap249610(owner->imageCollector_,family.materialRow,0,0,map,md)||
+                map.preparation!=assets::OriginalStandardMaterialMapPreparation50LA::ready||map.texture!=row.object04)
+                return fail(d,MaterialTextureGlError50EB::assets,"actual ordinary RA final map changed");
+            const auto& state=map.contextAfter249610;
+            constexpr std::int32_t expected[6]={0,0,1,5,0,-75};
+            for(std::size_t i=0;i<6;++i)if(state.sampler[i].value!=expected[i])
+                return fail(d,MaterialTextureGlError50EB::sampler,"RA canonical sampler is outside exact base-linear subset");
+            using F=assets::OriginalUiGsField50KG;
+            const auto horizontal=state.fields[static_cast<std::size_t>(F::wrapModeHorizontal)].value;
+            const auto vertical=state.fields[static_cast<std::size_t>(F::wrapModeVertical)].value;
+            const bool flag=owner->normalized(family.materialMember)=="textures/largeflag.psm";
+            if(horizontal!=0||vertical!=(flag?1:0))
+                return fail(d,MaterialTextureGlError50EB::sampler,"RA canonical wrap differs from authenticated closure");
+            // CPU bytes were lowered with these exact TEXA values. Revalidate
+            // final canonical fields; sampler admission must not conceal alpha changes.
+            if(!crowd)for(auto field:{F::sourceAlphaValueWhenAis0,F::sourceAlphaValueWhenAis1,F::methodOfExpandingTextureAlpha}){
+                const auto i=static_cast<std::size_t>(field);
+                if(state.fields[i].value!=family.context.fields[i].value)
+                    return fail(d,MaterialTextureGlError50EB::assets,"RA final TEXA differs from retained CPU image");
+            }
+            if(family.firstImage>49||family.imageCount>49-family.firstImage)
+                return fail(d,MaterialTextureGlError50EB::assets,"RA image range exceeds exact bank");
+            for(std::size_t f=0;f<family.imageCount;++f){
+                const auto i=family.firstImage+f;const auto& image=owner->coldImages_[i];
+                const auto* canonical=crowd?row.object04->frame102050(static_cast<std::int32_t>(f)):row.object04;
+                const auto* pixel=owner->pixelBank_.texture(static_cast<std::uint32_t>(i));
+                if(assigned[i]||image.family!=fi||image.frame!=f||!canonical||canonical!=image.canonical||
+                   !pixel||pixel->identity!=i+1||image.levels.empty()||image.mips.empty())
+                    return fail(d,MaterialTextureGlError50EB::assets,"distinct RA frame/canonical/bank identity changed");
+                assigned[i]=true;
+                samplers[i]={MaterialTextureFilter50EB::linear,MaterialTextureFilter50EB::linear,
+                    MaterialTextureWrap50EB::repeat,flag?MaterialTextureWrap50EB::clampToEdge:MaterialTextureWrap50EB::repeat};
+            }
+        }
+        for(bool complete:assigned)if(!complete)return fail(d,MaterialTextureGlError50EB::assets,"RA image bank incomplete");
+        if(!owner->publishImage(this))return fail(d,MaterialTextureGlError50EB::assets,"RA world publication already leased");
+        raStaticWorld_=std::move(owner);
+        auto input=request;input.samplers=samplers.data();input.samplerCount=49;
+        const bool okay=create(input,raStaticWorld_->pixelBank_,d);
+        if(!storage_){raStaticWorld_->retireImage(this);raStaticWorld_.reset();}
+        return okay;
+    }catch(...){return fail(d,MaterialTextureGlError50EB::allocation,"RA publication validation allocation failed");}
+}
+
+bool MaterialTextureGl50EB::createRaStaticFire(const MaterialTextureGlRequest50EB& request,
+    std::shared_ptr<ra_static_fire_visual50LA::Owner> owner,MaterialTextureGlDiagnostic50EB& d) noexcept {
+    d={};
+    if(storage_||raStaticFire_||raStaticWorld_||!owner||!owner->pixels())
+        return fail(d,MaterialTextureGlError50EB::assets,"actual unpublished FireP0t bank required");
+    assets::OriginalStandardMaterialMapBindingView50LA map;
+    assets::OriginalStandardMaterialDiagnostic50LA md;
+    if(!owner->currentMap(0,map,md))return fail(d,MaterialTextureGlError50EB::assets,"current FireP0t canonical map required");
+    // Exact authored source has MXL0, MMAG1/MMIN5: both select linear base
+    // texels. No generated mips or guessed LOD selection is introduced.
+    const auto& state=map.contextAfter249610;
+    constexpr std::int32_t sampler[6]={0,0,1,5,0,-75};
+    for(std::size_t i=0;i<6;++i)if(state.sampler[i].value!=sampler[i])
+        return fail(d,MaterialTextureGlError50EB::sampler,"unsupported FireP0t canonical sampler");
+    using F=assets::OriginalUiGsField50KG;
+    if(state.fields[static_cast<std::size_t>(F::wrapModeHorizontal)].value!=0||
+       state.fields[static_cast<std::size_t>(F::wrapModeVertical)].value!=0)
+        return fail(d,MaterialTextureGlError50EB::sampler,"unsupported FireP0t canonical wrap");
+    if(!owner->publishImage(this))return fail(d,MaterialTextureGlError50EB::assets,"FireP0t source already published");
+    raStaticFire_=std::move(owner);
+    MaterialTextureSampler50EB selected{MaterialTextureFilter50EB::linear,MaterialTextureFilter50EB::linear,
+        MaterialTextureWrap50EB::repeat,MaterialTextureWrap50EB::repeat};
+    auto input=request;input.samplers=&selected;input.samplerCount=1;
+    const bool okay=create(input,*raStaticFire_->pixels(),d);
+    if(!storage_){raStaticFire_->retireImage(this);raStaticFire_.reset();}
+    return okay;
+}
 bool MaterialTextureGl50EB::close(MaterialTextureGlDiagnostic50EB& d) noexcept {
     d = {};
+    if(raStaticWorld_&&raStaticWorld_->rendererPublication_){
+        d.cleanupIncomplete=true;
+        return fail(d,MaterialTextureGlError50EB::cleanup,"RA world renderer lease must retire before images");
+    }
+    if(raStaticFire_&&raStaticFire_->rendererPublication_){
+        d.cleanupIncomplete=true;
+        return fail(d,MaterialTextureGlError50EB::cleanup,"FireP0t renderer lease must retire before image publication");
+    }
     if (!storage_) return true;
     const bool result = storage_->cleanup(d);
-    if (!d.cleanupIncomplete) storage_.reset();
+    if (!d.cleanupIncomplete) {
+        storage_.reset();
+        if(raStaticFire_){raStaticFire_->retireImage(this);raStaticFire_.reset();}
+        if(raStaticWorld_){raStaticWorld_->retireImage(this);raStaticWorld_.reset();}
+    }
     return result;
 }
 bool MaterialTextureGl50EB::initialized() const noexcept { return storage_ && storage_->initialized; }
@@ -281,6 +414,12 @@ std::uint64_t MaterialTextureGl50EB::publicationToken() const noexcept {
 }
 bool MaterialTextureGl50EB::validBorrow(void* context, bool (*isCurrent)(void*) noexcept,
     std::uint64_t token) const noexcept {
+    // The full-world image bank has no admitted renderer route yet. A future
+    // typed friend renderer must hold its actual private lease before generic
+    // borrowing can succeed. This also rejects stale CPU/canonical ownership.
+    if(raStaticWorld_&&(!raStaticWorld_->rendererPublication_||
+       raStaticWorld_->imagePublication_!=this||raStaticWorld_->modelServiceTerminal_||
+       !raStaticWorld_->coldImagesCurrent()))return false;
     return token && token == publicationToken() && storage_->context == context &&
         storage_->isCurrent == isCurrent && storage_->thread == std::this_thread::get_id() &&
         isCurrent && isCurrent(context);

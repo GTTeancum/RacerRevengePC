@@ -104,10 +104,10 @@ AudioEventStatus50HE updatePodBoostAudio50HE(bool held,float heating,std::uint32
     auto next=before;AudioCommand50HE command{};std::size_t n=0;
     if(held) {
         if(heating>0.f&&previous64==0u) {
-            next.pitchBoost=true;n=1;
+            next.flags22C=static_cast<std::uint8_t>(next.flags22C|2u);n=1;
             command={AudioOperation50HE::Start,{AudioBank50HE::PodEngine,3},.9f,1.f,false,0x1a01f4};
         }
-    }else if(previous64!=0u)next.pitchBoost=false;
+    }else if(previous64!=0u)next.flags22C=static_cast<std::uint8_t>(next.flags22C&~2u);
     const auto result=publish(&command,n,out,capacity,count);
     if(result==AudioEventStatus50HE::Complete)after=next;
     return result;

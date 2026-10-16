@@ -1,0 +1,68 @@
+Damage predraw finite-nonnegative admission delta -- UNTESTED
+
+Separate from cold-owner Library libfile_216dd8dcd4688191a9de1b62dda7a15f.
+Base is the step-A numeric header in libfile_a7178d2b57c08191aa99c63c8c505025,
+not the baseline source ZIP (which predates that header). Apply the tiny patch
+to root's integrated numeric header after reviewing any intervening changes.
+
+Change: remove only the input upper-bound rejection in predraw18F4D0.
+All four floats must still pass isfinite and v>=0 before any HUD mutation.
+NaN, infinities and strictly negative values remain rejected. View bounds and
+leaf18F680's finite health[0,1] guards are unchanged. No Bank field is written;
+the four input parameters are by value. No renderer/snapshot/caller changes.
+
+Original static source proof (SLUS SHA256
+c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30):
+18F50C C44107DC: load damage7DC into f1.
+18F510 C44007D4: load damage7D4 into f0.
+18F514 46010228: MAX.S f8,f0,f1; store/reload selected maximum.
+18F524 3C023F80 /18F528 44820800: exact binary32 1.0 into f1.
+18F530 46000A29: MIN.S f8,f1,f0; store/reload bounded maximum.
+18F54C 46000801: SUB.S f0,f1,f0;18F550 stores health30[view].
+18F558 C44207D8 /18F55C C44007D0 load the second damage pair.
+18F560 46020228: MAX.S f8,f0,f2; store/reload.
+18F574 46000A29: MIN.S f8,f1,f0; store/reload.
+18F58C 46000801: SUB.S f0,f1,f0;18F594 stores health38[view]
+in the layout18EAD0 call's delay slot. Corresponding raw lines accompany this
+packet. No executable or guest instruction was executed to derive this delta.
+
+Why broader admission needs no new arithmetic:
+The existing comparisons select max(pair), the existing >1 ternary implements
+min(1,max), and existing volatile-float sub computes 1 minus that bounded value.
+These operations and their per-bank order are unchanged. Any newly admitted
+finite value above1 makes its bank maximum above1; MIN selects exactly1 before
+subtraction. Even the largest finite input never reaches arithmetic with a
+large operand, so this extension introduces no overflow or narrowing conversion.
+The other bank follows its unchanged existing computation. Thus the new region
+produces numeric health0 for that bank, while retaining the leaf[0,1] checks.
+
+Signed zero and rounding scope:
+The existing v<0 guard admits -0 as numeric nonnegative, as it already did.
+Equal MAX/MIN operands may have implementation-specific source signed-zero tie
+selection; either sign of a zero damage maximum gives exactly numeric health1.
+For newly admitted >1 pairs the MIN result is positive exact1; 1-1 is numeric0.
+Its zero sign can depend on the floating-point rounding environment (round-down
+may yield -0). The delta neither sets the environment nor canonicalizes that
+sign, and makes no new bitwise signed-zero parity claim. The leaf comparisons
+and nonnegative segment conversion accept either zero sign. Under the existing
+intended ordinary binary32 environment, the added region requires only exact
+selection and exact cancellation. Existing subnormal/host FP-mode/EE rounding
+equivalence for the old [0,1] region remains unproved by this source-only change.
+No new std::min/std::max, fmin/fmax, epsilon, cast, fused operation, clamp or
+arithmetic helper was introduced. NaN/inf/negative EE semantics remain closed.
+
+Motivation, not permission to change simulation:
+impact_consumers49z.cpp adds damage and only lower-clamps; periodic adds0.02
+and lower-clamps. The original HUD already upper-bounds the selected maximum.
+Rejecting all >1 damage was a native admission restriction, not a retail guard.
+
+Source-review checklist:
+[ ] Only the admission upper guard and explanatory comments changed.
+[ ] Exact existing max -> min(1,maximum) -> sub(1,bounded) expressions unchanged.
+[ ] All four inputs validated before mutation; leaf health bounds unchanged.
+[ ] Root reconciles dependency header; cold-owner package remains separate.
+[ ] No runtime caller, renderer activation, snapshot adapter or simulation edit.
+
+Validation: SOURCE REVIEW ONLY. No tests/builds/syntax checks/sanitizers/converters
+or gameplay runs. Archive hashes record transfer integrity only. Hold for root
+review; root alone integrates/tests. No further feature work started.

@@ -9,6 +9,10 @@ namespace rr::game {
 struct OriginalCameraSceneOwner {
     std::uint64_t sessionGeneration=0,sceneKey=0,allocationSerial=0;
     CollectionRef50BX object30=0;
+    //1143F0 initializes the actual embedded visibility30 scalar fields.
+    // Only low3 of33 is known; opaque upper bits are not invented.
+    std::uint8_t searchableType32=0xffu,searchableFlags33Low3=0;
+    bool searchableConstructed1143F0=false;
     LiveZoneStorage50EN storage{};
     LiveZoneMembership50EN registration34{};
     SpringVector4_48N position180{{0,0,0,1}};

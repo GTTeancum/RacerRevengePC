@@ -2,6 +2,7 @@
 #include "collision_runtime48h.h"
 #include "import_collision48g.h"
 #include <cmath>
+#include <cstring>
 #include <new>
 #include <utility>
 
@@ -40,8 +41,24 @@ bool project(Collision48G&& source, CollisionMesh48I& output, std::string& error
             CollisionMeshFace48I face;
             face.d = f.d;
             if (!packCollisionFaceNormal48H(f.normal, face.normal)) {
-                error = "collision.runtime_normal_overflow";
-                return false;
+                // Original 126330/34/38/44 (and Y/Z): the exact negative
+                // 0xFFC00000 source word stays negative through MUL/ADD
+                // saturation; CVT.W.S clamps to 0x80000000 and SH keeps zero.
+                // Sony EE User Manual 8.1.1/8.5/8.7/8.8 and Instruction Set
+                // Manual p356; arithmetic derivation: docs/native-collision48g.md.
+                // Preserve source bits separately; never cast a host NaN to int.
+                const auto bits=[](float value){std::uint32_t word;std::memcpy(&word,&value,4);return word;};
+                bool authored=bits(f.d)==0x7fc00000u;
+                for(float n:f.normal)authored=authored&&bits(n)==0xffc00000u;
+                for(auto index:f.vertices)authored=authored&&index<mesh.vertices.size();
+                if(authored){
+                    const auto& a=mesh.vertices[f.vertices[0]];
+                    const auto& b=mesh.vertices[f.vertices[1]];
+                    const auto& c=mesh.vertices[f.vertices[2]];
+                    authored=a==b||a==c||b==c;
+                }
+                if(!authored){error="collision.runtime_normal_overflow";return false;}
+                face.normal={0,0,0};
             }
             for (unsigned i = 0; i != 3; ++i)
                 face.vertices[i] = static_cast<std::uint16_t>(f.vertices[i]);

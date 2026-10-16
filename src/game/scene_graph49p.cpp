@@ -150,12 +150,34 @@ bool addParentlessTranslation49P(const SceneGraph49P& graph, Index index,
     afterLocalWrite(graph, index);
     return true;
 }
+bool setLocalTranslation49P(const SceneGraph49P& graph, Index index,
+                            const SceneDisplacement49P& translation) noexcept {
+    if (!admit(graph, index)) return false;
+    //28AB9C first copies the entire input vector before the three stores.
+    SceneDisplacement49P source;
+    std::memcpy(&source, &translation, sizeof source);
+    std::memcpy(&at(graph, index).localC0.v[12], source.v, 3 * sizeof(float));
+    afterLocalWrite(graph, index);
+    return true;
+}
 bool setLocalMatrix49P(const SceneGraph49P& graph, Index index,
                       const BodyMatrix48G& matrix) noexcept {
     if (!admit(graph, index)) return false;
     copyMatrix(at(graph, index).localC0, matrix);
     afterLocalWrite(graph, index);
     return true;
+}
+bool scene_detail49P::setLocalMatrixAdmittedTopology(const SceneGraph49P& graph,
+    Index index, const BodyMatrix48G& matrix) noexcept {
+#ifdef RR_SCENE49P_FLAG_STORE
+    // An arbitrary instrumentation callback need not preserve checked links.
+    return setLocalMatrix49P(graph, index, matrix);
+#else
+    if (std::fegetround() != FE_TONEAREST || !inRange(index, graph.count)) return false;
+    copyMatrix(at(graph, index).localC0, matrix);
+    afterLocalWrite(graph, index);
+    return true;
+#endif
 }
 bool markSceneAncestors49P(const SceneGraph49P& graph, Index index) noexcept {
     if (!admit(graph, index)) return false;
@@ -167,8 +189,8 @@ bool invalidateSceneReady49P(const SceneGraph49P& graph, Index index) noexcept {
     invalidate(graph, index);
     return true;
 }
-bool refreshSceneWorld49P(const SceneGraph49P& graph, Index index) noexcept {
-    if (!admit(graph, index)) return false;
+namespace {
+bool refreshWorld(const SceneGraph49P& graph, Index index) noexcept {
     if ((at(graph, index).sceneFlags190 & 1u) != 0) return true;
     // Stage only the required dirty ancestor chain. This allows arithmetic
     // admission before any mutation, without copying or rewriting other nodes.
@@ -198,5 +220,21 @@ bool refreshSceneWorld49P(const SceneGraph49P& graph, Index index) noexcept {
         storeFlags(graph, chain[slot], static_cast<std::uint8_t>(node.sceneFlags190 | 1u));
     }
     return true;
+}
+}
+bool refreshSceneWorld49P(const SceneGraph49P& graph, Index index) noexcept {
+    if (!admit(graph, index)) return false;
+    return refreshWorld(graph, index);
+}
+bool scene_detail49P::refreshWorldAdmittedTopology(const SceneGraph49P& graph,
+    Index index) noexcept {
+#ifdef RR_SCENE49P_FLAG_STORE
+    // Instrumentation is an arbitrary callback: retain full admission when it
+    // is present rather than assuming it preserves the previously checked links.
+    if (!admit(graph, index)) return false;
+#else
+    if (std::fegetround() != FE_TONEAREST || !inRange(index, graph.count)) return false;
+#endif
+    return refreshWorld(graph, index);
 }
 }

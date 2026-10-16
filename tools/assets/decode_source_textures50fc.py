@@ -53,18 +53,21 @@ def load_ta(path):
    need(key not in out,'duplicate texture name');need(sha(raw)==SOURCE_SHA[key[9:]],'source texture hash');out[key]=bytes(raw)
  need(len(out)==len(SOURCE_SHA),'missing source texture');return out
 
-def parse_pst(b,at=0):
+def parse_pst(b,at=0,*,allow_kind0=False):
  start=at;version,kind,count=unpack('<III',b,at);at+=12
- need(version==1 and kind in (1,2) and 1<=count<=7,'unsupported PST version/kind/mips')
- palette=piece(b,at,1024) if kind==1 else None
- if palette is not None:at+=1024
+ need(version==1 and (kind in (1,2) or (allow_kind0 and kind==0)) and 1<=count<=7,'unsupported PST version/kind/mips')
+ palette_bytes=64 if kind==0 else 1024 if kind==1 else 0
+ palette=piece(b,at,palette_bytes) if palette_bytes else None
+ at+=palette_bytes
  mips=[];last=None
  for level in range(count):
   header=at;h,w,a,c=unpack('<4I',b,at);at+=16
   need(16<=w<=1024 and 16<=h<=1024 and not(w&(w-1)) and not(h&(h-1)) and a==c==0,'PST mip header')
   need(last is None or (w,h)==(last[0]*2,last[1]*2),'PST mip order');last=(w,h)
   if kind==2:n,=unpack('<I',b,at);at+=4
-  else:n=w*h
+  else:
+   need(kind!=0 or (w*h)%2==0,'kind0 requires complete packed texel pairs')
+   n=w*h//2 if kind==0 else w*h
   data=piece(b,at,n)
   if kind==2:
    magic,size,iw,ih,frames=unpack('<4sIHHI',data,0)
@@ -73,7 +76,7 @@ def parse_pst(b,at=0):
   mips.append(dict(level=level,width=w,height=h,header_offset=header,data_offset=at,data=data));at+=n
  return dict(start=start,end=at,kind=kind,mips=mips,palette=palette),at
 
-def parse_resource(name,b):
+def parse_resource(name,b,*,allow_kind0=False):
  need(len(b)<=8*1024*1024,'source cap')
  if name.endswith('.atm'):
   version,count,reserved=unpack('<3I',b,0)
@@ -81,7 +84,7 @@ def parse_resource(name,b):
  else:count=1;at=0
  frames=[]
  for i in range(count):
-  frame,at=parse_pst(b,at);frames.append(frame)
+  frame,at=parse_pst(b,at,allow_kind0=allow_kind0);frames.append(frame)
  need(at==len(b),'PST/ATM trailing bytes')
  return frames
 
@@ -113,7 +116,17 @@ def decode_ipu(data,w,h,ffmpeg):
  need(len(proc.stdout)==w*h*3//2,'FFmpeg decoded frame extent')
  return ipu_rgba(proc.stdout,w,h),sha(proc.stdout)
 
-def decode_indexed(data,palette):
+def decode_indexed(data,palette,kind=1):
+ if kind==0:
+  # Source-equivalent to import_texture48e.cpp:184-195: PSMT4 low nibble
+  # first, identity 16-entry palette, all four original bytes including alpha.
+  # No kind1 CLUT permutation, alpha normalization, row flip or padding.
+  need(palette is not None and len(palette)==64,'kind0 palette extent')
+  out=bytearray()
+  for packed in data:
+   for index in (packed&15,packed>>4):out.extend(palette[4*index:4*index+4])
+  return bytes(out)
+ need(kind==1,'unsupported indexed kind')
  out=bytearray()
  for index in data:
   p=((index&~24)|((index&8)<<1)|((index&16)>>1))*4;out.extend(palette[p:p+4])

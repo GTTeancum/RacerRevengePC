@@ -1,0 +1,250 @@
+{
+  "source_commit": "1d236ee",
+  "status": "source_candidate_including_authenticated_ma_intake_v2",
+  "sources": [
+    {
+      "base": "repo",
+      "path": "src/assets/import_decode48c.cpp",
+      "sha256": "99feffba580821d63187dd12f7a61ed1685b9c9ded0bf962c120f1f4cb5c53f2"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_decode48c.h",
+      "sha256": "b334a60a0a5794cdb3ac5e7492e06045f93b40927ce3b6cecfbf7291abde2230"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_scene48d.cpp",
+      "sha256": "c32120daa132f7d7733067aa0f0d4b13c2bc21ae2715d0bd3badbddc35b08289"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_scene48d.h",
+      "sha256": "a6077121f9492e91634a962036e8a41c262876c67f131f61e2e0b820bf50117d"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_texture48e.cpp",
+      "sha256": "b32b3de416754eb8cc3887e06b1298221ce3effc3af710fab295f0f0f8b11348"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/import_texture48e.h",
+      "sha256": "d9b84d379d0971fa7ebe3f1f132acb9a71c92e1238c431b7b0454d647c1e06a5"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/native_asset48b.cpp",
+      "sha256": "2f4f798d1c7621188ddc0ef3a9b0e62b051ee6a50f3956bb2e0260ba99a2424f"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/native_asset48b.h",
+      "sha256": "c192664663b2e8885a437703995ec2a04c22f506538ffe8eb9279e0508cb3038"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/pod_physics49n.cpp",
+      "sha256": "47beb4459a72d7422ff9b62112e9ffab4fffcd16f1c9e5e7697ee16ccabef5a9"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/pod_physics49n.h",
+      "sha256": "a1ddbadd24e97d874e6040aa3cb63093cfdf8436c3ec4f36f763bfcb71ddcbdd"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/scene_asset48d.cpp",
+      "sha256": "b9fac29eb3247f28e807e6dd90bf7a4879113674ffa17474f493e3ca0b795b07"
+    },
+    {
+      "base": "repo",
+      "path": "src/assets/scene_asset48d.h",
+      "sha256": "516a3a0655f9c289df02b0c8a4ce549c0e84c6f1fce596bcb147a9d69d17b71e"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/advancement_selectors49k.h",
+      "sha256": "f2af8bf68d3a61901cd6e4f89bef395570740fe5be2327b2f72c745fe625481e"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/authored_parameters49n.h",
+      "sha256": "d1923aa3d1cccd31a997fdd6137685382553c928c5a3700e89466a8b27a9a9d8"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/body_advancement49k.h",
+      "sha256": "a54f0cfa788cbe70d0aebc043c0e77c065002cd8eab397f3351647d14d1d9df1"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/body_integration48c.h",
+      "sha256": "5da2c9c06d65e59ba037b9d434386d4ba212ba77a8585855c803dbfaf6e55363"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/body_scene48g.h",
+      "sha256": "b0a968fcbdcaf195a5adc1a461ca10b00f8feb0ac03f29a588aaa18e8d213805"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/body_wrapper48h.h",
+      "sha256": "55a912b66be48153af29b5d85adfab5ab4dd6099e420061f31a2d7c1e844baf5"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/control_binding48w.h",
+      "sha256": "ed593491aeb0f356e55e011f3742ae3dec73e3f10a0c18670239fe99c4279a39"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/control_filter48b.h",
+      "sha256": "0f3ff1cbacd4df34887dad6db353008384105525d7e5eecea5332d012ce6b38b"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/control_shaping48v.h",
+      "sha256": "dcc8a71d1a154bf0e7e91dec7e738aad32c53f0b5e984a10cafa0930ddf19273"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/coupled_body_advancement49m.h",
+      "sha256": "a1297366f62996cc140e5e03cfb060e72c6b35561952b17df9adee4d33eb7c36"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/gradient_noise49m.h",
+      "sha256": "e6d9dd686c603dd4c62562e83e2986493dd21f955905d700b933d4d3d2c941ec"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/player_input48x.h",
+      "sha256": "bf34b8eab78099945b664febdf3d8fe20adeaacee220f96f07698fdefe01f2ac"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/pod_sphere_constraint49l.h",
+      "sha256": "1a754359d82f4817d0be8b11f934469da37a300b62698395b9148f00e9368802"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/secondary_body49m.h",
+      "sha256": "2c03b7d8b5f893cd927fb4184b411d8285561567f2eade8d95a856bc10f0d133"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/vehicle_aero48e.h",
+      "sha256": "b0ac4ee3aba1baf810e8f9396837bdf1af9f67e7467fae6fe7f7295498cfe2ab"
+    },
+    {
+      "base": "repo",
+      "path": "src/game/vehicle_forces48d.h",
+      "sha256": "4cdf174e6469aae3a58671fac83f1a708cc6cdf6640b366b929c033802b772fe"
+    },
+    {
+      "base": "repo",
+      "path": "tests/native/recover_sky50gw.py",
+      "sha256": "1132b789720a8d9eb8480e7922513a1d4b7759c27f18fde04487c4c219c74cef"
+    },
+    {
+      "base": "repo",
+      "path": "third_party/native-json/json.hpp",
+      "sha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/assemble_ga_visual.py",
+      "sha256": "714cf1b8bb31850c94e4241bd05cc302fbf4c9b889ff701e22a4f8393b68f835"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/decode_scene48c.py",
+      "sha256": "e0b6811443c46cd05c621e1915134a031a457b1a66db18751e2956ed7d68af1a"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/decode_source_textures50fc.py",
+      "sha256": "5f9af6eba0f07732f913cde7aa40e246d218d38230f57a7aacc027afd25a7c49"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/decode_static48b.py",
+      "sha256": "875946365699396aaa0dd594a8e2b9cf1c4319cfc6079c53d686db98b998668a"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/decode_world48e.py",
+      "sha256": "f073107368ff6b5f5e398e74126834d585e8c8f965bb3e87718f5d9a7a166f21"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/original_roster/import_original_pods.cpp",
+      "sha256": "94d09ba27102f2cdcb7c22a05492450492fda61865f5068c0be2f45797817780"
+    },
+    {
+      "base": "repo",
+      "path": "tools/assets/original_roster/ma_compressed_scene_admission.h",
+      "sha256": "8b368e99ae1f1791c43b279bb4ac9804436126c7bb69198ff370bd34fecbaa68"
+    },
+    {
+      "base": "candidate",
+      "path": "assemble_ma_sa_visual.py",
+      "sha256": "ca29018d72ab2dfcb5e9cf9024b92e229be3dd14ccee0bd2f346d68716e4aea1"
+    },
+    {
+      "base": "candidate",
+      "path": "inventory_ma_sa_atm_frames.py",
+      "sha256": "48e876a70cb8dedbc20b9f0e222de7b94c89e764d0ae4152dbc6a55bb919f57e"
+    },
+    {
+      "base": "candidate",
+      "path": "ma-sa-source-inputs.json",
+      "sha256": "7aabcf08287d96ec5655292f05b5b5d68ea4f82fcf398df95c7696937de28ec9"
+    },
+    {
+      "base": "candidate",
+      "path": "ma_sa_asset_sources.py",
+      "sha256": "3e4d9ba4509ca8e5224c7d4cb6862e6b6d669dcaed0e81ebca4861abc253c164"
+    },
+    {
+      "base": "candidate",
+      "path": "prepare_ma_sa_assets.py",
+      "sha256": "cbe1aa284bcf8e2613292322342fd7c1d4ec363b0ed6293666220acbe2324c11"
+    },
+    {
+      "base": "candidate",
+      "path": "recover_ma_sa_sky.py",
+      "sha256": "317e8722afd4471f2c46288d8f52c0875dd2877655bb0af06bfbbf61f87f0399"
+    },
+    {
+      "base": "candidate",
+      "path": "prepare_sa_intake.py",
+      "sha256": "199a1937dfde4ee72a601d1b33adf8603238d1e54e11ca538ec9c501981b5717"
+    },
+    {
+      "base": "candidate",
+      "path": "extract_sa_members.cpp",
+      "sha256": "b92b47f0b0c82221528b2d0bd391468e8a141df4f7fab2c729982bc61071036f"
+    },
+    {
+      "base": "candidate",
+      "path": "prepare_ma_intake.py",
+      "sha256": "3bad731c04fbe34a42488b86edcce9257e7a52aa936f1dd18906083032b8e934"
+    },
+    {
+      "base": "candidate",
+      "path": "extract_ma_members.cpp",
+      "sha256": "4430a8cf520223645bba29352c6126829390bdb416692b85853d68f000eddc8c"
+    }
+  ],
+  "required_source_candidates": [
+    "psg-missing-color-candidate-20261012/src/assets/import_scene48d.cpp",
+    "psg-missing-color-candidate-20261012/tools/assets/original_roster/import_original_pods.cpp",
+    "psg-missing-color-candidate-20261012/tools/assets/original_roster/ma_compressed_scene_admission.h"
+  ],
+  "source_followup_candidates": [
+    "sa-ma-assets-candidate-20261012/ma-kind0-fix/ma-kind0-native-mips.patch",
+    "Explicit SA inventory V2 bridge; original archive/member/reference pins and exact legacy inventory pin retained."
+  ]
+}

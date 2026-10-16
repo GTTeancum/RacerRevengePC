@@ -2,17 +2,17 @@
 #include "vehicle_draw_batch50co.h"
 
 namespace rr::game {
-constexpr std::uint32_t vehicleDrawComponentCount50CS = 3;
-constexpr std::uint32_t vehicleDrawFixedCommands50CS = 6; // Three uploads, three binds.
+constexpr std::uint32_t vehicleDrawComponentCount50CS = maxVehicleDrawComponents50CM;
+constexpr std::uint32_t vehicleDrawFixedCommands50CS = 6; // Legacy three-model uploads/binds.
 constexpr std::uint32_t maxVehicleDrawCommands50CS =
-    vehicleDrawFixedCommands50CS + vehicleDrawComponentCount50CS * maxVehicleDrawSpans50CM;
+    vehicleDrawComponentCount50CS * (2 + maxVehicleDrawSpans50CM);
 
 struct VehicleDrawCapacity50CS {
-    std::uint32_t vertices[3]{}, indices[3]{};
+    std::uint32_t vertices[vehicleDrawComponentCount50CS]{}, indices[vehicleDrawComponentCount50CS]{};
     std::uint32_t commands = 0;
 };
 struct VehicleDrawPlan50CS {
-    std::uint32_t vertexBytes[3]{}, indexBytes[3]{};
+    std::uint32_t vertexBytes[vehicleDrawComponentCount50CS]{}, indexBytes[vehicleDrawComponentCount50CS]{};
     std::uint32_t draws = 0, commands = 0;
 };
 enum class VehicleDrawSubmitError50CS : std::uint8_t {
@@ -21,7 +21,7 @@ enum class VehicleDrawSubmitError50CS : std::uint8_t {
 };
 struct VehicleDrawSubmitDiagnostic50CS {
     VehicleDrawSubmitError50CS error = VehicleDrawSubmitError50CS::none;
-    // Three denotes a batch-level error; span is meaningful for spans/draw.
+    // Capacity denotes a batch-level error; span is meaningful for spans/draw.
     std::uint32_t component = vehicleDrawComponentCount50CS, span = 0;
 };
 
@@ -72,7 +72,7 @@ bool preflightVehicleDrawBatch50CS(const VehicleDrawBatch50CO&,
     const VehicleDrawCapacity50CS&, VehicleDrawPlan50CS&,
     VehicleDrawSubmitDiagnostic50CS&) noexcept;
 
-// Preflight, begin, all three world-space uploads, then each component's bind
+// Preflight, begin, all active world-space uploads, then each component's bind
 // and ordered material spans, then commit. No heap, device creation, index
 // upload, model transform, camera/material/visibility policy or presentation.
 // False means no new committed submission, provided the backend obeys the
@@ -94,7 +94,7 @@ struct VehicleDrawCommand50CS {
     std::int32_t baseVertex = 0;
 };
 struct VehicleDrawRecordingStorage50CS {
-    VehicleDrawBuffer50CM vertices[3]{};
+    VehicleDrawBuffer50CM vertices[vehicleDrawComponentCount50CS]{};
     VehicleDrawCommand50CS* commands = nullptr;
     std::uint32_t commandCapacity = 0;
 };
@@ -105,10 +105,11 @@ struct VehicleDrawRecordedGeometry50CS {
     std::uint32_t indexCount = 0;
 };
 struct VehicleDrawRecording50CS {
-    VehicleDrawRecordedGeometry50CS component[3]{};
+    VehicleDrawRecordedGeometry50CS component[vehicleDrawComponentCount50CS]{};
     const VehicleDrawCommand50CS* commands = nullptr;
     std::uint32_t commandCount = 0, vertices = 0, indices = 0, draws = 0;
     assets::Bounds48B bounds{};
+    std::uint32_t componentCount = defaultVehicleDrawComponents50CM;
 };
 
 class VehicleDrawRecorder50CS {

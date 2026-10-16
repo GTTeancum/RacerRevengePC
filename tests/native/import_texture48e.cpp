@@ -157,11 +157,32 @@ void adversarial(const fs::path& root) {
     Material48E parsed; expect(decodeMaterial48E(ascii(material), parsed, error), "ASCII mixed newline material fixture");
     expect(parsed.passes[0].texture_count_defaulted && parsed.passes[0].fields.unspecified.size() == 1 &&
         fields(parsed.passes[0].fields)["unknownAuthored"] == "keepThis", "authored unknown and blank fields retained without guessed defaults");
+    // Original 29B718/29B7F0 counts declared passes; these two historical
+    // rejection fixtures now retain ShaderPass_2 as inactive source evidence.
+    for (const auto& inactive : std::vector<std::pair<std::string, Json>>{
+        {"[ShaderPass_2]\n", Json::object()},
+        {"[ShaderPass_2]\nmicroProgramName=SpecularMapCompressed\n", Json{{"microProgramName", "SpecularMapCompressed"}}}}) {
+        const auto original = ascii(material + inactive.first); parsed = sentinelMaterial();
+        const bool accepted = decodeMaterial48E(original, parsed, error);
+        expect(accepted && error.kind == DecodeKind48C::none && error.code.empty(), "inactive numbered pass is accepted");
+        if (!accepted) continue;
+        expect(parsed.passes.size() == 1 && parsed.passes[0].pass == 1 &&
+            parsed.passes[0].microprogram == "PreLitCompressed" && parsed.passes[0].textures.size() == 1 &&
+            parsed.passes[0].textures[0].name == "ta_sand8", "only the declared pass supplies program and texture bindings");
+        expect(parsed.original_text == original && parsed.inactive_sections.size() == 1,
+            "inactive pass retains the complete original source and one evidence section");
+        if (parsed.inactive_sections.size() == 1) {
+            const auto& section = parsed.inactive_sections[0];
+            expect(section.name == "ShaderPass_2" && section.source_offset == material.size() &&
+                section.source_length == inactive.first.size() && fields(section.fields) == inactive.second,
+                "inactive pass retains its exact range and authored fields without requiring active bindings");
+        }
+    }
     const std::vector<std::string> invalidMaterials{
         "", "bad", "[General]\nTotalShaderPasses=999999999999999999999999999999\n",
         material + "TextureMap_1=duplicate\n", material + "texturemap_1=duplicate\n", material + "[General]\n",
         material + "TextureMap_2=extra\n", material + "totalTextureMaps=2\n", material + "totalTextureMaps=\n",
-        material + "totalTextureMaps=0\n", material + "[ShaderPass_2]\n", material + std::string(1, '\0'), material + std::string(1, '\xff'),
+        material + "totalTextureMaps=0\n", material + std::string(1, '\0'), material + std::string(1, '\xff'),
         "[General]\nTotalShaderPasses=1\n[ShaderPass_1]\nmicroProgramName=Unsafe Name\nTextureMap_1=x\n",
         "[General]\nTotalShaderPasses=1\n[ShaderPass_1]\nmicroProgramName=UnknownProgram\nTextureMap_1=../path\n"};
     for (const auto& bad : invalidMaterials) {
@@ -176,7 +197,7 @@ void adversarial(const fs::path& root) {
             materialUnchanged(parsed), "malformed PSM syntax/count/missing declared pass remains fatal");
     }
     for (const auto& unsupported : std::vector<std::string>{"[DefaultShaderParams]\nmicroProgramName=DiffuseCompressed\n",
-        material + "TextureMap_1=duplicate\n", material + "[ShaderPass_2]\nmicroProgramName=SpecularMapCompressed\n",
+        material + "TextureMap_1=duplicate\n",
         material + "[Prologue]\nsetting=original\n[Epilogue]\nsetting=original\n"}) {
         parsed = sentinelMaterial(); expect(!decodeMaterial48E(ascii(unsupported), parsed, error) && error.kind == DecodeKind48C::unsupported &&
             materialUnchanged(parsed), "recognized complete original PSM variants explicitly unsupported");
@@ -232,6 +253,10 @@ int main(int argc, char** argv) {
                     }
                 } else {
                     Material48E material; accepted = decodeMaterial48E(raw, material, error);
+                    // Frozen Python48D rejected extra numbered sections. Keep
+                    // this historical gate strict until per-member evidence
+                    // supplies the declared-pass acceptance/semantic rebase;
+                    // the synthetic cases above do not establish corpus totals.
                     expect(accepted == expected.at("accepted").get<bool>(), "native/Python PSM acceptance agrees");
                     if (accepted && expected.at("accepted").get<bool>()) compareMaterial(material, expected.at("material"));
                 }
@@ -244,6 +269,7 @@ int main(int argc, char** argv) {
                 }
             }
         }
+        // Historical totals remain unchanged pending that per-member rebase.
         expect(Json(counts) == reference.at("counts"), "all-disc accepted/rejected totals match frozen Python subset");
         adversarial(root);
         Json report{{"status", failures ? "FAIL" : "PASS"}, {"checks", checks}, {"failures", failures},

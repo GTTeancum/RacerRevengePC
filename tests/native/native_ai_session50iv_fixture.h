@@ -21,7 +21,10 @@ struct Session {
     AiRaceRankDiagnostic50IV rankDiagnostic{};
     std::int32_t packingReferences[capacity]{};
     bool rankBound=false;
-    std::uint32_t originalFinishedCount54=0;
+    OriginalAiFinishList finished44{};
+    OriginalAiRetirementList retired40{};
+    float trackLength38=0.f;
+    bool managerBound=false,all8FinishAwaitingDisplay=false,all8ResultsComplete=false;
 };
 inline void observe(Session&session,std::size_t slot,const VehicleFrameState49W&frame,
     const VehicleFrameBindings49W&bindings,const TrackNavigationProgress50EU&progress,
@@ -44,7 +47,7 @@ inline void observe(Session&session,std::size_t slot,const VehicleFrameState49W&
         rank.mapNode10[axis]=map.nodes[current].gate10[axis];rank.mapNode20[axis]=map.nodes[current].gate20[axis];}
 }
 inline bool rank(Session&session,std::size_t count) noexcept {
-    if(!updateAiRaceRank50IV(session.rankInput,count,session.originalFinishedCount54,
+    if(!session.managerBound||!updateAiRaceRank50IV(session.rankInput,count,session.finished44,session.retired40,
         session.rank,session.rankWork,session.rankDiagnostic))return false;
     for(std::size_t i=0;i<count;++i){session.fields[i]={session.rank[i].remainingCC4,session.rank[i].placeCCC,true};
         session.observed[i].progressCC4=session.rank[i].remainingCC4;}

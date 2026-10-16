@@ -1,12 +1,25 @@
+#include "../../../tests/native/ra_static_fire_visual50la.h"
 #include "vehicle_window_gl50ds.h"
+#include "native_camera_view50dx.h"
+#include "../../../src/game/original_racer_specular50la.h"
+#include "../../../src/game/original_racer_model_packets50la.h"
+#include "../../../src/game/original_camera_start_effects.h"
 #include "original_gameplay_blur_native_pass.h"
 #include "original_video_blocking_native.h"
 #include "original_ui_rider_draw_contribution50kg.h"
+#include "material_texture_functions50ee.h"
+#include "../../../src/game/original_race_hud50kg.h"
+#include "../../../src/game/original_time_stats50la.h"
+#include "../../../src/game/original_speed_boost50la.h"
+#include "../../../src/game/original_ui_text50kg.h"
+#include "../../../src/game/original_ui_text_position50kg.h"
+#include "../../../src/game/chariot_scene49u.h"
 #include "native_pod_shadow50hm.h"
 #include "native_pod_shadow_glsl50hm.h"
 #include "../../../src/game/pod_cables50fd.h"
 #include "../../../src/game/original_gameplay_binder_candidate.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <cstdio>
@@ -32,19 +45,55 @@ constexpr U texture2D = 0x0DE1, textureUnit0 = 0x84C0;
 // Keep the CPU capacity tied to the deliberately unrolled GLSL contract.
 static_assert(maxVehicleWindowOpponents50DS == 7, "update explicit shadow caster slots when racer capacity changes");
 constexpr U nativeShadowRacerCount = 1 + maxVehicleWindowOpponents50DS;
+// Existing native shadow approximation retains its three primary-model casters.
+// Optional models are rendered normally; no additional shadow parity is claimed.
 constexpr U nativeShadowCasterCount = 3 * nativeShadowRacerCount;
+constexpr U maxComponents = game::maxVehicleDrawComponents50CM;
+// Bounded body slots: primary left/right, then actual optional lower left/right.
+// Body slot N maps only to component N + 1; chariot has no source body slot.
+constexpr U sourceBodyCount50LA = 4;
+static_assert(maxComponents == 5, "source body slots require the exact five-component topology");
 constexpr game::VehicleDrawComponent50CM components[] = {
     game::VehicleDrawComponent50CM::chariot, game::VehicleDrawComponent50CM::leftEngine,
-    game::VehicleDrawComponent50CM::rightEngine
+    game::VehicleDrawComponent50CM::rightEngine, game::VehicleDrawComponent50CM::bottomLeftEngine,
+    game::VehicleDrawComponent50CM::bottomRightEngine
 };
 bool fail(VehicleWindowDiagnostic50DS& d, VehicleWindowError50DS error,
     const char* operation) noexcept {
     if (d.error == VehicleWindowError50DS::none) { d.error = error; d.operation = operation; }
     return false;
 }
+// Local observation only: no GL calls, logger, test dependency or simulation clock.
+class GameplayDisplayWallScope50DS final {
+    using Clock = std::chrono::steady_clock;
+    VehicleWindowWallSample50DS* sample_ = nullptr;
+    Clock::time_point before_{};
+public:
+    GameplayDisplayWallScope50DS(bool enabled,VehicleWindowWallSample50DS& sample) noexcept {
+        if(enabled){sample_=&sample;sample.attempted=true;before_=Clock::now();}
+    }
+    ~GameplayDisplayWallScope50DS() noexcept {
+        if(!sample_)return;
+        const auto after=Clock::now();
+        if(after<before_)return;
+        // Bound before integer conversion, including implementations with a
+        // wider steady-clock duration. An invalid sample never changes success.
+        const auto ns=std::chrono::duration<long double,std::nano>(after-before_).count();
+        if(!(ns>=0 && ns<18446744073709551616.0L))return;
+        sample_->wallNs=static_cast<std::uint64_t>(ns);sample_->valid=true;
+    }
+    GameplayDisplayWallScope50DS(const GameplayDisplayWallScope50DS&)=delete;
+    GameplayDisplayWallScope50DS& operator=(const GameplayDisplayWallScope50DS&)=delete;
+};
 U componentIndex(game::VehicleDrawComponent50CM component) noexcept {
-    for (U c = 0; c < 3; ++c) if (components[c] == component) return c;
-    return 3;
+    for (U c = 0; c < maxComponents; ++c) if (components[c] == component) return c;
+    return maxComponents;
+}
+bool sourceBodyComponent50LA(U component, U componentCount) noexcept {
+    // The generic draw interface also accepts four components. Source body
+    // admission requires a complete three-model pod or actual five-model pod.
+    return (componentCount == 3 || componentCount == 5) &&
+        component >= 1 && component <= sourceBodyCount50LA && component < componentCount;
 }
 U trackSpanChunkCount(U indexCount, bool textured, U maximumTriangles) noexcept {
     if (!textured || !maximumTriangles) return 1;
@@ -60,13 +109,29 @@ bool validateMaterialPolicy(const VehicleWindowMaterialBinding50DS& material,
         (material.fixedBlendAlpha && material.blend != VehicleWindowBlend50DS::additive) ||
         (material.blend == VehicleWindowBlend50DS::opaque && material.alphaScale != 1.f))
         return fail(d, VehicleWindowError50DS::material, "invalid explicit blend/alpha material policy");
+    if (material.sourceDiffuseCompressed50LA &&
+        (material.mode != VehicleWindowMaterialMode50DS::requiredTexture ||
+         material.blend != VehicleWindowBlend50DS::opaque || material.unlit ||
+         material.sourcePrelit || material.fixedBlendAlpha || material.alphaScale != 1.f))
+        return fail(d, VehicleWindowError50DS::material,
+            "source compressed diffuse requires a lit opaque base-map texture policy");
+    if (material.sourceSpecularPair50LA) {
+        if (!material.sourceDiffuseCompressed50LA || !material.depthWrite || !material.depthEqual ||
+            material.specularTextureIndex50LA == assets::unresolvedMaterialTexture50EA)
+            return fail(d, VehicleWindowError50DS::material,
+                "source specular pair requires source diffuse, real map 2 and inclusive writing base depth");
+    } else if (material.specularTextureIndex50LA != assets::unresolvedMaterialTexture50EA ||
+        material.sourceBaseFog50LA || material.sourceSpecularFog50LA || material.sourceSpecularAlphaTest50LA)
+        return fail(d, VehicleWindowError50DS::material, "unpaired material must not carry specular state");
     return true;
 }
 bool validateMaterials(const VehicleWindowRequest50DS& request,
     const assets::VehicleDrawAssets50CR& owner, VehicleWindowDiagnostic50DS& d) noexcept {
     const auto& input = request.materials;
+    if (input.componentCount != owner.componentCount())
+        return fail(d, VehicleWindowError50DS::material, "material component count must match actual assets");
     if (request.mode == VehicleWindowMode50DS::viewerNeutralUntextured) {
-        if (input.textures)
+        if (input.textures || input.specularTextures50LA)
             return fail(d, VehicleWindowError50DS::request, "neutral mode must not supply a texture bank");
         for (const auto& component : input.component)
             if (component.bindings || component.count)
@@ -77,7 +142,12 @@ bool validateMaterials(const VehicleWindowRequest50DS& request,
         input.textures->publicationToken()))
         return fail(d, VehicleWindowError50DS::material,
             "published texture bank with exact current context/callback/thread required");
-    for (U c = 0; c < 3; ++c) {
+    if (input.specularTextures50LA && !input.specularTextures50LA->validBorrow(
+        request.context, request.isCurrent, input.specularTextures50LA->publicationToken()))
+        return fail(d, VehicleWindowError50DS::material,
+            "map-2 publication requires the same current context, callback and thread");
+    bool anyPair = false;
+    for (U c = 0; c < owner.componentCount(); ++c) {
         d.component = c;
         d.material = d.texture = assets::unresolvedMaterialTexture50EA;
         const auto* scene = owner.scene(components[c]);
@@ -91,6 +161,20 @@ bool validateMaterials(const VehicleWindowRequest50DS& request,
             const auto& binding = component.bindings[m];
             d.texture = binding.textureIndex;
             if (!validateMaterialPolicy(binding, d)) return false;
+            if (binding.sourceDiffuseCompressed50LA &&
+                !sourceBodyComponent50LA(c, owner.componentCount()))
+                return fail(d, VehicleWindowError50DS::material,
+                    "source compressed diffuse requires actual engine components in a three/five-model pod");
+            if (binding.sourceSpecularPair50LA) {
+                if (!sourceBodyComponent50LA(c, owner.componentCount()))
+                    return fail(d, VehicleWindowError50DS::material,
+                        "source specular pair requires actual engine components in a three/five-model pod");
+                anyPair = true;
+                const auto* map2 = input.specularTextures50LA ?
+                    input.specularTextures50LA->asset(binding.specularTextureIndex50LA) : nullptr;
+                if (!map2 || !map2->name)
+                    return fail(d, VehicleWindowError50DS::material, "source pair has no actual published map 2");
+            }
             if (binding.mode == VehicleWindowMaterialMode50DS::untextured) {
                 if (binding.textureIndex != assets::unresolvedMaterialTexture50EA)
                     return fail(d, VehicleWindowError50DS::material,
@@ -104,11 +188,62 @@ bool validateMaterials(const VehicleWindowRequest50DS& request,
             }
         }
     }
-    d.component = 3;
+    if (anyPair != bool(input.specularTextures50LA))
+        return fail(d, VehicleWindowError50DS::material, "map-2 bank presence differs from source pair table");
+    d.component = maxComponents;
     d.material = d.texture = assets::unresolvedMaterialTexture50EA;
     return true;
 }
+// This checks live canonical state without touching create-only span arrays.
+bool currentRaStaticFire(const VehicleWindowTrack50DS& track,VehicleWindowDiagnostic50DS& d) noexcept {
+    if(!track.raStaticFire)return true;
+    if(!track.textures||track.textures->raStaticFireOwner()!=track.raStaticFire.get())
+        return fail(d,VehicleWindowError50DS::material,"FireP0t exact image publication lost");
+    constexpr std::int32_t fields[]={1,0,255,255,0,0,1,0,1,128,0,0,0,0,0,0,1,0,0,1,1,1,0,0,0,0,0,1,6,0,0,0,1,2,0};
+    constexpr std::int32_t sampler[]={0,0,1,5,0,-75};
+    for(std::size_t i=0;i<4;++i){
+        assets::OriginalStandardMaterialMapBindingView50LA map;
+        assets::OriginalStandardMaterialDiagnostic50LA md;
+        if(!track.raStaticFire->currentMap(i,map,md))
+            return fail(d,VehicleWindowError50DS::material,"FireP0t canonical map/collector expired");
+        if(map.contextAfter249610.fields.size()!=sizeof(fields)/sizeof(fields[0]))
+            return fail(d,VehicleWindowError50DS::material,"FireP0t unsupported canonical field extent");
+        for(std::size_t j=0;j<map.contextAfter249610.fields.size();++j)
+            if(map.contextAfter249610.fields[j].value!=fields[j])
+                return fail(d,VehicleWindowError50DS::material,"FireP0t unsupported canonical raster state");
+        for(std::size_t j=0;j<6;++j)if(map.contextAfter249610.sampler[j].value!=sampler[j])
+            return fail(d,VehicleWindowError50DS::material,"FireP0t canonical sampler changed");
+    }
+    return true;
+}
+bool validateRaStaticFire(const VehicleWindowTrack50DS& track,VehicleWindowDiagnostic50DS& d) noexcept {
+    if(!track.raStaticFire){
+        if(track.textures&&track.textures->raStaticFireOwner())
+            return fail(d,VehicleWindowError50DS::material,"FireP0t image bank requires its typed track publication");
+        return true;
+    }
+    if(track.mesh!=track.raStaticFire->mesh()||!track.mesh||
+       track.mode!=VehicleWindowMode50DS::callerMaterialTextures||track.vertexColorScale!=1.f||
+       track.spanCount!=4||!track.spans||track.sourceNormals||track.sourceNormalCount||
+       track.sourceProjectionUvs||track.sourceProjectionCount)
+        return fail(d,VehicleWindowError50DS::material,"FireP0t requires exact source mesh/four spans/authored RGB and UV");
+    if(!currentRaStaticFire(track,d))return false;
+    for(std::size_t i=0;i<4;++i){
+        const auto* source=track.raStaticFire->span(i);const auto& span=track.spans[i];const auto& m=span.material;
+        if(!source||source->vertexStart!=span.vertexStart||source->vertexCount!=span.vertexCount||
+           source->indexStart!=span.indexStart||source->indexCount!=span.indexCount||
+           m.mode!=VehicleWindowMaterialMode50DS::requiredTexture||m.textureIndex!=0||
+           m.blend!=VehicleWindowBlend50DS::opaque||!m.depthWrite||!m.depthEqual||m.alphaScale!=1.f||
+           m.fixedBlendAlpha||m.unlit||!m.sourcePrelit||m.sourceDiffuseCompressed50LA||m.sourceSpecularPair50LA||
+           span.sourcePass!=1||span.sourcePassCount!=1||span.projectionPass||span.discardZeroAlpha||
+           !span.sourceAlphaTest||span.sourceAlphaReference||span.sourceUvAnimation||
+           !span.sourceFogKnown||!span.sourceFogEnabled)
+            return fail(d,VehicleWindowError50DS::material,"FireP0t source span or exact canonical lowering differs");
+    }
+    return true;
+}
 bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnostic50DS& d) noexcept {
+    if(!validateRaStaticFire(request.track,d))return false;
     const auto& track = request.track;
     const auto& fog = track.worldFog;
     if (fog.enabled) {
@@ -202,6 +337,9 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
         if (index >= mesh.vertices.size())
             return fail(d, VehicleWindowError50DS::indices, "track index outside vertex array");
     if (track.mode == VehicleWindowMode50DS::callerMaterialTextures) {
+        if(track.textures&&track.textures->raStaticWorldOwner())
+            return fail(d,VehicleWindowError50DS::material,
+                "full RA image publication requires pending typed world renderer/light join");
         if (!track.textures || !track.textures->validBorrow(request.context, request.isCurrent,
             track.textures->publicationToken()) || !track.spans || !track.spanCount ||
             track.spanCount > maxVehicleWindowTrackSpans50DS)
@@ -212,7 +350,13 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
             d.trackSpan = i;
             const auto& span = track.spans[i];
             d.texture = span.material.textureIndex;
+            if (span.nativeCoverage != NativeTrackCoverage50DS::aa0 &&
+                span.nativeCoverage != NativeTrackCoverage50DS::fourSampleAa1)
+                return fail(d, VehicleWindowError50DS::material, "unknown native track coverage policy");
             if (!validateMaterialPolicy(span.material, d)) return false;
+            if (span.material.sourceDiffuseCompressed50LA)
+                return fail(d, VehicleWindowError50DS::material,
+                    "track, dynamic-world and sky spans cannot select racer source diffuse");
             if (!span.sourcePass || !span.sourcePassCount || span.sourcePassCount > 2 ||
                 span.sourcePass > span.sourcePassCount || span.projectionPass > 2 ||
                 (span.projectionPass && (!track.sourceProjectionUvs ||
@@ -240,6 +384,11 @@ bool validateTrack(const VehicleWindowRequest50DS& request, VehicleWindowDiagnos
                 if (mesh.indices[n] < span.vertexStart || mesh.indices[n] >= span.vertexStart+span.vertexCount)
                     return fail(d, VehicleWindowError50DS::indices,
                         "track span index escapes its declared source vertex range");
+            if ((span.discardZeroAlpha && span.sourceAlphaTest) ||
+                (span.sourceUvAnimation && (span.sourcePass != 1 || span.sourcePassCount != 1 ||
+                    span.projectionPass || span.material.mode != VehicleWindowMaterialMode50DS::requiredTexture)))
+                return fail(d,VehicleWindowError50DS::material,
+                    "source UV service requires one textured unprojected pass and one alpha-test mode");
             if (span.material.mode == VehicleWindowMaterialMode50DS::untextured) {
                 if (span.material.textureIndex != assets::unresolvedMaterialTexture50EA || span.discardZeroAlpha)
                     return fail(d, VehicleWindowError50DS::material,
@@ -329,6 +478,8 @@ bool validateDynamicWorld(const VehicleWindowRequest50DS& request, VehicleWindow
         return fail(d, VehicleWindowError50DS::limits,
             "dynamic world requires bounded textured topology without static culling/projection");
     const bool result = validateTrack(selected, d);
+    if(result)for(U i=0;i<world.spanCount;++i)if(world.spans[i].sourceUvAnimation)
+        return fail(d,VehicleWindowError50DS::material,"dynamic UV controller requires a separate owner binding");
     d.dynamicWorldSpan = d.trackSpan;
     d.trackSpan = assets::unresolvedMaterialTexture50EA;
     return result;
@@ -352,7 +503,8 @@ bool validateSky(const VehicleWindowRequest50DS& request, VehicleWindowDiagnosti
     for (U i = 0; i < sky.spanCount; ++i) {
         const auto& material = sky.spans[i].material;
         if (material.blend != VehicleWindowBlend50DS::opaque || material.depthWrite ||
-            !material.unlit || sky.spans[i].discardZeroAlpha || sky.spans[i].sourcePass != 1 ||
+            !material.unlit || sky.spans[i].discardZeroAlpha || sky.spans[i].sourceAlphaTest ||
+            sky.spans[i].sourceUvAnimation || sky.spans[i].sourcePass != 1 ||
             sky.spans[i].sourcePassCount != 1 || sky.spans[i].projectionPass)
             return fail(d, VehicleWindowError50DS::material,
                 "sky requires explicit unlit opaque non-depth-writing materials");
@@ -376,16 +528,21 @@ bool validateCables(const VehicleWindowRequest50DS& request, VehicleWindowDiagno
     return true;
 }
 U cableIndex50DS(U index) noexcept {
-    // Canonical 50FD strip topology, two nine-sample cables, two triangles
+    // Canonical 50FD strip topology, up to four nine-sample cables, two triangles
     // per adjacent sample pair. No topology is generated from visual guesses.
     constexpr U offsets[] = {0, 1, 2, 2, 1, 3};
     const U trianglePair = index / 6;
     return (trianglePair / 8) * 18 + (trianglePair % 8) * 2 + offsets[index % 6];
 }
 bool validateCableFrame(const game::PodCableMesh50FD& mesh, VehicleWindowDiagnostic50DS& d) noexcept {
-    static_assert(game::podCableVertexCount50FD == 36 && game::podCableIndexCount50FD == 96,
-        "50DS fixed storage requires the admitted 50FD two-cable topology");
-    for (const auto& vertex : mesh.vertices) {
+    static_assert(game::maxPodCableVertexCount50FD == 72 && game::maxPodCableIndexCount50FD == 192,
+        "50DS fixed storage requires the admitted 50FD four-cable capacity");
+    if (mesh.cableCount != 2 && mesh.cableCount != 4)
+        return fail(d, VehicleWindowError50DS::frame, "cable count is outside the admitted source topology");
+    const U vertexCount = mesh.cableCount * game::podCableVerticesPerCable50FD;
+    const U indexCount = mesh.cableCount * game::podCableIndicesPerCable50FD;
+    for (U i = 0; i < vertexCount; ++i) {
+        const auto& vertex = mesh.vertices[i];
         for (float value : vertex.position)
             if (!std::isfinite(value))
                 return fail(d, VehicleWindowError50DS::frame, "cable vertex contains nonfinite world position");
@@ -393,7 +550,7 @@ bool validateCableFrame(const game::PodCableMesh50FD& mesh, VehicleWindowDiagnos
             if (!std::isfinite(value))
                 return fail(d, VehicleWindowError50DS::frame, "cable vertex contains nonfinite source UV");
     }
-    for (U i = 0; i < game::podCableIndexCount50FD; ++i)
+    for (U i = 0; i < indexCount; ++i)
         if (mesh.indices[i] != cableIndex50DS(i))
             return fail(d, VehicleWindowError50DS::indices, "cable topology differs from canonical source strips");
     return true;
@@ -561,16 +718,22 @@ struct HostHudGeometry {
         for (U i = 0; i < input.standingsCount; ++i)
             if (input.standings[i].racerIndex == input.standingsPlayerIndex)
                 text(x + 12.f, y + 24.f, input.standings[i].displayName, 0xEDF3F8);
-        char place[32]{}, finish[40]{};
-        std::snprintf(place, sizeof(place), "PLACE %u / %u", input.resultsFinishPlace, input.raceRacerCount);
-        // Finish time is the explicit sealed HOST race observation; the native
-        // CC0 lap durations below retain their separate source provenance.
-        const U finishCentiseconds = static_cast<U>(input.resultsFinishSeconds * 100.0 + .5);
-        std::snprintf(finish, sizeof(finish), "FINISH TIME %u:%02u.%02u", finishCentiseconds / 6000u,
-            (finishCentiseconds / 100u) % 60u, finishCentiseconds % 100u);
-        text(x + 12.f, y + 40.f, place, 0xA8E6B4);
-        text(x + 158.f, y + 40.f, finish, 0xA8E6B4);
-        text(x + 12.f, y + 58.f, "STANDINGS AT YOUR FINISH", 0xA8C5DE);
+        if (input.raceFinished) {
+            char place[32]{}, finish[40]{};
+            std::snprintf(place, sizeof(place), "PLACE %u / %u", input.resultsFinishPlace, input.raceRacerCount);
+            // Explicit sealed finish only. Native CC0 durations below retain
+            // their separate provenance; neither elapsed time nor rank can
+            // manufacture a finish for a retired, unfinished racer.
+            const U finishCentiseconds = static_cast<U>(input.resultsFinishSeconds * 100.0 + .5);
+            std::snprintf(finish, sizeof(finish), "FINISH TIME %u:%02u.%02u", finishCentiseconds / 6000u,
+                (finishCentiseconds / 100u) % 60u, finishCentiseconds % 100u);
+            text(x + 12.f, y + 40.f, place, 0xA8E6B4);
+            text(x + 158.f, y + 40.f, finish, 0xA8E6B4);
+        } else {
+            text(x + 12.f, y + 40.f, "DNF", 0xFFBF55);
+            text(x + 158.f, y + 40.f, "NO FINISH TIME", 0xFFBF55);
+        }
+        text(x + 12.f, y + 58.f, "STANDINGS AT RACE END", 0xA8C5DE);
         text(x + 232.f, y + 58.f, "LAPS", 0xA8C5DE);
         for (U i = 0; i < input.standingsCount; ++i) {
             const auto& row = input.standings[i];
@@ -584,7 +747,8 @@ struct HostHudGeometry {
             text(x + 12.f, rowY, rank, color);
             text(x + 30.f, rowY, row.displayName, color);
             text(x + 232.f, rowY, laps, color);
-            text(x + 300.f, rowY, row.finished ? "FINISHED" : "UNFINISHED", 0xA8C5DE);
+            text(x + 300.f, rowY, row.finished ? "FINISHED" : row.retirementCD4 ? "DNF" : "UNFINISHED",
+                !row.finished && row.retirementCD4 ? 0xFFBF55 : 0xA8C5DE);
         }
         if (input.completedLapTimesValid) {
             text(x + 12.f, y + timingY, "COMPLETED LAP TIMES", 0xA8C5DE);
@@ -601,9 +765,11 @@ struct HostHudGeometry {
                 text(x + 12.f, rowY, label, 0xEDF3F8);
                 duration(rowY, input.completedLapSeconds[i]);
             }
-            const float bestY = y + timingY + 13.f + 11.f * float(input.completedLapTimeCount);
-            text(x + 12.f, bestY, "BEST", 0xA8E6B4);
-            duration(bestY, input.bestLapSeconds);
+            if (input.completedLapTimeCount) {
+                const float bestY = y + timingY + 13.f + 11.f * float(input.completedLapTimeCount);
+                text(x + 12.f, bestY, "BEST", 0xA8E6B4);
+                duration(bestY, input.bestLapSeconds);
+            } else text(x + 12.f, y + timingY + 13.f, "NO COMPLETED LAPS", 0xEDF3F8);
         } else text(x + 12.f, y + timingY, "LAP TIMES UNAVAILABLE", 0xA8C5DE);
         const char* actions[] = {"RESTART RACE", "MAIN MENU", "EXIT"};
         if (input.resultsConfirming) {
@@ -626,7 +792,8 @@ struct HostHudGeometry {
             "UP/DOWN SELECT  ENTER CONFIRM  ESC PAUSE", 0xA8C5DE);
         return !overflow;
     }
-    void standingsPanel(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
+    void standingsPanel(const VehicleWindowHostHud50DS& input, I width, I height,
+        float reservedTop=0.f,float maximumScale=0.f) noexcept {
         if (!input.standingsCount) return;
         // Leave a four-cell gap below the race readout, including optional
         // clocks. Only this panel contracts when the viewport cannot fit it
@@ -636,12 +803,14 @@ struct HostHudGeometry {
         const float timingHeight = input.completedLapTimesValid ?
             30.f + 11.f * float(input.completedLapTimeCount) : 0.f;
         const float panelHeight = standingsHeight + timingHeight;
-        const float clockHeight = input.raceClocksValid ? (input.raceFinished ? 14.f : 28.f) : 0.f;
-        const float top = (44.f + clockHeight) * hudScale;
+        const float clockHeight = input.raceClocksValid ?
+            (input.raceFinished || input.raceRetirementCD4 ? 14.f : 28.f) : 0.f;
+        const float top = reservedTop>0.f?reservedTop:(44.f + clockHeight) * hudScale;
         const float availableHeight = float(height) - top - 68.f * hudScale;
         const float availableWidth = float(width) - 68.f * hudScale;
         if (availableHeight <= 0.f || availableWidth <= 0.f) return;
-        scale = std::min(hudScale, std::min(availableWidth / panelWidth, availableHeight / panelHeight));
+        scale = std::min(maximumScale>0.f?maximumScale:hudScale,
+            std::min(availableWidth / panelWidth, availableHeight / panelHeight));
         const float x = 8.f * hudScale / scale - 8.f;
         const float y = 64.f - (float(height) - top) / scale;
         rectangle(x, y, panelWidth, panelHeight, 0x617589);
@@ -661,6 +830,7 @@ struct HostHudGeometry {
             text(x + 18.f, rowY, row.displayName, color);
             text(x + 168.f, rowY, completed, color);
             if (row.finished) text(x + 198.f, rowY, "FIN", 0xA8E6B4);
+            else if (row.retirementCD4) text(x + 198.f, rowY, "DNF", 0xFFBF55);
         }
         if (input.completedLapTimesValid) {
             const float timingY = y + standingsHeight;
@@ -690,10 +860,12 @@ struct HostHudGeometry {
         }
         scale = hudScale;
     }
-    bool build(const VehicleWindowHostHud50DS& input, I width, I height) noexcept {
+    bool build(const VehicleWindowHostHud50DS& input, I width, I height,
+        float admittedOriginalBottom=0.f) noexcept {
         if (input.resultsPanelVisible) return buildResults(input, width, height);
         count = 0; overflow = false;
-        const float clockHeight = input.raceClocksValid ? (input.raceFinished ? 14.f : 28.f) : 0.f;
+        const float clockHeight = input.raceClocksValid ?
+            (input.raceFinished || input.raceRetirementCD4 ? 14.f : 28.f) : 0.f;
         scale = width >= 960 && height >= 540 ? 2.f : 1.f;
         scale = std::min(scale, std::min(float(width) / 176.f,
             float(height) / (input.raceEnabled ? 112.f + clockHeight : input.lapCountValid ? 100.f : 72.f)));
@@ -709,7 +881,40 @@ struct HostHudGeometry {
         bar(19.f, input.heat01, input.overheated ? 0xFF6556 : 0xFFBF55);
         bar(31.f, input.leftDamage01, 0xEF7767);
         bar(43.f, input.rightDamage01, 0xEF7767);
-        if (input.raceEnabled) {
+        float standingsTop=0.f,standingsScale=0.f;bool omitStandings=false;
+        if (input.raceEnabled&&admittedOriginalBottom>0.f) {
+            // This bound comes only from this renderer's accepted TimeStats
+            // quad copy. Original coordinates and source draw stay untouched.
+            const float hudScale=scale;
+            const float top=admittedOriginalBottom+8.f*hudScale;
+            const float panelHeight=input.standingsCount?
+                22.f+11.f*float(input.standingsCount)+(input.completedLapTimesValid?
+                    30.f+11.f*float(input.completedLapTimeCount):0.f):0.f;
+            const float availableHeight=float(height)-top-68.f*hudScale;
+            const float availableWidth=float(width)-68.f*hudScale;
+            if(availableHeight<=0.f||availableWidth<=0.f)omitStandings=true;
+            else {
+                // Fit the compact status and standings together above heat/damage;
+                // leave the same right-side clearance used for NEXT.
+                scale=std::min(hudScale,std::min(availableWidth/(input.standingsCount?222.f:168.f),
+                    availableHeight/(32.f+(input.standingsCount?4.f+panelHeight:0.f))));
+                const float x=8.f*hudScale/scale-8.f;
+                const float y=64.f-(float(height)-top)/scale;
+                rectangle(x,y,168.f,32.f,0x617589);
+                rectangle(x+1.f,y+1.f,166.f,30.f,0x0A111B);
+                char place[32]{},countdown[32]{};
+                std::snprintf(place,sizeof(place),"POS %u/%u",input.racePlace,input.raceRacerCount);
+                std::snprintf(countdown,sizeof(countdown),"START IN %u",input.raceCountdown);
+                text(x+6.f,y+5.f,place,0xEDF3F8);
+                const char* status=input.raceResultsReady?"RESULTS":input.raceFinished?"FINISHED":
+                    input.raceRetirementCD4?"DNF":input.raceCountdown?countdown:
+                    input.raceGo?"GO":input.wrongWay?"WRONG WAY":"RACING";
+                text(x+6.f,y+19.f,status,input.raceFinished||input.raceGo?0xA8E6B4:
+                    input.raceRetirementCD4?0xFFBF55:input.wrongWay?0xFF6556:0xA8C5DE);
+                standingsTop=top+36.f*scale;standingsScale=scale;
+                scale=hudScale;
+            }
+        } else if (input.raceEnabled) {
             const float y = 72.f - float(height) / scale;
             rectangle(0.f, y, 168.f, 32.f + clockHeight, 0x617589);
             rectangle(1.f, y + 1.f, 166.f, 30.f + clockHeight, 0x0A111B);
@@ -719,10 +924,11 @@ struct HostHudGeometry {
             std::snprintf(countdown, sizeof(countdown), "START IN %u", input.raceCountdown);
             text(6.f, y + 5.f, laps, 0xEDF3F8);
             text(90.f, y + 5.f, place, 0xEDF3F8);
-            const char* status = input.raceResultsReady ? "RESULTS" : input.raceFinished ? "FINISHED" : input.raceCountdown ? countdown :
+            const char* status = input.raceResultsReady ? "RESULTS" : input.raceFinished ? "FINISHED" :
+                input.raceRetirementCD4 ? "DNF" : input.raceCountdown ? countdown :
                 input.raceGo ? "GO" : input.wrongWay ? "WRONG WAY" : "RACING";
             text(6.f, y + 19.f, status, input.raceFinished || input.raceGo ? 0xA8E6B4 :
-                input.wrongWay ? 0xFF6556 : 0xA8C5DE);
+                input.raceRetirementCD4 ? 0xFFBF55 : input.wrongWay ? 0xFF6556 : 0xA8C5DE);
             if (input.raceClocksValid) {
                 const auto clock = [&](float rowY, float seconds) noexcept {
                     // These live fields are not CC0's quantized completed laps.
@@ -735,7 +941,7 @@ struct HostHudGeometry {
                 };
                 text(6.f, y + 33.f, "RACE", 0xA8C5DE);
                 clock(y + 33.f, input.raceElapsedSeconds);
-                if (!input.raceFinished) {
+                if (!input.raceFinished && !input.raceRetirementCD4) {
                     text(6.f, y + 47.f, "LAP TIME", 0xA8C5DE);
                     clock(y + 47.f, input.currentLapSeconds);
                 }
@@ -782,7 +988,7 @@ struct HostHudGeometry {
             quad(shaft, 0x5DDFFF);
             quad(head, 0x5DDFFF);
         }
-        standingsPanel(input, width, height);
+        if(!omitStandings)standingsPanel(input, width, height,standingsTop,standingsScale);
         return !overflow;
     }
 };
@@ -827,6 +1033,9 @@ struct OwnerGl {
     void (*genTextures)(I,U*) = nullptr;
     void (*deleteTextures)(I,const U*) = nullptr;
     void (*texImage2D)(U,I,I,I,I,I,U,U,const void*) = nullptr;
+    void (*texImage2DMultisample)(U,I,U,I,I,std::uint8_t) = nullptr;
+    void (*drawBuffers)(I,const U*) = nullptr;
+    void (*clearBufferfv)(U,I,const float*) = nullptr;
     void (*texParameteri)(U,U,I) = nullptr;
     void (*getTexLevelParameteriv)(U,I,U,I*) = nullptr;
     void (*framebufferTexture2D)(U,U,U,U,I) = nullptr;
@@ -861,47 +1070,82 @@ struct OwnerGl {
 }
 
 struct VehicleWindowGl50DS::Storage {
+    std::shared_ptr<ra_static_fire_visual50LA::Owner> raStaticFireOwner;
+    const VehicleWindowGl50DS* raStaticFireRenderer=nullptr;
+    std::uint64_t raStaticFirePublicationSerial=0;
+    void retireRaStaticFirePublication() noexcept {
+        if(raStaticFireOwner){
+            raStaticFireOwner->retireRenderer(raStaticFireRenderer);
+            raStaticFireOwner.reset();raStaticFireRenderer=nullptr;raStaticFirePublicationSerial=0;
+        }
+    }
     struct MaterialUv { float value[4] = {1.f, 1.f, 0.f, 0.f}; };
     struct Material {
         U textureIndex = assets::unresolvedMaterialTexture50EA, name = 0;
+        U specularName50LA = 0;
+        std::uint64_t textureIdentity50LA = 0, specularIdentity50LA = 0;
         VehicleWindowMaterialBinding50DS policy{};
         float uv[4] = {1.f, 1.f, 0.f, 0.f};
     };
     struct TrackSpan {
+        NativeTrackCoverage50DS nativeCoverage = NativeTrackCoverage50DS::aa0;
         U indexStart = 0, indexCount = 0;
         Material material{};
         bool discardZeroAlpha = false;
+        bool sourceAlphaTest = false, sourceUvAnimation = false;
+        std::uint8_t sourceAlphaReference = 0;
         U sourcePass = 1, sourcePassCount = 1, projectionPass = 0;
         bool worldFogEligible = false;
+        bool allowPodShadow = true;
         U animation = assets::unresolvedMaterialTexture50EA;
+        bool submittedGameplayCandidate = false, submittedCompletedGameplay = false;
     };
     struct TrackChunk {
         U sourceSpan = 0, indexStart = 0, indexCount = 0;
     };
+    struct SpecularGroup50LA { U indexStart = 0, indexCount = 0; };
+    struct SpecularGeometry50LA {
+        bool enabled = false;
+        U buffers[2]{}, groupCount = 0;
+        U spanFirst[game::maxVehicleDrawSpans50CM]{}, spanCount[game::maxVehicleDrawSpans50CM]{};
+        std::unique_ptr<SpecularGroup50LA[]> groups;
+    };
+    std::array<SpecularGeometry50LA, sourceBodyCount50LA> sourceSpecularGeometry50LA;
+    bool hasSpecularPairs50LA = false;
+    U sourcePairColors50LA[2]{};
+    std::uint64_t specularPublication50LA = 0;
+    std::unique_ptr<std::array<float, 2>[]> frameSpecularUvs50LA;
+    std::unique_ptr<game::OriginalRacerSpecularWorkspace50LA> specularWorkspace50LA;
+    game::OriginalRacerSpecularRequest50LA frameSpecularCamera50LA{};
+    std::uintptr_t frameSpecularCameraOwner50LA = 0;
+    std::uint64_t frameSpecularCameraPublication50LA = 0;
+    bool frameSpecularSecond50LA[1 + maxVehicleWindowOpponents50DS][sourceBodyCount50LA]{};
     VehicleWindowRequest50DS request{};
     VehicleGlFunctions50CV drawGl{};
     VehicleGlShaderFunctions50CZ shaderGl{};
     OwnerGl gl{};
     VehicleGlResources50CV resources{};
-    U racerNormalBuffers[2][3]{};
+    U racerNormalBuffers[2][maxComponents]{};
     std::unique_ptr<VehicleGlShader50CZ> shader;
     std::unique_ptr<VehicleGlBackend50CV> adapter;
     const std::thread::id thread = std::this_thread::get_id();
-    const game::VehicleDrawMesh50CM* meshes[3]{};
-    const assets::Scene48D* scenes[3]{};
+    const game::VehicleDrawMesh50CM* meshes[maxComponents]{};
+    const assets::Scene48D* scenes[maxComponents]{};
     std::unique_ptr<Material[]> materials;
     std::unique_ptr<MaterialUv[]> opponentMaterialUvs;
     U opponentMaterialStride = 0;
-    U materialOffsets[3]{}, materialCount = 0;
+    U materialOffsets[maxComponents]{}, materialCount = 0;
     struct RacerArchetype {
-        const game::VehicleDrawMesh50CM* meshes[3]{};
-        const assets::Scene48D* scenes[3]{};
+        const game::VehicleDrawMesh50CM* meshes[maxComponents]{};
+        const assets::Scene48D* scenes[maxComponents]{};
         VehicleGlResources50CV resources{};
-        U normalBuffers[2][3]{};
+        U normalBuffers[2][maxComponents]{};
         std::unique_ptr<Material[]> materials;
-        U materialOffsets[3]{}, materialCount = 0;
+        U materialOffsets[maxComponents]{}, materialCount = 0;
         const MaterialTextureGl50EB* textures = nullptr;
-        std::uint64_t texturePublication = 0;
+        const MaterialTextureGl50EB* specularTextures50LA = nullptr;
+        std::uint64_t texturePublication = 0, specularPublication50LA = 0;
+        std::array<SpecularGeometry50LA, sourceBodyCount50LA> specularGeometry50LA;
         VehicleWindowCables50DS cables{};
         std::uint64_t cableTexturePublication = 0;
         U cableTextureName = 0;
@@ -912,22 +1156,54 @@ struct VehicleWindowGl50DS::Storage {
         const game::VehicleDrawMesh50CM* const* meshes;
         const assets::Scene48D* const* scenes;
         const VehicleGlResources50CV* resources;
-        const U (*normalBuffers)[3];
+        const U (*normalBuffers)[maxComponents];
         Material* materials;
         const U* materialOffsets;
         U materialCount;
         U cableTextureName;
+        const SpecularGeometry50LA* specular;
     };
     RacerView racerView(U archetype) const noexcept {
         if (!archetype) return {meshes, scenes, &resources, racerNormalBuffers, materials.get(),
-            materialOffsets, materialCount, cableTextureName};
+            materialOffsets, materialCount, cableTextureName, sourceSpecularGeometry50LA.data()};
         const auto& source = racerArchetypes[archetype - 1];
         return {source.meshes, source.scenes, &source.resources, source.normalBuffers, source.materials.get(),
-            source.materialOffsets, source.materialCount, source.cableTextureName};
+            source.materialOffsets, source.materialCount, source.cableTextureName, source.specularGeometry50LA.data()};
     }
     std::uint64_t texturePublication = 0;
     std::unique_ptr<TrackSpan[]> trackSpans;
     U trackSpanCount = 0;
+    U trackVisibilityPendingTarget = 0;
+    std::uint64_t trackVisibilityCompletedGeneration = 0;
+    bool trackVisibilityCompletedValid = false;
+    void acceptCompletedTrackVisibility() noexcept {
+        // Race banks are distinct from host-menu, UI and blocking-fade targets.
+        // Only a fully successful gameplay submit sets the pending target.
+        if(!trackVisibilityPendingTarget)return;
+        const bool actualGameplay=trackVisibilityPendingTarget==displayedTarget &&
+            displayedTarget==targets[published];
+        trackVisibilityPendingTarget=0;
+        if(!actualGameplay)return;
+        if(trackVisibilityCompletedGeneration==std::numeric_limits<std::uint64_t>::max()) {
+            trackVisibilityCompletedValid=false;
+            if(raStaticFireOwner)raStaticFireOwner->nativeCompletionLive_=false;
+            return;
+        }
+        for(U i=0;i<trackSpanCount;++i)
+            trackSpans[i].submittedCompletedGameplay=trackSpans[i].submittedGameplayCandidate;
+        ++trackVisibilityCompletedGeneration;trackVisibilityCompletedValid=true;
+        if(raStaticFireOwner){
+            // Exact cold admission proved source-order spans0..3 and retained
+            // their actual worldInstance identities. Read only issued draw bits.
+            if(trackSpanCount!=4){trackVisibilityCompletedValid=false;raStaticFireOwner->nativeCompletionLive_=false;return;}
+            std::array<bool,4> submitted{};
+            for(U i=0;i<4;++i)submitted[i]=trackSpans[i].submittedCompletedGameplay;
+            if(!raStaticFireOwner->recordNativeCompleted(raStaticFireRenderer,
+                raStaticFirePublicationSerial,trackVisibilityCompletedGeneration,submitted)){
+                trackVisibilityCompletedValid=false;raStaticFireOwner->nativeCompletionLive_=false;
+            }
+        }
+    }
     struct TrackAnimation {
         U sourceTextureIndex = assets::unresolvedMaterialTexture50EA;
         U firstTextureIndex = 0, frameCount = 0, selectedFrame = 0;
@@ -949,12 +1225,14 @@ struct VehicleWindowGl50DS::Storage {
     I skyIndexCount = 0;
     std::uint64_t skyTexturePublication = 0;
     float skyMatrix[16]{};
+    bool frameSkyEnabled = true;
     std::unique_ptr<TrackChunk[]> trackChunks;
     U trackChunkCount = 0;
     std::unique_ptr<game::StaticDrawBounds50EI[]> trackDrawBounds;
     std::unique_ptr<U[]> trackVisibleDrawIds;
     U trackDrawCount = 0, frameTrackDrawCount = 0;
     bool frameTrackCullingApplied = false;
+    VehicleWindowTrackUvFrame50DS frameTrackUv{};
     std::uint64_t trackTexturePublication = 0;
     std::uint64_t cableTexturePublication = 0;
     U cableTextureName = 0, cableVertexBuffer = 0, cableIndexBuffer = 0, cableVertexArray = 0;
@@ -977,6 +1255,7 @@ struct VehicleWindowGl50DS::Storage {
     I trackMatrixUniform = -1, trackColorScaleUniform = -1;
     I trackUseTextureUniform = -1, trackImageUniform = -1;
     I trackDiscardZeroAlphaUniform = -1, trackUseSourceNormalsUniform = -1, trackProjectionPassUniform = -1;
+    I trackUvTranslationUniform = -1, trackAlphaReferenceUniform = -1;
     I trackEffectModeUniform = -1, trackAlphaScaleUniform = -1, trackUnlitUniform = -1;
     I worldFogEnabledUniform = -1, worldFogCameraUniform = -1;
     I worldFogColorUniform = -1, worldFogRangeUniform = -1;
@@ -1031,7 +1310,7 @@ struct VehicleWindowGl50DS::Storage {
     OriginalUiSourceTerminal50KN uiSourceTerminal{};
     float uiSourceClear[4]{};
     bool uiSourceCoherentFramebufferFetch=false;
-    const OriginalUiRiderDrawContribution50KG* uiSourceFrameOwner=nullptr;
+    const OriginalUiSourceOwner50KM* uiSourceFrameOwner=nullptr;
     std::uint64_t uiSourceFrameGeneration=0,uiSourceTargetGeneration=0;
     U uiProgram = 0, uiVertexShader = 0, uiFragmentShader = 0;
     U uiVertexBuffer = 0, uiIndexBuffer = 0, uiVertexArray = 0, uiParticleFogBuffer = 0, uiSourceRasterWBuffer = 0;
@@ -1065,9 +1344,15 @@ struct VehicleWindowGl50DS::Storage {
     VehicleWindowDiagnostic50DS* diagnostic = nullptr; // Only during synchronous calls.
     std::uint8_t published = 0;
     bool initialized = false, active = false, frameSet = false, imageCommitted = false;
+    bool frontendOnly = false;
     std::uint64_t contextDrainGeneration = 0;
 
 #include "original_gameplay_blur_storage.inl"
+#include "native_coverage_storage.inl"
+#include "original_gc_particle_gl_storage50kg.inl"
+#include "original_race_hud_render.inl"
+#include "original_time_stats_render.inl"
+#include "original_speed_boost_render.inl"
 
     bool current(VehicleWindowDiagnostic50DS& d,
         const OriginalVideoBlockingNativeBackend* fadeOwner=nullptr) const noexcept {
@@ -1082,6 +1367,10 @@ struct VehicleWindowGl50DS::Storage {
     const game::original_gameplay_binder_candidate::Mesh* frameGameplayBinders=nullptr;
     U frameGameplayBinderCount=0,frameGameplayBinderImage=0;
     bool texturesCurrent(VehicleWindowDiagnostic50DS& d) const noexcept {
+        if(!currentRaStaticFire(request.track,d))return false;
+        if(request.gcParticleTextures&&!request.gcParticleTextures->validBorrow(
+            request.context,request.isCurrent,gcParticlePublication))
+            return fail(d,VehicleWindowError50DS::material,"GC particle atlas publication/context changed");
         if(request.gameplayBinderTextures&&!request.gameplayBinderTextures->validBorrow(
             request.context,request.isCurrent,gameplayBinderPublication))
             return fail(d,VehicleWindowError50DS::material,"Binder immutable texture publication expired");
@@ -1090,6 +1379,18 @@ struct VehicleWindowGl50DS::Storage {
                 request.context, request.isCurrent, texturePublication)))
             return fail(d, VehicleWindowError50DS::material,
                 "borrowed vehicle texture publication/context/thread is no longer valid");
+        if (request.materials.specularTextures50LA && !request.materials.specularTextures50LA->validBorrow(
+            request.context, request.isCurrent, specularPublication50LA))
+            return fail(d, VehicleWindowError50DS::material, "player map-2 publication/context/thread changed");
+        for (U m = 0; m < materialCount; ++m) {
+            const auto& material = materials[m];
+            if (!material.policy.sourceSpecularPair50LA) continue;
+            const auto* base = request.materials.textures->asset(material.textureIndex);
+            const auto* map2 = request.materials.specularTextures50LA->asset(material.policy.specularTextureIndex50LA);
+            if (!base || base->name != material.name || base->identity != material.textureIdentity50LA ||
+                !map2 || map2->name != material.specularName50LA || map2->identity != material.specularIdentity50LA)
+                return fail(d, VehicleWindowError50DS::material, "player source pair texture identity changed");
+        }
         for (U i = 0; i < racerArchetypeCount; ++i) {
             const auto& archetype = racerArchetypes[i];
             if (request.mode == VehicleWindowMode50DS::callerMaterialTextures &&
@@ -1097,6 +1398,9 @@ struct VehicleWindowGl50DS::Storage {
                     request.context, request.isCurrent, archetype.texturePublication)))
                 return fail(d, VehicleWindowError50DS::material,
                     "borrowed racer texture publication/context/thread is no longer valid");
+            if (archetype.specularTextures50LA && !archetype.specularTextures50LA->validBorrow(
+                request.context, request.isCurrent, archetype.specularPublication50LA))
+                return fail(d, VehicleWindowError50DS::material, "racer map-2 publication/context/thread changed");
             if (archetype.cables.textures && !archetype.cables.textures->validBorrow(
                 request.context, request.isCurrent, archetype.cableTexturePublication))
                 return fail(d, VehicleWindowError50DS::material,
@@ -1108,6 +1412,12 @@ struct VehicleWindowGl50DS::Storage {
                 if (!texture || texture->name != material.name)
                     return fail(d, VehicleWindowError50DS::material,
                         "racer material texture is no longer the retained publication");
+                if (material.policy.sourceSpecularPair50LA) {
+                    const auto* map2 = archetype.specularTextures50LA->asset(material.policy.specularTextureIndex50LA);
+                    if (texture->identity != material.textureIdentity50LA || !map2 ||
+                        map2->name != material.specularName50LA || map2->identity != material.specularIdentity50LA)
+                        return fail(d, VehicleWindowError50DS::material, "racer source pair texture identity changed");
+                }
             }
             if (archetype.cables.textures) {
                 const auto* texture = archetype.cables.textures->asset(archetype.cables.textureIndex);
@@ -1145,7 +1455,7 @@ struct VehicleWindowGl50DS::Storage {
         return request.mode == VehicleWindowMode50DS::callerMaterialTextures ||
             request.track.mode == VehicleWindowMode50DS::callerMaterialTextures || request.cables.textures ||
             request.sky.textures || request.dynamicWorld.textures || request.enableOriginalUi ||
-            request.enableOriginalGameplayBlur;
+            request.enableOriginalGameplayBlur || request.gcParticleTextures || (hasRaceHudResources() || hasTimeStatsResources() || hasSpeedBoostResources());
     }
     bool usesTrackShader() const noexcept {
         return request.track.mode == VehicleWindowMode50DS::sourceVertexColors ||
@@ -1165,15 +1475,21 @@ struct VehicleWindowGl50DS::Storage {
             target.indexStart = source.indexStart;
             target.indexCount = source.indexCount;
             target.discardZeroAlpha = source.discardZeroAlpha;
+            target.nativeCoverage = source.nativeCoverage;
+            coverageDemand = coverageDemand || source.nativeCoverage == NativeTrackCoverage50DS::fourSampleAa1;
+            target.sourceAlphaTest = source.sourceAlphaTest;
+            target.sourceAlphaReference = source.sourceAlphaReference;
+            target.sourceUvAnimation = source.sourceUvAnimation;
+            target.allowPodShadow = source.allowPodShadow;
             target.sourcePass = source.sourcePass;
             target.sourcePassCount = source.sourcePassCount;
             target.projectionPass = source.projectionPass;
             // All source ranges/pass continuity were validated before creation.
             // For alpha-over pairs, fogging both colors with the same factor
             // yields fog(alpha*layer + (1-alpha)*base), without fogging alpha.
-            target.worldFogEligible = source.sourcePassCount == 1 &&
-                source.material.blend == VehicleWindowBlend50DS::opaque && source.material.depthWrite;
-            if (source.sourcePassCount == 2) {
+            target.worldFogEligible = source.sourceFogKnown ? source.sourceFogEnabled :
+                (source.sourcePassCount == 1 && source.material.blend == VehicleWindowBlend50DS::opaque && source.material.depthWrite);
+            if (source.sourcePassCount == 2 && !source.sourceFogKnown) {
                 const U first = i - (source.sourcePass - 1);
                 const auto& base = input.spans[first];
                 const auto& layer = input.spans[first + 1];
@@ -1243,6 +1559,10 @@ struct VehicleWindowGl50DS::Storage {
             target.indexStart = source.indexStart;
             target.indexCount = source.indexCount;
             target.discardZeroAlpha = source.discardZeroAlpha;
+            target.sourceAlphaTest = source.sourceAlphaTest;
+            target.sourceAlphaReference = source.sourceAlphaReference;
+            target.sourceUvAnimation = source.sourceUvAnimation;
+            target.allowPodShadow = source.allowPodShadow;
             target.sourcePass = source.sourcePass;
             target.sourcePassCount = source.sourcePassCount;
             target.projectionPass = source.projectionPass;
@@ -1379,15 +1699,15 @@ struct VehicleWindowGl50DS::Storage {
     bool createMaterials(const VehicleWindowMaterials50DS& input) noexcept {
         if (request.mode != VehicleWindowMode50DS::callerMaterialTextures) return true;
         U total = 0;
-        for (U c = 0; c < 3; ++c) {
+        for (U c = 0; c < resources.componentCount; ++c) {
             materialOffsets[c] = total;
-            total += input.component[c].count; // Already bounded to 3 * 4096.
+            total += input.component[c].count; // Already bounded to 5 * 4096.
         }
         materialCount = total;
         materials.reset(new (std::nothrow) Material[total]);
         if (!materials)
             return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate bounded cold material table");
-        for (U c = 0; c < 3; ++c) {
+        for (U c = 0; c < resources.componentCount; ++c) {
             for (U m = 0; m < input.component[c].count; ++m) {
                 const auto& binding = input.component[c].bindings[m];
                 auto& resolved = materials[materialOffsets[c] + m];
@@ -1395,6 +1715,15 @@ struct VehicleWindowGl50DS::Storage {
                 resolved.policy = binding;
                 resolved.name = binding.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
                     input.textures->texture(binding.textureIndex) : 0;
+                if (binding.sourceSpecularPair50LA) {
+                    const auto* base = input.textures->asset(binding.textureIndex);
+                    const auto* map2 = input.specularTextures50LA->asset(binding.specularTextureIndex50LA);
+                    if (!base || !base->name || !map2 || !map2->name)
+                        return fail(*diagnostic, VehicleWindowError50DS::material, "source pair disappeared during create");
+                    resolved.textureIdentity50LA = base->identity;
+                    resolved.specularName50LA = map2->name; resolved.specularIdentity50LA = map2->identity;
+                    hasSpecularPairs50LA = true;
+                }
                 if (binding.mode == VehicleWindowMaterialMode50DS::requiredTexture && !resolved.name) {
                     diagnostic->component = c;
                     diagnostic->material = m;
@@ -1415,12 +1744,15 @@ struct VehicleWindowGl50DS::Storage {
         for (U i = 0; i < count; ++i) {
             const auto& uv = uvs[i];
             const U c = componentIndex(uv.component);
-            if (c >= 3 || uv.materialIndex >= selected.scenes[c]->materials.size())
+            if (c >= selected.resources->componentCount || uv.materialIndex >= selected.scenes[c]->materials.size())
                 return fail(d, VehicleWindowError50DS::frame, "material UV identity outside original scene");
             const U key = selected.materialOffsets[c] + uv.materialIndex;
             if (i && key <= previousKey)
                 return fail(d, VehicleWindowError50DS::frame, "material UV array must be unique and source ordered");
             previousKey = key;
+            if (selected.materials[key].policy.sourceSpecularPair50LA &&
+                (uv.uScale != 1.f || uv.vScale != 1.f || uv.uOffset != 0.f || uv.vOffset != 0.f))
+                return fail(d, VehicleWindowError50DS::material, "source pair requires its actual unmodified base UV");
             const float values[] = {uv.uScale, uv.vScale, uv.uOffset, uv.vOffset};
             for (float value : values)
                 if (!std::isfinite(value))
@@ -1431,18 +1763,71 @@ struct VehicleWindowGl50DS::Storage {
     bool retainedMesh(const game::VehicleDrawBatch50CO& batch, VehicleWindowDiagnostic50DS& d,
         U archetype = 0) const noexcept {
         const auto selected = racerView(archetype);
-        for (U c = 0; c < 3; ++c) {
+        if (batch.componentCount != selected.resources->componentCount)
+            return fail(d, VehicleWindowError50DS::assets, "batch component count differs from actual assets");
+        for (U c = 0; c < batch.componentCount; ++c) {
             const auto& mesh = *selected.meshes[c];
             const auto& part = batch.component[c];
             if (part.indices != mesh.indices || part.indexCount != mesh.indexCount ||
                 part.spans != mesh.spans || part.spanCount != mesh.spanCount || part.vertexCount != mesh.vertexCount)
                 return fail(d, VehicleWindowError50DS::assets, "batch is not the retained prepared mesh");
+            // Full semantic material identity, including unused entries, is
+            // retained with the generated RGB. A subset mask must not relabel
+            // imported RGB as source color or route generated RGB to legacy.
+            const auto count = static_cast<U>(selected.scenes[c]->materials.size());
+            bool sourceDiffuse = false, sourcePair = false;
+            if (selected.materials)
+                for (U m = 0; m < count; ++m) {
+                    const auto& policy = selected.materials[selected.materialOffsets[c] + m].policy;
+                    sourceDiffuse = sourceDiffuse || policy.sourceDiffuseCompressed50LA;
+                    sourcePair = sourcePair || policy.sourceSpecularPair50LA;
+                }
+            if (part.sourceSpecularGeometry50LA != sourcePair)
+                return fail(d, VehicleWindowError50DS::frame, "source pair geometry differs from actual cold body policy");
+            if (!sourceDiffuse) {
+                if (part.sourceColorMaterialModes50LA || part.sourceColorMaterialCount50LA ||
+                    part.sourceColorOwner50LA || part.sourceColorPublication50LA ||
+                    part.sourceColorGraphicsSequence50LA || part.sourceColorRacerSlot50LA)
+                    return fail(d, VehicleWindowError50DS::frame,
+                        "legacy racer component must not carry source-color metadata");
+                continue;
+            }
+            d.component = c;
+            if (!sourceBodyComponent50LA(c, batch.componentCount) ||
+                !part.sourceColorMaterialModes50LA || part.sourceColorMaterialCount50LA != count ||
+                !part.sourceColorOwner50LA || !part.sourceColorPublication50LA ||
+                !part.sourceColorGraphicsSequence50LA)
+                return fail(d, VehicleWindowError50DS::frame,
+                    "source diffuse requires the actual engine mask and light identity in a three/five-model pod");
+            for (U m = 0; m < count; ++m) {
+                d.material = m;
+                const auto& binding = selected.materials[selected.materialOffsets[c] + m].policy;
+                if (part.sourceColorMaterialModes50LA[m] !=
+                    (binding.sourceDiffuseCompressed50LA ? 1u : 0u))
+                    return fail(d, VehicleWindowError50DS::material,
+                        "source-color material mask differs from the retained actual material policy");
+            }
+            for (U i = 0; i < part.spanCount; ++i) {
+                const auto& span = part.spans[i];
+                if (!span.index_count) continue;
+                d.material = span.material_index;
+                if (span.material_index >= count ||
+                    part.sourceColorMaterialModes50LA[span.material_index] !=
+                    (selected.materials[selected.materialOffsets[c] + span.material_index].
+                        policy.sourceDiffuseCompressed50LA ? 1u : 0u))
+                    return fail(d, VehicleWindowError50DS::material,
+                        "source-color selected span differs from its retained material policy");
+            }
         }
+        d.component = maxComponents;
+        d.material = assets::unresolvedMaterialTexture50EA;
         return validateRacerNormals(batch, d);
     }
     bool validateRacerNormals(const game::VehicleDrawBatch50CO& batch,
         VehicleWindowDiagnostic50DS& d) const noexcept {
-        for (U c = 0; c < 3; ++c) {
+        if (!game::validVehicleDrawComponentCount50CM(batch.componentCount))
+            return fail(d, VehicleWindowError50DS::frame, "invalid active racer component count");
+        for (U c = 0; c < batch.componentCount; ++c) {
             const auto& part = batch.component[c];
             if (bool(part.sourceNormals) != bool(part.sourceNormalCount) ||
                 (part.sourceNormals && part.sourceNormalCount != part.vertexCount))
@@ -1479,7 +1864,7 @@ struct VehicleWindowGl50DS::Storage {
             const auto selected = racerView(opponent.racerArchetype);
             game::VehicleDrawCapacity50CS racerCapacity{};
             racerCapacity.commands = game::maxVehicleDrawCommands50CS;
-            for (U c = 0; c < 3; ++c) {
+            for (U c = 0; c < selected.resources->componentCount; ++c) {
                 racerCapacity.vertices[c] = selected.meshes[c]->vertexCount;
                 racerCapacity.indices[c] = selected.meshes[c]->indexCount;
             }
@@ -1492,7 +1877,7 @@ struct VehicleWindowGl50DS::Storage {
                 return fail(d, VehicleWindowError50DS::frame, "opponent cables require valid geometry and the cold cable bank");
             // Each independent live 50CO stream must survive until deferred
             // effects. Reject overlapping player/opponent/component storage.
-            for (U c = 0; c < 3; ++c) {
+            for (U c = 0; c < selected.resources->componentCount; ++c) {
                 const auto& part = opponent.batch->component[c];
                 const auto start = reinterpret_cast<std::uintptr_t>(part.vertices);
                 const auto bytes = std::uintptr_t(part.vertexCount) * sizeof(assets::Vertex48B);
@@ -1500,7 +1885,7 @@ struct VehicleWindowGl50DS::Storage {
                     return fail(d, VehicleWindowError50DS::frame, "opponent vertex range overflow");
                 for (U prior = 0; prior <= i + 1; ++prior) {
                     const auto& other = prior ? *frame.opponents[prior - 1].batch : player;
-                    for (U k = 0; k < (prior == i + 1 ? c : 3); ++k) {
+                    for (U k = 0; k < (prior == i + 1 ? c : other.componentCount); ++k) {
                         const auto begin = reinterpret_cast<std::uintptr_t>(other.component[k].vertices);
                         const auto size = std::uintptr_t(other.component[k].vertexCount) * sizeof(assets::Vertex48B);
                         if (begin > std::numeric_limits<std::uintptr_t>::max() - size ||
@@ -1527,10 +1912,18 @@ struct VehicleWindowGl50DS::Storage {
         std::uintptr_t& fleetOwner, game::NativeGcSelectedLightsCandidate& output,
         VehicleWindowDiagnostic50DS& d) const noexcept {
         output = {};
+        if (archetype > racerArchetypeCount)
+            return fail(d, VehicleWindowError50DS::frame,
+                "native GC packet requires the actual prepared racer archetype");
+        if (!retainedMesh(batch, d, archetype)) return false;
         if (policy == NativeRacerLightingPolicy50DS::unchangedHost) {
             if (input)
                 return fail(d, VehicleWindowError50DS::frame,
                     "unchanged host lighting requires no selected-light packet");
+            for (U c = 0; c < batch.componentCount; ++c)
+                if (batch.component[c].sourceColorMaterialModes50LA)
+                    return fail(d, VehicleWindowError50DS::frame,
+                        "unchanged host lighting cannot consume source-generated racer colors");
             return true;
         }
         if (policy != NativeRacerLightingPolicy50DS::nativeGcSelectedLights || !input ||
@@ -1541,26 +1934,29 @@ struct VehicleWindowGl50DS::Storage {
         // may legitimately have an older graphics sequence than another racer;
         // runtime must retain it with the exact geometry batch it describes.
         const game::NativeGcSelectedLightsCandidate packet = *input;
-        if (!packet.ready() || !packet.graphicsSequence() || packet.racerSlot() != expectedRacerSlot ||
+        if (!packet.ready() || packet.componentCount() != batch.componentCount || !packet.graphicsSequence() || packet.racerSlot() != expectedRacerSlot ||
             !packet.publication() || !packet.ownerIdentity() ||
             (fleetOwner && fleetOwner != packet.ownerIdentity()))
             return fail(d, VehicleWindowError50DS::frame,
                 "native GC packet requires ready matching racer and shared owner identity");
-        if (archetype > racerArchetypeCount)
-            return fail(d, VehicleWindowError50DS::frame,
-                "native GC packet requires the actual prepared racer archetype");
-        if (!retainedMesh(batch, d, archetype)) return false;
         const auto selected = racerView(archetype);
         if (!selected.materials)
             return fail(d, VehicleWindowError50DS::material,
                 "native GC lighting requires the actual retained material bank");
-        for (U c = 0; c < 3; ++c) {
+        for (U c = 0; c < batch.componentCount; ++c) {
             d.component = c;
             // Inspect actual nonempty draw spans only, not unused material
             // table entries. A requested lit opaque untextured surface cannot
             // silently fall back to the fixed-gray host light. Existing unlit,
             // source-prelit and transparent/additive paths remain excluded.
             const auto& geometry = batch.component[c];
+            if (geometry.sourceColorMaterialModes50LA &&
+                (geometry.sourceColorOwner50LA != packet.ownerIdentity() ||
+                 geometry.sourceColorPublication50LA != packet.publication() ||
+                 geometry.sourceColorGraphicsSequence50LA != packet.graphicsSequence() ||
+                 geometry.sourceColorRacerSlot50LA != packet.racerSlot()))
+                return fail(d, VehicleWindowError50DS::frame,
+                    "source-generated colors require their exact selected-light publication");
             for (U i = 0; i < geometry.spanCount; ++i) {
                 const auto& span = geometry.spans[i];
                 if (!span.index_count) continue;
@@ -1588,25 +1984,45 @@ struct VehicleWindowGl50DS::Storage {
                     const float direction = light->directions[row][lane];
                     const float diffuse = light->diffuse[row][lane];
                     const float specular = light->specular[row][lane];
+                    const auto rejectMatrixLane = [&](const char* operation) noexcept {
+                        if (d.error == VehicleWindowError50DS::none) {
+                            // Failure-only record; %a preserves every finite
+                            // binary32 value without changing diagnostic ABI.
+                            std::fprintf(stderr,
+                                "native selected-light matrix rejection racer=%u component=%u row=%u lane=%u direction=%a diffuse=%a specular=%a\n",
+                                static_cast<unsigned>(expectedRacerSlot), static_cast<unsigned>(c),
+                                static_cast<unsigned>(row), static_cast<unsigned>(lane),
+                                static_cast<double>(direction), static_cast<double>(diffuse),
+                                static_cast<double>(specular));
+                        }
+                        return fail(d, VehicleWindowError50DS::frame, operation);
+                    };
                     if (!std::isfinite(direction) || !std::isfinite(diffuse) ||
-                        !std::isfinite(specular) || std::abs(direction) > 1.f ||
-                        diffuse < 0.f || diffuse > 127.5f ||
-                        specular < 0.f || specular > 127.5f)
-                        return fail(d, VehicleWindowError50DS::frame,
-                            "native GC selected matrices exceed finite admitted color/direction bounds");
+                        !std::isfinite(specular))
+                        return rejectMatrixLane("native selected-light matrix contains a nonfinite lane");
+                    if (std::abs(direction) > 1.f)
+                        return rejectMatrixLane("native selected-light direction exceeds the admitted unit bound");
+                    // These are selected floating-point light coefficients,
+                    // not packed color bytes. Light::Init halves authored RGB,
+                    // but 1498A0 copies zone sun overrides without halving and
+                    // spatial selection divides local RGB by attenuation.
+                    // 149A50 folds negative DIFFUSE into sun/ambient only;
+                    // signed specular survives unchanged (TA negative spots).
+                    // Preserve those values: the native shader consumes only
+                    // diffuse RGB / 128, not this retained specular matrix.
+                    if (diffuse < 0.f)
+                        return rejectMatrixLane("native selected-light diffuse lane was not negative-light folded");
                     if ((row == 3 || lane == 3) && direction != 0.f)
-                        return fail(d, VehicleWindowError50DS::frame,
-                            "native GC selected direction fourth row and column must be zero");
+                        return rejectMatrixLane("native GC selected direction fourth row and column must be zero");
                     if ((lane == 3 && diffuse != (row == 3 ? 64.f : 0.f)) ||
                         ((row == 3 || lane == 3) && specular != 0.f))
-                        return fail(d, VehicleWindowError50DS::frame,
-                            "native GC selected color rows do not match admitted source layout");
+                        return rejectMatrixLane("native GC selected color rows do not match admitted source layout");
                 }
             }
         }
         fleetOwner = packet.ownerIdentity();
         output = packet;
-        d.component = 3;
+        d.component = maxComponents;
         return true;
     }
     bool hasDisplayFadeNames() const noexcept {
@@ -1742,6 +2158,8 @@ void main() {
         displayFadeDeletionPending=false;return true;
     }
     bool hasGlResources() const noexcept {
+        if(hasCoverageResources())return true;
+        if(hasRaceHudResources() || hasTimeStatsResources() || hasSpeedBoostResources())return true;
         if(hasDisplayFadeNames())return true;
         if (hasGameplayBlurResources()) return true;
         if (shader && shader->hasResources()) return true;
@@ -1764,17 +2182,24 @@ void main() {
             if (dynamicWorldVertexBuffers[b] || dynamicWorldNormalBuffers[b] || dynamicWorldArrays[b]) return true;
         if (skyVertexBuffer || skyIndexBuffer || skyVertexArray) return true;
         for (U b = 0; b < 2; ++b) {
+            if (sourcePairColors50LA[b]) return true;
+            for (const auto& body : sourceSpecularGeometry50LA)
+                if (body.buffers[b]) return true;
+        }
+        for (U b = 0; b < 2; ++b) {
             if (targets[b] || colors[b] || depths[b] || menuTargets[b] || menuColors[b]) return true;
-            for (U c = 0; c < 3; ++c)
+            for (U c = 0; c < maxComponents; ++c)
                 if (resources.bank[b].vertexBuffer[c] || resources.bank[b].vertexArray[c] ||
                     racerNormalBuffers[b][c]) return true;
         }
         for (const auto& index : resources.indices) if (index.buffer) return true;
         for (const auto& archetype : racerArchetypes) {
+            for (const auto& body : archetype.specularGeometry50LA)
+                for (U name : body.buffers) if (name) return true;
             for (const auto& bank : archetype.normalBuffers)
                 for (U normal : bank) if (normal) return true;
             for (const auto& bank : archetype.resources.bank)
-                for (U c = 0; c < 3; ++c)
+                for (U c = 0; c < maxComponents; ++c)
                     if (bank.vertexBuffer[c] || bank.vertexArray[c]) return true;
             for (const auto& index : archetype.resources.indices) if (index.buffer) return true;
         }
@@ -1838,13 +2263,13 @@ void main() {
         if (request.output == VehicleWindowOutput50DS::defaultBackBuffer || request.enableHostHud || request.enableOriginalUi || request.enableOriginalGameplayBlur) {
             LOAD(gl, blitFramebuffer, BlitFramebuffer);
         }
-        if (request.enableOriginalUi) {
+        if (request.enableOriginalUi || request.gcParticleTextures) {
             LOAD(gl, scissor, Scissor); LOAD(gl, getTexParameteriv, GetTexParameteriv);
         }
         if (usesTextures()) {
             LOAD(gl, activeTexture, ActiveTexture); LOAD(gl, bindTexture, BindTexture);
         }
-        if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur) {
+        if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || hasSpecularPairs50LA) {
             LOAD(gl, genTextures, GenTextures); LOAD(gl, deleteTextures, DeleteTextures);
             LOAD(gl, texImage2D, TexImage2D); LOAD(gl, texParameteri, TexParameteri);
             LOAD(gl, getTexLevelParameteriv, GetTexLevelParameteriv);
@@ -1885,6 +2310,7 @@ in vec4 rrColor;
 in vec3 rrWorldNormal;
 in vec4 rrProjectedUv;
 uniform int projectionPass;
+uniform vec4 trackUvTranslation;
 uniform int worldFogEnabled;
 uniform vec4 worldFogCamera;
 uniform vec4 worldFogRange;
@@ -1905,6 +2331,7 @@ void main() {
     trackSourceColor = rrColor;
     trackSourceUv = projectionPass == 1 ? rrProjectedUv.xy :
         (projectionPass == 2 ? rrProjectedUv.zw : rrUv);
+    trackSourceUv += trackUvTranslation.xy;
 }
 )GLSL";
         constexpr const char* fragmentSource = R"GLSL(#version 150 core
@@ -1918,6 +2345,7 @@ in vec2 trackSourceUv;
 uniform float vertexColorScale;
 uniform int useTexture;
 uniform int discardZeroAlpha;
+uniform float sourceAlphaReference;
 uniform int effectMode;
 uniform float alphaScale;
 uniform int unlit;
@@ -1951,10 +2379,14 @@ void main() {
     float alpha = trackSourceColor.a;
     if (useTexture != 0) {
         vec4 texel = texture(image, trackSourceUv);
-        if (discardZeroAlpha != 0 && texel.a <= 0.0) discard;
+        if (discardZeroAlpha == 1 && texel.a <= 0.0) discard;
         color *= texel.rgb;
         alpha *= texel.a;
     }
+    // Declared native GS-unit alpha policy. Original bytes remain unchanged;
+    // native interpolation/raster precision is not a PS2 fragment-parity claim.
+    float sourceAlphaByte = floor(clamp(alpha * (255.0 * 255.0 / 128.0), 0.0, 255.0));
+    if (discardZeroAlpha == 2 && sourceAlphaByte <= sourceAlphaReference) discard;
     color *= rrNativePodShadow(trackWorldPosition, normal);
     if (effectMode == 2) color *= alphaScale;
     if (worldFogEnabled != 0) color = mix(color, worldFogColor.rgb, trackFogAmount);
@@ -2003,6 +2435,8 @@ void main() {
         trackUnlitUniform = shaderGl.getUniformLocation(trackProgram, "unlit");
         trackUseSourceNormalsUniform = shaderGl.getUniformLocation(trackProgram, "useSourceNormals");
         trackProjectionPassUniform = shaderGl.getUniformLocation(trackProgram, "projectionPass");
+        trackUvTranslationUniform = shaderGl.getUniformLocation(trackProgram, "trackUvTranslation");
+        trackAlphaReferenceUniform = shaderGl.getUniformLocation(trackProgram, "sourceAlphaReference");
         nativeShadowEnabledUniform = shaderGl.getUniformLocation(trackProgram, "nativePodShadowEnabled");
         nativeShadowOpponentCountUniform = shaderGl.getUniformLocation(trackProgram, "nativePodShadowOpponentCount");
         for (U c = 0; c < nativeShadowCasterCount; ++c) {
@@ -2027,7 +2461,7 @@ void main() {
             trackMatrixUniform < 0 || trackColorScaleUniform < 0 ||
             trackUseTextureUniform < 0 || trackImageUniform < 0 || trackDiscardZeroAlphaUniform < 0 ||
             trackEffectModeUniform < 0 || trackAlphaScaleUniform < 0 || trackUnlitUniform < 0 ||
-            trackUseSourceNormalsUniform < 0 || trackProjectionPassUniform < 0 || nativeShadowEnabledUniform < 0 || nativeShadowOpponentCountUniform < 0)
+            trackUseSourceNormalsUniform < 0 || trackProjectionPassUniform < 0 || trackUvTranslationUniform < 0 || trackAlphaReferenceUniform < 0 || nativeShadowEnabledUniform < 0 || nativeShadowOpponentCountUniform < 0)
             return fail(*diagnostic, VehicleWindowError50DS::shader, "source-color track uniform missing");
         diagnostic->shader.stage = VehicleGlShaderStage50CZ::none;
         return true;
@@ -2071,7 +2505,7 @@ void main() {
     }
     bool createGeometry(VehicleGlResources50CV& resources,
         const game::VehicleDrawMesh50CM* const* meshes) noexcept {
-        for (U c = 0; c < 3; ++c) {
+        for (U c = 0; c < resources.componentCount; ++c) {
             diagnostic->component = c;
             const auto& mesh = *meshes[c];
             auto& index = resources.indices[c];
@@ -2119,7 +2553,7 @@ void main() {
                 if (!verifyLayout(bank.vertexBuffer[c], index.buffer)) return false;
             }
         }
-        diagnostic->component = 3;
+        diagnostic->component = maxComponents;
         return true;
     }
     bool createStaticGeometry(const assets::Mesh48B* mesh, U& trackVertexBuffer,
@@ -2213,12 +2647,221 @@ void main() {
         if (!check("verify authenticated normal offset")) return false;
         return pointer == nullptr || fail(*diagnostic, VehicleWindowError50DS::layout, "source normal attribute offset mismatch");
     }
+    // Preserve original PSG MSCNT group boundaries rather than pairing whole
+    // surfaces or individual base/map-2 triangles. Each strip's triangle order
+    // is checked against BOTH the semantic indices and immutable flattened EBO.
+    bool createSpecularGroups50LA(U archetype, U body, SpecularGeometry50LA& out) noexcept {
+        const auto selected = racerView(archetype);
+        if (!selected.materials) return true;
+        if (body >= sourceBodyCount50LA)
+            return fail(*diagnostic, VehicleWindowError50DS::assets, "source pair requires an engine body slot");
+        const U c = body + 1;
+        // Three-model pods have no lower scenes, meshes or material offsets.
+        // Leave their two absent body slots empty before indexing any of them.
+        if (c >= selected.resources->componentCount) return true;
+        const auto& scene = *selected.scenes[c];
+        const auto& mesh = *selected.meshes[c];
+        for (U m = 0; m < scene.materials.size(); ++m)
+            out.enabled = out.enabled || selected.materials[selected.materialOffsets[c] + m].policy.sourceSpecularPair50LA;
+        if (!out.enabled) return true;
+        if (!sourceBodyComponent50LA(c, selected.resources->componentCount))
+            return fail(*diagnostic, VehicleWindowError50DS::assets,
+                "source pair requires an actual engine in a three/five-model pod");
+        if (mesh.semanticScene != &scene || scene.lods.empty() ||
+            scene.lods[0].surfaces.size() != mesh.spanCount || mesh.spanCount > game::maxVehicleDrawSpans50CM)
+            return fail(*diagnostic, VehicleWindowError50DS::assets, "source pair requires exact semantic LOD0 spans");
+        const U capacity = mesh.vertexCount / 3; // Every original group owns at least three vertices.
+        out.groups.reset(new (std::nothrow) SpecularGroup50LA[capacity]);
+        if (!out.groups) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate bounded original body group table");
+        for (U spanIndex = 0; spanIndex < mesh.spanCount; ++spanIndex) {
+            const auto& span = mesh.spans[spanIndex];
+            if (!selected.materials[selected.materialOffsets[c] + span.material_index].policy.sourceSpecularPair50LA) continue;
+            const auto& surface = scene.lods[0].surfaces[spanIndex];
+            if (surface.material_index != span.material_index || surface.vertices.size() != span.vertex_count ||
+                surface.indices.size() != span.index_count || surface.strips.empty() || !surface.groups ||
+                surface.groups > capacity || span.index_start > mesh.indexCount ||
+                span.index_count > mesh.indexCount - span.index_start || span.vertex_start > mesh.vertexCount ||
+                span.vertex_count > mesh.vertexCount - span.vertex_start)
+                return fail(*diagnostic, VehicleWindowError50DS::assets, "source body surface/group extent differs");
+            out.spanFirst[spanIndex] = out.groupCount;
+            U index = 0, vertexBase = 0, stripIndex = 0;
+            for (U group = 0; group < surface.groups; ++group) {
+                if (out.groupCount >= capacity || stripIndex >= surface.strips.size())
+                    return fail(*diagnostic, VehicleWindowError50DS::assets, "source body group count escapes topology");
+                const U firstIndex = index;
+                U nextVertex = 0;
+                while (stripIndex < surface.strips.size() && surface.strips[stripIndex].group == group) {
+                    const auto& strip = surface.strips[stripIndex++];
+                    if (strip.start != nextVertex || strip.end < strip.start + 3 || strip.end > 16 ||
+                        strip.vertex_start != vertexBase + strip.start || strip.vertex_start > surface.vertices.size() ||
+                        strip.end - strip.start > surface.vertices.size() - strip.vertex_start)
+                        return fail(*diagnostic, VehicleWindowError50DS::assets, "source body strip order/3..16 vertex group differs");
+                    for (U v = strip.start + 2; v < strip.end; ++v) {
+                        U a = vertexBase + v - 2, b = vertexBase + v - 1;
+                        if ((v - strip.start) & 1u) std::swap(a, b);
+                        const U triangle[] = {a, b, vertexBase + v};
+                        for (U expected : triangle) {
+                            if (index >= surface.indices.size() || surface.indices[index] != expected ||
+                                mesh.indices[span.index_start + index] != span.vertex_start + expected)
+                                return fail(*diagnostic, VehicleWindowError50DS::indices, "source body group triangle order differs from retained EBO");
+                            ++index;
+                        }
+                    }
+                    nextVertex = strip.end;
+                }
+                if (nextVertex < 3 || index == firstIndex)
+                    return fail(*diagnostic, VehicleWindowError50DS::assets, "empty or missing original body group");
+                out.groups[out.groupCount++] = {span.index_start + firstIndex, index - firstIndex};
+                ++out.spanCount[spanIndex];
+                vertexBase += nextVertex;
+            }
+            if (stripIndex != surface.strips.size() || vertexBase != surface.vertices.size() || index != span.index_count)
+                return fail(*diagnostic, VehicleWindowError50DS::assets, "source body groups do not partition the retained surface");
+        }
+        return true;
+    }
+    bool createSpecularUvBuffers50LA(U archetype, U body, SpecularGeometry50LA& target) noexcept {
+        if (!target.enabled) return true;
+        if (body >= sourceBodyCount50LA)
+            return fail(*diagnostic, VehicleWindowError50DS::assets, "map-2 UVs require an engine body slot");
+        const auto selected = racerView(archetype);
+        const U c = body + 1;
+        if (!sourceBodyComponent50LA(c, selected.resources->componentCount))
+            return fail(*diagnostic, VehicleWindowError50DS::assets,
+                "map-2 UVs require an actual engine in a three/five-model pod");
+        constexpr U attribute = vehicleGlSpecularUvAttribute50LA;
+        const std::size_t bytes = std::size_t(selected.meshes[c]->vertexCount) * sizeof(std::array<float, 2>);
+        for (U bank = 0; bank < 2; ++bank) {
+            gl.genBuffers(1, &target.buffers[bank]);
+            drawGl.bindBuffer(arrayBuffer, target.buffers[bank]);
+            gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(bytes), nullptr, dynamicDraw);
+            if (!check("allocate private bounded map-2 UV stream") || !target.buffers[bank])
+                return fail(*diagnostic, VehicleWindowError50DS::allocation, "map-2 UV buffer allocation failed");
+            if (!verifyBuffer(arrayBuffer, bytes, dynamicDraw)) return false;
+            drawGl.bindVertexArray(selected.resources->bank[bank].vertexArray[c]);
+            gl.enableVertexAttribArray(attribute);
+            gl.vertexAttribPointer(attribute, 2, floatType, 0, sizeof(std::array<float, 2>), nullptr);
+            if (!check("bind source map-2 UV attribute")) return false;
+            constexpr U properties[] = {0x8622, 0x8623, 0x8624, 0x8625, 0x886A, 0x889F, 0x88FD};
+            const I expected[] = {1, 2, static_cast<I>(sizeof(std::array<float, 2>)),
+                static_cast<I>(floatType), 0, static_cast<I>(target.buffers[bank]), 0};
+            for (U p = 0; p < 7; ++p) {
+                I actual = 0; gl.getVertexAttribiv(attribute, properties[p], &actual);
+                if (!check("verify source map-2 UV layout")) return false;
+                if (actual != expected[p]) return fail(*diagnostic, VehicleWindowError50DS::layout, "map-2 UV layout differs");
+            }
+            void* offset = nullptr; gl.getVertexAttribPointerv(attribute, 0x8645, &offset);
+            if (!check("verify source map-2 UV offset")) return false;
+            if (offset) return fail(*diagnostic, VehicleWindowError50DS::layout, "map-2 UV offset differs");
+        }
+        return true;
+    }
+    bool prepareSpecularFrame50LA(const game::VehicleDrawBatch50CO& player,
+        const VehicleWindowFrame50DS& frame, VehicleWindowDiagnostic50DS& d) noexcept {
+        if (!hasSpecularPairs50LA) {
+            for (U i = 0; i < frame.opponentCount; ++i)
+                for (auto* model : frame.opponents[i].sourceBodyModelPackets50LA)
+                    if (model) return fail(d, VehicleWindowError50DS::frame,
+                        "source opponent model view owner supplied without paired body capability");
+            for (auto* model : frame.sourceBodyModelPackets50LA)
+                if (model) return fail(d, VehicleWindowError50DS::frame,
+                    "source player model view owner supplied without paired body capability");
+            return (!frame.sourceBodyCamera50LA && !frame.sourceBodyCameraOwner50LA &&
+                !frame.sourceBodyCameraPublication50LA && !frame.sourceBodyFog50LA &&
+                !frame.sourceBodyGlobals50LA) ||
+                fail(d, VehicleWindowError50DS::frame, "source body camera supplied without paired body capability");
+        }
+        if (!frame.sourceBodyCamera50LA || !frame.sourceBodyCameraOwner50LA ||
+            !frame.sourceBodyCameraPublication50LA || !frame.sourceBodyFog50LA ||
+            !frame.sourceBodyGlobals50LA || !specularWorkspace50LA || !frameSpecularUvs50LA)
+            return fail(d, VehicleWindowError50DS::frame, "source body pair requires actual current camera publication");
+        // A current source view is independent of the retained/stopped lighting
+        // publication. Its exact combined matrix must produce this same raster.
+        NativeCameraViewContract50DX contract{};
+        contract.provenance = NativeCameraViewProvenance50DX::currentCore49FForOutput;
+        contract.width = frame.width; contract.height = frame.height;
+        contract.clipDepth = NativeCameraClipDepth50DX::negativeOneToOne;
+        NativeCameraMatrix50DX converted{};
+        NativeCameraViewError50DX error{};
+        const game::CameraViewOutput49F camera = *frame.sourceBodyCamera50LA;
+        if (!convertNativeCameraView50DX(camera, contract, converted, error) ||
+            std::memcmp(converted.worldViewProjection, frame.worldViewProjection, sizeof(converted.worldViewProjection)))
+            return fail(d, VehicleWindowError50DS::frame, "source body camera differs from actual frame world-to-clip matrix");
+        game::OriginalRacerSpecularRequest50LA actual{};
+        actual.view = camera.view;
+        actual.cameraPosition = {camera.position.x, camera.position.y, camera.position.z};
+        for (U slot = 0; slot <= frame.opponentCount; ++slot) {
+            const U archetype = slot ? frame.opponents[slot - 1].racerArchetype : 0;
+            const auto selected = racerView(archetype);
+            const auto& batch = slot ? *frame.opponents[slot - 1].batch : player;
+            if (!retainedMesh(batch, d, archetype)) return false;
+            const auto& models = slot ? frame.opponents[slot - 1].sourceBodyModelPackets50LA :
+                frame.sourceBodyModelPackets50LA;
+            // These four fixed slots preserve each component's own model,
+            // semantic normals/root/bounds and stopped-geometry preparation.
+            for (U bodySlot = 0; bodySlot < sourceBodyCount50LA; ++bodySlot) {
+                frameSpecularSecond50LA[slot][bodySlot] = false;
+                auto* model = models[bodySlot];
+                if (!selected.specular[bodySlot].enabled) {
+                    if (model) return fail(d, VehicleWindowError50DS::frame,
+                        "source model view owner supplied without paired body");
+                    continue;
+                }
+                const U c = bodySlot + 1;
+                if (!sourceBodyComponent50LA(c, batch.componentCount))
+                    return fail(d, VehicleWindowError50DS::frame,
+                        "source body slot has no actual engine in this three/five-model batch");
+                game::OriginalRacerModelDistanceFlags50LA modelView{};
+                const auto& body = batch.component[c];
+                if (!model || !body.sourceSpecularGeometry50LA ||
+                    !model->prepareDistanceFlags241280(body.sourceAggregateBounds50LA,
+                        body.sourcePosition50LA, actual.cameraPosition, frame.sourceBodyFog50LA->start34,
+                        *frame.sourceBodyGlobals50LA, modelView).okay())
+                    return fail(d, VehicleWindowError50DS::frame,
+                        "actual model radius distance and view flags rejected");
+                game::OriginalRacerSpecularResult50LA result{};
+                const U uvSlot = slot * sourceBodyCount50LA + bodySlot;
+                if (!game::prepareOriginalRacerSpecular50LA(*selected.meshes[c], body, actual, modelView,
+                    frameSpecularUvs50LA.get() + uvSlot * game::maxRigidVertices49S, game::maxRigidVertices49S,
+                    *specularWorkspace50LA, result))
+                    return fail(d, VehicleWindowError50DS::frame, "actual current camera and retained body specular projection rejected");
+                frameSpecularSecond50LA[slot][bodySlot] = result.secondEnabled;
+            }
+        }
+        frameSpecularCamera50LA = actual;
+        frameSpecularCameraOwner50LA = frame.sourceBodyCameraOwner50LA;
+        frameSpecularCameraPublication50LA = frame.sourceBodyCameraPublication50LA;
+        return true;
+    }
+    bool uploadSpecularUvs50LA(std::uint8_t bank, U slot, U archetype) noexcept {
+        const auto selected = racerView(archetype);
+        for (U bodySlot = 0; bodySlot < sourceBodyCount50LA; ++bodySlot) {
+            const auto& body = selected.specular[bodySlot];
+            if (!body.enabled) continue;
+            const U c = bodySlot + 1, uvSlot = slot * sourceBodyCount50LA + bodySlot;
+            if (!sourceBodyComponent50LA(c, selected.resources->componentCount))
+                return fail(*diagnostic, VehicleWindowError50DS::assets,
+                    "source map-2 upload has no actual engine in this three/five-model pod");
+            drawGl.bindBuffer(arrayBuffer, body.buffers[bank]);
+            // CPU preparation still admits every current-camera UV. The same
+            // original distance flag prevents all map-2 draws for this body;
+            // other passes' results do not depend on this attribute. Every
+            // map-2-enabled body uploads its complete stream, even after a skip,
+            // bank switch, shared-archetype draw or failed prior submission.
+            if (frameSpecularSecond50LA[slot][bodySlot])
+                drawGl.bufferSubData(arrayBuffer, 0,
+                    std::intptr_t(selected.meshes[c]->vertexCount) * sizeof(std::array<float, 2>),
+                    frameSpecularUvs50LA.get() + uvSlot * game::maxRigidVertices49S);
+            if (!check("upload source map-2 UVs for this current camera and actual racer body")) return false;
+        }
+        return true;
+    }
     bool createRacerNormals(const VehicleGlResources50CV& geometry,
-        U (&buffers)[2][3]) noexcept {
+        U (&buffers)[2][maxComponents]) noexcept {
         // Keep the compatibility mesh and all UV/color bytes unchanged. Every
         // private VAO gets a bounded independent normal stream, initially zero.
         static constexpr assets::WorldNormal50HK absent[game::maxRigidVertices49S]{};
-        for (U bank = 0; bank < 2; ++bank) for (U c = 0; c < 3; ++c) {
+        for (U bank = 0; bank < 2; ++bank) for (U c = 0; c < geometry.componentCount; ++c) {
             VehicleWindowTrack50DS source{};
             source.sourceNormals = absent;
             source.sourceNormalCount = geometry.bank[bank].vertexCapacity[c];
@@ -2231,7 +2874,7 @@ void main() {
         U archetype = 0) noexcept {
         const auto selected = racerView(archetype);
         static constexpr assets::WorldNormal50HK absent[game::maxRigidVertices49S]{};
-        for (U c = 0; c < 3; ++c) {
+        for (U c = 0; c < batch.componentCount; ++c) {
             const auto& part = batch.component[c];
             drawGl.bindBuffer(arrayBuffer, selected.normalBuffers[bank][c]);
             drawGl.bufferSubData(arrayBuffer, 0,
@@ -2347,8 +2990,8 @@ void main() {
         if (!needed) return true;
         constexpr std::size_t vertexBytes = sizeof(game::PodCableMesh50FD::vertices);
         constexpr std::size_t indexBytes = sizeof(game::PodCableMesh50FD::indices);
-        U indices[game::podCableIndexCount50FD];
-        for (U i = 0; i < game::podCableIndexCount50FD; ++i) indices[i] = cableIndex50DS(i);
+        U indices[game::maxPodCableIndexCount50FD];
+        for (U i = 0; i < game::maxPodCableIndexCount50FD; ++i) indices[i] = cableIndex50DS(i);
         gl.genBuffers(1, &cableVertexBuffer);
         drawGl.bindBuffer(arrayBuffer, cableVertexBuffer);
         gl.bufferData(arrayBuffer, static_cast<std::intptr_t>(vertexBytes), nullptr, dynamicDraw);
@@ -2363,7 +3006,7 @@ void main() {
         if (!cableIndexBuffer)
             return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero cable index buffer");
         if (!verifyBuffer(arrayBuffer, indexBytes, staticDraw)) return false;
-        U uploaded[game::podCableIndexCount50FD];
+        U uploaded[game::maxPodCableIndexCount50FD];
         gl.getBufferSubData(arrayBuffer, 0, static_cast<std::intptr_t>(indexBytes), uploaded);
         if (!check("verify canonical cable index bytes")) return false;
         if (std::memcmp(indices, uploaded, indexBytes))
@@ -2429,7 +3072,7 @@ void main() {
         return true;
     }
     bool createOriginalUi() noexcept {
-        if (!request.enableOriginalUi) return true;
+        if (!request.enableOriginalUi && !request.gcParticleTextures && !raceHudPreparing && !timeStatsPreparing && !speedBoostPreparing) return true;
         constexpr const char* vertexSource = R"GLSL(#version 150 core
 in vec3 rrPosition;
 in vec2 rrUv;
@@ -2438,13 +3081,17 @@ in float rrParticleFog;
 in float rrSourceRasterW;
 uniform vec4 canvasToClip;
 uniform int uiSourceRaster;
+uniform int gcParticleMode;
 out vec2 uiUv;
 noperspective out vec4 uiColor;
 noperspective out float uiParticleFog;
 void main() {
     float w = uiSourceRaster != 0 ? rrSourceRasterW : 1.0;
+    // Source screen Z is reversed. Gameplay uses core49F depth[0,1],
+    // shared with the already drawn opaque world, not the UI reversed target.
+    float z=gcParticleMode!=0 ? (8388591.0-rrPosition.z)/8388590.0 : rrPosition.z/16777215.0;
     gl_Position = vec4(rrPosition.xy * canvasToClip.xy + canvasToClip.zw,
-        (rrPosition.z / 16777215.0) * 2.0 - 1.0, 1.0) * w;
+        z * 2.0 - 1.0, 1.0) * w;
     uiUv = rrUv; uiColor = rrColor; uiParticleFog = rrParticleFog;
 }
 )GLSL";
@@ -2468,6 +3115,7 @@ uniform sampler2D uiSourceTarget;
 #endif
 uniform int uiSourceComposition;
 uniform int uiSourceBlend;
+uniform int gcParticleMode;
 #ifdef RR_UI_COHERENT_FRAMEBUFFER_FETCH
 inout vec4 viewerOutput;
 #else
@@ -2526,6 +3174,21 @@ void main() {
             viewerOutput.rgb = viewerOutput.rgb * uiParticleFog +
                 uiParticleFogColor.rgb * (255.0 / 256.0 - uiParticleFog);
         }
+        if(gcParticleMode!=0) {
+            //Source MODULATE A is byte-quantized/clamped before both ALPHA
+            //and independent destination-A replacement. Never store A/128
+            //into a framebuffer whose source byte representation is A/255.
+            float sourceAlphaByte=floor(clamp(raw.a*(255.0*255.0/128.0),0.0,255.0));
+            if(gcParticleMode==3) {
+                viewerOutput=vec4(0.0,0.0,0.0,sourceAlphaByte/255.0);
+            } else if(gcParticleMode==2) {
+                //ONE/ONE permits genuine glow coefficients above1 without
+                //SRC_ALPHA clamp. Positive fixed-target additive saturation
+                //is unchanged if premultiplied source exceeds framebuffer1.
+                viewerOutput.rgb*=sourceAlphaByte/128.0;
+                viewerOutput.a=1.0;
+            } else viewerOutput.a=sourceAlphaByte/128.0;
+        }
     } else {
         // TME=0 uses raw interpolated vertex color without texture modulation.
         // Nonopaque A/128 uses one 255/128 scale; RGB retains its raw /255.
@@ -2579,6 +3242,7 @@ void main() {
         uiTexturedUniform = shaderGl.getUniformLocation(uiProgram, "uiTextured");
         uiParticleFogColorUniform = shaderGl.getUniformLocation(uiProgram, "uiParticleFogColor");
         uiSourceRasterUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceRaster");
+        gcParticleModeUniform = shaderGl.getUniformLocation(uiProgram, "gcParticleMode");
         uiSourceFogEnabledUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceFogEnabled");
         uiSourceAlphaTestUniform = shaderGl.getUniformLocation(uiProgram, "uiSourceAlphaTest");
         uiSourceCompositionUniform=shaderGl.getUniformLocation(uiProgram,"uiSourceComposition");
@@ -2587,7 +3251,7 @@ void main() {
         uiSourceBlendUniform=shaderGl.getUniformLocation(uiProgram,"uiSourceBlend");
         if (!check("locate original UI uniforms")) return false;
         if (uiCanvasUniform < 0 || uiImageUniform < 0 || uiAlphaUniform < 0 || uiTexturedUniform < 0 ||
-            uiParticleFogColorUniform < 0 || uiSourceRasterUniform < 0 ||
+            uiParticleFogColorUniform < 0 || uiSourceRasterUniform < 0 || gcParticleModeUniform < 0 ||
             uiSourceFogEnabledUniform < 0 || uiSourceAlphaTestUniform < 0 ||
             uiSourceCompositionUniform < 0 || (!uiSourceCoherentFramebufferFetch && uiSourceTargetUniform < 0) ||
             uiSourceBlendUniform < 0)
@@ -2807,7 +3471,9 @@ void main() { viewerOutput = hudColor; }
         // old committed images are renderbuffer pixels, not references to it.
         drawGl.bindVertexArray(cableVertexArray);
         drawGl.bindBuffer(arrayBuffer, cableVertexBuffer);
-        drawGl.bufferSubData(arrayBuffer, 0, sizeof(cables->vertices), cables->vertices);
+        const U vertexCount = cables->cableCount * game::podCableVerticesPerCable50FD;
+        const U indexCount = cables->cableCount * game::podCableIndicesPerCable50FD;
+        drawGl.bufferSubData(arrayBuffer, 0, vertexCount * sizeof(cables->vertices[0]), cables->vertices);
         drawGl.bindBuffer(elementBuffer, cableIndexBuffer);
         gl.useProgram(shader->program());
         gl.uniformMatrix4fv(shader->uniforms().worldViewProjection, 1, 0, matrix);
@@ -2819,11 +3485,11 @@ void main() { viewerOutput = hudColor; }
         gl.uniform1i(shader->uniforms().useLighting, 0); // Energy cables stay emissive.
         resetNativeGcLighting();
         if (!check("upload actual current source cable vertices and bind real texture")) return false;
-        drawGl.drawElementsBaseVertex(0x0004, game::podCableIndexCount50FD, 0x1405, nullptr, 0);
+        drawGl.drawElementsBaseVertex(0x0004, indexCount, 0x1405, nullptr, 0);
         if (!check("draw source cable strips after pod")) return false;
         ++diagnostic->cableDraws;
-        diagnostic->cableVertices += game::podCableVertexCount50FD;
-        diagnostic->cableIndices += game::podCableIndexCount50FD;
+        diagnostic->cableVertices += vertexCount;
+        diagnostic->cableIndices += indexCount;
         return true;
     }
     bool drawGameplayBinders() noexcept {
@@ -2843,6 +3509,7 @@ void main() { viewerOutput = hudColor; }
         gl.uniform1f(trackAlphaScaleUniform,(255.f/128.f)*(255.f/128.f));
         gl.uniform1i(trackUnlitUniform,1); // Diffuse ambient is already source-packed on CPU.
         gl.uniform1i(trackUseSourceNormalsUniform,0);gl.uniform1i(trackProjectionPassUniform,0);
+        gl.uniform4f(trackUvTranslationUniform,0.f,0.f,0.f,0.f);
         gl.uniform1i(nativeShadowEnabledUniform,0);gl.uniform1i(nativeShadowOpponentCountUniform,0);
         const auto& fog=request.track.worldFog;
         // Authored fog is on by default; retain the explicit scene-fog
@@ -3134,6 +3801,33 @@ void main() {
             return fail(*diagnostic,VehicleWindowError50DS::framebuffer,"incomplete source UI framebuffer");}
         return true;
     }
+    bool createSpecularColorAttachment50LA(U& name) noexcept {
+        // Gameplay banks keep their existing transaction/depth owners. Only
+        // authenticated body-pair capability changes color storage to RGBA8
+        // textures; UI targets, receipts and source-alpha owners are unrelated.
+        I maximum = 0; gl.getIntegerv(0x0D33, &maximum);
+        if (!check("query gameplay pair texture dimensions")) return false;
+        if (maximumWidth > maximum || maximumHeight > maximum)
+            return fail(*diagnostic, VehicleWindowError50DS::limits, "gameplay pair texture exceeds context limit");
+        gl.genTextures(1, &name); gl.activeTexture(textureUnit0); gl.bindTexture(texture2D, name);
+        if (gl.bindSampler) gl.bindSampler(0, 0);
+        gl.texParameteri(texture2D, 0x2801, 0x2600); gl.texParameteri(texture2D, 0x2800, 0x2600);
+        gl.texParameteri(texture2D, 0x2802, 0x812F); gl.texParameteri(texture2D, 0x2803, 0x812F);
+        gl.texParameteri(texture2D, 0x813C, 0); gl.texParameteri(texture2D, 0x813D, 0);
+        drawGl.bindBuffer(0x88EC, 0); // No inherited unpack-PBO offset.
+        gl.texImage2D(texture2D, 0, rgba8, maximumWidth, maximumHeight, 0, rgba, unsignedByte, nullptr);
+        if (!check("allocate private gameplay source-pair RGBA8 color") || !name)
+            return fail(*diagnostic, VehicleWindowError50DS::allocation, "gameplay source-pair texture allocation failed");
+        I w = 0, h = 0, format = 0;
+        gl.getTexLevelParameteriv(texture2D, 0, 0x1000, &w); gl.getTexLevelParameteriv(texture2D, 0, 0x1001, &h);
+        gl.getTexLevelParameteriv(texture2D, 0, 0x1003, &format);
+        if (!check("verify private gameplay source-pair texture")) return false;
+        if (w != maximumWidth || h != maximumHeight || format != static_cast<I>(rgba8))
+            return fail(*diagnostic, VehicleWindowError50DS::framebuffer, "gameplay source-pair texture storage mismatch");
+        gl.framebufferTexture2D(framebuffer, colorAttachment, texture2D, name, 0);
+        gl.bindTexture(texture2D, 0);
+        return check("attach private gameplay source-pair color");
+    }
     bool createTargets() noexcept {
         I maximum = 0, viewportLimits[2]{};
         gl.getIntegerv(0x84E8, &maximum); // GL_MAX_RENDERBUFFER_SIZE
@@ -3144,11 +3838,13 @@ void main() {
             (request.enableOriginalUiSourceRgba && (maximum<640 || viewportLimits[0]<640 || viewportLimits[1]<448)))
             return fail(*diagnostic, VehicleWindowError50DS::limits, "explicit resolution exceeds GL limits");
         for (U b = 0; b < 2; ++b) {
+            if(!frontendOnly){
             gl.genFramebuffers(1, &targets[b]);
             gl.bindFramebuffer(framebuffer, targets[b]);
             if (!check("create unpublished framebuffer")) return false;
             if (!targets[b]) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero framebuffer name");
-            if (!createAttachment(colors[b], rgba8, colorAttachment) ||
+            if (!(hasSpecularPairs50LA ? createSpecularColorAttachment50LA(sourcePairColors50LA[b]) :
+                    createAttachment(colors[b], rgba8, colorAttachment)) ||
                 !createAttachment(depths[b], depth24, depthAttachment)) return false;
             gl.drawBuffer(colorAttachment); gl.readBuffer(colorAttachment);
             const U status = gl.checkFramebufferStatus(framebuffer);
@@ -3156,6 +3852,7 @@ void main() {
             if (status != framebufferComplete) {
                 diagnostic->framebufferStatus = status;
                 return fail(*diagnostic, VehicleWindowError50DS::framebuffer, "incomplete unpublished framebuffer");
+            }
             }
             if (request.enableOriginalUi) {
                 gl.genFramebuffers(1, &uiTargets[b]);
@@ -3264,6 +3961,29 @@ void main() {
         uiSourceCoherentFramebufferFetch=coherentFetch;
         return true;
     }
+    bool checkSpecularPairSupport50LA(I major, I minor) noexcept {
+        if (!hasSpecularPairs50LA) return true;
+        I units = 0; gl.getIntegerv(0x8872, &units);
+        if (!check("query body-pair fragment texture units")) return false;
+        if (units < 2) return fail(*diagnostic, VehicleWindowError50DS::context, "body pairs need two fragment texture units");
+        bool coreOrArb = major > 4 || (major == 4 && minor >= 5), nv = false;
+        if (!load(gl.getStringi, "glGetStringi")) return false;
+        I count = 0; gl.getIntegerv(0x821D, &count);
+        if (!check("query body-pair texture-barrier extensions")) return false;
+        if (count < 0 || count > 65536)
+            return fail(*diagnostic, VehicleWindowError50DS::limits, "invalid bounded body-pair extension count");
+        for (I i = 0; i < count; ++i) {
+            const auto* extension = gl.getStringi(0x1F03, static_cast<U>(i));
+            if (!check("read body-pair texture-barrier capability")) return false;
+            if (!extension) return fail(*diagnostic, VehicleWindowError50DS::context, "null body-pair extension name");
+            const auto* name = reinterpret_cast<const char*>(extension);
+            if (!std::strcmp(name, "GL_ARB_texture_barrier")) coreOrArb = true;
+            if (!std::strcmp(name, "GL_NV_texture_barrier")) nv = true;
+        }
+        if (!coreOrArb && !nv)
+            return fail(*diagnostic, VehicleWindowError50DS::context, "body pairs require GL4.5, ARB or NV texture barrier");
+        return load(gl.textureBarrier, coreOrArb ? "glTextureBarrier" : "glTextureBarrierNV");
+    }
     bool checkContext() noexcept {
         const auto* version = gl.getString(0x1F02); // GL_VERSION
         I major = 0, minor = 0;
@@ -3272,7 +3992,9 @@ void main() {
         if (!version || std::strncmp(reinterpret_cast<const char*>(version), "OpenGL ES", 9) == 0 ||
             major < 3 || (major == 3 && minor < 2))
             return fail(*diagnostic, VehicleWindowError50DS::context, "desktop OpenGL 3.2 or newer required");
-        if (!checkTextureSampling(major, minor) || !checkOriginalUiSourceSupport(major,minor)) return false;
+        if (!checkCoverageSupport(major, minor)) return false;
+        if (!checkTextureSampling(major, minor) || !checkOriginalUiSourceSupport(major,minor) ||
+            !checkSpecularPairSupport50LA(major, minor)) return false;
         if (request.output == VehicleWindowOutput50DS::defaultBackBuffer) {
             if (!checkDefaultFramebuffer()) return false;
             I doubleBuffered = 0, stereo = 0, sampleBuffers = 0, samples = 0;
@@ -3298,8 +4020,11 @@ void main() {
         for (U a = 0; a < racerArchetypeCount; ++a) {
             const auto& source = input.racerArchetypes[a];
             auto& target = racerArchetypes[a];
+            target.resources.componentCount = source.assets->componentCount();
             target.textures = source.materials.textures;
             target.texturePublication = target.textures ? target.textures->publicationToken() : 0;
+            target.specularTextures50LA = source.materials.specularTextures50LA;
+            target.specularPublication50LA = target.specularTextures50LA ? target.specularTextures50LA->publicationToken() : 0;
             target.cables = source.cables;
             target.cableTexturePublication = target.cables.textures ?
                 target.cables.textures->publicationToken() : 0;
@@ -3308,7 +4033,7 @@ void main() {
             if (target.cables.textures && !target.cableTextureName)
                 return fail(*diagnostic, VehicleWindowError50DS::material,
                     "required racer cable texture disappeared during create");
-            for (U c = 0; c < 3; ++c) {
+            for (U c = 0; c < target.resources.componentCount; ++c) {
                 diagnostic->component = c;
                 const auto* mesh = target.meshes[c] = source.assets->preparedMesh(components[c]);
                 const auto* scene = target.scenes[c] = source.assets->scene(components[c]);
@@ -3335,7 +4060,7 @@ void main() {
             if (!target.materials)
                 return fail(*diagnostic, VehicleWindowError50DS::allocation,
                     "allocate bounded cold racer material table");
-            for (U c = 0; c < 3; ++c)
+            for (U c = 0; c < target.resources.componentCount; ++c)
                 for (U m = 0; m < source.materials.component[c].count; ++m) {
                     const auto& binding = source.materials.component[c].bindings[m];
                     auto& material = target.materials[target.materialOffsets[c] + m];
@@ -3343,6 +4068,15 @@ void main() {
                     material.textureIndex = binding.textureIndex;
                     material.name = binding.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
                         target.textures->texture(binding.textureIndex) : 0;
+                    if (binding.sourceSpecularPair50LA) {
+                        const auto* base = target.textures->asset(binding.textureIndex);
+                        const auto* map2 = target.specularTextures50LA->asset(binding.specularTextureIndex50LA);
+                        if (!base || !base->name || !map2 || !map2->name)
+                            return fail(*diagnostic, VehicleWindowError50DS::material, "racer source pair disappeared during create");
+                        material.textureIdentity50LA = base->identity;
+                        material.specularName50LA = map2->name; material.specularIdentity50LA = map2->identity;
+                        hasSpecularPairs50LA = true;
+                    }
                     if (binding.mode == VehicleWindowMaterialMode50DS::requiredTexture && !material.name)
                         return fail(*diagnostic, VehicleWindowError50DS::material,
                             "required racer material texture disappeared during create");
@@ -3356,15 +4090,35 @@ void main() {
                 return fail(*diagnostic, VehicleWindowError50DS::allocation,
                     "allocate bounded per-racer UV transform storage");
         }
-        diagnostic->component = 3;
+        diagnostic->component = maxComponents;
         return texturesCurrent(*diagnostic);
+    }
+    bool initializeOriginalFrontend(const VehicleWindowRequest50DS& input) noexcept {
+        request=input;frontendOnly=true;
+        maximumWidth=input.maximumWidth;maximumHeight=input.maximumHeight;
+        if(!validateOriginalUiBank(input))return false;
+        uiTexturePublication=input.originalUiTextures->publicationToken();
+        if(!current(*diagnostic)||!texturesCurrent(*diagnostic))return false;
+        if(!loadFunctions()||!check("initial frontend GL error state")||!checkContext())return false;
+        if(!createOriginalUi()||!createTargets())return false;
+        if(request.output==VehicleWindowOutput50DS::defaultBackBuffer)gl.bindFramebuffer(framebuffer,0);
+        if(!check("finish dedicated original frontend creation"))return false;
+        initialized=true;
+        diagnostic->originalUiCoherentFramebufferFetch=uiSourceCoherentFramebufferFetch;
+        return true;
     }
     bool initialize(const VehicleWindowRequest50DS& input,
         const assets::VehicleDrawAssets50CR& owner) noexcept {
         request = input;
+        // Coverage is currently admitted only for static track spans. Never
+        // silently consume a requested dynamic policy without binding it.
+        for (U i=0;i<input.dynamicWorld.spanCount;++i)
+            if(input.dynamicWorld.spans[i].nativeCoverage!=NativeTrackCoverage50DS::aa0)
+                return fail(*diagnostic,VehicleWindowError50DS::material,"dynamic coverage is not admitted");
+        resources.componentCount = owner.componentCount();
         if (input.enableOriginalUiSourceRgba && !input.enableOriginalUi)
             return fail(*diagnostic,VehicleWindowError50DS::request,"source UI requires original UI opt-in");
-        if (!validateOriginalUiBank(input)) return false;
+        if (!validateOriginalUiBank(input) || !validateGcParticleBank(input)) return false;
         uiTexturePublication = input.originalUiTextures ? input.originalUiTextures->publicationToken() : 0;
         request.racerArchetypes = nullptr; // Cold descriptors are never retained.
         request.trackAnimations = nullptr;
@@ -3384,6 +4138,7 @@ void main() {
         // publication token, never pointers into caller mapping storage.
         for (auto& component : request.materials.component) component = {};
         texturePublication = input.materials.textures ? input.materials.textures->publicationToken() : 0;
+        specularPublication50LA = input.materials.specularTextures50LA ? input.materials.specularTextures50LA->publicationToken() : 0;
         trackTexturePublication = input.track.textures ? input.track.textures->publicationToken() : 0;
         dynamicWorldTexturePublication = input.dynamicWorld.textures ? input.dynamicWorld.textures->publicationToken() : 0;
         trackAnimationTexturePublication = input.trackAnimationTextures ? input.trackAnimationTextures->publicationToken() : 0;
@@ -3395,7 +4150,7 @@ void main() {
         if (!current(*diagnostic) || !texturesCurrent(*diagnostic)) return false;
         if (input.cables.textures && !cableTextureName)
             return fail(*diagnostic, VehicleWindowError50DS::material, "required cable texture disappeared during create");
-        for (U c = 0; c < 3; ++c) {
+        for (U c = 0; c < resources.componentCount; ++c) {
             diagnostic->component = c;
             meshes[c] = owner.preparedMesh(components[c]); scenes[c] = owner.scene(components[c]);
             if (!meshes[c] || !scenes[c] || !meshes[c]->indices || !meshes[c]->spans ||
@@ -3413,21 +4168,38 @@ void main() {
                     return fail(*diagnostic, VehicleWindowError50DS::assets,
                         "original material index outside loaded scene");
         }
-        diagnostic->component = 3;
+        diagnostic->component = maxComponents;
         if (!createMaterials(input.materials) || !createRacerArchetypes(input) ||
             !createTrackMaterials(input.track) || !createTrackAnimations(input) ||
             !createDynamicWorldMaterials(input.dynamicWorld) ||
             !createTrackVisibility(input.track) || !createSkyMaterials(input.sky)) return false;
+        for (U body = 0; body < sourceBodyCount50LA; ++body)
+            if (!createSpecularGroups50LA(0, body, sourceSpecularGeometry50LA[body])) return false;
+        for (U i = 0; i < racerArchetypeCount; ++i)
+            for (U body = 0; body < sourceBodyCount50LA; ++body)
+                if (!createSpecularGroups50LA(i + 1, body, racerArchetypes[i].specularGeometry50LA[body])) return false;
+        if (hasSpecularPairs50LA) {
+            frameSpecularUvs50LA.reset(new (std::nothrow) std::array<float, 2>[
+                (1 + maxVehicleWindowOpponents50DS) * sourceBodyCount50LA * game::maxRigidVertices49S]);
+            specularWorkspace50LA.reset(new (std::nothrow) game::OriginalRacerSpecularWorkspace50LA);
+            if (!frameSpecularUvs50LA || !specularWorkspace50LA)
+                return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate bounded current-camera specular workspace");
+        }
         if (!loadFunctions() || !check("initial GL error state") || !checkContext()) return false;
         shader.reset(new (std::nothrow) VehicleGlShader50CZ(shaderGl));
         if (!shader) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate shader owner");
-        if (!shader->initialize(diagnostic->shader))
+        if (!shader->initialize(diagnostic->shader, coverageDemand && hasSpecularPairs50LA))
             return fail(*diagnostic, VehicleWindowError50DS::shader, "initialize 50CZ viewer shader");
         if (!createTrackShader() || !createGeometry(resources, meshes) ||
             !createRacerNormals(resources, racerNormalBuffers)) return false;
-        for (U i = 0; i < racerArchetypeCount; ++i)
+        for (U body = 0; body < sourceBodyCount50LA; ++body)
+            if (!createSpecularUvBuffers50LA(0, body, sourceSpecularGeometry50LA[body])) return false;
+        for (U i = 0; i < racerArchetypeCount; ++i) {
             if (!createGeometry(racerArchetypes[i].resources, racerArchetypes[i].meshes) ||
                 !createRacerNormals(racerArchetypes[i].resources, racerArchetypes[i].normalBuffers)) return false;
+            for (U body = 0; body < sourceBodyCount50LA; ++body)
+                if (!createSpecularUvBuffers50LA(i + 1, body, racerArchetypes[i].specularGeometry50LA[body])) return false;
+        }
         if (
             !createStaticGeometry(input.track.mesh, trackVertexBuffer, trackIndexBuffer, trackVertexArray, trackIndexCount) ||
             !createWorldNormals(input.track, trackNormalBuffer, trackVertexArray) ||
@@ -3435,10 +4207,11 @@ void main() {
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
-            !createTargets() || !createGameplayBlur()) return false;
+            !createTargets() || !createGameplayBlur() || !createCoverageProgram()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         hooks.begin = begin; hooks.bindMaterial = bindMaterial; hooks.commit = commit; hooks.abort = abort;
+        if (hasSpecularPairs50LA) hooks.drawSpan = drawSpan50LA;
         adapter.reset(new (std::nothrow) VehicleGlBackend50CV(drawGl, resources, hooks, published));
         if (!adapter) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate 50CV adapter");
         if (request.output == VehicleWindowOutput50DS::defaultBackBuffer)
@@ -3480,7 +4253,10 @@ void main() {
         if (!s.current(*s.diagnostic) || !s.texturesCurrent(*s.diagnostic)) return false;
         if (!s.initialized || s.active || !s.frameSet || bank != (s.published ^ 1u) ||
             !s.shader->program() || !s.targets[bank]) return false;
-        if (!s.validateRacerNormals(batch, *s.diagnostic)) return false;
+        if (s.coverageDemand && (!s.coverageLive.scene[bank] ||
+            s.coverageLive.width != s.width || s.coverageLive.height != s.height))
+            return fail(*s.diagnostic, VehicleWindowError50DS::frame, "exact native coverage extent is not prepared");
+        if (!s.retainedMesh(batch, *s.diagnostic)) return false;
         if (s.trackIndexCount && (!s.trackVertexBuffer || !s.trackIndexBuffer || !s.trackVertexArray))
             return fail(*s.diagnostic, VehicleWindowError50DS::assets, "static track resources are not ready");
         for (U i = 0; i < s.trackAnimationCount; ++i) {
@@ -3540,7 +4316,7 @@ void main() {
                 return fail(*s.diagnostic, VehicleWindowError50DS::material,
                     "required sky texture is no longer the retained publication");
         }
-        for (U c = 0; c < 3; ++c) {
+        for (U c = 0; c < resources.componentCount; ++c) {
             const auto& mesh = *s.meshes[c];
             const auto& b = batch.component[c];
             if (b.indices != mesh.indices || b.indexCount != mesh.indexCount ||
@@ -3568,7 +4344,7 @@ void main() {
     static bool materialReady(void* context, game::VehicleDrawComponent50CM component, U material) noexcept {
         auto& s = *static_cast<Storage*>(context);
         const U c = componentIndex(component);
-        if (c >= 3 || material >= s.scenes[c]->materials.size())
+        if (c >= s.resources.componentCount || material >= s.scenes[c]->materials.size())
             return fail(*s.diagnostic, VehicleWindowError50DS::assets,
                 "material is outside loaded component scene");
         if (s.request.mode == VehicleWindowMode50DS::callerMaterialTextures) {
@@ -3589,10 +4365,10 @@ void main() {
     static I effectMode(const VehicleWindowMaterialBinding50DS& policy) noexcept {
         return policy.blend == VehicleWindowBlend50DS::opaque ? 0 : (policy.fixedBlendAlpha ? 2 : 1);
     }
-    void configureBlend(const VehicleWindowMaterialBinding50DS& policy) noexcept {
+    void configureBlend(const VehicleWindowMaterialBinding50DS& policy, bool layeredDepth = false) noexcept {
         gl.enable(0x0B71);
         gl.depthMask(policy.depthWrite ? 1 : 0);
-        gl.depthFunc(policy.depthEqual ? 0x0203 : 0x0201);
+        gl.depthFunc(layeredDepth || policy.depthEqual ? 0x0203 : 0x0201);
         if (policy.blend == VehicleWindowBlend50DS::opaque) gl.disable(0x0BE2);
         else {
             gl.enable(0x0BE2);
@@ -3601,12 +4377,28 @@ void main() {
                 policy.blend == VehicleWindowBlend50DS::additive ? 1 : 0x0303);
         }
     }
+    void unbindSpecularFeedback50LA() noexcept {
+        if (!hasSpecularPairs50LA) return;
+        gl.activeTexture(textureUnit0 + 1); gl.bindTexture(texture2D, 0);
+        if (gl.bindSampler) gl.bindSampler(1, 0);
+        gl.activeTexture(textureUnit0);
+    }
     void resetNativeGcLighting() noexcept {
-        // The selector and coefficients are all explicitly cleared at renderer
-        // transitions, including after an aborted racer frame followed by UI.
+        coverageAa0();
+        // This capability owns no gameplay shader or coefficients to clear.
+        // The UI path immediately binds its own complete shader/state below.
+        if(frontendOnly)return;
+        // Both lighting selectors and coefficients are explicitly cleared at
+        // renderer transitions, including cable/sky/track and an aborted racer
+        // frame followed by UI. Source body MODULATE must never leak to them.
         gl.useProgram(shader->program());
         const auto& u = shader->uniforms();
         gl.uniform1i(u.useNativeGcSelectedLights, 0);
+        gl.uniform1i(u.useSourceDiffuseCompressed50LA, 0);
+        gl.uniform1i(u.sourcePairPass50LA, 0); gl.uniform1i(u.sourcePairFog50LA, 0);
+        gl.uniform1i(u.sourcePairAlphaTest50LA, 0);
+        gl.uniform1i(u.sourcePairDestination50LA, hasSpecularPairs50LA ? 1 : 0);
+        unbindSpecularFeedback50LA();
         gl.uniform4f(u.nativeGcAmbient, 0.f, 0.f, 0.f, 0.f);
         for (U i = 0; i < 3; ++i) {
             gl.uniform4f(u.nativeGcDiffuse[i], 0.f, 0.f, 0.f, 0.f);
@@ -3630,7 +4422,7 @@ void main() {
         resetNativeGcLighting();
     }
     bool drawSky() noexcept {
-        if (!skyIndexCount) return true;
+        if (!skyIndexCount || !frameSkyEnabled) return true;
         // Genuine source sky, separate caller camera transform, color only.
         // Nothing here scales geometry or manufactures missing faces.
         resetPodState();
@@ -3676,6 +4468,7 @@ void main() {
                 s.gl.uniform1i(s.trackUnlitUniform, 0);
                 s.gl.uniform1i(s.trackUseSourceNormalsUniform, s.trackNormalBuffer ? 1 : 0);
                 s.gl.uniform1i(s.trackProjectionPassUniform, 0);
+                s.gl.uniform4f(s.trackUvTranslationUniform,0.f,0.f,0.f,0.f);
                 s.gl.uniform1i(s.nativeShadowEnabledUniform,
                     s.request.enableNativePodShadows && !transparent ? 1 : 0);
                 s.gl.uniform1i(s.nativeShadowOpponentCountUniform,
@@ -3706,6 +4499,26 @@ void main() {
                 // Stable source order within each explicit pass. No distance
                 // sorting, index rebasing or reconstructed global-sort claim.
                 U boundSpan = assets::unresolvedMaterialTexture50EA;
+                // Only this uninterrupted track pass owns these material bindings.
+                // Do not infer state from pass setup, another program, or a prior frame.
+                I trackIntegerValues[7]{};
+                U trackTextureName = 0;
+                std::uint8_t trackAlphaReference = 0;
+                unsigned char trackAlphaScaleBytes[sizeof(float)]{};
+                bool trackMaterialKnown = false;
+                // Raster state belongs only to this uninterrupted track pass.
+                // Opaque tuples canonicalize blend factors that are not applied.
+                struct TrackRasterState {
+                    bool depthWrite = false, blendEnabled = false;
+                    U depthFunction = 0, sourceFactor = 0, destinationFactor = 0;
+                    bool same(const TrackRasterState& other) const noexcept {
+                        return depthWrite == other.depthWrite && blendEnabled == other.blendEnabled &&
+                            depthFunction == other.depthFunction && sourceFactor == other.sourceFactor &&
+                            destinationFactor == other.destinationFactor;
+                    }
+                };
+                TrackRasterState trackRasterState{};
+                bool trackRasterKnown = false;
                 for (U n = 0; n < s.frameTrackDrawCount; ++n) {
                     const U draw = s.frameTrackCullingApplied ? s.trackVisibleDrawIds[n] : n;
                     const U i = s.trackChunkCount ? s.trackChunks[draw].sourceSpan : draw;
@@ -3720,34 +4533,79 @@ void main() {
                     // Retained chunks of one span remain contiguous. Preserve
                     // its exact material policy without rebinding every chunk.
                     if (boundSpan != i) {
+                        // The public UV callback has no GL-state purity contract.
+                        // Emit every value on its span and invalidate for the next span,
+                        // even though the current MA controller callback is CPU-only.
+                        const bool reuseMaterial = trackMaterialKnown && !span.sourceUvAnimation;
+                        const auto integerUniform = [&](U slot, I location, I value) {
+                            if (!reuseMaterial || trackIntegerValues[slot] != value)
+                                s.gl.uniform1i(location, value);
+                            trackIntegerValues[slot] = value;
+                        };
                         const U textureName = span.animation == assets::unresolvedMaterialTexture50EA ?
                             span.material.name : s.trackAnimations[span.animation].names[
                                 s.trackAnimations[span.animation].selectedFrame];
-                        s.gl.bindTexture(texture2D, textureName);
-                        s.gl.uniform1i(s.trackUseTextureUniform, span.material.name ? 1 : 0);
-                        s.gl.uniform1i(s.trackDiscardZeroAlphaUniform, span.discardZeroAlpha ? 1 : 0);
-                        s.gl.uniform1i(s.worldFogEnabledUniform,
+                        if (!reuseMaterial || trackTextureName != textureName)
+                            s.gl.bindTexture(texture2D, textureName);
+                        integerUniform(0, s.trackUseTextureUniform, span.material.name ? 1 : 0);
+                        integerUniform(1, s.trackDiscardZeroAlphaUniform, span.sourceAlphaTest ? 2 : (span.discardZeroAlpha ? 1 : 0));
+                        if (!reuseMaterial || trackAlphaReference != span.sourceAlphaReference)
+                            s.gl.uniform1f(s.trackAlphaReferenceUniform,static_cast<float>(span.sourceAlphaReference));
+                        integerUniform(2, s.worldFogEnabledUniform,
                             s.request.track.worldFog.enabled && span.worldFogEligible ? 1 : 0);
-                        s.configureBlend(span.material.policy);
-                        // Coplanar authored passes must survive the first pass depth.
-                        // Restore the historical LESS rule for every single-pass draw.
-                        s.gl.depthFunc(span.sourcePass > 1 || span.material.policy.depthEqual ? 0x0203 : 0x0201);
-                        s.gl.uniform1i(s.trackProjectionPassUniform, static_cast<I>(span.projectionPass));
-                        s.gl.uniform1i(s.trackEffectModeUniform, effectMode(span.material.policy));
-                        s.gl.uniform1f(s.trackAlphaScaleUniform, span.material.policy.alphaScale);
-                        s.gl.uniform1i(s.trackUnlitUniform,
+                        // Establish the final authored depth rule once, before drawing.
+                        // Coplanar later passes use LEQUAL; single passes retain policy.
+                        const auto& rasterPolicy = span.material.policy;
+                        const bool blendEnabled = rasterPolicy.blend != VehicleWindowBlend50DS::opaque;
+                        const TrackRasterState nextRasterState{
+                            rasterPolicy.depthWrite, blendEnabled,
+                            (span.sourcePass > 1 || rasterPolicy.depthEqual) ? U{0x0203} : U{0x0201},
+                            blendEnabled ? (rasterPolicy.fixedBlendAlpha ? U{1} : U{0x0302}) : U{0},
+                            blendEnabled ? (rasterPolicy.blend == VehicleWindowBlend50DS::additive ?
+                                U{1} : U{0x0303}) : U{0}};
+                        // The UV callback below has no GL-state purity contract:
+                        // force this span and leave the next span unknown.
+                        if (span.sourceUvAnimation) trackRasterKnown = false;
+                        if (!trackRasterKnown || !trackRasterState.same(nextRasterState))
+                            s.configureBlend(span.material.policy, span.sourcePass > 1);
+                        integerUniform(3, s.trackProjectionPassUniform, static_cast<I>(span.projectionPass));
+                        float uOffset=0.f,vOffset=0.f;
+                        if(span.sourceUvAnimation && (!s.frameTrackUv.service ||
+                            !s.frameTrackUv.service(s.frameTrackUv.owner,i,uOffset,vOffset) ||
+                            !std::isfinite(uOffset) || !std::isfinite(vOffset)))
+                            return fail(*s.diagnostic,VehicleWindowError50DS::frame,
+                                "source track UV controller rejected selected material service");
+                        // Reuse only the exact zero tuple of consecutive unanimated spans.
+                        if (!reuseMaterial)
+                            s.gl.uniform4f(s.trackUvTranslationUniform,uOffset,vOffset,0.f,0.f);
+                        integerUniform(4, s.trackEffectModeUniform, effectMode(span.material.policy));
+                        // Byte identity preserves signed zero without changing the value.
+                        if (!reuseMaterial || std::memcmp(trackAlphaScaleBytes,
+                            &span.material.policy.alphaScale, sizeof(float)) != 0)
+                            s.gl.uniform1f(s.trackAlphaScaleUniform, span.material.policy.alphaScale);
+                        integerUniform(5, s.trackUnlitUniform,
                             span.material.policy.unlit || span.material.policy.sourcePrelit ? 1 : 0);
-                        s.gl.uniform1i(s.nativeShadowEnabledUniform, s.request.enableNativePodShadows &&
-                            !transparent && span.sourcePass == 1 && span.material.policy.depthWrite && !span.material.policy.unlit ? 1 : 0);
+                        integerUniform(6, s.nativeShadowEnabledUniform, s.request.enableNativePodShadows &&
+                            !transparent && span.allowPodShadow && span.sourcePass == 1 && span.material.policy.depthWrite && !span.material.policy.unlit ? 1 : 0);
                         if (!s.check("bind explicit source-ordered track material")) return false;
+                        trackRasterState = nextRasterState;
+                        trackRasterKnown = !span.sourceUvAnimation;
+                        trackTextureName = textureName;
+                        trackAlphaReference = span.sourceAlphaReference;
+                        std::memcpy(trackAlphaScaleBytes, &span.material.policy.alphaScale, sizeof(float));
+                        trackMaterialKnown = !span.sourceUvAnimation;
                         boundSpan = i;
                     }
+                    // Coverage binding mutates neither depth nor blend. Keep it
+                    // independent of the root-owned pass-local tuple cache.
+                    s.bindTrackCoverage(span.nativeCoverage);
                     const U indexStart = s.trackChunkCount ? s.trackChunks[draw].indexStart : span.indexStart;
                     const U indexCount = s.trackChunkCount ? s.trackChunks[draw].indexCount : span.indexCount;
                     const auto offset = std::uintptr_t(indexStart) * sizeof(U);
                     s.drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(indexCount),
                         0x1405, reinterpret_cast<const void*>(offset), 0);
                     if (!s.check("draw actual track surface range")) return false;
+                    if(indexCount)s.trackSpans[i].submittedGameplayCandidate=true;
                     ++s.diagnostic->trackDraws;
                     if (span.material.policy.blend != VehicleWindowBlend50DS::opaque) ++s.diagnostic->transparentTrackDraws;
                     if (span.material.name) ++s.diagnostic->trackTexturedDraws;
@@ -3775,11 +4633,21 @@ void main() {
         gl.uniform1i(trackImageUniform, 0);
         gl.uniform1i(trackUseSourceNormalsUniform, dynamicWorldNormalCount ? 1 : 0);
         gl.uniform1i(trackProjectionPassUniform, 0);
+        gl.uniform4f(trackUvTranslationUniform,0.f,0.f,0.f,0.f);
         // Static receiver/culling bounds are deliberately not reused for moving owners.
         gl.uniform1i(nativeShadowEnabledUniform, 0);
         gl.uniform1i(nativeShadowOpponentCountUniform, 0);
         drawGl.bindVertexArray(dynamicWorldArrays[bank]);
         drawGl.bindBuffer(elementBuffer, dynamicWorldIndexBuffer);
+        // Local to this pass: the first submitted span always establishes state,
+        // including texture zero. No call in the loop switches texture units,
+        // binds/deletes textures, or changes the texture-use uniform elsewhere.
+        U boundTexture = 0;
+        bool textureBound = false;
+        // Cache exactly configureBlend's inputs for this owned loop only.
+        // No intervening call changes blend/depth state or mutates policies.
+        const VehicleWindowMaterialBinding50DS* boundPolicy = nullptr;
+        bool boundLayeredDepth = false;
         for (U i = 0; i < dynamicWorldSpanCount; ++i) {
             const auto& span = dynamicWorldSpans[i];
             const auto& material = span.material;
@@ -3788,11 +4656,25 @@ void main() {
             if (deferred != transparent) continue;
             diagnostic->dynamicWorldSpan = i;
             diagnostic->texture = material.textureIndex;
-            configureBlend(material.policy);
-            gl.depthFunc(span.sourcePass > 1 || material.policy.depthEqual ? 0x0203 : 0x0201);
-            gl.bindTexture(texture2D, material.name);
-            gl.uniform1i(trackUseTextureUniform, material.name ? 1 : 0);
-            gl.uniform1i(trackDiscardZeroAlphaUniform, span.discardZeroAlpha ? 1 : 0);
+            const auto& policy = material.policy;
+            const bool layeredDepth = span.sourcePass > 1;
+            if (!boundPolicy || boundPolicy->blend != policy.blend ||
+                boundPolicy->depthWrite != policy.depthWrite ||
+                boundPolicy->depthEqual != policy.depthEqual ||
+                boundPolicy->fixedBlendAlpha != policy.fixedBlendAlpha ||
+                boundLayeredDepth != layeredDepth) {
+                configureBlend(policy, layeredDepth);
+                boundPolicy = &policy;
+                boundLayeredDepth = layeredDepth;
+            }
+            if (!textureBound || boundTexture != material.name) {
+                gl.bindTexture(texture2D, material.name);
+                gl.uniform1i(trackUseTextureUniform, material.name ? 1 : 0);
+                boundTexture = material.name;
+                textureBound = true;
+            }
+            gl.uniform1i(trackDiscardZeroAlphaUniform, span.sourceAlphaTest ? 2 : (span.discardZeroAlpha ? 1 : 0));
+            gl.uniform1f(trackAlphaReferenceUniform,static_cast<float>(span.sourceAlphaReference));
             gl.uniform1i(trackEffectModeUniform, effectMode(material.policy));
             gl.uniform1f(trackAlphaScaleUniform, material.policy.alphaScale);
             gl.uniform1i(trackUnlitUniform,
@@ -3810,17 +4692,26 @@ void main() {
     }
     bool applyPodMaterial(const Material& material, bool suppress, const float* overrideUv = nullptr,
         const game::original_racer_lighting50KM::LightMatrices* selectedLights = nullptr) noexcept {
+        const bool sourceDiffuse = material.policy.sourceDiffuseCompressed50LA;
+        if (sourceDiffuse && (!selectedLights || suppress || !material.name))
+            return fail(*diagnostic, VehicleWindowError50DS::material,
+                "source diffuse requires the authenticated unsuppressed textured body draw");
         configureBlend(material.policy);
         const auto& u = shader->uniforms();
+        unbindSpecularFeedback50LA();
+        gl.uniform1i(u.sourcePairPass50LA, 0); gl.uniform1i(u.sourcePairFog50LA, 0);
+        gl.uniform1i(u.sourcePairAlphaTest50LA, 0);
         gl.bindTexture(texture2D, material.name);
         gl.uniform1i(u.useTexture, material.name ? 1 : 0);
         gl.uniform1i(u.effectMode, effectMode(material.policy));
         gl.uniform1f(u.alphaScale, material.policy.alphaScale);
         gl.uniform1i(u.suppressDraw, suppress ? 1 : 0);
+        gl.uniform1i(u.useSourceDiffuseCompressed50LA, sourceDiffuse ? 1 : 0);
         // Retain source-alpha/additive effect appearance and explicit emissive
-        // materials. Only opaque pod surfaces opt into host illumination.
+        // materials. Generated source body RGB has already been lit on CPU;
+        // only the remaining opaque pod surfaces use host illumination.
         const bool hostLit = !material.policy.unlit && !material.policy.sourcePrelit &&
-            material.policy.blend == VehicleWindowBlend50DS::opaque;
+            !sourceDiffuse && material.policy.blend == VehicleWindowBlend50DS::opaque;
         gl.uniform1i(u.useLighting, hostLit ? 1 : 0);
         const bool nativeGc = selectedLights && hostLit && !suppress && material.name &&
             material.policy.mode == VehicleWindowMaterialMode50DS::requiredTexture;
@@ -3845,13 +4736,162 @@ void main() {
         gl.uniform4f(u.uvScaleOffset, uv[0], uv[1], uv[2], uv[3]);
         return check("bind explicit vehicle material blend and UV policy");
     }
+    bool drawSpecularSpan50LA(std::uint8_t bank, U slot, U archetype, U component,
+        U ordinal, const assets::SceneSpan48D& span) noexcept {
+        const auto selected = racerView(archetype);
+        const Material* material = selected.materials ?
+            &selected.materials[selected.materialOffsets[component] + span.material_index] : nullptr;
+        if (!material || !material->policy.sourceSpecularPair50LA) {
+            drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.index_count), 0x1405,
+                reinterpret_cast<const void*>(std::uintptr_t(span.index_start) * sizeof(U)), 0);
+            return check("draw unchanged original unpaired source span");
+        }
+        if (!sourceBodyComponent50LA(component, selected.resources->componentCount))
+            return fail(*diagnostic, VehicleWindowError50DS::assets,
+                "body pair requires an actual engine in a three/five-model pod");
+        const U bodySlot = component - 1;
+        const auto& groups = selected.specular[bodySlot];
+        if (!groups.enabled || ordinal >= game::maxVehicleDrawSpans50CM ||
+            !groups.spanCount[ordinal] || !sourcePairColors50LA[bank] || !gl.textureBarrier)
+            return fail(*diagnostic, VehicleWindowError50DS::assets, "body pair lost its exact original group resources");
+        const auto& u = shader->uniforms();
+        bool accepted = true;
+        const U first = groups.spanFirst[ordinal], end = first + groups.spanCount[ordinal];
+        const bool drawSecond = frameSpecularSecond50LA[slot][bodySlot];
+        const bool sameFog = material->policy.sourceBaseFog50LA == material->policy.sourceSpecularFog50LA;
+        // No draw in this owned span changes these states. Establish them
+        // once; the first existing base-bind check still audits every call.
+        gl.disable(0x0BE2); gl.enable(0x0B71); gl.depthFunc(0x0203);
+        gl.colorMask(1, 1, 1, 1);
+        // The shader consults this test only in pass 2. Its material policy
+        // therefore stays invariant even while complete base groups draw.
+        // Both callers bind this material first; applyPodMaterial has already
+        // established zero and checked it. No intervening command writes this
+        // uniform. Retain the unconditional reset below, including failures.
+        if (material->policy.sourceSpecularAlphaTest50LA)
+            gl.uniform1i(u.sourcePairAlphaTest50LA, 1);
+        // Establish sampler 0 on unit 1 once. Neither pass changes sampler
+        // objects; subsequent bases still unbind the feedback texture below.
+        unbindSpecularFeedback50LA();
+        if (!drawSecond) {
+            // The source distance gate removes every map-2 command in this
+            // span. Cold group admission proved that these groups partition
+            // this exact contiguous EBO range in order. With one unchanged
+            // base state and no feedback reads, issue those same triangles as
+            // one native draw. Keep source-group accounting, not host-call
+            // counts, in the diagnostics. This never combines paired passes.
+            gl.bindTexture(texture2D, material->name);
+            gl.uniform1i(u.sourcePairPass50LA, 1);
+            gl.uniform1i(u.sourcePairFog50LA, material->policy.sourceBaseFog50LA ? 1 : 0);
+            gl.depthMask(1);
+            accepted = check("bind original distance-skipped source base span");
+            if (accepted) {
+                drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.index_count), 0x1405,
+                    reinterpret_cast<const void*>(std::uintptr_t(span.index_start) * sizeof(U)), 0);
+                accepted = check("draw ordered distance-skipped source base span");
+                if (accepted) {
+                    diagnostic->sourceSpecularBaseGroups50LA += groups.spanCount[ordinal];
+                    diagnostic->sourceSpecularSkippedGroups50LA += groups.spanCount[ordinal];
+                }
+            }
+        }
+        for (U g = first; drawSecond && accepted && g < end; ++g) {
+            const auto& group = groups.groups[g];
+            // Original single32CC28/multi32D670 issue the ENTIRE MSCNT group
+            // base before single32CD18/multi32D750 issue that group's map 2.
+            // Several source strips can share the same group. Keep them joined.
+            // Map 2 changes these states, so restore them for every paired
+            // group. On the source distance-skip path only base draws follow;
+            // their texture/uniform/depth state and unbound feedback persist.
+            if (drawSecond || g == first) {
+                if (g != first) {
+                    gl.activeTexture(textureUnit0 + 1); gl.bindTexture(texture2D, 0);
+                    gl.activeTexture(textureUnit0);
+                }
+                gl.bindTexture(texture2D, material->name);
+                gl.uniform1i(u.sourcePairPass50LA, 1);
+                // Equal pass policies need one write per span. No command
+                // inside the group loop otherwise changes this uniform.
+                if (g == first || !sameFog)
+                    gl.uniform1i(u.sourcePairFog50LA, material->policy.sourceBaseFog50LA ? 1 : 0);
+                gl.depthMask(1);
+            }
+            accepted = check("bind original source-pair base group");
+            if (accepted) {
+                drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(group.indexCount), 0x1405,
+                    reinterpret_cast<const void*>(std::uintptr_t(group.indexStart) * sizeof(U)), 0);
+                accepted = check("draw complete original source-pair base group");
+                if (accepted) ++diagnostic->sourceSpecularBaseGroups50LA;
+            }
+            // Original distance130/1000 skip retains the complete base draw.
+            if (!accepted) continue;
+            if (!drawSecond) {
+                ++diagnostic->sourceSpecularSkippedGroups50LA;
+                continue;
+            }
+            gl.bindTexture(texture2D, material->specularName50LA);
+            gl.uniform1i(u.sourcePairPass50LA, 2);
+            if (!sameFog)
+                gl.uniform1i(u.sourcePairFog50LA, material->policy.sourceSpecularFog50LA ? 1 : 0);
+            gl.depthMask(0); // Same linked position shader/VAO and LEQUAL coverage.
+            gl.activeTexture(textureUnit0 + 1);
+            // The span's initial unbind selected sampler 0 on unit 1;
+            // no intervening command changes sampler-object bindings.
+            gl.bindTexture(texture2D, coverageDemand ? 0 : sourcePairColors50LA[bank]); gl.activeTexture(textureUnit0);
+            accepted = check("bind original source-pair second group");
+            // The unchanged single-sample route reads one actual triangle's
+            // own pixel once. A barrier before EACH draw observes overlapping
+            // prior second triangles, including their independent source-A store.
+            // Surviving map-2 samples were covered by the identical base group;
+            // the optional GREATER0/KEEP test can only narrow that coverage.
+            // Source sampling/clipping/depth remain the admitted native policy.
+            if (accepted) {
+                for (U i = group.indexStart; i < group.indexStart + group.indexCount; i += 3) {
+                    if (coverageDemand) {
+                        if (!drawCoveragePairTriangle(bank, i, material->specularName50LA)) {
+                            accepted = false; break;
+                        }
+                    } else {
+                        gl.textureBarrier();
+                        drawGl.drawElementsBaseVertex(0x0004, 3, 0x1405,
+                            reinterpret_cast<const void*>(std::uintptr_t(i) * sizeof(U)), 0);
+                    }
+                }
+                // The AA1 route checks each scratch/copy/composition operation.
+                // Cold source topology bounds one MSCNT group to 3..16
+                // vertices, hence at most 14 ordered triangles. Poll errors
+                // once for that bounded command batch, not once per triangle.
+                // On the unchanged route no intervening call consumes GL errors; reject before the
+                // next group and restore/unbind below, without publication.
+                const bool commandsOk = check("draw ordered source map-2 group with current destination alpha");
+                accepted = accepted && commandsOk;
+                if (accepted) diagnostic->sourceSpecularSecondTriangles50LA += group.indexCount / 3;
+            }
+        }
+        // Unbind the target even after failure, before any base/unrelated draw
+        // or abort. Publication still belongs solely to the existing bank owner.
+        unbindSpecularFeedback50LA();
+        gl.bindTexture(texture2D, material->name);
+        gl.uniform1i(u.sourcePairPass50LA, 0); gl.uniform1i(u.sourcePairFog50LA, 0);
+        gl.uniform1i(u.sourcePairAlphaTest50LA, 0); gl.depthMask(1);
+        const bool restored = check("restore state after original body source pair");
+        return accepted && restored;
+    }
+    static bool drawSpan50LA(void* context, game::VehicleDrawComponent50CM component,
+        U ordinal, const assets::SceneSpan48D& span, I baseVertex) noexcept {
+        auto& s = *static_cast<Storage*>(context);
+        const U c = componentIndex(component);
+        if (!s.active || c >= s.resources.componentCount || baseVertex)
+            return fail(*s.diagnostic, VehicleWindowError50DS::assets, "invalid owned body-pair span draw");
+        return s.drawSpecularSpan50LA(static_cast<std::uint8_t>(s.published ^ 1u), 0, 0, c, ordinal, span);
+    }
     bool uploadRacer(std::uint8_t bank, const game::VehicleDrawBatch50CO& batch,
         U archetype = 0) noexcept {
         const auto selected = racerView(archetype);
         if (!uploadRacerNormals(bank, batch, archetype)) return false;
         // Every batch was structurally preflighted and matched to these exact
         // cold buffers before begin. Only the inactive bank is ever reused.
-        for (U c = 0; c < 3; ++c) {
+        for (U c = 0; c < selected.resources->componentCount; ++c) {
             drawGl.bindBuffer(arrayBuffer, selected.resources->bank[bank].vertexBuffer[c]);
             drawGl.bufferSubData(arrayBuffer, 0,
                 std::intptr_t(batch.component[c].vertexCount) * sizeof(assets::Vertex48B), batch.component[c].vertices);
@@ -3863,8 +4903,9 @@ void main() {
         resetPodState();
         const U archetype = frameOpponentArchetypes[opponent];
         const auto selected = racerView(archetype);
-        if (!uploadRacer(bank, frameOpponentBatches[opponent], archetype)) return false;
-        for (U c = 0; c < 3; ++c) {
+        if (!uploadRacer(bank, frameOpponentBatches[opponent], archetype) ||
+            !uploadSpecularUvs50LA(bank, opponent + 1, archetype)) return false;
+        for (U c = 0; c < selected.resources->componentCount; ++c) {
             drawGl.bindVertexArray(selected.resources->bank[bank].vertexArray[c]);
             drawGl.bindBuffer(elementBuffer, selected.resources->indices[c].buffer);
             for (U i = 0; i < selected.meshes[c]->spanCount; ++i) {
@@ -3876,9 +4917,7 @@ void main() {
                         opponentMaterialUvs[opponent * opponentMaterialStride + material].value,
                         frameOpponentLights[opponent].component(c))) return false;
                 }
-                drawGl.drawElementsBaseVertex(0x0004, static_cast<I>(span.index_count), 0x1405,
-                    reinterpret_cast<const void*>(std::uintptr_t(span.index_start) * sizeof(U)), 0);
-                if (!check("draw actual opaque opponent source span")) return false;
+                if (!drawSpecularSpan50LA(bank, opponent + 1, archetype, c, i, span)) return false;
                 ++diagnostic->opponentOpaqueDraws;
                 diagnostic->opponentOpaqueIndices += span.index_count;
             }
@@ -3892,7 +4931,7 @@ void main() {
             frameOpponentArchetypes[opponent] : 0);
         if (!selected.materials) return true;
         resetPodState();
-        for (U c = 0; c < 3; ++c) {
+        for (U c = 0; c < selected.resources->componentCount; ++c) {
             bool bound = false;
             for (U i = 0; i < selected.meshes[c]->spanCount; ++i) {
                 const auto& span = selected.meshes[c]->spans[i];
@@ -3922,7 +4961,7 @@ void main() {
         s.active = true;
         // Same-context GL ordering protects buffer/target reuse after prior
         // commands, including aborted work. No mapping or cross-context sharing.
-        s.gl.bindFramebuffer(framebuffer, s.targets[bank]);
+        s.gl.bindFramebuffer(framebuffer, s.coverageDemand ? s.coverageLive.scene[bank] : s.targets[bank]);
         s.gl.drawBuffer(colorAttachment); s.gl.readBuffer(colorAttachment);
         s.gl.viewport(0, 0, s.width, s.height);
         // Solid, two-sided, opaque, LESS depth. This is diagnostic viewer state,
@@ -3954,7 +4993,7 @@ void main() {
         if (!s.check("begin explicit private frame")) return false;
         if (!s.uploadDynamicWorld(bank) || !s.drawSky() || !s.drawTrack(false) ||
             !s.drawDynamicWorld(bank, false)) return false;
-        return s.uploadRacerNormals(bank, s.framePlayerBatch);
+        return s.uploadRacerNormals(bank, s.framePlayerBatch) && s.uploadSpecularUvs50LA(bank, 0, 0);
     }
     static bool bindMaterial(void* context, game::VehicleDrawComponent50CM component, U material) noexcept {
         if (!materialReady(context, component, material)) return false;
@@ -3969,6 +5008,7 @@ void main() {
         }
         s.gl.uniform1i(s.shader->uniforms().useTexture, 0);
         s.gl.uniform1i(s.shader->uniforms().useNativeGcSelectedLights, 0);
+        s.gl.uniform1i(s.shader->uniforms().useSourceDiffuseCompressed50LA, 0);
         return s.check("bind explicit neutral vehicle material policy");
     }
     static bool commit(void* context, std::uint8_t bank) noexcept {
@@ -4002,8 +5042,20 @@ void main() {
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.resetPodState();
-        if (!s.drawGameplayBinders()) return false;
-        if (!s.drawHostHud() || !s.drawGameplayBlur(bank)) return false;
+        if (!s.drawGameplayBinders() || !s.drawGcParticles()) return false;
+        if (s.hasSpecularPairs50LA) {
+            // All body map-2 Ad consumers have completed. Current Binder/GC
+            // materials use source alpha and DATE0; the original HUD's private
+            // scratch proves its own clear-before-Ad coverage. No later current
+            // gameplay consumer needs these body/particle alpha bytes.
+            s.unbindSpecularFeedback50LA();
+            s.gl.disable(0x0C11); s.gl.colorMask(0, 0, 0, 1);
+            s.gl.clearColor(0.f, 0.f, 0.f, 1.f); s.gl.clear(colorBufferBit);
+            s.gl.colorMask(1, 1, 1, 1);
+            if (!s.check("restore opaque presentation alpha after all body and particle consumers")) return false;
+        }
+        if (!s.resolveCoverage(bank)) return false;
+        if (!s.drawHostHud() || !s.drawRaceHud(bank) || !s.drawTimeStats(bank) || !s.drawSpeedBoost(bank) || !s.drawGameplayBlur(bank)) return false;
         if (!s.check("accept private vehicle frame")) return false;
         // 50CV publication is CPU-only. The fallible window copy is deliberately
         // OUTSIDE this transaction, after submitVehicleDrawBatch50CS succeeds.
@@ -4018,7 +5070,10 @@ void main() {
     }
     static void abort(void* context, std::uint8_t) noexcept {
         // Previous private target remains untouched. Never blit or swap here.
-        static_cast<Storage*>(context)->active = false;
+        auto& s = *static_cast<Storage*>(context);
+        s.unbindSpecularFeedback50LA();
+        s.coverageAa0();
+        s.active = false;
     }
     bool copyToWindow() noexcept { return copyToWindow(width,height); }
     bool copyToWindow(I copyWidth,I copyHeight) noexcept {
@@ -4100,16 +5155,18 @@ void main() {
             return fail(d, VehicleWindowError50DS::wrongThread, "cleanup requires creating thread");
         }
         if (hasGlResources() && !current(d)) { d.cleanupIncomplete = true; return false; }
+        if(raStaticFireOwner)raStaticFireOwner->nativeCompletionLive_=false;
         initialized = false; active = frameSet = imageCommitted = false;
-        frameCables = nullptr; frameHostHud = false;
+        frameCables = nullptr; frameHostHud = false;frameGcParticles=nullptr;
         committedWidth = committedHeight = raceWidth = raceHeight = 0;
         displayedTarget = 0;
+        trackVisibilityPendingTarget=0;trackVisibilityCompletedValid=false;
         gameplayHistoryValid=gameplayHistoryStaged=frameGameplayBlurEnabled=false;
         gameplayAwaitingTarget=0;frameGameplayBlur={};
         game::clearGameplayBlurVideoStrengths(gameplayBlurVideo);
         uiPrivatePublicationGeneration=0;
         adapter.reset();
-        if (!hasGlResources()) { shader.reset(); d.cleanupIncomplete = false; return true; }
+        if (!hasGlResources()) { shader.reset(); retireRaStaticFirePublication(); d.cleanupIncomplete = false; return true; }
         // All functions were loaded before the first name could be allocated.
         if (!drainCleanupErrors(d)) {
             d.cleanupIncomplete = true;
@@ -4117,8 +5174,8 @@ void main() {
         }
         // Explicit source/display leases add a real completion obligation. Never
         // confuse a CPU generation increment or deferred GL deletion with it.
-        if (hasDisplayFadeNames() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
-            uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources()){
+        if (raStaticFireOwner || hasDisplayFadeNames() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
+            uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || (hasRaceHudResources() || hasTimeStatsResources() || hasSpeedBoostResources())){
             gl.finish();const U error=drawGl.getError();
             if (error){if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
                 return fail(d,VehicleWindowError50DS::cleanup,"complete source leases before cleanup");}
@@ -4129,8 +5186,14 @@ void main() {
         uiPromotedIncomingGeneration=0;
         gl.useProgram(0); drawGl.bindVertexArray(0); drawGl.bindBuffer(arrayBuffer, 0);
         gl.bindFramebuffer(framebuffer, 0); gl.bindRenderbuffer(renderbuffer, 0);
+        if (coverageDemand) {
+            coverageAa0();
+            gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
+            if(gl.bindSampler)gl.bindSampler(2,0);
+            gl.activeTexture(textureUnit0);gl.bindTexture(coverageTexture,0);
+        }
         if (usesTextures() || hasDisplayFadeNames()) {
-            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur) {
+            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || (hasRaceHudResources() || hasTimeStatsResources() || hasSpeedBoostResources()) || hasSpecularPairs50LA) {
                 gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
                 if (gl.bindSampler)gl.bindSampler(1,0);
             }
@@ -4144,6 +5207,9 @@ void main() {
             return fail(d, VehicleWindowError50DS::cleanup, "unbind renderer resources before cleanup");
         }
         bool complete = true;
+        if(!deleteSpeedBoostNames(d))goto incomplete;
+        if(!deleteTimeStatsNames(d))goto incomplete;
+        if(!deleteRaceHudNames(d))goto incomplete;
         if(!deleteGameplayBlurNames(d))goto incomplete;
         if (shader && !shader->release(d.cleanupShader)) {
             if (!d.cleanupGlError) d.cleanupGlError = d.cleanupShader.glError ?
@@ -4184,22 +5250,28 @@ void main() {
                 !deleteShaderName(hostHudVertexShader, false, d) ||
                 !deleteShaderName(hostHudFragmentShader, false, d)) goto incomplete;
             for (auto& bank : resources.bank) {
-                for (U c = 0; c < 3; ++c) {
+                for (U c = 0; c < maxComponents; ++c) {
                     if (!deleteName(bank.vertexArray[c], gl.deleteVertexArrays, d) ||
                         !deleteName(bank.vertexBuffer[c], gl.deleteBuffers, d)) goto incomplete;
                 }
             }
+            for (auto& body : sourceSpecularGeometry50LA)
+                for (auto& buffer : body.buffers)
+                    if (!deleteName(buffer, gl.deleteBuffers, d)) goto incomplete;
             for (auto& bank : racerNormalBuffers)
                 for (auto& normal : bank)
                     if (!deleteName(normal, gl.deleteBuffers, d)) goto incomplete;
             for (auto& index : resources.indices)
                 if (!deleteName(index.buffer, gl.deleteBuffers, d)) goto incomplete;
             for (auto& archetype : racerArchetypes) {
+                for (auto& body : archetype.specularGeometry50LA)
+                    for (auto& buffer : body.buffers)
+                        if (!deleteName(buffer, gl.deleteBuffers, d)) goto incomplete;
                 for (auto& bank : archetype.normalBuffers)
                     for (auto& normal : bank)
                         if (!deleteName(normal, gl.deleteBuffers, d)) goto incomplete;
                 for (auto& bank : archetype.resources.bank)
-                    for (U c = 0; c < 3; ++c)
+                    for (U c = 0; c < maxComponents; ++c)
                         if (!deleteName(bank.vertexArray[c], gl.deleteVertexArrays, d) ||
                             !deleteName(bank.vertexBuffer[c], gl.deleteBuffers, d)) goto incomplete;
                 for (auto& index : archetype.resources.indices)
@@ -4224,14 +5296,17 @@ void main() {
             if (!deleteName(skyVertexArray, gl.deleteVertexArrays, d) ||
                 !deleteName(skyVertexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(skyIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
+            if (!deleteCoverageResources(d)) goto incomplete;
             for (U b = 0; b < 2; ++b)
                 if (!deleteName(targets[b], gl.deleteFramebuffers, d) ||
                     !deleteName(colors[b], gl.deleteRenderbuffers, d) ||
+                    !deleteName(sourcePairColors50LA[b], gl.deleteTextures, d) ||
                     !deleteName(depths[b], gl.deleteRenderbuffers, d) ||
                     !deleteName(menuTargets[b], gl.deleteFramebuffers, d) ||
                     !deleteName(menuColors[b], gl.deleteRenderbuffers, d)) goto incomplete;
         }
         d.cleanupIncomplete = hasGlResources();
+        if(!d.cleanupIncomplete)retireRaStaticFirePublication();
         if (d.cleanupIncomplete || !complete)
             return fail(d, VehicleWindowError50DS::cleanup, "renderer cleanup incomplete");
         shader.reset();
@@ -4254,6 +5329,8 @@ VehicleWindowGl50DS::~VehicleWindowGl50DS() noexcept {
 bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     const assets::VehicleDrawAssets50CR& assets, VehicleWindowDiagnostic50DS& d) noexcept {
     d = {};
+    if(sessionDisplayOwner50LA_&&!sessionDisplayCreate50LA_)
+        return fail(d,VehicleWindowError50DS::request,"session renderer creation requires its actual display owner");
     if(request.gameplayBinderTextures){
         if(!request.cables.textures||request.track.mode!=VehicleWindowMode50DS::callerMaterialTextures||
             !request.track.mesh||
@@ -4296,6 +5373,12 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     }
     std::unique_ptr<Storage> next(new (std::nothrow) Storage);
     if (!next) return fail(d, VehicleWindowError50DS::allocation, "allocate caller-context renderer owner");
+    if(request.track.raStaticFire){
+        if(!request.track.raStaticFire->publishRenderer(this,request.track.textures))
+            return fail(d,VehicleWindowError50DS::material,"FireP0t renderer publication already leased");
+        next->raStaticFireOwner=request.track.raStaticFire;next->raStaticFireRenderer=this;
+        next->raStaticFirePublicationSerial=request.track.raStaticFire->rendererPublicationSerial_;
+    }
     next->diagnostic = &d;
     const bool result = next->initialize(request, assets);
     next->diagnostic = nullptr;
@@ -4308,11 +5391,42 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     return true;
 }
 
+bool VehicleWindowGl50DS::createOriginalFrontend(const OriginalFrontendWindowRequest50LA& input,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    if(sessionDisplayOwner50LA_){d={};return fail(d,VehicleWindowError50DS::request,
+        "race display renderer cannot be replaced by a frontend renderer");}
+    d={};
+    if(storage_)return fail(d,VehicleWindowError50DS::alreadyOwned,"renderer already owns resources");
+    if(!input.procAddress||!input.isCurrent||!input.cpuTextures||!input.textures||
+        (input.output!=VehicleWindowOutput50DS::defaultBackBuffer&&input.output!=VehicleWindowOutput50DS::headless)||
+        input.maximumWidth<=0||input.maximumHeight<=0||
+        std::uint64_t(input.maximumWidth)*std::uint64_t(input.maximumHeight)>
+            std::numeric_limits<std::size_t>::max()/16u)
+        return fail(d,VehicleWindowError50DS::request,"frontend requires exact context, authenticated UI bank and bounded output");
+    VehicleWindowRequest50DS request;
+    request.context=input.context;request.procAddress=input.procAddress;request.isCurrent=input.isCurrent;
+    request.maximumWidth=input.maximumWidth;request.maximumHeight=input.maximumHeight;request.output=input.output;
+    request.enableOriginalUi=true;request.enableOriginalUiSourceRgba=input.enableSourceRgba;
+    request.originalUiCpuTextures=input.cpuTextures;request.originalUiTextures=input.textures;
+    std::unique_ptr<Storage> next(new(std::nothrow) Storage);
+    if(!next)return fail(d,VehicleWindowError50DS::allocation,"allocate dedicated frontend renderer owner");
+    next->diagnostic=&d;
+    const bool result=next->initializeOriginalFrontend(request);
+    next->diagnostic=nullptr;
+    if(!result){
+        next->cleanup(d);
+        if(d.cleanupIncomplete)storage_=std::move(next);
+        return false;
+    }
+    storage_=std::move(next);return true;
+}
+
 bool VehicleWindowGl50DS::updateWorldFog(const VehicleWindowWorldFog50DS& fog,
     VehicleWindowDiagnostic50DS& d) noexcept {
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"world-fog update requires initialized renderer");
     auto& s=*storage_;
+    if(s.frontendOnly)return fail(d,VehicleWindowError50DS::request,"dedicated frontend owns no gameplay capability");
     if(!s.current(d))return false;
     if(s.active || s.frameSet || s.diagnostic)
         return fail(d,VehicleWindowError50DS::frame,"world-fog update requires idle renderer");
@@ -4328,20 +5442,102 @@ bool VehicleWindowGl50DS::updateWorldFog(const VehicleWindowWorldFog50DS& fog,
     return true;
 }
 
+bool VehicleWindowGl50DS::bindOriginalSpeedBoost(std::shared_ptr<game::OriginalSpeedBoost50LA> owner,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"original SpeedBoost binding requires idle gameplay renderer");
+    if(s.speedBoost||s.speedBoostUiCreationFailed||s.timeStatsUiCreationFailed||s.raceHudUiCreationFailed)
+        return fail(d,VehicleWindowError50DS::request,"original SpeedBoost already bound or late UI initialization failed");
+    s.diagnostic=&d;const bool accepted=s.prepareSpeedBoostResources(owner);
+    if(!accepted&&s.hasSpeedBoostResources()){
+        // Optional fallback is safe only after outstanding new HUD work/names
+        // have retired. An ambiguous deletion must not permit later allocation.
+        s.gl.finish();const bool drained=s.check("retire failed optional HUD initialization");
+        VehicleWindowDiagnostic50DS cleanup;
+        if(!drained||!s.deleteSpeedBoostNames(cleanup))d.cleanupIncomplete=true;
+        if(cleanup.cleanupGlError&&!d.cleanupGlError)d.cleanupGlError=cleanup.cleanupGlError;
+    }
+    if(!accepted&&!s.hasSpeedBoostResources())s.speedBoost.reset();
+    s.diagnostic=nullptr;
+    if(!accepted&&d.error==VehicleWindowError50DS::none)
+        fail(d,VehicleWindowError50DS::material,"original SpeedBoost optional cold join rejected");
+    return accepted;
+}
+bool VehicleWindowGl50DS::bindOriginalTimeStats(std::shared_ptr<game::OriginalTimeStats50LA> owner,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"original TimeStats binding requires idle gameplay renderer");
+    if(s.timeStats||s.timeStatsUiCreationFailed||s.raceHudUiCreationFailed||s.speedBoostUiCreationFailed)
+        return fail(d,VehicleWindowError50DS::request,"original TimeStats already bound or late UI initialization failed");
+    s.diagnostic=&d;const bool accepted=s.prepareTimeStatsResources(owner);
+    if(!accepted&&s.hasTimeStatsResources()){
+        // Optional fallback is safe only after outstanding new HUD work/names
+        // have retired. An ambiguous deletion must not permit later allocation.
+        s.gl.finish();const bool drained=s.check("retire failed optional HUD initialization");
+        VehicleWindowDiagnostic50DS cleanup;
+        if(!drained||!s.deleteTimeStatsNames(cleanup))d.cleanupIncomplete=true;
+        if(cleanup.cleanupGlError&&!d.cleanupGlError)d.cleanupGlError=cleanup.cleanupGlError;
+    }
+    if(!accepted&&!s.hasTimeStatsResources())s.timeStats.reset();
+    s.diagnostic=nullptr;
+    if(!accepted&&d.error==VehicleWindowError50DS::none)
+        fail(d,VehicleWindowError50DS::material,"original TimeStats optional cold join rejected");
+    return accepted;
+}
+bool VehicleWindowGl50DS::bindOriginalRaceHud(const game::OriginalRaceHud50KG& owner,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"original HUD binding requires idle gameplay renderer");
+    if(s.raceHud||s.raceHudUiCreationFailed||s.timeStatsUiCreationFailed||s.speedBoostUiCreationFailed)
+        return fail(d,VehicleWindowError50DS::request,"original HUD already bound or late UI initialization failed");
+    s.diagnostic=&d;const bool accepted=s.prepareRaceHudResources(owner);
+    if(!accepted&&s.hasRaceHudResources()){
+        // Optional fallback is safe only after outstanding new HUD work/names
+        // have retired. An ambiguous deletion must not permit later allocation.
+        s.gl.finish();const bool drained=s.check("retire failed optional HUD initialization");
+        VehicleWindowDiagnostic50DS cleanup;
+        if(!drained||!s.deleteRaceHudNames(cleanup))d.cleanupIncomplete=true;
+        if(cleanup.cleanupGlError&&!d.cleanupGlError)d.cleanupGlError=cleanup.cleanupGlError;
+    }
+    if(!accepted&&!s.hasRaceHudResources())s.raceHud.reset();
+    s.diagnostic=nullptr;
+    if(!accepted&&d.error==VehicleWindowError50DS::none)
+        fail(d,VehicleWindowError50DS::material,"original HUD optional cold join rejected");
+    return accepted;
+}
 bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     const VehicleWindowFrame50DS& frame, VehicleWindowDiagnostic50DS& d) noexcept {
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
-    if (!s.current(d) || !s.texturesCurrent(d)) return false;
-    if(!s.validateGameplayBlurFrame(frame.gameplayBlur,d))return false;
+    if(s.frontendOnly)return fail(d,VehicleWindowError50DS::request,"dedicated frontend owns no gameplay capability");
+    if (!s.current(d)) return false;
+    // Any new gameplay attempt supersedes an uncompleted candidate. Failure
+    // anywhere below cannot authorize its partial draws through a later finish.
+    s.trackVisibilityPendingTarget=0;
+    for(U i=0;i<s.trackSpanCount;++i)s.trackSpans[i].submittedGameplayCandidate=false;
+    if(!s.texturesCurrent(d))return false;
+    struct TrackUvBorrowReset {
+        VehicleWindowTrackUvFrame50DS& borrowed;
+        ~TrackUvBorrowReset() { borrowed={}; }
+    } trackUvBorrowReset{s.frameTrackUv};
+    if(!s.validateGameplayBlurFrame(frame.gameplayBlur,d) || !s.validateGcParticleFrame(frame,d))return false;
+    for(U i=0;i<s.trackSpanCount;++i)if(s.trackSpans[i].sourceUvAnimation &&
+        (!frame.trackUvAnimation || !frame.trackUvAnimation->owner || !frame.trackUvAnimation->service))
+        return fail(d,VehicleWindowError50DS::frame,"animated static material has no real frame controller");
     // A cold bank may remain resident in Main. Only active race frames supply
     // meshes; absence never requests an animation clock or a lighting owner.
     if((frame.gameplayBinderCount&&!s.request.gameplayBinderTextures)||
         bool(frame.gameplayBinders)!=bool(frame.gameplayBinderCount))
         return fail(d,VehicleWindowError50DS::frame,"Binder cold/frame presence differs");
     if(frame.gameplayBinderCount){
-        if(frame.gameplayBinderCount!=frame.opponentCount+1u||frame.gameplayBinderCount>8u||frame.gameplayBinderFrame>=10u)
+        if(frame.gameplayBinderCount<frame.opponentCount+1u||frame.gameplayBinderCount>2u*(frame.opponentCount+1u)||frame.gameplayBinderCount>16u||frame.gameplayBinderFrame>=10u)
             return fail(d,VehicleWindowError50DS::frame,"Binder racer/frame extent differs");
         constexpr float uv[4][2]={{0,0},{0,1},{1,0},{1,1}};
         for(U i=0;i<frame.gameplayBinderCount;++i)for(U v=0;v<4;++v){
@@ -4392,9 +5588,27 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             *opponent.batch, opponent.racerArchetype, fleetLightOwner, opponentLights[i], d)) return false;
     }
     d.opponentIndex = maxVehicleWindowOpponents50DS;
+    if (!s.prepareSpecularFrame50LA(batch, frame, d)) return false;
     if (bool(s.request.cables.textures) != bool(frame.cables))
         return fail(d, VehicleWindowError50DS::frame, "cable frame presence must match explicit cold cable request");
     if (frame.cables && !validateCableFrame(*frame.cables, d)) return false;
+    d.originalSpeedBoostRejected=!s.prepareSpeedBoostFrame(frame.originalSpeedBoost);
+    if(d.originalSpeedBoostRejected)
+        return fail(d,VehicleWindowError50DS::material,"requested original Speed/Boost frame rejected");
+    d.originalTimeStatsRejected=!s.prepareTimeStatsFrame(frame.originalTimeStats);
+    if(d.originalTimeStatsRejected)
+        return fail(d,VehicleWindowError50DS::material,"requested original TimeStats frame rejected");
+    float admittedOriginalBottom=0.f;
+    if(s.timeStats&&s.timeStats->frame){
+        // Match drawTimeStats' actual640x448 aspect transform, including
+        // letterboxing. Use admitted copied geometry, never a caller flag.
+        const double sourceScale=std::min(double(frame.width)/640.0,double(frame.height)/448.0);
+        const double oy=(frame.height-448.0*sourceScale)*.5;
+        float bottom=0.f;
+        for(U i=0;i<s.timeStats->quads*4;++i)
+            bottom=std::max(bottom,s.timeStats->vertices[i].position[1]);
+        admittedOriginalBottom=static_cast<float>(oy+double(bottom)*sourceScale);
+    }
     if (frame.hostHud) {
         if (!s.request.enableHostHud || !s.hostHudGeometry)
             return fail(d, VehicleWindowError50DS::frame, "host HUD frame requires explicit cold enableHostHud");
@@ -4412,26 +5626,49 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         if (hud.lapCountValid && hud.completedLaps > maxVehicleWindowCompletedLaps50DS)
             return fail(d, VehicleWindowError50DS::frame,
                 "host HUD enabled completed-lap count must be in [0,999]");
+        // Native 1AFD80 installs 0x40A66666 (5.2 seconds) for the ordinary
+        // course start. The existing one-way HUD adapter displays ceil of
+        // the real remaining time, so its admitted maximum is 6, not the
+        // earlier HOST-only three-second start. This changes no race clock.
+        constexpr U maxRaceCountdown = 6;
         if (hud.raceEnabled && (!hud.raceLapTarget || hud.raceLapTarget > 999 ||
             !hud.raceLap || hud.raceLap > hud.raceLapTarget || !hud.raceRacerCount ||
             hud.raceRacerCount > 16 || !hud.racePlace || hud.racePlace > hud.raceRacerCount ||
-            hud.raceCountdown > 3 ||
-            unsigned(hud.raceCountdown != 0) + unsigned(hud.raceGo) + unsigned(hud.raceFinished) > 1))
+            hud.raceCountdown > maxRaceCountdown ||
+            unsigned(hud.raceCountdown != 0) + unsigned(hud.raceGo) + unsigned(hud.raceFinished) +
+                unsigned(!hud.raceFinished && hud.raceRetirementCD4) > 1)) {
+            // Failure-only payload; keep the public diagnostic ABI intact.
+            if (d.error == VehicleWindowError50DS::none)
+                std::fprintf(stderr,
+                    "native race HUD rejection lap=%u target=%u place=%u racers=%u countdown=%u go=%u finished=%u retirementCD4=%u\n",
+                    static_cast<unsigned>(hud.raceLap), static_cast<unsigned>(hud.raceLapTarget),
+                    static_cast<unsigned>(hud.racePlace), static_cast<unsigned>(hud.raceRacerCount),
+                    static_cast<unsigned>(hud.raceCountdown), static_cast<unsigned>(hud.raceGo),
+                    static_cast<unsigned>(hud.raceFinished), static_cast<unsigned>(hud.raceRetirementCD4));
             return fail(d, VehicleWindowError50DS::frame, "native race HUD counters/status outside admitted bounds");
-        if (hud.raceResultsReady && (!hud.raceEnabled || !hud.raceFinished || hud.raceCountdown || hud.raceGo))
-            return fail(d, VehicleWindowError50DS::frame, "host results presentation requires a sealed human finish");
+        }
+        if (hud.raceResultsReady && (!hud.raceEnabled || (!hud.raceFinished && !hud.raceRetirementCD4) ||
+            hud.raceCountdown || hud.raceGo))
+            return fail(d, VehicleWindowError50DS::frame, "host results presentation requires a sealed finish or retirement");
         if (hud.resultsPanelVisible && (!hud.raceResultsReady || !hud.standingsCount ||
-            !hud.resultsFinishPlace || hud.resultsFinishPlace != hud.racePlace ||
-            hud.resultsSelectedAction >= 3 || !std::isfinite(hud.resultsFinishSeconds) ||
-            hud.resultsFinishSeconds < 0.0 || hud.resultsFinishSeconds > double(maxVehicleWindowLapSeconds50DS) ||
+            hud.resultsSelectedAction >= 3 ||
             (!hud.resultsConfirming && hud.resultsConfirmAccept)))
-            return fail(d, VehicleWindowError50DS::frame, "live results panel requires sealed finish and bounded action/time");
+            return fail(d, VehicleWindowError50DS::frame, "live results panel requires a sealed outcome and bounded action");
+        if (hud.resultsPanelVisible && hud.raceFinished &&
+            (!hud.resultsFinishPlace || hud.resultsFinishPlace > hud.raceRacerCount ||
+             (!hud.standingsSourceRanks && hud.resultsFinishPlace != hud.racePlace) ||
+             !std::isfinite(hud.resultsFinishSeconds) || hud.resultsFinishSeconds < 0.0 ||
+             hud.resultsFinishSeconds > double(maxVehicleWindowLapSeconds50DS)))
+            return fail(d, VehicleWindowError50DS::frame, "finished results require an explicit bounded finish place/time");
+        if (hud.resultsPanelVisible && !hud.raceFinished &&
+            (hud.resultsFinishPlace || hud.resultsFinishSeconds != 0.0))
+            return fail(d, VehicleWindowError50DS::frame, "DNF results cannot supply a finish place or finish time");
         if (hud.raceClocksValid) {
             const auto validSeconds = [](float value) noexcept {
                 return std::isfinite(value) && value >= 0.f && value <= maxVehicleWindowLapSeconds50DS;
             };
             if (!hud.raceEnabled || !validSeconds(hud.raceElapsedSeconds) ||
-                (!hud.raceFinished && !validSeconds(hud.currentLapSeconds)))
+                (!hud.raceFinished && !hud.raceRetirementCD4 && !validSeconds(hud.currentLapSeconds)))
                 return fail(d, VehicleWindowError50DS::frame, "native race clocks outside admitted presentation bounds");
         }
         if (hud.completedLapTimesValid) {
@@ -4455,20 +5692,24 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             bool seen[maxVehicleWindowStandings50DS]{}, unfinishedSeen = false;
             for (U i = 0; i < hud.standingsCount; ++i) {
                 const auto& row = hud.standings[i];
-                if (row.racerIndex >= hud.standingsCount || seen[row.racerIndex] || row.place != i + 1 ||
+                const bool rankValid = hud.standingsSourceRanks ?
+                    (row.place >= 1 && row.place <= hud.standingsCount &&
+                     (!i || hud.standings[i - 1].place <= row.place)) : row.place == i + 1;
+                if (row.racerIndex >= hud.standingsCount || seen[row.racerIndex] || !rankValid ||
                     !validHostHudName(row.displayName) || row.completedLaps > maxVehicleWindowCompletedLaps50DS ||
                     row.finished != (row.completedLaps >= hud.raceLapTarget) ||
-                    (row.finished && unfinishedSeen) || (hud.raceCountdown && row.completedLaps))
+                    (!hud.standingsSourceRanks && row.finished && unfinishedSeen) || (hud.raceCountdown && row.completedLaps))
                     return fail(d, VehicleWindowError50DS::frame, "named standings order/name/lap/finish state rejected");
                 seen[row.racerIndex] = true;
                 unfinishedSeen = unfinishedSeen || !row.finished;
                 if (row.racerIndex == hud.standingsPlayerIndex &&
                     (row.place != hud.racePlace || row.finished != hud.raceFinished ||
+                     row.retirementCD4 != hud.raceRetirementCD4 ||
                      std::min(row.completedLaps + 1, hud.raceLapTarget) != hud.raceLap))
                     return fail(d, VehicleWindowError50DS::frame, "named standings player differs from race HUD");
             }
         }
-        if (!s.hostHudGeometry->build(hud, frame.width, frame.height))
+        if (!s.hostHudGeometry->build(hud, frame.width, frame.height,admittedOriginalBottom))
             return fail(d, VehicleWindowError50DS::limits, "host HUD exceeds fixed glyph geometry capacity");
     }
     // Reset every cold material to identity so absent overrides never retain
@@ -4506,6 +5747,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             uv[2] = input.uOffset; uv[3] = input.vOffset;
         }
     }
+    s.frameTrackUv=frame.trackUvAnimation?*frame.trackUvAnimation:VehicleWindowTrackUvFrame50DS{};
+    s.frameSkyEnabled=frame.skyEnabled;
     if (frame.skyWorldViewProjection)
         std::memcpy(s.skyMatrix, frame.skyWorldViewProjection, sizeof(s.skyMatrix));
     if (s.request.track.worldFog.enabled)
@@ -4516,16 +5759,22 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     s.frameCables = frame.cables;
     s.frameGameplayBinders=frame.gameplayBinders;s.frameGameplayBinderCount=frame.gameplayBinderCount;
     s.frameGameplayBinderImage=frame.gameplayBinderFrame;
+    s.frameGcParticles=frame.gcParticles;
     s.frameDynamicWorld = frame.dynamicWorld;
     for (U i = 0; i < s.trackAnimationCount; ++i)
         s.trackAnimations[i].selectedFrame = frame.trackAnimationFrames[i];
     s.frameHostHud = frame.hostHud != nullptr;
+    // Prepare authentic geometry before any gameplay target writes. A bounded
+    // rejection leaves the existing native HUD and world frame unchanged.
+    d.originalRaceHudRejected=!s.prepareRaceHudFrame(frame.originalRaceHud);
+    if(d.originalRaceHudRejected&&s.raceHud)s.raceHud->frame=false;
     s.frameGameplayBlurEnabled=frame.gameplayBlur!=nullptr;
     s.frameGameplayBlur=frame.gameplayBlur?*frame.gameplayBlur:GameplayBlurFrame50DS{};
     s.frameSet = true; s.diagnostic = &d;
     s.prepareTrackVisibility();
     bool accepted = s.check("before private submission") &&
         (s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
+    if (accepted) accepted = s.prepareCoverageExtent();
     if (accepted) {
         accepted = game::submitVehicleDrawBatch50CS(batch, s.adapter->backend(), d.submission);
         if (!accepted) {
@@ -4546,8 +5795,12 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         }
     }
     s.frameSet = false; s.frameCables = nullptr; s.frameHostHud = false; s.diagnostic = nullptr;
+    if(s.raceHud)s.raceHud->frame=false;
+    if(s.timeStats)s.timeStats->frame=false;
+    if(s.speedBoost)s.speedBoost->frame=false;
     s.frameGameplayBlurEnabled=false;s.frameGameplayBlur={};
     s.frameGameplayBinders=nullptr;s.frameGameplayBinderCount=0;s.frameGameplayBinderImage=0;
+    s.frameGcParticles=nullptr;
     s.framePlayerBatch = {};
     s.framePlayerLights = {};
     s.frameDynamicWorld = {};
@@ -4558,6 +5811,8 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         s.frameOpponentArchetypes[i] = 0;
     }
     s.frameOpponentCount = 0;
+    if(accepted && s.displayedTarget==s.targets[s.published])
+        s.trackVisibilityPendingTarget=s.displayedTarget;
     return accepted;
 }
 
@@ -4613,9 +5868,9 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
         (frame.owner_==s.uiSourceFrameOwner && frame.frameGeneration_<=s.uiSourceFrameGeneration) ||
         s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max() ||
         (publishSource && s.uiSourcePublicationGeneration==std::numeric_limits<std::uint64_t>::max()))
-        return fail(d,VehicleWindowError50DS::frame,"unsealed or stale complete Rider frame");
+        return fail(d,VehicleWindowError50DS::frame,"unsealed or stale complete original UI frame");
     if (!frame.owner_->beginSourceSubmission(frame.frameGeneration_,*this))
-        return fail(d,VehicleWindowError50DS::frame,"Rider source binding-history receipt rejected");
+        return fail(d,VehicleWindowError50DS::frame,"original UI source binding-history receipt rejected");
     bool sourceWorkStarted=false;
     const auto sourceTargetBefore=s.uiSourceTargetGeneration;
     const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted,publishSource);
@@ -5154,7 +6409,7 @@ bool VehicleWindowGl50DS::releaseOriginalUiByteBlend(VehicleWindowDiagnostic50DS
     s.diagnostic=nullptr;return accepted;
 }
 bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
-    const OriginalUiRiderDrawContribution50KG& owner,VehicleWindowDiagnostic50DS& d) noexcept {
+    const OriginalUiSourceOwner50KM& owner,VehicleWindowDiagnostic50DS& d) noexcept {
     d={};
     if (!originalUiSourceRgbaAvailable())
         return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
@@ -5447,6 +6702,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.gl.enable(0x0B71); s.gl.useProgram(s.uiProgram);
         s.gl.uniform4f(s.uiCanvasUniform,float(2.0*scale/rasterWidth),float(-2.0*scale/rasterHeight),
             float(2.0*ox/rasterWidth-1.0),float(1.0-2.0*oy/rasterHeight));
+        s.gl.uniform1i(s.gcParticleModeUniform,0);
         s.gl.uniform1i(s.uiSourceCompositionUniform,sourceRgba?1:0);
         if(!s.uiSourceCoherentFramebufferFetch)s.gl.uniform1i(s.uiSourceTargetUniform,1);
         if(sourceRgba && !s.uiSourceCoherentFramebufferFetch){
@@ -5586,6 +6842,7 @@ bool VehicleWindowGl50DS::submitHostMenu(const VehicleWindowHostMenu50DS& input,
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_;
+    if(s.frontendOnly)return fail(d,VehicleWindowError50DS::request,"dedicated frontend owns no gameplay capability");
     if (!s.current(d)) return false;
     if (s.active || s.frameSet || !s.request.enableHostHud || !s.hostHudGeometry ||
         !s.hostHudProgram || !s.hostHudVertexBuffer || !s.hostHudIndexBuffer || !s.hostHudVertexArray ||
@@ -5677,6 +6934,64 @@ bool VehicleWindowGl50DS::readbackRgba(std::uint8_t* destination, std::size_t ca
     return result;
 }
 
+bool VehicleWindowGl50DS::readbackWindowFrontRgba(std::uint8_t* destination,
+    std::size_t capacityBytes,I width,I height,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"window readback requires initialized renderer");
+    auto& s=*storage_;
+    if(!s.current(d))return false;
+    if(s.request.output!=VehicleWindowOutput50DS::defaultBackBuffer || s.active || s.frameSet || s.diagnostic ||
+        !s.imageCommitted || width<=0 || height<=0 || width!=s.committedWidth || height!=s.committedHeight ||
+        std::uint64_t(width)*std::uint64_t(height)>std::numeric_limits<std::size_t>::max()/4u)
+        return fail(d,VehicleWindowError50DS::readback,"front-buffer readback requires idle real window and matching committed drawable");
+    d.readbackWidth=width;d.readbackHeight=height;
+    d.readbackBytes=std::size_t(width)*std::size_t(height)*4u; // Existing cold capacity bounds.
+    if(!destination || capacityBytes<d.readbackBytes)
+        return fail(d,VehicleWindowError50DS::readback,"window RGBA destination is null or too small");
+    s.diagnostic=&d;
+    bool accepted=s.check("before actual window front-buffer readback");
+    I previousRead=0,defaultRead=0,previousPackBuffer=0;
+    constexpr U packNames[]={0x0D05,0x0D02,0x0D03,0x0D04,0x0D00,0x0D01,0x806C,0x806B};
+    I previousPack[8]{};
+    bool restore=false;
+    if(accepted){
+        s.gl.getIntegerv(0x8CAA,&previousRead); // GL_READ_FRAMEBUFFER_BINDING
+        s.gl.getIntegerv(0x88ED,&previousPackBuffer); // GL_PIXEL_PACK_BUFFER_BINDING
+        for(unsigned i=0;i<8;++i)s.gl.getIntegerv(packNames[i],&previousPack[i]);
+        accepted=s.check("query prior window readback binding");
+    }
+    if(accepted){
+        s.gl.bindFramebuffer(readFramebuffer,0);s.gl.getIntegerv(0x0C02,&defaultRead);
+        restore=true;accepted=s.check("query default framebuffer read buffer");
+    }
+    if(accepted){
+        s.gl.readBuffer(0x0404); // GL_FRONT: the actual swapped application buffer.
+        s.drawGl.bindBuffer(pixelPackBuffer,0);
+        s.gl.pixelStorei(0x0D05,1);s.gl.pixelStorei(0x0D02,0);
+        s.gl.pixelStorei(0x0D03,0);s.gl.pixelStorei(0x0D04,0);
+        s.gl.pixelStorei(0x0D00,0);s.gl.pixelStorei(0x0D01,0);
+        s.gl.pixelStorei(0x806C,0);s.gl.pixelStorei(0x806B,0);
+        accepted=s.check("configure actual window RGBA readback");
+    }
+    if(accepted){
+        const U status=s.gl.checkFramebufferStatus(readFramebuffer);
+        accepted=s.check("check actual window readback framebuffer");
+        if(accepted&&status!=framebufferComplete){d.framebufferStatus=status;
+            accepted=fail(d,VehicleWindowError50DS::readback,"actual window framebuffer is incomplete");}
+    }
+    if(accepted){d.readbackBufferMayBeModified=true;
+        s.gl.readPixels(0,0,width,height,rgba,unsignedByte,destination);
+        accepted=s.check("read actual swapped window front-buffer RGBA bytes");}
+    if(restore){
+        s.gl.readBuffer(static_cast<U>(defaultRead));s.gl.bindFramebuffer(readFramebuffer,static_cast<U>(previousRead));
+        for(unsigned i=0;i<8;++i)s.gl.pixelStorei(packNames[i],previousPack[i]);
+        s.drawGl.bindBuffer(pixelPackBuffer,static_cast<U>(previousPackBuffer));
+        const bool restored=s.check("restore window readback binding");accepted=accepted&&restored;
+    }
+    if(!accepted&&d.error==VehicleWindowError50DS::gl)d.error=VehicleWindowError50DS::readback;
+    s.diagnostic=nullptr;return accepted;
+}
+
 bool VehicleWindowGl50DS::finishSubmittedWork(VehicleWindowDiagnostic50DS& d) noexcept {
     d = {};
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
@@ -5691,8 +7006,52 @@ bool VehicleWindowGl50DS::finishSubmittedWork(VehicleWindowDiagnostic50DS& d) no
         result = s.check("complete prior submitted GL work");
     }
     d.submittedWorkCompleted = result;
+    if(result)s.acceptCompletedTrackVisibility();
+    else s.trackVisibilityPendingTarget=0;
     s.diagnostic = nullptr;
     return result;
+}
+
+bool VehicleWindowGl50DS::completedRaStaticFire(
+    ra_static_fire_visual50LA::CompletedDrawReceipt& out,VehicleWindowDiagnostic50DS& d) const noexcept {
+    out={};d={};
+    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"FireP0t completion requires live renderer");
+    const auto& s=*storage_;
+    if(!s.raStaticFireOwner||s.raStaticFireRenderer!=this||
+       s.raStaticFireOwner->rendererPublication_!=this||
+       s.raStaticFirePublicationSerial!=s.raStaticFireOwner->rendererPublicationSerial_)
+        return fail(d,VehicleWindowError50DS::material,"FireP0t publication identity differs");
+    // Reuse the real idle/current/GPU-completion boundary. These outputs are
+    // private temporaries, never caller-supplied claims of submitted geometry.
+    const std::uint32_t indices[4]={0,1,2,3};std::uint8_t submitted[4]{};
+    VehicleWindowTrackVisibilityReceipt50DS receipt;
+    if(!completedTrackSpanVisibility(indices,submitted,4,receipt,d)||!s.texturesCurrent(d))return false;
+    if(!s.raStaticFireOwner->nativeCompletionLive_||receipt.sourceSpanCount!=4||receipt.completedGameplayGeneration!=s.raStaticFireOwner->nativeCompletedGeneration_)
+        return fail(d,VehicleWindowError50DS::frame,"FireP0t native completed generation differs");
+    for(U i=0;i<4;++i)if(bool(submitted[i])!=s.raStaticFireOwner->nativeSubmitted_[i])
+        return fail(d,VehicleWindowError50DS::frame,"FireP0t completed span evidence differs");
+    out.owner_=s.raStaticFireOwner;out.publication_=s.raStaticFirePublicationSerial;
+    out.generation_=receipt.completedGameplayGeneration;return true;
+}
+
+bool VehicleWindowGl50DS::completedTrackSpanVisibility(const std::uint32_t* indices,
+    std::uint8_t* submitted,std::uint32_t count,VehicleWindowTrackVisibilityReceipt50DS& receipt,
+    VehicleWindowDiagnostic50DS& d) const noexcept {
+    d={};receipt={};
+    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"track visibility requires initialized renderer");
+    const auto& s=*storage_;if(!s.current(d))return false;
+    if(s.frontendOnly)return fail(d,VehicleWindowError50DS::request,"dedicated frontend owns no gameplay capability");
+    if(s.active || s.frameSet || s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"track visibility requires idle renderer");
+    if(!s.trackVisibilityCompletedValid)
+        return fail(d,VehicleWindowError50DS::noImage,"no completed gameplay track visibility receipt");
+    if(count>s.trackSpanCount || (count && (!indices || !submitted)))
+        return fail(d,VehicleWindowError50DS::frame,"track visibility output or count is invalid");
+    for(U i=0;i<count;++i)if(indices[i]>=s.trackSpanCount)
+        return fail(d,VehicleWindowError50DS::frame,"track visibility source span index is outside the cold table");
+    for(U i=0;i<count;++i)submitted[i]=s.trackSpans[indices[i]].submittedCompletedGameplay?1u:0u;
+    receipt.completedGameplayGeneration=s.trackVisibilityCompletedGeneration;
+    receipt.sourceSpanCount=s.trackSpanCount;return true;
 }
 
 namespace {
@@ -5713,6 +7072,7 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::failure(std:
 bool OriginalVideoBlockingNativeBackend::ownersCurrent() noexcept {
     if(!renderer_.initialized())return fail(diagnostic_,VehicleWindowError50DS::notInitialized,"display fade requires live renderer");
     auto& s=*renderer_.storage_;
+    if(s.frontendOnly)return fail(diagnostic_,VehicleWindowError50DS::request,"dedicated frontend owns no gameplay fade capability");
     if(!s.current(diagnostic_,this))return false;
     if(s.request.context!=&host_ || ((s.request.output==VehicleWindowOutput50DS::defaultBackBuffer)!=window_))
         return fail(diagnostic_,VehicleWindowError50DS::context,"display fade requires renderer's exact current GameHost50ER");
@@ -5732,7 +7092,7 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::begin(
     if((phase_!=OriginalVideoNativePhase::idle && phase_!=OriginalVideoNativePhase::retired) ||
        (use_!=OriginalVideoNativeUse::blockingSourceLoops && !async) ||
        (direction!=game::OriginalVideoFadeDirection::out260850 && direction!=game::OriginalVideoFadeDirection::in261630) ||
-       (async?(direction!=game::OriginalVideoFadeDirection::in261630 || (video.flags404Low6&7u)!=6u):
+       (async?((video.flags404Low6&7u)!=(direction==game::OriginalVideoFadeDirection::out260850?5u:6u)):
            bool(video.flags404Low6&4u)) ||
        !(video.flags404Low6&(direction==game::OriginalVideoFadeDirection::out260850?1u:2u)) ||
        (direction==game::OriginalVideoFadeDirection::out260850 && (video.flags404Low6&32u)))
@@ -5945,6 +7305,7 @@ bool VehicleWindowGl50DS::completeGameplayDisplayImpl(GameHost50ER& host,
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"gameplay display requires initialized renderer");
     auto& s=*storage_;
+    if(s.frontendOnly)return fail(d,VehicleWindowError50DS::request,"dedicated frontend owns no gameplay capability");
     if(!s.current(d))return false;
     const bool window=s.request.output==VehicleWindowOutput50DS::defaultBackBuffer;
     if(!s.request.enableOriginalGameplayBlur || s.request.context!=static_cast<void*>(&host) ||
@@ -5957,20 +7318,36 @@ bool VehicleWindowGl50DS::completeGameplayDisplayImpl(GameHost50ER& host,
         return fail(d,VehicleWindowError50DS::frame,"gameplay display needs new successful race or host-menu publication");
     if(!checkHost(host,window,s.committedWidth,s.committedHeight,d))return false;
     s.diagnostic=&d;
-    bool accepted=s.check("before actual gameplay display completion") &&
-        s.stageGameplayDisplayedHistory(s.displayedTarget,s.committedWidth,s.committedHeight);
+    const auto stageHistory=[&]() noexcept {
+        GameplayDisplayWallScope50DS timing(s.request.enableGameplayDisplayWallTiming,d.gameplayHistoryStageWall);
+        return s.stageGameplayDisplayedHistory(s.displayedTarget,s.committedWidth,s.committedHeight);
+    };
+    bool accepted=s.check("before actual gameplay display completion") && stageHistory();
     // All fallible GPU work precedes the real swap. The staged image is an
     // independent copy, so no subsequent frame can mutate accepted history.
     s.gl.bindFramebuffer(framebuffer,0);
     const bool restored=s.check("restore framebuffer before gameplay display completion");
     accepted=accepted && restored;
-    if(accepted){s.gl.finish();accepted=s.check("complete final gameplay image and staged history before display");}
+    if(accepted){
+        {
+            GameplayDisplayWallScope50DS timing(s.request.enableGameplayDisplayWallTiming,d.gameplayFinishWall);
+            s.gl.finish();
+        }
+        accepted=s.check("complete final gameplay image and staged history before display");
+    }
     d.submittedWorkCompleted=accepted;
     s.diagnostic=nullptr;
-    if(!accepted)return false;
-    if(window && !swapHost(host,hostDiagnostic))
+    if(!accepted){s.trackVisibilityPendingTarget=0;return false;}
+    const auto swapWindow=[&]() noexcept {
+        GameplayDisplayWallScope50DS timing(s.request.enableGameplayDisplayWallTiming,d.gameplaySwapWall);
+        return swapHost(host,hostDiagnostic);
+    };
+    if(window && !swapWindow()) {
+        s.trackVisibilityPendingTarget=0;
         return fail(d,VehicleWindowError50DS::presentation,"GameHost gameplay window swap was not submitted");
+    }
     s.acceptGameplayDisplayedHistory();
+    s.acceptCompletedTrackVisibility();
     d.gameplayDisplayHistoryAccepted=true;
     d.gameplayDisplayHistoryGeneration=s.gameplayHistoryGeneration;
     d.gameplayWindowSwapSubmitted=window;d.gameplayHeadlessDisplayCompleted=!window;
@@ -5981,6 +7358,7 @@ bool VehicleWindowGl50DS::clearGameplayBlurStrengths(VehicleWindowDiagnostic50DS
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"gameplay blur clear requires initialized renderer");
     auto& s=*storage_;
+    if(s.frontendOnly)return fail(d,VehicleWindowError50DS::request,"dedicated frontend owns no gameplay capability");
     if(!s.current(d))return false;
     if(!s.request.enableOriginalGameplayBlur || s.active || s.frameSet || s.diagnostic)
         return fail(d,VehicleWindowError50DS::frame,"gameplay blur clear requires idle opted-in renderer");
@@ -5990,11 +7368,14 @@ bool VehicleWindowGl50DS::clearGameplayBlurStrengths(VehicleWindowDiagnostic50DS
 
 bool VehicleWindowGl50DS::close(VehicleWindowDiagnostic50DS& d) noexcept {
     d = {};
+    if(sessionDependentPins50LA_){
+        d.cleanupIncomplete=true;
+        return fail(d,VehicleWindowError50DS::request,"dependent primitive retirement must precede renderer close");
+    }
     if (!storage_) return true;
     const bool result = storage_->cleanup(d);
     if (!d.cleanupIncomplete) storage_.reset();
     return result;
 }
 bool VehicleWindowGl50DS::initialized() const noexcept { return storage_ && storage_->initialized; }
-bool VehicleWindowGl50DS::ownsResources() const noexcept { return bool(storage_); }
 }

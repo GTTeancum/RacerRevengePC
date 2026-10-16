@@ -14,13 +14,15 @@ public:
         rr::platform::AudioMixer50HD&mixer,rr::platform::RaceAudioGroups50IC&groups,
         rr::platform::AnnouncerEpisode50IC&episode,rr::game::LapEventRandomOwner50ID&lazy,
         rr::game::HostMonotonicClock50ID&clock,std::uint32_t&sharedRaw,std::string&error,
-        std::uint32_t playerRacer60=1) {
+        std::uint32_t playerRacer60=1,const std::uint32_t* actualRacer60=nullptr,
+        std::size_t actualRacerCount=0,rr::game::DynamicContactRangeOwner50IW* sharedRange=nullptr) {
         namespace d=pod_materials50ed_fixture::detail;
         if(attempted_){error="50IE requires a fresh stable owner";return false;}attempted_=true;
         try{
             d::need(groups.uses(mixer)&&episode.uses(mixer)&&!episode.active()&&!episode.episode(),
                 "50IE must borrow the idle shared Dax episode, never another voice");
-            if(!source_announcer_authoring50IE::readAuthoring(discRoot,authoring_,error,playerRacer60))return false;
+            if(!source_announcer_authoring50IE::readAuthoring(discRoot,authoring_,error,playerRacer60,
+                    actualRacer60,actualRacerCount))return false;
             std::vector<rr::assets::AudioRequest50HC> requests;requests.reserve(authoring_.cues.size());
             const auto normalized=[](std::string name){
                 for(auto& c:name){if(c=='\\')c='/';else if(c>='A'&&c<='Z')c=char(c-'A'+'a');}
@@ -28,7 +30,7 @@ public:
             };
             // Source named and generic event keys can share one original VAG.
             // POD03 keys12/13/14/15 overlap generic42/41/45/51 respectively.
-            // Deduplicate only cold PCM ownership. All54 semantic keys and
+            // Deduplicate only cold PCM ownership. Actual semantic keys and
             // original per-bank history rows remain distinct and unmodified.
             for(const auto&cue:authoring_.cues){
                 bool exists=false;
@@ -39,7 +41,9 @@ public:
                 }
                 if(!exists)requests.push_back(cue.request);
             }
-            d::need(authoring_.cues.size()==clips_.size(),"50IE original semantic cue count differs");
+            d::need(!authoring_.cues.empty()&&authoring_.cues.size()<=218,
+                "50IE original semantic cue count outside bounded roster");
+            clips_.resize(authoring_.cues.size());availability_.resize(authoring_.cues.size());
             if(!rr::assets::loadAudioBank50HC(audioRoot,requests,bank_,error))return false;
             d::need(bank_.clips.size()==requests.size(),"50IE incomplete original PCM bank registry");
             for(std::size_t i=0;i<clips_.size();++i){
@@ -54,8 +58,8 @@ public:
             d::need(rr::game::initializeAnnouncer50IE(authoring_.parameters,state_),"50IE source initialization rejected");
             d::need(episode.enableOriginalPolicy50IE(),"50IE shared episode already active or policy selected");
             mixer_=&mixer;groups_=&groups;episode_=&episode;lazy_=&lazy;clock_=&clock;raw_=&sharedRaw;
-            providers_={this,stopAll,end,begin,play,activity,seed,leader};
-            playerRacer60_=playerRacer60;prepared_=true;error.clear();return true;
+            providers_={this,stopAll,end,begin,play,activity,seed,leader,sharedRange};
+            prepared_=true;error.clear();return true;
         }catch(const std::exception&e){error=e.what();return false;}
     }
     // true means2C2C20 actually returned, including legitimate source rejection
@@ -63,7 +67,8 @@ public:
     bool request(std::uint32_t type,std::uint32_t racer,std::uint32_t variant,
                  std::uint32_t mode11258,std::uint8_t managerFlags58)noexcept {
         using P=rr::game::AnnouncerPhase50IE;using U=rr::game::AnnouncerUpdatePhase50IE;
-        if(!current()||racer!=playerRacer60_||(update_.phase!=U::Idle&&update_.phase!=U::Done))return false;
+        if(!current()||!hasNamedBank(racer)||(type<=2&&!authoring_.collisionRequests)||
+           (update_.phase!=U::Idle&&update_.phase!=U::Done))return false;
         const rr::game::AnnouncerRequest50IE request{type,racer,variant};
         if(cursor_.phase==P::Idle||cursor_.phase==P::Done){
             if(!rr::game::beginAnnouncerRequest50IE(request,{mode11258,managerFlags58},cursor_)){
@@ -95,6 +100,37 @@ public:
         prepared_=false;return true;
     }
     bool prepared()const noexcept{return current();}
+    bool hasNamedBank(std::uint32_t racer)const noexcept {
+        return racer<authoring_.namedBanks.size()&&authoring_.namedBanks[racer];
+    }
+    bool collisionRequestsEnabled()const noexcept{return current()&&authoring_.collisionRequests;}
+    //2C4E70 ORs activity from27 possible named banks and the generic bank.
+    // All admitted bank requests already share this actual native episode
+    // transport. Inspect that owned voice; never use queued speech/timers as
+    // activity or manufacture absent bank voices. False return is a boundary,
+    // whereas true with active=false is a genuine inactive observation.
+    bool anyActive2C4E70(bool& active)const noexcept {
+        active=false;
+        if(!current())return false;
+        rr::platform::AudioVoiceObservation50HD observed{};
+        const auto slot=episode_->slot();
+        if(!mixer_->inspectVoice(slot,observed)||!observed.groupKnown||
+           groups_->binding(slot)!=rr::game::RaceAudioGroup50IC::Announcer120)return false;
+        if(!observed.voice.active)return true;
+        if(!episode_->episode()||!playbackRevision_||observed.playbackRevision!=playbackRevision_)
+            return false;
+        const auto& live=observed.voice;
+        if(live.loop||live.gain!=1.f||live.pitch!=1.f||live.pan!=0.f)return false;
+        for(std::size_t i=0;i<clips_.size();++i){const auto& clip=clips_[i];
+            if(availability_[i]==rr::assets::AudioAssetState50HC::ready&&
+               live.clip.samples==clip.samples&&live.clip.frames==clip.frames&&
+               live.clip.sampleRate==clip.sampleRate&&live.clip.channels==clip.channels&&
+               live.clip.loopStart==clip.loopStart&&live.clip.loopEnd==clip.loopEnd){
+                active=true;return true;
+            }
+        }
+        return false;
+    }
     const rr::assets::AudioBank50HC&bank()const noexcept{return bank_;}
     const rr::game::AnnouncerState50IE&state()const noexcept{return state_;}
     const rr::game::AnnouncerCursor50IE&lastRequest()const noexcept{return cursor_;}
@@ -114,12 +150,14 @@ private:
             // A real cold resolution failure is an actual unavailable return,
             // not a fake acknowledgement of an unimplemented event helper.
             if(o.availability_[i]!=rr::assets::AudioAssetState50HC::ready)return true;
-            return o.episode_->sourcePlay50IE(o.clips_[i],started);
+            const bool returned=o.episode_->sourcePlay50IE(o.clips_[i],started);
+            if(returned&&started)o.playbackRevision_=o.mixer_->playbackRevision(o.episode_->slot());
+            return returned;
         }
         return false;
     }
     static bool activity(void*c,bool&active)noexcept {
-        auto&o=self(c);if(!o.current())return false;active=o.episode_->active();return true;
+        return self(c).anyActive2C4E70(active);
     }
     static bool seed(void*c,std::uint32_t&raw)noexcept {
         auto&o=self(c);if(&raw!=o.raw_)return false;
@@ -137,21 +175,22 @@ private:
     }
     source_announcer_authoring50IE::Authoring authoring_{};
     rr::assets::AudioBank50HC bank_{};
-    std::array<rr::platform::AudioClip50HD,54>clips_{};
-    std::array<rr::assets::AudioAssetState50HC,54>availability_{};
+    // Resized only during cold prepare, then immutable until owner closure.
+    std::vector<rr::platform::AudioClip50HD> clips_;
+    std::vector<rr::assets::AudioAssetState50HC> availability_;
     rr::platform::AudioMixer50HD*mixer_=nullptr;
     rr::platform::RaceAudioGroups50IC*groups_=nullptr;
     rr::platform::AnnouncerEpisode50IC*episode_=nullptr;
     rr::game::LapEventRandomOwner50ID*lazy_=nullptr;
     rr::game::HostMonotonicClock50ID*clock_=nullptr;
     std::uint32_t*raw_=nullptr;
-    std::uint32_t playerRacer60_=0;
     rr::game::AnnouncerState50IE state_{};
     rr::game::AnnouncerCursor50IE cursor_{};
     rr::game::AnnouncerUpdateCursor50IE update_{};
     rr::game::AnnouncerProviders50IE providers_{};
     rr::game::AnnouncerLeader50IE leader_{};
     rr::game::AnnouncerResult50IE last_{};
+    std::uint64_t playbackRevision_=0;
     bool attempted_=false,prepared_=false;
 };
 } // namespace source_announcer50IE

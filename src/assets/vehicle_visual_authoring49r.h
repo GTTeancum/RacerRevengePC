@@ -55,6 +55,12 @@ bool bindFreshVehicleVisualParameters49R(const VisualAuthoredValues49R&,
     const PsgHierarchyView49O& right, const PsgHierarchyView49O& left,
     rr::game::VehicleVisualParameters49R&, VisualAuthoringDiagnostic49R&) noexcept;
 
+// Original optional bottom-model nullcg captures211298/211594. Same fresh
+// PSG arithmetic as primary engines; no additional physical body is created.
+bool bindFreshBottomVehicleVisualParameters49R(const PsgHierarchyView49O& right,
+    const PsgHierarchyView49O& left, rr::game::VehicleVisualParameters49R&,
+    VisualAuthoringDiagnostic49R&) noexcept;
+
 // Explicit constructor-record provenance only. Call solely when constructing
 // a new caller-owned record, never as live-history repair/reset. No model/base
 // offset loading, mode inference, frame scheduling, or physics initialization.

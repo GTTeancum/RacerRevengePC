@@ -1,0 +1,99 @@
+RA static observer identity/lifetime and wrapper-name candidate — UNTESTED
+
+Baseline
+Snapshot7a757bb plus the exact static resource/placement artifact integrated by
+root: libfile_03f2c30755908191b8363ba4aefe2b17 (ZIP SHA256
+88f6fc8e7c7eda695b16ae1079899c4eb440dfe63f0bc75ee56f795afd7bd1b7).
+The fresh private directory was copied from that preserved candidate. No newer
+central commit was supplied; MANIFEST.json gives exact preimages for root to
+reconcile with its checkout. No central or original-disc files were modified.
+
+What changed
+1. The actual gameplay lighting/visibility Owner now owns a stable RA identity
+   range derived from its authenticated World48F.instances, allocated before
+   lifecycle publication. Racer1..N and cameraN+1 identities stay unchanged.
+   RA instance i reserves N+2+i; geometry-less slots remain unclaimed. Separate
+   typed model pointers record the actual claimant. There is one lifecycle,
+   not a copied registry or a racer identity reused for scenery. Non-RA tracks
+   retain the original fixed registration array/capacity and existing paths.
+2. Only the retained private static owner can bind/claim/access this range.
+   It retains the visibility Owner and its real Application owner, verifies
+   source instance identity and actual model counter/lock/type-registry fields,
+   and binds before any camera/draw publication. No public count/identity or
+   matrix/ready-flag injection API was added. Access is serial and excludes
+   racer/reset/draw/camera leases. Partial construction blocks those consumers;
+   final private commit verifies actual primary registrations. Retirement is
+   permitted after invalidation so retained prefixes can still be removed.
+3. Explicit aggregate registerStaticModelObserversAndParents stage follows
+   resources/placement and lighting preparation. For each actual visual model
+   in source order, it constructs retained observer backing, publishes19C,
+   computes actual28E230 bounds via the existing direct-root26F4B0 numeric leaf,
+   and calls the real2809C0 membership adapter with method1 and initial radius0.
+   Row0 aliases the actual model; no duplicate placement or proxy collision
+   shape is introduced. Bounds160/170/radius198 publish to that same model.
+4. Only successful observer registration permits27AE38/141960 append to the
+   existing actual per-zone StaticModels Entity. Its private flat list is
+   validated against retained source slots. The source mask0 append uses actual
+   Entity links and real Application lock. No wreck64 limit was widened; this
+   bounded static-only path walks its genuine retained list.
+5. Original wrapper name publication is added before placement.27A524 reads the
+   authored SLT stem through the first dot; the original cap50 is an explicit
+   admission bound here.27AC14 formats "%s.slt" (case preserved);27AD34 copies
+   at most127 bytes into actual name38. Longer/ambiguous inputs fail closed.
+
+Source-review checklist — no executable verification
+- Identity range is cold-allocated once from authenticated authored order;
+  every claimed slot records one real retained model. Existing camera identity
+  and real camera publication gates remain required. Camera count validation
+  now checks that actual cold namespace size, not a caller-supplied count.
+- Real static110 search selection must be List. Registry GrowthBoundary and
+  unsupported membership/bounds results remain failures, with prefixes retained.
+- No callback, active-route call, simulated input, racer mode change, shader,
+  material/color policy, host light, trigger replacement or renderer added.
+- Static bounds use the original28E260 gate, canonical graph world refresh,
+  direct model-as-row0 bounds and the existing affine box arithmetic. Native
+  binary32/sqrt remains an explicit possible visual difference from PS2.
+- Partial observer/registration/append prefixes stay owned. Whole-owner close
+  checks source parent topology, actual observer backing, resource ownership
+  and serial lifetime. Reverse placement order releases tail references and
+  warm resource users before their prototype; actual142590 repairs parent links.
+- Source280920 DOES NOT remove registry membership. Private-prefix cleanup
+  explicitly executes281490 before observer backing retirement. Source28EA80
+  demonstrates that remove-before-free operation. This is not a claim that
+ 289760 itself removes memberships, or that the complete27B650 destructor has
+  been implemented. Public scene cleanup still rejects nonnull19C; only this
+  private owner can preflight its retained observer before removing it.
+- Aggregate close accounts for the real visibility shared_ptr pin. Ownership
+  releases only after all static claims are empty. Pending prefixes do not
+  grant a successful camera/draw stage.
+- New heap-backed RA identity storage is included in existing cable/reset
+  alias checks; non-RA original registration storage remains inline.
+
+Boundaries still open
+Warm hierarchy clone26EA28/26EA50 is not implemented by this patch. Models
+continue using the previously admitted cold graphs and genuine warm resource
+retention. Geometry-less model slots, smoker/wrapper tail, selected traversal,
+portal renderer admission, packet rendering and gameplay remain incomplete.
+The original global observer allocator/pool443138 and global counter443140
+are not projected as new fake Application fields: this candidate owns native
+membership backing with the actual session visibility owner. No complete
+retail allocator/global-pool or full parent-destructor parity is claimed.
+Trigger collision replacement is untouched and still awaiting user approval.
+RA remains inactive. Static observers do not supply a renderer publication.
+
+Evidence
+source-evidence contains bounded, read-only original function words, static
+labels, exact range hashes and name literals. Original SLUS SHA256:
+c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30.
+27AE0C calls28E8A0(a2=1), preceding27AE38 append(mask0).
+28E8D0..E8E8 allocates/constructs/publishes19C;28E964 derives28E230 bounds;
+28E984 calls2809C0 with radius0.28EA9C removes281490 before28EAA8 frees280920.
+280890 initializes observer fields and references a shared pool;280920 only
+retires that backing/pool count.27B650's actual wrapper/base teardown is included
+to distinguish it from this candidate's explicit partial-prefix cleanup.
+
+Status: UNTESTED. No build, test, syntax check, sanitizer, converter, gameplay,
+guest execution or central Windows execution. Source reading/editing and
+artifact packaging/hashing only. Root owns integration and all validation.
+
+Central source-review correction: retireRaFreshVehicle excludes active static access but permits retirement while the static owner has an incomplete registration prefix. Otherwise aggregate canClose requires fresh racer retirement while staticBusy prevents that retirement, and aggregate cannot close the static prefix first. This narrowly allows cleanup, not new racer/camera/draw publication. All other staticBusy admission gates remain.

@@ -63,11 +63,11 @@ void periodic(const ImpactConsumerInput49Z& i, ImpactConsumerState49Z& s, Math& 
     s.periodic7E8 = 0.1f;
 }
 }
-ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
+static ImpactConsumerStatus49Z consumeImpactsImpl50KZ(const ImpactConsumerInput49Z& i,
     const ImpactConsumerState49Z& state, ImpactConsumerState49Z& output,
     ImpactConsumerEvent49Z* events, std::size_t capacity, std::size_t& count,
-    ImpactPartnerEvents49Z* partnerEvents) noexcept {
-    if (!(i.managerFlags58 & 2) || ((i.flagsCD8 & 1) && !i.vehicle3C)) {
+    ImpactPartnerEvents49Z* partnerEvents,bool afterFeedback) noexcept {
+    if (!afterFeedback&&(!(i.managerFlags58 & 2) || ((i.flagsCD8 & 1) && !i.vehicle3C))) {
         std::memcpy(&output, &state, sizeof state); count = 0;if(partnerEvents)*partnerEvents={};
         return ImpactConsumerStatus49Z::skipped;
     }
@@ -75,6 +75,7 @@ ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
     ImpactConsumerState49Z s; std::memcpy(&s, &state, sizeof s);
     ImpactConsumerEvent49Z pending[2]{}; std::size_t used = 0; Math m;
     ImpactPartnerEvents49Z partners{};
+    if(!afterFeedback){
     for (auto& timer : s.timers820) if (m.read(timer) > 0.0f) timer = m.sub(timer, i.factor);
     if (m.read(s.cooldown7E0) > 0.0f) s.cooldown7E0 = m.sub(s.cooldown7E0, i.factor);
     if (s.partnerState == 2) s.partnerDuration10 = m.add(s.partnerDuration10, i.factor);
@@ -104,6 +105,7 @@ ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
             pending[used++] = {0x222dec, 0x44, i.player5C, 2, 0, scale < 0.5f ? scale : 0.5f};
         }
     }
+    } // Original222DF4 continuation; prefix/controller helpers already returned.
     if (m.read(s.cooldown7E0) <= 0.0f) {
         if (!(i.flagsCD8 & 1) && !i.vehicle40) {
             // Frozen sum is consumed only by the excluded partner route; retain
@@ -139,5 +141,18 @@ ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
     count = used;
     if(partnerEvents)*partnerEvents=partners;
     return ImpactConsumerStatus49Z::applied;
+}
+
+ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z& i,
+    const ImpactConsumerState49Z& state,ImpactConsumerState49Z& output,
+    ImpactConsumerEvent49Z* events,std::size_t capacity,std::size_t& count,
+    ImpactPartnerEvents49Z* partners) noexcept {
+    return consumeImpactsImpl50KZ(i,state,output,events,capacity,count,partners,false);
+}
+ImpactConsumerStatus49Z resumeImpactsAfterControllerFeedback50KZ(
+    const ImpactConsumerInput49Z& i,const ImpactConsumerState49Z& state,
+    ImpactConsumerState49Z& output,ImpactPartnerEvents49Z* partners) noexcept {
+    std::size_t count=0;
+    return consumeImpactsImpl50KZ(i,state,output,nullptr,0,count,partners,true);
 }
 }

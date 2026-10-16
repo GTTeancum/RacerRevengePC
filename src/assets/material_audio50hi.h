@@ -5,13 +5,19 @@
 #include <array>
 namespace rr::assets {
 struct MaterialAudioCatalog50HI {
-    std::array<std::string,rr::game::maxMaterialAudioRows50HI> collision{},drive{};
+    std::array<std::string,rr::game::maxMaterialAudioRows50HI> collision{};
+    std::array<std::string,rr::game::maxMaterialDriveRows50HI> drive{};
+    // Selected source section for every distinct sound owner. SA collision
+    // owners17..32 reread section16 after original157D00 fails to select them.
+    std::array<std::uint32_t,rr::game::maxMaterialAudioRows50HI> collisionSectionKeys{};
+    std::array<std::uint32_t,rr::game::maxMaterialDriveRows50HI> driveSectionKeys{};
     struct ObjectMaterial {std::uint32_t material=0;std::string object;};
     std::vector<ObjectMaterial> orderedObjectMaterials;
     std::uint32_t materialCount=0,defaultMaterial=0;
     rr::game::MaterialAudioParameters50HI parameters{};
 };
-// Cold original selected AUB decoder (bounded8/12/20-row profiles). Uses actual SoundResourceFile and six drive
+// Cold original selected AUB decoder (TA8/8, GC12/12, GA20/20, MA16/12,
+// SA32/12 collision/drive profiles). Uses actual SoundResourceFile and six drive
 // parameters; no guessed VAG names, generic impacts or timing thresholds.
 bool readMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
     MaterialAudioCatalog50HI&,std::vector<AudioRequest50HC>& uniqueRequests,std::string&error);

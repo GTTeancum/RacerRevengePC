@@ -82,6 +82,12 @@ public:
         if(!receipt.complete||!synchronize(groups,receipt))return {};
         groups_=groups;duck_=duck;return receipt;
     }
+    // Borrow the SAME initialized group word for source logical-sound
+    // inhibition. Future original group-pause setters must update this owner.
+    const std::uint32_t* sourceState44(game::RaceAudioGroup50IC group)const noexcept {
+        return current()&&groups_.initialized&&represented(group)?
+            &groups_.state44[static_cast<std::size_t>(group)]:nullptr;
+    }
     const game::RaceAudioGroups50IC& levels()const noexcept{return groups_;}
     const game::RaceAudioSettings50IC& configuredLevels()const noexcept{return settings_;}
     const game::AnnouncerDuckingState50IC& ducking()const noexcept{return duck_;}

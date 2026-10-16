@@ -1,0 +1,23 @@
+{
+  "platform": "Windows",
+  "kind": "existing-executable menu launch smoke",
+  "status": "failed",
+  "source_commit": "0d1c75802baee816c8874b2c64d161092f586896",
+  "executable_sha256": "688663f24f1f27cf2101c65a54d54ad1d3698cf0b60912396d76d441d2af390c",
+  "started_at_utc": "2026-10-13T00:04:46.839468+00:00",
+  "cleanup_checked_at_utc": "2026-10-13T00:04:47.092582+00:00",
+  "exit_code": 1,
+  "remaining_owned_processes": 0,
+  "rendered_menu": false,
+  "error": "interactive drive: original Course race entry requires RR_START_MENU=0",
+  "environment": {
+    "RR_TRACK": "TA",
+    "RR_RACE": "0",
+    "RR_AUDIO": "0",
+    "RR_START_MENU": "1",
+    "RR_ORIGINAL_MAIN_MENU": "1",
+    "RR_ORIGINAL_MAIN_AUDIO": "muted",
+    "RR_TRACE_ORIGINAL_UI_STAGES": "1"
+  },
+  "limitations": "UI root and working directory supplied by Windows task. No retry/rebuild/driving/video. Corrected config is source-reviewed only."
+}

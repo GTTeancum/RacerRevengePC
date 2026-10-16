@@ -30,9 +30,12 @@ struct Math {
 };
 }
 TerrainPrepareStatus48M prepareTerrainSinglePair48M(
-    const TerrainPrepareInput48M& input,TerrainPrepareState48M& output) noexcept {
+    const TerrainPrepareInput48M& input,TerrainPrepareState48M& output,
+    WaterHeightResult50JC* waterDiagnostic) noexcept {
     if(!input.bodyLinked){output=input.state;return TerrainPrepareStatus48M::NoBody;}
-    if(input.auxiliarySource120||input.auxiliarySource124)
+    if(input.auxiliarySource120||
+       (input.auxiliarySource124&&(!input.water124||!coherentTerrainWater50JC(*input.water124)))||
+       (!input.auxiliarySource124&&input.water124))
         return TerrainPrepareStatus48M::UnsupportedScope;
     if(!affine(input.scene)||!finite(input.lowerEndpoint140))
         return TerrainPrepareStatus48M::InvalidInput;
@@ -45,6 +48,14 @@ TerrainPrepareStatus48M prepareTerrainSinglePair48M(
     // This seed always uses the full scene, independently of active104.
     result.terrain.surface.point150=f.point(input.scene,input.lowerEndpoint140);
     if(!f.valid)return TerrainPrepareStatus48M::InvalidInput;
+    if(input.auxiliarySource124){
+        TerrainWaterProposal50JC water{};
+        const auto queried=projectTerrainWater50JC(*input.water124,result.terrain.surface.point150.v,water);
+        if(waterDiagnostic)*waterDiagnostic=queried;
+        if(queried.status!=WaterHeightStatus50JC::Complete)return TerrainPrepareStatus48M::InvalidInput;
+        for(unsigned axis=0;axis<4;++axis)result.auxiliaryPoint160[axis]=water.point160[axis];
+        result.auxiliaryAbove118=water.above118;
+    }
     if(!input.queryEnabled100){output=result;return TerrainPrepareStatus48M::QueryDisabled;}
     if(input.shapeType88!=2||input.pairCount!=1||input.hasPairTree)
         return TerrainPrepareStatus48M::UnsupportedScope;

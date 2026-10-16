@@ -5,14 +5,15 @@
 #include <array>
 
 namespace rr::game {
-// Source-only GC controller join. GC's actual [CSCameras] NumberOfCameras=0;
-// its four .vub members do not make the source select four authored cuts.
+// Zero-effective-cut controller join. GC/GA author0; TA authors3 but174DF0
+// genuinely suppresses those cuts for admitted launch1/config0-or3/app350=0.
+// Raw track3E4 is retained separately; this join consumes controllerA8.
 // Register1752D0's Follow, other, attached, free, optional TV in that order,
 // then register the prepared procedural child if2D4DC0 succeeded. The cold
 // controller retains mode4. It selects this procedural child on the first
 // admitted175D70 frame; there is no native force-Follow shortcut.
 struct GcCameraStartContext {
-    std::int32_t sourceSceneCutCount3E4=0;
+    std::int32_t sourceControllerCutCountA8=0;
     std::int32_t sourceLaunchKind11258=1;
     // Real per-view preferences read by178700. Defaults are NOT established
     // by this record: provide actual initialized configuration11030/11038.
@@ -82,7 +83,7 @@ inline GcStartFrameReceipt advanceOriginalGcCameraStartFrame(
         return result;
     for(std::size_t i=0;i<8;++i)if(racerEffects.racers[i].racerKey!=bank.racers[i].racerKey)return result;
     result.status=GcStartFrameStatus::requiresOtherSourcePath;
-    if(context.sourceSceneCutCount3E4!=0||context.sourceLaunchKind11258==2||
+    if(context.sourceControllerCutCountA8!=0||context.sourceLaunchKind11258==2||
         (owner.mode44!=4&&owner.mode44!=7)||(frame.raceFlags1B0&3u)!=1u||frame.racerState40!=0||
         (frame.raceFlags1B0&0x10)||((frame.raceStateFlags58&1)&&frame.racerCD4==0)||
         (owner.flags62&0x80)||owner.shakeRemaining94>=0)return result;
@@ -152,7 +153,7 @@ inline bool describeOriginalGcStartExit(const OriginalRaceCameraOwner& owner,
     GcStartExitPlan& plan) noexcept {
     if(!owner.bound||owner.mode44!=7||!start.prepared||!start.active||!start.complete240||
         owner.binding.sessionGeneration!=start.sessionGeneration||
-        context.sourceSceneCutCount3E4!=0||context.savedCameraMode11030<0||
+        context.sourceControllerCutCountA8!=0||context.savedCameraMode11030<0||
         context.savedCameraMode11030>6||context.savedCameraMode11030==3||
         context.savedCameraMode11030==4||(owner.flags62&0x80u))return false;
     GcStartExitPlan next{};next.requestedMode=context.savedCameraMode11030;

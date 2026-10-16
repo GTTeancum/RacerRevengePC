@@ -1,0 +1,19 @@
+Authenticated source material comparison at b8b9a231114b94dece8c5b0d5ea93b94eab7666a. Static reads only; no guards changed, project code executed, or tests run.
+
+All six PSM files match the retained Round2 original member hashes. Exact original text bytes and identities/offsets are included. UIRIDER archive SHA256 112cd71ac9cfcc909b0edb56e0e420bb358b7078b5abae5f48c62b95a6bbf856.
+
+DefaultMT.psm is independently authenticated: 82 bytes, SHA256 1907587ff3a8153a9f687dc43e6858ad0dff6ac3827db74d8518acad5644b4f7; APPSTART.RES 58977 bytes, SHA256 04eb376a507d0745925e4351903a8ef7a1024d37d8250b78892cba0c74220b89. Original text selects DiffuseCompressed and alphaReferenceValue=0 only. Other fields inherit constructor values in original_ui_material_fields50kg.inc.
+
+With the existing runtime override disabled, defaults are fog=1, ATE=1, ATST=6, AREF=0 (template overrides constructor120), AFAIL=0, DATE=0, depthMethod=2, zWriteDisabled=0, blend=0, FIX=128. Blank PSM values do not override. Each pass independently inherits DefaultMT, not the preceding pass. inputAlphaD is the recognized alias for inputColorD. depthTestOnOff is not in the retained projected GS field schema; its blank authored field must not be treated as an explicit value.
+
+07_1 / 07_2: two active passes. Pass1 DiffuseCompressed, corresponding07_N map, ALPHA(0,1,0,1), explicit ATE0, inherited blend0/fog1/depth2/zwrite0. Pass2 SpecularMapCompressed, specmap1, ALPHA(0,2,1,1), explicit blend1/zwriteDisabled1; inherited fog1/ATE1/ATST6/AREF0/AFAIL0/depth2. These match the existing non19 body specular field predicates once exact identities are admitted. InputAlphaC1 selects destination-alpha additive, not fixed-alpha mode.
+
+07_shdw: one active DiffuseCompressed pass, own map, explicit ALPHA(2,1,0,1)/blend1; inherited fog1/ATE1/ATST6/AREF0/AFAIL0/depth2/zwriteDisabled0. Matches the existing shadow field predicates after exact identity admission.
+
+07_3: one active diffusecompressed pass, own map, explicit blend0, ALPHA(0,1,0,1); ATE blank therefore inherited1. This does NOT match the specialized indexed-body-first-pass requirement ATE0 merely by adding its name. Do not disable its authored/inherited alpha test. Prior exact07.psg material table contains07_1,07_2,cable,07_shdw;07_3 is absent there.
+
+07c_1: TotalShaderPasses1. Active first pass DiffuseCompressed, map07c_1, explicit ATE0, inherited blend0. A physically present ShaderPass_2 specmap1 section is inactive and must remain inactive. This file alone does not establish an IPUM source kind; do not add07c_1 to IPUM identities without PST evidence.
+
+07c_2: one active DiffuseCompressed pass, map07c_2, explicit blend0/ATE0, inherited fog1/depth2/zwriteDisabled0. Matches the IPUM first-pass field predicates; prior authenticated conversion establishes its kind2 source and five mips. Adding its exact PSM identity leaves common raster/image provenance checks required.
+
+These are source comparisons, not a claim that all runtime raster gates pass. Runtime override435670 would alter alpha/fog/blend/depth and is not applied in the above static projection.

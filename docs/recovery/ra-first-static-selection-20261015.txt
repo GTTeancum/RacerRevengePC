@@ -1,0 +1,93 @@
+RA first static method44 -- additive after integrated zone-prefix candidate
+
+STATUS: INACTIVE / UNCALLED / UNTESTED. No tests, builds, syntax checks,
+converters, sanitizers, gameplay, emulation, source executable execution,
+simulated input or central checkout/disc edits. Root alone merges and validates.
+
+Implemented source sequence
+- Retained actual static owners bind canonical model, graph backing, observer
+  address and live membership after real registration. The new ledger borrows
+  identities only: no graph, model, membership or registry is copied.
+- Each SAME canonical method owns selected18 backing, count00, capacity0C and
+  actual shared Application type2C/2D IDs. Constructor queue capacity/growth30;
+  append grows by30; no sorting/dedup. Type labels authenticated at3BBFC0/FD0.
+  Native construction join is late (static-owner binding); retail constructor
+  chronology is not claimed. Failed allocation/type prefix does not publish a
+  staticOwner borrow. Partial backing stays safely owned by lighting Storage.
+-27E880 uses each real physical block, full perBlock except actual lastUsed
+  in the last block.27F050 zeroes formerly used entries/count per block.
+  Deleted bit1 skips, tagbit0 clears, exact identity ledger resolves actual
+  model. Model03 enabled/disabled gates, type02 and embedded Entity29.bit0
+  are consumed; unknown identities/searchable callbacks reject explicitly.
+- Actual model26EFC0/240C00 refreshes canonical world, writes1B2 in source
+  order, uses genuine observer memberships and actual zone bounds/matrix60.
+  Multi-membership uses the recovered repeated4C/50 MIN/MAX pairs; no invented
+  four-coordinate union. Missing/stale matrices are explicit native boundaries.
+  The reused2B0580 leaf is pure numeric only; no UI membership/default is used.
+  Actual guardCombined2D0 is consumed only on the reached branch; its outside
+  return does not override first-clip selection. Source masks/191 are mutated.
+- The COMPLETE26F070 body is recovered through26F2F4. Count1A0==1 chooses
+  center140/radius194; warm0 chooses160/198. Genuine localF0 and actual camera
+ 180 feed distance;1BC writes before subsequent work. denominator=max(.1,
+  distance-radius); scale=focal1D8/denominator; projectedRadius=
+  (2*(radius*(383368*focal1D8)))/denominator. Each cutoff except the last tests
+  scale14*((scale*383360)*cutoff)<1, updating chosen LOD without early exit.
+  Writes real1B0, then invokes every selected-LOD surface with materials1C4[k]
+  (surface ordinal k, NOT a substituted material-index lookup).
+- Original26E170 constructs actual surfaces with2461E0. That constructor
+  installs3D20C0; the authenticated table's slot10 is246810. The existing
+  retained OriginalStandardMaterialTable50LA::demandSurface246810 supplies
+  the complete native surface/material demand continuation, including existing
+  terminal/unsupported failures. A failed demand never queues a completed model.
+- Application processed278 increments only after a completed model callback,
+  including culled models.13FC94 proves initial0. Disabled26EFC0 clears191 and
+  does not increment278. Existing image defaults383360/383368=1 and3833D8=1,
+  startup-BSS4354F0=0 now live in this same private actual Application owner.
+- Scanner enqueues actual model Entity+8 only after callback and actual191.bit0.
+  Original244D60(false) service runs after EVERY completed physical block,
+  through the genuine renderer fields/GL owner from retained DisplayInputs.
+  Queue/callback/service failure is an explicit boundary, no host drain or
+  success callback substitute. No GPU submission capability was added.
+- After first method44 succeeds, zone prefix stops at dynamic method38's
+ 27F888 boundary. Neighbor27FC40 projection/A6 is NOT moved ahead of it.
+
+Ownership / invalidation
+- Existing typed CameraVisibilityLease remains exclusive for the entire call.
+  Lease end invalidates projection authority and every selected queue's native
+  completion; no public ready receipt/stamp/matrix/queue access was introduced.
+- Model retirement clears borrowed selection binding and matching queue pointers;
+  static owner retirement destroys method backing and clears material borrow.
+  Partial allocation/type failures cannot strand the private world owner.
+- Static registration commit now requires each actual selection binding.
+  Pending cleanup remains authorized; central retireRaFreshVehicle o.staticAccess
+  fix is preserved. Heap alias protection includes the new backing.
+
+Explicit limits / remaining blockers
+- Actual Application/race/scene dispatch caller remains absent: private entry
+  remains UNCALLED. Constructor278 is owned, but later real per-render reset
+  scheduling still belongs to eventual Application traversal, not this callback.
+- Only source-initial LOD/clip globals are currently native-owned; future real
+  configuration writers must mutate these same fields, not supply caller flags.
+- Source may consume previously produced zone matrices. This native domain
+  refuses any required row lacking this admission/dispatch generation. This
+  is an unsupported result, NEVER invisible or full-viewport fallback.
+- Original bounded finite arithmetic uses existing native rounded sqrt/strict
+  binary32 helpers; no claim of all exceptional PS2 FP/sign-zero behavior.
+- More than256 LODs, unrepresented surface/material lanes, stale membership,
+  unknown searchable/racer identities, resource limits and renderer queues all
+  stop explicitly. Geometry-less source slots remain explicit/unconstructed.
+- Full dynamic method38, neighboring/fallback traversal, packet20 state/matrix
+  ordering and real GPU emission remain closed. Writing1B0 here does not claim
+  the currently LOD0 host renderer consumes another LOD. All racers remain AI.
+
+Root source-review checklist (no executable checks performed)
+[ ] Reconcile exact MANIFEST preimages against integrated zone-prefix source.
+[ ] Review actual constructor type IDs and physical block count/reset semantics.
+[ ] Review source240C00 multi-membership repeated4C/50 selection and guard flags.
+[ ] Review full26F070 arithmetic, cutoff loop, direct per-surface material handle
+    indexing and actual246810 dispatch proof (table JSON included).
+[ ] Review partial model/material mutations and failure before278/queue append.
+[ ] Review genuine renderer barrier and potential new core/platform link dependency.
+[ ] Review retirement, allocation failure, heap alias checks and lease invalidation.
+[ ] Keep source entry uncalled until real dispatch/dynamic method38 joins exist.
+[ ] Preserve central-only validation, authentic assets, trigger gate and inactive GPU route.

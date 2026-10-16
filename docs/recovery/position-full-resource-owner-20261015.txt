@@ -1,0 +1,116 @@
+PositionStats detached full cold resource owner -- UNTESTED ADDITIVE CANDIDATE
+Base is the isolated candidate sequence reported integrated through232d596.
+No central checkout was accessed; exact four preimages and all SHA256 values
+are included. One new header plus four focused existing-file edits. Apply patch
+or reconcile preimages; do not replace central files with unrelated newer edits.
+No builds, tests, syntax/sanitizer checks, converters, gameplay, guest execution,
+central checkout/disc edits or unrelated audits were performed.
+
+IMPLEMENTED BOUNDARY
+One actual detached18FF80 resource owner, Application-created with the real Entity
+counter owner, authoritative display generation/Video, canonical domain/context,
+authenticated OVERLAYS and the private fixed-resource display lease. It has NO
+race+CC registration, frame/view API, demand, collector, predraw, draw or readiness
+publication. Actual ALL8/view0 simulation/ranking/lap authorities remain unchanged.
+The new Application stage is uncalled. Root holds an empty result and has only an
+explicit retirement join before the existing display close gate. Existing active
+UI and diagnostics remain. Renderer never strongly owns this resource owner.
+
+CONSTRUCTION / ALLOCATION FAILURE
+Fixed-resource lease precedes source construction; Entity141300 is followed by
+five Text objects, nine Texture objects,118 Texture objects and embedded clip.
+Fixed constructors do no resource loading. The actual constructor127 marker is
+recorded before any190190 effects. Shared owner control-block storage is allocated
+BEFORE placement construction; aliasing shared ownership afterward allocates
+nothing. Thus control-block failure cannot delete a constructed undrained owner.
+The Entity prefix uses actual application10/objectCount423F60, detached native
+component identity and display-generation bookkeeping. It does not fabricate
+original race30/CC binding. Source fresh433EB0=(0,0,0,1) initializes32C0;32B8=7.
+Other represented constructor scalars remain original zero values. Original
+141C20 at1901B0 is the proven no-op identity return, not an omitted resource step.
+
+127 EXACT TEXTURE LOAD/POPULATION STEPS
+Authenticated stats/maptop/font13/RadarOverlay PSMs and actual stats/font13 PSTs
+are appended to the SAME canonical domain/provider before source loader calls.
+An actual ui\textures directory scope is restored even after exception/failure.
+Nine fixed textures load in source call order, including maptop at+4B0;118 maptop
+objects follow in ascending offset order. Each2DF0B0 allocates a primitive,
+performs actual find298C80/store/retainScreen14D590, then WHOLE canonical14D370
+and29E340 scans through the existing exact2DF144 helper. No batching/deferred scan.
+The actual material row/template/PSM bytes/pass/texture handle and canonical
+texture row are resolved. Both stats and maptop must resolve the authentic stats
+PST bytes; no fabricated maptop.pst or same-name assumption. Atlas dimensions
+drive reciprocal fields and original first dimensions. Only then buffer58 is
+allocated and source dimensions/UV stores override it in original order.
+Native PacketVertex storage represents actual resource data (RGBA/XYZ/STQ), not
+an encoded guest DMA/VIF/GIF packet. It has no submission API. Texture XY remain
+zero until original dirty regeneration; Z uses actual admitted Video depth-1.
+Loader flag changes preserve the original dimension-inequality/field3C conditions.
+
+ACTUAL SINGLE FONT / FIVE TEXT ALLOCATIONS
+190E64 uses the new one-name route through actual Application328, not a fabricated
+font pointer or TimeStats pair. The exact Entry/CEL/PST identity and decoded metrics
+are borrowed from that same registry. Each2DFD90 capacity40 then allocates string41,
+40 source glyph pairs (two source vertices each), primitive-pointer array2,
+packet-entry array2, and per-batch packet then primitive in source order. Batch
+counts36/4 glyphs produce72/8 packet vertices. Source-vertex aliases point to
+their actual batch storage. No quad/atlas substitute or source layout is generated.
+Two canonical font ScreenMT references per text; no extra population inside the
+text material association. Actual font directory is restored before alpha/RGB
+initialization. Initial text is empty, all capacity glyphs receive RGB114/108/54,
+alpha63, and only text1 field40=bits3FD9999A/text4 justification50=4 are overridden.
+The authenticated text packet leaf2E03F0 has initial STQ all0 and XYZ[0,0,1,0];
+these values and source-pair construction2DFBA0 are included as raw-word evidence.
+
+CLIP / PRIMITIVE LAST
+191098..191114 arithmetic is retained:32E0=45,32E4=554,32E8=142,
+32DC=((4*45)/720)/7,119F60 bounds(509,85,599,163). This is recovered source
+arithmetic, not a host layout. Previously corrected clip W=1 owner is used.
+Only after all127 textures, actual font, five texts and clip setter does the
+factory call the existing genuine191180 primitive fragment. Its partial owner
+is retained even on failure. Separate16 and127 leases remain distinct.
+Expected successful references are127 texture +10 font-batch +80 RadarOverlay;
+these are real acquisitions when staging is called, NOT claims they ran here.
+
+PARTIAL STATE / EXACT SOURCE DESTRUCTION
+Every failure retains the output owner, constructed arrays, canonical effects and
+partial allocations. No canonical population/provider effects are rolled back.
+Close first retires actual primitive16 through its real reverse per-element drains;
+failure returns before touching any fixed resource. Then clip119F10 is destroyed.
+The fixed lease requires the real primitive pin gone and walks118 maps reverse,
+then9 fixed textures reverse. Every constructed texture gets both real drains,
+including unloaded/partially loaded elements. Only then: free buffer58 FIRST,
+clear primitive10, release material/destroy54, acknowledge exact source offset.
+After all127 textures, five texts retire reverse. Each frees string8, glyphC,
+primitives4 ascending, then packet buffers64 ascending and entry array, followed
+by the native font borrow. This deliberately does not reuse wrappers with a
+different member destruction order. Actual Entity1413E0 counter cleanup occurs
+last, then the fixed lease releases backing. Failed drains keep phase/cursor and
+all later resources for retry. Successful close is idempotent; destructor without
+successful close terminates rather than silently bypassing original drains.
+
+ROOT JOIN / CONCRETE REMAINING BLOCKERS
+Root closeWindow first closes the full owner, then its earlier independent
+primitive-result slot, then the unchanged display gate. Any failure returns with
+backing intact. After the gate, root resets full/embedded-primitive strong owners.
+There is NO invocation of stagePositionStatsResources50LA in50DU or elsewhere
+added here. ColdResourcesLoaded records only completion of resource stages; it
+is never accepted as GPU/view/gameplay readiness.
+Remaining activation work: actual Session/ALL8/view0 binding using the existing
+source-backed adapter; original race30/CC/hierarchy or explicitly reviewed native
+detached scheduling; genuine demand/predraw/material population and zero-map
+RadarOverlay collector validation after final primitive refs; dirty texture/text
+geometry regeneration and exact original draw control flow. No renderer strong
+retention (would cycle through display lease), host-layout substitution, removed
+diagnostics or invented readiness are admissible. This patch stays cold/inactive.
+
+CENTRAL REVIEW CHECKLIST
+[ ] Four preimages match/reconcile; fifth new path absent.
+[ ] Verify constructor/shared-allocation exception ordering and actual Entity counter.
+[ ] Verify nine+118 calls each acquire/populate/resolve/allocate in source order.
+[ ] Verify maptop resolves stats; single font and5x2 genuine font refs.
+[ ] Verify text string/glyph/packet allocation and source-order destruction.
+[ ] Verify source clip arithmetic and primitive fragment last.
+[ ] Verify reverse cleanup through both real leases before root display gate.
+[ ] Keep ALL8/view0/runtime authority and staging/draw activation closed.
+[ ] Root alone supplies all later Windows/build validation; this remains untested.

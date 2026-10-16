@@ -86,7 +86,16 @@ void sourceDegenerates(const fs::path& root){
     for(const auto& row:audit.at("nonfinite_members")){
         const auto bytes=read(root/fs::u8path(row.at("fixture").get<std::string>()));check(sha(bytes)==row.at("source_sha256")&&bytes.size()==row.at("source_bytes"),"exact authored degenerate original bytes and SHA");
         const auto first=row.at("triangles")[0].at("source_offset").get<std::size_t>();DecodeError48C error;auto target=sentinel();
-        check(!decodeCollision48G(bytes,target,error)&&error.kind==DecodeKind48C::unsupported&&error.code=="col.degenerate_plane"&&error.offset==first&&unchanged(target),"complete original degenerate plane variant is named unsupported and transactional");
+        const bool accepted=decodeCollision48G(bytes,target,error);
+        check(accepted,"exact authored coincident-plane source is retained");
+        if(accepted){
+            Bytes original,cache,roundtrip;std::string why;Collision48G parsed;
+            check(encodeOriginalCollision48G(target,original,why)&&original==bytes,
+                "authored degenerate source roundtrip preserves all original bits");
+            const bool cached=encodeCollisionAsset48G(target,cache,why)&&parseCollisionAsset48G(cache,parsed,why);
+            check(cached&&encodeOriginalCollision48G(parsed,roundtrip,why)&&roundtrip==bytes,
+                "authored degenerate cache retains exact planes, indices and tree");
+        }
         faces+=row.at("triangles").size();fields+=row.at("fields").size();
         for(const auto& face:row.at("triangles")){
             const auto at=face.at("source_offset").get<std::size_t>();const auto& v=face.at("vertices");
@@ -96,7 +105,7 @@ void sourceDegenerates(const fs::path& root){
         const auto nv=get32(bytes,68),nn=get32(bytes,72);const auto normals=get32(bytes,84+12u*nv);const std::size_t nodes=88+12u*nv*(1+normals);
         for(const auto& change:std::vector<std::pair<std::size_t,std::uint32_t>>{{first,0xffc00000u},{first,0x7fc00001u},{first,0x7f800000u},{first,0u},{first+4,0x7fc00000u},{first+8,0u},{84,0x7fc00000u},{nodes,0x7fc00000u}}){auto altered=bytes;put32(altered,change.first,change.second);target=sentinel();check(!decodeCollision48G(altered,target,error)&&error.kind==DecodeKind48C::malformed&&unchanged(target),"unknown NaN patterns partial planes or nonface NaNs remain malformed");}
         for(const auto at:std::array<std::size_t,3>{{first+16,nodes+28,nodes+32u*(nn-1)+28}}){auto altered=bytes;put16(altered,at,65535);target=sentinel();check(!decodeCollision48G(altered,target,error)&&error.kind==DecodeKind48C::malformed&&unchanged(target),"bad indices anywhere in authored degenerate source remain malformed");}
-        auto cyclic=bytes;put16(cyclic,nodes+28,0);target=sentinel();check(!decodeCollision48G(cyclic,target,error)&&error.kind==DecodeKind48C::malformed&&unchanged(target),"complete tree still checked before unsupported degenerate classification");
+        auto cyclic=bytes;put16(cyclic,nodes+28,0);target=sentinel();check(!decodeCollision48G(cyclic,target,error)&&error.kind==DecodeKind48C::malformed&&unchanged(target),"complete tree still checked for authored degenerate source");
         for(const auto n:std::array<std::size_t,3>{{first,first+15,bytes.size()-1}}){const Bytes cut(bytes.begin(),bytes.begin()+n);target=sentinel();check(!decodeCollision48G(cut,target,error)&&error.kind==DecodeKind48C::malformed&&unchanged(target),"truncated authored degenerate source remains malformed");}
     }
     check(faces==54&&fields==216,"all 54 authored degenerate planes account for all 216 original nonfinite words");

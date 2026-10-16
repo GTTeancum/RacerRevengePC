@@ -6,6 +6,8 @@
 
 namespace rr::game {
 struct OriginalUiCourseLighting50KG;
+struct OriginalUiControlsLighting50KG;
+struct OriginalUiControlsModelSelection50KG;
 enum class OriginalUiLightManagerLifetimeError50KG : std::uint8_t {
     none,phase,archive,untrackedLifetime,registry,membership,arithmetic
 };
@@ -51,6 +53,13 @@ public:
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
     bool publishCourseRegistry(const OriginalUiCourseLighting50KG&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
+    // Actual Options background272A48 zone reset then277FCC SCN population.
+    // Same application cache lifetime and real selected background zone.
+    bool publishControlsRegistry(const OriginalUiControlsLighting50KG&,
+        OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
+    bool selectControlsModel(const OriginalUiControlsModelSelection50KG&,
+        original_racer_lighting50KM::LightMatrices&,
+        OriginalUiLightManagerLifetimeDiagnostic50KG&) const noexcept;
     //14A0E8 tests this shared owner's real absentA4 state BEFORE entering
     //149BB0. No invented cache miss, per-frame cache bypass or global-row
     // substitute. Small registry returns directly14A154 and never inserts.
@@ -76,6 +85,7 @@ public:
     // lease. It cannot create, reset or substitute a cache/lifetime.
     const assets::OriginalUiArchiveIdentity50KG* activeUiIdentity() const noexcept {return activeUi_;}
     bool riderRegistryReady() const noexcept {return riderRegistryReady_;}
+    bool controlsRegistryReady()const noexcept{return controlsRegistryReady_;}
     bool courseRegistryReady() const noexcept {return courseRegistryReady_;}
 private:
     OriginalUiLightCacheState50KG cacheState_=OriginalUiLightCacheState50KG::notConstructed;
@@ -85,6 +95,11 @@ private:
     original_racer_lighting50KM::SmallDirectionalRegistry riderRegistry_{};
     const assets::OriginalUiMemberIdentity50KG* courseUiIdentity_=nullptr;
     original_racer_lighting50KM::SmallDirectionalRegistry courseRegistry_{};
+    const assets::OriginalUiMemberIdentity50KG* controlsUiIdentity_=nullptr;
+    const assets::OriginalUiMemberIdentity50KG* controlsSceneIdentity_=nullptr;
+    const assets::OriginalUiMemberIdentity50KG* controlsWidgetIdentity_=nullptr;
+    original_racer_lighting50KM::SmallDirectionalRegistry controlsRegistry_{};
+    bool controlsRegistryReady_=false;
     std::uint64_t managerGeneration_=0,nativeGameplayGeneration_=0;
     bool enteredFirstMain_=false,riderRegistryReady_=false,courseRegistryReady_=false;
 };

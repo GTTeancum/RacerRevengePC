@@ -84,7 +84,7 @@ bool storage(const OriginalCameraQueryPairOwner& o,const V& a,const V& b,const V
     }
     return true;
 }
-bool binding(const OriginalCameraQueryPairOwner& o,bool attached) noexcept {
+bool binding(const OriginalCameraQueryPairOwner& o,bool sphereAttached,bool rayAttached) noexcept {
     const auto& life=*o.lifecycle;const auto& in=o.world;
     if(!life.perBlock||!life.zoneCount||life.zoneCount!=in.zoneCount||life.zoneCount!=o.liveWorld->zoneCount||
        life.objectCount!=in.objectCount||in.methodCount!=2u*life.zoneCount||
@@ -97,14 +97,18 @@ bool binding(const OriginalCameraQueryPairOwner& o,bool attached) noexcept {
        o.mutableWorld.methodCapacity<in.methodCount||
        in.objects[o.sphereObject-1].shapeTag!=5||in.objects[o.rayObject-1].shapeTag!=3)return false;
     const auto check=[&](const LiveZoneMembership50EN& m,CollectionRef50BX ref,
-        const OriginalCameraWorldQueryState& q) noexcept {
+        const OriginalCameraWorldQueryState& q,bool attached) noexcept {
         if(m.attached!=attached||(attached&&(m.object!=ref||m.method!=ZoneMethod50CL::Second)))return false;
         const auto& copies=o.mutableWorld.copies[ref-1];
         return o.mutableWorld.objects[ref-1].flagsF8==q.flagsF8&&(q.flagsF8&3u)==3u&&
             !(q.flagsF8&8u)&&!std::memcmp(&copies.copied40,&q.copied40,sizeof q.copied40)&&
             !std::memcmp(&copies.copied50,&q.copied50,sizeof q.copied50);
     };
-    return check(*o.sphereE0,o.sphereObject,o.state->sphere24)&&check(*o.rayE0,o.rayObject,o.state->ray190);
+    return check(*o.sphereE0,o.sphereObject,o.state->sphere24,sphereAttached)&&
+        check(*o.rayE0,o.rayObject,o.state->ray190,rayAttached);
+}
+bool binding(const OriginalCameraQueryPairOwner& o,bool attached) noexcept {
+    return binding(o,attached,attached);
 }
 struct Math {
     bool ok=true;
@@ -175,6 +179,7 @@ bool query(OriginalCameraQueryPairOwner& o,bool sphere,OriginalCameraCollisionCa
     s.ray190.flagsF8=o.mutableWorld.objects[o.rayObject-1].flagsF8;
     const CollisionNormalModeWrite50JA normalWrite{out.world.normalMode3DF5B0,out.world.normalModeWritten,true};
     if(!o.normalMode3DF5B0->acceptCompleted(normalWrite)){fail(out,S::Binding,0x121438u);return false;}
+    if(out.world.resetGlobalsWritten)o.normalMode3DF5B0->acceptCompletedWorldReset();
     ++out.queriesCommitted;return true;
 }
 } // namespace
@@ -211,4 +216,59 @@ S attachOriginalCameraQueryPair(OriginalCameraQueryPairOwner& o,CollectionRef50B
     if(!prepareRegistration(o,false,true,zone,out))return out.status;
     return S::Complete;
 }
+S resetOriginalCameraQueryPair179A80(OriginalCameraQueryPairOwner& o,CollectionRef50BX zone,
+    const V& position,float radius,OriginalCameraPairResetCursor& cursor,
+    OriginalCameraPairResult& out) noexcept {
+    using P=OriginalCameraPairResetStage;
+    const OriginalCameraOwnerSpan writes[]={{&cursor,sizeof cursor}};
+    if(!storage(o,position,position,position,nullptr,out,writes,1))return S::Storage;
+    out={};
+    if(std::fegetround()!=FE_TONEAREST||!std::isfinite(radius)||radius<=0.f)
+        return fail(out,S::Arithmetic,0x11c210u);
+    volatile float squared=radius*radius;
+    if(!std::isfinite(squared))return fail(out,S::Arithmetic,0x11c220u);
+    if(!zone||zone>o.lifecycle->zoneCount)return fail(out,S::Binding,0x179a80u);
+    if(cursor.stage==P::idle){
+        if(!binding(o,true))return fail(out,S::Binding,0x179a80u);
+        cursor.owner=&o;cursor.zone=zone;cursor.position=position;cursor.radius=radius;
+        cursor.stage=P::sphereRemove;
+    }else if(cursor.owner!=&o||cursor.zone!=zone||
+        std::memcmp(&cursor.position,&position,sizeof position)||std::memcmp(&cursor.radius,&radius,4))
+        return fail(out,S::Binding,0x179a80u);
+    for(;;){
+        const auto stage=cursor.stage;
+        const bool sphereAttached=stage==P::sphereRemove||stage==P::rayRemove||
+            stage==P::raySet||stage==P::rayAttach||stage==P::complete;
+        const bool rayAttached=stage==P::sphereRemove||stage==P::sphereSet||
+            stage==P::sphereAttach||stage==P::rayRemove||stage==P::complete;
+        if(!binding(o,sphereAttached,rayAttached))return fail(out,S::Binding,0x179a80u);
+        switch(stage){
+        case P::sphereRemove:
+        case P::rayRemove:{
+            auto& member=stage==P::sphereRemove?*o.sphereE0:*o.rayE0;
+            out.registration=removeLiveZoneMembership50EN(*o.lifecycle,*o.liveWorld,member,*o.liveWorkspace);
+            if(out.registration.status!=LiveZoneStatus50EN::Complete)
+                return fail(out,S::LiveRegistration,0x120290u);
+            ++out.updatesCommitted;
+            cursor.stage=stage==P::sphereRemove?P::sphereSet:P::raySet;break;}
+        case P::sphereSet:
+            //11C1F0 copies all four center lanes and recomputes the shape's
+            // radius-squared. It deliberately leaves query60/query80 cached.
+            o.state->sphereCenter00=position;o.state->sphereRadius50=radius;
+            o.state->sphereRadiusSquared54=squared;cursor.stage=P::sphereAttach;break;
+        case P::sphereAttach:
+            if(!prepareRegistration(o,true,true,zone,out))return out.status;
+            cursor.stage=P::rayRemove;break;
+        case P::raySet:
+            if(!setRay(o,position,position))return fail(out,S::Binding,0x11ca80u);
+            cursor.stage=P::rayAttach;break;
+        case P::rayAttach:
+            if(!prepareRegistration(o,false,true,zone,out))return out.status;
+            cursor.stage=P::complete;break;
+        case P::complete:return S::Complete;
+        default:return fail(out,S::Binding,0x179a80u);
+        }
+    }
+}
+
 }

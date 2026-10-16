@@ -8,7 +8,8 @@ param(
     [Parameter(Mandatory=$true)][string]$Linker,
     [Parameter(Mandatory=$true)][string]$SDL2IncludeDirectory,
     [string]$SDL2RuntimeDll,
-    [string]$SourceRevision = 'unverified-working-tree'
+    [string]$SourceRevision = 'unverified-working-tree',
+    [ValidateRange(1, 4)][int]$MaxCompileJobs = 1
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -66,7 +67,7 @@ if ($SDL2RuntimeDll) {
 }
 $manifestPath = ExistingFile (Join-Path $PSScriptRoot 'interactive50du.sources.json')
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.schema -ne 1 -or $manifest.sources.Count -ne 315 -or $manifest.nativeDependencySources.Count -ne 6) { throw 'Review changed source manifest before changing this gate.' }
+if ($manifest.schema -ne 1 -or $manifest.sources.Count -ne 352 -or $manifest.nativeDependencySources.Count -ne 6) { throw 'Review changed source manifest before changing this gate.' }
 foreach ($entry in (@($manifest.sourceListProvenance.PSObject.Properties) + @($manifest.nativeDependencySourceProvenance.PSObject.Properties))) {
     $actual = (Get-FileHash -LiteralPath (Join-Path $root $entry.Name) -Algorithm SHA256).Hash
     if ($actual -ine $entry.Value) { throw "Generator source changed; reconcile manifest first: $($entry.Name)" }
@@ -87,9 +88,9 @@ if (Test-Path -LiteralPath $out) { throw 'BuildDirectory must be new; existing o
 # Capture source and header inputs, including local retained fixture headers.
 $inputFiles = @($sources) + @($manifestPath, $PSCommandPath, $compilerPath, $linkerPath) + $runtimeDlls
 foreach ($dir in @('src', 'tests/native', 'platform/linux/native', 'platform/windows/native', 'third_party/native-json', 'third_party/native-zlib')) {
-    $inputFiles += Get-ChildItem -LiteralPath (Join-Path $root $dir) -Recurse -File | Where-Object { $_.Extension -in '.h', '.hpp', '.inc' } | ForEach-Object { $_.FullName }
+    $inputFiles += Get-ChildItem -LiteralPath (Join-Path $root $dir) -Recurse -File | Where-Object { $_.Extension -in '.h', '.hpp', '.inc', '.inl' } | ForEach-Object { $_.FullName }
 }
-$inputFiles += Get-ChildItem -LiteralPath $sdlInclude -Recurse -File | Where-Object { $_.Extension -in '.h', '.hpp', '.inc' } | ForEach-Object { $_.FullName }
+$inputFiles += Get-ChildItem -LiteralPath $sdlInclude -Recurse -File | Where-Object { $_.Extension -in '.h', '.hpp', '.inc', '.inl' } | ForEach-Object { $_.FullName }
 $inputHashes = @($inputFiles | Sort-Object -Unique | ForEach-Object { Get-FileHash -LiteralPath $_ -Algorithm SHA256 } | Select-Object Path, Hash)
 $null = New-Item -ItemType Directory -Path $out
 $null = New-Item -ItemType Directory -Path (Join-Path $out 'obj')
@@ -103,6 +104,8 @@ $receipt = [ordered]@{
     inputHashes = $inputHashes; compilerIncludeEnvironment = $env:INCLUDE
     linkerLibraryEnvironment = $env:LIB; sourceCount = $sources.Count
     acceptance = 'not run'; runtimeDependencyClosureVerified = $false
+    distributionReady = $false; crtPrerequisite = 'Approved x64 Visual C++ /MD runtime; not installed or verified'
+    packagingEntry = 'Package-Interactive50DU.ps1; separate approved inventory required'
     sdlRuntimeStaged = ($runtimeDlls.Count -gt 0); zlib = 'six vendored inflate C sources, same /MD runtime'
 }
 $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $receiptPath -Encoding UTF8
@@ -122,9 +125,84 @@ $common = @('/nologo', '/c', '/std:c++20', '/EHsc', '/O2', '/MD', '/fp:strict', 
 $common += $includes | ForEach-Object { '/I' + (RspQuote $_) }
 $cCommon = @('/nologo', '/c', '/TC', '/O2', '/MD', '/fp:strict', '/utf-8', '/DNDEBUG', '/D_CRT_SECURE_NO_WARNINGS', ('/FI' + (RspQuote $guard)))
 $cCommon += $includes | ForEach-Object { '/I' + (RspQuote $_) }
-$objects = @()
+$objects = New-Object 'string[]' $sources.Count
+$workItems = New-Object 'Collections.Generic.List[object]'
+$active = New-Object 'Collections.Generic.List[object]'
+$compileProgress = [ordered]@{
+    status = 'compiling'; maxCompileJobs = $MaxCompileJobs; sourceCount = $sources.Count
+    startedSourceCount = 0; completedSourceCount = 0; failedSourceCount = 0
+    cancelledSourceCount = 0; runningSourceCount = 0; notStartedSourceCount = $sources.Count
+}
+$receipt['compilation'] = $compileProgress
+function WriteCompileProgress {
+    foreach ($key in @('startedSourceCount', 'completedSourceCount', 'failedSourceCount', 'cancelledSourceCount', 'runningSourceCount')) {
+        $compileProgress[$key] = 0
+    }
+    $compileProgress.notStartedSourceCount = $sources.Count - $workItems.Count
+    foreach ($work in $workItems) {
+        if ($work.Started) { ++$compileProgress.startedSourceCount }
+        switch ($work.State) {
+            'completed' { ++$compileProgress.completedSourceCount }
+            'failed' { ++$compileProgress.failedSourceCount }
+            'cancelled' { ++$compileProgress.cancelledSourceCount }
+            'running' { ++$compileProgress.runningSourceCount }
+        }
+    }
+    # Ordinary stdout only: no progress file, replacement, temporary file or retry.
+    # Calls are bounded by source transitions (at most 2 * sourceCount + 3).
+    # The final build receipt uses the authoritative in-memory counters above.
+    Write-Output ('compile-progress ' + ($compileProgress | ConvertTo-Json -Depth 4 -Compress))
+}
+function RecordCompileExit($Work) {
+    $Work.ExitCode = $Work.Process.ExitCode
+    if ($Work.State -ne 'cancelled') {
+        $Work.State = 'failed'
+        if ($Work.ExitCode -eq 0 -and (Test-Path -LiteralPath $Work.Object -PathType Leaf)) {
+            $Work.State = 'completed'
+        }
+    }
+}
+function CloseCompileLogs($Work) {
+    # Both pipe copies run concurrently into separate files, without buffering
+    # an entire compiler's diagnostics or calling PowerShell on worker threads.
+    try {
+        if ($null -ne $Work.OutputTask) { $Work.OutputTask.GetAwaiter().GetResult() }
+    } finally {
+        try {
+            if ($null -ne $Work.ErrorTask) { $Work.ErrorTask.GetAwaiter().GetResult() }
+        } finally {
+            try {
+                if ($null -ne $Work.OutputStream) { $Work.OutputStream.Dispose() }
+            } finally {
+                if ($null -ne $Work.ErrorStream) { $Work.ErrorStream.Dispose() }
+            }
+        }
+    }
+}
 try {
-    for ($i = 0; $i -lt $sources.Count; ++$i) {
+    WriteCompileProgress
+    $next = 0
+    while ($next -lt $sources.Count -or $active.Count -gt 0) {
+        # Observe every exited compiler before launching another source. A
+        # nonzero exit (or missing object) aborts admission and enters cleanup.
+        foreach ($work in $active.ToArray()) {
+            if (-not $work.Process.HasExited) { continue }
+            $work.Process.WaitForExit()
+            RecordCompileExit $work
+            CloseCompileLogs $work
+            $work.Process.Dispose()
+            $work.Process = $null
+            $null = $active.Remove($work)
+            WriteCompileProgress
+            if ($work.State -eq 'failed') {
+                throw "Compilation failed (exit $($work.ExitCode), object required): $($work.Source)"
+            }
+        }
+        if ($next -ge $sources.Count -or $active.Count -ge $MaxCompileJobs) {
+            if ($active.Count -gt 0) { Start-Sleep -Milliseconds 50 }
+            continue
+        }
+        $i = $next
         # Unique object names avoid collisions between same-name asset/game owners.
         $stem = '{0:D4}-{1}' -f $i, [IO.Path]::GetFileNameWithoutExtension($sources[$i])
         $obj = Join-Path $out ('obj/' + $stem + '.obj')
@@ -135,10 +213,41 @@ try {
         $compileArgs += '/Fo' + (RspQuote $obj)
         $compileArgs += RspQuote $sources[$i]
         $compileArgs | Set-Content -LiteralPath $rsp -Encoding Unicode
-        & $compilerPath ('@' + $rsp) 2>&1 | Tee-Object -FilePath (Join-Path $out ($stem + '.log'))
-        if ($LASTEXITCODE -ne 0) { throw "Compilation failed ($LASTEXITCODE): $($sources[$i])" }
-        $objects += $obj
+        $work = [pscustomobject]@{
+            Source = $sources[$i]; Object = $obj; State = 'running'; Started = $false; ExitCode = $null
+            Process = (New-Object Diagnostics.Process)
+            OutputStream = $null; ErrorStream = $null; OutputTask = $null; ErrorTask = $null
+        }
+        # Register ownership BEFORE Start, including the interrupt window before
+        # Started is assigned. Retain this exact Process/handle until reaped;
+        # never rediscover by name/PID or kill a process tree.
+        $workItems.Add($work)
+        $active.Add($work)
+        $work.OutputStream = [IO.File]::Open((Join-Path $out ($stem + '.log')), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+        $work.ErrorStream = [IO.File]::Open((Join-Path $out ($stem + '.stderr.log')), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+        $work.Process.StartInfo.FileName = $compilerPath
+        $work.Process.StartInfo.Arguments = '@' + (RspQuote $rsp)
+        $work.Process.StartInfo.UseShellExecute = $false
+        $work.Process.StartInfo.CreateNoWindow = $true
+        $work.Process.StartInfo.RedirectStandardOutput = $true
+        $work.Process.StartInfo.RedirectStandardError = $true
+        if (-not $work.Process.Start()) { throw "Compiler did not start: $($work.Source)" }
+        $work.Started = $true
+        $work.OutputTask = $work.Process.StandardOutput.BaseStream.CopyToAsync($work.OutputStream)
+        $work.ErrorTask = $work.Process.StandardError.BaseStream.CopyToAsync($work.ErrorStream)
+        # Index by manifest order, never by nondeterministic completion order.
+        $objects[$i] = $obj
+        ++$next
+        WriteCompileProgress
     }
+    if ($compileProgress.completedSourceCount -ne $sources.Count -or $compileProgress.failedSourceCount -ne 0 -or $compileProgress.cancelledSourceCount -ne 0) {
+        throw 'Refusing to link an incomplete compilation set.'
+    }
+    foreach ($obj in $objects) {
+        if (-not (Test-Path -LiteralPath $obj -PathType Leaf)) { throw "Missing link input: $obj" }
+    }
+    $compileProgress.status = 'completed'
+    WriteCompileProgress
     $exe = Join-Path $out 'rr_interactive_vehicle50du.exe'
     $linkRsp = Join-Path $out 'link.rsp'
     $linkArgs = @('/NOLOGO', '/MACHINE:X64', '/SUBSYSTEM:CONSOLE', '/STACK:8388608', '/INCREMENTAL:NO', ('/OUT:' + (RspQuote $exe)))
@@ -155,12 +264,73 @@ try {
     $receipt.status = 'built-not-run'
     $receipt['executable'] = $exe
     $receipt['executableSha256'] = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
+    $receipt['runtimeFiles'] = @($runtimeDlls | ForEach-Object {
+        $staged = Join-Path $out ([IO.Path]::GetFileName($_))
+        [ordered]@{ name = [IO.Path]::GetFileName($_); sha256 = (Get-FileHash -LiteralPath $staged -Algorithm SHA256).Hash }
+    })
     if ($runtimeDlls.Count -eq 0) { Write-Warning 'SDL2.dll was not supplied. Build-only output is not runnable until the approved x64 runtime is staged.' }
     Write-Host "Built only: $exe. No tests or client execution performed; acceptance remains pending."
 } catch {
     $receipt.status = 'failed'
     $receipt['error'] = $_.Exception.Message
+    if ($compileProgress.status -eq 'compiling') { $compileProgress.status = 'failed' }
     throw
 } finally {
-    $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $receiptPath -Encoding UTF8
+    # PowerShell's normal exception/Ctrl+C unwinding reaches this block. Hard
+    # termination of the PowerShell host cannot run script-level cleanup.
+    if ($receipt.status -eq 'started') {
+        $receipt.status = 'interrupted'
+        $receipt['error'] = 'Build interrupted before completion.'
+    }
+    if ($compileProgress.status -eq 'compiling') { $compileProgress.status = 'interrupted' }
+    $cleanupErrors = New-Object 'Collections.Generic.List[string]'
+    foreach ($work in $active.ToArray()) {
+        $reaped = $false
+        try {
+            if ($null -eq $work.Process) { continue }
+            try {
+                $exited = $work.Process.HasExited
+                $work.Started = $true
+            } catch [InvalidOperationException] {
+                # Start failed or was interrupted before a process was created.
+                $work.State = 'failed'
+                $reaped = $true
+                continue
+            }
+            if (-not $exited) {
+                try {
+                    $work.Process.Kill()
+                    $work.State = 'cancelled'
+                } catch [InvalidOperationException] {
+                    if (-not $work.Process.HasExited) { throw }
+                }
+            }
+            $work.Process.WaitForExit()
+            $reaped = $true
+            RecordCompileExit $work
+        } catch {
+            $cleanupErrors.Add("$($work.Source): $($_.Exception.Message)")
+        } finally {
+            try {
+                if ($reaped) { CloseCompileLogs $work }
+            } catch {
+                $cleanupErrors.Add("$($work.Source) logs: $($_.Exception.Message)")
+            } finally {
+                try {
+                    if ($null -ne $work.Process) { $work.Process.Dispose() }
+                } catch {
+                    $cleanupErrors.Add("$($work.Source) handle: $($_.Exception.Message)")
+                }
+            }
+        }
+    }
+    if ($cleanupErrors.Count -gt 0) {
+        $receipt.status = 'failed'
+        $receipt['cleanupErrors'] = $cleanupErrors.ToArray()
+    }
+    try { WriteCompileProgress } finally {
+        $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $receiptPath -Encoding UTF8
+    }
+    if ($cleanupErrors.Count -gt 0) { throw 'Owned compiler cleanup/logging failed; see build-receipt.json.' }
 }
+

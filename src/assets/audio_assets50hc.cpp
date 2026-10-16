@@ -144,7 +144,22 @@ bool decodeVagMono50HC(const std::uint8_t* bytes, std::size_t size, AudioPcm50HC
         const auto version = be32(bytes + 4), payload = be32(bytes + 12), rate = be32(bytes + 16);
         need(version == 0 || version == 2 || version == 3 || version == 0x20, "unsupported.vag_version");
         need(be32(bytes + 8) == 0, "unsupported.vag_reserved");
-        for (std::size_t i = 20; i < 32; ++i) need(bytes[i] == 0, "unsupported.vag_header_variant");
+        // The actual MA material3 originals FLDHIT1/2 have an opaque0FE0
+        // word at0x18. Admit only these authenticated mono48-byte-header
+        // files for native PCM rendering. This does NOT interpret that word
+        // as pitch metadata, infer an IOP mapping, or relax payload checks.
+        bool retainedFieldHitHeader=false;
+        if(standardMagic&&version==3&&rate==22050&&be32(bytes+20)==0&&
+           be32(bytes+24)==0x0fe00000u&&be32(bytes+28)==0&&
+           ((size==12336&&payload==12288)||(size==9632&&payload==9584))){
+            const auto identity=sha256(Bytes(bytes,bytes+size));
+            retainedFieldHitHeader=(size==12336&&identity==
+                "1c27d67c3713d551f6400072a122287b607863b18f155aea3d25e9cb4a5d477e")||
+                (size==9632&&identity==
+                "0d0671026a864ec56f2ffebfb79149b648299552279c59049bfbbb0216ce59bf");
+        }
+        if(!retainedFieldHitHeader)for(std::size_t i=20;i<32;++i)
+            need(bytes[i]==0,"unsupported.vag_header_variant");
         need(payload && payload % 16 == 0 && payload <= size - 48, "audio.payload_extent");
         need(!retainedZeroHeader || payload == size - 48, "unsupported.vag_zero_header_extent");
         // Admit only bounded zero alignment padding, never silently decode a

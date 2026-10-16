@@ -7,15 +7,26 @@
 #include <bit>
 #include <cmath>
 
+namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace native_racer50HN {
 // Explicit HOST starting-grid policy; not the unrecovered lateral-grid leaf.
 // Ground height is always resolved by the actual native reset query against
 // authenticated terrain. It never substitutes an interpolated route elevation.
 // Lift belongs to the selected racer's PHY, not to the shared track owner.
-inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene& ground,
-    const rr::game::BodyMatrix48G& requested,float lift,
-    std::uint32_t* stack,std::size_t capacity,
-    rr::game::BodyMatrix48G& result) noexcept {
+inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene&,
+    const rr::game::BodyMatrix48G&,float,std::uint32_t*,std::size_t,
+    rr::game::BodyMatrix48G&) noexcept;
+// Only the retained RA bridge may supply a different authenticated owner span.
+// Existing Ground clients keep their original public interface and loop order.
+class ColdGroundProbe50HN final {
+    friend class ra_source_camera50LA::OwnershipBridge;
+    friend bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene&,
+        const rr::game::BodyMatrix48G&,float,std::uint32_t*,std::size_t,
+        rr::game::BodyMatrix48G&) noexcept;
+    template<class Owners> static bool run(const Owners& owners,
+        const rr::game::BodyMatrix48G& requested,float lift,
+        std::uint32_t* stack,std::size_t capacity,
+        rr::game::BodyMatrix48G& result) noexcept {
     using namespace rr::game;
     std::uint32_t position[4]{};
     for(unsigned i=0;i<4;++i)position[i]=std::bit_cast<std::uint32_t>(requested.v[12+i]);
@@ -25,7 +36,7 @@ inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene&
         SpringVector4_48N start{},end{};
         std::memcpy(start.v,probe.start,16);std::memcpy(end.v,probe.end,16);
         bool hit=false;std::uint32_t height=0;
-        for(const auto& owner:ground.owners){
+        for(const auto& owner:owners){
             if(!(owner.instance.category&16u))continue;
             ResetCandidateResult50AM candidate{};
             if(queryResetCandidate50AM(start,end,owner.instance.world,
@@ -41,6 +52,13 @@ inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene&
     for(unsigned i=0;i<4;++i)result.v[12+i]=std::bit_cast<float>(probe.staged[i]);
     return true;
 }
+};
+inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene& ground,
+    const rr::game::BodyMatrix48G& requested,float lift,
+    std::uint32_t* stack,std::size_t capacity,
+    rr::game::BodyMatrix48G& result) noexcept {
+    return ColdGroundProbe50HN::run(ground.owners,requested,lift,stack,capacity,result);
+}
 // Legacy callers retain their explicit Pod01 development-ground context.
 // Heterogeneous roster callers must use the overload with their own lift.
 inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene& ground,
@@ -55,10 +73,10 @@ inline bool groundGridPose(const authored_runtime_ground50cp_fixture::ColdScene&
 inline bool placeColdGrid(rr::game::VehicleFrameState49W& state,
     const rr::game::VehicleFrameBindings49W& bindings,
     const rr::game::BodyMatrix48G& requested,
-    const rr::game::PodSceneRebaseModel50FB (&models)[3],
+    const rr::game::PodSceneRebaseModel50FB* models,std::uint32_t modelCount,
     rr::game::BasePoseHistoryState50Y& history) noexcept {
     using namespace rr::game;
-    if(state.phase!=VehicleFramePhase49W::Ready||state.bodies.main.frameFactor!=0.f)return false;
+    if(!models||(modelCount!=3&&modelCount!=5)||state.phase!=VehicleFramePhase49W::Ready||state.bodies.main.frameFactor!=0.f)return false;
     const auto main=static_cast<unsigned>(bindings.lifecycle.main190);
     if(!validVehicleSceneCount49W(state,bindings)||main>=state.sceneNodeCount)return false;
     const auto& previous=state.nodes[main].world100;
@@ -79,7 +97,8 @@ inline bool placeColdGrid(rr::game::VehicleFrameState49W& state,
         !refreshSceneWorld49P(graph,node))return false;
     ResetBoundNode50BA boundNodes[maxModelBoundsNodes49O]{};ResetBoundsWorkspace50BA workspace{};
     ModelBoundsResult49O result{};
-    for(const auto& model:models){
+    for(unsigned modelIndex=0;modelIndex<modelCount;++modelIndex){
+        const auto& model=models[modelIndex];
         if(model.sourceNodeCount>maxModelBoundsNodes49O||model.sourceNodeCount!=model.hierarchy.nodeCount)return false;
         if(!addParentlessTranslation49P(graph,model.root,displacement))return false;
         for(unsigned i=0;i<model.sourceNodeCount;++i){
@@ -107,5 +126,12 @@ inline bool placeColdGrid(rr::game::VehicleFrameState49W& state,
     }
     for(auto& slot:history.historyD50){std::memcpy(slot,requested.v+12,12);slot[3]=0x3f800000u;}
     state=next;return true;
+}
+inline bool placeColdGrid(rr::game::VehicleFrameState49W& state,
+    const rr::game::VehicleFrameBindings49W& bindings,
+    const rr::game::BodyMatrix48G& requested,
+    const rr::game::PodSceneRebaseModel50FB (&models)[3],
+    rr::game::BasePoseHistoryState50Y& history) noexcept {
+    return placeColdGrid(state,bindings,requested,models,3,history);
 }
 }

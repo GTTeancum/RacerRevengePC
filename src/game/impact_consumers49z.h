@@ -25,8 +25,8 @@ struct ImpactConsumerInput49Z {
     // owner before any later frame stage. Legacy callers remain rejected.
     bool dynamicPartnerEventsBound=false,partnerEventThresholdBound=false;
     float partnerEventThreshold48=0;
-    // Terminal continuation admission: preserve the exact222D70/222D8C prefix,
-    // with no damage/later timers committed, if no actual feedback owner exists.
+    // Preserve the exact222D70/222D8C prefix before resolving the actual
+    // native controller object. The continuation resumes at222DF4.
     bool stopBeforeControllerFeedback50IW=false;
     bool player5CBound50IW=false;
 };
@@ -59,4 +59,11 @@ ImpactConsumerStatus49Z consumeImpacts49Z(const ImpactConsumerInput49Z&,
     const ImpactConsumerState49Z&, ImpactConsumerState49Z& output,
     ImpactConsumerEvent49Z* events, std::size_t capacity,
     std::size_t& count,ImpactPartnerEvents49Z* partnerEvents=nullptr) noexcept;
+// Starts at222DF4 only, after BOTH actual controller helper bodies returned.
+// Input/state must be the retained successful pendingControllerFeedback prefix.
+// No prefix timers, partner event0 or controller calls are replayed. The caller
+// retains controller helper effects even if this later numerical tail rejects.
+ImpactConsumerStatus49Z resumeImpactsAfterControllerFeedback50KZ(
+    const ImpactConsumerInput49Z&,const ImpactConsumerState49Z&,
+    ImpactConsumerState49Z&,ImpactPartnerEvents49Z* partnerEvents=nullptr) noexcept;
 }

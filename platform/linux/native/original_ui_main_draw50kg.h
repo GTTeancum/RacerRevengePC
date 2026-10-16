@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../src/game/original_application_animation_clock50kg.h"
 #include "original_ui_material_adapter50kg.h"
 #include "original_ui_main_particle_adapter50kg.h"
 #include "../../../src/game/original_ui_main_particle_geometry50kg.h"
@@ -108,10 +109,13 @@ struct OriginalUiMainSubmittedPacket50KG {
     OriginalUiMainDrawSegment50KG segment=OriginalUiMainDrawSegment50KG::ordinaryWidgets;
 };
 struct OriginalUiMainFrameClock50KG {
-    // Same application millisecond sample used by source material24A740.
-    // Caller already owns pause/update gating; no host clock is sampled here.
+    // Legacy filtered UI presentation time and update suppression. These
+    // fields do not identify Application230/11C; use the live view below.
+    // No host clock is sampled by this aggregate or the draw collector.
     bool known=false,advanceAnimations=false;
     std::uint32_t milliseconds=0;
+    // Independent live Application230/11C publication; defaults unavailable.
+    game::OriginalApplicationAnimationClockView50KG applicationAnimation{};
 };
 // Real scene/particle groups are deliberately separate contributions. This
 // marker is an insertion point in the original submission sequence, NOT an

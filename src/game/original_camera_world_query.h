@@ -11,6 +11,14 @@ struct OriginalCameraCollisionCallback {
     std::uint32_t hit114=0;
     std::array<float,3> pointE0{},normalF0{};
 };
+// Exact query-object9C/E4 binding. Zero E4 means the original nullable call
+// is skipped; a nonzero callback is admitted only for actual Follow1792D0.
+// owner9C is the native key of the bound camera, never a fabricated guest PC.
+struct OriginalCameraWorldCallbackBinding {
+    std::uint64_t owner9C=0;
+    std::uint32_t callbackE4=0;
+    OriginalCameraCollisionCallback* follow1792D0=nullptr;
+};
 struct OriginalCameraSingleRay {
     Vector3_48C localStart{},localDirection{};
     SpringVector4_48N worldStart{},worldDirection{},normal{},point{};
@@ -74,8 +82,14 @@ struct OriginalCameraWorldResult {
     CollectionRef50BX object=0,method=0;
     std::size_t visited=0,geometryHits=0,callbacks=0;
     float returnedDistance=0.f;
+    bool resetGlobalsWritten=false; // enabled121920 reached11DD00; publish only on Complete
     bool normalModeWritten=false;
     std::uint32_t normalMode3DF5B0=0;
+    // Genuine final VU VF9.W for the completed nullable-E4 shape3 route.
+    // The producer tracks actual ordered dispatches, including misses after
+    //a hit. Unknown for shape5, a skipped disabled query, or invoked Follow.
+    bool type3VectorScratchKnown=false;
+    float type3VectorScratchVF9W=0.f;
 };
 // Exact camera121920(a1=0) SearchList route. First pass method1 with global
 // fallback; second pass method2 WITHOUT fallback iff a registered zone has
@@ -96,4 +110,12 @@ OriginalCameraWorldStatus queryOriginalCameraWorld(
     const OriginalCameraWorldInput&,const OriginalCameraWorldMutable&,
     const OriginalCameraWorldWorkspace&,OriginalCameraWorldQueryState&,
     OriginalCameraCollisionCallback&,OriginalCameraWorldResult&) noexcept;
+// Caller-specific nullable E4 path used by death query120. All world/result
+// side effects are shared with the Follow entry, including candidate40/50
+// copies and a reached target E8 boundary. Null E4 never invokes1792D0 and
+// never interprets shape3 result90 as the incompatible Follow shape5 layout.
+OriginalCameraWorldStatus queryOriginalCameraWorld(
+    const OriginalCameraWorldInput&,const OriginalCameraWorldMutable&,
+    const OriginalCameraWorldWorkspace&,OriginalCameraWorldQueryState&,
+    const OriginalCameraWorldCallbackBinding&,OriginalCameraWorldResult&) noexcept;
 }

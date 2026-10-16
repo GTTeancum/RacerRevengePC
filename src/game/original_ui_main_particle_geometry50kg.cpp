@@ -29,19 +29,21 @@ float fixed4(float value) noexcept {
     return div(std::trunc(mul(value,16.f)),16.f);
 }
 }
-OriginalUiMainParticleGeometryStatus50KG projectOriginalUiMainParticleQuad50KG(
+OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuad50KG(
     const OriginalUiMainParticlePacket50KG& packet,std::uint8_t stateIndex,
     const OriginalUiMainParticleCamera50KG& camera,
     const OriginalUiMainParticleRenderConstants50KG& constants,
+    std::uint16_t authenticatedFrameCount,float maximumBrightness,
     OriginalUiMainParticleQuad50KG& output) noexcept {
     using Status=OriginalUiMainParticleGeometryStatus50KG;
     static_assert(sizeof(float)==4 && std::numeric_limits<float>::is_iec559,
         "Native ParticleCode requires binary32");
-    if(stateIndex>1 || packet.sourceFrame<52 || packet.sourceFrame>75 ||
+    if(stateIndex>1 || !authenticatedFrameCount || packet.sourceFrame>=authenticatedFrameCount ||
+        !finite(maximumBrightness) || maximumBrightness<0 || maximumBrightness>255 ||
         packet.sourceDepthBucket>=originalUiMainDepthBuckets50KG ||
         !finite(packet.sizeTimesCamera1D8) || packet.sizeTimesCamera1D8<0 ||
         !finite(packet.quantizedSourceDepth) || !finite(packet.sourceBrightness) ||
-        packet.sourceBrightness<0 || packet.sourceBrightness>128)
+        packet.sourceBrightness<0 || packet.sourceBrightness>maximumBrightness)
         return Status::input;
     for(float v:packet.position)if(!finite(v))return Status::input;
     for(const auto& uv:packet.normalizedUv)for(float v:uv)if(!finite(v))return Status::input;
@@ -79,7 +81,7 @@ OriginalUiMainParticleGeometryStatus50KG projectOriginalUiMainParticleQuad50KG(
     const float biasedAlpha=add(8388608.f,packet.sourceBrightness);
     std::uint32_t alphaBits=0;std::memcpy(&alphaBits,&biasedAlpha,sizeof(alphaBits));
     const auto alpha=static_cast<std::uint8_t>(alphaBits&0xffu);
-    if(alpha>128)return Status::arithmetic;
+    if(float(alpha)>maximumBrightness)return Status::arithmetic;
     // FTOI4.w followed by XYZF2's fog field extraction retains the integer
     // coefficient. Normalize by256 for the GS fog equation, not by255.
     const float fogByte=std::trunc(std::clamp(fog,0.f,254.f));
@@ -113,4 +115,14 @@ OriginalUiMainParticleGeometryStatus50KG projectOriginalUiMainParticleQuad50KG(
     }
     next.visible=true;output=next;return Status::complete;
 }
+OriginalUiMainParticleGeometryStatus50KG projectOriginalUiMainParticleQuad50KG(
+    const OriginalUiMainParticlePacket50KG& packet,std::uint8_t stateIndex,
+    const OriginalUiMainParticleCamera50KG& camera,
+    const OriginalUiMainParticleRenderConstants50KG& constants,
+    OriginalUiMainParticleQuad50KG& output) noexcept {
+    if(packet.sourceFrame<52 || packet.sourceFrame>75)
+        return OriginalUiMainParticleGeometryStatus50KG::input;
+    return projectOriginalParticleQuad50KG(packet,stateIndex,camera,constants,76,128,output);
+}
+
 }

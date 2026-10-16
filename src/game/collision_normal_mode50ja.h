@@ -12,6 +12,14 @@ struct CollisionNormalModeWrite50JA {
     bool reached=false;
     bool bound=false; // authentic query-owned mode was supplied
 };
+// The same application collision namespace also owns121920's lazy sentinel
+// and11DD00's separate vector-buffer counts. Native shape2/3/5 world calls
+// reset both counts and do not use the shape0/1 vector-buffer finalizers.
+// No source value is exposed until a real completed world call writes it.
+struct CollisionWorldQueryGlobals50JA {
+    std::uint8_t initializedGp8184=0;
+    std::uint32_t sentinel3E0860=0,count3DFDC0=0,count3DFDC8=0;
+};
 inline void recordCollisionNormalMode50JA(CollisionNormalModeWrite50JA& write,
     std::uint32_t actualShapeMode) noexcept {
     if(write.bound){write.value=actualShapeMode;write.reached=true;}
@@ -22,6 +30,13 @@ inline void recordCollisionNormalMode50JA(CollisionNormalModeWrite50JA& write,
 // terminal atomic-call boundary; a stale result must never be published.
 class CollisionNormalModeOwner50JA {
 public:
+    void acceptCompletedWorldReset() noexcept {
+        if(!worldGlobals_.initializedGp8184){worldGlobals_.sentinel3E0860=0xffffffffu;worldGlobals_.initializedGp8184=1;}
+        worldGlobals_.count3DFDC0=0;worldGlobals_.count3DFDC8=0;worldGlobalsWritten_=true;
+    }
+    const CollisionWorldQueryGlobals50JA* completedWorldGlobals()const noexcept {
+        return worldGlobalsWritten_?&worldGlobals_:nullptr;
+    }
     bool acceptCompleted(const CollisionNormalModeWrite50JA& write) noexcept {
         if(!write.bound)return false;
         if(write.reached){value_=write.value;written_=true;}
@@ -31,6 +46,8 @@ public:
         return written_?&value_:nullptr;
     }
 private:
+    CollisionWorldQueryGlobals50JA worldGlobals_{};
+    bool worldGlobalsWritten_=false;
     std::uint32_t value_=0; // unread until written_, not a source initializer
     bool written_=false;
 };

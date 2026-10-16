@@ -10,7 +10,7 @@ namespace rr::game {
 struct OriginalCameraVisibilityKeys {
     const original_gc_gameplay_lighting_candidate::Owner* owner=nullptr;
     std::uint64_t sessionGeneration=0,sceneKey=0;
-    std::array<std::uint64_t,original_gc_gameplay_lighting_candidate::gcZones> keys{};
+    std::array<std::uint64_t,original_gc_gameplay_lighting_candidate::maximumZones> keys{};
     std::size_t count=0;
     OriginalFollowVisibilityZones view() const noexcept {return {keys.data(),count};}
     bool matches(const original_gc_gameplay_lighting_candidate::Owner& actualOwner,

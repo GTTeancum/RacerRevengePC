@@ -1,5 +1,6 @@
 #pragma once
 #include "body_integration48c.h"
+#include "body_scene48g.h"
 #include <cstdint>
 
 namespace rr::game {
@@ -37,7 +38,44 @@ PortalGeometryStatus50EO overlapPortal231150_50EO(
     const PortalGeometry50EO& portal, const Vector3_48C& center, float radius,
     bool& overlaps, float& absolutePlaneDistance) noexcept;
 
-// All functions are bounded and allocation-free. Non-Complete leaves every
+struct PortalProjectionQuad50EO { float xy[4][2]{}; };
+//230450..230554 literal quad construction/copy/reorder. This is the shared
+// source434940 input, not a host-window rectangle. Failure leaves output alone.
+bool constructPortalViewport230450_50EO(PortalProjectionQuad50EO& output) noexcept;
+enum class PortalProjectionStatus50EO : std::uint8_t {
+    Hit, Miss, InvalidInput, ArithmeticFailure, CapacityExceeded
+};
+// Bounded native230880 leaf only; no zone traversal, visibility/LOD or owner
+// publication. Borrow the actual prepared portal and current source camera
+// +180 position, +1FC near and +100 combined, plus the actual434940 quad.
+// Never substitute a host raster rectangle or guard/screen transform.
+// Forced input W=1; classification uses |W|, intersections use signed W.
+// Retains six-plane order, point order and reached binary32 arithmetic.
+// Only Hit changes output. Miss means completed source rejection; numeric or
+// capacity failures are NOT culling decisions. Local banks hold16 vertices;
+// final clipped count must fit the original10-element230880 local buffer.
+// Inputs are immutable during the call; output may alias the bypass quad but
+// otherwise must be disjoint from the inputs.
+// Requires an actually prepared nondegenerate portal, finite consumed values,
+// FE_TONEAREST and strict binary32 operations. No exceptional VU parity claim.
+// Near bypass consumes no combined matrix; other paths consume no bypass quad.
+PortalProjectionStatus50EO projectPortal230880_50EO(
+    const PortalGeometry50EO& portal, const Vector3_48C& cameraPosition,
+    float cameraNear, const BodyMatrix48G& cameraCombined,
+    const PortalProjectionQuad50EO& borrowedQuad434940,
+    PortalProjectionQuad50EO& output) noexcept;
+
+// Original263260 bounded viewport intersection. Preserves containment order,
+// duplicate candidates, endpoint hits, four-point reorder and envelope fallback.
+// All input coordinates must be finite; strict nearest binary32 required.
+// Hit alone publishes output; Miss is completed-empty, safety failures are not
+// visibility decisions. Exact output aliasing with either input is supported.
+// No render-zone owner/stamp publication or gameplay culling is enabled here.
+PortalProjectionStatus50EO intersectPortalViewport263260_50EO(
+    const PortalProjectionQuad50EO& a, const PortalProjectionQuad50EO& b,
+    PortalProjectionQuad50EO& output) noexcept;
+
+// The three geometry functions above are bounded and allocation-free. Non-Complete leaves every
 // output unchanged. Inputs and consumed arithmetic must be finite; radius
 // must be nonnegative and a prepared portal must be nondegenerate. Preparation
 // may alias output.vertices. Other outputs must not overlap one another.

@@ -1,0 +1,110 @@
+PositionStats genuine view0 numbers adapter / cold-resource dependency
+UNTESTED source-only candidate. Numeric delta libfile_ad369ec5b7c08191a65560a5261b08ab
+remains separate and is not required by these new files. No production callers.
+
+Delivered bounded code
+original_position_stats_frame50la.h: scalar observation, never a readiness token.
+original_position_stats_adapter50la.h: binds actual Camera Session and actual
+native_ai Session identity, reads real Bank state40/countCD0, original preferences,
+mode and flags, and canonical rank[index].placeCCC/retired40.activeCount50. Rejects
+missing/unpublished/closed/abandoned/stale generation and non-ALL8/non-view0 owners.
+Captures current publication before reads and checks it/identity again before
+assigning output. No host sorting, rank recomputation, +1 or fixed denominator.
+original_camera_session50kx.h: ONLY new forward/friend declarations; reconcile
+those two additions into root's newer file instead of replacing the whole file.
+No field/lifecycle changes to actual camera. Adapter borrows Camera/Manager;
+they must outlive it. Consume scalar snapshot synchronously before another tick
+or teardown; a raw pointer cannot detect destruction and no asynchronous lifetime
+or GPU permission is claimed. Bank handles retain the real existing Bank identity.
+
+Camera A8 ownership PROVED for the admitted fixed view0 cut
+174A30 ctor clears low nibble at174A58..74 while preserving the high nibble.
+Race initialization1A73CC starts real view-loop index0.1A73D8..E0 resolves
+managerB0 via1AF330(index).1A73E4 loads race48[view] camera;1A73E8 passes the
+returned racer in a1 and SAME loop index in a2;1A73F0 calls1750A0(a3=0).
+1750A0 retains racer at+40 (17511C) and, for this a3==0 path, stores a2's low
+nibble at camera+A8 (175120..144). PositionStats191DF0 sign-extends the LOW
+NIBBLE and uses it to select race+B4 manager3C[index] at191F10..28.
+Actual native Session coldPhase6 calls bindFreshOriginalRaceCamera with retained
+managerIndex0 and exact scene/racer/mainBody keys. The binding is private inside
+the Session. Its source contract explicitly mirrors this1750A0 bind. Thus this
+admitted fixed view0 route can derive the original A8 low nibble from that actual
+retained call argument without inventing a separate byte owner. The adapter
+requires that same index0 and all three keys; no public selected-index parameter.
+This does NOT generalize to camera retarget/rebind, nonzero/multiple views, other
+bootstrap, high-nibble meaning or a followed-racer override. Those are rejected.
+Original nearby mode-input A8 readers do not store a different value in the
+inspected174A30..177B00 range; no claim of global absence of alias writes is made.
+
+Ranking join
+ai_race_rank50iv.h documents manager3C as canonical racer+C90 records, so record3C
+is placeCCC. Existing native rank pass stores Session.rank[managerIndex], then
+publishes matching Session.fields[index].placeCCC. Adapter verifies actual
+manager reference equals Camera.actual_.all8Manager, manager/rank/retirement
+bound flags, observed manager identity and fields/rank agreement. Slot0 is not
+chosen by host rank order. ActiveCount50 comes from original retirement owner.
+CD0 remains independent actual manager[Application268] Bank observation.
+
+Cold resources: exact new recovery and stopping boundary
+127 ScreenTextures:9 stats at+270 and118 maptop at+5D0. maptop is an AUTHORED
+PSM, not a missing-texture fallback: OVERLAYS ordinal64,1038 bytes, map=stats.
+RadarOverlay is AUTHORED ordinal65,513 bytes, one ScreenObject pass, ZERO texture
+maps, depthTest1, alphaBlend1, alphaTest0, fog0, textureMapping0,zWriteDisabled1.
+Both exact member contents are included. Never route RadarOverlay through the
+Damage/SpeedBoost missing-PSM texture fallback or demand a fabricated map0.
+The existing standard material construction accepts authored zero-map passes;
+that alone is not an implemented mesh owner or final renderer binding.
+
+191180 allocates array0x510 for16 type2E1920 objects stride50 (array helper
+2E8990/2E8980 family);32EC publication at1911CC. Per object1911F0 calls2E1AE0
+with null external vertices, count0x76(118), kind5, literalRadarOverlay.
+2E1B1C doubles count for kind5:236 vertices. It creates owned source vertex
+array at2E1E50..90, stride30 ctor2E2190/dtor2DFC10. It allocates packet entries
+and aligned packet buffers BEFORE primitive/material references. Packet loop
+uses maximum72 vertices, overlapping2 for kind5; stored count formula yields5
+packets for236 vertices. Source start/count sequence is (0,72),(70,72),(140,72),
+(210,26),(234,2), including final two-vertex packet; do not silently discard it.
+2E20A8..F0 creates one primitive24-byte object per packet and retains actual
+ScreenMT type15 RadarOverlay material for each.2E2140 attaches geometry AFTER
+material acquisition. Therefore sixteen meshes imply80 distinct primitive refs,
+in addition to127 ScreenTexture and actual font/glyph refs. One shared canonical
+PSM does not collapse the independent primitive ownership.
+191238 invokes133F20 to initialize each of236 source vertex color lanes per mesh
+to00FFFFFF; source branches choose stride30 versus60 based on actual kind5.
+No font/material/collector completion is implied by those color stores.
+
+Destruction2E1980 first performs real Video drain/flush virtual calls+20/+24;
+then destroys primitive pointers in ascending index and frees pointer array30;
+then frees each packet buffer from entries44 in ascending order and frees entries;
+then destroys owned source vertex array00 if owns38. PositionStats1900B0 first
+destroys optional16-mesh array32EC, then+3220, reverse118 textures, reverse9
+textures, reverse5 texts, Entity. This differs from Damage ScreenTexture cleanup
+and cannot reuse its order. SpeedBoost's single kind2 three-vertex owner is not
+a faithful kind5/236-vertex/5-packet implementation.
+
+Smallest remaining cold-owner dependency
+No retained native kind5 mesh owner exists in the reviewed source implementing
+this exact allocation/partial-failure/80-reference/packet-buffer lifetime and
+genuine drain-before-destruction requirement. The+3220 rectangle-like owner
+(119E50/119F60/119F00 and dynamic119FC0 consumers) also still needs its exact
+native lifecycle/binding proof. Building a ready cold owner with only sprites
+or a dummy drain would hide required functionality. None was built here.
+Next bounded step is a dedicated kind5 CPU resource owner through2E1AE0/2E1980
+using actual Application Video/material domain, authored RadarOverlay PSM,
+real partial acquisition retention, and actual renderer retirement capability.
+Then complete all127 texture authoring/font order and+3220 map state; borrow
+root's final collector/provider revision without rebuilding to manufacture readiness.
+Do not activate the numeric adapter until root schedules it at the actual rank+
+camera publication cut. No renderer is exposed by this packet.
+
+Review checklist
+[ ] Camera alias derives ONLY verified original bind a2 for same fixed view0.
+[ ] Real Camera/Manager lifetime and keys checked; no arbitrary caller rank row.
+[ ] Bank scalar reads outside leases; publication+generation checked twice.
+[ ] Original rank/count authority untouched; snapshot has no ready boolean.
+[ ] Only two friend lines change existing source; no root/main-TU activation.
+[ ] Numeric candidate and sibling provider issue remain separate.
+
+No tests/builds/syntax/sanitizer/gameplay checks/converters/guest execution or
+central edits. Original asset decompression was read-only inspection, no converted
+asset produced. Raw words/PSM evidence and packaging hashes only. Hold for root.

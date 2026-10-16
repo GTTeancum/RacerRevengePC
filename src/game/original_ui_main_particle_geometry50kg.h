@@ -37,4 +37,15 @@ OriginalUiMainParticleGeometryStatus50KG projectOriginalUiMainParticleQuad50KG(
     const OriginalUiMainParticleCamera50KG&,
     const OriginalUiMainParticleRenderConstants50KG&,
     OriginalUiMainParticleQuad50KG&) noexcept;
+// Shared numeric ParticleCode primitive, below concrete Main/Options/GC owners.
+// Caller authenticates the atlas and supplies its actual frame count. Historical
+// numeric packet/camera types carry no Main scene identity. The Main wrapper
+// above retains its52..75/alpha128 admission unchanged.
+OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuad50KG(
+    const OriginalUiMainParticlePacket50KG&,std::uint8_t stateIndex,
+    const OriginalUiMainParticleCamera50KG&,
+    const OriginalUiMainParticleRenderConstants50KG&,
+    std::uint16_t authenticatedFrameCount,float maximumBrightness,
+    OriginalUiMainParticleQuad50KG&) noexcept;
+
 }

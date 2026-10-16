@@ -91,6 +91,12 @@ Status OriginalUiApertureOwner50KG::bindGameOptions(
     const OriginalUiApertureCallbacks50KG& supplied,OriginalUiApertureDiagnostic50KG& d) noexcept {
     return bindPageImpl(std::move(archive),supplied,false,true,4,d);
 }
+Status OriginalUiApertureOwner50KG::bindControls(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,std::uint8_t page,
+    const OriginalUiApertureCallbacks50KG& supplied,OriginalUiApertureDiagnostic50KG& d) noexcept {
+    if(page!=2&&page!=3)return fail(d,Status::missingPage,0x1CEC8C);
+    return bindPageImpl(std::move(archive),supplied,false,true,page,d);
+}
 Status OriginalUiApertureOwner50KG::bindOptionsMenuEntryOnly(
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
     const OriginalUiApertureCallbacks50KG& supplied,
@@ -111,10 +117,45 @@ Status OriginalUiApertureOwner50KG::bindCourseEntryOnly(std::shared_ptr<const as
     const OriginalUiApertureCallbacks50KG& callbacks,OriginalUiApertureDiagnostic50KG& d)noexcept{
     return bindPageImpl(std::move(archive),callbacks,true,false,1,d,false,true);
 }
+Status OriginalUiApertureOwner50KG::bindTournament(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
+    const OriginalUiApertureCallbacks50KG& callbacks,OriginalUiApertureDiagnostic50KG& d) noexcept {
+    return bindPageImpl(std::move(archive),callbacks,false,false,1,d,false,false,true);
+}
+Status OriginalUiApertureOwner50KG::saveTournamentUpdateDelta38(float delta) noexcept {
+    if(!state_.bound)return Status::notBound;
+    if(!tournament_)return Status::invalidPhase;
+    //1F2498 stores298 before2A6BB0. Session owns preceding timer4064 subtraction.
+    return saveUpdateDelta38(delta);
+}
+Status OriginalUiApertureOwner50KG::resetTournamentExitRequestedAtEntry74() noexcept {
+    if(inOperation_)return Status::busy;
+    if(!state_.bound)return Status::notBound;
+    if(!tournament_)return Status::invalidPhase;
+    OperationScope operation(inOperation_);
+    if(!available())return Status::unavailable;
+    // Both popup entry paths clear4060, at1EEAB8 or1EEAD0.
+    tournamentExitRequested4060_=false;
+    return Status::ok;
+}
+Status OriginalUiApertureOwner50KG::beginTournamentEntryAtRender48(
+    Phase phase,std::uint8_t popupFlags29) noexcept {
+    if(inOperation_)return Status::busy;
+    if(!state_.bound)return Status::notBound;
+    if(!tournament_)return Status::invalidPhase;
+    OperationScope operation(inOperation_);
+    if(!available())return Status::unavailable;
+    if((popupFlags29&1u)&&!tournamentExitRequested4060_)return Status::unavailable;
+    // Actual source render point1F2DB8..1F2DF8, never manager entry.
+    if(state_.state!=State::closed||phase!=Phase::entry)return Status::noChange;
+    state_.state=State::opening;
+    emit(Hook::openingAC,0x1F2DF8,0x1EEB50);
+    return Status::ok;
+}
 Status OriginalUiApertureOwner50KG::bindPageImpl(
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,
     const OriginalUiApertureCallbacks50KG& supplied,bool entryOnly,bool optionsMenu,std::uint8_t page,
-    OriginalUiApertureDiagnostic50KG& d,bool rider,bool course) noexcept {
+    OriginalUiApertureDiagnostic50KG& d,bool rider,bool course,bool tournament) noexcept {
     static_assert(sizeof(float)==4 && std::numeric_limits<float>::is_iec559,
         "Original aperture requires IEEE binary32");
     d={};
@@ -123,7 +164,7 @@ Status OriginalUiApertureOwner50KG::bindPageImpl(
     OperationScope operation(inOperation_);
     const auto callbacks=supplied;
     if (!archive || !archive->loaded() || !archive->identity() ||
-        archive->identity()->id!=(course?assets::OriginalUiArchiveId50KG::course:rider?assets::OriginalUiArchiveId50KG::rider:optionsMenu?assets::OriginalUiArchiveId50KG::options:assets::OriginalUiArchiveId50KG::mainMenu))
+        archive->identity()->id!=(tournament?assets::OriginalUiArchiveId50KG::tournament:course?assets::OriginalUiArchiveId50KG::course:rider?assets::OriginalUiArchiveId50KG::rider:optionsMenu?assets::OriginalUiArchiveId50KG::options:assets::OriginalUiArchiveId50KG::mainMenu))
         return fail(d,Status::invalidArchive);
     if (!dependencies(callbacks)) return fail(d,Status::missingDependency);
     if (!dependenciesAvailable(callbacks)) return fail(d,Status::unavailable);
@@ -131,7 +172,7 @@ Status OriginalUiApertureOwner50KG::bindPageImpl(
     try {
         assets::OriginalUiDat50KG indexDat,pageDat;
         assets::OriginalUiPageIndex50KG index;
-        const std::string directory=course?"UI/UICourse/":rider?"UI/UIRider/":optionsMenu?"UI/UIOption/":"UI/UIMain/";
+        const std::string directory=tournament?"UI/UITourn/":course?"UI/UICourse/":rider?"UI/UIRider/":optionsMenu?"UI/UIOption/":"UI/UIMain/";
         if (!assets::readOriginalUiDat50KG(*archive,directory+"ui.dat",indexDat,d.parse) ||
             !assets::readOriginalUiPageIndex50KG(indexDat,index,d.parse))
             return fail(d,Status::parseFailure,d.parse.sourcePC);
@@ -176,7 +217,7 @@ Status OriginalUiApertureOwner50KG::bindPageImpl(
         // 2A5CCC's 1). Only the non-Closed config branch 1D654C writes it to 1.
         next.inputEnabled268=!config.startClosed;
         // No source update sample or rendered primitive is fabricated at bind.
-        archive_=std::move(archive);config_=config;callbacks_=callbacks;state_=next;entryOnly_=entryOnly;optionsMenu_=optionsMenu;optionsPage_=page;rider_=rider;course_=course;
+        archive_=std::move(archive);config_=config;callbacks_=callbacks;state_=next;entryOnly_=entryOnly;optionsMenu_=optionsMenu;optionsPage_=page;rider_=rider;course_=course;tournament_=tournament;
         return fail(d,Status::ok);
     } catch (const std::bad_alloc&) { return fail(d,Status::allocation); }
     catch (...) { return fail(d,Status::parseFailure); }
@@ -195,17 +236,17 @@ Status OriginalUiApertureOwner50KG::beginTransition7C(Phase phase) noexcept {
     OperationScope operation(inOperation_);
     if (!available()) return Status::unavailable;
     if (phase==Phase::entry) {
-        if(course_)return Status::noChange; // actual1E0460 entry is no-op
+        if(course_||tournament_)return Status::noChange; // actual1E0460 / 1F2E30 entry is no-op
         if (state_.state==State::open || state_.state==State::opening) return Status::noChange;
         state_.state=State::opening;
-        emit(Hook::openingAC,0x1D750C,rider_?0x1E9E70:optionsMenu_?(optionsPage_==4?0x1F5BF0:0x1F9D20):0x1E66C0);
+        emit(Hook::openingAC,0x1D750C,rider_?0x1E9E70:optionsMenu_?(optionsPage_==4?0x1F5BF0:optionsPage_==2||optionsPage_==3?0x1F44A0:0x1F9D20):0x1E66C0);
         return Status::ok;
     }
     if (phase==Phase::exit) {
         if (entryOnly_) return Status::unavailable;
         if (state_.state==State::closed || state_.state==State::closing) return Status::noChange;
         state_.state=State::closing;state_.inputEnabled268=false;
-        emit(Hook::closingB4,course_?0x1E04AC:rider_?0x1ED130:0x1D74B4,course_?0x1DAA70:rider_?0x1EA360:optionsMenu_?(optionsPage_==4?0x1F5DD0:0x1F9ED0):0x1E6960);
+        emit(Hook::closingB4,tournament_?0x1F2E7C:course_?0x1E04AC:rider_?0x1ED130:0x1D74B4,tournament_?0x1EEBE0:course_?0x1DAA70:rider_?0x1EA360:optionsMenu_?(optionsPage_==4?0x1F5DD0:optionsPage_==2||optionsPage_==3?0x1F45C0:0x1F9ED0):0x1E6960);
         return Status::ok;
     }
     // Native rejection instead of executing the source bad-transition assert.
@@ -225,7 +266,7 @@ Status OriginalUiApertureOwner50KG::saveRiderUpdateDelta38(float actualDelta) no
     return saveUpdateDelta38(actualDelta);
 }
 Status OriginalUiApertureOwner50KG::saveMainUpdateDelta38(float actualDelta) noexcept {
-    if(optionsMenu_||rider_||course_)return Status::invalidPhase;
+    if(optionsMenu_||rider_||course_||tournament_)return Status::invalidPhase;
     return saveUpdateDelta38(actualDelta);
 }
 Status OriginalUiApertureOwner50KG::saveOptionsMenuUpdateDelta38(float actualDelta) noexcept {
@@ -237,6 +278,11 @@ Status OriginalUiApertureOwner50KG::saveGameOptionsUpdateDelta38(float actualDel
     if(!state_.bound)return Status::notBound;
     if(!optionsMenu_||optionsPage_!=4)return Status::invalidPhase;
     return saveUpdateDelta38(actualDelta);
+}
+Status OriginalUiApertureOwner50KG::saveControlsUpdateDelta38(float actualDelta) noexcept {
+    if(!state_.bound)return Status::notBound;
+    if(!optionsMenu_||(optionsPage_!=2&&optionsPage_!=3))return Status::invalidPhase;
+    return saveUpdateDelta38(actualDelta); //1F3CD0/1F3CD4, before2A6BB0.
 }
 Status OriginalUiApertureOwner50KG::saveUpdateDelta38(float actualDelta) noexcept {
     if (inOperation_) return Status::busy;
@@ -287,12 +333,12 @@ Status OriginalUiApertureOwner50KG::render48(Life lifecycle) noexcept {
     } else if (closing) {
         state_.bottom28C=bottom;state_.top284=top;
         if (state_.bottom28C<=224 && state_.top284>=224)
-            emit(Hook::closingThresholdB8,0x1D7630,course_?0x1DAAC0:rider_?0x1EA3E0:optionsMenu_?(optionsPage_==4?0x1F5F30:0x1F9FE0):0x1E6A50);
+            emit(Hook::closingThresholdB8,0x1D7630,tournament_?0x1EEC30:course_?0x1DAAC0:rider_?0x1EA3E0:optionsMenu_?(optionsPage_==4?0x1F5F30:optionsPage_==2||optionsPage_==3?0x1F45E0:0x1F9FE0):0x1E6A50);
         // Deliberately retain closing here, including a crossed endpoint.
     } else if (opening && openEndpoint) {
         state_.top284=config_.openSize274;state_.bottom28C=448-config_.openSize274;
         state_.state=State::open;state_.inputEnabled268=true;
-        emit(Hook::openedB0,0x1D7698,course_?0x1DA950:rider_?0x1EA090:optionsMenu_?(optionsPage_==4?0x1F5D20:0x1F9E20):0x1E68F0);
+        emit(Hook::openedB0,0x1D7698,tournament_?0x1EEBA0:course_?0x1DA950:rider_?0x1EA090:optionsMenu_?(optionsPage_==4?0x1F5D20:optionsPage_==2||optionsPage_==3?0x1F44E0:0x1F9E20):0x1E68F0);
     } else if (opening) {
         state_.bottom28C=bottom;state_.top284=top;
         // Source has no opening post-step threshold check or callback.
@@ -310,13 +356,22 @@ Status OriginalUiApertureOwner50KG::render48(Life lifecycle) noexcept {
 }
 Completion OriginalUiApertureOwner50KG::pollCompletion(
     OriginalUiTransitionRoute50KG route,Phase phase) const noexcept {
-    if (inOperation_ || !state_.bound || route.screen!=(course_?6:rider_?5:optionsMenu_?12:4) || route.page!=((rider_||optionsMenu_)?optionsPage_:1))
+    if (inOperation_ || !state_.bound || route.screen!=(tournament_?9:course_?6:rider_?5:optionsMenu_?12:4) || route.page!=((rider_||optionsMenu_)?optionsPage_:1))
         return Completion::unavailable;
     OperationScope operation(inOperation_);
     if (!available()) return Completion::unavailable;
+    if(tournament_){
+        //1F2F00 returns1 for entry even while closed; render opens later.
+        // Pending exit writes4060 to suppress popup/save at1F28CC.
+        if(phase==Phase::entry)return Completion::complete;
+        if(phase==Phase::exit&&state_.state==State::closed)return Completion::complete;
+        tournamentExitRequested4060_=true;
+        return Completion::pending;
+    }
     if (phase==Phase::entry) return state_.state==State::open?Completion::complete:Completion::pending;
     if (phase==Phase::exit) return entryOnly_?Completion::unavailable:
         (state_.state==State::closed?Completion::complete:Completion::pending);
     return Completion::pending;
 }
 } // namespace rr::game
+

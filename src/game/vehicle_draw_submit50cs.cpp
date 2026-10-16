@@ -6,7 +6,8 @@ namespace rr::game {
 namespace {
 constexpr VehicleDrawComponent50CM components[] = {
     VehicleDrawComponent50CM::chariot, VehicleDrawComponent50CM::leftEngine,
-    VehicleDrawComponent50CM::rightEngine
+    VehicleDrawComponent50CM::rightEngine, VehicleDrawComponent50CM::bottomLeftEngine,
+    VehicleDrawComponent50CM::bottomRightEngine
 };
 bool reject(VehicleDrawSubmitDiagnostic50CS& diagnostic, VehicleDrawSubmitError50CS error,
     std::uint32_t component = vehicleDrawComponentCount50CS, std::uint32_t span = 0) noexcept {
@@ -25,8 +26,10 @@ bool preflightVehicleDrawBatch50CS(const VehicleDrawBatch50CO& batch,
     VehicleDrawSubmitDiagnostic50CS& diagnostic) noexcept {
     diagnostic = {};
     VehicleDrawPlan50CS next{};
+    if (!validVehicleDrawComponentCount50CM(batch.componentCount))
+        return reject(diagnostic, VehicleDrawSubmitError50CS::geometry);
     std::uint32_t vertices = 0, indices = 0;
-    for (std::uint32_t c = 0; c < vehicleDrawComponentCount50CS; ++c) {
+    for (std::uint32_t c = 0; c < batch.componentCount; ++c) {
         const auto& geometry = batch.component[c];
         if (!geometry.vertices || !geometry.indices || !geometry.spans ||
             !geometry.vertexCount || geometry.vertexCount > maxRigidVertices49S ||
@@ -47,7 +50,7 @@ bool preflightVehicleDrawBatch50CS(const VehicleDrawBatch50CO& batch,
         }
         if (vertex != geometry.vertexCount || index != geometry.indexCount)
             return reject(diagnostic, VehicleDrawSubmitError50CS::spans, c);
-        // 50CM's limits keep these products and all three-component sums in u32.
+        // 50CM's limits keep these products and all bounded component sums in u32.
         next.vertexBytes[c] = geometry.vertexCount * static_cast<std::uint32_t>(sizeof(assets::Vertex48B));
         next.indexBytes[c] = geometry.indexCount * static_cast<std::uint32_t>(sizeof(std::uint32_t));
         next.draws += geometry.spanCount;
@@ -56,7 +59,7 @@ bool preflightVehicleDrawBatch50CS(const VehicleDrawBatch50CO& batch,
     }
     if (vertices != batch.vertices || indices != batch.indices || next.draws != batch.draws)
         return reject(diagnostic, VehicleDrawSubmitError50CS::totals);
-    next.commands = vehicleDrawFixedCommands50CS + next.draws;
+    next.commands = 2 * batch.componentCount + next.draws;
     if (next.commands > capacity.commands)
         return reject(diagnostic, VehicleDrawSubmitError50CS::capacity);
     output = next;
@@ -79,12 +82,12 @@ bool submitVehicleDrawBatch50CS(const VehicleDrawBatch50CO& batch,
         return reject(diagnostic, error, component, span);
     };
     if (!backend.begin(backend.context, batch, plan)) return abort(VehicleDrawSubmitError50CS::begin);
-    for (std::uint32_t c = 0; c < vehicleDrawComponentCount50CS; ++c) {
+    for (std::uint32_t c = 0; c < batch.componentCount; ++c) {
         const auto& geometry = batch.component[c];
         if (!backend.uploadVertices(backend.context, components[c], geometry.vertices, geometry.vertexCount))
             return abort(VehicleDrawSubmitError50CS::upload, c);
     }
-    for (std::uint32_t c = 0; c < vehicleDrawComponentCount50CS; ++c) {
+    for (std::uint32_t c = 0; c < batch.componentCount; ++c) {
         const auto& geometry = batch.component[c];
         if (!backend.bindGeometry(backend.context, components[c], geometry.indices, geometry.indexCount))
             return abort(VehicleDrawSubmitError50CS::bind, c);
@@ -129,7 +132,7 @@ bool VehicleDrawRecorder50CS::preflight(void* context, const VehicleDrawBatch50C
     if (recorder.active_) return false;
     for (const auto& bank : recorder.storage_) {
         if (!bank.commands || bank.commandCapacity < plan.commands) return false;
-        for (std::uint32_t c = 0; c < vehicleDrawComponentCount50CS; ++c)
+        for (std::uint32_t c = 0; c < batch.componentCount; ++c)
             if (!bank.vertices[c].vertices || bank.vertices[c].capacity < batch.component[c].vertexCount)
                 return false;
     }
@@ -141,8 +144,9 @@ bool VehicleDrawRecorder50CS::begin(void* context, const VehicleDrawBatch50CO& b
     auto& recorder = *static_cast<VehicleDrawRecorder50CS*>(context);
     recorder.pendingBank_ = static_cast<std::uint8_t>(recorder.publishedBank_ ^ 1u);
     recorder.pending_ = {};
+    recorder.pending_.componentCount = batch.componentCount;
     const auto& bank = recorder.storage_[recorder.pendingBank_];
-    for (std::uint32_t c = 0; c < vehicleDrawComponentCount50CS; ++c) {
+    for (std::uint32_t c = 0; c < batch.componentCount; ++c) {
         const auto& geometry = batch.component[c];
         recorder.pending_.component[c] = {
             bank.vertices[c].vertices, geometry.vertexCount, geometry.indices, geometry.indexCount
@@ -170,7 +174,7 @@ bool VehicleDrawRecorder50CS::upload(void* context, VehicleDrawComponent50CM com
     const assets::Vertex48B* vertices, std::uint32_t count) noexcept {
     auto& recorder = *static_cast<VehicleDrawRecorder50CS*>(context);
     const auto c = componentIndex(component);
-    if (!recorder.active_ || c >= vehicleDrawComponentCount50CS || !vertices ||
+    if (!recorder.active_ || c >= recorder.pending_.componentCount || !vertices ||
         count != recorder.pending_.component[c].vertexCount || (recorder.uploaded_ & (1u << c))) return false;
     auto& target = recorder.storage_[recorder.pendingBank_].vertices[c];
     std::memcpy(target.vertices, vertices, std::size_t(count) * sizeof(assets::Vertex48B));
@@ -183,7 +187,7 @@ bool VehicleDrawRecorder50CS::bind(void* context, VehicleDrawComponent50CM compo
     const std::uint32_t* indices, std::uint32_t count) noexcept {
     auto& recorder = *static_cast<VehicleDrawRecorder50CS*>(context);
     const auto c = componentIndex(component);
-    if (!recorder.active_ || c >= vehicleDrawComponentCount50CS || recorder.uploaded_ != 7u ||
+    if (!recorder.active_ || c >= recorder.pending_.componentCount || recorder.uploaded_ != ((1u << recorder.pending_.componentCount) - 1u) ||
         indices != recorder.pending_.component[c].indices || count != recorder.pending_.component[c].indexCount)
         return false;
     return recorder.append({VehicleDrawCommandKind50CS::bindGeometry, component});
@@ -192,14 +196,14 @@ bool VehicleDrawRecorder50CS::bind(void* context, VehicleDrawComponent50CM compo
 bool VehicleDrawRecorder50CS::draw(void* context, VehicleDrawComponent50CM component,
     std::uint32_t ordinal, const assets::SceneSpan48D& span, std::int32_t baseVertex) noexcept {
     auto& recorder = *static_cast<VehicleDrawRecorder50CS*>(context);
-    if (!recorder.active_ || recorder.uploaded_ != 7u || baseVertex != 0 ||
-        componentIndex(component) >= vehicleDrawComponentCount50CS) return false;
+    if (!recorder.active_ || recorder.uploaded_ != ((1u << recorder.pending_.componentCount) - 1u) || baseVertex != 0 ||
+        componentIndex(component) >= recorder.pending_.componentCount) return false;
     return recorder.append({VehicleDrawCommandKind50CS::drawIndexed, component, ordinal, span, baseVertex});
 }
 
 bool VehicleDrawRecorder50CS::commit(void* context) noexcept {
     auto& recorder = *static_cast<VehicleDrawRecorder50CS*>(context);
-    if (!recorder.active_ || recorder.uploaded_ != 7u ||
+    if (!recorder.active_ || recorder.uploaded_ != ((1u << recorder.pending_.componentCount) - 1u) ||
         recorder.pending_.commandCount != recorder.expectedCommands_) return false;
     recorder.published_ = recorder.pending_;
     recorder.publishedBank_ = recorder.pendingBank_;

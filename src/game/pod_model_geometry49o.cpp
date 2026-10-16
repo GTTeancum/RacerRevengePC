@@ -45,7 +45,11 @@ bool buildFreshPodGeometry49O(const FreshPodGeometrySources49O& sources,
         bound.sceneFlags190=0xa4;
         for(unsigned j=0;j<3;++j){bound.center140.v[j]=node.bounds[j];bound.halfExtent150.v[j]=node.bounds[3+j];}
     }
-    if(!sampleModelMotionBlend49O(sources.forward,sources.back,sources.chariotBindings,.5f,0,work.local,count,diagnostic.motion))
+    //213808..21381C independently test actual Forward280 and Back284.
+    // Either missing record branches to213838, preserving authored locals
+    // before the separate optional Mid sample. Null is not a dummy motion.
+    if(sources.forward.data&&sources.back.data&&
+       !sampleModelMotionBlend49O(sources.forward,sources.back,sources.chariotBindings,.5f,0,work.local,count,diagnostic.motion))
         return fail(FreshPodGeometryError49O::motion);
     if(sources.mid&&!sampleModelMotion49O(*sources.mid,sources.chariotBindings,.5f,work.local,count,diagnostic.motion))
         return fail(FreshPodGeometryError49O::motion);

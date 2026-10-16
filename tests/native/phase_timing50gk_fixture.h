@@ -8,12 +8,15 @@
 #include <time.h>
 #else
 #include <chrono>
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 #endif
 
 namespace phase_timing50GK {
 enum class Phase : std::uint8_t {
     Input, Physics, RenderPrepareSubmit, CompletionWait, Capture, HostSleep,
-    CountdownService, AudioCommit, Count
+    CountdownService, AudioCommit, PostWorldService, Count
 };
 constexpr std::size_t phaseCount = static_cast<std::size_t>(Phase::Count);
 
@@ -27,6 +30,7 @@ inline const char* phaseName(Phase phase) noexcept {
     case Phase::HostSleep: return "host_sleep";
     case Phase::CountdownService: return "countdown_service";
     case Phase::AudioCommit: return "audio_commit";
+    case Phase::PostWorldService: return "post_world_service";
     default: return "invalid";
     }
 }
@@ -55,6 +59,24 @@ inline bool readClock(clockid_t clock, std::uint64_t& ns) noexcept {
     ns = seconds * 1000000000ull + fraction;
     return true;
 }
+#elif defined(_WIN32)
+inline bool readThreadCpu(std::uint64_t& ns) noexcept {
+    FILETIME creation{}, exit{}, kernel{}, user{};
+    if (!::GetThreadTimes(::GetCurrentThread(), &creation, &exit, &kernel, &user))
+        return false;
+    const auto ticks = [](const FILETIME& value) noexcept -> std::uint64_t {
+        return (static_cast<std::uint64_t>(value.dwHighDateTime) << 32) |
+            static_cast<std::uint64_t>(value.dwLowDateTime);
+    };
+    const auto kernelTicks = ticks(kernel), userTicks = ticks(user);
+    constexpr auto limit = (std::numeric_limits<std::uint64_t>::max)();
+    if (userTicks > limit - kernelTicks) return false;
+    const auto totalTicks = kernelTicks + userTicks;
+    if (totalTicks > limit / 100ull) return false;
+    // FILETIME uses 100-ns units; this does not imply 100-ns clock resolution.
+    ns = totalTicks * 100ull;
+    return true;
+}
 #endif
 }
 
@@ -64,11 +86,15 @@ inline Sample readClocks() noexcept {
     sample.wallValid = detail::readClock(CLOCK_MONOTONIC, sample.wallNs);
     sample.cpuValid = detail::readClock(CLOCK_THREAD_CPUTIME_ID, sample.cpuNs);
 #else
-    // A non-Linux build retains monotonic wall observations, but explicitly
-    // reports missing thread-CPU samples instead of substituting process CPU.
+    // Keep the existing monotonic host wall clock on non-Linux builds.
     const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
     if (ns >= 0) { sample.wallNs = static_cast<std::uint64_t>(ns); sample.wallValid = true; }
+#if defined(_WIN32)
+    sample.cpuValid = detail::readThreadCpu(sample.cpuNs);
+#endif
+    // Unsupported hosts and failed reads retain cpuValid=false. Never use
+    // process-wide CPU time as a substitute for the owning thread.
 #endif
     return sample;
 }

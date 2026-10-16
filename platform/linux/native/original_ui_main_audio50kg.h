@@ -17,8 +17,8 @@ class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
 public:
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
     static constexpr std::size_t effectVoiceCount = 6, requiredVoices = 7;
-    static constexpr std::size_t riderConfirmClipCount = 19;
-    // One accepted default-unlocked Rider Confirm per page lifetime. Its UIACCEPT stream
+    static constexpr std::size_t riderConfirmClipCount = 21;
+    // One accepted Rider Confirm per page lifetime. Its UIACCEPT stream
     // borrows a separate native voice; it cannot replace an active utterance.
     static constexpr std::size_t riderConfirmVoice = requiredVoices, courseRequiredVoices = requiredVoices + 1;
     enum class SteadyRiderError : std::uint8_t {
@@ -90,7 +90,9 @@ public:
     // leaves their already prepared transport intact and Rider unavailable.
     bool prepareRiderMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
     // Optional Course destination, before any playback: original Song11 and
-    // all 19 default-unlocked Rider Confirm choices. Native preload of authored IsStream=1
+    // all 19 default-unlocked choices plus Gasgano's two original choices.
+    // Audio preparation grants no profile unlock or destination capability.
+    // Native preload of authored IsStream=1
     // speech uses the existing decoder/mixer, with no IOP streamer emulation.
     bool prepareCourseMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
     bool ready() const noexcept override;
@@ -112,6 +114,8 @@ public:
     // No attached owner, stale mixer, or paused transport can certify Accept.
     const OriginalSoundMode50KG* soundModeOwner50KG() const noexcept;
     bool canApplySoundMode18874050KG(std::uint32_t mode) const noexcept;
+    // Capacity for the serialized188740 then SELECT1 Accept transaction.
+    bool canAcceptGameOptionsAudio50KG(std::uint32_t mode) const noexcept;
     bool applySoundMode18874050KG(std::uint32_t mode) noexcept;
     std::uint32_t sampleRate() const noexcept override {
         return current() ? mixer_->sampleRate() : 0;
@@ -153,6 +157,10 @@ public:
     // Read-only concrete preflight for a serialized profile/route transaction.
     bool canPlayGameOptionsEffect(std::uint32_t originalId) const noexcept;
     bool playGameOptionsEffect(std::uint32_t originalId) noexcept;
+    // Controls1F3950 owns SELECT1, ADVANCE2, left3, right4 and BACK5.
+    // The same real effect voices are retained across same-manager pages.
+    bool canPlayControlsEffect(std::uint32_t originalId) const noexcept;
+    bool playControlsEffect(std::uint32_t originalId) noexcept;
     bool update(float sourceSeconds) noexcept;
     void pause(bool value) noexcept {
         if(paused_!=value){paused_=value;noteControlChange();}

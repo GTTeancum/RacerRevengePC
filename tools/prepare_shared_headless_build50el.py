@@ -22,6 +22,7 @@ def main():
     command = [new_main if item == old_main else item for item in command if item not in remove]
     command[command.index('-lz'):command.index('-lz')] = [str(ROOT / name) for name in (
         'platform/linux/native/vehicle_window_gl50ds.cpp',
+        'platform/linux/native/native_camera_view50dx.cpp',
         'platform/linux/native/material_texture_gl50eb.cpp',
         'src/assets/material_texture_assets50ea.cpp')]
     destination.write_text(json.dumps(command, indent=2) + '\n', encoding='utf-8')

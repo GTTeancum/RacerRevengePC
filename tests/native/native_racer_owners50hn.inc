@@ -10,9 +10,21 @@ if(originalAiEnabled)registerRacerFrameExceptSharedNoise50IU(racerBank,s);
 else racerBank.owner(s);
 racerBank.owner(originalAi);
 racerBank.owner(originalAiReceipt);
+if(originalRecoveryEnabled){
+ racerBank.owner(originalRecovery);racerBank.owner(originalRecoveryModels);
+ racerBank.owner(originalHumanRecovery);racerBank.owner(humanBaseUndertrack);
+ recoveryQueryOwners.registerMutableOwners(racerBank);
+ racerBank.contents(qfilter.identityLists[0].identities);
+ racerBank.contents(secondaryFilter.identityLists[0].identities);
+ racerBank.owner(endpoints);racerBank.owner(endpointScenes);
+ racerBank.owner(movement.copied40);racerBank.owner(movement.copied50);
+}
 //50HW: a roster slot owns its authored tuning and source binding descriptors,
 // not just its live bodies. Borrowed PSG/MOT/type2 arrays remain in permanent
 // per-archetype cold owners; restoring these POD views never moves that data.
+// Configuration-sensitive input follows its actual racer; a human Controls
+// selection must not leak into another existing control owner.
+racerBank.owner(x.configurationEntryNonzero);
 racerBank.owner(x.parameters);
 racerBank.owner(x.bindings);
 racerBank.owner(x.secondaryInputs);
@@ -38,11 +50,14 @@ racerBank.owner(poseHistory);
 racerBank.owner(coldFlame);
 racerBank.owner(namesForEffects);
 racerBank.owner(nativeEffects);
+racerBank.owner(nativeEffectCount);
+racerBank.owner(resetEffectBindings);
 // Cold placement/geometry views follow the selected original forest. The
 // pointed-to source bytes are immutable; sourceNodes refers either to this
 // registered stable array or to the selected permanent Rig owner.
 racerBank.owner(rebaseNodes);
 racerBank.owner(rebaseModels);
+racerBank.owner(rebaseModelCount);
 // Actual source navigation, accepted lap crossings and wrong-way history.
 racerBank.owner(navigationProgress);
 racerBank.owner(navigationCA0);
@@ -119,6 +134,7 @@ racerBank.owner(terrainOwner.metadata.filter.flagsF8);
 racerBank.owner(terrainOwner.initial);
 racerBank.owner(terrainOwner.follow);
 racerBank.owner(terrainOwner.lowerEndpoint140);
+racerBank.owner(terrainOwner.lift1F0);
 racerBank.owner(terrainOwner.receipt);
 racerBank.owner(terrainOwner.prepared);
 // resource.rays must point to the SAME live arena terrainLiveOwner.pair for

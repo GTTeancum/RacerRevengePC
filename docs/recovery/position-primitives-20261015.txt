@@ -1,0 +1,113 @@
+PositionStats genuine type-5 primitive owner / canonical RadarOverlay facet
+ADDITIVE SOURCE CANDIDATE. UNTESTED. No builds, tests, syntax checks, sanitizers,
+gameplay, converters or guest execution. Central checkout and original disc untouched.
+Base is the private revised display-owner candidate reported integrated as aba03e7:
+libfile_e80a86e2519c8191a9fa68a99b6f972d over d24aab3. This helper did not fetch a
+separate aba03e7 checkout. Exact preimages AND SHA256 manifest accompany all edits;
+root must reconcile any other changes. Earlier held packets remain unchanged.
+
+DELIVERY
+Five-file additive patch: two new headers, one canonical-table friend declaration,
+Application factory/result declarations plus weak owner, and isolated50DU include,
+empty root-owned result and retirement before the existing display close gate.
+Display lease and its actual service/finish implementation are unchanged.
+There is NO call to the new staging method and NO draw/population/activation path.
+No rankings, completed-lap authority, simulation, controls or telemetry edits.
+
+GENUINE OWNERSHIP / SOURCE
+Application::stagePositionStatsPrimitives50LA is an uncalled detached191180
+resource fragment, not the entire190190 loader or PositionStats Entity. It admits
+only the actual Application Video, actual live material context/domain and its
+authoritative weak display owner. It authenticates OVERLAYS, parses original
+RadarOverlay PSM, requires its one ScreenObject pass/zero maps, mounts it through
+the real sealed provider and appends exact source bytes to the canonical corpus.
+No texture/map is invented. Actual global36B970 is scoped to ui\textures\ and
+restored on every normal/exception path. Effects in canonical provider/domain are
+not rolled back or claimed absent after failure. Failed output is one-shot.
+The owner retains domain/context/archive/source and obtains the private real
+display lease BEFORE constructing any primitives. It never takes an arbitrary
+renderer pointer, dispatch copy, ready flag or completion callback.
+
+EXACT GEOMETRY RESOURCE CUT
+191180 allocates and constructs all16 objects with2E1920 before first load;
+1911F0 calls2E1AE0(null,118,5,RadarOverlay). Type5 doubles count to236.
+Each native element independently owns236 source vertices, five packet buffers,
+five individually allocated primitives and five real canonical references.
+2E2190 source vertices=[0,0,1,1], aliases null/copies0. Packet vertex records from
+2E27C0 begin RGBA/STQ=[0,0,0,0], XYZ=[0,0,1,0]. Genuine strip ranges are
+ (0,72),(70,72),(140,72),(210,26),(234,2).
+The final two vertices are retained. Shared endpoints point to both packet copies,
+not a synthetic merged vertex. All five packets are allocated/aliased BEFORE the
+primitive-pointer array and per-primitive allocation/299BE0 association.
+No guest DMA/VIF command words are executed or represented as native completion.
+This is native vertex/alias/resource ownership, not an encoded retail packet.
+
+IMPORTANT CORRECTION TO EARLIER DEPENDENCY PROSE
+The earlier packet incorrectly said191238 colors all236 vertices. Raw words show
+191200..191250 loops118 times: when type==5 it uses base+s2 and increments s2 by60;
+other types use30. Thus only vertices0,2,...234 get133F20(00FFFFFF). Each touched
+vertex has RGB127 written to its first and optional second packet alias. Odd
+vertices keep packet RGB0; alpha remains0. This candidate implements that exact
+even-vertex loop; it does NOT import AIDamage alpha63 or color every236 vertices.
+133F20 raw words are included so root can review this correction directly.
+
+CANONICAL MATERIAL FACET
+Only OriginalPositionStatsPrimitiveOwner50LA may acquire/release its dedicated
+OriginalRadarOverlayMaterialReference50LA. It validates authentic OVERLAYS PSM
+against the real sealed provider bytes for every acquired reference and the
+original ui\textures path domain, then uses canonical find298C80 followed by
+retainScreen14D590. material00 receives the found slot BEFORE retain. Actual
+numeric ref08 and ScreenMT associated30 stay in the same Application table.
+Success acquires80 independent references. Failed lookup/retain is tracked without
+decrementing an unacquired reference. No AIDamage handle/geometry is copied.
+The facet destructor terminates if a reference remains retained; only explicit
+post-drain release299AC0 may discharge it. No implicit RAII bypass of2E1980.
+No population/demand is done here; successful acquisition is not a loaded shader
+or renderer-ready receipt. Canonical missing rows/providers remain real failures.
+
+PARTIAL FAILURE AND TEARDOWN
+Allocation failure before16 construction leaves an unconstructed lease that can
+be reset safely. All16 Element constructors are nonthrowing; after allocation,
+constructedAll16 is recorded before any2E1AE0 load. Any later failure preserves
+the full array and partial allocations in the output owner, including previously
+unloaded elements. Native null-initialized smart pointers provide bounded failure
+ownership, not an assertion that original failing allocators returned safely.
+close walks lease cursor15..0, including unloaded and partially loaded elements.
+For EACH it invokes the actual lease service244D60 and unconditional second
+finishInitializedContextWork/contextWorkCompleted. Failed drain returns with
+lease, cursor, resources, context, canonical references and root result intact.
+Only after both stages: ascending primitives (actual release14D500 and delete),
+pointer array; ascending packet buffers then entry array; owned source vertices.
+Then acknowledge that exact index to the private lease and move to the next.
+Final acknowledgement unpins; native empty array/lease containers are freed.
+Destruction without explicit successful close terminates instead of bypassing
+drains or releasing held references. Repeated successful close is idempotent.
+
+ROOT JOIN / NO CYCLE
+50DU has an empty result only; no staging call. If root later enables staging,
+its closeWindow first calls owner.close. Failure returns BEFORE display gate,
+camera/UI/resource retirement. Success passes the existing display gate then
+resets the root's owner. Every direct/coordinator/host close guard remains intact.
+Application holds only a weak primitive pointer; renderer never holds this owner.
+Do NOT make renderer Storage strongly own it: primitive -> lease -> display ->
+renderer -> primitive would be a cycle. Any future renderer access is a bounded
+borrow/weak reference, cleared before explicit primitive retirement.
+
+UNRESOLVED ACTIVATION PREREQUISITES
+This does not reconstruct PositionStats Entity18FF80/lifetime/race+CC, preceding
+five ScreenTexts/127 ScreenTextures, +3220 clipping119FC0, full material population
+and zero-map collector/draw validation, demand/predraw/frame order or live HUD join.
+The prior numeric adapter remains separate. Full original resource ordering and
+source-backed ALL8/view0 presentation must be joined before enabling a staging
+call or replacing host diagnostics. No layout is approximated or functionality
+hidden. Resource lifetime is now concrete; complete HUD integration is still held.
+
+SOURCE-REVIEW CHECKLIST
+[ ] Reconcile three changed preimages with central aba03e7; new files absent.
+[ ] Verify all16 construct before load; all5 packet ranges and two-copy aliases.
+[ ] Verify corrected118x60 color loop against191200..250 and133F20.
+[ ] Verify80 real retainScreen references and no public/automatic release bypass.
+[ ] Verify reverse16 and ascending inner releases after both actual per-element drains.
+[ ] Verify partial failures retained and root retirement precedes display gate.
+[ ] Keep staging/drawing disabled and diagnostics intact; no renderer strong cycle.
+[ ] Root alone performs later Windows/build validation; none was performed here.

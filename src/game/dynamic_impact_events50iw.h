@@ -163,7 +163,9 @@ struct DynamicContactEventRequest50IW {
     DynamicContactEventCall50IW kind=DynamicContactEventCall50IW::None;
     std::uint64_t sequence=0;
     std::uint32_t callPC=0;
-    RaceActorId50ID actor=0; // The actual D48 owner for a speech request.
+    // Actual source actor: D48 receiver for pod speech, or the racer60
+    // supplier for an announcer request. Never infer it from the camera slot.
+    RaceActorId50ID actor=0;
     std::uint32_t type=0,racer60=0,variant=0;
 };
 struct DynamicContactEventResult50IW {
@@ -312,25 +314,28 @@ inline DynamicContactEventResult50IW advanceDynamicContactEvent1Subscriber50IW(
         if(!actors.read||!actors.read(actors.context,id,actor))
             return eventResult(S::ActorUnavailable,c.announcerNamed?0x1a5b94:0x1a5bd4);
         if(c.announcerNamed)return eventIssue(c,K::Announcer2C2C20,
-            actor.vehicle60==16u?0x1a5bac:0x1a5bc4,P::AfterAnnouncer,0,2,actor.vehicle60,
-            actor.vehicle60==16u?1u:2u);
+            actor.vehicle60==16u?0x1a5bac:0x1a5bc4,P::AfterAnnouncer,id,2,actor.vehicle60,
+            //1A5978 initializes s2=0; ONLY the AI-partner successful
+            //chance branch at1A5B88 changes it to2. A human partner keeps
+            //variant0, including its genuine generic-probability RNG draw.
+            actor.vehicle60==16u?1u:(c.announcerPartnerHuman?0u:2u));
         if(actor.vehicle60==16u){
             RaceActorSnapshot50ID partner{};
             if(!actors.read(actors.context,c.event.actor0C,partner))
                 return eventResult(S::ActorUnavailable,0x1a5be8);
-            return eventIssue(c,K::Announcer2C2C20,0x1a5bf0,P::AfterAnnouncer,0,2,partner.vehicle60,2);
+            return eventIssue(c,K::Announcer2C2C20,0x1a5bf0,P::AfterAnnouncer,c.event.actor0C,2,partner.vehicle60,2);
         }
-        return eventIssue(c,K::Announcer2C2C20,0x1a5c08,P::AfterAnnouncer,0,1,actor.vehicle60,0);
+        return eventIssue(c,K::Announcer2C2C20,0x1a5c08,P::AfterAnnouncer,id,1,actor.vehicle60,0);
     }
     case P::AfterAnnouncer:c.phase=P::Complete;return eventResult(S::Complete,0x1a5c10);
     case P::Complete:return eventResult(S::Complete,0x1a5c10);
     default:return eventResult(S::WrongEvent,0x1a5940);
     }
 }
-//The existing50IE provider deliberately does not admit announcer types1/2.
 //This exact2C2DF0 profile predicate precedes owner state/RNG writes and can
 //complete the call only when the real profile and event-owner168 are bound.
-//Mode1 retains the full request for its real unjoined downstream owner.
+//Mode1 requires the actual shared50IE owner and authenticated roster banks;
+//this convenience suppression must never acknowledge that live request.
 inline bool completeSuppressedDynamicContactAnnouncer50IW(DynamicContactEventCursor50IW& c,
     const DynamicContactProfile50IW& profile,bool announcer168Bound) noexcept {
     if(!profile.bound||profile.mode11258==1u||!announcer168Bound||!c.pending.sequence||

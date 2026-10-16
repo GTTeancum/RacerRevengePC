@@ -12,7 +12,8 @@ constexpr std::uint32_t unsignedInt = 0x1405;
 constexpr std::uint32_t componentCount = game::vehicleDrawComponentCount50CS;
 constexpr game::VehicleDrawComponent50CM components[] = {
     game::VehicleDrawComponent50CM::chariot, game::VehicleDrawComponent50CM::leftEngine,
-    game::VehicleDrawComponent50CM::rightEngine
+    game::VehicleDrawComponent50CM::rightEngine, game::VehicleDrawComponent50CM::bottomLeftEngine,
+    game::VehicleDrawComponent50CM::bottomRightEngine
 };
 static_assert(std::is_standard_layout<assets::Vertex48B>::value, "GL vertex layout");
 static_assert(sizeof(assets::Vertex48B) == 24 &&
@@ -71,7 +72,9 @@ bool VehicleGlBackend50CV::preflight(void* context, const game::VehicleDrawBatch
         !gl.isVertexArray || !gl.getError || !hooks.ready || !hooks.materialReady ||
         !hooks.begin || !hooks.bindMaterial || !hooks.commit || !hooks.abort) return false;
     const auto& resources = self.resources_;
-    for (std::uint32_t c = 0; c < componentCount; ++c) {
+    if (!game::validVehicleDrawComponentCount50CM(batch.componentCount) ||
+        resources.componentCount != batch.componentCount) return false;
+    for (std::uint32_t c = 0; c < batch.componentCount; ++c) {
         const auto& indices = resources.indices[c];
         if (!indices.buffer || !indices.data || indices.data != batch.component[c].indices ||
             indices.count != batch.component[c].indexCount ||
@@ -81,16 +84,16 @@ bool VehicleGlBackend50CV::preflight(void* context, const game::VehicleDrawBatch
     }
     for (std::uint32_t b = 0; b < 2; ++b) {
         const auto& bank = resources.bank[b];
-        for (std::uint32_t c = 0; c < componentCount; ++c) {
+        for (std::uint32_t c = 0; c < batch.componentCount; ++c) {
             if (!bank.vertexBuffer[c] || !bank.vertexArray[c] ||
                 bank.vertexCapacity[c] < batch.component[c].vertexCount) return false;
             // A writable bank must never alias any retained index object or any
             // other component/bank's VBO or VAO, including the visible bank.
-            for (std::uint32_t other = 0; other < componentCount; ++other)
+            for (std::uint32_t other = 0; other < batch.componentCount; ++other)
                 if (bank.vertexBuffer[c] == resources.indices[other].buffer) return false;
-            for (std::uint32_t earlier = 0; earlier < b * componentCount + c; ++earlier) {
-                const auto& prior = resources.bank[earlier / componentCount];
-                const auto p = earlier % componentCount;
+            for (std::uint32_t earlier = 0; earlier < b * batch.componentCount + c; ++earlier) {
+                const auto& prior = resources.bank[earlier / batch.componentCount];
+                const auto p = earlier % batch.componentCount;
                 if (bank.vertexBuffer[c] == prior.vertexBuffer[p] ||
                     bank.vertexArray[c] == prior.vertexArray[p]) return false;
             }
@@ -100,7 +103,7 @@ bool VehicleGlBackend50CV::preflight(void* context, const game::VehicleDrawBatch
     // Do not issue even a GL query until the owner confirms a current context
     // and verifies resource contents/layouts/capacities beyond these names.
     if (!hooks.ready(hooks.context, resources, inactive, batch, plan) || !self.noGlError()) return false;
-    for (std::uint32_t c = 0; c < componentCount; ++c) {
+    for (std::uint32_t c = 0; c < batch.componentCount; ++c) {
         if (!gl.isBuffer(resources.indices[c].buffer)) return false;
         for (const auto& bank : resources.bank)
             if (!gl.isBuffer(bank.vertexBuffer[c]) || !gl.isVertexArray(bank.vertexArray[c])) return false;
@@ -116,9 +119,10 @@ bool VehicleGlBackend50CV::begin(void* context, const game::VehicleDrawBatch50CO
     auto& self = *static_cast<VehicleGlBackend50CV*>(context);
     if (self.active_) return false;
     self.pendingBank_ = static_cast<std::uint8_t>(self.publishedBank_ ^ 1u);
+    self.activeComponentCount_ = batch.componentCount;
     self.uploaded_ = self.nextComponent_ = self.nextSpan_ = 0;
     self.boundComponent_ = componentCount;
-    for (std::uint32_t c = 0; c < componentCount; ++c) {
+    for (std::uint32_t c = 0; c < batch.componentCount; ++c) {
         self.vertexCount_[c] = batch.component[c].vertexCount;
         self.spanCount_[c] = batch.component[c].spanCount;
     }
@@ -132,7 +136,7 @@ bool VehicleGlBackend50CV::upload(void* context, game::VehicleDrawComponent50CM 
     const assets::Vertex48B* vertices, std::uint32_t count) noexcept {
     auto& self = *static_cast<VehicleGlBackend50CV*>(context);
     const auto c = componentIndex(component);
-    if (!self.active_ || c >= componentCount || !vertices || count != self.vertexCount_[c] ||
+    if (!self.active_ || c >= self.activeComponentCount_ || !vertices || count != self.vertexCount_[c] ||
         (self.uploaded_ & (1u << c)) || self.nextComponent_ || self.boundComponent_ != componentCount)
         return false;
     self.gl_.bindBuffer(arrayBuffer, self.resources_.bank[self.pendingBank_].vertexBuffer[c]);
@@ -148,7 +152,7 @@ bool VehicleGlBackend50CV::bind(void* context, game::VehicleDrawComponent50CM co
     const std::uint32_t* indices, std::uint32_t count) noexcept {
     auto& self = *static_cast<VehicleGlBackend50CV*>(context);
     const auto c = componentIndex(component);
-    if (!self.active_ || c >= componentCount || self.uploaded_ != 7u ||
+    if (!self.active_ || c >= self.activeComponentCount_ || self.uploaded_ != ((1u << self.activeComponentCount_) - 1u) ||
         c != self.nextComponent_ || self.nextSpan_ || self.boundComponent_ != componentCount ||
         indices != self.resources_.indices[c].data || count != self.resources_.indices[c].count) return false;
     self.gl_.bindVertexArray(self.resources_.bank[self.pendingBank_].vertexArray[c]);
@@ -163,16 +167,20 @@ bool VehicleGlBackend50CV::draw(void* context, game::VehicleDrawComponent50CM co
     std::uint32_t ordinal, const assets::SceneSpan48D& span, std::int32_t baseVertex) noexcept {
     auto& self = *static_cast<VehicleGlBackend50CV*>(context);
     const auto c = componentIndex(component);
-    if (!self.active_ || c >= componentCount || self.uploaded_ != 7u ||
+    if (!self.active_ || c >= self.activeComponentCount_ || self.uploaded_ != ((1u << self.activeComponentCount_) - 1u) ||
         self.boundComponent_ != c || self.nextComponent_ != c || ordinal != self.nextSpan_ ||
         ordinal >= self.spanCount_[c] || baseVertex != 0 || span.index_count % 3 ||
         span.index_start > self.resources_.indices[c].count ||
         span.index_count > self.resources_.indices[c].count - span.index_start) return false;
     if (!self.hooks_.bindMaterial(self.hooks_.context, component, span.material_index) ||
         !self.noGlError()) return false;
-    const auto byteOffset = std::uintptr_t(span.index_start) * sizeof(std::uint32_t);
-    self.gl_.drawElementsBaseVertex(triangles, static_cast<std::int32_t>(span.index_count),
-        unsignedInt, reinterpret_cast<const void*>(byteOffset), 0);
+    if (self.hooks_.drawSpan) {
+        if (!self.hooks_.drawSpan(self.hooks_.context, component, ordinal, span, baseVertex)) return false;
+    } else {
+        const auto byteOffset = std::uintptr_t(span.index_start) * sizeof(std::uint32_t);
+        self.gl_.drawElementsBaseVertex(triangles, static_cast<std::int32_t>(span.index_count),
+            unsignedInt, reinterpret_cast<const void*>(byteOffset), 0);
+    }
     if (!self.noGlError()) return false;
     if (++self.nextSpan_ == self.spanCount_[c]) {
         ++self.nextComponent_;
@@ -184,7 +192,7 @@ bool VehicleGlBackend50CV::draw(void* context, game::VehicleDrawComponent50CM co
 
 bool VehicleGlBackend50CV::commit(void* context) noexcept {
     auto& self = *static_cast<VehicleGlBackend50CV*>(context);
-    if (!self.active_ || self.uploaded_ != 7u || self.nextComponent_ != componentCount ||
+    if (!self.active_ || self.uploaded_ != ((1u << self.activeComponentCount_) - 1u) || self.nextComponent_ != self.activeComponentCount_ ||
         self.nextSpan_ || self.boundComponent_ != componentCount || !self.noGlError()) return false;
     if (!self.hooks_.commit(self.hooks_.context, self.pendingBank_)) return false;
     // No GL call or fallible check after publication. The hook owns the final

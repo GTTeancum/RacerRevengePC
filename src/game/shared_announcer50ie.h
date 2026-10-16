@@ -1,9 +1,10 @@
 #pragma once
-// Bounded original2C2C20 owner for the eight retained racers' requests3..8/12. Effects
+// Bounded original2C2C20 owner for bound original racers' requests1..8/12. Effects
 // are synchronous provider calls; resumable phases retain already-returned
 // effects/RNG if a later provider is unavailable. No host speech policy here.
 #include <array>
 #include "original_racer_selection50ij.h"
+#include "shared_random_owner50id.h"
 #include <cfenv>
 #include <cmath>
 #include <cstdint>
@@ -59,6 +60,9 @@ struct AnnouncerProviders50IE {
     // EVERY variant attempt. Probability308030 does not call this beforehand.
     bool (*ensureSelectorSeed)(void*,std::uint32_t& sharedRaw)noexcept=nullptr;
     bool (*leaderTail)(void*,bool& nearHumanLeader)noexcept=nullptr;
+    // Optional only for legacy stand-alone consumers. Live source providers
+    // borrow the SAME application80AC/3D6B38 as collision/lap selectors.
+    DynamicContactRangeOwner50IW* sharedRange=nullptr;
 };
 enum class AnnouncerPhase50IE:std::uint8_t {
     Idle,Gate,QueueChoose,Stop,End,Begin,ImmediateChoose,Select,Selected,Play,CommitEpisode,Done,Fault
@@ -97,12 +101,15 @@ inline AnnouncerResult50IE done(std::uint32_t pc=0x2c2dcc)noexcept{return {Annou
 inline AnnouncerResult50IE need(AnnouncerBoundary50IE b,std::uint32_t pc)noexcept{return {AnnouncerStatus50IE::NeedProvider,b,pc};}
 inline bool namedSpec(unsigned type,unsigned&base,unsigned&count)noexcept {
     switch(type){
+    case 1:base=1;count=3;return true;case 2:base=4;count=3;return true;
     case 3:base=7;count=1;return true;case 4:base=8;count=1;return true;
     case 5:base=9;count=2;return true;case 6:base=11;count=1;return true;
     case 7:base=12;count=2;return true;case 8:base=14;count=2;return true;
     case 12:base=24;count=3;return true;default:return false;}
 }
 inline bool genericSpec(unsigned type,unsigned&base,unsigned&count)noexcept {
+    if(type==1){base=1;count=4;return true;}
+    if(type==2){base=5;count=28;return true;}
     if(type==6){base=33;count=19;return true;}
     if(type==12){base=128;count=23;return true;}return false;
 }
@@ -120,12 +127,14 @@ inline bool initializeAnnouncer50IE(const AnnouncerParameters50IE&p,AnnouncerSta
 inline bool beginAnnouncerRequest50IE(const AnnouncerRequest50IE&r,const AnnouncerGate50IE&g,
                                     AnnouncerCursor50IE&c)noexcept {
     if(c.phase!=AnnouncerPhase50IE::Idle&&c.phase!=AnnouncerPhase50IE::Done)return false;
-    // Cold providers authenticate the selected human's actual named bank.
+    // Cold providers authenticate the actual racers' named banks.
     // Constructor21079C/21081C/210820 ties racer60 to original Pod%02d, not
-    // the host's array position. This join admits only the eight retained IDs.
-    if(!((r.type>=3&&r.type<=8)||r.type==12)||
+    // the host's array position. The live provider separately binds its roster.
+    if(!((r.type>=1&&r.type<=8)||r.type==12)||
         !original_racer_selection50IJ::findByRacer60(r.racer60)||r.variant>2)return false;
-    c={};c.request=r;c.gate=g;c.priority=r.type==12?1:9;c.phase=AnnouncerPhase50IE::Gate;return true;
+    //2C48B0 falls through to priority1 for collision types1/2 and type12.
+    c={};c.request=r;c.gate=g;c.priority=(r.type<=2||r.type==12)?1:9;
+    c.phase=AnnouncerPhase50IE::Gate;return true;
 }
 // Source2C2DF0 ->2C2C20 ->2C4910/4840/4AB0. A provider returning false leaves
 // the exact current phase pending. Do not begin another request or update the
@@ -178,7 +187,17 @@ inline AnnouncerResult50IE resumeAnnouncerRequest50IE(AnnouncerState50IE&s,
         if(!p.ensureSelectorSeed||!p.ensureSelectorSeed(p.context,sharedRaw))
             return need(B::SelectorSeed,c.bank?0x2c3830u:0x2c2f30u);
         const float chosen=mul(static_cast<float>(count),draw(sharedRaw));++c.draws;++c.attempt;
-        if(!std::isfinite(chosen)||chosen<0.f||chosen>=static_cast<float>(count)){
+        // Original range guard initializes AFTER this committed draw. Do not
+        // seed or draw again while retaining the same source selector attempt.
+        bool checkRange=true;
+        if(p.sharedRange){
+            if(!p.sharedRange->lazy80AC){
+                p.sharedRange->rangeCheck3D6B38=1;p.sharedRange->lazy80AC=true;
+            }
+            checkRange=p.sharedRange->rangeCheck3D6B38!=0;
+        }
+        if(!std::isfinite(chosen)||chosen<0.f||chosen>static_cast<float>(count)||
+           (checkRange&&chosen>=static_cast<float>(count))){
             c.faultPC=0x133660;c.phase=P::Fault;
             return {AnnouncerStatus50IE::SourceAssertion,B::None,c.faultPC};}
         const unsigned candidate=base+static_cast<unsigned>(chosen);

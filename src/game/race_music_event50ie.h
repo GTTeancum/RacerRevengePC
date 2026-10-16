@@ -87,6 +87,67 @@ inline RaceMusicPlan50IE planCollisionMusic50IW(const RaceMusicState50IE& s,
     r.status=s.timer128>0.0f?RaceMusicPlanStatus50IE::Refresh:RaceMusicPlanStatus50IE::Play;
     return r;
 }
+// Bounded234440 prefix for the collision stream started in mode40=4 by
+//234900. This is source state and a pending backend request, NOT a gain ramp.
+// The original IOP timed-volume consumer is absent from the retained inputs.
+struct RaceMusicLoopFade23444050IW {
+    bool flag20=false;
+    float retirement6C=0.f,duration70=0.f;
+};
+struct RaceMusicTimedVolume26C8F050IW {
+    std::uint32_t sourcePC=0,helperPC=0;
+    std::int32_t targetVolume=0,argumentA3=0,durationMilliseconds=0;
+};
+enum class RaceMusicLoopFadeStatus50IW : std::uint8_t {
+    Inactive,NeedTimedVolume26C8F0,InvalidInput
+};
+struct RaceMusicLoopFadeResult50IW {
+    RaceMusicLoopFadeStatus50IW status=RaceMusicLoopFadeStatus50IW::InvalidInput;
+    RaceMusicTimedVolume26C8F050IW request{};
+};
+// The owning adapter must prove the initialized source stream and either its
+// absent handle or its actual mode4 playback. It may call this prefix ONCE.
+//234480's absent-handle branch returns0;1A4AF0 ignores that return. The active
+// branch writes flag20,6C,70 before235060 constructs26C8F0's exact arguments.
+// No backend acceptance, command19 enqueue, interpolation, timer advance,
+// source234440 return1, or1A4B44 timer0 store is claimed by NeedTimedVolume.
+inline RaceMusicLoopFadeResult50IW beginCollisionLoopFade23444050IW(
+    bool hasOwnedStreamHandle,RaceMusicLoopFade23444050IW& s) noexcept {
+    if(s.flag20||s.retirement6C!=0.f||s.duration70!=0.f)return {};
+    if(!hasOwnedStreamHandle)return {RaceMusicLoopFadeStatus50IW::Inactive,{}};
+    if(std::fegetround()!=FE_TONEAREST)return {};
+    volatile float retirement=0.35f+1.5f; //23455C..578, f32 addition order.
+    s.flag20=true;s.retirement6C=retirement;s.duration70=1.5f;
+    //235078 converts0 to integer;23509C converts1000*1.5 to1500.
+    // Those exact operands need no guessed general conversion or rounding.
+    return {RaceMusicLoopFadeStatus50IW::NeedTimedVolume26C8F0,
+        {0x2350a8u,0x26c8f0u,0,0,1500}};
+}
+//1A4AB0's ending caller passes1.0. The admitted stream modes are the SAME
+//234900 loop(mode4) and234880 one-shot(mode1) already used by this owner.
+// The adapter explicitly supplies native decoded-PCM remaining seconds for
+// mode1; it must not claim reconstructed original stream64/68 clock parity.
+// Source234598/5AC chooses the short-tail branch before any duration writes.
+inline RaceMusicLoopFadeResult50IW beginEndingMusicFade23444050IW(
+    bool actualLoop,float actualRemainingSeconds,RaceMusicLoopFade23444050IW& s) noexcept {
+    if(s.flag20||s.retirement6C!=0.f||s.duration70!=0.f||
+       std::fegetround()!=FE_TONEAREST||!std::isfinite(actualRemainingSeconds)||
+       (!actualLoop&&actualRemainingSeconds<=0.f))return {};
+    float duration=1.f,retirement=0.f;
+    if(actualLoop){volatile float next=0.35f+1.f;retirement=next;}
+    else if(actualRemainingSeconds<1.f){
+        volatile float tailRetirement=0.9f*actualRemainingSeconds;
+        volatile float tailDuration=0.8f*actualRemainingSeconds;
+        retirement=tailRetirement;duration=tailDuration; //2346D4..23471C.
+    }else{volatile float next=0.25f+1.f;retirement=next;} //234728..234760.
+    volatile float milliseconds=1000.f*duration; //23509C before2350A0.
+    if(!std::isfinite(retirement)||!std::isfinite(duration)||duration<=0.f||
+       retirement<=0.f||milliseconds<0.f||milliseconds>1000.f)return {};
+    const auto rounded=static_cast<std::int32_t>(std::nearbyint(milliseconds));
+    s.flag20=true;s.retirement6C=retirement;s.duration70=duration;
+    return {RaceMusicLoopFadeStatus50IW::NeedTimedVolume26C8F0,
+        {0x2350a8u,0x26c8f0u,0,0,rounded}};
+}
 enum class RaceMusicUpdateStatus50IW : std::uint8_t {Complete,NeedFade234440,InvalidInput};
 struct RaceMusicUpdate50IW {
     RaceMusicUpdateStatus50IW status=RaceMusicUpdateStatus50IW::InvalidInput;
@@ -95,8 +156,9 @@ struct RaceMusicUpdate50IW {
 };
 // Source1A4AF0 timer prefix. Only call once per declared world update. On
 //expiry, the caller MUST retain this exact234440(1.5) request and stop until
-//the real downstream provider returns. timer128's crossed value and the prior
-//latch/mode writes stay committed;1A4B44's timer0 store has NOT happened.
+//the real downstream provider returns (or its proven absent-handle branch).
+//timer128's crossed value and the prior latch/mode writes stay committed;
+//1A4B44's timer0 store has NOT happened.
 inline RaceMusicUpdate50IW beginRaceMusicUpdate50IW(float factor,RaceMusicState50IE& s) noexcept {
     if(std::fegetround()!=FE_TONEAREST||!std::isfinite(factor)||factor<0.f||
        !validRaceMusicState50IE(s))return {};

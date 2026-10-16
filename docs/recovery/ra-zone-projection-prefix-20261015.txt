@@ -1,0 +1,78 @@
+RA zone admission / projection prefix -- additive to integrated warm correction
+
+INACTIVE AND UNTESTED. No tests, builds, syntax checks, converters, sanitizers,
+gameplay, emulation, guest execution, input simulation or central/disc writes.
+The original executable was read only as authenticated source bytes. Source
+word labels and hashes are evidence, not executed or observed gameplay.
+
+Concrete changes
+1. Actual ApplicationEntities owns process admission8BE0/dispatch8BE4 and
+   depth443120/debug443100. Startup100008 zero-fill proves initial values;
+   no race teardown/reset changes them. Application14 null is13FBF8's explicit
+   store.36ADA8's image value1 remains an explicit private entry gate.
+2. Actual Application owns434940. Newly recovered230450..230554 constructs
+   (-1,-1),(-1,1),(1,1),(1,-1), copies with2630F0 and reorders with263730.
+   The native helper calls the existing recovered reorder leaf. This is not
+   a host viewport guess. Static ownership binding joins this constructor
+   side effect for each retained actual portal; numeric portal construction
+   occurred earlier in native cold preparation. Full retail constructor
+   timing is not claimed. No portal means no new quad construction.
+3. Canonical lighting Storage owns stable optional bounds4C, matrix60, A4/A6
+   beside the SAME4C0 row array. It does not copy a registry or allocate a
+   second visibility world. RA uses the existing bounded exclusion reader;
+   unsupported original text/EnvironmentNodeVisible override rejects rather
+   than being normalized. No RA authoring execution/check was performed.
+4. Private retained SourceCamera entry verifies actual rendererCurrentScene0,
+   current fog-adjusted matrices, actual Application, canonical visibility,
+   registered parent38, scene/parent/registration keys, generation and current
+   typed CameraVisibilityLease. No public matrix, viewport, flag, completion
+   token or caller-selected zone can reach the operation.
+5.27F650 prefix increments admission, stamps starting zone and writes source
+   full bounds, clears debug443100, walks actual linked portal order. First
+   hop checks original starting-zone exclusions;27F930 recursion does not.
+   Recursion uses the incoming intersection polygon, never accumulated bounds
+   substituted as a polygon. Bounds union and no-change return preserve order.
+6. After admission, prepares ONLY starting matrix60 through actual280720, then
+   increments dispatch8BE4 and stores itsA6. Stops with phase at27F860 (actual
+   first-method44), preserving the source boundary. It does NOT prematurely
+   prepare neighbor matrices, dispatch27FC40, fallback, selected191 or packet20.
+7. Scope is private partial publication only. CameraVisibilityLease owns its
+   whole consumption lifetime. Ending/invalidation of that lease clears native
+   projection authority while retaining actual written source values. There
+   are NO public matrix/stamp accessors, wreck stamp bindings or ready tokens.
+
+Explicit native admission limits / risks
+- Dynamic27F120 does not initialize stamp/bounds/matrix fields. Optional means
+  unproduced, not an asserted source zero. An unknown stamp is treated as not
+  current in this bounded native prefix; original heap parity is NOT claimed.
+- Refuses16-bit counter wrap, nonzero recursive draw depth, diagnostic owner,
+  depth>256, >65536 recursive visits, invalid topology, exceptional arithmetic,
+  or unsupported authoring. None of these failures becomes a culling decision.
+- The SourceCamera entry is private and UNCALLED. No aggregate API or runtime
+  hook was added. Actual Application root/race/scene dispatch ancestry still
+  must invoke it; camera/fog publication does not establish that ancestry.
+- The function intentionally returns incomplete at real selected-method44.
+  Source order forbids completing all neighbor60/A6 before that callback.
+  No complete zone/selected readiness or GPU submission capability is claimed.
+
+Root source-review checklist (not performed executable checks)
+[ ] Reconcile all8 exact preimage hashes against the integrated warm candidate.
+[ ] Preserve retireRaFreshVehicle's central o.staticAccess fix. Core cpp
+    preimage includes it; unrelated staticBusy gates remain unchanged.
+[ ] Review230450 literal points/copy/reorder against included authenticated words.
+[ ] Review process fields and lifetime; future diagnostic/config writers must
+    use these same owners, never shadow them in a camera/racer snapshot.
+[ ] Review RA exclusion grammar against actual retained source parameters.
+[ ] Review unknown-stamp and no-wrap native-domain decisions before adoption.
+[ ] Review ordered first-hop/recursive polygon handling and prefix failure paths.
+[ ] Confirm no callback is bypassed: first method44 blocks before neighbor60/A6.
+[ ] Join actual root/race/scene dispatch and real per-method selected18 queues
+    before adding any caller, public projection read or draw/wreck stamp bind.
+[ ] Preserve central-only testing and inactive RA trigger/runtime gates.
+
+Outstanding source/runtime joins
+Real selected18/method44 model callbacks; Application278 side effects;
+selected191 -> distance/LOD/fog -> original packet20 timing; neighbor27FC40
+projection/dispatch after actual callbacks; distinct fallback443108;
+renderer barriers and original material/packet/state/GPU emission. No racer
+DrawLease was forged. Original racer AI and authentic assets remain untouched.

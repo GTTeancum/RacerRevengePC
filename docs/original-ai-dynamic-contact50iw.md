@@ -27,7 +27,7 @@ The manager/all-racer failure guard and single-cold-session recovery guard remai
 
 ## First likely remaining boundary
 
-The authentic fresh11050bit2 is set. If any actual58=0,3C=0 racer has positive D20+D24, source222D70 reads vehicle5C and resolves the actual application controller registry before calls222D8C and222DEC. That vehicle/controller binding is not represented for this native mixed fleet. The implementation stops at222D70 with the exact preceding timer/partner prefix and any earlier event0 enqueue retained. It does not invent player index0, disable vibration, execute the later damage pass, or claim either virtual call returned. With a genuine identity/provider later supplied, the next cut is222D8C, followed by222DEC's original amount.
+The authentic fresh11050bit2 remains set. If an actual58=0,3C=0 racer has positive D20+D24, source222D70 resolves vehicle5C in the application controller registry before calls222D8C/+40 and222DEC/+44. The native human path now binds its real source5C0 to retained feedback state, executes238870 and2388B0, then resumes222DF4 without replaying the preceding timers/event0. A keyboard-only device takes the genuine fresh-incapable helper return; a connected gamepad uses actual SDL capability and ordered native motor transport. Missing identities still stop at the exact pending cut. See [native human controller feedback50KZ](native-human-controller-feedback50kz.md) for source evidence, platform scheduling policies and unrun verification limits.
 
 Other actual reached boundaries remain:
 
@@ -36,7 +36,7 @@ Other actual reached boundaries remain:
 - Music timer expiry at1A4B3C ->234440(1.5). The crossed timer/latch/mode prefix is retained, with no invented fade envelope or immediate-stop substitute.
 - Any actual unjoined FIFO subscriber, and all inherited combat, special AI state, route-choice, lap/finish, destruction, portal, undertrack and world-owner boundaries.
 
-Consequently this is an integrated bounded feature candidate, not a claim that ordinary contacts can yet run indefinitely. The smallest next connection is authentic vehicle5C/application-controller registry plus the actual feedback backend, followed by real per-opponent D48 lifetime and announcer types1/2. No guard should be removed by clearing source flags or dropping events.
+Consequently this is an integrated bounded feature candidate, not a claim that ordinary contacts can yet run indefinitely. The feedback connection is represented by50KZ; independently retained per-opponent D48 lifetime and announcer types1/2 boundaries must still be assessed through their actual owners. No guard should be removed by clearing source flags or dropping events.
 
 ## Manual review and bounded future acceptance
 

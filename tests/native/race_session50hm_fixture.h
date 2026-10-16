@@ -40,6 +40,10 @@ struct Racer {
     Observation observed{},live{},pending{};
     bool observedValid=false,sampled=false,finished=false;
     std::uint32_t place=0,finishPlace=0;
+    // Optional one-way native presentation value. Copy the real CD4 marker;
+    // retirement is independent of the CD8/list44 finish and never ranks or
+    // advances this HOST observer. Zero leaves the existing HOST path alone.
+    std::uint32_t retirementCD4=0;
     double remainingDistance=0,finishSeconds=0;
     std::int64_t distanceBucket=0;
 };

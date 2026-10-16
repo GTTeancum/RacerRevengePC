@@ -1,0 +1,66 @@
+RA warm childless rows: additive candidate after integrated7e57c93
+
+STATUS: INACTIVE / UNTESTED. No build, test, syntax check, sanitizer,
+converter, gameplay check, executable game code, or simulated input ran.
+All integration and validation remain root-owned. No central checkout or
+original disc changes. No RA activation, MSAA changes, or trigger claims.
+
+Implemented prerequisite
+- Delay actual fresh row construction until retained geometry cache lookup.
+- Private static-owner-only warm leaf admits real direct-root, childless
+  prototype and canonical per-model graphs; no caller matrix/ready flag.
+-26EAC4..26EB0C copies all four lanes of140/150, radius194 and sets190 bits24.
+  It does NOT copy local matrix, name, aggregate160/170/198,191,19C, or1A0.
+-26EB24..3C seeds root-only flat table count1;28C400 childless return does
+  not write1A0. Thus warm model keeps constructor1A0=0; fresh28CAC0 writes1.
+  This is material to26F070 and241280: only count==1 chooses140/194; warm0
+  uses aggregate160/198. General hierarchy clone remains unsupported.
+- Retain real geometry before warm row continuation; parameter copy remains
+  its own2406E0 operation. Warm handles must equal actual prototype handles.
+  Material acquisitions still occur in the pre-existing earlier native stage;
+  this does not claim full retail acquisition timing or allocation semantics.
+- Packet construction admits owner-private completed rows from either real
+  branch. Public loadedFreshRows28CAC0 remains fresh-only; no forged fresh flag.
+- Geometriless slots and source ordering remain unchanged. Existing observer
+  registration and parent retirement remain explicit. Partial failures retain
+  their owned prefix for the existing close path.
+
+Source review checklist for root (not executed tests)
+[ ] Reconcile exact MANIFEST preimages against integrated7e57c93.
+[ ] Preserve central retireRaFreshVehicle o.staticAccess fix; this package
+    does not modify the lighting cpp or any other staticBusy admission gate.
+[ ] Review warm branch words26EA88..26EB3C, ctor2893A0 and childless28C400.
+[ ] Review fresh / warm / rejected-prefix resource and scene destruction.
+[ ] Review packet friend admission: completed private rows, quantization,
+    real geometry identity and actual1B8 remain required.
+[ ] Confirm actual original material tokens match prototype per slot.
+[ ] Review aggregate bounds publication before warm distance/fog consumption.
+
+Source-selected traversal remains BLOCKED, not implemented by this patch
+- Real4C0 registrations exist, but gameplay zone projections4C..60,
+  admissionA4/A6, application render stamps/counters/dispatch and reached
+  camera114D00 ->27F650 are not yet retained owners in this source snapshot.
+- Real source camera pose/fog publication alone cannot authorize selected191.
+-27EAF0 resets selected18 on each physical block; skip deleted bit1, remove
+  tagbit0, require object03bit0 and !bit2, actual method2C/type02 and entity
+  eligibility, call model slot40 then read actual191 before enqueueEntity+8.
+  Preserve physical order, no sort/dedup/copied registry. Real renderer.slot20
+  barrier follows each block;27ECA0 emits actual queue order for each block.
+-26EFC0 disabled objects clear191 without application278 increment. Ordinary
+  model240C00 callback mutates1B2/191, invokes26F070 only if selected, and
+  increments278 even on cull. Returning1 is not proof of selection.
+-240C00 uses actual policy3833D8/4354F0 and membership/projection rows; special
+  multirow MIN/MAX consumes4C/50 rather than an invented four-coordinate box.
+-26F070 needs its full reached LOD tail beyond the included radial excerpt.
+-241280 must publish original full1B2|(1B3<<8) to packet20 at original timing,
+  before late1B3.bit08 and matrix operations. Palette-only map2 distance
+  behavior must not be applied to the nonpalette branch. Existing distance
+  subset helpers are not a substitute for this owner-selected continuation.
+- Material/packet/state emission joins and source renderer barriers remain
+  missing. No DrawLease was forged and no rendering capability was added.
+
+Evidence
+source-evidence includes bounded original instruction-word labels and exact
+range hashes from authenticated SLUS bytes (read only). These are static
+source evidence, not a disassembler execution, emulator, test or gameplay.
+The four changed files and unified patch are complete in this archive.

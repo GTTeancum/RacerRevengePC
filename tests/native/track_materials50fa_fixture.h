@@ -1,6 +1,9 @@
 #pragma once
 #include "pod_materials50ed_fixture.h"
 #include "track_visual_profile_fixture.h"
+#include "ta_original_members50la_fixture.h"
+#include "original_racer_material_sources50la_fixture.h"
+#include "../../src/assets/original_standard_material_domain50la.h"
 #include "../../src/assets/track_projected_uv.h"
 #include "../../src/assets/import_decode48c.h"
 #include <cfenv>
@@ -40,6 +43,20 @@ struct Request {
     // GC requires its complete original pass set. TA retains the historical
     // single-pass contract and never silently changes material scope.
     bool includeAllAuthoredPasses = false;
+    // Optional original-Main TA/SA racer route. All three are required
+    // together, from the SAME live Application/Video. TA alone admits its two
+    // pinned world models; SA retains its authenticated all-pass world. Other tracks
+    // retain their existing paths. No caller-set readiness or image callback.
+    std::shared_ptr<a::OriginalStandardMaterialDomain50LA> canonicalDomain;
+    std::shared_ptr<const a::OriginalStandardMaterialContext50LA> canonicalContext;
+    a::OriginalStandardMaterialPath50LA canonicalMaterialPath;
+    struct CanonicalRacerModel {
+        const a::OriginalStandardModelResource50LA* resource=nullptr;
+        const a::OriginalStandardMaterialReferences50LA* references=nullptr;
+    };
+    // Actual completed engine resource/ref owners, borrowed for this
+    // cold scan. No alternate table or duplicate26E640 retain is introduced.
+    std::vector<CanonicalRacerModel> canonicalRacerModels;
 };
 struct Selection {
     std::uint64_t assetIdentity = 0;
@@ -55,6 +72,10 @@ struct Selection {
     bool clampU = false, clampV = false;
     std::array<double,16> texGenMatrix{};
     nlohmann::json sourcePassFields; // Exact authenticated original PSM fields.
+    // Diagnostic identities read from the real model1C4 ->382B38 pass ->
+    //383400 resource chain that selected this SAME submitted bank slot.
+    std::int32_t canonicalMaterialRow = -1;
+    std::int16_t canonicalTextureRow = -1;
 
 };
 struct Span {
@@ -66,7 +87,11 @@ struct Span {
 };
 struct Diagnostic {
     std::uint32_t instance = unresolved, surface = unresolved, material = unresolved;
+    const char* stage = "input";
+    std::string sourceMember;
     std::string message;
+    a::OriginalStandardMaterialDiagnostic50LA canonical{};
+    original_racer_material_sources50LA::Diagnostic racerSource{};
     a::MaterialTextureAssetDiagnostic50EA bank{};
 };
 namespace detail {
@@ -140,11 +165,22 @@ struct SourceScene {
     a::Scene48D scene;
     std::vector<std::vector<std::uint32_t>> materialSelections;
     const Json* request = nullptr;
+    int canonicalTarget = -1;
 };
 } // namespace detail
 
 class Owner final {
+    struct CanonicalModel {
+        std::uint32_t worldInstance=unresolved;
+        std::shared_ptr<const a::OriginalStandardModelResource50LA> resource;
+        // This is the actual26E640/1C0/1C4 facet of the existing visual
+        // instance. It does not manufacture a Soultree class tag, unwritten
+        // header bytes, a complete StandardModelPrefix or scene registration.
+        a::OriginalStandardMaterialReferences50LA materials;
+    };
     struct Storage {
+        std::shared_ptr<a::OriginalStandardMaterialDomain50LA> canonicalDomain;
+        std::array<std::unique_ptr<CanonicalModel>,2> canonicalModels;
         a::MaterialTextureAssets50EA bank;
         std::vector<Selection> selections;
         std::vector<Span> spans;
@@ -152,6 +188,51 @@ class Owner final {
         std::vector<a::TrackProjectedUv> projectionUvs;
         std::size_t coldBytes = 0;
     };
+    // Source-neutral cold material operations. Admission remains in load();
+    // these helpers do not select world targets or activate particle owners.
+    // Keep the caller's source vectors alive through world refs/population.
+    static void mountCanonicalArchive(Storage& next,const Request& request,
+        const track_visual_profile_fixture::Profile& profile,
+        const a::ResArchive48C& archive,Diagnostic& d) {
+        using detail::need;
+        auto& diagnostic=d.canonical;
+        next.canonicalDomain=request.canonicalDomain;
+        d.stage="canonical_archive_mounts";
+        const auto& provider=next.canonicalDomain->archiveProvider3E1A70();
+        a::OriginalStandardArchiveProvider50LA::Diagnostic providerDiagnostic;
+        need(provider&&provider->mountAuthenticatedRes(profile.container,profile.archiveSha,
+            profile.archiveBytes,archive,providerDiagnostic)&&provider->sealNativeMounts(providerDiagnostic),
+            "Track complete native archive provider rejected");
+        need(next.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,diagnostic.texture),
+            "Track canonical resolver must borrow the same mounted provider");
+    }
+    static void appendCanonicalSources(Storage& next,const Request& request,
+        std::vector<std::shared_ptr<const a::OriginalStandardMaterialSource50LA>>& originalMaterials,
+        std::vector<a::OriginalStandardTextureSourceInput50LA>& originalTextures,Diagnostic& d) {
+        using detail::need;
+        const auto& provider=next.canonicalDomain->archiveProvider3E1A70();
+        for(const auto& racer:request.canonicalRacerModels){
+            d.stage="canonical_racer_sources";
+            need(racer.resource&&racer.references&&
+                racer.references->table382B38()==next.canonicalDomain->materials382B38().get()&&
+                original_racer_material_sources50LA::appendModelSources(*racer.resource,*racer.references,
+                    *request.canonicalMaterialPath.actualPrefix36B970,*provider,
+                    originalMaterials,originalTextures,d.racerSource),
+                "Track original model material/texture closure rejected");
+        }
+        d.stage="canonical_sources";
+        const bool bound=next.canonicalDomain->appendOriginalSources(originalMaterials,originalTextures,d.canonical);
+        need(bound,"Track original canonical source domain rejected");
+    }
+    static void populateCanonicalMaterials(Storage& next,const Request& request,Diagnostic& d) {
+        using detail::need;
+        auto& diagnostic=d.canonical;
+        d.stage="canonical_population";d.sourceMember.clear();
+        const bool populated=next.canonicalDomain->populate(request.canonicalContext,diagnostic);
+        need(populated,
+            "Track canonical14D370/29E340 population rejected at sourcePC="+
+            std::to_string(diagnostic.sourcePC?diagnostic.sourcePC:diagnostic.texture.sourcePC));
+    }
     std::unique_ptr<Storage> storage_;
 public:
     Owner() = default;
@@ -176,20 +257,32 @@ public:
             d = {};
             const auto& profile = track_visual_profile_fixture::get(request.track);
             const bool ga = request.track == track_source_fixture::Track::ga;
-            // Both authenticated Gamorr profiles preserve world-space roots,
-            // all authored passes and source wrap policy. This is not an alias
-            // of archive/profile identities or static texture selection.
-            const bool gc = request.track == track_source_fixture::Track::gc || ga;
-            need(!gc || request.includeAllAuthoredPasses, "GC requires every authored material pass");
+            const bool ma = request.track == track_source_fixture::Track::ma;
+            const bool sa = request.track == track_source_fixture::Track::sa;
+            // These selected original profiles preserve world-space roots,
+            // every authored pass and source wrap policy. Archive, profile and
+            // source image identities remain independent for every track.
+            const bool gc = request.track == track_source_fixture::Track::gc || ga || ma || sa;
+            need(!gc || request.includeAllAuthoredPasses, "Selected track requires every authored material pass");
             need(!storage_, "Track materials already loaded");
             need(std::fegetround() == FE_TONEAREST, "Track parity requires FE_TONEAREST");
             need(!request.root.empty() && !request.exportReport.empty(), "Explicit retained TA paths required");
             need(request.coldSourceByteCapacity > 0 &&
-                request.coldSourceByteCapacity <= pod_materials50ed_fixture::maxColdSourceBytes,
-                "Explicit bounded TA cold source capacity required");
+                request.coldSourceByteCapacity <= ((ma||sa)?64u*1024u*1024u:pod_materials50ed_fixture::maxColdSourceBytes),
+                "Explicit bounded selected-track cold source capacity required");
             const auto& choice = request.choice;
+            const bool canonical=bool(request.canonicalDomain);
+            const bool canonicalWorld=canonical&&request.track==track_source_fixture::Track::ta;
+            need(canonical==bool(request.canonicalContext)&&
+                canonical==(request.canonicalMaterialPath.actualPrefix36B970!=nullptr),
+                "Track canonical Application/Video/path must be supplied together");
+            need(!canonical||((request.track==track_source_fixture::Track::ta||sa)&&
+                request.canonicalDomain->prepared()&&request.canonicalContext->live()&&
+                *request.canonicalMaterialPath.actualPrefix36B970=="textures\\"&&
+                choice.mipMode==MipMode::largestRetained&&request.decodeSourceTexture),
+                "Track canonical racers require admitted track, actual gameplay directory, live Video and source archive");
             need(!gc || choice.requirement == a::MaterialTextureRequirement50EA::required,
-                "GC requires actual textures for the entire authored material closure");
+                "Selected track requires actual textures for the entire authored material closure");
             // Caller selects authored pass/slot one. GC explicitly requests all
             // source passes below; no absent channel or dropped layer is inferred.
             need(choice.pass == 1 && choice.slot == 1 &&
@@ -217,14 +310,17 @@ public:
                 "Track source archive and decoder must be supplied together");
             a::ResArchive48C archive;
             if (request.decodeSourceTexture) {
+                d.stage="original_archive";
                 const auto archiveBytes = inputs.read(request.sourceArchive, profile.archiveBytes);
                 need(archiveBytes.size() == profile.archiveBytes && sha256(archiveBytes) == profile.archiveSha, "Track original archive identity mismatch");
                 a::DecodeLimits48C limits; limits.resource_file_bytes = profile.archiveBytes;
                 limits.resource_decoded_bytes = profile.archiveDecodedBytes; limits.resource_entries = profile.archiveEntries;
                 a::DecodeError48C error;
-                need(a::decodeResource48C(archiveBytes, archive, error, nullptr, limits),
-                    "Track original archive decode: " + error.code);
+                const bool decoded=a::decodeResource48C(archiveBytes,archive,error,nullptr,limits);
+                need(decoded,"Track original archive decode: "+error.code+
+                    " offset="+std::to_string(error.offset)+" detail="+error.detail);
             }
+            d.stage="retained_selection";
             need(selected.at("schema") == "RR_VISUAL_SELECTION49G_V1" && selected.at("status") == "complete" &&
                 report.at("schema") == "RR_AUTHORED_MESH49G_V1" && report.at("success") == true,
                 "Track selection/export schema/status");
@@ -249,6 +345,41 @@ public:
             need(instances.size() == profile.instances && selected.at("visual_instances").size() == instances.size(),
                 "Track source world instance extent");
             auto next = std::make_unique<Storage>(); next->spans.reserve(profile.drawSpans);
+            if(canonical){
+                d.stage="original_provider";
+                ta_original_members50la_fixture::Sources sources;std::string why;
+                if(canonicalWorld){
+                    const bool prepared=sources.prepare(archive,selected,why);
+                    need(prepared,"Track original TA provider: "+why);
+                }else{
+                    // SA supplies only actual installed racer model sources.
+                    // Its world spans retain the separately authenticated full
+                    // authored-pass path; no TA target/resource pins are reused.
+                    need(sa&&!request.canonicalRacerModels.empty(),
+                        "SA canonical closure requires actual installed racer models");
+                }
+                auto& diagnostic=d.canonical;
+                mountCanonicalArchive(*next,request,profile,archive,d);
+                auto originalMaterials=sources.materials();
+                auto originalTextures=sources.textures();
+                appendCanonicalSources(*next,request,originalMaterials,originalTextures,d);
+                // TA world ownership stays separate from material initialization.
+                // Acquire every admitted reference before the one population.
+                for(std::size_t target=0;canonicalWorld&&target<next->canonicalModels.size();++target){
+                    d.stage="canonical_model_references";
+                    d.sourceMember=ta_original_members50la_fixture::targets[target].modelMember;
+                    auto model=std::make_unique<CanonicalModel>();
+                    model->worldInstance=ta_original_members50la_fixture::targets[target].worldInstance;
+                    model->resource=sources.model(target);
+                    need(model->resource&&model->materials.acquire26E640(*model->resource,
+                        next->canonicalDomain->materials382B38(),request.canonicalMaterialPath,diagnostic),
+                        "Track actual model26E640 material references rejected");
+                    need(model->materials.complete()&&model->materials.count1C0()&&
+                        *model->materials.count1C0()==1,"Track whole-model material count rejected");
+                    next->canonicalModels[target]=std::move(model);
+                }
+                populateCanonicalMaterials(*next,request,d);
+            }
             if (gc) next->projectionUvs.reserve(mesh.vertices.size());
             std::map<std::string, SourceScene> scenes;
             std::map<std::pair<std::string, std::uint32_t>, std::uint32_t> textureIndexes;
@@ -261,9 +392,12 @@ public:
             std::vector<Bytes> bytes;
             std::vector<a::MaterialTextureSlotInput50EA> slots;
             std::size_t rgbaBytes = 0, textureSourceBytes = 0;
+            std::array<std::uint32_t,2> canonicalSubmittedSpans{};
             std::uint32_t nextVertex = 0, nextIndex = 0;
             for (std::uint32_t instanceIndex = 0; instanceIndex < instances.size(); ++instanceIndex) {
                 d.instance = instanceIndex;
+                d.surface=d.material=unresolved;d.stage="instance_selection";
+                d.sourceMember.clear();d.canonical={};
                 const auto& instance = instances.at(instanceIndex);
                 const auto& selectedInstance = selected.at("visual_instances").at(instanceIndex);
                 for (auto it = selectedInstance.begin(); it != selectedInstance.end(); ++it)
@@ -271,9 +405,11 @@ public:
                 const std::string key = instance.at("key");
                 auto found = scenes.find(key);
                 if (found == scenes.end()) {
+                    d.stage="source_scene";
                     const auto rowFound = sceneRows.find(key);
                     need(rowFound != sceneRows.end(), "Track instance scene is unselected");
                     const auto& row = *rowFound->second;
+                    d.sourceMember=row.at("member").get<std::string>();
                     const auto& record = inputs.record(key);
                     need(row.at("status") == "converted_geometry" && record == row.at("native") &&
                         record.at("source_sha256") == row.at("source_sha256") &&
@@ -281,12 +417,16 @@ public:
                     const auto sourceBytes = inputs.selected(row.at("rrscene"), a::max_scene_bytes48d);
                     need(record.at("scene_sha256") == sha256(sourceBytes), "Track scene record hash mismatch");
                     SourceScene source; source.request = &row; std::string why;
-                    need(a::parseSceneAsset48D(sourceBytes, source.scene, why), "Track source scene parse: " + why);
+                    if(canonicalWorld)source.canonicalTarget=ta_original_members50la_fixture::targetIndex(row.at("member"));
+                    const bool parsed=a::parseSceneAsset48D(sourceBytes,source.scene,why);
+                    need(parsed,"Track source scene parse: "+why);
                     const auto& scene = source.scene;
                     need(scene.nodes.size() == 1 && !scene.identity_matrix_palette &&
                         record.at("materials") == Json(scene.materials), "Track single-root source scene/material subset");
                     const auto assetIdentity = static_cast<std::uint64_t>(scenes.size()) + 1;
                     for (std::uint32_t mi = 0; mi < scene.materials.size(); ++mi) {
+                        d.stage="retained_material";
+                        d.canonical={};
                         d.material = mi;
                         source.materialSelections.emplace_back();
                         const auto material = materials.find(scene.materials[mi]);
@@ -331,7 +471,70 @@ public:
                         need(passes.size() == 1 || out.projectedPrelit, "Every layered pass requires recovered ProjectedPrelit");
                         if (out.projectedPrelit) out.texGenMatrix = projection(out.sourcePassFields);
                         out.textureName = pass.at("textures").at(0).at("name").get<std::string>();
+                        const a::OriginalStandardTextureResource50LA* canonicalResource=nullptr;
+                        a::OriginalStandardTextureLevelView50LA canonicalLevel;
+                        if(source.canonicalTarget>=0){
+                            d.stage="canonical_material_pass";
+                            const auto target=static_cast<std::size_t>(source.canonicalTarget);
+                            const auto& definition=ta_original_members50la_fixture::targets[target];
+                            d.sourceMember=definition.materialMember;
+                            const auto& model=*next->canonicalModels[target];
+                            need(mi==0&&pi==0&&key==definition.sceneKey&&scene.materials.size()==1,
+                                "Track canonical whole-model selection mismatch");
+                            const auto* row1C4=model.materials.handle1C4(mi);
+                            auto& diagnostic=d.canonical;
+                            const a::OriginalStandardMaterialObject50LA* material=nullptr;
+                            need(row1C4&&model.materials.table382B38()==next->canonicalDomain->materials382B38().get()&&
+                                next->canonicalDomain->materials382B38()->resolve298E60(*row1C4,material,diagnostic)&&
+                                material&&material->constructed29B550()&&material->passCount48()&&
+                                *material->passCount48()==1&&material->source()&&material->source()->member()&&
+                                *material->source()->member()==definition.materialMember&&material->source()->originalBytes()&&
+                                sha256(*material->source()->originalBytes())==definition.materialSha,
+                                "Track model1C4 canonical whole PSM publication missing");
+                            a::OriginalStandardMaterialPassView50LA actualPass;
+                            need(material->pass4C(pi,actualPass)&&actualPass.references04&&*actualPass.references04>0&&
+                                actualPass.program18&&actualPass.mapCount20&&*actualPass.mapCount20==1&&
+                                actualPass.texture1A&&actualPass.uv1E&&(*actualPass.uv1E)[0]==0&&
+                                actualPass.flags21&&(*actualPass.flags21&2u)&&
+                                material->textures383400()==next->canonicalDomain->textures383400().get(),
+                                "Track canonical material pass/map ownership rejected");
+                            std::int16_t retainedProgram=-1;
+                            const bool programResolved=next->canonicalDomain->programs382B70()->find298C80(
+                                out.program,retainedProgram,diagnostic.program);
+                            need(programResolved&&retainedProgram==*actualPass.program18&&out.program=="PreLitCompressed",
+                                "Track native retained rendering policy differs from canonical program");
+                            // Source row39 spells this "PrelitCompressed";
+                            // retained authored metadata spells "PreLitCompressed".
+                            // The actual source lookup is case-insensitive, but
+                            // retain the authenticated spelling for exact
+                            // requester provenance and existing renderer policy.
+                            d.stage="canonical_texture_resource";d.sourceMember=definition.textureMember;
+                            a::OriginalStandardTextureRowView50LA textureRow;
+                            const auto token=(*actualPass.texture1A)[0];
+                            need(next->canonicalDomain->textures383400()->row(token,textureRow)&&
+                                textureRow.name00&&textureRow.references08&&*textureRow.references08>0&&textureRow.object04&&
+                                *textureRow.name00==std::string("textures\\")+out.textureName,
+                                "Track canonical pass texture token is unresolved");
+                            out.textureName=textureRow.name00->substr(textureRow.name00->find_last_of('\\')+1);
+                            canonicalResource=textureRow.object04;
+                            need(canonicalResource->constructed24DA30()&&canonicalResource->sourceMember()&&
+                                *canonicalResource->sourceMember()==definition.textureMember&&canonicalResource->originalBytes()&&
+                                sha256(*canonicalResource->originalBytes())==definition.textureSha&&
+                                canonicalResource->sourceKind()&&*canonicalResource->sourceKind()==1&&
+                                canonicalResource->formatAC()&&*canonicalResource->formatAC()==8&&
+                                canonicalResource->bitsPerPixelE8()&&*canonicalResource->bitsPerPixelE8()==8&&
+                                canonicalResource->palette208()&&!canonicalResource->palette204()&&
+                                canonicalResource->levelCountB0()&&*canonicalResource->levelCountB0()==5&&
+                                canonicalResource->uploadConversion382FC8()&&*canonicalResource->uploadConversion382FC8()==1&&
+                                canonicalResource->level100(0,canonicalLevel)&&canonicalLevel.sourceMipOrdinal==4&&
+                                canonicalLevel.width104==256&&canonicalLevel.height110==256&&
+                                canonicalLevel.linearSourceIndices&&canonicalLevel.linearSourceBytes==256u*256u&&
+                                (canonicalLevel.flags30KnownMask&4u)&&(canonicalLevel.flags30&4u),
+                                "Track canonical original PST/native selected level rejected");
+                            out.canonicalMaterialRow=*row1C4;out.canonicalTextureRow=token;
+                        }
                         const auto texture = textureRows.find(out.textureName);
+                        d.stage="retained_texture";
                         need(texture != textureRows.end(), "Track exact material texture association absent");
                         const auto& tr = *texture->second; requester = false;
                         for (const auto& r : tr.at("requested_by"))
@@ -351,7 +554,15 @@ public:
                                 out.unresolvedReason == "no_exact_member") {
                                 // Only the independently retained original animated
                                 // resources have an admitted source-frame route.
-                                const bool supportedAtm = gc ?
+                                const auto textureName = normalized(out.textureName);
+                                const bool supportedAtm = ma ?
+                                    (textureName == "MA_CROWD" || textureName == "FLAG_A" ||
+                                     textureName == "FLAG_ANI" || textureName == "FLAG_ARK" ||
+                                     textureName == "FLAG_FUD" || textureName == "FLAG_SUB" ||
+                                     textureName == "FLAG_BCD" || textureName == "FLAG_EFG" ||
+                                     textureName == "FHOLOBEAM") : sa ?
+                                    (textureName == "ARROWRED" || textureName == "MA_CROWD" ||
+                                     textureName == "FHOLOBEAM") : gc ?
                                     (out.textureName == "arrowred" || out.textureName == "s_flaga" ||
                                      out.textureName == "s_flagb" || out.textureName == "s_flagc") :
                                     (out.textureName == "arrowred" || out.textureName == "crowd");
@@ -407,7 +618,7 @@ public:
                             const auto& textureRecord = inputs.record(out.textureKey);
                             need(textureRecord == tr.at("native") && textureRecord.at("type") == "texture" &&
                                 (textureRecord.at("converter") == "rr-native-texture-48E-v1" ||
-                                 (ga && textureRecord.at("converter") == "rr-original-texture-50FC-v1")) &&
+                                 ((ga || ma || sa) && textureRecord.at("converter") == "rr-original-texture-50FC-v1")) &&
                                 textureRecord.at("source_sha256") == tr.at("selected").at("source_sha256"),
                                 "Track texture source record mismatch");
                             const auto& mips = textureRecord.at("mips");
@@ -424,8 +635,19 @@ public:
                                 const auto path = "cacheobjects/" + out.textureKey + "-mip" + std::to_string(index) + ".rrtex";
                                 const auto object = inputs.objects.find(path);
                                 if (object != inputs.objects.end() && object->second.at("extracted") == true &&
-                                    (choice.mipMode == MipMode::largestRetained || index == choice.mipIndex)) picked = &mip;
+                                    (canonicalResource?index==canonicalLevel.sourceMipOrdinal:
+                                        (choice.mipMode == MipMode::largestRetained || index == choice.mipIndex))) picked = &mip;
                             }
+                            // The canonical resource's real largest native
+                            // level selects its source mip. Retained RGBA is a
+                            // lowering of THAT original PST; no independent
+                            // metadata selector or transfer-bytes-as-RGBA path.
+                            if(canonicalResource)need(picked&&mips.size()==5&&
+                                tr.at("selected").at("source_sha256")==sha256(*canonicalResource->originalBytes())&&
+                                tr.at("selected").at("member")==*canonicalResource->sourceMember()&&
+                                number(*picked,"width",1024)==static_cast<std::uint32_t>(canonicalLevel.width104)&&
+                                number(*picked,"height",1024)==static_cast<std::uint32_t>(canonicalLevel.height110),
+                                "Track canonical selected PST/mip has no matching retained RGBA");
                             if (!picked) out.unresolvedReason = "requested_mip_not_retained";
                             else {
                                 out.mipIndex = static_cast<std::uint32_t>(number(*picked, "index", 6));
@@ -452,9 +674,18 @@ public:
                                     out.textureIndex = meta.bankIndex; textureIndexes.emplace(textureKey, meta.bankIndex);
                                     next->textures.push_back(std::move(meta)); bytes.push_back(std::move(retained));
                                 }
+                                if(canonicalResource){
+                                    const auto& retained=next->textures.at(out.textureIndex);
+                                    need(retained.mipIndex==canonicalLevel.sourceMipOrdinal&&
+                                        retained.width==static_cast<std::uint32_t>(canonicalLevel.width104)&&
+                                        retained.height==static_cast<std::uint32_t>(canonicalLevel.height110)&&
+                                        retained.sha256==picked->at("sha256").get<std::string>(),
+                                        "Track shared bank entry differs from canonical texture level");
+                                }
                             }
                         }
-                        need(out.textureIndex != unresolved || choice.requirement == a::MaterialTextureRequirement50EA::optionalUntextured,
+                        need(out.textureIndex != unresolved || (!canonicalResource&&
+                            choice.requirement == a::MaterialTextureRequirement50EA::optionalUntextured),
                             "Required track texture unresolved: " + out.textureName + ": " + out.unresolvedReason);
                         if (gc && out.textureIndex != unresolved) {
                             const auto policy = std::make_pair(out.clampU, out.clampV);
@@ -472,7 +703,16 @@ public:
                     found = scenes.emplace(key, std::move(source)).first;
                 }
                 const auto& source = found->second;
+                d.stage="mesh_span";
+                d.sourceMember=source.request->at("member").get<std::string>();
                 const auto& scene = source.scene;
+                if(source.canonicalTarget>=0){
+                    const auto& model=*next->canonicalModels[static_cast<std::size_t>(source.canonicalTarget)];
+                    need(number(instance,"world_instance_index",profile.maxWorldInstance)==model.worldInstance&&
+                        model.resource->scene()&&scene.materials==model.resource->scene()->materials&&
+                        scene.lods.size()==1&&scene.lods[0].surfaces.size()==1&&scene.spans_lod0.size()==1,
+                        "Track canonical instance whole-model closure mismatch");
+                }
                 need(instance.at("container") == profile.container &&
                     normalized(instance.at("geometry_member")) == normalized(source.request->at("member")),
                     "Track instance geometry/source mismatch");
@@ -543,6 +783,14 @@ public:
                         need(mesh.indices[out.indexStart + ii] == out.vertexStart + surface.indices[ii], "Track source index order mismatch");
                     for (const auto selectedPass : materialPasses) {
                         const auto& selection = next->selections.at(selectedPass);
+                        if(source.canonicalTarget>=0){
+                            const auto target=static_cast<std::size_t>(source.canonicalTarget);
+                            const auto* actual1C4=next->canonicalModels[target]->materials.handle1C4(si);
+                            need(actual1C4&&selection.canonicalMaterialRow==*actual1C4&&
+                                selection.canonicalTextureRow>=0&&selection.textureIndex!=unresolved&&
+                                si==0&&materialPasses.size()==1,"Track submitted span lost its actual model1C4 slot");
+                            ++canonicalSubmittedSpans[target];
+                        }
                         out.materialSelection = selectedPass; out.textureIndex = selection.textureIndex;
                         out.sourcePass = selection.pass; out.sourcePassCount = selection.passCount;
                         out.projectionPass = selection.projectedPrelit ? selection.pass : 0;
@@ -553,13 +801,16 @@ public:
             }
             need(next->spans.size() == profile.drawSpans && (!gc || next->projectionUvs.size() == mesh.vertices.size()) && nextVertex == mesh.vertices.size() && nextIndex == mesh.indices.size(),
                 "Track full source span coverage mismatch");
+            if(canonicalWorld)for(const auto count:canonicalSubmittedSpans)
+                need(count==1,"Track canonical whole-model submitted span missing or duplicated");
             std::vector<a::MaterialTextureAssetInput50EA> textureInput; textureInput.reserve(bytes.size());
             for (std::uint32_t i = 0; i < bytes.size(); ++i) textureInput.push_back({std::uint64_t(i) + 1, &bytes[i]});
             const a::MaterialTextureAssetsInput50EA bankInput{textureInput.data(), static_cast<std::uint32_t>(textureInput.size()),
                 slots.data(), static_cast<std::uint32_t>(slots.size()), budget};
+            d.stage="bank_publication";d.sourceMember.clear();
             need(next->bank.load(bankInput, d.bank), "Track real texture bank rejected");
             next->coldBytes = inputs.sourceBytes; storage_ = std::move(next);
-            d.instance = d.surface = d.material = unresolved; return true;
+            d.instance = d.surface = d.material = unresolved; d.stage="complete";return true;
         } catch (const std::exception& e) { try { d.message = e.what(); } catch (...) {} return false; }
         catch (...) { try { d.message = "Unexpected track cold material failure"; } catch (...) {} return false; }
     }

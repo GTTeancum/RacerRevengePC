@@ -1,0 +1,25 @@
+{
+  "source_commit": "a65e4e381dcb4dda6f0d5abfd0b5fc55026e7345",
+  "source_tree": "404210a8024cab33cd49ed83a4251069d0f46c90",
+  "platform": "Linux",
+  "started_at_utc": "2026-10-12T21:22:00.936021+00:00",
+  "finished_at_utc": "2026-10-12T21:25:05.682514+00:00",
+  "status": "failed",
+  "scope": "Single centralized compile/link basic smoke; no asset preparation, launch, driving or rendering",
+  "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+  "compiled": 133,
+  "reused": 184,
+  "source_count": 317,
+  "link_exit": 0,
+  "build_phase_exit": 0,
+  "postbuild_audit_error": "RuntimeError: Compiler dependency file disagrees with cached metadata",
+  "diagnosis": "Dependency file retains ../ path segments, while incremental-builder metadata stores resolved paths. Original audit compared these textual sets directly. Full audit was not rerun.",
+  "remaining_descendants": [],
+  "kernel_child_proof": {
+    "kernel_waitpid_echild": true,
+    "reaped": []
+  },
+  "next_eligible_utc": "2026-10-12T22:25:05.682514+00:00",
+  "runner_sha256": "3429905f6e1d6c6668bbd1071a2ff22181baa6797ad00d7c05ce00ed9e3d84ea",
+  "incremental_build_receipt_sha256": "30fa129b5b0e11ed4dfe5d82d31552a55176e09b70af9aa1ddbaa6e787f6c639"
+}

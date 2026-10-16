@@ -28,6 +28,13 @@ struct MotionBindingDiagnostic49O {
     std::uint32_t skippedUnknownNodes=0;
     std::size_t firstUnknownOffset=0;
 };
+//152EA0 alone, before either153450 MIR or1530E0 VUT. This always enumerates
+// every original PSG row, including models with NumberOfMotions=0 and models
+// whose actual VUT open fails. Names are uppercased;38/3C start clear.
+// Same fixed-capacity hierarchy/name admission as the combined reader below.
+// No synthetic VUT or motion file is required; output is unchanged on failure.
+bool readMotionNodeEnumeration49O(const PsgHierarchyView49O&,
+    MotionNodeBindings49O&,MotionBindingDiagnostic49O&) noexcept;
 // Fresh source hierarchy enumeration152EA0: emit siblings in source order,
 // then visit each sibling's child group. PSG parents must precede children;
 // exactly one root is admitted. Appending children28CC90/28BF50 establishes
@@ -39,7 +46,9 @@ struct MotionBindingDiagnostic49O {
 // these flags, but they are preserved instead of inventing their meaning.
 // Narrow text admission:1..16384 bytes,1..255 bytes per nonempty line, ASCII
 // identifier names1..49 chars with no whitespace, '=', or ','; LF/CRLF; optional
-// one suffix token. Unknown names fail by default. Explicit sourceDiagnosticSkip
+// one suffix token. Trailing ASCII spaces are source delimiters (15326C/153374),
+// removed after the physical-line bound check; other whitespace stays strict.
+// Unknown names fail by default. Explicit sourceDiagnosticSkip
 // follows the original153248..15325C missing-name branch: leave every row,
 // name, reference and flag unchanged, record the skipped line, then continue.
 // It does not synthesize a row or reinterpret a missing name as another node.

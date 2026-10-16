@@ -1,0 +1,236 @@
+[
+  {
+    "source_path": "D:\\Programming\\GitHub\\RacerRevengePC\\work\\native\\project\\disc\\AUDIO\\SPEECH\\UI\\GASSEL01.VAG",
+    "file": "GASSEL01.VAG",
+    "bytes": 26656,
+    "sha256": "4076d3b4943d5828a0b7977ca0bc9a6e1fdffc1e4a0925f41aed560713183c90",
+    "header48_hex": "000000000000000000000000000067f00000562200000000000000000000000000000000000000000000000000000000",
+    "version_be": 0,
+    "reserved_be": 0,
+    "payload_bytes": 26608,
+    "sample_rate": 22050,
+    "zero_header_except_length_rate": true,
+    "declared_payload_end": 26656,
+    "external_trailing_bytes": 0,
+    "declared_blocks": 1663,
+    "flag_runs": [
+      {
+        "first_block": 0,
+        "last_block": 1660,
+        "flags": 0,
+        "first_file_offset": 48,
+        "end_file_offset_exclusive": 26624
+      },
+      {
+        "first_block": 1661,
+        "last_block": 1661,
+        "flags": 1,
+        "first_file_offset": 26624,
+        "end_file_offset_exclusive": 26640
+      },
+      {
+        "first_block": 1662,
+        "last_block": 1662,
+        "flags": 0,
+        "first_file_offset": 26640,
+        "end_file_offset_exclusive": 26656
+      }
+    ],
+    "first_end_block": 1661,
+    "first_end_file_offset": 26624,
+    "first_end_header_hex": "0c01",
+    "first_end_block_sha256": "996c36ca126e8e5b61b60ed10fb8f20f47637718ad2979a64c55a66e8457434d",
+    "consumed_blocks": 1662,
+    "contract_frame_count": 46536,
+    "unconsumed_payload_bytes": 16,
+    "unconsumed_payload_sha256": "b2ae54503885a87838a4807d838e23fd0831bbf34979a772a493e4661b2bc83f",
+    "unconsumed_block_headers": [
+      {
+        "index": 1662,
+        "file_offset": 26640,
+        "predictor": 0,
+        "shift": 7,
+        "flags": 0,
+        "header_hex": "0700",
+        "consumed_under_reader_contract": false
+      }
+    ],
+    "loop_start_blocks": [],
+    "loop_end_blocks": [],
+    "invalid_consumed_block_headers": [],
+    "consumed_histograms": {
+      "predictor": {
+        "0": 132,
+        "1": 277,
+        "2": 495,
+        "3": 401,
+        "4": 357
+      },
+      "shift": {
+        "0": 2,
+        "1": 174,
+        "2": 452,
+        "3": 393,
+        "4": 202,
+        "5": 59,
+        "6": 64,
+        "7": 72,
+        "8": 78,
+        "9": 73,
+        "10": 37,
+        "11": 33,
+        "12": 23
+      },
+      "flags": {
+        "0": 1661,
+        "1": 1
+      }
+    },
+    "full_payload_histograms": {
+      "predictor": {
+        "0": 133,
+        "1": 277,
+        "2": 495,
+        "3": 401,
+        "4": 357
+      },
+      "shift": {
+        "0": 2,
+        "1": 174,
+        "2": 452,
+        "3": 393,
+        "4": 202,
+        "5": 59,
+        "6": 64,
+        "7": 73,
+        "8": 78,
+        "9": 73,
+        "10": 37,
+        "11": 33,
+        "12": 23
+      },
+      "flags": {
+        "0": 1662,
+        "1": 1
+      }
+    },
+    "embedded_magic_at_reader_probe_offsets": []
+  },
+  {
+    "source_path": "D:\\Programming\\GitHub\\RacerRevengePC\\work\\native\\project\\disc\\AUDIO\\SPEECH\\UI\\GASSEL02.VAG",
+    "file": "GASSEL02.VAG",
+    "bytes": 26512,
+    "sha256": "c647576fb9e438d58b921142c0592041ba2a9ccb0a9db539e0f6ceeb34eb28e9",
+    "header48_hex": "000000000000000000000000000067600000562200000000000000000000000000000000000000000000000000000000",
+    "version_be": 0,
+    "reserved_be": 0,
+    "payload_bytes": 26464,
+    "sample_rate": 22050,
+    "zero_header_except_length_rate": true,
+    "declared_payload_end": 26512,
+    "external_trailing_bytes": 0,
+    "declared_blocks": 1654,
+    "flag_runs": [
+      {
+        "first_block": 0,
+        "last_block": 1651,
+        "flags": 0,
+        "first_file_offset": 48,
+        "end_file_offset_exclusive": 26480
+      },
+      {
+        "first_block": 1652,
+        "last_block": 1652,
+        "flags": 1,
+        "first_file_offset": 26480,
+        "end_file_offset_exclusive": 26496
+      },
+      {
+        "first_block": 1653,
+        "last_block": 1653,
+        "flags": 0,
+        "first_file_offset": 26496,
+        "end_file_offset_exclusive": 26512
+      }
+    ],
+    "first_end_block": 1652,
+    "first_end_file_offset": 26480,
+    "first_end_header_hex": "0c01",
+    "first_end_block_sha256": "996c36ca126e8e5b61b60ed10fb8f20f47637718ad2979a64c55a66e8457434d",
+    "consumed_blocks": 1653,
+    "contract_frame_count": 46284,
+    "unconsumed_payload_bytes": 16,
+    "unconsumed_payload_sha256": "b2ae54503885a87838a4807d838e23fd0831bbf34979a772a493e4661b2bc83f",
+    "unconsumed_block_headers": [
+      {
+        "index": 1653,
+        "file_offset": 26496,
+        "predictor": 0,
+        "shift": 7,
+        "flags": 0,
+        "header_hex": "0700",
+        "consumed_under_reader_contract": false
+      }
+    ],
+    "loop_start_blocks": [],
+    "loop_end_blocks": [],
+    "invalid_consumed_block_headers": [],
+    "consumed_histograms": {
+      "predictor": {
+        "0": 54,
+        "1": 196,
+        "2": 493,
+        "3": 350,
+        "4": 560
+      },
+      "shift": {
+        "0": 2,
+        "1": 94,
+        "2": 314,
+        "3": 479,
+        "4": 230,
+        "5": 92,
+        "6": 85,
+        "7": 79,
+        "8": 58,
+        "9": 85,
+        "10": 61,
+        "11": 30,
+        "12": 44
+      },
+      "flags": {
+        "0": 1652,
+        "1": 1
+      }
+    },
+    "full_payload_histograms": {
+      "predictor": {
+        "0": 55,
+        "1": 196,
+        "2": 493,
+        "3": 350,
+        "4": 560
+      },
+      "shift": {
+        "0": 2,
+        "1": 94,
+        "2": 314,
+        "3": 479,
+        "4": 230,
+        "5": 92,
+        "6": 85,
+        "7": 80,
+        "8": 58,
+        "9": 85,
+        "10": 61,
+        "11": 30,
+        "12": 44
+      },
+      "flags": {
+        "0": 1653,
+        "1": 1
+      }
+    },
+    "embedded_magic_at_reader_probe_offsets": []
+  }
+]

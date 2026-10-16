@@ -1,0 +1,72 @@
+Ryloth native static-light binding — isolated source-only patch
+
+Base: abbf73d740ef23b8529448755d7494c234033e8b
+Tree: 12c4ffb473a0804bf09ba0e3d269b27cdd1c0ef8
+Source ZIP: 11,547,167 bytes
+SHA256: a9b83d548bb8f1609d1605ad90abab2ef204e30dcbe5c889dbb84ec16eaeca45
+The staged bytes matched exactly. Windows xattrs could not be installed.
+
+Delivered scope
+- Private aggregate-owned Binding and SourceCameraPublicationLease retain the
+  actual RA world, lighting Owner and camera OwnershipBridge.
+- The bridge alone issues a publication identity from its actual retained
+  Session, checking published stage, generation, serial and live idle Bank.
+  No caller camera matrix, ready flag, racer DrawLease or fake membership.
+- Reuses authored-zone/top-two numeric selection with the original negative
+  color fold. The private static entry accepts only the actual adapter.
+- Retains each actual placement zone, visual matrix, world-instance identity,
+  UseLighting metadata and original compressed-normal quantization.
+- Snapshots contain selected lights and normal axes. Every aggregate read
+  revalidates camera/world/light lifetimes. Copied values are not draw permits.
+- No renderer, MSAA, trigger, camera advancement, AI or gameplay changes.
+
+Explicit native policy
+Static selection uses the authored one-based placement zone and original SCB
+Position retained in authoredMatrix[12..14]. Snapshot retains its binary64
+source values separately from the finite binary32 native numeric projection.
+Normal axes still use visualMatrix, including identity for world-space PSGs.
+No geometry or normals receive the authored transform a second time.
+This is not retail spatial/cache parity and may differ visibly from PS2.
+Authored UseLighting is retained, not reinterpreted as a native enable switch.
+Existing raster material/fill/alpha/depth fields are untouched.
+
+Review checklist for central owner
+[ ] Review shared selection factoring: racer membership traversal still supplies
+    the same eligible zones; static selection never constructs a membership.
+[ ] Review bridge publication-stage/idle-bank checks and stale rejection after
+    publication change, terminal failure, camera close and world/provider change.
+[ ] Review aggregate reset on failure/close and same-owner pointer binding.
+[ ] Review one-based placement zone and separate authored selection anchor.
+[ ] Review actual source normal quantization[1] and exact normal recovery.
+[ ] Central owner alone performs compilation, integration and Windows tests.
+
+Remaining blockers / deliberately unfinished integration
+This patch does NOT shade RGBA, install a generated static-diffuse renderer
+stream, resolve model ambient/alpha defaults, or publish GPU readiness. Those
+require an explicit recovered-source or documented native ambient/alpha policy.
+The binding therefore remains a cold, fail-closed prerequisite: the aggregate
+has no new camera-advance route, and no snapshot exists until a genuinely
+published SourceCamera already exists. RA admission and trigger geometry remain
+blocked. Coverage targets are untouched for the separate worker.
+
+UNTESTED: No build, test, syntax check, sanitizer, converter, gameplay check,
+emulation or source-program execution was performed. Only archive handling,
+file editing, hashing, source reading and patch packaging were performed.
+
+Anchor revision source review
+- src/assets/import_world48f.cpp:163-165: placement writes Position directly
+  to matrix[12..14]; orientation construction does not alter translation.
+- Same file:270-272: Position comes from the original static-model parameter
+  block and instance.matrix is constructed from those retained source vectors.
+- Same file:292-295: validation compares retained vectors against source fields
+  and the entire matrix against those placement operations.
+- tests/native/ra_static_world50la.h: lowerPlacement explicitly bypasses the
+  root for world-space geometry (source240B04/241678), while the preparation
+  loop retains instance.matrix separately as authoredMatrix.
+- docs/recovery/ryloth-full-static-world-20261015.md, Matrix/vertex policy:
+  SCB replaces local roots; world-space geometry bypasses the root.
+These establish the SCB translation as an authentic placement anchor available
+for the chosen native selection policy. They do not prove original static
+retail lighting's exact query anchor. No centroid, PSG quantization-origin
+offset, camera position or inferred bounds center is substituted.
+The original v1 visual-origin selection is superseded by this v2 contract.

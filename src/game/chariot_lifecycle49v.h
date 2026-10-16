@@ -45,6 +45,11 @@ struct ChariotLifecycleDiagnostic49V {
 // later child cache refresh/physics. Requires vehicle58=0 or1, vehicle40=0 and
 // exactly one of (P,V)=(nonzero,0),(0,nonzero),(nonzero,nonzero), finite positive
 // duration848 and finite nonnegative frameFactor. (0,0) has no stack260 producer.
+// Also admits the actual human state1/2 physical continuation P!=0,V=0:
+// copy physical19C.localC0 to model1B4, skip21BEC4's speed selector, and write
+// vehicle840 from probe10C. This does not create detached state, launch pieces,
+// or widen49W whole-frame admission; those require the real destruction owner.
+// This physical-only route does not validate unused speed/duration operands.
 // Main cached34, local80 XYZ, local angularB4, current probe10C/1D0 and state40
 // are derived exclusively from the immutable canonical main body. Main70/B0
 // copies use its body fields and the actual mainLanes W words after exact reset.

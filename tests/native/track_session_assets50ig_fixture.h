@@ -1,6 +1,9 @@
 #pragma once
+#include "runtime_asset_paths50lb.h"
 #include <cstddef>
 #include <cstring>
+#include <array>
+#include <string>
 
 // Cold session selection. Metadata availability is deliberately distinct from
 // runnable admission: RRWORLD retains original SCB, not PSG/COL/SPL/sky payloads.
@@ -47,6 +50,27 @@ struct SessionAssets {
     bool originalStaticCandidates, tuningInArchive, nativeMode1, materialAudio;
 
 };
+// Own each resolved string for exactly the cold/live session that borrows it.
+// Archive member names remain unchanged; only actual filesystem inputs move.
+class ResolvedSessionAssets final {
+    std::array<std::string,6> paths_;
+public:
+    SessionAssets assets;
+    explicit ResolvedSessionAssets(const SessionAssets& source):assets(source) {
+        const char* inputs[]={source.archive,source.visualRoot,source.visualMesh,
+            source.visualReport,source.skyTextureRoot,source.impactTuning};
+        for(std::size_t i=0;i<paths_.size();++i)
+            paths_[i]=(i==5&&source.tuningInArchive)?inputs[i]:
+                runtime_asset_paths50LB::resolve(inputs[i]).string();
+        assets.archive=paths_[0].c_str();assets.visualRoot=paths_[1].c_str();
+        assets.visualMesh=paths_[2].c_str();assets.visualReport=paths_[3].c_str();
+        assets.skyTextureRoot=paths_[4].c_str();assets.impactTuning=paths_[5].c_str();
+    }
+    ResolvedSessionAssets(const ResolvedSessionAssets&)=delete;
+    ResolvedSessionAssets& operator=(const ResolvedSessionAssets&)=delete;
+    ResolvedSessionAssets(ResolvedSessionAssets&&)=delete;
+    ResolvedSessionAssets& operator=(ResolvedSessionAssets&&)=delete;
+};
 inline constexpr SessionAssets retainedTA{
     &worlds[0],
     "work/native/project/disc/TRACKS/TA.RES",
@@ -91,6 +115,28 @@ inline constexpr SessionAssets retainedGA{
     "063b65cc9a0410ba0393362309fb3f80c4516a3c65ffee2b9f7bc76d1afe25d9",2834942,
     true,true,false,true
 };
+// The remaining original unlocked destinations. Every cold provider still
+// authenticates its own source; a metadata row never substitutes missing data.
+inline constexpr SessionAssets retainedMA{
+    &worlds[4],"work/native/project/disc/TRACKS/MA.RES",
+    "tracks\\mma.spl","tracks\\ama.spl","tracks\\ma.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "evidence/visualMA","evidence/visualMA/export-placed-normal/ma-world.rrmesh",
+    "evidence/visualMA/export-placed-normal/export-report.json","evidence/skyMA",4,1,106,
+    "2a674f62e9d9d9ef9e6c2f7224d2aa0c55aeb883e55c499d58dfd3b00cddb228",3691592,
+    true,true,false,true
+};
+inline constexpr SessionAssets retainedSA{
+    &worlds[8],"work/native/project/disc/TRACKS/SA.RES",
+    "tracks\\msa.spl","tracks\\asa.spl","tracks\\sa.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "evidence/visualSA","evidence/visualSA/export-placed-normal/sa-world.rrmesh",
+    "evidence/visualSA/export-placed-normal/export-report.json","evidence/skySA",4,1,155,
+    "34826bbb3a3690ee20ac40f70515f7e903291cdf4546f7d8ab8d58849f30d96a",3786696,
+    true,true,false,true
+};
 inline bool codeEquals(const char* requested,const char* code) noexcept {
     if(!requested||!requested[0]||!requested[1]||requested[2])return false;
     for(unsigned i=0;i<2;++i){
@@ -110,7 +156,9 @@ inline const WorldMetadata* findWorld(const char* code) noexcept {
 inline const SessionAssets* sessionAssets(const WorldMetadata& world) noexcept {
     return codeEquals(world.code,"TA")?&retainedTA:
         codeEquals(world.code,"GC")?&retainedGC:
-        codeEquals(world.code,"GA")?&retainedGA:nullptr;
+        codeEquals(world.code,"GA")?&retainedGA:
+        codeEquals(world.code,"MA")?&retainedMA:
+        codeEquals(world.code,"SA")?&retainedSA:nullptr;
 }
 inline const SessionAssets* select(const char* code,const char*& error) noexcept {
     const auto* world=findWorld(code);

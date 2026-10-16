@@ -1,0 +1,229 @@
+{
+  "archives": [
+    {
+      "path": "UI/UIBKG.RES",
+      "bytes": 1330049,
+      "sha256": "67b7774815bd4352e72103160e323c00e062f2e2845e05e9720b38796185091f",
+      "members": [
+        {
+          "name": "ui\\textures\\07_bkg.pst",
+          "index_file_offset": 442,
+          "logical_offset": 589824,
+          "bytes": 132124,
+          "sha256": "b66c62f4f956e76bde4d12581f01138182ddc765bb9d521673c05c814ebf8d7c",
+          "compressed_blocks": [
+            {
+              "index": 24,
+              "file_offset": 236527,
+              "bytes": 9844
+            },
+            {
+              "index": 25,
+              "file_offset": 246372,
+              "bytes": 9907
+            },
+            {
+              "index": 26,
+              "file_offset": 256280,
+              "bytes": 11191
+            },
+            {
+              "index": 27,
+              "file_offset": 267472,
+              "bytes": 11930
+            },
+            {
+              "index": 28,
+              "file_offset": 279403,
+              "bytes": 11572
+            },
+            {
+              "index": 29,
+              "file_offset": 290976,
+              "bytes": 4715
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 131072,
+                "width": 512,
+                "height": 256,
+                "sha256": "f70ca5d9258f2c6b6b07325c9c039faa039758e05a7a87f0ea471f52e5d27abc"
+              }
+            ],
+            "end_offset": 132124
+          }
+        }
+      ]
+    },
+    {
+      "path": "UI/UIRIDER/UIRIDER.RES",
+      "bytes": 5552683,
+      "sha256": "112cd71ac9cfcc909b0edb56e0e420bb358b7078b5abae5f48c62b95a6bbf856",
+      "members": [
+        {
+          "name": "ui\\textures\\podstat.pst",
+          "index_file_offset": 1660,
+          "logical_offset": 0,
+          "bytes": 17436,
+          "sha256": "27570674c90afaf822cf2bf541764d918c2a21838987b67adc3fd451fbca62cf",
+          "compressed_blocks": [
+            {
+              "index": 0,
+              "file_offset": 19425,
+              "bytes": 487
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 16384,
+                "width": 128,
+                "height": 128,
+                "sha256": "0472cd08f63425e40b98b619ee624030462c1622ee5b3e980bd3b35941f8a2fc"
+              }
+            ],
+            "end_offset": 17436
+          }
+        },
+        {
+          "name": "ui\\textures\\podstat2.pst",
+          "index_file_offset": 1875,
+          "logical_offset": 147456,
+          "bytes": 17436,
+          "sha256": "54a0d53366d64898ae431b225469688b776e26cba3f3995ac5fcfbd6b54635fe",
+          "compressed_blocks": [
+            {
+              "index": 6,
+              "file_offset": 23473,
+              "bytes": 191
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 16384,
+                "width": 128,
+                "height": 128,
+                "sha256": "b91f329dcaa4e91bfa47d341ea8679373e8807d49696ad401a00ef350f43acee"
+              }
+            ],
+            "end_offset": 17436
+          }
+        },
+        {
+          "name": "ui\\textures\\notch.pst",
+          "index_file_offset": 1911,
+          "logical_offset": 172032,
+          "bytes": 1308,
+          "sha256": "e7d65fd8b3029f3c800b89888dfdb3609762010756076f38484452a80d88b422",
+          "compressed_blocks": [
+            {
+              "index": 7,
+              "file_offset": 23665,
+              "bytes": 66
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 256,
+                "width": 16,
+                "height": 16,
+                "sha256": "2661920f2409dd6c8adeb0c44972959f232b6429afa913845d0fd95e7e768234"
+              }
+            ],
+            "end_offset": 1308
+          }
+        },
+        {
+          "name": "ui\\textures\\specmap1.pst",
+          "index_file_offset": 2929,
+          "logical_offset": 884736,
+          "bytes": 66588,
+          "sha256": "d928592fbf2b0b7bd47075992bdcef7c9be426a766994148dce98ea2360f3f84",
+          "compressed_blocks": [
+            {
+              "index": 36,
+              "file_offset": 106471,
+              "bytes": 4486
+            },
+            {
+              "index": 37,
+              "file_offset": 110958,
+              "bytes": 4302
+            },
+            {
+              "index": 38,
+              "file_offset": 115261,
+              "bytes": 376
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 65536,
+                "width": 256,
+                "height": 256,
+                "sha256": "6bd3913964833cb36dbf06d3900cb2052ef3db198be1695f46043f192268a9eb"
+              }
+            ],
+            "end_offset": 66588
+          }
+        }
+      ]
+    }
+  ],
+  "exact_authored_audio_paths": [
+    {
+      "path": "AUDIO/SPEECH/UI/GASSEL01.VAG",
+      "present": true,
+      "bytes": 26656,
+      "sha256": "4076d3b4943d5828a0b7977ca0bc9a6e1fdffc1e4a0925f41aed560713183c90"
+    },
+    {
+      "path": "AUDIO/SPEECH/UI/GASSEL02.VAG",
+      "present": true,
+      "bytes": 26512,
+      "sha256": "c647576fb9e438d58b921142c0592041ba2a9ccb0a9db539e0f6ceeb34eb28e9"
+    },
+    {
+      "path": "AUDIO/SFX/RACE/GEN2_NGN.VAG",
+      "present": true,
+      "bytes": 23888,
+      "sha256": "b94dd496dcdb953e60921ee32412ca31ad6f6a2801441828bca34fa1b2e5b895"
+    },
+    {
+      "path": "AUDIO/SFX/RACE/AS_BEAM.VAG",
+      "present": true,
+      "bytes": 7744,
+      "sha256": "52f6ed8fd30bacb5d8058da66e611273310ce9bdf99d74161b7689f6d78ec7d4"
+    }
+  ]
+}

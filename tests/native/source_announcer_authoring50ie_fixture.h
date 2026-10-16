@@ -1,6 +1,6 @@
 #pragma once
 // Cold metadata only. This does not decode PCM, create mixer voices, select a
-// live event, or attach the unfinished announcer owner to the native frame.
+// live event, or perform a live announcer request.
 #include "pod_materials50ed_fixture.h"
 #include "original_player_identity50ik_fixture.h"
 #include "../../src/assets/audio_assets50hc.h"
@@ -16,6 +16,8 @@ struct AuthoredCue {
 struct Authoring {
     rr::game::AnnouncerParameters50IE parameters{};
     std::vector<AuthoredCue> cues;
+    std::array<bool,27> namedBanks{};
+    bool collisionRequests=false;
 };
 namespace detail {
 inline std::string_view trim(std::string_view s)noexcept {
@@ -56,33 +58,57 @@ inline std::vector<rr::assets::AudioRequest50HC> events(
 }
 }
 inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std::string&error,
-    std::uint32_t playerRacer60=1) {
+    std::uint32_t playerRacer60=1,const std::uint32_t* actualRacer60=nullptr,
+    std::size_t actualRacerCount=0) {
     namespace d=pod_materials50ed_fixture::detail;
     try {
-        d::Inputs input;input.capacity=16384;
-        const auto* identity=original_player_identity50IK::find(playerRacer60);
-        d::need(identity,"50IK named announcer player identity unsupported");
-        const auto podBytes=identity->announcerBytes;
+        const bool roster=actualRacerCount!=0;
+        d::need((actualRacer60!=nullptr)==roster&&actualRacerCount<=8,
+            "50IE invalid actual announcer roster extent");
+        Authoring next;next.parameters={.80f,7.f};next.collisionRequests=roster;
+        const std::size_t count=roster?actualRacerCount:1;
+        for(std::size_t i=0;i<count;++i){
+            const auto racer=roster?actualRacer60[i]:playerRacer60;
+            d::need(racer<next.namedBanks.size()&&original_player_identity50IK::find(racer)&&
+                rr::game::original_racer_selection50IJ::findByRacer60(racer),
+                "50IE actual named announcer identity unsupported");
+            d::need(!next.namedBanks[racer],"50IE duplicate actual announcer racer60");
+            next.namedBanks[racer]=true;
+        }
+        d::need(playerRacer60<next.namedBanks.size()&&next.namedBanks[playerRacer60],
+            "50IE selected racer is absent from actual announcer roster");
+        // One generic INI, one SPCHPCT, at most eight2496-byte named INIs.
+        // These are cold metadata reads only; no selector or RNG is touched.
+        d::Inputs input;input.capacity=32768;
         const auto generic=input.read(discRoot/"AUDIO/SPEECH/DAX/INRACE/GEN_ANN.INI",11704);
-        const auto pod=input.read(original_player_identity50IK::announcerPath(discRoot,*identity),podBytes);
         const auto percentages=input.read(discRoot/"AUDIO/SPCHPCT.INI",255);
         d::need(generic.size()==11704&&d::sha256(generic)==
             "24adbcb8784b20fab3d1f97650ffcb3bf12d0c3846b84b7f2477796dfbdcf6ab","50IE original GEN_ANN.INI differs");
-        d::need(pod.size()==podBytes&&d::sha256(pod)==identity->announcerSha256,
-            std::string("50IE original selected named announcer differs: ")+identity->podId);
         d::need(percentages.size()==255&&d::sha256(percentages)==
             "24c2967388a31d04761fb11208faaae43a4ae7b9b88b40291bf64daf195c018c","50IE original SPCHPCT.INI differs");
         const std::string_view pct(reinterpret_cast<const char*>(percentages.data()),percentages.size());
         d::need(pct.find("DaxGenericPercent=0.80f")!=pct.npos&&pct.find("DaxSpeechDelay=7.0f")!=pct.npos,
             "50IE original announcer fields absent");
-        // Original POD01/POD11 have29 events; other retained pods also author
-        // Track Favorite30. Parse the true count, retaining represented keys.
-        auto g=detail::events(generic,150),p=detail::events(pod,identity->announcerEvents);
-        Authoring next;next.parameters={.80f,7.f};next.cues.reserve(54);
-        for(unsigned key=33;key<=51;++key)next.cues.push_back({0,key,g[key-1]});
-        for(unsigned key=7;key<=15;++key)next.cues.push_back({playerRacer60,key,p[key-1]});
+        const auto g=detail::events(generic,150);
+        next.cues.reserve(roster?74+18*count:54);
+        //2C2FBC/2C30CC select generic1..4/5..32 for collision types1/2.
+        for(unsigned key=roster?1u:33u;key<=51;++key)next.cues.push_back({0,key,g[key-1]});
         for(unsigned key=128;key<=150;++key)next.cues.push_back({0,key,g[key-1]});
-        for(unsigned key=24;key<=26;++key)next.cues.push_back({playerRacer60,key,p[key-1]});
+        //2C4B30 creates each bank from actual manager racer60, independently
+        // of vehicle58. This also permits the real AI event5 type12 fallback.
+        for(std::size_t i=0;i<count;++i){
+            const auto racer=roster?actualRacer60[i]:playerRacer60;
+            const auto& identity=*original_player_identity50IK::find(racer);
+            const auto pod=input.read(original_player_identity50IK::announcerPath(discRoot,identity),
+                identity.announcerBytes);
+            d::need(pod.size()==identity.announcerBytes&&d::sha256(pod)==identity.announcerSha256,
+                std::string("50IE original named announcer differs: ")+identity.podId);
+            // Original POD01/POD11 author29 events, other retained pods30.
+            const auto p=detail::events(pod,identity.announcerEvents);
+            for(unsigned key=roster?1u:7u;key<=15;++key)next.cues.push_back({racer,key,p[key-1]});
+            for(unsigned key=24;key<=26;++key)next.cues.push_back({racer,key,p[key-1]});
+        }
+        d::need(next.cues.size()==(roster?74+18*count:54),"50IE semantic roster count differs");
         for(const auto&c:next.cues)d::need(!c.request.loop&&!c.request.stereo&&c.request.stream,
             "50IE original announcer delivery flags differ");
         out=std::move(next);error.clear();return true;

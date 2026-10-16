@@ -1,4 +1,5 @@
 #include "original_ui_material_binding50kg.h"
+#include "original_ui_controls_specmap50kg.h"
 #include <utility>
 
 namespace rr::assets {
@@ -36,7 +37,7 @@ bool OriginalUiMaterialBindingState50KG::recordDrainedBinding(const OriginalUiIm
             !source->pstBytes||source->pstOffset>source->memberIdentity->bytes||
             source->pstBytes>source->memberIdentity->bytes-source->pstOffset)
             return fail(d,E::provenance,0x2472f8);
-        if(texture->revision!=1||texture->flags||texture->kind>2||
+        if(texture->revision!=1||texture->flags||(texture->kind>2&&!(texture->kind==originalUiControlsTga1555Kind50KG&&isOriginalUiControlsSpecmap50KG(source->memberIdentity)))||
             texture->mips.empty()||texture->mips.size()>7)
             return fail(d,E::policy,0x24e790);
         const auto& base=texture->mips.back();
@@ -51,7 +52,8 @@ bool OriginalUiMaterialBindingState50KG::recordDrainedBinding(const OriginalUiIm
             if(!ipum||ipum->colorPolicyKind!=OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1||
                 source->pstOffset||source->pstBytes!=source->memberIdentity->bytes||
                 ipum->sourcePstSha256!=source->memberIdentity->sha256||
-                texture->mips.size()!=originalUiIpumMipCount50KG)
+                !ipum->mipCount||ipum->mipCount>originalUiIpumMipCount50KG||
+                texture->mips.size()!=ipum->mipCount)
                 return fail(d,E::policy,0x249818);
             ipumPolicy=ipum->colorPolicyKind;
         }else if(images->ipumProvenance(index))return fail(d,E::policy,0x249818);

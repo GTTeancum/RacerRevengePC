@@ -1,0 +1,544 @@
+{
+  "MA": {
+    "archive_bytes": 3691592,
+    "archive_decoded_bytes": 15532032,
+    "archive_entries": 485,
+    "archive_sha256": "2a674f62e9d9d9ef9e6c2f7224d2aa0c55aeb883e55c499d58dfd3b00cddb228",
+    "atm_members": [
+      {
+        "48F_status": "unsupported",
+        "bytes": 49861,
+        "logical_offset": 13074432,
+        "name": "textures\\MA_Crowd.atm",
+        "path": "textures/MA_Crowd.atm",
+        "sha256": "054ce086e15886a331f0da2fb610479e665413c917a9f9ab634ab133fc582b38"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 98835,
+        "logical_offset": 13885440,
+        "name": "textures\\flag_a.atm",
+        "path": "textures/flag_a.atm",
+        "sha256": "6cf7325c75752337f462c67d1897bcd7c9d2085d3e06ab26abdf643ddda4fd79"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 89076,
+        "logical_offset": 14008320,
+        "name": "textures\\Flag_Ani.atm",
+        "path": "textures/Flag_Ani.atm",
+        "sha256": "0f8816c9b16bd1acc93ab98023d00140e38e29aea1e95befcabf7c02d9225c8f"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 72783,
+        "logical_offset": 14155776,
+        "name": "textures\\Flag_Ark.atm",
+        "path": "textures/Flag_Ark.atm",
+        "sha256": "425d7e7db29e0d103b23e0c21981fd750499a22c0ee7eedde017bb82eb3d137a"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 49040,
+        "logical_offset": 14229504,
+        "name": "textures\\Flag_Fud.atm",
+        "path": "textures/Flag_Fud.atm",
+        "sha256": "ad40724a358ceaec3b0503bacb6ba1c6b70d691561f19305a1ae6ccfd3d4b5fe"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 78362,
+        "logical_offset": 14278656,
+        "name": "textures\\Flag_Sub.atm",
+        "path": "textures/Flag_Sub.atm",
+        "sha256": "dee8c070e8f3e5c75054894c34ec487f4db5f5bd56eeb822ae2ccd1fade4c840"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 102803,
+        "logical_offset": 14524416,
+        "name": "textures\\flag_bcd.atm",
+        "path": "textures/flag_bcd.atm",
+        "sha256": "322a0755031eda7a54333b9deb0fed342d32b6f31b3203ec9200361c2db8be61"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 106791,
+        "logical_offset": 14647296,
+        "name": "textures\\flag_efg.atm",
+        "path": "textures/flag_efg.atm",
+        "sha256": "2f6913733bac4cc67f349e57cd06a2548bc5504bcc96dfa279fc29c5600bc4f8"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 9676,
+        "logical_offset": 15212544,
+        "name": "textures\\fholobeam.atm",
+        "path": "textures/fholobeam.atm",
+        "sha256": "3013cb65a05f43857af0144e0d9f6e04b7e26173f94e363b5eacfb967b6ccb9f"
+      }
+    ],
+    "collision_instances": 106,
+    "cub": {
+      "48F_status": "unsupported",
+      "bytes": 227791,
+      "logical_offset": 9854976,
+      "name": "skies\\ma.cub",
+      "path": "skies/ma.cub",
+      "sha256": "c8bc416fca9f89351a76b7acd23195d661783fde6dcd3d9050f535caf8beae61"
+    },
+    "fog_fields": [
+      {
+        "entry_offset": 29570,
+        "name": "colorrgb",
+        "value": "166,173,184",
+        "value_bytes": 12,
+        "value_offset": 29699
+      },
+      {
+        "entry_offset": 29613,
+        "name": "haziness",
+        "value": "1.0",
+        "value_bytes": 4,
+        "value_offset": 29715
+      },
+      {
+        "entry_offset": 29656,
+        "name": "visibility",
+        "value": "1.0",
+        "value_bytes": 4,
+        "value_offset": 29711
+      }
+    ],
+    "fog_rgb": "166,173,184",
+    "fog_visibility": "1.0",
+    "instances": 1051,
+    "inventory_sha256": "5a51bf1025e4a0e7b49b8051e87b966f6641a6d57e373f47c59d1ced772778ae",
+    "inventory_v2_generation_sha256": "3cf500075d2f31e3930d5e74896a3068ca596fba3f47475ba9c4643bcbf60b39",
+    "inventory_v2_schema": "RR_ORIGINAL_MA_MEMBER_INVENTORY_V2",
+    "inventory_v2_sha256": "312c19e72a8b77c4f1553ef36ac32a3aacdd3a15b4d9a45d68986247dbdcdc4b",
+    "missing_geometry": 89,
+    "portals": 10,
+    "reference_sha256": "eee4fcf76ae8e568b2e63ba431ca4ae7ae6e1682ec5953436fffb824e334cf64",
+    "scb": {
+      "48F_status": "converted_world",
+      "bytes": 404992,
+      "logical_offset": 98304,
+      "name": "tracks\\ma.scb",
+      "path": "tracks/ma.scb",
+      "sha256": "5766af3e7a0bba0644058ae6f31eab802cadd9be7cc71911c349f603c7ca873b"
+    },
+    "sky_fields": [
+      {
+        "entry_offset": 29222,
+        "name": "cubefile",
+        "value": "ma.cub",
+        "value_bytes": 7,
+        "value_offset": 29533
+      },
+      {
+        "entry_offset": 29265,
+        "name": "particletexturemapname",
+        "value": "demoprt.tga",
+        "value_bytes": 12,
+        "value_offset": 29554
+      },
+      {
+        "entry_offset": 29308,
+        "name": "terrainbreadth",
+        "value": "5",
+        "value_bytes": 2,
+        "value_offset": 29542
+      },
+      {
+        "entry_offset": 29351,
+        "name": "terrainbreadthscale",
+        "value": "24.0",
+        "value_bytes": 5,
+        "value_offset": 29549
+      },
+      {
+        "entry_offset": 29394,
+        "name": "terrainfile",
+        "value": "nat13.trn",
+        "value_bytes": 10,
+        "value_offset": 29523
+      },
+      {
+        "entry_offset": 29437,
+        "name": "terrainwidth",
+        "value": "5",
+        "value_bytes": 2,
+        "value_offset": 29540
+      },
+      {
+        "entry_offset": 29480,
+        "name": "terrainwidthscale",
+        "value": "24.0",
+        "value_bytes": 5,
+        "value_offset": 29544
+      }
+    ],
+    "sky_palette_count": 256,
+    "sky_tile_descriptor": [
+      0,
+      32,
+      0,
+      16,
+      4096,
+      4,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sky_visible_authored_zones": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "zones": 9
+  },
+  "SA": {
+    "archive_bytes": 3786696,
+    "archive_decoded_bytes": 29638656,
+    "archive_entries": 1065,
+    "archive_sha256": "34826bbb3a3690ee20ac40f70515f7e903291cdf4546f7d8ab8d58849f30d96a",
+    "atm_members": [
+      {
+        "48F_status": "unsupported",
+        "bytes": 114312,
+        "logical_offset": 27795456,
+        "name": "textures\\arrowred.atm",
+        "path": "textures/arrowred.atm",
+        "sha256": "dbfdaf3d44918c86254ae9f39f4146cc101c363e1fb9e2cda43bb8c0ea99b220"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 49861,
+        "logical_offset": 27967488,
+        "name": "textures\\MA_Crowd.atm",
+        "path": "textures/MA_Crowd.atm",
+        "sha256": "054ce086e15886a331f0da2fb610479e665413c917a9f9ab634ab133fc582b38"
+      },
+      {
+        "48F_status": "unsupported",
+        "bytes": 9676,
+        "logical_offset": 29343744,
+        "name": "textures\\fholobeam.atm",
+        "path": "textures/fholobeam.atm",
+        "sha256": "3013cb65a05f43857af0144e0d9f6e04b7e26173f94e363b5eacfb967b6ccb9f"
+      }
+    ],
+    "collision_instances": 155,
+    "cub": {
+      "48F_status": "unsupported",
+      "bytes": 242613,
+      "logical_offset": 22831104,
+      "name": "skies\\sullust.cub",
+      "path": "skies/sullust.cub",
+      "sha256": "0cb2c1389889318ec806edafe7779ae74fde5d4dc1fc2040e3a4e36da6cfd61d"
+    },
+    "fog_fields": [
+      {
+        "entry_offset": 57955,
+        "name": "colorrgb",
+        "value": "18,21,22",
+        "value_bytes": 9,
+        "value_offset": 58084
+      },
+      {
+        "entry_offset": 57998,
+        "name": "haziness",
+        "value": "1",
+        "value_bytes": 2,
+        "value_offset": 58093
+      },
+      {
+        "entry_offset": 58041,
+        "name": "visibility",
+        "value": "1",
+        "value_bytes": 2,
+        "value_offset": 58095
+      }
+    ],
+    "fog_rgb": "18,21,22",
+    "fog_visibility": "1",
+    "instances": 1869,
+    "inventory_sha256": "c112f1f12214f887774003717d7ff18b83df8a935e2097389f889ab7c3897cc2",
+    "inventory_v2_generation_sha256": "3cf500075d2f31e3930d5e74896a3068ca596fba3f47475ba9c4643bcbf60b39",
+    "inventory_v2_sha256": "4e67977f5fb8df9221486ab18ef16e94c3ccda2f4fb8bfbe9cb1484d43f425fe",
+    "missing_geometry": 154,
+    "portals": 25,
+    "reference_sha256": "e7ca1e07e0f20cf67eae270d872b1dc1c36be13280e230a0fee6a33ac6c79cc2",
+    "scb": {
+      "48F_status": "converted_world",
+      "bytes": 813441,
+      "logical_offset": 73728,
+      "name": "tracks\\sa.scb",
+      "path": "tracks/sa.scb",
+      "sha256": "dd38f087f0438b2e1279651fe3b4f525b053c90d34cf5365d6bf4ec6c7d1d394"
+    },
+    "sky_fields": [
+      {
+        "entry_offset": 56432,
+        "name": "cubefile1",
+        "value": "sullust.cub",
+        "value_bytes": 12,
+        "value_offset": 57889
+      },
+      {
+        "entry_offset": 56475,
+        "name": "cubefileforzone1",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57901
+      },
+      {
+        "entry_offset": 56518,
+        "name": "cubefileforzone10",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57919
+      },
+      {
+        "entry_offset": 56561,
+        "name": "cubefileforzone11",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57921
+      },
+      {
+        "entry_offset": 56604,
+        "name": "cubefileforzone12",
+        "value": "1",
+        "value_bytes": 2,
+        "value_offset": 57923
+      },
+      {
+        "entry_offset": 56647,
+        "name": "cubefileforzone13",
+        "value": "1",
+        "value_bytes": 2,
+        "value_offset": 57925
+      },
+      {
+        "entry_offset": 56690,
+        "name": "cubefileforzone14",
+        "value": "1",
+        "value_bytes": 2,
+        "value_offset": 57927
+      },
+      {
+        "entry_offset": 56733,
+        "name": "cubefileforzone15",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57929
+      },
+      {
+        "entry_offset": 56776,
+        "name": "cubefileforzone16",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57931
+      },
+      {
+        "entry_offset": 56819,
+        "name": "cubefileforzone17",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57933
+      },
+      {
+        "entry_offset": 56862,
+        "name": "cubefileforzone18",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57935
+      },
+      {
+        "entry_offset": 56905,
+        "name": "cubefileforzone19",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57937
+      },
+      {
+        "entry_offset": 56948,
+        "name": "cubefileforzone2",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57903
+      },
+      {
+        "entry_offset": 56991,
+        "name": "cubefileforzone20",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57939
+      },
+      {
+        "entry_offset": 57034,
+        "name": "cubefileforzone21",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57941
+      },
+      {
+        "entry_offset": 57077,
+        "name": "cubefileforzone22",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57943
+      },
+      {
+        "entry_offset": 57120,
+        "name": "cubefileforzone23",
+        "value": "1",
+        "value_bytes": 2,
+        "value_offset": 57945
+      },
+      {
+        "entry_offset": 57163,
+        "name": "cubefileforzone24",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57947
+      },
+      {
+        "entry_offset": 57206,
+        "name": "cubefileforzone25",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57949
+      },
+      {
+        "entry_offset": 57249,
+        "name": "cubefileforzone3",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57905
+      },
+      {
+        "entry_offset": 57292,
+        "name": "cubefileforzone4",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57907
+      },
+      {
+        "entry_offset": 57335,
+        "name": "cubefileforzone5",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57909
+      },
+      {
+        "entry_offset": 57378,
+        "name": "cubefileforzone6",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57911
+      },
+      {
+        "entry_offset": 57421,
+        "name": "cubefileforzone7",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57913
+      },
+      {
+        "entry_offset": 57464,
+        "name": "cubefileforzone8",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57915
+      },
+      {
+        "entry_offset": 57507,
+        "name": "cubefileforzone9",
+        "value": "0",
+        "value_bytes": 2,
+        "value_offset": 57917
+      },
+      {
+        "entry_offset": 57550,
+        "name": "numberofskycubes",
+        "value": "1",
+        "value_bytes": 2,
+        "value_offset": 57887
+      },
+      {
+        "entry_offset": 57593,
+        "name": "particletexturemapname",
+        "value": "demoprt.tga",
+        "value_bytes": 12,
+        "value_offset": 57875
+      },
+      {
+        "entry_offset": 57636,
+        "name": "terrainbreadth",
+        "value": "5",
+        "value_bytes": 2,
+        "value_offset": 57863
+      },
+      {
+        "entry_offset": 57679,
+        "name": "terrainbreadthscale",
+        "value": "24.0",
+        "value_bytes": 5,
+        "value_offset": 57870
+      },
+      {
+        "entry_offset": 57722,
+        "name": "terrainfile",
+        "value": "nat13.trn",
+        "value_bytes": 10,
+        "value_offset": 57851
+      },
+      {
+        "entry_offset": 57765,
+        "name": "terrainwidth",
+        "value": "5",
+        "value_bytes": 2,
+        "value_offset": 57861
+      },
+      {
+        "entry_offset": 57808,
+        "name": "terrainwidthscale",
+        "value": "24.0",
+        "value_bytes": 5,
+        "value_offset": 57865
+      }
+    ],
+    "sky_palette_count": 256,
+    "sky_tile_descriptor": [
+      0,
+      34,
+      0,
+      16,
+      16,
+      4,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "sky_visible_authored_zones": [
+      12,
+      13,
+      14,
+      23
+    ],
+    "zones": 25
+  }
+}

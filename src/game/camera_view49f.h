@@ -48,4 +48,18 @@ struct CameraViewOutput49F {
 // world/scene queries or RNG. Live typed inputs/output are required.
 bool composeCameraView49F(const CameraSceneState49F& prior,
     const TVCameraUpdateOutput49F& supplied,CameraViewOutput49F& output) noexcept;
+
+// Original 280720 -> 14DAF0: zone viewport projection combined with the SAME
+// current camera's view+C0. Bounds are minX,maxX,minY,maxY from zone4C..58.
+// This off-axis matrix has different depth terms from camera14DB90; it must
+// not replace the camera's core projection. No admission/dispatch is implied.
+// Native finite domain requires ordered nonzero bounds, positive aspect/near,
+// far>near and 0<FOV<180. A rejected numeric input is not a culled zone.
+// Reuses strict binary32 scalar math and the existing native matrix product.
+// Output changes only on success; output must be disjoint from the inputs.
+struct PortalZoneViewOutput49F {
+    std::array<float,16> projection{},matrix60{};
+};
+bool composePortalZoneView280720(const CameraViewOutput49F& currentCamera,
+    const std::array<float,4>& bounds,PortalZoneViewOutput49F& output) noexcept;
 }

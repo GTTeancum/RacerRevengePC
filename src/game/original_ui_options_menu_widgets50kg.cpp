@@ -29,6 +29,11 @@ struct OriginalUiOptionsMenuWidgets50KG::Storage {
     OriginalUiNavigation50KG navigation;
     OriginalUiGameOptionsController50KG gameController;
     OriginalUiGameOptionsState50KG gameState;
+    OriginalUiControlsController50KG controlsController;
+    struct Localized {std::uint16_t stringId=0;std::size_t writtenLineCount=0;std::vector<std::string> lines;};
+    std::array<std::vector<Localized>,168> localized;
+    std::array<std::string,168> dynamicSecond;
+    std::array<std::array<std::uint16_t,2>,168> renderedString;
     std::array<std::string,168> dynamic;
     std::array<std::int32_t,168> renderedVolume;
     std::array<OriginalUiOptionsWidgetState50KG,168> state{};
@@ -51,14 +56,21 @@ Status OriginalUiOptionsMenuWidgets50KG::bind(std::shared_ptr<const assets::Orig
         d.controller=s->controller.bind(archive,d.parse);
         if(d.controller!=Control::ok || !s->controller.initialNavigation(s->navigation))
             return finish(d,Status::controllerFailure);
-        d.controller=s->gameController.bind(std::move(archive),d.parse);
+        d.controller=s->gameController.bind(archive,d.parse);
         if(d.controller!=Control::ok||!s->gameController.initialState(s->gameState))return finish(d,Status::controllerFailure);
+        d.controller=s->controlsController.bind(std::move(archive),0,d.parse);
+        if(d.controller!=Control::ok)return finish(d,Status::controllerFailure);
+        for(auto& row:s->renderedString)row.fill(0xffffu);
         const auto& dat=*s->controller.widgetsDat();
         for(auto id:originalUiOptionsManagerWidgetIds50KG) {
             d.widgetId=id;auto& state=s->state[id];
-            state.kind=id==5?Kind::movement:(id==98||id==99||id==105||id==107||id==108||id==109)?Kind::icon:Kind::text;
             const auto* section=dat.section("Widget "+std::to_string(id));
             if(!section)return finish(d,Status::parseFailure);
+            const auto* type=section->find("Type");if(!type)return finish(d,Status::parseFailure);
+            state.kind=type->text=="Overlay_Text"?Kind::text:type->text=="Icon"?Kind::icon:
+                id==5&&type->text=="Movement_Control"?Kind::movement:
+                id==36&&type->text=="Soultree_Character"?Kind::model:Kind::absent;
+            if(state.kind==Kind::absent)return finish(d,Status::invalidWidget);
             if(!assets::originalUiBoolean50KG(*section,"OnTop",false,state.onTop,d.parse,0x1CD890))
                 return finish(d,Status::parseFailure);
             if(state.kind==Kind::text) {
@@ -67,8 +79,29 @@ Status OriginalUiOptionsMenuWidgets50KG::bind(std::shared_ptr<const assets::Orig
                 const auto& text=s->texts[id];
                 if(text.wantsJoystickInput[0]||text.wantsJoystickInput[1])return finish(d,Status::invalidInput);
                 if(text.textSource==assets::OriginalUiTextSource50KG::dynamic){
-                    if((id!=38&&id!=112&&id!=114&&id!=165)||text.lines.size()!=1||text.dynamicLineLength!=4)return finish(d,Status::invalidInput);
-                    s->dynamic[id].reserve(4);
+                    const bool volume=id==38||id==112||id==114||id==165;
+                    const bool controls=id==47||id==130||id==77||(id>=80&&id<=84)||(id>=93&&id<=96)||id==145||id==150||id==155;
+                    if((!volume&&!controls)||text.lines.empty()||text.lines.size()>2||text.dynamicLineLength<0)return finish(d,Status::invalidInput);
+                    s->dynamic[id].reserve(static_cast<std::size_t>(text.dynamicLineLength));
+                    s->dynamicSecond[id].reserve(static_cast<std::size_t>(text.dynamicLineLength));
+                    if(volume&&(text.lines.size()!=1||text.dynamicLineLength!=4))return finish(d,Status::invalidInput);
+                    if(controls){
+                        if(!english||!english->loaded())return finish(d,Status::missingResource);
+                        const unsigned first=id==47?70:id==130?62:74,last=id==47?71:id==130?69:85;
+                        for(unsigned stringId=first;stringId<=last;++stringId){
+                            //188C10 action labels never consume75/76 here.
+                            if(first==74&&(stringId==75||stringId==76))continue;
+                            const auto* entry=english->at(stringId);if(!entry)return finish(d,Status::missingResource);
+                            Storage::Localized value;value.stringId=static_cast<std::uint16_t>(stringId);
+                            std::size_t at=0;
+                            do{const auto found=entry->text.find('@',at),end=found==std::string::npos?entry->text.size():found;
+                                if(value.lines.size()>=text.lines.size()||end-at>static_cast<std::size_t>(text.dynamicLineLength))return finish(d,Status::invalidInput);
+                                value.lines.push_back(entry->text.substr(at,end-at));
+                                if(found==std::string::npos)break;at=end+1;
+                            }while(at<=entry->text.size());
+                            value.writtenLineCount=value.lines.size();value.lines.resize(text.lines.size());s->localized[id].push_back(std::move(value));
+                        }
+                    }
                 }
                 d.text=s->textWidgets[id].bind(text);
                 if(d.text!=Text::ok)return finish(d,Status::textFailure);
@@ -137,7 +170,11 @@ Status OriginalUiOptionsMenuWidgets50KG::commitCallbacks(const OriginalUiOptions
             else (void)text.apply(c.operation,c.value);
         } else {
             bool showOnSelect=true,hideOnSelect=false,showOnDeselect=false,hideOnDeselect=true;
-            if(state.kind==Kind::icon) {
+            if(state.kind==Kind::model){
+                // Common Soultree Widget36 authors none of the four flags.
+                //2A8770 defaults every selection-visibility flag to false.
+                showOnSelect=hideOnSelect=showOnDeselect=hideOnDeselect=false;
+            }else if(state.kind==Kind::icon) {
                 const auto& icon=storage_->icons[c.widgetId];
                 showOnSelect=icon.enableOnSelect;hideOnSelect=icon.disableOnSelect;
                 showOnDeselect=icon.enableOnDeselect;hideOnDeselect=icon.disableOnDeselect;
@@ -149,7 +186,7 @@ Status OriginalUiOptionsMenuWidgets50KG::commitCallbacks(const OriginalUiOptions
             case Op::select:state.selected=true;visibility(showOnSelect,hideOnSelect);break;
             case Op::deselect:state.selected=false;visibility(showOnDeselect,hideOnDeselect);break;
             case Op::clearSelection:state.selected=false;break;
-            case Op::setEnabled:state.selected=c.value;state.shown=c.value;break;
+            case Op::setEnabled:if(state.kind!=Kind::model)state.selected=c.value;state.shown=c.value;break;
             }
         }
     }
@@ -226,8 +263,63 @@ Status OriginalUiOptionsMenuWidgets50KG::refreshGameOptionsVolumeText(Diagnostic
     }
     return Status::ok;
 }
-const std::string* OriginalUiOptionsMenuWidgets50KG::dynamicText(std::uint16_t id) const noexcept {
-    const auto* d=textDescriptor(id);return d&&d->textSource==assets::OriginalUiTextSource50KG::dynamic?&storage_->dynamic[id]:nullptr;
+const std::string* OriginalUiOptionsMenuWidgets50KG::dynamicText(std::uint16_t id,std::size_t line) const noexcept {
+    const auto* d=textDescriptor(id);return d&&d->textSource==assets::OriginalUiTextSource50KG::dynamic&&line<d->lines.size()&&line<2?
+        (line?&storage_->dynamicSecond[id]:&storage_->dynamic[id]):nullptr;
+}
+const assets::OriginalUiPage50KG* OriginalUiOptionsMenuWidgets50KG::controlsPage() const noexcept {
+    return storage_?storage_->controlsController.page():nullptr;
+}
+const std::vector<std::string>* OriginalUiOptionsMenuWidgets50KG::controlsLocalizedLines(std::uint16_t id,std::uint16_t stringId) const noexcept {
+    if(!storage_||id>=168)return nullptr;
+    for(const auto& value:storage_->localized[id])if(value.stringId==stringId)return &value.lines;
+    return nullptr;
+}
+std::uint16_t OriginalUiOptionsMenuWidgets50KG::controlsRenderedString(std::uint16_t id,std::size_t line) const noexcept {
+    return storage_&&id<168&&line<2?storage_->renderedString[id][line]:0xffffu;
+}
+Status OriginalUiOptionsMenuWidgets50KG::preflightControlsPlan(const OriginalUiControlsPlan50KG& plan,Diagnostic& d) const noexcept {
+    d={};if(!storage_)return finish(d,Status::notBound);
+    if(!plan.state.navigation.page||plan.state.navigation.page->identity!=controlsPage()->identity||
+        plan.effectCount>plan.effects.size()||plan.state.controllerIndex4DC>1)return finish(d,Status::invalidCommand);
+    for(std::size_t i=0;i<plan.effectCount;++i){const auto& e=plan.effects[i];d.callbackIndex=i;d.widgetId=e.widgetId;d.sourcePC=e.sourcePC;
+        using E=OriginalUiControlsEffectKind50KG;
+        switch(e.kind){
+        case E::widget:if(!admitted(e.widgetId)||!valid(e.operation))return finish(d,Status::invalidCommand);break;
+        case E::localizedText:if(!controlsLocalizedLines(e.widgetId,e.stringId))return finish(d,Status::invalidCommand);break;
+        case E::model:if(e.widgetId!=36)return finish(d,Status::invalidWidget);break;
+        case E::drawBackground:if(e.ordinal>3)return finish(d,Status::invalidCommand);break;
+        case E::scene:case E::previewPresets:case E::renderAperture:break;
+        default:return finish(d,Status::invalidCommand);
+        }
+    }
+    return finish(d,Status::ok);
+}
+Status OriginalUiOptionsMenuWidgets50KG::commitControlsPlan(const OriginalUiControlsPlan50KG& plan,
+    void* context,bool (*effect)(void*,const OriginalUiControlsEffect50KG&) noexcept,Diagnostic& d) noexcept {
+    if(preflightControlsPlan(plan,d)!=Status::ok)return d.status;
+    for(std::size_t i=0;i<plan.effectCount;++i){const auto& e=plan.effects[i];d.callbackIndex=i;d.widgetId=e.widgetId;d.sourcePC=e.sourcePC;
+        if(e.kind==OriginalUiControlsEffectKind50KG::widget){
+            const OriginalUiOptionsMenuCallback50KG callback{e.widgetId,e.operation,e.value,e.sourcePC};
+            if(commitCallbacks(&callback,1,d)!=Status::ok)return d.status;
+            if(storage_->state[e.widgetId].kind==Kind::model&&(!effect||!effect(context,e)))return finish(d,Status::controllerFailure);
+        }else if(e.kind==OriginalUiControlsEffectKind50KG::localizedText){
+            std::size_t written=0;for(const auto& value:storage_->localized[e.widgetId])if(value.stringId==e.stringId)written=value.writtenLineCount;
+            const auto& lines=*controlsLocalizedLines(e.widgetId,e.stringId);auto& widget=storage_->textWidgets[e.widgetId];
+            for(std::size_t line=0;line<lines.size();++line){const auto* state=widget.line(line);if(!state)return finish(d,Status::invalidWidget);
+                if(state->locked)continue;
+                (line?storage_->dynamicSecond[e.widgetId]:storage_->dynamic[e.widgetId]).assign(lines[line]);
+                storage_->renderedString[e.widgetId][line]=e.stringId;
+                //2A9DE0 sets up each written split line. Trailing empty lines
+                // are only cleared at2A9FAC, without re-enabling the overlay.
+                if(line<written){
+                    d.text=widget.setupLine(line,OriginalUiTextLineSetup50KG{});if(d.text!=Text::ok)return finish(d,Status::textFailure);
+                }
+            }
+        }else if(!effect||!effect(context,e))return finish(d,Status::controllerFailure);
+    }
+    if(plan.writesPageInputFlags42C)storage_->flags42C=plan.pageInputFlags42C;
+    return finish(d,Status::ok);
 }
 std::int32_t OriginalUiOptionsMenuWidgets50KG::gameOptionsRenderedVolume(std::uint16_t id) const noexcept {
     return dynamicText(id)?storage_->renderedVolume[id]:-1;
@@ -245,11 +337,24 @@ Status OriginalUiOptionsMenuWidgets50KG::projectText(std::uint16_t id,std::size_
     d={};d.widgetId=id;if(!storage_)return finish(d,Status::notBound);
     const auto* text=textDescriptor(id);if(!text)return finish(d,Status::invalidWidget);
     OriginalUiOptionsTextProjection50KG projected;
-    if(text->textSource==assets::OriginalUiTextSource50KG::dynamic&&text->justification!=assets::OriginalUiTextJustification50KG::left)return finish(d,Status::invalidInput);
-    if(!positionOriginalUiText50KG({text,line,fontHeight,width,height},projected.position))return finish(d,Status::invalidInput);
+    const auto* positioned=text;
+    // Cold variants retain the source justification and live empty-line gate.
+    // No descriptor mutation or per-frame string allocation is needed.
+    if(text->textSource==assets::OriginalUiTextSource50KG::dynamic){
+        const auto* live=dynamicText(id,line);if(!live)return finish(d,Status::invalidInput);
+        if(!positionOriginalUiText50KG({text,line,fontHeight,0,0},projected.position))return finish(d,Status::invalidInput);
+        if(!live->empty()){
+            const auto j=text->justification;
+            if(j==assets::OriginalUiTextJustification50KG::right)projected.position.positionedX-=float(width);
+            else if(j==assets::OriginalUiTextJustification50KG::centerBoth||j==assets::OriginalUiTextJustification50KG::centerHorizontal)
+                projected.position.positionedX=float(static_cast<std::int32_t>(projected.position.positionedX-float(width)*.5f));
+            if(j==assets::OriginalUiTextJustification50KG::centerBoth||j==assets::OriginalUiTextJustification50KG::centerVertical)
+                projected.position.positionedY=float(static_cast<std::int32_t>(projected.position.positionedY-float(height)*.5f));
+        }
+    }else if(!positionOriginalUiText50KG({positioned,line,fontHeight,width,height},projected.position))return finish(d,Status::invalidInput);
     const auto result=storage_->textWidgets[id].projectLine(line,projected.line,shown);
     if(result!=Text::ok)return textResult(d,result);
-    if(text->textSource==assets::OriginalUiTextSource50KG::dynamic)projected.line.text=&storage_->dynamic[id];
+    if(text->textSource==assets::OriginalUiTextSource50KG::dynamic)projected.line.text=dynamicText(id,line);
     projected.descriptor=text;projected.widgetId=id;projected.lineIndex=line;output=projected;return textResult(d,Text::ok);
 }
 Status OriginalUiOptionsMenuWidgets50KG::prepareIcon(std::uint16_t id,

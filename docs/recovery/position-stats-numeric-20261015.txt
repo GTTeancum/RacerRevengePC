@@ -1,0 +1,101 @@
+PositionStats18FF80: source-reviewed numeric subset, UNTESTED
+
+Delivered: one new uncalled header original_position_stats_numeric50la.h.
+No cold/resource owner, adapter, renderer activation, rank writes, main-TU edits
+or HUD replacement. Full Damage remains held/unavailable; no partial Damage HUD.
+Source base abbf73d; new file can be reviewed independently against root's tree.
+
+Original construction and lifetime
+Race1A8B78..1A8BC8 allocates0x32F0, constructs18FF80, invokes virtual+30=190190,
+stores race+CC and binds191150. Constructor creates five ScreenTexts at+40,
+stride70; nine ScreenTextures at+270,stride60;118 ScreenTextures at+5D0,stride60;
+constructs object+3220 through119E50; initializes own fields32B0/32B4 zero,
+32B8 bits40E00000 (=7),32C0 vector from original433EB0,32D0..32EC zero.
+Bind191150 stores actual race+30 and race8C into3210, calls layout(view1).
+Destructor1900B0 frees optional32EC via array destroy2E1980, destroys+3220,
+reverses118 textures then9 textures then5 texts, then Entity base.
+Vtable3CE820: load190190,+40 demand191AF0,+44 predraw191BB0,+48 draw191BE0.
+
+Resource/layout recovery boundary
+Loader190190 first calls2DF0B0 for genuine stats at3A8FA8. Additional original
+literals3A8FB0="maptop",3A8FB8="RadarOverlay",3A8FC8="/%d",3A8FD0="%d".
+Five text loads at190EB0 use original font literal3A8E60 and capacity40. Localized
+labels are actual IDs455 at191E1C and457 at192130, not handwritten host labels.
+191180 allocates0x510 and constructs sixteen stride50 objects via2E1920/2E1980;
+each2E1AE0 call receives0x76,5 and RadarOverlay. These are additional real dynamic
+geometry/material lifetimes, not replaced by127 sprite booleans. Their complete
+authoring/retirement and the+3220 owner are not yet ported/proven by this subset.
+Predraw191BB0 uses actual Application268+1 to layout191290. Numeric candidate
+recovers ONLY offsets32B0/32B4: mode0(0,0);mode1 view1(0,0),view2(0,-27);
+mode2 view1(-300,0),view2(-320,0). Values are exact source float constants, with
+no host scaling. All subsequent per-texture/text coordinates and dirty writes
+remain deferred. Numeric admission explicitly restricts modes0..2/views1..2.
+
+Original draw order and preference predicates
+191BE0 uses same absent-second-view, race1B0 bit4, Entity29 bit2 and UI1E4 bit0
+omission gates recovered for Damage, then191CF0 backgrounds; conditional1924C0
+map path plus texture+4B0; then191DB0 text; Entity141D70 afterwards.
+Actual preference owner is Application2DC, word10F9C[zero-based view]. The three
+small original routines are fully represented for bounded values0..7:
+17FB90 permits{1,2,3,7}, requires manager[view].state40==0 and subtype11258!=3.
+17FC30 permits{2,4,5,7}, same state/subtype gates (text later reads actual CD0).
+17FCD0 permits{3,5,6,7}, requires state40==0 but has NO subtype3 exclusion.
+Native ControlPresets49D already owns field10F9C and original settings owner
+supplies11258. Predicates do not inspect Player-only fields or racer class.
+Candidate functions are pure numeric observations, not ready/draw receipts.
+
+Position/ranking authority: important identity distinction
+191DDC..191DFC loads actual race48[Application268] camera, then LB camera+A8 and
+sign-extends its LOW FOUR BITS with DSLL32/DSRA32. This signed index is used at
+191F10..28 to resolve race+B4 manager3C[index], then record+3C. Formatting uses
+that place directly with "%d"; denominator uses manager+50 with "/%d".
+The index is NOT an inferred followed-racer key, rank-sort row, or arbitrarily
+selected host racer. Candidate signedCameraIndex reproduces low-nibble signed
+decode without implementation-defined signed casts. A real adapter must prove
+that exact camera field and bound same-session manager record before calling
+the simple observation helper. Negative nibble values are not legal indices.
+src/game/ai_race_rank50iv.h already identifies manager3C records as vehicle+C90:
+record3C is canonical placeCCC. native_ai_session50iv_fixture.h owns original
+ranking/retirement, including actual activeCount50. No sorting/recalculation or
++1 adjustment is introduced; activeCount50 is not assumed to be8 or total30.
+
+Class/view dependencies and AI feasibility
+The inspected PositionStats text path reads ranking record3C and common racerCD0
+(191DB0 body,1921D8 lookup), not Player10A8..10C8. The map path1924C0 resolves
+manager[view], uses common340->288 scene/pose, race+B8 track/map services, then
+iterates actual other manager racers, skips self and nonzero40. No fixed-offset
+Player extension load was found across191BB0..192FFF. This is positive evidence
+for a possible all-AI common-state path, NOT full class admissibility proof for
+every indirect map/helper operation. Those helpers and their genuine native
+map-owner authoring must be finished before a full owner/renderer joins.
+Current native camera code exposes cameraViewA8 to some input helpers as a
+caller-supplied byte; RaceCameraBinding.managerIndex/followed racer must not be
+substituted blindly for this exact signed-nibble camera state. First verify its
+constructor/bind/update lifetime and existing Session representation. That is
+the next smallest position-number snapshot identity join.
+
+Concrete next bounded work
+1. Recover cameraA8 constructor/bind writers and its same-session published view
+   identity; map that exact signed index to existing canonical manager rank row.
+   Bind actual pref10F9C, subtype11258, state40 and countCD0 read handles separately.
+2. Recover all190190 texture/font identities and per-object load order, complete
+   layout191290, resource hook191AF0 and sixteen192? triangle owners, including
+   source failure/retirement semantics. Reuse same Application canonical domain.
+3. Implement cold owner only once those complete source-backed resources exist;
+   final readiness must include current provider revision plus collector state.
+   Renderer remains a later separate step. Do not advertise current subset as POS
+   replacement, standings, completed-lap presentation or full minimap recovery.
+
+Review checklist
+[ ] New header only; no production callers or existing source edits.
+[ ] Mode/view/preference bounded rejection preserves output.
+[ ] Exact original distinct preference masks and subtype/map asymmetry retained.
+[ ] Layout is offsets only, with no guessed full retail arrangement.
+[ ] Signed low-nibble camera decode is explicit; rank/count are observations only.
+[ ] Root alone integrates/tests; no host sorting, simulation or AI authority edits.
+
+Evidence: original SLUS SHA256 c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30.
+Raw PositionStats owner/load/layout/draw/helper ranges and preference functions
+are included as data. No original instructions were executed. No tests/builds,
+syntax/sanitizer/gameplay checks/converters or central edits were performed.
+Sibling TimeStats/SpeedBoost provider audit remains separate. Hold for review.

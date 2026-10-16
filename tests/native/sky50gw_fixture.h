@@ -4,7 +4,7 @@
 #include "../../src/assets/import_decode48c.h"
 #include <cfenv>
 
-// Cold authenticated bridge for original TA/GC/GA sky members. Cube geometry is the direct
+// Cold authenticated bridge for original TA/GC/GA/MA/SA sky members. Cube geometry is the direct
 // 12A8A0 source constructor, not an invented enclosing mesh. Only authored
 // face/tile mask bits produce geometry. Images are genuine decoded IPUM bytes.
 namespace sky50gw_fixture {
@@ -48,6 +48,18 @@ inline constexpr Entry gaEntries[] = {
 };
 static_assert(sizeof(gaEntries) / sizeof(gaEntries[0]) == tileCount, "Actual authored GA tile count");
 #endif
+#if __has_include("sky_ma_index.inc")
+inline constexpr Entry maEntries[] = {
+#include "sky_ma_index.inc"
+};
+static_assert(sizeof(maEntries)/sizeof(maEntries[0]) == tileCount, "Actual authored MA tile count");
+#endif
+#if __has_include("sky_sa_index.inc")
+inline constexpr Entry saEntries[] = {
+#include "sky_sa_index.inc"
+};
+static_assert(sizeof(saEntries)/sizeof(saEntries[0]) == tileCount, "Actual authored SA tile count");
+#endif
 struct Source {
     std::size_t archiveBytes, decodedCapacity, cubBytes, sceneBytes;
     std::uint32_t archiveEntries;
@@ -75,6 +87,20 @@ inline const Source& source(track_source_fixture::Track track) {
         "tracks\\ga.scb","ad38b0d47efdda92e36bf36f9b380f7f3111698cb068532068a19229097de5d7",
         21908,"117,107,66",gaEntries};
 #endif
+#if __has_include("sky_ma_index.inc")
+    static const Source ma{3691592,32u*1024u*1024u,227791,404992,485,
+        "2a674f62e9d9d9ef9e6c2f7224d2aa0c55aeb883e55c499d58dfd3b00cddb228",
+        "skies\\ma.cub","c8bc416fca9f89351a76b7acd23195d661783fde6dcd3d9050f535caf8beae61",
+        "tracks\\ma.scb","5766af3e7a0bba0644058ae6f31eab802cadd9be7cc71911c349f603c7ca873b",
+        29699,"166,173,184",maEntries};
+#endif
+#if __has_include("sky_sa_index.inc")
+    static const Source sa{3786696,32u*1024u*1024u,242613,813441,1065,
+        "34826bbb3a3690ee20ac40f70515f7e903291cdf4546f7d8ab8d58849f30d96a",
+        "skies\\sullust.cub","0cb2c1389889318ec806edafe7779ae74fde5d4dc1fc2040e3a4e36da6cfd61d",
+        "tracks\\sa.scb","dd38f087f0438b2e1279651fe3b4f525b053c90d34cf5365d6bf4ec6c7d1d394",
+        58084,"18,21,22",saEntries};
+#endif
     switch (track) {
     case track_source_fixture::Track::ta: return ta;
     case track_source_fixture::Track::gc: return gc;
@@ -83,6 +109,18 @@ inline const Source& source(track_source_fixture::Track track) {
         return ga;
 #else
         throw std::runtime_error("GA sky bytes have not been decoded and pinned by authorized cold preparation");
+#endif
+    case track_source_fixture::Track::ma:
+#if __has_include("sky_ma_index.inc")
+        return ma;
+#else
+        throw std::runtime_error("MA sky bytes have not been cold-prepared and pinned");
+#endif
+    case track_source_fixture::Track::sa:
+#if __has_include("sky_sa_index.inc")
+        return sa;
+#else
+        throw std::runtime_error("SA sky bytes have not been cold-prepared and pinned");
 #endif
     default: throw std::runtime_error("Unsupported original sky track identity");
     }

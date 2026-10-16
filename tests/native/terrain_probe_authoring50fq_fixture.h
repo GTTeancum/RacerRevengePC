@@ -1,4 +1,5 @@
 #pragma once
+#include "runtime_asset_paths50lb.h"
 // Cold source-derived original-pod vehicle+348 authoring. No captured RAM, guest
 // execution, ground-height substitute, or hot loading. Runtime namespace and
 // preserved owner bits are explicit inputs, not invented constructor defaults.
@@ -46,6 +47,9 @@ struct Owner {
     TerrainPrepareState48M initial{};
     TerrainFollowParameters48G follow{};
     Vector3_48C lowerEndpoint140{};
+    // Canonical348+1F0 from the admitted1B1240 setup, distinct from the
+    // vehicle7EC parameter and from the cold authoring receipt.
+    float lift1F0=0;
     TerrainQuery48J metadata{};
     Receipt receipt{};
     bool prepared=false;
@@ -137,7 +141,7 @@ inline bool prepare(Owner& out,const Type2StaticQuery49X& main690,
         receipt.podBoxMBytes=collisionOwner->receipt().memberBytes[0];
     }else{
         if(!archivePath||!mainMember)return detail::fail(error,"probe collision archive/member is unbound");
-        std::ifstream file(archivePath,std::ios::binary);if(!file)return detail::fail(error,"actual pod archive unavailable");
+        std::ifstream file(runtime_asset_paths50LB::resolve(archivePath),std::ios::binary);if(!file)return detail::fail(error,"actual pod archive unavailable");
         std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}},podM;
         assets::ResArchive48C archive;assets::DecodeError48C decode;
         if(!assets::decodeResource48C(bytes,archive,decode)||!assets::extractResMember48C(archive,mainMember,podM,decode)||podM.size()<92)
@@ -159,6 +163,9 @@ inline bool prepare(Owner& out,const Type2StaticQuery49X& main690,
     Type2BoundsInput50BY input{};input.resource=authentic;input.preparedWorld=detail::identity();CollectionBoundsResult48S bounds{};
     if(prepareType2Bounds50BY(input,bounds)!=CollectionBoundsStatus48S::Complete)return detail::fail(error,"source2121C8 podboxm bounds rejected");
     receipt.vehicle324=bounds.half.v[1];
+    //214948 supplies f12=7EC;1B1270 publishes it to this actual348 owner.
+    // prepare has already verified selected-body binding and authored lift.
+    staged.lift1F0=receipt.authoredLift;
     const float offset[3]={0,receipt.vehicle324,0},up[3]={0,1,0};
     const float fiveLift=detail::mul(5.f,receipt.authoredLift);
     for(unsigned i=0;i<3;++i){
@@ -220,6 +227,7 @@ inline bool installProbeCold(Owner& arena,live_terrain_probe50fr::Owner& live,
            af.identityLists[i].identities!=bf.identityLists[i].identities)
             return detail::fail(error,"cold terrain-probe identity lists differ");
     arena.initial=authored.initial;arena.follow=authored.follow;
+    arena.lift1F0=authored.lift1F0;
     arena.lowerEndpoint140=authored.lowerEndpoint140;arena.receipt=authored.receipt;
     arena.prepared=authored.prepared;arena.metadata.filter.flagsF8=authored.metadata.filter.flagsF8;
     // initialize() has no fallible branch for an empty owner. Initialize at its

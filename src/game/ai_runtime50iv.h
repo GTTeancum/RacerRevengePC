@@ -1,5 +1,6 @@
 #pragma once
 #include "ai_driving50iv.h"
+#include "ai_finish_controls50kg.h"
 #include "ai_state_prefix50iv.h"
 #include "lap_timing50id.h"
 
@@ -58,6 +59,9 @@ struct AiRuntimeInput50IV {
     std::size_t racerCount=0;
     const AiRaceFields50IV* raceFields=nullptr;
     const LapTimingFields50ID* timing=nullptr;
+    //Borrow the actual race94 owner. Consumed only by genuine state6 ending;
+    //manager30, racerCB8 and HOST race seconds are not substitutes.
+    const float* raceCountdown94=nullptr;
     AiApplicationGlobals50IV* applicationGlobals=nullptr;
     std::uint32_t actualZoneOrdinal48=0,managerHumanCount34=0;
     std::uint8_t settings1125C=0;
@@ -234,11 +238,11 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
         resetAiRuntimeScalars50IV(ai,m.controls.player.flagsB9C);
         ++ai.scalarResets16E830;receipt.scalarResetCompleted=true;
         ai.physicalReset2255B0Pending=true;
-        // Retain the exact physical-reset boundary. Existing50ET/50EW leaves
-        // still lack the live AI/PostPlayer owner chain. Registered694 and
-        // reset124CB0 implementations exist in50IZ, but their live bindings
-        // remain absent. No drive/boost/brake or dispatch credit is produced,
-        // and the canonical frame phase remains PostPlayer.
+        // Retain the exact physical-reset boundary for the concrete native
+        // owner continuation. It must complete2255B0/AI216A30 and return via
+        //16EAA8 directly to16EAE8, never fall through the ordinary state0
+        // branch below. Until then no drive/boost/brake or dispatch credit is
+        // produced, and the canonical frame phase remains PostPlayer.
         return stop(0x2255b0u);
     }
     PlayerReadResult48X actions=m.controls.player;Math f;V target{{0,0,0,1}},direction{{0,0,0,1}};
@@ -253,7 +257,8 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
            !aiStartupSpeed50IV(in.aiMetadata->nodes[current],ai.profile,ai.lists,in.racers,in.racerCount,
             position,m.components.root.body.velocity.v,actions,receipt.desiredSpeed,attemptBoost,receipt.driving))return stop(receipt.driving.sourcePC);
         boostFactor=1.f;++ai.startupFrames;
-    }else if(ai.state.aiStateFE8==0u||ai.state.aiStateFE8==2u||ai.state.aiStateFE8==3u){
+    }else if(ai.state.aiStateFE8==0u||ai.state.aiStateFE8==2u||ai.state.aiStateFE8==3u||
+             ai.state.aiStateFE8==6u){
         //172380 early start-line return preserves B60 and1090.
         if(!lapCC8&&current==1u)actions.raw.values[0]=0.f;
         else{
@@ -270,6 +275,17 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
             direction=normalize(f,dot(f,distant,velocity)<dot(f,nearby,velocity)?distant:nearby);
             if(!steerAi50IV(direction.v,forward,scene.localC0.v[5],m.cachedSpeed34,ai.engineDifference5C,
                 m.components.root.worldAngularVelocityA0.v[1],ai.racer60,actions,receipt.driving))return stop(receipt.driving.sourcePC);
+        }
+        if(ai.state.aiStateFE8==6u){
+            //16EAB0 invokes the same172380 steering above, then172B50.
+            //No target-speed selection, boost draw or ordinary brake call is
+            //reached. Earlier navigation/state/packing/repair remain genuine.
+            if(!f.valid)return stop(0x172380u);
+            if(!in.raceCountdown94)return stop(0x172b98u);
+            if(!applyOriginalAiEndingSpeed172B50(m.cachedSpeed34,*in.raceCountdown94,
+                actions,receipt.speed))return stop(receipt.speed.sourcePC);
+            m.controls.player=actions;++ai.dispatchedFrames;receipt.dispatched=true;
+            receipt.stateFE8=ai.state.aiStateFE8;return true;
         }
         AiSpeedTargetInput50IR speed{};speed.currentNodeSpeedLimit5C=in.aiMetadata->nodes[current].speedLimit5C;
         speed.currentNodeFlags79=in.aiMetadata->nodes[current].flags79;speed.vehicleSpeedScaleFFC=ai.packing.scaleFFC;

@@ -15,7 +15,7 @@
 namespace render_diagnostics50GQ {
 enum class Subphase : std::uint8_t {
     DrawBank, VehicleProjection, HostCamera, SourceCables, HostHud,
-    DriverSubmit, Census, Count
+    DriverSubmit, Census, OpponentPreparation, Count
 };
 constexpr std::size_t subphaseCount = static_cast<std::size_t>(Subphase::Count);
 
@@ -28,6 +28,7 @@ inline const char* subphaseName(Subphase phase) noexcept {
     case Subphase::HostHud: return "host_hud";
     case Subphase::DriverSubmit: return "driver_submit";
     case Subphase::Census: return "census";
+    case Subphase::OpponentPreparation: return "opponent_preparation";
     default: return "invalid";
     }
 }

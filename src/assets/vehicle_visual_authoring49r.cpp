@@ -200,11 +200,20 @@ bool bindFreshVehicleVisualParameters49R(const VisualAuthoredValues49R& values,
     if(!offset(right,p.rightBase2C0,d.error)||!offset(left,p.leftBase2B0,d.error))return false;
     out=p;return true;
 }
+bool bindFreshBottomVehicleVisualParameters49R(const PsgHierarchyView49O& right,
+    const PsgHierarchyView49O& left, rr::game::VehicleVisualParameters49R& out,
+    VisualAuthoringDiagnostic49R& d) noexcept {
+    d={E::none,{PodPhysicsError49N::none,0},K::Count};
+    if(std::fegetround()!=FE_TONEAREST){d.error=E::rounding_mode;return false;}
+    auto p=out;
+    if(!offset(right,p.rightBase2E0,d.error)||!offset(left,p.leftBase2D0,d.error))return false;
+    out=p;return true;
+}
 void initializeVehicleVisualConstructorRecords49R(rr::game::VehicleVisualState49R& state) noexcept {
     using namespace rr::game;
     const VisualVector49R zero={{0,0,0,1}},up={{0,1,0,1}};
     const VisualResponse49R response={zero,zero,zero,{{1,0,0,0}}};
-    state.upC20=up;state.publishedUpAF0=up;state.right=response;state.left=response;
+    state.upC20=up;state.publishedUpAF0=up;state.right=response;state.left=response;state.bottomRight=response;state.bottomLeft=response;
     state.phase8B0=0;state.phase900=0;state.phase950=0;state.phase9A0=0;
 }
 void initializeVehicleVisualSharedColdRecords49R(rr::game::VisualShared49R& shared) noexcept {

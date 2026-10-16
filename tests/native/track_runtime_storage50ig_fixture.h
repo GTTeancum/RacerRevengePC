@@ -16,21 +16,26 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <type_traits>
 
 // Cold ownership only. This replaces size assumptions, not original resources
 // or authoring: every candidate must point at one actual loaded COL owner.
 // No geometry, filters, opaque identities, spawn, route or query state is made
 // up here. The caller constructs those owners before preparing this layer.
+namespace ra_static_registry50LA { class ColdStage; }
+namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace track_runtime_storage50IG {
 using namespace rr::game;
 namespace a=rr::assets;
 using Ground=authored_runtime_ground50cp_fixture::ColdScene;
-// Share the cold loader's one-block ceiling, including all three dynamic
-// references. Neither layer may admit 1024 static owners plus live queries.
+// Share the cold loader's one-block ceiling. Every optional actual query
+// reference is charged before allocating registry/object backing.
 inline constexpr std::size_t hardTerrainOwners=authored_runtime_ground50cp_fixture::hardCollisionOwners50IG;
 inline constexpr std::size_t runtimeSearchSlotLimit=authored_runtime_ground50cp_fixture::runtimeSearchSlotLimit50IG;
 inline constexpr std::size_t runtimeDynamicReferenceReserve=authored_runtime_ground50cp_fixture::runtimeDynamicReferenceReserve50IG;
-static_assert(runtimeDynamicReferenceReserve==3&&hardTerrainOwners+runtimeDynamicReferenceReserve==runtimeSearchSlotLimit);
+inline constexpr std::size_t runtimeRecoveryReferenceReserve=authored_runtime_ground50cp_fixture::runtimeRecoveryReferenceReserve50IG;
+static_assert(runtimeDynamicReferenceReserve==3&&runtimeRecoveryReferenceReserve==2&&
+    hardTerrainOwners+runtimeDynamicReferenceReserve==runtimeSearchSlotLimit);
 inline constexpr std::size_t hardZones=256,hardPortals=4096;
 inline constexpr std::size_t sourceSelectionCapacity=CandidateMergeCapacity48S;
 static_assert(sourceSelectionCapacity==64);
@@ -41,8 +46,16 @@ struct Limits {
     // Excludes allocator bookkeeping and independently owned mesh/radii bytes.
     std::size_t coldPayloadBytes=32u*1024u*1024u;
     // Only the explicitly selected original-camera route reserves its actual
-    // sphere24/ray190 records. Legacy callers retain the exact three refs.
+    // sphere24/ray190 and distinct death120 records. Legacy callers retain three refs.
     bool originalCameraQueries=false;
+    // Only the original-AI recovery route reserves missing actual694/7A4 refs.
+    // Existing main690, secondary spring and348 retain their IDs. Follow
+    // remains the same owner; its trailing native refs follow the new pair.
+    bool originalRecoveryQueries=false;
+    // Exact count of real source PhysicsObject pieces constructed cold. Each
+    // owns E0/E4/E8; reserve no slot for authored-only pending collections.
+    // This capacity option does not publish identities or activate queries.
+    std::size_t wreckPieceQueries=0;
 };
 struct Binding {
     // Caller order is authoritative (TA may retain its existing corpus order).
@@ -61,7 +74,11 @@ struct Counts {
     std::size_t terrain=0,zones=0,portals=0,methods=0,blocks=0,objects=0;
     std::size_t portalLinks=0,membership=0,selected=0,events=0;
     CollectionRef50BX mainQuery=0,secondaryQuery=0,terrainQuery=0;
-    CollectionRef50BX cameraSphere=0,cameraRay=0;
+    CollectionRef50BX cameraSphere=0,cameraRay=0,cameraDeath=0;
+    CollectionRef50BX podQuery=0,movementQuery=0;
+    std::size_t recoveryReferences=0;
+    CollectionRef50BX wreckFirstQuery=0;
+    std::size_t wreckReferences=0;
 };
 struct Diagnostic {
     std::string message;
@@ -100,7 +117,11 @@ struct Membership {
 // Own this at a stable address for the complete session. Backing may be exposed
 // to the existing serial frame APIs, but never replace descriptors while a
 // query, cursor, racer-bank visit or registration operation is outstanding.
+class Owner;
 struct Storage {
+    // First member: keep borrowed source backing and the exclusive
+    // serial world lease alive until every registry/scratch member is retired.
+    const std::shared_ptr<void> borrowedWorldLease;
     const Counts count;
     FixedBuffer<Type2StaticCandidate49X*> candidates;
     FixedBuffer<std::uint32_t> candidateZones;
@@ -124,6 +145,9 @@ struct Storage {
     FixedBuffer<CollectionTree50BX> trees;
     FixedBuffer<CollectionZone50BX> zones;
     ZoneLifecycle50CL lifecycle{};
+    // Shared collision-world constructor invalidation byte, source3E0730.
+    // It is not query readiness and belongs to the world rather than a camera.
+    std::uint8_t globalValid3E0730=0;
     ZoneRegistrationScratch50CJ registrationScratch{};
     FixedBuffer<ZoneRegistrationCommand50CQ> events;
     ZoneRegistrationQueue50CQ queue{};
@@ -144,21 +168,31 @@ struct Storage {
     FixedBuffer<std::uint32_t> scratchIds,firstIds,secondIds,mergeScratch,mergedIds;
     CandidateCollectionInput50BX collectionInput{};
 
-    explicit Storage(Counts n):count(n),candidates(n.terrain),candidateZones(n.terrain),candidateMethods(n.terrain),
+private:
+    friend class Owner;
+    // Only Owner's private authenticated borrowed route can select a lease.
+    explicit Storage(Counts n,const LiveZoneWorld50EN* borrowed,
+        std::shared_ptr<void> lease):borrowedWorldLease(std::move(lease)),count(n),candidates(n.terrain),candidateZones(n.terrain),candidateMethods(n.terrain),
         contactMaterials(n.terrain),handles(n.terrain),movement(n.terrain),
         registeredMovement(n.terrain),terrainTargets(n.terrain),terrainSelected(n.selected),
         terrainScratchEffects(n.selected),terrainEffects(n.selected),
         registeredIndices(n.selected),probeIndices(n.selected),resolveScratch(sourceSelectionCapacity),
         registries(n.methods),membershipScratchRegistries(n.methods),registrations(n.objects),
         blocks(n.blocks),trees(n.methods),zones(n.zones),events(n.events),
-        authoredPortals(n.portals),portalHeads(n.zones),portalLinks(n.portalLinks),
-        portalScratchLinks(n.portalLinks),portalGeometry(n.portals),
+        authoredPortals(borrowed?0:n.portals),portalHeads(borrowed?0:n.zones),portalLinks(borrowed?0:n.portalLinks),
+        portalScratchLinks(n.portalLinks),portalGeometry(borrowed?0:n.portals),
         mainMembership(n.membership),secondaryMembership(n.membership),terrainMembership(n.membership),
         membershipScratchLinks(n.membership),membershipScratchEntries(n.membership),
         objects(n.objects),source(n.objects),scratch(n.objects),first(n.objects),second(n.objects),
         treeSource(n.methods),treeScratch(n.methods),treeFirst(n.methods),treeSecond(n.methods),
         scratchIds(sourceSelectionCapacity),firstIds(sourceSelectionCapacity),secondIds(sourceSelectionCapacity),
-        mergeScratch(sourceSelectionCapacity),mergedIds(sourceSelectionCapacity){}
+        mergeScratch(sourceSelectionCapacity),mergedIds(sourceSelectionCapacity){
+        // This facade points at the same cache/topology owner used for RA's
+        // two navigation bindings. It never creates a second cache owner.
+        if(borrowed)world=*borrowed;
+    }
+public:
+    explicit Storage(Counts n):Storage(n,nullptr,{}){}
     Storage(const Storage&)=delete;
     Storage& operator=(const Storage&)=delete;
     Storage(Storage&&)=delete;
@@ -211,7 +245,10 @@ struct Storage {
             bank.owner(c.collision.copied40);bank.owner(c.collision.copied50);}
         bank.owner(lifecycle);elements(registries);elements(registrations);
         elements(blocks);elements(trees);elements(zones);bank.owner(queue);elements(events);
-        elements(portalHeads);elements(portalLinks);elements(portalGeometry);
+        // Bank the selected real backing, including the borrowed-world route.
+        bank.elements(world.portalHeads,world.zoneCount);
+        bank.elements(world.portalLinks,world.portalLinkCount);
+        bank.elements(world.portals,world.portalCount);
         for(auto* m:{&mainMembership,&secondaryMembership,&terrainMembership}){
             bank.owner(m->state);elements(m->links);elements(m->entries);}
         elements(objects);elements(source);elements(treeSource);bank.owner(collectionInput);
@@ -231,7 +268,7 @@ struct Budget {
         need(used<=capacity&&bytes<=capacity-used,"track storage requested payload exceeds cold budget");used+=bytes;
     }
 };
-inline void account(Budget& b,const Counts& n){
+inline void account(Budget& b,const Counts& n,bool borrowedWorld=false){
     b.add<Storage>(1);b.add<Type2StaticCandidate49X*>(n.terrain);
     b.add<std::uint32_t>(n.terrain);b.add<ZoneMethod50CL>(n.terrain);b.add<ContactMaterial50HI>(n.terrain);
     b.add<CandidateHandle50CB>(n.terrain);b.add<Type3Candidate48P>(n.terrain,2);
@@ -240,9 +277,12 @@ inline void account(Budget& b,const Counts& n){
     b.add<std::size_t>(sourceSelectionCapacity);b.add<SearchStorage50BS>(n.methods,2);
     b.add<ZoneRegistration50CJ>(n.objects);b.add<SearchListBlock50BR>(n.blocks);
     b.add<CollectionTree50BX>(n.methods);b.add<CollectionZone50BX>(n.zones);
-    b.add<ZoneRegistrationCommand50CQ>(n.events);b.add<LiveZonePortalInput50EN>(n.portals);
-    b.add<CollectionRef50BX>(n.zones);b.add<LiveZonePortalLink50EN>(n.portalLinks,2);
-    b.add<PortalGeometry50EO>(n.portals);b.add<CollectionZoneLink50BX>(n.membership,4);
+    b.add<ZoneRegistrationCommand50CQ>(n.events);
+    if(!borrowedWorld){b.add<LiveZonePortalInput50EN>(n.portals);
+        b.add<CollectionRef50BX>(n.zones);b.add<LiveZonePortalLink50EN>(n.portalLinks);
+        b.add<PortalGeometry50EO>(n.portals);}
+    b.add<LiveZonePortalLink50EN>(n.portalLinks); // private transaction scratch in either route
+    b.add<CollectionZoneLink50BX>(n.membership,4);
     b.add<LiveZoneEntry50EN>(n.membership,4);b.add<CollectionObject50BX>(n.objects);
     b.add<CollectionObjectState50BX>(n.objects,4);b.add<CollectionTreeState50BX>(n.methods,4);
     b.add<std::uint32_t>(sourceSelectionCapacity,5);
@@ -270,7 +310,20 @@ inline void reserveFilter(CollisionFilter48J& f,const std::array<std::size_t,3>&
 }
 } // namespace detail
 
+// A non-owning view, admitted only inside Owner's private construction path.
+// Authentication/lifetime comes from the existing Ground or the RA owner lease.
+template<class CollisionOwner> struct SourceSpan {
+    const CollisionOwner* values=nullptr;std::size_t count=0;
+    std::size_t size()const noexcept{return count;}
+    const CollisionOwner& operator[](std::size_t i)const noexcept{return values[i];}
+};
+template<class CollisionOwner> struct SourceWorldView {
+    const a::World48F& world;
+    SourceSpan<CollisionOwner> owners;
+};
 class Owner {
+    friend class ra_static_registry50LA::ColdStage;
+    friend class ra_source_camera50LA::OwnershipBridge;
     std::unique_ptr<Storage> storage_;
 public:
     Owner()=default;
@@ -284,6 +337,15 @@ public:
     // addresses longer than this owner; its hot helpers never discover assets.
     bool prepare(const Ground& ground,const Binding* bindings,std::size_t count,
         const Limits& limits,Diagnostic& diagnostic) noexcept {
+        using Original=typename std::decay_t<decltype(ground.owners)>::value_type;
+        const SourceWorldView<Original> source{ground.world,{ground.owners.data(),ground.owners.size()}};
+        return prepareSource(source,bindings,count,limits,diagnostic,nullptr,{});
+    }
+private:
+    template<class CollisionOwner>
+    bool prepareSource(const SourceWorldView<CollisionOwner>& ground,const Binding* bindings,std::size_t count,
+        const Limits& limits,Diagnostic& diagnostic,const LiveZoneWorld50EN* borrowed,
+        std::shared_ptr<void> lease) noexcept {
         using namespace detail;
         try {
             diagnostic={};need(!storage_,"track storage already prepared");
@@ -291,25 +353,37 @@ public:
                 limits.zones&&limits.zones<=hardZones&&limits.portals<=hardPortals&&
                 limits.coldPayloadBytes&&limits.coldPayloadBytes<=32u*1024u*1024u,
                 "track storage limits may only reduce hard ceilings");
-            need(bindings&&count&&count>=ground.owners.size()&&count<=limits.terrainOwners,
+            need((!ground.owners.size()||ground.owners.values)&&bindings&&count&&count>=ground.owners.size()&&count<=limits.terrainOwners,
                 "track storage requires every original loaded COL owner exactly once");
             Counts n{};n.terrain=count;n.zones=ground.world.zones.size();n.portals=ground.world.portals.size();
             need(n.zones&&n.zones<=limits.zones&&n.portals<=limits.portals,"original world exceeds storage bounds");
             n.methods=n.zones*2;n.blocks=n.zones*4;
-            const std::size_t references=runtimeDynamicReferenceReserve+(limits.originalCameraQueries?2u:0u);
+            n.recoveryReferences=limits.originalRecoveryQueries?runtimeRecoveryReferenceReserve:0u;
+            const std::size_t cameraReferences=limits.originalCameraQueries?3u:0u;
+            const std::size_t existingReferences=runtimeDynamicReferenceReserve+cameraReferences+n.recoveryReferences;
+            need(limits.wreckPieceQueries<=(runtimeSearchSlotLimit-existingReferences)/3u,
+                "actual wreck query references exceed the one-block SearchList ceiling");
+            n.wreckReferences=limits.wreckPieceQueries*3u;
+            const std::size_t references=existingReferences+n.wreckReferences;
             need(count<=runtimeSearchSlotLimit-references,
-                "original camera query pair exceeds the one-block SearchList ceiling");
+                "actual camera/recovery/wreck query references exceed the one-block SearchList ceiling");
             n.objects=count+references;n.portalLinks=n.portals*2;
+            if(n.wreckReferences)n.wreckFirstQuery=static_cast<CollectionRef50BX>(count+existingReferences+1u);
             n.membership=n.portals+1;n.selected=std::max(count,sourceSelectionCapacity);
             n.events=std::max<std::size_t>(128,n.objects);
             n.mainQuery=static_cast<CollectionRef50BX>(count+1);
             n.secondaryQuery=static_cast<CollectionRef50BX>(count+2);
             n.terrainQuery=static_cast<CollectionRef50BX>(count+3);
             if(limits.originalCameraQueries){
-                n.cameraSphere=static_cast<CollectionRef50BX>(count+4);
-                n.cameraRay=static_cast<CollectionRef50BX>(count+5);
+                n.cameraSphere=static_cast<CollectionRef50BX>(count+4+n.recoveryReferences);
+                n.cameraRay=static_cast<CollectionRef50BX>(count+5+n.recoveryReferences);
+                n.cameraDeath=static_cast<CollectionRef50BX>(count+6+n.recoveryReferences);
             }
-            Budget budget{limits.coldPayloadBytes};account(budget,n);
+            if(limits.originalRecoveryQueries){
+                n.podQuery=static_cast<CollectionRef50BX>(count+runtimeDynamicReferenceReserve+1u);
+                n.movementQuery=static_cast<CollectionRef50BX>(count+runtimeDynamicReferenceReserve+2u);
+            }
+            Budget budget{limits.coldPayloadBytes};account(budget,n,borrowed!=nullptr);
             std::array<std::size_t,3> filterMaximum{};
             for(std::size_t z=0;z<n.zones;++z){
                 diagnostic.zone=z;const auto choice=a::readZoneSearchSelection50CN(ground.world,z);
@@ -326,12 +400,20 @@ public:
                     bindings[j].candidate!=binding.candidate,"duplicate original collider binding");
                 const auto& c=binding.candidate->candidate.collision;
                 if(binding.trigger){
+                    // Native group-owned MA boxes share the existing authored
+                    // trigger registry. Legacy Gate bindings remain sphere5;
+                    // accepting a box never aliases it to a sphere or mesh.
+                    const auto& target=*binding.candidate;
+                    const bool sphere=target.shapeType==5&&(bool(target.gate)!=bool(target.nativeTriggers));
+                    const bool box=target.shapeType==6&&!target.gate&&target.nativeTriggers&&
+                        validNativeTriggerBox50MA(target.nativeTriggerBox)&&
+                        !std::memcmp(c.geometry.worldMatrix.v,target.nativeTriggerBox.world.v,sizeof c.geometry.worldMatrix.v);
                     need(!binding.animated&&binding.originalOwner==std::numeric_limits<std::size_t>::max()&&
                         binding.authoredZone&&binding.authoredZone<=n.zones&&binding.method==ZoneMethod50CL::First&&
-                        binding.candidate->shapeType==5&&(bool(binding.candidate->gate)!=bool(binding.candidate->nativeTriggers))&&c.shapeType==5&&
+                        (sphere||box)&&c.shapeType==target.shapeType&&
                         !c.geometry.mesh&&!c.compound&&c.hasResponseCallbackE8&&c.filter.categoryA4==8u&&
                         c.filter.identity&&c.geometry.id==c.filter.identity&&c.ownerIdentity9C,
-                        "original Gate sphere binding is incomplete");
+                        "original native sphere/box trigger binding is incomplete");
                 }else if(binding.animated){
                     need(binding.originalOwner==std::numeric_limits<std::size_t>::max()&&binding.authoredZone&&binding.authoredZone<=n.zones&&
                         binding.candidate->shapeType==1&&binding.candidate->compound&&c.shapeType==1&&c.compound==binding.candidate->compound&&
@@ -354,7 +436,12 @@ public:
             need(staticCount==ground.owners.size(),"not every original SCB collider is bound exactly once");
             for(auto maximum:filterMaximum){budget.add<std::uint32_t>(maximum,n.terrain);budget.add<std::uint32_t>(maximum,n.selected);}
             diagnostic.requestedPayloadBytes=budget.used;
-            auto next=std::make_unique<Storage>(n);
+            need(bool(borrowed)==bool(lease),"borrowed world requires its exclusive retained lease");
+            if(borrowed)need(borrowed->zoneCount==n.zones&&borrowed->portalCount==n.portals&&
+                borrowed->portalLinkCount==n.portalLinks&&borrowed->portalHeads&&
+                (!n.portalLinks||borrowed->portalLinks)&&(!n.portals||borrowed->portals),
+                "borrowed source portal world extent mismatch");
+            auto next=std::unique_ptr<Storage>(new Storage(n,borrowed,std::move(lease)));
             for(std::size_t i=0;i<count;++i){
                 diagnostic.candidate=i;auto& c=*bindings[i].candidate;
                 const auto& binding=bindings[i];
@@ -405,6 +492,7 @@ public:
                     "cold original collider registration queue full");
             const auto drained=drainZoneRegistrations50CQ(next->queue,next->lifecycle,next->registrationScratch,n.events);
             need(drained.status==ZoneQueueStatus50CQ::Complete&&!drained.remaining,"cold original collider registration rejected");
+            if(!borrowed){
             for(std::size_t i=0;i<n.portals;++i){
                 const auto& p=ground.world.portals[i];need(p.parameter_block<ground.world.parameters.blocks.size(),"invalid original portal block");
                 auto& v=next->authoredPortals[i];v.zoneA=p.zones[0];v.zoneB=p.zones[1];
@@ -416,14 +504,16 @@ public:
                 next->portalLinks.data(),n.portalLinks,next->portalGeometry.data(),n.portals};
             need(prepareLiveZoneWorld50EN(next->authoredPortals.data(),n.portals,n.zones,portals,next->world)==
                 LiveZoneStatus50EN::Complete,"original portal world preparation rejected");
+            }
             next->membershipWork={next->membershipScratchRegistries.data(),n.methods,
                 next->membershipScratchLinks.data(),next->membershipScratchEntries.data(),n.membership,
                 next->portalScratchLinks.data(),n.portalLinks,{}};
             auto& input=next->collectionInput;input.objects=next->objects.data();
-            // The optional pair does not exist in opponent-bank worlds. Its
-            // concrete bank0 preparation alone expands this BANKED active
-            // domain; backing and lifecycle capacities already include it.
-            input.objectCount=n.terrain+runtimeDynamicReferenceReserve;
+            // Recovery reserves a contiguous pair beside the three required
+            // vehicle owners. None may be queried before all cold bindings
+            // publish actual records. The camera expands this BANKED active
+            // extent only in bank0 after its own trailing pair is published.
+            input.objectCount=n.terrain+runtimeDynamicReferenceReserve+n.recoveryReferences;
             input.trees=next->trees.data();input.treeCount=n.methods;input.zones=next->zones.data();input.zoneCount=n.zones;
             // Query owner, bounds, actual E0 membership and type tags remain
             // explicitly unbound until the caller has prepared each real query.

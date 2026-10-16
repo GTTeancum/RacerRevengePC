@@ -21,16 +21,28 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <memory>
+#include <exception>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+namespace ra_source_camera50LA { class OwnershipBridge; }
+namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 
 namespace native_racer50HN {
 inline constexpr std::size_t maximumRacers=rr::game::maxHostRaceRacers50HT;
 class Bank {
 public:
     Bank()=default;
+    ~Bank() noexcept {
+        // Check BEFORE snapshots/spans and their externally borrowed owners die.
+        if(nativeFifoPins_)std::terminate();
+        // Only the RA-bound route adds a retirement obligation. The private
+        // pin survives all snapshots/spans and checks its actual Follow owner.
+        if(raWorldLifetime_&&(visiting_||readBlocked_))std::terminate();
+    }
     Bank(const Bank&)=delete;
     Bank& operator=(const Bank&)=delete;
     // Cold-bound scalar subrange of one registered owner span. No caller may
@@ -179,6 +191,19 @@ public:
     std::size_t count()const noexcept{return count_;}
     std::size_t bytesPerRacer()const noexcept{return bytes_;}
 private:
+    friend class ra_source_camera50LA::OwnershipBridge;
+    friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
+    std::uint32_t nativeFifoPins_=0;
+    // Only the concrete RA bridge can construct/install the derived pin. No
+    // public replacement, generic keepalive or caller retirement operation.
+    struct RaWorldLifetime {
+        const Bank* const identity;
+        explicit RaWorldLifetime(const Bank& bank)noexcept:identity(&bank){}
+        virtual ~RaWorldLifetime()=default;
+    };
+    // Declared before every span/snapshot: destroyed last. Bank alone strongly
+    // owns the pin; its concrete owner retains the actual same-source backing.
+    std::shared_ptr<RaWorldLifetime> raWorldLifetime_;
     struct Span {void* address;std::size_t bytes,offset;};
     struct Slot {std::vector<unsigned char> bytes;std::uint64_t completedSteps=0;bool active=false;};
     std::vector<Span> spans_;

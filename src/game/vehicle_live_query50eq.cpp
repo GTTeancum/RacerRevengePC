@@ -66,10 +66,10 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
         const auto& owner=owners[indices[i]];
         // Apply the same shape ownership rule before the live membership
         // prefix can mutate buffers or hand this owner to indexed50CC.
-        if((owner.nativeTriggers&&owner.shapeType!=5)||
+        if((owner.nativeTriggers&&owner.shapeType!=5&&owner.shapeType!=6)||
            (!owner.nativeTriggers&&owner.nativeTriggerIndex!=0))return false;
-        if(owner.shapeType==5){
-            if(bool(owner.gate)==bool(owner.nativeTriggers))return false;
+        if(owner.shapeType==5||owner.shapeType==6){
+            if((owner.shapeType==6&&owner.gate)||bool(owner.gate)==bool(owner.nativeTriggers))return false;
             if(owner.gate){
                 if(triggerOwner||(gateOwner&&gateOwner!=owner.gate))return false;
                 gateOwner=owner.gate;
@@ -89,16 +89,36 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
        !g.read(initial.metadata,initial.pairSlots)||!g.read(initial.recordSlots,initial.recordCount))return false;
     if(!g.read(source.resource->nodes,source.resource->nodeCount)||
        !g.read(source.resource->rays,source.resource->rayCount)||!g.filter(*source.filter))return false;
+    // The write guard is complete, and this admission pass performs no mesh
+    // mutations or callbacks. Reuse only complete successes within this call.
+    struct MeshSpanAdmission {
+        const assets::CollisionMesh48I* mesh;
+        const float* radii;
+        std::size_t radiusCount;
+    };
+    constexpr std::size_t meshSpanCapacity=8;
+    MeshSpanAdmission admittedMeshes[meshSpanCapacity]{};
+    std::size_t admittedMeshCount=0;
     for(std::size_t i=0;i<count;++i){
         if(indices[i]>=ownerCount)return false;
         const auto& owner=owners[indices[i]];const auto& candidate=owner.candidate;
         if(!g.filter(candidate.collision.filter)||!g.read(candidate.sceneName,candidate.sceneNameBytes))return false;
         const auto readMesh=[&](const assets::CollisionMesh48I* mesh,const float* radii,
             std::size_t radiusCount) noexcept {
+            for(std::size_t j=0;j<admittedMeshCount;++j){
+                const auto& admitted=admittedMeshes[j];
+                if(admitted.mesh==mesh&&admitted.radii==radii&&
+                   admitted.radiusCount==radiusCount)return true;
+            }
             if(!g.read(mesh,1)||!g.read(radii,radiusCount))return false;
-            return g.read(mesh->nodes.data(),mesh->nodes.size())&&g.read(mesh->faces.data(),mesh->faces.size())&&
-                g.read(mesh->vertices.data(),mesh->vertices.size())&&
-                g.read(mesh->vertex_normals.data(),mesh->vertex_normals.size());
+            if(!(g.read(mesh->nodes.data(),mesh->nodes.size())&&g.read(mesh->faces.data(),mesh->faces.size())&&
+                 g.read(mesh->vertices.data(),mesh->vertices.size())&&
+                 g.read(mesh->vertex_normals.data(),mesh->vertex_normals.size())))return false;
+            // A full cache never rejects an otherwise valid mesh: misses still
+            // execute every original span check, in the original order.
+            if(admittedMeshCount<meshSpanCapacity)
+                admittedMeshes[admittedMeshCount++]={mesh,radii,radiusCount};
+            return true;
         };
         if(owner.shapeType==0){
             if(!readMesh(candidate.collision.geometry.mesh,owner.nodeRadii,owner.nodeRadiusCount))return false;
@@ -111,8 +131,8 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
             for(std::size_t j=0;j<compound->count;++j){const auto& part=compound->parts[j];
                 if(!readMesh(part.mesh,part.nodeRadii,part.nodeRadiusCount))return false;
             }
-        }else if(owner.shapeType==5){
-            if(!source.nativeGatePolicy)return false;
+        }else if(owner.shapeType==5||owner.shapeType==6){
+            if(!source.nativeGatePolicy||(owner.shapeType==6&&!validNativeTriggerBox50MA(owner.nativeTriggerBox)))return false;
             if(owner.gate){
                 if(owner.gate!=gateOwner||!owner.gate->callbacks.activateAnimation)return false;
             }else if(owner.nativeTriggers!=triggerOwner||!triggerOwner||

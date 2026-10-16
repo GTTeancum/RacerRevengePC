@@ -1,0 +1,296 @@
+#pragma once
+namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
+namespace original_cable_selection50LA { class Binding; }
+#include "original_standard_model_resource50la.h"
+#include "original_standard_material_object50la.h"
+#include <memory>
+
+namespace ra_static_world50LA {class Owner;}
+namespace rr::game {class OriginalPositionStatsResources50LA;}
+namespace rr::assets {
+// A partial CPU callback outcome, never a renderer capability. The first
+// enabled pass cannot return until24B9B0; subsequent passes remain untouched.
+enum class OriginalCableMaterialCallbackStage50LA : std::uint8_t {
+    blocked,materialReturned,rendererSubmissionRequired
+};
+class OriginalUiScreenMaterialReference50KG;
+class OriginalStandardMaterialReferences50LA;
+class OriginalStandardScreenMaterialReference50LA;
+class OriginalStandardMaterialTable50LA;
+class OriginalStandardMaterialAnimationInstance50LA;
+// A sealed observation of this actual table's complete CONSTRUCTION-STATE
+// registry. Only a successful whole-table rebuild can mint it. It is not a
+// rendered-frame, effective249610 binding-history or FIFO-drain receipt.
+// The same application/table must outlive this borrowed value.
+class OriginalStandardMaterialCollectorReceipt50LA final {
+public:
+    OriginalStandardMaterialCollectorReceipt50LA() noexcept=default;
+private:
+    friend class OriginalStandardMaterialTable50LA;
+    const OriginalStandardMaterialTable50LA* owner_=nullptr;
+    std::uint64_t generation_=0;
+};
+struct OriginalStandardMaterialCollectorEntryView50LA {
+    // Borrowed observation only. Validate its seal again before reuse after
+    // any table mutation; row release can destroy this material immediately.
+    std::int32_t materialRow=-1,pass=-1,registration=-1,redirect18=-1,limit1C=-1,finalLeaf=-1;
+    const OriginalStandardMaterialObject50LA* material=nullptr;
+};
+enum class OriginalStandardMaterialMapPreparation50LA : std::uint8_t {
+    disabled,nullTexture,ready,absentMap
+};
+// Borrowed, prospective native binding inputs for one actual FINAL leaf map.
+// This is not a seal, accepted bind/history mutation, selected resident mip,
+// GPU upload, queue submission or FIFO drain. Discard this view before any
+// table/resource mutation and reacquire through the checked preparation API;
+// a collector seal alone does not version later texture population.
+struct OriginalStandardMaterialMapBindingView50LA {
+    OriginalStandardMaterialCollectorEntryView50LA origin{},representative{};
+    OriginalStandardMaterialMapPreparation50LA preparation=OriginalStandardMaterialMapPreparation50LA::disabled;
+    std::size_t map=0;
+    std::int16_t textureToken=-1;
+    const OriginalStandardTextureResource50LA* texture=nullptr;
+    // Constructor fields plus ONLY the proven per-map249610 TEXA overwrite.
+    // No TEX0 address/residency or dynamic ZBUF state is manufactured here.
+    OriginalStandardMaterialStateContext50LA contextAfter249610{};
+};
+// Stack-only prospective input inspection. No public constructor/accessor,
+// submission method, accepted-state bit or source frame/scene default exists.
+// The concrete strip callback retains its material reference throughout and
+// acquires the actual display pin before native attribute inspection. This
+// object cannot escape in the callback result.
+class OriginalCableEmissionBinding50LA final {
+    friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
+    friend class OriginalStandardMaterialTable50LA;
+    friend class ::original_cable_selection50LA::Binding;
+    OriginalCableEmissionBinding50LA()=default;
+    OriginalCableEmissionBinding50LA(OriginalCableEmissionBinding50LA&&)=default;
+    OriginalCableEmissionBinding50LA(const OriginalCableEmissionBinding50LA&)=delete;
+    OriginalCableEmissionBinding50LA& operator=(const OriginalCableEmissionBinding50LA&)=delete;
+    std::shared_ptr<const OriginalStandardMaterialContext50LA> context_;
+    OriginalStandardMaterialCollectorReceipt50LA registry_;
+    OriginalStandardMaterialCollectorEntryView50LA origin_,representative_;
+    OriginalStandardMaterialPassView50LA originatingPass_,effectivePass_;
+    //24BA0C..24BA24 keeps the first/origin node's parameters across redirect.
+    const OriginalStandardMaterialParameters50LA* originatingParameters_=nullptr;
+    const OriginalStandardMaterialAnimationInstance50LA* vertexBase_=nullptr;
+    const OriginalStandardMaterialTextureAnimation50LA* textureBase_=nullptr;
+    std::array<OriginalStandardMaterialMapBindingView50LA,2> maps_{};
+    std::size_t mapCount_=0;
+};
+enum class OriginalStandardMaterialStatus50LA : std::uint8_t {
+    complete,unprepared,alreadyPrepared,input,archive,templates,table,name,
+    missingName,range,reference,overflow,allocation,phase,missingMaterialObject,source,document,passCount,unsupportedAction,unsupportedPass,
+    program,texture,runtime,video,duplicatePublication,arithmetic,demandTerminal,collector
+};
+struct OriginalStandardMaterialDiagnostic50LA {
+    OriginalStandardMaterialStatus50LA status=OriginalStandardMaterialStatus50LA::complete;
+    std::uint32_t sourcePC=0;
+    std::int32_t row=-1;
+    std::size_t slot=0,storedSlots=0,retainedSlots=0;
+    bool sourceEffectsCommitted=false;
+    std::size_t populationVisited=0,populationPublished=0,pass=0;
+    std::size_t map=0,demandMapsVisited=0,nullTexturesSkipped=0,texturesDemanded=0;
+    bool textureDemandWritten=false;
+    const char* field=nullptr;
+    OriginalUiPageDiagnostic50KG document{};
+    OriginalStandardProgramDiagnostic50LA program{};
+    OriginalStandardTextureDiagnostic50LA texture{};
+};
+struct OriginalStandardMaterialRowView50LA {
+    const std::string* name00=nullptr;
+    const OriginalStandardMaterialObject50LA* object04=nullptr;
+    const std::int32_t* references08=nullptr;
+    const OriginalUiMaterialTemplateState50KG* associated30=nullptr;
+    std::uint32_t tableByteOffset=0;
+};
+// Actual native reference/population portion of the source382B38 table, not the
+// UI lifetime projection. Its one shared application owner must be retained
+// across models/scenes. Only a fresh constructor -> first Mat_Stbl load is
+// admitted; this cannot adopt/reset an already-running manager or infer that
+// existing foreign owners are absent. Default construction is UNPREPARED.
+// Serial and nonreentrant; no table mutation during scene/renderer borrows.
+class OriginalStandardMaterialTable50LA final {
+public:
+    OriginalStandardMaterialTable50LA() noexcept;
+    ~OriginalStandardMaterialTable50LA();
+    OriginalStandardMaterialTable50LA(const OriginalStandardMaterialTable50LA&)=delete;
+    OriginalStandardMaterialTable50LA& operator=(const OriginalStandardMaterialTable50LA&)=delete;
+    // Uses authenticated APPSTART and its real shared24A8E0/24A9A0 templates.
+    // Populates every table row in file order, including duplicate names.
+    // Null object and zero refs are source29888C/2988B0 stores, not defaults for
+    // an unknown live manager. No PSM is loaded and no14D370 success is claimed.
+    bool prepareFresh(std::shared_ptr<const OriginalUiArchive50KG>,
+        std::shared_ptr<const OriginalUiMaterialTemplates50KG>,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    // Preferred join to the SAME actual application APPSTART/template owner.
+    // This aliases its retained templates, never makes a second template copy.
+    bool prepareFresh(std::shared_ptr<const OriginalUiMaterialApplication50LA>,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool prepared() const noexcept;
+    std::size_t rowCount() const noexcept;
+    bool row(std::int32_t,OriginalStandardMaterialRowView50LA&) const noexcept;
+    // Genuine298C80 first-match, ASCII case-insensitive. Slash spelling stays
+    // significant. Missing names reject; they never become row0 or new rows.
+    bool find298C80(const std::string&,std::int32_t&,
+        OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    // Genuine298E60 read of canonical row+4. A valid pending row returns true
+    // with null output; caller MUST NOT call24A430 on that absent owner.
+    bool resolve298E60(std::int32_t,const OriginalStandardMaterialObject50LA*&,
+        OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    // Executes source14D370 in table order. Only positive-ref/null-object rows
+    // construct. Prior published rows survive later terminal failure; partial
+    // construction stays owned but unpublished. No collector/demand/render call.
+    // The same application program/texture and sealed context bindings must
+    // be supplied on every call. Actual source members may grow between calls.
+    bool populate14D370(const OriginalStandardMaterialPopulationInput50LA&,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool populationTerminal() const noexcept;
+    //14D440 after the actual14D370/29E340 population pair. Registers EVERY
+    // nonnull row and every declared pass, including disabled/foreign passes,
+    // in canonical row/pass order. Unique texture prototypes never merge;
+    // unique vertex animation still may merge. Group unique(-2) never merges;
+    // none(-1) is ordinary. Named/nonnegative groups remain closed.
+    // Preserves the source redirect/barrier algorithm and4096 registration cap.
+    // Once clear starts, failure leaves any partial registry unsealed and no
+    // prior receipt remains current. Rejection before clear changes no state.
+    bool rebuildColdCollector14D440(OriginalStandardMaterialCollectorReceipt50LA&,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool coldCollectorCurrent(const OriginalStandardMaterialCollectorReceipt50LA&) const noexcept;
+    std::size_t coldCollectorCount(const OriginalStandardMaterialCollectorReceipt50LA&) const noexcept;
+    bool coldCollectorEntry(const OriginalStandardMaterialCollectorReceipt50LA&,std::size_t,
+        OriginalStandardMaterialCollectorEntryView50LA&) const noexcept;
+    bool coldCollectorPass(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t row,std::size_t pass,OriginalStandardMaterialCollectorEntryView50LA&) const noexcept;
+    // Read-only preparation from this exact sealed cold registry. Resolves
+    // the final entry FIRST, then its enabled pass, actual map token and SAME
+    // texture table. Null resources remain a genuine no-bind result.
+    // This ordinary path rejects texture animation: it has no null-key UI
+    // caller proof. IPU/RenderTarget/residency remain closed.
+    // Output is unchanged on failure; success does not mutate source history.
+    bool prepareColdRepresentativeMap249610(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t row,std::size_t pass,std::size_t map,
+        OriginalStandardMaterialMapBindingView50LA&,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    //Explicit ScreenTexture2DF864 null-object-key route. Unique texture leaves
+    //select their SAME actual prototype, then102050 real child. No racer clone.
+    //Read-only current-phase binding only; this never dispatches animation.
+    bool prepareColdScreenPrototypeMap249610(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t row,std::size_t pass,std::size_t map,
+        OriginalStandardMaterialMapBindingView50LA&,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    // Authentic246810 ->24A430 over one immutable source surface. The override
+    // is the model's retained1C4 surface-ordinal handle; only -1 uses entry+0.
+    // Completes texture demand only, including the genuine null-resource skip.
+    // This is never a collector, GPU upload, geometry or renderer receipt.
+    bool demandSurface246810(const OriginalStandardModelResource50LA&,
+        std::size_t lod,std::size_t surfaceOrdinal,std::int32_t materialOverride,
+        float projectedRadius,float scale,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    bool demandTerminal() const noexcept;
+    // Null until the corresponding source lazy initialization actually ran.
+    const float* demandScale4356E0() const noexcept;
+    const std::uint32_t* demandUvAssertion4356E8() const noexcept;
+    const OriginalStandardMaterialObject50LA* partialConstruction() const noexcept;
+    // Read-only source14D370 next pending row in ascending table order.
+    // This is inspection, never a population/completion callback.
+    bool firstPending14D370(std::int32_t& row,const std::string*& name,
+        OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+private:
+    friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
+    bool pinNativeCollector(const OriginalStandardMaterialCollectorReceipt50LA&) noexcept;
+    void unpinNativeCollector() noexcept;
+    friend class ::ra_static_world50LA::Owner;
+    // Only the actual retained full-world Placement proof may enter here.
+    // No public caller supplies a row or model pointer for this route.
+    bool serviceRetainedModelPrototype24A740(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t,std::size_t,const rr::game::OriginalApplicationAnimationClockView50KG&,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool prepareRetainedModelMap24B26C(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t,std::size_t,std::size_t,OriginalStandardMaterialMapBindingView50LA&,
+        OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    enum class PrototypeRoute {ordinary,screenNullKey,retainedModel,cableNullKey};
+    bool prepareColdMap249610(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t,std::size_t,std::size_t,PrototypeRoute,
+        OriginalStandardMaterialMapBindingView50LA&,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    friend class OriginalUiScreenMaterialReference50KG;
+    bool serviceTournamentMarker24A740(std::int32_t,const OriginalStandardTextureTable50LA&,
+        const OriginalUiMemberView50KG&,const OriginalUiMemberView50KG&,
+        const rr::game::OriginalApplicationAnimationClockView50KG&,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool retainTournamentFallback14D590(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,
+        std::shared_ptr<OriginalStandardTextureTable50LA>,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool screenApplicationMatches(const OriginalUiMaterialApplication50LA&) const noexcept;
+    bool demandTournamentFallback2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,
+        const OriginalUiArchive50KG&,std::uint32_t storePC,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    bool demandTournamentMarker2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,
+        const OriginalUiMemberView50KG&,const OriginalUiMemberView50KG&,
+        OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    bool demandTournamentOutline2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,
+        const OriginalUiMemberView50KG&,const OriginalUiMemberView50KG&,
+        OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    friend class OriginalStandardMaterialReferences50LA;
+    friend class OriginalStandardScreenMaterialReference50LA;
+    friend class OriginalRadarOverlayMaterialReference50LA;
+    friend class rr::game::OriginalPositionStatsResources50LA;
+    friend class OriginalTimeStatsMaterialReference50LA;
+    friend class OriginalSpeedBoostMaterialReference50LA;
+    friend class OriginalDamageMaterialReference50LA;
+    bool retainDamageFallback14D590(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,
+        std::shared_ptr<OriginalStandardTextureTable50LA>,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool retainSpeedBoostFallback14D590(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,
+        std::shared_ptr<OriginalStandardTextureTable50LA>,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    friend class OriginalStandardParticleMaterialReference50LA;
+    friend class OriginalStandardCableMaterialReference50LA;
+    friend class ::original_cable_selection50LA::Binding;
+    bool selectRacerMaterial29BFF0(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool inspectCableEmission24B9B0(std::int32_t,std::size_t,
+        OriginalCableEmissionBinding50LA&,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    OriginalCableMaterialCallbackStage50LA serviceCableNullKey24A620(
+        std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    // All concrete caller families mutate the SAME row. Association is the actual
+    // retained application template, selected only by these concrete owners.
+    bool retain14D590(std::int32_t,OriginalUiTemplate50KG,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool retainDefault14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool retainScreen14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool release14D500(std::int32_t) noexcept;
+    struct Storage;
+    std::unique_ptr<Storage> storage_;
+};
+// The ACTUAL caller-owned36B970 path text at26E6AC, borrowed only during the
+// cold call. Null means unknown, not empty. Empty is an explicitly known source
+// value. No track/UI prefix or slash normalization is inferred from filenames.
+struct OriginalStandardMaterialPath50LA { const std::string* actualPrefix36B970=nullptr; };
+// One model's canonical count1C0 and retained handle array1C4. Each slot owns
+// one actual numeric source ref, including duplicate names. Partial acquisition
+// is terminal; its real retained prefix survives until ordered destruction.
+// No caller-set handle, reference count, or constructed-object setter exists.
+class OriginalStandardMaterialReferences50LA final {
+public:
+    OriginalStandardMaterialReferences50LA() noexcept;
+    ~OriginalStandardMaterialReferences50LA();
+    OriginalStandardMaterialReferences50LA(const OriginalStandardMaterialReferences50LA&)=delete;
+    OriginalStandardMaterialReferences50LA& operator=(const OriginalStandardMaterialReferences50LA&)=delete;
+    bool acquire26E640(const OriginalStandardModelResource50LA&,
+        std::shared_ptr<OriginalStandardMaterialTable50LA>,const OriginalStandardMaterialPath50LA&,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    //26EB44..26EBA8: copy the live prototype's actual count/handles, then
+    //retain every copied slot with DefaultMT. Do not resolve source names
+    //again: prototype handles can differ after an admitted material change.
+    bool clone26EB44(const OriginalStandardMaterialReferences50LA&,
+        OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    //Explicit ordered26E460 phase. Preflight includes duplicate-slot counts
+    //and never mutates the shared manager. Release is idempotent; owned handle
+    //backing stays stable until native destruction, after geometry cleanup.
+    bool canRelease26E4C0() const noexcept;
+    bool release26E4C0(OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool released26E4C0() const noexcept;
+    bool started() const noexcept;
+    bool complete() const noexcept;
+    const std::uint32_t* count1C0() const noexcept;
+    const std::int32_t* handle1C4(std::size_t surfaceOrdinal) const noexcept;
+    const OriginalStandardMaterialTable50LA* table382B38() const noexcept;
+private:
+    struct Storage;
+    std::unique_ptr<Storage> storage_;
+};
+}

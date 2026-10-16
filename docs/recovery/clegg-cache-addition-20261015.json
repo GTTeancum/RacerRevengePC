@@ -1,0 +1,62 @@
+{
+  "policy": "Append only two authentic Clegg records; historical eight records and forty files retained unchanged.",
+  "historical_catalog_sha256": "1ecee110fac920a8fe5661517de86c4a88012d3bcb177ab674e8d5f3e9e218fe",
+  "raw_catalog_sha256": "839436b3cc9e7c2685e61b9ea46d28c6015ab8011bac69c558c194117616cc75",
+  "merged_catalog_sha256": "fad5a62213709cc0f6343b3fc10bfe2545fa5e3476783358223f1333b5ac0442",
+  "files": [
+    {
+      "name": "03c_1-mip0.rrtex",
+      "bytes": 1040,
+      "sha256": "0decc7ca11e61a07d94eb8a653f7d45b247d56913c1e3f5f63a083aeb36b387f"
+    },
+    {
+      "name": "03c_1-mip1.rrtex",
+      "bytes": 4112,
+      "sha256": "0345147222f4825adfeda8718dcbb3f524bf57bcbf35788f61407b30aaa0516c"
+    },
+    {
+      "name": "03c_1-mip2.rrtex",
+      "bytes": 16400,
+      "sha256": "98b2a310ae2ae16e716fd63d9626f21e98ef2829a49881aaef7953b15e57d731"
+    },
+    {
+      "name": "03c_1-mip3.rrtex",
+      "bytes": 65552,
+      "sha256": "cd445233c079af1234bb9261d55821b53af4b3ded6c787666a3792671369f637"
+    },
+    {
+      "name": "03c_1-mip4.rrtex",
+      "bytes": 262160,
+      "sha256": "2c3ae56b5afd882b2b6d0e899fca79bf1a530f6c6f1ea5bd1e89338a8d3ba19d"
+    },
+    {
+      "name": "03c_2-mip0.rrtex",
+      "bytes": 1040,
+      "sha256": "68359538932bf350241ea5223ca02994246b99360ed1cf22bcc4a2fbebe23453"
+    },
+    {
+      "name": "03c_2-mip1.rrtex",
+      "bytes": 4112,
+      "sha256": "b4a7d9582459d7da9e6fbcf349eaf95072d7006d736de6e63f9ae32f006d8256"
+    },
+    {
+      "name": "03c_2-mip2.rrtex",
+      "bytes": 16400,
+      "sha256": "7d2c71ab0b33fad737fb98bb49f721721f77c037700a6873e8eb9400e5ac6859"
+    },
+    {
+      "name": "03c_2-mip3.rrtex",
+      "bytes": 65552,
+      "sha256": "bf50ee407f872ba0850b1bd971e6fc7c1c2b2a82463d837777e9015eec053d47"
+    },
+    {
+      "name": "03c_2-mip4.rrtex",
+      "bytes": 262160,
+      "sha256": "3ad084ef096eac86668cdd65d32cf80c7461507e15eb247db8736e8b5cfb2e66"
+    }
+  ],
+  "software_test_ran": false,
+  "hardware_pixel_parity_verified": false,
+  "pinned_decoder_sha256": "e482393f6b384863d17c7cc84aa930affd466eb6c6718dfd1292713408bf9efe",
+  "decoder_source": "Retained pre-kind0 helper with exact required hash; central newer kind0 helper left unchanged."
+}

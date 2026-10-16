@@ -30,13 +30,31 @@ OriginalUiRiderPodAssets50KG::OriginalUiRiderPodAssets50KG() noexcept=default;
 OriginalUiRiderPodAssets50KG::~OriginalUiRiderPodAssets50KG()=default;
 bool OriginalUiRiderPodAssets50KG::load(std::shared_ptr<const OriginalUiArchive50KG> archive,
     std::uint16_t widget,OriginalUiRiderPodDiagnostic50KG& d) noexcept {
+    return loadImpl(std::move(archive),widget,false,d);
+}
+bool OriginalUiRiderPodAssets50KG::loadTournament(
+    std::shared_ptr<const OriginalUiArchive50KG> archive,std::uint32_t career,
+    OriginalUiRiderPodDiagnostic50KG& d) noexcept {
+    // Literal table3AFEA0 -> switch blocks1EECB8..1EEFD0. Manager154
+    // is zero-based: offset98 is authored widget39, not widget38.
+    static constexpr std::uint16_t widgets[27]{
+        0,39,40,41,42,0,0,43,44,45,46,47,48,0,
+        49,50,51,52,53,54,55,56,57,58,59,60,61};
+    d={};
+    if(storage_)return fail(d,E::alreadyLoaded,0x1D3590);
+    if(career>=27||!widgets[career])return fail(d,E::widget,0x1EEC94);
+    return loadImpl(std::move(archive),widgets[career],true,d);
+}
+bool OriginalUiRiderPodAssets50KG::loadImpl(
+    std::shared_ptr<const OriginalUiArchive50KG> archive,std::uint16_t widget,
+    bool tournament,OriginalUiRiderPodDiagnostic50KG& d) noexcept {
     d={};if (storage_) return fail(d,E::alreadyLoaded,0x1D3590);
     if (!archive||!archive->loaded()||!archive->identity()||
-        archive->identity()->id!=OriginalUiArchiveId50KG::rider) return fail(d,E::archive,0x1D3590);
+        archive->identity()->id!=(tournament?OriginalUiArchiveId50KG::tournament:OriginalUiArchiveId50KG::rider)) return fail(d,E::archive,0x1D3590);
     try {
         auto next=std::make_unique<Storage>();next->archive=std::move(archive);next->widget=widget;
         OriginalUiDat50KG widgets;
-        if (!readOriginalUiDat50KG(*next->archive,"UI/UIRider/Widgets.Dat",widgets,d.text,
+        if (!readOriginalUiDat50KG(*next->archive,tournament?"UI/UITourn/Widgets.Dat":"UI/UIRider/Widgets.Dat",widgets,d.text,
             OriginalUiRepeatedKeyPolicy50KG::preserveInOrder)) return fail(d,E::widget,0x1D31D0);
         next->widgetSource=widgets.identity();
         const auto* section=widgets.section("Widget "+std::to_string(widget));
@@ -47,7 +65,7 @@ bool OriginalUiRiderPodAssets50KG::load(std::shared_ptr<const OriginalUiArchive5
             !originalUiBoolean50KG(*section,"DynamicLoad",false,dynamic,d.text,0x1CD5C0)||!dynamic)
             return fail(d,E::widget,0x1CD600);
         auto& c=next->config;
-        // Rider explicitly authors these vectors. Do not silently manufacture
+        // Both pages explicitly author these vectors. Do not manufacture
         // constructor defaults instead of the source missing-field getter route.
         if (!section->find("Position")||!section->find("LookVector")||!section->find("UpVector")||
             !originalUiTriple50KG(*section,"Position",{},c.position,d.text,0x1D31D0)||

@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+namespace ra_cold_roster50LA { class Resources; }
 namespace native_racer_collision50HW {
 using namespace rr::game;
 enum class QueryBody { Main, Secondary };
@@ -50,6 +51,7 @@ struct Receipt {
     bool endpointWordsCallerSupplied=false;
 };
 class Owner {
+    friend class ra_cold_roster50LA::Resources;
 public:
     Owner()=default;
     Owner(const Owner&)=delete;

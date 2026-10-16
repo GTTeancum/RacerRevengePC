@@ -1,0 +1,1411 @@
+{
+  "elf": {
+    "path": "SLUS_202.68",
+    "bytes": 2972720,
+    "sha256": "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30",
+    "load_segments": [
+      {
+        "offset": 128,
+        "virtual": 1048576,
+        "file_bytes": 2972160
+      },
+      {
+        "offset": 2972288,
+        "virtual": 4519424,
+        "file_bytes": 0
+      }
+    ],
+    "constructor_words": [
+      {
+        "pc": "001e7c40",
+        "file_offset": 949440,
+        "word": "ac4304dc"
+      },
+      {
+        "pc": "001e7c44",
+        "file_offset": 949444,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7c48",
+        "file_offset": 949448,
+        "word": "ac4004ec"
+      },
+      {
+        "pc": "001e7c4c",
+        "file_offset": 949452,
+        "word": "8fa300ac"
+      },
+      {
+        "pc": "001e7c50",
+        "file_offset": 949456,
+        "word": "24840002"
+      },
+      {
+        "pc": "001e7c54",
+        "file_offset": 949460,
+        "word": "28820006"
+      },
+      {
+        "pc": "001e7c58",
+        "file_offset": 949464,
+        "word": "00651821"
+      },
+      {
+        "pc": "001e7c5c",
+        "file_offset": 949468,
+        "word": "ac6053a0"
+      },
+      {
+        "pc": "001e7c60",
+        "file_offset": 949472,
+        "word": "8fa300ac"
+      },
+      {
+        "pc": "001e7c64",
+        "file_offset": 949476,
+        "word": "00651821"
+      },
+      {
+        "pc": "001e7c68",
+        "file_offset": 949480,
+        "word": "24a50008"
+      },
+      {
+        "pc": "001e7c6c",
+        "file_offset": 949484,
+        "word": "1440fff7"
+      },
+      {
+        "pc": "001e7c70",
+        "file_offset": 949488,
+        "word": "ac6053a4"
+      },
+      {
+        "pc": "001e7c74",
+        "file_offset": 949492,
+        "word": "8fa500ac"
+      },
+      {
+        "pc": "001e7c78",
+        "file_offset": 949496,
+        "word": "24040004"
+      },
+      {
+        "pc": "001e7c7c",
+        "file_offset": 949500,
+        "word": "24030002"
+      },
+      {
+        "pc": "001e7c80",
+        "file_offset": 949504,
+        "word": "24020005"
+      },
+      {
+        "pc": "001e7c84",
+        "file_offset": 949508,
+        "word": "aca453c0"
+      },
+      {
+        "pc": "001e7c88",
+        "file_offset": 949512,
+        "word": "8fa500ac"
+      },
+      {
+        "pc": "001e7c8c",
+        "file_offset": 949516,
+        "word": "24150001"
+      },
+      {
+        "pc": "001e7c90",
+        "file_offset": 949520,
+        "word": "24140007"
+      },
+      {
+        "pc": "001e7c94",
+        "file_offset": 949524,
+        "word": "24130009"
+      },
+      {
+        "pc": "001e7c98",
+        "file_offset": 949528,
+        "word": "aca353c4"
+      },
+      {
+        "pc": "001e7c9c",
+        "file_offset": 949532,
+        "word": "8fa500ac"
+      },
+      {
+        "pc": "001e7ca0",
+        "file_offset": 949536,
+        "word": "2412000b"
+      },
+      {
+        "pc": "001e7ca4",
+        "file_offset": 949540,
+        "word": "2411000d"
+      },
+      {
+        "pc": "001e7ca8",
+        "file_offset": 949544,
+        "word": "2410000f"
+      },
+      {
+        "pc": "001e7cac",
+        "file_offset": 949548,
+        "word": "aca353c8"
+      },
+      {
+        "pc": "001e7cb0",
+        "file_offset": 949552,
+        "word": "8fa500ac"
+      },
+      {
+        "pc": "001e7cb4",
+        "file_offset": 949556,
+        "word": "241f0011"
+      },
+      {
+        "pc": "001e7cb8",
+        "file_offset": 949560,
+        "word": "24190013"
+      },
+      {
+        "pc": "001e7cbc",
+        "file_offset": 949564,
+        "word": "24180015"
+      },
+      {
+        "pc": "001e7cc0",
+        "file_offset": 949568,
+        "word": "aca353cc"
+      },
+      {
+        "pc": "001e7cc4",
+        "file_offset": 949572,
+        "word": "8fa500ac"
+      },
+      {
+        "pc": "001e7cc8",
+        "file_offset": 949576,
+        "word": "240f0017"
+      },
+      {
+        "pc": "001e7ccc",
+        "file_offset": 949580,
+        "word": "240e0019"
+      },
+      {
+        "pc": "001e7cd0",
+        "file_offset": 949584,
+        "word": "240d001b"
+      },
+      {
+        "pc": "001e7cd4",
+        "file_offset": 949588,
+        "word": "aca353d0"
+      },
+      {
+        "pc": "001e7cd8",
+        "file_offset": 949592,
+        "word": "8fa500ac"
+      },
+      {
+        "pc": "001e7cdc",
+        "file_offset": 949596,
+        "word": "240c001d"
+      },
+      {
+        "pc": "001e7ce0",
+        "file_offset": 949600,
+        "word": "240b001f"
+      },
+      {
+        "pc": "001e7ce4",
+        "file_offset": 949604,
+        "word": "240a0021"
+      },
+      {
+        "pc": "001e7ce8",
+        "file_offset": 949608,
+        "word": "aca353d4"
+      },
+      {
+        "pc": "001e7cec",
+        "file_offset": 949612,
+        "word": "8fa500ac"
+      },
+      {
+        "pc": "001e7cf0",
+        "file_offset": 949616,
+        "word": "24090023"
+      },
+      {
+        "pc": "001e7cf4",
+        "file_offset": 949620,
+        "word": "24080025"
+      },
+      {
+        "pc": "001e7cf8",
+        "file_offset": 949624,
+        "word": "24070027"
+      },
+      {
+        "pc": "001e7cfc",
+        "file_offset": 949628,
+        "word": "aca353d8"
+      },
+      {
+        "pc": "001e7d00",
+        "file_offset": 949632,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d04",
+        "file_offset": 949636,
+        "word": "2406002c"
+      },
+      {
+        "pc": "001e7d08",
+        "file_offset": 949640,
+        "word": "2405002e"
+      },
+      {
+        "pc": "001e7d0c",
+        "file_offset": 949644,
+        "word": "24170032"
+      },
+      {
+        "pc": "001e7d10",
+        "file_offset": 949648,
+        "word": "aec353dc"
+      },
+      {
+        "pc": "001e7d14",
+        "file_offset": 949652,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d18",
+        "file_offset": 949656,
+        "word": "241e0034"
+      },
+      {
+        "pc": "001e7d1c",
+        "file_offset": 949660,
+        "word": "aec353e0"
+      },
+      {
+        "pc": "001e7d20",
+        "file_offset": 949664,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d24",
+        "file_offset": 949668,
+        "word": "aec353e4"
+      },
+      {
+        "pc": "001e7d28",
+        "file_offset": 949672,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d2c",
+        "file_offset": 949676,
+        "word": "aec353e8"
+      },
+      {
+        "pc": "001e7d30",
+        "file_offset": 949680,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d34",
+        "file_offset": 949684,
+        "word": "aec353ec"
+      },
+      {
+        "pc": "001e7d38",
+        "file_offset": 949688,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d3c",
+        "file_offset": 949692,
+        "word": "aec353f0"
+      },
+      {
+        "pc": "001e7d40",
+        "file_offset": 949696,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d44",
+        "file_offset": 949700,
+        "word": "aec353f4"
+      },
+      {
+        "pc": "001e7d48",
+        "file_offset": 949704,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d4c",
+        "file_offset": 949708,
+        "word": "aec353f8"
+      },
+      {
+        "pc": "001e7d50",
+        "file_offset": 949712,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d54",
+        "file_offset": 949716,
+        "word": "aec353fc"
+      },
+      {
+        "pc": "001e7d58",
+        "file_offset": 949720,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d5c",
+        "file_offset": 949724,
+        "word": "aec35400"
+      },
+      {
+        "pc": "001e7d60",
+        "file_offset": 949728,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d64",
+        "file_offset": 949732,
+        "word": "aec35404"
+      },
+      {
+        "pc": "001e7d68",
+        "file_offset": 949736,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d6c",
+        "file_offset": 949740,
+        "word": "aec25408"
+      },
+      {
+        "pc": "001e7d70",
+        "file_offset": 949744,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d74",
+        "file_offset": 949748,
+        "word": "aec3540c"
+      },
+      {
+        "pc": "001e7d78",
+        "file_offset": 949752,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d7c",
+        "file_offset": 949756,
+        "word": "aec45410"
+      },
+      {
+        "pc": "001e7d80",
+        "file_offset": 949760,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d84",
+        "file_offset": 949764,
+        "word": "aec35414"
+      },
+      {
+        "pc": "001e7d88",
+        "file_offset": 949768,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d8c",
+        "file_offset": 949772,
+        "word": "aec35418"
+      },
+      {
+        "pc": "001e7d90",
+        "file_offset": 949776,
+        "word": "8fb600ac"
+      },
+      {
+        "pc": "001e7d94",
+        "file_offset": 949780,
+        "word": "aec3541c"
+      },
+      {
+        "pc": "001e7d98",
+        "file_offset": 949784,
+        "word": "8fa300ac"
+      },
+      {
+        "pc": "001e7d9c",
+        "file_offset": 949788,
+        "word": "ac645420"
+      },
+      {
+        "pc": "001e7da0",
+        "file_offset": 949792,
+        "word": "8fa300ac"
+      },
+      {
+        "pc": "001e7da4",
+        "file_offset": 949796,
+        "word": "ac645424"
+      },
+      {
+        "pc": "001e7da8",
+        "file_offset": 949800,
+        "word": "8fa300ac"
+      },
+      {
+        "pc": "001e7dac",
+        "file_offset": 949804,
+        "word": "ac75542c"
+      },
+      {
+        "pc": "001e7db0",
+        "file_offset": 949808,
+        "word": "8fa300ac"
+      },
+      {
+        "pc": "001e7db4",
+        "file_offset": 949812,
+        "word": "ac625430"
+      },
+      {
+        "pc": "001e7db8",
+        "file_offset": 949816,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7dbc",
+        "file_offset": 949820,
+        "word": "ac545434"
+      },
+      {
+        "pc": "001e7dc0",
+        "file_offset": 949824,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7dc4",
+        "file_offset": 949828,
+        "word": "ac535438"
+      },
+      {
+        "pc": "001e7dc8",
+        "file_offset": 949832,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7dcc",
+        "file_offset": 949836,
+        "word": "ac52543c"
+      },
+      {
+        "pc": "001e7dd0",
+        "file_offset": 949840,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7dd4",
+        "file_offset": 949844,
+        "word": "ac515440"
+      },
+      {
+        "pc": "001e7dd8",
+        "file_offset": 949848,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7ddc",
+        "file_offset": 949852,
+        "word": "ac505444"
+      },
+      {
+        "pc": "001e7de0",
+        "file_offset": 949856,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7de4",
+        "file_offset": 949860,
+        "word": "ac5f5448"
+      },
+      {
+        "pc": "001e7de8",
+        "file_offset": 949864,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7dec",
+        "file_offset": 949868,
+        "word": "ac59544c"
+      },
+      {
+        "pc": "001e7df0",
+        "file_offset": 949872,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7df4",
+        "file_offset": 949876,
+        "word": "ac585450"
+      },
+      {
+        "pc": "001e7df8",
+        "file_offset": 949880,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7dfc",
+        "file_offset": 949884,
+        "word": "ac4f5454"
+      },
+      {
+        "pc": "001e7e00",
+        "file_offset": 949888,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e04",
+        "file_offset": 949892,
+        "word": "ac4e5458"
+      },
+      {
+        "pc": "001e7e08",
+        "file_offset": 949896,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e0c",
+        "file_offset": 949900,
+        "word": "ac4d545c"
+      },
+      {
+        "pc": "001e7e10",
+        "file_offset": 949904,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e14",
+        "file_offset": 949908,
+        "word": "ac4c5460"
+      },
+      {
+        "pc": "001e7e18",
+        "file_offset": 949912,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e1c",
+        "file_offset": 949916,
+        "word": "ac4b5464"
+      },
+      {
+        "pc": "001e7e20",
+        "file_offset": 949920,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e24",
+        "file_offset": 949924,
+        "word": "ac4a5468"
+      },
+      {
+        "pc": "001e7e28",
+        "file_offset": 949928,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e2c",
+        "file_offset": 949932,
+        "word": "ac49546c"
+      },
+      {
+        "pc": "001e7e30",
+        "file_offset": 949936,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e34",
+        "file_offset": 949940,
+        "word": "ac485470"
+      },
+      {
+        "pc": "001e7e38",
+        "file_offset": 949944,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e3c",
+        "file_offset": 949948,
+        "word": "ac475474"
+      },
+      {
+        "pc": "001e7e40",
+        "file_offset": 949952,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e44",
+        "file_offset": 949956,
+        "word": "ac465478"
+      },
+      {
+        "pc": "001e7e48",
+        "file_offset": 949960,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e4c",
+        "file_offset": 949964,
+        "word": "ac45547c"
+      },
+      {
+        "pc": "001e7e50",
+        "file_offset": 949968,
+        "word": "8fa200ac"
+      },
+      {
+        "pc": "001e7e54",
+        "file_offset": 949972,
+        "word": "ac575480"
+      }
+    ]
+  },
+  "archives": [
+    {
+      "path": "UI/UIRIDER/UIRIDER.RES",
+      "bytes": 5552683,
+      "sha256": "112cd71ac9cfcc909b0edb56e0e420bb358b7078b5abae5f48c62b95a6bbf856",
+      "members": [
+        {
+          "name": "ui\\textures\\07_flrg.pst",
+          "index_file_offset": 2264,
+          "logical_offset": 417792,
+          "bytes": 5148,
+          "sha256": "961be88fb4f5aeda59b9c8cffefc064db020c8fc6e9b9ba939e4d45e919d67d6",
+          "compressed_blocks": [
+            {
+              "index": 17,
+              "file_offset": 51183,
+              "bytes": 2691
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 4096,
+                "width": 64,
+                "height": 64,
+                "sha256": "44b1add89c37e900bd13f0fac6a561e2f691d7519a7018ec551e3ed85b6ce7bd"
+              }
+            ],
+            "end_offset": 5148
+          }
+        },
+        {
+          "name": "ui\\textures\\07_bkg.psm",
+          "index_file_offset": 3837,
+          "logical_offset": 1769472,
+          "bytes": 329,
+          "sha256": "4e452c110a5425d72011f773b99598e8bc0629c2e2d59082f8dccd950a326ea6",
+          "compressed_blocks": [
+            {
+              "index": 72,
+              "file_offset": 248664,
+              "bytes": 196
+            }
+          ],
+          "authored_text": "[General] \r\nTotalShaderPasses                         = 1\r\n\r\n[ShaderPass_1]                            ;---------------------------------------\r\nmicroProgramName                          = ScreenObject\r\n\r\ntotalTextureMaps                          = 1\r\nTextureMap_1                              = 07_bkg\r\n\r\nZWriteDisabled\t\t\t\t  = 1"
+        },
+        {
+          "name": "UI\\UIRider\\Widgets.Dat",
+          "index_file_offset": 4240,
+          "logical_offset": 2064384,
+          "bytes": 24173,
+          "sha256": "6e5fab48528286a04a6782362457cc66ef0ae478470a4cb77302b871db0f2bd5",
+          "compressed_blocks": [
+            {
+              "index": 84,
+              "file_offset": 251603,
+              "bytes": 3074
+            }
+          ],
+          "relevant_sections": [
+            "[Widget 41]\r\nType=Soultree_Character\r\nDynamicLoad=T\r\nPosition=0.443992,-0.086557,0.934678\r\nLookVector=0.000000,0.000000,1.000000\r\nUpVector=0.000000,1.000000,0.000000\r\nInitialMotion=1\r\nSelectionMotion=1\r\nMCF=07c.mcf\r\n\r\n; Mars Guo\r\n"
+          ]
+        },
+        {
+          "name": "ui\\geometry\\07.psg",
+          "index_file_offset": 7314,
+          "logical_offset": 5652480,
+          "bytes": 108636,
+          "sha256": "81ddf3fdf1b79815551c816dd45baf207426822428b00bf17df1d25acd7920dd",
+          "compressed_blocks": [
+            {
+              "index": 230,
+              "file_offset": 1266544,
+              "bytes": 8820
+            },
+            {
+              "index": 231,
+              "file_offset": 1275365,
+              "bytes": 10351
+            },
+            {
+              "index": 232,
+              "file_offset": 1285717,
+              "bytes": 11510
+            },
+            {
+              "index": 233,
+              "file_offset": 1297228,
+              "bytes": 12020
+            },
+            {
+              "index": 234,
+              "file_offset": 1309249,
+              "bytes": 4945
+            }
+          ]
+        },
+        {
+          "name": "ui\\anim\\07c.mcf",
+          "index_file_offset": 7344,
+          "logical_offset": 5775360,
+          "bytes": 612,
+          "sha256": "55445c18457279fd56bd2ddb5a13af583f212ec5f211b28c28078e776828a463",
+          "compressed_blocks": [
+            {
+              "index": 235,
+              "file_offset": 1314195,
+              "bytes": 290
+            }
+          ],
+          "authored_text": "[General info]\r\nNumberOfMotions=6\r\nContentDirectory=\r\nSLTFile=07c.slt\r\nVUTfilename=07c.vut\r\nRotationType=SHORTAXIS\r\n\r\n[MOTION 1]\r\nNAME=07c_ent\r\nVUE=07c_ent.vue\r\nFPS=15\r\nFrameCount=150\r\nLooping=no\r\n\r\n[MOTION 2]\r\nNAME=07c_idl1\r\nVUE=07c_idl1.vue\r\nFPS=15\r\nFrameCount=60\r\nLooping=no\r\n\r\n[MOTION 3]\r\nNAME=07c_breathe\r\nVUE=07c_breathe.vue\r\nFPS=15\r\nFrameCount=60\r\nLooping=yes\r\n\r\n[MOTION 4]\r\nNAME=07c_sel\r\nVUE=07c_sel.vue\r\nFPS=15\r\nFrameCount=60\r\nLooping=no\r\n\r\n[MOTION 5]\r\nNAME=07c_idl2\r\nVUE=07c_idl2.vue\r\nFPS=15\r\nFrameCount=60\r\nLooping=no\r\n\r\n[MOTION 6]\r\nNAME=07c_idl3\r\nVUE=07c_idl3.vue\r\nFPS=15\r\nFrameCount=60\r\nLooping=no\r\n"
+        },
+        {
+          "name": "ui\\anim\\07c.psg",
+          "index_file_offset": 7371,
+          "logical_offset": 5799936,
+          "bytes": 74020,
+          "sha256": "ce618b019509b130c6509248154b28195a4263d6d82ba975686e52b7d1d8ee31",
+          "compressed_blocks": [
+            {
+              "index": 236,
+              "file_offset": 1314486,
+              "bytes": 9404
+            },
+            {
+              "index": 237,
+              "file_offset": 1323891,
+              "bytes": 11577
+            },
+            {
+              "index": 238,
+              "file_offset": 1335469,
+              "bytes": 11212
+            },
+            {
+              "index": 239,
+              "file_offset": 1346682,
+              "bytes": 319
+            }
+          ]
+        },
+        {
+          "name": "ui\\anim\\07c.vut",
+          "index_file_offset": 7398,
+          "logical_offset": 5898240,
+          "bytes": 788,
+          "sha256": "f1c459643d70c7b8cdf5f9c2719b2d39f5ffc41d6240348eaab3115e0c6a14c2",
+          "compressed_blocks": [
+            {
+              "index": 240,
+              "file_offset": 1347002,
+              "bytes": 287
+            }
+          ]
+        },
+        {
+          "name": "ui\\anim\\07c_ent.mot",
+          "index_file_offset": 7425,
+          "logical_offset": 5922816,
+          "bytes": 29756,
+          "sha256": "38dd6d74882dad6d748df3fcd53b8dd1a730cd8a3a66c370a853b2c2c5294a79",
+          "compressed_blocks": [
+            {
+              "index": 241,
+              "file_offset": 1347290,
+              "bytes": 15171
+            },
+            {
+              "index": 242,
+              "file_offset": 1362462,
+              "bytes": 2659
+            }
+          ]
+        },
+        {
+          "name": "ui\\anim\\07c_idl1.mot",
+          "index_file_offset": 7456,
+          "logical_offset": 5971968,
+          "bytes": 12296,
+          "sha256": "9b8fad5584f90bd64c2287817b40a1e0536e8ef6ceba1eab77c8633c3448ea4b",
+          "compressed_blocks": [
+            {
+              "index": 243,
+              "file_offset": 1365122,
+              "bytes": 7934
+            }
+          ]
+        },
+        {
+          "name": "ui\\anim\\07c_idl2.mot",
+          "index_file_offset": 7488,
+          "logical_offset": 5996544,
+          "bytes": 12296,
+          "sha256": "ac8aa9e9f6208a7ad1e01dd53eb34f4ae759cbb3e921279a10e4110228e40698",
+          "compressed_blocks": [
+            {
+              "index": 244,
+              "file_offset": 1373057,
+              "bytes": 7757
+            }
+          ]
+        },
+        {
+          "name": "ui\\anim\\07c_idl3.mot",
+          "index_file_offset": 7520,
+          "logical_offset": 6021120,
+          "bytes": 12296,
+          "sha256": "9181031665e3e612ec7482a9031b592f928ed077cb1535db24d8b7dbb0d7d478",
+          "compressed_blocks": [
+            {
+              "index": 245,
+              "file_offset": 1380815,
+              "bytes": 6840
+            }
+          ]
+        },
+        {
+          "name": "ui\\anim\\07c_breathe.mot",
+          "index_file_offset": 7552,
+          "logical_offset": 6045696,
+          "bytes": 12296,
+          "sha256": "430ec6c5dd1dc55155b2d23186db188e218aba2c1618006b8e2f88a9dd09b133",
+          "compressed_blocks": [
+            {
+              "index": 246,
+              "file_offset": 1387656,
+              "bytes": 6462
+            }
+          ]
+        },
+        {
+          "name": "ui\\anim\\07c_sel.mot",
+          "index_file_offset": 7587,
+          "logical_offset": 6070272,
+          "bytes": 12296,
+          "sha256": "edf78ae0955981ebf0f18d1dc0cba7d2a2965890f077b7299773de93d3302e21",
+          "compressed_blocks": [
+            {
+              "index": 247,
+              "file_offset": 1394119,
+              "bytes": 7299
+            }
+          ]
+        },
+        {
+          "name": "ui\\textures\\07_shdw.pst",
+          "index_file_offset": 7618,
+          "logical_offset": 6094848,
+          "bytes": 17436,
+          "sha256": "2438bc2a60ec2973c2fbac4b2ef4cc54f68cf1ea6a3df16343c53c378c1206b5",
+          "compressed_blocks": [
+            {
+              "index": 248,
+              "file_offset": 1401419,
+              "bytes": 2007
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 16384,
+                "width": 128,
+                "height": 128,
+                "sha256": "5c9903cc8b23664789fbe7e0471ccd329d5ca5696321a4cd4d52247571d7ca56"
+              }
+            ],
+            "end_offset": 17436
+          }
+        },
+        {
+          "name": "ui\\textures\\07_shdw.psm",
+          "index_file_offset": 7653,
+          "logical_offset": 6119424,
+          "bytes": 2624,
+          "sha256": "1b8637c2d16eeada60d2a85c003f819db21dddba43321153394e4e4ba159f60b",
+          "compressed_blocks": [
+            {
+              "index": 249,
+              "file_offset": 1403427,
+              "bytes": 801
+            }
+          ],
+          "authored_text": "[General] \r\nTotalShaderPasses                         = 1\r\n\r\n[ShaderPass_1]                            ;---------------------------------------\r\nmicroProgramName                          = diffusecompressed\r\ntotalTextureMaps                          = 1\r\nTextureMap_1                              = 07_shdw\r\nTextureCoordinateIndex_1                  = 0\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 2\r\ninputColorB                               = 1\r\ninputAlphaC                               = 0\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = 1\r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = \r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = \r\n"
+        },
+        {
+          "name": "ui\\textures\\07_1.psm",
+          "index_file_offset": 7688,
+          "logical_offset": 6144000,
+          "bytes": 5198,
+          "sha256": "5486ce47e2c33bf38d38037c274b4909b5bc04faf76def7799163663ae1e03c9",
+          "compressed_blocks": [
+            {
+              "index": 250,
+              "file_offset": 1404229,
+              "bytes": 865
+            }
+          ],
+          "authored_text": "[General] \r\nTotalShaderPasses                         = 2\r\n\r\n[ShaderPass_1]                            ;---------------------------------------\r\nmicroProgramName                          = DiffuseCompressed\r\ntotalTextureMaps                          = 1\r\nTextureMap_1                              = 07_1 \r\nTextureCoordinateIndex_1                  = 0\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 0\r\ninputColorB                               = 1\r\ninputAlphaC                               = 0\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = \r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = 0\r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = \r\n\r\n[ShaderPass_2]                            ;---------------------------------------\r\nmicroProgramName                          = SpecularMapCompressed\r\ntotalTextureMaps                          = 1\r\nTextureMap_1                              = specmap1 \r\nTextureCoordinateIndex_1                  = 0\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 0\r\ninputColorB                               = 2\r\ninputAlphaC                               = 1\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = 1\r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = \r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = 1\r\n\r\n\r\n"
+        },
+        {
+          "name": "ui\\textures\\07_2.psm",
+          "index_file_offset": 7720,
+          "logical_offset": 6168576,
+          "bytes": 5198,
+          "sha256": "974a9a24344d7da62742549fab6126d59291229db9025e6f1462ebfaa9de709f",
+          "compressed_blocks": [
+            {
+              "index": 251,
+              "file_offset": 1405095,
+              "bytes": 864
+            }
+          ],
+          "authored_text": "[General] \r\nTotalShaderPasses                         = 2\r\n\r\n[ShaderPass_1]                            ;---------------------------------------\r\nmicroProgramName                          = DiffuseCompressed\r\ntotalTextureMaps                          = 1\r\nTextureMap_1                              = 07_2 \r\nTextureCoordinateIndex_1                  = 0\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 0\r\ninputColorB                               = 1\r\ninputAlphaC                               = 0\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = \r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = 0\r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = \r\n\r\n[ShaderPass_2]                            ;---------------------------------------\r\nmicroProgramName                          = SpecularMapCompressed\r\ntotalTextureMaps                          = 1\r\nTextureMap_1                              = specmap1 \r\nTextureCoordinateIndex_1                  = 0\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 0\r\ninputColorB                               = 2\r\ninputAlphaC                               = 1\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = 1\r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = \r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = 1\r\n\r\n\r\n"
+        },
+        {
+          "name": "ui\\textures\\07_3.psm",
+          "index_file_offset": 7752,
+          "logical_offset": 6193152,
+          "bytes": 2622,
+          "sha256": "ae016e27a66b37d779faa79ecbf75d1544e93c0fd7803943edf10365b4d2e5c8",
+          "compressed_blocks": [
+            {
+              "index": 252,
+              "file_offset": 1405960,
+              "bytes": 798
+            }
+          ],
+          "authored_text": "[General] \r\nTotalShaderPasses                         = 1\r\n\r\n[ShaderPass_1]                            ;---------------------------------------\r\nmicroProgramName                          = diffusecompressed\r\ntotalTextureMaps                          = 1\r\nTextureMap_1                              = 07_3 \r\nTextureCoordinateIndex_1                  = 0\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 0\r\ninputColorB                               = 1\r\ninputAlphaC                               = 0\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = 0\r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = \r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = \r\n"
+        },
+        {
+          "name": "ui\\textures\\07c_1.pst",
+          "index_file_offset": 7784,
+          "logical_offset": 6217728,
+          "bytes": 66588,
+          "sha256": "95c250dcc8083d62c321c13db6600bc55304807e3e52b75406389397cb45caea",
+          "compressed_blocks": [
+            {
+              "index": 253,
+              "file_offset": 1406759,
+              "bytes": 18379
+            },
+            {
+              "index": 254,
+              "file_offset": 1425139,
+              "bytes": 18436
+            },
+            {
+              "index": 255,
+              "file_offset": 1443576,
+              "bytes": 12491
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 65536,
+                "width": 256,
+                "height": 256,
+                "sha256": "11ff044271e87e94908b2331973aa9e63bcf57f6f11b7a79fae2b04b1858e406"
+              }
+            ],
+            "end_offset": 66588
+          }
+        },
+        {
+          "name": "ui\\textures\\07c_1.psm",
+          "index_file_offset": 7817,
+          "logical_offset": 6291456,
+          "bytes": 5147,
+          "sha256": "b883ec9e712ff5c475b04c3833871c9eef8421502beb4eb7e7262e99acb85c65",
+          "compressed_blocks": [
+            {
+              "index": 256,
+              "file_offset": 1456068,
+              "bytes": 867
+            }
+          ],
+          "authored_text": "[General] \r\n;TotalShaderPasses                         = 2\r\nTotalShaderPasses                         = 1\r\n\r\n[ShaderPass_1]                            ;---------------------------------------\r\nmicroProgramName                          = DiffuseCompressed\r\nTextureMap_1                              = 07c_1\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 0\r\ninputColorB                               = 1\r\ninputAlphaC                               = 0\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = \r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = 0\r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = \r\n\r\n[ShaderPass_2]                            ;---------------------------------------\r\nmicroProgramName                          = SpecularMapCompressed\r\ntotalTextureMaps                          = 1\r\nTextureMap_1                              = specmap1\r\nTextureCoordinateIndex_1                  = 0\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 0\r\ninputColorB                               = 2\r\ninputAlphaC                               = 1\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = 1\r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = \r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = 1\r\n"
+        },
+        {
+          "name": "ui\\textures\\07c_2.pst",
+          "index_file_offset": 7850,
+          "logical_offset": 6316032,
+          "bytes": 29512,
+          "sha256": "cbd5e15d11e7b1b9336a1e8f965b18ecdb93d948e770baa2bc3005e3576b11ce",
+          "compressed_blocks": [
+            {
+              "index": 257,
+              "file_offset": 1456936,
+              "bytes": 23755
+            },
+            {
+              "index": 258,
+              "file_offset": 1480692,
+              "bytes": 4995
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 2,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 12,
+                "data_offset": 32,
+                "bytes": 216,
+                "width": 16,
+                "height": 16,
+                "sha256": "51c6ffdc77b9e50ffff5d9b7d00241f4da0c6a1d9de99cc84423f24e660321a2"
+              },
+              {
+                "level": 1,
+                "header_offset": 248,
+                "data_offset": 268,
+                "bytes": 776,
+                "width": 32,
+                "height": 32,
+                "sha256": "a93eec935f3de3fec135477ff4f22f9ebb9889acbeacc1d85f1197548ebef856"
+              },
+              {
+                "level": 2,
+                "header_offset": 1044,
+                "data_offset": 1064,
+                "bytes": 2392,
+                "width": 64,
+                "height": 64,
+                "sha256": "d525e93bf42b571ebaf2327a5f00bc4ab2c2b80b2dd242aeb43c79644cc2ba87"
+              },
+              {
+                "level": 3,
+                "header_offset": 3456,
+                "data_offset": 3476,
+                "bytes": 7101,
+                "width": 128,
+                "height": 128,
+                "sha256": "fbb471df280643efeb1afa45fdc8b9d29b44da9a12c270900ba83aa25e021424"
+              },
+              {
+                "level": 4,
+                "header_offset": 10577,
+                "data_offset": 10597,
+                "bytes": 18915,
+                "width": 256,
+                "height": 256,
+                "sha256": "89b135287cd4fbc7a0ecbeda1105396abe6eb8ca1dfab643553f8416fb7f3e6d"
+              }
+            ],
+            "end_offset": 29512
+          }
+        },
+        {
+          "name": "ui\\textures\\07c_2.psm",
+          "index_file_offset": 7883,
+          "logical_offset": 6365184,
+          "bytes": 2529,
+          "sha256": "bd6e9739cc95723e9e2e97cd1a77b25bc6457e75b5a0b8b67e2dfe840d4296b5",
+          "compressed_blocks": [
+            {
+              "index": 259,
+              "file_offset": 1485688,
+              "bytes": 778
+            }
+          ],
+          "authored_text": "[General] \r\nTotalShaderPasses                         = 1\r\n\r\n[ShaderPass_1]                            ;---------------------------------------\r\nmicroProgramName                          = DiffuseCompressed\r\nTextureMap_1                              = 07c_2\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 0\r\ninputColorB                               = 1\r\ninputAlphaC                               = 0\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = 0\r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = 0\r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = \r\n"
+        }
+      ]
+    },
+    {
+      "path": "UI/UIPODTEX.RES",
+      "bytes": 2653798,
+      "sha256": "ffb0f32563e3e5b6e3fefe915bbb37a00610e1a9a44163bce9737c2ac9d6e641",
+      "members": [
+        {
+          "name": "UI\\Textures\\07_1.pst",
+          "index_file_offset": 976,
+          "logical_offset": 1032192,
+          "bytes": 66588,
+          "sha256": "d572a9715129b9484f333cc335dac9141dfdab67d677e5b4199164a859d351eb",
+          "compressed_blocks": [
+            {
+              "index": 42,
+              "file_offset": 614126,
+              "bytes": 18174
+            },
+            {
+              "index": 43,
+              "file_offset": 632301,
+              "bytes": 19089
+            },
+            {
+              "index": 44,
+              "file_offset": 651391,
+              "bytes": 11380
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 65536,
+                "width": 256,
+                "height": 256,
+                "sha256": "be138e8d366dfe20e515e35ad3054be457939d4e39f2b2a9317b7a7678366e17"
+              }
+            ],
+            "end_offset": 66588
+          }
+        },
+        {
+          "name": "UI\\Textures\\07_2.pst",
+          "index_file_offset": 1008,
+          "logical_offset": 1105920,
+          "bytes": 66588,
+          "sha256": "15a97aa93df5a0209905d7185146dfeb93dcc869d1a5ae8fd997fe3e2ad3ae70",
+          "compressed_blocks": [
+            {
+              "index": 45,
+              "file_offset": 662772,
+              "bytes": 16003
+            },
+            {
+              "index": 46,
+              "file_offset": 678776,
+              "bytes": 16983
+            },
+            {
+              "index": 47,
+              "file_offset": 695760,
+              "bytes": 12144
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 65536,
+                "width": 256,
+                "height": 256,
+                "sha256": "b4a9928c282312fd4fc95f6e9f0a7d741cf1b64c895b8be6de1a7852f930b685"
+              }
+            ],
+            "end_offset": 66588
+          }
+        },
+        {
+          "name": "UI\\Textures\\07_3.pst",
+          "index_file_offset": 1040,
+          "logical_offset": 1179648,
+          "bytes": 17436,
+          "sha256": "ff4eb00f695f24c8082cd44fc7438c087df1836bc3edf886e54937bc77b8b3e9",
+          "compressed_blocks": [
+            {
+              "index": 48,
+              "file_offset": 707905,
+              "bytes": 15289
+            }
+          ],
+          "pst": {
+            "version": 1,
+            "kind": 1,
+            "mips": [
+              {
+                "level": 0,
+                "header_offset": 1036,
+                "data_offset": 1052,
+                "bytes": 16384,
+                "width": 128,
+                "height": 128,
+                "sha256": "a88c7d4cf446e472adedfdf450f6e39ce2c5cb361d6815ce57dfc889edcd00bd"
+              }
+            ],
+            "end_offset": 17436
+          }
+        }
+      ]
+    },
+    {
+      "path": "UI/PODPHYS.RES",
+      "bytes": 46563,
+      "sha256": "8361cb484ea841e1772cc0ddec2223fa923e397c1cc9a89f06ab06b1cd7ca2c8",
+      "members": [
+        {
+          "name": "pods\\pod07\\Pod07.phy",
+          "index_file_offset": 204,
+          "logical_offset": 98304,
+          "bytes": 6617,
+          "sha256": "8615aca792d1efb68abcda048dd2b6cc9207c6c044300bf2306b6618edaffa48",
+          "compressed_blocks": [
+            {
+              "index": 4,
+              "file_offset": 8801,
+              "bytes": 1994
+            }
+          ],
+          "authored_text": "[Pod Setup]\r\n\r\nName = \"Gasgano\"\r\nPrefix = \"07\"\r\n\r\nChariot = chariot.slt\r\nLeftEngine = englt1.slt\r\nRightEngine = engrt1.slt\r\n\r\nEngineMotion = 5\r\n\r\n[Wreckage]\r\n\r\nNumberOfParts = 3\r\nPart1 = chariot\r\nPart2 = englt1\r\nPart3 = engrt1\r\n\r\nGravity = 3\r\n\r\n[chariot]\r\n\r\nNumberOfParts = 1\r\nMaxNumberOfDamageEmitters = 0\r\n\r\nMaxCompression = 2\r\nSpring = 0\r\nDamping = 0\r\nImpulseSpring = 0.5\r\nImpulseDamping = 0.3\r\nRestitution = 0.2\r\nFriction = 1\r\nFrictionTorqueScale = 1\r\nDrag = 0.01\r\nRateDamping = 10\r\n\r\nPart1 = chariot\r\nInertia1 = 1\r\nWeight1 = 50\r\nBreakRate1 = 0\r\nBreakScale1 = 1\r\nEmitSmoke1 = F\r\n\r\n[englt1]\r\n\r\nNumberOfParts = 3\r\nMaxNumberOfDamageEmitters = 1\r\n\r\nMaxCompression = 5\r\nSpring = 0\r\nDamping = 0\r\nImpulseSpring = 0\r\nImpulseDamping = 0\r\nRestitution = 0.5\r\nFriction = 1\r\nFrictionTorqueScale = 1.5\r\nDrag = 0.01\r\nRateDamping = 5\r\n\r\nPart1 = englt1a\r\nInertia1 = 1\r\nWeight1 = 50\r\nBreakRate1 = 0.6\r\nBreakScale1 = 1\r\nEmitSmoke1 = T\r\n\r\nPart2 = englt1b\r\nInertia2 = 1\r\nWeight2 = 50\r\nBreakRate2 = 0.6\r\nBreakScale2 = 1\r\nEmitSmoke2 = F\r\n\r\nPart3 = englt1c\r\nInertia3 = 1\r\nWeight3 = 50\r\nBreakRate3 = 0.6\r\nBreakScale3 = 1\r\nEmitSmoke3 = T\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n[engrt1]\r\n\r\nNumberOfParts = 3\r\nMaxNumberOfDamageEmitters = 1\r\n\r\nMaxCompression = 5\r\nSpring = 0\r\nDamping = 0\r\nImpulseSpring = 0\r\nImpulseDamping = 0\r\nRestitution = 0.5\r\nFriction = 1\r\nFrictionTorqueScale = 1.5\r\nDrag = 0.01\r\nRateDamping = 5\r\n\r\nPart1 = engrt1a\r\nInertia1 = 1\r\nWeight1 = 50\r\nBreakRate1 = 0.6\r\nBreakScale1 = 1\r\nEmitSmoke1 = T\r\n\r\nPart2 = engrt1b\r\nInertia2 = 1\r\nWeight2 = 50\r\nBreakRate2 = 0.6\r\nBreakScale2 = 1\r\nEmitSmoke2 = F\r\n\r\nPart3 = engrt1c\r\nInertia3 = 1\r\nWeight3 = 50\r\nBreakRate3 = 0.6\r\nBreakScale3 = 1\r\nEmitSmoke3 = T\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n[Physical Properties]\r\n\r\nWeight = 1000\r\nChariotWeight = 200\r\nGravity = 6\r\nAirborneGravity = 10\r\nRollInertiaScale = 1\r\nPitchInertiaScale = 1\r\nYawInertiaScale = 1\r\n\r\n[Repulsor]\r\n\r\nMaxLiftHeight = 5\r\nSpring = 4\r\nDamping = 0.3\r\nOrientationSpring = 100\r\nSideForceCoefficient = 0\r\n\r\n[Roll Control]\r\n\r\nRollAngleScale = 0.3\r\nRollForceScale = 100\r\nMaxRollAngle = 45\r\nRollFilter = 0.1\r\n\r\n[Engine]\r\n\r\nMaxThrustA = 5062.5\r\nMaxThrustB = 6900\r\nMaxThrustC = 8737.5\r\nMinMaxThrust = 3750\r\nMaxMaxThrust = 9000\r\n\r\nBoostThrust = 1800\r\nRepairThrust = 1600\r\n\r\nTheoreticalTopSpeedA = 580\r\nTheoreticalTopSpeedB = 720\r\nTheoreticalTopSpeedC = 860\r\nMinTheoreticalTopSpeed = 500\r\nMaxTheoreticalTopSpeed = 900\r\n\r\nActualTopSpeed = 100\r\nRepairSpeed = 25\r\nBoostSpeed = 200\r\nRampDownSpeed = 110\r\nLeftEnginePosition = -0.3,0.0,0.0\r\nRightEnginePosition = 0.3,0.0,0.0\r\nRampUpFilter = 1\r\nRampDownFilter = 1\r\n\r\n[Engine Aerodynamics]\r\n\r\nChord = 3\r\nWingSpan = 12\r\nWingArea = 36\r\nDefaultAngleOfAttack = 0\r\n\r\nLift = 0\r\nPitchRateLift = 0\r\nElevatorLift = 0\r\n\r\nBasicDrag = 0.02\r\nLiftDrag = 0\r\nElevatorDrag = 0\r\nSpoilerDrag = 500\r\nSpoilerBrakeDrag = 8000\r\n\r\nPitchMoment = 25000\r\nPitchRatePitchMoment = -10000\r\nElevatorPitchMoment = 0\r\n\r\nSideSlipSideForce = -1000\r\nSpoilerSideForce = -70000\r\nRudderSideForce = 0\r\nRollRateSideForce = 0\r\nYawRateSideForce = 0\r\n\r\nSideSlipRollMoment = 0\r\nAileronRollMoment = 0\r\nRudderRollMoment = 0\r\nRollRateRollMoment = -2000\r\nYawRateRollMoment = 0\r\n\r\nSideSlipYawMoment = 100\r\nAileronYawMoment = 0\r\nRudderYawMoment = 0\r\nRollRateYawMoment = 0\r\nYawRateYawMoment = -5000\r\nSpoilerYawMomentScale = 0.00005\r\nSpoilerYawMomentOffset = 0\r\n\r\nSpoilerYawMomentA = -5450\r\nSpoilerYawMomentB = -6500\r\nSpoilerYawMomentC = -7550\r\nMinSpoilerYawMoment = -5000\r\nMaxSpoilerYawMoment = -8000\r\n\r\nRampDownElevatorPitch = 35\r\nMaxElevatorPitch = 45\r\n\r\nPowerslideThrust = 40\r\nPowerslideSpoilerYawMoment = -5000\r\nPowerslideSideForce = -40\r\n\r\nInvertedSideSlipSideForce = -20\r\nInvertedSpoilerSideForce = -2000\r\nInvertedSideSlipYawMoment = 300\r\n\r\n[Pod Animation]\r\n\r\nImpactForce = 12\r\nGroundImpactForce = -4\r\nSeparationForce = 5\r\nThrustForce = 10\r\nLiftForce = 40\r\nDragForce = -10\r\nEngineSpring = 17\r\nEngineDamping = -5\r\nBinderSpring = 20\r\n\r\nYawTorque = 1\r\nPitchTorque = 1\r\nRollTorque = -5\r\nEngineTorque = 20\r\nEngineTorqueDamping = -4.5\r\nBinderTorque = 0\r\n\r\nMinTurbulenceScale = 0.4\r\nMaxTurbulenceScale = 0.5\r\nMinTurbulenceTimeScale = 1\r\nMaxTurbulenceTimeScale = 3\r\nMaxTurbulenceSpeed = 400\r\nOrientationScale = 0.06\r\nDamageTurbulenceScale = 4\r\nDamageOrientationTurbulenceScale = 4\r\n\r\nMaxInputScaleSpeed = 200\r\n\r\nCableForce = 60\r\nCableRadiusForce = 50\r\nChariotImpactForce = 0\r\nChariotHeadOnImpactForce = -20\r\nChariotMaxImpulse = 10\r\nChariotRepulsorImpactForce = -4\r\nChariotLandingImpulseScale = 10\r\nChariotMaxRepulsorImpulse = 10\r\nChariotMaxYawAngle = 5\r\nChariotMaxYawRate = 60\r\nChariotVelocityRateForce = 50\r\nChariotVelocityForce = 10\r\nChariotPowerslideVelocityForce = 1\r\nChariotVelocityDamping = -5\r\nChariotOrientationGain = 100\r\nChariotAngularRateDamping = -10\r\n\r\nMinChariotTurbulenceScale = 0.5\r\nMaxChariotTurbulenceScale = 0.1\r\nMinChariotTurbulenceTimeScale = 2\r\nMaxChariotTurbulenceTimeScale = 3\r\nChariotOrientationScale = 0.05\r\n\r\nPowerslideYawTorque = 2\r\nPowerslidePitchTorque = 2\r\nChariotMaxPowerslideYawAngle = -25\r\n\r\n[Collisions]\r\n\r\nMaxCompression = 1\r\nSpring = 0\r\nDamping = 0\r\nImpulseSpring = 1\r\nImpulseDamping = 0.3\r\nWallRestitution = 0\r\nPodRestitution = 0\r\nMomentScale = 0\r\nImpulseScale = 0\r\nAngularImpulseScale = 0\r\nFriction = 0.1\r\nFrictionTorqueScale = 0\r\nExplosiveWreckSpeed = 85\r\nResetSpeed = 75\r\n\r\n[Joystick]\r\n\r\nSteerSpeed1 = 250\r\nSteerScale1 = 1\r\nSteerSpeed2 = 450\r\nSteerScale2 = 1\r\nXAxisRateLimit = 4\r\nYAxisRateLimit = 3\r\n\r\n[CameraInfo]\r\n\r\nFirstPersonCamOffset = 0.0, 2.0, 0.0\r\n\r\n[DamageRepair]\r\n\r\nDefenseA = 0.15\r\nDefenseB = 0.5\r\nDefenseC = 0.85\r\nMinDefense = 0\r\nMaxDefense = 1\r\n\r\nBaseRepairAmountA = 0.0058\r\nBaseRepairAmountB = 0.00895\r\nBaseRepairAmountC = 0.0121\r\nMinBaseRepairAmount = 0.0055\r\nMaxBaseRepairAmount = 0.014\r\n\r\nBaseCoolingTimeA = 0.0036\r\nBaseCoolingTimeB = 0.00375\r\nBaseCoolingTimeC = 0.0048\r\nMinBaseCoolingTime = 0.0035\r\nMaxBaseCoolingTime = 0.006\r\n\r\n[Pod Audio]\r\n\r\n; Audio Parameters\r\nEngineAudioFile = sfx\\race\\gen2_ngn.vag\r\nBeamAudioFile = sfx\\race\\as_beam.vag\r\nIdlePitchModifier = 0.84\r\nPitchRangeModifier = 1.89\r\nIdleBinderModifier = 0.47\r\nBinderRangeModifier = 1.59\r\nEngineVolume = 85\r\nBinderVolume = 100\r\n\r\n[BaseAbilities]\r\n\r\n;These are the base/default abilities for THIS pod\r\nMaxThrust = 0.25\r\nTheoreticalTopSpeed = 0.2\r\nSpoilerYawMoment = 0.15\r\nDefense = 0.15\r\nBaseRepairAmount = 0.2\r\nBaseCoolingTime = 0.25\r\n\r\n[MaxAbilities]\r\n\r\n;These are the max abilities for THIS pod\r\nMaxThrust = 0.95\r\nTheoreticalTopSpeed = 0.9\r\nSpoilerYawMoment = 0.85\r\nDefense = 0.85\r\nBaseRepairAmount = 0.9\r\nBaseCoolingTime = 0.95\r\n\r\n[Tuning]\r\n\r\nUseValues = 1\r\nUseAValues = 0\r\nUseBValues = 0\r\nUseCValues = 0\r\n; if UseValues == 0, specify pct\r\nUpgradePercent = 0\r\n\r\n"
+        }
+      ]
+    },
+    {
+      "path": "PODS/POD07/POD07.RES",
+      "bytes": 354874,
+      "sha256": "0cde5fac5d9a379e1ca426409809ba5c04eec6895013577f03639c69859fd8a8",
+      "members": [
+        {
+          "name": "Pods\\Pod07\\Pod07.phy",
+          "index_file_offset": 1609,
+          "logical_offset": 1056768,
+          "bytes": 6617,
+          "sha256": "8615aca792d1efb68abcda048dd2b6cc9207c6c044300bf2306b6618edaffa48",
+          "compressed_blocks": [
+            {
+              "index": 43,
+              "file_offset": 61149,
+              "bytes": 1994
+            }
+          ],
+          "authored_text": "[Pod Setup]\r\n\r\nName = \"Gasgano\"\r\nPrefix = \"07\"\r\n\r\nChariot = chariot.slt\r\nLeftEngine = englt1.slt\r\nRightEngine = engrt1.slt\r\n\r\nEngineMotion = 5\r\n\r\n[Wreckage]\r\n\r\nNumberOfParts = 3\r\nPart1 = chariot\r\nPart2 = englt1\r\nPart3 = engrt1\r\n\r\nGravity = 3\r\n\r\n[chariot]\r\n\r\nNumberOfParts = 1\r\nMaxNumberOfDamageEmitters = 0\r\n\r\nMaxCompression = 2\r\nSpring = 0\r\nDamping = 0\r\nImpulseSpring = 0.5\r\nImpulseDamping = 0.3\r\nRestitution = 0.2\r\nFriction = 1\r\nFrictionTorqueScale = 1\r\nDrag = 0.01\r\nRateDamping = 10\r\n\r\nPart1 = chariot\r\nInertia1 = 1\r\nWeight1 = 50\r\nBreakRate1 = 0\r\nBreakScale1 = 1\r\nEmitSmoke1 = F\r\n\r\n[englt1]\r\n\r\nNumberOfParts = 3\r\nMaxNumberOfDamageEmitters = 1\r\n\r\nMaxCompression = 5\r\nSpring = 0\r\nDamping = 0\r\nImpulseSpring = 0\r\nImpulseDamping = 0\r\nRestitution = 0.5\r\nFriction = 1\r\nFrictionTorqueScale = 1.5\r\nDrag = 0.01\r\nRateDamping = 5\r\n\r\nPart1 = englt1a\r\nInertia1 = 1\r\nWeight1 = 50\r\nBreakRate1 = 0.6\r\nBreakScale1 = 1\r\nEmitSmoke1 = T\r\n\r\nPart2 = englt1b\r\nInertia2 = 1\r\nWeight2 = 50\r\nBreakRate2 = 0.6\r\nBreakScale2 = 1\r\nEmitSmoke2 = F\r\n\r\nPart3 = englt1c\r\nInertia3 = 1\r\nWeight3 = 50\r\nBreakRate3 = 0.6\r\nBreakScale3 = 1\r\nEmitSmoke3 = T\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n[engrt1]\r\n\r\nNumberOfParts = 3\r\nMaxNumberOfDamageEmitters = 1\r\n\r\nMaxCompression = 5\r\nSpring = 0\r\nDamping = 0\r\nImpulseSpring = 0\r\nImpulseDamping = 0\r\nRestitution = 0.5\r\nFriction = 1\r\nFrictionTorqueScale = 1.5\r\nDrag = 0.01\r\nRateDamping = 5\r\n\r\nPart1 = engrt1a\r\nInertia1 = 1\r\nWeight1 = 50\r\nBreakRate1 = 0.6\r\nBreakScale1 = 1\r\nEmitSmoke1 = T\r\n\r\nPart2 = engrt1b\r\nInertia2 = 1\r\nWeight2 = 50\r\nBreakRate2 = 0.6\r\nBreakScale2 = 1\r\nEmitSmoke2 = F\r\n\r\nPart3 = engrt1c\r\nInertia3 = 1\r\nWeight3 = 50\r\nBreakRate3 = 0.6\r\nBreakScale3 = 1\r\nEmitSmoke3 = T\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n[Physical Properties]\r\n\r\nWeight = 1000\r\nChariotWeight = 200\r\nGravity = 6\r\nAirborneGravity = 10\r\nRollInertiaScale = 1\r\nPitchInertiaScale = 1\r\nYawInertiaScale = 1\r\n\r\n[Repulsor]\r\n\r\nMaxLiftHeight = 5\r\nSpring = 4\r\nDamping = 0.3\r\nOrientationSpring = 100\r\nSideForceCoefficient = 0\r\n\r\n[Roll Control]\r\n\r\nRollAngleScale = 0.3\r\nRollForceScale = 100\r\nMaxRollAngle = 45\r\nRollFilter = 0.1\r\n\r\n[Engine]\r\n\r\nMaxThrustA = 5062.5\r\nMaxThrustB = 6900\r\nMaxThrustC = 8737.5\r\nMinMaxThrust = 3750\r\nMaxMaxThrust = 9000\r\n\r\nBoostThrust = 1800\r\nRepairThrust = 1600\r\n\r\nTheoreticalTopSpeedA = 580\r\nTheoreticalTopSpeedB = 720\r\nTheoreticalTopSpeedC = 860\r\nMinTheoreticalTopSpeed = 500\r\nMaxTheoreticalTopSpeed = 900\r\n\r\nActualTopSpeed = 100\r\nRepairSpeed = 25\r\nBoostSpeed = 200\r\nRampDownSpeed = 110\r\nLeftEnginePosition = -0.3,0.0,0.0\r\nRightEnginePosition = 0.3,0.0,0.0\r\nRampUpFilter = 1\r\nRampDownFilter = 1\r\n\r\n[Engine Aerodynamics]\r\n\r\nChord = 3\r\nWingSpan = 12\r\nWingArea = 36\r\nDefaultAngleOfAttack = 0\r\n\r\nLift = 0\r\nPitchRateLift = 0\r\nElevatorLift = 0\r\n\r\nBasicDrag = 0.02\r\nLiftDrag = 0\r\nElevatorDrag = 0\r\nSpoilerDrag = 500\r\nSpoilerBrakeDrag = 8000\r\n\r\nPitchMoment = 25000\r\nPitchRatePitchMoment = -10000\r\nElevatorPitchMoment = 0\r\n\r\nSideSlipSideForce = -1000\r\nSpoilerSideForce = -70000\r\nRudderSideForce = 0\r\nRollRateSideForce = 0\r\nYawRateSideForce = 0\r\n\r\nSideSlipRollMoment = 0\r\nAileronRollMoment = 0\r\nRudderRollMoment = 0\r\nRollRateRollMoment = -2000\r\nYawRateRollMoment = 0\r\n\r\nSideSlipYawMoment = 100\r\nAileronYawMoment = 0\r\nRudderYawMoment = 0\r\nRollRateYawMoment = 0\r\nYawRateYawMoment = -5000\r\nSpoilerYawMomentScale = 0.00005\r\nSpoilerYawMomentOffset = 0\r\n\r\nSpoilerYawMomentA = -5450\r\nSpoilerYawMomentB = -6500\r\nSpoilerYawMomentC = -7550\r\nMinSpoilerYawMoment = -5000\r\nMaxSpoilerYawMoment = -8000\r\n\r\nRampDownElevatorPitch = 35\r\nMaxElevatorPitch = 45\r\n\r\nPowerslideThrust = 40\r\nPowerslideSpoilerYawMoment = -5000\r\nPowerslideSideForce = -40\r\n\r\nInvertedSideSlipSideForce = -20\r\nInvertedSpoilerSideForce = -2000\r\nInvertedSideSlipYawMoment = 300\r\n\r\n[Pod Animation]\r\n\r\nImpactForce = 12\r\nGroundImpactForce = -4\r\nSeparationForce = 5\r\nThrustForce = 10\r\nLiftForce = 40\r\nDragForce = -10\r\nEngineSpring = 17\r\nEngineDamping = -5\r\nBinderSpring = 20\r\n\r\nYawTorque = 1\r\nPitchTorque = 1\r\nRollTorque = -5\r\nEngineTorque = 20\r\nEngineTorqueDamping = -4.5\r\nBinderTorque = 0\r\n\r\nMinTurbulenceScale = 0.4\r\nMaxTurbulenceScale = 0.5\r\nMinTurbulenceTimeScale = 1\r\nMaxTurbulenceTimeScale = 3\r\nMaxTurbulenceSpeed = 400\r\nOrientationScale = 0.06\r\nDamageTurbulenceScale = 4\r\nDamageOrientationTurbulenceScale = 4\r\n\r\nMaxInputScaleSpeed = 200\r\n\r\nCableForce = 60\r\nCableRadiusForce = 50\r\nChariotImpactForce = 0\r\nChariotHeadOnImpactForce = -20\r\nChariotMaxImpulse = 10\r\nChariotRepulsorImpactForce = -4\r\nChariotLandingImpulseScale = 10\r\nChariotMaxRepulsorImpulse = 10\r\nChariotMaxYawAngle = 5\r\nChariotMaxYawRate = 60\r\nChariotVelocityRateForce = 50\r\nChariotVelocityForce = 10\r\nChariotPowerslideVelocityForce = 1\r\nChariotVelocityDamping = -5\r\nChariotOrientationGain = 100\r\nChariotAngularRateDamping = -10\r\n\r\nMinChariotTurbulenceScale = 0.5\r\nMaxChariotTurbulenceScale = 0.1\r\nMinChariotTurbulenceTimeScale = 2\r\nMaxChariotTurbulenceTimeScale = 3\r\nChariotOrientationScale = 0.05\r\n\r\nPowerslideYawTorque = 2\r\nPowerslidePitchTorque = 2\r\nChariotMaxPowerslideYawAngle = -25\r\n\r\n[Collisions]\r\n\r\nMaxCompression = 1\r\nSpring = 0\r\nDamping = 0\r\nImpulseSpring = 1\r\nImpulseDamping = 0.3\r\nWallRestitution = 0\r\nPodRestitution = 0\r\nMomentScale = 0\r\nImpulseScale = 0\r\nAngularImpulseScale = 0\r\nFriction = 0.1\r\nFrictionTorqueScale = 0\r\nExplosiveWreckSpeed = 85\r\nResetSpeed = 75\r\n\r\n[Joystick]\r\n\r\nSteerSpeed1 = 250\r\nSteerScale1 = 1\r\nSteerSpeed2 = 450\r\nSteerScale2 = 1\r\nXAxisRateLimit = 4\r\nYAxisRateLimit = 3\r\n\r\n[CameraInfo]\r\n\r\nFirstPersonCamOffset = 0.0, 2.0, 0.0\r\n\r\n[DamageRepair]\r\n\r\nDefenseA = 0.15\r\nDefenseB = 0.5\r\nDefenseC = 0.85\r\nMinDefense = 0\r\nMaxDefense = 1\r\n\r\nBaseRepairAmountA = 0.0058\r\nBaseRepairAmountB = 0.00895\r\nBaseRepairAmountC = 0.0121\r\nMinBaseRepairAmount = 0.0055\r\nMaxBaseRepairAmount = 0.014\r\n\r\nBaseCoolingTimeA = 0.0036\r\nBaseCoolingTimeB = 0.00375\r\nBaseCoolingTimeC = 0.0048\r\nMinBaseCoolingTime = 0.0035\r\nMaxBaseCoolingTime = 0.006\r\n\r\n[Pod Audio]\r\n\r\n; Audio Parameters\r\nEngineAudioFile = sfx\\race\\gen2_ngn.vag\r\nBeamAudioFile = sfx\\race\\as_beam.vag\r\nIdlePitchModifier = 0.84\r\nPitchRangeModifier = 1.89\r\nIdleBinderModifier = 0.47\r\nBinderRangeModifier = 1.59\r\nEngineVolume = 85\r\nBinderVolume = 100\r\n\r\n[BaseAbilities]\r\n\r\n;These are the base/default abilities for THIS pod\r\nMaxThrust = 0.25\r\nTheoreticalTopSpeed = 0.2\r\nSpoilerYawMoment = 0.15\r\nDefense = 0.15\r\nBaseRepairAmount = 0.2\r\nBaseCoolingTime = 0.25\r\n\r\n[MaxAbilities]\r\n\r\n;These are the max abilities for THIS pod\r\nMaxThrust = 0.95\r\nTheoreticalTopSpeed = 0.9\r\nSpoilerYawMoment = 0.85\r\nDefense = 0.85\r\nBaseRepairAmount = 0.9\r\nBaseCoolingTime = 0.95\r\n\r\n[Tuning]\r\n\r\nUseValues = 1\r\nUseAValues = 0\r\nUseBValues = 0\r\nUseCValues = 0\r\n; if UseValues == 0, specify pct\r\nUpgradePercent = 0\r\n\r\n"
+        },
+        {
+          "name": "audio\\speech\\pod07\\sounds.ini",
+          "index_file_offset": 3153,
+          "logical_offset": 2531328,
+          "bytes": 291,
+          "sha256": "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2",
+          "compressed_blocks": [
+            {
+              "index": 103,
+              "file_offset": 353403,
+              "bytes": 188
+            }
+          ],
+          "authored_text": "[Indices]\r\n; Curses\r\nNumberOfLowDamageSounds = 2\r\nNumberOfWallHitSounds = 3\r\nNumberOfPassedSounds = 3\r\nNumberOfAttackedSounds = 3\r\n\r\n; Taunts\r\nNumberOfPassingSounds = 4\r\nNumberOfAttackingSounds = 4\r\n\r\n; Special Sounds\r\nNumberOfDeathSounds = 3\r\nNumberOfWinSounds = 3\r\nNumberOfLoseSounds = 3\r\n"
+        },
+        {
+          "name": "audio\\speech\\pod07\\curses.ini",
+          "index_file_offset": 3194,
+          "logical_offset": 2555904,
+          "bytes": 810,
+          "sha256": "b64a320ffbe23f0676e327983470076c862b1c6bd40139e895ff82cbd0af3102",
+          "compressed_blocks": [
+            {
+              "index": 104,
+              "file_offset": 353592,
+              "bytes": 266
+            }
+          ],
+          "authored_text": "[ResponseEmitter]\r\nNumEvents = 11\r\n\r\n; Low Damage\r\n[Event1]\r\nFileName = speech\\pod07\\gasrdl01.vag\r\nIsStream = 1\r\n\r\n[Event2]\r\nFileName = speech\\pod07\\gasrdl02.vag\r\nIsStream = 1\r\n\r\n; Wall Hit Sounds\r\n[Event3]\r\nFileName = speech\\pod07\\gasrhw01.vag\r\nIsStream = 1\r\n\r\n[Event4]\r\nFileName = speech\\pod07\\gasrhw02.vag\r\nIsStream = 1\r\n\r\n[Event5]\r\nFileName = speech\\pod07\\gasrhw03.vag\r\nIsStream = 1\r\n\r\n; Passed Sounds\r\n[Event6]\r\nFileName = speech\\pod07\\gasrpd01.vag\r\nIsStream = 1\r\n\r\n[Event7]\r\nFileName = speech\\pod07\\gasrpd02.vag\r\nIsStream = 1\r\n\r\n[Event8]\r\nFileName = speech\\pod07\\gasrpd03.vag\r\nIsStream = 1\r\n\r\n; Attacked Sounds\r\n[Event9]\r\nFileName = speech\\pod07\\gasrba01.vag\r\nIsStream = 1\r\n\r\n[Event10]\r\nFileName = speech\\pod07\\gasrba02.vag\r\nIsStream = 1\r\n\r\n[Event11]\r\nFileName = speech\\pod07\\gasrba03.vag\r\nIsStream = 1\r\n"
+        },
+        {
+          "name": "audio\\speech\\pod07\\taunts.ini",
+          "index_file_offset": 3235,
+          "logical_offset": 2580480,
+          "bytes": 584,
+          "sha256": "d74158fb8097b441968fff62f83c3c5bc51a65aef3fa7d07b982cddf8cc5f952",
+          "compressed_blocks": [
+            {
+              "index": 105,
+              "file_offset": 353859,
+              "bytes": 218
+            }
+          ],
+          "authored_text": "[ResponseEmitter]\r\nNumEvents = 8\r\n\r\n; Passing Sounds\r\n[Event1]\r\nFileName = speech\\pod07\\gasrwp01.vag\r\nIsStream = 1\r\n\r\n[Event2]\r\nFileName = speech\\pod07\\gasrwp02.vag\r\nIsStream = 1\r\n\r\n[Event3]\r\nFileName = speech\\pod07\\gasrwp03.vag\r\nIsStream = 1\r\n\r\n[Event4]\r\nFileName = speech\\pod07\\gasrwp04.vag\r\nIsStream = 1\r\n\r\n; Attacking Sounds\r\n[Event5]\r\nFileName = speech\\pod07\\gasrwa01.vag\r\nIsStream = 1\r\n\r\n[Event6]\r\nFileName = speech\\pod07\\gasrwa02.vag\r\nIsStream = 1\r\n\r\n[Event7]\r\nFileName = speech\\pod07\\gasrwa03.vag\r\nIsStream = 1\r\n\r\n[Event8]\r\nFileName = speech\\pod07\\gasrwa04.vag\r\nIsStream = 1\r\n"
+        },
+        {
+          "name": "audio\\speech\\pod07\\special.ini",
+          "index_file_offset": 3276,
+          "logical_offset": 2605056,
+          "bytes": 655,
+          "sha256": "92e9203f008c2c0afc47087ca72d2b37625a93a542371182facc60a6247ca41d",
+          "compressed_blocks": [
+            {
+              "index": 106,
+              "file_offset": 354078,
+              "bytes": 228
+            }
+          ],
+          "authored_text": "[ResponseEmitter]\r\nNumEvents = 9\r\n\r\n; Death Sounds\r\n[Event1]\r\nFileName = speech\\pod07\\gasrds01.vag\r\nIsStream = 1\r\n\r\n[Event2]\r\nFileName = speech\\pod07\\gasrds02.vag\r\nIsStream = 1\r\n\r\n[Event3]\r\nFileName = speech\\pod07\\gasrds03.vag\r\nIsStream = 1\r\n\r\n; Win Sounds\r\n[Event4]\r\nFileName = speech\\pod07\\gasrwn01.vag\r\nIsStream = 1\r\n\r\n[Event5]\r\nFileName = speech\\pod07\\gasrwn02.vag\r\nIsStream = 1\r\n\r\n[Event6]\r\nFileName = speech\\pod07\\gasrwn03.vag\r\nIsStream = 1\r\n\r\n; Lose Sounds\r\n[Event7]\r\nFileName = speech\\pod07\\gasrls01.vag\r\nIsStream = 1\r\n\r\n[Event8]\r\nFileName = speech\\pod07\\gasrls02.vag\r\nIsStream = 1\r\n\r\n[Event9]\r\nFileName = speech\\pod07\\gasrls03.vag\r\nIsStream = 1\r\n"
+        }
+      ]
+    }
+  ],
+  "audio": [
+    {
+      "path": "AUDIO/UIACCEPT.INI",
+      "bytes": 4411,
+      "sha256": "245b0bd530e6797637ac72bbf2de8f101f3b1da280e00e8fc24e4b4930d79f3b",
+      "relevant_sections": [
+        "[Event15]\r\nFileName = speech\\UI\\gassel01.vag\r\nIsStream = 1\r\n\r\n",
+        "[Event16]\r\nFileName = speech\\UI\\gassel02.vag\r\nIsStream = 1\r\n\r\n; Mars Guo\r\n"
+      ]
+    },
+    {
+      "path": "AUDIO/SPEECH/DAX/INRACE/POD07ANN.INI",
+      "bytes": 2496,
+      "sha256": "ee0e83e2bc80e896c783d0f0f4058d381677faf8da7ce8f8e9cbfb06671d17e9"
+    }
+  ]
+}

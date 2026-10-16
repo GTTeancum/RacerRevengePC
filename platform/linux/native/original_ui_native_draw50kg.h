@@ -78,8 +78,27 @@ struct OriginalUiSourceTerminal50KN {
     std::int32_t lodCalculationMethod=0,maximumMipLevel=0,magFilter=0,minFilter=0,lodL=0,lodK=0;
 };
 class OriginalUiRiderDrawContribution50KG;
+class OriginalUiOptionsDrawContribution50KG;
 class VehicleWindowGl50DS;
-// Sealed by the concrete complete Rider frame composer only, after every real
+// A closed native ownership interface, not a caller-created certificate. Only
+// the two concrete full-frame composers can construct it. Both retain their
+// own material-history transaction; renderer ownership and GPU retirement are
+// identical regardless of the active original UI destination.
+class OriginalUiSourceOwner50KM {
+public:
+    OriginalUiSourceOwner50KM(const OriginalUiSourceOwner50KM&)=delete;
+    OriginalUiSourceOwner50KM& operator=(const OriginalUiSourceOwner50KM&)=delete;
+protected:
+    virtual ~OriginalUiSourceOwner50KM() noexcept=default;
+private:
+    friend class OriginalUiRiderDrawContribution50KG;
+    friend class OriginalUiOptionsDrawContribution50KG;
+    friend class VehicleWindowGl50DS;
+    OriginalUiSourceOwner50KM() noexcept=default;
+    virtual bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept=0;
+    virtual void finishSourceSubmission(std::uint64_t,bool sourceAccepted,bool sourceWorkStarted) const noexcept=0;
+};
+// Sealed by a concrete complete Rider or Options frame composer, after every real
 // widget/model/material pass has joined its source order and combined bank.
 // Source target is fresh PSMCT32/context0/mask0,640x448,clear alpha128,reverseD24.
 // No retained race image, unhandled group target, later source sampler or other
@@ -93,12 +112,13 @@ public:
     ~OriginalUiSourceFrame50KM() noexcept=default;
 private:
     friend class OriginalUiRiderDrawContribution50KG;
+    friend class OriginalUiOptionsDrawContribution50KG;
     friend class VehicleWindowGl50DS;
     OriginalUiSourceFrame50KM() noexcept=default;
     OriginalUiSourceFrame50KM(const OriginalUiSourceFrame50KM&)=delete;
     OriginalUiSourceFrame50KM& operator=(const OriginalUiSourceFrame50KM&)=delete;
     const OriginalUiNativeDraw50KG* native_=nullptr;
-    const OriginalUiRiderDrawContribution50KG* owner_=nullptr;
+    const OriginalUiSourceOwner50KM* owner_=nullptr;
     // Nonzero, increasing for this live composer; written only after a whole
     // frame has assembled successfully. Borrowed arrays and owner remain live.
     std::uint64_t frameGeneration_=0;

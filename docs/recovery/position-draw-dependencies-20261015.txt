@@ -1,0 +1,69 @@
+PositionStats draw/observation dependency -- SOURCE REVIEW ONLY, UNTESTED
+No code patch. No stage activation, host panel replacement, simulation/ranking/
+completed-lap change, renderer submission, central checkout or disc edits.
+No tests/builds/syntax checks/converters/emulation/gameplay were performed.
+
+NEW CONTROL-FLOW BOUNDARIES
+191BB0 predraw reads Application+268, passes that value+1 as a1 to191290
+(JAL at191BC4; ADDIU in its delay slot), and returns1. The geometry update
+191290..191AEF must be recovered as a whole before dirty geometry is published.
+191BE0 draw includes Application split/view state and Race/UI gates. Its child
+calls include191CF0, conditional1924C0 plus ScreenTexture draw at owner+4B0,
+191DB0, then base141D70. Do not bypass these gates with coldResourcesLoaded.
+191CF0 draws270/2D0/330/390/3F0 conditional on17FB90;450 conditional on17FCD0;
+510/570 conditional on17FC30. All ScreenTexture calls target2DF550.
+CORRECTION: numeric routine entry is191DB0, not191DF0 (an interior address).
+The included raw words record the exact boundaries without claiming the rest
+of the dirty/map draw body has been fully translated or validated.
+
+ACTUAL OBSERVATION JOIN DEPENDENCY
+Existing original_position_stats_adapter50la.h Owner binds actual Camera Session
+and native_ai Session, validates ALL8/native_all_ai/view0 identities and captures
+only a published camera frame with canonical rank/retirement/bank observations.
+It is a synchronous borrow, not a lifetime pin. Owners must outlive it.
+Existing detached full resource owner uses Application entities, Video/display
+generation and canonical material domain/context; it has no race/view binding.
+Do not equate display generation with camera generation, accept a caller-supplied
+ready flag, retain the scalar snapshot across ticks, or infer application identity
+from equal counters. A private Application-mediated binding must prove the camera
+race owner belongs to that same Application/display and synchronously call the
+existing adapter. The proof of that link is the remaining dependency; no public
+arbitrary Numbers setter or unchecked cross-owner join is supplied here.
+
+ZERO-MAP RADAROVERLAY DEPENDENCY
+Authored PSM: one ScreenObject pass, totalTextureMaps0, textureMappingOff,
+alphaBlendOn, alphaTestOff, fogOff, depthTestMethod1, zWriteDisabled1.
+Canonical material table already owns a sealed collector and exposes
+coldCollectorPass(row,pass) and coldCollectorEntry(finalLeaf). A retained primitive
+reference owns the actual RadarOverlay row; it must be the origin of any query.
+The origin must resolve to its actual FINAL representative before reading that
+representative pass. A borrowed view becomes invalid on table mutation/release.
+prepareColdMap249610 rejects map>=mapCount20 at source implementation line439:
+map0 is invalid for this authored material. Do not invent a texture/map token,
+dummy atlas, null-map bind receipt, or a successful GPU claim to bypass this.
+Existing state30 is constructor state only; no native zero-map submission is
+established. PSM depthTestMethod1 alone does not define all effective renderer
+depth/blend/coordinate behavior; retain actual ScreenMT inherited state.
+
+BOUNDED FOLLOW-UP, IN ORDER
+1. Recover191290..191AEF dirty triggers, all written vertices/aliases, and its
+   split/view argument from original source. Record exact source field owners.
+2. Recover191BE0 gates and1924C0 map draw through actual clip119FC0 calls,
+   primitive emission counts/order and packet alias writes. Preserve partial
+   failure semantics and reject unsupported inputs without hiding diagnostics.
+3. Add a private observation join only after actual Application/race/camera
+   identity linkage is proven; invoke the existing adapter synchronously.
+4. Add zero-map pass preparation under the retained RadarOverlay facet using
+   canonical collector receipt, origin and FINAL representative. Read actual
+   program/state and enabled bit; do not route through per-map249610.
+5. Recover the native ScreenObject zero-map vertex/state lowering and submission
+   requirements before adding GPU work. Preserve both existing drain phases and
+   reverse ownership teardown. Keep staging and host panels untouched meanwhile.
+
+ROOT SOURCE-REVIEW CHECKLIST
+- Confirm predraw argument/call and numeric-entry correction against raw words.
+- Treat all packaged observations as evidence, not draw or readiness receipts.
+- Require same-owner proof for adapter/resource join; no generation substitution.
+- Keep zero-map origin/FINAL representative and receipt validity separate.
+- Preserve fixed127/primitive16 retirement and actual renderer/Video pins.
+- Root alone integrates/tests; no terrain_interactive_drive50du.cpp delta here.

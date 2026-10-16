@@ -1,0 +1,6435 @@
+{
+  "schema": "RR_RYLOTH_COLD_SOURCE_METADATA_V1",
+  "scope": "Authenticated static original source fields only; not native decoder or gameplay validation",
+  "analysis_method": "Bounded standard zlib RES3 block decompression and reversible BINARY1 field/ASCII spline/COL record inspection; no project executable",
+  "source_executable": {
+    "name": "SLUS_202.68",
+    "bytes": 2972720,
+    "sha256": "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30",
+    "load_file_offset": 128,
+    "load_virtual_address": 1048576
+  },
+  "fresh_grid_policy": {
+    "initial_collision_zone_ref": 1,
+    "source_world_table_index": 0,
+    "original_proof_pcs": [
+      "0x1AE578",
+      "0x1AE57C",
+      "0x1AE588",
+      "0x1AE58C",
+      "0x1AE590",
+      "0x216A2C",
+      "0x216A38"
+    ],
+    "native_neutral_center_rank": 4,
+    "native_roster_rank_assignment": [
+      4,
+      0,
+      1,
+      2,
+      3,
+      5,
+      6,
+      7
+    ],
+    "rank_assignment_is_native_policy": true,
+    "native_geometry_owner": "source_grid50IG::prepare over actual M spline gates, with per-racer actual PHY lift and real COL ground probes"
+  },
+  "runtime_admitted": false,
+  "tracks": {
+    "RA": {
+      "archive": {
+        "member": "TRACKS/RA.RES",
+        "bytes": 4604561,
+        "sha256": "1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2",
+        "entries": 1010,
+        "decoded_bytes": 29687808
+      },
+      "world": {
+        "zones": 10,
+        "portals": 10,
+        "placements": 1261,
+        "collision_placements": 178,
+        "distinct_collision_members": 178,
+        "collision_placements_by_zone": {
+          "1": 20,
+          "2": 10,
+          "3": 13,
+          "4": 35,
+          "5": 14,
+          "6": 31,
+          "7": 10,
+          "8": 13,
+          "9": 19,
+          "10": 13
+        },
+        "both_members_absent": [],
+        "collision_header_profiles": [
+          {
+            "quantized": 0,
+            "normals_present": 0,
+            "reverse_mode": 0,
+            "members": 107
+          },
+          {
+            "quantized": 0,
+            "normals_present": 1,
+            "reverse_mode": 0,
+            "members": 69
+          },
+          {
+            "quantized": 1,
+            "normals_present": 0,
+            "reverse_mode": 0,
+            "members": 2
+          }
+        ],
+        "collision_source_categories": {
+          "4": 109,
+          "20": 69
+        }
+      },
+      "source_members": {
+        "ra.scb": {
+          "name": "tracks\\ra.scb",
+          "logical_offset": 122880,
+          "bytes": 540795,
+          "sha256": "57a0c9a244714d2f5f7b1ffcfb66fb182808348673b25362482458253b78ae81"
+        },
+        "ra.tob": {
+          "name": "tracks\\ra.tob",
+          "logical_offset": 0,
+          "bytes": 95558,
+          "sha256": "7336c6bab40265adb5e82aec8ed3ee66669c19b26a597cfacedddfca4be48524"
+        },
+        "ra.aub": {
+          "name": "tracks\\ra.aub",
+          "logical_offset": 98304,
+          "bytes": 22511,
+          "sha256": "c0977667b46b918872c3d351f745ce59260037b9f604b76aea23b11bb5c88c6a"
+        },
+        "ra.tun": {
+          "name": "tracks\\ra.tun",
+          "logical_offset": 29663232,
+          "bytes": 922,
+          "sha256": "fb3e303604a27265585a498943d87099177d99f4701d1a75165d175e053044f8"
+        },
+        "mra.spl": {
+          "name": "tracks\\mra.spl",
+          "logical_offset": 24748032,
+          "bytes": 23820,
+          "sha256": "99ac08267db1a7fe3a161c46f1e941200390b68c9300bdc59d9e42608aecc52c"
+        },
+        "ara.spl": {
+          "name": "tracks\\ara.spl",
+          "logical_offset": 24723456,
+          "bytes": 23404,
+          "sha256": "a074570af7e199dadab63fabdad37cfa4ea1d36d537ff5ef4003dacadfc397f3"
+        }
+      },
+      "navigation": {
+        "m": {
+          "nodes": 115,
+          "track_header": {
+            "numnodes": "115",
+            "trackwidth": "232.000000"
+          },
+          "node0": {
+            "position": "12021.209961,3254.868164,8144.617676",
+            "lefttrackwidth": "314.000000",
+            "righttrackwidth": "374.000000",
+            "speedlimit": "600.000000",
+            "distancetofinish": "0.000000",
+            "branchid": "0",
+            "numnextnodes": "1",
+            "next0": "1"
+          },
+          "ordered_first_next0_predecessor": 103,
+          "all_next0_predecessors": [
+            103
+          ],
+          "predecessor": {
+            "position": "12019.970703,3265.009277,7513.507813",
+            "lefttrackwidth": "294.000000",
+            "righttrackwidth": "384.000000",
+            "speedlimit": "600.000000",
+            "distancetofinish": "631.192566",
+            "branchid": "0",
+            "numnextnodes": "1",
+            "next0": "0"
+          },
+          "max_next_count": 2
+        },
+        "a": {
+          "nodes": 113,
+          "track_header": {
+            "numnodes": "113",
+            "trackwidth": "32.000000"
+          },
+          "node0": {
+            "position": "12009.275391,3254.868164,8053.677246",
+            "lefttrackwidth": "109.699997",
+            "righttrackwidth": "107.999992",
+            "speedlimit": "600.000000",
+            "distancetofinish": "0.000000",
+            "branchid": "0",
+            "numnextnodes": "1",
+            "next0": "1"
+          },
+          "ordered_first_next0_predecessor": 101,
+          "all_next0_predecessors": [
+            101
+          ],
+          "predecessor": {
+            "position": "11959.728516,3265.009277,7490.550293",
+            "lefttrackwidth": "184.000000",
+            "righttrackwidth": "184.000000",
+            "speedlimit": "600.000000",
+            "distancetofinish": "565.393433",
+            "branchid": "0",
+            "numnextnodes": "1",
+            "next0": "0"
+          },
+          "max_next_count": 2
+        }
+      },
+      "height": {
+        "terrain_file": {
+          "value": "nat13.trn",
+          "entry_offset": 38306,
+          "value_offset": 38435,
+          "value_bytes": 10
+        },
+        "water_file_field_present": false,
+        "fresh_game_track_terrain330": "source_absent_constructor_route",
+        "fresh_game_track_water334": "source_absent_default_none_route",
+        "scene_info_environment_fallback_field_present": false
+      },
+      "zone_search_tokens": {
+        "zone1": {
+          "value": "List",
+          "entry_offset": 123388,
+          "value_offset": 123478,
+          "value_bytes": 5
+        },
+        "zone10": {
+          "value": "List",
+          "entry_offset": 276622,
+          "value_offset": 276711,
+          "value_bytes": 5
+        },
+        "zone2": {
+          "value": "List",
+          "entry_offset": 298790,
+          "value_offset": 298879,
+          "value_bytes": 5
+        },
+        "zone3": {
+          "value": "List",
+          "entry_offset": 330134,
+          "value_offset": 330223,
+          "value_bytes": 5
+        },
+        "zone4": {
+          "value": "List",
+          "entry_offset": 341432,
+          "value_offset": 341521,
+          "value_bytes": 5
+        },
+        "zone5": {
+          "value": "List",
+          "entry_offset": 365508,
+          "value_offset": 365597,
+          "value_bytes": 5
+        },
+        "zone6": {
+          "value": "List",
+          "entry_offset": 373418,
+          "value_offset": 373508,
+          "value_bytes": 5
+        },
+        "zone7": {
+          "value": "List",
+          "entry_offset": 454838,
+          "value_offset": 454927,
+          "value_bytes": 5
+        },
+        "zone8": {
+          "value": "List",
+          "entry_offset": 466116,
+          "value_offset": 466206,
+          "value_bytes": 5
+        },
+        "zone9": {
+          "value": "List",
+          "entry_offset": 506252,
+          "value_offset": 506342,
+          "value_bytes": 5
+        }
+      },
+      "collision_members": [
+        {
+          "name": "geometry\\FireCOL01.col",
+          "logical_offset": 1376256,
+          "bytes": 1640,
+          "sha256": "9a226b3d256e11ad1268b8ab1375b2817c89f881c486af9e9b755160e3f87248",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\FireCOL02.col",
+          "logical_offset": 1400832,
+          "bytes": 1136,
+          "sha256": "0c0a43077d2a22fbaa6f0bf1c49671e98ece6097fdbb0081f2ceaa3025888c41",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\FireCOL03.col",
+          "logical_offset": 1425408,
+          "bytes": 1136,
+          "sha256": "0991b6614c4308858422f950d582cc77d00b456b6b8e92095f3c7eb9c03cf874",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\FireCOL04.col",
+          "logical_offset": 1449984,
+          "bytes": 1268,
+          "sha256": "51dc3f5d55cde7b7e0de45e2203a675a807e9be0b6de2faae399cde60b453b45",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 17,
+          "faces": 18,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_ArenaL.col",
+          "logical_offset": 2850816,
+          "bytes": 15776,
+          "sha256": "bca7ef3c6c374aabe20cc173199333f64986781f68a3cabbbf24f7f2b7b34c54",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 194,
+          "nodes": 247,
+          "faces": 248,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_ArenaL03.col",
+          "logical_offset": 2875392,
+          "bytes": 2984,
+          "sha256": "c204a2142c9c560111bb7bdd638937776be2f4f9d7925caa36da9b888af8ab44",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 46,
+          "nodes": 43,
+          "faces": 44,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_ArenaPost05.col",
+          "logical_offset": 2899968,
+          "bytes": 476,
+          "sha256": "41c67bd4498b3a759df33356870331e9f049ae7d07ee037427eae82f6d91995c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 8,
+          "nodes": 5,
+          "faces": 6,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 3,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_ArenaPost06.col",
+          "logical_offset": 2924544,
+          "bytes": 476,
+          "sha256": "a6edbc963d9a9007c17c84aa6b0493cd467afc21da31e75afe6d3bb6d0af1348",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 8,
+          "nodes": 5,
+          "faces": 6,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 3,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_ArenaPost07.col",
+          "logical_offset": 2949120,
+          "bytes": 476,
+          "sha256": "62b492a03c1867d8a97a51909cc9895aa17d860c7524a393d79fa55fb4e41d32",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 8,
+          "nodes": 5,
+          "faces": 6,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 3,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_ArenaPost08.col",
+          "logical_offset": 2973696,
+          "bytes": 476,
+          "sha256": "dd6746ce0e4dee1050a47c08d700784ac7512cead4c27d9fca3afea65f04a8b7",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 8,
+          "nodes": 5,
+          "faces": 6,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 3,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_ArenaPost09.col",
+          "logical_offset": 2998272,
+          "bytes": 476,
+          "sha256": "159500929ab4ef4775458596ca2704bbdcace0f97be0f8cdecaa3ae74b43d55d",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 8,
+          "nodes": 5,
+          "faces": 6,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 3,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_ArenaPost010.col",
+          "logical_offset": 3022848,
+          "bytes": 476,
+          "sha256": "37194e5e988594349a7291f4b3ab65e8bf2b3fee97ece940a5ec10bd2e2c1aa1",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 8,
+          "nodes": 5,
+          "faces": 6,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 3,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_Road01_floor.col",
+          "logical_offset": 3047424,
+          "bytes": 3104,
+          "sha256": "8cd560e282eb56e544f33735c445bbb6384c89ffb9f685734ff230521722317a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 37,
+          "nodes": 39,
+          "faces": 40,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone01_COL_Road02_floor.col",
+          "logical_offset": 3072000,
+          "bytes": 1640,
+          "sha256": "bb536ae6de2ac8dd1af3d50b3acef9c2a3610cdae0ce252a70de02b722e5043f",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 21,
+          "nodes": 19,
+          "faces": 20,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone01_COL_Road03_floor.col",
+          "logical_offset": 3096576,
+          "bytes": 1508,
+          "sha256": "96e0146e4e70b7be3a2533144f129817086766ee6ebdbb854e1091c54760150f",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 17,
+          "faces": 18,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone01_COL_Road04_floor.col",
+          "logical_offset": 3121152,
+          "bytes": 2420,
+          "sha256": "f7bf429daa401e44de6d4516ffa05316bcaca95edb7f14d99131c41f1043c0c9",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 31,
+          "nodes": 29,
+          "faces": 30,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone01_COL_Wall01.col",
+          "logical_offset": 3145728,
+          "bytes": 1400,
+          "sha256": "50426842418b54da9e2e8e501eedec301a28019e097a06b60ce9066376b4b1a3",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 22,
+          "nodes": 19,
+          "faces": 20,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_Wall02.col",
+          "logical_offset": 3170304,
+          "bytes": 344,
+          "sha256": "6c3929fb96a62753d9e7be3613c61076bfc4b8738d2fac7fed2569c988b8bd4c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 6,
+          "nodes": 3,
+          "faces": 4,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 2,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_Wall03.col",
+          "logical_offset": 3194880,
+          "bytes": 1136,
+          "sha256": "e68d650d9d643cac010fde9765e0b78ae21ad9290f31fabe8d77afbb23626e1b",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_Wall04.col",
+          "logical_offset": 3219456,
+          "bytes": 344,
+          "sha256": "6183de67cda4eb26fbb16e0905ad04f0b266775872b5241e4e673e450361a7eb",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 6,
+          "nodes": 3,
+          "faces": 4,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 2,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_BuildingCOL01.col",
+          "logical_offset": 5750784,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_BuildingCOL02.col",
+          "logical_offset": 5775360,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_BuildingCOL03.col",
+          "logical_offset": 5799936,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_BuildingCOL04.col",
+          "logical_offset": 5824512,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_COL_Road01_floor.col",
+          "logical_offset": 5849088,
+          "bytes": 1352,
+          "sha256": "5020a817cf420642de514908b957358c972b1e9540232ecc1670733f45a6bb73",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone02_COL_Road02_floor.col",
+          "logical_offset": 5873664,
+          "bytes": 1196,
+          "sha256": "1c65bf9fa4ef628c4cc67906ce131023c8a5a1a12481e765e23849a6cae8dfb6",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 16,
+          "nodes": 13,
+          "faces": 14,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone02_COL_Wall01.col",
+          "logical_offset": 5898240,
+          "bytes": 1664,
+          "sha256": "2a014c214bba408c6c22e1182e2bf095045c6e302a4190f0079195a347be90a8",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 26,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_COL_Wall02.col",
+          "logical_offset": 5922816,
+          "bytes": 1268,
+          "sha256": "09cc84c62b115ae77f57e61139866972216fae38f99cd38020002628d1a573d3",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 17,
+          "faces": 18,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_COL_Wall03.col",
+          "logical_offset": 5947392,
+          "bytes": 872,
+          "sha256": "a167c86c809766f0afb2c0670c134a32902e20fe882606b19b85d1d8d5659678",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 14,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_COL_Wall04.col",
+          "logical_offset": 5971968,
+          "bytes": 1004,
+          "sha256": "eef2960e01bc6f7ddeff04e8380b4032cf5dfb782c14361f6b91fee4583f2eb2",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 16,
+          "nodes": 13,
+          "faces": 14,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_ExitiGateWall04.col",
+          "logical_offset": 6070272,
+          "bytes": 1664,
+          "sha256": "b02d4c5d9a7e59de5aa539eb16858aa86cba227a7e57dd1d7e958faa5d3b600e",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 26,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_exitGates.col",
+          "logical_offset": 6144000,
+          "bytes": 1160,
+          "sha256": "b31ae65a84d28bee70918e8d78b60eb7a747fea766aea1eee50dd86e276ce3aa",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_ExitGateWall01.col",
+          "logical_offset": 6168576,
+          "bytes": 1796,
+          "sha256": "e7ec88149589555605861598c60606a953ecfaec124e516176032d2ccebbf539",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 28,
+          "nodes": 25,
+          "faces": 26,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_ExitGateWall02.col",
+          "logical_offset": 6193152,
+          "bytes": 1928,
+          "sha256": "5dcbe23170e9b56a2084a6d305feef2922dca871f253c0f3a8e054ea21d3e0e6",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 30,
+          "nodes": 27,
+          "faces": 28,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_ExitGateWall03.col",
+          "logical_offset": 6217728,
+          "bytes": 1532,
+          "sha256": "cde6312223c7e91c1669d81cc63efcecfbcca10e926f5f505ea5d7419cc7cb0a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 21,
+          "faces": 22,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_Pillar03.col",
+          "logical_offset": 6266880,
+          "bytes": 1640,
+          "sha256": "2355590f8fa828c13467313b326ae7f7745b5f3a163cb4ff9b0ce3b450e907fc",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_Pillar04.col",
+          "logical_offset": 6291456,
+          "bytes": 1640,
+          "sha256": "2de4978fed59762e04a4ed2916c4ce7761339b330cbfba7f146912b09c51cb29",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_Road01_floor.col",
+          "logical_offset": 6316032,
+          "bytes": 9224,
+          "sha256": "ef9cfccff6ab0177618b9a9f220207b550a93c9ecc41d93df93cf8060d3ec64c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 94,
+          "nodes": 127,
+          "faces": 128,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone03_COL_Road02_floor.col",
+          "logical_offset": 6340608,
+          "bytes": 1664,
+          "sha256": "502b8cb87cb2378fc368531f3476a3d7b38a75939206e3aea5d2ab1f098c912e",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 22,
+          "nodes": 19,
+          "faces": 20,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone03_COL_Road03_floor.col",
+          "logical_offset": 6365184,
+          "bytes": 2948,
+          "sha256": "cfa03b42fece08796f5c266879c489cb90f8bad0e529ba9f8c3b3b88286aad52",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 35,
+          "nodes": 37,
+          "faces": 38,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone03_COL_Wall01.col",
+          "logical_offset": 6389760,
+          "bytes": 212,
+          "sha256": "10e2f0bf3d500b137d8b0d34a9e7451d9952b3b66f234757b93e198ca7062bb7",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 4,
+          "nodes": 1,
+          "faces": 2,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 1,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_Wall02.col",
+          "logical_offset": 6414336,
+          "bytes": 212,
+          "sha256": "b2cbcdce3e08fabc61c52d8f737d0d34cfee783328bbe68a02209c2e1ddcd798",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 4,
+          "nodes": 1,
+          "faces": 2,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 1,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_Wall03.col",
+          "logical_offset": 6438912,
+          "bytes": 2084,
+          "sha256": "00d91b803600cc36bfcbf1d17a06f895a99ec056e920de0a36dafca5ec228a32",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 34,
+          "nodes": 29,
+          "faces": 30,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_CaveCeiling01COL.col",
+          "logical_offset": 7372800,
+          "bytes": 22454,
+          "sha256": "b60a951a035f97518d66aba632afb327310bb2775ab05108168308469b84aa35",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 233,
+          "nodes": 362,
+          "faces": 363,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 24,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_CaveFloor01COL_floor.col",
+          "logical_offset": 7421952,
+          "bytes": 29828,
+          "sha256": "1cdbb88c51ff94103d337067713cd8ffc0d75ea13fd6613cf5cbfe1e0468db17",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 273,
+          "nodes": 429,
+          "faces": 430,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_CaveWalls.col",
+          "logical_offset": 7495680,
+          "bytes": 34940,
+          "sha256": "cadc845c2b8401fadeb250aeab1d956e55049d69da28a09daed64fcc418153d6",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 369,
+          "nodes": 604,
+          "faces": 605,
+          "quantized": 1,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_CaveWalls01COL.col",
+          "logical_offset": 7544832,
+          "bytes": 12170,
+          "sha256": "a9b415de400c0a4bffc21088ffd5557e5b49b409e77e72b9fe7fea4dc6deff11",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 159,
+          "nodes": 188,
+          "faces": 189,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 12,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Cave02_floor.col",
+          "logical_offset": 7643136,
+          "bytes": 6950,
+          "sha256": "687da39933023c8c0528535a6f350e50a0c8461aa323d03ef9424c9d6f942490",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 69,
+          "nodes": 96,
+          "faces": 97,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 12,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Cliff.col",
+          "logical_offset": 7667712,
+          "bytes": 2336,
+          "sha256": "bf798f052ccac4f80ff2b75aebd065b10f8d19d0ed51730c8fcebbe2b2692bcd",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 28,
+          "nodes": 35,
+          "faces": 36,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road01_floor.col",
+          "logical_offset": 7692288,
+          "bytes": 2672,
+          "sha256": "ca61c40eacc8d45ad71480a7ecfe53863b807fb2e8bb084052dc6048989633a0",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 28,
+          "nodes": 35,
+          "faces": 36,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road08_floor.col",
+          "logical_offset": 7716864,
+          "bytes": 3086,
+          "sha256": "92605d5d15d57e4a72ecd5678c5f1b7fad07ede612062a30c67e1d614481b0e8",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 34,
+          "nodes": 40,
+          "faces": 41,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road09_floor.col",
+          "logical_offset": 7741440,
+          "bytes": 4868,
+          "sha256": "499399cd841aee3dbb97a13a44a7ed5af4968bb0d6dbb0fb8f71c0b5bc6fb5e2",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 52,
+          "nodes": 65,
+          "faces": 66,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road10_floor.col",
+          "logical_offset": 7766016,
+          "bytes": 3404,
+          "sha256": "cbfe23ee8e3fea9c7415cebc0c7bffa4ce39cc40c93f55d73f45b1fbcf08cdb6",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 36,
+          "nodes": 45,
+          "faces": 46,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road11_floor.col",
+          "logical_offset": 7790592,
+          "bytes": 3512,
+          "sha256": "72fa09ded51abdbc8839d95d7cd6b29265a62af8a61ddaf4e9ca608d75db8740",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 36,
+          "nodes": 47,
+          "faces": 48,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road12_floor.col",
+          "logical_offset": 7815168,
+          "bytes": 2300,
+          "sha256": "5ca4d736f2212dba8465a871d02f439b90ae33c89a1b549ee11b313399f599af",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 26,
+          "nodes": 29,
+          "faces": 30,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road13_floor.col",
+          "logical_offset": 7839744,
+          "bytes": 1748,
+          "sha256": "89b8cb19d076ad7a01fb3d74c7e7a5ab067e66c9d9dd1973234ff521a655f050",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 21,
+          "nodes": 21,
+          "faces": 22,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road14_floor.col",
+          "logical_offset": 7864320,
+          "bytes": 1484,
+          "sha256": "9194972ed1d832efc722f045a55bcfb5229b4381e3bf4b7703b8722bdb6831e0",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 19,
+          "nodes": 17,
+          "faces": 18,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road15_floor.col",
+          "logical_offset": 7888896,
+          "bytes": 3116,
+          "sha256": "c81bf20f9cc016cb9221c231f6fcb5e1fb9409f3d8959d85135a4e7ec63fc32b",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 33,
+          "nodes": 41,
+          "faces": 42,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_Road16_floor.col",
+          "logical_offset": 7913472,
+          "bytes": 3512,
+          "sha256": "9a1cda6f39f8788b682173f54786c2e8f7527907e1dccf9e746fa77abae30fb1",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 36,
+          "nodes": 47,
+          "faces": 48,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_COL_rocka74.col",
+          "logical_offset": 7938048,
+          "bytes": 1682,
+          "sha256": "e163e30b8cce3c806bddb274733de74a76e4af6219e7fd2a5a9966e3606e45bc",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 23,
+          "nodes": 24,
+          "faces": 25,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_rocka75.col",
+          "logical_offset": 7962624,
+          "bytes": 1352,
+          "sha256": "aa17ecbdf792098ba9d883c43872ed9d807077fbf787972cb8e886b3097d8b1d",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 19,
+          "faces": 20,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_RockTurn.col",
+          "logical_offset": 7987200,
+          "bytes": 5684,
+          "sha256": "882bfe640d91fed50f0998b21cc945f5e8307d561c8abd211df14b839bdee136",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 64,
+          "nodes": 89,
+          "faces": 90,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Wall01.col",
+          "logical_offset": 8011776,
+          "bytes": 9308,
+          "sha256": "cadee5b8122e5875dce23db72b19771504095be802101e0bfca6df398089a418",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 105,
+          "nodes": 147,
+          "faces": 148,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Wall11.col",
+          "logical_offset": 8036352,
+          "bytes": 8480,
+          "sha256": "7aab8e7098d9c3355891ab71783b185c1d280b99ae35470551af2048502892cb",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 99,
+          "nodes": 133,
+          "faces": 134,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 12,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Wall12.col",
+          "logical_offset": 8060928,
+          "bytes": 10880,
+          "sha256": "4981d04c39191cee2f697396a73d308915efbf5c7000b96ac483c44a8f350b66",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 119,
+          "nodes": 173,
+          "faces": 174,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Wall13.col",
+          "logical_offset": 8085504,
+          "bytes": 3668,
+          "sha256": "6b54d6ae03bf9480a376a863fe1f763c16dc4fab64f211dc2ec636a97bc490a5",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 49,
+          "nodes": 55,
+          "faces": 56,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Wall15.col",
+          "logical_offset": 8110080,
+          "bytes": 4700,
+          "sha256": "4163ad28594de1f8a403bc37620ca90f787836949fdf1863ffaa95eb6df9ee7a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 63,
+          "nodes": 71,
+          "faces": 72,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Wall16.col",
+          "logical_offset": 8134656,
+          "bytes": 4880,
+          "sha256": "a1c76e033e880af3eb640c571fa34ad922db9ddd085e3073a6601d7b7d2f7991",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 60,
+          "nodes": 75,
+          "faces": 76,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 12,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Wall17.col",
+          "logical_offset": 8159232,
+          "bytes": 4046,
+          "sha256": "07ee961160a6d247be94ef4d13803a2eb897804f16a651a4244eb84791efaf16",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 49,
+          "nodes": 62,
+          "faces": 63,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Wall18.col",
+          "logical_offset": 8183808,
+          "bytes": 6224,
+          "sha256": "69eee00a78a131873bcd6c5661455d5540f72f93a70d681be8c39cbf2d24a375",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 73,
+          "nodes": 97,
+          "faces": 98,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_Wall19.col",
+          "logical_offset": 8208384,
+          "bytes": 7238,
+          "sha256": "4d1511a286b7e59da73c27b47d45e60e7ac2c42f2e7a91318571e0c6cfb01ec1",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 81,
+          "nodes": 114,
+          "faces": 115,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_rocka205COL.col",
+          "logical_offset": 8552448,
+          "bytes": 1058,
+          "sha256": "08e7e75882d4efc37ed55d921ba6631a3eceeaa5e0fb2499934e7e7001dc7e0c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 16,
+          "nodes": 14,
+          "faces": 15,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_rocka230COL.col",
+          "logical_offset": 8601600,
+          "bytes": 740,
+          "sha256": "4b5567ced395c806665a37f7efc1435d71da314d85bb97bf53c915b08e24c3e1",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 9,
+          "faces": 10,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_Rockd01COL.col",
+          "logical_offset": 8822784,
+          "bytes": 608,
+          "sha256": "be6861e75d57691664f7db9f88c952a16acc4ce8182e9d4a222c371887810331",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 10,
+          "nodes": 7,
+          "faces": 8,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_Rockd02COL.col",
+          "logical_offset": 8871936,
+          "bytes": 608,
+          "sha256": "eea82620037d084fb718d559c7cbc7144c1a290a74c61959ef25f1017d543352",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 10,
+          "nodes": 7,
+          "faces": 8,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_skullCol.col",
+          "logical_offset": 8970240,
+          "bytes": 1796,
+          "sha256": "2825f7b24ea88080176deb4aba219211a199a59980b2e4533b46e4f8224ac630",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 28,
+          "nodes": 25,
+          "faces": 26,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_SkullCOL02.col",
+          "logical_offset": 8994816,
+          "bytes": 10382,
+          "sha256": "9bf2549a1944f1fd8f717d9395ce72ae01ce6865e08bcc2bb9932ebe2a337294",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 145,
+          "nodes": 158,
+          "faces": 159,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone4_SkullSandCOL.col",
+          "logical_offset": 9043968,
+          "bytes": 11168,
+          "sha256": "d6bf0732624537ae8193e806c65eac61af1f426d10c412fbaf6cee6bf3fd334c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 116,
+          "nodes": 179,
+          "faces": 180,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_CaveCeiling01COL.col",
+          "logical_offset": 9216000,
+          "bytes": 40724,
+          "sha256": "823f6187a0c8634c7f414d300f1937d69ea640fd115e194e76a9aa9da20cf1f5",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 419,
+          "nodes": 659,
+          "faces": 660,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 19,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_CaveFloor01COL_floor.col",
+          "logical_offset": 9289728,
+          "bytes": 31034,
+          "sha256": "cbff871f8e3b6af5d36a838cbab09edd43f192a4a6591d4becfd0cf967a04da6",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 276,
+          "nodes": 450,
+          "faces": 451,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_CaveWall.col",
+          "logical_offset": 9388032,
+          "bytes": 60434,
+          "sha256": "f4a8b9c4327dac5c547bcc504a24dd5e558fbb31eb20b3a900a27d8418de2a81",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 631,
+          "nodes": 1047,
+          "faces": 1048,
+          "quantized": 1,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 19,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_CaveWall01COL.col",
+          "logical_offset": 9461760,
+          "bytes": 29516,
+          "sha256": "31e27c32c6fe9face49d074eb5785ab2a5c1e11bf8ae3d2d54c8eb72de082928",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 340,
+          "nodes": 469,
+          "faces": 470,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 19,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_COL_Road01_floor.col",
+          "logical_offset": 9535488,
+          "bytes": 6200,
+          "sha256": "fa1b1a09486b1afddb2994e50232b8ebce9bb1257318bde6103fe1aa52833d5d",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 67,
+          "nodes": 83,
+          "faces": 84,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_COL_Road02_floor.col",
+          "logical_offset": 9560064,
+          "bytes": 1832,
+          "sha256": "9e87f5d755c799fc229bffe68f005c2238c9b8bbe15a9feba435ecc32241afe7",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_COL_Road03_floor.col",
+          "logical_offset": 9584640,
+          "bytes": 1460,
+          "sha256": "cbd7068dad197953e1dd286c25c0f5af80dde8dd10bdb9b354f9645892f02122",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 17,
+          "faces": 18,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_COL_Road05_floor.col",
+          "logical_offset": 9609216,
+          "bytes": 3902,
+          "sha256": "63a4d124f931f70184a08bfeb0ef99b726a79f1a72e113f9371ce34020fb6a05",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 41,
+          "nodes": 52,
+          "faces": 53,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_COL_Road06_floor.col",
+          "logical_offset": 9633792,
+          "bytes": 4244,
+          "sha256": "9d9aa7b2a75addca16eb77b08bc5285b6ba72dbf7e8fedd3918aa71f05652e1f",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 44,
+          "nodes": 57,
+          "faces": 58,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_COL_Road07_floor.col",
+          "logical_offset": 9658368,
+          "bytes": 4418,
+          "sha256": "ace73a0ad13d2dab3d69b57b5d8110ca6202ce7edf8cd3c9792c3032adaef289",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 49,
+          "nodes": 58,
+          "faces": 59,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_COL_Road08_floor.col",
+          "logical_offset": 9682944,
+          "bytes": 3326,
+          "sha256": "388bc8924e3bd68f5618cdf9a7dcbf38b233d5bf5f994147e8336d5fb32a4488",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 35,
+          "nodes": 44,
+          "faces": 45,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_COL_Road09_floor.col",
+          "logical_offset": 9707520,
+          "bytes": 3710,
+          "sha256": "3d61493722654e5c990cf12324025e1e32e2acae83798213cbbc4734196927cc",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 42,
+          "nodes": 48,
+          "faces": 49,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_COL_Wall01.col",
+          "logical_offset": 9732096,
+          "bytes": 65582,
+          "sha256": "2548dc022f18866535dd26105b205753ba2e4426427b2c58a2462d0e473c6a94",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 722,
+          "nodes": 1052,
+          "faces": 1053,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 16,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_Rocka104_COL.col",
+          "logical_offset": 9854976,
+          "bytes": 4538,
+          "sha256": "aff76d2f509b1f8bebaf57bafa41f7e7051f6d4bdf06d89ef7c7d66c9520c483",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 45,
+          "nodes": 72,
+          "faces": 73,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 16,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\BridgeCOL_floor.col",
+          "logical_offset": 10100736,
+          "bytes": 9008,
+          "sha256": "8a07079649a7820e2bc1ef3d3f911c62e824e6e8355ef1fa398de7d758fb5bd1",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 85,
+          "nodes": 127,
+          "faces": 128,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\BridgePartCOL.col",
+          "logical_offset": 10174464,
+          "bytes": 2180,
+          "sha256": "7673a2ed809762cebfceb8d27b04c0b1b06b4feefb2f23cf640000b324ce441a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 33,
+          "faces": 34,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\BridgePartCOL01.col",
+          "logical_offset": 10199040,
+          "bytes": 2180,
+          "sha256": "7673a2ed809762cebfceb8d27b04c0b1b06b4feefb2f23cf640000b324ce441a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 33,
+          "faces": 34,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\BridgePillar_COL.col",
+          "logical_offset": 10223616,
+          "bytes": 872,
+          "sha256": "5b4a1a0db74848258eebb2a2b6ee54a24dff987aa6ef1c00e5a5d7772a7d7a21",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 14,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\BridgePillar_COL01.col",
+          "logical_offset": 10248192,
+          "bytes": 872,
+          "sha256": "6be66f1746480a0e8f00c7c99d34e5b767c5ecb2aa70e45a042979ba26e39c99",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 14,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\BridgePillar_COL02.col",
+          "logical_offset": 10272768,
+          "bytes": 872,
+          "sha256": "6be66f1746480a0e8f00c7c99d34e5b767c5ecb2aa70e45a042979ba26e39c99",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 14,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\BridgeWallCOL.col",
+          "logical_offset": 10297344,
+          "bytes": 2216,
+          "sha256": "abd9e425f0ce4c85230bbb1534c56bb235d2b9e54c04160814159dc0064a3c29",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 36,
+          "nodes": 31,
+          "faces": 32,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\LargeSandCOL.col",
+          "logical_offset": 12263424,
+          "bytes": 3536,
+          "sha256": "ee8f22524504c84e046ffc705e29e18b80a2026c253912a10197748bd57fcdf1",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 56,
+          "nodes": 51,
+          "faces": 52,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\RockSlideCOL.col",
+          "logical_offset": 12705792,
+          "bytes": 872,
+          "sha256": "39931f5f09a6bd5943d039087399052204bbfb9579565538fddbda9027a871a4",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 14,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\RockSlideSand01COL.col",
+          "logical_offset": 12754944,
+          "bytes": 5996,
+          "sha256": "9e61db4c3c51fce32d8bd19096db30989ef5e0e358b7ea96456d2b8971a8af72",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 63,
+          "nodes": 95,
+          "faces": 96,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road01_floor.col",
+          "logical_offset": 14622720,
+          "bytes": 4190,
+          "sha256": "568e2d39667485fe3adeadca8f3cb3b42311b437da2ec9f692e1bb6f6be3c8aa",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 44,
+          "nodes": 56,
+          "faces": 57,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road02_floor.col",
+          "logical_offset": 14647296,
+          "bytes": 9062,
+          "sha256": "265a47fcc2bba06a76e4cab3b6909a01cd268f6de89e44f028a9ee9d835a1584",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 94,
+          "nodes": 124,
+          "faces": 125,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road03_floor.col",
+          "logical_offset": 14671872,
+          "bytes": 4004,
+          "sha256": "bb1b0c28d4f4a73b96c3b4bdb3e257e314ecc263a87fc9789d594727b2cf88fb",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 43,
+          "nodes": 53,
+          "faces": 54,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road04_floor.col",
+          "logical_offset": 14696448,
+          "bytes": 2318,
+          "sha256": "9afbb7b835c07c0a940ed62c2c4f5d5a90ff8268a3dc70022eb83d9fe56732f7",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 29,
+          "nodes": 28,
+          "faces": 29,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road05_floor.col",
+          "logical_offset": 14721024,
+          "bytes": 3446,
+          "sha256": "6cb0af3ce5cfed5102c19501c34526b5b6e79e7b779148547b8092a06019cec4",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 40,
+          "nodes": 44,
+          "faces": 45,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road06_floor.col",
+          "logical_offset": 14745600,
+          "bytes": 2816,
+          "sha256": "9ec136c4971d6e57481a581298c5da9eb8278722925ab6d9e5960a23078ed5b3",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 34,
+          "nodes": 35,
+          "faces": 36,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road07_floor.col",
+          "logical_offset": 14770176,
+          "bytes": 2582,
+          "sha256": "d15d08b1a87d2f2ebd59a2476994a5166dc6dbc208ce19e219e4744eb40d94a8",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 31,
+          "nodes": 32,
+          "faces": 33,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road08_floor.col",
+          "logical_offset": 14794752,
+          "bytes": 3020,
+          "sha256": "991325554eb559b97a3f0e64a9fe270a0aaf6c6fd72cfbbf97e6135381ffd434",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 38,
+          "nodes": 37,
+          "faces": 38,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road09_floor.col",
+          "logical_offset": 14819328,
+          "bytes": 3020,
+          "sha256": "22f80acda39d72b9abdff08a4a0c9e4e9f6f14665ea5060648df02fece69cb48",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 38,
+          "nodes": 37,
+          "faces": 38,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road10_floor.col",
+          "logical_offset": 14843904,
+          "bytes": 2288,
+          "sha256": "4ba72789020b4986846bd58b7fbc69b213240937a38f3c7959c74277ff5df5bf",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 30,
+          "nodes": 27,
+          "faces": 28,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road11_floor.col",
+          "logical_offset": 14868480,
+          "bytes": 4106,
+          "sha256": "4346a1c72e6e53840804e11a8ed817529cc461b31c10898aaa1d9ef54d71a979",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 45,
+          "nodes": 54,
+          "faces": 55,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road12_floor.col",
+          "logical_offset": 14893056,
+          "bytes": 3872,
+          "sha256": "d32a8e7cb4962d7d4209bfb1393bb130bdb75c5276aacb7b0a3bb053942f2819",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 42,
+          "nodes": 51,
+          "faces": 52,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road14_floor.col",
+          "logical_offset": 14917632,
+          "bytes": 4508,
+          "sha256": "f577612f5d392e01b9eeedbc5aeced9fa5bb5801cbb34b68cce699371e6c2a1c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 46,
+          "nodes": 61,
+          "faces": 62,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road15_floor.col",
+          "logical_offset": 14942208,
+          "bytes": 2732,
+          "sha256": "c7d907a28ba586db3903d0ee3de431fcc6f401b89ee56c72b54bb03d10923b8e",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 35,
+          "nodes": 33,
+          "faces": 34,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road16_floor.col",
+          "logical_offset": 14966784,
+          "bytes": 3326,
+          "sha256": "2f62bfb8aa5f0c6e42be1c5a77ed288340c18cd01f2e333daa44879dcf415245",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 35,
+          "nodes": 44,
+          "faces": 45,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road17_floor.col",
+          "logical_offset": 14991360,
+          "bytes": 5234,
+          "sha256": "dacd800c9c88d17603d9cf9c9fe7c77b2e510e160c78e2c826bd4a9bbf4b65b9",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 56,
+          "nodes": 70,
+          "faces": 71,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road18_floor.col",
+          "logical_offset": 15015936,
+          "bytes": 2672,
+          "sha256": "55e06c6e311b3bc8c8414762356fc5b1a58e6aec24fcb79ea4a6dcf7d1ca047c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 28,
+          "nodes": 35,
+          "faces": 36,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_Road19_floor.col",
+          "logical_offset": 15040512,
+          "bytes": 2330,
+          "sha256": "c8927cf228197c515c6e07a1d88bbdb0eda820a238a6a0fb65c1c070099d5a44",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 25,
+          "nodes": 30,
+          "faces": 31,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_COL_rocka87.col",
+          "logical_offset": 15065088,
+          "bytes": 1652,
+          "sha256": "7db4ca9fa9e275d705ad20276431b849f63c7e189df9343c8e3a44da2e4a5bd0",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 25,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone06_COL_rockj07.col",
+          "logical_offset": 15089664,
+          "bytes": 2480,
+          "sha256": "75c2eb88ce4c5da9d881cc73d9f1a2c5ddd81cba229b8a739c172b67a68a2a96",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 31,
+          "nodes": 37,
+          "faces": 38,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone06_COL_Wall01.col",
+          "logical_offset": 15114240,
+          "bytes": 117008,
+          "sha256": "d3f35246360d7b58160b4d4b87fddd8ac029a4f91e2b23d9f63d7be96f73dee8",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 1385,
+          "nodes": 1857,
+          "faces": 1858,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 33,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\RockSlideCOL03.col",
+          "logical_offset": 16441344,
+          "bytes": 476,
+          "sha256": "cbad0878f1e61c53cdb1ac8118208f4bf8f8eb8b51df81e73910876d0494d97f",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 8,
+          "nodes": 5,
+          "faces": 6,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 3,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone07_COL_Ground02_floor.col",
+          "logical_offset": 16515072,
+          "bytes": 14318,
+          "sha256": "df449d5707f20ad28342c8c8ce20444a1f3e9a6e57e5c43103996ae2b009a829",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 133,
+          "nodes": 204,
+          "faces": 205,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone07_COL_Ground03_floor.col",
+          "logical_offset": 16539648,
+          "bytes": 7184,
+          "sha256": "45b7c63cf409ca7647a2624b47ebbece4d274771d53a9b61ffcec34a9b7df711",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 72,
+          "nodes": 99,
+          "faces": 100,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone07_COL_Ground05_floor.col",
+          "logical_offset": 16564224,
+          "bytes": 6452,
+          "sha256": "7ff05462388e16ff195ba7cf6f72395b790c32f60b45199562dcd58bdc35432a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 64,
+          "nodes": 89,
+          "faces": 90,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone07_COL_Ground06_floor.col",
+          "logical_offset": 16588800,
+          "bytes": 3932,
+          "sha256": "e4fd24369a0d2e2c3948ef4b2430bbc6048be5dd8b6bdaaa6a01939f13bfbac9",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 40,
+          "nodes": 53,
+          "faces": 54,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone07_COL_Ground07_floor.col",
+          "logical_offset": 16613376,
+          "bytes": 3284,
+          "sha256": "859b8cb46c6701c33230c95aa9e9c1d3ad11d54da9357fd47b4484c149471df2",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 40,
+          "nodes": 41,
+          "faces": 42,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 12,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone07_COL_tusk01.col",
+          "logical_offset": 16637952,
+          "bytes": 2150,
+          "sha256": "257717ca21b6248373e46d9c6987485330c5b4eda760101c775f8c9059f6174a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 26,
+          "nodes": 32,
+          "faces": 33,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone07_COL_tusk02.col",
+          "logical_offset": 16662528,
+          "bytes": 2216,
+          "sha256": "13388292154946b18ecd00aeaa4f9a9925405522f98e85722abb2453f6e3b5b0",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 27,
+          "nodes": 33,
+          "faces": 34,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone07_COL_Wall01.col",
+          "logical_offset": 16687104,
+          "bytes": 66506,
+          "sha256": "4cd260e17fe82f934c58c8f0685c3265b7aedb3d1f6b0a015f79faf16d916ceb",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 727,
+          "nodes": 1068,
+          "faces": 1069,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 34,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\RockSlideCOL02.col",
+          "logical_offset": 17055744,
+          "bytes": 3212,
+          "sha256": "cabb7b3d7c1ddc62dcfa3db905bf72aaa8db1ca2d3da00e06eb641131460bfeb",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 38,
+          "nodes": 49,
+          "faces": 50,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_BuildingCOL01.col",
+          "logical_offset": 19587072,
+          "bytes": 848,
+          "sha256": "d4664170f52a5820d4a854d9467423668059fce833bf7f056a087af0b98da173",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_BuildingCOL02.col",
+          "logical_offset": 19611648,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_BuildingCOL03.col",
+          "logical_offset": 19636224,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_BuildingCOL04.col",
+          "logical_offset": 19660800,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_BuildingCOL05.col",
+          "logical_offset": 19685376,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_BuildingCOL06.col",
+          "logical_offset": 19709952,
+          "bytes": 848,
+          "sha256": "d4664170f52a5820d4a854d9467423668059fce833bf7f056a087af0b98da173",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_BuildingCOL07.col",
+          "logical_offset": 19734528,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_BuildingCOL08.col",
+          "logical_offset": 19759104,
+          "bytes": 848,
+          "sha256": "21ebfb90059524af1280b5eae32954b180cef5bd276ea1da8361360ab4d6b047",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 12,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 4,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_COL_Road01_floor.col",
+          "logical_offset": 19783680,
+          "bytes": 1508,
+          "sha256": "fdaf98ef1687e398eecd40842694dda063fce4ac798dd70fff8068269de08912",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 17,
+          "faces": 18,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone08_COL_Road02_floor.col",
+          "logical_offset": 19808256,
+          "bytes": 1508,
+          "sha256": "d575e15ac58f6999bf2305935d5a20e49c0451916c757129895a83341cb6033a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 17,
+          "faces": 18,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone08_COL_Road03_floor.col",
+          "logical_offset": 19832832,
+          "bytes": 1976,
+          "sha256": "e30f76377e28b37411b595124404ca9b19a375f71cb9bfcaef33a3951c52c35a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 26,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone08_COL_Wall01.col",
+          "logical_offset": 19857408,
+          "bytes": 2588,
+          "sha256": "21a645913438bd6b28bfd70b88aaf209d0d488e53fe1151aff2b990ade37f2f0",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 40,
+          "nodes": 37,
+          "faces": 38,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 12,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_COL_Wall02.col",
+          "logical_offset": 19881984,
+          "bytes": 2720,
+          "sha256": "b5fda28da4903166d4f309636d0a88f63fe7b2d6b2e5626b53f493902a0caa07",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 42,
+          "nodes": 39,
+          "faces": 40,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\COL_quadpatch01.col",
+          "logical_offset": 20127744,
+          "bytes": 2150,
+          "sha256": "d9e6935d9df5481f6a2be630952b05f6d61ccda8820447871859f55cdcf0bdc0",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 35,
+          "nodes": 30,
+          "faces": 31,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_patch01.col",
+          "logical_offset": 22020096,
+          "bytes": 1400,
+          "sha256": "b27ac141538fc4f0d65e0fa71f98a67c3c0e0d2e391174b2aa7effc78c0aaa59",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 22,
+          "nodes": 19,
+          "faces": 20,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Road02_floor.col",
+          "logical_offset": 22044672,
+          "bytes": 4340,
+          "sha256": "ad779a7d90a5cc3d8385ed678033511a3136300686588fdcc7d0d58068eadbea",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 48,
+          "nodes": 57,
+          "faces": 58,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone09_COL_Road03_floor.col",
+          "logical_offset": 22069248,
+          "bytes": 4508,
+          "sha256": "1db1f925cc667e190327637b00ffcab2843af563c6562c827783fa547f6aa584",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 46,
+          "nodes": 61,
+          "faces": 62,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone09_COL_Road04_floor.col",
+          "logical_offset": 22093824,
+          "bytes": 3308,
+          "sha256": "bb0a70d7f8d478d32a761bea4058a2485e633878541d60462736de9cb9673e02",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 41,
+          "nodes": 41,
+          "faces": 42,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone09_COL_Road05_floor.col",
+          "logical_offset": 22118400,
+          "bytes": 5072,
+          "sha256": "1c674cad3d5c9078b4ea70336e08ed0f438cda6406ca9b94505bcee09083b846",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 56,
+          "nodes": 67,
+          "faces": 68,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone09_COL_Road06_floor.col",
+          "logical_offset": 22142976,
+          "bytes": 7448,
+          "sha256": "4720ba820ee4f7a0bccc17dcd809343800b0fef2253b9cda4a5ac20a045974de",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 74,
+          "nodes": 103,
+          "faces": 104,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone09_COL_Road07_floor.col",
+          "logical_offset": 22167552,
+          "bytes": 2864,
+          "sha256": "f00b4b1b18c6a5658e01bf21910b940351bcf434fcde88795ede7f1f9024e5ad",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 36,
+          "nodes": 35,
+          "faces": 36,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone09_COL_Road50_floor.col",
+          "logical_offset": 22192128,
+          "bytes": 2588,
+          "sha256": "1d082b30ea396854a119f42d11c09e9eebcaed7c99e3b793a37a5e0657344393",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 29,
+          "nodes": 33,
+          "faces": 34,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone09_COL_rocka86.col",
+          "logical_offset": 22216704,
+          "bytes": 1454,
+          "sha256": "c04bc31047cb11c3dcb85efaada224415f2212ae2c04c8ec9cd66863b3d27a96",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 22,
+          "nodes": 20,
+          "faces": 21,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Wall02.col",
+          "logical_offset": 22241280,
+          "bytes": 2480,
+          "sha256": "614d2f7e010f6acff2af50d23e59a1e9b0920dfe0f0d1cec9f373a5b9b5d4bc4",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 40,
+          "nodes": 35,
+          "faces": 36,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Wall03.col",
+          "logical_offset": 22265856,
+          "bytes": 2666,
+          "sha256": "d73c586e4445421a6d8f28ddb2132fbde96e486b79b2a57c85bc4d9cca57dfe5",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 42,
+          "nodes": 38,
+          "faces": 39,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Wall05.col",
+          "logical_offset": 22290432,
+          "bytes": 2348,
+          "sha256": "ec0a1b428642750c608911053c0940e561ded97aedfa6eab720d91dbb5140cfe",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 38,
+          "nodes": 33,
+          "faces": 34,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Wall06.col",
+          "logical_offset": 22315008,
+          "bytes": 6434,
+          "sha256": "43cccfe7e5e0e278b2d641e95d47b0e83acbaa28be8597901414588dc90f7a59",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 86,
+          "nodes": 98,
+          "faces": 99,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Wall07.col",
+          "logical_offset": 22339584,
+          "bytes": 6884,
+          "sha256": "405675528f99d633ddce33d9009d1b2a416f8b1d23bc8ccb8af5a7375115e28e",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 83,
+          "nodes": 107,
+          "faces": 108,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Wall08.col",
+          "logical_offset": 22364160,
+          "bytes": 8990,
+          "sha256": "9f975e868dfb6f20d18ff8805fadfa059dbe4548456b1f43450e9fcc4e5dec3c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 110,
+          "nodes": 140,
+          "faces": 141,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 12,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Wall09.col",
+          "logical_offset": 22388736,
+          "bytes": 5594,
+          "sha256": "c686fe55d0ba573df58987cf271d8271d0eff0116f2782b8ed759e786fe03b80",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 70,
+          "nodes": 86,
+          "faces": 87,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Wall10.col",
+          "logical_offset": 22413312,
+          "bytes": 3062,
+          "sha256": "ec9eb8668f2ef2a822fd8724f4be542b43b6a0ad7954e8358ce058f27cdc88e5",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 48,
+          "nodes": 44,
+          "faces": 45,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_Wall11.col",
+          "logical_offset": 22437888,
+          "bytes": 1778,
+          "sha256": "9384f4b3d442f3442820ff5564e3b4e457962e7998020b88f3c3fc5655ac526b",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 31,
+          "nodes": 24,
+          "faces": 25,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone10_COL_exitGates01.col",
+          "logical_offset": 24059904,
+          "bytes": 1160,
+          "sha256": "9406bc9feca7f78d45e2ebbc5a766a0d747df35a47d03c0f58c6a7ed9e173be2",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone10_COL_GateWall01.col",
+          "logical_offset": 24084480,
+          "bytes": 1664,
+          "sha256": "8f290756440fa965d86c1d9d5ab732996f278fd5f15f2487d212b0eb611bf361",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 26,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone10_COL_Ground01_floor.col",
+          "logical_offset": 24109056,
+          "bytes": 4292,
+          "sha256": "e9f3f5c815e39a691f67aceee42bd863c1afdea2d4f6ff8c5df48540fab7bba0",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 55,
+          "nodes": 53,
+          "faces": 54,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone10_COL_Ground08_floor.col",
+          "logical_offset": 24133632,
+          "bytes": 5132,
+          "sha256": "7561ed18e7d9993dca006103c95ab081981103d04fef11ecd266e8a25a0f433d",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 54,
+          "nodes": 69,
+          "faces": 70,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone10_COL_Ground09_floor.col",
+          "logical_offset": 24158208,
+          "bytes": 2732,
+          "sha256": "8f672eed55db8974ed197a41a8aebcaa6d565ec4d1b616aee91ace1e246a5388",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 35,
+          "nodes": 33,
+          "faces": 34,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone10_COL_Ground10_floor.col",
+          "logical_offset": 24182784,
+          "bytes": 2756,
+          "sha256": "319a775961dfeef78faa126d7a7e3f120de137881c27dc90d630b44efed89f0c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 36,
+          "nodes": 33,
+          "faces": 34,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone10_COL_Ground11_floor.col",
+          "logical_offset": 24207360,
+          "bytes": 3512,
+          "sha256": "e62bfd8600b43bb44293e560e74c141eab946ae23aa2ddead31676ce891348cb",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 45,
+          "nodes": 43,
+          "faces": 44,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone10_COL_Pillar01.col",
+          "logical_offset": 24231936,
+          "bytes": 1136,
+          "sha256": "e844aee207dee6b902db5adfde6e35eef75467846ef7cb46ca9c0e34ff4e62be",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone10_COL_Pillar02.col",
+          "logical_offset": 24256512,
+          "bytes": 1136,
+          "sha256": "ceb84d18663b8341de3cd7929d7a0c6cc3aba35b2463e1b87f8101154fce40d3",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone10_COL_Wall01.col",
+          "logical_offset": 24281088,
+          "bytes": 26312,
+          "sha256": "d8a7efe35b5b5b58548f4dd5e853e4690a08c2c1f099b06435f80bde7b5cf6a4",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 289,
+          "nodes": 421,
+          "faces": 422,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone10_COL_Wall05.col",
+          "logical_offset": 24330240,
+          "bytes": 212,
+          "sha256": "641c28c0a833ebd839dc36ed3557f4a8a20bf95ae18a70ad4364bf86380a580b",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 4,
+          "nodes": 1,
+          "faces": 2,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 1,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone10_COL_Wall06.col",
+          "logical_offset": 24354816,
+          "bytes": 212,
+          "sha256": "7146ae9043af08ab39b8c2035deb428d216ccc2f8dd28aec5ab1d1cde50a92f6",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 4,
+          "nodes": 1,
+          "faces": 2,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 1,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone10_COL_WallGate02.col",
+          "logical_offset": 24379392,
+          "bytes": 1664,
+          "sha256": "8572a7dcb2689874342aac3d1301faecea21ab146fbe59306caf9a08af853768",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 26,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        }
+      ],
+      "tuning": {
+        "EnvDamage": {
+          "hitxl": "1050",
+          "hitl": "787.5",
+          "hitm": "440",
+          "hits": "175",
+          "hitxs": "50",
+          "pointsxl": "25",
+          "pointsl": "20",
+          "pointsm": "15",
+          "pointss": "10",
+          "pointsxs": ".5"
+        },
+        "PodDamage": {
+          "hitxl": "135",
+          "hitl": "105",
+          "hitm": "75",
+          "hits": "45",
+          "hitxs": "13",
+          "pointsxl": "22",
+          "pointsl": "15",
+          "pointsm": "10",
+          "pointss": "5",
+          "pointsxs": "2.5",
+          "aipointsmultiplier": "1.5",
+          "finaldamagethreshold": "1.0",
+          "finaldamageincrement": "0.0",
+          "waittorepairenvtime": "7.0",
+          "repairenvthreshold": "0.6",
+          "repairenvuntil": "2.0",
+          "aienvpointsmultiplier": "1.0"
+        },
+        "AIDriving": {
+          "lookahead": "0.7",
+          "behindplayerclearance": "50",
+          "startlineboosttime": "0",
+          "racepacecutofftime": "2.0",
+          "racepace": "70"
+        },
+        "Packing": {
+          "numpackingfront": "4",
+          "numpackingrear": "4",
+          "farfrontdist": "1250",
+          "closefrontdist": "500",
+          "farbehinddist": "750",
+          "closebehinddist": "0",
+          "slowestspeedpct": "0.5",
+          "fastestspeedpct": "1.0"
+        }
+      }
+    },
+    "RC": {
+      "archive": {
+        "member": "TRACKS/RC.RES",
+        "bytes": 4655141,
+        "sha256": "ce1b41b845935210c288c86d76b3ae0b99f198fb2c29190889c005631c7d2a8b",
+        "entries": 1121,
+        "decoded_bytes": 31703040
+      },
+      "world": {
+        "zones": 15,
+        "portals": 15,
+        "placements": 1277,
+        "collision_placements": 112,
+        "distinct_collision_members": 93,
+        "collision_placements_by_zone": {
+          "1": 26,
+          "2": 2,
+          "3": 9,
+          "4": 5,
+          "5": 7,
+          "6": 4,
+          "7": 9,
+          "8": 10,
+          "9": 10,
+          "10": 3,
+          "11": 2,
+          "12": 8,
+          "13": 4,
+          "14": 9,
+          "15": 4
+        },
+        "both_members_absent": [],
+        "collision_header_profiles": [
+          {
+            "quantized": 0,
+            "normals_present": 0,
+            "reverse_mode": 0,
+            "members": 72
+          },
+          {
+            "quantized": 0,
+            "normals_present": 1,
+            "reverse_mode": 0,
+            "members": 16
+          },
+          {
+            "quantized": 1,
+            "normals_present": 0,
+            "reverse_mode": 0,
+            "members": 5
+          }
+        ],
+        "collision_source_categories": {
+          "4": 96,
+          "20": 16
+        }
+      },
+      "source_members": {
+        "rc.scb": {
+          "name": "tracks\\rc.scb",
+          "logical_offset": 196608,
+          "bytes": 468918,
+          "sha256": "1efe553a10cbeb349794c75c6f9e898f2871474a2dd587e0109772ae7cd1e27a"
+        },
+        "rc.tob": {
+          "name": "tracks\\rc.tob",
+          "logical_offset": 0,
+          "bytes": 124930,
+          "sha256": "71b1f9609c0a6ce84d71ff69355d9cfcbc8771eb7ddb8876473b4fddd6e23e6d"
+        },
+        "rc.aub": {
+          "name": "tracks\\rc.aub",
+          "logical_offset": 147456,
+          "bytes": 47432,
+          "sha256": "8b34867bb6e76e1ddce72ac65c6c4548068d52d30a53b4ca08af87bfe3ca1851"
+        },
+        "rc.tun": {
+          "name": "tracks\\rc.tun",
+          "logical_offset": 31678464,
+          "bytes": 978,
+          "sha256": "3084d5216fb70e70d843f53ea7195f51c47fd3d096932534631dbadf07635c35"
+        },
+        "mrc.spl": {
+          "name": "tracks\\mrc.spl",
+          "logical_offset": 28139520,
+          "bytes": 39508,
+          "sha256": "f36306b7bdac88401b810add285785f770491987dbc55de7e0e5cd05319b270c"
+        },
+        "arc.spl": {
+          "name": "tracks\\arc.spl",
+          "logical_offset": 28090368,
+          "bytes": 43780,
+          "sha256": "5687db7ebe3929fcf455121222d4d98e617332091e7bbbc291886403e6135171"
+        }
+      },
+      "navigation": {
+        "m": {
+          "nodes": 186,
+          "track_header": {
+            "numnodes": "186",
+            "trackwidth": "300.000000"
+          },
+          "node0": {
+            "position": "12957.106445,5152.527832,6867.923828",
+            "lefttrackwidth": "551.200012",
+            "righttrackwidth": "598.200012",
+            "speedlimit": "700.000000",
+            "distancetofinish": "0.000000",
+            "branchid": "0",
+            "numnextnodes": "1",
+            "next0": "1"
+          },
+          "ordered_first_next0_predecessor": 130,
+          "all_next0_predecessors": [
+            130
+          ],
+          "predecessor": {
+            "position": "13872.122070,5194.863770,6807.419434",
+            "lefttrackwidth": "481.400024",
+            "righttrackwidth": "428.099976",
+            "speedlimit": "700.000000",
+            "distancetofinish": "918.856934",
+            "branchid": "0",
+            "numnextnodes": "1",
+            "next0": "0"
+          },
+          "max_next_count": 2
+        },
+        "a": {
+          "nodes": 209,
+          "track_header": {
+            "numnodes": "209",
+            "trackwidth": "100.000000"
+          },
+          "node0": {
+            "position": "13106.952148,5152.527832,6870.064453",
+            "lefttrackwidth": "100.000000",
+            "righttrackwidth": "100.000000",
+            "speedlimit": "700.000000",
+            "distancetofinish": "0.000000",
+            "branchid": "0",
+            "numnextnodes": "1",
+            "next0": "1"
+          },
+          "ordered_first_next0_predecessor": 145,
+          "all_next0_predecessors": [
+            145
+          ],
+          "predecessor": {
+            "position": "13945.348633,5196.105469,6728.676758",
+            "lefttrackwidth": "100.000000",
+            "righttrackwidth": "70.000000",
+            "speedlimit": "700.000000",
+            "distancetofinish": "851.350769",
+            "branchid": "0",
+            "numnextnodes": "1",
+            "next0": "0"
+          },
+          "max_next_count": 2
+        }
+      },
+      "height": {
+        "terrain_file": {
+          "value": "nat13.trn",
+          "entry_offset": 35094,
+          "value_offset": 35223,
+          "value_bytes": 10
+        },
+        "water_file_field_present": false,
+        "fresh_game_track_terrain330": "source_absent_constructor_route",
+        "fresh_game_track_water334": "source_absent_default_none_route",
+        "scene_info_environment_fallback_field_present": false
+      },
+      "zone_search_tokens": {
+        "zone1": {
+          "value": "List",
+          "entry_offset": 45660,
+          "value_offset": 45750,
+          "value_bytes": 5
+        },
+        "zone10": {
+          "value": "List",
+          "entry_offset": 99198,
+          "value_offset": 99287,
+          "value_bytes": 5
+        },
+        "zone11": {
+          "value": "List",
+          "entry_offset": 109648,
+          "value_offset": 109737,
+          "value_bytes": 5
+        },
+        "zone12": {
+          "value": "List",
+          "entry_offset": 124584,
+          "value_offset": 124673,
+          "value_bytes": 5
+        },
+        "zone13": {
+          "value": "List",
+          "entry_offset": 146989,
+          "value_offset": 147079,
+          "value_bytes": 5
+        },
+        "zone14": {
+          "value": "List",
+          "entry_offset": 220802,
+          "value_offset": 220891,
+          "value_bytes": 5
+        },
+        "zone15": {
+          "value": "List",
+          "entry_offset": 231543,
+          "value_offset": 231632,
+          "value_bytes": 5
+        },
+        "zone2": {
+          "value": "List",
+          "entry_offset": 236192,
+          "value_offset": 236281,
+          "value_bytes": 5
+        },
+        "zone3": {
+          "value": "List",
+          "entry_offset": 255274,
+          "value_offset": 255364,
+          "value_bytes": 5
+        },
+        "zone4": {
+          "value": "List",
+          "entry_offset": 324088,
+          "value_offset": 324177,
+          "value_bytes": 5
+        },
+        "zone5": {
+          "value": "List",
+          "entry_offset": 344131,
+          "value_offset": 344220,
+          "value_bytes": 5
+        },
+        "zone6": {
+          "value": "List",
+          "entry_offset": 374613,
+          "value_offset": 374703,
+          "value_bytes": 5
+        },
+        "zone7": {
+          "value": "List",
+          "entry_offset": 411251,
+          "value_offset": 411340,
+          "value_bytes": 5
+        },
+        "zone8": {
+          "value": "List",
+          "entry_offset": 429595,
+          "value_offset": 429684,
+          "value_bytes": 5
+        },
+        "zone9": {
+          "value": "List",
+          "entry_offset": 450006,
+          "value_offset": 450095,
+          "value_bytes": 5
+        }
+      },
+      "collision_members": [
+        {
+          "name": "geometry\\LargePillarBottom01_COL.col",
+          "logical_offset": 1990656,
+          "bytes": 1640,
+          "sha256": "94c4d896404cfa036d64eca1f4c0d7857aebd052e300b304a5cc7c128929f810",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\tuskBottom_Col.col",
+          "logical_offset": 2334720,
+          "bytes": 1640,
+          "sha256": "72b6045c20c8990c4fce7ada5f6fc95e6b20ff2864bf61e6c071ae748cd6af32",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\tuskBottom_Col01.col",
+          "logical_offset": 2359296,
+          "bytes": 1640,
+          "sha256": "72b6045c20c8990c4fce7ada5f6fc95e6b20ff2864bf61e6c071ae748cd6af32",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\tuskBottom_Col02.col",
+          "logical_offset": 2383872,
+          "bytes": 1640,
+          "sha256": "72b6045c20c8990c4fce7ada5f6fc95e6b20ff2864bf61e6c071ae748cd6af32",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\tuskBottom_Col03.col",
+          "logical_offset": 2408448,
+          "bytes": 1640,
+          "sha256": "521bbb94b561c6fa8e5d74619240611ef7bc839641dc531ddf5d04a4aba52973",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\tuskBottom_Col04.col",
+          "logical_offset": 2433024,
+          "bytes": 1640,
+          "sha256": "72b6045c20c8990c4fce7ada5f6fc95e6b20ff2864bf61e6c071ae748cd6af32",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\tuskBottom_Col05.col",
+          "logical_offset": 2457600,
+          "bytes": 1640,
+          "sha256": "d7a3cee94451c2d74340cafa1ad24a028c521e068594025fbf2a332fed41c41c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\zone1Wall_COL.col",
+          "logical_offset": 2555904,
+          "bytes": 13622,
+          "sha256": "aef7733cae384b67bfd3ce376754abebd7a7fb777b64609b2692f3cd3e8dea25",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 199,
+          "nodes": 206,
+          "faces": 207,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 18,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_ArenaCOL_Left.col",
+          "logical_offset": 2580480,
+          "bytes": 1424,
+          "sha256": "90518e74a815e54e3d4da03d31d6839772e12b7f359f57dff34438e523ae8f4a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 19,
+          "faces": 20,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 12,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_ArenaCOL_Right.col",
+          "logical_offset": 2605056,
+          "bytes": 872,
+          "sha256": "ba95c3dad4f3bb48f72abdf01d65ed88031535f89f7fe6a4be5101f71649dedd",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 14,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone01_COL_floor.col",
+          "logical_offset": 2629632,
+          "bytes": 31448,
+          "sha256": "9168727e8b64295e471db34dd7a449b4cfd755defeb0c66c21f6c900aa48286f",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 354,
+          "nodes": 423,
+          "faces": 424,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 20,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone02_COL_floor.col",
+          "logical_offset": 4079616,
+          "bytes": 38306,
+          "sha256": "fb0fc9198705d697eb1792c425aea5a69d315f367a72c7e5b7f2a76fc0255e77",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 381,
+          "nodes": 538,
+          "faces": 539,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone02_Wall_COL.col",
+          "logical_offset": 4128768,
+          "bytes": 60296,
+          "sha256": "8fbad5c52dbf1ce438d33ebffbca2e6347d9a78c5c5c1e9c5eafc4ac70425a8a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 736,
+          "nodes": 951,
+          "faces": 952,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 26,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\pool04_COL.col",
+          "logical_offset": 7913472,
+          "bytes": 23246,
+          "sha256": "8c74ac77bc09f4c51d8daef10554e65b932fbbd782908160e787bf5e7cce7c53",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 281,
+          "nodes": 366,
+          "faces": 367,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\PoolRock_COL.col",
+          "logical_offset": 7938048,
+          "bytes": 1136,
+          "sha256": "08e8f4f045e398c434bfe4927009baf70784edaa8754859394424be87a23336c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\PoolShutOff_COL.col",
+          "logical_offset": 7962624,
+          "bytes": 10292,
+          "sha256": "a9100e655c80cfc3b6372ca2833ac514fc4d5727a03c0eebc31cbfe6972739fa",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 160,
+          "nodes": 153,
+          "faces": 154,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rockf01_COL.col",
+          "logical_offset": 8257536,
+          "bytes": 3020,
+          "sha256": "5331b44c12a3d7b9b791edef022729c5f77a158e5e6d6bfd6eb6516c2e812b8e",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 31,
+          "nodes": 47,
+          "faces": 48,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 12,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_COL_floor.col",
+          "logical_offset": 9068544,
+          "bytes": 48416,
+          "sha256": "a923f3c4dbf13e3d87d8ec21d14e63a1f5d6a7e8ecdf704cd9cc467c90dfb2f7",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 494,
+          "nodes": 675,
+          "faces": 676,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 28,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone03_Rock01_COL.col",
+          "logical_offset": 9142272,
+          "bytes": 2192,
+          "sha256": "e2a20e86f6a00f1f92c8e3806197f3063ced097bbbe9fa2dd50693fe17ba9214",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 34,
+          "nodes": 31,
+          "faces": 32,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_Rock02_COL.col",
+          "logical_offset": 9166848,
+          "bytes": 1532,
+          "sha256": "d14191b0b350db3b902a6d55d62ea9053f936607117fb07523f5822bf9a0fe0c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 24,
+          "nodes": 21,
+          "faces": 22,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone03_Wall_COL.col",
+          "logical_offset": 9216000,
+          "bytes": 28478,
+          "sha256": "8584881f2d19a68b0cb0cffe7846067f742a0a3de49497fd886fc31bc6bbc8bb",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 366,
+          "nodes": 444,
+          "faces": 445,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 19,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone3_Rock04_COL02.col",
+          "logical_offset": 9265152,
+          "bytes": 1484,
+          "sha256": "f95d8bace10351016f9a676d82b8b3bea58d487a28268312caf7f5dcd9a680d4",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 21,
+          "faces": 22,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_Box01_COL.col",
+          "logical_offset": 10199040,
+          "bytes": 5456,
+          "sha256": "c818d1c3d21963cf813ebf1e5edf0faea03a908f35d5b3d028a2dbdd7c3a6ccd",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 72,
+          "nodes": 83,
+          "faces": 84,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_COL_floor.col",
+          "logical_offset": 10223616,
+          "bytes": 61742,
+          "sha256": "9236fa1fb8dbd013a9e5fbbf9e2d59fb898a772364ea2bc042aa809831274037",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 588,
+          "nodes": 880,
+          "faces": 881,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone04_Midtunnel01_COL.col",
+          "logical_offset": 10297344,
+          "bytes": 7412,
+          "sha256": "b59457235f1560b8e3e36ed797758227b8b8ef0a4313bbdabe59baaba5e29933",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 118,
+          "nodes": 109,
+          "faces": 110,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_MountainpassGround_COL.col",
+          "logical_offset": 10321920,
+          "bytes": 13436,
+          "sha256": "cededb780ad65545cf7f77a2c1fd938f549003da8182423a33c05b454875fd98",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 206,
+          "nodes": 201,
+          "faces": 202,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_TunnelCover02_COL.col",
+          "logical_offset": 10346496,
+          "bytes": 19706,
+          "sha256": "2ff6eaafef8028b66e71bea7bedabe9001e3cc0722be9aa68a653f262eb2d4bc",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 238,
+          "nodes": 310,
+          "faces": 311,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 21,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\zone5Midtunnel01_COL.col",
+          "logical_offset": 10616832,
+          "bytes": 6704,
+          "sha256": "cf9b20f6944278405a9a494882afccbe0ab3b25020af6c1a3a2bf6ce77002e19",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 104,
+          "nodes": 99,
+          "faces": 100,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_CaveInsert_COL.col",
+          "logical_offset": 10838016,
+          "bytes": 1652,
+          "sha256": "9bbbb88e38a6bcf5b741523d1b7c4f56dbcadaa36a51304cb21ef65e6b8a6042",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 25,
+          "nodes": 23,
+          "faces": 24,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_COL_floor.col",
+          "logical_offset": 10862592,
+          "bytes": 91328,
+          "sha256": "0bf1b4520366ca5238726f422231e7ac3330da74bc47145d70de2cd177ca3f23",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 878,
+          "nodes": 1299,
+          "faces": 1300,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 18,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone05_Midtunnel01_COL.col",
+          "logical_offset": 10960896,
+          "bytes": 4724,
+          "sha256": "f6fcd36b788427e0cf67dfc563734405f00a7bd91361af793d6cf0e3ec05da1a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 56,
+          "nodes": 73,
+          "faces": 74,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 19,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_Mountain_COL.col",
+          "logical_offset": 10985472,
+          "bytes": 25598,
+          "sha256": "a6c364fdf07bd6ec1b0c83ae87c54596f5ec803256efbe2e0765653dcb4b7576",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 315,
+          "nodes": 402,
+          "faces": 403,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_MountainPassGround_COL.col",
+          "logical_offset": 11034624,
+          "bytes": 3842,
+          "sha256": "cf2d42f27f514da4c708810181afdb6208f9113beeb604610543331cf3e4aeaa",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 59,
+          "nodes": 56,
+          "faces": 57,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone05_Tunnelcover01_COL.col",
+          "logical_offset": 11108352,
+          "bytes": 17084,
+          "sha256": "6524967f9f5a43ea56fa745685e8b055baf9b120b267a9ffbfff14f25c97d640",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 249,
+          "nodes": 259,
+          "faces": 260,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 16,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone06_COL_floor.col",
+          "logical_offset": 13590528,
+          "bytes": 41420,
+          "sha256": "2a42f8b334c1f9bf92213ef03cbfb4488a080597b0816070f84e73ee18aafbd9",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 432,
+          "nodes": 573,
+          "faces": 574,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone06_LargeWall_COL.col",
+          "logical_offset": 13639680,
+          "bytes": 5492,
+          "sha256": "5fb8e178120cda9ec647012122f9dd68428f6ec4f77e6bf19dc06a041d61f80b",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 84,
+          "nodes": 81,
+          "faces": 82,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone06_QuadPatch03_COL.col",
+          "logical_offset": 13688832,
+          "bytes": 14360,
+          "sha256": "cc62f0ee0173e240f855a03c2cd6228cc66646116e054e7b313a82357bdc7c9b",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 193,
+          "nodes": 221,
+          "faces": 222,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone06_SmallWall_COL.col",
+          "logical_offset": 13713408,
+          "bytes": 1136,
+          "sha256": "cfe0e695321901733ade6ed210e6634c05e482ba6ba14dc4b6abe8127d02254d",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka66.col",
+          "logical_offset": 13787136,
+          "bytes": 4232,
+          "sha256": "b6e7dac1a3b2d27a58f72a63680d633ffb6c4282649028c66424194bf2c68e38",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 48,
+          "nodes": 71,
+          "faces": 72,
+          "quantized": 1,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 14,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka57.col",
+          "logical_offset": 14401536,
+          "bytes": 5084,
+          "sha256": "fe0c4787203414f5ae08eb7d597da22643cdd1f1c2b9c39ca0e52f1df0ff925b",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 55,
+          "nodes": 86,
+          "faces": 87,
+          "quantized": 1,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 19,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka59.col",
+          "logical_offset": 14475264,
+          "bytes": 5084,
+          "sha256": "87bbf7360539d24978aa01553a3ee0ce18657909b61cf16b4ec2d4b3ac4f78e5",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 55,
+          "nodes": 86,
+          "faces": 87,
+          "quantized": 1,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 21,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka60.col",
+          "logical_offset": 14524416,
+          "bytes": 5084,
+          "sha256": "ce0619f7d66a8840fe988de0849f9d58ffa5c6d6815966cbf7d60f47865e7696",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 55,
+          "nodes": 86,
+          "faces": 87,
+          "quantized": 1,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 22,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka70.col",
+          "logical_offset": 14745600,
+          "bytes": 3572,
+          "sha256": "2eda232f6620af2f3abae08c1e196106f5731aa39cdfac8b7a654399ca93cf19",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 37,
+          "nodes": 60,
+          "faces": 61,
+          "quantized": 1,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone07_COL_floor.col",
+          "logical_offset": 14991360,
+          "bytes": 39836,
+          "sha256": "9d09fc08a1391c14a0c2e1cc7afceada6b49263235388844291d4bd3bb9b626c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 402,
+          "nodes": 557,
+          "faces": 558,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone07_largecliff_col.col",
+          "logical_offset": 15040512,
+          "bytes": 33848,
+          "sha256": "b24156a7c0bf84a47665e6ef3fa3a85a551be3484084165b65b49b2017ee9af9",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 395,
+          "nodes": 537,
+          "faces": 538,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone07_Mountain01_COL.col",
+          "logical_offset": 15089664,
+          "bytes": 25298,
+          "sha256": "6bef4ec6787434b9d0781ed3f00fe1f58047ef21a1303d5933498ab3137c958e",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 290,
+          "nodes": 402,
+          "faces": 403,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 19,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone07_Tunnelcover_COL.col",
+          "logical_offset": 15310848,
+          "bytes": 17396,
+          "sha256": "5c0418e7951c8684876ccc2b61079c2e51909d6d68a405946adad45b7c07160e",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 167,
+          "nodes": 283,
+          "faces": 284,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 16,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka37_COL.col",
+          "logical_offset": 15507456,
+          "bytes": 2204,
+          "sha256": "39e4de4a40b30117e1cc0990ad0fdf275f0207a017bf9b13a1c94e40e56369e4",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 26,
+          "nodes": 33,
+          "faces": 34,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka38_COL.col",
+          "logical_offset": 15532032,
+          "bytes": 3398,
+          "sha256": "0190e4375d17ddab98e73f79949a01783e66dc5f5cd8d4816a1242e9bceb8710",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 40,
+          "nodes": 52,
+          "faces": 53,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka40_COL.col",
+          "logical_offset": 15581184,
+          "bytes": 1682,
+          "sha256": "53303d1440b7c6dd2052f86e7f9075f251c130bb67c623ec25becebd5d5401ba",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 23,
+          "nodes": 24,
+          "faces": 25,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka41_COL.col",
+          "logical_offset": 15630336,
+          "bytes": 3800,
+          "sha256": "8d4821c325e5c188086a20ff1b1d445c95343e32d255a9e5504798147e1c4eb2",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 42,
+          "nodes": 59,
+          "faces": 60,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone08_COL_floor.col",
+          "logical_offset": 15974400,
+          "bytes": 38624,
+          "sha256": "18827f41fb7d74e7c920f53d0a999fb816e7b1f361b6814d2b8ddea5a04f47e8",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 464,
+          "nodes": 507,
+          "faces": 508,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 22,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone08_Wall_COL.col",
+          "logical_offset": 16097280,
+          "bytes": 33920,
+          "sha256": "554cc55b1b9035c26c99f1d2740a41e80d7d12d8689b5954825dc00fc986bad9",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 500,
+          "nodes": 515,
+          "faces": 516,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 19,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\zone9groundpiece_COL.col",
+          "logical_offset": 17104896,
+          "bytes": 8936,
+          "sha256": "447f27ce6cafdbc2235602e2d24830415ec1942839a9d2eeaaff03257d0037e3",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 101,
+          "nodes": 141,
+          "faces": 142,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_CaveRock01_COL.col",
+          "logical_offset": 17129472,
+          "bytes": 872,
+          "sha256": "1e50e75353740cabf00408b393fb383a61974499988547d2ae486e9c237fdec7",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 14,
+          "nodes": 11,
+          "faces": 12,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_CaveRock02_COL.col",
+          "logical_offset": 17154048,
+          "bytes": 1136,
+          "sha256": "64ce339e3cf434b9d31ff7aa3c2a3b194f95df302751f383bc75ad8fd5209e49",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_COL_floor.col",
+          "logical_offset": 17227776,
+          "bytes": 33020,
+          "sha256": "75b78ae121f3a152db3edf9803ba741070adda0759ce790f244db2f446521ad6",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 343,
+          "nodes": 457,
+          "faces": 458,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone09_Rock01_COL.col",
+          "logical_offset": 17326080,
+          "bytes": 6560,
+          "sha256": "c404cf362ba9b03e15ecccd22dc4cb8226467262052dfcc622de92a4bd029faf",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 74,
+          "nodes": 103,
+          "faces": 104,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 24,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_Rock03_COL.col",
+          "logical_offset": 17350656,
+          "bytes": 2618,
+          "sha256": "530d1a5a9bf25f96364cde89c17a2c39c504275823f38ce611dbf64be5a483f6",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 29,
+          "nodes": 40,
+          "faces": 41,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_Rock04_COL03.col",
+          "logical_offset": 17399808,
+          "bytes": 3080,
+          "sha256": "ca07c57fc1e8b17afedd4bf1e52a97dc4ac6c881475c24572cac3b85784061b1",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 36,
+          "nodes": 47,
+          "faces": 48,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 9,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone09_Wall_COL.col",
+          "logical_offset": 17424384,
+          "bytes": 40124,
+          "sha256": "e73f18ed2159b129e2d9df5cefcef29a73e8bd272811b10dde0825119fa88346",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 477,
+          "nodes": 635,
+          "faces": 636,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 1,
+          "category": 4,
+          "nonfinite_plane_source_proof": [
+            {
+              "face_index": 113,
+              "source_offset": 28618,
+              "plane_words": [
+                "0x7fc00000",
+                "0xffc00000",
+                "0xffc00000",
+                "0xffc00000"
+              ],
+              "vertex_indices": [
+                30,
+                68,
+                67
+              ],
+              "positions": [
+                [
+                  -617.269775390625,
+                  -1149.1551513671875,
+                  6022.138671875
+                ],
+                [
+                  -617.269775390625,
+                  -1149.1551513671875,
+                  6022.138671875
+                ],
+                [
+                  -675.3814697265625,
+                  -1071.4776611328125,
+                  5930.4208984375
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "geometry\\Zone9_Tunnel_COL_floor.col",
+          "logical_offset": 17571840,
+          "bytes": 53888,
+          "sha256": "82617b537eb4a421b95ff95acde2f20d7c92ca3cd9d55ad3caa96415683ade06",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 488,
+          "nodes": 779,
+          "faces": 780,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone9_Tunnel_Wall_COL.col",
+          "logical_offset": 17645568,
+          "bytes": 26624,
+          "sha256": "f4f4ce9574d9d9a6bd0a62e086e310fafb72bdf3ba2a79677128ab8f54270631",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 396,
+          "nodes": 403,
+          "faces": 404,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_Rocks_COL.col",
+          "logical_offset": 17866752,
+          "bytes": 3620,
+          "sha256": "9eccdb6de725e68721110e8438e8e588ef2c827616606d42ee6aad9a34f68a21",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 45,
+          "nodes": 55,
+          "faces": 56,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 8,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone10_COL_floor.col",
+          "logical_offset": 17891328,
+          "bytes": 48338,
+          "sha256": "d99d44e73af4ab941ef543d38dd323345b699d977c5f1435c681613ecd485983",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 475,
+          "nodes": 682,
+          "faces": 683,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone10_Wall_COL.col",
+          "logical_offset": 18087936,
+          "bytes": 63824,
+          "sha256": "6b5c951bb5008515b3075702c3c199efbdb761ecd5e9cfcd62bd284ee39bcf94",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 796,
+          "nodes": 1003,
+          "faces": 1004,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 22,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone11_COL_floor.col",
+          "logical_offset": 19365888,
+          "bytes": 13184,
+          "sha256": "e03f53a126a56e3c5c5238bca0f8ffd79ce7b3d398f83a24c2d8eb544f3a7ca2",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 133,
+          "nodes": 183,
+          "faces": 184,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 13,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone11_Wall_COL.col",
+          "logical_offset": 19439616,
+          "bytes": 14702,
+          "sha256": "2d9d38369f3295f583f2904972863f73e175030d4fd85e529aebf0c91b06d973",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 199,
+          "nodes": 226,
+          "faces": 227,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Mushroom28_COL.col",
+          "logical_offset": 20619264,
+          "bytes": 1136,
+          "sha256": "38538545dbd4b00b2a18f3565afbcb494b8e74971c719277d5d6e8234694443c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 6,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rockcluster01_COL.col",
+          "logical_offset": 20717568,
+          "bytes": 5306,
+          "sha256": "f7ffdfe746154b1ffb4f523d389b85a96854bf35cf0ccd04831b93bd09b49216",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 64,
+          "nodes": 82,
+          "faces": 83,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\UberShroom04_COL.col",
+          "logical_offset": 20815872,
+          "bytes": 1136,
+          "sha256": "0bbf8994d2632ef9d35c91322a096e34484ad62f9f3b93280ff4a7eda4716ca8",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 18,
+          "nodes": 15,
+          "faces": 16,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\UberShroom05_COL.col",
+          "logical_offset": 20865024,
+          "bytes": 980,
+          "sha256": "ac63a4780503fe7e89935651a39b3bd700adc28c2f4f5e55e798e7d08fa98685",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 14,
+          "nodes": 13,
+          "faces": 14,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 5,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02_BigRock_COL.col",
+          "logical_offset": 20914176,
+          "bytes": 1322,
+          "sha256": "033dec9a1e085edb08a35c085a9d3a4fe72cdc3460d91f8ff3a55e898c79d2f9",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 20,
+          "nodes": 18,
+          "faces": 19,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone02Uber02_COL.col",
+          "logical_offset": 20938752,
+          "bytes": 1904,
+          "sha256": "ccdad163a888a09cde2b8bd15fe8950133100b71a240c0968e42d21b5380c449",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 28,
+          "nodes": 27,
+          "faces": 28,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 7,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone12_COL_floor.col",
+          "logical_offset": 20963328,
+          "bytes": 15848,
+          "sha256": "3b36d68fd6e52076e1bb7e991189bb7e1657d9dce81c98aff255b0a277ff518f",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 163,
+          "nodes": 219,
+          "faces": 220,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 18,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone12_Wall_COL.col",
+          "logical_offset": 21061632,
+          "bytes": 22112,
+          "sha256": "3f3d96601d1eb991797156e8d818eb52d3472620704d3a3398ba0d7ec80a9e9c",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 290,
+          "nodes": 343,
+          "faces": 344,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 20,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\pool01_COL.col",
+          "logical_offset": 26173440,
+          "bytes": 13784,
+          "sha256": "92fccb9e3957456b0e5733899f2715a06f0d4d2e8a0240999ad38aef57a4ca04",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 172,
+          "nodes": 215,
+          "faces": 216,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 17,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\PoolShutOff_COL02.col",
+          "logical_offset": 26222592,
+          "bytes": 8126,
+          "sha256": "268c226e1ada062a9274a0c80d4a5754bce85db44da1691f55e4606ec967a8f5",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 119,
+          "nodes": 122,
+          "faces": 123,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone13_COL_floor.col",
+          "logical_offset": 26394624,
+          "bytes": 46628,
+          "sha256": "3d9571a113b03bcd47cac70cab0fbcd55b24e2ef463f8eec3e8927b397ae16a7",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 460,
+          "nodes": 657,
+          "faces": 658,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 23,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone13_Wall_COL.col",
+          "logical_offset": 26542080,
+          "bytes": 17624,
+          "sha256": "cc4b17f0746fbc5fcf86ff6c66d7f94842e77d5b6b6daefb634b8ffb56940470",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 258,
+          "nodes": 267,
+          "faces": 268,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 16,
+          "nonfinite_face_planes": 2,
+          "category": 4,
+          "nonfinite_plane_source_proof": [
+            {
+              "face_index": 153,
+              "source_offset": 15094,
+              "plane_words": [
+                "0x7fc00000",
+                "0xffc00000",
+                "0xffc00000",
+                "0xffc00000"
+              ],
+              "vertex_indices": [
+                49,
+                151,
+                48
+              ],
+              "positions": [
+                [
+                  -8547.962890625,
+                  -1788.9200439453125,
+                  2010.26220703125
+                ],
+                [
+                  -8569.7900390625,
+                  -1790.3983154296875,
+                  1964.710693359375
+                ],
+                [
+                  -8569.7900390625,
+                  -1790.3983154296875,
+                  1964.710693359375
+                ]
+              ]
+            },
+            {
+              "face_index": 156,
+              "source_offset": 15160,
+              "plane_words": [
+                "0x7fc00000",
+                "0xffc00000",
+                "0xffc00000",
+                "0xffc00000"
+              ],
+              "vertex_indices": [
+                47,
+                48,
+                151
+              ],
+              "positions": [
+                [
+                  -8589.9638671875,
+                  -1791.72705078125,
+                  1918.333984375
+                ],
+                [
+                  -8569.7900390625,
+                  -1790.3983154296875,
+                  1964.710693359375
+                ],
+                [
+                  -8569.7900390625,
+                  -1790.3983154296875,
+                  1964.710693359375
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "geometry\\rocka25_COL.col",
+          "logical_offset": 26910720,
+          "bytes": 2498,
+          "sha256": "043c0181046a4320ba1fb47ca91b91a8793fb08d92dceca357878dfa192e5c21",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 37,
+          "nodes": 36,
+          "faces": 37,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka26_COL.col",
+          "logical_offset": 26959872,
+          "bytes": 2804,
+          "sha256": "7348ae04fbec4d8d0d159a4b67f75da5b205d949b2ff35f30c85d0280f025e48",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 31,
+          "nodes": 43,
+          "faces": 44,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 10,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka28_COL.col",
+          "logical_offset": 27033600,
+          "bytes": 608,
+          "sha256": "20d030a250d37e8f65fe25102fafa5b988f91e74f16593b11023e7d9a720948e",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 10,
+          "nodes": 7,
+          "faces": 8,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 3,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka32_COL.col",
+          "logical_offset": 27131904,
+          "bytes": 2336,
+          "sha256": "d40f057b10ec2802a5e35613b4e9fa1b64b1c894dafce72ab189e3356af5f382",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 28,
+          "nodes": 35,
+          "faces": 36,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka86_COL.col",
+          "logical_offset": 27279360,
+          "bytes": 2978,
+          "sha256": "5c0ea1a80c4aa9884d8b9c089966c31b6c0d75173e861ead9941ac87dfef53ce",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 32,
+          "nodes": 46,
+          "faces": 47,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 15,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_Mountain_COL.col",
+          "logical_offset": 27303936,
+          "bytes": 19616,
+          "sha256": "6c50e1c08f71763f292fae5790142e16f2e0d1f93728d5b18fad377667429dd5",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 235,
+          "nodes": 309,
+          "faces": 310,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 26,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone04_RockGroup_COL.col",
+          "logical_offset": 27328512,
+          "bytes": 7208,
+          "sha256": "9038f7776ddd54be62a5b9392ba48d0701b239b5d06d494d477f0b80ee0b1a51",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 110,
+          "nodes": 107,
+          "faces": 108,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone14_COL_floor.col",
+          "logical_offset": 27353088,
+          "bytes": 22100,
+          "sha256": "8567fc5de7b523224b3fb6eea7e1c6b200fb6b61a27435264ca32a7e25c99732",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 239,
+          "nodes": 301,
+          "faces": 302,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 16,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone14_TunnelCover02_COL.col",
+          "logical_offset": 27525120,
+          "bytes": 5498,
+          "sha256": "5c9da408b3b946bfeed31cd3bec2da22228a4ae0305c4e03974bb962c21e8a6a",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 89,
+          "nodes": 80,
+          "faces": 81,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 11,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka34_COL.col",
+          "logical_offset": 27549696,
+          "bytes": 5108,
+          "sha256": "2697f790b846f3e3e02955a4ddd8b5fabff7d1a7bc79db591ae8e807abb7653d",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 52,
+          "nodes": 81,
+          "faces": 82,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 21,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\rocka01_COL.col",
+          "logical_offset": 27574272,
+          "bytes": 5108,
+          "sha256": "b0ebca84d2a41551b67231aa3df03747ea9accc5d391220913c67515658f0f72",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 52,
+          "nodes": 81,
+          "faces": 82,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 20,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        },
+        {
+          "name": "geometry\\Zone15_COL_floor.col",
+          "logical_offset": 27697152,
+          "bytes": 13898,
+          "sha256": "6ddda07b14348963eb7438376918b55eceba1f25e1fc0a25de94cf3f140240c2",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 156,
+          "nodes": 186,
+          "faces": 187,
+          "quantized": 0,
+          "normals_present": 1,
+          "reverse_mode": 0,
+          "max_tree_depth": 16,
+          "nonfinite_face_planes": 0,
+          "category": 20
+        },
+        {
+          "name": "geometry\\Zone15_Wall_COL.col",
+          "logical_offset": 27795456,
+          "bytes": 29522,
+          "sha256": "f8b31757f70744c3d3b10fd1f9903ac2707aaa63b142b09dd395fa540f4c77cd",
+          "header": [
+            1234,
+            7106403,
+            1,
+            0
+          ],
+          "vertices": 363,
+          "nodes": 464,
+          "faces": 465,
+          "quantized": 0,
+          "normals_present": 0,
+          "reverse_mode": 0,
+          "max_tree_depth": 19,
+          "nonfinite_face_planes": 0,
+          "category": 4
+        }
+      ],
+      "tuning": {
+        "EnvDamage": {
+          "hitxl": "1050",
+          "hitl": "787.5",
+          "hitm": "440",
+          "hits": "175",
+          "hitxs": "50",
+          "pointsxl": "25",
+          "pointsl": "20",
+          "pointsm": "15",
+          "pointss": "10",
+          "pointsxs": ".5"
+        },
+        "PodDamage": {
+          "hitxl": "135",
+          "hitl": "100",
+          "hitm": "68",
+          "hits": "44",
+          "hitxs": "12",
+          "pointsxl": "23",
+          "pointsl": "18",
+          "pointsm": "13",
+          "pointss": "10",
+          "pointsxs": "4.5",
+          "aipointsmultiplier": "1.75",
+          "aimultiplierdecrement": "0.15",
+          "mingrindingspeed": "200",
+          "finaldamagethreshold": "1.0",
+          "finaldamageincrement": "0.0",
+          "waittorepairenvtime": "4.0",
+          "repairenvthreshold": "0.5",
+          "repairenvuntil": "2.0",
+          "aienvpointsmultiplier": "1.0"
+        },
+        "AIDriving": {
+          "lookahead": "0.7",
+          "behindplayerclearance": "50",
+          "startlineboosttime": "0",
+          "racepacecutofftime": "1.0",
+          "racepace": "86"
+        },
+        "Packing": {
+          "numpackingfront": "4",
+          "numpackingrear": "4",
+          "farfrontdist": "1250",
+          "closefrontdist": "500",
+          "farbehinddist": "750",
+          "closebehinddist": "0",
+          "slowestspeedpct": "0.5",
+          "fastestspeedpct": "1.0"
+        }
+      }
+    }
+  }
+}

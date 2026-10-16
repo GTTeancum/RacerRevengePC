@@ -1,0 +1,102 @@
+PositionStats fixed-resource lifetime and one-name font prerequisites
+UNTESTED additive candidate. No builds, tests, syntax checks, converters, gameplay,
+guest execution, owner checkout edits or unrelated audits. No full resource owner,
+staging invocation, meshes or drawing activation is introduced.
+Base: the helper's isolated integrated-candidate sequence through primitive owner
+and ab28ab2 loader/clip recovery. Root's separate W-lane correction is outside the
+three files touched here. Exact preimages and SHA256 manifest are included; root
+must reconcile other central changes rather than replacing newer full files.
+
+THREE FILES
+tests/native/original_race_display_lifetime50la.h -- new private fixed-resource lease.
+src/assets/original_application_fonts50la.h -- fixed single-font source wrapper;
+same private implementation shared with existing pairs by compile-time array count.
+tests/native/original_ui_main_entry50kg.h -- uncalled actual Application font entry.
+No terrain_interactive_drive50du.cpp edit; its existing close gate stays intact.
+
+ACTUAL127-TEXTURE RETAINED LIFETIME
+RaceDisplayLifetime50LA::retainPositionStatsFixedResources is private, accessible
+only to the future rr::game::OriginalPositionStatsResources50LA concrete owner.
+It uses the same authoritative Application display, real renderer/dispatch/Video,
+initialized/current-context admission, actual private pin counters and owner thread.
+No arbitrary renderer/context/queue, caller readiness, callback or generic count.
+Only one fixed-resource lease may be active. Its pin is SEPARATE from the existing
+16-primitive lease. No existing16-element acquisition/drain/acknowledgement logic
+is changed. Existing direct/coordinator/destructor/host-close guards see both pins.
+
+CONSTRUCTION AND ORDER CONTRACT FOR THE FUTURE OWNER
+Acquire the fixed-resource lease before18FF80's nonallocating fixed constructors:
+5 texts,9 textures,118 textures,clip. Once ALL finish, call the private
+constructedFixedResources18FF80 before any190190 load or primitive16 construction.
+Allocation failure before fixed construction may dispose the unconstructed lease.
+After that point every original texture object, loaded or not, must retire.
+At close, finish the actual independent16-primitive owner first (or its original
+null case), then embedded clip119F10. Only then call beginAfterClip119F10.
+The clip destructor has no resource or GPU completion callback to manufacture.
+Admission checks the REAL renderer and host pin counts are both exactly1: the
+fixed-resource lease itself. Any still-live primitive lease prevents retirement.
+The attempt marks actual display retiring to bar new leases, but does not block
+existing primitive/texture drain retries. After primitive close, retry can succeed.
+
+PER-TEXTURE RETRIES AND PRESERVED BACKING
+Cursor126..9 visits original offsets31B0..5D0 (118 textures in reverse), then8..0
+visits570..270 (9 in reverse). drainNext2DEFE0 calls actual
+serviceOriginalRenderer244D60(dispatch,true,renderer,initializedContext), then
+unconditionally finishInitializedContextWork AND contextWorkCompleted at2DF030.
+This includes disabledD8 service and unloaded textures. Failed phase0 retries
+phase0; successful phase0/failed phase1 retains phase1 and retries only second
+finish. Phase2 remains until actual resources are freed. No cursor/pin advances
+on drain failure. The owner/context, both guards and every later object stay live.
+The sole friend must free actual buffer58, clear primitive10, destroy actual
+primitive/material, then acknowledge the EXACT source offset. Invalid order,
+offset or phase cannot advance. This models2DF038..74 without a synthetic callback.
+
+PIN SURVIVES ALL TEXT/ENTITY RETIREMENT
+After texture0, the lease remains pinned. Text cursor4..0 computes source offset
+0x40 + index*0x70, yielding0x200,0x190,0x120,0xB0,0x40 in reverse order.
+The private finishedTextResources rejects every text before all127 textures finish.
+No extra renderer calls are invented for2E1340->2DFC60. The concrete owner frees
+string8, glyph arrayC, primitives4 ascending, optional packet buffers64 and their
+array, and its actual font borrow, then acknowledges the exact text offset.
+finishedEntity1413E0 releases the pin only AFTER every text acknowledgement and
+the concrete friend's actual Entity cleanup. Until then guards still prevent any
+backing close. Constructed outstanding lease destruction terminates; it never
+silently unpins. Native acknowledgements cannot be called outside the sole friend.
+
+IMPORTANT OWNERSHIP CYCLE RULE
+Root/session owns the future full PositionStats owner. Renderer storage must NEVER
+strongly own an owner that holds either display lease; that would form a cycle.
+Any eventual renderer access is a bounded borrow/weak reference retired explicitly.
+
+ONE-NAME FONT LOAD THROUGH SAME ACTUAL MANAGER
+Application::loadPositionStatsFont190E64 delegates through its existing fonts328()
+to private loadPositionStats190E64. That wrapper selects exactly array1{eurostile13},
+sourceCaller190E64, reload0 semantics. No extra denmark16 or italic26 request.
+The existing TimeStats and SpeedBoost wrappers still select the same arrays2 in
+the same order; only the private shared body name/count parameter becomes a
+compile-time template. Its logic is unchanged: same pending Entry, existing-entry
+validation, actual provider bytes, CEL decode, directory scope, canonical texture
+acquire/retain, full29E340 scan, restore before publication, insertion order,
+terminal failure effects and retained partial state. No copies/new manager tables.
+Already loaded13 takes the existing reload0 skip; first load appends only13 at
+the actual current publication position. Earlier entries remain unchanged.
+Application supplies its actual mutable36B970 and actual font36B420. The wrapper
+does not bind/mount invented sources; future full loader must mount authentic
+OVERLAYS and append actual font PST before invoking190E64, in original order.
+
+SOURCE EVIDENCE
+Included static words18FF80..191150 prove5/9/118/clip construction and reverse
+destruction;2DEFE0 proves both unconditional source renderer calls before58/54;
+2DFC60 proves text string/glyph/primitive/packet order and absence of renderer
+calls;190E40..190E84 proves one-name282430 at190E64 then282210 lookup. Original
+literal3A8E60 is eurostileboldbold13ingame. No guest instructions executed.
+
+REVIEW / REMAINING WORK
+[ ] Reconcile exact three preimages; no other files or old16-lease logic changed.
+[ ] Confirm actual-pin gating and127 texture retry/cursor state.
+[ ] Confirm pin survives5 texts and Entity; source frees must precede private acks.
+[ ] Confirm one-font route shares identical canonical body and directory restoration.
+[ ] Keep source/full owner absent and activation closed until root reviews these APIs.
+[ ] Future full owner must integrate actual constructors, ordered127 loader/population,
+    five fonts/texts, clip, primitive fragment, ALL8/view0 owner binding and cleanup.
+[ ] Root alone owns testing. This packet contains NO runtime/check evidence.

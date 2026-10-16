@@ -9,6 +9,24 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 get_filename_component(RR_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 find_package(ZLIB REQUIRED)
 add_library(rr_native_gameplay50dj STATIC
+  # Shared interactive dependencies already used by the Windows manifest.
+  "${RR_ROOT}/src/game/material_audio50hi.cpp"
+  "${RR_ROOT}/src/assets/original_stream_metadata50kz.cpp"
+  "${RR_ROOT}/src/game/cold_logical_audio_domain50ky.cpp"
+  "${RR_ROOT}/src/assets/original_audio_directory50kx.cpp"
+  "${RR_ROOT}/src/assets/material_audio50hi.cpp"
+  "${RR_ROOT}/src/game/gameplay_audio50he.cpp"
+  "${RR_ROOT}/src/game/body_contact_list48r.cpp"
+  "${RR_ROOT}/src/game/pod_speech50hg.cpp"
+  # Canonical material/resource closure for the existing native TA consumer.
+  "${RR_ROOT}/src/assets/original_standard_model_resource50la.cpp"
+  "${RR_ROOT}/src/assets/original_standard_program_table50la.cpp"
+  "${RR_ROOT}/src/assets/original_standard_material_source50la.cpp"
+  "${RR_ROOT}/src/assets/original_standard_material_object50la.cpp"
+  "${RR_ROOT}/src/assets/original_standard_material_table50la.cpp"
+  "${RR_ROOT}/src/assets/original_standard_screen_material_reference50la.cpp"
+  "${RR_ROOT}/src/assets/original_standard_texture_table50la.cpp"
+  "${RR_ROOT}/src/assets/original_standard_texture_resource50la.cpp"
   # Inactive source-derived original UI modules.
   "${RR_ROOT}/src/assets/original_ui_archive50kg.cpp"
   "${RR_ROOT}/src/assets/original_ui_atm50kg.cpp"
@@ -60,16 +78,27 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/platform/linux/native/original_ui_main_session50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_frontend50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_options_session50kg.cpp"
+  "${RR_ROOT}/platform/linux/native/original_ui_audio_options50kg.cpp"
+  "${RR_ROOT}/src/game/original_ui_audio_options50kg.cpp"
   "${RR_ROOT}/src/assets/audio_assets50hc.cpp"
   "${RR_ROOT}/platform/linux/native/audio_mixer50hd.cpp"
   "${RR_ROOT}/src/game/original_ui_main_widget_manager50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_options_menu_controller50kg.cpp"
+  "${RR_ROOT}/src/game/original_ui_controls_controller50kg.cpp"
+  "${RR_ROOT}/src/game/original_ui_controls_model50kg.cpp"
+  "${RR_ROOT}/src/assets/original_ui_controls_model_assets50kg.cpp"
+  "${RR_ROOT}/src/assets/original_ui_controls_specmap50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_options_menu_widgets50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_options_menu_layout50kg.cpp"
   "${RR_ROOT}/src/game/original_ui_options_camera50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_options_draw_resources50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_rider_draw_resources50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_rider_profile50kg.cpp"
+  "${RR_ROOT}/src/game/original_tournament_result50kg.cpp"
+  "${RR_ROOT}/src/game/original_ui_tournament_input50kg.cpp"
+  "${RR_ROOT}/src/assets/original_ui_tournament_page50kg.cpp"
+  "${RR_ROOT}/platform/linux/native/original_ui_tournament_career_resources50kg.cpp"
+  "${RR_ROOT}/src/assets/original_ui_screen_material_reference50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_rider_stat_draw50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_rider_draw_contribution50kg.cpp"
   "${RR_ROOT}/platform/linux/native/original_ui_rider_session50kg.cpp"
@@ -182,6 +211,12 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/original_camera_scene_tick.cpp"
   "${RR_ROOT}/src/game/original_camera_sphere_query.cpp"
   "${RR_ROOT}/src/game/original_camera_world_query.cpp"
+  "${RR_ROOT}/src/game/original_death_camera_query.cpp"
+  "${RR_ROOT}/src/game/original_death_camera50kg.cpp"
+  "${RR_ROOT}/src/game/original_race_hud50kg.cpp"
+  "${RR_ROOT}/src/game/original_wreck_explosion50la.cpp"
+  "${RR_ROOT}/src/game/original_wreck_splash50la.cpp"
+  "${RR_ROOT}/src/game/original_wreck_effects50la.cpp"
   "${RR_ROOT}/src/game/original_follow_cam.cpp"
   "${RR_ROOT}/src/game/original_follow_camera.cpp"
   "${RR_ROOT}/src/game/original_follow_collision.cpp"
@@ -224,6 +259,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/assets/import_texture48e.cpp"
   "${RR_ROOT}/src/game/engine_tail50t.cpp"
   "${RR_ROOT}/src/game/flame_bindings50v.cpp"
+  "${RR_ROOT}/src/game/engine_flare50gv.cpp"
   "${RR_ROOT}/src/game/vehicle_frame49w.cpp"
   "${RR_ROOT}/src/game/movement_hit_point50m.cpp"
   "${RR_ROOT}/src/game/impact_effects50b.cpp"
@@ -237,6 +273,7 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/assets/track_collider50ao.cpp"
   "${RR_ROOT}/src/assets/track_collision_tags50an.cpp"
   "${RR_ROOT}/src/assets/import_world48f.cpp"
+  "${RR_ROOT}/src/game/original_world_environment50kg.cpp"
   "${RR_ROOT}/src/game/reset_lifecycle50at.cpp"
   "${RR_ROOT}/src/game/main_reset50ar.cpp"
   "${RR_ROOT}/src/game/group_shape48t.cpp"
@@ -285,6 +322,16 @@ add_library(rr_native_gameplay50dj STATIC
   "${RR_ROOT}/src/game/type0_bounds50ew.cpp"
   "${RR_ROOT}/src/game/undertrack_reset50ew.cpp"
   "${RR_ROOT}/src/game/reset_visibility50ey.cpp"
+  "${RR_ROOT}/src/game/reset_ground_query50iz.cpp"
+  "${RR_ROOT}/src/game/original_gc_particle_manager50kg.cpp"
+  "${RR_ROOT}/src/game/original_gc_generator_fire50kg.cpp"
+  "${RR_ROOT}/src/game/original_gc_spray50kg.cpp"
+  "${RR_ROOT}/src/game/original_gc_fire_emission50kg.cpp"
+  "${RR_ROOT}/src/game/original_gc_pod_dust50kg.cpp"
+  "${RR_ROOT}/src/game/original_gc_pod_fire50kg.cpp"
+  "${RR_ROOT}/src/game/original_gc_pod_sparks50kg.cpp"
+  "${RR_ROOT}/src/assets/original_gc_particle_material50kg.cpp"
+  "${RR_ROOT}/src/game/original_gc_particle_render50kg.cpp"
   "${RR_ROOT}/src/game/pod_scene_rebase50fb.cpp"
   "${RR_ROOT}/src/game/pod_cables50fd.cpp"
   "${RR_ROOT}/src/game/boost_controls50fk.cpp"
@@ -338,7 +385,7 @@ option(RR_BUILD_INTERACTIVE_CLIENT "Build the retained-fixture interactive vehic
 if(RR_BUILD_INTERACTIVE_CLIENT)
   find_package(Threads REQUIRED)
   add_library(rr_linux_interactive50dv STATIC
-    window_host50dq.cpp keyboard_packet50dr.cpp vehicle_window_gl50ds.cpp
+    audio_output50hd.cpp window_host50dq.cpp keyboard_packet50dr.cpp vehicle_window_gl50ds.cpp
     game_host50er.cpp offscreen_gl_context50dc.cpp
     vehicle_draw_gl50cv.cpp vehicle_shader_gl50cz.cpp vehicle_view_camera50dg.cpp
     native_camera_view50dx.cpp material_texture_gl50eb.cpp
@@ -353,7 +400,8 @@ if(RR_BUILD_SHARED_HEADLESS_CLIENT)
   find_package(Threads REQUIRED)
   add_library(rr_linux_shared_headless50el STATIC
     vehicle_draw_gl50cv.cpp vehicle_shader_gl50cz.cpp offscreen_gl_context50dc.cpp
-    vehicle_window_gl50ds.cpp vehicle_view_camera50dg.cpp material_texture_gl50eb.cpp)
+    vehicle_window_gl50ds.cpp vehicle_view_camera50dg.cpp native_camera_view50dx.cpp
+    material_texture_gl50eb.cpp)
   target_link_libraries(rr_linux_shared_headless50el PUBLIC rr_native_gameplay50dj Threads::Threads ${CMAKE_DL_LIBS})
   add_executable(rr_headless_drive50ek "${RR_ROOT}/tests/native/terrain_headless_drive50ek.cpp")
   target_link_libraries(rr_headless_drive50ek PRIVATE rr_linux_shared_headless50el)

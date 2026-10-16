@@ -219,7 +219,7 @@ struct OriginalGcIntroExitBindings {
     std::uint8_t& actualUiFlags1E4;
     std::int32_t actualFadeManagerA8,actualApplicationMode22C,actualApplication33C;
     std::int32_t actualLaunch11258,actualPreference11030,actualVariant11038;
-    //Actual source80.177750(a8 intro count0) never allocates it on GC.
+    //Actual source80.177750(effective A8 intro count0) never allocates it.
     std::uint64_t actualIntroAudio80;
     //Current common racer40, not class58 or an input-role inference.
     std::int32_t actualRacerState40;
@@ -301,7 +301,7 @@ public:
         }
     }
 };
-//The reached exit contains no course switch. Both authenticated GC and GA
+//The reached exit contains no course switch. Authenticated GC, GA and TA
 //have the same absent321-action list; the LIVE completed procedural child,
 //null80 and actual configuration predicates above remain mandatory.
 using OriginalGcGaIntroExitOwner=OriginalGcIntroExitOwner;

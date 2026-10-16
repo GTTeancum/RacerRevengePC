@@ -45,7 +45,7 @@ struct WaterVehicleEffectInput50JC {
     bool waterAttachment334Bound=false;
 };
 enum class WaterVehicleActionKind50JC : std::uint8_t {
-    Anchor2B1690,Force2B1370,WriteSprayPosition30,Effect50B,WritePreviousBE0
+    Anchor2B1690,Force2B1370,WriteSprayPosition30,Effect50B,WritePreviousBE0,GraphRead49P
 };
 struct WaterVehicleAction50JC {
     WaterVehicleActionKind50JC kind=WaterVehicleActionKind50JC::WritePreviousBE0;
@@ -54,18 +54,28 @@ struct WaterVehicleAction50JC {
     WaterWakeForceInput50JC force{};
     ImpactEffectEvent50B effect{};
     std::int32_t anchorBucket=0; // Actual22A798 passes zero.
+    std::size_t firstGraphWrite=0,graphWriteCount=0;
 };
 // distance<=70 boundsCVT(1+.2*distance) to15. Each model contributes at
 // most3 spray operations and30 force calls, plus one anchor and oneBE0 write.
-constexpr std::size_t maxWaterVehicleActions50JC=68;
+// The optional ordered-cache form adds the three actual28B2B0 read sites.
+constexpr std::size_t maxWaterVehicleActions50JC=71;
+constexpr std::size_t maxWaterVehicleGraphWrites50JC=3u*maxSceneNodes49P;
+struct WaterVehicleGraphWrite50JC {
+    std::uint32_t node=0;
+    SceneNode49P before{},after{};
+};
 struct WaterVehicleEffectWorkspace50JC {
     SceneNode49P nextNodes[maxSceneNodes49P];
     WaterVehicleAction50JC actions[maxWaterVehicleActions50JC];
+    SceneNode49P graphPublishedNodes[maxSceneNodes49P];
+    WaterVehicleGraphWrite50JC graphWrites[maxWaterVehicleGraphWrites50JC];
 };
 struct WaterVehicleEffectProposal50JC {
     std::size_t actionCount=0;
     std::uint32_t graphCount=0;
     bool graphRead=false;
+    bool orderedGraphReads=false;
 };
 namespace water_vehicle_effect_detail50jc {
 using Status=WaterVehicleEffectStatus50JC;
@@ -82,6 +92,12 @@ inline bool position(const SceneGraph49P& g,I i,float (&p)[4]) noexcept {
     if(i==I::none||!refreshSceneWorld49P(g,i))return false;
     std::memcpy(p,g.nodes[static_cast<std::uint32_t>(i)].world100.v+12,12);
     p[3]=1.f;return true; //28B2B0(relative=null), initialized vf0.W.
+}
+inline bool sameNode(const SceneNode49P& a,const SceneNode49P& b) noexcept {
+    return std::memcmp(a.localC0.v,b.localC0.v,sizeof a.localC0.v)==0&&
+        std::memcmp(a.world100.v,b.world100.v,sizeof a.world100.v)==0&&
+        a.parent180==b.parent180&&a.firstChild184==b.firstChild184&&
+        a.nextSibling188==b.nextSibling188&&a.sceneFlags190==b.sceneFlags190;
 }
 inline void transform(const BodyMatrix48G& matrix,const float (&p)[4],
     float (&out)[4],Math& m,std::uint32_t pc) noexcept {
@@ -121,11 +137,26 @@ struct Builder {
     WaterVehicleEffectWorkspace50JC& w;
     std::size_t count=0;
     bool valid=true;
+    bool orderedGraphReads=false;
+    std::size_t graphWriteCount=0;
     WaterVehicleAction50JC* add(WaterVehicleActionKind50JC kind,
         std::uint32_t pc,std::uint32_t target,const float* point=nullptr) noexcept {
         if(count==maxWaterVehicleActions50JC){valid=false;return nullptr;}
         auto& a=w.actions[count++];a={};a.kind=kind;a.sourcePC=pc;a.target=target;
         if(point)std::memcpy(a.point,point,16);return &a;
+    }
+    bool graphRead(std::uint32_t pc,const SceneGraph49P& staged) noexcept {
+        if(!orderedGraphReads)return true;
+        auto* a=add(WaterVehicleActionKind50JC::GraphRead49P,pc,0);
+        if(!a)return false;
+        a->firstGraphWrite=graphWriteCount;
+        for(std::uint32_t i=0;i<staged.count;++i){
+            auto& prior=w.graphPublishedNodes[i];const auto& next=staged.nodes[i];
+            if(sameNode(prior,next))continue;
+            if(graphWriteCount==maxWaterVehicleGraphWrites50JC){valid=false;return false;}
+            w.graphWrites[graphWriteCount++]={i,prior,next};prior=next;++a->graphWriteCount;
+        }
+        return true;
     }
     void effect(ImpactEffectKind50B kind,std::uint32_t pc,
         std::uint32_t id,const float* p=nullptr) noexcept {
@@ -146,14 +177,22 @@ struct Builder {
 // projection is NOT a completed caller until every action is consumed in
 // order and the staged graph caches are published by the enclosing owner.
 // Consumers cannot mutate model graphs, source bindings or the other spray.
+// Legacy/default projection retains only final nextNodes publication and the
+// existing non-graph action order. orderedGraphReads=true also emits exact
+// per-getter before/after packets at22A668/22A918/22AB6C, interleaved with
+// their source actions. Cursor consumers must apply those packets there,
+// never bulk-publish later getters early. nextNodes still holds the final
+// snapshot in either form. Cache packet capacity is three complete graphs.
 inline WaterVehicleEffectResult50JC projectWaterVehicleEffects50JC(
     const SceneGraph49P& graph,const WaterVehicleEffectInput50JC& in,
-    WaterVehicleEffectWorkspace50JC& w,WaterVehicleEffectProposal50JC& out) noexcept {
+    WaterVehicleEffectWorkspace50JC& w,WaterVehicleEffectProposal50JC& out,
+    bool orderedGraphReads=false) noexcept {
     using namespace water_vehicle_effect_detail50jc;
     if(!in.waterAttachment334Bound||!in.waterOwner334)
         return result(Status::Owner,0x228b40u);
     if(!in.query348State118)return result(Status::Owner,0x22a648u);
-    Builder b{w};WaterVehicleEffectProposal50JC next;
+    Builder b{w};b.orderedGraphReads=orderedGraphReads;
+    WaterVehicleEffectProposal50JC next;next.orderedGraphReads=orderedGraphReads;
     bool eligible=*in.query348State118==1u;
     if(eligible){if(!in.component7FC)return result(Status::Owner,0x22a654u);eligible=*in.component7FC!=0;}
     if(!eligible){
@@ -175,8 +214,10 @@ inline WaterVehicleEffectResult50JC projectWaterVehicleEffects50JC(
     if(!in.previousBE0)return result(Status::Owner,0x22a680u);
     if(std::fegetround()!=FE_TONEAREST)return result(Status::Arithmetic,0x22a698u);
     std::memcpy(w.nextNodes,graph.nodes,graph.count*sizeof(SceneNode49P));
+    if(orderedGraphReads)std::memcpy(w.graphPublishedNodes,graph.nodes,graph.count*sizeof(SceneNode49P));
     SceneGraph49P staged{w.nextNodes,graph.count};next.graphRead=true;next.graphCount=graph.count;
     float current[4];if(!position(staged,in.chariot1B4.node,current))return result(Status::Graph,0x22a668u);
+    if(!b.graphRead(0x22a668u,staged))return result(Status::Storage,0x22a668u);
     Math m;float delta[4]={0,0,0,1};
     constexpr std::uint32_t deltaPC[3]{0x22a698u,0x22a69cu,0x22a6a4u};
     for(unsigned c=0;c<3;++c)delta[c]=m.sub(in.previousBE0[c],current[c],deltaPC[c]);
@@ -237,6 +278,8 @@ inline WaterVehicleEffectResult50JC projectWaterVehicleEffects50JC(
         if(node==I::none)continue;
         if(!in.query348WaterY164)return result(Status::Owner,side?0x22ab8cu:0x22a938u);
         float world[4];if(!position(staged,node,world))return result(Status::Graph,side?0x22ab6cu:0x22a918u);
+        if(!b.graphRead(side?0x22ab6cu:0x22a918u,staged))
+            return result(Status::Storage,side?0x22ab6cu:0x22a918u);
         world[1]=*in.query348WaterY164;
         const auto& matrix=staged.nodes[static_cast<std::uint32_t>(node)].world100;
         float local[4];inversePoint(matrix,world,local,m);

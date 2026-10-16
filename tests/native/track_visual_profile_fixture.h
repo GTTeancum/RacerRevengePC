@@ -31,6 +31,16 @@ inline const Profile& get(track_source_fixture::Track track) {
 #include "ga_visual_profile.inc"
     };
 #endif
+#if __has_include("ma_visual_profile.inc")
+    static constexpr Profile ma{
+#include "ma_visual_profile.inc"
+    };
+#endif
+#if __has_include("sa_visual_profile.inc")
+    static constexpr Profile sa{
+#include "sa_visual_profile.inc"
+    };
+#endif
     switch (track) {
     case track_source_fixture::Track::ta: return ta;
     case track_source_fixture::Track::gc: return gc;
@@ -39,6 +49,18 @@ inline const Profile& get(track_source_fixture::Track track) {
         return ga;
 #else
         throw std::runtime_error("GA native visual assets have not been cold-prepared and pinned");
+#endif
+    case track_source_fixture::Track::ma:
+#if __has_include("ma_visual_profile.inc")
+        return ma;
+#else
+        throw std::runtime_error("MA native visual assets have not been cold-prepared and pinned");
+#endif
+    case track_source_fixture::Track::sa:
+#if __has_include("sa_visual_profile.inc")
+        return sa;
+#else
+        throw std::runtime_error("SA native visual assets have not been cold-prepared and pinned");
 #endif
     default: throw std::runtime_error("Unsupported original visual track identity");
     }

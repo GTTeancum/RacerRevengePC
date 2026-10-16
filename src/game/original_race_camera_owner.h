@@ -150,6 +150,67 @@ inline bool strength(float value, std::int32_t& result) noexcept {
     result = static_cast<std::int32_t>(value); // Original CVT.W.S truncation.
     return true;
 }
+// Shared source175D90..175F4C prefix, used by both the ordinary controller
+// and the genuine ending controller. Callers supply staged copies and perform
+// the actual binding/mode/frame admission before calling this numerical leaf.
+inline bool advanceCommonPrefix175D70(OriginalRaceCameraOwner& next,
+    OriginalCameraShakeChannels& shake,GameplayBlurPending& requests,float elapsed,
+    bool& attemptedBlur,std::int32_t& stagedStrength) noexcept {
+    if (next.cooldown8C > 0.f) {
+        next.cooldown8C = sub(next.cooldown8C,elapsed);
+        if (!scalar(next.cooldown8C)) return false;
+    }
+    // Cut timer always has priority; the alternate timer/delay freezes beneath it.
+    if (next.cutRemaining90 >= 0.f) {
+        const float ratio = div(next.cutRemaining90,2.f);
+        const float value = mul(100.f,ratio);
+        if (!scalar(ratio) || !strength(value,stagedStrength)) return false;
+        attemptedBlur = true;
+        requestGameplayBlur(requests,stagedStrength,0,0);
+        if (next.cutRemaining90 == 0.f) next.cutRemaining90 = -1.f;
+        else {
+            const float remaining = sub(next.cutRemaining90,elapsed);
+            if (!scalar(remaining)) return false;
+            next.cutRemaining90 = remaining <= 0.f ? 0.f : remaining;
+        }
+    } else {
+        if (!scalar(next.shakeRemaining94)) return false;
+        if (next.shakeRemaining94 >= 0.f) {
+            if (!scalar(next.shakeDelayA0)) return false;
+            if (next.shakeDelayA0 > 0.f) {
+                next.shakeDelayA0 = sub(next.shakeDelayA0,elapsed);
+                if (!scalar(next.shakeDelayA0)) return false;
+            } else {
+                stagedStrength = 75;
+                if (next.shakeDecayingA9) {
+                    if (!scalar(next.shakeDuration98) || next.shakeDuration98 == 0.f)
+                        return false;
+                    const float ratio = div(next.shakeRemaining94,next.shakeDuration98);
+                    const float value = mul(80.f,ratio);
+                    if (!scalar(ratio) || !strength(value,stagedStrength)) return false;
+                }
+                attemptedBlur = true;
+                requestGameplayBlur(requests,stagedStrength,0,0);
+                if (next.shakeRemaining94 == 0.f) {
+                    next.shakeRemaining94 = -1.f;
+                    next.shakeDuration98 = 0.f;
+                    if (next.mode44 == 0) {
+                        shake.followMagnitude174 = 0.f;
+                        shake.followFactor170 = 0.f;
+                    } else if (next.mode44 == 5) {
+                        shake.attachedMagnitude2C = 0.f;
+                        shake.attachedFactor28 = 0.f;
+                    }
+                } else {
+                    const float remaining = sub(next.shakeRemaining94,elapsed);
+                    if (!scalar(remaining)) return false;
+                    next.shakeRemaining94 = remaining <= 0.f ? 0.f : remaining;
+                }
+            }
+        }
+    }
+    return true;
+}
 }
 
 // Original175D70's stable ordinary mode0/5 control path, excluding the final
@@ -159,8 +220,11 @@ inline bool strength(float value, std::int32_t& result) noexcept {
 // this API deliberately has no "pretend Follow" or "originalOwnerAvailable"
 // switch. Cold mode4 rejects and cannot activate effects by default.
 //
-// Admission excludes mode changes, TV/replay, racer states other than0 and the
-// positive-time special bit0 branch. ALL8 may use the closed common-base camera
+// Admission excludes mode changes, TV/replay, racer states outside0/1/2 and
+// the positive-time special bit0 branch. Source states1/2 retain mode0/5; only
+// states3/4 select death child68 at176748. A nonzero CD4 is kept verbatim and
+// correctly prevents the separate manager-ended finish-orbit branch. ALL8 may
+// use the closed common-base camera
 // consumer with explicit native_all_ai binding; this does not convert AI to
 // Player or authorize Player1090/1094 effects. Nonfinite/subnormal reached
 // arithmetic, negative dt and non-nearest host rounding reject. Atomic rejection
@@ -175,7 +239,8 @@ inline RaceCameraControlReceipt advanceStableOriginalRaceCamera(
         owner.binding.racerKey != frame.racerKey ||
         owner.binding.mainBodyKey != frame.mainBodyKey) return receipt;
     receipt.result = RaceCameraControlResult::requires_other_original_camera_path;
-    if ((owner.mode44 != 0 && owner.mode44 != 5) || frame.racerState40 != 0 ||
+    if ((owner.mode44 != 0 && owner.mode44 != 5) ||
+        frame.racerState40 < 0 || frame.racerState40 > 2 ||
         (frame.raceFlags1B0 & 0x10u)) return receipt;
     const bool special = (frame.raceStateFlags58 & 1u) && frame.racerCD4 == 0;
     receipt.result = RaceCameraControlResult::outside_native_numeric_domain;
@@ -196,61 +261,13 @@ inline RaceCameraControlReceipt advanceStableOriginalRaceCamera(
     auto requests = pending;
     bool attemptedBlur = false;
     std::int32_t stagedStrength = 0;
-    if (next.cooldown8C > 0.f) {
-        next.cooldown8C = d::sub(next.cooldown8C,frame.elapsed);
-        if (!d::scalar(next.cooldown8C)) return receipt;
-    }
-    // Cut timer always has priority; the alternate timer/delay freezes beneath it.
-    if (next.cutRemaining90 >= 0.f) {
-        const float ratio = d::div(next.cutRemaining90,2.f);
-        const float value = d::mul(100.f,ratio);
-        if (!d::scalar(ratio) || !d::strength(value,stagedStrength)) return receipt;
-        attemptedBlur = true;
-        requestGameplayBlur(requests,stagedStrength,0,0);
-        if (next.cutRemaining90 == 0.f) next.cutRemaining90 = -1.f;
-        else {
-            const float remaining = d::sub(next.cutRemaining90,frame.elapsed);
-            if (!d::scalar(remaining)) return receipt;
-            next.cutRemaining90 = remaining <= 0.f ? 0.f : remaining;
-        }
-    } else {
-        if (!d::scalar(next.shakeRemaining94)) return receipt;
-        if (next.shakeRemaining94 >= 0.f) {
-            if (!d::scalar(next.shakeDelayA0)) return receipt;
-            if (next.shakeDelayA0 > 0.f) {
-                next.shakeDelayA0 = d::sub(next.shakeDelayA0,frame.elapsed);
-                if (!d::scalar(next.shakeDelayA0)) return receipt;
-            } else {
-                stagedStrength = 75;
-                if (next.shakeDecayingA9) {
-                    if (!d::scalar(next.shakeDuration98) || next.shakeDuration98 == 0.f)
-                        return receipt;
-                    const float ratio = d::div(next.shakeRemaining94,next.shakeDuration98);
-                    const float value = d::mul(80.f,ratio);
-                    if (!d::scalar(ratio) || !d::strength(value,stagedStrength)) return receipt;
-                }
-                attemptedBlur = true;
-                requestGameplayBlur(requests,stagedStrength,0,0);
-                if (next.shakeRemaining94 == 0.f) {
-                    next.shakeRemaining94 = -1.f;
-                    next.shakeDuration98 = 0.f;
-                    if (next.mode44 == 0) {
-                        shake.followMagnitude174 = 0.f;
-                        shake.followFactor170 = 0.f;
-                    } else {
-                        shake.attachedMagnitude2C = 0.f;
-                        shake.attachedFactor28 = 0.f;
-                    }
-                } else {
-                    const float remaining = d::sub(next.shakeRemaining94,frame.elapsed);
-                    if (!d::scalar(remaining)) return receipt;
-                    next.shakeRemaining94 = remaining <= 0.f ? 0.f : remaining;
-                }
-            }
-        }
-    }
-    //175F50..17601C: active racer state0 clears these two camera bits.
-    next.flags63Low5 = static_cast<std::uint8_t>(next.flags63Low5 & ~0x18u);
+    if (!d::advanceCommonPrefix175D70(next,shake,requests,frame.elapsed,
+        attemptedBlur,stagedStrength)) return receipt;
+    //175F50..17601C: state0 clears both bits, state1 sets bit3 only,
+    //state2 sets bit4 only. Retirement does not alias or clear these fields.
+    const auto stateBits = frame.racerState40 == 1 ? 8u :
+        frame.racerState40 == 2 ? 16u : 0u;
+    next.flags63Low5 = static_cast<std::uint8_t>((next.flags63Low5 & ~0x18u) | stateBits);
     if (!skipShakeTail) {
         if (!d::scalar(next.shakeDelayA0)) return receipt;
         if (next.shakeDelayA0 <= 0.f) {

@@ -348,7 +348,11 @@ bool bindFreshOriginalCameraScene(OriginalCameraSceneOwner& out,
        !session||!scene||!object||object>(std::numeric_limits<CollectionRef50BX>::max()>>2u)||
        !storage.capacity||!storage.links||!storage.entries)return false;
     OriginalCameraSceneOwner next;next.sessionGeneration=session;next.sceneKey=scene;
-    next.object30=object;next.storage=storage;out=next;return true;
+    next.object30=object;next.storage=storage;
+    next.searchableType32=0xffu; //114428
+    next.searchableFlags33Low3=0; //114448/45C/470, all three cleared.
+    next.searchableConstructed1143F0=true;
+    out=next;return true;
 }
 LiveZoneResult50EN attachOriginalCameraScene114770(ResetVisibilityWorld50EY& space,
     OriginalCameraSceneOwner& owner,CollectionRef50BX zone,

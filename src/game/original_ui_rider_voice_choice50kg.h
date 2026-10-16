@@ -23,8 +23,8 @@ public:
     OriginalUiRiderVoiceChoice50KG()noexcept=default;
     OriginalUiRiderVoiceChoice50KG(const OriginalUiRiderVoiceChoice50KG&)=delete;
     OriginalUiRiderVoiceChoice50KG& operator=(const OriginalUiRiderVoiceChoice50KG&)=delete;
-    // Original constructor rows for the default-unlocked Rider set:
-    // 2,4,10,11,12,15,19,20. Other riders remain unavailable.
+    // Original constructor rows for default-unlocked Riders plus Gasgano:
+    // 2,4,7,10,11,12,15,19,20. This grants no profile unlock.
     bool preflight(std::uint32_t rider,OriginalUiRiderVoiceChoiceDiagnostic50KG&)const noexcept;
     bool choose(std::uint32_t rider,HostMonotonicClock50ID&,CoupledNoiseContext49M&,SharedRandomOwner50ID&,
         OriginalUiRiderVoiceChoiceReceipt50KG&,OriginalUiRiderVoiceChoiceDiagnostic50KG&)noexcept;

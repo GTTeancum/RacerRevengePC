@@ -1,7 +1,7 @@
 #pragma once
 #include "pod_materials50ed_fixture.h"
 
-// Cold-only adapters for authenticated TA/GC/GA source textures.
+// Cold-only adapters for authenticated TA/GC/GA/MA/SA source textures.
 // No codec runs in the client. The generated table pins original member bytes
 // and genuine decoded output bytes; this adapter authenticates both. ATM uses
 // genuine retained source frames; their live timing belongs to the separate owner.
@@ -29,17 +29,30 @@ inline constexpr Entry gaEntries[] = {
 };
 static_assert(sizeof(gaEntries)/sizeof(gaEntries[0])==9,"Exact GA four-ATM/five-dynamic-PST closure");
 #endif
+#if __has_include("source_texture_ma_index.inc")
+inline constexpr Entry maEntries[] = {
+#include "source_texture_ma_index.inc"
+};
+static_assert(sizeof(maEntries)/sizeof(maEntries[0]) == 9, "Exact original MA ATM closure");
+#endif
+#if __has_include("source_texture_sa_index.inc")
+inline constexpr Entry saEntries[] = {
+#include "source_texture_sa_index.inc"
+};
+static_assert(sizeof(saEntries)/sizeof(saEntries[0]) == 11, "Exact original SA three-ATM/eight-dynamic-PST closure");
+#endif
 } // namespace detail
 
 // Matches track_materials50fa_fixture::SourceTextureDecoder. Root explicitly
 // chooses largest retained mip and enables static ATM frame0. Caller's output
 // bytes and mipIndex remain unchanged on failure; only error is replaced.
 inline bool decodeRetainedSource(const detail::Entry* entries, std::size_t entryCount,
-    const std::filesystem::path& root, const char* sourceMember,
+    const std::filesystem::path& requestedRoot, const char* sourceMember,
     const std::vector<std::uint8_t>& source, std::vector<std::uint8_t>& rrtex,
     std::uint32_t& mipIndex, std::string& error) {
     using namespace detail;
     try {
+        const auto root=runtime_asset_paths50LB::resolve(requestedRoot);
         shared::need(sourceMember != nullptr && source.size() <= 1024u * 1024u,
             "50FC exact source member and bounded bytes required");
         const auto member = shared::normalized(sourceMember);
@@ -94,6 +107,30 @@ inline bool decodeSourceTextureGa(const char* sourceMember,
 #else
     (void)sourceMember;(void)source;(void)rrtex;(void)mipIndex;
     error="GA original source frames have not been cold-prepared and pinned";return false;
+#endif
+}
+// Exact selected-track source frames; missing preparation fails closed.
+inline bool decodeSourceTextureMa(const char* sourceMember,
+    const std::vector<std::uint8_t>& source, std::vector<std::uint8_t>& rrtex,
+    std::uint32_t& mipIndex, std::string& error) {
+#if __has_include("source_texture_ma_index.inc")
+    return decodeRetainedSource(detail::maEntries, sizeof(detail::maEntries)/sizeof(detail::maEntries[0]),
+        "evidence/texturesMA", sourceMember, source, rrtex, mipIndex, error);
+#else
+    (void)sourceMember; (void)source; (void)rrtex; (void)mipIndex;
+    error = "MA original source frames have not been cold-prepared and pinned"; return false;
+#endif
+}
+// Exact selected-track source frames; missing preparation fails closed.
+inline bool decodeSourceTextureSa(const char* sourceMember,
+    const std::vector<std::uint8_t>& source, std::vector<std::uint8_t>& rrtex,
+    std::uint32_t& mipIndex, std::string& error) {
+#if __has_include("source_texture_sa_index.inc")
+    return decodeRetainedSource(detail::saEntries, sizeof(detail::saEntries)/sizeof(detail::saEntries[0]),
+        "evidence/texturesSA", sourceMember, source, rrtex, mipIndex, error);
+#else
+    (void)sourceMember; (void)source; (void)rrtex; (void)mipIndex;
+    error = "SA original source frames have not been cold-prepared and pinned"; return false;
 #endif
 }
 } // namespace source_texture50fc_fixture

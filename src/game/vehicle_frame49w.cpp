@@ -4,6 +4,7 @@
 #include "pod_live_query50iz.h"
 #include "chariot_scene49u.h"
 #include "movement_hit_point50m.h"
+#include "../assets/original_standard_material_animation50la.h"
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -12,6 +13,7 @@
 #include <cstddef>
 #include <limits>
 #include <utility>
+#include <exception>
 
 #ifndef RR_VEHICLE_FRAME49W_STAGE
 #define RR_VEHICLE_FRAME49W_STAGE(pc) ((void)0)
@@ -60,7 +62,10 @@ bool admit(const S&s,const VehicleFrameBindings49W&b,VehicleFrameDiagnostic49W&d
  // Preserve the old disabled admission; enabled348 requires explicit cold opt-in.
  if(!s.terrainProbe.enabled&&m.probe100)return fail(d,E::Admission,0);
  if(s.terrainProbe.enabled&&(m.probe100!=1u||s.terrainProbe.stage>3u||c.main.components.probe348.field1E8>16u))return fail(d,E::Admission,0x1b1800);
- if(std::fegetround()!=FE_TONEAREST||s.fields.vehicle58>1u||(s.fields.vehicle58==1u&&!s.fields.nativeAiOwnersBound50IV)||s.fields.vehicle3C||s.fields.vehicle834||c.main.vehicleState40||c.main.applicationActive11C||m.body320!=1||m.bodyChildCount||b.mainDomain.firstComponentChildPresent18||m.sceneObserverCount||!m.sceneAttached||m.sceneHasParent||!m.bodyEnabled||!m.secondBodyPresent||m.override3C||m.resetRequested||m.probe120Present||m.probe124Present||z.body320!=1||z.registrationMask!=2||z.bodyChildCount||b.secondaryDomain.firstComponentChildPresent18||z.sceneObserverCount||z.sceneHasParent||!c.secondary.scenePresent||!c.secondary.enabled||s.shape.type88||(s.shape.registrationE0&&!b.podLiveQuery50IZ)||!emptyRoute(b.mainDomain)||!emptyRoute(b.secondaryDomain))return fail(d,E::Admission,0);
+ if(m.probe124Present!=bool(b.terrainWater50JC)||
+    (b.terrainWater50JC&&(!s.terrainProbe.enabled||!coherentTerrainWater50JC(*b.terrainWater50JC))))
+  return fail(d,E::Admission,0x1b18b4);
+ if(std::fegetround()!=FE_TONEAREST||s.fields.vehicle58>1u||(s.fields.vehicle58==1u&&!s.fields.nativeAiOwnersBound50IV)||s.fields.vehicle3C||s.fields.vehicle834||c.main.vehicleState40||c.main.applicationActive11C||m.body320!=1||m.bodyChildCount||b.mainDomain.firstComponentChildPresent18||m.sceneObserverCount||!m.sceneAttached||m.sceneHasParent||!m.bodyEnabled||!m.secondBodyPresent||m.override3C||m.resetRequested||m.probe120Present||z.body320!=1||z.registrationMask!=2||z.bodyChildCount||b.secondaryDomain.firstComponentChildPresent18||z.sceneObserverCount||z.sceneHasParent||!c.secondary.scenePresent||!c.secondary.enabled||s.shape.type88||(s.shape.registrationE0&&!b.podLiveQuery50IZ)||!emptyRoute(b.mainDomain)||!emptyRoute(b.secondaryDomain))return fail(d,E::Admission,0);
  if(b.podLiveQuery50IZ&&!coherentPodLiveQuery50IZ(s.shape,*b.podLiveQuery50IZ))
   return fail(d,E::Admission,0x12023cu);
  const SceneGraph49P g{const_cast<SceneNode49P*>(s.nodes),s.sceneNodeCount};
@@ -78,7 +83,7 @@ bool phases(const S&s) noexcept {
  switch(s.phase){
  case P::Ready:m=M::FrameReady;c=C::FrameReady;break;
  case P::PostPlayer:m=M::AwaitingPostPlayer;c=C::AwaitingPostPlayer;break;
- case P::BeforeGraphics:case P::PostGraphics:case P::PostImpactConsumers:case P::PostImpactRepair:case P::PostImpactEffects50O:case P::PostOptionalProbeEffects50P:case P::PostPlainEffects50Q:case P::PostPackedBytes50S:case P::PostEngineBase50X:case P::AfterImpactBlock:case P::BetweenBodyChildren:case P::AfterBodyChildren:break;
+ case P::ImpactFeedbackPending50KZ:case P::ImpactFeedbackClearReturned50KZ:case P::ImpactFeedbackReturned50KZ:case P::BeforeGraphics:case P::PostGraphics:case P::PostImpactConsumers:case P::PostImpactRepair:case P::PostImpactEffects50O:case P::PostOptionalProbeEffects50P:case P::PostPlainEffects50Q:case P::PostPackedBytes50S:case P::PostEngineBase50X:case P::AfterImpactBlock:case P::BetweenBodyChildren:case P::AfterBodyChildren:break;
  case P::SubstepReady:m=M::SubstepReady;c=C::SubstepReady;break;
  case P::PostWorld:m=M::AwaitingWorldPreparation;c=C::AwaitingWorldPreparation;break;
  case P::Post354:m=M::AwaitingResponse354;c=C::AwaitingResponse354;break;
@@ -121,8 +126,11 @@ ReadyBodyBasis48D basis(const BodyMatrix48G&m) noexcept {ReadyBodyBasis48D r{};f
 // Exact null-relative28A700 path: ready test/lazy world, then XYZ axes copies.
 bool axes(S&s,I i,V&forward,V&up) noexcept {if(!refreshSceneWorld49P(graph(s),i))return false;for(unsigned j=0;j<3;++j){forward.v[j]=node(s,i).world100.v[8+j];up.v[j]=node(s,i).world100.v[4+j];}return true;}
 void mainSphere(const S&s,const VehicleFrameParameters49W&p,PodSphereBody49L&out) noexcept {const auto&m=s.bodies.main;const auto&l=s.bodies.mainSphere;SecondaryBodyState49M view{};view.root=m.components.root;view.scenePresent=m.domain.sceneAttached;view.sceneFlags190=l.sceneFlags190;view.velocity70W=l.velocity70W;view.angularVelocityB0W=l.angularVelocityB0W;view.force180W=l.force180W;view.torque190W=l.torque190W;SecondaryBodyParameters49M par{};par.body=p.bodies.main.body;par.centerOffset=p.bodies.main.centerOffset;par.centerOffsetW=p.bodies.mainSphere.centerOffsetW;std::memcpy(par.inverseInertiaExtra,p.bodies.mainSphere.inverseInertiaExtra,sizeof par.inverseInertiaExtra);makeSecondarySphereBody49M(view,par,out);}
-// New graph-aware ordinary40=0 force path. Gravity/damping commit to scratch
-// before218C60 lazy relative getter. No persistent49L body mirror exists.
+// Graph-aware source force path. Gravity/damping commit to scratch before
+//218C60 lazy relative getter. Nonzero40 uses the genuine shared14EEC0 noise
+//branch, never ordinary alignment with a missing engine. Whole-frame admission
+//still requires the actual destruction owner before that route is reachable.
+//No persistent49L body mirror exists.
 bool secondaryForces(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParameters49W&p,const SecondaryInputs49M&x) noexcept {
  auto&z=s.bodies.secondary;const auto&m=s.bodies.main;const auto&par=p.bodies.secondary;
  if(z.phase!=SecondaryPhase49M::Ready)return false;
@@ -140,12 +148,30 @@ bool secondaryForces(S&s,const VehicleFrameBindings49W&b,const VehicleFrameParam
  const float length=f.scalarRoot(f.squared(error));
  RR_VEHICLE_FRAME49W_STAGE(0x218ce0);if(!detail::direction49U(graph(s),b.lifecycle.main190,error,scratch,worldError))return false;
  f.addLoad(z.root.loads.force,f.scale(f.mul(x.effective4346E0,length),f.normalize(worldError)));
- f.addLoad(z.root.loads.force,f.scale(f.neg(x.effective4346C8),vector(z.root.body.velocity)));
- RR_VEHICLE_FRAME49W_STAGE(0x218e30);if(!axes(s,b.lifecycle.physical19C,forward,upA))return false;
- RR_VEHICLE_FRAME49W_STAGE(0x218e44);if(!axes(s,b.lifecycle.main190,forward,upB))return false;
- const auto worldTorque=f.scale(x.effective4346E8,f.cross(upA,upB));
- RR_VEHICLE_FRAME49W_STAGE(0x218eb8);if(!detail::inverseDirection49U(graph(s),b.lifecycle.physical19C,worldTorque,scratch,torque))return false;
- f.addLoad(z.root.loads.torque,torque);if(!f.valid)return false;
+ RR_VEHICLE_FRAME49W_STAGE(0x218d90);
+ if(!m.vehicleState40){
+  f.addLoad(z.root.loads.force,f.scale(f.neg(x.effective4346C8),vector(z.root.body.velocity)));
+  RR_VEHICLE_FRAME49W_STAGE(0x218e30);if(!axes(s,b.lifecycle.physical19C,forward,upA))return false;
+  RR_VEHICLE_FRAME49W_STAGE(0x218e44);if(!axes(s,b.lifecycle.main190,forward,upB))return false;
+  const auto worldTorque=f.scale(x.effective4346E8,f.cross(upA,upB));
+  RR_VEHICLE_FRAME49W_STAGE(0x218eb8);if(!detail::inverseDirection49U(graph(s),b.lifecycle.physical19C,worldTorque,scratch,torque))return false;
+  f.addLoad(z.root.loads.torque,torque);
+ }else{
+  //218EFC..2190A0. s is this49W leaf's transaction scratch. Its noise is
+  //the staged SAME application owner from start(), not a per-racer stream.
+  const float coordinate=f.mul(x.effective434708,z.time864);float value=0.f;
+  RR_VEHICLE_FRAME49W_STAGE(0x218f08);
+  if(!f.valid||!evaluateGradientNoise49M(s.noise.noise,s.noise.sharedRandomState,coordinate,value))return false;
+  const float h=f.add(.5f,f.mul(.5f,value));
+  f.addLoad(z.root.loads.torque,{{0.f,0.f,f.mul(m.cachedSpeed34,f.mul(h,x.effective4346F8)),1.f}});
+  const V localForce{{f.mul(m.cachedSpeed34,f.mul(h,x.effective434700)),0.f,0.f,1.f}};
+  z.time864=f.add(z.time864,m.schedule.factorPerSubstep);
+  V worldForce{};RR_VEHICLE_FRAME49W_STAGE(0x218fd8);
+  if(!f.valid||!detail::direction49U(graph(s),b.lifecycle.physical19C,localForce,scratch,worldForce))return false;
+  f.addLoad(z.root.loads.force,worldForce);
+  f.addLoad(z.root.loads.force,f.scale(f.neg(x.effective4346F0),vector(z.root.body.velocity)));
+ }
+ if(!f.valid)return false;
  project(s,b);z.phase=SecondaryPhase49M::ConstraintPending;
  PodSphereBody49L main{};mainSphere(s,p,main);
  RR_VEHICLE_FRAME49W_STAGE(0x2190ac);
@@ -307,12 +333,102 @@ bool consumeVehicleImpacts49Z(S&s,const VehicleFrameBindings49W&b,const ImpactCo
   // binding at222D70, or up to its first virtual call when identity is bound.
   // No2228D0 damage or later timer/clear writes were executed. Caller must
   // fulfill the preceding22ADE0 event before surfacing this terminal cut.
-  commit(s,w,P::PostGraphics);events=next;return fail(d,E::ExternalCut,next.values[0].sourcePC);
+  r.pendingImpactInput50KZ=in;
+  // This sum was already validated by the prefix and its inputs are unchanged.
+  volatile float lateral=f.impactDirectionalD08[6]+f.impactDirectionalD08[7];
+  r.pendingImpactLateral50KZ=lateral;r.pendingImpactDuration50KZ=0.f;
+  commit(s,w,P::ImpactFeedbackPending50KZ);events=next;return fail(d,E::ExternalCut,next.values[0].sourcePC);
  }
  r.impactConsumerPending49Y=0;r.impactConsumersActive49Z=1;
  // The outer manager gate jumps to228B40, beyond repair/effects/transitions.
  // CD8's inner222B20 skip instead returns to2288BC and still reaches repair.
  commit(s,w,(in.managerFlags58&2u)?P::PostImpactConsumers:P::AfterImpactBlock);events=next;return true;
+}
+bool resumeVehicleImpactsWithControllers50KZ(S&s,const VehicleFrameBindings49W&b,
+ ControllerFeedbackState50KZ* devices,std::size_t deviceCount,VehicleImpactEvents49Z&events,
+ VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
+ // Reject aliasing before start clears the diagnostic or stages w.next.
+ // An aliased diagnostic itself cannot safely receive a failure record.
+ if(overlap(&d,sizeof d,&s,sizeof s)||overlap(&d,sizeof d,&w,sizeof w)||
+    overlap(&d,sizeof d,&b,sizeof b)||overlap(&d,sizeof d,&events,sizeof events))return false;
+ if(deviceCount>2u)return false; // Unknown extent cannot safely exclude d/device alias.
+ if(devices&&overlap(devices,deviceCount*sizeof *devices,&d,sizeof d))return false;
+ if((devices&&(overlap(devices,deviceCount*sizeof *devices,&s,sizeof s)||
+    overlap(devices,deviceCount*sizeof *devices,&w,sizeof w)||
+    overlap(devices,deviceCount*sizeof *devices,&events,sizeof events)||
+    overlap(devices,deviceCount*sizeof *devices,&b,sizeof b)))||
+    overlap(&events,sizeof events,&s,sizeof s)||overlap(&events,sizeof events,&w,sizeof w)||
+    overlap(&events,sizeof events,&b,sizeof b))return fail(d,E::Storage,0x222d70u);
+ if(s.phase!=P::ImpactFeedbackPending50KZ&&s.phase!=P::ImpactFeedbackClearReturned50KZ&&
+    s.phase!=P::ImpactFeedbackReturned50KZ)return fail(d,E::Phase,0x222d70u);
+ if(!start(s,b,s.phase,w,d))return false;
+ const auto& saved=s.pendingImpactInput50KZ;
+ if(!saved.player5CBound50IW||!devices||saved.player5C>=deviceCount)
+  return fail(d,E::ExternalCut,0x222d70u);
+ // This is the real native registry object for retained source5C. An absent
+ // physical device is still an object, exactly as original237C10 constructs.
+ auto& device=devices[saved.player5C];
+ events={};
+ if(s.phase!=P::ImpactFeedbackPending50KZ){
+  events.values[0]={0x222d8cu,0x40u,saved.player5C,2u,0u,0.f};events.count=1;
+  if(s.phase==P::ImpactFeedbackReturned50KZ){
+   events.values[1]={0x222decu,0x44u,saved.player5C,2u,0u,s.pendingImpactDuration50KZ};events.count=2;
+  }
+ }
+ if(s.phase==P::ImpactFeedbackPending50KZ){
+  RR_VEHICLE_FRAME49W_STAGE(0x222d8c);
+  clearControllerFeedback50KZ(device,2);
+  events={};events.values[0]={0x222d8cu,0x40u,saved.player5C,2u,0u,0.f};events.count=1;
+  commit(s,w,P::ImpactFeedbackClearReturned50KZ);
+ }
+ if(s.phase==P::ImpactFeedbackClearReturned50KZ){
+  if(!start(s,b,P::ImpactFeedbackClearReturned50KZ,w,d))return false;
+  // Source222DB0/min.s, not an arbitrary rumble strength. Its result is a
+  // duration in seconds;2388B0 owns the capability gate and timer writes.
+  Math math;const auto scaled=math.mul(0.005f,s.pendingImpactLateral50KZ);
+  const auto duration=scaled<0.5f?scaled:0.5f;
+  if(!math.valid||((bits(scaled)&0x7f800000u)==0u&&(bits(scaled)&0x7fffffu)!=0u))
+   return fail(d,E::Arithmetic,0x222db0u);
+  RR_VEHICLE_FRAME49W_STAGE(0x222dec);
+  if(!requestControllerFeedback50KZ(device,2,0u,duration))return fail(d,E::Arithmetic,0x222decu);
+  w.next.pendingImpactDuration50KZ=duration;
+  events.values[1]={0x222decu,0x44u,s.pendingImpactInput50KZ.player5C,2u,0u,duration};events.count=2;
+  commit(s,w,P::ImpactFeedbackReturned50KZ);
+ }
+ if(!start(s,b,P::ImpactFeedbackReturned50KZ,w,d))return false;
+ auto&r=w.next;auto&f=r.fields;auto&z=r.impactSupplement;
+ const auto& in=r.pendingImpactInput50KZ;
+ auto copyFloat=[](float&to,const float&from){std::memcpy(&to,&from,sizeof(float));};
+ ImpactConsumerState49Z before{},after{};
+ std::memcpy(before.directionalD08,f.impactDirectionalD08,sizeof before.directionalD08);
+ std::memcpy(before.timers820,z.timers820,sizeof before.timers820);
+ copyFloat(before.damage7D0[0],f.damage7D0);copyFloat(before.damage7D0[1],f.damage7D4);copyFloat(before.damage7D0[2],f.damage7D8);copyFloat(before.damage7D0[3],f.damage7DC);
+ copyFloat(before.cooldown7E0,z.cooldown7E0);copyFloat(before.periodic7E8,z.periodic7E8);
+ before.fieldCFC=f.vehicleCFC;before.fieldD00=f.vehicleD00;before.fieldD04=z.fieldD04;
+ before.partnerId=z.partnerId;before.partnerState=z.partnerState;
+ copyFloat(before.partnerTimer08,z.partnerTimer08);copyFloat(before.partnerAmount0C,z.partnerAmount0C);copyFloat(before.partnerDuration10,f.objectD34_10);
+ copyFloat(before.environmentalD38,z.environmentalD38);copyFloat(before.environmentalD3C,z.environmentalD3C);
+
+ ImpactPartnerEvents49Z partners{};
+ RR_VEHICLE_FRAME49W_STAGE(0x222df4);
+ const auto status=resumeImpactsAfterControllerFeedback50KZ(in,before,after,
+     in.dynamicPartnerEventsBound?&partners:nullptr);
+ if(status==ImpactConsumerStatus49Z::unsupportedPartner)return fail(d,E::Admission,0x222a84u);
+ if(status==ImpactConsumerStatus49Z::unsupportedDynamicTuning)return fail(d,E::Admission,0x222a84u);
+ if(status!=ImpactConsumerStatus49Z::applied)return fail(d,E::Arithmetic,0x222df4u);
+ std::memcpy(f.impactDirectionalD08,after.directionalD08,sizeof after.directionalD08);
+ std::memcpy(z.timers820,after.timers820,sizeof after.timers820);
+ copyFloat(f.damage7D0,after.damage7D0[0]);copyFloat(f.damage7D4,after.damage7D0[1]);copyFloat(f.damage7D8,after.damage7D0[2]);copyFloat(f.damage7DC,after.damage7D0[3]);
+ copyFloat(z.cooldown7E0,after.cooldown7E0);copyFloat(z.periodic7E8,after.periodic7E8);
+ f.vehicleCFC=after.fieldCFC;f.vehicleD00=after.fieldD00;z.fieldD04=after.fieldD04;
+ z.partnerId=after.partnerId;z.partnerState=after.partnerState;
+ copyFloat(z.partnerTimer08,after.partnerTimer08);copyFloat(z.partnerAmount0C,after.partnerAmount0C);copyFloat(f.objectD34_10,after.partnerDuration10);
+ copyFloat(z.environmentalD38,after.environmentalD38);copyFloat(z.environmentalD3C,after.environmentalD3C);
+
+ r.impactConsumerPending49Y=0;r.impactConsumersActive49Z=1;
+ r.pendingImpactInput50KZ={};r.pendingImpactLateral50KZ=0.f;r.pendingImpactDuration50KZ=0.f;
+ events.partners=partners;
+ return commit(s,w,P::PostImpactConsumers);
 }
 bool repairVehicleImpacts50A(S&s,const VehicleFrameBindings49W&b,VehicleFrameWorkspace49W&w,VehicleFrameDiagnostic49W&d) noexcept {
  if(!start(s,b,P::PostImpactConsumers,w,d))return false;
@@ -377,6 +493,7 @@ bool enableVehicleTerrain50FP(S& s,const VehicleFrameBindings49W& b,
  for(const auto* vector:{&initial.follow.previousPoint180,&initial.follow.previousNormal190,
      &initial.follow.largestVelocityChange1d0,&initial.terrain.surface.point150,&initial.terrain.surface.normal170})
   for(float value:vector->v)if(!std::isfinite(value))return fail(d,E::Input,0x1b1240);
+ for(float value:initial.auxiliaryPoint160)if(!std::isfinite(value))return fail(d,E::Input,0x1b1240);
  if(initial.terrain.collectedCount>16u)return fail(d,E::Input,0x1b1240);
  auto& r=w.next;r.terrainProbe={};r.terrainProbe.enabled=true;r.terrainProbe.response=parameters;
  installTerrainSurface50FP(r,initial.terrain);
@@ -385,7 +502,25 @@ bool enableVehicleTerrain50FP(S& s,const VehicleFrameBindings49W& b,
  probe.field118=initial.auxiliaryAbove118;probe.point150[3]=1.f;probe.vector1D0[3]=1.f;
  std::memcpy(probe.vector1D0,initial.follow.largestVelocityChange1d0.v,12);
  r.terrainProbe.previousPoint180=initial.follow.previousPoint180;r.terrainProbe.previousNormal190=initial.follow.previousNormal190;
+ std::memcpy(r.terrainProbe.waterPoint160.v,initial.auxiliaryPoint160,16);
  r.bodies.main.domain.probe100=1u;return commit(s,w,P::Ready);
+}
+bool bindVehicleTerrainWater50JC(S& s,VehicleFrameBindings49W& b,
+ const TerrainWaterBinding50JC& water,VehicleFrameDiagnostic49W& d) noexcept {
+ if(overlap(&s,sizeof s,&b,sizeof b)||overlap(&d,sizeof d,&s,sizeof s)||
+    overlap(&d,sizeof d,&b,sizeof b)||overlap(&water,sizeof water,&s,sizeof s)||
+    overlap(&water,sizeof water,&b,sizeof b)||overlap(&water,sizeof water,&d,sizeof d))return false;
+ d={E::None,0,GraphBodyDiagnostic49W::None};
+ if(s.phase!=P::Ready||!phases(s))return fail(d,E::Phase,0x21207c);
+ if(!admit(s,b,d))return false;
+ if(!s.terrainProbe.enabled||b.terrainWater50JC||s.bodies.main.domain.probe124Present||
+    s.bodies.main.domain.probe120Present||!coherentTerrainWater50JC(water))
+  return fail(d,E::Admission,0x1b120c);
+ for(const auto& read:{std::pair<const void*,std::size_t>{water.probe124,sizeof(*water.probe124)},
+      {water.globals,sizeof(*water.globals)}})
+  if(overlap(read.first,read.second,&s,sizeof s)||overlap(read.first,read.second,&b,sizeof b)||
+     overlap(read.first,read.second,&d,sizeof d))return fail(d,E::Storage,0x1b120c);
+ b.terrainWater50JC=&water;s.bodies.main.domain.probe124Present=true;return true;
 }
 bool prepareVehicleTerrain50FP(S& s,const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& parameters,
  const LocalSegment48I& segment,TerrainPrepareState48M& output,
@@ -402,14 +537,20 @@ bool prepareVehicleTerrain50FP(S& s,const VehicleFrameBindings49W& b,const Vehic
  if(!same(parameters.bodies.main.effective434260,clear,16))return fail(d,E::Admission,0x1b1800);
  TerrainPrepareInput48M input{};input.state.follow=terrainFollow50FP(s);input.state.terrain=terrainSurface50FP(s);
  input.state.segment=segment;input.state.auxiliaryAbove118=s.bodies.main.components.probe348.field118;
+ std::memcpy(input.state.auxiliaryPoint160,s.terrainProbe.waterPoint160.v,16);
+ input.auxiliarySource120=s.bodies.main.domain.probe120Present;
+ input.auxiliarySource124=s.bodies.main.domain.probe124Present;input.water124=b.terrainWater50JC;
  input.scene=node(s,b.lifecycle.main190).world100;
  std::memcpy(input.lowerEndpoint140.v,parameters.bodies.main.probeLocal140,12);
  TerrainPrepareState48M prepared{};
  RR_VEHICLE_FRAME49W_STAGE(0x1b1800);
- if(prepareTerrainSinglePair48M(input,prepared)!=TerrainPrepareStatus48M::QueryReady)return fail(d,E::Query,0x1b1800);
+ WaterHeightResult50JC waterDiagnostic{};
+ if(prepareTerrainSinglePair48M(input,prepared,&waterDiagnostic)!=TerrainPrepareStatus48M::QueryReady)
+  return fail(d,E::Query,waterDiagnostic.sourcePC?waterDiagnostic.sourcePC:0x1b1800);
  auto& r=w.next;auto& probe=r.bodies.main.components.probe348;
  installTerrainSurface50FP(r,prepared.terrain);probe.point150[3]=1.f;
  probe.field118=prepared.auxiliaryAbove118;std::memcpy(probe.vector1D0,clear,16);
+ std::memcpy(r.terrainProbe.waterPoint160.v,prepared.auxiliaryPoint160,16);
  r.terrainProbe.stage=1;commit(s,w,P::PostWorld);output=prepared;return true;
 }
 bool commitVehicleTerrainQuery50FP(S& s,const VehicleFrameBindings49W& b,const TerrainQueryResult48M& query,
@@ -670,7 +811,20 @@ bool effectsVehicleImpacts50O(S&s,const VehicleFrameBindings49W&b,const ImpactEf
  auto read=[&](const void*p,std::size_t n,std::size_t size){if(!n)return true;const auto a=reinterpret_cast<std::uintptr_t>(p);if(!p||n>std::numeric_limits<std::size_t>::max()/size)return false;const auto bytes=n*size;if(bytes>std::numeric_limits<std::uintptr_t>::max()-a)return false;for(unsigned i=0;i<used;++i)if(a<writes[i].z&&writes[i].a<a+bytes)return false;return true;};
  if(!read(&b,1,sizeof b)||!read(&owners,1,sizeof owners)||!read(owners.damage00Matches,owners.nameCount,1))return false;
  if(!start(s,b,P::PostImpactRepair,w,d))return false;
- if(b.visual.extra1C0Present||b.visual.extra1C4Present||owners.models[0].node!=b.visual.left1BC||owners.models[1].node!=b.visual.right1B8||owners.models[2].node!=I::none||owners.models[3].node!=I::none)return fail(d,E::Admission,0x223540);
+ //223540 visits 1BC,1B8,1C4,1C0 in that order. Optional presence must
+ // name the actual cold model owner, never a primary-model alias.
+ if(b.visual.extra1C0Present!=(b.visual.bottomRight1C0!=I::none)||
+    b.visual.extra1C4Present!=(b.visual.bottomLeft1C4!=I::none)||
+    owners.models[0].node!=b.visual.left1BC||owners.models[1].node!=b.visual.right1B8||
+    owners.models[2].node!=b.visual.bottomLeft1C4||owners.models[3].node!=b.visual.bottomRight1C0)
+  return fail(d,E::Admission,0x223540);
+ for(unsigned i=0;i<4;++i){
+  const auto& model=owners.models[i];
+  if(model.node==I::none){
+   if(model.effect800.id||model.effect804.id||model.effect80C.id)return fail(d,E::Admission,0x223540);
+  }else for(unsigned j=0;j<i;++j)if(model.node==owners.models[j].node)
+   return fail(d,E::Admission,0x223540);
+ }
  auto&r=w.next;ImpactEffectsInput50B input;std::memcpy(&input,&owners,sizeof input);
  const float*damage[]={&r.fields.damage7D0,&r.fields.damage7D4,&r.fields.damage7D8,&r.fields.damage7DC};for(unsigned i=0;i<4;++i)std::memcpy(&input.damage7D0[i],damage[i],4);
  std::memcpy(input.timers820,r.impactSupplement.timers820,sizeof input.timers820);
@@ -730,43 +884,118 @@ bool packVehicleFrame50S(S&s,const VehicleFrameBindings49W&b,bool configurationE
 BaseTailState50X coldBaseTailState50X(std::uint32_t leftW,std::uint32_t rightW) noexcept {
  BaseTailState50X out{};out.flagsACC=out.flagsAD0=1;out.engineThrustW[0]=leftW;out.engineThrustW[1]=rightW;return out;
 }
-bool advanceVehicleBaseThroughEngine50X(S&s,const VehicleFrameBindings49W&b,const FrameTimingState49I&clock,
+static bool advanceVehicleBaseThroughEngineImpl50X(S&s,const VehicleFrameBindings49W&b,const FrameTimingState49I&clock,
  const BaseTailBindings50X&binding,BaseTailState50X&tail,BaseTailGlobals50X&globals,
  rr::assets::PodFlameOwners50W&flame,BaseTailWorkspace50X&scratch,VehicleFrameWorkspace49W&w,
- VehicleFrameDiagnostic49W&d) noexcept {
- struct Span{const void*p;std::size_t n;};const Span writes[]={{&s,sizeof s},{&tail,sizeof tail},{&globals,sizeof globals},{&flame,sizeof flame},{&scratch,sizeof scratch},{&w,sizeof w},{&d,sizeof d}};
- for(unsigned i=0;i<7;++i){for(unsigned j=0;j<i;++j)if(overlap(writes[i].p,writes[i].n,writes[j].p,writes[j].n))return false;for(const auto&read: {Span{&b,sizeof b},Span{&clock,sizeof clock},Span{&binding,sizeof binding}})if(overlap(writes[i].p,writes[i].n,read.p,read.n))return false;}
+ VehicleFrameDiagnostic49W&d,BaseUndertrackContinuation50X* undertrack,bool resuming) noexcept {
+ struct Span{const void*p;std::size_t n;};const Span writes[]={{&s,sizeof s},{&tail,sizeof tail},{&globals,sizeof globals},{&flame,sizeof flame},{&scratch,sizeof scratch},{&w,sizeof w},{&d,sizeof d},{undertrack,undertrack?sizeof(*undertrack):0}};
+ for(unsigned i=0;i<8;++i){for(unsigned j=0;j<i;++j)if(overlap(writes[i].p,writes[i].n,writes[j].p,writes[j].n))return false;for(const auto&read: {Span{&b,sizeof b},Span{&clock,sizeof clock},Span{&binding,sizeof binding}})if(overlap(writes[i].p,writes[i].n,read.p,read.n))return false;}
  if(!start(s,b,P::PostPackedBytes50S,w,d))return false;
+ if(resuming){
+  if(!undertrack||!undertrack->pending||undertrack->frame!=&s||undertrack->bindings!=&b||
+     s.fields.vehicle58!=0u||std::memcmp(&undertrack->frameFactor,&s.bodies.main.frameFactor,4)||
+     !std::isfinite(undertrack->position[1])||!(undertrack->position[1]<0.f))
+   return fail(d,E::Admission,0x228bc4);
+ }else if(undertrack&&undertrack->pending)return fail(d,E::Admission,0x228bbc);
  if(!binding.vehicleOwnerId||static_cast<unsigned>(binding.probe128)>2)return fail(d,E::Admission,0x2208a0);
- const auto leftId=static_cast<std::uint32_t>(b.visual.left1BC)+1u,rightId=static_cast<std::uint32_t>(b.visual.right1B8)+1u;
- if(flame.models[0].modelId!=leftId||flame.models[1].modelId!=rightId||flame.models[2].modelId||flame.models[3].modelId||flame.models[0].flameFilter!=1||flame.models[1].flameFilter!=2)return fail(d,E::Admission,0x2208d0);
- // Counts come from each retained engine scene, including POD09's additional
- // static material reference. The prepared projection still has four flame
- // references per engine and therefore the same eight callback writes below.
- for(unsigned side=0;side<2;++side)if(!flame.models[side].referenceCount||flame.models[side].referenceCount>rr::assets::podFlameReferencesPerModel50W)return fail(d,E::Admission,0x2208d0);
+ const SceneNodeIndex49P flameRoots[]={b.visual.left1BC,b.visual.right1B8,
+  b.visual.bottomLeft1C4,b.visual.bottomRight1C0};
+ if(flame.modelCount<2||flame.modelCount>rr::assets::podFlameModelCapacity50W)
+  return fail(d,E::Admission,0x2208d0);
+ for(unsigned model=0;model<rr::assets::podFlameModelCapacity50W;++model){
+  const auto root=flameRoots[model];const auto& prepared=flame.models[model];
+  if(model>=flame.modelCount){
+   if(root!=SceneNodeIndex49P::none||prepared.modelId)return fail(d,E::Admission,0x2208d0);
+   continue;
+  }
+  if(root==SceneNodeIndex49P::none||prepared.modelId!=static_cast<std::uint32_t>(root)+1u||
+     prepared.flameFilter!=(model&1u)+1u||!prepared.referenceCount||
+     prepared.referenceCount>rr::assets::podFlameReferencesPerModel50W)
+   return fail(d,E::Admission,0x2208d0);
+  for(unsigned earlier=0;earlier<model;++earlier)
+   if(flame.models[earlier].modelId==prepared.modelId)return fail(d,E::Admission,0x2208d0);
+ }
+ // Each actual model retains four flame references: 8 callback installations
+ // for legacy two-engine pods, 16 for POD02's four independent model instances.
  scratch.next=tail;scratch.globals=globals;scratch.flame=flame;auto&r=w.next;auto&m=r.bodies.main;
- RR_VEHICLE_FRAME49W_STAGE(0x228b8c);r.fields.impactBA0=r.visualShared.zero434630;
  V position{{0,0,0,1}};
- // Original28B180 copies local F0/F4/F8 only; it does not refresh world caches.
- RR_VEHICLE_FRAME49W_STAGE(0x228b98);std::memcpy(position.v,node(r,b.lifecycle.main190).localC0.v+12,12);
- if(!std::isfinite(position.v[1]))return fail(d,E::Arithmetic,0x228bac);
- if(position.v[1]<0.f)return fail(d,E::ExternalCut,0x228bbc);
+ if(resuming){
+  RR_VEHICLE_FRAME49W_STAGE(0x228bc4);std::memcpy(position.v,undertrack->position,16);
+ }else{
+  RR_VEHICLE_FRAME49W_STAGE(0x228b8c);r.fields.impactBA0=r.visualShared.zero434630;
+  // Original28B180 copies local F0/F4/F8 only; no world refresh occurs here.
+  RR_VEHICLE_FRAME49W_STAGE(0x228b98);std::memcpy(position.v,node(r,b.lifecycle.main190).localC0.v+12,12);
+  if(!std::isfinite(position.v[1]))return fail(d,E::Arithmetic,0x228bac);
+  if(position.v[1]<0.f){
+   if(undertrack){
+    if(s.fields.vehicle58!=0u||undertrack->serial==std::numeric_limits<std::uint64_t>::max())
+     return fail(d,E::Admission,0x228bbc);
+    ++undertrack->serial;undertrack->frame=&s;undertrack->bindings=&b;undertrack->frameFactor=s.bodies.main.frameFactor;
+    std::memcpy(undertrack->position,position.v,16);undertrack->pending=true;
+    // This represented source store precedes the real2255B0 call. It must
+    // remain committed while that call owns a later source continuation.
+    s.fields.impactBA0=r.fields.impactBA0;
+   }
+   return fail(d,E::ExternalCut,0x228bbc);
+  }
+ }
  std::memcpy(scratch.next.positionAt228B98,position.v,12);scratch.next.positionAt228B98[3]=1.f;
  if(!scratch.globals.initialized434810){scratch.globals.value434810=0xffffffffu;scratch.globals.initialized434810=true;}
  auto&flags=m.controls.player.flagsB9C;
+ bool flameBindingPrepared=false;
  if(!(flags&16u)){
-  const auto result=bindPreparedFlameModels50V(scratch.flame.models,binding.vehicleOwnerId,rr::assets::flameViews50W(scratch.flame),scratch.flame.records,4,scratch.binding);
-  if(result.status!=FlameStatus50V::Complete||result.writes!=8)return fail(d,E::ExternalCut,result.sourcePC?result.sourcePC:0x2208d0);
+  const auto result=bindPreparedFlameModels50V(scratch.flame.models,binding.vehicleOwnerId,rr::assets::flameViews50W(scratch.flame),scratch.flame.records,2+scratch.flame.modelCount,scratch.binding);
+  if(result.status!=FlameStatus50V::Complete||result.writes!=4*scratch.flame.modelCount)return fail(d,E::ExternalCut,result.sourcePC?result.sourcePC:0x2208d0);
   flags=static_cast<std::uint8_t>(flags|16u);
+  flameBindingPrepared=true;
  }
- if(scratch.flame.records[2].words[0]!=0x20f110u||scratch.flame.records[3].words[0]!=0x20ee90u||scratch.flame.records[2].words[1]!=binding.vehicleOwnerId||scratch.flame.records[3].words[1]!=binding.vehicleOwnerId)return fail(d,E::Admission,0x220a48);
+ for(unsigned model=0;model<scratch.flame.modelCount;++model){
+  const auto& record=scratch.flame.records[model+2];
+  if(record.words[0]!=((model&1u)?0x20ee90u:0x20f110u)||record.words[1]!=binding.vehicleOwnerId)
+   return fail(d,E::Admission,0x220a48);
+ }
  EngineTailState50T engine{};auto&t=scratch.next;engine.flagsACC=t.flagsACC;engine.flagsAD0=t.flagsAD0;for(unsigned i=0;i<2;++i){engine.countAD4[i]=t.countAD4[i];engine.timerADC[i]=t.timerADC[i];std::memcpy(engine.thrustA0[i],m.components.engine.localThrust[i].v,12);engine.thrustA0[i][3]=t.engineThrustW[i];}
  engine.timerAE4=t.timerAE4;engine.activeAE8=t.activeAE8;engine.field844=r.fields.vehicle844;engine.sharedRandomState=r.noise.sharedRandomState;
  EngineTailInput50T input{};input.flagsB9C=flags;input.application58=r.fields.applicationByte58;input.state40=m.vehicleState40;std::memcpy(&input.frameFactorBits,&clock.lastDispatched23C,4);input.probe128Present=binding.probe128!=Probe128Binding50X::Null;
  RR_VEHICLE_FRAME49W_STAGE(0x228c0c);const auto result=advanceEngineTail50T(engine,input);
  if(result.status!=EngineTailStatus50T::Complete)return fail(d,result.status==EngineTailStatus50T::Arithmetic?E::Arithmetic:E::ExternalCut,result.status==EngineTailStatus50T::NeedsProbeReset?0x1b1560:0x2208a0);
  const auto&next=result.state;t.flagsACC=next.flagsACC;t.flagsAD0=next.flagsAD0;for(unsigned i=0;i<2;++i){t.countAD4[i]=next.countAD4[i];t.timerADC[i]=next.timerADC[i];std::memcpy(m.components.engine.localThrust[i].v,next.thrustA0[i],12);t.engineThrustW[i]=next.thrustA0[i][3];}t.timerAE4=next.timerAE4;t.activeAE8=next.activeAE8;r.fields.vehicle844=next.field844;r.noise.sharedRandomState=next.sharedRandomState;
- commit(s,w,P::PostEngineBase50X);tail=scratch.next;globals=scratch.globals;flame=scratch.flame;return true;
+ // The source binder above writes scratch records transactionally. Do not
+ // install its callback in a canonical material clone on any abandoned base
+ // frame. All actual clone targets are preflighted before the no-fail commit.
+ for(unsigned model=0;model<scratch.flame.modelCount;++model){
+  auto* instance=scratch.flame.canonicalInstances50LA[model];
+  if(instance!=flame.canonicalInstances50LA[model])return fail(d,E::Admission,0x29B1D0);
+  if(!instance)continue;
+  const auto& record=scratch.flame.records[model+2];
+  if(!instance->prototype()||!instance->prototype()->constructed29B890()||!instance->model()||
+     instance->prototype()->instance29B1D0(*instance->model())!=instance||
+     instance->nativeModelId()!=scratch.flame.models[model].modelId)
+   return fail(d,E::Admission,0x29B1D0);
+  if(flameBindingPrepared){
+   if(!instance->canBindEngine29BD80(record.words[0],record.words[1]))return fail(d,E::Admission,0x29BDE4);
+  }else if(instance->callback00()!=record.words[0]||instance->callbackOwner04()!=record.words[1])
+   return fail(d,E::Admission,0x29BDE4);
+ }
+ commit(s,w,P::PostEngineBase50X);tail=scratch.next;globals=scratch.globals;flame=scratch.flame;
+ if(flameBindingPrepared)for(unsigned model=0;model<flame.modelCount;++model)
+  if(auto* instance=flame.canonicalInstances50LA[model]){
+   const auto& record=flame.records[model+2];
+   if(!instance->bindEngine29BD80(record.words[0],record.words[1]))std::terminate();
+  }
+ if(resuming){const auto serial=undertrack->serial;*undertrack={};undertrack->serial=serial;}return true;
+}
+bool advanceVehicleBaseThroughEngine50X(S&s,const VehicleFrameBindings49W&b,const FrameTimingState49I&clock,
+ const BaseTailBindings50X&binding,BaseTailState50X&tail,BaseTailGlobals50X&globals,
+ rr::assets::PodFlameOwners50W&flame,BaseTailWorkspace50X&scratch,VehicleFrameWorkspace49W&w,
+ VehicleFrameDiagnostic49W&d,BaseUndertrackContinuation50X* undertrack) noexcept {
+ return advanceVehicleBaseThroughEngineImpl50X(s,b,clock,binding,tail,globals,flame,scratch,w,d,undertrack,false);
+}
+bool resumeVehicleBaseAfterUndertrack50X(S&s,const VehicleFrameBindings49W&b,const FrameTimingState49I&clock,
+ const BaseTailBindings50X&binding,BaseTailState50X&tail,BaseTailGlobals50X&globals,
+ rr::assets::PodFlameOwners50W&flame,BaseTailWorkspace50X&scratch,VehicleFrameWorkspace49W&w,
+ VehicleFrameDiagnostic49W&d,BaseUndertrackContinuation50X& undertrack) noexcept {
+ return advanceVehicleBaseThroughEngineImpl50X(s,b,clock,binding,tail,globals,flame,scratch,w,d,&undertrack,true);
 }
 
 bool finishVehicleBaseAndMainCache50Y(S&s,const VehicleFrameBindings49W&b,const BaseTailState50X&tail,

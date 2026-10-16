@@ -1,4 +1,5 @@
 #include "original_ui_course_background50kg.h"
+#include "original_ui_controls_specmap50kg.h"
 #include "original_ui_screen_assets50kg.h"
 #include <new>
 #include <string>
@@ -73,6 +74,8 @@ bool OriginalUiScreenAssets50KG::load(const std::vector<OriginalUiImageSource50K
             }else if(!s.cel.identity&&!s.pstOffset&&s.pstBytes==s.member.size&&
                 isOriginalUiCourseBackground50KG(s.member)){
                 if(!decodeOriginalUiCourseBackground50KG(s.member,decoded,d.texture))return fail(d,Error::texture,i);
+            }else if(!s.cel.identity&&!s.pstOffset&&s.pstBytes==s.member.size&&isOriginalUiControlsSpecmap50KG(s.member.identity)){
+                if(!decodeOriginalUiControlsSpecmap50KG(s.member,decoded,d.texture))return fail(d,Error::texture,i);
             }else if(!decodeTexture48E(pst,decoded,d.texture))return fail(d,Error::texture,i);
             if(decoded.mips.empty())return fail(d,Error::texture,i);
             const auto& base=decoded.mips.back();

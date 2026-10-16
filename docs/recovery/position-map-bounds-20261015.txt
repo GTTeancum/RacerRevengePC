@@ -1,0 +1,92 @@
+PositionStats type-5 resource dependency and bounded +3220 numeric subset
+UNTESTED. Source review only. No builds, syntax checks, tests, converters, gameplay,
+guest execution, or central checkout edits. Root frozen 8a911b3 remains untouched.
+Baseline source abbf73d740ef23b8529448755d7494c234033e8b; source ZIP SHA256
+a9b83d548bb8f1609d1605ad90abab2ef204e30dcbe5c889dbb84ec16eaeca45.
+
+RESULT / HOLD
+No full primitive/resource owner or HUD activation is supplied. The exact missing
+join is a retained binding from the actual PositionStats application owner to
+the real VehicleWindowGl renderer AND its real dispatch fields, surviving partial
+load and teardown. The existing material context/video identity alone does not
+prove that binding. No fake renderer completion, fabricated material references,
+host map texture, skipped drain, or guessed cleanup is acceptable.
+
+ORIGINAL OWNERS AND CONSTRUCTION
+18FF80 constructs PositionStats (size 32F0), owned at race+CC. Five ScreenTexts
+start +40 stride70; nine ScreenTextures +270 stride60; 118 ScreenTextures +5D0
+stride60. Embedded +3220 is constructed by119E50. Dynamic array +32EC starts0.
+190190 loads authored textures; 190EB0 loads five fonts (3A8E60, capacity40).
+191110 initializes +3220 bounds via119F60. 191180 allocates510 bytes; array helper
+constructs all16 objects, stride50, using2E1920 and destructor2E1980. The complete
+array is published at32EC by1911CC, before per-element load.
+Each1911F0 calls2E1AE0 with external vertices=null, input count118, type5,
+name RadarOverlay. Type5 doubles count to236. Each owns236 vertices stride30,
+constructed2E2190/destructed2DFC10, plus packet storage and five primitive refs.
+Per-packet primitive is24 bytes, ctor2461E0 at2E20A8; material acquire2E20F0 is
+type15 (actual ScreenMT); packet pointer is attached at2E2140. These are80 actual
+independent references for16 meshes, not16 references or dummy handles.
+
+PACKET / VERTEX DATA
+Max72 vertices; ceil(236/72)+1 for this strip yields five packets:
+(first,count)=(0,72),(70,72),(140,72),(210,26),(234,2).
+The final two-vertex packet exists in original construction and cannot be dropped.
+2E2190 source vertex authored lanes are [0,0,1,1], copies10=0, alias arrays zero.
+2E27C0 initializes packet RGBA/STQ four lanes0; XYZ=[0,0,1,0], then wires source
+aliases at14/1C/24 and increments copies10. Overlapped endpoints have two copies.
+191238 calls133F20 for RGB00FFFFFF for every source vertex. Do not borrow a
+Damage alpha63 default: PositionStats initialization does not establish it here.
+Packet command words are evidence/data only, never guest command execution.
+RadarOverlay is the authored zero-map PSM; maptop uses authored stats texture.
+The original text bytes are included unchanged. Zero-map does not mean a missing
+texture may be replaced with a host map. The existing AIDamage-only reference
+facet hardcodes a different name and cannot stand in for RadarOverlay ownership.
+
+EXACT DESTRUCTION DEPENDENCY
+1900B0 destroys dynamic16 array using2E8750 with2E1980 in REVERSE element order;
+then embedded +3220 via119F10; reverse118 textures; reverse9; reverse5 texts; Entity.
+Correction to earlier dependency prose: +3220 destructor address is119F10.
+Every2E1980 first invokes real renderer virtual+20(a1=1) at2E19B4 then
+UNCONDITIONAL virtual+24 at2E19CC. This includes constructed-but-unloaded objects.
+Then primitives in ascending order, primitive-pointer array free; packet buffers
+ascending, packet-entry array free; owned vertex array iff owns38, through helper
+2E8750/2DFC10. Partial failure must retain all16 constructed elements and drain
+before freeing their resources, including unattempted elements. Never clean up
+only successful loads or release canonical material refs before the real drain.
+
+EXISTING NATIVE SUPPORT / EXACT BOUNDED FOLLOW-UP
+OriginalAIDamagePrimitiveArray50LA::releaseCold2E1980 demonstrates real
+serviceOriginalRenderer244D60(..., initializedContext) followed by unconditional
+finishInitializedContextWork and contextWorkCompleted. Its fixed4-vertex/1-packet
+owner and AIDamage-only canonical ref cannot directly own this dynamic strip.
+1. Root provides actual retained PositionStats-to-renderer/dispatch binding and
+   shutdown order using existing camera/Video lifecycle; no ready boolean proxy.
+2. Add a RadarOverlay-specific canonical retainScreen14D590/release14D500 facet,
+   preserving authored zero-map ScreenMT and each actual per-packet reference.
+3. Implement bounded236-vertex/five-packet owner preserving alias pointers and
+   constructor/load stages, then reverse16 teardown with real two-stage drains.
+4. Recover exact119FC0 clipping arithmetic before any map draw integration.
+Root alone decides integration and all Windows validation. Numeric adapter packet
+libfile_475fd1b9e3a081919d87bca7090a7e88 remains separate and unmodified.
+
+DELIVERED UNCALLED BOUNDS CANDIDATE
+files/src/game/original_position_map_bounds50la.h contains only constructor119E50
+and setter119F60 numeric subset. Eight1048E0 constructors integer-zero all lanes.
+Explicit corner stores establish +/-FLT_MAX X/Y, Z=-FLT_MAX, W=0 in repeated
+groups of4. Bounds80/84=-FLT_MAX,88=+FLT_MAX (stored twice);8C is UNWRITTEN.
+119F60 writes all4 bounds, updates first4 X/Y, copies all4 lanes to final4.
+The native candidate refuses observation before setter; its maxY backing zero
+is never asserted to be original initialized state. Finite/ordered input gate is
+explicit bounded native admission, not retail validation. No119FC0 clipping,
+resource ownership, readiness, consumer, or activation is claimed. Embedded
+119F10 owns no resources and does not free storage for destructor argument-1.
+
+SOURCE-REVIEW CHECKLIST
+[ ] Reconcile new uncalled header against root before optional cherry-pick.
+[ ] Verify raw constructor/setter words and deliberately unavailable pre-set8C.
+[ ] Verify16x236 vertices,16x5 actual refs, five exact packet ranges and aliases.
+[ ] Supply real backend/dispatch lifetime before any primitive-owner integration.
+[ ] Preserve reverse16 and ascending inner frees after both genuine drain stages.
+[ ] Keep root numeric/rank/lap authority and terrain_interactive_drive50du intact.
+[ ] Keep original diagnostics until genuine rendering replaces their function.
+[ ] Root performs all tests later; this packet has undergone none.

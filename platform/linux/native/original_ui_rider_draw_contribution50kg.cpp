@@ -71,10 +71,13 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
     if(same(pass.microprogram,"ScreenObject")){assets::OriginalUiNativeMaterial50KG policy{};
         return assets::prepareOriginalUiNativeMaterial50KG(pass,*texture,policy,d.materialDetail)&&
             convertOriginalUiMaterialSpan50KG(policy,range,output);}
-    if(same(pass.textureName,"02_shdw")||same(pass.textureName,"04_shdw")||
-       same(pass.textureName,"10_shdw")||same(pass.textureName,"11_shdw")||
+    if(same(pass.textureName,"02_shdw")||same(pass.textureName,"03_shdw")||same(pass.textureName,"04_shdw")||
+       same(pass.textureName,"07_shdw")||same(pass.textureName,"10_shdw")||same(pass.textureName,"11_shdw")||
        same(pass.textureName,"12_shdw")||same(pass.textureName,"15_shdw")||
-       same(pass.textureName,"19_shdw")||same(pass.textureName,"20_shdw")){assets::OriginalUiRider19ShadowMaterial50KM policy{};
+       same(pass.textureName,"19_shdw")||same(pass.textureName,"20_shdw")||
+       same(pass.textureName,"09_shdw")||same(pass.textureName,"23_shdw")||same(pass.textureName,"24_shdw")||
+       same(pass.textureName,"01_shdw")||same(pass.textureName,"08_shdw")||same(pass.textureName,"14_shdw")||same(pass.textureName,"16_shdw")||same(pass.textureName,"17_shdw")||
+       same(pass.textureName,"18_shdw")||same(pass.textureName,"21_shdw")||same(pass.textureName,"22_shdw")||same(pass.textureName,"25_shdw")){assets::OriginalUiRider19ShadowMaterial50KM policy{};
         return assets::prepareOriginalUiRider19ShadowMaterial50KM(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19ShadowMaterialSpan50KM(policy,images,range,output);}
     if(same(pass.microprogram,"SpecularMapCompressed")){assets::OriginalUiRider19SpecularMaterial50KM policy{};
@@ -83,6 +86,9 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
     if(texture->kind==2){assets::OriginalUiRider19IpumMaterial50KM policy{};
         return assets::prepareOriginalUiRider19IpumMaterial50KM(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19IpumMaterialSpan50KM(policy,images,range,output);}
+    if(same(pass.textureName,"17_3")){assets::OriginalUiRider17CutoutMaterial50KM policy{};
+        return assets::prepareOriginalUiRider17CutoutMaterial50KM(pass,images,index,policy,d.materialDetail)&&
+            convertOriginalUiRider17CutoutMaterialSpan50KM(policy,images,range,output);}
     if(texture->mips.size()>1){
         if(same(pass.textureName,"pod_wndw")||same(pass.textureName,"12c_4")){assets::OriginalUiRiderWindowMaterial50KM policy{};
             return assets::prepareOriginalUiRiderWindowMaterial50KM(pass,images,index,policy,d.materialDetail)&&

@@ -1,0 +1,99 @@
+#pragma once
+#include "original_ui_main_entry50kg.h"
+#include "ra_cold_aggregate50la.h"
+#include <cstring>
+
+namespace ra_cold_aggregate50LA {
+inline bool Owner::constructRuntimeSourceCamera(
+    const original_main_entry50KG::Application& application,
+    const ra_source_camera50LA::CameraCallerOwners& actual,
+    const std::vector<std::uint8_t>& selectedOriginalCam,
+    original_camera_session50KX::DisplayInputs& display,Diagnostic& d)noexcept {
+    namespace c=original_camera_session50KX;
+    d={};d.stage=Stage::sourceCamera;
+    if(terminal_||closed_||!prefix_.runtimeQueryWorldOwners||!prefix_.lighting||
+       !prefix_.trackParticleManager||!prefix_.staticWorldImages||!runtimeQueries_||
+       runtimeQueries_->cameraAttempted_)
+        return fail(d,"RA camera requires its existing registered runtime/light/particle/image owners");
+    auto& runtime=*runtimeQueries_;
+    runtime.cameraAttempted_=true;
+    try {
+        const auto domain=application.standardMaterialDomain();
+        const auto entities=application.entities();
+        const auto* source=source_?source_->sourcesDecoded():nullptr;
+        if(runtime.terminal_||!runtime.queriesConstructed_||!runtime.worldOwnersRegistered_||
+           &actual.bank!=runtime.bankIdentity_||!runtime.cameraBankCurrent()||
+           !runtime.actual_||&actual.arena!=&runtime.actual_->frame||
+           (runtime.gridArena_&&(&actual.bindings!=&runtime.gridArena_->bindings||
+               &actual.ai!=&runtime.gridArena_->ai||&actual.poseHistory!=&runtime.gridArena_->history||
+               &actual.actualRigs!=&runtime.gridArena_->rigs))||
+           !source||!lighting_||!lighting_->world()||!trackParticles_||!trackParticles_->prepared()||
+           !trackParticleGeneration_||trackParticleHostApplication_!=&application||
+           trackParticleDomain_!=domain||trackParticleApplication_!=entities||
+           !domain||domain!=world_->domain_||!entities||!world_->context_||!world_->context_->live()||
+           world_->context_->materialApplication()!=application.materialApplication||
+           trackParticles_->material150()->table382B38()!=domain->materials382B38().get()||
+           !domain->materials382B38()->coldCollectorCurrent(world_->imageCollector_)||
+           domain->archiveProvider3E1A70()->revision()!=world_->providerRevision_||
+           display.trackFog3EC||selectedOriginalCam.empty()||!actual.actualRigs[0]||actual.actualRigs[0]->phy.empty()||
+           bool(actual.actualBottomRightModels)!=bool(actual.actualBottomLeftModels))
+            return fail(d,"RA camera Bank/Application/context/manager or selected rig ownership differs");
+        for(std::size_t i=0;i<8;++i){
+            const auto* rig=actual.actualRigs[i].get();
+            if(!rig||!actual.actualCables[i]||actual.actualCables[i]->sourceRig_!=rig||!actual.actualRightModels[i]||!actual.actualLeftModels[i]||!actual.actualChariotModels[i]||
+               rig->podId.size()!=5u||rig->podId.compare(0,3,"POD")||
+               rig->podId[3]<'0'||rig->podId[3]>'9'||rig->podId[4]<'0'||rig->podId[4]>'9'||
+               static_cast<std::uint32_t>((rig->podId[3]-'0')*10+rig->podId[4]-'0')!=actual.racer60[i])
+                return fail(d,"RA camera requires the actual eight rig/model identities");
+        }
+        // Already authenticated from this same retained RA archive by the
+        // particle authoring owner. Do not re-read another SessionAssets route.
+        const auto* tob=particles_->originalMember(0);
+        if(!tob)return fail(d,"same-source authenticated RA TOB unavailable");
+        a::OriginalStandardArchiveProvider50LA::MemberView selected;
+        a::OriginalStandardArchiveProvider50LA::MountView mount;
+        const auto& provider=domain->archiveProvider3E1A70();
+        if(provider->lookup132820("tracks\\ra.tob",selected)!=a::OriginalStandardArchiveProvider50LA::Lookup::present||
+           !provider->mount(selected.mount,mount)||!mount.archiveSha256||
+           *mount.archiveSha256!=ra_cold_sources50LA::archiveSha||mount.archiveBytes!=4604561u||
+           mount.memberCount!=1010u||!selected.data||selected.size!=tob->size()||
+           selected.revision!=world_->providerRevision_||std::memcmp(selected.data,tob->data(),tob->size()))
+            return fail(d,"RA camera TOB differs from its actual mounted source");
+        // Publish private storage before constructing a Session, so any later
+        // exception keeps its real effects and authoring backing for cleanup.
+        runtime.camera_.reset(new ra_source_camera50LA::OwnershipBridge::CameraBinding());
+        auto& camera=*runtime.camera_;
+        camera.lighting=lighting_;camera.particles=trackParticles_;
+        for(std::size_t i=0;i<8;++i){
+            camera.cablePins[i]=actual.actualCables[i]->retainSourceCamera(*actual.actualRigs[i]);
+            if(!camera.cablePins[i])return fail(d,"actual persistent Cables camera lifetime unavailable");
+            camera.cables[i]=actual.actualCables[i].get();
+        }
+        camera.cam=selectedOriginalCam;camera.tob=*tob;
+        camera.selectedRig=actual.actualRigs[0].get();camera.phySnapshot=camera.selectedRig->phy;
+        camera.display=&display;camera.generation=trackParticleGeneration_;
+        if(!camera.fog.prepare(source_))return fail(d,"actual retained RA fog authoring rejected");
+        camera.fogAddress=&camera.fog.fields_;
+        display.trackFog3EC=camera.fogAddress; // Same retained field used by Session restore and fog preparation.
+        const auto& phy=camera.selectedRig->phy;
+        camera.authored={camera.cam.data(),camera.cam.size(),reinterpret_cast<const char*>(phy.data()),phy.size(),
+            static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&phy)),
+            camera.tob.data(),camera.tob.size(),g::OriginalCameraStartCourse::ra};
+        auto& storage=*runtime.storage_.get();
+        camera.session.reset(new c::Session(c::ActualOwners{
+            actual.bank,actual.arena,actual.bindings,actual.baseTail,actual.ai,actual.racerTiming,
+            actual.all8Manager,actual.hostRace,actual.sharedRandom,actual.attachedGlobals,actual.applicationClock,
+            actual.preferences,actual.launchKind11258,actual.configuration34,actual.application350,
+            *camera.lighting,storage.lifecycle,storage.mainMembership.state,actual.blur,*runtime.follow_,
+            actual.poseHistory,actual.boost,actual.cycleAudio,actual.racer60,actual.humanCount34,actual.race94,
+            actual.humanHeld,actual.raceHud,actual.deathDebris,entities,domain->materials382B38(),
+            &application.materialDirectory36B970(),&actual.actualRigs,camera.particles.get(),
+            &source->height.sourceDomain,&actual.actualRightModels,&actual.actualLeftModels,
+            &actual.actualChariotModels,actual.actualBottomRightModels,actual.actualBottomLeftModels,
+            application.animationClock(),&camera.cables}));
+        // No prepare, pose, viewport publication, RNG/clock sampling or
+        // source-ready flag. Only an actual retained Session now exists.
+        return true;
+    }catch(...){return fail(d,"RA camera construction failed; actual private prefix retained for cleanup");}
+}
+} // namespace ra_cold_aggregate50LA

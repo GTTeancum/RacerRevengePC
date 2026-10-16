@@ -52,10 +52,10 @@ int main(){
     assert(updatePodWarnings50HE(input,state,next,commands,5,count)==AudioEventStatus50HE::Input&&count==91);
     PodBoostAudioState50HE boost{},boostNext{};
     assert(updatePodBoostAudio50HE(true,.1f,0,boost,boostNext,commands,5,count)==AudioEventStatus50HE::Complete);
-    assert(count==1&&boostNext.pitchBoost&&commands[0].cue.bank==AudioBank50HE::PodEngine&&commands[0].cue.key==3);
+    assert(count==1&&boostNext.pitchBoost()&&commands[0].cue.bank==AudioBank50HE::PodEngine&&commands[0].cue.key==3);
     boost=boostNext;
     assert(updatePodBoostAudio50HE(true,.1f,1,boost,boostNext,commands,5,count)==AudioEventStatus50HE::Complete&&count==0);
-    assert(updatePodBoostAudio50HE(false,0,2,boost,boostNext,commands,5,count)==AudioEventStatus50HE::Complete&&count==0&&!boostNext.pitchBoost);
+    assert(updatePodBoostAudio50HE(false,0,2,boost,boostNext,commands,5,count)==AudioEventStatus50HE::Complete&&count==0&&!boostNext.pitchBoost());
     float damage[4]={0,0,0,0};
     assert(repairCompletionAudio50HE(2,0,damage,commands,5,count)==AudioEventStatus50HE::Complete&&count==1&&commands[0].cue.key==2);
     damage[2]=.001f;

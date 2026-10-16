@@ -23,7 +23,10 @@ using Kind=game::OriginalUiRiderWidgetKind50KG;
 // predicates are still required. Runtime acceptance is pending.
 constexpr bool boundedRiderConfirmEnabled=true;
 bool supportedRider(std::uint32_t rider) noexcept {
-    switch(rider){case 2:case 4:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+    switch(rider){case 2:case 4:case 7:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+}
+bool previewSupportedRider(std::uint32_t rider) noexcept {
+    return rider==3||supportedRider(rider);
 }
 Status result(Diagnostic& d,Status s,std::uint32_t pc=0) noexcept {d.status=s;d.sourcePC=pc;return s;}
 bool apertureOkay(ApertureStatus s) noexcept {return s==ApertureStatus::ok||s==ApertureStatus::noChange;}
@@ -150,7 +153,7 @@ struct OriginalUiRiderSession50KG::Storage {
         ++state.audio.submitted;return true;
     }
     bool preparedRider(std::uint32_t rider) const noexcept {
-        return supportedRider(rider)&&backend.preparedRider(rider);
+        return (previewSupportedRider(rider)||dynamic.previewRequested(rider))&&backend.preparedRider(rider);
     }
     bool controlWidgets(std::uint16_t slot,std::uint32_t rider,std::array<std::uint16_t,4>& out) const noexcept {
         const auto* n=nav();
@@ -413,14 +416,42 @@ OriginalUiRiderSession50KG::~OriginalUiRiderSession50KG(){
 }
 
 Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& cold,Diagnostic& d) noexcept {
-    return bindCold(cold,game::OriginalUiRiderColdPopulation50KG::defaultUnlocked,d);
+    std::uint32_t requested=0;
+    if(!game::originalUiRiderPreviewRequest50KG(cold.previewSet,cold.requestedPreviewRiders,requested))
+        return result(d,Status::invalidInput);
+    const bool gasgano=(cold.profile&&cold.profile->gasganoTestProfile())||
+        game::originalUiRiderRequested50KG(requested,7);
+    const auto population=(cold.prepareCleggLockedPreview||game::originalUiRiderRequested50KG(requested,3))?
+        (gasgano?game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasganoAndCleggPreview:
+                  game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndCleggPreview):
+        (gasgano?game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasgano:
+                  game::OriginalUiRiderColdPopulation50KG::defaultUnlocked);
+    return bindCold(cold,population,d);
 }
 Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG& cold,
     game::OriginalUiRiderColdPopulation50KG population,Diagnostic& d) noexcept {
     d={};if(storage_)return result(d,Status::alreadyBound);
     if(population!=game::OriginalUiRiderColdPopulation50KG::selected19&&
        population!=game::OriginalUiRiderColdPopulation50KG::rider19And20&&
-       population!=game::OriginalUiRiderColdPopulation50KG::defaultUnlocked)return result(d,Status::invalidInput);
+       population!=game::OriginalUiRiderColdPopulation50KG::defaultUnlocked&&
+       population!=game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasgano&&
+       population!=game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndCleggPreview&&
+       population!=game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasganoAndCleggPreview)return result(d,Status::invalidInput);
+    const bool clegg=population==game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndCleggPreview||
+        population==game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasganoAndCleggPreview;
+    const bool gasgano=population==game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasgano||
+        population==game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasganoAndCleggPreview;
+    std::uint32_t requested=0;
+    if(!game::originalUiRiderPreviewRequest50KG(cold.previewSet,cold.requestedPreviewRiders,requested))
+        return result(d,Status::invalidInput);
+    if(clegg&&!cold.prepareCleggLockedPreview&&!game::originalUiRiderRequested50KG(requested,3))
+        return result(d,Status::invalidInput);
+    const bool gasganoPreview=game::originalUiRiderRequested50KG(requested,7);
+    if(cold.previewSet==game::OriginalUiRiderPreviewSet50KG::gasgano7&&!gasgano)
+        return result(d,Status::invalidInput);
+    // Resource opt-in never changes the actual profile or source Confirm rules.
+    if(gasgano&&!gasganoPreview&&
+       (!cold.profile||!cold.profile->gasganoTestProfile()))return result(d,Status::invalidInput);
     const bool fromMain=cold.previousScreen==4&&cold.predecessorResources&&
         !cold.predecessorCourseResources&&!cold.predecessorCourseHolograms&&
         cold.predecessorResources->loaded()&&cold.predecessorResources->materials()&&cold.predecessorResources->particleMaterial();
@@ -455,9 +486,8 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
            cold.resources->bankInput()->owners[0]!=cold.resources->images())return result(d,Status::resource,0x1D63B0);
         // Resolve original group membership and widget IDs from authenticated
         // rider.dat. No rider arithmetic or compact substitute roster.
-        for(const auto rider:{2u,4u,10u,11u,12u,15u,19u,20u}){
-            if(population==game::OriginalUiRiderColdPopulation50KG::selected19&&rider!=19)continue;
-            if(population==game::OriginalUiRiderColdPopulation50KG::rider19And20&&rider!=19&&rider!=20)continue;
+        for(const auto rider:game::originalUiRiderRoster50KG){
+            if(!game::originalUiRiderColdMember50KG(population,requested,rider))continue;
             std::size_t matches=0;
             for(std::size_t slot=1;slot<=page->groups[1].controls.size();++slot){
                 const auto control=page->groups[1].controls[slot-1];
@@ -540,14 +570,21 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         // sees the exact prospective source decision; the shared word is untouched.
         if(!cold.profile->selectionSnapshotForMode(cold.prospectiveMode,copiedProfile)||
            game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),0,copiedProfile,coldPlan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
-           !supportedRider(coldPlan.rider4C4))return result(d,Status::unavailableDestination,0x1E9C50);
+           (!supportedRider(coldPlan.rider4C4)&&!(clegg&&coldPlan.rider4C4==3)&&
+            !game::originalUiRiderRequested50KG(requested,coldPlan.rider4C4)))
+            return result(d,Status::unavailableDestination,0x1E9C50);
         // This local session has not escaped. Prepare genuine immutable
         // descriptor candidates, then one complete bank and irreversible seal.
         // Subsequent callback preflight only reads that sealed population.
-        if(!s->dynamic.prepareCold(population,d.dynamic))return result(d,Status::resource,d.dynamic.sourcePC);
+        if(!s->dynamic.prepareCold(population,d.dynamic,cold.previewSet,cold.requestedPreviewRiders))return result(d,Status::resource,d.dynamic.sourcePC);
         if(!s->backend.prepareColdAndSeal(s->dynamic,d.backend))return result(d,Status::backend);
         if(population!=game::OriginalUiRiderColdPopulation50KG::selected19&&
            (!s->preparedRider(19)||!s->preparedRider(20)))return result(d,Status::unavailableDestination,0x1E9C50);
+        if(gasgano&&!s->preparedRider(7))return result(d,Status::unavailableDestination,0x1E9C50);
+        if(clegg&&!s->preparedRider(3))return result(d,Status::unavailableDestination,0x1E9C50);
+        for(const auto rider:game::originalUiRiderRoster50KG)
+            if(game::originalUiRiderRequested50KG(requested,rider)&&!s->preparedRider(rider))
+                return result(d,Status::unavailableDestination,0x1E9C50);
         if(!s->preparedRider(coldPlan.rider4C4))return result(d,Status::unavailableDestination,0x1E9C50);
         if(!s->widgets().preflightNavigation(0,coldPlan.nextNavigation,coldPlan.navigationCommands,s->dynamic.hooks(),d.widget)){
             d.dynamic=s->dynamic.diagnostic();d.backend=s->backend.diagnostic();return result(d,Status::resource,0x1E9FD4);}
@@ -945,6 +982,9 @@ OriginalUiRiderSessionSnapshot50KG OriginalUiRiderSession50KG::snapshot() const 
     const auto* s=storage_.get();if(!s)return {};
     auto out=s->state;out.blocked4E0=s->panel.inputBlocked4E0();out.bypass4E4=s->panel.bypass4E4();out.panelY4DC=s->panel.offset4DC();
     out.transition=s->transition();out.aperture=s->aperture.snapshot();out.bankGeneration=s->backend.generation();
+    std::uint16_t character=0;
+    out.selectedCharacterReady=out.selectionAttached&&s->selectedConfirmCharacter(character)&&
+        s->dynamic.sourceCharacterReadiness(character);
     out.registryGeneration=s->backend.registryGeneration();out.framePublished=sourceFrame()!=nullptr;return out;
 }
 void OriginalUiRiderSession50KG::drain() noexcept {if(storage_)storage_->cpuDrain();}

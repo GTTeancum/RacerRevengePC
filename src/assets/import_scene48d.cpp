@@ -346,9 +346,21 @@ bool decodeScene48D(const std::vector<std::uint8_t>& input, Scene48D& output,
                 const auto size = read.u32(at + 16); at += 20;
                 require(surface.material_index < materialCount, DecodeKind48C::malformed,
                     "scene.material_index", surface.source_offset, "Surface material index outside table");
-                require(surface.component_word == 0x00ff010f || surface.component_word == 0x00000107,
+                // Original 246344..2463A4 reads separate attribute/UV-count/
+                // palette/reserved bytes. 00ff0107 is the observed single-node,
+                // no-palette form of position/normal/UV without stored colors.
+                // Original 23c.psg also stores 0000010f: palette zero with
+                // position/normal/UV and authored V4_8 colors. Its palette
+                // trailer is validated below, as for the uncolored 00000107.
+                // Keep exact admission: other palettes/attributes are unproven.
+                require(surface.component_word == 0x00ff010f || surface.component_word == 0x0000010f ||
+                    surface.component_word == 0x00000107 ||
+                    (surface.component_word == 0x00ff0107 && nodeCount == 1),
                     DecodeKind48C::unsupported, "scene.attribute_variant", surface.source_offset + 4, "Unknown original surface attribute variant");
-                surface.has_original_colors = surface.component_word == 0x00ff010f;
+                // Absence is retained semantically; it is not an authored white
+                // color or a recovered material/lighting default.
+                surface.has_original_colors = surface.component_word == 0x00ff010f ||
+                    surface.component_word == 0x0000010f;
                 require(std::isfinite(surface.uv_size_uninterpreted) && surface.uv_size_uninterpreted > 0 &&
                     vertexCount >= 3 && surface.source_strips >= 1 && surface.source_strips <= std::uint32_t(vertexCount) / 3u,
                     DecodeKind48C::malformed, "scene.surface_metadata", surface.source_offset + 8, "Invalid UV-size/vertex/strip metadata");

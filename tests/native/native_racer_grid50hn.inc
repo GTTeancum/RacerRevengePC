@@ -39,7 +39,7 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
       membershipWork).status==LiveZoneStatus50EN::Complete,"AI secondary grid detach failed");
   require50DU(removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,terrainMembership,
       membershipWork).status==LiveZoneStatus50EN::Complete,"AI terrain grid detach failed");
-  require50DU(native_racer50HN::placeColdGrid(s,x.bindings,grounded,rebaseModels,
+  require50DU(native_racer50HN::placeColdGrid(s,x.bindings,grounded,rebaseModels,rebaseModelCount,
       poseHistory),"native cold AI grid placement failed");
   LiveZoneBounds50EN mainBounds{},secondaryBounds{};
   require50DU(prepareQueryCache(query,s.nodes[static_cast<unsigned>(x.bindings.lifecycle.main190)].world100,

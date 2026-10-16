@@ -33,6 +33,7 @@ constexpr std::uint32_t vehicleGlPositionAttribute50CZ = 0;
 constexpr std::uint32_t vehicleGlUvAttribute50CZ = 1;
 constexpr std::uint32_t vehicleGlColorAttribute50CZ = 2;
 constexpr std::uint32_t vehicleGlNormalAttribute50CZ = 3;
+constexpr std::uint32_t vehicleGlSpecularUvAttribute50LA = 4;
 constexpr std::uint32_t vehicleGlColorOutput50CZ = 0;
 
 struct VehicleGlShaderUniforms50CZ {
@@ -59,6 +60,13 @@ struct VehicleGlShaderUniforms50CZ {
     std::int32_t useNativeGcSelectedLights = -1, nativeGcAmbient = -1;
     std::int32_t nativeGcDiffuse[3] = {-1, -1, -1};
     std::int32_t nativeGcDirection[3] = {-1, -1, -1};
+    // Explicit base-map original packed-RGB MODULATE; bypasses host lighting.
+    // Generated color uses its own noperspective varying. Unpaired alpha stays 1.
+    std::int32_t useSourceDiffuseCompressed50LA = -1;
+    // 0 preserves legacy opaque alpha, 1 writes paired base RGBA, 2 performs
+    // the ordered source map-2 equation using the current destination byte A.
+    std::int32_t sourcePairPass50LA = -1, sourcePairFog50LA = -1;
+    std::int32_t sourcePairDestination50LA = -1, sourcePairAlphaTest50LA = -1;
 };
 
 enum class VehicleGlShaderStage50CZ : std::uint8_t {
@@ -88,7 +96,10 @@ public:
     // Deliberately no implicit GL cleanup: call release while the context is
     // current, before destruction. Never delete/relink the borrowed names.
     ~VehicleGlShader50CZ() = default;
-    bool initialize(VehicleGlShaderDiagnostic50CZ&) noexcept;
+    // coveragePayload is private native AA1-demand plumbing: same linked
+    // position/source-byte kernel, with pass3 writing an AA0 scratch payload.
+    // Default false retains the existing single-sample program route.
+    bool initialize(VehicleGlShaderDiagnostic50CZ&, bool coveragePayload = false) noexcept;
     // First unbind this program in every context using it. Deletion may be
     // deferred by GL otherwise. False retains any unresolved ownership; keep
     // this object alive and recover the context before attempting release again.
@@ -99,7 +110,7 @@ public:
 private:
     bool noGlError(VehicleGlShaderDiagnostic50CZ&, bool cleanup = false) noexcept;
     bool compile(std::uint32_t type, const char* source, std::uint32_t&,
-        VehicleGlShaderDiagnostic50CZ&) noexcept;
+        VehicleGlShaderDiagnostic50CZ&, bool coveragePayload = false) noexcept;
     void cleanup(VehicleGlShaderDiagnostic50CZ&) noexcept;
     VehicleGlShaderFunctions50CZ gl_;
     VehicleGlShaderUniforms50CZ uniforms_{};

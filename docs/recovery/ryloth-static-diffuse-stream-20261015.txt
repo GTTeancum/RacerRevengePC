@@ -1,0 +1,90 @@
+Ryloth typed native static diffuse RGBA stream — SOURCE ONLY / UNTESTED
+
+Integration base: root reports anchor-v2 integrated as
+11db1930075364f8f409f8fb294cfed033f5288b, with newer navigation-lease changes.
+This delta was authored against the isolated anchor-v2 files, not that newer
+complete root tree. Apply the small aggregate method hunk preserving root's
+navigation changes. Do not replace the entire aggregate header.
+
+Files
+NEW tests/native/ra_static_diffuse_stream50la.h
+EDIT tests/native/ra_static_lighting50la.h
+EDIT tests/native/ra_cold_aggregate50la.h (two new CPU methods only)
+
+Approved explicit native policy
+StaticDiffusePolicy::selectedMatrixWithoutModelOverrides consumes the actual
+selected four-lane diffuse matrix unchanged. It does NOT fabricate model
+flags1F4, model ambient/alpha override fields, a constructor receipt or retail
+static-light selection parity. Visual differences from PS2 remain possible.
+Alpha comes through projectDiffuseCompressedRgba from the selected inputs.
+There is no fixed alpha64/128/255, fill-alpha substitution, imported-color
+modulation or second ambient/negative-light fold.
+
+Actual data path
+The aggregate owns Binding, which privately owns a separate StaticDiffuseStream.
+Its camera/world/light pins and anchor-v2 source-selection rules are unchanged.
+Preparation walks the complete surface draw plan in source order. The existing
+canonical inventory only admits black.psm as DiffuseCompressed; the stream
+requires that exact inventory's program, required-light flag, ordinary one-map
+family, actual material handle, single canonical pass, program token, group,
+pass flags and fill bytes. Other programs must be original PrelitCompressed.
+No required diffuse surface may be skipped. Required count must match both the
+snapshot sequence and complete draw-plan requirements.
+
+Each diffuse surface receives a vector of generated RGBA bytes in original
+source vertex order. Signed source normals are exactly recovered using the
+actual scene quantization[1]. The prepared visual normal axes and selected four
+color rows feed projectDiffuseCompressedRgba. That kernel preserves ordered
+early-bias arithmetic, upper packing bound and explicit failure domain.
+Signed authored-light evaluation remains in the existing selector/fold.
+
+Original positions, UVs, indices, transforms, source colors, materials, pass
+order and authoring are never rewritten. Metadata retains the actual source
+surface/placement/world-instance/raster/material/program, vertex/index ranges
+and camera generation/publication/frame. Source-prelit bytes remain solely in
+the original bank. No racer permission flag or host-track lighting mode is used.
+
+Fill boundary
+Any required diffuse surface with canonical passFlags bit0x04 set rejects the
+ENTIRE stream publication with fillUnsupported. A subsequent changed material
+also invalidates reads from the entire publication, not merely that surface.
+Fill bytes are checked against the actual pass but are not used as generated
+alpha or color. Fill-consumer semantics remain a separate recovered-source task.
+
+Lifetime / failure contract
+prepareNativeStaticDiffuseStream(d) first clears any previous stream. A private
+unique_ptr owns all partial vector allocations until successful completion.
+Any validation/numeric/allocation failure destroys that unpublished partial
+stream; no external source or GPU state requires rollback. No stale old output
+is retained as fallback. Publication occurs only after complete count checks and
+fresh binding validation, inside the same serial callback-free preparation.
+
+readNativeStaticDiffuseVertex(surface, vertex, identity, rgba) revalidates the
+actual idle-Bank camera publication, world/provider/collector lifetime and light
+owner. It then checks every generated surface's canonical material before
+copying the requested identity and RGBA value. Failure leaves caller outputs
+unchanged. Prelit surfaces have no generated row and reject this read.
+Values copied to a caller are NOT admission/renderer capabilities. A future
+renderer must consume through an actual checked binding; caching the scalar
+identity does not retain a lifetime. Binding replacement, aggregate failure or
+close destroys the stream. Camera advancement/retirement or owner invalidation
+makes reads fail through the existing anchor-v2 publication contract.
+
+Scope limits
+No renderer activation, packet-to-fragment lowering, texture/alpha normalization,
+interpolation choice, blending, alpha test, depth state, shadows, fog, GPU receipt,
+MSAA targets or RA gameplay admission is added. Actual material finalContext
+remains in the original inventory for the separate renderer review. Trigger
+geometry remains blocked; all racers remain original AI.
+
+Central source-review checklist
+[ ] Preserve root's navigation-lease edits when applying the aggregate hunk.
+[ ] Review complete inventory/count/order and exact canonical pass comparisons.
+[ ] Review signed normal recovery and untouched four-lane matrix consumption.
+[ ] Review fill rejection, partial allocation cleanup and no prior fallback.
+[ ] Review stale camera/world/collector/light rejection and full material scan.
+[ ] Approve packet-to-fragment semantics separately before any renderer consumer.
+
+No tests, builds, syntax checks, sanitizers, converters, shader checks, emulation,
+gameplay checks or source-program execution were performed. Source reading,
+editing and artifact packaging only. Compilation and validation remain root-owned.

@@ -1,0 +1,172 @@
+DAMAGE-FIRST STEP A — SOURCE-ONLY NUMERIC PACKET
+2026-10-15, based on abbf73d740ef23b8529448755d7494c234033e8b
+UNTESTED: no build, syntax check, sanitizer, converter, project executable,
+source test, emulation, guest execution, input injection or gameplay run.
+The only executed scripts read/hash raw bytes, inspect archive metadata,
+inflate one bounded original archive block, and package this delivery.
+
+Deliverable and integration boundary
+files/src/game/original_damage_state50la.h is new, isolated pure data/state
+code. It is NOT installed into the private baseline, included in any build,
+called by terrain, or activated by a renderer. No owner or canonical facet
+implementation is supplied: the dedicated facet design is below.
+No host panel, simulation state, race ranking, completed-lap time or AI changed.
+No change to terrain_interactive_drive50du.cpp or FPS telemetry.
+
+Authenticated evidence
+SLUS_202.68:
+c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30
+Raw evidence covers entire18C550..18FF7F, including all requested loader,
+layout, predraw and draw operations. Additional helper ranges are retained.
+Original archive UI/TEXTURES/OVERLAYS.RES:154528 bytes,
+ab51e88aef70d4a619ca3e614c64b90bad07deb3b9f0ec918577a44a8effb15c.
+archive-proof.json contains every one of112 original index records in order.
+Index begins0xFE, data records0x106, ends0x1152, indexlength0x104C;
+117 uint16 sizes contain116 blocks and zero terminator. Every compressed
+block boundary has its sourceFF separator and the extent ends exactly at EOF.
+Exactly one case-normalized ui\\textures\\dmgradar.pst: ordinal48,
+logical offset1277952, length17436; block52 inflates to24576 bytes.
+Extracted member hash:
+3b79203f92e2e0ec7efc4097eee9daf7b9500467a049410b89affcff015da249.
+No ui\\textures\\dmgradar.psm exists in the complete original index.
+This proves absence in this authenticated archive, not all possible mounts.
+No pixel decoding, conversion, image inspection or runtime resource loading ran.
+
+Texture construction / loader contract
+Constructor18C550 owns12 ScreenTextures+50,10 at+4D0,10 at+890, stride60.
+Every object invokes2DF0B0 with the same dmgradar string at3A8F98.
+The new header's authored table gives all32 source offsets, exact dimensions
+and UV pixel coordinates. loadCallerPC pins every loader call (loops share PC).
+loadOrder preserves actual order: bank pairs0,1,2,3,4,5,6,7,8,9 first;
+then base indices0,1,2,3,6,9,4,7,10,5,8,11. It must not be sorted.
+
+Each UV axis is source pixel-coordinate * the individual texture's reciprocal
+atlas dimension, not direct division per coordinate and not assumed128.
+The reversed second-bank U endpoints are intentional. Repeated dmgradar
+references may share immutable atlas pixels, never mutable ScreenTextures.
+
+ScreenTexture2DEF40 supplies x/y/origin/rotation/dimensions zero, scale1,
+depth1, color00FFFFFF, alpha255, reciprocal dimensions1 and dirty bits0/1 clear.
+The numeric subset models x/y/width/height/rotation/UV/color/alpha/dirty and
+packet color only. It does not claim primitive allocation, dimensions readback,
+canonical texture readiness, corners, screen scaling, GPU state or destruction.
+At loader/layout setters, geometry change sets bit0; if rotation is nonzero,
+also sets bit1. Unchanged values retain existing dirty bits. UV stores target
+the actual primitive fields directly and do not set these geometry bits.
+Color/alpha writes similarly change four packet lanes directly.
+Default other dirty bits are outside this private subset.
+
+Two-view layout18EAD0..18F450
+Argument is one-based view. ModeC58=0: offsets0/0.
+Mode1: x0, y=-199 forview1 or-224 forview2.
+Other modes: y0, x0 forview1 or-30 forview2.
+The header rejects views outside1..2 before mutation (native bounded policy).
+
+The banks are positioned descending i9..0, at y355+oy.
+Initial leftX42,rightX151. After placing both, rightX decreases6 fori7/4/1
+else5; leftX increases6 fori6/3 else5. Preserve that asymmetry.
+Per-index leftX0..9:89,84,79,73,68,63,57,52,47,42.
+Per-index rightX0..9:103,109,114,119,125,130,135,141,146,151.
+Base index0..11 coordinates:
+(36,350),(100,350),(55,368),(77,371),(90,376),(101,371),
+(65,373),(84,390),(109,373),(53,375),(77,401),(115,375).
+Writes follow0,1,2,3,6,9,4,7,10,5,8,11; apply offsets before setters.
+All source add/sub/mul/div operations in the numeric subset materialize float
+results separately. This is bounded native binary32 work, not all-input EE parity.
+
+Predraw / identity / health
+18F4D0 reads Application268 as zero-based view and calls1AF330 on race+B0.
+1AF330 checks index against manager30 and returns manager44[index] (1AF488..A4).
+There is NO copied SpeedBoost selected-camera-racer override in this path.
+Actual view-manager identity must be used for damage, B9C and attachment slots.
+18F680 independently calls the same view lookup and checks vehicle state40==0.
+The future adapter must check publication/generation/Bank liveness and preserve
+that source identity, even in an all-AI spectator session.
+
+Predraw source MAX.S then MIN.S, then subtraction:
+health30[view] = 1 - min(max(racer7D4,racer7DC),1).
+health38[view] = 1 - min(max(racer7D0,racer7D8),1).
+Then layout(view+1). Constructor initializes both views' health pairs to1.
+The code deliberately admits finite inputs in[0,1] only; negative, >1, NaN and
+infinite source values are unresolved and rejected, not clamped or substituted.
+The source formula itself is broader; a future owner must decide whether this
+native admitted domain covers actual state, without changing simulation.
+Source update18F460 stores elapsed40 then tails Entity141ED0; this hierarchy
+update is not implemented. elapsed40 is retained as an explicit unused field.
+
+Required snapshot correction to prior handoff
+Four damage fields7D0/7D4/7D8/7DC plus nine signed slots10A8..10C8 are necessary
+but insufficient: racer+B9C BIT1 also controls the alternate segment tint.
+Need view index, race mode8C, manager count/identity, view state40,
+race1B0/entity29/UI1E4, actual viewport/generation/publication and flagsB9C.
+Do not infer any of these from host left/right bars or elapsed presentation.
+Original outside gates use second-view count and race/UI flags. No gate,
+snapshot, Bank read or camera ownership is implemented by this header.
+
+Draw18F680..18FF7F
+Actual leaf order:
+1. Base textures+50,+B0,+110 (indices0,1,2).
+2. Health full bankA ascending, full bankB ascending, partialA, partialB.
+3. Attachments: nine slots ascending; if signed slot!=-1, texture index3+i.
+   A negative slot other than-1 still passes the original predicate.
+No synthetic attachment names/meanings are assigned.
+
+For each health h, scaled=10*h, n=EE CVT.W.S(scaled), fraction=scaled-float(n).
+EE CVT.W.S is the finite-domain truncation used by the existing text helper.
+n>=6 uses0065C96E, n>=3 uses00C4D868, otherwise00CA6060.
+B9C bit1 overrides either bank to006A9DD4. It does not change segmentation.
+Full segments0..n-1 get alpha255; ifn<10, segmentn is ALSO submitted, even
+with fraction0. Its alpha is uint32(255*fraction)&255, with multiplication
+materialized first. Raw310F38/3105A8 proves unsigned conversion truncation
+for admitted nonnegative finite[0,255]; no guessed rounding-to-nearest.
+Packed RGB lanes are each byte>>1, packet alpha is stored alpha>>2.
+Color and alpha setters compare caches, update every primitive vertex lane
+when changed, and leave geometry dirty bits alone.
+Do not fade width/UV, omit alpha0 partials, interleave partialA before fullB,
+deduplicate a source submission, or sort the emitted indices.
+At most32 indices:3 bases +20 health +9 attachments. Unsubmitted texture state
+remains unchanged. Header rejects out-of-domain health before any mutation.
+The output describes source order only. It is not a draw or readiness receipt.
+
+Dedicated canonical provenance facet design (NOT IMPLEMENTED)
+Suggested separate types:
+- OriginalDamageMaterialReference50LA, private to future OriginalDamage50LA.
+- readOriginalDamageFallbackMaterial50LA: admit ONLY authenticated OVERLAYS,
+  exact ui\\textures\\dmgradar absentPSM/presentPST, true ScreenMT association,
+  and original Damage loader caller family recorded in loadCallerPC.
+- retainDamageFallback14D590: a separately typed internal proof on canonical
+  row, bound to the same actual Application material/texture domain/context.
+Do not expand OriginalSpeedBoostImage50LA or route through its retain method.
+
+Source chain:18C748/etc ->2DF0B0; primitive+54 allocation, type15 dispatch
+through virtual+0C at2DF11C with actual ScreenMT3833F0; material29B550 checks
+missing source at29B638; virtual+18 reaches2475C0, which resolves associated
+template (or actual ScreenMT), program, one texture map and canonical383400
+texture retain. Shared existing implementation may be factored privately,
+but publicly admitted provenance must remain Damage-specific and exact.
+Acquisition must compare mounted original bytes, reject contradicting PSM,
+use genuine live construction context, canonical rows, ref counts and partial
+failure retention. Repeated32 primitive refs are distinct despite same material.
+Do not bypass population, forge collector receipts or use a standalone parsed
+material as canonical ownership. Same Application domain as TimeStats/SpeedBoost.
+
+Demand18F470 resolves first ScreenTexture+50 through2DF8A0; source comparison
+raises resource10 to10, then calls Entity141C30. Hook is not destruction.
+Destructor18C640 reverses bankB10, bankA10, base12, then Entity cleanup.
+Future renderer must retain owner/resources across submission until real GPU
+retirement; actual view/session must outlive borrows. No lifetime readiness
+boolean from this pure state can authorize destruction or renderer publication.
+
+Explicit remaining work / source-review checklist
+[ ] Root independently reviews header tables and raw PCs; no executed validation.
+[ ] Confirm canonical atlas dimension decoding in the actual admitted loader.
+[ ] Implement dedicated dmgradar provenance/ref facet, preserving all lifetimes.
+[ ] Implement actual Application owner, partial-failure and collector sequencing.
+[ ] Implement exact published view-manager snapshot including newly found B9C bit1.
+[ ] Resolve/approve broader numeric domains if live source exceeds finite[0,1].
+[ ] Add ScreenTexture corner/dirty-clear/draw bridge and renderer lifetime only
+    under root's separate approval; this code does not perform those steps.
+[ ] Root alone runs Windows build/visible validation and decides eventual host
+    POD STATUS replacement. POS, standings and completed-lap authority remain.
+No claim of completed native Damage owner or original HUD activation is made.
+

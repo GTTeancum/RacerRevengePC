@@ -181,11 +181,11 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         std::array<bool,120> included{};
         std::array<std::uint16_t,32> pods{},characters{};
         std::size_t pairCount=0;
-        for(const std::uint32_t rider:{2u,4u,10u,11u,12u,15u,19u,20u}){
+        for(const auto rider:originalUiRiderRoster50KG){
             const auto pod=owner.podWidget(rider),character=owner.characterWidget(rider);
             const auto p=owner.podAssets(pod);const auto c=owner.characterAssets(character);
             if(bool(p)!=bool(c))return fail(E::input);
-            if(!p){if(rider==19)return fail(E::input);continue;}
+            if(!p){if(rider==19||owner.previewRequested(rider))return fail(E::input);continue;}
             if(!valid(pod)||!valid(character)||!p->loaded()||!c->loaded()||!p->scene()||!c->scene())return fail(E::input);
             bool podReady=false,characterReady=false;
             d.widget=pod;
@@ -193,7 +193,9 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
             d.widget=character;
             if(!materialCacheReady(*c->scene(),false,s.input,characterReady,d.material))return fail(E::material);
             if(!podReady||!characterReady){
-                if(rider==19||rider==20)return fail(E::material);
+                // Every explicitly requested pair is mandatory;
+                // never seal a requested preview with either cache absent.
+                if(rider==3||rider==7||rider==19||rider==20||owner.previewRequested(rider))return fail(E::material);
                 continue;
             }
             if(included[pod]||included[character])return fail(E::input);
@@ -253,6 +255,16 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         }
         auto bank=std::make_shared<assets::OriginalUiImageBank50KG>();
         if(!bank->load(population,d.bank))return fail(E::bank);
+        // Explicit preview pairs require complete private candidates before seal.
+        // Mapping alone never implies descriptor/material readiness.
+        for(const auto rider:originalUiRiderRoster50KG)
+            if(owner.previewRequested(rider)||(rider==3&&owner.podAssets(owner.podWidget(rider)))){
+            if(!pods[rider]||!characters[rider])return fail(E::input);
+            for(const auto id:{pods[rider],characters[rider]})
+                if(!modelSources[id]||!candidates[id]||!candidates[id]->loaded()||
+                   !footprints[id].prepared()||indices[id]==noOwner||!bank->mapping(indices[id],0))
+                    return fail(E::material);
+        }
         // Commit only to the still-private candidate. Collector policies and
         // actual GPU admission must succeed before the manager can escape.
         // No source material reference/lifetime is acquired by these caches.

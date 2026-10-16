@@ -36,12 +36,13 @@ def strip_quote(value):
     return value.strip().strip('"')
 
 
-def prepare_pod(importer, resource, out):
+def prepare_pod(importer, resource, out, identities):
     source_hash = sha(resource)
-    if resource.stem.upper() == 'POD19':
-        require(resource.stat().st_size == 388750 and source_hash ==
-                '7fd2b69f04351dc73d563527df8b67a1ed896c7d47f6a47fe9ee753f2394e826',
-                'POD19 requires its exact original RES; another pod or UI archive is not a substitute')
+    identity = identities.get(resource.stem.upper())
+    if identity:
+        require(resource.stat().st_size == identity['resource_bytes'] and
+                source_hash == identity['resource_sha256'],
+                resource.stem.upper() + ' requires its exact original RES; another pod or UI archive is not a substitute')
     subprocess.run([str(importer), str(resource), str(out)], check=True, stdout=subprocess.DEVNULL)
     require(sha(resource) == source_hash, 'Original resource changed during import')
     report = json.loads((out / 'import.json').read_text())
@@ -56,16 +57,29 @@ def prepare_pod(importer, resource, out):
     physics = [r for r in report['members'] if r['kind'] == 'phy']
     require(len(physics) == 1, 'Expected one exact pod PHY')
     phy = physics[0]
+    if identity:
+        require(phy['source_sha256'] == identity['phy_sha256'], 'Original selected PHY identity mismatch')
+        for category, digest in identity['speech_sha256'].items():
+            key = 'audio/speech/' + resource.stem.lower() + '/' + category + '.ini'
+            require(key in index and index[key]['source_sha256'] == digest,
+                    'Original selected audio authoring identity mismatch: ' + key)
     require(phy['native_physics_49n_accepted'], 'PHY is outside the native49N reader admission')
     authored = ini(out / phy['source_file'])
     setup = authored['Pod Setup']
+    roles = ['Chariot', 'LeftEngine', 'RightEngine']
+    bottom = [role in setup for role in ('BottomLeftEngine', 'BottomRightEngine')]
+    require(bottom[0] == bottom[1], 'Partial original bottom-engine pair')
+    if bottom[0]:
+        require(resource.stem.upper() == 'POD02' and strip_quote(setup['EngineMotion']) == '5',
+                'Unsupported original bottom-engine topology')
+        roles += ['BottomLeftEngine', 'BottomRightEngine']
     prefix = norm(phy['source_member']).rsplit('/', 1)[0] + '/'
     pod = {'pod_id': resource.stem.upper(), 'name': strip_quote(setup['Name']),
            'resource_sha256': report['source_container_sha256'],
            'resource_file': str(resource), 'phy': phy, 'components': [],
            'materials': [], 'textures': [], 'unresolved_texture_bindings': [], 'original_asset_inputs_available': True}
     materials, textures = {}, {}
-    for role in ('Chariot', 'LeftEngine', 'RightEngine'):
+    for role in roles:
         stem = Path(norm(strip_quote(setup[role]))).stem
         member = prefix + stem + '.psg'
         require(member in index, 'Missing authored component ' + member)
@@ -93,11 +107,14 @@ def prepare_pod(importer, resource, out):
 
 
 def main():
+    catalog = json.loads(Path(__file__).with_name('additional_pod_identities.json').read_text())
+    require(catalog.get('schema') == 'RR_ADDITIONAL_POD_IDENTITIES_V1', 'Additional identity catalog schema mismatch')
+    identities = catalog['pods']
     parser = argparse.ArgumentParser()
     parser.add_argument('--importer', required=True, type=Path)
     parser.add_argument('--disc', required=True, type=Path)
     parser.add_argument('--pods', nargs='+', default=['POD%02d' % i for i in (1, 3, 4, 7, 8, 9, 10, 11)])
-    parser.add_argument('--additional-pods', nargs='+', choices=['POD19'], default=[],
+    parser.add_argument('--additional-pods', nargs='+', choices=list(identities), default=[],
                         help='Prepare own Course-selected resources without enlarging the eight-racer field')
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--expected-visual-selection', type=Path)
@@ -113,7 +130,12 @@ def main():
     for pod in selected_pods:
         expected = f'pods/{pod.lower()}/{pod.lower()}.res'
         require(expected in source_index, 'Missing retained original resource: ' + expected)
-        resources.append(source_index[expected])
+        resource = source_index[expected]
+        identity = identities.get(pod)
+        if identity:
+            require(resource.stat().st_size == identity['resource_bytes'] and
+                    sha(resource) == identity['resource_sha256'], 'Original resource identity mismatch: ' + expected)
+        resources.append(resource)
     expected = {}
     if args.expected_visual_selection:
         expected = {r['pod_id']: r for r in json.loads(args.expected_visual_selection.read_text())['racers']}
@@ -121,7 +143,7 @@ def main():
     roster, additional = [], []
     for resource in resources:
         directory = resource.stem.lower()
-        pod = prepare_pod(args.importer.resolve(), resource.resolve(), args.output / directory)
+        pod = prepare_pod(args.importer.resolve(), resource.resolve(), args.output / directory, identities)
         if expected:
             reference = expected[pod['pod_id']]
             require(pod['resource_sha256'] == reference['container_sha256'], 'Original container differs from authenticated visual source')

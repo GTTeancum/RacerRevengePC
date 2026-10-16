@@ -1,0 +1,44 @@
+SOURCE REVIEW ONLY -- UNTESTED
+Base: abbf73d740ef23b8529448755d7494c234033e8b
+Tree: 12c4ffb473a0804bf09ba0e3d269b27cdd1c0ef8
+Input ZIP: 11547167 bytes; SHA256 a9b83d548bb8f1609d1605ad90abab2ef204e30dcbe5c889dbb84ec16eaeca45
+Exact changed file: platform/linux/native/vehicle_window_gl50ds.cpp
+Exact function: Storage::drawTrack(bool transparent)
+Patch SHA256: 0c41f0c3975617511b92814bf98f71862f6a5ecb83b2a1f82b3af1bd9333bd65
+
+Source-review checklist:
+- Cache is stack-local inside the track-span branch, unknown on every invocation.
+  No cross-frame, cross-pass, cross-context or external state assumptions.
+- Effective tuple: depthWrite, blendEnabled, depthFunction, sourceFactor,
+  destinationFactor. Opaque factors canonicalized to zero.
+- Depth function mirrors configureBlend: layered sourcePass > 1 or depthEqual
+  selects LEQUAL; otherwise LESS. Depth testing remains enabled.
+- Blended source factor mirrors fixedBlendAlpha (ONE vs SRC_ALPHA);
+  destination factor mirrors additive (ONE vs ONE_MINUS_SRC_ALPHA).
+  configureBlend still establishes FUNC_ADD whenever emitted for blending.
+- Unknown/different tuple executes the original configureBlend unchanged.
+  Known identical tuple skips its four opaque or six blended state calls.
+- sourceUvAnimation invalidates before configureBlend and remains unknown after
+  the existing material check: both the callback span and following span submit.
+  Callback placement and same-span chunk behavior remain unchanged.
+- Other reachable operations in this loop are direct texture/uniform/draw GL
+  calls, pure effectMode calculation, and check/getError. They do not mutate
+  depth/blend state. Any future impure callback/helper must invalidate this cache.
+- Tuple assignment/known publication occur only after the original material
+  error check succeeds. Failure returns before publication; local state dies.
+- Existing boundSpan chunk reuse and texture/uniform cache unchanged.
+- Every draw, source-order/pass filter, layered adjacency, index range, counter,
+  submittedGameplayCandidate flag and material/draw error check is unchanged.
+- resetNativeGcLighting and resetPodState remain unchanged. Cache dies on return.
+- configureBlend definition and all other callers are unchanged.
+- No batching, uniform changes, material/raster-policy changes, synchronization,
+  target/MSAA changes, world-light binding changes, or gameplay changes.
+
+Root integration:
+This is an incremental patch against the exact primary renderer entry in the
+supplied abbf73d ZIP. Root must coordinate renderer-file overlap with MSAA and
+world-light helpers; do not replace the whole renderer from this helper folder.
+No implementation or edits in central checkout. No original disc access.
+No builds, tests, syntax checks, profiling, gameplay or project execution.
+No speedup claim: retained draw count does not establish redundant span count.
+Root owns integration, compilation and all software/runtime checks.

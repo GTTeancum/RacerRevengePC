@@ -87,7 +87,7 @@ Type3Segment48P segment(const Type3RayBuffers48P& b,std::size_t i) noexcept {
 Status dispatchMesh50IJ(const Type3QueryInput48P& input,const Type3QueryContext48P& context,
     const assets::CollisionMesh48I* mesh,const BodyMatrix48G& matrix,bool updateCenter,bool identityValid,
     const Type3RayBuffers48P& rays,std::uint32_t* stack,std::size_t stackCapacity,
-    Type3QueryState48P& state,bool& hit) noexcept {
+    Type3QueryState48P& state,bool& hit,detail::Type3VectorScratch48U* scratch=nullptr) noexcept {
     const auto count=static_cast<std::size_t>(context.pairCount);Math math;
     if(!mesh||mesh->nodes.empty()||mesh->faces.empty()||mesh->vertices.empty()||
        (!mesh->vertex_normals.empty()&&mesh->vertex_normals.size()!=mesh->vertices.size()))return Status::InvalidInput;
@@ -104,6 +104,10 @@ Status dispatchMesh50IJ(const Type3QueryInput48P& input,const Type3QueryContext4
     if(updateCenter)state.localCenter=math.transform(inverse,xyz(state.worldCenter),true);
     else if(!finite(state.localCenter))return Status::InvalidInput;
     if(!math.valid)return Status::InvalidInput;
+    //1271D0/12721C (compound1274C4 local-start counterpart): every reached
+    //point transform resetsVF9.W=1. The admitted miss tree/triangle helpers
+    //use onlyVF4..6, preserving it until the result transforms below.
+    if(scratch&&(count||updateCenter)){scratch->vf9W=1.f;scratch->written=true;}
     if(!stackCapacity)return Status::InsufficientCapacity;
     if(mesh->nodes.size()>std::numeric_limits<std::size_t>::max()-mesh->faces.size())return Status::InvalidInput;
     const auto visitLimit=mesh->nodes.size()+mesh->faces.size();std::size_t used=1,visits=0;stack[0]=0;
@@ -159,13 +163,17 @@ Status dispatchMesh50IJ(const Type3QueryInput48P& input,const Type3QueryContext4
         state.selectedPoint=quad(math.transform(matrix,xyz(state.selectedPoint),true),1.f);
         state.selectedNormal=quad(math.transform(matrix,xyz(state.selectedNormal),false,true),2.f);
         state.selectedCorrection=quad(math.transform(matrix,xyz(state.selectedCorrection),false,true),3.f);
+        //12731C resets1;127360 and127394 increment to3. Compound1275D4,
+        //127618,12764C repeat the same sequence, even after an earlier member
+        //hit when this member contributes none (the source hit is cumulative).
+        if(scratch){scratch->vf9W=3.f;scratch->written=true;}
     }
     return math.valid?Status::Complete:Status::InvalidInput;
 }
 Status dispatchBorrowed(const Type3QueryInput48P& input,const Type3QueryContext48P& context,const Type3Candidate48P& candidate,
     const CollisionSphere48J& sphere,const assets::CollisionMesh48I* mesh,const BodyMatrix48G& matrix,bool shapePresent,
     const Type3RayBuffers48P& rays,std::uint32_t* stack,std::size_t stackCapacity,
-    Type3QueryState48P& state,bool& hit) noexcept {
+    Type3QueryState48P& state,bool& hit,detail::Type3VectorScratch48U* scratch=nullptr) noexcept {
     hit=false;const auto count=static_cast<std::size_t>(context.pairCount);const auto& c=candidate.collision;
     for(std::size_t i=0;i<count;++i)rays.hits[i]=0;
     if(!(c.filter.flags31&1u))return Status::Complete;
@@ -179,7 +187,7 @@ Status dispatchBorrowed(const Type3QueryInput48P& input,const Type3QueryContext4
     for(std::size_t i=0;i<count;++i)rays.fractions[i]=-1.f;
     if(candidate.shapeType!=0&&candidate.shapeType!=1)return Status::Complete;
     if(!shapePresent)return Status::UnsupportedScope;
-    if(candidate.shapeType==0)return dispatchMesh50IJ(input,context,mesh,matrix,true,c.geometry.id==c.filter.identity,rays,stack,stackCapacity,state,hit);
+    if(candidate.shapeType==0)return dispatchMesh50IJ(input,context,mesh,matrix,true,c.geometry.id==c.filter.identity,rays,stack,stackCapacity,state,hit,scratch);
     if(!candidate.compound)return Status::UnsupportedScope;
     const auto& compound=*candidate.compound;
     if(compound.count>maxCompoundMembers50IJ||(compound.count&&!compound.parts))return Status::InvalidInput;
@@ -187,7 +195,7 @@ Status dispatchBorrowed(const Type3QueryInput48P& input,const Type3QueryContext4
     // All flags/fractions and cumulative hit survive between ordered members.
     for(std::size_t i=0;i<compound.count;++i){
         const auto& part=compound.parts[i];
-        const auto status=dispatchMesh50IJ(input,context,part.mesh,part.worldMatrix,false,c.geometry.id==c.filter.identity,rays,stack,stackCapacity,state,hit);
+        const auto status=dispatchMesh50IJ(input,context,part.mesh,part.worldMatrix,false,c.geometry.id==c.filter.identity,rays,stack,stackCapacity,state,hit,scratch);
         if(status!=Status::Complete)return status;
     }
     return Status::Complete;
@@ -207,6 +215,15 @@ Type3QueryStatus48P dispatchType3Borrowed48U(const Type3QueryInput48P& input,
     const Type3RayBuffers48P& rays,std::uint32_t* stack,std::size_t stackCapacity,
     Type3QueryState48P& state,bool& hit) noexcept {
     return dispatchBorrowed(input,context,candidate,sphere,mesh,matrix,shapePresent,rays,stack,stackCapacity,state,hit);
+}
+Type3QueryStatus48P dispatchType3BorrowedWithScratch48U(const Type3QueryInput48P& input,
+    const Type3QueryContext48P& context,const Type3Candidate48P& candidate,
+    const CollisionSphere48J& sphere,const assets::CollisionMesh48I* mesh,const BodyMatrix48G& matrix,bool shapePresent,
+    const Type3RayBuffers48P& rays,std::uint32_t* stack,std::size_t stackCapacity,
+    Type3QueryState48P& state,bool& hit,Type3VectorScratch48U& scratch) noexcept {
+    scratch.written=false;
+    return dispatchBorrowed(input,context,candidate,sphere,mesh,matrix,shapePresent,
+        rays,stack,stackCapacity,state,hit,&scratch);
 }
 bool eligibleType3Borrowed48U(const CollisionFilter48J& query,const CollisionFilter48J& candidate,
     std::uint8_t flagsF8) noexcept {return eligible(query,candidate,flagsF8);}

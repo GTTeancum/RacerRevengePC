@@ -1,0 +1,157 @@
+RA compressed static fog recovery, 2026-10-15 — UNTESTED source-only candidate
+
+DELIVERABLE
+New standalone tests/native/ra_static_fog_numeric50la.h, plus original-word
+annotations and this ownership proposal. No existing production, material
+decoder, aggregate, renderer or Session file changed. This supersedes the
+numeric dependency in RA-STATIC-FOG-DEPENDENCY.txt: the single-palette compressed
+fog scaling is now recovered from original executable bytes. It does NOT close
+actual RA model compute-fog state or SourceCamera fog-preparation lifetime.
+
+Original disc SLUS_202.68 read only, SHA256
+c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30.
+ELF offset=VA-100000+80. No guest instruction executed. Annotators only label
+word fields. No instruction state, register bank, stepping or emulation exists.
+Packet annotations distinguish VIF MPG headers from instruction pairs and map
+branch targets through MPG addresses; raw ELF-relative branching would be off
+by eight bytes when crossing a packet header. Unknown labels remain explicit.
+
+ACTUAL UPLOADS AND BRANCH
+240A7C..240A98 sets UNPACK row41 and row42.2415E0..2415E8 copies actual
+model1B2/1B3 to the packet row41.x field.240A9C..240AD0 sets row42 to:
+  (model1E0 positionScale, model1E4 normalScale, model1E8 textureScale,
+   binary32(1 / model1E0)).
+The final element is NOT PSG quantization[3]. Do not reuse that semantic field
+as inverse positionScale or change the unrelated texture importer here.
+
+340178 reads row32 into camera vector30;340180 reads row33 into vector18.
+24BDA4..24BE08 obtains row32 from the actual active camera+180..18C.
+24BE38..24BE78 gets actual renderer B4/B8, uploading end and slope to33.zw.
+245140's state setter owns slope255/(start-end), independently of program.
+
+3376B8/3376D0/3376D8/3376E8 and339628/339640/339648/339658 read row41.x,
+mask2, and branch to radial fog when nonzero. Diffuse's target is338318 after
+accounting for its MPG header; Prelit's target339C88. Bit04 selects clipping
+path; Diffuse additionally branches on row41.w palette count. Numeric candidate
+scope is the single-palette/static vertex path, not arbitrary palette clipping.
+
+241320..241384 selects radius194 when nodeCount1A0==1, else radius198; adds
+distance1BC, compares against current renderer B0 fogStart, and writes bit02
+of1B2 to !(distance+radius < fogStart), preserving other bits.26F070's distance
+producer chooses center140 or160 using the same node-count condition, then
+uses (center-camera180)+LOCAL model F0/F4/F8, ordered squared length/SQRT,
+and writes distance1BC at26F190. The new leaf does not claim these source
+fields exist in RA's current native Placement merely because its vertices do.
+
+Correction to the earlier dependency report:240664..2406C8 sets compression
+bit40 by comparing position/normal scales with1. It does NOT produce fog bit02.
+The real compute-fog producer is24133C..241384, detailed above.
+
+ORDERED COMPRESSED PREAMBLE
+340188: d=camera180-packetModel.translation.
+3401A0..3401F0: componentwise multiply d by each packet basis row; local camera
+X=(x+y)+z; Y=(y+x)+z; Z=(z+x)+y, preserving the distinct addition orders.
+3401F8: endProduct=end33.z*slope33.w, BEFORE any slope scaling.
+340210: scaledSlope=slope33.w*row42.x when bit40 is set.
+340218: localCameraRaw=localCamera*row42.w when bit40 is set.
+3402E0 stores localCameraRaw in row65; positive-palette path separately stores
+it at palette+11 at340288. The latter is not silently admitted by this patch.
+
+For world-space model1DC!=0,240B04..240B74 constructs identity via14D840 and
+copies model1D0/1D4/1D8 into translation;241678..2416A0 skips replacement.
+Thus packetModel is identity+PSG origin, NOT the identity visualMatrix used
+after semantic vertex import, and NOT the SCB placement translation. Local
+single-node packets use the real model world100. Raw vertex integer must be
+recovered before position scale AND origin; semantic worldPosition is not raw.
+
+FOG BYTE LEAF
+Single-palette Prelit clipped candidate vertex sequence:
+339D38 reads row65;339D58/339D68 subtract localCameraRaw from ITOF0 raw XYZ;
+339D78 ELENG,339E08 MFP.w;339E20 SUBAz.w forms524288-endProduct;
+339E30 MADD.w adds distance*scaledSlope;339E58 lower clamp524288;
+339E78 upper clamp524543;339EB0 MTIR.w retains the packed fog bits.
+Unclipped Prelit matches at33A118/33A138/33A1C8/33A1E0/33A1E8/33A208/33A228,
+with subsequent pipelined vertices retaining the same calculation.
+Diffuse clipped matches338398/3383D0/3383F0/338480/338488/3384A0/3384C0/3384E0;
+unclipped counterpart338798 onward uses the same row65 and18.zw operands,
+SUB/ELENG/MFP/SUBAz/MADD/max/min sequence (see full retained listing).
+
+Native equation, in distinct binary32 operations:
+  delta=rawPosition-localCameraRaw
+  distance=native_sqrt((dx*dx+dy*dy)+dz*dz)
+  biased=(524288-endProduct)+(distance*scaledSlope)
+  clamped=max(524288,min(524543,biased))
+  F=(floatBits(clamped)>>4)&255
+MTIR extracts low16 containing F<<4; this agrees with source fog lane packing.
+The bit02-clear branch emits255 after254+vf0.w and FTOI4, not254. Material FGE
+is independent. No CPU/GPU interpolation or fragment operation is provided.
+
+NATIVE CANDIDATE CONTRACT
+prepareCompressed accepts pure operand snapshots, validates finite affine
+matrix/positive scale/round-to-nearest, preserves lane order and separate
+operations, and publishes output only on success. radialByte validates signed
+24-bit source integers, finite arithmetic, computes the native sqrt candidate
+and packs a byte. This is source-backed native math with possible visual
+differences, NOT EFU/PS2 bit parity. It cannot mint any owner lease or renderer
+permission. No tests or shader checks have been run. No shared native rejection
+was removed; no guessed compute-fog bit or all-F255 fallback was installed.
+
+MINIMAL SOURCECAMERA GUARD PROPOSAL (NOT IMPLEMENTED)
+Apply to root's current Session, not by copying this older entire header:
+1. Add a private FogPreparation record in Session with monotonically increasing
+   revision, pose publication/frame/generation, actual trackFog3EC pointer,
+   consumed source color30/start34/end38 and actual resulting camera data.
+   Keep this record inaccessible to callers; no public constructor accepting
+   matrix/ready/fog fields. Only prepareGameplayFogRender publishes it after
+   successfully rebuilding the same camera. Check revision overflow beforehand.
+2. Clear the current record at entry to every prepareGameplayFogRender call,
+   including invalid-phase failures, and on every new frame, failure, close,
+   abandon and fog reset/restore path. Keep revision monotonic across clears.
+   Successful reprepare increments revision even within the same pose frame.
+3. Private readCurrentFogPreparation must require coldBound, published stage,
+   live unchanged DisplayInputs, same actual trackFog3EC pointer, same session
+   generation/pose publication/frame, matching consumed fog values, and same
+   rebuilt matrices/range. Return copied numeric operands only on success.
+   Checking near/far alone is insufficient: different start/color values can
+   share far. A pointer alone is insufficient: restoreOriginalRaceFog1A98DC and
+   other existing owners mutate the pointed-to state.
+4. OwnershipBridge must first pass its existing actual cameraBankCurrent/
+   freshLighting/session identity checks, then borrow that private record.
+   A nested typed FogPublicationLease retains this bridge and the exact issued
+   revision. Every read rechecks current revision and all source ownership.
+   No public Session pointer or free matrix constructor; no racer DrawLease.
+5. The already-public DisplayInputs trackFog3EC pointer is borrowed. Its owning
+   arena must outlive Session/Bridge, consistent with existing Session display
+   borrows. If root allows replacement/destruction while Session survives,
+   add an actual retained fog-owner object before any lease; a generation token
+   cannot make a dangling pointer safe. Inspect current root wiring first.
+
+EXACT REMAINING INPUTS BEFORE A WORLD BINDING
+- Genuine current RA Session fog-prepared publication and its live trackFog3EC
+  owner, including authentic start/end/color (no TA/GC numeric substitution).
+- Actual RA per-placement model node count, radius194/198 and distance1BC /
+  bit02 production at the correct source phase. Current Placement holds source
+  payload/materials/matrices but no admitted lifetime for those computed fields.
+- Actual packet matrix: identity+PSG origin for world-space, correct source
+  model world for local route; original raw24 positions and positionScale.
+- Preserve compression bit40 and single-palette admission; don't admit a
+  positive-palette row65 shortcut. Clip-generated vertices remain unresolved.
+- Sampling/interpolation, destination composition, AA/MSAA coverage and target
+  depth mapping remain separate. All seven material profiles and depth writes
+  stay exactly as in the earlier inventory. No decoder-worker files touched.
+
+REVIEW CHECKLIST
+[ ] Independently inspect raw words/MPG boundaries and operand ordering.
+[ ] Review native sqrt/binary32 policy as an explicit visual difference.
+[ ] Integrate only the new header; no existing interface is relaxed.
+[ ] Bind only after real RA model fog bit and SourceCamera guard exist.
+[ ] Keep RA activation blocked and all validation centrally owned.
+
+Annotation encoding reference (read only, no reference project executed):
+https://raw.githubusercontent.com/PCSX2/pcsx2/master/pcsx2/DebugTools/DisVUmicro.h
+https://raw.githubusercontent.com/PCSX2/pcsx2/master/pcsx2/DebugTools/DisVU1Micro.cpp
+Source words, not emulator output, are the game evidence. No reference emulator
+implementation was included in the native arithmetic candidate.
+
+No tests, builds, syntax/shader checks, sanitizers, gameplay, converters, guest
+execution, emulation, central edits, renderer activation or RA gameplay claims.

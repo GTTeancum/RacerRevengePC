@@ -15,15 +15,10 @@ bool equal(const char* a,const char* b,std::size_t n) noexcept {
     return i==n&&a[i]==0;
 }
 }
-bool readMotionNodeBindings49O(const PsgHierarchyView49O& view,
-    const char* text,std::size_t bytes,MotionNodeBindings49O& output,
-    MotionBindingDiagnostic49O& diagnostic,MotionBindingMissingNode49O missingNode) noexcept {
+bool readMotionNodeEnumeration49O(const PsgHierarchyView49O& view,
+    MotionNodeBindings49O& output,MotionBindingDiagnostic49O& diagnostic) noexcept {
     diagnostic={MotionBindingError49O::none,0};
     const auto fail=[&](MotionBindingError49O e,std::size_t p){diagnostic.error=e;diagnostic.offset=p;return false;};
-    if(missingNode!=MotionBindingMissingNode49O::reject&&
-       missingNode!=MotionBindingMissingNode49O::sourceDiagnosticSkip)
-        return fail(MotionBindingError49O::limit,0);
-    if(!text||!bytes||bytes>16384)return fail(MotionBindingError49O::limit,0);
     if(!view.nodeCount||view.nodeCount>64)return fail(MotionBindingError49O::hierarchy,0);
     std::int32_t parents[64]{};
     char names[64][50]{};
@@ -52,11 +47,29 @@ bool readMotionNodeBindings49O(const PsgHierarchyView49O& view,
         }
     }
     if(result.count!=view.nodeCount)return fail(MotionBindingError49O::hierarchy,0);
+    output=result;return true;
+}
+bool readMotionNodeBindings49O(const PsgHierarchyView49O& view,
+    const char* text,std::size_t bytes,MotionNodeBindings49O& output,
+    MotionBindingDiagnostic49O& diagnostic,MotionBindingMissingNode49O missingNode) noexcept {
+    diagnostic={MotionBindingError49O::none,0};
+    const auto fail=[&](MotionBindingError49O e,std::size_t p){diagnostic.error=e;diagnostic.offset=p;return false;};
+    if(missingNode!=MotionBindingMissingNode49O::reject&&
+       missingNode!=MotionBindingMissingNode49O::sourceDiagnosticSkip)
+        return fail(MotionBindingError49O::limit,0);
+    if(!text||!bytes||bytes>16384)return fail(MotionBindingError49O::limit,0);
+    MotionNodeBindings49O result{};
+    if(!readMotionNodeEnumeration49O(view,result,diagnostic))return false;
     std::size_t p=0;
     while(p<bytes){
         const auto start=p;while(p<bytes&&text[p]!='\n')++p;
         auto end=p;if(end>start&&text[end-1]=='\r')--end;
         if(end==start||end-start>255)return fail(MotionBindingError49O::line,start);
+        // Original15326C/153374 strtok delimiters at3A5F60/3A5F68 include
+        // ASCII space. Authentic03c.vut authors trailing spaces on RHS names.
+        // Admit only this source-backed suffix; preserve the physical-line
+        // bound and every identifier, hierarchy and unknown-node check.
+        while(end>start&&text[end-1]==' ')--end;
         std::size_t sep=start;while(sep<end&&text[sep]!='=')++sep;
         if(sep==end||!identifier(text+start,sep-start))return fail(MotionBindingError49O::line,start);
         std::size_t comma=sep+1;while(comma<end&&text[comma]!=',')++comma;

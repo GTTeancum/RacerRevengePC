@@ -52,9 +52,20 @@ struct MaterialPass48E {
     std::vector<MaterialTexture48E> textures;
     MaterialFields48E fields;
 };
+struct MaterialInactiveSection48E {
+    std::string name; // Original numbered section above TotalShaderPasses.
+    std::size_t source_offset = 0, source_length = 0;
+    // Lexical evidence only: no program, texture, defaults or render state.
+    MaterialFields48E fields;
+};
 struct Material48E {
     MaterialFields48E general;
-    std::vector<MaterialPass48E> passes;
+    std::vector<MaterialPass48E> passes; // Only declared ShaderPass_1..count.
+    std::vector<MaterialInactiveSection48E> inactive_sections; // Source order.
+    // Populated for inactive sections or admitted empty duplicate keys. Original text
+    // is retained byte-for-byte, including comments, whitespace and newlines;
+    // each inactive section's range refers into this bounded evidence buffer.
+    std::vector<std::uint8_t> original_text;
 };
 
 // Bounded48D kind1 subset plus source-backed50KG kind0 packed-index expansion.
@@ -70,6 +81,9 @@ bool decodeTexture48E(const std::vector<std::uint8_t>& input, Texture48E& output
     const TextureLimits48E& limits = TextureLimits48E{});
 bool encodeTextureLevel48E(const TextureMip48E& mip, std::vector<std::uint8_t>& output,
     DecodeError48C& error);
+// Original29B718/29B7F0 counts declared passes, not physical section headers.
+// Extra ShaderPass_N sections within1..8 remain inactive lexical evidence.
+// Prologue/Epilogue and unrecognized sections are still outside this subset.
 bool decodeMaterial48E(const std::vector<std::uint8_t>& input, Material48E& output,
     DecodeError48C& error, const DecodeHooks48C* hooks = nullptr,
     std::size_t maxBytes = 64u * 1024u);

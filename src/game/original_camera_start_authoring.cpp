@@ -67,9 +67,22 @@ bool OriginalCourseStartActions::prepare(OriginalCameraStartCourse course,const 
     const char* sha=nullptr;std::size_t exact=0;
     if(course==OriginalCameraStartCourse::gc){exact=9623;sha="e677f80d12da2c2225c8ba030e2a29e3a358c52bcfd4f9c981b79c3c53b72454";}
     else if(course==OriginalCameraStartCourse::ga){exact=9689;sha="e96450990e23c97f6d686707a183789b08d45857187d5c8463960cb323e75aa3";}
+    else if(course==OriginalCameraStartCourse::ta){exact=13887;sha="11e4c4909bf866fee626977c970d9907d4f191c29eeff32bddd162f173916f6b";}
+    else if(course==OriginalCameraStartCourse::ma){exact=32691;sha="4a3bcecce43a53b3ec3ac28df9c9672a61e825a2987c11bbd0ab055b29f7da55";}
+    else if(course==OriginalCameraStartCourse::sa){exact=13314;sha="b2b53df201ddfc5bd0283cd50911c6e94937f3633bba33b864da13557f415542";}
+    else if(course==OriginalCameraStartCourse::ra){exact=95558;sha="7336c6bab40265adb5e82aec8ed3ee66669c19b26a597cfacedddfca4be48524";}
+    else if(course==OriginalCameraStartCourse::rc){exact=124930;sha="71b1f9609c0a6ce84d71ff69355d9cfcbc8771eb7ddb8876473b4fddd6e23e6d";}
     if(!sha||size!=exact||!hashMatches(bytes,size,sha))return false;
     // Independent static section-table inspection of these exact unchanged
     // originals proves no321_anims section. No generic section fallback here.
+    // RA tracks\ra.tob:713 sections; RC tracks\rc.tob:907 sections.
+    // CSCameras count bytes at TOB offsets15496/19491 are respectively7/5.
+    // Exact [CSCameras].NumberOfCameras: GC4, GA0, TA3, MA4, SA5, RA7, RC5.
+    // Source174DF0 derives controllerA8 from this genuine track3E4 value.
+    sourceSceneCutCount3E4_=course==OriginalCameraStartCourse::ta?3:
+        (course==OriginalCameraStartCourse::gc||course==OriginalCameraStartCourse::ma)?4:
+        (course==OriginalCameraStartCourse::sa||course==OriginalCameraStartCourse::rc)?5:
+        course==OriginalCameraStartCourse::ra?7:0;
     course_=course;authenticated_=true;return true;
 }
 }

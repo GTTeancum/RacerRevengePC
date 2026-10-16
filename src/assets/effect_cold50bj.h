@@ -6,7 +6,8 @@ struct EffectColdOpaque50BJ {std::uint8_t postBaseFlags1D4;std::uint32_t unusedN
 // Creates only a native control projection, not an entire source emitter.
 // Identity/profile must be supplied from the genuine creation binding. Upper
 // constructor flag bits remain explicit opaque input. The nonparticle word is
-// unconsumed adapter storage, NOT a recovered source204/render parameter.
+// unconsumed adapter storage for other nonparticle profiles. Splash19DBE0
+// has a proved real fractional204 initialized to0 and ignores this opaque word.
 // Requires authored Velocity XYZ; preserves constructor W=1 (158C00 writesXYZ).
 // Supports fresh modes0/1; false preserves output. Cold, bounded, allocation-free.
 bool buildEffectControlOwner50BJ(std::uint32_t id,rr::game::EffectProfile50BE,

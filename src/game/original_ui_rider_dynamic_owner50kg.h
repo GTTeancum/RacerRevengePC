@@ -4,9 +4,47 @@
 #include "original_ui_rider_model_scene50kg.h"
 namespace rr::platform {class OriginalUiRiderSession50KG;}
 namespace rr::game {
-// Immutable descriptor population only. Neither value authorizes source
+// Immutable descriptor population only. No value authorizes source
 // selection, graph creation, material registration or a destination change.
-enum class OriginalUiRiderColdPopulation50KG : std::uint8_t {selected19,rider19And20,defaultUnlocked};
+enum class OriginalUiRiderColdPopulation50KG : std::uint8_t {
+    selected19,rider19And20,defaultUnlocked,defaultUnlockedAndGasgano,
+    defaultUnlockedAndCleggPreview,defaultUnlockedAndGasganoAndCleggPreview
+};
+// Additive immutable resources only; never unlocks or selects a rider.
+enum class OriginalUiRiderPreviewSet50KG : std::uint8_t {none,indexed23And24,gasgano7,mawhonic9};
+// Original rider.dat identities only. Bit N requests rider N's complete pair.
+// A request conveys no unlock, selection, Confirm, or decoder admission.
+inline constexpr std::uint32_t originalUiRiderPreviewMask50KG=
+    (1u<<1)|(1u<<3)|(1u<<7)|(1u<<8)|(1u<<9)|(1u<<14)|(1u<<16)|(1u<<17)|
+    (1u<<18)|(1u<<21)|(1u<<22)|(1u<<23)|(1u<<24)|(1u<<25)|(1u<<26);
+inline constexpr std::uint32_t originalUiRiderRoster50KG[]{
+    1,2,3,4,7,8,9,10,11,12,14,15,16,17,18,19,20,21,22,23,24,25,26};
+inline constexpr bool originalUiRiderRequested50KG(std::uint32_t mask,std::uint32_t rider) noexcept {
+    return rider<32&&(mask&(std::uint32_t{1}<<rider))!=0;
+}
+inline bool originalUiRiderPreviewRequest50KG(OriginalUiRiderPreviewSet50KG legacy,
+    std::uint32_t requested,std::uint32_t& combined) noexcept {
+    combined=0;if(requested&~originalUiRiderPreviewMask50KG)return false;
+    switch(legacy){
+    case OriginalUiRiderPreviewSet50KG::none:break;
+    case OriginalUiRiderPreviewSet50KG::indexed23And24:requested|=(1u<<23)|(1u<<24);break;
+    case OriginalUiRiderPreviewSet50KG::gasgano7:requested|=1u<<7;break;
+    case OriginalUiRiderPreviewSet50KG::mawhonic9:requested|=1u<<9;break;
+    default:return false;
+    }
+    combined=requested;return true;
+}
+inline bool originalUiRiderColdMember50KG(OriginalUiRiderColdPopulation50KG population,
+    std::uint32_t requested,std::uint32_t rider) noexcept {
+    if(originalUiRiderRequested50KG(requested,rider))return true;
+    if(population==OriginalUiRiderColdPopulation50KG::selected19)return rider==19;
+    if(population==OriginalUiRiderColdPopulation50KG::rider19And20)return rider==19||rider==20;
+    if(rider==3)return population==OriginalUiRiderColdPopulation50KG::defaultUnlockedAndCleggPreview||
+        population==OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasganoAndCleggPreview;
+    if(rider==7)return population==OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasgano||
+        population==OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasganoAndCleggPreview;
+    return rider==2||rider==4||rider==10||rider==11||rider==12||rider==15||rider==19||rider==20;
+}
 class OriginalUiRiderDynamicOwner50KG;
 struct OriginalUiRiderDynamicBackend50KG {
     void* context=nullptr;
@@ -65,6 +103,7 @@ public:
     OriginalUiRiderDynamicHooks50KG hooks() noexcept;
     const OriginalUiRiderDynamicDiagnostic50KG& diagnostic() const noexcept;
     bool poisoned() const noexcept;
+    bool previewRequested(std::uint32_t rider) const noexcept;
     std::uint16_t podWidget(std::uint32_t rider) const noexcept;
     std::uint16_t characterWidget(std::uint32_t rider) const noexcept;
     OriginalUiRiderWidgetState50KG state(std::uint16_t) const noexcept;
@@ -83,7 +122,9 @@ private:
     friend class rr::platform::OriginalUiRiderSession50KG;
     // The session invokes this once while its candidate is still private.
     // Local candidates commit together; no dynamic/source callback is run.
-    bool prepareCold(OriginalUiRiderColdPopulation50KG,OriginalUiRiderDynamicDiagnostic50KG&) noexcept;
+    bool prepareCold(OriginalUiRiderColdPopulation50KG,OriginalUiRiderDynamicDiagnostic50KG&,
+        OriginalUiRiderPreviewSet50KG = OriginalUiRiderPreviewSet50KG::none,
+        std::uint32_t requestedPreviewRiders=0) noexcept;
     bool preflight(const OriginalUiRiderWidgetCallback50KG*,std::size_t) noexcept;
     bool apply(const OriginalUiRiderWidgetCallback50KG&,OriginalUiRiderWidgetState50KG&) noexcept;
     bool loadModel(std::uint16_t) noexcept;

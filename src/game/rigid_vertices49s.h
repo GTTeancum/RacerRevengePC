@@ -3,9 +3,10 @@
 #include <cstdint>
 
 namespace rr::game {
-constexpr std::uint32_t maxRigidVertices49S = 4096;
+constexpr std::uint32_t maxRigidVertices49S = 8192;
 constexpr std::uint32_t maxRigidPalette49S = 64;
 
+// Bounded storage includes POD02's authentic 4124-vertex chariot.
 // Compact, immutable projection of the admitted RRSCENE1 semantic position
 // and rigid bone association. No bind transform has been applied to positions.
 struct RigidVertex49S {
@@ -32,8 +33,8 @@ struct RigidVertexDiagnostic49S {
 // hierarchy traversal, root/placement reapplication, UV/color/index mutation,
 // allocation, I/O, callback or ownership operation.
 //
-// Admission: 1..4096 vertices, 1..64 finite affine matrices; finite local XYZ;
-// valid palette IDs; output capacity between input.count and4096. All views,
+// Admission: 1..8192 vertices, 1..64 finite affine matrices; finite local XYZ;
+// valid palette IDs; output capacity between input.count and8192. All views,
 // backing arrays and diagnostic are distinct live caller-owned records with
 // stable contents/lifetimes for this serial call. Overlap and lifetime are
 // preconditions, not inferred or repaired by this function.

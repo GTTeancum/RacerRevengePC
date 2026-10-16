@@ -1,0 +1,92 @@
+RA static model construction prefix -- isolated, UNTESTED
+
+Base: supplied d24aab3 full tracked-source snapshot, 11,765,841 bytes,
+SHA256 e8f8fbb3bd18178c5b2065904667655c70d8ad4babd4a0687c0c9a204757961a.
+Earlier light/fog candidates remain in their separate private directory.
+Root alone integrates; no owner checkout edits or source changes outside this
+new private extraction. No checks or tests were run.
+
+Concrete implemented ownership
+- New ra_static_model_cold50la.h owns stable per-placement model objects and
+  one canonical SceneGraph49P root each. Shared immutable PSG payloads never
+  share mutable model/graph/Entity state. It calls the existing authentic
+  constructDirectRoot2403A0, prepareDirectRoot26E934 and
+  loadDirectRootSourceRows28CAC0 operations on actual retained original bytes.
+  Direct row0 aliases the model, so count/reference/destruction occur once.
+- Every counted constructor uses the SAME retained Application423F60 counter,
+  attachment lock and type registry. Constructor sourceA1 is1, loader root mode
+  is direct (sourceA2=0). Original row matrix/bounds/radius are retained; no
+  caller matrix, calculated display AABB or selected flag is accepted.
+- Per-zone StaticModels parents use authentic27B610 Entity construction and
+  dispatch kind, sourceA1=1 from271154, with stable ordered authored slots.
+  Geometry-less slots remain explicitly unresolved rather than disappearing.
+  The expected source inventory is the existing 1085 visual placements plus
+  176 unresolved geometry-less slots, not a claimed runtime validation count.
+- The new owner strongly retains actual source/Application/material-table and
+  immutable geometry owners, borrowing each stable Placement's actual acquired
+  material references. It creates no second materials table or acquisition.
+- Cold factory accepts the actual Application, uses its exact retained world
+  domain/context, and derives session identity from the already retained RA
+  particle manager, as SourceCamera does. No caller generation/ready Boolean.
+- World owns the prefix and retires it before Placement backing/materials.
+  All constructed prefixes remain installed on failure. canClose preflights
+  lock, graph, references, absent observers, absent links and global count
+  before any destruction. Existing closeFreshUnlinked handles counted model
+  prefixes, then private empty parent references/base counts retire exactly
+  once. Native backing allocated before constructors is never counted.
+
+Exact bounded stop, deliberately NOT a full Standard loader
+This implements model/graph/Entity construction and source parent/order
+ownership, not completed27ABC0. Model roots still contain the original PSG
+local matrix. Source placement28AB90/289EC0 has NOT run. Material/geometry
+objects are retained inputs, not fabricated model1C4/1B4 fields. Cache warm
+selection/clone, packet1F0, row table26EE9C and wrapper metadata construction
+remain unadmitted. Repeated payload users receive distinct native cold row
+construction; this is not a claim that original26E820 chose a fresh cache path
+for every repeated member.
+
+The exact source order is observer28E8A0 at27AE0C BEFORE append141960 at27AE38.
+Therefore the StaticModels parents have no Entity children yet. Ordered slots
+associate the actual model prefixes with their source parent/ordinal, but do
+not impersonate completed wrapper tables or a live parent1C edge. This avoids
+skipping the still-missing observer stage merely to make the forest look live.
+The source StaticType default is Standard (3BB350/3BB360); any explicit value
+other than exact Standard is rejected for a visual model, rather than silently
+constructing a PSX model for a PhysicsObject wrapper. Null slots remain unresolved.
+
+Integration
+Include tests/native/ra_static_model_factory50la.h in root's chosen bounded
+cold setup caller. After prepareStaticWorld and constructRuntimeTrackParticleManager,
+explicitly call aggregate.constructStaticModelPrefixes(actualApplication, diagnostic).
+No existing caller was added or altered. Cold views are available through
+coldStaticWorld()->coldModelPrefixes(): model(), sourceRoot(), parent(), parentSlot().
+These are construction observations, never render/selected-state capabilities.
+The whole-world close path owns teardown, including failed prefixes.
+
+Source-review checklist
+1. Confirm same Application/domain/session and source-world identity at factory.
+2. Review direct-root row0 aliasing, count/reference balance and partial failure
+   after a type-registry mutation. No blanket counter reset or rollback.
+3. Preserve unresolved source slots and original per-zone/ordinal order.
+4. Do not use cold graphs as placed or selected models. Do not claim parent
+   Entity append, observer registration, packet production or full cache load.
+5. Before extending beyond this prefix, join actual source placement, resource/
+   material/packet publication and wrapper lifetime, then real observer19C;
+   only afterwards perform27AE38 with the exact parent and mask0.
+6. Root owns compilation/lifecycle validation; none occurred here. No syntax,
+   shader, sanitizer, build, gameplay or converter checks; no guest execution.
+
+Source word evidence
+Original SLUS was read only as data; never executed or modified. Included word
+annotations and range hashes cover2710F0 caller,27B610 parent constructor and
+27B650 teardown,27ABC0 model construction,27AAD0 wrapper destruction and
+3D2640 table.27AAD0 frees metadata/wrapper, NOT model8. Thus the new private
+unlinked-prefix cleanup explicitly owns its models and does not falsely call
+that cleanup a completed27B650/240450 teardown of an attached source scene.
+StaticModels table uses base notification28/2C and base child render slots;
+the new dispatch enum does not activate any walker.
+
+All active routes, original AI and RA trigger/activation blockers stay unchanged.
+No observer/projection/portal/selected queue or renderer-ready flag was added.
+
+Central review clarification: material references remain borrowed from stable world Placements for the entire prefix lifetime. Retaining immutable PSG inputs does not establish an acquired model geometry1B4 owner. Compile inclusion only; no caller or activation was added.

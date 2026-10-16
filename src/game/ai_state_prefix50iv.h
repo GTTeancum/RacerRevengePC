@@ -111,7 +111,7 @@ struct AiNoCombatInput50IV {
     AiTurnSideInput50IV turnSide; //Consumed only when1090<=0.
 };
 struct AiStateDispatchReceipt50IV {bool complete=true;std::uint32_t boundaryPC=0;bool turnSideRefreshed=false;};
-//16EB00 after1739D0. Implements actual0,4,5 and proven no-combat state2 guards.
+//16EB00 after1739D0. Implements actual0,4,5,6 and proven no-combat state2 guards.
 //A valid Boundary receipt means STOP before that operation; it is never false
 //combat input. Source writes preceding the boundary remain committed to state.
 inline bool advanceAiStateNoCombat50IV(const AiNoCombatInput50IV& i,AiStatePrefixState50IV& state,
@@ -134,7 +134,7 @@ inline bool advanceAiStateNoCombat50IV(const AiNoCombatInput50IV& i,AiStatePrefi
     case 2:
         if((i.applicationFlags58&1u)&&i.managerRacer0Present&&!i.managerRacer0State40&&
            (i.managerField34!=2u||(i.managerRacer1Present&&!i.managerRacer1State40))){
-            n.aiStateFE8=6;boundary(0x16eab0);break;}
+            n.aiStateFE8=6;break;} //16ED24/30 then16EDBC, packing/repair still follow.
         //1704E0 no-write early returns, in exact source order.
         if(f.read(i.combat1054)==0.f)break;
         if(f.read(i.timerCB8)<f.read(i.combatWait106C))break;
@@ -142,6 +142,7 @@ inline bool advanceAiStateNoCombat50IV(const AiNoCombatInput50IV& i,AiStatePrefi
         if(i.currentNodeFlags79&2u)break;
         if(i.fieldFE4&&i.placeCCC!=1)break;
         boundary(0x1705c8);break; //Next source operation scans real racers and writes1008.
+    case 6:break; //Authenticated3A7C40[6]=16EDBC: preserve genuine ending state.
     default:boundary(0x16eb7c);break;
     }
     if(!f.valid)return fail(d,AiPrefixError50IV::Arithmetic,0x16eb00);

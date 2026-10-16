@@ -17,7 +17,8 @@ struct SourceDependencies {
 class Owner final {
     gameplay_binder_candidate_fixture::Owner source_;
     p::MaterialTextureGl50EB gpu_;
-    std::array<core::Mesh,8> meshes_{};
+    std::array<std::array<core::Mesh,2>,8> meshes_{};
+    mutable std::array<core::Mesh,16> published_{};
     std::array<bool,8> ready_{};
     core::Workspace workspace_;
 public:
@@ -57,16 +58,22 @@ public:
         if(slot>=8||!source_.bindings(slot))return false;
         std::array<float,4> ambient;
         if(!lights.currentSourceGlobalAmbient50(ambient))return false;
-        g::OriginalUiRiderBinderQuad50KG quad;
         const std::array<float,3> camera{{cameraBackward.v[0],cameraBackward.v[1],cameraBackward.v[2]}};
-        if(core::project(state,frame,*source_.bindings(slot),camera,quad,workspace_)!=core::Status::complete||
-            core::shade(quad,ambient,meshes_[slot])!=core::Status::complete)return false;
-        ready_[slot]=true;return true;
+        std::array<core::Mesh,2> next{};
+        for(unsigned pair=0;pair<source_.bindingCount(slot);++pair){
+            g::OriginalUiRiderBinderQuad50KG quad;
+            if(core::project(state,frame,*source_.bindings(slot,pair),camera,quad,workspace_)!=core::Status::complete||
+                core::shade(quad,ambient,next[pair])!=core::Status::complete)return false;
+        }
+        meshes_[slot]=next;ready_[slot]=true;return true;
     }
     bool bindRaceFrame(p::VehicleWindowFrame50DS& frame)const noexcept {
         if(!gpu_.initialized()||frame.opponentCount!=7)return false;
         for(bool ready:ready_)if(!ready)return false;
-        frame.gameplayBinders=meshes_.data();frame.gameplayBinderCount=8;
+        std::uint32_t count=0;
+        for(unsigned slot=0;slot<8;++slot)
+            for(unsigned pair=0;pair<source_.bindingCount(slot);++pair)published_[count++]=meshes_[slot][pair];
+        frame.gameplayBinders=published_.data();frame.gameplayBinderCount=count;
         frame.gameplayBinderFrame=source_.selectedFrame();return frame.gameplayBinderFrame<10;
     }
     void reset()noexcept{source_.reset();ready_.fill(false);}

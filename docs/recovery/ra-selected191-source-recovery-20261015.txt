@@ -1,0 +1,129 @@
+Original RA static selected191 recovery -- source-only, UNTESTED
+
+Outcome: recovered exact producer/consumer boundaries and one documentation
+correction. No owner-backed selected state can truthfully be joined in the
+abbf73d snapshot: actual static model19C membership, gameplay projection rows,
+and selected18 traversal queues are absent. No selected Boolean API, runtime
+lease scaffolding, synthetic traversal or rendering activation was added.
+The prior fog-camera patch remains separate and byte-for-byte unchanged.
+Root's frozen8a911b3 and central checkout were not touched.
+
+1. Producer26EFC0, correction to portal-join-next-20261014.md line791
+
+26EFCC loads model03; DSLL32/DSRL32 at26EFD0/D4 isolate bit2. If set,
+26EFE0..26EFFC compute (old191 & ~1) | (0 & 1), store191, return1.
+Thus the disabled route CLEARS bit0, not sets it. This agrees with existing
+original_ui_rider_visibility50kg.cpp and contradicts the older prose note.
+It skips both selection and Application278 increment.
+Ordinary route calls actual model1A8.slotBC at26F008 (240C00 for this type),
+stores its low bit in191 at26F024 preserving other bits, calls26F070 only if
+that bit is set, then increments actual Application278 at26F050.
+Successful return1 from26EFC0 is therefore NOT a selected-state receipt.
+
+2. Exact240C00 selection, not a caller frustum Boolean
+
+240C2C..40 refreshes graph2897B0 if model190 bit0 is clear.
+240C44..90 initializes1B2: set04, clear08/80, preserving fog02 and other bits.
+240C94/CA0 uses actual3833D8 and model19C. When both permit membership,
+the source follows observer primary/linked rows and selects/rebuilds their
+projection; otherwise it multiplies actual modelWorld100 with actual
+renderer442F70.currentCamera0.combined100. Null-observer fallback is real
+source behavior, but is NOT permission to omit a static observer whose source
+constructor28E8A0 actually attached one.
+
+Important literal operand detail: the retained240CBC..240DD4 words initialize
+f12/f14 from row4C and f13/f15 from row50, reduce additional rows using MIN.S
+for f12/f14 and MAX.S for f13/f15, compare the selected candidate's same4C/50,
+and use280720 if the equalities fail. No loads from row54/58 appear in that
+loop. Do not replace this with an assumed four-coordinate rectangle union.
+Preserve this source peculiarity or explicitly bound admission after root
+reviews it. Existing flat-UI membership code does not implement this multi-row
+gameplay producer. Raw words are included; labeler's COP1 fn29 is MIN.S,
+fn28 MAX.S, fn32 C.EQ.S. No guest state was evaluated.
+
+240EF4..240F10 clips actual aggregate center160/halfExtent170 via2B0580 and
+sets selected to1-minus-return. This selection uses aggregate bounds even
+though26F070 separately uses center140/radius194 for nodeCount1A0==1.
+If selected with zero union mask, set1B2.08. Otherwise the selected branch
+clips against actual camera guardCombined2D0 at240F5C..240FF0. Its RETURN
+does not change selection: only its union-mask output affects flags. A zero
+guard union sets80 if actual4354F0 is nonzero, else08.
+241044 strips clip mask10; selected models set/clear1B2 bits04 and01 together
+according to remaining mask. Rejected models preserve01 while04 stays set
+and08/80 stay cleared. Returns original first-clip selection at2410BC.
+No selected-light membership, SCB zone ordinal, or host AABB result is enough.
+
+3. Actual camera/scene traversal boundary
+
+114D00 camera slot40 reads real parent38, passes it as BOTH arguments to
+27F650 at114D28, then runs base141C30. Parentless/disabled source paths differ;
+the camera Session pose publication alone is not this reached Entity callback.
+27F650 owns portal projection/admission work. At27F84C..27F888 it invokes
+actual zone method34.slot44 and distinct method38.slot44. Fallback443108 has
+its own identity/stamp and method34 dispatch at27F8F0..27F908.
+Actual per-zone List27E880 scans physical blocks via27EAF0.27EAF0 resets its
+selected18 collection at27EB38, filters actual registry flag/type entries,
+requires model31 bit0, invokes embedded model+8 Entity.slot40 at27EBA8,
+reads actual model191 at27EBB0 and queues that SAME model+8 only if selected.
+It calls actual renderer.slot20(0) at27EC68 after scanning each block.
+
+Later camera114D50 slot48 traverses27FEE0 before base141D70; the existing
+portal-render-entry note retains its independent stamp/recursion/exclusion
+contract. List27E920 invokes27ECA0 per physical block.27ECA0 ignores those
+buffer/count parameters and emits the actual selected18 collection in order
+through each queued Entity.slot48. The embedded model adapters2418F0/2418E0
+subtract8 then transfer to26EFC0/241280 respectively. Do not deduplicate, sort,
+clear once globally, or synthesize a list of visible placements. In particular,
+the source block-local reset/repeated emit behavior is not a host optimization.
+
+4. Fog-bit production and consumed packet ordering
+
+2412AC..2412BC gates the entire241280 model draw body on current191.bit0.
+Selected path refreshes graph when needed, reads radius194 iff nodeCount1A0
+is1 else radius198, adds retained distance1BC, compares with actual rendererB0.
+24136C..241384 writes only1B2.bit02 = !(distance+radius < rendererB0).
+The comparison belongs to this selected draw callback, not the earlier clip.
+The full1B2/1B3 halfword is copied into packet20 at241478..241484 for palette
+packets, or2415E0..2415E8 for the single-packet path. Copy precedes later matrix
+copies and1B3.08 completion. The earlier compressed-source recovery establishes
+row41.x bit02 consumption by DiffuseCompressed/PrelitCompressed VU programs.
+Material FGE still independently controls fragment fog. Neither FGE nor the
+unused numeric candidate is proof these actual packet stores happened.
+
+5. Native ownership audit and minimal honest next join
+
+ra_static_world50la.h::Placement owns source payload/materials and authored/
+visual matrices, not a canonical model graph Entity, observer19C, model191,
+packet1F0 or selected18 queue. OriginalStandardModelResource50LA is shared
+asset storage; it must not own per-placement mutable selection.
+original_gc_gameplay_lighting_candidate.cpp::Storage still allocates exactly
+maximumRacers+1 registration rows; beginCameraVisibility checks lifecycle
+objectCount==racerCount+1. Its lease cannot establish static model membership.
+The private camera fog revision fixes projection freshness only. It does not
+mint zone projection rows, admission A4/A6, Entity traversal or queue identity.
+
+Required joined ownership, before any selected-state publication:
+- Canonical per-placement model/graph plus actual embedded Entity and source
+  StaticModels parent/order/teardown. Populate aggregate160/170 as required by
+  240C00; single-row fog radius194 alone is not aggregate projection ownership.
+- Same retained world4C0 namespace expanded with each actual model Ref and
+  real19C First registration from28E8A0/2809C0, including updates and removal.
+- Actual zone projection4C..60 and application admission/dispatch lifetime,
+  current fog-prepared camera publication and mutable3833D8/4354F0 ownership.
+- Actual List/QuadTree methods, physical registries and per-method selected18
+  queues invoked by reached camera Entity callbacks with renderer barriers.
+- Only a private capability issued while processing that concrete queued
+  Entity may expose selected191/current graph/current packet preparation.
+  Keep identity+camera/fog revision+membership/traversal revision together;
+  invalidate on any dependent mutation. No public selected/ready input.
+
+These require genuine broader model/scene owners, not a narrow local adapter.
+Therefore no runtime source changes are proposed here. Root can compare its
+newer source for those owners before assigning the complete integration scope.
+
+Review checklist: verify disabled-bit correction; literal multi-row projection
+operands; first-clip versus guard selection distinction; per-block queue behavior;
+actual radius/packet order; absence of admitted selected state in this packet.
+All original AI and active routes are untouched. RA trigger geometry stays
+blocked. No tests/builds/syntax/shader/sanitizer/gameplay checks or converters.
+Only original bytes read and statically labeled; no SLUS/guest execution.

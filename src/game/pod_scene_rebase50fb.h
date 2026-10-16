@@ -4,7 +4,7 @@
 
 namespace rr::game {
 // Caller order is source 217440 order: Chariot, right engine, left engine.
-// The optional fourth/fifth source models are absent in this Pod01 context.
+// Optional fourth/fifth models follow: bottom right, bottom left.
 struct PodSceneRebaseModel50FB {
     SceneNodeIndex49P root = SceneNodeIndex49P::none;
     assets::PsgHierarchyView49O hierarchy{};
@@ -22,18 +22,23 @@ struct PodSceneRebaseWorkspace50FB {
     SceneNode49P nodes[maxSceneNodes49P];
     ResetBoundNode50BA boundsNodes[maxSceneNodes49P];
     ResetBoundsWorkspace50BA bounds;
-    ModelBoundsResult49O result[3];
+    ModelBoundsResult49O result[5];
 };
 // Cold setup of the source first-base 217440 represented scene effects.
 // Call AFTER capture of pre-animation geometry/target/inertia and any reset
 // bound inputs, and BEFORE declaring the first-base B9C bit80 precondition.
-// Requires three present fresh-model box roots (own04/sphere10 clear), exact
-// complete PSG source-node mappings, coherent caches, and no optional models.
+// Requires three or five present fresh-model box roots (own04/sphere10 clear), exact
+// complete PSG source-node mappings and coherent caches.
 // Preserves all bodies, authored parameters, model-root matrices, animation
 // locals other than nullcg XYZ, and unrelated scene flags. Source28AB90's
 // ready-gated invalidation and 28E110's reached model-box/world recomputation
 // use the existing49P/50BA/49O operations. No frame49W admission is widened.
 // Graph/output remain unchanged on rejection. Scratch must be disjoint.
+bool rebaseColdPodScene50FB(const SceneGraph49P& graph,
+    const PodSceneRebaseModel50FB* models, std::uint32_t modelCount,
+    PodSceneRebaseWorkspace50FB& workspace, ModelBoundsResult49O* bounds,
+    PodSceneRebaseDiagnostic50FB& diagnostic) noexcept;
+// Historical three-model client remains source-compatible.
 bool rebaseColdPodScene50FB(const SceneGraph49P& graph,
     const PodSceneRebaseModel50FB (&models)[3],
     PodSceneRebaseWorkspace50FB& workspace,

@@ -65,6 +65,31 @@ inline bool convertOriginalUiRider19BodyMaterialSpan50KM(
         material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed)return false;
     return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
 }
+// Only a prepared canonical17_3 cutout result on this exact immutable bank.
+// Preserve source-alpha testing; no alpha replacement or shader change.
+inline bool convertOriginalUiRider17CutoutMaterialSpan50KM(
+    const assets::OriginalUiRider17CutoutMaterial50KM& material,
+    const assets::OriginalUiScreenAssets50KG& publishedImages,
+    const OriginalUiMaterialSpanBinding50KG& binding,
+    OriginalUiMaterialSpan50KG& output) noexcept {
+    const auto* bank=publishedImages.textures();
+    const auto* image=bank?bank->texture(binding.textureIndex):nullptr;
+    const auto* decoded=publishedImages.decodedTexture(binding.textureIndex);
+    const auto& raster=material.material.raster;
+    if(material.imagePolicy!=assets::OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly ||
+        material.images!=&publishedImages || !publishedImages.loaded() || !image || !decoded ||
+        binding.textureIndex!=material.imageIndex || binding.textureCount!=bank->textureCount() ||
+        image->identity!=material.imageIdentity || material.sourceMipCount!=4 || material.sourceStoredMipIndex!=3 ||
+        decoded->kind!=1 || decoded->mips.size()!=4 ||
+        decoded->mips.back().width!=128 || decoded->mips.back().height!=128 ||
+        material.material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed ||
+        raster.blend!=assets::OriginalUiMaterialBlend50KG::opaque || !raster.depthWrite || raster.depthMethod!=2 ||
+        raster.environmentContext!=0 || raster.minification!=assets::OriginalUiMaterialFilter50KG::linear ||
+        raster.magnification!=assets::OriginalUiMaterialFilter50KG::linear ||
+        raster.u!=assets::OriginalUiMaterialWrap50KG::repeat || raster.v!=assets::OriginalUiMaterialWrap50KG::repeat ||
+        !material.material.fogEnabled || !material.material.alphaTestGreaterZero)return false;
+    return convertOriginalUiLitMaterialSpan50KM(material.material,binding,output);
+}
 // Exact bank/index/identity for original pod_wndw and12c_4 passes1/3.
 // Caller must preserve both passes and the intervening authentic specular leaf
 // in the source registry schedule; this local conversion cannot certify it.

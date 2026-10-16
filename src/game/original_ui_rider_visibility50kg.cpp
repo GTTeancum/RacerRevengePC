@@ -1,4 +1,5 @@
 #include "original_ui_rider_visibility50kg.h"
+#include "camera_view49f.h"
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -12,7 +13,6 @@ using Vector=std::array<float,4>;
 using Error=OriginalUiRiderVisibilityError50KG;
 using Diagnostic=OriginalUiRiderVisibilityDiagnostic50KG;
 bool fail(Diagnostic& d,Error e,std::uint32_t pc) noexcept {d={e,pc};return false;}
-float word(std::uint32_t u) noexcept {float f;std::memcpy(&f,&u,4);return f;}
 bool arithmeticReady() noexcept {
     return sizeof(float)==4&&std::numeric_limits<float>::is_iec559&&std::fegetround()==FE_TONEAREST;
 }
@@ -67,37 +67,12 @@ bool graphReady(const SceneGraph49P& graph,const assets::PsgHierarchyView49O& ps
 bool prepareOriginalUiRiderMembershipCamera50KG(const OriginalUiRiderCamera50KG& camera,
     OriginalUiRiderMembershipCamera50KG& output) noexcept {
     if(!arithmeticReady()||!camera.pageIdentity||!finite(camera.core.view))return false;
-    const auto& source=camera.core.sceneAfter;
-    if(!std::isfinite(source.fovDegrees)||source.fovDegrees<=0||source.fovDegrees>=180||
-        !std::isfinite(source.aspect1F8)||source.aspect1F8<=0||
-        !std::isfinite(source.nearPlane)||source.nearPlane<=0||
-        !std::isfinite(source.farPlane)||source.farPlane<=source.nearPlane)return false;
-    Arithmetic a;float tangent=0;
-    //280748..280774 uses the already-halved radians constant, NOT the core
-    // camera's separately rounded0.5*(radians*FOV), nor focal-pixel grouping.
-    if(!originalUiSourceTangent50KG(a.mul(word(0x3C0EFA34),source.fovDegrees),tangent))return false;
-    const float horizontal=a.mul(source.nearPlane,tangent);
-    const float vertical=a.mul(horizontal,source.aspect1F8);
     OriginalUiRiderMembershipCamera50KG next{};
-    const float left=a.mul(horizontal,next.viewport4C[0]);
-    const float right=a.mul(horizontal,next.viewport4C[1]);
-    const float bottom=a.mul(vertical,next.viewport4C[2]);
-    const float top=a.mul(vertical,next.viewport4C[3]);
-    auto& m=next.projection;
-    //14DAF0: preserve its independent numerator/denominator operation order,
-    // signed-zero offsets and symmetric-depth projection. Never reuse80.
-    const float sumX=a.add(right,left),twoNear=a.mul(2,source.nearPlane);
-    const float width=a.sub(right,left);
-    m[0]=a.div(twoNear,width);m[8]=a.div(-sumX,width);
-    const float sumY=a.add(top,bottom),height=a.sub(top,bottom);
-    m[5]=a.div(twoNear,height);m[9]=a.div(-sumY,height);
-    float depthNumerator=a.mul(-2,source.farPlane);
-    depthNumerator=a.mul(depthNumerator,source.nearPlane);
-    const float depth=a.sub(source.farPlane,source.nearPlane);
-    m[10]=a.div(a.add(source.farPlane,source.nearPlane),depth);
-    m[14]=a.div(depthNumerator,depth);m[11]=1;
-    next.matrix60=product(a,camera.core.view,m);
-    if(!a.valid)return false;
+    PortalZoneViewOutput49F numeric;
+    // Same source 280720 operation as gameplay zones, with this real flat UI
+    // owner's full viewport. Retain UI identity and separate clip ownership.
+    if(!composePortalZoneView280720(camera.core,next.viewport4C,numeric))return false;
+    next.projection=numeric.projection;next.matrix60=numeric.matrix60;
     output=next;return true;
 }
 

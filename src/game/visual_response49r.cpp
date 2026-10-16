@@ -198,31 +198,53 @@ bool noiseAdd(float& lane, float coordinate, float amplitude, CoupledNoiseContex
     if (!f.valid || !evaluateGradientNoise49M(noise.noise, noise.sharedRandomState, coordinate, value)) return false;
     lane = f.add(lane, f.mul(amplitude, value)); return f.valid;
 }
-bool emitRoot(VisualResponse49R& s, bool right, float phase, float common, float translation,
+bool emitRoot(VisualResponse49R& s, unsigned engine, float phase, float common, float translation,
               float orientation, const VehicleVisualInput49R& in, const VehicleVisualParameters49R& p,
               const BodyMatrix48G& containerWorld, const SceneGraph49P& graph, SceneNodeIndex49P node,
               CoupledNoiseContext49M& noise, Math& f, VehicleVisualDiagnostic49R& d) noexcept {
+    // Original call order: primary right, primary left, bottom right, bottom left.
+    const bool right = (engine & 1u) == 0;
+    const bool bottom = engine >= 2;
+    constexpr std::uint32_t positionNoisePC[] = {0x21e7b8, 0x21f0e4, 0x21fa24, 0x220354};
+    constexpr std::uint32_t orientationNoisePC[] = {0x21e888, 0x21f1b4, 0x21fb04, 0x220434};
+    constexpr std::uint32_t composePC[] = {0x21e97c, 0x21f2a8, 0x21fbf0, 0x220520};
     V position = s.position;
     if (in.vehicle844 == 0) {
         const float amplitude = f.mul(common, translation);
-        const float x = right ? phase : f.add(5.0f, phase);
+        const float x = bottom ? (right ? f.add(13.0f, phase) : phase) :
+            (right ? phase : f.add(5.0f, phase));
+        const float yOffset = bottom ? (right ? 11.0f : 5.0f) : (right ? 2.0f : 7.0f);
         if (!noiseAdd(position.v[0], x, amplitude, noise, f) ||
-            !noiseAdd(position.v[1], f.add(right ? 2.0f : 7.0f, phase), amplitude, noise, f))
-            return fail(d, VehicleVisualError49R::noise, right ? 0x21e7b8 : 0x21f0e4);
+            !noiseAdd(position.v[1], f.add(yOffset, phase), amplitude, noise, f))
+            return fail(d, VehicleVisualError49R::noise, positionNoisePC[engine]);
     }
     f.read(p.verticalLimit7EC); f.read(position.v[1]);
     if (!(position.v[1] <= p.verticalLimit7EC)) {
         position.v[1] = p.verticalLimit7EC; s.position.v[1] = p.verticalLimit7EC; s.linearVelocity.v[1] = 0.0f;
+    } else if (bottom) {
+        //21FA8C/2203BC: the lower engines use -0.4*7EC, not -7EC.
+        // Preserve the repeated source multiplication on the feedback store.
+        const float lower = f.mul(fp(0xbecccccdu), p.verticalLimit7EC);
+        if (position.v[1] < lower) {
+            position.v[1] = lower;
+            s.position.v[1] = f.mul(fp(0xbecccccdu), p.verticalLimit7EC);
+            s.linearVelocity.v[1] = 0.0f;
+        }
     } else if (position.v[1] < f.neg(p.verticalLimit7EC)) {
         position.v[1] = f.neg(p.verticalLimit7EC); s.position.v[1] = f.neg(p.verticalLimit7EC); s.linearVelocity.v[1] = 0.0f;
     }
     Quaternion48C visual = s.orientation;
     if (in.vehicle844 == 0) {
         const float amplitude = f.mul(p.orientationScaleA64, f.mul(common, orientation));
-        const float offsets[4] = {right ? 2.0f : 11.0f, right ? 17.0f : 13.0f, right ? 5.0f : 7.0f, 1.0f};
+        constexpr float offsets[4][4] = {
+            {2.0f, 17.0f, 5.0f, 1.0f},
+            {11.0f, 13.0f, 7.0f, 1.0f},
+            {7.0f, 5.0f, 17.0f, 19.0f},
+            {23.0f, 5.0f, 3.0f, 17.0f}
+        };
         for (unsigned i = 0; i < 4; ++i)
-            if (!noiseAdd(visual.v[(i + 1) % 4], f.add(offsets[i], phase), amplitude, noise, f))
-                return fail(d, VehicleVisualError49R::noise, right ? 0x21e888 : 0x21f1b4);
+            if (!noiseAdd(visual.v[(i + 1) % 4], f.add(offsets[engine][i], phase), amplitude, noise, f))
+                return fail(d, VehicleVisualError49R::noise, orientationNoisePC[engine]);
     }
     normalize(visual, f); // Also required with844!=0.
     BodyMatrix48G local{};
@@ -244,7 +266,7 @@ bool emitRoot(VisualResponse49R& s, bool right, float phase, float common, float
         x = f.add(x, f.mul(containerWorld.v[8 + lane], local.v[4 * row + 2]));
         composed.v[4 * row + lane] = f.add(x, f.mul(containerWorld.v[12 + lane], local.v[4 * row + 3]));
     }
-    if (!f.valid) return fail(d, VehicleVisualError49R::arithmetic, right ? 0x21e97c : 0x21f2a8);
+    if (!f.valid) return fail(d, VehicleVisualError49R::arithmetic, composePC[engine]);
     if (!setLocalMatrix49P(graph, node, composed)) return fail(d, VehicleVisualError49R::graph, 0x28b490);
     return true;
 }
@@ -285,8 +307,15 @@ bool updateVisualResponses49R(const VehicleVisualInput49R& in, const VehicleVisu
         rightDrag = f.mul(inputScale, in.aeroE8);
     }
     if (!f.valid) return fail(d, VehicleVisualError49R::arithmetic, 0x21d91c);
-    Vector3_48C angleRight{}, angleLeft{};
+    const bool fourEngines = binding.extra1C0Present && binding.extra1C4Present;
+    Vector3_48C angleRight{}, angleLeft{}, angleBottomRight{}, angleBottomLeft{};
     if (!quaternionToAngles48G(s.right.orientation, angleRight) || !quaternionToAngles48G(s.left.orientation, angleLeft))
+        return fail(d, VehicleVisualError49R::arithmetic, 0x14fc00);
+    //21D954..21D988 snapshot both optional orientations before any response
+    // integration, just as the primary angle snapshots above are preserved.
+    if (fourEngines &&
+        (!quaternionToAngles48G(s.bottomRight.orientation, angleBottomRight) ||
+         !quaternionToAngles48G(s.bottomLeft.orientation, angleBottomLeft)))
         return fail(d, VehicleVisualError49R::arithmetic, 0x14fc00);
     if (!refreshSceneWorld49P(graph, binding.main190)) return fail(d, VehicleVisualError49R::graph, 0x28bbb0);
     V impact = inverseDirection(graph.nodes[static_cast<std::uint32_t>(binding.main190)].world100, in.impactBA0, f);
@@ -297,8 +326,11 @@ bool updateVisualResponses49R(const VehicleVisualInput49R& in, const VehicleVisu
     else impact.v[0] = clampImpact(impact.v[0]);
     for (unsigned i = 0; i < 3; ++i) impact.v[i] = clampImpact(impact.v[i]);
     RR_VISUAL49R_STAGE(0x21db30u);
-    const V delta = f.difference(s.right.position, s.left.position);
-    const V rest = f.difference(p.rightBase2C0, p.leftBase2B0);
+    //21DB60..21DCF0: with four engines the first binder crosses from the
+    // primary left to the bottom right. Otherwise retain the original primary
+    // pair's arithmetic and ordering exactly.
+    const V delta = f.difference(fourEngines ? s.bottomRight.position : s.right.position, s.left.position);
+    const V rest = f.difference(fourEngines ? p.rightBase2E0 : p.rightBase2C0, p.leftBase2B0);
     const float restLength = f.scalarRoot(f.squared(rest, false));
     const float currentLength = f.scalarRoot(f.squared(delta, false));
     V binder = f.vuNormalize(delta);
@@ -306,20 +338,47 @@ bool updateVisualResponses49R(const VehicleVisualInput49R& in, const VehicleVisu
     const float scalar = f.mul(p.binderSpringA10, extension);
     for (unsigned i = 0; i < 3; ++i) binder.v[i] = f.mul(binder.v[i], scalar);
     V binderTorque{{0, 0, 0, 1}};
-    for (unsigned i = 0; i < 3; ++i) binderTorque.v[i] = f.mul(p.binderTorqueA30, f.sub(angleRight.v[i], angleLeft.v[i]));
+    const auto& firstRightAngle = fourEngines ? angleBottomRight : angleRight;
+    for (unsigned i = 0; i < 3; ++i) binderTorque.v[i] = f.mul(p.binderTorqueA30, f.sub(firstRightAngle.v[i], angleLeft.v[i]));
     binderTorque.v[1] = 0.0f;
+    V secondBinder{}, secondBinderTorque{};
+    if (fourEngines) {
+        //21DCF4..21DE7C: the second binder crosses bottom left to primary
+        // right. Both binders use the old positions and survive all four writes.
+        const V secondDelta = f.difference(s.right.position, s.bottomLeft.position);
+        const V secondRest = f.difference(p.rightBase2C0, p.leftBase2D0);
+        const float secondRestLength = f.scalarRoot(f.squared(secondRest, false));
+        const float secondCurrentLength = f.scalarRoot(f.squared(secondDelta, false));
+        secondBinder = f.vuNormalize(secondDelta);
+        const float secondExtension = f.sub(secondCurrentLength, secondRestLength);
+        const float secondScalar = f.mul(p.binderSpringA10, secondExtension);
+        for (unsigned i = 0; i < 3; ++i) secondBinder.v[i] = f.mul(secondBinder.v[i], secondScalar);
+        secondBinderTorque = {{0, 0, 0, 1}};
+        for (unsigned i = 0; i < 3; ++i)
+            secondBinderTorque.v[i] = f.mul(p.binderTorqueA30, f.sub(angleRight.v[i], angleBottomLeft.v[i]));
+        secondBinderTorque.v[1] = 0.0f;
+    }
     RR_VISUAL49R_STAGE(0x21e040u);
     const float thrustGain = bit1 ? 1.0f : fp(shared.globals[5].word);
     if (!f.valid) return fail(d, VehicleVisualError49R::arithmetic, 0x21e074);
-    // Both old angle snapshots and the old-position binder survive the complete
-    // right update/root write before the left engine begins.
-    for (unsigned side = 0; side < 2; ++side) {
-        const bool right = side == 0;
-        VisualResponse49R& response = right ? s.right : s.left;
+    // Primary right/left then bottom right/left is the source response and
+    // shared noise order. Optional records are unconsumed on the two-engine path.
+    [[maybe_unused]] constexpr std::uint32_t integrationPC[] = {0x21e62c, 0x21ef4c, 0x21f88c, 0x2201c8};
+    constexpr std::uint32_t integratedPC[] = {0x21e79c, 0x21f0bc, 0x21f9fc, 0x220338};
+    [[maybe_unused]] constexpr std::uint32_t rootPC[] = {0x21e7a0, 0x21f0c0, 0x21fa00, 0x22033c};
+    [[maybe_unused]] constexpr std::uint32_t nextPC[] = {0x21e9f4, 0x21f320, 0x21fc70, 0x2205a0};
+    constexpr unsigned amplitudeIndices[] = {0, 2, 1, 3};
+    for (unsigned engine = 0; engine < (fourEngines ? 4u : 2u); ++engine) {
+        const bool right = (engine & 1u) == 0;
+        const bool bottom = engine >= 2;
+        VisualResponse49R& response = bottom ? (right ? s.bottomRight : s.bottomLeft) : (right ? s.right : s.left);
         V force = shared.zero434630, torque = shared.zero434630;
+        const bool secondPair = fourEngines && (engine == 0 || engine == 3);
+        const V& pairForce = secondPair ? secondBinder : binder;
+        const V& pairTorque = secondPair ? secondBinderTorque : binderTorque;
         if (bit1) for (unsigned i = 0; i < 3; ++i) {
-            force.v[i] = right ? f.neg(binder.v[i]) : binder.v[i];
-            torque.v[i] = right ? binderTorque.v[i] : f.neg(binderTorque.v[i]);
+            force.v[i] = right ? f.neg(pairForce.v[i]) : pairForce.v[i];
+            torque.v[i] = right ? pairTorque.v[i] : f.neg(pairTorque.v[i]);
         }
         if (in.vehicle844 != 0) force.v[1] = f.sub(force.v[1], fp(shared.globals[2].word));
         const float horizontalImpact = right ? f.minimum(impact.v[0], 0.0f) : f.maximum(impact.v[0], 0.0f);
@@ -333,7 +392,8 @@ bool updateVisualResponses49R(const VehicleVisualInput49R& in, const VehicleVisu
         force.v[1] = right ? f.sub(force.v[1], lift) : f.add(force.v[1], lift);
         const float separation = f.mul(p.separation9F8, right ? f.abs(f.minimum(differential, 0.0f)) : f.maximum(differential, 0.0f));
         force.v[0] = right ? f.add(force.v[0], separation) : f.sub(force.v[0], separation);
-        const V displacement = f.difference(right ? p.rightBase2C0 : p.leftBase2B0, response.position);
+        const V& base = bottom ? (right ? p.rightBase2E0 : p.leftBase2D0) : (right ? p.rightBase2C0 : p.leftBase2B0);
+        const V displacement = f.difference(base, response.position);
         const bool fullSpring = (in.applicationByte58 & 6u) != 0;
         const float spring = fullSpring ? p.springA08 : f.mul(fp(shared.globals[4].word), p.springA08);
         addScaled(force, spring, displacement, f);
@@ -348,20 +408,23 @@ bool updateVisualResponses49R(const VehicleVisualInput49R& in, const VehicleVisu
             torque.v[0] = right ? f.add(torque.v[0], pitch) : f.sub(torque.v[0], pitch);
         }
         torque.v[1] = f.add(torque.v[1], f.mul(in.aeroD8 != 0 ? p.slideYawA18 : p.yawA14, differential));
-        const auto& angle = right ? angleRight : angleLeft;
+        const auto& angle = bottom ? (right ? angleBottomRight : angleBottomLeft) : (right ? angleRight : angleLeft);
         const V angleVector{{angle.v[0], angle.v[1], angle.v[2], 1.0f}};
         addScaled(torque, p.angleReturnA28, angleVector, f);
         addScaled(torque, p.angularDampingA2C, response.angularVelocity, f);
-        RR_VISUAL49R_STAGE(right ? 0x21e62cu : 0x21ef4cu);
+        RR_VISUAL49R_STAGE(integrationPC[engine]);
         integrate(response, force, torque, in.frameFactor, f);
-        if (!f.valid) return fail(d, VehicleVisualError49R::arithmetic, right ? 0x21e79c : 0x21f0bc);
-        RR_VISUAL49R_STAGE(right ? 0x21e7a0u : 0x21f0c0u);
-        const unsigned amplitudeIndex = right ? 0 : 2;
-        if (!emitRoot(response, right, right ? s.phase900 : s.phase8B0, amplitudes.common,
+        if (!f.valid) return fail(d, VehicleVisualError49R::arithmetic, integratedPC[engine]);
+        RR_VISUAL49R_STAGE(rootPC[engine]);
+        const unsigned amplitudeIndex = amplitudeIndices[engine];
+        const float phase = bottom ? (right ? s.phase9A0 : s.phase950) : (right ? s.phase900 : s.phase8B0);
+        const auto root = bottom ? (right ? binding.bottomRight1C0 : binding.bottomLeft1C4) :
+            (right ? binding.right1B8 : binding.left1BC);
+        if (!emitRoot(response, engine, phase, amplitudes.common,
             amplitudes.translation[amplitudeIndex], amplitudes.orientation[amplitudeIndex], in, p,
             graph.nodes[static_cast<std::uint32_t>(binding.container194)].world100, graph,
-            right ? binding.right1B8 : binding.left1BC, noise, f, d)) return false;
-        RR_VISUAL49R_STAGE(right ? 0x21e9f4u : 0x21f320u);
+            root, noise, f, d)) return false;
+        RR_VISUAL49R_STAGE(nextPC[engine]);
     }
     // The source reaches this guard before testing the admitted empty B54 list.
     lazy(shared.globals[8], 0x41200000u);

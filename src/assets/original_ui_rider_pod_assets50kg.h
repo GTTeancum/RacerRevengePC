@@ -32,6 +32,12 @@ public:
     OriginalUiRiderPodAssets50KG& operator=(const OriginalUiRiderPodAssets50KG&)=delete;
     bool load(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t widgetId,
         OriginalUiRiderPodDiagnostic50KG&) noexcept;
+    // Separate archive gate preserves Rider load's contract. career is the
+    // actual selected100C0 value, never an ordinal in a host character list.
+    // Source1EEC40 table3AFEA0 selects DAT widgets39..61. Default cases fail
+    // closed: they do not borrow another pod or fabricate an unlock.
+    bool loadTournament(std::shared_ptr<const OriginalUiArchive50KG>,
+        std::uint32_t career,OriginalUiRiderPodDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
     std::uint16_t widgetId() const noexcept;
     const OriginalUiRiderPodConfig50KG* config() const noexcept;
@@ -42,6 +48,8 @@ public:
     // Pin retains all original material members for the shared material owner.
     std::shared_ptr<const OriginalUiArchive50KG> archive() const noexcept;
 private:
+    bool loadImpl(std::shared_ptr<const OriginalUiArchive50KG>,std::uint16_t,
+        bool tournament,OriginalUiRiderPodDiagnostic50KG&) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

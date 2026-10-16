@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <optional>
 
 namespace rr::game { namespace {
 using S=OriginalCameraWorldStatus;
@@ -43,11 +44,11 @@ bool meshRead(const Guard& g,const assets::CollisionMesh48I* m) noexcept {
 }
 bool storage(const OriginalCameraWorldInput& in,const OriginalCameraWorldMutable& live,
     const OriginalCameraWorldWorkspace& work,OriginalCameraWorldQueryState& q,
-    OriginalCameraCollisionCallback& camera,OriginalCameraWorldResult& out) noexcept {
+    const OriginalCameraWorldCallbackBinding& callback,OriginalCameraWorldResult& out) noexcept {
     Guard g;
     if(!writes(g,live)||!writes(g,work.staging)||!g.write(work.meshStack,work.meshStackCapacity)||
-       !g.write(&q,1)||!g.write(&camera,1)||!g.write(&out,1)||
-       !g.read(&in,1)||!g.read(&live,1)||!g.read(&work,1)||
+       !g.write(&q,1)||!g.write(callback.follow1792D0,callback.follow1792D0?1u:0u)||!g.write(&out,1)||
+       !g.read(&in,1)||!g.read(&live,1)||!g.read(&work,1)||!g.read(&callback,1)||
        !g.read(in.objects,in.objectCount)||!g.read(in.geometry,in.objectCount)||
        !g.read(in.methods,in.methodCount)||!g.read(in.zones,in.zoneCount)||
        !g.read(in.zoneLinks,in.zoneLinkCount)||
@@ -100,7 +101,8 @@ struct Query {
     const OriginalCameraWorldInput& in;
     const OriginalCameraWorldWorkspace& work;
     OriginalCameraWorldQueryState state;
-    OriginalCameraCollisionCallback camera;
+    bool invokeFollow1792D0=false;
+    std::optional<OriginalCameraCollisionCallback> camera;
     OriginalCameraWorldResult& result;
     CollectionBoundsResult48S bounds{};
     Ref link=0,zone=0,method=0;std::size_t linkSteps=0;
@@ -137,7 +139,10 @@ struct Query {
         if(link){
             if(++linkSteps>in.zoneLinkCount)return fail(S::Topology,0x29483cu);
             link=in.zoneLinks[link-1].next;
-            if(link){if(!ref(link,in.zoneLinkCount)||!select(in.zoneLinks[link-1].zone,0x294850u))return false;}
+            if(link){
+                if(!ref(link,in.zoneLinkCount))return fail(S::Topology,0x294850u);
+                if(!select(in.zoneLinks[link-1].zone,0x294850u))return false;
+            }
         }
         //121920 first iterator passes t3=1; second iterator passes t3=0.
         if(!method&&pass==1&&*in.globalFallbackZone443108&&zone!=*in.globalFallbackZone443108)
@@ -200,17 +205,23 @@ struct Query {
             candidate.compound=geometry.compound;
             const CollisionSphere48J coarse{{{current.cachedCenter.v[0],current.cachedCenter.v[1],current.cachedCenter.v[2]}},current.cachedRadius};
             result.normalModeWritten=true;result.normalMode3DF5B0=in.type3NormalMode44; //126FA0
-            const auto status=detail::dispatchType3Borrowed48U(input,context,candidate,coarse,geometry.mesh,
-                geometry.world,definition.hasShape,rays(state.ray),work.meshStack,work.meshStackCapacity,state.type3,hit);
+            detail::Type3VectorScratch48U scratch{};
+            const auto status=detail::dispatchType3BorrowedWithScratch48U(input,context,candidate,coarse,geometry.mesh,
+                geometry.world,definition.hasShape,rays(state.ray),work.meshStack,work.meshStackCapacity,state.type3,hit,scratch);
             if(status!=Type3QueryStatus48P::Complete)return fail(S::Narrowphase,0x126f40u,object);
+            if(scratch.written&&result.type3VectorScratchKnown)result.type3VectorScratchVF9W=scratch.vf9W;
         }
         if(!hit)return true;
         ++result.geometryHits;state.flagsF8=static_cast<std::uint8_t>(state.flagsF8|0x20u);
         auto& copies=work.staging.copies[object-1];copies.copied40=state.copied40;copies.copied50=state.copied50;
-        ++result.callbacks; //1792D0 is invoked even when its category gate returns
-        if(definition.filter.categoryA4&*in.staticObjectMask3E0720){
+        //121D10..121D24 conditionally calls the query's actual E4. Death's
+        //22D8CC null store skips this entire block, not the surrounding copies.
+        if(invokeFollow1792D0){
+          result.type3VectorScratchKnown=false; //No scratch claim for this separate callback route.
+          ++result.callbacks; //1792D0 is invoked even when its category gate returns
+          if(definition.filter.categoryA4&*in.staticObjectMask3E0720){
             if(in.shapeTag==5){
-                if(state.sphere.count){camera.pointE0=state.sphere.worldPoint;camera.normalF0=state.sphere.worldNormal;}
+                if(state.sphere.count){camera->pointE0=state.sphere.worldPoint;camera->normalF0=state.sphere.worldNormal;}
             }else{
                 //1792D0 casts result+4 as signed integer, NOT type3 hitCount60.
                 //11DD00 copied sentinel into result00. Its ordinary Y=0 skips
@@ -218,14 +229,16 @@ struct Query {
                 std::int32_t rawY;std::memcpy(&rawY,&state.type3.result00.v[1],4);
                 if(rawY>0)return fail(S::UnsupportedCallback,0x1792f0u,object);
             }
-            camera.hit114=1;
+            camera->hit114=1;
+          }
         }
         if(geometry.hasResponseCallbackE8)return fail(S::UnsupportedCallback,0x121d2cu,object);
         return true;
     }
     bool runPass(unsigned which) noexcept {
         pass=which;link=in.zoneHead;linkSteps=0;
-        if(!ref(link,in.zoneLinkCount)||!select(in.zoneLinks[link-1].zone,0x294650u)||!open())return false;
+        if(!ref(link,in.zoneLinkCount))return fail(S::Topology,0x294650u);
+        if(!select(in.zoneLinks[link-1].zone,0x294650u)||!open())return false;
         for(;;){Ref object=0;if(!next(object))return false;if(!object)return true;if(!candidate(object))return false;}
     }
     bool run() noexcept {
@@ -240,6 +253,7 @@ struct Query {
         state.distance84=m.sub(state.distance84,moved);state.previousCenter70=q.cachedCenter;
         if(!m.valid)return fail(S::Arithmetic,0x1219a0u);
         state.distance84=0.f; // a1=0 always enters query, even cached distance>0
+        result.resetGlobalsWritten=true;
         state.flagsF8=static_cast<std::uint8_t>((state.flagsF8&~0x20u)|0x10u);
         if(in.shapeTag==5)state.sphere.count=0;
         else{
@@ -255,6 +269,12 @@ struct Query {
         auto b=in.bounds;b.cachedCenter=q.cachedCenter;b.cachedRadius=q.cachedRadius;
         if(prepareCollectionBounds48S(b,bounds)!=CollectionBoundsStatus48S::Complete)return fail(S::Arithmetic,0x1202e0u);
         q.cachedCenter=bounds.cachedCenter;q.cachedRadius=bounds.cachedRadius;
+        //Actual120CC0 setsVF9.W=1;120D04/38/6C increment it to4. The
+        //SearchList/filter/coarse-sphere paths and type3 result11E330/11E470
+        //preserve this lane; only entered mesh transforms below replace it.
+        if(in.shapeTag==3&&!invokeFollow1792D0){
+            result.type3VectorScratchKnown=true;result.type3VectorScratchVF9W=4.f;
+        }
         // SearchList27E660 leaves the initial min/max output vectors at zero.
         const float left=m.sub(m.sub(bounds.center.v[0],bounds.half.v[0]),0.f);
         const float back=m.sub(m.sub(bounds.center.v[2],bounds.half.v[2]),0.f);
@@ -278,10 +298,14 @@ struct Query {
 } // namespace
 OriginalCameraWorldStatus queryOriginalCameraWorld(const OriginalCameraWorldInput& in,
     const OriginalCameraWorldMutable& live,const OriginalCameraWorldWorkspace& work,
-    OriginalCameraWorldQueryState& state,OriginalCameraCollisionCallback& camera,
+    OriginalCameraWorldQueryState& state,const OriginalCameraWorldCallbackBinding& callback,
     OriginalCameraWorldResult& result) noexcept {
-    if(!storage(in,live,work,state,camera,result))return S::Storage;
+    if(!storage(in,live,work,state,callback,result))return S::Storage;
     result={};auto fail=[&](S s,std::uint32_t pc){result.status=s;result.sourcePC=pc;return s;};
+    if(!callback.owner9C||
+       (callback.callbackE4==0&&callback.follow1792D0)||
+       (callback.callbackE4!=0&&(callback.callbackE4!=0x1792d0u||!callback.follow1792D0)))
+        return fail(S::Binding,0x121d10u);
     if(std::fegetround()!=FE_TONEAREST)return fail(S::Arithmetic,0x121920u);
     if((in.shapeTag!=3&&in.shapeTag!=5)||in.bounds.shapeTag!=in.shapeTag)return fail(S::UnsupportedQuery,0x121bd4u);
     if(!in.methodCount||!in.zoneCount||!in.registrationChainPresent||!in.zoneHead||in.zoneHead>in.zoneLinkCount||
@@ -303,11 +327,23 @@ OriginalCameraWorldStatus queryOriginalCameraWorld(const OriginalCameraWorldInpu
     std::memcpy(work.staging.objects,live.objects,in.objectCount*sizeof(*live.objects));
     std::memcpy(work.staging.methods,live.methods,in.methodCount*sizeof(*live.methods));
     std::memcpy(work.staging.copies,live.copies,in.objectCount*sizeof(*live.copies));
-    Query query{in,work,state,camera,result};
-    if(!query.run())return result.status;
+    const bool invokesFollow=callback.callbackE4==0x1792d0u;
+    Query query{in,work,state,invokesFollow,
+        invokesFollow?std::optional<OriginalCameraCollisionCallback>{*callback.follow1792D0}:std::nullopt,result};
+    if(!query.run())return result.status==S::Complete?fail(S::Topology,0x121920u):result.status;
     std::memcpy(live.objects,work.staging.objects,in.objectCount*sizeof(*live.objects));
     std::memcpy(live.methods,work.staging.methods,in.methodCount*sizeof(*live.methods));
     std::memcpy(live.copies,work.staging.copies,in.objectCount*sizeof(*live.copies));
-    state=query.state;camera=query.camera;return S::Complete;
+    state=query.state;
+    if(invokesFollow)*callback.follow1792D0=*query.camera;
+    return S::Complete;
+}
+OriginalCameraWorldStatus queryOriginalCameraWorld(const OriginalCameraWorldInput& in,
+    const OriginalCameraWorldMutable& live,const OriginalCameraWorldWorkspace& work,
+    OriginalCameraWorldQueryState& state,OriginalCameraCollisionCallback& camera,
+    OriginalCameraWorldResult& result) noexcept {
+    const OriginalCameraWorldCallbackBinding callback{
+        static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&camera)),0x1792d0u,&camera};
+    return queryOriginalCameraWorld(in,live,work,state,callback,result);
 }
 }

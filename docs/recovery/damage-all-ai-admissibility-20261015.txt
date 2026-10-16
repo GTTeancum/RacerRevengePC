@@ -1,0 +1,101 @@
+Damage full presentation remains UNAVAILABLE for current native ALL8 AI
+Source-only admissibility review; no production changes, untested.
+
+Conclusion
+No original-semantics positive join was found for full Damage in the current
+one-view all-eight-original-AI route. The native route is explicitly a bootstrap
+variation. Original Damage consumes manager[Application268], not the followed
+camera's selected racer override; when visible/state40==0 its leaf necessarily
+reads Player-only radar slots after drawing health. A legitimate whole-leaf skip
+exists, but no independent radar-only skip or class58==AI alternative appears in
+the complete wrapper/leaf. Keep the cold resource owner unactivated. Do not call
+an empty skipped leaf a replacement for the host POD STATUS panel.
+
+Construction/dispatch proof
+Race vtable3CEE80+74 (word3CEEF4) points to1A8A40. Actual race initialization
+invokes this virtual at1A74CC..D8 (load vtable,slot74,JALR,this delay argument).
+Within1A8A40, Damage allocation0xC60 at1A8C80/84 is followed by ctor18C550
+at1A8C98 and loader18C6F0 at1A8CA8, using actual race pointer and race8C mode.
+The result is stored race+C8 at1A8CB4. There is no class58/human-count/AI-follow
+branch around this allocation/load segment; allocation-failure/error handling
+is not a spectator admission branch. Construction alone does not prove that a
+view racer has the Player extension.
+Damage ctor installs vtable3CE8A0. Its+40 demand=18F470,+44 predraw=18F4D0,
++48 draw=18F5B0 are exact pointer words3CE8E0/E4/E8. Parent drawing continues
+through Entity141D70 after the wrapper; no hidden alternate positive Damage leaf
+is selected there in the recovered wrapper.
+
+Exact view binding
+Predraw18F4E0..18F500 reads Application382B80+268, race+C54->B0, calls1AF330,
+and caches returned racer in Damage+C50.1AF330 verifies signed index>=0 and
+index<manager30, then loads actual manager44[index]. Mode8C changes layout;
+it does not remap that racer. Independent draw leaf18F69C..18F6AC again uses
+1AF330(viewIndex) and checks returned racer40. Camera Follow/TV selection is
+not consulted by either lookup. No selected-racer override may be borrowed from
+SpeedBoost or a native camera binding to manufacture Player-owned fields.
+
+Complete legitimate omission gates in draw wrapper18F5B0..18F674
+1. Application268==1 AND (race1B0&3)<2: skip own Damage leaf (second view absent).
+2. race1B0 bit4 (0x10) set: skip own leaf.
+3. race Entity29 bit2 (0x04) set: skip own leaf.
+4. race+F8 UI1E4 bit0 set: skip own leaf.
+Otherwise18F658 directly calls18F680 with same view index. The lazy global
+initialization of433F18 to-1 is not read as an AI/class skip in this wrapper.
+These gates still proceed to Entity141D70; they are source visibility behavior,
+not authority to change flags to hide unsupported state.
+
+Leaf18F680..18F740
+If actual view racer40!=0,18F6AC branches to return without base/health/radar
+draws. If40==0, it submits base textures0/1/2, calls health helper18F750, then
+unconditionally enters all nine cached-racer10A8..10C8 reads. Each-1 omits that
+individual marker; no class gate or health-only branch exists between helper
+return and the nine reads. Earlier packet proved Player constructor/scan owns
+these words; original AI0x10B0 allocation cannot contain the full range.
+An actual hidden/nonzero-state snapshot could legitimately say "no Damage leaf
+draw this publication" without reading radar. It cannot become positive
+readiness for a later visible state0 publication. We did not add such a partial
+accessor because it would not complete the requested visible replacement.
+
+Current native route, versus original spectator claims
+src/game/original_race_camera_owner.h explicitly distinguishes
+original_single_player (original1A6C54 setup forces one Player) from native_all_ai
+(explicit current-native bootstrap variation). The binding requires AI class for
+native_all_ai and manager index0. It authorizes only common-base camera behavior;
+its documented stable Follow consumer does not authorize Player1090/1094 effects.
+Original setup1A6C54..7C modifies actual preference1125C human-count bits before
+view-mode1A9240; one-view mode stores race8C=0 at1A9284. There is no proof here
+that the native no-Player bootstrap corresponds to an original retail spectator
+setup with a distinct valid Damage owner.
+tests/native/original_camera_session50kx.h retains race1B0=1, Entity29=1 and
+initial UI1E4=1 (intro hidden). Actual countdown later controls UI visibility.
+Camera-only input remains original AI-safe input routing; changing camera mode
+does not change racer class or create a Player radar owner. On the ordinary
+visible one-view cut with state40=0, none of the recovered omission gates
+protects an AI view from the Player radar reads.
+No proof of a retail all-AI spectator Damage alternative was recovered; do not
+upgrade this bounded finding into a universal claim about all game modes.
+
+Concrete compatible boundary / next action
+-Retain original Damage cold assets/lifetime and numeric work, but leave full
+  draw/snapshot integration unavailable for native_all_ai.
+-Do not change AI class, add Player input/state, synthesize radar, read AI padding
+  or beyond allocation, or permanently initialize missing marker slots to-1.
+-If root wants a separately labeled partial health presentation later, it must
+  explicitly scope that as a subset; no source branch proves a complete original
+  Damage replacement that silently omits radar. No such work is included here.
+-To reopen full admission, supply a proven ORIGINAL view owner/dispatch whose
+  complete required state exists while preserving the actual AI-only contract.
+  Current common-base camera binding is insufficient. This is an ownership/class
+  dependency, not a missing numeric helper or resource upload.
+
+Review coverage and limitations
+Included exact raw ranges cover construction, vtables, initialization dispatch,
+view lookup, complete Damage predraw/wrapper/leaf and Player/AI allocation evidence.
+Direct call/pointer scans located only the recovered Damage construction pair,
+leaf call and vtable predraw/draw entries in the file-backed section; indirect
+dispatch is analyzed through those proven vtables. No guest instructions executed.
+Source baseline is supplied abbf73d; root reports cold owner ed87dbe and numeric
+delta45e6e42 integrated later, neither changes these original owner/class facts.
+Sibling TimeStats/SpeedBoost provider audit remains separate and untouched.
+No tests/builds/syntax/sanitizer/gameplay checks/converters, central edits, HUD
+replacement, driver input or simulation changes. Hold for root review.

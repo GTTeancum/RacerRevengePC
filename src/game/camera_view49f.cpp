@@ -157,4 +157,48 @@ bool composeCameraView49F(const CameraSceneState49F& prior,
     std::memcpy(&output,&next,sizeof(next));
     return true;
 }
+
+bool composePortalZoneView280720(const CameraViewOutput49F& camera,
+    const std::array<float,4>& bounds,PortalZoneViewOutput49F& output) noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return false;
+    Arithmetic a;
+    const auto& s=camera.sceneAfter;
+    for(float v:bounds)a.check(v);
+    for(float v:camera.view)a.check(v);
+    a.check(s.fovDegrees);a.check(s.aspect1F8);a.check(s.nearPlane);a.check(s.farPlane);
+    if(!a.ok||!(bounds[0]<bounds[1])||!(bounds[2]<bounds[3])||
+       !(s.fovDegrees>0&&s.fovDegrees<180)||!(s.aspect1F8>0)||
+       !(s.nearPlane>0)||!(s.farPlane>s.nearPlane))return false;
+    // 28076C..2807A4: direct half-angle constant, then near*tan,
+    // aspect scaling of the Y pair, and the authored viewport bounds.
+    const float t=tangent(a,a.mul(constant(0x3c0efa34u),s.fovDegrees));
+    const float halfX=a.mul(s.nearPlane,t);
+    const float halfY=a.mul(halfX,s.aspect1F8);
+    const float left=a.mul(halfX,bounds[0]),right=a.mul(halfX,bounds[1]);
+    const float bottom=a.mul(halfY,bounds[2]),top=a.mul(halfY,bounds[3]);
+    // 14DAF0: row-vector off-axis matrix. Keep sums, products and divisions
+    // separately rounded, including (-2*far)*near in the depth translation.
+    Mat projection{};
+    const float sumX=a.add(right,left);
+    const float twiceNear=a.mul(2.f,s.nearPlane);
+    const float width=a.sub(right,left);
+    projection[0]=a.div(twiceNear,width);
+    const float sumY=a.add(top,bottom);
+    projection[8]=a.div(-sumX,width);
+    const float height=a.sub(top,bottom);
+    projection[5]=a.div(twiceNear,height);
+    projection[9]=a.div(-sumY,height);
+    const float depthProduct=a.mul(a.mul(-2.f,s.farPlane),s.nearPlane);
+    const float depth=a.sub(s.farPlane,s.nearPlane);
+    const float depthSum=a.add(s.farPlane,s.nearPlane);
+    projection[10]=a.div(depthSum,depth);
+    projection[14]=a.div(depthProduct,depth);
+    projection[11]=1.f;
+    // 2807D4..280860: current view+C0 multiplied by this projection.
+    PortalZoneViewOutput49F next;
+    next.projection=projection;
+    next.matrix60=multiply(a,camera.view,projection);
+    if(!a.ok)return false;
+    output=next;return true;
+}
 }

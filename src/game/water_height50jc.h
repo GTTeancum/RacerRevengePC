@@ -21,7 +21,7 @@ struct WaterBucket50JC {
     bool bound=false;
 };
 enum class WaterOriginPublication50JC : std::uint8_t {
-    Unbound,OriginalRender2BEBD0,NativeOneViewPresentation50JC
+    Unbound,OriginalRender2BEBD0,NativeOneViewPresentation50JC,OriginalCold2BE110
 };
 struct WaterSignature50JC {
     std::uint32_t dimension04=0,rowStride08=0,pixelStride0C=0;
@@ -29,8 +29,10 @@ struct WaterSignature50JC {
     WaterBytes50JC current2C{},next30{};
     float originXC0=0,originZC4=0;
     std::uint32_t infiniteD4=0,channelD8=0,effect110=0;
-    // Distinguish original render-side publication from the explicit native
-    // one-view policy. Time stepping preserves this owner and prior origins.
+    // Distinguish actual constructor2BE14C/150 zero origins, original render
+    // publication, and the explicit native one-view policy. Only a complete
+    // canonical constructor owner may admit OriginalCold2BE110; retained cold
+    // resource projections alone remain Unbound. Time keeps prior origins.
     WaterOriginPublication50JC originPublication=WaterOriginPublication50JC::Unbound;
     bool bound=false;
 };
@@ -143,7 +145,8 @@ inline WaterHeightResult50JC signatures(const WaterSignatureOwner50JC& s,
         if(w.channelD8==4u)continue;
         if(w.channelD8>4u)return fail(Status::Unsupported,0x2b7484u,i);
         if(w.originPublication!=WaterOriginPublication50JC::OriginalRender2BEBD0&&
-           w.originPublication!=WaterOriginPublication50JC::NativeOneViewPresentation50JC)
+           w.originPublication!=WaterOriginPublication50JC::NativeOneViewPresentation50JC&&
+           w.originPublication!=WaterOriginPublication50JC::OriginalCold2BE110)
             return fail(Status::Owner,0x2bec50u,i);
         const float dx=m.sub(x,w.originXC0,0x2b730cu);
         const float dz=m.sub(z,w.originZC4,0x2b7320u);

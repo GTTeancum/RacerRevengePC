@@ -1,4 +1,5 @@
 #pragma once
+#include "runtime_asset_paths50lb.h"
 #include "../../src/assets/material_texture_assets50ea.h"
 #include "../../src/assets/vehicle_draw_assets50cr.h"
 #include "../../src/assets/scene_asset48d.h"
@@ -152,7 +153,8 @@ struct Inputs {
     fs::path root;
     std::size_t capacity = 0, sourceBytes = 0;
     std::map<std::string, Json> objects, records;
-    Bytes read(const fs::path& path, std::size_t limit) {
+    Bytes read(const fs::path& requested, std::size_t limit) {
+        const auto path=runtime_asset_paths50LB::resolve(requested);
         need(!fs::is_symlink(path), "Symlink input rejected: " + path.string());
         std::ifstream f(path, std::ios::binary | std::ios::ate);
         need(f.is_open(), "Cannot open retained input: " + path.string());

@@ -30,14 +30,25 @@ inline constexpr std::array<Entry,8> entries{{
 // and permutation; the cold Course owner replaces only camera slot0.
 inline constexpr Entry coursePod19{19,"POD19","Anakin Skywalker","pod19/pod.json",
     true,"RACER: ANAKIN SKYWALKER"};
+// Genuine supplemental Course identities, outside the retained eight-entry
+// host-menu cycle. Names are the originals' own PHY Name fields. Every cold
+// selection still requires that pod's authenticated RES/import/PHY owners.
+inline constexpr std::array<Entry,4> additionalCoursePods{{
+    {2,"POD02","Ben Quad","pod02/pod.json",true,"RACER: BEN QUAD"},
+    {12,"POD12","Shrivel Braittrand","pod12/pod.json",true,"RACER: SHRIVEL BRAITTRAND"},
+    {15,"POD15","Teemto","pod15/pod.json",true,"RACER: TEEMTO"},
+    {20,"POD20","Occo Ninebar","pod20/pod.json",true,"RACER: OCCO NINEBAR"}
+}};
 inline constexpr const Entry* findByRacer60(std::uint32_t value) noexcept {
     for(const auto& entry:entries)if(entry.racer60==value)return &entry;
     if(value==coursePod19.racer60)return &coursePod19;
+    for(const auto& entry:additionalCoursePods)if(entry.racer60==value)return &entry;
     return nullptr;
 }
 inline constexpr const Entry* findByPodId(std::string_view value) noexcept {
     for(const auto& entry:entries)if(entry.podId==value)return &entry;
     if(value==coursePod19.podId)return &coursePod19;
+    for(const auto& entry:additionalCoursePods)if(entry.podId==value)return &entry;
     return nullptr;
 }
 inline constexpr bool canSelectHuman(std::uint32_t value) noexcept {
@@ -72,9 +83,12 @@ inline constexpr bool cancel(Selection& state) noexcept {
 // the source ID, including POD01 when it moves into the selected pod's bot slot.
 inline constexpr bool buildRosterOrder(std::uint32_t humanRacer60,
     std::array<std::size_t,entries.size()>& out) noexcept {
-    if(!canSelectHuman(humanRacer60)||humanRacer60==coursePod19.racer60)return false;
-    std::array<std::size_t,entries.size()> order{};std::size_t selected=0;
+    if(!canSelectHuman(humanRacer60))return false;
+    std::array<std::size_t,entries.size()> order{};std::size_t selected=entries.size();
     for(std::size_t i=0;i<entries.size();++i){order[i]=i;if(entries[i].racer60==humanRacer60)selected=i;}
+    // Supplemental Course pods require their real replacement row, not a
+    // fabricated permutation of the eight default originals.
+    if(selected==entries.size())return false;
     order[0]=selected;order[selected]=0;out=order;return true;
 }
 } // namespace rr::game::original_racer_selection50IJ

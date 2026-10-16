@@ -65,7 +65,13 @@ struct PodEngineControls50HE {
 bool podEngineControls50HE(const PodEngineParameters50HE&,const PodEngineInput50HE&,
     PodEngineControls50HE&) noexcept;
 
-struct PodBoostAudioState50HE { bool pitchBoost=false; };
+struct PodBoostAudioState50HE {
+    // Canonical represented source22C low4 bits (178914..178988 clears all
+    // four at construction; upper bits are opaque). Boost changes bit1 only; physical
+    // reset clears bit2 without replacing the boost or unrelated flags.
+    std::uint8_t flags22C=0;
+    bool pitchBoost()const noexcept{return (flags22C&2u)!=0;}
+};
 // Source217760/2177BC ->19FF10/19FF60 ->1A0120. Call at the original boost
 // boundary: heldBoost=(B9C&1)&&!(B9C&2), heating is the source88*(70+74),
 // previous64 is the PREVIOUS state, before heat can make this tick state2.

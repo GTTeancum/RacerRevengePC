@@ -1,0 +1,34 @@
+Remaining Rider finite material identities: SOURCE-ONLY, UNTESTED
+
+Deliverable: remaining-rider-materials.patch. Two isolated replacement files in candidate/, exact preimages in preimage/, preimage SHA256s in patch-preimages.json. Base observed HEAD8a3a2207f447f8f9c13e6e236f7cdfb5edfc8a38. Central repository unchanged.
+
+Adds17 opaque character IPUM identities,20 body identities (their second specular pass uses those same identities),9 ordinary shadow identities plus the exact26-to25 shadow source alias, and08c_3 FIX64 character-specular identity. Nine corresponding shadow texture names enter existing typed dispatch. No semantic gates, pass counts/order, texture pixels, startup activation, profiles/unlocks/Confirm, source callbacks, mesh/model caches or original assets changed.
+
+SOURCE EQUIVALENCE
+Archive bytes read directly from the supplied original-game-UI-menu-and-videos ZIP using only standard-library ZIP/RES block inflation and text/header inspection. No project importer/converter ran.
+UI/UIRIDER/UIRIDER.RES:5552683 bytes SHA256112cd71ac9cfcc909b0edb56e0e420bb358b7078b5abae5f48c62b95a6bbf856.
+UI/UIPODTEX.RES SHA256ffb0f32563e3e5b6e3fefe915bbb37a00610e1a9a44163bce9737c2ac9d6e641. source-evidence.json contains exact byte counts, member offsets, SHA256s, raw PSM text, original PST kind/count/dimensions/payload ranges. comparison.json compares all section/key/value declarations (including blanks and inactive sections), ignoring comments/whitespace and replacing only the material's own texture name. full-pass-equivalence.json enumerates every declared pass, all authored fields, resolved constructor/DefaultMT GS fields, sampler/enable/map/UV controls, source textures/provenance, and separately preserved inactive sections.
+
+01/08/14/16/17/18/21/22/25/26 _1 and _2: complete two-pass PSM declaration equivalence to04_1, own-name substitution only. Their actual UIPODTEX textures are kind1, one256x256 mip; generic first diffuse admission already covers this layout. New body identities enable the existing required specmap1 second pass. They do not create additional passes or force these sources through a multilevel adapter.
+
+01/08/14/16/17/18/21/22/25 _shdw: full one-pass declaration equivalence to04_shdw; exact own UIRIDER kind1 one128x128 mip. Existing typed attenuation/source-alpha/fog/ATE6 REF0/GEQUAL/depth-write gates unchanged.26_shdw.psm is BYTE IDENTICAL to25_shdw.psm (SHA256323a1156c149fd8bd04244601d195f86c0898ef016b46545d7ec589868b661bc), and actually names25_shdw.pst. Patch requires exact26_shdw PSM identity and returns25_shdw source name; does not substitute26_shdw.pst.
+
+01c_1/2,08c_1/2,14c_2,16c_1/2,17c_1/2,18c_2,22c_1,25c_1/2/3/4/5: complete one-pass declaration equivalence to04c_1, own-name substitution only. Exact original kind2 textures retain all mips.25c_3/4 have4 ascending16..128 mips;25c_5 has3 ascending16..64; others5 ascending16..256. Existing authenticated per-PST/archive/mip/color-policy bank checks and last-stored highest-resolution-only policy unchanged.18c_1 declares1 pass; pass1 differs only by inherited blank ABE rather than explicit0. Constructor ABE0 plus authenticated82-byte DefaultMT leaves the same state. Its unused SpecularMapCompressed section stays inactive, as the existing declared-count reader requires. All17 additions keep opaque/alpha-test-off admission.
+
+08c_3: full three-pass declarations match03c_3 and12c_4 after own-name substitution. Exact PSM SHA25630d8eb61a8f6d5d9a24dd37cf091db67117ef88f51d7a0846cc60bcd458e43e1; source PST2140 bytes SHA25600ee343f104df9101ca7bfd03f2c65e48026d0e90718e17c6efcce1a41625816 is packed kind0, one64x64 mip,16-entry original palette. This checkout ALREADY admits kind0 end to end through the relevant single-mip material adapter chain:
+- OriginalUiRiderModelMaterials resolves actual authenticated UIRIDER member, rejects ATM/missing/colliding source and keeps all3 passes.
+- OriginalUiScreenAssets retains source identity and decodedTexture.kind; import_texture48e.cpp explicitly decodes packed nibble kind0. No relabel to kind1/IPUM.
+- Rider material dispatch sends passes1/3 to prepareOriginalUiLitMaterial50KM; common textureShape explicitly admits kind<=1 with one mip. All original dimensions/header words/state remain subject to existing checks.
+- Exact diffuse state: sourceAlpha ALPHA(0,1,0,1), ABE1, ATE1/ATST6/REF0/AFAIL0, fog1, AA0, context0, depthGEQUAL/write, linear-repeat, MXL0. Generic common gate supports it. convertOriginalUiLitMaterialSpan50KM and common conversion retain sourceAlpha, DiffuseCompressed, fog and ATE; neither imposes a kind1-only restriction.
+- Added pass2 exact identity retains original specmap1 member proof, kind1 one256x256 original mip and published RGBA equality. Existing FIX64 additive ALPHA(0,2,2,1), depth-writing, fog/ATE/GEQUAL contract and same bank/index/identity conversion stay mandatory.
+This demonstrates source-level adapter compatibility, NOT runtime publication, draw scheduling, geometry, lighting, stored-alpha renderer readiness or pixel parity. No claim of complete Rider8 activation/readiness.
+
+REMAINING LIMITS (do not skip declared passes)
+25c_7: original kind2,3 mips16..64, declared1 DiffuseCompressed pass with ABE1 and AA1, alphaTestOff/REF120. Existing IPUM adapter requires ABE0 and the common gate requires AA0. Not added; converted IPUM presence alone does not solve it.
+22_3: declares3 passes: diffusecompressed, EnvironmentMapcompressed, StripOptFogCode. The latter two lack the supported lit program semantics here. Not relabeled to specular/diffuse and no pass dropped. Exact kind1 one128x128 original22_3 texture does not solve programs.
+17_3: actual kind1 four16..128 mips, one diffusecompressed pass with inherited ATE1/ATST6/REF0. Generic adapter is single-mip only; typed indexed-body adapter requires ATE0. Identity-only addition cannot admit it. Not added; a separately scoped source-equivalent multi-mip ATE1 policy would be needed if this material is reached.
+21_3.psm: texture21_3 PST absent from both supplied archives; no manufactured replacement. Inventory presence does not establish that this PSM is selected by an actual requested model.
+Other single-mip materials retain generic routes, including21c_3's existing additive/fog-off declared state.01c_3,14c_1,21c_1/2,22c_2,25c_6,26c_1/2 and22_4 declare only1 pass despite spare specular sections. The inventory report does not assert mesh material reachability or per-rider readiness.
+
+NO EXECUTABLE VALIDATION
+No builds, tests, syntax checks, sanitizers, gameplay, guest execution, converters or project importer execution performed. No mesh-cache audit performed. Work is raw original-byte comparisons, static source-chain inspection, isolated source edits and reporting only. Parent must integrate/review and perform separately authorized verification. Nothing enables the remaining racers.

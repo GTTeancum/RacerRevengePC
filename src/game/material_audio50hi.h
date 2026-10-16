@@ -10,10 +10,13 @@ struct MaterialDriveParameters50HI {
     // Native provider base-pitch units, never fabricated PS2 metadata.
     std::uint32_t basePitch=4096;
 };
-inline constexpr std::size_t maxMaterialAudioRows50HI=20;
+inline constexpr std::size_t maxMaterialAudioRows50HI=32;
+inline constexpr std::size_t maxMaterialDriveRows50HI=20;
 struct MaterialAudioParameters50HI {
-    MaterialDriveParameters50HI drive[maxMaterialAudioRows50HI]{};
-    std::uint32_t rowCount=8; // Legacy TA callers retain their exact8-row bound.
+    MaterialDriveParameters50HI drive[maxMaterialDriveRows50HI]{};
+    // rowCount retains the existing collision-bound API. Original2928B0
+    // constructs independent collision(+200) and drive(+214) arrays.
+    std::uint32_t rowCount=8,driveRowCount=8;
 };
 struct ContactMaterial50HI { std::uint32_t candidateIdentity=0; std::uint8_t materialA9=0; };
 // Identity0 is the actual no-contact state. A nonzero unresolved identity fails;
@@ -34,7 +37,7 @@ struct MaterialAudioInput50HI {
 struct MaterialAudioState50HI {
     std::uint8_t emitterFlags22C=0;
     std::int32_t driveMaterial240=-1,driveKey244=-1;
-    std::int32_t cachedSlope20[maxMaterialAudioRows50HI]={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+    std::int32_t cachedSlope20[maxMaterialDriveRows50HI]={-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
 };
 struct MaterialAudioCommand50HI {
     AudioOperation50HE operation=AudioOperation50HE::Start;
@@ -49,8 +52,12 @@ inline constexpr std::size_t maxMaterialAudioCommands50HI=3;
 // shared RNG owner as other subscribers; no private seed. Missing contact is
 // the source lazy skip, not material0 or an inferred stop. No hot allocation.
 // State/RNG/commands/count are transactional. Prior and next state may alias;
-// other mutable output spans must be distinct. Only complete caller-bound four-variant families up to20 rows are
-// admitted; no positive out-of-range material is substituted. Playback availability/restart guards belong to the real provider.
+// other mutable output spans must be distinct. Collision families are bounded
+// by rowCount; drive owners are independently bounded by driveRowCount. A
+// collision-only material retains its selected drive key, but the original
+// missing drive lookup produces no playback/control or pitch RNG draw.
+// No positive out-of-range collision material is substituted. Playback
+// availability/restart guards belong to the real provider.
 AudioEventStatus50HE updateMaterialAudio50HI(const MaterialAudioParameters50HI&,
     const MaterialAudioInput50HI&,const MaterialAudioState50HI&,MaterialAudioState50HI&,
     std::uint32_t& sharedRandomState,MaterialAudioCommand50HI*,std::size_t capacity,

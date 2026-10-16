@@ -1,4 +1,6 @@
 #pragma once
+#include "original_racer_field48_50la.h"
+#include "original_racer_length858_50la.h"
 #include "plain_effect_tail50q.h"
 #include "packed_vehicle_tail50r.h"
 #include "vehicle_animation49t.h"
@@ -7,6 +9,7 @@
 #include "pod_shape49w.h"
 #include "static_impact49y.h"
 #include "impact_consumers49z.h"
+#include "controller_feedback50kz.h"
 #include "impact_aftermath50a.h"
 #include "impact_effects50b.h"
 #include "optional_probe_effects50p.h"
@@ -21,7 +24,7 @@ constexpr std::uint32_t vehicleFrameNodeCount49W=maxSceneNodes49P;
 enum class VehicleFramePhase49W : std::uint32_t {
     Ready, PostPlayer, BeforeGraphics, PostGraphics, PostImpactConsumers, PostImpactRepair, AfterImpactBlock, BetweenBodyChildren,
     AfterBodyChildren, SubstepReady, PostWorld, Post354, Post368,
-    MainIntegration, Query219120, PostImpactEffects50O, PostOptionalProbeEffects50P, PostPlainEffects50Q, PostPackedBytes50S, PostEngineBase50X, PodLivePending50IZ
+    MainIntegration, Query219120, PostImpactEffects50O, PostOptionalProbeEffects50P, PostPlainEffects50Q, PostPackedBytes50S, PostEngineBase50X, PodLivePending50IZ, ImpactFeedbackPending50KZ, ImpactFeedbackClearReturned50KZ, ImpactFeedbackReturned50KZ
 };
 // These are supplied source-completed stages, never callbacks invented by the
 // native implementation. All unrepresented effects are outside this bridge;
@@ -54,6 +57,9 @@ struct VehicleFrameBindings49W {
     // Null retains the old current-null admission. No boolean can stand in
     // for its actual object/membership/source context.
     const PodLiveQueryContext50IZ* podLiveQuery50IZ=nullptr;
+    // Stable actual shared provider334 -> enabled348+124 cold binding. The
+    // descriptor/pointees are outside racer snapshots; only this borrow is banked.
+    const TerrainWaterBinding50JC* terrainWater50JC=nullptr;
 };
 struct VehicleFrameParameters49W {
     CoupledBodyParameters49M bodies;
@@ -89,6 +95,10 @@ struct VehicleFrameFields49W {
     bool nativeAiOwnersBound50IV=false;
     // Exact dynamic-contact registry/list/runtime join, independent of AI role.
     bool dynamicOwnersBound50IW=false;
+    // Optional bottom model flag191 owners; independent of primary engines.
+    std::uint8_t bottomLeft191=0,bottomRight191=0;
+    OriginalRacerLength85850LA length858; //Sole211A2C/2126F4 owner; banked with this record.
+    OriginalRacerField48_50LA cableMode48; //20F6B4, same per-racer Bank owner.
 };
 // Only previously unrepresented consumer state lives here. Damage7D0..7DC,
 // CFC/D00, partnerDuration10 and directional maxima keep their existing owners.
@@ -113,6 +123,8 @@ struct VehicleTerrainProbe50FP {
     std::array<std::uint32_t,16> collectedIdentities{};
     std::uint32_t currentCandidateIdentity=0;
     TerrainFollowParameters48G response{};
+    // Canonical348+160 vector, including queried height164. Distinct from150.
+    VisualVector49R waterPoint160{{0.f,0.f,0.f,1.f}};
 };
 struct VehicleFrameState49W {
     SceneNode49P nodes[vehicleFrameNodeCount49W];
@@ -135,6 +147,11 @@ struct VehicleFrameState49W {
     std::uint32_t impactConsumerPending49Y;
     VehicleImpactSupplement49Z impactSupplement;
     std::uint32_t impactConsumersActive49Z;
+    // Native continuation only, never another timer/damage owner. Frozen at
+    // the actual222D70/222D8C cut so a retry cannot rerun222B20's prefix.
+    ImpactConsumerInput49Z pendingImpactInput50KZ{};
+    float pendingImpactLateral50KZ=0.f,pendingImpactDuration50KZ=0.f;
+
     // Sole packed C00..C06 owner. Written completely by2291D0 before use.
     std::uint8_t packedC00[7];
     VehicleTerrainProbe50FP terrainProbe;
@@ -279,6 +296,19 @@ bool graphicsVehicleFrame49W(VehicleFrameState49W&,const VehicleFrameBindings49W
 bool consumeVehicleImpacts49Z(VehicleFrameState49W&,const VehicleFrameBindings49W&,
     const ImpactConsumerInput49Z&,VehicleImpactEvents49Z&,
     VehicleFrameWorkspace49W&,VehicleFrameDiagnostic49W&) noexcept;
+// Resolves the retained actual source5C in the native controller registry,
+// executes238870/+40 and2388B0/+44, then resumes222DF4 without replay. Device
+// objects exist even when their real physical transport is absent; their fresh
+// capability gate then makes2388B0 a genuine no-device return. No callback is
+// fabricated. Helper timers belong to the registry and survive later failure.
+// Caller MUST fulfill the prefix partner events before calling; returned partner
+// events are only the later2228D0 suffix. Numerical-tail retry cannot reissue the
+// helpers because the phase records their actual return. Helper receipts are
+// reconstructed cumulatively from retained phase, even with a fresh output.
+bool resumeVehicleImpactsWithControllers50KZ(VehicleFrameState49W&,
+    const VehicleFrameBindings49W&,ControllerFeedbackState50KZ* devices,
+    std::size_t deviceCount,VehicleImpactEvents49Z&,
+    VehicleFrameWorkspace49W&,VehicleFrameDiagnostic49W&) noexcept;
 // Executes actual virtual+80 ->224370 immediately after the consumers. Reads
 // canonical player.flagsB9C, factor, repairCF4 and bound component presence.
 // Stops before the subsequent223540 effect and225C50 transition operations;
@@ -298,6 +328,11 @@ bool beginVehicleSubstep49W(VehicleFrameState49W&,const VehicleFrameBindings49W&
 bool enableVehicleTerrain50FP(VehicleFrameState49W&,const VehicleFrameBindings49W&,
     const TerrainPrepareState48M& initial,const TerrainFollowParameters48G&,
     VehicleFrameWorkspace49W&,VehicleFrameDiagnostic49W&) noexcept;
+// Fresh enabled348 only. Binds the actual recovered334->124 ownership without
+// changing clocks, query values or the separate attached-water effect path.
+// Binding and all provider storage must remain stable for the race lifetime.
+bool bindVehicleTerrainWater50JC(VehicleFrameState49W&,VehicleFrameBindings49W&,
+    const TerrainWaterBinding50JC&,VehicleFrameDiagnostic49W&) noexcept;
 // PostWorld AFTER spring detection, BEFORE forces. Publishes actual48M numeric
 // preparation to caller for348's own live membership update and limited query.
 // Segment endpoints/mode are actual cold query ownership; old numeric world is

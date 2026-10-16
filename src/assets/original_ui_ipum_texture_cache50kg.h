@@ -10,6 +10,7 @@ namespace rr::assets {
 // The first bounded closure is the actual Rider19 character texture19c_1.
 // More sources require a separately authenticated, compiled catalog change.
 inline constexpr std::size_t originalUiIpumMipCount50KG = 5;
+inline constexpr std::size_t originalUiIpumAdditionalCapacity50KG = 29;
 enum class OriginalUiIpumColorPolicy50KG : std::uint8_t {
     unavailable,original50FcRgb5Texa255Aem1
 };
@@ -28,6 +29,8 @@ struct OriginalUiIpumProvenance50KG {
     // measured bit parity with a hardware inverse-DCT/framebuffer capture.
     bool hardwarePixelParityVerified=false;
     std::array<OriginalUiIpumMipProvenance50KG,originalUiIpumMipCount50KG> mips{};
+    // Only [0,mipCount) is authenticated; zero means unavailable.
+    std::size_t mipCount=0;
 };
 enum class OriginalUiIpumCacheError50KG : std::uint8_t {
     none,alreadyLoaded,cacheUnavailable,archive,source,imageCount,sourceLayout,
@@ -59,6 +62,8 @@ public:
     static bool catalogAvailable() noexcept;
     // Finite optional source catalog. Zero means unavailable, not an empty
     // authenticated cache. Indexes are compiled identities, never caller pins.
+    // A source-only pin (including Gasgano07c_2) does not add an index: real
+    // generated pixel/codec provenance must exist in the compiled catalog.
     static std::size_t additionalCatalogSourceCount() noexcept;
     static const char* additionalSourceMember(std::size_t source) noexcept;
     static std::size_t additionalMipCount(std::size_t source) noexcept;
@@ -90,6 +95,6 @@ public:
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
-    std::array<std::unique_ptr<Storage>,8> additional_{};
+    std::array<std::unique_ptr<Storage>,originalUiIpumAdditionalCapacity50KG> additional_{};
 };
 } // namespace rr::assets

@@ -39,22 +39,79 @@ struct Guard {
         for(unsigned i=0;i<count;++i)if(overlap(r,writes[i]))return false;
         reads[readCount++]=r;return true;
     }
+    // All writes must already be registered. Water resources have variable
+    // nested span counts; validate each without imposing this guard's fixed
+    // descriptor-list capacity on the authentic signature/bucket list.
+    template<class T> bool nestedRead(const T* p,std::size_t n=1) const noexcept {
+        Range r;if(!range(p,n,r))return false;
+        for(unsigned i=0;i<count;++i)if(overlap(r,writes[i]))return false;
+        return true;
+    }
 };
+bool waterStorage(const Guard& g,const WaterHeightProvider50JC& p,
+    const WaterHeightGlobals50JC& globals,const float* lift) noexcept {
+    const auto optional=[&g](const auto* value) noexcept {
+        return g.nestedRead(value,value?1u:0u);
+    };
+    const auto bytes=[&g](const WaterBytes50JC& span) noexcept {
+        return g.nestedRead(span.data,span.size);
+    };
+    if(!optional(lift)||!optional(p.baseHeight3C)||!optional(p.heightScaleC0)||
+       !bytes(p.noise5C)||!optional(globals.renderInfinitePlane3834E0)||
+       !optional(globals.wakeScale443B88)||!optional(globals.waterHeightRange443B90)||
+       !optional(globals.poolBase443E90)||!optional(globals.poolDepth443B98)||
+       !optional(globals.channelScale98)||!optional(globals.channelScale9C)||
+       !optional(globals.channelScaleA0)||!optional(globals.channelScaleA4))return false;
+    if(p.count4C>0){
+        if(!g.nestedRead(p.buckets40,static_cast<std::size_t>(p.count4C)))return false;
+        for(std::int32_t i=0;i<p.count4C;++i)
+            for(const auto& buffer:p.buckets40[i].buffers38)if(!bytes(buffer))return false;
+    }
+    if(p.signaturesC4){
+        if(!g.nestedRead(p.signaturesC4))return false;
+        const auto& owner=*p.signaturesC4;
+        if(!g.nestedRead(owner.signatures328,owner.count)||!optional(owner.time388)||
+           !optional(owner.phase34C)||!optional(owner.phase350)||
+           !optional(owner.complement360)||!optional(owner.complement364))return false;
+        for(std::size_t i=0;i<owner.count;++i){const auto& signature=owner.signatures328[i];
+            if(!bytes(signature.current2C)||!bytes(signature.next30))return false;
+        }
+    }
+    return true;
+}
 std::uint32_t bits(float x) noexcept {std::uint32_t u;std::memcpy(&u,&x,4);return u;}
 bool validIndex(I i) noexcept {const auto n=static_cast<std::int32_t>(i);return n>=0&&n<static_cast<std::int32_t>(vehicleFrameNodeCount49W);}
 SceneNode49P& node(VehicleFrameState49W& s,I i) noexcept {return s.nodes[static_cast<unsigned>(i)];}
 const SceneNode49P& node(const VehicleFrameState49W& s,I i) noexcept {return s.nodes[static_cast<unsigned>(i)];}
 SceneGraph49P graph(VehicleFrameState49W& s) noexcept {return {s.nodes,s.sceneNodeCount};}
-bool frameDomain(const VehicleFrameState49W& s,const VehicleFrameBindings49W& b) noexcept {
-    if(std::fegetround()!=FE_TONEAREST||s.phase!=VehicleFramePhase49W::PostPackedBytes50S||
-       s.fields.vehicle58||s.fields.vehicle3C||b.visual.extra1C0Present||b.visual.extra1C4Present||
+bool entryDomain(const VehicleFrameState49W& s,UndertrackResetDomain50EW domain) noexcept {
+    if(s.fields.vehicle3C)return false;
+    switch(domain){
+    case UndertrackResetDomain50EW::PlayerPostPackedBytes50S:
+        return s.phase==VehicleFramePhase49W::PostPackedBytes50S&&s.fields.vehicle58==0u;
+    case UndertrackResetDomain50EW::PlayerControllerReady50LC:
+        return s.phase==VehicleFramePhase49W::Ready&&s.fields.vehicle58==0u;
+    case UndertrackResetDomain50EW::OriginalAiPostPlayer:
+        return s.phase==VehicleFramePhase49W::PostPlayer&&s.fields.vehicle58==1u&&
+            s.fields.nativeAiOwnersBound50IV;
+    }
+    return false;
+}
+bool frameDomain(const VehicleFrameState49W& s,const VehicleFrameBindings49W& b,
+    UndertrackResetDomain50EW domain) noexcept {
+    if(std::fegetround()!=FE_TONEAREST||!entryDomain(s,domain)||
        !s.bodies.main.domain.secondBodyPresent||!s.bodies.secondary.scenePresent||
        s.bodies.main.domain.sceneObserverCount||s.bodies.secondaryDomain.sceneObserverCount||
        b.mainDomain.rootObserverPresent19C||b.secondaryDomain.rootObserverPresent19C)return false;
     if(!validVehicleSceneCount49W(s,b)||!validateSceneGraph49P({const_cast<SceneNode49P*>(s.nodes),s.sceneNodeCount}))return false;
     const I ids[]={b.lifecycle.main190,b.lifecycle.hidden198,b.lifecycle.physical19C,
-        b.lifecycle.model1B4,b.lifecycle.right1B8,b.lifecycle.left1BC};
-    for(unsigned i=0;i<6;++i){if(!validIndex(ids[i])||static_cast<unsigned>(ids[i])>=s.sceneNodeCount||node(s,ids[i]).parent180!=I::none)return false;
+        b.lifecycle.model1B4,b.lifecycle.right1B8,b.lifecycle.left1BC,
+        b.visual.bottomRight1C0,b.visual.bottomLeft1C4};
+    if(b.visual.extra1C0Present!=b.visual.extra1C4Present||
+       b.visual.extra1C0Present!=(b.visual.bottomRight1C0!=I::none)||
+       b.visual.extra1C4Present!=(b.visual.bottomLeft1C4!=I::none))return false;
+    const unsigned count=b.visual.extra1C0Present?8u:6u;
+    for(unsigned i=0;i<count;++i){if(!validIndex(ids[i])||static_cast<unsigned>(ids[i])>=s.sceneNodeCount||node(s,ids[i]).parent180!=I::none)return false;
         for(unsigned j=0;j<i;++j)if(ids[i]==ids[j])return false;}
     return true;
 }
@@ -121,18 +178,46 @@ bool registryStorage(Guard& g,VehicleFrameState49W& frame,const UndertrackQueryO
 }
 }
 
-UndertrackResetResult50EW placeInitialUndertrackPhysics50EW(VehicleFrameState49W& s,
+namespace {
+UndertrackResetResult50EW placeInitialPhysics(VehicleFrameState49W& s,
     const VehicleFrameBindings49W& b,const UndertrackPlacement50ET& placement,
     const UndertrackPhysicsDomain50EW& domain,const SecondaryActivationGlobals49V& bodyGlobals,
-    const ResetLifecycleGlobals50AT& lifecycleGlobals,UndertrackPhysicsWorkspace50EW& w) noexcept {
-    Guard g;if(!g.write(&s)||!g.write(&w)||!g.read(&b)||!g.read(&placement)||!g.read(&domain)||
+    const ResetLifecycleGlobals50AT& lifecycleGlobals,UndertrackPhysicsWorkspace50EW& w,
+    UndertrackResetDomain50EW entry,UndertrackPlacement50ET* placementOutput) noexcept {
+    Guard g;if(!g.write(&s)||!g.write(&w)||(placementOutput&&!g.write(placementOutput))||
+        !g.read(&b)||(&placement!=placementOutput&&!g.read(&placement))||!g.read(&domain)||
         !g.read(&bodyGlobals)||!g.read(&lifecycleGlobals))return result(S::Storage);
-    if(!frameDomain(s,b))return result(S::Binding,0x216bd0);
+    if(!frameDomain(s,b,entry))return result(S::Binding,0x216bd0);
     if(domain.terrain330!=UndertrackHeightOwner50EW::Absent)return result(S::UnsupportedHeightOwner,0x216b38);
-    if(domain.water334!=UndertrackHeightOwner50EW::Absent)return result(S::UnsupportedHeightOwner,0x216b78);
+    const bool water=domain.water334==UndertrackHeightOwner50EW::Present;
+    if((!water&&domain.water334!=UndertrackHeightOwner50EW::Absent)||
+       (water&&(!placementOutput||!domain.waterProvider334||!domain.waterGlobals)))
+        return result(S::UnsupportedHeightOwner,0x216b78);
+    if(water&&(!g.read(domain.waterProvider334)||!g.read(domain.waterGlobals)||
+       !waterStorage(g,*domain.waterProvider334,*domain.waterGlobals,domain.terrain348Lift1F0)))
+        return result(S::Storage,0x216b94);
     if(std::memcmp(lifecycleGlobals.zero434630,s.visualShared.zero434630.v,16))return result(S::Binding,0x216c4c);
+    auto nextPlacement=placement;
+    if(water){
+        //216B84..216B98 copies the current BC0 and passes no effect output.
+        float point[3];std::memcpy(point,nextPlacement.positionBC0,sizeof point);
+        const auto sampled=queryWaterHeight50JC(*domain.waterProvider334,*domain.waterGlobals,point);
+        if(sampled.status!=WaterHeightStatus50JC::Complete){
+            auto r=result(S::WaterHeight,sampled.sourcePC);r.water=sampled;return r;
+        }
+        water_height_detail50jc::Math arithmetic;
+        const float delta=arithmetic.sub(point[1],nextPlacement.positionBC0[1],0x216bac);
+        if(arithmetic.badPC)return result(S::Arithmetic,arithmetic.badPC);
+        //216BB8 takes the <=0 branch BEFORE reading348+1F0. Signed-zero
+        // equality preserves the original BC4 bits and does not add the lift.
+        if(!(delta<=0.f)){
+            if(!domain.terrain348Lift1F0)return result(S::UnsupportedHeightOwner,0x216bc4);
+            nextPlacement.positionBC0[1]=arithmetic.add(point[1],*domain.terrain348Lift1F0,0x216bc8);
+            if(arithmetic.badPC)return result(S::Arithmetic,arithmetic.badPC);
+        }
+    }
     w.frame=s;auto& next=w.frame;BodyMatrix48G pose{};
-    if(!poseFor(next,placement,placement.positionBC0,pose))return result(S::Arithmetic,0x216af0);
+    if(!poseFor(next,nextPlacement,nextPlacement.positionBC0,pose))return result(S::Arithmetic,0x216af0);
     orientationGlobal(next);
     if(!place(next,b.lifecycle.main190,pose,w)||!refreshSceneWorld49P(graph(next),b.lifecycle.main190))return result(S::Scene,0x216bd0);
     if(!place(next,b.lifecycle.hidden198,pose,w,UndertrackSceneOrder50ET::PositionThenOrientation))return result(S::Scene,0x216c08);
@@ -141,23 +226,48 @@ UndertrackResetResult50EW placeInitialUndertrackPhysics50EW(VehicleFrameState49W
     if(!place(next,b.lifecycle.model1B4,pose,w,UndertrackSceneOrder50ET::PositionThenOrientation))return result(S::Scene,0x216cf0);
     if(!place(next,b.lifecycle.physical19C,pose,w,UndertrackSceneOrder50ET::PositionThenOrientation))return result(S::Scene,0x216d20);
     resetSecondaryActivation49V(next.bodies.secondary,next.secondarySupplement,bodyGlobals);
-    project(next,b);s=next;return result(S::SourceSliceComplete,0x216d64);
+    project(next,b);s=next;
+    if(placementOutput)*placementOutput=nextPlacement;
+    return result(S::SourceSliceComplete,0x216d64);
+}
+}
+
+UndertrackResetResult50EW placeInitialUndertrackPhysics50EW(VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,UndertrackPlacement50ET& placement,
+    const UndertrackPhysicsDomain50EW& domain,const SecondaryActivationGlobals49V& bodyGlobals,
+    const ResetLifecycleGlobals50AT& lifecycleGlobals,UndertrackPhysicsWorkspace50EW& w,
+    UndertrackResetDomain50EW entry) noexcept {
+    return placeInitialPhysics(s,b,placement,domain,bodyGlobals,lifecycleGlobals,w,entry,&placement);
+}
+
+UndertrackResetResult50EW placeInitialUndertrackPhysics50EW(VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,const UndertrackPlacement50ET& placement,
+    const UndertrackPhysicsDomain50EW& domain,const SecondaryActivationGlobals49V& bodyGlobals,
+    const ResetLifecycleGlobals50AT& lifecycleGlobals,UndertrackPhysicsWorkspace50EW& w,
+    UndertrackResetDomain50EW entry) noexcept {
+    return placeInitialPhysics(s,b,placement,domain,bodyGlobals,lifecycleGlobals,w,entry,nullptr);
 }
 
 UndertrackResetResult50EW finishUndertrackPhysics50EW(VehicleFrameState49W& s,
     const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
     const UndertrackPlacement50ET& placement,const ResetProbe50AG& probe,
-    const VisualVector49R& offset,const UndertrackModelBounds50EW (&models)[3],
+    const VisualVector49R& offset,const UndertrackModelBounds50EW* models,std::uint32_t modelCount,
     const ResetEffectBindings50BK& effectBindings,EffectOwner50BE* owners,std::size_t ownerCount,
-    std::uint32_t& vehicle850,UndertrackPhysicsWorkspace50EW& w) noexcept {
-    Guard g;if(ownerCount>maxEffectOwners50BE||!g.write(&s)||!g.write(&w)||!g.write(&vehicle850)||
+    std::uint32_t& vehicle850,UndertrackPhysicsWorkspace50EW& w,
+    UndertrackResetDomain50EW entry) noexcept {
+    Guard g;if(!models||modelCount!=(b.visual.extra1C0Present?5u:3u)||ownerCount>maxEffectOwners50BE||!g.write(&s)||!g.write(&w)||!g.write(&vehicle850)||
         !g.write(owners,ownerCount))return result(S::Storage);
-    for(const auto& m:models)if(!m.result||!g.write(m.result))return result(S::Storage);
+    for(auto* control:effectBindings.controls81C)if(control&&!g.write(control))return result(S::Storage);
+    for(unsigned i=0;i<modelCount;++i)if(!models[i].result||!g.write(models[i].result))return result(S::Storage);
     if(!g.read(&b)||!g.read(&p)||!g.read(&placement)||!g.read(&probe)||!g.read(&offset)||
-       !g.read(&effectBindings)||!g.read(models,3))return result(S::Storage);
-    for(const auto& m:models)if(!m.count||!g.read(m.nodes,m.count))return result(S::Storage);
-    if(!frameDomain(s,b))return result(S::Binding,0x216f6c);
-    if(probe.phase!=ResetProbePhase50AG::Hit||probe.attempt>=20||probe.lift!=bits(p.visual.verticalLimit7EC)||
+       !g.read(&effectBindings)||!g.read(models,modelCount))return result(S::Storage);
+    for(unsigned i=0;i<modelCount;++i)if(!models[i].count||!g.read(models[i].nodes,models[i].count))return result(S::Storage);
+    if(!frameDomain(s,b,entry))return result(S::Binding,0x216f6c);
+    const bool hit=probe.phase==ResetProbePhase50AG::Hit&&probe.attempt<20;
+    //216F48 exhaustion is shared by both actual callers. Each continuation
+    // emits the original diagnostic before publishing this terminal probe.
+    const bool exhausted=probe.phase==ResetProbePhase50AG::Exhausted&&probe.attempt==19;
+    if((!hit&&!exhausted)||probe.lift!=bits(p.visual.verticalLimit7EC)||
        probe.staged[0]!=bits(placement.positionBC0[0])||probe.staged[2]!=bits(placement.positionBC0[2])||
        probe.staged[3]!=bits(placement.positionBC0[3]))return result(S::GroundNotResolved,0x216f28);
     w.frame=s;w.vehicle850=vehicle850;if(ownerCount)std::memcpy(w.owners,owners,ownerCount*sizeof(*owners));
@@ -173,10 +283,11 @@ UndertrackResetResult50EW finishUndertrackPhysics50EW(VehicleFrameState49W& s,
        !refreshResetModelBounds50BA(graph(next),b.lifecycle.model1B4,models[0].nodes,models[0].count,w.bounds,w.modelResults[0])||
        !refreshSceneWorld49P(graph(next),b.lifecycle.model1B4))return result(S::ModelBounds,0x217030);
     if(!place(next,b.lifecycle.physical19C,pose,w))return result(S::Scene,0x21704c);
-    const I ids[]={b.lifecycle.right1B8,b.lifecycle.left1BC};
-    const VisualVector49R* offsets[]={&p.visual.rightBase2C0,&p.visual.leftBase2B0};
-    constexpr std::uint32_t boundPC[]={0x2170dc,0x21714c};
-    for(unsigned i=0;i<2;++i){
+    const I ids[]={b.lifecycle.right1B8,b.lifecycle.left1BC,b.visual.bottomRight1C0,b.visual.bottomLeft1C4};
+    const VisualVector49R* offsets[]={&p.visual.rightBase2C0,&p.visual.leftBase2B0,
+        &p.visual.rightBase2E0,&p.visual.leftBase2D0};
+    constexpr std::uint32_t boundPC[]={0x2170dc,0x21714c,0x2171bc,0x21722c};
+    for(unsigned i=0;i<modelCount-1;++i){
         if(!detail::pointGraph49W(graph(next),b.lifecycle.main190,*offsets[i],context,translated))return result(S::Arithmetic,boundPC[i]-0x4c);
         std::memcpy(pose.v+12,translated.v,16);
         if(!place(next,ids[i],pose,w)||!refreshResetModelBounds50BA(graph(next),ids[i],models[i+1].nodes,
@@ -186,20 +297,39 @@ UndertrackResetResult50EW finishUndertrackPhysics50EW(VehicleFrameState49W& s,
     std::uint32_t zero[4];std::memcpy(zero,next.visualShared.zero434630.v,16);
     resetUndertrackPriorPoint50ET(next.bodies.main,w.vehicle850,zero);
     ResetEffectState50BK effectState{};std::memcpy(effectState.timers820,next.impactSupplement.timers820,16);
-    const auto stopped=resetEffectStops50BK(effectBindings,w.owners,ownerCount,effectState,w.effects);
+    auto stagedEffectBindings=effectBindings;
+    for(unsigned i=0;i<2;++i)if(effectBindings.controls81C[i]){
+        w.controls81C[i]=*effectBindings.controls81C[i];
+        stagedEffectBindings.controls81C[i]=&w.controls81C[i];
+    }
+    const auto stopped=resetEffectStops50BK(stagedEffectBindings,w.owners,ownerCount,effectState,w.effects);
     if(stopped.status!=EffectDispatchStatus50BE::Complete){auto r=result(S::Effects,stopped.sourcePC);r.effects=stopped.status;return r;}
     std::memcpy(next.impactSupplement.timers820,effectState.timers820,16);
     finishUndertrackControlHistory50ET(next.bodies.main);project(next,b);
     s=next;vehicle850=w.vehicle850;
-    for(unsigned i=0;i<3;++i)*models[i].result=w.modelResults[i];
+    for(unsigned i=0;i<modelCount;++i)*models[i].result=w.modelResults[i];
     if(ownerCount)std::memcpy(owners,w.owners,ownerCount*sizeof(*owners));
+    for(unsigned i=0;i<2;++i)if(effectBindings.controls81C[i])
+        *effectBindings.controls81C[i]=w.controls81C[i];
     return result(S::SourceSliceComplete,0x2173f8);
 }
 
+UndertrackResetResult50EW finishUndertrackPhysics50EW(VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
+    const UndertrackPlacement50ET& placement,const ResetProbe50AG& probe,
+    const VisualVector49R& offset,const UndertrackModelBounds50EW (&models)[3],
+    const ResetEffectBindings50BK& effects,EffectOwner50BE* owners,std::size_t ownerCount,
+    std::uint32_t& vehicle850,UndertrackPhysicsWorkspace50EW& workspace,
+    UndertrackResetDomain50EW entry) noexcept {
+    return finishUndertrackPhysics50EW(s,b,p,placement,probe,offset,models,3,
+        effects,owners,ownerCount,vehicle850,workspace,entry);
+}
+
 UndertrackResetResult50EW prepareUndertrackPodQuery50EW(VehicleFrameState49W& s,
-    const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,LiveZoneBounds50EN& bounds) noexcept {
+    const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,LiveZoneBounds50EN& bounds,
+    UndertrackResetDomain50EW entry) noexcept {
     Guard g;if(!g.write(&s)||!g.write(&bounds)||!g.read(&b)||!g.read(&p))return result(S::Storage);
-    if(s.phase!=VehicleFramePhase49W::PostPackedBytes50S)return result(S::Phase,0x21684c);
+    if(!entryDomain(s,entry))return result(S::Phase,0x21684c);
     PodShapeState49W pod{};LiveZoneBounds50EN prepared{};
     if(!preparePod(s,b,p,pod,prepared))return result(S::QueryPreparation,0x21684c);
     CollectionBoundsResult48S checked{};Type0BoundsInput50EW input{};
@@ -211,9 +341,10 @@ UndertrackResetResult50EW prepareUndertrackPodQuery50EW(VehicleFrameState49W& s,
 
 UndertrackResetResult50EW removeUndertrackCollisionOwners50EW(VehicleFrameState49W& s,
     const UndertrackQueryOwners50EW& owners,ZoneLifecycle50CL& life,LiveZoneWorld50EN& world,
-    LiveZoneWorkspace50EN& w,UndertrackRegistryProgress50EW& progress) noexcept {
+    LiveZoneWorkspace50EN& w,UndertrackRegistryProgress50EW& progress,
+    UndertrackResetDomain50EW entry) noexcept {
     Guard g;if(!registryStorage(g,s,owners,life,world,w,progress))return result(S::Storage);
-    if(s.phase!=VehicleFramePhase49W::PostPackedBytes50S||progress.removed>4||progress.attached)return result(S::Phase,0x216acc);
+    if(!entryDomain(s,entry)||progress.removed>4||progress.attached)return result(S::Phase,0x216acc);
     std::uint32_t missing=0;if(!queryOwners(owners,life,missing))return missingOwner(missing,0x216acc);
     const auto& pod=owners.query[1];
     if(s.shape.registrationE0!=(pod.membership->attached?pod.object:0u))return result(S::Binding,0x216ad4);
@@ -230,19 +361,22 @@ UndertrackResetResult50EW attachUndertrackCollisionOwners50EW(VehicleFrameState4
     const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
     const UndertrackPlacement50ET& placement,const UndertrackQueryOwners50EW& owners,
     ZoneLifecycle50CL& life,LiveZoneWorld50EN& world,LiveZoneWorkspace50EN& w,
-    UndertrackRegistryProgress50EW& progress) noexcept {
+    UndertrackRegistryProgress50EW& progress,UndertrackResetDomain50EW entry) noexcept {
     Guard g;if(!registryStorage(g,s,owners,life,world,w,progress))return result(S::Storage);
     if(!g.read(&b)||!g.read(&p)||!g.read(&placement))return result(S::Storage);
-    if(s.phase!=VehicleFramePhase49W::PostPackedBytes50S||progress.removed!=4||progress.attached>4)
+    if(!entryDomain(s,entry)||progress.removed!=4||progress.attached>4)
         return result(S::Phase,0x21690c);
     std::uint32_t missing=0;if(!queryOwners(owners,life,missing))return missingOwner(missing,0x21690c);
     if(!readyMain(s,b)||!placement.vehicleC34||placement.vehicleC34>life.zoneCount)return result(S::Binding,0x21691c);
     // Preflight actual prepared resource/backing owners before any attachment.
     for(unsigned i:{0u,3u}){const auto& q=owners.query[i];
-        if(!q.type2||!q.type2->resource||!q.type2->queryScene.value)return missingOwner(i?0x348:0x690,i?0x216984:0x21691c);
-        if(!g.write(q.type2)||!g.read(q.type2->resource)||
-           !g.read(q.type2->resource->nodes,q.type2->resource->nodeCount)||
-           !g.read(q.type2->resource->rays,q.type2->resource->rayCount))return result(S::Storage);
+        const bool terrain=i==3u&&q.terrain&&q.terrainResource&&!q.type2;
+        if(!terrain&&(!q.type2||!q.type2->resource||!q.type2->queryScene.value||q.terrain||q.terrainResource))
+            return missingOwner(i?0x348:0x690,i?0x216984:0x21691c);
+        const auto* resource=terrain?q.terrainResource:q.type2->resource;
+        if(!(terrain?g.write(q.terrain):g.write(q.type2))||!g.read(resource)||
+           !g.read(resource->nodes,resource->nodeCount)||
+           !g.read(resource->rays,resource->rayCount))return result(S::Storage);
     }
     const auto& movement=owners.query[2];
     if(!movement.endpoints||!movement.metadata||!movement.shapeTag||!movement.segmentSphere)return missingOwner(0x7a4,0x21696c);
@@ -250,9 +384,13 @@ UndertrackResetResult50EW attachUndertrackCollisionOwners50EW(VehicleFrameState4
     constexpr unsigned order[]={0,2,3,1};constexpr std::uint32_t pcs[]={0x21691c,0x21696c,0x216984,0x21699c};
     while(progress.attached<4){const unsigned stage=progress.attached,index=order[stage];const auto& q=owners.query[index];
         if(q.membership->attached||q.membership->object)return result(S::Binding,pcs[stage]);
-        LiveZoneBounds50EN bounds{};Type2StaticQuery49X prepared2{};PodShapeState49W prepared0{};
+        LiveZoneBounds50EN bounds{};Type2StaticQuery49X prepared2{};TerrainPrepareState48M preparedTerrain{};
+        PodShapeState49W prepared0{};
         SpringVector4_48N endpoints[2]{};std::uint32_t metadata[2]{},tag=3;
-        if(index==0||index==3){prepared2=*q.type2;const auto& resource=*prepared2.resource;
+        if(index==0||index==3){
+            const bool terrain=q.terrain!=nullptr;
+            if(terrain)preparedTerrain=*q.terrain;else prepared2=*q.type2;
+            const auto& resource=terrain?*q.terrainResource:*prepared2.resource;
             QuerySpherePrepareInput48O input{};input.preparedScene=node(s,b.lifecycle.main190).world100;
             input.hasPairTree=resource.nodeCount!=0;
             if(input.hasPairTree){if(!resource.nodes||(resource.root&type2Leaf49X)||resource.root>=resource.nodeCount)return result(S::QueryPreparation,pcs[stage]);
@@ -260,9 +398,14 @@ UndertrackResetResult50EW attachUndertrackCollisionOwners50EW(VehicleFrameState4
             else {if(resource.root!=type2Leaf49X||!resource.rays||!resource.rayCount)return result(S::QueryPreparation,pcs[stage]);input.first=resource.rays[0].first;input.second=resource.rays[0].second;}
             QuerySpherePrepareOutput48O prepared{};
             if(prepareQuerySphere48O(input,prepared)!=QuerySpherePrepareStatus48O::Ready)return result(S::QueryPreparation,pcs[stage]);
-            prepared2.worldMatrix=prepared.world;for(unsigned k=0;k<3;++k)prepared2.sphere.center.v[k]=prepared.center.v[k];prepared2.sphere.radius=prepared.radius;
+            if(terrain){preparedTerrain.segment.worldMatrix=prepared.world;
+                for(unsigned k=0;k<3;++k)preparedTerrain.sphere.center.v[k]=prepared.center.v[k];
+                preparedTerrain.sphere.radius=prepared.radius;
+            }else {prepared2.worldMatrix=prepared.world;
+                for(unsigned k=0;k<3;++k)prepared2.sphere.center.v[k]=prepared.center.v[k];
+                prepared2.sphere.radius=prepared.radius;}
             bounds.bounds.shapeTag=2;bounds.bounds.shapeWorld=prepared.world;bounds.bounds.cachedCenter=prepared.center;
-            bounds.bounds.cachedRadius=prepared.radius;bounds.type2Resource=prepared2.resource;
+            bounds.bounds.cachedRadius=prepared.radius;bounds.type2Resource=&resource;
         }else if(index==1){if(!preparePod(s,b,p,prepared0,bounds))return result(S::QueryPreparation,pcs[stage]);
         }else {
             //216934..216960:28BAB0(main190,body340+1E0), then11CA80 pair.
@@ -279,7 +422,7 @@ UndertrackResetResult50EW attachUndertrackCollisionOwners50EW(VehicleFrameState4
         const auto attached=attachLiveZoneMembership50EN(life,world,*q.membership,q.storage,q.object,
             placement.vehicleC34,ZoneMethod50CL::Second,0.f,bounds,w);
         if(attached.status!=LiveZoneStatus50EN::Complete){auto r=result(S::Registry,pcs[stage]);r.registry=attached;return r;}
-        if(index==0||index==3)*q.type2=prepared2;
+        if(index==0||index==3){if(q.terrain)*q.terrain=preparedTerrain;else *q.type2=prepared2;}
         else if(index==1){prepared0.registrationE0=q.object;s.shape=prepared0;}
         else {std::memcpy(q.endpoints,endpoints,sizeof endpoints);std::memcpy(q.metadata,metadata,sizeof metadata);*q.shapeTag=tag;
             for(unsigned k=0;k<3;++k)q.segmentSphere->center.v[k]=q.membership->bounds.cachedCenter.v[k];q.segmentSphere->radius=q.membership->bounds.cachedRadius;}

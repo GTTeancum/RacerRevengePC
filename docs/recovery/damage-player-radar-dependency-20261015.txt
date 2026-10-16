@@ -1,0 +1,100 @@
+Damage nine-slot dependency CORRECTION: Player proximity/radar state
+SOURCE REVIEW ONLY / UNTESTED / NO IMPLEMENTATION
+
+The earlier label "attachment fields" was incorrect. The original words show
+Player-owned nearby-racer index slots, geometrically classified by bearing and
+distance. This is not attachment/model-presence state. Do not implement the
+previous report's suggested attachment lifecycle. No synthetic storage was added.
+
+Decisive owner/class evidence
+1A02C0 is the Player constructor. It calls common20F390 at1A02CC, installs vtable
+3DED50 at1A02D4..E0, sets class58=0 at1A0304, and initializes all nine signed
+slots to-1 at1A037C..1A03D4: paired loop writes10A8/10AC with stride8 through
+the first eight words, followed by the ninth-word tail. These are real constructor
+stores, not guessed sentinels.
+Manager factories allocate0x10D0 before calling this ctor at1ADFE8 and1AE86C.
+AI factory allocates0x10B0 at1AE3D0 and calls16E260 at1AE3E0. That constructor
+calls common20F390, installs DIFFERENT vtable3DE1E0, sets class58=1, and its
+explicit extended fields end with10A0 at16E364. A nine-word range10A8..10C8
+does not fit that original AI allocation:10B0 onward lies outside it. A shared
+base/offset numeric coincidence is not a Player radar owner on an AI instance.
+
+Actual writer and lifecycle
+1A1EB0 is the radar scan, directly called at1A1634 in the Player frame path
+(same this in a0 at delay slot1A1638). It obtains Application28C race+B0 manager,
+self scene node through racer340+288, world position28B180, forward28A530 and
+direction angle172DF0. It clears all nine slots to-1 each scan via1A1F20..44.
+Then it walks manager indices in order:1A1F54 skips own racer5C;1A1F64 calls
+1AF330 and1A1F6C reads candidate40; nonzero state skips candidate.1A1F7C again
+resolves the candidate, queries its actual scene position, computes squared
+distance and relative wrapped angle. Stores assign the current manager index
+(s1), never a model handle, boolean or guessed attachment index.
+
+Writer families:
+-1A2118..2180: bank10B0/10BC/10C8.
+-1A21B0..2218: bank10AC/10B8/10C4.
+-1A2248..22AC: bank10A8/10B4/10C0.
+Three angular sectors use lazy original thresholds bits3F96CBE4 and401D1463;
+range branches use original words48EF4200 outer,481C4000 and46AFC800 inner.
+Branches include unconditional delay-slot stores and checks of PRIOR slot values
+against-1 before clearing displaced outer slots. This is order-sensitive
+classification, not a nearest-racer sort or an interchangeable distance bucket.
+1A22B8 reads actual manager30;1A22BC compares current index and1A22C0 loops.
+Each completed scan supersedes the prior nine values. Constructor and next scan
+provide known resets. No independent attachment destruction/reset ownership is
+established or required by these observed scalar stores. No separate destructor
+work for these integers was found; this is not proof of every indirect alias.
+
+Readers
+Damage18F6E4 borrows predraw's cached manager-selected racer C50;18F6EC reads
+10A8 and loop18F718..724 visits nine words, drawing authored sprite3+i only when
+word!=-1. It does not resolve a mesh or chase the stored candidate index.
+Thus dmgradar's nine markers are occupancy of proximity sectors/ranges.
+The source leaf's unchecked read does NOT justify reading Player-only words from
+the current native all-AI manager slot. No Player-class conversion is authorized.
+
+Search completeness limits
+Included candidate inventory scans the full file-backed executable section
+VA100000..3D5A00 for listed load/store/address-immediate opcodes with offsets
+10A8..10C8. It is static word inspection, not guest execution. Stack accesses,
+other object types and data words can match; they are not automatically racer
+readers/writers. Proven Player/Damage sites above were traced in surrounding raw
+words. Indirect pointer aliases, computed offsets and bulk operations require
+further owner analysis; this inventory alone does not prove their absence.
+
+Existing native counterpart and Bank boundary
+src/game/player_events49a.h PlayerEventState49A represents only40/5C/FFC,
+1090/1094/1098 and timing/count fields, not radar. original_human_reset_timers50lc.h
+already identifies1A0368/70 as PLAYER constructor timer stores, independently
+supporting this constructor classification. src/game/player_finish50ia.h has
+the172DF0 direction-angle helper, but that helper is not the missing radar owner.
+AiRuntimeState50IV and native_ai_session50iv_fixture.h own authentic AI state and
+manager observations. Camera identitiesCurrent verifies class58=1 for all eight
+in the requested ALL8 mode. No existing native1A1EB0 radar dispatch or authoritative
+nine-word storage was found in supplied abbf73d. Earlier integrated Damage owner
+and numeric delta do not supply it.
+Bank bindRead accepts actual registered scalar storage only; saved slots preserve
+such owner bytes across visits. Merely adding an array to a banked common arena
+would not establish the missing Player constructor/dispatch or make it AI state.
+Player-only implementation, if separately authorized later, must attach to its
+genuine owner, initialize at real constructor boundary, persist in actual Player
+Bank state, run at real1A1634 scheduling with same manager/scene owners, and retain
+partial writer effects. It must not run for class58=1 just to make Damage ready.
+
+Exact remaining dependency / STOP
+For unchanged ALL8 AI, there is no proven authoritative Player radar owner for
+the view slot. Recover the original presentation/class admissibility and actual
+owner used for the nine markers in an AI-only view before any complete Damage
+snapshot/leaf admission. If retail Damage assumes a Player view, a full retail
+Damage replacement in the current all-AI view cannot be claimed under present
+constraints. Do not silently omit nine markers, read beyond AI storage, retain
+constructor-only-1 forever, retag/create a Player, or introduce a host radar scan.
+A health-only original subpresentation would be a separately scoped partial
+presentation decision requiring root review, not completion of this nine-slot join.
+No faithful ALL8 storage/writer join is supported by the evidence recovered here.
+
+Separate TimeStats/SpeedBoost provider audit remains untouched. No central files,
+simulation, AI, renderer or HUD panels changed. No tests/builds/syntax checks,
+sanitizers/gameplay/converters or original executable instructions executed.
+Only source/static-byte inspection and packet/hash generation performed.
+Root alone integrates/validates; hold for review.

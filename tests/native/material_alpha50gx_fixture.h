@@ -1,5 +1,7 @@
 #pragma once
 #include "track_materials50fa_fixture.h"
+#include "../../src/assets/original_ui_material50kg.h"
+#include <charconv>
 #include <cstdint>
 #include <string>
 
@@ -14,6 +16,9 @@ struct Policy {
     bool sourceDepthWriteSpecified = false;
     bool depthEqual = false;
     bool discardZeroAlpha = false;
+    bool sourceAlphaTest = false;
+    std::uint8_t sourceAlphaReference = 0;
+    bool sourceFogKnown = false, sourceFogEnabled = true;
     bool unlit = false;
     float alphaScale = 1.0f;
     // Actual prelit program copies authored RGB; distinct from emissive/unlit.
@@ -118,6 +123,45 @@ inline bool selectGc(const track_materials50fa_fixture::Selection& selection, Po
     return true;
 }
 
+// GA keeps its existing lighting/fog/blend policy, but must inherit the real
+// DefaultMT alpha test. Its flag PSMs omit these fields; omission is not OFF.
+inline bool selectGa(const track_materials50fa_fixture::Selection& selection,
+    const rr::assets::OriginalUiMaterialTemplates50KG& templates,
+    const rr::assets::OriginalUiMaterialRuntime50KG& runtime, Policy& output) {
+    using Field = rr::assets::OriginalUiGsField50KG;
+    Policy next;
+    if(selection.track!=track_source_fixture::Track::ga||!runtime.overrideKnown||
+       runtime.override435670||!selectGc(selection,next))return false;
+    const auto* inherited=templates.get(rr::assets::OriginalUiTemplate50KG::defaultMt);
+    if(!inherited||!inherited->identity||!inherited->identity->sha256||
+       std::string(inherited->identity->sha256)!=
+           "1907587ff3a8153a9f687dc43e6858ad0dff6ac3827db74d8518acad5644b4f7")return false;
+    const Field fields[]{Field::alphaTestOnOff,Field::alphaTestMethod,
+        Field::alphaReferenceValue,Field::processingMethodWhenFailedInAlphaTest};
+    std::array<std::int32_t,4> values{};
+    for(std::size_t i=0;i<values.size();++i){
+        values[i]=inherited->gs[fields[i]].value;
+        bool found=false;
+        const auto name=detail::lower(rr::assets::originalUiGsFieldName50KG(fields[i]));
+        for(const auto& item:selection.sourcePassFields.at("authored")){
+            if(!item.contains("name")||!item.at("name").is_string())return false;
+            if(detail::lower(item.at("name").get<std::string>())!=name)continue;
+            if(found||!item.contains("value")||!item.at("value").is_string())return false;
+            const auto text=item.at("value").get<std::string>();
+            const auto parsed=std::from_chars(text.data(),text.data()+text.size(),values[i]);
+            if(parsed.ec!=std::errc{}||parsed.ptr!=text.data()+text.size())return false;
+            found=true;
+        }
+    }
+    if(values[0]!=0&&values[0]!=1)return false;
+    if(values[0]){
+        if(values[1]!=6||values[2]<0||values[2]>255||values[3]!=0)return false;
+        next.sourceAlphaTest=true;
+        next.sourceAlphaReference=static_cast<std::uint8_t>(values[2]);
+    }
+    output=next;return true;
+}
+
 // Call only with a selection borrowed from a successfully loaded 50FA owner.
 // Transactional: unsupported/mismatched selections leave output unchanged.
 // Blank source blending fields retain the previous explicit opaque host policy;
@@ -159,5 +203,85 @@ inline bool select(const track_materials50fa_fixture::Selection& selection, Poli
         return true;
     }
     return false;
+}
+
+// The MA/SA ordinary world route borrows the actual authenticated APPSTART
+// DefaultMT owner. 2476A0 inherits its GS fields, then applies nonempty pass
+// values; inputAlphaD is the compatibility alias before inputColorD. This is
+// deliberately separate from the older TA/GC/GA explicit native policies.
+inline bool selectMaSa(const track_materials50fa_fixture::Selection& selection,
+    const rr::assets::OriginalUiMaterialTemplates50KG& templates,
+    const rr::assets::OriginalUiMaterialRuntime50KG& runtime, Policy& output) {
+    using Field = rr::assets::OriginalUiGsField50KG;
+    if ((selection.track != track_source_fixture::Track::ma &&
+         selection.track != track_source_fixture::Track::sa) || selection.slot != 1 ||
+        selection.pass != 1 || selection.passCount != 1 || selection.projectedPrelit ||
+        !runtime.overrideKnown || runtime.override435670) return false;
+    const auto* inherited = templates.get(rr::assets::OriginalUiTemplate50KG::defaultMt);
+    if (!inherited || !inherited->identity || !inherited->identity->sha256 ||
+        std::string(inherited->identity->sha256) !=
+            "1907587ff3a8153a9f687dc43e6858ad0dff6ac3827db74d8518acad5644b4f7") return false;
+    const auto& fields = selection.sourcePassFields;
+    if (!fields.is_object() || !fields.contains("authored") || !fields.at("authored").is_array()) return false;
+    auto sourceInteger = [&](const char* name, std::int32_t& result) {
+        bool found = false;
+        for (const auto& item : fields.at("authored")) {
+            if (!item.is_object() || !item.contains("name") || !item.contains("value")) return false;
+            if (!item.at("name").is_string()) return false;
+            if (detail::lower(item.at("name").get<std::string>()) != detail::lower(name)) continue;
+            if (found || !item.at("value").is_string()) return false;
+            const auto text = item.at("value").get<std::string>();
+            const auto parsed = std::from_chars(text.data(), text.data()+text.size(), result);
+            if (parsed.ec != std::errc{} || parsed.ptr != text.data()+text.size()) return false;
+            found = true;
+        }
+        return true;
+    };
+    std::array<std::int32_t, rr::assets::originalUiGsFieldCount50KG> gs{};
+    for (std::size_t i = 0; i < gs.size(); ++i) {
+        const auto field = static_cast<Field>(i);
+        gs[i] = inherited->gs[field].value;
+        if (field == Field::environmentContext0or1) gs[i] = 0; // 247C88 pass-local default.
+        if (field == Field::inputColorD && !sourceInteger("inputAlphaD", gs[i])) return false;
+        if (!sourceInteger(rr::assets::originalUiGsFieldName50KG(field), gs[i])) return false;
+    }
+    auto get = [&](Field field) { return gs[static_cast<std::size_t>(field)]; };
+    auto flag = [&](Field field) { return get(field) == 0 || get(field) == 1; };
+    if (!flag(Field::alphaBlendingOnOff) || !flag(Field::alphaTestOnOff) ||
+        !flag(Field::zWriteDisabled) || !flag(Field::foggingOnOff) || get(Field::destinationAlphaTestOnOff) != 0 ||
+        get(Field::depthTestMethod) != 2 || get(Field::textureColorComponent) != 1 ||
+        get(Field::textureFunction) != 0 || get(Field::alphaCorrectionValue) != 0 ||
+        get(Field::alphaBlendingControlInUnitsOfPixels) != 0) return false;
+    const auto program = detail::lower(selection.program);
+    const bool shield = selection.track == track_source_fixture::Track::ma &&
+        detail::lower(selection.materialName) == "ma_shield" &&
+        detail::lower(selection.textureName) == "ma_shield";
+    if (program != "prelitcompressed" && program != "diffusecompressed" &&
+        !(shield && program == "diffusetextranscompressed")) return false;
+    Policy next;
+    next.depthWrite = get(Field::zWriteDisabled) == 0;
+    next.depthEqual = true; // Source GEQUAL becomes LEQUAL in the native depth map.
+    next.sourcePrelit = program == "prelitcompressed";
+    next.sourceFogKnown = true;
+    next.sourceFogEnabled = get(Field::foggingOnOff) != 0;
+    for (const auto& item : fields.at("authored"))
+        if (detail::lower(item.at("name").get<std::string>()) == "zwritedisabled") next.sourceDepthWriteSpecified = true;
+    if (get(Field::alphaTestOnOff)) {
+        if (get(Field::alphaTestMethod) != 6 || (get(Field::alphaReferenceValue) < 0 || get(Field::alphaReferenceValue) > 255) ||
+            get(Field::processingMethodWhenFailedInAlphaTest) != 0) return false;
+        next.sourceAlphaTest = true;
+        next.sourceAlphaReference = static_cast<std::uint8_t>(get(Field::alphaReferenceValue));
+    }
+    if (get(Field::alphaBlendingOnOff)) {
+        if (get(Field::inputColorA) != 0 || get(Field::inputAlphaC) != 0 ||
+            get(Field::inputColorD) != 1 || (get(Field::inputColorB) != 1 && get(Field::inputColorB) != 2) ||
+            selection.textureIndex == track_materials50fa_fixture::unresolved) return false;
+        next.blend = get(Field::inputColorB) == 2 ? Blend::additive : Blend::sourceAlpha;
+        // Existing declared native GS-unit modulation policy. This does not
+        // assert PS2 fragment quantization, microprogram or framebuffer parity.
+        next.alphaScale = (255.0f/128.0f)*(255.0f/128.0f);
+    }
+    output = next;
+    return true;
 }
 } // namespace material_alpha50gx_fixture

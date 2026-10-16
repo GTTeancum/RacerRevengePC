@@ -5,8 +5,9 @@
 namespace rr::assets {
 static_assert(sizeof(float)==4 && std::numeric_limits<float>::is_iec559,
               "Pod physics requires IEEE binary32");
-bool parsePodPhysicsNumber49N(const char* text, std::size_t bytes, float& output,
-                             std::uint64_t* binary64Bits) noexcept {
+namespace {
+bool parseBoundedDecimal49N(const char* text, std::size_t bytes, float& output,
+                           std::uint64_t* binary64Bits, std::size_t maxFractional) noexcept {
     if (!text || !bytes || bytes > 11) return false;
     std::size_t at=0, digits=0, fractional=0;
     const bool negative=text[0]=='-';
@@ -21,7 +22,7 @@ bool parsePodPhysicsNumber49N(const char* text, std::size_t bytes, float& output
     if (at<bytes && text[at]=='.') {
         ++at; const std::size_t start=at;
         while (at<bytes && text[at]>='0' && text[at]<='9') {
-            if (++digits>9 || ++fractional>6) return false;
+            if (++digits>9 || ++fractional>maxFractional) return false;
             n=n*10+static_cast<unsigned>(text[at++]-'0'); d*=10;
         }
         if (at==start) return false;
@@ -30,7 +31,7 @@ bool parsePodPhysicsNumber49N(const char* text, std::size_t bytes, float& output
     std::uint64_t binary64=0;
     std::uint32_t binary32=0;
     if (n) {
-        // n and d are exact nonnegative integers <=999999999 and1000000.
+        // n and d are exact nonnegative integers <=999999999 and10000000.
         // Normalize a/b into[1,2), then generate53 bits by long division.
         // Remainder compares implement nearest-even without host arithmetic.
         int exponent=0;
@@ -58,6 +59,14 @@ bool parsePodPhysicsNumber49N(const char* text, std::size_t bytes, float& output
     std::memcpy(&output,&binary32,4);
     if (binary64Bits) *binary64Bits=binary64;
     return true;
+}
+} // namespace
+bool parsePodPhysicsNumber49N(const char* text, std::size_t bytes, float& output,
+                             std::uint64_t* binary64Bits) noexcept {
+    return parseBoundedDecimal49N(text,bytes,output,binary64Bits,6);
+}
+bool parseOriginalUiNumber49N(const char* text, std::size_t bytes, float& output) noexcept {
+    return parseBoundedDecimal49N(text,bytes,output,nullptr,7);
 }
 namespace {
 using Key=rr::game::AuthoredKey49N;

@@ -5,7 +5,20 @@
 
 namespace rr::platform {
 class OriginalSoundMode50KG;
-inline constexpr std::size_t audioMaximumVoices50HD = 192;
+// Existing0..219 reservations plus the eight distinct original D44 arrays.
+// Each admitted track has at most44 collision+drive rows (SA32+12). These
+// are native exclusive playback slots, never guest hardware channel IDs.
+inline constexpr std::size_t originalMaterialFirstVoice50HD=220;
+inline constexpr std::size_t originalMaterialRowsPerRacer50HD=44;
+inline constexpr std::size_t originalMaterialRacers50HD=8;
+inline constexpr std::size_t originalSpeechFirstVoice50HD=originalMaterialFirstVoice50HD+
+    originalMaterialRowsPerRacer50HD*originalMaterialRacers50HD;
+// Largest authenticated D48 bank is POD19:24 curses+12 taunts+11 specials.
+// All eight racers retain distinct logical voices, including the followed AI.
+inline constexpr std::size_t originalSpeechVoicesPerRacer50HD=47;
+inline constexpr std::size_t originalSpeechRacers50HD=8;
+inline constexpr std::size_t audioMaximumVoices50HD=originalSpeechFirstVoice50HD+
+    originalSpeechVoicesPerRacer50HD*originalSpeechRacers50HD;
 
 // Borrowed decoded, signed PCM16. Samples and the voice array must outlive use.
 // Mono or interleaved stereo; frame counts are not scalar sample counts.
@@ -69,6 +82,9 @@ public:
     // division. Requires the real mode owner. The resulting L/R percentages
     // include volume; voice.gain is unity, so volume is never applied twice.
     // Legacy gain APIs above retain their existing normalization policy.
+    // Native source-volume rendering admits normalized rate0 as silent paused
+    // playback: token/active status/cursor survive until positive controls or
+    // stop. This is a native policy, not emulated IOP pitch-zero behavior.
     bool playSourceVolume(std::size_t slot,const AudioClip50HD&,std::int32_t volume,
                           float pitch,bool loop,std::int32_t engineAngle) noexcept;
     bool controlsSourceVolume(std::size_t slot,std::int32_t volume,float pitch,

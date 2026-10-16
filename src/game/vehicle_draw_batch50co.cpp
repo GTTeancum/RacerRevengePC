@@ -3,17 +3,36 @@
 namespace rr::game {
 bool buildVehicleDrawBatch50CO(const VehicleFrameState49W&frame,const VehicleFrameBindings49W&bindings,
     const VehicleDrawBatchInput50CO&input,VehicleDrawBatch50CO&output,
-    VehicleDrawWorkspace50CM&workspace,VehicleDrawBatchDiagnostic50CO&diagnostic)noexcept{
+    VehicleDrawWorkspace50CM&workspace,VehicleDrawBatchDiagnostic50CO&diagnostic,
+    const VehicleDrawBatchSourceColors50LA* sourceColors)noexcept{
     diagnostic={};VehicleDrawBatch50CO next{};
     constexpr VehicleDrawComponent50CM expected[]={VehicleDrawComponent50CM::chariot,
-        VehicleDrawComponent50CM::leftEngine,VehicleDrawComponent50CM::rightEngine};
-    for(unsigned i=0;i<3;++i){
+        VehicleDrawComponent50CM::leftEngine,VehicleDrawComponent50CM::rightEngine,
+        VehicleDrawComponent50CM::bottomLeftEngine,VehicleDrawComponent50CM::bottomRightEngine};
+    if(!validVehicleDrawComponentCount50CM(input.componentCount)){
+        diagnostic.detail.error=VehicleDrawError50CM::storage;return false;
+    }
+    // Preflight every requested descriptor, including inactive components.
+    // A partial request must not silently degrade into a legacy draw.
+    if(sourceColors)for(unsigned i=0;i<maxVehicleDrawComponents50CM;++i){
+        const auto& colors=sourceColors->component[i];
+        const bool any=colors.materialModes||colors.materialCount||colors.selectedLights||
+            colors.prepareSpecular50LA||colors.modelPackets50LA;
+        if(any&&(i>=input.componentCount||!colors.materialModes||
+            !colors.materialCount||!colors.selectedLights)){
+            diagnostic.component=i;diagnostic.detail.error=VehicleDrawError50CM::sourceColors;return false;
+        }
+    }
+    next.componentCount=input.componentCount;
+    for(unsigned i=0;i<input.componentCount;++i){
         diagnostic.component=i;
         if(input.selection[i].component!=expected[i]){
             diagnostic.detail.error=VehicleDrawError50CM::binding;return false;
         }
+        const VehicleDrawSourceColors50LA* colors=sourceColors&&
+            sourceColors->component[i].materialModes?&sourceColors->component[i]:nullptr;
         if(!buildVehicleDraw50CM(frame,bindings,input.selection[i],input.mesh[i],
-            input.staging[i],next.component[i],workspace,diagnostic.detail))return false;
+            input.staging[i],next.component[i],workspace,diagnostic.detail,colors))return false;
         const auto&component=next.component[i];
         const auto limit=std::numeric_limits<std::uint32_t>::max();
         if(component.vertexCount>limit-next.vertices||component.indexCount>limit-next.indices||

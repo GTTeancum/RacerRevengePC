@@ -1,0 +1,23 @@
+UNTESTED incremental Mawhonic9 preview descriptor request
+
+Base relationship: follows local Gasgano patchc923ce6, integrated by root as0e60492, plus prior23/24 and all23 mapping changes. Root-reported Clegg cache append8336f2f is intentionally not copied/modified here. Apply ONLY the feature patch; no local snapshot commits.
+
+Changed files: src/game/original_ui_rider_dynamic_owner50kg.h/.cpp; src/game/original_ui_rider_backend50kg.cpp; platform/linux/native/original_ui_rider_session50kg.cpp.
+
+Appends mawhonic9 to existing default-none preview-set enum. Original values none/indexed23And24/gasgano7 preserved. No Application/frontend activation, combined groups or profile changes. Explicit9 uses authenticated original slot11/control7/widget17 pod,43 character,69 name,99 Huttese.
+
+Existing descriptor loaders own ui/geometry/09.psg,ui/anim/09c.psg,09c.mcf,09c.vut and six original motions in authored order ent,idl1,breathe,sel,idl2,idl3. Their timing/looping/bindings and geometry constraints remain enforced by existing readers. Presence in inventory is not a successful decoder/runtime claim.
+
+Pod material references09_1,09_2,cable,09_shdw; character09c_1/09c_2 (09c_2 repeated). Existing active body specular references specmap1. Inactive extra sections of09c_2 are excluded. No material gate or interpretation changes. Binder ownership remains the existing authenticated binder.psm/binder.atm plus actual source endpoint detection; no manufactured nodes.
+
+Missing genuine owner: ui/textures/09c_1.pst,25778bytes,SHA2563e59ec8fcb97d760a97c140dc49428c62feb72cc40f6e5166bcf7e7b83fe75d5. Kind2,5mips16/32/64/128/256. Exact original compressed payload offsets/sizes/hashes retained in09c_1-source-pins.json. It needs genuine09c_1-mip0..4.rrtex and authenticated output catalog/provenance from root-owned conversion. This patch creates NONE of those. Existing other referenced textures are kind1/single-mip. UIRIDER.RES provenance5552683bytes SHA256112cd71ac9cfcc909b0edb56e0e420bb358b7078b5abae5f48c62b95a6bbf856; evidence reused from preserved original inventory, no disc access now.
+
+Review checklist:
+- Invalid preview enums reject. Existing groups/defaults unchanged.9 omitted unless explicitly requested.
+- Dynamic descriptor preparation uses current original mappings, existing readers and private candidate commit; no silent partial descriptor group.
+- Backend recognizes9 only through real pod/character owners, rejects partial pairs and missing texture-cache readiness, and requires private loaded materials/footprints/image-bank mappings before seal.
+- Session validates original membership/background/portrait, and requires preparedRider(9) before publication. Actual callbacks/collector policies/renderer admission remain mandatory.
+- Missing09c_1 owner or unsupported geometry/material behavior rejects; no placeholders or successful-readiness claim. No skipped controls when9 is absent or when neighboring requested sets are unavailable.
+- Original confirmation whitelist, unlock/profile state, hidden rules, navigation order, six motions and binder semantics untouched.
+- Each preview enum remains a separate explicit set; requesting9 does not implicitly request7 or23/24. Clegg's existing independent flag remains independent. This is not an entire navigation-loop completion.
+- All code review/validation and conversion belong to root. No tests, builds, syntax checks, sanitizers, gameplay, converters, project imports, central edits or mesh-cache audit occurred.

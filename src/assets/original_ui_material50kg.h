@@ -3,10 +3,12 @@
 #include "import_texture48e.h"
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace rr::assets {
+class OriginalUiScreenAssets50KG;
 enum class OriginalUiGsField50KG : std::uint8_t {
     textureColorComponent, textureFunction, sourceAlphaValueWhenAis0,
     sourceAlphaValueWhenAis1, methodOfExpandingTextureAlpha,
@@ -55,21 +57,28 @@ struct OriginalUiMaterialTemplateState50KG {
 };
 // Only authenticated APPSTART can construct the real DefaultMT and ScreenMT
 // owners. Both start with original 24A8E0, then apply their own file overrides.
-// 3833E8 is DefaultMT; 3833F0 is ScreenMT (not DefaultMT).
+// 3833E8 is DefaultMT; 3833F0 is ScreenMT (not DefaultMT). Each handle pins
+// immutable backing shared with its actual APPSTART archive, so independent
+// page/resource handles no longer create separate template object addresses.
+// The application must retain the SAME archive through frontend/race restarts.
 class OriginalUiMaterialTemplates50KG final {
 public:
+    // Serial cold call, like archive.load. A second load on this handle fails;
+    // a new handle for the same archive borrows its existing template backing.
     bool load(const OriginalUiArchive50KG& appStart, OriginalUiMaterialDiagnostic50KG&) noexcept;
-    bool loaded() const noexcept { return loaded_; }
+    bool loaded() const noexcept { return bool(storage_); }
     const OriginalUiMaterialTemplateState50KG* get(OriginalUiTemplate50KG) const noexcept;
 private:
-    bool loaded_ = false;
-    OriginalUiMaterialTemplateState50KG defaults_, screen_;
+    std::shared_ptr<const OriginalUiMaterialTemplateStorage50KG> storage_;
 };
 enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     authoredPsm, mainLogoMissingPsmFallback, mainPromptMissingPsmFallback,
     optionsMenuPromptMissingPsmFallback, optionsGamePromptMissingPsmFallback, riderStatMissingPsmFallback, riderPortraitMissingPsmFallback,
     riderNameBlurMissingPsmFallback, riderBackgroundMissingPsmFallback, riderPromptMissingPsmFallback,
-    courseNameBlurMissingPsmFallback, coursePromptMissingPsmFallback
+    courseNameBlurMissingPsmFallback, coursePromptMissingPsmFallback,
+    controlsNameBlurMissingPsmFallback, controlsFontMissingPsmFallback, controlsPromptMissingPsmFallback, raceHudFontMissingPsmFallback, tournamentTrophyMissingPsmFallback, tournamentNotchMissingPsmFallback, tournamentPortraitMissingPsmFallback,
+    speedBoostTextureMissingPsmFallback, speedBoostTriangleMissingPsmFallback,
+    damageTextureMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -111,6 +120,10 @@ struct OriginalUiMaterialRuntime50KG {
     // not be silently interpreted as normal mode.
     bool overrideKnown = false;
     bool override435670 = false;
+    // Distinct24A674 alternate-material branch. Missing remains unknown.
+    // Only the actual Application startup owner supplies a known value.
+    bool callbackOverrideKnown = false;
+    std::uint32_t callbackOverride435678 = 0;
 };
 // Explicit selection represents the actual material registry associated owner
 // (14D5E0). Only a source-known null may choose nullOwnerScreenFallback.
@@ -203,6 +216,21 @@ bool readOriginalUiCoursePromptFallbackMaterial50KG(const OriginalUiArchive50KG&
     const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
+// Actual Controls Icon131 / Overlay_Text129 / inherited circle prompt.
+// Only these authenticated absent-PSM resources enter the shared2475C0 leaf.
+enum class OriginalUiControlsFallback50KG : std::uint8_t {nameBlur,smallFont,circle};
+bool readOriginalUiControlsFallbackMaterial50KG(const OriginalUiArchive50KG& options,
+    const OriginalUiArchive50KG& fonts,OriginalUiControlsFallback50KG,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Source1A8DD4 ->29CA40 ->2DFD90/2DF8E0, exact in-game16 font.
+// The authenticated OVERLAYS member has no PSM; ScreenMT is explicit.
+bool readOriginalRaceHudFontFallbackMaterial50KG(const OriginalUiArchive50KG& overlays,
+    const OriginalUiMaterialTemplates50KG&,const OriginalUiMaterialRuntime50KG&,
+    OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
 enum class OriginalUiMaterialBlend50KG : std::uint8_t {
     opaque, sourceAlpha, additive, destinationAlphaAdditive, fixed255Additive,
     destinationSourceAlphaAttenuation, fixed64Additive
@@ -265,6 +293,19 @@ bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass5
 bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG&,
     const Texture48E& exactAtlas, OriginalUiNativeMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;
+// The two authenticated OVERLAYS gleam ScreenTextures require actual stored
+// framebuffer alpha. The clear pass is ATST=NEVER/AFAIL=FB_ONLY; the bright
+// pass consumes destination alpha. This typed CPU policy does not admit a
+// generic ScreenObject exception or certify a framebuffer/depth/group owner.
+// clearFramebufferOnly preserves the source failed-test depth-write mask;
+// callers must keep the unchanged raster.depthWrite source value separately.
+struct OriginalRaceHudGleamMaterial50KG {
+    OriginalUiNativeMaterial50KG raster{};
+    bool clearFramebufferOnly=false;
+};
+bool prepareOriginalRaceHudGleamMaterial50KG(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalRaceHudGleamMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 // Separate original 3D programs. These do not become ScreenObject passes.
 enum class OriginalUiLitProgram50KM : std::uint8_t { diffuse, diffuseCompressed, specularMapCompressed };
 struct OriginalUiLitMaterial50KM {
@@ -325,6 +366,23 @@ bool prepareOriginalUiRider19BodyMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19BodyMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
+// Dedicated canonical17_3 pass1 cutout policy. Keeps all four original
+// UIPODTEX kind1 mips and raw palette alpha; publishes only source level0
+// (last stored128x128). ATE1/ATST6/REF0, opaque RGB, fog and depth writes
+// remain source-owned. No generic multilevel or opaque-body exception.
+// The immutable images owner must outlive this result and publication.
+struct OriginalUiRider17CutoutMaterial50KM {
+    OriginalUiLitMaterial50KM material{};
+    OriginalUiNativeIndexedImagePolicy50KM imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::unavailable;
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+    std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0;
+};
+bool prepareOriginalUiRider17CutoutMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider17CutoutMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
 // Exact pod_wndw and12c_4 DiffuseCompressed passes1/3. Both retain their
 // source-alpha blend, alpha test and depth write. The distinct specular pass2
 // is not replaced or omitted. Native policy publishes the real64x64 original
@@ -357,6 +415,18 @@ bool prepareOriginalUiRider19ShadowMaterial50KM(const OriginalUiMaterialPass50KG
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19ShadowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
+// Authenticated controller body second pass. Native TGA-to1555 RGB5
+// base image and sampled alpha are pinned to specmap3 and TA0/TA1/AEM.
+struct OriginalUiControlsSpecularMaterial50KG {
+    OriginalUiLitMaterial50KM material{};
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0xffffffffu;
+    std::uint64_t imageIdentity=0;
+};
+bool prepareOriginalUiControlsSpecularMaterial50KG(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t,
+    OriginalUiControlsSpecularMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
 // Exact published specmap1 and unchanged original pass2: finite body _1/_2
 // identities of riders2,4,10,11,12,15,19,20 plus pod_wndw. Legacy19 API kept.
 // Actual12c_4 pass2 additionally requires FIX64 and depth writes; dormant
@@ -373,4 +443,50 @@ struct OriginalUiRider19SpecularMaterial50KM {
 bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19SpecularMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Exact Speed/Boost1895B0 family, from authenticated OVERLAYS absence.
+// The last image belongs to the distinct18A7C0->2E1AE0 triangle caller.
+// This is immutable material provenance only, not a live canonical row,
+// primitive reference, population, renderer capability or active HUD.
+enum class OriginalSpeedBoostImage50LA : std::uint8_t {
+    panel,segment1,segment2,segment3,segment4,segment5,segment6,segment7,segment8,triangle9
+};
+bool readOriginalSpeedBoostFallbackMaterial50LA(
+    const OriginalUiArchive50KG&,OriginalSpeedBoostImage50LA,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Exact Tournament1EEC40 championship ScreenTextures. No PSM is authored for
+// these six names; original2DF0B0/29B638 reaches2475C0 with ScreenMT.
+// This is not a generic missing-material fallback.
+enum class OriginalUiTournamentTrophy50KG : std::uint8_t {
+    goldIcon,silverIcon,bronzeIcon,goldAward,silverAward,bronzeAward
+};
+bool readOriginalUiTournamentTrophyFallbackMaterial50KG(
+    const OriginalUiArchive50KG&,OriginalUiTournamentTrophy50KG,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Exact Tournament notch construction1F1424; same bounded2475C0 ScreenMT
+// path, separately identified from Rider notch and Tournament trophies.
+bool readOriginalUiTournamentNotchFallbackMaterial50KG(
+    const OriginalUiArchive50KG&,const OriginalUiMaterialTemplates50KG&,
+    OriginalUiTemplate50KG,const OriginalUiMaterialRuntime50KG&,
+    OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+// Exact Tournament selected-career portrait at1EF034, absent original PSM.
+bool readOriginalUiTournamentPortraitFallbackMaterial50KG(
+    const OriginalUiArchive50KG&,std::uint8_t career,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+}
+
+namespace rr::assets {
+// Exact Damage first loader18C748; per-primitive callers remain on references.
+bool readOriginalDamageFallbackMaterial50LA(const OriginalUiArchive50KG&,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 }

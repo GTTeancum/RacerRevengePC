@@ -1,0 +1,72 @@
+RA static resource and placement continuation — isolated, UNTESTED
+Base: source snapshot 7a757bb, including static cold prefix 2c9b84a.
+Input ZIP: 11,905,918 bytes; SHA256 f476c98b9ca8774a8c313a2b939ba4a51805138cacd35f3a0ffc379bd8d9792a.
+
+Deliverable
+Four additive/private adapter file changes. No automatic active-route call.
+Owner::completeStaticModelResourcesAndPlacement is an explicit cold stage.
+It joins the retained source/Application/material-domain owners, authentic PSG
+cache resources, actual per-placement material references, native CPU packets,
+and authored placement in each independent canonical model graph.
+
+Source-review checklist (review only; no executed validation)
+- Standard wrapper type00/dispatch04, model8 alias, retained descriptor10 are
+  represented as typed private native state. No wrapper Entity count invented.
+- Descriptor144 UseDynamicLighting defaults false. It is not UseLighting140.
+  Source27AC4C passes144 to the real packet constructor. Optional authored T/F
+  is retained; duplicate/unsupported values fail closed. Material policy and
+  authored color values are not changed.
+- Shared immutable PSG payloads remain shared; each placement retains its own
+  mutable model, source-row table, CPU packet owner and canonical graph.
+- Fresh geometry uses actual construct240110/publishGeometry1326A0. Warm
+  geometry must have an earlier prototype owned here and the same payload;
+  retain104960/copyParameters2406E0 use that actual prototype. Foreign cache
+  prototypes are rejected. No synthetic geometry/trailer/palette is supplied.
+- Existing placement material handles are borrowed into1C4 without a second
+  acquisition; the retained world continues to own their backing.
+- Packet creation uses the original palette and quantization. Packet matrix
+  slots retain their constructor semantics; no draw preparation is asserted.
+-28AB90 preserves all non-XYZ local lanes.289EC0(a3=1,t0=0,t1=0) uses the
+  existing pure native arithmetic leaf with matching cross-correction branch:
+  right=up cross look, correctedLook=right cross up, normalize up/look, then
+  recompute right. Native binary32/sqrt may differ visually from PS2 VU results.
+  Both writes use canonical graph dirty propagation; world caches remain lazy.
+- Partial prefixes remain retained on error. Whole-owner preflight checks real
+  packet/material/geometry associations. Reverse placement retirement releases
+  all warm references before the resource prototype. Actual142590,240450,
+  26E4C0,26E598,26E5CC and2896D0 leaves retire constructed resource stages.
+- No observer19C, selected queue, parent Entity append, GPU publication, fake
+  racer DrawLease, camera-ready flag, fixed host light, or activation was added.
+
+Remaining blockers and scope limits
+1. observer28E8A0 MUST precede parent append27AE38. Current lighting candidate
+   has registrations[maximumRacers+1] and requires objectCount==racerCount+1
+   at camera visibility entry (original_gc_gameplay_lighting_candidate.cpp).
+   There is no authentic static-model visibility identity namespace. This
+   patch does not substitute a racer/wreck ref or parallel observer registry.
+2. These are already-admitted cold graphs. Warm resource retention does NOT
+   implement or claim original warm hierarchy-clone26EA28/26EA50 chronology.
+3. Wrapper descriptor180/name38 publication27AD34 remains unimplemented; the
+   existing PSG row name remains. Wrapper metadata is a retained subset, not
+   a completed27ABC0 loader or source descriptor binary layout. IsSmoker and
+   later wrapper tail are not completed; descriptor10 stays alive.
+4. Resource240110 retains its existing exact original trailer admission.
+   Any unsupported RA trailer fails closed. No corpus execution was performed
+   to establish which payloads reach this gate successfully.
+5. Geometry-less slots remain unresolved. Trigger compatibility, selected
+   traversal, render packet preparation and actual static visibility remain
+   blockers. This does not make Ryloth runnable, playable, or render-ready.
+
+Evidence
+source-evidence includes read-only original source-word ranges and exact range
+hashes for placement, descriptor and wrapper functions, plus literal labels.
+Original SLUS SHA256 c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30.
+Word labels are static source review, never guest instruction execution.
+MANIFEST.json lists exact snapshot preimage and candidate hashes for each file.
+The unified patch is against the authenticated ZIP, not a moving checkout.
+
+Status
+UNTESTED. No build, test, syntax check, sanitizer, converter, gameplay, or guest
+execution was run. Only source reading/editing and artifact hashing/packaging.
+Central Windows integration and all validation remain root-owned. The reported
+central Sullust/Gasgano smoke success does not validate this isolated patch.

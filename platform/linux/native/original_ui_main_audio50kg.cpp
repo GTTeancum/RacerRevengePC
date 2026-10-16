@@ -74,7 +74,8 @@ constexpr OriginalFile riderOriginal{
 constexpr OriginalFile courseOriginal{
     "MUSIC/UI/SCREENS/UI_TRKS.VAG",448480,
     "b00ea0f7d26f88970eaa87899b5e185b821d82a2bd01a07a33ccf14ded42b40d",390628};
-// UIACCEPT.INI exact events for the default-unlocked constructor ranges.
+// UIACCEPT.INI exact events for default-unlocked ranges and Gasgano's range.
+// These retained audio owners do not grant profile or Course admission.
 // Retained 48-byte zero-header VAGs, 22050 Hz mono: frames include the
 // first end-flag block (28 samples each), excluding the final padding block.
 // Counts and SHA256s come from raw headers/end flags and original bytes.
@@ -86,6 +87,9 @@ constexpr std::array<OriginalRiderConfirmFile,OriginalUiMainAudio50KG::riderConf
     // Rider4: Dud Bolt, Event9..10.
     {9,{"SPEECH/UI/DUDSEL01.VAG",31696,"4b711f32ba5d299a728fe04f0b2dc802caeceae955de94727986a39118cf84b6",55356}},
     {10,{"SPEECH/UI/DUDSEL02.VAG",13664,"ebeaa61ec7190e7b6d97d7c8ea83b563ab3c853062481e619be3bd7445f621f4",23800}},
+    // Rider7: Gasgano, Event15..16. First-end blocks1661/1652 inclusive.
+    {15,{"SPEECH/UI/GASSEL01.VAG",26656,"4076d3b4943d5828a0b7977ca0bc9a6e1fdffc1e4a0925f41aed560713183c90",46536}},
+    {16,{"SPEECH/UI/GASSEL02.VAG",26512,"c647576fb9e438d58b921142c0592041ba2a9ccb0a9db539e0f6ceeb34eb28e9",46284}},
     // Rider10: Aldar Beedo, Event21..22.
     {21,{"SPEECH/UI/ALDSEL01.VAG",36496,"029332c4f2eba4b37dad0a6fb007f849a607b08bdd686d6976714d3164eab748",63756}},
     {22,{"SPEECH/UI/ALDSEL02.VAG",18208,"71a6c0b1e4fd790d81d4580a0903dac2d846961a7c99e520ff5512264982560d",31752}},
@@ -283,10 +287,10 @@ bool OriginalUiMainAudio50KG::prepareCourseMenu(const std::filesystem::path& aud
             const auto bytes=authenticatedRead(audioRoot,original.path,original.bytes,original.sha);
             std::string decodeError;
             need(assets::decodeVagMono50HC(bytes.data(),bytes.size(),speech[i],decodeError),
-                "Original default-unlocked Rider Confirm speech decode rejected");
+                "Original Rider Confirm speech decode rejected");
             const auto& pcm=speech[i];
             const AudioClip50HD clip{pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,0,0};
-            need(preparedClipMatches(clip,pcm,original,1),"Original default-unlocked Rider Confirm PCM metadata differs");
+            need(preparedClipMatches(clip,pcm,original,1),"Original Rider Confirm PCM metadata differs");
         }
         coursePcm_=std::move(song);
         courseClip_={coursePcm_.samples.data(),coursePcm_.frames,coursePcm_.sampleRate,coursePcm_.channels,0,0};
@@ -373,7 +377,13 @@ const OriginalSoundMode50KG* OriginalUiMainAudio50KG::soundModeOwner50KG() const
 }
 bool OriginalUiMainAudio50KG::canApplySoundMode18874050KG(std::uint32_t mode) const noexcept {
     const auto* owner=soundModeOwner50KG();
-    return !paused_&&owner&&owner->canApply188740(*mixer_,mode);
+    return !paused_&&owner&&canRecordControlChange()&&owner->canApply188740(*mixer_,mode);
+}
+bool OriginalUiMainAudio50KG::canAcceptGameOptionsAudio50KG(std::uint32_t mode) const noexcept {
+    //188740 records one transport change; SELECT records one more and can
+    // stop then restart its existing owned voice (two mixer changes).
+    return canApplySoundMode18874050KG(mode)&&canRecordControlChange(2)&&
+        mixer_->canRecordControlChanges(2)&&canPlayGameOptionsEffect(1);
 }
 bool OriginalUiMainAudio50KG::applySoundMode18874050KG(std::uint32_t mode) noexcept {
     if(!canApplySoundMode18874050KG(mode)||!mixer_->originalSoundMode50KG()->apply188740(*mixer_,mode))return false;
@@ -529,6 +539,14 @@ bool OriginalUiMainAudio50KG::canPlayGameOptionsEffect(std::uint32_t originalId)
 bool OriginalUiMainAudio50KG::playGameOptionsEffect(std::uint32_t originalId) noexcept {
     const std::size_t clip=originalId==1?1:originalId==2?6:originalId==3?2:originalId==4?3:
         originalId==5?5:originalId==7?4:clips_.size();return playEffectClip(clip);
+}
+bool OriginalUiMainAudio50KG::canPlayControlsEffect(std::uint32_t originalId) const noexcept {
+    const std::size_t clip=originalId==1?1:originalId==2?6:originalId==3?2:
+        originalId==4?3:originalId==5?5:clips_.size();return canPlayEffectClip(clip);
+}
+bool OriginalUiMainAudio50KG::playControlsEffect(std::uint32_t originalId) noexcept {
+    const std::size_t clip=originalId==1?1:originalId==2?6:originalId==3?2:
+        originalId==4?3:originalId==5?5:clips_.size();return playEffectClip(clip);
 }
 bool OriginalUiMainAudio50KG::canPlayEffectClip(std::size_t clip) const noexcept {
     if (!current() || paused_ || !clip || clip>=clips_.size()) return false;

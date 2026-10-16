@@ -1,0 +1,101 @@
+Offline data extraction from authenticated original UITOURN.RES. No guest execution.
+ui\textures\19_bkg.psm
+[General] 
+TotalShaderPasses                         = 1
+
+[ShaderPass_1]                            ;---------------------------------------
+microProgramName                          = ScreenObject
+
+totalTextureMaps                          = 1
+TextureMap_1                              = 19_bkg
+
+ZWriteDisabled				  = 1
+ui\textures\medstar.psm
+[General] 
+TotalShaderPasses                         = 1
+
+[ShaderPass_1]                            ;---------------------------------------
+microProgramName                          = ScreenObject
+totalTextureMaps                          = 1
+TextureMap_1                              = medstar
+TextureCoordinateIndex_1                  = 0
+
+;ALPHA AlphaBlendingSetting
+inputColorA                               = 0
+inputColorB                               = 2
+inputAlphaC                               = 0
+inputAlphaD                               = 1
+fixedAlphaValue                           = 
+
+;CLAMP TextureWrapMode
+wrapModeHorizontal                        = 
+wrapModeVertical                          = 
+minClampParameterInUDirection             = 
+maxClampParameterInUDirection             = 
+minClampParameterInVDirection             = 
+maxClampParameterInVDirection             = 
+
+;COLCLAMP ColorClampComtrol
+colorClampingMethod                       = 
+
+;FBA AlphaCorrectionValue
+alphaCorrectionValue = 
+
+;PABE AlphaBlendingControlInUnitsOfPixels
+alphaBlendingControlInUnitsOfPixels       = 
+
+;PRMODE DrawingAttributesSetting
+gouraudShadingOnOff                       = 
+textureMappingOnOff                       = 1
+foggingOnOff                              = 
+alphaBlendingOnOff                        = 1
+onePassAntiAliasingOnOff                  = 
+textureCoordinatesSTQorUV                 = 
+environmentContext0or1                    = 
+fragmentValueControlFixedOrNot            = 
+
+;TEST PixelTestControl
+alphaTestOnOff                            = 0
+alphaTestMethod                           = 
+alphaReferenceValue                       = 
+processingMethodWhenFailedInAlphaTest     = 
+destinationAlphaTestOnOff                 = 
+destinationAlphaTestMode                  = 
+depthTestOnOff                            = 
+depthTestMethod                           = 
+
+;TEX0 TextureInformationSetting0
+textureColorComponent                     = 
+textureFunction                           = 
+
+;TEX1 TextureInformationSetting
+lodCalculationMethod                      = 
+maximumMipLevel                           = 
+magFilter                                 = 
+minFilter                                 = 
+L                                         = 
+K                                         = 
+
+;TEXA TextureAlphaValueSetting
+sourceAlphaValueWhenAis0                  = 
+sourceAlphaValueWhenAis1                  = 
+methodOfExpandingTextureAlpha             = 
+
+;ZBUF ZBufferSetting
+zWriteDisabled                            = 1
+
+TextureAnimation			  = unique
+animatedMapFramesPerSecond		  = 15
+animatedMapReverseLoopOnEnd		  = 0
+animatedMapLoopOnEndToFrame               = 0
+
+medstar.atm bytes=46344 revision=1 frames=9 selector=0
+frame=0 offset=12 bytes=5148 kind=1 mips=1 width=64 height=64
+frame=1 offset=5160 bytes=5148 kind=1 mips=1 width=64 height=64
+frame=2 offset=10308 bytes=5148 kind=1 mips=1 width=64 height=64
+frame=3 offset=15456 bytes=5148 kind=1 mips=1 width=64 height=64
+frame=4 offset=20604 bytes=5148 kind=1 mips=1 width=64 height=64
+frame=5 offset=25752 bytes=5148 kind=1 mips=1 width=64 height=64
+frame=6 offset=30900 bytes=5148 kind=1 mips=1 width=64 height=64
+frame=7 offset=36048 bytes=5148 kind=1 mips=1 width=64 height=64
+frame=8 offset=41196 bytes=5148 kind=1 mips=1 width=64 height=64

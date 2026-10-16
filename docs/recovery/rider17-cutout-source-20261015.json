@@ -1,0 +1,240 @@
+{
+  "17_3.psm": {
+    "archive": "UI/UIRIDER/UIRIDER.RES",
+    "archive_bytes": 5552683,
+    "archive_sha256": "112cd71ac9cfcc909b0edb56e0e420bb358b7078b5abae5f48c62b95a6bbf856",
+    "member": "ui\\textures\\17_3.psm",
+    "logical_offset": 12828672,
+    "bytes": 2622,
+    "sha256": "ead3cbf14671c3957105f90c123e298840c9578cbceda5bd140533b6ab6b2ec9",
+    "text": "[General] \r\nTotalShaderPasses                         = 1\r\n\r\n[ShaderPass_1]                            ;---------------------------------------\r\nmicroProgramName                          = diffusecompressed\r\ntotalTextureMaps                          = 1\r\nTextureMap_1                              = 17_3 \r\nTextureCoordinateIndex_1                  = 0\r\n\r\n;ALPHA AlphaBlendingSetting\r\ninputColorA                               = 0\r\ninputColorB                               = 1\r\ninputAlphaC                               = 0\r\ninputAlphaD                               = 1\r\nfixedAlphaValue                           = \r\n\r\n;CLAMP TextureWrapMode\r\nwrapModeHorizontal                        = \r\nwrapModeVertical                          = \r\nminClampParameterInUDirection             = \r\nmaxClampParameterInUDirection             = \r\nminClampParameterInVDirection             = \r\nmaxClampParameterInVDirection             = \r\n\r\n;COLCLAMP ColorClampComtrol\r\ncolorClampingMethod                       = \r\n\r\n;FBA AlphaCorrectionValue\r\nalphaCorrectionValue = \r\n\r\n;PABE AlphaBlendingControlInUnitsOfPixels\r\nalphaBlendingControlInUnitsOfPixels       = \r\n\r\n;PRMODE DrawingAttributesSetting\r\ngouraudShadingOnOff                       = \r\ntextureMappingOnOff                       = \r\nfoggingOnOff                              = \r\nalphaBlendingOnOff                        = 0\r\nonePassAntiAliasingOnOff                  = \r\ntextureCoordinatesSTQorUV                 = \r\nenvironmentContext0or1                    = \r\nfragmentValueControlFixedOrNot            = \r\n\r\n;TEST PixelTestControl\r\nalphaTestOnOff                            = \r\nalphaTestMethod                           = \r\nalphaReferenceValue                       = \r\nprocessingMethodWhenFailedInAlphaTest     = \r\ndestinationAlphaTestOnOff                 = \r\ndestinationAlphaTestMode                  = \r\ndepthTestOnOff                            = \r\ndepthTestMethod                           = \r\n\r\n;TEX0 TextureInformationSetting0\r\ntextureColorComponent                     = \r\ntextureFunction                           = \r\n\r\n;TEX1 TextureInformationSetting\r\nlodCalculationMethod                      = \r\nmaximumMipLevel                           = \r\nmagFilter                                 = \r\nminFilter                                 = \r\nL                                         = \r\nK                                         = \r\n\r\n;TEXA TextureAlphaValueSetting\r\nsourceAlphaValueWhenAis0                  = \r\nsourceAlphaValueWhenAis1                  = \r\nmethodOfExpandingTextureAlpha             = \r\n\r\n;ZBUF ZBufferSetting\r\nzWriteDisabled                            = \r\n"
+  },
+  "17_3.pst": {
+    "archive": "UI/UIPODTEX.RES",
+    "archive_bytes": 2653798,
+    "archive_sha256": "ffb0f32563e3e5b6e3fefe915bbb37a00610e1a9a44163bce9737c2ac9d6e641",
+    "member": "UI\\Textures\\17_3.pst",
+    "logical_offset": 2899968,
+    "bytes": 22860,
+    "sha256": "8f8e544455c57a4f6c9b5caced7880d001387135015ce0604006f9aef3d8c0a1",
+    "header_words": [
+      1,
+      1,
+      4
+    ],
+    "palette_sha256": "c5d2ad08eaa03c83ee3a2eaa2da9a09bade4a298ca63a92b123ae8bbec44bb59",
+    "palette_alpha_values": [
+      255
+    ],
+    "mips": [
+      {
+        "width": 16,
+        "height": 16,
+        "offset": 1052,
+        "bytes": 256,
+        "header_words": [
+          16,
+          16,
+          0,
+          0
+        ],
+        "indices_sha256": "5be1feb5aee5b004a20a1669209d0229efdfe4c73f090f5443dfe002281afe0d"
+      },
+      {
+        "width": 32,
+        "height": 32,
+        "offset": 1324,
+        "bytes": 1024,
+        "header_words": [
+          32,
+          32,
+          0,
+          0
+        ],
+        "indices_sha256": "21ac7b9e1e92f725d22cce8dc4d0c25ca030364259dc163e85371449cf5de04f"
+      },
+      {
+        "width": 64,
+        "height": 64,
+        "offset": 2364,
+        "bytes": 4096,
+        "header_words": [
+          64,
+          64,
+          0,
+          0
+        ],
+        "indices_sha256": "38c5da0d4fafd71fdb0ca40f2cdafaf12feb3ad2c1cfb899a5836a3f84ad125b"
+      },
+      {
+        "width": 128,
+        "height": 128,
+        "offset": 6476,
+        "bytes": 16384,
+        "header_words": [
+          128,
+          128,
+          0,
+          0
+        ],
+        "indices_sha256": "ee620e21f9f8e1890e1070c0715186f9500093e528d13df27c11bf4737bd06a4"
+      }
+    ]
+  },
+  "DefaultMT.psm": {
+    "archive": "APPSTART.RES",
+    "archive_bytes": 58977,
+    "archive_sha256": "04eb376a507d0745925e4351903a8ef7a1024d37d8250b78892cba0c74220b89",
+    "member": "AppStart\\DefaultMT.psm",
+    "logical_offset": 73728,
+    "bytes": 82,
+    "sha256": "1907587ff3a8153a9f687dc43e6858ad0dff6ac3827db74d8518acad5644b4f7",
+    "text": "[DefaultShaderParams]\r\nmicroProgramName=DiffuseCompressed\r\nalphaReferenceValue=0\r\n"
+  },
+  "resolved_pass": {
+    "name": "17_3",
+    "psm_sha256": "ead3cbf14671c3957105f90c123e298840c9578cbceda5bd140533b6ab6b2ec9",
+    "psm_bytes": 2622,
+    "declared_pass_count": 1,
+    "passes": [
+      {
+        "pass": 1,
+        "program": "diffusecompressed",
+        "texture": "17_3",
+        "texture_archive": "UI/UIPODTEX.RES",
+        "texture_source": {
+          "bytes": 22860,
+          "sha256": "8f8e544455c57a4f6c9b5caced7880d001387135015ce0604006f9aef3d8c0a1",
+          "logical_offset": 2899968,
+          "kind": 1,
+          "mips": [
+            {
+              "width": 16,
+              "height": 16,
+              "offset": 1052,
+              "bytes": 256
+            },
+            {
+              "width": 32,
+              "height": 32,
+              "offset": 1324,
+              "bytes": 1024
+            },
+            {
+              "width": 64,
+              "height": 64,
+              "offset": 2364,
+              "bytes": 4096
+            },
+            {
+              "width": 128,
+              "height": 128,
+              "offset": 6476,
+              "bytes": 16384
+            }
+          ],
+          "end": 22860
+        },
+        "gs_resolved_no_runtime_override": {
+          "textureColorComponent": 1,
+          "textureFunction": 0,
+          "sourceAlphaValueWhenAis0": 255,
+          "sourceAlphaValueWhenAis1": 255,
+          "methodOfExpandingTextureAlpha": 0,
+          "inputColorA": 0,
+          "inputColorB": 1,
+          "inputAlphaC": 0,
+          "inputColorD": 1,
+          "fixedAlphaValue": 128,
+          "wrapModeHorizontal": 0,
+          "wrapModeVertical": 0,
+          "minClampParameterInUDirection": 0,
+          "maxClampParameterInUDirection": 0,
+          "minClampParameterInVDirection": 0,
+          "maxClampParameterInVDirection": 0,
+          "colorClampingMethod": 1,
+          "alphaCorrectionValue": 0,
+          "alphaBlendingControlInUnitsOfPixels": 0,
+          "gouraudShadingOnOff": 1,
+          "textureMappingOnOff": 1,
+          "foggingOnOff": 1,
+          "alphaBlendingOnOff": 0,
+          "onePassAntiAliasingOnOff": 0,
+          "textureCoordinatesSTQorUV": 0,
+          "environmentContext0or1": 0,
+          "fragmentValueControlFixedOrNot": 0,
+          "alphaTestOnOff": 1,
+          "alphaTestMethod": 6,
+          "alphaReferenceValue": 0,
+          "processingMethodWhenFailedInAlphaTest": 0,
+          "destinationAlphaTestOnOff": 0,
+          "destinationAlphaTestMode": 1,
+          "depthTestMethod": 2,
+          "zWriteDisabled": 0
+        },
+        "sampler_and_controls": {
+          "lodCalculationMethod": 0,
+          "maximumMipLevel": 0,
+          "magFilter": 1,
+          "minFilter": 5,
+          "L": 0,
+          "K": -75,
+          "EnableThisShader": 1,
+          "totalTextureMaps": 1,
+          "TextureCoordinateIndex_1": 0,
+          "ShaderPassGroup": "none"
+        },
+        "full_authored_fields_including_blanks": {
+          "microProgramName": "diffusecompressed",
+          "totalTextureMaps": "1",
+          "TextureMap_1": "17_3",
+          "TextureCoordinateIndex_1": "0",
+          "inputColorA": "0",
+          "inputColorB": "1",
+          "inputAlphaC": "0",
+          "inputAlphaD": "1",
+          "fixedAlphaValue": "",
+          "wrapModeHorizontal": "",
+          "wrapModeVertical": "",
+          "minClampParameterInUDirection": "",
+          "maxClampParameterInUDirection": "",
+          "minClampParameterInVDirection": "",
+          "maxClampParameterInVDirection": "",
+          "colorClampingMethod": "",
+          "alphaCorrectionValue": "",
+          "alphaBlendingControlInUnitsOfPixels": "",
+          "gouraudShadingOnOff": "",
+          "textureMappingOnOff": "",
+          "foggingOnOff": "",
+          "alphaBlendingOnOff": "0",
+          "onePassAntiAliasingOnOff": "",
+          "textureCoordinatesSTQorUV": "",
+          "environmentContext0or1": "",
+          "fragmentValueControlFixedOrNot": "",
+          "alphaTestOnOff": "",
+          "alphaTestMethod": "",
+          "alphaReferenceValue": "",
+          "processingMethodWhenFailedInAlphaTest": "",
+          "destinationAlphaTestOnOff": "",
+          "destinationAlphaTestMode": "",
+          "depthTestOnOff": "",
+          "depthTestMethod": "",
+          "textureColorComponent": "",
+          "textureFunction": "",
+          "lodCalculationMethod": "",
+          "maximumMipLevel": "",
+          "magFilter": "",
+          "minFilter": "",
+          "L": "",
+          "K": "",
+          "sourceAlphaValueWhenAis0": "",
+          "sourceAlphaValueWhenAis1": "",
+          "methodOfExpandingTextureAlpha": "",
+          "zWriteDisabled": ""
+        }
+      }
+    ],
+    "inactive_sections": {}
+  },
+  "resolution_basis": "Manual source projection of existing constructor/template/read semantics, not execution of project importer or adapter. DefaultMT original82 bytes SHA2561907587ff3a8153a9f687dc43e6858ad0dff6ac3827db74d8518acad5644b4f7. Runtime override435670=0 for comparison; existing runtime gates unchanged."
+}

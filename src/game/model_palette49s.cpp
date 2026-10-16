@@ -16,8 +16,11 @@ bool getWorld(const SceneGraph49P& graph, SceneNodeIndex49P index) noexcept {
 #ifdef RR_MODEL_PALETTE49S_GETTER
     // Test-only call-order evidence; absent from the ordinary production object.
     RR_MODEL_PALETTE49S_GETTER(index);
-#endif
+    // An arbitrary instrumentation callback may invalidate topology admission.
     return refreshSceneWorld49P(graph, index);
+#else
+    return scene_detail49P::refreshWorldAdmittedTopology(graph, index);
+#endif
 }
 }
 bool projectModelPalette49S(const SceneGraph49P& graph,
@@ -47,6 +50,9 @@ bool projectModelPalette49S(const SceneGraph49P& graph,
 
     std::memcpy(workspace.nodes, graph.nodes, graph.count * sizeof(SceneNode49P));
     const SceneGraph49P staged{workspace.nodes, graph.count};
+    // Full forest admission above applies to this exact copy. Serial getters
+    // below write only world100/sceneFlags190, never count, storage or links.
+    // Instrumented builds retain checked refresh admission at each callback.
     const auto root = static_cast<std::uint32_t>(input.modelRoot);
     // Original2412E4..2412FC; a ready model root is not called again here.
     if ((staged.nodes[root].sceneFlags190 & 1u) == 0 &&

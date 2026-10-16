@@ -27,10 +27,11 @@ enum class OriginalVideoNativeUse : std::uint8_t {
 // is claimed. Root pauses simulation, handles events/quit, and continues the
 // numeric owner's videoClockWait. A resize is an explicit admission failure;
 // no changing image size or source capture is hidden inside the transaction.
-// The explicit async option admits IN flags&7==6 and native sourceCopyPC=0:
-// its caller owns real25B5D0 numeric samples over a frozen real Attached frame.
+// The explicit async option admits IN flags&7==6 or OUT flags&7==5 and
+// native sourceCopyPC=0. Its caller owns real25B5D0 numeric samples over a
+// frozen real race image, including the actual human-ending camera image.
 // It does not claim async25B5D0 calls blocking261630/262D80. Use a separate
-// backend for blocking OUT and async IN. A successfully retired instance can
+// backend for blocking and async effects. A successfully retired instance can
 // later begin its same policy again, only after a fresh actual race publication.
 class OriginalVideoBlockingNativeBackend final : public game::OriginalVideoBlockingBackend {
 public:

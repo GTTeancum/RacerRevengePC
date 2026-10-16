@@ -21,7 +21,7 @@ namespace detail {
 using pod_materials50ed_fixture::detail::need;
 using pod_materials50ed_fixture::detail::sha256;
 inline std::vector<std::uint8_t> read(const char* path) {
-    std::ifstream f(path,std::ios::binary|std::ios::ate);
+    std::ifstream f(runtime_asset_paths50LB::resolve(path),std::ios::binary|std::ios::ate);
     need(bool(f),"Cannot open original Pod01.RES for cable");
     const auto n=f.tellg();need(n>0&&static_cast<std::uint64_t>(n)<=1024u*1024u,"Pod01.RES cable input size");
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(n));f.seekg(0);

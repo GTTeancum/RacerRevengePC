@@ -41,7 +41,7 @@ class Owner final {
  struct Geometry {const g::Type2ResourceView49X* resource=nullptr;g::BodyMatrix48G world{};bool valid=false;};
  std::array<Geometry,colliders> geometry_{};
  const ActionLease* lease_=nullptr;
- std::uint32_t originalAiNodeCount_=0;
+ std::uint32_t originalAiNodeCount_=0,playerPrefixCount34_=0;
  bool ready_=false,muted_=false,actionFailed_=false;
  Counters counters_{};Status terminal_=Status::Complete;
  std::size_t colliderIndex(std::uint32_t id)const noexcept {
@@ -78,8 +78,8 @@ class Owner final {
   switch(action.kind){
    case ga_trigger_authoring::Action::LostAI:{
     // Preserve original race traversal and main690 matching. The eight actual
-    // identities include camera-followed slot0; IgnoreTrigger PLAYER was
-    // enforced by the geometric caller's identity filter, never by AI role.
+    // identities include every roster slot; IgnoreTrigger PLAYER uses the
+    // source manager+34 prefix, never the camera slot or AI class58.
     std::array<g::LostAiRacer50IN,racers> destinations{};
     for(std::size_t i=0;i<racers;++i)destinations[i]={racers_[i].main690,
       racers_[i].main690==lease_->racerMain690?lease_->nodeC80:nullptr};
@@ -114,8 +114,12 @@ public:
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
  bool prepare(const ga_trigger_authoring::Owner& source,ga_animated_world::Owner& animation,
      const std::array<RacerIdentities,racers>& identities,std::uint32_t aiNodeCount,
-     gc_gate_audio50IN::Owner* sound,bool explicitlyMuted)noexcept {
-  if(ready_||!source.ready()||!animation.ready()||aiNodeCount<=102||
+     gc_gate_audio50IN::Owner* sound,bool explicitlyMuted,
+     std::uint32_t playerPrefixCount34=1u)noexcept {
+  // The trailing default retains the old GA HOST one-player roster policy
+  // for old callers only. Source-connected sessions MUST pass real manager+34;
+  // neither camera slot0 nor arena class58 determines the PLAYER prefix.
+  if(ready_||!source.ready()||!animation.ready()||aiNodeCount<=102||playerPrefixCount34>racers||
      (!explicitlyMuted&&(!sound||!sound->available()||!sound->ready())))return false;
   std::array<std::uint32_t,colliders> ids{};
   for(std::size_t i=0;i<racers;++i){ids[i*2]=identities[i].main690;ids[i*2+1]=identities[i].secondary;}
@@ -126,7 +130,7 @@ public:
   for(std::size_t i=0;i<group_.triggers.size();++i){const auto& authored=source.source(i);
    if(authored.randomTriggerPercent!=100||!authored.actionCount||authored.actionCount>2)return false;
   }
-  source_=&source;animation_=&animation;racers_=identities;originalAiNodeCount_=aiNodeCount;sound_=sound;muted_=explicitlyMuted;
+  source_=&source;animation_=&animation;racers_=identities;originalAiNodeCount_=aiNodeCount;playerPrefixCount34_=playerPrefixCount34;sound_=sound;muted_=explicitlyMuted;
   for(std::size_t i=0;i<ids.size();++i)group_.colliders[i].identity=ids[i];
   for(std::size_t i=0;i<group_.triggers.size();++i){const auto& authored=source.source(i);auto& state=group_.triggers[i];
    state.flags29=authored.startEnabled?3u:0u;
@@ -135,7 +139,10 @@ public:
    state.callbackCount98=authored.actionCount;state.collider.identity=firstTriggerIdentity+static_cast<std::uint32_t>(i);
   }
   ready_=true;group_.actions=hooks();group_.ready=true;
-  for(std::size_t i=0;i<group_.triggers.size();++i)group_.ignoreCollider[i]=source.source(i).ignorePlayer?identities[0].main690:0u;
+  for(std::size_t i=0;i<group_.triggers.size();++i)if(source.source(i).ignorePlayer){
+   group_.ignoreColliderCount[i]=playerPrefixCount34_;
+   for(std::size_t j=0;j<playerPrefixCount34_;++j)group_.ignoreColliders[i][j]=identities[j].main690;
+  }
   return g::validNativeTriggerGroup50GA(group_);
  }
  // This is NOT a geometric query entry point. Call only after the declared
@@ -151,7 +158,8 @@ public:
      lease.listenerCount>2||(lease.listenerCount&&!lease.listenerPositions))return fail(Status::Input);
   // Ignoring PLAYER must occur before 2A00A0/touched/fired/list writes. Return
   // a distinct outcome so callers cannot count a suppressed contact as action.
-  if(source_->source(trigger).ignorePlayer&&collider==racers_[0].main690)return Status::IgnoredPlayer;
+  if(source_->source(trigger).ignorePlayer)for(std::size_t i=0;i<playerPrefixCount34_;++i)
+   if(collider==racers_[i].main690)return Status::IgnoredPlayer;
   lease_=&lease;receipt=g::triggerContact50IN(group_.triggers[trigger],group_.colliders[c],hooks());lease_=nullptr;
   if(receipt.status!=g::TriggerEntryStatus50IN::Complete||receipt.randomConsumed)return fail(Status::Entry);
   if(actionFailed_)return fail(Status::Action);

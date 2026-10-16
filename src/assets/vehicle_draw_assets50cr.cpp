@@ -1,6 +1,8 @@
 #include "vehicle_draw_assets50cr.h"
 #include "scene_asset48d.h"
 #include <array>
+#include <cmath>
+#include <limits>
 #include <new>
 #include <stdexcept>
 
@@ -9,7 +11,9 @@ namespace {
 constexpr game::VehicleDrawComponent50CM components[vehicleDrawComponentCount50CR] = {
     game::VehicleDrawComponent50CM::chariot,
     game::VehicleDrawComponent50CM::leftEngine,
-    game::VehicleDrawComponent50CM::rightEngine
+    game::VehicleDrawComponent50CM::rightEngine,
+    game::VehicleDrawComponent50CM::bottomLeftEngine,
+    game::VehicleDrawComponent50CM::bottomRightEngine
 };
 
 std::uint32_t componentIndex(game::VehicleDrawComponent50CM component) noexcept {
@@ -17,6 +21,8 @@ std::uint32_t componentIndex(game::VehicleDrawComponent50CM component) noexcept 
     case game::VehicleDrawComponent50CM::chariot: return 0;
     case game::VehicleDrawComponent50CM::leftEngine: return 1;
     case game::VehicleDrawComponent50CM::rightEngine: return 2;
+    case game::VehicleDrawComponent50CM::bottomLeftEngine: return 3;
+    case game::VehicleDrawComponent50CM::bottomRightEngine: return 4;
     }
     return vehicleDrawComponentCount50CR;
 }
@@ -34,6 +40,7 @@ struct VehicleDrawAssets50CR::Storage {
         Scene48D scene;
         Mesh48B mesh;
         std::vector<game::RigidVertex49S> localVertices;
+        std::vector<game::VehicleDrawCompressedNormal50LA> compressedNormals50LA;
         std::array<game::SceneNodeIndex49P, game::maxRigidPalette49S> sourceNodes{};
         std::array<std::uint8_t, game::maxRigidPalette49S> paletteIds{};
         game::VehicleDrawSelection50CM selection{};
@@ -41,6 +48,7 @@ struct VehicleDrawAssets50CR::Storage {
         std::vector<Vertex48B> staging[vehicleDrawStagingBankCount50CR];
         std::vector<WorldNormal50HK> normalStaging[vehicleDrawStagingBankCount50CR];
     } component[vehicleDrawComponentCount50CR];
+    std::uint32_t componentCount = game::defaultVehicleDrawComponents50CM;
 };
 
 VehicleDrawAssets50CR::VehicleDrawAssets50CR() noexcept = default;
@@ -53,10 +61,12 @@ bool VehicleDrawAssets50CR::load(const VehicleDrawAssetsInput50CR& input,
     diagnostic.parserMessage.clear();
     diagnostic.draw = {};
     if (storage_) return reject(diagnostic, VehicleDrawAssetError50CR::alreadyLoaded);
+    if (!game::validVehicleDrawComponentCount50CM(input.componentCount))
+        return reject(diagnostic, VehicleDrawAssetError50CR::input);
 
     // Check every descriptor before parsing/allocating any component. The
     // supplied vector/array storage must remain stable throughout this call.
-    for (std::uint32_t i = 0; i < vehicleDrawComponentCount50CR; ++i) {
+    for (std::uint32_t i = 0; i < input.componentCount; ++i) {
         diagnostic.component = i;
         const auto& source = input.component[i];
         if (!source.sceneBytes || !source.sourceNodes || !source.paletteIds ||
@@ -69,11 +79,29 @@ bool VehicleDrawAssets50CR::load(const VehicleDrawAssetsInput50CR& input,
         // Commit only the pointer. Storage and all of its vectors stay at
         // their prepared addresses; no Component/Scene/Mesh is moved later.
         std::unique_ptr<Storage> next(new Storage);
-        for (std::uint32_t i = 0; i < vehicleDrawComponentCount50CR; ++i) {
+        next->componentCount = input.componentCount;
+        for (std::uint32_t i = 0; i < input.componentCount; ++i) {
             diagnostic.component = i;
             const auto& source = input.component[i];
             auto& target = next->component[i];
-            if (!parseSceneAsset48D(*source.sceneBytes, target.scene, diagnostic.parserMessage))
+            if (source.sourcePsgBytes) {
+                // RRSCENE1 preserves geometry but omits original MSCNT group
+                // and strip metadata. Keep the genuine decoded owner, after
+                // proving its complete compatibility serialization is exactly
+                // the caller's already-authenticated scene cache.
+                DecodeError48C sourceError{};
+                if (!decodeScene48D(*source.sourcePsgBytes, target.scene, sourceError)) {
+                    diagnostic.parserMessage = "Original PSG scene decode rejected: " + sourceError.code;
+                    return reject(diagnostic, VehicleDrawAssetError50CR::scene);
+                }
+                std::vector<std::uint8_t> encoded;
+                if (!encodeSceneAsset48D(target.scene, encoded, diagnostic.parserMessage))
+                    return reject(diagnostic, VehicleDrawAssetError50CR::scene);
+                if (encoded != *source.sceneBytes) {
+                    diagnostic.parserMessage = "Original PSG/cache scene conversion differs";
+                    return reject(diagnostic, VehicleDrawAssetError50CR::scene);
+                }
+            } else if (!parseSceneAsset48D(*source.sceneBytes, target.scene, diagnostic.parserMessage))
                 return reject(diagnostic, VehicleDrawAssetError50CR::scene);
             if (!parseMesh48B(target.scene.neutral_lod0.data(), target.scene.neutral_lod0.size(),
                 target.mesh, diagnostic.parserMessage))
@@ -105,6 +133,35 @@ bool VehicleDrawAssets50CR::load(const VehicleDrawAssetsInput50CR& input,
                 target.localVertices.data(), vertexCount, target.prepared, diagnostic.draw))
                 return reject(diagnostic, VehicleDrawAssetError50CR::drawMesh);
 
+            // The genuine PSG decoder forms normal_local as signed i8 times
+            // its binary32 q. For normal q this and the inverse/roundtrip are
+            // exact normal binary64 operations, so cold preparation adds no FP
+            // status flags, even for currently unselected material slots.
+            // Generic RRSCENE-only inputs may have non-compressible normals;
+            // leave those on live decode rather than raising flags early.
+            // The scene and this exact flattened order remain immutable.
+            const double authoredQ = target.scene.quantization[1];
+            if (source.sourcePsgBytes &&
+                game::original_racer_lighting50KM::selection_detail::arithmeticReady() &&
+                sizeof(double) == 8 && std::numeric_limits<double>::is_iec559 &&
+                std::isfinite(authoredQ) &&
+                authoredQ >= static_cast<double>(std::numeric_limits<float>::min()) &&
+                authoredQ <= static_cast<double>(std::numeric_limits<float>::max()) &&
+                static_cast<double>(static_cast<float>(authoredQ)) == authoredQ) {
+                target.compressedNormals50LA.resize(vertexCount);
+                std::uint32_t vertex = 0;
+                for (const auto& surface : target.scene.lods[0].surfaces)
+                    for (const auto& sourceVertex : surface.vertices) {
+                        auto& normal = target.compressedNormals50LA[vertex++];
+                        normal.valid = game::vehicle_draw_detail50LA::decodeCompressedNormal(
+                            sourceVertex.normal_local, authoredQ, normal.value);
+                    }
+                target.prepared.compressedNormals50LA = target.compressedNormals50LA.data();
+                target.prepared.compressedNormalScene50LA = &target.scene;
+                target.prepared.compressedNormalCount50LA = vertexCount;
+                target.prepared.compressedNormalQ50LA = authoredQ;
+            }
+
             target.selection.component = components[i];
             target.selection.sourceNodes = target.sourceNodes.data();
             target.selection.sourceNodeCount = source.sourceNodeCount;
@@ -128,21 +185,24 @@ bool VehicleDrawAssets50CR::load(const VehicleDrawAssetsInput50CR& input,
 }
 
 bool VehicleDrawAssets50CR::loaded() const noexcept { return bool(storage_); }
+std::uint32_t VehicleDrawAssets50CR::componentCount() const noexcept {
+    return storage_ ? storage_->componentCount : 0;
+}
 
 const Scene48D* VehicleDrawAssets50CR::scene(game::VehicleDrawComponent50CM component) const noexcept {
     const auto index = componentIndex(component);
-    return storage_ && index < vehicleDrawComponentCount50CR ? &storage_->component[index].scene : nullptr;
+    return storage_ && index < storage_->componentCount ? &storage_->component[index].scene : nullptr;
 }
 
 const Mesh48B* VehicleDrawAssets50CR::compatibilityMesh(game::VehicleDrawComponent50CM component) const noexcept {
     const auto index = componentIndex(component);
-    return storage_ && index < vehicleDrawComponentCount50CR ? &storage_->component[index].mesh : nullptr;
+    return storage_ && index < storage_->componentCount ? &storage_->component[index].mesh : nullptr;
 }
 
 const game::VehicleDrawMesh50CM* VehicleDrawAssets50CR::preparedMesh(
     game::VehicleDrawComponent50CM component) const noexcept {
     const auto index = componentIndex(component);
-    return storage_ && index < vehicleDrawComponentCount50CR ? &storage_->component[index].prepared : nullptr;
+    return storage_ && index < storage_->componentCount ? &storage_->component[index].prepared : nullptr;
 }
 
 bool VehicleDrawAssets50CR::batchInput(std::uint32_t bank, game::ModelPalettePhase49S phase,
@@ -152,7 +212,8 @@ bool VehicleDrawAssets50CR::batchInput(std::uint32_t bank, game::ModelPalettePha
         suppliedState != game::ModelPaletteSceneState49S::completeCurrentScene)
         return false;
     game::VehicleDrawBatchInput50CO next{};
-    for (std::uint32_t i = 0; i < vehicleDrawComponentCount50CR; ++i) {
+    next.componentCount = storage_->componentCount;
+    for (std::uint32_t i = 0; i < storage_->componentCount; ++i) {
         auto& source = storage_->component[i];
         next.selection[i] = source.selection;
         next.selection[i].phase = phase;

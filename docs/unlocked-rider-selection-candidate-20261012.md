@@ -14,7 +14,8 @@ Incremental to the frozen Rider19/20 lifecycle patch. The prior patch is unchang
 - Additional pairs lacking a genuine authenticated kind2 image cache are omitted
   before immutable material-bank construction. Malformed references remain errors.
 - Profile, Confirm and Course entry retain the selected original rider. Original
-  Course-to-race admission remains restricted to the prepared Rider19 destination.
+  Course-to-race admission now supports TA/GA with each of the eight unlocked
+  riders when its own authenticated race resources are prepared.
 - Confirm voices use source constructor event ranges5–6,9–10,21–22,23–24,25–26,
   31–32,39–43,44–45, explicit event lookup and one shared original RNG draw.
   The12 added files are SPEECH/UI/{BEN,DUD,ALD,ODY,SHR,TEE}SEL{01,02}.VAG.

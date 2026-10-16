@@ -1,6 +1,7 @@
 // Source-reviewed bounded Course integration; runtime acceptance is pending.
 #pragma once
 #include "original_ui_options_session50kg.h"
+#include "../../../src/game/control_presets49d.h"
 #include "original_ui_rider_session50kg.h"
 #include "original_ui_course_session50kg.h"
 #include "vehicle_window_gl50ds.h"
@@ -10,9 +11,12 @@
 #include <memory>
 
 namespace rr::platform {
-// Concrete native host implementation retains its actual cold world, roster,
-// original AI and renderer owners. This read-only gate must inspect those live
-// instances; archive names or a caller-set ready flag never admit a race.
+// Concrete native host gate admits either its already-prepared same-world
+// destination or a supported cold-load request whose authentic source archive
+// is retained. A queued request is not a loaded-world/completion receipt: the
+// host must retire the old session and execute the target's real cold loader
+// before any race activation. Archive names or caller-set ready flags alone
+// cannot admit either path; actual source and lifecycle owners are required.
 class OriginalUiCourseRaceDestination50KG {
 public:
     virtual ~OriginalUiCourseRaceDestination50KG()=default;
@@ -72,6 +76,9 @@ struct OriginalUiFrontendCold50KG {
     assets::OriginalUiMaterialRuntime50KG runtime{};
     std::shared_ptr<OriginalUiMainProfile50KG> profile;
     std::shared_ptr<OriginalUiOptionsProfile50KG> optionsProfile;
+    // One actual application owner, shared with the native gameplay/camera
+    // binding. Page entry and Cancel never reset or replace these presets.
+    std::shared_ptr<game::ControlPresets49D> controlsProfile;
     // Retained sole application profile for page4. Optional: without it only
     // Options menu1 is admitted. No reset or imported-save claim is made here.
     std::shared_ptr<game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
@@ -93,6 +100,13 @@ struct OriginalUiFrontendCold50KG {
     // Borrowed stable application owner, outliving this frontend. Absence keeps
     // Left/Right unavailable before any model, image or profile mutation.
     OriginalUiRiderPresentationHost50KG* riderPresentation=nullptr;
+    // Explicit application request, copied across manager rebuilds. False keeps
+    // existing populations; true requires both authenticated Clegg cache members.
+    bool prepareCleggLockedPreview=false;
+    // Additive bit N = original rider N. Retained across Main/Course transitions
+    // and manager rebuilds; resources only, never profile or Confirm admission.
+    // Zero preserves the existing population and legacy Clegg request.
+    std::uint32_t requestedPreviewRiders=0;
 };
 struct OriginalUiFrontendColdInterval50KG {
     // Host loading interval only; no source clock is sampled or advanced here.
@@ -136,7 +150,7 @@ struct OriginalUiFrontendSnapshot50KG {
     std::uint64_t lightManagerGeneration=0;
     bool lightManagerEntered=false;
 };
-// Concrete native Main4/1 <-> Options12/{1,4}, plus Rider5/1 for
+// Concrete native Main4/1 <-> Options12/{1,2,3,4}, plus Rider5/1 for
 // authenticated default-unlocked Rider selection, with mode0 Confirm -> bounded Course6/1
 // and Back. Course Confirm additionally requires the concrete native race lease.
 // No guest execution, fallback UI or profile reset. Runtime acceptance is pending.

@@ -216,7 +216,7 @@ bool decodeMaterial48E(const Bytes& input, Material48E& output, DecodeError48C& 
             require(input[i] != 0, DecodeKind48C::malformed, "psm.nul", i, "NUL is not accepted in material text");
             require(input[i] < 128, DecodeKind48C::unsupported, "psm.encoding", i, "Only original ASCII material text is supported");
         }
-        std::vector<Section> sections; bool duplicateKey = false; std::size_t duplicateOffset = 0;
+        std::vector<Section> sections; bool duplicateKey = false, retainedEmptyDuplicate = false; std::size_t duplicateOffset = 0;
         for (std::size_t at = 0; at < input.size();) {
             checkCancel(hooks, at); const std::size_t begin = at;
             while (at < input.size() && !lineBreak(input[at])) ++at;
@@ -238,14 +238,20 @@ bool decodeMaterial48E(const Bytes& input, Material48E& output, DecodeError48C& 
             MaterialField48E field{trim(line.substr(0, equal)), trim(line.substr(equal + 1)), begin};
             require(!field.name.empty(), DecodeKind48C::malformed, "psm.key", begin, "Empty material key");
             const auto folded = lower(field.name);
-            for (const auto& previous : sections.back().fields) if (lower(previous.name) == folded && !duplicateKey) {
-                duplicateKey = true; duplicateOffset = begin;
+            for (const auto& previous : sections.back().fields) if (lower(previous.name) == folded) {
+                // Original158648 returns the first present value and skips
+                // bare empty assignments. MA hoh_bust-a authors a valid map
+                // followed by an empty repeat. Retain both lexical fields;
+                // this empty suffix cannot replace its first present value.
+                if (!previous.value.empty() && field.value.empty()) retainedEmptyDuplicate = true;
+                else if (!duplicateKey) { duplicateKey = true; duplicateOffset = begin; }
+                break;
             }
             sections.back().fields.push_back(std::move(field));
         }
-        // Repeated authored settings occur in complete original PSMs. Their
-        // precedence is unproved; do not choose a winner. Complete lexical
-        // validation above still makes malformed lines/NUL/sections fatal.
+        // Admit only empty repeats after an already-present value. Conflicting
+        // present repeats and empty-first forms stay outside this subset.
+        // Complete lexical validation still rejects malformed later lines.
         require(!duplicateKey, DecodeKind48C::unsupported, "psm.duplicate_key", duplicateOffset,
             "Repeated authored key requires unproved original precedence semantics");
         const Section* general = nullptr;
@@ -261,15 +267,40 @@ bool decodeMaterial48E(const Bytes& input, Material48E& output, DecodeError48C& 
             for (const auto& section : sections) present = present || section.name == name;
             require(present, DecodeKind48C::malformed, "psm.sections", 0, "Missing declared numbered ShaderPass section");
         }
-        bool knownExtraSections = true;
+        bool knownExtraSections = true, auxiliarySections = false;
         for (const auto& section : sections) {
-            bool known = section.name == "General" || section.name == "Prologue" || section.name == "Epilogue";
+            const bool auxiliary = section.name == "Prologue" || section.name == "Epilogue";
+            auxiliarySections = auxiliarySections || auxiliary;
+            bool known = section.name == "General" || auxiliary;
             for (unsigned pass = 1; pass <= 8; ++pass) known = known || section.name == "ShaderPass_" + std::to_string(pass);
             knownExtraSections = knownExtraSections && known;
         }
-        require(sections.size() == count + 1, knownExtraSections ? DecodeKind48C::unsupported : DecodeKind48C::malformed,
-            "psm.sections", 0, "Extra inactive passes or Prologue/Epilogue need separate original semantics");
+        require(knownExtraSections, DecodeKind48C::malformed, "psm.sections", 0,
+            "Unrecognized material section outside General and ShaderPass_1 through ShaderPass_8");
+        // Original29B6B8/29B808 processes these outside the counted pass loop.
+        // They cannot be reclassified as inactive shader evidence.
+        require(!auxiliarySections, DecodeKind48C::unsupported, "psm.sections", 0,
+            "Prologue/Epilogue need separate original semantics");
         Material48E parsed; parsed.general = retainFields(*general);
+        // Original29B718 reads the numeric TotalShaderPasses into owner+48.
+        // 29B7A0/29B7EC/29B7F0..29B7F8 loops index=0; index<count; ++index.
+        // 247178/24718C looks up ShaderPass_(index+1), never enumerating the
+        // physical section headers. Higher numbered sections are opaque here,
+        // even if they name programs/maps not supported by semantic decoding.
+        for (std::size_t i = 0; i < sections.size(); ++i) {
+            const auto& section = sections[i];
+            for (std::uint32_t pass = count + 1; pass <= 8; ++pass) {
+                if (section.name != "ShaderPass_" + std::to_string(pass)) continue;
+                MaterialInactiveSection48E inactive;
+                inactive.name = section.name; inactive.source_offset = section.offset;
+                const auto end = i + 1 < sections.size() ? sections[i + 1].offset : input.size();
+                inactive.source_length = end - section.offset;
+                inactive.fields = retainFields(section);
+                parsed.inactive_sections.push_back(std::move(inactive));
+                break;
+            }
+        }
+        if (!parsed.inactive_sections.empty() || retainedEmptyDuplicate) parsed.original_text = input;
         progress(hooks, "psm.bindings", 0, count); checkCancel(hooks, 0);
         for (std::uint32_t pass = 1; pass <= count; ++pass) {
             const Section* section = nullptr; const auto name = "ShaderPass_" + std::to_string(pass);

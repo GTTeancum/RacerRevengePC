@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../src/game/original_application_animation_clock50kg.h"
 #include "original_ui_options_draw_resources50kg.h"
 #include "../../../src/game/original_ui_aperture_owner50kg.h"
 namespace rr::platform {
@@ -19,11 +20,12 @@ struct OriginalUiOptionsPacket50KG {
     std::uint32_t sourceOrdinal=0,sourcePC=0;
     std::uint16_t widgetId=0;OriginalUiOptionsSegment50KG segment=OriginalUiOptionsSegment50KG::ordinaryWidgets;
 };
-struct OriginalUiOptionsClock50KG {bool known=false,advanceAnimations=false;std::uint32_t milliseconds=0;};
+struct OriginalUiOptionsClock50KG {bool known=false,advanceAnimations=false;std::uint32_t milliseconds=0;
+    game::OriginalApplicationAnimationClockView50KG applicationAnimation{};};
 // Actual Options widget/page/aperture/scene graph, with a separately authenticated
 // Options GPU bank. CPU-only contributions remain available; standalone draws
 // additionally require the actual scene tail and a live matching publication.
-class OriginalUiOptionsDrawContribution50KG final {
+class OriginalUiOptionsDrawContribution50KG final : public OriginalUiSourceOwner50KM {
 public:
     OriginalUiOptionsDrawContribution50KG() noexcept;
     ~OriginalUiOptionsDrawContribution50KG();
@@ -34,21 +36,25 @@ public:
         std::shared_ptr<const MaterialTextureGl50EB>,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool begin(const OriginalUiOptionsClock50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     // Typed source page choice for the same Options manager resource bank.
-    // Supported only for actual menu1 and Game Options4.
+    // Actual menu1, Controls2/3 and Game Options4.
     bool beginPage(std::uint8_t,const OriginalUiOptionsClock50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectOrdinaryWidgets(bool ancestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     // Exact page1F9A80 draw point. Page visibility gates whole contribution.
     bool projectPage(bool pageAncestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
+    bool projectControlsBackground(std::uint8_t ordinal,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectExitText(const game::OriginalUiApertureHook50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     // Wire only to real shared-aperture submitOverlay, original+424 then+428.
     bool projectAperture(std::uint8_t,const game::OriginalUiApertureRectangle50KG&,
         OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
-    // Reads the same bank's genuine source mask42C (menu0/3, Game Options0/7).
+    // Reads the same bank's source mask42C (menu0/3, Controls0/15, Game Options0/7).
     bool projectPrompts(OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectOnTopWidgets(bool ancestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectParticles(OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool drain(OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     const OriginalUiNativeDraw50KG* draw() const noexcept;
+    const OriginalUiSourceFrame50KM* sourceFrame() const noexcept;
+    bool sourceTeardownPending() const noexcept;
+    bool retireSourceRenderer(VehicleWindowGl50DS&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool finishContribution(OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     // Original submission sequence, NOT material-sorted or ready for standalone
     // presentation. Each packet references the pinned resources' native policy.
@@ -56,9 +62,13 @@ public:
     const std::vector<OriginalUiOptionsPacket50KG>* packets() const noexcept;
     const OriginalUiOptionsDrawResources50KG* resources() const noexcept;
 private:
+    bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept override;
+    void finishSourceSubmission(std::uint64_t,bool sourceAccepted,bool sourceWorkStarted) const noexcept override;
     struct Storage;std::unique_ptr<Storage> storage_;
+    OriginalUiSourceFrame50KM frame_;
     bool append(const game::OriginalUiOverlayQuad50KG&,std::uint32_t material,float packetZ,
         OriginalUiOptionsSegment50KG,std::uint16_t,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool widgets(bool onTop,bool ancestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
+    bool controlsModel(bool ancestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
 };
 }

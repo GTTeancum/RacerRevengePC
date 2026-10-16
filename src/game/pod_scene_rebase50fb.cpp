@@ -19,22 +19,22 @@ bool nullcg(const char* name) noexcept {
 }
 }
 bool rebaseColdPodScene50FB(const SceneGraph49P& graph,
-    const PodSceneRebaseModel50FB (&models)[3],
+    const PodSceneRebaseModel50FB* models, std::uint32_t modelCount,
     PodSceneRebaseWorkspace50FB& workspace,
-    ModelBoundsResult49O (&bounds)[3],
+    ModelBoundsResult49O* bounds,
     PodSceneRebaseDiagnostic50FB& diagnostic) noexcept {
     diagnostic = {};
     auto reject = [&](PodSceneRebaseError50FB error) noexcept {
         diagnostic.error = error;
         return false;
     };
-    if (std::fegetround() != FE_TONEAREST)
+    if (!models || !bounds || (modelCount != 3 && modelCount != 5) || std::fegetround() != FE_TONEAREST)
         return reject(PodSceneRebaseError50FB::context);
     if (!graph.count || !validateSceneGraph49P(graph))
         return reject(PodSceneRebaseError50FB::graph);
     bool claimed[maxSceneNodes49P]{};
     // Admit all descriptors before making even staged source changes.
-    for (unsigned model = 0; model < 3; ++model) {
+    for (unsigned model = 0; model < modelCount; ++model) {
         diagnostic.model = model;
         const auto& input = models[model];
         if (!valid(input.root, graph.count) || !input.sourceNodes ||
@@ -65,7 +65,7 @@ bool rebaseColdPodScene50FB(const SceneGraph49P& graph,
     }
     std::memcpy(workspace.nodes, graph.nodes, graph.count * sizeof(SceneNode49P));
     const SceneGraph49P staged{workspace.nodes, graph.count};
-    for (unsigned model = 0; model < 3; ++model) {
+    for (unsigned model = 0; model < modelCount; ++model) {
         diagnostic.model = model;
         diagnostic.sourceNode = 0;
         const auto& input = models[model];
@@ -103,8 +103,13 @@ bool rebaseColdPodScene50FB(const SceneGraph49P& graph,
             return reject(PodSceneRebaseError50FB::bounds);
     }
     std::memcpy(graph.nodes, workspace.nodes, graph.count * sizeof(SceneNode49P));
-    std::memcpy(bounds, workspace.result, sizeof workspace.result);
+    std::memcpy(bounds, workspace.result, modelCount * sizeof workspace.result[0]);
     diagnostic = {};
     return true;
+}
+bool rebaseColdPodScene50FB(const SceneGraph49P& graph,
+    const PodSceneRebaseModel50FB (&models)[3], PodSceneRebaseWorkspace50FB& workspace,
+    ModelBoundsResult49O (&bounds)[3], PodSceneRebaseDiagnostic50FB& diagnostic) noexcept {
+    return rebaseColdPodScene50FB(graph,models,3,workspace,bounds,diagnostic);
 }
 }

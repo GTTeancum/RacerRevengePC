@@ -57,6 +57,26 @@ OriginalCameraPairStatus updateOriginalCameraQueryPair(
     const SpringVector4_48N& endpoint,const SpringVector4_48N& sphereCenter,
     bool executeQueries,OriginalCameraCollisionCallback&,OriginalCameraPairResult&) noexcept;
 
+// Live179A80 continuation. Neither actual query may be absent: cold creation
+// belongs to attachOriginalCameraQueryPair. Successful source operations remain
+// committed on a later rejection, and the cursor resumes that exact operation.
+// The original cached sphere center/radius survive its11C1F0 setter:179A80 has
+// NO11FF60 between the live setter and120070. Ray metadata is cleared by11CA80.
+enum class OriginalCameraPairResetStage : std::uint8_t {
+    idle,sphereRemove,sphereSet,sphereAttach,rayRemove,raySet,rayAttach,complete
+};
+struct OriginalCameraPairResetCursor {
+    OriginalCameraPairResetStage stage=OriginalCameraPairResetStage::idle;
+    OriginalCameraQueryPairOwner* owner=nullptr;
+    CollectionRef50BX zone=0;
+    SpringVector4_48N position{};
+    float radius=0.f;
+};
+OriginalCameraPairStatus resetOriginalCameraQueryPair179A80(
+    OriginalCameraQueryPairOwner&,CollectionRef50BX collisionZoneC34,
+    const SpringVector4_48N& originalAnchor,float actualRadius178,
+    OriginalCameraPairResetCursor&,OriginalCameraPairResult&) noexcept;
+
 // Fresh179A80 attachment after cold query projection, sphere first then ray.
 // This deliberately does not insert a missing11FF60 between the setter and
 //120070. The retained sphere cache can differ from its new local center.

@@ -1,4 +1,5 @@
 #include "game_host50er.h"
+#include "vehicle_window_gl50ds.h"
 #include <exception>
 
 #if defined(__linux__)
@@ -61,6 +62,10 @@ GameHost50ER::GameHost50ER() noexcept : thread_(std::this_thread::get_id()) {}
 GameHost50ER::~GameHost50ER() noexcept {
     GameHostDiagnostic50ER d;
     if (!ownerThread() || !closeOwned(d)) std::terminate();
+}
+bool GameHost50ER::sessionDisplayBlocksClose50LA() const noexcept {
+    return sessionDependentPins50LA_ ||
+        (sessionDisplayRenderer50LA_&&sessionDisplayRenderer50LA_->ownsResources());
 }
 bool GameHost50ER::ownerThread() const noexcept {
     return thread_ == std::this_thread::get_id();
@@ -127,6 +132,7 @@ void GameHost50ER::resetInput() noexcept {
 bool GameHost50ER::create(const GameHostRequest50ER& r, GameHostDiagnostic50ER& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, GameHostError50ER::WrongThread, "create");
+    if(sessionDisplayBlocksClose50LA())return fail(d,GameHostError50ER::AlreadyOwned,"session renderer/context still retained");
     if (ready_ || ownsResources()) return fail(d, GameHostError50ER::AlreadyOwned, "create");
     if (r.mode != GameHostMode50ER::Window && r.mode != GameHostMode50ER::HeadlessLive)
         return fail(d, GameHostError50ER::InvalidMode, "create/explicit mode required");
@@ -189,6 +195,7 @@ bool GameHost50ER::bind(GameHostDiagnostic50ER& d) noexcept {
 bool GameHost50ER::release(GameHostDiagnostic50ER& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, GameHostError50ER::WrongThread, "release");
+    if(sessionDisplayBlocksClose50LA())return fail(d,GameHostError50ER::AlreadyOwned,"session renderer/context still retained");
     if (!created()) return fail(d, GameHostError50ER::NotCreated, "release");
     if (mode_ == GameHostMode50ER::Window)
         return window_.release(d.window) || fail(d, GameHostError50ER::Window, "WindowHost50DQ::release");
@@ -329,12 +336,25 @@ bool GameHost50ER::setSwapInterval(std::int32_t interval,GameHostDiagnostic50ER&
     const bool accepted=window_.setSwapInterval(interval,d.window);refreshInfo();
     return accepted||fail(d,GameHostError50ER::Window,"WindowHost50DQ::setSwapInterval");
 }
+bool GameHost50ER::rumbleController50KZ(std::uint32_t slot,std::int32_t instance,
+    std::uint8_t small,std::uint8_t large,ControllerRumbleReceipt50KZ& receipt,
+    GameHostDiagnostic50ER& d) noexcept {
+    d={};receipt={};
+    if(!ownerThread())return fail(d,GameHostError50ER::WrongThread,"rumbleController50KZ");
+    if(!created())return fail(d,GameHostError50ER::NotCreated,"rumbleController50KZ");
+    if(mode_!=GameHostMode50ER::Window)return true; // Genuine no physical host device.
+    if(!window_.rumbleController50KZ(slot,instance,small,large,receipt,d.window))
+        return fail(d,GameHostError50ER::Window,"WindowHost50DQ::rumbleController50KZ");
+    return true;
+}
 bool GameHost50ER::close(GameHostDiagnostic50ER& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, GameHostError50ER::WrongThread, "close");
     return closeOwned(d);
 }
 bool GameHost50ER::closeOwned(GameHostDiagnostic50ER& d) noexcept {
+    // Also reached directly by the destructor: never invalidate a retained context.
+    if(sessionDisplayBlocksClose50LA())return fail(d,GameHostError50ER::AlreadyOwned,"session renderer/context still retained");
     ready_ = false;
     bool okay = true;
     if (window_.ownsResources() && !window_.close(d.window))

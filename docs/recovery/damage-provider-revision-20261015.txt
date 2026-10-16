@@ -1,0 +1,53 @@
+Damage provider-revision readiness correction -- UNTESTED
+
+Revises cold-owner packet libfile_216dd8dcd4688191a9de1b62dda7a15f.
+Only src/game/original_damage50la.h changes relative to that packet.
+provider-readiness-only.patch is the incremental delta. damage-cold-owner.patch
+and files/ contain the complete revised candidate against abbf73d. Root alone
+reconciles/integrates. Separate numeric-domain delta libfile_f4a9f2fb43248191b90016a621b935bd
+is NOT folded in here; dependency copy and earlier domain caveats remain as sent.
+
+Correction:
+- Successful finish captures the actual domain provider revision after existing
+  providerCurrent() authentic PST/PSM absence validation. It verifies sealed state
+  and the unchanged revision again immediately before publishing CPU readiness.
+- nativeCpuResourcesPrepared() retains every existing owner/context/collector
+  condition, then requires a nonnull sealed actual domain provider whose revision
+  equals the stored successful-finalization revision. No allocation, lookup,
+  exception-handling workaround, sealing or resource mutation in this noexcept
+  accessor. sealed()/revision()/archiveProvider3E1A70() are noexcept observations.
+- Provider commit in original_standard_archive_provider50la.h increments revision
+  and sets sealed=false for a new mount; unchanged identical mount returns without
+  revision/phase change. Resealing cannot restore this owner's old revision.
+  Revision overflow is rejected by provider commit. Domain's provider is assigned
+  during prepareFresh and has no replacement setter; no second identity created.
+
+Source-review checklist:
+[ ] Capture only through successful final verification; cpuPrepared still gates
+    the initial revision value and every failed preparation.
+[ ] Changed revision invalidates readiness even after reseal, with collector
+    unchanged. Nonnull/sealed check also rejects an unsealed provider directly.
+[ ] Partial owners, source refcounts, resources, destructor order and failure
+    retention unchanged. Failed/stale query is observational, not teardown.
+[ ] No renderer, snapshot, source simulation, input clamp or central edits.
+
+Related accessors/callers:
+Damage demand18F470 already gates on nativeCpuResourcesPrepared(), so it now
+rejects stale revisions before its existing providerCurrent() and lease checks.
+Application DamageColdResult50LA.phase==cpuPrepared is historical staging state,
+not a live readiness accessor; it is unchanged. Consumers must use the owner's
+live predicate. There is no Damage renderer readiness accessor in this candidate.
+In supplied abbf73d source, sibling TimeStats/SpeedBoost readiness predicates
+also gate on context/collector without provider seal/revision checks. Their
+nativeMaterial() and prepareNativeDisplay() depend on those predicates;
+TimeStats advanceNativeWorld() does too. This is a related stale-provider
+readiness audit item for root, not a claim about root's newer integrated tree.
+Those files are unchanged by this narrowly scoped correction.
+
+Serial/nonreentrant domain contract remains required. Revision observation is
+not thread synchronization; concurrent unsynchronized provider mutation is not
+admitted. The new checks do not claim to make that safe.
+
+SOURCE REVIEW ONLY. No builds/tests/syntax checks/sanitizers/converters/gameplay
+or executable runs. Packaging/hash operations are transfer integrity only.
+Holding for root review after delivery.

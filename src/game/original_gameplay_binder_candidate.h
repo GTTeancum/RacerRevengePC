@@ -1,17 +1,19 @@
 #pragma once
-// Source-only candidate, not built or tested. Ordinary two-engine gameplay.
+// Source-native ordinary two/four-engine gameplay; execution acceptance pending.
 #include "vehicle_frame49w.h"
 #include "original_ui_rider_binder50kg.h"
 #include "../assets/native_asset48b.h"
 #include <array>
 
 namespace rr::game::original_gameplay_binder_candidate {
+enum class Pair : std::uint8_t { primary, bottomLeftToPrimaryRight, primaryLeftToBottomRight };
 struct Bindings {
     SceneNodeIndex49P left230=SceneNodeIndex49P::none;
     SceneNodeIndex49P right238=SceneNodeIndex49P::none;
     //215BC8..215BFC: [Binder] BinderMeshHalfHeight default2.25. The cold
     // owner must read the selected PHY; never use a physical spring parameter.
     float halfHeight25C=2.25f;
+    Pair pair=Pair::primary;
 };
 struct Mesh {
     std::array<assets::Vertex48B,4> vertices{};
@@ -26,8 +28,9 @@ enum class Status : std::uint8_t {
 // is sampled here. Output is the exact four world positions/UV order expected
 // by the existing generic Diffuse projector, despite that type's UI name.
 // Copies/refreshes the current graphics graph in caller workspace only.
-// Scope: vehicle40=0, ordinary vehicle3C=0, one primary engine pair. Ghost,
-// four-engine, detached states and scene/render scheduling are not substituted.
+// Scope: vehicle40=0, ordinary vehicle3C=0, primary pair or the two original
+// crossing four-engine pairs229DB4..229DE8. Ghost/detached states and original
+// scene/render scheduling are not substituted.
 // Finite binary32/nearest arithmetic, portable native sqrt. No guest execution,
 // VU implementation, generated texture, RNG, allocation, or state mutation.
 // Degenerate/subnormal cross products reject, never invent a facing axis.

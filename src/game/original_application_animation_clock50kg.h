@@ -1,0 +1,49 @@
+#pragma once
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+namespace original_main_entry50KG { struct Application; }
+namespace rr::game {
+// Application382B80 lanes, not a host frame counter or legacy UI active time.
+struct OriginalApplicationAnimationClockSample50KG {
+    std::uint32_t current230=0,pause11C=0,pending120=0;
+};
+class OriginalApplicationAnimationClockView50KG;
+class OriginalApplicationAnimationClock50KG final {
+    friend struct original_main_entry50KG::Application;
+    friend class OriginalApplicationAnimationClockView50KG;
+    OriginalApplicationAnimationClock50KG() noexcept=default;
+    //13FC44/4C/50 initialize the words. Zero alone is not a sampled timestamp.
+    OriginalApplicationAnimationClockSample50KG value_{};
+    bool published_=false,applicationAlive_=true;
+public:
+    ~OriginalApplicationAnimationClock50KG()=default;
+    OriginalApplicationAnimationClock50KG(const OriginalApplicationAnimationClock50KG&)=delete;
+    OriginalApplicationAnimationClock50KG& operator=(const OriginalApplicationAnimationClock50KG&)=delete;
+};
+// Main-thread-only live capability. Pins publication backing, not Application
+// or Video; it has no clock sampler, callback, writer or GPU-readiness claim.
+// Re-read at EACH original boundary:29AC90 entry, texture leaf reads, and
+//29AD48 after callbacks (even callback=false). Do not cache the entry stamp
+// as the final stamp across a callback that can publish application time.
+class OriginalApplicationAnimationClockView50KG final {
+    friend struct original_main_entry50KG::Application;
+    std::shared_ptr<const OriginalApplicationAnimationClock50KG> owner_;
+    explicit OriginalApplicationAnimationClockView50KG(
+        std::shared_ptr<const OriginalApplicationAnimationClock50KG> owner) noexcept
+        :owner_(std::move(owner)) {}
+public:
+    OriginalApplicationAnimationClockView50KG() noexcept=default;
+    //13FC4C initialized this lane independently of timestamp publication.
+    // Read the actual shared pause owner; never invent a sampled timestamp.
+    bool readPause11C(std::uint32_t& out)const noexcept {
+        if(!owner_||!owner_->applicationAlive_)return false;
+        out=owner_->value_.pause11C;return true;
+    }
+    bool read(OriginalApplicationAnimationClockSample50KG& out) const noexcept {
+        if(!owner_||!owner_->applicationAlive_||!owner_->published_)return false;
+        out=owner_->value_;return true;
+    }
+};
+}

@@ -4,8 +4,9 @@
 
 namespace rr::game {
 // Concrete native scene fields, already selected by this racer's vehicle5C:
-// app+28C+134+28*5C, +130+28*5C, and +164+4*5C. The current native scene
-// constructs no original HUD objects. Its HOST overlay is a separate owner.
+// app+28C+134+28*5C, +130+28*5C, and +164+4*5C. The native scene
+// may bind concrete OriginalRaceHud50KG objects for the human view. The native
+// overlay remains a separate presentation owner.
 // known=false means unrepresented, never an inferred null object.
 struct LapHudFields50ID {
     std::uintptr_t lap134=0,race130=0,lastLap164=0;

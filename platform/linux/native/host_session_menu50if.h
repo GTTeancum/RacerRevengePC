@@ -21,13 +21,14 @@ public:
         const game::RaceAudioSettings50IC& selectedAudio = game::freshOriginalAudioSettings50IC(),
         HostTrack50IM loadedTrack = HostTrack50IM::TA, HostTrack50IM selectedTrack = HostTrack50IM::TA,
         const HostTrackAdmission50IM& trackAdmission = {},
-        bool nativeAllAiRestart = false, bool returnOriginalMain = false) noexcept
+        bool nativeAllAiRestart = false, bool returnOriginalMain = false, bool nativeHumanRace = false) noexcept
         : page_(startAtMenu ? Page::Main : Page::Closed),
           loadedRacer60_(loadedRacer60), selectedRacer60_(loadedRacer60),
           race_(race), started_(!startAtMenu), racerChoice_(race && racerSelectionAvailable),
           audioChoice_(audioOptionsAvailable), audioOptions_(loadedAudio, selectedAudio),
           loadedTrack_(loadedTrack), selectedTrack_(selectedTrack), trackAdmission_(trackAdmission),
-          nativeAllAiRestart_(nativeAllAiRestart), returnOriginalMain_(nativeAllAiRestart&&returnOriginalMain) {
+          nativeAllAiRestart_(nativeAllAiRestart), returnOriginalMain_(nativeAllAiRestart&&returnOriginalMain),
+          nativeHumanRace_(nativeAllAiRestart&&nativeHumanRace) {
         audioChoice_ = audioChoice_ && audioOptions_.valid();
         if (nativeAllAiRestart_ || loadedTrack_ == HostTrack50IM::GA) {
             // Whole-world ALL8 restarts keep the loaded track/racer/audio.
@@ -38,6 +39,9 @@ public:
             returnPage_ = Page::Pause;
             if (startAtMenu) page_ = Page::Pause;
         }
+    }
+    void setHumanControls(std::uint32_t preset,bool twinEngine,bool physical) noexcept {
+        humanPreset_=preset;humanTwinEngine_=twinEngine;humanPhysical_=physical;++revision_;
     }
     bool open() const noexcept { return page_ != Page::Closed; }
     Page page() const noexcept { return page_; }
@@ -183,9 +187,9 @@ public:
         out.retainRaceImage = page_ == Page::Pause ||
             (page_ != Page::Main && returnPage_ == Page::Pause);
         out.selectedRow = selected_;
-        if (nativeAllAiRestart_) {
-            out.title = "NATIVE ALL-AI RACE";
-            out.subtitle = canResume ? "ALL 8 RACERS USE ORIGINAL AI" : "SESSION STOPPED. RESTART TO CONTINUE.";
+        if (nativeAllAiRestart_&&!(nativeHumanRace_&&page_==Page::Controls)) {
+            out.title = nativeHumanRace_?"PAUSED":"NATIVE ALL-AI RACE";
+            out.subtitle = canResume ? (nativeHumanRace_?"PLAYER 1 AND SEVEN ORIGINAL AI":"ALL 8 RACERS USE ORIGINAL AI") : "SESSION STOPPED. RESTART TO CONTINUE.";
             if(page_==Page::Controls){
                 out.title="ALL-AI RACE CONTROLS";
                 out.rows[0]="C          CYCLE ORIGINAL CAMERA";
@@ -283,16 +287,34 @@ public:
             out.rows[4] = "MODE1 RECORD CONFIGURATION";
             out.rows[5] = "CANCEL"; out.rows[6] = "SELECT GC FOR NEXT SESSION"; out.rowCount = 7;
         } else if (page_ == Page::Controls) {
-            out.title = "CONTROLS"; out.subtitle = "KEYBOARD  TWIN ENGINE CONTROLS";
-            out.rows[0] = "W / S      LEFT THROTTLE / BRAKE";
-            out.rows[1] = "UP / DOWN  RIGHT THROTTLE / BRAKE";
-            out.rows[2] = "UNEQUAL ENGINE INPUT STEERS";
-            out.rows[3] = "SPACE      BOOST";
-            out.rows[4] = "R          HOLD TO REPAIR";
-            out.rows[5] = "LEFT SHIFT POWERSLIDE";
-            out.rows[6] = race_ ? "BACKSPACE  RESTART ENTIRE RACE" : "BACKSPACE  RETURN TO CHECKPOINT";
+            out.title = "CONTROLS";
+            out.subtitle = humanPhysical_ ? "SDL GAMEPAD  SELECTED ORIGINAL LAYOUT" :
+                humanTwinEngine_ ? "KEYBOARD  TWIN ENGINE CONTROLS" : "KEYBOARD  NORMAL CONTROLS";
+            if(humanPhysical_){
+                const auto layout=humanPreset_%4u;
+                out.rows[0]=humanTwinEngine_?"LEFT STICK Y   LEFT THROTTLE / BRAKE":
+                    layout==1?"CIRCLE / B     THROTTLE":"CROSS / A      THROTTLE";
+                out.rows[1]=humanTwinEngine_?"RIGHT STICK Y  RIGHT THROTTLE / BRAKE":
+                    layout==1?"TRIANGLE / Y   BRAKE":layout==2?"CIRCLE / B     BRAKE":"SQUARE / X     BRAKE";
+                out.rows[2]=humanTwinEngine_?"UNEQUAL ENGINE INPUT STEERS":"LEFT STICK X   STEERING";
+                out.rows[3]=(layout==1||layout==3)?"R1 / RIGHT SHOULDER  BOOST":"R2 / RIGHT TRIGGER   BOOST";
+                out.rows[4]=layout==1?"L1 / LEFT SHOULDER   REPAIR":layout==3?
+                    "R2 / RIGHT TRIGGER   REPAIR":"L2 / LEFT TRIGGER    REPAIR";
+                out.rows[5]=layout==1?"R2 / RIGHT TRIGGER   POWERSLIDE":layout==3?
+                    "L2 / LEFT TRIGGER    POWERSLIDE":"R1 / RIGHT SHOULDER  POWERSLIDE";
+            }else{
+                out.rows[0]=humanTwinEngine_?"W / S      LEFT THROTTLE / BRAKE":"W / S      THROTTLE / BRAKE";
+                out.rows[1]=humanTwinEngine_?"UP / DOWN  RIGHT THROTTLE / BRAKE":"LEFT / RIGHT  STEERING";
+                out.rows[2]=humanTwinEngine_?"UNEQUAL ENGINE INPUT STEERS":"UP / DOWN  ORIGINAL LEFT STICK Y";
+                out.rows[3]="SPACE      BOOST";out.rows[4]="R          HOLD TO REPAIR";
+                out.rows[5]="LEFT SHIFT POWERSLIDE";
+            }
+            out.rows[6] = nativeHumanRace_ ? "C          CYCLE ORIGINAL CAMERA" :
+                    race_ ? "BACKSPACE  RESTART ENTIRE RACE" : "BACKSPACE  RETURN TO CHECKPOINT";
+            if(humanPhysical_)out.rows[6]=nativeHumanRace_?(humanPreset_%4u==1u?
+                "SQUARE / X     CYCLE CAMERA":"TRIANGLE / Y   CYCLE CAMERA"):"OTHER ORIGINAL PAD ACTIONS UNJOINED";
             out.rows[7] = "F5         RESTART FROM GRID";
-            out.rows[8] = "ESC        PAUSE / RESUME";
+            out.rows[8] = humanPhysical_?"START / ESC  NATIVE PAUSE / RESUME":"ESC        PAUSE / RESUME";
             out.rows[9] = "BACK"; out.rowCount = 10; out.selectedRow = 9;
             out.footer = "ENTER OR ESC RETURNS TO THE MENU";
         } else {
@@ -315,6 +337,8 @@ private:
     HostAudioOptions50IK audioOptions_;
     HostTrack50IM loadedTrack_ = HostTrack50IM::TA, selectedTrack_ = HostTrack50IM::TA;
     HostTrackAdmission50IM trackAdmission_{};
-    bool nativeAllAiRestart_=false,returnOriginalMain_=false;
+    bool nativeAllAiRestart_=false,returnOriginalMain_=false,nativeHumanRace_=false;
+    std::uint32_t humanPreset_=4;
+    bool humanTwinEngine_=true,humanPhysical_=false;
 };
 }

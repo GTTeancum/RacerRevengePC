@@ -1,0 +1,81 @@
+SOURCE-ONLY RA STATIC MATERIAL PROFILE DECODER
+Base observed: 312bad7d55537902b2290961d1692f819997c5b8 plus actual working-tree source copied into before/.
+Patch: static-material-profiles.patch (paths before/ and after/, suitable for -p1).
+Isolated replacement files: after/tests/native/.
+No central files modified. No builds, tests, syntax/shader checks, sanitizers,
+gameplay, converters, or project programs executed. Review is textual only.
+
+Implementation / integration
+1. New ra_static_world_profiles50la.inl is included privately inside Owner after
+   image definitions, before current-map service and draw inventory.
+2. ColdFamily now retains constructionContext at actual population. Existing
+   context continues to hold ordinary final-map context or crowd construction
+   context exactly as before. Separate snapshot matters because final maps use
+   the collector representative's provenance, which need not be origin's.
+3. prepareDrawPlan invokes private decodeStaticMaterialProfile(fi,map,...) on
+   its existing real map operation. RasterInventory retains semantic demands
+   alongside its unchanged full finalContext and collector identity.
+4. currentCrowdSurfaceMap24B26C invokes decoder only after existing selected
+   child / image / actual lease proof; ModelCrowdMap gains demands. It still
+   selects through genuine retained model24B26C/29AF90/102050. Service clock,
+   shared prototype update, initial phase semantics and terminal behavior are
+   unchanged. A caught allocation failure rejects this observation.
+
+Checks
+- Existing current world/image collector and actual live context, runtime zero.
+- Every collector field for origin, retained family and real final representative.
+- Representative belongs to retained RA families, pass zero, no redirect.
+- Authenticated retained PSM member and bytes; one pass, one map, same actual
+  DefaultMT association, program table token and retained texture token.
+- flags21 exactly2: enabled single-map and fill disabled; no vertex animation.
+- Complete 35-field expected vector, including inactive DATM/FIX/ALPHA and clamp
+  bounds, source STQ/context, depth GEQUAL/write even for blended families.
+- Exact six-lane sampler 0,0,1,5,0,-75.
+- Every integer's value/origin/template identity/byte offset/source PC compared
+  to immutable owner-retained construction snapshot; missing source PC rejects.
+- Final field provenance matches real representative construction except only
+  actual crowd TEXA: runtime/null/offset0/PC24983C with TA0=TA1=255,AEM=1.
+- Video depth format/base copied and compared against actual Video context,
+  never reinterpreted as host graphics state.
+- All seven source-observed profile families and exact 33-name ordinary set.
+  wallside01_blend stays A; trailing undeclared ShaderPass_2 remains ignored by
+  unchanged canonical material construction.
+- Exact retained image pointer, source member/bytes, family/index extent, live
+  references, format, bpp and known F8 bit. Indexed PST kind1/sourceFormat;
+  ordinary TGA format1555 from ORIGINAL24-BIT BGR, or8888 from32-bit BGRA;
+  selected crowd pstIpum1555 with real retained frame lease. Ordinary1555 AEM0
+  is preserved; no coverage-alpha inference and no TEXA reapplied to pixels.
+
+Output / limits
+Seven semantic profile IDs and demands for source fog byte, native coverage,
+ordered current destination, sampled/interpolated operands and source GEQUAL
+with depth writes. No readiness flags are accepted and no renderer lease is
+minted. This does not recover F, filtering, interpolation, AA behavior, sample
+count, destination feedback, or projected-depth mapping. Existing fog/lighting
+helpers and byte arithmetic leaf are untouched. Public results are descriptive
+observations and must not become later authorization; any rendering join must
+reacquire actual current maps and validate its independently owned contracts.
+
+Exact source evidence inspected
+- packet/RA-FRAGMENT-RECOVERY.txt and static-material-fields.json: seven rows,
+  all44 names/programs/textures; all texture stems match material stems.
+- src/assets/original_ui_material_fields50kg.inc and original_ui_material50kg.h:
+  35-field order, constructors/getters, field-count guard.
+- original_standard_material_object50la.cpp: singleState143..187 inheritance,
+  sourceDefault/template/authored provenance, runtime435670 and sampler; flags
+  construction and fill branch around815..862.
+- original_standard_material_table50la.cpp: prepareColdMap249610 around425..481,
+  origin/final representative lookup, selection and actual24983C TEXA overwrite.
+- original_standard_material_object50la.h, table50la.h, context50la.h and
+  source50la.h: actual typed owners, map and collector views, exact provenance,
+  runtime and Video depth accessors.
+- original_standard_texture_resource50la.h: source kinds/formats and resource
+  views; tests/native/ra_static_world_images50la.inl: source authentication,
+  indexed source, original24-bit TGA1555/32-bit TGA8888 and six crowd leases.
+- tests/native/ra_static_world_model_service50la.inl: genuine current child
+  boundary and service; ra_static_world_draw_plan50la.inl: final-map inventory;
+  ra_static_world50la.h: private include order.
+
+Verification not performed
+Patch application, compilation and all runtime behavior remain unverified by
+explicit task constraint. Textual review is not a successful test claim.

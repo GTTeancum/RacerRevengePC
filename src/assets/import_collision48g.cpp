@@ -39,7 +39,8 @@ struct Writer {
     Bytes b;
     void u32(std::size_t n) { need(n<=0xffffffffu,"col.integer_range");for(unsigned j=0;j<4;++j)b.push_back(static_cast<std::uint8_t>(n>>(j*8))); }
     void u16(std::uint32_t n) { need(n<=65535,"col.short_index_range");b.push_back(static_cast<std::uint8_t>(n));b.push_back(static_cast<std::uint8_t>(n>>8)); }
-    void f32(float f) { need(std::isfinite(f),"col.nonfinite");std::uint32_t bits;std::memcpy(&bits,&f,4);u32(bits); }
+    void rawFloat(float f) { std::uint32_t bits;std::memcpy(&bits,&f,4);u32(bits); }
+    void f32(float f) { need(std::isfinite(f),"col.nonfinite");rawFloat(f); }
     template<std::size_t N> void values(const std::array<float,N>& a) { for(auto x:a)f32(x); }
 };
 std::uint32_t originalChild(std::uint32_t child) {
@@ -97,9 +98,10 @@ std::size_t validate(const Collision48G& c, bool inspectOriginalDegenerate = fal
         const bool finite=std::isfinite(f.d)&&std::isfinite(f.normal[0])&&std::isfinite(f.normal[1])&&std::isfinite(f.normal[2]);
         if(!finite) {
             // Nine original disc members contain this exact exporter degeneracy. It is
-            // inspected solely to classify unsupported source data, never accepted in a native asset.
+            // retained exactly only with coincident finite positions. Runtime packing
+            // follows the original signed conversion; no face or tree link is removed.
             const auto& a=c.vertices[f.vertices[0]];const auto& b=c.vertices[f.vertices[1]];const auto& d=c.vertices[f.vertices[2]];
-            const bool authored=inspectOriginalDegenerate&&floatBits(f.d)==0x7fc00000u&&
+            const bool authored=inspectOriginalDegenerate&&!c.quantized&&floatBits(f.d)==0x7fc00000u&&
                 floatBits(f.normal[0])==0xffc00000u&&floatBits(f.normal[1])==0xffc00000u&&floatBits(f.normal[2])==0xffc00000u&&
                 (a==b||a==d||b==d);
             need(authored,"col.plane_nonfinite",f.source_offset,"Nonfinite face plane outside the evidenced coincident-vertex source variant");
@@ -118,7 +120,7 @@ std::size_t validate(const Collision48G& c, bool inspectOriginalDegenerate = fal
     return firstDegenerate;
 }
 Bytes original(const Collision48G& c) {
-    validate(c);Writer w;w.u32(1234);w.u32(0x006c6f63);w.u32(1);w.u32(0);
+    validate(c,true);Writer w;w.u32(1234);w.u32(0x006c6f63);w.u32(1);w.u32(0);
     for(unsigned row=0;row<4;++row)for(unsigned col=0;col<3;++col)w.f32(c.matrix[row*4+col]);
     w.u32(c.reverse_mode);w.u32(c.vertices.size());w.u32(c.nodes.size());w.u32(c.faces.size());w.u32(c.quantized);
     if(c.quantized){
@@ -131,7 +133,7 @@ Bytes original(const Collision48G& c) {
     }else for(const auto& v:c.vertices)w.values(v);
     w.u32(c.normals_present);for(const auto& v:c.vertex_normals)w.values(v);
     for(const auto& n:c.nodes){w.f32(n.volume);w.values(n.center);w.values(n.half);for(auto x:n.children)w.u16(originalChild(x));}
-    for(const auto& f:c.faces){w.f32(f.d);w.values(f.normal);for(auto x:f.vertices)w.u16(x);}
+    for(const auto& f:c.faces){w.rawFloat(f.d);for(auto n:f.normal)w.rawFloat(n);for(auto x:f.vertices)w.u16(x);}
     need(w.b.size()<=8u*1024u*1024u,"col.original_size");
     need(w.b==c.original_bytes,"col.provenance_mismatch",0,"Typed collision records do not match complete original bytes");
     return std::move(w.b);
@@ -169,8 +171,7 @@ void decodeBody(Reader& r, Collision48G& c, const DecodeHooks48C* hooks,
         if((i&255u)==0)tick(hooks,"collision-nodes",i,nn);}
     c.faces_offset=static_cast<std::uint32_t>(r.at);c.faces.resize(nf);
     for(std::uint32_t i=0;i<nf;++i){auto& f=c.faces[i];f.source_offset=static_cast<std::uint32_t>(r.at);f.d=r.rawFloat();for(auto& n:f.normal)n=r.rawFloat();for(auto& v:f.vertices)v=r.u16();if((i&255u)==0)tick(hooks,"collision-faces",i,nf);}
-    need(r.at==expected,"col.exact_extent",r.at);const auto degenerate=validate(c,true,vertexBase);
-    supported(!degenerate,"col.degenerate_plane",degenerate,"Original coincident-vertex face contains the evidenced NaN plane; query behavior is not supported");
+    need(r.at==expected,"col.exact_extent",r.at);validate(c,true,vertexBase);
 }
 std::string message(const Failure& f) { return std::string(f.code)+" at "+std::to_string(f.offset)+": "+f.detail; }
 bool matrixFinite(const std::array<double,16>& m) { for(double d:m)if(!std::isfinite(d))return false;return m[3]==0&&m[7]==0&&m[11]==0&&m[15]==1; }
@@ -239,7 +240,7 @@ bool encodeCollisionAsset48G(const Collision48G& c, Bytes& output, std::string& 
         w.u32(c.vertices_offset);w.u32(c.normals_flag_offset);w.u32(c.nodes_offset);w.u32(c.faces_offset);w.values(c.matrix);
         for(const auto& v:c.vertices)w.values(v);for(const auto& v:c.vertex_normals)w.values(v);
         for(const auto& n:c.nodes){w.u32(n.source_offset);w.f32(n.volume);w.values(n.center);w.values(n.half);for(auto x:n.children)w.u32(x);}
-        for(const auto& f:c.faces){w.u32(f.source_offset);w.f32(f.d);w.values(f.normal);for(auto x:f.vertices)w.u32(x);}
+        for(const auto& f:c.faces){w.u32(f.source_offset);w.rawFloat(f.d);for(auto n:f.normal)w.rawFloat(n);for(auto x:f.vertices)w.u32(x);}
         need(w.b.size()<=max_collision_asset_bytes48g-c.original_bytes.size(),"rrcol.size");
         w.b.insert(w.b.end(),c.original_bytes.begin(),c.original_bytes.end());
         const auto n=static_cast<std::uint32_t>(w.b.size());for(unsigned j=0;j<4;++j)w.b[12+j]=static_cast<std::uint8_t>(n>>(8*j));
@@ -259,7 +260,7 @@ bool parseCollisionAsset48G(const Bytes& input, Collision48G& output, std::strin
         c.vertices_offset=r.u32();c.normals_flag_offset=r.u32();c.nodes_offset=r.u32();c.faces_offset=r.u32();r.values(c.matrix);
         c.vertices.resize(nv);for(auto& v:c.vertices)r.values(v);if(c.normals_present){c.vertex_normals.resize(nv);for(auto& v:c.vertex_normals)r.values(v);}
         c.nodes.resize(nn);for(auto& n:c.nodes){n.source_offset=r.u32();n.volume=r.f32();r.values(n.center);r.values(n.half);for(auto& x:n.children)x=r.u32();}
-        c.faces.resize(nf);for(auto& f:c.faces){f.source_offset=r.u32();f.d=r.f32();r.values(f.normal);for(auto& x:f.vertices)x=r.u32();}
+        c.faces.resize(nf);for(auto& f:c.faces){f.source_offset=r.u32();f.d=r.rawFloat();for(auto& n:f.normal)n=r.rawFloat();for(auto& x:f.vertices)x=r.u32();}
         r.range(raw);c.original_bytes.assign(input.begin()+r.at,input.end());r.at+=raw;need(r.at==input.size(),"rrcol.exact_extent");
         original(c);output=std::move(c);return true;
     }catch(const Failure& f){error=message(f);}catch(const std::bad_alloc&){error="rrcol.allocation";}return false;

@@ -176,7 +176,20 @@ Status prepareStaticTargetRadii49X(const assets::CollisionMesh48I& mesh,float* r
     if(radiusCapacity<nn||ws.topologyCapacity<nn+nf)return Status::InsufficientCapacity;
     for(const auto& v:mesh.vertices)if(!finite3(v.data()))return Status::InvalidInput;
     for(const auto& n:mesh.vertex_normals)if(!finite3(n.data()))return Status::InvalidInput;
-    for(const auto& f:mesh.faces){if(!std::isfinite(f.d))return Status::InvalidInput;for(auto v:f.vertices)if(v>=nv)return Status::InvalidInput;}
+    for(const auto& f:mesh.faces){
+        for(auto v:f.vertices)if(v>=nv)return Status::InvalidInput;
+        if(!std::isfinite(f.d)){
+            // D is retained provenance, not an operand in type2 SAT/leaf math.
+            // Admit only the original coincident-face projection. Keep this
+            // leaf and the ordered tree; never skip collision geometry.
+            std::uint32_t word;std::memcpy(&word,&f.d,4);
+            const auto& a=mesh.vertices[f.vertices[0]];
+            const auto& b=mesh.vertices[f.vertices[1]];
+            const auto& c=mesh.vertices[f.vertices[2]];
+            if(word!=0x7fc00000u||f.normal!=std::array<std::int16_t,3>{0,0,0}||
+               !(a==b||a==c||b==c))return Status::InvalidInput;
+        }
+    }
     for(const auto& n:mesh.nodes){float r;
         if(!std::isfinite(n.volume)||n.volume<0.f||!finite3(n.center.data())||!half3(n.half.data())||!radius(n.half.data(),r))return Status::InvalidInput;
     }

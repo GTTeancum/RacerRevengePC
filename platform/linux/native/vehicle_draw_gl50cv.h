@@ -20,10 +20,10 @@ struct VehicleGlFunctions50CV {
 };
 
 struct VehicleGlBank50CV {
-    // Six distinct VBOs and six distinct VAOs across both banks, created once.
+    // Two distinct VBO/VAO sets for the active components, created once.
     // Each VAO references its component's VBO: float3 position at 0, float2 UV
     // at 12, normalized unsigned-byte RGBA at 20, stride 24, base offset zero.
-    std::uint32_t vertexBuffer[3]{}, vertexArray[3]{}, vertexCapacity[3]{};
+    std::uint32_t vertexBuffer[game::maxVehicleDrawComponents50CM]{}, vertexArray[game::maxVehicleDrawComponents50CM]{}, vertexCapacity[game::maxVehicleDrawComponents50CM]{};
 };
 struct VehicleGlIndices50CV {
     // The exact immutable array used to initialize buffer, retained unchanged
@@ -33,7 +33,8 @@ struct VehicleGlIndices50CV {
 };
 struct VehicleGlResources50CV {
     VehicleGlBank50CV bank[2]{};
-    VehicleGlIndices50CV indices[3]{}; // Immutable, shared by both banks.
+    VehicleGlIndices50CV indices[game::maxVehicleDrawComponents50CM]{}; // Immutable, shared by both banks.
+    std::uint32_t componentCount = game::defaultVehicleDrawComponents50CM;
 };
 
 struct VehicleGlHooks50CV {
@@ -65,6 +66,13 @@ struct VehicleGlHooks50CV {
     // Discard pending work, restore caller state as needed, preserve the last
     // committed image and resources. Must also handle failed begin/commit.
     void (*abort)(void*, std::uint8_t inactiveBank) noexcept = nullptr;
+    // Optional owner draw override, after bindMaterial, with the exact retained
+    // span and current VAO/EBO. When supplied it owns this span's entire draw;
+    // false aborts the unpublished frame. It must preserve geometry bindings.
+    // This permits ordered original group pairs without deferring map 2 until
+    // commit. The default null path retains the original single draw.
+    bool (*drawSpan)(void*, game::VehicleDrawComponent50CM, std::uint32_t ordinal,
+        const assets::SceneSpan48D&, std::int32_t baseVertex) noexcept = nullptr;
 };
 
 // No allocation, resource creation/destruction, index upload, default state,
@@ -104,9 +112,10 @@ private:
     VehicleGlFunctions50CV gl_;
     VehicleGlResources50CV resources_;
     VehicleGlHooks50CV hooks_;
-    std::uint32_t vertexCount_[3]{}, spanCount_[3]{};
+    std::uint32_t vertexCount_[game::maxVehicleDrawComponents50CM]{}, spanCount_[game::maxVehicleDrawComponents50CM]{};
     std::uint32_t uploaded_ = 0, nextComponent_ = 0, nextSpan_ = 0;
-    std::uint32_t boundComponent_ = 3, glError_ = 0;
+    std::uint32_t boundComponent_ = game::maxVehicleDrawComponents50CM, glError_ = 0;
+    std::uint32_t activeComponentCount_ = game::defaultVehicleDrawComponents50CM;
     std::uint8_t publishedBank_ = 0, pendingBank_ = 1;
     bool active_ = false;
 };

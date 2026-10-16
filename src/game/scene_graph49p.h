@@ -44,7 +44,12 @@ bool setParentlessWorldMatrix49P(const SceneGraph49P& graph,
 // localFC and all 12 basis/fourth lanes are preserved.
 bool addParentlessTranslation49P(const SceneGraph49P& graph,
     SceneNodeIndex49P node, const SceneDisplacement49P& displacement) noexcept;
-// 28B490 copies local, then marks bit80 on this node/ancestors. All three
+// 28AB90 copies only local translation XYZ from the real source vector.
+// No arithmetic or parentless restriction; preserves all other13 local words.
+// Then28C4F0 and ready-gated289A20, exactly as the matrix setters below.
+bool setLocalTranslation49P(const SceneGraph49P& graph,
+    SceneNodeIndex49P node, const SceneDisplacement49P& translation) noexcept;
+// 28B490 copies local, then marks bit80 on this node/ancestors. All four
 // setters clear this node's ready01 and invalidate descendants ONLY if it was
 // ready. An already-dirty setter does not repair ready descendants.
 bool setLocalMatrix49P(const SceneGraph49P& graph,
@@ -62,4 +67,20 @@ bool invalidateSceneReady49P(const SceneGraph49P& graph,
 // descendants/siblings are not eagerly refreshed. Result lives in world100.
 bool refreshSceneWorld49P(const SceneGraph49P& graph,
     SceneNodeIndex49P node) noexcept;
+namespace scene_detail49P {
+// Internal motion-track-loop entry only. This exact forest was validated and
+// cloned into distinct owned scratch; storage/count/links remain unchanged
+// under serial access. Locals/worlds/flags may vary. Per-call rounding/index
+// checks and original ordered invalidation remain. Other callers use the
+// fully checked setLocalMatrix49P wrapper.
+bool setLocalMatrixAdmittedTopology(const SceneGraph49P& graph,
+    SceneNodeIndex49P node, const BodyMatrix48G& matrix) noexcept;
+// Internal palette-loop entry only. The caller has validated this exact forest
+// and keeps its storage, count and all parent/child/sibling links unchanged under
+// serial access. Only worlds/flags may change between calls. Current rounding
+// mode, target index and all numeric arithmetic checks remain per-call.
+// Call refreshSceneWorld49P unless that topology proof is locally available.
+bool refreshWorldAdmittedTopology(const SceneGraph49P& graph,
+    SceneNodeIndex49P node) noexcept;
+}
 }

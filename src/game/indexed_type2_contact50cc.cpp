@@ -156,8 +156,9 @@ bool overlap(Range a,Range b) noexcept {return a.begin<b.end&&b.begin<a.end;}
 template<class T>bool aligned(const T* p,std::size_t n) noexcept {return !n||reinterpret_cast<std::uintptr_t>(p)%alignof(T)==0;}
 Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* candidates,std::size_t ownerCount,const std::size_t* indices,std::size_t count,
     const Type2StaticInitial49X& initial,const Type2StaticWorkspace49X& w,
-    const Type2StaticDestination49X& d,Type2StaticResult49X& result) noexcept {
-    Range writes[12]{};unsigned nw=0;
+    const Type2StaticDestination49X& d,Type2StaticResult49X& result,
+    const Type2WorldContinuation50CC* continuation,std::uint32_t* categoryOutput) noexcept {
+    Range writes[13]{};unsigned nw=0;
     const auto write=[&](auto* p,std::size_t n) noexcept {
         if(!aligned(p,n)||!range(p,n,sizeof(*p),writes[nw]))return false;
         for(unsigned i=0;i<nw;++i)if(overlap(writes[nw],writes[i]))return false;
@@ -166,8 +167,9 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
     if(!write(w.pairs,w.pairCapacity)||!write(w.metadata,w.metadataCapacity)||!write(w.records,w.recordCapacity)||
        !write(w.effects,w.effectCapacity)||!write(w.stack,w.stackCapacity)||!write(w.trace,w.traceCapacity)||
        !write(d.pairs,d.pairCapacity)||!write(d.metadata,d.metadataCapacity)||!write(d.records,d.recordCapacity)||
-       !write(d.effects,d.effectCapacity)||!write(&result,1))return Status::InvalidInput;
-    // Admit one shared GC Gate OR one shared GA trigger group as a writable
+       !write(d.effects,d.effectCapacity)||!write(&result,1)||
+       (categoryOutput&&!write(categoryOutput,1)))return Status::InvalidInput;
+    // Admit one shared GC Gate OR one shared bounded trigger group as a writable
     // track owner before all immutable spans. Mixing these schemas is rejected;
     // duplicate candidate visits may share the same owner.
     Range ownerRange{},indexRange{};GateTriggerBinding50KG* gateOwner=nullptr;NativeTriggerGroup50GA* triggerOwner=nullptr;
@@ -176,12 +178,12 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
     for(std::size_t i=0;i<count;++i){
         if(indices[i]>=ownerCount)return Status::InvalidInput;
         const auto& candidate=candidates[indices[i]];
-        // Native trigger state belongs only to an admitted shape5 owner.
+        // Native trigger state belongs only to an admitted shape5/6 owner.
         // Reject stray pointers/indices before any group dereference or write.
-        if((candidate.nativeTriggers&&candidate.shapeType!=5)||
+        if((candidate.nativeTriggers&&candidate.shapeType!=5&&candidate.shapeType!=6)||
            (!candidate.nativeTriggers&&candidate.nativeTriggerIndex!=0))return Status::InvalidInput;
-        if(candidate.shapeType==5){
-            if(bool(candidate.gate)==bool(candidate.nativeTriggers))return Status::InvalidInput;
+        if(candidate.shapeType==5||candidate.shapeType==6){
+            if((candidate.shapeType==6&&candidate.gate)||bool(candidate.gate)==bool(candidate.nativeTriggers))return Status::InvalidInput;
             if(candidate.gate){
                 if(triggerOwner||(gateOwner&&gateOwner!=candidate.gate))return Status::UnsupportedScope;
                 gateOwner=candidate.gate;
@@ -201,22 +203,42 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
     if(!read(&q,1)||!read(&initial,1)||!read(&w,1)||!read(&d,1)||!read(candidates,ownerCount)||!read(indices,count)||
        !read(q.resource,1)||!read(q.filter,1)||!read(initial.pairs,initial.pairSlots)||
        !read(initial.metadata,initial.pairSlots)||!read(initial.recordSlots,initial.recordCount))return Status::InvalidInput;
+    if(continuation){
+        if(!read(continuation,1)||!categoryOutput||count!=1||ownerCount!=1||
+           (continuation->previous&&!read(continuation->previous,1))||
+           (continuation->targetWorldOverride&&!read(continuation->targetWorldOverride,1))||
+           (continuation->currentEffect&&!read(continuation->currentEffect,1)))return Status::InvalidInput;
+        if(candidates[0].shapeType!=0&&candidates[0].shapeType!=1)return Status::UnsupportedScope;
+        if(continuation->targetWorldOverride&&candidates[0].shapeType!=0)return Status::InvalidInput;
+        if(continuation->currentEffect&&continuation->currentEffect->identity!=
+           candidates[0].candidate.collision.filter.identity)return Status::InvalidInput;
+    }
     const auto readVector=[&](const auto& v) noexcept {return read(v.data(),v.size());};
     const auto readFilter=[&](const CollisionFilter48J& f) noexcept {
         return readVector(f.categoryMasks)&&readVector(f.identityLists[0].identities)&&readVector(f.identityLists[1].identities);
     };
     const auto& resource=*q.resource;
+    const auto& records=continuation&&continuation->previous?continuation->previous->records:initial.records;
     if(!read(resource.nodes,resource.nodeCount)||!read(resource.rays,resource.rayCount)||!readFilter(*q.filter))return Status::InvalidInput;
     if(!resource.rayCount||resource.rayCount>32768||resource.nodeCount>32768||
        resource.maxDepth>resource.nodeCount+resource.rayCount||std::fegetround()!=FE_TONEAREST||
-       !affine(q.worldMatrix)||!finite(q.sphere)||initial.records.generatedCapacity88<0||
-       initial.records.generatedCount84<0)return Status::InvalidInput;
+       !affine(q.worldMatrix)||!finite(q.sphere)||records.generatedCapacity88<0||
+       records.generatedCount84<0)return Status::InvalidInput;
+    if(continuation&&continuation->previous&&
+       (continuation->previous->pairCount>resource.rayCount||continuation->previous->pairCount>initial.pairSlots))return Status::InvalidInput;
+    if(continuation&&continuation->previous){
+        for(std::size_t i=0;i<continuation->previous->pairCount;++i){
+            const auto tag=initial.metadata[i].queryTag;
+            if(!(tag&leaf)||(tag&0x7fffu)>=resource.rayCount)return Status::InvalidInput;
+            for(std::size_t j=0;j<i;++j)if(initial.metadata[j].queryTag==tag)return Status::InvalidInput;
+        }
+    }
     if(resource.root&leaf){if((resource.root&0x7fff)>=resource.rayCount)return Status::InvalidInput;}
     else if(resource.root>=resource.nodeCount)return Status::InvalidInput;
     if(count>std::numeric_limits<std::size_t>::max()/resource.rayCount)return Status::InvalidInput;
     if(initial.pairSlots<resource.rayCount||w.pairCapacity<initial.pairSlots||w.metadataCapacity<initial.pairSlots||
        d.pairCapacity<initial.pairSlots||d.metadataCapacity<initial.pairSlots||
-       initial.recordCount<static_cast<std::size_t>(initial.records.generatedCapacity88)||
+       initial.recordCount<static_cast<std::size_t>(records.generatedCapacity88)||
        w.recordCapacity<initial.recordCount||d.recordCapacity<initial.recordCount||w.effectCapacity<count||d.effectCapacity<count)
         return Status::InsufficientCapacity;
     for(std::size_t i=0;i<resource.rayCount;++i)
@@ -258,7 +280,8 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
         const auto& candidate=candidates[indices[i]];const auto& c=candidate.candidate.collision;
         if(!readFilter(c.filter)||!read(candidate.candidate.sceneName,candidate.candidate.sceneNameBytes)||!finite(c.sphere))return Status::InvalidInput;
         if(candidate.shapeType==0){
-            const auto status=validateMesh(c.geometry.mesh,c.geometry.worldMatrix,candidate.nodeRadii,candidate.nodeRadiusCount,candidate.maxDepth);
+            const auto& world=continuation&&continuation->targetWorldOverride?*continuation->targetWorldOverride:c.geometry.worldMatrix;
+            const auto status=validateMesh(c.geometry.mesh,world,candidate.nodeRadii,candidate.nodeRadiusCount,candidate.maxDepth);
             if(status!=Status::Complete)return status;
         }else if(candidate.shapeType==1){
             const auto* compound=candidate.compound;
@@ -269,9 +292,9 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
                 const auto status=validateMesh(part.mesh,part.worldMatrix,part.nodeRadii,part.nodeRadiusCount,part.maxDepth);
                 if(status!=Status::Complete)return status;
             }
-        }else if(candidate.shapeType==5){
+        }else if(candidate.shapeType==5||candidate.shapeType==6){
             if(!q.nativeGatePolicy||!q.callbackEnabled||q.skipMask!=8u||
-               c.shapeType!=5||c.compound||c.geometry.mesh||c.filter.categoryA4!=8u||
+               c.shapeType!=candidate.shapeType||c.compound||c.geometry.mesh||c.filter.categoryA4!=8u||
                !c.hasResponseCallbackE8)return Status::UnsupportedScope;
             if(candidate.gate){
                 if(candidate.gate!=gateOwner||!candidate.gate->callbacks.activateAnimation)return Status::UnsupportedScope;
@@ -279,6 +302,7 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
                 candidate.nativeTriggerIndex>=triggerOwner->triggers.size()||
                 c.filter.identity!=triggerOwner->triggers[candidate.nativeTriggerIndex].collider.identity||
                 nativeTriggerCollider50GA(*triggerOwner,q.filter->identity)==triggerOwner->colliders.size())return Status::UnsupportedScope;
+            if(candidate.shapeType==6&&!validNativeTriggerBox50MA(candidate.nativeTriggerBox))return Status::InvalidInput;
             if(q.nativeGateHasPrevious&&!affine(q.nativeGatePreviousWorld))return Status::InvalidInput;
         }else return Status::UnsupportedScope;
     }
@@ -289,47 +313,60 @@ std::uint16_t tag16(std::uint32_t tag) noexcept {
 }
 }
 
-Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuery49X& query,
+static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49X& query,
     const Type2StaticCandidate49X* candidates,std::size_t ownerCount,const std::size_t* indices,std::size_t count,const Type2StaticInitial49X& initial,
     const Type2StaticWorkspace49X& w,const Type2StaticDestination49X& d,
-    Type2StaticResult49X& output) noexcept {
-    const auto checked=validate(query,candidates,ownerCount,indices,count,initial,w,d,output);
+    Type2StaticResult49X& output,const Type2WorldContinuation50CC* continuation,
+    std::uint32_t* categoryOutput) noexcept {
+    const auto checked=validate(query,candidates,ownerCount,indices,count,initial,w,d,output,continuation,categoryOutput);
     if(checked!=Status::Complete)return checked;
     if(query.normalMode54!=0u)return Status::UnsupportedScope;
     const auto& resource=*query.resource;
-    Type2StaticResult49X result{};result.normalModeWrite.bound=query.normalMode54Bound;std::memcpy(&result.selected,&initial.selected,sizeof(result.selected));result.selected.fraction=1.f;
-    result.selected.first={{0.f,0.f,0.f,1.f}};result.selected.second={{0.f,0.f,0.f,1.f}};
-    result.records=initial.records;if(query.resetRecordsBefore)resetSpringRecords48N(result.records);
+    Type2StaticResult49X result{};
+    if(continuation&&continuation->previous){
+        std::memcpy(&result,continuation->previous,sizeof(result));
+        result.traceUsed=0; // per-visit trace scratch is not a retained slot span
+    }else{
+        std::memcpy(&result.selected,&initial.selected,sizeof(result.selected));result.selected.fraction=1.f;
+        result.selected.first={{0.f,0.f,0.f,1.f}};result.selected.second={{0.f,0.f,0.f,1.f}};
+        result.records=initial.records;if(query.resetRecordsBefore)resetSpringRecords48N(result.records);
+        result.currentCandidateIdentity=query.initialQueryCurrentIdentity;
+        result.queryFlagsF8=static_cast<std::uint8_t>((query.filter->flagsF8|0x10u)&~0x20u);
+    }
+    result.normalModeWrite.bound=query.normalMode54Bound;
     std::memcpy(w.pairs,initial.pairs,initial.pairSlots*sizeof(*w.pairs));
     std::memcpy(w.metadata,initial.metadata,initial.pairSlots*sizeof(*w.metadata));
     if(initial.recordCount)std::memcpy(w.records,initial.recordSlots,initial.recordCount*sizeof(*w.records));
-    result.candidateCount=count;result.currentCandidateIdentity=query.initialQueryCurrentIdentity;
-    result.queryFlagsF8=static_cast<std::uint8_t>((query.filter->flagsF8|0x10u)&~0x20u);
-    auto currentCategory=query.initialCurrentCategory;
+    if(count>std::numeric_limits<std::size_t>::max()-result.candidateCount)return Status::InvalidInput;
+    result.candidateCount+=count;
+    auto currentCategory=continuation&&continuation->previous?continuation->currentCategory:query.initialCurrentCategory;
     for(std::size_t candidateIndex=0;candidateIndex<count;++candidateIndex){
         const auto& candidate=candidates[indices[candidateIndex]];const auto& c=candidate.candidate.collision;
         auto& effect=w.effects[candidateIndex];effect.identity=c.filter.identity;effect.flagsF8=c.filter.flagsF8;
         std::memcpy(effect.copied40.data(),c.copied40.data(),sizeof(effect.copied40));
         std::memcpy(effect.copied50.data(),c.copied50.data(),sizeof(effect.copied50));
+        if(continuation&&continuation->currentEffect)std::memcpy(&effect,continuation->currentEffect,sizeof effect);
         // Repeated handles identify one physical owner; earlier writes must be
         // visible on its next visit even though caller's owner table is const.
         for(std::size_t previous=candidateIndex;previous>0;--previous)
             if(indices[previous-1]==indices[candidateIndex]){
                 effect=w.effects[previous-1];break;
             }
-        if(c.typeTag!=query.collisionTypeTag){
+        if(!continuation&&c.typeTag!=query.collisionTypeTag){
             if(c.typeTag==query.groupTypeTag&&!(result.queryFlagsF8&1u))return Status::UnsupportedScope;
             continue;
         }
         result.currentCandidateIdentity=c.filter.identity;effect.flagsF8=static_cast<std::uint8_t>(effect.flagsF8|0x10u);
-        bool sphereOverlap=false;if(!spheres(query.sphere,c.sphere,sphereOverlap))return Status::InvalidInput;
-        // A registered Gate keeps bilateral filtering but its continuous
-        // narrowphase may cross while the current endpoint sphere is outside.
-        if((!sphereOverlap&&!(candidate.shapeType==5&&query.nativeGateHasPrevious))||
-           !filter(*query.filter,c.filter))continue;
-        // validate() admitted this exact shape5 group's writable range and
+        if(!continuation){
+            bool sphereOverlap=false;if(!spheres(query.sphere,c.sphere,sphereOverlap))return Status::InvalidInput;
+            // A registered Gate keeps bilateral filtering but its continuous
+            // narrowphase may cross while the current endpoint sphere is outside.
+            if((!sphereOverlap&&!((candidate.shapeType==5||candidate.shapeType==6)&&query.nativeGateHasPrevious))||
+               !filter(*query.filter,c.filter))continue;
+        }
+        // validate() admitted this exact shape5/6 group's writable range and
         // identity/index before scratch or shared action state can be changed.
-        if(candidate.shapeType==5&&candidate.nativeTriggers&&
+        if((candidate.shapeType==5||candidate.shapeType==6)&&candidate.nativeTriggers&&
            !nativeTriggerPairAllowed50GA(*candidate.nativeTriggers,
             candidate.nativeTriggerIndex,query.filter->identity))continue;
         if(c.geometry.id!=c.filter.identity)return Status::InvalidInput;
@@ -372,6 +409,8 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
                         outcome=1;partHit=true;++result.leafHits;
                         std::size_t pair=0;while(pair<result.pairCount&&w.metadata[pair].queryTag!=item.queryTag)++pair;
                         const bool fresh=pair==result.pairCount;
+                        if(fresh&&(pair>=resource.rayCount||pair>=w.pairCapacity||pair>=w.metadataCapacity))
+                            return Status::InsufficientCapacity;
                         if(fresh||hit.fraction<w.metadata[pair].fraction){
                             auto& m=w.metadata[pair];auto& p=w.pairs[pair];
                             if(fresh){std::memcpy(&p.first,&ray.first,sizeof(p.first));std::memcpy(&p.second,&ray.second,sizeof(p.second));m.queryTag=item.queryTag;++result.pairCount;}
@@ -446,12 +485,15 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
             return Status::Complete;
         };
         if(candidate.shapeType==0){
-            const auto status=visitMesh(*c.geometry.mesh,c.geometry.worldMatrix,candidate.nodeRadii);
+            const auto& world=continuation&&continuation->targetWorldOverride?*continuation->targetWorldOverride:c.geometry.worldMatrix;
+            const auto status=visitMesh(*c.geometry.mesh,world,candidate.nodeRadii);
             if(status!=Status::Complete)return status;
-        }else if(candidate.shapeType==5){
-            if(!nativeType2GateOverlap50KG(resource,query.worldMatrix,
-                query.nativeGateHasPrevious?&query.nativeGatePreviousWorld:nullptr,
-                c.sphere,candidateHit))return Status::InvalidInput;
+        }else if(candidate.shapeType==5||candidate.shapeType==6){
+            const auto* previous=query.nativeGateHasPrevious?&query.nativeGatePreviousWorld:nullptr;
+            const bool valid=candidate.shapeType==6
+                ?nativeType2TriggerBoxOverlap50MA(resource,query.worldMatrix,previous,candidate.nativeTriggerBox,candidateHit)
+                :nativeType2GateOverlap50KG(resource,query.worldMatrix,previous,c.sphere,candidateHit);
+            if(!valid)return Status::InvalidInput;
         }else {
             //121640/122BA0: parent-box coarse test precedes active-child visits.
             const auto& compound=*candidate.compound;Vector3_48C center{},half{};
@@ -489,7 +531,7 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
             }
         }
         if(c.hasResponseCallbackE8){
-            if(candidate.shapeType!=5)return Status::UnsupportedScope;
+            if(candidate.shapeType!=5&&candidate.shapeType!=6)return Status::UnsupportedScope;
             //122860..88: E4 skips TRIGGER8 first; E8 then commits its action
             // synchronously. A later numerical failure cannot undo this event.
             if(candidate.nativeTriggers){
@@ -505,6 +547,24 @@ Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuer
     std::memcpy(d.metadata,w.metadata,initial.pairSlots*sizeof(*d.metadata));
     if(initial.recordCount)std::memcpy(d.records,w.records,initial.recordCount*sizeof(*d.records));
     if(count)std::memcpy(d.effects,w.effects,count*sizeof(*d.effects));
-    std::memcpy(&output,&result,sizeof(output));return Status::Complete;
+    std::memcpy(&output,&result,sizeof(output));
+    if(categoryOutput)*categoryOutput=currentCategory;
+    return Status::Complete;
+}
+
+Type2StaticStatus49X produceIndexedStaticType2Contacts50CC(const Type2StaticQuery49X& query,
+    const Type2StaticCandidate49X* candidates,std::size_t ownerCount,const std::size_t* indices,std::size_t count,
+    const Type2StaticInitial49X& initial,const Type2StaticWorkspace49X& w,const Type2StaticDestination49X& d,
+    Type2StaticResult49X& output) noexcept {
+    return runIndexedType2Contacts50CC(query,candidates,ownerCount,indices,count,initial,w,d,output,nullptr,nullptr);
+}
+
+Type2StaticStatus49X continueType2WorldCandidate50CC(const Type2StaticQuery49X& query,
+    const Type2StaticCandidate49X& candidate,const Type2StaticInitial49X& initial,
+    const Type2StaticWorkspace49X& w,const Type2StaticDestination49X& d,
+    const Type2WorldContinuation50CC& continuation,Type2StaticResult49X& output,
+    std::uint32_t& currentCategory) noexcept {
+    const std::size_t index=0;
+    return runIndexedType2Contacts50CC(query,&candidate,1,&index,1,initial,w,d,output,&continuation,&currentCategory);
 }
 }

@@ -81,8 +81,11 @@ bool OriginalUiRiderCharacterAssets50KG::load(std::shared_ptr<const OriginalUiAr
         if (!next->psg.identity || !next->vut.identity) return fail(d,E::member,0x1538B0);
         if (!readPsgHierarchy49O(next->psg.data,next->psg.size,next->hierarchy,d.model))
             return fail(d,E::hierarchy,0x152EA0);
+        // Original153248..15325C logs then skips missing VUT names, leaving
+        // real PSG rows unchanged. Authentic Clegg authors absent Main_Dummy.
         if (!readMotionNodeBindings49O(next->hierarchy,reinterpret_cast<const char*>(next->vut.data),
-                next->vut.size,next->bindings,d.binding)) return fail(d,E::binding,0x153218);
+                next->vut.size,next->bindings,d.binding,MotionBindingMissingNode49O::sourceDiagnosticSkip))
+            return fail(d,E::binding,0x153218);
         // Resolve source-constructed names, retaining the actual MCF ordering.
         const std::array<std::string,6> required{{next->base+"_ent",next->base+"_sel",
             next->base+"_breathe",next->base+"_idl1",next->base+"_idl2",next->base+"_idl3"}};

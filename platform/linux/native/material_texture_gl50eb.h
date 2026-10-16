@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <memory>
 
+namespace ra_static_fire_visual50LA {class Owner;}
+namespace ra_static_world50LA {class Owner;}
+namespace ra_cold_aggregate50LA {class Owner;}
 namespace rr::platform {
 // Linux desktop core GL >= 3.2 signatures. Resolve these in the context owner; no
 // GL headers, loader/link dependency, context creation or global proc table.
@@ -98,9 +101,21 @@ public:
 
     // Inputs and diagnostics must be distinct live storage. Retry after a
     // fully cleaned-up failure; an existing publication is never replaced.
+    // Exact native FireP0t source bank. Samplers derive from current canonical
+    // map state; the private source lease survives incomplete GPU cleanup.
+    // Inactive full-world image publication. Only the real aggregate can
+    // supply its private world; all 49 logical images retain that same owner.
+    // Geometry/raster/normal lighting and renderer admission remain separate.
+    bool createRaStaticWorld(const MaterialTextureGlRequest50EB&,
+        const ra_cold_aggregate50LA::Owner&,MaterialTextureGlDiagnostic50EB&) noexcept;
+    const ra_static_world50LA::Owner* raStaticWorldOwner()const noexcept {return raStaticWorld_.get();}
+    bool createRaStaticFire(const MaterialTextureGlRequest50EB&,
+        std::shared_ptr<ra_static_fire_visual50LA::Owner>,MaterialTextureGlDiagnostic50EB&) noexcept;
+    const ra_static_fire_visual50LA::Owner* raStaticFireOwner()const noexcept {return raStaticFire_.get();}
     bool create(const MaterialTextureGlRequest50EB&, const assets::MaterialTextureAssets50EA&,
         MaterialTextureGlDiagnostic50EB&) noexcept;
-    // Any close attempt ends publication. A failure retains unresolved names
+    // An active typed FireP0t/full-world renderer lease rejects close without changing
+    // publication. Otherwise a close attempt ends publication and retains names
     // for retry; never create/reuse texture names between failed close calls.
     // cleanupIncomplete == false means ownership ended even if stale GL errors
     // made the return value false. Empty close is idempotent and requires no GL.
@@ -112,6 +127,7 @@ public:
     // Nonzero only for the current published bank. Each successful create on
     // this live owner has a distinct token, including close/recreate cycles.
     std::uint64_t publicationToken() const noexcept;
+    // Full-world RA remains closed here until its private renderer lease joins.
     // Read-only, allocation-free, and GL-free borrower validation. Requires
     // this exact callback/context pair, the creating thread, the same live
     // publication, and the callback's current-context check. Keep this owner
@@ -127,6 +143,8 @@ public:
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
+    std::shared_ptr<ra_static_fire_visual50LA::Owner> raStaticFire_;
+    std::shared_ptr<ra_static_world50LA::Owner> raStaticWorld_;
     std::uint64_t lastPublication_ = 0;
 };
 }

@@ -44,8 +44,11 @@ bool updateVehicleVisual49R(const VehicleVisualInput49R& input,
     CoupledNoiseContext49M& noise, VehicleVisualWorkspace49R& workspace,
     VehicleVisualDiagnostic49R& diagnostic) noexcept {
     diagnostic = {};
+    const bool bottomRight = bindings.bottomRight1C0 != Index::none;
+    const bool bottomLeft = bindings.bottomLeft1C4 != Index::none;
     if (input.phase != VehicleVisualPhase49R::afterAnimationBeforeChariotAndPhysics ||
-        input.vehicle834 != 0 || bindings.extra1C0Present || bindings.extra1C4Present ||
+        input.vehicle834 != 0 || bottomRight != bottomLeft ||
+        bindings.extra1C0Present != bottomRight || bindings.extra1C4Present != bottomLeft ||
         bindings.rotatingNodeCountB54 != 0)
         return reject(diagnostic, VehicleVisualError49R::context, 0x21c120);
     if (std::fegetround() != FE_TONEAREST)
@@ -53,8 +56,10 @@ bool updateVehicleVisual49R(const VehicleVisualInput49R& input,
     if (!validateSceneGraph49P(graph))
         return reject(diagnostic, VehicleVisualError49R::graph, 0x21c120);
     const Index indices[] = {bindings.main190, bindings.container194,
-                             bindings.right1B8, bindings.left1BC};
-    for (unsigned i = 0; i < 4; ++i) {
+                             bindings.right1B8, bindings.left1BC,
+                             bindings.bottomRight1C0, bindings.bottomLeft1C4};
+    const unsigned indexCount = bottomRight ? 6u : 4u;
+    for (unsigned i = 0; i < indexCount; ++i) {
         if (!validIndex(indices[i], graph.count))
             return reject(diagnostic, VehicleVisualError49R::graph, 0x21c120);
         for (unsigned j = 0; j < i; ++j)
@@ -66,6 +71,10 @@ bool updateVehicleVisual49R(const VehicleVisualInput49R& input,
     if (main.parent180 != Index::none || container.parent180 != bindings.main190 ||
         graph.nodes[static_cast<std::uint32_t>(bindings.right1B8)].parent180 != Index::none ||
         graph.nodes[static_cast<std::uint32_t>(bindings.left1BC)].parent180 != Index::none)
+        return reject(diagnostic, VehicleVisualError49R::graph, 0x21c120);
+    if (bottomRight &&
+        (graph.nodes[static_cast<std::uint32_t>(bindings.bottomRight1C0)].parent180 != Index::none ||
+         graph.nodes[static_cast<std::uint32_t>(bindings.bottomLeft1C4)].parent180 != Index::none))
         return reject(diagnostic, VehicleVisualError49R::graph, 0x21c120);
     if (!admittedRecords(input, parameters, bindings, graph, state, shared, noise, workspace))
         return reject(diagnostic, VehicleVisualError49R::records, 0x21c120);

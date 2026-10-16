@@ -82,13 +82,16 @@ inline float selectRepair(const rr::assets::RepairAuthoring50A& repair,
 }
 }
 
-// Atomic cold bind: all fallible native readers/projections operate on local
-// records. Failure throws without changing the live arena or tuning references.
+// Generic cold bind stages readers/projections in local records. With a
+// retained constructor, source target/854 were already published; later858
+// and joint prefix mutations commit to their actual owners and survive failure.
+// Remaining handling records/tuning keep their existing atomic publication.
 // The selection context is passed through unchanged, including Tuning overrides.
 // The existing client policy requires no profile overwrite and takes CF0 from
 // this racer's BaseAbilities.Defense. It does not silently adopt DefenseA/B/C.
 // Geometry owns secondary mass/inertia/target/joint; ChariotWeight is not a
 // substitute for the recovered secondary constructor and fresh model bounds.
+template<class ColdOwner=std::nullptr_t>
 inline HandlingReceipt bindColdHandling(
     const std::vector<std::uint8_t>& phy,
     const rr::assets::PsgHierarchyView49O& right,
@@ -96,7 +99,9 @@ inline HandlingReceipt bindColdHandling(
     const rr::game::FreshPodGeometryResult49O& geometry,
     const rr::game::PodShapeSource49W& mainShape,
     const rr::game::AuthoredSelectionContext49N& selection,
-    runtime_startup50fl::Fixture& live,const HandlingTuning& tuning) {
+    runtime_startup50fl::Fixture& live,const HandlingTuning& tuning,
+    const rr::assets::PsgHierarchyView49O* bottomRight=nullptr,
+    const rr::assets::PsgHierarchyView49O* bottomLeft=nullptr,ColdOwner* retained=nullptr) {
     using namespace rr::game;
     namespace assets=rr::assets;
     using runtime_startup50fl::require;
@@ -131,6 +136,13 @@ inline HandlingReceipt bindColdHandling(
     require(assets::readVehicleVisualAuthoring49R(text,bytes,visual,visualDiagnostic)&&
         assets::bindFreshVehicleVisualParameters49R(visual,right,left,
             parameters.visual,visualDiagnostic),"racer visual PHY/geometry binding failed");
+    require(bool(bottomRight)==bool(bottomLeft)&&
+        bool(bottomRight)==live.bindings.visual.extra1C0Present&&
+        bool(bottomLeft)==live.bindings.visual.extra1C4Present,
+        "racer bottom-engine authored/bound presence differs");
+    if(bottomRight)require(assets::bindFreshBottomVehicleVisualParameters49R(
+        *bottomRight,*bottomLeft,parameters.visual,visualDiagnostic),
+        "racer bottom-engine own PSG base capture failed");
     receipt.liftHeight=parameters.visual.verticalLimit7EC;
     assets::ChariotRootAuthoredValues49U root{};
     assets::ChariotRootAuthoringDiagnostic49U rootDiagnostic{};
@@ -138,13 +150,24 @@ inline HandlingReceipt bindColdHandling(
         assets::bindFreshChariotRootParameters49U(root,geometry,parameters.visual,
             parameters.lifecycle,rootDiagnostic),"racer chariot PHY/geometry binding failed");
 
+    if constexpr(!std::is_same_v<ColdOwner,std::nullptr_t>){
+        if(retained){
+            auto admission=geometry.parameters;
+            retained->preserveColdTargetForHandling(live,admission);
+            parameters.lifecycle.restLength854=live.parameters.lifecycle.restLength854;
+        }
+    }
     parameters.shape=mainShape;
     receipt.authored=runtime_startup50fl::bind(phy,geometry,selection,parameters,
-        state,selectors,secondary);
+        state,selectors,secondary,retained,&live);
     require(receipt.authored.massSetterWrote,"racer main mass setter was skipped");
     assets::initializeVehicleVisualConstructorRecords49R(state.visual);
     state.visual.right.position=parameters.visual.rightBase2C0;
     state.visual.left.position=parameters.visual.leftBase2B0;
+    if(bottomRight){
+        state.visual.bottomRight.position=parameters.visual.rightBase2E0;
+        state.visual.bottomLeft.position=parameters.visual.leftBase2D0;
+    }
 
     assets::SpringCollisionAuthoring50F collision{};
     require(assets::readSpringCollision50F(text,bytes,collision,physicsDiagnostic)&&
@@ -205,6 +228,32 @@ inline void placeColdHandlingRoots(runtime_startup50fl::Fixture& live) {
         refreshSceneWorld49P(graph,live.bindings.lifecycle.physical19C)&&
         setLocalMatrix49P(graph,live.bindings.lifecycle.model1B4,secondaryPose),
         "racer cold physical/displayed root placement rejected");
+    // Original217078..217238 places each present engine from its own base
+    // through main190. The optional topology must be correctly placed before
+    // source model rebase and host grid translation, not deferred to graphics.
+    // Keep the historical three-model host cold policy unchanged.
+    if(live.bindings.visual.extra1C0Present){
+        require(live.bindings.visual.extra1C4Present,"racer partial bottom-engine cold placement");
+        const SceneNodeIndex49P roots[]={live.bindings.visual.right1B8,live.bindings.visual.left1BC,
+            live.bindings.visual.bottomRight1C0,live.bindings.visual.bottomLeft1C4};
+        const VisualVector49R* bases[]={&live.parameters.visual.rightBase2C0,&live.parameters.visual.leftBase2B0,
+            &live.parameters.visual.rightBase2E0,&live.parameters.visual.leftBase2D0};
+        for(unsigned engine=0;engine<4;++engine){
+            auto enginePose=mainPose;
+            for(unsigned axis=0;axis<3;++axis){
+                volatile float a=mainPose.v[axis]*bases[engine]->v[0];
+                volatile float b=mainPose.v[4+axis]*bases[engine]->v[1];
+                volatile float c=mainPose.v[8+axis]*bases[engine]->v[2];
+                volatile float ab=a+b;
+                volatile float abc=ab+c;
+                volatile float position=mainPose.v[12+axis]+abc;
+                require(std::isfinite(position),"racer own engine cold placement arithmetic");
+                enginePose.v[12+axis]=position;
+            }
+            require(setLocalMatrix49P(graph,roots[engine],enginePose)&&
+                refreshSceneWorld49P(graph,roots[engine]),"racer own engine cold root placement rejected");
+        }
+    }
     runtime_startup50fl::project(state,live.bindings);
     for(auto* root:{&state.bodies.main.components.root,&state.bodies.secondary.root}){
         require(matrixToQuaternion48G(root->scene,root->body.orientation),

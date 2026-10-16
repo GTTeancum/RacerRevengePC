@@ -13,6 +13,10 @@ struct VehicleVisualState49R {
     VisualVector49R upC20, publishedUpAF0;
     VisualResponse49R right, left;
     float phase8B0, phase900, phase950, phase9A0;
+    // Optional source response records, not additional physical bodies.
+    // bottomRight: position9B0/velocity9C0/rate9D0/orientation9E0.
+    // bottomLeft: position960/velocity970/rate980/orientation990.
+    VisualResponse49R bottomRight{}, bottomLeft{};
 };
 struct VisualLazyWord49R { std::uint8_t guard; std::uint32_t word; };
 struct VisualShared49R {
@@ -31,6 +35,9 @@ struct VehicleVisualParameters49R {
     float effectiveSpeedSquaredA54, damageTranslationA58, damageOrientationA5C;
     float orientationScaleA64, effectiveInputSpeedA68, verticalLimit7EC;
     VisualVector49R rightBase2C0, leftBase2B0;
+    // Original BottomRightEngine and BottomLeftEngine nullcg world offsets.
+    // These source offsets are deliberately not in numerical slot order.
+    VisualVector49R rightBase2E0{}, leftBase2D0{};
 };
 enum class VehicleVisualPhase49R : std::uint32_t {
     unspecified, afterAnimationBeforeChariotAndPhysics, laterPhysics
@@ -49,6 +56,8 @@ struct VisualSceneBindings49R {
     SceneNodeIndex49P main190, container194, right1B8, left1BC;
     bool extra1C0Present, extra1C4Present;
     std::uint32_t rotatingNodeCountB54;
+    SceneNodeIndex49P bottomRight1C0 = SceneNodeIndex49P::none;
+    SceneNodeIndex49P bottomLeft1C4 = SceneNodeIndex49P::none;
 };
 struct VehicleVisualWorkspace49R {
     SceneNode49P nodes[maxSceneNodes49P];
@@ -66,11 +75,15 @@ struct VehicleVisualDiagnostic49R {
 
 // Selected original21C120 normal834==0 call through its real return. Requires
 // distinct parentless main/right/left roots, container194.parent==main190,
-// both primary engines present, no optional roots, and B54==0. This is an
+// both primary engines present, B54==0, and either both bottom roots present
+// or both absent. Optional indices must agree with extra1C0/1C4Present. All
+// admitted engine roots are distinct and parentless. This is an
 // explicit native admission, not a discovery of scene/resource identities.
 // Runs after21A000 node animation and before21A660/later physical substeps.
-// Produces container local/world/cache state, C20/AF0, all four clocks, both
-// primary response records and actual engine-root LOCAL matrices. Root worlds
+// Produces container local/world/cache state, C20/AF0, all four clocks, all
+// present engine response records and actual engine-root LOCAL matrices. The
+// four-engine branch preserves cross-pair binders and bottom-specific noise
+// offsets/lower clamps; it does not create more physical body owners. Root worlds
 // stay lazy. Application/body/component/probe/impact values are stable supplied
 // phase inputs; no contact/query/body update or Chariot IK is executed.
 //

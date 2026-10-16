@@ -39,6 +39,9 @@ PodSpeechStatus50HG initializePodSpeech50HG(const PodSpeechCounts50HG&,
 // it in the audio owner. Both countdowns deliberately may cross belowzero.
 bool advanceSpeechTimers50HG(float factor,UndertrackPlayerPrefix50ET&,
     PodSpeechState50HG&) noexcept;
+// D48's own2C20C0 callback, independent of the human1A1590/109C prefix.
+// An original AI owns this timer but never acquires the human damage producer.
+bool advancePodSpeechCooldown50HG(float factor,PodSpeechState50HG&) noexcept;
 // Original repair override1A2404..1A244C, AFTER224370. Uses source max of
 // 7D0/7D4/7DC; if<0.7, clears ONLY10CC bit2 and sets109C=3seconds.
 // This does not invent a repair sound;50HE separately implements its soundtail.

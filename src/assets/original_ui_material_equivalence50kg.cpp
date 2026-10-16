@@ -1,4 +1,5 @@
 #include "original_ui_material_equivalence50kg.h"
+#include "original_ui_controls_specmap50kg.h"
 #include <utility>
 
 namespace rr::assets {
@@ -52,7 +53,8 @@ bool textureMember(const OriginalUiMaterialPass50KG& pass,
     const auto leaf=path.substr(slash==std::string::npos?0:slash+1);
     if(leaf.size()<5)return false;
     const auto extension=leaf.substr(leaf.size()-4);
-    if(!same(extension,".pst")&&!same(extension,".atm"))return false;
+    if(!same(extension,".pst")&&!same(extension,".atm")&&
+       !(same(extension,".tga")&&isOriginalUiControlsSpecmap50KG(m)&&image.pstOffset==0&&image.pstBytes==m->bytes))return false;
     if(!same(pass.textureName,leaf.substr(0,leaf.size()-4).c_str()))return false;
     // A standalone PST must be the complete member. An ATM's selected range
     // is authenticated by ScreenAssets but deliberately not an equality field.

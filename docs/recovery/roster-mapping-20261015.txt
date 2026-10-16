@@ -1,0 +1,15 @@
+UNTESTED source-only candidate against abbf73d740ef23b8529448755d7494c234033e8b.
+Source snapshot ZIP:11547167bytes SHA256a9b83d548bb8f1609d1605ad90abab2ef204e30dcbe5c889dbb84ec16eaeca45.
+Apply only the feature patch. Local baseline688b739 is a one-file snapshot, not an integration commit.
+Changed file: src/game/original_ui_rider_dynamic_owner50kg.cpp.
+
+Review checklist:
+- Group1 must have exactly23 controls in original order and corresponding original PodIndex identities; invalid/reordered/missing/duplicate identities reject before storage publication.
+- All four source widget IDs must be valid, unique across the roster and typed pod/text/text/character. Widget numbers are read from authenticated controls, not derived arithmetically.
+- Pod/character maps cover every original rider, including hidden traversal intermediates. Binding remains transactional through the private next owner.
+- Clegg-only mapping reconstruction removed; its opt-in preparation remains unchanged.
+- Existing prepareCold populations and descriptor-loading loop remain unchanged. No new descriptors, texture caches, material gates, callbacks, backend readiness, session admission, hidden/unlock/navigation rules or defaults enabled.
+- Backend pair collection still checks actual podAssets/characterAssets before admission; mappings alone do not confer readiness. Session callback preflight still requires prepared owners.
+- Root should review source compatibility and own every later software check. The stricter full roster validation now applies at bind even for limited populations.
+
+Source review only. No tests/builds/syntax checks, project imports/converters/gameplay, original disc reads, central checkout edits, mesh-cache/audio/material-equivalence work performed.

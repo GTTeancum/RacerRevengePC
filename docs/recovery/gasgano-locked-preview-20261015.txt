@@ -1,0 +1,22 @@
+UNTESTED incremental locked Gasgano preview-resource request
+
+Apply only this patch after root d7feccc65e3e4f05f7ea83ca24bd6e61a22f07d3 (23/24 set), with all23 mapping7fd0cf45 already present. Local equivalent predecessor1e25612. No other root changes assumed.
+
+Four files: src/game/original_ui_rider_dynamic_owner50kg.h/.cpp; platform/linux/native/original_ui_rider_session50kg.h/.cpp.
+
+Existing OriginalUiRiderPreviewSet50KG appends gasgano7, preserving none=0 and indexed23And24=1. No new default or Application/frontend activation. Public bind chooses existing Gasgano population on this explicit resource request; bindCold permits that request without requiring the unlocking test profile. Normal profile initialization and every unlock word remain untouched. Both session and dynamic preparation reject a gasgano7 request paired with a population that omits7.
+
+Existing population machinery loads actual07 pod and07c character descriptors; existing backend fails requested7 material-cache absence and requires real materials/footprints/image-bank ownership. Existing session preparedRider(7) check runs before navigation/aperture publication. No new readiness booleans or success placeholders.
+
+Source evidence: original Group1 slot10/control5, widgets pod15/name67/Huttese97/character41. Original ui/geometry/07.psg, ui/anim/07c.psg,07c.mcf,07c.vut, six actual motion references are in attached preserved inventory. Pod materials07_1,07_2,cable,07_shdw; character07c_1/07c_2. Existing generated additional catalog contains07c_2.pst29512bytes SHA256cbd5e15d11e7b1b9336a1e8f965b18ecdb93d948e770baa2bc3005e3576b11ce with5mips.07c_1 and pod/shadow textures are kind1 single-mip. No new conversion is required by the inventory. Actual retained files must still be supplied/authenticated; generated records alone never establish runtime readiness.
+
+Review checklist:
+- Enum values/defaults and indexed23And24 behavior preserved. Existing test-profile Gasgano route preserved.
+- Request only relaxes the test-profile prerequisite for resource preparation, not source profile/selection/confirmation eligibility.
+- supportedRider and original Confirm planning remain unchanged. Original appearance uses actual locked profile state, never test-profile initialization.
+- Existing Clegg opt-in remains independent and still needs actual03c_1/2 owners. No missing intermediate callbacks skipped; Gasgano cannot be reached through an unprepared Clegg slot by this patch. No full-selection-loop claim.
+- No descriptor/model/motion/material/binder decoder changes. Genuine retained resources, backend seal and actual callback prerequisites remain mandatory.
+- This is a mutually exclusive requested set, not a new combination of all preview groups. Selecting indexed23And24 retains its existing meaning; gasgano7 does not additionally request23/24.
+- Root owns integration and all later software validation. No tests/builds/syntax checks/project imports/converters/gameplay, central/disc edits, or mesh-cache audit occurred.
+
+Retained inventory provenance: UIRIDER.RES5552683bytes SHA256112cd71ac9cfcc909b0edb56e0e420bb358b7078b5abae5f48c62b95a6bbf856. Read from preserved evidence, not reread from disc in this task. Baseline inspected is the verified abbf73d snapshot plus locally delivered mapping and23/24 patches.

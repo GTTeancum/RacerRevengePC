@@ -44,4 +44,22 @@ struct ModelBoundsResult49O {
 bool computeModelBounds49O(const ModelBoundsNode49O* nodes, std::size_t count,
     const ModelBoundsContext49O& context, ModelBoundsWorkspace49O& workspace,
     ModelBoundsResult49O& output) noexcept;
+
+// Ordinary static A2=0 load: source row0 IS the model root, not a child.
+// Caller supplies that actual alias in original1B8 order, with1..64 rows;
+// row0.parent=-1 and every later parent is an earlier source row. Row0's
+// flags/box must be the SAME root values in context, bit-for-bit. Root own04
+// must be set; sphere10 remains unsupported. Locals are finite affine source
+// inputs, but row0.local is not multiplied: its actual ready rootWorld100 is
+// copied into workspace.world[0]. This prevents applying placement twice.
+//
+// Preserve26F4B0's own-root box seed, THEN28DAF0 projection of every eligible
+// source row, including row0 through that SAME root world/basis. Do not omit
+// its repeated projection or replace the root-basis transpose with an inverse.
+// Remaining numeric/disjoint-storage/output-on-failure rules above apply.
+// This numeric API does not establish model identity, graph readiness, source
+// resource acquisition, bounds publication, or observer membership ownership.
+bool computeDirectRootModelBounds50KG(const ModelBoundsNode49O* sourceRows,
+    std::size_t count, const ModelBoundsContext49O& context,
+    ModelBoundsWorkspace49O& workspace, ModelBoundsResult49O& output) noexcept;
 }

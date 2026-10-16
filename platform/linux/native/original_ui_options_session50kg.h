@@ -2,7 +2,9 @@
 #include "original_ui_options_draw_contribution50kg.h"
 #include "original_ui_main_session50kg.h"
 #include "original_sound_mode50kg.h"
+#include "original_ui_audio_options50kg.h"
 #include "../../../src/game/original_ui_game_options_apply50kg.h"
+#include "../../../src/game/original_ui_controls_controller50kg.h"
 namespace rr::platform {
 // The source +6E4 word is separate from Main's +6E0. Import/reset it only from
 // an authenticated profile owner. No implicit default or fabricated save file.
@@ -27,6 +29,7 @@ struct OriginalUiOptionsSessionCold50KG {
     std::shared_ptr<const MaterialTextureGl50EB> gpu;
     std::shared_ptr<const assets::OriginalUiArchive50KG> optionsArchive;
     std::shared_ptr<OriginalUiOptionsProfile50KG> profile;
+    std::shared_ptr<game::ControlPresets49D> controlsProfile;
     // Optional sole application profile owner for page4 fields. Missing owner
     // keeps that page unavailable; known must come from real profile lifecycle.
     std::shared_ptr<game::OriginalUiGameSettingsProfile50KG> gameSettingsProfile;
@@ -52,6 +55,7 @@ struct OriginalUiOptionsSessionInputReceipt50KG {
     game::OriginalUiOptionsMenuPageResult50KG page{};
     game::OriginalUiMovementNotification50KG movement{};
     game::OriginalUiGameOptionsPlan50KG gameOptions{};
+    game::OriginalUiControlsPlan50KG controls{};
     game::OriginalUiTransitionSnapshot50KG sourceLifecycle{};
     OriginalUiOptionsRouteProposal50KG routeProposal{};
     OriginalUiOptionsSessionStatus50KG status=OriginalUiOptionsSessionStatus50KG::noChange;
@@ -61,15 +65,16 @@ struct OriginalUiOptionsSessionSnapshot50KG {
     bool cameraActive=false,framePublished=false,backProposalPending=false;
     std::uint32_t packedBackground430=0,promptMask42C=0;
     std::uint64_t updateCount=0,renderCount=0;
-    std::uint64_t gameOptionsAcceptCount=0,lastGameOptionsSoundRevision=0;
+    std::uint64_t gameOptionsAcceptCount=0,lastGameOptionsSoundRevision=0,controlsAcceptCount=0;
     game::OriginalUiTransitionSnapshot50KG transition{};
     game::OriginalUiApertureSnapshot50KG aperture{};
     OriginalUiMainSessionAudioReceipt50KG audio{};
     game::OriginalUiMainFireReceipt50KG lastParticleAdvance{},lastFireEmit{};
 };
-// Options menu and bounded Game Options page/scene owner. Page4 Accept needs
+// Options menu, authentic Controls and bounded Game Options scene owner. Page4 Accept needs
 // the exact shared profile and actual frontend PCM sound-mode consumer.
-// Pages2/3/5/6 and HOF remain unavailable.
+// Page3 is prepared but unadmitted until actual menu-controller/hotplug and
+// the original missing-controller popup are joined. Pages5/6 and HOF stay unavailable.
 // Cross-screen admission, sole manager tick, deferred queue consumption and
 // renderer-bank publication belong to the root coordinator, not this page.
 class OriginalUiOptionsSession50KG final {
@@ -107,7 +112,12 @@ public:
     OriginalUiOptionsSessionStatus50KG render(const OriginalUiOptionsClock50KG&,
         OriginalUiOptionsSessionDiagnostic50KG&) noexcept;
     OriginalUiOptionsSessionSnapshot50KG snapshot() const noexcept;
+    // Committed profile projection for the parent-owned race/profile bridge.
+    // Never exposes local edits or claims save/race-group application.
+    bool appliedAudioOptions(game::OriginalUiAudioOptions50KG&) const noexcept;
+    const game::OriginalUiControlsState50KG* controlsState(std::uint8_t controllerIndex) const noexcept;
     const OriginalUiNativeDraw50KG* draw() const noexcept;
+    const OriginalUiSourceFrame50KM* sourceFrame() const noexcept;
     void requestQuit() noexcept;
 private:
     friend class OriginalUiFrontend50KG;
@@ -119,6 +129,10 @@ private:
     // occurs between source1F66F0 writes,188740 and group6E8. Manager publishes
     // its page request immediately after this returns; notify emits SELECT.
     bool commitGameOptionsAccept(const OriginalUiOptionsRouteProposal50KG&,
+        const game::OriginalUiRouteDecision50KG& admittedDecision) noexcept;
+    bool sourceTeardownPending() const noexcept;
+    OriginalUiOptionsSessionStatus50KG teardownSource(VehicleWindowGl50DS*,OriginalUiOptionsSessionDiagnostic50KG&) noexcept;
+    bool commitControlsReturn(const OriginalUiOptionsRouteProposal50KG&,
         const game::OriginalUiRouteDecision50KG& admittedDecision) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };

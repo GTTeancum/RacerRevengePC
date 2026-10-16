@@ -63,15 +63,25 @@ AudioEventStatus50HE updateMaterialAudio50HI(const MaterialAudioParameters50HI&p
     const MaterialAudioInput50HI&in,const MaterialAudioState50HI&previous,MaterialAudioState50HI&output,
     std::uint32_t&randomState,MaterialAudioCommand50HI*commands,std::size_t capacity,std::size_t&count)noexcept {
     using S=AudioEventStatus50HE;
-    if(!p.rowCount||p.rowCount>maxMaterialAudioRows50HI||(p.rowCount%4u)||(!commands&&capacity)||capacity>1024||in.channelArgument<1||in.channelArgument>3||std::fegetround()!=FE_TONEAREST)return S::Input;
+    if(!p.rowCount||p.rowCount>maxMaterialAudioRows50HI||(p.rowCount%4u)||
+       !p.driveRowCount||p.driveRowCount>maxMaterialDriveRows50HI||(p.driveRowCount%4u)||(!commands&&capacity)||capacity>1024||in.channelArgument<1||in.channelArgument>3||std::fegetround()!=FE_TONEAREST)return S::Input;
     auto next=previous;auto rng=randomState;MaterialAudioCommand50HI staged[maxMaterialAudioCommands50HI]{};std::size_t n=0;
     auto emit=[&](AudioOperation50HE operation,MaterialCueKind50HI kind,std::uint32_t key,float gain,float pitch,bool loop,std::uint32_t source){staged[n++]={operation,kind,key,gain,pitch,loop,source};};
-    auto stop=[&](){if(next.driveKey244>0){if(static_cast<std::uint32_t>(next.driveKey244)>p.rowCount)return false;emit(AudioOperation50HE::Stop,MaterialCueKind50HI::DriveOn,static_cast<std::uint32_t>(next.driveKey244),0.f,1.f,true,0x2c27d0);}next.driveMaterial240=next.driveKey244=-1;return true;};
+    auto stop=[&](){
+        if(next.driveKey244>0){
+            const auto key=static_cast<std::uint32_t>(next.driveKey244);
+            if(key>std::max(p.rowCount,p.driveRowCount))return false;
+            //2C27D0/2933D0 stops constructed drive owners only. A key for
+            //a collision-only material has no voice to stop.
+            if(key<=p.driveRowCount)emit(AudioOperation50HE::Stop,MaterialCueKind50HI::DriveOn,key,0.f,1.f,true,0x2c27d0);
+        }
+        next.driveMaterial240=next.driveKey244=-1;return true;
+    };
     if(in.vehicle220Present){
         if(in.channelArgument==3){next.emitterFlags22C&=static_cast<std::uint8_t>(~8u);if(!stop())return S::Input;}
         else if(in.contactMaterialA9>=0){
-            // Original key=4*A9+variant. The actual AUB row count bounds the
-            // native storage; unavailable materials remain explicit failures.
+            // Original key=4*A9+variant. The collision count bounds admitted
+            // material families; the independent drive lookup may be absent.
             if(static_cast<std::uint32_t>(in.contactMaterialA9)>=p.rowCount/4u)return S::Input;
             const bool collision=in.channelArgument==1||!(next.emitterFlags22C&8u);
             if(in.channelArgument==2)next.emitterFlags22C|=8u;
@@ -97,7 +107,10 @@ AudioEventStatus50HE updateMaterialAudio50HI(const MaterialAudioParameters50HI&p
                             next.driveKey244=4*in.contactMaterialA9+variant+1;
                         }
                         if(next.driveKey244<1||static_cast<std::uint32_t>(next.driveKey244)>p.rowCount)return S::Input;
-                        if(in.listenerDistance<450.f){
+                        //293470 returns null above the independent drive array bound.
+                        //104378 still permits the distance calculation, but292DA0
+                        //and292F30 return before controls/293010 or pitch RNG.
+                        if(static_cast<std::uint32_t>(next.driveKey244)<=p.driveRowCount&&in.listenerDistance<450.f){
                             const auto key=static_cast<std::uint32_t>(next.driveKey244);float gain=0,pitch=0;
                             if(!driveControls(p.drive[key-1],std::max(speed,50),next.cachedSlope20[key-1],rng,gain,pitch))return S::Input;
                             emit(changed?AudioOperation50HE::Start:AudioOperation50HE::Controls,

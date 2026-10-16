@@ -70,6 +70,7 @@ inline g::Vector3_48C vector(const std::string& text){
 }
 class Owner final {
  std::array<Source,count> sources_{};
+ std::vector<std::uint8_t> originalTob_;
  bool attempted_=false,ready_=false;
 public:
  Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
@@ -122,9 +123,10 @@ public:
      need(sound.filename=="sfx\\race\\bigdoor.vag"&&sound.minDistance==0.f&&sound.maxDistance==2500.f&&!optional(second,"specificobject"),"GC Gate original sound action changed");
     }
    }
-   sources_=std::move(next);ready_=true;error.clear();return true;
+   sources_=std::move(next);originalTob_=std::move(tob);ready_=true;error.clear();return true;
   }catch(const std::exception& e){error=e.what();return false;}
  }
+ const std::vector<std::uint8_t>& originalTob()const noexcept{return originalTob_;}
  bool ready()const noexcept{return ready_;}
  const Source& source(std::size_t i)const{return sources_.at(i);}
 };

@@ -2,7 +2,7 @@
 #include "effect_stop50bd.h"
 #include "impact_effects50b.h"
 namespace rr::game {
-enum class EffectProfile50BE : std::uint32_t {Particle19A5E0,Ordinary15F100,Deferred15E800,Fire15DE00};
+enum class EffectProfile50BE : std::uint32_t {Particle19A5E0,Ordinary15F100,Deferred15E800,Fire15DE00,Splash19DBE0};
 struct EffectOwner50BE {std::uint32_t id;EffectProfile50BE profile;EffectControlState50BC state;std::uint32_t mode1D8,duration1E4;};
 constexpr std::size_t maxEffectOwners50BE=16,maxEffectCommands50BE=64;
 struct EffectDispatchWorkspace50BE {EffectOwner50BE next[maxEffectOwners50BE];};

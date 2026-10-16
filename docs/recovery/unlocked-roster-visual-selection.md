@@ -1,0 +1,19 @@
+# Supplemental original roster visual selection
+
+select_original_roster.py now consumes the same additional_pod_identities.json as the raw preparation path. Supplemental IDs 2/12/15/19/20 are accepted only from that source-backed catalog. Before creating output, it requires the catalog generation to equal authenticated48F generation 3cf500075d2f31e3930d5e74896a3068ca596fba3f47475ba9c4643bcbf60b39 and each selected container's exact byte count/hash to match the actual generation's container row. Duplicate supplemental IDs or overlap with the fixed eight-racer field are rejected.
+
+Existing48F object selection retains each pod's own scene, mesh, material, texture, and original-authoring identities. No fallback model, handling, audio, or fabricated converted data is added. Supplemental TAUNTS names are now checked against their exact catalog hash before the existing authenticated UIACCEPT speech-prefix association. POD19 retains its source-proven Event39 exception. POD02/12/15/20 use their actual Ben/ShR/Teemto/Occo speech prefixes and original UI comments through the existing generic association.
+
+POD02's actual48F rows include englt2.psg and engrt2.psg as well as englt1.psg/engrt1.psg and chariot.psg. The selector explicitly reports those two additional scene identities and does not claim runtime ownership of them. Actual original POD02 PHY explicitly binds BottomLeftEngine=englt2.slt, BottomRightEngine=engrt2.slt, and EngineMotion=5; each MCF names its own SLT/VUT. Raw preparation now rejects those bottom-engine roles rather than silently dropping them. This is a genuine native topology gap, not missing audio or a missing source archive. POD12/15/20's principal chariot/englt1/engrt1 scenes are present in the generation; their original motion/rig/collision and native conversion acceptance remain required by production preparation and cold loading.
+
+At20:08 UTC on October12, root reported receipt of all four exact RES originals under the requested paths, with the prescribed byte counts and SHA pins. That closes the previously documented missing-container inventory boundary; it does not establish successful production import or gameplay readiness. Transfer ZIP SHA-256: 43016c0be1182fa877c9777a3c5b8a2740dd483d27c83b7c460654c6ce4350ef.
+
+Production sequence is unchanged: raw preparation imports the admitted three-component originals with --additional-pods POD12 POD15 POD20, then visual selection uses the same selected IDs as integers with --raw-imports pointing to that actual output and --audio-root pointing to original AUDIO. Include POD19 when desired. POD02 can be selected for visual/source inspection without --raw-imports, but its runtime raw-roster path remains explicitly blocked on four-engine ownership. The --expected-visual-selection option can still consume an independently selected authenticated48F catalog. Course/roster runtime gates are separate and are not opened by this patch.
+
+Source and metadata editing only; no selector/importer/decoder, test, syntax check, build, or gameplay execution was performed.
+
+Actual original PHY audio names: POD02/POD20 select sfx\race\gen3_ngn.vag and sfx\race\sb_ngn.vag; POD12/POD15 select sfx\race\gen1_ngn.vag and sfx\race\as_beam.vag. Existing original audio loaders consume these authored fields without a replacement tuning table.
+
+## Subsequent POD02 integration
+
+The source-only boundary described above has now been closed by the five-model native pipeline. Preparation emits all five actual components; selector metadata calls this additional_engine_assets_prepared, without claiming a completed runtime load. The native race loader retains independent bottom model, motion, effect, cable, flame and Binder owners, and its Course capability now requires the authentic prepared POD02 inputs. No execution result is asserted here.

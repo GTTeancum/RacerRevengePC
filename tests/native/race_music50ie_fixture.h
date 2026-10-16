@@ -6,6 +6,7 @@
 #include "../../src/assets/audio_assets50hc.h"
 #include "../../src/game/race_music_event50ie.h"
 #include "../../platform/linux/native/race_audio_groups50ic.h"
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <filesystem>
@@ -133,7 +134,7 @@ inline rr::assets::AudioPcm50HC decodeSelected(const d::Bytes& bytes,
 
 enum class Result : std::uint8_t {
     Started,Suppressed,Unavailable,Unprepared,Paused,UnsupportedEvent,Input,Ownership,BackendRejected,
-    Refreshed,PendingFade234440,PendingPlay,Updated
+    Refreshed,PendingFade234440,PendingPlay,Updated,PendingTimedVolume26C8F0
 };
 struct Receipt {
     Result result=Result::Unprepared;
@@ -143,16 +144,29 @@ struct Receipt {
     // Unavailable/backend errors never acknowledge the category6 FIFO ticket.
     bool completed()const noexcept{return result==Result::Started||result==Result::Refreshed||result==Result::Suppressed;}
 };
+// Cold, explicit port policy. Strict preserves the recovered backend boundary.
+enum class TimedVolumePolicy50IW : std::uint8_t {StrictSourceBoundary,NativeLinearSharedMix};
+// Explicit native transport lifecycle, separate from the source call result.
+// The accepted source request does not certify original IOP interpolation.
+enum class NativeFadePhase50IW : std::uint8_t {Idle,Pending,Fading,SilentRetirement,Retired};
+struct NativeFade50IW {
+    NativeFadePhase50IW phase=NativeFadePhase50IW::Idle;
+    std::uint64_t startFrame=0,lastFrame=0;
+    float gain=1.f,startGain=1.f;
+};
 struct UpdateReceipt50IW {
     Result result=Result::Unprepared;
     std::uint32_t sourcePC=0,helperPC=0;
     float fadeSeconds=0.f;
+    NativeFadePhase50IW nativeFade=NativeFadePhase50IW::Idle;
+    bool nativeFadeAccepted=false;
     bool completed()const noexcept{return result==Result::Updated;}
 };
 struct Counters {
     std::uint64_t requests=0,starts=0,loopStarts=0,oneShotStarts=0,suppressed=0;
     std::uint64_t unavailable=0,rejected=0,stoppedPrevious=0,completions=0,resets=0;
     std::uint64_t contactRefreshes=0,fadeRequests=0;
+    std::uint64_t nativeFadeAdmissions=0,nativeFadeUpdates=0,nativeFadeRetirements=0;
 };
 // Own at a stable address. The shared mixer/groups must outlive this owner.
 //117 is exclusive; no second music writer is admitted. No hot file access,
@@ -164,11 +178,15 @@ public:
     Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
     bool prepare(const std::filesystem::path& discRoot,const std::filesystem::path& audioRoot,
         rr::platform::AudioMixer50HD& mixer,rr::platform::RaceAudioGroups50IC& groups,
-        std::string& error,bool includeContactMusic=false) {
+        std::string& error,bool includeContactMusic=false,
+        TimedVolumePolicy50IW timedVolumePolicy=TimedVolumePolicy50IW::StrictSourceBoundary) {
         namespace d=pod_materials50ed_fixture::detail;
         if(attempted_){error="50IE preparation requires a fresh stable owner";return false;}
         attempted_=true;
         try {
+            d::need(timedVolumePolicy==TimedVolumePolicy50IW::StrictSourceBoundary||
+                timedVolumePolicy==TimedVolumePolicy50IW::NativeLinearSharedMix,
+                "50IW unknown timed-volume policy");
             d::need(mixer.count()>voice&&groups.uses(mixer)&&!mixer.active(voice)&&
                 groups.binding(voice)==rr::game::RaceAudioGroup50IC::Unrepresented&&
                 !mixer.hasVoiceGroupGain50IC(voice),"50IE exclusive music slot117 unavailable");
@@ -212,7 +230,8 @@ public:
             d::need(groups.bind(voice,rr::game::RaceAudioGroup50IC::Music118),
                 "50IE source Music118 binding rejected");
             mixer_=&mixer;groups_=&groups;pcmBytes_=pcmBytes;
-            contactMusicEnabled_=includeContactMusic;error.clear();return true;
+            contactMusicEnabled_=includeContactMusic;timedVolumePolicy_=timedVolumePolicy;
+            error.clear();return true;
         }catch(const std::exception& e){error=e.what();return false;}
         catch(...){error="50IE music cold preparation failed";return false;}
     }
@@ -221,7 +240,7 @@ public:
         Receipt r;r.song=song;++counters_.requests;
         if(!mixer_)return rejected(r,Result::Unprepared);
         if(paused_)return rejected(r,Result::Paused);
-        if(fadePending_)return rejected(r,Result::PendingFade234440);
+        if(fadePending_)return rejected(r,fade_.flag20?Result::PendingTimedVolume26C8F0:Result::PendingFade234440);
         if(playPending_){
             if(song!=pendingSong_||argumentA2)return rejected(r,Result::Ownership);
             return resumePlay(r);
@@ -231,7 +250,7 @@ public:
         //1A46E0 reads existing mode/timer directly. Do not synthesize an
         //activity update before collision admission or the timer refresh.
         if(contact){
-            if(!current()||(!owned_&&mixer_->active(voice)))return rejected(r,Result::Ownership);
+            if(!transportIdentity())return rejected(r,Result::Ownership);
         }else if(!pollCompletion())return rejected(r,Result::Ownership);
         const auto plan=contact?rr::game::planCollisionMusic50IW(state_,liveMode11258,song,argumentA2):
             rr::game::planCategory6Music50IE(state_,liveMode11258,song,argumentA2);
@@ -256,6 +275,9 @@ public:
         r.stoppedPrevious=owned_&&mixer_->active(voice);
         rr::game::beginCategory6MusicPlay50IE(plan,state_);
         mixer_->stop(voice);owned_=false;
+        // Source stop-before-replace cancels the outgoing stream envelope.
+        fade_={};pendingVolume_={};nativeFade_={};endingFade_=false;
+        fadeCallPC_=0x1a4b3cu;fadeRequestedSeconds_=1.5f;
         rr::game::finishCategory6MusicStop50IE(plan,state_);
         // Retain the exact pending start after committed timer/stop/mode
         //writes. A backend rejection must not turn a retry into a timer-only
@@ -265,43 +287,125 @@ public:
         pendingCallPC_=contact?0x1a47fcu:(plan.loop?0x1a482cu:0x1a48ccu);
         return resumePlay(r);
     }
-    // Source1A4AF0 at the declared accepted-world seam, once per update.
-    // The collision timer expires into a REAL unresolved234440(1.5) request.
-    // Keep this owner and source queue held. No invented linear mixer ramp,
-    //immediate stop, timer0 store or acknowledgement substitutes for it.
+    // Actual1A7E44 ending gate reads1A4AD0/1A65A0 before1A4AB0(1.0).
+    // Return validity separately from inactivity; pending starts and foreign
+    // playback must not let the ending timer pretend this owner is silent.
+    bool readEndingActivity(bool& active,bool& fading)const noexcept {
+        active=false;fading=false;
+        if(!transportIdentity()||playPending_)return false;
+        if(!owned_)return true;
+        rr::platform::AudioVoiceObservation50HD observed{};
+        if(!ownedMusicIdentity(observed))return false;
+        active=observed.voice.active;fading=active&&fade_.flag20;
+        return true;
+    }
+    UpdateReceipt50IW requestEndFade1A4AB0()noexcept {
+        if(!mixer_)return {Result::Unprepared,0x1a4ab0u,0,1.f};
+        if(paused_)return {Result::Paused,0x1a4ab0u,0,1.f};
+        if(playPending_)return {Result::PendingPlay,pendingCallPC_,pendingPlayPC_,1.f};
+        if(fadePending_)return endingFade_?resumeNativeFadeAdmission():pendingFadeReceipt();
+        rr::platform::AudioVoiceObservation50HD observed{};
+        if(!ownedMusicIdentity(observed)||!observed.voice.active)
+            return {Result::Ownership,0x1a4ab0u,0,1.f};
+        if(fade_.flag20||!rr::game::validRaceMusicState50IE(state_))
+            return {Result::Input,0x1a4ab0u,0,1.f};
+        // Existing native decoded-rate transport supplies remaining playback,
+        // with no synthetic source stream64/68 or IOP clock. Source mode1's
+        // short-tail branch still uses0.9/0.8; mode4 always uses1.0+0.35.
+        const auto& live=observed.voice;
+        const auto remaining=static_cast<float>((static_cast<double>(live.clip.frames)-
+            live.sourceFrame)/live.clip.sampleRate);
+        if(!std::isfinite(remaining)||(!live.loop&&remaining<=0.f))
+            return {Result::Input,0x1a4abcu,0x234440u,1.f};
+        state_.latch130=-1;state_.mode12C=0; //1A4AB4/1A4AB8; timer128 is untouched.
+        endingFade_=true;fadeCallPC_=0x1a4abcu;fadeRequestedSeconds_=1.f;
+        fadePending_=true;nativeFade_.phase=NativeFadePhase50IW::Pending;
+        ++counters_.fadeRequests;
+        const auto fade=rr::game::beginEndingMusicFade23444050IW(live.loop,remaining,fade_);
+        if(fade.status!=rr::game::RaceMusicLoopFadeStatus50IW::NeedTimedVolume26C8F0)
+            return pendingFadeReceipt();
+        pendingVolume_=fade.request;return resumeNativeFadeAdmission();
+    }
+    // Once after each actual shared-mixer world step.234440's source prefix
+    // becomes a real native schedule on this SAME owned voice. Linear gain
+    // is an explicit native block-boundary policy, not original IOP parity.
+    // Both fade and silent retirement use the existing mixed-frame clock.
     UpdateReceipt50IW update(float sourceSeconds) noexcept {
-        if(fadePending_)return {Result::PendingFade234440,0x1a4b3cu,0x234440u,1.5f};
+        if(fadePending_)return resumeNativeFadeAdmission();
         if(playPending_)return {Result::PendingPlay,pendingCallPC_,pendingPlayPC_,0.f};
         if(!mixer_)return {Result::Unprepared,0x1a4af0u,0,0.f};
         if(paused_)return {Result::Paused,0x1a4af0u,0,0.f};
-        if(!current()||(!owned_&&mixer_->active(voice)))return {Result::Ownership,0x1a4af0u,0,0.f};
+        if(!transportIdentity())return {Result::Ownership,0x1a4af0u,0,0.f};
         const auto step=rr::game::beginRaceMusicUpdate50IW(sourceSeconds,state_);
         if(step.status==rr::game::RaceMusicUpdateStatus50IW::InvalidInput)
             return {Result::Input,0x1a4af0u,0,0.f};
         if(step.status==rr::game::RaceMusicUpdateStatus50IW::NeedFade234440){
-            fadePending_=true;++counters_.fadeRequests;
-            return {Result::PendingFade234440,step.sourcePC,0x234440u,step.fadeSeconds};
+            // An ending request does not clear128. If its remaining collision
+            // timer expires, preserve the real1A4AF0 request rather than hiding
+            // it. A source-directed native retirement is distinct from a
+            // guessed absent original handle or arbitrary PCM inactivity.
+            if(endingFade_&&nativeFade_.phase==NativeFadePhase50IW::Retired&&
+               !owned_&&!mixer_->active(voice)){
+                state_.timer128=0.f;++counters_.fadeRequests;
+                return {Result::Updated,0x1a4b64u,0,1.5f,nativeFade_.phase,false};
+            }
+            if(endingFade_&&collisionLoopIdentity()){
+                //234550..58C overwrites these source prefix fields on the
+                //same playback. Keep the actual held gain and native cursor.
+                fade_={};pendingVolume_={};endingFade_=false;
+            }
+            fadeCallPC_=0x1a4b3cu;fadeRequestedSeconds_=1.5f;
+            fadePending_=true;nativeFade_.phase=NativeFadePhase50IW::Pending;
+            ++counters_.fadeRequests;
+            // Native inactivity is not proof of source+5C==-1. Only the
+            // actual active collision loop may extend this source prefix.
+            if(!collisionLoopIdentity())return pendingFadeReceipt();
+            const auto fade=rr::game::beginCollisionLoopFade23444050IW(true,fade_);
+            if(fade.status!=rr::game::RaceMusicLoopFadeStatus50IW::NeedTimedVolume26C8F0)
+                return pendingFadeReceipt();
+            pendingVolume_=fade.request;return resumeNativeFadeAdmission();
         }
+        const auto native=advanceNativeFade();
+        if(native!=Result::Updated)return {native,0x234a5cu,0x234440u,0.f,nativeFade_.phase,false};
         if(!pollCompletion())return {Result::Ownership,0x1a4b48u,0,0.f};
-        return {Result::Updated,0x1a4b64u,0,0.f};
+        return {Result::Updated,0x1a4b64u,0,0.f,nativeFade_.phase,false};
     }
     bool contactMusicEnabled()const noexcept{return contactMusicEnabled_;}
+    TimedVolumePolicy50IW timedVolumePolicy()const noexcept{return timedVolumePolicy_;}
     bool fadePending()const noexcept{return fadePending_;}
+    // Source prefix parameters retained for the native schedule. This is not
+    // a claim that the separate original234980 global stream tick is running.
+    const rr::game::RaceMusicLoopFade23444050IW& fadeState()const noexcept{return fade_;}
+    const NativeFade50IW& nativeFade()const noexcept{return nativeFade_;}
+    const rr::game::RaceMusicTimedVolume26C8F050IW& timedVolumeRequest()const noexcept{
+        return pendingVolume_;
+    }
+    // Native playback identity only; never a fabricated original SPU handle.
+    std::uint64_t playbackRevision()const noexcept{return playbackRevision_;}
     // Call after a real shared-mixer committed step, also before event dispatch.
     // Completion follows actual source-frame consumption, not a guessed timer.
     bool pollCompletion()noexcept {
-        if(!current()||fadePending_||playPending_)return false;
+        if(!transportIdentity()||fadePending_||playPending_)return false;
         const bool active=mixer_->active(voice);
         if(!owned_&&active)return false; // Another writer violated117 ownership.
-        if(owned_&&!active){owned_=false;currentSong_=0;++counters_.completions;}
+        if(owned_&&!active){
+            if(endingFade_&&(nativeFade_.phase==NativeFadePhase50IW::Fading||
+                nativeFade_.phase==NativeFadePhase50IW::SilentRetirement)){
+                nativeFade_.phase=NativeFadePhase50IW::Retired;fade_={};
+                ++counters_.nativeFadeRetirements;
+            }
+            owned_=false;currentSong_=0;playbackRevision_=0;++counters_.completions;
+        }
         rr::game::observeCategory6MusicActivity50IE(active,state_);return true;
     }
     void pause(bool value)noexcept{paused_=value;}
     // Host race reset/close. No cumulative audio clock or other voice changes.
     void reset()noexcept {
-        if(mixer_&&current()&&owned_)mixer_->stop(voice);
+        if(transportIdentity()&&owned_)mixer_->stop(voice);
         owned_=false;currentSong_=0;state_={};paused_=false;fadePending_=false;playPending_=false;
         pendingSong_=0;pendingPlayPC_=0;pendingCallPC_=0;
+        fade_={};pendingVolume_={};nativeFade_={};playbackRevision_=0;endingFade_=false;
+        fadeCallPC_=0x1a4b3cu;fadeRequestedSeconds_=1.5f;
         pendingLoop_=false;pendingStoppedPrevious_=false;++counters_.resets;
     }
     bool prepared()const noexcept{return mixer_!=nullptr;}
@@ -309,25 +413,136 @@ public:
         return mixer_&&groups_&&groups_->uses(*mixer_)&&mixer_->count()>voice&&
             groups_->binding(voice)==rr::game::RaceAudioGroup50IC::Music118;
     }
-    bool active()const noexcept{return current()&&owned_&&mixer_->active(voice);}
+    bool active()const noexcept{return transportIdentity()&&owned_&&mixer_->active(voice);}
     std::uint32_t currentSong()const noexcept{return currentSong_;}
     const rr::game::RaceMusicState50IE& state()const noexcept{return state_;}
     const rr::assets::AudioBank50HC& bank()const noexcept{return bank_;}
     const Counters& counters()const noexcept{return counters_;}
     std::size_t pcmBytes()const noexcept{return pcmBytes_;}
 private:
+    bool transportIdentity()const noexcept {
+        if(!current()||!mixer_->canRecordControlChanges())return false;
+        return owned_?playbackRevision_!=0&&mixer_->playbackRevision(voice)==playbackRevision_:
+            !mixer_->active(voice);
+    }
+    bool ownedMusicIdentity(rr::platform::AudioVoiceObservation50HD& observed)const noexcept {
+        if(!transportIdentity()||!owned_)return false;
+        const bool collision=rr::game::collisionMusicSong50IW(currentSong_);
+        if(!collision&&!rr::game::category6MusicSong50IE(currentSong_))return false;
+        const auto i=detail::index(currentSong_);
+        if(i>=bank_.clips.size())return false;
+        if(!mixer_->inspectVoice(voice,observed))return false;
+        const auto& live=observed.voice;const auto& clip=clips_[i];
+        const bool loop=collision||currentSong_==29u||currentSong_==33u||currentSong_==34u;
+        return live.loop==loop&&live.gain==nativeFade_.gain&&live.pitch==1.f&&live.pan==0.f&&
+            observed.groupKnown&&live.clip.samples==clip.samples&&live.clip.frames==clip.frames&&
+            live.clip.sampleRate==clip.sampleRate&&live.clip.channels==clip.channels&&
+            live.clip.loopStart==clip.loopStart&&live.clip.loopEnd==clip.loopEnd;
+    }
+    bool collisionLoopIdentity()const noexcept {
+        rr::platform::AudioVoiceObservation50HD observed{};
+        return rr::game::collisionMusicSong50IW(currentSong_)&&ownedMusicIdentity(observed)&&
+            observed.voice.active&&observed.voice.loop;
+    }
+    bool fadePlaybackIdentity()const noexcept {
+        if(!endingFade_)return collisionLoopIdentity();
+        rr::platform::AudioVoiceObservation50HD observed{};
+        return ownedMusicIdentity(observed)&&observed.voice.active;
+    }
+    UpdateReceipt50IW pendingFadeReceipt()const noexcept {
+        if(!transportIdentity())return {Result::Ownership,fadeCallPC_,0x234440u,fadeRequestedSeconds_};
+        if(pendingVolume_.helperPC){
+            if(!fadePlaybackIdentity())return {Result::Ownership,
+                pendingVolume_.sourcePC,pendingVolume_.helperPC,fadeRequestedSeconds_};
+            return {Result::PendingTimedVolume26C8F0,
+                pendingVolume_.sourcePC,pendingVolume_.helperPC,fadeRequestedSeconds_,NativeFadePhase50IW::Pending,false};
+        }
+        return {Result::PendingFade234440,fadeCallPC_,0x234440u,fadeRequestedSeconds_};
+    }
+    UpdateReceipt50IW resumeNativeFadeAdmission()noexcept {
+        if(timedVolumePolicy_!=TimedVolumePolicy50IW::NativeLinearSharedMix)return pendingFadeReceipt();
+        if(paused_)return {Result::Paused,0x2350a8u,0x26c8f0u,fadeRequestedSeconds_,NativeFadePhase50IW::Pending,false};
+        if(!pendingVolume_.helperPC||!fadePlaybackIdentity()||
+           pendingVolume_.targetVolume!=0||pendingVolume_.argumentA3!=0||
+           !fade_.flag20||!mixer_->sampleRate())return pendingFadeReceipt();
+        if(endingFade_){
+            if(pendingVolume_.durationMilliseconds<0||pendingVolume_.durationMilliseconds>1000||
+               fade_.duration70<=0.f||fade_.duration70>1.f||fade_.retirement6C<=0.f)
+                return pendingFadeReceipt();
+        }else if(pendingVolume_.durationMilliseconds!=1500||fade_.duration70!=1.5f)
+            return pendingFadeReceipt();
+        const bool immediate=pendingVolume_.durationMilliseconds==0;
+        // A genuine very short non-loop tail can round2350A0 to0ms. Apply
+        //that native target now, without dividing by zero or mixing another
+        //full-volume block after an accepted immediate-volume request.
+        if(immediate&&(!mixer_->canRecordControlChanges(1)||!mixer_->controls(voice,0.f,1.f,0.f)))
+            return {Result::BackendRejected,0x2350a8u,0x26c8f0u,fadeRequestedSeconds_,
+                NativeFadePhase50IW::Pending,false};
+        // This concrete schedule belongs to this owner and playback revision.
+        // No source/SPU handle or IOP enqueue/success return is fabricated.
+        nativeFade_.phase=immediate?NativeFadePhase50IW::SilentRetirement:NativeFadePhase50IW::Fading;
+        nativeFade_.startFrame=nativeFade_.lastFrame=mixer_->mixedFrames();
+        nativeFade_.startGain=nativeFade_.gain;
+        if(immediate){nativeFade_.gain=0.f;++counters_.nativeFadeUpdates;}
+        fadePending_=false;++counters_.nativeFadeAdmissions;
+        // Collision acceptance returns through234594 to1A4B44. Ending returns
+        //through1A4AB0 and does not clear128. Both source callers ignore the
+        //helper result; native admission is separate from actual retirement.
+        if(!endingFade_)state_.timer128=0.f;
+        if(!pollCompletion())return {Result::Ownership,0x1a4b48u,0,0.f,nativeFade_.phase,true};
+        return {Result::Updated,endingFade_?0x1a4abcu:0x1a4b64u,0,
+            fadeRequestedSeconds_,nativeFade_.phase,true};
+    }
+    Result advanceNativeFade()noexcept {
+        if(nativeFade_.phase!=NativeFadePhase50IW::Fading&&
+           nativeFade_.phase!=NativeFadePhase50IW::SilentRetirement)return Result::Updated;
+        if(!transportIdentity()||!mixer_->sampleRate())return Result::Ownership;
+        if(endingFade_&&owned_&&!mixer_->active(voice)){
+            // A non-looping original cue can naturally finish during its
+            //native fade. Completion is real PCM activity, not a silent shim.
+            nativeFade_.phase=NativeFadePhase50IW::Retired;fade_={};
+            ++counters_.nativeFadeRetirements;return Result::Updated;
+        }
+        if(!fadePlaybackIdentity())return Result::Ownership;
+        const auto now=mixer_->mixedFrames();
+        if(now<nativeFade_.lastFrame||now<nativeFade_.startFrame)return Result::Input;
+        if(now==nativeFade_.lastFrame)return Result::Updated;
+        // Existing actual shared-mix consumption is the sole native clock.
+        // Apply one held gain at this accepted block boundary, without
+        // rewriting the PCM cursor or the independent Music118 group gain.
+        const double elapsed=static_cast<double>(now-nativeFade_.startFrame)/mixer_->sampleRate();
+        const double duration=static_cast<double>(pendingVolume_.durationMilliseconds)/1000.0;
+        const double amount=duration>0.0?std::min(1.0,elapsed/duration):1.0;
+        const float target=static_cast<float>(pendingVolume_.targetVolume)/100.f;
+        const float gain=static_cast<float>(nativeFade_.startGain+
+            (target-nativeFade_.startGain)*amount);
+        const bool retire=elapsed>=static_cast<double>(fade_.retirement6C);
+        if(!mixer_->canRecordControlChanges(retire?2u:1u)||
+           !mixer_->controls(voice,gain,1.f,0.f))return Result::BackendRejected;
+        nativeFade_.gain=gain;nativeFade_.lastFrame=now;++counters_.nativeFadeUpdates;
+        nativeFade_.phase=amount>=1.0?NativeFadePhase50IW::SilentRetirement:NativeFadePhase50IW::Fading;
+        if(retire){
+            // Native retirement uses this request's source-selected margin.
+            // Its block quantization is native policy; no IOP timing parity.
+            mixer_->stop(voice);nativeFade_.phase=NativeFadePhase50IW::Retired;
+            fade_={};++counters_.nativeFadeRetirements;
+        }
+        return Result::Updated;
+    }
     Receipt resumePlay(Receipt r) noexcept {
         r.sourcePlayPC=pendingPlayPC_;r.stoppedPrevious=pendingStoppedPrevious_;
-        if(!current()||(!owned_&&mixer_->active(voice)))return rejected(r,Result::Ownership);
+        if(!transportIdentity())return rejected(r,Result::Ownership);
         const auto i=detail::index(pendingSong_);
         if(i>=bank_.clips.size()||bank_.clips[i].state!=rr::assets::AudioAssetState50HC::ready)
             return rejected(r,Result::Unavailable);
         // Native transport: natural22050Hz PCM through the48000Hz mixer,
         //unity per-voice gain/pitch, independent sourceMusic118 group gain.
         //RACEMUS Pitch1881 is source SPU units, never a native pitch ratio.
-        if(!mixer_->play(voice,clips_[i],1.f,1.f,pendingLoop_,0.f))
+        if(!mixer_->canRecordControlChanges(1)||
+           !mixer_->play(voice,clips_[i],1.f,1.f,pendingLoop_,0.f))
             return rejected(r,Result::BackendRejected);
-        owned_=true;currentSong_=pendingSong_;r.result=Result::Started;r.originalV0=1;
+        owned_=true;playbackRevision_=mixer_->playbackRevision(voice);
+        currentSong_=pendingSong_;r.result=Result::Started;r.originalV0=1;
         ++counters_.starts;if(pendingLoop_)++counters_.loopStarts;else ++counters_.oneShotStarts;
         if(pendingStoppedPrevious_)++counters_.stoppedPrevious;
         playPending_=false;pendingSong_=0;pendingPlayPC_=0;pendingCallPC_=0;
@@ -341,11 +556,19 @@ private:
     rr::platform::AudioMixer50HD* mixer_=nullptr;
     rr::platform::RaceAudioGroups50IC* groups_=nullptr;
     rr::game::RaceMusicState50IE state_{};
+    rr::game::RaceMusicLoopFade23444050IW fade_{};
+    rr::game::RaceMusicTimedVolume26C8F050IW pendingVolume_{};
+    NativeFade50IW nativeFade_{};
+    TimedVolumePolicy50IW timedVolumePolicy_=TimedVolumePolicy50IW::StrictSourceBoundary;
+    std::uint64_t playbackRevision_=0;
     Counters counters_{};
     std::size_t pcmBytes_=0;
     std::uint32_t currentSong_=0;
     bool attempted_=false,paused_=false,owned_=false;
     bool contactMusicEnabled_=false,fadePending_=false,playPending_=false;
+    bool endingFade_=false;
+    std::uint32_t fadeCallPC_=0x1a4b3cu;
+    float fadeRequestedSeconds_=1.5f;
     std::uint32_t pendingSong_=0,pendingPlayPC_=0,pendingCallPC_=0;
     bool pendingLoop_=false,pendingStoppedPrevious_=false;
 };

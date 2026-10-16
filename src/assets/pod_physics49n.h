@@ -29,6 +29,11 @@ struct PodPhysicsProvenance49N {
 // Atomic failure; binary64Bits is optional audit output, not retained state.
 bool parsePodPhysicsNumber49N(const char* text, std::size_t bytes, float& output,
                              std::uint64_t* binary64Bits = nullptr) noexcept;
+// UI DAT extension of the same integer-only conversion: at most seven
+// fractional digits, still nine total digits and eleven bytes. Original
+// Gasgano Widget15 authors -22.0652073; PHY admission above stays unchanged.
+// Same exact binary64 then binary32 rounding, zero and atomic-failure rules.
+bool parseOriginalUiNumber49N(const char* text, std::size_t bytes, float& output) noexcept;
 // Load-time, serial, bounded and allocation-free. Input is original decoded PHY
 // text, not its compressed RES bytes. Caller owns fixed output/provenance.
 // All61 mapped scalars and both Engine vectors are required (narrower native

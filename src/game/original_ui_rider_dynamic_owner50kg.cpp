@@ -25,6 +25,7 @@ struct OriginalUiRiderDynamicOwner50KG::Storage {
     ModelMotionSharedState49T* motion=nullptr;ModelMode0IkShared50KG* ik=nullptr;
     SourceLibmState49T* libm=nullptr;CoupledNoiseContext49M* rng=nullptr;
     OriginalUiRiderDynamicBackend50KG backend;
+    std::uint32_t requestedPreviewRiders=0;
     bool coldPrepared=false,poisoned=false,inCallback=false,drained=false;
 };
 OriginalUiRiderDynamicOwner50KG::OriginalUiRiderDynamicOwner50KG() noexcept=default;
@@ -63,19 +64,28 @@ bool OriginalUiRiderDynamicOwner50KG::bind(std::shared_ptr<const assets::Origina
             // actual manager cold construction, before selection publication.
             if(e.state.selected||e.state.shown)return fail(E::input);
         }
-        // Bind identities from the authenticated rider.dat control membership.
-        // Numeric rider IDs do not imply a widget offset or an asset filename.
+        // Original Group1 order and PodIndex identities from authenticated rider.dat.
+        // Bind metadata for all23 controls, including hidden traversal intermediates.
+        // These maps confer no descriptor ownership or preview readiness.
+        constexpr std::uint16_t controls[]{16,17,10,8,2,4,9,12,3,5,7,19,20,13,6,14,21,15,1,11,22,18,23};
+        constexpr std::uint16_t riders[]{19,20,12,10,2,4,11,15,3,7,9,22,23,16,8,17,24,18,1,14,25,21,26};
+        constexpr std::size_t count=sizeof(controls)/sizeof(controls[0]);
         const auto* selection=widgets.selectionData();const auto* page=selection->page();
-        if(!page||page->groups.size()<=1)return fail(E::input);
-        for(const auto control:page->groups[1].controls){
-            if(control<0||static_cast<std::size_t>(control)>=page->controls.size())return fail(E::input);
+        if(!page||page->groups.size()<=1||page->groups[1].controls.size()!=count)return fail(E::input);
+        std::array<bool,120> usedWidgets{};
+        for(std::size_t slot=0;slot<count;++slot){
+            const auto control=page->groups[1].controls[slot];
+            if(control!=controls[slot]||static_cast<std::size_t>(control)>=page->controls.size())return fail(E::input);
             const auto rider=selection->controlRider(static_cast<std::uint16_t>(control));
-            if(rider<0||rider>=32)return fail(E::input);
-            if(rider!=2&&rider!=4&&rider!=10&&rider!=11&&rider!=12&&rider!=15&&rider!=19&&rider!=20)continue;
+            if(rider!=riders[slot]||next->pods[rider]||next->characters[rider])return fail(E::input);
             const auto& ids=page->controls[control].widgets;
-            if(ids.size()!=4||!idOk(ids[0])||!idOk(ids[3])||
-               next->entries[ids[0]].state.kind!=K::pod||next->entries[ids[3]].state.kind!=K::character||
-               next->pods[rider]||next->characters[rider])return fail(E::input);
+            if(ids.size()!=4)return fail(E::input);
+            constexpr K kinds[]{K::pod,K::text,K::text,K::character};
+            for(std::size_t i=0;i<4;++i){
+                if(!idOk(ids[i])||usedWidgets[ids[i]]||next->entries[ids[i]].state.kind!=kinds[i])return fail(E::input);
+                usedWidgets[ids[i]]=true;
+            }
+            // Widget references come from the source control, never rider arithmetic.
             next->pods[rider]=ids[0];next->characters[rider]=ids[3];
         }
         storage_=std::move(next);diagnostic_={};d={};return true;
@@ -99,23 +109,35 @@ std::uint16_t OriginalUiRiderDynamicOwner50KG::characterWidget(std::uint32_t rid
 OriginalUiRiderWidgetState50KG OriginalUiRiderDynamicOwner50KG::state(std::uint16_t id)const noexcept {
     return storage_&&idOk(id)?storage_->entries[id].state:OriginalUiRiderWidgetState50KG{};
 }
+bool OriginalUiRiderDynamicOwner50KG::previewRequested(std::uint32_t rider)const noexcept {
+    return storage_&&storage_->coldPrepared&&originalUiRiderRequested50KG(storage_->requestedPreviewRiders,rider);
+}
 bool OriginalUiRiderDynamicOwner50KG::prepareCold(OriginalUiRiderColdPopulation50KG population,
-    OriginalUiRiderDynamicDiagnostic50KG& d) noexcept {
+    OriginalUiRiderDynamicDiagnostic50KG& d,OriginalUiRiderPreviewSet50KG previewSet,
+    std::uint32_t requestedPreviewRiders) noexcept {
     d={};const auto fail=[&](E e){d.error=e;diagnostic_=d;return false;};
+    std::uint32_t requested=0;
+    if(!originalUiRiderPreviewRequest50KG(previewSet,requestedPreviewRiders,requested))return fail(E::input);
     if(!storage_||storage_->coldPrepared||storage_->poisoned||storage_->drained||storage_->inCallback||
        (population!=OriginalUiRiderColdPopulation50KG::selected19&&
         population!=OriginalUiRiderColdPopulation50KG::rider19And20&&
-        population!=OriginalUiRiderColdPopulation50KG::defaultUnlocked))return fail(E::input);
+        population!=OriginalUiRiderColdPopulation50KG::defaultUnlocked&&
+        population!=OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasgano&&
+        population!=OriginalUiRiderColdPopulation50KG::defaultUnlockedAndCleggPreview&&
+        population!=OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasganoAndCleggPreview))return fail(E::input);
+    if(previewSet==OriginalUiRiderPreviewSet50KG::gasgano7&&
+       population!=OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasgano&&
+       population!=OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasganoAndCleggPreview)return fail(E::input);
     auto& s=*storage_;
     for(const auto& e:s.entries)if(e.everLoaded||e.registered||e.characterAssets||e.podAssets||
        (dynamic(e.state.kind)&&(e.state.selected||e.state.shown)))return fail(E::input);
     try {
         std::array<std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG>,120> characters{};
         std::array<std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG>,120> pods{};
-        for(const std::uint32_t rider:{2u,4u,10u,11u,12u,15u,19u,20u}){
-            if(population==OriginalUiRiderColdPopulation50KG::selected19&&rider!=19)continue;
-            if(population==OriginalUiRiderColdPopulation50KG::rider19And20&&rider!=19&&rider!=20)continue;
-            const auto pod=s.pods[rider],character=s.characters[rider];
+        auto podIds=s.pods,characterIds=s.characters;
+        for(const auto rider:originalUiRiderRoster50KG){
+            if(!originalUiRiderColdMember50KG(population,requested,rider))continue;
+            const auto pod=podIds[rider],character=characterIds[rider];
             if(!pod||!character||pods[pod]||characters[character])return fail(E::input);
             d.widget=pod;
             auto p=std::make_shared<assets::OriginalUiRiderPodAssets50KG>();
@@ -134,7 +156,8 @@ bool OriginalUiRiderDynamicOwner50KG::prepareCold(OriginalUiRiderColdPopulation5
         // sample, attachment, IK, visibility, binder clock or source row exists.
         for(std::uint16_t id=1;id<120;++id){s.entries[id].characterAssets=std::move(characters[id]);
             s.entries[id].podAssets=std::move(pods[id]);}
-        s.coldPrepared=true;diagnostic_={};d={};return true;
+        s.pods=podIds;s.characters=characterIds;
+        s.requestedPreviewRiders=requested;s.coldPrepared=true;diagnostic_={};d={};return true;
     }catch(...){return fail(E::allocation);}
 }
 bool OriginalUiRiderDynamicOwner50KG::preflight(const OriginalUiRiderWidgetCallback50KG* calls,std::size_t count) noexcept {

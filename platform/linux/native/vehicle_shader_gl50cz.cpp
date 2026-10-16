@@ -1,6 +1,7 @@
 #include "vehicle_shader_gl50cz.h"
 #include "../../../src/assets/native_asset48b.h"
 #include <cstddef>
+#include <cstring>
 #include <type_traits>
 
 namespace rr::platform {
@@ -14,25 +15,32 @@ static_assert(std::is_standard_layout<assets::Vertex48B>::value && sizeof(float)
 }
 
 // Default diagnostic behavior from platform/windows/native/main48b.cpp, with
-// explicit opt-in native source-normal lighting for the window renderer.
-// This is not a recovered original-game material program or PS2 transform.
+// explicit opt-in native source-normal lighting for the window renderer, plus
+// bounded original packed-RGB MODULATE and source-owned dual-map byte algebra.
+// Native transform, sampler, clipping and depth precision remain explicit
+// policy boundaries; this is not original hardware fragment/raster parity.
 const char* vehicleGlVertexSource50CZ() noexcept {
     return R"GLSL(#version 150 core
 in vec3 rrPosition;
 in vec2 rrUv;
 in vec4 rrColor;
 in vec3 rrWorldNormal;
+in vec2 rrSpecularUv50LA;
 uniform mat4 worldViewProjection;
 uniform int useUvTransform;
 uniform vec4 uvScaleOffset;
 out vec2 viewerUv;
+out vec2 sourceSpecularUv50LA;
 out vec4 viewerColor;
+noperspective out vec4 sourceColor;
 out vec3 viewerWorldPosition;
 out vec3 viewerWorldNormal;
 void main() {
     gl_Position = vec4(rrPosition, 1.0) * worldViewProjection;
     viewerUv = useUvTransform != 0 ? rrUv * uvScaleOffset.xy + uvScaleOffset.zw : rrUv;
+    sourceSpecularUv50LA = rrSpecularUv50LA;
     viewerColor = rrColor;
+    sourceColor = rrColor;
     viewerWorldPosition = rrPosition;
     viewerWorldNormal = rrWorldNormal;
 }
@@ -42,7 +50,9 @@ void main() {
 const char* vehicleGlFragmentSource50CZ() noexcept {
     return R"GLSL(#version 150 core
 in vec2 viewerUv;
+in vec2 sourceSpecularUv50LA;
 in vec4 viewerColor;
+noperspective in vec4 sourceColor;
 in vec3 viewerWorldPosition;
 in vec3 viewerWorldNormal;
 uniform int useTexture;
@@ -52,11 +62,60 @@ uniform float alphaScale;
 uniform int suppressDraw;
 uniform int useLighting;
 uniform int useNativeGcSelectedLights;
+uniform int useSourceDiffuseCompressed50LA;
+uniform int sourcePairPass50LA;
+uniform int sourcePairFog50LA;
+uniform int sourcePairAlphaTest50LA;
+uniform sampler2D sourcePairDestination50LA;
 uniform vec4 nativeGcAmbient;
 uniform vec4 nativeGcDiffuse[3];
 uniform vec4 nativeGcDirection[3];
 out vec4 viewerOutput;
+#ifdef RR_COVERAGE_PAYLOAD
+out float coverageDepth;
+#endif
 void main() {
+    if (useSourceDiffuseCompressed50LA != 0) {
+        if (suppressDraw != 0) discard;
+        // rrColor is the original CPU-generated early-bias packed color for
+        // this authenticated body material, never imported vertex RGB. The
+        // base map uses MODULATE neutral 128 before byte clamp/truncation.
+        if (sourcePairPass50LA != 0) {
+            vec2 uv = sourcePairPass50LA >= 2 ? sourceSpecularUv50LA : viewerUv;
+            vec4 sourceByte = floor(clamp(texture(image, uv) * 255.0 *
+                clamp(sourceColor * 255.0, 0.0, 255.0) / 128.0, 0.0, 255.0));
+            // Original dual packets carry F=255. GS fog divides by 256;
+            // enabled inherited/overridden FGE therefore still changes RGB.
+            if (sourcePairFog50LA != 0) sourceByte.rgb = floor(sourceByte.rgb * (255.0 / 256.0));
+            if (sourcePairPass50LA >= 2) {
+                if (sourcePairAlphaTest50LA != 0 && sourceByte.a < 1.0) discard;
+#ifdef RR_COVERAGE_PAYLOAD
+                // Same linked vertex/fragment program as base; same original
+                // source byte/fog/alpha-test kernel. Private AA0 raster payload.
+                if (sourcePairPass50LA == 3) {
+                    viewerOutput = sourceByte;
+                    coverageDepth = gl_FragCoord.z;
+                    return;
+                }
+#endif
+                // One triangle per barrier/draw. Read this fragment's current
+                // destination, never a whole-group snapshot or source alpha.
+                vec4 destinationByte = floor(clamp(texelFetch(sourcePairDestination50LA,
+                    ivec2(gl_FragCoord.xy), 0) * 255.0, 0.0, 255.0) + 0.5);
+                sourceByte.rgb = clamp(floor(sourceByte.rgb * destinationByte.a / 128.0) +
+                    destinationByte.rgb, 0.0, 255.0);
+            }
+            viewerOutput = sourceByte / 255.0; // Map 2 independently replaces A.
+            return;
+        }
+        vec3 sourceByte = clamp(sourceColor.rgb * 255.0, 0.0, 255.0);
+        vec3 sourceRgb = floor(clamp(texture(image, viewerUv).rgb * 255.0 *
+            sourceByte / 128.0, 0.0, 255.0)) / 255.0;
+        // Deliberately retain opaque host alpha until the complete gameplay
+        // source-RGBA producer/consumer order has its own recovered owner.
+        viewerOutput = vec4(sourceRgb, 1.0);
+        return;
+    }
     // Evaluate derivatives before any discard. Source normals retain their
     // authored signs; only the zero-normal fallback follows triangle winding.
     vec3 plane = cross(dFdx(viewerWorldPosition), dFdy(viewerWorldPosition));
@@ -115,10 +174,17 @@ bool VehicleGlShader50CZ::noGlError(VehicleGlShaderDiagnostic50CZ& diagnostic,
 }
 
 bool VehicleGlShader50CZ::compile(std::uint32_t type, const char* source,
-    std::uint32_t& shader, VehicleGlShaderDiagnostic50CZ& diagnostic) noexcept {
+    std::uint32_t& shader, VehicleGlShaderDiagnostic50CZ& diagnostic, bool coveragePayload) noexcept {
     shader = gl_.createShader(type);
     if (!noGlError(diagnostic) || !shader) return false;
-    gl_.shaderSource(shader, 1, &source, nullptr);
+    if (coveragePayload) {
+        // Insert a private define after the unchanged GLSL version directive.
+        const char* body = std::strchr(source, '\n');
+        if (!body) return false;
+        const char* pieces[] = {source, "#define RR_COVERAGE_PAYLOAD 1\n", body + 1};
+        const std::int32_t lengths[] = {static_cast<std::int32_t>(body + 1 - source), -1, -1};
+        gl_.shaderSource(shader, 3, pieces, lengths);
+    } else gl_.shaderSource(shader, 1, &source, nullptr);
     if (!noGlError(diagnostic)) return false;
     gl_.compileShader(shader);
     if (!noGlError(diagnostic)) return false;
@@ -153,7 +219,7 @@ void VehicleGlShader50CZ::cleanup(VehicleGlShaderDiagnostic50CZ& diagnostic) noe
     diagnostic.cleanupIncomplete = hasResources();
 }
 
-bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic) noexcept {
+bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, bool coveragePayload) noexcept {
     diagnostic = {};
     if (hasResources()) {
         diagnostic.stage = VehicleGlShaderStage50CZ::alreadyOwned;
@@ -173,7 +239,7 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic) 
     diagnostic.stage = VehicleGlShaderStage50CZ::vertex;
     if (!compile(vertexShader, vehicleGlVertexSource50CZ(), vertex_, diagnostic)) return fail();
     diagnostic.stage = VehicleGlShaderStage50CZ::fragment;
-    if (!compile(fragmentShader, vehicleGlFragmentSource50CZ(), fragment_, diagnostic)) return fail();
+    if (!compile(fragmentShader, vehicleGlFragmentSource50CZ(), fragment_, diagnostic, coveragePayload)) return fail();
     diagnostic.stage = VehicleGlShaderStage50CZ::link;
     program_ = gl_.createProgram();
     if (!noGlError(diagnostic) || !program_) return fail();
@@ -189,8 +255,14 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic) 
     if (!noGlError(diagnostic)) return fail();
     gl_.bindAttribLocation(program_, vehicleGlNormalAttribute50CZ, "rrWorldNormal");
     if (!noGlError(diagnostic)) return fail();
+    gl_.bindAttribLocation(program_, vehicleGlSpecularUvAttribute50LA, "rrSpecularUv50LA");
+    if (!noGlError(diagnostic)) return fail();
     gl_.bindFragDataLocation(program_, vehicleGlColorOutput50CZ, "viewerOutput");
     if (!noGlError(diagnostic)) return fail();
+    if (coveragePayload) {
+        gl_.bindFragDataLocation(program_, 1, "coverageDepth");
+        if (!noGlError(diagnostic)) return fail();
+    }
     gl_.linkProgram(program_);
     if (!noGlError(diagnostic)) return fail();
     std::int32_t linked = 0;
@@ -217,6 +289,11 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic) 
     uniforms_.uvScaleOffset = gl_.getUniformLocation(program_, "uvScaleOffset");
     uniforms_.useLighting = gl_.getUniformLocation(program_, "useLighting");
     uniforms_.useNativeGcSelectedLights = gl_.getUniformLocation(program_, "useNativeGcSelectedLights");
+    uniforms_.useSourceDiffuseCompressed50LA = gl_.getUniformLocation(program_, "useSourceDiffuseCompressed50LA");
+    uniforms_.sourcePairPass50LA = gl_.getUniformLocation(program_, "sourcePairPass50LA");
+    uniforms_.sourcePairFog50LA = gl_.getUniformLocation(program_, "sourcePairFog50LA");
+    uniforms_.sourcePairDestination50LA = gl_.getUniformLocation(program_, "sourcePairDestination50LA");
+    uniforms_.sourcePairAlphaTest50LA = gl_.getUniformLocation(program_, "sourcePairAlphaTest50LA");
     uniforms_.nativeGcAmbient = gl_.getUniformLocation(program_, "nativeGcAmbient");
     constexpr const char* diffuseNames[] = {
         "nativeGcDiffuse[0]", "nativeGcDiffuse[1]", "nativeGcDiffuse[2]"
@@ -233,6 +310,9 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic) 
     if (!noGlError(diagnostic) || uniforms_.effectMode < 0 || uniforms_.alphaScale < 0 ||
         uniforms_.suppressDraw < 0 || uniforms_.useUvTransform < 0 || uniforms_.uvScaleOffset < 0 ||
         uniforms_.useLighting < 0 || uniforms_.useNativeGcSelectedLights < 0 ||
+        uniforms_.useSourceDiffuseCompressed50LA < 0 || uniforms_.sourcePairPass50LA < 0 ||
+        uniforms_.sourcePairFog50LA < 0 || uniforms_.sourcePairDestination50LA < 0 ||
+        uniforms_.sourcePairAlphaTest50LA < 0 ||
         uniforms_.nativeGcAmbient < 0)
         return fail();
     ready_ = true;

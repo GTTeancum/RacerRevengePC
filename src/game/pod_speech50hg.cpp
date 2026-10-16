@@ -65,6 +65,13 @@ PodSpeechStatus50HG initializePodSpeech50HG(const PodSpeechCounts50HG& c,
     for(unsigned n=0;n<6;++n)if(!randomIndex(nextRaw,sizes[n],state.cursors[n]))return PodSpeechStatus50HG::RandomRange;
     state.initialized=true;raw=nextRaw;out=state;return PodSpeechStatus50HG::Complete;
 }
+bool advancePodSpeechCooldown50HG(float dt,PodSpeechState50HG& state) noexcept {
+    if(!state.initialized||std::fegetround()!=FE_TONEAREST||!finite(dt)||dt<0.f||
+       !finite(state.cooldown224))return false;
+    const auto remaining=state.cooldown224>0.f?sub(state.cooldown224,dt):state.cooldown224;
+    if(!finite(remaining))return false;
+    state.cooldown224=remaining;return true;
+}
 bool advanceSpeechTimers50HG(float dt,UndertrackPlayerPrefix50ET& prefix,PodSpeechState50HG& state) noexcept {
     const auto damageTimer=fp(prefix.counter109C);
     if(!state.initialized||std::fegetround()!=FE_TONEAREST||!finite(dt)||dt<0.f||

@@ -306,8 +306,15 @@ bool updateChariotLifecycle49V(const ChariotLifecycleInput49V& input,
     CoupledNoiseContext49M& noise,ChariotLifecycleWorkspace49V& w,
     ChariotLifecycleDiagnostic49V& d) noexcept {
     d={};
+    //22791C..227928 (mirrored at227FF0..227FFC) leaves a real detached human
+    //chariot physical:838=1,83C=0.21BEC0..21BEC8 then skips the normal
+    //speed selector after the prefix has copied that physical local pose.
+    //This is a leaf domain only;49W still requires the actual wreck owner
+    //before it can admit a nonzero-state whole frame.
+    const bool detachedHuman=input.vehicle58==0u&&
+        (main.vehicleState40==1u||main.vehicleState40==2u)&&physical&&!s.vehicle83C;
     if(input.phase!=ChariotLifecyclePhase49V::afterEngineResponseBeforePhysics||
-        main.vehicleState40||input.vehicle58>1u||(!physical&&!s.vehicle83C))
+        (main.vehicleState40&&!detachedHuman)||input.vehicle58>1u||(!physical&&!s.vehicle83C))
         return fail(d,ChariotLifecycleError49V::context,0x21a660);
     if(input.vehicle58==1u&&!input.applicationByte58Bound)
         return fail(d,ChariotLifecycleError49V::context,0x21bfdc);
@@ -329,8 +336,9 @@ bool updateChariotLifecycle49V(const ChariotLifecycleInput49V& input,
         (secondary.sceneFlags190&255u)!=physicalNode.sceneFlags190)
         return fail(d,ChariotLifecycleError49V::body_scene,0x21a660);
     const float effective=shared.speed434750.guard?fp(shared.speed434750.word):fp(0x4312aa7fu);
-    if(!std::isfinite(input.frameFactor)||input.frameFactor<0||!std::isfinite(main.cachedSpeed34)||
-        !std::isfinite(effective)||!std::isfinite(s.duration848)||!(s.duration848>0))
+    if(!std::isfinite(input.frameFactor)||input.frameFactor<0||
+        (!detachedHuman&&(!std::isfinite(main.cachedSpeed34)||!std::isfinite(effective)||
+         !std::isfinite(s.duration848)||!(s.duration848>0))))
         return fail(d,ChariotLifecycleError49V::input,0x21a660);
     // This temporary source-shaped input is derived only at the call boundary;
     // it is not another persistent body/cache/clock owner.
@@ -379,8 +387,13 @@ bool updateChariotLifecycle49V(const ChariotLifecycleInput49V& input,
     //21BFDC..21BFF4 extracts bit1 with DSLL32(30),DSRL32(31).
     // This is the actual manager flag, not the vehicle's own mode word.
     if(ai)RR_CHARIOT_LIFECYCLE49V_STAGE(0x21bfdcu);
-    const bool selectPhysical=ai?!(input.applicationByte58&2u):in.cachedBodySpeed34<effective;
-    if(selectPhysical){
+    const bool selectPhysical=!detachedHuman&&
+        (ai?!(input.applicationByte58&2u):in.cachedBodySpeed34<effective);
+    if(detachedHuman){
+        //21BEC4 branches directly to21C0F4. Preserve838/83C, elapsed,
+        //response, physical velocities and activation histories exactly.
+        RR_CHARIOT_LIFECYCLE49V_STAGE(0x21bec4u);
+    }else if(selectPhysical){
         if(!w.vehicle838){
             RR_CHARIOT_LIFECYCLE49V_STAGE(ai?0x21c008u:0x21bef8u);
             if(!detail::copyLocal49U(g,b.physical19C,node(g,b.model1B4).localC0))

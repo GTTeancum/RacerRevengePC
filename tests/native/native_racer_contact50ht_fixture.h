@@ -1,4 +1,5 @@
 #pragma once
+#include "runtime_asset_paths50lb.h"
 // UNVERIFIED reconstruction from worker conversation after workspace rollback.
 // HOST-ORDERED native main-body contact adapter, not original world scheduling.
 // Actual Pod01 podboxm rays -> actual podboxf triangles; no bumper primitive.
@@ -67,7 +68,7 @@ public:
     bool prepare(const Type2ResourceView49X& mainResource,std::string& error,
                  const char* archivePath="work/native/project/disc/PODS/POD01/POD01.RES") {
         if(ready_)return fail(error,"contact owner already prepared");
-        std::ifstream file(archivePath,std::ios::binary);
+        std::ifstream file(runtime_asset_paths50LB::resolve(archivePath),std::ios::binary);
         if(!file)return fail(error,"actual Pod01 archive missing");
         std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}},podM,podF,cache;
         rr::assets::ResArchive48C archive;rr::assets::DecodeError48C why;

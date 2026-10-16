@@ -1,0 +1,92 @@
+[
+  {
+    "member": "09_1",
+    "reference": "04_1",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "09_2",
+    "reference": "04_1",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "23_1",
+    "reference": "04_1",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "23_2",
+    "reference": "04_1",
+    "exactBytesEqualAfterOwnTextureNameReplacement": false,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "24_1",
+    "reference": "04_1",
+    "exactBytesEqualAfterOwnTextureNameReplacement": false,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "24_2",
+    "reference": "04_1",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "09_shdw",
+    "reference": "04_shdw",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "23_shdw",
+    "reference": "04_shdw",
+    "exactBytesEqualAfterOwnTextureNameReplacement": false,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "24_shdw",
+    "reference": "04_shdw",
+    "exactBytesEqualAfterOwnTextureNameReplacement": false,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "09c_1",
+    "reference": "04c_1",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "09c_2",
+    "reference": "19c_2",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "23c_1",
+    "reference": "19c_2",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "23c_2",
+    "reference": "19c_2",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "24c_1",
+    "reference": "19c_2",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  },
+  {
+    "member": "24c_2",
+    "reference": "19c_2",
+    "exactBytesEqualAfterOwnTextureNameReplacement": true,
+    "equalAfterTrimmingLineEnds": true
+  }
+]

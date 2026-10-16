@@ -5,9 +5,12 @@
 #include "../../../src/game/original_ui_rider_selection50kg.h"
 #include "../../../src/game/original_ui_rider_stat_projection50kg.h"
 #include "../../../src/game/original_ui_route_decisions50kg.h"
+#include "../../../src/game/original_tournament_result50kg.h"
+#include "../../../src/game/lap_timing50id.h"
 
 namespace rr::platform {
 class OriginalUiFrontend50KG;
+class OriginalUiTournamentSession50KG;
 struct OriginalUiRiderProfileDiagnostic50KG {
     enum class Error:std::uint8_t {none,alreadyInitialized,commonProfile,archive,member,parse,range,allocation} error=Error::none;
     std::uint32_t sourcePC=0,rider=0;
@@ -29,9 +32,10 @@ struct OriginalUiRiderProfileStamp50KG {
 // 186EF0 unlock reset / remembered fields. The Main subset is shared by identity,
 // so Main's later mode34 changes are observed directly, never copied stale.
 //
-// This represents the Rider-visible diagonal of the original27x27 career/pod
-// matrix, plus its reset metadata. No original save import, off-diagonal game
-// progression, save IO, or profile reset popup is claimed. No public readiness
+// This retains the original27x27 career/pod matrix and its source result
+// writeback. No original save import, save IO, or profile reset popup is claimed.
+// A result commit remains private and requires a genuinely armed tournament
+// launch; current missing tournament lifecycle guards stay closed. No public readiness
 // flag or arbitrary observation setter can manufacture an initialized owner.
 class OriginalUiRiderProfileOwner50KG final {
 public:
@@ -45,6 +49,13 @@ public:
     bool initializeAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG> podPhysics,
         OriginalUiRiderProfileDiagnostic50KG&) noexcept;
+    // Explicit process-local capture fixture, NOT186EF0 or an earned award.
+    // Only rider7 availability and mode0 remembered selection differ. No saved
+    // profile, career result, progression, or arbitrary rider setter exists.
+    bool initializeGasganoTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
+        std::shared_ptr<const assets::OriginalUiArchive50KG> podPhysics,
+        OriginalUiRiderProfileDiagnostic50KG&) noexcept;
+    bool gasganoTestProfile() const noexcept;
     bool initialized() const noexcept;
     const OriginalUiMainProfile50KG* commonProfile() const noexcept;
     OriginalUiRiderProfileStamp50KG stamp() const noexcept;
@@ -60,9 +71,34 @@ public:
     };
     bool courseRaceSnapshot(CourseRaceSelection&)const noexcept;
     bool riderConfirmSnapshot(std::uint8_t& packed1125D,std::uint32_t& comparison100C0)const noexcept;
+    struct TournamentCareerSnapshot {
+        std::uint32_t career100C0=0,earned2190=0,unspent2194=0,kills2198=0;
+        std::uint8_t progress219C=0,availability11018=0;
+        std::array<std::uint8_t,13> medals1938{};
+        std::array<std::int16_t,13> remainingPrizes1946{};
+        OriginalUiRiderProfileStamp50KG stamp{};
+    };
+    bool tournamentCareerSnapshot(std::uint32_t career,TournamentCareerSnapshot&)const noexcept;
+    bool tournamentPodCareerSnapshot(std::uint32_t career,std::uint32_t pod,
+        game::OriginalTournamentPodCareer50KG&)const noexcept;
 private:
+    bool initializeStartupProfile(std::shared_ptr<OriginalUiMainProfile50KG>,
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,bool gasganoTest,
+        OriginalUiRiderProfileDiagnostic50KG&) noexcept;
+    friend class OriginalUiTournamentSession50KG;
     friend class OriginalUiCourseSession50KG;
     bool commitRiderConfirmToCourse(const game::OriginalUiRouteDecision50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
+    bool commitRiderConfirmToTournament(const game::OriginalUiRouteDecision50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
+    // Concrete frontend only: call AFTER an admitted genuine mode2 cold race
+    // launch commits its exact original selected profile fields and the SAME
+    // real manager reaches active bit1 (before ended bit0). Arming never
+    // unlocks/mutates progress. Existing mode0-only launch cannot arm this.
+    bool armTournamentResultForCommittedRace(const CourseRaceSelection&,OriginalUiRiderProfileStamp50KG,
+        const game::LapTimingManager50ID&,OriginalUiMainApplication50KG&)noexcept;
+    bool commitTournamentRaceResult(const game::LapTimingManager50ID&,
+        const game::OriginalTournamentResultRacer50KG*,std::size_t,std::uint32_t humanCount,
+        const CourseRaceSelection&,OriginalUiRiderProfileStamp50KG,
+        OriginalUiMainApplication50KG&,game::OriginalTournamentResultReceipt50KG&)noexcept;
     bool commitCourseEntry(const game::OriginalUiCourseSelectionData50KG&,const game::OriginalUiCourseEntryPrefix50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     bool commitCourseMove(const game::OriginalUiCourseSelectionData50KG&,const game::OriginalUiNavigation50KG& before,
         bool forward,const game::OriginalUiCourseMove50KG&,OriginalUiRiderProfileStamp50KG)noexcept;

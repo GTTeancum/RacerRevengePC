@@ -1,11 +1,24 @@
 #include "original_gc_gameplay_lighting_candidate.h"
+#include "original_racer_entity_cold50la.h"
+#include "original_camera_scene_owner.h"
+#include "original_application_entities50la.h"
+#include "original_racer_model_scene50la.h"
+#include "original_racer_model_view50la.h"
+#include "original_ui_rider_visibility50kg.h"
+#include "original_camera_start_native.h"
+#include "../assets/original_standard_model_resource50la.h"
+#include "../assets/original_standard_material_table50la.h"
+#include <optional>
+#include <algorithm>
 #include "../assets/track_start50ad.h"
 #include "../assets/original_light_pose_defaults_candidate.h"
 #include "../assets/zone_search_authoring50cn.h"
 #include <cmath>
+#include <cfenv>
 #include <cstring>
 #include <limits>
 #include <new>
+#include <exception>
 #include <utility>
 
 #if defined(__FAST_MATH__) || (defined(__FINITE_MATH_ONLY__) && __FINITE_MATH_ONLY__ > 0)
@@ -19,6 +32,20 @@ bool fail(Diagnostic& d,Status s,std::uint32_t pc) noexcept {d.status=s;d.source
 float add(float a,float b) noexcept {volatile float r=a+b;return r;}
 float mul(float a,float b) noexcept {volatile float r=a*b;return r;}
 float sub(float a,float b) noexcept {volatile float r=a-b;return r;}
+// Bounded finite RA cone half-angles. Same13BBA0 polynomial already
+// recovered privately in graph_body49w/control_shaping48v. No new libm owner.
+// RA authored0..180 degrees needs no reflection. Separate volatile operations
+// retain the source146F30 degree conversion and149FF4 half-angle chronology.
+float raConeCosine(float degrees) noexcept {
+    auto word=[](std::uint32_t bits){float f;std::memcpy(&f,&bits,sizeof(f));return f;};
+    const float radians=mul(degrees,word(0x3c8efa34u));
+    const float x=mul(.5f,radians),square=mul(x,x);
+    float t=add(word(0x37d00d01u),mul(word(0xb493f27eu),square));
+    t=add(word(0xbab60b61u),mul(square,t));
+    t=add(word(0x3d2aaaabu),mul(square,t));
+    t=add(-.5f,mul(square,t));
+    return mul(1.f,add(1.f,mul(square,t)));
+}
 bool normalizeOnce(light::Vec3& v) noexcept {
     const float square=add(add(mul(v[0],v[0]),mul(v[1],v[1])),mul(v[2],v[2]));
     if(!std::isfinite(square)||square<std::numeric_limits<float>::min())return false;
@@ -40,6 +67,49 @@ const assets::ParameterField48F* field(const assets::ParameterBlock48F& b,const 
 }
 bool textField(const assets::ParameterBlock48F& b,const char* key,const char* text) noexcept {
     const auto* f=field(b,key);return f&&f->value==text;
+}
+bool readGaRenderAuthoring(const assets::ParameterBlock48F& b,std::size_t zoneCount,
+    AuthoredRenderZone& out) noexcept {
+    AuthoredRenderZone next{};
+    const assets::ParameterField48F* exclusions=nullptr;
+    for(const auto& f:b.fields){
+        if(f.name=="exclusionlist"){
+            if(exclusions)return false;
+            exclusions=&f;
+        }
+        // Authenticated GA has no override: 275D74/275EE4 default to one.
+        // Do not silently approximate the integer reader for unseen overrides.
+        if(f.name=="environmentnodevisible")return false;
+    }
+    if(exclusions){
+        const auto& text=exclusions->value;
+        if(text.size()>=128)return false; // Original reader's 128-byte buffer.
+        std::size_t at=0;
+        while(at<text.size()){
+            // Bounded admitted domain: positive decimal authored zone labels.
+            // 27632C..27641C stores converted labels minus one. No sorting or
+            // deduplication; no host stoi/locale or unproven malformed input.
+            std::uint32_t label=0;
+            const auto start=at;
+            while(at<text.size()&&text[at]>='0'&&text[at]<='9'){
+                const auto digit=static_cast<std::uint32_t>(text[at]-'0');
+                if(label>(std::numeric_limits<std::uint32_t>::max()-digit)/10u)return false;
+                label=label*10u+digit;++at;
+            }
+            if(at==start||!label||label>zoneCount||next.exclusionCount>=next.exclusions.size())return false;
+            next.exclusions[next.exclusionCount++]=label-1u;
+            if(at==text.size())break;
+            if(text[at]!=','&&text[at]!='\n')return false;
+            ++at;
+            // 29FFA0 terminates on a single trailing delimiter. GA zones 3
+            // and 7 actually use this form; it does not append an empty token.
+            if(at==text.size())break;
+            while(at<text.size()&&(text[at]==','||text[at]=='\n'))++at;
+            // Multiple trailing delimiters remain outside the admitted domain.
+            if(at==text.size())return false;
+        }
+    }
+    out=next;return true;
 }
 bool triple(const assets::ParameterBlock48F& b,const char* key,light::Vec3& out) noexcept {
     const auto* f=field(b,key);if(!f)return false;std::size_t at=0;
@@ -88,8 +158,9 @@ void shaBlock(const std::uint8_t* block, std::array<std::uint32_t, 8>& h) noexce
     }
     h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d; h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=v;
 }
-bool authenticScb(const std::vector<std::uint8_t>& input,bool ta,bool ga) noexcept {
-    if ((ta&&ga)||input.size() != (ga?292650u:ta?130511u:359830u)) return false;
+bool authenticScb(const std::vector<std::uint8_t>& input,std::size_t expectedBytes,
+    const char* expected) noexcept {
+    if (input.size()!=expectedBytes||!expected) return false;
     std::array<std::uint32_t, 8> h{{0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
         0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19}};
     std::size_t at = 0;
@@ -104,10 +175,6 @@ bool authenticScb(const std::vector<std::uint8_t>& input,bool ta,bool ga) noexce
         tail[padded - 1 - i] = static_cast<std::uint8_t>(bits >> (i * 8));
     shaBlock(tail.data(), h);
     if (padded == 128) shaBlock(tail.data() + 64, h);
-    const char* expected = ga ?
-        "ad38b0d47efdda92e36bf36f9b380f7f3111698cb068532068a19229097de5d7" : ta ?
-        "c3431a55c1f44ae704dae5b031a51f4b7907dbfc3e7787aba4c7ccbf9969031d" :
-        "d47a83f4b50812609c923381f3a9038328c81d9a50563b68fb4de022a9be210d";
     constexpr char hex[] = "0123456789abcdef";
     for (unsigned i = 0; i < 64; ++i)
         if (expected[i] != hex[(h[i / 8] >> ((7u - i % 8) * 4)) & 15u]) return false;
@@ -116,13 +183,23 @@ bool authenticScb(const std::vector<std::uint8_t>& input,bool ta,bool ga) noexce
 bool validRoot(SceneNodeIndex49P root,std::uint32_t count) noexcept {
     const auto i=static_cast<std::int32_t>(root);return i>=0&&static_cast<std::uint32_t>(i)<count;
 }
-std::array<SceneNodeIndex49P,3> modelRoots(const VehicleFrameBindings49W& b) noexcept {
-    return {b.lifecycle.model1B4,b.visual.left1BC,b.visual.right1B8};
+std::array<SceneNodeIndex49P,maxVehicleDrawComponents50CM> modelRoots(const VehicleFrameBindings49W& b) noexcept {
+    return {b.lifecycle.model1B4,b.visual.left1BC,b.visual.right1B8,
+        b.visual.bottomLeft1C4,b.visual.bottomRight1C0};
+}
+std::uint32_t modelCount(const VehicleFrameBindings49W& b) noexcept {
+    return b.visual.bottomRight1C0!=SceneNodeIndex49P::none ? 5u :
+        b.visual.bottomLeft1C4!=SceneNodeIndex49P::none ? 4u : defaultVehicleDrawComponents50CM;
 }
 bool frameBinding(const VehicleFrameState49W& s,const VehicleFrameBindings49W& b) noexcept {
     if(!validVehicleSceneCount49W(s,b)||!validRoot(b.lifecycle.main190,s.sceneNodeCount))return false;
     const auto roots=modelRoots(b);
-    for(auto root:roots)if(!validRoot(root,s.sceneNodeCount))return false;
+    const auto count=modelCount(b);
+    for(std::uint32_t c=0;c<count;++c){
+        if(!validRoot(roots[c],s.sceneNodeCount))return false;
+        for(std::uint32_t earlier=0;earlier<c;++earlier)
+            if(roots[c]==roots[earlier])return false;
+    }
     return roots[0]==b.animation.chariot1B4&&roots[1]==b.animation.left1BC&&
         roots[1]==b.lifecycle.left1BC&&roots[2]==b.animation.right1B8&&roots[2]==b.lifecycle.right1B8&&
         roots[0]!=roots[1]&&roots[0]!=roots[2]&&roots[1]!=roots[2];
@@ -132,65 +209,176 @@ LiveZoneBounds50EN shapeBounds(const PodShapeState49W& shape,const PodShapeSourc
     bounds.bounds.cachedCenter=shape.center60;bounds.bounds.cachedRadius=shape.radius80;
     bounds.type0Resource=&source;return bounds;
 }
+bool disjointResetField(const std::uint32_t* field,const void* other,std::size_t size) noexcept {
+    const auto a=reinterpret_cast<std::uintptr_t>(field);
+    const auto b=reinterpret_cast<std::uintptr_t>(other);
+    if(!field||a%alignof(std::uint32_t)||a>std::numeric_limits<std::uintptr_t>::max()-sizeof(*field)||
+       !other||b>std::numeric_limits<std::uintptr_t>::max()-size)return false;
+    return a+sizeof(*field)<=b||b+size<=a;
+}
+bool preparedResetShape(const VehicleFrameState49W& s,const VehicleFrameBindings49W& b,
+    const VehicleFrameParameters49W& p) noexcept {
+    if(!frameBinding(s,b)||s.shape.type88||s.shape.registrationE0)return false;
+    const auto& main=s.nodes[static_cast<std::uint32_t>(b.lifecycle.main190)];
+    if(!(main.sceneFlags190&1u)||main.parent180!=SceneNodeIndex49P::none||
+       std::memcmp(&main.world100,&s.bodies.main.components.root.scene,sizeof(BodyMatrix48G))||
+       std::memcmp(&main.world100,&s.shape.world80,sizeof(BodyMatrix48G)))return false;
+    // Verify the completed numeric prefix without mutating or preparing the
+    // canonical694 again. previousC0 remains the actual preceding11FE50 result.
+    auto checked=s.shape;
+    if(!transformPodShape49W(p.shape,main.world100,checked))return false;
+    return !std::memcmp(&checked.composed00,&s.shape.composed00,sizeof(BodyMatrix48G))&&
+        !std::memcmp(&checked.center60,&s.shape.center60,sizeof(s.shape.center60))&&
+        !std::memcmp(&checked.radius80,&s.shape.radius80,sizeof(s.shape.radius80));
+}
 }
 
 struct Owner::Storage {
-    // Frozen authenticated authored TA session, deliberately not a projection
-    // of source Light+D0 or LightManager+88. No updates are invented.
-    struct AuthoredSpot {
+    // Frozen authentic authored local lights, deliberately not a projection
+    // of source Light+D0 or LightManager+88. No light updates are invented.
+    struct AuthoredLocalLight {
         light::Vec3 position{},look{},rgb{},attenuation{};
         float innerCos=0,outerCos=0;
-        std::uint32_t zone=0;
+        std::uint32_t zone=0,sourceOrdinal=0,effectiveSourceOrdinal=0;
+        bool spotlight=true,emitsLight=true;
+        //2776D4 defaults PlaceLightAtInfinity to1. Preserve the source flag;
+        //it does not turn a type1/type3 attenuation query into a directional sun.
+        bool placeAtInfinity=true;
     };
-    bool taNative=false,gaNative=false;
-    std::uint32_t spotCount=0;
-    std::array<AuthoredSpot,36> spots{};
+    Scene scene=Scene::gc;
+    // SA:74 spotlights+166 non-emitting ObjectPoints, retained in numeric order.
+    static constexpr std::uint32_t maximumLocalLights=240;
+    std::uint32_t localLightCount=0;
+    std::array<AuthoredLocalLight,maximumLocalLights> localLights{};
     light::Vec3 sunLook{};
-    std::array<light::Vec4,gcZones> sun44{};
+    light::Vec4 authoredSunSpecular{};
+    std::array<light::Vec4,maximumZones> sun44{};
     bool prepareTa(Diagnostic&);
     bool prepareGa(Diagnostic&);
-    bool selectTa(const LiveZoneMembership50EN&,const light::Vec3&,
+    bool prepareMaSa(Diagnostic&);
+    bool selectAuthored(const LiveZoneMembership50EN&,const light::Vec3&,
         light::LightMatrices&,Diagnostic&) const noexcept;
+
+    bool selectAuthoredZones(std::uint32_t,const LiveZoneMembership50EN*,
+        const light::Vec3&,light::LightMatrices&,Diagnostic&) const noexcept;
 
     assets::World48F world;
     light::SmallDirectionalRegistry registry{};
-    std::array<light::Vec4,gcZones> ambient60{};
+    std::array<light::Vec4,maximumZones> ambient60{};
     light::Vec4 globalAmbient50{};
     bool fixedGcGlobalAmbient=false;
     ResetVisibilityWorld50EY visibility{};
-    std::array<SearchStorage50BS,gcZones*2> registries{},scratchRegistries{};
-    std::array<ZoneRegistration50CJ,maximumRacers+1u> registrations{};
-    std::array<CollectionTree50BX,gcZones*2> methods{};
-    std::array<CollectionZone50BX,gcZones> zones{};
-    std::array<SearchListBlock50BR,gcZones*4> blocks{};
-    std::array<CollectionRef50BX,gcZones> portalHeads{};
+    std::array<SearchStorage50BS,maximumZones*2> registries{},scratchRegistries{};
+    // Allocate once before publishing lifecycle pointers. RA's additional
+    // identities correspond one-for-one to authenticated authored instances,
+    // including unresolved slots. They are not arbitrary spare racer refs.
+    struct RegistrationBacking {
+        std::array<ZoneRegistration50CJ,maximumRacers+1u> original{};
+        std::vector<ZoneRegistration50CJ> ra;
+        void resize(std::size_t count){if(count>original.size())ra.resize(count);}
+        ZoneRegistration50CJ* data()noexcept{return ra.empty()?original.data():ra.data();}
+        const ZoneRegistration50CJ* data()const noexcept{return ra.empty()?original.data():ra.data();}
+        std::size_t size()const noexcept{return ra.empty()?original.size():ra.size();}
+        ZoneRegistration50CJ& operator[](std::size_t i)noexcept{return data()[i];}
+        const ZoneRegistration50CJ& operator[](std::size_t i)const noexcept{return data()[i];}
+    } registrations;
+    std::vector<const OriginalRacerModelSceneOwner50LA*> staticModels;
+    struct StaticSelectionBinding {
+        OriginalRacerModelSceneOwner50LA* model=nullptr;
+        SceneGraph49P graph{};
+        const void* observer=nullptr;
+        const LiveZoneMembership50EN* membership=nullptr;
+    };
+    std::vector<StaticSelectionBinding> staticSelection;
+    const assets::OriginalStandardMaterialTable50LA* staticMaterials=nullptr;
+    struct SelectedMethod {
+        std::vector<const OriginalWreckComponent50LA*> selected18;
+        std::size_t count00=0,capacity0C=0;
+        std::uint8_t type2C=0xffu,type2D=0xffu;
+        bool constructed=false,complete=false;
+    };
+    std::array<SelectedMethod,maximumZones*2> selectedMethods;
+    const ::ra_static_model_cold50LA::Owner* staticOwner=nullptr;
+    const OriginalApplicationEntities50LA* staticApplication=nullptr;
+    bool staticAccess=false;
+    bool staticRegistrationComplete=false;
+    bool staticBusy()const noexcept{return staticAccess||(staticOwner&&!staticRegistrationComplete);}
+    std::size_t identityCount()const noexcept{return racerCount+1u+staticModels.size();}
+    bool disjointStaticBacking(const std::uint32_t* field)const noexcept {
+        if(!((registrations.ra.empty()||disjointResetField(field,registrations.ra.data(),
+            registrations.ra.size()*sizeof(ZoneRegistration50CJ)))&&
+            (staticModels.empty()||disjointResetField(field,staticModels.data(),
+            staticModels.size()*sizeof(staticModels[0])))&&
+            (staticSelection.empty()||disjointResetField(field,staticSelection.data(),
+             staticSelection.size()*sizeof(staticSelection[0])))))return false;
+        for(const auto& method:selectedMethods)if(!method.selected18.empty()&&
+            !disjointResetField(field,method.selected18.data(),method.selected18.size()*sizeof(method.selected18[0])))return false;
+        return true;
+    }
+    std::array<CollectionTree50BX,maximumZones*2> methods{};
+    std::array<CollectionZone50BX,maximumZones> zones{};
+    // Stable fields beside the SAME4C0 identities/registries. Constructor27F120
+    // does not initialize these: disengaged optional means unproduced, not a
+    // claimed source zero. No raw stamp addresses are exported to wreck/draw.
+    struct ZoneProjection {
+        //27F15C explicitly initializes A0 null. The actual numeric owner is
+        //created only when27FF38 reaches280230, not by camera publication.
+        std::shared_ptr<OriginalZoneScissor50LA> scissorA0;
+        std::optional<std::uint16_t> admissionA4,dispatchA6;
+        std::optional<std::array<float,4>> bounds4C;
+        std::optional<PortalZoneViewOutput49F> matrix60;
+    };
+    std::array<ZoneProjection,maximumZones> zoneProjection;
+    const CameraVisibilityLease* zoneProjectionLease=nullptr;
+    std::array<AuthoredRenderZone,maximumZones> renderAuthoring{};
+    bool renderAuthoringReady=false;
+    std::array<SearchListBlock50BR,maximumZones*4> blocks{};
+    std::array<CollectionRef50BX,maximumZones> portalHeads{};
     std::array<LiveZonePortalLink50EN,maximumPortals*2> portalLinks{},scratchPortalLinks{};
     std::array<PortalGeometry50EO,maximumPortals> portalGeometry{};
     std::array<CollectionZoneLink50BX,maximumPortals+1> scratchLinks{};
     std::array<LiveZoneEntry50EN,maximumPortals+1> scratchEntries{};
     LiveZoneWorkspace50EN workspace{};
     struct Vehicle {
-        LiveZoneMembership50EN member{};
+        // This owns the existing7F0 throughout its lifetime. Never copy an
+        // attached membership into a temporary reset adapter.
+        ResetVisibilityOwner50EY resetOwner{};
         std::array<CollectionZoneLink50BX,maximumPortals+1> links{};
         std::array<LiveZoneEntry50EN,maximumPortals+1> entries{};
         PodShapeSource49W source{};
         PodShapeState49W preparedPrefix{};
+        const VehicleFrameState49W* resetFrame=nullptr; // Pending reset identity only.
+        const VehicleFrameState49W* graphicsFrame=nullptr; // Last successful update identity only.
         SceneNodeIndex49P mainRoot=SceneNodeIndex49P::none;
-        std::array<SceneNodeIndex49P,3> roots{};
-        std::uint64_t graphicsSequence=0;
-        bool pendingInitial=false,attached=false;
+        std::array<SceneNodeIndex49P,maxVehicleDrawComponents50CM> roots{};
+        std::uint64_t graphicsSequence=0,graphicsMembershipRevision=0;
+        bool pendingInitial=false,attached=false,resetPending=false,resetNeedsGraphics=false;
+        bool raColdRetired=false;
     };
     std::array<Vehicle,maximumRacers> vehicles{};
-    std::array<light::LightMatrices,3> selected{};
-    std::array<bool,3> selectedReady{};
+    std::array<light::LightMatrices,maxVehicleDrawComponents50CM> selected{};
+    std::array<bool,maxVehicleDrawComponents50CM> selectedReady{};
     std::uint32_t racerCount=0;
     std::uint64_t drawGeneration=0;
     const DrawLease* activeLease=nullptr;
     const CameraVisibilityLease* activeCamera=nullptr;
+    const ResetVisibilityLease* activeReset=nullptr;
     std::uint64_t cameraGeneration=0;
-    bool bound(std::uint32_t slot) const noexcept {
+    std::uint64_t resetGeneration=0;
+    bool resetPending() const noexcept {
+        for(std::uint32_t slot=0;slot<racerCount;++slot)
+            if(vehicles[slot].resetPending)return true;
+        return false;
+    }
+    bool resetBound(std::uint32_t slot) const noexcept {
         if(slot>=racerCount)return false;
-        const auto& v=vehicles[slot];const auto& m=v.member;
+        const auto& v=vehicles[slot];const auto& reset=v.resetOwner;
+        return reset.object30==slot+1u&&reset.storage.links==v.links.data()&&
+            reset.storage.entries==v.entries.data()&&reset.storage.capacity==v.links.size();
+    }
+    bool bound(std::uint32_t slot) const noexcept {
+        if(!resetBound(slot))return false;
+        const auto& v=vehicles[slot];const auto& m=v.resetOwner.membership7F0;
         if(!v.attached||!m.attached||m.object!=slot+1u||m.method!=ZoneMethod50CL::Second||
            m.storage.links!=v.links.data()||m.storage.entries!=v.entries.data()||
            m.storage.capacity!=v.links.size()||!v.entries[0].used)return false;
@@ -199,12 +387,30 @@ struct Owner::Storage {
         return r.owner==&registries[(zone-1u)*2u+1u]&&r.encodedObject==((slot+1u)<<2u)&&
             r.owner==e.owner&&r.slot==e.slot&&r.encodedObject==e.encodedObject;
     }
+    bool writeCablesField50(std::uint32_t slot,const VehicleFrameState49W& frame,
+        std::uint32_t& field50,Diagnostic& d) noexcept {
+        if(!bound(slot))return fail(d,Status::identity,0x174360);
+        auto& v=vehicles[slot];auto& reset=v.resetOwner;
+        if(v.resetNeedsGraphics||(reset.object254Field50&&reset.object254Field50!=&field50)||
+           !disjointResetField(&field50,this,sizeof(*this))||
+           !disjointStaticBacking(&field50)||
+           !disjointResetField(&field50,&frame,sizeof(frame)))
+            return fail(d,Status::identity,0x174360);
+        for(std::uint32_t other=0;other<racerCount;++other)
+            if(other!=slot&&vehicles[other].resetOwner.object254Field50==&field50)
+                return fail(d,Status::identity,0x174360);
+        // Sole canonical7F0 identity, not a truncated guest/host pointer.
+        // Visibility attachment never manufactures this graphics-side store.
+        reset.object254Field50=&field50;field50=reset.membership7F0.object;return true;
+    }
 };
 bool Owner::Storage::prepareTa(Diagnostic& d) {
-    spotCount=17;
+    localLightCount=17;
     const auto& params=world.parameters;
     const auto* lights=block(params,"lights");
-    if(!lights||!textField(*lights,"numberoflights","26"))return fail(d,Status::sourceFields,0x2783d0);
+    const auto* environment=block(params,"environment");
+    if(!lights||!textField(*lights,"numberoflights","26")||!environment||
+       field(*environment,"ambientcolorflashminidletime"))return fail(d,Status::sourceFields,0x2783d0);
     auto scalar=[](const assets::ParameterBlock48F& b,const char* key,float& value){
         const auto* f=field(b,key);
         return f&&assets::parseTrackNumber50AD(f->value.data(),f->value.size(),value);
@@ -233,10 +439,15 @@ bool Owner::Storage::prepareTa(Diagnostic& d) {
         }else if(i<=9){
             if(!textField(*b,"type","Ambient"))return fail(d,Status::sourceFields,0x148f30);
             const light::Vec4 row{{rgb[0],rgb[1],rgb[2],64.f}};
+            //148F90/FB4/FD8/FFC updates global+50 for EVERY registered
+            // ambient, before the zone0-only all-row propagation branch.
+            // Numeric Light2..9 order therefore leaves the actual last
+            // ambient here; selected-zone60 is never a Binder substitute.
+            globalAmbient50=row;fixedGcGlobalAmbient=true;
             if(zone==1)for(auto& current:ambient60)current=row;
             else ambient60[zone-1]=row;
         }else{
-            auto& spot=spots[i-10];float inner=0,outer=0;
+            auto& spot=localLights[i-10];spot.sourceOrdinal=i;float inner=0,outer=0;
             if(!textField(*b,"type","Spotlight")||!triple(*b,"position",spot.position)||
                !triple(*b,"lookvector",spot.look)||!triple(*b,"attenuation",spot.attenuation)||
                !scalar(*b,"innerconeangle",inner)||!scalar(*b,"outerconeangle",outer)||
@@ -292,13 +503,13 @@ bool Owner::Storage::prepareGa(Diagnostic& d) {
         const auto* f=field(b,key);
         return f&&assets::parseTrackNumber50AD(f->value.data(),f->value.size(),value);
     };
-    spotCount=36;
-    for(std::uint32_t index=0;index<spotCount;++index){
+    localLightCount=36;
+    for(std::uint32_t index=0;index<localLightCount;++index){
         const auto ordinal=index+3u;
         const auto name="light"+std::to_string(ordinal);const auto* b=block(params,name.c_str());
         if(!b||!textField(*b,"type","Spotlight")||field(*b,"hasflasher"))
             return fail(d,Status::sourceFields,0x277390);
-        auto& spot=spots[index];light::Vec3 rgb{};float inner=0.f,outer=0.f;
+        auto& spot=localLights[index];spot.sourceOrdinal=ordinal;light::Vec3 rgb{};float inner=0.f,outer=0.f;
         if(!triple(*b,"colorrgb",rgb)||!triple(*b,"attenuation",spot.attenuation)||
            !scalar(*b,"innerconeangle",inner)||!scalar(*b,"outerconeangle",outer)||
            inner<0.f||inner>=outer||outer>180.f)
@@ -327,16 +538,177 @@ bool Owner::Storage::prepareGa(Diagnostic& d) {
     }
     return true;
 }
-bool Owner::Storage::selectTa(const LiveZoneMembership50EN& member,
+bool Owner::Storage::prepareMaSa(Diagnostic& d) {
+    if(scene!=Scene::ma&&scene!=Scene::sa&&scene!=Scene::ra)return fail(d,Status::unsupportedScene,0x278290);
+    const bool ra=scene==Scene::ra;
+    const bool sa=scene==Scene::sa;
+    const auto& params=world.parameters;
+    const auto* lights=block(params,"lights");
+    const auto* environment=block(params,"environment");
+    if(!lights||!environment||field(*environment,"ambientcolorflashminidletime"))
+        return fail(d,Status::sourceFields,0x270e9c);
+    auto scalar=[](const assets::ParameterBlock48F& b,const char* key,float& value){
+        const auto* f=field(b,key);
+        return f&&assets::parseTrackNumber50AD(f->value.data(),f->value.size(),value);
+    };
+    auto ordinal=[](const assets::ParameterBlock48F& b,const char* key,
+                    std::uint32_t fallback,std::uint32_t& value){
+        const auto* f=field(b,key);value=fallback;if(!f)return true;
+        if(f->value.empty())return false;
+        value=0;
+        for(char c:f->value){
+            if(c<'0'||c>'9'||value>(std::numeric_limits<std::uint32_t>::max()-
+                static_cast<unsigned>(c-'0'))/10u)return false;
+            value=value*10u+static_cast<unsigned>(c-'0');
+        }
+        return true;
+    };
+    auto flag=[](const assets::ParameterBlock48F& b,const char* key,bool fallback,bool& value){
+        const auto* f=field(b,key);value=fallback;if(!f)return true;
+        // Narrow admission of the authentic authoring's integer/T spellings.
+        //2776FC/27772C/277764 retain bit0 of the original integer-reader result.
+        if(f->value=="1"||f->value=="T"){value=true;return true;}
+        if(f->value=="0"||f->value=="F"){value=false;return true;}
+        return false;
+    };
+    std::uint32_t numberOfLights=0;
+    if(!ordinal(*lights,"numberoflights",0u,numberOfLights)||numberOfLights!=(ra?185u:sa?263u:43u))
+        return fail(d,Status::sourceFields,0x2782e0);
+    std::uint32_t ambientCount=0,directionalCount=0,pointCount=0,emittingPoints=0,spotlights=0;
+    localLightCount=0;
+    //2783D0..278408 reads numeric Light1..NumberOfLights. A section scan
+    //would wrongly include MA's unrelated Light276 or reorder Light10/Light2.
+    for(std::uint32_t sourceOrdinal=1;sourceOrdinal<=numberOfLights;++sourceOrdinal){
+        const auto name="light"+std::to_string(sourceOrdinal);
+        const auto* b=block(params,name.c_str());
+        std::uint32_t effectiveOrdinal=sourceOrdinal;
+        //2773CC ignores failed157D00;157DD8 preserves the prior selector.
+        //Only these two missing blocks occur in the authenticated RA corpus.
+        if(ra&&(sourceOrdinal==90u||sourceOrdinal==107u)){
+            if(b)return fail(d,Status::sourceFields,0x157dd8);
+            effectiveOrdinal=sourceOrdinal-1u;
+            const auto retained="light"+std::to_string(effectiveOrdinal);
+            b=block(params,retained.c_str());
+        }
+        if(!b||field(*b,"hasflasher"))return fail(d,Status::sourceFields,0x277390);
+        light::Vec3 rgb{};std::uint32_t zone=0;
+        if(!triple(*b,"colorrgb",rgb)||!ordinal(*b,"initialzone",1u,zone)||
+           !zone||zone>world.zones.size())return fail(d,Status::sourceFields,0x277494);
+        for(float& c:rgb)c=mul(c,.5f); //146FDC..147014 Light::Init.
+        if(textField(*b,"type","Ambient")){
+            ++ambientCount;
+            const light::Vec4 row{{rgb[0],rgb[1],rgb[2],64.f}};
+            //148F90/FB4/FD8/FFC writes+50 for EVERY numeric registration.
+            globalAmbient50=row;fixedGcGlobalAmbient=true;
+            //2774C8 absent InitialZone=1,2774FC -> source zone0.149000..149040
+            //then propagates to all rows. In SA both Light21 and Light22 take
+            //this path, replacing the earlier per-zone ambients legitimately.
+            if(zone==1)for(auto& current:ambient60)current=row;
+            else ambient60[zone-1]=row;
+            continue;
+        }
+        bool emits=true,infinity=true;
+        if(!flag(*b,"emitslight",true,emits)||!flag(*b,"placelightatinfinity",true,infinity))
+            return fail(d,Status::sourceFields,0x2776cc);
+        namespace poseSource=assets::original_light_pose_defaults_candidate;
+        poseSource::FreshPose pose;poseSource::Diagnostic poseDiagnostic;
+        if(!poseSource::readFreshPose(*b,static_cast<std::uint32_t>(world.zones.size()),pose,poseDiagnostic))
+            return fail(d,Status::sourceFields,poseDiagnostic.sourcePC);
+        if(pose.initialZone!=zone)return fail(d,Status::sourceFields,0x277500);
+        if(textField(*b,"type","Directional")){
+            if(++directionalCount!=1u||!emits||!infinity||zone!=1u)
+                return fail(d,Status::sourceFields,0x1490c0);
+            sunLook=pose.effectiveLook78;
+            authoredSunSpecular={{rgb[0],rgb[1],rgb[2],0.f}};
+            //1490E0 propagates the initial directional color only for zone0.
+            for(auto& row:sun44)row=authoredSunSpecular;
+            continue;
+        }
+        const bool spotlight=textField(*b,"type","Spotlight");
+        if(!spotlight&&!textField(*b,"type","ObjectPoint"))
+            return fail(d,Status::sourceFields,0x277b70);
+        if(localLightCount>=localLights.size())return fail(d,Status::bounds,0x2783dc);
+        auto& local=localLights[localLightCount++];
+        local.sourceOrdinal=sourceOrdinal;local.effectiveSourceOrdinal=effectiveOrdinal;
+        local.zone=zone;local.spotlight=spotlight;
+        local.emitsLight=emits;local.placeAtInfinity=infinity;
+        for(unsigned c=0;c<3;++c)local.position[c]=pose.positionA0[c];
+        local.look=pose.effectiveLook78;local.rgb=rgb;
+        //277638..277678 reader defaults:0x3CF5C28F/3B03126F/3A83126F.
+        //SA flare-only ObjectPoints omit Attenuation. Retain those reader
+        //values; do not evaluate them as emitted light (277DDC..277E04).
+        local.attenuation={{.03f,.002f,.001f}};
+        if(field(*b,"attenuation")&&!triple(*b,"attenuation",local.attenuation))
+            return fail(d,Status::sourceFields,0x277674);
+        for(float a:local.attenuation)if(!std::isfinite(a)||a<0.f)
+            return fail(d,Status::sourceFields,0x146f60);
+        if(spotlight){
+            ++spotlights;
+            //277694..2776C8 defaults30/45 degrees. Actual admitted spotlights
+            //supply both fields. MA/SA retain ordinary native cos; RA uses the
+            //bounded recovered source polynomial below.
+            float inner=30.f,outer=45.f;
+            if((field(*b,"innerconeangle")&&!scalar(*b,"innerconeangle",inner))||
+               (field(*b,"outerconeangle")&&!scalar(*b,"outerconeangle",outer))||
+               (!ra&&(inner<0.f||inner>=outer||outer>180.f||!emits))||
+               (ra&&(inner<0.f||outer<0.f||inner>180.f||outer>180.f||!emits||
+                 (sourceOrdinal!=129u&&inner>=outer)||
+                 (sourceOrdinal==129u&&(inner!=60.f||outer!=0.f)))))
+                return fail(d,Status::sourceFields,0x2776a8);
+            if(ra){
+                local.innerCos=raConeCosine(inner);local.outerCos=raConeCosine(outer);
+                if(!std::isfinite(local.innerCos)||!std::isfinite(local.outerCos)||
+                   (sourceOrdinal!=129u&&!(local.innerCos>local.outerCos)))
+                    return fail(d,Status::arithmetic,0x149fe4);
+                //129 is source-authored60/0.149FFC first tests dot<outerCos;
+                //otherwise14A02C tests dot<=innerCos. For finite input this
+                //inverted pair never enters the interpolation denominator.
+            }else{
+                constexpr float halfDegree=3.14159265358979323846f/360.f;
+                local.innerCos=std::cos(mul(inner,halfDegree));
+                local.outerCos=std::cos(mul(outer,halfDegree));
+                if(!(local.innerCos>local.outerCos))return fail(d,Status::arithmetic,0x149fe4);
+            }
+        }else{
+            ++pointCount;if(emits)++emittingPoints;
+            //ObjectPoint has no cone. Absent look remains the fresh source+X
+            //cache, but local direction is computed from position at draw time.
+        }
+    }
+    if(ambientCount!=(ra?4u:sa?22u:9u)||directionalCount!=1u||pointCount!=(ra?15u:sa?166u:20u)||
+       emittingPoints!=(ra?15u:sa?0u:14u)||spotlights!=(ra?165u:sa?74u:13u)||localLightCount!=(ra?180u:sa?240u:33u))
+        return fail(d,Status::sourceFields,0x278408);
+    //278370..2783A4 ->1498A0 DIRECT copy, after all light registrations.
+    //These authored per-zone overrides must never be halved a second time.
+    for(std::size_t z=0;z<world.zones.size();++z){
+        const auto key="directionallightcolorforzone"+std::to_string(z+1u);
+        if(field(*lights,key.c_str())){
+            light::Vec3 rgb{};
+            if(!triple(*lights,key.c_str(),rgb))return fail(d,Status::sourceFields,0x278370);
+            for(unsigned c=0;c<3;++c)sun44[z][c]=rgb[c];
+        }
+    }
+    return true;
+}
+bool Owner::Storage::selectAuthored(const LiveZoneMembership50EN& member,
     const light::Vec3& position,light::LightMatrices& output,Diagnostic& d) const noexcept {
     for(float x:position)if(!std::isfinite(x))return fail(d,Status::arithmetic,0x2413a8);
     if(!member.attached||!member.storage.links||!member.storage.capacity)
         return fail(d,Status::identity,0x14a118);
     const auto primary=member.storage.links[0].zone;
     if(!primary||primary>world.zones.size())return fail(d,Status::identity,0x14a120);
+    return selectAuthoredZones(primary,&member,position,output,d);
+}
+bool Owner::Storage::selectAuthoredZones(std::uint32_t primary,const LiveZoneMembership50EN* membership,
+    const light::Vec3& position,light::LightMatrices& output,Diagnostic& d) const noexcept {
+    // Null membership means precisely the owned static placement zone.
+    for(float x:position)if(!std::isfinite(x))return fail(d,Status::arithmetic,0x2413a8);
+    if(!primary||primary>world.zones.size())return fail(d,Status::identity,0x14a120);
     light::LightMatrices next{};
     next.diffuse[3]=ambient60[primary-1];next.diffuse[0]=sun44[primary-1];
-    next.specular[0]=sun44[0]; // Native host renderer currently ignores specular.
+    //MA/SA overrides change diffuse44, not the directional light's own4C.
+    //Preserve the preexisting TA/GA native specular branch unchanged.
+    next.specular[0]=(scene==Scene::ma||scene==Scene::sa||scene==Scene::ra)?authoredSunSpecular:sun44[0];
     for(unsigned c=0;c<3;++c)next.directions[c][0]=-sunLook[c];
     //149680 exact high-level portal color blend, actual visibility-zone links.
     //500 is original14A698's radius, not a visual calibration constant.
@@ -372,11 +744,17 @@ bool Owner::Storage::selectTa(const LiveZoneMembership50EN& member,
     // attenuation, ties retain earlier authored lights. Sun reserves slot0.
     std::array<float,2> scores{{std::numeric_limits<float>::infinity(),std::numeric_limits<float>::infinity()}};
     std::array<light::Vec3,2> directions{},colors{};
-    if(spotCount>spots.size())return fail(d,Status::bounds,0x14a118);
-    for(std::uint32_t spotIndex=0;spotIndex<spotCount;++spotIndex){
-        const auto& spot=spots[spotIndex];
-        bool eligible=false;auto memberLink=CollectionRef50BX{1};std::size_t count=0;
+    if(localLightCount>localLights.size())return fail(d,Status::bounds,0x14a118);
+    for(std::uint32_t localIndex=0;localIndex<localLightCount;++localIndex){
+        const auto& spot=localLights[localIndex];
+        // Explicit source EmitsLight=0 remains non-emitting.277DDC..277E04
+        // gives its flare-only runtime light FLT_MAX attenuation. This native
+        // branch omits it entirely, never inventing a rendered flare or light.
+        if(!spot.emitsLight)continue;
+        bool eligible=!membership&&spot.zone==primary;
+        auto memberLink=CollectionRef50BX{membership?1u:0u};std::size_t count=0;
         while(memberLink){
+            const auto& member=*membership;
             if(memberLink>member.storage.capacity||++count>member.storage.capacity)
                 return fail(d,Status::registration,0x14a118);
             const auto& current=member.storage.links[memberLink-1];
@@ -391,12 +769,16 @@ bool Owner::Storage::selectTa(const LiveZoneMembership50EN& member,
         // native directional Lambert contribution is undefined and is omitted.
         if(square==0.f)continue;
         const float distance=std::sqrt(square);if(!normalizeOnce(toward))return fail(d,Status::arithmetic,0x14a5cc);
-        float cosine=0.f;for(unsigned c=0;c<3;++c)cosine=add(cosine,mul(toward[c],-spot.look[c]));
         float penalty=1.f;
-        if(cosine<spot.outerCos)penalty=5.f;
-        else if(cosine<=spot.innerCos){
-            volatile float fraction=sub(spot.innerCos,cosine)/sub(spot.innerCos,spot.outerCos);
-            penalty=add(sub(1.f,fraction),mul(5.f,fraction));
+        //14A380..14A398 applies149F20 only to type3. MA type1 ObjectPoint
+        //uses the same source-distance denominator without a cone multiplier.
+        if(spot.spotlight){
+            float cosine=0.f;for(unsigned c=0;c<3;++c)cosine=add(cosine,mul(toward[c],-spot.look[c]));
+            if(cosine<spot.outerCos)penalty=5.f;
+            else if(cosine<=spot.innerCos){
+                volatile float fraction=sub(spot.innerCos,cosine)/sub(spot.innerCos,spot.outerCos);
+                penalty=add(sub(1.f,fraction),mul(5.f,fraction));
+            }
         }
         const float denominator=mul(penalty,add(add(spot.attenuation[0],mul(spot.attenuation[1],distance)),mul(spot.attenuation[2],square)));
         if(!std::isfinite(denominator)||denominator<=0.f)return fail(d,Status::arithmetic,0x14a37c);
@@ -417,37 +799,83 @@ bool Owner::Storage::selectTa(const LiveZoneMembership50EN& member,
     return true;
 }
 
+bool Owner::raStaticCurrent() const noexcept {
+    return storage_&&!invalidated_&&storage_->scene==Scene::ra&&
+        !storage_->staticBusy()&&!storage_->activeLease&&!storage_->activeCamera&&!storage_->activeReset&&!storage_->resetPending();
+}
+bool Owner::selectRaStatic(std::uint32_t zone,const std::array<float,3>& authoredAnchor,
+    light::LightMatrices& out,Diagnostic& d) const noexcept {
+    d={};if(!raStaticCurrent())return fail(d,Status::stalePublication,0x2413a8);
+    for(float v:authoredAnchor)if(!std::isfinite(v))return fail(d,Status::arithmetic,0x2413a8);
+    return storage_->selectAuthoredZones(zone,nullptr,authoredAnchor,out,d);
+}
+
 Owner::Owner() noexcept=default;
 Owner::~Owner(){
+    if(storage_&&storage_->staticOwner)std::terminate();
     if(storage_&&storage_->activeLease)endDraw(*const_cast<DrawLease*>(storage_->activeLease));
     if(storage_&&storage_->activeCamera)endCameraVisibility(*const_cast<CameraVisibilityLease*>(storage_->activeCamera));
+    if(storage_&&storage_->activeReset)endResetVisibility(*const_cast<ResetVisibilityLease*>(storage_->activeReset));
 }
 DrawLease::~DrawLease(){if(owner_)owner_->endDraw(*this);}
 const assets::World48F* Owner::world() const noexcept {return storage_?&storage_->world:nullptr;}
 bool Owner::prepare(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
-    return prepareScene(scb,racers,false,false,d);
+    return prepareScene(scb,racers,Scene::gc,d);
 }
 bool Owner::prepareTaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
-    return prepareScene(scb,racers,true,false,d);
+    return prepareScene(scb,racers,Scene::ta,d);
 }
 bool Owner::prepareGaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
-    return prepareScene(scb,racers,false,true,d);
+    return prepareScene(scb,racers,Scene::ga,d);
 }
-bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t racers,bool ta,bool ga,Diagnostic& d) noexcept {
+bool Owner::prepareMaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
+    return prepareScene(scb,racers,Scene::ma,d);
+}
+bool Owner::prepareSaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
+    return prepareScene(scb,racers,Scene::sa,d);
+}
+bool Owner::prepareRaNative(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Diagnostic& d) noexcept {
+    return prepareScene(scb,racers,Scene::ra,d);
+}
+bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t racers,Scene scene,Diagnostic& d) noexcept {
     d={};if(invalidated_)return fail(d,Status::unprepared,0x272a48);
     if(storage_)return fail(d,Status::alreadyPrepared,0x272a48);
     if(!racers||racers>maximumRacers)return fail(d,Status::identity,0x1ae578);
-    if(!authenticScb(scb,ta,ga))return fail(d,Status::sourceIdentity,0x270b10);
+    std::size_t expectedBytes=0,expectedZones=0,expectedPortals=0;
+    const char* expectedSha=nullptr;
+    switch(scene){
+    case Scene::ra:
+        expectedBytes=540795u;expectedZones=10u;expectedPortals=10u;
+        expectedSha="57a0c9a244714d2f5f7b1ffcfb66fb182808348673b25362482458253b78ae81";break;
+    case Scene::gc:
+        expectedBytes=359830u;expectedZones=gcZones;expectedPortals=gcPortals;
+        expectedSha="d47a83f4b50812609c923381f3a9038328c81d9a50563b68fb4de022a9be210d";break;
+    case Scene::ta:
+        expectedBytes=130511u;expectedZones=9u;expectedPortals=10u;
+        expectedSha="c3431a55c1f44ae704dae5b031a51f4b7907dbfc3e7787aba4c7ccbf9969031d";break;
+    case Scene::ga:
+        expectedBytes=292650u;expectedZones=gcZones;expectedPortals=gaPortals;
+        expectedSha="ad38b0d47efdda92e36bf36f9b380f7f3111698cb068532068a19229097de5d7";break;
+    case Scene::ma:
+        expectedBytes=404992u;expectedZones=maZones;expectedPortals=maPortals;
+        expectedSha="5766af3e7a0bba0644058ae6f31eab802cadd9be7cc71911c349f603c7ca873b";break;
+    case Scene::sa:
+        expectedBytes=813441u;expectedZones=saZones;expectedPortals=saPortals;
+        expectedSha="dd38f087f0438b2e1279651fe3b4f525b053c90d34cf5365d6bf4ec6c7d1d394";break;
+    }
+    if(!authenticScb(scb,expectedBytes,expectedSha))return fail(d,Status::sourceIdentity,0x270b10);
     if(!light::selection_detail::arithmeticReady())return fail(d,Status::arithmetic,0x146f60);
     try {
         auto next=std::make_unique<Storage>();
         if(!assets::decodeWorld48F(scb,next->world,d.decode))return fail(d,Status::sourceShape,0x270b10);
         const auto& w=next->world;
-        if(w.zones.size()!=(ta?9u:gcZones)||w.portals.size()!=(ga?gaPortals:ta?10u:gcPortals))
+        if(w.zones.size()!=expectedZones||w.portals.size()!=expectedPortals||
+           w.zones.size()>maximumZones||w.portals.size()>maximumPortals)
             return fail(d,Status::unsupportedScene,0x272a48);
-        next->taNative=ta;next->gaNative=ga;
-        if(ga){if(!next->prepareGa(d))return false;}
-        else if(ta){if(!next->prepareTa(d))return false;}else{
+        next->scene=scene;
+        if(scene==Scene::ma||scene==Scene::sa||scene==Scene::ra){if(!next->prepareMaSa(d))return false;}
+        else if(scene==Scene::ga){if(!next->prepareGa(d))return false;}
+        else if(scene==Scene::ta){if(!next->prepareTa(d))return false;}else{
         const auto* first=block(w.parameters,"light1");const auto* second=block(w.parameters,"light2");
         const auto* lights=block(w.parameters,"lights");
         if(!first||!second||!lights||!textField(*lights,"numberoflights","2")||
@@ -483,17 +911,35 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
         next->globalAmbient50=row;next->fixedGcGlobalAmbient=true;
         }
         next->racerCount=racers;
+        for(std::uint32_t slot=0;slot<racers;++slot){
+            auto& v=next->vehicles[slot];v.resetOwner.object30=slot+1u;
+            v.resetOwner.storage={v.links.data(),v.entries.data(),v.links.size()};
+            // No254 field is invented by cold lighting preparation.
+        }
         for(std::size_t z=0;z<w.zones.size();++z){
             const auto read=assets::readZoneSearchSelection50CN(w,z);
             if(w.zones[z].zone!=z+1||read.status!=assets::ZoneSearchReadStatus50CN::Complete||
-               read.selection.visibilityDynamic114!=assets::ZoneSearchKind50CN::List)
+               read.selection.visibilityDynamic114!=assets::ZoneSearchKind50CN::List||
+               (scene==Scene::ra&&read.selection.visibilityStatic110!=assets::ZoneSearchKind50CN::List))
                 return fail(d,Status::unsupportedScene,0x272a58);
+            if(scene==Scene::ga||scene==Scene::ra){
+                const auto index=w.zones[z].parameter_block;
+                if(index>=w.parameters.blocks.size()||
+                   !readGaRenderAuthoring(w.parameters.blocks[index],w.zones.size(),next->renderAuthoring[z]))
+                    return fail(d,Status::sourceFields,0x27632c);
+            }
         }
+        next->renderAuthoringReady=scene==Scene::ga||scene==Scene::ra;
+        if(scene==Scene::ra){next->staticModels.resize(w.instances.size(),nullptr);
+            next->staticSelection.resize(w.instances.size());}
+        next->registrations.resize(next->identityCount());
         const ZoneLifecycleStorage50CL lifeStorage{next->registries.data(),next->registries.size(),
             next->registrations.data(),next->registrations.size(),
             {next->methods.data(),next->methods.size(),next->zones.data(),next->zones.size(),
              next->blocks.data(),next->blocks.size()}};
-        if(initializeZoneLifecycle50CL(next->visibility.lifecycle,lifeStorage,w.zones.size(),racers+(ta?0u:1u),1024,
+        // Reserve the actual camera scene30 registration independently of
+        // the existing racer1..N identities on every authenticated world.
+        if(initializeZoneLifecycle50CL(next->visibility.lifecycle,lifeStorage,w.zones.size(),next->identityCount(),1024,
             next->workspace.transfer)!=SearchStorageStatus50BS::Complete)
             return fail(d,Status::registration,0x272a58);
         std::array<LiveZonePortalInput50EN,maximumPortals> input{};
@@ -527,10 +973,10 @@ bool Owner::attachFreshVehicle(std::uint32_t slot,VehicleFrameState49W& s,
     d={};d.racer=slot;
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x229f20);
     auto& o=*storage_;
-    if(o.activeLease||o.activeCamera)return fail(d,Status::activeDraw,0x2167a0);
+    if(o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending())return fail(d,Status::activeDraw,0x2167a0);
     if(slot>=o.racerCount||!frameBinding(s,b))return fail(d,Status::identity,0x2167a0);
     auto& v=o.vehicles[slot];
-    if(v.attached||v.member.attached)return fail(d,Status::alreadyPrepared,0x229f30);
+    if(v.raColdRetired||v.attached||v.resetOwner.membership7F0.attached)return fail(d,Status::alreadyPrepared,0x229f30);
     if(s.phase!=VehicleFramePhase49W::Ready||s.bodies.main.frameFactor!=0.f)
         return fail(d,Status::phase,0x229f44);
     const auto& main=s.nodes[static_cast<std::uint32_t>(b.lifecycle.main190)];
@@ -557,11 +1003,32 @@ bool Owner::attachFreshVehicle(std::uint32_t slot,VehicleFrameState49W& s,
     const LiveZoneStorage50EN backing{v.links.data(),v.entries.data(),v.links.size()};
     // Source C30 was ACTUALLY initialized from visibility4C0[0] at1AE578;
     // sourceRef1 is that same first row in this owner's separate namespace.
-    d.membership=attachLiveZoneMembership50EN(o.visibility.lifecycle,o.visibility.portals,v.member,backing,
+    d.membership=attachLiveZoneMembership50EN(o.visibility.lifecycle,o.visibility.portals,v.resetOwner.membership7F0,backing,
         slot+1u,1u,ZoneMethod50CL::Second,s.shape.radius80,bounds,o.workspace);
     if(d.membership.status!=LiveZoneStatus50EN::Complete)
         return fail(d,Status::registration,0x21688c);
     v.attached=true;v.pendingInitial=false;return true;
+}
+bool Owner::matchesRaFreshRoster(std::uint32_t count) const noexcept {
+    if(!storage_||invalidated_||storage_->scene!=Scene::ra||storage_->racerCount!=count)return false;
+    for(std::uint32_t slot=0;slot<count;++slot)if(!storage_->resetBound(slot))return false;
+    return true;
+}
+bool Owner::retireRaFreshVehicle(std::uint32_t slot,Diagnostic& d) noexcept {
+    d={};d.racer=slot;
+    if(!storage_||storage_->scene!=Scene::ra||slot>=storage_->racerCount)
+        return fail(d,Status::identity,0x21688c);
+    auto& o=*storage_;auto& v=o.vehicles[slot];
+    if(o.staticAccess||o.activeLease||o.activeCamera||o.activeReset||o.resetPending())
+        return fail(d,Status::activeDraw,0x2167a0);
+    if(!o.resetBound(slot))return fail(d,Status::identity,0x21688c);
+    // Terminal native teardown; failed removal retains its exact membership.
+    v.raColdRetired=true;
+    d.membership=removeLiveZoneMembership50EN(o.visibility.lifecycle,o.visibility.portals,
+        v.resetOwner.membership7F0,o.workspace);
+    if(d.membership.status!=LiveZoneStatus50EN::Complete)
+        return fail(d,Status::registration,0x21688c);
+    v.attached=false;v.pendingInitial=false;return true;
 }
 bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s,
     const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
@@ -569,7 +1036,7 @@ bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s
     d={};d.racer=slot;
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x228844);
     auto& o=*storage_;
-    if(o.activeLease||o.activeCamera)return fail(d,Status::activeDraw,0x228844);
+    if(o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending())return fail(d,Status::activeDraw,0x228844);
     if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot))
         return fail(d,Status::identity,0x228858);
     auto& v=o.vehicles[slot];
@@ -583,16 +1050,175 @@ bool Owner::updateAfterGraphics(std::uint32_t slot,const VehicleFrameState49W& s
     // not reprepare694.228844 calls1202E0 directly on its EXISTING cached state.
     // A later219FD8 can advance694 without advancing7F0 until the next graphics.
     const auto bounds=shapeBounds(s.shape,p.shape);
-    d.membership=updateLiveZoneMembership50EN(o.visibility.lifecycle,o.visibility.portals,v.member,bounds,o.workspace);
+    d.membership=updateLiveZoneMembership50EN(o.visibility.lifecycle,o.visibility.portals,v.resetOwner.membership7F0,bounds,o.workspace);
     if(d.membership.status!=LiveZoneStatus50EN::Complete)
         return fail(d,Status::registration,0x228884);
-    v.graphicsSequence=graphicsSequence;return true;
+    v.graphicsSequence=graphicsSequence;v.graphicsFrame=&s;
+    v.graphicsMembershipRevision=v.resetOwner.membership7F0.revision;
+    v.resetNeedsGraphics=false;return true;
+}
+ResetVisibilityLease::~ResetVisibilityLease(){if(owner_)owner_->endResetVisibility(*this);}
+bool Owner::resetLeaseCurrent(const ResetVisibilityLease& lease) const noexcept {
+    if(!storage_||invalidated_||lease.owner_!=this||!lease.frame_||
+       !lease.bindings_||!lease.parameters_)return false;
+    const auto& o=*storage_;
+    if(o.activeReset!=&lease||o.staticBusy()||o.activeLease||o.activeCamera||!lease.generation_||
+       lease.generation_!=o.resetGeneration||!o.resetBound(lease.racer_))return false;
+    const auto& v=o.vehicles[lease.racer_];
+    const auto& s=*lease.frame_;const auto& b=*lease.bindings_;const auto& p=*lease.parameters_;
+    const bool domain=lease.player_?
+        s.phase==(lease.input_?VehicleFramePhase49W::Ready:VehicleFramePhase49W::PostPackedBytes50S)&&s.fields.vehicle58==0u:
+        s.phase==VehicleFramePhase49W::PostPlayer&&s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV;
+    return domain&&
+        frameBinding(s,b)&&v.mainRoot==b.lifecycle.main190&&v.roots==modelRoots(b)&&
+        !std::memcmp(&v.source,&p.shape,sizeof(p.shape))&&!s.shape.type88&&
+        v.graphicsSequence==lease.graphicsSequence_&&v.resetOwner.object254Field50&&
+        (!v.resetPending||v.resetFrame==&s);
+}
+bool Owner::beginAiResetVisibility(std::uint32_t slot,const VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
+    std::uint32_t* field50,ResetVisibilityLease& lease,Diagnostic& d) noexcept {
+    return beginResetVisibility(slot,s,b,p,field50,lease,d,false);
+}
+bool Owner::beginPlayerResetVisibility(std::uint32_t slot,const VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
+    std::uint32_t* field50,ResetVisibilityLease& lease,Diagnostic& d) noexcept {
+    return beginResetVisibility(slot,s,b,p,field50,lease,d,true);
+}
+bool Owner::beginPlayerInputResetVisibility(std::uint32_t slot,const VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
+    std::uint32_t* field50,ResetVisibilityLease& lease,Diagnostic& d) noexcept {
+    return beginResetVisibility(slot,s,b,p,field50,lease,d,true,true);
+}
+bool Owner::beginResetVisibility(std::uint32_t slot,const VehicleFrameState49W& s,
+    const VehicleFrameBindings49W& b,const VehicleFrameParameters49W& p,
+    std::uint32_t* field50,ResetVisibilityLease& lease,Diagnostic& d,bool player,bool input) noexcept {
+    d={};d.racer=slot;
+    if(!storage_||invalidated_)return fail(d,Status::unprepared,0x216a90);
+    auto& o=*storage_;
+    if(o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||lease.owner_)
+        return fail(d,Status::activeDraw,0x216a90);
+    // Missing254 is not the original null7F0 branch. Never authorize any
+    // registry mutation or manufacture a replacement field for this case.
+    if(!field50)return fail(d,Status::missingResetOwner,0x216ac8);
+    if(slot>=o.racerCount||!frameBinding(s,b)||!o.resetBound(slot))
+        return fail(d,Status::identity,0x216a90);
+    const bool domain=player?
+        s.phase==(input?VehicleFramePhase49W::Ready:VehicleFramePhase49W::PostPackedBytes50S)&&s.fields.vehicle58==0u:
+        s.phase==VehicleFramePhase49W::PostPlayer&&s.fields.vehicle58==1u&&s.fields.nativeAiOwnersBound50IV;
+    if(!domain||s.fields.vehicle3C)return fail(d,Status::phase,0x216a90);
+    auto& v=o.vehicles[slot];auto& reset=v.resetOwner;
+    if(v.pendingInitial||v.mainRoot!=b.lifecycle.main190||v.roots!=modelRoots(b)||
+       s.shape.type88||std::memcmp(&v.source,&p.shape,sizeof(p.shape))||
+       (reset.object254Field50&&reset.object254Field50!=field50)||
+       (v.resetPending&&v.resetFrame!=&s))return fail(d,Status::identity,0x216a90);
+    if(!disjointResetField(field50,&o,sizeof(o))||!disjointResetField(field50,&s,sizeof(s))||
+       !o.disjointStaticBacking(field50)||
+       !disjointResetField(field50,&b,sizeof(b))||!disjointResetField(field50,&p,sizeof(p))||
+       !disjointResetField(field50,&lease,sizeof(lease)))return fail(d,Status::identity,0x216ac8);
+    for(std::uint32_t other=0;other<o.racerCount;++other)if(other!=slot){
+        if(o.vehicles[other].resetPending)return fail(d,Status::activeDraw,0x216a90);
+        if(o.vehicles[other].resetOwner.object254Field50==field50)
+            return fail(d,Status::identity,0x216ac8);
+    }
+    if(v.attached){
+        if(!o.bound(slot))return fail(d,Status::identity,0x216a90);
+    }else{
+        const auto& registration=o.registrations[slot];
+        if(!v.resetPending||reset.membership7F0.attached||reset.membership7F0.object||
+           registration.owner||registration.slot||registration.encodedObject)
+            return fail(d,Status::identity,0x216a90);
+    }
+    if(o.resetGeneration==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,Status::stalePublication,0x216a90);
+    reset.object254Field50=field50;
+    lease.owner_=this;lease.frame_=&s;lease.bindings_=&b;lease.parameters_=&p;
+    lease.generation_=++o.resetGeneration;lease.graphicsSequence_=v.graphicsSequence;
+    lease.racer_=slot;lease.player_=player;lease.input_=input;lease.removed_=v.resetPending;lease.attached_=v.resetPending&&v.attached;
+    o.activeReset=&lease;return true;
+}
+bool Owner::removeAiResetVisibility(ResetVisibilityLease& lease,Diagnostic& d) noexcept {
+    d={};d.racer=lease.racer_;
+    if(!resetLeaseCurrent(lease))return fail(d,Status::identity,0x216a90);
+    auto& o=*storage_;auto& v=o.vehicles[lease.racer_];
+    if(lease.removed_||lease.attached_||v.resetPending||!o.bound(lease.racer_))
+        return fail(d,Status::phase,0x216a90);
+    d.resetVisibility=removeResetVisibility50EY(o.visibility,v.resetOwner,o.workspace);
+    d.membership=d.resetVisibility.registry;
+    if(d.resetVisibility.status!=ResetVisibilityStatus50EY::SourceSliceComplete)
+        return fail(d,Status::registration,d.resetVisibility.sourcePC);
+    v.attached=false;v.resetPending=true;v.resetNeedsGraphics=true;v.resetFrame=lease.frame_;
+    o.selectedReady.fill(false);lease.removed_=true;return true;
+}
+bool Owner::attachAiResetVisibility(ResetVisibilityLease& lease,
+    CollectionRef50BX visibilityZoneC30,Diagnostic& d) noexcept {
+    d={};d.racer=lease.racer_;
+    if(!resetLeaseCurrent(lease))return fail(d,Status::identity,0x216874);
+    auto& o=*storage_;auto& v=o.vehicles[lease.racer_];
+    if(!lease.removed_||lease.attached_||!v.resetPending||v.attached)
+        return fail(d,Status::phase,0x216874);
+    if(!visibilityZoneC30||visibilityZoneC30>o.visibility.lifecycle.zoneCount)
+        return fail(d,Status::identity,0x21687c);
+    if(!preparedResetShape(*lease.frame_,*lease.bindings_,*lease.parameters_))
+        return fail(d,Status::bounds,0x21684c);
+    d.resetVisibility=attachResetVisibility50EY(o.visibility,v.resetOwner,*lease.frame_,
+        *lease.bindings_,lease.parameters_->shape,visibilityZoneC30,o.workspace);
+    d.membership=d.resetVisibility.registry;
+    if(d.resetVisibility.status!=ResetVisibilityStatus50EY::SourceSliceComplete)
+        return fail(d,Status::registration,d.resetVisibility.sourcePC);
+    v.attached=true;lease.attached_=true;return true;
+}
+bool Owner::finishAiResetVisibility(ResetVisibilityLease& lease,Diagnostic& d) noexcept {
+    d={};d.racer=lease.racer_;
+    if(!resetLeaseCurrent(lease))return fail(d,Status::identity,0x2169a0);
+    auto& o=*storage_;auto& v=o.vehicles[lease.racer_];
+    if(!lease.removed_||!lease.attached_||!v.resetPending||!o.bound(lease.racer_)||
+       !lease.frame_->shape.registrationE0)return fail(d,Status::phase,0x2169a0);
+    if(lease.player_&&!lease.input_){
+        // Player2255B0 occurs AFTER this frame's genuine graphics call. Its
+        //216F6C..21723C reset has now rebuilt every displayed model scene and
+        // bound. Replaying graphics/228844 would be an extra source operation.
+        // Retain the existing graphics serial, but publish the current reset
+        // registration and freshly ready model worlds to the native draw gate.
+        if(!v.graphicsSequence||v.graphicsSequence!=lease.graphicsSequence_)
+            return fail(d,Status::stalePublication,0x21723c);
+        const auto& frame=*lease.frame_;const auto count=modelCount(*lease.bindings_);
+        for(std::uint32_t c=0;c<count;++c){
+            const auto& node=frame.nodes[static_cast<std::uint32_t>(v.roots[c])];
+            if(node.parent180!=SceneNodeIndex49P::none||!(node.sceneFlags190&1u)||
+               std::memcmp(&node.localC0,&node.world100,sizeof(BodyMatrix48G)))
+                return fail(d,Status::bounds,0x21723c);
+        }
+        v.graphicsFrame=&frame;v.graphicsMembershipRevision=v.resetOwner.membership7F0.revision;
+        v.resetNeedsGraphics=false;
+    }
+    v.resetPending=false;v.resetFrame=nullptr;return true;
+}
+void Owner::endResetVisibility(ResetVisibilityLease& lease) noexcept {
+    if(storage_&&storage_->activeReset==&lease)storage_->activeReset=nullptr;
+    lease.owner_=nullptr;lease.frame_=nullptr;lease.bindings_=nullptr;lease.parameters_=nullptr;
+    lease.generation_=0;lease.graphicsSequence_=0;lease.racer_=0;
+    lease.removed_=false;lease.attached_=false;lease.player_=false;lease.input_=false;
+}
+std::uint64_t ResetVisibilityLease::zoneKey4C0(std::size_t ordinal) const noexcept {
+    if(!owner_||!owner_->resetLeaseCurrent(*this)||
+       ordinal>=owner_->storage_->visibility.lifecycle.zoneCount)return 0;
+    return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&owner_->storage_->zones[ordinal]));
+}
+std::size_t ResetVisibilityLease::zoneCount() const noexcept {
+    return owner_&&owner_->resetLeaseCurrent(*this)?owner_->storage_->visibility.lifecycle.zoneCount:0u;
+}
+CollectionRef50BX ResetVisibilityLease::zoneRef4C0(std::uint64_t actualKey) const noexcept {
+    if(!actualKey||!owner_||!owner_->resetLeaseCurrent(*this))return 0;
+    for(std::size_t ordinal=0;ordinal<owner_->storage_->visibility.lifecycle.zoneCount;++ordinal)
+        if(zoneKey4C0(ordinal)==actualKey)return static_cast<CollectionRef50BX>(ordinal+1u);
+    return 0;
 }
 CameraVisibilityLease::~CameraVisibilityLease(){if(owner_)owner_->endCameraVisibility(*this);}
 bool Owner::cameraLeaseCurrent(const CameraVisibilityLease& lease) const noexcept {
     if(!storage_||invalidated_||lease.owner_!=this)return false;
     const auto& o=*storage_;
-    return o.activeCamera==&lease&&!o.activeLease&&!o.taNative&&
+    return o.activeCamera==&lease&&!o.staticBusy()&&!o.activeLease&&!o.activeReset&&!o.resetPending()&&
         lease.generation_&&lease.generation_==o.cameraGeneration&&
         lease.racer_<o.racerCount&&o.bound(lease.racer_);
 }
@@ -601,9 +1227,8 @@ bool Owner::beginCameraVisibility(std::uint32_t slot,CameraVisibilityLease& leas
     d={};d.racer=slot;
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x175224);
     auto& o=*storage_;
-    if(o.activeLease||o.activeCamera||lease.owner_)return fail(d,Status::activeDraw,0x175224);
-    if(o.taNative)return fail(d,Status::unsupportedScene,0x175224);
-    if(slot>=o.racerCount||!o.bound(slot)||o.visibility.lifecycle.objectCount!=o.racerCount+1u)
+    if(o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||lease.owner_)return fail(d,Status::activeDraw,0x175224);
+    if(slot>=o.racerCount||!o.bound(slot)||o.visibility.lifecycle.objectCount!=o.identityCount())
         return fail(d,Status::identity,0x175224);
     if(o.cameraGeneration==std::numeric_limits<std::uint64_t>::max())
         return fail(d,Status::stalePublication,0x175224);
@@ -611,6 +1236,12 @@ bool Owner::beginCameraVisibility(std::uint32_t slot,CameraVisibilityLease& leas
     o.activeCamera=&lease;return true;
 }
 void Owner::endCameraVisibility(CameraVisibilityLease& lease) noexcept {
+    // No partial matrix/stamp publication survives the actual camera borrow.
+    // Retain source field values, invalidate only native consumption authority.
+    if(storage_&&storage_->zoneProjectionLease==&lease){
+        storage_->zoneProjectionLease=nullptr;
+        for(auto& method:storage_->selectedMethods)method.complete=false;
+    }
     if(storage_&&storage_->activeCamera==&lease)storage_->activeCamera=nullptr;
     lease.owner_=nullptr;lease.generation_=0;lease.racer_=0;
 }
@@ -621,7 +1252,30 @@ LiveZoneWorkspace50EN* CameraVisibilityLease::workspace() noexcept {
     return owner_&&owner_->cameraLeaseCurrent(*this)?&owner_->storage_->workspace:nullptr;
 }
 const LiveZoneMembership50EN* CameraVisibilityLease::racerVisibility7F0() const noexcept {
-    return owner_&&owner_->cameraLeaseCurrent(*this)?&owner_->storage_->vehicles[racer_].member:nullptr;
+    return owner_&&owner_->cameraLeaseCurrent(*this)?&owner_->storage_->vehicles[racer_].resetOwner.membership7F0:nullptr;
+}
+const LiveZoneMembership50EN* Owner::cableCallbackVisibility7F0(
+    const CameraVisibilityLease& view,std::uint32_t callbackRacer,
+    const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const std::uint32_t& actualCableField50)const noexcept {
+    // cameraLeaseCurrent checks the exclusive active pointer, generation,
+    // owner, viewing racer, reset/static/draw exclusions. Do not change view.
+    if(!cameraLeaseCurrent(view)||!frameBinding(frame,bindings))return nullptr;
+    const auto& o=*storage_;
+    if(callbackRacer>=o.racerCount||!o.bound(callbackRacer)||
+       o.visibility.lifecycle.objectCount!=o.identityCount())return nullptr;
+    const auto& v=o.vehicles[callbackRacer];
+    if(v.mainRoot!=bindings.lifecycle.main190||v.roots!=modelRoots(bindings)||
+       v.resetNeedsGraphics||
+       (v.resetOwner.object254Field50&&v.resetOwner.object254Field50!=&actualCableField50)||
+       !disjointResetField(&actualCableField50,this,sizeof(*this))||
+       !disjointResetField(&actualCableField50,&o,sizeof(o))||
+       !disjointResetField(&actualCableField50,&frame,sizeof(frame))||
+       !o.disjointStaticBacking(&actualCableField50))return nullptr;
+    for(std::uint32_t other=0;other<o.racerCount;++other)
+        if(other!=callbackRacer&&o.vehicles[other].resetOwner.object254Field50==&actualCableField50)
+            return nullptr;
+    return &v.resetOwner.membership7F0;
 }
 CollectionRef50BX CameraVisibilityLease::cameraObject30() const noexcept {
     return owner_&&owner_->cameraLeaseCurrent(*this)?owner_->storage_->racerCount+1u:0u;
@@ -633,52 +1287,97 @@ std::uint64_t CameraVisibilityLease::zoneKey4C0(std::size_t ordinal) const noexc
 std::size_t CameraVisibilityLease::zoneCount() const noexcept {
     return owner_&&owner_->cameraLeaseCurrent(*this)?owner_->storage_->visibility.lifecycle.zoneCount:0u;
 }
+const AuthoredRenderZone* CameraVisibilityLease::authoredRenderZone(std::size_t ordinal) const noexcept {
+    if(!owner_||!owner_->cameraLeaseCurrent(*this))return nullptr;
+    const auto& o=*owner_->storage_;
+    if(!o.renderAuthoringReady||ordinal>=o.visibility.lifecycle.zoneCount)return nullptr;
+    return &o.renderAuthoring[ordinal];
+}
 bool Owner::beginDraw(std::uint32_t slot,const VehicleFrameState49W& s,
     const VehicleFrameBindings49W& b,std::uint64_t expectedGraphicsSequence,
     DrawLease& lease,Diagnostic& d) noexcept {
     d={};d.racer=slot;
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x229e08);
     auto& o=*storage_;
-    if(o.activeLease||o.activeCamera||lease.owner_)return fail(d,Status::activeDraw,0x229e08);
+    if(o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending()||lease.owner_)return fail(d,Status::activeDraw,0x229e08);
     if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot))
         return fail(d,Status::identity,0x229e08);
     if(s.phase!=VehicleFramePhase49W::Ready&&s.phase!=VehicleFramePhase49W::PostGraphics)
         return fail(d,Status::phase,0x229e08);
     const auto& v=o.vehicles[slot];
-    if(v.mainRoot!=b.lifecycle.main190||v.roots!=modelRoots(b)||!v.graphicsSequence||
+    if(v.mainRoot!=b.lifecycle.main190||v.roots!=modelRoots(b)||v.resetNeedsGraphics||!v.graphicsSequence||
        v.graphicsSequence!=expectedGraphicsSequence||
        o.drawGeneration==std::numeric_limits<std::uint64_t>::max())
         return fail(d,Status::identity,0x229e08);
     lease.owner_=this;lease.frame_=&s;lease.generation_=++o.drawGeneration;
-    lease.membershipRevision_=v.member.revision;lease.racer_=slot;lease.roots_=v.roots;
+    lease.membershipRevision_=v.resetOwner.membership7F0.revision;lease.racer_=slot;lease.roots_=v.roots;
+    lease.componentCount_=modelCount(b);
     o.selectedReady.fill(false);o.activeLease=&lease;return true;
+}
+bool Owner::writeCablesVisibility50(const DrawLease& lease,std::uint32_t& field50,
+    Diagnostic& d) noexcept {
+    d={};d.racer=lease.racer_;
+    if(!storage_||invalidated_)return fail(d,Status::unprepared,0x225588);
+    auto& o=*storage_;
+    if(lease.owner_!=this||o.activeLease!=&lease||o.activeCamera||o.activeReset||o.resetPending()||
+       !lease.frame_||!lease.generation_||lease.generation_!=o.drawGeneration||
+       !o.bound(lease.racer_))return fail(d,Status::stalePublication,0x225588);
+    const auto& v=o.vehicles[lease.racer_];
+    if(v.resetOwner.membership7F0.revision!=lease.membershipRevision_||
+       !disjointResetField(&field50,&lease,sizeof(lease)))return fail(d,Status::identity,0x174360);
+    return o.writeCablesField50(lease.racer_,*lease.frame_,field50,d);
+}
+bool Owner::writeCablesVisibilityAfterGraphics(std::uint32_t slot,
+    const VehicleFrameState49W& s,const VehicleFrameBindings49W& b,
+    const VehicleFrameParameters49W& p,std::uint64_t graphicsSequence,
+    std::uint32_t& field50,Diagnostic& d) noexcept {
+    d={};d.racer=slot;
+    if(!storage_||invalidated_)return fail(d,Status::unprepared,0x225588);
+    auto& o=*storage_;
+    if(o.staticBusy()||o.activeLease||o.activeCamera||o.activeReset||o.resetPending())
+        return fail(d,Status::activeDraw,0x225588);
+    if(slot>=o.racerCount||!frameBinding(s,b)||!o.bound(slot))
+        return fail(d,Status::identity,0x225588);
+    const auto& v=o.vehicles[slot];
+    if(s.phase!=VehicleFramePhase49W::PostGraphics||!graphicsSequence||
+       v.graphicsSequence!=graphicsSequence||v.graphicsFrame!=&s||
+       v.graphicsMembershipRevision!=v.resetOwner.membership7F0.revision)
+        return fail(d,Status::phase,0x225588);
+    if(v.mainRoot!=b.lifecycle.main190||v.roots!=modelRoots(b)||s.shape.type88||
+       std::memcmp(&v.source,&p.shape,sizeof(p.shape))||
+       !disjointResetField(&field50,&b,sizeof(b))||!disjointResetField(&field50,&p,sizeof(p)))
+        return fail(d,Status::identity,0x225588);
+    return o.writeCablesField50(slot,s,field50,d);
 }
 bool Owner::select(const DrawLease& lease,std::uint32_t component,SceneNodeIndex49P root,
     CachePolicy policy,light::LightMatrices& output,Diagnostic& d) noexcept {
     d={};d.racer=lease.racer_;
     if(!storage_||invalidated_)return fail(d,Status::unprepared,0x2413a8);
     auto& o=*storage_;
-    if(lease.owner_!=this||o.activeLease!=&lease||lease.generation_!=o.drawGeneration||
-       lease.racer_>=o.racerCount||!o.bound(lease.racer_)||component>=3u||
+    if(lease.owner_!=this||o.activeLease!=&lease||o.activeReset||o.resetPending()||lease.generation_!=o.drawGeneration||
+       lease.racer_>=o.racerCount||!o.bound(lease.racer_)||component>=lease.componentCount_||
        lease.roots_[component]!=root||
-       o.vehicles[lease.racer_].member.revision!=lease.membershipRevision_)
+       o.vehicles[lease.racer_].resetOwner.membership7F0.revision!=lease.membershipRevision_)
         return fail(d,Status::stalePublication,0x2413d0);
-    if(policy!=(o.gaNative?CachePolicy::nativeGaAuthoredZoneSpotSelection:
-        o.taNative?CachePolicy::nativeTaAuthoredZoneSpotSelection:
+    if(policy!=(o.scene==Scene::ra?CachePolicy::nativeRaAuthoredZoneLightSelection:
+        o.scene==Scene::ma?CachePolicy::nativeMaAuthoredZoneLightSelection:
+        o.scene==Scene::sa?CachePolicy::nativeSaAuthoredZoneLightSelection:
+        o.scene==Scene::ga?CachePolicy::nativeGaAuthoredZoneSpotSelection:
+        o.scene==Scene::ta?CachePolicy::nativeTaAuthoredZoneSpotSelection:
         CachePolicy::inactiveCandidateNativePerPublicationRecompute))
         return fail(d,Status::unsupportedPolicy,0x14a0e8);
     // INTENTIONALLY INACTIVE NATIVE POLICY: do not reproduce retail A4 hits.
     // It can differ from14A860's membership-key retained matrix. No source
     // null/miss/completeness assertion is manufactured by choosing this branch.
     if(!o.selectedReady[component]){
-        if(o.taNative||o.gaNative){
+        if(o.scene!=Scene::gc){
             if(!lease.frame_||!validRoot(root,lease.frame_->sceneNodeCount))
                 return fail(d,Status::identity,0x2413d0);
             const auto& node=lease.frame_->nodes[static_cast<std::uint32_t>(root)];
             if(!(node.sceneFlags190&1u))return fail(d,Status::phase,0x2412e4);
             const light::Vec3 position{{node.world100.v[12],node.world100.v[13],node.world100.v[14]}};
             light::LightMatrices next{};
-            if(!o.selectTa(o.vehicles[lease.racer_].member,position,next,d))return false;
+            if(!o.selectAuthored(o.vehicles[lease.racer_].resetOwner.membership7F0,position,next,d))return false;
             o.selected[component]=next;o.selectedReady[component]=true;
         }else{
         const auto zone=o.vehicles[lease.racer_].links[0].zone;
@@ -694,8 +1393,9 @@ bool Owner::select(const DrawLease& lease,std::uint32_t component,SceneNodeIndex
 bool Owner::publishNativeDraw(const DrawLease& lease,CachePolicy policy,
     NativeGcSelectedLightsCandidate& output,Diagnostic& d) noexcept {
     NativeGcSelectedLightsCandidate next{};
-    for(unsigned c=0;c<3;++c)
+    for(unsigned c=0;c<lease.componentCount_;++c)
         if(!select(lease,c,lease.roots_[c],policy,next.matrices_[c],d))return false;
+    next.componentCount_=lease.componentCount_;
     next.ownerIdentity_=reinterpret_cast<std::uintptr_t>(this);
     next.graphicsSequence_=storage_->vehicles[lease.racer_].graphicsSequence;
     next.publication_=lease.generation_;next.racerSlot_=lease.racer_;
@@ -706,7 +1406,7 @@ void Owner::endDraw(DrawLease& lease) noexcept {
         storage_->selectedReady.fill(false);storage_->activeLease=nullptr;
     }
     lease.owner_=nullptr;lease.frame_=nullptr;lease.generation_=0;lease.membershipRevision_=0;
-    lease.racer_=0;lease.roots_={};
+    lease.racer_=0;lease.roots_={};lease.componentCount_=defaultVehicleDrawComponents50CM;
 }
 void Owner::invalidate() noexcept {
     invalidated_=true;
@@ -754,14 +1454,18 @@ bool recoverCompressedNormal(const std::array<double,3>& expanded,double normalQ
 
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 bool Owner::currentGcGlobalAmbient50(std::array<float,4>& out) const noexcept {
-    if(!storage_||invalidated_||storage_->taNative||storage_->gaNative||!storage_->fixedGcGlobalAmbient)return false;
+    if(!storage_||invalidated_||storage_->scene!=Scene::gc||!storage_->fixedGcGlobalAmbient)return false;
     out=storage_->globalAmbient50;return true;
 }
 }
 
 namespace rr::game::original_gc_gameplay_lighting_candidate {
 bool Owner::currentSourceGlobalAmbient50(std::array<float,4>& out) const noexcept {
-    if(!storage_||invalidated_||storage_->taNative||!storage_->fixedGcGlobalAmbient)return false;
+    if(!storage_||invalidated_||!storage_->fixedGcGlobalAmbient)return false;
     out=storage_->globalAmbient50;return true;
 }
 }
+
+#include "original_ra_static_visibility50la.inl"
+#include "original_ra_static_selection50la.inl"
+#include "original_ra_zone_projection50la.inl"

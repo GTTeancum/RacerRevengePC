@@ -225,7 +225,16 @@ bool sample(const assets::MotionView49O& motion, const assets::MotionView49O* se
             RR_MODEL49T_TRACK_WRITE(channel,i,bindings.rows[track.rowIndex].sceneNode);
 #endif
             //28A580/28AC10 share28C4F0+ready-gated289A20 with28B490.
+#if defined(RR_MODEL49T_SHARED_WRITE) || defined(RR_MODEL49T_MODEL_WRITE) || defined(RR_MODEL49T_TRACK_WRITE)
+            // Arbitrary instrumentation may mutate the otherwise stable links.
             if(!setLocalMatrix49P(staged,target,local))return reject(d,ModelMotionError49T::topology,i,channel);
+#else
+            // Full topology admission preceded the exact scratch clone. Key
+            // readers touch only local results; setters change locals/flags,
+            // never storage/count/links. Keep mutable per-call checks intact.
+            if(!scene_detail49P::setLocalMatrixAdmittedTopology(staged,target,local))
+                return reject(d,ModelMotionError49T::topology,i,channel);
+#endif
         }
     }
     std::memcpy(graph.nodes,workspace.nodes,bytes);

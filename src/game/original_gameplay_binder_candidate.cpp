@@ -34,8 +34,13 @@ Status project(const VehicleFrameState49W& s,const VehicleFrameBindings49W& fram
     std::memcpy(work.nodes.data(),s.nodes,s.sceneNodeCount*sizeof(SceneNode49P));
     const SceneGraph49P graph{work.nodes.data(),s.sceneNodeCount};
     if(!validateSceneGraph49P(graph))return Status::graph;
-    if(!descendant(graph,b.left230,frame.lifecycle.left1BC)||
-       !descendant(graph,b.right238,frame.lifecycle.right1B8))return Status::binding;
+    auto leftRoot=frame.lifecycle.left1BC,rightRoot=frame.lifecycle.right1B8;
+    if(b.pair==Pair::bottomLeftToPrimaryRight)leftRoot=frame.visual.bottomLeft1C4;
+    else if(b.pair==Pair::primaryLeftToBottomRight)rightRoot=frame.visual.bottomRight1C0;
+    else if(b.pair!=Pair::primary)return Status::binding;
+    if(b.pair!=Pair::primary&&(!frame.visual.extra1C0Present||!frame.visual.extra1C4Present))
+        return Status::binding;
+    if(!descendant(graph,b.left230,leftRoot)||!descendant(graph,b.right238,rightRoot))return Status::binding;
     if(!refreshSceneWorld49P(graph,b.left230)||!refreshSceneWorld49P(graph,b.right238))
         return Status::graph;
     const auto& left=work.nodes[static_cast<std::uint32_t>(b.left230)].world100;

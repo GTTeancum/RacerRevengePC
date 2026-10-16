@@ -45,12 +45,12 @@
     {
       "base": "repo",
       "path": "src/assets/import_texture48e.cpp",
-      "sha256": "15ffdb328539309d449f940985f03a62b917f21bfab8d50b06614429508b0d2a"
+      "sha256": "b32b3de416754eb8cc3887e06b1298221ce3effc3af710fab295f0f0f8b11348"
     },
     {
       "base": "repo",
       "path": "src/assets/import_texture48e.h",
-      "sha256": "01ebfcd78d2445a55c0f6fb6a501e09c7ccdde6ae371e8c1c6ac602d2b349536"
+      "sha256": "d9b84d379d0971fa7ebe3f1f132acb9a71c92e1238c431b7b0454d647c1e06a5"
     },
     {
       "base": "repo",

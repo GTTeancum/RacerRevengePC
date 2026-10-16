@@ -22,6 +22,9 @@ enum class OriginalCameraPresentationStatus : std::uint8_t {
 struct OriginalCameraPresentationResult {
     OriginalCameraPresentationStatus status=OriginalCameraPresentationStatus::owner;
     NativeCameraViewError50DX conversion=NativeCameraViewError50DX::none;
+    // Preserve the exact reached sky producer failure instead of reporting
+    // only skyProjection with an untouched conversion error of none.
+    game::OriginalCameraStartResult skyRebuild{};
 };
 // The whole actual drawable receives the recovered source viewport projection.
 // Resize does not invent widescreen FOV/aspect: original640x448 scene/aspect is
@@ -61,8 +64,8 @@ inline OriginalCameraPresentationResult projectOriginalCameraPresentation(
     r.status=OriginalCameraPresentationStatus::skyProjection;
     //115350 direct rebuild reads the owned Look/Up without a second normalize.
     //Only these local projection/scratch copies are written.
-    if(game::rebuildOriginalRaceScene236DD0(skyViewport,skyScene,skyPosition,skyCore).status!=
-           game::OriginalCameraStartStatus::complete||
+    r.skyRebuild=game::rebuildOriginalRaceScene236DD0(skyViewport,skyScene,skyPosition,skyCore);
+    if(r.skyRebuild.status!=game::OriginalCameraStartStatus::complete||
        !convertNativeCameraView50DX(skyCore,contract,converted,r.conversion))return r;
     std::memcpy(next.sky.worldViewProjection,converted.worldViewProjection,sizeof converted.worldViewProjection);
     output=next;r.status=OriginalCameraPresentationStatus::complete;return r;

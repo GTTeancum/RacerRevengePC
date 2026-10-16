@@ -1,0 +1,82 @@
+FOG CAMERA RECONCILIATION — SOURCE REVIEW ONLY, UNTESTED, NOT INTEGRATED
+
+Result
+A minimal observation-only delta is available in fog-camera-reconciled-UNTESTED.patch.
+The source snapshot started at d24aab3 and preserved root's subsequently added
+PositionStats forward declaration/friend. Final delta baseline is 8a3a2207f447f8f9c13e6e236f7cdfb5edfc8a38;
+per-file hashes are in MANIFEST.json. Use the delta, never whole candidate headers.
+No central files were written. No rendering call sites or activation were added.
+No builds, tests, syntax checks, shader checks, sanitizers, converters, game or
+guest/project execution occurred. Python performed only source text manipulation
+and patch/manifest generation; git was used for read-only revision metadata.
+
+Changes beyond the held proposal
+1. Raw-position inversion previously accepted an integer merely because it
+round-tripped. Adjacent raw integers may decode identically when a large origin
+swallows quantization increments. Reject matching in-range neighbors as well;
+positive q makes decoding monotonic. Explicit separate double product/sum avoids
+contracting this admission operation. This is still a strict supported subset,
+not proof of raw bytes, original packet ownership or PS2 numeric equivalence.
+2. exactFloat rejects nonfinite/out-of-float-range doubles BEFORE narrowing.
+3. Fog/source/scene/pose comparisons use componentwise bit identity. Include all
+pose and CameraSceneState fields and CameraViewOutput metadata, not only position
+XYZ and matrices. Never memcmp whole padded structs.
+4. Destroy the already-closed Session explicitly before clearing the matching
+DisplayInputs fog slot. Do not touch a foreign replacement slot; no clear occurs
+unless fogAddress is nonnull. Fog backing remains alive through Session destruction.
+5. Both originalSelectedSchedulingJoined and originalFogBit02Published are
+immutable false. Numeric distanceCandidate/computeFogCandidate02 remain observations.
+
+Mutation audit
+Current Session matrix/pose writes occur in prepare, resetHuman225B0C,
+advanceSceneChild, advanceCameraChild, press, and prepareGameplayFogRender.
+The held delta invalidates each before work, also fail, sceneBorrow,
+applyAuthoredShakeEnter, close and abandonAndCloseSpatial. advanceExit obtains
+sceneBorrow; it cannot bypass invalidation. Public view/viewport/pose getters are
+const. TimeStats/SpeedBoost/PositionStats friend adapters inspected are readers.
+Display/video and ending-clock methods do not directly mutate these matrices.
+Only a successful actual prepareGameplayFogRender rebuild publishes a monotonically
+revisioned observation. Revision exhaustion fails closed; same-frame re-preparation
+invalidates older leases, even if resulting matrix values are unchanged.
+
+Ownership audit
+Binding retains shared_ptr world and shared_ptr OwnershipBridge. Private publication
+requires same camera Session, generation/publication/frame, retained fog pointer,
+and preparation revision. Camera publication checks the real bank lifetime control
+block, idle/non-read-blocked bank and actual lighting owner. Explicit world or camera
+close makes subsequent reads reject, even if the enclosing shared_ptr lives on.
+Aggregate fail/close retires the fog binding first. Camera failure retains its prefix
+until real close; failed close does not clear the installed fog pointer. Factory
+requires an initially empty trackFog3EC slot, installs its retained RA fog fields,
+and uses the existing restoreOriginalRaceFog1A98DC range arithmetic. Non-RA factory
+paths are unchanged. New roster and navigation ownership code is preserved.
+
+Remaining blockers / limits
+- Genuine static selected191, full visibility/entity membership, original selection
+240C00 -> distance26F070 -> draw241280 scheduling and actual fog bit02 publication
+are not owned here. NO draw admission follows from the observations or raw operands.
+- DisplayInputs and other caller objects remain borrowed: they must outlive the
+camera binding, including failed-construction/cleanup prefixes. shared_ptr camera
+retention does not turn external application/renderer/bank descriptors into owned
+objects. No claim that this patch removes the existing caller lifetime contract.
+- Snapshot identity detects current differences, not raw pointer mutation/restoration
+(ABA) outside Session. There is no thread-safety or concurrent mutation contract.
+- Exact binary32 matrix admission can reject importer-normalized double transforms.
+Inverse position admission can reject legitimate originals after rounding. Original
+raw stream retention would be a stronger future source of packet operands.
+- Strict FP/compiler contraction, FTZ/DAZ and PS2 arithmetic parity remain unverified.
+The adjacent check improves source-level rejection; it is not runtime verification.
+- Actual scene/viewport preparation is mutated by the explicit unused preparation
+API. It is not a pure getter; do not call it from an invented rendering schedule.
+- Clipping, interpolation, renderer queues, coverage/MSAA and material policies
+remain separate. No material FGE substitute was used and no material policy changed.
+
+Relevant central source
+Session: tests/native/original_camera_session50kx.h, prepareGameplayFogRender,
+sceneBorrow, advanceSceneChild, advanceCameraChild, resetHuman225B0C, press, close.
+RA owner: tests/native/ra_source_camera_ownership50la.h, cameraBankCurrent,
+readStaticLightPublication, closeCamera, canClose/close and CameraBinding.
+World: tests/native/ra_static_world50la.h close and
+ra_static_world_draw_plan50la.inl drawPlanCurrent.
+Decoded position origin/scale: src/assets/import_scene48d.cpp lines 190–191;
+source quantization/local-origin validation: src/assets/import_decode48c.cpp 250–260.

@@ -72,9 +72,9 @@ bool number(const char* text, std::size_t bytes, float& out) noexcept {
         if (sign) expanded[0]=text[0];
         expanded[sign]='0';
         for (std::size_t i=sign;i<bytes;++i) expanded[i+1]=text[i];
-        return parsePodPhysicsNumber49N(expanded,bytes+1,out);
+        return parseOriginalUiNumber49N(expanded,bytes+1,out);
     }
-    return parsePodPhysicsNumber49N(text,bytes,out);
+    return parseOriginalUiNumber49N(text,bytes,out);
 }
 bool count(const OriginalUiDatSection50KG& s, const char* key,
     std::size_t limit, std::int32_t& out, OriginalUiPageDiagnostic50KG& d,

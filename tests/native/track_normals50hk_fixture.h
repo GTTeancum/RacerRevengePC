@@ -66,9 +66,11 @@ inline bool load(const std::filesystem::path& root,
             }
             const auto& scene=found->second;
             auto matrix=instance.at("matrix").get<std::array<double,16>>();
-            if ((track==track_source_fixture::Track::gc||track==track_source_fixture::Track::ga) && scene.world_space)
+            if ((track==track_source_fixture::Track::gc||track==track_source_fixture::Track::ga||
+                 track==track_source_fixture::Track::ma||track==track_source_fixture::Track::sa) && scene.world_space)
                 matrix={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
-            if ((track==track_source_fixture::Track::gc||track==track_source_fixture::Track::ga))
+            if ((track==track_source_fixture::Track::gc||track==track_source_fixture::Track::ga||
+                 track==track_source_fixture::Track::ma||track==track_source_fixture::Track::sa))
                 d::need(instance.at("visual_matrix")==d::Json(matrix) &&
                     instance.at("world_space_root_bypassed")==scene.world_space,
                     "Original world-space normal root policy mismatch");

@@ -6,7 +6,9 @@
 #include <cstdint>
 #include <thread>
 
+namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
 namespace rr::platform {
+class VehicleWindowGl50DS;
 enum class GameHostMode50ER : std::uint8_t { Unspecified, Window, HeadlessLive };
 inline constexpr std::size_t gameHostInputByteBudget50ER = 1024;
 inline constexpr std::size_t gameHostCommandCapacity50ER = 64;
@@ -102,6 +104,9 @@ public:
     // Renderer submit/commit is separate and never performed by this facade.
     bool swapWindow(GameHostDiagnostic50ER&) noexcept;
     bool setSwapInterval(std::int32_t,GameHostDiagnostic50ER&) noexcept;
+    bool rumbleController50KZ(std::uint32_t slot,std::int32_t expectedInstance,
+        std::uint8_t small,std::uint8_t large,ControllerRumbleReceipt50KZ&,
+        GameHostDiagnostic50ER&) noexcept;
     bool close(GameHostDiagnostic50ER&) noexcept;
     bool created() const noexcept;
     bool ownsResources() const noexcept;
@@ -111,6 +116,10 @@ public:
     bool hasWindow() const noexcept { return mode_ == GameHostMode50ER::Window; }
     const GameHostInfo50ER& info() const noexcept { return info_; }
 private:
+    friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
+    const VehicleWindowGl50DS* sessionDisplayRenderer50LA_=nullptr;
+    std::uint32_t sessionDependentPins50LA_=0;
+    bool sessionDisplayBlocksClose50LA() const noexcept;
     bool ownerThread() const noexcept;
     bool closeOwned(GameHostDiagnostic50ER&) noexcept;
     void refreshInfo() noexcept;

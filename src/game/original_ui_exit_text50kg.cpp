@@ -12,7 +12,7 @@ Status fail(OriginalUiExitTextDiagnostic50KG& d,Status status,std::uint32_t pc=0
 }
 bool pageSource(OriginalUiTransitionRoute50KG route,Archive& id,const char*& directory) noexcept {
     if(route.screen==4 && route.page==1){id=Archive::mainMenu;directory="UI/UIMain/";return true;}
-    if(route.screen==12 && (route.page==1 || route.page==4)){id=Archive::options;directory="UI/UIOption/";return true;}
+    if(route.screen==12 && (route.page>=1 && route.page<=4)){id=Archive::options;directory="UI/UIOption/";return true;}
     if(route.screen==5 && (route.page==1 || route.page==2)){id=Archive::rider;directory="UI/UIRider/";return true;}
     if(route.screen==6 && route.page==1){id=Archive::course;directory="UI/UICourse/";return true;}
     return false;

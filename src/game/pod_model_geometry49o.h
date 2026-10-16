@@ -7,6 +7,8 @@ namespace rr::game {
 struct FreshPodGeometrySources49O {
     assets::PsgHierarchyView49O chariot;
     assets::PsgHierarchyView49O rightEngine;
+    // A null data pointer is an actual absent MCF lookup. The original cold
+    // constructor samples the pair only when BOTH records are present.
     assets::MotionView49O forward;
     assets::MotionView49O back;
     assets::MotionNodeBindings49O chariotBindings;
@@ -32,10 +34,11 @@ struct FreshPodGeometryDiagnostic49O {
 // Closed numeric projection for the fresh source model context:
 // - unparented identity graphics model roots, source hierarchy in file order;
 // - source node0 is the root nullcg in both original PSGs;
-// - Forward/Back and optional Mid are the actual selected MCF records;
+// - optional Forward/Back and Mid are the actual selected MCF records;
 // - original initialized bases/trig tables; no additional transform effects.
 // Capture PRE-animation Chariot nullcg LOCAL XYZ and right-engine nullcg WORLD
-// Z; sample155E70 at(.5,0,nonmirror), then optional1559F0 Mid at.5
+// Z; if BOTH Forward/Back exist, sample155E70 at(.5,0,nonmirror),
+// otherwise keep authored locals; then optional1559F0 Mid at.5
 // (213838..213854); compute original26F4B0 box aggregate;
 // bind the original secondary body mass/inertia, target and joint geometry.
 // Stored PSG sphere radius is never substituted for the live aggregate.

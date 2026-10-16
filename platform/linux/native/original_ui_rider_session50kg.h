@@ -61,6 +61,15 @@ struct OriginalUiRiderSessionCold50KG {
     // and suppresses only output; its independent review gate stays closed.
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
     std::shared_ptr<OriginalUiMainAudio50KG> audio;
+    // Explicit cold-only resource opt-in; never unlocks or admits rider3 Confirm.
+    // Default false preserves all existing public-bind populations.
+    bool prepareCleggLockedPreview=false;
+    // Explicit resources only; no frontend activation or confirmation admission.
+    game::OriginalUiRiderPreviewSet50KG previewSet=game::OriginalUiRiderPreviewSet50KG::none;
+    // Additive bit N = original rider N. Only originalUiRiderPreviewMask50KG
+    // bits are accepted. Every requested pair must prepare before publication.
+    // Zero preserves existing defaults; legacy previewSet requests are unioned.
+    std::uint32_t requestedPreviewRiders=0;
 };
 class OriginalUiRiderSession50KG;
 struct OriginalUiRiderRouteProposal50KG {
@@ -85,6 +94,9 @@ struct OriginalUiRiderSessionSnapshot50KG {
     bool bound=false,faulted=false,quitRequested=false,pageShown=false,inputContainerShown=false;
     bool cameraActive=false,selectionAttached=false,framePublished=false,backProposalPending=false;
     bool confirmProposalPending=false;
+    // Observed from the actual selected, attached character's source owner.
+    // Evidence consumers may wait for this without changing input admission.
+    bool selectedCharacterReady=false;
     bool blocked4E0=false,bypass4E4=false,fadeMusic4E8=true;
     std::uint32_t rider4C4=0,promptMask42C=0,packedBackground430=0,deferred4EC=0;
     std::uint16_t slot4C8=0;
@@ -153,7 +165,11 @@ private:
     friend class OriginalUiFrontend50KG;
     OriginalUiRiderSessionStatus50KG commitMove(const OriginalUiRiderSessionInputReceipt50KG&,
         VehicleWindowGl50DS&,VehicleWindowDiagnostic50DS&,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
-    // Public bind prepares the default-unlocked immutable union. A cold population
+    // Public bind prepares the default-unlocked immutable union, adding Gasgano
+    // for the explicit process-local test profile or a rider7 resource request.
+    // Neither resource request changes profile unlocks. The separate default-false
+    // cold option adds Clegg preview resources without changing profile words. The
+    // requestedPreviewRiders mask unions bounded original preview pairs. A cold population
     // never selects or registers a model; real callbacks and renderer-first
     // retirement remain required at each entry/direction boundary.
     OriginalUiRiderSessionStatus50KG bindCold(const OriginalUiRiderSessionCold50KG&,

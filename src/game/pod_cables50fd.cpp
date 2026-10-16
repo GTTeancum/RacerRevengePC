@@ -53,15 +53,26 @@ bool buildPodCables50FD(const VehicleFrameState49W& state,
     for(float v:cameraForward.v)if(!std::isfinite(v))return reject(d,PodCableError50FD::input);
     if(cameraForward.v[0]==0.f&&cameraForward.v[1]==0.f&&cameraForward.v[2]==0.f)
         return reject(d,PodCableError50FD::input);
-    std::memcpy(w.nodes,state.nodes,sizeof w.nodes);
+    if(!validVehicleSceneCount49W(state,bindings))return reject(d,PodCableError50FD::graph);
+    // Graph consumers use only admitted nodes; the unused workspace tail is scratch.
+    std::memcpy(w.nodes,state.nodes,state.sceneNodeCount*sizeof(SceneNode49P));
     const SceneGraph49P graph{w.nodes,state.sceneNodeCount};
-    if(!validVehicleSceneCount49W(state,bindings)||!validateSceneGraph49P(graph))return reject(d,PodCableError50FD::graph);
+    if(!validateSceneGraph49P(graph))return reject(d,PodCableError50FD::graph);
     const auto& b=bindings.lifecycle;
-    const I roots[2]={b.left1BC,b.right1B8};
+    const auto& visual=bindings.visual;
+    const bool bottomLeft=visual.bottomLeft1C4!=I::none;
+    const bool bottomRight=visual.bottomRight1C0!=I::none;
+    if(bottomLeft!=bottomRight||bottomLeft!=visual.extra1C4Present||
+        bottomRight!=visual.extra1C0Present||cable.cableCount!=(bottomLeft?4u:2u))
+        return reject(d,PodCableError50FD::binding);
+    const I roots[4]={b.left1BC,b.right1B8,visual.bottomLeft1C4,visual.bottomRight1C0};
     if(!valid(b.model1B4,graph.count)||cable.chariot[0]==cable.chariot[1]||cable.engine[0]==cable.engine[1])
         return reject(d,PodCableError50FD::binding);
-    for(unsigned side=0;side<2;++side) {
+    for(unsigned side=0;side<cable.cableCount;++side) {
         d.cable=side;
+        for(unsigned prior=0;prior<side;++prior)
+            if(cable.engine[side]==cable.engine[prior]||roots[side]==roots[prior])
+                return reject(d,PodCableError50FD::binding);
         if(!descendant(graph,cable.chariot[side],b.model1B4)||!descendant(graph,cable.engine[side],roots[side]))
             return reject(d,PodCableError50FD::binding);
         if(!refreshSceneWorld49P(graph,cable.chariot[side])||!refreshSceneWorld49P(graph,cable.engine[side]))
@@ -88,7 +99,10 @@ bool buildPodCables50FD(const VehicleFrameState49W& state,
         engineTangent.v[c]=f.mul(6.5f,engineTangent.v[c]);
     }
     if(!f.valid)return reject(d,PodCableError50FD::arithmetic);
-    for(unsigned side=0;side<2;++side) {
+    //224AF0,224D5C,224FC8,225234 share these two tangent vectors but
+    // resolve each slot's independent current chariot/engine attachment.
+    w.next={};w.next.cableCount=cable.cableCount;
+    for(unsigned side=0;side<cable.cableCount;++side) {
         d.cable=side;
         const auto& chariot=w.nodes[static_cast<std::uint32_t>(cable.chariot[side])].world100;
         const auto& engine=w.nodes[static_cast<std::uint32_t>(cable.engine[side])].world100;
@@ -130,7 +144,9 @@ bool buildPodCables50FD(const VehicleFrameState49W& state,
     }
     if(!f.valid)return reject(d,PodCableError50FD::arithmetic);
     for(unsigned c=0;c<3;++c)w.next.bounds.minimum[c]=w.next.bounds.maximum[c]=w.next.vertices[0].position[c];
-    for(const auto& v:w.next.vertices)for(unsigned c=0;c<3;++c) {
+    const auto vertexCount=cable.cableCount*podCableVerticesPerCable50FD;
+    for(unsigned i=0;i<vertexCount;++i)for(unsigned c=0;c<3;++c) {
+        const auto& v=w.next.vertices[i];
         if(v.position[c]<w.next.bounds.minimum[c])w.next.bounds.minimum[c]=v.position[c];
         if(v.position[c]>w.next.bounds.maximum[c])w.next.bounds.maximum[c]=v.position[c];
     }

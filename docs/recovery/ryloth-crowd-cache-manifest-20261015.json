@@ -1,0 +1,585 @@
+{
+  "schema": "RR_RA_CROWD_FLAGS0_IMAGES_50LA_1",
+  "source_archive_bytes": 4604561,
+  "source_archive_sha256": "1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2",
+  "source_member": "textures\\crowd.atm",
+  "source_bytes": 214578,
+  "source_sha256": "76b78e28cda066154e46a22e1ecda5ab4ade267ea30f44472af8e4304e738031",
+  "source_pins_sha256": "85dd24cc082899044e4a9726008195c96fa443b1b01e46030a8fa0cc43d90bda",
+  "source_frames": [
+    {
+      "frame": 0,
+      "pstOffset": 12,
+      "pstBytes": 35304,
+      "pstSha256": "8c9c285f924853b221d9a1bf4a69f8c05f160dd256d73307f645d0bc09f6e219",
+      "mips": [
+        {
+          "ordinal": 0,
+          "width": 16,
+          "height": 16,
+          "headerOffset": 24,
+          "payloadOffset": 44,
+          "payloadBytes": 234,
+          "payloadSha256": "bcc219eaddfcab3003854623b0e5d51b0f04ceef505c0d565ce451a0f7b2d6d9",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 1,
+          "width": 32,
+          "height": 32,
+          "headerOffset": 278,
+          "payloadOffset": 298,
+          "payloadBytes": 841,
+          "payloadSha256": "e24194284216552e24f7e12797f817cdbcb0d82db46925b18a33c2a03995090d",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 2,
+          "width": 64,
+          "height": 64,
+          "headerOffset": 1139,
+          "payloadOffset": 1159,
+          "payloadBytes": 2540,
+          "payloadSha256": "d51ebece826ed5380549a092ea59251cd248eb22f08d09029219aa3eb552666e",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 3,
+          "width": 128,
+          "height": 128,
+          "headerOffset": 3699,
+          "payloadOffset": 3719,
+          "payloadBytes": 7904,
+          "payloadSha256": "5a4dbee3f194641767fb6bbeaeea208f417441b8d5e8a72d8a4e258256731eab",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 4,
+          "width": 256,
+          "height": 256,
+          "headerOffset": 11623,
+          "payloadOffset": 11643,
+          "payloadBytes": 23673,
+          "payloadSha256": "6a189a6e6f2ce8d0a253108477dc051c47d1b445bd8b24c73952b935bf7dbe7d",
+          "loadedFlags0": true
+        }
+      ]
+    },
+    {
+      "frame": 1,
+      "pstOffset": 35316,
+      "pstBytes": 35486,
+      "pstSha256": "365736f6a3e4bc336d165a919c0132e799e714264559903fc91b1c6bdc1144aa",
+      "mips": [
+        {
+          "ordinal": 0,
+          "width": 16,
+          "height": 16,
+          "headerOffset": 35328,
+          "payloadOffset": 35348,
+          "payloadBytes": 231,
+          "payloadSha256": "8f9b6c3df848ace902094dc2c3a3f8931d310288e5e4c568c7e630be39240fa0",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 1,
+          "width": 32,
+          "height": 32,
+          "headerOffset": 35579,
+          "payloadOffset": 35599,
+          "payloadBytes": 839,
+          "payloadSha256": "e864ef520ef928313677af393bff008260faa90ee10f7f1df1296f212d580cb8",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 2,
+          "width": 64,
+          "height": 64,
+          "headerOffset": 36438,
+          "payloadOffset": 36458,
+          "payloadBytes": 2589,
+          "payloadSha256": "9fd175d743f9cf1fa14d7f52edbfbac9e05216f430716366cd848640f6951e75",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 3,
+          "width": 128,
+          "height": 128,
+          "headerOffset": 39047,
+          "payloadOffset": 39067,
+          "payloadBytes": 7878,
+          "payloadSha256": "d286fcf7713d6be71f1ea0027d2d7b847558637ebc0f51b23c27390844f445b8",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 4,
+          "width": 256,
+          "height": 256,
+          "headerOffset": 46945,
+          "payloadOffset": 46965,
+          "payloadBytes": 23837,
+          "payloadSha256": "8d36c299f0c0e0bf4b03ebd91b032a0b1ec907080c1d991d9f897d11e049f7af",
+          "loadedFlags0": true
+        }
+      ]
+    },
+    {
+      "frame": 2,
+      "pstOffset": 70802,
+      "pstBytes": 35949,
+      "pstSha256": "fc80a4063bd98d2ba3d6cca1c9cf81fcb37ad797b209bf9b3f44595d252b0b1f",
+      "mips": [
+        {
+          "ordinal": 0,
+          "width": 16,
+          "height": 16,
+          "headerOffset": 70814,
+          "payloadOffset": 70834,
+          "payloadBytes": 235,
+          "payloadSha256": "981d15583194048ef4ccadaa58c59f5289569a0096f52f5f386593a76c4d2ff1",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 1,
+          "width": 32,
+          "height": 32,
+          "headerOffset": 71069,
+          "payloadOffset": 71089,
+          "payloadBytes": 852,
+          "payloadSha256": "f54da708ee75685a46a830806e57317174042294e0869445f2a5fe902fda7035",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 2,
+          "width": 64,
+          "height": 64,
+          "headerOffset": 71941,
+          "payloadOffset": 71961,
+          "payloadBytes": 2579,
+          "payloadSha256": "0e2777c58fafc85176de70c1b6d1cf05cac07ee66b300ded97248e0913049a27",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 3,
+          "width": 128,
+          "height": 128,
+          "headerOffset": 74540,
+          "payloadOffset": 74560,
+          "payloadBytes": 8005,
+          "payloadSha256": "18f4e2aa2524656bcc2ff6105681bd565705a8de716fa33f2e9f78d819fc482d",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 4,
+          "width": 256,
+          "height": 256,
+          "headerOffset": 82565,
+          "payloadOffset": 82585,
+          "payloadBytes": 24166,
+          "payloadSha256": "b92f0253da647ed99434376e0a455d5c709fd590851eb5730bde00c9600c1ec9",
+          "loadedFlags0": true
+        }
+      ]
+    },
+    {
+      "frame": 3,
+      "pstOffset": 106751,
+      "pstBytes": 36392,
+      "pstSha256": "0f651ba46edeb4e158d9462606f4b92956ac57b004e0e204d676675f4d45caa3",
+      "mips": [
+        {
+          "ordinal": 0,
+          "width": 16,
+          "height": 16,
+          "headerOffset": 106763,
+          "payloadOffset": 106783,
+          "payloadBytes": 242,
+          "payloadSha256": "fcf1c8a83d1a89120b7de861b8a53d52211bcdfe0bfe53f72ca0e3d45950540e",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 1,
+          "width": 32,
+          "height": 32,
+          "headerOffset": 107025,
+          "payloadOffset": 107045,
+          "payloadBytes": 849,
+          "payloadSha256": "ea2b4154427701fdfeb1583bdf469a9b4b6263e26c60941006a1b9a0157e9cb4",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 2,
+          "width": 64,
+          "height": 64,
+          "headerOffset": 107894,
+          "payloadOffset": 107914,
+          "payloadBytes": 2577,
+          "payloadSha256": "1fc573e4fc05bf1045a1f55da2f0b8302ee51fd1e21d28238dd0814fbd92aa0f",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 3,
+          "width": 128,
+          "height": 128,
+          "headerOffset": 110491,
+          "payloadOffset": 110511,
+          "payloadBytes": 8215,
+          "payloadSha256": "7e986e44b7a6df8e929957426f09af6e8bfb6b7ebe66f88b085c7e58be33581b",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 4,
+          "width": 256,
+          "height": 256,
+          "headerOffset": 118726,
+          "payloadOffset": 118746,
+          "payloadBytes": 24397,
+          "payloadSha256": "41252808860b102808dcaf983452cc86a37c54882a6e95e76bd56fad3961c2ac",
+          "loadedFlags0": true
+        }
+      ]
+    },
+    {
+      "frame": 4,
+      "pstOffset": 143143,
+      "pstBytes": 35949,
+      "pstSha256": "fc80a4063bd98d2ba3d6cca1c9cf81fcb37ad797b209bf9b3f44595d252b0b1f",
+      "mips": [
+        {
+          "ordinal": 0,
+          "width": 16,
+          "height": 16,
+          "headerOffset": 143155,
+          "payloadOffset": 143175,
+          "payloadBytes": 235,
+          "payloadSha256": "981d15583194048ef4ccadaa58c59f5289569a0096f52f5f386593a76c4d2ff1",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 1,
+          "width": 32,
+          "height": 32,
+          "headerOffset": 143410,
+          "payloadOffset": 143430,
+          "payloadBytes": 852,
+          "payloadSha256": "f54da708ee75685a46a830806e57317174042294e0869445f2a5fe902fda7035",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 2,
+          "width": 64,
+          "height": 64,
+          "headerOffset": 144282,
+          "payloadOffset": 144302,
+          "payloadBytes": 2579,
+          "payloadSha256": "0e2777c58fafc85176de70c1b6d1cf05cac07ee66b300ded97248e0913049a27",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 3,
+          "width": 128,
+          "height": 128,
+          "headerOffset": 146881,
+          "payloadOffset": 146901,
+          "payloadBytes": 8005,
+          "payloadSha256": "18f4e2aa2524656bcc2ff6105681bd565705a8de716fa33f2e9f78d819fc482d",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 4,
+          "width": 256,
+          "height": 256,
+          "headerOffset": 154906,
+          "payloadOffset": 154926,
+          "payloadBytes": 24166,
+          "payloadSha256": "b92f0253da647ed99434376e0a455d5c709fd590851eb5730bde00c9600c1ec9",
+          "loadedFlags0": true
+        }
+      ]
+    },
+    {
+      "frame": 5,
+      "pstOffset": 179092,
+      "pstBytes": 35486,
+      "pstSha256": "365736f6a3e4bc336d165a919c0132e799e714264559903fc91b1c6bdc1144aa",
+      "mips": [
+        {
+          "ordinal": 0,
+          "width": 16,
+          "height": 16,
+          "headerOffset": 179104,
+          "payloadOffset": 179124,
+          "payloadBytes": 231,
+          "payloadSha256": "8f9b6c3df848ace902094dc2c3a3f8931d310288e5e4c568c7e630be39240fa0",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 1,
+          "width": 32,
+          "height": 32,
+          "headerOffset": 179355,
+          "payloadOffset": 179375,
+          "payloadBytes": 839,
+          "payloadSha256": "e864ef520ef928313677af393bff008260faa90ee10f7f1df1296f212d580cb8",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 2,
+          "width": 64,
+          "height": 64,
+          "headerOffset": 180214,
+          "payloadOffset": 180234,
+          "payloadBytes": 2589,
+          "payloadSha256": "9fd175d743f9cf1fa14d7f52edbfbac9e05216f430716366cd848640f6951e75",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 3,
+          "width": 128,
+          "height": 128,
+          "headerOffset": 182823,
+          "payloadOffset": 182843,
+          "payloadBytes": 7878,
+          "payloadSha256": "d286fcf7713d6be71f1ea0027d2d7b847558637ebc0f51b23c27390844f445b8",
+          "loadedFlags0": false
+        },
+        {
+          "ordinal": 4,
+          "width": 256,
+          "height": 256,
+          "headerOffset": 190721,
+          "payloadOffset": 190741,
+          "payloadBytes": 23837,
+          "payloadSha256": "8d36c299f0c0e0bf4b03ebd91b032a0b1ec907080c1d991d9f897d11e049f7af",
+          "loadedFlags0": true
+        }
+      ]
+    }
+  ],
+  "elf_sha256": "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30",
+  "elf_verified_anchors": [
+    {
+      "address": "0x24e99c",
+      "word": "0x10820028"
+    },
+    {
+      "address": "0x24f158",
+      "word": "0xc04becc"
+    },
+    {
+      "address": "0x24f198",
+      "word": "0xc04becc"
+    },
+    {
+      "address": "0x24f1b8",
+      "word": "0x24420010"
+    },
+    {
+      "address": "0x257604",
+      "word": "0x3c030800"
+    },
+    {
+      "address": "0x25760c",
+      "word": "0x3c050400"
+    },
+    {
+      "address": "0x257624",
+      "word": "0x3c070001"
+    },
+    {
+      "address": "0x257634",
+      "word": "0xac650000"
+    },
+    {
+      "address": "0x2f56c8",
+      "word": "0x3c039000"
+    },
+    {
+      "address": "0x2f56d4",
+      "word": "0xac430000"
+    },
+    {
+      "address": "0x2421e8",
+      "word": "0x240300ff"
+    },
+    {
+      "address": "0x2421ec",
+      "word": "0xa2230015"
+    },
+    {
+      "address": "0x2421f0",
+      "word": "0xa2230016"
+    },
+    {
+      "address": "0x2421f4",
+      "word": "0x24030001"
+    },
+    {
+      "address": "0x2421fc",
+      "word": "0xa2230017"
+    }
+  ],
+  "converter_sha256": "5f9af6eba0f07732f913cde7aa40e246d218d38230f57a7aacc027afd25a7c49",
+  "generator_sha256": "fefcc937a007f9bfab96bda9dda6ac106c2518019b8d887b4d45a6801836bc6e",
+  "ffmpeg_sha256": "e8a8d46f5225f3062cec7c07fb145d58ae73c603cb740dcd5bad34bfb54e455a",
+  "ffmpeg_version_report": "ffmpeg version 7.1.5-0+deb13u1 Copyright (c) 2000-2026 the FFmpeg developers\nbuilt with gcc 14 (Debian 14.2.0-19)\nconfiguration: --prefix=/usr --extra-version=0+deb13u1 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --disable-libmfx --disable-omx --enable-gnutls --enable-libaom --enable-libass --enable-libbs2b --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libharfbuzz --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-openal --enable-opencl --enable-opengl --disable-sndio --enable-libvpl --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-ladspa --enable-libbluray --enable-libcaca --enable-libdvdnav --enable-libdvdread --enable-libjack --enable-libpulse --enable-librabbitmq --enable-librist --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libx264 --enable-libzmq --enable-libzvbi --enable-lv2 --enable-sdl2 --enable-libplacebo --enable-librav1e --enable-pocketsphinx --enable-librsvg --enable-libjxl --enable-shared\nlibavutil      59. 39.100 / 59. 39.100\nlibavcodec     61. 19.101 / 61. 19.101\nlibavformat    61.  7.103 / 61.  7.103\nlibavdevice    61.  3.100 / 61.  3.100\nlibavfilter    10.  5.100 / 10.  5.100\nlibswscale      8.  3.100 /  8.  3.100\nlibswresample   5.  3.100 /  5.  3.100\nlibpostproc    58.  3.100 / 58.  3.100\n",
+  "ffmpeg_argv": [
+    "/usr/bin/ffmpeg",
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-nostdin",
+    "-cpuflags",
+    "0",
+    "-flags",
+    "+bitexact",
+    "-idct",
+    "simple",
+    "-threads",
+    "1",
+    "-err_detect",
+    "explode",
+    "-f",
+    "ipu",
+    "-i",
+    "pipe:0",
+    "-frames:v",
+    "1",
+    "-pix_fmt",
+    "yuv420p",
+    "-f",
+    "rawvideo",
+    "pipe:1"
+  ],
+  "codec": "FFmpeg native IPU first-frame YUV420P",
+  "color_policy": "50FC integer BT.601; nearest 2x2 chroma; RGB16 dither; RGB5 high-bit expansion; TEXA TA0=TA1=255 AEM=1; no row flip; hardware pixel parity unverified",
+  "input_policy": "Exact IPUM payload excluding final4-byte B1; B0 retained",
+  "hardware_pixel_parity_verified": false,
+  "frames": [
+    {
+      "frame": 0,
+      "source_pst_offset": 12,
+      "source_pst_bytes": 35304,
+      "source_pst_sha256": "8c9c285f924853b221d9a1bf4a69f8c05f160dd256d73307f645d0bc09f6e219",
+      "source_mip_ordinal": 4,
+      "native_level_slot": 0,
+      "native_level_count": 1,
+      "width": 256,
+      "height": 256,
+      "source_header_offset": 11623,
+      "source_payload_offset": 11643,
+      "source_payload_bytes": 23673,
+      "source_payload_sha256": "6a189a6e6f2ce8d0a253108477dc051c47d1b445bd8b24c73952b935bf7dbe7d",
+      "yuv420p_sha256": "7d3e30ca4469b28002adb614a9c8d39bedba172953f09a14b69ed37e14c60eb8",
+      "rgba_sha256": "2ecb5c7e462163d0837121b570936208e1191b129bf63e2cfbcc2d6ba285e028",
+      "rrtex_sha256": "fcfeb0c00938ab1bbae791a24d705c18989b4b222e9d492ab4593d67dff79e98",
+      "rrtex_bytes": 262160,
+      "filename": "crowd-frame0-mip4.rrtex"
+    },
+    {
+      "frame": 1,
+      "source_pst_offset": 35316,
+      "source_pst_bytes": 35486,
+      "source_pst_sha256": "365736f6a3e4bc336d165a919c0132e799e714264559903fc91b1c6bdc1144aa",
+      "source_mip_ordinal": 4,
+      "native_level_slot": 0,
+      "native_level_count": 1,
+      "width": 256,
+      "height": 256,
+      "source_header_offset": 46945,
+      "source_payload_offset": 46965,
+      "source_payload_bytes": 23837,
+      "source_payload_sha256": "8d36c299f0c0e0bf4b03ebd91b032a0b1ec907080c1d991d9f897d11e049f7af",
+      "yuv420p_sha256": "ee5c45350930145773f63eb81292cd6b0e9d380e04c6e4042c503146e2d3bcd2",
+      "rgba_sha256": "667470850555eba31a370958a57efcb4586319798a525c0193889c7312fccc4b",
+      "rrtex_sha256": "93c38e0dbe0fd044a5e4b88b59cf5937ea106461d96e6ae484bfbab99cd78c60",
+      "rrtex_bytes": 262160,
+      "filename": "crowd-frame1-mip4.rrtex"
+    },
+    {
+      "frame": 2,
+      "source_pst_offset": 70802,
+      "source_pst_bytes": 35949,
+      "source_pst_sha256": "fc80a4063bd98d2ba3d6cca1c9cf81fcb37ad797b209bf9b3f44595d252b0b1f",
+      "source_mip_ordinal": 4,
+      "native_level_slot": 0,
+      "native_level_count": 1,
+      "width": 256,
+      "height": 256,
+      "source_header_offset": 82565,
+      "source_payload_offset": 82585,
+      "source_payload_bytes": 24166,
+      "source_payload_sha256": "b92f0253da647ed99434376e0a455d5c709fd590851eb5730bde00c9600c1ec9",
+      "yuv420p_sha256": "719a0b310c1d4688033cc597f60b5b2d5894c8f52ddc544438996fc6b8aedad9",
+      "rgba_sha256": "46dc37f92774bc8079a5c9629975ee81a8a066132ba3d1c9bf1be7001b9e8496",
+      "rrtex_sha256": "2d5612b9cc8539d2b9d8045ace3d0319448ca730cbd99a1210d2e13327f72890",
+      "rrtex_bytes": 262160,
+      "filename": "crowd-frame2-mip4.rrtex"
+    },
+    {
+      "frame": 3,
+      "source_pst_offset": 106751,
+      "source_pst_bytes": 36392,
+      "source_pst_sha256": "0f651ba46edeb4e158d9462606f4b92956ac57b004e0e204d676675f4d45caa3",
+      "source_mip_ordinal": 4,
+      "native_level_slot": 0,
+      "native_level_count": 1,
+      "width": 256,
+      "height": 256,
+      "source_header_offset": 118726,
+      "source_payload_offset": 118746,
+      "source_payload_bytes": 24397,
+      "source_payload_sha256": "41252808860b102808dcaf983452cc86a37c54882a6e95e76bd56fad3961c2ac",
+      "yuv420p_sha256": "78decad10716f61386437220cf417c9b81563e64b517a3eab8f2438a5808aceb",
+      "rgba_sha256": "15e3583326d339ae0a88d5a695b1b2e49b885d8eec6b15113f7e95c3a4f20f76",
+      "rrtex_sha256": "f8239452fb91c2c4f3845990604d2d7990105807867f8617500eb1c687f5e215",
+      "rrtex_bytes": 262160,
+      "filename": "crowd-frame3-mip4.rrtex"
+    },
+    {
+      "frame": 4,
+      "source_pst_offset": 143143,
+      "source_pst_bytes": 35949,
+      "source_pst_sha256": "fc80a4063bd98d2ba3d6cca1c9cf81fcb37ad797b209bf9b3f44595d252b0b1f",
+      "source_mip_ordinal": 4,
+      "native_level_slot": 0,
+      "native_level_count": 1,
+      "width": 256,
+      "height": 256,
+      "source_header_offset": 154906,
+      "source_payload_offset": 154926,
+      "source_payload_bytes": 24166,
+      "source_payload_sha256": "b92f0253da647ed99434376e0a455d5c709fd590851eb5730bde00c9600c1ec9",
+      "yuv420p_sha256": "719a0b310c1d4688033cc597f60b5b2d5894c8f52ddc544438996fc6b8aedad9",
+      "rgba_sha256": "46dc37f92774bc8079a5c9629975ee81a8a066132ba3d1c9bf1be7001b9e8496",
+      "rrtex_sha256": "2d5612b9cc8539d2b9d8045ace3d0319448ca730cbd99a1210d2e13327f72890",
+      "rrtex_bytes": 262160,
+      "filename": "crowd-frame4-mip4.rrtex"
+    },
+    {
+      "frame": 5,
+      "source_pst_offset": 179092,
+      "source_pst_bytes": 35486,
+      "source_pst_sha256": "365736f6a3e4bc336d165a919c0132e799e714264559903fc91b1c6bdc1144aa",
+      "source_mip_ordinal": 4,
+      "native_level_slot": 0,
+      "native_level_count": 1,
+      "width": 256,
+      "height": 256,
+      "source_header_offset": 190721,
+      "source_payload_offset": 190741,
+      "source_payload_bytes": 23837,
+      "source_payload_sha256": "8d36c299f0c0e0bf4b03ebd91b032a0b1ec907080c1d991d9f897d11e049f7af",
+      "yuv420p_sha256": "ee5c45350930145773f63eb81292cd6b0e9d380e04c6e4042c503146e2d3bcd2",
+      "rgba_sha256": "667470850555eba31a370958a57efcb4586319798a525c0193889c7312fccc4b",
+      "rrtex_sha256": "93c38e0dbe0fd044a5e4b88b59cf5937ea106461d96e6ae484bfbab99cd78c60",
+      "rrtex_bytes": 262160,
+      "filename": "crowd-frame5-mip4.rrtex"
+    }
+  ],
+  "limitations": [
+    "No original hardware IDCT/framebuffer parity measurement.",
+    "Only source ordinal4 decoded; smaller four mips authenticated but skipped.",
+    "No canonical resource, material, animation, GL or course admission is certified."
+  ]
+}

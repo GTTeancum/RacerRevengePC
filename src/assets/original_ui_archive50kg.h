@@ -7,12 +7,14 @@
 #include <vector>
 
 namespace rr::assets {
+class OriginalUiMaterialTemplates50KG;
+struct OriginalUiMaterialTemplateStorage50KG;
 // NEW reconstruction: identities transcribed from the retained Full48F manifest.
 // These IDs identify exact US-disc originals, not arbitrary files.
 // Existing archive ordinals are preserved; authenticated menu pod physics appended.
 enum class OriginalUiArchiveId50KG : std::uint8_t {
     appStart = 0, localization = 1, overlays = 2, fonts = 3, mainMenu = 4,
-    backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11
+    backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11, tournament = 12
 };
 struct OriginalUiArchiveIdentity50KG {
     OriginalUiArchiveId50KG id;
@@ -48,6 +50,8 @@ struct OriginalUiArchiveDiagnostic50KG {
 };
 
 // Cold load-once, immutable owner of authenticated original logical bytes.
+// Its optional immutable APPSTART template backing is published once by the
+// serial material loader. It never changes these authenticated bytes.
 // No file I/O, cache writing, format conversion, substitute art or GL calls.
 // No archive member name is ever used as an output filesystem path.
 // Borrowed views remain valid until this owner is destroyed. Failed loads
@@ -75,7 +79,14 @@ public:
     // fallback, prefix matching, cross-archive lookup or temporary allocation.
     OriginalUiMemberView50KG find(const std::string& originalName) const noexcept;
 private:
+    friend class OriginalUiMaterialTemplates50KG;
     struct Storage;
     std::unique_ptr<Storage> storage_;
+    // An application retaining this SAME APPSTART archive retains the SAME
+    // DefaultMT/ScreenMT objects across page, frontend and race lifetimes.
+    // Template handles also pin this backing; no reference back to the archive
+    // is stored in it, so these two ownership directions do not form a cycle.
+    mutable std::shared_ptr<const OriginalUiMaterialTemplateStorage50KG> materialTemplates_;
 };
 }
+

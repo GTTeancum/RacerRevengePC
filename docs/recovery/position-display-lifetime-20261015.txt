@@ -1,0 +1,114 @@
+PositionStats display ownership prerequisite -- UNTESTED source candidate
+Base: rr-source-d24aab3-helpers.zip / libfile_8c59998d73308191a358a42a1132525b
+11765841 bytes, SHA256 e8f8fbb3bd18178c5b2065904667655c70d8ad4babd4a0687c0c9a204757961a
+Fresh isolated extraction; earlier held packets preserved. Root alone integrates.
+No builds, tests, syntax checks, sanitizers, converters, gameplay or guest execution.
+No central checkout/disc writes. Materialization hash and delivery hashes are
+file-transfer integrity evidence only, not program validation.
+
+IMPLEMENTED
+Application creates one RaceDisplayLifetime50LA for the real cold session,
+retaining its authoritative Video shared_ptr and owning the actual renderer and
+dispatch formerly on50DU's stack. Application weak owner excludes overlapping
+sessions; checked monotonically increasing generation excludes accidental reuse.
+50DU's renderer/sourceRendererDispatch are references to those exact members.
+The owner is declared at the original renderer declaration, preserving its unwind
+order relative to earlier texture owners and later camera/coordinator owners.
+The same real host procAddress/current callbacks now have stable private static
+functions. Root uses bindCreationRequest, then owner.create, which validates exact
+host/callback identities and performs the actual existing renderer.create call.
+Only that call may create this attached renderer; external replacement and the
+frontend-create route reject. Unattached standalone/frontend renderers unchanged.
+Private lease acquisition requires actual successful create, initialized renderer,
+current live original Main Video, owner thread, intact host back-pointer and no
+retirement. It accepts no supplied renderer pointer, dispatch copy, ready flag,
+material identity or completion receipt. No PositionStats resources are created.
+
+GUARDED EDGES
+Renderer close checks private dependent count before touching storage; failure
+sets cleanupIncomplete and preserves all storage. This covers direct root close,
+OriginalUiFrontend50KG coordinator close and renderer destructor (its existing
+incomplete-cleanup termination). Zero dependents follows original cleanup.
+GameHost closeOwned checks private dependents OR actual renderer resource storage
+before setting ready=false; both public close and destructor reach this guard.
+Host release/create also reject while retained, preventing context unbind/reopen.
+The host is retained by the authoritative Video control block, not a raw context.
+Its renderer back-pointer is installed by the private actual owner constructor and
+cleared only after real renderer cleanup has completed. No public mint API exists.
+ownsResources was moved inline (same bool(storage_) expression) so GameHost-only
+targets do not gain an out-of-line renderer implementation link dependency.
+No shared ownership cycle: Application holds weak display, display holds Video,
+lease holds display, host holds only guarded raw renderer observation.
+
+FUTURE PRIMITIVE CONTRACT (NO ACTIVATION IN THIS PATCH)
+Only forward-declared rr::game::OriginalPositionStatsPrimitiveOwner50LA is friend
+of the private retainPositionStats16 and lease methods. That concrete future owner
+must acquire the lease BEFORE allocating original array16. If allocation fails
+before any nonthrowing2E1920 construction, untouched lease destruction unpins.
+After all16 constructors, call constructedAll16 BEFORE first2E1AE0 resource load.
+The lease starts at element15 and permits one reverse element at a time:
+  drainNext2E1980 calls serviceOriginalRenderer244D60(actual dispatch,true,actual
+  renderer,initializedContext); records phase1 only on actual complete status.
+  Then always calls finishInitializedContextWork AND checks contextWorkCompleted,
+  including the disabled-D8 branch and constructed-but-unloaded elements.
+  Failed phase0 retries phase0; failed phase1 retries only phase1. Pin and backing
+  remain. Successful phase2 is idempotent until this element's resources are freed.
+  Future friend frees actual primitive refs ascending, packet buffers ascending,
+  then owned vertex storage; only then calls finishedElementResources(nextIndex).
+  That advances15..0. The final acknowledgement unpins renderer and host.
+No callback certifies completion. A mismatched index/phase cannot advance. Destroying
+a constructed outstanding lease terminates rather than releasing backing silently.
+This packet implements lifetime/drain authority, NOT the future actual resource
+frees, material facet, meshes, authored draw, or full PositionStats constructor.
+
+ROOT CLOSE JOIN
+closeWindow now invokes beginCloseAfterDependents before any existing cleanup.
+With zero dependents it marks retiring and existing order continues unchanged.
+With dependents it marks retiring (no new leases), returns false without camera,
+UI, texture, renderer or host teardown; lease drain retries remain permitted.
+When primitives are later integrated, root must explicitly retire the actual
+PositionStats owner BEFORE this gate. A retirement error must retain that owner
+and retry; do not reset it to force close. Existing camera-route repeated failure
+terminates without unwinding resources. No dependent is instantiated today.
+Do not introduce the future resource owner without that explicit retire join.
+
+SOURCE BASIS
+Existing OriginalAIDamagePrimitiveArray50LA::releaseCold2E1980 supplies the actual
+service244D60/initializedContext plus unconditional second finish pattern.
+Original2E1980 calls renderer+20 at2E19B4 then+24 at2E19CC before resource release;
+2E8750 destroys the constructed array in reverse order. Resource recovery packet
+libfile_250e11daeadc8191b0ced185d8f2fed9 contains raw static source words and order.
+Existing Application Video factory/material context provide authoritative shared
+control block precedent. Existing50DU request and close paths are the actual
+native call sites, not claims of complete original root scheduling.
+
+COORDINATOR EARLY BOUNDARY (v2)
+VehicleWindowGl50DS::hasSessionDependents50LA is allocation-free, inline and
+read-only, observing the actual private dependent-pin count. It provides no
+completion or mutation capability. Existing owner-thread/no-reentrancy policy
+applies. OriginalUiFrontend50KG::close checks it after storage/busy admission but
+BEFORE Operation, closing/frame flag changes, Rider presentation end, or any
+source-owner retirement. A pin returns Status::cleanup and renderer diagnostic
+cleanupIncomplete while preserving coordinator state and every backing. Once
+the actual leases retire, the existing close/retry path runs unchanged. The root
+first-line gate and renderer/host guards remain unchanged. Zero pins take the
+existing path. No transition or unrelated audit changes are included.
+
+NO STRONG RENDERER-TO-POSITIONSTATS OWNERSHIP
+Future renderer Storage MUST NOT strongly own a PositionStats owner which holds
+this display lease: renderer -> PositionStats -> lease -> display -> renderer
+would form a strong cycle. The root/session must own and explicitly retire the
+PositionStats owner before close; renderer access must be a bounded borrow or
+weak reference cleared before retirement. No future renderer retention pattern
+may silently copy the strong TimeStats ownership pattern for this leased owner.
+
+CENTRAL SOURCE-REVIEW CHECKLIST
+[ ] Apply focused candidate.patch against d24aab3 or reconcile eight files.
+[ ] Verify actual renderer/dispatch identity is shared by all existing borrowers.
+[ ] Check declaration/unwind order; retained Video outlives renderer cleanup.
+[ ] Check request callbacks remain identical across renderer and texture banks.
+[ ] Check direct/coordinator/destructor/host-close guards preserve failed backing.
+[ ] Check zero-dependent active route and frontend path behavior centrally.
+[ ] Keep no meshes/material facet/draw activation; no ranking/lap authority edits.
+[ ] Future owner must close before root gate and honor every16-element drain.
+[ ] All build/Windows checks remain root-owned and have NOT been performed here.

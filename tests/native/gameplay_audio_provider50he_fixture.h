@@ -47,26 +47,35 @@ public:
     // is all60 POD01/TA cues; an explicit selection can leave unauthored slots
     // empty. No new event is invented merely because its sample is registered.
     // Policy: one dedicated mixer slot per cue (bounded restart of same cue).
+    // An explicit map admits a separately owned, compact per-racer D48 range;
+    // its caller must authenticate the selected catalog and reserve that range.
     // Native lap owner needs a separate voice range. Bank PCM must stay alive
     // and immutable. It is permissible that every sample is explicitly missing.
     bool prepare(const rr::assets::AudioBank50HC& bank,rr::platform::AudioMixer50HD& mixer,
         std::size_t firstVoice,std::string& error,
-        const std::array<rr::assets::AudioRequest50HC,cueCount>* selected=nullptr) {
-        if(mixer_||firstVoice>mixer.count()||legacyCueCount>mixer.count()-firstVoice) {
+        const std::array<rr::assets::AudioRequest50HC,cueCount>* selected=nullptr,
+        const std::array<std::size_t,cueCount>* explicitVoices=nullptr) {
+        if(mixer_||firstVoice>mixer.count()||
+           (!explicitVoices&&legacyCueCount>mixer.count()-firstVoice)) {
             error="50HE provider requires a fresh owner and60 dedicated mixer voices";return false;
         }
         std::array<rr::platform::AudioClip50HD,cueCount> prepared{};
         std::array<bool,cueCount> ready{},authored{};std::size_t loaded=0;
+        std::array<std::size_t,cueCount> voiceSlots{};
         for(std::size_t n=0;n<cueCount;++n) {
             // A selected player's empty slot is genuinely unauthored, not a
             // request to fall back to the legacy POD01 catalog filename.
             if(selected?(*selected)[n].name.empty():catalog[n].filename==nullptr)continue;
-            const auto voice=cueVoice(firstVoice,n);
-            if(voice>=mixer.count()||(n>=legacyCueCount&&voice>=firstVoice&&
+            const auto voice=explicitVoices?(*explicitVoices)[n]:cueVoice(firstVoice,n);
+            if(voice>=mixer.count()||(!explicitVoices&&n>=legacyCueCount&&voice>=firstVoice&&
                 voice-firstVoice<legacyCueCount)) {
                 error="50HE selected extra speech voice overlaps or exceeds mixer capacity";return false;
             }
-            authored[n]=true;
+            for(std::size_t previous=0;previous<n;++previous)
+                if(authored[previous]&&voiceSlots[previous]==voice){
+                    error="50HE authored cues require distinct owned voices";return false;
+                }
+            voiceSlots[n]=voice;authored[n]=true;
             const std::string name=selected?(*selected)[n].name:catalog[n].filename;
             const bool loop=selected?(*selected)[n].loop:catalog[n].authoredLoop;
             const bool stream=selected?(*selected)[n].stream:catalog[n].stream;
@@ -85,7 +94,7 @@ public:
             }
             ready[n]=true;++loaded;
         }
-        clips_=prepared;ready_=ready;authored_=authored;loaded_=loaded;firstVoice_=firstVoice;mixer_=&mixer;error.clear();return true;
+        clips_=prepared;ready_=ready;authored_=authored;loaded_=loaded;voiceSlots_=voiceSlots;mixer_=&mixer;error.clear();return true;
     }
     // Hot, ordered, allocation-free. Return values report actual mixer action;
     // registration, an emitted command, or missing bytes are never playback.
@@ -94,7 +103,7 @@ public:
         const auto index=cueIndex(command.cue);if(index==cueCount||!authored_[index])return ApplyResult::InvalidCue;
         if(!std::isfinite(command.gain)||command.gain<0.f||!std::isfinite(command.pitch)||command.pitch<=0.f)
             return ApplyResult::InvalidCommand;
-        const auto slot=cueVoice(firstVoice_,index);
+        const auto slot=voiceSlots_[index];
         if(command.operation==AudioOperation50HE::Stop) {
             const bool active=mixer_->active(slot);mixer_->stop(slot);++stops_;
             return active?ApplyResult::Stopped:ApplyResult::Inactive;
@@ -110,14 +119,14 @@ public:
         ++starts_;return ApplyResult::Started;
     }
     void stopAll() noexcept {
-        if(mixer_)for(std::size_t n=0;n<cueCount;++n)if(authored_[n])mixer_->stop(cueVoice(firstVoice_,n));
+        if(mixer_)for(std::size_t n=0;n<cueCount;++n)if(authored_[n])mixer_->stop(voiceSlots_[n]);
     }
     bool available(AudioCue50HE cue)const noexcept {
         const auto index=cueIndex(cue);return mixer_&&index<cueCount&&ready_[index];
     }
     bool active(AudioCue50HE cue)const noexcept {
         const auto index=cueIndex(cue);return mixer_&&index<cueCount&&authored_[index]&&
-            mixer_->active(cueVoice(firstVoice_,index));
+            mixer_->active(voiceSlots_[index]);
     }
     std::size_t loaded()const noexcept{return loaded_;}
     std::uint64_t starts()const noexcept{return starts_;}
@@ -128,7 +137,8 @@ private:
     rr::platform::AudioMixer50HD* mixer_=nullptr;
     std::array<rr::platform::AudioClip50HD,cueCount> clips_{};
     std::array<bool,cueCount> ready_{},authored_{};
-    std::size_t firstVoice_=0,loaded_=0;
+    std::array<std::size_t,cueCount> voiceSlots_{};
+    std::size_t loaded_=0;
     std::uint64_t starts_=0,stops_=0,controls_=0,unavailable_=0;
 };
 }

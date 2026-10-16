@@ -5,6 +5,7 @@
 #include "spring_query48n.h"
 #include "gate_trigger_action50kg.h"
 #include "native_trigger_group50ga.h"
+#include "native_trigger_box_geometry50ma.h"
 
 namespace rr::game {
 struct Type2PairMetadata49X {
@@ -52,9 +53,10 @@ struct Type2StaticCandidate49X {
     // Shared track lifetime, never per-racer copied or rolled back.
     GateTriggerBinding50KG* gate=nullptr;
     // Alternative shared native trigger set. Exactly one of gate/group is used
-    // for shape5. Original action/reciprocal state lives in this shared owner.
+    // for shape5/6. Original action/reciprocal state lives in this shared owner.
     NativeTriggerGroup50GA* nativeTriggers=nullptr;
     std::size_t nativeTriggerIndex=0;
+    NativeTriggerBox50MA nativeTriggerBox{}; // shape6 only, inline immutable geometry
 };
 struct Type2WorkItem49X { std::uint16_t queryTag,targetTag; };
 struct Type2Visit49X {

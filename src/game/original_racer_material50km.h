@@ -89,6 +89,66 @@ inline Status projectDiffuseCompressedRgb(const DiffuseProgramInputs& in,
     return Status::complete;
 }
 
+struct DiffuseRgbaProgramInputs {
+    // Same original vf5..7 coefficients as the RGB-only leaf. The caller
+    // composes scaled selected direction rows with the actual node basis.
+    std::array<Vec3, 3> normalAxes{};
+    // Original vf9..12, including the actual selected ambient fourth lane.
+    Matrix colorRows{};
+};
+struct DiffuseVertexRgba {
+    std::array<std::uint8_t, 4> rgba{};
+};
+
+//3378F8..337978 operates on all four color lanes, as retained by the UI
+// source vertex projection. Keep the older RGB-only leaf unchanged. This
+// source-generated alpha is packet data; consuming it as framebuffer alpha
+// still requires the separate original gameplay alpha/fragment-state owner.
+// The same finite/nonnegative packed domain and transactional output apply.
+namespace material_detail {
+// Caller has admitted arithmeticReady() and every coefficient as finite.
+// Inputs and FP mode stay stable throughout the serial, callback-free loop.
+inline Status projectDiffuseCompressedRgbaFiniteInputs(const DiffuseRgbaProgramInputs& in,
+    const CompressedNormal& normal, DiffuseVertexRgba& output) noexcept {
+    Vec3 amount{};
+    for (unsigned light = 0; light < 3; ++light) {
+        float value = 0.f;
+        if (!material_detail::dot(in.normalAxes, normal, light, value)) return Status::arithmetic;
+        amount[light] = value > 0.f ? value : 0.f;
+    }
+    DiffuseVertexRgba next;
+    for (unsigned c = 0; c < 4; ++c) {
+        // ADDAz ambient + 2^23 precedes each of the three ordered light
+        // multiply/add operations. No imported vertex color is multiplied.
+        float packed = material_detail::add(in.colorRows[3][c], 8388608.f);
+        if (!material_detail::finite(packed)) return Status::arithmetic;
+        for (unsigned light = 0; light < 3; ++light) {
+            const float product = material_detail::mul(in.colorRows[light][c], amount[light]);
+            if (!material_detail::finite(product)) return Status::arithmetic;
+            packed = material_detail::add(packed, product);
+            if (!material_detail::finite(packed)) return Status::arithmetic;
+        }
+        if (packed > 8388863.f) packed = 8388863.f;
+        if (packed < 8388608.f) return Status::arithmetic;
+        std::uint32_t bits = 0;
+        std::memcpy(&bits, &packed, sizeof(bits));
+        next.rgba[c] = static_cast<std::uint8_t>(bits & 0xffu);
+    }
+    output = next;
+    return Status::complete;
+}
+} // namespace material_detail
+
+inline Status projectDiffuseCompressedRgba(const DiffuseRgbaProgramInputs& in,
+    const CompressedNormal& normal, DiffuseVertexRgba& output) noexcept {
+    if (!selection_detail::arithmeticReady()) return Status::arithmetic;
+    for (const auto& row : in.normalAxes)
+        for (float x : row) if (!material_detail::finite(x)) return Status::input;
+    for (const auto& row : in.colorRows)
+        for (float x : row) if (!material_detail::finite(x)) return Status::input;
+    return material_detail::projectDiffuseCompressedRgbaFiniteInputs(in, normal, output);
+}
+
 struct SpecularMapDualInputs {
     // Effective source normal-to-view coefficients, already scaled by the
     // scene's authored normal quantization. This is vf19/vf20/vf13 for the
@@ -102,11 +162,11 @@ struct SpecularMapDualInputs {
 // UV is the corresponding semantic representation. Clipping, triangle order,
 // sampling, original map-2 blend/depth state and texture admission are external.
 // No reflected-vector or guessed shininess equation is introduced.
-inline Status projectSpecularMapDualUv(const SpecularMapDualInputs& in,
+namespace material_detail {
+// Caller has admitted arithmeticReady() and every coefficient as finite.
+// Inputs and FP mode stay stable throughout the serial, callback-free loop.
+inline Status projectSpecularMapDualUvFiniteInputs(const SpecularMapDualInputs& in,
     const CompressedNormal& normal, std::array<float, 2>& output) noexcept {
-    if (!selection_detail::arithmeticReady()) return Status::arithmetic;
-    for (const auto& row : in.cameraNormalAxes)
-        for (float x : row) if (!material_detail::finite(x)) return Status::input;
     std::array<float, 2> next{};
     for (unsigned c = 0; c < 2; ++c) {
         float projected = material_detail::mul(in.cameraNormalAxes[0][c],
@@ -126,5 +186,14 @@ inline Status projectSpecularMapDualUv(const SpecularMapDualInputs& in,
     }
     output = next;
     return Status::complete;
+}
+} // namespace material_detail
+
+inline Status projectSpecularMapDualUv(const SpecularMapDualInputs& in,
+    const CompressedNormal& normal, std::array<float, 2>& output) noexcept {
+    if (!selection_detail::arithmeticReady()) return Status::arithmetic;
+    for (const auto& row : in.cameraNormalAxes)
+        for (float x : row) if (!material_detail::finite(x)) return Status::input;
+    return material_detail::projectSpecularMapDualUvFiniteInputs(in, normal, output);
 }
 } // namespace rr::game::original_racer_lighting50KM

@@ -7,6 +7,7 @@
 #include "lap_timing50id.h"
 #include "race_event_queue50id.h"
 #include "lap_hud_null50id.h"
+#include "original_race_hud50kg.h"
 
 namespace lap_drive50GJ {
 using namespace rr::game;
@@ -45,6 +46,19 @@ struct Owner {
     LapConfigTa50ID* nativeConfig=nullptr;
     void* completionEffectContext=nullptr;
     bool (*completionEffect)(void*,const LapCompletionRequest50GG&) noexcept=nullptr;
+    // Shared race-lifetime original HUD, outside racer snapshots. Only the
+    // actual human view is bound. Other effects retain their existing owner.
+    OriginalRaceHud50KG* originalHudOwner=nullptr;
+    const std::uint32_t* originalHudGroup34=nullptr;
+    const std::uint32_t* originalHudConfig11050=nullptr;
+    std::uint32_t originalHudView=0;
+    bool bindOriginalHud(OriginalRaceHud50KG& hud,std::uint32_t view,
+        const std::uint32_t& group34,const std::uint32_t& config11050) noexcept {
+        if(!continuity||originalHudOwner||!hud.loaded()||view>=hud.viewCount())return false;
+        const auto fields=hud.lapFields(view);if(!fields.known||!fields.lap134||!fields.race130||!fields.lastLap164)return false;
+        continuity->originalHud=fields;originalHudOwner=&hud;originalHudView=view;
+        originalHudGroup34=&group34;originalHudConfig11050=&config11050;return true;
+    }
     lap_sound50GH::DisabledAudioProvider provider{};
     lap_sound50GH::Owner sound{};
     // Optional real native provider. Null retains the explicitly disabled
@@ -116,10 +130,23 @@ struct Owner {
                         if(static_cast<std::int32_t>(result.providerResult)<0)++unavailableSounds;
                     }
                 }else{
-                    const auto hud=applyLapHudNullBranch50ID(c.originalHud,request);
-                    if(hud!=LapHudResult50ID::NullReturned&&
-                       (!completionEffect||!completionEffect(completionEffectContext,request)))
-                        return false;
+                    const bool textCall=request.kind==LapCompletionCall50GG::LapRecord22B170||
+                        request.kind==LapCompletionCall50GG::RaceRecord22B370||request.kind==LapCompletionCall50GG::LastLap22B760;
+                    const auto nullBranch=applyLapHudNullBranch50ID(c.originalHud,request);
+                    if(nullBranch==LapHudResult50ID::NullReturned){
+                        // A real banked null HUD retains its original early return.
+                    }else if(textCall&&originalHudOwner){
+                        const auto expected=originalHudOwner->lapFields(originalHudView);
+                        if(!originalHudGroup34||!originalHudConfig11050||!expected.known||!c.originalHud.known||
+                           c.originalHud.lap134!=expected.lap134||c.originalHud.race130!=expected.race130||
+                           c.originalHud.lastLap164!=expected.lastLap164||
+                           !originalHudOwner->applyLapCompletion(originalHudView,*originalHudGroup34,
+                               static_cast<std::uint8_t>(*originalHudConfig11050),request))return false;
+                    }else{
+                        const auto hud=applyLapHudNullBranch50ID(c.originalHud,request);
+                        if(hud!=LapHudResult50ID::NullReturned&&
+                           (!completionEffect||!completionEffect(completionEffectContext,request)))return false;
+                    }
                 }
             }else return false;
             //Only an actually returned effect/query reaches this acknowledgement.

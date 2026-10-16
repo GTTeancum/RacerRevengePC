@@ -1,0 +1,91 @@
+Racer Revenge Damage cold-owner handoff -- UNTESTED
+
+Base: abbf73d740ef23b8529448755d7494c234033e8b
+Tree: 12c4ffb473a0804bf09ba0e3d269b27cdd1c0ef8
+Source ZIP: 11547167 bytes; SHA256 a9b83d548bb8f1609d1605ad90abab2ef204e30dcbe5c889dbb84ec16eaeca45.
+This is a private source-only patch. Root alone integrates and tests. Reconcile
+against root's newer source; do not overwrite whole shared files blindly.
+No central checkout/disc writes. No tests, builds, syntax checks, sanitizers,
+converters, executable/gameplay/emulation/input runs were performed.
+
+WHAT IS DELIVERED
+Dedicated Damage fallback parser/provenance, canonical material-reference facet,
+32 fixed-address cold resources, private demand-floor method, and uncalled
+Application stage/finish factories. Uses the existing Application Entity owner,
+generation, canonical material/program/texture domain, exact Video construction
+context and sealed provider. No runtime main-TU edits. No HUD panel changes.
+No renderer, snapshot, view-manager binding, simulation/ranking/lap changes.
+CPU preparation is explicitly not completion of the original loader or draw.
+
+DEPENDENCY
+Step A numeric header is required at src/game/original_damage_state50la.h.
+Reference copy is under dependencies/ only, intentionally outside files/ and
+the patch, to avoid replacing root's already-reviewed/integrated numeric work.
+Earlier packet: libfile_a7178d2b57c08191aa99c63c8c505025.
+This cold owner uses authored, loadCallerPC, loadOrder, State::initializeTexture
+and sub only. It does NOT call finite-[0,1] predraw or widen its arithmetic.
+
+SOURCE-REVIEW CHECKLIST
+[ ] Damage race+C8 constructor18C550, sizeC60, has32 separate ScreenTextures:
+    base12 +50/stride60; A10 +4D0; B10 +890. Fixed arrays precede acquisitions.
+[ ] Loader18C6F0 loads original dmgradar (string3A8F98). First acquisition is
+    index12 at18C748; reference records each actual offset/caller separately.
+    Load order is interleaved banks then base in recovered non-array order.
+[ ] Real find298C80 + retain14D590 per reference, actual ScreenMT type15,
+    source population14D370 then29E340 before each geometry buffer allocation.
+    One shared canonical material is not one shared mutable ScreenTexture.
+[ ] Archive proof is distinct from mounted-provider absence. Both original
+    OVERLAYS and the actual sealed provider must lack dmgradar.psm; provider PST
+    bytes must match the authenticated member. No global absence claim.
+[ ] Dedicated Damage proof cannot mix with Tournament/SpeedBoost proof. Exact
+    dmgradar only; existing public fallback-name admission is not widened.
+[ ] Material uses real2475C0 default construction, same application template,
+    runtime/program/texture ownership, NULL-document defaults, one retained map.
+[ ] Source depth/colors and atlas-relative authored UV/dimensions are initialized
+    only after actual canonical dimensions resolve. No guessed atlas dimensions.
+[ ] Loader-tail18EAA0 layout remains deferred: actual race mode/view is absent.
+    Neither cold stage nor final CPU verification claims full18C6F0 completion.
+[ ] Failure preserves genuine prior reference/table effects and current partial
+    wrapper. No rollback, ready boolean, placeholder material or retry path.
+[ ] Finish borrows the caller's current whole-table collector receipt and checks
+    all32 refs, one atlas, PST provenance, final leaf, GS/sampler policy. It does
+    not rebuild/seal the collector. No GPU upload/submission/retirement receipt.
+[ ] Demand18F470 is private and uncalled. Resolves actual first base+50 lease;
+    exact floor10 store18F4A8. No replacement generic projected-demand formula.
+[ ] Destructor18C640 releases B10 reverse, A10 reverse, base12 reverse; each
+    buffer precedes primitive/material; genuine detached Entity dies last.
+    Any future GPU user must retain owner through actual renderer retirement.
+[ ] Application factories are uncalled, one live cold owner at a time, retain
+    failed result, temporarily select/restore actual36B970 directory, and use
+    existing context/domain. Stage must precede root's final collector join.
+
+BOUNDED FOLLOW-UP / BLOCKERS TO A GENUINE VISIBLE REPLACEMENT
+1. Establish read-only actual1AF330(Application268) view-slot binding, bounds
+   count30 and slots44, view state40, race mode, preferences, session/publication
+   generation. Do not use SpeedBoost's selected-racer override as Damage proof.
+2. Snapshot four actual racer fields7D0/7D4/7D8/7DC, B9C bit1 and nine signed
+   attachment slots10A8..10C8. Preserve simulation authority; never clamp Bank
+   data merely to admit the current numeric subset.
+3. Prove/widen supported arithmetic before runtime activation: impact_consumers49z
+   adds damage with lower clamps only; periodic +.02 likewise; aftermath upper
+   clamp is conditional. Finite unit range is NOT a universal runtime invariant.
+   Original health is1-min(max(pair),1), with source FP/order concerns outside
+   the current bounded subset. Stop or retain honest diagnostics on unsupported
+   input until source-backed domain handling exists.
+4. Bind real layout18EAD0, predraw18F4D0, draw18F5A0-family source order/color/
+   visibility, actual demand phase and genuine renderer owner retirement. Only
+   then consider replacing POD STATUS. POS/standings/completed-lap remain separate
+   dependencies and unchanged. No visible HUD recovery is claimed by this packet.
+
+AUTHENTICATED EVIDENCE
+Original SLUS SHA256 c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30.
+OVERLAYS.RES154528 bytes SHA256 ab51e88aef70d4a619ca3e614c64b90bad07deb3b9f0ec918577a44a8effb15c.
+Full112 original index records were inspected; dmgradar.pst ordinal48,
+logical1277952,size17436,block52, SHA256
+3b79203f92e2e0ec7efc4097eee9daf7b9500467a049410b89affcff015da249.
+No dmgradar.psm index member. Evidence copies included from step A: archive-proof
+and complete Damage static word ranges. They are data, never executed instructions.
+
+VALIDATION STATUS
+Source review only. No compiler or runtime evidence. ZIP/file SHA256 inventory
+is transfer integrity evidence only and must not be described as a code test.

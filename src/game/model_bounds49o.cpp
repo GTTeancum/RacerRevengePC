@@ -65,15 +65,27 @@ void merge(Math& m,ModelBoundsResult49O& o,const Vector3_48C& c,const Vector3_48
     o.seeded=true;
 }
 }
-bool computeModelBounds49O(const ModelBoundsNode49O* nodes,std::size_t count,
+namespace {
+bool computeBounds(const ModelBoundsNode49O* nodes,std::size_t count,
     const ModelBoundsContext49O& context,ModelBoundsWorkspace49O& workspace,
-    ModelBoundsResult49O& output) noexcept {
+    ModelBoundsResult49O& output,bool directRoot) noexcept {
     if(std::fegetround()!=FE_TONEAREST||count>maxModelBoundsNodes49O||(count&&!nodes)||(context.rootSceneFlags190&0x10u)||!affine(context.rootWorld100))return false;
     if((context.rootSceneFlags190&4u)&&!validBox(context.rootCenter140,context.rootHalfExtent150))return false;
     for(std::size_t i=0;i<count;++i){const auto& n=nodes[i];if(n.parent<-1||n.parent>=static_cast<std::int32_t>(i)||!affine(n.local))return false;if((n.sceneFlags190&4u)&&!validBox(n.center140,n.halfExtent150))return false;}
+    if(directRoot){
+        if(!count||!(context.rootSceneFlags190&4u)||nodes[0].parent!=-1||
+           nodes[0].sceneFlags190!=context.rootSceneFlags190)return false;
+        for(unsigned j=0;j<3;++j)
+            if(bits(nodes[0].center140.v[j])!=bits(context.rootCenter140.v[j])||
+               bits(nodes[0].halfExtent150.v[j])!=bits(context.rootHalfExtent150.v[j]))return false;
+        for(std::size_t i=1;i<count;++i)if(nodes[i].parent<0)return false;
+    }
     Math m;ModelBoundsResult49O o{};o.minimum[3]=o.maximum[3]=o.center160[3]=o.halfExtent170[3]=1;
     if(context.rootSceneFlags190&4u)merge(m,o,context.rootCenter140,context.rootHalfExtent150);
-    for(std::size_t i=0;i<count;++i){const auto& n=nodes[i];workspace.world[i]=m.product(n.local,n.parent<0?context.rootWorld100:workspace.world[n.parent]);if(!(n.sceneFlags190&4u))continue;
+    for(std::size_t i=0;i<count;++i){const auto& n=nodes[i];
+        if(directRoot&&i==0)workspace.world[i]=context.rootWorld100;
+        else workspace.world[i]=m.product(n.local,n.parent<0?context.rootWorld100:workspace.world[n.parent]);
+        if(!(n.sceneFlags190&4u))continue;
         const auto center=m.toRoot(m.point(n.center140,workspace.world[i]),context.rootWorld100,true);
         Vector3_48C axes[3]{},extent{};
         for(unsigned axis=0;axis<3;++axis){Vector3_48C v{};v.v[axis]=n.halfExtent150.v[axis];axes[axis]=m.toRoot(m.direction(v,workspace.world[i]),context.rootWorld100,false);}
@@ -86,5 +98,16 @@ bool computeModelBounds49O(const ModelBoundsNode49O* nodes,std::size_t count,
     o.rootSceneFlags190=static_cast<std::uint8_t>(context.rootSceneFlags190|1u|(o.radius198>0?0x40u:0u));
     if(!m.valid)return false;
     output=o;return true;
+}
+}
+bool computeModelBounds49O(const ModelBoundsNode49O* nodes,std::size_t count,
+    const ModelBoundsContext49O& context,ModelBoundsWorkspace49O& workspace,
+    ModelBoundsResult49O& output) noexcept {
+    return computeBounds(nodes,count,context,workspace,output,false);
+}
+bool computeDirectRootModelBounds50KG(const ModelBoundsNode49O* sourceRows,
+    std::size_t count,const ModelBoundsContext49O& context,
+    ModelBoundsWorkspace49O& workspace,ModelBoundsResult49O& output) noexcept {
+    return computeBounds(sourceRows,count,context,workspace,output,true);
 }
 }

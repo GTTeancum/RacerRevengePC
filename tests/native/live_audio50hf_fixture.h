@@ -1,10 +1,12 @@
 #pragma once
 // Stable native client owner. This subscribes to source-backed gameplay fields;
-// it does not supply the original D40 object or bypass any core source guard.
+// its typed human reset fields are canonical, while the full retail emitter
+// scheduler remains unrepresented. No missing core provider is bypassed.
 #include "gameplay_audio_provider50he_fixture.h"
 #include "pod_audio_owner50he_fixture.h"
 #include "race_audio_groups50ic_fixture.h"
 #include "selected_player_audio50ij_fixture.h"
+#include "../../src/game/original_human_engine_reset50lb.h"
 #include "../../platform/linux/native/audio_output50hd.h"
 #include "../../platform/linux/native/announcer_episode50ic.h"
 #include <array>
@@ -15,7 +17,10 @@
 #include <vector>
 
 namespace live_audio50HF {
-inline constexpr std::size_t voiceCount=192,providerFirstVoice=0,lapFirstVoice=60,lapVoiceCount=4;
+// Existing0..219 reservations remain fixed; original D44 arrays own the
+// separate220..571 suffix and share this SAME sample clock/mixer.
+inline constexpr std::size_t voiceCount=rr::platform::audioMaximumVoices50HD,providerFirstVoice=0,lapFirstVoice=60,lapVoiceCount=4;
+static_assert(voiceCount<=rr::platform::audioMaximumVoices50HD);
 inline constexpr std::uint32_t sampleRate=48000,stepMicroseconds=16000,stepFrames=768;
 static_assert(gameplay_audio50HE::legacyCueCount==lapFirstVoice);
 static_assert(gameplay_audio50HE::extraFirstVoice+gameplay_audio50HE::cueCount-
@@ -132,19 +137,19 @@ public:
     }
     EventReceipt warnings(const rr::game::PodWarningInput50HE& input)noexcept {
         EventReceipt r;if(!admit(r))return r;
-        auto next=warning_;
-        const auto status=rr::game::updatePodWarnings50HE(input,warning_,next,
+        auto next=humanController_.warning;
+        const auto status=rr::game::updatePodWarnings50HE(input,humanController_.warning,next,
             r.commands.data(),r.commands.size(),r.commandCount);
         if(!projected(status,r))return r;
-        warning_=next;++counters_.warningUpdates;apply(r);return r;
+        humanController_.warning=next;++counters_.warningUpdates;apply(r);return r;
     }
     EventReceipt boostAtBoundary(bool heldBoost,float heating,std::uint32_t previous64)noexcept {
         EventReceipt r;if(!admit(r))return r;
-        auto next=boost_;
-        const auto status=rr::game::updatePodBoostAudio50HE(heldBoost,heating,previous64,boost_,next,
+        auto next=humanController_.boost;
+        const auto status=rr::game::updatePodBoostAudio50HE(heldBoost,heating,previous64,humanController_.boost,next,
             r.commands.data(),r.commands.size(),r.commandCount);
         if(!projected(status,r))return r;
-        boost_=next;++counters_.boostUpdates;apply(r);return r;
+        humanController_.boost=next;++counters_.boostUpdates;apply(r);return r;
     }
     EventReceipt repairCompletion(std::uint8_t flagsB9C,std::uint32_t vehicle3C,
         const float (&damage7D0)[4])noexcept {
@@ -205,7 +210,7 @@ public:
     void resetVoices()noexcept {
         if(!prepared_||closed_)return;
         if(!announcer_.stop())++counters_.groupFailures;
-        mixer_.stopAll();warning_={};boost_={};++counters_.resets;
+        mixer_.stopAll();humanController_.warning={};humanController_.boost={};++counters_.resets;
     }
     // Explicit close BEFORE WindowHost50DQ destruction/SDL_Quit. Idempotent.
     // Destructor is only a fallback; host construction order remains important.
@@ -223,8 +228,9 @@ public:
     bool outputOpen()const noexcept{return outputOpen_;}
     bool paused()const noexcept{return paused_;}
     bool closed()const noexcept{return closed_;}
-    bool boostPitch()const noexcept{return boost_.pitchBoost;}
-    const rr::game::PodWarningState50HE& warningState()const noexcept{return warning_;}
+    rr::game::OriginalHumanEngineResetOwner50LB& humanController() noexcept{return humanController_;}
+    bool boostPitch()const noexcept{return humanController_.boost.pitchBoost();}
+    const rr::game::PodWarningState50HE& warningState()const noexcept{return humanController_.warning;}
     const rr::assets::AudioBank50HC& bank()const noexcept{return bank_;}
     const gameplay_audio50HE::Provider& provider()const noexcept{return provider_;}
     // Root integration may reserve the disjoint64..79 material-sound range.
@@ -305,8 +311,7 @@ private:
     selected_player_audio50IJ::Authoring selected_{};
     pod_audio50HE::Owner lap_{};
     rr::platform::AudioOutput50HD output_{};
-    rr::game::PodWarningState50HE warning_{};
-    rr::game::PodBoostAudioState50HE boost_{};
+    rr::game::OriginalHumanEngineResetOwner50LB humanController_{};
     Counters counters_{};
     bool prepareAttempted_=false,prepared_=false,outputOpen_=false,paused_=false,closed_=false;
 };

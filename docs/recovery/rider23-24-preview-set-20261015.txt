@@ -1,0 +1,24 @@
+UNTESTED incremental descriptor-preparation candidate
+
+Base: abbf73d740ef23b8529448755d7494c234033e8b plus the all23 mapping integrated by root as7fd0cf45f227bd221e282699032b47e2c13c7ffa. Local equivalent mapping is8f5794f. Apply ONLY the enclosed feature patch; neither local snapshot commit688b739 nor a9c908d is an integration change. No new root commits were read or assumed.
+
+Changed paths:
+src/game/original_ui_rider_dynamic_owner50kg.h
+src/game/original_ui_rider_dynamic_owner50kg.cpp
+src/game/original_ui_rider_backend50kg.cpp
+platform/linux/native/original_ui_rider_session50kg.h
+platform/linux/native/original_ui_rider_session50kg.cpp
+
+Source-review checklist:
+1. New OriginalUiRiderPreviewSet50KG has none/indexed23And24 only. Trailing RiderSessionCold field defaults none. Existing descriptor-preparation calls default none; invalid enum values reject. No Application/frontend transport or default activation.
+2. Explicit set adds exactly riders23 and24 independently of existing cold populations. Authenticated mapped controls/widgets are reused:23 control20 pod31 character57;24 control21 pod32 character58. Both mappings and descriptors required; no widget arithmetic.
+3. Existing pod/character loaders remain unchanged. They authenticate original widget transforms, MCF/VUT/PSG and six motions with original ordering/timing/looping, and retain existing geometry/binding constraints. Local descriptor candidates commit only after all requested loads succeed.
+4. Existing material loading/identity/collision/animated-texture policies and native decoder gates remain unchanged. Backend includes the two real pairs only when descriptors exist, rejects partial pairs and any requested cache readiness failure, and requires actual materials/footprints/bank mappings before seal.
+5. Session checks source group membership plus backgrounds/portraits and requires both prepared pairs after backend sealing before callback publication. Existing collector policy validation and navigation preflight still run before session escape. A failed private candidate is not a published manager.
+6. Original23/24 assets in retained inventory use kind1 single-mip textures, so no new IPUM output generation is proposed. Their body/specular/shadow policy may still reject under unchanged material gates; this candidate does not certify rendering readiness or bypass such rejection.
+7. Shared binder material/ATM ownership, actual binder endpoint discovery, graph attachment and cleanup remain unchanged. No synthetic endpoint or fallback resource. Backend footprint/event/owner capacity checks remain mandatory.
+8. Only preview resource eligibility for23/24 changes when explicitly requested and backend-ready. supportedRider/confirmation whitelist unchanged; no profile writes/unlocks, hidden-state changes, control skipping or reordered callbacks. Remembered source entry can use23/24 only with explicit request and subsequent readiness/preflight success.
+9. Existing public defaults and Gasgano/Clegg behavior remain. Additional descriptors are not created when request is none. This does not complete the traversal loop: intervening unsupported controls still reject as before.
+10. Root owns source integration and all future validation. Source diff inspected only. No tests, builds, syntax checks, converters, project imports, gameplay, physics edits, mesh-cache/audio/material-equivalence audits, central checkout or disc access occurred.
+
+Known limitation: actual PSG/motion/material compatibility is untested; any unsupported authentic source prerequisite must fail closed. No guarantee that enabling the explicit set currently succeeds. This is resource preparation infrastructure, not default availability or full gameplay support.

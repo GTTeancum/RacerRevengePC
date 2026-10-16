@@ -1,0 +1,382 @@
+[
+  {
+    "pc": "001ea658",
+    "file_offset": 960216,
+    "word": "8e4304c4"
+  },
+  {
+    "pc": "001ea65c",
+    "file_offset": 960220,
+    "word": "838280a8"
+  },
+  {
+    "pc": "001ea660",
+    "file_offset": 960224,
+    "word": "00031880"
+  },
+  {
+    "pc": "001ea664",
+    "file_offset": 960228,
+    "word": "00721821"
+  },
+  {
+    "pc": "001ea668",
+    "file_offset": 960232,
+    "word": "8c6353bc"
+  },
+  {
+    "pc": "001ea66c",
+    "file_offset": 960236,
+    "word": "14400005"
+  },
+  {
+    "pc": "001ea670",
+    "file_offset": 960240,
+    "word": "2471ffff"
+  },
+  {
+    "pc": "001ea674",
+    "file_offset": 960244,
+    "word": "24020001"
+  },
+  {
+    "pc": "001ea678",
+    "file_offset": 960248,
+    "word": "3c01003d"
+  },
+  {
+    "pc": "001ea67c",
+    "file_offset": 960252,
+    "word": "ac206b30"
+  },
+  {
+    "pc": "001ea680",
+    "file_offset": 960256,
+    "word": "a38280a8"
+  },
+  {
+    "pc": "001ea684",
+    "file_offset": 960260,
+    "word": "3c01003d"
+  },
+  {
+    "pc": "001ea688",
+    "file_offset": 960264,
+    "word": "8c226b30"
+  },
+  {
+    "pc": "001ea68c",
+    "file_offset": 960268,
+    "word": "14400009"
+  },
+  {
+    "pc": "001ea690",
+    "file_offset": 960272,
+    "word": "26220001"
+  },
+  {
+    "pc": "001ea694",
+    "file_offset": 960276,
+    "word": "0c040694"
+  },
+  {
+    "pc": "001ea698",
+    "file_offset": 960280,
+    "word": "00000000"
+  },
+  {
+    "pc": "001ea69c",
+    "file_offset": 960284,
+    "word": "3c01003d"
+  },
+  {
+    "pc": "001ea6a0",
+    "file_offset": 960288,
+    "word": "ac226b30"
+  },
+  {
+    "pc": "001ea6a4",
+    "file_offset": 960292,
+    "word": "3c01003d"
+  },
+  {
+    "pc": "001ea6a8",
+    "file_offset": 960296,
+    "word": "0c0c2008"
+  },
+  {
+    "pc": "001ea6ac",
+    "file_offset": 960300,
+    "word": "8c246b30"
+  },
+  {
+    "pc": "001ea6b0",
+    "file_offset": 960304,
+    "word": "26220001"
+  },
+  {
+    "pc": "001ea6b4",
+    "file_offset": 960308,
+    "word": "44820000"
+  },
+  {
+    "pc": "001ea6b8",
+    "file_offset": 960312,
+    "word": "0c0c200c"
+  },
+  {
+    "pc": "001ea6bc",
+    "file_offset": 960316,
+    "word": "46800520"
+  },
+  {
+    "pc": "001ea6c0",
+    "file_offset": 960320,
+    "word": "44820000"
+  },
+  {
+    "pc": "001ea6c4",
+    "file_offset": 960324,
+    "word": "3c033000"
+  },
+  {
+    "pc": "001ea6c8",
+    "file_offset": 960328,
+    "word": "46800060"
+  },
+  {
+    "pc": "001ea6cc",
+    "file_offset": 960332,
+    "word": "838280ac"
+  },
+  {
+    "pc": "001ea6d0",
+    "file_offset": 960336,
+    "word": "44830000"
+  },
+  {
+    "pc": "001ea6d4",
+    "file_offset": 960340,
+    "word": "00000000"
+  },
+  {
+    "pc": "001ea6d8",
+    "file_offset": 960344,
+    "word": "46010002"
+  },
+  {
+    "pc": "001ea6dc",
+    "file_offset": 960348,
+    "word": "4600a002"
+  },
+  {
+    "pc": "001ea6e0",
+    "file_offset": 960352,
+    "word": "46000024"
+  },
+  {
+    "pc": "001ea6e4",
+    "file_offset": 960356,
+    "word": "44100000"
+  },
+  {
+    "pc": "001ea6e8",
+    "file_offset": 960360,
+    "word": "14400005"
+  },
+  {
+    "pc": "001ea6ec",
+    "file_offset": 960364,
+    "word": "00000000"
+  },
+  {
+    "pc": "001ea6f0",
+    "file_offset": 960368,
+    "word": "24020001"
+  },
+  {
+    "pc": "001ea6f4",
+    "file_offset": 960372,
+    "word": "3c01003d"
+  },
+  {
+    "pc": "001ea6f8",
+    "file_offset": 960376,
+    "word": "ac226b38"
+  },
+  {
+    "pc": "001ea6fc",
+    "file_offset": 960380,
+    "word": "a38280ac"
+  },
+  {
+    "pc": "001ea700",
+    "file_offset": 960384,
+    "word": "3c01003d"
+  },
+  {
+    "pc": "001ea704",
+    "file_offset": 960388,
+    "word": "8c226b38"
+  },
+  {
+    "pc": "001ea708",
+    "file_offset": 960392,
+    "word": "10400016"
+  },
+  {
+    "pc": "001ea70c",
+    "file_offset": 960396,
+    "word": "00000000"
+  },
+  {
+    "pc": "001ea710",
+    "file_offset": 960400,
+    "word": "06000005"
+  },
+  {
+    "pc": "001ea714",
+    "file_offset": 960404,
+    "word": "70001628"
+  },
+  {
+    "pc": "001ea718",
+    "file_offset": 960408,
+    "word": "0230082a"
+  },
+  {
+    "pc": "001ea71c",
+    "file_offset": 960412,
+    "word": "14200003"
+  },
+  {
+    "pc": "001ea720",
+    "file_offset": 960416,
+    "word": "304400ff"
+  },
+  {
+    "pc": "001ea724",
+    "file_offset": 960420,
+    "word": "64020001"
+  },
+  {
+    "pc": "001ea728",
+    "file_offset": 960424,
+    "word": "304400ff"
+  },
+  {
+    "pc": "001ea72c",
+    "file_offset": 960428,
+    "word": "3c02003b"
+  },
+  {
+    "pc": "001ea730",
+    "file_offset": 960432,
+    "word": "2445fa78"
+  },
+  {
+    "pc": "001ea734",
+    "file_offset": 960436,
+    "word": "0c04cd98"
+  },
+  {
+    "pc": "001ea738",
+    "file_offset": 960440,
+    "word": "2406003f"
+  },
+  {
+    "pc": "001ea73c",
+    "file_offset": 960444,
+    "word": "10400009"
+  },
+  {
+    "pc": "001ea740",
+    "file_offset": 960448,
+    "word": "00000000"
+  },
+  {
+    "pc": "001ea744",
+    "file_offset": 960452,
+    "word": "3c02003b"
+  },
+  {
+    "pc": "001ea748",
+    "file_offset": 960456,
+    "word": "0c04cdb0"
+  },
+  {
+    "pc": "001ea74c",
+    "file_offset": 960460,
+    "word": "2444fa80"
+  },
+  {
+    "pc": "001ea750",
+    "file_offset": 960464,
+    "word": "3c02003b"
+  },
+  {
+    "pc": "001ea754",
+    "file_offset": 960468,
+    "word": "0c04cdb0"
+  },
+  {
+    "pc": "001ea758",
+    "file_offset": 960472,
+    "word": "2444eba8"
+  },
+  {
+    "pc": "001ea75c",
+    "file_offset": 960476,
+    "word": "0000000d"
+  },
+  {
+    "pc": "001ea760",
+    "file_offset": 960480,
+    "word": "00000000"
+  },
+  {
+    "pc": "001ea764",
+    "file_offset": 960484,
+    "word": "8e4204c4"
+  },
+  {
+    "pc": "001ea768",
+    "file_offset": 960488,
+    "word": "8e4453b8"
+  },
+  {
+    "pc": "001ea76c",
+    "file_offset": 960492,
+    "word": "70003628"
+  },
+  {
+    "pc": "001ea770",
+    "file_offset": 960496,
+    "word": "70003e28"
+  },
+  {
+    "pc": "001ea774",
+    "file_offset": 960500,
+    "word": "00021080"
+  },
+  {
+    "pc": "001ea778",
+    "file_offset": 960504,
+    "word": "00521021"
+  },
+  {
+    "pc": "001ea77c",
+    "file_offset": 960508,
+    "word": "8c425428"
+  },
+  {
+    "pc": "001ea780",
+    "file_offset": 960512,
+    "word": "0c0a48d8"
+  },
+  {
+    "pc": "001ea784",
+    "file_offset": 960516,
+    "word": "00502821"
+  }
+]

@@ -33,7 +33,7 @@ def main():
                    'src/game/vehicle_contact48g.cpp', 'src/game/body_contact_list48r.cpp', 'src/game/controller_actions50ec.cpp', 'src/assets/repair_authoring50a.cpp',
                    'src/game/live_zone_membership50en.cpp', 'src/game/portal_geometry50eo.cpp',
                    'src/game/vehicle_live_query50eq.cpp',
-                   'src/game/track_navigation50eu.cpp', 'src/game/type0_bounds50ew.cpp', 'src/game/undertrack_reset50ew.cpp', 'src/game/reset_visibility50ey.cpp', 'src/game/pod_scene_rebase50fb.cpp', 'src/game/pod_cables50fd.cpp', 'src/game/boost_controls50fk.cpp', 'src/game/undertrack_reposition50et.cpp',
+                   'src/game/track_navigation50eu.cpp', 'src/game/type0_bounds50ew.cpp', 'src/game/undertrack_reset50ew.cpp', 'src/game/reset_visibility50ey.cpp', 'src/game/reset_ground_query50iz.cpp', 'src/game/original_gc_particle_manager50kg.cpp', 'src/game/original_gc_generator_fire50kg.cpp', 'src/game/original_gc_spray50kg.cpp', 'src/game/original_gc_fire_emission50kg.cpp', 'src/game/original_gc_pod_dust50kg.cpp', 'src/game/original_gc_pod_fire50kg.cpp', 'src/game/original_gc_pod_sparks50kg.cpp', 'src/assets/original_gc_particle_material50kg.cpp', 'src/game/original_gc_particle_render50kg.cpp', 'src/game/pod_scene_rebase50fb.cpp', 'src/game/pod_cables50fd.cpp', 'src/game/boost_controls50fk.cpp', 'src/game/undertrack_reposition50et.cpp',
                    'src/game/source_acos49t.cpp', 'src/game/chariot_scene49u.cpp'):
         absolute = str(ROOT / source)
         if absolute not in argv:
@@ -49,6 +49,12 @@ def main():
         'src/game/original_camera_scene_tick.cpp',
         'src/game/original_camera_sphere_query.cpp',
         'src/game/original_camera_world_query.cpp',
+        'src/game/original_death_camera_query.cpp',
+        'src/game/original_death_camera50kg.cpp',
+        'src/game/original_race_hud50kg.cpp',
+        'src/game/original_wreck_explosion50la.cpp',
+        'src/game/original_wreck_splash50la.cpp',
+        'src/game/original_wreck_effects50la.cpp',
         'src/game/original_follow_cam.cpp',
         'src/game/original_follow_camera.cpp',
         'src/game/original_follow_collision.cpp',
@@ -81,6 +87,20 @@ def main():
     gameplay_binder = str(ROOT / 'src/game/original_gameplay_binder_candidate.cpp')
     if gameplay_binder not in argv:
         argv.insert(argv.index('-lz'), gameplay_binder)
+    # Canonical material/resource closure for the existing native TA consumer.
+    for source in (
+        'src/assets/original_standard_model_resource50la.cpp',
+        'src/assets/original_standard_program_table50la.cpp',
+        'src/assets/original_standard_material_source50la.cpp',
+        'src/assets/original_standard_material_object50la.cpp',
+        'src/assets/original_standard_material_table50la.cpp',
+        'src/assets/original_standard_screen_material_reference50la.cpp',
+        'src/assets/original_standard_texture_table50la.cpp',
+        'src/assets/original_standard_texture_resource50la.cpp',
+    ):
+        absolute = str(ROOT / source)
+        if absolute not in argv:
+            argv.insert(argv.index('-lz'), absolute)
     # Inactive original UI modules; source registration does not enable frontend.
     for source in (
         'src/assets/original_ui_archive50kg.cpp',
@@ -132,8 +152,20 @@ def main():
         'platform/linux/native/original_ui_main_session50kg.cpp',
         'platform/linux/native/original_ui_frontend50kg.cpp',
         'platform/linux/native/original_ui_options_session50kg.cpp',
+        'src/game/original_tournament_result50kg.cpp',
+        'src/game/original_ui_tournament_input50kg.cpp',
+        'src/assets/original_ui_tournament_page50kg.cpp',
+        'platform/linux/native/original_ui_tournament_career_resources50kg.cpp',
+        'src/assets/original_ui_screen_material_reference50kg.cpp',
+        'src/game/original_world_environment50kg.cpp',
+        'platform/linux/native/original_ui_audio_options50kg.cpp',
+        'src/game/original_ui_audio_options50kg.cpp',
         'src/game/original_ui_main_widget_manager50kg.cpp',
         'src/game/original_ui_options_menu_controller50kg.cpp',
+        'src/game/original_ui_controls_controller50kg.cpp',
+        'src/game/original_ui_controls_model50kg.cpp',
+        'src/assets/original_ui_controls_model_assets50kg.cpp',
+        'src/assets/original_ui_controls_specmap50kg.cpp',
         'src/game/original_ui_game_options_controller50kg.cpp',
         'src/game/original_ui_options_menu_widgets50kg.cpp',
         'src/game/original_ui_options_menu_layout50kg.cpp',

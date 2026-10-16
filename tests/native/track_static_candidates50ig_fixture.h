@@ -19,11 +19,15 @@ struct Radii {std::vector<float> values;std::size_t maxDepth=0;};
 // COL type0 loads with a1=null at1B572C; owner9C stays constructor-null. Thus
 // there is NO material scene/name. MaterialID+A9 is handled by50HI separately.
 // Authored enumeration is never sorted, collapsed, shortened or filled from TA.
-inline void prepare(const authored_runtime_ground50cp_fixture::ColdScene& ground,
+// Borrow an actual contiguous, stable decoded owner span. Each owner supplies
+// its original mesh and prepared instance; no pose/lift/height placeholder is
+// needed. Caller retains this span and all output backing through registration
+// teardown. Failure may leave an unpublished output prefix, as before.
+template<class CollisionOwner>
+inline void prepareSpan(const CollisionOwner* owners,std::size_t count,
     const Bindings& names,std::vector<Type2StaticCandidate49X>& candidates,
     std::vector<Radii>& radii,std::vector<track_runtime_storage50IG::Binding>& bindings) {
-    const auto count=ground.owners.size();
-    if(!candidates.empty()||!radii.empty()||!bindings.empty()||!count||
+    if(!owners||!candidates.empty()||!radii.empty()||!bindings.empty()||!count||
        count>authored_runtime_ground50cp_fixture::hardCollisionOwners50IG||
        !names.firstIdentity||count-1>std::numeric_limits<std::uint32_t>::max()-names.firstIdentity||
        names.collisionTypeTag==names.groupTypeTag||
@@ -31,7 +35,7 @@ inline void prepare(const authored_runtime_ground50cp_fixture::ColdScene& ground
         throw std::runtime_error("invalid original static candidate namespace or cold owner extent");
     candidates.resize(count);radii.resize(count);bindings.resize(count);
     for(std::size_t i=0;i<count;++i){
-        const auto& original=ground.owners[i];auto& out=candidates[i];auto& radius=radii[i];
+        const auto& original=owners[i];auto& out=candidates[i];auto& radius=radii[i];
         radius.values.resize(original.mesh.nodes.size());
         std::vector<std::uint32_t> topology(original.mesh.nodes.size()+original.mesh.faces.size());
         if(prepareStaticTargetRadii49X(original.mesh,radius.values.data(),radius.values.size(),
@@ -54,5 +58,11 @@ inline void prepare(const authored_runtime_ground50cp_fixture::ColdScene& ground
         c.copied40={0.f,0.f,0.f,1.f};c.copied50=c.copied40;
         bindings[i]={i,&out};
     }
+}
+// Existing callers retain exactly their former checks, mutation and ordering.
+inline void prepare(const authored_runtime_ground50cp_fixture::ColdScene& ground,
+    const Bindings& names,std::vector<Type2StaticCandidate49X>& candidates,
+    std::vector<Radii>& radii,std::vector<track_runtime_storage50IG::Binding>& bindings) {
+    prepareSpan(ground.owners.data(),ground.owners.size(),names,candidates,radii,bindings);
 }
 } // namespace track_static_candidates50IG

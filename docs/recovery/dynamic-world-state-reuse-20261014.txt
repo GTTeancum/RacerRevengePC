@@ -1,0 +1,25 @@
+Draw submission third patch: exact dynamic-world blend/depth input reuse
+Canonical baseline: Library libfile_e015f5ae0cec819195a35c5bb6f45663, file_00000000033481f585a6cbe8a66f8ddd, version 0, size 452355 bytes, 7015 lines. Root identifies integrated baseline a67bcaf. Prior measured FPS is not evidence for this patch.
+Changed source: platform/linux/native/vehicle_window_gl50ds.cpp only.
+Changed function: Storage::drawDynamicWorld (canonical lines 4409-4461).
+Delivery is a source patch against the exact Library-read function, not a replacement based on the older local clone. All other integrated changes are retained.
+
+Local proof:
+1. configureBlend (canonical lines 4208-4219) reads exactly policy.blend, policy.depthWrite, policy.depthEqual, policy.fixedBlendAlpha, and layeredDepth. It enables depth test, chooses depth mask and depth function, then chooses blend enable/equation/factors.
+2. The patch compares every one of those inputs with exact equality. It deliberately compares even fields whose values would not affect an opaque draw; this is conservative. No structure memcmp, float comparison, material-index identity shortcut, hashing, or approximate rendering equivalence.
+3. The first admitted span always calls configureBlend because boundPolicy is null. Passing over filtered spans cannot establish a cache entry. A changed input calls the original helper with the original arguments.
+4. Equal inputs imply the exact same calls and GL-visible values for depth test, depth mask, depth function, blend enable, blend equation and both factors. For opaque spans the helper does not change equation/factors; skipping it likewise preserves those values.
+5. The entire dynamic-world loop has no callbacks and no other writes to blend/depth state. Its other GL operations are texture binds, uniforms, indexed draws, and check's getError. These do not mutate the cached state. Source spans and policy storage remain unchanged within this synchronous loop.
+6. boundPolicy points only into an already-existing dynamicWorldSpans material. No allocation, resize, replacement or mutation occurs in the loop. The cache contains no GL object identity, and introduces no new object-lifetime dependency.
+7. Cache scope is one function invocation, so every frame, opaque/transparent pass, bank, retry, abort and resource/context change starts uncached. No cross-pass invalidation mechanism or external state promise is added.
+8. Existing material and draw error checks remain in position. If configureBlend or later setup fails, the function exits before any cache reuse; local state is discarded.
+
+Unchanged behavior:
+Same pass admission, geometry bindings, source order, index ranges/counts, base vertex, per-span alpha reference/test, alpha-scale/effect/unlit uniforms, texture handling, diagnostic counts, reset and error paths. Source alpha/depth/blending values are unchanged. No visibility, shaders, physics, assets, racer lighting, map2/specular commands or barriers are edited.
+
+Static call-count implication only:
+For each consecutive admitted span with all five equal inputs, the code omits four GL calls for opaque policies or six for nonopaque policies. Actual frequency and net performance are unknown; comparisons have a CPU cost. No performance benefit is claimed.
+
+Review boundary:
+Read canonical Library source only for this change; no central source edits or commits. Library materialization returned a cloud-only workspace path inaccessible to this Windows execution context, so the patch was constructed directly from the exact Library-read function and source line metadata. The old clone was not used as the baseline. Root should apply to its canonical copy.
+No tests, builds, syntax/compiler checks, sanitizer checks, game/project executables or benchmarks were run. Root owns all application and software validation.
