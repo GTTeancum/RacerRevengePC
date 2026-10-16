@@ -125,6 +125,19 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
     const auto& p=pass.provenance;
     if(pass.identity || pass.inheritedTemplate!=catalogMember(OriginalUiArchiveId50KG::appStart,"AppStart\\ScreenMT.psm") ||
         p.creationPC!=0x2475c0u || pass.pass!=1 || !pass.authored.values.empty() || !pass.authored.name.empty())return false;
+    if(p.origin==OriginalUiMaterialOrigin50KG::pauseBackdropMissingPsmFallback){
+        constexpr auto id=OriginalUiArchiveId50KG::overlays;
+        if(p.archive!=originalUiArchiveIdentity50KG(id)||p.fallbackWidgetSource||p.fallbackPageSource)return false;
+        for(unsigned i=0;i<2;++i){
+            const char* name=i?"results2":"results1";
+            const std::string base=std::string("ui\\textures\\")+name;
+            const auto* texture=catalogMember(id,(base+".pst").c_str());
+            if(texture&&!catalogMember(id,(base+".psm").c_str())&&p.fallbackTexture==texture&&
+               p.sourceCallerPC==(i?0x1B898Cu:0x1B8840u)&&p.registeredName==base&&
+               p.attemptedPsmMember==base+".psm"&&pass.textureName==name)return true;
+        }
+        return false;
+    }
     if(p.origin==OriginalUiMaterialOrigin50KG::damageTextureMissingPsmFallback){
         // Exact provenance emitted by readOriginalDamageFallbackMaterial50LA:
         // first ScreenTexture loader18C748, genuine OVERLAYS PST, absent PSM.
@@ -1480,6 +1493,35 @@ bool readOriginalDamageFallbackMaterial50LA(
         p.archive=overlays.identity();p.fallbackTexture=texture.identity;p.sourceCallerPC=caller;
         p.registeredName=base;p.attemptedPsmMember=base+".psm";p.creationPC=0x2475C0;
         auto next=screenTextureFallback(p,"dmgradar",*inherited,runtime);
+        output=std::move(next);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+
+bool readOriginalPauseBackdropFallbackMaterial50LA(
+    const OriginalUiArchive50KG& overlays,std::uint8_t index,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(index>1)return fail(d,Error::fallbackSource,"Pause backdrop index",0x1B8810);
+        const std::uint32_t caller=index?0x1B898C:0x1B8840;
+        const char* name=index?"results2":"results1";
+        if(!overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Pause backdrop OVERLAYS",caller);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"actual Pause backdrop ScreenMT/runtime",0x2DF10C);
+        const std::string base=std::string("ui\\textures\\")+name;
+        const auto texture=overlays.find(base+".pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||
+           overlays.find(base+".psm").identity)
+            return fail(d,Error::fallbackSource,"original Pause backdrop PST and absent PSM",caller);
+        OriginalUiMaterialProvenance50KG p;
+        p.origin=OriginalUiMaterialOrigin50KG::pauseBackdropMissingPsmFallback;
+        p.archive=overlays.identity();p.fallbackTexture=texture.identity;p.sourceCallerPC=caller;
+        p.registeredName=base;p.attemptedPsmMember=base+".psm";p.creationPC=0x2475C0;
+        auto next=screenTextureFallback(p,name,*inherited,runtime);
         output=std::move(next);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }

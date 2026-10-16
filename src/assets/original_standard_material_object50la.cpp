@@ -301,6 +301,8 @@ struct OriginalStandardMaterialObject50LA::Storage {
     std::unique_ptr<OriginalUiMaterial50KG> speedBoostFallback;
     std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm;
     std::unique_ptr<OriginalUiMaterial50KG> damageFallback;
+    std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm;
+    std::unique_ptr<OriginalUiMaterial50KG> pauseBackdropFallback;
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates;
     std::shared_ptr<const OriginalStandardProgramTable50LA> programs;
     std::shared_ptr<OriginalStandardTextureTable50LA> textures;
@@ -364,6 +366,9 @@ const OriginalUiMaterialProvenance50KG* OriginalStandardMaterialObject50LA::spee
 }
 const OriginalUiMaterialProvenance50KG* OriginalStandardMaterialObject50LA::damageFallbackProvenance() const noexcept {
     return storage_&&storage_->damageFallback?&storage_->damageFallback->provenance:nullptr;
+}
+const OriginalUiMaterialProvenance50KG* OriginalStandardMaterialObject50LA::pauseBackdropFallbackProvenance() const noexcept {
+    return storage_&&storage_->pauseBackdropFallback?&storage_->pauseBackdropFallback->provenance:nullptr;
 }
 bool OriginalStandardMaterialObject50LA::serviceCableBasePrototype29AC90(
     std::size_t slot,D& d) noexcept {
@@ -698,7 +703,8 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
     const OriginalStandardMaterialPopulationInput50LA& input,
     std::shared_ptr<const OriginalUiArchive50KG> tournamentMissingPsm,
     std::shared_ptr<const OriginalUiArchive50KG> speedBoostMissingPsm,
-    std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm,D& d) noexcept {
+    std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm,
+    std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm,D& d) noexcept {
     try {
         auto& s=*storage_;
         if(s.row40!=-1)return fail(d,E::phase,0x29B550);
@@ -717,7 +723,8 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             s.source=source;
         }
         if((tournamentMissingPsm&&speedBoostMissingPsm)||
-           (damageMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm)))return fail(d,E::source,0x29B638);
+           (damageMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm))||
+           (pauseBackdropMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm||damageMissingPsm)))return fail(d,E::source,0x29B638);
         if(!s.source&&speedBoostMissingPsm){
             // Only a retained concrete Speed/Boost primitive reference can
             // attach this archive proof to the canonical row. No input flag.
@@ -801,6 +808,46 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             pass.state30=std::move(state); //247678. No parameters/animation path.
             s.constructed=true;return true;
         }
+        if(!s.source&&pauseBackdropMissingPsm){
+            // Only a retained concrete Pause backdrop primitive reference can
+            // attach this archive proof to the canonical row. No input flag.
+            if(!templates||association!=templates->get(OriginalUiTemplate50KG::screenMt)||
+                !input.construction||!input.construction->live()||
+                &input.construction->materialApplication()->templates()!=templates.get())
+                return fail(d,E::templates,0x2475F8);
+            const auto& archive=*pauseBackdropMissingPsm;
+            if(!archive.loaded()||archive.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
+                archive.find(s.name00).identity)return fail(d,E::source,0x29B638);
+            const std::string prefix="ui\\textures\\";
+            if(s.name00.compare(0,prefix.size(),prefix)!=0||s.name00.size()<prefix.size()+5)
+                return fail(d,E::name,0x29B638);
+            const auto name=s.name00.substr(prefix.size(),s.name00.size()-prefix.size()-4);
+            auto proof=std::make_unique<OriginalUiMaterial50KG>();OriginalUiMaterialDiagnostic50KG proofDiagnostic;
+            if((name!="results1"&&name!="results2")||!readOriginalPauseBackdropFallbackMaterial50LA(archive,
+                name=="results1"?0:1,*templates,
+                OriginalUiTemplate50KG::screenMt,input.construction->materialRuntime(),*proof,proofDiagnostic)||
+                proof->passes.size()!=1)return fail(d,E::source,0x29B638);
+            s.templates=std::move(templates);s.programs=input.actualPrograms382B70;
+            s.textures=input.actualTextures383400;s.construction=input.construction;
+            s.pauseBackdropMissingPsm=std::move(pauseBackdropMissingPsm);s.pauseBackdropFallback=std::move(proof);
+            s.count48=1;s.passes4C[0]=std::make_unique<Storage::Pass>();
+            auto& pass=*s.passes4C[0];pass.constructionTemplate=association;
+            if(!s.programs||!s.programs->prepared()||
+                !s.programs->find298C80(association->microprogram,pass.program18,d.program))
+                return fail(d,E::program,0x247620);
+            pass.mapCount20=1; //247630; constructor flags21 stay2, UV1E stays0.
+            if(!s.textures||!s.textures->prepared()||
+                !s.textures->bindMaterialContext(s.construction,d.texture)||
+                !s.textures->acquire299330AndRetain298A30(prefix+name,pass.texture1A[0],d.texture))
+                return fail(d,E::texture,0x247648);
+            //247670 passes NULL document. Empty attribute view supplies only
+            //source defaults; it is never a PSM/source object or identity.
+            const OriginalUiDatSection50KG noAttributes{};
+            auto state=std::make_unique<OriginalStandardMaterialState50LA>();
+            if(!singleState(noAttributes,*association,s.construction.get(),*state,d))return false;
+            pass.state30=std::move(state); //247678. No parameters/animation path.
+            s.constructed=true;return true;
+        }
         if(!s.source&&tournamentMissingPsm){
             // Only a retained concrete Tournament ScreenTexture reference can
             // attach this archive proof to the canonical row. No input flag.
@@ -852,6 +899,7 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             s.constructed=true;return true;
         }
         if(damageMissingPsm)return fail(d,E::source,0x29B638,"PSM contradicts Damage absence proof");
+        if(pauseBackdropMissingPsm)return fail(d,E::source,0x29B638,"PSM contradicts Pause backdrop absence proof");
         if(speedBoostMissingPsm)return fail(d,E::source,0x29B638,"PSM contradicts Speed/Boost absence proof");
         if(tournamentMissingPsm)return fail(d,E::source,0x29B638,"PSM contradicts retained absence proof");
         if(!s.source)return fail(d,E::source,0x29B628,"unresolved PSM; missing-file fallback not established");

@@ -1,6 +1,8 @@
 #pragma once
 #include "original_wreck_asset_inventory50la.h"
 #include "original_wreck_forces50la.h"
+#include "original_wreck_collection_tuning50la.h"
+#include "original_wreck_shared_response50la.h"
 #include <limits>
 
 namespace rr::game {
@@ -40,12 +42,15 @@ class OriginalWreckCollectionStorage50LA final {
     // Genuine planned pointer order for collection38, not yet a source
     // publication. Each slot names its distinct stable occurrence owner.
     std::unique_ptr<OriginalWreckPieceStorage50LA*[]> ordered38_;
+    // Destroy group backing before every piece/component it may later borrow.
+    OriginalWreckGroupArrays50LA group_;
 public:
     OriginalWreckCollectionStorage50LA()=default;
     OriginalWreckCollectionStorage50LA(const OriginalWreckCollectionStorage50LA&)=delete;
     OriginalWreckCollectionStorage50LA& operator=(const OriginalWreckCollectionStorage50LA&)=delete;
     OriginalWreckCollectionStorage50LA(OriginalWreckCollectionStorage50LA&&)=delete;
     OriginalWreckCollectionStorage50LA& operator=(OriginalWreckCollectionStorage50LA&&)=delete;
+    const OriginalWreckGroupArrays50LA& groupBacking()const noexcept{return group_;}
     std::size_t ordinal()const noexcept{return ordinal_;}
     std::size_t plannedPieceCount()const noexcept{return count_;}
     const OriginalWreckPieceStorage50LA* piece(std::size_t i)const noexcept {
@@ -106,6 +111,9 @@ public:
                 if(source.ordinal!=c+1u||planned[c].ordinal!=source.ordinal||source.pieces.empty()||
                    source.pieces.size()!=planned[c].pieces.size())return fail(S::inventory);
                 collection.ordinal_=source.ordinal;collection.count_=source.pieces.size();
+                const auto group=collection.group_.prepareCold(collection.count_-1u);
+                if(group.status!=OriginalWreckGroupArrayStatus50LA::coldBacking)
+                    return fail(group.status==OriginalWreckGroupArrayStatus50LA::allocation?S::allocation:S::inventory);
                 collection.pieces_=std::make_unique<OriginalWreckPieceStorage50LA[]>(collection.count_);
                 collection.ordered38_=std::make_unique<OriginalWreckPieceStorage50LA*[]>(collection.count_);
                 if(next->totalComponents>std::numeric_limits<std::size_t>::max()-2u)return fail(S::capacity);

@@ -1,4 +1,8 @@
 #include "runtime_allocations50fl.h"
+#include "../../src/game/original_pause_storage50la.h" // Inactive concrete Pause cold storage.
+#include "../../src/assets/original_pause_source_data50la.h" // Inactive original Pause cold data.
+#include "../../src/assets/original_pause_authored_materials50la.h" // Compile visibility only.
+#include "../../src/assets/original_pause_primitive_references50la.h" // No runtime Pause activation.
 #include "original_racer_selection50ij.h"
 #include "original_course_roster50kg_fixture.h"
 #include "original_course_race_targets50kx.h"

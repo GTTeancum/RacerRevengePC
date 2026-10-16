@@ -7,6 +7,8 @@ namespace rr::game {
 // The real one-piece aggregate's saved physical authoring. Its primary3C is
 //a borrow of piece0.D0, never a second physics body. No nonroot slot exists.
 struct OriginalWreckSingleGroupFields50LA {
+    // Historical one-piece name: source30 counts registered nonprimary members,
+    // not currently attached members. It remains zero in this capacity-zero owner.
     std::uint32_t attachedCount30=0,capacity34=0;
     //2CA9DC clears this before the attached-detector loop;2CAA30 increments
     //for each actual reached attached detector. Constructor leaves it unwritten;
@@ -53,7 +55,7 @@ inline void inverseToParameters(const BodyMatrix48G& inverse,SecondaryBodyParame
 }
 }
 // Actual2CA020 root-only field binding. The surrounding group owner still
-//performs its genuine constructor/effect work. The eight pointer-array
+//performs its genuine constructor/effect work. The six source-array
 //allocations have zero capacity for this route; no synthetic child is added.
 inline bool bindOriginalOnePieceGroup50LA(OriginalWreckSingleGroupFields50LA& g,
     OriginalWreckPhysical50LA& p,OriginalWreckPieceFields50LA& piece,
@@ -67,24 +69,19 @@ inline bool bindOriginalOnePieceGroup50LA(OriginalWreckSingleGroupFields50LA& g,
     g.center50.v[3]=p.parameters.centerOffsetW;return true;
 }
 
-// Complete166400 numeric tuning reached by22C310 for the genuine authored
-//single piece. Uses the SAME cold model's28D670 aggregate half extents already
-//computed by assets. Call before any activation or animation changes that
-//graph; cached bounds are not a live geometry provider. Source does not use
-//the returned bounds center as body1E0. Exact source scaling/operation order,
-//mass-setter nonpositive preserve path, full inertia inverse,295C90 contact
-//coefficients, material0-only friction and22C310 overrides are retained.
-//Native admission is FE_TONEAREST, finite consumed arithmetic, serial/disjoint
-//owners. Failure leaves physical/piece/group untouched. No activation receipt.
-inline bool tuneOriginalOnePieceWreck50LA(const OriginalWreckAssets50LA& assets,
-    OriginalWreckPhysical50LA& p,OriginalWreckPieceFields50LA& piece,
-    OriginalWreckSingleGroupFields50LA& group) noexcept {
+// Actual166400 numeric tuning plus22C53C..22C574 piece/DC overrides for
+// one retained authored occurrence. Shared by the legacy single-piece route
+// and the ordered full collection route. It does not register group membership
+// or refresh group saved-root fields. Cold model bounds must still describe
+// the actual unanimated model. Failure leaves this piece/body unchanged.
+// FE_TONEAREST, finite consumed arithmetic and serial/disjoint owners retain
+// the existing admission. Bounds center is not substituted for body1E0.
+inline bool tuneOriginalWreckPiece22C310_50LA(const OriginalWreckAssets50LA& assets,
+    OriginalWreckPhysical50LA& p,OriginalWreckPieceFields50LA& piece) noexcept {
     using namespace original_wreck_tuning_detail50LA;
-    if(std::fegetround()!=FE_TONEAREST||!assets.prepared()||
-       assets.selected().pieces.size()!=1||!p.bodyConstructorFieldsApplied||
-       !p.contactConstructorFieldsApplied||p.contactBody30!=&p.body||
-       group.primary3C!=&p||group.primary40!=&piece||group.capacity34||group.attachedCount30)return false;
-    const auto& t=assets.selected().tuning;const auto& authored=assets.selected().pieces[0];
+    if(std::fegetround()!=FE_TONEAREST||!assets.prepared()||!p.bodyConstructorFieldsApplied||
+       !p.contactConstructorFieldsApplied||p.contactBody30!=&p.body)return false;
+    const auto& t=assets.selected().tuning;const auto& authored=assets.selectedPiece();
     const auto& bounds=assets.modelBounds();Math f;
     const float x=f.mul(2.f,bounds.halfExtent170[0]);
     const float y=f.mul(2.f,bounds.halfExtent170[1]);
@@ -127,8 +124,16 @@ inline bool tuneOriginalOnePieceWreck50LA(const OriginalWreckAssets50LA& assets,
     piece.waterDragF4=1.f;piece.waterRateF8=200.f;piece.buoyancyFC=.5f;
     piece.baseDrag100=t.drag;piece.baseRateDamping104=t.rateDamping;
     piece.restitution110=t.restitution;piece.frictionTorqueScale114=t.frictionTorqueScale;
-    //2CA190's primary40 equality returns without consuming breakRate/Scale.
-    //22C5B0 then saves the tuned root mass and full inertia matrix.
+    return true;
+}
+// Preserve the complete legacy capacity-zero admission and saved-root suffix.
+inline bool tuneOriginalOnePieceWreck50LA(const OriginalWreckAssets50LA& assets,
+    OriginalWreckPhysical50LA& p,OriginalWreckPieceFields50LA& piece,
+    OriginalWreckSingleGroupFields50LA& group) noexcept {
+    if(!assets.prepared()||assets.selected().pieces.size()!=1||group.primary3C!=&p||
+       group.primary40!=&piece||group.capacity34||group.attachedCount30)return false;
+    if(!tuneOriginalWreckPiece22C310_50LA(assets,p,piece))return false;
+    //2CA190 skips primary40.22C5B0..22C5F0 then copies only mass and inertia.
     group.mass4C=p.parameters.body.mass;group.inertia60=p.inertia100;return true;
 }
 // Exact2CA620 zero-capacity/zero-attached route. It restores saved center,

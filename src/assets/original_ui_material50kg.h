@@ -78,7 +78,7 @@ enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     courseNameBlurMissingPsmFallback, coursePromptMissingPsmFallback,
     controlsNameBlurMissingPsmFallback, controlsFontMissingPsmFallback, controlsPromptMissingPsmFallback, raceHudFontMissingPsmFallback, tournamentTrophyMissingPsmFallback, tournamentNotchMissingPsmFallback, tournamentPortraitMissingPsmFallback,
     speedBoostTextureMissingPsmFallback, speedBoostTriangleMissingPsmFallback,
-    damageTextureMissingPsmFallback
+    damageTextureMissingPsmFallback, pauseBackdropMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -485,6 +485,12 @@ bool readOriginalUiTournamentPortraitFallbackMaterial50KG(
 }
 
 namespace rr::assets {
+// Original shared Pause loader1B8810: results1 at1B8840, results2 first at1B898C.
+// index0/1 only; second results2 primitive retains the same canonical material.
+bool readOriginalPauseBackdropFallbackMaterial50LA(const OriginalUiArchive50KG&,
+    std::uint8_t index,const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
 // Exact Damage first loader18C748; per-primitive callers remain on references.
 bool readOriginalDamageFallbackMaterial50LA(const OriginalUiArchive50KG&,
     const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,

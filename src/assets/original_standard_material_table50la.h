@@ -17,6 +17,7 @@ enum class OriginalCableMaterialCallbackStage50LA : std::uint8_t {
 class OriginalUiScreenMaterialReference50KG;
 class OriginalStandardMaterialReferences50LA;
 class OriginalStandardScreenMaterialReference50LA;
+class OriginalPausePrimitiveReferences50LA;
 class OriginalStandardMaterialTable50LA;
 class OriginalStandardMaterialAnimationInstance50LA;
 // A sealed observation of this actual table's complete CONSTRUCTION-STATE
@@ -236,6 +237,9 @@ private:
     friend class OriginalTimeStatsMaterialReference50LA;
     friend class OriginalSpeedBoostMaterialReference50LA;
     friend class OriginalDamageMaterialReference50LA;
+    friend class OriginalPausePrimitiveReferences50LA;
+    bool retainPauseBackdropFallback14D590(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,
+        std::shared_ptr<OriginalStandardTextureTable50LA>,OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool retainDamageFallback14D590(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,
         std::shared_ptr<OriginalStandardTextureTable50LA>,OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool retainSpeedBoostFallback14D590(std::int32_t,std::shared_ptr<const OriginalUiArchive50KG>,

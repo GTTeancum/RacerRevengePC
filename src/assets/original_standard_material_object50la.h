@@ -90,6 +90,7 @@ public:
     const OriginalUiMaterialProvenance50KG* tournamentFallbackProvenance() const noexcept;
     const OriginalUiMaterialProvenance50KG* speedBoostFallbackProvenance() const noexcept;
     const OriginalUiMaterialProvenance50KG* damageFallbackProvenance() const noexcept;
+    const OriginalUiMaterialProvenance50KG* pauseBackdropFallbackProvenance() const noexcept;
     bool pass4C(std::size_t,OriginalStandardMaterialPassView50LA&) const noexcept;
     const std::int32_t* collector5C(std::size_t) const noexcept;
     const OriginalStandardTextureTable50LA* textures383400() const noexcept;
@@ -132,6 +133,7 @@ private:
         std::shared_ptr<const OriginalUiArchive50KG> tournamentMissingPsm,
         std::shared_ptr<const OriginalUiArchive50KG> speedBoostMissingPsm,
         std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm,
+        std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     // Source24A430. Only the canonical manager supplies its one persistent
     // lazy application state. Surface values come from the retained PSG;

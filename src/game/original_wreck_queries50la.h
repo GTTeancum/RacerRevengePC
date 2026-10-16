@@ -8,6 +8,7 @@
 #include "original_camera_world_query.h"
 #include "collision_normal_mode50ja.h"
 #include "original_wreck_type2_storage50la.h"
+#include "original_wreck_exclusion50la.h"
 #include <array>
 #include <algorithm>
 #include <cstring>
@@ -47,6 +48,9 @@ struct OriginalWreckQueryWorld50LA {
     std::size_t type2TargetCount=0;
     const std::uint8_t* groupTypeGp8014=nullptr;
     const std::uint32_t* skipCategory3E0728=nullptr;
+    // Actual authored collection size, cold capacity only. E0 needs own E4/E8
+    // plus every other piece E4. Existing one-piece owners retain capacity2.
+    std::size_t groupPieceCapacity=1;
 };
 enum class OriginalWreckQueryStatus50LA : std::uint8_t {
     complete,binding,allocation,graph,preparation,registration
@@ -123,7 +127,8 @@ public:
         OriginalOnePieceWreckOwner50LA& piece,OriginalWreckPhysical50LA& physical,
         const OriginalWreckQueryWorld50LA& world) noexcept {
         using S=OriginalWreckQueryStatus50LA;
-        if(retired_||storage_||!assets.prepared()||!world.lifecycle||!world.world||!world.workspace||
+        if(retired_||storage_||!world.groupPieceCapacity||world.groupPieceCapacity>512u||
+           !assets.prepared()||!world.lifecycle||!world.world||!world.workspace||
            !world.objects||!world.states||!world.copies||!world.geometry||!world.objectCount||
            world.objectCount!=world.lifecycle->objectCount||!world.physicsBodyCategory3E0718||
            !*world.physicsBodyCategory3E0718||!world.collisionTypeGp8010||
@@ -152,8 +157,10 @@ public:
             next->piece=&piece;next->physical=&physical;
             next->capacity=world.world->portalCount+1u;
             const auto category=*world.physicsBodyCategory3E0718;
-            next->exclusions[0]={world.identities[1],world.identities[2]};
-            next->exclusions[1]={world.identities[0],world.identities[2]};
+            next->exclusionCapacity[0]=world.groupPieceCapacity+1u;next->exclusionCapacity[1]=2u;
+            for(unsigned i=0;i<2;++i)next->exclusions[i]=std::make_unique<std::uint32_t[]>(next->exclusionCapacity[i]);
+            next->exclusions[0][0]=world.identities[1];next->exclusions[0][1]=world.identities[2];
+            next->exclusions[1][0]=world.identities[0];next->exclusions[1][1]=world.identities[2];
             next->categoryD8[0]=category;
             auto& definitions=next->coldDefinitions;auto& states=next->coldStates;
             for(unsigned i=0;i<3;++i){
@@ -317,8 +324,27 @@ public:
     // order is E0:[E4,E8], E4:[E0,E8]; no future query is inserted early.
     bool bindMutualExclusions() noexcept {
         if(!coherent(0)||!coherent(1)||!coherent(2)||storage_->mutualBound)return false;
-        for(unsigned i=0;i<2;++i)object(i).filter.identities[0]={storage_->exclusions[i].data(),2,2,1};
+        for(unsigned i=0;i<2;++i)object(i).filter.identities[0]={storage_->exclusions[i].get(),storage_->exclusionCapacity[i],2,1};
         storage_->mutualBound=true;return true;
+    }
+    // Actual group123EB0/123FA0 target is the other piece's E4 object identity.
+    // Both owners must retain the SAME canonical namespace. These primitives
+    // do not certify group attach/detach, alter E4 lists, or rebind E0.A0.
+    OriginalWreckExclusionStatus50LA addGroupE4Exclusion(const OriginalWreckQueries50LA& target)noexcept {
+        if(!constructed()||!target.constructed()||!coherent(0)||!target.coherent(1)||
+           storage_->world.world!=target.storage_->world.world||
+           storage_->world.objects!=target.storage_->world.objects)
+            return OriginalWreckExclusionStatus50LA::binding;
+        return addOriginalWreckExclusion123EB0(object(0).filter.identities[0],storage_->exclusions[0].get(),
+            storage_->exclusionCapacity[0],target.object(1).identity);
+    }
+    OriginalWreckExclusionStatus50LA removeGroupE4Exclusion(const OriginalWreckQueries50LA& target)noexcept {
+        if(!constructed()||!target.constructed()||!coherent(0)||!target.coherent(1)||
+           storage_->world.world!=target.storage_->world.world||
+           storage_->world.objects!=target.storage_->world.objects)
+            return OriginalWreckExclusionStatus50LA::binding;
+        return removeOriginalWreckExclusion123FA0(object(0).filter.identities[0],storage_->exclusions[0].get(),
+            storage_->exclusionCapacity[0],target.object(1).identity);
     }
     // Actual2CB5A0 after165C30 completes; the earlier base callback165920 is
     // never misrepresented as the derived response before this source store.
@@ -440,7 +466,8 @@ private:
         OriginalWreckPhysical50LA* physical=nullptr;
         OriginalWreckQueryWorld50LA world{};
         std::size_t capacity=0;
-        std::array<std::array<std::uint32_t,2>,2> exclusions{};
+        std::array<std::unique_ptr<std::uint32_t[]>,2> exclusions;
+        std::array<std::size_t,2> exclusionCapacity{};
         std::array<std::uint32_t,2> categoryD8{};
         std::uint32_t waterCategoryE0=0;
         bool collectionFilterApplied=false;

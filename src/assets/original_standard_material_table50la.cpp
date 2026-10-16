@@ -97,6 +97,8 @@ struct OriginalStandardMaterialTable50LA::Storage {
         std::shared_ptr<OriginalStandardTextureTable50LA> speedBoostTextures;
         std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm;
         std::shared_ptr<OriginalStandardTextureTable50LA> damageTextures;
+        std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm;
+        std::shared_ptr<OriginalStandardTextureTable50LA> pauseBackdropTextures;
     };
     std::shared_ptr<const OriginalUiArchive50KG> appStart;
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates;
@@ -711,6 +713,9 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
             if(canonical!=static_cast<std::int32_t>(i)){
                 fail(d,S::duplicatePublication,0x29B854);return terminal();
             }
+            if(row.pauseBackdropMissingPsm&&row.pauseBackdropTextures!=input.actualTextures383400){
+                fail(d,S::texture,0x247638);return terminal();
+            }
             if(row.damageMissingPsm&&row.damageTextures!=input.actualTextures383400){
                 fail(d,S::texture,0x247638);return terminal();
             }
@@ -720,7 +725,7 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
             if(row.tournamentMissingPsm&&row.tournamentTextures!=input.actualTextures383400){
                 fail(d,S::texture,0x247638);return terminal();
             }
-            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,d))return terminal();
+            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,row.pauseBackdropMissingPsm,d))return terminal();
             if(!s.partial->constructed29B550()){
                 fail(d,S::phase,0x29B854);return terminal();
             }
@@ -758,7 +763,7 @@ bool OriginalStandardMaterialTable50LA::retainTournamentFallback14D590(
         !archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::tournament))
         return fail(d,S::source,0x29B638);
     auto& row=storage_->rows[static_cast<std::size_t>(index)];
-    if(row.damageMissingPsm||!textures||!textures->prepared()||(row.tournamentTextures&&row.tournamentTextures!=textures)||
+    if(row.pauseBackdropMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||(row.tournamentTextures&&row.tournamentTextures!=textures)||
         (row.tournamentMissingPsm&&row.tournamentMissingPsm!=archive)||
         (row.object04&&!row.tournamentMissingPsm))return fail(d,S::phase,0x29B638);
     if(!retainScreen14D590(index,d))return false;
@@ -771,7 +776,7 @@ bool OriginalStandardMaterialTable50LA::retainSpeedBoostFallback14D590(
         !archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
         return fail(d,S::source,0x29B638);
     auto& row=storage_->rows[static_cast<std::size_t>(index)];
-    if(row.tournamentMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||
+    if(row.pauseBackdropMissingPsm||row.tournamentMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||
         (row.speedBoostTextures&&row.speedBoostTextures!=textures)||
         (row.object04&&!row.speedBoostMissingPsm))return fail(d,S::phase,0x29B638);
     // Serial host sessions may independently authenticate the SAME original
@@ -803,7 +808,7 @@ bool OriginalStandardMaterialTable50LA::retainDamageFallback14D590(
         !archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
         return fail(d,S::source,0x29B638);
     auto& row=storage_->rows[static_cast<std::size_t>(index)];
-    if(row.tournamentMissingPsm||row.speedBoostMissingPsm||!textures||!textures->prepared()||
+    if(row.pauseBackdropMissingPsm||row.tournamentMissingPsm||row.speedBoostMissingPsm||!textures||!textures->prepared()||
         (row.damageTextures&&row.damageTextures!=textures)||
         (row.object04&&!row.damageMissingPsm))return fail(d,S::phase,0x29B638);
     // Serial host sessions may independently authenticate the SAME original
@@ -826,6 +831,40 @@ bool OriginalStandardMaterialTable50LA::retainDamageFallback14D590(
     if(!retainScreen14D590(index,d))return false;
     if(!row.damageMissingPsm)row.damageMissingPsm=std::move(archive);
     if(!row.damageTextures)row.damageTextures=std::move(textures);
+    return true;
+}
+bool OriginalStandardMaterialTable50LA::retainPauseBackdropFallback14D590(
+    std::int32_t index,std::shared_ptr<const OriginalUiArchive50KG> archive,
+    std::shared_ptr<OriginalStandardTextureTable50LA> textures,D& d) noexcept {
+    if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||!archive||
+        !archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+        return fail(d,S::source,0x29B638);
+    auto& row=storage_->rows[static_cast<std::size_t>(index)];
+    if(row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||!textures||!textures->prepared()||
+        (row.pauseBackdropTextures&&row.pauseBackdropTextures!=textures)||
+        (row.object04&&!row.pauseBackdropMissingPsm))return fail(d,S::phase,0x29B638);
+    if(row.name00!="ui\\textures\\results1"&&row.name00!="ui\\textures\\results2")
+        return fail(d,S::source,0x29B638);
+    // Serial host sessions may independently authenticate the SAME original
+    // OVERLAYS. Preserve the first retained proof object (including while the
+    // canonical row is loaded/pending); never replace its active provenance.
+    if(row.pauseBackdropMissingPsm&&row.pauseBackdropMissingPsm!=archive){
+        const auto& prior=*row.pauseBackdropMissingPsm;
+        if(!prior.loaded()||prior.identity()!=archive->identity()||
+            prior.memberCount()!=archive->identity()->memberCount||
+            archive->memberCount()!=prior.memberCount())return fail(d,S::source,0x29B638);
+        for(std::size_t i=0;i<prior.memberCount();++i){
+            const auto oldMember=prior.member(i),newMember=archive->member(i);
+            if(!oldMember.identity||oldMember.identity!=newMember.identity||
+                !oldMember.data||!newMember.data||oldMember.size!=oldMember.identity->bytes||
+                newMember.size!=oldMember.size||
+                (oldMember.size&&std::memcmp(oldMember.data,newMember.data,oldMember.size)!=0))
+                return fail(d,S::source,0x29B638);
+        }
+    }
+    if(!retainScreen14D590(index,d))return false;
+    if(!row.pauseBackdropMissingPsm)row.pauseBackdropMissingPsm=std::move(archive);
+    if(!row.pauseBackdropTextures)row.pauseBackdropTextures=std::move(textures);
     return true;
 }
 bool OriginalStandardMaterialTable50LA::retainScreen14D590(std::int32_t index,D& d) noexcept {

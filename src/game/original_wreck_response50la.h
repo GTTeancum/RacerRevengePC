@@ -90,6 +90,28 @@ inline void impact(OriginalWreckPhysical50LA& p,const RootBodyState48H& next)noe
 }
 }
 
+namespace original_wreck_response_detail50LA {
+// Legacy adapter preserves its existing single-owner admission and identity
+// provider. The common kernel never substitutes a response-only scene map.
+struct SingleContactContext {
+    OriginalOnePieceWreckOwner50LA& owner;
+    OriginalWreckPhysical50LA& contact()noexcept{return owner.physical;}
+    OriginalWreckPhysical50LA& body()noexcept{return owner.physical;}
+    bool bound()const noexcept{return owner.physical.contactConstructorFieldsApplied&&
+        owner.physical.contactBody30==&owner.physical.body;}
+    bool ready()const noexcept{return owner.prepared()&&owner.physical.bodyConstructorFieldsApplied&&
+        owner.physical.model288==owner.assets.model14C();}
+    SceneGraph49P graph()noexcept{return owner.assets.graph();}
+    const SpringVector4_48N* zero()const noexcept{return owner.contactVector4435A0();}
+    bool sentinels(VisualLazyWord49R& a,VisualLazyWord49R& b)noexcept{return sentinelStorage(owner,a,b);}
+    bool storageBound(const SceneGraph49P& g,VisualLazyWord49R& a,VisualLazyWord49R& b)noexcept {
+        return storage(owner,g,a,b);
+    }
+    bool recordFrame(SpringSceneId48N id,SceneGraph49P& g,SceneNodeIndex49P& model)noexcept {
+        if(id.value&&id.value!=owner.modelSceneIdentity().value)return false;
+        g=owner.assets.graph();model=owner.physical.model288;return true;
+    }
+};
 // Actual2964C0 static generated-record route, borrowing the SAME DC8C records,
 // D0 body and graph288 as295630. No caller contacts, response receipt or second
 // mutable physics owner. The no-record route retains its original non-reading
@@ -105,15 +127,17 @@ inline void impact(OriginalWreckPhysical50LA& p,const RootBodyState48H& next)noe
 // separate operations/no contraction. A helper's numerical failure is atomic
 // for that helper; earlier source stages and records stay committed. The caller
 // must stop, not replay this call or call the integration suffix after failure.
-inline OriginalWreckResponseResult50LA advanceOriginalWreckContact2964C0_50LA(
-    OriginalOnePieceWreckOwner50LA& o,VisualLazyWord49R& pointSentinel4435E0,
+template<class Context>
+inline OriginalWreckResponseResult50LA advanceContact2964C0(
+    Context& context,VisualLazyWord49R& pointSentinel4435E0,
     VisualLazyWord49R& generatedSentinel4435E8)noexcept {
     using namespace original_wreck_response_detail50LA;
     using S=OriginalWreckResponseStatus50LA;OriginalWreckResponseResult50LA r;
     auto fail=[&](S s,std::uint32_t pc){r.status=s;r.sourcePC=pc;return r;};
-    auto& p=o.physical;auto& state=p.spring;auto& settings=p.generated;
-    if(!p.contactConstructorFieldsApplied||p.contactBody30!=&p.body)return fail(S::owner,0x2964c0u);
-    if(!sentinelStorage(o,pointSentinel4435E0,generatedSentinel4435E8))return fail(S::storage,0x2964c0u);
+    auto& p=context.contact();auto& b=context.body();
+    auto& state=p.spring;auto& settings=p.generated;
+    if(!context.bound())return fail(S::owner,0x2964c0u);
+    if(!context.sentinels(pointSentinel4435E0,generatedSentinel4435E8))return fail(S::storage,0x2964c0u);
     if(settings.pointContacts48)return fail(S::pointContacts,0x2965bcu);
     if(state.generatedCount84<=0){
         sentinel(pointSentinel4435E0);sentinel(generatedSentinel4435E8);
@@ -121,25 +145,29 @@ inline OriginalWreckResponseResult50LA advanceOriginalWreckContact2964C0_50LA(
     }
     if(state.generatedCapacity88<state.generatedCount84||
        static_cast<std::size_t>(state.generatedCapacity88)>p.records.size())return fail(S::storage,0x296500u);
-    if(!o.prepared()||!p.bodyConstructorFieldsApplied||p.model288!=o.assets.model14C())return fail(S::owner,0x296518u);
-    const auto graph=o.assets.graph();const auto model=static_cast<std::int32_t>(p.model288);
+    if(!context.ready())return fail(S::owner,0x296518u);
+    const auto graph=context.graph();const auto model=static_cast<std::int32_t>(b.model288);
     if(!validateSceneGraph49P(graph)||model<0||static_cast<std::uint32_t>(model)>=graph.count)
         return fail(S::graph,0x296524u);
-    if(!storage(o,graph,pointSentinel4435E0,generatedSentinel4435E8))return fail(S::storage,0x2964c0u);
+    if(!context.storageBound(graph,pointSentinel4435E0,generatedSentinel4435E8))return fail(S::storage,0x2964c0u);
     if(std::fegetround()!=FE_TONEAREST)return fail(S::arithmetic,0x29652cu);
     Math math;
     const V center=math.point(graph.nodes[model].world100,settings.impact.customCenter70?
-        settings.impact.customLocalCenter100:p.parameters.centerOffset);
+        settings.impact.customLocalCenter100:b.parameters.centerOffset);
     if(!math.valid)return fail(S::arithmetic,0x296598u);
     settings.impact.worldCenter110=center;p.worldCenter110W=1.f;r.centerCommitted=true;
     sentinel(pointSentinel4435E0);sentinel(generatedSentinel4435E8);
     for(std::int32_t i=0;i<state.generatedCount84;++i){
         auto& record=p.records[static_cast<std::size_t>(i)];
-        if(record.scene40.value&&record.scene40.value!=o.modelSceneIdentity().value)
+        SceneGraph49P recordGraph{};SceneNodeIndex49P recordModel=SceneNodeIndex49P::none;
+        if(!context.recordFrame(record.scene40,recordGraph,recordModel))
             return fail(S::sceneBinding,0x296884u);
-        //294BB0 supplied model scene40; genuine zero uses body288's same model.
-        //Neither path performs a getter before this cached-matrix read.
-        const V world=math.point(graph.nodes[model].world100,xyz(record.localPoint10));
+        //296884 nonzero scene40 and2968CC zero fallback are distinct owners.
+        // Neither path refreshes a scene before this cached-matrix read.
+        const auto recordIndex=static_cast<std::int32_t>(recordModel);
+        if(!recordGraph.nodes||recordIndex<0||static_cast<std::uint32_t>(recordIndex)>=recordGraph.count)
+            return fail(S::sceneBinding,0x296884u);
+        const V world=math.point(recordGraph.nodes[recordIndex].world100,xyz(record.localPoint10));
         const V normal=xyz(record.normal20),surface=xyz(record.surfacePoint30);
         V separation{};for(unsigned axis=0;axis<3;++axis)separation.v[axis]=math.sub(surface.v[axis],world.v[axis]);
         const float depth=math.dot(separation,normal);
@@ -157,32 +185,32 @@ inline OriginalWreckResponseResult50LA advanceOriginalWreckContact2964C0_50LA(
         //by the final scalar cache construction and never enters body state.
         V arm{};for(unsigned axis=0;axis<3;++axis)arm.v[axis]=math.sub(point.v[axis],center.v[axis]);
         if(!math.valid)return fail(S::arithmetic,0x296fa8u);
-        detail::SceneVectorContext49U context{1.f};VisualVector49R local{},rotational{};
-        const bool localOkay=detail::inverseDirection49U(graph,p.model288,vector(arm),context,local);
-        projection(p,graph);
+        detail::SceneVectorContext49U sceneContext{1.f};VisualVector49R local{},rotational{};
+        const bool localOkay=detail::inverseDirection49U(graph,b.model288,vector(arm),sceneContext,local);
+        projection(b,graph);
         if(!localOkay)return fail(S::graph,0x296fb4u);
-        const V spin=math.cross(p.body.root.body.angularVelocity,xyz(local));
+        const V spin=math.cross(b.body.root.body.angularVelocity,xyz(local));
         if(!math.valid)return fail(S::arithmetic,0x296fe8u);
-        const bool worldOkay=detail::direction49U(graph,p.model288,vector(spin),context,rotational);
-        projection(p,graph);
+        const bool worldOkay=detail::direction49U(graph,b.model288,vector(spin),sceneContext,rotational);
+        projection(b,graph);
         if(!worldOkay)return fail(S::graph,0x296ff4u);
         // The released static leaves use source4435A0's initialized XYZ +0
         //for no-other velocity/acceleration and their zero-point sentinel.
         //Authenticate that SAME application binding before consuming it.
-        std::uint32_t zero[3];std::memcpy(zero,o.contactVector4435A0()->v,sizeof zero);
+        std::uint32_t zero[3];std::memcpy(zero,context.zero()->v,sizeof zero);
         if(zero[0]||zero[1]||zero[2])return fail(S::sourceGlobal,0x29703cu);
         V velocity{};for(unsigned axis=0;axis<3;++axis)
-            velocity.v[axis]=math.sub(math.add(rotational.v[axis],p.body.root.body.velocity.v[axis]),0.f);
+            velocity.v[axis]=math.sub(math.add(rotational.v[axis],b.body.root.body.velocity.v[axis]),0.f);
         if(!math.valid)return fail(S::arithmetic,0x297178u);
         settings.impact.contactVelocity120=velocity;p.contactVelocity120W=1.f;r.velocityCacheCommitted=true;
         if(settings.impact54){
-            const auto body=primary(p);SpringImpactResult48K next{};
+            const auto body=primary(b);SpringImpactResult48K next{};
             if(!applySpringImpact48K(normal,point,depth,settings.impact,body,nullptr,next))return fail(S::impact,0x296ae0u);
-            impact(p,next.primary);
+            impact(b,next.primary);
         }
         auto secondary=[&]()noexcept {
-            V next{};if(!removeSpringInwardVelocity48L(normal,velocity,p.body.root.body.velocity,next))return false;
-            p.body.root.body.velocity=next;return true;
+            V next{};if(!removeSpringInwardVelocity48L(normal,velocity,b.body.root.body.velocity,next))return false;
+            b.body.root.body.velocity=next;return true;
         };
         if(settings.secondary68&&!secondary())return fail(S::arithmetic,0x296b00u);
         if(settings.springForce4C){
@@ -190,26 +218,33 @@ inline OriginalWreckResponseResult50LA advanceOriginalWreckContact2964C0_50LA(
                 if(!std::isfinite(p.response.maxPenetration90))return fail(S::arithmetic,0x296b24u);
                 if(depth>=p.response.maxPenetration90&&!settings.impact54&&!secondary())return fail(S::arithmetic,0x296b4cu);
             }
-            const auto body=primary(p);const auto& a=settings.impact;const auto& b=p.response;
-            const SpringPointForceParameters48J force{p.parameters.centerOffset,a.customLocalCenter100,a.forceTorqueScaleB4,a.customCenter70,a.yawOnly6C};
-            const SpringForceParameters48L input{velocity,force,b.maxPenetration90,b.maxSpeed94,b.stiffness9C,b.dampingA0,
-                b.impactStiffnessA4,b.impactDampingA8,settings.impact54,settings.otherSpring58};
+            const auto body=primary(b);const auto& a=settings.impact;const auto& response=p.response;
+            const SpringPointForceParameters48J force{b.parameters.centerOffset,a.customLocalCenter100,a.forceTorqueScaleB4,a.customCenter70,a.yawOnly6C};
+            const SpringForceParameters48L input{velocity,force,response.maxPenetration90,response.maxSpeed94,response.stiffness9C,response.dampingA0,
+                response.impactStiffnessA4,response.impactDampingA8,settings.impact54,settings.otherSpring58};
             SpringFrictionResult48J next{};
             if(!applySpringForce48L(normal,point,depth,input,body,nullptr,next))return fail(S::springForce,0x296b68u);
-            p.body.root.loads.force=next.primary.force;p.body.root.loads.torque=next.primary.torque;
+            b.body.root.loads.force=next.primary.force;b.body.root.loads.torque=next.primary.torque;
         }
         if(settings.friction50){
             if(record.material4C>=settings.frictionByMaterial.size())return fail(S::storage,0x296b94u);
             const auto& a=settings.impact;
-            const SpringPointForceParameters48J force{p.parameters.centerOffset,a.customLocalCenter100,settings.frictionTorqueScaleC4,a.customCenter70,a.yawOnly6C};
-            const SpringFrictionBody48J body{p.body.root.scene,p.body.root.loads,p.parameters.body.mass};
+            const SpringPointForceParameters48J force{b.parameters.centerOffset,a.customLocalCenter100,settings.frictionTorqueScaleC4,a.customCenter70,a.yawOnly6C};
+            const SpringFrictionBody48J body{b.body.root.scene,b.body.root.loads,b.parameters.body.mass};
             SpringFrictionResult48J next{};
             if(!applySpringFriction48J(normal,point,velocity,settings.frictionByMaterial[record.material4C],force,body,nullptr,next))
                 return fail(S::friction,0x296b98u);
-            p.body.root.loads.force=next.primary.force;p.body.root.loads.torque=next.primary.torque;
+            b.body.root.loads.force=next.primary.force;b.body.root.loads.torque=next.primary.torque;
         }
         ++r.recordsCompleted;
     }
     state.pending38=0;r.pendingCleared=true;r.status=S::complete;r.sourcePC=0x296bf8u;return r;
+}
+} // namespace original_wreck_response_detail50LA
+inline OriginalWreckResponseResult50LA advanceOriginalWreckContact2964C0_50LA(
+    OriginalOnePieceWreckOwner50LA& owner,VisualLazyWord49R& pointSentinel4435E0,
+    VisualLazyWord49R& generatedSentinel4435E8)noexcept {
+    original_wreck_response_detail50LA::SingleContactContext context{owner};
+    return original_wreck_response_detail50LA::advanceContact2964C0(context,pointSentinel4435E0,generatedSentinel4435E8);
 }
 } // namespace rr::game

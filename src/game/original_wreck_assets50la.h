@@ -131,6 +131,8 @@ public:
     const Type2ResourceView49X& queryE0()const noexcept{return storage_->query.view;}
     const OriginalWreckTarget50LA& targetE4()const noexcept{return storage_->target;}
     SceneGraph49P graph()noexcept{return {storage_->nodes.data(),static_cast<std::uint32_t>(storage_->nodes.size())};}
+    const SceneNode49P* modelGraphIdentity()const noexcept{return storage_->nodes.data();}
+    std::uint32_t modelGraphNodeCount()const noexcept{return static_cast<std::uint32_t>(storage_->nodes.size());}
     SceneNodeIndex49P model14C()const noexcept{return static_cast<SceneNodeIndex49P>(0);}
     const ModelBoundsResult49O& modelBounds()const noexcept{return storage_->bounds;}
     // Actual26F4B0 box-cache provider, separate from166400's28D670 inertia

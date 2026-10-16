@@ -23,6 +23,10 @@ struct OriginalWreckPhysical50LA final {
     float cachedAnglesE0W=0.f;
     std::uint32_t body320=0,awake208=0,linkedCount268=0;
     SceneNodeIndex49P model288=SceneNodeIndex49P::none;
+    // Native identity of the actual1652E0 scene owner; graph-local model288
+    // alone cannot distinguish distinct retained PartN asset occurrences.
+    const SceneNode49P* modelGraphNodes=nullptr;
+    std::uint32_t modelGraphCount=0;
     SpringRecordState48N spring{};
     //295C20 allocates two separate50-record arrays. Their unused payload is
     //not source-initialized; only reached records written by real producers
@@ -122,6 +126,7 @@ inline bool initializeOriginalWreckBody50LA(OriginalWreckPhysical50LA& p,
     std::memcpy(q.inverseInertiaExtra,extraInverse,sizeof extraInverse);
     copy(q.centerOffset,q.centerOffsetW,g.bodyVector433AD0);
     p.linkedCount268=0;p.model288=SceneNodeIndex49P::none;b.scenePresent=false;
+    p.modelGraphNodes=nullptr;p.modelGraphCount=0;
     b.body20C=0;r.callbackState238=0;
     for(unsigned i=0;i<3;++i){q.body.translationEnabled[i]=true;q.body.rotationEnabled[i]=true;}
     //167920 calls its genuine slotAC167A50, including167AD0 histories.
@@ -138,7 +143,8 @@ inline bool bindOriginalWreckBodyModel50LA(OriginalWreckPhysical50LA& p,
     const auto index=static_cast<std::int32_t>(model);
     if(!p.bodyConstructorFieldsApplied||index<0||!graph.nodes||
        static_cast<std::uint32_t>(index)>=graph.count||!validateSceneGraph49P(graph))return false;
-    p.model288=model;p.body.scenePresent=true;
+    p.model288=model;p.modelGraphNodes=graph.nodes;p.modelGraphCount=graph.count;
+    p.body.scenePresent=true;
     p.body.root.scene=graph.nodes[index].world100;
     p.body.sceneFlags190=graph.nodes[index].sceneFlags190;
     p.body320=1;p.body.enabled=false;return true;
