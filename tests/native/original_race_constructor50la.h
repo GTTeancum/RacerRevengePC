@@ -13,6 +13,7 @@ class OriginalRaceConstructor50LA final {
     std::shared_ptr<OriginalApplicationEntities50LA> application_;
     std::shared_ptr<platform::OriginalUiRiderProfileOwner50KG> profile_;
     OriginalWreckComponent50LA entity_;
+    original_course_targets50KX::Selection launchSelection_{}; //Actual consumed provenance, not a guest field.
     OriginalRaceHudBlink50LA hudBlink_;
     // Native typed numeric lanes actually written by this constructor. Child
     // pointer slots acquire only explicitly reached native children below.
@@ -36,6 +37,30 @@ class OriginalRaceConstructor50LA final {
     std::array<OriginalWreckComponent50LA*,6> raceGroups_{};
     std::size_t raceGroupCount_=0,raceGroupsAttached_=0;
     bool raceGroupsAttempted_=false,raceMaskRecomputed_=false;
+    std::shared_ptr<assets::OriginalStandardMaterialDomain50LA> resourceDomain_;
+    std::shared_ptr<const assets::OriginalStandardMaterialContext50LA> resourceContext_;
+    bool resourcesAttempted_=false,resourcesPrepared_=false;
+    std::shared_ptr<original_main_entry50KG::RaceDisplayLifetime50LA> loadDisplay_;
+    std::shared_ptr<original_main_entry50KG::NativeCollectorFifo50LA> loadFifo_;
+    bool loadPrefixAttempted_=false,loadPrefixReached_=false;
+    std::shared_ptr<ra_cold_aggregate50LA::Owner> world74_;
+    bool worldAttempted_=false;
+    bool constructWorld1A6BC0(const original_main_entry50KG::Application&,
+        std::shared_ptr<ra_cold_aggregate50LA::Owner>,std::uint32_t&)noexcept;
+    bool populateResources1AA5A0(std::shared_ptr<assets::OriginalStandardMaterialDomain50LA> domain,
+        std::shared_ptr<const assets::OriginalStandardMaterialContext50LA> context,
+        assets::OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        d={};
+        if(!detachedPrefix()||!constructorSuffix_||!loadPrefixReached_||resourcesAttempted_||raceGroupsAttempted_||
+           !domain||!context){d.status=assets::OriginalStandardMaterialStatus50LA::phase;
+            d.sourcePC=0x1aa5a0;return false;}
+        resourcesAttempted_=true;resourceDomain_=std::move(domain);resourceContext_=std::move(context);
+        // Exact1AA5AC/1AA5B8 pair. No14D440 collector rebuild belongs here.
+        // The existing ScreenTexture leaf implements this identical ordered
+        // whole-table pair over the SAME382B38/382B70/383400/resolver owners.
+        if(!resourceDomain_->populateTimeStatsResources2DF144(resourceContext_,d))return false;
+        resourcesPrepared_=true;d.sourcePC=0x1aa5c8;return true;
+    }
     inline static constexpr RaceAudioGroup50IC groupOrder_[]={RaceAudioGroup50IC::Effects110,
         RaceAudioGroup50IC::Engines114,RaceAudioGroup50IC::Music118,RaceAudioGroup50IC::Character11C,
         RaceAudioGroup50IC::Announcer120,RaceAudioGroup50IC::Auxiliary124};
@@ -72,7 +97,7 @@ public:
     bool constructRaceGroups1A6B5C(platform::RaceAudioGroups50IC& audio,
         platform::AudioMixer50HD& mixer,std::uint32_t& sourcePC)noexcept {
         sourcePC=0x1a6b5c;
-        if(!detachedPrefix()||!constructorSuffix_||raceGroupsAttempted_||
+        if(!detachedPrefix()||!constructorSuffix_||!loadPrefixReached_||!resourcesPrepared_||raceGroupsAttempted_||
            audio.coldStarted_||audio.mixer_||audio.groups_.initialized)return false;
         raceGroupsAttempted_=true;raceAudio_=&audio;
         for(std::size_t i=0;i<6;++i){
@@ -90,10 +115,12 @@ public:
         }
         sourcePC=0x1a6bc0;return true;
     }
+    bool rollbackNativeRaceWorldFailure(std::uint32_t& sourcePC)noexcept;
     // Reverse native construction-failure cleanup. If world construction has
     // acquired its seventh group, its own explicit rollback must run first.
     bool rollbackNativeRaceGroupsFailure(std::uint32_t& sourcePC)noexcept {
         sourcePC=0x1a6b5c;
+        if(world74_)return false;
         if(!raceAudio_)return raceGroupCount_==0;
         auto& audio=*raceAudio_;
         if(!counted_||rolledBack_||application_->attachmentLock423F58()||
@@ -134,14 +161,27 @@ public:
         sourcePC=0x1a65cc;
         if(rolledBack_)return true;
         if(!counted_){rolledBack_=true;return true;}
-        if(raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
+        if(world74_||loadDisplay_||loadFifo_||raceAudio_||raceGroupCount_||!detachedPrefix()||application_->attachmentLock423F58()||
            !application_->objectCount423F60()||!application_->entityAuthority_.retire(entity_))return false;
         --entity_.reference00;--application_->objectCount423F60();
-        rolledBack_=true;profile_.reset();return true;
+        rolledBack_=true;profile_.reset();resourceContext_.reset();resourceDomain_.reset();return true;
     }
 };
 }
 namespace original_main_entry50KG {
+inline bool Application::populateConsumedRaceResources1AA5A0(rr::game::OriginalRaceConstructor50LA& owner,
+    rr::assets::OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
+    d={};
+    if(raceConstructorColdOwner50LA_.lock().get()!=&owner||owner.application_!=entitiesOwner_||
+       owner.profile_!=riderProfile||!videoOwner_||!Video::materialConstructionPinLive(*videoOwner_)||
+       !materialContextOwner_||!materialContextOwner_->live()||
+       materialContextOwner_->videoIdentity()!=videoOwner_.get()||
+       materialContextOwner_->materialApplication()!=materialApplication||
+       !standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared()){
+        d.status=rr::assets::OriginalStandardMaterialStatus50LA::video;d.sourcePC=0x1aa5a0;return false;
+    }
+    return owner.populateResources1AA5A0(standardMaterialDomainOwner_,materialContextOwner_,d);
+}
 inline std::shared_ptr<rr::game::OriginalRaceConstructor50LA> Application::constructConsumedRaceCold1A65C0(
     original_course_targets50KX::ConsumedLaunch& launch,std::uint64_t session,std::uint32_t& sourcePC)const noexcept {
     using T=rr::game::OriginalRaceConstructor50LA;
@@ -152,6 +192,7 @@ inline std::shared_ptr<rr::game::OriginalRaceConstructor50LA> Application::const
        !launch.matches(*riderProfile,session,launch.target_->track,launch.selection_.rider))return {};
     std::shared_ptr<T> owner;
     try {owner=std::shared_ptr<T>(new T(entitiesOwner_,riderProfile));}catch(...){return {};}
+    owner->launchSelection_=launch.selection_;
     if(!owner->initializeCount(session))return {};
     launch.raceConstructorClaimed_=true;
     sourcePC=0x1a66cc;

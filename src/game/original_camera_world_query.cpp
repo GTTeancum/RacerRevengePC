@@ -209,6 +209,7 @@ struct Query {
             const auto status=detail::dispatchType3BorrowedWithScratch48U(input,context,candidate,coarse,geometry.mesh,
                 geometry.world,definition.hasShape,rays(state.ray),work.meshStack,work.meshStackCapacity,state.type3,hit,scratch);
             if(status!=Type3QueryStatus48P::Complete)return fail(S::Narrowphase,0x126f40u,object);
+            result.type3FractionsWritten=result.type3FractionsWritten||scratch.fractionsWritten;
             if(scratch.written&&result.type3VectorScratchKnown)result.type3VectorScratchVF9W=scratch.vf9W;
         }
         if(!hit)return true;

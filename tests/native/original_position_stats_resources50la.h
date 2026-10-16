@@ -191,8 +191,8 @@ class OriginalPositionStatsResources50LA final {
         //Source loader overrides dimensions after buffer construction; positions
         //stay unregenerated. Native data only, never a guest command packet.
         t.flags5C|=1; //2DF510.
-        if(t.width34!=data.width34){t.width34=data.width34;t.flags5C|=1;if(t.field3C==0)t.flags5C|=2;}
-        if(t.height38!=data.height38){t.height38=data.height38;t.flags5C|=1;if(t.field3C==0)t.flags5C|=2;}
+        if(t.width34!=data.width34){t.width34=data.width34;t.flags5C|=1;if(t.field3C!=0)t.flags5C|=2;}
+        if(t.height38!=data.height38){t.height38=data.height38;t.flags5C|=1;if(t.field3C!=0)t.flags5C|=2;}
         return true;
     }
     bool stageTextures(std::string& directory,std::uint32_t depth,D& d)noexcept {
@@ -384,7 +384,7 @@ class OriginalPositionStatsResources50LA final {
             auto& t=fixed_[i];const float nextX=x[i]+field32B0_,nextY=y[i]+field32B4_;
             if(t.x10==nextX&&t.y14==nextY)continue;
             t.x10=nextX;t.y14=nextY;t.flags5C=std::uint8_t((t.flags5C&~1u)|1u);
-            if(t.field3C==0.f)t.flags5C=std::uint8_t((t.flags5C&~2u)|2u);
+            if(t.field3C!=0.f)t.flags5C=std::uint8_t((t.flags5C&~2u)|2u);
         }
         constexpr std::array<float,5> tx{{500,570,571,500,590}};
         constexpr std::array<float,5> ty{{53,51,53,31,31}};
@@ -441,7 +441,7 @@ class OriginalPositionStatsResources50LA final {
                 d.error=E::phase;d.sourcePC=0x192938;return false;}
             const float x=add(sub(point.x,3.f),field32B0_),y=add(sub(point.y,3.f),field32B4_);
             if(t.x10!=x||t.y14!=y){t.x10=x;t.y14=y;t.flags5C=std::uint8_t(t.flags5C|1u);
-                if(t.field3C==0.f)t.flags5C=std::uint8_t(t.flags5C|2u);}
+                if(t.field3C!=0.f)t.flags5C=std::uint8_t(t.flags5C|2u);}
             if(t.alpha48!=static_cast<std::int16_t>(point.alpha)){
                 t.alpha48=static_cast<std::int16_t>(point.alpha);
                 for(std::size_t vertex=0;vertex<4;++vertex)t.buffer58->vertices[vertex].rgba[3]=point.alpha>>2;

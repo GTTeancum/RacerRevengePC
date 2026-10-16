@@ -2,6 +2,7 @@
 #include "ra_cold_sources50la.h"
 #include "track_static_candidates50ig_fixture.h"
 #include "ra_trigger_candidates50la.h"
+namespace ra_collision_resources50LA {class Owner;}
 namespace ra_cold_aggregate50LA { class Owner; }
 #include <memory>
 #include <utility>
@@ -12,6 +13,7 @@ namespace ra_static_candidates50LA {
 // It does not create world registries, query identities, pod shapes, membership,
 // Course admission or a source parent. Root supplies actual namespace bindings.
 class Owner final {
+    friend class ra_collision_resources50LA::Owner;
     friend class ra_cold_aggregate50LA::Owner;
     friend class ra_static_registry50LA::ColdStage;
     friend class ra_cold_aggregate50LA::Owner;

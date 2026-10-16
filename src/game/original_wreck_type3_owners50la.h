@@ -1,5 +1,7 @@
 #pragma once
 #include "type2_resource49x.h"
+#include "original_camera_world_query.h"
+#include <cstring>
 #include <exception>
 #include <memory>
 
@@ -18,13 +20,14 @@ class OriginalWreckType3Owners50LA final {
         std::unique_ptr<float[]> lengths14;
         std::unique_ptr<SpringVector4_48N[]> worldStarts18,worldDirections1C;
         SpringVector4_48N center20{},center30{};
+        float radius40=0.f; // produced by11DD00, not constructor initialized
         std::uint32_t normalMode44=0;
     };
     struct Result {
         SpringVector4_48N first00{},second10{},normal20{},point30{},correction40{};
         std::unique_ptr<Type2Ray49X[]> pairs50;
         std::unique_ptr<SpringVector4_48N[]> normals54,points58;
-        std::uint32_t count5C=1;
+        std::uint32_t count5C=1,hitCount60=0; //60 first becomes known at11DD00
         std::unique_ptr<std::uint32_t[]> words64,flags68;
         std::unique_ptr<float[]> fractions6C;
         std::unique_ptr<std::uint16_t[]> tags70;
@@ -34,6 +37,49 @@ class OriginalWreckType3Owners50LA final {
     std::unique_ptr<Result> result90_;
     bool attempted_=false,loaded_=false,retired_=false;
     std::uint32_t boundary_=0;
+    bool preparedByProducer_=false,hitsProduced_=false,fractionsProduced_=false;
+    // Inline numeric records are transaction staging; these arrays remain the
+    //actual persistent source owner. Unwritten scalar backing is never read.
+    bool readProducerState(Type3QueryState48P& state,OriginalCameraSingleRay& ray)const noexcept {
+        if(!loaded_||retired_)return false;
+        const auto& s=*shape8C_;const auto& r=*result90_;
+        std::memcpy(state.localCenter.v,s.center20.v,sizeof(Vector3_48C));
+        state.worldCenter=s.center30;
+        state.result00=r.first00;state.result10=r.second10;
+        state.selectedNormal=r.normal20;state.selectedPoint=r.point30;state.selectedCorrection=r.correction40;
+        std::memcpy(ray.localStart.v,s.localStarts0C[0].v,sizeof(Vector3_48C));
+        std::memcpy(ray.localDirection.v,s.localDirections10[0].v,sizeof(Vector3_48C));
+        ray.worldStart=s.worldStarts18[0];ray.worldDirection=s.worldDirections1C[0];
+        ray.normal=r.normals54[0];ray.point=r.points58[0];
+        if(preparedByProducer_){state.radius=s.radius40;state.hitCount=r.hitCount60;
+            state.selectedFraction=r.selectedFraction74;ray.length=s.lengths14[0];}
+        if(hitsProduced_)ray.hit=r.flags68[0];
+        if(fractionsProduced_)ray.fraction=r.fractions6C[0];
+        return true;
+    }
+    bool commitProducerState(const Type3QueryState48P& state,const OriginalCameraSingleRay& ray,
+        const OriginalCameraWorldResult& receipt)noexcept {
+        if(!loaded_||retired_||receipt.status!=OriginalCameraWorldStatus::Complete)return false;
+        if(!receipt.resetGlobalsWritten)return true; //disabled query did not reach11DD00
+        auto& s=*shape8C_;auto& r=*result90_;
+        // Native candidate-local scratch represents XYZ only. Do not invent
+        // original unused W/register-carry writes in center20/0C/10.
+        std::memcpy(s.center20.v,state.localCenter.v,sizeof(Vector3_48C));
+        std::memcpy(s.localStarts0C[0].v,ray.localStart.v,sizeof(Vector3_48C));
+        std::memcpy(s.localDirections10[0].v,ray.localDirection.v,sizeof(Vector3_48C));
+        s.center30=state.worldCenter;s.radius40=state.radius;
+        s.worldStarts18[0]=ray.worldStart;s.worldDirections1C[0]=ray.worldDirection;s.lengths14[0]=ray.length;
+        r.first00=state.result00;r.second10=state.result10;r.normal20=state.selectedNormal;
+        r.point30=state.selectedPoint;r.correction40=state.selectedCorrection;
+        r.normals54[0]=ray.normal;r.points58[0]=ray.point;
+        r.hitCount60=state.hitCount;r.selectedFraction74=state.selectedFraction;preparedByProducer_=true;
+        // Every reached126F40 dispatch clears68, even if its inner coarse test
+        // rejects.6C is written only after that coarse test admits the pair.
+        if(receipt.normalModeWritten){r.flags68[0]=ray.hit;hitsProduced_=true;}
+        if(receipt.type3FractionsWritten){r.fractions6C[0]=ray.fraction;fractionsProduced_=true;}
+        //50/64/70 and opaque78/7C are not produced by this route.
+        return true;
+    }
     bool allocate11C710(const SpringVector4_48N& actualSentinel3E02C0)noexcept {
         if(attempted_||retired_)return false;
         attempted_=true;boundary_=0x11c740u;
@@ -85,6 +131,7 @@ public:
     OriginalWreckType3Owners50LA(const OriginalWreckType3Owners50LA&)=delete;
     OriginalWreckType3Owners50LA& operator=(const OriginalWreckType3Owners50LA&)=delete;
     ~OriginalWreckType3Owners50LA(){if(shape8C_||result90_)std::terminate();}
+    bool producerPrepared()const noexcept{return preparedByProducer_;}
     bool attempted()const noexcept{return attempted_;}
     bool loaded()const noexcept{return loaded_;}
     bool retired()const noexcept{return retired_;}

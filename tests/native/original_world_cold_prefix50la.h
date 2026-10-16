@@ -3,6 +3,78 @@
 #include "ra_cold_aggregate50la.h"
 #include <limits>
 namespace ra_pod_scene50LA {
+inline bool Owner::prepareWorldPhysicsIndex270CDC(
+    std::shared_ptr<const ra_cold_sources50LA::Owner> source,std::uint32_t& pc)noexcept {
+    pc=0;
+    if(!worldColdConstructed_||!worldList500_||worldPhysics3D4_||topologyAttempted_)
+        return fail(pc,0x270cc4);
+    std::unique_ptr<g::OriginalWorldPhysicsIndex50LA> index;
+    try {index.reset(new g::OriginalWorldPhysicsIndex50LA);}catch(...){return fail(pc,0x270cc4);}
+    if(!index->prepare27C110(std::move(source)))return fail(pc,0x270ce4);
+    worldPhysics3D4_=std::move(index);return true;
+}
+
+inline bool Owner::prepareWorldCollisionObjects271230(
+    std::shared_ptr<const ra_cold_sources50LA::Owner> source,std::uint32_t& pc)noexcept {
+    pc=0;
+    if(!worldColdConstructed_||!worldList500_||!worldPhysics3D4_||worldCollisionObjects3CC_||
+       topologyAttempted_||!worldApplication_||worldApplication_->attachmentLock423F58()||
+       !worldAudio_||worldAudio_->coldThread_!=std::this_thread::get_id())return fail(pc,0x271230);
+    auto& authority=worldApplication_->entityAuthority_;
+    if(worldApplication_->objectCount423F60()>std::numeric_limits<std::uint32_t>::max()-10||
+       !authority.reserveAdditional(10))
+        return fail(pc,0x141300);
+    std::unique_ptr<g::OriginalWorldCollisionObjects50LA> objects;
+    try {objects.reset(new g::OriginalWorldCollisionObjects50LA);}catch(...){return fail(pc,0x271264);}
+    if(!objects->prepareBacking(std::move(source)))return fail(pc,0x27bca0);
+    for(auto& zone:objects->zones_)
+        if(!authority.canEnroll(zone.entity,key(&zone.entity)))return fail(pc,0x141300);
+    // Native backing/admission above has no counted effects. Actual zone
+    // constructors and their count30 publications retain source order below.
+    worldCollisionObjects3CC_=std::move(objects);
+    for(auto& zone:worldCollisionObjects3CC_->zones_){
+        auto& e=zone.entity;
+        if(g::initializeOriginalWreckComponent50LA(e,g::OriginalWreckComponentKind50LA::collisionObjects27BB40,
+            worldEntity_.sessionGeneration,key(&e),true,worldApplication_->objectCount423F60()).status!=
+            g::OriginalWreckComponentStatus50LA::complete||!authority.enroll(e))std::terminate();
+        zone.counted=true;zone.count30=static_cast<std::uint32_t>(zone.entries34.size());
+    }
+    return true;
+}
+inline bool Owner::releaseWorldCollisionObjects27BB80(std::uint32_t& pc)noexcept {
+    if(!worldCollisionObjects3CC_)return true;
+    if(!worldApplication_||worldApplication_->attachmentLock423F58())return fail(pc,0x27bb80);
+    auto& objects=*worldCollisionObjects3CC_;
+    std::size_t counted=0;
+    for(const auto& zone:objects.zones_){const auto& e=zone.entity;
+        if(!zone.counted||e.reference00!=1||e.previous10||e.next14||e.parent1C||e.firstChild18||
+           e.mask20||e.descendants24||e.objectKey!=key(&e)||e.sessionGeneration!=worldEntity_.sessionGeneration||
+           zone.count30!=zone.entries34.size())return fail(pc,0x27bb80);
+        for(const auto& wrapper:zone.entries34)if(wrapper.collision04||!wrapper.descriptor08)
+            return fail(pc,0x27bbf4);
+        ++counted;
+    }
+    if(worldApplication_->objectCount423F60()<counted)return fail(pc,0x1413e0);
+    for(auto& zone:objects.zones_){
+        //Actual142590/104970 final reference, then27BB80 raw descriptor/row
+        //deletion and1413E0. No live collision Entity has been acquired here.
+        if(!worldApplication_->entityAuthority_.retire(zone.entity))std::terminate();
+        --zone.entity.reference00;
+        for(auto& wrapper:zone.entries34){wrapper.descriptor08.reset();wrapper.decodedCollision=nullptr;}
+        decltype(zone.entries34)().swap(zone.entries34);
+        --worldApplication_->objectCount423F60();zone.counted=false;
+    }
+    worldCollisionObjects3CC_.reset();return true;
+}
+
+inline bool Owner::prepareWorldCollisionResources(std::shared_ptr<ra_static_candidates50LA::Owner> candidates,
+    std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA> resolver,
+    rr::assets::OriginalStandardTextureDiagnostic50LA& d)noexcept {
+    if(!worldColdConstructed_||!worldCollisionObjects3CC_||worldCollisionResources_||topologyAttempted_||
+       !worldAudio_||worldAudio_->coldThread_!=std::this_thread::get_id())return false;
+    try {worldCollisionResources_.reset(new ra_collision_resources50LA::Owner);}catch(...){return false;}
+    return worldCollisionResources_->prepare(std::move(candidates),std::move(resolver),d);
+}
 inline bool Owner::constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicationEntities50LA> app,
     rr::platform::RaceAudioGroups50IC& audio,rr::platform::AudioMixer50HD& mixer,
     std::uint64_t generation,std::uint32_t& pc)noexcept {
@@ -48,11 +120,17 @@ inline bool Owner::rollbackNativeWorldConstructionFailure(std::uint32_t& pc)noex
        audio.coldApplication_!=worldApplication_||audio.coldSession_!=e.sessionGeneration||
        audio.coldThread_!=std::this_thread::get_id()||!worldApplication_->objectCount423F60())
         return fail(pc,0x1b2870);
+    if(worldCollisionResources_&&!worldCollisionResources_->closeUnloadedBacking())return fail(pc,0x11b600);
+    worldCollisionResources_.reset();
+    if(!releaseWorldCollisionObjects27BB80(pc))return false;
     auto& group=audio.coldGroups_[static_cast<std::size_t>(g::RaceAudioGroup50IC::World4D8)];
     if(group.constructed&&!audio.releaseEmptyCold142590(g::RaceAudioGroup50IC::World4D8))
         return fail(pc,0x235150);
     // Host failure cleanup only. The complete world destructor is NOT called:
-    //3CC/3D4, LightManager148110 and context103DD0 have no false completion.
+    //Later live3CC loading, LightManager148110 and context103DD0 remain unjoined.
+    //Only an actually acquired, source-proven3D4 index is retired here.
+    if(worldPhysics3D4_&&!worldPhysics3D4_->release27C030())return fail(pc,0x27c030);
+    worldPhysics3D4_.reset();
     if(!worldApplication_->entityAuthority_.retire(e))std::terminate();
     worldList500_.reset();--e.reference00;--worldApplication_->objectCount423F60();
     worldColdConstructed_=false;worldAudio_=nullptr;worldApplication_.reset();
@@ -60,6 +138,16 @@ inline bool Owner::rollbackNativeWorldConstructionFailure(std::uint32_t& pc)noex
 }
 }
 namespace ra_cold_aggregate50LA {
+inline bool Owner::prepareWorldCollisionResources(const original_main_entry50KG::Application& app,
+    rr::assets::OriginalStandardTextureDiagnostic50LA& d)noexcept {
+    if(closed_||terminal_||!candidates_||!worldColdConstructed_||app.entities()!=worldApplication_||
+       runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
+    try {
+        const auto domain=app.standardMaterialDomain();
+        if(!domain||!domain->prepared())return false;
+        return ra_pod_scene50LA::Owner::prepareWorldCollisionResources(candidates_,domain->resolver3E1A70(),d);
+    }catch(...){return false;}
+}
 inline bool Owner::constructWorldCold1B2870(const original_main_entry50KG::Application& app,
     rr::platform::RaceAudioGroups50IC& audio,rr::platform::AudioMixer50HD& mixer,
     std::uint64_t generation,std::uint32_t& pc)noexcept {

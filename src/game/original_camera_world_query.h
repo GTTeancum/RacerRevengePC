@@ -83,6 +83,7 @@ struct OriginalCameraWorldResult {
     std::size_t visited=0,geometryHits=0,callbacks=0;
     float returnedDistance=0.f;
     bool resetGlobalsWritten=false; // enabled121920 reached11DD00; publish only on Complete
+    bool type3FractionsWritten=false; // actual126F40 coarse-admitted reset, Complete only
     bool normalModeWritten=false;
     std::uint32_t normalMode3DF5B0=0;
     // Genuine final VU VF9.W for the completed nullable-E4 shape3 route.

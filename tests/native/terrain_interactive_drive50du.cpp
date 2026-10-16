@@ -109,6 +109,8 @@
 #include "original_tunnel_track50la.h" // Inactive genuine spline Entity ownership.
 #include "original_world_cold_prefix50la.h" // Inactive same-scene world constructor prefix.
 #include "original_race_constructor50la.h" // Inactive consumed-launch race constructor ownership.
+#include "original_race_load_prefix50la.h" // Inactive actual early load-owner join.
+#include "original_race_world_join50la.h" // Inactive same-aggregate race world ownership.
 #include "original_pause_observation50la.h" // Inactive source-only settings observer.
 #include "original_race_display_lifetime50la.h"
 #include "original_position_stats_primitives50la.h"

@@ -8,7 +8,7 @@
 namespace rr::game {
 // Existing racer member order is retained; wreckDust adds the proved piece168 member.
 enum class OriginalGcPodDustMember50KG : std::uint8_t {
-    leftDust,rightDust,leftSmoke,rightSmoke,wreckDust
+    leftDust,rightDust,leftSmoke,rightSmoke,wreckDust,wreckSmoke
 };
 // Immutable source15AEA0/19B060 authoring. Constructor defaults are replaced
 // by reader defaults where retail does so (notably +230 and +23C).

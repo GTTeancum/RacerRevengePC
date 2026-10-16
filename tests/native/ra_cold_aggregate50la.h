@@ -73,6 +73,7 @@ struct Diagnostic {
     std::string sky;
 };
 class Owner final : private ra_pod_scene50LA::Owner {
+    friend class rr::game::OriginalRaceConstructor50LA;
     friend class rr::platform::MaterialTextureGl50EB;
     friend class rr::platform::VehicleWindowGl50DS;
     friend class ra_cold_roster50LA::Operation;
@@ -128,6 +129,22 @@ class Owner final : private ra_pod_scene50LA::Owner {
 public:
     bool constructWorldCold1B2870(const original_main_entry50KG::Application&,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
+    bool prepareWorldPhysicsIndex270CDC(std::uint32_t& pc)noexcept {
+        pc=0;
+        if(closed_||terminal_||!worldColdConstructed_||trackParticleAttempted_||
+           modelPrefixesAttempted_||particlesAttempted_||runtimeCameraBorrows_||runtimeWorldBorrows_){
+            pc=0x270cc4;return false;
+        }
+        return ra_pod_scene50LA::Owner::prepareWorldPhysicsIndex270CDC(source_,pc);
+    }
+    bool prepareWorldCollisionObjects271230(std::uint32_t& pc)noexcept {
+        pc=0;
+        if(closed_||terminal_||trackParticleAttempted_||modelPrefixesAttempted_||particlesAttempted_||
+           runtimeCameraBorrows_||runtimeWorldBorrows_){pc=0x271230;return false;}
+        return ra_pod_scene50LA::Owner::prepareWorldCollisionObjects271230(source_,pc);
+    }
+    bool prepareWorldCollisionResources(const original_main_entry50KG::Application&,
+        rr::assets::OriginalStandardTextureDiagnostic50LA&)noexcept;
     bool rollbackNativeWorldConstructionFailure(std::uint32_t& pc)noexcept {
         return ra_pod_scene50LA::Owner::rollbackNativeWorldConstructionFailure(pc);
     }

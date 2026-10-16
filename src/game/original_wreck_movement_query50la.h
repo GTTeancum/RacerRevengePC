@@ -63,12 +63,13 @@ inline OriginalWreckMovementQueryResult50LA queryOriginalWreckMovement50LA(
     stage.flagsF8=queries.state(2).flagsF8;stage.currentCandidateIdentity=q.currentIdentity94;
     stage.previousCenter70=q.previousCenter70;stage.distance84=q.distance84;
     stage.copied40=queries.copies(2).copied40;stage.copied50=queries.copies(2).copied50;
-    stage.type3=q.type3;stage.ray=q.ray;
+    if(!queries.readMovementProducerState(stage))return fail(S::owner,0x11dd00u);
     const OriginalCameraWorldCallbackBinding callback{pieceComponent.objectKey,0u,nullptr};
     const auto status=queryOriginalCameraWorld(in,w.mutableQuery,w.queryWorkspace,stage,callback,r.world);
     if(status!=OriginalCameraWorldStatus::Complete)return fail(S::worldQuery,r.world.sourcePC);
     q.currentIdentity94=stage.currentCandidateIdentity;q.previousCenter70=stage.previousCenter70;
-    q.distance84=stage.distance84;q.type3=stage.type3;q.ray=stage.ray;
+    q.distance84=stage.distance84;
+    if(!queries.commitMovementProducerState(stage,r.world))return fail(S::owner,0x121920u);
     //Core already committed flags/cache/copies in their canonical world tables.
     r.queryCommitted=true;
     if(!w.normalMode3DF5B0->acceptCompleted({r.world.normalMode3DF5B0,r.world.normalModeWritten,true}))

@@ -8,7 +8,7 @@ using namespace original_wreck_component_detail50LA;
 // nodes, reference acquisition, activity changes or dispatch completion.
 template<class Domain>
 inline bool walk(const Domain& d,const C* first,const C* parent,
-                 bool (&seen)[maxOriginalWreckComponents50LA]) noexcept {
+                 unsigned char* seen) noexcept {
     const C* previous=nullptr;
     for(auto* p=first;p;p=p->next14){
         if(!contains(d,p))return false;
@@ -20,10 +20,14 @@ inline bool walk(const Domain& d,const C* first,const C* parent,
     }
     return true;
 }
+inline unsigned char* entityVisitScratch(const OriginalWreckComponentDomain50LA&) noexcept {return nullptr;}
 template<class Domain>
 inline bool forest(const Domain& d) noexcept {
     if(!domain(d))return false;
-    bool seen[maxOriginalWreckComponents50LA]{};
+    unsigned char legacySeen[maxOriginalWreckComponents50LA]{};
+    auto* seen=entityVisitScratch(d); //Private Application View supplies its reserved extent.
+    if(!seen){if(d.count>maxOriginalWreckComponents50LA)return false;seen=legacySeen;}
+    for(std::size_t i=0;i<d.count;++i)seen[i]=0;
     for(std::size_t i=0;i<d.count;++i){
         const auto* p=d.objects[i];
         if(!p->parent1C&&!p->previous10&&!walk(d,p,nullptr,seen))return false;

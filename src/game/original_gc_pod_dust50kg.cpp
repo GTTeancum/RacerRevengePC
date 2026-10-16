@@ -142,15 +142,16 @@ bool hashMatches(const std::uint8_t* data, std::size_t size,
 // Text tokenizer above also accepts the original colon-prefixed annotations;
 // the stricter scene PRT reader cannot consume those authentic EMT lines.
 bool authentic(const std::vector<std::uint8_t>& b,OriginalGcPodDustMember50KG member) noexcept {
-    constexpr std::size_t sizes[]={3237,3236,2906,2908,3232};
+    constexpr std::size_t sizes[]={3237,3236,2906,2908,3232,3237};
     constexpr const char* hashes[]={
         "0e18ac3a94b8d4abaec38f9288a96b39b800ac58b17ba499ffc33f247995bb66",
         "9e5b26cf362e261239a0c6f7ff499f4dea285862286aa8dae65611529e2b5f7f",
         "03f835faf0501dd2a0761f5d1e1996d44bb634fa636242ff94341beaec7008c0",
         "2e89d1d1c6d44804dc25687d837699ab3207e8a800ee3756875e5760226957e2",
-        "02ae885a7fa05b2d1370c4d0148bfbc51614a340ea04abe3098812a89ab33d9b"};
+        "02ae885a7fa05b2d1370c4d0148bfbc51614a340ea04abe3098812a89ab33d9b",
+        "f559ef3678be818686c576ffc58eb7bbae7f30dc07f271bfe264b2960ccda914"};
     const auto i=static_cast<unsigned>(member);
-    return i<5&&b.size()==sizes[i]&&hashMatches(b.data(),b.size(),hashes[i]);
+    return i<6&&b.size()==sizes[i]&&hashMatches(b.data(),b.size(),hashes[i]);
 }
 } // namespace
 OriginalGcSprayStatus50KG readOriginalGcPodDustDefinition50KG(
@@ -222,7 +223,7 @@ OriginalGcSprayStatus50KG readOriginalGcPodDustDefinition50KG(
            !v("MinimumVelocityNoise",f.minimumVelocityNoise240,0x19b9b4)||
            !v("MaximumVelocityNoise",f.maximumVelocityNoise250,0x19b9d0))return S::authoredData;
         if(m.badPC){d.sourcePC=m.badPC;return S::arithmetic;}
-        // All five authenticated source members are in these asserted domains.
+        // All six authenticated source members are in these asserted domains.
         // Keep bad authored values visible rather than silently clamp them.
         if(f.particleGroup1B8<0||f.minimumPercentLife21C<0||f.minimumPercentLife21C>1||
            f.minimumPercentLifeConvergance220<0||f.minimumInitialSize208<0||f.maximumInitialSize20C<0||

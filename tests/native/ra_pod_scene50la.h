@@ -1,5 +1,8 @@
 #pragma once
 #include "ra_source_camera_ownership50la.h"
+#include "original_world_physics_index50la.h"
+#include "original_world_collision_objects50la.h"
+#include "ra_collision_resources50la.h"
 #include "../../src/game/original_track_particle_cold50la.h"
 #include "../../src/game/original_visibility_quadtree50la.h"
 #include <array>
@@ -7,6 +10,7 @@
 #include <memory>
 #include "../../platform/linux/native/race_audio_groups50ic.h"
 
+namespace rr::game {class OriginalRaceConstructor50LA;}
 namespace ra_cold_aggregate50LA {class Owner;}
 namespace ra_pod_scene50LA {
 namespace g=rr::game;
@@ -15,6 +19,7 @@ namespace g=rr::game;
 // steps; these are not copies, replacement registries or alternate query worlds.
 class Owner {
     friend class ::ra_cold_aggregate50LA::Owner;
+    friend class rr::game::OriginalRaceConstructor50LA;
 protected:
     using Entity=g::OriginalWreckComponent50LA;
     std::shared_ptr<g::original_gc_gameplay_lighting_candidate::Owner> lighting_;
@@ -22,6 +27,14 @@ protected:
     std::shared_ptr<g::OriginalTrackParticleCold50LA> trackParticles_;
 private:
     // Constructor-only prefix on this SAME concrete scene. No second world.
+    std::unique_ptr<g::OriginalWorldPhysicsIndex50LA> worldPhysics3D4_;
+    bool prepareWorldPhysicsIndex270CDC(std::shared_ptr<const ra_cold_sources50LA::Owner>,std::uint32_t&)noexcept;
+    std::unique_ptr<g::OriginalWorldCollisionObjects50LA> worldCollisionObjects3CC_;
+    bool prepareWorldCollisionObjects271230(std::shared_ptr<const ra_cold_sources50LA::Owner>,std::uint32_t&)noexcept;
+    bool releaseWorldCollisionObjects27BB80(std::uint32_t&)noexcept;
+    std::unique_ptr<ra_collision_resources50LA::Owner> worldCollisionResources_;
+    bool prepareWorldCollisionResources(std::shared_ptr<ra_static_candidates50LA::Owner>,
+        std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA>,rr::assets::OriginalStandardTextureDiagnostic50LA&)noexcept;
     Entity worldEntity_;
     std::shared_ptr<g::OriginalApplicationEntities50LA> worldApplication_;
     rr::platform::RaceAudioGroups50IC* worldAudio_=nullptr; //Caller lifetime through rollback/retirement.

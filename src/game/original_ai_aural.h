@@ -8,6 +8,8 @@
 #include <cstring>
 #include <limits>
 
+namespace native_original_ai_audio { class Owner; }
+
 namespace rr::game {
 struct OriginalAiAudioListener {
     float position[4]{},forward[4]{};
@@ -157,6 +159,15 @@ public:
         r.status=OriginalAiAuralStatus::complete;r.sourcePC=0x103710u;return r;
     }
 private:
+    friend class ::native_original_ai_audio::Owner;
+    // Native owner shutdown revokes borrowed emitter/sound pointers before
+    // their channels retire. This is terminal even after partial preparation;
+    // it does not perform source103DD0's Entity detach/release callbacks.
+    void retireNativeRegistrations() noexcept {
+        blocked_=true;
+        entries_.fill(nullptr);
+        count_=0;
+    }
     std::array<OriginalAiEmitterSpatial*,16> entries_{};
     std::size_t count_=0;bool blocked_=false;
 };

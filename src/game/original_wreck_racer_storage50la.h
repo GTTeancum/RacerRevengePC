@@ -4,6 +4,8 @@
 #include "original_wreck_collection_tuning50la.h"
 #include "original_wreck_shared_response50la.h"
 #include "original_racer_model_packets50la.h"
+#include "original_wreck_effect_arrays50la.h"
+#include "original_wreck_smoke_owner50la.h"
 #include "reset_visibility50ey.h"
 #include <limits>
 #include <exception>
@@ -11,6 +13,12 @@
 
 namespace rr::game {
 class OriginalWreckRacerStorage50LA;
+// Addresses of the actual caller fields, not optional copied context values.
+//22BFD0 forwards its resource argument and particle-parent argument to2CB5A0.
+struct OriginalWreckPieceEffectInputs50LA {
+    const OriginalWreckEffectResourceContext50LA* const* resourceContextField=nullptr;
+    OriginalWreckComponent50LA* const* particleParentField=nullptr;
+};
 // Native backing for ONE actual authored occurrence. Its body/gravity/Entity
 // storage is not initialized by any source constructor merely by allocation.
 // In particular it is not a disguised one-piece collection/group owner.
@@ -38,6 +46,11 @@ class OriginalWreckPieceStorage50LA final {
     OriginalRacerModelPackets50LA modelPackets_;
     std::unique_ptr<OriginalWreckComponent50LA*[]> componentSlots_;
     OriginalWreckEffectFields50LA effects_;
+    OriginalWreckEffectArrays50LA effectArrays_;
+    OriginalWreckPieceEffectInputs50LA effectInputs_{};
+    const OriginalWreckEffectResourceContext50LA* effectResource_=nullptr;
+    OriginalWreckComponent50LA* effectParent_=nullptr;
+    bool effectInputsCommitted_=false;
     const WaterHeightProvider50JC* actualWaterB0_=nullptr;
     const WaterHeightGlobals50JC* actualWaterGlobals_=nullptr;
     std::unique_ptr<OriginalWreckComponent50LA[]> components_;
@@ -60,6 +73,12 @@ public:
     // Read-only cold inspection. No public constructor-completion flag or
     // mutable body/query/camera view exists at this stage.
     const OriginalWreckPhysical50LA& physicalBacking()const noexcept{return physical_;}
+    bool effectCountCommitted()const noexcept{return effectInputsCommitted_;}
+    std::uint32_t effectCount174()const noexcept{return effects_.count174;}
+    bool effectInputsStillBound()const noexcept {
+        return effectInputsCommitted_&&effectInputs_.resourceContextField&&effectInputs_.particleParentField&&
+            *effectInputs_.resourceContextField==effectResource_&&*effectInputs_.particleParentField==effectParent_;
+    }
     const OriginalWreckComponent50LA* componentAt(std::size_t index)const noexcept {
         return index<componentCount_?componentSlots_[index]:nullptr;
     }
@@ -149,7 +168,7 @@ struct OriginalWreckContactConstructorBinding50LA {
     const OriginalWreckTerrainProvider50LA* const* actualTerrain330Field=nullptr;
 };
 enum class OriginalWreckConstructorPrefixStatus50LA : std::uint8_t {
-    binding,capacity,allocation,components,physical,publishedLifetimeRequired,stopped,modelLoadRequired,warmModelRequired,modelAppendRequired,geometryAdmission,pieceSetupRequired,queryPublicationRequired,queryConstructionFailed,contactConstructorRequired,contactConstructionFailed,e4ConstructorRequired,e4ConstructionFailed,e4PreparationRequired,e4PreparationFailed,e8ConstructorRequired,e8ConstructionFailed,mutualFiltersRequired
+    binding,capacity,allocation,components,physical,publishedLifetimeRequired,stopped,modelLoadRequired,warmModelRequired,modelAppendRequired,geometryAdmission,pieceSetupRequired,queryPublicationRequired,queryConstructionFailed,contactConstructorRequired,contactConstructionFailed,e4ConstructorRequired,e4ConstructionFailed,e4PreparationRequired,e4PreparationFailed,e8ConstructorRequired,e8ConstructionFailed,mutualFiltersRequired,mutualFiltersFailed,effectInputsRequired,effectConstructorRequired,effectReturnRequired,effectArraysFailed,effectChildrenRequired,effectSmokeFailed,effectFireRequired
 };
 struct OriginalWreckConstructorPrefixResult50LA {
     OriginalWreckConstructorPrefixStatus50LA status=OriginalWreckConstructorPrefixStatus50LA::binding;
@@ -187,7 +206,7 @@ class OriginalWreckRacerStorage50LA final {
         bool contactSuffixAttempted=false,contactSuffixRetired=false,dcReached=false,d8Reached=false;
         std::size_t contactSuffixDestroyed=0;
         bool e4ConstructorAttempted=false,e4PrefixRetired=false,e4PublicationAttempted=false;
-        bool e8ConstructorAttempted=false,e8PrefixRetired=false;
+        bool e8ConstructorAttempted=false,e8PrefixRetired=false,mutualConstructionAttempted=false;
         bool constructorAttempted=false,retirementAttempted=false,freshModelLoadAttempted=false,modelAppendAttempted=false,pieceSetupAttempted=false;
         const OriginalWreckConstructorGlobals50LA* actualConstructorGlobals=nullptr;
         const SpringVector4_48N* actualGravityVector4431C0=nullptr;
@@ -856,13 +875,104 @@ public:
         if(loaded.status!=OriginalWreckQueryStatus50LA::complete)return finish(S::e8ConstructionFailed,loaded.sourcePC);
         return finish(S::mutualFiltersRequired,0x166390u);
     }
+    //Finish165E90's four ordered source allocations, return through165C30,
+    //then perform actual2CB610 derived callback store. Stop before2CB614
+    //reads the incoming effect count: null contexts do not justify skipping it.
+    OriginalWreckConstructorPrefixResult50LA constructFirstMutualAndDerived()noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        OriginalWreckConstructorPrefixResult50LA rejected;
+        if(!storage_||storage_->mutualConstructionAttempted||storage_->e8PrefixRetired||storage_->retirementAttempted||
+           storage_->prefixResult.status!=S::mutualFiltersRequired||storage_->prefixResult.sourcePC!=0x166390u||
+           !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
+           !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return rejected;
+        auto& piece=storage_->collections[0].pieces_[0];storage_->mutualConstructionAttempted=true;
+        auto finish=[&](S status,std::uint32_t pc){storage_->prefixResult={status,pc,storage_->prefixDomain.count,true};return storage_->prefixResult;};
+        const auto mutual=piece.queries_.constructFullMutual166390();
+        if(mutual.status!=OriginalWreckQueryStatus50LA::complete)return finish(S::mutualFiltersFailed,mutual.sourcePC);
+        if(!piece.queries_.bindFullDerived2CB610())return finish(S::mutualFiltersFailed,0x2cb610u);
+        return finish(S::effectInputsRequired,0x2cb614u);
+    }
+    // Actual22C0F8/22C100 incoming count, followed by2CB614/2CB61C.
+    // Stop before any effect allocation, including count-zero dust/splash.
+    // A genuine null argument selects the source epilogue, but this method
+    // does not certify that return, piece append, or effect-route completion.
+    OriginalWreckConstructorPrefixResult50LA bindFirstEffectConstructorInputs(
+        const OriginalWreckPieceEffectInputs50LA& binding)noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        OriginalWreckConstructorPrefixResult50LA rejected;
+        if(!storage_||storage_->retirementAttempted||storage_->e8PrefixRetired||
+           storage_->prefixResult.status!=S::effectInputsRequired||storage_->prefixResult.sourcePC!=0x2cb614u||
+           !binding.resourceContextField||!binding.particleParentField||
+           !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
+           !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return rejected;
+        auto& piece=storage_->collections[0].pieces_[0];
+        if(piece.effectInputsCommitted_)return rejected;
+        const auto& authored=storage_->inventory->authoring().collections[0];
+        // The adopted inventory owns this exact occurrence and its PHY words.
+        // Missing input addresses are rejected; only their actual values may
+        // select either original null branch. No substitute context is made.
+        piece.effectInputs_=binding;
+        piece.effectResource_=*binding.resourceContextField;
+        piece.effectParent_=*binding.particleParentField;
+        piece.effects_.count174=authored.pieces[0].emitSmoke?authored.maxNumberOfDamageEmitters:0u;
+        piece.effectInputsCommitted_=true;
+        const bool resourceNull=!piece.effectResource_;
+        const bool parentNull=!piece.effectParent_;
+        storage_->prefixResult={resourceNull||parentNull?S::effectReturnRequired:S::effectConstructorRequired,
+            resourceNull?0x2cb8c4u:(parentNull?0x2cb8c8u:0x2cb628u),storage_->prefixDomain.count,true};
+        return storage_->prefixResult;
+    }
+    OriginalWreckConstructorPrefixResult50LA constructFirstPositiveEffectArrays()noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        OriginalWreckConstructorPrefixResult50LA rejected;
+        if(!storage_||storage_->retirementAttempted||storage_->e8PrefixRetired||
+           storage_->prefixResult.status!=S::effectConstructorRequired||storage_->prefixResult.sourcePC!=0x2cb628u||
+           !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58)return rejected;
+        auto& piece=storage_->collections[0].pieces_[0];
+        if(!piece.effectInputsStillBound()||!piece.effectResource_||!piece.effectParent_||
+           !piece.effects_.count174||piece.effects_.count174>512u||piece.effectArrays_.attempted()||piece.modelOwner_.released())return rejected;
+        const bool ready=piece.effectArrays_.allocateAndFind2CB634(piece.effects_.count174,
+            piece.modelOwner_,piece.assets_->graph());
+        storage_->prefixResult={ready?S::effectChildrenRequired:S::effectArraysFailed,
+            piece.effectArrays_.sourceBoundary(),storage_->prefixDomain.count,true};
+        return storage_->prefixResult;
+    }
+    //First actual160[0] child, retained by its separate external owner. Piece
+    //array disposal never owns this emitter or its manager registration.
+    OriginalWreckConstructorPrefixResult50LA constructFirstPositiveSmoke(
+        OriginalWreckSmokeOwner50LA& owner,const OriginalWreckSmokeBinding50LA& binding)noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        OriginalWreckConstructorPrefixResult50LA rejected;
+        if(!storage_||storage_->retirementAttempted||storage_->e8PrefixRetired||
+           storage_->prefixResult.status!=S::effectChildrenRequired||storage_->prefixResult.sourcePC!=0x2cb6ccu)return rejected;
+        auto& piece=storage_->collections[0].pieces_[0];
+        if(!piece.effectInputsStillBound()||owner.context_!=piece.effectResource_||
+           binding.particleParent!=piece.effectParent_||binding.domain==&storage_->prefixDomain||
+           binding.actualObjectCount423F60!=storage_->actualObjectCount423F60||
+           binding.actualAttachmentLock423F58!=storage_->actualAttachmentLock423F58||
+           !binding.domain||binding.domain->sessionGeneration!=storage_->sessionGeneration||
+           !piece.effectArrays_.smoke160_||piece.effectArrays_.smokeWritten_||
+           piece.effectArrays_.anchorsWritten_!=piece.effects_.count174||!owner.admit(binding))return rejected;
+        for(std::size_t i=0;i<storage_->prefixDomain.count;++i)
+            if(storage_->prefixComponents[i]->objectKey==binding.componentKey)return rejected;
+        if(!owner.construct19A5E0(binding))return rejected;
+        piece.effectArrays_.smoke160_[0]=&owner.component_; //2CB700, before setup
+        piece.effectArrays_.smokeWritten_=1;
+        const bool ready=owner.setupAppend19A720();
+        storage_->prefixResult={ready?S::effectFireRequired:S::effectSmokeFailed,
+            owner.sourceBoundary(),storage_->prefixDomain.count,true};return storage_->prefixResult;
+    }
     bool retireFirstE8Prefix()noexcept {
         using S=OriginalWreckConstructorPrefixStatus50LA;
         if(!storage_||!storage_->e8ConstructorAttempted)return false;
         if(storage_->e8PrefixRetired)return true;
         if(storage_->retirementAttempted||storage_->e4PrefixRetired||!storage_->actualObjectCount423F60||
            !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
-           (storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed)||
+           (storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed&&
+            storage_->prefixResult.status!=S::mutualFiltersFailed&&storage_->prefixResult.status!=S::effectInputsRequired&&
+            storage_->prefixResult.status!=S::effectConstructorRequired&&storage_->prefixResult.status!=S::effectReturnRequired&&
+            storage_->prefixResult.status!=S::effectArraysFailed&&storage_->prefixResult.status!=S::effectChildrenRequired&&
+            storage_->prefixResult.status!=S::effectSmokeFailed&&storage_->prefixResult.status!=S::effectFireRequired)||
            !original_wreck_component_detail50LA::domain(storage_->prefixDomain))return false;
         auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
         auto& root=*piece.componentSlots_[0];auto& e4=*piece.componentSlots_[body+5u];auto& e8=*piece.componentSlots_[body+6u];
@@ -881,7 +991,11 @@ public:
            (storage_->e8ConstructorAttempted&&!storage_->e8PrefixRetired)||!storage_->actualObjectCount423F60||
            !storage_->actualAttachmentLock423F58||*storage_->actualAttachmentLock423F58||
            (storage_->prefixResult.status!=S::e8ConstructorRequired&&storage_->prefixResult.status!=S::e4PreparationFailed&&
-            storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed))return false;
+            storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed&&
+            storage_->prefixResult.status!=S::mutualFiltersFailed&&storage_->prefixResult.status!=S::effectInputsRequired&&
+            storage_->prefixResult.status!=S::effectConstructorRequired&&storage_->prefixResult.status!=S::effectReturnRequired&&
+            storage_->prefixResult.status!=S::effectArraysFailed&&storage_->prefixResult.status!=S::effectChildrenRequired&&
+            storage_->prefixResult.status!=S::effectSmokeFailed&&storage_->prefixResult.status!=S::effectFireRequired))return false;
         auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
         std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> live{};
         OriginalWreckComponentDomain50LA domain{storage_->sessionGeneration,live.data(),0};
@@ -922,7 +1036,11 @@ public:
            (storage_->prefixResult.status!=S::e4ConstructorRequired&&storage_->prefixResult.status!=S::contactConstructionFailed&&
             storage_->prefixResult.status!=S::e4PreparationRequired&&storage_->prefixResult.status!=S::e4ConstructionFailed&&
             storage_->prefixResult.status!=S::e8ConstructorRequired&&storage_->prefixResult.status!=S::e4PreparationFailed&&
-            storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed)||
+            storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed&&
+            storage_->prefixResult.status!=S::mutualFiltersFailed&&storage_->prefixResult.status!=S::effectInputsRequired&&
+            storage_->prefixResult.status!=S::effectConstructorRequired&&storage_->prefixResult.status!=S::effectReturnRequired&&
+            storage_->prefixResult.status!=S::effectArraysFailed&&storage_->prefixResult.status!=S::effectChildrenRequired&&
+            storage_->prefixResult.status!=S::effectSmokeFailed&&storage_->prefixResult.status!=S::effectFireRequired)||
            !storage_->prefixDomain.count)return false;
         auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
         std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> liveObjects{};
@@ -975,7 +1093,11 @@ public:
             storage_->prefixResult.status!=S::e4ConstructorRequired&&storage_->prefixResult.status!=S::contactConstructionFailed&&
             storage_->prefixResult.status!=S::e4PreparationRequired&&storage_->prefixResult.status!=S::e4ConstructionFailed&&
             storage_->prefixResult.status!=S::e8ConstructorRequired&&storage_->prefixResult.status!=S::e4PreparationFailed&&
-            storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed)||
+            storage_->prefixResult.status!=S::mutualFiltersRequired&&storage_->prefixResult.status!=S::e8ConstructionFailed&&
+            storage_->prefixResult.status!=S::mutualFiltersFailed&&storage_->prefixResult.status!=S::effectInputsRequired&&
+            storage_->prefixResult.status!=S::effectConstructorRequired&&storage_->prefixResult.status!=S::effectReturnRequired&&
+            storage_->prefixResult.status!=S::effectArraysFailed&&storage_->prefixResult.status!=S::effectChildrenRequired&&
+            storage_->prefixResult.status!=S::effectSmokeFailed&&storage_->prefixResult.status!=S::effectFireRequired)||
            !storage_->prefixDomain.count)return false;
         auto& piece=storage_->collections[0].pieces_[0];const auto body=1u+piece.sceneCount_;
         std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> live{};
@@ -1034,6 +1156,14 @@ public:
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e4ConstructionFailed||
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e8ConstructorRequired||
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::mutualFiltersRequired||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::mutualFiltersFailed||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::effectInputsRequired||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::effectConstructorRequired||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::effectReturnRequired||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::effectArraysFailed||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::effectChildrenRequired||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::effectSmokeFailed||
+                storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::effectFireRequired||
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e8ConstructionFailed||
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::e4PreparationFailed||
                 storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::contactConstructionFailed)&&storage_->e0PrefixRetired))||
@@ -1189,16 +1319,20 @@ public:
         }
         storage_->pieceCollectionRetirementAttempted=true;
         auto out=storage_->retirementResult;
-        //104970 reaches zero once. Actual2CB4B0 initialized160/164/170
-        // NULL, and this private pre-E4 path never reached their allocators.
-        //2CB500 therefore skips all three frees, then165BD0 reaches1413E0.
+        //104970 reaches zero once.2CB500 frees actual160/164/170 arrays,
+        //or follows their genuine constructor-NULL branches if unreached.
+        //External children, if reached, belong to their separate forest owner.
         --object.reference00;++out.referencesReleased;
+        if(piece.effectArrays_.attempted()&&!piece.effectArrays_.release2CB500())std::terminate();
         object.kind=K::entity141300;--*storage_->actualObjectCount423F60;++out.objectsDestroyed;
         // Only now has the source piece lifetime ended. End native borrows,
         // not source B4/B8 stores. Numeric zone values remain historical.
         piece.visibilityWorldB4_=nullptr;piece.collisionWorldB8_=nullptr;
         piece.collisionLifecycleB8_=nullptr;piece.setupZonesBound_=false;
         piece.actualWaterB0_=nullptr;piece.actualWaterGlobals_=nullptr;
+        // End native caller-field borrows only after genuine piece retirement.
+        // Preserve the committed source174 word and reached-input history.
+        piece.effectInputs_={};piece.effectResource_=nullptr;piece.effectParent_=nullptr;
         // The piece was never appended at22C1B8, so container child18 is
         // genuinely empty.22BF50 frees38 only; it never releases pointees.
         --container.reference00;++out.referencesReleased;

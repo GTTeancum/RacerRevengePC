@@ -26,12 +26,9 @@ class OriginalWreckType0Owners50LA final {
             (std::uint32_t(b[at+2])<<16)|(std::uint32_t(b[at+3])<<24);
     }
     static void freeArrays11AEE0(Resource& r)noexcept {
-        //11AF24,11AF3C,11AF5C,11AF7C. Radius backing belongs to native
-        //node semantics; clear it with nodes. Swap releases actual capacity.
-        decltype(r.mesh_.nodes){}.swap(r.mesh_.nodes);decltype(r.radii_){}.swap(r.radii_);
-        decltype(r.mesh_.faces){}.swap(r.mesh_.faces);
-        decltype(r.mesh_.vertices){}.swap(r.mesh_.vertices);
-        decltype(r.mesh_.vertex_normals){}.swap(r.mesh_.vertex_normals);
+        //11AF24/3C/5C/7C. Shared RA-backed resources retire their actual
+        //borrowed view; immutable native cache pins may remain afterwards.
+        r.releaseArrays11AEE0();
     }
     bool load11B920(const OriginalWreckAssets50LA& assets,SpringSceneId48N model,
         const std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA>& resolver,

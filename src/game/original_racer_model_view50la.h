@@ -9,6 +9,7 @@
 #error "Original racer model view requires strict finite IEEE arithmetic"
 #endif
 
+namespace original_main_entry50KG { struct Application; }
 namespace rr::game {
 // The actual current multi-node49O result, retained with the same completed
 // graphical model. These are source aggregate bounds, not the render AABB.
@@ -28,6 +29,10 @@ struct OriginalRacerModelDistanceFlags50LA {
 // One actual launch-owned setting corresponding to1A6AA0/2410E0. Capture
 // once from that session's launch subtype; draw consumers read the same value.
 class OriginalRacerModelRenderGlobals50LA final {
+    friend struct ::original_main_entry50KG::Application;
+    void setRaceDistance2410E0(std::uint32_t subtype)noexcept {
+        secondMapDistance382FA0_=subtype==3u?1000.f:130.f;
+    }
 public:
     explicit OriginalRacerModelRenderGlobals50LA(std::uint32_t launchSubtype11258)noexcept
         :secondMapDistance382FA0_(launchSubtype11258==3u?1000.f:130.f){}

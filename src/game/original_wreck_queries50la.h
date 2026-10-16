@@ -11,6 +11,7 @@
 #include "original_wreck_type0_owners50la.h"
 #include "original_wreck_type3_owners50la.h"
 #include "original_wreck_exclusion50la.h"
+#include "original_wreck_identity_list50la.h"
 #include "original_wreck_scene_domain50la.h"
 #include "original_wreck_piece_query_owner50la.h"
 #include "original_wreck_contact50la.h"
@@ -21,6 +22,7 @@
 #include <memory>
 
 namespace rr::game {
+struct OriginalWreckMovementQueryResult50LA;
 
 // Actual shared collision namespace and canonical collector slots. All three
 // slots are reserved COLD for this particular piece, before any world/query
@@ -95,6 +97,9 @@ struct OriginalWreckQueryCallbackResult50LA {
 // or empty-world/miss receipt is manufactured by this owner.
 class OriginalWreckQueries50LA final {
     friend class OriginalWreckRacerStorage50LA;
+    friend OriginalWreckMovementQueryResult50LA queryOriginalWreckMovement50LA(
+        OriginalWreckQueries50LA&,const OriginalWreckComponent50LA&,
+        const SpringVector4_48N&,const SpringVector4_48N&,std::uint32_t) noexcept;
 public:
     enum class QueryCallback { none,contact294BB0 };
     enum class ResponseCallback { none,physics165920,wreck2CB420 };
@@ -318,6 +323,8 @@ private:
                storage_->plannedQueries[0]->kind!=OriginalWreckComponentKind50LA::entity141300||
                object(0).identity!=storage_->world.identities[0]||object(0).shapeTag!=2u||object(0).hasShape)return false;
         }else if(storage_->e0FullPublication)return false;
+        if(storage_->fullMutualAttempted&&(!fullMutualOwnership()||
+           !storage_->sourceIdentityC0[0].retired()||!storage_->sourceIdentityC0[1].retired()))return false;
         const auto& w=storage_->world;
         if(storage_->e4FullPublication){
             const auto& g=w.geometry[w.refs[1]-1u];
@@ -526,6 +533,23 @@ public:
             return {S::preparation,0x11ca80u};
         return {S::complete,0u,true,false};
     }
+private:
+    // Existing121920 transaction reads/writes the actual full E8 owner. The
+    //legacy one-piece owner keeps its explicitly admitted inline representation.
+    bool readMovementProducerState(OriginalCameraWorldQueryState& stage)const noexcept {
+        if(!coherent(2))return false;
+        const auto& q=storage_->queries[2];
+        stage.type3=q.type3;stage.ray=q.ray;
+        return !q.type3Owners.attempted()||q.type3Owners.readProducerState(stage.type3,stage.ray);
+    }
+    bool commitMovementProducerState(const OriginalCameraWorldQueryState& stage,
+        const OriginalCameraWorldResult& receipt)noexcept {
+        if(!coherent(2)||receipt.status!=OriginalCameraWorldStatus::Complete)return false;
+        auto& q=query(2);
+        if(q.type3Owners.attempted()&&!q.type3Owners.commitProducerState(stage.type3,stage.ray,receipt))return false;
+        q.type3=stage.type3;q.ray=stage.ray;return true;
+    }
+public:
     //120070 always uses method2 and initial overlap radius ZERO. Call three
     // times E0,E4,E8 after the real preceding visibility28E8A0, not before it.
     OriginalWreckQueryResult50LA attach(unsigned i,CollectionRef50BX zone) noexcept {
@@ -609,6 +633,9 @@ private:
         std::array<std::uint32_t,2> categoryD8{};
         std::uint32_t waterCategoryE0=0;
         bool collectionFilterApplied=false;
+        bool fullMutualAttempted=false;
+        std::size_t fullMutualCursor=0;
+        std::array<OriginalWreckIdentityList50LA,2> sourceIdentityC0;
         bool e0ConstructorReached=false,e0ConstructorRetired=false;
         bool e0FullPublication=false,e0Prepared=false;
         bool e4ConstructorReached=false,e4ConstructorRetired=false;
@@ -767,6 +794,51 @@ private:
         s.world.geometry[index]={&mesh,q.type0.composed00,nullptr,true};
         s.published[1]=true;s.e4FullPublication=true;return {S::complete,0x1662dcu,true,false};
     }
+    bool fullMutualOwnership()const noexcept {
+        if(!storage_||!storage_->fullMutualAttempted)return false;
+        const auto& s=*storage_;if(s.fullMutualCursor>4u)return false;
+        for(std::size_t i=0;i<2;++i){const auto& owned=s.sourceIdentityC0[i];const auto& view=object(i).filter.identities[0];
+            const auto n=i==0?(s.fullMutualCursor<2u?s.fullMutualCursor:2u):(s.fullMutualCursor>2u?s.fullMutualCursor-2u:0u);
+            if(owned.extent()!=n)return false;
+            if(owned.retired()){
+                if((i==0?!s.e0ConstructorRetired:!s.e4ConstructorRetired)||view.values||view.capacity!=n||view.mode!=1||view.count!=static_cast<std::int32_t>(n))return false;
+            }else{
+                if(!owned.matches(view))return false;
+                if(n&&view.values[0]!=s.world.identities[i==0?1u:0u])return false;
+                if(n==2u&&view.values[1]!=s.world.identities[2])return false;
+            }
+        }
+        return true;
+    }
+    OriginalWreckQueryResult50LA constructFullMutual166390()noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!storage_||storage_->fullMutualAttempted||storage_->mutualBound||storage_->derivedBound||
+           !storage_->e8FullPublication||!storage_->e4FullPublication||!storage_->e0FullPublication||
+           storage_->initialShapesReady||!storage_->components[2]||
+           !canRetireFullE811B4A0(*storage_->components[2]))return {S::binding,0x166390u};
+        auto& s=*storage_;
+        for(std::size_t i=0;i<2;++i){
+            if(!s.components[i]||s.components[i]->reference00!=1u||!s.published[i]||
+               !s.sourceIdentityC0[i].matches(object(i).filter.identities[0]))return {S::binding,0x166394u};
+        }
+        s.fullMutualAttempted=true;
+        object(0).filter.identities[0].mode=1; //166394:123EA0(E0,1)
+        object(1).filter.identities[0].mode=1; //1663A0:123EA0(E4,1)
+        const std::size_t owner[4]={0,0,1,1},target[4]={1,2,0,2};
+        const std::uint32_t pc[4]={0x1663acu,0x1663b8u,0x1663c4u,0x1663d0u};
+        for(std::size_t i=0;i<4;++i){
+            if(!s.sourceIdentityC0[owner[i]].append123EB0(object(static_cast<unsigned>(owner[i])).filter.identities[0],
+                s.world.identities[target[i]]))return {S::allocation,pc[i]};
+            ++s.fullMutualCursor;
+        }
+        s.mutualBound=true;return {S::complete,0x1663d8u};
+    }
+    bool bindFullDerived2CB610()noexcept {
+        if(!storage_||!storage_->mutualBound||storage_->derivedBound||storage_->fullMutualCursor!=4u||
+           !fullMutualOwnership()||!storage_->published[1]||storage_->e4ConstructorRetired||
+           query(1).responseE8!=ResponseCallback::physics165920)return false;
+        query(1).responseE8=ResponseCallback::wreck2CB420;storage_->derivedBound=true;return true;
+    }
     bool canConstructE8Prefix11B190()const noexcept {
         if(!storage_||!storage_->e4FullPublication||storage_->e4ConstructorRetired||storage_->e8ConstructorReached||
            storage_->components[2]||storage_->published[2]||storage_->initialShapesReady)return false;
@@ -818,7 +890,8 @@ private:
     bool canRetireFullE811B4A0(const OriginalWreckComponent50LA& component)const noexcept {
         if(!storage_||!storage_->e8ConstructorReached||storage_->e8ConstructorRetired||storage_->components[2]!=&component||
            component.reference00!=1u||component.firstChild18||component.kind!=OriginalWreckComponentKind50LA::collision11B190||
-           storage_->initialShapesReady||storage_->mutualBound||storage_->derivedBound||storage_->collectionFilterApplied)return false;
+           storage_->initialShapesReady||((storage_->mutualBound||storage_->derivedBound)&&!storage_->fullMutualAttempted)||storage_->collectionFilterApplied||
+           (storage_->fullMutualAttempted&&!fullMutualOwnership()))return false;
         const auto& s=*storage_;const auto& q=s.queries[2];const auto& r=s.world.lifecycle->storage.registrations[s.world.refs[2]-1u];
         if(r.owner||r.slot||r.encodedObject||q.membership.attached||q.membership.object||q.membership.revision||
            q.owner9C!=(s.e8OwnerBound?s.piece:nullptr)||q.contactOwner9C||q.bodyA0||
@@ -851,13 +924,14 @@ private:
         if(!storage_||!storage_->e4CallbacksBound||storage_->e4ConstructorRetired||
            storage_->components[1]!=&component||component.reference00!=1u||component.firstChild18||
            component.kind!=OriginalWreckComponentKind50LA::collision11B190||storage_->published[2]||
-           storage_->initialShapesReady||storage_->mutualBound||storage_->derivedBound||storage_->collectionFilterApplied)return false;
+           storage_->initialShapesReady||((storage_->mutualBound||storage_->derivedBound)&&!storage_->fullMutualAttempted)||storage_->collectionFilterApplied||
+           (storage_->fullMutualAttempted&&!fullMutualOwnership()))return false;
         const auto& s=*storage_;const auto& q=s.queries[1];const auto* resource=q.type0Owners.resource();
         if(!q.type0Owners.loaded()||!resource||!resource->live()||!modelSceneIdentity().value||
            q.type0Owners.shape8C_->model110.value!=modelSceneIdentity().value||q.type0.registrationE0||
            q.membership.attached||q.membership.object||q.membership.revision||q.owner9C!=s.piece||
            q.contactOwner9C||q.bodyA0!=&s.physical->body.root||q.queryE4!=QueryCallback::none||
-           q.responseE8!=ResponseCallback::physics165920)return false;
+           q.responseE8!=(s.derivedBound?ResponseCallback::wreck2CB420:ResponseCallback::physics165920))return false;
         const auto& r=s.world.lifecycle->storage.registrations[s.world.refs[1]-1u];
         if(r.owner||r.slot||r.encodedObject)return false;
         for(std::size_t i=0;i<s.capacity;++i){const auto& e=q.entries[i];
@@ -868,7 +942,9 @@ private:
             if(!s.e4Prepared||o.identity!=s.world.identities[1]||!o.hasShape||o.shapeTag||o.group||
                o.typeTag!=*s.world.collisionTypeGp8010||o.filter.flags31!=component.flags29||
                g.mesh!=&resource->mesh()||g.compound||!g.hasResponseCallbackE8)return false;
-            for(const auto& list:o.filter.identities)if(list.values||list.count)return false;
+            if(s.fullMutualAttempted){if(!s.sourceIdentityC0[1].matches(o.filter.identities[0]))return false;}
+            else if(o.filter.identities[0].values||o.filter.identities[0].count)return false;
+            if(o.filter.identities[1].values||o.filter.identities[1].count)return false;
             if(o.filter.categories.values||o.filter.categories.count)return false;
         }
         return true;
@@ -878,6 +954,7 @@ private:
         if(!storage_||!storage_->e4CallbacksBound||storage_->components[1]!=&component||
            component.reference00||storage_->e4ConstructorRetired)return false;
         auto& s=*storage_;auto& q=s.queries[1];
+        if(s.fullMutualAttempted&&!s.sourceIdentityC0[1].release11B4F4(object(1).filter.identities[0]))return false;
         if(!q.type0Owners.release11B600())return false;
         if(s.e4FullPublication){
             object(1).hasShape=false; //11B900; preserve shape tag/filter/bounds/history
@@ -888,7 +965,7 @@ private:
         }
         component.kind=OriginalWreckComponentKind50LA::entity141300;--count;
         q.owner9C=nullptr;q.bodyA0=nullptr; //native borrows end after actual lifetime
-        s.components[1]=nullptr;s.published[1]=false;s.e4ConstructorRetired=true;return true;
+        s.components[1]=nullptr;s.published[1]=false;s.e4ConstructorRetired=true;s.derivedBound=false;return true;
     }
     bool canRetireE4Prefix11B4A0(const OriginalWreckComponent50LA& component)const noexcept {
         if(!storage_||!storage_->e4ConstructorReached||storage_->e4ConstructorRetired||
@@ -915,8 +992,8 @@ private:
         if(!storage_||!storage_->e0FullPublication||storage_->e0ConstructorRetired||
            (storage_->e4ConstructorReached&&!storage_->e4ConstructorRetired)||
            storage_->initialShapesReady||storage_->published[1]||storage_->published[2]||
-           storage_->mutualBound||storage_->derivedBound||storage_->collectionFilterApplied||
-           !modelSceneIdentity().value)return false;
+           (storage_->mutualBound&&!storage_->fullMutualAttempted)||storage_->derivedBound||storage_->collectionFilterApplied||
+           (storage_->fullMutualAttempted&&!fullMutualOwnership())||!modelSceneIdentity().value)return false;
         const auto& s=*storage_;const auto& q=s.queries[0];
         if(!q.type2||!q.type2->sourceOwners.loaded()||q.membership.attached||
            q.membership.object||q.membership.revision)return false;
@@ -945,8 +1022,9 @@ private:
         if(!storage_||!storage_->e0FullPublication||storage_->e0ConstructorRetired||
            (storage_->e4ConstructorReached&&!storage_->e4ConstructorRetired)||
            storage_->components[0]!=&component||component.reference00!=1u||component.firstChild18||
-           storage_->published[1]||storage_->published[2]||storage_->mutualBound||
-           storage_->derivedBound||storage_->collectionFilterApplied)return false;
+           storage_->published[1]||storage_->published[2]||(storage_->mutualBound&&!storage_->fullMutualAttempted)||
+           storage_->derivedBound||storage_->collectionFilterApplied||
+           (storage_->fullMutualAttempted&&!fullMutualOwnership()))return false;
         const auto& s=*storage_;const auto& q=s.queries[0];const auto& w=s.world;
         if(!q.type2||!q.type2->sourceOwners.loaded()||!s.sceneDomain->canRetireShape11B600(s.modelScene44,component)||
            q.membership.attached||q.membership.object||q.membership.revision||
@@ -968,7 +1046,9 @@ private:
         if(object(0).typeTag!=*w.collisionTypeGp8010||object(0).group||
            object(0).filter.flags31!=component.flags29)return false;
         const auto& f=object(0).filter;
-        for(const auto& list:f.identities)if(list.values||list.count)return false;
+        if(s.fullMutualAttempted){if(!s.sourceIdentityC0[0].matches(f.identities[0]))return false;}
+        else if(f.identities[0].values||f.identities[0].count)return false;
+        if(f.identities[1].values||f.identities[1].count)return false;
         return !f.categories.values&&!f.categories.count;
     }
     bool retireFullE011B4A0(OriginalWreckComponent50LA& component,std::uint32_t& objectCount)noexcept {
@@ -976,6 +1056,7 @@ private:
         if(!storage_||component.reference00||storage_->components[0]!=&component||
            !storage_->e0FullPublication||storage_->e0ConstructorRetired)return false;
         auto& s=*storage_;auto& q=s.queries[0];
+        if(s.fullMutualAttempted&&!s.sourceIdentityC0[0].release11B4F4(object(0).filter.identities[0]))return false;
         if(!q.type2->sourceOwners.releaseShapeResult11B600())return false;
         object(0).hasShape=false; //11B900 clears8C, leaves source88/category/history
         if(!s.sceneDomain->retireShape11B600(s.modelScene44,q.type2->sourceOwners,component))std::terminate();
@@ -983,7 +1064,7 @@ private:
         // End native borrows only AFTER actual E0 lifetime; these are not
         // claimed source stores clearing the dead object's callback words.
         q.owner9C=nullptr;q.bodyA0=nullptr;q.contactOwner9C=nullptr;q.queryE4=QueryCallback::none;
-        s.contactBound=false;s.components[0]=nullptr;
+        s.contactBound=false;s.mutualBound=false;s.components[0]=nullptr;
         s.published[0]=false;s.e0ConstructorRetired=true;return true;
     }
     bool canRetireE0Prefix11B4A0(const OriginalWreckComponent50LA& component)const noexcept {

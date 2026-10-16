@@ -185,6 +185,7 @@ Status dispatchBorrowed(const Type3QueryInput48P& input,const Type3QueryContext4
     if(!(square<squareRadius))return Status::Complete;
     state.selectedFraction=1.f;state.hitCount=0;
     for(std::size_t i=0;i<count;++i)rays.fractions[i]=-1.f;
+    if(scratch)scratch->fractionsWritten=true;
     if(candidate.shapeType!=0&&candidate.shapeType!=1)return Status::Complete;
     if(!shapePresent)return Status::UnsupportedScope;
     if(candidate.shapeType==0)return dispatchMesh50IJ(input,context,mesh,matrix,true,c.geometry.id==c.filter.identity,rays,stack,stackCapacity,state,hit,scratch);
@@ -221,7 +222,7 @@ Type3QueryStatus48P dispatchType3BorrowedWithScratch48U(const Type3QueryInput48P
     const CollisionSphere48J& sphere,const assets::CollisionMesh48I* mesh,const BodyMatrix48G& matrix,bool shapePresent,
     const Type3RayBuffers48P& rays,std::uint32_t* stack,std::size_t stackCapacity,
     Type3QueryState48P& state,bool& hit,Type3VectorScratch48U& scratch) noexcept {
-    scratch.written=false;
+    scratch.written=false;scratch.fractionsWritten=false;
     return dispatchBorrowed(input,context,candidate,sphere,mesh,matrix,shapePresent,
         rays,stack,stackCapacity,state,hit,&scratch);
 }

@@ -42,7 +42,7 @@ class OriginalPositionStatsHud50LA final:public OriginalPositionStatsNativeOwner
         }catch(...){return fail(d,0x191af0);}
     }
     bool appendTextureObject(R::Texture& t,std::uint32_t material,D& d)noexcept {
-        if(!t.buffer58||t.buffer58->count!=4||t.field3C!=0||t.field30!=1||
+        if(!t.buffer58||t.buffer58->count!=4||t.field3C!=0||(t.flags5C&2u)||t.field30!=1||
            draw_.quadCount==draw_.maximumQuads||draw_.packetCount==draw_.maximumPackets)return fail(d,0x2df550);
         if(t.flags5C&1u){
             for(unsigned v=0;v<4;++v){auto& p=t.buffer58->vertices[v];

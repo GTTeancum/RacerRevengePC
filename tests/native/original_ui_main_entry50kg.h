@@ -1,7 +1,8 @@
 #pragma once
 namespace original_course_targets50KX { class ConsumedLaunch; }
+namespace ra_cold_aggregate50LA { class Owner; }
 namespace ra_cold_sources50LA { class ColdNavigationLease; }
-namespace rr::game { class OriginalRaceConstructor50LA; class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
+namespace rr::game { class OriginalRacerModelRenderGlobals50LA; class OriginalRaceConstructor50LA; class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
 namespace original_camera_session50KX { class Session; }
 namespace native_ai50IV { struct Session; }
@@ -143,6 +144,7 @@ private:
     // zeroing. Its gameplay meaning/nonzero producer is not established.
     // Retain actual storage once with Application, never per race/session.
     std::uint32_t sourceProcessWord3E1C10_=0;
+    mutable std::int32_t sourceApplicationMode22C_=1; //13FDBC genuine constructor store.
     void clearRaceProcessWord1A6884() noexcept { sourceProcessWord3E1C10_=0; }
 
     mutable std::weak_ptr<RaceDisplayLifetime50LA> raceDisplayOwner50LA_;
@@ -294,6 +296,15 @@ public:
     std::shared_ptr<rr::game::OriginalRaceTuning50LA> retainRaceTuningCold1A7184()const noexcept;
     std::shared_ptr<rr::game::OriginalRaceConstructor50LA> constructConsumedRaceCold1A65C0(
         original_course_targets50KX::ConsumedLaunch&,std::uint64_t session,std::uint32_t& sourcePC)const noexcept;
+    bool populateConsumedRaceResources1AA5A0(rr::game::OriginalRaceConstructor50LA&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool beginConsumedRaceLoad1A6AA0(rr::game::OriginalRaceConstructor50LA&,
+        rr::game::OriginalRacerModelRenderGlobals50LA&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool rollbackNativeRaceLoadPrefix(rr::game::OriginalRaceConstructor50LA&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool constructConsumedRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
+        std::shared_ptr<ra_cold_aggregate50LA::Owner>,std::uint32_t& sourcePC)const noexcept;
+    std::int32_t applicationMode22C()const noexcept{return sourceApplicationMode22C_;}
     // Exact conditional443848 typed destruction leaf; never an implicit drain.
     bool retireNativeCollector1A6948(rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     // Source-only detached ownership. Definitions are in original_pause_entity50la.h.

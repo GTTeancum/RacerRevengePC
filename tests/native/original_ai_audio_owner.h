@@ -374,9 +374,19 @@ public:
         field24C=materialD44_.resetField24C(r.materialD44,r.engine);
         if(!field24C)return false;flags22C=&r.engine.flags22CLow4;return true;
     }
-    void close()noexcept {for(std::size_t slot=firstAiSlot_;slot<racers_.size();++slot){auto& r=racers_[slot];
-        if(speechPrepared_)r.speechProvider.stopAll();r.materials.close();r.materialD44=nullptr;r.wrecks.close();r.loops.close();}
-        humanMaterials_.close();materialD44_.close();humanResetOwner_=nullptr;humanResetD44_=nullptr;prepared_=false;materialPrepared_=false;materialNativeBound_=false;speechPrepared_=false;}
+    void close()noexcept {
+        // Close every public update admission before any borrowed sound is
+        // retired. Preserve the reached speech preparation for actual voice stops.
+        // A failed prepare may already have registered a subset of emitters.
+        const bool stopSpeech=speechPrepared_;
+        attempted_=true;prepared_=false;activated_=false;listenerReady_=false;mode_=nullptr;
+        materialPrepared_=false;materialNativeBound_=false;
+        speechPrepared_=false;speechInitialized_=false;
+        aural_.retireNativeRegistrations();
+        for(std::size_t slot=firstAiSlot_;slot<racers_.size();++slot){auto& r=racers_[slot];
+        if(stopSpeech)r.speechProvider.stopAll();r.materials.close();r.materialD44=nullptr;r.wrecks.close();r.loops.close();}
+        humanMaterials_.close();materialD44_.close();humanResetOwner_=nullptr;humanResetD44_=nullptr;
+    }
     bool prepared()const noexcept{return prepared_;}
     bool ownsSlot(std::size_t actualManagerOrdinal)const noexcept {
         return prepared_&&materialD44_.ownsAiSlot(actualManagerOrdinal);
