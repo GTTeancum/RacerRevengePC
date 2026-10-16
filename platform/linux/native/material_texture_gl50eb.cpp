@@ -1,5 +1,6 @@
 #include "../../../tests/native/ra_static_fire_visual50la.h"
 #include "material_texture_gl50eb.h"
+#include "../../../src/assets/original_native_texture_upload50la.h"
 #include "../../../tests/native/ra_cold_aggregate50la.h"
 #include <exception>
 #include <limits>
@@ -254,11 +255,16 @@ bool MaterialTextureGl50EB::create(const MaterialTextureGlRequest50EB& request,
     next->isCurrent = request.isCurrent;
     next->count = bank.textureCount();
     next->bytes = bytes;
+    assets::OriginalNativeTextureUploadScope50LA transfer(
+        request.originalUploadBinding,*this,request.context,request.isCurrent);
+    if(!transfer.admitted())
+        return fail(d,MaterialTextureGlError50EB::request,"actual display upload lifetime rejected");
     if (!next->upload(bank, request.samplers, d)) {
         next->cleanup(d);
         if (d.cleanupIncomplete) storage_ = std::move(next);
         return false;
     }
+    transfer.completed();
     storage_ = std::move(next);
     ++lastPublication_;
     return true;

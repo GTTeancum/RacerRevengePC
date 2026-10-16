@@ -5,12 +5,15 @@
 #include "../../src/game/original_pod_cable_allocation50la.h"
 #include "../../src/game/original_zone_scissor50la.h"
 #include <list>
+#include <thread>
 #include <limits>
 #include <vector>
 namespace original_main_entry50KG {
 // Inactive native443848 semantic FIFO. The actual Application owns exactly
-//one process instance. No source command words, synthetic frame or drain.
+//one active process-slot instance. Source race teardown clears that slot; a
+//later genuine constructor may create its successor. No synthetic frame/drain.
 class NativeCollectorFifo50LA final {
+    friend struct Application;
     friend class ::original_cable_selection50LA::Binding;
     friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class rr::platform::VehicleWindowGl50DS;
@@ -45,7 +48,8 @@ class NativeCollectorFifo50LA final {
     Zone scissor4014_; // Actual slot; value_ starts null at24B704.
     std::list<Record> records_; // Stable native nodes, source insertion order.
     std::vector<Leaf> leaves_; // Actual registration ordinals; redirects share final leaf.
-    bool draining_=false;
+    bool draining_=false,closed_=false;
+    const std::thread::id ownerThread_=std::this_thread::get_id();
     NativeCollectorFifo50LA(const Application& app,std::shared_ptr<Table> table)
         :application_(&app),table_(std::move(table)),scissor4014_(app.entitiesOwner_.get()){}
     static std::shared_ptr<NativeCollectorFifo50LA> actualApplication(Pin& pin,
@@ -57,7 +61,7 @@ class NativeCollectorFifo50LA final {
         if(!app->nativeCollectorFifoOwner_)
             app->nativeCollectorFifoOwner_=std::shared_ptr<NativeCollectorFifo50LA>(new NativeCollectorFifo50LA(*app,table));
         const auto& fifo=app->nativeCollectorFifoOwner_;
-        return fifo->application_==app&&fifo->table_==table?fifo:nullptr;
+        return !fifo->closed_&&fifo->application_==app&&fifo->table_==table?fifo:nullptr;
     }
     const rr::game::OriginalApplicationEntities50LA* applicationEntities()const noexcept {
         return application_?application_->entitiesOwner_.get():nullptr;
@@ -65,7 +69,7 @@ class NativeCollectorFifo50LA final {
     Result accept24B9B0(std::shared_ptr<Allocation> allocation,std::uint32_t strip,
         std::shared_ptr<Bridge> camera,native_racer50HW::Cables& cables,std::unique_ptr<Binding> binding,
         std::unique_ptr<Pin> display,const Zone& zone,const Visibility& visibility)noexcept {
-        if(draining_||!allocation||!camera||!binding||!binding->context_||!display||!display->owner_||
+        if(closed_||draining_||!allocation||!camera||!binding||!binding->context_||!display||!display->owner_||
            camera->closed_||camera->nativeFifoPins_==std::numeric_limits<std::uint32_t>::max()||
            display->owner_->application_!=application_||!display->owner_->canRetain()||
            binding->context_->videoIdentity()!=display->owner_->video_.get()||
@@ -114,7 +118,9 @@ class NativeCollectorFifo50LA final {
             return {Status::acceptedCpuOnly,0x24ba28u,true};
         }catch(...){if(tablePinned)table_->unpinNativeCollector();return {Status::allocation,0x105720u};}
     }
+    bool retire24B720(const Application&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
     Result drain24B7B0()noexcept {
+        if(closed_)return {Status::owner,0x24b7b0u};
         // Even an empty source drain performs renderer/global work before
         //105990 and epoch increment. No glFinish/empty-queue substitute.
         // The real lowering has no implementation/receipt producer yet.
@@ -133,7 +139,7 @@ class NativeCollectorFifo50LA final {
             :owner_(&owner),epoch_(owner.epoch04_),count_(owner.records_.size()){}
     };
     bool commitActualDrain(const CompletedLowering& done)noexcept {
-        if(!draining_||done.owner_!=this||done.epoch_!=epoch04_||done.count_!=records_.size())return false;
+        if(closed_||!draining_||done.owner_!=this||done.epoch_!=epoch04_||done.count_!=records_.size())return false;
         //105990 belongs AFTER all actual source drain work. Resources survive
         //every unsupported/failed drain; this is its only successful release.
         for(auto& record:records_){
@@ -155,6 +161,38 @@ public:
         if(!records_.empty())std::terminate(); // No implicit failed-queue discard.
     }
 };
+inline bool NativeCollectorFifo50LA::retire24B720(const Application& app,
+    rr::assets::OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+    using S=rr::assets::OriginalStandardMaterialStatus50LA;
+    d={};
+    if(application_!=&app||app.nativeCollectorFifoOwner_.get()!=this||closed_||draining_||
+       ownerThread_!=std::this_thread::get_id()||!records_.empty()||
+       !table_||!app.standardMaterialDomainOwner_||
+       app.standardMaterialDomainOwner_->materials382B38()!=table_||
+       !table_->canRetireNativeCollector29C300()){
+        d.status=S::phase;d.sourcePC=0x1a6948u;return false;
+    }
+    // No native4010 lowering allocation exists in this implementation. Future
+    // real lowering must retire its actual backing BEFORE the base destructor.
+    // Allocator08 has no live accepted records; no drain/105990/epoch advance
+    // is synthesized. Every rejection above preserves all dependent lifetimes.
+    closed_=true;
+    //29C354/360 clears443848 iff this is the actual registered instance.
+    // Application entry retains this storage through registration cleanup.
+    app.nativeCollectorFifoOwner_.reset();
+    table_->retireNativeCollector29C300();
+    leaves_.clear();registry_={};
+    scissor4014_.value_.reset();scissor4014_.owner_=nullptr;
+    scissor4014_.cameraGeneration_=0;
+    table_.reset();
+    d.sourceEffectsCommitted=true;d.sourcePC=0x24b778u;return true;
+}
+inline bool Application::retireNativeCollector1A6948(
+    rr::assets::OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
+    d={};const auto fifo=nativeCollectorFifoOwner_;
+    if(!fifo)return true; //Actual1A6930/38 null branch: no destructor reached.
+    return fifo->retire24B720(*this,d);
+}
 }
 
 namespace ra_source_camera50LA {
@@ -168,7 +206,7 @@ inline bool OwnershipBridge::drawZonePrefix114E00(const ZoneDrawEntry114E00& ent
     // The actual factory-associated Application, canonical materials and same
     // selected SourceCamera own this store. No supplied replacement4014 slot.
     if(!session.actual_.applicationEntities||!session.actual_.applicationMaterials||
-       !fifo.application_||fifo.draining_||
+       !fifo.application_||fifo.closed_||fifo.draining_||
        fifo.applicationEntities()!=session.actual_.applicationEntities.get()||
        fifo.table_!=session.actual_.applicationMaterials||
        &session.actual_.visibility!=freshLighting_.get()||

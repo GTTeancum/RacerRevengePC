@@ -4,6 +4,7 @@
 #include <exception>
 
 namespace rr::game {
+class OriginalTunnelTrack50LA;
 class OriginalApplicationEntities50LA;
 class OriginalPauseStorage50LA;
 // One native Application's lifetime membership. Session generations remain the
@@ -12,6 +13,7 @@ class OriginalPauseStorage50LA;
 class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalApplicationEntities50LA;
     friend class OriginalPauseStorage50LA;
+    friend class OriginalTunnelTrack50LA;
     using C=OriginalWreckComponent50LA;
     struct Entry { C* node=nullptr;std::uint64_t generation=0,key=0; };
     std::array<Entry,maxOriginalWreckComponents50LA> entries_{};

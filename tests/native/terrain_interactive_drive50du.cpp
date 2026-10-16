@@ -105,6 +105,8 @@
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/host_session_menu50if.h"
 #include "original_ui_main_entry50kg.h"
+#include "original_race_tuning50la.h" // Inactive same-source C0 ownership.
+#include "original_tunnel_track50la.h" // Inactive genuine spline Entity ownership.
 #include "original_pause_observation50la.h" // Inactive source-only settings observer.
 #include "original_race_display_lifetime50la.h"
 #include "original_position_stats_primitives50la.h"
@@ -5314,6 +5316,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // mip, linear filtering and repeat. This does not reproduce original shaders.
   platform::MaterialTextureGlRequest50EB textureRequest{};
   textureRequest.context=&host;textureRequest.isCurrent=renderRequest.isCurrent;
+  require50DU(sourceDisplayLifetime->bindTextureUploadRequest(textureRequest),
+      "actual Application direct-upload lifetime binding rejected");
   const char* missingTextureProc=nullptr;
   require50DU(platform::loadMaterialTextureFunctions50EE(&host,renderRequest.procAddress,
       textureRequest.gl,missingTextureProc),"required texture GL entry point unavailable");

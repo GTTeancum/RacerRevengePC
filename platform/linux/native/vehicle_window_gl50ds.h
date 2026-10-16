@@ -297,6 +297,8 @@ struct VehicleWindowRacerArchetype50DS {
     VehicleWindowCables50DS cables{};
 };
 struct VehicleWindowRequest50DS {
+    // Actual display-sealed direct-transfer binding, retained through local HUD uploads.
+    std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA> originalUploadBinding;
     // Actual retained RA aggregate and its complete immutable 49-image GPU bank.
     // This selects the dedicated byte-material world path, never legacy track
     // shading. Prepare current native lighting/diffuse/fog bindings before submit.

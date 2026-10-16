@@ -3,6 +3,7 @@
 #include "graph_body49w.h"
 #include "spring_model48k.h"
 #include "spring_records48n.h"
+#include "original_wreck_record_array50la.h"
 #include "vehicle_aero48e.h"
 #include <array>
 #include <cfenv>
@@ -35,8 +36,8 @@ struct OriginalWreckPhysical50LA final {
     //295C20 allocates two separate50-record arrays. Their unused payload is
     //not source-initialized; only reached records written by real producers
     //may be consumed. C++ initial values are not a source validity receipt.
-    std::array<SpringRecord48N,50> records{};       //DC8C generated storage
-    std::array<SpringRecord48N,50> pointRecords{};  //DC80 point storage
+    OriginalWreckRecordArray50LA records;       //DC8C generated storage
+    OriginalWreckRecordArray50LA pointRecords;  //DC80 point storage
     SpringGeneratedParameters48K generated{};
     // Full source DC110/120 caches; the existing48K parameters hold XYZ.
     //2964C0 and296F10 write W=1 independently of every D0 fourth lane.
@@ -173,18 +174,18 @@ inline void initializeOriginalWreckPieceFields50LA(OriginalWreckPieceFields50LA&
     p.explicitCandidateCount148=0;
 }
 
-//295A40 represented response defaults,295C20(50) storage metadata, and the
-//actual165E90 overrides. No record payload is initialized or declared valid.
+//295A40 represented response defaults only. Array allocation295C20, body
+//binding and165E90 overrides are later phases; no record payload is valid.
 //DC30 must be bound to this same body by the owner; detector/query/scene links
 //are separate concrete owners. Authored166400/22C310 tuning follows later.
-inline bool initializeOriginalWreckContact50LA(OriginalWreckPhysical50LA& p,
+inline bool initializeOriginalWreckContactConstructor295A40_50LA(OriginalWreckPhysical50LA& p,
     const OriginalWreckComponent50LA& contactComponent,
     const SpringVector4_48N& actualVector4435A0) noexcept {
     using namespace original_wreck_physical_detail50LA;
     if(contactComponent.kind!=OriginalWreckComponentKind50LA::contact295A40||
        !contactComponent.objectKey||!contactComponent.sessionGeneration||p.contactConstructorFieldsApplied)return false;
-    p.spring={};p.spring.generatedCapacity88=50;
-    p.contactBody30=&p.body;p.contactMode34=1;
+    p.spring={};
+    p.contactBody30=nullptr;p.contactMode34=0;
     auto& g=p.generated;auto& a=g.impact;
     a.worldCenter110={{0.f,0.f,0.f}};
     p.worldCenter110W=1.f; //295A6C vector default constructor
@@ -193,16 +194,34 @@ inline bool initializeOriginalWreckContact50LA(OriginalWreckPhysical50LA& p,
     std::memcpy(&p.contactVelocity120W,actualVector4435A0.v+3,4); //295B44
     a.normalForceScale98=1.f;a.angularImpulseScaleB0=1.f;a.forceTorqueScaleB4=1.f;
     a.restitutionB8=0.f;a.restitutionBC=0.f;a.restitutionC0=0.f;
-    a.positionCorrectionScaleCC=word(0x3ba3d70au);a.angularCorrectionScaleD0=0.f;
-    a.disableLeverArms5C=false;a.correctPenetration64=true;a.yawOnly6C=false;a.customCenter70=false;
+    a.positionCorrectionScaleCC=word(0x3d4ccccdu);a.angularCorrectionScaleD0=0.f;
+    a.disableLeverArms5C=false;a.correctPenetration64=false;a.yawOnly6C=false;a.customCenter70=false;
     g.frictionTorqueScaleC4=1.f;g.frictionByMaterial.fill(0.f);
-    g.pointContacts48=true;g.springForce4C=false;g.friction50=true;g.impact54=true;
+    g.pointContacts48=true;g.springForce4C=true;g.friction50=true;g.impact54=true;
     g.otherSpring58=false;g.secondary68=false;
     p.response.maxPenetration90=0.f;p.response.maxSpeed94=word(0x461c4000u);
     p.response.stiffness9C=0.f;p.response.dampingA0=0.f;
     p.response.impactStiffnessA4=0.f;p.response.impactDampingA8=0.f;
     p.response.secondaryAtLimit60=false;p.normalVelocityScaleAC=1.f;
     p.contactConstructorFieldsApplied=true;return true;
+}
+
+// Actual1660F0..16615C overrides, AFTER POINT generation296190.
+inline void applyOriginalWreckContact1660F0_50LA(OriginalWreckPhysical50LA& p)noexcept {
+    p.contactMode34=1;p.generated.impact54=true;p.generated.springForce4C=false;
+    p.generated.impact.correctPenetration64=true;p.generated.friction50=true;
+    p.normalVelocityScaleAC=1.f;p.generated.impact.angularImpulseScaleB0=1.f;
+    p.generated.impact.forceTorqueScaleB4=1.f;p.generated.frictionTorqueScaleC4=1.f;
+    p.generated.impact.positionCorrectionScaleCC=original_wreck_physical_detail50LA::word(0x3ba3d70au);
+    p.generated.impact.angularCorrectionScaleD0=0.f;p.generated.impact.normalForceScale98=1.f;
+}
+// Preserve the existing legacy owner's combined admission. The full owner
+// invokes the genuine phases separately, with actual array ownership between.
+inline bool initializeOriginalWreckContact50LA(OriginalWreckPhysical50LA& p,
+    const OriginalWreckComponent50LA& component,const SpringVector4_48N& vector4435A0)noexcept {
+    if(!initializeOriginalWreckContactConstructor295A40_50LA(p,component,vector4435A0))return false;
+    p.spring.generatedCapacity88=50;p.contactBody30=&p.body;
+    applyOriginalWreckContact1660F0_50LA(p);return true;
 }
 
 enum class OriginalWreckBodyControlStatus50LA : std::uint8_t {

@@ -92,8 +92,11 @@ public:
         pending_.reset();
         for(std::size_t n=0;n<publicationCount_;++n)entries_[publicationOrder_[n]].reset();
         publicationCount_=0;
-        terminal_=true;terminalDiagnostic_.status=OriginalApplicationFontStatus50LA::phase;
-        terminalDiagnostic_.sourcePC=0x282190;return true;
+        //282190 empties the SAME list; only282280 subsequently deletes it.
+        // Successful cleanup is not a permanent font-load failure. Preserve
+        // any genuine earlier failure/diagnostic rather than clearing it, but
+        // leave a previously healthy registry available for reached282430.
+        return true;
     }
     bool terminal()const noexcept{return terminal_;}
     std::shared_ptr<const Entry> find282210(Name name)const noexcept {

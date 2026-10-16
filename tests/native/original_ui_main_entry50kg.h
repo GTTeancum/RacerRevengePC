@@ -1,5 +1,6 @@
 #pragma once
-namespace rr::game { class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
+namespace ra_cold_sources50LA { class ColdNavigationLease; }
+namespace rr::game { class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
 namespace original_camera_session50KX { class Session; }
 namespace native_ai50IV { struct Session; }
@@ -11,6 +12,7 @@ namespace native_ai50IV { struct Session; }
 #include "../../src/assets/original_ui_localization50kg.h"
 #include "../../src/assets/original_ui_material_application50la.h"
 #include "../../src/assets/original_standard_material_context50la.h"
+#include "../../src/assets/original_native_texture_upload50la.h"
 #include "../../src/assets/original_standard_material_domain50la.h"
 #include "../../src/assets/original_application_fonts50la.h"
 #include "../../src/game/lap_host_clock50id.h"
@@ -21,6 +23,7 @@ namespace native_ai50IV { struct Session; }
 #include "../../src/game/original_speed_boost50la.h"
 #include "../../src/game/original_damage50la.h"
 #include "../../src/game/original_ui_light_manager_lifetime50kg.h"
+#include <array>
 #include <filesystem>
 #include <chrono>
 #include <cstdlib>
@@ -133,9 +136,18 @@ struct Application {
     // not admitted; never reinitialize this owner on page/race/session entry.
 private:
     friend struct Video;
+    friend struct Frontend;
     friend class NativeCollectorFifo50LA;
+    // Opaque original process word3E1C10, included in entry100008..30 BSS
+    // zeroing. Its gameplay meaning/nonzero producer is not established.
+    // Retain actual storage once with Application, never per race/session.
+    std::uint32_t sourceProcessWord3E1C10_=0;
+    void clearRaceProcessWord1A6884() noexcept { sourceProcessWord3E1C10_=0; }
+
     mutable std::weak_ptr<RaceDisplayLifetime50LA> raceDisplayOwner50LA_;
     mutable std::weak_ptr<rr::game::OriginalPauseStorage50LA> pauseColdOwner50LA_;
+    mutable std::array<std::weak_ptr<rr::game::OriginalTunnelTrack50LA>,2> tunnelTrackColdOwners50LA_;
+    mutable std::weak_ptr<rr::game::OriginalRaceTuning50LA> raceTuningColdOwner50LA_;
     // Process443848 FIFO identity. Scene/display close cannot silently reset it.
     mutable std::shared_ptr<NativeCollectorFifo50LA> nativeCollectorFifoOwner_;
     mutable std::uint64_t raceDisplayGeneration50LA_=0;
@@ -272,6 +284,14 @@ public:
     bool preparePositionStatsText50LA(rr::game::OriginalPositionStatsResources50LA&,
         const original_camera_session50KX::Session&,const native_ai50IV::Session&,
         rr::game::OriginalPositionStatsResourceDiagnostic50LA&) const noexcept;
+    // Detached source-stage TunnelTrack ownership; no race publication/activation.
+    std::shared_ptr<rr::game::OriginalTunnelTrack50LA> constructTunnelTrackCold2A1160(
+        std::uint64_t,rr::game::OriginalTunnelTrackRole50LA,
+        std::shared_ptr<const ra_cold_sources50LA::ColdNavigationLease>)const noexcept;
+    bool bindTunnelTrackColdProjection2A1260(rr::game::OriginalTunnelTrack50LA&)const noexcept;
+    std::shared_ptr<rr::game::OriginalRaceTuning50LA> retainRaceTuningCold1A7184()const noexcept;
+    // Exact conditional443848 typed destruction leaf; never an implicit drain.
+    bool retireNativeCollector1A6948(rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     // Source-only detached ownership. Definitions are in original_pause_entity50la.h.
     std::shared_ptr<rr::game::OriginalPauseStorage50LA> constructPauseCold1A8AB0(
         std::uint64_t actualSessionGeneration)const noexcept;
@@ -923,6 +943,17 @@ inline std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
     return archive;
 }
 struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
+private:
+    using UploadLifetime=rr::assets::OriginalNativeFrontendUploadLifetime50LA;
+    std::shared_ptr<UploadLifetime> uploadLifetime_;
+    static bool uploadLifetimeLive(const UploadLifetime& token)noexcept {
+        const auto* owner=token.frontend_;
+        return owner&&owner->uploadLifetime_.get()==&token&&owner->materialApplicationOwner&&
+            token.video_&&owner->materialApplicationOwner->videoOwner_.get()==token.video_.get()&&
+            token.video_->originalMain&&token.video_->host.created()&&token.video_->host.current();
+    }
+public:
+
     const Application* materialApplicationOwner=nullptr;
     using Status=rr::platform::OriginalUiFrontendStatus50KG;
     using StageClock=std::chrono::steady_clock;
@@ -1156,7 +1187,15 @@ struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
         cold.optionsProfile=application.optionsProfile;cold.gameSettingsProfile=application.gameSettingsProfile;
         cold.soundMode=application.soundMode;cold.controlsProfile=application.controlsProfile;
         cold.audioMode=application.audioMode;
+        require(video&&application.videoOwner_==video&&textureRequest.context==&video->host&&
+            rendererRequest.context==&video->host&&textureRequest.isCurrent&&
+            textureRequest.isCurrent==rendererRequest.isCurrent&&!uploadLifetime_,
+            "frontend upload requires its actual Application Video and context callbacks");
+        uploadLifetime_=std::shared_ptr<UploadLifetime>(new UploadLifetime(*this,video,&uploadLifetimeLive));
+        using UploadBinding=rr::assets::OriginalNativeTextureUploadBinding50LA;
         cold.textureRequest=textureRequest;
+        cold.textureRequest.originalUploadBinding=std::shared_ptr<const UploadBinding>(new UploadBinding(
+            uploadLifetime_,application.textureLifetimeOwner_,&video->host,textureRequest.isCurrent));
         cold.textureRequest.samplers=nullptr;cold.textureRequest.samplerCount=0;
         cold.textureRequest.maximumGpuBytes=32u*1024u*1024u;
         if(application.audioMode==rr::platform::OriginalUiMainAudioMode50KG::enabled){
@@ -1411,8 +1450,12 @@ struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
     }
     void requestQuit() noexcept {coordinator.requestQuit();}
     bool closeUi() noexcept {
+        if(uploadLifetime_&&(uploadLifetime_->active_||
+            uploadLifetime_->thread_!=std::this_thread::get_id()))return false;
         const auto status=coordinator.close(diagnostic);
-        return status==Status::ok||status==Status::noChange;
+        if(status!=Status::ok&&status!=Status::noChange)return false;
+        if(uploadLifetime_){uploadLifetime_->retired_=true;uploadLifetime_.reset();}
+        return true;
     }
     bool closeAudio() noexcept {
         rr::platform::AudioOutputDiagnostic50HD d;const bool okay=audioOutput.close(d);

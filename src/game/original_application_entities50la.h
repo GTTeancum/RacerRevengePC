@@ -14,6 +14,7 @@ namespace native_racer_model50LA { class Owner; }
 
 namespace rr::game::original_gc_gameplay_lighting_candidate { class Owner; }
 namespace rr::game {
+class OriginalTunnelTrack50LA;
 class OriginalVisibilityQuadTree50LA;
 class OriginalRacerStripOwners50LA;
 class OriginalTrackParticleCold50LA;
@@ -83,6 +84,7 @@ private:
 // retail application forest or a substitute race/manager ancestor chain.
 class OriginalApplicationEntities50LA final {
     friend class OriginalPauseStorage50LA;
+    friend class OriginalTunnelTrack50LA;
     OriginalApplicationEntityAuthority50LA entityAuthority_;
     friend class ::ra_pod_scene50LA::Owner;
     friend class OriginalVisibilityQuadTree50LA;

@@ -1,6 +1,7 @@
 #pragma once
 namespace original_cable_selection50LA { class Binding; }
 #include "original_ui_main_entry50kg.h"
+#include "../../src/assets/original_native_texture_upload50la.h"
 #include "../../src/game/original_camera_start_native.h"
 #include <exception>
 #include <limits>
@@ -48,6 +49,7 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
         return std::unique_ptr<CableInspection>(new CableInspection(owner->shared_from_this()));
     }
     const Application* const application_; // Actual factory owner, no caller replacement.
+    const std::shared_ptr<rr::assets::OriginalStandardTextureLifetime50LA> textureLifetime_;
     const std::shared_ptr<Video> video_; // Authoritative Application control block.
     const std::uint64_t generation_;
     const std::thread::id thread_=std::this_thread::get_id();
@@ -62,9 +64,10 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
 
     bool attempted_=false,created_=false,retiring_=false;
     bool positionStatsTextureLeaseActive_=false;
-    RaceDisplayLifetime50LA(std::shared_ptr<Video> video,std::uint64_t generation,const Application& application)
-        :application_(&application),video_(std::move(video)),generation_(generation) {
-        require(video_&&generation_&&!video_->host.sessionDisplayRenderer50LA_,
+    RaceDisplayLifetime50LA(std::shared_ptr<Video> video,std::uint64_t generation,const Application& application,
+        std::shared_ptr<rr::assets::OriginalStandardTextureLifetime50LA> textureLifetime)
+        :application_(&application),textureLifetime_(std::move(textureLifetime)),video_(std::move(video)),generation_(generation) {
+        require(video_&&textureLifetime_&&generation_&&!video_->host.sessionDisplayRenderer50LA_,
             "display requires the actual unclaimed Application Video");
         renderer_.sessionDisplayOwner50LA_=this;
         video_->host.sessionDisplayRenderer50LA_=&renderer_;
@@ -75,6 +78,12 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
     }
     static bool current(void* context)noexcept {
         return static_cast<rr::platform::GameHost50ER*>(context)->current();
+    }
+    static bool uploadBindingLive(const RaceDisplayLifetime50LA& owner)noexcept {
+        return owner.ownerThread()&&!owner.retiring_&&owner.video_->originalMain&&
+            owner.video_->host.created()&&owner.video_->host.current()&&
+            owner.video_->host.sessionDisplayRenderer50LA_==&owner.renderer_&&
+            owner.renderer_.sessionDisplayOwner50LA_==&owner;
     }
     // Only the future genuine primitive owner can obtain/use a lease. No caller
     // can supply a renderer pointer, queue copy, ready flag or completion callback.
@@ -119,9 +128,22 @@ public:
     rr::platform::VehicleWindowGl50DS& renderer()noexcept{return renderer_;}
     rr::game::OriginalRendererDispatchFields& dispatch()noexcept{return dispatch_;}
     std::uint64_t generation()const noexcept{return generation_;}
+    // Cold uploads occur before renderer.create; the actual current Video and
+    // display identity, rather than an invented GPU-ready flag, admit them.
+    bool bindTextureUploadRequest(rr::platform::MaterialTextureGlRequest50EB& request) {
+        if(!uploadBindingLive(*this)||request.context!=&video_->host||request.isCurrent!=&current)
+            return false;
+        using Binding=rr::assets::OriginalNativeTextureUploadBinding50LA;
+        request.originalUploadBinding=std::shared_ptr<const Binding>(new Binding(
+            shared_from_this(),textureLifetime_,&video_->host,&current,&uploadBindingLive));
+        return true;
+    }
     void bindCreationRequest(rr::platform::VehicleWindowRequest50DS& request)const {
         require(ownerThread()&&!attempted_&&!retiring_,"display creation already attempted/retired");
         request.context=&video_->host;request.procAddress=&proc;request.isCurrent=&current;
+        using Binding=rr::assets::OriginalNativeTextureUploadBinding50LA;
+        request.originalUploadBinding=std::shared_ptr<const Binding>(new Binding(
+            shared_from_this(),textureLifetime_,&video_->host,&current,&uploadBindingLive));
     }
     bool create(const rr::platform::VehicleWindowRequest50DS& request,
         const rr::assets::VehicleDrawAssets50CR& assets,
@@ -156,11 +178,40 @@ public:
             d.operation="race reset requires its actual current Application display owner";
             return {S::owner,0x2450b0};
         }
+        // A real client-transfer scope still owns the borrowed upload bytes.
+        // This is incremental admission, not a claim that other upload paths
+        // have been registered or that full manager13C is covered.
+        if(textureLifetime_->nativeUploads_) {
+            d.error=rr::platform::VehicleWindowError50DS::frame;
+            d.operation="race reset rejected during registered native texture transfer";
+            return {S::rendererDrain,0x2450b8};
+        }
         if(!renderer_.idleForRaceReset50LA(d))return {S::rendererDrain,0x2450b8};
         // Exactly one actual drain, including when D8 bit0 was already clear.
         // Failure leaves D8 intact. No GL resources, CPU references or pins
         // are discarded here; downstream source destructors retain ownership.
         return rr::game::resetOriginalRenderer2450A0(dispatch_,renderer_,d);
+    }
+    // Native direct-upload capability retirement corresponding to the reached
+    //2543F0 ordering. This retires REAL sealed bindings, never persistent images
+    // or a fabricated guest13C allocation. Arbitrary unbound uploaders and a
+    // future cached-transfer backend require their own explicit lifecycle join.
+    rr::game::OriginalCameraStartResult retireDirectUploadBindings2543F0(
+        rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
+        using S=rr::game::OriginalCameraStartStatus;
+        d={};
+        if(!ownerThread()||textureLifetime_->nativeUploads_||
+           textureLifetime_->nativeUploadGeneration_==std::numeric_limits<std::uint64_t>::max()) {
+            d.error=rr::platform::VehicleWindowError50DS::request;
+            d.operation="native upload retirement requires idle transferable generation";
+            return {S::owner,0x254404};
+        }
+        const auto result=resetRenderer2450A0(d);
+        if(result.status!=S::complete)return result;
+        // No fallible operation follows the real drain/D8 suffix. Old copies
+        // now reject before upload; a later genuine cold owner must rebind.
+        ++textureLifetime_->nativeUploadGeneration_;
+        return {S::complete,0x254420};
     }
     // Called before root cleanup touches any backing. Outstanding dependents
     // retire explicitly through their real drain path, then root retries here.
@@ -333,7 +384,7 @@ inline std::shared_ptr<RaceDisplayLifetime50LA> Application::raceDisplayForSessi
     require(raceDisplayGeneration50LA_!=std::numeric_limits<std::uint64_t>::max(),
         "race display generation exhausted");
     auto owner=std::shared_ptr<RaceDisplayLifetime50LA>(new RaceDisplayLifetime50LA(
-        videoOwner_,raceDisplayGeneration50LA_+1,*this));
+        videoOwner_,raceDisplayGeneration50LA_+1,*this,textureLifetimeOwner_));
     ++raceDisplayGeneration50LA_;raceDisplayOwner50LA_=owner;return owner;
 }
 }

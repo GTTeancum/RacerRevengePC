@@ -110,6 +110,7 @@ bool prepareRaceHudResources(const game::OriginalRaceHud50KG& owner) noexcept {
         !load(gl.getTexLevelParameteriv,"glGetTexLevelParameteriv")||!load(gl.framebufferTexture2D,"glFramebufferTexture2D")||
         !load(gl.blitFramebuffer,"glBlitFramebuffer"))return false;
     MaterialTextureGlRequest50EB requestTextures{};requestTextures.context=request.context;
+    requestTextures.originalUploadBinding=request.originalUploadBinding;
     requestTextures.isCurrent=request.isCurrent;requestTextures.samplers=h.samplers.data();requestTextures.samplerCount=4;
     requestTextures.maximumGpuBytes=16u*1024u*1024u;const char* missing=nullptr;
     MaterialTextureGlDiagnostic50EB textureDiagnostic;

@@ -48,6 +48,7 @@ struct DynamicImpactTuning50IW {
     float thresholds28[5]{},points3C[5]{};
     float minGrindingSpeed54=0,aiPointsMultiplier58=0,aiMultiplierDecrement5C=0;
     bool bound=false; // authenticated selected-track PodDamage authoring
+    float podGrindingPoints50=0; // Original C0+50; bound by the same authoring reader.
 };
 struct DynamicImpactProfile50IW {
     // Exact application2DC fields, not RR_RACE_MODE or a guessed mode predicate.

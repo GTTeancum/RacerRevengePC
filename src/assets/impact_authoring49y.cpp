@@ -17,10 +17,10 @@ namespace {
 struct Mapping { const char* section; const char* key; };
 constexpr Mapping env[]={{"EnvDamage","hitXL"},{"EnvDamage","hitL"},{"EnvDamage","hitM"},{"EnvDamage","hitS"},{"EnvDamage","hitXS"},{"EnvDamage","pointsXL"},{"EnvDamage","pointsL"},{"EnvDamage","pointsM"},{"EnvDamage","pointsS"},{"EnvDamage","pointsXS"}};
 constexpr Mapping aiEnv[]={{"EnvDamage","hitXL"},{"EnvDamage","hitL"},{"EnvDamage","hitM"},{"EnvDamage","hitS"},{"EnvDamage","hitXS"},{"EnvDamage","pointsXL"},{"EnvDamage","pointsL"},{"EnvDamage","pointsM"},{"EnvDamage","pointsS"},{"EnvDamage","pointsXS"},{"PodDamage","AIEnvPointsMultiplier"}};
-constexpr Mapping dynamicImpact[]={{"PodDamage","hitXL"},{"PodDamage","hitL"},{"PodDamage","hitM"},{"PodDamage","hitS"},{"PodDamage","hitXS"},{"PodDamage","pointsXL"},{"PodDamage","pointsL"},{"PodDamage","pointsM"},{"PodDamage","pointsS"},{"PodDamage","pointsXS"},{"PodDamage","MinGrindingSpeed"},{"PodDamage","AIPointsMultiplier"},{"PodDamage","AIMultiplierDecrement"}};
+constexpr Mapping dynamicImpact[]={{"PodDamage","hitXL"},{"PodDamage","hitL"},{"PodDamage","hitM"},{"PodDamage","hitS"},{"PodDamage","hitXS"},{"PodDamage","pointsXL"},{"PodDamage","pointsL"},{"PodDamage","pointsM"},{"PodDamage","pointsS"},{"PodDamage","pointsXS"},{"PodDamage","MinGrindingSpeed"},{"PodDamage","AIPointsMultiplier"},{"PodDamage","AIMultiplierDecrement"},{"PodDamage","PodGrindingPoints"}};
 constexpr Mapping finalImpact[]={{"PodDamage","FinalDamageThreshold"},{"PodDamage","FinalDamageIncrement"}};
 constexpr Mapping defense[]={{"BaseAbilities","Defense"},{"MaxAbilities","Defense"},{"DamageRepair","MinDefense"},{"DamageRepair","MaxDefense"}};
-struct Parsed { float values[13]{}; bool present[13]{}; ImpactAuthoringToken49Y tokens[13]{}; };
+struct Parsed { float values[14]{}; bool present[14]{}; ImpactAuthoringToken49Y tokens[14]{}; };
 struct Slice { const char* p; std::size_t n, offset; };
 char lower(char c) noexcept { return c>='A' && c<='Z' ? static_cast<char>(c+('a'-'A')) : c; }
 bool space(char c) noexcept { return c==' ' || c=='\t' || c=='\r'; }
@@ -121,18 +121,20 @@ bool readFinalImpactAuthoring49Y(const char* text,std::size_t bytes,FinalImpactA
     output=result; if(provenance) *provenance=audit; return true;
 }
 bool readDynamicImpactAuthoring50IW(const char* text,std::size_t bytes,rr::game::DynamicImpactTuning50IW& output,PodPhysicsDiagnostic49N& diagnostic,DynamicImpactProvenance50IW* provenance) noexcept {
-    Parsed p{};if(!read(text,bytes,dynamicImpact,13,false,p,diagnostic))return false;
+    Parsed p{};if(!read(text,bytes,dynamicImpact,14,false,p,diagnostic))return false;
     // Original1AAB30 initializes54=100 (1AAC6C) and5C=0x3D4CCCCD
     // (1AAC7C). Reader158A70 skips absent keys; RA.TUN omits these two.
     // Empty provenance tokens identify constructor values, not authored text.
-    for(unsigned i=0;i<13;++i)if(i!=10&&i!=12&&!p.present[i])
+    for(unsigned i=0;i<14;++i)if(i!=10&&i!=12&&i!=13&&!p.present[i])
         return fail(diagnostic,PodPhysicsError49N::missing_key,bytes);
+    //1AAC64 initializes C0+50 to1;1AA8A0 skips an absent PodGrindingPoints.
+    if(!p.present[13])p.values[13]=1.f;
     if(!p.present[10])p.values[10]=100.f;
     if(!p.present[12]){const std::uint32_t bits=0x3d4ccccdu;std::memcpy(&p.values[12],&bits,4);}
     rr::game::DynamicImpactTuning50IW result{};DynamicImpactProvenance50IW audit{};
     for(unsigned i=0;i<5;++i){result.thresholds28[i]=p.values[i];result.points3C[i]=p.values[5+i];}
-    result.minGrindingSpeed54=p.values[10];result.aiPointsMultiplier58=p.values[11];result.aiMultiplierDecrement5C=p.values[12];result.bound=true;
-    for(unsigned i=0;i<13;++i)audit.fields[i]=p.tokens[i];output=result;if(provenance)*provenance=audit;return true;
+    result.minGrindingSpeed54=p.values[10];result.aiPointsMultiplier58=p.values[11];result.aiMultiplierDecrement5C=p.values[12];result.podGrindingPoints50=p.values[13];result.bound=true;
+    for(unsigned i=0;i<14;++i)audit.fields[i]=p.tokens[i];output=result;if(provenance)*provenance=audit;return true;
 }
 bool readDefenseAuthoring49Y(const char* text,std::size_t bytes,DefenseAuthoring49Y& output,PodPhysicsDiagnostic49N& diagnostic,DefenseProvenance49Y* provenance) noexcept {
     Parsed p{}; if(!read(text,bytes,defense,4,false,p,diagnostic)) return false;

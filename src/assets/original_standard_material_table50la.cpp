@@ -340,6 +340,20 @@ bool OriginalStandardMaterialTable50LA::rebuildColdCollector14D440(
     }catch(const std::bad_alloc&){return fail(d,S::allocation,0x29C558u);}
     catch(...){return fail(d,S::collector,0x14D440u);}
 }
+bool OriginalStandardMaterialTable50LA::canRetireNativeCollector29C300()const noexcept {
+    return storage_&&!storage_->nativeFifoPins&&!storage_->collectorActive&&
+        !storage_->populationActive&&!storage_->demandActive;
+}
+void OriginalStandardMaterialTable50LA::retireNativeCollector29C300()noexcept {
+    if(!canRetireNativeCollector29C300())std::terminate();
+    //29C370..3A8 destroys registration nodes in ascending order. Concrete
+    //24AED0->29C100 frees only each node, with no material/pass release.
+    // Invalidate external receipts before freeing the same native records.
+    storage_->collectorSealed=false;
+    for(auto& entry:storage_->collector)entry=Storage::CollectorEntry{};
+    std::vector<Storage::CollectorEntry>().swap(storage_->collector);
+    // Unlike14D440 rebuild, source29C300 does NOT call29BEA0 on materials.
+}
 bool OriginalStandardMaterialTable50LA::pinNativeCollector(
     const OriginalStandardMaterialCollectorReceipt50LA& receipt) noexcept {
     if(!coldCollectorCurrent(receipt)||storage_->nativeFifoPins==std::numeric_limits<std::uint32_t>::max())return false;

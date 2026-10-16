@@ -3,12 +3,14 @@
 #include <exception>
 #include <limits>
 
-namespace original_main_entry50KG { struct Application; }
+namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; }
 
 namespace rr::assets {
 class OriginalStandardMaterialContext50LA;
 class OriginalStandardTextureResource50LA;
 class OriginalStandardTextureLifetime50LA;
+class OriginalNativeTextureUploadScope50LA;
+class OriginalNativeTextureUploadBinding50LA;
 
 // The resource owns these native links. Source29C6E0 initializes+A0/+A4,
 // and29DDD0/29DE20 append/remove that SAME object. No integer guest pointer,
@@ -40,6 +42,14 @@ public:
 class OriginalStandardTextureLifetime50LA final {
     friend struct original_main_entry50KG::Application;
     friend class OriginalStandardMaterialContext50LA;
+    friend class OriginalNativeTextureUploadScope50LA;
+    friend class OriginalNativeTextureUploadBinding50LA;
+    friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
+    // Native direct-transfer ledger, distinct from source registration list30.
+    OriginalNativeTextureUploadScope50LA* nativeUploads_=nullptr;
+    std::uint64_t nativeUploadAttempts_=0,nativeUploadCompletions_=0;
+    // Native capability lifetime only, not the source13C pointer or readiness.
+    std::uint64_t nativeUploadGeneration_=1;
     OriginalStandardTextureLifetimeLink50LA* head00_=nullptr;
     OriginalStandardTextureLifetimeLink50LA* tail04_=nullptr;
     OriginalStandardTextureLifetimeLink50LA* cursor08_=nullptr;
@@ -82,7 +92,7 @@ public:
     ~OriginalStandardTextureLifetime50LA(){
         // The retained context prevents manager teardown under live resources.
         // A violated native lifetime is not repaired by dropping real entries.
-        if(head00_||tail04_||count0C_)std::terminate();
+        if(head00_||tail04_||count0C_||nativeUploads_)std::terminate();
     }
 };
 }

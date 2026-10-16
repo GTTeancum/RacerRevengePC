@@ -49,11 +49,14 @@ launch still needs the authentic subsequent font population/owner lifecycle;
 blindly closing the shared registry on a speculative race-prefix unwind is not
 safe. Source-order Pause/result/UI retirement must precede the owning font drain.
 
-Targeted current-source review still finds no concrete resolver132BD0 scratch
-slots/reset, texture-manager13C/backend2543F0 reset, Video44/renderer2C/global
-3E1C10 facets, or same-profile7E4/7E8 race-constructor mutation. Existing queue44,
-fade fields, texture registration list and ordinary cache maps are not those
-fields. No guessed absent state or no-op callback is justified.
+Update through efd1f7d: same-owner profile7E4/7E8 writes, resolver132BD0
+scratch producer/reset, Video44/renderer2C scalars, opaque process3E1C10, and
+actual renderer2450A0 completion/D8 clear are implemented as bounded facets.
+They remain inactive until their exact reached race boundaries. Manager13C
+allocation/transfer-cache retirement is still distinct from the native direct
+upload scope and persistent GPU image banks. Existing queue44, fade fields,
+texture registration lists and ordinary cache maps cannot replace that owner.
+No guessed absent state or no-op callback is justified.
 
 ## Smallest honest connected implementation sequence
 
@@ -79,3 +82,42 @@ Device suffix1AF770 is no longer a leaf-semantics blocker: see
 but its actual world Entity142040 prefix remains a separate required join.
 Navigation and layout already have genuine inactive consumers. This review does
 not add another disconnected race wrapper or claim complete Pause open/close.
+
+
+## Next concrete race child ownership joins
+
+RaceB8 andBC are map and AI TunnelTrack entities.1A6F4C/1A707C call2A1160,
+then publish B8 at1A6F54 andBC at1A7084 and call2A1260. Source string3AA718
+is `.spl`;3AA720 and3AA780 identify the map/AI fallback failures. Constructor
+2A1160 calls141300 and installs3D39B0; it explicitly initializes30/44 and
+other scalar fields. Destructor2A11E0 releases array30 through reverse node
+teardown2A1100 (each node's next array6C), frees44, then calls1413E0.
+
+Actual RA navigation is already held by DecodedSources.map/ai and the sealed
+ColdNavigationLease, which strongly retains that same source owner. The driver
+and Camera observation borrow those actual objects. A genuine child Entity
+facet can retain this lease without copying navigation or introducing a second
+map; it must preserve the original reached construction/count order and typed
+retirement. Current plain inline TrackNavigation arrays are not already these
+counted Entity owners. Merely adding two null pointers to the race is invalid.
+
+RaceC0's actual producer is1AAB30: allocateA8 at1AAB4C/50, publishC0 at1AAB54,
+then initialize tuning and read authored overrides. Existing
+ai_cold_owners50IU models source defaults; impact_authoring49Y and the same
+DecodedSources aiTuning/aiImpact/dynamicImpact/finalImpact model portions of the
+actual tuning. A future owned combined projection must map every reached field
+and preserve source lifetime; independent POD subsets do not yet certify full
+C0 allocation retirement. Its source producer is not a constructor-zero gate.
+
+### Admission before race141300
+
+Required inputs are actual Application/profile/Video/display/resolver/fonts,
+the genuine committed launch, pre-reserved canonical Entity enrollment and
+stable storage, plus an implemented cleanup path for every reached conditional
+race owner. Manager13C retirement and reached B8/BC/C0 ownership remain explicit.
+Original1A65C0 does not initialize B8/BC/C0, and no private constructor unwind
+was found. Native zero-initialization or base-only1413E0 cannot close this gap.
+Consequently this update does not create a counted race that cannot be safely
+retired. The useful safe child target is the finite2A1160/2A11E0 ownership layer,
+followed by actual tuning ownership and manager transfer retirement; only then
+can Application28C publication and complete race/Pause sibling wiring proceed.

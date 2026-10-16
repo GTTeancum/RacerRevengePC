@@ -8,7 +8,7 @@ struct ImpactAuthoringToken49Y {
 };
 struct EnvironmentImpactProvenance49Y { ImpactAuthoringToken49Y fields[10]; };
 struct AIEnvironmentImpactProvenance49Y { ImpactAuthoringToken49Y fields[11]; };
-struct DynamicImpactProvenance50IW { ImpactAuthoringToken49Y fields[13]; };
+struct DynamicImpactProvenance50IW { ImpactAuthoringToken49Y fields[14]; };
 struct FinalImpactAuthoring49Y { float threshold64, increment68; };
 struct FinalImpactProvenance49Y { ImpactAuthoringToken49Y fields[2]; };
 struct DefenseValue49Y { float value; bool present; };

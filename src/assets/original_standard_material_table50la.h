@@ -198,6 +198,8 @@ public:
 private:
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class rr::game::OriginalPauseMaterialAdmission50LA;
+    bool canRetireNativeCollector29C300()const noexcept;
+    void retireNativeCollector29C300()noexcept;
     bool pinNativeCollector(const OriginalStandardMaterialCollectorReceipt50LA&) noexcept;
     void unpinNativeCollector() noexcept;
     friend class ::ra_static_world50LA::Owner;

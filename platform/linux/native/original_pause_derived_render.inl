@@ -66,6 +66,7 @@ bool preparePauseDerivedResources(std::shared_ptr<const game::OriginalPauseNativ
         !load(gl.getTexLevelParameteriv,"glGetTexLevelParameteriv")||!load(gl.framebufferTexture2D,"glFramebufferTexture2D")||
         !load(gl.blitFramebuffer,"glBlitFramebuffer"))return false;
     MaterialTextureGlRequest50EB requestTextures{};requestTextures.context=request.context;
+    requestTextures.originalUploadBinding=request.originalUploadBinding;
     requestTextures.isCurrent=request.isCurrent;requestTextures.samplers=h.samplers.data();requestTextures.samplerCount=bank->textureCount();
     requestTextures.maximumGpuBytes=assets::maxMaterialTextureRGBABytes50EA;const char* missing=nullptr;
     MaterialTextureGlDiagnostic50EB textureDiagnostic;

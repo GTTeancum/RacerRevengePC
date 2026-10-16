@@ -7,6 +7,7 @@
 namespace ra_static_fire_visual50LA {class Owner;}
 namespace ra_static_world50LA {class Owner;}
 namespace ra_cold_aggregate50LA {class Owner;}
+namespace rr::assets { class OriginalNativeTextureUploadBinding50LA; }
 namespace rr::platform {
 // Linux desktop core GL >= 3.2 signatures. Resolve these in the context owner; no
 // GL headers, loader/link dependency, context creation or global proc table.
@@ -49,6 +50,8 @@ struct MaterialTextureGlRequest50EB {
     // real bank textures. Zero admits only an empty texture bank. GL driver
     // metadata/padding are implementation-dependent and outside this count.
     std::size_t maximumGpuBytes = 0;
+    // Optional sealed actual-display binding; copies preserve the same owner.
+    std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA> originalUploadBinding;
 };
 struct MaterialTextureGlAsset50EB {
     std::uint64_t identity = 0; // Exact 50EA caller identity, including zero.

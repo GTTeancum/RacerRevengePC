@@ -2,6 +2,7 @@
 #include "original_wreck_assets50la.h"
 #include "original_wreck_physical50la.h"
 #include "candidate_collection50bx.h"
+#include "original_wreck_type2_owners50la.h"
 
 namespace rr::game {
 class OriginalWreckQueries50LA;
@@ -82,6 +83,22 @@ class OriginalWreckSceneDomain50LA final {
     SpringSceneId48N identity(Handle h)const noexcept {
         return h.generation==generation_&&h.slot<used_&&coherent(entries_[h.slot])?
             entries_[h.slot].identity:SpringSceneId48N{};
+    }
+    bool canRetireShape11B600(Handle h,const OriginalWreckComponent50LA& query)const noexcept {
+        return h.generation==generation_&&h.slot<used_&&coherent(entries_[h.slot])&&
+            entries_[h.slot].queryComponent==&query&&query.reference00==1u;
+    }
+    bool retireShape11B600(Handle h,const OriginalWreckType2Owners50LA& allocations,
+        const OriginalWreckComponent50LA& query)noexcept {
+        if(h.generation!=generation_||h.slot>=used_||!allocations.retired()||query.reference00)return false;
+        auto& e=entries_[h.slot];
+        if(!e.live||e.queryComponent!=&query||query.objectKey!=e.queryKey||
+           query.sessionGeneration!=generation_||!e.queryObject||e.queryObject->hasShape||
+           e.queryObject->identity!=e.queryIdentity||!e.physical||e.physical->modelSceneDomain!=this)return false;
+        // The source shape containing model44 has actually died. Preserve the
+        // historical identity/key/occurrence tombstone; never erase its row or
+        // make it available to another model. End the native model borrow now.
+        e.physical->modelSceneDomain=nullptr;e.live=false;--live_;return true;
     }
     void revokeNative(Handle h)noexcept {
         // Token-only invalidation: NEVER dereference possibly already destroyed
