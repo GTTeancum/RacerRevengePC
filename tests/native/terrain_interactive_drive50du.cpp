@@ -18,6 +18,8 @@
 #include "original_camera_assets50kx.h"
 #include "native_ta_particle_cold50la_fixture.h"
 #include "ra_cold_aggregate50la.h" // Inactive cold owner: compile visibility only.
+#include "original_wreck_rig_inventory50la.h" // Inactive authentic ordered asset join.
+#include "../../src/game/original_wreck_racer_storage50la.h" // Cold backing only; no source publication.
 #include "sc_trigger_authoring50la.h" // Inactive SC source/zero-sky/trigger authoring only.
 #include "../../src/game/original_damage_state50la.h"
 #include "../../src/game/original_ra_static_fragment_bytes.h" // Inactive native byte arithmetic; no renderer admission.
@@ -39,6 +41,7 @@
 #include "original_speed_boost_adapter50la.h"
 #include "native_query_identities50kx.h"
 #include "../../platform/linux/native/original_camera_presentation.h"
+#include "../../platform/linux/native/original_ui_controller_navigation50la.h"
 #include "../../platform/linux/native/original_video_blocking_native.h"
 #include "race_audio50hq_fixture.h"
 #include "../../src/game/original_ui_audio_options50kg.h"
@@ -3422,9 +3425,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   windowRequest.major=3;windowRequest.minor=2;
   windowRequest.profile=platform::WindowGlProfile50DQ::Core;
   windowRequest.samples=requestedWindowSamples;windowRequest.swapInterval=0;windowRequest.resizable=true;
-  // Original frontend controller/popup routing has its own remaining owner.
-  // Only explicit native human-pad selection opens actual SDL devices here.
-  windowRequest.gameControllers=usePhysicalGameController;
+  // Frontend navigation borrows actual SDL button edges independently of
+  // human driving. ALL8 keeps usePhysicalGameController false. No second-pad
+  // popup/presence capability or source racing action is admitted here.
+  windowRequest.gameControllers=usePhysicalGameController||(originalUiStarted&&!headlessLive);
   if(originalUiActive){
    windowRequest.redBits=windowRequest.greenBits=windowRequest.blueBits=windowRequest.alphaBits=8;
    windowRequest.depthBits=24;windowRequest.stencilBits=0;
@@ -5949,6 +5953,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::vector<std::uint8_t> captureRgbRow(headlessLive?static_cast<std::size_t>(nativeVideo->width)*3u:0u);
   const char* visibilitySetting=std::getenv("RR_CAPTURE_VISIBILITY");
   const bool captureVisibility=visibilitySetting&&std::string(visibilitySetting)=="1";
+  platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation;
   bool wasPaused=true,oversizeReported=false;
   const char* baselineSetting=std::getenv("RR_TRACK_FPS_BASELINE");
   require50DU(!baselineSetting||std::string(baselineSetting)=="0"||std::string(baselineSetting)=="1",
@@ -6297,6 +6302,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     // At most eight receipts for the first inactive iteration, plus the two
     // second-poll receipts above. Logging never supplies a source-clock value.
+    platform::OriginalUiControllerNavigation50LA::Events menuEvents;
+    require50DU(originalUiControllerNavigation.observe(input,active,menuEvents),
+        "original frontend physical controller snapshot invalid");
     const bool traceFirstMainInactive=originalMain.traceStages&&!active&&!firstMainInactiveReported;
     if(traceFirstMainInactive){
      firstMainInactiveReported=true;
@@ -6330,19 +6338,24 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const bool controlsInput=inputRoute.screen==12&&(inputRoute.page==2||inputRoute.page==3);
     const bool riderInput=inputRoute.screen==5&&inputRoute.page==1;
     const bool courseInput=inputRoute.screen==6&&inputRoute.page==1;
+    // Merge real keyboard/pad edges by source ID so a simultaneous confirm
+    // dispatches once. Preserve the current keyboard ordering, including Back
+    // after Controls configuration7. Source pages still own all admission.
     if(gameOptionsInput||controlsInput||riderInput||courseInput){
-     if(input.pressed[80])originalMain.input(0);
-     if(input.pressed[79])originalMain.input(1);
-     if(input.pressed[82]||input.pressed[26])originalMain.input(2);
-     if(input.pressed[81]||input.pressed[22])originalMain.input(3);
+     menuEvents[0]=menuEvents[0]||input.pressed[80];
+     menuEvents[1]=menuEvents[1]||input.pressed[79];
+     menuEvents[2]=menuEvents[2]||input.pressed[82]||input.pressed[26];
+     menuEvents[3]=menuEvents[3]||input.pressed[81]||input.pressed[22];
     }else{
-     if(input.pressed[82]||input.pressed[80]||input.pressed[26])originalMain.input(2);
-     if(input.pressed[81]||input.pressed[79]||input.pressed[22])originalMain.input(3);
+     menuEvents[2]=menuEvents[2]||input.pressed[82]||input.pressed[80]||input.pressed[26];
+     menuEvents[3]=menuEvents[3]||input.pressed[81]||input.pressed[79]||input.pressed[22];
     }
-    if(input.pressed[40]||input.pressed[44])originalMain.input(4);
-    if((gameOptionsInput||controlsInput)&&input.pressed[21])originalMain.input(5); // R: Defaults on page4, actual Rotate on Controls.
-    if(controlsInput&&input.pressed[43])originalMain.input(7); // Native Tab => original circle/configuration event.
-    if(input.pressed[41]||hostInput.menuRequested)originalMain.input(6);
+    menuEvents[4]=menuEvents[4]||input.pressed[40]||input.pressed[88]||input.pressed[44];
+    menuEvents[5]=menuEvents[5]||((gameOptionsInput||controlsInput)&&input.pressed[21]);
+    menuEvents[7]=menuEvents[7]||(controlsInput&&input.pressed[43]);
+    menuEvents[6]=menuEvents[6]||input.pressed[41]||hostInput.menuRequested;
+    for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u})
+     if(menuEvents[event])originalMain.input(static_cast<std::uint8_t>(event));
     const auto uiNow=monotonicNow50DU();
     const std::uint64_t elapsedNanoseconds=originalMain.acceptedElapsed(uiNow);
     const float elapsed=static_cast<float>(double(elapsedNanoseconds)/1000000000.0);
