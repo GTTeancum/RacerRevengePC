@@ -4,6 +4,8 @@
 #include "ra_cold_sources50la.h"
 #include "../../src/game/original_pause_storage50la.h"
 #include "../../src/game/original_pause_layout50la.h"
+#include "../../src/game/original_pause_native_draw50la.h"
+#include "../../src/game/original_pause_viewport_scope50la.h"
 
 namespace original_pause_observation50LA {
 // Serial actual-owner observation and bounded navigation. Application must outlive this borrow; caller unbinds
@@ -73,11 +75,57 @@ public:
            !raceIdentity(*camera,*track,*pause,*controls))return false;
         // Source gating precedes title/settings observation. Existing standalone
         // captureTitle/captureSettings remain observations, not callback calls.
-        if(!rr::game::OriginalPauseLayout50LA::visible(*pause))return true;
+        if(!rr::game::OriginalPauseLayout50LA::visible(*pause))
+            return rr::game::OriginalPauseLayout50LA::prepare1BB010(*pause,out,layout);
         if(!pause->refreshTitle1BB010(camera->raceFlags1B0_,108,observation)||
            !pause->refreshSettings1BB590(*controls,*settings,observation))return false;
         return rr::game::OriginalPauseLayout50LA::prepare1BB010(*pause,out,layout);
     }
+    // Inactive outer one-view render preparation. Actual shared profile1125C
+    // determines count; the ALL8 manager human count is unrelated.
+    bool captureOuterLayout(rr::game::OriginalPauseLayout50LA::Commands& out,
+        Diagnostic& observation,rr::game::OriginalPauseLayout50LA::Diagnostic& layout)const noexcept {
+        out={};observation={};layout={};
+        if(!application_||!cameraGeneration_)return false;
+        const auto pause=pause_.lock();const auto controls=controls_.lock();
+        const auto camera=camera_.lock();const auto track=track_.lock();
+        const auto profile=application_->profile;
+        if(!pause||!controls||!camera||!track||!profile||camera->generation_!=cameraGeneration_||
+           application_->controlsProfile!=controls||!raceIdentity(*camera,*track,*pause,*controls))return false;
+        const auto count=(profile->playerBits1125C>>5)&3u;
+        if(count>=2||pause->mode1F0_!=0){layout.sourcePC=count>=2?0x1B9DB0:0x1B9C24;return false;}
+        rr::game::OriginalPauseLayout50LA::Commands derived;
+        if(count&&!captureLayout(derived,observation,layout))return false;
+        return rr::game::OriginalPauseLayout50LA::prepareOuterTail1B9D84(
+            *pause,derived,profile->playerBits1125C,out,layout);
+    }
+
+    // Native draw-tail preparation under the actual retained camera's115A60
+    // scope. This is not last-camera admission, a timer tick or full1B9220.
+    bool captureOuterNativeFrame(rr::game::OriginalPauseNativeDraw50LA& native,
+        Diagnostic& observation,rr::game::OriginalPauseLayout50LA::Diagnostic& layout,
+        rr::game::OriginalPauseNativeResources50LA::Diagnostic& draw)const noexcept {
+        observation={};layout={};draw={};
+        if(native.frame_)native.frame_->prepared=false;
+        if(!application_||!cameraGeneration_)return false;
+        const auto pause=pause_.lock();const auto controls=controls_.lock();
+        const auto camera=camera_.lock();const auto track=track_.lock();const auto profile=application_->profile;
+        if(!pause||!controls||!camera||!track||!profile||native.owner_!=pause||!native.current()||
+           camera->generation_!=cameraGeneration_||!camera->publicationCount_||
+           application_->controlsProfile!=controls||!raceIdentity(*camera,*track,*pause,*controls))return false;
+        if(pause->mode1F0_!=0){layout.sourcePC=0x1B9C24;return false;}
+        const auto count=(profile->playerBits1125C>>5)&3u;
+        rr::game::OriginalPauseViewportScope50LA viewport(camera->viewport_,count>=2);
+        if(!viewport.valid_){layout.sourcePC=0x115A60;return false;}
+        rr::game::OriginalPauseLayout50LA::Commands derived,outer;
+        if(count&&!captureLayout(derived,observation,layout))return false;
+        if(!rr::game::OriginalPauseLayout50LA::prepareOuterTail1B9D84(
+            *pause,derived,profile->playerBits1125C,outer,layout))return false;
+        // Private concrete join can consume a multiview-tagged command list;
+        // public prepareOuter cannot bypass this real viewport mutation/restore.
+        return native.prepareCommands(outer,camera->viewport_,camera->publicationCount_,draw);
+    }
+
     struct NavigationResult {
         enum class Status : std::uint8_t {complete,owner,parent,actionUnavailable,audioUnavailable,childRoute};
         Status status=Status::owner;

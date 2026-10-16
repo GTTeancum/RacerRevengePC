@@ -40,13 +40,15 @@ must still retain their canonical owners through this reached operation.
 
 tests/native/original_ui_main_entry50kg.h::Application retains the genuine
 Video via videoOwner_/videoForSession. Its Video struct presently owns GameHost
-and authenticated dimensions/material context; it has no sourceVideo44 facet.
+and authenticated dimensions/material context. The inactive scalar44 facet now
+retains its original constructor-zero and exact reached-boundary stores.
 OriginalVideoFadeState represents only fade fields3DC..404 and does not supply
 44. A fade object cannot be treated as the original Video owner.
 
 Renderer queue state lives in OriginalRendererDispatchFields and the actual
 VehicleWindowGl50DS borrowed through CameraSession DisplayInputs. It represents
-D8/44/54/60/DC, but not source2C or source40's backend object. In particular
+D8/44/54/60/DC. The same retained display owner now also owns scalar2C.
+Renderer40 is its own function-table pointer, not a backend object. In particular
 currentQueue44 is renderer44, not Video44. CameraScene rendererCurrentScene0
 is another distinct source pointer; it cannot substitute for renderer2C.
 
@@ -61,8 +63,8 @@ an inference or equate it to any camera/lease stamp.
 Complete1AB4F0 consists of LUI44, jump2543F0, and delay-slot A0=global443870.
 It ignores the incoming race pointer.2543F0 preserves that actual manager,
 then unconditionally calls2450A0(globalrenderer442F70).2450A0:
--loads actual renderer40;
--dispatches that object's table24;
+-loads actual renderer function table40 (3D2050 from243A80);
+-dispatches slot24=245090, which calls242EE0(1,3);
 -clears rendererD8 bit0 while preserving upper bits.
 
 2543F0 then reads texture-manager13C. If nonnull it calls252EA0(A0=13C,A1=1).
@@ -78,7 +80,9 @@ service is a different reached operation, and cannot certify this reset.
 
 Minimal extension target: actual application texture-manager reset, borrowing
 the actual renderer/backend and owning/retiring the authentic13C allocation.
-It is blocked on that backend/13C lifecycle, not on a missing generic callback.
+The renderer reset now has a genuine single native completion and D8 suffix;
+manager13C allocation/retirement remains unavailable. This is not a missing
+generic callback.
 
 ### Application328 is an authentic owning list
 

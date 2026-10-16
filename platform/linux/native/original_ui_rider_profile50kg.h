@@ -8,6 +8,8 @@
 #include "../../../src/game/original_tournament_result50kg.h"
 #include "../../../src/game/lap_timing50id.h"
 
+namespace original_main_entry50KG { struct Application; }
+
 namespace rr::platform {
 class OriginalUiFrontend50KG;
 class OriginalUiTournamentSession50KG;
@@ -89,6 +91,11 @@ public:
     bool tournamentPodCareerSnapshot(std::uint32_t career,std::uint32_t pod,
         game::OriginalTournamentPodCareer50KG&)const noexcept;
 private:
+    friend struct ::original_main_entry50KG::Application;
+    // Actual Application2DC owner only. Called at the future admitted race
+    // constructor boundary, never on a page proposal or resource prewarm.
+    // Represents only proven7E4 bit0; upper seven bits stay unrepresented.
+    bool beginPodRace1A66CC(const OriginalUiMainProfile50KG& actualCommon)noexcept;
     bool initializeStartupProfile(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint32_t testRider,
         OriginalUiRiderProfileDiagnostic50KG&) noexcept;

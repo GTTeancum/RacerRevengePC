@@ -20,6 +20,8 @@ class OriginalPauseTextGeometry50LA;
 class OriginalPauseTextureGeometry50LA;
 class OriginalPauseMaterialAdmission50LA;
 class OriginalPauseNativeResources50LA;
+class OriginalPauseNativeDraw50LA;
+class OriginalPausePolygonGeometry50LA;
 // Concrete cold storage for shared Pause load1B8810 and derived1BA390:
 // original textures, polygons and texts with canonical references. No Entity attachment
 // or draw API. Progress stages are not original full-Pause-load receipts.
@@ -30,6 +32,8 @@ class OriginalPauseStorage50LA final {
     friend class OriginalPauseTextureGeometry50LA;
     friend class OriginalPauseMaterialAdmission50LA;
     friend class OriginalPauseNativeResources50LA;
+    friend class OriginalPauseNativeDraw50LA;
+    friend class OriginalPausePolygonGeometry50LA;
     friend struct original_main_entry50KG::Application;
     // Genuine1BA140->141300 prefix, constructed before resource members and
     // released after them. Detached only until the actual race forest is joined.
@@ -41,10 +45,13 @@ class OriginalPauseStorage50LA final {
             :application(std::move(a)) {
             if(!application||!application->application10()||!session)return;
             const auto key=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&component));
+            // Native bounded admission precedes source construction; no invented unwind.
+            if(!application->entityAuthority_.canEnroll(component,key))return;
             const auto r=initializeOriginalWreckComponent50LA(component,
                 OriginalWreckComponentKind50LA::entity141300,session,key,true,
                 application->objectCount423F60()); //Actual1A8AAC A1=1.
             initialized=r.status==OriginalWreckComponentStatus50LA::complete;
+            if(initialized&&!application->entityAuthority_.enroll(component))std::terminate();
         }
         bool detached()const noexcept {
             return initialized&&application&&application->application10()&&
@@ -66,6 +73,7 @@ class OriginalPauseStorage50LA final {
         void beginRelease104970()noexcept {
             if(!initialized)return;
             if(releasing||!detached())std::terminate();
+            if(!application->entityAuthority_.retire(component))std::terminate();
             --component.reference00;releasing=true;
         }
         ~EntityPrefix(){

@@ -517,6 +517,11 @@ struct Video {
     const std::uint32_t zBufferFormat=0x31;
     ~Video()=default;
 private:
+    // Actual Video443A60 scalar, initialized by259F58. It is not a
+    // resource pointer, renderer queue44, or a claim that race load ran.
+    std::uint32_t sourceMode44_=0;
+    void beginRaceDisplay1A7658() noexcept { sourceMode44_=1; }
+    void clearRaceDisplay1A6870() noexcept { sourceMode44_=0; }
     rr::game::OriginalApplicationAnimationClockView50KG applicationAnimation_;
     explicit Video(bool main,rr::game::OriginalApplicationAnimationClockView50KG animation)
         :originalMain(main),height(main?448:480),applicationAnimation_(std::move(animation)){}

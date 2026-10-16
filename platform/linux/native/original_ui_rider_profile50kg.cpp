@@ -78,6 +78,10 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     std::uint32_t subtype11258=1;
     std::uint32_t comparison100C0=0;
     bool cardFlag100BC=false;
+    //17E330..33C clears only bit0, preserving opaque upper7E4 bits.
+    //17E348 initializes the complete7E8 word. No synthetic full7E4 byte.
+    bool bit0_7E4=false;
+    std::uint32_t word7E8=0;
     std::uint32_t testRider=0;
     std::array<OriginalUiCourseProfileColors50KG,6> planetColors{};
     std::array<std::uint8_t,13> courseOrder100C4{};
@@ -86,6 +90,18 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
 };
 OriginalUiRiderProfileOwner50KG::OriginalUiRiderProfileOwner50KG() noexcept=default;
 OriginalUiRiderProfileOwner50KG::~OriginalUiRiderProfileOwner50KG()=default;
+bool OriginalUiRiderProfileOwner50KG::beginPodRace1A66CC(
+    const OriginalUiMainProfile50KG& actualCommon)noexcept {
+    if(!storage_||storage_->common.get()!=&actualCommon||!actualCommon.known||
+       storage_->generation==std::numeric_limits<std::uint64_t>::max())return false;
+    //1A66D8..E4 masks bit0 then ORs0;1A66F0 writes the same profile7E8.
+    // These are actual stored source lanes, not a race-ready flag or receipt.
+    storage_->bit0_7E4=false;
+    storage_->word7E8=0;
+    ++storage_->generation; //Native observation identity, not a guest field.
+    return true;
+}
+
 bool OriginalUiRiderProfileOwner50KG::initializeAtApplicationStartup(
     std::shared_ptr<OriginalUiMainProfile50KG> common,
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {

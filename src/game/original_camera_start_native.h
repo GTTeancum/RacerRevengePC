@@ -62,6 +62,26 @@ inline OriginalCameraStartResult drainOriginalCameraRenderer(
         return {diagnostic.error==platform::VehicleWindowError50DS::noImage?S::rendererNoImage:S::rendererDrain,0x245910};
     return {S::complete,0x245918};
 }
+// Exact bounded2450A0: the actual243A80 renderer table3D2050 at+40
+// has slot+24=245090, which calls242EE0(1,3). This is ONE completion,
+// not244D60 queue submission and not the two-drain2458C0 destructor path.
+// Admit only the represented empty queues/no callback. A real source callback
+// or queue cannot be discharged by completing unrelated native GPU work.
+// No image is required by245090; the actual initialized context is required.
+inline OriginalCameraStartResult resetOriginalRenderer2450A0(
+    OriginalRendererDispatchFields& fields,platform::VehicleWindowGl50DS& renderer,
+    platform::VehicleWindowDiagnostic50DS& diagnostic) noexcept {
+    using S=OriginalCameraStartStatus;
+    if(fields.pendingCallbackDC)return {S::rendererCallback,0x242f78};
+    if(fields.count54!=0||fields.count60!=0)return {S::rendererQueue,0x2450b8};
+    // Even an already-clear D8 must perform the original virtual+24 call.
+    if(!renderer.finishInitializedContextWork(diagnostic)||!diagnostic.contextWorkCompleted)
+        return {S::rendererDrain,0x2450b8};
+    //2450C8 is ANDI a0,zero,1 (zero), so the final OR does not set bit0.
+    // Preserve all other bits. On a failed drain the original suffix has not run.
+    fields.flagsD8&=static_cast<std::uint8_t>(~1u);
+    return {S::complete,0x2450d4};
+}
 //Entity29 and children18 are not camera-child collection38/selected34.
 //Cold174A30->141300 yields low29=3 and no generic entity children. The
 //115DE0 registered camera array does not populate this entity child list.

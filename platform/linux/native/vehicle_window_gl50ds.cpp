@@ -13,6 +13,7 @@
 #include "../../../src/game/original_race_hud50kg.h"
 #include "../../../src/game/original_time_stats50la.h"
 #include "../../../src/game/original_damage50la.h"
+#include "../../../src/game/original_pause_native_draw50la.h"
 #include "../../../src/game/original_position_stats_hud_draw50la.h"
 #include "../../../src/game/original_speed_boost50la.h"
 #include "../../../src/game/original_ui_text50kg.h"
@@ -1360,6 +1361,7 @@ struct VehicleWindowGl50DS::Storage {
 #include "original_time_stats_render.inl"
 #include "original_position_stats_render.inl"
 #include "original_damage_render.inl"
+#include "original_pause_derived_render.inl"
 #include "original_speed_boost_render.inl"
 
     bool current(VehicleWindowDiagnostic50DS& d,
@@ -1465,7 +1467,7 @@ struct VehicleWindowGl50DS::Storage {
         return request.mode == VehicleWindowMode50DS::callerMaterialTextures ||
             request.track.mode == VehicleWindowMode50DS::callerMaterialTextures || request.cables.textures ||
             request.sky.textures || request.dynamicWorld.textures || request.enableOriginalUi ||
-            request.enableOriginalGameplayBlur || request.gcParticleTextures || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasSpeedBoostResources());
+            request.enableOriginalGameplayBlur || request.gcParticleTextures || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources());
     }
     bool usesTrackShader() const noexcept {
         return request.track.mode == VehicleWindowMode50DS::sourceVertexColors ||
@@ -2171,7 +2173,7 @@ void main() {
     bool hasGlResources() const noexcept {
         if(hasRaWorldResources())return true;
         if(hasCoverageResources())return true;
-        if(hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasSpeedBoostResources())return true;
+        if(hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())return true;
         if(hasDisplayFadeNames())return true;
         if (hasGameplayBlurResources()) return true;
         if (shader && shader->hasResources()) return true;
@@ -3084,7 +3086,7 @@ void main() {
         return true;
     }
     bool createOriginalUi() noexcept {
-        if (!request.enableOriginalUi && !request.gcParticleTextures && !raceHudPreparing && !timeStatsPreparing && !positionStatsPreparing && !damagePreparing && !speedBoostPreparing) return true;
+        if (!request.enableOriginalUi && !request.gcParticleTextures && !raceHudPreparing && !timeStatsPreparing && !positionStatsPreparing && !damagePreparing && !pauseDerivedPreparing && !speedBoostPreparing) return true;
         constexpr const char* vertexSource = R"GLSL(#version 150 core
 in vec3 rrPosition;
 in vec2 rrUv;
@@ -5098,7 +5100,7 @@ void main() {
         // 1AAE38/48/58/68 attach C8/CC/D0/C4 through141960 tail append;
         // 141D70 traverses firstChild18/next14. Preserve that HUD sibling order.
         // These explicit native joins do not claim recovered parent traversal.
-        if (!s.drawHostHud() || !s.drawRaceHud(bank) || !s.drawDamage(bank) || !s.drawPositionStats(bank) || !s.drawTimeStats(bank) || !s.drawSpeedBoost(bank) || !s.drawGameplayBlur(bank)) return false;
+        if (!s.drawHostHud() || !s.drawRaceHud(bank) || !s.drawDamage(bank) || !s.drawPositionStats(bank) || !s.drawTimeStats(bank) || !s.drawSpeedBoost(bank) || !s.drawGameplayBlur(bank) || !s.drawPauseDerived(bank)) return false;
         s.traceRaStage("hud_blur",stageStart);
         if (!s.check("accept private vehicle frame")) return false;
         // 50CV publication is CPU-only. The fallible window copy is deliberately
@@ -5219,7 +5221,7 @@ void main() {
         // Explicit source/display leases add a real completion obligation. Never
         // confuse a CPU generation increment or deferred GL deletion with it.
         if (raWorld || raStaticFireOwner || hasDisplayFadeNames() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
-            uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasSpeedBoostResources())){
+            uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())){
             gl.finish();const U error=drawGl.getError();
             if (error){if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
                 return fail(d,VehicleWindowError50DS::cleanup,"complete source leases before cleanup");}
@@ -5237,7 +5239,7 @@ void main() {
             gl.activeTexture(textureUnit0);gl.bindTexture(coverageTexture,0);
         }
         if (usesTextures() || hasDisplayFadeNames()) {
-            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasSpeedBoostResources()) || hasSpecularPairs50LA || raWorld) {
+            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources()) || hasSpecularPairs50LA || raWorld) {
                 gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
                 if (gl.bindSampler)gl.bindSampler(1,0);
             }
@@ -5252,6 +5254,7 @@ void main() {
         }
         bool complete = true;
         if(!deleteSpeedBoostNames(d))goto incomplete;
+        if(!deletePauseDerivedNames(d))goto incomplete;
         if(!deleteDamageNames(d))goto incomplete;
         if(!deletePositionStatsNames(d))goto incomplete;
         if(!deleteTimeStatsNames(d))goto incomplete;
@@ -5507,7 +5510,7 @@ bool VehicleWindowGl50DS::bindOriginalSpeedBoost(std::shared_ptr<game::OriginalS
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
         return fail(d,VehicleWindowError50DS::frame,"original SpeedBoost binding requires idle gameplay renderer");
-    if(s.speedBoost||s.speedBoostUiCreationFailed||s.timeStatsUiCreationFailed||s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.raceHudUiCreationFailed)
+    if(s.speedBoost||s.speedBoostUiCreationFailed||s.timeStatsUiCreationFailed||s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.pauseDerivedUiCreationFailed||s.raceHudUiCreationFailed)
         return fail(d,VehicleWindowError50DS::request,"original SpeedBoost already bound or late UI initialization failed");
     s.diagnostic=&d;const bool accepted=s.prepareSpeedBoostResources(owner);
     if(!accepted&&s.hasSpeedBoostResources()){
@@ -5530,7 +5533,7 @@ bool VehicleWindowGl50DS::bindOriginalTimeStats(std::shared_ptr<game::OriginalTi
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
         return fail(d,VehicleWindowError50DS::frame,"original TimeStats binding requires idle gameplay renderer");
-    if(s.timeStats||s.timeStatsUiCreationFailed||s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.raceHudUiCreationFailed||s.speedBoostUiCreationFailed)
+    if(s.timeStats||s.timeStatsUiCreationFailed||s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.pauseDerivedUiCreationFailed||s.raceHudUiCreationFailed||s.speedBoostUiCreationFailed)
         return fail(d,VehicleWindowError50DS::request,"original TimeStats already bound or late UI initialization failed");
     s.diagnostic=&d;const bool accepted=s.prepareTimeStatsResources(owner);
     if(!accepted&&s.hasTimeStatsResources()){
@@ -5553,7 +5556,7 @@ bool VehicleWindowGl50DS::bindOriginalDamage(std::shared_ptr<game::OriginalDamag
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
         return fail(d,VehicleWindowError50DS::frame,"original Damage binding requires idle gameplay renderer");
-    if(s.damage||s.damageUiCreationFailed||s.positionStatsUiCreationFailed||s.timeStatsUiCreationFailed||s.raceHudUiCreationFailed||s.speedBoostUiCreationFailed)
+    if(s.damage||s.damageUiCreationFailed||s.pauseDerivedUiCreationFailed||s.positionStatsUiCreationFailed||s.timeStatsUiCreationFailed||s.raceHudUiCreationFailed||s.speedBoostUiCreationFailed)
         return fail(d,VehicleWindowError50DS::request,"original Damage already bound or late UI initialization failed");
     s.diagnostic=&d;const bool accepted=s.prepareDamageResources(owner);
     if(!accepted&&s.hasDamageResources()){
@@ -5570,13 +5573,36 @@ bool VehicleWindowGl50DS::bindOriginalDamage(std::shared_ptr<game::OriginalDamag
         fail(d,VehicleWindowError50DS::material,"original Damage optional cold join rejected");
     return accepted;
 }
+bool VehicleWindowGl50DS::bindOriginalPauseDerived(std::shared_ptr<game::OriginalPauseNativeDraw50LA> owner,
+    VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"original PauseDerived binding requires idle gameplay renderer");
+    if(s.pauseDerived||s.pauseDerivedUiCreationFailed||s.damageUiCreationFailed||s.positionStatsUiCreationFailed||s.timeStatsUiCreationFailed||s.raceHudUiCreationFailed||s.speedBoostUiCreationFailed)
+        return fail(d,VehicleWindowError50DS::request,"original PauseDerived already bound or late UI initialization failed");
+    s.diagnostic=&d;const bool accepted=s.preparePauseDerivedResources(owner);
+    if(!accepted&&s.hasPauseDerivedResources()){
+        // Optional fallback is safe only after outstanding new HUD work/names
+        // have retired. An ambiguous deletion must not permit later allocation.
+        s.gl.finish();const bool drained=s.check("retire failed optional HUD initialization");
+        VehicleWindowDiagnostic50DS cleanup;
+        if(!drained||!s.deletePauseDerivedNames(cleanup))d.cleanupIncomplete=true;
+        if(cleanup.cleanupGlError&&!d.cleanupGlError)d.cleanupGlError=cleanup.cleanupGlError;
+    }
+    if(!accepted&&!s.hasPauseDerivedResources())s.pauseDerived.reset();
+    s.diagnostic=nullptr;
+    if(!accepted&&d.error==VehicleWindowError50DS::none)
+        fail(d,VehicleWindowError50DS::material,"original PauseDerived optional cold join rejected");
+    return accepted;
+}
 bool VehicleWindowGl50DS::bindOriginalPositionStats(std::shared_ptr<game::OriginalPositionStatsNativeOwner50LA> owner,
     VehicleWindowDiagnostic50DS& d) noexcept {
     d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
         return fail(d,VehicleWindowError50DS::frame,"original PositionStats binding requires idle gameplay renderer");
-    if(s.positionStats||s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.timeStatsUiCreationFailed||s.raceHudUiCreationFailed||s.speedBoostUiCreationFailed)
+    if(s.positionStats||s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.pauseDerivedUiCreationFailed||s.timeStatsUiCreationFailed||s.raceHudUiCreationFailed||s.speedBoostUiCreationFailed)
         return fail(d,VehicleWindowError50DS::request,"original PositionStats already bound or late UI initialization failed");
     s.diagnostic=&d;const bool accepted=s.preparePositionStatsResources(owner);
     if(!accepted&&s.hasPositionStatsResources()){
@@ -5599,7 +5625,7 @@ bool VehicleWindowGl50DS::bindOriginalRaceHud(const game::OriginalRaceHud50KG& o
     auto& s=*storage_;if(!s.current(d))return false;
     if(s.frontendOnly||s.active||s.frameSet||s.diagnostic)
         return fail(d,VehicleWindowError50DS::frame,"original HUD binding requires idle gameplay renderer");
-    if(s.raceHud||s.raceHudUiCreationFailed||s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.timeStatsUiCreationFailed||s.speedBoostUiCreationFailed)
+    if(s.raceHud||s.raceHudUiCreationFailed||s.positionStatsUiCreationFailed||s.damageUiCreationFailed||s.pauseDerivedUiCreationFailed||s.timeStatsUiCreationFailed||s.speedBoostUiCreationFailed)
         return fail(d,VehicleWindowError50DS::request,"original HUD already bound or late UI initialization failed");
     s.diagnostic=&d;const bool accepted=s.prepareRaceHudResources(owner);
     if(!accepted&&s.hasRaceHudResources()){
@@ -5707,6 +5733,9 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     d.originalPositionStatsRejected=!s.preparePositionStatsFrame(frame.originalPositionStats);
     if(d.originalPositionStatsRejected)
         return fail(d,VehicleWindowError50DS::material,"requested original PositionStats frame rejected");
+    d.originalPauseDerivedRejected=!s.preparePauseDerivedFrame(frame.originalPauseDerived);
+    if(d.originalPauseDerivedRejected)
+        return fail(d,VehicleWindowError50DS::material,"requested original Pause derived frame rejected");
     d.originalDamageRejected=!s.prepareDamageFrame(frame.originalDamage);
     if(d.originalDamageRejected)
         return fail(d,VehicleWindowError50DS::material,"requested original Damage frame rejected");
@@ -5916,6 +5945,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     if(s.timeStats)s.timeStats->frame=false;
     if(s.positionStats)s.positionStats->frame=false;
     if(s.damage)s.damage->frame=false;
+    if(s.pauseDerived)s.pauseDerived->frame=false;
     if(s.speedBoost)s.speedBoost->frame=false;
     s.frameGameplayBlurEnabled=false;s.frameGameplayBlur={};
     s.frameGameplayBinders=nullptr;s.frameGameplayBinderCount=0;s.frameGameplayBinderImage=0;
@@ -7406,6 +7436,16 @@ game::OriginalCameraStartResult OriginalVideoBlockingNativeBackend::restoreAndCo
 }
 bool OriginalVideoBlockingNativeBackend::cancelAndRetire() noexcept {
     diagnostic_={};return retire(true);
+}
+
+bool VehicleWindowGl50DS::idleForRaceReset50LA(VehicleWindowDiagnostic50DS& d) const noexcept {
+    d={};
+    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"race reset requires initialized renderer");
+    const auto& s=*storage_;
+    if(!s.current(d))return false;
+    if(s.active||s.frameSet||s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"race reset requires idle native submission ownership");
+    return true;
 }
 
 bool VehicleWindowGl50DS::finishInitializedContextWork(VehicleWindowDiagnostic50DS& d) noexcept {

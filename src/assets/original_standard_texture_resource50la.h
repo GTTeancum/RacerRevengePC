@@ -4,6 +4,7 @@
 #include <array>
 #include <vector>
 
+namespace original_main_entry50KG { struct Application; }
 namespace ra_crowd_image50LA { class Verifier; }
 namespace ra_tga_source50LA { class Verifier; }
 namespace rr::game { class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; }
@@ -161,6 +162,13 @@ public:
     void clearAnimation1327D0(const rr::game::OriginalRacerAnimationCold50LA*) noexcept;
     void clearGeometry1327D0(const OriginalStandardModelGeometry50LA*) noexcept;
 private:
+    friend struct ::original_main_entry50KG::Application;
+    // Actual resolver-owned native scratch backing. Explicit dormant suffixes,
+    // never inferred from file/cache readiness or called by ordinary lookup.
+    bool initializeScratch12CDF0(OriginalStandardTextureDiagnostic50LA&)noexcept;
+    bool restoreScratch132BD0(OriginalStandardTextureDiagnostic50LA&)noexcept;
+    struct Scratch;
+    std::unique_ptr<Scratch> scratch_;
     friend class ::ra_crowd_image50LA::Verifier;
     bool bindIpumImages(const std::shared_ptr<const OriginalStandardIpumImageSet50LA>&,
         const std::shared_ptr<const OriginalStandardMaterialContext50LA>&,

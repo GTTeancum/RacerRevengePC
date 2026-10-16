@@ -92,6 +92,7 @@ struct OriginalWreckQueryCallbackResult50LA {
 // contacts before admitting a frame that can reach them. No callback success
 // or empty-world/miss receipt is manufactured by this owner.
 class OriginalWreckQueries50LA final {
+    friend class OriginalWreckRacerStorage50LA;
 public:
     enum class QueryCallback { none,contact294BB0 };
     enum class ResponseCallback { none,physics165920,wreck2CB420 };
@@ -104,6 +105,7 @@ public:
         QueryCallback queryE4=QueryCallback::none;
         RootBodyState48H* bodyA0=nullptr; // E8 source ctor leaves this null
         ResponseCallback responseE8=ResponseCallback::none;
+        SpringVector4_48N constructorCopied40{},constructorCopied50{};
         SpringVector4_48N previousCenter70{};
         float distance84=0.f;
         std::uint32_t currentIdentity94=0;
@@ -279,7 +281,7 @@ private:
 public:
     OriginalWreckQueryResult50LA prepareInitialModelQueries11F570()noexcept {
         using S=OriginalWreckQueryStatus50LA;
-        if(!storage_||storage_->initialShapesAttempted||storage_->initialShapesReady||!storage_->piece->coherent()||
+        if(!storage_||storage_->e0ConstructorReached||storage_->initialShapesAttempted||storage_->initialShapesReady||!storage_->piece->coherent()||
            storage_->published[0]||storage_->published[1]||storage_->published[2])return {S::binding,0x11f570u};
         storage_->initialShapesAttempted=true;return stageInitialModelShapes(*storage_);
     }
@@ -298,7 +300,8 @@ public:
            w.lifecycle->storage.registrationCapacity<w.objectCount)return false;
         for(unsigned i=0;i<3;++i){
             const auto& q=storage_->queries[i];
-            if(storage_->published[i]||storage_->components[i]||q.membership.attached||
+            if((q.type2&&q.type2->sourceOwners.attempted())||
+               storage_->published[i]||storage_->components[i]||q.membership.attached||
                q.membership.object||q.membership.revision||q.type0.registrationE0||
                !w.refs[i]||w.refs[i]>w.objectCount)return false;
             const auto& primary=w.lifecycle->storage.registrations[w.refs[i]-1u];
@@ -328,7 +331,7 @@ public:
     OriginalWreckQueryResult50LA publishColdQuery(unsigned i,OriginalWreckComponent50LA& component,
         OriginalWreckComponent50LA& actualModel,SpringSceneId48N actualModelIdentity) noexcept {
         using S=OriginalWreckQueryStatus50LA;
-        if(!storage_||i>2||storage_->published[i]||!storage_->initialShapesReady||!storage_->piece->coherent()||
+        if(!storage_||storage_->e0ConstructorReached||i>2||storage_->published[i]||!storage_->initialShapesReady||!storage_->piece->coherent()||
            storage_->plannedModel!=&actualModel||storage_->plannedQueries[i]!=&component||
            component.kind!=OriginalWreckComponentKind50LA::collision11B190||
            !component.objectKey||!component.sessionGeneration||
@@ -552,12 +555,71 @@ private:
         std::array<std::uint32_t,2> categoryD8{};
         std::uint32_t waterCategoryE0=0;
         bool collectionFilterApplied=false;
+        bool e0ConstructorReached=false,e0ConstructorRetired=false;
         bool published[3]{},contactBound=false,mutualBound=false,derivedBound=false,initialShapesReady=false,initialShapesAttempted=false;
         std::array<OriginalWreckComponent50LA*,3> components{};
         std::array<CollectionObject50BX,3> coldDefinitions{};
         std::array<CollectionObjectState50BX,3> coldStates{};
         std::array<Query,3> queries;
     };
+    // Full-owner-only source prefix. These are the SAME reserved E0 fields,
+    // still private until actual11BBC0 model/shape publication. Legacy cold
+    // staging remains separate and cannot consume this unfinished constructor.
+    bool canConstructE0Prefix11B190()const noexcept {
+        if(!storage_||storage_->e0ConstructorReached||storage_->initialShapesReady||
+           storage_->initialShapesAttempted||!storage_->piece->coherent()||
+           storage_->components[0]||storage_->published[0]||storage_->published[1]||storage_->published[2])return false;
+        const auto& w=storage_->world;const auto& q=storage_->queries[0];
+        const auto& registration=w.lifecycle->storage.registrations[w.refs[0]-1u];
+        return !registration.owner&&!registration.slot&&!registration.encodedObject&&!q.membership.attached&&
+            w.collisionTypeGp8010&&*w.collisionTypeGp8010==storage_->coldDefinitions[0].typeTag&&
+            w.groupTypeGp8014&&*w.groupTypeGp8014!=0xffu&&
+            w.physicsBodyCategory3E0718&&*w.physicsBodyCategory3E0718&&w.globalValid3E0730;
+    }
+    bool constructE0Prefix11B190(OriginalWreckComponent50LA& component)noexcept {
+        if(!canConstructE0Prefix11B190()||storage_->plannedQueries[0]!=&component||
+           component.kind!=OriginalWreckComponentKind50LA::collision11B190||component.reference00!=1u)return false;
+        auto& s=*storage_;auto& definition=s.coldDefinitions[0];auto& state=s.coldStates[0];
+        //11B190 owns88=0,8C=NULL,90=NULL. Cold native future-shape backing
+        // is not a source allocation or completed11BBC0 call.
+        definition.hasShape=false;definition.shapeTag=0u;
+        definition.filter.flags31=component.flags29;
+        definition.filter.categoryA4=0u;
+        state.flagsF8=static_cast<std::uint8_t>((state.flagsF8&0xc0u)|6u);
+        auto& query=s.queries[0];query.owner9C=nullptr;query.contactOwner9C=nullptr;query.bodyA0=nullptr;
+        query.queryE4=QueryCallback::none;query.responseE8=ResponseCallback::none;
+        query.constructorCopied40=*s.world.sentinel3E02C0;query.constructorCopied50=*s.world.sentinel3E02C0;
+        query.previousCenter70={{0.f,-10000.f,0.f,1.f}};
+        query.distance84=0.f;query.currentIdentity94=0;
+        //16603C ->11B570(3): clear bit3 and select bits1/2=1/0.
+        state.flagsF8=static_cast<std::uint8_t>((state.flagsF8&~0x0eu)|2u);
+        *s.world.globalValid3E0730=0;
+        definition.filter.categoryA4=*s.world.physicsBodyCategory3E0718; //166050
+        query.owner9C=s.piece;query.bodyA0=&s.physical->body.root; //166058/166068
+        s.components[0]=&component;s.e0ConstructorReached=true;return true;
+    }
+    bool canRetireE0Prefix11B4A0(const OriginalWreckComponent50LA& component)const noexcept {
+        if(!storage_||!storage_->e0ConstructorReached||storage_->e0ConstructorRetired||
+           storage_->components[0]!=&component||storage_->published[0]||storage_->published[1]||storage_->published[2]||
+           storage_->initialShapesReady||storage_->initialShapesAttempted||storage_->contactBound||
+           storage_->mutualBound||storage_->derivedBound||storage_->collectionFilterApplied||
+           (storage_->queries[0].type2&&storage_->queries[0].type2->sourceOwners.attempted()))return false;
+        const auto& w=storage_->world;const auto& q=storage_->queries[0];
+        const auto& r=w.lifecycle->storage.registrations[w.refs[0]-1u];
+        return !r.owner&&!r.slot&&!r.encodedObject&&!q.membership.attached&&!q.membership.object&&
+            !q.membership.revision&&!storage_->coldDefinitions[0].hasShape&&
+            storage_->coldDefinitions[0].shapeTag==0u&&component.kind==OriginalWreckComponentKind50LA::collision11B190;
+    }
+    bool retireE0Prefix11B4A0(OriginalWreckComponent50LA& component,std::uint32_t& actualObjectCount423F60)noexcept {
+        if(!canRetireE0Prefix11B4A0(component)||component.reference00||component.parent1C||
+           component.firstChild18||component.previous10||component.next14)return false;
+        //Actual11B190 initialized registrationE0,filtersC0/CC/D8,shape8C,
+        //result90 NULL. No11BBC0/11F570/registration call occurred, so11B4A0
+        //and11B600 take their genuine null-owner branches before1413E0.
+        component.kind=OriginalWreckComponentKind50LA::entity141300;--actualObjectCount423F60;
+        auto& s=*storage_;s.queries[0].owner9C=nullptr;s.queries[0].bodyA0=nullptr;
+        s.components[0]=nullptr;s.e0ConstructorRetired=true;return true;
+    }
     static OriginalWreckQueryResult50LA stageInitialModelShapes(Storage& storage)noexcept {
         using S=OriginalWreckQueryStatus50LA;
         auto& assets=*storage.assets;auto graph=assets.graph();const auto model=assets.model14C();

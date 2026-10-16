@@ -87,7 +87,7 @@ public:
     //append22C1B8 is a distinct later phase. This extent is not activation.
     std::size_t reachedSourcePieceSlotCount()const noexcept{return sourceSlots38_;}
     const OriginalWreckPieceStorage50LA* piece(std::size_t i)const noexcept {
-        return i<count_?ordered38_[i]:nullptr;
+        return ordered38_&&i<count_?ordered38_[i]:nullptr;
     }
     //2CC060's future primary is piece0; capacity is count-1. This describes
     //authoring only, not source group40/34 or aggregate construction completion.
@@ -141,7 +141,7 @@ struct OriginalWreckSetupZones50LA {
     const CollectionRef50BX* collisionZoneField=nullptr;
 };
 enum class OriginalWreckConstructorPrefixStatus50LA : std::uint8_t {
-    binding,capacity,allocation,components,physical,publishedLifetimeRequired,stopped,modelLoadRequired,warmModelRequired,modelAppendRequired,geometryAdmission,pieceSetupRequired
+    binding,capacity,allocation,components,physical,publishedLifetimeRequired,stopped,modelLoadRequired,warmModelRequired,modelAppendRequired,geometryAdmission,pieceSetupRequired,queryPublicationRequired
 };
 struct OriginalWreckConstructorPrefixResult50LA {
     OriginalWreckConstructorPrefixStatus50LA status=OriginalWreckConstructorPrefixStatus50LA::binding;
@@ -153,7 +153,7 @@ struct OriginalWreckConstructorPrefixResult50LA {
     std::uint32_t nativeLoaderDiagnosticPC=0;
 };
 enum class OriginalWreckPrefixRetirementStatus50LA : std::uint8_t {
-    binding,attachmentLocked,topology,modelRetirementRequired,pieceRetirementRequired,modelResource
+    binding,attachmentLocked,topology,modelRetirementRequired,pieceRetirementRequired,modelResource,prefixRetired
 };
 struct OriginalWreckPrefixRetirementResult50LA {
     OriginalWreckPrefixRetirementStatus50LA status=OriginalWreckPrefixRetirementStatus50LA::binding;
@@ -174,7 +174,8 @@ class OriginalWreckRacerStorage50LA final {
         OriginalWreckSceneDomain50LA modelScenes;
         bool queryPreparationAttempted=false,queriesColdPrepared=false,queryBorrowsReleased=false;
         std::size_t preparedQueries=0;
-        bool modelRetirementAttempted=false;
+        bool modelRetirementAttempted=false,pieceCollectionRetirementAttempted=false;
+        bool e0ConstructorAttempted=false,e0PrefixRetired=false;
         bool constructorAttempted=false,retirementAttempted=false,freshModelLoadAttempted=false,modelAppendAttempted=false,pieceSetupAttempted=false;
         const OriginalWreckConstructorGlobals50LA* actualConstructorGlobals=nullptr;
         const SpringVector4_48N* actualGravityVector4431C0=nullptr;
@@ -617,6 +618,46 @@ public:
         //authentic COL member. Stop before E0 allocation/construction166018.
         return finish(S::publishedLifetimeRequired,0x166018u);
     }
+    // Actual E0 Entity and11B190/11B570 setup, stopping before11BBC0.
+    // No model-domain row or source shape allocation is claimed here.
+    OriginalWreckConstructorPrefixResult50LA constructFirstE0To11BBC0()noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;using K=OriginalWreckComponentKind50LA;
+        OriginalWreckConstructorPrefixResult50LA rejected;
+        if(!storage_||storage_->e0ConstructorAttempted||storage_->retirementAttempted||
+           storage_->prefixResult.status!=S::publishedLifetimeRequired||storage_->prefixResult.sourcePC!=0x166018u||
+           !storage_->actualObjectCount423F60||!orderedQueriesColdPrepared())return rejected;
+        auto& piece=storage_->collections[0].pieces_[0];
+        if(!piece.queries_.canConstructE0Prefix11B190()||
+           storage_->prefixDomain.count==maxOriginalWreckComponents50LA)return rejected;
+        auto& e0=*piece.componentSlots_[3u+piece.sceneCount_];
+        storage_->e0ConstructorAttempted=true;
+        auto finish=[&](S status,std::uint32_t pc){
+            storage_->prefixResult={status,pc,storage_->prefixDomain.count,true};return storage_->prefixResult;
+        };
+        const auto initialized=initializeOriginalWreckComponent50LA(e0,K::collision11B190,
+            storage_->sessionGeneration,static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&e0)),
+            true,*storage_->actualObjectCount423F60);
+        if(initialized.status!=OriginalWreckComponentStatus50LA::complete)return finish(S::components,initialized.sourcePC);
+        storage_->prefixComponents[storage_->prefixDomain.count++]=&e0;
+        if(!piece.queries_.constructE0Prefix11B190(e0))return finish(S::components,0x11b190u);
+        return finish(S::queryPublicationRequired,0x166074u);
+    }
+    // Unlinked E0 has not reached append166098. Its real104970->11B4A0
+    // retirement must precede the earlier D4/D0/model disposal cursor.
+    bool retireFirstUnpublishedE0()noexcept {
+        using S=OriginalWreckConstructorPrefixStatus50LA;
+        if(!storage_||!storage_->e0ConstructorAttempted)return false;
+        if(storage_->e0PrefixRetired)return true;
+        if(storage_->retirementAttempted||storage_->prefixResult.status!=S::queryPublicationRequired||
+           !storage_->actualObjectCount423F60||!storage_->actualAttachmentLock423F58||
+           *storage_->actualAttachmentLock423F58)return false;
+        auto& piece=storage_->collections[0].pieces_[0];auto& e0=*piece.componentSlots_[3u+piece.sceneCount_];
+        if(e0.reference00!=1u||e0.parent1C||e0.firstChild18||e0.previous10||e0.next14||
+           !piece.queries_.canRetireE0Prefix11B4A0(e0))return false;
+        --e0.reference00;
+        if(!piece.queries_.retireE0Prefix11B4A0(e0,*storage_->actualObjectCount423F60))std::terminate();
+        storage_->e0PrefixRetired=true;return true;
+    }
     // Reached142590 child suffix of the complete pre-E0 constructor prefix.
     // This does not pretend the unjoined model destructor or enclosing piece
     // has retired. Original sibling/reference/count writes survive the stop.
@@ -624,7 +665,8 @@ public:
         using S=OriginalWreckPrefixRetirementStatus50LA;using K=OriginalWreckComponentKind50LA;
         OriginalWreckPrefixRetirementResult50LA out;
         if(!storage_||!storage_->constructorAttempted||
-           storage_->prefixResult.status!=OriginalWreckConstructorPrefixStatus50LA::publishedLifetimeRequired||
+           (storage_->prefixResult.status!=OriginalWreckConstructorPrefixStatus50LA::publishedLifetimeRequired&&
+            !(storage_->prefixResult.status==OriginalWreckConstructorPrefixStatus50LA::queryPublicationRequired&&storage_->e0PrefixRetired))||
            !storage_->actualObjectCount423F60||!storage_->actualAttachmentLock423F58)return out;
         if(storage_->retirementAttempted)return storage_->retirementResult;
         if(*storage_->actualAttachmentLock423F58){out.status=S::attachmentLocked;out.sourcePC=0x1425a8u;return out;}
@@ -634,7 +676,17 @@ public:
         // No generic source destructor is admitted: only this exact private,
         // never-published constructor route has known NULL body28C and the
         // one-target gravity allocation represented by gravity_.
-        if(!original_wreck_component_detail50LA::domain(storage_->prefixDomain)||
+        std::array<OriginalWreckComponent50LA*,maxOriginalWreckComponents50LA> liveObjects{};
+        OriginalWreckComponentDomain50LA liveDomain{storage_->sessionGeneration,liveObjects.data(),0};
+        for(std::size_t i=0;i<storage_->prefixDomain.count;++i){
+            auto* object=storage_->prefixComponents[i];
+            if(storage_->e0PrefixRetired&&object==piece.componentSlots_[body+2u]){
+                if(object->reference00){out.status=S::topology;return out;}
+                continue;
+            }
+            liveObjects[liveDomain.count++]=object;
+        }
+        if(!original_wreck_component_detail50LA::domain(liveDomain)||
            root.parent1C||root.previous10||root.next14||root.firstChild18!=&model||
            model.parent1C!=&root||model.previous10||model.next14!=&d0||
            d0.parent1C!=&root||d0.previous10!=&model||d0.next14!=&gravity||d0.firstChild18||
@@ -644,6 +696,7 @@ public:
            piece.gravity_.count30!=1u||piece.gravity_.capacity34!=1u||
            piece.queries_.modelSceneIdentity().value){out.status=S::topology;return out;}
         storage_->retirementAttempted=true;
+        if(storage_->e0PrefixRetired){out.referencesReleased=1u;out.objectsDestroyed=1u;}
         //1424E0 tail recursion first severs predecessor.next and self.next.
         //142590 then repairs adjacent links and104970 decrements exactly once.
         auto releaseLeaf=[&](OriginalWreckComponent50LA& leaf){
@@ -724,6 +777,63 @@ public:
         // PieceB4/B8 still borrow their worlds. Model retirement is not the
         // enclosing2CB500/165BD0/1413E0 lifetime boundary; do not clear them.
         return finish(S::pieceRetirementRequired,0x2cb500u);
+    }
+    // Dispose the actual unlinked first piece and collection after their
+    // children. Does not unregister or cancel never-published query backing.
+    OriginalWreckPrefixRetirementResult50LA retireFirstPieceAndCollection(
+        const LiveZoneWorld50EN& actualCollisionWorld)noexcept {
+        using S=OriginalWreckPrefixRetirementStatus50LA;using K=OriginalWreckComponentKind50LA;
+        OriginalWreckPrefixRetirementResult50LA rejected;
+        if(!storage_||!storage_->modelRetirementAttempted)return rejected;
+        if(storage_->pieceCollectionRetirementAttempted)return storage_->retirementResult;
+        if(storage_->retirementResult.status!=S::pieceRetirementRequired||
+           !storage_->actualObjectCount423F60||!storage_->actualAttachmentLock423F58||
+           *storage_->actualAttachmentLock423F58||!orderedQueriesColdPrepared())return rejected;
+        auto& collection=storage_->collections[0];auto& piece=collection.pieces_[0];
+        auto& object=*piece.componentSlots_[0];auto& container=collection.collectionComponent_;
+        if(!piece.modelOwner_.released()||!piece.modelPackets_.released()||
+           !piece.modelMaterials_.released26E4C0()||!piece.modelGeometry_||
+           piece.modelGeometry_->constructed240110()||!piece.setupZonesBound_||
+           piece.collisionWorldB8_!=&actualCollisionWorld||
+           object.reference00!=1u||container.reference00!=1u||
+           object.kind!=K::piece2CB4B0||container.kind!=K::collection22BF00||
+           object.firstChild18||object.parent1C||object.previous10||object.next14||
+           container.firstChild18||container.parent1C||container.previous10||container.next14||
+           !collection.ordered38_||collection.sourceSlots38_!=1u||
+           collection.ordered38_[0]!=&piece||collection.groupComponent_.reference00)return rejected;
+        // No other source constructor may have been reached. The retained
+        // source-prefix pointer list is an observation, never a ref-zero writer.
+        for(std::size_t i=0;i<storage_->prefixDomain.count;++i){
+            const auto* component=storage_->prefixComponents[i];
+            if(!component||(component!=&object&&component!=&container&&component->reference00))return rejected;
+        }
+        // Refuse pending publication/registration/response borrows before any
+        // lifetime ends. The later cancellation repeats its own admission.
+        for(std::size_t c=0;c<storage_->count;++c)for(std::size_t p=0;p<storage_->collections[c].count_;++p){
+            const auto& query=storage_->collections[c].pieces_[p].queries_;
+            if(!query.prepared()||!query.canReleaseUnpublishedWorld(actualCollisionWorld))return rejected;
+        }
+        storage_->pieceCollectionRetirementAttempted=true;
+        auto out=storage_->retirementResult;
+        //104970 reaches zero once. Actual2CB4B0 initialized160/164/170
+        // NULL, and this private pre-E0 path never reached their allocators.
+        //2CB500 therefore skips all three frees, then165BD0 reaches1413E0.
+        --object.reference00;++out.referencesReleased;
+        object.kind=K::entity141300;--*storage_->actualObjectCount423F60;++out.objectsDestroyed;
+        // Only now has the source piece lifetime ended. End native borrows,
+        // not source B4/B8 stores. Numeric zone values remain historical.
+        piece.visibilityWorldB4_=nullptr;piece.collisionWorldB8_=nullptr;
+        piece.collisionLifecycleB8_=nullptr;piece.setupZonesBound_=false;
+        piece.actualWaterB0_=nullptr;piece.actualWaterGlobals_=nullptr;
+        // The piece was never appended at22C1B8, so container child18 is
+        // genuinely empty.22BF50 frees38 only; it never releases pointees.
+        --container.reference00;++out.referencesReleased;
+        collection.ordered38_.reset(); //22BF84 native pointer-array disposal
+        container.kind=K::entity141300;--*storage_->actualObjectCount423F60;++out.objectsDestroyed;
+        // Source count30/slot history and native occurrence backing survive;
+        // query storage still borrows it until explicit cold cancellation.
+        out.status=S::prefixRetired;out.sourcePC=0x22bf90u;
+        storage_->retirementResult=out;return out;
     }
     bool coldBackingPrepared()const noexcept{return bool(storage_);}
     std::uint64_t sessionGeneration()const noexcept{return storage_?storage_->sessionGeneration:0;}

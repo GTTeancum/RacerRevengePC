@@ -21,7 +21,7 @@
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
-namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
+namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPauseNativeDraw50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; }
 namespace rr::platform {
 class GameHost50ER;
@@ -617,6 +617,8 @@ struct VehicleWindowFrame50DS {
     const game::OriginalRaceHud50KG* originalRaceHud = nullptr;
     const game::OriginalTimeStats50LA* originalTimeStats = nullptr;
     const game::OriginalDamage50LA* originalDamage = nullptr;
+    // Explicit derived/ordinary outer-tail batch; genuine Pause scheduling required.
+    const game::OriginalPauseNativeDraw50LA* originalPauseDerived = nullptr;
     const game::OriginalPositionStatsNativeOwner50LA* originalPositionStats = nullptr;
     const game::OriginalSpeedBoost50LA* originalSpeedBoost = nullptr;
     // Current successful source camera publication, including stopped racers.
@@ -728,6 +730,8 @@ struct VehicleWindowDiagnostic50DS {
     bool originalPositionStatsRejected=false;
     std::uint32_t originalDamageQuads=0,originalDamageLeaves=0;
     bool originalDamageRejected=false;
+    std::uint32_t originalPauseDerivedQuads=0,originalPauseDerivedLeaves=0;
+    bool originalPauseDerivedRejected=false;
     std::uint32_t originalSpeedBoostPrimitives=0,originalSpeedBoostLeaves=0;
     bool originalSpeedBoostRejected=false;
     // UI-only publication, never a successful native vehicle batch receipt.
@@ -973,6 +977,8 @@ public:
     // The adapter weak-borrows the display-pinned genuine resource owner.
     bool bindOriginalPositionStats(std::shared_ptr<game::OriginalPositionStatsNativeOwner50LA>,
         VehicleWindowDiagnostic50DS&) noexcept;
+    // Retains original derived Pause resources through checked GPU cleanup.
+    bool bindOriginalPauseDerived(std::shared_ptr<game::OriginalPauseNativeDraw50LA>,VehicleWindowDiagnostic50DS&) noexcept;
     // Retains the detached Damage canonical owner through checked GPU cleanup.
     // One authentic dmgradar PST; no replacement material or player identity.
     bool bindOriginalDamage(std::shared_ptr<game::OriginalDamage50LA>,VehicleWindowDiagnostic50DS&) noexcept;
@@ -1199,6 +1205,8 @@ public:
     bool hasSessionDependents50LA() const noexcept { return sessionDependentPins50LA_!=0; }
 private:
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
+    // Actual session owner alone admits the source reset between submissions.
+    bool idleForRaceReset50LA(VehicleWindowDiagnostic50DS&) const noexcept;
     // Private session authority: callers cannot mint a pin or authorize creation.
     const void* sessionDisplayOwner50LA_=nullptr;
     bool sessionDisplayCreate50LA_=false;

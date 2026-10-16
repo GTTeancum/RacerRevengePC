@@ -73,7 +73,7 @@ Exact missing scalar facet:
 -17E330..33C performs byte7E4=(byte7E4 & FE), preserving the other seven bits.
 -17E348 sets uint32 field7E8=0.
 -Race1A66CC..F0 resolves SAME globalApplication382B80->2DC, preserves7E4 upper
- bits, sets bit0=1, and zeros7E8 on that SAME profile owner.
+ bits, clears bit0, and zeros7E8 on that SAME profile owner.
 Do not invent names/meanings for the other bits or duplicate the Main mode34.
 
 Proposed concrete facet operations, private to authentic application/race owners:
@@ -180,3 +180,7 @@ Static field/provenance files are under portal-traversal-owner-map/render-entry1
   This slice includes complete ctor through17F8F8 and destructor17F900..17F96C.
 -1A6840..1A6AA0:00a54449daef070217ecd133b6730ccd6ce0e66fb8b37e47a59fc1df5c86bb5a
 
+
+2026-10-16 raw-word correction: race1A666C is30070001, ANDI a3,zero,1,
+so A3 is zero through1A66E0. The race constructor clears7E4 bit0; it does not
+set it. This corrects the earlier scalar-facet description above.

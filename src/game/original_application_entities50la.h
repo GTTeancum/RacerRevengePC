@@ -3,6 +3,7 @@ namespace ra_pod_scene50LA { class Owner; }
 namespace original_cable_selection50LA { class Binding; }
 namespace native_racer_model50LA { class Owner; }
 #include "original_wreck_components50la.h"
+#include "original_application_entity_authority50la.h"
 #include "portal_geometry50eo.h"
 #include <array>
 #include <cstring>
@@ -81,6 +82,8 @@ private:
 // and retains it across serial native race lifetimes. It is NOT a complete
 // retail application forest or a substitute race/manager ancestor chain.
 class OriginalApplicationEntities50LA final {
+    friend class OriginalPauseStorage50LA;
+    OriginalApplicationEntityAuthority50LA entityAuthority_;
     friend class ::ra_pod_scene50LA::Owner;
     friend class OriginalVisibilityQuadTree50LA;
     //Startup BSS; one real process slot, never a per-scene forced null.
@@ -165,6 +168,7 @@ public:
         if(first.status!=OriginalWreckComponentStatus50LA::complete||
            second.status!=OriginalWreckComponentStatus50LA::complete||
            attached.status!=OriginalWreckComponentStatus50LA::complete)std::terminate();
+        if(!entityAuthority_.enroll(outer26C_)||!entityAuthority_.enroll(root10_))std::terminate();
         constructed_=true;
     }
     OriginalApplicationEntities50LA(const OriginalApplicationEntities50LA&)=delete;
@@ -186,7 +190,7 @@ public:
     // child destructor, detach141A70 call or whole-tree mask reset is used.
     bool releaseApplication1411AC()noexcept {
         if(released_)return true;
-        if(visibility443A98_||environment443108_||activeTree442E18_)return false;
+        if(visibility443A98_||environment443108_||activeTree442E18_||entityAuthority_.count_!=2)return false;
         if(!constructed_||attachmentLock423F58_||outer26C_.reference00!=1u||root10_.reference00!=1u||
            outer26C_.kind!=OriginalWreckComponentKind50LA::entity141300||
            root10_.kind!=OriginalWreckComponentKind50LA::entity141300||
@@ -196,9 +200,11 @@ public:
         //142590 visits child10 first, repairs the parent's head, then releases
         // its actual64-bit reference. Only the zero result calls1413E0.
         outer26C_.firstChild18=root10_.next14;
+        if(!entityAuthority_.retire(root10_))std::terminate();
         --root10_.reference00;
         if(!root10_.reference00)--objectCount423F60_;
         // Parent26C has no sibling or parent to repair.142654 releases it.
+        if(!entityAuthority_.retire(outer26C_))std::terminate();
         --outer26C_.reference00;
         if(!outer26C_.reference00)--objectCount423F60_;
         released_=true;return true;

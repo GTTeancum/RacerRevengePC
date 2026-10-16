@@ -6,7 +6,8 @@ namespace original_entity_chain_detail50LA {
 using namespace original_wreck_component_detail50LA;
 // Validate the complete borrowed topology before any source store. No copied
 // nodes, reference acquisition, activity changes or dispatch completion.
-inline bool walk(const D& d,const C* first,const C* parent,
+template<class Domain>
+inline bool walk(const Domain& d,const C* first,const C* parent,
                  bool (&seen)[maxOriginalWreckComponents50LA]) noexcept {
     const C* previous=nullptr;
     for(auto* p=first;p;p=p->next14){
@@ -19,7 +20,8 @@ inline bool walk(const D& d,const C* first,const C* parent,
     }
     return true;
 }
-inline bool forest(const D& d) noexcept {
+template<class Domain>
+inline bool forest(const Domain& d) noexcept {
     if(!domain(d))return false;
     bool seen[maxOriginalWreckComponents50LA]{};
     for(std::size_t i=0;i<d.count;++i){
@@ -52,12 +54,14 @@ inline std::uint32_t recompute(C& root) noexcept {
 }
 }
 
+namespace original_entity_chain_detail50LA {
 //141860 appends an incoming sibling chain after the tail reached from anchor.
 // It is NOT child attachment. Source sets only the incoming HEAD's mask20;
 // the remaining siblings retain their masks. Parent may genuinely be null
 // (race load builds its chain before Application10 attachment).
+template<class Domain>
 inline OriginalWreckComponentResult50LA appendOriginalWreckSiblingChain14186050LA(
-    const OriginalWreckComponentDomain50LA& d,OriginalWreckComponent50LA& anchor,
+    const Domain& d,OriginalWreckComponent50LA& anchor,
     OriginalWreckComponent50LA& head,std::uint32_t sourceMask,
     std::uint32_t actualAttachmentLock423F58) noexcept {
     using namespace original_entity_chain_detail50LA;
@@ -75,8 +79,9 @@ inline OriginalWreckComponentResult50LA appendOriginalWreckSiblingChain14186050L
 //141960's actual chain splice. The older singleton helper remains unchanged.
 // Parent assignment visits every incoming sibling (1419D0..1419E4), but the
 // mask store and ancestor propagation start only at head (1419F0..141A54).
+template<class Domain>
 inline OriginalWreckComponentResult50LA attachOriginalWreckChildChain14196050LA(
-    const OriginalWreckComponentDomain50LA& d,OriginalWreckComponent50LA& parent,
+    const Domain& d,OriginalWreckComponent50LA& parent,
     OriginalWreckComponent50LA& head,std::uint32_t sourceMask,
     std::uint32_t actualAttachmentLock423F58) noexcept {
     using namespace original_entity_chain_detail50LA;
@@ -96,8 +101,9 @@ inline OriginalWreckComponentResult50LA attachOriginalWreckChildChain14196050LA(
 // intact. Recompute the original top ancestor's complete surviving child tree,
 // rather than subtracting bits shared with another sibling. A parentless node
 // recomputes its own child tree, exactly as141AF8..141B78 do.
+template<class Domain>
 inline OriginalWreckComponentResult50LA detachOriginalWreckComponent141A7050LA(
-    const OriginalWreckComponentDomain50LA& d,OriginalWreckComponent50LA& node,
+    const Domain& d,OriginalWreckComponent50LA& node,
     std::uint32_t actualAttachmentLock423F58) noexcept {
     using namespace original_entity_chain_detail50LA;
     using S=OriginalWreckComponentStatus50LA;
@@ -111,5 +117,21 @@ inline OriginalWreckComponentResult50LA detachOriginalWreckComponent141A7050LA(
     recompute(*root);
     node.parent1C=nullptr;node.next14=nullptr;node.previous10=nullptr;
     return {S::complete,0x141b88u};
+}
+}
+inline OriginalWreckComponentResult50LA appendOriginalWreckSiblingChain14186050LA(
+    const OriginalWreckComponentDomain50LA& d,OriginalWreckComponent50LA& anchor,
+    OriginalWreckComponent50LA& head,std::uint32_t mask,std::uint32_t lock) noexcept {
+    return original_entity_chain_detail50LA::appendOriginalWreckSiblingChain14186050LA(d,anchor,head,mask,lock);
+}
+inline OriginalWreckComponentResult50LA attachOriginalWreckChildChain14196050LA(
+    const OriginalWreckComponentDomain50LA& d,OriginalWreckComponent50LA& anchor,
+    OriginalWreckComponent50LA& head,std::uint32_t mask,std::uint32_t lock) noexcept {
+    return original_entity_chain_detail50LA::attachOriginalWreckChildChain14196050LA(d,anchor,head,mask,lock);
+}
+inline OriginalWreckComponentResult50LA detachOriginalWreckComponent141A7050LA(
+    const OriginalWreckComponentDomain50LA& d,OriginalWreckComponent50LA& node,
+    std::uint32_t lock) noexcept {
+    return original_entity_chain_detail50LA::detachOriginalWreckComponent141A7050LA(d,node,lock);
 }
 }

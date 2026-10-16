@@ -53,6 +53,13 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
     const std::thread::id thread_=std::this_thread::get_id();
     rr::platform::VehicleWindowGl50DS renderer_;
     rr::game::OriginalRendererDispatchFields dispatch_{1,2,0,0,0};
+    // SAME renderer's scalar2C: base26F880 initializes zero; race load
+    // writes one at1A6AD8.243FC0 reads it to choose default clear mask2/3.
+    // It is separate from current scene0 and dispatch queue44.
+    std::uint32_t sourceClearMode2C_=0;
+    void beginRaceClear1A6AD8() noexcept { sourceClearMode2C_=1; }
+    void clearRaceClear1A687C() noexcept { sourceClearMode2C_=0; }
+
     bool attempted_=false,created_=false,retiring_=false;
     bool positionStatsTextureLeaseActive_=false;
     RaceDisplayLifetime50LA(std::shared_ptr<Video> video,std::uint64_t generation,const Application& application)
@@ -132,6 +139,28 @@ public:
         created_=renderer_.create(request,assets,d); // Real creation, same callbacks/banks.
         renderer_.sessionDisplayCreate50LA_=false;
         return created_;
+    }
+    // Reached renderer suffix of texture-manager2543F0. This owns the SAME
+    // renderer442F70/dispatch, never a copied queue or caller completion flag.
+    // It is intentionally not full2543F0: manager13C retirement is separate.
+    // Live child pins are allowed: source1A68C4 resets before child destruction.
+    rr::game::OriginalCameraStartResult resetRenderer2450A0(
+        rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
+        using S=rr::game::OriginalCameraStartStatus;
+        d={};
+        if(!ownerThread()||!created_||!video_->originalMain||
+           !video_->host.created()||!video_->host.current()||
+           video_->host.sessionDisplayRenderer50LA_!=&renderer_||
+           renderer_.sessionDisplayOwner50LA_!=this) {
+            d.error=rr::platform::VehicleWindowError50DS::context;
+            d.operation="race reset requires its actual current Application display owner";
+            return {S::owner,0x2450b0};
+        }
+        if(!renderer_.idleForRaceReset50LA(d))return {S::rendererDrain,0x2450b8};
+        // Exactly one actual drain, including when D8 bit0 was already clear.
+        // Failure leaves D8 intact. No GL resources, CPU references or pins
+        // are discarded here; downstream source destructors retain ownership.
+        return rr::game::resetOriginalRenderer2450A0(dispatch_,renderer_,d);
     }
     // Called before root cleanup touches any backing. Outstanding dependents
     // retire explicitly through their real drain path, then root retries here.

@@ -305,6 +305,69 @@ bool OriginalStandardTextureResolver50LA::bindIpumImages(
         return fail(d,E::source,0x132820);
     file.ipumImages=images;return true;
 }
+// Same resolver's eight source88..130 slots. This is native CPU storage,
+// not guest addresses or an emulated allocator. No file reader currently borrows it.
+struct OriginalStandardTextureResolver50LA::Scratch {
+    static constexpr std::size_t bytes=0x6000,alignment=64;
+    struct Slot {
+        std::uint8_t* pointer00=nullptr;
+        std::int64_t status08=-2; //12C920/944: actual constructor store.
+        std::int32_t offset10=-0x6000; //12C924/958.
+    };
+    Scratch()=default;
+    Scratch(const Scratch&)=delete;Scratch& operator=(const Scratch&)=delete;
+    std::array<Slot,8> slots;
+    std::int32_t selected148=-1;
+    bool initialAllocationReached=false;
+    static bool allocate(Slot& slot)noexcept {
+        slot.pointer00=static_cast<std::uint8_t*>(
+            ::operator new(bytes,std::align_val_t(alignment),std::nothrow));
+        slot.status08=slot.pointer00?-1:-2;
+        slot.offset10=-0x6000;
+        return slot.pointer00!=nullptr;
+    }
+    ~Scratch(){
+        // Exact scratch-only12CB4C..84 suffix; this does not stand in for
+        // resolver12CA10 file/list closure. No scratch borrowers exist yet.
+        for(auto& slot:slots){
+            if(slot.pointer00)::operator delete(slot.pointer00,std::align_val_t(alignment));
+            slot.pointer00=nullptr;slot.status08=-2;slot.offset10=-0x6000;
+        }
+    }
+};
+bool OriginalStandardTextureResolver50LA::initializeScratch12CDF0(D& d)noexcept {
+    d={};
+    if(scratch_)return fail(d,E::phase,0x12CDF0);
+    try {scratch_=std::make_unique<Scratch>();}
+    catch(...){return fail(d,E::allocation,0x12C928);}
+    //12CDF0..CE3C attempts every allocation, retaining partial success.
+    std::size_t successful=0;
+    for(std::size_t i=0;i<scratch_->slots.size();++i)
+        if(Scratch::allocate(scratch_->slots[i])){
+            ++successful;scratch_->selected148=static_cast<std::int32_t>(i);
+        }
+    scratch_->initialAllocationReached=true;d.sourceEffectsCommitted=true;
+    //12CE40..68 requires at least two. This is only the allocation suffix,
+    // not a receipt for12CBA0's separate file/index initialization.
+    return successful>=2?true:fail(d,E::allocation,0x12CE48);
+}
+bool OriginalStandardTextureResolver50LA::restoreScratch132BD0(D& d)noexcept {
+    d={};if(!scratch_||!scratch_->initialAllocationReached)return fail(d,E::phase,0x132BD0);
+    // Original assertions require null pointer for the missing(-2) case.
+    // Reject corrupt ownership before mutating or replacing any live buffer.
+    for(const auto& slot:scratch_->slots)
+        if((slot.status08==-2&&slot.pointer00)||
+           (slot.status08!=-2&&!slot.pointer00))return fail(d,E::phase,0x132C28);
+    bool allocated=true;
+    for(auto& slot:scratch_->slots){
+        if(slot.status08!=-2)continue; //132BF0: preserve live slot and offset.
+        d.sourceEffectsCommitted=true;
+        if(!Scratch::allocate(slot))allocated=false;
+    }
+    //132BD0 leaves selected148 unchanged. Failures preserve every completed
+    // allocation and each failed slot's authentic -2/negative-size state.
+    return allocated?true:fail(d,E::allocation,0x132C74);
+}
 OriginalStandardTextureResolver50LA::OriginalStandardTextureResolver50LA() noexcept=default;
 OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
     //Every cached live resource pins this resolver. Only cleared associations

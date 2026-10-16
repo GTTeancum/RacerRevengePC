@@ -1,5 +1,6 @@
 #pragma once
 #include "indexed_type2_contact50cc.h"
+#include "original_wreck_type2_owners50la.h"
 #include <array>
 #include <vector>
 
@@ -14,6 +15,9 @@ struct OriginalWreckType2Storage50LA {
         std::array<SpringRecord48N,50> records{};
         TerrainCandidateEffects48J effect{};
     };
+    // Inactive full-constructor allocation owner. Legacy transaction state
+    // below is never evidence that source shape/result allocations occurred.
+    OriginalWreckType2Owners50LA sourceOwners;
     Type2StaticResult49X result90{};
     Bank live,banks[2],scratch;
     std::vector<Type2WorkItem49X> stack;
