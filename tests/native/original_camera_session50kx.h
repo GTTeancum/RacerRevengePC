@@ -1,5 +1,6 @@
 #pragma once
 namespace original_cable_selection50LA { class Binding; }
+namespace rr::game { class OriginalDamageObservation50LA; }
 // Concrete original-AI / one-Player native session adapter. Intended install: tests/native.
 // All camera/scene/selector state stays OUTSIDE the sealed50HN racer bank.
 // This is an explicit native root policy, not recovered retail root scheduling.
@@ -174,6 +175,7 @@ class Session final {
     friend class original_time_stats_adapter50LA::Owner;
     friend class original_speed_boost_adapter50LA::Owner;
     friend class original_position_stats_adapter50LA::Owner;
+    friend class rr::game::OriginalDamageObservation50LA;
     template<class T> using Read=Bank::ReadHandle<T>;
     // Stable native binding descriptors identify actual (bank,managerSlot)
     // owners. Their addresses are key tokens ONLY because this Session cannot

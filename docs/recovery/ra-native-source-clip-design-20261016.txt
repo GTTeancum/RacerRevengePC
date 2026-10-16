@@ -1,0 +1,146 @@
+Native RA source polygon clipping: source-only implementation review
+
+Base: 52993dd2a2b6ab62eb7ff13f3fed176765c915ce
+Isolated tree: /workspace/shared/rr-ra-native-clip-529
+Changed file: platform/linux/native/ra_static_world_gl_storage.inl
+Exact preimage blob: 5fe3185e57476bd451f675d5dd98b911c8ffbf0b
+No build, shader compilation, syntax check, test, gameplay, or screenshot review.
+
+Purpose
+This changes clip-generated original RGBA/F operands. The parent's tested
+52993dd smooth F*W transport already resolved its reported foreground artifact;
+this separate change must not be presented as that fix. Fragment transport and
+capture GPU attestation from 52993dd are retained.
+
+Authenticated source
+SLUS_202.68 SHA256 c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30.
+Active direct upload24B588..24B598 selects descriptor366430, payload366450.
+Registration aliases ScissorCoreCode and TriStripClipper name the same payload.
+PrelitCompressed33A060 calls the clip entry. Independent evidence note:
+/workspace/shared/ra-original-clip-fog-audit-20261016.txt
+Static words: /workspace/shared/ra-clip-attributes-1303/ScissorCore.words.txt
+
+Math
+For source homogeneous position P, sequential planes are Z+W, W-Z, Y+W,
+W-Y, X+W, W-X. Distances >=0 are inside. For directed edge A -> B and
+distance values da/db, crossing positions and attributes use:
+ A + (B-A)*da/(da-db) when A is inside;
+ B + (B-A)*db/(da-db) when A is outside.
+These retain the original two endpoint forms (367330 / 367380), without
+attempting VU rounding, instruction timing, or guest state reproduction.
+The source edge loop starts last -> first and writes A if inside, followed by
+an intersection if crossing. The native code retains that polygon rotation.
+
+Raw RGBA is homogeneous-edge interpolated through the FIRST near plane.
+Then multiply RGBA by source W (3669C0), clip the other five planes, divide
+by final W (367160), and truncate nonnegative channels to byte values
+(367180). Thus a negative-W input does not cause the same generated color
+as globally screen-linear GL clipping.
+UV is homogeneous-edge interpolated, then uses native perspective raster
+interpolation. The original366678 multiplication restores raw STQ before
+clipping;367168 divides XYZ afterwards. Fog is the independent fourth lane,
+not multiplied by W in either operation. It is homogeneous-edge interpolated
+for all six planes, then packed FTOI4 (367188); final byte F is screen-linear.
+The native geometry stage emits floor(F) * nativeClipW; the existing fragment
+stage reconstructs screen-linear F by multiplying gl_FragCoord.w.
+A triangle with no source-plane exclusion passes through without introducing
+additional vertex byte rounding.
+
+Coordinate domain
+Original row66 contains ordinary model*view*projection, not guard projection:
+33FDC8..E0 loads ordinary row8;33FE38..B0 forms model*view;
+33FEB8..33FF30 forms ordinary projection product;33FFF0..340008 stores it
+before the corresponding guard products are produced.
+The CPU upload evidence is retained in static-fog-numeric-1513/packet/evidence.
+Native depth conversion is GLz=2*sourceZ-W. Hence the original near plane
+sourceZ+W corresponds to GLz+3W, NOT GLz+W. The geometry stage reads the actual
+unconverted source camera.combined matrix, transposed only for GL storage.
+It separately interpolates existing native positions, preserving the current
+GL depth mapping and final native fixed-function clipping policy.
+
+Bounds, resources, submission
+Convex triangle intersected with six half spaces has at most nine polygon
+vertices. A triangle fan needs at most seven triangles / 21 output vertices.
+The stage declares max_vertices21. Host checks geometry output component and
+vertex limits; existing shader compilation/link diagnostics report failures.
+A dedicated retained shader name participates in hasResources and deletion.
+No new textures, assets, index streams, material order changes, or draws.
+Opaque batches remain batched; blended original triangles retain their
+existing destination snapshots and draw order. Generated fan pieces remain
+within the original triangle's conservative CPU snapshot/scissor bounds.
+
+Limitations
+Native IEEE shader arithmetic, UV filtering, depth clipping, rasterization,
+MSAA and screen-coordinate subpixel rules are still native policy. There is
+no hardware bit-parity claim. Original model-space matrix multiplication
+rounding is not reproduced by the already-lowered world-space geometry.
+The mathematical polygon capacity assumes finite, convex source operands;
+there is no GPU per-primitive arithmetic fault readback in this GL4.0 slice.
+Host asset and camera admission, GL resource-limit errors and compile/link
+fault reporting remain active. Adding an invalid-operand feedback channel
+would be a distinct API/resource change, not silently inferred here.
+
+Final polygon topology (independently recovered)
+24BDE4 selects row34;24BDFC supplies literal5 and24BE00 shifts it into
+GIFtag PRIM (5<<47).24BED4..24BEE0 sets PRE;24BEE4..24BEF0 retains the
+primitive field. PRIM low3=5 is triangle fan.3665E0 copies that tag into
+polygon headers101/141.3671B8..C8 updates only NLOOP/EOP;3671D0 emits the
+sequential completed polygon. Fan anchor is final polygon[0].
+
+Initial polygon order (independently recovered)
+The importer reverses the first two indices for odd strip triangles, keeping
+native winding consistent. The original clipper instead takes chronological
+oldest/middle/current records:3665F8/366610 packet offsets -8/-9;
+3666B0/3666C8 offsets -5/-6;366760/366778 offsets -2/-3. Ring positions match:
+339EF0 writes986(vi2),339F28 negates vi2;33A068 retains next-to-overwrite vi2;
+366608 reads that older position,3666C0 the opposite newer position,366770
+current989. It does not swap polygon input by parity. The vertex stage passes
+gl_VertexID; for clipped polygons only, the geometry stage restores increasing
+first-two source indices before the six plane passes. The final fan therefore
+preserves authentic source anchor and winding, which can alternate for odd
+strip triangles; existing RA culling stays disabled. Unclipped triangles keep
+the already lowered native order. No additional asset decoding is involved.
+
+Review revisions: topology admission and boundary capacity
+Before GPU allocation, every admitted draw-plan triangle must have the exact
+chronological set n,n+1,n+2, allowing only A/B reversal, within its placement
+vertex range and signed GL vertex-ID range. Failure is an explicit assets
+error. This verifies the imported invariant rather than guessing global
+triangle parity or relying on gl_PrimitiveID (which resets for individual
+blended draws). Actual strip restarts and group boundaries need no new GPU
+metadata because their chronological vertex records remain consecutive.
+
+Exact zero-distance endpoints retain the source duplicate intersections.
+Removing duplicates would change later polygon rotations and can move the
+fan anchor, so that tempting optimization is not source-equivalent. For a
+convex polygon, an intersecting plane has at most two crossing edges and
+removes at least one vertex: n_next <= n-1+2 = n+1, including intersections
+coincident with retained endpoints. An all-inside plane emits n vertices and
+still performs the source cyclic rotation. Starting at3, six planes need at
+most9 slots. Exact boundary duplicates do not break this capacity proof.
+Empty or less-than-three-vertex polygons have no filled area and emit none.
+This is the geometric capacity proof; the existing limitation concerning
+nonfinite or exceptional GPU arithmetic is not claimed resolved by it.
+
+Per-plane control flow review
+The source runs each complete edge loop in order. The branches after the six
+loops at366950,366B10,366C80,366DE8,366F50,3670B8 test empty output and leave
+the clipper. The intervening IBGTZ branches choose the alternating polygon
+buffer (102 versus142); they do not bypass a plane. Per-edge clip masks select
+inside/outside/crossing cases within a loop. Thus an all-inside plane still
+copies last,first,... and rotates the polygon. The native six rotations are
+intentional, including exact coincident endpoint records.
+
+UV semantic transport and existing cache scope
+Prelit339CD8 initializes vf7.z=1. Signed UV lanes are converted at339DC0 /
+339F28 and scaled at339F48.339E70 /339F38 obtains reciprocal clip W;
+339EC0 applies it to vf7.xyz, producing packet (u/W,v/W,1/W).
+339F08 and33A050 store that STQ. Common clipper366678 multiplies XYZ by W,
+restoring semantic (u,v,1) before homogeneous edge interpolation.367168
+redelivers STQ with final reciprocal W. Therefore the native geometry stage
+correctly interpolates its already-retained semantic UV and leaves GL's
+perspective interpolation to reconstruct the raster value.
+The existing importer uses quantization[2+axis] for semantic UV; the source
+prelit instruction scales both lanes by row42.z. The row42 upload/cache-scale
+identity is a separate preexisting lowering question under independent audit.
+This patch does not change UV scaling or add an assumption about equal scales.

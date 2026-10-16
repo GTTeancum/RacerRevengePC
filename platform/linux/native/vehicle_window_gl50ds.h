@@ -21,7 +21,7 @@
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
-namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
+namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; }
 namespace rr::platform {
 class GameHost50ER;
@@ -616,6 +616,7 @@ struct VehicleWindowFrame50DS {
     // only this layer; no empty batch counts as an original GPU submission.
     const game::OriginalRaceHud50KG* originalRaceHud = nullptr;
     const game::OriginalTimeStats50LA* originalTimeStats = nullptr;
+    const game::OriginalDamage50LA* originalDamage = nullptr;
     const game::OriginalPositionStatsNativeOwner50LA* originalPositionStats = nullptr;
     const game::OriginalSpeedBoost50LA* originalSpeedBoost = nullptr;
     // Current successful source camera publication, including stopped racers.
@@ -725,6 +726,8 @@ struct VehicleWindowDiagnostic50DS {
     bool originalTimeStatsRejected=false;
     std::uint32_t originalPositionStatsQuads=0,originalPositionStatsLeaves=0;
     bool originalPositionStatsRejected=false;
+    std::uint32_t originalDamageQuads=0,originalDamageLeaves=0;
+    bool originalDamageRejected=false;
     std::uint32_t originalSpeedBoostPrimitives=0,originalSpeedBoostLeaves=0;
     bool originalSpeedBoostRejected=false;
     // UI-only publication, never a successful native vehicle batch receipt.
@@ -970,6 +973,9 @@ public:
     // The adapter weak-borrows the display-pinned genuine resource owner.
     bool bindOriginalPositionStats(std::shared_ptr<game::OriginalPositionStatsNativeOwner50LA>,
         VehicleWindowDiagnostic50DS&) noexcept;
+    // Retains the detached Damage canonical owner through checked GPU cleanup.
+    // One authentic dmgradar PST; no replacement material or player identity.
+    bool bindOriginalDamage(std::shared_ptr<game::OriginalDamage50LA>,VehicleWindowDiagnostic50DS&) noexcept;
     bool bindOriginalTimeStats(std::shared_ptr<game::OriginalTimeStats50LA>,VehicleWindowDiagnostic50DS&) noexcept;
     bool bindOriginalSpeedBoost(std::shared_ptr<game::OriginalSpeedBoost50LA>,VehicleWindowDiagnostic50DS&) noexcept;
     // Copy admitted shared scene fog after its real owner updates it. Requires

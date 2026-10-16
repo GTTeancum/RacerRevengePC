@@ -1,0 +1,46 @@
+Original Damage native GPU join (source-only; no runtime claim)
+Base eed335c. Companion owner/adapter belongs to wire_position_hud_textures;
+this patch only adds renderer integration, not source damage/proximity formulas.
+
+Public joins:
+ VehicleWindowGl50DS::bindOriginalDamage(shared_ptr<game::OriginalDamage50LA>, diagnostic)
+ VehicleWindowFrame50DS::originalDamage = genuine owner pointer, or null
+ VehicleWindowDiagnostic50DS::originalDamageQuads/Leaves/Rejected
+Root must stageDamageNativeCold50LA before RA collector seal and finish after
+final population, bind owner after renderer creation, prepareNativeDisplay with
+actual followed camera/racer publication before assigning originalDamage.
+No native input/PC/player identity is synthesized by this renderer.
+
+Material/image:
+One actual dmgradar PST texture bank;owner proves originating retained32refs,
+canonical FINAL map association and genuine ScreenMT missing-PSM fallback.
+Renderer accepts one material/image0 with exact native source-alpha policy,
+separate source-alpha store, GEQUAL/write and real sampler. No synthetic PSM,
+shader group rename, texture replacement or readiness assertion.
+
+Geometry and order:
+Owner's same-frame nativeDraw bounded32quads/32packets; renderer checks owner,
+CPU publication, viewport640x448, scene/session,serial,camera publication,
+finite XY/UV, original packet byte alpha bound,depth16777214,non-overlapping
+packet ownership/full quad coverage and native texture publication. Actual
+vertices/colors/UVs are copied without reinterpretation or damage clamping.
+Packet order retained. Component draw order Damage→PositionStats→TimeStats→
+SpeedBoost follows1AAE38/48/58/68 attachment via141960 tail append and141D70
+firstChild18/next14 traversal, as confirmed by owner worker's source review.
+This explicit host join does not claim recovered full original parent traversal.
+
+GPU/lifetime:
+Same native sourceRGBA shader path as TimeStats: real-size private RGBA8+D24,
+copy pending gameplay RGB,source-alpha equation with independent alpha store,
+coherent fetch or ordered per-triangle texture barriers,source-depthGEQUAL/write,
+then copy to pending image and restore presentation alpha1. Shared buffers,
+late UI creation guards, failure drains, normal cleanup drain and name retirement
+include Damage. Strong canonical owner survives checked GPU name retirement.
+Damage retains Entity/material context/Video host, not RaceDisplayLifetime;
+Video has GameHost but no renderer-owning race display. Application display
+owner field is weak. Thus unlike PositionStats resource lease there is no
+renderer→Damage→raceDisplay→renderer retention cycle.
+
+Remaining limits:
+Companion owner/adapter integration required. No actual draw/fps/visual success
+claimed. No source builds,tests,syntax checks,gameplay or screenshot checks run.

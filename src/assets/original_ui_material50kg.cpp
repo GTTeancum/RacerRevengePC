@@ -125,6 +125,19 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
     const auto& p=pass.provenance;
     if(pass.identity || pass.inheritedTemplate!=catalogMember(OriginalUiArchiveId50KG::appStart,"AppStart\\ScreenMT.psm") ||
         p.creationPC!=0x2475c0u || pass.pass!=1 || !pass.authored.values.empty() || !pass.authored.name.empty())return false;
+    if(p.origin==OriginalUiMaterialOrigin50KG::damageTextureMissingPsmFallback){
+        // Exact provenance emitted by readOriginalDamageFallbackMaterial50LA:
+        // first ScreenTexture loader18C748, genuine OVERLAYS PST, absent PSM.
+        // Shared checks above still require an unauthored ScreenMT fallback;
+        // native GS/program/sampler admission below remains unchanged.
+        constexpr auto id=OriginalUiArchiveId50KG::overlays;
+        const auto* texture=catalogMember(id,"ui\\textures\\dmgradar.pst");
+        return texture&&p.archive==originalUiArchiveIdentity50KG(id)&&
+            !p.fallbackWidgetSource&&!p.fallbackPageSource&&
+            !catalogMember(id,"ui\\textures\\dmgradar.psm")&&p.fallbackTexture==texture&&
+            p.sourceCallerPC==0x18C748&&p.registeredName=="ui\\textures\\dmgradar"&&
+            p.attemptedPsmMember=="ui\\textures\\dmgradar.psm"&&pass.textureName=="dmgradar";
+    }
     if(p.origin==OriginalUiMaterialOrigin50KG::speedBoostTextureMissingPsmFallback||
        p.origin==OriginalUiMaterialOrigin50KG::speedBoostTriangleMissingPsmFallback){
         constexpr auto id=OriginalUiArchiveId50KG::overlays;

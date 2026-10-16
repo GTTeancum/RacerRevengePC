@@ -1,9 +1,11 @@
 #pragma once
-// Source-only detached cold Damage resources. UNTESTED. No race/view binding,
-// snapshot, frame scheduling, geometry preparation or GPU readiness is exposed.
-// Numeric dependency remains explicitly finite[0,1]; impact producers do NOT
-// prove that universal bound. Never clamp simulation fields to fit this owner.
+// Detached original Damage resources and native HUD frame preparation.
+// Source-derived CPU geometry is separate from actual GPU submission/completion.
+// Native health admits finite nonnegative damage, including values above1.
+// Source MIN bounds health locally; simulation fields are never clamped.
 #include "original_damage_state50la.h"
+#include "original_damage_frame50la.h"
+#include "original_camera_start_effects.h"
 #include "original_application_entities50la.h"
 #include "original_ui_text50kg.h"
 #include "../assets/original_ui_screen_assets50kg.h"
@@ -23,6 +25,7 @@ struct OriginalDamageDiagnostic50LA {
 };
 class OriginalDamage50LA final {
     friend struct original_main_entry50KG::Application;
+    friend class OriginalDamageObservation50LA;
     using Domain=assets::OriginalStandardMaterialDomain50LA;
     using Context=assets::OriginalStandardMaterialContext50LA;
     using Archive=assets::OriginalUiArchive50KG;
@@ -101,6 +104,7 @@ class OriginalDamage50LA final {
     Stage stage_=Stage::fresh;
     bool effects_=false,cpuPrepared_=false;
     Diagnostic terminal_;
+    OriginalDamageNativeDraw50LA nativeDraw_;
     OriginalDamage50LA(std::shared_ptr<OriginalApplicationEntities50LA> entities,
         std::uint64_t generation,std::shared_ptr<Domain> domain,
         std::shared_ptr<const Context> context,std::shared_ptr<const Archive> overlays)
@@ -286,6 +290,67 @@ class OriginalDamage50LA final {
         }catch(...){return stop(d,Error::allocation,0x18F470);}
     }
 public:
+    const assets::OriginalUiScreenAssets50KG* nativePixels()const noexcept{return pixels_.get();}
+    const assets::OriginalUiMaterial50KG* nativeMaterial(std::size_t i)const noexcept {
+        return i==0&&nativeCpuResourcesPrepared()?&material_:nullptr;
+    }
+    std::uint32_t nativeImage(std::size_t)const noexcept{return 0;}
+    const OriginalDamageNativeDraw50LA& nativeDraw()const noexcept{return nativeDraw_;}
+    void invalidateNativeDraw()noexcept{nativeDraw_.prepared=false;}
+    // Explicit native ALL8 presentation adaptation. The proximity observation
+    // comes from the original scan in a separate HUD owner, not AI extension
+    // storage. The original health/marker leaf is complete, never health-only.
+    bool prepareNativeDisplay(const OriginalDamageNativeFrame50LA& frame,Diagnostic& d)noexcept {
+        d={};nativeDraw_.prepared=false;nativeDraw_.quadCount=nativeDraw_.packetCount=0;
+        if(!nativeCpuResourcesPrepared()||!frame.viewport||frame.viewIndex||frame.raceMode8C!=0||
+           (frame.raceFlags1B0&3u)!=1u||frame.sessionGeneration!=entity_.session||
+           !frame.cameraPublication||frame.cameraPublication<nativeDraw_.cameraPublication||
+           nativeDraw_.serial==std::numeric_limits<std::uint64_t>::max())return stop(d,Error::phase,0x18f4d0);
+        const auto& view=*frame.viewport;
+        if(!view.prepared||!view.matricesReady||!view.sceneKey||view.sessionGeneration!=frame.sessionGeneration||
+           view.x1E0||view.y1E4||view.width1E8!=640||view.height1EC!=448||
+           (nativeDraw_.viewport&&nativeDraw_.viewport!=&view))return stop(d,Error::source,0x18ead0);
+        nativeDraw_.viewport=&view;nativeDraw_.cameraPublication=frame.cameraPublication;++nativeDraw_.serial;
+        state_.raceModeC58=frame.raceMode8C;
+        if(!state_.predraw18F4D0(frame.viewIndex,frame.damage7D4,frame.damage7DC,frame.damage7D0,frame.damage7D8))
+            return stop(d,Error::geometry,0x18f4d0);
+        if((frame.raceFlags1B0&16u)||(frame.raceEntityFlags29&4u)||(frame.uiFlags1E4&1u)){
+            nativeDraw_.prepared=true;return true;
+        }
+        assets::OriginalStandardMaterialMapBindingView50LA map;
+        if(!domain_->materials382B38()->prepareColdScreenPrototypeMap249610(collector_,
+               textures_[0].primitive54->material.material00(),0,0,map,d.material)||
+           map.preparation!=assets::OriginalStandardMaterialMapPreparation50LA::ready||
+           map.texture!=atlas_||map.origin.finalLeaf!=leaf_)return stop(d,Error::material,0x249610);
+        for(std::size_t f=0;f<assets::originalUiGsFieldCount50KG;++f)
+            if(map.contextAfter249610.fields[f].value!=material_.passes[0].gs.fields[f].value)
+                return stop(d,Error::material,0x249610);
+        if(!demand18F470(d))return false;
+        if(frame.viewVehicleState40){nativeDraw_.prepared=true;return true;}
+        damage_detail50LA::State::DrawSequence sequence;
+        if(!state_.leaf18F680(frame.viewIndex,frame.flagsB9C,frame.proximity.nearby,sequence))
+            return stop(d,Error::geometry,0x18f680);
+        for(std::size_t p=0;p<sequence.count;++p){const auto index=sequence.textureIndices[p];
+            d.object=index;auto& texture=state_.textures[index];auto& storage=*textures_[index].storage58;
+            if(texture.rotation!=0||!std::isfinite(texture.x)||!std::isfinite(texture.y)||
+               !std::isfinite(texture.width)||!std::isfinite(texture.height))return stop(d,Error::geometry,0x2df694);
+            if(texture.dirty&1u){
+                const float right=texture.x+texture.width,bottom=texture.y+texture.height;
+                if(!std::isfinite(right)||!std::isfinite(bottom))return stop(d,Error::geometry,0x2df6c0);
+                storage.vertices[0].x=storage.vertices[3].x=texture.x;
+                storage.vertices[1].x=storage.vertices[2].x=right;
+                storage.vertices[0].y=storage.vertices[1].y=texture.y;
+                storage.vertices[2].y=storage.vertices[3].y=bottom;texture.dirty=std::uint8_t(texture.dirty&~1u);
+            }
+            for(auto& color:storage.colors)color=texture.packetColor;
+            if(nativeDraw_.quadCount==nativeDraw_.maximumQuads||nativeDraw_.packetCount==nativeDraw_.maximumPackets)
+                return stop(d,Error::geometry,0x2df550);
+            auto& quad=nativeDraw_.quads[nativeDraw_.quadCount];
+            quad.vertices=storage.vertices;quad.packetColors=storage.colors;quad.depth=storage.depth;
+            nativeDraw_.packets[nativeDraw_.packetCount++]={nativeDraw_.quadCount++,1,0,leaf_};
+        }
+        nativeDraw_.prepared=true;return true;
+    }
     OriginalDamage50LA(const OriginalDamage50LA&)=delete;
     OriginalDamage50LA& operator=(const OriginalDamage50LA&)=delete;
     OriginalDamage50LA(OriginalDamage50LA&&)=delete;

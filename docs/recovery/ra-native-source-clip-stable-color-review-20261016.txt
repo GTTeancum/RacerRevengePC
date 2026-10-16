@@ -1,0 +1,47 @@
+Native original RA clipping, rebased onto stable RGBA transport
+
+Base: d7472a2c90652ba36b805eab9910bbb195532bf7
+Worktree: /workspace/shared/rr-ra-native-clip-d747
+Patch: /workspace/shared/ra-native-source-clip-d747.patch
+File: platform/linux/native/ra_static_world_gl_storage.inl
+Exact preimage blob: da0f7f8c62f4c4c3ca41578e0e5be9762093666a
+
+This preserves the previously reviewed native original polygon algorithm,
+including chronological strip admission, original fan anchor, all six plane
+rotations, retained boundary duplicates and the convex nine-vertex bound.
+Original source math and anchors remain documented in:
+/workspace/shared/ra-native-source-clip-design-20261016.txt
+/workspace/shared/ra-original-clip-fog-audit-20261016.txt
+
+The only algorithmic difference from the archived 529-based clipping patch is
+final GPU transport of all four RGBA lanes. Internally, first-near clipping
+still interpolates raw RGBA, then uses color*sourceW for the other five source
+planes. At output it divides by sourceW, clamps and floors to final source
+bytes. Those recovered bytes are then multiplied by nativeClipW and emitted
+as smooth packetColorTimesClipW, matching the current stable fragment input.
+Unclipped triangles likewise emit the untouched original RGBA*nativeClipW.
+Fog transport is unchanged. No noperspective output remains in the RA stage.
+
+The fragment shader is copied unchanged from d7472a2. Thus reconstruction,
+texture sampling, byte modulation, alpha test, fog, destination composition
+and source-depth output are untouched. Existing GPU input attestation and
+resource lifecycle hooks are retained. The final RGBA transport is separate
+from the source clipper's internal post-near C*W representation; they must not
+be combined or applied twice.
+
+Root reported earlier GS-only rollback did not remove black wedges, and then
+reported stable homogeneous RGBA transport did remove them. This report does
+not establish a driver defect or prove the revised GS's runtime behavior.
+No builds, tests, shader compilation, syntax checks, gameplay execution or
+screenshot reviews were performed by this worker.
+
+UV audit follow-up: the source helper reported quantization[2] and[3] are
+bit-identical in all710 original RA PSG headers. Thus its previously noted
+cache-scale question requires no RA correction. Evidence:
+/workspace/shared/ra-uv-quantization-audit-20261016.txt
+/workspace/shared/ra-uv-source-fields-20261016.json
+
+Limits remain native floating-point rounding, raster/depth clipping and MSAA;
+not original hardware bit parity. The original near plane stays sourceZ+W,
+which corresponds to nativeGLz+3W, with later native depth clipping preserved.
+No exceptional per-primitive GPU arithmetic feedback channel was added.

@@ -35,6 +35,7 @@
 #include "ra_static_fire_visual50la.h" // Inactive native static CPU owner; no RA runtime admission.
 #include "original_camera_input50kx.h"
 #include "original_time_stats_adapter50la.h"
+#include "original_damage_observation50la.h"
 #include "original_speed_boost_adapter50la.h"
 #include "native_query_identities50kx.h"
 #include "../../platform/linux/native/original_camera_presentation.h"
@@ -2694,6 +2695,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto sourceDisplayLifetime=originalMainApplication.raceDisplayForSession50LA();
  original_main_entry50KG::SpeedBoostColdResult50LA sourceSpeedBoost;
  original_main_entry50KG::TimeStatsColdResult50LA sourceTimeStats;
+ original_main_entry50KG::DamageColdResult50LA sourceDamage;
  native_racer50HN::Bank racerBank;
  std::unique_ptr<ra_native_session50LA::Join> raSession;
  ra_native_session50LA::Diagnostic raSessionDiagnostic;
@@ -3994,6 +3996,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        originalMainApplication.assetRoot,sessionIndex+1,sourceSpeedBoost),"RA Speed/Boost source staging failed");
    require50DU(originalMainApplication.stageTimeStatsNativeCold50LA(
        originalMainApplication.assetRoot,sessionIndex+1,sourceTimeStats,true),"RA TimeStats source staging failed");
+   if(allAiEnabled)require50DU(originalMainApplication.stageDamageNativeCold50LA(
+       originalMainApplication.assetRoot,sessionIndex+1,sourceDamage),"RA Damage source staging failed");
    require50DU(sourcePositionStatsPrestage.stage(originalMainApplication,
        originalMainApplication.assetRoot,raMaterialContext,sourcePositionStatsPrestageDiagnostic),
        sourcePositionStatsPrestageDiagnostic.failure?sourcePositionStatsPrestageDiagnostic.failure:
@@ -4026,6 +4030,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    require50DU(originalMainApplication.finishTimeStatsNativeCold50LA(sourceTimeStats),
        "RA TimeStats final shared material verification failed");
+   if(sourceDamage.owner)require50DU(originalMainApplication.finishDamageNativeCold50LA(sourceDamage),
+       "RA Damage final shared material verification failed");
    require50DU(sourcePositionStatsPrestage.verify(sourcePositionStatsPrestageDiagnostic),
        "RA PositionStats preloaded canonical sources changed during construction");
    require50DU(originalMainApplication.finishSpeedBoostNativeCold50LA(sourceSpeedBoost),
@@ -4871,6 +4877,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  bool sourceSpeedBoostRendering=false,sourceSpeedBoostDisplayReported=false;
  original_time_stats_adapter50LA::Owner sourceTimeStatsAdapter;
  bool sourceTimeStatsRendering=false,sourceTimeStatsDisplayReported=false;
+ OriginalDamageObservation50LA sourceDamageObservation;
+ bool sourceDamageRendering=false,sourceDamageDisplayReported=false;
  original_camera_input50KX::Owner sourceCameraInput;
  original_all8_frame::Schedule sourceFrameSchedule;
  std::unique_ptr<platform::OriginalVideoBlockingNativeBackend> sourceFadeOut,sourceFadeIn,sourceEndingFade;
@@ -4948,6 +4956,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // Release canonical UI refs before later model retirement invalidates leaves.
   sourceTimeStatsRendering=false;
   sourceTimeStats.owner.reset();sourceTimeStats.pixels.reset();
+  sourceDamageRendering=false;
+  sourceDamage.owner.reset();sourceDamage.pixels.reset();
   sourcePositionStatsRendering=false;sourcePositionStatsHud.reset();
   sourceSpeedBoostRendering=false;sourceSpeedBoost.owner.reset();sourceSpeedBoost.pixels.reset();
   if(gcDynamicWindow.ownsResources()&&!gcDynamicWindow.close(textureDiagnostic)){
@@ -5772,6 +5782,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     if(!sourceSpeedBoostRendering)std::cerr<<"original_speed_boost_gpu_rejected operation="
         <<(speedDiagnostic.operation?speedDiagnostic.operation:"unknown")<<'\n';
     require50DU(sourceSpeedBoostRendering,"original Speed/Boost GPU source join rejected");
+   }
+   if(sourceDamage.owner){
+    OriginalDamageObservation50LA::Diagnostic observation;
+    require50DU(sourceDamageObservation.bind(*sourceCameraSession,sourceDamage.owner,observation),
+        "actual ALL8 Damage observation bind rejected");
+    platform::VehicleWindowDiagnostic50DS damageDiagnostic;
+    sourceDamageRendering=renderer.bindOriginalDamage(sourceDamage.owner,damageDiagnostic);
+    if(!sourceDamageRendering)std::cerr<<"original_damage_gpu_rejected operation="
+        <<(damageDiagnostic.operation?damageDiagnostic.operation:"unknown")<<'\n';
+    require50DU(sourceDamageRendering,"original Damage GPU source join rejected");
    }
    if(sourceTimeStats.owner){
     original_time_stats_adapter50LA::Owner::Diagnostic adapterDiagnostic;
@@ -6768,6 +6788,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
              advanceNativeGcWater();
              advanceOriginalAiManager(.016f,&schedule);
              if(sourceSpeedBoost.owner)sourceSpeedBoost.owner->invalidateNativeDraw();
+             if(sourceDamage.owner)sourceDamage.owner->invalidateNativeDraw();
              if(sourceTimeStats.owner)
               require50DU(sourceTimeStats.owner->advanceNativeWorld(.016f),
                   "original TimeStats accepted-world animation update rejected");
@@ -7422,6 +7443,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          "original TimeStats display preparation rejected");
      renderFrame.originalTimeStats=sourceTimeStats.owner.get();
     }
+    if(sourceDamageRendering&&sourceCameraSession){
+     OriginalDamageNativeFrame50LA damageFrame;
+     OriginalDamageObservation50LA::Diagnostic observation;
+     const bool captured=sourceDamageObservation.capture(damageFrame,observation);
+     if(!captured)std::cerr<<"original_damage_observation_rejected status="
+         <<static_cast<unsigned>(observation.status)<<" source_pc="<<observation.sourcePC
+         <<" slot="<<observation.slot<<'\n';
+     require50DU(captured,"original Damage observation rejected");
+     const bool prepared=sourceDamage.owner->prepareNativeDisplay(damageFrame,sourceDamage.object);
+     if(!prepared)std::cerr<<"original_damage_display_rejected source_pc="<<sourceDamage.object.sourcePC<<'\n';
+     require50DU(prepared,"original Damage display preparation rejected");
+     renderFrame.originalDamage=sourceDamage.owner.get();
+    }
     if(sourcePositionStatsRendering&&sourceCameraSession&&originalAiSession.managerBound&&
        originalAiSession.rankBound&&originalAiSession.retired40.bound){
      const bool prepared=sourcePositionStatsHud->prepareNativeDisplay(originalMainApplication,
@@ -7431,7 +7465,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<sourcePositionStatsResources.diagnostic.material.sourcePC<<'\n';
      require50DU(prepared,"original PositionStats display preparation rejected");
      renderFrame.originalPositionStats=sourcePositionStatsHud.get();
-     // All three original HUD owners now provide this admitted race view.
+     // Original HUD owners provide this admitted race view; ALL8 RA also
+     // binds complete health/proximity through its native observation owner.
      // Do not cover them with the host standings/navigation/status panels.
      if(renderFrame.originalTimeStats&&renderFrame.originalSpeedBoost)renderFrame.hostHud=nullptr;
     }
@@ -7787,6 +7822,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          <<" leaves="<<rendererDiagnostic.originalPositionStatsLeaves
          <<" rank=original_ai_manager radar=original_map markers=original_bank scheduling=native_host"<<'\n';
      sourcePositionStatsDisplayReported=true;
+    }
+    if(actualGameplayImageCompleted&&rendererDiagnostic.originalDamageQuads&&!sourceDamageDisplayReported){
+     std::cerr<<"ORIGINAL DAMAGE: actual completed display quads="<<rendererDiagnostic.originalDamageQuads
+         <<" leaves="<<rendererDiagnostic.originalDamageLeaves
+         <<" health=original_bank proximity=original_scan native_observation=all8_ai scheduling=native_host"<<'\n';
+     sourceDamageDisplayReported=true;
     }
     if(nativeGcWater){
      platform::VehicleWindowTrackVisibilityReceipt50DS visibilityReceipt;

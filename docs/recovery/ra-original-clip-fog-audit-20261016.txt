@@ -1,0 +1,144 @@
+Original TriStripClipper fog/color policy, source-only follow-up to939089a
+
+No guest execution, tests, builds, syntax checks, gameplay or screenshot
+inspection. Reads were original SLUS static words plus existing source/logs.
+
+Program registration150EC8..150EE0 supplies original366430 for TriStripClipper.
+Container366450 is MPG count256 at micro570. Second container366C58 continues
+at micro670. PrelitCompressed33A060 branches/calls micro570 (VUbyte2B80).
+
+Lane evidence, original upper instruction words:
+366670 01E9493C ITOF0.xyzw vf9,vf9: color unpacked from original integer lanes.
+366678 01C4529B MULw.xyz vf10,vf10,vf4.w: UV xyz multiplied by clipW, NOT fog w.
+366680 002A993D ITOF4.w vf10,vf19: masked packed fog F<<4 becomes scalar F.
+Second/third input lanes repeat366728..366738 /3667D8..3667E8.
+
+First clip plane uses homogeneous distances z+w:
+366860 01C423C3 ADDw.xyz vf15,vf4,vf4.w
+366868 01C52C03 ADDw.xyz vf16,vf5,vf5.w
+366870 01E4286C SUB.xyzw vf1,vf5,vf4 (position delta)
+366878 01E958AC SUB.xyzw vf2,vf11,vf9 (color delta)
+366880 01EA60EC SUB.xyzw vf3,vf12,vf10 (UV AND fog delta)
+366888 01D07C6C SUB.xyz vf17,vf15,vf16 (plane-distance delta)
+3668A8/3668D0 DIV source components z, followed by helper call.
+
+Intersection helper367330..367358 forms endpoint plus delta*t:
+367330 01E0283C ADDAx.xyzw ACC,vf5,vf0.x
+367338 01E00921 MADDq.xyzw vf4,vf1,Q
+367340 01E0583C ADDAx.xyzw ACC,vf11,vf0.x
+367348 01E01261 MADDq.xyzw vf9,vf2,Q
+367350 01E0603C ADDAx.xyzw ACC,vf12,vf0.x
+367358 01E01AA1 MADDq.xyzw vf10,vf3,Q
+Opposite crossing helper367380..3673A8 uses the other endpoint.
+All attributes are clipped across full xyzw; fog stays in vf10.w.
+
+After the first near-plane loop,3669C0 01E44A5B MULw.xyzw vf9,vf9,vf4.w
+scales color by clipW. This is AFTER near-plane clipping and BEFORE the other
+five plane loops. Fog is not scaled there. Color and fog cannot simply share
+one inferred clipping policy.
+
+Output:
+367120 DIV vf0.w/vf4.w produces reciprocal clipW.
+367130 00205180 ADDx.w vf6,vf10,vf0.x copies F into output position.w.
+367158 01C0319C MULq.xyz vf6,vf6,Q divides screen XYZ, preserving fog w.
+367160 01E04A5C MULq.xyzw vf9,vf9,Q divides W-scaled color.
+367168 01C0521C MULq.xyz vf8,vf10,Q divides UV xyz, not fog.
+367180 01E7497C FTOI0.xyzw vf7,vf9 packs color.
+367188 01E6317D FTOI4.xyzw vf6,vf6 packs screen XYZ and F<<4.
+
+Conclusion: original clipping interpolates raw F with homogeneous edge t and
+then the emitted polygon gets GS screen-linear fog interpolation. GL's native
+noperspective clipping instead interpolates W-weighted fog at generated
+vertices; equal constants remain invariant in both schemes. Therefore this
+source distinction does not explain recorded floor117's constant255 becoming
+full fog, but is a separate genuine native clip-policy mismatch to recover.
+
+The equivalent smooth(F*W)*gl_FragCoord.w robustness patch deliberately keeps
+the existing native screen-linear clip policy. It does not implement this
+original two-stage clip policy and must not be represented as doing so.
+A source-faithful correction needs clipping original operands before native
+rasterization with appropriate per-attribute rules. No such code was added.
+
+Active payload and plane-order follow-up:
+- ScissorCoreCode1506A8..1506C0 and TriStripClipper150EC8..150EE0 BOTH
+  register366430. ScissorCoreOrgCode1506C8..1506E0 registers3227D0.
+- Renderer construction243EB8..243ECC installs366430 through244940.
+- Actual pass submission tail24B588..24B598 loads current renderer442F70 and
+  invokes244C50 with a1=366430.244C50 checks current payload+64, updates it,
+  and appends the payload reference. Therefore366450 is directly selected;
+  its identification does not rest only on the named program registry.
+- Plane masks820,410,208,104,82,41, in that order, correspond to
+  z+w, z-w, y+w, y-w, x+w, x-w. The first/third/fifth use ADDw, the others
+  SUBw; DIV selects z,z,y,y,x,x. This is near,far,bottom,top,left,right in
+  the clip coordinate system, not necessarily GL's converted depth domain.
+- Let positions P0=vf4,P1=vf5, attributes A0/A1, delta=P1-P0,
+  and signed plane distances d0,d1. One crossing helper computes
+  P0+delta*d0/(d0-d1); the opposite helper computes
+  P1+delta*d1/(d0-d1). The same ordered endpoint-plus-delta*Q is applied
+  to color and UV/F. Both are algebraically the plane intersection, while
+  retaining the distinct original operand forms matters to float rounding.
+
+Original camera domain evidence (CPU uploader):
+24BB70 chooses UNPACK row4;24BBAC..24BBB8 copies camera290..2C0 guardProjection.
+24BBD0 row8 copies camera80..B0 ordinary projection.
+24BC00 row12 copies camera140..170 screen matrix.
+24BC30 row16 copies cameraC0..F0 view matrix.
+24BD1C row46 receives reciprocal camera290.x and camera2A4.y; Z=W=1.
+The existing native original_camera_start_effects.cpp309..312 reproduces the
+original guardProjection by scaling ONLY projection X/Y. Source Z remains
+unchanged. Final preamble row66 products are under independent worker review;
+GL conversion from core Z[0,W] to[-W,W] must not silently change the original
+clip-plane domain. If the source clip operand is original core Z, its z+w
+plane becomes GLz+3W, not GLz+W.
+
+Final row66 corroboration with renderer worker:
+33FDC0 sets vi2=8;33FDC8..E0 loads ordinary projection into vf9..12.
+33FE10 sets vi2=16; view loads and33FE38..B0 form model*view vf19..22.
+33FEB8..33FF30 forms ordinary projected vf13..16. Guard matrix replaces
+vf9..12 only at33FF68..80.33FFE8 sets row66;33FFF0/33FFF8/340000/340008
+stores ordinary vf13..16, before each newly calculated guard destination is
+produced (first guard vf13 at340000, last guard vf16 at340060).
+340290..3402B0 reloads row66 for a positive palette; it does not overwrite it.
+Therefore the single-node compressed clip operands from rows66..69 are the
+ordinary projection. The core sourceclipZ=(GLclipZ+W)/2 mapping is justified;
+no guard uniform is needed for those clip operands. Original near-plane
+z+w becomes GLclipZ+3W. This original clip domain must remain distinct from
+any later GL fixed-function clipping/depth range.
+
+Final polygon topology and initial strip-order proof (13:16 UTC):
+The output is a TRIANGLE FAN, not a strip. CPU uploader24BDE4 chooses
+UNPACK row34 (8022);24BDFC loads integer5 and24BE00 DSLL32 shift15 makes
+5<<47, the GIFtag PRIM field.24BEE4..24BEF0 inserts this field into the
+zero-initialized row34 tag.24BED4..24BEE0 sets PRE bit46. GS primitive type5
+is triangle fan.3665E0 reads row34 and3665E8/3665F0 copies the tag to polygon
+scratch headers101/141.3671B8..3671C8 updates only NLOOP/EOP tocount|8000;
+3671D0 kicks the selected header.367100..3671B0 walks the completed polygon
+sequentially, emitting one STQ/color/XYZF record per vertex. Its first emitted
+polygon vertex is the fan anchor: triangles(0,1,2),(0,2,3),etc.
+
+Initial clipping polygon order is chronological older,newer,current, rather
+than the native importer's winding-normalized odd-triangle order:
+3665F8/366610 obtains first color/UV at packetvi5-8/-9;
+3666B0/3666C8 obtains second at-5/-6;
+366760/366778 obtains third at-2/-3.
+These complete records append sequentially from row102 with no parity swap.
+Position ring matches those chronological records: Prelit339EF0 stores current
+position at986(vi2),339F28 negatesvi2 for the next slot; the clip call occurs
+before that current write.33A068 publishesvi2 in990.y;3665C8 reads it asvi8.
+366608 reads986(vi8), the oldest/next-overwritten slot.3666A8 negatesvi8 and
+3666C0 reads the newer previous slot.366770 reads current position989.
+
+Native import_scene48d.cpp165..170 constructs(a,b,c)=(finish-2,finish-1,finish)
+then swaps(a,b) on odd(finish-start).ra_static_world50la.h203 preserves those
+indices with a common placement/surface offset. A source-order clipper must
+undo that first-pair swap before clipping. Comparing the actual first two
+original vertex indices can restore chronological order without guessing
+strip boundaries; third remains newest. Keep each complete vertex record
+associated with its original index. A different fan anchor/diagonal is not
+permitted merely because geometry covers the same polygon: clip-generated
+fog/color need not be globally screen-affine.
+
+Per-plane iteration begins A=last,B=first and emits A when inside, followed
+by crossing intersections where required. Consequently an unchanged polygon
+rotates each pass; preserve the actual six successive plane passes and final
+result[0] anchor rather than choosing a convenient fan root after clipping.

@@ -1,22 +1,24 @@
 // VehicleWindowGl50DS::Storage. Native RA submission ownership, not a guest
 // command stream. Original world topology, material profiles and byte operands
-// remain owned by the actual aggregate. GL sampling/clipping/MSAA are native.
+// remain owned by the actual aggregate. Source polygon clipping is native GPU
+// math; raster/depth/MSAA remain GL.
     std::shared_ptr<ra_static_world50LA::Owner> raWorld;
     const VehicleWindowGl50DS* raWorldRenderer=nullptr;
     std::uint64_t raWorldImagePublication=0;
     U raWorldArray=0,raWorldVertices=0,raWorldIndices=0;
-    U raWorldVertexShader=0,raWorldFragment[2]{},raWorldProgram[2]{};
-    struct RaWorldUniforms { I matrix=-1,image=-1,fog=-1,alpha=-1,payload=-1,destination=-1; } raWorldUniform[2];
+    U raWorldVertexShader=0,raWorldGeometryShader=0,raWorldFragment[2]{},raWorldProgram[2]{};
+    struct RaWorldUniforms { I matrix=-1,sourceMatrix=-1,image=-1,fog=-1,alpha=-1,payload=-1,destination=-1; } raWorldUniform[2];
     struct RaWorldVertex { float position[3],uv[2],color[4],fog; };
     std::vector<RaWorldVertex> raWorldFrame;
     std::vector<U> raWorldFrameImages;
     struct RaWorldFrameDraw { std::size_t surface=0;std::array<I,4> scissor{}; };
     std::vector<RaWorldFrameDraw> raWorldFrameDraws;
     ra_static_fog50LA::CameraObservation raWorldCamera;
+    float raWorldSourceMatrix[16]{};
     bool raWorldFramePrepared=false;
     bool raPixelProvenanceLogged=false;
     bool hasRaWorldResources() const noexcept {
-        return raWorldArray||raWorldVertices||raWorldIndices||raWorldVertexShader||
+        return raWorldArray||raWorldVertices||raWorldIndices||raWorldVertexShader||raWorldGeometryShader||
             raWorldFragment[0]||raWorldFragment[1]||raWorldProgram[0]||raWorldProgram[1];
     }
     void retireRaWorldPublication() noexcept {
@@ -35,7 +37,8 @@
     bool deleteRaWorldResources(VehicleWindowDiagnostic50DS& d) noexcept {
         for(U i=0;i<2;++i)if(!deleteShaderName(raWorldProgram[i],true,d)||
             !deleteShaderName(raWorldFragment[i],false,d))return false;
-        return deleteShaderName(raWorldVertexShader,false,d)&&
+        return deleteShaderName(raWorldGeometryShader,false,d)&&
+            deleteShaderName(raWorldVertexShader,false,d)&&
             deleteName(raWorldArray,gl.deleteVertexArrays,d)&&
             deleteName(raWorldVertices,gl.deleteBuffers,d)&&deleteName(raWorldIndices,gl.deleteBuffers,d);
     }
@@ -56,6 +59,22 @@
                plan.vertexCount>raWorld->vertices_.size()-plan.vertexStart||
                plan.vertexCount>std::numeric_limits<U>::max()-plan.vertexStart)
                 return fail(*diagnostic,VehicleWindowError50DS::limits,"RA source draw range exceeds native limits");
+            // import_scene48d emits chronological consecutive strip records,
+            // swapping only A/B for odd strip triangles. Restarts begin a new
+            // chronological run; lowering adds one constant placement offset.
+            // This invariant lets the GS recover source fan anchors from actual
+            // indexed vertex IDs, independently of draw batching/primitive ID.
+            for(U offset=0;offset<plan.indexCount;offset+=3){
+                const auto a=raWorld->indices_[plan.indexStart+offset];
+                const auto b=raWorld->indices_[plan.indexStart+offset+1];
+                const auto c=raWorld->indices_[plan.indexStart+offset+2];
+                const std::uint64_t oldest=std::min(a,b),middle=std::max(a,b);
+                if(oldest<plan.vertexStart||middle!=oldest+1||std::uint64_t(c)!=oldest+2||
+                   std::uint64_t(c)>=std::uint64_t(plan.vertexStart)+plan.vertexCount||
+                   c>static_cast<U>(std::numeric_limits<I>::max()))
+                    return fail(*diagnostic,VehicleWindowError50DS::assets,
+                        "RA source triangle lacks retained chronological strip indices");
+            }
             if(raWorld->rasterInventory_[plan.raster].passFlags&4u)
                 return fail(*diagnostic,VehicleWindowError50DS::material,"RA fill-color program is not implemented");
         }
@@ -82,9 +101,108 @@
         if(actual!=static_cast<std::int64_t>(ib))return fail(*diagnostic,VehicleWindowError50DS::allocation,"RA index storage size differs");
         constexpr const char* vertex=R"GLSL(#version 400 core
 in vec3 position;in vec2 uv;in vec4 color;in float fogByte;
-uniform mat4 worldViewProjection;
-out vec2 sourceUv;smooth out vec4 packetColorTimesClipW;smooth out float packetFogTimesClipW;
-void main(){gl_Position=vec4(position,1.0)*worldViewProjection;sourceUv=uv;packetColorTimesClipW=color*gl_Position.w;packetFogTimesClipW=fogByte*gl_Position.w;}
+uniform mat4 worldViewProjection,sourceWorldViewProjection;
+out SourceVertex { vec4 clip;vec2 uv;vec4 color;float fog;flat int sourceIndex; } operand;
+void main(){
+    gl_Position=vec4(position,1.0)*worldViewProjection;
+    operand.clip=vec4(position,1.0)*sourceWorldViewProjection;
+    operand.uv=uv;operand.color=color;operand.fog=fogByte;operand.sourceIndex=gl_VertexID;
+}
+)GLSL";
+        // Authenticated common clipper 366450, called by PrelitCompressed.
+        // Source near is Z+W; native depth conversion makes it GL Z+3W.
+        // Keep both positions: GL still owns final depth clipping/rasterization.
+        constexpr const char* geometry=R"GLSL(#version 400 core
+layout(triangles) in;
+layout(triangle_strip,max_vertices=21) out;
+in SourceVertex { vec4 clip;vec2 uv;vec4 color;float fog;flat int sourceIndex; } operand[];
+out vec2 sourceUv;smooth out vec4 packetColorTimesClipW;
+smooth out float packetFogTimesClipW;
+struct Vertex { vec4 clip;vec4 nativeClip;vec2 uv;vec4 color;float fog; };
+Vertex polygon[9],nextPolygon[9];
+float distanceToPlane(vec4 p,int plane){
+    int axis=2-plane/2;
+    return (plane%2==0)?p.w+p[axis]:p.w-p[axis];
+}
+Vertex intersection(Vertex a,Vertex b,float da,float db,bool aInside){
+    // 367330 / 367380 retain the entering/leaving endpoint forms.
+    float q=(aInside?da:db)/(da-db);
+    Vertex origin=a;
+    if(!aInside)origin=b;
+    Vertex result;
+    result.clip=origin.clip+q*(b.clip-a.clip);
+    result.nativeClip=origin.nativeClip+q*(b.nativeClip-a.nativeClip);
+    result.uv=origin.uv+q*(b.uv-a.uv);
+    result.color=origin.color+q*(b.color-a.color);
+    result.fog=origin.fog+q*(b.fog-a.fog);
+    return result;
+}
+void emitPacket(Vertex v){
+    gl_Position=v.nativeClip;sourceUv=v.uv;
+    // 367160 / 367180: undo post-near color weighting, then FTOI0.
+    vec4 rawColor=floor(clamp(v.color/v.clip.w,0.0,255.0));
+    // Source clipping's C*sourceW representation ends above. The separate
+    // native transport below carries final byte RGBA through GL clipping.
+    packetColorTimesClipW=rawColor*gl_Position.w;
+    // 367188 FTOI4 packs F in bits 4..11. Fog was never W-weighted
+    // during source clipping. Transport only AFTER polygon generation.
+    packetFogTimesClipW=floor(clamp(v.fog,0.0,255.0))*gl_Position.w;
+    EmitVertex();
+}
+void main(){
+    int count=3;bool clipped=false;
+    for(int i=0;i<3;++i){
+        polygon[i].clip=operand[i].clip;polygon[i].nativeClip=gl_in[i].gl_Position;
+        polygon[i].uv=operand[i].uv;polygon[i].color=operand[i].color;
+        polygon[i].fog=operand[i].fog;
+        for(int plane=0;plane<6;++plane)
+            clipped=clipped || distanceToPlane(polygon[i].clip,plane)<0.0;
+    }
+    if(!clipped){
+        // No source clip-generated operands: keep the original byte values.
+        for(int i=0;i<3;++i){
+            gl_Position=gl_in[i].gl_Position;sourceUv=operand[i].uv;
+            packetColorTimesClipW=operand[i].color*gl_Position.w;
+            packetFogTimesClipW=operand[i].fog*gl_Position.w;EmitVertex();
+        }
+        EndPrimitive();return;
+    }
+    // 3665F8..3667F0 assembles oldest, middle, current source records.
+    // The importer swaps the first two indices for odd strip triangles;
+    // undo that only for clipped polygons, preserving the source fan anchor.
+    if(operand[0].sourceIndex>operand[1].sourceIndex){
+        Vertex first=polygon[0];polygon[0]=polygon[1];polygon[1]=first;
+    }
+    // Convex triangle intersected by six half spaces has at most 3+6
+    // vertices. Each pass adds at most one; fan output is at most 21.
+    // Source order: -Z,+Z,-Y,+Y,-X,+X (366870..366FD8).
+    for(int plane=0;plane<6;++plane){
+        int nextCount=0;
+        for(int i=0;i<count;++i){
+            Vertex a=polygon[(i+count-1)%count],b=polygon[i];
+            float da=distanceToPlane(a.clip,plane),db=distanceToPlane(b.clip,plane);
+            bool aInside=da>=0.0,bInside=db>=0.0;
+            // The source stores A on inside edges, starting last -> first.
+            if(aInside)nextPolygon[nextCount++]=a;
+            // Preserve coincident boundary records: later source plane
+            // rotations depend on their count and therefore the fan anchor.
+            // At most two crossings, with at least one excluded vertex,
+            // imply nextCount<=count+1 even with endpoint intersections.
+            if(aInside!=bInside)nextPolygon[nextCount++]=intersection(a,b,da,db,aInside);
+        }
+        count=nextCount;
+        if(count<3)return;
+        for(int i=0;i<count;++i){
+            polygon[i]=nextPolygon[i];
+            // 3669C0: raw RGBA at first near intersection, C*W thereafter.
+            if(plane==0)polygon[i].color*=polygon[i].clip.w;
+        }
+    }
+    for(int i=1;i<count-1;++i){
+        emitPacket(polygon[0]);emitPacket(polygon[i]);emitPacket(polygon[i+1]);
+        EndPrimitive();
+    }
+}
 )GLSL";
         constexpr const char* fragment=R"GLSL(
 in vec2 sourceUv;smooth in vec4 packetColorTimesClipW;smooth in float packetFogTimesClipW;
@@ -122,7 +240,13 @@ void main(){
 #endif
 }
 )GLSL";
-        if(!compileTrackShader(0x8B31,vertex,raWorldVertexShader))return false;
+        I geometryVertices=0,geometryComponents=0;
+        gl.getIntegerv(0x8DE0,&geometryVertices); // GL_MAX_GEOMETRY_OUTPUT_VERTICES
+        gl.getIntegerv(0x8DE1,&geometryComponents); // GL_MAX_GEOMETRY_TOTAL_OUTPUT_COMPONENTS
+        if(!check("query RA source clip geometry limits")||geometryVertices<21||geometryComponents<21*11)
+            return fail(*diagnostic,VehicleWindowError50DS::limits,"RA source clip geometry limits insufficient");
+        if(!compileTrackShader(0x8B31,vertex,raWorldVertexShader)||
+           !compileTrackShader(0x8DD9,geometry,raWorldGeometryShader))return false;
         try {
         for(U i=0;i<2;++i){
             std::string source=i?"#version 400 core\n#define RA_SAMPLE_DESTINATION\n":"#version 400 core\n";
@@ -130,7 +254,8 @@ void main(){
             if(!compileTrackShader(0x8B30,source.c_str(),raWorldFragment[i]))return false;
             auto& p=raWorldProgram[i];p=shaderGl.createProgram();
             if(!p)return fail(*diagnostic,VehicleWindowError50DS::shader,"zero RA world program");
-            shaderGl.attachShader(p,raWorldVertexShader);shaderGl.attachShader(p,raWorldFragment[i]);
+            shaderGl.attachShader(p,raWorldVertexShader);shaderGl.attachShader(p,raWorldGeometryShader);
+            shaderGl.attachShader(p,raWorldFragment[i]);
             const char* names[]={"position","uv","color","fogByte"};
             for(U a=0;a<4;++a)shaderGl.bindAttribLocation(p,a,names[a]);
             shaderGl.bindFragDataLocation(p,0,"sourceColor");if(!i)shaderGl.bindFragDataLocation(p,1,"sourceDepth");
@@ -140,10 +265,11 @@ void main(){
                 diagnostic->shader.log[sizeof(diagnostic->shader.log)-1]=0;
                 return fail(*diagnostic,VehicleWindowError50DS::shader,"native RA world shader link failed");}
             auto& u=raWorldUniform[i];u.matrix=shaderGl.getUniformLocation(p,"worldViewProjection");
+            u.sourceMatrix=shaderGl.getUniformLocation(p,"sourceWorldViewProjection");
             u.image=shaderGl.getUniformLocation(p,"image");u.fog=shaderGl.getUniformLocation(p,"fogColorAndEnable");
             u.alpha=shaderGl.getUniformLocation(p,"alphaReference");
             u.payload=shaderGl.getUniformLocation(p,"payload");u.destination=shaderGl.getUniformLocation(p,"destinationImage");
-            if(u.matrix<0||u.image<0||u.fog<0||u.alpha<0||(i?u.destination<0:u.payload<0))
+            if(u.matrix<0||u.sourceMatrix<0||u.image<0||u.fog<0||u.alpha<0||(i?u.destination<0:u.payload<0))
                 return fail(*diagnostic,VehicleWindowError50DS::shader,"RA source uniforms missing");
         }
         }catch(...){return fail(*diagnostic,VehicleWindowError50DS::allocation,"allocate RA shader source");}
@@ -212,6 +338,8 @@ void main(){
         if(!convertNativeCameraView50DX(raWorldCamera.camera,contract,projected,error)||
            std::memcmp(projected.worldViewProjection,frame.worldViewProjection,sizeof(projected.worldViewProjection)))
             return fail(d,VehicleWindowError50DS::frame,"RA world requires exact current fog-prepared camera matrix");
+        for(U row=0;row<4;++row)for(U column=0;column<4;++column)
+            raWorldSourceMatrix[column*4+row]=raWorldCamera.camera.combined[row*4+column];
         for(const auto& selectedDraw:raWorldFrameDraws){
             const auto& plan=raWorld->surfaceDrawPlan_[selectedDraw.surface];
             ra_static_fog50LA::CameraObservation camera;ra_static_fog50LA::PlacementObservation placement;
@@ -286,7 +414,8 @@ void main(){
         using F=assets::OriginalUiGsField50KG;
         const auto field=[&](F f){return raster.finalContext.fields[static_cast<std::size_t>(f)].value;};
         const auto& u=raWorldUniform[program];gl.useProgram(raWorldProgram[program]);
-        gl.uniformMatrix4fv(u.matrix,1,0,matrix);gl.uniform1i(u.image,0);
+        gl.uniformMatrix4fv(u.matrix,1,0,matrix);
+        gl.uniformMatrix4fv(u.sourceMatrix,1,0,raWorldSourceMatrix);gl.uniform1i(u.image,0);
         const U color=raWorldCamera.source.color30;
         //Original color30 is packed ARGB, not a GS-native low-byte-R word.
         //RA SCB colorrgb180,180,165 is retained as0xffb4b4a5 by the actual
