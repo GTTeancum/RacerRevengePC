@@ -22,6 +22,9 @@ struct OriginalWreckComponent50LA final {
     // Fresh native storage is not a constructed source reference.
     std::uint64_t reference00=0;
     std::uint64_t sessionGeneration=0,objectKey=0;
+    // Native borrow of the actual effect control identity, never a source field.
+    // Valid only while this canonical component remains in its live domain.
+    const std::uint32_t* nativeEffectControlId=nullptr;
     OriginalWreckComponentKind50LA kind=OriginalWreckComponentKind50LA::unbound;
     OriginalWreckComponent50LA* previous10=nullptr;
     OriginalWreckComponent50LA* next14=nullptr;
@@ -50,6 +53,15 @@ struct OriginalWreckComponentResult50LA {
 };
 namespace original_wreck_component_detail50LA {
 using C=OriginalWreckComponent50LA;using D=OriginalWreckComponentDomain50LA;
+inline bool effectControlIdentityBound(const C& c) noexcept {
+    using K=OriginalWreckComponentKind50LA;
+    switch(c.kind){
+    case K::effect19A5E0:case K::effect19DBE0:case K::effect15F100:
+    case K::effect15E800:case K::effect15DE00:case K::effect19CC50:
+    case K::effect19BA50:return c.nativeEffectControlId&&*c.nativeEffectControlId;
+    default:return true;
+    }
+}
 inline bool domain(const D& d) noexcept {
     if(!d.sessionGeneration||!d.objects||!d.count||d.count>maxOriginalWreckComponents50LA)return false;
     for(std::size_t i=0;i<d.count;++i){

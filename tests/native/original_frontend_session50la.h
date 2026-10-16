@@ -1,4 +1,5 @@
 #pragma once
+#include "../../platform/linux/native/original_ui_controller_navigation50la.h"
 // Native original Main session. Included by50DU after its host diagnostics and
 // SessionExit50DU declaration. This lifetime owns no vehicle, world, race audio,
 // shared particle manager, or cold gameplay renderer. Course publishes only a
@@ -51,7 +52,10 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   window.title="Racer Revenge | Original UI | Arrows select/change | Enter confirm | R defaults | Esc back";
   window.width=nativeVideo->width;window.height=nativeVideo->height;
   window.major=3;window.minor=2;window.profile=platform::WindowGlProfile50DQ::Core;
-  window.samples=0;window.swapInterval=0;window.resizable=true;window.gameControllers=false;
+  window.samples=0;window.swapInterval=0;window.resizable=true;
+  // Physical menu devices belong to this actual frontend window. There is no
+  // racer/control owner in this session, including the ALL8 launch route.
+  window.gameControllers=!headlessLive;
   window.redBits=window.greenBits=window.blueBits=window.alphaBits=8;
   window.depthBits=24;window.stencilBits=0;
   hostRequest.headless={platform::OffscreenGlPlatform50DC::MesaSurfaceless,nativeVideo->width,nativeVideo->height,
@@ -212,6 +216,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    }
   };
   platform::GameHostInput50ER hostInput;auto& input=hostInput.keys;
+  platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation;
   reportUiState("bound");
   std::cerr<<"Original UI controls: arrows select/change; Enter/Space confirm; Escape/menu back; "
       "R defaults/rotate; Tab controller configuration. Window Close, quit, or stdin EOF exits.\n";
@@ -284,6 +289,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     ++traceGateReports;previousGateMask=gateMask;
     previousDrawableWidth=info.drawableWidth;previousDrawableHeight=info.drawableHeight;
    }
+   platform::OriginalUiControllerNavigation50LA::Events menuEvents;
+   require50DU(originalUiControllerNavigation.observe(input,active,menuEvents),
+       "original frontend physical controller snapshot invalid");
    const auto mainClock=originalMain.sampleClock(applicationClock,active);
    originalMain.audioOutput.pause(!active);
    if(!active){
@@ -297,18 +305,22 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    const bool course=route.screen==6&&route.page==1;
    if(physicalInput){
    if(gameOptions||controls||rider||course){
-    if(input.pressed[80])originalMain.input(0);
-    if(input.pressed[79])originalMain.input(1);
-    if(input.pressed[82]||input.pressed[26])originalMain.input(2);
-    if(input.pressed[81]||input.pressed[22])originalMain.input(3);
+    menuEvents[0]=menuEvents[0]||input.pressed[80];
+    menuEvents[1]=menuEvents[1]||input.pressed[79];
+    menuEvents[2]=menuEvents[2]||input.pressed[82]||input.pressed[26];
+    menuEvents[3]=menuEvents[3]||input.pressed[81]||input.pressed[22];
    }else{
-    if(input.pressed[82]||input.pressed[80]||input.pressed[26])originalMain.input(2);
-    if(input.pressed[81]||input.pressed[79]||input.pressed[22])originalMain.input(3);
+    menuEvents[2]=menuEvents[2]||input.pressed[82]||input.pressed[80]||input.pressed[26];
+    menuEvents[3]=menuEvents[3]||input.pressed[81]||input.pressed[79]||input.pressed[22];
    }
-   if(input.pressed[40]||input.pressed[44])originalMain.input(4);
-   if((gameOptions||controls)&&input.pressed[21])originalMain.input(5);
-   if(controls&&input.pressed[43])originalMain.input(7);
-   if(input.pressed[41]||hostInput.menuRequested)originalMain.input(6);
+   menuEvents[4]=menuEvents[4]||input.pressed[40]||input.pressed[88]||input.pressed[44];
+   menuEvents[5]=menuEvents[5]||((gameOptions||controls)&&input.pressed[21]);
+   menuEvents[7]=menuEvents[7]||(controls&&input.pressed[43]);
+   menuEvents[6]=menuEvents[6]||input.pressed[41]||hostInput.menuRequested;
+   // Same source-ID merge/order as the existing race-hosted frontend. One
+   // actual keyboard/pad confirm edge dispatches once even if both are pressed.
+   for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u})
+    if(menuEvents[event])originalMain.input(static_cast<std::uint8_t>(event));
    }
    if(captureRoute.enabled()){
     require50DU(originalMain.inputCount==captureRoute.issuedActions(),"physical menu input interrupted unattended original UI route");

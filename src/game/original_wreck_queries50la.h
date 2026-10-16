@@ -12,6 +12,7 @@
 #include "original_wreck_type3_owners50la.h"
 #include "original_wreck_exclusion50la.h"
 #include "original_wreck_identity_list50la.h"
+#include "original_wreck_category_list50la.h"
 #include "original_wreck_scene_domain50la.h"
 #include "original_wreck_piece_query_owner50la.h"
 #include "original_wreck_contact50la.h"
@@ -314,7 +315,7 @@ private:
     bool canReleaseWorldBacking(const LiveZoneWorld50EN& actualWorld,bool sourceRetired)const noexcept {
         if(!storage_||retired_||storage_->world.world!=&actualWorld||
            storage_->contactBound||storage_->mutualBound||storage_->derivedBound||
-           storage_->collectionFilterApplied)return false;
+           (storage_->collectionFilterApplied&&!storage_->fullCollectionAttempted))return false;
         if(sourceRetired){
             if(!storage_->e0FullPublication||!storage_->e0ConstructorRetired||
                !storage_->queries[0].type2||!storage_->queries[0].type2->sourceOwners.retired()||
@@ -323,6 +324,8 @@ private:
                storage_->plannedQueries[0]->kind!=OriginalWreckComponentKind50LA::entity141300||
                object(0).identity!=storage_->world.identities[0]||object(0).shapeTag!=2u||object(0).hasShape)return false;
         }else if(storage_->e0FullPublication)return false;
+        if(storage_->fullCollectionAttempted&&(!fullCategoryOwnership()||
+           !storage_->sourceCategoryD8[0].retired()||!storage_->sourceCategoryD8[1].retired()))return false;
         if(storage_->fullMutualAttempted&&(!fullMutualOwnership()||
            !storage_->sourceIdentityC0[0].retired()||!storage_->sourceIdentityC0[1].retired()))return false;
         const auto& w=storage_->world;
@@ -333,7 +336,7 @@ private:
                g.mesh||g.compound||g.hasResponseCallbackE8)return false;
         }
         if(storage_->e8FullPublication&&(!sourceRetired||!storage_->e8ConstructorRetired||
-           !storage_->queries[2].type3Owners.retired()||storage_->e8CategoryD8||
+           !storage_->queries[2].type3Owners.retired()||!storage_->sourceCategoryD8[1].retired()||
            object(2).identity!=w.identities[2]||object(2).shapeTag!=3u||object(2).hasShape))return false;
         if(!w.lifecycle||!w.lifecycle->storage.registrations||
            w.lifecycle->storage.registrationCapacity<w.objectCount)return false;
@@ -491,7 +494,8 @@ public:
     //category exclusions after2CB5A0 completes.124170 preserves first-match
     //order and does not append a duplicate. Storage remains distinct perD8.
     bool applyCollectionWaterExclusion(const std::uint32_t& actualWater4342A8) noexcept {
-        if(!coherent(0)||!coherent(2)||storage_->collectionFilterApplied||!actualWater4342A8)return false;
+        if(!coherent(0)||!coherent(2)||storage_->collectionFilterApplied||storage_->fullCollectionAttempted||
+           storage_->e0FullPublication||!actualWater4342A8)return false;
         storage_->waterCategoryE0=actualWater4342A8;
         object(0).filter.categories={&storage_->waterCategoryE0,1,1,1};
         auto& categories=object(2).filter.categories;
@@ -641,7 +645,10 @@ private:
         bool e4ConstructorReached=false,e4ConstructorRetired=false;
         bool e4CallbacksBound=false,e4Prepared=false,e4FullPublication=false;
         bool e8ConstructorReached=false,e8ConstructorRetired=false,e8OwnerBound=false,e8FullPublication=false;
-        std::unique_ptr<std::uint32_t[]> e8CategoryD8;
+        std::array<OriginalWreckCategoryList50LA,2> sourceCategoryD8; //E0,E8
+        bool fullCollectionAttempted=false;
+        std::size_t fullCollectionCursor=0;
+        std::uint32_t fullCollectionWater=0;
         const OriginalWreckComponent50LA* fullContactComponent=nullptr;
         const OriginalWreckComponent50LA* fullDetectorComponent=nullptr;
         bool published[3]{},contactBound=false,mutualBound=false,derivedBound=false,initialShapesReady=false,initialShapesAttempted=false;
@@ -794,6 +801,40 @@ private:
         s.world.geometry[index]={&mesh,q.type0.composed00,nullptr,true};
         s.published[1]=true;s.e4FullPublication=true;return {S::complete,0x1662dcu,true,false};
     }
+    bool fullCategoryOwnership()const noexcept {
+        if(!storage_||!storage_->fullCollectionAttempted)return false;
+        const auto& s=*storage_;if(s.fullCollectionCursor>2u||!s.fullCollectionWater)return false;
+        for(unsigned i=0;i<2;++i){const auto& owner=s.sourceCategoryD8[i];
+            const auto& view=object(i?2u:0u).filter.categories;
+            const auto n=i?(1u+((s.fullCollectionCursor==2u&&s.fullCollectionWater!=*s.world.physicsBodyCategory3E0718)?1u:0u)):
+                (s.fullCollectionCursor?1u:0u);
+            if(owner.extent()!=n)return false;
+            if(owner.retired()){
+                if((i?!s.e8ConstructorRetired:!s.e0ConstructorRetired)||view.values||
+                   view.capacity!=n||view.count!=static_cast<std::int32_t>(n)||view.mode!=1)return false;
+            }else{
+                if(!owner.matches(view))return false;
+                if(n&&view.values[0]!=(i?*s.world.physicsBodyCategory3E0718:s.fullCollectionWater))return false;
+                if(n==2u&&view.values[1]!=s.fullCollectionWater)return false;
+            }
+        }
+        return true;
+    }
+    OriginalWreckQueryResult50LA constructFullCollectionFilters22C21C(const std::uint32_t& actualWater4342A8)noexcept {
+        using S=OriginalWreckQueryStatus50LA;
+        if(!storage_||storage_->fullCollectionAttempted||storage_->collectionFilterApplied||!actualWater4342A8||
+           !storage_->e0FullPublication||!storage_->e8FullPublication||storage_->e0ConstructorRetired||
+           storage_->e8ConstructorRetired||!storage_->derivedBound||!fullMutualOwnership()||
+           !storage_->components[2]||!canRetireFullE811B4A0(*storage_->components[2])||
+           !storage_->sourceCategoryD8[0].matches(object(0).filter.categories))return {S::binding,0x22c21cu};
+        auto& s=*storage_;s.fullCollectionAttempted=true;s.fullCollectionWater=actualWater4342A8;
+        object(0).filter.categories.mode=1; //124160,22C21C
+        if(!s.sourceCategoryD8[0].append124170(object(0).filter.categories,actualWater4342A8))return {S::allocation,0x22c238u};
+        s.fullCollectionCursor=1;
+        if(!s.sourceCategoryD8[1].append124170(object(2).filter.categories,actualWater4342A8))return {S::allocation,0x22c254u};
+        s.fullCollectionCursor=2;s.collectionFilterApplied=true;
+        return {S::complete,0x22c25cu};
+    }
     bool fullMutualOwnership()const noexcept {
         if(!storage_||!storage_->fullMutualAttempted)return false;
         const auto& s=*storage_;if(s.fullMutualCursor>4u)return false;
@@ -881,16 +922,16 @@ private:
         s.world.copies[index].copied40=q.constructorCopied40;s.world.copies[index].copied50=q.constructorCopied50;
         s.world.geometry[index]={};s.published[2]=true;s.e8FullPublication=true;
         object(2).filter.categories.mode=1; //124160(1), repeats constructor D4=1
-        try {s.e8CategoryD8=std::make_unique<std::uint32_t[]>(1);}catch(...){return {S::allocation,0x124214u};}
-        s.e8CategoryD8[0]=*s.world.physicsBodyCategory3E0718;
-        object(2).filter.categories={s.e8CategoryD8.get(),1,1,1}; //124170 append/high-water
+        if(!s.sourceCategoryD8[1].append124170(object(2).filter.categories,*s.world.physicsBodyCategory3E0718))
+            return {S::allocation,0x124214u};
         state(2).flagsF8=static_cast<std::uint8_t>((state(2).flagsF8&~1u)|1u); //16638C
         return {S::complete,0x166390u};
     }
     bool canRetireFullE811B4A0(const OriginalWreckComponent50LA& component)const noexcept {
         if(!storage_||!storage_->e8ConstructorReached||storage_->e8ConstructorRetired||storage_->components[2]!=&component||
            component.reference00!=1u||component.firstChild18||component.kind!=OriginalWreckComponentKind50LA::collision11B190||
-           storage_->initialShapesReady||((storage_->mutualBound||storage_->derivedBound)&&!storage_->fullMutualAttempted)||storage_->collectionFilterApplied||
+           storage_->initialShapesReady||((storage_->mutualBound||storage_->derivedBound)&&!storage_->fullMutualAttempted)||(storage_->collectionFilterApplied&&!storage_->fullCollectionAttempted)||
+           (storage_->fullCollectionAttempted&&!fullCategoryOwnership())||
            (storage_->fullMutualAttempted&&!fullMutualOwnership()))return false;
         const auto& s=*storage_;const auto& q=s.queries[2];const auto& r=s.world.lifecycle->storage.registrations[s.world.refs[2]-1u];
         if(r.owner||r.slot||r.encodedObject||q.membership.attached||q.membership.object||q.membership.revision||
@@ -901,8 +942,7 @@ private:
         if(s.published[2]!=s.e8FullPublication)return false;
         if(s.e8FullPublication){const auto& o=object(2);const auto& c=o.filter.categories;
             if(o.identity!=s.world.identities[2]||!o.hasShape||o.shapeTag!=3u||o.group||
-               o.filter.flags31!=component.flags29||c.mode!=1||c.values!=s.e8CategoryD8.get()||
-               c.count!=(s.e8CategoryD8?1:0))return false;
+               o.filter.flags31!=component.flags29||!s.sourceCategoryD8[1].matches(c))return false;
             for(const auto& list:o.filter.identities)if(list.values||list.count)return false;
         }
         return true;
@@ -911,8 +951,8 @@ private:
         if(!storage_||!storage_->e8ConstructorReached||storage_->e8ConstructorRetired||
            storage_->components[2]!=&component||component.reference00)return false;
         auto& s=*storage_;auto& q=s.queries[2];
-        s.e8CategoryD8.reset(); //11B51C, AFTER genuineNULL C0/CC, BEFORE11B600
-        if(s.e8FullPublication)object(2).filter.categories.values=nullptr; //end native alias; preserve high-water/mode
+        //11B51C, AFTER genuineNULL C0/CC, BEFORE11B600. Retain DC/mode.
+        if(s.e8FullPublication&&!s.sourceCategoryD8[1].release11B51C(object(2).filter.categories))return false;
         if(q.type3Owners.attempted()&&!q.type3Owners.release11B600())return false;
         if(s.e8FullPublication)object(2).hasShape=false;
         component.kind=OriginalWreckComponentKind50LA::entity141300;--count;
@@ -924,7 +964,8 @@ private:
         if(!storage_||!storage_->e4CallbacksBound||storage_->e4ConstructorRetired||
            storage_->components[1]!=&component||component.reference00!=1u||component.firstChild18||
            component.kind!=OriginalWreckComponentKind50LA::collision11B190||storage_->published[2]||
-           storage_->initialShapesReady||((storage_->mutualBound||storage_->derivedBound)&&!storage_->fullMutualAttempted)||storage_->collectionFilterApplied||
+           storage_->initialShapesReady||((storage_->mutualBound||storage_->derivedBound)&&!storage_->fullMutualAttempted)||(storage_->collectionFilterApplied&&!storage_->fullCollectionAttempted)||
+           (storage_->fullCollectionAttempted&&!fullCategoryOwnership())||
            (storage_->fullMutualAttempted&&!fullMutualOwnership()))return false;
         const auto& s=*storage_;const auto& q=s.queries[1];const auto* resource=q.type0Owners.resource();
         if(!q.type0Owners.loaded()||!resource||!resource->live()||!modelSceneIdentity().value||
@@ -992,7 +1033,8 @@ private:
         if(!storage_||!storage_->e0FullPublication||storage_->e0ConstructorRetired||
            (storage_->e4ConstructorReached&&!storage_->e4ConstructorRetired)||
            storage_->initialShapesReady||storage_->published[1]||storage_->published[2]||
-           (storage_->mutualBound&&!storage_->fullMutualAttempted)||storage_->derivedBound||storage_->collectionFilterApplied||
+           (storage_->mutualBound&&!storage_->fullMutualAttempted)||storage_->derivedBound||(storage_->collectionFilterApplied&&!storage_->fullCollectionAttempted)||
+           (storage_->fullCollectionAttempted&&!fullCategoryOwnership())||
            (storage_->fullMutualAttempted&&!fullMutualOwnership())||!modelSceneIdentity().value)return false;
         const auto& s=*storage_;const auto& q=s.queries[0];
         if(!q.type2||!q.type2->sourceOwners.loaded()||q.membership.attached||
@@ -1023,7 +1065,8 @@ private:
            (storage_->e4ConstructorReached&&!storage_->e4ConstructorRetired)||
            storage_->components[0]!=&component||component.reference00!=1u||component.firstChild18||
            storage_->published[1]||storage_->published[2]||(storage_->mutualBound&&!storage_->fullMutualAttempted)||
-           storage_->derivedBound||storage_->collectionFilterApplied||
+           storage_->derivedBound||(storage_->collectionFilterApplied&&!storage_->fullCollectionAttempted)||
+           (storage_->fullCollectionAttempted&&!fullCategoryOwnership())||
            (storage_->fullMutualAttempted&&!fullMutualOwnership()))return false;
         const auto& s=*storage_;const auto& q=s.queries[0];const auto& w=s.world;
         if(!q.type2||!q.type2->sourceOwners.loaded()||!s.sceneDomain->canRetireShape11B600(s.modelScene44,component)||
@@ -1049,7 +1092,8 @@ private:
         if(s.fullMutualAttempted){if(!s.sourceIdentityC0[0].matches(f.identities[0]))return false;}
         else if(f.identities[0].values||f.identities[0].count)return false;
         if(f.identities[1].values||f.identities[1].count)return false;
-        return !f.categories.values&&!f.categories.count;
+        return s.fullCollectionAttempted?s.sourceCategoryD8[0].matches(f.categories):
+            (!f.categories.values&&!f.categories.count);
     }
     bool retireFullE011B4A0(OriginalWreckComponent50LA& component,std::uint32_t& objectCount)noexcept {
         // Caller already admitted canRetireFullE0 and performed142590/104970.
@@ -1057,6 +1101,7 @@ private:
            !storage_->e0FullPublication||storage_->e0ConstructorRetired)return false;
         auto& s=*storage_;auto& q=s.queries[0];
         if(s.fullMutualAttempted&&!s.sourceIdentityC0[0].release11B4F4(object(0).filter.identities[0]))return false;
+        if(s.fullCollectionAttempted&&!s.sourceCategoryD8[0].release11B51C(object(0).filter.categories))return false;
         if(!q.type2->sourceOwners.releaseShapeResult11B600())return false;
         object(0).hasShape=false; //11B900 clears8C, leaves source88/category/history
         if(!s.sceneDomain->retireShape11B600(s.modelScene44,q.type2->sourceOwners,component))std::terminate();
@@ -1071,7 +1116,8 @@ private:
         if(!storage_||!storage_->e0ConstructorReached||storage_->e0ConstructorRetired||
            storage_->components[0]!=&component||storage_->published[0]||storage_->published[1]||storage_->published[2]||
            storage_->initialShapesReady||storage_->initialShapesAttempted||storage_->contactBound||
-           storage_->mutualBound||storage_->derivedBound||storage_->collectionFilterApplied||
+           storage_->mutualBound||storage_->derivedBound||(storage_->collectionFilterApplied&&!storage_->fullCollectionAttempted)||
+           (storage_->fullCollectionAttempted&&!fullCategoryOwnership())||
            (storage_->queries[0].type2&&storage_->queries[0].type2->sourceOwners.attempted()))return false;
         const auto& w=storage_->world;const auto& q=storage_->queries[0];
         const auto& r=w.lifecycle->storage.registrations[w.refs[0]-1u];

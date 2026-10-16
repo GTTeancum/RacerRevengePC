@@ -9,10 +9,12 @@
 #include "../../../src/game/original_application_entities50la.h"
 #include <exception>
 
+namespace live_audio50HF { class Owner; }
 namespace rr::game { class OriginalRaceConstructor50LA; }
 namespace rr::platform {
 class RaceAudioGroups50IC final {
     friend class ::ra_pod_scene50LA::Owner;
+    friend class ::live_audio50HF::Owner;
     friend class rr::game::OriginalRaceConstructor50LA;
 public:
     RaceAudioGroups50IC() noexcept { bindings_.fill(game::RaceAudioGroup50IC::Unrepresented); }
@@ -38,7 +40,8 @@ public:
         settings_=settings;groups_=next;duck_={};return true;
     }
     bool current()const noexcept {
-        return !coldRetiring_&&mixer_&&mixer_->groupEpoch50IC()==epoch_&&mixer_->count()==count_&&
+        return (!coldStarted_||coldThread_==std::this_thread::get_id())&&
+            !coldRetiring_&&!nativeBindingsRetired_&&mixer_&&mixer_->groupEpoch50IC()==epoch_&&mixer_->count()==count_&&
             mixer_->requiresVoiceGroupGains50IC();
     }
     bool uses(const AudioMixer50HD& mixer)const noexcept {return current()&&mixer_==&mixer;}
@@ -46,9 +49,16 @@ public:
         return static_cast<std::size_t>(group)<game::raceAudioGroupCount50IC;
     }
     bool canBind(std::size_t slot,game::RaceAudioGroup50IC group)const noexcept {
-        // Cold counted owners have no logical-sound membership join yet.
-        // Never permit provider voices to outgrow their genuinely empty lists.
-        if(coldStarted_||!current()||slot>=count_||!represented(group))return false;
+        if(!current()||slot>=count_||!represented(group))return false;
+        // Native provider membership is the actual bindings_ ledger below,
+        // not a fabricated source logicalMembers4C Entity registration.
+        if(coldStarted_){
+            const auto& p=coldGroups_[static_cast<std::size_t>(group)];
+            if(coldThread_!=std::this_thread::get_id()||coldMixer_!=mixer_||coldEpoch_!=epoch_||
+               !coldApplication_||!p.constructed||!p.loaded||p.count48||
+               p.slot40<0||static_cast<std::size_t>(p.slot40)>=coldApplication_->soundGroups434A10_.size()||
+               coldApplication_->soundGroups434A10_[p.slot40]!=&p.entity)return false;
+        }
         if(bindings_[slot]==group)return mixer_->hasVoiceGroupGain50IC(slot);
         return bindings_[slot]==game::RaceAudioGroup50IC::Unrepresented&&
             !mixer_->active(slot)&&!mixer_->hasVoiceGroupGain50IC(slot);
@@ -58,13 +68,22 @@ public:
     bool bind(std::size_t slot,game::RaceAudioGroup50IC group)noexcept {
         if(!canBind(slot,group))return false;
         if(bindings_[slot]==group)return true;
+        const auto changes=1u+unsigned(mixer_->groupPaused50IC_[slot]!=
+            (groups_.state44[static_cast<std::size_t>(group)]!=0));
+        if(!mixer_->canRecordControlChanges(changes))return false;
         if(!mixer_->setVoiceGroupGain50IC(slot,normalized(groups_,group)))return false;
         if(!mixer_->setVoiceGroupPaused50IC(slot,groups_.state44[static_cast<std::size_t>(group)]!=0))return false;
         bindings_[slot]=group;return true;
     }
     bool bindRange(std::size_t first,std::size_t count,game::RaceAudioGroup50IC group)noexcept {
         if(!current()||!count||first>=count_||count>count_-first||!represented(group))return false;
-        for(std::size_t i=0;i<count;++i)if(!canBind(first+i,group))return false;
+        std::uint64_t changes=0;
+        for(std::size_t i=0;i<count;++i){
+            if(!canBind(first+i,group))return false;
+            if(bindings_[first+i]!=group)changes+=1u+unsigned(mixer_->groupPaused50IC_[first+i]!=
+                (groups_.state44[static_cast<std::size_t>(group)]!=0));
+        }
+        if(!mixer_->canRecordControlChanges(changes))return false;
         // All setters are now infallible on this single-threaded owner.
         for(std::size_t i=0;i<count;++i)if(!bind(first+i,group))return false;
         return true;
@@ -99,21 +118,7 @@ public:
     // The original caller must first perform Entity142040 propagation; this
     // method is not a receipt for that prefix or a full Pause open/close.
     bool pauseWorld2356EC(bool requested)noexcept {
-        if(!current()||!groups_.initialized)return false;
-        constexpr auto group=game::RaceAudioGroup50IC::World4D8;
-        auto& state=groups_.state44[static_cast<std::size_t>(group)];
-        if((state!=0)==requested)return true; //2356BC..6E4: no lower command.
-        std::uint64_t changes=0;
-        for(std::size_t i=0;i<count_;++i)if(bindings_[i]==group){
-            if(!mixer_->hasVoiceGroupGain50IC(i)||mixer_->groupPaused50IC_[i]!=(state!=0))return false;
-            ++changes;
-        }
-        if(!mixer_->canRecordControlChanges(changes))return false;
-        state=requested?1u:0u; //2356EC precedes lower26D380(group2).
-        // Every setter is now infallible on the real serial mixer owner.
-        for(std::size_t i=0;i<count_;++i)if(bindings_[i]==group)
-            if(!mixer_->setVoiceGroupPaused50IC(i,requested))std::terminate();
-        return true;
+        return pauseGroupSuffix2356EC(game::RaceAudioGroup50IC::World4D8,requested);
     }
     // Borrow the SAME initialized group word for source logical-sound
     // inhibition. The original world pause suffix updates this SAME owner.
@@ -130,7 +135,34 @@ public:
         std::shared_ptr<game::OriginalApplicationEntities50LA>,std::uint64_t session,
         game::RaceAudioGroup50IC)noexcept;
     bool releaseEmptyCold142590(game::RaceAudioGroup50IC)noexcept;
+    // Explicit native shutdown after real provider voice stops. Does not stop
+    // live playback or execute source2353D0 logical-member callbacks.
+    bool retireNativeVoiceBindings()noexcept;
 private:
+    // Concrete2356A0 for this owner's actual counted group. Only the real
+    // race/world owner friends can call it; no synthetic component is accepted.
+    bool pauseColdGroup2356A0(game::RaceAudioGroup50IC,bool)noexcept;
+    bool canPauseGroupSuffix2356EC(game::RaceAudioGroup50IC group,bool requested)const noexcept {
+        if(!current()||!groups_.initialized||!represented(group))return false;
+        const auto state=groups_.state44[static_cast<std::size_t>(group)];
+        if((state!=0)==requested)return true;
+        std::uint64_t changes=0;
+        for(std::size_t i=0;i<count_;++i)if(bindings_[i]==group){
+            if(!mixer_->hasVoiceGroupGain50IC(i)||mixer_->groupPaused50IC_[i]!=(state!=0))return false;
+            ++changes;
+        }
+        return mixer_->canRecordControlChanges(changes);
+    }
+    bool pauseGroupSuffix2356EC(game::RaceAudioGroup50IC group,bool requested)noexcept {
+        if(!canPauseGroupSuffix2356EC(group,requested))return false;
+        auto& state=groups_.state44[static_cast<std::size_t>(group)];
+        if((state!=0)==requested)return true; //No lower command on Boolean equality.
+        state=requested?1u:0u; //2356EC precedes26D380 on the actual allocated group.
+        for(std::size_t i=0;i<count_;++i)if(bindings_[i]==group)
+            if(!mixer_->setVoiceGroupPaused50IC(i,requested))std::terminate();
+        return true;
+    }
+    bool canReleaseEmptyCold142590(game::RaceAudioGroup50IC)const noexcept;
     struct ColdGroup {
         game::OriginalWreckComponent50LA entity;
         std::unique_ptr<game::OriginalWreckComponent50LA*[]> logicalMembers4C;
@@ -144,7 +176,7 @@ private:
     std::uint64_t coldEpoch_=0,coldSession_=0;
     std::thread::id coldThread_{};
     std::size_t coldNext_=0;
-    bool coldStarted_=false,coldRetiring_=false;
+    bool coldStarted_=false,coldRetiring_=false,nativeBindingsRetired_=false;
     static float normalized(const game::RaceAudioGroups50IC& groups,
                             game::RaceAudioGroup50IC group)noexcept {
         return static_cast<float>(groups.volume38[static_cast<std::size_t>(group)])/100.f;

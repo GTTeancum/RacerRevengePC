@@ -615,13 +615,16 @@ inline bool Owner::constructRetainedRuntimeSourceCamera(
     return constructRuntimeSourceCamera(app,owners,cam,display,d);
 }
 inline bool Owner::prepareRuntimeRosterQueryStorage(
+    std::shared_ptr<g::OriginalApplicationEntities50LA> app,
     std::shared_ptr<const ra_cold_roster50LA::Resources> roster,
     undertrack_owners50ew_fixture::Owners* recovery,
     const undertrack_owners50ew_fixture::SourceGlobals& recoveryGlobals,
     const terrain_probe_authoring50fq_fixture::Owner& terrain,const g::Type3QueryInput48P& movement,
     const std::vector<ra_source_camera50LA::WreckReservation>& wreck,Diagnostic& d)noexcept {
     d={};
-    if(!roster||!recovery||runtimeStorageAttempted_||registryAttempted_||terminal_||closed_)
+    if(!app||!app->application10()||(worldApplication_&&worldApplication_!=app)||
+       (collisionApplication_&&collisionApplication_!=app)||
+       !roster||!recovery||runtimeStorageAttempted_||registryAttempted_||terminal_||closed_)
         return fail(d,"RA actual roster reservation requires fresh same-source ownership");
     try {
         if(!terrain.prepared||!recoveryGlobals.terrainIdentity348||!recoveryGlobals.identity[0]||
@@ -638,12 +641,13 @@ inline bool Owner::prepareRuntimeRosterQueryStorage(
         // Construct here rather than calling the public raw-borrow route, which
         // would publish the bridge before its strong roster retention exists.
         if(!enter(d,Stage::runtimeQueryStorage,runtimeStorageAttempted_,prefix_.staticCandidates))return false;
+        collisionApplication_=app;
         runtimeQueries_.reset(new ra_source_camera50LA::OwnershipBridge());
         runtimeQueries_->rosterResources_=std::move(roster);
         runtimeQueries_->rosterTerrain_=&terrain;runtimeQueries_->rosterMovement_=&movement;
         runtimeQueries_->rosterAuxiliaryIds_={recoveryGlobals.terrainIdentity348,
             recoveryGlobals.identity[0],recoveryGlobals.identity[1]};
-        if(!runtimeQueries_->constructStorage(candidates_,input,d.runtimeQueries))
+        if(!runtimeQueries_->constructStorage(std::move(app),candidates_,input,d.runtimeQueries))
             return fail(d,"RA retained roster Storage preparation failed; prefix retained");
         prefix_.runtimeQueryStorage=true;return true;
     }catch(...){return fail(d,"RA retained roster reservation exception");}

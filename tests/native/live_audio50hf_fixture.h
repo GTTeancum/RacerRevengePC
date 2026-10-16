@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace live_audio50HF {
@@ -58,6 +59,22 @@ public:
     Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
 
+    // Native storage stage only. The caller constructs the real six groups,
+    // world, then seventh group on these SAME owners before prepare().
+    bool beginCountedRaceAudioStorage()noexcept {
+        if(prepareAttempted_||prepared_||closed_||coldStorage_||mixer_.count()||
+           groups_.coldStarted_||groups_.mixer_||groups_.groups_.initialized)return false;
+        if(!mixer_.initialize(voices_.data(),voices_.size(),sampleRate))return false;
+        coldStorage_=true;coldStorageEpoch_=mixer_.groupEpoch50IC();
+        coldStorageThread_=std::this_thread::get_id();return true;
+    }
+    rr::platform::AudioMixer50HD* mixerForCountedConstruction()noexcept {
+        return coldStorageBorrowLive()?&mixer_:nullptr;
+    }
+    rr::platform::RaceAudioGroups50IC* groupsForCountedConstruction()noexcept {
+        return coldStorageBorrowLive()?&groups_:nullptr;
+    }
+
     // Cold only, once per owner, before any gameplay work. All authenticated
     // selected requests remain present, including unavailable records.
     // POD01 has60 authored semantic slots; the other seven have48. All use the
@@ -69,6 +86,10 @@ public:
         std::string& error,std::uint32_t playerRacer60=1,
         const rr::game::RaceAudioSettings50IC& audioSettings=rr::game::freshOriginalAudioSettings50IC()) {
         if(prepareAttempted_||closed_) {error="50HF preparation requires a fresh stable owner";return false;}
+        if(coldStorage_&&(!coldStorageBorrowLive()||!groups_.coldStarted_||
+           groups_.coldNext_!=rr::game::raceAudioGroupCount50IC)) {
+            error="50HF counted audio storage requires its seven live constructed groups";return false;
+        }
         prepareAttempted_=true;
         if(!rr::game::announcer_callbacks50IC_detail::settings(audioSettings)) {
             error="50HF original audio configuration must be integer 0..100";return false;
@@ -79,7 +100,7 @@ public:
             if(bank_.clips.size()!=selected_.requests.size()) {
                 error="50HF authenticated selected audio catalog count differs";return false;
             }
-            if(!mixer_.initialize(voices_.data(),voices_.size(),sampleRate)) {
+            if(!coldStorage_&&!mixer_.initialize(voices_.data(),voices_.size(),sampleRate)) {
                 error="50HF bounded mixer initialization failed";return false;
             }
             // The session owner supplies one immutable effective configuration.
@@ -215,13 +236,14 @@ public:
     // Explicit close BEFORE WindowHost50DQ destruction/SDL_Quit. Idempotent.
     // Destructor is only a fallback; host construction order remains important.
     bool close(rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
+        if(closeComplete_){diagnostic={};return true;}
         const bool restored=announcer_.stop();
         mixer_.stopAll();
         const bool result=output_.close(diagnostic);
         outputOpen_=false;closed_=true;
         if(!restored){++counters_.groupFailures;if(result)return fail(diagnostic,
             rr::platform::AudioOutputError50HD::Mixer,"50IC.close","Announcer group restoration rejected");}
-        return result&&restored;
+        closeComplete_=result&&restored;return closeComplete_;
     }
 
     bool prepared()const noexcept{return prepared_;}
@@ -300,6 +322,16 @@ private:
             }
         }
     }
+    bool coldStorageBorrowLive()const noexcept {
+        return coldStorage_&&coldStorageThread_==std::this_thread::get_id()&&
+            !prepareAttempted_&&!prepared_&&!closed_&&!outputOpen_&&
+            mixer_.groupEpoch50IC()==coldStorageEpoch_&&mixer_.count()==voices_.size()&&
+            !mixer_.requiresVoiceGroupGains50IC()&&!groups_.coldRetiring_&&
+            !groups_.nativeBindingsRetired_&&!groups_.mixer_;
+    }
+    bool coldStorage_=false,closeComplete_=false;
+    std::uint64_t coldStorageEpoch_=0;
+    std::thread::id coldStorageThread_{};
     // Destruction reverses this order; close also precedes every borrowed PCM
     // lifetime. No mutable accessors can resize a live PCM vector or voice array.
     rr::assets::AudioBank50HC bank_{};

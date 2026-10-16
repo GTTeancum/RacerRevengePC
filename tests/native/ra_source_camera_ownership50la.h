@@ -350,10 +350,12 @@ class OwnershipBridge final {
         for(const auto& b:*bindings)if(b.candidate->candidate.collision.filter.identity==id)return false;
         return true;
     }
-    bool constructStorage(std::shared_ptr<const ra_static_candidates50LA::Owner> candidates,
+    bool constructStorage(std::shared_ptr<g::OriginalApplicationEntities50LA> app,
+        std::shared_ptr<const ra_static_candidates50LA::Owner> candidates,
         const RuntimeQueryCapacityInputs& input,Diagnostic& d)noexcept {
         d={};
-        if(storageAttempted_||terminal_||closed_)return fail(d,"RA runtime storage cannot be replayed");
+        if(storageAttempted_||terminal_||closed_||!app||!app->application10())
+            return fail(d,"RA runtime storage requires fresh state and actual Application");
         storageAttempted_=true;
         try {
             const auto* source=candidates?candidates->decodedSource():nullptr;
@@ -461,7 +463,7 @@ class OwnershipBridge final {
             const storage::SourceWorldView<ra_cold_sources50LA::CollisionOwner> view{
                 source->world,{source->collisions.data(),source->collisions.size()}};
             if(!storage_.prepareSource(view,bindings->data(),bindings->size(),limits_,d.storage,
-                &lease->world(),lease))return fail(d,"RA runtime static/query storage construction failed");
+                &lease->world(),lease,std::move(app)))return fail(d,"RA runtime static/query storage construction failed");
             storageConstructed_=true;
             if(candidates_->triggerActions_){auto& s=*storage_.get();
                 for(std::size_t i=0;i<2;++i){

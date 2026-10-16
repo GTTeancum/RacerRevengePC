@@ -65,7 +65,9 @@ bool OriginalWreckEffects50LA::binding(const OriginalWreckEffectComponentBinding
         if(!b.componentKeys[i]||!b.controlOwnerIds[i])return false;
         for(unsigned j=0;j<i;++j)if(b.componentKeys[i]==b.componentKeys[j]||b.controlOwnerIds[i]==b.controlOwnerIds[j])return false;
         for(std::size_t j=0;j<b.domain->count;++j){const auto* existing=b.domain->objects[j];
-            if(existing->objectKey==b.componentKeys[i]&&existing!=&components_[i])return false;}
+            if(existing!=&components_[i]&&(!original_wreck_component_detail50LA::effectControlIdentityBound(*existing)||
+               existing->objectKey==b.componentKeys[i]||
+               (existing->nativeEffectControlId&&*existing->nativeEffectControlId==b.controlOwnerIds[i])))return false;}
     }
     return true;
 }
@@ -82,7 +84,7 @@ OriginalWreckEffectsReceipt50LA OriginalWreckEffects50LA::constructOne(unsigned 
     const auto initialized=initializeOriginalWreckComponent50LA(components_[i],kinds[i],
         d.sessionGeneration,binding_.componentKeys[i],true,*binding_.actualObjectCount423F60);
     if(initialized.status!=OriginalWreckComponentStatus50LA::complete)return fail(S::storage,initialized.sourcePC);
-    ++initializedChildren_;
+    ++initializedChildren_;components_[i].nativeEffectControlId=&owners_[i].id;
     // Publish only this genuinely initialized source object into the existing
     // external domain view. The next three unconstructed slots stay absent.
     binding_.domainStorage[d.count++]=&components_[i];

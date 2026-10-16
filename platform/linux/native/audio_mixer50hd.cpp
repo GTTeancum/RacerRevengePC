@@ -201,6 +201,12 @@ bool AudioMixer50HD::setVoiceGroupPaused50IC(std::size_t slot,bool paused) noexc
 bool AudioMixer50HD::hasVoiceGroupGain50IC(std::size_t slot) const noexcept {
     return slot < count_ && groupKnown50IC_[slot];
 }
+bool AudioMixer50HD::retireStoppedVoiceGroup50IC(std::size_t slot) noexcept {
+    if(slot>=count_||voices_[slot].active||!groupKnown50IC_[slot])return false;
+    noteControlChange();
+    groupKnown50IC_[slot]=false;groupGains50IC_[slot]=0.f;groupPaused50IC_[slot]=false;
+    return true;
+}
 bool AudioMixer50HD::requireVoiceGroupGains50IC() noexcept {
     if (!voices_ || !count_) return false;
     for (std::size_t i = 0; i < count_; ++i)

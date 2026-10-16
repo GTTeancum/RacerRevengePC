@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/game/original_application_entities50la.h"
 #include "authored_runtime_ground50cp_fixture.h"
 #include "live_terrain_probe50fr_fixture.h"
 #include "candidate_handles50cb.h"
@@ -119,7 +120,17 @@ struct Membership {
 // query, cursor, racer-bank visit or registration operation is outstanding.
 class Owner;
 struct Storage {
-    // First member: keep borrowed source backing and the exclusive
+private:
+    // Declared before the byte reference and every query field. All escaped
+    // query-byte borrows are protected by this actual process-owner retain.
+    const std::shared_ptr<OriginalApplicationEntities50LA> application_;
+    static std::shared_ptr<OriginalApplicationEntities50LA> requireApplication(
+        std::shared_ptr<OriginalApplicationEntities50LA> app) {
+        if(!app||!app->application10())throw std::invalid_argument("actual live Application collision authority required");
+        return app;
+    }
+public:
+    // Keep borrowed source backing and the exclusive
     // serial world lease alive until every registry/scratch member is retired.
     const std::shared_ptr<void> borrowedWorldLease;
     const Counts count;
@@ -145,9 +156,9 @@ struct Storage {
     FixedBuffer<CollectionTree50BX> trees;
     FixedBuffer<CollectionZone50BX> zones;
     ZoneLifecycle50CL lifecycle{};
-    // Shared collision-world constructor invalidation byte, source3E0730.
-    // It is not query readiness and belongs to the world rather than a camera.
-    std::uint8_t globalValid3E0730=0;
+    // SAME process3E0730 byte across serial worlds and all existing query
+    // consumers. Reference preserves existing address-taking and write sites.
+    std::uint8_t& globalValid3E0730;
     ZoneRegistrationScratch50CJ registrationScratch{};
     FixedBuffer<ZoneRegistrationCommand50CQ> events;
     ZoneRegistrationQueue50CQ queue{};
@@ -172,13 +183,15 @@ private:
     friend class Owner;
     // Only Owner's private authenticated borrowed route can select a lease.
     explicit Storage(Counts n,const LiveZoneWorld50EN* borrowed,
-        std::shared_ptr<void> lease):borrowedWorldLease(std::move(lease)),count(n),candidates(n.terrain),candidateZones(n.terrain),candidateMethods(n.terrain),
+        std::shared_ptr<void> lease,std::shared_ptr<OriginalApplicationEntities50LA> app)
+        :application_(requireApplication(std::move(app))),borrowedWorldLease(std::move(lease)),count(n),candidates(n.terrain),candidateZones(n.terrain),candidateMethods(n.terrain),
         contactMaterials(n.terrain),handles(n.terrain),movement(n.terrain),
         registeredMovement(n.terrain),terrainTargets(n.terrain),terrainSelected(n.selected),
         terrainScratchEffects(n.selected),terrainEffects(n.selected),
         registeredIndices(n.selected),probeIndices(n.selected),resolveScratch(sourceSelectionCapacity),
         registries(n.methods),membershipScratchRegistries(n.methods),registrations(n.objects),
-        blocks(n.blocks),trees(n.methods),zones(n.zones),events(n.events),
+        blocks(n.blocks),trees(n.methods),zones(n.zones),
+        globalValid3E0730(application_->collisionGlobalValid3E0730_),events(n.events),
         authoredPortals(borrowed?0:n.portals),portalHeads(borrowed?0:n.zones),portalLinks(borrowed?0:n.portalLinks),
         portalScratchLinks(n.portalLinks),portalGeometry(borrowed?0:n.portals),
         mainMembership(n.membership),secondaryMembership(n.membership),terrainMembership(n.membership),
@@ -192,7 +205,8 @@ private:
         if(borrowed)world=*borrowed;
     }
 public:
-    explicit Storage(Counts n):Storage(n,nullptr,{}){}
+    explicit Storage(Counts n,std::shared_ptr<OriginalApplicationEntities50LA> app)
+        :Storage(n,nullptr,{},std::move(app)){}
     Storage(const Storage&)=delete;
     Storage& operator=(const Storage&)=delete;
     Storage(Storage&&)=delete;
@@ -335,20 +349,21 @@ public:
     // every original/candidate input untouched. No live retry/resizing exists.
     // Caller keeps Ground, candidates, names, filters and radii at their stable
     // addresses longer than this owner; its hot helpers never discover assets.
-    bool prepare(const Ground& ground,const Binding* bindings,std::size_t count,
+    bool prepare(std::shared_ptr<OriginalApplicationEntities50LA> app,const Ground& ground,const Binding* bindings,std::size_t count,
         const Limits& limits,Diagnostic& diagnostic) noexcept {
         using Original=typename std::decay_t<decltype(ground.owners)>::value_type;
         const SourceWorldView<Original> source{ground.world,{ground.owners.data(),ground.owners.size()}};
-        return prepareSource(source,bindings,count,limits,diagnostic,nullptr,{});
+        return prepareSource(source,bindings,count,limits,diagnostic,nullptr,{},std::move(app));
     }
 private:
     template<class CollisionOwner>
     bool prepareSource(const SourceWorldView<CollisionOwner>& ground,const Binding* bindings,std::size_t count,
         const Limits& limits,Diagnostic& diagnostic,const LiveZoneWorld50EN* borrowed,
-        std::shared_ptr<void> lease) noexcept {
+        std::shared_ptr<void> lease,std::shared_ptr<OriginalApplicationEntities50LA> app) noexcept {
         using namespace detail;
         try {
             diagnostic={};need(!storage_,"track storage already prepared");
+            need(app&&app->application10(),"actual live Application collision authority required");
             need(limits.terrainOwners&&limits.terrainOwners<=hardTerrainOwners&&
                 limits.zones&&limits.zones<=hardZones&&limits.portals<=hardPortals&&
                 limits.coldPayloadBytes&&limits.coldPayloadBytes<=32u*1024u*1024u,
@@ -441,7 +456,7 @@ private:
                 borrowed->portalLinkCount==n.portalLinks&&borrowed->portalHeads&&
                 (!n.portalLinks||borrowed->portalLinks)&&(!n.portals||borrowed->portals),
                 "borrowed source portal world extent mismatch");
-            auto next=std::unique_ptr<Storage>(new Storage(n,borrowed,std::move(lease)));
+            auto next=std::unique_ptr<Storage>(new Storage(n,borrowed,std::move(lease),std::move(app)));
             for(std::size_t i=0;i<count;++i){
                 diagnostic.candidate=i;auto& c=*bindings[i].candidate;
                 const auto& binding=bindings[i];

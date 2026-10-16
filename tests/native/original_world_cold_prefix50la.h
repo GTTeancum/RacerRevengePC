@@ -41,7 +41,7 @@ inline bool Owner::prepareWorldCollisionObjects271230(
     }
     return true;
 }
-inline bool Owner::releaseWorldCollisionObjects27BB80(std::uint32_t& pc)noexcept {
+inline bool Owner::canReleaseWorldCollisionObjects27BB80(std::uint32_t& pc)const noexcept {
     if(!worldCollisionObjects3CC_)return true;
     if(!worldApplication_||worldApplication_->attachmentLock423F58())return fail(pc,0x27bb80);
     auto& objects=*worldCollisionObjects3CC_;
@@ -49,12 +49,19 @@ inline bool Owner::releaseWorldCollisionObjects27BB80(std::uint32_t& pc)noexcept
     for(const auto& zone:objects.zones_){const auto& e=zone.entity;
         if(!zone.counted||e.reference00!=1||e.previous10||e.next14||e.parent1C||e.firstChild18||
            e.mask20||e.descendants24||e.objectKey!=key(&e)||e.sessionGeneration!=worldEntity_.sessionGeneration||
-           zone.count30!=zone.entries34.size())return fail(pc,0x27bb80);
+           zone.count30!=zone.entries34.size()||!worldApplication_->entityAuthority_.canRetire(e))
+            return fail(pc,0x27bb80);
         for(const auto& wrapper:zone.entries34)if(wrapper.collision04||!wrapper.descriptor08)
             return fail(pc,0x27bbf4);
         ++counted;
     }
     if(worldApplication_->objectCount423F60()<counted)return fail(pc,0x1413e0);
+    return true;
+}
+inline bool Owner::releaseWorldCollisionObjects27BB80(std::uint32_t& pc)noexcept {
+    if(!canReleaseWorldCollisionObjects27BB80(pc))return false;
+    if(!worldCollisionObjects3CC_)return true;
+    auto& objects=*worldCollisionObjects3CC_;
     for(auto& zone:objects.zones_){
         //Actual142590/104970 final reference, then27BB80 raw descriptor/row
         //deletion and1413E0. No live collision Entity has been acquired here.
@@ -72,6 +79,25 @@ inline bool Owner::prepareWorldCollisionResources(std::shared_ptr<ra_static_cand
     rr::assets::OriginalStandardTextureDiagnostic50LA& d)noexcept {
     if(!worldColdConstructed_||!worldCollisionObjects3CC_||worldCollisionResources_||topologyAttempted_||
        !worldAudio_||worldAudio_->coldThread_!=std::this_thread::get_id())return false;
+    // Join the actual3CC wrappers to the SAME retained decoded source. Matching
+    // filenames/counts from another aggregate cannot authorize these shapes.
+    const auto* source=worldCollisionObjects3CC_->source_->sourcesDecoded();
+    if(!candidates||!source||candidates->decodedSource()!=source)return false;
+    std::size_t collision=0;
+    for(const auto& zone:worldCollisionObjects3CC_->zones_){
+        if(!zone.counted||zone.count30!=zone.entries34.size())return false;
+        for(const auto& wrapper:zone.entries34){
+            if(wrapper.type00!=1||wrapper.collision04||!wrapper.descriptor08)return false;
+            if(!wrapper.decodedCollision)continue; //Still a future actual resolver miss.
+            if(collision>=source->collisions.size()||
+               wrapper.decodedCollision!=&source->collisions[collision])return false;
+            const auto& authored=*wrapper.descriptor08->source;
+            if(wrapper.decodedCollision->zone!=authored.zone||
+               wrapper.decodedCollision->ordinal!=authored.ordinal)return false;
+            ++collision;
+        }
+    }
+    if(collision!=source->collisions.size())return false;
     try {worldCollisionResources_.reset(new ra_collision_resources50LA::Owner);}catch(...){return false;}
     return worldCollisionResources_->prepare(std::move(candidates),std::move(resolver),d);
 }
@@ -80,7 +106,8 @@ inline bool Owner::constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicati
     std::uint64_t generation,std::uint32_t& pc)noexcept {
     pc=0;
     if(worldColdAttempted_||topologyAttempted_||topologyClosed_||!app||!app->application10()||
-       !generation||app->attachmentLock423F58()||!audio.coldStarted_||audio.coldRetiring_||
+       !generation||(collisionApplication_&&collisionApplication_!=app)||
+       app->attachmentLock423F58()||!audio.coldStarted_||audio.coldRetiring_||
        audio.coldNext_!=6||audio.coldApplication_!=app||audio.coldSession_!=generation||
        audio.coldMixer_!=&mixer||audio.coldThread_!=std::this_thread::get_id()||
        audio.coldEpoch_!=mixer.groupEpoch50IC()||audio.mixer_||audio.groups_.initialized)
@@ -109,6 +136,45 @@ inline bool Owner::constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicati
     worldApplication_->worldRegistration434320_=0; //1B28D0, real shared word.
     worldMode524_=3; //1B28D4 follows the process-word clear.
     pc=0x1b2918;return true; //Constructor prefix only, never world-load readiness.
+}
+// Explicit native ownership retirement, not a26FD80 dispatch or substitute
+// for unrepresented LightManager/context callbacks. The aggregate calls the
+// second leaf only after its actual runtime/GPU/static owners have closed.
+inline bool Owner::canRetireNativeWorldPrefix()const noexcept {
+    if(!worldColdConstructed_||!worldApplication_||!worldAudio_||
+       worldApplication_->attachmentLock423F58())return false;
+    const auto& e=worldEntity_;const auto& audio=*worldAudio_;
+    if(e.reference00!=1||e.previous10||e.next14||e.parent1C||e.firstChild18||e.mask20||e.descendants24||
+       e.objectKey!=key(&e)||audio.coldApplication_!=worldApplication_||
+       audio.coldSession_!=e.sessionGeneration||audio.coldThread_!=std::this_thread::get_id()||
+       !audio.coldMixer_||audio.coldEpoch_!=audio.coldMixer_->groupEpoch50IC())return false;
+    if(!worldApplication_->entityAuthority_.canRetire(e))return false;
+    if(worldList500_&&worldListCount50C_)return false;
+    if(worldCollisionResources_&&!worldCollisionResources_->canCloseUnloadedBacking())return false;
+    std::uint32_t pc=0;if(!canReleaseWorldCollisionObjects27BB80(pc))return false;
+    if(worldPhysics3D4_&&!worldPhysics3D4_->canRelease27C030())return false;
+    const auto& group=audio.coldGroups_[static_cast<std::size_t>(g::RaceAudioGroup50IC::World4D8)];
+    if(group.constructed&&!audio.canReleaseEmptyCold142590(g::RaceAudioGroup50IC::World4D8))return false;
+    const std::size_t required=1u+std::size_t(group.constructed)+
+        (worldCollisionObjects3CC_?worldCollisionObjects3CC_->zones_.size():0u);
+    return worldApplication_->objectCount423F60()>=required;
+}
+inline bool Owner::retireNativeWorldPrefixAfterOwnedCleanup(std::uint32_t& pc)noexcept {
+    pc=0;
+    if(!canRetireNativeWorldPrefix()||runtimeQueries_||trackParticles_||environmentMethod_||
+       (topologyAttempted_&&!topologyClosed_))return fail(pc,0x1b2870);
+    if(worldCollisionResources_&&!worldCollisionResources_->closeUnloadedBacking())return fail(pc,0x11b600);
+    worldCollisionResources_.reset();
+    if(!releaseWorldCollisionObjects27BB80(pc))return false;
+    auto& audio=*worldAudio_;
+    const auto group=g::RaceAudioGroup50IC::World4D8;
+    if(audio.coldGroups_[static_cast<std::size_t>(group)].constructed&&
+       !audio.releaseEmptyCold142590(group))return fail(pc,0x235150);
+    if(worldPhysics3D4_&&!worldPhysics3D4_->release27C030())return fail(pc,0x27c030);
+    worldPhysics3D4_.reset();
+    if(!worldApplication_->entityAuthority_.retire(worldEntity_))return fail(pc,0x1413e0);
+    worldList500_.reset();--worldEntity_.reference00;--worldApplication_->objectCount423F60();
+    worldColdConstructed_=false;worldAudio_=nullptr;worldApplication_.reset();return true;
 }
 inline bool Owner::rollbackNativeWorldConstructionFailure(std::uint32_t& pc)noexcept {
     pc=0;

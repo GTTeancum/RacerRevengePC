@@ -131,6 +131,7 @@ private:
     friend class RaceAudioGroups50IC;
     // Actual group owner only; independent of gain, pitch and playback token.
     bool setVoiceGroupPaused50IC(std::size_t slot,bool paused) noexcept;
+    bool retireStoppedVoiceGroup50IC(std::size_t slot) noexcept;
     void noteControlChange() noexcept;
     bool originalRouting50KG(std::int32_t engineAngle,float& left,float& right,
                             std::int32_t volume=100) const noexcept;

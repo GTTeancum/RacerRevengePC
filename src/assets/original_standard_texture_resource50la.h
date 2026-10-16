@@ -22,6 +22,8 @@ class OriginalStandardIpumImageLease50LA;
 class OriginalStandardIpumImageSet50LA;
 
 enum class OriginalStandardModelFileKind50LA : std::uint8_t { mcf,psg,colType0 };
+// Explicit sealed-namespace absence is distinct from an unresolved native row.
+enum class OriginalStandardCollisionLookup50LA : std::uint8_t { rejected,absent,present };
 //Native stable row identity, not an original archive offset or retail index.
 //Both parts are checked; a row from another application cannot be adopted.
 struct OriginalStandardModelFileId50LA {
@@ -153,6 +155,11 @@ public:
         const std::vector<std::uint8_t>&,OriginalStandardModelFileId50LA&,
         OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool lookupModel132820(const std::string&,OriginalStandardModelFileKind50LA,
+        OriginalStandardModelFileView50LA&,OriginalStandardTextureDiagnostic50LA&) const noexcept;
+    // Actual11BA34 missing-COL branch may consume only this provider-backed
+    // absence. Present requires an already authenticated canonical COL row.
+    // Neither outcome constructs a query, shape, cache association or ref60.
+    OriginalStandardCollisionLookup50LA lookupCollision132820(const std::string&,
         OriginalStandardModelFileView50LA&,OriginalStandardTextureDiagnostic50LA&) const noexcept;
     bool modelFile(OriginalStandardModelFileId50LA,OriginalStandardModelFileView50LA&,
         OriginalStandardTextureDiagnostic50LA&) const noexcept;

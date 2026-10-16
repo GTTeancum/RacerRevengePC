@@ -925,7 +925,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       raWorld->prepareStaticCandidates(raNames,raDiagnostic)&&
       raWorld->prepareAuthoring(raDiagnostic)&&raWorld->prepareNativeTriggers(raDiagnostic)&&
       raWorld->prepareLighting(static_cast<std::uint32_t>(racerRigs.size()),raDiagnostic)&&
-      raWorld->prepareRuntimeRosterQueryStorage(roster,&recoveryQueryOwners,recoveryGlobals,
+      raWorld->prepareRuntimeRosterQueryStorage(originalMainApplication.entities(),roster,&recoveryQueryOwners,recoveryGlobals,
           terrainOwner,movement,{},raDiagnostic);
   if(!raColdReady){
    std::cerr<<"RA cold failure stage="<<unsigned(raDiagnostic.stage)
@@ -1094,7 +1094,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  track_runtime_storage50IG::Diagnostic trackStorageDiagnostic{};
  track_runtime_storage50IG::Limits trackStorageLimits;trackStorageLimits.originalCameraQueries=originalCameraEnabled;
  trackStorageLimits.originalRecoveryQueries=originalRecoveryEnabled;
- if(!isRaTrack)require50DU(trackStorageOwner.prepare(ground,trackBindings.data(),trackBindings.size(),trackStorageLimits,
+ if(!isRaTrack)require50DU(trackStorageOwner.prepare(originalMainApplication.entities(),ground,trackBindings.data(),trackBindings.size(),trackStorageLimits,
      trackStorageDiagnostic),trackStorageDiagnostic.message.empty()?"original track storage preparation failed":
      trackStorageDiagnostic.message.c_str());
  auto& trackStorage=isRaTrack?raRuntime->storage:*trackStorageOwner.get();

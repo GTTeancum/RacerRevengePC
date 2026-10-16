@@ -12,7 +12,12 @@ class OriginalWreckEffectArrays50LA final {
     using O=OriginalRacerSceneObject50LA;
     std::unique_ptr<OriginalWreckComponent50LA*[]> smoke160_,fire164_;
     std::unique_ptr<const O*[]> anchors170_;
-    std::size_t count_=0,anchorsWritten_=0,smokeWritten_=0;
+    std::size_t count_=0,anchorsWritten_=0,smokeWritten_=0,fireWritten_=0,pairsStopped_=0;
+    // Same actual external forest for every source loop iteration. These are
+    // native borrows only;2CB500 never retires that forest or its children.
+    OriginalWreckComponentDomain50LA* externalDomain_=nullptr;
+    OriginalWreckComponent50LA** externalStorage_=nullptr;
+    std::size_t externalCapacity_=0;
     bool attempted_=false,retired_=false;
     std::uint32_t boundary_=0;
     static bool damageName(const std::string& name)noexcept {
@@ -66,6 +71,7 @@ class OriginalWreckEffectArrays50LA final {
         //2CB534/548/55C free pointer arrays without reading/releasing pointees.
         //External children are separately owned; this owner never disposes them.
         smoke160_.reset();fire164_.reset();anchors170_.reset();
+        externalDomain_=nullptr;externalStorage_=nullptr;
         retired_=true;boundary_=0x2cb568u;return true;
     }
 public:

@@ -1,4 +1,5 @@
 #pragma once
+namespace track_runtime_storage50IG {struct Storage;}
 namespace ra_pod_scene50LA { class Owner; }
 namespace original_cable_selection50LA { class Binding; }
 namespace native_racer_model50LA { class Owner; }
@@ -66,6 +67,25 @@ public:
         if(result.okay())searchableTypeGp801C_=result.type;
         return result;
     }
+    // Actual11B270..11B2E4 constructor registry suffix. The second name
+    // is Vegetation, despite legacy native callers naming its tag "group".
+    // Lazy process caches belong to this SAME registry, not to each query.
+    Result collisionObject11B270()noexcept {
+        if(terminal_)return {Status::terminal,0x11b270u};
+        if(collisionTypeGp8010_==0xffu){
+            auto result=findOrAppend2A31E0("CollisionObject");
+            if(!result.okay())return result;
+            collisionTypeGp8010_=result.type;
+        }
+        if(vegetationTypeGp8014_==0xffu){
+            auto result=findOrAppend2A31E0("Vegetation");
+            if(!result.okay())return result;
+            vegetationTypeGp8014_=result.type;
+        }
+        //11B2C8 is unconditional, including warm-cache constructors. Its
+        //returned byte, not a fixed native tag, becomes query.type02.
+        return findOrAppend2A31E0("CollisionObject");
+    }
     std::uint32_t count00()const noexcept{return count00_;}
     const std::array<char,128>* name(std::uint8_t type)const noexcept {
         return !terminal_&&type<names_.size()?&names_[type]:nullptr;
@@ -75,6 +95,7 @@ private:
     std::uint32_t count00_=0,assertion443978_=0;
     std::vector<std::array<char,128>> names_;
     std::uint8_t searchableTypeGp801C_=0xffu;
+    std::uint8_t collisionTypeGp8010_=0xffu,vegetationTypeGp8014_=0xffu;
     bool assertionInitialized_=false,terminal_=false;
 };
 
@@ -92,6 +113,10 @@ class OriginalApplicationEntities50LA final {
     std::uint32_t worldRegistration434320_=0; //BSS startup;1B28D0 clears on actual world construction.
     OriginalApplicationEntityAuthority50LA entityAuthority_;
     friend class ::ra_pod_scene50LA::Owner;
+    friend struct ::track_runtime_storage50IG::Storage;
+    // Process BSS3E0730. Storage borrows this byte; allocating another world
+    // does not reset it. Only reached original query methods write it.
+    std::uint8_t collisionGlobalValid3E0730_=0;
     friend class OriginalVisibilityQuadTree50LA;
     //Startup BSS; one real process slot, never a per-scene forced null.
     OriginalVisibilityQuadTree50LA* visibility443A98_=nullptr;

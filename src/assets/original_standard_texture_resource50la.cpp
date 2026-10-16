@@ -671,6 +671,39 @@ bool OriginalStandardTextureResolver50LA::lookupModel132820(const std::string& n
     }
     return fail(d,E::unresolved,0x13294C);
 }
+OriginalStandardCollisionLookup50LA OriginalStandardTextureResolver50LA::lookupCollision132820(
+    const std::string& name,OriginalStandardModelFileView50LA& out,D& d) const noexcept {
+    using Result=OriginalStandardCollisionLookup50LA;
+    using Provider=OriginalStandardArchiveProvider50LA;
+    d={};out={};
+    if(name.size()<4||name.size()>259){fail(d,E::input,0x132820);return Result::rejected;}
+    for(unsigned char c:name)if(c<32||c>=127){fail(d,E::input,0x132820);return Result::rejected;}
+    constexpr char extension[]=".col";
+    for(std::size_t i=0;i<4;++i)
+        if(fold(static_cast<unsigned char>(name[name.size()-4+i]))!=
+           static_cast<unsigned char>(extension[i])){
+            fail(d,E::input,0x132820);return Result::rejected;
+        }
+    if(!storage_||!storage_->provider||!storage_->provider->sealed()){
+        fail(d,E::unresolved,0x132820);return Result::rejected;
+    }
+    Provider::MemberView actual;
+    const auto resolution=storage_->provider->lookup132820(name,actual);
+    if(resolution==Provider::Lookup::unknown){
+        fail(d,E::unresolved,0x132820);return Result::rejected;
+    }
+    if(resolution==Provider::Lookup::absent){
+        // A retained positive row contradicting the current namespace must
+        // never be converted into a successful negative-load cleanup path.
+        for(const auto& file:storage_->files)if(same(file->member,name)){
+            fail(d,E::phase,0x132820);return Result::rejected;
+        }
+        d.sourcePC=0x13294c;return Result::absent;
+    }
+    if(!lookupModel132820(name,OriginalStandardModelFileKind50LA::colType0,out,d))
+        return Result::rejected;
+    return Result::present;
+}
 bool OriginalStandardTextureResolver50LA::publishAnimation1326A0(OriginalStandardModelFileId50LA id,
     const rr::game::OriginalRacerAnimationCold50LA* animation,D& d) noexcept {
     OriginalStandardModelFileView50LA file;

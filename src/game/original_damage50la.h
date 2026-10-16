@@ -199,7 +199,8 @@ class OriginalDamage50LA final {
                 if(!state_.initializeTexture(i,*t.atlas->sourceWidth14(),*t.atlas->sourceHeight18()))
                     return stop(d,Error::geometry,damage_detail50LA::loadCallerPC[i]);
                 const auto& v=state_.textures[i];auto& q=t.storage58->vertices;
-                q[0].u=q[3].u=v.u0;q[1].u=q[2].u=v.u1;
+                // Source strip1,0,2,3 preserves its diagonal in the native fan.
+                q[0].u=q[3].u=v.u1;q[1].u=q[2].u=v.u0;
                 q[0].v=q[1].v=v.v0;q[2].v=q[3].v=v.v1;
             }
             //18EAA0 layout requires actual race mode/view binding. Cold resources
@@ -337,8 +338,8 @@ public:
             if(texture.dirty&1u){
                 const float right=texture.x+texture.width,bottom=texture.y+texture.height;
                 if(!std::isfinite(right)||!std::isfinite(bottom))return stop(d,Error::geometry,0x2df6c0);
-                storage.vertices[0].x=storage.vertices[3].x=texture.x;
-                storage.vertices[1].x=storage.vertices[2].x=right;
+                storage.vertices[0].x=storage.vertices[3].x=right;
+                storage.vertices[1].x=storage.vertices[2].x=texture.x;
                 storage.vertices[0].y=storage.vertices[1].y=texture.y;
                 storage.vertices[2].y=storage.vertices[3].y=bottom;texture.dirty=std::uint8_t(texture.dirty&~1u);
             }

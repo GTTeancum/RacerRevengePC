@@ -39,7 +39,9 @@ class OriginalWreckSmokeOwner50LA final {
            !domain(*b.domain)||!b.particleParent||!contains(*b.domain,b.particleParent)||
            !b.actualObjectCount423F60||*b.actualObjectCount423F60==std::numeric_limits<std::uint32_t>::max()||
            !b.actualAttachmentLock423F58||*b.actualAttachmentLock423F58||!b.componentKey||!b.controlOwnerId)return false;
-        for(std::size_t i=0;i<b.domain->count;++i)if(b.domainStorage[i]->objectKey==b.componentKey)return false;
+        for(std::size_t i=0;i<b.domain->count;++i){const auto* c=b.domainStorage[i];
+            if(!effectControlIdentityBound(*c)||c->objectKey==b.componentKey||
+               (c->nativeEffectControlId&&*c->nativeEffectControlId==b.controlOwnerId))return false;}
         return true;
     }
     bool construct19A5E0(const OriginalWreckSmokeBinding50LA& b)noexcept {
@@ -47,7 +49,8 @@ class OriginalWreckSmokeOwner50LA final {
         const auto r=initializeOriginalWreckComponent50LA(component_,OriginalWreckComponentKind50LA::effect19A5E0,
             b.domain->sessionGeneration,b.componentKey,true,*b.actualObjectCount423F60);
         if(r.status!=OriginalWreckComponentStatus50LA::complete)return false;
-        initialized_=true;b.domainStorage[b.domain->count++]=&component_;
+        initialized_=true;component_.nativeEffectControlId=&controls_.id;
+        b.domainStorage[b.domain->count++]=&component_;
         //15A70C initializes1C4=NULL. Authenticated smoke reader admits no
         //positive forced-set count, so subsequent setup cannot allocate it.
         boundary_=0x2cb700u;return true;
@@ -113,6 +116,7 @@ public:
         //Authentic forced-set count0 proves the source1C4 NULL free branch.
         c.kind=OriginalWreckComponentKind50LA::entity141300;--*b.actualObjectCount423F60;
         --b.domain->count; //end native live-domain borrow; retained slot history
+        c.nativeEffectControlId=nullptr; //the actual external Entity lifetime ended
         retired_=true;boundary_=0x141418u;
         //Do not remove manager rows or particles, or reset historical controls.
         context_=nullptr;bytes_=nullptr;return true;

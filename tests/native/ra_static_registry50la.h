@@ -23,7 +23,8 @@ public:
     ColdStage()=default;
     ColdStage(const ColdStage&)=delete;ColdStage& operator=(const ColdStage&)=delete;
     ColdStage(ColdStage&&)=delete;ColdStage& operator=(ColdStage&&)=delete;
-    bool construct(std::shared_ptr<const ra_static_candidates50LA::Owner> candidates,
+    bool construct(std::shared_ptr<rr::game::OriginalApplicationEntities50LA> app,
+        std::shared_ptr<const ra_static_candidates50LA::Owner> candidates,
         Diagnostic& d)noexcept {
         try {
             d={};
@@ -31,7 +32,7 @@ public:
             attempted_=true;
             const auto* source=candidates?candidates->decodedSource():nullptr;
             const auto* bindings=candidates?candidates->staticBindings():nullptr;
-            if(!source||!bindings||source->collisions.size()!=178||bindings->size()!=178){
+            if(!app||!app->application10()||!source||!bindings||source->collisions.size()!=178||bindings->size()!=178){
                 d.message="actual authenticated RA static candidate owner required";return false;
             }
             // Current stage contains exactly the authenticated SCB COL owners.
@@ -51,7 +52,7 @@ public:
             // invents their objects nor includes them in a live query.
             const track_runtime_storage50IG::Limits limits{};
             if(!storage_.prepareSource(view,bindings->data(),bindings->size(),limits,
-                d.storage,&lease->world(),lease)){
+                d.storage,&lease->world(),lease,std::move(app))){
                 d.status=Diagnostic::Status::storage;return false;
             }
             constructed_=true;d.status=Diagnostic::Status::constructed;return true;

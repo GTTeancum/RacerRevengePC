@@ -45,11 +45,16 @@ class OriginalWorldPhysicsIndex50LA final {
         try {zones_.resize(world.zones.size());}catch(...){return false;}
         source_=std::move(source);constructed_=true;return true;
     }
-    bool release27C030()noexcept {
+    bool canRelease27C030()const noexcept {
         if(closed_)return true;
         if(!constructed_)return false;
         for(const auto& zone:zones_)
             if(zone.capacity04||zone.used08||!zone.models0C.empty())return false;
+        return true;
+    }
+    bool release27C030()noexcept {
+        if(!canRelease27C030())return false;
+        if(closed_)return true;
         //27C030 releases per-zone backing, then the three index arrays. No
         //model reference is released by this owner; admitted per-zone backing
         //was never allocated, proven from SAME immutable authored source.

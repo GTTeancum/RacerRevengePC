@@ -107,8 +107,12 @@ class Owner final {
         }
         shape.query=nullptr;return true;
     }
-    bool closeUnloadedBacking()noexcept {
+    bool canCloseUnloadedBacking()const noexcept {
         for(const auto& row:rows_)if(row.shape.query||row.shape.resource124)return false;
+        return true;
+    }
+    bool closeUnloadedBacking()noexcept {
+        if(!canCloseUnloadedBacking())return false;
         std::vector<Row>().swap(rows_);candidates_.reset();resolver_.reset();prepared_=false;return true;
     }
 public:

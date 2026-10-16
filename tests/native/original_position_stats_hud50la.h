@@ -49,7 +49,8 @@ class OriginalPositionStatsHud50LA final:public OriginalPositionStatsNativeOwner
                 p.xyz[0]=t.x10+((v&1)?t.width34:0.f);p.xyz[1]=t.y14+((v&2)?t.height38:0.f);}
             t.flags5C=std::uint8_t(t.flags5C&~1u);
         }
-        auto& q=draw_.quads[draw_.quadCount];constexpr unsigned order[]={0,1,3,2};
+        // Preserve the original strip's TR-BL diagonal with native fan indices.
+        auto& q=draw_.quads[draw_.quadCount];constexpr unsigned order[]={1,0,2,3};
         for(unsigned v=0;v<4;++v){const auto& p=t.buffer58->vertices[order[v]];
             if(!std::isfinite(p.xyz[0])||!std::isfinite(p.xyz[1])||p.xyz[2]!=16777214.f)return fail(d,0x2df694);
             q.vertices[v]={p.xyz[0],p.xyz[1],p.stq[0],p.stq[1]};

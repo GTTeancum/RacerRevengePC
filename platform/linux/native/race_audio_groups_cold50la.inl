@@ -1,6 +1,61 @@
 #pragma once
 #include <limits>
 namespace rr::platform {
+//2356A0 calls142040 first, even when state44 already has the requested value.
+// This counted route admits only the actually empty child topology currently
+// constructed by2350D0/2351F0. Future children need their concrete slot50 calls.
+inline bool RaceAudioGroups50IC::pauseColdGroup2356A0(
+    game::RaceAudioGroup50IC group,bool requested)noexcept {
+    if(!represented(group)||!coldStarted_||coldRetiring_||nativeBindingsRetired_||
+       !coldApplication_||coldThread_!=std::this_thread::get_id()||
+       !coldMixer_||coldMixer_!=mixer_||coldEpoch_!=epoch_||
+       coldApplication_->attachmentLock423F58()||
+       !canPauseGroupSuffix2356EC(group,requested))return false;
+    auto& p=coldGroups_[static_cast<std::size_t>(group)];auto& e=p.entity;
+    if(!p.constructed||!p.loaded||!p.logicalMembers4C||p.count48||
+       e.firstChild18||e.descendants24||e.sessionGeneration!=coldSession_||
+       e.objectKey!=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&e))||
+       p.slot40<0||static_cast<std::size_t>(p.slot40)>=coldApplication_->soundGroups434A10_.size()||
+       coldApplication_->soundGroups434A10_[p.slot40]!=&e||
+       !coldApplication_->entityAuthority_.canRetire(e))return false;
+    // Canonical parent/sibling links may be present. Validate them without
+    // detaching or substituting another per-session Entity namespace.
+    if(!game::original_entity_chain_detail50LA::forest(coldApplication_->entityAuthority_.view()))return false;
+    e.flags29=static_cast<std::uint8_t>((e.flags29&~4u)|(requested?4u:0u)); //142050..6C.
+    // descendants24==0 proves142078 takes the no-child branch. Preserve the
+    // original prefix-before-audio order; preflight makes suffix infallible.
+    if(!pauseGroupSuffix2356EC(group,requested))std::terminate();
+    return true;
+}
+inline bool RaceAudioGroups50IC::retireNativeVoiceBindings()noexcept {
+    if(!coldStarted_||!coldApplication_||coldThread_!=std::this_thread::get_id()||
+       !mixer_||coldMixer_!=mixer_||coldEpoch_!=epoch_||mixer_->groupEpoch50IC()!=epoch_||
+       mixer_->count()!=count_||!mixer_->requiresVoiceGroupGains50IC()||
+       coldApplication_->attachmentLock423F58())return false;
+    std::uint64_t changes=0;
+    for(std::size_t i=0;i<count_;++i){
+        if(mixer_->active(i))return false;
+        const bool bound=represented(bindings_[i]);
+        if(bound!=mixer_->hasVoiceGroupGain50IC(i)||
+           (!bound&&bindings_[i]!=game::RaceAudioGroup50IC::Unrepresented))return false;
+        if(bound){
+            const auto& p=coldGroups_[static_cast<std::size_t>(bindings_[i])];
+            if(!p.constructed||!p.loaded||p.count48||nativeBindingsRetired_||coldRetiring_||
+               p.slot40<0||static_cast<std::size_t>(p.slot40)>=coldApplication_->soundGroups434A10_.size()||
+               coldApplication_->soundGroups434A10_[p.slot40]!=&p.entity)return false;
+            ++changes;
+        }
+    }
+    if(nativeBindingsRetired_)return true;
+    if(!current()||!mixer_->canRecordControlChanges(changes))return false;
+    // Complete preflight precedes every mutation. On the serial owner thread
+    // these stopped-slot retirements cannot fail or touch playback cursors.
+    for(std::size_t i=0;i<count_;++i)if(represented(bindings_[i])){
+        if(!mixer_->retireStoppedVoiceGroup50IC(i))std::terminate();
+        bindings_[i]=game::RaceAudioGroup50IC::Unrepresented;
+    }
+    nativeBindingsRetired_=true;return true;
+}
 inline bool RaceAudioGroups50IC::constructNextCold2350D0(AudioMixer50HD& mixer,
     std::shared_ptr<game::OriginalApplicationEntities50LA> app,std::uint64_t session,
     game::RaceAudioGroup50IC group)noexcept {
@@ -41,20 +96,26 @@ inline bool RaceAudioGroups50IC::constructNextCold2350D0(AudioMixer50HD& mixer,
     p.slot40=static_cast<std::int32_t>(slot);groups_.volume38[index]=100;p.loaded=true;
     ++coldNext_;return true;
 }
-inline bool RaceAudioGroups50IC::releaseEmptyCold142590(game::RaceAudioGroup50IC group)noexcept {
+inline bool RaceAudioGroups50IC::canReleaseEmptyCold142590(game::RaceAudioGroup50IC group)const noexcept {
     if(!represented(group)||!coldStarted_||!coldApplication_||!coldMixer_||
        coldThread_!=std::this_thread::get_id()||coldEpoch_!=coldMixer_->groupEpoch50IC()||
        coldApplication_->attachmentLock423F58())return false;
-    auto& p=coldGroups_[static_cast<std::size_t>(group)];auto& e=p.entity;
+    const auto& p=coldGroups_[static_cast<std::size_t>(group)];const auto& e=p.entity;
     if(!p.constructed||!p.loaded||p.count48||!p.logicalMembers4C||
        e.reference00!=1||e.previous10||e.next14||e.parent1C||e.firstChild18||
        e.sessionGeneration!=coldSession_||e.objectKey!=static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&e))||
        p.slot40<0||static_cast<std::size_t>(p.slot40)>=coldApplication_->soundGroups434A10_.size()||
        coldApplication_->soundGroups434A10_[p.slot40]!=&e||!coldApplication_->objectCount423F60())return false;
-    // No provider binding is admitted on this route, even after final levels.
+    // Native provider membership must actually be retired first. A constructor
+    // that never acquired any binding still has a genuinely empty ledger.
     for(std::size_t i=0;i<coldMixer_->count();++i)
         if(coldMixer_->active(i)||coldMixer_->hasVoiceGroupGain50IC(i)||
            bindings_[i]!=game::RaceAudioGroup50IC::Unrepresented)return false;
+    return coldApplication_->entityAuthority_.canRetire(e);
+}
+inline bool RaceAudioGroups50IC::releaseEmptyCold142590(game::RaceAudioGroup50IC group)noexcept {
+    if(!canReleaseEmptyCold142590(group))return false;
+    auto& p=coldGroups_[static_cast<std::size_t>(group)];auto& e=p.entity;
     if(!coldApplication_->entityAuthority_.retire(e))return false;
     coldRetiring_=true; // A partially retired group set cannot resume loading.
     --e.reference00; //142590/104970 -> concrete235150.

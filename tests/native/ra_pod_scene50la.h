@@ -31,12 +31,16 @@ private:
     bool prepareWorldPhysicsIndex270CDC(std::shared_ptr<const ra_cold_sources50LA::Owner>,std::uint32_t&)noexcept;
     std::unique_ptr<g::OriginalWorldCollisionObjects50LA> worldCollisionObjects3CC_;
     bool prepareWorldCollisionObjects271230(std::shared_ptr<const ra_cold_sources50LA::Owner>,std::uint32_t&)noexcept;
+    bool canReleaseWorldCollisionObjects27BB80(std::uint32_t&)const noexcept;
     bool releaseWorldCollisionObjects27BB80(std::uint32_t&)noexcept;
     std::unique_ptr<ra_collision_resources50LA::Owner> worldCollisionResources_;
     bool prepareWorldCollisionResources(std::shared_ptr<ra_static_candidates50LA::Owner>,
         std::shared_ptr<rr::assets::OriginalStandardTextureResolver50LA>,rr::assets::OriginalStandardTextureDiagnostic50LA&)noexcept;
     Entity worldEntity_;
     std::shared_ptr<g::OriginalApplicationEntities50LA> worldApplication_;
+    // Native collision storage can precede the counted world prefix. Retain
+    // its actual process identity so either acquisition order must agree.
+    std::shared_ptr<g::OriginalApplicationEntities50LA> collisionApplication_;
     rr::platform::RaceAudioGroups50IC* worldAudio_=nullptr; //Caller lifetime through rollback/retirement.
     std::unique_ptr<Entity*[]> worldList500_;
     std::uint32_t worldListCount50C_=0,worldListCapacity504_=0,worldListGrowth508_=0;
@@ -45,6 +49,8 @@ private:
     bool constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicationEntities50LA>,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
     bool rollbackNativeWorldConstructionFailure(std::uint32_t&)noexcept;
+    bool canRetireNativeWorldPrefix()const noexcept;
+    bool retireNativeWorldPrefixAfterOwnedCleanup(std::uint32_t&)noexcept;
     struct SearchNode {
         Entity entity;
         // Exact stable canonical row. This borrow does NOT claim the source

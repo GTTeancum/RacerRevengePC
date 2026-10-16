@@ -154,6 +154,7 @@ public:
     // Typed adoption precedes runtime reservation. Definition is isolated in
     // the Application-aware cold roster header; no mutable roster escapes.
     bool prepareRuntimeRosterQueryStorage(
+        std::shared_ptr<g::OriginalApplicationEntities50LA>,
         std::shared_ptr<const ra_cold_roster50LA::Resources>,
         undertrack_owners50ew_fixture::Owners*,
         const undertrack_owners50ew_fixture::SourceGlobals&,
@@ -207,23 +208,32 @@ public:
     bool endRuntimeTriggerQuery(native_racer50HN::Bank&,Diagnostic&)noexcept;
     bool observeRuntimeTriggerPoses(native_racer50HN::Bank&,std::size_t,Diagnostic&)noexcept;
     bool serviceRuntimeTriggers(native_racer50HN::Bank&,Diagnostic&)noexcept;
-    bool constructClosedStaticRegistry(Diagnostic& d) noexcept {
+    bool constructClosedStaticRegistry(std::shared_ptr<g::OriginalApplicationEntities50LA> app,Diagnostic& d) noexcept {
+        if(!app||!app->application10()||(worldApplication_&&worldApplication_!=app)||
+           (collisionApplication_&&collisionApplication_!=app))
+            return fail(d,"actual same Application collision authority required");
         if(!enter(d,Stage::staticRegistry,registryAttempted_,prefix_.staticCandidates&&!runtimeStorageAttempted_))return false;
+        collisionApplication_=app;
         try{
             registry_=std::make_unique<ra_static_registry50LA::ColdStage>();
-            if(!registry_->construct(candidates_,d.registry))return fail(d,"RA exclusive closed static prefix failed");
+            if(!registry_->construct(std::move(app),candidates_,d.registry))return fail(d,"RA exclusive closed static prefix failed");
             prefix_.staticRegistry=true;return true;
         }catch(...){return fail(d,"RA static registry allocation failure");}
     }
     // Mutually exclusive fresh route. This reserves and owns real backing,
     // but its static prefix is not the complete RA gameplay collider extent.
-    bool prepareRuntimeQueryStorage(const ra_source_camera50LA::RuntimeQueryCapacityInputs& input,
+    bool prepareRuntimeQueryStorage(std::shared_ptr<g::OriginalApplicationEntities50LA> app,
+        const ra_source_camera50LA::RuntimeQueryCapacityInputs& input,
         Diagnostic& d) noexcept {
+        if(!app||!app->application10()||(worldApplication_&&worldApplication_!=app)||
+           (collisionApplication_&&collisionApplication_!=app))
+            return fail(d,"actual same Application collision authority required");
         if(!enter(d,Stage::runtimeQueryStorage,runtimeStorageAttempted_,
             prefix_.staticCandidates&&!registryAttempted_))return false;
+        collisionApplication_=app;
         try{
             runtimeQueries_.reset(new ra_source_camera50LA::OwnershipBridge());
-            if(!runtimeQueries_->constructStorage(candidates_,input,d.runtimeQueries))
+            if(!runtimeQueries_->constructStorage(std::move(app),candidates_,input,d.runtimeQueries))
                 return fail(d,"RA fresh runtime query storage rejected; prefix retained");
             prefix_.runtimeQueryStorage=true;return true;
         }catch(...){return fail(d,"RA runtime query storage allocation failed");}
@@ -641,12 +651,18 @@ public:
     track_runtime_storage50IG::Counts reservedStaticCounts()const noexcept {
         return registry_?registry_->reservedCounts():track_runtime_storage50IG::Counts{};
     }
-    bool close() noexcept {
+    // Explicit native normal ownership cleanup, after real external borrows
+    // retire. Does not dispatch or claim the original26FD80 destructor.
+    bool closeNativeLoadedWorld() noexcept {return closeOwnedNativeResources(true);}
+    bool close() noexcept {return closeOwnedNativeResources(false);}
+private:
+    bool closeOwnedNativeResources(bool retireCountedWorld) noexcept {
         if(closed_)return true;
-        // A real counted world prefix needs its original loaded teardown or
-        // explicit native failure rollback; aggregate close cannot certify it.
-        if(worldColdConstructed_)return false;
+        if(worldColdConstructed_&&(!retireCountedWorld||!canRetireNativeWorldPrefix()))return false;
         if(runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
+        // This explicit counted-world route must actually destroy its runtime
+        // storage below; an external strong pin cannot postpone that teardown.
+        if(worldColdConstructed_&&runtimeQueries_&&runtimeQueries_.use_count()!=1)return false;
         staticFog_.reset();
         staticLighting_.reset(); // Retire typed camera/world/light borrows before preflight.
         if(navigationLease_&&navigationLease_.use_count()!=1)return false;
@@ -675,7 +691,11 @@ public:
         if(!closeTopology())return false;
         lighting_.reset();skyImages_.reset();sky_.reset();triggers_.reset();
         // Storage drops its exclusive serial world lease before radii/source.
-        runtimeQueries_.reset();registry_.reset();candidates_.reset();navigationLease_.reset();source_.reset();closed_=true;return true;
+        runtimeQueries_.reset();registry_.reset();
+        if(worldColdConstructed_){std::uint32_t pc=0;
+            if(!retireNativeWorldPrefixAfterOwnedCleanup(pc))return false;}
+        candidates_.reset();navigationLease_.reset();source_.reset();
+        collisionApplication_.reset();closed_=true;return true;
     }
 };
 }

@@ -246,7 +246,8 @@ class OriginalSpeedBoost50LA final {
                 if(!state_.initializeTexture(i,*current.atlas->sourceWidth14(),*current.atlas->sourceHeight18()))
                     return stop(d,Error::geometry,0x1895F4);
                 auto& q=current.storage58->vertices;const auto& t=state_.textures[i];
-                q[0].u=q[3].u=t.u0;q[1].u=q[2].u=t.u1;
+                // Source strip1,0,2,3 preserves its diagonal in the native fan.
+                q[0].u=q[3].u=t.u1;q[1].u=q[2].u=t.u0;
                 q[0].v=q[1].v=t.v0;q[2].v=q[3].v=t.v1;
             }
             stage_=Stage::textures;d.sourceEffectsCommitted=effects_;return true;
@@ -421,11 +422,11 @@ class OriginalSpeedBoost50LA final {
             if(!std::isfinite(f))return stop(d,Error::geometry,0x2DF550);
         if(t.dirty&1u){const float right=speed_boost_detail50LA::add(t.x,t.width);
             const float bottom=speed_boost_detail50LA::add(t.y,t.height);
-            q.vertices[0].x=q.vertices[3].x=t.x;q.vertices[1].x=q.vertices[2].x=right;
+            q.vertices[0].x=q.vertices[3].x=right;q.vertices[1].x=q.vertices[2].x=t.x;
             q.vertices[0].y=q.vertices[1].y=t.y;q.vertices[2].y=q.vertices[3].y=bottom;
             t.dirty=static_cast<std::uint8_t>(t.dirty&~1u);}
         // Original heat writes UV aliases directly even without a position dirty bit.
-        q.vertices[0].u=q.vertices[3].u=t.u0;q.vertices[1].u=q.vertices[2].u=t.u1;
+        q.vertices[0].u=q.vertices[3].u=t.u1;q.vertices[1].u=q.vertices[2].u=t.u0;
         q.vertices[0].v=q.vertices[1].v=t.v0;q.vertices[2].v=q.vertices[3].v=t.v1;
         return true;
     }

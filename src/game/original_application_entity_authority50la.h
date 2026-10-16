@@ -94,6 +94,12 @@ class OriginalApplicationEntityAuthority50LA final {
         entries_[count_]={&node,node.sessionGeneration,node.objectKey};nodes_[count_++]=&node;
         return true;
     }
+    bool canRetire(const C& node)const noexcept {
+        if(node.reference00!=1)return false;
+        for(std::size_t i=0;i<count_;++i)if(entries_[i].node==&node)
+            return node.sessionGeneration==entries_[i].generation&&node.objectKey==entries_[i].key;
+        return false;
+    }
     bool retire(C& node)noexcept {
         // Called immediately before the genuine last-reference release. No
         // stale enrollment may survive storage destruction or address reuse.

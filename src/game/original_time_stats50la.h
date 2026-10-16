@@ -259,11 +259,12 @@ class OriginalTimeStats50LA final {
                 state.u0=i%2?.7890625f:.5f;state.u1=i%2?1.f:.78125f;
                 state.v0=.796875f;state.v1=.9375f;
                 state.field3C=0;state.flags5C|=1;
-                // Native order TL,TR,BR,BL expands original0,1,3,2.
-                geometry.vertices[0].u=state.u0;geometry.vertices[0].v=state.v0;
-                geometry.vertices[1].u=state.u1;geometry.vertices[1].v=state.v0;
-                geometry.vertices[2].u=state.u1;geometry.vertices[2].v=state.v1;
-                geometry.vertices[3].u=state.u0;geometry.vertices[3].v=state.v1;
+                // Native fan order TR,TL,BL,BR preserves the original strip
+                // diagonal (source1,0,2,3), as in the Pause texture adapter.
+                geometry.vertices[0].u=state.u1;geometry.vertices[0].v=state.v0;
+                geometry.vertices[1].u=state.u0;geometry.vertices[1].v=state.v0;
+                geometry.vertices[2].u=state.u0;geometry.vertices[2].v=state.v1;
+                geometry.vertices[3].u=state.u1;geometry.vertices[3].v=state.v1;
             }
             stage_=ResourceStage::statsReferences;d.sourceEffectsCommitted=effects_;return true;
         }catch(...){return stop(d,Error::allocation,0x2DF1CC);}
@@ -287,10 +288,10 @@ class OriginalTimeStats50LA final {
             const float right=state.x10+width,bottom=state.y14+height;
             if(!std::isfinite(right)||!std::isfinite(bottom))
                 return stop(d,Error::geometry,0x2DF6C0);
-            geometry.vertices[0].x=state.x10;geometry.vertices[0].y=state.y14;
-            geometry.vertices[1].x=right;geometry.vertices[1].y=state.y14;
-            geometry.vertices[2].x=right;geometry.vertices[2].y=bottom;
-            geometry.vertices[3].x=state.x10;geometry.vertices[3].y=bottom;
+            geometry.vertices[0].x=right;geometry.vertices[0].y=state.y14;
+            geometry.vertices[1].x=state.x10;geometry.vertices[1].y=state.y14;
+            geometry.vertices[2].x=state.x10;geometry.vertices[2].y=bottom;
+            geometry.vertices[3].x=right;geometry.vertices[3].y=bottom;
             state.flags5C=static_cast<std::uint8_t>(state.flags5C&~1u);
         }
         d.sourceEffectsCommitted=effects_;return true;
