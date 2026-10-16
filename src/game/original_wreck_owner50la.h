@@ -187,6 +187,12 @@ public:
     const SpringVector4_48N* contactVector4435A0()const noexcept{return binding_.actualVector4435A0;}
     const SpringVector4_48N* groupVector4441F0()const noexcept{return binding_.actualVector4441F0;}
     std::size_t componentCapacity()const noexcept{return capacity_;}
+    // Borrow the same application reset globals consumed by this body's
+    // constructor. Runtime167A50 must not manufacture per-call reset storage.
+    const SecondaryActivationGlobals49V* bodyResetGlobals()const noexcept {
+        return constructed_&&binding_.constructorGlobals?&binding_.constructorGlobals->reset:nullptr;
+    }
+    bool hasGroupEffects()const noexcept{return hasEffects_;}
     OriginalWreckComponent50LA& collectionComponent()noexcept{return components[0];}
     OriginalWreckComponent50LA& pieceComponent()noexcept{return components[1];}
     OriginalWreckComponent50LA& modelComponent()noexcept{return components[2];}
@@ -201,7 +207,7 @@ public:
 
     OriginalWreckOwnerResult50LA constructCold()noexcept {
         using S=OriginalWreckOwnerStatus50LA;using K=OriginalWreckComponentKind50LA;
-        if(!storagePrepared_||constructionAttempted_)return result(S::stopped,stoppedPC_);
+        if(!storagePrepared_||constructionAttempted_||!queries.prepared())return result(S::stopped,stoppedPC_);
         if(!sameEffectContext())return result(S::binding,0x2cb618u);
         constructionAttempted_=true;
         if(!initialize(0,K::collection22BF00))return result(S::components,0x22bf0cu);

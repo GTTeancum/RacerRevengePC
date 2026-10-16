@@ -123,7 +123,7 @@ public:
         OriginalOnePieceWreckOwner50LA& piece,OriginalWreckPhysical50LA& physical,
         const OriginalWreckQueryWorld50LA& world) noexcept {
         using S=OriginalWreckQueryStatus50LA;
-        if(storage_||!assets.prepared()||!world.lifecycle||!world.world||!world.workspace||
+        if(retired_||storage_||!assets.prepared()||!world.lifecycle||!world.world||!world.workspace||
            !world.objects||!world.states||!world.copies||!world.geometry||!world.objectCount||
            world.objectCount!=world.lifecycle->objectCount||!world.physicsBodyCategory3E0718||
            !*world.physicsBodyCategory3E0718||!world.collisionTypeGp8010||
@@ -245,6 +245,39 @@ public:
         }catch(...){return {S::allocation,0x165ec8u};}
     }
     bool prepared()const noexcept{return bool(storage_);}
+    // Terminal native cancellation BEFORE the first source11B190 publication.
+    // prepareCold owns backing only; no shared table field or Entity has been
+    // published by this owner yet. This is not11B4A0 or active-piece retirement.
+    // The world owner invokes it only after its actual terminal lifetime gates.
+    bool canReleaseUnpublishedWorld(const LiveZoneWorld50EN& actualWorld)const noexcept {
+        if(!storage_||retired_||storage_->world.world!=&actualWorld||
+           storage_->contactBound||storage_->mutualBound||storage_->derivedBound||
+           storage_->collectionFilterApplied)return false;
+        const auto& w=storage_->world;
+        if(!w.lifecycle||!w.lifecycle->storage.registrations||
+           w.lifecycle->storage.registrationCapacity<w.objectCount)return false;
+        for(unsigned i=0;i<3;++i){
+            const auto& q=storage_->queries[i];
+            if(storage_->published[i]||storage_->components[i]||q.membership.attached||
+               q.membership.object||q.membership.revision||q.type0.registrationE0||
+               !w.refs[i]||w.refs[i]>w.objectCount)return false;
+            const auto& primary=w.lifecycle->storage.registrations[w.refs[i]-1u];
+            if(primary.owner||primary.slot||primary.encodedObject)return false;
+            for(std::size_t j=0;j<storage_->capacity;++j){
+                const auto& e=q.entries[j];
+                if(e.used||e.registration.owner||e.registration.slot||e.registration.encodedObject)return false;
+            }
+        }
+        return true;
+    }
+    bool releaseUnpublishedWorld(const LiveZoneWorld50EN& actualWorld)noexcept {
+        if(!canReleaseUnpublishedWorld(actualWorld))return false;
+        // Nothing in the canonical world was published, so do not clear or
+        // restore any shared definition, selected hit, filter, or geometry.
+        // Drop ALL nested world/target/workspace borrows with their backing.
+        storage_.reset();retired_=true;return true;
+    }
+    bool retired()const noexcept{return retired_;}
     bool constructed()const noexcept {
         return storage_&&storage_->published[0]&&storage_->published[1]&&storage_->published[2]&&
             storage_->contactBound&&storage_->mutualBound&&storage_->derivedBound;
@@ -418,6 +451,7 @@ private:
         std::array<Query,3> queries;
     };
     std::unique_ptr<Storage> storage_;
+    bool retired_=false; // terminal cancellation cannot prepare/rebind again
     static bool prepareType2(const Type2ResourceView49X& resource,const BodyMatrix48G& world,
         QuerySpherePrepareOutput48O& out) noexcept {
         QuerySpherePrepareInput48O in{};in.preparedScene=world;in.shapeType=2;

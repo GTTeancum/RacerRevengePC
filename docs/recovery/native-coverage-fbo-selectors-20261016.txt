@@ -1,0 +1,71 @@
+Remove invariant private coverage FBO selector reassertions
+
+Base: cb1df6c4d3cadcd11efcf149d314886a1969af72 (includes26cf869 VAO hoist)
+Worktree: /workspace/shared/rr-ra-fbo-selectors-cb1
+Patch: /workspace/shared/ra-coverage-fbo-selectors-cb1.patch
+File: platform/linux/native/native_coverage_storage.inl
+Exact preimage blob: 6c24aa251cdc96005e8c7ef80ef391ede00cd7be
+No build/test/syntax/sanitizer/gameplay/image checks were performed.
+
+Concrete change
+Delete eight redundant framebuffer draw/read selector API calls from each
+successful native map-2 bridge run. Framebuffer binds, viewport/scissor,
+clear, payload draw, snapshot blit, per-sample composition, depth, textures,
+VAO restoration, all error checks and original command ordering remain.
+
+State ownership proof
+createCoverageExtent initializes and checks each complete private FBO before
+publishing its extent:
+- scene[0/1]: draw COLOR_ATTACHMENT0; read COLOR_ATTACHMENT0.
+- snapshot: draw COLOR_ATTACHMENT0; read COLOR_ATTACHMENT0.
+- raster: draw COLOR_ATTACHMENT0/1; read COLOR_ATTACHMENT0.
+These names are privately retained; none is the published displayedTarget.
+Extent swaps move names without changing their GL object state. Partial
+allocation failure never publishes an uninitialized extent.
+
+All subsequent relevant writers were audited:
+- VehicleWindow Storage::begin binds scene[bank] and reasserts attachment0.
+- RA snapshotRaWorld uses scene read0 and snapshot draw0.
+- RA drawRaWorld uses raster draw0/1 and scene draw0, ending scene read0/draw0.
+- The source-pair bridge being edited repeats these same assignments.
+- resolveCoverage selects scene read0; its destination is the separate target.
+- Window/UI publication and readback choose their own targets/default FBO,
+  not coverageLive.raster/snapshot/scene selectors.
+No owner changes any of these private selector values after initialization.
+The remaining reassertions elsewhere are harmless and deliberately untouched.
+
+API semantics, primary authority
+OpenGL4.6 core specification, sections9.2,17.4.1,18.2.1:
+https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf
+Binding an existing framebuffer preserves its object state. Draw selection
+is maintained for each framebuffer, and read selection belongs to the read
+framebuffer. Thus binding another target does not erase these initialized
+selectors. This is persistent object state, not a global state-cache guess.
+
+Success/failure behavior
+The first setup check still catches bind/state errors before payload draw.
+Snapshot and composition checks remain in their exact phases. On any rejected
+phase, cleanup binds the same private scene FBO, whose selectors already have
+the required values, and restores every other previous bridge state as before.
+No new fallback, error suppression, synchronization assumption or quality
+policy is introduced.
+
+Static call counts only
+Per successful run, removed calls are:
+ raster drawBuffers + readBuffer:2
+ snapshot scene readBuffer + snapshot drawBuffer:2
+ composition scene drawBuffer + readBuffer:2
+ restoration scene drawBuffer + readBuffer:2
+Total8 per run. Empty groups/runs still have no bridge operations.
+Existing a781667 logs report3047 runs in an early frame and5100 in a later
+frame (player+opaque opponents). That corresponds to24376 /40800 eliminated
+selector calls for those logged run counts if replayed unchanged. No measured
+FPS or CPU/GPU-time benefit is claimed; the root owns execution validation.
+
+Why batching is not widened
+The existing14-triangle maximum reflects authenticated3..16-vertex MSCNT
+source groups. Simply raising it cannot extend a run inside those groups.
+Crossing a group boundary would reorder an entire later base draw relative
+to the earlier destination-alpha map-2 pass. It needs an additional complete
+base-and-map2 disjointness proof, not just the current map2 rectangle test.
+This patch instead removes proven redundant state without reordering work.

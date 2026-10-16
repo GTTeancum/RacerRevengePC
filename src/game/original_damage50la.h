@@ -272,8 +272,8 @@ class OriginalDamage50LA final {
             d.sourceEffectsCommitted=effects_;return true;
         }catch(...){return stop(d,Error::allocation,0x1A7B14);}
     }
-    //No caller in this slice. A future genuine resource-demand phase must
-    //resolve+50's actual lease; neither finalization nor a draw implies demand.
+    //Native eligible-display preparation explicitly invokes this source leaf.
+    //Resolve+50's actual lease; finalization alone never implies demand.
     bool demand18F470(Diagnostic& d)noexcept {
         if(!nativeCpuResourcesPrepared()){d.error=Error::phase;d.sourcePC=0x18F470;return false;}
         try {

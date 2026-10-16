@@ -1,0 +1,56 @@
+Hoist native source-pair VAO retention to the original group
+
+Base: a7816676d2378108a89b59a0fb65a8f04c920eb6
+Worktree: /workspace/shared/rr-ra-group-vao-a781
+Patch: /workspace/shared/ra-group-vao-query-a781.patch
+Changed file: platform/linux/native/native_coverage_storage.inl
+Exact preimage blob: 387681eb4340a72ae07ed4136c74245ffecfdf0e
+No builds, tests, syntax checks, sanitizer checks, gameplay or image review.
+
+Change
+The coverage bridge previously queried GL_VERTEX_ARRAY_BINDING and polled
+errors before every nonempty map-2 run. drawCoveragePairGroup now obtains the
+actual current binding once, immediately before its first nonempty run, and
+passes the retained name to each bridge. Entirely clipped/empty groups still
+perform no query. There is no assumed/default/hardcoded VAO identity.
+
+Ownership and failure proof
+The only drawCoveragePairTriangle call site is drawCoveragePairGroup.
+The only drawCoveragePairGroup call site is drawSpecularSpan50LA's bounded
+original MSCNT-group loop. That loop is called for a currently bound player
+or opponent component. drawOpaqueOpponent explicitly binds the component VAO
+before its spans; player drawSpan50LA participates in its owned backend draw.
+The optimization nevertheless queries the actual binding, so it does not
+rely on reconstructing the resource name from the component metadata.
+
+Inside drawCoveragePairGroup, region construction/lookahead and counters are
+CPU-only. Only the bridge changes a VAO. It binds coverageArray for composition
+and restores sourceArray on every accepted/rejected path after entry. Empty
+bridge returns do not change state. A failed retained-binding query/check
+returns before any bridge state change. A failed bridge restores state and
+returns false immediately; no later run consumes the retained name.
+
+Each bridge still checks payload setup, payload draw, destination copy,
+composition setup/draw, and its complete state restoration. The next run's
+removed pre-query check was redundant with the immediately preceding restored
+check; only CPU rectangle calculations intervene. No draw/error publication
+boundary, state cleanup, framebuffer or sampler operation is removed.
+
+Draws, original assets/material order, geometry, depth policy, primitive
+regions, disjoint batching, byte shaders, AI and physics are unchanged.
+
+Static call-count effect, not a performance result
+For an original group with R nonempty bridge runs, the old path performs R
+VAO binding queries/checks; the new path performs1. It removes R-1 queries
+and R-1 redundant check calls. The cold group bound permits up to14 triangles,
+so savings range0..13 per nonempty group. Empty groups remain0 versus0.
+
+Existing a781667 smoke logs show the first reported frame has3047 bridge runs
+for3088 nonempty triangles; later reports include5100 runs for5181 triangles.
+The old code therefore issues3047 or5100 VAO queries in those reported scopes
+(player plus opaque opponents), respectively. New total is the number of
+nonempty original groups G, so savings are3047-G or5100-G. The existing log
+does not record G; no exact observed saving or FPS gain is claimed.
+The final three existing opaque-opponent wall reports are705139,782190,
+812823 microseconds. These are CPU submission wall times including any driver
+wait, not isolated GPU timings and not evidence of this patch's speedup.

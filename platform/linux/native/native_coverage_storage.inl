@@ -110,6 +110,8 @@
         if(!check("query actual-extent coverage texture limit"))return false;
         if(width<=0||height<=0||width>limit||height>limit)
             return fail(*diagnostic,VehicleWindowError50DS::limits,"native coverage extent exceeds texture limit");
+        // Draw/read selectors are framebuffer object state, retained across
+        // binds and extent swaps. All users keep these private assignments.
         for(U b=0;b<2;++b){
             if(!coverageFramebuffer(e.scene[b])||
                !coverageTextureStorage(e.color[b],rgba8,width,height,true,colorAttachment)||
@@ -199,19 +201,20 @@ void main(){
             return fail(*diagnostic,VehicleWindowError50DS::shader,"coverage composition inputs unavailable");
         return true;
     }
-    bool drawCoveragePairTriangle(U bank,U first,U image,const std::array<I,4>& region,U triangleCount=1) noexcept {
+    bool drawCoveragePairTriangle(U bank,U first,U image,const std::array<I,4>& region,U sourceArray,U triangleCount) noexcept {
         // A proven empty native clip region cannot touch any destination
         // sample. Preserve source group order/accounting without GPU work.
         if(region[2]<=region[0]||region[3]<=region[1])return true;
-        I previousArray=0;gl.getIntegerv(0x85B5,&previousArray);
-        if(!check("retain source-pair vertex array for coverage bridge"))return false;
         coverageAa0();gl.disable(0x8DB9);gl.disable(0x0BE2);
         if(request.raStaticWorld){
             gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
         }else gl.disable(0x0C11);
         gl.bindFramebuffer(framebuffer,coverageLive.raster);
-        const U outputs[]={colorAttachment,colorAttachment+1};gl.drawBuffers(2,outputs);
-        gl.readBuffer(colorAttachment);gl.viewport(0,0,width,height);
+        // These private FBOs retain createCoverageExtent's selectors:
+        // raster draws to attachments0/1; scene/snapshot draw/read0.
+        // Binding an FBO does not reset its selectors. No later owner changes
+        // these values, so do not reissue eight selector calls per run.
+        gl.viewport(0,0,width,height);
         gl.colorMask(1,1,1,1);gl.disable(0x0B71);gl.depthMask(0);
         const float invalid[]={0.f,0.f,0.f,-1.f};gl.clearBufferfv(0x1800,0,invalid);
         gl.useProgram(shader->program());gl.uniform1i(shader->uniforms().sourcePairPass50LA,3);
@@ -223,14 +226,14 @@ void main(){
             accepted=check("raster original AA0 map-2 payload and center depth");
         }
         if(accepted){
-            gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);gl.readBuffer(colorAttachment);
-            gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);gl.drawBuffer(colorAttachment);
+            gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);
+            gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);
             gl.blitFramebuffer(region[0],region[1],region[2],region[3],
                 region[0],region[1],region[2],region[3],colorBufferBit,0x2600);
             accepted=check("copy per-sample destination before ordered map-2 triangle");
         }
         if(accepted){
-            gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+            gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
             gl.enable(0x809D);gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);
             gl.useProgram(coverageProgram);gl.uniform1i(coverageRaCompositionUniform,0);drawGl.bindVertexArray(coverageArray);
             gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
@@ -245,9 +248,9 @@ void main(){
         gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
         gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);
-        gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
+        gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
         gl.useProgram(shader->program());gl.uniform1i(shader->uniforms().sourcePairPass50LA,2);
-        drawGl.bindVertexArray(static_cast<U>(previousArray));
+        drawGl.bindVertexArray(sourceArray);
         coverageAa0();gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);
         gl.disable(0x0C11);
         const bool restored=check("restore source-pair state after native coverage bridge");
@@ -267,6 +270,11 @@ void main(){
         // A rejected lookahead becomes the next run's first triangle; avoid
         // evaluating its clip rectangle twice in the common singleton case.
         U pendingFirst=end;std::array<I,4> pending{};
+        // The sole caller owns one VAO for the entire original MSCNT group.
+        // Each bridge restores it on success AND rejection; region lookahead
+        // is CPU-only. Retain the actual binding once, lazily, so all-empty
+        // groups still issue no GL queries or bridge operations.
+        bool sourceArrayRetained=false;I sourceArray=0;
         while(first<end){
             const auto initial=pendingFirst==first?pending:racerTriangleRasterRegion(slot,component,first);
             if(initial[2]<=initial[0]||initial[3]<=initial[1]){++coveragePairEmptyTriangles;first+=3;continue;}
@@ -301,7 +309,12 @@ void main(){
             }
             // Singleton uses the same bridge and triangle count as before.
             // Full/uncertain clip fallback always remains its own run.
-            if(!drawCoveragePairTriangle(bank,first,image,united,run))return false;
+            if(!sourceArrayRetained){
+                gl.getIntegerv(0x85B5,&sourceArray);
+                if(!check("retain source-pair vertex array for coverage group"))return false;
+                sourceArrayRetained=true;
+            }
+            if(!drawCoveragePairTriangle(bank,first,image,united,static_cast<U>(sourceArray),run))return false;
             ++coveragePairRuns;coveragePairTriangles+=run;
             if(run>1)coveragePairCoalescedTriangles+=run;
             if(fullRegion(initial))++coveragePairFullSingletons;

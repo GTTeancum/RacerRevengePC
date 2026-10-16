@@ -1,7 +1,7 @@
 #pragma once
-// Cold native ownership for the authored one-piece chariot collection. This is
-// not a destruction scheduler. Every collection/piece remains in PHY order;
-// unselected collections have authoring only and remain pending runtime owners.
+// Cold native geometry/query assets for one actual authored piece. Legacy
+// prepare selects the unique one-piece chariot; the full inventory friend loads
+// each original occurrence. Neither route constructs runtime wreck owners.
 #include "type2_resource49x.h"
 #include "pod_shape49w.h"
 #include "scene_graph49p.h"
@@ -47,7 +47,7 @@ struct OriginalWreckCollectionAuthoring50LA {
 };
 struct OriginalWreckAuthoring50LA {
     std::vector<OriginalWreckCollectionAuthoring50LA> collections;
-    std::size_t selectedCollection=0; // Zero-based original Wreckage.PartN order.
+    std::size_t selectedCollection=0; // Zero-based selection; inventory uses count if no unique chariot.
     std::string chariotStem;
     float gravity=0,gravityAcceleration=0;
 };
@@ -95,7 +95,9 @@ struct OriginalWreckAssetReceipt50LA {
     std::uint32_t sourceModelNodeCount=0;
     bool endpointWordsCallerSupplied=false;
 };
+class OriginalWreckAssetInventory50LA;
 class OriginalWreckAssets50LA final {
+    friend class OriginalWreckAssetInventory50LA;
 public:
     OriginalWreckAssets50LA()=default;
     OriginalWreckAssets50LA(const OriginalWreckAssets50LA&)=delete;
@@ -122,6 +124,9 @@ public:
     const OriginalWreckAuthoring50LA& authoring()const noexcept{return storage_->authoring;}
     const OriginalWreckCollectionAuthoring50LA& selected()const noexcept {
         return authoring().collections[authoring().selectedCollection];
+    }
+    const OriginalWreckPieceAuthoring50LA& selectedPiece()const noexcept {
+        return selected().pieces[storage_->selectedPieceIndex];
     }
     const Type2ResourceView49X& queryE0()const noexcept{return storage_->query.view;}
     const OriginalWreckTarget50LA& targetE4()const noexcept{return storage_->target;}
@@ -155,6 +160,7 @@ private:
     };
     struct Storage {
         OriginalWreckAuthoring50LA authoring;
+        std::size_t selectedPieceIndex=0;
         OriginalWreckAssetReceipt50LA receipt;
         std::array<std::vector<std::uint8_t>,4> raw;
         Query query;
@@ -246,7 +252,8 @@ private:
         }
         return true;
     }
-    static bool author(const Document& doc,OriginalWreckAuthoring50LA& out,std::string& error) {
+    static bool author(const Document& doc,OriginalWreckAuthoring50LA& out,std::string& error,
+                       bool requireOnePieceChariot=true) {
         const auto* chariot=value(doc,"Pod Setup","Chariot");
         if(!chariot||chariot->size()<5||lower(chariot->substr(chariot->size()-4))!=".slt")
             return fail(error,"original PHY does not author a chariot SLT");
@@ -302,7 +309,11 @@ private:
             }
             out.collections.push_back(std::move(collection));
         }
-        return matches==1?true:fail(error,"PHY does not uniquely author a one-piece chariot wreck collection");
+        if(matches!=1){
+            out.selectedCollection=out.collections.size(); // no unique selected one-piece view
+            if(requireOnePieceChariot)return fail(error,"PHY does not uniquely author a one-piece chariot wreck collection");
+        }
+        return true;
     }
     static std::uint32_t u32(const std::uint8_t* p)noexcept {
         return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|
@@ -537,6 +548,11 @@ private:
         if(!member(archive,binding.phyMember,out.raw[0],receipt.members[0],error))return false;
         Document doc;
         if(!document(out.raw[0],doc,error)||!author(doc,out.authoring,error))return false;
+        if(!podIdentity(binding,doc,error))return false;
+        return loadSelectedPiece(archive,binding,endpoint,out,error);
+    }
+    static bool podIdentity(const OriginalWreckAssetBinding50LA& binding,const Document& doc,
+                            std::string& error) {
         const auto* prefix=value(doc,"Pod Setup","Prefix");
         if(!prefix||prefix->size()!=2||(*prefix)[0]<'0'||(*prefix)[0]>'9'||(*prefix)[1]<'0'||(*prefix)[1]>'9')
             return fail(error,"original wreck PHY pod identity missing");
@@ -544,7 +560,16 @@ private:
         if(lower(binding.memberPrefix)!=expectedPrefix||
            lower(binding.phyMember)!=expectedPrefix+"pod"+*prefix+".phy")
             return fail(error,"original wreck PHY/archive pod identity mismatch");
-        const auto& piece=out.authoring.collections[out.authoring.selectedCollection].pieces[0];
+        return true;
+    }
+    static bool loadSelectedPiece(const rr::assets::ResArchive48C& archive,
+        const OriginalWreckAssetBinding50LA& binding,const OriginalWreckEndpointPolicy50LA& endpoint,
+        Storage& out,std::string& error) {
+        if(out.authoring.selectedCollection>=out.authoring.collections.size()||
+           out.selectedPieceIndex>=out.authoring.collections[out.authoring.selectedCollection].pieces.size())
+            return fail(error,"original wreck selected piece identity out of range");
+        auto& receipt=out.receipt;
+        const auto& piece=out.authoring.collections[out.authoring.selectedCollection].pieces[out.selectedPieceIndex];
         receipt.sltRequest=binding.memberPrefix+piece.stem+".slt";
         //165C30 model vslotA8=240740 ->26E820;26E8F4..26E934 replaces
         // the extension with actual3B9790 '.psg'. No guessed SLT binary reader.

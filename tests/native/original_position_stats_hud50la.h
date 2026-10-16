@@ -13,10 +13,34 @@ class OriginalPositionStatsHud50LA final:public OriginalPositionStatsNativeOwner
     std::array<assets::OriginalUiMaterial50KG,3> materials_{};
     std::array<std::int32_t,3> rows_{{-1,-1,-1}},leaves_{{-1,-1,-1}};
     assets::OriginalUiNativeUntexturedMaterial50KG radarPolicy_{};
+    std::array<std::int16_t,2> demandTokens_{{-1,-1}};
     std::uint64_t providerRevision_=0;
     OriginalPositionStatsNativeDraw50LA draw_{};
     bool cold_=false;
     static bool fail(D& d,std::uint32_t pc)noexcept {d.error=D::Error::material;d.sourcePC=pc;return false;}
+    bool demand191AF0(const original_main_entry50KG::Application& application,R& r,D& d)noexcept {
+        try {
+            const auto table=r.domain_->textures383400();
+            assets::OriginalStandardTextureResource50LA* texture=nullptr;
+            //191B00: actual ScreenTexture+270 getter2DF8A0, then191B28.
+            if(!table->resolve298E60(demandTokens_[0],texture,d.material.texture)||
+               texture!=r.fixed_[0].atlas)return fail(d,0x2df8a0);
+            bool written=false;
+            if(!texture->demandPositionStats191AF0(0x191B28u,written,d.material.texture))return fail(d,0x191b28);
+            //191B3C: same Application328 registry lookup282210. Registry was
+            // created by real190E64 staging and survives serial display close.
+            const auto font=application.fonts328()->find282210(assets::OriginalApplicationFonts50LA::Name::eurostile13);
+            if(font){
+                if(font!=r.texts_[0].font4C||
+                   !table->resolve298E60(demandTokens_[1],texture,d.material.texture)||
+                   texture!=font->texture281F90())return fail(d,0x281f90);
+                if(!texture->demandPositionStats191AF0(0x191B88u,written,d.material.texture))return fail(d,0x191b88);
+            }
+            //191B90's141C30 finds no children in this genuinely detached
+            // owner. Native scheduling does not claim global HUD traversal.
+            return true;
+        }catch(...){return fail(d,0x191af0);}
+    }
     bool appendTextureObject(R::Texture& t,std::uint32_t material,D& d)noexcept {
         if(!t.buffer58||t.buffer58->count!=4||t.field3C!=0||t.field30!=1||
            draw_.quadCount==draw_.maximumQuads||draw_.packetCount==draw_.maximumPackets)return fail(d,0x2df550);
@@ -72,6 +96,12 @@ public:
                    !R::sameBytes(a->originalBytes(),member)||!a->sourceWidth14()||!a->sourceHeight18()||
                    tex->texture.width!=std::uint32_t(*a->sourceWidth14())||tex->texture.height!=std::uint32_t(*a->sourceHeight18())||
                    p->celIdentity!=(i?r->texts_[0].font4C->celIdentity():nullptr))return fail(d,0x2df180);
+            }
+            const char* demandNames[]={"ui\\textures\\stats","font\\eurostileboldbold13ingame"};
+            for(unsigned i=0;i<2;++i){assets::OriginalStandardTextureResource50LA* texture=nullptr;
+                if(!r->domain_->textures383400()->find(demandNames[i],demandTokens_[i])||
+                   !r->domain_->textures383400()->resolve298E60(demandTokens_[i],texture,d.material.texture)||
+                   texture!=(i?r->texts_[0].font4C->texture281F90():r->fixed_[0].atlas))return fail(d,0x191af0);
             }
             rows_={{r->fixed_[0].primitive54->material.row,r->fixed_[6].primitive54->material.row,r->texts_[0].primitives4[0]->material.row}};
             const char* names[]={"ui\\textures\\stats.psm","ui\\textures\\maptop.psm","font\\eurostileboldbold13ingame.psm"};
@@ -139,6 +169,9 @@ public:
             for(std::size_t f=0;f<assets::originalUiGsFieldCount50KG;++f)
                 if(materials_[i].passes[0].gs.fields[f].value!=map.contextAfter249610.fields[f].value)return fail(d,0x249610);
         }
+        // Native eligible-display service, like TimeStats194E20 and Damage18F470.
+        // Preserve stats-before-font source writes and every committed prefix.
+        if(!demand191AF0(application,*r,d))return false;
         if(preference.position)for(unsigned i=0;i<5;++i)if(!appendTexture(*r,i,d))return false;
         if(preference.map&&!appendTexture(*r,5,d))return false;
         if(preference.countCD0&&(!appendTexture(*r,7,d)||!appendTexture(*r,8,d)))return false;

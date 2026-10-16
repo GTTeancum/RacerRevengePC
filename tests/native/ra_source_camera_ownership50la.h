@@ -1100,16 +1100,23 @@ class OwnershipBridge final {
                s->terrainMembership.state.attached))return false;
         if(storageConstructed_&&inputs_.recovery&&
            (inputs_.recovery->memberships[0].attached||inputs_.recovery->memberships[1].attached))return false;
-        // A prepared piece retains world pointers even after its memberships
-        // detach. The later actual piece owner must provide a typed retirement
-        // join before such a borrow can outlive this Storage; absent that join,
-        // reject close rather than release backing beneath the piece.
+        // An entirely unpublished cold allocation can cancel its native
+        // borrows at terminal close. Any source-published piece still needs
+        // its real destructor/Entity retirement, even after membership detach.
         if(s)for(const auto& w:inputs_.wreck)if(w.queries&&w.queries->prepared()&&
-            w.queries->worldBinding().world==&s->world)return false;
+            w.queries->worldBinding().world==&s->world&&
+            !w.queries->canReleaseUnpublishedWorld(s->world))return false;
         return true;
     }
     bool close()noexcept {
         if(closed_)return true;if(sceneOwner_||!canClose())return false;
+        // Only after ALL bank/camera/scene/registry lifetime gates above pass.
+        // A later failure retains Storage; already cancelled borrows stay
+        // terminal and are skipped on retry. No successful source retirement
+        // callback or caller-provided completion flag is accepted.
+        if(auto* s=storage_.get())for(const auto& w:inputs_.wreck)if(w.queries&&w.queries->prepared()&&
+            w.queries->worldBinding().world==&s->world&&
+            !w.queries->releaseUnpublishedWorld(s->world))return false;
         if(podBindings_&&podBindings_->podLiveQuery50IZ==podContext_.get())podBindings_->podLiveQuery50IZ=nullptr;
         podContext_.reset();podBindings_=nullptr;podParameters_=nullptr;
         camera_.reset();follow_.reset();closed_=true;return true;
