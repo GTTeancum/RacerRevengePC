@@ -1,4 +1,5 @@
 #include "original_standard_material_table50la.h"
+#include "original_shader_pass_groups50la.h"
 #include "original_standard_texture_resource50la.h"
 #include "original_standard_material_animation50la.h"
 #include <cfenv>
@@ -40,7 +41,8 @@ bool collectorPass(const OriginalStandardMaterialObject50LA& material,std::size_
     if(!material.pass4C(slot,pass)||!pass.references04||*pass.references04<=0||
        !pass.program18||*pass.program18<0||!pass.texture1A||!pass.uv1E||
        !pass.mapCount20||*pass.mapCount20>2||!pass.flags21||(*pass.flags21&~7u)||
-       !pass.group22||(*pass.group22!=-1&&*pass.group22!=-2)||!pass.state30||
+       !pass.group22||(*pass.group22!=-1&&*pass.group22!=-2&&
+           !OriginalShaderPassGroups50LA::contains(*pass.group22))||!pass.state30||
        bool(*pass.flags21&1u)!=(*pass.mapCount20==2)||
        pass.state30->contextCount()!=(*pass.mapCount20==2?2u:1u))
         return fail(d,S::collector,0x249BA0u);
@@ -521,6 +523,35 @@ OriginalCableMaterialCallbackStage50LA OriginalStandardMaterialTable50LA::servic
         d.sourcePC=0x24a790u;return Stage::rendererSubmissionRequired;
     }
     d.sourcePC=0x24a7d0u;return Stage::materialReturned;
+}
+bool OriginalStandardMaterialTable50LA::serviceRetainedScreenPrototype24A740(
+    const OriginalStandardMaterialCollectorReceipt50LA& receipt,std::int32_t index,
+    std::size_t passIndex,D& d) noexcept {
+    d={};d.row=index;d.pass=passIndex;
+    if(!storage_||!coldCollectorCurrent(receipt))return fail(d,S::collector,0x24A620);
+    auto& s=*storage_;
+    if(s.populationActive||s.demandActive||s.collectorActive||s.populationTerminal||s.demandTerminal)
+        return fail(d,S::phase,0x24A740);
+    if(!s.construction||!s.construction->live())return fail(d,S::video,0x24A620);
+    const auto& runtime=s.construction->materialRuntime();
+    if(!runtime.callbackOverrideKnown||runtime.callbackOverride435678!=0u)
+        return fail(d,S::runtime,0x24A674);
+    if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x24A740);
+    auto& row=s.rows[static_cast<std::size_t>(index)];OriginalStandardMaterialPassView50LA pass;
+    OriginalStandardMaterialCollectorEntryView50LA collector;
+    if(row.references08<=0||!s.templates||row.associated30!=s.templates->get(OriginalUiTemplate50KG::screenMt)||
+       !row.object04||!row.object04->pass4C(passIndex,pass)||!pass.flags21||
+       !coldCollectorPass(receipt,index,passIndex,collector))return fail(d,S::reference,0x24A740);
+    if(!(*pass.flags21&2u))return true;
+    // Current ScreenObject path has no model/clone key. Unique controllers
+    // retain their actual origin leaf, never a representative's foreign base.
+    if(pass.animation10||(pass.textureAnimation10&&
+       (!pass.textureAnimation10->unique18()||collector.finalLeaf!=collector.registration)))
+        return fail(d,S::unsupportedPass,0x29B1D0);
+    struct Guard {bool& value;explicit Guard(bool& v):value(v){value=true;}~Guard(){value=false;}} guard(s.demandActive);
+    if(row.object04->serviceCableBasePrototype29AC90(passIndex,d))return true;
+    if(d.sourceEffectsCommitted){s.demandTerminal=true;s.demandTerminalDiagnostic=d;}
+    return false;
 }
 bool OriginalStandardMaterialTable50LA::serviceRetainedModelPrototype24A740(
     const OriginalStandardMaterialCollectorReceipt50LA& receipt,std::int32_t index,std::size_t passIndex,

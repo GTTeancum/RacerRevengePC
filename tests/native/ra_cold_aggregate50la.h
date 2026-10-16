@@ -653,47 +653,76 @@ public:
     }
     // Explicit native normal ownership cleanup, after real external borrows
     // retire. Does not dispatch or claim the original26FD80 destructor.
+    struct NativeCloseDiagnostic {
+        const char* gate=nullptr;
+        bool counted=false,retireCounted=false,topologyAttempted=false,topologyClosed=false;
+        std::uint64_t cameraBorrows=0,worldBorrows=0,worldReferences=0;
+        long runtimeOwners=0,navigationOwners=0,lightingOwners=0,particleOwners=0;
+        std::size_t expectedLightingOwners=0;
+        std::uint32_t sourcePC=0,worldFlags=0,worldMask=0;
+    };
+    const NativeCloseDiagnostic& nativeCloseDiagnostic()const noexcept{return nativeCloseDiagnostic_;}
     bool closeNativeLoadedWorld() noexcept {return closeOwnedNativeResources(true);}
     bool close() noexcept {return closeOwnedNativeResources(false);}
 private:
+    NativeCloseDiagnostic nativeCloseDiagnostic_;
     bool closeOwnedNativeResources(bool retireCountedWorld) noexcept {
         if(closed_)return true;
-        if(worldColdConstructed_&&(!retireCountedWorld||!canRetireNativeWorldPrefix()))return false;
-        if(runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
-        // This explicit counted-world route must actually destroy its runtime
-        // storage below; an external strong pin cannot postpone that teardown.
-        if(worldColdConstructed_&&runtimeQueries_&&runtimeQueries_.use_count()!=1)return false;
+        auto& diagnostic=nativeCloseDiagnostic_;diagnostic={};
+        diagnostic.counted=worldColdConstructed_;diagnostic.retireCounted=retireCountedWorld;
+        diagnostic.topologyAttempted=topologyAttempted_;diagnostic.topologyClosed=topologyClosed_;
+        diagnostic.cameraBorrows=runtimeCameraBorrows_;diagnostic.worldBorrows=runtimeWorldBorrows_;
+        diagnostic.runtimeOwners=runtimeQueries_.use_count();diagnostic.navigationOwners=navigationLease_.use_count();
+        diagnostic.lightingOwners=lighting_.use_count();diagnostic.particleOwners=trackParticles_.use_count();
+        diagnostic.worldReferences=worldEntity_.reference00;diagnostic.worldFlags=worldEntity_.flags29;
+        diagnostic.worldMask=worldEntity_.mask20;
+        const auto reject=[&](const char* gate){diagnostic.gate=gate;return false;};
+        if(worldColdConstructed_){
+            if(!retireCountedWorld)return reject("counted world requires explicit retirement");
+            const char* prefix=nullptr;
+            if(!canRetireNativeWorldPrefix(&prefix))return reject(prefix?prefix:"world prefix preflight");
+        }
+        if(runtimeCameraBorrows_||runtimeWorldBorrows_)return reject("live camera/world borrows");
+        // These aggregate-owned observation bindings each retain the actual
+        // runtime bridge. Retire them before counting external runtime owners.
         staticFog_.reset();
         staticLighting_.reset(); // Retire typed camera/world/light borrows before preflight.
-        if(navigationLease_&&navigationLease_.use_count()!=1)return false;
+        diagnostic.runtimeOwners=runtimeQueries_.use_count();
+        // This explicit counted-world route must actually destroy its runtime
+        // storage below; an external strong pin cannot postpone that teardown.
+        if(worldColdConstructed_&&runtimeQueries_&&runtimeQueries_.use_count()!=1)return reject("runtime strong owners");
+        diagnostic.navigationOwners=navigationLease_.use_count();
+        if(navigationLease_&&navigationLease_.use_count()!=1)return reject("navigation strong owners");
         // Preflight the sole actual Application reference/count owner BEFORE
         // releasing anything. Unexpected live links/refs reject destruction.
-        if(!canCloseTopology())return false;
-        if(world_&&!world_->canClose())return false;
-        if(runtimeQueries_&&!runtimeQueries_->canClose())return false;
+        if(!canCloseTopology())return reject("scene topology preflight");
+        if(world_&&!world_->canClose())return reject("static world publication/material preflight");
+        if(runtimeQueries_&&!runtimeQueries_->canClose())return reject("runtime query retirement preflight");
         if(lighting_){
             const auto expected=1u+std::size_t(runtimeQueries_&&runtimeQueries_->freshLighting_==lighting_)+
                 std::size_t(world_&&world_->holdsStaticVisibility(lighting_.get()));
-            if(lighting_.use_count()!=static_cast<long>(expected))return false;
+            diagnostic.expectedLightingOwners=expected;
+            diagnostic.lightingOwners=lighting_.use_count();
+            if(lighting_.use_count()!=static_cast<long>(expected))return reject("lighting strong owners");
         }
-        if(trackParticles_&&trackParticles_.use_count()!=1)return false;
-        if(particles_&&!particles_->close())return false;
+        if(trackParticles_&&trackParticles_.use_count()!=1)return reject("track particle strong owners");
+        if(particles_&&!particles_->close())return reject("detached particles close");
         // Detached emitters/real camera borrowers must retire before the
         // source pool/material150/Entity cleanup. Failures retain the owner.
-        if(trackParticles_&&!trackParticles_->close())return false;
-        if(world_&&!world_->close())return false;
+        if(trackParticles_&&!trackParticles_->close())return reject("track particles close");
+        if(world_&&!world_->close())return reject("static world close");
         trackParticles_.reset();trackParticleApplication_.reset();trackParticleDomain_.reset();
         rosterMountDomain_.reset();rosterMountApplication_=nullptr;rosterModelResourcesComplete_=false;
         world_.reset();
         particles_.reset();emitterApplication_.reset();audio_.reset();atm_.reset();
         // World publication preflight above prevents any backing from retiring
         // while its image or future renderer lease is live.
-        if(!closeTopology())return false;
+        if(!closeTopology())return reject("scene topology close");
         lighting_.reset();skyImages_.reset();sky_.reset();triggers_.reset();
         // Storage drops its exclusive serial world lease before radii/source.
         runtimeQueries_.reset();registry_.reset();
         if(worldColdConstructed_){std::uint32_t pc=0;
-            if(!retireNativeWorldPrefixAfterOwnedCleanup(pc))return false;}
+            if(!retireNativeWorldPrefixAfterOwnedCleanup(pc)){diagnostic.sourcePC=pc;return reject("counted world prefix retirement");}}
         candidates_.reset();navigationLease_.reset();source_.reset();
         collisionApplication_.reset();closed_=true;return true;
     }

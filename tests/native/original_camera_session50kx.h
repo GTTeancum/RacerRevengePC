@@ -75,6 +75,12 @@ struct DisplayInputs {
     std::uint8_t rootFlags228;
     OriginalCameraDrainPolicy drainPolicy;
     OriginalRaceFogFields* trackFog3EC=nullptr;
+    // Optional actual Application borrow. Legacy native callers retain their
+    // explicit copied policy; consumed source ownership reads its live scalar.
+    const std::int32_t* applicationMode22CSource=nullptr;
+    std::int32_t currentApplicationMode22C()const noexcept {
+        return applicationMode22CSource?*applicationMode22CSource:applicationMode22C;
+    }
 };
 inline bool initializeFreshNativeCameraVideoAlpha0(OriginalVideoFadeState& video) noexcept {
     // Only a fresh native display; never reset an existing fade/history.
@@ -594,7 +600,7 @@ class Session final {
         OriginalGcGaIntroExitBindings bindings{controller_,start_,introChild_,attached_,attachedChild_,follow_,followChild_,
             sceneBinding_,*world,spatial_,zones,*work,transition,display_,exitScene,app.video,
             actual_.applicationClock,countdown_,actual_.all8Manager,startActions_,raceFlags1B0_,uiFlags1E4_,
-            app.fadeManagerA8,app.applicationMode22C,app.application33C,
+            app.fadeManagerA8,app.currentApplicationMode22C(),app.application33C,
             static_cast<std::int32_t>(actual_.launchKind11258),
             static_cast<std::int32_t>(preference.field11030),static_cast<std::int32_t>(preference.field11038),
             0,static_cast<std::int32_t>(actual_.bank.read(0,reads_.state40))};
@@ -1343,7 +1349,7 @@ public:
         if(app.fadeManagerA8==8){
             //2AE93C..2AE958: actual duration98,+38=260610,a2=1;clear A8.
             result_.start=requestOriginalVideoFade260610(video,actual_.applicationClock,
-                app.applicationMode22C,app.fadeDuration98,true);
+                app.currentApplicationMode22C(),app.fadeDuration98,true);
             if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::videoPending,result_.start.sourcePC);
             app.fadeManagerA8=0;fadeInRequested_=true;
         }else if(app.fadeManagerA8)return set(Status::sourcePath,0x2ae7fc);
@@ -1387,7 +1393,7 @@ public:
         auto& app=*displayInputs_;
         if(app.fadeManagerA8==7){
             result_.start=requestOriginalVideoFade260320(app.video,actual_.applicationClock,
-                app.applicationMode22C,app.fadeDuration98,true,false);
+                app.currentApplicationMode22C(),app.fadeDuration98,true,false);
             if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::sourcePath,result_.start.sourcePC);
             app.fadeManagerA8=4;endingFadeRequested_=true;
         }else if(app.fadeManagerA8==4){

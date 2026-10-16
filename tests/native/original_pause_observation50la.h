@@ -1,5 +1,7 @@
 #pragma once
 #include "original_pause_entity50la.h"
+#include "original_race_pause_parent50la.h"
+#include "original_race_pause_forward50la.h"
 #include "original_camera_session50kx.h"
 #include "ra_cold_sources50la.h"
 #include "../../src/game/original_pause_storage50la.h"
@@ -17,6 +19,7 @@ class Owner final {
     std::weak_ptr<Camera> camera_;
     std::weak_ptr<const Track> track_;
     std::uint64_t cameraGeneration_=0;
+    mutable bool lifecycleRejected_=false;
     const original_main_entry50KG::Application* application_=nullptr;
     std::weak_ptr<rr::game::OriginalPauseStorage50LA> pause_;
     std::weak_ptr<rr::game::ControlPresets49D> controls_;
@@ -141,7 +144,7 @@ public:
         rr::game::DeviceButtonRecord48Y& record)const noexcept {
         using Result=NavigationResult;using Status=Result::Status;
         Result result;
-        if(!application_||!cameraGeneration_)return result;
+        if(lifecycleRejected_||!application_||!cameraGeneration_)return result;
         const auto pause=pause_.lock();const auto controls=controls_.lock();
         const auto camera=camera_.lock();const auto track=track_.lock();
         if(!pause||!controls||!camera||!track||camera->generation_!=cameraGeneration_||
@@ -172,7 +175,7 @@ public:
                 result.audio=camera->actual_.cycleAudio.dispatchPauseFeedback(event.code==12u?3u:4u);
                 using A=original_camera_cycle_audio50KX::Owner::Result;
                 if(result.audio!=A::started&&result.audio!=A::unavailable&&result.audio!=A::muted){
-                    result.status=Status::audioUnavailable;return result;
+                    lifecycleRejected_=true;result.status=Status::audioUnavailable;return result;
                 }
             }else if(event.code==2u||event.code==15u||event.code==13u){
                 result.status=Status::actionUnavailable;result.sourcePC=0x1BD8BC;return result;
@@ -186,11 +189,23 @@ public:
         result.status=routed.status==rr::game::EventRouteStatus48Z::Complete?Status::complete:Status::childRoute;
         result.sourcePC=0x1BE80C;result.originalReturn=routed.handled?1u:0u;return result;
     }
+    // Explicit native spectator opening policy; the original human-device
+    // acceptance1A87A0 is unavailable with the actual ALL8 humanCount34==0.
+    bool openNativeAll8SpectatorMenu(const rr::game::InputEvent48Z&,Diagnostic&)const noexcept;
+    NavigationResult continueRow0(rr::game::InputEvent48Z&,rr::game::DeviceButtonRecord48Y&)const noexcept;
+    bool nativeSpectatorMenuOpen()const noexcept;
+    bool closeNativeSpectatorMenuForShutdown(Diagnostic&)const noexcept;
+    bool prepareNativePresentation(rr::game::OriginalPauseNativeDraw50LA&,Diagnostic&,
+        rr::game::OriginalPauseLayout50LA::Diagnostic&,
+        rr::game::OriginalPauseNativeResources50LA::Diagnostic&)const noexcept;
+    bool resetNativePresentationClock()const noexcept;
     void unbind()noexcept {
-        camera_.reset();track_.reset();cameraGeneration_=0;
+        camera_.reset();track_.reset();cameraGeneration_=0;lifecycleRejected_=false;
         application_=nullptr;pause_.reset();controls_.reset();settings_.reset();
     }
 private:
+    bool closeLifecycle1BE830(Diagnostic&)const noexcept;
+    bool attachedLifecycle(const Camera&,const rr::game::OriginalPauseStorage50LA&)const noexcept;
     bool raceIdentity(const Camera& c,const Track& track,
         const rr::game::OriginalPauseStorage50LA& p,const rr::game::ControlPresets49D& controls)const noexcept {
         const auto& selection=track.freshSelection;
@@ -205,3 +220,5 @@ private:
     }
 };
 }
+
+#include "original_pause_callback_scheduler50la.inl"

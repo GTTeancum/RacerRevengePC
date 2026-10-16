@@ -49,7 +49,7 @@ private:
     bool constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicationEntities50LA>,
         rr::platform::RaceAudioGroups50IC&,rr::platform::AudioMixer50HD&,std::uint64_t,std::uint32_t&)noexcept;
     bool rollbackNativeWorldConstructionFailure(std::uint32_t&)noexcept;
-    bool canRetireNativeWorldPrefix()const noexcept;
+    bool canRetireNativeWorldPrefix(const char** gate=nullptr)const noexcept;
     bool retireNativeWorldPrefixAfterOwnedCleanup(std::uint32_t&)noexcept;
     struct SearchNode {
         Entity entity;

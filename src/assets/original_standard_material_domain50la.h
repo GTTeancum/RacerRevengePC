@@ -213,7 +213,7 @@ private:
     bool populateTimeStatsResources2DF144(std::shared_ptr<const OriginalStandardMaterialContext50LA> context,
         OriginalStandardMaterialDiagnostic50LA& d) noexcept {
         d={};
-        if(!prepared()||!resolver_||!resolver_->prepared()){
+        if(!prepared()||!resolver_){
             d.status=OriginalStandardMaterialStatus50LA::unprepared;return false;
         }
         if(!context||!context->live()||context->materialApplication()!=application_){

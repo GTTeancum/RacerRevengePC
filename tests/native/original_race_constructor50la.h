@@ -10,6 +10,7 @@ namespace rr::game {
 // Application28C publication is a separate same-owner facet; full load remains gated.
 class OriginalRaceConstructor50LA final {
     friend struct ::original_main_entry50KG::Application;
+    friend class ::original_pause_observation50LA::Owner;
     std::shared_ptr<OriginalApplicationEntities50LA> application_;
     std::shared_ptr<platform::OriginalUiRiderProfileOwner50KG> profile_;
     OriginalWreckComponent50LA entity_;
@@ -49,8 +50,8 @@ class OriginalRaceConstructor50LA final {
     bool nativeRootAttached_=false,nativeRootMaskReached_=false;
     bool canRetainPause100()const noexcept;
     bool attachNativePauseParent()noexcept;
-    bool retireNativePauseParent()noexcept;
-    bool retireNativeWorldAndGroups(std::uint32_t&)noexcept;
+    bool retireNativePauseParent(const char*&)noexcept;
+    bool retireNativeWorldAndGroups(std::uint32_t&,const char*&)noexcept;
     bool pauseWorld1ACF50(bool)noexcept;
     bool pauseEntity142040(bool)noexcept;
     bool constructWorld1A6BC0(const original_main_entry50KG::Application&,

@@ -29,11 +29,14 @@ inline bool OriginalRaceConstructor50LA::attachNativePauseParent()noexcept {
        OriginalWreckComponentStatus50LA::complete)return false;
     nativeRootMaskReached_=nativeRootAttached_=true;return true;
 }
-inline bool OriginalRaceConstructor50LA::retireNativePauseParent()noexcept {
+inline bool OriginalRaceConstructor50LA::retireNativePauseParent(const char*& gate)noexcept {
+    gate="Pause absent with native root attachment";
     if(!pause100_)return !nativeRootAttached_;
+    gate="Pause retirement application/lock/entity/material borrows";
     if(!application_||application_->attachmentLock423F58()||!pause100_->entity_||
        pause100_->materialAdmissionBorrows_)return false;
     auto& p=*pause100_->entity_;auto& e=p.component;
+    gate="Pause canonical identity/flags/mask/forest";
     if(p.application!=application_||e.sessionGeneration!=entity_.sessionGeneration||
        e.firstChild18||e.descendants24||e.mask20!=p.retainedAttachmentMask20||
        (e.flags29&15u)!=(p.disabledAfterLoad?0u:3u)||
@@ -41,18 +44,23 @@ inline bool OriginalRaceConstructor50LA::retireNativePauseParent()noexcept {
        !application_->entityAuthority_.canRetire(entity_)||
        !original_entity_chain_detail50LA::forest(application_->entityAuthority_.view()))return false;
     if(nativeRootAttached_){
+        gate="Pause native root exact sibling chain";
         if(entity_.parent1C!=application_->application10()||entity_.next14!=&e||
            e.parent1C!=entity_.parent1C||e.previous10!=&entity_||e.next14||
            entity_.mask20!=0xffffffffu||!nativeRootMaskReached_)return false;
         //17D8E8 detaches race first; its concrete child cleanup then detaches Pause.
+        gate="detach actual race root";
         if(application_->entityAuthority_.detach(entity_,0).status!=OriginalWreckComponentStatus50LA::complete)return false;
         nativeRootAttached_=false;
-    }else if(entity_.parent1C||entity_.previous10)return false;
+    }else if(entity_.parent1C||entity_.previous10){gate="race root retains parent/previous";return false;}
     // Also admits the acquired sibling-only state if root attachment failed.
     if(e.parent1C||e.previous10||e.next14){
+        gate="Pause unexpected next sibling";
         if(e.next14)return false;
+        gate="detach actual Pause root";
         if(application_->entityAuthority_.detach(e,0).status!=OriginalWreckComponentStatus50LA::complete)return false;
     }
+    gate="Pause detached prefix";
     if(!p.detached())return false;
     pause100_->closeCold();pause100_.reset();return true;
 }

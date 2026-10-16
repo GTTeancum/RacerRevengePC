@@ -1,4 +1,5 @@
 #pragma once
+namespace original_pause_observation50LA { class Owner; }
 namespace original_course_targets50KX { class ConsumedLaunch; }
 namespace ra_cold_aggregate50LA { class Owner; }
 namespace ra_cold_sources50LA { class ColdNavigationLease; }
@@ -138,6 +139,8 @@ struct Application {
     // Original100008..100030 clears435670 AND435678 in BSS. Native debug overrides are
     // not admitted; never reinitialize this owner on page/race/session entry.
 private:
+    friend class ::original_pause_observation50LA::Owner;
+    mutable std::uint32_t sourceCameraIndex0C_=0;
     friend struct Video;
     friend struct Frontend;
     friend class NativeCollectorFifo50LA;
@@ -315,7 +318,7 @@ public:
     bool pauseConsumedRaceWorld1ACF50(rr::game::OriginalRaceConstructor50LA&,bool)const noexcept;
     bool constructConsumedRaceWorld1A6BC0(rr::game::OriginalRaceConstructor50LA&,
         std::shared_ptr<ra_cold_aggregate50LA::Owner>,std::uint32_t& sourcePC)const noexcept;
-    std::int32_t applicationMode22C()const noexcept{return sourceApplicationMode22C_;}
+    const std::int32_t& applicationMode22C()const noexcept{return sourceApplicationMode22C_;}
     // Exact conditional443848 typed destruction leaf; never an implicit drain.
     bool retireNativeCollector1A6948(rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     // Source-only detached ownership. Definitions are in original_pause_entity50la.h.

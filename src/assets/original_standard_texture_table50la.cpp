@@ -150,11 +150,16 @@ bool OriginalStandardTextureTable50LA::populate29E340(
     auto& s=*storage_;
     if(s.populationTerminal){d=s.terminalDiagnostic;return false;}
     if(s.populationActive)return fail(d,E::phase,0x29E340);
-    if(!resolver||!resolver->prepared())return fail(d,E::source,0x24DAF8);
+    if(!resolver)return fail(d,E::source,0x24DAF8);
     if(!construction||!construction->live())return fail(d,E::video,0x29C768);
     if(s.construction&&s.construction!=construction)return fail(d,E::phase,0x29E340);
     if(s.populationBound&&(s.resolver!=resolver||s.construction!=construction))
         return fail(d,E::phase,0x29E340);
+    // The source table scan with actual count zero performs no texture load,
+    // so it never reaches24DAF8's resolver lookup. Keep the corpus unprepared
+    // and unbound; a later genuine positive-row scan retains all normal gates.
+    if(s.rows.empty()){d.status=E::complete;return true;}
+    if(!resolver->prepared())return fail(d,E::source,0x24DAF8);
     if(!resolver->bind(construction,d))return false;
     if(!s.populationBound){
         s.resolver=std::move(resolver);s.construction=std::move(construction);s.populationBound=true;

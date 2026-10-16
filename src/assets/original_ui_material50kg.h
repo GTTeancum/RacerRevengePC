@@ -293,6 +293,12 @@ bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass5
 bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG&,
     const Texture48E& exactAtlas, OriginalUiNativeMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;
+// Only authenticated Pause arrows with their actual canonical unique controller.
+// Generic native policy still rejects animatesWhilePaused metadata.
+class OriginalStandardMaterialTextureAnimation50LA;
+bool prepareOriginalPauseAnimatedMaterial50LA(const OriginalUiMaterialPass50KG&,
+    const Texture48E&,const OriginalStandardMaterialTextureAnimation50LA&,
+    OriginalUiNativeMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 // The two authenticated OVERLAYS gleam ScreenTextures require actual stored
 // framebuffer alpha. The clear pass is ATST=NEVER/AFAIL=FB_ONLY; the bright
 // pass consumes destination alpha. This typed CPU policy does not admit a

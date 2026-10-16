@@ -319,19 +319,22 @@ class OwnershipBridge final {
         std::shared_ptr<ra_cold_roster50LA::Operation> rosterOperation;
         BankPin(native_racer50HN::Bank& bank,std::shared_ptr<OwnershipBridge> actual)noexcept
             :RaWorldLifetime(bank),owner(std::move(actual)){}
+        bool canRetire()const noexcept override {return owner&&owner->canRetireBankBacking();}
         ~BankPin() override {
             // Bank's slots/spans have already died. Do not touch Bank here.
             // SourceCamera must have performed its real bank0 close first.
             owner->verifyFollowRetiredForBankDestruction();
         }
     };
+    bool canRetireBankBacking()const noexcept {
+        if(nativeFifoPins_||triggerQueryActive_||rosterRetirementRequired_)return false;
+        for(const bool pending:freshRetirementRequired_)if(pending)return false;
+        for(const bool pending:gridRetirementRequired_)if(pending)return false;
+        return (!camera_||!camera_->session||camera_->session->closed_)&&
+            (!follow_||!follow_->attempted_||follow_->closed_);
+    }
     void verifyFollowRetiredForBankDestruction()const noexcept {
-        if(nativeFifoPins_||triggerQueryActive_)std::terminate();
-        if(rosterRetirementRequired_)std::terminate();
-        for(const bool pending:freshRetirementRequired_)if(pending)std::terminate();
-        for(const bool pending:gridRetirementRequired_)if(pending)std::terminate();
-        if(camera_&&camera_->session&&!camera_->session->closed_)std::terminate();
-        if(follow_&&follow_->attempted_&&!follow_->closed_)std::terminate();
+        if(!canRetireBankBacking())std::terminate();
     }
     explicit OwnershipBridge()=default;
     bool fail(Diagnostic& d,const char* why)noexcept {
@@ -564,7 +567,7 @@ class OwnershipBridge final {
         d={};
         if(terminal_||closed_||registrationAttempted_||!queriesConstructed_||
            self.get()!=this||bankIdentity_||bank.raWorldLifetime_||
-           bank.sealed_||bank.visiting_||bank.readBlocked_)
+           bank.retired_||bank.sealed_||bank.visiting_||bank.readBlocked_)
             return fail(d,"RA world registration requires its actual fresh bridge and unsealed idle Bank");
         registrationAttempted_=true;
         try {

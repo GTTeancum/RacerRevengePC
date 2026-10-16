@@ -1,4 +1,5 @@
 #include "original_standard_material_table50la.h"
+#include "original_shader_pass_groups50la.h"
 #include "original_standard_material_animation50la.h"
 #include "original_standard_texture_resource50la.h"
 #include "original_standard_texture_demand_math50la.h"
@@ -135,8 +136,6 @@ bool admitPass(const OriginalUiDatSection50KG& section,bool dual,bool animated,b
     for(std::size_t kind=0;kind<3;++kind)if(const auto* v=section.find(animation[kind]))
         if(!same(v->text,"none")&&!(((animated&&kind==1)||(textureAnimated&&kind==0))&&same(v->text,"unique")))
             return fail(d,E::unsupportedPass,0x29B890,animation[kind]);
-    if(const auto* v=section.find("ShaderPassGroup"))if(!same(v->text,"none")&&!same(v->text,"unique"))
-        return fail(d,E::unsupportedPass,0x247550,"ShaderPassGroup");
     for(const auto& value:section.values)if(value.sourceValuePresent&&!knownField(value.key,dual,animated,textureAnimated,programs))
         return fail(d,E::unsupportedPass,0x247110,"unrepresented active pass field");
     return true;
@@ -1048,7 +1047,8 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
             if(!string(*section,"ShaderPassGroup","none",group,d,0x247550,127))return false;
             if(same(group,"none"))pass.group22=-1;
             else if(same(group,"unique"))pass.group22=-2;
-            else return fail(d,E::unsupportedPass,0x2475AC,"named ShaderPassGroup");
+            else if(!OriginalShaderPassGroups50LA::instance().acquire299330(group,pass.group22))
+                return fail(d,E::unsupportedPass,0x2475AC,"named ShaderPassGroup index capacity");
             if(!admitPass(*section,dual,pass.animation10!=nullptr,pass.textureAnimation10!=nullptr,*s.programs,d))return false;
         }
         if(s.source->section("Epilogue"))return fail(d,E::unsupportedAction,0x29B828,"Epilogue");

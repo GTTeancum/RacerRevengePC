@@ -1,6 +1,8 @@
 #include "original_ui_material50kg.h"
 #include "original_ui_screen_assets50kg.h"
 #include "original_ui_controls_specmap50kg.h"
+#include "original_standard_material_object50la.h"
+#include "original_standard_material_animation50la.h"
 #include <utility>
 
 namespace rr::assets {
@@ -848,7 +850,7 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
     bool authenticatedRiderWindow = false, bool authenticatedRiderShadow = false,
     bool authenticatedCharacterFixed64 = false, bool authenticatedControlsTga1555 = false,
     bool authenticatedRaceGleam = false, bool authenticatedRaceClear = false,
-    bool authenticatedRider17Cutout = false) noexcept {
+    bool authenticatedRider17Cutout = false, bool canonicalPauseAnimation = false) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
@@ -864,7 +866,8 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
             return fail(d, Error::profile, litProgram ? "authored DefaultMT Diffuse/Compressed" :
                 "enabled single-map ScreenObject", 0x2471bcu);
         for (const auto& field : pass.authored.values)
-            if (field.sourceValuePresent && !knownPassField(field.key))
+            if (field.sourceValuePresent && !knownPassField(field.key) &&
+                !(canonicalPauseAnimation && same(field.key,"animatesWhilePaused")))
                 return fail(d, Error::unsupportedField, field.key.c_str(), 0x247110u);
         const auto value = [&](Field field) { return pass.gs[field].value; };
         // Original packet construction shifts/ORs integers; do not let an
@@ -990,6 +993,33 @@ bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     OriginalUiMaterialDiagnostic50KG& d) noexcept {
     bool fog = false, alphaTest = false;
     return prepareOriginalUiOneMapMaterial50KM(pass, texture, output, d, false, fog, alphaTest);
+}
+bool prepareOriginalPauseAnimatedMaterial50LA(const OriginalUiMaterialPass50KG& pass,
+    const Texture48E& texture,const OriginalStandardMaterialTextureAnimation50LA& controller,
+    OriginalUiNativeMaterial50KG& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};try {
+        const bool left=pass.identity==catalogMember(OriginalUiArchiveId50KG::overlays,
+            "ui\\textures\\arrwleftPause.psm");
+        const bool right=pass.identity==catalogMember(OriginalUiArchiveId50KG::overlays,
+            "ui\\textures\\arrwrghtPause.psm");
+        const auto* owner=controller.materialOwner();
+        const auto* source=owner?owner->source():nullptr;
+        OriginalStandardMaterialPassView50LA canonical;
+        const auto* animation=pass.authored.find("TextureAnimation");
+        bool paused=false;
+        if((!left&&!right)||!controller.unique18()||!owner||!owner->constructed29B550()||
+           !source||!source->member()||!same(*source->member(),pass.identity->name)||
+           pass.pass!=controller.passOrdinal()+1||
+           !owner->pass4C(controller.passOrdinal(),canonical)||canonical.textureAnimation10!=&controller||
+           !animation||!same(animation->text,"unique")||
+           !pass.authored.find("animatesWhilePaused")||
+           !originalUiBoolean50KG(pass.authored,"animatesWhilePaused",false,paused,d.document,0x29AB30)||
+           paused!=controller.animatesWhilePaused18())
+            return fail(d,Error::profile,"actual Pause authored animation controller",0x29AB30);
+        bool fog=false,alphaTest=false;
+        return prepareOriginalUiOneMapMaterial50KM(pass,texture,output,d,false,fog,alphaTest,
+            false,false,false,false,false,false,false,false,false,false,true);
+    }catch(...){d.error=Error::allocation;return false;}
 }
 bool prepareOriginalRaceHudGleamMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     const OriginalUiScreenAssets50KG& images,std::uint32_t index,

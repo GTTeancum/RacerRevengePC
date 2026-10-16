@@ -11,7 +11,7 @@ namespace rr::assets {
 enum class OriginalPauseSourceMember50LA : std::uint8_t {
     results1Pixels, results2Pixels, ingameFontCells, ingameFontPixels,
     letterBoxMaterial, iconMaterial, fontMaterial, leftArrowMaterial,
-    rightArrowMaterial, count
+    rightArrowMaterial, iconPixels, leftArrowFrames, rightArrowFrames, count
 };
 enum class OriginalPauseSourceError50LA : std::uint8_t {
     none, alreadyLoaded, overlaysArchive, localizationArchive, member,
@@ -66,7 +66,9 @@ public:
                 "font\\denmarkbold16ingame.cel", "font\\denmarkbold16ingame.pst",
                 "ui\\textures\\letterboxpause.psm", "ui\\textures\\icon_xpause.psm",
                 "font\\denmarkbold16pause.psm", "ui\\textures\\arrwleftPause.psm",
-                "ui\\textures\\arrwrghtPause.psm"
+                "ui\\textures\\arrwrghtPause.psm",
+                "ui\\textures\\icon_x.pst", "ui\\textures\\arrwleft.atm",
+                "ui\\textures\\arrwrght.atm"
             };
             std::array<OriginalUiMemberView50KG,memberCount> members{};
             for(std::size_t i=0;i<memberCount;++i) {

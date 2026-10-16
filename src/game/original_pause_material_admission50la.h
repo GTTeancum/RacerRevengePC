@@ -123,6 +123,22 @@ public:
         --owner_->materialAdmissionBorrows_;owner_.reset();providerRevision_=0;seal_={};
     }
 private:
+    friend class OriginalPauseNativeResources50LA;
+    bool serviceEmission(std::size_t reference,D& d)noexcept {
+        d={};if(!current()||reference>=assets::OriginalPausePrimitiveReferences50LA::count)
+            return fail(d,S::phase,0x246760);
+        const auto* retained=owner_->references_.reference(reference);
+        const auto table=owner_->domain_->materials382B38();
+        const assets::OriginalStandardMaterialObject50LA* object=nullptr;
+        if(!retained||!retained->retained||!table->resolve298E60(retained->material00,object,d)||
+           !object||!object->passCount48()||*object->passCount48()<0||*object->passCount48()>4)
+            return fail(d,S::reference,0x246760);
+        // ScreenObject key is null: service the originating prototype before
+        // resolving its FINAL representative, once per actual emitted object.
+        for(std::size_t p=0;p<std::size_t(*object->passCount48());++p)
+            if(!table->serviceRetainedScreenPrototype24A740(seal_,retained->material00,p,d))return false;
+        return true;
+    }
     bool copyPass(const assets::OriginalStandardMaterialPassView50LA& in,PassState& out,D& d)const {
         if(!in.references04||*in.references04<=0||!in.program18||!in.group22||!in.mapCount20||
            *in.mapCount20>2||!in.flags21||!in.texture1A||!in.uv1E||!in.fillRgba2C||

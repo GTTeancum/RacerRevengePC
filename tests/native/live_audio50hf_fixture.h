@@ -75,6 +75,16 @@ public:
         return coldStorageBorrowLive()?&groups_:nullptr;
     }
 
+    // Explicit muted backend policy still needs the real seven-group control
+    // suffix. Consume the same staged mixer once; no PCM/provider/output claim.
+    bool finishCountedMutedGroups(const rr::game::RaceAudioSettings50IC& settings)noexcept {
+        if(!coldStorageBorrowLive()||!groups_.coldStarted_||
+           groups_.coldNext_!=rr::game::raceAudioGroupCount50IC||
+           !rr::game::announcer_callbacks50IC_detail::settings(settings))return false;
+        prepareAttempted_=true; // Construction borrows expire before effects.
+        return groups_.initialize(mixer_,settings);
+    }
+
     // Cold only, once per owner, before any gameplay work. All authenticated
     // selected requests remain present, including unavailable records.
     // POD01 has60 authored semantic slots; the other seven have48. All use the
@@ -221,6 +231,31 @@ public:
             return fail(diagnostic,rr::platform::AudioOutputError50HD::Mixer,"50IC.completion","Announcer group restoration rejected");
         }
         ++counters_.committedSteps;return true;
+    }
+    // Native spectator-menu scheduling only. Caller supplies actual host-time
+    // chunks (at most one16ms audio quantum), never a physics-step receipt.
+    // Original group pause state remains authoritative for every voice cursor.
+    bool serviceNativeMenuAudio(std::uint32_t elapsedMicroseconds,
+        rr::platform::AudioOutputDiagnostic50HD& diagnostic)noexcept {
+        const auto* worldPaused=groups_.sourceState44(rr::game::RaceAudioGroup50IC::World4D8);
+        if(!outputOpen_||!prepared_||closed_||paused_||!coldStorage_||!worldPaused||!*worldPaused||
+           !elapsedMicroseconds||elapsedMicroseconds>stepMicroseconds)
+            return fail(diagnostic,rr::platform::AudioOutputError50HD::InvalidRequest,
+                "50HF.menu","Actual counted menu audio requires a live unpaused output and bounded host interval");
+        if(!announcer_.pollCompletion()){
+            ++counters_.groupFailures;
+            return fail(diagnostic,rr::platform::AudioOutputError50HD::Mixer,
+                "50IC.menu","Shared announcer ownership rejected");
+        }
+        const bool mixed=output_.advanceMicroseconds(mixer_,elapsedMicroseconds,diagnostic);
+        // Output can reject after actual samples were consumed. Always poll
+        // their real completion, with no world/AI/announcer scheduling update.
+        const bool restored=announcer_.pollCompletion();
+        if(!restored)++counters_.groupFailures;
+        if(!mixed){++counters_.mixFailures;return false;}
+        if(!restored)return fail(diagnostic,rr::platform::AudioOutputError50HD::Mixer,
+            "50IC.menuCompletion","Announcer group restoration rejected");
+        return true; // Never increments committedSteps: no simulation step ran.
     }
     void pause(bool paused)noexcept {
         if(closed_)return;

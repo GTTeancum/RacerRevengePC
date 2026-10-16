@@ -148,6 +148,7 @@ public:
         roster_.reset();retired_=true;return true;
     }
     // Aggregate::close is deliberately NOT called here: the actual Bank must
-    // first die, retiring every saved pointer and its destruction-bound pin.
+    // first retire every saved pointer and its lifetime pin, either through
+    // explicit terminal retireNativeBacking() or actual Bank destruction.
 };
 } // namespace ra_native_session50LA

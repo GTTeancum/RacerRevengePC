@@ -73,7 +73,9 @@ inline bool Application::prewarmPauseCold50LA(original_pause_cold50LA::Owner& ou
         }
         std::vector<a::OriginalStandardTextureSourceInput50LA> textures;
         for(auto id:{a::OriginalPauseSourceMember50LA::results1Pixels,
-            a::OriginalPauseSourceMember50LA::results2Pixels,a::OriginalPauseSourceMember50LA::ingameFontPixels}){
+            a::OriginalPauseSourceMember50LA::results2Pixels,a::OriginalPauseSourceMember50LA::ingameFontPixels,
+            a::OriginalPauseSourceMember50LA::iconPixels,a::OriginalPauseSourceMember50LA::leftArrowFrames,
+            a::OriginalPauseSourceMember50LA::rightArrowFrames}){
             const auto member=out.data_->member(id);
             textures.push_back({member.identity->name,
                 std::vector<std::uint8_t>(member.data,member.data+member.size)});

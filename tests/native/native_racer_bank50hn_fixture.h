@@ -58,7 +58,7 @@ public:
         ReadHandle()=default;
     };
     template<class T> ReadHandle<T> bindRead(const T& value) const {
-        if(!sealed_||visiting_||readBlocked_)
+        if(retired_||!sealed_||visiting_||readBlocked_)
             throw std::runtime_error("racer read binding requires a sealed idle bank");
         const auto address=reinterpret_cast<std::uintptr_t>(&value);
         for(const auto& span:spans_){
@@ -75,7 +75,7 @@ public:
         throw std::runtime_error("racer read field is not within one registered owner span");
     }
     template<class T> T read(std::size_t index,const ReadHandle<T>& handle) const {
-        if(!sealed_||visiting_||readBlocked_||index>=count_||handle.owner_!=this||!handle.live_)
+        if(retired_||!sealed_||visiting_||readBlocked_||index>=count_||handle.owner_!=this||!handle.live_)
             throw std::runtime_error("invalid or leased native racer scalar read");
         T value;
         // Slot0 may have advanced since its last save. Every nonzero slot is
@@ -93,6 +93,7 @@ public:
     }
     template<class T> void elements(T* values,std::size_t count) {
         static_assert(std::is_trivially_copyable_v<T>,"Backing elements must be POD");
+        if(retired_)throw std::runtime_error("retired native racer bank");
         if(count>std::numeric_limits<std::size_t>::max()/sizeof(T))
             throw std::runtime_error("racer owner extent overflow");
         if(count)add(values,count*sizeof(T));
@@ -104,7 +105,7 @@ public:
     // Slot zero is the player. Opponents begin from identical cold native state;
     // initialize each slot at its separate host grid position before stepping.
     void seal(std::size_t count) {
-        if(sealed_||spans_.empty()||count<2||count>maximumRacers)
+        if(retired_||sealed_||spans_.empty()||count<2||count>maximumRacers)
             throw std::runtime_error("invalid native racer bank seal");
         for(std::size_t i=0;i<count;++i){slots_[i].bytes.resize(bytes_);slots_[i].active=true;}
         count_=count;sealed_=true;
@@ -115,7 +116,7 @@ public:
     // preserve an opponent's exact partial state on failure and restore player
     // even if the callback throws. No allocation occurs after seal().
     template<class F> decltype(auto) visit(std::size_t index,F&& operation) {
-        if(!sealed_||index>=count_||visiting_)
+        if(retired_||!sealed_||index>=count_||visiting_)
             throw std::runtime_error("invalid or nested native racer visit");
         if(!index){
             // Legacy slot0 visits do not take the swapping lease. Keep their
@@ -145,7 +146,7 @@ public:
     // This does not advance any slot's completedSteps or change eligibility.
     template<class F> bool visitMany(const std::size_t* order,
         std::size_t visitCount,F&& operation) {
-        if(!sealed_||visiting_||visitCount>count_)
+        if(retired_||!sealed_||visiting_||visitCount>count_)
             throw std::runtime_error("invalid or nested native racer batch visit");
         for(std::size_t position=0;position<visitCount;++position)
             if(order&&order[position]>=count_)
@@ -174,7 +175,7 @@ public:
     // Race gate is supplied by the host countdown/finish owner. A stopped slot
     // remains inspectable/renderable; it is never silently reset or teleported.
     template<class Step> bool step(std::size_t index,bool racing,Step&& operation) {
-        if(index==0||index>=count_)throw std::runtime_error("invalid AI racer slot");
+        if(retired_||index==0||index>=count_)throw std::runtime_error("invalid AI racer slot");
         if(!racing||!slots_[index].active)return false;
         try {
             const bool advanced=visit(index,std::forward<Step>(operation));
@@ -183,10 +184,22 @@ public:
             return advanced;
         } catch (...) {slots_[index].active=false;throw;}
     }
-    void stop(std::size_t index) noexcept {if(index<count_)slots_[index].active=false;}
-    bool active(std::size_t index)const noexcept{return index<count_&&slots_[index].active;}
+    void stop(std::size_t index) noexcept {if(!retired_&&index<count_)slots_[index].active=false;}
+    bool active(std::size_t index)const noexcept{return !retired_&&index<count_&&slots_[index].active;}
     std::uint64_t completedSteps(std::size_t index)const noexcept{
         return index<count_?slots_[index].completedSteps:0;
+    }
+    // Explicit native terminal teardown, after all real camera/roster/GPU users.
+    // Keep scalar reporting counters, but destroy all borrowed-pointer snapshots
+    // and registration spans before releasing the actual RA lifetime owner.
+    bool retireNativeBacking()noexcept {
+        if(retired_)return true;
+        if(visiting_||readBlocked_||nativeFifoPins_||
+           (raWorldLifetime_&&!raWorldLifetime_->canRetire()))return false;
+        retired_=true;sealed_=false;
+        for(auto& slot:slots_)std::vector<unsigned char>().swap(slot.bytes);
+        std::vector<Span>().swap(spans_);
+        raWorldLifetime_.reset();return true;
     }
     std::size_t count()const noexcept{return count_;}
     std::size_t bytesPerRacer()const noexcept{return bytes_;}
@@ -195,11 +208,13 @@ private:
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     std::uint32_t nativeFifoPins_=0;
     // Only the concrete RA bridge can construct/install the derived pin. No
-    // public replacement, generic keepalive or caller retirement operation.
+    // public replacement or generic keepalive. Only terminal backing teardown
+    // may release this pin early, after its concrete retirement preflight.
     struct RaWorldLifetime {
         const Bank* const identity;
         explicit RaWorldLifetime(const Bank& bank)noexcept:identity(&bank){}
         virtual ~RaWorldLifetime()=default;
+        virtual bool canRetire()const noexcept=0;
     };
     // Declared before every span/snapshot: destroyed last. Bank alone strongly
     // owns the pin; its concrete owner retains the actual same-source backing.
@@ -209,9 +224,9 @@ private:
     std::vector<Span> spans_;
     std::array<Slot,maximumRacers> slots_{};
     std::size_t bytes_=0,count_=0;
-    bool sealed_=false,visiting_=false,readBlocked_=false;
+    bool sealed_=false,visiting_=false,readBlocked_=false,retired_=false;
     void add(void* address,std::size_t bytes) {
-        if(sealed_||!address||!bytes||bytes>std::numeric_limits<std::size_t>::max()-bytes_)
+        if(retired_||sealed_||!address||!bytes||bytes>std::numeric_limits<std::size_t>::max()-bytes_)
             throw std::runtime_error("invalid native racer owner span");
         const auto first=reinterpret_cast<std::uintptr_t>(address);
         if(bytes>std::numeric_limits<std::uintptr_t>::max()-first)

@@ -28,9 +28,15 @@ public:
         assets::OriginalUiNativeMaterial50KG textured;
         assets::OriginalUiNativeUntexturedMaterial50KG untextured;
         std::shared_ptr<const Image> image;
+        std::vector<std::shared_ptr<const Image>> frames;
     };
     struct Projection {std::size_t reference=0;std::vector<Pass> passes;};
 private:
+    friend class OriginalPauseNativeDraw50LA;
+    bool prepareEmission(std::size_t reference,Projection& output,Diagnostic& d)noexcept {
+        if(!current()||!admission_.serviceEmission(reference,d.canonical))return fail(d,0x24A758);
+        return prepare(reference,output,d);
+    }
     std::shared_ptr<Storage> owner_;
     Admission admission_;
     std::array<assets::OriginalUiMaterial50KG,36> parsed_;
@@ -62,6 +68,7 @@ private:
     }
     std::shared_ptr<const Image> imageFor(const assets::OriginalStandardTextureResource50LA* texture,Diagnostic& d){
         for(const auto& image:images_)if(image->resource==texture)return image;
+        if(prepared_)return {}; // Immutable cold bank: emission never decodes/adds a child.
         if(!texture||!texture->sourceMember()||!texture->originalBytes())return {};
         const auto member=owner_->data_->overlays()->find(*texture->sourceMember());
         auto image=std::make_shared<Image>();image->resource=texture;image->member=member.identity;
@@ -118,8 +125,31 @@ public:
                         if(map.preparation!=assets::OriginalStandardMaterialMapPreparation50LA::ready)
                             return fail(d,0x24B260); //Pending/null is not drawable pixels.
                         p.image=imageFor(map.texture,d);if(!p.image)return fail(d,0x24E880);
+                        assets::OriginalStandardTextureRowView50LA textureRow;
+                        if(!owner_->domain_->textures383400()->row(map.textureToken,textureRow)||
+                           !textureRow.object04||!textureRow.references08||*textureRow.references08<=0)
+                            return fail(d,0x298E60);
+                        const auto* root=textureRow.object04;
+                        if(root->animated102070()){
+                            const auto* count=root->frameCount20();
+                            if(!count||*count<=0||*count>64)return fail(d,0x102050);
+                            for(std::int32_t f=0;f<*count;++f){
+                                auto image=imageFor(root->frame102050(f),d);
+                                if(!image)return fail(d,0x24E880);
+                                p.frames.push_back(std::move(image));
+                            }
+                        }else{
+                            if(root!=map.texture)return fail(d,0x102050);
+                            p.frames.push_back(p.image);
+                        }
+                        bool selected=false;for(const auto& image:p.frames)selected|=image==p.image;
+                        if(!selected)return fail(d,0x102050);
                         effective(descriptor,map.contextAfter249610);
-                        if(!assets::prepareOriginalUiNativeMaterial50KG(descriptor,p.image->decoded,p.textured,d.material))
+                        const bool policy=c.original.textureAnimation ?
+                            assets::prepareOriginalPauseAnimatedMaterial50LA(descriptor,p.image->decoded,
+                                *c.original.textureAnimation,p.textured,d.material) :
+                            assets::prepareOriginalUiNativeMaterial50KG(descriptor,p.image->decoded,p.textured,d.material);
+                        if(!policy)
                             return fail(d,0x249610);
                         p.hasTexture=true;
                     }
@@ -149,7 +179,8 @@ public:
                         assets::OriginalUiTemplate50KG::screenMt,owner_->context_->materialRuntime(),parsed_[i],d.material);
                 }
                 Projection ignored;
-                if(!parsed||!prepare(i,ignored,d)){close();return fail(d,0x247110);}
+                if(!parsed){close();return fail(d,d.material.sourcePC?d.material.sourcePC:0x247110);}
+                if(!prepare(i,ignored,d)){close();return false;}
             }
             prepared_=true;return true;
         }catch(...){close();return fail(d,0x247110);}

@@ -140,24 +140,26 @@ inline bool Owner::constructWorldColdPrefix(std::shared_ptr<g::OriginalApplicati
 // Explicit native ownership retirement, not a26FD80 dispatch or substitute
 // for unrepresented LightManager/context callbacks. The aggregate calls the
 // second leaf only after its actual runtime/GPU/static owners have closed.
-inline bool Owner::canRetireNativeWorldPrefix()const noexcept {
+inline bool Owner::canRetireNativeWorldPrefix(const char** gate)const noexcept {
+    const auto reject=[&](const char* text){if(gate)*gate=text;return false;};
     if(!worldColdConstructed_||!worldApplication_||!worldAudio_||
-       worldApplication_->attachmentLock423F58())return false;
+       worldApplication_->attachmentLock423F58())return reject("world prefix actual owner/lock");
     const auto& e=worldEntity_;const auto& audio=*worldAudio_;
     if(e.reference00!=1||e.previous10||e.next14||e.parent1C||e.firstChild18||e.mask20||e.descendants24||
        e.objectKey!=key(&e)||audio.coldApplication_!=worldApplication_||
        audio.coldSession_!=e.sessionGeneration||audio.coldThread_!=std::this_thread::get_id()||
-       !audio.coldMixer_||audio.coldEpoch_!=audio.coldMixer_->groupEpoch50IC())return false;
-    if(!worldApplication_->entityAuthority_.canRetire(e))return false;
-    if(worldList500_&&worldListCount50C_)return false;
-    if(worldCollisionResources_&&!worldCollisionResources_->canCloseUnloadedBacking())return false;
-    std::uint32_t pc=0;if(!canReleaseWorldCollisionObjects27BB80(pc))return false;
-    if(worldPhysics3D4_&&!worldPhysics3D4_->canRelease27C030())return false;
+       !audio.coldMixer_||audio.coldEpoch_!=audio.coldMixer_->groupEpoch50IC())return reject("world prefix Entity/audio identity");
+    if(!worldApplication_->entityAuthority_.canRetire(e))return reject("world prefix Entity authority");
+    if(worldList500_&&worldListCount50C_)return reject("world prefix nonempty list500");
+    if(worldCollisionResources_&&!worldCollisionResources_->canCloseUnloadedBacking())return reject("world collision backing still loaded");
+    std::uint32_t pc=0;if(!canReleaseWorldCollisionObjects27BB80(pc))return reject("world collision object topology");
+    if(worldPhysics3D4_&&!worldPhysics3D4_->canRelease27C030())return reject("world physics index references");
     const auto& group=audio.coldGroups_[static_cast<std::size_t>(g::RaceAudioGroup50IC::World4D8)];
-    if(group.constructed&&!audio.canReleaseEmptyCold142590(g::RaceAudioGroup50IC::World4D8))return false;
+    if(group.constructed&&!audio.canReleaseEmptyCold142590(g::RaceAudioGroup50IC::World4D8))return reject("world seventh audio group retirement");
     const std::size_t required=1u+std::size_t(group.constructed)+
         (worldCollisionObjects3CC_?worldCollisionObjects3CC_->zones_.size():0u);
-    return worldApplication_->objectCount423F60()>=required;
+    if(worldApplication_->objectCount423F60()<required)return reject("world prefix Application count");
+    return true;
 }
 inline bool Owner::retireNativeWorldPrefixAfterOwnedCleanup(std::uint32_t& pc)noexcept {
     pc=0;

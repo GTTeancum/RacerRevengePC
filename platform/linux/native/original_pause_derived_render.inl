@@ -42,8 +42,14 @@ bool preparePauseDerivedResources(std::shared_ptr<const game::OriginalPauseNativ
         // alpha; never admit a destination-alpha-dependent Pause pass here.
         if(blend==assets::OriginalUiMaterialBlend50KG::destinationAlphaAdditive||depth>3||context)
             return fail(*diagnostic,VehicleWindowError50DS::material,"unsupported original Pause derived raster");
-        if(p->hasTexture&&(h.images[i]>=bank->textureCount()||!positionStatsSampler(p->textured,h.samplers[h.images[i]])))
-            return fail(*diagnostic,VehicleWindowError50DS::material,"unsupported original Pause sampler");
+        if(p->hasTexture){
+            const auto* frames=h.owner->frameImages(i);
+            if(!frames||frames->empty()||h.images[i]>=bank->textureCount())
+                return fail(*diagnostic,VehicleWindowError50DS::material,"missing original Pause frame bank");
+            for(const auto image:*frames)
+                if(image>=bank->textureCount()||!positionStatsSampler(p->textured,h.samplers[image]))
+                    return fail(*diagnostic,VehicleWindowError50DS::material,"unsupported original Pause sampler");
+        }
     }
     // A texture-feedback path is needed only for this native private target.
     // Do not change the already compiled UI program's coherent-fetch variant.
@@ -117,6 +123,12 @@ bool preparePauseDerivedFrame(const game::OriginalPauseNativeDraw50LA* owner) no
     for(U p=0;p<source.packetCount;++p){const auto& packet=source.packets[p];
         if(packet.material>=h.policies.size()||!h.policies[packet.material]||!h.policies[packet.material]->enabled||packet.leaf<0||!packet.count||
            packet.first>source.quadCount||packet.count>source.quadCount-packet.first)return false;
+        if(h.policies[packet.material]->hasTexture){
+            const auto image=owner->image(packet.material);
+            const auto* bank=owner->pixels();
+            if(!bank||image>=bank->textureCount())return false;
+            h.images[packet.material]=image;
+        }
         for(U q=packet.first;q<packet.first+packet.count;++q){
             if(covered[q])return false;covered[q]=true;
             const auto& quad=source.quads[q];const auto& policy=*h.policies[packet.material];
@@ -218,7 +230,8 @@ bool deletePauseDerivedNames(VehicleWindowDiagnostic50DS& d) noexcept {
         if(!d.cleanupGlError)d.cleanupGlError=td.glError?td.glError:td.cleanupGlError;}
     if(!deleteName(h.target,gl.deleteFramebuffers,d)||!deleteName(h.color,gl.deleteTextures,d)||
         !deleteName(h.depth,gl.deleteRenderbuffers,d))return false;
-    // Whole-renderer close or failed-bind cleanup has completed glFinish.
+    // Whole-renderer close, explicit binding retirement or failed-bind cleanup
+    // has completed glFinish.
     // Release the strong canonical owner only after acknowledged name retirement.
     pauseDerived.reset();return true;
 }

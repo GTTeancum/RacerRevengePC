@@ -980,6 +980,7 @@ public:
     bool bindOriginalPositionStats(std::shared_ptr<game::OriginalPositionStatsNativeOwner50LA>,
         VehicleWindowDiagnostic50DS&) noexcept;
     // Retains original derived Pause resources through checked GPU cleanup.
+    bool retireOriginalPauseDerived(VehicleWindowDiagnostic50DS&) noexcept;
     bool bindOriginalPauseDerived(std::shared_ptr<game::OriginalPauseNativeDraw50LA>,VehicleWindowDiagnostic50DS&) noexcept;
     // Retains the detached Damage canonical owner through checked GPU cleanup.
     // One authentic dmgradar PST; no replacement material or player identity.

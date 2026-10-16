@@ -11,6 +11,8 @@ class Owner final {
     std::shared_ptr<rr::game::OriginalRaceConstructor50LA> race_;
     bool attempted_=false;
 public:
+    rr::platform::AudioOutputDiagnostic50HD closeAudioDiagnostic;
+    rr::assets::OriginalStandardMaterialDiagnostic50LA closeMaterialDiagnostic;
     Owner(const original_main_entry50KG::Application& app,live_audio50HF::Owner& audio)noexcept
         :application_(app),audio_(audio){}
     Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
@@ -39,11 +41,10 @@ public:
     const std::shared_ptr<rr::game::OriginalRaceConstructor50LA>& race()const noexcept {return race_;}
     bool close()noexcept {
         if(!attempted_)return true;
-        rr::platform::AudioOutputDiagnostic50HD audioDiagnostic;
-        if(!audio_.close(audioDiagnostic))return false;
+        closeAudioDiagnostic={};closeMaterialDiagnostic={};
+        if(!audio_.close(closeAudioDiagnostic))return false;
         if(race_){
-            rr::assets::OriginalStandardMaterialDiagnostic50LA d;
-            if(!application_.closeNativeConsumedRace(*race_,d))return false;
+            if(!application_.closeNativeConsumedRace(*race_,closeMaterialDiagnostic))return false;
             race_.reset();
         }
         return true;

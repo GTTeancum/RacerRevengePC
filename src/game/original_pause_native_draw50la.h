@@ -31,13 +31,15 @@ private:
     assets::MaterialTextureAssets50EA pixels_;
     std::array<Resources::Projection,36> policies_;
     std::array<std::uint32_t,maximumMaterials> images_{};
+    std::array<std::vector<std::uint32_t>,maximumMaterials> frameImages_;
     std::unique_ptr<Frame> frame_;
     OriginalCameraViewportFields rasterViewport_;
     const OriginalCameraViewportFields* sourceViewport_=nullptr;
     bool ready_=false;
     static bool samePolicy(const Resources::Pass& a,const Resources::Pass& b)noexcept {
-        if(a.enabled!=b.enabled||a.hasTexture!=b.hasTexture||a.image!=b.image)return false;
+        if(a.enabled!=b.enabled||a.hasTexture!=b.hasTexture||a.frames!=b.frames)return false;
         if(!a.enabled)return true;
+        if(a.hasTexture&&a.textured.maximumVertexAlpha!=b.textured.maximumVertexAlpha)return false;
         const auto& x=a.canonical;const auto& y=b.canonical;
         if(x.origin.finalLeaf!=y.origin.finalLeaf||x.final.maps!=y.final.maps||x.final.uv!=y.final.uv)return false;
         const auto& xs=a.hasTexture?x.maps[0].contextAfter249610:x.final.state;
@@ -50,11 +52,19 @@ private:
     bool append(std::size_t reference,const Quad* quads,std::size_t count,Frame& f,Resources::Diagnostic& d){
         if(!count)return true;
         Resources::Projection fresh;
-        if(!resources_.prepare(reference,fresh,d)||fresh.passes.size()!=policies_[reference].passes.size())return false;
+        if(!resources_.prepareEmission(reference,fresh,d)||fresh.passes.size()!=policies_[reference].passes.size())return false;
         for(std::size_t p=0;p<fresh.passes.size();++p){
             const auto& pass=fresh.passes[p];
             if(!samePolicy(pass,policies_[reference].passes[p]))return false;
             if(!pass.enabled)continue;
+            if(pass.hasTexture){
+                const auto material=reference*4+p;
+                bool found=false;
+                for(std::size_t i=0;i<pass.frames.size();++i)if(pass.frames[i]==pass.image){
+                    images_[material]=frameImages_[material][i];found=true;break;
+                }
+                if(!found)return false;
+            }
             if(f.packetCount>=maximumPackets||count>maximumQuads-f.quadCount)return false;
             const auto first=f.quadCount;
             for(std::size_t q=0;q<count;++q){
@@ -93,10 +103,15 @@ public:
                 if(!resources_.prepare(r,policies_[r],d)||policies_[r].passes.size()>4)return false;
                 for(std::size_t p=0;p<policies_[r].passes.size();++p){const auto& pass=policies_[r].passes[p];
                     if(!pass.enabled||!pass.hasTexture)continue;
-                    images_[r*4+p]=static_cast<std::uint32_t>(inputs.size());
-                    // Native bank identity is the exact reference/pass ordinal,
-                    // not a fabricated source resource ID. Bytes remain original.
-                    inputs.push_back({r*4+p+1,&pass.image->decoded.base_rrtex});
+                    for(const auto& image:pass.frames){
+                        if(inputs.size()>=maximumMaterials)return false;
+                        const auto index=static_cast<std::uint32_t>(inputs.size());
+                        frameImages_[r*4+p].push_back(index);
+                        if(image==pass.image)images_[r*4+p]=index;
+                        // Immutable native bank ordinal; original child identity
+                        // and exact PST extent remain retained in pass.frames.
+                        inputs.push_back({inputs.size()+1,&image->decoded.base_rrtex});
+                    }
                 }
             }
             assets::MaterialTextureAssetsInput50EA input;
@@ -114,6 +129,9 @@ public:
         return current()&&i<maximumMaterials&&i%4<policies_[i/4].passes.size()?&policies_[i/4].passes[i%4]:nullptr;
     }
     std::uint32_t image(std::size_t i)const noexcept{return i<maximumMaterials?images_[i]:assets::unresolvedMaterialTexture50EA;}
+    const std::vector<std::uint32_t>* frameImages(std::size_t i)const noexcept {
+        return current()&&i<maximumMaterials?&frameImages_[i]:nullptr;
+    }
     const Frame* frame()const noexcept{return current()?frame_.get():nullptr;}
     bool prepareDerived(const OriginalPauseLayout50LA::Commands& commands,
         const OriginalCameraViewportFields& viewport,std::uint64_t publication,Resources::Diagnostic& d)noexcept {

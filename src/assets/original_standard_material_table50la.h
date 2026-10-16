@@ -198,6 +198,8 @@ public:
 private:
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class rr::game::OriginalPauseMaterialAdmission50LA;
+    bool serviceRetainedScreenPrototype24A740(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t,std::size_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool canRetireNativeCollector29C300()const noexcept;
     void retireNativeCollector29C300()noexcept;
     bool pinNativeCollector(const OriginalStandardMaterialCollectorReceipt50LA&) noexcept;

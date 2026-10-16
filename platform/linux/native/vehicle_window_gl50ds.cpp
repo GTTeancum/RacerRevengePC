@@ -5580,6 +5580,20 @@ bool VehicleWindowGl50DS::bindOriginalDamage(std::shared_ptr<game::OriginalDamag
         fail(d,VehicleWindowError50DS::material,"original Damage optional cold join rejected");
     return accepted;
 }
+bool VehicleWindowGl50DS::retireOriginalPauseDerived(VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};
+    if(!storage_||!storage_->pauseDerived)return true;
+    if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"Pause retirement requires its live renderer");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(s.active||s.frameSet||s.diagnostic)
+        return fail(d,VehicleWindowError50DS::frame,"Pause retirement requires idle renderer");
+    s.diagnostic=&d;
+    bool okay=s.check("before original Pause binding retirement");
+    if(okay){s.gl.finish();okay=s.check("drain original Pause binding work");}
+    if(okay)okay=s.deletePauseDerivedNames(d);
+    s.diagnostic=nullptr;
+    return okay;
+}
 bool VehicleWindowGl50DS::bindOriginalPauseDerived(std::shared_ptr<game::OriginalPauseNativeDraw50LA> owner,
     VehicleWindowDiagnostic50DS& d) noexcept {
     d={};if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"renderer not initialized");

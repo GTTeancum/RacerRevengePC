@@ -779,7 +779,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    reportHost50DU(hostDiagnostic);throw std::runtime_error("window/context creation failed");
   }
  };
+ // First usable scope is the explicit muted consumed ALL8 RA spectator route.
+ // Source command25 audible-feedback semantics remain unsupported; preserve
+ // every counted group state rather than invent an Auxiliary pause exemption.
+ const char* spectatorAudioPolicy=std::getenv("RR_AUDIO");
+ const bool sourceConsumedPauseActivation=consumedLaunch&&isRaTrack&&allAiEnabled&&
+     originalCameraEnabled&&spectatorAudioPolicy&&std::string(spectatorAudioPolicy)=="0";
  original_consumed_ra_stage50DU::Owner consumedRaStage(originalMainApplication,*liveAudio);
+ original_pause_cold50LA::Owner sourcePause;
+ original_pause_observation50LA::Owner sourcePauseObservation;
+ std::shared_ptr<const ra_cold_sources50LA::DecodedSources> sourcePauseTrack;
+ bool sourcePauseParentAttached=false;
  // Permanent original-resource owners precede the snapshot bank and all draw
  // publications. Only their immutable borrowed views enter the live arena.
  original_position_stats_prestage50LA::Owner sourcePositionStatsPrestage;
@@ -975,13 +985,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    originalMainApplication.appStart(originalMainApplication.assetRoot);
    originalMainApplication.enterGameplayMaterialDirectory17D7A0();
    const auto context=nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication);
-   if(!context)return false;
+   const auto domain=originalMainApplication.standardMaterialDomain();
+   if(!context||!domain||!domain->prepared())return false;
    if(!sourceModelRenderGlobals)sourceModelRenderGlobals=
        std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
    rr::assets::OriginalStandardMaterialDiagnostic50LA d;std::uint32_t pc=0;
-   return consumedRaStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
+   const bool ready=consumedRaStage.begin(*consumedLaunch,sessionIndex+1,playerRacer60,
        *sourceModelRenderGlobals,raWorld,d,pc);
+   if(!ready)std::cerr<<"consumed_ra_prefix_rejected source_pc="<<pc
+       <<" material_pc="<<d.sourcePC<<" material_status="<<static_cast<unsigned>(d.status)<<'\n';
+   return ready;
   };
+  if(raColdReady&&sourceConsumedPauseActivation)require50DU(beginConsumedRaPrefix(),
+      "actual consumed RA constructor prefix rejected");
   const bool raStorageReady=raColdReady&&
       raWorld->prepareRuntimeRosterQueryStorage(originalMainApplication.entities(),roster,&recoveryQueryOwners,recoveryGlobals,
           terrainOwner,movement,{},raDiagnostic);
@@ -1498,6 +1514,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::unique_ptr<gc_gate_audio50IN::Owner> gaGateAudio,gcGateAudio;
  SpeechPosition50HG audioListener{};bool audioListenerReady=false;
  std::uint64_t speechEvents=0,speechCues=0,announcerRequestsUnjoined=0;
+ if(consumedRaStage.race()&&!audioEnabled)require50DU(liveAudio->finishCountedMutedGroups(loadedAudioSettings),
+     "actual counted muted audio group settings rejected");
  if(originalCameraEnabled&&!audioEnabled)require50DU(sourceCameraCycleAudio.prepareMuted(),
      "explicit muted camera cycle owner rejected");
  if(audioEnabled){
@@ -1521,8 +1539,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto* audioGroups=liveAudio->groupsForProviders();
   auto* sharedAnnouncer=liveAudio->sharedAnnouncer();
   require50DU(audioGroups&&sharedAnnouncer,"shared native audio group/episode owner unavailable");
-  if(originalCameraEnabled)require50DU(materialMixer&&sourceCameraCycleAudio.prepare(
-      runtime_asset_paths50LB::resolve("work/native/project/disc"),audioRoot,*materialMixer,*audioGroups,audioError),
+  if(originalCameraEnabled)require50DU(materialMixer&&(consumedRaStage.race()?
+      sourceCameraCycleAudio.preparePauseFeedback(runtime_asset_paths50LB::resolve("work/native/project/disc"),
+          audioRoot,*materialMixer,*audioGroups,audioError):
+      sourceCameraCycleAudio.prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),
+          audioRoot,*materialMixer,*audioGroups,audioError)),
       audioError.empty()?"original camera cycle audio owner unavailable":audioError.c_str());
   if(isGaTrack){
    gaGateAudio=std::make_unique<gc_gate_audio50IN::Owner>();
@@ -4052,6 +4073,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        originalMainApplication.assetRoot,raMaterialContext,sourcePositionStatsPrestageDiagnostic),
        sourcePositionStatsPrestageDiagnostic.failure?sourcePositionStatsPrestageDiagnostic.failure:
        "RA PositionStats native source preload rejected");
+   if(consumedRaStage.race())require50DU(originalMainApplication.prewarmPauseCold50LA(sourcePause),
+       "actual Pause canonical prewarm rejected");
    require50DU(raWorld->mountRetainedRuntimeRosterArchives(originalMainApplication,raDiagnostic),
        raDiagnostic.failure?raDiagnostic.failure:"RA roster archive mounting rejected");
    std::array<std::vector<std::uint8_t>,6> crowdImages;
@@ -4065,7 +4088,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        nativeEffects,nativeEffectCount,resetEffectBindings,resetEffectState,resetEffectWorkspace,
        originalRecoveryModels,terrainBindings,coldFlame,nativeOrdinaryLaunch11258};
    const bool raSessionReady=raSession->construct(arena,raFreshProbe,{endpoints,endpointScenes,movementSource},
-       raMaterialContext,crowdImages,raSessionDiagnostic,nativeRosterOwners);
+       raMaterialContext,crowdImages,raSessionDiagnostic,nativeRosterOwners,
+       consumedRaStage.race().get(),consumedRaStage.race()?&sourcePause:nullptr);
    if(!raSessionReady){
     auto text=[](const char* p){return p?p:"";};
     std::cerr<<"RA session failure operation="<<text(raSessionDiagnostic.operation)
@@ -4076,6 +4100,21 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       <<" roster_stage="<<text(raSessionDiagnostic.roster.stage)
       <<" slot="<<raSessionDiagnostic.roster.slot
       <<" detail="<<raSessionDiagnostic.roster.detail<<'\n';
+    const auto& material=raSessionDiagnostic.aggregate.world.material;
+    rr::assets::OriginalStandardMaterialRowView50LA materialRow;
+    rr::assets::OriginalStandardTextureRowView50LA textureRow;
+    const auto failureDomain=originalMainApplication.standardMaterialDomain();
+    const bool hasMaterial=failureDomain->materials382B38()->row(material.row,materialRow);
+    const bool hasTexture=material.texture.row>=0&&material.texture.row<=32767&&
+        failureDomain->textures383400()->row(static_cast<std::int16_t>(material.texture.row),textureRow);
+    std::cerr<<"ra_population_diagnostic status="<<static_cast<unsigned>(material.status)
+        <<" pc="<<material.sourcePC<<" row="<<material.row
+        <<" name="<<(hasMaterial&&materialRow.name00?*materialRow.name00:std::string{})
+        <<" field="<<text(material.field)<<" pass="<<material.pass
+        <<" texture_status="<<static_cast<unsigned>(material.texture.status)
+        <<" texture_pc="<<material.texture.sourcePC<<" texture_row="<<material.texture.row
+        <<" texture_name="<<(hasTexture&&textureRow.name00?*textureRow.name00:std::string{})
+        <<" texture_offset="<<material.texture.byteOffset<<'\n';
     require50DU(false,raSessionDiagnostic.failure?raSessionDiagnostic.failure:"RA actual cold session construction failed");
    }
    require50DU(originalMainApplication.finishTimeStatsNativeCold50LA(sourceTimeStats),
@@ -4941,27 +4980,70 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
 
  bool restartRequested=false,returnOriginalMainRequested=false;
  auto closeWindow=[&](){
+  const auto closeRejected=[&](const char* gate){
+   std::cerr<<"native_close_rejected gate="<<gate
+       <<" renderer_error="<<static_cast<unsigned>(rendererDiagnostic.error)
+       <<" renderer_operation="<<(rendererDiagnostic.operation?rendererDiagnostic.operation:"")
+       <<" renderer_cleanup_incomplete="<<rendererDiagnostic.cleanupIncomplete
+       <<" position_error="<<static_cast<unsigned>(sourcePositionStatsResources.diagnostic.error)
+       <<" position_material_status="<<static_cast<unsigned>(sourcePositionStatsResources.diagnostic.material.status)
+       <<" position_material_pc="<<sourcePositionStatsResources.diagnostic.material.sourcePC
+       <<" consumed_material_status="<<static_cast<unsigned>(consumedRaStage.closeMaterialDiagnostic.status)
+       <<" consumed_material_pc="<<consumedRaStage.closeMaterialDiagnostic.sourcePC
+       <<" consumed_material_field="<<(consumedRaStage.closeMaterialDiagnostic.field?consumedRaStage.closeMaterialDiagnostic.field:"")
+       <<" consumed_audio_error="<<static_cast<unsigned>(consumedRaStage.closeAudioDiagnostic.error)
+       <<" position_pc="<<sourcePositionStatsResources.diagnostic.sourcePC
+       <<" position_renderer_operation="<<(sourcePositionStatsResources.diagnostic.renderer.operation?
+           sourcePositionStatsResources.diagnostic.renderer.operation:"")
+       <<" ra_failure="<<(raSessionDiagnostic.failure?raSessionDiagnostic.failure:"")<<'\n';
+   if(raWorld){const auto& world=raWorld->nativeCloseDiagnostic();
+    std::cerr<<"native_world_close_rejected gate="<<(world.gate?world.gate:"")
+        <<" counted="<<world.counted<<" retire_counted="<<world.retireCounted
+        <<" topology_attempted="<<world.topologyAttempted<<" topology_closed="<<world.topologyClosed
+        <<" camera_borrows="<<world.cameraBorrows<<" world_borrows="<<world.worldBorrows
+        <<" runtime_owners="<<world.runtimeOwners<<" navigation_owners="<<world.navigationOwners
+        <<" lighting_owners="<<world.lightingOwners<<" expected_lighting_owners="<<world.expectedLightingOwners
+        <<" particle_owners="<<world.particleOwners<<" pc="<<world.sourcePC
+        <<" world_refs="<<world.worldReferences<<" world_flags="<<world.worldFlags<<" world_mask="<<world.worldMask<<'\n';
+   }
+   return false;
+  };
+  const auto closeAccumulated=[](const char* gate){
+   std::cerr<<"native_close_accumulated gate="<<gate<<'\n';return false;
+  };
+  if(sourcePauseParentAttached){
+   original_pause_observation50LA::Owner::Diagnostic pauseCloseDiagnostic;
+   if(!sourcePauseObservation.closeNativeSpectatorMenuForShutdown(pauseCloseDiagnostic)){
+    std::cerr<<"native_pause_shutdown_rejected pc="<<pauseCloseDiagnostic.sourcePC<<'\n';
+    return closeRejected("pause_shutdown_callback");
+   }
+   sourcePauseParentAttached=false; // Actual close completed; native graph cleanup follows.
+  }
+  // Retire the actual Pause GPU borrow and FINAL pin before any HUD material
+  // releases. Keep the renderer/context live for PositionStats' own drains.
+  if(!renderer.retireOriginalPauseDerived(rendererDiagnostic))return closeRejected("if(!renderer.retireOriginalPauseDerived(rendererDiagnostic))");
+  if(!sourcePause.retireDrawing())return closeRejected("if(!sourcePause.retireDrawing())");
   if(sourcePositionStatsResources.owner&&
-     !sourcePositionStatsResources.owner->close(sourcePositionStatsResources.diagnostic))return false;
+     !sourcePositionStatsResources.owner->close(sourcePositionStatsResources.diagnostic))return closeRejected("!sourcePositionStatsResources.owner->close(sourcePositionStatsResources.diagnostic))");
   if(sourcePositionStatsPrimitives.owner&&
-     !sourcePositionStatsPrimitives.owner->close(sourcePositionStatsPrimitives.diagnostic))return false;
-  // Future primitive owners must retire first; a failure preserves every backing.
-  if(!sourceDisplayLifetime->beginCloseAfterDependents())return false;
+     !sourcePositionStatsPrimitives.owner->close(sourcePositionStatsPrimitives.diagnostic))return closeRejected("!sourcePositionStatsPrimitives.owner->close(sourcePositionStatsPrimitives.diagnostic))");
+  // Counted race/FIFO/world owners also retain the display. Its final close
+  // admission follows their real retirement below, while GL remains current.
   sourcePositionStatsResources.owner.reset();sourcePositionStatsResources.primitive.owner.reset();
   sourcePositionStatsResources.coldResourcesLoaded=false;
   sourcePositionStatsPrimitives.owner.reset();sourcePositionStatsPrimitives.resourceFragmentLoaded=false;
   bool clean=true;
   if(originalCameraEnabled){
-   if(sourceEndingFade&&!sourceEndingFade->cancelAndRetire())return false;
-   if(sourceFadeIn&&!sourceFadeIn->cancelAndRetire())return false;
-   if(sourceFadeOut&&!sourceFadeOut->cancelAndRetire())return false;
-   if(sourceCameraSession&&sourceCameraSession->abandonAndCloseSpatial().status!=sourceCamera::Status::abandoned)return false;
+   if(sourceEndingFade&&!sourceEndingFade->cancelAndRetire())return closeRejected("if(sourceEndingFade&&!sourceEndingFade->cancelAndRetire())");
+   if(sourceFadeIn&&!sourceFadeIn->cancelAndRetire())return closeRejected("if(sourceFadeIn&&!sourceFadeIn->cancelAndRetire())");
+   if(sourceFadeOut&&!sourceFadeOut->cancelAndRetire())return closeRejected("if(sourceFadeOut&&!sourceFadeOut->cancelAndRetire())");
+   if(sourceCameraSession&&sourceCameraSession->abandonAndCloseSpatial().status!=sourceCamera::Status::abandoned)return closeRejected("if(sourceCameraSession&&sourceCameraSession->abandonAndCloseSpatial().status!=sourceCamera::Status::abandoned)");
    if(isRaTrack){
     sourceCameraSession.reset();
-    if(raSession&&!raSession->retireBeforeBankDestruction(raSessionDiagnostic))return false;
+    if(raSession&&!raSession->retireBeforeBankDestruction(raSessionDiagnostic))return closeRejected("if(raSession&&!raSession->retireBeforeBankDestruction(raSessionDiagnostic))");
    }
-   if(!nativeTaParticles.close())return false;
-   if(renderer.initialized()&&!renderer.clearGameplayBlurStrengths(rendererDiagnostic))return false;
+   if(!nativeTaParticles.close())return closeRejected("if(!nativeTaParticles.close())");
+   if(renderer.initialized()&&!renderer.clearGameplayBlurStrengths(rendererDiagnostic))return closeRejected("if(renderer.initialized()&&!renderer.clearGameplayBlurStrengths(rendererDiagnostic))");
   }
   // The coordinator retires Rider source owners through its live renderer,
   // then closes the renderer before releasing session/texture owners. A host
@@ -4971,7 +5053,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    // failure. With no coordinator borrow, preserve renderer-first cleanup.
    if(!originalMain.coordinator.borrowsRenderer(renderer)&&
       renderer.ownsResources()&&!renderer.close(rendererDiagnostic)){
-    clean=false;
+    clean=closeAccumulated("coordinator_renderer_close");
     // Retry cleanup while its context and both texture owners are still live.
     // Never unwind into bank destructors while the renderer retains a borrow.
     if(!renderer.close(rendererDiagnostic)){
@@ -4980,15 +5062,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
    }
    if(!originalMain.closeUi()){
-    clean=false;
+    clean=closeAccumulated("original_main_close_ui");
     if(!originalMain.closeUi()){
      std::cerr<<"original UI bank cleanup remains unresolved; terminating with context retained\n";
      std::terminate();
     }
    }
   }
-  if(!originalMain.closeAudio())clean=false;
-  if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();
+  if(!originalMain.closeAudio())clean=closeAccumulated("if(!originalMain.closeAudio())clean=false;");
+  if(!sourceAnnouncer->reset())clean=closeAccumulated("if(!sourceAnnouncer->reset())clean=false;raceMusic->reset();");raceMusic->reset();
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
   gcGateAudio.reset(); // Stop exclusive GC voice126 before its real mixer/groups.
   gaGateAudio.reset(); // Stop voice126 while its real mixer/groups still live.
@@ -4996,14 +5078,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   originalAiAudio->close();
   sourceCameraCycleAudio.close(); //Retire exclusive voice159 before its actual mixer/output.
   if(!liveAudio->close(audioDiagnostic)){
-   std::cerr<<"audio close failed "<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"audio close failed "<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"audio close failed \"<<static_cast<unsigned>(audioDiagnostic.error)<<'\n';clean=false;");
   }
   if(renderer.ownsResources()&&!renderer.close(rendererDiagnostic)){
-   reportRenderer50DU(rendererDiagnostic);clean=false;
+   reportRenderer50DU(rendererDiagnostic);clean=closeAccumulated("reportRenderer50DU(rendererDiagnostic);clean=false;");
   }
   // Never destroy a context beneath unresolved GPU ownership. Destructors may
   // retry cleanup in the same correct order; neither silently leaks resources.
-  if(renderer.ownsResources())return false;
+  if(renderer.ownsResources())return closeRejected("if(renderer.ownsResources())");
+  if(!sourcePause.retireDrawing())return closeRejected("if(!sourcePause.retireDrawing())");
   // Renderer has retired its strong HUD owner and every pixel/GPU borrow.
   // Release canonical UI refs before later model retirement invalidates leaves.
   sourceTimeStatsRendering=false;
@@ -5013,62 +5096,62 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   sourcePositionStatsRendering=false;sourcePositionStatsHud.reset();
   sourceSpeedBoostRendering=false;sourceSpeedBoost.owner.reset();sourceSpeedBoost.pixels.reset();
   if(gcDynamicWindow.ownsResources()&&!gcDynamicWindow.close(textureDiagnostic)){
-   std::cerr<<"GC dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"GC dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GC dynamic texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
-  if(gcDynamicWindow.ownsResources())return false;
+  if(gcDynamicWindow.ownsResources())return closeRejected("if(gcDynamicWindow.ownsResources())");
   if(gaDynamicWindow.ownsResources()&&!gaDynamicWindow.close(textureDiagnostic)){
-   std::cerr<<"GA dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"GA dynamic texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GA dynamic texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
-  if(gaDynamicWindow.ownsResources())return false;
+  if(gaDynamicWindow.ownsResources())return closeRejected("if(gaDynamicWindow.ownsResources())");
   if(gcAtm.ownsResources()&&!gcAtm.close(textureDiagnostic)){
-   std::cerr<<"GC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"GC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GC ATM texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
-  if(gcAtm.ownsResources())return false;
+  if(gcAtm.ownsResources())return closeRejected("if(gcAtm.ownsResources())");
   if(saDynamicWindow.ownsResources()&&!saDynamicWindow.close(textureDiagnostic)){
-   std::cerr<<"SA dynamic texture cleanup rejected\n";clean=false;
+   std::cerr<<"SA dynamic texture cleanup rejected\n";clean=closeAccumulated("std::cerr<<\"SA dynamic texture cleanup rejected\n\";clean=false;");
   }
-  if(saDynamicWindow.ownsResources())return false;
+  if(saDynamicWindow.ownsResources())return closeRejected("if(saDynamicWindow.ownsResources())");
   if(maSaAtm.ownsResources()&&!maSaAtm.close(textureDiagnostic)){
-   std::cerr<<"MA/SA ATM texture cleanup rejected\n";clean=false;
+   std::cerr<<"MA/SA ATM texture cleanup rejected\n";clean=closeAccumulated("std::cerr<<\"MA/SA ATM texture cleanup rejected\n\";clean=false;");
   }
-  if(maSaAtm.ownsResources())return false;
+  if(maSaAtm.ownsResources())return closeRejected("if(maSaAtm.ownsResources())");
   if(gaAtm.ownsResources()&&!gaAtm.close(textureDiagnostic)){
-   std::cerr<<"GA ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"GA ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GA ATM texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
-  if(gaAtm.ownsResources())return false;
-  if(gcParticleMaterials.ownsResources()&&!gcParticleMaterials.closeGpu(textureDiagnostic))clean=false;
-  if(gcParticleMaterials.ownsResources())return false;
-  if(gameplayBinder.ownsResources()&&!gameplayBinder.close(textureDiagnostic))clean=false;
-  if(gameplayBinder.ownsResources())return false;
+  if(gaAtm.ownsResources())return closeRejected("if(gaAtm.ownsResources())");
+  if(gcParticleMaterials.ownsResources()&&!gcParticleMaterials.closeGpu(textureDiagnostic))clean=closeAccumulated("if(gcParticleMaterials.ownsResources()&&!gcParticleMaterials.closeGpu(textureDiagnostic))clean=false;");
+  if(gcParticleMaterials.ownsResources())return closeRejected("if(gcParticleMaterials.ownsResources())");
+  if(gameplayBinder.ownsResources()&&!gameplayBinder.close(textureDiagnostic))clean=closeAccumulated("if(gameplayBinder.ownsResources()&&!gameplayBinder.close(textureDiagnostic))clean=false;");
+  if(gameplayBinder.ownsResources())return closeRejected("if(gameplayBinder.ownsResources())");
   for(std::size_t index=0;index<raceOpponentCount;++index){
    for(auto* texture:{&opponentGpuTextures[index],&opponentCableGpuTextures[index],
        &opponentSpecularGpuTextures50LA[index]}){
     if(texture->ownsResources()&&!texture->close(textureDiagnostic)){
-     std::cerr<<"original racer texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+     std::cerr<<"original racer texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"original racer texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
     }
-    if(texture->ownsResources())return false;
+    if(texture->ownsResources())return closeRejected("if(texture->ownsResources())");
    }
   }
   if(gpuTextures.ownsResources()&&!gpuTextures.close(textureDiagnostic)){
-   std::cerr<<"texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
-  if(gpuTextures.ownsResources())return false;
+  if(gpuTextures.ownsResources())return closeRejected("if(gpuTextures.ownsResources())");
   if(specularGpuTextures50LA.ownsResources()&&!specularGpuTextures50LA.close(textureDiagnostic)){
-   std::cerr<<"canonical specular texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"canonical specular texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"canonical specular texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
-  if(specularGpuTextures50LA.ownsResources())return false;
+  if(specularGpuTextures50LA.ownsResources())return closeRejected("if(specularGpuTextures50LA.ownsResources())");
   if(trackGpuTextures.ownsResources()&&!trackGpuTextures.close(textureDiagnostic)){
-   std::cerr<<"track texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"track texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"track texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
-  if(trackGpuTextures.ownsResources())return false;
+  if(trackGpuTextures.ownsResources())return closeRejected("if(trackGpuTextures.ownsResources())");
   if(cableGpuTextures.ownsResources()&&!cableGpuTextures.close(textureDiagnostic)){
-   std::cerr<<"cable texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"cable texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"cable texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
-  if(cableGpuTextures.ownsResources())return false;
+  if(cableGpuTextures.ownsResources())return closeRejected("if(cableGpuTextures.ownsResources())");
   if(skyGpuTextures.ownsResources()&&!skyGpuTextures.close(textureDiagnostic)){
-   std::cerr<<"sky texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;
+   std::cerr<<"sky texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"sky texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
-  if(skyGpuTextures.ownsResources())return false;
+  if(skyGpuTextures.ownsResources())return closeRejected("if(skyGpuTextures.ownsResources())");
   // Session retires its attached racers above. Frontend-only exit and a
   // rejected cold material population have no Session, but still own real
   // installed models and may already have canonical flame borrows. Close
@@ -5083,17 +5166,27 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     if(model&&!model->close()){
      std::cerr<<"original model cleanup rejected slot="<<slot-1
          <<" role="<<model->modelRole()<<" source_pc="<<model->failurePC()<<'\n';
-     return false;
+     return closeRejected("original_model_close");
     }
    }
   }
+  if(consumedRaStage.race()){
+   // No frame, reader or model callback is invoked beyond this point. Destroy
+   // actual snapshots before releasing the aggregate's runtime lifetime pin.
+   if(!racerBank.retireNativeBacking())return closeRejected("if(!racerBank.retireNativeBacking())");
+   sourcePauseTrack.reset();raRuntime.reset();
+   if(!consumedRaStage.close())return closeRejected("if(!consumedRaStage.close())");
+  }
+  if(!sourcePause.close())return closeRejected("if(!sourcePause.close())");
+  if(!sourceDisplayLifetime->beginCloseAfterDependents())return closeRejected("if(!sourceDisplayLifetime->beginCloseAfterDependents())");
   if(host.ownsResources()&&!host.close(hostDiagnostic)){
-   reportHost50DU(hostDiagnostic);clean=false;
+   reportHost50DU(hostDiagnostic);clean=closeAccumulated("reportHost50DU(hostDiagnostic);clean=false;");
   }
   if(hostDiagnostic.window.cleanupError==platform::WindowHostError50DQ::ControllerFailure)
    std::cerr<<"SDL final rumble stop was not submitted; native resources were released: "
        <<hostDiagnostic.window.cleanupDetail.data()<<'\n';
   feedbackHost=nullptr;
+  if(!clean)std::cerr<<"native_close_rejected gate=accumulated_cleanup_error\n";
   return clean;
  };
  try {
@@ -5750,7 +5843,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        sourceFadeManagerA8,sourceFadeDuration98,0,0,
        static_cast<std::uint8_t>(originalUiStarted?originalMainApplication.state->globalFlags228:applicationEvents.rootFlags228),
        OriginalCameraDrainPolicy::initializedContext,
-       isRaTrack?nullptr:&sourceTrackFog});
+       isRaTrack?nullptr:&sourceTrackFog,
+       consumedRaStage.race()?&originalMainApplication.applicationMode22C():nullptr});
    if(isRaTrack){
     const auto domain=originalMainApplication.standardMaterialDomain();
     const auto collector=domain->coldCollector14D440();
@@ -5760,7 +5854,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         originalMainApplication.assetRoot,sourcePositionStatsResources);
     if(!staged)std::cerr<<"original_position_stats_stage_rejected message="
         <<sourcePositionStatsResources.failure<<" source_pc="<<sourcePositionStatsResources.diagnostic.sourcePC
-        <<" material_pc="<<sourcePositionStatsResources.material.sourcePC<<'\n';
+        <<" material_pc="<<sourcePositionStatsResources.diagnostic.material.sourcePC
+        <<" material_status="<<static_cast<unsigned>(sourcePositionStatsResources.diagnostic.material.status)<<'\n';
     require50DU(staged,"original PositionStats full resource construction failed");
     require50DU(provider->sealed()&&provider->revision()==revision&&
         domain->materials382B38()->coldCollectorCurrent(collector)&&
@@ -5826,6 +5921,28 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        <<" follow_query_pc="<<sourceFollowQueries->diagnostic().sourcePC
        <<" follow_query="<<sourceFollowQueries->diagnostic().message<<'\n';
    require50DU(prepared.status==sourceCamera::Status::complete,"original camera cold source join rejected");
+   }
+   // Pause draw admission pins FINAL: finish only after every real HUD/camera
+   // resource retain and population call above has completed.
+   if(consumedRaStage.race()&&!originalMainApplication.finishPauseDrawCold50LA(sourcePause)){
+    const auto& d=sourcePause.nativeDiagnostic;
+    std::cerr<<"pause_draw_diagnostic pc="<<d.sourcePC<<" reference="<<d.reference<<" pass="<<d.pass
+        <<" canonical_status="<<static_cast<unsigned>(d.canonical.status)<<" canonical_pc="<<d.canonical.sourcePC
+        <<" canonical_row="<<d.canonical.row<<" canonical_field="<<(d.canonical.field?d.canonical.field:"")
+        <<" material_error="<<static_cast<unsigned>(d.material.error)<<" material_pc="<<d.material.sourcePC
+        <<" material_field="<<d.material.field<<" texture_code="<<d.texture.code<<" texture_detail="<<d.texture.detail<<'\n';
+    require50DU(false,"actual Pause FINAL native draw preparation rejected");
+   }
+   if(consumedRaStage.race()){
+    sourcePauseTrack=raWorld->borrowNativeSource(raWorld,raDiagnostic);
+    require50DU(sourcePauseTrack&&sourcePauseObservation.bind(originalMainApplication,sourcePause.storage())&&
+        sourcePauseObservation.bindRace(sourceCameraSession,sourcePauseTrack),
+        "actual Pause camera/source observation bind rejected");
+    require50DU(renderer.bindOriginalPauseDerived(sourcePause.drawing(),rendererDiagnostic),
+        "actual Pause GPU binding rejected");
+    require50DU(originalMainApplication.attachNativeConsumedRacePause(*consumedRaStage.race(),sourceCameraSession),
+        "actual consumed race/Pause parent attachment rejected");
+    sourcePauseParentAttached=true;
    }
    if(sourceSpeedBoost.owner){
     original_speed_boost_adapter50LA::Owner::Diagnostic adapterDiagnostic;
@@ -6004,6 +6121,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const char* visibilitySetting=std::getenv("RR_CAPTURE_VISIBILITY");
   const bool captureVisibility=visibilitySetting&&std::string(visibilitySetting)=="1";
   platform::OriginalUiControllerNavigation50LA originalUiControllerNavigation;
+  platform::OriginalSpectatorMenuInput50LA spectatorMenuInput;
+  bool spectatorInputActive=false,spectatorClockResetRequired=true;
+  std::uint64_t spectatorUnderlayPublication=0;
+  std::uint64_t spectatorAudioLastNs=0,spectatorAudioCarryNs=0;
+  std::int32_t spectatorUnderlayWidth=0,spectatorUnderlayHeight=0;
+
   bool wasPaused=true,oversizeReported=false;
   const char* baselineSetting=std::getenv("RR_TRACK_FPS_BASELINE");
   require50DU(!baselineSetting||std::string(baselineSetting)=="0"||std::string(baselineSetting)=="1",
@@ -6457,6 +6580,104 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     composePacket(false,input);sampleController(); // Route a final held release before cleanup.
     break;
    }
+   if(sourcePauseParentAttached){
+    if(input.quitRequested)break;
+    const auto& pauseInfo=host.info();
+    const bool active=input.focused&&!input.minimized&&!input.activityLost&&
+        !input.eventBudgetExhausted&&sourceCameraSession&&sourceCameraSession->hasView()&&
+        !sourceCameraSession->pendingDisplayWork()&&spectatorUnderlayPublication&&
+        spectatorUnderlayPublication==sourceCameraSession->publicationCount();
+    platform::OriginalSpectatorMenuInput50LA::Batch menuEdges;
+    require50DU(spectatorMenuInput.observe(input,active,menuEdges),"spectator UI physical snapshot rejected");
+    if(!active)spectatorClockResetRequired=true;
+    if(active&&spectatorClockResetRequired){
+     require50DU(sourcePauseObservation.resetNativePresentationClock(),"spectator UI source clock reset rejected");
+     spectatorClockResetRequired=false;
+    }
+    const bool wasOpen=sourcePauseObservation.nativeSpectatorMenuOpen();
+    for(std::size_t edge=0;edge<menuEdges.count;++edge){
+     auto& event=menuEdges.events[edge];auto& record=menuEdges.records[edge];
+     const bool open=sourcePauseObservation.nativeSpectatorMenuOpen();
+     if(!open&&event.code==8){
+      original_pause_observation50LA::Owner::Diagnostic d;
+      require50DU(sourcePauseObservation.openNativeAll8SpectatorMenu(event,d),"native spectator Pause opening failed");
+     }else if(open&&(event.code==12||event.code==14||event.code==2)){
+      const auto result=event.code==2?sourcePauseObservation.continueRow0(event,record):
+          sourcePauseObservation.pressNavigation1BD7C0(event,record);
+      using Status=original_pause_observation50LA::Owner::NavigationResult::Status;
+      require50DU(result.status==Status::complete||result.status==Status::actionUnavailable,
+          "original Pause navigation failed after source effects");
+     }
+    }
+    // Original Pause owns this admitted route. No host-menu/restart command
+    // or human driving packet may consume the same physical edge.
+    hostInput.pauseRequested=hostInput.resumeRequested=hostInput.menuRequested=false;
+    hostInput.restartRequested=hostInput.checkpointRequested=false;
+    const bool open=sourcePauseObservation.nativeSpectatorMenuOpen();
+    if(wasOpen&&!open){
+     spectatorAudioLastNs=spectatorAudioCarryNs=0;
+     hostClock.pause(monotonicNow50DU());forceSceneRender=true;suppressResumeKeys=true;
+     lastStatusNs=monotonicNow50DU();lastStatusRenderCount=submittedDrawFrames;
+     displayWallTotals.reportAndReset("original_pause_resume");
+     phaseTiming.resetInterval();renderDiagnostics.resetInterval();
+    }
+    if(open){
+     discardTrackBaseline();
+     require50DU(sourceCameraInput.sample(input,false,sourceCameraDisplay->rootFlags228),
+         "spectator Pause camera release failed");
+     composePacket(false,input);hostClock.pause(monotonicNow50DU());wasPaused=true;
+     if(!wasOpen||!spectatorInputActive){stopFeedbackTransport();sampleController();}
+     // Native UI audio uses elapsed host time, never a committed world step.
+     // The explicit muted ALL8 route still owns a live logical mixer/output.
+     if(audioEnabled&&liveAudio->outputOpen()){
+      if(!active){
+       liveAudio->pause(true);spectatorAudioLastNs=spectatorAudioCarryNs=0;
+      }else{
+       liveAudio->pause(false);
+       const auto audioNow=monotonicNow50DU();
+       if(!wasOpen||!spectatorAudioLastNs)spectatorAudioLastNs=audioNow;
+       require50DU(audioNow>=spectatorAudioLastNs,"native menu audio clock regressed");
+       const auto elapsed=audioNow-spectatorAudioLastNs;spectatorAudioLastNs=audioNow;
+       // Match the host's bounded catch-up policy: at most64ms is serviced.
+       // Excess wall time is discarded, never passed to physics or source250.
+       spectatorAudioCarryNs=std::min<std::uint64_t>(64000000,
+           spectatorAudioCarryNs+std::min<std::uint64_t>(elapsed,64000000));
+       while(spectatorAudioCarryNs>=1000){
+        const auto micros=static_cast<std::uint32_t>(std::min<std::uint64_t>(16000,spectatorAudioCarryNs/1000));
+        require50DU(liveAudio->serviceNativeMenuAudio(micros,audioDiagnostic),"native menu audio service rejected");
+        spectatorAudioCarryNs-=std::uint64_t(micros)*1000;
+       }
+      }
+     }
+
+     const bool drawable=active&&pauseInfo.drawableWidth==spectatorUnderlayWidth&&
+         pauseInfo.drawableHeight==spectatorUnderlayHeight;
+     if(drawable){
+      original_pause_observation50LA::Owner::Diagnostic d;
+      OriginalPauseLayout50LA::Diagnostic layout;
+      OriginalPauseNativeResources50LA::Diagnostic draw;
+      require50DU(sourcePauseObservation.prepareNativePresentation(*sourcePause.drawing(),d,layout,draw),
+          "original Pause presentation preparation failed");
+      require50DU(renderer.submitRetainedOriginalPause(*sourcePause.drawing(),
+          pauseInfo.drawableWidth,pauseInfo.drawableHeight,rendererDiagnostic),
+          "original Pause retained-image submission failed");
+      const bool capturePause=host.hasWindow()&&windowCapture.due(windows_capture50LD::Stage::other,false);
+      require50DU(windowCapture.swapAndCapture(renderer,host,capturePause,windowSwaps+1,
+          [&](){return renderer.completeGameplayDisplay(host,hostDiagnostic,completionDiagnostic);}),
+          "original Pause actual display completion failed");
+      if(host.hasWindow())addCounter50DU(windowSwaps);
+      if(capturePause)windowCapture.record(renderer,host,windows_capture50LD::Stage::other,false,
+          J{{"screen","original_pause"},{"window_swaps",windowSwaps},{"native_tick",completedFrames},
+            {"camera_publication",spectatorUnderlayPublication},{"all_original_ai",allAiEnabled},
+            {"original_ai_count",originalAiOpponentCount},{"human_count",originalAiHumanCount},
+            {"source_pause_open",sourcePauseObservation.nativeSpectatorMenuOpen()},
+            {"native_policy","explicit_muted_all8_spectator_menu"}});
+     }else spectatorClockResetRequired=true;
+     spectatorInputActive=active;
+     captureCommitted();std::this_thread::sleep_for(std::chrono::milliseconds(8));continue;
+    }
+    spectatorInputActive=active;
+   }
    // Unattended relaxes focus only. Hold even source display effects while
    // minimized, event-starved or outside the real drawable capacity.
    if(captureRun.unattended()&&(input.minimized||input.eventBudgetExhausted||
@@ -6552,7 +6773,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    }
    const bool menuWasOpen=sessionMenu.open();
    const auto menuRevision=sessionMenu.revision();
-   if(input.focused&&!input.minimized&&!input.eventBudgetExhausted&&
+   if(!sourcePauseParentAttached&&input.focused&&!input.minimized&&!input.eventBudgetExhausted&&
        (!sourceCameraSession||!sourceCameraSession->pendingDisplayWork())){
     const auto action=sessionMenu.poll(hostInput,!recoveryPaused&&s.phase==VehicleFramePhase49W::Ready);
     // Only accepted explicit native menu commands map to Application11C.
@@ -7189,6 +7410,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        (plan.steps||input.resized||!presenter.hasPublished||capturePending||forceSceneRender||
         (sourceCameraSession&&renderedCameraPublication!=sourceCameraSession->publicationCount()))){
     phase_timing50GK::Scope renderTiming(phaseTiming,phase_timing50GK::Phase::RenderPrepareSubmit);
+    if(sourcePauseParentAttached){
+     original_pause_observation50LA::Owner::Diagnostic d;
+     OriginalPauseLayout50LA::Diagnostic layout;OriginalPauseNativeResources50LA::Diagnostic draw;
+     require50DU(sourcePauseObservation.prepareNativePresentation(*sourcePause.drawing(),d,layout,draw),
+         "original disabled Pause presentation clock rejected");
+    }
+
     {
      render_diagnostics50GQ::Scope censusTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::Census);
      renderDiagnostics.observeScene(s,completedFrames);
@@ -7834,6 +8062,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       if(!displayAccepted)displayWallTotals.reportAndReset("failure");
       require50DU(displayAccepted,"original camera actual displayed image/history completion failed");
       actualGameplayImageCompleted=true;
+      if(sourcePauseParentAttached){
+       spectatorUnderlayPublication=sourceCameraSession->publicationCount();
+       spectatorUnderlayWidth=info.drawableWidth;spectatorUnderlayHeight=info.drawableHeight;
+      }
+
       if(host.hasWindow())addCounter50DU(windowSwaps);
       // This receipt excludes private unswapped underlays, fades, menu frames,
       // CPU loop iterations, and ordinary queued renderer submissions.
@@ -8224,6 +8457,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   throw;
  }
+ const auto closedNavigationAnchor=originalUiActive?0u:static_cast<unsigned>(
+     navigationMap->nodeIndex78[navigationProgress.reset.vehicleC8C]);
+ const auto closedMainZone=originalUiActive?0:mainMembership.storage.links[0].zone;
+ const auto closedSecondaryZone=originalUiActive?0:secondaryMembership.storage.links[0].zone;
  bool windowClosed=closeWindow();
  if(originalCameraEnabled&&!windowClosed){
   windowClosed=closeWindow();
@@ -8255,13 +8492,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
           <<" collected_calls="<<collectedCalls<<" peak_collected="<<peakCollected
           <<" main_contact_ticks="<<mainContactFrames<<" secondary_contact_ticks="<<secondaryContactFrames
           <<" repair_active_ticks="<<repairActiveTicks
-          <<" main_primary_zone="<<mainMembership.storage.links[0].zone
-          <<" secondary_primary_zone="<<secondaryMembership.storage.links[0].zone
+          <<" main_primary_zone="<<closedMainZone
+          <<" secondary_primary_zone="<<closedSecondaryZone
           <<" main_crossed_portals="<<mainCrossedPortals<<" secondary_crossed_portals="<<secondaryCrossedPortals
           <<" nav_C80="<<navigationProgress.reset.vehicleC80<<" nav_C84="<<navigationProgress.vehicleC84
           <<" nav_C88="<<navigationProgress.reset.vehicleC88<<" nav_C8C="<<navigationProgress.reset.vehicleC8C
-          <<" nav_anchor_index78="<<static_cast<unsigned>(
-              navigationMap->nodeIndex78[navigationProgress.reset.vehicleC8C])
+          <<" nav_anchor_index78="<<closedNavigationAnchor
           <<" nav_updates="<<navigationUpdates<<" nav_gate_skips="<<navigationGateSkips
           <<" nav_CA0_copies="<<navigationCA0Copies
           <<" nav_map_sequential="<<navigationMapSequential<<" nav_AI_sequential="<<navigationAISequential

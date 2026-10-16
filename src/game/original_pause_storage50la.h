@@ -70,6 +70,11 @@ class OriginalPauseStorage50LA final {
         // Parent/sibling attachment is allowed, but this owner's source child
         // tree is genuinely empty. Reject future children rather than skipping
         // their potentially overriding enable/disable callbacks.
+        bool currentForest()const noexcept {
+            return initialized&&!releasing&&application&&!application->attachmentLock423F58()&&
+                application->entityAuthority_.canRetire(component)&&
+                original_entity_chain_detail50LA::forest(application->entityAuthority_.view());
+        }
         bool setActivity141630(bool enabled)noexcept {
             if(!initialized||releasing||!application||!application->application10()||
                application->attachmentLock423F58()||component.firstChild18||
@@ -705,6 +710,7 @@ private:
     //1BA130 initializes both genuine Pause fields to zero. Future input
     //callbacks own changes; no public host-selection/player setter exists.
     std::uint32_t selection880_=0,controller884_=0;
+    std::uint32_t active200_=0; //1BA29C genuine derived constructor store.
     std::int32_t subtype11258_=0; //Actual value consumed during derived load.
     //1BA1C4/1DC/1E4 constructor stores; parent callbacks alone own transitions.
     float opening30_=.25f,transition164_=0.f;
