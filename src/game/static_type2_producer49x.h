@@ -56,6 +56,10 @@ struct Type2StaticCandidate49X {
     // for shape5/6. Original action/reciprocal state lives in this shared owner.
     NativeTriggerGroup50GA* nativeTriggers=nullptr;
     std::size_t nativeTriggerIndex=0;
+    // RA originals only: current authored COL segments against the authored
+    // sphere, never the historical108E90 triangle/descriptor interpretation.
+    // No previous matrix or swept surface. Default leaves all other tracks alone.
+    bool raOriginalTriggerSegments=false;
     NativeTriggerBox50MA nativeTriggerBox{}; // shape6 only, inline immutable geometry
 };
 struct Type2WorkItem49X { std::uint16_t queryTag,targetTag; };

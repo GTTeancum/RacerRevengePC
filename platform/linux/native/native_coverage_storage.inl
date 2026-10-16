@@ -12,6 +12,7 @@
         }
     } coverageLive, coverageSpare;
     U coverageProgram=0,coverageVertex=0,coverageFragment=0,coverageArray=0;
+    I coverageRaCompositionUniform=-1;
     I coveragePayloadUniform=-1,coverageDepthUniform=-1,coverageDestinationUniform=-1;
     bool hasCoverageResources() const noexcept {
         return coverageLive.owns()||coverageSpare.owns()||coverageProgram||
@@ -113,7 +114,7 @@
             gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
             if(!coverageComplete())return false;
         }
-        if(hasSpecularPairs50LA){
+        if(hasSpecularPairs50LA || request.raStaticWorld){
             if(!coverageFramebuffer(e.snapshot)||
                !coverageTextureStorage(e.snapshotColor,rgba8,width,height,true,colorAttachment))return false;
             gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
@@ -154,6 +155,7 @@ void main(){
 }
 )GLSL";
         constexpr const char* fragment=R"GLSL(#version 400 core
+uniform int raComposition;
 uniform sampler2D payloadImage;
 uniform sampler2D depthImage;
 uniform sampler2DMS destinationImage;
@@ -166,7 +168,9 @@ void main(){
     // A static SampleID use requires separate invocations for every sample.
     // Geometry coverage came from the original AA0 triangle's center raster.
     vec4 destinationByte=floor(clamp(texelFetch(destinationImage,pixel,gl_SampleID)*255.0,0.0,255.0)+0.5);
-    sourceByte.rgb=clamp(floor(sourceByte.rgb*destinationByte.a/128.0)+destinationByte.rgb,0.0,255.0);
+    sourceByte.rgb=raComposition!=0 ?
+        clamp(destinationByte.rgb+floor((sourceByte.rgb-destinationByte.rgb)*sourceByte.a/128.0),0.0,255.0) :
+        clamp(floor(sourceByte.rgb*destinationByte.a/128.0)+destinationByte.rgb,0.0,255.0);
     composedColor=sourceByte/255.0;
 }
 )GLSL";
@@ -182,19 +186,26 @@ void main(){
             diagnostic->shader.log[sizeof(diagnostic->shader.log)-1]='\0';
             check("read coverage composition link log");
             return fail(*diagnostic,VehicleWindowError50DS::shader,"coverage composition link failed");}
+        coverageRaCompositionUniform=shaderGl.getUniformLocation(coverageProgram,"raComposition");
         coveragePayloadUniform=shaderGl.getUniformLocation(coverageProgram,"payloadImage");
         coverageDepthUniform=shaderGl.getUniformLocation(coverageProgram,"depthImage");
         coverageDestinationUniform=shaderGl.getUniformLocation(coverageProgram,"destinationImage");
         gl.genVertexArrays(1,&coverageArray);
         if(!check("locate coverage composition inputs and array")||!coverageArray||
-           coveragePayloadUniform<0||coverageDepthUniform<0||coverageDestinationUniform<0)
+           coverageRaCompositionUniform<0||coveragePayloadUniform<0||coverageDepthUniform<0||coverageDestinationUniform<0)
             return fail(*diagnostic,VehicleWindowError50DS::shader,"coverage composition inputs unavailable");
         return true;
     }
-    bool drawCoveragePairTriangle(U bank,U first,U image) noexcept {
+    bool drawCoveragePairTriangle(U bank,U first,U image,const std::array<I,4>& region) noexcept {
+        // A proven empty native clip region cannot touch any destination
+        // sample. Preserve source group order/accounting without GPU work.
+        if(region[2]<=region[0]||region[3]<=region[1])return true;
         I previousArray=0;gl.getIntegerv(0x85B5,&previousArray);
         if(!check("retain source-pair vertex array for coverage bridge"))return false;
-        coverageAa0();gl.disable(0x0C11);gl.disable(0x8DB9);gl.disable(0x0BE2);
+        coverageAa0();gl.disable(0x8DB9);gl.disable(0x0BE2);
+        if(request.raStaticWorld){
+            gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
+        }else gl.disable(0x0C11);
         gl.bindFramebuffer(framebuffer,coverageLive.raster);
         const U outputs[]={colorAttachment,colorAttachment+1};gl.drawBuffers(2,outputs);
         gl.readBuffer(colorAttachment);gl.viewport(0,0,width,height);
@@ -211,13 +222,14 @@ void main(){
         if(accepted){
             gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);gl.readBuffer(colorAttachment);
             gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);gl.drawBuffer(colorAttachment);
-            gl.blitFramebuffer(0,0,width,height,0,0,width,height,colorBufferBit,0x2600);
+            gl.blitFramebuffer(region[0],region[1],region[2],region[3],
+                region[0],region[1],region[2],region[3],colorBufferBit,0x2600);
             accepted=check("copy per-sample destination before ordered map-2 triangle");
         }
         if(accepted){
             gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
             gl.enable(0x809D);gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);
-            gl.useProgram(coverageProgram);drawGl.bindVertexArray(coverageArray);
+            gl.useProgram(coverageProgram);gl.uniform1i(coverageRaCompositionUniform,0);drawGl.bindVertexArray(coverageArray);
             gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
             gl.activeTexture(textureUnit0+1);if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
             gl.activeTexture(textureUnit0+2);if(gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
@@ -234,6 +246,7 @@ void main(){
         gl.useProgram(shader->program());gl.uniform1i(shader->uniforms().sourcePairPass50LA,2);
         drawGl.bindVertexArray(static_cast<U>(previousArray));
         coverageAa0();gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);
+        gl.disable(0x0C11);
         const bool restored=check("restore source-pair state after native coverage bridge");
         return accepted&&restored;
     }

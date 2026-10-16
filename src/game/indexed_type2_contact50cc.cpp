@@ -182,6 +182,9 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
         // Reject stray pointers/indices before any group dereference or write.
         if((candidate.nativeTriggers&&candidate.shapeType!=5&&candidate.shapeType!=6)||
            (!candidate.nativeTriggers&&candidate.nativeTriggerIndex!=0))return Status::InvalidInput;
+        if(candidate.raOriginalTriggerSegments&&
+           (candidate.shapeType!=5||candidate.gate||!candidate.nativeTriggers||candidate.nativeTriggerIndex>=2))
+            return Status::InvalidInput;
         if(candidate.shapeType==5||candidate.shapeType==6){
             if((candidate.shapeType==6&&candidate.gate)||bool(candidate.gate)==bool(candidate.nativeTriggers))return Status::InvalidInput;
             if(candidate.gate){
@@ -303,7 +306,7 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
                 c.filter.identity!=triggerOwner->triggers[candidate.nativeTriggerIndex].collider.identity||
                 nativeTriggerCollider50GA(*triggerOwner,q.filter->identity)==triggerOwner->colliders.size())return Status::UnsupportedScope;
             if(candidate.shapeType==6&&!validNativeTriggerBox50MA(candidate.nativeTriggerBox))return Status::InvalidInput;
-            if(q.nativeGateHasPrevious&&!affine(q.nativeGatePreviousWorld))return Status::InvalidInput;
+            if(!candidate.raOriginalTriggerSegments&&q.nativeGateHasPrevious&&!affine(q.nativeGatePreviousWorld))return Status::InvalidInput;
         }else return Status::UnsupportedScope;
     }
     return Status::Complete;
@@ -361,7 +364,7 @@ static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49
             bool sphereOverlap=false;if(!spheres(query.sphere,c.sphere,sphereOverlap))return Status::InvalidInput;
             // A registered Gate keeps bilateral filtering but its continuous
             // narrowphase may cross while the current endpoint sphere is outside.
-            if((!sphereOverlap&&!((candidate.shapeType==5||candidate.shapeType==6)&&query.nativeGateHasPrevious))||
+            if((!sphereOverlap&&!((candidate.shapeType==5||candidate.shapeType==6)&&!candidate.raOriginalTriggerSegments&&query.nativeGateHasPrevious))||
                !filter(*query.filter,c.filter))continue;
         }
         // validate() admitted this exact shape5/6 group's writable range and
@@ -489,7 +492,7 @@ static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49
             const auto status=visitMesh(*c.geometry.mesh,world,candidate.nodeRadii);
             if(status!=Status::Complete)return status;
         }else if(candidate.shapeType==5||candidate.shapeType==6){
-            const auto* previous=query.nativeGateHasPrevious?&query.nativeGatePreviousWorld:nullptr;
+            const auto* previous=(!candidate.raOriginalTriggerSegments&&query.nativeGateHasPrevious)?&query.nativeGatePreviousWorld:nullptr;
             const bool valid=candidate.shapeType==6
                 ?nativeType2TriggerBoxOverlap50MA(resource,query.worldMatrix,previous,candidate.nativeTriggerBox,candidateHit)
                 :nativeType2GateOverlap50KG(resource,query.worldMatrix,previous,c.sphere,candidateHit);

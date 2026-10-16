@@ -189,6 +189,8 @@ inline HandlingReceipt bindColdHandling(
     state.fields.defenseCF0=receipt.defenseCF0;
     state.fields.repairCF4=receipt.repairCF4;
 
+    if constexpr(!std::is_same_v<ColdOwner,std::nullptr_t>)
+        if(retained)retained->commitMainInertia21488C(live,receipt.authored);
     live.parameters=parameters;live.state=state;
     live.selectors=selectors;live.secondaryInputs=secondary;
     tuning.mainSpring=mainSpring;tuning.mainResponse=mainResponse;

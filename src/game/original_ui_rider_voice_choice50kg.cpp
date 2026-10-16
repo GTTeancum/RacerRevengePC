@@ -14,6 +14,7 @@ constexpr OriginalConfirmRange originalConfirmRanges[]{
     {2,5,2,"Ben Quadinaros"},       // count1E7C98, first1E7DB4
     {4,9,2,"Dud Bolt"},            // count1E7CC0, first1E7DC4
     {7,15,2,"Gasgano"},           // count1E7CFC, first1E7DDC
+    {9,19,2,"Mawhonic"},          // count1E7D1C, first1E7DEC
     {10,21,2,"Aldar Beedo"},       // count1E7D24, first1E7DF4
     {11,23,2,"Ody Mandrell"},      // count1E7D2C, first1E7DFC
     {12,25,2,"Shrivel Braittrand"},// count1E7D34, first1E7E04

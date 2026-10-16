@@ -7,7 +7,7 @@
 // original Confirm event as Enter, at most three times. SA adds one original
 // Next and optionally one Rider Next. Explicit rider/course navigation allows
 // at most 26 Rider Nexts, followed by the original course sequence. GA takes
-// three Course Nexts; Alder/POD10 or Ody/POD11 on MA takes two; Gasgano7/SA takes one.
+// three Course Nexts; Alder/POD10 or Ody/POD11 on MA takes two; Gasgano7/SA takes one; the explicit Mawhonic9/RA fixture takes four.
 // It does not write a profile, select a screen, advance a transition, control a racer, or admit a
 // missing destination. The caller owns the explicit native-window unattended opt-in,
 // shared wall-time deadline, actual framebuffer capture, and normal teardown.
@@ -20,7 +20,7 @@ class Route final {
     bool enabled_=false,awaitingDispatch_=false;
     bool sa_=false,awaitingMove_=false,moved_=false;
     bool occo_=false,awaitingRiderMove_=false,riderMoved_=false;
-    bool selectedRoute_=false,gasganoInitial_=false;
+    bool selectedRoute_=false,gasganoInitial_=false,mawhonicRa_=false;
     std::uint32_t selectedRider_=4;
     std::uint8_t targetCourseMoves_=3;
     std::uint8_t riderMoves_=0,courseMoves_=0;
@@ -51,8 +51,8 @@ class Route final {
         return accepted&&source>priorRiderSource_&&publication&&publication==priorRiderPublication_;
     }
     static bool selectedFreshCourse(const Snapshot& s,unsigned move) noexcept {
-        constexpr std::uint32_t courses[]{0,11,4,8},planets[]{0,4,5,1};
-        return move<4&&s.course.courseSlot14E4==move+1&&
+        constexpr std::uint32_t courses[]{0,11,4,8,7},planets[]{0,4,5,1,2};
+        return move<5&&s.course.courseSlot14E4==move+1&&
             s.course.selectedCourse44==courses[move]&&s.course.selectedPlanet40==planets[move]&&
             s.course.subtypeSlot14F4==1&&s.course.laps14EC==3&&s.course.entrants14F0==8;
     }
@@ -72,8 +72,9 @@ class Route final {
             if(!mainCaptured)return -1;
         }else if(issued_==1){
             require(mainCaptured,"Selected Rider arrived without Main capture");
-            if(gasganoInitial_)require(!riderMoves_&&s.rider.rider4C4==7&&s.rider.slot4C8==10,
-                "Gasgano test profile requires original remembered Rider7/slot10 entry");
+            if(gasganoInitial_||mawhonicRa_)require(!riderMoves_&&s.rider.rider4C4==selectedRider_&&
+                s.rider.slot4C8==(mawhonicRa_?11u:10u),
+                "Explicit test profile requires its original remembered Rider/slot entry");
             else if(!riderMoves_)require(s.rider.rider4C4==19&&s.rider.slot4C8==1,
                 "Selected route requires actual fresh Rider19 entry");
             if(!riderSourceAccepted||!riderSource||!riderPublication)return -1;
@@ -93,15 +94,17 @@ class Route final {
                 awaitingMove_=awaitingDispatch_=true;return 1;
             }
             if(!courseCaptured)return -1;
-            require(courseReady,"Selected course original race prerequisites are unavailable");
+            require(courseReady,mawhonicRa_?
+                "Mawhonic9 / Ryloth Brightlands UI reached course7/planet2/slot5; RA cold target/runtime readiness is unavailable. No race Confirm or substitute dispatched":
+                "Selected course original race prerequisites are unavailable");
         }
         ++issued_;awaitingDispatch_=true;return 4;
     }
 public:
     explicit Route(bool enabled,bool sa=false,bool occo=false,bool dudGa=false,bool benGa=false,bool alderMa=false,
-        bool odyMa=false,bool gasganoSa=false) noexcept:
-        enabled_(enabled),sa_(enabled&&(sa||occo)),occo_(enabled&&occo),selectedRoute_(enabled&&(dudGa||benGa||alderMa||odyMa||gasganoSa)),
-        gasganoInitial_(enabled&&gasganoSa),selectedRider_(gasganoSa?7u:odyMa?11u:alderMa?10u:benGa?2u:4u),targetCourseMoves_(gasganoSa?1u:(alderMa||odyMa)?2u:3u){}
+        bool odyMa=false,bool gasganoSa=false,bool mawhonicRa=false) noexcept:
+        enabled_(enabled),sa_(enabled&&(sa||occo)),occo_(enabled&&occo),selectedRoute_(enabled&&(dudGa||benGa||alderMa||odyMa||gasganoSa||mawhonicRa)),
+        gasganoInitial_(enabled&&gasganoSa),mawhonicRa_(enabled&&mawhonicRa),selectedRider_(mawhonicRa?9u:gasganoSa?7u:odyMa?11u:alderMa?10u:benGa?2u:4u),targetCourseMoves_(mawhonicRa?4u:gasganoSa?1u:(alderMa||odyMa)?2u:3u){}
     bool enabled()const noexcept{return enabled_;}
     std::uint8_t issuedActions()const noexcept{return static_cast<std::uint8_t>(issued_+
         (selectedRoute_?courseMoves_+riderMoves_:(moved_?1u:0u)+(riderMoved_?1u:0u)));}
@@ -140,8 +143,8 @@ public:
         if(s.route.screen==5&&!s.rider.selectedCharacterReady)return false;
         if(selectedRoute_){
             if(s.route.screen==5){
-                if(gasganoInitial_)return !riderMoves_&&!awaitingDispatch_&&issued_==1&&
-                    s.rider.rider4C4==7&&s.rider.slot4C8==10&&settled(s)&&
+                if(gasganoInitial_||mawhonicRa_)return !riderMoves_&&!awaitingDispatch_&&issued_==1&&
+                    s.rider.rider4C4==selectedRider_&&s.rider.slot4C8==(mawhonicRa_?11u:10u)&&settled(s)&&
                     sourceAccepted&&source&&publication;
                 return riderMoves_&&!awaitingDispatch_&&issued_==1&&
                     s.rider.rider4C4==selectedRider_&&settled(s)&&freshOccoSource(sourceAccepted,source,publication);

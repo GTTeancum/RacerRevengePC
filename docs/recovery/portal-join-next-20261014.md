@@ -668,11 +668,13 @@ VisibilityQuadTree family instead.
 
 The fallback443A98 constructor2AEF70 first delegates27E9D0 and finally
 installs3D4580, exact type VisibilityQuadTree(3C02E0 ->3C0230),
-slots44=2B00E0 and48=2B00D0. The source2AF150 call with5000 is exactly
-jr ra/nop; it must not be described as a completed capacity allocation.
+slots44=2B00E0 and48=2B00D0. The source2AF150 call with5000 returns through jr ra with a DELAY-SLOT
+store of A1 to method8C0 (2AF154=AC8508C0). This publishes the requested
+query capacity5000; allocation is deferred to2AF1D0, not completed here.
 
 Complete2B00E0..2B016C invokes its actual slot40, then queries2AF1D0
-using actual currentCamera180/188 and root8C0. The returned physical
+using actual currentCamera180/188 and requested capacity8C0. The actual
+tree root is method94, read at2AF340. The returned physical
 candidate buffer is owner898 and count8A0. It calls27EAF0(owner,
 buffer898,&count8A0), thereby reusing the original flag/type scan and
 selected18 publication without pretending the owner is SearchList.

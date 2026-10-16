@@ -9,6 +9,7 @@ struct OriginalUiCourseWidgetProfile50KG {
     std::uint32_t mode34=0,course700=0,subtype70C=0;
     std::uint8_t flags100BC=0,flags11018=0,flags1125C=0;
     std::array<std::uint8_t,13> courseRecords100C4{};
+    bool mawhonicRylothTest=false;
 };
 enum class OriginalUiCourseWidgetStepKind50KG :std::uint8_t {widget,audioStartLoop11,audioFade1,promptMask42C};
 struct OriginalUiCourseWidgetStep50KG {

@@ -56,6 +56,13 @@ public:
         std::shared_ptr<const assets::OriginalUiArchive50KG> podPhysics,
         OriginalUiRiderProfileDiagnostic50KG&) noexcept;
     bool gasganoTestProfile() const noexcept;
+    // Explicit process-local Mawhonic/Brightlands fixture: rider9 available,
+    // mode0 remembers9, and original course prefix availability is5. No earned
+    // medal/progression or saved state is manufactured; RA runtime stays gated.
+    bool initializeMawhonicRylothTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
+        std::shared_ptr<const assets::OriginalUiArchive50KG> podPhysics,
+        OriginalUiRiderProfileDiagnostic50KG&) noexcept;
+    bool mawhonicRylothTestProfile() const noexcept;
     bool initialized() const noexcept;
     const OriginalUiMainProfile50KG* commonProfile() const noexcept;
     OriginalUiRiderProfileStamp50KG stamp() const noexcept;
@@ -83,7 +90,7 @@ public:
         game::OriginalTournamentPodCareer50KG&)const noexcept;
 private:
     bool initializeStartupProfile(std::shared_ptr<OriginalUiMainProfile50KG>,
-        std::shared_ptr<const assets::OriginalUiArchive50KG>,bool gasganoTest,
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint32_t testRider,
         OriginalUiRiderProfileDiagnostic50KG&) noexcept;
     friend class OriginalUiTournamentSession50KG;
     friend class OriginalUiCourseSession50KG;

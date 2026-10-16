@@ -280,7 +280,9 @@ bool sampleModelMotionTransition50KG(const assets::MotionView49O& current,
        (previous&&!previous->data))return reject(d,ModelMotionError49T::input);
     if(!bindings.count||bindings.count>assets::maxModelNodes49O||
        current.rotationCount>assets::maxMotTracks49O||current.positionCount>assets::maxMotTracks49O||
-       (previous&&(previous->rotationCount!=current.rotationCount||previous->positionCount!=current.positionCount))||
+       //154CC0 and154F70 iterate current counts; previous tracks are read by
+       //the same ordinal. Extra previous tracks are valid and are not sampled.
+       (previous&&(previous->rotationCount<current.rotationCount||previous->positionCount<current.positionCount))||
        (captured&&captured->count!=bindings.count)||!validateSceneGraph49P(graph))
         return reject(d,ModelMotionError49T::topology);
     const auto bytes=sizeof(SceneNode49P)*graph.count;

@@ -53,6 +53,12 @@ struct ChariotIkDiagnostic49T {
 bool initializeChariotIk49T(const ChariotIkBindings49T&, const SceneGraph49P&,
     ChariotIkPair49T&, SourceLibmState49T&, ChariotIkWorkspace49T&,
     ChariotIkDiagnostic49T&) noexcept;
+// One separately allocated28EB90 record with the actual shared-axis operand.
+// Per-record numeric admission is atomic; successful earlier records are not
+// rolled back by a later call. Does not allocate or retain scene references.
+bool initializeChariotIkRecord50LA(const ChariotIkChainBinding49T&, const ChariotIkVector49T&,
+    const SceneGraph49P&, ChariotIkChain49T&, SourceLibmState49T&,
+    ChariotIkWorkspace49T&, ChariotIkDiagnostic49T&) noexcept;
 // Original left290A00 then right290A00: target position, fixed-axis solve,
 // target world orientation, wrist parent-relative orientation assignment.
 // Requires persistent source-initialized records with mode10=1/debug40=0.

@@ -36,6 +36,14 @@ class Binding final {
         if(!std::isfinite(source)||!std::isfinite(value)||double(value)!=source)return false;
         out=value;return true;
     }
+    static bool nativePlacementFloat(double source,float& out)noexcept {
+        // World48F stores normalized placement bases as binary64. The actual
+        // native static scene/GPU matrices consume their binary32 projection;
+        // requiring an exact binary64 round trip rejects rotated scenery.
+        if(!std::isfinite(source)||source>std::numeric_limits<float>::max()||
+           source<-std::numeric_limits<float>::max())return false;
+        out=static_cast<float>(source);return std::isfinite(out);
+    }
     bool prepare(std::shared_ptr<ra_static_world50LA::Owner> world,
         std::shared_ptr<ra_source_camera50LA::OwnershipBridge> camera) {
         world_=std::move(world);camera_.owner=std::move(camera);CameraObservation observation;
@@ -50,14 +58,14 @@ class Binding final {
             //28CB88/28CC3C load source row0 center140/radius194; source1A0==1.
             for(unsigned a=0;a<3;++a){
                 if(!exactFloat(node.stored_bounds[a],next.center140[a])||
-                   !exactFloat(p.authoredMatrix[12+a],next.localTranslation[a]))return false;
+                   !nativePlacementFloat(p.authoredMatrix[12+a],next.localTranslation[a]))return false;
             }
             if(!exactFloat(node.stored_bounds[6],next.radius194)||next.radius194<0||
                !exactFloat(scene->quantization[0],next.positionScale)||next.positionScale<=0)return false;
             if(scene->world_space){
                 next.packetModel[0]=next.packetModel[5]=next.packetModel[10]=next.packetModel[15]=1;
                 for(unsigned a=0;a<3;++a)if(!exactFloat(scene->quantization[4+a],next.packetModel[12+a]))return false;
-            }else for(unsigned a=0;a<16;++a)if(!exactFloat(p.authoredMatrix[a],next.packetModel[a]))return false;
+            }else for(unsigned a=0;a<16;++a)if(!nativePlacementFloat(p.authoredMatrix[a],next.packetModel[a]))return false;
             // Identical26F0E0..26F190 numeric leaf; center140 replaces160 for
             // the proven single-node branch. No radius recomputation/AABB.
             std::array<float,4> center{{next.center140[0],next.center140[1],next.center140[2],0}};

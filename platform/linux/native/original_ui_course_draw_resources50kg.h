@@ -17,7 +17,7 @@ struct OriginalUiCourseDrawResourceDiagnostic50KG {
  game::OriginalUiCourseWidgetDiagnostic50KG widgets{};game::OriginalUiTextGeometryDiagnostic50KG text{};game::OriginalUiExitTextDiagnostic50KG exitText{};
 };
 struct OriginalUiCourseVideoOwner50KG {std::shared_ptr<const void> lifetime;std::int32_t width=0,height=0,colorBits=0,packetZMaximum=0;std::uint32_t zBufferFormat=0;};
-struct OriginalUiCourseColdInput50KG {std::shared_ptr<const assets::OriginalUiArchive50KG> appStart,course,fonts,backgrounds,controllerPopup,overlays;const assets::OriginalUiEnglish50KG* english=nullptr;assets::OriginalUiMaterialRuntime50KG runtime{};OriginalUiCourseVideoOwner50KG video{};};
+struct OriginalUiCourseColdInput50KG {std::shared_ptr<const assets::OriginalUiArchive50KG> appStart,course,fonts,backgrounds,controllerPopup,overlays;const assets::OriginalUiEnglish50KG* english=nullptr;assets::OriginalUiMaterialRuntime50KG runtime{};OriginalUiCourseVideoOwner50KG video{};bool prepareRylothBackground=false;};
 struct OriginalUiCourseMaterialBinding50KG {
  std::string registeredName;assets::OriginalUiMaterial50KG material;std::vector<std::uint32_t> images;
  std::vector<assets::OriginalUiNativeMaterial50KG> policies;assets::OriginalUiNativeUntexturedMaterial50KG untextured{};

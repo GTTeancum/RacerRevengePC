@@ -162,9 +162,18 @@ bool Owner::prepareRaZonePrefix114D00(CameraVisibilityLease& lease,
         if(!neighbors(neighbors,edge.zone-1u,1u))return false;
         link=edge.next;
     }
-    // Actual root44/fallback443108 ownership is not part of this lighting
-    // projection. Do not declare selection complete or enter27FEE0 drawing.
-    return fail(d,Status::phase,0x27f8b8u);
+    //27F8B8 consumes the actual SAME root44, produced before that zone's
+    //static wrapper registration. Authored metadata alone is not this write.
+    if(!first.environment44Published)return fail(d,Status::phase,0x27f8b8u);
+    if(first.environmentVisible44){
+        //The global443108 owner is distinct from every authored4C0 zone.
+        //Its real world4BC attachment and VisibilityQuadTree method lifetime
+        //are not yet joined. Stop before its load; never assume null/empty.
+        return fail(d,Status::phase,0x27f8c8u);
+    }
+    //The source zero44 route returns from27F650. The enclosing114D00 still
+    //owes its real141C30 camera-child traversal, so issue no completion here.
+    return fail(d,Status::phase,0x114d34u);
 }
 }
 

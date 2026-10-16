@@ -51,8 +51,7 @@ class GroundBridge {
     // that source route or explicit F; a T needs the real443108 owner/method.
     const CollectionRef50BX absentGlobalFallback443108_=0;
 
-    static void admitNoEnvironmentFallback(const storage::Ground& ground) {
-        const auto& world=ground.world;
+    static void admitNoEnvironmentFallback(const rr::assets::World48F& world) {
         if(world.zones.empty()||world.scene_info_block>=world.parameters.blocks.size())
             throw std::runtime_error("AI reset original SceneInfo is unavailable");
         const auto& info=world.parameters.blocks[world.scene_info_block];
@@ -232,7 +231,7 @@ class GroundBridge {
         // cursor/flags16 writes already reside in the actual method owners.
     }
 public:
-    GroundBridge(storage::Storage& track,const storage::Ground& ground,
+    GroundBridge(storage::Storage& track,const rr::assets::World48F& sourceWorld,
         CollisionNormalModeOwner50JA& normalMode,Type2StaticQuery49X& main690,CollisionFilter48J& mainFilter,
         Type2StaticQuery49X& secondary,CollisionFilter48J& secondaryFilter,TerrainQuery48J& terrain348,
         VehicleFrameState49W& canonicalFrame,recovery::Owners& recoveryOwners,
@@ -242,7 +241,7 @@ public:
         movement_(actualMovement7A4),floorMask_(floorMask),geometry_(track.count.objects),
         projections_(track.count.objects),scratchObjects_(track.count.objects),scratchMethods_(track.count.methods),
         meshStack_(meshCapacity(track)) {
-        admitNoEnvironmentFallback(ground);
+        admitNoEnvironmentFallback(sourceWorld);
         if(!layout())throw std::runtime_error("AI reset bridge requires the actual reserved track-storage namespace");
         world_.objects=track.objects.data();world_.geometry=geometry_.data();world_.objectCount=track.count.objects;
         world_.methods=track.trees.data();world_.methodCount=track.count.methods;
@@ -251,6 +250,13 @@ public:
         work_={scratchObjects_.data(),scratchObjects_.size(),scratchMethods_.data(),scratchMethods_.size(),
             meshStack_.data(),meshStack_.size()};
     }
+    GroundBridge(storage::Storage& track,const storage::Ground& ground,
+        CollisionNormalModeOwner50JA& normalMode,Type2StaticQuery49X& main690,CollisionFilter48J& mainFilter,
+        Type2StaticQuery49X& secondary,CollisionFilter48J& secondaryFilter,TerrainQuery48J& terrain348,
+        VehicleFrameState49W& canonicalFrame,recovery::Owners& recoveryOwners,
+        Type3QueryInput48P& actualMovement7A4,const std::uint32_t& floorMask):
+        GroundBridge(track,ground.world,normalMode,main690,mainFilter,secondary,secondaryFilter,
+            terrain348,canonicalFrame,recoveryOwners,actualMovement7A4,floorMask){}
     GroundBridge(const GroundBridge&)=delete;GroundBridge& operator=(const GroundBridge&)=delete;
     GroundBridge(GroundBridge&&)=delete;GroundBridge& operator=(GroundBridge&&)=delete;
     const Diagnostic& diagnostic() const noexcept{return diagnostic_;}

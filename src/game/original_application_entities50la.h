@@ -1,17 +1,23 @@
 #pragma once
+namespace ra_pod_scene50LA { class Owner; }
 namespace original_cable_selection50LA { class Binding; }
+namespace native_racer_model50LA { class Owner; }
 #include "original_wreck_components50la.h"
 #include "portal_geometry50eo.h"
 #include <array>
 #include <cstring>
 #include <exception>
 #include <string_view>
+#include <optional>
 #include <vector>
 
 namespace rr::game::original_gc_gameplay_lighting_candidate { class Owner; }
 namespace rr::game {
+class OriginalVisibilityQuadTree50LA;
 class OriginalRacerStripOwners50LA;
 class OriginalTrackParticleCold50LA;
+class OriginalRacerMainBodyOwner50LA;
+class OriginalRacerGravityOwner50LA;
 // One native application owns the source383408 name registry. IDs are actual
 // insertion indices in this same registry, not retail boot constants or the
 // unrelated collision-category bit namespace. Only reached real constructors
@@ -75,8 +81,24 @@ private:
 // and retains it across serial native race lifetimes. It is NOT a complete
 // retail application forest or a substitute race/manager ancestor chain.
 class OriginalApplicationEntities50LA final {
+    friend class ::ra_pod_scene50LA::Owner;
+    friend class OriginalVisibilityQuadTree50LA;
+    //Startup BSS; one real process slot, never a per-scene forced null.
+    OriginalVisibilityQuadTree50LA* visibility443A98_=nullptr;
+    OriginalVisibilityQuadTree50LA* activeTree442E18_=nullptr;
+    OriginalWreckComponent50LA* environment443108_=nullptr;
+    std::optional<float> treeQuantum442E20_;
+    friend class ::native_racer_model50LA::Owner;
     friend class ::original_cable_selection50LA::Binding;
     friend class OriginalRacerStripOwners50LA;
+    friend class OriginalRacerMainBodyOwner50LA;
+    friend class OriginalRacerGravityOwner50LA;
+    // Original static3CAA20 ->3CAA7C; shared SelectiveGravityModel vector.
+    const std::array<std::uint32_t,4> gravityOrigin4431C0_{{0,0,0,0x3f800000u}};
+    // Source startup3C9190/3C9290 and file382B60, shared once per Application.
+    const std::array<std::uint32_t,4> bodyOrigin433AD0_{{0,0,0,0x3f800000u}};
+    const std::array<std::uint32_t,4> bodyReset433B80_{{0,0,0,0x3f800000u}};
+    const std::array<std::uint32_t,4> bodyQuaternion382B60_{{0,0,0,0}};
     friend class OriginalCableStripAttributes50LA;
     struct CableLazy {std::uint8_t guard=0;std::uint32_t word=0;};
     // Actual224720 shared lazy fields4347B0/B8/C0/C8/D0, not per-racer state.
@@ -96,6 +118,7 @@ class OriginalApplicationEntities50LA final {
     // Process-lifetime source startup100008 zero stores, never per-race reset.
     std::uint16_t portalAdmission8BE0_=0,portalDispatch8BE4_=0;
     std::uint32_t portalDepth443120_=0,portalDebug443100_=0;
+    std::uint32_t portalDrawDebug443110_=0,portalDrawDepth443118_=0; // Same startup BSS.
     //36ADA8's authenticated data-image word. No native configuration writer
     // currently changes it; keep the real camera-entry gate explicit.
     std::uint32_t portalEnabled36ADA8_=1;
@@ -163,6 +186,7 @@ public:
     // child destructor, detach141A70 call or whole-tree mask reset is used.
     bool releaseApplication1411AC()noexcept {
         if(released_)return true;
+        if(visibility443A98_||environment443108_||activeTree442E18_)return false;
         if(!constructed_||attachmentLock423F58_||outer26C_.reference00!=1u||root10_.reference00!=1u||
            outer26C_.kind!=OriginalWreckComponentKind50LA::entity141300||
            root10_.kind!=OriginalWreckComponentKind50LA::entity141300||

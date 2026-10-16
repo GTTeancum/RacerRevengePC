@@ -34,6 +34,7 @@ struct OriginalUiCourseRememberedProfile50KG {
     std::uint8_t availability11018=0;
     std::uint32_t planet0Primary79C=0,planet0Secondary7A0=0;
     std::array<std::uint8_t,13> courseOrder100C4{};
+    bool mawhonicRylothTest=false; // retained fixture provenance, not runtime capability
 };
 struct OriginalUiCourseEntryPrefix50KG {
     std::uint32_t promptMask42C=0;

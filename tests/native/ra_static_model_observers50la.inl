@@ -59,6 +59,7 @@ bool registerObserversAndParents(std::shared_ptr<g::original_gc_gameplay_lightin
     try {
         auto* world=visibility_->raStaticVisibility(this);auto* work=visibility_->raStaticWorkspace(this);
         if(!world||!work)return finish(reject(d,"canonical visibility borrow missing"));
+        const Parent* enteredParent=nullptr;
         for(std::size_t i=0;i<models_.size();++i){auto& m=*models_[i];d.placement=i;
             auto& scene=m.scene;auto& root=scene.model_;auto& p=*parents_[m.parent];
             // Retained Application identities, never a caller count or ready bit.
@@ -68,6 +69,14 @@ bool registerObserversAndParents(std::shared_ptr<g::original_gc_gameplay_lightin
                scene.binding_.actualTypes383408!=&application_->types383408()||
                root.entity8.sessionGeneration!=generation_||!parentTopology(p))
                 return finish(reject(d,"actual canonical static model/Application changed"));
+            if(enteredParent!=&p){
+                //2741C0 is before this zone's27B930 ->27ABC0 ->28E8A0.
+                //Publish once in the existing authored model order. A cold
+                //parent with no represented callback remains unproduced.
+                if(!visibility_->publishRaStaticZone2741C0(this,p.zone))
+                    return finish(reject(d,"actual zone44 publication predecessor rejected"));
+                enteredParent=&p;
+            }
             auto observer=std::make_unique<Observer>();
             observer->links.resize(world->portals.portalCount+1u);
             observer->entries.resize(observer->links.size());
@@ -78,8 +87,12 @@ bool registerObserversAndParents(std::shared_ptr<g::original_gc_gameplay_lightin
             g::LiveZoneBounds50EN bounds{};
             if(!staticBounds(m,bounds))return finish(reject(d,"actual28E230/26F4B0 bounds rejected"));
             auto& o=*m.observer;
+            // The attach transaction mutates membership and reads the storage
+            // descriptor. Keep that descriptor outside the mutated record;
+            // its backing arrays remain the same stable observer allocations.
+            const auto registrationStorage=o.membership.storage;
             const auto registered=g::attachLiveZoneMembership50EN(world->lifecycle,world->portals,
-                o.membership,o.membership.storage,o.object,p.zone,g::ZoneMethod50CL::First,0.f,bounds,*work);
+                o.membership,registrationStorage,o.object,p.zone,g::ZoneMethod50CL::First,0.f,bounds,*work);
             d.visibility=registered;
             if(registered.status!=g::LiveZoneStatus50EN::Complete)
                 return finish(reject(d,"actual static2809C0 registration rejected"));

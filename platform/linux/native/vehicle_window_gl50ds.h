@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <memory>
 
+namespace ra_cold_aggregate50LA { class Owner; }
 namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
 namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
@@ -296,6 +297,12 @@ struct VehicleWindowRacerArchetype50DS {
     VehicleWindowCables50DS cables{};
 };
 struct VehicleWindowRequest50DS {
+    // Actual retained RA aggregate and its complete immutable 49-image GPU bank.
+    // This selects the dedicated byte-material world path, never legacy track
+    // shading. Prepare current native lighting/diffuse/fog bindings before submit.
+    std::shared_ptr<ra_cold_aggregate50LA::Owner> raStaticWorld;
+    const MaterialTextureGl50EB* raStaticWorldTextures = nullptr;
+
     // Borrowed until close. isCurrent must check this exact live desktop GL
     // context AND its host surface/currentness contract, on the creating thread,
     // without GL calls. Window output requires the exact window drawable;
@@ -1125,6 +1132,12 @@ public:
     bool readbackWindowFrontRgba(std::uint8_t* rgba, std::size_t capacityBytes,
         std::int32_t drawableWidth, std::int32_t drawableHeight,
         VehicleWindowDiagnostic50DS&) noexcept;
+    // Pre-swap evidence only: exact current GameHost-owned default GL_BACK.
+    // The caller must pair these bytes with that image's successful swap before
+    // publishing them. Never read BACK after swap or call this a scanout capture.
+    bool readbackWindowBackRgba(GameHost50ER&,std::uint8_t* rgba,std::size_t capacityBytes,
+        std::int32_t drawableWidth,std::int32_t drawableHeight,
+        VehicleWindowDiagnostic50DS&) noexcept;
     // Explicit caller-controlled completion barrier for already submitted work,
     // e.g. bounded headless completed-frame timing. Requires an existing private
     // committed image and the exact live context/thread; calls glFinish, checks
@@ -1189,6 +1202,8 @@ private:
     bool publishOriginalUiBlendImage(const OriginalUiByteBlend50KO&,
         const OriginalUiByteBlendSample50KO*,std::int32_t width,std::int32_t height,
         OriginalUiPrivatePublication50KP&,VehicleWindowDiagnostic50DS&) noexcept;
+    bool readbackWindowBufferRgba(std::uint8_t*,std::size_t,std::int32_t,std::int32_t,
+        bool front,const GameHost50ER* expectedHost,VehicleWindowDiagnostic50DS&) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

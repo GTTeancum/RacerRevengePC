@@ -137,6 +137,20 @@ inline constexpr SessionAssets retainedSA{
     "34826bbb3a3690ee20ac40f70515f7e903291cdf4546f7d8ab8d58849f30d96a",3786696,
     true,true,false,true
 };
+// Native RA source binding only. Empty legacy mesh/report/sky paths are
+// intentional: the retained aggregate owns original PSG/material/sky sources.
+// This row requests the explicit same-owner native RA cold route. Its
+// constructor, query, renderer and camera checks must still all succeed. In particular,
+// a metadata row must never send Ryloth through the legacy TA visual defaults.
+inline constexpr SessionAssets retainedRA{
+    &worlds[6],"work/native/project/disc/TRACKS/RA.RES",
+    "tracks\\mra.spl","tracks\\ara.spl","tracks\\ra.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "","","","",4,1,178,
+    "1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2",4604561,
+    true,true,false,true
+};
 inline bool codeEquals(const char* requested,const char* code) noexcept {
     if(!requested||!requested[0]||!requested[1]||requested[2])return false;
     for(unsigned i=0;i<2;++i){
@@ -158,7 +172,8 @@ inline const SessionAssets* sessionAssets(const WorldMetadata& world) noexcept {
         codeEquals(world.code,"GC")?&retainedGC:
         codeEquals(world.code,"GA")?&retainedGA:
         codeEquals(world.code,"MA")?&retainedMA:
-        codeEquals(world.code,"SA")?&retainedSA:nullptr;
+        codeEquals(world.code,"SA")?&retainedSA:
+        codeEquals(world.code,"RA")?&retainedRA:nullptr;
 }
 inline const SessionAssets* select(const char* code,const char*& error) noexcept {
     const auto* world=findWorld(code);

@@ -18,7 +18,7 @@ bool audio(P& p,K k,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return
 bool prompt(P& p,std::uint32_t mask,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return false;p.steps[p.count++]={K::promptMask42C,0,O::hide,false,pc,mask};p.writesPromptMask42C=true;p.promptMask42C=mask;return true;}
 bool bounded(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
  constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
- return p.mode34==0&&p.course700>=1&&p.course700<=4&&p.subtype70C==1&&!(p.flags100BC&1)&&(p.flags11018&31)==4&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
+ return p.mode34==0&&p.course700>=1&&p.course700<=(p.mawhonicRylothTest?5u:4u)&&p.subtype70C==1&&!(p.flags100BC&1)&&(p.flags11018&31)==(p.mawhonicRylothTest?5u:4u)&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
 }
 struct OriginalUiCourseWidgetController50KG::Storage {std::shared_ptr<const assets::OriginalUiArchive50KG> archive;assets::OriginalUiDat50KG pageDat,widgets;assets::OriginalUiPage50KG page;std::array<std::int32_t,24> courseIndex{};};
 OriginalUiCourseWidgetController50KG::OriginalUiCourseWidgetController50KG()noexcept=default;
@@ -41,7 +41,7 @@ S OriginalUiCourseWidgetController50KG::moveCourse(const OriginalUiNavigation50K
     P p;p.navigation=n;OriginalUiCommands50KG commands;
     if(moveOriginalUiControl50KG(p.navigation,1,forward,commands)!=OriginalUiNavigationStatus50KG::ok||!expand(p,commands))return S::invalidNavigation;
     const auto slot=p.navigation.groups[1].selectedSlot;
-    if(!slot||slot>4||!control(p,page()->groups[1].controls[slot-1],O::reset,false,0x2A5A38))return S::invalidNavigation;
+    if(!slot||slot>(profile.mawhonicRylothTest?5u:4u)||!control(p,page()->groups[1].controls[slot-1],O::reset,false,0x2A5A38))return S::invalidNavigation;
     out=p;return S::ok;
 }
 S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,OriginalUiCourseWidgetPhase50KG phase,const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept {

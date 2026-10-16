@@ -13,22 +13,28 @@ class Operation;
 // One-time adoption of the EXISTING eight objects, before world reservation.
 // Unique-pointer movement changes no Rig/COL address. No public array getter:
 // the private stable array is the future aggregate grid/camera borrow.
+struct SharedOwners final {
+    std::array<std::unique_ptr<native_racer50HW::Rig>,8> rigs;
+    std::array<std::unique_ptr<native_racer_collision50HW::Owner>,8> collisions;
+};
 class Resources final {
     friend class Operation;
     friend class ra_cold_aggregate50LA::Owner;
-    std::array<std::unique_ptr<native_racer50HW::Rig>,8> rigs_;
-    std::array<std::unique_ptr<native_racer_collision50HW::Owner>,8> collisions_;
+    std::shared_ptr<SharedOwners> owners_;
+    const std::array<std::unique_ptr<native_racer50HW::Rig>,8>& rigs_;
+    const std::array<std::unique_ptr<native_racer_collision50HW::Owner>,8>& collisions_;
     std::array<std::vector<std::uint8_t>,8> aiSources_;
     std::array<std::vector<std::uint8_t>,6> effects_;
-    Resources()=default;
+    explicit Resources(std::shared_ptr<SharedOwners> owners)
+        :owners_(std::move(owners)),rigs_(owners_->rigs),collisions_(owners_->collisions){}
 public:
     Resources(const Resources&)=delete;Resources& operator=(const Resources&)=delete;
     static std::shared_ptr<const Resources> adopt(
-        std::array<std::unique_ptr<native_racer50HW::Rig>,8>& rigs,
-        std::array<std::unique_ptr<native_racer_collision50HW::Owner>,8>& collisions,
-        std::string& error) noexcept {
+        std::shared_ptr<SharedOwners> owners,std::string& error) noexcept {
         try {
-            auto result=std::shared_ptr<Resources>(new Resources());
+            if(!owners)throw std::runtime_error("actual retained roster storage absent");
+            auto result=std::shared_ptr<Resources>(new Resources(std::move(owners)));
+            const auto& rigs=result->rigs_;const auto& collisions=result->collisions_;
             for(std::size_t slot=0;slot<8;++slot){
                 const auto* rig=rigs[slot].get();const auto* collision=collisions[slot].get();
                 if(!rig||!collision||!collision->prepared()||(rig->modelCount!=3u&&rig->modelCount!=5u))
@@ -78,8 +84,8 @@ public:
                 if(pod_materials50ed_fixture::detail::sha256(result->effects_[i])!=pins[i])
                     throw std::runtime_error("original shared effect identity differs");
             }
-            // All fallible source validation precedes ownership movement.
-            result->rigs_=std::move(rigs);result->collisions_=std::move(collisions);
+            // Retain the SAME arrays and object addresses used by the driver.
+            // Construction is complete; no pointer is moved or reconstructed.
             return result;
         }catch(const std::exception& e){try{error=e.what();}catch(...){}return {};}
         catch(...){try{error="actual roster adoption failed";}catch(...){}return {};}

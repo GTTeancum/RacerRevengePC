@@ -12,6 +12,7 @@ namespace original_main_entry50KG {
 //one process instance. No source command words, synthetic frame or drain.
 class NativeCollectorFifo50LA final {
     friend class ::original_cable_selection50LA::Binding;
+    friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class rr::platform::VehicleWindowGl50DS;
     using Table=rr::assets::OriginalStandardMaterialTable50LA;
     using Binding=rr::assets::OriginalCableEmissionBinding50LA;
@@ -41,12 +42,12 @@ class NativeCollectorFifo50LA final {
     std::shared_ptr<Table> table_;
     rr::assets::OriginalStandardMaterialCollectorReceipt50LA registry_;
     std::uint32_t epoch04_=1; // Actual29C2C4/C8 fresh constructor, NOT cold generation.
-    std::shared_ptr<rr::game::OriginalZoneScissor50LA> scissor4014_; //24B704 null.
+    Zone scissor4014_; // Actual slot; value_ starts null at24B704.
     std::list<Record> records_; // Stable native nodes, source insertion order.
     std::vector<Leaf> leaves_; // Actual registration ordinals; redirects share final leaf.
     bool draining_=false;
     NativeCollectorFifo50LA(const Application& app,std::shared_ptr<Table> table)
-        :application_(&app),table_(std::move(table)){}
+        :application_(&app),table_(std::move(table)),scissor4014_(app.entitiesOwner_.get()){}
     static std::shared_ptr<NativeCollectorFifo50LA> actualApplication(Pin& pin,
         const std::shared_ptr<Table>& table) {
         if(!pin.owner_)return {};
@@ -58,15 +59,8 @@ class NativeCollectorFifo50LA final {
         const auto& fifo=app->nativeCollectorFifoOwner_;
         return fifo->application_==app&&fifo->table_==table?fifo:nullptr;
     }
-    Result bindZone280118(const Zone& zone,const Visibility& visibility,
-        const std::shared_ptr<Bridge>& camera)noexcept {
-        if(draining_||!camera||!zone.owner_||zone.owner_!=visibility.owner_||
-           camera->freshLighting_.get()!=zone.owner_||!visibility.racerVisibility7F0()||
-           !zone.cameraGeneration_||zone.cameraGeneration_!=visibility.generation_||
-           !zone.value_||!zone.value_->revision_)return {Status::scene,0x280118u};
-        // Only a traversal-issued capability can reach this store. The current
-        // incomplete27FEE0 walk has NO issuer; do not create one from bounds.
-        scissor4014_=zone.value_;return {Status::acceptedCpuOnly,0x280118u,true};
+    const rr::game::OriginalApplicationEntities50LA* applicationEntities()const noexcept {
+        return application_?application_->entitiesOwner_.get():nullptr;
     }
     Result accept24B9B0(std::shared_ptr<Allocation> allocation,std::uint32_t strip,
         std::shared_ptr<Bridge> camera,native_racer50HW::Cables& cables,std::unique_ptr<Binding> binding,
@@ -78,7 +72,8 @@ class NativeCollectorFifo50LA final {
            !table_->coldCollectorCurrent(binding->registry_)||allocation->closed_||
            strip>=allocation->ownedStrips_||!allocation->strips30_[strip]||
            allocation->fifoPins_==std::numeric_limits<std::uint32_t>::max())return {Status::owner,0x24b9b0u};
-        if(zone.owner_!=visibility.owner_||!zone.value_||scissor4014_!=zone.value_||
+        if(&zone!=&scissor4014_||zone.owner_!=visibility.owner_||!zone.value_||
+           zone.application_!=application_->entitiesOwner_.get()||
            zone.cameraGeneration_!=visibility.generation_||!visibility.racerVisibility7F0()||
            camera->freshLighting_.get()!=zone.owner_)return {Status::scene,0x24b9f8u};
         // Same externally owned Bank and persistent Cables, not bridge-only
@@ -115,7 +110,7 @@ class NativeCollectorFifo50LA final {
             //29C218/21C then epoch/head/tail stores, followed by24B9E4..24BA24.
             if(destination.epoch!=epoch04_){destination.epoch=epoch04_;destination.head=&record;destination.tail=&record;}
             else {destination.tail->next=&record;destination.tail=&record;}
-            record.scissor18=scissor4014_;
+            record.scissor18=scissor4014_.value_;
             return {Status::acceptedCpuOnly,0x24ba28u,true};
         }catch(...){if(tablePinned)table_->unpinNativeCollector();return {Status::allocation,0x105720u};}
     }
@@ -160,4 +155,33 @@ public:
         if(!records_.empty())std::terminate(); // No implicit failed-queue discard.
     }
 };
+}
+
+namespace ra_source_camera50LA {
+inline bool OwnershipBridge::drawZonePrefix114E00(const ZoneDrawEntry114E00& entry,Diagnostic& d)noexcept {
+    d={};StaticFogPublication id;ra_static_fog50LA::CameraObservation observation;
+    if(entry.owner_!=this||!entry.visibility_||!entry.collector_||
+       !readStaticFogPublication(id,observation)||!camera_||!camera_->session){
+        d.message="actual114D50 draw entry and retained camera required";return false;
+    }
+    auto& session=*camera_->session;auto& fifo=*entry.collector_;
+    // The actual factory-associated Application, canonical materials and same
+    // selected SourceCamera own this store. No supplied replacement4014 slot.
+    if(!session.actual_.applicationEntities||!session.actual_.applicationMaterials||
+       !fifo.application_||fifo.draining_||
+       fifo.applicationEntities()!=session.actual_.applicationEntities.get()||
+       fifo.table_!=session.actual_.applicationMaterials||
+       &session.actual_.visibility!=freshLighting_.get()||
+       session.display_.rendererCurrentScene0!=&session.viewport_||
+       !session.spatial_.registration34.attached||!session.spatial_.parent38||
+       !session.visibilityKeys_.matches(*freshLighting_,*entry.visibility_,session.generation_,session.key(session.scene_))){
+        d.message="draw entry no longer matches actual Application/camera/collector";return false;
+    }
+    g::original_gc_gameplay_lighting_candidate::Diagnostic detail;
+    const bool complete=freshLighting_->drawRaZonePrefix27FEE0(*entry.visibility_,
+        *session.actual_.applicationEntities,session.spatial_.parent38,session.viewport_,fifo.scissor4014_,detail);
+    d.camera.sourcePC=detail.sourcePC;
+    d.message="private zone draw prefix only; camera drain and child tail remain unjoined";
+    return complete;
+}
 }

@@ -3,11 +3,13 @@
 #include "ra_cold_navigation_lease50la.h"
 #include "original_racer_material_sources50la_fixture.h"
 #include "ra_source_camera_ownership50la.h"
+#include "ra_pod_scene50la.h"
 #include "ra_static_world50la.h"
 #include "ra_static_lighting50la.h"
 #include "ra_static_fog_binding50la.h"
 #include "ra_trigger_authoring50la.h"
 #include "original_track_sky50kx_fixture.h"
+#include "sky50gw_fixture.h"
 #include "ra_atm_authoring50la.h"
 #include "ra_audio_authoring50la.h"
 #include "ra_particle_authoring50la.h"
@@ -70,18 +72,18 @@ struct Diagnostic {
     ra_static_model_cold50LA::Owner::Diagnostic staticModels{};
     std::string sky;
 };
-class Owner final {
+class Owner final : private ra_pod_scene50LA::Owner {
     friend class rr::platform::MaterialTextureGl50EB;
+    friend class rr::platform::VehicleWindowGl50DS;
     friend class ra_cold_roster50LA::Operation;
     // One actual decoded source owner. All child borrows die before it. No
     // external source/registry injection or second source decode is possible.
     std::shared_ptr<ra_cold_sources50LA::Owner> source_;
     std::shared_ptr<ra_static_candidates50LA::Owner> candidates_;
     std::unique_ptr<ra_static_registry50LA::ColdStage> registry_;
-    std::shared_ptr<ra_source_camera50LA::OwnershipBridge> runtimeQueries_;
-    std::unique_ptr<ra_trigger_authoring50LA::Owner> triggers_;
+    std::shared_ptr<ra_trigger_authoring50LA::Owner> triggers_;
     std::unique_ptr<original_track_sky50KX::Owner> sky_;
-    std::shared_ptr<light::Owner> lighting_;
+    std::unique_ptr<sky50gw_fixture::Owner> skyImages_;
     std::shared_ptr<const ra_cold_sources50LA::ColdNavigationLease> navigationLease_;
     std::unique_ptr<ra_atm_authoring50LA::Owner> atm_;
     std::unique_ptr<ra_audio_authoring50LA::Owner> audio_;
@@ -89,7 +91,6 @@ class Owner final {
     std::shared_ptr<ra_static_world50LA::Owner> world_;
     // One actual scene pool. Future camera children must retain this SAME
     // private owner; no public mutable manager/pool getter is provided.
-    std::shared_ptr<g::OriginalTrackParticleCold50LA> trackParticles_;
     std::shared_ptr<a::OriginalStandardMaterialDomain50LA> trackParticleDomain_;
     std::shared_ptr<g::OriginalApplicationEntities50LA> trackParticleApplication_;
     const original_main_entry50KG::Application* trackParticleHostApplication_=nullptr;
@@ -108,6 +109,7 @@ class Owner final {
     bool staticModelResourcesAttempted_=false;
     bool staticObserversAttempted_=false;
     bool terminal_=false,closed_=false;
+    std::size_t runtimeCameraBorrows_=0,runtimeWorldBorrows_=0;
     bool rosterModelResourcesAttempted_=false,rosterModelResourcesComplete_=false;
     bool rosterMountAttempted_=false,rosterMountComplete_=false;
     const original_main_entry50KG::Application* rosterMountApplication_=nullptr;
@@ -167,6 +169,22 @@ public:
             prefix_.staticCandidates=true;return true;
         }catch(...){return fail(d,"RA static candidate allocation failure");}
     }
+    // Explicit user-approved RA compatibility policy. Must precede every
+    // registry/storage borrow; keeps authentic source and shared action owner.
+    bool prepareNativeTriggers(Diagnostic& d)noexcept {
+        d={};d.stage=Stage::staticCandidates;
+        if(terminal_||closed_||!prefix_.staticCandidates||!prefix_.triggers||
+           registryAttempted_||runtimeStorageAttempted_)
+            return fail(d,"RA trigger preparation requires fresh authored candidates");
+        try {if(!candidates_->prepareTriggers(triggers_))return fail(d,"RA trigger candidates rejected");return true;}
+        catch(...){return fail(d,"RA trigger candidate allocation failure");}
+    }
+    // Actual synchronous racer visit only. C80 is obtained internally from
+    // the retained original roster operation, never from a caller's substitute.
+    bool beginRuntimeTriggerQuery(native_racer50HN::Bank&,std::size_t,Diagnostic&)noexcept;
+    bool endRuntimeTriggerQuery(native_racer50HN::Bank&,Diagnostic&)noexcept;
+    bool observeRuntimeTriggerPoses(native_racer50HN::Bank&,std::size_t,Diagnostic&)noexcept;
+    bool serviceRuntimeTriggers(native_racer50HN::Bank&,Diagnostic&)noexcept;
     bool constructClosedStaticRegistry(Diagnostic& d) noexcept {
         if(!enter(d,Stage::staticRegistry,registryAttempted_,prefix_.staticCandidates&&!runtimeStorageAttempted_))return false;
         try{
@@ -275,13 +293,82 @@ public:
         const auto* storage=runtimeQueries_?runtimeQueries_->storage_.get():nullptr;
         return storage?storage->count:track_runtime_storage50IG::Counts{};
     }
+    std::shared_ptr<const ra_cold_sources50LA::DecodedSources> borrowNativeSource(
+        const std::shared_ptr<Owner>& self,Diagnostic& d)noexcept {
+        d={};d.stage=Stage::sources;
+        if(self.get()!=this||terminal_||closed_||!source_||!source_->sourcesDecoded()){
+            d.failure="actual decoded RA source unavailable";return {};
+        }
+        try {
+            ++runtimeWorldBorrows_;
+            return std::shared_ptr<const ra_cold_sources50LA::DecodedSources>(source_->sourcesDecoded(),
+                [self](const ra_cold_sources50LA::DecodedSources*)noexcept{--self->runtimeWorldBorrows_;});
+        }catch(...){d.failure="RA native source borrow allocation failed";return {};}
+    }
+    // The native driver shares this exact query service with the camera. The
+    // retained runtime view pins it until all frame/recovery clients retire.
+    original_follow_query_bridge::QueryBridge* nativeFollowQueries()const noexcept {
+        return !closed_&&runtimeQueries_&&prefix_.runtimeQueryOwners?runtimeQueries_->follow_.get():nullptr;
+    }
+    struct NativeRuntimeView {
+        const ra_cold_sources50LA::DecodedSources& source;
+        const std::vector<track_runtime_storage50IG::Binding>& bindings;
+        track_runtime_storage50IG::Storage& storage;
+        std::vector<g::Type2StaticCandidate49X>& candidates;
+        light::Owner& lighting;
+    };
+    // Native algorithms use the same fixed registry and immutable source
+    // records. This view does not construct a replacement world or physics
+    // arena. The caller must retire it before closing the aggregate; no
+    // candidate vector or backing-container resize operation is exposed.
+    std::shared_ptr<NativeRuntimeView> borrowNativeRuntime(
+        const std::shared_ptr<Owner>& self,Diagnostic& d)noexcept {
+        d={};d.stage=Stage::runtimeQueryStorage;
+        if(self.get()!=this||terminal_||closed_||!prefix_.runtimeQueryStorage||
+           !runtimeQueries_||!source_||!source_->sourcesDecoded()||!candidates_||
+           !candidates_->staticBindings()||!runtimeQueries_->storage_.get()||!lighting_){
+            d.failure="same retained RA source and fixed runtime storage required";return {};
+        }
+        try {
+            auto view=std::unique_ptr<NativeRuntimeView>(new NativeRuntimeView{
+                *source_->sourcesDecoded(),*candidates_->staticBindings(),*runtimeQueries_->storage_.get(),
+                candidates_->candidates_,*lighting_});
+            ++runtimeWorldBorrows_;
+            return std::shared_ptr<NativeRuntimeView>(view.release(),[self](NativeRuntimeView* value)noexcept{
+                delete value;--self->runtimeWorldBorrows_;
+            });
+        }catch(...){d.failure="RA native runtime borrow allocation failed";return {};}
+    }
     // Pure source inspection stages. This does NOT call material Provider::
     // prepare, loadAudioBank, image decode, converter, resource population or GL.
     // Earlier closures remain owned when a later closure fails.
+    // Native cold image/mesh ownership from this SAME authenticated archive.
+    // Source CUB/SCB and every retained decoded tile are independently pinned.
+    bool prepareSkyImages(const std::filesystem::path& textureRoot,Diagnostic& d)noexcept {
+        d={};d.stage=Stage::authoring;
+        if(terminal_||closed_||!prefix_.sky||!source_||!source_->sourcesDecoded()||skyImages_)
+            return fail(d,"RA sky images require the actual fresh source/selection owner");
+        try {
+            auto images=std::make_unique<sky50gw_fixture::Owner>();
+            sky50gw_fixture::Request request;
+            request.track=track_source_fixture::Track::ra;request.textureRoot=textureRoot;
+            request.retainedArchive=&source_->sourcesDecoded()->archive;
+            sky50gw_fixture::Diagnostic detail;
+            if(!images->load(request,detail)){d.sky=detail.message;return fail(d,"RA original sky image preparation failed");}
+            skyImages_=std::move(images);return true;
+        }catch(...){return fail(d,"RA original sky image allocation failed");}
+    }
+    // Borrowed through this aggregate's real renderer/session lifetime.
+    const sky50gw_fixture::Owner* skyAssets()const noexcept {
+        return !terminal_&&!closed_&&skyImages_&&skyImages_->loaded()?skyImages_.get():nullptr;
+    }
+    bool sampleSky(std::uint32_t actualCameraZone48,bool& enabled)const noexcept {
+        return !terminal_&&!closed_&&prefix_.sky&&sky_&&sky_->select(actualCameraZone48,enabled);
+    }
     bool prepareAuthoring(Diagnostic& d) noexcept {
         if(!enter(d,Stage::authoring,authoringAttempted_,prefix_.sources))return false;
         try{
-            triggers_=std::make_unique<ra_trigger_authoring50LA::Owner>();
+            triggers_=std::make_shared<ra_trigger_authoring50LA::Owner>();
             if(!triggers_->decode(source_,d.triggers))return fail(d,"RA trigger authoring failed");
             prefix_.triggers=true;
             sky_=std::make_unique<original_track_sky50KX::Owner>();
@@ -370,6 +457,34 @@ public:
         const ra_source_camera50LA::CameraCallerOwners&,
         const std::vector<std::uint8_t>& selectedOriginalCam,
         original_camera_session50KX::DisplayInputs&,Diagnostic&)noexcept;
+    bool constructRetainedRuntimeSourceCamera(const original_main_entry50KG::Application&,
+        const ra_source_camera50LA::CameraRuntimeOwners&,
+        const std::vector<std::uint8_t>& selectedOriginalCam,
+        original_camera_session50KX::DisplayInputs&,Diagnostic&)noexcept;
+    // A native consumer borrows the actual retained Session. The strong
+    // aggregate capture pins every world/query/model dependency. Explicit
+    // close/abandon rejects while a borrow survives, so no reset can invalidate
+    // the driver pointer between the real countdown/frame/display calls.
+    std::shared_ptr<original_camera_session50KX::Session> borrowRuntimeSourceCamera(
+        const std::shared_ptr<Owner>& self,Diagnostic& d)noexcept {
+        d={};d.stage=Stage::sourceCamera;
+        if(self.get()!=this||terminal_||closed_||!runtimeQueries_||
+           !runtimeQueries_->cameraBankCurrent()||!runtimeQueries_->camera_||
+           !runtimeQueries_->camera_->session||!runtimeQueries_->camera_->session->ready()){
+            d.failure="actual prepared RA camera and retained aggregate required";return {};
+        }
+        try {
+            ++runtimeCameraBorrows_;
+            return std::shared_ptr<original_camera_session50KX::Session>(
+                runtimeQueries_->camera_->session.get(),[self](original_camera_session50KX::Session*)noexcept{
+                    --self->runtimeCameraBorrows_;
+                });
+        }catch(...){
+            // shared_ptr invokes the supplied deleter if control-block allocation
+            // fails; it has already discharged the borrow count in that case.
+            d.failure="RA native camera borrow allocation failed";return {};
+        }
+    }
     original_camera_session50KX::Result prepareRuntimeSourceCamera(
         std::uint64_t actualSessionGeneration,Diagnostic& d)noexcept {
         d={};d.stage=Stage::sourceCamera;
@@ -379,6 +494,8 @@ public:
     }
     original_camera_session50KX::Result closeRuntimeSourceCamera(Diagnostic& d)noexcept {
         d={};d.stage=Stage::sourceCamera;
+        if(runtimeCameraBorrows_){d.failure="retire actual native camera borrows before camera destruction";
+            d.runtimeQueries.camera.status=original_camera_session50KX::Status::owner;return d.runtimeQueries.camera;}
         if(!runtimeQueries_){d.runtimeQueries.camera.status=original_camera_session50KX::Status::complete;return d.runtimeQueries.camera;}
         return runtimeQueries_->closeCamera(false,d.runtimeQueries);
     }
@@ -386,6 +503,8 @@ public:
     // work before using abandonment. This operation performs no fake drain.
     original_camera_session50KX::Result abandonRuntimeSourceCamera(Diagnostic& d)noexcept {
         d={};d.stage=Stage::sourceCamera;
+        if(runtimeCameraBorrows_){d.failure="retire actual native camera borrows before camera destruction";
+            d.runtimeQueries.camera.status=original_camera_session50KX::Status::owner;return d.runtimeQueries.camera;}
         if(!runtimeQueries_){d.runtimeQueries.camera.status=original_camera_session50KX::Status::complete;return d.runtimeQueries.camera;}
         return runtimeQueries_->closeCamera(true,d.runtimeQueries);
     }
@@ -490,11 +609,13 @@ public:
     }
     bool close() noexcept {
         if(closed_)return true;
+        if(runtimeCameraBorrows_||runtimeWorldBorrows_)return false;
         staticFog_.reset();
         staticLighting_.reset(); // Retire typed camera/world/light borrows before preflight.
         if(navigationLease_&&navigationLease_.use_count()!=1)return false;
         // Preflight the sole actual Application reference/count owner BEFORE
         // releasing anything. Unexpected live links/refs reject destruction.
+        if(!canCloseTopology())return false;
         if(world_&&!world_->canClose())return false;
         if(runtimeQueries_&&!runtimeQueries_->canClose())return false;
         if(lighting_){
@@ -514,7 +635,8 @@ public:
         particles_.reset();emitterApplication_.reset();audio_.reset();atm_.reset();
         // World publication preflight above prevents any backing from retiring
         // while its image or future renderer lease is live.
-        lighting_.reset();sky_.reset();triggers_.reset();
+        if(!closeTopology())return false;
+        lighting_.reset();skyImages_.reset();sky_.reset();triggers_.reset();
         // Storage drops its exclusive serial world lease before radii/source.
         runtimeQueries_.reset();registry_.reset();candidates_.reset();navigationLease_.reset();source_.reset();closed_=true;return true;
     }

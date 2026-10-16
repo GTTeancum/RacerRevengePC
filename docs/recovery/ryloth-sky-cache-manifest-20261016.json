@@ -1,0 +1,2062 @@
+{
+  "schema": "RR_ORIGINAL_RA_SKY_V1",
+  "archive_sha256": "1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2",
+  "archive_bytes": 4604561,
+  "member": "skies\\ra.cub",
+  "member_sha256": "c497927d2fe78de6f2f9bbf9e319ac0ea2b4939e020df45a4ae570e5abb73960",
+  "member_bytes": 161825,
+  "tile_count": 48,
+  "tiles": [
+    {
+      "face": 0,
+      "tile": 0,
+      "offset": 99180,
+      "bytes": 1201,
+      "sha256": "38bbc0cf0a66a218152f3e4627ff7e00e068fc839ac29349fe10f54177e428b7",
+      "mips": [
+        {
+          "offset": 99228,
+          "bytes": 58,
+          "dimension": 16,
+          "sha256": "24bd0bca5b929c4079319783c51dd9b8122a7925a6ae30c947ae9c73bce20dac"
+        },
+        {
+          "offset": 99290,
+          "bytes": 108,
+          "dimension": 32,
+          "sha256": "9f310578918a091281b9623fbfebab7d5defed62500019a6127db64163aec068"
+        },
+        {
+          "offset": 99402,
+          "bytes": 236,
+          "dimension": 64,
+          "sha256": "4c34459263c6d90715e5e36fc56b31eac1a6199d367cfed931517b3c8e475362"
+        },
+        {
+          "offset": 99642,
+          "bytes": 739,
+          "dimension": 128,
+          "sha256": "752ae30744abb1dd4e65e410b43b0259c6f66cb4a29d6345e771aac88cdd2c3a"
+        }
+      ],
+      "yuv_sha256": "a8b914683db24ce1ab5ae0eab74ce7d929308758cac948f8c19030c97a258a6a",
+      "decoded": {
+        "filename": "face0-tile00.rrtex",
+        "sha256": "c47caa0c71420b0e5ff6a10f920567212046e6bf9eab8da12c5b95557a87c88c",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 0,
+      "tile": 1,
+      "offset": 100381,
+      "bytes": 1144,
+      "sha256": "f2b9cb510f065a0984ecdf5c102f26956330d795ff0bd68135633fcd47ddc37b",
+      "mips": [
+        {
+          "offset": 100429,
+          "bytes": 50,
+          "dimension": 16,
+          "sha256": "eb2699efec474584a5a776d1e4b2fed6159608898e83c71f901466cc09ed2a1b"
+        },
+        {
+          "offset": 100483,
+          "bytes": 97,
+          "dimension": 32,
+          "sha256": "1d54e7d6352fca0317086058762de4042dba4fb02a716813501657f471683a17"
+        },
+        {
+          "offset": 100584,
+          "bytes": 227,
+          "dimension": 64,
+          "sha256": "4ec7e745d29ce1c3651aa9535981059ef43c40fbdcb6616ae50f7d72f2827e9b"
+        },
+        {
+          "offset": 100815,
+          "bytes": 710,
+          "dimension": 128,
+          "sha256": "d8e7a4e323f4166387a4283861ea81c1fe8b46dd1e2e355f6ab66d196a2359cf"
+        }
+      ],
+      "yuv_sha256": "45366de7c960efbc3650f88999fdc82213213f6e48ec91ce3ce6e135beb0b617",
+      "decoded": {
+        "filename": "face0-tile01.rrtex",
+        "sha256": "9a05bba5d91e1080a31902b790935e98cc7c3ee9ac6c4bc1132960454abcb3b1",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 0,
+      "tile": 2,
+      "offset": 101525,
+      "bytes": 1170,
+      "sha256": "436771c66bd8e6d6090e994c7bead576b52a759b849d98823da60f730be62f91",
+      "mips": [
+        {
+          "offset": 101573,
+          "bytes": 54,
+          "dimension": 16,
+          "sha256": "197e31b40218bc900fc6c0d709a8a8089709bce6f8ace09da4e72f8fb01d9500"
+        },
+        {
+          "offset": 101631,
+          "bytes": 91,
+          "dimension": 32,
+          "sha256": "edcae371b01b2a8154d227b46e0183f8287aa6415beadbfecf00e5d5ed516180"
+        },
+        {
+          "offset": 101726,
+          "bytes": 235,
+          "dimension": 64,
+          "sha256": "d3dbfbe1a96ec9201ae00b095f240165cd5a23b68c8445c0b8f3b332495af7db"
+        },
+        {
+          "offset": 101965,
+          "bytes": 730,
+          "dimension": 128,
+          "sha256": "6814565ae52a7eb3c3f622b3efd6d1ff1496bc2d8c40cca9b40072db6debb812"
+        }
+      ],
+      "yuv_sha256": "c3f4f99540b8dfc142db6bacaa5f507544e30751a37c59848f166163b0ac67f3",
+      "decoded": {
+        "filename": "face0-tile02.rrtex",
+        "sha256": "22308089b8818ad1be97db540b2cc3227089ee10ba703d474057fb9721b82ddb",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 0,
+      "tile": 3,
+      "offset": 102695,
+      "bytes": 1224,
+      "sha256": "6414c2aa8f8846c0c2bbc2069343629cb670ebd4562990bcb901ded79fe6740a",
+      "mips": [
+        {
+          "offset": 102743,
+          "bytes": 53,
+          "dimension": 16,
+          "sha256": "89da504ec5c7e48354fd008b8f56c2dd4c2768d23c211ed98296fbbc940a0ff0"
+        },
+        {
+          "offset": 102800,
+          "bytes": 93,
+          "dimension": 32,
+          "sha256": "9b79fe5e9942c8c1dc33b7ecec2f1e067049e46e899fbec1181f459c689e9d40"
+        },
+        {
+          "offset": 102897,
+          "bytes": 239,
+          "dimension": 64,
+          "sha256": "1e6cbd0819e89bf11d4c43bb909cccd0d6db9c8f43a6db56b2a5283c8dfbb8a1"
+        },
+        {
+          "offset": 103140,
+          "bytes": 779,
+          "dimension": 128,
+          "sha256": "8c2a39035a71ee86b824a23c0c5edf799303c0b8aca3c9182d8524fe905b6642"
+        }
+      ],
+      "yuv_sha256": "8efeaf7f514e604bca2a86e4f65d3d1f30812c2101b2d7c3aa6e04546196ea99",
+      "decoded": {
+        "filename": "face0-tile03.rrtex",
+        "sha256": "9105397a9f4c21238234749460574534876969b83d026069efa06c8e83ac9892",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 0,
+      "tile": 4,
+      "offset": 103919,
+      "bytes": 1583,
+      "sha256": "afc0df84077912b610e0f6cfc396e1626c6d7c37592abf56ebab8f039a0b9c2f",
+      "mips": [
+        {
+          "offset": 103967,
+          "bytes": 70,
+          "dimension": 16,
+          "sha256": "372e67c28cb4ca256da4fcd7abc89f8d2eef8f52bd2df97bfc9569876eebacaf"
+        },
+        {
+          "offset": 104041,
+          "bytes": 145,
+          "dimension": 32,
+          "sha256": "952d89101fc72772c9dc215f84b58cd2fe0fe5507396b4e647f52ec02d5de790"
+        },
+        {
+          "offset": 104190,
+          "bytes": 345,
+          "dimension": 64,
+          "sha256": "6d195a2fcd8d17ddc6ac392bf24468867fde3f69f4635d39eaa2bf7e023be162"
+        },
+        {
+          "offset": 104539,
+          "bytes": 963,
+          "dimension": 128,
+          "sha256": "394fd3d4d02377967fa74fdf635f402f901f0ef598edd72ec481ec80bbc2092b"
+        }
+      ],
+      "yuv_sha256": "a0455715072a01010b003cdf284846af64338bbedf458135d903b4b5836f7dad",
+      "decoded": {
+        "filename": "face0-tile04.rrtex",
+        "sha256": "339181c017c3254120e59cbd79741fe17665ec19ed1abe2283f55786e571edde",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 0,
+      "tile": 5,
+      "offset": 105502,
+      "bytes": 1660,
+      "sha256": "0456db44e7964958c5e573c76b9360eaf6b164230015bc059dc8e31c15aa4c76",
+      "mips": [
+        {
+          "offset": 105550,
+          "bytes": 75,
+          "dimension": 16,
+          "sha256": "2280a284b8251b93c19b8865e3b9e760ee030334c773d2c21a7d46254c222131"
+        },
+        {
+          "offset": 105629,
+          "bytes": 155,
+          "dimension": 32,
+          "sha256": "cf05d0266cfac402c0402b1755a6f23852b23b3a33e3a3ee367cbc643433cdfd"
+        },
+        {
+          "offset": 105788,
+          "bytes": 367,
+          "dimension": 64,
+          "sha256": "e719816463072940065c13d6c1cf351a55e91d6948660663ac23ed6b43a45864"
+        },
+        {
+          "offset": 106159,
+          "bytes": 1003,
+          "dimension": 128,
+          "sha256": "83427cea63a68827a6480a42219e1aa25b4166973b7cf1179c51cd8c56912e3d"
+        }
+      ],
+      "yuv_sha256": "d2ab8160afd4b7bd9a17a0e9c6c69cfa02ac335f839bb99871fc5a20bb9331b9",
+      "decoded": {
+        "filename": "face0-tile05.rrtex",
+        "sha256": "59cc3b269c451b267a1081b63f3ff499ecbb7dd0362d1a1e9e7c5df2e6a8a265",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 0,
+      "tile": 6,
+      "offset": 107162,
+      "bytes": 1663,
+      "sha256": "d409ecd39ffa7069caf2b6be2abef547a36a527d44c159697876e123aed94608",
+      "mips": [
+        {
+          "offset": 107210,
+          "bytes": 73,
+          "dimension": 16,
+          "sha256": "4c22c7934185660973c7a9d486776bbcc7b0049e7df549c143aa89f0e14a6789"
+        },
+        {
+          "offset": 107287,
+          "bytes": 154,
+          "dimension": 32,
+          "sha256": "6e0432f9f72638600144a837a3438e3d38589e141e2d33e015888b007e997d00"
+        },
+        {
+          "offset": 107445,
+          "bytes": 381,
+          "dimension": 64,
+          "sha256": "2ad856678c9b2fea4b81f278e3d8d18d32706a68ebf096acb78f9323bd80c6a9"
+        },
+        {
+          "offset": 107830,
+          "bytes": 995,
+          "dimension": 128,
+          "sha256": "f470f96aa4d87518884732fe604c8fb1530b068861078c479a7db2651c7b277c"
+        }
+      ],
+      "yuv_sha256": "b3c68946f74f665c6ab32d5fe3ddb4c66a41be1d4ce85aa442977be1769413cc",
+      "decoded": {
+        "filename": "face0-tile06.rrtex",
+        "sha256": "20d4ed0049097e9ad79cb6abed2b3f50e760adf20f938ef4d839551e7ed641a4",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 0,
+      "tile": 7,
+      "offset": 108825,
+      "bytes": 1611,
+      "sha256": "895f9cf896072c99a82133ffd8e4bd543ae4da88a1d9a924775f3198c7ae0c42",
+      "mips": [
+        {
+          "offset": 108873,
+          "bytes": 72,
+          "dimension": 16,
+          "sha256": "34d1f2fa379520c8a0697310daf33a4a3815c39fff0780400acc700c31317ed6"
+        },
+        {
+          "offset": 108949,
+          "bytes": 156,
+          "dimension": 32,
+          "sha256": "07e0b5dd9723a96770699acab1d1c01bc71e6cd085d5052e943400e8c325abba"
+        },
+        {
+          "offset": 109109,
+          "bytes": 383,
+          "dimension": 64,
+          "sha256": "e57754e8014d5e0c7860e5212f1b0602ada170024d3802b19ab6f6dc777be092"
+        },
+        {
+          "offset": 109496,
+          "bytes": 940,
+          "dimension": 128,
+          "sha256": "565b30bddd7f16488d1f237ecc3c50e059078851f38de4e6eb10af34a75509e5"
+        }
+      ],
+      "yuv_sha256": "29d67180a397da9f30e2a46b30917f43741b1550a02e3c5e402f455eaa7d893f",
+      "decoded": {
+        "filename": "face0-tile07.rrtex",
+        "sha256": "e7b5eff1e66f1979e0263641cf48e10bd2c6426ff94aa16c0ee4240bd6c7043a",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 1,
+      "tile": 0,
+      "offset": 110436,
+      "bytes": 1164,
+      "sha256": "75c12ee9c500dd55492082f02c42c670b6e87a3f12e123a2cc61721952162c91",
+      "mips": [
+        {
+          "offset": 110484,
+          "bytes": 48,
+          "dimension": 16,
+          "sha256": "818f54117956fbd15e5a874e75c4407dc9070c26b93da5bfd72659ef80326f87"
+        },
+        {
+          "offset": 110536,
+          "bytes": 88,
+          "dimension": 32,
+          "sha256": "6969b48dab03809ddecc277016e73f23966c8e46e93b26e7d190f4793a6b2781"
+        },
+        {
+          "offset": 110628,
+          "bytes": 222,
+          "dimension": 64,
+          "sha256": "3debe9b222e35df7cf1ba3b01ce9f71729d84a650b92398b8cbb0b7b71483f54"
+        },
+        {
+          "offset": 110854,
+          "bytes": 746,
+          "dimension": 128,
+          "sha256": "1df7cba65eba0f7ac5df1bf50a32e2f7810901c0f697f9efc95101dfe75ad46b"
+        }
+      ],
+      "yuv_sha256": "7d4ee90e9f6151c8e6dfd16e331acfdbb7946e7571a74cb2b193c77db0a9227d",
+      "decoded": {
+        "filename": "face1-tile00.rrtex",
+        "sha256": "080c66ef7b7b0cfa9089c80dcbbca4cb35c0d5e16e6f1562c48902d872d71c92",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 1,
+      "tile": 1,
+      "offset": 111600,
+      "bytes": 1229,
+      "sha256": "937da1d7d6761a94bed6145c75ccf8614ba24547749be68978e935b3cfa4300c",
+      "mips": [
+        {
+          "offset": 111648,
+          "bytes": 59,
+          "dimension": 16,
+          "sha256": "4d664365451d9829766257f7a2b159c719f2231915e6b885eb8739b9283058e7"
+        },
+        {
+          "offset": 111711,
+          "bytes": 106,
+          "dimension": 32,
+          "sha256": "8ef0083a9a585e4812d8f268f779a24aa86726169ea9b5c370d1d2bd17b7238a"
+        },
+        {
+          "offset": 111821,
+          "bytes": 235,
+          "dimension": 64,
+          "sha256": "9054d3a0f233a99371d8608c99ae3210c43f9482bec6c0945abf4a51f1fe4fe1"
+        },
+        {
+          "offset": 112060,
+          "bytes": 769,
+          "dimension": 128,
+          "sha256": "ac8d5ca7c4e91b22688ab69ab15f79be25d34df58588f091680e0a837cdc7cd4"
+        }
+      ],
+      "yuv_sha256": "9fefb4489f8be646dfe1684171744af7a8be37a1aee061597a9071bc2e21da51",
+      "decoded": {
+        "filename": "face1-tile01.rrtex",
+        "sha256": "a72c1cb5a95c2f0a34ad2c862a185907b050f3853141ce974cf27aea91aa7d29",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 1,
+      "tile": 2,
+      "offset": 112829,
+      "bytes": 1480,
+      "sha256": "3b5c56c5374c1cf6cb256f1b5496b848ed25c5f18e161281a8d671838f59728c",
+      "mips": [
+        {
+          "offset": 112877,
+          "bytes": 87,
+          "dimension": 16,
+          "sha256": "d216acfc2ccfb58c0fbf9d244d08b223956de8c89a73eebd656f30081e6f17ce"
+        },
+        {
+          "offset": 112968,
+          "bytes": 151,
+          "dimension": 32,
+          "sha256": "4d37af8ce51e12e1b93e9423f5b70b8d63f6ee9d869c46f26d4aab3f3022c1a2"
+        },
+        {
+          "offset": 113123,
+          "bytes": 308,
+          "dimension": 64,
+          "sha256": "bd35aff32d05dee8bf0ab8e3ab34af53c6318aa38af4d89904f6fcc47a3fcc2b"
+        },
+        {
+          "offset": 113435,
+          "bytes": 874,
+          "dimension": 128,
+          "sha256": "0ccb151d2d484fbc19d53f983af54f35fa6c416dc5bb9230555c8feb95e412ed"
+        }
+      ],
+      "yuv_sha256": "6252b7edd30740830909d96f26a87a2925c9c7eb41bc8905315fd123c7246c98",
+      "decoded": {
+        "filename": "face1-tile02.rrtex",
+        "sha256": "b8109224d52d2e65f0fd584949c90a7e1fcf80507b33c8632ccfd1b2ea9c0d57",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 1,
+      "tile": 3,
+      "offset": 114309,
+      "bytes": 1160,
+      "sha256": "1b102e3bf97d19dfe71622a74dc1955984b40a0fa883878c74c76bccc7f22007",
+      "mips": [
+        {
+          "offset": 114357,
+          "bytes": 53,
+          "dimension": 16,
+          "sha256": "c545b4fba8094a141f324fe91ba0feffff9e72459a2312837064d88e21730077"
+        },
+        {
+          "offset": 114414,
+          "bytes": 100,
+          "dimension": 32,
+          "sha256": "0785da58e19cd5a789c466522793f8bb071372bb033be207148cfe33e68c7402"
+        },
+        {
+          "offset": 114518,
+          "bytes": 229,
+          "dimension": 64,
+          "sha256": "82550fdc0da03c387030bc159ad79a3cdb119bbacaa8de892f6ae9856def8083"
+        },
+        {
+          "offset": 114751,
+          "bytes": 718,
+          "dimension": 128,
+          "sha256": "a05a6b462c1a8dc1d22d14e408469c345ddad318aa9c43a3bb0e0873fd6ebcfd"
+        }
+      ],
+      "yuv_sha256": "e2a72260ff5ca3ba072071a31024e59527041c7de8221ca6824d061b0a192d5b",
+      "decoded": {
+        "filename": "face1-tile03.rrtex",
+        "sha256": "05c84433de9fd30946c016314956110f88520041551ec06bae68ed4bc069fb3b",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 1,
+      "tile": 4,
+      "offset": 115469,
+      "bytes": 1597,
+      "sha256": "03fcc92d0a4edf8fd89e87a4bfec59173e2c3eee1acb82836285f9283333192d",
+      "mips": [
+        {
+          "offset": 115517,
+          "bytes": 72,
+          "dimension": 16,
+          "sha256": "798975ae92033c35b83bb585d8cb5f6655890dfbcc9515609e49005a3c3554b0"
+        },
+        {
+          "offset": 115593,
+          "bytes": 137,
+          "dimension": 32,
+          "sha256": "eb661ab0c6b1ebd9a4dc56dbbbf7e6ced4da756385547c741ae37a15c6043dc2"
+        },
+        {
+          "offset": 115734,
+          "bytes": 345,
+          "dimension": 64,
+          "sha256": "ea4e2f288bda1b249c17584cc2a49fb52b85e830ce86612630f9df3be79c8932"
+        },
+        {
+          "offset": 116083,
+          "bytes": 983,
+          "dimension": 128,
+          "sha256": "22b8b2bd12cdf92912657012416c0c44fe7e6a606f7bb7af555fd864a6980518"
+        }
+      ],
+      "yuv_sha256": "29aa3f6eeb466b03d9922786efe99200630276f9425b209c43ff1e335a495ac8",
+      "decoded": {
+        "filename": "face1-tile04.rrtex",
+        "sha256": "1b934341d4d691bd46a555c23eaf5595b87a194a16bb4d7095f0941e4cc4f926",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 1,
+      "tile": 5,
+      "offset": 117066,
+      "bytes": 1760,
+      "sha256": "c60e0606dfd2aa06528b02b2f22aa1d319f2bc6a7187112cff7bf030a4132d35",
+      "mips": [
+        {
+          "offset": 117114,
+          "bytes": 83,
+          "dimension": 16,
+          "sha256": "b507b11ee374080c6efcb4b7e9cc632e27cef79ad205d9496ad0b150e67e7a0d"
+        },
+        {
+          "offset": 117201,
+          "bytes": 167,
+          "dimension": 32,
+          "sha256": "e85eb6cefc2f6f3b51139306248652a5cd0889f5b0975e724b99a0f388027f2c"
+        },
+        {
+          "offset": 117372,
+          "bytes": 376,
+          "dimension": 64,
+          "sha256": "4649660b08ae35825d715e6cd2425d716121fb366eddbd759fcaf86ee54d1fa8"
+        },
+        {
+          "offset": 117752,
+          "bytes": 1074,
+          "dimension": 128,
+          "sha256": "d893e6837e539c2742cf22f5aacbe461493708db9a6c8290d6f6e4bb87887f29"
+        }
+      ],
+      "yuv_sha256": "937773d52867d582fc2dd8891a28c650b45163795339a761f3c03e2ac392a92e",
+      "decoded": {
+        "filename": "face1-tile05.rrtex",
+        "sha256": "55f3efaab3af0c70aef9879b6ccf1609e8ce3a609d7718f153e8e5caff203369",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 1,
+      "tile": 6,
+      "offset": 118826,
+      "bytes": 1922,
+      "sha256": "13e942ac223d7996e46e6830512faa9d2d1ab547b983f1ab389ce2cab5ff8e4d",
+      "mips": [
+        {
+          "offset": 118874,
+          "bytes": 105,
+          "dimension": 16,
+          "sha256": "b66d55a388bdfdca7871402a73c4026789ecb4bac7187723480218d680891f0e"
+        },
+        {
+          "offset": 118983,
+          "bytes": 200,
+          "dimension": 32,
+          "sha256": "88e7d5ee7d2944b703b0deadf6f9ea24300b0702aeaea4e11ff087f80b5ad015"
+        },
+        {
+          "offset": 119187,
+          "bytes": 451,
+          "dimension": 64,
+          "sha256": "ed490a64f968091f85167030d0b6c8428cec7b4ed1fc0e40d330d244e33164b3"
+        },
+        {
+          "offset": 119642,
+          "bytes": 1106,
+          "dimension": 128,
+          "sha256": "39542e7810ffbc58d90cf908a396698f0827b737915fbecc340fd3d3fff6e026"
+        }
+      ],
+      "yuv_sha256": "4ea5a2d645d518a0edda0d80039cca56a4b564fdc17effcfab594437c9029a66",
+      "decoded": {
+        "filename": "face1-tile06.rrtex",
+        "sha256": "a8e121ab8d922f3944cb144807e38ed21dda350091b7be568e48abf32dc53d8b",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 1,
+      "tile": 7,
+      "offset": 120748,
+      "bytes": 1566,
+      "sha256": "b73bc84d4fe4b558157dd8187bf2525e161d9bcda26265be82632694c38e1b96",
+      "mips": [
+        {
+          "offset": 120796,
+          "bytes": 69,
+          "dimension": 16,
+          "sha256": "14f90f140fd6b0ad83efdd262fa08bece8881681355e4f2992fa62842847cc5b"
+        },
+        {
+          "offset": 120869,
+          "bytes": 139,
+          "dimension": 32,
+          "sha256": "008550911df70a5f41388dfb06aa330f079ca558d58d273f08f38c31fb0b5059"
+        },
+        {
+          "offset": 121012,
+          "bytes": 330,
+          "dimension": 64,
+          "sha256": "134afcf2d80bcc6704f3d316d90ebaa19c9fdbdf472327be8b82b93c4c4db0fc"
+        },
+        {
+          "offset": 121346,
+          "bytes": 968,
+          "dimension": 128,
+          "sha256": "13bb86a56a57786fcf6afd0e2d97e0f6d90d966fa7308f19829c81a709539d19"
+        }
+      ],
+      "yuv_sha256": "332b4c8ffdfb111f3e17d11269ae1476f146ab68bf9754d1cdf74781da2c4b43",
+      "decoded": {
+        "filename": "face1-tile07.rrtex",
+        "sha256": "8d17fc1862f2ccd0a821be078bfa168cd14d2c4bc386524f505125e5ee168457",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 2,
+      "tile": 0,
+      "offset": 122314,
+      "bytes": 1142,
+      "sha256": "02f7dc30990ac6b0933bc9df1438aaaf2511eb4442fbce61f7440e4952205d4a",
+      "mips": [
+        {
+          "offset": 122362,
+          "bytes": 51,
+          "dimension": 16,
+          "sha256": "3444b20ac91ead5b339beec3a8d59f6061e859cc020184bf1b312b0d66456e9f"
+        },
+        {
+          "offset": 122417,
+          "bytes": 88,
+          "dimension": 32,
+          "sha256": "07426988aad69899051ab24cd922278db1ba5740fc25305512980a4e3a8d587b"
+        },
+        {
+          "offset": 122509,
+          "bytes": 209,
+          "dimension": 64,
+          "sha256": "a3eff80c40a47d35f69ad972f6a67d63c1867968ab84b90cc199f1cc8488895d"
+        },
+        {
+          "offset": 122722,
+          "bytes": 734,
+          "dimension": 128,
+          "sha256": "979ed638f1bb739e3ddf4d1e4c3ffdb011bcb9d5fcbe86874f18ca6755d886ff"
+        }
+      ],
+      "yuv_sha256": "22c802723f3e710483cd72523360eabcd602101b1a2d331ff3f131039e313710",
+      "decoded": {
+        "filename": "face2-tile00.rrtex",
+        "sha256": "9fcda2bd695e72310b6ad2aedcdb26633d2a869eff3e43cbf6fdc62111b82175",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 2,
+      "tile": 1,
+      "offset": 123456,
+      "bytes": 1104,
+      "sha256": "ad0f38e6d8af850b8cbf63f63d62349fa19de0ce903af04b5ee0af980c6fe3e1",
+      "mips": [
+        {
+          "offset": 123504,
+          "bytes": 44,
+          "dimension": 16,
+          "sha256": "75f34f840f3ec48c1d51e9ca9bad54e48b0bbea28a471876b3b903f90b3cc602"
+        },
+        {
+          "offset": 123552,
+          "bytes": 84,
+          "dimension": 32,
+          "sha256": "4a3c834152c225573ebd559f463686ad5739d3f95c3ec989cce601fd89952057"
+        },
+        {
+          "offset": 123640,
+          "bytes": 205,
+          "dimension": 64,
+          "sha256": "bbecf304c2fe11c97fc223220e3cc60f57a4007a6b5ec9265709a8d85dd3047f"
+        },
+        {
+          "offset": 123849,
+          "bytes": 711,
+          "dimension": 128,
+          "sha256": "2b498f6a2d8164e966370931fb1127788bd0da93e564d371fc714d0ef3783990"
+        }
+      ],
+      "yuv_sha256": "f6914a568bb1eeeb3c554dc13596566f138a20ece73f7b62ec34c68b1c26418c",
+      "decoded": {
+        "filename": "face2-tile01.rrtex",
+        "sha256": "84d96504d7466dd206e38ea2d5cc1abfb45640ad0488be9f1930da4c74e8fca2",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 2,
+      "tile": 2,
+      "offset": 124560,
+      "bytes": 1184,
+      "sha256": "989c0f7df7ff55ff6ad805dace2eaecc68fcaf298a2641599eaa51edecd5b3ff",
+      "mips": [
+        {
+          "offset": 124608,
+          "bytes": 51,
+          "dimension": 16,
+          "sha256": "f48b7cbf316bb3459b95859e47a444f35529b78b7c2e0ccfb378feef24e9e9ad"
+        },
+        {
+          "offset": 124663,
+          "bytes": 84,
+          "dimension": 32,
+          "sha256": "bd3a2ee1a011f43c7bfbbccc00736c4be144d8934e925417c28848c0aab4c6ed"
+        },
+        {
+          "offset": 124751,
+          "bytes": 246,
+          "dimension": 64,
+          "sha256": "95b2ac92e84be7e2a497a3b39bfbb6142a50553495df1bfafc1a033a963a57c6"
+        },
+        {
+          "offset": 125001,
+          "bytes": 743,
+          "dimension": 128,
+          "sha256": "056bffcb767532c7019dbbdc20a8e88a2d119c61854bc3bc3f7aa546716ce2f1"
+        }
+      ],
+      "yuv_sha256": "fd3acb5e00cff036ec23d793e8885d6a7c8ace81c01bd6ea2a741b59278ed396",
+      "decoded": {
+        "filename": "face2-tile02.rrtex",
+        "sha256": "7ad43e6af1bf0f8ce21912f58e287351b3c08711cd2532e0a1d0c61356796bfb",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 2,
+      "tile": 3,
+      "offset": 125744,
+      "bytes": 1222,
+      "sha256": "09b70babe04b16f2ba7a817b1271108134abbd64a5456d538d180f39ee29d853",
+      "mips": [
+        {
+          "offset": 125792,
+          "bytes": 53,
+          "dimension": 16,
+          "sha256": "555a72abb0d39b3861204b55e52eaeb9d6dacaeb67c876d4756a3152376642b3"
+        },
+        {
+          "offset": 125849,
+          "bytes": 94,
+          "dimension": 32,
+          "sha256": "fdd647d1766a021cbe67a1c80c57d8baa8aec2a9df7be138eef0145ca6019fee"
+        },
+        {
+          "offset": 125947,
+          "bytes": 244,
+          "dimension": 64,
+          "sha256": "6646a766b7fb2d1f54ef5933ade234fe58b3374e1005a0b246f6ebdb24844a39"
+        },
+        {
+          "offset": 126195,
+          "bytes": 771,
+          "dimension": 128,
+          "sha256": "1fced7f99ced5a5c6968b8c6aff5fc597516764d9d2c3468f7ea0548c2c0d9d6"
+        }
+      ],
+      "yuv_sha256": "417b558ddd2748c7054744fcc853b5c425944cedeea7e0040ffaaa7627546b7f",
+      "decoded": {
+        "filename": "face2-tile03.rrtex",
+        "sha256": "459b30c3e8c1070bc3248205e293a3d0be15fb527dc89dcb4084a8957fb10203",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 2,
+      "tile": 4,
+      "offset": 126966,
+      "bytes": 1654,
+      "sha256": "0959a8a83f96f7599ae62a0717f774278ee54a65ecdcbd0619c3de92b5a6b905",
+      "mips": [
+        {
+          "offset": 127014,
+          "bytes": 71,
+          "dimension": 16,
+          "sha256": "4753e332af6770eedb9d240fafe6fdd29b18179a6eac900b00233024a3a4a15b"
+        },
+        {
+          "offset": 127089,
+          "bytes": 142,
+          "dimension": 32,
+          "sha256": "7b0c9a34a19b96ec9062a7e8b87a7cff3e4ccae3117eacfc7184363b80732915"
+        },
+        {
+          "offset": 127235,
+          "bytes": 389,
+          "dimension": 64,
+          "sha256": "0fa84fa5715fb1e5dc69d5316363a51dbc0d2bbbbffa297ee9f4f061ee2b11a7"
+        },
+        {
+          "offset": 127628,
+          "bytes": 992,
+          "dimension": 128,
+          "sha256": "6c5cd360920c600e0478d238498a52113a9cd6dc3979a702ad6d501477b99e38"
+        }
+      ],
+      "yuv_sha256": "192b5e93e68e9c8933a17dd1ab769e080317747c56bebfc1ab118fe0d9950c6b",
+      "decoded": {
+        "filename": "face2-tile04.rrtex",
+        "sha256": "325c99080d8d964cf3f5ecd467ec6057423b077c0d56066ad566a980f126d2e1",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 2,
+      "tile": 5,
+      "offset": 128620,
+      "bytes": 1733,
+      "sha256": "3530a0c2ca01aeb5e9233a862c9fcc7663c47f58b9d0163c77c662fb5955c0b9",
+      "mips": [
+        {
+          "offset": 128668,
+          "bytes": 76,
+          "dimension": 16,
+          "sha256": "d85462a22c6994b9a22ead9cc5d35f4c467772d7f1abf0aec6242981c7fa9414"
+        },
+        {
+          "offset": 128748,
+          "bytes": 154,
+          "dimension": 32,
+          "sha256": "76a9860318d198b821f01d52fc159395e0458d3da52a4bddef19f1e1eb5fb7a1"
+        },
+        {
+          "offset": 128906,
+          "bytes": 404,
+          "dimension": 64,
+          "sha256": "6156c492f6e50c12b936ca35d8399e97751a84575d0279b136baa555a54c3ba3"
+        },
+        {
+          "offset": 129314,
+          "bytes": 1039,
+          "dimension": 128,
+          "sha256": "6c8d66e533380f31930565a1ed3edfd33688a414b01235002a2effec1ef74bdc"
+        }
+      ],
+      "yuv_sha256": "c9bc9dada11dc350430125c2bb7aae73fe60a84c9f55bc1380855c12cb7e0ab5",
+      "decoded": {
+        "filename": "face2-tile05.rrtex",
+        "sha256": "b1866d41f22d6a936e3aec16afff4bea7dfb2e1aa6d5a506bcfba7fd2da52a0f",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 2,
+      "tile": 6,
+      "offset": 130353,
+      "bytes": 1672,
+      "sha256": "b16ab2a2c4455054e7e8283572d58800b10e50de7bb6a74df3ac7b9bf388574e",
+      "mips": [
+        {
+          "offset": 130401,
+          "bytes": 73,
+          "dimension": 16,
+          "sha256": "73ada28c6635504821b0e3f6af0ef44e2413f2cf7e7aaf1b08e9ed8fafeba399"
+        },
+        {
+          "offset": 130478,
+          "bytes": 153,
+          "dimension": 32,
+          "sha256": "5581af432687625f30f7b7904b18a11cabe567e1491d3fa37b3beb49bfb6d6bf"
+        },
+        {
+          "offset": 130635,
+          "bytes": 385,
+          "dimension": 64,
+          "sha256": "d705c8af9704f6d3f8df45c6fddf4efe45b89dd405ce982db61f23f027bc2c25"
+        },
+        {
+          "offset": 131024,
+          "bytes": 1001,
+          "dimension": 128,
+          "sha256": "26d9b887ddffe3786956d9d5523da351c9503e247928921ad7b2a3fe16986ef3"
+        }
+      ],
+      "yuv_sha256": "2ce000da26add5904c5f50c9d14b0ad27fb4c81516b525fa31a2699753df43ad",
+      "decoded": {
+        "filename": "face2-tile06.rrtex",
+        "sha256": "b32652a7870090fb1fabd47ebe999adfda353605c207c100987c863383420078",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 2,
+      "tile": 7,
+      "offset": 132025,
+      "bytes": 1580,
+      "sha256": "bf08c43171df74fd9aaef27da60800a54ae03e6fbbda9fe0eb60969c2573dd11",
+      "mips": [
+        {
+          "offset": 132073,
+          "bytes": 73,
+          "dimension": 16,
+          "sha256": "a2156e21cf659cef5a5202cf4501330a535250dd71710575cd1d2c19fdcb2a66"
+        },
+        {
+          "offset": 132150,
+          "bytes": 145,
+          "dimension": 32,
+          "sha256": "5b5d729fbeabaf00833538f144e8d945358e3e26927d893179ea88eca20469cc"
+        },
+        {
+          "offset": 132299,
+          "bytes": 356,
+          "dimension": 64,
+          "sha256": "76e33eaff5ef7289eadd4bbac76e8caad4d0a3dd33059dffb19394c1e00c1476"
+        },
+        {
+          "offset": 132659,
+          "bytes": 946,
+          "dimension": 128,
+          "sha256": "e9cd4eda3cfc727cf46581086a200abb7b5256674ef77b735cc238e002732102"
+        }
+      ],
+      "yuv_sha256": "e796e9477af46f33c8ccd436043b891987b2075642c1e28256d090e93d9a64c7",
+      "decoded": {
+        "filename": "face2-tile07.rrtex",
+        "sha256": "b2215161aad08f83bee0c9c245b849e123179a044a636ddaf1c2730bbca309fd",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 3,
+      "tile": 0,
+      "offset": 133605,
+      "bytes": 1152,
+      "sha256": "b9115d345f05675812a1c2ec20d27e4147c6f42d57774ddfdc1a71c5b671b381",
+      "mips": [
+        {
+          "offset": 133653,
+          "bytes": 49,
+          "dimension": 16,
+          "sha256": "100643d4426815642b55832216368e30a36f83829fb691281a4110fb83969987"
+        },
+        {
+          "offset": 133706,
+          "bytes": 89,
+          "dimension": 32,
+          "sha256": "55ce8f875e6a952c90a3972b4e41da04f5989965ec00cd65b527e163b1801c47"
+        },
+        {
+          "offset": 133799,
+          "bytes": 222,
+          "dimension": 64,
+          "sha256": "6385b9b3fb04e44c6a0955f34f9f7d8a1945db5f379c4d257007b122a68093ca"
+        },
+        {
+          "offset": 134025,
+          "bytes": 732,
+          "dimension": 128,
+          "sha256": "6e33d674eadb8e6adac0564e942d1ce4d8cbfdce2a47d1b6cc75a912321fae04"
+        }
+      ],
+      "yuv_sha256": "b06e9dc7affa93bdb928a42d348e0df2b3ed86708e82c7396df8a41bf446fe42",
+      "decoded": {
+        "filename": "face3-tile00.rrtex",
+        "sha256": "1a1f4ea072fb9a0f62469ffd4ee023a6eeef7aebf3682732d2d6e1bf344120fe",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 3,
+      "tile": 1,
+      "offset": 134757,
+      "bytes": 1140,
+      "sha256": "5a58a13817c794cf0db466e96824afe53fa0edd7325f4db9f979f873cfff7b01",
+      "mips": [
+        {
+          "offset": 134805,
+          "bytes": 41,
+          "dimension": 16,
+          "sha256": "18edf18e6b60291908d1d6ce864b0aa67f0fc30c7eb1613ccb252ab1e7b3a85d"
+        },
+        {
+          "offset": 134850,
+          "bytes": 74,
+          "dimension": 32,
+          "sha256": "64f3c97871588b8f4fa9d1251a7fadea5b6195f8a1d20e378f063938943b306f"
+        },
+        {
+          "offset": 134928,
+          "bytes": 220,
+          "dimension": 64,
+          "sha256": "75ddc18a526719dcf8104c08bb540498588694f67d529c37e8368de27ad5ac80"
+        },
+        {
+          "offset": 135152,
+          "bytes": 745,
+          "dimension": 128,
+          "sha256": "4f24cdac1a74d90980c4851b6a571da3345ee0a4e127de59c8ea8aa5af7ef9c2"
+        }
+      ],
+      "yuv_sha256": "cc2c87d4fa4f405fc3eb2168f9a25675509c0ee98bb479d8ff8e91086cb69297",
+      "decoded": {
+        "filename": "face3-tile01.rrtex",
+        "sha256": "a41aa14a4199c2373d3aafe07204e8a3b8c25d39640fc89df92b275b210362d9",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 3,
+      "tile": 2,
+      "offset": 135897,
+      "bytes": 1152,
+      "sha256": "a059c1c59f11b02669412f8f3f10b4576d8bdd2d492e83d470f8d503774cd882",
+      "mips": [
+        {
+          "offset": 135945,
+          "bytes": 46,
+          "dimension": 16,
+          "sha256": "a2f541bde819a6b9fe8321e4118e10be425f30c4ed2889e67d93221691dfb74f"
+        },
+        {
+          "offset": 135995,
+          "bytes": 88,
+          "dimension": 32,
+          "sha256": "bf35e55b48363c7638c098a133fe99059fb0370e9542011d2ae725be80a4067d"
+        },
+        {
+          "offset": 136087,
+          "bytes": 213,
+          "dimension": 64,
+          "sha256": "39a961acfb9f9954c32f0a3436cb6ad4130b8f0e15b1a357b184addac08d0a7e"
+        },
+        {
+          "offset": 136304,
+          "bytes": 745,
+          "dimension": 128,
+          "sha256": "86e74b6351e1480aeb1d3588f7d5e5235af23e1a89e207777e891c4145ccfa36"
+        }
+      ],
+      "yuv_sha256": "0ce4ddfe6dd6746ab012efdf9003f466e107f324bc4d1d4dcd1983fa7754922c",
+      "decoded": {
+        "filename": "face3-tile02.rrtex",
+        "sha256": "899b8fa2e3c5171a17a68d665465fad67055ffdb3fbd722c93aba7e6e4fcc77f",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 3,
+      "tile": 3,
+      "offset": 137049,
+      "bytes": 1056,
+      "sha256": "708d45d072bd36d1cfae7daf9caa6fd0d007fc3ee08cb22be0b9eebb83e48cdb",
+      "mips": [
+        {
+          "offset": 137097,
+          "bytes": 49,
+          "dimension": 16,
+          "sha256": "e638bf71c2cb866e3531d6df73f7045bac05a1b85b53d73ad7dc5987735c5768"
+        },
+        {
+          "offset": 137150,
+          "bytes": 81,
+          "dimension": 32,
+          "sha256": "88d8bda370738f5494b1e0948314e2e23eb979a17ed7fd7487e1b5549d5ed2be"
+        },
+        {
+          "offset": 137235,
+          "bytes": 217,
+          "dimension": 64,
+          "sha256": "1c262da1b06a000952b10f1f0fd322a7def6ec1d0e7f2d577037652c1187da72"
+        },
+        {
+          "offset": 137456,
+          "bytes": 649,
+          "dimension": 128,
+          "sha256": "f5deb14e5e6eebc966df6095da697e3d6618118c1b9749e4060ff61870f250b6"
+        }
+      ],
+      "yuv_sha256": "a8e2f1e16e0c77675d245f703a5b2d562f9c26fe50b61d675f92194ce96bba08",
+      "decoded": {
+        "filename": "face3-tile03.rrtex",
+        "sha256": "d7a4696359965c0f4bcf0fa4b520cd76bf504abfc51d3a7eb0bfc4fb03fabca1",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 3,
+      "tile": 4,
+      "offset": 138105,
+      "bytes": 1605,
+      "sha256": "1bfcdf99e5e8ddfb10841f58aba2cd2fcd8033f4cfd31ee0adf6876e44516f72",
+      "mips": [
+        {
+          "offset": 138153,
+          "bytes": 76,
+          "dimension": 16,
+          "sha256": "3a0f3e6df3f7eee6f709fdbfb19f596a98e003c541014829b744f4bfe4a51eb8"
+        },
+        {
+          "offset": 138233,
+          "bytes": 145,
+          "dimension": 32,
+          "sha256": "5c7bbb631c52c242a7db770212af3d9875a1e1dfd35dbddede86ac6f3948e133"
+        },
+        {
+          "offset": 138382,
+          "bytes": 373,
+          "dimension": 64,
+          "sha256": "8f13aef1f3bc26facbcc0e30d14dc250b792c67bcac31d7d1d4162e13cfc204e"
+        },
+        {
+          "offset": 138759,
+          "bytes": 951,
+          "dimension": 128,
+          "sha256": "3ad02485dfc2280e1ac5d3c2344a975115eefb4d275c0497faa702c0a9b426e9"
+        }
+      ],
+      "yuv_sha256": "18754b6204153936a094ffb50c3bbe1d2f59ce573765b4fda608958fb14b29a5",
+      "decoded": {
+        "filename": "face3-tile04.rrtex",
+        "sha256": "4bd2a177c8829266bd88ea70dfeb5b5301096582e86b82f0ac4c60e4014ebdd4",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 3,
+      "tile": 5,
+      "offset": 139710,
+      "bytes": 1603,
+      "sha256": "788f103668135c7cdc4046cba7b36dab16c69444986dc5e6b36ba571dde30585",
+      "mips": [
+        {
+          "offset": 139758,
+          "bytes": 75,
+          "dimension": 16,
+          "sha256": "c8ca4b7459effd8f6ee8b304a253855f01b4b0e4458594e5727a03f5d379d3e6"
+        },
+        {
+          "offset": 139837,
+          "bytes": 148,
+          "dimension": 32,
+          "sha256": "bec7f01ebba5e15cd2eebfc4d8e085e4a7e4dd93de38910f3546a86761eab710"
+        },
+        {
+          "offset": 139989,
+          "bytes": 360,
+          "dimension": 64,
+          "sha256": "ec141e4873be051e22ba9e523556cf3f2456030edeb82879d9f7d76193ac0d31"
+        },
+        {
+          "offset": 140353,
+          "bytes": 960,
+          "dimension": 128,
+          "sha256": "c9cc00f12de4b4a69ade669c061d9515fcac0dba23280ba1ce0e7ca13849d36e"
+        }
+      ],
+      "yuv_sha256": "d9666455a5df491afdf3dcba38b4c9a121783a4fae9f2c3a2ef8b957bef4c1f2",
+      "decoded": {
+        "filename": "face3-tile05.rrtex",
+        "sha256": "0f1854aedece99922d553460543379a9be6dd8951892d8b0de4a73705bdf4bdc",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 3,
+      "tile": 6,
+      "offset": 141313,
+      "bytes": 1644,
+      "sha256": "4214bcea0cf5c76e7fa6de64b5687f6ee4ea0ef25c14e8eb0af5a6bd99f2843d",
+      "mips": [
+        {
+          "offset": 141361,
+          "bytes": 78,
+          "dimension": 16,
+          "sha256": "adfb1bcdc9902ccd2ffe5e5b6f7a648de563b823578ee885d8f1853de1dc7371"
+        },
+        {
+          "offset": 141443,
+          "bytes": 153,
+          "dimension": 32,
+          "sha256": "054a958f24d923f495b0f8beb750fd9385be239ca2e1ff45bb333558ef50dba6"
+        },
+        {
+          "offset": 141600,
+          "bytes": 371,
+          "dimension": 64,
+          "sha256": "c50fcc5d707299d091df0f40d333f2e9e25a3167d200d9b4a17575158db1ded8"
+        },
+        {
+          "offset": 141975,
+          "bytes": 982,
+          "dimension": 128,
+          "sha256": "99a3e15c8e0298c339b763d837e79bd28ac1a81a43048499bfb7b809cf8897a6"
+        }
+      ],
+      "yuv_sha256": "9ec009179812afeac369ce1fa34c852ff92d3881e3834501464cd4f793f6eeb7",
+      "decoded": {
+        "filename": "face3-tile06.rrtex",
+        "sha256": "ab50cf7ea136e21aa1db491e28130be2127eacd36e06a3fdf917871a2111231d",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 3,
+      "tile": 7,
+      "offset": 142957,
+      "bytes": 1543,
+      "sha256": "b001b420137c52c7bf026a2c2b19eb7a9aa5441c3fcc6deed02305e063df287f",
+      "mips": [
+        {
+          "offset": 143005,
+          "bytes": 74,
+          "dimension": 16,
+          "sha256": "e1ab80d587004786c0bc2d69abfb082502cae7685b1a783b350b13b22e72be83"
+        },
+        {
+          "offset": 143083,
+          "bytes": 142,
+          "dimension": 32,
+          "sha256": "4a92f4aafd030dec4fcef6b8179c806a80d60f18b4dea0dd4c2c1acaa3ae2e4e"
+        },
+        {
+          "offset": 143229,
+          "bytes": 355,
+          "dimension": 64,
+          "sha256": "3cd1e38c0732bc2b4aadd22c569928fefc47808b836abd1bd75681c34e147666"
+        },
+        {
+          "offset": 143588,
+          "bytes": 912,
+          "dimension": 128,
+          "sha256": "c5b0edda2b4c987d27fb0ab29fa67ebe6af340bc0ab1a90eb9971b1d4f43826b"
+        }
+      ],
+      "yuv_sha256": "3e1a35e7efe88fb2df448ae3ee199305fc9c06941675398d7b0c00017b1746ec",
+      "decoded": {
+        "filename": "face3-tile07.rrtex",
+        "sha256": "d63ef1a9659e49858cc7c6016aac4450a07e3c64a9ba71149e8873965991e17b",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 0,
+      "offset": 144500,
+      "bytes": 1171,
+      "sha256": "c953514467ab490c9248b2cdc3bccb523a47d78baa1730e6dda24b41cf0498d7",
+      "mips": [
+        {
+          "offset": 144548,
+          "bytes": 47,
+          "dimension": 16,
+          "sha256": "b19241e6c0fc2efd3734b2203991b29364f6b862130fc7e1692d6c474405a6b6"
+        },
+        {
+          "offset": 144599,
+          "bytes": 83,
+          "dimension": 32,
+          "sha256": "91cd4bc57c027857988cc6b901d135411f1bc5a5268244221dac3d00f26c97ed"
+        },
+        {
+          "offset": 144686,
+          "bytes": 212,
+          "dimension": 64,
+          "sha256": "f58c964c6814c14aae533979691b98a5bcdba7452654fcc24441da15434c5807"
+        },
+        {
+          "offset": 144902,
+          "bytes": 769,
+          "dimension": 128,
+          "sha256": "0b19b4dfee5cdeae952912d8fe8bfb6aa3a51bb20385a168d6fc4cbb5bd998be"
+        }
+      ],
+      "yuv_sha256": "88dbf08ee72f71ddc58687e1f834f481669392a934c0d2efe88c4f886f468947",
+      "decoded": {
+        "filename": "face4-tile00.rrtex",
+        "sha256": "4ec54bb45822fe50d1ed3ab63afd6e3d619d5c18bbee0f92fb578c0fd7f516b9",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 1,
+      "offset": 145671,
+      "bytes": 1041,
+      "sha256": "693a6d40a9d9bacf9dca7a68459eae3660ed6d0551b6227fb3cf0b470f2e3712",
+      "mips": [
+        {
+          "offset": 145719,
+          "bytes": 47,
+          "dimension": 16,
+          "sha256": "99ff0db8a3a92c2ea65e238119838692983cc11a51581de48e0c230997fc1f46"
+        },
+        {
+          "offset": 145770,
+          "bytes": 78,
+          "dimension": 32,
+          "sha256": "cea750d91093cf31d859d8513a3d09bf3ac5ecad44c5f94a62ce401feb3a0d9d"
+        },
+        {
+          "offset": 145852,
+          "bytes": 202,
+          "dimension": 64,
+          "sha256": "ab0f3a35f28f1c3e862f71cc21aad0975b7fa8cab6a7b40de21d12128fd91e40"
+        },
+        {
+          "offset": 146058,
+          "bytes": 654,
+          "dimension": 128,
+          "sha256": "5b8ea81f7980b3ed120b02709daeb79e84c8c53f551b844808a1c2994a444d54"
+        }
+      ],
+      "yuv_sha256": "4340ff1599132a22ae1646529137bd03931198d42749d4c661d641b9f3c8a2fd",
+      "decoded": {
+        "filename": "face4-tile01.rrtex",
+        "sha256": "0a804b9e71a9c9f5cbb92b200c6380c68c506b3c865bcd7e42684f8b3f2e0749",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 2,
+      "offset": 146712,
+      "bytes": 1117,
+      "sha256": "e093f699cde0658873107e564438f7e4ed679270760f3e89ab58e55b20b7525d",
+      "mips": [
+        {
+          "offset": 146760,
+          "bytes": 42,
+          "dimension": 16,
+          "sha256": "0a8254aeb4c251ba4afaa8d0465f9b1ace85c9264815b1708b2e9de1da4a28ef"
+        },
+        {
+          "offset": 146806,
+          "bytes": 75,
+          "dimension": 32,
+          "sha256": "6e62aaa4991f80ed22fcbb5f09d00da040830bdeb3707937b73483fb5ec98d9a"
+        },
+        {
+          "offset": 146885,
+          "bytes": 205,
+          "dimension": 64,
+          "sha256": "51af67b59d3712f87e7d668c6cee730059011a834b196f1d1ee652944cb86484"
+        },
+        {
+          "offset": 147094,
+          "bytes": 735,
+          "dimension": 128,
+          "sha256": "6264c8e4eccb8911ceafd288c5ba94a24ff5c05d959ba04b128eaa249a11f798"
+        }
+      ],
+      "yuv_sha256": "600592aecbed8366b7c90bed5cb051d5e9f812bcf80d4e39730b1cd6ddc4917e",
+      "decoded": {
+        "filename": "face4-tile02.rrtex",
+        "sha256": "bed252e401748c6a892889d3349595f46ea739c22fd245b60f5cfc75d45e224c",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 3,
+      "offset": 147829,
+      "bytes": 953,
+      "sha256": "06bf6180748748d4b34fb84323e28e27c33507485b6c9208bb8708e7e7dc9035",
+      "mips": [
+        {
+          "offset": 147877,
+          "bytes": 39,
+          "dimension": 16,
+          "sha256": "4382826aebd4c370a5dded9fb0694b54340522cecaf9c2d4f35761d95b376c96"
+        },
+        {
+          "offset": 147920,
+          "bytes": 75,
+          "dimension": 32,
+          "sha256": "40b014ed682501bb362ff92bb02fb33dc7951c52119a944a1dbec070b97cf50e"
+        },
+        {
+          "offset": 147999,
+          "bytes": 180,
+          "dimension": 64,
+          "sha256": "9f4f2804f71b732128d06ab281cb84dcf3ce3233cf4f1cbe7ec784a4246b14c6"
+        },
+        {
+          "offset": 148183,
+          "bytes": 599,
+          "dimension": 128,
+          "sha256": "64a9124848afa727c3fea12d1ea6263a0449a640c43c3babe82ab0312357ba38"
+        }
+      ],
+      "yuv_sha256": "a14f8339193a0ee1bffe00872475d08b19e178c1853018c45649ef800f980579",
+      "decoded": {
+        "filename": "face4-tile03.rrtex",
+        "sha256": "b77d67ca311dee260e95978b1f0dc046d797ecd5264bf4a0d801e4bdac3261c0",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 4,
+      "offset": 148782,
+      "bytes": 1160,
+      "sha256": "72d60bad77126476600057db3c748140f026a70ff6099dc776dceac82d5f5007",
+      "mips": [
+        {
+          "offset": 148830,
+          "bytes": 44,
+          "dimension": 16,
+          "sha256": "2bc2a30ec09483c4e71958b41816146fed04d1f9985f8e6fd8c70b01200f540c"
+        },
+        {
+          "offset": 148878,
+          "bytes": 92,
+          "dimension": 32,
+          "sha256": "43a28d834c2e7a09b56f56a94b18552ccd1113279d915449d0984890a9aea6bb"
+        },
+        {
+          "offset": 148974,
+          "bytes": 227,
+          "dimension": 64,
+          "sha256": "29bad932e79338e155e7bdf94027f5fe362d69b3ea12f5983e3cc62d86b921c0"
+        },
+        {
+          "offset": 149205,
+          "bytes": 737,
+          "dimension": 128,
+          "sha256": "a6f1259a624b9c24ae8b640383465bad3ca495d8a451cfac7b6a5db75652e9c5"
+        }
+      ],
+      "yuv_sha256": "cd6d79ede89dd420b415f4ccffcdddf3e6e2ff11e591e5a2dfed4f36d418dd8f",
+      "decoded": {
+        "filename": "face4-tile04.rrtex",
+        "sha256": "9d2c95148064db1616f51eae73a36462dcef465ff786758a81d81ec3aa070122",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 5,
+      "offset": 149942,
+      "bytes": 990,
+      "sha256": "bcbce89fb8ff455fa6a9ce8e6da17533e6ffc9c83e7080f5fa62aa5f905f3d32",
+      "mips": [
+        {
+          "offset": 149990,
+          "bytes": 38,
+          "dimension": 16,
+          "sha256": "8912852a65bda31d62ca90a6a5c6f8a7fb423bc9ba6c931530e109e15baf10a2"
+        },
+        {
+          "offset": 150032,
+          "bytes": 68,
+          "dimension": 32,
+          "sha256": "40b4f040d568ba790f462b47e9f67d4e990e305ff6909a3cba87938e1df775ad"
+        },
+        {
+          "offset": 150104,
+          "bytes": 186,
+          "dimension": 64,
+          "sha256": "414c1d9bc3e5deb060563dcf02dd29a3b91d3f188a2ac2eb95f7e542820cc17e"
+        },
+        {
+          "offset": 150294,
+          "bytes": 638,
+          "dimension": 128,
+          "sha256": "c3204afccd63c8c7c2f08fc705936e0350c9003492ea1cae671e97d9daa970f7"
+        }
+      ],
+      "yuv_sha256": "6741c3de0ff1d371e396b12f044357a38d4ffaa93166ba74399c9616984ce190",
+      "decoded": {
+        "filename": "face4-tile05.rrtex",
+        "sha256": "e0a8b0b0c57e32f56eeaa7edd1ac239cb37313d0068cf3ed19f7e4ded81fd840",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 6,
+      "offset": 150932,
+      "bytes": 1334,
+      "sha256": "23e95d41e0fa42e6202b4d03bcf47ca5cae328d62fd215cdb7261fb50bbddfa9",
+      "mips": [
+        {
+          "offset": 150980,
+          "bytes": 41,
+          "dimension": 16,
+          "sha256": "cc6fc7cd065b829a89821b55b611cd8199789badba086d0ee40ebac1e1a18dbc"
+        },
+        {
+          "offset": 151025,
+          "bytes": 86,
+          "dimension": 32,
+          "sha256": "682dea6ca20a178b37cd0993833534d4adada5260bc9539d7c7ed9bf80908480"
+        },
+        {
+          "offset": 151115,
+          "bytes": 265,
+          "dimension": 64,
+          "sha256": "de9e6fc74364df9cf1f1ae55dae8c8e4ea23743409f9e0420adec69035959096"
+        },
+        {
+          "offset": 151384,
+          "bytes": 882,
+          "dimension": 128,
+          "sha256": "c70b971327099976839429ba7c46642ca52675d99ef989530a607066bac04fd4"
+        }
+      ],
+      "yuv_sha256": "9d0b2e79dc859838fc05830d99ffea37693404f08236a88b0c094f397bc99362",
+      "decoded": {
+        "filename": "face4-tile06.rrtex",
+        "sha256": "7ac1f75dbb6445ac2216ba9f9e04e5651a67e6be4d9e4914026235b26d5a3c62",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 7,
+      "offset": 152266,
+      "bytes": 933,
+      "sha256": "98957153d373eb64ec534e1ad48e390ce32ce89f67d246e7f602ed781c3d61e7",
+      "mips": [
+        {
+          "offset": 152314,
+          "bytes": 39,
+          "dimension": 16,
+          "sha256": "1e5db9fb9875e9b78df83b41ab6829957f04fc13d1dae8c2f7af075e838869c0"
+        },
+        {
+          "offset": 152357,
+          "bytes": 73,
+          "dimension": 32,
+          "sha256": "a35a6d4fd9809cf61087fe6a0151ab77c035b743af5b7cadf7c4fbb322797e40"
+        },
+        {
+          "offset": 152434,
+          "bytes": 150,
+          "dimension": 64,
+          "sha256": "2cb9b2b54369757b0f8de04d2b7e16c78a42012ed8b574a9c642a1b0cdcfb72e"
+        },
+        {
+          "offset": 152588,
+          "bytes": 611,
+          "dimension": 128,
+          "sha256": "f9eeef3b56db07609a5e2c71c7b794f4a389a76b0ab1f4e9bcf1dd362f508961"
+        }
+      ],
+      "yuv_sha256": "920429867c464872fc2fc68a887629cfb95c2eeb79819ef570b15effc858c386",
+      "decoded": {
+        "filename": "face4-tile07.rrtex",
+        "sha256": "8e0116746fdd83e46d57f1e9cdeff1d4302d969ac05724d4082e7ed71834fe4c",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 8,
+      "offset": 153199,
+      "bytes": 1029,
+      "sha256": "0016cd68ab1de00d94599a6c19bedf913c9364839b42bf431532be2a77523d68",
+      "mips": [
+        {
+          "offset": 153247,
+          "bytes": 42,
+          "dimension": 16,
+          "sha256": "63da4f844840693f8ac6aa7aa6aa235a4ea4f3dfc655d48ba2d49aac2be0481e"
+        },
+        {
+          "offset": 153293,
+          "bytes": 72,
+          "dimension": 32,
+          "sha256": "37d48ffee8df56d5f6f9dc737d676e00bd028c8ca9d4fc95e974891d7283a935"
+        },
+        {
+          "offset": 153369,
+          "bytes": 192,
+          "dimension": 64,
+          "sha256": "3a045831d7a98e64ddd62c63f098022eb1391449b22284bc4200093eef0a17e0"
+        },
+        {
+          "offset": 153565,
+          "bytes": 663,
+          "dimension": 128,
+          "sha256": "e47ef558379dacef47188bbdb8a1a49e34fe1ccc57c7f406967130ea71666320"
+        }
+      ],
+      "yuv_sha256": "038fccbe23468ff7f98422952ecf7cb48a3442ce9c5893bd00e6a37037a9d11b",
+      "decoded": {
+        "filename": "face4-tile08.rrtex",
+        "sha256": "e3f2d26e2ba0da3b3978d5b94dc8b82585cff88bbea4736880fcceb7f210cce7",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 9,
+      "offset": 154228,
+      "bytes": 1066,
+      "sha256": "b23ca8922a61ab03d864554929a9ce467d267cc62ad0f15906de56aa2cc40935",
+      "mips": [
+        {
+          "offset": 154276,
+          "bytes": 42,
+          "dimension": 16,
+          "sha256": "3b5d1e40851d1343b9e1740a5bf546b67ddb7d7913377b47c4f3fc4ad44c2d23"
+        },
+        {
+          "offset": 154322,
+          "bytes": 83,
+          "dimension": 32,
+          "sha256": "bdb81028f21c7f57680758cbeaaafbc153611e5de5c291df9f8ad33373575b6c"
+        },
+        {
+          "offset": 154409,
+          "bytes": 208,
+          "dimension": 64,
+          "sha256": "20ff2bbf2561241eb07cdc1a7b3d0b7419718a3a4de314aa81d8f952a16e1ff9"
+        },
+        {
+          "offset": 154621,
+          "bytes": 673,
+          "dimension": 128,
+          "sha256": "c8401afb0ca05ac6e16d88f2894300c8f5768354ea240a4f720a7bb50123e335"
+        }
+      ],
+      "yuv_sha256": "8ed81e8fb8018b07713399ce4759ef4e9ef059ced40195163a8c1a7bae5bd6f9",
+      "decoded": {
+        "filename": "face4-tile09.rrtex",
+        "sha256": "107cc2c9deb1a830fe633403c0bb692ddceb985ffe65e73d6b168c330589673b",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 10,
+      "offset": 155294,
+      "bytes": 1072,
+      "sha256": "574b6bbf3520a04e8c09fcbb57c90ae7735927b4e6005e95e2f8ee50545915ca",
+      "mips": [
+        {
+          "offset": 155342,
+          "bytes": 41,
+          "dimension": 16,
+          "sha256": "ebc5646f562cfc7e3ec6d2c7a953108404b077883f58be096ab40a48fb084d51"
+        },
+        {
+          "offset": 155387,
+          "bytes": 74,
+          "dimension": 32,
+          "sha256": "6e152b376802d1c17ab14abc5c842918efb2c44cdfb1e38b74b27dd3cbf3b3b1"
+        },
+        {
+          "offset": 155465,
+          "bytes": 198,
+          "dimension": 64,
+          "sha256": "ac5e4f821153592c0cffca56ffd8d1025758bc778093eb1b74b983b6e28d94e5"
+        },
+        {
+          "offset": 155667,
+          "bytes": 699,
+          "dimension": 128,
+          "sha256": "c013043d9cf2dd067469fcdcc3b63f488ae637c2e8869f515eee251c853ea9c9"
+        }
+      ],
+      "yuv_sha256": "55fa2b686f71352052b6317e80ee4f68e57f05e88ad0cd0d184b57bf55d8d33f",
+      "decoded": {
+        "filename": "face4-tile10.rrtex",
+        "sha256": "2984b59e5b38ba1b86358597715e676b1ae0d67cce157ecb2d0c967954e4bc1f",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 11,
+      "offset": 156366,
+      "bytes": 1074,
+      "sha256": "d366673d6f158257f9b9983c9bde3fa84fa102a0f3200dc571a32e56e9c2005c",
+      "mips": [
+        {
+          "offset": 156414,
+          "bytes": 40,
+          "dimension": 16,
+          "sha256": "f30391ce405f5541bfd911acbe2112b62e2a95a79acf5f458d75f4cc635d58bd"
+        },
+        {
+          "offset": 156458,
+          "bytes": 69,
+          "dimension": 32,
+          "sha256": "84e8e8539ee01d5991bef5f24b3a72ca97996892ff249138a8fe2cd93da1fd3c"
+        },
+        {
+          "offset": 156531,
+          "bytes": 188,
+          "dimension": 64,
+          "sha256": "2b416bd32dbb6f706b845ee645d73b1b3f4ffffac3798247dfc83dd3c85220cc"
+        },
+        {
+          "offset": 156723,
+          "bytes": 717,
+          "dimension": 128,
+          "sha256": "e3f72621e55a8f9b4bfc957452b190f9f7efdc391ec114c1228ec9bcab4f30c8"
+        }
+      ],
+      "yuv_sha256": "753d350b367831f8e5ed1b251ea574ddae83341dc45629c3b48aa794a3b67371",
+      "decoded": {
+        "filename": "face4-tile11.rrtex",
+        "sha256": "e87150917d335d63a09fbfd0c8169b7ec971315f8f2171839a1ebb39b03e06ac",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 12,
+      "offset": 157440,
+      "bytes": 1091,
+      "sha256": "81d76070035b4e90d4da0522d296b5cbb1c929266c88979237a0cba4dae507c8",
+      "mips": [
+        {
+          "offset": 157488,
+          "bytes": 43,
+          "dimension": 16,
+          "sha256": "baedca21fc0eeb29ec7733205c9237c59539cb1566679f0c72bbe071e88a0dcb"
+        },
+        {
+          "offset": 157535,
+          "bytes": 84,
+          "dimension": 32,
+          "sha256": "d68cdfbf40901c143ed7d7cb930f0b139a2818712a221219a549d1153a13b041"
+        },
+        {
+          "offset": 157623,
+          "bytes": 197,
+          "dimension": 64,
+          "sha256": "d627dcf910612d9a31d8df37820d14d17c6d321e03259d92f18a9b395f6eb5c7"
+        },
+        {
+          "offset": 157824,
+          "bytes": 707,
+          "dimension": 128,
+          "sha256": "4da26b3aecc171ecbf97b77d43ff584196aafcf6c25866b5ba3b6616f4cf80ae"
+        }
+      ],
+      "yuv_sha256": "62adc2f48eab6d636aa6394cd64aa9f1ea5f54e72a643f960fb8d07296ee96ba",
+      "decoded": {
+        "filename": "face4-tile12.rrtex",
+        "sha256": "6be2b1d983a66a77983644b387b8d5bf1030f52c5ff70e537d19fbf981926347",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 13,
+      "offset": 158531,
+      "bytes": 1107,
+      "sha256": "0a8e84ae1774a3c507a02ecb9079713e75bf280c93d25d370e5c136aba4acc13",
+      "mips": [
+        {
+          "offset": 158579,
+          "bytes": 45,
+          "dimension": 16,
+          "sha256": "601b949a982364a5d040c454a6dd3b7443ad9b1f5dcb27c43926812686314ec9"
+        },
+        {
+          "offset": 158628,
+          "bytes": 76,
+          "dimension": 32,
+          "sha256": "0d41226f04eeb435a8677461a6017cea46f6a02b8c4d233afa0bc6b56e9c5a1e"
+        },
+        {
+          "offset": 158708,
+          "bytes": 211,
+          "dimension": 64,
+          "sha256": "95652bce3fa872114bb59297da51d79b361f97bd49958f855563c20538b1c168"
+        },
+        {
+          "offset": 158923,
+          "bytes": 715,
+          "dimension": 128,
+          "sha256": "06131d5bfa4561184b85c78ae5fbe35b6f4c4b7f473a3b6c7913ba1fa1e96098"
+        }
+      ],
+      "yuv_sha256": "2d80237e65f222beb202760e0dc24848071b05d616087363bdc2986d2f9d49ac",
+      "decoded": {
+        "filename": "face4-tile13.rrtex",
+        "sha256": "832bd3ef6b7fea3d2efb24b0535d384121496b719d611c69cc962fa9eebcacbe",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 14,
+      "offset": 159638,
+      "bytes": 1072,
+      "sha256": "3589afb18e76e09dc683aaf1619ea6d290d9833128b4dff11e489388d761945e",
+      "mips": [
+        {
+          "offset": 159686,
+          "bytes": 40,
+          "dimension": 16,
+          "sha256": "35abaaed6e589dbb44303a5df6866ff7b1aeddd0c22729780b23d511fef5bbb7"
+        },
+        {
+          "offset": 159730,
+          "bytes": 83,
+          "dimension": 32,
+          "sha256": "56416e5770ec115befc3f01701be7fd4532837a09992f6e1f53a4eb798ec08f4"
+        },
+        {
+          "offset": 159817,
+          "bytes": 194,
+          "dimension": 64,
+          "sha256": "d932bc3bd423cdf948348089d1cc458c6a54fce3dcd8003a38f032e06d06341d"
+        },
+        {
+          "offset": 160015,
+          "bytes": 695,
+          "dimension": 128,
+          "sha256": "2ce1d5e47e4667c3532434fdde455376b5ceb6bb1d2fd79605f2071d5087fa10"
+        }
+      ],
+      "yuv_sha256": "bd221d42db57f7fff658058c49f447413c3db4a4881ce1b52f31dbec2c8de115",
+      "decoded": {
+        "filename": "face4-tile14.rrtex",
+        "sha256": "5b15e77cc61edfe72d2a4fc014405fe1cc722ff74038f44db85d41bb34b57320",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "face": 4,
+      "tile": 15,
+      "offset": 160710,
+      "bytes": 1115,
+      "sha256": "f5baed0e65e85bb0e4daf3e4cd1c333bc9933584ac0d23b12a0840493b2fab32",
+      "mips": [
+        {
+          "offset": 160758,
+          "bytes": 43,
+          "dimension": 16,
+          "sha256": "b6009620b6968d945c43311eaeab0f788108999ae89bd36d44752b7090689f7c"
+        },
+        {
+          "offset": 160805,
+          "bytes": 77,
+          "dimension": 32,
+          "sha256": "31c4dad243224a217f4bcf9e85f955189258373d506a54d99e158af43a6479f9"
+        },
+        {
+          "offset": 160886,
+          "bytes": 210,
+          "dimension": 64,
+          "sha256": "1c1dbf09b103e95e7bb75830af9b6871511a9bad52f7e9a914642890e6a6ae00"
+        },
+        {
+          "offset": 161100,
+          "bytes": 725,
+          "dimension": 128,
+          "sha256": "a8d7bd42383789e315a318e2896f9484c3fe1344f6c0740daa168a8b07c939e7"
+        }
+      ],
+      "yuv_sha256": "1f4a7c6bdfbb1e7416fbbccc5e3164a88046742abb247996e3325020e388f76b",
+      "decoded": {
+        "filename": "face4-tile15.rrtex",
+        "sha256": "59b48605420755d608906d2408ee129bdbe71118781b666892174aedf16f23f7",
+        "bytes": 65552,
+        "width": 128,
+        "height": 128
+      }
+    }
+  ],
+  "palette_header": [
+    0,
+    226,
+    0
+  ],
+  "elf_sha256": "c1f1b63eb422b624189e68eb0140b318455e341d73182703017298fea6ce6c30",
+  "elf_verified_anchors": [
+    {
+      "address": "0x24e99c",
+      "word": "0x10820028"
+    },
+    {
+      "address": "0x24f158",
+      "word": "0xc04becc"
+    },
+    {
+      "address": "0x24f198",
+      "word": "0xc04becc"
+    },
+    {
+      "address": "0x24f1b8",
+      "word": "0x24420010"
+    },
+    {
+      "address": "0x257604",
+      "word": "0x3c030800"
+    },
+    {
+      "address": "0x25760c",
+      "word": "0x3c050400"
+    },
+    {
+      "address": "0x257624",
+      "word": "0x3c070001"
+    },
+    {
+      "address": "0x257634",
+      "word": "0xac650000"
+    },
+    {
+      "address": "0x2f56c8",
+      "word": "0x3c039000"
+    },
+    {
+      "address": "0x2f56d4",
+      "word": "0xac430000"
+    },
+    {
+      "address": "0x2421e8",
+      "word": "0x240300ff"
+    },
+    {
+      "address": "0x2421ec",
+      "word": "0xa2230015"
+    },
+    {
+      "address": "0x2421f0",
+      "word": "0xa2230016"
+    },
+    {
+      "address": "0x2421f4",
+      "word": "0x24030001"
+    },
+    {
+      "address": "0x2421fc",
+      "word": "0xa2230017"
+    }
+  ],
+  "decoder_sha256": "5f9af6eba0f07732f913cde7aa40e246d218d38230f57a7aacc027afd25a7c49",
+  "generator_sha256": "d4b2f36d0abd1000c21dadaf144a7419a3aa49e5284c24a5cebb90f28bbf1750",
+  "ffmpeg_sha256": "e8a8d46f5225f3062cec7c07fb145d58ae73c603cb740dcd5bad34bfb54e455a",
+  "ffmpeg_version_report": "ffmpeg version 7.1.5-0+deb13u1 Copyright (c) 2000-2026 the FFmpeg developers\nbuilt with gcc 14 (Debian 14.2.0-19)\nconfiguration: --prefix=/usr --extra-version=0+deb13u1 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --disable-libmfx --disable-omx --enable-gnutls --enable-libaom --enable-libass --enable-libbs2b --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libharfbuzz --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-openal --enable-opencl --enable-opengl --disable-sndio --enable-libvpl --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-ladspa --enable-libbluray --enable-libcaca --enable-libdvdnav --enable-libdvdread --enable-libjack --enable-libpulse --enable-librabbitmq --enable-librist --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libx264 --enable-libzmq --enable-libzvbi --enable-lv2 --enable-sdl2 --enable-libplacebo --enable-librav1e --enable-pocketsphinx --enable-librsvg --enable-libjxl --enable-shared\nlibavutil      59. 39.100 / 59. 39.100\nlibavcodec     61. 19.101 / 61. 19.101\nlibavformat    61.  7.103 / 61.  7.103\nlibavdevice    61.  3.100 / 61.  3.100\nlibavfilter    10.  5.100 / 10.  5.100\nlibswscale      8.  3.100 /  8.  3.100\nlibswresample   5.  3.100 /  5.  3.100\nlibpostproc    58.  3.100 / 58.  3.100\n",
+  "ffmpeg_flags": "-cpuflags 0 -flags +bitexact -idct simple -threads 1 -err_detect explode",
+  "input_policy": "Exact IPUM first frame through B0; final four-byte B1 excluded",
+  "color_policy": "50FC integer BT.601; nearest chroma; RGB16 dither; RGB5 high-bit expansion; TEXA TA0=TA1=255 AEM=1; no row flip",
+  "half_extent": 25600,
+  "camera_relative_y_offset": 1024,
+  "source_uv_range": [
+    0.03125,
+    0.96875
+  ],
+  "hardware_pixel_parity_verified": false,
+  "index_sha256": "ee5bb784a1120b0cbf56f234f0e78cf7ea5dc03d910da11d5d34f9431f1f85b7"
+}

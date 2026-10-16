@@ -121,7 +121,14 @@ bool readFinalImpactAuthoring49Y(const char* text,std::size_t bytes,FinalImpactA
     output=result; if(provenance) *provenance=audit; return true;
 }
 bool readDynamicImpactAuthoring50IW(const char* text,std::size_t bytes,rr::game::DynamicImpactTuning50IW& output,PodPhysicsDiagnostic49N& diagnostic,DynamicImpactProvenance50IW* provenance) noexcept {
-    Parsed p{};if(!read(text,bytes,dynamicImpact,13,true,p,diagnostic))return false;
+    Parsed p{};if(!read(text,bytes,dynamicImpact,13,false,p,diagnostic))return false;
+    // Original1AAB30 initializes54=100 (1AAC6C) and5C=0x3D4CCCCD
+    // (1AAC7C). Reader158A70 skips absent keys; RA.TUN omits these two.
+    // Empty provenance tokens identify constructor values, not authored text.
+    for(unsigned i=0;i<13;++i)if(i!=10&&i!=12&&!p.present[i])
+        return fail(diagnostic,PodPhysicsError49N::missing_key,bytes);
+    if(!p.present[10])p.values[10]=100.f;
+    if(!p.present[12]){const std::uint32_t bits=0x3d4ccccdu;std::memcpy(&p.values[12],&bits,4);}
     rr::game::DynamicImpactTuning50IW result{};DynamicImpactProvenance50IW audit{};
     for(unsigned i=0;i<5;++i){result.thresholds28[i]=p.values[i];result.points3C[i]=p.values[5+i];}
     result.minGrindingSpeed54=p.values[10];result.aiPointsMultiplier58=p.values[11];result.aiMultiplierDecrement5C=p.values[12];result.bound=true;

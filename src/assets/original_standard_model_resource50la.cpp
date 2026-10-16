@@ -1,6 +1,7 @@
 #include "original_standard_model_resource50la.h"
 #include "original_standard_material_table50la.h"
 #include <exception>
+#include <cstdio>
 #include <limits>
 #include <new>
 #include <utility>
@@ -76,7 +77,15 @@ bool OriginalStandardModelGeometry50LA::construct240110(
     std::shared_ptr<const OriginalStandardModelResource50LA> payload,
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver,OriginalStandardModelFileId50LA file,
     const rr::game::OriginalRacerModelSceneOwner50LA* prototype,D& d) noexcept {
-    d={};if(storage_)return fail(d,S::alreadyPrepared,0x240110);
+    d={};
+    struct FailureReport {
+        const std::string* member; D& diagnostic;
+        ~FailureReport(){if(diagnostic.status!=S::complete)
+            std::fprintf(stderr,"original_geometry_failure member=%s status=%u pc=%08x cache=%u cache_pc=%08x\n",
+                member?member->c_str():"",unsigned(diagnostic.status),diagnostic.sourcePC,
+                unsigned(diagnostic.cache.status),diagnostic.cache.sourcePC);}
+    } failureReport{payload?payload->member():nullptr,d};
+    if(storage_)return fail(d,S::alreadyPrepared,0x240110);
     if(!payload||!payload->prepared()||!payload->scene()||!payload->member()||
        !payload->originalBytes()||!resolver||!prototype)return fail(d,S::input,0x26EE38);
     OriginalStandardModelFileView50LA source;
@@ -115,9 +124,17 @@ bool OriginalStandardModelGeometry50LA::construct240110(
         const auto packetBytes=read32(offset+16);
         if(packetBytes>bytes.size()-offset-20)return fail(d,S::geometry,0x24024C);
         const auto at=offset+20+packetBytes;
-        if(bytes.size()-at<4)return fail(d,S::geometry,0x24024C);
-        const auto count=read32(at);
-        if(count==0){
+        // Original static one-node PSGs end exactly after surface data. They
+        // carry no matrix-palette trailer (the authenticated decoder enforces
+        // this). Represent that real native no-palette resource directly;
+        // never read past EOF or invent a zero word in the original file.
+        const bool staticNoPalette=payload->nodeCount()==1&&at==bytes.size()&&
+            !scene.identity_matrix_palette;
+        if(!staticNoPalette&&bytes.size()-at<4)return fail(d,S::geometry,0x24024C);
+        const auto count=staticNoPalette?0u:read32(at);
+        if(staticNoPalette){
+            // No palette allocation or synthesized source-read result.
+        }else if(count==0){
             if(at+4!=bytes.size()||scene.identity_matrix_palette)return fail(d,S::geometry,0x240258);
         }else {
             if(count!=1||!scene.identity_matrix_palette||bytes.size()-at<8)

@@ -281,6 +281,7 @@ public:
         const auto previousContainer=state.nodes[static_cast<unsigned>(bindings.lifecycle.container194)];
         const auto previousHidden=state.nodes[static_cast<unsigned>(bindings.lifecycle.hidden198)];
         for(auto& node:state.nodes){node={};node.localC0=node.world100=f::identity();}
+        state.animationShared={}; //Before retained single-record28EB90/libm effects.
         // Complete each actual owner's constructor/setup in represented source
         // right/left/bottom-right/bottom-left/chariot order before normalization,
         // motion sample or rebase. This differs from the Rig's asset role order.
@@ -368,9 +369,17 @@ public:
         }
         auto owner=[&](Index index,const SceneNode49P& original){auto& target=state.nodes[static_cast<unsigned>(index)];target=original;
             target.parent180=target.firstChild184=target.nextSibling188=Index::none;};
-        owner(main,previousMain);owner(physical,previousPhysical);owner(container,previousContainer);owner(hidden,previousHidden);
-        state.nodes[static_cast<unsigned>(main)].firstChild184=container;
-        state.nodes[static_cast<unsigned>(container)].parent180=main;
+        owner(physical,previousPhysical);
+        bool retainedScenes=false;
+        if constexpr(!std::is_same_v<ChariotModelConstruction,std::nullptr_t>)
+            retainedScenes=chariotModel!=nullptr;
+        if(!retainedScenes){
+            owner(main,previousMain);owner(container,previousContainer);owner(hidden,previousHidden);
+            state.nodes[static_cast<unsigned>(main)].firstChild184=container;
+            state.nodes[static_cast<unsigned>(container)].parent180=main;
+        }
+        // Retained190/198/194 were constructed before the chariot and190->194
+        // parented at211A34. Never overwrite them with later numeric snapshots.
         const auto leftCable=find(chariot,"chariotcableleft1"),rightCable=find(chariot,"chariotcableright1");
         need(leftCable!=Index::none&&rightCable!=Index::none,"Roster lifecycle cable anchors");
         bindings.lifecycle={main,container,hidden,physical,roots[chariot],roots[left],roots[right],leftCable,rightCable};
@@ -409,7 +418,10 @@ public:
         // POD20 has neither hand nor target: retain absent bindings, with no
         // dummy nodes, synthetic IK records, or constructor/libm side effects.
         const bool absentHands=podId=="POD20";
-        if(absentHands){
+        if(retainedScenes){
+            if constexpr(!std::is_same_v<ChariotModelConstruction,std::nullptr_t>)
+                chariotModel->bindColdWrists(animation.hands,hands,animation.handRecords);
+        }else if(absentHands){
             need(pod_materials50ed_fixture::detail::sha256(psg[chariot])=="136b0690d569ef1ed641055534371f9e99a02ac7d0a33599683f5c6d170c9ca3"&&
                 find(chariot,"handlt")==Index::none&&find(chariot,"handrt")==Index::none&&
                 find(chariot,"l_hand_dummy")==Index::none&&find(chariot,"r_hand_dummy")==Index::none,
@@ -419,12 +431,12 @@ public:
         }else{
             animation.hands={chain("handlt","l_hand_dummy"),chain("handrt","r_hand_dummy")};animation.handRecords=&hands;
         }
-        state.animation={};state.animationShared={};
+        state.animation={};
         need(initializeVehicleAnimationFilters49T(0,0,state.animation),"Roster cold animation filters");
         state.sceneNodeCount=bindings.sceneNodeCount=nodeCount;
         const SceneGraph49P graph{state.nodes,state.sceneNodeCount};
         ChariotIkWorkspace49T ikWork{};ChariotIkDiagnostic49T ikDiagnostic{};
-        if(!absentHands)need(initializeChariotIk49T(animation.hands,graph,hands,state.animationShared.libm,ikWork,ikDiagnostic),"Roster original pre-motion IK constructors");
+        if(!retainedScenes&&!absentHands)need(initializeChariotIk49T(animation.hands,graph,hands,state.animationShared.libm,ikWork,ikDiagnostic),"Roster original pre-motion IK constructors");
         // Original213830 then213854. These mutate only this model's source rows.
         ModelMotionWorkspace49T motionWork{};ModelMotionDiagnostic49T motionDiagnostic{};
         if(motion(Forward)&&motion(Back))need(sampleModelMotionBlend49T(motions[Forward],motions[Back],*animation.chariotRows,.5f,0,
@@ -449,8 +461,18 @@ public:
         // Display root carries the current secondary pose; never collapse the
         // per-node hierarchy or replace future native animation with this pose.
         need(setLocalMatrix49P(graph,roots[chariot],previousPhysical.localC0),"Roster initial chariot display pose");
+        // Native caller placement, after the concrete original constructor.
+        // Preserve its identity/hierarchy and use only the caller's saved local
+        // pose.2893A0 intentionally leaves world100 zero; canonical refresh is
+        // required before project and handling consume the placed main world.
+        // This is not an assertion of another original210770 placement call.
+        if(retainedScenes)
+            need(setLocalMatrix49P(graph,main,previousMain.localC0)&&
+                refreshSceneWorld49P(graph,main),"Roster retained main caller placement");
         for(unsigned i=0;i<vehicleFrameNodeCount49W;++i)
             bindings.topology[i]={state.nodes[i].parent180,state.nodes[i].firstChild184,state.nodes[i].nextSibling188};
+        if constexpr(!std::is_same_v<ChariotModelConstruction,std::nullptr_t>)
+            if(chariotModel)chariotModel->constructColdMain211F6C(graph);
         f::project(state,bindings);
     }
     void buildEffectNames(const g::VehicleFrameState49W& state,a::EffectNames50BL& names)const{

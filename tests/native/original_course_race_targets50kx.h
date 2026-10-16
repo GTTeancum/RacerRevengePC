@@ -24,11 +24,12 @@ struct Target {
     const track_session_assets50IG::SessionAssets* assets;
     std::uint32_t course,planet;
 };
-inline const std::array<Target,5> targets{{
+inline const std::array<Target,6> targets{{
     {Track::TA,&track_session_assets50IG::retainedTA,0,0},
     {Track::SA,&track_session_assets50IG::retainedSA,11,4},
     {Track::MA,&track_session_assets50IG::retainedMA,4,5},
     {Track::GA,&track_session_assets50IG::retainedGA,8,1},
+    {Track::RA,&track_session_assets50IG::retainedRA,7,2},
     // Authenticated UICourse Control11/Group1 slot11: Gamorr C, course10.
     // Capability only. Actual locked profile/UI state must independently admit
     // this destination. The genuine ALL8 world request or explicit diagnostic

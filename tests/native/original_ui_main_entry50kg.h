@@ -299,7 +299,8 @@ public:
     // caller boolean can certify the cold boundary. Result must retire before
     // Application/font-manager destruction. The native ALL8 root calls this.
     bool stageTimeStatsNativeCold50LA(const std::filesystem::path& originalRoot,
-        std::uint64_t actualSessionGeneration,TimeStatsColdResult50LA&)const noexcept;
+        std::uint64_t actualSessionGeneration,TimeStatsColdResult50LA&,bool deferPopulation=false)const noexcept;
+    bool finishTimeStatsNativeCold50LA(TimeStatsColdResult50LA&)const noexcept;
     // Unactivated Speed/Boost stages. Stage references before TimeStats,
     // then finish against the actual final whole-table population/collector.
     bool stageSpeedBoostNativeCold50LA(const std::filesystem::path& originalRoot,
@@ -353,21 +354,22 @@ public:
             requestedPreviewRiders=(1u<<3)|(1u<<7)|(1u<<9)|(1u<<23)|(1u<<24);
         }
         const char* testProfileSetting=std::getenv("RR_ORIGINAL_TEST_PROFILE");
-        require(!testProfileSetting||std::string(testProfileSetting)=="gasgano",
+        require(!testProfileSetting||std::string(testProfileSetting)=="gasgano"||std::string(testProfileSetting)=="mawhonic-ryloth",
             "unsupported explicit test profile");
-        const bool gasganoTest=testProfileSetting!=nullptr;
-        if(gasganoTest){
+        const bool gasganoTest=testProfileSetting&&std::string(testProfileSetting)=="gasgano";
+        const bool mawhonicRylothTest=testProfileSetting&&std::string(testProfileSetting)=="mawhonic-ryloth";
+        if(testProfileSetting){
             const auto exact=[](const char* name,const char* value){
                 const auto* setting=std::getenv(name);return setting&&std::string(setting)==value;
             };
             const auto* captureDirectory=std::getenv("RR_WINDOW_CAPTURE_DIR");
-            require(enabled&&exact("RR_UNATTENDED_UI_ROUTE","main-gasgano07-course-sa")&&
+            require(enabled&&exact("RR_UNATTENDED_UI_ROUTE",mawhonicRylothTest?"main-mawhonic09-course-ra":"main-gasgano07-course-sa")&&
                 exact("RR_WINDOW_CAPTURE_AUTO","1")&&exact("RR_UNATTENDED_CAPTURE","1")&&
                 exact("RR_ORIGINAL_AI_ALL_RACERS","1")&&exact("RR_TRACK_FPS_BASELINE","1")&&
                 captureDirectory&&*captureDirectory,
-                "Gasgano test profile requires the explicit complete original-AI window evidence route");
+                "Explicit test profile requires the explicit complete original-AI window evidence route");
             require(std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),
-                "Gasgano test profile requires an authenticated Rider pixel cache");
+                "Explicit test profile requires an authenticated Rider pixel cache");
         }
         if(!enabled)return;
         const char* root=std::getenv("RR_ORIGINAL_UI_ROOT");
@@ -418,11 +420,15 @@ public:
             riderProfile=std::make_shared<rr::platform::OriginalUiRiderProfileOwner50KG>();
             rr::platform::OriginalUiRiderProfileDiagnostic50KG riderProfileDiagnostic;
             const auto physics=readArchive(assetRoot,rr::assets::OriginalUiArchiveId50KG::podPhysics);
-            require(gasganoTest?
+            require(mawhonicRylothTest?
+                riderProfile->initializeMawhonicRylothTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):gasganoTest?
                 riderProfile->initializeGasganoTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):
                 riderProfile->initializeAtApplicationStartup(profile,physics,riderProfileDiagnostic),
                 "Rider startup profile initialization rejected");
-            require(riderProfile->gasganoTestProfile()==gasganoTest,"Rider test profile provenance differs");
+            require(riderProfile->gasganoTestProfile()==gasganoTest&&
+                riderProfile->mawhonicRylothTestProfile()==mawhonicRylothTest,"Rider test profile provenance differs");
+            if(mawhonicRylothTest)std::cerr<<"TEST PROFILE: Mawhonic9 available and initially remembered; original course prefix availability5 for Brightlands, process-local only. "
+                "No earned unlock, qualification, career progress or save write is claimed. RA race admission remains subject to genuine runtime readiness.\n";
             if(gasganoTest)std::cerr<<"TEST PROFILE: Gasgano available and initially remembered for this process only; "
                 "no earned unlock, qualification, saved-profile import or save write is claimed.\n";
         }
@@ -435,7 +441,7 @@ public:
         require(rr::game::sampleHostTimestamp50ID(*state->clock101A50,state->rawRandom308030),
             "Main startup shared application timestamp unavailable");
         state->known=true;
-        std::cerr<<"ORIGINAL MAIN: "<<(gasganoTest?"explicit Gasgano test profile":"fresh native profile")
+        std::cerr<<"ORIGINAL MAIN: "<<(mawhonicRylothTest?"explicit Mawhonic/Ryloth test profile":gasganoTest?"explicit Gasgano test profile":"fresh native profile")
             <<"/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
@@ -519,7 +525,7 @@ inline std::shared_ptr<Video> Application::videoForSession() const {
     return videoOwner_;
 }
 inline bool Application::stageTimeStatsNativeCold50LA(const std::filesystem::path& originalRoot,
-    std::uint64_t actualSessionGeneration,TimeStatsColdResult50LA& out)const noexcept {
+    std::uint64_t actualSessionGeneration,TimeStatsColdResult50LA& out,bool deferPopulation)const noexcept {
     using namespace rr::assets;using Phase=TimeStatsColdResult50LA::Phase;
     // Never erase a prior partial result or replace an outstanding owner.
     if(out.phase!=Phase::fresh||out.owner||out.pixels)return false;
@@ -613,6 +619,7 @@ inline bool Application::stageTimeStatsNativeCold50LA(const std::filesystem::pat
         out.pixels=pixels;
         if(!out.owner->borrowTextPixels(out.pixels,1,out.object))
             return fail("TimeStats canonical font/pixel bridge mismatch");
+        if(deferPopulation){out.phase=Phase::awaitingFinalVerification;return true;}
         out.phase=Phase::population;
         // Explicit native cold policy corresponding to the later original
         //1AA5A0 resource pair and1A7B14 collector. This is not six per-text
@@ -629,6 +636,18 @@ inline bool Application::stageTimeStatsNativeCold50LA(const std::filesystem::pat
         out.phase=Phase::cpuPrepared;return true;
     }catch(const std::exception& e){return fail(e.what());}
     catch(...){return fail("TimeStats cold preparation exception");}
+}
+inline bool Application::finishTimeStatsNativeCold50LA(TimeStatsColdResult50LA& out)const noexcept {
+    using Phase=TimeStatsColdResult50LA::Phase;
+    if(out.phase!=Phase::awaitingFinalVerification||!out.owner||!out.pixels||
+       timeStatsColdOwner_.lock()!=out.owner||!videoOwner_||
+       !Video::materialConstructionPinLive(*videoOwner_))return false;
+    if(!out.owner->finishNativeColdPreparation50LA(out.pixels,0,1,
+        videoOwner_->width,videoOwner_->height,out.object)){
+        out.failedAt=out.phase;out.phase=Phase::failed;
+        out.failure="TimeStats final shared collector verification rejected";return false;
+    }
+    out.sourceEffectsCommitted=true;out.phase=Phase::cpuPrepared;return true;
 }
 inline bool Application::stageDamageNativeCold50LA(const std::filesystem::path& originalRoot,
     std::uint64_t actualSessionGeneration,DamageColdResult50LA& out)const noexcept {
@@ -1124,6 +1143,14 @@ struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
             " rider_pc="+std::to_string(diagnostic.rider.sourcePC)+
             " rider_widget="+std::to_string(static_cast<unsigned>(diagnostic.rider.widget.error))+
             " rider_dynamic="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.error))+
+            " rider_dynamic_widget="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.widget))+
+            " rider_model="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.model.error))+
+            " rider_model_pc="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.model.sourcePC))+
+            " rider_playback="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.model.playback.error))+
+            " rider_playback_pc="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.model.playback.sourceStage))+
+            " rider_sample="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.model.playback.sample.error))+
+            " rider_sample_track="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.model.playback.sample.track))+
+            " rider_sample_channel="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.model.playback.sample.channel))+
             " rider_backend="+std::to_string(static_cast<unsigned>(diagnostic.rider.backend.error))+
             " rider_draw="+std::to_string(static_cast<unsigned>(diagnostic.rider.draw.error))+
             " course="+std::to_string(static_cast<unsigned>(diagnostic.course.status))+

@@ -10,7 +10,7 @@
 namespace rr::platform {
 namespace {
 bool supportedRider(std::uint32_t rider) noexcept {
-    switch(rider){case 2:case 4:case 7:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+    switch(rider){case 2:case 4:case 7:case 9:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
 }
 using Status=OriginalUiFrontendStatus50KG;
 using Diagnostic=OriginalUiFrontendDiagnostic50KG;
@@ -273,7 +273,7 @@ struct OriginalUiFrontend50KG::Storage {
            !cold.profile||!cold.profile->known||cold.profile->mode34!=0||
            (cold.profile->playerBits1125C&0x60)!=0x20)return false;
         game::OriginalUiCourseRememberedProfile50KG p;
-        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&p.course700>=1&&p.course700<=4&&p.subtype70C==1&&
+        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&p.course700>=1&&p.course700<=(p.mawhonicRylothTest?5u:4u)&&p.subtype70C==1&&
             p.laps704==3&&p.entrants708==8&&!p.cardFlag100BC&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
             p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
     }
@@ -522,6 +522,7 @@ struct OriginalUiFrontend50KG::Storage {
                 if(!courseInputsReady()||prospectiveMode!=0||!active||!active->rider||!same(active->currentRoute(),{5,1})){
                     result(d,Status::unavailableDestination);return false;}
                 OriginalUiCourseColdInput50KG input;input.appStart=cold.appStart;input.course=cold.course;
+                input.prepareRylothBackground=cold.riderProfile->mawhonicRylothTestProfile();
                 input.fonts=cold.fonts;input.backgrounds=cold.backgrounds;input.controllerPopup=cold.controllerPopup;
                 input.overlays=cold.overlays;input.english=&english;input.runtime=cold.runtime;
                 input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};

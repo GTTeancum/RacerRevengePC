@@ -23,7 +23,7 @@ using Kind=game::OriginalUiRiderWidgetKind50KG;
 // predicates are still required. Runtime acceptance is pending.
 constexpr bool boundedRiderConfirmEnabled=true;
 bool supportedRider(std::uint32_t rider) noexcept {
-    switch(rider){case 2:case 4:case 7:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+    switch(rider){case 2:case 4:case 7:case 9:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
 }
 bool previewSupportedRider(std::uint32_t rider) noexcept {
     return rider==3||supportedRider(rider);
@@ -426,7 +426,9 @@ Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& co
                   game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndCleggPreview):
         (gasgano?game::OriginalUiRiderColdPopulation50KG::defaultUnlockedAndGasgano:
                   game::OriginalUiRiderColdPopulation50KG::defaultUnlocked);
-    return bindCold(cold,population,d);
+    auto prepared=cold;
+    if(cold.profile&&cold.profile->mawhonicRylothTestProfile())prepared.requestedPreviewRiders|=1u<<9;
+    return bindCold(prepared,population,d);
 }
 Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG& cold,
     game::OriginalUiRiderColdPopulation50KG population,Diagnostic& d) noexcept {

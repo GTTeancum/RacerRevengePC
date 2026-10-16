@@ -104,10 +104,13 @@ bool chainBinding(const SceneGraph49P& g, const ChariotIkChainBinding49T& b) noe
         (b.target == none || index(b.target, g.count));
 }
 bool bindings(const SceneGraph49P& g, const ChariotIkBindings49T& b) noexcept {
-    if (!chainBinding(g, b.left) || !chainBinding(g, b.right)) return false;
+    auto optional = [&](const ChariotIkChainBinding49T& c) noexcept {
+        return c.wrist == none ? c.shoulder == none && c.elbow == none && c.target == none : chainBinding(g, c);
+    };
+    if (!optional(b.left) || !optional(b.right)) return false;
     const I left[3] = {b.left.shoulder, b.left.elbow, b.left.wrist};
     const I right[3] = {b.right.shoulder, b.right.elbow, b.right.wrist};
-    for (I a : left) for (I z : right) if (a == z) return false;
+    for (I a : left) for (I z : right) if (a != none && a == z) return false;
     const I targets[2] = {b.left.target, b.right.target};
     for (I t : targets) if (t != none) {
         for (I a : left) if (t == a) return false;
@@ -430,7 +433,7 @@ bool initializeChariotIk49T(const ChariotIkBindings49T& binding, const SceneGrap
     const Span live[] = {{graph.nodes, graph.count * sizeof(SceneNode49P)}, {&records, sizeof records},
         {&libm, sizeof libm}, {&work, sizeof work}, {&binding, sizeof binding}, {&graph, sizeof graph}, {&diagnostic, sizeof diagnostic}};
     if (!spans(live, 7)) return fail(diagnostic, ChariotIkError49T::records, 0x28eb90);
-    if (!bindings(graph, binding)) return fail(diagnostic, ChariotIkError49T::bindings, 0x28eb90);
+    if (!chainBinding(graph, binding.left) || !chainBinding(graph, binding.right) || !bindings(graph, binding)) return fail(diagnostic, ChariotIkError49T::bindings, 0x28eb90);
     if (!libmContext(libm)) return fail(diagnostic, ChariotIkError49T::context, 0x302730);
     copyGraph(graph, work.nodes); work.libm = libm;
     const SceneGraph49P staged{work.nodes, graph.count}; Math f;
@@ -439,6 +442,27 @@ bool initializeChariotIk49T(const ChariotIkBindings49T& binding, const SceneGrap
     if (!construct(staged, binding.right, true, work.records.right, work.libm, f))
         return fail(diagnostic, ChariotIkError49T::arithmetic, 0x28eb90, 1);
     copyGraph(staged, graph.nodes); records = work.records; libm = work.libm;
+    return true;
+}
+
+bool initializeChariotIkRecord50LA(const ChariotIkChainBinding49T& binding, const V& axis,
+    const SceneGraph49P& graph, ChariotIkChain49T& record, SourceLibmState49T& libm,
+    ChariotIkWorkspace49T& work, ChariotIkDiagnostic49T& diagnostic) noexcept {
+    diagnostic = {};
+    if (std::fegetround() != FE_TONEAREST) return fail(diagnostic, ChariotIkError49T::rounding_mode, 0x28eb90);
+    if (!finiteGraph(graph)) return fail(diagnostic, ChariotIkError49T::graph, 0x28eb90);
+    const Span live[] = {{graph.nodes, graph.count * sizeof(SceneNode49P)}, {&record, sizeof record},
+        {&libm, sizeof libm}, {&work, sizeof work}, {&binding, sizeof binding},
+        {&axis, sizeof axis}, {&graph, sizeof graph}, {&diagnostic, sizeof diagnostic}};
+    if (!spans(live, 8)) return fail(diagnostic, ChariotIkError49T::records, 0x28eb90);
+    if (!chainBinding(graph, binding)) return fail(diagnostic, ChariotIkError49T::bindings, 0x28eb90);
+    for (float x : axis.v) if (!std::isfinite(x)) return fail(diagnostic, ChariotIkError49T::context, 0x28eb90);
+    if (!libmContext(libm)) return fail(diagnostic, ChariotIkError49T::context, 0x302730);
+    copyGraph(graph, work.nodes); work.libm = libm;
+    const SceneGraph49P staged{work.nodes, graph.count}; Math f;
+    if (!constructAxis(staged, binding, axis, work.records.left, work.libm, f))
+        return fail(diagnostic, ChariotIkError49T::arithmetic, 0x28eb90);
+    copyGraph(staged, graph.nodes); record = work.records.left; libm = work.libm;
     return true;
 }
 

@@ -136,7 +136,11 @@ public:
             if(archiveProvider_->revision()!=providerRevision){
                 d.status=OriginalStandardMaterialStatus50LA::phase;d.sourcePC=0x132820u;return false;
             }
-            if(!resolver_->appendOriginalSources(textures,d.texture)){
+            // PSM registration precedes image population for an original world.
+            // An empty texture batch has no resolver mutation and must not
+            // require textures to have been prepared already. This does not
+            // mark the resolver ready or permit unresolved texture demand.
+            if(!textures.empty()&&!resolver_->appendOriginalSources(textures,d.texture)){
                 d.status=OriginalStandardMaterialStatus50LA::texture;return false;
             }
             sources_=std::move(next);return true;

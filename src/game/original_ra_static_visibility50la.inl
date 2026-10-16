@@ -85,6 +85,20 @@ bool Owner::releaseRaStaticOwner(const ::ra_static_model_cold50LA::Owner* owner)
     storage_->staticOwner=nullptr;storage_->staticApplication=nullptr;storage_->staticMaterials=nullptr;
     for(auto& method:storage_->selectedMethods)method={};return true;
 }
+//2741C0 precedes the SAME zone's27B930 wrapper/observer callback. This
+//private call receives the retained parent's zone, never a camera/racer hint.
+bool Owner::publishRaStaticZone2741C0(const ::ra_static_model_cold50LA::Owner* owner,
+    std::uint32_t actualZone)noexcept {
+    if(!raStaticVisibility(owner)||!storage_->renderAuthoringReady||!actualZone||
+       actualZone>storage_->world.zones.size())return false;
+    auto& row=storage_->zoneProjection[actualZone-1u];
+    if(row.environment44Published)return false;
+    //The admitted authenticated RA authoring has no override. Its parser
+    //rejects explicit integers rather than replacing source low-bit semantics.
+    row.environmentVisible44=storage_->renderAuthoring[actualZone-1u].environmentNodeVisible?1u:0u;
+    row.environment44Published=true;
+    return true;
+}
 bool Owner::commitRaStaticOwner(const ::ra_static_model_cold50LA::Owner* owner)noexcept {
     if(!raStaticVisibility(owner))return false;
     auto& s=*storage_;bool found=false;

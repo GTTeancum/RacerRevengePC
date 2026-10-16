@@ -49,6 +49,7 @@ private:
     friend class ::ra_static_model_cold50LA::Owner;
     friend class original_gc_gameplay_lighting_candidate::Owner;
     friend class OriginalRacerModelSceneOwner50LA;
+    friend class OriginalRacerColdScenes50LA;
     OriginalWreckComponent50LA entity8;
 public:
     const OriginalWreckComponent50LA& entity()const noexcept{return entity8;}
@@ -101,6 +102,7 @@ struct OriginalRacerModelFields50LA {
 // materials1C4, quantization and packet1F0 belong to their concrete owners.
 // Destruction is deliberately split at the real source call boundaries.
 class OriginalRacerModelSceneOwner50LA final {
+    friend class OriginalRacerColdScenes50LA;
     friend class ::ra_static_model_cold50LA::Owner;
     friend class original_gc_gameplay_lighting_candidate::Owner;
     friend class OriginalRacerModelPackets50LA;
@@ -763,10 +765,14 @@ private:
         return nullptr;
     }
     R constructScene2893A0(O& target,I index,const SceneGraph49P& graph,bool sourceA1,K kind)noexcept {
+        return constructStandaloneScene2893A0(binding_,target,index,graph,sourceA1,kind);
+    }
+    static R constructStandaloneScene2893A0(const OriginalRacerModelSceneBinding50LA& binding,
+        O& target,I index,const SceneGraph49P& graph,bool sourceA1,K kind)noexcept {
         target.field00=0;target.type02=0xffu;
         target.flags03=static_cast<std::uint8_t>(target.flags03&~7u);
         const auto entity=initializeOriginalWreckComponent50LA(target.entity8,kind,
-            binding_.sessionGeneration,key(&target.entity8),sourceA1,*binding_.actualObjectCount423F60);
+            binding.sessionGeneration,key(&target.entity8),sourceA1,*binding.actualObjectCount423F60);
         if(entity.status!=OriginalWreckComponentStatus50LA::complete)return {S::entity,entity.sourcePC};
         target.constructed=true;target.sceneIndex=index;target.dispatch1A8=K::scene2893A0;
         //289448/454/460/46C: SQC2 vf0 is(0,0,0,1), not a zero vector.
@@ -779,7 +785,7 @@ private:
         std::memset(node.world100.v,0,sizeof node.world100.v);
         node.sceneFlags190=0x80u;
         target.observer19C=nullptr;target.name38.clear();target.nodeCount1A0=0;
-        const auto type=binding_.actualTypes383408->findOrAppend2A31E0("SoultreeObject");
+        const auto type=binding.actualTypes383408->findOrAppend2A31E0("SoultreeObject");
         if(!type.okay())return {S::typeRegistry,0x289654u};
         target.type02=type.type;target.entity8.category28=type.type;
         target.flags191=static_cast<std::uint8_t>((target.flags191&~3u)|1u);
@@ -813,7 +819,9 @@ private:
         node.sceneFlags190=static_cast<std::uint8_t>(node.sceneFlags190&~1u);
         if(node.firstChild184!=none)invalidate289A20(graph,node.firstChild184);
     }
-    void detachScene28BFC0(const SceneGraph49P& graph,O& child)noexcept {
+    // Shared source prefix: mark child/ancestors before invalidating the
+    // ready child subtree, while the original parent links still exist.
+    static void prepareDetachScene28BFC0(const SceneGraph49P& graph,const O& child)noexcept {
         auto& node=at(graph,child.sceneIndex);
         for(auto p=child.sceneIndex;p!=none;p=at(graph,p).parent180)
             at(graph,p).sceneFlags190=static_cast<std::uint8_t>(at(graph,p).sceneFlags190|0x80u);
@@ -821,6 +829,10 @@ private:
             node.sceneFlags190=static_cast<std::uint8_t>(node.sceneFlags190&~1u);
             if(node.firstChild184!=none)invalidate289A20(graph,node.firstChild184);
         }
+    }
+    void detachScene28BFC0(const SceneGraph49P& graph,O& child)noexcept {
+        prepareDetachScene28BFC0(graph,child);
+        auto& node=at(graph,child.sceneIndex);
         auto& parent=at(graph,node.parent180);
         if(parent.firstChild184==child.sceneIndex)parent.firstChild184=node.nextSibling188;
         if(node.nextSibling188!=none)object(node.nextSibling188)->previous18C=child.previous18C;

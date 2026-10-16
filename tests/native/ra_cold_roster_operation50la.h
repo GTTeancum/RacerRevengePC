@@ -1,6 +1,7 @@
 #pragma once
 #include "ra_cold_roster_resources50la.h"
 #include "ra_cold_aggregate50la.h"
+#include "ra_source_camera_factory50la.h"
 #include "original_ui_main_entry50kg.h"
 #include "native_racer_handling50hw_fixture.h"
 #include "native_racer_model_lifetime50la_fixture.h"
@@ -67,6 +68,14 @@ struct Arena {
     // Real application launch kind, not a caller's invented race phase.
     const std::uint32_t& launchKind11258;
 };
+// Shared native storage is established before Bank registration. Both the
+// driver and retained operation use these exact owners; no model is cloned.
+struct RuntimeOwners final {
+    std::array<std::unique_ptr<native_racer_model50LA::Owner>,8> right,left,bottomRight,bottomLeft,chariot;
+    std::array<std::unique_ptr<native_racer50HW::Visual>,8> visuals;
+    std::array<std::unique_ptr<native_racer50HW::Cables>,8> cables;
+    std::array<native_racer_contact50HW::Binding,8> contacts{};
+};
 class Operation final {
     friend class ra_cold_aggregate50LA::Owner;
     using Model=native_racer_model50LA::Owner;
@@ -82,10 +91,15 @@ class Operation final {
     const std::uint64_t generation_;
     Arena arena_;
     // Real objects, retained across every partial stage and Bank save.
-    std::array<std::unique_ptr<Model>,8> right_,left_,bottomRight_,bottomLeft_,chariot_;
-    std::array<std::unique_ptr<native_racer50HW::Visual>,8> visuals_;
-    std::array<std::unique_ptr<native_racer50HW::Cables>,8> cables_;
-    std::array<native_racer_contact50HW::Binding,8> contacts_{};
+    std::shared_ptr<RuntimeOwners> owners_;
+    std::array<std::unique_ptr<Model>,8>& right_;
+    std::array<std::unique_ptr<Model>,8>& left_;
+    std::array<std::unique_ptr<Model>,8>& bottomRight_;
+    std::array<std::unique_ptr<Model>,8>& bottomLeft_;
+    std::array<std::unique_ptr<Model>,8>& chariot_;
+    std::array<std::unique_ptr<native_racer50HW::Visual>,8>& visuals_;
+    std::array<std::unique_ptr<native_racer50HW::Cables>,8>& cables_;
+    std::array<native_racer_contact50HW::Binding,8>& contacts_;
     std::array<bool,8> attempted_{},completed_{};
     std::size_t nextSlot_=0;
     // Immutable source closure retained even after a later partial failure.
@@ -94,11 +108,13 @@ class Operation final {
     bool terminal_=false,closed_=false;
     Operation(std::shared_ptr<ra_cold_aggregate50LA::Owner> owner,
         const original_main_entry50KG::Application& app,native_racer50HN::Bank& bank,
-        const Arena& arena,std::shared_ptr<const FreshProbe> probe)
+        const Arena& arena,std::shared_ptr<const FreshProbe> probe,std::shared_ptr<RuntimeOwners> owners)
         :aggregate_(std::move(owner)),resources_(aggregate_->runtimeQueries_->rosterResources_),
          navigation_(aggregate_->navigationLease_),probe_(std::move(probe)),entities_(app.entities()),
          domain_(app.standardMaterialDomain()),motions_(app.motionLibrary4333C0()),application_(&app),bank_(&bank),
-         generation_(aggregate_->trackParticleGeneration_),arena_(arena){}
+         generation_(aggregate_->trackParticleGeneration_),arena_(arena),owners_(std::move(owners)),
+         right_(owners_->right),left_(owners_->left),bottomRight_(owners_->bottomRight),bottomLeft_(owners_->bottomLeft),
+         chariot_(owners_->chariot),visuals_(owners_->visuals),cables_(owners_->cables),contacts_(owners_->contacts){}
     static void need(bool v,const char* why){if(!v)throw std::runtime_error(why);}
     auto& runtime()const noexcept{return *aggregate_->runtimeQueries_;}
     bool registered()const noexcept {
@@ -154,7 +170,8 @@ public:
     ~Operation(){if(!closed_)std::terminate();}
     static std::shared_ptr<Operation> bind(std::shared_ptr<ra_cold_aggregate50LA::Owner> aggregate,
         const original_main_entry50KG::Application& app,native_racer50HN::Bank& bank,
-        const Arena& arena,std::shared_ptr<const FreshProbe> probe,Diagnostic& d)noexcept {
+        const Arena& arena,std::shared_ptr<const FreshProbe> probe,Diagnostic& d,
+        std::shared_ptr<RuntimeOwners> owners={})noexcept {
         d={};d.stage="retained cold binding";
         try {
             need(aggregate&&!aggregate->terminal_&&!aggregate->closed_&&aggregate->runtimeQueries_&&
@@ -174,15 +191,24 @@ public:
             ra_cold_aggregate50LA::Diagnostic ad;
             auto navigation=aggregate->borrowColdNavigation(ad);
             need(bool(navigation),"same-source navigation lease unavailable");
-            auto out=std::shared_ptr<Operation>(new Operation(aggregate,app,bank,arena,std::move(probe)));
+            if(!owners)owners=std::make_shared<RuntimeOwners>();
+            for(std::size_t i=0;i<8;++i)need(!owners->right[i]&&!owners->left[i]&&!owners->bottomRight[i]&&
+                !owners->bottomLeft[i]&&!owners->chariot[i]&&!owners->visuals[i]&&!owners->cables[i],
+                "native roster constructor cannot replace existing owners");
+            auto out=std::shared_ptr<Operation>(new Operation(aggregate,app,bank,arena,std::move(probe),std::move(owners)));
             // No model or arena effects yet; rejected binding must be destroyable.
             out->closed_=true;
             need(out->registered(),"actual cold constructor lanes are not registered");
             need(out->domain_&&out->domain_->prepared()&&out->motions_&&
                 !out->domain_->materials382B38()->coldCollectorCurrent(out->domain_->coldCollector14D440()),
                 "cold model construction cannot invalidate a current collector");
-            need(out->navigation_->freshSelection().bound&&
-                arena.selection.inferredClass==out->navigation_->freshSelection().actualRaceClass&&
+            // PHY214954 applies the explicit RA class-B exception. AI16E590
+            // independently uses fresh course order4, class A. Do not conflate
+            // these original selectors or overwrite either with the other.
+            g::AuthoredClass49N handlingClass{};
+            need(g::selectAuthoredClass49N("ra",2,handlingClass)&&
+                out->navigation_->freshSelection().bound&&
+                arena.selection.inferredClass==handlingClass&&
                 !arena.selection.applyProfileOverwrite&&arena.selection.configurationEntryNonzero,
                 "actual all-AI RA handling selection differs");
             need(r.inputs_.collisionRoster.size()==8u,"actual complete collision roster required");
@@ -353,6 +379,12 @@ inline bool Owner::mountRetainedRuntimeRosterArchives(
             return fail(d,"roster archive mount cannot mutate a current collector domain");
         const auto& provider=domain->archiveProvider3E1A70();
         if(!provider)return fail(d,"actual Application archive provider missing");
+        // Mount the same fully authenticated RA source before any world model
+        // resolves materials. The roster mounts alone contain no track PSMs.
+        const auto* track=source_?source_->sourcesDecoded():nullptr;
+        if(!track||!provider->mountAuthenticatedRes("TRACKS/RA.RES",
+            ra_cold_sources50LA::archiveSha,4604561,track->archive,d.rosterMount))
+            return fail(d,"actual retained RA archive mount rejected");
         for(std::size_t slot=0;slot<8;++slot){
             d.rosterSlot=slot;
             const auto& rig=runtimeQueries_->rosterResources_->rigs_[slot];
@@ -511,6 +543,76 @@ inline bool Owner::attachRetainedRuntimeFreshSlot(native_racer50HN::Bank& bank,
     if(!r.attachFresh(bank,slot,lighting_,&recovery,d.runtimeQueries))
         return failRetainedHandoff(d,"retained fresh failed; actual visibility/recovery prefixes remain owned");
     return true;
+}
+inline bool Owner::beginRuntimeTriggerQuery(native_racer50HN::Bank& bank,
+    std::size_t slot,Diagnostic& d)noexcept {
+    d={};d.stage=Stage::runtimeQueryOwners;
+    if(terminal_||closed_||!runtimeQueries_)return fail(d,"RA live trigger aggregate unavailable");
+    auto& r=*runtimeQueries_;
+    if(r.terminal_||r.closed_||r.triggerQueryActive_||!r.triggerBankCurrent(bank,slot,true)||
+       !r.freshComplete_[slot])return fail(d,"RA live trigger query requires the actual fresh racer visit");
+    const auto pin=std::static_pointer_cast<ra_source_camera50LA::OwnershipBridge::BankPin>(r.bankLifetime_.lock());
+    const auto op=pin?pin->rosterOperation:nullptr;
+    if(!op||op->aggregate_.get()!=this||op->bank_!=&bank||op->terminal_||op->closed_||
+       !op->completed_[slot]||op->arena_.ai.managerIndexFE0!=slot||
+       !r.registeredRange(&op->arena_.navigation,sizeof(op->arena_.navigation)))
+        return fail(d,"RA trigger C80 requires retained actual original AI arena");
+    r.triggerLease_={r.actual_->mainFilter.identity,&op->arena_.navigation.reset.vehicleC80};
+    if(!r.candidates_->triggerActions_->beginQuery(r.triggerLease_))
+        return fail(d,"RA trigger synchronous C80 lease rejected");
+    r.triggerQueryActive_=true;return true;
+}
+inline bool Owner::endRuntimeTriggerQuery(native_racer50HN::Bank& bank,Diagnostic& d)noexcept {
+    d={};d.stage=Stage::runtimeQueryOwners;
+    if(!runtimeQueries_)return fail(d,"RA trigger query owner unavailable");auto& r=*runtimeQueries_;
+    if(r.bankIdentity_!=&bank||!r.triggerQueryActive_||!r.candidates_->triggerActions_)
+        return fail(d,"RA trigger query lease is not active for this Bank");
+    const bool complete=r.candidates_->triggerActions_->endQuery();
+    r.triggerLease_={};r.triggerQueryActive_=false;
+    return complete?true:fail(d,"RA trigger action failed after its committed prefix");
+}
+inline bool Owner::observeRuntimeTriggerPoses(native_racer50HN::Bank& bank,
+    std::size_t slot,Diagnostic& d)noexcept {
+    d={};d.stage=Stage::runtimeQueryOwners;
+    if(terminal_||closed_||!runtimeQueries_)return fail(d,"RA trigger observation owner unavailable");
+    auto& r=*runtimeQueries_;
+    if(r.terminal_||r.closed_||r.triggerQueryActive_||!r.triggerBankCurrent(bank,slot,true))
+        return fail(d,"RA trigger observation requires this actual racer visit");
+    return r.observeTriggerPoses(d.runtimeQueries)?true:fail(d,"RA actual committed trigger poses rejected");
+}
+inline bool Owner::serviceRuntimeTriggers(native_racer50HN::Bank& bank,Diagnostic& d)noexcept {
+    d={};d.stage=Stage::runtimeQueryOwners;
+    if(terminal_||closed_||!runtimeQueries_)return fail(d,"RA trigger world owner unavailable");
+    auto& r=*runtimeQueries_;
+    if(r.terminal_||r.closed_||r.triggerQueryActive_||!r.triggerBankCurrent(bank,0u,false))
+        return fail(d,"RA trigger exit service requires the same idle actual Bank");
+    return r.candidates_->triggerActions_->serviceWorld()==ra_trigger_actions50LA::Status::Complete?
+        true:fail(d,"RA original trigger exit bookkeeping failed");
+}
+// No model arrays escape the retained owner. This is the same factory used
+// by the raw route, supplied with its actual Bank-pinned roster and arena.
+inline bool Owner::constructRetainedRuntimeSourceCamera(
+    const original_main_entry50KG::Application& app,
+    const ra_source_camera50LA::CameraRuntimeOwners& actual,
+    const std::vector<std::uint8_t>& cam,
+    original_camera_session50KX::DisplayInputs& display,Diagnostic& d)noexcept {
+    d={};d.stage=Stage::sourceCamera;
+    auto op=retainedRosterForHandoff(actual.bank,d);if(!op)return false;
+    if(op->application_!=&app||&actual.arena!=&op->arena_.live.state||
+       &actual.bindings!=&op->arena_.live.bindings||&actual.ai!=&op->arena_.ai||
+       &actual.poseHistory!=&op->arena_.history||
+       &actual.launchKind11258!=&op->arena_.launchKind11258)
+        return failRetainedHandoff(d,"retained camera runtime differs from the actual constructor arena");
+    const ra_source_camera50LA::CameraCallerOwners owners{
+        actual.bank,actual.arena,actual.bindings,actual.baseTail,actual.ai,
+        actual.racerTiming,actual.all8Manager,actual.hostRace,actual.sharedRandom,
+        actual.attachedGlobals,actual.applicationClock,actual.preferences,
+        actual.launchKind11258,actual.configuration34,actual.application350,
+        actual.blur,actual.poseHistory,actual.boost,actual.cycleAudio,actual.racer60,
+        actual.humanCount34,actual.race94,actual.humanHeld,
+        op->resources_->rigs_,op->cables_,op->right_,op->left_,op->chariot_,
+        &op->bottomRight_,&op->bottomLeft_,actual.raceHud,actual.deathDebris};
+    return constructRuntimeSourceCamera(app,owners,cam,display,d);
 }
 inline bool Owner::prepareRuntimeRosterQueryStorage(
     std::shared_ptr<const ra_cold_roster50LA::Resources> roster,

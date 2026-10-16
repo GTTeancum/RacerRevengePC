@@ -68,6 +68,8 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
         // prefix can mutate buffers or hand this owner to indexed50CC.
         if((owner.nativeTriggers&&owner.shapeType!=5&&owner.shapeType!=6)||
            (!owner.nativeTriggers&&owner.nativeTriggerIndex!=0))return false;
+        if(owner.raOriginalTriggerSegments&&
+           (owner.shapeType!=5||owner.gate||!owner.nativeTriggers||owner.nativeTriggerIndex>=2))return false;
         if(owner.shapeType==5||owner.shapeType==6){
             if((owner.shapeType==6&&owner.gate)||bool(owner.gate)==bool(owner.nativeTriggers))return false;
             if(owner.gate){

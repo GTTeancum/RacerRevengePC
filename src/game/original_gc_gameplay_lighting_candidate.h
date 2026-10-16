@@ -19,6 +19,8 @@ namespace rr::assets { class OriginalStandardMaterialTable50LA; }
 namespace rr::platform { class VehicleWindowGl50DS; struct VehicleWindowDiagnostic50DS; }
 namespace rr::game { struct OriginalCameraViewportFields; struct OriginalCameraSceneOwner; struct OriginalRendererDispatchFields; }
 namespace ra_source_camera50LA { class OwnershipBridge; }
+namespace rr::game::original_world_environment50KG {struct SpatialBounds;}
+namespace ra_pod_scene50LA { class Owner; }
 namespace original_cable_selection50LA { class Binding; }
 namespace ra_static_lighting50LA { class Binding; }
 namespace ra_static_model_cold50LA { class Owner; }
@@ -169,6 +171,11 @@ public:
 // authored lights, and a separate4C0 visibility namespace. It never borrows collision
 //4C4 membership or resets OriginalUiLightManagerLifetime50KG.
 class Owner final {
+    friend class ::ra_pod_scene50LA::Owner;
+    const original_world_environment50KG::SpatialBounds* sceneBounds534(const ::ra_pod_scene50LA::Owner*) const noexcept;
+    const CollectionZone50BX* retainSceneZones272A78(const ::ra_pod_scene50LA::Owner*,std::size_t&) noexcept;
+    bool canReleaseSceneZones272A78(const ::ra_pod_scene50LA::Owner*) const noexcept;
+    bool releaseSceneZones272A78(const ::ra_pod_scene50LA::Owner*) noexcept;
     friend class ::original_cable_selection50LA::Binding;
     // Private114D00 callback lookup: the viewing lease remains unchanged.
     // Only the source bridge's canonical Bank visit may supply the callback
@@ -186,6 +193,7 @@ class Owner final {
     void endRaStaticAccess(const ::ra_static_model_cold50LA::Owner*) noexcept;
     bool releaseRaStaticOwner(const ::ra_static_model_cold50LA::Owner*) noexcept;
     bool commitRaStaticOwner(const ::ra_static_model_cold50LA::Owner*) noexcept;
+    bool publishRaStaticZone2741C0(const ::ra_static_model_cold50LA::Owner*,std::uint32_t actualZone) noexcept;
     ResetVisibilityWorld50EY* raStaticVisibility(const ::ra_static_model_cold50LA::Owner*) noexcept;
     LiveZoneWorkspace50EN* raStaticWorkspace(const ::ra_static_model_cold50LA::Owner*) noexcept;
     CollectionRef50BX claimRaStaticModel(const ::ra_static_model_cold50LA::Owner*,
@@ -198,6 +206,12 @@ class Owner final {
     friend class ::ra_source_camera50LA::OwnershipBridge;
     // Internal partial source operation, never a selection-ready capability.
     // Only the actual SourceCamera bridge can supply these retained borrows.
+    // Separate114D50 ->114E00 draw callback, never the114D00 selection tail.
+    // Caller supplies the actual Application collector slot, not a copied list.
+    bool drawRaZonePrefix27FEE0(CameraVisibilityLease&,OriginalApplicationEntities50LA&,
+        std::uint32_t actualParent38,const OriginalCameraViewportFields&,
+        OriginalZoneScissorPublication50LA&,Diagnostic&) noexcept;
+    bool drawRaSelectedMethod48(const CameraVisibilityLease&,std::uint32_t,Diagnostic&) noexcept;
     bool prepareRaZoneScissor280230(const CameraVisibilityLease&,std::uint32_t,
         const OriginalApplicationEntities50LA&,const OriginalCameraViewportFields&,Diagnostic&) noexcept;
     bool prepareRaZonePrefix114D00(CameraVisibilityLease&,

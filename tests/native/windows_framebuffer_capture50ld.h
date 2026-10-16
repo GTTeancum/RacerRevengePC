@@ -51,7 +51,7 @@ class Run final {
  const Clock::time_point started_=Clock::now();
  std::filesystem::path directory_;
  bool enabled_=false,automatic_=false,unattended_=false,navigate_=false,timeoutReported_=false;
- bool navigateSa_=false,navigateOcco_=false,navigateDudGa_=false,navigateBenGa_=false,navigateAlderMa_=false,navigateOdyMa_=false,navigateGasganoSa_=false;
+ bool navigateSa_=false,navigateOcco_=false,navigateDudGa_=false,navigateBenGa_=false,navigateAlderMa_=false,navigateOdyMa_=false,navigateGasganoSa_=false,navigateMawhonicRa_=false;
  std::uint32_t videoHoldSeconds_=0;
  Clock::time_point baselineFinished_{};
  std::uint32_t wallSeconds_=180;
@@ -64,7 +64,7 @@ public:
   automatic_=option("RR_WINDOW_CAPTURE_AUTO");unattended_=option("RR_UNATTENDED_CAPTURE");
   const auto* route=std::getenv("RR_UNATTENDED_UI_ROUTE");
   require(!route||std::string(route)=="main-rider-course-ta"||std::string(route)=="main-rider-course-sa"||
-      std::string(route)=="main-occo20-course-sa"||std::string(route)=="main-dud04-course-ga"||std::string(route)=="main-ben02-course-ga"||std::string(route)=="main-alder10-course-ma"||std::string(route)=="main-ody11-course-ma"||std::string(route)=="main-gasgano07-course-sa",
+      std::string(route)=="main-occo20-course-sa"||std::string(route)=="main-dud04-course-ga"||std::string(route)=="main-ben02-course-ga"||std::string(route)=="main-alder10-course-ma"||std::string(route)=="main-ody11-course-ma"||std::string(route)=="main-gasgano07-course-sa"||std::string(route)=="main-mawhonic09-course-ra",
       "unsupported unattended original UI route");
   navigate_=route!=nullptr;
   navigateOcco_=route&&std::string(route)=="main-occo20-course-sa";
@@ -73,19 +73,30 @@ public:
   navigateAlderMa_=route&&std::string(route)=="main-alder10-course-ma";
   navigateOdyMa_=route&&std::string(route)=="main-ody11-course-ma";
   navigateGasganoSa_=route&&std::string(route)=="main-gasgano07-course-sa";
+  navigateMawhonicRa_=route&&std::string(route)=="main-mawhonic09-course-ra";
   const auto* testProfile=std::getenv("RR_ORIGINAL_TEST_PROFILE");
   require(!navigateGasganoSa_||(testProfile&&std::string(testProfile)=="gasgano"),
       "Gasgano/SA capture requires RR_ORIGINAL_TEST_PROFILE=gasgano");
-  require(!testProfile||(navigateGasganoSa_&&std::string(testProfile)=="gasgano"),
-      "RR_ORIGINAL_TEST_PROFILE requires exact main-gasgano07-course-sa route and gasgano value");
+  require(!navigateMawhonicRa_||(testProfile&&std::string(testProfile)=="mawhonic-ryloth"),
+      "Mawhonic/RA capture requires RR_ORIGINAL_TEST_PROFILE=mawhonic-ryloth");
+  require(!testProfile||(navigateGasganoSa_&&std::string(testProfile)=="gasgano")||
+      (navigateMawhonicRa_&&std::string(testProfile)=="mawhonic-ryloth"),
+      "RR_ORIGINAL_TEST_PROFILE requires its exact bounded racer/course route");
   navigateSa_=navigateOcco_||(route&&std::string(route)=="main-rider-course-sa");
   require(enabled_||(!automatic_&&!unattended_&&!navigate_),"window capture options require RR_WINDOW_CAPTURE_DIR");
   require(!navigate_||(unattended_&&automatic_),"unattended original UI route requires unattended automatic capture");
   if(const auto* seconds=std::getenv("RR_UNATTENDED_SECONDS")){
    require(unattended_&&*seconds,"RR_UNATTENDED_SECONDS requires explicit unattended capture");
+   // Software-rendered RA needs time for the unchanged original intro.
+   // Default budgets and all Windows/other-route limits remain300 seconds.
+#if defined(__linux__)
+   const std::uint32_t maximum=navigateMawhonicRa_?1200u:300u;
+#else
+   const std::uint32_t maximum=300u;
+#endif
    std::uint32_t value=0;
-   for(const char* p=seconds;*p;++p){require(*p>='0'&&*p<='9'&&value<=300,"invalid unattended wall budget");value=value*10u+std::uint32_t(*p-'0');}
-   require(value>0&&value<=300,"unattended wall budget must be 1..300 seconds");wallSeconds_=value;
+   for(const char* p=seconds;*p;++p){require(*p>='0'&&*p<='9'&&value<=maximum,"invalid unattended wall budget");value=value*10u+std::uint32_t(*p-'0');}
+   require(value>0&&value<=maximum,"unattended wall budget exceeds bounded platform/route limit");wallSeconds_=value;
   }
   if(const auto* seconds=std::getenv("RR_WINDOW_VIDEO_HOLD_SECONDS")){
    require(unattended_&&std::string(seconds)=="75","video hold requires unattended capture and exact 75-second recording window");
@@ -100,8 +111,8 @@ public:
    require(allAi&&std::string(allAi)=="1","unattended capture requires original AI for all racers, including camera slot 0");
   }
   std::cerr<<platformName<<"_capture_run "<<Json{{"evidence_mode",evidenceMode()},{"automatic",automatic_},
-      {"video_hold_seconds",videoHoldSeconds_},{"ui_route",navigateGasganoSa_?"main-gasgano07-course-sa":navigateOdyMa_?"main-ody11-course-ma":navigateAlderMa_?"main-alder10-course-ma":navigateBenGa_?"main-ben02-course-ga":navigateDudGa_?"main-dud04-course-ga":navigateOcco_?"main-occo20-course-sa":navigateSa_?"main-rider-course-sa":navigate_?"main-rider-course-ta":"none"},{"wall_budget_seconds",unattended_?wallSeconds_:0},
-      {"test_profile",navigateGasganoSa_?"gasgano":"none"},{"actual_focus_preserved",true},{"directory",directory_.string()}}.dump()<<'\n';
+      {"video_hold_seconds",videoHoldSeconds_},{"ui_route",navigateMawhonicRa_?"main-mawhonic09-course-ra":navigateGasganoSa_?"main-gasgano07-course-sa":navigateOdyMa_?"main-ody11-course-ma":navigateAlderMa_?"main-alder10-course-ma":navigateBenGa_?"main-ben02-course-ga":navigateDudGa_?"main-dud04-course-ga":navigateOcco_?"main-occo20-course-sa":navigateSa_?"main-rider-course-sa":navigate_?"main-rider-course-ta":"none"},{"wall_budget_seconds",unattended_?wallSeconds_:0},
+      {"test_profile",testProfileName()},{"actual_focus_preserved",true},{"directory",directory_.string()}}.dump()<<'\n';
  }
  bool enabled()const noexcept{return enabled_;}
  bool automatic()const noexcept{return automatic_;}
@@ -114,6 +125,8 @@ public:
  bool navigateAlderMa()const noexcept{return navigateAlderMa_;}
  bool navigateOdyMa()const noexcept{return navigateOdyMa_;}
  bool navigateGasganoSa()const noexcept{return navigateGasganoSa_;}
+ bool navigateMawhonicRa()const noexcept{return navigateMawhonicRa_;}
+ const char* testProfileName()const noexcept{return navigateMawhonicRa_?"mawhonic-ryloth":navigateGasganoSa_?"gasgano":"none";}
  bool videoHoldComplete()const noexcept{return !videoHoldSeconds_||(!baselineFile_.empty()&&
      Clock::now()-baselineFinished_>=std::chrono::seconds(videoHoldSeconds_));}
  bool timedOut()const noexcept{return timeoutReported_;}
@@ -128,7 +141,7 @@ public:
   const auto file=directory_/"track-fps-baseline.json";
   require(baselineFile_.empty()&&!std::filesystem::exists(file),"track baseline receipt would overwrite an existing file");
   std::ofstream output(file,std::ios::binary);require(bool(output),"cannot open track FPS baseline receipt");
-  Json evidence=receipt;if(navigateGasganoSa_)evidence["test_profile"]="gasgano";
+  Json evidence=receipt;if(navigateGasganoSa_||navigateMawhonicRa_)evidence["test_profile"]=testProfileName();
   output<<evidence.dump(2)<<'\n';output.close();require(bool(output),"track FPS baseline receipt write failed");
   baselineFinished_=Clock::now();baselineFile_=file;
  }
@@ -144,7 +157,7 @@ public:
   Json receipt={{"evidence_mode",evidenceMode()},{"completed",evidenceComplete()&&videoHoldComplete()},
       {"video_hold_seconds",videoHoldSeconds_},{"video_hold_complete",videoHoldComplete()},
       {"cleanup_complete",true},{"timed_out",timeoutReported_},{"baseline_file",baselineFile_.string()}};
-  if(navigateGasganoSa_)receipt["test_profile"]="gasgano";
+  if(navigateGasganoSa_||navigateMawhonicRa_)receipt["test_profile"]=testProfileName();
   for(const auto stage:{Stage::main,Stage::rider,Stage::course,Stage::race}){
    const auto i=static_cast<std::size_t>(stage);
    receipt[stageName(stage)]={{"image_file",images_[i].string()},{"receipt_file",receipts_[i].string()}};
@@ -172,7 +185,59 @@ class Session final {
  std::array<bool,static_cast<std::size_t>(Stage::count)> captured_{};
  std::uint64_t serial_=0,session_=0;
  bool requested_=false,limitReported_=false;
+#if defined(__linux__)
+ struct PendingWindowImage {
+  const rr::platform::VehicleWindowGl50DS* renderer=nullptr;
+  const rr::platform::GameHost50ER* host=nullptr;
+  std::int32_t width=0,height=0;
+  std::uint64_t swapSequence=0;
+ } pending_;
+#endif
 public:
+ Session()=default;
+ Session(const Session&)=delete;
+ Session& operator=(const Session&)=delete;
+ // The callback must submit this exact BACK image, without another window draw.
+ // Frontend uses swapWindow; gameplay uses completeGameplayDisplay, whose only
+ // intervening draw is a private history copy. Failure clears unpublished bytes'
+ // authority. No renderer or host retains this cold owner's storage.
+ template<class Swap> bool swapAndCapture(rr::platform::VehicleWindowGl50DS& renderer,
+     rr::platform::GameHost50ER& host,bool capture,std::uint64_t swapSequence,Swap swap){
+#if defined(__linux__)
+  pending_={};
+  rr::platform::VehicleWindowDiagnostic50DS diagnostic;
+  const auto before=host.info();
+  if(capture){
+   require(run_&&serial_<64&&swapSequence&&host.created()&&host.current()&&host.hasWindow()&&!before.minimized,
+       "pre-swap capture requires its live window owner");
+   if(!renderer.readbackWindowBackRgba(host,rgba_.data(),rgba_.size(),
+       before.drawableWidth,before.drawableHeight,diagnostic)){
+    std::cerr<<platformName<<"_framebuffer_readback_failed "<<Json{
+        {"error",static_cast<unsigned>(diagnostic.error)},
+        {"operation",diagnostic.operation?diagnostic.operation:"unknown"},{"gl_error",diagnostic.glError},
+        {"drawable_width",before.drawableWidth},{"drawable_height",before.drawableHeight}}.dump()<<'\n';
+    throw std::runtime_error("actual pre-swap window back-buffer readback failed; no private-target fallback");
+   }
+  }
+  if(!swap())return false;
+  if(capture){
+   const auto& after=host.info();
+   require(host.created()&&host.current()&&host.hasWindow()&&!after.minimized&&
+       before.drawableWidth==after.drawableWidth&&before.drawableHeight==after.drawableHeight,
+       "window capture drawable changed during paired swap");
+   pending_={&renderer,&host,diagnostic.readbackWidth,diagnostic.readbackHeight,swapSequence};
+  }
+  return true;
+#else
+  (void)renderer;(void)host;(void)capture;(void)swapSequence;
+  return swap(); // Windows retains its original post-swap GL_FRONT readback.
+#endif
+ }
+ void discardPendingWindowImage()noexcept{
+#if defined(__linux__)
+  pending_={};
+#endif
+ }
  void prepare(Run& run,std::uint64_t sessionIndex,std::int32_t width,std::int32_t height,const char* role){
   if(!run.enabled())return;
   require(width>0&&height>0&&std::uint64_t(width)*std::uint64_t(height)<=std::numeric_limits<std::size_t>::max()/4u,
@@ -199,9 +264,18 @@ public:
   }
   return requested_||(run_->automatic()&&settled&&stage!=Stage::other&&!captured(stage));
  }
- void record(rr::platform::VehicleWindowGl50DS& renderer,const rr::platform::GameHostInfo50ER& info,
+ void record(rr::platform::VehicleWindowGl50DS& renderer,const rr::platform::GameHost50ER& host,
      Stage stage,bool settled,Json details){
   require(run_&&serial_<64,"window capture owner is unavailable");
+  const auto& info=host.info();
+#if defined(__linux__)
+  const auto paired=pending_;pending_={}; // Consume once, even if file publication fails.
+  require(paired.renderer==&renderer&&paired.host==&host&&host.created()&&host.current()&&
+      host.hasWindow()&&!info.minimized&&paired.width==info.drawableWidth&&paired.height==info.drawableHeight&&
+      details.at("window_swaps").get<std::uint64_t>()==paired.swapSequence,
+      "window capture lacks its exact successful swap/owner/drawable pairing");
+  const auto width=paired.width,height=paired.height;
+#else
   rr::platform::VehicleWindowDiagnostic50DS diagnostic;
   if(!renderer.readbackWindowFrontRgba(rgba_.data(),rgba_.size(),info.drawableWidth,info.drawableHeight,diagnostic)){
    std::cerr<<platformName<<"_framebuffer_readback_failed "<<Json{{"error",static_cast<unsigned>(diagnostic.error)},
@@ -210,6 +284,7 @@ public:
    throw std::runtime_error("actual window front-buffer readback failed; no private-target fallback");
   }
   const auto width=diagnostic.readbackWidth,height=diagnostic.readbackHeight;
+#endif
   require(width>0&&height>0&&static_cast<std::size_t>(width)*3u<=row_.size(),"window capture row exceeds cold capacity");
   const auto stem=std::string(stageName(stage))+"-"+std::to_string(serial_+1);
   const auto file=directory_/(stem+".ppm"),pending=directory_/(stem+".ppm.pending");
@@ -225,8 +300,15 @@ public:
   }
   image.close();require(bool(image),"window framebuffer image write failed");
   std::filesystem::rename(pending,file);
-  details["evidence_mode"]=run_->evidenceMode();details["pixel_source"]="default_framebuffer_GL_FRONT_after_actual_SDL_window_swap";
-  if(run_->navigateGasganoSa())details["test_profile"]="gasgano";
+  details["evidence_mode"]=run_->evidenceMode();
+#if defined(__linux__)
+  details["pixel_source"]="default_window_framebuffer_GL_BACK_before_matching_actual_SDL_window_swap";
+  details["paired_window_swap_sequence"]=paired.swapSequence;
+  details["capture_scope"]="pre-swap default-window framebuffer paired with actual swap; not OS desktop or GL_FRONT capture";
+#else
+  details["pixel_source"]="default_framebuffer_GL_FRONT_after_actual_SDL_window_swap";
+#endif
+  if(run_->navigateGasganoSa()||run_->navigateMawhonicRa())details["test_profile"]=run_->testProfileName();
   details["physical_desktop_scanout_verified"]=false;
   details["stage"]=stageName(stage);details["sequence"]=serial_+1;details["session"]=session_;
   details["settled"]=settled;

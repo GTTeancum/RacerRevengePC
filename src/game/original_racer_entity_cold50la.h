@@ -1,5 +1,6 @@
 #pragma once
 #include "original_application_entities50la.h"
+#include "chariot_ik49t.h"
 #include "original_camera_start_native.h"
 #include "original_gc_particle_manager50kg.h"
 #include "undertrack_reset50ew.h"
@@ -16,9 +17,21 @@
 namespace native_racer50HW { class Cables; }
 namespace native_racer_model50LA {class Owner;}
 namespace rr::game {
+class OriginalPodSphereOwner50LA;
+class OriginalRacerMainBodyOwner50LA;
+class OriginalRacerGravityOwner50LA;
 class OriginalRacerStripOwners50LA;
 class OriginalRacerModelSceneOwner50LA;
+struct OriginalRacerSceneObject50LA;
 class OriginalRacerAnimationCold50LA;
+// Same independently allocated source0x60 record, staged by the chariot
+// before Session exists, then owned here by the actual racer208/20C lifetime.
+// Plain destruction does not inspect or release any borrowed scene identity.
+struct OriginalRacerWristAllocation50LA final {
+    ChariotIkChain49T record;
+    std::array<std::byte,0x60-sizeof(ChariotIkChain49T)> nativePadding;
+};
+static_assert(sizeof(OriginalRacerWristAllocation50LA)==0x60);
 class OriginalPodCableAllocation50LA;
 enum class OriginalRacerEntityColdStatus50LA : std::uint8_t {
     complete,binding,alreadyConstructed,material,component,attachment,entityType,allocation
@@ -307,6 +320,16 @@ class OriginalRacerEntityCold50LA final {
     // Late handles are published by concrete retained primitive owners only.
 public:
     OriginalWreckComponent50LA racer,detached7F8,particle7FC;
+    const OriginalRacerMainBodyOwner50LA* body340=nullptr; //Borrowed actual retained body owner.
+    const OriginalRacerGravityOwner50LA* gravity344=nullptr; //Borrowed actual retained gravity owner.
+    const OriginalPodSphereOwner50LA* joint360=nullptr; //Borrowed actual retained joint owner.
+    // Borrowed source aliases of the distinct retained2893A0 allocations.
+    const OriginalRacerSceneObject50LA* scene190=nullptr;
+    const OriginalRacerSceneObject50LA* scene198=nullptr;
+    const OriginalRacerSceneObject50LA* scene194=nullptr;
+    // Borrowed independently allocated native28EB90 records; no Entity retain.
+    const ChariotIkChain49T* wrist208=nullptr;
+    const ChariotIkChain49T* wrist20C=nullptr;
     // Source210C48/210F0C/211210/21150C/21193C publish the actual animation owners;
     //210C8C/210F50/211254/211550/211980 publish their SAME model04 after1538B0. Native
     // early resource staging lends those exact owners to this Session join.
@@ -497,6 +520,10 @@ public:
             slots800_.reset();slots804_.reset();slots808_.reset();slots80C_.reset();
             slots818_.reset();slots81C_.reset();
             if(count_==2u){--detached7F8.reference00;--counter;}
+            //210664..210688 is in2104D0 AFTER142590 retired the racer's
+            // attached children and AFTER detached7F8. Borrowed scene records
+            // may already be dead: plain allocation deletion never reads them.
+            wristAllocations_[0].reset();wristAllocations_[1].reset();
             --counter;
         }
         cleanupPhase_=3;released_=true;
@@ -504,6 +531,7 @@ public:
     }
 private:
     OriginalRacerEntityColdBinding50LA binding_{};
+    std::array<std::unique_ptr<OriginalRacerWristAllocation50LA>,2> wristAllocations_;
     using Slots2=std::array<OriginalWreckComponent50LA*,2>;
     using Slots4=std::array<OriginalWreckComponent50LA*,4>;
     using Slots10=std::array<OriginalWreckComponent50LA*,10>;

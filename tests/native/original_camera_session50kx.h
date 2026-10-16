@@ -622,6 +622,11 @@ public:
     bool abandoned()const noexcept{return abandoned_;}
     bool countdownInstalled()const noexcept{return countdownInstalled_;}
     bool introExitReady()const noexcept{return controller_.mode44==7&&start_.complete240;}
+    // Read-only smoke progress; this neither authorizes nor advances a cut.
+    std::array<std::int32_t,4> nativeStartProgress()const noexcept {
+        return {{static_cast<std::int32_t>(controller_.mode44),start_.nextRoute1F8,
+            start_.routeCount1FC,countdownInstalled_?1:0}};
+    }
     bool willUseFollowPose()const noexcept {
         // The first ending Follow transition can start from Attached mode5.
         // Its genuine17A870 spatial query needs the same live animated

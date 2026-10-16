@@ -92,8 +92,15 @@ private:
     void retireImage(const rr::platform::MaterialTextureGl50EB* image)noexcept {
         if(imagePublication_!=image||rendererPublication_)std::terminate();imagePublication_=nullptr;
     }
-    // No renderer acquisition/retirement method is admitted yet. The eventual
-    // friend renderer must tie these fields to its real checked GPU cleanup.
+    bool publishRenderer(const rr::platform::VehicleWindowGl50DS* renderer,
+        const rr::platform::MaterialTextureGl50EB* image) noexcept {
+        if(!renderer || !image || imagePublication_!=image || rendererPublication_ || !drawPlanCurrent())return false;
+        rendererPublication_=renderer;return true;
+    }
+    void retireRenderer(const rr::platform::VehicleWindowGl50DS* renderer) noexcept {
+        if(!renderer || rendererPublication_!=renderer)std::terminate();
+        rendererPublication_=nullptr;
+    }
     Owner()=default;
     std::shared_ptr<const ra_cold_sources50LA::Owner> source_;
     std::shared_ptr<a::OriginalStandardMaterialDomain50LA> domain_;

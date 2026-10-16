@@ -9,7 +9,7 @@
 namespace rr::platform {
 namespace {
 bool supportedRider(std::uint32_t rider) noexcept {
-    switch(rider){case 2:case 4:case 7:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+    switch(rider){case 2:case 4:case 7:case 9:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
 }
 using Diagnostic=OriginalUiRiderProfileDiagnostic50KG;
 using Error=Diagnostic::Error;
@@ -78,7 +78,7 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     std::uint32_t subtype11258=1;
     std::uint32_t comparison100C0=0;
     bool cardFlag100BC=false;
-    bool gasganoTest=false;
+    std::uint32_t testRider=0;
     std::array<OriginalUiCourseProfileColors50KG,6> planetColors{};
     std::array<std::uint8_t,13> courseOrder100C4{};
     std::uint64_t generation=1;
@@ -89,20 +89,29 @@ OriginalUiRiderProfileOwner50KG::~OriginalUiRiderProfileOwner50KG()=default;
 bool OriginalUiRiderProfileOwner50KG::initializeAtApplicationStartup(
     std::shared_ptr<OriginalUiMainProfile50KG> common,
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),false,d);
+    return initializeStartupProfile(std::move(common),std::move(archive),0,d);
 }
 bool OriginalUiRiderProfileOwner50KG::initializeGasganoTestProfileAtApplicationStartup(
     std::shared_ptr<OriginalUiMainProfile50KG> common,
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
-    return initializeStartupProfile(std::move(common),std::move(archive),true,d);
+    return initializeStartupProfile(std::move(common),std::move(archive),7,d);
 }
 bool OriginalUiRiderProfileOwner50KG::gasganoTestProfile() const noexcept {
-    return storage_&&storage_->gasganoTest;
+    return storage_&&storage_->testRider==7;
+}
+bool OriginalUiRiderProfileOwner50KG::initializeMawhonicRylothTestProfileAtApplicationStartup(
+    std::shared_ptr<OriginalUiMainProfile50KG> common,
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
+    return initializeStartupProfile(std::move(common),std::move(archive),9,d);
+}
+bool OriginalUiRiderProfileOwner50KG::mawhonicRylothTestProfile() const noexcept {
+    return storage_&&storage_->testRider==9;
 }
 bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
     std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,bool gasganoTest,Diagnostic& d) noexcept {
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,std::uint32_t testRider,Diagnostic& d) noexcept {
     d={};if(storage_)return fail(d,Error::alreadyInitialized,0x17F970);
+    if(testRider!=0&&testRider!=7&&testRider!=9)return fail(d,Error::range,0x17F970);
     if(!common||!common->known)return fail(d,Error::commonProfile,0x17F970);
     if(!archive||!archive->loaded()||!archive->identity()||
        archive->identity()->id!=assets::OriginalUiArchiveId50KG::podPhysics)
@@ -154,14 +163,14 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         next->unlock10FAC.fill(0);next->hidden0730.fill(0);
         for(const auto rider:{2u,4u,10u,11u,12u,15u,19u,20u})next->unlock10FAC[rider]=1;
         for(const auto rider:{1u,14u,21u,25u,26u})next->hidden0730[rider]=1;
-        // Explicit isolated test setup for the requested Gasgano capture.
+        // Explicit isolated test setup for the requested racer capture.
         // This does not execute187F40 or fabricate a qualification/result.
-        if(gasganoTest){next->unlock10FAC[7]=1;next->gasganoTest=true;}
+        if(testRider){next->unlock10FAC[testRider]=1;next->testRider=testRider;}
         //186678..186684, after unlock reset. Mode stays in the shared owner.
         next->remembered.fill(19);
         // Test profile enters through the original remembered-selection search.
         // No visible locked neighbors are skipped or hidden by navigation.
-        if(gasganoTest)next->remembered[0]=7;
+        if(testRider)next->remembered[0]=testRider;
         // Original constructor/reset fields, same retained fresh profile.
         next->rememberedCourse={{1,3,8,1,1,8,3}}; //186688..1866A8
         next->packed1125D=0x98;next->packed1125E=0x12;
@@ -171,6 +180,10 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         //17E7D8..17E880 ->17F800..17F884; stride12, primary+79C/secondary+7A0.
         next->planetColors={{{0xc2a684,0x80674a},{0x8cc46e,0x628036},{0xc0b5a5,0x8c8479},
             {0xf4f1a2,0xa8a66f},{0xce766d,0xffbab2},{0xb26a36,0xe5a373}}};
+        // Commit fixture-only shared availability after every fallible preparation.
+        // The source course order and career matrix stay untouched.
+        if(testRider==9)next->common->availability11018=
+            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|5u);
         storage_=std::move(next);d={};return true;
     }catch(...){return fail(d,Error::allocation,0x17F970);}
 }
@@ -240,7 +253,7 @@ bool OriginalUiRiderProfileOwner50KG::coursePlanetColors(std::uint32_t planet,Or
 }
 bool OriginalUiRiderProfileOwner50KG::courseSnapshot(game::OriginalUiCourseRememberedProfile50KG& out)const noexcept{
     if(!storage_||!storage_->readable())return false;const auto& s=*storage_;
-    game::OriginalUiCourseRememberedProfile50KG p;p.ownerReady=true;p.mode34=s.common->mode34;
+    game::OriginalUiCourseRememberedProfile50KG p;p.ownerReady=true;p.mode34=s.common->mode34;p.mawhonicRylothTest=s.testRider==9;
     p.course700=s.rememberedCourse[0];p.laps704=s.rememberedCourse[1];p.entrants708=s.rememberedCourse[2];p.subtype70C=s.rememberedCourse[3];
     p.course710=s.rememberedCourse[4];p.entrants714=s.rememberedCourse[5];p.laps718=s.rememberedCourse[6];
     p.packed1125E=s.packed1125E;p.cardFlag100BC=s.cardFlag100BC;p.availability11018=s.common->availability11018;

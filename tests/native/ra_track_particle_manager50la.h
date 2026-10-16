@@ -42,6 +42,13 @@ inline bool Owner::constructRuntimeTrackParticleManager(
             }
         if(!scbName||*scbName!="demoprt.tga"||application.particleDirectory36B530()!="particle\\")
             return fail(d,"actual RA SCB/Application particle directory selection differs");
+        //1B4DC0's real scene predecessor belongs to the SAME visibility and
+        //collision owners. The new aggregate never clones either registry.
+        std::uint32_t scenePC=0;
+        if(!constructTopology(entities,generation,scenePC)||!particlePredecessor1B4DC0(scenePC)){
+            d.trackParticles.sourcePC=scenePC;
+            return fail(d,"RA scene/environment constructor prefix retained; actual1B4DC0 predecessor failed");
+        }
         const auto* prt=particles_->originalMember(2);
         const auto* psm=particles_->originalMember(3);
         const auto* pst=particles_->originalMember(4);

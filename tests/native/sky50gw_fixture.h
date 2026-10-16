@@ -4,7 +4,7 @@
 #include "../../src/assets/import_decode48c.h"
 #include <cfenv>
 
-// Cold authenticated bridge for original TA/GC/GA/MA/SA sky members. Cube geometry is the direct
+// Cold authenticated bridge for original TA/GC/GA/MA/SA/RA sky members. Cube geometry is the direct
 // 12A8A0 source constructor, not an invented enclosing mesh. Only authored
 // face/tile mask bits produce geometry. Images are genuine decoded IPUM bytes.
 namespace sky50gw_fixture {
@@ -15,6 +15,9 @@ struct Request {
     std::filesystem::path archive; // Exact archive for the explicitly selected track.
     std::filesystem::path textureRoot; // Matching cold sky decode; no runtime codec.
     track_source_fixture::Track track = track_source_fixture::Track::ta;
+    // Cold-only borrow from the SAME retained RA aggregate; never retained by this owner.
+    // Both CUB and SCB are authenticated below, with no second archive decode.
+    const a::ResArchive48C* retainedArchive = nullptr;
 };
 struct Span {
     std::uint32_t indexStart = 0, indexCount = 0, vertexStart = 0, vertexCount = 0;
@@ -60,6 +63,12 @@ inline constexpr Entry saEntries[] = {
 };
 static_assert(sizeof(saEntries)/sizeof(saEntries[0]) == tileCount, "Actual authored SA tile count");
 #endif
+#if __has_include("sky_ra_index.inc")
+inline constexpr Entry raEntries[] = {
+#include "sky_ra_index.inc"
+};
+static_assert(sizeof(raEntries)/sizeof(raEntries[0]) == tileCount, "Actual authored RA tile count");
+#endif
 struct Source {
     std::size_t archiveBytes, decodedCapacity, cubBytes, sceneBytes;
     std::uint32_t archiveEntries;
@@ -101,6 +110,13 @@ inline const Source& source(track_source_fixture::Track track) {
         "tracks\\sa.scb","dd38f087f0438b2e1279651fe3b4f525b053c90d34cf5365d6bf4ec6c7d1d394",
         58084,"18,21,22",saEntries};
 #endif
+#if __has_include("sky_ra_index.inc")
+    static const Source ra{4604561,32u*1024u*1024u,161825,540795,1010,
+        "1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2",
+        "skies\\ra.cub","c497927d2fe78de6f2f9bbf9e319ac0ea2b4939e020df45a4ae570e5abb73960",
+        "tracks\\ra.scb","57a0c9a244714d2f5f7b1ffcfb66fb182808348673b25362482458253b78ae81",
+        38633,"180,180,165",raEntries};
+#endif
     switch (track) {
     case track_source_fixture::Track::ta: return ta;
     case track_source_fixture::Track::gc: return gc;
@@ -121,6 +137,12 @@ inline const Source& source(track_source_fixture::Track track) {
         return sa;
 #else
         throw std::runtime_error("SA sky bytes have not been cold-prepared and pinned");
+#endif
+    case track_source_fixture::Track::ra:
+#if __has_include("sky_ra_index.inc")
+        return ra;
+#else
+        throw std::runtime_error("RA sky bytes have not been cold-prepared and pinned");
 #endif
     default: throw std::runtime_error("Unsupported original sky track identity");
     }
@@ -187,20 +209,24 @@ public:
             d = {};
             need(!storage_, "Sky assets already loaded");
             need(std::fegetround() == FE_TONEAREST, "Sky geometry requires FE_TONEAREST");
-            need(!request.archive.empty() && !request.textureRoot.empty(), "Explicit sky source paths required");
+            need((!request.archive.empty() || request.retainedArchive) && !request.textureRoot.empty(), "Explicit sky source paths required");
+            need(!request.retainedArchive || request.track == track_source_fixture::Track::ra, "Retained sky archive requires explicit RA identity");
             need(!std::filesystem::is_symlink(request.textureRoot), "Sky texture root symlink rejected");
             const auto& selected = source(request.track);
             shared::Inputs input; input.capacity = 8u * 1024u * 1024u;
-            auto archiveBytes = input.read(request.archive, selected.archiveBytes);
-            need(archiveBytes.size() == selected.archiveBytes && sha256(archiveBytes) == selected.archiveSha, "Original sky archive identity");
-            a::ResArchive48C archive; a::DecodeError48C error;
-            a::DecodeLimits48C limits;
-            limits.resource_file_bytes = selected.archiveBytes;
-            limits.resource_decoded_bytes = selected.decodedCapacity;
-            limits.resource_entries = selected.archiveEntries;
-            limits.resource_name_bytes = 128;
-            need(a::decodeResource48C(archiveBytes, archive, error, nullptr, limits),
-                "Original sky archive decode: " + error.detail);
+            a::ResArchive48C decodedArchive; a::DecodeError48C error;
+            if (!request.retainedArchive) {
+                auto archiveBytes = input.read(request.archive, selected.archiveBytes);
+                need(archiveBytes.size() == selected.archiveBytes && sha256(archiveBytes) == selected.archiveSha, "Original sky archive identity");
+                a::DecodeLimits48C limits;
+                limits.resource_file_bytes = selected.archiveBytes;
+                limits.resource_decoded_bytes = selected.decodedCapacity;
+                limits.resource_entries = selected.archiveEntries;
+                limits.resource_name_bytes = 128;
+                need(a::decodeResource48C(archiveBytes, decodedArchive, error, nullptr, limits),
+                    "Original sky archive decode: " + error.detail);
+            }
+            const auto& archive = request.retainedArchive ? *request.retainedArchive : decodedArchive;
             Bytes cub;
             need(a::extractResMember48C(archive, selected.cubMember, cub, error, selected.cubBytes),
                 "Original sky member extraction: " + error.detail);

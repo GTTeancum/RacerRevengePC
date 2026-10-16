@@ -3,6 +3,10 @@
 #include "original_racer_animation_setup50la_fixture.h"
 #include "../../src/game/original_racer_animation_cold50la.h"
 #include "../../src/game/original_racer_model_scene50la.h"
+#include "../../src/game/original_racer_cold_scenes50la.h"
+#include "../../src/game/original_pod_sphere_owner50la.h"
+#include "../../src/game/original_racer_main_body_owner50la.h"
+#include "../../src/game/original_racer_gravity_owner50la.h"
 #include "../../src/game/original_racer_model_packets50la.h"
 #include "../../src/game/original_racer_entity_cold50la.h"
 #include "../../src/game/original_motion_library50la.h"
@@ -10,6 +14,9 @@
 #include "../../src/assets/original_standard_material_domain50la.h"
 #include <array>
 #include <cfenv>
+#include <cstring>
+#include <cstddef>
+#include <new>
 #include <cmath>
 #include <memory>
 #include <optional>
@@ -31,8 +38,8 @@ using Rig=native_racer50HW::Rig;
 // at the actual Session caller.
 // This split is native lifetime staging, not full retail210770 chronology.
 // The bounded Entity list projects three or five real owners in source-relative
-// order. It does not claim the interleaved190/198/194 Entities or the no-engine
-// combined model194 branch were constructed.
+// order, with concrete190/198/194 between the last engine and chariot.
+// The no-engine combined model194 branch remains unadmitted.
 class Owner final {
     friend class ::native_racer50HW::Cables;
     friend class ::original_cable_selection50LA::Binding;
@@ -232,14 +239,14 @@ class Owner final {
     static bool findBoundsNullcg28C590(const g::OriginalRacerModelSceneOwner50LA& start,
         const g::SceneGraph49P& graph,
         const std::array<const g::OriginalRacerModelSceneOwner50LA*,5>& models,
-        const g::OriginalRacerSceneObject50LA*& found)noexcept {
+        const g::OriginalRacerSceneObject50LA*& found,const char* wanted="nullcg")noexcept {
         found=nullptr;if(!start.model()||start.released()||!start.sourceRowCount())return false;
         std::size_t remaining=graph.count;
-        auto equal=[](const std::string& name)noexcept {
-            constexpr char expected[]="nullcg";
-            if(name.size()!=6u)return false;
-            for(unsigned i=0;i<6;++i){auto c=name[i];if(c>='A'&&c<='Z')c=char(c+32);
-                if(c!=expected[i])return false;}return true;
+        auto equal=[wanted](const std::string& name)noexcept {
+            const auto size=std::strlen(wanted);
+            if(name.size()!=size)return false;
+            for(std::size_t i=0;i<size;++i){auto c=name[i];if(c>='A'&&c<='Z')c=char(c+32);
+                if(c!=wanted[i])return false;}return true;
         };
         auto walk=[&](auto&& self,g::SceneNodeIndex49P index)->bool {
             if(index==g::SceneNodeIndex49P::none)return true;
@@ -261,6 +268,61 @@ class Owner final {
             return self(self,graph.nodes[n].firstChild184);
         };
         return walk(walk,start.model()->sceneIndex);
+    }
+    // Early staging owns these exact allocations until Session publishes them
+    // into the actual racer. No scene reference is acquired by28EB90.
+    using ColdWristAllocation=g::OriginalRacerWristAllocation50LA;
+    struct ColdWrist final {
+        enum class Stage {unreached,absent,allocationNull,allocated,constructed};
+        Stage stage=Stage::unreached;
+        std::unique_ptr<ColdWristAllocation> allocation;
+        const g::OriginalRacerSceneObject50LA *shoulder=nullptr,*elbow=nullptr,*wrist=nullptr;
+    };
+    std::array<ColdWrist,2> coldWrists_;
+    void constructColdWrists211A4C(const g::SceneGraph49P& canonical){
+        need(modelRole_==Rig::chariot&&coldScenes_.parented_&&
+            canonical.nodes==arena_->nodes&&canonical.count==rig_->nodeCount,
+            "original optional wrist construction requires actual190/194 and chariot");
+        const std::array<const g::OriginalRacerModelSceneOwner50LA*,5> own{{&scene_,nullptr,nullptr,nullptr,nullptr}};
+        auto object=[&](g::SceneNodeIndex49P index)->const g::OriginalRacerSceneObject50LA* {
+            if(index==g::SceneNodeIndex49P::none)return nullptr;
+            if(scene_.model()->sceneIndex==index)return scene_.model();
+            for(std::uint32_t i=0;i<scene_.sourceRowCount();++i){
+                const auto* row=scene_.sourceRow(i);if(row&&row->sceneIndex==index)return row;}
+            return nullptr;
+        };
+        for(unsigned i=0;i<2;++i){
+            auto& owner=coldWrists_[i];failurePC_=i?0x211ab0u:0x211a4cu;
+            need(owner.stage==ColdWrist::Stage::unreached,"original wrist constructor cannot replay");
+            need(findBoundsNullcg28C590(scene_,canonical,own,owner.wrist,i?"handrt":"handlt"),
+                "original wrist name lookup topology stopped");
+            if(!owner.wrist){owner.stage=ColdWrist::Stage::absent;continue;}
+            const auto parent=canonical.nodes[static_cast<unsigned>(owner.wrist->sceneIndex)].parent180;
+            if(parent==g::SceneNodeIndex49P::none){owner.stage=ColdWrist::Stage::absent;continue;}
+            owner.elbow=object(parent);need(owner.elbow,"original wrist parent lacks retained scene identity");
+            const auto grandparent=canonical.nodes[static_cast<unsigned>(parent)].parent180;
+            if(grandparent==g::SceneNodeIndex49P::none){owner.stage=ColdWrist::Stage::absent;continue;}
+            owner.shoulder=object(grandparent);need(owner.shoulder,"original wrist grandparent lacks retained scene identity");
+            failurePC_=i?0x211adcu:0x211a78u;
+            try{owner.allocation=std::make_unique<ColdWristAllocation>();}
+            catch(const std::bad_alloc&){owner.stage=ColdWrist::Stage::allocationNull;continue;}
+            owner.stage=ColdWrist::Stage::allocated;
+            g::ChariotIkVector49T axis;
+            std::memcpy(axis.v,application_->binderTriple434650_.data(),sizeof axis.v);
+            if(i){for(unsigned lane=0;lane<3;++lane)axis.v[lane]=-axis.v[lane];axis.v[3]=1.f;}
+            const g::ChariotIkChainBinding49T binding{owner.shoulder->sceneIndex,owner.elbow->sceneIndex,
+                owner.wrist->sceneIndex,g::SceneNodeIndex49P::none};
+            g::ChariotIkWorkspace49T work{};g::ChariotIkDiagnostic49T diagnostic{};
+            failurePC_=i?0x211b34u:0x211a9cu;
+            need(g::initializeChariotIkRecord50LA(binding,axis,canonical,owner.allocation->record,
+                arena_->animationShared.libm,work,diagnostic),"original separate wrist28EB90 numeric boundary stopped");
+            owner.stage=ColdWrist::Stage::constructed; //211AA4 or211B3C publication.
+        }
+    }
+    void closeUnpublishedColdWrists()noexcept {
+        // Native pre-Session exceptional unwind only. Published allocations
+        // have moved to racer208/20C and survive all model/scene child closes.
+        for(auto& owner:coldWrists_)owner.allocation.reset();
     }
     runtime_startup50fl::Fixture* fixture_=nullptr; //Exact canonical destination lifetime.
     native_racer50HN::Bank* bank_=nullptr;
@@ -289,6 +351,13 @@ class Owner final {
     bool modelDirectorySaved_=false;
     g::OriginalRacerAnimationCold50LA animation_;
     g::OriginalRacerModelSceneOwner50LA scene_;
+    g::OriginalRacerColdScenes50LA coldScenes_;
+    std::unique_ptr<g::OriginalRacerMainBodyOwner50LA> body340_;
+    bool bodyAllocationAttempted_=false;
+    std::unique_ptr<g::OriginalRacerGravityOwner50LA> gravity344_;
+    bool gravityAllocationAttempted_=false;
+    std::unique_ptr<g::OriginalPodSphereOwner50LA> joint360_;
+    bool jointAllocationAttempted_=false;
     std::unique_ptr<setup::Setup> setup_;
     std::unique_ptr<setup::Input> input_;
     std::unique_ptr<setup::Archive> archive_;
@@ -320,7 +389,7 @@ class Owner final {
     }
     g::SceneGraph49P graph()const noexcept{return {arena_->nodes,rig_->nodeCount};}
     g::OriginalWreckComponentDomain50LA outside(
-        std::array<g::OriginalWreckComponent50LA*,9>& storage)noexcept {
+        std::array<g::OriginalWreckComponent50LA*,15>& storage)noexcept {
         std::size_t count=0;storage[count++]=&animationEntity();
         for(auto* peer:peers_)if(peer&&peer->animation_.constructed1536F0())
             storage[count++]=&peer->animationEntity();
@@ -328,6 +397,17 @@ class Owner final {
             storage[count++]=&racer_->racer;storage[count++]=&racer_->overlay240.component;
             storage[count++]=&racer_->particle7FC;storage[count++]=&racer_->detached7F8;
         }
+        if(body340_&&body340_->liveEntity())storage[count++]=body340_->liveEntity();
+        for(auto* peer:peers_)if(peer&&peer->body340_&&peer->body340_->liveEntity())
+            storage[count++]=peer->body340_->liveEntity();
+        if(gravity344_&&gravity344_->liveEntity())storage[count++]=gravity344_->liveEntity();
+        for(auto* peer:peers_)if(peer&&peer->gravity344_&&peer->gravity344_->liveEntity())
+            storage[count++]=peer->gravity344_->liveEntity();
+        if(joint360_&&joint360_->liveEntity())storage[count++]=joint360_->liveEntity();
+        for(auto* peer:peers_)if(peer&&peer->joint360_&&peer->joint360_->liveEntity())
+            storage[count++]=peer->joint360_->liveEntity();
+        coldScenes_.addDomain(storage.data(),count);
+        for(auto* peer:peers_)if(peer)peer->coldScenes_.addDomain(storage.data(),count);
         // Scene methods add the at-most-five real Model Entity8 addresses privately.
         // No released peer or stale model alias becomes a new live object.
         return {generation_,storage.data(),count};
@@ -340,7 +420,9 @@ class Owner final {
             return false;
         if(!animation_.constructed1536F0())return true;
         const auto& c=animationEntity();
-        if(c.reference00!=1u||c.next14||
+        const auto* next=body340_&&body340_->stage_==g::OriginalRacerMainBodyOwner50LA::Stage::appended?
+            body340_->liveEntity():nullptr;
+        if(c.reference00!=1u||c.next14!=next||
            (modelAppended_?c.firstChild18!=scene_.modelEntity8():c.firstChild18!=nullptr))return false;
         if(!animationAttached_)return !c.parent1C&&!c.previous10;
         if(!racer_||c.parent1C!=&racer_->racer||c.mask20!=2u)return false;
@@ -358,6 +440,10 @@ class Owner final {
         // Source142590/1424E0 closes later animation siblings first. In this
         // bounded projection the reverse is C, BL, BR, L, R (or C, L, R),
         // before each earlier owner consumes its surviving model alias.
+        if(modelRole_==Rig::chariot){
+            if(coldScenes_.appended_!=3)return false;
+            previous=coldScenes_.lastEntity();
+        }
         return c.previous10==previous&&previous->next14==&c;
     }
     bool closeOnCurrentGraph()noexcept {
@@ -372,12 +458,45 @@ class Owner final {
             const auto motionAdmission=motions_.preflightRelease153F50();
             if(!motionAdmission.okay()){failurePC_=motionAdmission.sourcePC;return false;}
             if(!admitAnimationClose()){failurePC_=0x142590u;return false;}
+            const auto* bodyTail=body340_&&body340_->stage_==g::OriginalRacerMainBodyOwner50LA::Stage::appended?
+                body340_->liveEntity():nullptr;
+            const auto* gravityTail=gravity344_&&gravity344_->appended()?gravity344_->liveEntity():nullptr;
+            const auto* jointTail=joint360_&&joint360_->stage_==g::OriginalPodSphereOwner50LA::Stage::appended?
+                joint360_->liveEntity():nullptr;
+            if(body340_&&!body340_->preflightClose(racer_?&racer_->racer:nullptr,&animationEntity(),gravityTail)){
+                failurePC_=0x142590u;return false;
+            }
+            if(gravity344_&&!gravity344_->preflightClose(racer_?&racer_->racer:nullptr,bodyTail,jointTail)){
+                failurePC_=0x142590u;return false;
+            }
+            if(joint360_&&!joint360_->preflightClose(racer_?&racer_->racer:nullptr,gravityTail)){
+                failurePC_=0x142590u;return false;
+            }
+            closeUnpublishedColdWrists();
+            if(joint360_){
+                const auto released=joint360_->close142590(racer_?&racer_->racer:nullptr,gravityTail);
+                if(released.status!=g::OriginalWreckComponentStatus50LA::complete){
+                    failurePC_=released.sourcePC;return false;
+                }
+            }
+            if(gravity344_){
+                const auto released=gravity344_->close142590(racer_?&racer_->racer:nullptr,bodyTail);
+                if(released.status!=g::OriginalWreckComponentStatus50LA::complete){
+                    failurePC_=released.sourcePC;return false;
+                }
+            }
+            if(body340_){
+                const auto released=body340_->close142590(racer_?&racer_->racer:nullptr,&animationEntity());
+                if(released.status!=g::OriginalWreckComponentStatus50LA::complete){
+                    failurePC_=released.sourcePC;return false;
+                }
+            }
             if(scene_.modelEntity8()&&!scene_.released()){
                 if(!modelAppended_){
                     const auto r=scene_.closeFreshUnlinked(graph());
                     if(!r.okay()){failurePC_=r.sourcePC;return false;}
                 }else{
-                    std::array<g::OriginalWreckComponent50LA*,9> storage{};
+                    std::array<g::OriginalWreckComponent50LA*,15> storage{};
                     const auto d=outside(storage);
                     const auto peers=peerScenes();
                     const auto admission=scene_.preflightScene2896D0(graph());
@@ -429,6 +548,8 @@ class Owner final {
                 --application_->objectCount423F60();
                 animation_.released_=true;
             }
+            const auto coldClosed=coldScenes_.close(graph());
+            if(!coldClosed.okay()){failurePC_=coldClosed.sourcePC;return false;}
             // Native partial-construction unwind also releases a still-live
             // temporary config. Completed1538B0 already disposed it1573B0.
             configuration08_.reset();input_.reset();archive_.reset();closed_=true;
@@ -621,13 +742,18 @@ public:
             &application_->objectCount423F60(),&application_->attachmentLock423F58(),
             &application_->types383408(),rig_->roots[modelRole_],rig_->sourceNodes[modelRole_],
             rig_->hierarchy[modelRole_].nodeCount};
+        if(modelRole_==Rig::chariot){
+            const auto result=coldScenes_.construct(binding,canonical,rig_->main,rig_->hidden,rig_->container);
+            failurePC_=result.sourcePC;
+            need(result.okay(),"original190/198/194 SceneObject construction failed");
+        }
         need(scene_.construct2403A0(binding,canonical,(animationEntity().flags29&1u)!=0).okay(),
             "original2403A0 model constructor failed");
         animation_.fields_.model04=&scene_;
         need(scene_.constructSeparateRoot26E944(canonical,psgRequest_).okay()&&
             scene_.loadSourceRows28CAC0(canonical,rig_->hierarchy[modelRole_]).okay(),
             "original separate-root PSG model construction failed");
-        std::array<g::OriginalWreckComponent50LA*,9> storage{};
+        std::array<g::OriginalWreckComponent50LA*,15> storage{};
         const auto peers=peerScenes();
         need(scene_.appendToAnimation154348(outside(storage),animationEntity(),
             peers[0],peers[1],peers[2],peers[3]).okay(),
@@ -669,7 +795,39 @@ public:
         // Rig invokes this before its normalization, motion and root placement.
         // Cold snapshots stay inside the same owner across delayed Session join.
         captureColdNullcgAfterModel(canonical);
-        if(modelRole_==Rig::chariot)publishColdTarget2119C4();
+        if(modelRole_==Rig::chariot){
+            publishColdTarget2119C4();
+            const auto result=coldScenes_.parent211A34(canonical);failurePC_=result.sourcePC;
+            need(result.okay(),"original190/194 scene parenting failed");
+            constructColdWrists211A4C(canonical);
+        }
+    }
+    // Immutable numeric adapter only: allocation/publication remains above.
+    // Solver targets are resolved separately and never gate source allocation.
+    void bindColdWrists(g::ChariotIkBindings49T& bindings,g::ChariotIkPair49T& records,
+        const g::ChariotIkPair49T*& borrowed)const {
+        need(!closed_,"original wrist adapter cannot read retired scene borrows");
+        const g::ChariotIkChainBinding49T absent{g::SceneNodeIndex49P::none,g::SceneNodeIndex49P::none,
+            g::SceneNodeIndex49P::none,g::SceneNodeIndex49P::none};
+        bindings={absent,absent};borrowed=nullptr;
+        for(unsigned i=0;i<2;++i){
+            const auto& owner=coldWrists_[i];
+            need(owner.stage!=ColdWrist::Stage::unreached&&owner.stage!=ColdWrist::Stage::allocated,
+                "original wrist constructor did not reach terminal optional boundary");
+            if(owner.stage!=ColdWrist::Stage::constructed)continue;
+            const auto* allocation=owner.allocation?owner.allocation.get():
+                racer_&&!racer_->released()?racer_->wristAllocations_[i].get():nullptr;
+            need(allocation&&owner.wrist&&!owner.wrist->released,
+                "original wrist allocation or retained scene lifetime ended");
+            const std::array<const g::OriginalRacerModelSceneOwner50LA*,5> own{{&scene_,nullptr,nullptr,nullptr,nullptr}};
+            const g::OriginalRacerSceneObject50LA* target=nullptr;
+            need(findBoundsNullcg28C590(scene_,graph(),own,target,i?"r_hand_dummy":"l_hand_dummy"),
+                "original retained wrist target lookup topology stopped");
+            auto& b=i?bindings.right:bindings.left;
+            b={owner.shoulder->sceneIndex,owner.elbow->sceneIndex,owner.wrist->sceneIndex,
+                target?target->sceneIndex:g::SceneNodeIndex49P::none};
+            (i?records.right:records.left)=allocation->record;borrowed=&records;
+        }
     }
     // Actual Rig pre-motion normalization, after retained cold capture. Uses
     //28AB90 so a world cache read for stack0F70 cannot survive the local write.
@@ -688,6 +846,53 @@ public:
         std::memcpy(zero.v,arena_->visualShared.zero434630.v,sizeof zero.v);
         need(g::setLocalTranslation49P(canonical,cg->sceneIndex,zero),
             "original28AB90 cold engine normalization stopped");
+    }
+    // Called by this SAME Rig after its canonical scene install, before any
+    // PHY handling working copy. Represented340 and344 constructor writes
+    // are admitted; probe348/collision owners remain separate cuts.
+    void constructColdMain211F6C(const g::SceneGraph49P& canonical){
+        need(modelRole_==Rig::chariot&&fixture_ && &fixture_->state==arena_&&
+            !bodyAllocationAttempted_&&!body340_&&canonical.nodes==arena_->nodes&&
+            canonical.count==rig_->nodeCount&&coldScenes_.initialized_==3&&
+            coldScenes_.objects_[0]&&coldScenes_.objects_[0]->sceneIndex==rig_->main&&
+            fixture_->bindings.lifecycle.main190==rig_->main,
+            "original main340 construction destination rejected");
+        bodyAllocationAttempted_=true;failurePC_=0x211f6cu;
+        body340_=std::make_unique<g::OriginalRacerMainBodyOwner50LA>();
+        const auto constructed=body340_->construct167920(*application_,generation_,
+            fixture_->state,fixture_->parameters,fixture_->bindings);
+        failurePC_=constructed.sourcePC;
+        need(constructed.status==g::OriginalWreckComponentStatus50LA::complete,
+            "original main340 constructor stopped");
+        const auto bound=body340_->bindMain211FB0(*coldScenes_.objects_[0]);
+        failurePC_=bound.sourcePC;
+        need(bound.status==g::OriginalWreckComponentStatus50LA::complete,
+            "original main340 scene288 binding stopped");
+        need(!gravityAllocationAttempted_&&!gravity344_,"original gravity344 allocation cannot replay");
+        gravityAllocationAttempted_=true;failurePC_=0x211ff8u;
+        gravity344_=std::make_unique<g::OriginalRacerGravityOwner50LA>();
+        const auto gravityConstructed=gravity344_->construct282670(*application_,generation_,
+            fixture_->state.bodies.main,fixture_->parameters.bodies.main);
+        failurePC_=gravityConstructed.sourcePC;
+        need(gravityConstructed.status==g::OriginalWreckComponentStatus50LA::complete,
+            "original gravity344 constructor stopped");
+        const auto gravityTargets=gravity344_->allocateOne282750();
+        failurePC_=gravityTargets.sourcePC;
+        need(gravityTargets.status==g::OriginalWreckComponentStatus50LA::complete,
+            "original gravity344 target-array allocation stopped");
+    }
+    // Join the existing successful numeric PHY transaction's actual165340
+    //100 result to this SAME body owner. The no-fail live state/parameter copy
+    //immediately follows; a failed handling transaction never reaches here.
+    //This does not claim the intervening2146C0 Entity consumers are present.
+    void commitMainInertia21488C(runtime_startup50fl::Fixture& actual,
+        const g::AuthoredBinding49N& binding){
+        need(&actual==fixture_&&modelRole_==Rig::chariot&&body340_&&
+            body340_->stage_==g::OriginalRacerMainBodyOwner50LA::Stage::sceneBound&&
+            body340_->canonicalNumericAddress()==&actual.state.bodies.main&&
+            body340_->parameters_==&actual.parameters.bodies.main,
+            "original main340 handling commit destination rejected");
+        std::memcpy(body340_->inertia100_.v,binding.inertia100.v,sizeof binding.inertia100.v);
     }
     // Handling uses a native working copy, but this exact Fixture and its
     // canonical target/854/858 remain the retained source owners. No new visit.
@@ -715,15 +920,24 @@ public:
             geometry.secondaryAnchor300.v[2]==3.f&&geometry.secondaryAnchor300.v[3]==1.f,
             "original2126B0 anchor binding differs");
         auto& sourceJoint=actual.state.bodies.joint;
-        failurePC_=0x1b6200u;need(g::initializePodSphere49L(sourceJoint),"original joint suffix stopped");
+        need(modelRole_==Rig::chariot&&body340_&&
+            body340_->canonicalNumericAddress()==&actual.state.bodies.main&&
+            !jointAllocationAttempted_&&!joint360_,
+            "original joint360 allocation cannot replay");
+        jointAllocationAttempted_=true;failurePC_=0x21266cu;
+        joint360_=std::make_unique<g::OriginalPodSphereOwner50LA>();
+        const auto constructed=joint360_->construct1B6200(*application_,generation_,sourceJoint);
+        failurePC_=constructed.sourcePC;
+        need(constructed.status==g::OriginalWreckComponentStatus50LA::complete,
+            "original joint360 Entity/numeric construction stopped");
         failurePC_=0x2126d0u;const float anchorLength=coldLength(geometry.secondaryAnchor300.v);
         volatile float result=actual.parameters.lifecycle.restLength854-anchorLength;
         need(std::isfinite(result),"original2126F0 length subtraction stopped");
         length.value_=result;length.stage_=Stage::adjusted2126F4;
         g::PodSphereBody49L secondary{};secondary.inverseMass=geometry.inverseMass270;
         std::memcpy(secondary.inverseInertia.v,geometry.inverseInertia140.v,sizeof secondary.inverseInertia.v);
-        // Existing numeric constructor suffix is still the bounded joint owner;
-        // no missing base constructor/effect/Entity completion is asserted.
+        // The retained Entity owns this SAME numeric joint; source A/B
+        // operations continue here. Session stages the real alias/append later.
         failurePC_=0x212700u;need(g::setupPodSphereA49L(sourceJoint,secondary,geometry.secondaryAnchor300),
             "original212700 joint A setup stopped");
         g::PodSphereVector49L zero;std::memcpy(zero.v,actual.state.visualShared.zero434630.v,16);
@@ -856,12 +1070,31 @@ public:
             racer.racer.sessionGeneration==generation_&&!animationSlot&&!modelSlot&&
             (!racer_||racer_==&racer)&&attachmentOrderAdmitted(racer),
             "original model Session attachment order rejected");
-        std::array<g::OriginalWreckComponent50LA*,9> storage{};
+        std::array<g::OriginalWreckComponent50LA*,15> storage{};
         racer_=&racer;
         // The same early-constructed1536F0 identity reaches its real Session
         // slot. This is native staging, not a replayed constructor or cache hit.
-        animationSlot=&animation_;
         const auto d=outside(storage);
+        if(modelRole_==Rig::chariot){
+            need(!racer.scene190&&!racer.scene198&&!racer.scene194,
+                "original retained scene aliases already published");
+            racer.scene190=coldScenes_.objects_[0].get();
+            racer.scene198=coldScenes_.objects_[1].get();
+            racer.scene194=coldScenes_.objects_[2].get();
+            need(!racer.wrist208&&!racer.wrist20C&&!racer.wristAllocations_[0]&&!racer.wristAllocations_[1],
+                "original racer wrist allocation ownership already published");
+            for(const auto& owner:coldWrists_)
+                need(owner.stage==ColdWrist::Stage::constructed||owner.stage==ColdWrist::Stage::absent||
+                    owner.stage==ColdWrist::Stage::allocationNull,"original wrist construction not complete");
+            // Transfer SAME allocations, never reconstruct/copy the source
+            // records. Their scene borrows need not outlive plain2E8B00 frees.
+            for(unsigned i=0;i<2;++i)racer.wristAllocations_[i]=std::move(coldWrists_[i].allocation);
+            racer.wrist208=racer.wristAllocations_[0]?&racer.wristAllocations_[0]->record:nullptr;
+            racer.wrist20C=racer.wristAllocations_[1]?&racer.wristAllocations_[1]->record:nullptr;
+            const auto result=coldScenes_.append(d,racer.racer);failurePC_=result.sourcePC;
+            need(result.okay(),"original190/198/194 Entity append failed");
+        }
+        animationSlot=&animation_;
         failurePC_=animationPC;
         const auto attached=g::appendOriginalWreckComponent50LA(d,racer.racer,animationEntity(),2u,
             application_->attachmentLock423F58());
@@ -895,6 +1128,39 @@ public:
         if(!materialPass.okay()){
             failurePC_=materialPass.sourcePC;
             throw std::runtime_error("original213380 canonical material pass stopped");
+        }
+        if(modelRole_==Rig::chariot){
+            failurePC_=0x211f88u;
+            need(body340_&&!racer.body340&&
+                body340_->canonicalNumericAddress()==&fixture_->state.bodies.main&&
+                body340_->scene288()==racer.scene190,
+                "original main340 canonical owner publication rejected");
+            racer.body340=body340_.get();
+            const auto bodyAppended=body340_->append211FA8(d,racer.racer);
+            failurePC_=bodyAppended.sourcePC;
+            need(bodyAppended.status==g::OriginalWreckComponentStatus50LA::complete,
+                "original main340 Entity append stopped");
+            failurePC_=0x212014u;
+            need(gravity344_&&!racer.gravity344&&
+                gravity344_->canonicalAccelerationAddress()==&fixture_->state.bodies.main.selectedGravity,
+                "original gravity344 canonical owner publication rejected");
+            racer.gravity344=gravity344_.get();
+            const auto gravityAppended=gravity344_->append212034(d,racer.racer);
+            failurePC_=gravityAppended.sourcePC;
+            need(gravityAppended.status==g::OriginalWreckComponentStatus50LA::complete,
+                "original gravity344 Entity append stopped");
+            const auto gravityBound=gravity344_->bindTarget212048(*body340_);
+            failurePC_=gravityBound.sourcePC;
+            need(gravityBound.status==g::OriginalWreckComponentStatus50LA::complete,
+                "original gravity344 main target binding stopped");
+            failurePC_=0x212688u;
+            need(joint360_&&!racer.joint360&&
+                joint360_->canonicalNumericAddress()==&fixture_->state.bodies.joint,
+                "original joint360 canonical owner publication rejected");
+            racer.joint360=joint360_.get();
+            const auto result=joint360_->append2126A8(d,racer.racer);failurePC_=result.sourcePC;
+            need(result.status==g::OriginalWreckComponentStatus50LA::complete,
+                "original joint360 Entity append stopped");
         }
         finished_=true;failurePC_=0;
     }

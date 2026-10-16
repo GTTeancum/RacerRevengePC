@@ -1,6 +1,7 @@
 #include "original_gc_gameplay_lighting_candidate.h"
 #include "original_racer_entity_cold50la.h"
 #include "original_camera_scene_owner.h"
+#include "original_world_environment50kg.h"
 #include "original_application_entities50la.h"
 #include "original_racer_model_scene50la.h"
 #include "original_racer_model_view50la.h"
@@ -317,10 +318,15 @@ struct Owner::Storage {
     }
     std::array<CollectionTree50BX,maximumZones*2> methods{};
     std::array<CollectionZone50BX,maximumZones> zones{};
+    const ::ra_pod_scene50LA::Owner* sceneOwner=nullptr;
     // Stable fields beside the SAME4C0 identities/registries. Constructor27F120
     // does not initialize these: disengaged optional means unproduced, not a
     // claimed source zero. No raw stamp addresses are exported to wreck/draw.
     struct ZoneProjection {
+        //27F158 initializes the actual SearchNode44 to zero. Authoring is
+        //published only at its retained StaticModels callback predecessor.
+        std::uint32_t environmentVisible44=0;
+        bool environment44Published=false;
         //27F15C explicitly initializes A0 null. The actual numeric owner is
         //created only when27FF38 reaches280230, not by camera publication.
         std::shared_ptr<OriginalZoneScissor50LA> scissorA0;
@@ -330,6 +336,9 @@ struct Owner::Storage {
     };
     std::array<ZoneProjection,maximumZones> zoneProjection;
     const CameraVisibilityLease* zoneProjectionLease=nullptr;
+    //Same authenticated RA scene authoring retained for the future272FC0
+    //environment method. Bounds publication does not construct443108.
+    std::unique_ptr<original_world_environment50KG::Owner> environment3A4;
     std::array<AuthoredRenderZone,maximumZones> renderAuthoring{};
     bool renderAuthoringReady=false;
     std::array<SearchListBlock50BR,maximumZones*4> blocks{};
@@ -812,7 +821,7 @@ bool Owner::selectRaStatic(std::uint32_t zone,const std::array<float,3>& authore
 
 Owner::Owner() noexcept=default;
 Owner::~Owner(){
-    if(storage_&&storage_->staticOwner)std::terminate();
+    if(storage_&&(storage_->staticOwner||storage_->sceneOwner))std::terminate();
     if(storage_&&storage_->activeLease)endDraw(*const_cast<DrawLease*>(storage_->activeLease));
     if(storage_&&storage_->activeCamera)endCameraVisibility(*const_cast<CameraVisibilityLease*>(storage_->activeCamera));
     if(storage_&&storage_->activeReset)endResetVisibility(*const_cast<ResetVisibilityLease*>(storage_->activeReset));
@@ -873,6 +882,13 @@ bool Owner::prepareScene(const std::vector<std::uint8_t>& scb,std::uint32_t race
            w.zones.size()>maximumZones||w.portals.size()>maximumPortals)
             return fail(d,Status::unsupportedScene,0x272a48);
         next->scene=scene;
+        if(scene==Scene::ra){
+            next->environment3A4=std::make_unique<original_world_environment50KG::Owner>();
+            original_world_environment50KG::Diagnostic environment;
+            if(!next->environment3A4->prepare(w,environment)||
+               !next->environment3A4->prepareSpatialBounds276F3C(environment))
+                return fail(d,Status::sourceFields,environment.sourcePC);
+        }
         if(scene==Scene::ma||scene==Scene::sa||scene==Scene::ra){if(!next->prepareMaSa(d))return false;}
         else if(scene==Scene::ga){if(!next->prepareGa(d))return false;}
         else if(scene==Scene::ta){if(!next->prepareTa(d))return false;}else{
@@ -1469,3 +1485,32 @@ bool Owner::currentSourceGlobalAmbient50(std::array<float,4>& out) const noexcep
 #include "original_ra_static_visibility50la.inl"
 #include "original_ra_static_selection50la.inl"
 #include "original_ra_zone_projection50la.inl"
+
+#include "original_ra_zone_draw50la.inl"
+
+namespace rr::game::original_gc_gameplay_lighting_candidate {
+const CollectionZone50BX* Owner::retainSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner,
+    std::size_t& count)noexcept {
+    count=0;
+    if(!owner||!storage_||storage_->scene!=Scene::ra||invalidated_||storage_->sceneOwner||
+       storage_->activeLease||storage_->activeCamera||storage_->activeReset||storage_->resetPending())return nullptr;
+    auto& s=*storage_;
+    if(s.visibility.lifecycle.storage.views.zones!=s.zones.data())return nullptr;
+    s.sceneOwner=owner;count=s.world.zones.size();return s.zones.data();
+}
+bool Owner::canReleaseSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner)const noexcept {
+    return storage_&&owner&&storage_->sceneOwner==owner&&!storage_->activeLease&&
+       !storage_->activeCamera&&!storage_->activeReset&&!storage_->resetPending();
+}
+bool Owner::releaseSceneZones272A78(const ::ra_pod_scene50LA::Owner* owner)noexcept {
+    if(!canReleaseSceneZones272A78(owner))return false;
+    storage_->sceneOwner=nullptr;return true;
+}
+}
+
+namespace rr::game::original_gc_gameplay_lighting_candidate {
+const original_world_environment50KG::SpatialBounds* Owner::sceneBounds534(const ::ra_pod_scene50LA::Owner* owner)const noexcept {
+    return storage_&&owner&&storage_->sceneOwner==owner&&storage_->environment3A4?
+        storage_->environment3A4->spatialBounds534():nullptr;
+}
+}

@@ -93,8 +93,9 @@ bool OriginalUiCoursePageDraw50KG::prepare(
 bool OriginalUiCoursePageDraw50KG::applyPlanetPalette(OriginalUiCourseWidgets50KG& widgets,
     std::uint32_t primary,std::uint32_t secondary,D& d)noexcept{
     d={};if(!prepared())return fail(d,poisoned_?E::poisoned:E::notPrepared,0x1DD580);
-    // Retained profile's four fresh-course planet rows, source17F800..17F884.
+    // Retained profile's fresh-course and Ryloth planet rows, source17F800..17F884.
     if(!((primary==0xC2A684&&secondary==0x80674A)||(primary==0x8CC46E&&secondary==0x628036)||
+         (primary==0xC0B5A5&&secondary==0x8C8479)||
          (primary==0xCE766D&&secondary==0xFFBAB2)||(primary==0xB26A36&&secondary==0xE5A373)))return fail(d,E::palette,0x1DD580);
     const auto* nav=widgets.navigation();
     if(widgets.poisoned()||!nav||!nav->page||nav->page->identity!=pageIdentity_)return fail(d,E::widget,0x1DD580);

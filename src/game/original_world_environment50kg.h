@@ -9,7 +9,7 @@ namespace rr::game::original_world_environment50KG {
 enum class Status : std::uint8_t {
     complete, unprepared, alreadyPrepared, sourceShape, missingEnvironment,
     duplicateField, integerSyntax, storageLimit, sourceRange, cameraZone,
-    allocation
+    allocation, numberSyntax, arithmetic
 };
 struct Diagnostic {
     Status status=Status::unprepared;
@@ -24,9 +24,16 @@ struct SkySelection {
     std::int32_t cubeIndex=-1;
     bool enabled=false;
 };
-// Native retained sky-selection portion of world3A4 EnvironmentInfo, from
-// constructor276950/read276C00. This does not impersonate its other fields or
-// construct world3F8 sky nodes/resources, terrain, water, or an Ecosystem.
+// Retained EnvironmentInfo520..540, in source read order. These are authoring
+//fields, not a spatial tree, an admitted zone, or a query-completion token.
+struct SpatialBounds {
+    float terrainWidth520=0.f,terrainBreadth524=0.f;
+    float terrainWidthScale528=0.f,terrainBreadthScale52C=0.f,border530=0.f;
+    float xMin534=0.f,xMax538=0.f,zMin53C=0.f,zMax540=0.f;
+};
+// Native retained authoring portions of world3A4 EnvironmentInfo, from
+// constructor276950/read276C00. This does not construct world3F8 sky
+//nodes/resources, a spatial tree, terrain, water, or an Ecosystem.
 class Owner final {
 public:
     Owner() noexcept;
@@ -40,6 +47,12 @@ public:
     // original parameter field and original_bytes. No mutable source alias is
     // exposed and subsequent caller edits cannot change a prepared owner.
     bool prepare(const assets::World48F& authenticatedWorld,Diagnostic&) noexcept;
+    // Separate optional continuation of the SAME retained Environment block.
+    // It preserves the sky-only preparation domain and accepts no replacement
+    //bounds. Positive finite extents >=1 form the bounded native domain; source
+    //diagnostic side effects and malformed numeric spellings remain unjoined.
+    bool prepareSpatialBounds276F3C(Diagnostic&) noexcept;
+    const SpatialBounds* spatialBounds534() const noexcept;
     bool prepared() const noexcept;
     const assets::World48F* world() const noexcept;
     std::size_t zoneCount() const noexcept;

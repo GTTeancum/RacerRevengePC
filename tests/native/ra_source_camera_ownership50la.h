@@ -22,6 +22,7 @@ namespace original_cable_selection50LA { class Binding; }
 #include <vector>
 
 namespace ra_cold_aggregate50LA { class Owner; }
+namespace ra_pod_scene50LA { class Owner; }
 namespace ra_cold_roster50LA { class Resources; class Operation; }
 namespace ra_static_lighting50LA { class Binding; }
 namespace ra_static_fog50LA { class Binding; }
@@ -81,6 +82,8 @@ struct Diagnostic {
 // and Follow/death cold buffers while borrowing the existing body/query arena.
 // No public constructor, mutable Storage, query getter, attach or camera API.
 class OwnershipBridge final {
+    friend class ::ra_pod_scene50LA::Owner;
+    const ::ra_pod_scene50LA::Owner* sceneOwner_=nullptr;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class ::original_cable_selection50LA::Binding;
     friend class ra_cold_aggregate50LA::Owner;
@@ -174,6 +177,20 @@ class OwnershipBridge final {
         d.message="partial selection prefix only; inspect sourcePC for the remaining source boundary";
         return completed;
     }
+    // Unissued: the actual application phase5/camera114D50 prefix must own
+    // this entry, including prior selection/camera-child completion and the
+    // SAME still-active visibility lease. A pose/fog publication cannot make it.
+    class ZoneDrawEntry114E00 final {
+        friend class OwnershipBridge;
+        OwnershipBridge* owner_;
+        g::original_gc_gameplay_lighting_candidate::CameraVisibilityLease* visibility_;
+        std::shared_ptr<::original_main_entry50KG::NativeCollectorFifo50LA> collector_;
+        ZoneDrawEntry114E00(OwnershipBridge& owner,
+            g::original_gc_gameplay_lighting_candidate::CameraVisibilityLease& visibility,
+            std::shared_ptr<::original_main_entry50KG::NativeCollectorFifo50LA> collector)
+            :owner_(&owner),visibility_(&visibility),collector_(std::move(collector)){}
+    };
+    bool drawZonePrefix114E00(const ZoneDrawEntry114E00&,Diagnostic&)noexcept;
     bool prepareFog(Diagnostic& d)noexcept {
         d={};StaticLightPublication base;
         if(!readStaticLightPublication(base)||!camera_->fog.current()||!camera_->display||
@@ -193,6 +210,10 @@ class OwnershipBridge final {
     std::size_t recoveryMeshStack_=0,wreckMeshStack_=0;
     storage::Limits limits_{};
     storage::Owner storage_;
+    std::array<std::unique_ptr<storage::Membership>,2> triggerMembership_;
+    // Shared across all racer banks: never snapshot action/contact history.
+    ra_trigger_actions50LA::ActionLease triggerLease_{};
+    bool triggerQueryActive_=false;
     std::unique_ptr<ActualQueryOwners> actual_;
     std::unique_ptr<original_follow_query_bridge::QueryBridge> follow_;
     struct CameraBinding final {
@@ -264,7 +285,7 @@ class OwnershipBridge final {
         }
     };
     void verifyFollowRetiredForBankDestruction()const noexcept {
-        if(nativeFifoPins_)std::terminate();
+        if(nativeFifoPins_||triggerQueryActive_)std::terminate();
         if(rosterRetirementRequired_)std::terminate();
         for(const bool pending:freshRetirementRequired_)if(pending)std::terminate();
         for(const bool pending:gridRetirementRequired_)if(pending)std::terminate();
@@ -296,12 +317,17 @@ class OwnershipBridge final {
         try {
             const auto* source=candidates?candidates->decodedSource():nullptr;
             const auto* bindings=candidates?candidates->staticBindings():nullptr;
-            if(!source||!bindings||source->collisions.size()!=178u||bindings->size()!=178u||
+            if(!source||!bindings||source->collisions.size()!=178u||bindings->size()!=(candidates->triggerActions_?180u:178u)||
                input.collisionRoster.empty()||input.collisionRoster.size()>8u||
                input.wreck.size()>(storage::runtimeSearchSlotLimit-8u)/3u)
                 return fail(d,"actual RA static source and bounded original collision roster required");
-            for(const auto& b:*bindings)if(!b.candidate||b.animated||b.trigger)
-                return fail(d,"RA runtime prefix requires the authentic static binding sequence");
+            for(std::size_t i=0;i<bindings->size();++i){const auto& b=(*bindings)[i];
+                if(!b.candidate||b.animated||b.trigger!=(i>=178u)||
+                   (i>=178u&&(!b.candidate->raOriginalTriggerSegments||b.authoredZone!=4u||
+                    b.candidate->nativeTriggers!=&candidates->triggerActions_->nativeGroup()||
+                    b.candidate->nativeTriggerIndex!=i-178u)))
+                    return fail(d,"RA requires original static prefix then its two authored trigger owners");
+            }
             if(input.recovery&&(input.recovery->storagePrepared||input.recovery->sourcePrepared))
                 return fail(d,"recovery reservation requires its fresh actual owner before world-sized allocation");
             candidates_=std::move(candidates);
@@ -378,6 +404,16 @@ class OwnershipBridge final {
                     if(next==std::numeric_limits<std::uint32_t>::max())next=0;else ++next;
                 }
             }
+            if(candidates_->triggerActions_){
+                if(inputs_.collisionRoster.size()!=8u||!rosterResources_)
+                    return fail(d,"RA triggers require the actual all-eight retained roster");
+                std::array<ra_trigger_actions50LA::RacerIdentities,8> ids{};
+                for(std::size_t i=0;i<8u;++i)ids[i]={bodyIdentities_[i].main,bodyIdentities_[i].secondary};
+                // This retained RA route constructs eight original AI racers.
+                // No human-prefix0 fallback or camera-derived exclusion.
+                if(!candidates_->triggerActions_->prepare(*candidates_->triggerSource_,ids,0u,source->ai.track.count))
+                    return fail(d,"RA original trigger identity/action preparation failed");
+            }
             capacitySealed_=true;
             auto lease=ra_cold_sources50LA::Owner::leaseLiveWorld(candidates_->source_);
             if(!lease)return fail(d,"same-source RA live world already leased or invalid");
@@ -385,7 +421,20 @@ class OwnershipBridge final {
                 source->world,{source->collisions.data(),source->collisions.size()}};
             if(!storage_.prepareSource(view,bindings->data(),bindings->size(),limits_,d.storage,
                 &lease->world(),lease))return fail(d,"RA runtime static/query storage construction failed");
-            storageConstructed_=true;return true;
+            storageConstructed_=true;
+            if(candidates_->triggerActions_){auto& s=*storage_.get();
+                for(std::size_t i=0;i<2;++i){
+                    triggerMembership_[i]=std::make_unique<storage::Membership>(s.count.membership);
+                    auto& m=*triggerMembership_[i];const auto& authored=(*candidates_->triggerSource_->sources())[i];
+                    const auto bounds=ra_trigger_candidates50LA::bounds(authored);
+                    if(g::attachLiveZoneMembership50EN(s.lifecycle,s.world,m.state,m.storage(),
+                        static_cast<g::CollectionRef50BX>(179u+i),authored.zone,g::ZoneMethod50CL::First,0.f,
+                        bounds,s.membershipWork).status!=g::LiveZoneStatus50EN::Complete||
+                       g::updateLiveZoneMembership50EN(s.lifecycle,s.world,m.state,bounds,s.membershipWork).status!=
+                        g::LiveZoneStatus50EN::Complete)return fail(d,"RA original trigger membership rejected");
+                }
+            }
+            return true;
         }catch(...){return fail(d,"RA runtime storage failure; retained prefix is terminal");}
     }
     bool bindQueries(const ActualQueryOwners& a,Diagnostic& d)noexcept {
@@ -489,6 +538,28 @@ class OwnershipBridge final {
             storage_.get()->registerMutableOwners(bank);
             worldOwnersRegistered_=true;return true;
         }catch(...){return fail(d,"RA world registration failed; Bank pin and partial spans retained until destruction");}
+    }
+    bool triggerBankCurrent(const native_racer50HN::Bank& bank,std::size_t slot,bool inVisit)const noexcept {
+        const auto pin=bankLifetime_.lock();
+        if(!pin||bankIdentity_!=&bank||pin->identity!=&bank||
+           bank.raWorldLifetime_.get()!=pin.get()||!bank.sealed_||bank.count_!=8u||
+           !candidates_->triggerActions_||!actual_)return false;
+        // visit(0) uses readBlocked rather than the swapping lease; batched
+        // visits use visiting for every slot, including zero.
+        if(inVisit?(!bank.visiting_&&!(slot==0u&&bank.readBlocked_)):
+            (bank.visiting_||bank.readBlocked_))return false;
+        return !inVisit||(slot<8u&&actual_->mainFilter.identity==bodyIdentities_[slot].main&&
+            actual_->secondaryFilter.identity==bodyIdentities_[slot].secondary&&
+            actual_->main.resource==&bodyIdentities_[slot].collision->main()&&
+            actual_->secondary.resource==&bodyIdentities_[slot].collision->secondary());
+    }
+    bool observeTriggerPoses(Diagnostic& d)noexcept {
+        if(!candidates_->triggerActions_||!actual_)return fail(d,"RA trigger owner/query absent");
+        auto& q=*actual_;auto& actions=*candidates_->triggerActions_;
+        if(!actions.observePrepared(q.mainFilter.identity,*q.main.resource,q.main.worldMatrix)||
+           !actions.observePrepared(q.secondaryFilter.identity,*q.secondary.resource,q.secondary.worldMatrix))
+            return fail(d,"RA trigger pose observation rejected");
+        return true;
     }
     bool cameraBankCurrent()const noexcept {
         // Check the live nonforgeable control block BEFORE dereferencing Bank.
@@ -711,6 +782,7 @@ class OwnershipBridge final {
                 receipt.mainRevision=storage.mainMembership.state.revision;
                 receipt.secondaryRevision=storage.secondaryMembership.state.revision;
                 receipt.terrainRevision=storage.terrainMembership.state.revision;
+                if(candidates_->triggerActions_&&!observeTriggerPoses(d))return;
                 complete=true;
             });
             gridCompletion_[slot].complete=complete;
@@ -967,7 +1039,7 @@ class OwnershipBridge final {
             d.camera.status=c::Status::terminal;return d.camera;}
     }
     bool canClose()const noexcept {
-        if(nativeFifoPins_)return false;
+        if(nativeFifoPins_||triggerQueryActive_)return false;
         if(closed_)return true;
         if(rosterRetirementRequired_)return false;
         if(!bankLifetime_.expired())return false;
@@ -996,7 +1068,7 @@ class OwnershipBridge final {
         return true;
     }
     bool close()noexcept {
-        if(closed_)return true;if(!canClose())return false;
+        if(closed_)return true;if(sceneOwner_||!canClose())return false;
         if(podBindings_&&podBindings_->podLiveQuery50IZ==podContext_.get())podBindings_->podLiveQuery50IZ=nullptr;
         podContext_.reset();podBindings_=nullptr;podParameters_=nullptr;
         camera_.reset();follow_.reset();closed_=true;return true;

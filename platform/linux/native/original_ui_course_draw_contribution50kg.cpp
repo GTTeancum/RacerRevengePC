@@ -98,7 +98,9 @@ bool OriginalUiCourseDrawContribution50KG::prepareBank(D& d)noexcept{
      if(index==missing||!assets::prepareOriginalUiLitMaterial50KM(m->passes[p],*images->decodedTexture(index),policy,d.materialDetail)||!convertOriginalUiLitMaterialSpan50KM(policy,{0,1,1,index,textures->textureCount()},converted)||!assign(index,converted.native.sampler))return fail(d,E::material);}
    }
   }
-  for(auto planet:{0u,1u,4u,5u}){OriginalUiSpan50KG bg;OriginalUiNativeSpan50KG bgState;auto bgImage=s.mapped(0,s.resources->backgroundImage(planet));
+  for(auto planet:{0u,1u,4u,5u,2u}){
+   if(planet==2&&s.resources->backgroundImage(planet)==assets::unresolvedMaterialTexture50EA)continue;
+   OriginalUiSpan50KG bg;OriginalUiNativeSpan50KG bgState;auto bgImage=s.mapped(0,s.resources->backgroundImage(planet));
    if(!prepareOriginalUiCourseBackgroundSpan50KG(*images,bgImage,bg,bgState)||!assign(bgImage,bgState.sampler))return fail(d,E::material);}
   for(const auto& p:s.samplers)if(p.minification==MaterialTextureFilter50EB::unspecified)return fail(d,E::material);
   s.bankPrepared=true;return true;

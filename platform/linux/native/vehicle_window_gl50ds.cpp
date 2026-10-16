@@ -1,5 +1,7 @@
 #include "../../../tests/native/ra_static_fire_visual50la.h"
 #include "vehicle_window_gl50ds.h"
+#include "../../../tests/native/ra_cold_aggregate50la.h"
+#include "../../../tests/native/ra_static_fog_numeric50la.h"
 #include "native_camera_view50dx.h"
 #include "../../../src/game/original_racer_specular50la.h"
 #include "../../../src/game/original_racer_model_packets50la.h"
@@ -1349,6 +1351,7 @@ struct VehicleWindowGl50DS::Storage {
 
 #include "original_gameplay_blur_storage.inl"
 #include "native_coverage_storage.inl"
+#include "ra_static_world_gl_storage.inl"
 #include "original_gc_particle_gl_storage50kg.inl"
 #include "original_race_hud_render.inl"
 #include "original_time_stats_render.inl"
@@ -1426,6 +1429,7 @@ struct VehicleWindowGl50DS::Storage {
                         "racer cable texture is no longer the retained publication");
             }
         }
+        if(!raWorldCurrent(d))return false;
         if (request.track.mode == VehicleWindowMode50DS::callerMaterialTextures &&
             (!request.track.textures || !request.track.textures->validBorrow(
                 request.context, request.isCurrent, trackTexturePublication)))
@@ -1450,6 +1454,7 @@ struct VehicleWindowGl50DS::Storage {
         return true;
     }
     bool usesTextures() const noexcept {
+        if(request.raStaticWorld)return true;
         for (U i = 0; i < racerArchetypeCount; ++i)
             if (racerArchetypes[i].cables.textures) return true;
         return request.mode == VehicleWindowMode50DS::callerMaterialTextures ||
@@ -1460,7 +1465,8 @@ struct VehicleWindowGl50DS::Storage {
     bool usesTrackShader() const noexcept {
         return request.track.mode == VehicleWindowMode50DS::sourceVertexColors ||
             request.track.mode == VehicleWindowMode50DS::callerMaterialTextures ||
-            request.dynamicWorld.mode == VehicleWindowMode50DS::callerMaterialTextures;
+            request.dynamicWorld.mode == VehicleWindowMode50DS::callerMaterialTextures ||
+            request.gameplayBinderTextures != nullptr;
     }
     bool createTrackMaterials(const VehicleWindowTrack50DS& input) noexcept {
         if (input.mode != VehicleWindowMode50DS::callerMaterialTextures) return true;
@@ -2158,6 +2164,7 @@ void main() {
         displayFadeDeletionPending=false;return true;
     }
     bool hasGlResources() const noexcept {
+        if(hasRaWorldResources())return true;
         if(hasCoverageResources())return true;
         if(hasRaceHudResources() || hasTimeStatsResources() || hasSpeedBoostResources())return true;
         if(hasDisplayFadeNames())return true;
@@ -3498,7 +3505,8 @@ void main() { viewerOutput = hudColor; }
         // Existing native world shader handles fog/clipping; exact source
         // raster quantization, framebuffer-alpha and group ordering remain open.
         const auto* bank=request.gameplayBinderTextures;
-        if(!bank||!trackProgram||!cableVertexArray)return false;
+        if(!bank||!trackProgram||!cableVertexArray)
+            return fail(*diagnostic,VehicleWindowError50DS::material,"Binder shader, pixel bank or quad buffers missing");
         const U texture=bank->texture(frameGameplayBinderImage);if(!texture)return false;
         resetPodState();
         gl.useProgram(trackProgram);gl.uniformMatrix4fv(trackMatrixUniform,1,0,matrix);
@@ -4185,6 +4193,7 @@ void main() {
             if (!frameSpecularUvs50LA || !specularWorkspace50LA)
                 return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate bounded current-camera specular workspace");
         }
+        coverageDemand = coverageDemand || bool(request.raStaticWorld);
         if (!loadFunctions() || !check("initial GL error state") || !checkContext()) return false;
         shader.reset(new (std::nothrow) VehicleGlShader50CZ(shaderGl));
         if (!shader) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate shader owner");
@@ -4207,7 +4216,7 @@ void main() {
             !createTrackProjection(input.track) ||
             !createStaticGeometry(input.sky.mesh, skyVertexBuffer, skyIndexBuffer, skyVertexArray, skyIndexCount) ||
             !createCableGeometry() || !createHostHud() || !createOriginalUi() ||
-            !createTargets() || !createGameplayBlur() || !createCoverageProgram()) return false;
+            !createTargets() || !createGameplayBlur() || !createCoverageProgram() || !createRaWorld()) return false;
         VehicleGlHooks50CV hooks{};
         hooks.context = this; hooks.ready = ready; hooks.materialReady = materialReady;
         hooks.begin = begin; hooks.bindMaterial = bindMaterial; hooks.commit = commit; hooks.abort = abort;
@@ -4848,7 +4857,8 @@ void main() {
             if (accepted) {
                 for (U i = group.indexStart; i < group.indexStart + group.indexCount; i += 3) {
                     if (coverageDemand) {
-                        if (!drawCoveragePairTriangle(bank, i, material->specularName50LA)) {
+                        if (!drawCoveragePairTriangle(bank, i, material->specularName50LA,
+                            racerTriangleRasterRegion(slot,component,i))) {
                             accepted = false; break;
                         }
                     } else {
@@ -4991,8 +5001,13 @@ void main() {
         s.gl.clearColor(s.clearRgba[0], s.clearRgba[1], s.clearRgba[2], s.clearRgba[3]);
         s.gl.clear(colorBufferBit | depthBufferBit);
         if (!s.check("begin explicit private frame")) return false;
-        if (!s.uploadDynamicWorld(bank) || !s.drawSky() || !s.drawTrack(false) ||
-            !s.drawDynamicWorld(bank, false)) return false;
+        auto stageStart=std::chrono::steady_clock::now();
+        if (!s.uploadDynamicWorld(bank) || !s.drawSky())return false;
+        s.traceRaStage("sky",stageStart);
+        if(!s.drawRaWorld(bank))return false;
+        s.traceRaStage("ra_world",stageStart);
+        if(!s.drawTrack(false)||!s.drawDynamicWorld(bank,false))return false;
+        s.traceRaStage("legacy_world",stageStart);
         return s.uploadRacerNormals(bank, s.framePlayerBatch) && s.uploadSpecularUvs50LA(bank, 0, 0);
     }
     static bool bindMaterial(void* context, game::VehicleDrawComponent50CM component, U material) noexcept {
@@ -5011,9 +5026,16 @@ void main() {
         s.gl.uniform1i(s.shader->uniforms().useSourceDiffuseCompressed50LA, 0);
         return s.check("bind explicit neutral vehicle material policy");
     }
+    void traceRaStage(const char* stage,std::chrono::steady_clock::time_point& start) noexcept {
+        if(!request.raStaticWorld||!request.enableGameplayDisplayWallTiming)return;
+        const auto now=std::chrono::steady_clock::now();
+        const auto elapsed=std::chrono::duration_cast<std::chrono::microseconds>(now-start).count();
+        std::fprintf(stderr,"ra_renderer_stage name=%s cpu_submission_wall_us=%lld\n",stage,static_cast<long long>(elapsed));start=now;
+    }
     static bool commit(void* context, std::uint8_t bank) noexcept {
         auto& s = *static_cast<Storage*>(context);
         if (!s.active || bank != (s.published ^ 1u)) return false;
+        auto stageStart=std::chrono::steady_clock::now();
         // One transaction and one clear/sky/track pass. Other actual opaque
         // racers join the player's pending framebuffer before ANY effects.
         for (U i = 0; i < s.frameOpponentCount; ++i) {
@@ -5021,6 +5043,7 @@ void main() {
             if (!s.drawOpaqueOpponent(bank, i)) return false;
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
+        s.traceRaStage("opaque_opponents",stageStart);
         // Cable/HUD failure still aborts the unpublished combined frame.
         s.resetPodState();
         if (!s.drawCables(s.frameCables, s.cableTextureName)) return false;
@@ -5030,6 +5053,7 @@ void main() {
                 s.racerView(s.frameOpponentArchetypes[i]).cableTextureName)) return false;
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
+        s.traceRaStage("cables",stageStart);
         if (!s.drawTrack(true) || !s.drawDynamicWorld(bank, true)) return false;
         // The shared inactive VBOs currently hold the last opaque opponent.
         // Restore the player's independent stream before its deferred effects.
@@ -5042,7 +5066,9 @@ void main() {
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;
         s.resetPodState();
+        s.traceRaStage("transparent_racers",stageStart);
         if (!s.drawGameplayBinders() || !s.drawGcParticles()) return false;
+        s.traceRaStage("binders_particles",stageStart);
         if (s.hasSpecularPairs50LA) {
             // All body map-2 Ad consumers have completed. Current Binder/GC
             // materials use source alpha and DATE0; the original HUD's private
@@ -5055,7 +5081,9 @@ void main() {
             if (!s.check("restore opaque presentation alpha after all body and particle consumers")) return false;
         }
         if (!s.resolveCoverage(bank)) return false;
+        s.traceRaStage("coverage_resolve",stageStart);
         if (!s.drawHostHud() || !s.drawRaceHud(bank) || !s.drawTimeStats(bank) || !s.drawSpeedBoost(bank) || !s.drawGameplayBlur(bank)) return false;
+        s.traceRaStage("hud_blur",stageStart);
         if (!s.check("accept private vehicle frame")) return false;
         // 50CV publication is CPU-only. The fallible window copy is deliberately
         // OUTSIDE this transaction, after submitVehicleDrawBatch50CS succeeds.
@@ -5166,7 +5194,7 @@ void main() {
         game::clearGameplayBlurVideoStrengths(gameplayBlurVideo);
         uiPrivatePublicationGeneration=0;
         adapter.reset();
-        if (!hasGlResources()) { shader.reset(); retireRaStaticFirePublication(); d.cleanupIncomplete = false; return true; }
+        if (!hasGlResources()) { shader.reset(); retireRaWorldPublication(); retireRaStaticFirePublication(); d.cleanupIncomplete = false; return true; }
         // All functions were loaded before the first name could be allocated.
         if (!drainCleanupErrors(d)) {
             d.cleanupIncomplete = true;
@@ -5174,7 +5202,7 @@ void main() {
         }
         // Explicit source/display leases add a real completion obligation. Never
         // confuse a CPU generation increment or deferred GL deletion with it.
-        if (raStaticFireOwner || hasDisplayFadeNames() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
+        if (raWorld || raStaticFireOwner || hasDisplayFadeNames() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
             uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || (hasRaceHudResources() || hasTimeStatsResources() || hasSpeedBoostResources())){
             gl.finish();const U error=drawGl.getError();
             if (error){if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
@@ -5193,7 +5221,7 @@ void main() {
             gl.activeTexture(textureUnit0);gl.bindTexture(coverageTexture,0);
         }
         if (usesTextures() || hasDisplayFadeNames()) {
-            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || (hasRaceHudResources() || hasTimeStatsResources() || hasSpeedBoostResources()) || hasSpecularPairs50LA) {
+            if (request.enableOriginalUiSourceRgba || request.enableOriginalGameplayBlur || (hasRaceHudResources() || hasTimeStatsResources() || hasSpeedBoostResources()) || hasSpecularPairs50LA || raWorld) {
                 gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
                 if (gl.bindSampler)gl.bindSampler(1,0);
             }
@@ -5296,7 +5324,7 @@ void main() {
             if (!deleteName(skyVertexArray, gl.deleteVertexArrays, d) ||
                 !deleteName(skyVertexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(skyIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
-            if (!deleteCoverageResources(d)) goto incomplete;
+            if (!deleteRaWorldResources(d) || !deleteCoverageResources(d)) goto incomplete;
             for (U b = 0; b < 2; ++b)
                 if (!deleteName(targets[b], gl.deleteFramebuffers, d) ||
                     !deleteName(colors[b], gl.deleteRenderbuffers, d) ||
@@ -5306,7 +5334,7 @@ void main() {
                     !deleteName(menuColors[b], gl.deleteRenderbuffers, d)) goto incomplete;
         }
         d.cleanupIncomplete = hasGlResources();
-        if(!d.cleanupIncomplete)retireRaStaticFirePublication();
+        if(!d.cleanupIncomplete){retireRaStaticFirePublication();retireRaWorldPublication();}
         if (d.cleanupIncomplete || !complete)
             return fail(d, VehicleWindowError50DS::cleanup, "renderer cleanup incomplete");
         shader.reset();
@@ -5332,8 +5360,11 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     if(sessionDisplayOwner50LA_&&!sessionDisplayCreate50LA_)
         return fail(d,VehicleWindowError50DS::request,"session renderer creation requires its actual display owner");
     if(request.gameplayBinderTextures){
-        if(!request.cables.textures||request.track.mode!=VehicleWindowMode50DS::callerMaterialTextures||
-            !request.track.mesh||
+        // Binder uses the shared cable quad buffers and the requested
+        // world material shader. RA has its own authenticated world geometry,
+        // so it must not supply a fabricated legacy track mesh here.
+        if(!request.cables.textures||(!request.raStaticWorld&&
+            (request.track.mode!=VehicleWindowMode50DS::callerMaterialTextures||!request.track.mesh))||
             request.gameplayBinderTextures->textureCount()!=10||
             !request.gameplayBinderTextures->validBorrow(request.context,request.isCurrent,
                 request.gameplayBinderTextures->publicationToken()))
@@ -5373,6 +5404,16 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     }
     std::unique_ptr<Storage> next(new (std::nothrow) Storage);
     if (!next) return fail(d, VehicleWindowError50DS::allocation, "allocate caller-context renderer owner");
+    if(request.raStaticWorld){
+        if(request.track.mesh || request.track.raStaticFire || !request.raStaticWorldTextures ||
+           !request.raStaticWorld->world_ || request.raStaticWorld->terminal_ || request.raStaticWorld->closed_ ||
+           request.raStaticWorldTextures->raStaticWorldOwner()!=request.raStaticWorld->world_.get() ||
+           !request.raStaticWorld->world_->publishRenderer(this,request.raStaticWorldTextures))
+            return fail(d,VehicleWindowError50DS::material,"actual complete RA aggregate/image publication required without legacy track");
+        next->raWorld=request.raStaticWorld->world_;next->raWorldRenderer=this;
+        next->raWorldImagePublication=request.raStaticWorldTextures->publicationToken();
+    }else if(request.raStaticWorldTextures)
+        return fail(d,VehicleWindowError50DS::material,"RA image bank requires actual aggregate owner");
     if(request.track.raStaticFire){
         if(!request.track.raStaticFire->publishRenderer(this,request.track.textures))
             return fail(d,VehicleWindowError50DS::material,"FireP0t renderer publication already leased");
@@ -5558,6 +5599,7 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     for (U i = 0; i < 4; ++i)
         if (!std::isfinite(frame.clearRgba[i]) || frame.clearRgba[i] < 0 || frame.clearRgba[i] > 1)
             return fail(d, VehicleWindowError50DS::frame, "clear color outside finite [0,1]");
+    if(!s.prepareRaWorldFrame(frame,d))return false;
     if (s.request.track.worldFog.enabled) {
         if (!frame.worldFogCamera)
             return fail(d, VehicleWindowError50DS::frame, "world fog requires explicit camera position");
@@ -5782,7 +5824,12 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
             // old GL error into a new structural-rejection diagnostic.
             if (!d.glError && d.submission.error >= game::VehicleDrawSubmitError50CS::backendPreflight)
                 d.glError = s.adapter->glError();
-            fail(d, VehicleWindowError50DS::submission, "50CS/50CV submission rejected");
+            std::fprintf(stderr,"vehicle_submission_failure stage=%u component=%u span=%u gl=%u\n",
+                unsigned(d.submission.error),d.submission.component,d.submission.span,s.adapter->glError());
+            // Keep the first concrete world/effect rejection from callbacks;
+            // the outer submission status must not erase its cause.
+            if(d.error==VehicleWindowError50DS::none)
+                fail(d, VehicleWindowError50DS::submission, "50CS/50CV submission rejected");
         } else {
             d.batchAccepted = true;
             if(s.request.output==VehicleWindowOutput50DS::headless)
@@ -6936,20 +6983,32 @@ bool VehicleWindowGl50DS::readbackRgba(std::uint8_t* destination, std::size_t ca
 
 bool VehicleWindowGl50DS::readbackWindowFrontRgba(std::uint8_t* destination,
     std::size_t capacityBytes,I width,I height,VehicleWindowDiagnostic50DS& d) noexcept {
+    return readbackWindowBufferRgba(destination,capacityBytes,width,height,true,nullptr,d);
+}
+
+bool VehicleWindowGl50DS::readbackWindowBackRgba(GameHost50ER& host,std::uint8_t* destination,
+    std::size_t capacityBytes,I width,I height,VehicleWindowDiagnostic50DS& d) noexcept {
+    return readbackWindowBufferRgba(destination,capacityBytes,width,height,false,&host,d);
+}
+
+bool VehicleWindowGl50DS::readbackWindowBufferRgba(std::uint8_t* destination,
+    std::size_t capacityBytes,I width,I height,bool front,const GameHost50ER* expectedHost,
+    VehicleWindowDiagnostic50DS& d) noexcept {
     d={};
     if(!initialized())return fail(d,VehicleWindowError50DS::notInitialized,"window readback requires initialized renderer");
     auto& s=*storage_;
     if(!s.current(d))return false;
-    if(s.request.output!=VehicleWindowOutput50DS::defaultBackBuffer || s.active || s.frameSet || s.diagnostic ||
+    if((expectedHost && s.request.context!=static_cast<const void*>(expectedHost)) ||
+        s.request.output!=VehicleWindowOutput50DS::defaultBackBuffer || s.active || s.frameSet || s.diagnostic ||
         !s.imageCommitted || width<=0 || height<=0 || width!=s.committedWidth || height!=s.committedHeight ||
         std::uint64_t(width)*std::uint64_t(height)>std::numeric_limits<std::size_t>::max()/4u)
-        return fail(d,VehicleWindowError50DS::readback,"front-buffer readback requires idle real window and matching committed drawable");
+        return fail(d,VehicleWindowError50DS::readback,"window-buffer readback requires idle real window owner and matching committed drawable");
     d.readbackWidth=width;d.readbackHeight=height;
     d.readbackBytes=std::size_t(width)*std::size_t(height)*4u; // Existing cold capacity bounds.
     if(!destination || capacityBytes<d.readbackBytes)
         return fail(d,VehicleWindowError50DS::readback,"window RGBA destination is null or too small");
     s.diagnostic=&d;
-    bool accepted=s.check("before actual window front-buffer readback");
+    bool accepted=s.check("before actual window framebuffer readback");
     I previousRead=0,defaultRead=0,previousPackBuffer=0;
     constexpr U packNames[]={0x0D05,0x0D02,0x0D03,0x0D04,0x0D00,0x0D01,0x806C,0x806B};
     I previousPack[8]{};
@@ -6965,7 +7024,7 @@ bool VehicleWindowGl50DS::readbackWindowFrontRgba(std::uint8_t* destination,
         restore=true;accepted=s.check("query default framebuffer read buffer");
     }
     if(accepted){
-        s.gl.readBuffer(0x0404); // GL_FRONT: the actual swapped application buffer.
+        s.gl.readBuffer(front?0x0404:0x0405); // GL_FRONT after swap / GL_BACK strictly before swap.
         s.drawGl.bindBuffer(pixelPackBuffer,0);
         s.gl.pixelStorei(0x0D05,1);s.gl.pixelStorei(0x0D02,0);
         s.gl.pixelStorei(0x0D03,0);s.gl.pixelStorei(0x0D04,0);
@@ -6981,7 +7040,8 @@ bool VehicleWindowGl50DS::readbackWindowFrontRgba(std::uint8_t* destination,
     }
     if(accepted){d.readbackBufferMayBeModified=true;
         s.gl.readPixels(0,0,width,height,rgba,unsignedByte,destination);
-        accepted=s.check("read actual swapped window front-buffer RGBA bytes");}
+        accepted=s.check(front?"read actual swapped window front-buffer RGBA bytes":
+            "read actual pre-swap window back-buffer RGBA bytes");}
     if(restore){
         s.gl.readBuffer(static_cast<U>(defaultRead));s.gl.bindFramebuffer(readFramebuffer,static_cast<U>(previousRead));
         for(unsigned i=0;i<8;++i)s.gl.pixelStorei(packNames[i],previousPack[i]);

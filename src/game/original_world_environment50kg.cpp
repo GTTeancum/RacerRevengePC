@@ -1,7 +1,16 @@
 #include "original_world_environment50kg.h"
+#include "../assets/track_start50ad.h"
+#include <cmath>
+#include <cfenv>
+#include <optional>
+#include <string_view>
 #include <limits>
 #include <utility>
 #include <vector>
+
+#if defined(__FAST_MATH__) || (defined(__FINITE_MATH_ONLY__) && __FINITE_MATH_ONLY__ > 0)
+#error "EnvironmentInfo bounds require strict finite IEEE arithmetic"
+#endif
 
 namespace rr::game::original_world_environment50KG {
 namespace {
@@ -11,7 +20,7 @@ constexpr std::size_t sourceFilenameBytes=0x104;
 bool fail(Diagnostic& d,Status s,std::uint32_t pc,std::size_t offset=0) noexcept {
     d.status=s;d.sourcePC=pc;d.sourceOffset=offset;return false;
 }
-bool field(const assets::ParameterBlock48F& b,const std::string& name,
+bool field(const assets::ParameterBlock48F& b,std::string_view name,
     const assets::ParameterField48F*& out,Diagnostic& d,std::uint32_t pc) noexcept {
     out=nullptr;
     for(const auto& f:b.fields)if(f.name==name){
@@ -48,6 +57,7 @@ struct Owner::Storage {
     assets::World48F world;
     std::vector<std::string> cubeFiles;
     std::vector<std::int32_t> zoneIndices;
+    std::optional<SpatialBounds> spatialBounds;
 };
 Owner::Owner() noexcept=default;
 Owner::~Owner()=default;
@@ -110,6 +120,67 @@ bool Owner::prepare(const assets::World48F& source,Diagnostic& d) noexcept {
         }
         storage_=std::move(next);d.status=Status::complete;return true;
     }catch(...){return fail(d,Status::allocation,0x276c68);}
+}
+bool Owner::prepareSpatialBounds276F3C(Diagnostic& d) noexcept {
+    d={};
+    if(!storage_)return fail(d,Status::unprepared,0x276f3c);
+    if(storage_->spatialBounds)return fail(d,Status::alreadyPrepared,0x276f3c);
+    if(std::fegetround()!=FE_TONEAREST)return fail(d,Status::arithmetic,0x277014);
+    const assets::ParameterBlock48F* environment=nullptr;
+    for(const auto& b:storage_->world.parameters.blocks)if(b.name=="environment")environment=&b;
+    if(!environment)return fail(d,Status::missingEnvironment,0x276c2c);
+    SpatialBounds next;
+    auto read=[&](const char* name,float& value,std::uint32_t pc,bool& present)->bool {
+        const assets::ParameterField48F* f=nullptr;
+        if(!field(*environment,name,f,d,pc))return false;
+        present=bool(f);value=0.f; // Every source158B80 default here is zero.
+        if(!f)return true;
+        if(!assets::parseTrackNumber50AD(f->value.data(),f->value.size(),value)||!std::isfinite(value))
+            return fail(d,Status::numberSyntax,pc,f->value_offset);
+        //The bounded decimal leaf canonicalizes zero. Restore the reader's
+        //signed zero rather than changing an explicit negative-zero override.
+        if(value==0.f&&!f->value.empty()&&f->value.front()=='-')value=-0.f;
+        return true;
+    };
+    bool present=false;
+    if(!read("terrainwidth",next.terrainWidth520,0x276f4c,present)||
+       !read("terrainbreadth",next.terrainBreadth524,0x276f64,present)||
+       !read("terrainwidthscale",next.terrainWidthScale528,0x276f7c,present)||
+       !read("terrainbreadthscale",next.terrainBreadthScale52C,0x276f94,present)||
+       !read("terrainborderwidth",next.border530,0x276fac,present))return false;
+    if(!read("xmin",next.xMin534,0x276fc4,present))return false;
+    if(!present)next.xMin534=-next.border530;
+    if(!read("xmax",next.xMax538,0x276ff0,present))return false;
+    if(!present){
+        volatile float extent=next.terrainWidth520*next.terrainWidthScale528;
+        volatile float scaled=256.f*extent;
+        volatile float maximum=next.border530+scaled;
+        next.xMax538=maximum; //277014..277020, never fused or reassociated.
+    }
+    if(!read("zmin",next.zMin53C,0x277034,present))return false;
+    if(!present)next.zMin53C=-next.border530;
+    if(!read("zmax",next.zMax540,0x277060,present))return false;
+    if(!present){
+        volatile float extent=next.terrainBreadth524*next.terrainBreadthScale52C;
+        volatile float scaled=256.f*extent;
+        volatile float maximum=next.border530+scaled;
+        next.zMax540=maximum;
+    }
+    volatile float width=next.xMax538-next.xMin534;
+    volatile float breadth=next.zMax540-next.zMin53C;
+    //2770D4/27714C convert each extent to signed integer for diagnostics.
+    //Admit only ordinary positive, safely representable extents. No clamping,
+    //fallback box, suppressed assertion, or native spatial-tree claim.
+    if(!std::isfinite(next.xMin534)||!std::isfinite(next.xMax538)||
+       !std::isfinite(width)||width<1.f||static_cast<double>(width)>2147483647.0)
+        return fail(d,Status::sourceRange,0x2770d4);
+    if(!std::isfinite(next.zMin53C)||!std::isfinite(next.zMax540)||
+       !std::isfinite(breadth)||breadth<1.f||static_cast<double>(breadth)>2147483647.0)
+        return fail(d,Status::sourceRange,0x27714c);
+    storage_->spatialBounds=next;d.status=Status::complete;return true;
+}
+const SpatialBounds* Owner::spatialBounds534() const noexcept {
+    return storage_&&storage_->spatialBounds?&*storage_->spatialBounds:nullptr;
 }
 bool Owner::prepared() const noexcept{return bool(storage_);}
 const assets::World48F* Owner::world() const noexcept{return storage_?&storage_->world:nullptr;}

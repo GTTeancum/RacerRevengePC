@@ -9,7 +9,7 @@
 namespace rr::platform {
 namespace {
 bool supportedRider(std::uint32_t rider) noexcept {
-    switch(rider){case 2:case 4:case 7:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+    switch(rider){case 2:case 4:case 7:case 9:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
 }
 using S=OriginalUiCourseSessionStatus50KG;using D=OriginalUiCourseSessionDiagnostic50KG;
 using Phase=game::OriginalUiTransitionPhase50KG;using Life=game::OriginalUiTransitionLifecycle50KG;
@@ -36,8 +36,8 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
 }
 bool bounded(const game::OriginalUiCourseRememberedProfile50KG& p,const OriginalUiMainProfile50KG& common)noexcept{
     constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
-    return p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700>=1&&p.course700<=4&&p.subtype70C==1&&
-        p.laps704==3&&p.entrants708==8&&!p.cardFlag100BC&&(p.availability11018&31)==4&&
+    return p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700>=1&&p.course700<=(p.mawhonicRylothTest?5u:4u)&&p.subtype70C==1&&
+        p.laps704==3&&p.entrants708==8&&!p.cardFlag100BC&&(p.availability11018&31)==(p.mawhonicRylothTest?5u:4u)&&
         ((common.playerBits1125C>>5)&3)==1&&p.courseOrder100C4==order&&
         p.planet0Primary79C==0xc2a684&&p.planet0Secondary7A0==0x80674a;
 }
@@ -119,7 +119,7 @@ struct OriginalUiCourseSession50KG::Storage {
     }
     bool widgetProfile(game::OriginalUiCourseWidgetProfile50KG& out)const noexcept{
         game::OriginalUiCourseRememberedProfile50KG p;if(!cold.profile->courseSnapshot(p)||!bounded(p,*cold.commonProfile))return false;
-        out={};out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
+        out={};out.mawhonicRylothTest=p.mawhonicRylothTest;out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
         out.flags100BC=p.cardFlag100BC?1:0;out.flags11018=p.availability11018;
         out.flags1125C=cold.commonProfile->playerBits1125C;out.courseRecords100C4=p.courseOrder100C4;return true;
     }
@@ -212,7 +212,7 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         if(!s->selection.load(cold.courseArchive,d.selection))return result(d,S::resource);
         game::OriginalUiCourseRememberedProfile50KG p;game::OriginalUiCourseEntryPrefix50KG entry;
         if(!cold.profile->courseSnapshot(p)||game::planOriginalUiCourseEntryPrefix50KG(s->selection,p,entry)!=game::OriginalUiCourseSelectionStatus50KG::ok||
-            entry.courseSlot14E4>4||!assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40)||entry.showPopup438)return result(d,S::profile,0x1DA618);
+            entry.courseSlot14E4>(p.mawhonicRylothTest?5u:4u)||!assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40)||entry.showPopup438)return result(d,S::profile,0x1DA618);
         if(!game::prepareOriginalUiCourseCamera50KG(*cold.courseArchive,s->camera,d.camera)||
            !game::prepareOriginalUiCourseRenderContext50KG(*cold.courseArchive,s->camera,s->renderContext,d.renderContext))return result(d,S::camera);
         if(!game::prepareOriginalUiCourseLighting50KG(*cold.courseArchive,s->lighting,d.lighting))return result(d,S::lighting);
@@ -225,7 +225,7 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         //1DDF00 stores BA0 from the actual English owner, capacity40. Visible
         // course names remain their authored control text widgets27/31/32/28.
         constexpr std::uint32_t ids[]={11,15,12,16,14,13};
-        for(auto planet:{0u,1u,4u,5u}){const auto* text=cold.english->at(ids[planet]);if(!text)return result(d,S::resource,0x1DDF64);
+        for(auto planet:{0u,1u,4u,5u,2u}){if(planet==2&&!cold.profile->mawhonicRylothTestProfile())continue;const auto* text=cold.english->at(ids[planet]);if(!text)return result(d,S::resource,0x1DDF64);
             s->planetNamesBA0[planet]=text->text.substr(0,40);
             if(cold.resources->backgroundImage(planet)==assets::unresolvedMaterialTexture50EA)return result(d,S::resource,0x1DDF00);}
         if(!s->collector.bind(cold.resources,cold.holograms,d.draw)||!s->collector.prepareBank(d.draw))return result(d,S::draw);
@@ -257,7 +257,7 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
             s->cold.profile->riderConfirmSnapshot(packed,comparison)&&
             supportedRider(packed>>3)&&comparison==static_cast<std::uint32_t>(packed>>3)&&
             s->cold.profile->courseSnapshot(p)&&game::planOriginalUiCourseEntryPrefix50KG(s->selection,p,entry)==game::OriginalUiCourseSelectionStatus50KG::ok&&
-            !entry.showPopup438&&entry.courseSlot14E4<=4&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);
+            !entry.showPopup438&&entry.courseSlot14E4<=(p.mawhonicRylothTest?5u:4u)&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);
         if(!valid){s->fault(S::profile,0x1DA4A0);break;}
         if(s->cold.lightManager->activeUiIdentity()!=s->cold.courseArchive->identity()||
             !s->cold.lightManager->publishCourseRegistry(s->lighting,s->faultDetail.lightManager)){s->fault(S::lighting,0x1CDB10);break;}
@@ -321,7 +321,7 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
         const auto before=*navigation;const auto stamp=s->cold.profile->stamp();
         const auto planned=game::planOriginalUiCourseMove50KG(s->selection,before,profile,forward,move);
         if(planned==game::OriginalUiCourseSelectionStatus50KG::noChange)return result(d,S::noChange);
-        if(planned!=game::OriginalUiCourseSelectionStatus50KG::ok||move.courseSlot14E4>4||
+        if(planned!=game::OriginalUiCourseSelectionStatus50KG::ok||move.courseSlot14E4>(profile.mawhonicRylothTest?5u:4u)||
            !assets::originalUiCourseBackgroundName50KG(move.selectedControl.planet40)||
            s->cold.resources->backgroundImage(move.selectedControl.planet40)==assets::unresolvedMaterialTexture50EA||
            stamp.generation==std::numeric_limits<std::uint64_t>::max())return result(d,S::unsupportedState,move.sourcePC);

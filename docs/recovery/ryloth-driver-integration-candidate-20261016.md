@@ -1,0 +1,7 @@
+# Explicit native Mawhonic/Ryloth integration candidate
+
+Source-only, untested until central compilation and actual window smoke. RR_RA_NATIVE_WORLD=1 requires the existing exact mawhonic-ryloth original Main test profile and fresh all-eight original-AI mode2 session. This flag authorizes a cold request only. Genuine source, query, roster, camera, sky, material, GPU and lifecycle checks still reject unavailable owners. Original profile progression is unchanged outside the explicit process-local fixture.
+
+The source metadata and HostTrack/catalog/domain now identify RA explicitly instead of sending it through TA. Brightlands remains course7/planet2/slot5; Mawhonic is original rider9. The retained scene's original archive, same Bank, original AI/handling, original COL geometry and approved two-trigger compatibility policy are used. Native RA renderer and sky resources replace the legacy track mesh/material submission; no diagnostic preview or temporary course driver is used. RA contact audio indices use the retained static collision zone/ordinal authoring, excluding triggers.
+
+This consolidates previously source-reviewed renderer/trigger/composition work and saved incomplete driver changes after the helpers' preview limit. Actual execution may reveal remaining integration failures; it is not a passing gameplay claim. No new Windows result is claimed. Central testing and recovery remain required before a post-smoke publication.
