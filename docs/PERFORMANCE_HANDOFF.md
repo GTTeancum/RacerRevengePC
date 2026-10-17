@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 7:12 a.m. EDT (2026-10-17 11:12 UTC).
+Updated: 2026-10-17 7:22 a.m. EDT (2026-10-17 11:22 UTC).
 
 ## Current direction
 
@@ -146,7 +146,7 @@ Incidence and net timing are unmeasured. See
 
 ## New untested source change: reuse normalized crowd member name
 
-`tests/native/ra_static_world_profiles50la.inl` now normalizes the retained
+At the earlier aaaa813a checkpoint, `tests/native/ra_static_world_profiles50la.inl` normalized the retained
 source-family material name once within each pass validator and reuses that
 owned string for lookup and comparison. Normalization of the actual material
 source, both pass validations and all provenance/currentness checks remain.
@@ -179,11 +179,37 @@ Repository source inspection found no raw object-layout/serialization dependency
 a full native rebuild is required and no external binary ABI is promised. This
 is UNTESTED. See `docs/recovery/hud-first-glyph-index-20261017.md`.
 
+## New untested source change: reuse adjacent glyph UV results
+
+For adjacent identical ASCII glyphs in the pixel-metric text branch, layout now
+copies the previous successful quad’s four UV results. Different/first glyphs
+still execute the original multiply-then-divide expressions. All current glyph,
+metric, extent, position, measurement and finite checks remain; positions always
+recompute. No extra cache, allocation or cross-call state is added.
+
+TimeStats source emits repeated `--` and `00` pairs; the retained font metadata
+receipt confirms the actual font has pixel metrics. This establishes a reached
+opportunity, not measured frequency or speed. UNTESTED. See
+`docs/recovery/hud-adjacent-glyph-uv-20261017.md`.
+
+## New untested source change: retain canonical material lookup keys
+
+Each private RA ColdFamily now owns the authenticated PSM map key established
+at cold construction. Profile validation/classification and crowd-surface proof
+reuse that immutable key by const reference. Raw source names, actual-source
+normalization, byte comparisons and all publication/currentness checks remain.
+This supersedes repeated expected-name normalization at the three hot sites,
+including the earlier local-name reuse optimization. Extra cold allocation is
+caught before images become publishable; no borrowed map-key pointer is stored.
+
+UNTESTED. See `docs/recovery/ra-canonical-material-keys-20261017.md` for the
+construction and lifetime proof. No measured FPS gain is claimed.
+
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[f66c8a9](https://github.com/GTTeancum/RacerRevengePC/commit/f66c8a914d9c56bb9c61b0424fc49260a988472e).
-The new normalized-member reuse, HUD wrapper-copy removal, decoded-font index and preceding source changes are **UNTESTED**: in-place RA fog observations,
+[aaaa813a](https://github.com/GTTeancum/RacerRevengePC/commit/aaaa813a4fd5cbb04f20b55779badaaf5e85319e).
+The adjacent glyph UV reuse, retained canonical material keys and preceding source changes are **UNTESTED**: in-place RA fog observations,
 bounded draw-list capacity hint, per-surface diffuse input admission reuse, and
 adjacent scissor reuse invalidated at potential allocation boundaries. The sections above document their proofs and limitations. The earlier fog reserve
 change remains untested as well.

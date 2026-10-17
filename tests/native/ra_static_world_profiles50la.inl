@@ -56,7 +56,7 @@ private:
         const auto validatePass=[&](const ColdFamily& sourceFamily,
             const a::OriginalStandardMaterialObject50LA* material,
             a::OriginalStandardMaterialPassView50LA& view){
-            const auto memberName=normalized(sourceFamily.materialMember);
+            const auto& memberName=sourceFamily.canonicalMaterialKey;
             const auto retained=psms_.find(memberName);
             if(retained==psms_.end()||!retained->second||!retained->second->originalBytes()||
                !material->source()||!material->source()->member()||
@@ -85,7 +85,7 @@ private:
         if(!validatePass(family,origin.material,pass)||
            !validatePass(*representativeFamily,representative.material,representativePass))
             return reject(d,"static profile pass or retained provenance changed");
-        StaticFragmentDemands next;const auto name=normalized(family.materialMember);
+        StaticFragmentDemands next;const auto& name=family.canonicalMaterialKey;
         if(name=="textures/black.psm")next.profile=P::indexedDiffuseBlack;
         else if(name=="textures/metalgrate.psm"||name=="textures/twidesigns02.psm")next.profile=P::tga1555Prelit;
         else if(name=="textures/camdroid03.psm"||name=="textures/gatedoor01.psm"||

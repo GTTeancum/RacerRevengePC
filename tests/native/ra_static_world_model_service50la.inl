@@ -30,7 +30,7 @@
             if(family)return reject(d,"ambiguous actual crowd family");family=&candidate;
         }
         if(!family)return reject(d,"retained crowd family/six-set missing");
-        const auto materialMember=normalized(family->materialMember);
+        const auto& materialMember=family->canonicalMaterialKey;
         if(materialMember!="textures/crowd.psm"||
            normalized(family->sourceMember)!="textures/crowd.atm"||!family->animatedCurrentMapPending||
            family->imageCount!=6||family->firstImage>coldImages_.size()||

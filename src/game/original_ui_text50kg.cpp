@@ -91,10 +91,19 @@ bool layoutOriginalUiTextDimensions50LA(const OriginalUiTextInput50KG& input,
             top = input.localY - 0.5f;
             right = left + static_cast<float>(int(g->widthMinusOne) + 1);
             bottom = top + static_cast<float>(int(g->heightMinusOne) + 1);
-            u0 = (u0 * widthMinusOne) / width;
-            u1 = (u1 * widthMinusOne) / width;
-            v0 = (v0 * heightMinusOne) / height;
-            v1 = (v1 * heightMinusOne) / height;
+            if (i > 0 && ascii == next.quads[i - 1].ascii) {
+                // Same glyph and dimensions; the preceding quad fully validated.
+                const auto& previous = next.quads[i - 1].vertices;
+                u0 = previous[0].u;
+                u1 = previous[1].u;
+                v0 = previous[0].v;
+                v1 = previous[2].v;
+            } else {
+                u0 = (u0 * widthMinusOne) / width;
+                u1 = (u1 * widthMinusOne) / width;
+                v0 = (v0 * heightMinusOne) / height;
+                v1 = (v1 * heightMinusOne) / height;
+            }
             pen = pen + static_cast<float>(g->advanceAfterBearing);
             measured = measured + static_cast<float>(
                 int(g->leftBearing) + int(g->advanceAfterBearing));

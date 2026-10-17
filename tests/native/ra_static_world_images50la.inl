@@ -24,6 +24,8 @@ public:
         std::size_t firstImage=0,imageCount=0;
         bool animatedCurrentMapPending=false;
         bool contextAfter249610Available=false; // false: construction context only
+        // Owned authenticated lookup key; raw materialMember remains unchanged.
+        std::string canonicalMaterialKey;
     };
 private:
     std::vector<ColdFamily> imageFamilies_;
@@ -149,6 +151,7 @@ private:
             std::vector<a::OriginalStandardTextureSourceInput50LA> inputs;
             for(const auto& psm:psms_){
                 ColdFamily family;family.materialMember=*psm.second->member();
+                family.canonicalMaterialKey=psm.first;
                 if(!a::decodeMaterial48E(*psm.second->originalBytes(),family.authored,d.decode)||family.authored.passes.size()!=1||
                    family.authored.passes[0].pass!=1||family.authored.passes[0].textures.size()!=1||
                    family.authored.passes[0].textures[0].slot!=1)return reject(d,"actual44-family single-map shape differs");
