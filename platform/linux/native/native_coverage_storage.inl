@@ -172,7 +172,7 @@ void main(){
     gl_FragDepth=texelFetch(depthImage,pixel,0).r;
     // A static SampleID use requires separate invocations for every sample.
     // Geometry coverage came from the original AA0 triangle's center raster.
-    vec4 destinationByte=floor(clamp(texelFetch(destinationImage,pixel,gl_SampleID)*255.0,0.0,255.0)+0.5);
+    vec4 destinationByte=floor(texelFetch(destinationImage,pixel,gl_SampleID)*255.0+0.5);
     sourceByte.rgb=raComposition!=0 ?
         clamp(destinationByte.rgb+floor((sourceByte.rgb-destinationByte.rgb)*sourceByte.a/128.0),0.0,255.0) :
         clamp(floor(sourceByte.rgb*destinationByte.a/128.0)+destinationByte.rgb,0.0,255.0);

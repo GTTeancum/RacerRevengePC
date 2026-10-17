@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 8:43 p.m. EDT (2026-10-17 00:43 UTC).
+Updated: 2026-10-16 8:56 p.m. EDT (2026-10-17 00:56 UTC).
 
 ## Current direction
 
@@ -146,8 +146,11 @@ The coding VM became unavailable around 2026-10-17 00:40 UTC. This checkpoint
 recovers reviewed source changes from retained exact diffs applied to the verified
 27e14fc68f4fc9741c658a3b073728fc3fae49d7 GitHub files. Reconstructed source blob IDs
 are checked against the recorded diff identities and contents are read back.
-The complete unavailable local commit/tree has not been reproduced byte for byte;
-the recovery documentation records current facts rather than claiming otherwise.
+At recovery publication time the complete unavailable local tree was not claimed
+byte-for-byte identical. VM access returned at 00:49 UTC: all three source files,
+five proof notes and README matched their recovered Git blob hashes exactly.
+After accepting the updated recovery handoff, local checkpoint 794f104 has the
+exact published b90a8f9 tree d28d1afe877a2786333480d07b795fdfd22a4000.
 No builds, tests or runtime measurements were performed during recovery.
 
 Additional untested source changes:
@@ -175,6 +178,17 @@ These are source-level changes and byte/work reductions, not measured FPS gains.
 The speculative opponent-light uniform receipt was not independently reviewed
 or integrated and is not part of this recovery.
 
+## Post-recovery shader change
+
+Two destination-input clamp expressions are removed from the coverage and RA
+fragment shaders. Their inputs are exclusively the private, queried RGBA8
+unsigned-normalized snapshot texture, already finite in [0,1]. Original
+fetch *255.0 +0.5 and floor order is retained. Floating payload and final result
+clamps remain. Ownership, initialization, extent/sample bounds and official GL
+range guarantees were independently source-reviewed. This may already be
+optimized by the driver; no measured gain is claimed. See
+[destination clamp proof](recovery/destination-rgba8-clamp-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -189,12 +203,12 @@ or integrated and is not part of this recovery.
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified untested-source publication: `27e14fc68f4fc9741c658a3b073728fc3fae49d7`
-(tree `cde0dca8cc917a03101e2f493b878198fac72e88`, parent `7de49979`).
-It includes the earlier coverage, clipping, material lookup, validation-scope
-and snapshot changes listed above. This recovery adds the five changes described
-in the recovered checkpoint section. All changes after the tested baseline are
-untested. Source review does not establish compilation or runtime correctness.
+Previous verified untested-source publication: `b90a8f9b9cbf7a664279a342f356da25550ca6d9`
+(tree `d28d1afe877a2786333480d07b795fdfd22a4000`, parent `27e14fc6`).
+It includes the recovered changes above. The current checkpoint adds only the
+two destination-clamp removals and documentation updates. All changes after the
+tested baseline are untested. Source review does not establish compilation or
+runtime correctness.
 
 ## Known functional limits
 
@@ -210,8 +224,9 @@ Wreck collection work is held and not active gameplay evidence.
 A broader cross-publication cold normal cache remains held pending stronger
 lifecycle proof. The opponent-component lighting uniform proposal is also held:
 actual current-route benefit and independent review remain unfinished.
-The original VM's local commits are currently inaccessible; do not assume local
-drafts are included in GitHub unless their published file contents establish it.
+VM access has returned and the published recovery tree is reconciled locally.
+Unreviewed local drafts are still excluded unless published file contents establish
+otherwise.
 
 ## Next steps for the next owner
 

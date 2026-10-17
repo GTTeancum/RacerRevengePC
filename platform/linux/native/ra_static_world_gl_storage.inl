@@ -264,7 +264,7 @@ void main(){
     sourceDepth=gl_FragCoord.z;
     sourceColor=payload!=0?bytes:bytes/255.0;
 #else
-    vec3 destination=floor(clamp(texelFetch(destinationImage,ivec2(gl_FragCoord.xy),gl_SampleID).rgb*255.0,0.0,255.0)+0.5);
+    vec3 destination=floor(texelFetch(destinationImage,ivec2(gl_FragCoord.xy),gl_SampleID).rgb*255.0+0.5);
     bytes.rgb=clamp(destination+floor((bytes.rgb-destination)*bytes.a/128.0),0.0,255.0);
     sourceColor=bytes/255.0;
 #endif
