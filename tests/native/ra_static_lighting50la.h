@@ -192,7 +192,12 @@ class Binding final {
                 for(std::size_t vertex=0;vertex<recovered.count;++vertex){
                     const auto& normal=recoveredNormals_[recovered.first+vertex];
                     numeric::DiffuseVertexRgba rgba;
-                    if(numeric::projectDiffuseCompressedRgba(input,normal,rgba)!=numeric::Status::complete)
+                    // The first successful vertex admits the unchanged surface inputs.
+                    // This reserved, callback-free loop cannot change their FP mode.
+                    const auto projected=vertex==0?
+                        numeric::projectDiffuseCompressedRgba(input,normal,rgba):
+                        numeric::material_detail::projectDiffuseCompressedRgbaFiniteInputs(input,normal,rgba);
+                    if(projected!=numeric::Status::complete)
                         return reject(StaticDiffuseStatus::arithmetic);
                     output.vertices.push_back(rgba);++d.vertex;
                 }

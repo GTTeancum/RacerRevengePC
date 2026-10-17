@@ -189,6 +189,8 @@ bool Owner::prepareNativeRaStaticDraw(const CameraVisibilityLease& lease,
                 if(!std::isfinite(value))return fail(d,Status::arithmetic,0x26f224u);
                 if(value<1.f)lod=static_cast<std::uint32_t>(i+1u);
             }
+            // Previous demand is only a bounded allocation hint, never reused selection.
+            if(next.empty())next.reserve(std::min(output.size(),s.staticSelection.size()));
             next.push_back({instance,lod,zone,scissor,{{viewport.x1E0,viewport.y1E4,viewport.width1E8,viewport.height1EC}}});
             return true;
         };

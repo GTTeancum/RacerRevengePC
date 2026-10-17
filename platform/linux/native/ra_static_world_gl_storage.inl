@@ -321,6 +321,10 @@ void main(){
         if(!selected)return fail(d,VehicleWindowError50DS::frame,"RA native draw publication expired");
         raWorldFrameDraws.clear();
         try {
+            bool havePreviousScissor=false;
+            std::array<std::uint32_t,4> previousSourceScissor{};
+            std::array<std::int32_t,4> previousViewport{};
+            std::array<I,4> previousScissor{};
             for(const auto& record:*selected){
                 // Cold construction appends each visual placement in strictly
                 // increasing source world-instance order. The live renderer
@@ -339,24 +343,33 @@ void main(){
                     return fail(d,VehicleWindowError50DS::assets,"RA selected surface/scissor range differs");
                 // Original scissor endpoints are inclusive and top-origin.
                 // Native framebuffer uses bottom-origin and actual pixel extent.
-                const double x=record.viewport[0],y=record.viewport[1];
-                const double w=record.viewport[2],h=record.viewport[3];
-                const double bounds[4]={
-                    (double(record.scissor[0])-x)/w*frame.width,
-                    (y+h-double(record.scissor[3])-1.)/h*frame.height,
-                    (double(record.scissor[1])+1.-x)/w*frame.width,
-                    (y+h-double(record.scissor[2]))/h*frame.height};
                 std::array<I,4> scissor{};
-                for(U axis=0;axis<4;++axis){
-                    const double extent=(axis&1u)?frame.height:frame.width;
-                    const double rounded=axis<2?std::floor(bounds[axis]):std::ceil(bounds[axis]);
-                    scissor[axis]=static_cast<I>(std::max(0.,std::min(extent,rounded)));
+                if(havePreviousScissor&&record.viewport==previousViewport&&
+                   record.scissor==previousSourceScissor){
+                    scissor=previousScissor;
+                }else{
+                    const double x=record.viewport[0],y=record.viewport[1];
+                    const double w=record.viewport[2],h=record.viewport[3];
+                    const double bounds[4]={
+                        (double(record.scissor[0])-x)/w*frame.width,
+                        (y+h-double(record.scissor[3])-1.)/h*frame.height,
+                        (double(record.scissor[1])+1.-x)/w*frame.width,
+                        (y+h-double(record.scissor[2]))/h*frame.height};
+                    for(U axis=0;axis<4;++axis){
+                        const double extent=(axis&1u)?frame.height:frame.width;
+                        const double rounded=axis<2?std::floor(bounds[axis]):std::ceil(bounds[axis]);
+                        scissor[axis]=static_cast<I>(std::max(0.,std::min(extent,rounded)));
+                    }
+                    previousViewport=record.viewport;previousSourceScissor=record.scissor;
+                    previousScissor=scissor;havePreviousScissor=true;
                 }
                 if(scissor[0]>=scissor[2]||scissor[1]>=scissor[3])continue;
                 for(std::size_t surface=range.firstSurface;surface<range.firstSurface+range.surfaceCount;++surface){
                     const auto& plan=raWorld->surfaceDrawPlan_[surface];
                     if(plan.worldInstance!=record.worldInstance||plan.sourceLod!=record.sourceLod||plan.surface!=surface)
                         return fail(d,VehicleWindowError50DS::assets,"RA native selection and source draw inventory differ");
+                    // Never reuse computed FP results across a possible allocator callback.
+                    if(raWorldFrameDraws.size()==raWorldFrameDraws.capacity())havePreviousScissor=false;
                     raWorldFrameDraws.push_back({surface,scissor});
                 }
             }

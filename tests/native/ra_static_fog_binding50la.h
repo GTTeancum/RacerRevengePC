@@ -54,7 +54,9 @@ class Binding final {
         for(std::size_t i=0;i<world_->placements_.size();++i){
             const auto& p=*world_->placements_[i];const auto* scene=p.payload?p.payload->scene():nullptr;
             if(!scene||scene->nodes.size()!=1||scene->nodes[0].parent!=-1||scene->identity_matrix_palette)return false;
-            PlacementObservation next;next.placement=i;next.worldInstance=p.worldInstance;
+            // Fill the reserved private row directly; failed bindings never publish.
+            placements_.emplace_back();auto& next=placements_.back();
+            next.placement=i;next.worldInstance=p.worldInstance;
             next.worldSpace=scene->world_space;
             const auto& node=scene->nodes[0];
             //28CB88/28CC3C load source row0 center140/radius194; source1A0==1.
@@ -76,7 +78,6 @@ class Binding final {
             const auto far=rr::game::original_racer_model_view_detail50LA::add(next.distanceCandidate,next.radius194);
             if(!std::isfinite(far))return false;
             next.computeFogCandidate02=!(far<observation.source.start34);
-            placements_.push_back(next);
         }
         return current(observation);
     }

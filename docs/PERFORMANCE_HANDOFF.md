@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 2:06 a.m. EDT (2026-10-17 06:06 UTC).
+Updated: 2026-10-17 6:58 a.m. EDT (2026-10-17 10:58 UTC).
 
 ## Current direction
 
@@ -25,8 +25,10 @@ After receiving the b4c303e Windows cross-build, the user reported smooth menus
 but a crash/exit when loading a track. The selected racer/course, launcher and
 console error are not yet known. Root requested the console error or the FPS
 route's stdout.log/stderr.log and asked which course/launcher was used.
-All feature work is stopped pending diagnosis. Do not treat the cross-build as a
-Windows runtime pass. The Linux b4c303e Mawhonic/Ryloth smoke did reach gameplay.
+At 10:47 UTC the user explicitly directed continued work without waiting on
+them. Independent source-only performance work has resumed; the Windows loading
+issue remains unresolved. Do not treat the cross-build as a Windows runtime pass.
+The Linux b4c303e Mawhonic/Ryloth smoke did reach gameplay.
 
 A concrete package coverage gap was found: the initial five-ZIP generated runtime has
 TA visual49G/sky50GW and native RA sky/crowd resources, but lacks visualGA/GC/MA/SA
@@ -40,8 +42,8 @@ The PE stack reserve was verified as 8MiB. Excluded .su files were inspected and
 are GCC stack-usage reports under verification directories, not runtime surface
 assets. The user canceled a separate trimming effort, then later explicitly
 requested the expanded data package described below. The EXE remains unchanged. No additional test has been run after the last requested smoke.
-The fog in-place construction proposal is unimplemented. The already-published
-fog reserve change predates the crash report and is not in the delivered EXE.
+The fog in-place construction change below is now implemented and UNTESTED.
+Both it and the earlier fog reserve change are absent from the delivered EXE.
 
 ### Recovered Sullust runtime candidate
 
@@ -88,16 +90,73 @@ confirmed packaged bytes matched their inputs. This was file integrity inspectio
 not an execution-based game test. Shared original roster geometry and effects are
 included from the prior package; the UI rider cache alone is not sufficient.
 
+## New untested source change: RA fog rows built in place
+
+`tests/native/ra_static_fog_binding50la.h` now constructs each placement
+observation directly in its already-reserved private vector, removing the local
+aggregate-to-vector copy. All member initializers, arithmetic, operand validation,
+row ordering and final currentness check remain. A failed row stays in an
+unpublished temporary binding that is destroyed. No reader sees partial rows.
+
+Two independent source reviews accepted the minimal change. It has not been
+built or tested and no FPS gain is claimed. This does not fix or diagnose the
+reported Windows track-load failure. See
+`docs/recovery/ra-fog-in-place-observations-20261017.md`.
+
+## New untested source change: bounded RA draw capacity hint
+
+`src/game/original_ra_native_static_draw50la.inl` lazily reserves temporary draw
+storage before its first selected row, using the smaller of the prior output
+count and current static selection size. Prior results are used only as an
+allocation hint. Selection, portal traversal, duplicates, LOD arithmetic, row
+ordering and camera lease validation are still recomputed. Counts above the hint
+can grow normally. Fully culled frames incur no new reserve.
+
+This can avoid intermediate vector reallocations/copies on similar consecutive
+frames, but still allocates a fresh vector. Allocation-failure timing can differ;
+existing caught failure and publication rules remain. No build/test or measured
+FPS improvement is claimed. See
+`docs/recovery/ra-native-draw-capacity-hint-20261017.md`.
+
+## New untested source change: reuse diffuse input admission per surface
+
+In `tests/native/ra_static_lighting50la.h`, the first diffuse vertex still uses
+the public numeric wrapper. After it succeeds, later vertices use the existing
+finite-input arithmetic core with the same surface-local coefficients. This
+removes repeated rounding-mode and 25 finite-coefficient checks for later vertices
+while retaining every per-vertex numeric check and the exact arithmetic core.
+The loop is serial, callback-free and pre-reserved; inputs and FP mode stay stable.
+Empty/one-vertex surfaces, diagnostics and transactional output are unchanged.
+
+Two source reviews accepted the design. This is UNTESTED and no timing/FPS gain
+is claimed. See `docs/recovery/ra-diffuse-input-admission-20261017.md`.
+
+## New untested source change: adjacent RA scissor tuple reuse
+
+`platform/linux/native/ra_static_world_gl_storage.inl` retains one preceding
+viewport/source-scissor tuple and its computed native rectangle within each frame
+preparation call. All placement, range, viewport and surface checks remain.
+A mismatch executes the original arithmetic unchanged. Cache validity is cleared
+before any potentially allocating frame-draw append, preventing reuse across an
+allocator/new-handler callback. Empty rectangles retain the same skip behavior.
+
+The source producer emits multiple model rows per zone with a shared tuple.
+Incidence and net timing are unmeasured. See
+`docs/recovery/ra-adjacent-scissor-reuse-20261017.md`. This source is UNTESTED.
+
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[4c29a6c](https://github.com/GTTeancum/RacerRevengePC/commit/4c29a6c7956876c75e9b822ea40dffdedb5762d1).
-New source is **UNTESTED**: RA fog preparation reserves its exact placement-row
-count once per fresh private publication, avoiding vector growth copies while
-retaining source arithmetic, validation and publication gates. See
-[proof](recovery/ra-fog-placement-reserve-20261017.md).
-This is later than the delivered Windows b4c303e tester, which is unchanged.
-No new test was run for this source change.
+[8ef877d](https://github.com/GTTeancum/RacerRevengePC/commit/8ef877db1464802220b202c38280143e32ba628e).
+The current source changes are **UNTESTED**: in-place RA fog observations,
+bounded draw-list capacity hint, per-surface diffuse input admission reuse, and
+adjacent scissor reuse invalidated at potential allocation boundaries. The four
+sections above document their proofs and limitations. The earlier fog reserve
+change remains untested as well.
+
+The delivered Windows executable is still b4c303e and contains none of these
+later changes. No new build, test or FPS measurement was run. The unresolved
+Windows load report is retained separately and no fix is claimed for it.
 
 ### Last executed Linux source
 
