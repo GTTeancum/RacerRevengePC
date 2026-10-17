@@ -313,7 +313,8 @@ void main(){
         while(first<end){
             const auto initial=pendingFirst==first?pending:racerTriangleRasterRegion(slot,component,first);
             if(initial[2]<=initial[0]||initial[3]<=initial[1]){++coveragePairEmptyTriangles;first+=3;continue;}
-            std::array<std::array<I,4>,maximumRun> regions{};
+            // Only the assigned prefix [0,run) is read; unused rows never escape.
+            std::array<std::array<I,4>,maximumRun> regions;
             regions[0]=initial;auto united=initial;U run=1;
             const auto area=[](const std::array<I,4>& r) noexcept -> std::uint64_t {
                 return std::uint64_t(r[2]-r[0])*std::uint64_t(r[3]-r[1]);

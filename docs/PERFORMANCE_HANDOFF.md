@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 9:17 p.m. EDT (2026-10-17 01:17 UTC).
+Updated: 2026-10-16 9:42 p.m. EDT (2026-10-17 01:42 UTC).
 
 ## Current direction
 
@@ -37,6 +37,25 @@ Historical baseline: **0.851877902726142 FPS** on the Linux llvmpipe VM.
 This result does not validate changes after that tree. No GitHub CI pass was
 established. No fresh Windows test was performed.
 
+## One-off Linux validation, 2026-10-17 01:40 UTC
+
+The user explicitly requested one FPS test. Exact local source
+`61b289e3bc34bbab7a505553be5a937a2e97854c`, tree
+`9683a493b8cbedd70258385b4c0678592a578735`, built successfully at 01:37:20 UTC.
+The Mawhonic/Ryloth Linux llvmpipe smoke ended at 01:40:48 UTC: exit0, no timeout,
+cleanup confirmed. Root inspected main/rider/course/track/Pause screenshots;
+muted spectator Pause → Continue resumed. Eight original AI racers, zero human
+racers, host-driver calls or driving keyboard packets.
+
+Measured **0.8289711243839988 FPS**, five GPU-completed gameplay swaps over
+6.031573179 seconds, native ticks28–48. Prior75fbe2e measured0.851877902726142 FPS
+on the same tick window: about2.7% lower in this single sample. No performance
+improvement is demonstrated; this is not a controlled benchmark or Windows result.
+The source-only changes described below through scratch/operand initialization
+are covered by this limited smoke. Any later source changes remain UNTESTED.
+This one-off authorization does not establish a recurring test schedule.
+See [one-off result](recovery/performance-one-off-61b289e-20261017.json).
+
 ## Performance findings
 
 - Rendering submission dominates: roughly 1.1 s/frame; opaque opponents roughly
@@ -57,7 +76,7 @@ established. No fresh Windows test was performed.
   tick-window differences prohibit treating those results as a clean benchmark.
   Never restore incorrect geometry rejection to obtain higher FPS.
 
-## Current untested changes
+## Changes since the earlier baseline
 
 Integrated source-reviewed group-local invariants in
 `platform/linux/native/native_coverage_storage.inl`: redundant sampler-object
@@ -209,6 +228,19 @@ reuse the source program restored by that tail, keeping the mode3 uniform write
 and every tail program bind unconditional. See
 [checked depth-state proof](recovery/coverage-checked-depth-state-20261017.md).
 
+The group lookahead rectangle scratch array now initializes only entries it uses.
+The 14-row local array is not zero-filled; row0 and each appended row are fully
+assigned before the only reads of prefix [0,run). Unused rows never escape.
+All geometry arithmetic, bounds and thresholds remain unchanged. The compiler
+may already remove these dead stores; no speedup is established. See
+[scratch-prefix proof](recovery/coverage-region-scratch-prefix-20261017.md).
+
+Native raster operand local arrays also avoid duplicate member-zero initialization.
+The producer still explicitly resets every member, cache storage stays value-
+initialized, and consumers require three fully produced or copied finite records.
+Failure paths bypass partial arrays. No clipping arithmetic changes. See
+[operand initialization proof](recovery/raster-operand-initialization-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -223,10 +255,11 @@ and every tail program bind unconditional. See
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified untested-source publication: `71aa1b2149b5a9e91ec197e0524fed5d57681cbf`
-(tree `6d2090763a992dd5148f59fdf49703a34b247e2a`, parent `7787eb22`).
-It includes the texture-selector/binding reuse above. The current checkpoint adds
-the narrowly bounded checked depth/framebuffer reuse and documentation. All changes after the
+Previous verified untested-source publication: `3d85fe33ee6d1f7046b7a3570d4c61b755f4d8da`
+(tree `f9fb1545fced1482ffa13f68d3666e33c2dac3a7`, parent `71aa1b21`).
+It includes the checked depth/sample/framebuffer/program reuse above. The current
+checkpoint adds live-prefix scratch and raster operand initialization reductions
+and documentation. All changes after the
 tested baseline are untested. Source review does not establish compilation or
 runtime correctness.
 

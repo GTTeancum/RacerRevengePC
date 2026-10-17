@@ -539,8 +539,10 @@ void main(){
         return common!=0;
     }
     struct NativeRasterVertex {
-        double clip[4]{},error[4]{};
-        unsigned outside=0;
+        // Producers explicitly initialize every member before consumption.
+        // Avoid duplicate zeroing in local arrays filled by producer/copy.
+        double clip[4],error[4];
+        unsigned outside;
     };
     struct CachedNativeRasterVertex {
         NativeRasterVertex operand;
