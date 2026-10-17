@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 12:59 a.m. EDT (2026-10-17 04:59 UTC).
+Updated: 2026-10-17 1:09 a.m. EDT (2026-10-17 05:09 UTC).
 
 ## Current direction
 
@@ -18,6 +18,30 @@ Use the VM only, not the user's PC. Preserve remote history, never force-push,
 and independently verify the resulting remote commit, tree and parent. Git
 publication is explicitly authorized, including untested source checkpoints.
 Continue independent coding if publication is blocked, and report exact blockers.
+
+## Active Windows track-load failure investigation
+
+After receiving the b4c303e Windows cross-build, the user reported smooth menus
+but a crash/exit when loading a track. The selected racer/course, launcher and
+console error are not yet known. Root requested the console error or the FPS
+route's stdout.log/stderr.log and asked which course/launcher was used.
+All feature work is stopped pending diagnosis. Do not treat the cross-build as a
+Windows runtime pass. The Linux b4c303e Mawhonic/Ryloth smoke did reach gameplay.
+
+A concrete package coverage gap was found: the delivered generated runtime has
+TA visual49G/sky50GW and native RA sky/crowd resources, but lacks visualGA/GC/MA/SA
+and corresponding sky directories. Those non-RA course loaders require their
+hash-pinned selection/export JSON, matching world mesh, referenced cacheobjects
+and 48 compiled-index sky tiles. Missing data can cause a caught track-load
+rejection and application exit. This is not yet the confirmed cause of the user's
+specific report and does not explain an alleged TA or RA failure by itself.
+
+The PE stack reserve was verified as 8MiB. Excluded .su files were inspected and
+are GCC stack-usage reports under verification directories, not runtime surface
+assets. The delivered package remains unchanged; the user canceled a separate
+trimming effort. No additional test has been run after the last requested smoke.
+The fog in-place construction proposal is unimplemented. The already-published
+fog reserve change predates the crash report and is not in the delivered EXE.
 
 ## Current checkpoint summary
 
