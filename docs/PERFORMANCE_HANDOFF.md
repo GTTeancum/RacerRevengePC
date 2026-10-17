@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 11:19 p.m. EDT (2026-10-17 03:19 UTC).
+Updated: 2026-10-16 11:26 p.m. EDT (2026-10-17 03:26 UTC).
 
 ## Current direction
 
@@ -331,15 +331,18 @@ See [racer copy proof](recovery/racer-coverage-copy-image-20261017.md) and
   alpha semantics. Do not reduce quality or omit racers to improve FPS.
 - Multisample same-texture feedback with texture barriers remains unproven;
   per-texel exception does not establish safe four-sample read/write feedback.
-- Shared-edge triangle batching is held: CPU/GPU transform and subpixel error
-  bounds have not been proven. Arbitrary epsilon/padding is not a proof.
+- Shared-edge triangle batching remains held after focused specification review.
+  AA0 pixel ownership, not just destination-sample disjointness, is required.
+  Current transform margins and SUBPIXEL_BITS do not establish complete portable
+  post-quantization orientation bounds. See [held proof](recovery/shared-edge-batching-held-20261017.md).
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified publication: `97139ec1db28842d68c59d0dcb68ce092f739285`
-(tree `fe88afaca20f81e3d4c56972bcfaf334b7434ad2`, parent `7b603207`).
-The current checkpoint adds both image-copy paths, exact tested source from the
-latest one-off, and result documentation. Earlier UNTESTED labels describe their
+Previous verified publication: `86743c2f1102891590f461efb84c3ace690492c8`
+(tree `fac7376491acc7bead51b50784c61f8442152caa`, parent `97139ec1`).
+It contains both image-copy paths, exact tested source from the latest one-off,
+and result documentation. This checkpoint adds documentation only; game code is
+unchanged. Earlier UNTESTED labels describe their
 source-review state; the limited latest smoke coverage is stated above. Changes after the latest tested4f82775 source remain untested. Source review does not establish compilation or
 runtime correctness.
 
