@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 1:09 a.m. EDT (2026-10-17 05:09 UTC).
+Updated: 2026-10-17 1:30 a.m. EDT (2026-10-17 05:30 UTC).
 
 ## Current direction
 
@@ -42,6 +42,29 @@ assets. The delivered package remains unchanged; the user canceled a separate
 trimming effort. No additional test has been run after the last requested smoke.
 The fog in-place construction proposal is unimplemented. The already-published
 fog reserve change predates the crash report and is not in the delivered EXE.
+
+### Recovered Sullust runtime candidate
+
+The existing `Sullust-authenticated-runtime-20261013.tar.gz` archive was recovered
+from the user’s Library. This is a recovery candidate only; it has not been added
+to the delivered Windows package or exercised in a new smoke.
+
+Read-only archive byte inspection found:
+- Both selection and export metadata SHA256 values exactly match the shipped SA profile.
+- All 2,355 `selection.objects` members are present and match their declared byte lengths and SHA256 values.
+- The 7,560,628-byte world mesh matches the authenticated export report hash.
+- All 48 complete sky tile files match the compiled `sky_sa_index.inc` hashes.
+
+Selection SHA256: `7d6b9e99b00dd4854edf76499c4934ce79a4efc8f7ced57240cea3085925f8cc`.
+Export SHA256: `f2352dd81f394554da3d61c992cff605f24de3fb437ec422f3987c5e68968275`.
+Mesh SHA256: `0306a315e460235f73180a2f344112a03d051705ed56f65ecde24cba9ddcf6c2`.
+
+Next owner: obtain the selected course/launcher and console error first. If it
+identifies missing SA runtime, this archive supplies an authenticated recovery
+candidate without changing source admission pins. Validate the repaired route
+before calling it fixed. GA/GC/MA generated data remains missing from the delivered
+bundle. Do not infer that SA is the user’s failing course. No new build, gameplay,
+FPS measurement or smoke was run for this inspection.
 
 ## Current checkpoint summary
 
