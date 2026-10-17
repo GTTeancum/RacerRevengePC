@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 8:18 a.m. EDT (2026-10-17 12:18 UTC).
+Updated: 2026-10-17 8:33 a.m. EDT (2026-10-17 12:33 UTC).
 
 ## Current direction
 
@@ -269,12 +269,22 @@ This is loading work; the per-frame crowd branch bypasses it. All comparisons an
 provenance checks remain. See `docs/recovery/ra-literal-profile-whitelist-20261017.md`.
 Both changes are UNTESTED. No new execution-based validation occurred.
 
+## New untested source change: surviving vehicle template fields
+
+Vehicle draw publication copies template UVs and only the template colors that
+will survive. Projected positions and generated colors keep their original
+writes; all 24 vertex bytes are still defined identically on the supported layout.
+This removes source-level copies that were immediately overwritten. Runtime
+player and opponent preparation reaches this path, but compiler behavior and FPS
+gains are unmeasured. UNTESTED. See
+`docs/recovery/vehicle-surviving-template-fields-20261017.md`.
+
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[de99212b](https://github.com/GTTeancum/RacerRevengePC/commit/de99212b76a5b1360924a48f36f57abdb6082f8e).
-Its tree is b2e6fbbbf9b7e94ac68a9cdeafab76e7b52ed2aa, sole parent d352a141.
-Independent live-ref and all three file readbacks verified publication at 12:15 UTC.
+[63c0a54b](https://github.com/GTTeancum/RacerRevengePC/commit/63c0a54bee5d2bc232333ea2ccc965a1d074b61e).
+Its tree is 173a9150ec24f044c50d295043943fb99328713e, sole parent de99212b.
+Independent live-ref and all five file readbacks verified publication at 12:30 UTC.
 The earlier combined source audit found no concrete ownership, stale-metadata
 or failure-contract regression across the new HUD and RA changes. This was
 source review only, not execution-based validation.

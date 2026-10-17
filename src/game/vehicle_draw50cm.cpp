@@ -520,10 +520,15 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
     for (std::uint32_t axis = 0; axis < 3; ++axis)
         next.bounds.minimum[axis] = next.bounds.maximum[axis] = workspace.positions[0].v[axis];
     for (std::uint32_t n = 0; n < mesh.vertexCount; ++n) {
-        std::memcpy(destination.vertices + n, mesh.vertexTemplate + n, sizeof(assets::Vertex48B));
+        // Position is always projected below; retain only template fields that survive.
+        std::memcpy(destination.vertices[n].uv, mesh.vertexTemplate[n].uv,
+            sizeof(destination.vertices[n].uv));
         if (sourceColors)
             for (unsigned c = 0; c < 4; ++c)
                 destination.vertices[n].color[c] = workspace.sourceColors50LA[n].rgba[c];
+        else
+            std::memcpy(destination.vertices[n].color, mesh.vertexTemplate[n].color,
+                sizeof(destination.vertices[n].color));
         for (std::uint32_t axis = 0; axis < 3; ++axis) {
             const float value = workspace.positions[n].v[axis];
             destination.vertices[n].position[axis] = value;
