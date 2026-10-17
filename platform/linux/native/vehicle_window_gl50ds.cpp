@@ -1145,6 +1145,7 @@ struct VehicleWindowGl50DS::Storage {
     // UI texture-bank replacement never modify these racer material policies.
     struct RacerMaterialSummary {
         bool sourceDiffuse = false, sourcePair = false, normalDependent = false;
+        bool hasDeferredEffects = false;
     };
     static bool podMaterialUsesNormals(const VehicleWindowMaterialBinding50DS& policy) noexcept {
         return !policy.unlit && !policy.sourcePrelit && !policy.sourceDiffuseCompressed50LA &&
@@ -1745,6 +1746,7 @@ struct VehicleWindowGl50DS::Storage {
                 materialSummary[c].sourceDiffuse |= binding.sourceDiffuseCompressed50LA;
                 materialSummary[c].sourcePair |= binding.sourceSpecularPair50LA;
                 materialSummary[c].normalDependent |= podMaterialUsesNormals(binding);
+                materialSummary[c].hasDeferredEffects |= binding.blend != VehicleWindowBlend50DS::opaque;
                 resolved.name = binding.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
                     input.textures->texture(binding.textureIndex) : 0;
                 if (binding.sourceSpecularPair50LA) {
@@ -2935,7 +2937,7 @@ void main() {
         return true;
     }
     bool uploadRacerNormals(std::uint8_t bank, const game::VehicleDrawBatch50CO& batch,
-        U archetype = 0) noexcept {
+        U archetype = 0, bool effectsOnly = false) noexcept {
         const auto selected = racerView(archetype);
         static constexpr assets::WorldNormal50HK absent[game::maxRigidVertices49S]{};
         for (U c = 0; c < batch.componentCount; ++c) {
@@ -2944,7 +2946,10 @@ void main() {
             // A complete cold bank with no normal-dependent lighting keeps its
             // verified zero-filled attribute. CPU normals still feed source
             // colors/specular and validation; absent tables stay conservative.
-            if (!selected.materials || selected.materialSummary[c].normalDependent)
+            // Deferred draws select nonopaque materials, making the normal
+            // varying output-independent. Preserve the conservative null-table
+            // route, every bind/check, and all ordinary opaque uploads.
+            if (!selected.materials || (!effectsOnly && selected.materialSummary[c].normalDependent))
                 drawGl.bufferSubData(arrayBuffer, 0,
                     std::intptr_t(part.vertexCount) * sizeof(assets::WorldNormal50HK),
                     part.sourceNormals ? part.sourceNormals : absent);
@@ -4137,6 +4142,7 @@ void main() {
                     target.materialSummary[c].sourceDiffuse |= binding.sourceDiffuseCompressed50LA;
                     target.materialSummary[c].sourcePair |= binding.sourceSpecularPair50LA;
                     target.materialSummary[c].normalDependent |= podMaterialUsesNormals(binding);
+                    target.materialSummary[c].hasDeferredEffects |= binding.blend != VehicleWindowBlend50DS::opaque;
                     material.textureIndex = binding.textureIndex;
                     material.name = binding.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
                         target.textures->texture(binding.textureIndex) : 0;
@@ -4968,15 +4974,19 @@ void main() {
         return s.drawSpecularSpan50LA(static_cast<std::uint8_t>(s.published ^ 1u), 0, 0, c, ordinal, span);
     }
     bool uploadRacer(std::uint8_t bank, const game::VehicleDrawBatch50CO& batch,
-        U archetype = 0) noexcept {
+        U archetype = 0, bool effectsOnly = false) noexcept {
         const auto selected = racerView(archetype);
-        if (!uploadRacerNormals(bank, batch, archetype)) return false;
+        if (!uploadRacerNormals(bank, batch, archetype, effectsOnly)) return false;
         // Every batch was structurally preflighted and matched to these exact
         // cold buffers before begin. Only the inactive bank is ever reused.
         for (U c = 0; c < selected.resources->componentCount; ++c) {
             drawGl.bindBuffer(arrayBuffer, selected.resources->bank[bank].vertexBuffer[c]);
-            drawGl.bufferSubData(arrayBuffer, 0,
-                std::intptr_t(batch.component[c].vertexCount) * sizeof(assets::Vertex48B), batch.component[c].vertices);
+            // No deferred span consumes an all-opaque component. Upload the
+            // complete current stream for every possible deferred consumer;
+            // never assume submitted UV/color bytes equal the cold template.
+            if (!effectsOnly || !selected.materials || selected.materialSummary[c].hasDeferredEffects)
+                drawGl.bufferSubData(arrayBuffer, 0,
+                    std::intptr_t(batch.component[c].vertexCount) * sizeof(assets::Vertex48B), batch.component[c].vertices);
             if (!check("upload independent world-space racer into inactive buffers")) return false;
         }
         return true;
@@ -5139,11 +5149,11 @@ void main() {
         if (!s.drawTrack(true) || !s.drawDynamicWorld(bank, true)) return false;
         // The shared inactive VBOs currently hold the last opaque opponent.
         // Restore the player's independent stream before its deferred effects.
-        if (s.frameOpponentCount && s.materials && !s.uploadRacer(bank, s.framePlayerBatch)) return false;
+        if (s.frameOpponentCount && s.materials && !s.uploadRacer(bank, s.framePlayerBatch, 0, true)) return false;
         if (!s.drawTransparentPod(bank)) return false;
         if (s.materials) for (U i = 0; i < s.frameOpponentCount; ++i) {
             s.diagnostic->opponentIndex = i;
-            if (!s.uploadRacer(bank, s.frameOpponentBatches[i], s.frameOpponentArchetypes[i]) ||
+            if (!s.uploadRacer(bank, s.frameOpponentBatches[i], s.frameOpponentArchetypes[i], true) ||
                 !s.drawTransparentPod(bank, i)) return false;
         }
         s.diagnostic->opponentIndex = maxVehicleWindowOpponents50DS;

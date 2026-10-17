@@ -260,7 +260,8 @@ void main(){
         if(accepted){
             gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
             // First-run setup established mask0; checked successful tails preserve it.
-            gl.enable(0x809D);gl.enable(0x0B71);gl.depthFunc(0x0203);
+            // The checked source-pair span already established LEQUAL.
+            gl.enable(0x809D);gl.enable(0x0B71);
             // The first successful bridge in this span establishes the private
             // composition mode and all three sampler-object bindings. Checked
             // bridge tails and base/map-2 group setup preserve those values.

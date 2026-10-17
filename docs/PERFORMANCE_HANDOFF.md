@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 10:15 p.m. EDT (2026-10-17 02:15 UTC).
+Updated: 2026-10-16 10:32 p.m. EDT (2026-10-17 02:32 UTC).
 
 ## Current direction
 
@@ -272,6 +272,15 @@ UNTESTED after the one-off baseline. See
 [span texture proof](recovery/racer-coverage-span-texture-unit-reuse-20261017.md) and
 [span setup proof](recovery/racer-coverage-span-invariant-setup-20261017.md).
 
+Composition also reuses the LEQUAL comparison established by checked span entry;
+the rejection-tail write remains. Deferred racer reuploads now omit vertex data
+only for complete cold all-opaque components, while every potentially nonopaque
+component receives its full current interleaved stream. Deferred normals are
+output-independent and their transfers are omitted with a conservative null-table
+fallback. All binds, checks, ordinary uploads and validation remain. Both changes
+are UNTESTED. See [depth-function proof](recovery/coverage-depth-function-reuse-20261017.md)
+and [deferred-upload proof](recovery/racer-deferred-upload-gating-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -286,10 +295,10 @@ UNTESTED after the one-off baseline. See
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified publication: `1fbd380eab1463708a9f6332378ed184fe2942ee`
-(tree `b4b90f170ed1d7121a86d06db961c8f56e92fb20`, parent `db6b0ff8`).
-It adds the UNTESTED normal-upload elision after the quotient cache.
-The current checkpoint adds UNTESTED paired-span coverage setup reuse. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
+Previous verified publication: `a7b51bf2343b688ee754ab7f4331b4df9f5e7e1e`
+(tree `91d4dcd9abf92bff19be504bd7a437de4da6e9cb`, parent `1fbd380e`).
+It adds UNTESTED paired-span coverage setup reuse. The current checkpoint adds
+UNTESTED depth-function reuse and deferred-upload gating. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
 runtime correctness.
 
 ## Known functional limits
