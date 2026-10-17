@@ -226,7 +226,7 @@ void main(){
         // inside a bridge or its tail. Establish them at the first nonempty
         // run, without carrying a state cache across groups or callbacks.
         if(firstRun){coverageAa0();gl.disable(0x8DB9);gl.disable(0x0BE2);}
-        else gl.disable(0x809D); // Composition changes MULTISAMPLE alone.
+        // Later runs inherit disabled MULTISAMPLE from the checked tail.
         if(request.raStaticWorld){
             gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
         }else gl.disable(0x0C11);
@@ -236,9 +236,11 @@ void main(){
         // Binding an FBO does not reset its selectors. No later owner changes
         // these values, so do not reissue eight selector calls per run.
         if(firstRun){gl.viewport(0,0,width,height);gl.colorMask(1,1,1,1);}
-        gl.disable(0x0B71);gl.depthMask(0);
+        gl.disable(0x0B71);if(firstRun)gl.depthMask(0);
         const float invalid[]={0.f,0.f,0.f,-1.f};gl.clearBufferfv(0x1800,0,invalid);
-        gl.useProgram(shader->program());gl.uniform1i(shader->uniforms().sourcePairPass50LA,3);
+        // The checked prior tail restored this same source program.
+        if(firstRun)gl.useProgram(shader->program());
+        gl.uniform1i(shader->uniforms().sourcePairPass50LA,3);
         // Later runs inherit unit0/image from the previous checked tail.
         // The synchronous group performs only CPU lookahead between runs.
         if(firstRun){gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);}
@@ -257,7 +259,8 @@ void main(){
         }
         if(accepted){
             gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
-            gl.enable(0x809D);gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);
+            // First-run setup established mask0; checked successful tails preserve it.
+            gl.enable(0x809D);gl.enable(0x0B71);gl.depthFunc(0x0203);
             // The first successful bridge establishes this private program's
             // composition mode and all three sampler-object bindings. Neither
             // bridge restoration nor CPU-only group lookahead changes them.
@@ -273,13 +276,16 @@ void main(){
         gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
         gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);
-        gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
+        // Successful composition already checked the exact scene binding.
+        // Rejected setup still receives the original unconditional retry path.
+        if(!accepted)gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
         gl.useProgram(shader->program());gl.uniform1i(shader->uniforms().sourcePairPass50LA,2);
         drawGl.bindVertexArray(sourceArray);
         // On success only MULTISAMPLE changed. A rejected setup may not have
         // established every sample bit; preserve the full old cleanup retry.
         if(accepted)gl.disable(0x809D);else coverageAa0();
-        gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);
+        // Accepted composition retained depth enabled, LEQUAL and mask0.
+        if(!accepted){gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(0);}
         gl.disable(0x0C11);
         const bool restored=check("restore source-pair state after native coverage bridge");
         return accepted&&restored;

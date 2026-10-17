@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 9:10 p.m. EDT (2026-10-17 01:10 UTC).
+Updated: 2026-10-16 9:17 p.m. EDT (2026-10-17 01:17 UTC).
 
 ## Current direction
 
@@ -197,6 +197,18 @@ remain; no persistent cache is added. These changes remove one composition-entry
 call and two later-run payload-entry calls, without a measured FPS claim.
 See [selector scope proof](recovery/coverage-payload-texture-selector-20261017.md).
 
+The coverage bridge additionally reuses checked depth/framebuffer state within
+one invocation: composition does not repeat payload depthMask(0), and successful
+tails omit the already-established scene framebuffer/depth tuple. Rejected paths
+retain the original restoration calls at their original positions. Every error
+gate and required texture/program/VAO/sample/scissor transition remains. This is
+not the reverted broad group restoration change. Later nonempty runs also omit
+MULTISAMPLE-disable and depthMask(0) repeats, inheriting those values from the
+previous checked successful tail; first runs remain explicit. Later runs also
+reuse the source program restored by that tail, keeping the mode3 uniform write
+and every tail program bind unconditional. See
+[checked depth-state proof](recovery/coverage-checked-depth-state-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -211,10 +223,10 @@ See [selector scope proof](recovery/coverage-payload-texture-selector-20261017.m
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified untested-source publication: `7787eb229c04458e030a258f36b19dda4e8c47a7`
-(tree `73d7df05a62974fdaa7b94d76658a3d504672bfd`, parent `b90a8f9b`).
-It includes the recovered changes and destination-clamp removals above. The current
-checkpoint adds the bounded texture-selector/binding reuse and documentation. All changes after the
+Previous verified untested-source publication: `71aa1b2149b5a9e91ec197e0524fed5d57681cbf`
+(tree `6d2090763a992dd5148f59fdf49703a34b247e2a`, parent `7787eb22`).
+It includes the texture-selector/binding reuse above. The current checkpoint adds
+the narrowly bounded checked depth/framebuffer reuse and documentation. All changes after the
 tested baseline are untested. Source review does not establish compilation or
 runtime correctness.
 
@@ -231,13 +243,12 @@ Wreck collection work is held and not active gameplay evidence.
 
 A broader cross-publication cold normal cache remains held pending stronger
 lifecycle proof. The opponent-component lighting uniform proposal is also held:
-actual current-route benefit and independent review remain unfinished.
-VM access failed again at 2026-10-17 01:09 UTC after local commit 08fb631.
-The reviewed selector source was recovered by exact anchored edits against remote
-7787eb22; its Git blob is ed63fa7b8c73e7939670cfb9b47e9210838fa6cc, matching the
-retained local diff prefix. Documentation was reconstructed from verified remote
-content and review records. This is not a claim of full unavailable-local-tree
-identity. Unreviewed local drafts remain excluded.
+actual repeated eligible hostLit/nativeGc span incidence remains unproven.
+Source-lit body/specular spans bypass those seven uniforms, so total opponent
+draw count does not establish a useful saving. Keep this draft excluded.
+VM access returned at 2026-10-17 01:14 UTC. Recovered source exactly matched the
+local source blob; after documentation reconciliation the complete local tree
+matched verified remote 71aa1b21. Unreviewed local drafts remain excluded.
 
 ## Next steps for the next owner
 
