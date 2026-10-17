@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 9:42 p.m. EDT (2026-10-17 01:42 UTC).
+Updated: 2026-10-16 9:45 p.m. EDT (2026-10-17 01:45 UTC).
 
 ## Current direction
 
@@ -23,18 +23,19 @@ Continue independent coding if publication is blocked, and report exact blockers
 
 The commit containing this document is the current handoff checkpoint; use its
 Git history to identify the exact revision. A document cannot contain its own
-final commit hash. Last independently verified **tested** publication:
+final commit hash. Earlier independently verified **tested** publication:
 [e53d3220](https://github.com/GTTeancum/RacerRevengePC/commit/e53d3220ddcd721f67aeda7a84a80b2504c0e5e7).
 Its exact source tree is `7cdb5a7a64d53a3897c978177dd382545aa6bcfc` (local tested
 source `75fbe2e0c61ca5b0041b877c2450edce731008c6`).
 
-Last Linux build passed at 2026-10-16 22:40:30 UTC. Last smoke ended at
+The earlier Linux build passed at 2026-10-16 22:40:30 UTC. Its smoke ended at
 22:44:22 UTC: exit 0, cleanup true, five real gameplay swaps, native ticks
 28–48, eight original AI racers, zero human racers/host-driver calls/keyboard
 packets. Main menu, rider selection, course selection, track and original Pause
 screenshots were reviewed. Escape → Pause → Continue resumed gameplay.
 Historical baseline: **0.851877902726142 FPS** on the Linux llvmpipe VM.
-This result does not validate changes after that tree. No GitHub CI pass was
+That earlier result does not validate changes after its tree. See the newer
+one-off validation below. No GitHub CI pass was
 established. No fresh Windows test was performed.
 
 ## One-off Linux validation, 2026-10-17 01:40 UTC
@@ -241,6 +242,18 @@ initialized, and consumers require three fully produced or copied finite records
 Failure paths bypass partial arrays. No clipping arithmetic changes. See
 [operand initialization proof](recovery/raster-operand-initialization-20261017.md).
 
+## New source after the one-off test: UNTESTED
+
+The racer operand cache now lazily retains eight ordered projection quotients per
+eligible indexed vertex within one synchronous group. Common-plane rejection and
+W guards still precede lookup; hits preserve each finite check and ordered min/max
+operation. Slots are rechecked by exact index after possible collisions, readiness
+is reset on operand replacement and set only after all eight finite quotients.
+Generic RA calls remain uncached. Cost includes roughly2KiB fixed storage, reset
+stores and lookup/miss overhead. No measured gain is claimed. This change was
+NOT included in the one-off61b289e smoke. See
+[quotient-cache proof](recovery/racer-projection-quotient-cache-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -255,12 +268,10 @@ Failure paths bypass partial arrays. No clipping arithmetic changes. See
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified untested-source publication: `3d85fe33ee6d1f7046b7a3570d4c61b755f4d8da`
-(tree `f9fb1545fced1482ffa13f68d3666e33c2dac3a7`, parent `71aa1b21`).
-It includes the checked depth/sample/framebuffer/program reuse above. The current
-checkpoint adds live-prefix scratch and raster operand initialization reductions
-and documentation. All changes after the
-tested baseline are untested. Source review does not establish compilation or
+Previous verified publication: `a07bbd9e9ed6d97c84673875de77901cfafe56d0`
+(tree `26bb112de7368dc341c8d0a2e47815e94f3ad277`, parent `3d85fe33`).
+Its source code is exactly the one-off tested61b289e code, with result documents
+added afterward. The current checkpoint adds the UNTESTED quotient cache. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
 runtime correctness.
 
 ## Known functional limits

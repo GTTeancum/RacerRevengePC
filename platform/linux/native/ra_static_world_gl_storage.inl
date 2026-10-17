@@ -546,8 +546,9 @@ void main(){
     };
     struct CachedNativeRasterVertex {
         NativeRasterVertex operand;
+        std::array<double,8> projectedQuotients{};
         U index=0;
-        bool occupied=false,finite=false;
+        bool occupied=false,finite=false,projectionReady=false;
     };
     // Scratch exists only within one synchronous source MSCNT group. It
     // retains no resource pointer and is invalidated before every group.
@@ -578,7 +579,8 @@ void main(){
         }
         return true;
     }
-    std::array<I,4> nativeTriangleRasterOperands(const std::array<NativeRasterVertex,3>& vertices)const noexcept {
+    std::array<I,4> nativeTriangleRasterOperands(const std::array<NativeRasterVertex,3>& vertices,
+        const U* cacheIndices=nullptr)const noexcept {
         const std::array<I,4> full{{0,0,width,height}};
         unsigned common=63u;
         for(const auto& vertex:vertices)common&=vertex.outside;
@@ -590,11 +592,28 @@ void main(){
         for(U corner=0;corner<3;++corner){
             const auto& c=vertices[corner].clip;const auto& e=vertices[corner].error;
             if(c[3]<=e[3]+0.0001)return full;
+            // The current group supplies indices only after validating its scope.
+            // Operand construction can replace colliding slots; reacquire and
+            // check each tag here, keeping the local operand copy authoritative.
+            CachedNativeRasterVertex* projection=nullptr;
+            if(cacheIndices&&racerRasterCacheActive){
+                const U index=cacheIndices[corner];
+                auto& entry=racerRasterOperands[index%racerRasterOperands.size()];
+                if(entry.occupied&&entry.finite&&entry.index==index)projection=&entry;
+            }
+            const bool reuseProjection=projection&&projection->projectionReady;
+            U quotient=0;
             for(U axis=0;axis<2;++axis)for(int a:{-1,1})for(int w:{-1,1}){
-                const double value=(c[axis]+a*e[axis])/(c[3]+w*e[3]);
+                const double value=reuseProjection?projection->projectedQuotients[quotient]:
+                    (c[axis]+a*e[axis])/(c[3]+w*e[3]);
                 if(!std::isfinite(value))return full;
                 low[axis]=std::min(low[axis],value);high[axis]=std::max(high[axis],value);
+                if(projection&&!reuseProjection)projection->projectedQuotients[quotient]=value;
+                ++quotient;
             }
+            // Retain ordered scalar values only after all eight are finite.
+            // Never cache merged extrema or a partial/nonfinite projection.
+            if(projection&&!reuseProjection)projection->projectionReady=true;
         }
         std::array<I,4> region{};
         for(U axis=0;axis<2;++axis){
@@ -640,13 +659,14 @@ void main(){
             if(!cache||!entry.occupied||entry.index!=index){
                 std::array<float,3> position;
                 std::copy_n(part.vertices[index].position,3,position.begin());
+                entry.projectionReady=false;
                 entry.index=index;entry.finite=nativeRasterVertex(position,entry.operand);
                 entry.occupied=cache;
             }
             if(!entry.finite)return full;
             vertices[corner]=entry.operand;
         }
-        return nativeTriangleRasterOperands(vertices);
+        return nativeTriangleRasterOperands(vertices,cache?part.indices+first:nullptr);
     }
     // Capture-only attestation of existing GL attribute/storage, never a draw,
     // source replay, visibility test or pixel-winner claim. Six vertex reads
