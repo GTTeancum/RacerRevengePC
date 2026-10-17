@@ -1143,7 +1143,13 @@ struct VehicleWindowGl50DS::Storage {
     U materialOffsets[maxComponents]{}, materialCount = 0;
     // Derived alongside the private cold policy copies. Frame UV updates and
     // UI texture-bank replacement never modify these racer material policies.
-    struct RacerMaterialSummary { bool sourceDiffuse = false, sourcePair = false; };
+    struct RacerMaterialSummary {
+        bool sourceDiffuse = false, sourcePair = false, normalDependent = false;
+    };
+    static bool podMaterialUsesNormals(const VehicleWindowMaterialBinding50DS& policy) noexcept {
+        return !policy.unlit && !policy.sourcePrelit && !policy.sourceDiffuseCompressed50LA &&
+            policy.blend == VehicleWindowBlend50DS::opaque;
+    }
     RacerMaterialSummary materialSummary[maxComponents]{};
     struct RacerArchetype {
         const game::VehicleDrawMesh50CM* meshes[maxComponents]{};
@@ -1738,6 +1744,7 @@ struct VehicleWindowGl50DS::Storage {
                 resolved.policy = binding;
                 materialSummary[c].sourceDiffuse |= binding.sourceDiffuseCompressed50LA;
                 materialSummary[c].sourcePair |= binding.sourceSpecularPair50LA;
+                materialSummary[c].normalDependent |= podMaterialUsesNormals(binding);
                 resolved.name = binding.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
                     input.textures->texture(binding.textureIndex) : 0;
                 if (binding.sourceSpecularPair50LA) {
@@ -2934,9 +2941,13 @@ void main() {
         for (U c = 0; c < batch.componentCount; ++c) {
             const auto& part = batch.component[c];
             drawGl.bindBuffer(arrayBuffer, selected.normalBuffers[bank][c]);
-            drawGl.bufferSubData(arrayBuffer, 0,
-                std::intptr_t(part.vertexCount) * sizeof(assets::WorldNormal50HK),
-                part.sourceNormals ? part.sourceNormals : absent);
+            // A complete cold bank with no normal-dependent lighting keeps its
+            // verified zero-filled attribute. CPU normals still feed source
+            // colors/specular and validation; absent tables stay conservative.
+            if (!selected.materials || selected.materialSummary[c].normalDependent)
+                drawGl.bufferSubData(arrayBuffer, 0,
+                    std::intptr_t(part.vertexCount) * sizeof(assets::WorldNormal50HK),
+                    part.sourceNormals ? part.sourceNormals : absent);
             if (!check("upload current per-node racer source normals")) return false;
         }
         return true;
@@ -4125,6 +4136,7 @@ void main() {
                     material.policy = binding;
                     target.materialSummary[c].sourceDiffuse |= binding.sourceDiffuseCompressed50LA;
                     target.materialSummary[c].sourcePair |= binding.sourceSpecularPair50LA;
+                    target.materialSummary[c].normalDependent |= podMaterialUsesNormals(binding);
                     material.textureIndex = binding.textureIndex;
                     material.name = binding.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
                         target.textures->texture(binding.textureIndex) : 0;
@@ -4771,8 +4783,7 @@ void main() {
         // Retain source-alpha/additive effect appearance and explicit emissive
         // materials. Generated source body RGB has already been lit on CPU;
         // only the remaining opaque pod surfaces use host illumination.
-        const bool hostLit = !material.policy.unlit && !material.policy.sourcePrelit &&
-            !sourceDiffuse && material.policy.blend == VehicleWindowBlend50DS::opaque;
+        const bool hostLit = podMaterialUsesNormals(material.policy);
         gl.uniform1i(u.useLighting, hostLit ? 1 : 0);
         const bool nativeGc = selectedLights && hostLit && !suppress && material.name &&
             material.policy.mode == VehicleWindowMaterialMode50DS::requiredTexture;

@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 9:45 p.m. EDT (2026-10-17 01:45 UTC).
+Updated: 2026-10-16 10:00 p.m. EDT (2026-10-17 02:00 UTC).
 
 ## Current direction
 
@@ -254,6 +254,13 @@ stores and lookup/miss overhead. No measured gain is claimed. This change was
 NOT included in the one-off61b289e smoke. See
 [quotient-cache proof](recovery/racer-projection-quotient-cache-20261017.md).
 
+Racer normal-buffer uploads are now skipped only when a complete immutable cold
+material table proves no material can enable host lighting. The summary uses the
+same predicate as applyPodMaterial. Null tables remain conservative. Cold zero
+initialization, VAOs, CPU normal validation/lighting/specular use, buffer binds and
+error polls remain unchanged. The new code is UNTESTED and was not part of the
+one-off smoke. See [normal-upload proof](recovery/racer-unused-normal-upload-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -268,10 +275,10 @@ NOT included in the one-off61b289e smoke. See
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified publication: `a07bbd9e9ed6d97c84673875de77901cfafe56d0`
-(tree `26bb112de7368dc341c8d0a2e47815e94f3ad277`, parent `3d85fe33`).
-Its source code is exactly the one-off tested61b289e code, with result documents
-added afterward. The current checkpoint adds the UNTESTED quotient cache. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
+Previous verified publication: `db6b0ff8b99b4babe02deeef1ac68ce503c61d4a`
+(tree `660105f6d08ae864c8ce423456d6d9c90184e09c`, parent `a07bbd9e`).
+It adds the UNTESTED quotient cache after the one-off tested61b289e code.
+The current checkpoint adds the UNTESTED normal-upload elision. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
 runtime correctness.
 
 ## Known functional limits
