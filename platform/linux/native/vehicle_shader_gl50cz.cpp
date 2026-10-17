@@ -116,16 +116,20 @@ void main() {
         viewerOutput = vec4(sourceRgb, 1.0);
         return;
     }
-    // Evaluate derivatives before any discard. Source normals retain their
-    // authored signs; only the zero-normal fallback follows triangle winding.
-    vec3 plane = cross(dFdx(viewerWorldPosition), dFdy(viewerWorldPosition));
-    float planeLength = dot(plane, plane);
     vec3 normal = vec3(0.0, 1.0, 0.0);
-    float authoredLength = dot(viewerWorldNormal, viewerWorldNormal);
-    if (authoredLength > 0.000001) normal = viewerWorldNormal * inversesqrt(authoredLength);
-    else if (planeLength > 0.0) {
-        normal = plane * inversesqrt(planeLength);
-        if (!gl_FrontFacing) normal = -normal;
+    // Only generic lit output consumes normal preparation. The uniform guard
+    // preserves uniform derivative control, before the existing discard.
+    // Source normals retain their authored signs; only the zero-normal
+    // fallback follows triangle winding. Source-color paths returned above.
+    if (useLighting != 0) {
+        vec3 plane = cross(dFdx(viewerWorldPosition), dFdy(viewerWorldPosition));
+        float planeLength = dot(plane, plane);
+        float authoredLength = dot(viewerWorldNormal, viewerWorldNormal);
+        if (authoredLength > 0.000001) normal = viewerWorldNormal * inversesqrt(authoredLength);
+        else if (planeLength > 0.0) {
+            normal = plane * inversesqrt(planeLength);
+            if (!gl_FrontFacing) normal = -normal;
+        }
     }
     if (suppressDraw != 0) discard;
     vec4 texel = useTexture != 0 ? texture(image, viewerUv) : vec4(1.0);

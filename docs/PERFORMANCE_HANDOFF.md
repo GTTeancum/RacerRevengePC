@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 10:32 p.m. EDT (2026-10-17 02:32 UTC).
+Updated: 2026-10-16 10:46 p.m. EDT (2026-10-17 02:46 UTC).
 
 ## Current direction
 
@@ -281,6 +281,15 @@ fallback. All binds, checks, ordinary uploads and validation remain. Both change
 are UNTESTED. See [depth-function proof](recovery/coverage-depth-function-reuse-20261017.md)
 and [deferred-upload proof](recovery/racer-deferred-upload-gating-20261017.md).
 
+Generic fragment normal preparation is now guarded by draw-uniform useLighting.
+Derivatives remain before the existing generic discard; lit arithmetic, varyings
+and outputs remain unchanged. Original source-diffuse/pair/payload paths already
+return earlier, so this does not address the dominant bridge workload. The driver
+may already eliminate the unused work; no generated-instruction or FPS improvement
+is established. Independent source/spec review is not a cross-compilation
+bit-identical derivative guarantee. UNTESTED. See
+[uniform normal guard proof](recovery/generic-normal-uniform-guard-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -295,10 +304,10 @@ and [deferred-upload proof](recovery/racer-deferred-upload-gating-20261017.md).
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified publication: `a7b51bf2343b688ee754ab7f4331b4df9f5e7e1e`
-(tree `91d4dcd9abf92bff19be504bd7a437de4da6e9cb`, parent `1fbd380e`).
-It adds UNTESTED paired-span coverage setup reuse. The current checkpoint adds
-UNTESTED depth-function reuse and deferred-upload gating. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
+Previous verified publication: `7b603207ba30bd0dd092cd12091e70394a90de9b`
+(tree `e332a3df4ef2b1da05a9d27d3ce17296fbbeace9`, parent `a7b51bf2`).
+It adds UNTESTED depth-function reuse and deferred-upload gating. The current
+checkpoint adds the UNTESTED generic normal preparation guard. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
 runtime correctness.
 
 ## Known functional limits
