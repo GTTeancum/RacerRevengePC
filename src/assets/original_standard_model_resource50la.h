@@ -52,6 +52,12 @@ private:
     // decoder limits. Public/default resource preparation remains unchanged.
     bool prepareOriginalLimits(const std::string&,const std::vector<std::uint8_t>&,
         const SceneLimits48D&,OriginalStandardResourceDiagnostic50LA&) noexcept;
+    // Private authenticated RA path: input may be consumed on a later decode failure.
+    bool prepareOriginalLimits(const std::string&,std::vector<std::uint8_t>&&,
+        const SceneLimits48D&,OriginalStandardResourceDiagnostic50LA&) noexcept;
+    template<class Bytes>
+    bool prepareOriginalLimitsImpl(const std::string&,Bytes&&,
+        const SceneLimits48D&,OriginalStandardResourceDiagnostic50LA&) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

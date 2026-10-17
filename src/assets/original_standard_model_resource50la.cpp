@@ -26,13 +26,14 @@ bool OriginalStandardModelResource50LA::prepare(const std::string& member,
     const std::vector<std::uint8_t>& bytes,D& d) noexcept {
     return prepareOriginalLimits(member,bytes,SceneLimits48D{},d);
 }
-bool OriginalStandardModelResource50LA::prepareOriginalLimits(const std::string& member,
-    const std::vector<std::uint8_t>& bytes,const SceneLimits48D& limits,D& d) noexcept {
+template<class Bytes>
+bool OriginalStandardModelResource50LA::prepareOriginalLimitsImpl(const std::string& member,
+    Bytes&& bytes,const SceneLimits48D& limits,D& d) noexcept {
     d={};if(storage_)return fail(d,S::alreadyPrepared,0x26E820);
     if(member.empty()||member.size()>260||bytes.empty()||bytes.size()>maxPsgBytes49O)
         return fail(d,S::input,0x26E990);
     try {
-        auto next=std::make_unique<Storage>();next->member=member;next->bytes=bytes;
+        auto next=std::make_unique<Storage>();next->member=member;next->bytes=std::forward<Bytes>(bytes);
         PsgHierarchyView49O hierarchy{};
         if(!readPsgHierarchy49O(next->bytes.data(),next->bytes.size(),hierarchy,d.hierarchy))
             return fail(d,S::hierarchy,0x28CAC0);
@@ -47,6 +48,14 @@ bool OriginalStandardModelResource50LA::prepareOriginalLimits(const std::string&
         storage_=std::move(next);return true;
     }catch(const std::bad_alloc&){return fail(d,S::allocation,0x26EE38);}
     catch(...){return fail(d,S::input,0x26E820);}
+}
+bool OriginalStandardModelResource50LA::prepareOriginalLimits(const std::string& member,
+    const std::vector<std::uint8_t>& bytes,const SceneLimits48D& limits,D& d) noexcept {
+    return prepareOriginalLimitsImpl(member,bytes,limits,d);
+}
+bool OriginalStandardModelResource50LA::prepareOriginalLimits(const std::string& member,
+    std::vector<std::uint8_t>&& bytes,const SceneLimits48D& limits,D& d) noexcept {
+    return prepareOriginalLimitsImpl(member,std::move(bytes),limits,d);
 }
 bool OriginalStandardModelResource50LA::prepared() const noexcept{return bool(storage_);}
 const std::string* OriginalStandardModelResource50LA::member() const noexcept{return storage_?&storage_->member:nullptr;}

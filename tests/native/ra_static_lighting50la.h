@@ -179,6 +179,8 @@ class Binding final {
                 next->surfaces_.emplace_back();auto& output=next->surfaces_.back();
                 auto& id=output.identity;id.surface=plan.surface;id.placement=plan.placement;
                 id.worldInstance=plan.worldInstance;id.raster=plan.raster;id.materialRow=raster.materialRow;
+                if(next->surfaces_.size()>1&&next->surfaces_.front().identity.raster!=id.raster)
+                    next->allRastersEqual_=false;
                 id.programToken=raster.programToken;id.vertexStart=plan.vertexStart;id.vertexCount=plan.vertexCount;
                 id.indexStart=plan.indexStart;id.indexCount=plan.indexCount;
                 id.cameraGeneration=snapshot.cameraGeneration;id.cameraPublication=snapshot.cameraPublication;
@@ -214,15 +216,21 @@ class Binding final {
     template<class Visitor>
     bool visitDiffuseSurface(std::size_t surface,Visitor&& visitor)const noexcept {
         if(!current()||!diffuseStream_)return false;
-        // The scan is read-only and callback-free. Reuse only the immediately
-        // preceding successful raster check, never a result from another visit.
-        bool havePrevious=false;std::size_t previousRaster=0;
-        for(const auto& row:diffuseStream_->surfaces_){
-            const auto raster=row.identity.raster;
-            if(havePrevious&&raster==previousRaster)continue;
+        // Validate live raster state on every visit. Uniform immutable IDs need
+        // one check; mixed IDs retain the read-only adjacent-deduplicated scan.
+        if(!diffuseStream_->surfaces_.empty()&&diffuseStream_->allRastersEqual_){
+            const auto raster=diffuseStream_->surfaces_.front().identity.raster;
             if(!diffuseRasterCurrent(raster)||
                (world_->rasterInventory_[raster].passFlags&4u))return false;
-            previousRaster=raster;havePrevious=true;
+        }else{
+            bool havePrevious=false;std::size_t previousRaster=0;
+            for(const auto& row:diffuseStream_->surfaces_){
+                const auto raster=row.identity.raster;
+                if(havePrevious&&raster==previousRaster)continue;
+                if(!diffuseRasterCurrent(raster)||
+                   (world_->rasterInventory_[raster].passFlags&4u))return false;
+                previousRaster=raster;havePrevious=true;
+            }
         }
         // prepareDiffuseStream appends a filtered subset of the source plan's
         // strictly increasing surface IDs; the published stream never reorders.

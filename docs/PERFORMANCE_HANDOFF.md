@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 7:22 a.m. EDT (2026-10-17 11:22 UTC).
+Updated: 2026-10-17 7:39 a.m. EDT (2026-10-17 11:39 UTC).
 
 ## Current direction
 
@@ -205,11 +205,41 @@ caught before images become publishable; no borrowed map-key pointer is stored.
 UNTESTED. See `docs/recovery/ra-canonical-material-keys-20261017.md` for the
 construction and lifetime proof. No measured FPS gain is claimed.
 
+## New untested source changes: diffuse row shape and archive lookup index
+
+A fresh private diffuse stream records whether all emitted surface raster IDs
+match. Nonempty uniform streams now perform the same live raster validation once
+without scanning identical immutable IDs; mixed/empty streams retain the original
+scan. Lookup, callback, failure behavior and initial/final currentness checks stay.
+The admitted black-only diffuse route establishes the applicable uniform case.
+
+RA cold preparation now owns normalized archive names and entry indices once,
+preserving per-key duplicate ambiguity and all provider/member checks. This avoids
+repeated full archive-name normalization during track construction. The 176
+collision-only rows alone previously made 352 full 1,010-entry scans. That count
+is source-derived loading work, not measured startup time or track FPS.
+
+Both changes are UNTESTED. See `docs/recovery/ra-uniform-diffuse-ids-20261017.md`
+and `docs/recovery/ra-source-entry-index-20261017.md` for lifetime/failure proofs.
+
+## New untested source change: transfer authenticated RA PSG buffers
+
+A private rvalue overload transfers the already-authenticated RA extraction buffer
+into its native model resource instead of copying it again. The public/default
+const-input route still copies inside the same caught-error boundary. Validation,
+hierarchy/scene decoding and transactional publication remain in one shared body;
+RA never reads the moved local afterward. Later failure may consume that private
+rvalue input. Original byte contents and resource ownership remain intact.
+
+This removes an explicit retained-buffer copy per successful RA payload, with
+710 payloads required by the cold route. It is loading-time work, not a measured
+FPS gain. UNTESTED. See `docs/recovery/ra-owned-psg-transfer-20261017.md`.
+
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[aaaa813a](https://github.com/GTTeancum/RacerRevengePC/commit/aaaa813a4fd5cbb04f20b55779badaaf5e85319e).
-The adjacent glyph UV reuse, retained canonical material keys and preceding source changes are **UNTESTED**: in-place RA fog observations,
+[6b499194](https://github.com/GTTeancum/RacerRevengePC/commit/6b499194dafbdc44c5976e563d343917ddff67db).
+The diffuse-ID summary, cold archive index, owned PSG transfer and preceding source changes are **UNTESTED**: in-place RA fog observations,
 bounded draw-list capacity hint, per-surface diffuse input admission reuse, and
 adjacent scissor reuse invalidated at potential allocation boundaries. The sections above document their proofs and limitations. The earlier fog reserve
 change remains untested as well.

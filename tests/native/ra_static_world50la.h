@@ -113,6 +113,8 @@ private:
     std::shared_ptr<const a::OriginalStandardMaterialContext50LA> context_;
     std::map<std::string,std::shared_ptr<const a::OriginalStandardModelResource50LA>> payloads_;
     std::map<std::string,std::shared_ptr<const a::OriginalStandardMaterialSource50LA>> psms_;
+    struct SourceEntryIndexRow {std::size_t index=0;bool ambiguous=false;};
+    std::map<std::string,SourceEntryIndexRow> sourceEntryIndex_;
     std::vector<std::unique_ptr<Placement>> placements_;
     std::unique_ptr<ra_static_model_cold50LA::Owner> modelPrefixes_;
     std::vector<CollisionOnly> collisionOnly_;
@@ -127,9 +129,10 @@ private:
     static bool reject(Diagnostic& d,const char* why)noexcept{d.failure=why;return false;}
     const a::ResourceEntry48C* sourceEntry(const std::string& name)const {
         const auto key=normalized(name);const auto* data=source_->sourcesDecoded();
-        const a::ResourceEntry48C* found=nullptr;
-        for(const auto& e:data->archive.entries)if(normalized(e.name)==key){if(found)return nullptr;found=&e;}
-        return found;
+        const auto found=sourceEntryIndex_.find(key);
+        if(!data||found==sourceEntryIndex_.end()||found->second.ambiguous||
+           found->second.index>=data->archive.entries.size())return nullptr;
+        return &data->archive.entries[found->second.index];
     }
     bool member(const a::ResourceEntry48C& row,std::vector<std::uint8_t>& bytes,Diagnostic& d)const {
         const auto* data=source_->sourcesDecoded();const auto& provider=domain_->archiveProvider3E1A70();
@@ -222,6 +225,12 @@ private:
             providerRevision_=domain_->archiveProvider3E1A70()->revision();
             if(!domain_->resolver3E1A70()->bindProvider3E1A70(domain_->archiveProvider3E1A70(),d.material.texture))
                 return reject(d,"same actual resolver/provider binding rejected");
+            // Own names/indices only. Duplicate names reject their queries, not unrelated entries.
+            for(std::size_t i=0;i<data->archive.entries.size();++i){
+                const auto inserted=sourceEntryIndex_.emplace(normalized(data->archive.entries[i].name),
+                    SourceEntryIndexRow{i,false});
+                if(!inserted.second)inserted.first->second.ambiguous=true;
+            }
             // Authenticate the fixed compressed-material closure in the SAME
             // mounted provider before any private widened geometry admission.
             for(const auto& pin:ra_compressed_scene::detail::compressedMaterials){
@@ -241,7 +250,7 @@ private:
                     limits.allow_signed32_quantized_positions=true;++d.widePayloads;
                 }
                 auto payload=std::make_shared<a::OriginalStandardModelResource50LA>();
-                if(!payload->prepareOriginalLimits(row.name,bytes,limits,d.resource))return reject(d,"actual RA model decoder rejected");
+                if(!payload->prepareOriginalLimits(row.name,std::move(bytes),limits,d.resource))return reject(d,"actual RA model decoder rejected");
                 if(!payload->scene()||payload->nodeCount()!=1)return reject(d,"actual source hierarchy differs");
                 if(!retainPsmSources(*payload->scene(),d))return false;
                 if(!payloads_.emplace(key,std::move(payload)).second)return reject(d,"duplicate RA PSG identity");
@@ -369,7 +378,7 @@ public:
         // Canonical references release children before the retained six-set;
         // private image/renderer leases have already retired above.
         coldImages_.clear();imageFamilies_.clear();crowdImages_.reset();crowdCompressed_.reset();imagesComplete_=false;
-        payloads_.clear();psms_.clear();context_.reset();domain_.reset();source_.reset();
+        payloads_.clear();psms_.clear();sourceEntryIndex_.clear();context_.reset();domain_.reset();source_.reset();
         staged_=false;closed_=true;return true;
     }
 };

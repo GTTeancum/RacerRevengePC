@@ -35,6 +35,8 @@ class StaticDiffuseStream final {
         std::vector<rr::game::original_racer_lighting50KM::DiffuseVertexRgba> vertices;
     };
     std::vector<Surface> surfaces_;
+    // Immutable row-shape summary only; live raster admission is never cached.
+    bool allRastersEqual_=true;
     StaticDiffuseStream()=default;
 public:
     ~StaticDiffuseStream()=default;
