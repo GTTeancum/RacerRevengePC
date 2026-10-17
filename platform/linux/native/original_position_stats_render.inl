@@ -154,7 +154,7 @@ bool preparePositionStatsFrame(const game::OriginalPositionStatsNativeOwner50LA*
             for(U i=0;i<4;++i){const auto& in=quad.vertices[i];const auto& c=quad.packetColors[i];
                 if(!std::isfinite(in.x)||!std::isfinite(in.y)||!std::isfinite(in.u)||!std::isfinite(in.v)||
                    c[3]>(packet.material==3?h.radar.maximumVertexAlpha:h.policies[packet.material].maximumVertexAlpha))return false;
-                auto& out=h.vertices[q*4+i];out={};out.position[0]=in.x;out.position[1]=in.y;out.position[2]=quad.depth;
+                auto& out=h.vertices[q*4+i];out.position[0]=in.x;out.position[1]=in.y;out.position[2]=quad.depth;
                 out.uv[0]=in.u;out.uv[1]=in.v;for(U lane=0;lane<4;++lane)out.color[lane]=c[lane];
             }
         }
@@ -202,12 +202,15 @@ bool drawPositionStats(U bank) noexcept {
         // Preserve actual source order and effective per-pass depth. Radar
         // is genuine zero-map ALWAYS/no-write with inert native vertex Z0.
         // Textured screen quads retain original packet depth and state.
-        const bool radar=packet.material==3;
-        const auto depth=radar?h.radar.depthMethod:h.policies[packet.material].depthMethod;
-        gl.depthFunc(depth==0?0x0200:depth==1?0x0207:depth==2?0x0206:0x0204);
-        gl.depthMask((radar?h.radar.depthWrite:h.policies[packet.material].depthWrite)?1:0);
-        gl.uniform1i(uiSourceBlendUniform,1);gl.uniform1i(uiTexturedUniform,radar?0:1);
-        gl.bindTexture(texture2D,radar?0:h.textures.texture(h.images[packet.material]));
+        // Material identity includes radar's distinct depth/texturing policy.
+        if(p==0 || packet.material!=h.packets[p-1].material){
+            const bool radar=packet.material==3;
+            const auto depth=radar?h.radar.depthMethod:h.policies[packet.material].depthMethod;
+            gl.depthFunc(depth==0?0x0200:depth==1?0x0207:depth==2?0x0206:0x0204);
+            gl.depthMask((radar?h.radar.depthWrite:h.policies[packet.material].depthWrite)?1:0);
+            gl.uniform1i(uiSourceBlendUniform,1);gl.uniform1i(uiTexturedUniform,radar?0:1);
+            gl.bindTexture(texture2D,radar?0:h.textures.texture(h.images[packet.material]));
+        }
         if(uiSourceCoherentFramebufferFetch){
             drawGl.drawElementsBaseVertex(0x0004,I(packet.count*6),0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(packet.first)*6*sizeof(U)),0);

@@ -127,7 +127,7 @@ bool prepareTimeStatsFrame(const game::OriginalTimeStats50LA* owner) noexcept {
             for(U i=0;i<4;++i){const auto& in=quad.vertices[i];const auto& c=quad.packetColors[i];
                 if(!std::isfinite(in.x)||!std::isfinite(in.y)||!std::isfinite(in.u)||!std::isfinite(in.v)||
                    c[3]>h.policies[packet.material].maximumVertexAlpha)return false;
-                auto& out=h.vertices[q*4+i];out={};out.position[0]=in.x;out.position[1]=in.y;out.position[2]=quad.depth;
+                auto& out=h.vertices[q*4+i];out.position[0]=in.x;out.position[1]=in.y;out.position[2]=quad.depth;
                 out.uv[0]=in.u;out.uv[1]=in.v;for(U lane=0;lane<4;++lane)out.color[lane]=c[lane];
             }
         }
@@ -174,8 +174,11 @@ bool drawTimeStats(U bank) noexcept {
     for(U p=0;okay&&p<h.packetCount;++p){const auto& packet=h.packets[p];
         // Both actual policies were admitted as source-alpha, GEQUAL/write.
         // Preserve owner packet order; no synthetic registration/rank sorting.
-        gl.depthMask(1);gl.uniform1i(uiSourceBlendUniform,1);
-        gl.bindTexture(texture2D,h.textures.texture(h.images[packet.material]));
+        // A checked adjacent packet with the same material retains this setup.
+        if(p==0 || packet.material!=h.packets[p-1].material){
+            gl.depthMask(1);gl.uniform1i(uiSourceBlendUniform,1);
+            gl.bindTexture(texture2D,h.textures.texture(h.images[packet.material]));
+        }
         if(uiSourceCoherentFramebufferFetch){
             drawGl.drawElementsBaseVertex(0x0004,I(packet.count*6),0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(packet.first)*6*sizeof(U)),0);

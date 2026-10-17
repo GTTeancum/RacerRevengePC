@@ -132,7 +132,7 @@ bool prepareSpeedBoostFrame(const game::OriginalSpeedBoost50LA* owner) noexcept 
             for(U i=0;i<quad.vertexCount;++i){const auto& in=quad.vertices[i];const auto& c=quad.colors[i];
                 if(!std::isfinite(in.x)||!std::isfinite(in.y)||!std::isfinite(in.u)||!std::isfinite(in.v)||
                    c[3]>h.policies[packet.material].maximumVertexAlpha)return false;
-                auto& out=h.vertices[q*4+i];out={};out.position[0]=in.x;out.position[1]=in.y;out.position[2]=quad.depth;
+                auto& out=h.vertices[q*4+i];out.position[0]=in.x;out.position[1]=in.y;out.position[2]=quad.depth;
                 out.uv[0]=in.u;out.uv[1]=in.v;for(U lane=0;lane<4;++lane)out.color[lane]=c[lane];
             }
         }
@@ -182,8 +182,11 @@ bool drawSpeedBoost(U bank) noexcept {
     for(U p=0;okay&&p<h.packetCount;++p){const auto& packet=h.packets[p];
         // Both actual policies were admitted as source-alpha, GEQUAL/write.
         // Preserve owner packet order; no synthetic registration/rank sorting.
-        gl.depthMask(1);gl.uniform1i(uiSourceBlendUniform,1);
-        gl.bindTexture(texture2D,h.textures.texture(h.images[packet.material]));
+        // A checked adjacent packet with the same material retains this setup.
+        if(p==0 || packet.material!=h.packets[p-1].material){
+            gl.depthMask(1);gl.uniform1i(uiSourceBlendUniform,1);
+            gl.bindTexture(texture2D,h.textures.texture(h.images[packet.material]));
+        }
         const U indexCount=packet.vertexCount==3?3u:packet.count*6u;
         // Shared index slot is0,1,2,0,2,3. A triangle consumes exactly its
         // first three indices and retains the source's three real vertices.

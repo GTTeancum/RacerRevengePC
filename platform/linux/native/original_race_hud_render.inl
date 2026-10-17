@@ -161,7 +161,7 @@ bool prepareRaceHudFrame(const game::OriginalRaceHud50KG* owner) noexcept {
         if(t->enabled70&&offset!=0x12c&&offset!=0x130&&offset!=0x134&&offset!=0x164)return false;}
     const auto put=[&](float x,float y,float u,float vv,const std::array<std::uint8_t,4>& color,U index){
         if(!std::isfinite(x)||!std::isfinite(y)||!std::isfinite(u)||!std::isfinite(vv)||color[3]>128)return false;
-        auto& vertex=h.vertices[index];vertex={};vertex.position[0]=x;vertex.position[1]=y;vertex.position[2]=16777214.f;
+        auto& vertex=h.vertices[index];vertex.position[0]=x;vertex.position[1]=y;vertex.position[2]=16777214.f;
         vertex.uv[0]=u;vertex.uv[1]=vv;for(U c=0;c<4;++c)vertex.color[c]=color[c];return true;};
     // 2E6960 prepares both embedded ScreenTextures, then enqueues bright and
     // clear. Their real registry leaves drain clear before text before bright.

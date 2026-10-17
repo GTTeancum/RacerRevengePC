@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 11:51 p.m. EDT (2026-10-17 03:51 UTC).
+Updated: 2026-10-17 12:05 a.m. EDT (2026-10-17 04:05 UTC).
 
 ## Current direction
 
@@ -22,12 +22,18 @@ Continue independent coding if publication is blocked, and report exact blockers
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[d6651457](https://github.com/GTTeancum/RacerRevengePC/commit/d6651457efa7b8814151b0ca5fc936f9879d99e8),
-tree `37fb609d8bbb99764d7df34c8cab4d9d44436aca`.
-This checkpoint adds three **UNTESTED** changes: retained RA snapshot-fallback
-selectors, in-place private RA lighting Snapshot construction, and adjacent
-same-material original HUD state reuse. Exact source-only reviews accompany
-the proof documents below. No build, smoke or FPS measurement was run for them.
+[88edf271](https://github.com/GTTeancum/RacerRevengePC/commit/88edf271153d2a4cd507fe049d15be30eb109e66),
+tree `329deb23c84123f0b25bcc392bd17cfa71311a87`.
+This checkpoint adds **UNTESTED** adjacent-material state reuse in the original
+Damage, PositionStats, TimeStats and SpeedBoost HUD passes. Packet order,
+geometry, barriers, checks and cleanup remain; radar transitions and triangle
+needle indexing retain their distinct handling. See
+[proof](recovery/remaining-hud-material-state-20261017.md).
+The five HUD packing paths also omit a redundant per-vertex zero assignment
+before fully writing all 24 bytes; SpeedBoost retains its four-slot clear.
+See [packing proof](recovery/hud-full-vertex-write-20261017.md). This may already
+be optimized by the compiler and has no measured benefit.
+No build, smoke or FPS measurement was run for this source.
 
 Last executed source remains `4f82775`, tree
 `ed51765d87b357345095efd8f5c7494c3555e62e`, with Linux llvmpipe
