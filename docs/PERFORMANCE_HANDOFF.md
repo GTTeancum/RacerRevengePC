@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 8:56 p.m. EDT (2026-10-17 00:56 UTC).
+Updated: 2026-10-16 9:10 p.m. EDT (2026-10-17 01:10 UTC).
 
 ## Current direction
 
@@ -189,6 +189,14 @@ range guarantees were independently source-reviewed. This may already be
 optimized by the driver; no measured gain is claimed. See
 [destination clamp proof](recovery/destination-rgba8-clamp-20261017.md).
 
+The racer coverage composition reuses texture unit0 established by its checked
+payload setup. Later nonempty runs within the same synchronous group also reuse
+unit0/image established by the previous checked successful tail. First runs remain
+explicit. All composition binds, error gates and unconditional tail transitions
+remain; no persistent cache is added. These changes remove one composition-entry
+call and two later-run payload-entry calls, without a measured FPS claim.
+See [selector scope proof](recovery/coverage-payload-texture-selector-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -203,10 +211,10 @@ optimized by the driver; no measured gain is claimed. See
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified untested-source publication: `b90a8f9b9cbf7a664279a342f356da25550ca6d9`
-(tree `d28d1afe877a2786333480d07b795fdfd22a4000`, parent `27e14fc6`).
-It includes the recovered changes above. The current checkpoint adds only the
-two destination-clamp removals and documentation updates. All changes after the
+Previous verified untested-source publication: `7787eb229c04458e030a258f36b19dda4e8c47a7`
+(tree `73d7df05a62974fdaa7b94d76658a3d504672bfd`, parent `b90a8f9b`).
+It includes the recovered changes and destination-clamp removals above. The current
+checkpoint adds the bounded texture-selector/binding reuse and documentation. All changes after the
 tested baseline are untested. Source review does not establish compilation or
 runtime correctness.
 
@@ -224,9 +232,12 @@ Wreck collection work is held and not active gameplay evidence.
 A broader cross-publication cold normal cache remains held pending stronger
 lifecycle proof. The opponent-component lighting uniform proposal is also held:
 actual current-route benefit and independent review remain unfinished.
-VM access has returned and the published recovery tree is reconciled locally.
-Unreviewed local drafts are still excluded unless published file contents establish
-otherwise.
+VM access failed again at 2026-10-17 01:09 UTC after local commit 08fb631.
+The reviewed selector source was recovered by exact anchored edits against remote
+7787eb22; its Git blob is ed63fa7b8c73e7939670cfb9b47e9210838fa6cc, matching the
+retained local diff prefix. Documentation was reconstructed from verified remote
+content and review records. This is not a claim of full unavailable-local-tree
+identity. Unreviewed local drafts remain excluded.
 
 ## Next steps for the next owner
 

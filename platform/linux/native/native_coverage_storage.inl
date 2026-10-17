@@ -239,7 +239,9 @@ void main(){
         gl.disable(0x0B71);gl.depthMask(0);
         const float invalid[]={0.f,0.f,0.f,-1.f};gl.clearBufferfv(0x1800,0,invalid);
         gl.useProgram(shader->program());gl.uniform1i(shader->uniforms().sourcePairPass50LA,3);
-        gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);
+        // Later runs inherit unit0/image from the previous checked tail.
+        // The synchronous group performs only CPU lookahead between runs.
+        if(firstRun){gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);}
         bool accepted=check("bind AA0 original triangle payload target");
         if(accepted){
             drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(triangleCount*3),0x1405,
@@ -260,7 +262,7 @@ void main(){
             // composition mode and all three sampler-object bindings. Neither
             // bridge restoration nor CPU-only group lookahead changes them.
             gl.useProgram(coverageProgram);if(firstRun)gl.uniform1i(coverageRaCompositionUniform,0);drawGl.bindVertexArray(coverageArray);
-            gl.activeTexture(textureUnit0);if(firstRun&&gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
+            if(firstRun&&gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
             gl.activeTexture(textureUnit0+1);if(firstRun&&gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
             gl.activeTexture(textureUnit0+2);if(firstRun&&gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
             accepted=check("bind sample-specific original destination-alpha composition");
