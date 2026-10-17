@@ -1141,6 +1141,10 @@ struct VehicleWindowGl50DS::Storage {
     std::unique_ptr<MaterialUv[]> opponentMaterialUvs;
     U opponentMaterialStride = 0;
     U materialOffsets[maxComponents]{}, materialCount = 0;
+    // Derived alongside the private cold policy copies. Frame UV updates and
+    // UI texture-bank replacement never modify these racer material policies.
+    struct RacerMaterialSummary { bool sourceDiffuse = false, sourcePair = false; };
+    RacerMaterialSummary materialSummary[maxComponents]{};
     struct RacerArchetype {
         const game::VehicleDrawMesh50CM* meshes[maxComponents]{};
         const assets::Scene48D* scenes[maxComponents]{};
@@ -1148,6 +1152,7 @@ struct VehicleWindowGl50DS::Storage {
         U normalBuffers[2][maxComponents]{};
         std::unique_ptr<Material[]> materials;
         U materialOffsets[maxComponents]{}, materialCount = 0;
+        RacerMaterialSummary materialSummary[maxComponents]{};
         const MaterialTextureGl50EB* textures = nullptr;
         const MaterialTextureGl50EB* specularTextures50LA = nullptr;
         std::uint64_t texturePublication = 0, specularPublication50LA = 0;
@@ -1165,16 +1170,18 @@ struct VehicleWindowGl50DS::Storage {
         const U (*normalBuffers)[maxComponents];
         Material* materials;
         const U* materialOffsets;
+        const RacerMaterialSummary* materialSummary;
         U materialCount;
         U cableTextureName;
         const SpecularGeometry50LA* specular;
     };
     RacerView racerView(U archetype) const noexcept {
         if (!archetype) return {meshes, scenes, &resources, racerNormalBuffers, materials.get(),
-            materialOffsets, materialCount, cableTextureName, sourceSpecularGeometry50LA.data()};
+            materialOffsets, materialSummary, materialCount, cableTextureName, sourceSpecularGeometry50LA.data()};
         const auto& source = racerArchetypes[archetype - 1];
         return {source.meshes, source.scenes, &source.resources, source.normalBuffers, source.materials.get(),
-            source.materialOffsets, source.materialCount, source.cableTextureName, source.specularGeometry50LA.data()};
+            source.materialOffsets, source.materialSummary, source.materialCount, source.cableTextureName,
+            source.specularGeometry50LA.data()};
     }
     std::uint64_t texturePublication = 0;
     std::unique_ptr<TrackSpan[]> trackSpans;
@@ -1729,6 +1736,8 @@ struct VehicleWindowGl50DS::Storage {
                 auto& resolved = materials[materialOffsets[c] + m];
                 resolved.textureIndex = binding.textureIndex;
                 resolved.policy = binding;
+                materialSummary[c].sourceDiffuse |= binding.sourceDiffuseCompressed50LA;
+                materialSummary[c].sourcePair |= binding.sourceSpecularPair50LA;
                 resolved.name = binding.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
                     input.textures->texture(binding.textureIndex) : 0;
                 if (binding.sourceSpecularPair50LA) {
@@ -1776,8 +1785,38 @@ struct VehicleWindowGl50DS::Storage {
         }
         return true;
     }
+    // Only submit's callback-free CPU preflight owns these stack receipts.
+    // They never survive that scope or cross a caller-currentness/GL callback.
+    struct RacerNormalReceipt {
+        struct Component {
+            const assets::Vertex48B* vertices = nullptr;
+            const assets::WorldNormal50HK* normals = nullptr;
+            U vertexCount = 0, normalCount = 0;
+        } component[maxComponents]{};
+        const game::VehicleDrawBatch50CO* completedBatch = nullptr;
+        U componentCount = 0;
+        bool matches(const game::VehicleDrawBatch50CO& batch) const noexcept {
+            if (completedBatch != &batch || componentCount != batch.componentCount) return false;
+            for (U c = 0; c < componentCount; ++c) {
+                const auto& part = batch.component[c];
+                const auto& saved = component[c];
+                if (saved.vertices != part.vertices || saved.normals != part.sourceNormals ||
+                    saved.vertexCount != part.vertexCount || saved.normalCount != part.sourceNormalCount)
+                    return false;
+            }
+            return true;
+        }
+        void accept(const game::VehicleDrawBatch50CO& batch) noexcept {
+            componentCount = batch.componentCount;
+            for (U c = 0; c < componentCount; ++c) {
+                const auto& part = batch.component[c];
+                component[c] = {part.vertices, part.sourceNormals, part.vertexCount, part.sourceNormalCount};
+            }
+            completedBatch = &batch;
+        }
+    };
     bool retainedMesh(const game::VehicleDrawBatch50CO& batch, VehicleWindowDiagnostic50DS& d,
-        U archetype = 0) const noexcept {
+        U archetype = 0, RacerNormalReceipt* normalReceipt = nullptr) const noexcept {
         const auto selected = racerView(archetype);
         if (batch.componentCount != selected.resources->componentCount)
             return fail(d, VehicleWindowError50DS::assets, "batch component count differs from actual assets");
@@ -1791,13 +1830,8 @@ struct VehicleWindowGl50DS::Storage {
             // retained with the generated RGB. A subset mask must not relabel
             // imported RGB as source color or route generated RGB to legacy.
             const auto count = static_cast<U>(selected.scenes[c]->materials.size());
-            bool sourceDiffuse = false, sourcePair = false;
-            if (selected.materials)
-                for (U m = 0; m < count; ++m) {
-                    const auto& policy = selected.materials[selected.materialOffsets[c] + m].policy;
-                    sourceDiffuse = sourceDiffuse || policy.sourceDiffuseCompressed50LA;
-                    sourcePair = sourcePair || policy.sourceSpecularPair50LA;
-                }
+            const auto& summary = selected.materialSummary[c];
+            const bool sourceDiffuse = summary.sourceDiffuse, sourcePair = summary.sourcePair;
             if (part.sourceSpecularGeometry50LA != sourcePair)
                 return fail(d, VehicleWindowError50DS::frame, "source pair geometry differs from actual cold body policy");
             if (!sourceDiffuse) {
@@ -1837,7 +1871,11 @@ struct VehicleWindowGl50DS::Storage {
         }
         d.component = maxComponents;
         d.material = assets::unresolvedMaterialTexture50EA;
-        return validateRacerNormals(batch, d);
+        if (normalReceipt && normalReceipt->matches(batch)) return true;
+        if (normalReceipt) normalReceipt->completedBatch = nullptr;
+        if (!validateRacerNormals(batch, d)) return false;
+        if (normalReceipt) normalReceipt->accept(batch);
+        return true;
     }
     bool validateRacerNormals(const game::VehicleDrawBatch50CO& batch,
         VehicleWindowDiagnostic50DS& d) const noexcept {
@@ -1860,7 +1898,8 @@ struct VehicleWindowGl50DS::Storage {
         return true;
     }
     bool validateOpponents(const game::VehicleDrawBatch50CO& player, const VehicleWindowFrame50DS& frame,
-        VehicleWindowDiagnostic50DS& d) const noexcept {
+        VehicleWindowDiagnostic50DS& d,
+        RacerNormalReceipt (&normalReceipts)[1 + maxVehicleWindowOpponents50DS]) const noexcept {
         if (frame.opponentCount > maxVehicleWindowOpponents50DS ||
             bool(frame.opponentCount) != bool(frame.opponents))
             return fail(d, VehicleWindowError50DS::frame, "opponents require an explicit bounded array of at most seven");
@@ -1869,7 +1908,7 @@ struct VehicleWindowGl50DS::Storage {
         game::VehicleDrawPlan50CS plan{};
         if (!game::preflightVehicleDrawBatch50CS(player, capacity, plan, d.submission))
             return fail(d, VehicleWindowError50DS::submission, "player batch preflight rejected before opponent rendering");
-        if (!retainedMesh(player, d)) return false;
+        if (!retainedMesh(player, d, 0, &normalReceipts[0])) return false;
         for (U i = 0; i < frame.opponentCount; ++i) {
             d.opponentIndex = i;
             const auto& opponent = frame.opponents[i];
@@ -1886,7 +1925,7 @@ struct VehicleWindowGl50DS::Storage {
             }
             if (!game::preflightVehicleDrawBatch50CS(*opponent.batch, racerCapacity, plan, d.submission))
                 return fail(d, VehicleWindowError50DS::submission, "opponent batch preflight rejected");
-            if (!retainedMesh(*opponent.batch, d, opponent.racerArchetype) ||
+            if (!retainedMesh(*opponent.batch, d, opponent.racerArchetype, &normalReceipts[i + 1]) ||
                 !validateMaterialUvs(opponent.materialUvs, opponent.materialUvCount, d,
                     opponent.racerArchetype)) return false;
             if (opponent.cables && (!selected.cableTextureName || !validateCableFrame(*opponent.cables, d)))
@@ -1926,12 +1965,12 @@ struct VehicleWindowGl50DS::Storage {
         const game::NativeGcSelectedLightsCandidate* input, U expectedRacerSlot,
         const game::VehicleDrawBatch50CO& batch, U archetype,
         std::uintptr_t& fleetOwner, game::NativeGcSelectedLightsCandidate& output,
-        VehicleWindowDiagnostic50DS& d) const noexcept {
+        VehicleWindowDiagnostic50DS& d, RacerNormalReceipt& normalReceipt) const noexcept {
         output = {};
         if (archetype > racerArchetypeCount)
             return fail(d, VehicleWindowError50DS::frame,
                 "native GC packet requires the actual prepared racer archetype");
-        if (!retainedMesh(batch, d, archetype)) return false;
+        if (!retainedMesh(batch, d, archetype, &normalReceipt)) return false;
         if (policy == NativeRacerLightingPolicy50DS::unchangedHost) {
             if (input)
                 return fail(d, VehicleWindowError50DS::frame,
@@ -2774,7 +2813,8 @@ void main() {
         return true;
     }
     bool prepareSpecularFrame50LA(const game::VehicleDrawBatch50CO& player,
-        const VehicleWindowFrame50DS& frame, VehicleWindowDiagnostic50DS& d) noexcept {
+        const VehicleWindowFrame50DS& frame, VehicleWindowDiagnostic50DS& d,
+        RacerNormalReceipt (&normalReceipts)[1 + maxVehicleWindowOpponents50DS]) noexcept {
         if (!hasSpecularPairs50LA) {
             for (U i = 0; i < frame.opponentCount; ++i)
                 for (auto* model : frame.opponents[i].sourceBodyModelPackets50LA)
@@ -2811,7 +2851,7 @@ void main() {
             const U archetype = slot ? frame.opponents[slot - 1].racerArchetype : 0;
             const auto selected = racerView(archetype);
             const auto& batch = slot ? *frame.opponents[slot - 1].batch : player;
-            if (!retainedMesh(batch, d, archetype)) return false;
+            if (!retainedMesh(batch, d, archetype, &normalReceipts[slot])) return false;
             const auto& models = slot ? frame.opponents[slot - 1].sourceBodyModelPackets50LA :
                 frame.sourceBodyModelPackets50LA;
             // These four fixed slots preserve each component's own model,
@@ -4083,6 +4123,8 @@ void main() {
                     const auto& binding = source.materials.component[c].bindings[m];
                     auto& material = target.materials[target.materialOffsets[c] + m];
                     material.policy = binding;
+                    target.materialSummary[c].sourceDiffuse |= binding.sourceDiffuseCompressed50LA;
+                    target.materialSummary[c].sourcePair |= binding.sourceSpecularPair50LA;
                     material.textureIndex = binding.textureIndex;
                     material.name = binding.mode == VehicleWindowMaterialMode50DS::requiredTexture ?
                         target.textures->texture(binding.textureIndex) : 0;
@@ -5730,24 +5772,32 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
         for (U i = 0; i < 16; ++i)
             if (!std::isfinite(frame.skyWorldViewProjection[i]))
                 return fail(d, VehicleWindowError50DS::frame, "nonfinite authored sky matrix");
-    if (!s.validateMaterialUvs(frame.materialUvs, frame.materialUvCount, d) ||
-        !s.validateOpponents(batch, frame, d) || !s.validateDynamicWorldFrame(frame.dynamicWorld, d) ||
-        !s.validateTrackAnimationFrames(frame, d)) return false;
     // All selected-light validation and value copying precedes the first GL
     // call. Missing/invalid requested packets never fall back to generic light.
     game::NativeGcSelectedLightsCandidate playerLights{};
     game::NativeGcSelectedLightsCandidate opponentLights[maxVehicleWindowOpponents50DS]{};
-    std::uintptr_t fleetLightOwner = 0;
-    if (!s.copyNativeGcLights(frame.lightingPolicy, frame.selectedLights, 0,
-        batch, 0, fleetLightOwner, playerLights, d)) return false;
-    for (U i = 0; i < frame.opponentCount; ++i) {
-        d.opponentIndex = i;
-        const auto& opponent = frame.opponents[i];
-        if (!s.copyNativeGcLights(opponent.lightingPolicy, opponent.selectedLights, i + 1,
-            *opponent.batch, opponent.racerArchetype, fleetLightOwner, opponentLights[i], d)) return false;
+    {
+        // These owned validators neither invoke callbacks nor mutate the live
+        // vertex/normal streams. Reuse only a completed, identity-matched scan;
+        // ready() still performs its original scan after currentness callbacks.
+        Storage::RacerNormalReceipt normalReceipts[1 + maxVehicleWindowOpponents50DS]{};
+        if (!s.validateMaterialUvs(frame.materialUvs, frame.materialUvCount, d) ||
+            !s.validateOpponents(batch, frame, d, normalReceipts) ||
+            !s.validateDynamicWorldFrame(frame.dynamicWorld, d) ||
+            !s.validateTrackAnimationFrames(frame, d)) return false;
+        std::uintptr_t fleetLightOwner = 0;
+        if (!s.copyNativeGcLights(frame.lightingPolicy, frame.selectedLights, 0,
+            batch, 0, fleetLightOwner, playerLights, d, normalReceipts[0])) return false;
+        for (U i = 0; i < frame.opponentCount; ++i) {
+            d.opponentIndex = i;
+            const auto& opponent = frame.opponents[i];
+            if (!s.copyNativeGcLights(opponent.lightingPolicy, opponent.selectedLights, i + 1,
+                *opponent.batch, opponent.racerArchetype, fleetLightOwner, opponentLights[i], d,
+                normalReceipts[i + 1])) return false;
+        }
+        d.opponentIndex = maxVehicleWindowOpponents50DS;
+        if (!s.prepareSpecularFrame50LA(batch, frame, d, normalReceipts)) return false;
     }
-    d.opponentIndex = maxVehicleWindowOpponents50DS;
-    if (!s.prepareSpecularFrame50LA(batch, frame, d)) return false;
     if (bool(s.request.cables.textures) != bool(frame.cables))
         return fail(d, VehicleWindowError50DS::frame, "cable frame presence must match explicit cold cable request");
     if (frame.cables && !validateCableFrame(*frame.cables, d)) return false;

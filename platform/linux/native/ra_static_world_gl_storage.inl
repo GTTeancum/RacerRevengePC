@@ -82,6 +82,14 @@
             raWorldFrame.resize(raWorld->vertices_.size());
             raWorldFrameImages.resize(raWorld->surfaceDrawPlan_.size());
         }catch(...){return fail(*diagnostic,VehicleWindowError50DS::allocation,"allocate complete RA frame streams");}
+        // The retained cold world owns immutable position/UV lanes. Crowd
+        // animation selects images; per-frame lighting/fog only updates the
+        // remaining lanes. Reinitialize these copies on every GPU creation.
+        for(std::size_t v=0;v<raWorldFrame.size();++v){
+            const auto& input=raWorld->vertices_[v];auto& output=raWorldFrame[v];
+            std::copy(input.worldPosition.begin(),input.worldPosition.end(),output.position);
+            std::copy(input.sourceUv.begin(),input.sourceUv.end(),output.uv);
+        }
         const std::uint64_t vb=raWorldFrame.size()*sizeof(RaWorldVertex),ib=raWorld->indices_.size()*sizeof(U);
         if(!vb||!ib||vb>std::uint64_t(std::numeric_limits<std::intptr_t>::max())||
            ib>std::uint64_t(std::numeric_limits<std::intptr_t>::max()))
@@ -374,29 +382,61 @@ void main(){
                     placement.positionScale,camera.source.end38,slope,fog)!=N::complete)
                     return fail(d,VehicleWindowError50DS::frame,"RA compressed source fog operands rejected");
             }
-            for(U v=0;v<plan.vertexCount;++v){
-                const auto& input=raWorld->vertices_[plan.vertexStart+v];auto& output=raWorldFrame[plan.vertexStart+v];
-                std::copy(input.worldPosition.begin(),input.worldPosition.end(),output.position);
-                std::copy(input.sourceUv.begin(),input.sourceUv.end(),output.uv);
-                std::array<std::uint8_t,4> color;
-                if(raster.requiresNativeStaticLighting){
-                    ra_static_lighting50LA::StaticDiffuseSurface identity;
-                    game::original_racer_lighting50KM::DiffuseVertexRgba diffuse;
-                    if(!request.raStaticWorld->readNativeStaticDiffuseVertex(plan.surface,v,identity,diffuse)||
-                       identity.cameraGeneration!=camera.generation||identity.cameraPublication!=camera.publication||identity.cameraFrame!=camera.frame)
-                        return fail(d,VehicleWindowError50DS::frame,"RA current source diffuse bytes unavailable");
-                    color=diffuse.rgba;
-                }else {if(!plan.hasOriginalColors)return fail(d,VehicleWindowError50DS::assets,"RA prelit source colors absent");color=input.sourceColor;}
-                for(U a=0;a<4;++a)output.color[a]=color[a];
-                std::uint8_t fogByte=ra_static_fog_numeric50LA::noComputeFogByte;
+            using DiffuseVertex=game::original_racer_lighting50KM::DiffuseVertexRgba;
+            bool visited=false,callbackSucceeded=false;
+            const auto prepareVertices=[&](const ra_static_lighting50LA::StaticDiffuseSurface* identity,
+                const std::vector<DiffuseVertex>* diffuse) noexcept {
+                visited=true;
+                if(diffuse&&(!identity||identity->cameraGeneration!=camera.generation||
+                   identity->cameraPublication!=camera.publication||identity->cameraFrame!=camera.frame||
+                   diffuse->size()<plan.vertexCount))
+                    return fail(d,VehicleWindowError50DS::frame,"RA current source diffuse bytes unavailable");
+                const auto prepareWithRawReader=[&](const auto& readRaw) noexcept {
+                    for(U v=0;v<plan.vertexCount;++v){
+                        const auto& input=raWorld->vertices_[plan.vertexStart+v];auto& output=raWorldFrame[plan.vertexStart+v];
+                        std::array<std::uint8_t,4> color;
+                        if(diffuse){
+                            color=(*diffuse)[v].rgba;
+                        }else {if(!plan.hasOriginalColors)return fail(d,VehicleWindowError50DS::assets,"RA prelit source colors absent");color=input.sourceColor;}
+                        for(U a=0;a<4;++a)output.color[a]=color[a];
+                        std::uint8_t fogByte=ra_static_fog_numeric50LA::noComputeFogByte;
+                        if(raster.fragmentDemands.sourceFogByte&&placement.computeFogCandidate02){
+                            std::array<std::int32_t,3> raw;
+                            if(!readRaw(v,raw)||
+                               ra_static_fog_numeric50LA::radialByte(fog,raw,fogByte)!=N::complete)
+                                return fail(d,VehicleWindowError50DS::frame,"RA original raw position/fog byte unavailable");
+                        }
+                        output.fog=fogByte;
+                    }
+                    return true;
+                };
                 if(raster.fragmentDemands.sourceFogByte&&placement.computeFogCandidate02){
-                    std::array<std::int32_t,3> raw;
-                    if(!request.raStaticWorld->readNativeStaticRawPosition(plan.surface,v,raw)||
-                       ra_static_fog_numeric50LA::radialByte(fog,raw,fogByte)!=N::complete)
-                        return fail(d,VehicleWindowError50DS::frame,"RA original raw position/fog byte unavailable");
+                    bool readVisited=false,readSucceeded=false;
+                    const bool prepared=request.raStaticWorld->visitNativeStaticRawPositionSurface(plan.surface,
+                        [&](const auto& readRaw) noexcept {
+                            readVisited=true;readSucceeded=prepareWithRawReader(readRaw);return readSucceeded;
+                        });
+                    if(!prepared){
+                        if(!readVisited||readSucceeded)
+                            return fail(d,VehicleWindowError50DS::frame,"RA original raw position/fog byte unavailable");
+                        return false;
+                    }
+                    return true;
                 }
-                output.fog=fogByte;
-            }
+                // The actual no-fog branch cannot invoke this reader.
+                return prepareWithRawReader([](std::size_t,std::array<std::int32_t,3>&) noexcept {return false;});
+            };
+            if(raster.requiresNativeStaticLighting){
+                const bool prepared=request.raStaticWorld->visitNativeStaticDiffuseSurface(plan.surface,
+                    [&](const auto& identity,const auto& diffuse) noexcept {
+                        callbackSucceeded=prepareVertices(&identity,&diffuse);
+                        return callbackSucceeded;
+                    });
+                if(!prepared){
+                    if(!visited||callbackSucceeded)return fail(d,VehicleWindowError50DS::frame,"RA current source diffuse bytes unavailable");
+                    return false;
+                }
+            }else if(!prepareVertices(nullptr,nullptr))return false;
         }
         if(!request.raStaticWorld->nativeStaticDrawPublication()||!raWorldCurrent(d))return fail(d,VehicleWindowError50DS::frame,"RA current frame has no complete source plan");
         raWorldFramePrepared=true;return true;

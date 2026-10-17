@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 8:13 p.m. EDT (2026-10-17 00:13 UTC).
+Updated: 2026-10-16 8:26 p.m. EDT (2026-10-17 00:26 UTC).
 
 ## Current direction
 
@@ -100,6 +100,46 @@ through synchronous drawing, instead of making a second Storage copy. A scope
 guard clears all pointers before the snapshots die, including failure exits.
 See [snapshot lifetime proof](recovery/racer-light-snapshot-borrow-20261017.md).
 
+RA world position/UV lanes are now copied once at renderer creation from the
+immutable retained geometry. Per-frame dynamic color/fog and all selected draw
+checks remain, and full GPU upload is unchanged. See
+[immutable lane rationale](recovery/ra-immutable-vertex-lanes-20261017.md).
+
+Repeated racer normal-length scans now reuse a completed validation receipt
+only inside callback-free CPU preflight. Batch/component pointers and counts
+must match; all other mesh/material checks remain. The later ready() scan still
+runs after external currentness callbacks. Receipts expire before drawing. See
+[normal validation scope](recovery/racer-normal-validation-receipt-20261017.md).
+
+The static diffuse preparation path now validates the complete material/publication
+set once per selected lit surface, then privately borrows its current color stream
+inside one synchronous callback. Previously that complete scan and surface search
+ran for every vertex. Before/after currentness and exact camera identity remain;
+raw-position preparation is scoped separately as described below. No cross-frame cache or public unchecked API
+was added. This is a potentially larger CPU-work reduction, still unmeasured.
+See [diffuse surface lifetime proof](recovery/ra-diffuse-surface-borrow-20261017.md).
+
+Fogged surfaces similarly resolve raw source geometry and validate camera/world
+currentness once around synchronous vertex preparation, instead of repeating deep
+owner lookup per vertex. Exact quantization recovery, roundtrip/ambiguity checks,
+output commit and radial fog arithmetic remain per vertex. The public observation
+API is unchanged; no-fog surfaces do not acquire this scope. See
+[raw-position scope proof](recovery/ra-raw-position-surface-scope-20261017.md).
+
+Racer component diffuse/specular-presence flags are now derived alongside cold
+material policy copies, avoiding repeated whole-bank OR scans during preflight.
+Live source masks, spans and provenance checks remain. See
+[cold material summary proof](recovery/racer-cold-material-summary-20261017.md).
+
+Inside the private diffuse validation scan, adjacent identical raster IDs now
+reuse only the preceding successful material check. Every changed ID is checked
+in original order, with no persistent cache. See
+[adjacent raster validation proof](recovery/ra-diffuse-raster-runs-20261017.md).
+
+After complete diffuse publication validation, the selected row lookup uses
+binary search over the strictly source-ordered generated rows, with an exact
+equality check. See [diffuse row ordering proof](recovery/ra-diffuse-row-lookup-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -114,10 +154,13 @@ See [snapshot lifetime proof](recovery/racer-light-snapshot-borrow-20261017.md).
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified untested-source publication: `3ddb155abe43a474c9b5ff8c0308b74e6bc2cf78`
-(tree `9363d39865f60e62f8eaf1fbe5fbc9f24cd3e6db`, parent `84779866`). It contains
-the racer state-call change and clarification that the successor may test.
-The current checkpoint additionally includes the other source-only changes above.
+Previous verified untested-source publication: `7de49979a64eb7071ec40c77c5282507879d01c5`
+(tree `6c324809addf4d7358e6414e60f781f1094369f7`, parent `3ddb155a`).
+It contains the initial group-state, clip-operand, uniform, clip-product, placement
+lookup and light-snapshot changes. Current source also includes the later
+immutable-lane, preflight normal, diffuse/raw-position and material-validation work.
+All are untested. A combined read-only source audit identified no concrete
+integration blocker; it does not establish compilation or runtime correctness.
 
 ## Known functional limits
 
@@ -127,6 +170,16 @@ Audible Pause remains gated on missing original audio receiver semantics.
 Aggregate cleanup now releases internal camera observer owners before checking
 for external runtime ownership, retaining external-borrow guards.
 Wreck collection work is held and not active gameplay evidence.
+
+## Pending investigation (not implemented in this checkpoint)
+
+- Split immutable position/UV and dynamic color/fog GPU streams to reduce full
+  RA uploads; requires consistent attribute bindings and diagnostics plus safe
+  partial-allocation cleanup. No code or speedup is claimed for this proposal.
+- Retain compressed-normal recovery within a single lighting publication to avoid
+  its second identical recovery pass. Dynamic light/color projection must remain
+  current; allocation/failure behavior needs review. A broader cross-publication
+  cold normal cache is held pending stronger lifecycle proof.
 
 ## Next steps for the next owner
 

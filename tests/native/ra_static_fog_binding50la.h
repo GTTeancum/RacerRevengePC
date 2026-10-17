@@ -87,19 +87,14 @@ class Binding final {
         // Match the importer's separate double product and sum.
         volatile double product=raw*q;return product+origin;
     }
-    bool rawPosition(std::size_t surface,std::size_t vertex,std::array<std::int32_t,3>& out)const noexcept {
-        CameraObservation camera;
-        if(!current(camera)||surface>=world_->surfaces_.size())return false;
-        const auto& span=world_->surfaces_[surface];
-        if(span.placement>=world_->placements_.size())return false;
-        const auto& placement=*world_->placements_[span.placement];const auto* scene=placement.payload->scene();
-        if(!scene||span.sourceLod>=scene->lods.size()||span.sourceSurface>=scene->lods[span.sourceLod].surfaces.size())return false;
-        const auto& input=scene->lods[span.sourceLod].surfaces[span.sourceSurface];
+    static bool recoverRawPosition(const rr::assets::Scene48D& scene,
+        const rr::assets::SceneSurface48D& input,std::size_t vertex,
+        std::array<std::int32_t,3>& out)noexcept {
         if(vertex>=input.vertices.size()||input.vertices[vertex].bone!=0)return false;
-        const double q=scene->quantization[0];if(!std::isfinite(q)||q<=0)return false;
+        const double q=scene.quantization[0];if(!std::isfinite(q)||q<=0)return false;
         std::array<std::int32_t,3> next{};
         for(unsigned a=0;a<3;++a){
-            const double value=input.vertices[vertex].position_local[a],origin=scene->quantization[4+a];
+            const double value=input.vertices[vertex].position_local[a],origin=scene.quantization[4+a];
             const double raw=(value-origin)/q;
             if(!std::isfinite(raw)||raw<-8388608.||raw>8388607.||std::trunc(raw)!=raw||decodedPosition(raw,q,origin)!=value)return false;
             // A round trip alone is insufficient when origin swallows quantized steps.
@@ -109,6 +104,33 @@ class Binding final {
             next[a]=static_cast<std::int32_t>(raw);
         }
         out=next;return true;
+    }
+    // Only the aggregate's synchronous renderer callback may use this reader;
+    // no source pointer/callable is retained beyond the selected surface.
+    template<class Visitor>
+    bool visitRawPositionSurface(std::size_t surface,Visitor&& visitor)const noexcept {
+        CameraObservation camera;
+        if(!current(camera)||surface>=world_->surfaces_.size())return false;
+        const auto& span=world_->surfaces_[surface];
+        if(span.placement>=world_->placements_.size())return false;
+        const auto& placement=*world_->placements_[span.placement];const auto* scene=placement.payload->scene();
+        if(!scene||span.sourceLod>=scene->lods.size()||span.sourceSurface>=scene->lods[span.sourceLod].surfaces.size())return false;
+        const auto& input=scene->lods[span.sourceLod].surfaces[span.sourceSurface];
+        const auto read=[&](std::size_t vertex,std::array<std::int32_t,3>& out) noexcept {
+            return recoverRawPosition(*scene,input,vertex,out);
+        };
+        if(!visitor(read))return false;
+        return current(camera);
+    }
+    bool rawPosition(std::size_t surface,std::size_t vertex,std::array<std::int32_t,3>& out)const noexcept {
+        CameraObservation camera;
+        if(!current(camera)||surface>=world_->surfaces_.size())return false;
+        const auto& span=world_->surfaces_[surface];
+        if(span.placement>=world_->placements_.size())return false;
+        const auto& placement=*world_->placements_[span.placement];const auto* scene=placement.payload->scene();
+        if(!scene||span.sourceLod>=scene->lods.size()||span.sourceSurface>=scene->lods[span.sourceLod].surfaces.size())return false;
+        const auto& input=scene->lods[span.sourceLod].surfaces[span.sourceSurface];
+        return recoverRawPosition(*scene,input,vertex,out);
     }
 };
 }

@@ -77,6 +77,18 @@ class Owner final : private ra_pod_scene50LA::Owner {
     friend class rr::platform::MaterialTextureGl50EB;
     friend class rr::platform::VehicleWindowGl50DS;
     friend class ra_cold_roster50LA::Operation;
+    // Private renderer borrow; no vector or publication capability escapes
+    // the actual synchronous selected-surface preparation callback.
+    template<class Visitor>
+    bool visitNativeStaticDiffuseSurface(std::size_t surface,Visitor&& visitor)const noexcept {
+        return !terminal_&&!closed_&&staticLighting_&&
+            staticLighting_->visitDiffuseSurface(surface,std::forward<Visitor>(visitor));
+    }
+    template<class Visitor>
+    bool visitNativeStaticRawPositionSurface(std::size_t surface,Visitor&& visitor)const noexcept {
+        return !terminal_&&!closed_&&staticFog_&&
+            staticFog_->visitRawPositionSurface(surface,std::forward<Visitor>(visitor));
+    }
     // One actual decoded source owner. All child borrows die before it. No
     // external source/registry injection or second source decode is possible.
     std::shared_ptr<ra_cold_sources50LA::Owner> source_;

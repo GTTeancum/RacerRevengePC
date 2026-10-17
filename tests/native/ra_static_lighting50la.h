@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include "ra_static_world50la.h"
 #include "ra_source_camera_ownership50la.h"
 #include "ra_static_diffuse_stream50la.h"
@@ -179,6 +180,29 @@ class Binding final {
             if(!current())return reject(StaticDiffuseStatus::stale);
             diffuseStream_=std::move(next);return true;
         }catch(...){return reject(StaticDiffuseStatus::allocation);}
+    }
+    // Renderer-only synchronous surface scope via the aggregate. The caller
+    // must not mutate or reenter publication/material owners during the visit.
+    template<class Visitor>
+    bool visitDiffuseSurface(std::size_t surface,Visitor&& visitor)const noexcept {
+        if(!current()||!diffuseStream_)return false;
+        // The scan is read-only and callback-free. Reuse only the immediately
+        // preceding successful raster check, never a result from another visit.
+        bool havePrevious=false;std::size_t previousRaster=0;
+        for(const auto& row:diffuseStream_->surfaces_){
+            const auto raster=row.identity.raster;
+            if(havePrevious&&raster==previousRaster)continue;
+            if(!diffuseRasterCurrent(raster)||
+               (world_->rasterInventory_[raster].passFlags&4u))return false;
+            previousRaster=raster;havePrevious=true;
+        }
+        // prepareDiffuseStream appends a filtered subset of the source plan's
+        // strictly increasing surface IDs; the published stream never reorders.
+        const auto found=std::lower_bound(diffuseStream_->surfaces_.begin(),diffuseStream_->surfaces_.end(),
+            surface,[](const auto& row,std::size_t id){return row.identity.surface<id;});
+        if(found==diffuseStream_->surfaces_.end()||found->identity.surface!=surface)return false;
+        if(!visitor(found->identity,found->vertices))return false;
+        return current();
     }
     bool readDiffuseVertex(std::size_t surface,std::size_t vertex,
         StaticDiffuseSurface& identity,numeric::DiffuseVertexRgba& rgba)const noexcept {
