@@ -1,0 +1,98 @@
+{
+  "source": "b4c303ec54d64de206b188aa06790518c2161baa",
+  "tree": "9afdc22f9906e86d4283607fd92000107dd7ce06",
+  "target": "Windows AMD64",
+  "toolchain": "Debian MinGW-w64 GCC14.2 POSIX, cross-compiled in Linux VM",
+  "status": "built-not-run-on-windows",
+  "startedUtc": "2026-10-17T04:34:17.762231+00:00",
+  "sourceCount": 358,
+  "flags": [
+    "-O2",
+    "-DNDEBUG",
+    "-DNOMINMAX",
+    "-DWIN32_LEAN_AND_MEAN",
+    "-fno-fast-math",
+    "-frounding-math",
+    "-ffp-contract=off",
+    "-Wa,-mbig-obj",
+    "-pthread",
+    "-I/workspace/shared/rr-validation-b4c303e/source/src/game",
+    "-I/workspace/shared/rr-validation-b4c303e/source/src/assets",
+    "-I/workspace/shared/rr-validation-b4c303e/source/third_party/native-json",
+    "-I/workspace/shared/rr-validation-b4c303e/source/third_party/native-zlib",
+    "-I/workspace/shared/rr-validation-b4c303e/source/platform/linux/native",
+    "-I/workspace/shared/rr-win-toolchain/SDL2-2.32.10/x86_64-w64-mingw32/include/SDL2"
+  ],
+  "manifestSha256": "5d6bfc08f6c243c5df6fff22c71eb3c04ecfe6e5280c3f18e14deded2b2a6251",
+  "failures": [],
+  "runtimeValidation": "NOT RUN ON WINDOWS; user-requested tester build",
+  "dependencies": "Vendored zlib; static libgcc/libstdc++/winpthread; official SDL2.dll dynamically loaded",
+  "linkExitCode": 0,
+  "executableSha256": "f3f2c0af3bfa8b0d945a6c7d9543723b7e825797c3e3640a08fc74f00c1cdb80",
+  "endedUtc": "2026-10-17T04:36:37.226399+00:00",
+  "staticPeInspection": {
+    "architecture": "AMD64 PE32+",
+    "stackReserveBytes": 8388608,
+    "exeImports": [
+      "KERNEL32.dll",
+      "msvcrt.dll"
+    ],
+    "sdlImports": [
+      "ADVAPI32.dll",
+      "GDI32.dll",
+      "IMM32.dll",
+      "KERNEL32.dll",
+      "msvcrt.dll",
+      "ole32.dll",
+      "OLEAUT32.dll",
+      "SETUPAPI.dll",
+      "SHELL32.dll",
+      "USER32.dll",
+      "VERSION.dll",
+      "WINMM.dll"
+    ],
+    "runtimeExecutionPerformed": false
+  },
+  "compilerWarnings": [
+    "GCC14 Wstringop-overflow diagnostic in original_ui_controls_model50kg.cpp; independent source review found bounded indices (1..64 within80, actual admitted asset2 nodes) and no demonstrated overflow. This is not Windows runtime validation. See compiler-warning.txt."
+  ],
+  "sdlSource": {
+    "url": "https://www.libsdl.org/release/SDL2-devel-2.32.10-mingw.tar.gz",
+    "archiveSha256": "83a5d74012311edc3c0d40ea6faecbe57ad692aa033fa5dc273cc937e3938ff2"
+  },
+  "deliveryParts": [
+    {
+      "bytes": 8301388,
+      "sha256": "85738848194a8058e50f669577ae21e2d436c453790cbedb9052b87ea50418ec",
+      "files": 125,
+      "fileName": "RacerRevengePC-Windows-b4c303e-Part1-of-5.zip"
+    },
+    {
+      "bytes": 8256074,
+      "sha256": "9aa62877c2c81c252a2506614ec7a7632651f320783e5d218b1b8a73a9f2f74a",
+      "files": 662,
+      "fileName": "RacerRevengePC-Windows-b4c303e-Part2-of-5.zip"
+    },
+    {
+      "bytes": 8172950,
+      "sha256": "cdd4a6264c1d3863136900e9011b40ee38abd9d4acc36f4bf3ebf8c59549e60f",
+      "files": 811,
+      "fileName": "RacerRevengePC-Windows-b4c303e-Part3-of-5.zip"
+    },
+    {
+      "bytes": 7431625,
+      "sha256": "643705aee53cfdfca7389716370c16c4a4ff17e66845461c0353045d2554b172",
+      "files": 651,
+      "fileName": "RacerRevengePC-Windows-b4c303e-Part4-of-5.zip"
+    },
+    {
+      "bytes": 1246569,
+      "sha256": "8c509ee3dba590fa4f23d7b49b26de4a270b22379e1e0be981723dfe53fdac83",
+      "files": 5,
+      "fileName": "RacerRevengePC-Windows-b4c303e-Part5-of-5.zip"
+    }
+  ],
+  "deliveryInstructions": "Extract all five independent ZIPs into the same original extracted asset folder beside SLUS_202.68. Original disc assets are not included. Back up SDL2.dll first.",
+  "sourcePublication": "073ef26f18854c806339aca736f22cebc22d6aa4 has identical game code plus post-Linux-test documentation.",
+  "scripts": "tools/windows-tester-b4c303e; reviewed as source only, never run on Windows."
+}

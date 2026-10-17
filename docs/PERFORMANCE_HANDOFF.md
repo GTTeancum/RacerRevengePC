@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 12:28 a.m. EDT (2026-10-17 04:28 UTC).
+Updated: 2026-10-17 12:44 a.m. EDT (2026-10-17 04:44 UTC).
 
 ## Current direction
 
@@ -43,6 +43,34 @@ this limited smoke now covers changes through the pass-constant HUD setup.
 Any subsequent source changes require their own validation. Routine testing
 restrictions remain specific to the outgoing session; the successor may validate.
 See [full result](recovery/performance-one-off-b4c303e-20261017.json).
+
+### Windows tester delivered, 2026-10-17 04:43 UTC
+
+The user requested a Windows build to test on their own PC. Root cross-compiled
+all352 Windows manifest C++ sources and six vendored zlib C files from the exact
+b4c303e source with Debian MinGW-w64 GCC14.2, strict floating-point flags and an
+8MiB stack. Linking succeeded at04:36:37 UTC. This is **BUILT, NOT RUN ON WINDOWS**;
+no visible Windows smoke, Windows FPS or runtime compatibility pass is claimed.
+No user-PC access occurred. Static PE inspection found AMD64 PE32+ and only
+Windows system DLL imports; GCC runtimes are static. Official SDL2 2.32.10 is
+bundled, without Mesa or a forced software renderer.
+
+The tester was delivered privately as five independent ZIPs, all extracted into
+the same original game asset folder beside SLUS_202.68. BIN/CUE alone is not
+supported: original files/directories must already be extracted. Matching
+runtime and Rider/sky/crowd caches are included; original disc assets are not.
+The versioned EXE avoids replacing the old native EXE, but SDL2.dll should be
+backed up before extraction. Launchers preserve ALL8 original AI and include a
+separate bounded Ryloth FPS route. Use ordinary writable local-drive paths;
+UNC paths and percent-bearing batch paths are not supported by these wrappers.
+
+See [build/delivery receipt](recovery/windows-crossbuild-b4c303e-20261017.json)
+and [tester instructions](../tools/windows-tester-b4c303e/README-FIRST.txt).
+A GCC14 object-size warning in Controls graph preparation remains disclosed;
+independent source review found checked indices within the allocated array, but
+this is not runtime proof. The successor may validate this cross-toolchain build
+or use the existing supported MSVC entry. The chat attachment limit required
+five ZIPs; they are not multi-volume archives and must all be extracted together.
 
 ### Historical smoother Windows results
 
