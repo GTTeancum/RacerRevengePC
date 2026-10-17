@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 11:26 p.m. EDT (2026-10-17 03:26 UTC).
+Updated: 2026-10-16 11:35 p.m. EDT (2026-10-17 03:35 UTC).
 
 ## Current direction
 
@@ -341,8 +341,8 @@ See [racer copy proof](recovery/racer-coverage-copy-image-20261017.md) and
 Previous verified publication: `86743c2f1102891590f461efb84c3ace690492c8`
 (tree `fac7376491acc7bead51b50784c61f8442152caa`, parent `97139ec1`).
 It contains both image-copy paths, exact tested source from the latest one-off,
-and result documentation. This checkpoint adds documentation only; game code is
-unchanged. Earlier UNTESTED labels describe their
+and result documentation. The subsequent 9aa6a5b6 checkpoint added documentation
+only. The pending selector change below modifies game code. Earlier UNTESTED labels describe their
 source-review state; the limited latest smoke coverage is stated above. Changes after the latest tested4f82775 source remain untested. Source review does not establish compilation or
 runtime correctness.
 
@@ -379,3 +379,34 @@ matched verified remote 71aa1b21. Unreviewed local drafts remain excluded.
    smoke before claiming correctness or performance improvement.
    Any future Windows validation must be visible from the original asset folder,
    native exe beside SLUS, with menu/rider/course/track screenshots and baseline FPS.
+
+## Pending source-only checkpoint after 9aa6a5b6
+
+Latest independently verified publication: [9aa6a5b6](https://github.com/GTTeancum/RacerRevengePC/commit/9aa6a5b6929e4435aacffce2c324be08a0d6d1ee), a documentation-only checkpoint.
+
+New source is **UNTESTED**: successful racer coverage cleanup reuses its already
+selected texture unit2, retaining explicit selection on every rejection. The
+snapshot unbind, remaining restoration and error checks are unchanged. Two
+source reviews accepted the guard. See [proof](recovery/coverage-tail-texture-selector-20261017.md).
+One API call is removed per successful bridge; no measured gain is claimed.
+The latest 0.8035408549754633 FPS result predates this source change.
+
+Map-2 alpha-invariance research also remains held: opaque materials do not prove
+constant alpha, equal-depth base provenance matters, and the current payload
+cannot accumulate overlapping fragments. See [findings](recovery/map2-invariant-alpha-held-20261017.md).
+
+A second **UNTESTED** source change reuses the RA private raster/scene FBO draw
+selectors initialized and checked at extent creation. It removes only three
+per-primitive reassertion sites; snapshot fallback and final cleanup selectors
+remain. See [proof](recovery/ra-coverage-fbo-selector-reuse-20261017.md).
+No new build, smoke or FPS measurement was run.
+
+The RA blended-AA0 path also reuses composition mode1 after the first checked
+primitive of each selected draw. New draws and clipped-leading cases retain
+initialization, and failures stop before reuse. This is **UNTESTED**; see
+[mode proof](recovery/ra-composition-mode-reuse-20261017.md).
+
+Direct RA blended-AA1 draws now retain their program after the first checked
+primitive within a selected draw. Program0/AA0 bindings remain unconditional,
+and new selected draws still bind before uniform writes. This is **UNTESTED**;
+see [program proof](recovery/ra-aa1-program-reuse-20261017.md).

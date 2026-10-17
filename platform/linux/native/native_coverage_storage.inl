@@ -290,7 +290,8 @@ void main(){
         }
         // Restore even on rejection. The caller still owns group/span accounting
         // and aborts before publication. No sampled texture remains attached.
-        gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
+        // Successful composition leaves unit2 selected; rejection restores explicitly.
+        if(!accepted)gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
         gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);
         gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,image);
         // Successful composition already checked the exact scene binding.

@@ -481,9 +481,11 @@ void main(){
         bool uploadUniforms) noexcept {
         using F=assets::OriginalUiGsField50KG;
         const auto field=[&](F f){return raster.finalContext.fields[static_cast<std::size_t>(f)].value;};
-        const auto& u=raWorldUniform[program];gl.useProgram(raWorldProgram[program]);
-        // AA0 composition switches programs, so retain the bind on every
-        // primitive. The selected draw's material/camera uniforms do not vary.
+        const auto& u=raWorldUniform[program];
+        // Program1 is used only by direct AA1 blended draws: later checked
+        // primitives retain it. Program0 still binds for every AA0 payload.
+        if(uploadUniforms || program==0)gl.useProgram(raWorldProgram[program]);
+        // The selected draw's material/camera uniforms do not vary.
         if(!uploadUniforms)return;
         gl.uniformMatrix4fv(u.matrix,1,0,matrix);
         gl.uniformMatrix4fv(u.sourceMatrix,1,0,raWorldSourceMatrix);gl.uniform1i(u.image,0);
@@ -873,20 +875,21 @@ void main(){
                     // AA0 uses one center payload followed by per-sample
                     // composition, matching the established racer bridge.
                     gl.bindFramebuffer(framebuffer,coverageLive.raster);
-                    const U outputs[]={colorAttachment,colorAttachment+1};gl.drawBuffers(2,outputs);
+                    // Private raster FBO retains both checked attachment selectors.
                     coverageAa0();gl.disable(0x0B71);gl.depthMask(0);
                     const float invalid[]={0,0,0,-1};gl.clearBufferfv(0x1800,0,invalid);
                     bindRaWorldMaterial(raster,0,true,firstPrimitive);
                     drawGl.drawElementsBaseVertex(0x0004,3,0x1405,reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
-                    gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.drawBuffer(colorAttachment);
+                    gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
                     gl.enable(0x809D);gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(1);
                     gl.useProgram(coverageProgram);drawGl.bindVertexArray(coverageArray);
                     gl.activeTexture(textureUnit0);gl.bindTexture(texture2D,coverageLive.payload);
                     gl.activeTexture(textureUnit0+1);if(gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
                     gl.activeTexture(textureUnit0+2);if(gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
-                    gl.uniform1i(coverageRaCompositionUniform,1);gl.drawArrays(0x0004,0,3);
+                    // Later primitives retain mode1 from this selected draw's checked first bridge.
+                    if(firstPrimitive)gl.uniform1i(coverageRaCompositionUniform,1);gl.drawArrays(0x0004,0,3);
                 }else {
-                    gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.drawBuffer(colorAttachment);
+                    gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
                     bindTrackCoverage(aa?NativeTrackCoverage50DS::fourSampleAa1:NativeTrackCoverage50DS::aa0);
                     gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(1);
                     bindRaWorldMaterial(raster,blend?1:0,false,firstPrimitive);
