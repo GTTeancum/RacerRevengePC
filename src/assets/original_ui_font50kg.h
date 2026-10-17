@@ -41,6 +41,11 @@ public:
     const OriginalUiGlyph50KG* glyph(std::uint8_t ascii) const noexcept {
         return decoded_ && present_[ascii] ? &glyphs_[ascii] : nullptr;
     }
+    // Lowest present ASCII slot, independent of CEL record order.
+    const OriginalUiGlyph50KG* firstGlyph() const noexcept {
+        return decoded_ && firstPresent_ < originalUiFontGlyphCapacity50KG ?
+            &glyphs_[firstPresent_] : nullptr;
+    }
 private:
     friend bool decodeOriginalUiCel50KG(const std::uint8_t*, std::size_t,
         OriginalUiFont50KG&, OriginalUiCelDiagnostic50KG&) noexcept;
@@ -48,6 +53,7 @@ private:
     std::array<bool, originalUiFontGlyphCapacity50KG> present_{};
     std::uint16_t glyphCount_ = 0, metricCount_ = 0;
     bool decoded_ = false, hasMetricSection_ = false;
+    std::uint16_t firstPresent_ = originalUiFontGlyphCapacity50KG;
 };
 
 // Source: original font load 0x2817D0..0x281F84. Little-endian u32 count,

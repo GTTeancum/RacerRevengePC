@@ -28,9 +28,9 @@ bool layoutOriginalUiText50KG(const OriginalUiTextInput50KG& input,
         atlas.height > assets::max_texture_dimension ||
         atlas.rgba.size() != std::size_t(atlas.width) * atlas.height * 4u)
         return fail(diagnostic, OriginalUiTextError50KG::atlasShape, 0x2E0A88u);
-    OriginalUiTextLayout50KG next;
-    if (!layoutOriginalUiTextDimensions50LA(input,atlas.width,atlas.height,next,diagnostic))return false;
-    next.atlas=input.atlas;output=next;return true;
+    // Dimensions publishes output only after every layout check succeeds.
+    if (!layoutOriginalUiTextDimensions50LA(input,atlas.width,atlas.height,output,diagnostic))return false;
+    output.atlas=input.atlas;return true;
 }
 
 bool layoutOriginalUiTextDimensions50LA(const OriginalUiTextInput50KG& input,
@@ -57,15 +57,11 @@ bool layoutOriginalUiTextDimensions50LA(const OriginalUiTextInput50KG& input,
     OriginalUiTextLayout50KG next;
     next.atlas = nullptr; // CPU dimensions are not a decoded-image receipt.
     next.endLocalX = input.localX;
-    for (std::size_t ascii = 0; ascii < assets::originalUiFontGlyphCapacity50KG; ++ascii) {
-        const auto* glyph = input.font->glyph(static_cast<std::uint8_t>(ascii));
-        if (glyph) {
-            const float uvHeight = glyph->bottom - glyph->top;
-            next.fontLineHeight = height * uvHeight;
-            if (!std::isfinite(next.fontLineHeight))
-                return fail(diagnostic, OriginalUiTextError50KG::arithmetic, 0x2817A8u);
-            break;
-        }
+    if (const auto* glyph = input.font->firstGlyph()) {
+        const float uvHeight = glyph->bottom - glyph->top;
+        next.fontLineHeight = height * uvHeight;
+        if (!std::isfinite(next.fontLineHeight))
+            return fail(diagnostic, OriginalUiTextError50KG::arithmetic, 0x2817A8u);
     }
     bool pixelMode = false;
     float measured = 0;

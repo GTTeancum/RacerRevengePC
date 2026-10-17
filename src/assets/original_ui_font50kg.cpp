@@ -68,6 +68,8 @@ bool decodeOriginalUiCel50KG(const std::uint8_t* bytes, std::size_t size,
             return fail(diagnostic, OriginalUiCelError50KG::reversedUv,
                         offset + 4, record, static_cast<std::int32_t>(ascii));
         next.present_[ascii] = true;
+        if (ascii < next.firstPresent_)
+            next.firstPresent_ = static_cast<std::uint16_t>(ascii);
     }
     next.glyphCount_ = static_cast<std::uint16_t>(count);
     if (offset != size) {

@@ -56,10 +56,11 @@ private:
         const auto validatePass=[&](const ColdFamily& sourceFamily,
             const a::OriginalStandardMaterialObject50LA* material,
             a::OriginalStandardMaterialPassView50LA& view){
-            const auto retained=psms_.find(normalized(sourceFamily.materialMember));
+            const auto memberName=normalized(sourceFamily.materialMember);
+            const auto retained=psms_.find(memberName);
             if(retained==psms_.end()||!retained->second||!retained->second->originalBytes()||
                !material->source()||!material->source()->member()||
-               normalized(*material->source()->member())!=normalized(sourceFamily.materialMember)||
+               normalized(*material->source()->member())!=memberName||
                !material->source()->originalBytes()||
                *material->source()->originalBytes()!=*retained->second->originalBytes()||
                !material->passCount48()||*material->passCount48()!=1||!material->pass4C(0,view)||

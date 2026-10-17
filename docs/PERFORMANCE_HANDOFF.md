@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 6:58 a.m. EDT (2026-10-17 10:58 UTC).
+Updated: 2026-10-17 7:12 a.m. EDT (2026-10-17 11:12 UTC).
 
 ## Current direction
 
@@ -144,14 +144,48 @@ The source producer emits multiple model rows per zone with a shared tuple.
 Incidence and net timing are unmeasured. See
 `docs/recovery/ra-adjacent-scissor-reuse-20261017.md`. This source is UNTESTED.
 
+## New untested source change: reuse normalized crowd member name
+
+`tests/native/ra_static_world_profiles50la.inl` now normalizes the retained
+source-family material name once within each pass validator and reuses that
+owned string for lookup and comparison. Normalization of the actual material
+source, both pass validations and all provenance/currentness checks remain.
+The reached crowd profile decoder invokes this validator twice. This removes
+two duplicate string copies/scans per successful decode. The model-surface proof
+also reuses its normalized material key after an explicit unchanged null-family
+rejection, removing one duplicate normalization per successful proof. No measured
+gain is claimed.
+See `docs/recovery/ra-profile-member-normalization-20261017.md`. UNTESTED.
+
+## New untested source change: eliminate redundant HUD text wrapper layout
+
+`src/game/original_ui_text50kg.cpp` passes caller output directly into the
+already-transactional dimensions layout helper, then attaches the admitted atlas
+pointer on success. This removes the wrapper’s extra 255-quad temporary and full
+layout copy while preserving every validation, glyph operation and failure path.
+Unused quad members still come from the helper’s initialized local layout.
+Two independent design reviews accepted it; no padding-byte or timing guarantee
+is claimed. See `docs/recovery/hud-text-wrapper-copy-20261017.md`. UNTESTED.
+
+## New untested source change: decoded-font first-glyph index
+
+`OriginalUiFont50KG` retains the lowest present ASCII index during its existing
+transactional CEL decode. Text layout uses that index instead of scanning sparse
+slots for line height. The original subtraction, multiply and finite check still
+execute on every layout; empty fonts retain the same sentinel. Copies carry an
+index with their own arrays, not a borrowed pointer. No CEL format changes.
+
+Repository source inspection found no raw object-layout/serialization dependency;
+a full native rebuild is required and no external binary ABI is promised. This
+is UNTESTED. See `docs/recovery/hud-first-glyph-index-20261017.md`.
+
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[8ef877d](https://github.com/GTTeancum/RacerRevengePC/commit/8ef877db1464802220b202c38280143e32ba628e).
-The current source changes are **UNTESTED**: in-place RA fog observations,
+[f66c8a9](https://github.com/GTTeancum/RacerRevengePC/commit/f66c8a914d9c56bb9c61b0424fc49260a988472e).
+The new normalized-member reuse, HUD wrapper-copy removal, decoded-font index and preceding source changes are **UNTESTED**: in-place RA fog observations,
 bounded draw-list capacity hint, per-surface diffuse input admission reuse, and
-adjacent scissor reuse invalidated at potential allocation boundaries. The four
-sections above document their proofs and limitations. The earlier fog reserve
+adjacent scissor reuse invalidated at potential allocation boundaries. The sections above document their proofs and limitations. The earlier fog reserve
 change remains untested as well.
 
 The delivered Windows executable is still b4c303e and contains none of these

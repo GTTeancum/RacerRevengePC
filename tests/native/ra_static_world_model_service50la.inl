@@ -29,7 +29,9 @@
         for(const auto& candidate:imageFamilies_)if(candidate.materialRow==*token){
             if(family)return reject(d,"ambiguous actual crowd family");family=&candidate;
         }
-        if(!family||normalized(family->materialMember)!="textures/crowd.psm"||
+        if(!family)return reject(d,"retained crowd family/six-set missing");
+        const auto materialMember=normalized(family->materialMember);
+        if(materialMember!="textures/crowd.psm"||
            normalized(family->sourceMember)!="textures/crowd.atm"||!family->animatedCurrentMapPending||
            family->imageCount!=6||family->firstImage>coldImages_.size()||
            family->imageCount>coldImages_.size()-family->firstImage||!crowdImages_||crowdImages_->count()!=6)
@@ -40,7 +42,7 @@
             return reject(d,"actual unique crowd collector changed");
         const auto* material=leaf.material;a::OriginalStandardMaterialPassView50LA pass;
         if(!material||!material->source()||!material->source()->originalBytes()||
-           *material->source()->originalBytes()!=*psms_.at(normalized(family->materialMember))->originalBytes()||
+           *material->source()->originalBytes()!=*psms_.at(materialMember)->originalBytes()||
            !material->passCount48()||*material->passCount48()!=1||!material->pass4C(0,pass)||
            !pass.mapCount20||*pass.mapCount20!=1||!pass.texture1A||(*pass.texture1A)[0]!=family->textureToken||
            !pass.textureAnimation10||!pass.textureAnimation10->unique18()||pass.animation10||
