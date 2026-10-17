@@ -504,8 +504,9 @@ void main(){
                 region[0],region[1],0,coverageLive.snapshotColor,coverageTexture,0,
                 region[0],region[1],0,region[2]-region[0],region[3]-region[1],1);
         }else{
-            gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);gl.readBuffer(colorAttachment);
-            gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);gl.drawBuffer(colorAttachment);
+            // Extent creation checked these private FBO selectors; binds retain them.
+            gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);
+            gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);
             gl.blitFramebuffer(region[0],region[1],region[2],region[3],
                 region[0],region[1],region[2],region[3],colorBufferBit,0x2600);
         }

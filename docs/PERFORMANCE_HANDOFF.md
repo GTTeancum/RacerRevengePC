@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 11:35 p.m. EDT (2026-10-17 03:35 UTC).
+Updated: 2026-10-16 11:51 p.m. EDT (2026-10-17 03:51 UTC).
 
 ## Current direction
 
@@ -18,6 +18,22 @@ Use the VM only, not the user's PC. Preserve remote history, never force-push,
 and independently verify the resulting remote commit, tree and parent. Git
 publication is explicitly authorized, including untested source checkpoints.
 Continue independent coding if publication is blocked, and report exact blockers.
+
+## Current checkpoint summary
+
+Latest independently verified main before this checkpoint is
+[d6651457](https://github.com/GTTeancum/RacerRevengePC/commit/d6651457efa7b8814151b0ca5fc936f9879d99e8),
+tree `37fb609d8bbb99764d7df34c8cab4d9d44436aca`.
+This checkpoint adds three **UNTESTED** changes: retained RA snapshot-fallback
+selectors, in-place private RA lighting Snapshot construction, and adjacent
+same-material original HUD state reuse. Exact source-only reviews accompany
+the proof documents below. No build, smoke or FPS measurement was run for them.
+
+Last executed source remains `4f82775`, tree
+`ed51765d87b357345095efd8f5c7494c3555e62e`, with Linux llvmpipe
+**0.8035408549754633 FPS** at 03:17 UTC. That result does not validate subsequent
+changes. The sections below retain historical publication and review context;
+use this section and the containing commit for current checkpoint identity.
 
 ## Checkpoint and evidence
 
@@ -410,3 +426,25 @@ Direct RA blended-AA1 draws now retain their program after the first checked
 primitive within a selected draw. Program0/AA0 bindings remain unconditional,
 and new selected draws still bind before uniform writes. This is **UNTESTED**;
 see [program proof](recovery/ra-aa1-program-reuse-20261017.md).
+
+## Checkpoint after d6651457
+
+Latest independently verified publication: [d6651457](https://github.com/GTTeancum/RacerRevengePC/commit/d6651457efa7b8814151b0ca5fc936f9879d99e8),
+tree37fb609d8bbb99764d7df34c8cab4d9d44436aca, parent9aa6a5b6. It contains the
+four untested state-reuse changes above, with exact source-only review.
+
+The new **UNTESTED** change removes two redundant private-FBO selector writes
+from the RA snapshot blit fallback. Bindings, blit, error check and final
+restoration remain; CopyImage is unchanged. See [proof](recovery/ra-snapshot-selector-reuse-20261017.md).
+No new test ran and no FPS improvement has been measured.
+
+RA lighting preparation now constructs each private Snapshot in its reserved
+vector rather than copying a completed stack row. Publication remains gated on
+full preparation success; all arithmetic and validation retain their order.
+This source-level copy removal is **UNTESTED**, with no measured allocation or
+FPS benefit. See [proof](recovery/ra-lighting-snapshot-in-place-20261017.md).
+
+Original HUD packets now reuse depth-mask, blend-uniform and texture setup only
+when adjacent material IDs match. Packet/triangle order, texture barriers and
+all error gates remain. Clear and bright gleam IDs remain distinct. This is
+**UNTESTED**; see [proof](recovery/hud-adjacent-material-state-20261017.md).

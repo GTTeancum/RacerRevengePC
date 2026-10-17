@@ -81,7 +81,9 @@ class Binding final {
             const auto* scene=placement.payload?placement.payload->scene():nullptr;
             if(!scene||plan.worldInstance!=placement.worldInstance||!placement.zone||
                plan.sourceLod>=scene->lods.size()||plan.sourceSurface>=scene->lods[plan.sourceLod].surfaces.size())return false;
-            Snapshot row;row.surface=plan.surface;row.placement=plan.placement;
+            // This fresh binding is unpublished until every row validates.
+            snapshots_.emplace_back();auto& row=snapshots_.back();
+            row.surface=plan.surface;row.placement=plan.placement;
             row.worldInstance=placement.worldInstance;row.authoredZone=placement.zone;
             row.authoredUseLighting=placement.sourceUseLighting;
             row.cameraGeneration=camera_.identity.generation;
@@ -108,7 +110,7 @@ class Binding final {
                 if(!light::recoverCompressedNormal(vertex.normal_local,normalQ,normal))return false;
                 recoveredNormals_.push_back(normal);
             }
-            snapshots_.push_back(row);recoveredNormalSurfaces_.push_back(recovered);
+            recoveredNormalSurfaces_.push_back(recovered);
         }
         return snapshots_.size()==world_->drawRequirements_.staticLightingSurfaces&&
             recoveredNormals_.size()==world_->drawRequirements_.staticLightingVertices&&current();

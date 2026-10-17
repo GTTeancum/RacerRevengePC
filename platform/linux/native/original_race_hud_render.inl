@@ -263,8 +263,11 @@ bool drawRaceHud(U bank) noexcept {
         // Original clear's failed alpha test keeps framebuffer writes while
         // suppressing depth writes. Its exact zero RGBA leaves RGB untouched
         // and replaces source A with zero through the ordinary source equation.
-        gl.depthMask(packet.material==6?0:1);gl.uniform1i(uiSourceBlendUniform,packet.material==5?3:1);
-        gl.bindTexture(texture2D,h.textures.texture(image[packet.material]));
+        // Adjacent packets of one leaf retain the preceding checked material state.
+        if(p==0 || packet.material!=h.packets[p-1].material){
+            gl.depthMask(packet.material==6?0:1);gl.uniform1i(uiSourceBlendUniform,packet.material==5?3:1);
+            gl.bindTexture(texture2D,h.textures.texture(image[packet.material]));
+        }
         if(uiSourceCoherentFramebufferFetch){
             drawGl.drawElementsBaseVertex(0x0004,I(packet.count*6),0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(packet.first)*6*sizeof(U)),0);
