@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 1:30 a.m. EDT (2026-10-17 05:30 UTC).
+Updated: 2026-10-17 2:06 a.m. EDT (2026-10-17 06:06 UTC).
 
 ## Current direction
 
@@ -28,7 +28,7 @@ route's stdout.log/stderr.log and asked which course/launcher was used.
 All feature work is stopped pending diagnosis. Do not treat the cross-build as a
 Windows runtime pass. The Linux b4c303e Mawhonic/Ryloth smoke did reach gameplay.
 
-A concrete package coverage gap was found: the delivered generated runtime has
+A concrete package coverage gap was found: the initial five-ZIP generated runtime has
 TA visual49G/sky50GW and native RA sky/crowd resources, but lacks visualGA/GC/MA/SA
 and corresponding sky directories. Those non-RA course loaders require their
 hash-pinned selection/export JSON, matching world mesh, referenced cacheobjects
@@ -38,22 +38,23 @@ specific report and does not explain an alleged TA or RA failure by itself.
 
 The PE stack reserve was verified as 8MiB. Excluded .su files were inspected and
 are GCC stack-usage reports under verification directories, not runtime surface
-assets. The delivered package remains unchanged; the user canceled a separate
-trimming effort. No additional test has been run after the last requested smoke.
+assets. The user canceled a separate trimming effort, then later explicitly
+requested the expanded data package described below. The EXE remains unchanged. No additional test has been run after the last requested smoke.
 The fog in-place construction proposal is unimplemented. The already-published
 fog reserve change predates the crash report and is not in the delivered EXE.
 
 ### Recovered Sullust runtime candidate
 
 The existing `Sullust-authenticated-runtime-20261013.tar.gz` archive was recovered
-from the user’s Library. This is a recovery candidate only; it has not been added
-to the delivered Windows package or exercised in a new smoke.
+from the user’s Library. This is a recovery candidate. At the user’s request, it was added to an expanded six-ZIP
+Windows package delivered at 06:05 UTC. It has not been exercised in a new smoke.
 
 Read-only archive byte inspection found:
 - Both selection and export metadata SHA256 values exactly match the shipped SA profile.
 - All 2,355 `selection.objects` members are present and match their declared byte lengths and SHA256 values.
 - The 7,560,628-byte world mesh matches the authenticated export report hash.
 - All 48 complete sky tile files match the compiled `sky_sa_index.inc` hashes.
+- All 25 ATM frames and 11 dynamic textures match `sa_atm_frame_index.inc` and `source_texture_sa_index.inc`; these additional roots are mandatory.
 
 Selection SHA256: `7d6b9e99b00dd4854edf76499c4934ce79a4efc8f7ced57240cea3085925f8cc`.
 Export SHA256: `f2352dd81f394554da3d61c992cff605f24de3fb437ec422f3987c5e68968275`.
@@ -62,9 +63,30 @@ Mesh SHA256: `0306a315e460235f73180a2f344112a03d051705ed56f65ecde24cba9ddcf6c2`.
 Next owner: obtain the selected course/launcher and console error first. If it
 identifies missing SA runtime, this archive supplies an authenticated recovery
 candidate without changing source admission pins. Validate the repaired route
-before calling it fixed. GA/GC/MA generated data remains missing from the delivered
+before calling it fixed. GA/GC/MA generated data remains missing from the expanded
 bundle. Do not infer that SA is the user’s failing course. No new build, gameplay,
 FPS measurement or smoke was run for this inspection.
+
+### Expanded Windows data package delivered
+
+The user requested all needed data and a list of candidate tracks. A replacement
+six-ZIP set contains the unchanged b4c303e EXE, SDL2, launchers and all prior
+prepared data plus the full authenticated SA archive, including visualSA, skySA,
+atmSA and texturesSA. All six ZIPs must be merged into the same extracted original
+asset directory beside SLUS_202.68. Original disc files remain user-supplied.
+This supersedes the earlier five-ZIP delivery; it does not replace source code.
+
+Candidate routes communicated: Brightlands/RA through Run-Ryloth-FPS.cmd (last
+Linux smoke reached gameplay), first Tatooine/TA course through original menus,
+and Soro Suub Facility/SA when available. GA/GC/MA and other unsupported courses
+should be avoided. No crash-free Windows guarantee, new smoke, or FPS gain was
+claimed. The reported failing course/error is still unknown.
+
+Package archive paths, sizes and SHA256s are recorded in
+`docs/recovery/windows-expanded-track-data-20261017.json`. Archive readback
+confirmed packaged bytes matched their inputs. This was file integrity inspection,
+not an execution-based game test. Shared original roster geometry and effects are
+included from the prior package; the UI rider cache alone is not sufficient.
 
 ## Current checkpoint summary
 

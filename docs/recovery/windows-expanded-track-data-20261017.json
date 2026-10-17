@@ -1,0 +1,56 @@
+{
+  "source": "b4c303ec54d64de206b188aa06790518c2161baa",
+  "deliveredUtc": "2026-10-17T06:05:51Z",
+  "newGameTest": false,
+  "exeChanged": false,
+  "addedRuntimeRoots": [
+    "visualSA",
+    "skySA",
+    "atmSA",
+    "texturesSA"
+  ],
+  "parts": [
+    {
+      "files": 120,
+      "bytes": 8334098,
+      "sha256": "9f6426a0bba27892e8d49d96acf902e192f7ed3e507e785da87c2aaeb1d2ebcb",
+      "filename": "RacerRevenge-Windows-TrackData-Part1-of-6.zip",
+      "libraryFileId": "libfile_b7aa9e5706388191ba89b7f97726d17f"
+    },
+    {
+      "files": 679,
+      "bytes": 8295940,
+      "sha256": "400bbe48087d4445bb6e0d521be138f14ad470f611cd7d3dbd116739b20c18b1",
+      "filename": "RacerRevenge-Windows-TrackData-Part2-of-6.zip",
+      "libraryFileId": "libfile_dccbc19403bc819198eff50d3bbdf105"
+    },
+    {
+      "files": 782,
+      "bytes": 8281853,
+      "sha256": "c25e578e2b7a1ad3d06d1f7344f7a670a3f2bb8541fb0357aba8fcaa92cc0393",
+      "filename": "RacerRevenge-Windows-TrackData-Part3-of-6.zip",
+      "libraryFileId": "libfile_c4a10100a69c819198a6cc398c7f158e"
+    },
+    {
+      "files": 755,
+      "bytes": 8041348,
+      "sha256": "929f935d3bf984bdf9d58dd208b6b0868869d4b7711d5c2caaee685d66dbb73f",
+      "filename": "RacerRevenge-Windows-TrackData-Part4-of-6.zip",
+      "libraryFileId": "libfile_95f876aa815c8191a6bafcf05101592a"
+    },
+    {
+      "files": 1833,
+      "bytes": 8083960,
+      "sha256": "85c83e68660f82c699af0cbb0054b9260da9c8bf1d0e3bb57bb294823b70ad98",
+      "filename": "RacerRevenge-Windows-TrackData-Part5-of-6.zip",
+      "libraryFileId": "libfile_ea72e21efa4c8191a40f6f1297904192"
+    },
+    {
+      "files": 532,
+      "bytes": 5310729,
+      "sha256": "217a005deea43ee03ef265df55b8e803079ebf73b0f7781a3c947d1e67da325d",
+      "filename": "RacerRevenge-Windows-TrackData-Part6-of-6.zip",
+      "libraryFileId": "libfile_06b61f2891b881919edd9b30fc88a20b"
+    }
+  ]
+}
