@@ -217,15 +217,15 @@ void main(){
         return initialized&&restored;
     }
     bool drawCoveragePairTriangle(U bank,U first,U image,const std::array<I,4>& region,U sourceArray,U triangleCount,
-        bool firstRun) noexcept {
+        bool firstRun,bool firstCoverageSetup) noexcept {
         // A proven empty native clip region cannot touch any destination
         // sample. Preserve source group order/accounting without GPU work.
         if(region[2]<=region[0]||region[3]<=region[1])return true;
-        // The sole caller owns one synchronous MSCNT group. These five
-        // sample-policy bits, sRGB/blend, viewport and color mask never change
-        // inside a bridge or its tail. Establish them at the first nonempty
-        // run, without carrying a state cache across groups or callbacks.
-        if(firstRun){coverageAa0();gl.disable(0x8DB9);gl.disable(0x0BE2);}
+        // The sole caller owns one synchronous source-pair span. These five
+        // sample-policy bits, sRGB/blend, viewport and color mask do not change
+        // between its groups. Establish them at the first nonempty bridge,
+        // without carrying state across spans or callbacks.
+        if(firstCoverageSetup){coverageAa0();gl.disable(0x8DB9);gl.disable(0x0BE2);}
         // Later runs inherit disabled MULTISAMPLE from the checked tail.
         if(request.raStaticWorld){
             gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
@@ -235,7 +235,7 @@ void main(){
         // raster draws to attachments0/1; scene/snapshot draw/read0.
         // Binding an FBO does not reset its selectors. No later owner changes
         // these values, so do not reissue eight selector calls per run.
-        if(firstRun){gl.viewport(0,0,width,height);gl.colorMask(1,1,1,1);}
+        if(firstCoverageSetup){gl.viewport(0,0,width,height);gl.colorMask(1,1,1,1);}
         gl.disable(0x0B71);if(firstRun)gl.depthMask(0);
         const float invalid[]={0.f,0.f,0.f,-1.f};gl.clearBufferfv(0x1800,0,invalid);
         // The checked prior tail restored this same source program.
@@ -261,13 +261,13 @@ void main(){
             gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);
             // First-run setup established mask0; checked successful tails preserve it.
             gl.enable(0x809D);gl.enable(0x0B71);gl.depthFunc(0x0203);
-            // The first successful bridge establishes this private program's
-            // composition mode and all three sampler-object bindings. Neither
-            // bridge restoration nor CPU-only group lookahead changes them.
-            gl.useProgram(coverageProgram);if(firstRun)gl.uniform1i(coverageRaCompositionUniform,0);drawGl.bindVertexArray(coverageArray);
-            if(firstRun&&gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
-            gl.activeTexture(textureUnit0+1);if(firstRun&&gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
-            gl.activeTexture(textureUnit0+2);if(firstRun&&gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
+            // The first successful bridge in this span establishes the private
+            // composition mode and all three sampler-object bindings. Checked
+            // bridge tails and base/map-2 group setup preserve those values.
+            gl.useProgram(coverageProgram);if(firstCoverageSetup)gl.uniform1i(coverageRaCompositionUniform,0);drawGl.bindVertexArray(coverageArray);
+            if(firstCoverageSetup&&gl.bindSampler)gl.bindSampler(0,0);gl.bindTexture(texture2D,coverageLive.payload);
+            gl.activeTexture(textureUnit0+1);if(firstCoverageSetup&&gl.bindSampler)gl.bindSampler(1,0);gl.bindTexture(texture2D,coverageLive.rasterDepth);
+            gl.activeTexture(textureUnit0+2);if(firstCoverageSetup&&gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);
             accepted=check("bind sample-specific original destination-alpha composition");
             if(accepted){gl.drawArrays(0x0004,0,3);accepted=check("compose ordered map-2 triangle per destination sample");}
         }
@@ -290,7 +290,8 @@ void main(){
         const bool restored=check("restore source-pair state after native coverage bridge");
         return accepted&&restored;
     }
-    bool drawCoveragePairGroup(U bank,U slot,U component,U first,U count,U image) noexcept {
+    bool drawCoveragePairGroup(U bank,U slot,U component,U first,U count,U image,
+        bool& firstCoverageSetup) noexcept {
         // Never cross the original base/map-2 MSCNT group boundary. A run
         // retains contiguous EBO order and admits only pairwise-disjoint
         // conservative pixel rectangles. Thus no sample can consume another
@@ -350,8 +351,9 @@ void main(){
                 if(!check("retain source-pair vertex array for coverage group"))return false;
                 sourceArrayRetained=true;
             }
-            if(!drawCoveragePairTriangle(bank,first,image,united,static_cast<U>(sourceArray),run,firstRun))return false;
-            firstRun=false;
+            if(!drawCoveragePairTriangle(bank,first,image,united,static_cast<U>(sourceArray),run,firstRun,firstCoverageSetup))return false;
+            // Only an accepted nonempty bridge authorizes setup reuse.
+            firstRun=false;firstCoverageSetup=false;
             ++coveragePairRuns;coveragePairTriangles+=run;
             if(run>1)coveragePairCoalescedTriangles+=run;
             if(fullRegion(initial))++coveragePairFullSingletons;

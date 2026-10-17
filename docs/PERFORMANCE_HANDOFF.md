@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 10:00 p.m. EDT (2026-10-17 02:00 UTC).
+Updated: 2026-10-16 10:15 p.m. EDT (2026-10-17 02:15 UTC).
 
 ## Current direction
 
@@ -261,6 +261,17 @@ initialization, VAOs, CPU normal validation/lighting/specular use, buffer binds 
 error polls remain unchanged. The new code is UNTESTED and was not part of the
 one-off smoke. See [normal-upload proof](recovery/racer-unused-normal-upload-20261017.md).
 
+Coverage paired spans now omit redundant unit1-zero/active0 transitions between
+checked groups; single-sample destination binding and span cleanup remain.
+Immutable sample/sRGB/blend/viewport/color-mask/sampler/composition-mode setup is
+also reused across groups within one synchronous span. A separate group-first
+flag still establishes source program, image and mask after base→map2 transitions.
+Empty groups never authorize reuse; every restoration and error gate remains.
+The operand/quotient cache still resets per group, not per span. Both changes are
+UNTESTED after the one-off baseline. See
+[span texture proof](recovery/racer-coverage-span-texture-unit-reuse-20261017.md) and
+[span setup proof](recovery/racer-coverage-span-invariant-setup-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -275,10 +286,10 @@ one-off smoke. See [normal-upload proof](recovery/racer-unused-normal-upload-202
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified publication: `db6b0ff8b99b4babe02deeef1ac68ce503c61d4a`
-(tree `660105f6d08ae864c8ce423456d6d9c90184e09c`, parent `a07bbd9e`).
-It adds the UNTESTED quotient cache after the one-off tested61b289e code.
-The current checkpoint adds the UNTESTED normal-upload elision. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
+Previous verified publication: `1fbd380eab1463708a9f6332378ed184fe2942ee`
+(tree `b4b90f170ed1d7121a86d06db961c8f56e92fb20`, parent `db6b0ff8`).
+It adds the UNTESTED normal-upload elision after the quotient cache.
+The current checkpoint adds UNTESTED paired-span coverage setup reuse. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
 runtime correctness.
 
 ## Known functional limits

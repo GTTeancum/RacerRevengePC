@@ -4828,6 +4828,7 @@ void main() {
             return fail(*diagnostic, VehicleWindowError50DS::assets, "body pair lost its exact original group resources");
         const auto& u = shader->uniforms();
         bool accepted = true;
+        bool firstCoverageSetup = true;
         const U first = groups.spanFirst[ordinal], end = first + groups.spanCount[ordinal];
         const bool drawSecond = frameSpecularSecond50LA[slot][bodySlot];
         const bool sameFog = material->policy.sourceBaseFog50LA == material->policy.sourceSpecularFog50LA;
@@ -4842,8 +4843,9 @@ void main() {
         // uniform. Retain the unconditional reset below, including failures.
         if (material->policy.sourceSpecularAlphaTest50LA)
             gl.uniform1i(u.sourcePairAlphaTest50LA, 1);
-        // Establish sampler 0 on unit 1 once. Neither pass changes sampler
-        // objects; subsequent bases still unbind the feedback texture below.
+        // Establish sampler 0 on unit 1 once. Group setup preserves it;
+        // only single-sample later bases need to unbind feedback.
+        // Coverage bridge tails retain their checked feedback unbind.
         unbindSpecularFeedback50LA();
         if (!drawSecond) {
             // The source distance gate removes every map-2 command in this
@@ -4876,7 +4878,7 @@ void main() {
             // group. On the source distance-skip path only base draws follow;
             // their texture/uniform/depth state and unbound feedback persist.
             if (drawSecond || g == first) {
-                if (g != first) {
+                if (g != first && !coverageDemand) {
                     gl.activeTexture(textureUnit0 + 1); gl.bindTexture(texture2D, 0);
                     gl.activeTexture(textureUnit0);
                 }
@@ -4906,10 +4908,14 @@ void main() {
             if (!sameFog)
                 gl.uniform1i(u.sourcePairFog50LA, material->policy.sourceSpecularFog50LA ? 1 : 0);
             gl.depthMask(0); // Same linked position shader/VAO and LEQUAL coverage.
-            gl.activeTexture(textureUnit0 + 1);
-            // The span's initial unbind selected sampler 0 on unit 1;
-            // no intervening command changes sampler-object bindings.
-            gl.bindTexture(texture2D, coverageDemand ? 0 : sourcePairColors50LA[bank]); gl.activeTexture(textureUnit0);
+            // Coverage entry and checked bridge tails retain unit 1 unbound
+            // and unit 0 current, including groups with no visible triangles.
+            if (!coverageDemand) {
+                gl.activeTexture(textureUnit0 + 1);
+                // The span's initial unbind selected sampler 0 on unit 1;
+                // no intervening command changes sampler-object bindings.
+                gl.bindTexture(texture2D, sourcePairColors50LA[bank]); gl.activeTexture(textureUnit0);
+            }
             accepted = check("bind original source-pair second group");
             // The unchanged single-sample route reads one actual triangle's
             // own pixel once. A barrier before EACH draw observes overlapping
@@ -4924,7 +4930,7 @@ void main() {
                     // as well as success before another source owner can run.
                     beginRacerRasterOperandGroup(slot,component,group.indexStart,group.indexCount);
                     accepted = drawCoveragePairGroup(bank, slot, component,
-                        group.indexStart, group.indexCount, material->specularName50LA);
+                        group.indexStart, group.indexCount, material->specularName50LA, firstCoverageSetup);
                     endRacerRasterOperandGroup();
                 } else {
                     for (U i = group.indexStart; i < group.indexStart + group.indexCount; i += 3) {
