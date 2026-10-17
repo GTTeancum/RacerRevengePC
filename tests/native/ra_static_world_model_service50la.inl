@@ -32,7 +32,7 @@
         if(!family)return reject(d,"retained crowd family/six-set missing");
         const auto& materialMember=family->canonicalMaterialKey;
         if(materialMember!="textures/crowd.psm"||
-           normalized(family->sourceMember)!="textures/crowd.atm"||!family->animatedCurrentMapPending||
+           family->canonicalImageKey!="textures/crowd.atm"||!family->animatedCurrentMapPending||
            family->imageCount!=6||family->firstImage>coldImages_.size()||
            family->imageCount>coldImages_.size()-family->firstImage||!crowdImages_||crowdImages_->count()!=6)
             return reject(d,"retained crowd family/six-set missing");

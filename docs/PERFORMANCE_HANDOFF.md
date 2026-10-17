@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 7:39 a.m. EDT (2026-10-17 11:39 UTC).
+Updated: 2026-10-17 7:52 a.m. EDT (2026-10-17 11:52 UTC).
 
 ## Current direction
 
@@ -235,10 +235,25 @@ This removes an explicit retained-buffer copy per successful RA payload, with
 710 payloads required by the cold route. It is loading-time work, not a measured
 FPS gain. UNTESTED. See `docs/recovery/ra-owned-psg-transfer-20261017.md`.
 
+## New untested source change: retained canonical image identity
+
+Cold RA families now own the image key already normalized during image admission.
+The profile and crowd proof reuse this expected key, removing three repeated
+normalizations along a complete successful crowd service/query route. Actual
+image/texture source normalization, byte comparison and dynamic checks remain.
+The raw archive spelling is unchanged. This retains a small additional string
+per family and changes native metadata layout. UNTESTED; no measured gain.
+See `docs/recovery/ra-canonical-image-keys-20261017.md`.
+
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[6b499194](https://github.com/GTTeancum/RacerRevengePC/commit/6b499194dafbdc44c5976e563d343917ddff67db).
+[a043ec59](https://github.com/GTTeancum/RacerRevengePC/commit/a043ec5990b8db3791179ecde7a8fd92897bba74).
+Its tree is b67f6df28cd0f8fbdd56f45d2001ae48208f748d, sole parent 6b499194.
+Independent live-ref and all nine file readbacks verified publication at 11:45 UTC.
+A subsequent combined source audit found no concrete ownership, stale-metadata
+or failure-contract regression across the new HUD and RA changes. This was
+source review only, not execution-based validation.
 The diffuse-ID summary, cold archive index, owned PSG transfer and preceding source changes are **UNTESTED**: in-place RA fog observations,
 bounded draw-list capacity hint, per-surface diffuse input admission reuse, and
 adjacent scissor reuse invalidated at potential allocation boundaries. The sections above document their proofs and limitations. The earlier fog reserve
@@ -670,9 +685,9 @@ matched verified remote 71aa1b21. Unreviewed local drafts remain excluded.
    Any future Windows validation must be visible from the original asset folder,
    native exe beside SLUS, with menu/rider/course/track screenshots and baseline FPS.
 
-## Pending source-only checkpoint after 9aa6a5b6
+## Historical source-only checkpoint after 9aa6a5b6
 
-Latest independently verified publication: [9aa6a5b6](https://github.com/GTTeancum/RacerRevengePC/commit/9aa6a5b6929e4435aacffce2c324be08a0d6d1ee), a documentation-only checkpoint.
+Publication at that historical checkpoint: [9aa6a5b6](https://github.com/GTTeancum/RacerRevengePC/commit/9aa6a5b6929e4435aacffce2c324be08a0d6d1ee), a documentation-only checkpoint.
 
 New source is **UNTESTED**: successful racer coverage cleanup reuses its already
 selected texture unit2, retaining explicit selection on every rejection. The
@@ -701,9 +716,9 @@ primitive within a selected draw. Program0/AA0 bindings remain unconditional,
 and new selected draws still bind before uniform writes. This is **UNTESTED**;
 see [program proof](recovery/ra-aa1-program-reuse-20261017.md).
 
-## Checkpoint after d6651457
+## Historical checkpoint after d6651457
 
-Latest independently verified publication: [d6651457](https://github.com/GTTeancum/RacerRevengePC/commit/d6651457efa7b8814151b0ca5fc936f9879d99e8),
+Publication at that historical checkpoint: [d6651457](https://github.com/GTTeancum/RacerRevengePC/commit/d6651457efa7b8814151b0ca5fc936f9879d99e8),
 tree37fb609d8bbb99764d7df34c8cab4d9d44436aca, parent9aa6a5b6. It contains the
 four untested state-reuse changes above, with exact source-only review.
 

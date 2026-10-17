@@ -26,6 +26,8 @@ public:
         bool contextAfter249610Available=false; // false: construction context only
         // Owned authenticated lookup key; raw materialMember remains unchanged.
         std::string canonicalMaterialKey;
+        // Owned canonical image identity; sourceMember retains the archive spelling.
+        std::string canonicalImageKey;
     };
 private:
     std::vector<ColdFamily> imageFamilies_;
@@ -159,7 +161,8 @@ private:
                 if(name.empty()||name.find_first_of("\\/.:\"")!=std::string::npos)return reject(d,"actual texture basename unsupported");
                 family.requestedTexture="textures\\"+name;
                 if(!selectImageSource(family,d))return false;
-                const auto key=normalized(family.sourceMember);
+                family.canonicalImageKey=normalized(family.sourceMember);
+                const auto& key=family.canonicalImageKey;
                 if(!imageMembers.insert(key).second)return reject(d,"actual44-family image identity duplicated");
                 const auto ext=key.substr(key.size()-4);
                 if(ext==".pst"){++indexed;inputs.push_back({family.sourceMember,family.sourceBytes});}

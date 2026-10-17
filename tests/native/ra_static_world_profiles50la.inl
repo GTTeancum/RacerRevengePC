@@ -123,7 +123,7 @@ private:
             if(image)return reject(d,"static profile image alias");image=&coldImages_[family.firstImage+i];
         }
         const auto& texture=*map.texture;
-        const auto imageName=normalized(family.sourceMember);
+        const auto& imageName=family.canonicalImageKey;
         const auto expectedName=name.substr(0,name.size()-4)+(crowd?".atm":(tga16||tga32?".tga":".pst"));
         if(!image||image->family!=fi||imageName!=expectedName||
            normalized(image->sourceMember)!=imageName||!texture.sourceMember()||
