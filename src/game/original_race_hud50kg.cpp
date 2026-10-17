@@ -234,9 +234,9 @@ bool OriginalRaceHud50KG::applyLapCompletion(std::uint32_t view,std::uint32_t gr
     return true;
 }
 namespace {
-void advanceText(Text& t,float dt,std::int32_t rendererWidth,std::int32_t rendererHeight) noexcept {
-    t.viewportScaleX=static_cast<float>(rendererWidth)/static_cast<float>(t.viewport->width1E8);
-    t.viewportScaleY=static_cast<float>(rendererHeight)/static_cast<float>(t.viewport->height1EC);
+void advanceText(Text& t,float dt,float viewportScaleX,float viewportScaleY) noexcept {
+    t.viewportScaleX=viewportScaleX;
+    t.viewportScaleY=viewportScaleY;
     t.colorDirty180=t.alphaDirty184=t.scaleDirty188=t.rotationDirty18C=false;
     if(t.enabled70){
         if(t.hold84>=0){t.hold84=t.hold84-dt;}
@@ -286,10 +286,13 @@ bool OriginalRaceHud50KG::advanceAnimations29CDA0(float dt) noexcept {
     for(unsigned i=0;i<storage_->count;++i){const auto* v=storage_->views[i]->status17C.viewport;
         if(!v||v->width1E8<=0||v->height1EC<=0)return false;}
     for(unsigned i=0;i<storage_->count;++i){auto& v=*storage_->views[i];
-        for(auto& t:v.records12C)advanceText(t,dt,storage_->rendererWidth,storage_->rendererHeight);
-        advanceText(v.status17C,dt,storage_->rendererWidth,storage_->rendererHeight);
-        advanceText(v.time164,dt,storage_->rendererWidth,storage_->rendererHeight);
-        for(auto& t:v.explosions16C)advanceText(t,dt,storage_->rendererWidth,storage_->rendererHeight);
+        // All text owners in this view retain the same constructor-bound viewport.
+        const float scaleX=static_cast<float>(storage_->rendererWidth)/static_cast<float>(v.status17C.viewport->width1E8);
+        const float scaleY=static_cast<float>(storage_->rendererHeight)/static_cast<float>(v.status17C.viewport->height1EC);
+        for(auto& t:v.records12C)advanceText(t,dt,scaleX,scaleY);
+        advanceText(v.status17C,dt,scaleX,scaleY);
+        advanceText(v.time164,dt,scaleX,scaleY);
+        for(auto& t:v.explosions16C)advanceText(t,dt,scaleX,scaleY);
         for(auto* g:{&v.gleam184,&v.recordGleam194})if(g->active11C){
             g->elapsed124=g->elapsed124+dt;if(g->elapsed124>g->duration120)g->active11C=0; //2E6E50.
         }

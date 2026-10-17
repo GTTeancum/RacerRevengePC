@@ -94,12 +94,12 @@ private:
         else if(name=="textures/largeflag.psm")next.profile=P::tga8888ClampedBlend;
         else if(name=="textures/crowd.psm")next.profile=P::currentCrowd1555Blend;
         else {
-            constexpr const char* ordinary[]={"arch01","arena01","arenahead01","arenatile","bridgeground01",
-                "building01","building02","gargoylebody","gargoyleface","gatebottom01","grayrough01",
-                "lightcoloredtile","newrock","rockcavewall","rockcavewall02","rockfloor","rockfloorfade",
-                "rockwall","sand10","sand11","sand8","spear","spearcabledark","spearholder","stairs01",
-                "theskull01","twidesigns","twilekflag01","wall001","wall002","wall_design01","wallside01","wallside01_blend"};
-            bool found=false;for(const auto* stem:ordinary)if(name==std::string("textures/")+stem+".psm")found=true;
+            constexpr const char* ordinary[]={"textures/arch01.psm","textures/arena01.psm","textures/arenahead01.psm","textures/arenatile.psm","textures/bridgeground01.psm",
+                "textures/building01.psm","textures/building02.psm","textures/gargoylebody.psm","textures/gargoyleface.psm","textures/gatebottom01.psm","textures/grayrough01.psm",
+                "textures/lightcoloredtile.psm","textures/newrock.psm","textures/rockcavewall.psm","textures/rockcavewall02.psm","textures/rockfloor.psm","textures/rockfloorfade.psm",
+                "textures/rockwall.psm","textures/sand10.psm","textures/sand11.psm","textures/sand8.psm","textures/spear.psm","textures/spearcabledark.psm","textures/spearholder.psm","textures/stairs01.psm",
+                "textures/theskull01.psm","textures/twidesigns.psm","textures/twilekflag01.psm","textures/wall001.psm","textures/wall002.psm","textures/wall_design01.psm","textures/wallside01.psm","textures/wallside01_blend.psm"};
+            bool found=false;for(const auto* member:ordinary)if(name==member)found=true;
             if(!found)return reject(d,"unobserved RA profile family");
         }
         const bool crowd=next.profile==P::currentCrowd1555Blend;

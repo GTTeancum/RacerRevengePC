@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 8:03 a.m. EDT (2026-10-17 12:03 UTC).
+Updated: 2026-10-17 8:18 a.m. EDT (2026-10-17 12:18 UTC).
 
 ## Current direction
 
@@ -255,12 +255,26 @@ remain unchanged. The producer can emit multi-quad packets. For Q quads in one
 packet this removes 2(Q-1) converter calls, with no measured FPS gain. UNTESTED.
 See `docs/recovery/hud-radar-shared-corners-20261017.md`.
 
+## New untested source changes: per-view HUD scale and literal RA profiles
+
+Race HUD animation updates compute the same viewport scale once per view and
+pass it to all eleven text owners. All-view preflight, float division expressions,
+text assignments and animation order remain. This reduces source-level divisions
+from 22 to 2 per view/update; compiler behavior and runtime gains are unmeasured.
+See `docs/recovery/hud-per-view-scale-20261017.md`.
+
+The RA ordinary-profile whitelist now uses the same 33 complete path literals,
+avoiding repeated temporary string concatenations during cold classification.
+This is loading work; the per-frame crowd branch bypasses it. All comparisons and
+provenance checks remain. See `docs/recovery/ra-literal-profile-whitelist-20261017.md`.
+Both changes are UNTESTED. No new execution-based validation occurred.
+
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[d352a141](https://github.com/GTTeancum/RacerRevengePC/commit/d352a14129b243fce76a1f7c40d6c9619fd74ab7).
-Its tree is 335290385943b2ca6e43dd1eea01b34a18c8186e, sole parent a043ec59.
-Independent live-ref and all five file readbacks verified publication at 12:00 UTC.
+[de99212b](https://github.com/GTTeancum/RacerRevengePC/commit/de99212b76a5b1360924a48f36f57abdb6082f8e).
+Its tree is b2e6fbbbf9b7e94ac68a9cdeafab76e7b52ed2aa, sole parent d352a141.
+Independent live-ref and all three file readbacks verified publication at 12:15 UTC.
 The earlier combined source audit found no concrete ownership, stale-metadata
 or failure-contract regression across the new HUD and RA changes. This was
 source review only, not execution-based validation.
