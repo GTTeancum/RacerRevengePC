@@ -182,11 +182,10 @@ bool drawSpeedBoost(U bank) noexcept {
     for(U p=0;okay&&p<h.packetCount;++p){const auto& packet=h.packets[p];
         // Both actual policies were admitted as source-alpha, GEQUAL/write.
         // Preserve owner packet order; no synthetic registration/rank sorting.
-        // A checked adjacent packet with the same material retains this setup.
-        if(p==0 || packet.material!=h.packets[p-1].material){
-            gl.depthMask(1);gl.uniform1i(uiSourceBlendUniform,1);
+        // Depth/blend policy is constant across this pass's checked packets.
+        if(p==0){gl.depthMask(1);gl.uniform1i(uiSourceBlendUniform,1);}
+        if(p==0 || packet.material!=h.packets[p-1].material)
             gl.bindTexture(texture2D,h.textures.texture(h.images[packet.material]));
-        }
         const U indexCount=packet.vertexCount==3?3u:packet.count*6u;
         // Shared index slot is0,1,2,0,2,3. A triangle consumes exactly its
         // first three indices and retains the source's three real vertices.

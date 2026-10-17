@@ -174,11 +174,10 @@ bool drawTimeStats(U bank) noexcept {
     for(U p=0;okay&&p<h.packetCount;++p){const auto& packet=h.packets[p];
         // Both actual policies were admitted as source-alpha, GEQUAL/write.
         // Preserve owner packet order; no synthetic registration/rank sorting.
-        // A checked adjacent packet with the same material retains this setup.
-        if(p==0 || packet.material!=h.packets[p-1].material){
-            gl.depthMask(1);gl.uniform1i(uiSourceBlendUniform,1);
+        // Depth/blend policy is constant across this pass's checked packets.
+        if(p==0){gl.depthMask(1);gl.uniform1i(uiSourceBlendUniform,1);}
+        if(p==0 || packet.material!=h.packets[p-1].material)
             gl.bindTexture(texture2D,h.textures.texture(h.images[packet.material]));
-        }
         if(uiSourceCoherentFramebufferFetch){
             drawGl.drawElementsBaseVertex(0x0004,I(packet.count*6),0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(packet.first)*6*sizeof(U)),0);

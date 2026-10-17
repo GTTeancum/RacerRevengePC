@@ -1,0 +1,158 @@
+{
+  "source": "b4c303ec54d64de206b188aa06790518c2161baa",
+  "tree": "9afdc22f9906e86d4283607fd92000107dd7ce06",
+  "status": "basic-linux-pass",
+  "buildStartedUtc": "2026-10-17T04:20:20.850869+00:00",
+  "buildEndedUtc": "2026-10-17T04:23:32.609855+00:00",
+  "smokeStartedUtc": "2026-10-17T04:24:04.843942+00:00",
+  "smokeEndedUtc": "2026-10-17T04:27:02.914845+00:00",
+  "exitCode": 0,
+  "timedOut": false,
+  "cleanupConfirmed": true,
+  "rootVisualReview": true,
+  "screens": [
+    "main",
+    "rider",
+    "course",
+    "track",
+    "original_pause"
+  ],
+  "pauseContinueResumed": true,
+  "renderer": "llvmpipe (LLVM 19.1.7, 256 bits)",
+  "baseline": {
+    "actual_completed_swap_submissions": 4,
+    "actual_focus": true,
+    "all_original_ai": true,
+    "audio_output_requested": false,
+    "authored_world_fog": false,
+    "begin_native_tick": 28,
+    "begin_window_swaps": 263,
+    "capture_readback_and_disk_intervals_discarded": true,
+    "clock": "std::chrono::steady_clock; process-relative nanoseconds",
+    "controller_samples": 0,
+    "discarded_intervals": 1,
+    "display_wall_diagnostics": {
+      "accepted_sample_swaps": 4,
+      "additive_to_parent": false,
+      "baseline_aligned": true,
+      "begin_native_tick": 28,
+      "begin_window_swaps": 263,
+      "boundary_identity_match": true,
+      "components": {
+        "finish_wait": {
+          "attempted": 4,
+          "max_wall_ns": 2644,
+          "overflow": false,
+          "valid": 4,
+          "wall_ns": 9795
+        },
+        "history_stage": {
+          "attempted": 4,
+          "max_wall_ns": 506804,
+          "overflow": false,
+          "valid": 4,
+          "wall_ns": 947730
+        },
+        "host_swap": {
+          "attempted": 4,
+          "max_wall_ns": 459112,
+          "overflow": false,
+          "valid": 4,
+          "wall_ns": 1583367
+        }
+      },
+      "count_agreement": true,
+      "discarded_intervals": 1,
+      "end_native_tick": 44,
+      "end_window_swaps": 267,
+      "interval_begin_ns": 172340151737,
+      "interval_end_ns": 177370113879,
+      "nested": true,
+      "overflow": false,
+      "parent": "completion_wait",
+      "parent_wall_time_measured": false,
+      "schema": "baseline-display-wall-v1",
+      "scope": "gameplay",
+      "session": 2,
+      "timing_complete": true
+    },
+    "drawable_height": 448,
+    "drawable_width": 640,
+    "elapsed_ns": 5029962142,
+    "end_native_tick": 44,
+    "end_window_swaps": 267,
+    "followed_racer60": 9,
+    "followed_racer_slot": 0,
+    "fps": 0.795234613517296,
+    "host_driver_calls": 0,
+    "human_count": 0,
+    "includes_existing_host_pacing_and_telemetry": true,
+    "interval_begin_ns": 172340151737,
+    "interval_end_ns": 177370113879,
+    "keyboard_packets": 0,
+    "logical_audio_enabled": true,
+    "maximum_catchup_steps": 4,
+    "measurement_required_ns": 5000000000,
+    "measurement_scope": "GPU-completed actual gameplay images submitted through the Linux SDL swap; physical monitor scanout is not measured",
+    "mode": "unattended_linux",
+    "msaa_samples_requested": 0,
+    "native_pod_shadows": false,
+    "native_step_ns": 16000000,
+    "original_ai_count": 8,
+    "original_gameplay_blur": true,
+    "paused_menu_fade_intervals_discarded": true,
+    "ra_authored_material_fog": true,
+    "ra_conservative_clip_rejection": true,
+    "ra_internal_coverage_samples": 4,
+    "racer_count": 8,
+    "schema": "native-linux-track-fps-v1",
+    "session": 2,
+    "source_identity_scope": "correlate external build receipt and executable SHA256",
+    "source_revision": null,
+    "swap_interval": 0,
+    "test_profile": "mawhonic-ryloth",
+    "track": "RA",
+    "track_adapter_settings_apply": false,
+    "track_archive_sha256": "1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2",
+    "track_frustum_culling": false,
+    "warmup_excluded_ns": 6141440897,
+    "warmup_excluded_swap_submissions": 5,
+    "warmup_required_ns": 5000000000,
+    "world_renderer": "native_ra_aggregate"
+  },
+  "pauseMenuOnlyKeys": [
+    "Escape",
+    "F12",
+    "Return"
+  ],
+  "executableSha256": "5da09b1a99276246339e0abaae3a266f6323135482df7d7d846c6b60e8d1b80f",
+  "scope": "One user-authorized Linux basic build and smoke; no fresh Windows result or full-race validation",
+  "comparison": {
+    "previousSource": "4f82775f79ce205511919e5ad7bee60f67fbf4a3",
+    "previousFps": 0.8035408549754633,
+    "percentChange": -1.0337049332010628,
+    "limitation": "Current four swaps/ticks28-44 versus previous five swaps/ticks28-48; single short samples do not demonstrate a speedup or isolate causes."
+  },
+  "screenshots": [
+    {
+      "name": "frontend-session-1/course-3.png",
+      "sha256": "c18663b8cec226d267c309bf084052b697c5c5e85a125c2725686782f374036b"
+    },
+    {
+      "name": "frontend-session-1/main-1.png",
+      "sha256": "83be89effa29cbc53e80d1244f649a9d1bcbf7b2e3d073de47b169ad1977f02d"
+    },
+    {
+      "name": "frontend-session-1/rider-2.png",
+      "sha256": "1769d9692643ebd0af9aa1bd94902348754d518a7097628490ed897cff0ce3a4"
+    },
+    {
+      "name": "race-session-2/other-2.png",
+      "sha256": "0a5eecc8d638fd8d8400b73a262943b299bbdc61cd57a465370e169bf02a147a"
+    },
+    {
+      "name": "race-session-2/track-1.png",
+      "sha256": "1098953471f2e45bbe5888f1db84c1a6f04db88f598ff99c08fa5cb0b4fc5ab1"
+    }
+  ]
+}

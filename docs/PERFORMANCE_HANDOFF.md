@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 12:05 a.m. EDT (2026-10-17 04:05 UTC).
+Updated: 2026-10-17 12:28 a.m. EDT (2026-10-17 04:28 UTC).
 
 ## Current direction
 
@@ -22,24 +22,37 @@ Continue independent coding if publication is blocked, and report exact blockers
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[88edf271](https://github.com/GTTeancum/RacerRevengePC/commit/88edf271153d2a4cd507fe049d15be30eb109e66),
-tree `329deb23c84123f0b25bcc392bd17cfa71311a87`.
-This checkpoint adds **UNTESTED** adjacent-material state reuse in the original
-Damage, PositionStats, TimeStats and SpeedBoost HUD passes. Packet order,
-geometry, barriers, checks and cleanup remain; radar transitions and triangle
-needle indexing retain their distinct handling. See
-[proof](recovery/remaining-hud-material-state-20261017.md).
-The five HUD packing paths also omit a redundant per-vertex zero assignment
-before fully writing all 24 bytes; SpeedBoost retains its four-slot clear.
-See [packing proof](recovery/hud-full-vertex-write-20261017.md). This may already
-be optimized by the compiler and has no measured benefit.
-No build, smoke or FPS measurement was run for this source.
+[81d27c3](https://github.com/GTTeancum/RacerRevengePC/commit/81d27c302282f600c3ba95e5f8b659c4cca2b84c).
+The user explicitly requested another one-off FPS test. Exact source
+`b4c303ec54d64de206b188aa06790518c2161baa`, tree
+`9afdc22f9906e86d4283607fd92000107dd7ce06`, built successfully at
+2026-10-17 04:23:32 UTC. The Linux smoke ended at 04:27:02 UTC with exit0,
+no timeout and confirmed cleanup. Root reviewed menu, Mawhonic character select,
+Ryloth course, track and original Pause screenshots; Pause → Continue resumed.
+Eight original AI racers, zero human racers, host-driver calls or driving input.
 
-Last executed source remains `4f82775`, tree
-`ed51765d87b357345095efd8f5c7494c3555e62e`, with Linux llvmpipe
-**0.8035408549754633 FPS** at 03:17 UTC. That result does not validate subsequent
-changes. The sections below retain historical publication and review context;
-use this section and the containing commit for current checkpoint identity.
+Measured **0.795234613517296 FPS** on llvmpipe: four GPU-completed gameplay swaps
+in 5.029962142 seconds, native ticks28–44. Previous 4f82775 measured
+0.8035408549754633 FPS over five swaps/ticks28–48. Current sample is about1.03%
+lower; unequal short windows and ordinary variability prevent attributing that
+difference. No performance improvement is demonstrated.
+
+This checkpoint retains that exact game code and adds only result/handoff
+information afterward. Earlier UNTESTED labels record the source-review stage;
+this limited smoke now covers changes through the pass-constant HUD setup.
+Any subsequent source changes require their own validation. Routine testing
+restrictions remain specific to the outgoing session; the successor may validate.
+See [full result](recovery/performance-one-off-b4c303e-20261017.json).
+
+### Historical smoother Windows results
+
+[MA intake history](recovery/ma-intake-20261014.md) records Ody/Mon Calamari source
+c06a1b0364f81137315b20a07af2f73244eb524b at **36.6928 FPS** on October14:
+184 completed swaps/5.0146019 seconds, 640x448, all8 original AI, warmup excluded.
+Other documented Aldar/Mon Calamari Windows samples were about30.75–31.24 FPS.
+These are historical different-course/racer results; hardware identity was not
+recorded there. They do not measure current Windows Ryloth performance. The
+recent Linux software-rendered Ryloth samples cannot establish that comparison.
 
 ## Checkpoint and evidence
 

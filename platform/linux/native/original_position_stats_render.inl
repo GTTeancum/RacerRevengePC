@@ -208,7 +208,9 @@ bool drawPositionStats(U bank) noexcept {
             const auto depth=radar?h.radar.depthMethod:h.policies[packet.material].depthMethod;
             gl.depthFunc(depth==0?0x0200:depth==1?0x0207:depth==2?0x0206:0x0204);
             gl.depthMask((radar?h.radar.depthWrite:h.policies[packet.material].depthWrite)?1:0);
-            gl.uniform1i(uiSourceBlendUniform,1);gl.uniform1i(uiTexturedUniform,radar?0:1);
+            // Blend mode stays source-alpha across every checked material transition.
+            if(p==0)gl.uniform1i(uiSourceBlendUniform,1);
+            gl.uniform1i(uiTexturedUniform,radar?0:1);
             gl.bindTexture(texture2D,radar?0:h.textures.texture(h.images[packet.material]));
         }
         if(uiSourceCoherentFramebufferFetch){
