@@ -496,10 +496,17 @@ void main(){
         if(program)gl.uniform1i(u.destination,2);else gl.uniform1i(u.payload,payload?1:0);
     }
     bool snapshotRaWorld(U bank,const std::array<I,4>& region) noexcept {
-        gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);gl.readBuffer(colorAttachment);
-        gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);gl.drawBuffer(colorAttachment);
-        gl.blitFramebuffer(region[0],region[1],region[2],region[3],
-            region[0],region[1],region[2],region[3],colorBufferBit,0x2600);
+        if(gl.copyImageSubData){
+            // Same distinct RGBA8/four-sample snapshot as the racer bridge.
+            gl.copyImageSubData(coverageLive.color[bank],coverageTexture,0,
+                region[0],region[1],0,coverageLive.snapshotColor,coverageTexture,0,
+                region[0],region[1],0,region[2]-region[0],region[3]-region[1],1);
+        }else{
+            gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);gl.readBuffer(colorAttachment);
+            gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);gl.drawBuffer(colorAttachment);
+            gl.blitFramebuffer(region[0],region[1],region[2],region[3],
+                region[0],region[1],region[2],region[3],colorBufferBit,0x2600);
+        }
         return check("retain actual per-sample destination before next RA primitive");
     }
     bool raTriangleOutsideNativeClip(U first) const noexcept {

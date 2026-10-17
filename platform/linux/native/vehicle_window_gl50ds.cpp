@@ -1000,6 +1000,15 @@ struct HostHudGeometry {
 };
 
 // Linux desktop GL scalar signatures; resolved only through the caller's host.
+// Match GL APIENTRY on Windows without importing platform GL headers.
+#if defined(_WIN32)
+using CopyImageSubData50DS = void (__stdcall *)(U, U, I, I, I, I,
+    U, U, I, I, I, I, I, I, I);
+#else
+using CopyImageSubData50DS = void (*)(U, U, I, I, I, I,
+    U, U, I, I, I, I, I, I, I);
+#endif
+
 struct OwnerGl {
     void (*genBuffers)(I, U*) = nullptr;
     void (*deleteBuffers)(I, const U*) = nullptr;
@@ -1072,6 +1081,8 @@ struct OwnerGl {
     void (*drawArrays)(U,I,I) = nullptr;
     const unsigned char* (*getString)(U) = nullptr;
     void (*blitFramebuffer)(I, I, I, I, I, I, I, I, U, U) = nullptr;
+    // Optional, admitted only by the actual desktop GL 4.3+ context.
+    CopyImageSubData50DS copyImageSubData = nullptr;
 };
 }
 

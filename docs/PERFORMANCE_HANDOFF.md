@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 10:46 p.m. EDT (2026-10-17 02:46 UTC).
+Updated: 2026-10-16 11:19 p.m. EDT (2026-10-17 03:19 UTC).
 
 ## Current direction
 
@@ -56,6 +56,28 @@ The source-only changes described below through scratch/operand initialization
 are covered by this limited smoke. Any later source changes remain UNTESTED.
 This one-off authorization does not establish a recurring test schedule.
 See [one-off result](recovery/performance-one-off-61b289e-20261017.json).
+
+## Latest one-off validation, 2026-10-17 03:17 UTC
+
+The user requested another test. The initial build was interrupted by full VM
+replacement. Original source tree `ed51765d87b357345095efd8f5c7494c3555e62e`
+(local source `4f82775f79ce205511919e5ad7bee60f67fbf4a3`) was recovered exactly
+from verified GitHub objects and a source backup, including raw line endings.
+Original disc/runtime inputs were recovered; all144 rider textures and48 sky
+images matched their committed expected hashes. SLUS was read only as data.
+
+Rebuild completed successfully at03:10:36 UTC. The Linux smoke ran03:13:40–03:17:04
+UTC, exit0, no timeout, cleanup confirmed. Root reviewed main/rider/course/track
+and Pause images; Continue resumed. All8 original AI, zero human/host-driver/
+driving-keyboard counts. **0.8035408549754633 FPS**, five completed gameplay swaps,
+native ticks28–48. Previous61b289e measured0.8289711243839988 FPS; this sample is about3.1% lower. VM replacement and single-sample scope prevent a controlled
+comparison; no speedup is demonstrated. Renderer: llvmpipe LLVM19.1.7, GL4.5 Core,
+Mesa25.0.7. The optional copy procedure branch was not independently traced.
+
+This limited smoke covers the code through both optional image-copy paths below,
+including earlier post61b289e changes. Later source must remain UNTESTED until
+validated. No fresh Windows test. The one-off does not authorize routine tests.
+See [exact result](recovery/performance-one-off-4f82775-20261017.json).
 
 ## Performance findings
 
@@ -242,7 +264,7 @@ initialized, and consumers require three fully produced or copied finite records
 Failure paths bypass partial arrays. No clipping arithmetic changes. See
 [operand initialization proof](recovery/raster-operand-initialization-20261017.md).
 
-## New source after the one-off test: UNTESTED
+## Source changes after the first one-off test
 
 The racer operand cache now lazily retains eight ordered projection quotients per
 eligible indexed vertex within one synchronous group. Common-plane rejection and
@@ -290,6 +312,16 @@ is established. Independent source/spec review is not a cross-compilation
 bit-identical derivative guarantee. UNTESTED. See
 [uniform normal guard proof](recovery/generic-normal-uniform-guard-20261017.md).
 
+Optional named image copies now retain the same distinct four-sample RGBA8
+snapshot for racer and RA composition. Admission requires checked desktop GL4.3+
+and a nonnull optional procedure. Unsupported/missing-procedure contexts retain
+the exact original framebuffer blit. Runtime copy errors reject through existing
+checks/restoration without retry. Rectangle, sample storage, order and original
+composition remain; no same-image feedback is introduced. This removes two racer
+or four RA copy-setup calls per eligible snapshot, with no measured speedup claim.
+See [racer copy proof](recovery/racer-coverage-copy-image-20261017.md) and
+[RA copy proof](recovery/ra-world-copy-image-20261017.md).
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -304,10 +336,11 @@ bit-identical derivative guarantee. UNTESTED. See
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified publication: `7b603207ba30bd0dd092cd12091e70394a90de9b`
-(tree `e332a3df4ef2b1da05a9d27d3ce17296fbbeace9`, parent `a7b51bf2`).
-It adds UNTESTED depth-function reuse and deferred-upload gating. The current
-checkpoint adds the UNTESTED generic normal preparation guard. Changes after the one-off61b289e source are untested. Source review does not establish compilation or
+Previous verified publication: `97139ec1db28842d68c59d0dcb68ce092f739285`
+(tree `fe88afaca20f81e3d4c56972bcfaf334b7434ad2`, parent `7b603207`).
+The current checkpoint adds both image-copy paths, exact tested source from the
+latest one-off, and result documentation. Earlier UNTESTED labels describe their
+source-review state; the limited latest smoke coverage is stated above. Changes after the latest tested4f82775 source remain untested. Source review does not establish compilation or
 runtime correctness.
 
 ## Known functional limits

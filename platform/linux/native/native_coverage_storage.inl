@@ -21,7 +21,8 @@
         return coverageLive.owns()||coverageSpare.owns()||coverageProgram||
             coverageVertex||coverageFragment||coverageArray;
     }
-    bool checkCoverageSupport(I major,I) noexcept {
+    bool checkCoverageSupport(I major,I minor) noexcept {
+        gl.copyImageSubData=nullptr;
         if(!coverageDemand)return true;
         if(major<4)return fail(*diagnostic,VehicleWindowError50DS::context,
             "AA1 native coverage requires desktop GL4.0 and GLSL400; no fallback");
@@ -39,6 +40,13 @@
         if(!check("query strict native coverage capability limits"))return false;
         if(samples<4||colorSamples<4||depthSamples<4||units<3||buffers<2||attachments<2)
             return fail(*diagnostic,VehicleWindowError50DS::limits,"four-sample coverage/AA0 bridge limits unavailable");
+        // This optional transfer route needs core capability AND a proc.
+        // Do not use mandatory load(): a missing proc retains the exact blit.
+        if(major>4||(major==4&&minor>=3)){
+            gl.copyImageSubData=reinterpret_cast<CopyImageSubData50DS>(
+                request.procAddress(request.context,"glCopyImageSubData"));
+            if(!check("resolve optional core coverage image copy"))return false;
+        }
         return true;
     }
     // This helper changes coverage alone, never a depth/blend tuple. Call on
@@ -251,10 +259,18 @@ void main(){
             accepted=check("raster original AA0 map-2 payload and center depth");
         }
         if(accepted){
-            gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);
-            gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);
-            gl.blitFramebuffer(region[0],region[1],region[2],region[3],
-                region[0],region[1],region[2],region[3],colorBufferBit,0x2600);
+            if(gl.copyImageSubData){
+                // Distinct verified RGBA8/four-sample images; preserve every
+                // sample at identical texel coordinates, without feedback.
+                gl.copyImageSubData(coverageLive.color[bank],coverageTexture,0,
+                    region[0],region[1],0,coverageLive.snapshotColor,coverageTexture,0,
+                    region[0],region[1],0,region[2]-region[0],region[3]-region[1],1);
+            }else{
+                gl.bindFramebuffer(readFramebuffer,coverageLive.scene[bank]);
+                gl.bindFramebuffer(drawFramebuffer,coverageLive.snapshot);
+                gl.blitFramebuffer(region[0],region[1],region[2],region[3],
+                    region[0],region[1],region[2],region[3],colorBufferBit,0x2600);
+            }
             accepted=check("copy per-sample destination before ordered map-2 triangle");
         }
         if(accepted){
