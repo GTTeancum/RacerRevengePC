@@ -292,8 +292,13 @@ void main(){
         raWorldFrameDraws.clear();
         try {
             for(const auto& record:*selected){
-                const ra_static_world50LA::Owner::Placement* placement=nullptr;
-                for(const auto& owned:raWorld->placements_)if(owned->worldInstance==record.worldInstance){placement=owned.get();break;}
+                // Cold construction appends each visual placement in strictly
+                // increasing source world-instance order. The live renderer
+                // publication prevents close/reordering of this same vector.
+                const auto found=std::lower_bound(raWorld->placements_.begin(),raWorld->placements_.end(),
+                    record.worldInstance,[](const auto& owned,std::size_t instance){return owned->worldInstance<instance;});
+                const ra_static_world50LA::Owner::Placement* placement=
+                    found!=raWorld->placements_.end()&&(*found)->worldInstance==record.worldInstance?found->get():nullptr;
                 if(!placement||record.sourceLod>=placement->lodRanges.size())
                     return fail(d,VehicleWindowError50DS::assets,"RA selected authentic LOD has no retained geometry");
                 const auto& range=placement->lodRanges[record.sourceLod];
@@ -410,10 +415,14 @@ void main(){
             return fail(d,VehicleWindowError50DS::frame,"RA prepared camera/fog publication changed before draw");
         return true;
     }
-    void bindRaWorldMaterial(const ra_static_world50LA::Owner::RasterInventory& raster,U program,bool payload) noexcept {
+    void bindRaWorldMaterial(const ra_static_world50LA::Owner::RasterInventory& raster,U program,bool payload,
+        bool uploadUniforms) noexcept {
         using F=assets::OriginalUiGsField50KG;
         const auto field=[&](F f){return raster.finalContext.fields[static_cast<std::size_t>(f)].value;};
         const auto& u=raWorldUniform[program];gl.useProgram(raWorldProgram[program]);
+        // AA0 composition switches programs, so retain the bind on every
+        // primitive. The selected draw's material/camera uniforms do not vary.
+        if(!uploadUniforms)return;
         gl.uniformMatrix4fv(u.matrix,1,0,matrix);
         gl.uniformMatrix4fv(u.sourceMatrix,1,0,raWorldSourceMatrix);gl.uniform1i(u.image,0);
         const U color=raWorldCamera.source.color30;
@@ -442,6 +451,10 @@ void main(){
             if(index>=raWorldFrame.size())return false;
             const auto& v=raWorldFrame[index];
             const double p[4]={v.position[0],v.position[1],v.position[2],1.};
+            // Reuse only identical products, never reassociate a plane sum.
+            // Populate each axis at its first original plane so an earlier
+            // nonfinite rejection does not evaluate previously unreached axes.
+            double products[4][4];
             unsigned outside=0;
             for(U plane=0;plane<6;++plane){
                 const U axis=plane/2;const double sign=(plane&1)?-1.:1.;
@@ -449,8 +462,10 @@ void main(){
                 for(U k=0;k<4;++k){
                     // Same row-vector product as GLSL; each output lane
                     // reads one column of the column-major uniform storage.
-                    const double w=double(matrix[3*4+k])*p[k];
-                    const double a=double(matrix[axis*4+k])*p[k];
+                    if(plane==0)products[3][k]=double(matrix[3*4+k])*p[k];
+                    if(!(plane&1))products[axis][k]=double(matrix[axis*4+k])*p[k];
+                    const double w=products[3][k];
+                    const double a=products[axis][k];
                     value+=w+sign*a;scale+=std::abs(w)+std::abs(a);
                 }
                 if(!std::isfinite(value)||!std::isfinite(scale))return false;
@@ -461,33 +476,55 @@ void main(){
         }
         return common!=0;
     }
-    std::array<I,4> nativeTriangleRasterRegion(const std::array<std::array<float,3>,3>& triangle)const noexcept {
-        const std::array<I,4> full{{0,0,width,height}};
-        double clip[3][4]{},error[3][4]{};unsigned common=63u;
-        for(U corner=0;corner<3;++corner){
-            const auto& v=triangle[corner];const double p[4]={v[0],v[1],v[2],1.};
-            // gl_Position = vec4(position,1) * worldViewProjection;
-            // uniformMatrix4fv(...,GL_FALSE,...) keeps column-major storage.
-            for(U column=0;column<4;++column){
-                double magnitude=0;
-                for(U k=0;k<4;++k){const double term=double(matrix[column*4+k])*p[k];clip[corner][column]+=term;magnitude+=std::abs(term);}
-                error[corner][column]=32.*std::numeric_limits<float>::epsilon()*magnitude+0.0001;
-                if(!std::isfinite(clip[corner][column])||!std::isfinite(error[corner][column]))return full;
-            }
-            unsigned outside=0;
-            for(U plane=0;plane<6;++plane){const U axis=plane/2;
-                const double value=clip[corner][3]+((plane&1)?-clip[corner][axis]:clip[corner][axis]);
-                if(value < -(error[corner][3]+error[corner][axis]))outside|=1u<<plane;
-            }
-            common&=outside;
+    struct NativeRasterVertex {
+        double clip[4]{},error[4]{};
+        unsigned outside=0;
+    };
+    struct CachedNativeRasterVertex {
+        NativeRasterVertex operand;
+        U index=0;
+        bool occupied=false,finite=false;
+    };
+    // Scratch exists only within one synchronous source MSCNT group. It
+    // retains no resource pointer and is invalidated before every group.
+    mutable std::array<CachedNativeRasterVertex,32> racerRasterOperands{};
+    bool racerRasterCacheActive=false;
+    U racerRasterSlot=0,racerRasterComponent=0,racerRasterFirst=0,racerRasterCount=0;
+    void beginRacerRasterOperandGroup(U slot,U component,U first,U count)noexcept {
+        racerRasterCacheActive=false;
+        if(!request.raStaticWorld||count<3)return;
+        for(auto& entry:racerRasterOperands)entry.occupied=false;
+        racerRasterSlot=slot;racerRasterComponent=component;
+        racerRasterFirst=first;racerRasterCount=count;
+        racerRasterCacheActive=true;
+    }
+    void endRacerRasterOperandGroup()noexcept {racerRasterCacheActive=false;}
+    bool nativeRasterVertex(const std::array<float,3>& v,NativeRasterVertex& out)const noexcept {
+        out={};const double p[4]={v[0],v[1],v[2],1.};
+        // Preserve the previous per-column/per-term arithmetic and checks.
+        for(U column=0;column<4;++column){
+            double magnitude=0;
+            for(U k=0;k<4;++k){const double term=double(matrix[column*4+k])*p[k];out.clip[column]+=term;magnitude+=std::abs(term);}
+            out.error[column]=32.*std::numeric_limits<float>::epsilon()*magnitude+0.0001;
+            if(!std::isfinite(out.clip[column])||!std::isfinite(out.error[column]))return false;
         }
+        for(U plane=0;plane<6;++plane){const U axis=plane/2;
+            const double value=out.clip[3]+((plane&1)?-out.clip[axis]:out.clip[axis]);
+            if(value < -(out.error[3]+out.error[axis]))out.outside|=1u<<plane;
+        }
+        return true;
+    }
+    std::array<I,4> nativeTriangleRasterOperands(const std::array<NativeRasterVertex,3>& vertices)const noexcept {
+        const std::array<I,4> full{{0,0,width,height}};
+        unsigned common=63u;
+        for(const auto& vertex:vertices)common&=vertex.outside;
         // Fully clipped triangles have no payload or destination consumers,
         // including triangles entirely behind the camera. Do not expand
         // those into a costly full-target fallback merely because W is low.
         if(common)return {{0,0,0,0}};
         double low[2]={1.,1.},high[2]={-1.,-1.};
         for(U corner=0;corner<3;++corner){
-            const auto& c=clip[corner];const auto& e=error[corner];
+            const auto& c=vertices[corner].clip;const auto& e=vertices[corner].error;
             if(c[3]<=e[3]+0.0001)return full;
             for(U axis=0;axis<2;++axis)for(int a:{-1,1})for(int w:{-1,1}){
                 const double value=(c[axis]+a*e[axis])/(c[3]+w*e[3]);
@@ -506,6 +543,12 @@ void main(){
         }
         return region;
     }
+    std::array<I,4> nativeTriangleRasterRegion(const std::array<std::array<float,3>,3>& triangle)const noexcept {
+        std::array<NativeRasterVertex,3> vertices;
+        for(U corner=0;corner<3;++corner)
+            if(!nativeRasterVertex(triangle[corner],vertices[corner]))return {{0,0,width,height}};
+        return nativeTriangleRasterOperands(vertices);
+    }
     std::array<I,4> raTriangleRasterRegion(U first)const noexcept {
         std::array<std::array<float,3>,3> triangle;
         for(U corner=0;corner<3;++corner){
@@ -523,12 +566,23 @@ void main(){
         if(component>=batch.componentCount)return full;
         const auto& part=batch.component[component];
         if(!part.vertices||!part.indices||first>part.indexCount||part.indexCount-first<3)return full;
-        std::array<std::array<float,3>,3> triangle;
+        const bool cache=racerRasterCacheActive&&slot==racerRasterSlot&&component==racerRasterComponent&&
+            first>=racerRasterFirst&&first-racerRasterFirst<=racerRasterCount&&
+            racerRasterCount-(first-racerRasterFirst)>=3;
+        std::array<NativeRasterVertex,3> vertices;
         for(U corner=0;corner<3;++corner){
             const auto index=part.indices[first+corner];if(index>=part.vertexCount)return full;
-            std::copy_n(part.vertices[index].position,3,triangle[corner].begin());
+            auto& entry=racerRasterOperands[index%racerRasterOperands.size()];
+            if(!cache||!entry.occupied||entry.index!=index){
+                std::array<float,3> position;
+                std::copy_n(part.vertices[index].position,3,position.begin());
+                entry.index=index;entry.finite=nativeRasterVertex(position,entry.operand);
+                entry.occupied=cache;
+            }
+            if(!entry.finite)return full;
+            vertices[corner]=entry.operand;
         }
-        return nativeTriangleRasterRegion(triangle);
+        return nativeTriangleRasterOperands(vertices);
     }
     // Capture-only attestation of existing GL attribute/storage, never a draw,
     // source replay, visibility test or pixel-winner claim. Six vertex reads
@@ -683,6 +737,10 @@ void main(){
             // Opaque original triangles can share a draw. Blended triangles
             // observe each preceding primitive's current destination samples.
             const U step=blend?3:plan.indexCount;
+            // This uninterrupted selected draw has no callbacks or other
+            // writers of its private RA program uniforms. Establish them only
+            // after clipping admits a primitive, and reuse only after success.
+            bool firstPrimitive=true;
             for(U first=plan.indexStart;accepted&&first<plan.indexStart+plan.indexCount;first+=step){
                 if(blend&&raTriangleOutsideNativeClip(first))continue;
                 if(blend){
@@ -708,7 +766,7 @@ void main(){
                     const U outputs[]={colorAttachment,colorAttachment+1};gl.drawBuffers(2,outputs);
                     coverageAa0();gl.disable(0x0B71);gl.depthMask(0);
                     const float invalid[]={0,0,0,-1};gl.clearBufferfv(0x1800,0,invalid);
-                    bindRaWorldMaterial(raster,0,true);
+                    bindRaWorldMaterial(raster,0,true,firstPrimitive);
                     drawGl.drawElementsBaseVertex(0x0004,3,0x1405,reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
                     gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.drawBuffer(colorAttachment);
                     gl.enable(0x809D);gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(1);
@@ -721,13 +779,14 @@ void main(){
                     gl.bindFramebuffer(framebuffer,coverageLive.scene[bank]);gl.drawBuffer(colorAttachment);
                     bindTrackCoverage(aa?NativeTrackCoverage50DS::fourSampleAa1:NativeTrackCoverage50DS::aa0);
                     gl.enable(0x0B71);gl.depthFunc(0x0203);gl.depthMask(1);
-                    bindRaWorldMaterial(raster,blend?1:0,false);
+                    bindRaWorldMaterial(raster,blend?1:0,false,firstPrimitive);
                     if(blend){gl.activeTexture(textureUnit0+2);if(gl.bindSampler)gl.bindSampler(2,0);gl.bindTexture(coverageTexture,coverageLive.snapshotColor);}
                     drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(step),0x1405,reinterpret_cast<const void*>(std::uintptr_t(first)*sizeof(U)),0);
                 }
                 gl.activeTexture(textureUnit0+2);gl.bindTexture(coverageTexture,0);
                 gl.activeTexture(textureUnit0+1);gl.bindTexture(texture2D,0);gl.activeTexture(textureUnit0);
                 accepted=check("draw source-ordered RA material primitive with source depth/alpha rules");
+                if(accepted)firstPrimitive=false;
             }
             if(accepted){++diagnostic->trackDraws;diagnostic->trackIndices+=plan.indexCount;}
         }

@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 8:03 p.m. EDT (2026-10-17 00:03 UTC).
+Updated: 2026-10-16 8:13 p.m. EDT (2026-10-17 00:13 UTC).
 
 ## Current direction
 
@@ -69,8 +69,36 @@ bridge. Generic callback/span state binding remains unchanged. See
 [the source rationale](recovery/coverage-group-invariant-state-20261017.md).
 These changes have not been built or tested, and no speedup is claimed.
 
-Previous documentation-only handoff publication: `847798661571b1852e3f6c2c5b01ec7b8e09f4a5`,
+Also integrated a fixed 32-entry actual-index cache for vertex clip operands,
+scoped to one synchronous racer MSCNT group. It is reset at entry and disabled
+on success or failure; static-world clipping remains uncached. Dot-product and
+rectangle arithmetic are unchanged. Cache collisions recompute. Lookup/copy
+cost versus saved arithmetic is unmeasured. See
+[operand cache rationale](recovery/racer-raster-operand-cache-20261017.md).
+
+Earlier documentation-only handoff publication: `847798661571b1852e3f6c2c5b01ec7b8e09f4a5`,
 verified tree `818ee732f9580900201d0e75d02742a9484d3710`, parent `e53d3220`.
+
+The RA world draw path also reuses six unchanged material/camera uniforms
+after the first checked nonempty primitive of a selected draw. Program binding
+still occurs on every primitive, and AA0 composition mode remains explicit.
+Source-reviewed only; see [RA uniform rationale](recovery/ra-material-uniforms-20261017.md).
+
+RA clip-plane rejection also reuses each identical matrix-position product
+within a vertex. Original accumulation order, thresholds and nonfinite fallback
+are preserved. Source-level products fall from 48 to 16 per fully reached vertex;
+compiler optimization and lookup costs make runtime impact uncertain. See
+[clip-product rationale](recovery/ra-clip-product-reuse-20261017.md).
+
+RA selected-instance placement lookup now uses binary search in the cold-built,
+strictly ordered retained placement vector. Exact identity/LOD checks remain;
+no allocation or additional retained pointer is introduced. See
+[placement lookup proof](recovery/ra-placement-lookup-20261017.md).
+
+Selected-light submission now borrows its already-validated local value snapshots
+through synchronous drawing, instead of making a second Storage copy. A scope
+guard clears all pointers before the snapshots die, including failure exits.
+See [snapshot lifetime proof](recovery/racer-light-snapshot-borrow-20261017.md).
 
 ## Avoid unsafe shortcuts
 
@@ -85,6 +113,11 @@ verified tree `818ee732f9580900201d0e75d02742a9484d3710`, parent `e53d3220`.
   bounds have not been proven. Arbitrary epsilon/padding is not a proof.
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
+
+Previous verified untested-source publication: `3ddb155abe43a474c9b5ff8c0308b74e6bc2cf78`
+(tree `9363d39865f60e62f8eaf1fbe5fbc9f24cd3e6db`, parent `84779866`). It contains
+the racer state-call change and clarification that the successor may test.
+The current checkpoint additionally includes the other source-only changes above.
 
 ## Known functional limits
 

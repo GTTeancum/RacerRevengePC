@@ -1244,10 +1244,11 @@ struct VehicleWindowGl50DS::Storage {
     U cableTextureName = 0, cableVertexBuffer = 0, cableIndexBuffer = 0, cableVertexArray = 0;
     const game::PodCableMesh50FD* frameCables = nullptr;
     game::VehicleDrawBatch50CO framePlayerBatch{}, frameOpponentBatches[maxVehicleWindowOpponents50DS]{};
-    // Immutable value snapshots travel with the corresponding real batch for
-    // this one unpublished frame. No source owner/lease pointer is borrowed.
-    game::NativeGcSelectedLightsCandidate framePlayerLights{};
-    game::NativeGcSelectedLightsCandidate frameOpponentLights[maxVehicleWindowOpponents50DS]{};
+    // Borrow submit's validated value snapshots only through its synchronous
+    // callbacks. Its scope guard clears these before the local snapshots die;
+    // no source owner/lease pointer is borrowed.
+    const game::NativeGcSelectedLightsCandidate* framePlayerLights = nullptr;
+    const game::NativeGcSelectedLightsCandidate* frameOpponentLights[maxVehicleWindowOpponents50DS]{};
     const game::PodCableMesh50FD* frameOpponentCables[maxVehicleWindowOpponents50DS]{};
     U frameOpponentCount = 0;
     U frameOpponentArchetypes[maxVehicleWindowOpponents50DS]{};
@@ -4865,8 +4866,13 @@ void main() {
             // Source sampling/clipping/depth remain the admitted native policy.
             if (accepted) {
                 if (coverageDemand) {
+                    // No callback or matrix/vertex mutation occurs inside
+                    // this synchronous group. End the scratch scope on failure
+                    // as well as success before another source owner can run.
+                    beginRacerRasterOperandGroup(slot,component,group.indexStart,group.indexCount);
                     accepted = drawCoveragePairGroup(bank, slot, component,
                         group.indexStart, group.indexCount, material->specularName50LA);
+                    endRacerRasterOperandGroup();
                 } else {
                     for (U i = group.indexStart; i < group.indexStart + group.indexCount; i += 3) {
                         gl.textureBarrier();
@@ -4932,7 +4938,7 @@ void main() {
                     if (selected.materials[material].policy.blend != VehicleWindowBlend50DS::opaque) continue;
                     if (!applyPodMaterial(selected.materials[material], false,
                         opponentMaterialUvs[opponent * opponentMaterialStride + material].value,
-                        frameOpponentLights[opponent].component(c))) return false;
+                        frameOpponentLights[opponent]->component(c))) return false;
                 }
                 if (!drawSpecularSpan50LA(bank, opponent + 1, archetype, c, i, span)) return false;
                 ++diagnostic->opponentOpaqueDraws;
@@ -5028,7 +5034,7 @@ void main() {
             // selected effect issues a discard-only first-pass draw, then the
             // retained source range is rendered once at commit after opaques.
             return s.applyPodMaterial(binding, binding.policy.blend != VehicleWindowBlend50DS::opaque,
-                nullptr, s.framePlayerLights.component(componentIndex(component)));
+                nullptr, s.framePlayerLights->component(componentIndex(component)));
         }
         s.gl.uniform1i(s.shader->uniforms().useTexture, 0);
         s.gl.uniform1i(s.shader->uniforms().useNativeGcSelectedLights, 0);
@@ -5889,13 +5895,23 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     // Snapshot bounded opponent descriptors and UV values before any GL work.
     // Their independent source vertex/cable arrays remain borrowed only through
     // this synchronous transaction; no per-frame allocation or index upload.
+    // Reuse the admitted light values above instead of copying every component
+    // matrix again. Reset on every exit, including a failed backend transaction.
+    struct FrameLightBorrowReset {
+        Storage& state;
+        U opponentCount;
+        ~FrameLightBorrowReset() noexcept {
+            state.framePlayerLights = nullptr;
+            for (U i = 0; i < opponentCount; ++i) state.frameOpponentLights[i] = nullptr;
+        }
+    } frameLightBorrowReset{s, frame.opponentCount};
     s.frameOpponentCount = frame.opponentCount;
     s.framePlayerBatch = batch;
-    s.framePlayerLights = playerLights;
+    s.framePlayerLights = &playerLights;
     for (U i = 0; i < frame.opponentCount; ++i) {
         const auto& opponent = frame.opponents[i];
         s.frameOpponentBatches[i] = *opponent.batch;
-        s.frameOpponentLights[i] = opponentLights[i];
+        s.frameOpponentLights[i] = &opponentLights[i];
         s.frameOpponentCables[i] = opponent.cables;
         s.frameOpponentArchetypes[i] = opponent.racerArchetype;
         const auto selected = s.racerView(opponent.racerArchetype);
@@ -5973,11 +5989,9 @@ bool VehicleWindowGl50DS::submit(const game::VehicleDrawBatch50CO& batch,
     s.frameGameplayBinders=nullptr;s.frameGameplayBinderCount=0;s.frameGameplayBinderImage=0;
     s.frameGcParticles=nullptr;
     s.framePlayerBatch = {};
-    s.framePlayerLights = {};
     s.frameDynamicWorld = {};
     for (U i = 0; i < s.frameOpponentCount; ++i) {
         s.frameOpponentBatches[i] = {};
-        s.frameOpponentLights[i] = {};
         s.frameOpponentCables[i] = nullptr;
         s.frameOpponentArchetypes[i] = 0;
     }
