@@ -188,7 +188,15 @@ public:
                     const auto first=draw_.quadCount;
                     for(std::size_t v=0;v+3<packet.activeCount;v+=2){auto& quad=draw_.quads[draw_.quadCount++];
                         const std::size_t order[]={v+1,v,v+2,v+3};
-                        for(unsigned corner=0;corner<4;++corner){const auto& source=packet.vertices[order[corner]];assets::Vertex48B vertex;
+                        unsigned firstCorner=0;
+                        if(v){
+                            // The preceding strip quad already validated these shared endpoints.
+                            const auto& previous=draw_.quads[draw_.quadCount-2];
+                            quad.vertices[0]=previous.vertices[3];quad.vertices[1]=previous.vertices[2];
+                            quad.packetColors[0]=previous.packetColors[3];quad.packetColors[1]=previous.packetColors[2];
+                            firstCorner=2;
+                        }
+                        for(unsigned corner=firstCorner;corner<4;++corner){const auto& source=packet.vertices[order[corner]];assets::Vertex48B vertex;
                             if(!platform::convertOriginalRadarOverlayDepthIndependentVertex50LA(material,source.stq,source.rgba,vertex))return fail(d,0x2e21d0);
                             quad.vertices[corner]={vertex.position[0],vertex.position[1],0,0};
                             for(unsigned c=0;c<4;++c)quad.packetColors[corner][c]=vertex.color[c];}
