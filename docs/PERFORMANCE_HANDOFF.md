@@ -1,17 +1,19 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 8:01 p.m. EDT (2026-10-17 00:01 UTC).
+Updated: 2026-10-16 8:03 p.m. EDT (2026-10-17 00:03 UTC).
 
 ## Current direction
 
 Continue performance-focused work until the user says to stop. Publish reviewed
 source checkpoints to `GTTeancum/RacerRevengePC` main every 15 minutes and update
-this handoff with each publication. The user explicitly requested **no tests**;
-do not run builds, smokes, syntax checks, sanitizers, benchmarks or gameplay.
-New source changes are **UNTESTED**. Do not infer an FPS improvement from fewer
-API calls. The previous Friday-evening cutoff has been superseded.
+this handoff with each publication. The outgoing session is focused entirely on code and is publishing changes
+without execution-based validation. This restriction applies only to the outgoing
+session, not to the next owner. New source changes are **UNTESTED**. Do not infer
+an FPS improvement from fewer API calls. The previous Friday-evening cutoff has
+been superseded.
 
-Keep integration centrally owned; helpers are source-only, Medium maximum.
+Keep integration centrally owned. The outgoing session uses source-only helpers,
+Medium maximum; the next owner should establish its validation plan with the user.
 Use the VM only, not the user's PC. Preserve remote history, never force-push,
 and independently verify the resulting remote commit, tree and parent. Git
 publication is explicitly authorized, including untested source checkpoints.
@@ -55,14 +57,20 @@ established. No fresh Windows test was performed.
   tick-window differences prohibit treating those results as a clean benchmark.
   Never restore incorrect geometry rejection to obtain higher FPS.
 
-## Active source-only work
+## Current untested changes
 
-Review conservative group-local invariants in
+Integrated source-reviewed group-local invariants in
 `platform/linux/native/native_coverage_storage.inl`: redundant sampler-object
 bindings/composition mode and fixed coverage/viewport/color-mask/blend state.
-Retain all existing per-run error gates, draw order, destination snapshots,
-texture feedback unbinds and complete failure-path restoration. No patch from
-this investigation is claimed tested or faster.
+The change retains existing per-run error gates, draw order, destination snapshots,
+texture feedback unbinds and failure-path restoration. A local firstRun flag is
+reset per original MSCNT group; it advances only after a successful nonempty
+bridge. Generic callback/span state binding remains unchanged. See
+[the source rationale](recovery/coverage-group-invariant-state-20261017.md).
+These changes have not been built or tested, and no speedup is claimed.
+
+Previous documentation-only handoff publication: `847798661571b1852e3f6c2c5b01ec7b8e09f4a5`,
+verified tree `818ee732f9580900201d0e75d02742a9484d3710`, parent `e53d3220`.
 
 ## Avoid unsafe shortcuts
 
@@ -95,6 +103,8 @@ Wreck collection work is held and not active gameplay evidence.
    document ownership boundaries and failure paths for each change.
 3. Update this document with the actual changes and remaining work on each push.
    Publish untested checkpoints without implying a build/smoke/FPS result.
-4. Do not start testing unless the user changes the current no-tests instruction.
+4. The next owner may validate these untested changes; the outgoing session’s
+   code-only restriction does not carry over. Prioritize a build and focused
+   smoke before claiming correctness or performance improvement.
    Any future Windows validation must be visible from the original asset folder,
    native exe beside SLUS, with menu/rider/course/track screenshots and baseline FPS.
