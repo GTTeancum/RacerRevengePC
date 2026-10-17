@@ -28,6 +28,7 @@ public:
     };
     struct DrawPlanRequirements {
         std::size_t surfaces=0,placements=0,staticLightingSurfaces=0,coverageSurfaces=0,dynamicMapSurfaces=0;
+        std::size_t staticLightingVertices=0;
         // These are unresolved implementation requirements, not caller-set
         // readiness. They deliberately do not authorize renderer publication.
     };
@@ -124,7 +125,13 @@ private:
                 record.hasOriginalColors=span.hasOriginalColors;record.worldSpaceRootBypassed=span.worldSpaceRootBypassed;record.authoredUseLighting=placement.sourceUseLighting;
                 surfaceDrawPlan_.push_back(record);seenPlacement[span.placement]=true;
                 auto& policy=rasterInventory_[raster];++policy.surfaceCount;
-                drawRequirements_.staticLightingSurfaces+=policy.requiresNativeStaticLighting?1:0;
+                if(policy.requiresNativeStaticLighting){
+                    if(drawRequirements_.staticLightingVertices>vertices_.size()||
+                       record.vertexCount>vertices_.size()-drawRequirements_.staticLightingVertices)
+                        return failed("lit source vertex total exceeds retained world geometry");
+                    drawRequirements_.staticLightingVertices+=record.vertexCount;
+                    ++drawRequirements_.staticLightingSurfaces;
+                }
                 drawRequirements_.coverageSurfaces+=policy.requiresNativeCoverage?1:0;
                 drawRequirements_.dynamicMapSurfaces+=policy.dynamicCrowdMap?1:0;
             }

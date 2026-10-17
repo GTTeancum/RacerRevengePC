@@ -41,6 +41,15 @@ class Binding final {
     std::shared_ptr<ra_static_world50LA::Owner> world_;
     std::shared_ptr<light::Owner> light_;
     std::vector<Snapshot> snapshots_;
+    struct RecoveredNormalSurface {
+        const rr::assets::Scene48D* scene=nullptr;
+        const rr::assets::SceneSurface48D* surface=nullptr;
+        std::size_t first=0,count=0;
+    };
+    // Same-publication results from prepare's existing source validation, not
+    // dynamic lighting or a cache surviving replacement of this Binding.
+    std::vector<RecoveredNormalSurface> recoveredNormalSurfaces_;
+    std::vector<numeric::CompressedNormal> recoveredNormals_;
     std::unique_ptr<StaticDiffuseStream> diffuseStream_;
     Binding()=default;
     bool current()const noexcept {
@@ -54,6 +63,11 @@ class Binding final {
         light::Diagnostic& d) {
         world_=std::move(world);light_=std::move(lighting);camera_.owner=std::move(camera);
         if(!camera_.owner||!camera_.owner->readStaticLightPublication(camera_.identity)||!current())return false;
+        // The completed immutable draw plan counted these exact lit rows.
+        // Reserve exact metadata and lit-vertex demand, not all-world vertices.
+        snapshots_.reserve(world_->drawRequirements_.staticLightingSurfaces);
+        recoveredNormalSurfaces_.reserve(world_->drawRequirements_.staticLightingSurfaces);
+        recoveredNormals_.reserve(world_->drawRequirements_.staticLightingVertices);
         // Native static policy: select at the authored SCB Position, from the
         // authored one-based zone. import_world48f::placement stores Position
         // directly in matrix[12..14]. PSG world-space bypass only changes the
@@ -89,11 +103,15 @@ class Binding final {
             // Verify the original compressed normals remain recoverable; never
             // replace source normals or force white prelit color streams.
             const auto& surface=scene->lods[plan.sourceLod].surfaces[plan.sourceSurface];
+            RecoveredNormalSurface recovered{scene,&surface,recoveredNormals_.size(),surface.vertices.size()};
             for(const auto& vertex:surface.vertices){numeric::CompressedNormal normal;
-                if(!light::recoverCompressedNormal(vertex.normal_local,normalQ,normal))return false;}
-            snapshots_.push_back(row);
+                if(!light::recoverCompressedNormal(vertex.normal_local,normalQ,normal))return false;
+                recoveredNormals_.push_back(normal);
+            }
+            snapshots_.push_back(row);recoveredNormalSurfaces_.push_back(recovered);
         }
-        return snapshots_.size()==world_->drawRequirements_.staticLightingSurfaces&&current();
+        return snapshots_.size()==world_->drawRequirements_.staticLightingSurfaces&&
+            recoveredNormals_.size()==world_->drawRequirements_.staticLightingVertices&&current();
     }
     bool read(std::size_t surface,Snapshot& out)const noexcept {
         if(!current())return false;
@@ -138,7 +156,8 @@ class Binding final {
                 }
                 if(!diffuseRasterCurrent(plan.raster))return reject(StaticDiffuseStatus::material);
                 if(raster.passFlags&4u)return reject(StaticDiffuseStatus::fillUnsupported);
-                if(selected>=snapshots_.size())return reject(StaticDiffuseStatus::source);
+                if(selected>=snapshots_.size()||selected>=recoveredNormalSurfaces_.size())return reject(StaticDiffuseStatus::source);
+                const auto& recovered=recoveredNormalSurfaces_[selected];
                 const auto& snapshot=snapshots_[selected++];
                 if(snapshot.surface!=plan.surface||snapshot.placement!=plan.placement||
                    snapshot.worldInstance!=plan.worldInstance||plan.placement>=world_->placements_.size()||
@@ -151,6 +170,9 @@ class Binding final {
                 const auto* material=placement.materials.handle1C4(surface.material_index);
                 if(!material||*material!=raster.materialRow||surface.material_index!=plan.materialSlot||
                    surface.vertices.size()!=plan.vertexCount||surface.indices.size()!=plan.indexCount)
+                    return reject(StaticDiffuseStatus::source);
+                if(recovered.scene!=scene||recovered.surface!=&surface||recovered.count!=surface.vertices.size()||
+                   recovered.first>recoveredNormals_.size()||recovered.count>recoveredNormals_.size()-recovered.first)
                     return reject(StaticDiffuseStatus::source);
                 next->surfaces_.emplace_back();auto& output=next->surfaces_.back();
                 auto& id=output.identity;id.surface=plan.surface;id.placement=plan.placement;
@@ -165,17 +187,16 @@ class Binding final {
                 // model ambient/alpha overrides, fill substitution or constant
                 // alpha. Selection already performed the signed-light fold.
                 input.colorRows=snapshot.lights.diffuse;
-                for(const auto& vertex:surface.vertices){
-                    numeric::CompressedNormal normal;
-                    if(!light::recoverCompressedNormal(vertex.normal_local,scene->quantization[1],normal))
-                        return reject(StaticDiffuseStatus::normal);
+                for(std::size_t vertex=0;vertex<recovered.count;++vertex){
+                    const auto& normal=recoveredNormals_[recovered.first+vertex];
                     numeric::DiffuseVertexRgba rgba;
                     if(numeric::projectDiffuseCompressedRgba(input,normal,rgba)!=numeric::Status::complete)
                         return reject(StaticDiffuseStatus::arithmetic);
                     output.vertices.push_back(rgba);++d.vertex;
                 }
             }
-            if(selected!=snapshots_.size()||selected!=world_->drawRequirements_.staticLightingSurfaces)
+            if(selected!=snapshots_.size()||selected!=recoveredNormalSurfaces_.size()||
+               selected!=world_->drawRequirements_.staticLightingSurfaces)
                 return reject(StaticDiffuseStatus::source);
             if(!current())return reject(StaticDiffuseStatus::stale);
             diffuseStream_=std::move(next);return true;

@@ -5,11 +5,17 @@
     std::shared_ptr<ra_static_world50LA::Owner> raWorld;
     const VehicleWindowGl50DS* raWorldRenderer=nullptr;
     std::uint64_t raWorldImagePublication=0;
-    U raWorldArray=0,raWorldVertices=0,raWorldIndices=0;
+    U raWorldArray=0,raWorldVertices=0,raWorldOperands=0,raWorldIndices=0;
     U raWorldVertexShader=0,raWorldGeometryShader=0,raWorldFragment[2]{},raWorldProgram[2]{};
     struct RaWorldUniforms { I matrix=-1,sourceMatrix=-1,image=-1,fog=-1,alpha=-1,payload=-1,destination=-1; } raWorldUniform[2];
-    struct RaWorldVertex { float position[3],uv[2],color[4],fog; };
-    std::vector<RaWorldVertex> raWorldFrame;
+    struct RaWorldVertex { float position[3],uv[2]; };
+    struct RaWorldFrameVertex { float color[4],fog; };
+    static_assert(sizeof(RaWorldVertex)==20&&offsetof(RaWorldVertex,position)==0&&
+        offsetof(RaWorldVertex,uv)==12,"RA immutable float stream layout");
+    static_assert(sizeof(RaWorldFrameVertex)==20&&offsetof(RaWorldFrameVertex,color)==0&&
+        offsetof(RaWorldFrameVertex,fog)==16,"RA current float stream layout");
+    std::vector<RaWorldVertex> raWorldGeometry;
+    std::vector<RaWorldFrameVertex> raWorldFrame;
     std::vector<U> raWorldFrameImages;
     struct RaWorldFrameDraw { std::size_t surface=0;std::array<I,4> scissor{}; };
     std::vector<RaWorldFrameDraw> raWorldFrameDraws;
@@ -18,7 +24,7 @@
     bool raWorldFramePrepared=false;
     bool raPixelProvenanceLogged=false;
     bool hasRaWorldResources() const noexcept {
-        return raWorldArray||raWorldVertices||raWorldIndices||raWorldVertexShader||raWorldGeometryShader||
+        return raWorldArray||raWorldVertices||raWorldOperands||raWorldIndices||raWorldVertexShader||raWorldGeometryShader||
             raWorldFragment[0]||raWorldFragment[1]||raWorldProgram[0]||raWorldProgram[1];
     }
     void retireRaWorldPublication() noexcept {
@@ -40,7 +46,8 @@
         return deleteShaderName(raWorldGeometryShader,false,d)&&
             deleteShaderName(raWorldVertexShader,false,d)&&
             deleteName(raWorldArray,gl.deleteVertexArrays,d)&&
-            deleteName(raWorldVertices,gl.deleteBuffers,d)&&deleteName(raWorldIndices,gl.deleteBuffers,d);
+            deleteName(raWorldVertices,gl.deleteBuffers,d)&&deleteName(raWorldOperands,gl.deleteBuffers,d)&&
+            deleteName(raWorldIndices,gl.deleteBuffers,d);
     }
     bool createRaWorld() noexcept {
         if(!raWorld)return true;
@@ -79,34 +86,49 @@
                 return fail(*diagnostic,VehicleWindowError50DS::material,"RA fill-color program is not implemented");
         }
         try {
+            raWorldGeometry.resize(raWorld->vertices_.size());
             raWorldFrame.resize(raWorld->vertices_.size());
             raWorldFrameImages.resize(raWorld->surfaceDrawPlan_.size());
         }catch(...){return fail(*diagnostic,VehicleWindowError50DS::allocation,"allocate complete RA frame streams");}
         // The retained cold world owns immutable position/UV lanes. Crowd
-        // animation selects images; per-frame lighting/fog only updates the
-        // remaining lanes. Reinitialize these copies on every GPU creation.
-        for(std::size_t v=0;v<raWorldFrame.size();++v){
-            const auto& input=raWorld->vertices_[v];auto& output=raWorldFrame[v];
+        // animation selects images. Keep current float RGBA/fog in a separate
+        // stream so each frame uploads only those lanes, without repacking.
+        // Reinitialize the immutable copies on every GPU creation.
+        for(std::size_t v=0;v<raWorldGeometry.size();++v){
+            const auto& input=raWorld->vertices_[v];auto& output=raWorldGeometry[v];
             std::copy(input.worldPosition.begin(),input.worldPosition.end(),output.position);
             std::copy(input.sourceUv.begin(),input.sourceUv.end(),output.uv);
         }
-        const std::uint64_t vb=raWorldFrame.size()*sizeof(RaWorldVertex),ib=raWorld->indices_.size()*sizeof(U);
-        if(!vb||!ib||vb>std::uint64_t(std::numeric_limits<std::intptr_t>::max())||
+        const std::uint64_t vb=raWorldGeometry.size()*sizeof(RaWorldVertex),
+            fb=raWorldFrame.size()*sizeof(RaWorldFrameVertex),ib=raWorld->indices_.size()*sizeof(U);
+        if(!vb||!fb||!ib||vb>std::uint64_t(std::numeric_limits<std::intptr_t>::max())||
+           fb>std::uint64_t(std::numeric_limits<std::intptr_t>::max())||
            ib>std::uint64_t(std::numeric_limits<std::intptr_t>::max()))
             return fail(*diagnostic,VehicleWindowError50DS::limits,"RA source buffer extent exceeds GL limits");
         gl.genVertexArrays(1,&raWorldArray);drawGl.bindVertexArray(raWorldArray);
         gl.genBuffers(1,&raWorldVertices);drawGl.bindBuffer(arrayBuffer,raWorldVertices);
-        gl.bufferData(arrayBuffer,static_cast<std::intptr_t>(vb),nullptr,dynamicDraw);
+        gl.bufferData(arrayBuffer,static_cast<std::intptr_t>(vb),raWorldGeometry.data(),staticDraw);
+        const I staticCounts[]={3,2};const std::size_t staticOffsets[]={offsetof(RaWorldVertex,position),offsetof(RaWorldVertex,uv)};
+        for(U i=0;i<2;++i){gl.enableVertexAttribArray(i);gl.vertexAttribPointer(i,staticCounts[i],0x1406,0,sizeof(RaWorldVertex),reinterpret_cast<const void*>(staticOffsets[i]));}
+        gl.genBuffers(1,&raWorldOperands);drawGl.bindBuffer(arrayBuffer,raWorldOperands);
+        // A fresh renderer's value-initialized CPU records define every GPU
+        // operand, including unselected surfaces inspected by diagnostics.
+        gl.bufferData(arrayBuffer,static_cast<std::intptr_t>(fb),raWorldFrame.data(),dynamicDraw);
+        const I frameCounts[]={4,1};const std::size_t frameOffsets[]={offsetof(RaWorldFrameVertex,color),offsetof(RaWorldFrameVertex,fog)};
+        for(U i=0;i<2;++i){gl.enableVertexAttribArray(i+2);gl.vertexAttribPointer(i+2,frameCounts[i],0x1406,0,sizeof(RaWorldFrameVertex),reinterpret_cast<const void*>(frameOffsets[i]));}
         gl.genBuffers(1,&raWorldIndices);drawGl.bindBuffer(elementBuffer,raWorldIndices);
         gl.bufferData(elementBuffer,static_cast<std::intptr_t>(ib),raWorld->indices_.data(),staticDraw);
-        const I counts[]={3,2,4,1};const std::size_t offsets[]={offsetof(RaWorldVertex,position),offsetof(RaWorldVertex,uv),offsetof(RaWorldVertex,color),offsetof(RaWorldVertex,fog)};
-        for(U i=0;i<4;++i){gl.enableVertexAttribArray(i);gl.vertexAttribPointer(i,counts[i],0x1406,0,sizeof(RaWorldVertex),reinterpret_cast<const void*>(offsets[i]));}
-        if(!check("upload complete RA world index bank and allocate current source operands")||!raWorldArray||!raWorldVertices||!raWorldIndices)
+        if(!check("upload complete RA world geometry/index banks and allocate current source operands")||
+           !raWorldArray||!raWorldVertices||!raWorldOperands||!raWorldIndices)
             return fail(*diagnostic,VehicleWindowError50DS::allocation,"RA native geometry allocation failed");
         std::int64_t actual=0;gl.getBufferParameteri64v(arrayBuffer,bufferSize,&actual);
+        if(actual!=static_cast<std::int64_t>(fb))return fail(*diagnostic,VehicleWindowError50DS::allocation,"RA current operand storage size differs");
+        drawGl.bindBuffer(arrayBuffer,raWorldVertices);gl.getBufferParameteri64v(arrayBuffer,bufferSize,&actual);
         if(actual!=static_cast<std::int64_t>(vb))return fail(*diagnostic,VehicleWindowError50DS::allocation,"RA vertex storage size differs");
+        drawGl.bindBuffer(arrayBuffer,raWorldOperands);
         gl.getBufferParameteri64v(elementBuffer,bufferSize,&actual);
         if(actual!=static_cast<std::int64_t>(ib))return fail(*diagnostic,VehicleWindowError50DS::allocation,"RA index storage size differs");
+        if(!check("verify split RA vertex storage extents"))return false;
         constexpr const char* vertex=R"GLSL(#version 400 core
 in vec3 position;in vec2 uv;in vec4 color;in float fogByte;
 uniform mat4 worldViewProjection,sourceWorldViewProjection;
@@ -488,8 +510,8 @@ void main(){
         for(U corner=0;corner<3;++corner){
             if(first+corner>=raWorld->indices_.size())return false;
             const auto index=raWorld->indices_[first+corner];
-            if(index>=raWorldFrame.size())return false;
-            const auto& v=raWorldFrame[index];
+            if(index>=raWorldGeometry.size())return false;
+            const auto& v=raWorldGeometry[index];
             const double p[4]={v.position[0],v.position[1],v.position[2],1.};
             // Reuse only identical products, never reassociate a plane sum.
             // Populate each axis at its first original plane so an earlier
@@ -594,8 +616,8 @@ void main(){
         for(U corner=0;corner<3;++corner){
             if(first+corner>=raWorld->indices_.size())return {{0,0,width,height}};
             const auto index=raWorld->indices_[first+corner];
-            if(index>=raWorldFrame.size())return {{0,0,width,height}};
-            std::copy_n(raWorldFrame[index].position,3,triangle[corner].begin());
+            if(index>=raWorldGeometry.size())return {{0,0,width,height}};
+            std::copy_n(raWorldGeometry[index].position,3,triangle[corner].begin());
         }
         return nativeTriangleRasterRegion(triangle);
     }
@@ -653,12 +675,12 @@ void main(){
         error=drawGl.getError();
         const auto offset=reinterpret_cast<std::uintptr_t>(pointer);
         const bool layout=!error&&actual[0]==1&&actual[1]==1&&
-            actual[2]==I(sizeof(RaWorldVertex))&&actual[3]==I(floatType)&&actual[4]==0&&
-            actual[5]==I(raWorldVertices)&&actual[6]==0&&offset==offsetof(RaWorldVertex,fog);
+            actual[2]==I(sizeof(RaWorldFrameVertex))&&actual[3]==I(floatType)&&actual[4]==0&&
+            actual[5]==I(raWorldOperands)&&actual[6]==0&&offset==offsetof(RaWorldFrameVertex,fog);
         std::fprintf(stderr,"ra_fog_gpu_attribute vao=%u attribute=3 query_error=%u enabled=%d size=%d stride=%d type=%d normalized=%d vbo=%d integer=%d offset=%llu expected_vbo=%u expected_stride=%zu expected_offset=%zu layout_match=%u element_buffer=%d expected_element=%u gpu_winner_unknown=1\n",
             raWorldArray,error,actual[0],actual[1],actual[2],actual[3],actual[4],actual[5],actual[6],
-            static_cast<unsigned long long>(offset),raWorldVertices,sizeof(RaWorldVertex),offsetof(RaWorldVertex,fog),unsigned(layout),element,raWorldIndices);
-        drawGl.bindBuffer(arrayBuffer,raWorldVertices);
+            static_cast<unsigned long long>(offset),raWorldOperands,sizeof(RaWorldFrameVertex),offsetof(RaWorldFrameVertex,fog),unsigned(layout),element,raWorldIndices);
+        drawGl.bindBuffer(arrayBuffer,raWorldOperands);
         std::int64_t vertexBytes=-1;gl.getBufferParameteri64v(arrayBuffer,bufferSize,&vertexBytes);
         const U bufferError=drawGl.getError();
         const std::size_t surface=438;
@@ -677,17 +699,20 @@ void main(){
                 }
                 for(U corner=0;corner<3;++corner){
                     const auto index=raWorld->indices_[std::size_t(plan.indexStart)+relative+corner];
-                    const std::uint64_t byte=std::uint64_t(index)*sizeof(RaWorldVertex)+offsetof(RaWorldVertex,fog);
+                    const std::uint64_t byte=std::uint64_t(index)*sizeof(RaWorldFrameVertex)+offsetof(RaWorldFrameVertex,fog);
                     if(index>=raWorldFrame.size()||byte>std::uint64_t(vertexBytes)||
                        sizeof(float)>std::uint64_t(vertexBytes)-byte||
                        byte>std::uint64_t(std::numeric_limits<std::intptr_t>::max())){
                         std::fprintf(stderr,"ra_fog_gpu_vertex surface=%zu triangle=%u corner=%u index=%u unavailable=vertex_range\n",surface,triangle,corner,index);continue;
                     }
                     float gpu=0;gl.getBufferSubData(arrayBuffer,static_cast<std::intptr_t>(byte),sizeof(gpu),&gpu);
+                    // Unselected records outside the current upload interval
+                    // can differ after an abandoned CPU preparation. Report
+                    // that real staging/GPU difference rather than hiding it.
                     const U readError=drawGl.getError();const float cpu=raWorldFrame[index].fog;
                     U gpuBits=0,cpuBits=0;std::memcpy(&gpuBits,&gpu,sizeof(gpuBits));std::memcpy(&cpuBits,&cpu,sizeof(cpuBits));
                     std::fprintf(stderr,"ra_fog_gpu_vertex surface=%zu triangle=%u corner=%u selected=%u index=%u byte=%llu buffer=%u read_error=%u cpu=%.9g gpu=%.9g cpu_bits=%08x gpu_bits=%08x bytes_match=%u fetch_layout_match=%u gpu_winner_unknown=1\n",
-                        surface,triangle,corner,unsigned(selected),index,static_cast<unsigned long long>(byte),raWorldVertices,readError,
+                        surface,triangle,corner,unsigned(selected),index,static_cast<unsigned long long>(byte),raWorldOperands,readError,
                         double(cpu),double(gpu),cpuBits,gpuBits,unsigned(!readError&&cpuBits==gpuBits),unsigned(layout));
                 }
             }
@@ -739,11 +764,12 @@ void main(){
                     draw.scissor[0],draw.scissor[1],draw.scissor[2],draw.scissor[3],
                     region[0],region[1],region[2],region[3]);
                 for(U corner=0;corner<3;++corner){
-                    const auto& v=raWorldFrame[raWorld->indices_[first+corner]];
+                    const auto index=raWorld->indices_[first+corner];
+                    const auto& v=raWorldGeometry[index];const auto& current=raWorldFrame[index];
                     std::fprintf(stderr," v%u_world=%.9g,%.9g,%.9g v%u_uv=%.9g,%.9g v%u_rgba=%.9g,%.9g,%.9g,%.9g v%u_fog=%.9g",
                         corner,double(v.position[0]),double(v.position[1]),double(v.position[2]),
-                        corner,double(v.uv[0]),double(v.uv[1]),corner,double(v.color[0]),double(v.color[1]),
-                        double(v.color[2]),double(v.color[3]),corner,double(v.fog));
+                        corner,double(v.uv[0]),double(v.uv[1]),corner,double(current.color[0]),double(current.color[1]),
+                        double(current.color[2]),double(current.color[3]),corner,double(current.fog));
                     double clip[4]{};
                     for(U column=0;column<4;++column){
                         for(U axis=0;axis<3;++axis)clip[column]+=double(matrix[column*4+axis])*v.position[axis];
@@ -762,8 +788,23 @@ void main(){
         if(!raWorld)return true;
         if(!raWorldFrameCurrent(*diagnostic)||!coverageLive.scene[bank]||!coverageLive.snapshot||!coverageLive.raster)
             return fail(*diagnostic,VehicleWindowError50DS::frame,"RA complete common target/coverage storage missing");
-        drawGl.bindVertexArray(raWorldArray);drawGl.bindBuffer(arrayBuffer,raWorldVertices);
-        drawGl.bufferSubData(arrayBuffer,0,static_cast<std::intptr_t>(raWorldFrame.size()*sizeof(RaWorldVertex)),raWorldFrame.data());
+        // Cold admission proves each surface's indices stay in its vertex
+        // range. Recompute one containing upload interval for this selection;
+        // no prior frame, LOD, or successful-upload receipt is reused.
+        std::size_t uploadFirst=raWorldFrame.size(),uploadEnd=0;
+        for(const auto& selectedDraw:raWorldFrameDraws){
+            if(selectedDraw.surface>=raWorld->surfaceDrawPlan_.size())
+                return fail(*diagnostic,VehicleWindowError50DS::assets,"RA selected upload surface exceeds retained plan");
+            const auto& plan=raWorld->surfaceDrawPlan_[selectedDraw.surface];
+            const std::size_t first=plan.vertexStart,count=plan.vertexCount;
+            if(!count||first>raWorldFrame.size()||count>raWorldFrame.size()-first)
+                return fail(*diagnostic,VehicleWindowError50DS::assets,"RA selected upload range exceeds current operands");
+            uploadFirst=std::min(uploadFirst,first);uploadEnd=std::max(uploadEnd,first+count);
+        }
+        drawGl.bindVertexArray(raWorldArray);drawGl.bindBuffer(arrayBuffer,raWorldOperands);
+        if(uploadFirst<uploadEnd)
+            drawGl.bufferSubData(arrayBuffer,static_cast<std::intptr_t>(uploadFirst*sizeof(RaWorldFrameVertex)),
+                static_cast<std::intptr_t>((uploadEnd-uploadFirst)*sizeof(RaWorldFrameVertex)),raWorldFrame.data()+uploadFirst);
         drawGl.bindBuffer(elementBuffer,raWorldIndices);
         gl.disable(0x0BE2);gl.disable(0x0B44);gl.disable(0x0C11);gl.disable(0x8DB9);gl.colorMask(1,1,1,1);
         bool accepted=check("upload same-camera RA packed-color and fog operands");

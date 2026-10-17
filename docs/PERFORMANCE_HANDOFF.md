@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-16 8:26 p.m. EDT (2026-10-17 00:26 UTC).
+Updated: 2026-10-16 8:43 p.m. EDT (2026-10-17 00:43 UTC).
 
 ## Current direction
 
@@ -23,7 +23,7 @@ Continue independent coding if publication is blocked, and report exact blockers
 
 The commit containing this document is the current handoff checkpoint; use its
 Git history to identify the exact revision. A document cannot contain its own
-final commit hash. Last independently verified publication before this update:
+final commit hash. Last independently verified **tested** publication:
 [e53d3220](https://github.com/GTTeancum/RacerRevengePC/commit/e53d3220ddcd721f67aeda7a84a80b2504c0e5e7).
 Its exact source tree is `7cdb5a7a64d53a3897c978177dd382545aa6bcfc` (local tested
 source `75fbe2e0c61ca5b0041b877c2450edce731008c6`).
@@ -102,7 +102,7 @@ See [snapshot lifetime proof](recovery/racer-light-snapshot-borrow-20261017.md).
 
 RA world position/UV lanes are now copied once at renderer creation from the
 immutable retained geometry. Per-frame dynamic color/fog and all selected draw
-checks remain, and full GPU upload is unchanged. See
+checks remain. The later split-stream change below also reduces GPU uploads. See
 [immutable lane rationale](recovery/ra-immutable-vertex-lanes-20261017.md).
 
 Repeated racer normal-length scans now reuse a completed validation receipt
@@ -140,6 +140,41 @@ After complete diffuse publication validation, the selected row lookup uses
 binary search over the strictly source-ordered generated rows, with an exact
 equality check. See [diffuse row ordering proof](recovery/ra-diffuse-row-lookup-20261017.md).
 
+## Recovered code checkpoint
+
+The coding VM became unavailable around 2026-10-17 00:40 UTC. This checkpoint
+recovers reviewed source changes from retained exact diffs applied to the verified
+27e14fc68f4fc9741c658a3b073728fc3fae49d7 GitHub files. Reconstructed source blob IDs
+are checked against the recorded diff identities and contents are read back.
+The complete unavailable local commit/tree has not been reproduced byte for byte;
+the recovery documentation records current facts rather than claiming otherwise.
+No builds, tests or runtime measurements were performed during recovery.
+
+Additional untested source changes:
+- Separate immutable position/UV and dynamic color/fog GPU streams. All float
+  values, shader inputs and indices are retained. Upload size changes from 40
+  bytes to 20 bytes per retained vertex before selection bounding. The extra
+  buffer has checked allocation/cleanup; fog attestation uses its actual layout.
+  See [stream split](recovery/ra-split-vertex-streams-20261017.md).
+- Upload only one contiguous dynamic interval covering all selected surface
+  vertex ranges, or no interval when selection is empty. The full GPU buffer is
+  initialized at creation. Unselected values can differ from abandoned CPU
+  staging, and diagnostics continue reporting that honestly.
+  See [bounded upload](recovery/ra-bounded-operand-upload-20261017.md).
+- Retain the first compressed-normal recovery within the same lighting
+  publication and reuse it after exact scene/surface/count checks. All dynamic
+  lighting and RGBA projection remain current; there is no cross-publication
+  normal cache. See [normal reuse](recovery/ra-normal-publication-reuse-20261017.md).
+- Reserve lighting metadata from the actual lit-surface count and recovered
+  normals from a new bounded, exact lit-vertex count in the cold draw plan.
+  Actual recovered count is checked. Earlier allocation failure remains an
+  unpublished failure. See [metadata reserve](recovery/ra-light-metadata-reserve-20261017.md)
+  and [exact normal reserve](recovery/ra-exact-normal-reserve-20261017.md).
+
+These are source-level changes and byte/work reductions, not measured FPS gains.
+The speculative opponent-light uniform receipt was not independently reviewed
+or integrated and is not part of this recovery.
+
 ## Avoid unsafe shortcuts
 
 - Every racer, including followed player, must retain original in-game AI.
@@ -154,13 +189,12 @@ equality check. See [diffuse row ordering proof](recovery/ra-diffuse-row-lookup-
 - Existing disjoint conservative-rectangle grouping, VAO query hoist, private
   FBO selectors and sampler initialization already exist; do not duplicate them.
 
-Previous verified untested-source publication: `7de49979a64eb7071ec40c77c5282507879d01c5`
-(tree `6c324809addf4d7358e6414e60f781f1094369f7`, parent `3ddb155a`).
-It contains the initial group-state, clip-operand, uniform, clip-product, placement
-lookup and light-snapshot changes. Current source also includes the later
-immutable-lane, preflight normal, diffuse/raw-position and material-validation work.
-All are untested. A combined read-only source audit identified no concrete
-integration blocker; it does not establish compilation or runtime correctness.
+Previous verified untested-source publication: `27e14fc68f4fc9741c658a3b073728fc3fae49d7`
+(tree `cde0dca8cc917a03101e2f493b878198fac72e88`, parent `7de49979`).
+It includes the earlier coverage, clipping, material lookup, validation-scope
+and snapshot changes listed above. This recovery adds the five changes described
+in the recovered checkpoint section. All changes after the tested baseline are
+untested. Source review does not establish compilation or runtime correctness.
 
 ## Known functional limits
 
@@ -171,15 +205,13 @@ Aggregate cleanup now releases internal camera observer owners before checking
 for external runtime ownership, retaining external-borrow guards.
 Wreck collection work is held and not active gameplay evidence.
 
-## Pending investigation (not implemented in this checkpoint)
+## Pending investigation
 
-- Split immutable position/UV and dynamic color/fog GPU streams to reduce full
-  RA uploads; requires consistent attribute bindings and diagnostics plus safe
-  partial-allocation cleanup. No code or speedup is claimed for this proposal.
-- Retain compressed-normal recovery within a single lighting publication to avoid
-  its second identical recovery pass. Dynamic light/color projection must remain
-  current; allocation/failure behavior needs review. A broader cross-publication
-  cold normal cache is held pending stronger lifecycle proof.
+A broader cross-publication cold normal cache remains held pending stronger
+lifecycle proof. The opponent-component lighting uniform proposal is also held:
+actual current-route benefit and independent review remain unfinished.
+The original VM's local commits are currently inaccessible; do not assume local
+drafts are included in GitHub unless their published file contents establish it.
 
 ## Next steps for the next owner
 

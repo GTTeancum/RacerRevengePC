@@ -2,7 +2,13 @@
 
 A native PC reimplementation of Star Wars: Racer Revenge, with shared code designed for a future original-Xbox port.
 
-## Status
+## Current handoff
+
+See [the performance handoff](docs/PERFORMANCE_HANDOFF.md) for current source status,
+last verified results, untested changes and takeover steps. The status narrative
+below is historical consolidation context and predates that handoff.
+
+## Historical consolidation status
 
 Native host CPU/GPU reimplementation is in progress. Linux is a temporary validation platform; portable gameplay and Windows releases are the priority. All driving validation requires original in-game AI for every racer, including the camera-followed player.
 
