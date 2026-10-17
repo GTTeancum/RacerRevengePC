@@ -49,6 +49,8 @@ class Binding final {
         world_=std::move(world);camera_.owner=std::move(camera);CameraObservation observation;
         if(!camera_.owner||!camera_.owner->readStaticFogPublication(camera_.issued,observation)||
            !current(observation))return false;
+        // A fresh unpublished binding emits exactly one row per retained placement.
+        placements_.reserve(world_->placements_.size());
         for(std::size_t i=0;i<world_->placements_.size();++i){
             const auto& p=*world_->placements_[i];const auto* scene=p.payload?p.payload->scene():nullptr;
             if(!scene||scene->nodes.size()!=1||scene->nodes[0].parent!=-1||scene->identity_matrix_palette)return false;

@@ -1,6 +1,6 @@
 # Racer Revenge performance handoff
 
-Updated: 2026-10-17 12:44 a.m. EDT (2026-10-17 04:44 UTC).
+Updated: 2026-10-17 12:59 a.m. EDT (2026-10-17 04:59 UTC).
 
 ## Current direction
 
@@ -22,7 +22,16 @@ Continue independent coding if publication is blocked, and report exact blockers
 ## Current checkpoint summary
 
 Latest independently verified main before this checkpoint is
-[81d27c3](https://github.com/GTTeancum/RacerRevengePC/commit/81d27c302282f600c3ba95e5f8b659c4cca2b84c).
+[4c29a6c](https://github.com/GTTeancum/RacerRevengePC/commit/4c29a6c7956876c75e9b822ea40dffdedb5762d1).
+New source is **UNTESTED**: RA fog preparation reserves its exact placement-row
+count once per fresh private publication, avoiding vector growth copies while
+retaining source arithmetic, validation and publication gates. See
+[proof](recovery/ra-fog-placement-reserve-20261017.md).
+This is later than the delivered Windows b4c303e tester, which is unchanged.
+No new test was run for this source change.
+
+### Last executed Linux source
+
 The user explicitly requested another one-off FPS test. Exact source
 `b4c303ec54d64de206b188aa06790518c2161baa`, tree
 `9afdc22f9906e86d4283607fd92000107dd7ce06`, built successfully at
@@ -37,8 +46,8 @@ in 5.029962142 seconds, native ticks28–44. Previous 4f82775 measured
 lower; unequal short windows and ordinary variability prevent attributing that
 difference. No performance improvement is demonstrated.
 
-This checkpoint retains that exact game code and adds only result/handoff
-information afterward. Earlier UNTESTED labels record the source-review stage;
+The earlier test-result checkpoint retained that exact game code. Current
+post-test changes are listed above. Earlier UNTESTED labels record their source-review stage;
 this limited smoke now covers changes through the pass-constant HUD setup.
 Any subsequent source changes require their own validation. Routine testing
 restrictions remain specific to the outgoing session; the successor may validate.
