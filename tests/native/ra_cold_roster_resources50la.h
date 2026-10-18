@@ -2,6 +2,7 @@
 #include "native_racer_rig50hw_fixture.h"
 #include "native_racer_collision50hw_fixture.h"
 #include "original_player_identity50ik_fixture.h"
+#include "original_disc_effects50lb.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -79,8 +80,8 @@ public:
                 "2e89d1d1c6d44804dc25687d837699ab3207e8a800ee3756875e5760226957e2",
                 "0a8e6c18e9f98992770f7046eea11a7541f286c387977aedcbbf277026d180d8",
                 "b122aca0eb7779d48f5f90c93f2ab2d624ee38d2f824b1843ae62e790a5e44f8"};
+            result->effects_=original_disc_effects50LB::load();
             for(unsigned i=0;i<6;++i){
-                result->effects_[i]=runtime_startup50fl::readBytes(std::string("evidence/effectAuthoring50BF/members/")+names[i]);
                 if(pod_materials50ed_fixture::detail::sha256(result->effects_[i])!=pins[i])
                     throw std::runtime_error("original shared effect identity differs");
             }

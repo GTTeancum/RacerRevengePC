@@ -20,6 +20,11 @@ struct AiObservedRacer50IV {
     float progressCC4=0.f;
     std::int32_t lapCC8=0;
     std::uint8_t flagsB9C=0,flagsCD8=0;
+    // Actual serial manager rank and target owners consumed by1706C0,
+    //171430,16EDD0 and16FB50. No HOST pose, rank or acceleration derivation.
+    std::int32_t placeCCC=0;
+    std::uint32_t vehicleC84=0;
+    float forward190[3]{},up190[3]{},velocity70[3]{},linearAccelerationC0[3]{};
 };
 struct AiRacerLists50IV {
     std::array<std::uint32_t,aiObservedCapacity50IV> values[5]{};
@@ -38,6 +43,13 @@ struct AiRouteChoiceOwners50IY {
     const std::uint32_t& aiStateFE8;
     const std::uint32_t& packingPolicy1000;
     std::uint32_t& sharedRandomState;
+    // Borrow source-owned scalars: state/target selection can change after
+    // this object is constructed and before same-frame171FE0 calls.
+    const std::uint32_t* attackMode1050=nullptr;
+    const bool* target1008Present=nullptr;
+    const std::uint32_t* target1008ManagerIndex=nullptr;
+    const AiObservedRacer50IV* racers=nullptr;
+    std::size_t racerCount=0;
 };
 enum class AiDrivingError50IV : std::uint8_t {
     None,Owner,Arithmetic,RouteChoice,Predecessor,Traversal,Capacity,Unsupported
@@ -79,8 +91,94 @@ inline bool shortestRoute(const TrackNavigation50EU&t,const UndertrackNode50ET&n
     }
     return true;
 }
-//1719B0's represented branch order, with exact171750 weighted draw. The
-// unjoined attack1050/171320 owner is an explicit boundary only if reached.
+//171430: for a human beyond a fork, infer the selected branch from its
+// actual local190 forward. Scores include every successor, even blocked or
+// Pretty nodes; only171320 subsequently applies those filters. Initial best
+// score is0 and default branch is successor0, so all nonpositive scores and
+// ties preserve that source choice. No RNG or route-cache writes occur here.
+inline bool predictAttackBranch171430(const TrackNavigation50EU&t,
+    const AiObservedRacer50IV&target,std::int32_t&branch,
+    AiDrivingDiagnostic50IV&d) noexcept {
+    if(!t.track.count||t.track.count>maxUndertrackNodes50ET||target.vehicleC84>=t.track.count)
+        return fail(d,AiDrivingError50IV::Owner,0x17145cu,target.vehicleC84);
+    const auto&previousNode=t.track.nodes[target.vehicleC84];
+    if(!previousNode.nextCount||previousNode.nextCount>maxUndertrackNext50ET)
+        return fail(d,AiDrivingError50IV::Capacity,0x171460u,target.vehicleC84);
+    if(std::fegetround()!=FE_TONEAREST)
+        return fail(d,AiDrivingError50IV::Arithmetic,0x171430u);
+    std::array<float,maxUndertrackNext50ET> scores{};Math f;
+    for(unsigned axis=0;axis<3;++axis){f.keep(target.position190[axis]);f.keep(target.forward190[axis]);}
+    if(!f.valid)return fail(d,AiDrivingError50IV::Arithmetic,0x1714a0u);
+    for(std::uint32_t i=0;i<previousNode.nextCount;++i){
+        const auto n=previousNode.next[i];
+        if(n>=t.track.count)return fail(d,AiDrivingError50IV::Owner,0x1714d4u,n);
+        for(unsigned axis=0;axis<3;++axis)f.keep(t.track.nodes[n].position[axis]);
+        if(!f.valid)return fail(d,AiDrivingError50IV::Arithmetic,0x1714d4u,n);
+        const V delta=sub(f,point(t.track.nodes[n].position),point(target.position190));
+        const float norm=dot(f,delta,delta);
+        //171538..171544 always executes VRSQRT then VMULQ. Retain the
+        //same saturated-Q finite convention as native undertrack50ET;
+        //a norm that rounded to0 does NOT synthesize a zero direction.
+        const float q=norm==0.f?std::numeric_limits<float>::max():f.div(1.f,root(f,norm));
+        const V direction=scale(f,delta,q);
+        scores[i]=dot(f,direction,point(target.forward190));
+        if(!f.valid)return fail(d,AiDrivingError50IV::Arithmetic,0x171568u,n);
+    }
+    branch=t.nodes[previousNode.next[0]].branch68;float best=0.f;
+    for(std::uint32_t i=0;i<previousNode.nextCount;++i){
+        if(scores[i]<=best)continue;
+        best=scores[i];branch=t.nodes[previousNode.next[i]].branch68;
+    }
+    return true;
+}
+//171320: a completed source return-1 is distinct from a missing owner.
+// The caller1719B0 genuinely continues to packing/random on that return.
+inline bool chooseAttackRoute171320(const TrackNavigation50EU&t,
+    const UndertrackNode50ET&node,const AiRouteChoiceOwners50IY&owners,
+    std::int32_t&ordinal,AiDrivingDiagnostic50IV&d) noexcept {
+    ordinal=-1;
+    if(!t.track.count||t.track.count>maxUndertrackNodes50ET)
+        return fail(d,AiDrivingError50IV::Owner,0x171340u);
+    if(!owners.target1008Present||!*owners.target1008Present||
+       !owners.target1008ManagerIndex||!owners.racers||
+       *owners.target1008ManagerIndex>=owners.racerCount)
+        return fail(d,AiDrivingError50IV::Owner,0x171340u);
+    const auto index=*owners.target1008ManagerIndex;
+    const auto&target=owners.racers[index];
+    if(!target.bound||target.managerIndex!=index)
+        return fail(d,AiDrivingError50IV::Owner,0x17134cu,index);
+    if(target.vehicle58==1u)return true; //171358 return-1, no target geometry.
+    std::int32_t branch=0;
+    if(target.vehicle58==0u){
+        if(target.vehicleC84>=t.track.count)
+            return fail(d,AiDrivingError50IV::Owner,0x171368u,target.vehicleC84);
+        if(t.track.nodes[target.vehicleC84].nextCount>=2u){
+            if(!predictAttackBranch171430(t,target,branch,d))return false;
+        }else{
+            if(target.vehicleC80>=t.track.count)
+                return fail(d,AiDrivingError50IV::Owner,0x171394u,target.vehicleC80);
+            branch=t.nodes[target.vehicleC80].branch68;
+        }
+    }else{
+        if(target.vehicleC80>=t.track.count)
+            return fail(d,AiDrivingError50IV::Owner,0x171394u,target.vehicleC80);
+        branch=t.nodes[target.vehicleC80].branch68;
+    }
+    if(node.nextCount>maxUndertrackNext50ET)
+        return fail(d,AiDrivingError50IV::Capacity,0x1713a4u);
+    for(std::uint32_t i=0;i<node.nextCount;++i){
+        const auto n=node.next[i];
+        if(n>=t.track.count)return fail(d,AiDrivingError50IV::Owner,0x1713b4u,n);
+        const auto&candidate=t.nodes[n];
+        if(candidate.flags79&1u)continue;
+        if(candidate.flags79&0x40u)continue;
+        if(candidate.branch68==branch){ordinal=static_cast<std::int32_t>(i);return true;}
+    }
+    return true;
+}
+//1719B0's exact branch order: record shortest, state1/mode1 attack route,
+// packing policy4 shortest, then171750 weighted draw. Only a genuine return-1
+// falls through; failed owner/arithmetic recovery never invents a route.
 inline bool chooseRoute(const TrackNavigation50EU&t,const UndertrackNode50ET&node,
     AiNavigationState50IV&state,const AiRouteChoiceOwners50IY&owners,
     std::int32_t&ordinal,AiDrivingDiagnostic50IV&d) noexcept {
@@ -89,7 +187,13 @@ inline bool chooseRoute(const TrackNavigation50EU&t,const UndertrackNode50ET&nod
         if(!shortestRoute(t,node,owners.metadata,ordinal,d))return false;
         if(ordinal!=-1)return true;
     }
-    if(owners.aiStateFE8==1u)return fail(d,AiDrivingError50IV::RouteChoice,0x171a04u);
+    if(owners.aiStateFE8==1u){
+        if(!owners.attackMode1050)return fail(d,AiDrivingError50IV::Owner,0x171a04u);
+        if(*owners.attackMode1050==1u){
+            if(!chooseAttackRoute171320(t,node,owners,ordinal,d))return false;
+            if(ordinal!=-1)return true;
+        }
+    }
     if(owners.packingPolicy1000==4u){
         if(!shortestRoute(t,node,owners.metadata,ordinal,d))return false;
         if(ordinal!=-1)return true;

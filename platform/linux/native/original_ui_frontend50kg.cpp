@@ -579,7 +579,30 @@ struct OriginalUiFrontend50KG::Storage {
         if(m.rider->teardownSource(renderer,d.renderer,d.rider)!=RiderStatus::ok){result(d,Status::cleanup);return false;}
         m.riderRetired=true;return true;
     }
-    bool refreshRiderBank(Manager& m,Diagnostic& d) noexcept {
+    bool drainBankWork(Diagnostic& d,OriginalUiFrontendWorkObservation50KG& observation) noexcept {
+        // Observation only. Keep genuine completion waits in the active stall
+        // budget; they are never merged into the bank-publication receipt.
+        observation.measured=true;observation.begin=std::chrono::steady_clock::now();
+        const bool okay=renderer&&renderer->finishSubmittedWork(d.renderer)&&d.renderer.submittedWorkCompleted;
+        observation.end=std::chrono::steady_clock::now();
+        observation.nanoseconds=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            observation.end-observation.begin).count());
+        return okay;
+    }
+    bool publishResidentBank(const assets::MaterialTextureAssets50EA& textures,const MaterialTextureGl50EB& gpu,
+        Diagnostic& d,OriginalUiFrontendColdInterval50KG& coldInterval) noexcept {
+        if(!renderer||coldInterval.measured){result(d,Status::invalidInput);return false;}
+        // The renderer performs its cold immutable-bank alpha scan here.
+        // Prerequisite checks, GPU completion, source callbacks, ordinary
+        // update/render/swap and logging are outside this exact interval.
+        coldInterval.measured=true;coldInterval.begin=std::chrono::steady_clock::now();
+        const bool okay=renderer->bindOriginalUiTextures(textures,gpu,d.renderer);
+        coldInterval.end=std::chrono::steady_clock::now();
+        coldInterval.nanoseconds=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            coldInterval.end-coldInterval.begin).count());
+        return okay;
+    }
+    bool refreshRiderBank(Manager& m,Diagnostic& d,OriginalUiFrontendUpdateReceipt50KG& receipt) noexcept {
         if(!m.rider)return true;
         if(m.rider->prepareBank(d.rider)!=RiderStatus::ok){result(d,Status::session);return false;}
         const auto next=m.rider->bank();const auto* samplers=m.rider->samplers();
@@ -598,8 +621,8 @@ struct OriginalUiFrontend50KG::Storage {
         }
         if(m.rider->bindPublishedBank(m.gpu,d.rider)!=RiderStatus::ok){result(d,Status::session);return false;}
         if(renderer&&bank==&m&&next!=m.publishedRiderBank){
-            if(!renderer->finishSubmittedWork(d.renderer)||!d.renderer.submittedWorkCompleted||
-               !renderer->bindOriginalUiTextures(*textures,*m.gpu,d.renderer)){result(d,Status::renderer);return false;}
+            if(!drainBankWork(d,receipt.bankDrain)||
+               !publishResidentBank(*textures,*m.gpu,d,receipt.coldInterval)){result(d,Status::renderer);return false;}
         }
         m.publishedRiderBank=next;return true;
     }
@@ -900,8 +923,8 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
         // work and rebind that real bank; do not fake original DMA completion,
         // replace images, reconstruct the manager or emulate video registers.
         if(!s->renderer||s->bank!=&m||!s->verifyCourseBank(m,d)||
-           !s->renderer->finishSubmittedWork(d.renderer)||!d.renderer.submittedWorkCompleted||
-           !s->renderer->bindOriginalUiTextures(*m.textures(),*m.gpu,d.renderer))return s->fault(d,Status::renderer,0x1DFE18);
+           !s->drainBankWork(d,receipt.bankDrain)||
+           !s->publishResidentBank(*m.textures(),*m.gpu,d,receipt.coldInterval))return s->fault(d,Status::renderer,0x1DFE18);
         if(m.course->completeSelectionRefresh(d.course)!=CourseStatus::ok)return s->fault(d,Status::session,0x1DFE58);
     }
     const bool prepared=m.main?m.main->prepareUpdateAudio(input,d.main)==MainStatus::ok:m.options?
@@ -916,7 +939,7 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
         m.options->update(input,d.options)==OptionsStatus::ok:m.rider?m.rider->update(input,d.rider)==RiderStatus::ok:
         m.course&&m.course->update(input,d.course)==CourseStatus::ok;
     if(!updated)return s->fault(d,Status::session);
-    if(!s->refreshRiderBank(m,d)||!s->verifyCourseBank(m,d))return s->fault(d,d.status);
+    if(!s->refreshRiderBank(m,d,receipt)||!s->verifyCourseBank(m,d))return s->fault(d,d.status);
     ++s->updates;receipt.accepted=true;receipt.sequence=s->updates;receipt.update=input;receipt.source=m.currentRoute();
     return result(d,Status::ok);
 }
@@ -969,7 +992,12 @@ Status OriginalUiFrontend50KG::submit(VehicleWindowGl50DS& renderer,std::int32_t
     s->frameSubmitted=true;s->submittedUpdate=s->updates;++s->submissions;return result(d,Status::ok);
 }
 Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,Diagnostic& d) noexcept {
-    d={};auto* s=storage_.get();if(!s)return result(d,Status::notActive);
+    OriginalUiFrontendDeferredReceipt50KG receipt;
+    return commitDeferred(renderer,receipt,d);
+}
+Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
+    OriginalUiFrontendDeferredReceipt50KG& receipt,Diagnostic& d) noexcept {
+    d={};receipt={};auto* s=storage_.get();if(!s)return result(d,Status::notActive);
     if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->activated)return result(d,Status::notActive);
     if(s->quit||s->closing)return result(d,Status::quit);if(!s->queued)return result(d,Status::noChange);
@@ -997,9 +1025,9 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,Diag
     const auto* destinationArchive=s->pending->main?s->cold.mainMenu.get():
         (s->pending->options?s->cold.options.get():s->pending->rider?s->cold.rider.get():s->pending->course?s->cold.course.get():nullptr);
     if(!destinationArchive)return s->fault(d,Status::unavailableDestination,0x1CCD88);
-    if(!renderer.finishSubmittedWork(d.renderer)||!d.renderer.submittedWorkCompleted)return s->fault(d,Status::renderer);
+    if(!s->drainBankWork(d,receipt.bankDrain))return s->fault(d,Status::renderer);
     if(!s->retireSource(*s->active,d))return s->fault(d,Status::cleanup);
-    if(!renderer.bindOriginalUiTextures(*s->pending->textures(),*s->pending->gpu,d.renderer))return s->fault(d,Status::renderer);
+    if(!s->publishResidentBank(*s->pending->textures(),*s->pending->gpu,d,receipt.coldInterval))return s->fault(d,Status::renderer);
     // All outgoing source submissions have completed. Switch the shared light
     // manager BEFORE incoming page callbacks, while retaining old cold/GPU
     // resources for the existing retirement boundary. Page-only Options

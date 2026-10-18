@@ -4,6 +4,18 @@
 namespace original_speed_boost_adapter50LA {
 class Owner final {
     using Camera=original_camera_session50KX::Session;
+    // Source camera preparation constructs these two exact view0 identities.
+    // Human count alone cannot authorize an AI/player reinterpretation.
+    static bool supportedSourceView(const Camera& c)noexcept {
+        if(!c.controller_.bound)return false;
+        const auto& binding=c.controller_.binding;
+        return (c.actual_.humanCount34==0u&&
+                binding.bootstrap==rr::game::CameraBootstrap::native_all_ai&&
+                binding.racerClass==rr::game::CameraRacerClass::ai)||
+            (c.actual_.humanCount34==1u&&
+                binding.bootstrap==rr::game::CameraBootstrap::original_single_player&&
+                binding.racerClass==rr::game::CameraRacerClass::player);
+    }
     using Bank=native_racer50HN::Bank;
     template<class T>using Read=Bank::ReadHandle<T>;
     const Camera* camera_=nullptr;
@@ -19,8 +31,7 @@ public:
         d={};if(camera_)return false;
         try {
             if(!camera.coldBound_||!camera.readsBound_||camera.closed_||camera.abandoned_||
-               !camera.generation_||camera.actual_.humanCount34||camera.actual_.bank.count()!=8||
-               !camera.controller_.bound||camera.controller_.binding.bootstrap!=rr::game::CameraBootstrap::native_all_ai)
+               !camera.generation_||camera.actual_.bank.count()!=8||!supportedSourceView(camera))
                 return false;
             if((camera.frameStage_!=Camera::FrameStage::idle&&camera.frameStage_!=Camera::FrameStage::published)||
                !camera.identitiesCurrent()){d.status=Status::phase;return false;}
@@ -42,8 +53,7 @@ public:
                c.generation_!=generation_||c.frameStage_!=Camera::FrameStage::published||
                !c.publicationCount_||!c.completedFrame_||!c.viewport_.prepared||!c.viewport_.matricesReady||
                c.viewport_.sessionGeneration!=generation_){d.status=Status::phase;return false;}
-            if(c.actual_.humanCount34||bank.count()!=8||!c.controller_.bound||
-               c.controller_.binding.bootstrap!=rr::game::CameraBootstrap::native_all_ai||
+            if(bank.count()!=8||!supportedSourceView(c)||
                c.controller_.binding.sessionGeneration!=generation_||
                c.controller_.binding.managerIndex!=c.identity_[0].managerIndex||
                c.controller_.binding.racerKey!=Camera::key(c.identity_[0].racerTag)||

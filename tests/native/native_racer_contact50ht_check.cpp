@@ -64,8 +64,24 @@ int main(){
       !std::memcmp(onePairOutput,output,sizeof output),"one pair equals reciprocal-suppressed full order");
  auto noImpact=settings;noImpact.impact54=false;noImpact.friction50=false;c::Body noImpactOutput[4]{};c::Receipt noImpactReceipt{};
  watch=true;status=owner.run(input,4,onePair,1,noImpact,response,noImpactOutput,noImpactReceipt);watch=false;
+ c::Body noImpactExpected[4]{};std::memcpy(noImpactExpected,input,sizeof input);
+ auto& processedExpected=noImpactExpected[1].physical.body.state;
+ processedExpected.callbackState238=1;
+ processedExpected.processedContactPartners23C[0]={input[0].physical.identity};
  need(status==c::Status::Complete&&noImpactReceipt.activeRecords>0&&
-      !std::memcmp(input,noImpactOutput,sizeof input),"disabling recovered response leaves active geometry with zero impulse");
+      noImpactReceipt.contacts[0].count20C==1&&noImpactReceipt.contacts[1].count20C==1&&
+      !std::memcmp(noImpactExpected,noImpactOutput,sizeof noImpactExpected),
+      "zero impulse preserves dynamics but commits authentic asymmetric1654C0 callback");
+ // Persisted processed identities survive another run until actual integration
+ // clears count238. Reciprocal geometry remains real, with no response replay.
+ const c::Pair reverseOnly[]={{1,0}};c::Body pendingOutput[4]{};c::Receipt pendingReceipt{};
+ watch=true;status=owner.run(noImpactOutput,4,reverseOnly,1,noImpact,response,pendingOutput,pendingReceipt);watch=false;
+ need(status==c::Status::Complete&&pendingReceipt.geometryPairs==1&&pendingReceipt.suppressedPairs==1&&
+      pendingReceipt.respondedPairs==0&&!std::memcmp(noImpactOutput,pendingOutput,sizeof pendingOutput),
+      "next contact transaction consumes canonical pending238/23C");
+ watch=true;status=owner.run(noImpactOutput,4,nullptr,0,noImpact,response,pendingOutput,pendingReceipt);watch=false;
+ need(status==c::Status::Complete&&pendingReceipt.testedPairs==0&&
+      !std::memcmp(noImpactOutput,pendingOutput,sizeof pendingOutput),"zero-pair pass preserves pending processed owner");
  c::Body four[4]{},fourOutput[4]{};std::memcpy(four,input,sizeof four);
  four[2].physical.body.state.scene=pose(-6,-12);four[3].physical.body.state.scene=pose(6,-12);
  four[2].physical.body.state.body.velocity={{30,0,10}};four[3].physical.body.state.body.velocity={{-20,0,5}};

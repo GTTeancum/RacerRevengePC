@@ -91,10 +91,20 @@ public:
     // and initial frame. Recheck those associations before adding frame banks.
     bool load(const std::filesystem::path& sourceArchive,
         const track_materials50fa_fixture::Owner& track,Diagnostic& d)noexcept {
+        return load<track_materials50fa_fixture::Owner>(sourceArchive,track,d);
+    }
+    // Narrow read-only static-owner contract: loaded(), bank(), selections()
+    // and spans(). Both retained and direct-original owners expose the same
+    // authenticated selection/span records. No owner is copied or retained.
+    template<class StaticMaterialOwner>
+    bool load(const std::filesystem::path& sourceArchive,
+        const StaticMaterialOwner& track,Diagnostic& d)noexcept {
         using namespace detail;using shared::need;
         try{
             d={};need(metadataAvailable,"GA ATM profiles have not been cold-prepared and reviewed");
             need(!storage_ && track.loaded(),"GA ATM requires a loaded static source material owner");
+            const auto* bank=track.bank();const auto* selections=track.selections();const auto* spans=track.spans();
+            need(bank&&selections&&spans,"GA ATM static source owner bank/selections/spans unavailable");
             shared::Inputs inputs;inputs.capacity=8u*1024u*1024u;
             auto bytes=inputs.read(sourceArchive,2834942);
             need(bytes.size()==2834942&&shared::sha256(bytes)==
@@ -135,7 +145,7 @@ public:
                     "GA authored animation scope/rate/start/loop policy");
                 const auto materialKey=shared::sha256(std::string("rr-native-material-48E-v1\n")+entry.materialSha);
                 bool found=false;
-                for(const auto& selection:*track.selections()){
+                for(const auto& selection:*selections){
                     if(selection.textureName!=entry.name)continue;
                     need(selection.track==track_source_fixture::Track::ga&&selection.materialKey==materialKey&&
                         selection.pass==1&&selection.slot==1&&selection.passCount==1&&selection.program==pass.microprogram&&
@@ -159,7 +169,7 @@ public:
                         decoded.mips.back().width==frame.width&&decoded.mips.back().height==frame.height&&
                         shared::sha256(decoded.base_rrtex)==frame.nativeSha,"GA native stored animation frame decode/identity");
                     if(f==entry.initialFrame){
-                        const auto* initial=track.bank()->texture(out.sourceTextureIndex);
+                        const auto* initial=bank->texture(out.sourceTextureIndex);
                         need(initial&&initial->texture.width==frame.width&&initial->texture.height==frame.height&&
                             initial->texture.rgba==decoded.mips.back().rgba,
                             "GA authored initial frame differs from retained original image");
@@ -169,9 +179,9 @@ public:
                 need(end==original.size(),"GA original ATM trailing bytes");
             }
             std::uint32_t placed=0;
-            for(std::uint32_t si=0;si<track.spans()->size();++si){
-                const auto& span=track.spans()->at(si);
-                const auto& selection=track.selections()->at(span.materialSelection);
+            for(std::uint32_t si=0;si<spans->size();++si){
+                const auto& span=spans->at(si);
+                const auto& selection=selections->at(span.materialSelection);
                 for(std::uint32_t i=0;i<sourceAnimationCount;++i){
                     if(selection.textureName!=entries[i].name)continue;
                     need(placed<animationCount&&span.sourcePass==1&&span.sourcePassCount==1&&span.projectionPass==0,

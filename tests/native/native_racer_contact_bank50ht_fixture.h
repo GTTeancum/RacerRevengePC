@@ -18,7 +18,8 @@ namespace native_racer_contact50HT {
 // or matching-velocity overwrite of the secondary body is performed.
 //
 // Identical Pod01 parameters/settings are required for this bounded eight-racer owner.
-// identity[i] is a unique opaque main-body id in this isolated contact pass.
+// identity[i] is a unique opaque main-body id retained for this entire bank
+// lifetime, including every pending238/23C reference; never use arena addresses.
 // material[i] is explicit; emptyPhysicalRootMaterial is the documented HOST
 // policy for the authenticated fresh empty root, not unknown-prefix recovery. Pair order indexes bank slots directly, with no
 // sorting/deduplication. A stalled/finished racer should appear only if the host
@@ -65,13 +66,18 @@ inline Status applyAtWorldBoundary(
             !std::memcmp(&live.bodies.main.components.root,&before[i].physical.body.state,sizeof(RootBodyState48H));}))
             return Status::InvalidInput;
     // All fallible work is over. Commit the exact two-body numerical response
-    // fields only; transform/position/quaternion/history and terrain stay intact.
+    // fields and canonical238/23C; transform/position/quaternion/history and terrain stay intact.
     const auto commit=[&](std::size_t i){bank.visit(i,[&](){
         auto& dst=live.bodies.main.components.root;const auto& src=after[i].physical.body.state;
         dst.body.velocity=src.body.velocity;dst.body.angularVelocity=src.body.angularVelocity;
         dst.loads=src.loads;dst.positionCorrection1a0=src.positionCorrection1a0;
         dst.rotationCorrection1b0=src.rotationCorrection1b0;
         dst.accumulator1c0=src.accumulator1c0;dst.accumulator1d0=src.accumulator1d0;
+        // Canonical processed-body list is independent of20C/210 damage join.
+        // Its identities remain valid until the existing next root count-clear.
+        dst.callbackState238=src.callbackState238;
+        std::memcpy(dst.processedContactPartners23C,src.processedContactPartners23C,
+            sizeof(dst.processedContactPartners23C));
     });};
     for(std::size_t i=1;i<count;++i)if(participates[i])commit(i);if(participates[0])commit(0);
     receipt=staged;return Status::Complete;

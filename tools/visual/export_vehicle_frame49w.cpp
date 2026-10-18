@@ -16,7 +16,16 @@ using Bytes=std::vector<std::uint8_t>;
 namespace fs=std::filesystem;
 template<class T>J raw(const T& object){static_assert(sizeof(T)%4==0);std::array<U,sizeof(T)/4> words{};std::memcpy(words.data(),&object,sizeof object);return J(words);}
 static c::Graph graphCopy(const VehicleFrameState49W&s){c::Graph g{};std::copy_n(s.nodes,53,g.begin());return g;}
-static J body(const RootBodyState48H&r,const SecondaryActivationSupplement49V&s,const GraphBodyExtraLanes49W&e){static_assert(sizeof(RootBodyState48H)==320);return {{"root_words",raw(r)},{"orientation1F0",raw(r.body.orientation)},{"derivative_supplement_words",raw(s)},{"extra_lane_words",raw(e)}};}
+static J body(const RootBodyState48H&r,const SecondaryActivationSupplement49V&s,const GraphBodyExtraLanes49W&e){
+ // Keep advancing49w.trace.v1's existing 80-word numerical root prefix stable.
+ // The recovered ten23C identities have their own explicit additive field;
+ // callbackState238 remains the original final word of root_words.
+ static_assert(offsetof(RootBodyState48H,processedContactPartners23C)==320);
+ static_assert(sizeof(RootBodyState48H)==360);
+ std::array<U,80> legacyRoot{};std::memcpy(legacyRoot.data(),&r,sizeof legacyRoot);
+ return {{"root_words",J(legacyRoot)},{"processed_partners23C",raw(r.processedContactPartners23C)},
+     {"orientation1F0",raw(r.body.orientation)},{"derivative_supplement_words",raw(s)},{"extra_lane_words",raw(e)}};
+}
 static J joint(const PodSphereJoint49L&j){return {{"stiffness_damping",old::scalarWords({j.stiffness30,j.damping34})},{"flags",{j.enabled38,j.unilateral3C,j.suppressed40}},{"body_present",{j.bodyAPresent44,j.bodyBPresent48}},{"tail_words",old::words(&j.length4C,(sizeof(j)-offsetof(PodSphereJoint49L,length4C))/4)}};}
 // advancing49w.trace.v1 uses stable phase IDs, not the runtime enum's ordinal.
 // The impact/repair stages inserted into the runtime ordering must not renumber

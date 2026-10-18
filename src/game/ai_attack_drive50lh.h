@@ -1,0 +1,123 @@
+#pragma once
+#include "ai_combat_candidate50lh.h"
+
+namespace rr::game {
+// Process-lifetime owner of source171240..171250. The guarded initialization
+// is reached only after B9C.1 is cleared and both authored widths are read.
+struct AiAttackDriveGlobals50LH {
+    float widthThreshold433CC8=0.f;
+    bool widthThresholdInitialized=false; // gp-7AAC source guard byte.
+};
+struct AiAttackDriveSelection50LH {
+    bool wideSteering16EDD0=false;
+    bool attackSpeed16FB50=false;
+    float currentNodeWidth=0.f;
+};
+// Source1711E0 prefix. Canonical B9C and104C are explicit references because
+// their writes precede the steering/speed leaves and survive a later boundary.
+// No mode is synthesized: every mode other than3/4 follows the real172C50
+// branch. Runtime stateFE8=1 admission belongs to the source dispatcher.
+inline bool beginAiAttackDrive1711E0(const TrackNavigation50EU& track,
+    std::uint32_t currentNode,std::uint32_t mode1050,std::uint8_t& flagsB9C,
+    float& field104C,AiAttackDriveGlobals50LH& globals,
+    AiAttackDriveSelection50LH& selection,AiDrivingDiagnostic50IV& diagnostic) noexcept {
+    using ai_driving_detail50IV::fail;selection={};diagnostic={};
+    flagsB9C=static_cast<std::uint8_t>(flagsB9C&0xfdu); //171210, unconditionally.
+    if(!track.track.count||track.track.count>maxUndertrackNodes50ET||currentNode>=track.track.count)
+        return fail(diagnostic,AiDrivingError50IV::Owner,0x17121cu,currentNode);
+    if(std::fegetround()!=FE_TONEAREST)
+        return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x17123cu,currentNode);
+    ai_prefix_detail50IV::Math f;
+    selection.currentNodeWidth=f.add(track.nodes[currentNode].left54,track.nodes[currentNode].right58);
+    if(!f.valid)return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x17123cu,currentNode);
+    if(!globals.widthThresholdInitialized){
+        globals.widthThreshold433CC8=250.f; //171248
+        globals.widthThresholdInitialized=true; //171250
+    }
+    if(mode1050==3u){
+        const float threshold=f.read(globals.widthThreshold433CC8);
+        if(!f.valid)return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x171268u,currentNode);
+        selection.wideSteering16EDD0=!(selection.currentNodeWidth<=threshold);
+        selection.attackSpeed16FB50=true;
+    }else{
+        field104C=-1.f; //1712C0 mode4,1712E8 every other mode.
+        selection.attackSpeed16FB50=mode1050==4u;
+    }
+    return true;
+}
+struct AiAttackSpeedInput50LH {
+    const TrackNavigation50EU* trackFF4=nullptr;
+    const AiTrackMetadata50IU* metadata=nullptr;
+    const AiObservedRacer50IV* target=nullptr;
+    const float* selfPosition190=nullptr;
+    std::uint32_t selfNodeC80=0;
+    std::int32_t selfLapCC8=0,myMinSpeed108C=0;
+    float preparedFactor=0.f,selfCachedSpeed34=0.f;
+    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
+    void* diagnosticContext=nullptr;
+};
+struct AiAttackSpeedReceipt50LH {
+    float selfGateDistance=0.f,targetGateDistance=0.f,signedDistance=0.f;
+    float targetForwardAcceleration=0.f,desiredSpeed=0.f;
+    bool minimumApplied=false,driveFullSpeedOverride=false;
+    ai_combat_distance50LH::Receipt distance{};
+    AiNonBoostSpeedReceipt50IR speed{};
+};
+//16FB50 is a distinct attack speed planner, not172C50. It never invokes
+//173180, reads heat, touches109C, or draws RNG. The sole terminal control leaf
+//is173770, which clears boost bit0 and writes accelerator/brake B7C/B80.
+//Input target position/forward/C0 are the real serial body/scene observations.
+inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50LH& input,
+    PlayerReadResult48X& actions,AiAttackSpeedReceipt50LH& receipt,
+    AiDrivingDiagnostic50IV& diagnostic,AiSpeedDiagnostic50IR& speedDiagnostic) noexcept {
+    using ai_driving_detail50IV::fail;diagnostic={};speedDiagnostic={};receipt={};
+    if(std::fegetround()!=FE_TONEAREST)
+        return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x16fb50u);
+    if(!input.trackFF4||!input.metadata||!input.metadata->bound||
+       input.metadata->count!=input.trackFF4->track.count||!input.target||
+       !input.target->bound||!input.selfPosition190)
+        return fail(diagnostic,AiDrivingError50IV::Owner,0x16fb80u);
+    const auto& track=*input.trackFF4;const auto& target=*input.target;
+    if(!ai_combat_candidate_detail50LH::gateDistance(track,input.selfNodeC80,
+        input.selfPosition190,receipt.selfGateDistance,diagnostic)){
+        if(diagnostic.sourcePC==0x1706c0u)diagnostic.sourcePC=0x16fd44u;return false;
+    }
+    if(!ai_combat_candidate_detail50LH::gateDistance(track,target.vehicleC80,
+        target.position190,receipt.targetGateDistance,diagnostic)){
+        if(diagnostic.sourcePC==0x1706c0u)diagnostic.sourcePC=0x16fed8u;return false;
+    }
+    ai_prefix_detail50IV::Math f;
+    receipt.signedDistance=f.sub(receipt.selfGateDistance,receipt.targetGateDistance); //16FEEC delay slot.
+    if(input.selfNodeC80!=target.vehicleC80){
+        float correction=0.f;
+        if(!ai_combat_distance50LH::distanceBetweenNodes2A2DC0(*input.metadata,
+            target.vehicleC80,target.lapCC8,input.selfNodeC80,input.selfLapCC8,
+            correction,receipt.distance,input.diagnostic,input.diagnosticContext))
+            return fail(diagnostic,receipt.distance.error==ai_combat_distance50LH::Error::Owner?
+                AiDrivingError50IV::Owner:AiDrivingError50IV::Arithmetic,receipt.distance.sourcePC);
+        receipt.signedDistance=f.add(receipt.signedDistance,correction); //16FF00.
+    }
+    // Scalar ADDAs/MADD keep this exact grouping; the VU dot has its own
+    // accumulator. Do not replace the actual acceleration by speed deltas.
+    const float scalarAccumulator=f.add(2.f,receipt.signedDistance); //16FF14.
+    receipt.targetForwardAcceleration=f.dot(target.linearAccelerationC0,target.forward190); //16FF24..40.
+    const float accelerationStep=f.mul(receipt.targetForwardAcceleration,input.preparedFactor); //16FF48.
+    const float feedback=f.add(scalarAccumulator,f.mul(10.f,accelerationStep)); //16FF60.
+    const float predicted=f.add(target.cachedSpeed34,feedback); //16FF64.
+    const float minimum=f.integer(input.myMinSpeed108C); //16FF68.
+    float desired=f.mul(ai_speed_detail50IR::word(0x3f2e8bc1u),predicted); //16FF6C.
+    if(desired<minimum){desired=minimum;receipt.minimumApplied=true;}
+    if(!f.valid)return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x16ff6cu);
+    //Gate distance already proved self node in bounds before either accessor.
+    if(input.metadata->nodes[input.selfNodeC80].flags79&0x10u){
+        desired=f.read(input.metadata->nodes[input.selfNodeC80].speedLimit5C);
+        receipt.driveFullSpeedOverride=true;
+    }
+    if(!f.valid)return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x16ffa0u);
+    receipt.desiredSpeed=desired;
+    if(!applyAiNonBoostSpeed50IR(desired,input.selfCachedSpeed34,actions,actions,
+        receipt.speed,speedDiagnostic))
+        return fail(diagnostic,AiDrivingError50IV::Arithmetic,speedDiagnostic.sourcePC);
+    return true;
+}
+} //namespace rr::game

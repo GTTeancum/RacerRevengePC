@@ -69,6 +69,15 @@ public:
         std::ifstream file(binding.archivePath,std::ios::binary);
         if(!file)return fail(error,"original pod collision archive unavailable");
         std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
+        return prepare(binding,bytes,endpoint,error);
+    }
+    // In-memory original-archive route. The caller owns source authentication;
+    // decoding and publication are identical to the file-backed path above.
+    bool prepare(const ArchiveBinding& binding,const std::vector<std::uint8_t>& bytes,
+                 const EndpointPolicy& endpoint,std::string& error) {
+        if(storage_||!endpoint.words||binding.archivePath.empty()||
+           binding.memberPrefix.empty()||std::fegetround()!=FE_TONEAREST)
+            return fail(error,"invalid fresh original-pod collision binding");
         rr::assets::ResArchive48C archive;rr::assets::DecodeError48C why;
         if(!rr::assets::decodeResource48C(bytes,archive,why))
             return fail(error,"original pod collision archive rejected");

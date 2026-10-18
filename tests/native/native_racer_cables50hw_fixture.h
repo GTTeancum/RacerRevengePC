@@ -20,6 +20,7 @@ namespace native_racer_model50LA { class Owner; }
 namespace native_racer50HW {
 namespace visual_detail {
 inline std::vector<std::uint8_t> original(const Rig& rig,const std::string& member){
+    if(rig.directOriginal)return rig.originalMember(member);
     const auto wanted=rig_detail::lower(member);const J* selected=nullptr;
     for(const auto& row:rig.manifest.at("members"))
         if(rig_detail::lower(row.at("source_member").get<std::string>())==wanted){

@@ -14,7 +14,8 @@ struct FrameReads {
     Read<std::uint8_t> flagsB9C,flagsCD8;
     Read<bool> aiOwnersBound,dynamicOwnersBound;
     Read<float> cachedSpeed34,smoothedChannel0D28,worldAngularVelocityA4;
-    std::array<std::array<Read<float>,3>,rr::game::vehicleFrameNodeCount49W> localPosition;
+    std::array<std::array<Read<float>,3>,rr::game::vehicleFrameNodeCount49W> localPosition,localForward,localUp;
+    std::array<Read<float>,3> velocity70,linearAccelerationC0;
 
     void bind(const Bank& bank,const rr::game::VehicleFrameState49W& frame) {
         phase=bank.bindRead(frame.phase);
@@ -32,8 +33,29 @@ struct FrameReads {
         // nodes is inline storage in VehicleFrameState49W's registered prefix.
         // Bind actual matrix lanes, never a copied graph/binding pointer.
         for(std::size_t node=0;node<localPosition.size();++node)
-            for(unsigned axis=0;axis<3;++axis)
+            for(unsigned axis=0;axis<3;++axis){
                 localPosition[node][axis]=bank.bindRead(frame.nodes[node].localC0.v[12+axis]);
+                localForward[node][axis]=bank.bindRead(frame.nodes[node].localC0.v[8+axis]);
+                localUp[node][axis]=bank.bindRead(frame.nodes[node].localC0.v[4+axis]);
+            }
+        for(unsigned axis=0;axis<3;++axis){
+            velocity70[axis]=bank.bindRead(frame.bodies.main.components.root.body.velocity.v[axis]);
+            linearAccelerationC0[axis]=bank.bindRead(frame.bodies.main.components.root.body.linearAcceleration.v[axis]);
+        }
+    }
+    float forward(const Bank& bank,std::size_t slot,
+        rr::game::SceneNodeIndex49P node,unsigned axis) const {
+        const auto index=static_cast<std::uint32_t>(node);
+        if(index>=localForward.size()||axis>=3)
+            throw std::runtime_error("racer observation inline forward lane is out of bounds");
+        return bank.read(slot,localForward[index][axis]);
+    }
+    float up(const Bank& bank,std::size_t slot,
+        rr::game::SceneNodeIndex49P node,unsigned axis) const {
+        const auto index=static_cast<std::uint32_t>(node);
+        if(index>=localUp.size()||axis>=3)
+            throw std::runtime_error("racer observation inline up lane is out of bounds");
+        return bank.read(slot,localUp[index][axis]);
     }
     float position(const Bank& bank,std::size_t slot,
         rr::game::SceneNodeIndex49P node,unsigned axis) const {

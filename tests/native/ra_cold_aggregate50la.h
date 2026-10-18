@@ -10,6 +10,8 @@
 #include "ra_trigger_authoring50la.h"
 #include "original_track_sky50kx_fixture.h"
 #include "sky50gw_fixture.h"
+#include "ra_crowd_image50la.h"
+#include "runtime_asset_paths50lb.h"
 #include "ra_atm_authoring50la.h"
 #include "ra_audio_authoring50la.h"
 #include "ra_particle_authoring50la.h"
@@ -397,10 +399,26 @@ public:
             sky50gw_fixture::Request request;
             request.track=track_source_fixture::Track::ra;request.textureRoot=textureRoot;
             request.retainedArchive=&source_->sourcesDecoded()->archive;
+            request.decodeOriginalImages=!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
             sky50gw_fixture::Diagnostic detail;
             if(!images->load(request,detail)){d.sky=detail.message;return fail(d,"RA original sky image preparation failed");}
             skyImages_=std::move(images);return true;
         }catch(...){return fail(d,"RA original sky image allocation failed");}
+    }
+    // Decode directly from this aggregate's already authenticated original
+    // archive. The ordinary image verifier still admits the final resources.
+    bool decodeCrowdImages(std::array<std::vector<std::uint8_t>,6>& images,Diagnostic& d)const noexcept {
+        d={};d.stage=Stage::staticWorldImages;
+        if(terminal_||closed_||!source_||!source_->sourcesDecoded()){
+            d.failure="RA crowd decode requires the actual original source owner";return false;}
+        try {
+            std::vector<std::uint8_t> atm;a::DecodeError48C error;
+            if(!a::extractResMember48C(source_->sourcesDecoded()->archive,"textures\\crowd.atm",atm,error)){
+                d.sky=error.detail;d.failure="RA original crowd member extraction failed";return false;}
+            if(!ra_crowd_image50LA::Verifier::decodeRaSixOriginal(atm,images,d.sky)){
+                d.failure="RA original crowd image decode failed";return false;}
+            return true;
+        }catch(...){d.failure="RA original crowd image allocation failed";return false;}
     }
     // Borrowed through this aggregate's real renderer/session lifetime.
     const sky50gw_fixture::Owner* skyAssets()const noexcept {

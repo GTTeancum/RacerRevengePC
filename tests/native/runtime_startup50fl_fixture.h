@@ -1,5 +1,8 @@
 #pragma once
 #include "runtime_asset_paths50lb.h"
+#include "pod_materials50ed_fixture.h"
+#include "original_player_identity50ik_fixture.h"
+#include "../../src/assets/import_decode48c.h"
 // Native-only cold owner for the development client. This preserves the explicit
 // supplied development context of frame49w_test::Fixture(0); geometry, IK,
 // visual/root/physics parameters and joints are computed by native production
@@ -58,27 +61,63 @@ inline BodyParameters48C bodyParameters(){
     p.linearAccelerationLimitSquared=p.angularAccelerationLimitSquared=p.linearVelocityLimitSquared=p.angularVelocityLimitSquared=1e8f;
     return p;
 }
+// Explicit cold input selection. The ordinary RA route owns the original
+// POD01 bytes in memory; older diagnostic callers retain their loose inputs.
+// This changes only input ownership, not Fixture's development arena semantics.
+enum class AssetInput { RetainedDevelopment, OriginalDisc };
 struct Assets {
+    std::vector<std::uint8_t> originalArchive,phy,podShape;
+    std::filesystem::path originalArchivePath;
     std::array<std::vector<std::uint8_t>,3> psg,vut;
     std::array<std::vector<std::uint8_t>,6> mot;
     std::array<rr::assets::PsgHierarchyView49O,3> hierarchy{};
     std::array<rr::assets::MotionNodeBindings49O,3> rows{};
     std::array<rr::assets::MotionView49O,6> motions{};
-    explicit Assets(const std::filesystem::path& root){
+    explicit Assets(const std::filesystem::path& root,AssetInput input=AssetInput::RetainedDevelopment){
         const auto directory=root/"evidence/authoredGeometry49O/asset-reader/fixtures";
         const char* ps[]={"48-englt1.psg","43-engrt1.psg","52-chariot.psg"};
         const char* vs[]={"49-englt1.vut","44-engrt1.vut","53-chariot.vut"};
         const char* ms[]={"50-englt1.mot","45-engrt1.mot","54-01_brklt.mot","55-01_brkrt.mot","56-01_forwd.mot","57-01_back.mot"};
         const U offsets[]={1,16,31};
+        if(input==AssetInput::OriginalDisc){
+            originalArchivePath=runtime_asset_paths50LB::resolve(root/"work/native/project/disc/PODS/POD01/POD01.RES");
+            const auto* pin=original_player_identity50IK::find(1u);
+            require(pin&&std::filesystem::file_size(originalArchivePath)==pin->archiveBytes,
+                "original POD01 bootstrap archive extent differs");
+            originalArchive=readBytes(originalArchivePath);
+            require(originalArchive.size()==pin->archiveBytes&&
+                pod_materials50ed_fixture::detail::sha256(originalArchive)==pin->archiveSha256,
+                "original POD01 bootstrap archive identity differs");
+            rr::assets::ResArchive48C archive;rr::assets::DecodeError48C error;
+            require(rr::assets::decodeResource48C(originalArchive,archive,error),"original POD01 bootstrap archive rejected");
+            const auto member=[&](const char* name){
+                std::vector<std::uint8_t> bytes;
+                if(!rr::assets::extractResMember48C(archive,std::string("Pods\\Pod01\\")+name,bytes,error))
+                    throw std::runtime_error(std::string("original POD01 bootstrap member missing: ")+name);
+                return bytes;
+            };
+            const char* originalPsg[]={"englt1.psg","engrt1.psg","chariot.psg"};
+            const char* originalVut[]={"englt1.vut","engrt1.vut","chariot.vut"};
+            const char* originalMot[]={"englt1.mot","engrt1.mot","01_brklt.mot","01_brkrt.mot","01_forwd.mot","01_back.mot"};
+            for(U i=0;i<3;++i){psg[i]=member(originalPsg[i]);vut[i]=member(originalVut[i]);}
+            for(U i=0;i<6;++i)mot[i]=member(originalMot[i]);
+            phy=member("Pod01.phy");podShape=member("podboxf.col");
+            require(pod_materials50ed_fixture::detail::sha256(phy)==pin->phySha256,
+                "original POD01 bootstrap PHY identity differs");
+        }else{
+            for(U i=0;i<3;++i){psg[i]=readBytes(directory/ps[i]);vut[i]=readBytes(directory/vs[i]);}
+            for(U i=0;i<6;++i)mot[i]=readBytes(directory/ms[i]);
+            phy=readBytes(root/"evidence/authoredInitialization49N/authoring-source/Pod01.phy");
+            podShape=readBytes(root/"evidence/frameBridge49W/shape/podboxf.col");
+        }
         rr::assets::GeometryDiagnostic49O geometry{};rr::assets::MotionBindingDiagnostic49O binding{};
         for(U i=0;i<3;++i){
-            psg[i]=readBytes(directory/ps[i]);vut[i]=readBytes(directory/vs[i]);
             require(rr::assets::readPsgHierarchy49O(psg[i].data(),psg[i].size(),hierarchy[i],geometry),"native PSG reader");
             require(rr::assets::readMotionNodeBindings49O(hierarchy[i],reinterpret_cast<const char*>(vut[i].data()),vut[i].size(),rows[i],binding),"native VUT reader");
             for(U row=0;row<rows[i].count;++row)rows[i].rows[row].sceneNode=std::uint8_t(rows[i].rows[row].sceneNode+offsets[i]);
         }
         require(hierarchy[0].nodeCount==14&&hierarchy[1].nodeCount==14&&hierarchy[2].nodeCount==18,"native startup pod topology");
-        for(U i=0;i<6;++i){mot[i]=readBytes(directory/ms[i]);require(rr::assets::readMot49O(mot[i].data(),mot[i].size(),motions[i],geometry),"native MOT reader");}
+        for(U i=0;i<6;++i){require(rr::assets::readMot49O(mot[i].data(),mot[i].size(),motions[i],geometry),"native MOT reader");}
     }
     Graph graph()const{
         Graph graph{};
@@ -114,7 +153,8 @@ struct Fixture {
     unsigned frame=0;
     PlayerActionCodes48X actionCodes{-1,-1,-1,-1,-1};
     bool configurationEntryNonzero=true;
-    explicit Fixture(float initialSpeed=0,const std::filesystem::path& root="."):assets(root){
+    explicit Fixture(float initialSpeed=0,const std::filesystem::path& root=".",
+        AssetInput input=AssetInput::RetainedDevelopment):assets(root,input){
         require(std::fegetround()==FE_TONEAREST&&std::isfinite(initialSpeed),"native startup numeric context");
         const auto graph=assets.graph();std::copy(graph.begin(),graph.end(),state.nodes);
         auto& animation=bindings.animation;
@@ -142,7 +182,7 @@ struct Fixture {
   for(unsigned i=0;i<vehicleFrameNodeCount49W;++i)bindings.topology[i]={state.nodes[i].parent180,state.nodes[i].firstChild184,state.nodes[i].nextSibling188};
   bindings.mainDomain=bindings.secondaryDomain={2,false,false,GraphBodyIntegrator49W::OriginalAdamsBashforth2,GraphBodyCallback49W::Clear238};
   rr::assets::initializeVehicleVisualSharedColdRecords49R(state.visualShared);
-  const auto visualPhy=readBytes(root/"evidence/authoredInitialization49N/authoring-source/Pod01.phy");
+  const auto& visualPhy=assets.phy;
   rr::assets::VisualAuthoredValues49R visualValues{};
   rr::assets::VisualAuthoringDiagnostic49R visualDiagnostic{};
   require(rr::assets::readVehicleVisualAuthoring49R(reinterpret_cast<const char*>(visualPhy.data()),visualPhy.size(),visualValues,visualDiagnostic),"native visual PHY");
@@ -184,7 +224,7 @@ struct Fixture {
   project(state,bindings);
   PodSphereBody49L a{},bb{};makeSecondarySphereBody49M(z,parameters.bodies.secondary,a);auto mainView=z;mainView.root=m.components.root;mainView.sceneFlags190=state.bodies.mainSphere.sceneFlags190;makeSecondarySphereBody49M(mainView,parameters.bodies.secondary,bb);
   require(initializePodSphere49L(state.bodies.joint)&&setupPodSphereA49L(state.bodies.joint,a,{{0,0,0,1}})&&setupPodSphereB49L(state.bodies.joint,&bb,{{0,0,0,1}},5),"initial joint");
-  auto shape=readBytes(root/"evidence/frameBridge49W/shape/podboxf.col");rr::assets::DecodeError48C error{};require(rr::assets::decodePodShapeSource49W(shape,parameters.shape,error),"authored pod shape");state.shape.registrationE0=0;
+  const auto& shape=assets.podShape;rr::assets::DecodeError48C error{};require(rr::assets::decodePodShapeSource49W(shape,parameters.shape,error),"authored pod shape");state.shape.registrationE0=0;
   m.currentPoint7C0[3]=-71;
  }
     Fixture(const Fixture&)=delete;

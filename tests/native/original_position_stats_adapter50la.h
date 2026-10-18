@@ -1,5 +1,5 @@
 #pragma once
-// Actual ALL8 view0 numeric observation. No scheduling or drawing is implied.
+// Actual packed-racer view0 numeric observation. No scheduling or drawing is implied.
 namespace original_main_entry50KG { struct Application; }
 #include "original_camera_session50kx.h"
 #include "native_ai_session50iv_fixture.h"
@@ -10,6 +10,18 @@ namespace original_position_stats_adapter50LA {
 class Owner final {
     friend struct original_main_entry50KG::Application;
     using Camera=original_camera_session50KX::Session;
+    // Source camera preparation constructs these two exact view0 identities.
+    // Human count alone cannot authorize an AI/player reinterpretation.
+    static bool supportedSourceView(const Camera& c)noexcept {
+        if(!c.controller_.bound)return false;
+        const auto& binding=c.controller_.binding;
+        return (c.actual_.humanCount34==0u&&
+                binding.bootstrap==rr::game::CameraBootstrap::native_all_ai&&
+                binding.racerClass==rr::game::CameraRacerClass::ai)||
+            (c.actual_.humanCount34==1u&&
+                binding.bootstrap==rr::game::CameraBootstrap::original_single_player&&
+                binding.racerClass==rr::game::CameraRacerClass::player);
+    }
     // Only Application supplies these identities, taken from its real display
     // and canonical owners. Equality of camera/display counters is not proof.
     static bool belongsToApplication(const Camera& camera,
@@ -27,12 +39,10 @@ class Owner final {
     bool identityCurrent()const {
         const auto& c=*camera_;const auto& m=*manager_;
         return !c.closed_&&!c.abandoned_&&c.coldBound_&&c.readsBound_&&
-            c.generation_==generation_&&c.actual_.humanCount34==0&&c.actual_.bank.count()==8&&
+            c.generation_==generation_&&c.actual_.bank.count()==8&&supportedSourceView(c)&&
             &c.actual_.all8Manager==&m.manager&&m.managerBound&&m.rankBound&&
             m.retired40.bound&&m.retired40.activeCount50<=8&&
             c.controller_.bound&&c.controller_.binding.sessionGeneration==generation_&&
-            c.controller_.binding.bootstrap==rr::game::CameraBootstrap::native_all_ai&&
-            c.controller_.binding.racerClass==rr::game::CameraRacerClass::ai&&
             c.controller_.binding.managerIndex==0&&c.identity_[0].managerIndex==0&&
             c.controller_.binding.racerKey==Camera::key(c.identity_[0].racerTag)&&
             c.controller_.binding.mainBodyKey==Camera::key(c.identity_[0].mainBodyTag)&&
@@ -50,7 +60,7 @@ public:
         d={};if(camera_){d.status=Status::alreadyBound;return false;}
         try {
             if(!camera.generation_||camera.closed_||camera.abandoned_||
-               !camera.coldBound_||!camera.readsBound_||camera.actual_.humanCount34||
+               !camera.coldBound_||!camera.readsBound_||!supportedSourceView(camera)||
                camera.actual_.bank.count()!=8||&camera.actual_.all8Manager!=&manager.manager||
                !camera.identitiesCurrent())return false;
             if(camera.frameStage_!=Camera::FrameStage::idle&&camera.frameStage_!=Camera::FrameStage::published){
@@ -64,7 +74,8 @@ public:
     // Source1A73DC/1A73F0 passes the SAME manager-loop index to1750A0, which
     // stores its low nibble at175144. The retained native binding mirrors that
     // exact view0 call argument. This is not a followed-racer override; no other
-    // camera bootstrap, nonzero view, rebinding or arbitrary index is admitted.
+    // view, rebinding or arbitrary index is admitted; the original single-player
+    // and native all-AI bootstrap retain the same actual view0 manager identity.
     // Consume synchronously after real rank/camera publication and before the
     // next world tick; publication is an observation, not an async lifetime pin.
     bool capture(rr::game::OriginalPositionStatsNumbers50LA& output,Diagnostic& d)const noexcept {

@@ -7,15 +7,25 @@ namespace rr::game {
 // Original scan output lives here for one synchronous camera publication only.
 class OriginalDamageObservation50LA final {
     using Camera=original_camera_session50KX::Session;
+    // Source camera preparation constructs these two exact view0 identities.
+    // Human count alone cannot authorize an AI/player reinterpretation.
+    static bool supportedSourceView(const Camera& c)noexcept {
+        if(!c.controller_.bound)return false;
+        const auto& binding=c.controller_.binding;
+        return (c.actual_.humanCount34==0u&&
+                binding.bootstrap==rr::game::CameraBootstrap::native_all_ai&&
+                binding.racerClass==rr::game::CameraRacerClass::ai)||
+            (c.actual_.humanCount34==1u&&
+                binding.bootstrap==rr::game::CameraBootstrap::original_single_player&&
+                binding.racerClass==rr::game::CameraRacerClass::player);
+    }
     const Camera* camera_=nullptr;
     std::weak_ptr<OriginalDamage50LA> owner_;
     std::uint64_t generation_=0;
     bool identity(const Camera& c,const OriginalDamage50LA& owner)const noexcept {
         return !c.closed_&&!c.abandoned_&&c.coldBound_&&c.readsBound_&&c.displayInputs_&&
             c.generation_==generation_&&owner.entity_.session==generation_&&
-            c.actual_.humanCount34==0&&c.actual_.bank.count()==8&&c.controller_.bound&&
-            c.controller_.binding.bootstrap==CameraBootstrap::native_all_ai&&
-            c.controller_.binding.racerClass==CameraRacerClass::ai&&
+            c.actual_.bank.count()==8&&supportedSourceView(c)&&
             c.controller_.binding.sessionGeneration==generation_&&
             c.controller_.binding.managerIndex==0&&c.identity_[0].managerIndex==0&&
             c.controller_.binding.racerKey==Camera::key(c.identity_[0].racerTag)&&

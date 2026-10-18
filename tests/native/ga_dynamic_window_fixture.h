@@ -16,7 +16,15 @@ public:
  Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
  bool loadSource(const std::filesystem::path& archive,const ga_animated_world::Owner& world,
      ga_dynamic_materials::Diagnostic& d){
-  loaded_=world.ready()&&source_.load(archive,world.source(0).scene,world.source(1).scene,d);return loaded_;
+  return loadSource(archive,world,source_texture50fc_fixture::decodeSourceTextureGa,d);
+ }
+ // Direct-disc callers select their pinned decoder explicitly. Motion, GL,
+ // source-time ownership and material/alpha policy are unchanged.
+ bool loadSource(const std::filesystem::path& archive,const ga_animated_world::Owner& world,
+     ga_dynamic_materials::SourceTextureDecoder sourceDecoder,ga_dynamic_materials::Diagnostic& d){
+  if(loaded_){d.message="GA dynamic window source is already loaded";return false;}
+  if(!world.ready()){d.message="GA dynamic window world is not ready";return false;}
+  loaded_=source_.load(archive,world.source(0).scene,world.source(1).scene,sourceDecoder,d);return loaded_;
  }
  bool loaded()const noexcept{return loaded_;}
  bool ownsResources()const noexcept{return gpu_.ownsResources();}

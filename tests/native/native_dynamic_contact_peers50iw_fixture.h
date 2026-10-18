@@ -86,7 +86,7 @@ public:
     Registry& operator=(const Registry&)=delete;
     // Fresh session only. No reset/rebind API: existing210 identities and D34
     // numeric indices must not silently resolve against a replacement roster.
-    // This registry must outlive every pending210 and rememberedD34 in its bank.
+    // This registry must outlive every pending210/23C and rememberedD34 in its bank.
     // Source humanCount34 is supplied from the authentic manager owner; actual58
     // is never inferred from that boundary, bankSlot, or a HOST driving role.
     bool prepare(const ManagerBinding* entriesInSourceManagerOrder,
@@ -116,6 +116,11 @@ public:
     std::int32_t humanCount34() const noexcept{return humanCount_;}
     std::int32_t managerIndexForSlot(std::size_t bankSlot) const noexcept {
         return ready_&&bankSlot<count_?indexBySlot_[bankSlot]:-1;
+    }
+    // target1008 stores SOURCE manager identity, not a bank slot. Resolve it
+    // in this same retained session registry without borrowing the live arena.
+    BodyContactIdentity48R bodyIdentityForManagerIndex(std::uint32_t managerIndex) const noexcept {
+        return ready_&&managerIndex<count_?bindings_[managerIndex].mainBody340:BodyContactIdentity48R{};
     }
     BodyContactIdentity48R bodyIdentityForSlot(std::size_t bankSlot) const noexcept {
         const auto index=managerIndexForSlot(bankSlot);

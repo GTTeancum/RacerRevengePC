@@ -215,7 +215,7 @@ public:
             }
             return out;
         }
-        if (loadedTrack_ == HostTrack50IM::GA) {
+        if (loadedTrack_ == HostTrack50IM::GA && !nativeHumanRace_) {
             out.title = "GA NATIVE PREVIEW";
             out.subtitle = canResume ? "INCOMPLETE TRACK. ALL 8 RACERS USE ORIGINAL AI." : "SESSION STOPPED. EXIT TO START FRESH.";
             if (page_ == Page::Controls) {

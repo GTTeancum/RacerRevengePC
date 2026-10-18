@@ -2,6 +2,7 @@
 #include "pod_materials50ed_fixture.h"
 #include "track_source_fixture.h"
 #include "../../src/assets/import_decode48c.h"
+#include "../../src/assets/original_ipu_decoder.h"
 #include <cfenv>
 
 // Cold authenticated bridge for original TA/GC/GA/MA/SA/RA sky members. Cube geometry is the direct
@@ -13,11 +14,12 @@ constexpr std::uint32_t tileCount = 48, vertexCount = 192, indexCount = 288;
 constexpr float halfExtent = 25600.0f, cameraRelativeYOffset = 1024.0f;
 struct Request {
     std::filesystem::path archive; // Exact archive for the explicitly selected track.
-    std::filesystem::path textureRoot; // Matching cold sky decode; no runtime codec.
+    std::filesystem::path textureRoot; // Optional explicit predecoded compatibility input.
     track_source_fixture::Track track = track_source_fixture::Track::ta;
     // Cold-only borrow from the SAME retained RA aggregate; never retained by this owner.
     // Both CUB and SCB are authenticated below, with no second archive decode.
     const a::ResArchive48C* retainedArchive = nullptr;
+    bool decodeOriginalImages = false; // Cold in-process decode from this same authenticated CUB.
 };
 struct Span {
     std::uint32_t indexStart = 0, indexCount = 0, vertexStart = 0, vertexCount = 0;
@@ -209,9 +211,10 @@ public:
             d = {};
             need(!storage_, "Sky assets already loaded");
             need(std::fegetround() == FE_TONEAREST, "Sky geometry requires FE_TONEAREST");
-            need((!request.archive.empty() || request.retainedArchive) && !request.textureRoot.empty(), "Explicit sky source paths required");
+            need((!request.archive.empty() || request.retainedArchive) &&
+                (request.decodeOriginalImages || !request.textureRoot.empty()), "Explicit sky source paths required");
             need(!request.retainedArchive || request.track == track_source_fixture::Track::ra, "Retained sky archive requires explicit RA identity");
-            need(!std::filesystem::is_symlink(request.textureRoot), "Sky texture root symlink rejected");
+            need(request.decodeOriginalImages || !std::filesystem::is_symlink(request.textureRoot), "Sky texture root symlink rejected");
             const auto& selected = source(request.track);
             shared::Inputs input; input.capacity = 8u * 1024u * 1024u;
             a::ResArchive48C decodedArchive; a::DecodeError48C error;
@@ -288,7 +291,32 @@ public:
                 Bytes source(cub.begin()+offset, cub.begin()+offset+e.bytes);
                 need(sha256(source) == e.sourceSha256, "Sky source tile identity");
                 offset += e.bytes;
-                images[index] = input.read(request.textureRoot / e.filename, 65552);
+                if(request.decodeOriginalImages){
+                    //128D50/24F2C0: exact tile descriptor followed by four IPUM mips.
+                    constexpr std::uint32_t descriptor[]{0,32,0,16,4096,4,0,0,0,0,0};
+                    need(source.size()>=sizeof(descriptor),"Original sky tile descriptor extent");
+                    for(std::size_t word=0;word<11;++word)
+                        need(u32(source.data()+word*4)==descriptor[word],"Original sky tile descriptor");
+                    std::size_t at=sizeof(descriptor),largest=0,largestBytes=0;
+                    for(std::uint32_t dimension=16;dimension<=128;dimension*=2){
+                        need(at<=source.size()&&source.size()-at>=4,"Original sky mip size extent");
+                        const auto bytes=u32(source.data()+at);at+=4;
+                        need(bytes>=25&&bytes<=65536&&bytes<=source.size()-at,"Original sky mip extent");
+                        const auto* ipum=source.data()+at;
+                        need(std::memcmp(ipum,"ipum",4)==0&&u32(ipum+4)==bytes-8&&
+                            u16(ipum+8)==dimension&&u16(ipum+10)==dimension&&u32(ipum+12)==1,
+                            "Original sky mip header");
+                        largest=at;largestBytes=bytes;at+=bytes;
+                    }
+                    need(at==source.size(),"Original sky tile mip closure");
+                    Bytes rgba;std::string codecError;
+                    const bool decoded=a::decodeOriginalIpuRgba(source.data()+largest,largestBytes,
+                        128,128,rgba,codecError);
+                    need(decoded,"Original sky IPUM decode: "+codecError);
+                    need(rgba.size()==128u*128u*4u,"Original sky RGBA extent");
+                    images[index]={'R','R','T','E','X','0','0','1',128,0,0,0,128,0,0,0};
+                    images[index].insert(images[index].end(),rgba.begin(),rgba.end());
+                }else images[index] = input.read(request.textureRoot / e.filename, 65552);
                 need(images[index].size() == 65552 && sha256(images[index]) == e.imageSha256 &&
                     std::memcmp(images[index].data(), "RRTEX001", 8) == 0 &&
                     u32(images[index].data()+8) == 128 && u32(images[index].data()+12) == 128,

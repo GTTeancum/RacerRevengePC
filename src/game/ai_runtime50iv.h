@@ -1,5 +1,9 @@
 #pragma once
 #include "ai_driving50iv.h"
+#include "ai_combat_candidate50lh.h"
+#include "ai_combat_state50lh.h"
+#include "ai_attack_drive50lh.h"
+#include "ai_attack_wide50lh.h"
 #include "ai_finish_controls50kg.h"
 #include "ai_state_prefix50iv.h"
 #include "lap_timing50id.h"
@@ -25,7 +29,7 @@ struct AiRuntimeState50IV {
     bool target1008Present=false;
     std::uint32_t target1008ManagerIndex=0;
     // Canonical source scalar owners, constructor16E2B8..16E2C0/16E2F8/
-    //16E348. Their combat consumers remain bounded; reset16E830 still owns
+    //16E348. Recovered human combat consumes these same owners;16E830 owns
     // these writes.1050 is an integer mode (171254), not a float timer.
     float timer100C=0.f,timer1010=0.f,timer1014=0.f,field104C=-1.f;
     std::uint32_t mode1050=0;
@@ -36,7 +40,7 @@ struct AiRuntimeState50IV {
     // ordinary state0 frame. Only a complete physical-reset join can clear it.
     bool physicalReset2255B0Pending=false;
     std::uint64_t scalarResets16E830=0;
-    std::uint64_t combatScans=0,combatAiRejections=0;
+    std::uint64_t combatScans=0,combatAiRejections=0,attackFrames=0;
     std::uint64_t dispatchedFrames=0,brakingFrames=0,startupFrames=0,ordinaryFrames=0,boundBrakeSteerFrames=0;
 };
 // This owner is populated by native1B0400 over the actual manager field. CCC
@@ -48,6 +52,8 @@ struct AiApplicationGlobals50IV {
     std::uint32_t paused433CB0=0;
     std::uint64_t navigationCalls433CC0=0;
     bool navigationCounterInitialized=false;
+    AiAttackDriveGlobals50LH attackDrive{};
+    AiAttackWideGlobals16EDD0 attackWide{};
 };
 struct AiRuntimeInput50IV {
     const TrackNavigation50EU* mapFF0=nullptr;
@@ -67,6 +73,10 @@ struct AiRuntimeInput50IV {
     std::uint8_t settings1125C=0;
     float aiTrackLength3C=0.f;
     bool raceOwnersBound=false,settings188F60Nonzero=false;
+    ai_combat_distance50LH::DiagnosticSink combatDiagnostic=nullptr;
+    void* combatDiagnosticContext=nullptr;
+    BodyContactIdentity48R (*resolveBody340)(const void*,std::uint32_t) noexcept=nullptr;
+    const void* body340Context=nullptr;
 };
 struct AiRuntimeReceipt50IV {
     bool dispatched=false,attemptedBoost=false,boostHandled=false,braking=false;
@@ -146,7 +156,8 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
     }
     ++in.applicationGlobals->navigationCalls433CC0;
     const AiRouteChoiceOwners50IY routeOwners{*in.aiMetadata,ai.fieldFE4,
-        ai.state.aiStateFE8,ai.packing.policy1000,frame.noiseOwner().sharedRandomState};
+        ai.state.aiStateFE8,ai.packing.policy1000,frame.noiseOwner().sharedRandomState,
+        &ai.mode1050,&ai.target1008Present,&ai.target1008ManagerIndex,in.racers,in.racerCount};
     if(!advanceAiNavigation50IV(*in.mapFF0,*in.aiFF4,*in.aiMetadata,previousCA0,position,
         in.actualZoneOrdinal48,progress,lapCC8,frame.fields.impactFlagsCD8,ai.navigation,ai.boost,routeOwners,receipt.driving))return stop(receipt.driving.sourcePC);
     const auto current=progress.reset.vehicleC80,previous=progress.vehicleC84;
@@ -175,36 +186,76 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
         stateInput.turnSide.scene190Position[axis]=position[axis];stateInput.turnSide.scene190LocalForward[axis]=forward[axis];}
     AiStateDispatchReceipt50IV dispatch{};
     if(!advanceAiStateNoCombat50IV(stateInput,ai.state,dispatch,receipt.prefix))return stop(receipt.prefix.sourcePC);
-    if(!dispatch.complete){
-        if(dispatch.boundaryPC!=0x1705c8u||ai.state.aiStateFE8!=2u)
-            return stop(dispatch.boundaryPC);
-        // State2 caller16ED38, after the unchanged1704E0 early guards.
-        // Source1705C8..1706B8 visits the entire real manager in index order.
-        // Each1705F4 target store precedes its speed read and candidate guards.
-        // No callback/result is fabricated for the still-unjoined1706C0.
+    // Source1705C8..1706B8. The same actual manager scan is called by state2
+    // and by state1 after170480 misses. Target1008 stores precede every guard;
+    // a genuine false geometry result continues, while a native boundary stops.
+    auto scanCandidates=[&](bool& accepted) noexcept {
+        accepted=false;
         for(std::size_t index=0;index<in.racerCount;++index){
             if(index==ai.managerIndexFE0)continue;
             const auto& candidate=in.racers[index];
             if(!candidate.bound||candidate.managerIndex!=index)return stop(0x1af330u);
             ai.target1008Present=true;ai.target1008ManagerIndex=candidate.managerIndex;
             ai_prefix_detail50IV::Math scan;
-            //17061C is the always-executed delay-slot multiply, including AI
-            // candidates that immediately return false at170620/170624.
             const float candidateSpeed=scan.mul(ai_speed_detail50IR::word(0x3f2e8bc1u),
-                scan.read(candidate.cachedSpeed34));
+                scan.read(candidate.cachedSpeed34)); //17061C delay, even AI rejection
             if(!scan.valid)return stop(0x17061cu);
             if(candidate.vehicle58==1u){++ai.combatAiRejections;continue;}
-            if(candidate.vehicle40)continue;
-            if(candidateSpeed<200.f)continue;
-            if(candidate.vehicle58!=0u)continue;
-            // Genuine eligible human candidate. Preserve1008 and the exact
-            // partial AI frame; do not pretend the geometric combat helper
-            // returned false or enter a fabricated attack mode.
-            return stop(0x170668u);
+            if(candidate.vehicle40||candidateSpeed<200.f||candidate.vehicle58!=0u)continue;
+            AiCombatCandidateInput50LH input{};
+            input.trackFF4=in.aiFF4;input.metadata=in.aiMetadata;input.target=&candidate;
+            input.selfPosition190=position;input.selfNodeC80=current;
+            input.selfLapCC8=static_cast<std::int32_t>(lapCC8);
+            input.selfPlaceCCC=in.raceFields->placeCCC;input.combatZoneLength107C=ai.profile.combatZoneLength107C;
+            input.diagnostic=in.combatDiagnostic;input.diagnosticContext=in.combatDiagnosticContext;
+            AiCombatCandidateReceipt50LH selected{};
+            if(!evaluateAiCombatCandidate50LH(input,selected,receipt.driving))return stop(receipt.driving.sourcePC);
+            if(!selected.accepted)continue;
+            ai.mode1050=selected.mode1050;
+            if(selected.clearRouteChoices){ai.navigation.choice1080=-1;ai.navigation.choice1084=-1;}
+            accepted=true;++ai.combatScans;return true;
         }
-        ++ai.combatScans;
-        // Exhaustion returns0 at1706A0. State2's caller changes neither FE8
-        // nor1008 for this return. State7 and attack-mode callers stay unjoined.
+        ++ai.combatScans;return true;
+    };
+    if(!dispatch.complete){
+        if(dispatch.boundaryPC==0x16ec6cu&&ai.state.aiStateFE8==3u){
+            if(!advanceOriginalAiState3Timer50LH(m.frameFactor,ai.timer100C,
+                ai.state.aiStateFE8,receipt.prefix))return stop(receipt.prefix.sourcePC);
+        }else if(dispatch.boundaryPC==0x170480u&&ai.state.aiStateFE8==1u){
+            AiCombatContactView50LH contact{};
+            contact.count238Bits=m.components.root.callbackState238;
+            contact.slots23C=m.components.root.processedContactPartners23C;
+            contact.slotCount=10;
+            if(static_cast<std::int32_t>(contact.count238Bits)>0&&ai.target1008Present&&
+               ai.target1008ManagerIndex<in.racerCount&&in.resolveBody340){
+                contact.targetBody340=in.resolveBody340(in.body340Context,ai.target1008ManagerIndex);
+                contact.targetBody340Bound=contact.targetBody340.value!=0;
+            }
+            bool hit=false;
+            if(!checkOriginalAiAttackContact17048050LH(contact,ai.profile.waitToRepairTime1060,
+                ai.repair.cooldown1018,hit,receipt.prefix))return stop(receipt.prefix.sourcePC);
+            if(hit){
+                if(!completeOriginalAiAttackHit50LH(ai.target1008Present,ai.state.aiStateFE8,
+                    ai.timer100C,ai.profile.attackRecoveryTime1068,in.raceFields->placeCCC,
+                    ai.fieldFE4,receipt.prefix))return stop(receipt.prefix.sourcePC);
+            }else{
+                //1704E0 no-write guards, in the exact same order as state2.
+                ai_prefix_detail50IV::Math guard;bool scan=true;
+                if(guard.read(stateInput.combat1054)==0.f)scan=false;
+                else if(guard.read(stateInput.timerCB8)<guard.read(stateInput.combatWait106C))scan=false;
+                else if(stateInput.lapCC8==static_cast<std::int32_t>(stateInput.settings1125C&31u)-1&&
+                        guard.read(stateInput.remainingCC4)<2000.f)scan=false;
+                else if(stateInput.currentNodeFlags79&2u)scan=false;
+                else if(stateInput.fieldFE4&&stateInput.placeCCC!=1)scan=false;
+                if(!guard.valid)return stop(0x1704e0u);
+                bool accepted=false;if(scan&&!scanCandidates(accepted))return false;
+                completeOriginalAiState1Scan50LH(accepted?1u:0u,ai.target1008Present,
+                    ai.field104C,ai.state.aiStateFE8);
+            }
+        }else if(dispatch.boundaryPC==0x1705c8u&&ai.state.aiStateFE8==2u){
+            bool accepted=false;if(!scanCandidates(accepted))return false;
+            if(accepted)ai.state.aiStateFE8=1; //16ED50 delay slot
+        }else return stop(dispatch.boundaryPC);
     }
     AiPackingInput50IV packing{};packing.referenceFF8=ai.referenceFF8;
     if(ai.referenceFF8>=0){const auto index=static_cast<std::size_t>(ai.referenceFF8);
@@ -245,20 +296,15 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
         // produced, and the canonical frame phase remains PostPlayer.
         return stop(0x2255b0u);
     }
-    PlayerReadResult48X actions=m.controls.player;Math f;V target{{0,0,0,1}},direction{{0,0,0,1}};
+    const bool attackDispatch=ai.state.aiStateFE8==1u;
+    PlayerReadResult48X stagedActions=m.controls.player;
+    //1711E0 clears B9C before geometry; later source boundaries must retain
+    //that write and completed steering. Ordinary existing paths retain their
+    //prior staged-controls contract.
+    PlayerReadResult48X& actions=attackDispatch?m.controls.player:stagedActions;
+    Math f;V target{{0,0,0,1}},direction{{0,0,0,1}};
     bool attemptBoost=true;float boostFactor=m.frameFactor;
-    if(ai.state.aiStateFE8==4u){
-        if(!buildAiRacerLists50IV(*in.aiFF4,progress,ai.profile,in.racers,in.racerCount,ai.managerIndexFE0,
-            position,forward,ai.lists,receipt.driving)||
-           !aiDesiredPosition50IV(*in.aiFF4,progress,ai.navigation,routeOwners,position,200.f,target,receipt.driving))return stop(receipt.driving.sourcePC);
-        direction=normalize(f,sub(f,target,point(position)));
-        if(!steerAi50IV(direction.v,forward,scene.localC0.v[5],m.cachedSpeed34,ai.engineDifference5C,
-            m.components.root.worldAngularVelocityA0.v[1],ai.racer60,actions,receipt.driving)||
-           !aiStartupSpeed50IV(in.aiMetadata->nodes[current],ai.profile,ai.lists,in.racers,in.racerCount,
-            position,m.components.root.body.velocity.v,actions,receipt.desiredSpeed,attemptBoost,receipt.driving))return stop(receipt.driving.sourcePC);
-        boostFactor=1.f;++ai.startupFrames;
-    }else if(ai.state.aiStateFE8==0u||ai.state.aiStateFE8==2u||ai.state.aiStateFE8==3u||
-             ai.state.aiStateFE8==6u){
+    auto ordinarySteering172380=[&]() noexcept {
         //172380 early start-line return preserves B60 and1090.
         if(!lapCC8&&current==1u)actions.raw.values[0]=0.f;
         else{
@@ -276,6 +322,68 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
             if(!steerAi50IV(direction.v,forward,scene.localC0.v[5],m.cachedSpeed34,ai.engineDifference5C,
                 m.components.root.worldAngularVelocityA0.v[1],ai.racer60,actions,receipt.driving))return stop(receipt.driving.sourcePC);
         }
+        return f.valid||stop(0x172380u);
+    };
+    auto ordinaryTargetSpeed172C50=[&]() noexcept {
+        AiSpeedTargetInput50IR speed{};speed.currentNodeSpeedLimit5C=in.aiMetadata->nodes[current].speedLimit5C;
+        speed.currentNodeFlags79=in.aiMetadata->nodes[current].flags79;speed.vehicleSpeedScaleFFC=ai.packing.scaleFFC;
+        speed.vehicleMinimumSpeed108C=ai.profile.myMinSpeed108C;speed.trackControlFlags58=frame.fields.applicationByte58;
+        speed.vehicleFlagsCD8=frame.fields.impactFlagsCD8;speed.vehicleAiStateFE8=ai.state.aiStateFE8;
+        speed.trackRacePace7C=in.tuning->racePace7C;speed.settings188F60Nonzero=in.settings188F60Nonzero;
+        speed.vehicleCCC=in.raceFields->placeCCC;speed.vehicleCB0=in.timing->timeCB0;
+        speed.vehicleCC4=in.raceFields->remainingCC4;speed.aiTrackLength3C=in.aiTrackLength3C;
+        AiSpeedTargetReceipt50IR selected{};if(!selectAiTargetSpeed50IR(speed,selected,receipt.speed))return stop(receipt.speed.sourcePC);
+        receipt.desiredSpeed=selected.desiredSpeed;
+        return true;
+    };
+    if(attackDispatch){
+        AiAttackDriveSelection50LH selection{};
+        if(!beginAiAttackDrive1711E0(*in.aiFF4,current,ai.mode1050,actions.flagsB9C,
+            ai.field104C,in.applicationGlobals->attackDrive,selection,receipt.driving))
+            return stop(receipt.driving.sourcePC);
+        const AiObservedRacer50IV* attackTarget=nullptr;
+        if(ai.target1008Present&&ai.target1008ManagerIndex<in.racerCount){
+            const auto& candidate=in.racers[ai.target1008ManagerIndex];
+            if(candidate.bound&&candidate.managerIndex==ai.target1008ManagerIndex)attackTarget=&candidate;
+        }
+        if(selection.wideSteering16EDD0){
+            if(!attackTarget)return stop(0x16ee10u);
+            if(!aiAttackWideSteering16EDD0(*in.aiFF4,progress,*attackTarget,position,forward,
+                scene.localC0.v[5],m.cachedSpeed34,ai.engineDifference5C,
+                m.components.root.worldAngularVelocityA0.v[1],ai.racer60,
+                in.applicationGlobals->attackWide,ai.field104C,actions,receipt.driving))
+                return stop(receipt.driving.sourcePC);
+        }else if(!ordinarySteering172380())return false;
+        if(selection.attackSpeed16FB50){
+            if(!attackTarget)return stop(0x16fb80u);
+            AiAttackSpeedInput50LH input{};input.trackFF4=in.aiFF4;input.metadata=in.aiMetadata;
+            input.target=attackTarget;input.selfPosition190=position;input.selfNodeC80=current;
+            input.selfLapCC8=static_cast<std::int32_t>(lapCC8);input.myMinSpeed108C=ai.profile.myMinSpeed108C;
+            input.preparedFactor=m.frameFactor;input.selfCachedSpeed34=m.cachedSpeed34;
+            input.diagnostic=in.combatDiagnostic;input.diagnosticContext=in.combatDiagnosticContext;
+            AiAttackSpeedReceipt50LH attacked{};
+            if(!applyAiAttackSpeed16FB50(input,actions,attacked,receipt.driving,receipt.speed))
+                return stop(receipt.driving.sourcePC);
+            receipt.desiredSpeed=attacked.desiredSpeed;receipt.braking=attacked.speed.braking;
+            if(receipt.braking)++ai.brakingFrames;
+            //16FB50 terminates at173770. Do not invoke173180 or173770 twice.
+            ++ai.attackFrames;++ai.dispatchedFrames;receipt.dispatched=true;
+            receipt.stateFE8=ai.state.aiStateFE8;return true;
+        }
+        if(!ordinaryTargetSpeed172C50())return false; //1712FC, then ordinary boost/brake
+    }else if(ai.state.aiStateFE8==4u){
+        if(!buildAiRacerLists50IV(*in.aiFF4,progress,ai.profile,in.racers,in.racerCount,ai.managerIndexFE0,
+            position,forward,ai.lists,receipt.driving)||
+           !aiDesiredPosition50IV(*in.aiFF4,progress,ai.navigation,routeOwners,position,200.f,target,receipt.driving))return stop(receipt.driving.sourcePC);
+        direction=normalize(f,sub(f,target,point(position)));
+        if(!steerAi50IV(direction.v,forward,scene.localC0.v[5],m.cachedSpeed34,ai.engineDifference5C,
+            m.components.root.worldAngularVelocityA0.v[1],ai.racer60,actions,receipt.driving)||
+           !aiStartupSpeed50IV(in.aiMetadata->nodes[current],ai.profile,ai.lists,in.racers,in.racerCount,
+            position,m.components.root.body.velocity.v,actions,receipt.desiredSpeed,attemptBoost,receipt.driving))return stop(receipt.driving.sourcePC);
+        boostFactor=1.f;++ai.startupFrames;
+    }else if(ai.state.aiStateFE8==0u||ai.state.aiStateFE8==2u||ai.state.aiStateFE8==3u||
+             ai.state.aiStateFE8==6u){
+        if(!ordinarySteering172380())return false;
         if(ai.state.aiStateFE8==6u){
             //16EAB0 invokes the same172380 steering above, then172B50.
             //No target-speed selection, boost draw or ordinary brake call is
@@ -287,19 +395,17 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
             m.controls.player=actions;++ai.dispatchedFrames;receipt.dispatched=true;
             receipt.stateFE8=ai.state.aiStateFE8;return true;
         }
-        AiSpeedTargetInput50IR speed{};speed.currentNodeSpeedLimit5C=in.aiMetadata->nodes[current].speedLimit5C;
-        speed.currentNodeFlags79=in.aiMetadata->nodes[current].flags79;speed.vehicleSpeedScaleFFC=ai.packing.scaleFFC;
-        speed.vehicleMinimumSpeed108C=ai.profile.myMinSpeed108C;speed.trackControlFlags58=frame.fields.applicationByte58;
-        speed.vehicleFlagsCD8=frame.fields.impactFlagsCD8;speed.vehicleAiStateFE8=ai.state.aiStateFE8;
-        speed.trackRacePace7C=in.tuning->racePace7C;speed.settings188F60Nonzero=in.settings188F60Nonzero;
-        speed.vehicleCCC=in.raceFields->placeCCC;speed.vehicleCB0=in.timing->timeCB0;
-        speed.vehicleCC4=in.raceFields->remainingCC4;speed.aiTrackLength3C=in.aiTrackLength3C;
-        AiSpeedTargetReceipt50IR selected{};if(!selectAiTargetSpeed50IR(speed,selected,receipt.speed))return stop(receipt.speed.sourcePC);
-        receipt.desiredSpeed=selected.desiredSpeed;++ai.ordinaryFrames;
+        if(!ordinaryTargetSpeed172C50())return false;
+        ++ai.ordinaryFrames;
     }else return stop(0x16e9fc);
     if(!f.valid)return stop(0x172380);
     if(attemptBoost){AiBoostDecisionInput50IT boost{boostFactor,receipt.desiredSpeed,thermal.heat7C,m.cachedSpeed34,
         ai.state.aiStateFE8,ai.lists.counts[0],ai.lists.counts[1],m.components.probe348.field10C,false,0};
+        if(ai.target1008Present&&ai.target1008ManagerIndex<in.racerCount){
+            const auto& candidate=in.racers[ai.target1008ManagerIndex];
+            boost.target1008Present=candidate.bound&&candidate.managerIndex==ai.target1008ManagerIndex;
+            if(boost.target1008Present)boost.target1008FlagsB9C=candidate.flagsB9C;
+        }
         AiBoostDecisionReceipt50IT boosted{};
         if(!decideAiBoost50IT(boost,actions,actions,ai.boost,frame.noiseOwner().sharedRandomState,boosted,receipt.boost))return stop(receipt.boost.sourcePC);
         receipt.attemptedBoost=true;receipt.boostHandled=boosted.handled;
@@ -308,6 +414,7 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
         if(!applyAiNonBoostSpeed50IR(receipt.desiredSpeed,m.cachedSpeed34,actions,actions,braking,receipt.speed))return stop(receipt.speed.sourcePC);
         receipt.braking=braking.braking;if(braking.braking)++ai.brakingFrames;
     }
-    m.controls.player=actions;++ai.dispatchedFrames;receipt.dispatched=true;receipt.stateFE8=ai.state.aiStateFE8;return true;
+    m.controls.player=actions;if(attackDispatch)++ai.attackFrames;
+    ++ai.dispatchedFrames;receipt.dispatched=true;receipt.stateFE8=ai.state.aiStateFE8;return true;
 }
 } //namespace rr::game

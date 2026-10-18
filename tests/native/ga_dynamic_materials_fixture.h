@@ -8,9 +8,12 @@
 // Exact GA dynamic material owner. Geometry equality with GC does not imply
 // texture equality: three GA images are kind2, and all five original PSTs are
 // authenticated independently. No same-name static/GC bank borrowing.
+// Direct-disc callers explicitly inject their source decoder. The legacy
+// overload retains its existing cold-prepared-file adapter.
 namespace ga_dynamic_materials {
 namespace a=rr::assets;
 using Selection=track_materials50fa_fixture::Selection;
+using SourceTextureDecoder=track_materials50fa_fixture::SourceTextureDecoder;
 struct Diagnostic {
  std::uint32_t material=a::unresolvedMaterialTexture50EA;
  std::string message;a::DecodeError48C source{};a::MaterialTextureAssetDiagnostic50EA bank{};
@@ -18,7 +21,7 @@ struct Diagnostic {
 namespace detail {
 namespace shared=pod_materials50ed_fixture::detail;
 struct Material {const char* name;const char* sha;std::uint32_t bytes,texture;};
-struct Texture {const char* name;const char* sha;std::uint32_t bytes,width,height,mip;};
+struct Texture {const char* name;const char* sha;std::uint32_t bytes,width,height,mip;const char* nativeSha;};
 inline constexpr Material materials[]={
  {"fience02","913cb65c8e2bc8c91f6cc99b1a1a6ad59694d94dd76d7c568a00a46b4dcf7e94",260,0},
  {"fience_opening","43c2defc92a04c61066e3f69138270603215f02f7bb104495fbb0efefa923eea",569,1},
@@ -27,12 +30,14 @@ inline constexpr Material materials[]={
  {"house_stand_e01","627b6c6b47ce6b45661b7cf413dc0cbf961928664a133a24ead2b14cdf1a8243",269,4},
  {"fience_opening","43c2defc92a04c61066e3f69138270603215f02f7bb104495fbb0efefa923eea",569,1}
 };
+// Existing source_texture_ga_index.inc output identities, also enforced at
+// this owner boundary so decoder injection cannot weaken the reviewed pins.
 inline constexpr Texture textures[]={
- {"fience","c6c1f848a8efd2b2f7af8d3be5fa8d13f76fea11fd1ffadef4c460d29f30f00f",22860,128,128,3},
- {"fience_opening","c6c1f848a8efd2b2f7af8d3be5fa8d13f76fea11fd1ffadef4c460d29f30f00f",22860,128,128,3},
- {"market_hut_a01","738f9957fc7dc79de8e9255827e6c9425a731210f4c470823d706e94be236619",1339,64,64,2},
- {"opening_a","d775490a47fd8332a5b81371a7725996215d7c716ff7ad88c9d8d7502b994dc3",9327,128,128,3},
- {"house_stand_e01","fe193d5eea5c2e7750c1a29e881be3bada46a0590aab9bc695ded9efcb9313a9",2156,64,64,2}
+ {"fience","c6c1f848a8efd2b2f7af8d3be5fa8d13f76fea11fd1ffadef4c460d29f30f00f",22860,128,128,3,"17b2dbb87a1ff184d05f71e80bc3694de7cbb5611d74ad68a953167e63927323"},
+ {"fience_opening","c6c1f848a8efd2b2f7af8d3be5fa8d13f76fea11fd1ffadef4c460d29f30f00f",22860,128,128,3,"17b2dbb87a1ff184d05f71e80bc3694de7cbb5611d74ad68a953167e63927323"},
+ {"market_hut_a01","738f9957fc7dc79de8e9255827e6c9425a731210f4c470823d706e94be236619",1339,64,64,2,"259b1f2faa285b40205665822773afece66385873ddc3b4050ffc4fcb6d79d4e"},
+ {"opening_a","d775490a47fd8332a5b81371a7725996215d7c716ff7ad88c9d8d7502b994dc3",9327,128,128,3,"d748d9935439a786e771af17e94f3d86788774907ed29a6c6f76f1fb160ebee1"},
+ {"house_stand_e01","fe193d5eea5c2e7750c1a29e881be3bada46a0590aab9bc695ded9efcb9313a9",2156,64,64,2,"4fdc33f757d8facef2fa8a259d7876a879e94f7255a35f0077295a4496256eb9"}
 };
 inline nlohmann::json fields(const a::MaterialFields48E& source){
  auto out=nlohmann::json::object();out["authored"]=nlohmann::json::array();out["unspecified"]=nlohmann::json::array();
@@ -51,9 +56,16 @@ public:
  const std::array<Selection,6>* selections()const noexcept{return storage_?&storage_->selections:nullptr;}
  bool load(const std::filesystem::path& archivePath,const a::Scene48D& defensegate,
      const a::Scene48D& opening,Diagnostic& d)noexcept {
+  return load(archivePath,defensegate,opening,source_texture50fc_fixture::decodeSourceTextureGa,d);
+ }
+ // Input remains the exact authenticated GA member bytes. Null or failed
+ // decoders are fatal and never fall back to the legacy retained-file route.
+ bool load(const std::filesystem::path& archivePath,const a::Scene48D& defensegate,
+     const a::Scene48D& opening,SourceTextureDecoder sourceDecoder,Diagnostic& d)noexcept {
   using namespace detail;using shared::need;
   try{
    d={};need(!storage_,"GA dynamic material owner is already loaded");
+   need(sourceDecoder,"GA dynamic material owner requires an explicit source decoder");
    need(defensegate.materials.size()==2&&opening.materials.size()==4,"GA dynamic scene material counts");
    for(std::size_t i=0;i<6;++i)need((i<2?defensegate.materials[i]:opening.materials[i-2])==materials[i].name,"GA dynamic scene material order");
    shared::Inputs reader;reader.capacity=watchtower_source_fixture::archiveBytes;
@@ -76,15 +88,18 @@ public:
      need(native.mips.size()==entry.mip+1&&native.mips.back().width==entry.width&&native.mips.back().height==entry.height,"GA indexed texture dimensions");
      pixels[t]=std::move(native.base_rrtex);
     }else{
-     // Only authenticated kind2 reaches the established cold source-image
-     // adapter. Missing preparation remains fatal; no pixel fallback exists.
-     need(original.size()>=12&&shared::u32(original.data()+4)==2,"GA dynamic indexed texture decode failed");
+     // Only authenticated kind2 reaches the explicitly selected decoder;
+     // a failure never authorizes a different file, decoder or image.
+     need(original.size()>=12&&shared::u32(original.data())==1&&
+       shared::u32(original.data()+4)==2&&shared::u32(original.data()+8)==entry.mip+1,
+       "GA dynamic original kind2 mip header");
      std::uint32_t mip=0;std::string error;
-     need(source_texture50fc_fixture::decodeSourceTextureGa(member.c_str(),original,pixels[t],mip,error),error.empty()?"GA kind2 texture not cold-prepared":error);
+     need(sourceDecoder(member.c_str(),original,pixels[t],mip,error),error.empty()?"GA kind2 source texture decode failed":error);
      need(mip==entry.mip,"GA kind2 source mip differs");
     }
     need(pixels[t].size()==16u+std::size_t(entry.width)*entry.height*4u&&std::memcmp(pixels[t].data(),"RRTEX001",8)==0&&
-      shared::u32(pixels[t].data()+8)==entry.width&&shared::u32(pixels[t].data()+12)==entry.height,"GA native texture framing");
+      shared::u32(pixels[t].data()+8)==entry.width&&shared::u32(pixels[t].data()+12)==entry.height&&
+      shared::sha256(pixels[t])==entry.nativeSha,"GA native texture framing/output identity");
     images[t]={std::uint64_t(t)+1,&pixels[t]};
    }
    for(std::uint32_t i=0;i<6;++i){

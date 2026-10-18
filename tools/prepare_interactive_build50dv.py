@@ -220,6 +220,10 @@ def main():
         absolute = str(ROOT / source)
         if absolute not in argv:
             argv.insert(argv.index('-lz'), absolute)
+    # Public version-matched FFmpeg headers; decoder dynamically loads native
+    # libraries. No command-line converter or generated texture pack is used.
+    argv.insert(1, '-I' + str(ROOT / 'third_party/ffmpeg-7.1.5/include'))
+    argv.insert(argv.index('-lz'), str(ROOT / 'src/assets/original_ipu_decoder.cpp'))
     destination.write_text(json.dumps(argv, indent=2) + '\n', encoding='utf-8')
 
 if __name__ == '__main__':

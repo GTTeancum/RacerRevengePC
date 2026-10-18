@@ -25,6 +25,9 @@ struct OriginalUiIpumProvenance50KG {
     std::string sourceMember,sourcePstSha256,sourceArchiveSha256;
     std::string converterSha256,generatorSha256,ffmpegVersion,ffmpegSha256;
     std::string ffmpegCommand,colorPolicy;
+    // Codec fields above identify the pinned reference conversion. This flag
+    // distinguishes fresh in-process decoding from supplied cached pixels.
+    bool decodedInProcess=false;
     // Native host decoding of the original image-codec bytes. This is NOT
     // measured bit parity with a hardware inverse-DCT/framebuffer capture.
     bool hardwarePixelParityVerified=false;
@@ -34,11 +37,12 @@ struct OriginalUiIpumProvenance50KG {
 };
 enum class OriginalUiIpumCacheError50KG : std::uint8_t {
     none,alreadyLoaded,cacheUnavailable,archive,source,imageCount,sourceLayout,
-    encodedIdentity,imageIdentity,imageFormat,limit,cancelled,allocation,unexpectedFailure
+    encodedIdentity,imageIdentity,imageFormat,limit,cancelled,allocation,unexpectedFailure,codec
 };
 struct OriginalUiIpumCacheDiagnostic50KG {
     OriginalUiIpumCacheError50KG error=OriginalUiIpumCacheError50KG::none;
     std::size_t mip=0;
+    std::string detail;
 };
 
 // Cold, load-once authentication of a compiled, source-derived image cache.
@@ -46,8 +50,9 @@ struct OriginalUiIpumCacheDiagnostic50KG {
 // pixels through a callback, codec claims or alternate original identities.
 // The generated catalog is unavailable until the root's authorized cold
 // FFmpeg conversion writes real output hashes. A missing catalog fails closed.
-// No FFmpeg process, decoder library, guest code, PS2 device, I/O or GL call
-// runs here. No generated fallback pixels, palette or selected-mip collapse.
+// Original-disc methods use the native in-process decoder before the same
+// admission. No FFmpeg process, guest code, PS2 device, filesystem or GL call
+// runs here. No replacement pixels, palette or selected-mip collapse.
 // Keep this owner only until consumers have copied its immutable result;
 // the authenticated source archive is retained for all borrowed source views.
 class OriginalUiIpumTextureCache50KG final {
@@ -75,6 +80,15 @@ public:
         OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C* =nullptr,
         const TextureLimits48E& =TextureLimits48E{}) noexcept;
     static const char* retainedMipFilename(std::size_t mip) noexcept;
+    // Cold native decoding from the authenticated archive. Outputs pass the
+    // same fixed source/pixel hash admission as the compatibility cache path.
+    // No filesystem cache, subprocess, Python or external image pack is used.
+    bool loadOriginal(std::shared_ptr<const OriginalUiArchive50KG>,
+        OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C* =nullptr,
+        const TextureLimits48E& =TextureLimits48E{}) noexcept;
+    bool loadAdditionalOriginal(std::size_t source,std::shared_ptr<const OriginalUiArchive50KG>,
+        OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C* =nullptr,
+        const TextureLimits48E& =TextureLimits48E{}) noexcept;
     bool load(std::shared_ptr<const OriginalUiArchive50KG>,
         const std::vector<std::vector<std::uint8_t>>& retainedMipRrtex,
         OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C* =nullptr,

@@ -35,7 +35,8 @@ inline void observe(Session&session,std::size_t slot,const VehicleFrameState49W&
     auto&o=session.observed[slot];o={};o.bound=true;o.managerIndex=static_cast<std::uint32_t>(slot);
     o.vehicle58=frame.fields.vehicle58;o.vehicle40=frame.bodies.main.vehicleState40;
     o.vehicleC80=progress.reset.vehicleC80;o.cachedSpeed34=frame.bodies.main.cachedSpeed34;
-    o.progressCC4=session.rank[slot].remainingCC4;o.lapCC8=static_cast<std::int32_t>(lapCC8);
+    o.progressCC4=session.fields[slot].remainingCC4;o.placeCCC=session.fields[slot].placeCCC;
+    o.vehicleC84=progress.vehicleC84;o.lapCC8=static_cast<std::int32_t>(lapCC8);
     o.flagsB9C=frame.bodies.main.controls.player.flagsB9C;o.flagsCD8=frame.fields.impactFlagsCD8;
     const auto&scene=frame.nodes[static_cast<unsigned>(bindings.lifecycle.main190)];
     const auto&physical=frame.nodes[static_cast<unsigned>(bindings.animation.bodyScene288)];
@@ -43,6 +44,9 @@ inline void observe(Session&session,std::size_t slot,const VehicleFrameState49W&
     rank.mapNode60=mapMetadata.nodes[current].distanceToFinish60;rank.lapCC8=o.lapCC8;
     rank.vehicleState40=o.vehicle40;rank.retirementCD4=retirementCD4;rank.flagsCD8=o.flagsCD8;
     for(unsigned axis=0;axis<3;++axis){o.position190[axis]=scene.localC0.v[12+axis];
+        o.forward190[axis]=scene.localC0.v[8+axis];o.up190[axis]=scene.localC0.v[4+axis];
+        o.velocity70[axis]=frame.bodies.main.components.root.body.velocity.v[axis];
+        o.linearAccelerationC0[axis]=frame.bodies.main.components.root.body.linearAcceleration.v[axis];
         rank.bodyScene288Position[axis]=physical.localC0.v[12+axis];
         rank.mapNode10[axis]=map.nodes[current].gate10[axis];rank.mapNode20[axis]=map.nodes[current].gate20[axis];}
 }
@@ -50,7 +54,8 @@ inline bool rank(Session&session,std::size_t count) noexcept {
     if(!session.managerBound||!updateAiRaceRank50IV(session.rankInput,count,session.finished44,session.retired40,
         session.rank,session.rankWork,session.rankDiagnostic))return false;
     for(std::size_t i=0;i<count;++i){session.fields[i]={session.rank[i].remainingCC4,session.rank[i].placeCCC,true};
-        session.observed[i].progressCC4=session.rank[i].remainingCC4;}
+        session.observed[i].progressCC4=session.fields[i].remainingCC4;
+        session.observed[i].placeCCC=session.fields[i].placeCCC;}
     session.rankBound=true;return true;
 }
 // Scalar-only alternative to the arena observe() above. It reads the exact
@@ -61,7 +66,7 @@ struct ObservationReads {
     Read<bool> initialized;
     Read<std::uint32_t> managerIndexFE0,racer60,fieldFE4,sourceBoundary,frameSourceStage;
     Read<float> repairTime1064;
-    Read<std::uint32_t> vehicleC80,vehicleC88,lapCC8,retirementCD4;
+    Read<std::uint32_t> vehicleC80,vehicleC84,vehicleC88,lapCC8,retirementCD4;
     Read<SceneNodeIndex49P> main190,bodyScene288;
     void bind(const native_racer50HN::Bank& bank,const VehicleFrameBindings49W& bindings,
         const TrackNavigationProgress50EU& progress,const std::uint32_t& laps,
@@ -71,7 +76,7 @@ struct ObservationReads {
         racer60=bank.bindRead(ai.racer60);fieldFE4=bank.bindRead(ai.fieldFE4);
         repairTime1064=bank.bindRead(ai.profile.repairTime1064);
         sourceBoundary=bank.bindRead(receipt.sourceBoundary);frameSourceStage=bank.bindRead(diagnostic.sourceStage);
-        vehicleC80=bank.bindRead(progress.reset.vehicleC80);vehicleC88=bank.bindRead(progress.reset.vehicleC88);
+        vehicleC80=bank.bindRead(progress.reset.vehicleC80);vehicleC84=bank.bindRead(progress.vehicleC84);vehicleC88=bank.bindRead(progress.reset.vehicleC88);
         lapCC8=bank.bindRead(laps);retirementCD4=bank.bindRead(retirement);
         main190=bank.bindRead(bindings.lifecycle.main190);bodyScene288=bank.bindRead(bindings.animation.bodyScene288);
     }
@@ -85,13 +90,17 @@ struct ObservationReads {
         auto&o=session.observed[slot];o={};o.bound=true;o.managerIndex=static_cast<std::uint32_t>(slot);
         o.vehicle58=bank.read(slot,frame.vehicle58);o.vehicle40=bank.read(slot,frame.vehicle40);
         o.vehicleC80=bank.read(slot,vehicleC80);o.cachedSpeed34=bank.read(slot,frame.cachedSpeed34);
-        o.progressCC4=session.rank[slot].remainingCC4;o.lapCC8=static_cast<std::int32_t>(bank.read(slot,lapCC8));
+        o.progressCC4=session.fields[slot].remainingCC4;o.placeCCC=session.fields[slot].placeCCC;
+        o.vehicleC84=bank.read(slot,vehicleC84);o.lapCC8=static_cast<std::int32_t>(bank.read(slot,lapCC8));
         o.flagsB9C=bank.read(slot,frame.flagsB9C);o.flagsCD8=bank.read(slot,frame.flagsCD8);
         const auto scene=bank.read(slot,main190),physical=bank.read(slot,bodyScene288);
         auto&rank=session.rankInput[slot];rank={};
         rank.mapNode60=mapMetadata.nodes[current].distanceToFinish60;rank.lapCC8=o.lapCC8;
         rank.vehicleState40=o.vehicle40;rank.retirementCD4=bank.read(slot,retirementCD4);rank.flagsCD8=o.flagsCD8;
         for(unsigned axis=0;axis<3;++axis){o.position190[axis]=frame.position(bank,slot,scene,axis);
+            o.forward190[axis]=frame.forward(bank,slot,scene,axis);o.up190[axis]=frame.up(bank,slot,scene,axis);
+            o.velocity70[axis]=bank.read(slot,frame.velocity70[axis]);
+            o.linearAccelerationC0[axis]=bank.read(slot,frame.linearAccelerationC0[axis]);
             rank.bodyScene288Position[axis]=frame.position(bank,slot,physical,axis);
             rank.mapNode10[axis]=map.nodes[current].gate10[axis];rank.mapNode20[axis]=map.nodes[current].gate20[axis];}
     }

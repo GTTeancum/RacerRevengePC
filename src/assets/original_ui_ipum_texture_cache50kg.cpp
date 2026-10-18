@@ -1,4 +1,5 @@
 #include "original_ui_ipum_texture_cache50kg.h"
+#include "original_ipu_decoder.h"
 #include <algorithm>
 #include <cstring>
 #include <new>
@@ -412,6 +413,43 @@ bool checkedHash(const std::uint8_t* data,std::size_t bytes,const char* expected
     if(result==HashResult::cancelled)return fail(d,Error::cancelled,mip);
     return result==HashResult::match?true:fail(d,error,mip);
 }
+bool decodeOriginalMips(const std::shared_ptr<const OriginalUiArchive50KG>& archive,
+    const char* member,std::size_t expectedBytes,const char* expectedSha,
+    const SourceMipRecord* mips,std::size_t count,
+    std::vector<std::vector<std::uint8_t>>& images,OriginalUiIpumCacheDiagnostic50KG& d,
+    const DecodeHooks48C* hooks,const TextureLimits48E& limits) {
+    if(!archive||!archive->loaded()||
+       archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
+       std::strcmp(archive->identity()->sha256,archiveSha256)!=0)return fail(d,Error::archive);
+    const auto source=archive->find(member);
+    if(!source.identity||!source.data||source.size!=expectedBytes||
+       source.identity->bytes!=expectedBytes||std::strcmp(source.identity->sha256,expectedSha)!=0)
+        return fail(d,Error::source);
+    if(expectedBytes>std::min(limits.input_bytes,std::size_t(8u*1024u*1024u))||
+       count==0||count>originalUiIpumMipCount50KG)return fail(d,Error::limit);
+    if(!checkedHash(source.data,source.size,expectedSha,hooks,d,Error::source))return false;
+    std::size_t total=0;images.reserve(count);
+    for(std::size_t i=0;i<count;++i){
+        const auto& mip=mips[i];
+        if(mip.payload>source.size||mip.bytes>source.size-mip.payload)
+            return fail(d,Error::sourceLayout,i);
+        if(!checkedHash(source.data+mip.payload,mip.bytes,mip.sha256,hooks,d,Error::encodedIdentity,i))return false;
+        const auto bytes=std::size_t(mip.width)*mip.height*4u;
+        const auto budget=std::min(limits.decoded_bytes,std::size_t(16u*1024u*1024u));
+        if(total>budget||bytes>budget-total)return fail(d,Error::limit,i);
+        total+=bytes;
+        std::vector<std::uint8_t> rgba;
+        if(!decodeOriginalIpuRgba(source.data+mip.payload,mip.bytes,mip.width,mip.height,rgba,d.detail))
+            return fail(d,Error::codec,i);
+        if(cancelled(hooks))return fail(d,Error::cancelled,i);
+        if(rgba.size()!=bytes)return fail(d,Error::imageFormat,i);
+        std::vector<std::uint8_t> rrtex{'R','R','T','E','X','0','0','1'};
+        for(const auto dimension:{mip.width,mip.height})
+            for(unsigned lane=0;lane<4;++lane)rrtex.push_back(static_cast<std::uint8_t>(dimension>>(lane*8)));
+        rrtex.insert(rrtex.end(),rgba.begin(),rgba.end());images.push_back(std::move(rrtex));
+    }
+    return true;
+}
 } // namespace
 
 struct OriginalUiIpumTextureCache50KG::Storage {
@@ -426,6 +464,35 @@ OriginalUiIpumTextureCache50KG::~OriginalUiIpumTextureCache50KG()=default;
 bool OriginalUiIpumTextureCache50KG::catalogAvailable() noexcept{return catalogValid();}
 const char* OriginalUiIpumTextureCache50KG::retainedMipFilename(std::size_t mip) noexcept {
     return mip<originalUiIpumMipCount50KG?sourceMips[mip].filename:nullptr;
+}
+bool OriginalUiIpumTextureCache50KG::loadOriginal(std::shared_ptr<const OriginalUiArchive50KG> archive,
+    OriginalUiIpumCacheDiagnostic50KG& d,const DecodeHooks48C* hooks,const TextureLimits48E& limits) noexcept {
+    d={};
+    try {
+        if(storage_)return fail(d,Error::alreadyLoaded);
+        if(!catalogValid())return fail(d,Error::cacheUnavailable);
+        std::vector<std::vector<std::uint8_t>> images;
+        if(!decodeOriginalMips(archive,sourceMember,sourceBytes,sourceSha256,sourceMips,
+            originalUiIpumMipCount50KG,images,d,hooks,limits)||!load(std::move(archive),images,d,hooks,limits))return false;
+        storage_->evidence.decodedInProcess=true;return true;
+    }catch(const std::bad_alloc&){return fail(d,Error::allocation);}
+    catch(...){return fail(d,Error::unexpectedFailure);}
+}
+bool OriginalUiIpumTextureCache50KG::loadAdditionalOriginal(std::size_t sourceIndex,
+    std::shared_ptr<const OriginalUiArchive50KG> archive,OriginalUiIpumCacheDiagnostic50KG& d,
+    const DecodeHooks48C* hooks,const TextureLimits48E& limits) noexcept {
+    d={};
+    try {
+        if(!additionalCatalogValid()||sourceIndex>=additionalSourceCount)return fail(d,Error::cacheUnavailable);
+        if(additional_[sourceIndex])return fail(d,Error::alreadyLoaded);
+        const auto& record=additionalSources[sourceIndex];
+        std::vector<std::vector<std::uint8_t>> images;
+        if(!decodeOriginalMips(archive,record.member,record.sourceBytes,record.sourceSha256,
+            record.sourceMips,record.mipCount,images,d,hooks,limits)||
+            !loadAdditional(sourceIndex,std::move(archive),images,d,hooks,limits))return false;
+        additional_[sourceIndex]->evidence.decodedInProcess=true;return true;
+    }catch(const std::bad_alloc&){return fail(d,Error::allocation);}
+    catch(...){return fail(d,Error::unexpectedFailure);}
 }
 bool OriginalUiIpumTextureCache50KG::load(std::shared_ptr<const OriginalUiArchive50KG> archive,
     const std::vector<std::vector<std::uint8_t>>& retained,OriginalUiIpumCacheDiagnostic50KG& d,

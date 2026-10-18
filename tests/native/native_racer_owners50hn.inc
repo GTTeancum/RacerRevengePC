@@ -25,6 +25,7 @@ if(originalRecoveryEnabled){
 // Configuration-sensitive input follows its actual racer; a human Controls
 // selection must not leak into another existing control owner.
 racerBank.owner(x.configurationEntryNonzero);
+racerBank.owner(x.actionCodes);
 racerBank.owner(x.parameters);
 racerBank.owner(x.bindings);
 racerBank.owner(x.secondaryInputs);

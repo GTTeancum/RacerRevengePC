@@ -57,7 +57,54 @@ class Catalog final {
     std::array<std::vector<std::uint8_t>,targets.size()> originals_;
     inline static constexpr auto riders=rr::game::nativeCourseRacers50KG;
     std::array<native_racer50HW::J,riders.size()> authenticatedRosters_;
-    bool attempted_=false;
+    // Disc-only admission retains each verified encoded original once. The
+    // real post-handoff Rig/model loaders still create and validate their own
+    // actual resource owners. This is source availability, never race readiness.
+    std::array<std::vector<std::uint8_t>,original_player_identity50IK::originals.size()> originalPods_;
+    bool attempted_=false,directDisc_=false;
+    void prepareDirectDiscRosters() {
+        namespace identities=original_player_identity50IK;
+        namespace detail=native_racer50HW::rig_detail;
+        const auto disc=runtime_asset_paths50LB::resolve("work/native/project/disc");
+        for(std::size_t i=0;i<identities::originals.size();++i){const auto& identity=identities::originals[i];
+            try {
+                auto raw=runtime_startup50fl::readBytes(identities::archivePath(disc,identity));
+                detail::need(raw.size()==identity.archiveBytes&&
+                    pod_materials50ed_fixture::detail::sha256(raw)==identity.archiveSha256,
+                    "Original disc roster archive identity differs");
+                rr::assets::ResArchive48C archive;rr::assets::DecodeError48C diagnostic;
+                detail::need(rr::assets::decodeResource48C(raw,archive,diagnostic),
+                    "Original disc roster archive decode rejected: "+diagnostic.code);
+                const auto lowerPod=detail::lower(identity.podId);
+                const auto wanted="pods/"+lowerPod+"/"+lowerPod+".phy";
+                const rr::assets::ResourceEntry48C* member=nullptr;
+                for(const auto& entry:archive.entries)if(detail::lower(entry.name)==wanted){
+                    detail::need(!member,"Original disc roster PHY is ambiguous");member=&entry;}
+                detail::need(member,"Original disc roster PHY is absent");
+                std::vector<std::uint8_t> phy;
+                detail::need(rr::assets::extractResMember48C(archive,member->name,phy,diagnostic)&&
+                    pod_materials50ed_fixture::detail::sha256(phy)==identity.phySha256,
+                    "Original disc roster PHY identity differs");
+                originalPods_[i]=std::move(raw);
+            }catch(const std::exception& error){
+                std::cerr<<"Course direct original pod unavailable: "<<identity.podId<<" "<<error.what()<<'\n';
+            }
+        }
+        for(std::size_t i=0;i<riders.size();++i){
+            auto roster=original_course_roster50KG::directDiscRoster(riders[i]);bool complete=true;
+            for(const auto& row:roster.at("racers")){
+                bool verified=false;
+                for(std::size_t pod=0;pod<identities::originals.size();++pod){const auto& identity=identities::originals[pod];
+                    if(row.at("pod_id")==identity.podId&&row.at("resource_sha256")==identity.archiveSha256&&
+                       row.at("phy_sha256")==identity.phySha256&&originalPods_[pod].size()==identity.archiveBytes)
+                        verified=true;
+                }
+                complete=complete&&verified;
+            }
+            if(complete)authenticatedRosters_[i]=std::move(roster);
+            else std::cerr<<"Course direct original field unavailable for rider: "<<riders[i]<<'\n';
+        }
+    }
     // A supplied catalog must describe the exact original field. Validate its
     // admission-bearing structure/identities before the per-rider asset checks:
     // malformed metadata is fatal, while an absent optional pod stays unavailable.
@@ -103,25 +150,31 @@ public:
         runtime_startup50fl::require(!attempted_,"Course target catalog is cold one-shot");attempted_=true;
         const auto rosterRoot=runtime_asset_paths50LB::resolve("evidence/originalRoster50HW/raw-imports");
         const auto rosterPath=rosterRoot/"roster.json";
-        if(!std::filesystem::exists(rosterPath)){
-            std::cerr<<"Course race destinations unavailable: original roster absent: "<<rosterPath.string()<<'\n';
-            return;
-        }
-        // Only absence is optional. Read/parse/metadata failures from a supplied
-        // roster propagate; never turn malformed input into a readiness fallback.
-        std::ifstream input(rosterPath);
-        native_racer50HW::rig_detail::need(bool(input),"Cannot open Course roster metadata: "+rosterPath.string());
-        // Unlike stream extraction, strict parse rejects a valid JSON prefix
-        // followed by trailing malformed data or another document.
-        const auto originals=native_racer50HW::J::parse(input);
-        validateRosterMetadata(originals);
-        for(std::size_t i=0;i<riders.size();++i){
-            auto roster=originals;std::string error;
-            if(original_course_roster50KG::selectPreparedRider(".",rosterRoot,roster,riders[i],error))
-                authenticatedRosters_[i]=std::move(roster);
-            else std::cerr<<"Course cold rider unavailable: "<<riders[i]<<" "<<error<<'\n';
+        if(!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty()||
+           !std::filesystem::exists(rosterPath)){
+            // Explicit original-disc mode is independent of any leftover
+            // generated catalog. Other tracks keep their prepared-data gate.
+            directDisc_=true;prepareDirectDiscRosters();
+        }else{
+            // A supplied legacy roster must still validate. A malformed catalog
+            // cannot silently fall through to another readiness mode.
+            std::ifstream input(rosterPath);
+            native_racer50HW::rig_detail::need(bool(input),"Cannot open Course roster metadata: "+rosterPath.string());
+            // Strict parse rejects a JSON prefix followed by trailing content.
+            const auto originals=native_racer50HW::J::parse(input);
+            validateRosterMetadata(originals);
+            for(std::size_t i=0;i<riders.size();++i){
+                auto roster=originals;std::string error;
+                if(original_course_roster50KG::selectPreparedRider(".",rosterRoot,roster,riders[i],error))
+                    authenticatedRosters_[i]=std::move(roster);
+                else std::cerr<<"Course cold rider unavailable: "<<riders[i]<<" "<<error<<'\n';
+            }
         }
         for(std::size_t i=0;i<targets.size();++i){const auto& t=targets[i];
+            if(directDisc_&&t.track!=Track::RA&&t.track!=Track::GA)continue;
+            // GA proof requires explicit original-disc ownership, never the
+            // legacy generated corpus or an absent-catalog fallback.
+            if(t.track==Track::GA&&runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())continue;
             if(!admission.gcMode2||!rr::platform::hostTrackAdmitted50IM(t.track,admission))continue;
             try {
                 auto bytes=runtime_startup50fl::readBytes(t.assets->archive);
@@ -137,7 +190,7 @@ public:
         }
     }
     const Target* admits(const Selection& s)const noexcept {
-        const auto* selected=target(s);if(!attempted_||!selected)return nullptr;
+        const auto* selected=target(s);if(!attempted_||!selected||(directDisc_&&selected->track!=Track::RA&&selected->track!=Track::GA))return nullptr;
         bool rosterPresent=false;
         for(std::size_t i=0;i<riders.size();++i)
             if(s.rider==riders[i]&&!authenticatedRosters_[i].is_null())rosterPresent=true;

@@ -1,0 +1,150 @@
+{
+  "upstream": "https://github.com/FFmpeg/FFmpeg",
+  "ref": "n7.1.5",
+  "tag_object_sha1": "eefb3654c445a9004712036be4ffb01a68b2c3e1",
+  "commit_sha1": "3a0867c2bfda4a4d4309ca1a8cbdc6175e67f587",
+  "retrieved": "2026-10-17",
+  "files": {
+    "libavcodec/avcodec.h": {
+      "git_blob_sha1": "77ca8dee1f6a70a5d7e43499e6859ad1b7e9c048",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/avcodec.h"
+    },
+    "libavutil/cpu.h": {
+      "git_blob_sha1": "ba6c234e044afb6fe027aecd8e24702f0404756d",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/cpu.h"
+    },
+    "libavutil/frame.h": {
+      "git_blob_sha1": "f7806566d54c9574bf51d7e36298088150f746ad",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/frame.h"
+    },
+    "libavcodec/codec.h": {
+      "git_blob_sha1": "f7541ffc42b3a3e904f69866306463361ae58fc1",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/codec.h"
+    },
+    "libavcodec/packet.h": {
+      "git_blob_sha1": "0a28010542f063d32a2caaaf0e7125e13bc500f2",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/packet.h"
+    },
+    "libavcodec/codec_par.h": {
+      "git_blob_sha1": "f4b9bb5c06d25fb41e7d4642c9782c24f44b0380",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/codec_par.h"
+    },
+    "libavutil/attributes.h": {
+      "git_blob_sha1": "04c615c952c467f6061588606c695a548cd2e130",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/attributes.h"
+    },
+    "libavcodec/defs.h": {
+      "git_blob_sha1": "24250f8af5f8167bf56db49a45a7f21bb748309e",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/defs.h"
+    },
+    "libavutil/rational.h": {
+      "git_blob_sha1": "849f47f38d569a5fe5004fd0f5db3586097067e4",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/rational.h"
+    },
+    "libavutil/samplefmt.h": {
+      "git_blob_sha1": "6e55d711401ffb9917272b9d90edacc9cc812db2",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/samplefmt.h"
+    },
+    "libavcodec/codec_desc.h": {
+      "git_blob_sha1": "96afd20208b3dd4c3eb44710d45c61e116a9dbce",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/codec_desc.h"
+    },
+    "libavcodec/version_major.h": {
+      "git_blob_sha1": "63df40e9ddded5caac3d770b92db3bb61b27c24f",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/version_major.h"
+    },
+    "libavutil/version.h": {
+      "git_blob_sha1": "753f85b91ce800664fea7e82e04c10f76b7e3175",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/version.h"
+    },
+    "libavutil/avutil.h": {
+      "git_blob_sha1": "d2900dcb485f58ab1d74b7074b3d9a8b045fa712",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/avutil.h"
+    },
+    "libavcodec/codec_id.h": {
+      "git_blob_sha1": "0a8d3bed1e38c5d2d3a2ed96f9a16a65bb8869c0",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/codec_id.h"
+    },
+    "libavutil/buffer.h": {
+      "git_blob_sha1": "e1ef5b7f07fc52f535c6c6f5db6ad2ab8dbb0729",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/buffer.h"
+    },
+    "libavutil/dict.h": {
+      "git_blob_sha1": "713c9e361af83391089601972f2d6e9c2e9c1407",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/dict.h"
+    },
+    "libavutil/pixfmt.h": {
+      "git_blob_sha1": "a7f50e169038256a8b83a2313dd36c31794a8ada",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/pixfmt.h"
+    },
+    "libavcodec/version.h": {
+      "git_blob_sha1": "b6ca025fae5cadf4dabcb899b161dd2b41426655",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/version.h"
+    },
+    "libavutil/channel_layout.h": {
+      "git_blob_sha1": "3a96c2d9b8e45c7c837c27872deaf7f9a4e26cd6",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/channel_layout.h"
+    },
+    "libavutil/log.h": {
+      "git_blob_sha1": "ab7ceabe2234a7b23e0768e4adcdcbaf52bb8e36",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/log.h"
+    },
+    "libavutil/mathematics.h": {
+      "git_blob_sha1": "e213bab68c9c9ec341d239034d5ac86762e1f0e4",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/mathematics.h"
+    },
+    "libavutil/hwcontext.h": {
+      "git_blob_sha1": "bac30debaed54ab914dc09f304167be5920a05bd",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/hwcontext.h"
+    },
+    "libavutil/macros.h": {
+      "git_blob_sha1": "2a7567c3ea8fb3884437362e0643ed8135e6eec5",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/macros.h"
+    },
+    "libavutil/common.h": {
+      "git_blob_sha1": "bf23aa50b0cf659254df83449f2f42281f244627",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/common.h"
+    },
+    "libavutil/intfloat.h": {
+      "git_blob_sha1": "fe3d7ec4a5b6f5f616c103aef5a5cf7ec01f8242",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/intfloat.h"
+    },
+    "libavutil/error.h": {
+      "git_blob_sha1": "1efa86c4c106cb7e4fd65282d60dce49fca01e55",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/error.h"
+    },
+    "libavutil/mem.h": {
+      "git_blob_sha1": "ab7648ac5705f8534d014a79d2ac0beb44f34bde",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavutil/mem.h"
+    }
+  },
+  "generated": [
+    "include/libavutil/avconfig.h"
+  ],
+  "referenceFiles": [
+    {
+      "path": "libavformat/ipudec.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavformat/ipudec.c"
+    },
+    {
+      "path": "libavcodec/ipu_parser.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/ipu_parser.c"
+    },
+    {
+      "path": "libavcodec/mpeg12dec.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/mpeg12dec.c"
+    },
+    {
+      "path": "libavcodec/idctdsp.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/idctdsp.c"
+    },
+    {
+      "path": "libavcodec/x86/idctdsp_init.c",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/libavcodec/x86/idctdsp_init.c"
+    },
+    {
+      "path": "configure",
+      "url": "https://github.com/FFmpeg/FFmpeg/blob/n7.1.5/configure"
+    }
+  ]
+}

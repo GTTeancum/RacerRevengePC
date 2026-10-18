@@ -155,7 +155,7 @@ inline Status applyAtWorldBoundary(
         }))
             return Status::InvalidInput;
     // All fallible work is over. Commit the exact two-body numerical response
-    // fields and, only when joined, canonical20C/210; all ten210 slots preserve
+    // fields, canonical238/23C and, only when joined, canonical20C/210; all ten210 slots preserve
     // their old bits unless a source append overwrites that slot. Transform,
     // position, quaternion, history and terrain stay intact.
     const auto commit=[&](std::size_t i){bank.visit(i,[&](){
@@ -164,6 +164,11 @@ inline Status applyAtWorldBoundary(
         dst.loads=src.loads;dst.positionCorrection1a0=src.positionCorrection1a0;
         dst.rotationCorrection1b0=src.rotationCorrection1b0;
         dst.accumulator1c0=src.accumulator1c0;dst.accumulator1d0=src.accumulator1d0;
+        // Canonical processed-body list is independent of20C/210 damage join.
+        // Its identities remain valid until the existing next root count-clear.
+        dst.callbackState238=src.callbackState238;
+        std::memcpy(dst.processedContactPartners23C,src.processedContactPartners23C,
+            sizeof(dst.processedContactPartners23C));
         if(dynamicJoined){
             std::memcpy(&live.bodies.main.components.body20C,&contactAfter[i].count20C,
                 sizeof(contactAfter[i].count20C));

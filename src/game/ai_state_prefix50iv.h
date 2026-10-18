@@ -124,6 +124,8 @@ inline bool advanceAiStateNoCombat50IV(const AiNoCombatInput50IV& i,AiStatePrefi
     auto boundary=[&](std::uint32_t pc) noexcept {r.complete=false;r.boundaryPC=pc;};
     switch(n.aiStateFE8){
     case 0:n.aiStateFE8=4;break;
+    case 1:boundary(0x170480u);break; //16EBE0: actual contact owner consumed by runtime.
+    case 3:boundary(0x16ec6cu);break; //Actual100C/prepared factor live in runtime.
     case 4:if(!(f.read(i.timerCB8)<=5.f))n.aiStateFE8=2;break;
     case 5:
         //16EDA8 targets16EDBC: the low-timer branch skips BOTH stores.

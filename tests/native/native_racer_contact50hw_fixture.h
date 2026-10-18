@@ -82,6 +82,10 @@ public:
         std::array<Body,maxRacers> staged{};
         std::memcpy(staged.data(),input,count*sizeof(Body));
         std::array<ProcessedList,maxRacers> processed{};Receipt result{};
+        // Never reset here: only the genuine root callback1654B0 owns cadence.
+        // Existing pending identities must participate in294C34 suppression.
+        for(std::size_t i=0;i<count;++i)
+            if(!processed[i].load(staged[i].physical.body.state))return Status::InvalidInput;
         result.normalModeWrite.bound=true; // prepared main690 query owners, including zero-pair pass
         for(std::size_t p=0;p<pairCount;++p){
             const auto a=order[p].primary,b=order[p].other;
@@ -162,6 +166,9 @@ public:
             for(std::size_t i=0;i<n;++i){records_[i].flags50=preparedFlags_[i];if(preparedFlags_[i]&2)++result.activeRecords;}
             result.generatedRecords+=n;++result.respondedPairs;
         }
+        // Publish the actual asymmetric1654C0 callbacks with the responses.
+        // A rejected pair leaves both canonical counts and every slot unchanged.
+        for(std::size_t i=0;i<count;++i)processed[i].store(staged[i].physical.body.state);
         std::memcpy(output,staged.data(),count*sizeof(Body));receipt=result;return Status::Complete;
     }
 private:

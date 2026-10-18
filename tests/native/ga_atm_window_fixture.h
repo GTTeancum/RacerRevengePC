@@ -19,6 +19,13 @@ public:
     bool ownsResources()const noexcept{return gpu_.ownsResources();}
     bool loadSource(const std::filesystem::path& archive,
         const track_materials50fa_fixture::Owner& track,ga_atm_animation_fixture::Diagnostic& d)noexcept {
+        return loadSource<track_materials50fa_fixture::Owner>(archive,track,d);
+    }
+    // Shares the frame decoder and lifetime with the legacy overload; the
+    // static source owner supplies only authenticated bank/selections/spans.
+    template<class StaticMaterialOwner>
+    bool loadSource(const std::filesystem::path& archive,
+        const StaticMaterialOwner& track,ga_atm_animation_fixture::Diagnostic& d)noexcept {
         return source_.load(archive,track,d);
     }
     bool createGpu(const p::MaterialTextureGlRequest50EB& caller,

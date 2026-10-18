@@ -2,6 +2,7 @@
 // Cold selected-original-pod ownership for the actual694/7A4 recovery join.
 // No archive default, duplicate348, guest execution, or live resource loading.
 #include "undertrack_reset50ew.h"
+#include "native_cold_query_role50lh.h"
 #include "type2_bounds50by.h"
 #include "native_racer_collision50hw_fixture.h"
 #include "../../src/game/type3_query48p.h"
@@ -265,9 +266,14 @@ inline bool attachFreshQueries(Owners& owner,VehicleFrameState49W& frame,
     const VehicleFrameBindings49W& bindings,const VehicleFrameParameters49W& parameters,
     const BorrowedQueries& borrowed,const std::array<CollectionRef50BX,2>& refs,
     ZoneLifecycle50CL& life,LiveZoneWorld50EN& world,LiveZoneWorkspace50EN& workspace,
-    CollectionRef50BX actualInitialC34) noexcept {
-    if(frame.phase!=VehicleFramePhase49W::Ready||frame.fields.vehicle58!=1u||
-       !frame.fields.nativeAiOwnersBound50IV||frame.bodies.main.frameFactor!=0.f||
+    CollectionRef50BX actualInitialC34,
+    ColdQueryRole50LH role=ColdQueryRole50LH::originalAi) noexcept {
+    // Source212238/212444 query construction is shared pod geometry. Admit
+    // only the explicitly selected genuine role; retain every fresh-source,
+    // existing-query, registration and final-grid invariant below unchanged.
+    if(frame.phase!=VehicleFramePhase49W::Ready||
+       !coldQueryRoleMatches50LH(role,frame.fields.vehicle58,frame.fields.nativeAiOwnersBound50IV)||
+       frame.bodies.main.frameFactor!=0.f||
        frame.shape.registrationE0||!actualInitialC34||actualInitialC34>life.zoneCount||
        !owner.sourcePrepared||owner.memberships[0].attached||owner.memberships[1].attached)return false;
     const auto queries=owner.binding(borrowed,refs);

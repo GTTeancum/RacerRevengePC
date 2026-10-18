@@ -116,6 +116,13 @@ struct OriginalUiFrontendColdInterval50KG {
     std::chrono::steady_clock::time_point begin{},end{};
     std::uint64_t nanoseconds=0;
 };
+// Observation only: this interval remains active work. In particular, an
+// outgoing GPU drain never supplies cold-time exclusion authority.
+struct OriginalUiFrontendWorkObservation50KG {
+    bool measured=false;
+    std::chrono::steady_clock::time_point begin{},end{};
+    std::uint64_t nanoseconds=0;
+};
 struct OriginalUiFrontendInputReceipt50KG {
     OriginalUiFrontendStatus50KG status=OriginalUiFrontendStatus50KG::noChange;
     game::OriginalUiTransitionRoute50KG source{},requested{};
@@ -134,6 +141,15 @@ struct OriginalUiFrontendUpdateReceipt50KG {
     std::uint64_t sequence=0;
     OriginalUiMainSessionUpdate50KG update{};
     game::OriginalUiTransitionRoute50KG source{};
+    // Only the resident CPU/GPU bank validation/publication call is cold.
+    // It occurs AFTER the host's accepted elapsed sample and belongs to the
+    // next update/material intervals, never this already accepted update.
+    OriginalUiFrontendColdInterval50KG coldInterval{};
+    OriginalUiFrontendWorkObservation50KG bankDrain{};
+};
+struct OriginalUiFrontendDeferredReceipt50KG {
+    OriginalUiFrontendColdInterval50KG coldInterval{};
+    OriginalUiFrontendWorkObservation50KG bankDrain{};
 };
 struct OriginalUiFrontendSnapshot50KG {
     bool prepared=false,active=false,faulted=false,quitRequested=false;
@@ -189,6 +205,10 @@ public:
     // Never invoked inside a manager callback or before the source frame ends.
     OriginalUiFrontendStatus50KG commitDeferred(VehicleWindowGl50DS&,
         OriginalUiFrontendDiagnostic50KG&) noexcept;
+    // Additive receipt overload. No-change/rejected preconditions issue no
+    // cold receipt; attempted bank publication retains its exact interval.
+    OriginalUiFrontendStatus50KG commitDeferred(VehicleWindowGl50DS&,
+        OriginalUiFrontendDeferredReceipt50KG&,OriginalUiFrontendDiagnostic50KG&) noexcept;
     // Retires source-frame owners through the live borrowed renderer, closes
     // that renderer, then releases sessions and GPU owners. May be retried only
     // for unresolved cleanup; no source work can resume after it.

@@ -13,6 +13,27 @@ namespace original_course_roster50KG {
 inline constexpr bool supportsPreparedRider(std::uint32_t racer60) noexcept {
     return rr::game::nativeCourseRacerOwned50KG(racer60);
 }
+// Field selection describes the admitted original identities only. Each Rig
+// subsequently authenticates and decodes its own actual RES, PHY and model
+// resources. No generated pod/import/roster JSON files are read or written.
+inline native_racer50HW::J directDiscRoster(std::uint32_t racer60) {
+    namespace selection=rr::game::original_racer_selection50IJ;
+    namespace identities=original_player_identity50IK;
+    using native_racer50HW::rig_detail::need;
+    const auto* selected=selection::findByRacer60(racer60);
+    need(selected&&selected->humanJoinImplemented&&identities::find(racer60),
+        "Original disc selected racer has no native cold owner");
+    native_racer50HW::J roster={{"schema","RR_ORIGINAL_DISC_ROSTER_V1"},{"player_index",0},
+        {"racers",native_racer50HW::J::array()}};
+    auto row=[](const selection::Entry& entry){const auto* identity=identities::find(entry.racer60);
+        need(identity,"Original disc roster resource identity absent");
+        return native_racer50HW::J{{"pod_id",std::string(entry.podId)},
+            {"resource_sha256",identity->archiveSha256},{"phy_sha256",identity->phySha256}};};
+    bool present=false;
+    for(const auto& entry:selection::entries){roster["racers"].push_back(row(entry));present|=entry.racer60==racer60;}
+    if(!present)roster["racers"][0]=row(*selection::findByRacer60(racer60));
+    return roster;
+}
 // Authenticate the selected original's own cold inputs. Mutable rig, collision,
 // GPU publication and race construction remain the actual target loaders' work
 // after old-world destruction. Never retag an already loaded Rider19 owner.

@@ -1,5 +1,5 @@
 #pragma once
-// Unactivated, read-only native-host scheduling adapter for actual ALL8.
+// Read-only native-host scheduling adapter for the actual packed racer bank.
 // No timing owner, host standings, driver dispatch, new clock or AI retagging.
 #include "original_camera_session50kx.h"
 #include "native_ai_session50iv_fixture.h"
@@ -9,6 +9,18 @@
 namespace original_time_stats_adapter50LA {
 class Owner final {
     using Camera=original_camera_session50KX::Session;
+    // Source camera preparation constructs these two exact view0 identities.
+    // Human count alone cannot authorize an AI/player reinterpretation.
+    static bool supportedSourceView(const Camera& c)noexcept {
+        if(!c.controller_.bound)return false;
+        const auto& binding=c.controller_.binding;
+        return (c.actual_.humanCount34==0u&&
+                binding.bootstrap==rr::game::CameraBootstrap::native_all_ai&&
+                binding.racerClass==rr::game::CameraRacerClass::ai)||
+            (c.actual_.humanCount34==1u&&
+                binding.bootstrap==rr::game::CameraBootstrap::original_single_player&&
+                binding.racerClass==rr::game::CameraRacerClass::player);
+    }
     using Bank=native_racer50HN::Bank;
     template<class T> using Read=Bank::ReadHandle<T>;
     const Camera* camera_=nullptr;
@@ -35,10 +47,9 @@ public:
         d={};if(bound_){d.status=Status::alreadyBound;return false;}
         try {
             if(!camera.coldBound_||!camera.readsBound_||camera.closed_||camera.abandoned_||
-               !camera.generation_||camera.actual_.humanCount34!=0||
+               !camera.generation_||!supportedSourceView(camera)||
                &camera.actual_.all8Manager!=&manager.manager||
-               &camera.actual_.racerTiming!=&continuity.timing||camera.actual_.bank.count()!=8||
-               !camera.controller_.bound||camera.controller_.binding.bootstrap!=rr::game::CameraBootstrap::native_all_ai)
+               &camera.actual_.racerTiming!=&continuity.timing||camera.actual_.bank.count()!=8)
                 return false;
             if(camera.frameStage_!=Camera::FrameStage::idle&&camera.frameStage_!=Camera::FrameStage::published){
                 d.status=Status::phase;return false;
@@ -74,10 +85,9 @@ public:
                !camera.publicationCount_||!camera.completedFrame_||
                !camera.viewport_.prepared||!camera.viewport_.matricesReady||
                camera.viewport_.sessionGeneration!=generation_){d.status=Status::phase;return false;}
-            if(camera.actual_.humanCount34!=0||bank.count()!=8||
+            if(!supportedSourceView(camera)||bank.count()!=8||
                &camera.actual_.all8Manager!=&manager.manager||!manager.managerBound||!manager.rankBound||
                !manager.retired40.bound||manager.retired40.activeCount50>bank.count()||
-               !camera.controller_.bound||camera.controller_.binding.bootstrap!=rr::game::CameraBootstrap::native_all_ai||
                camera.controller_.binding.sessionGeneration!=generation_||
                camera.controller_.binding.managerIndex!=camera.identity_[0].managerIndex||
                camera.controller_.binding.racerKey!=Camera::key(camera.identity_[0].racerTag)||

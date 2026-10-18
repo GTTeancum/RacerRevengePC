@@ -185,6 +185,7 @@ public:
     Visual(const std::filesystem::path& repository,
            const std::filesystem::path& visualSelectionRoot,const Rig& rig) {
         namespace d=visual_detail;namespace s=visual_detail::shared;
+        if(rig.directOriginal){loadOriginalDisc(rig);return;}
         const auto requested=visualSelectionRoot.is_absolute()?visualSelectionRoot:repository/visualSelectionRoot;
         s::need(!std::filesystem::is_symlink(requested),"Original visual root symlink rejected");
         const auto root=std::filesystem::canonical(requested);
@@ -1327,6 +1328,138 @@ public:
         return result;
     }
 private:
+    // No retained selection catalog or cached geometry is involved. Each native
+    // owner is built directly from this Rig's authenticated original archive.
+    // The existing canonical closure below still proves the actual model,
+    // geometry, material references, textures and source-node identities before
+    // any render publication. This is cold conversion only; no guest execution.
+    void loadOriginalDisc(const Rig& rig) {
+        namespace d=visual_detail;namespace s=visual_detail::shared;
+        podId=rig.podId;displayName=rig.displayName;componentCount=rig.modelCount;
+        s::need(!displayName.empty()&&(componentCount==3||componentCount==5),
+            "Direct original pod identity/topology unavailable");
+        chariotPsgMember_=rig.psgMembers[Rig::chariot];
+        chariotPsgSha256_=s::sha256(rig.psg[Rig::chariot]);chariotModelIndex_=rig.roots[Rig::chariot];
+        leftPsgMember_=rig.psgMembers[Rig::left];
+        leftPsgSha256_=s::sha256(rig.psg[Rig::left]);leftModelIndex_=rig.roots[Rig::left];
+        rightPsgMember_=rig.psgMembers[Rig::right];
+        rightPsgSha256_=s::sha256(rig.psg[Rig::right]);rightModelIndex_=rig.roots[Rig::right];
+        if(componentCount==5)for(unsigned side=0;side<2;++side){const auto model=side?Rig::bottomRight:Rig::bottomLeft;
+            lowerPsg_[side]={rig.psgMembers[model],s::sha256(rig.psg[model])};lowerModelIndex_[side]=rig.roots[model];}
+        const std::uint64_t textureIdentityBase=(std::uint64_t((podId[3]-'0')*10+(podId[4]-'0'))+1u)<<32;
+        a::VehicleDrawAssetsInput50CR drawInput{};drawInput.componentCount=componentCount;
+        std::array<d::Bytes,5> sceneBytes;
+        std::array<std::array<std::uint8_t,a::maxModelNodes49O>,5> palettes{};
+        constexpr unsigned mapped[]={Rig::chariot,Rig::left,Rig::right,Rig::bottomLeft,Rig::bottomRight};
+        for(unsigned c=0;c<componentCount;++c){
+            const auto model=mapped[c];const auto& psg=rig.psg[model];
+            a::Scene48D scene;a::DecodeError48C error;std::string why;
+            s::need(a::decodeScene48D(psg,scene,error),"Direct original PSG decode rejected: "+rig.psgMembers[model]+" "+error.code);
+            s::need(a::encodeSceneAsset48D(scene,sceneBytes[c],why),"Direct native scene preparation rejected: "+why);
+            const auto count=rig.hierarchy[model].nodeCount;const auto padded=(count+3u)&~3u;
+            s::need(count&&count<=a::maxModelNodes49O&&psg.size()>=12u+padded,"Direct original PSG palette bounds");
+            const auto suffix=psg.size()-(12u+padded);
+            s::need(s::u32(psg.data()+suffix)==1&&s::u32(psg.data()+suffix+4)==padded&&
+                s::u32(psg.data()+suffix+8+padded)==count,"Direct original PSG palette framing");
+            for(unsigned n=0;n<count;++n)palettes[c][n]=psg[suffix+8+n];
+            drawInput.component[c]={&sceneBytes[c],rig.sourceNodes[model],count,palettes[c].data(),count};
+            drawInput.component[c].sourcePsgBytes=&psg;
+        }
+        a::VehicleDrawAssetDiagnostic50CR drawDiagnostic;
+        s::need(drawAssets.load(drawInput,drawDiagnostic),"Direct original draw owner rejected: "+drawDiagnostic.parserMessage);
+        std::map<std::string,std::uint32_t> textureIndices;
+        std::vector<d::Bytes> textureBytes;std::vector<a::MaterialTextureSlotInput50EA> slots;
+        std::size_t rgbaBytes=0,sourceBytes=0;
+        for(unsigned c=0;c<componentCount;++c){
+            const auto* scene=drawAssets.scene(static_cast<g::VehicleDrawComponent50CM>(c));
+            s::need(scene&&scene->materials.size()<=4096,"Direct original component material bound");
+            textures[c].reserve(scene->materials.size());windowBindings_[c].reserve(scene->materials.size());
+            for(std::uint32_t mi=0;mi<scene->materials.size();++mi){
+                const auto materialName=rig_detail::lower(scene->materials[mi]);
+                auto found=originalMaterials_.find(materialName);
+                if(found==originalMaterials_.end()){
+                    const auto* entry=rig.originalEntry("textures/"+materialName+".psm");
+                    s::need(entry,"Direct original scene PSM missing: "+materialName);
+                    const auto bytes=rig.originalMember(entry->name);const auto digest=s::sha256(bytes);
+                    a::Material48E material;a::DecodeError48C error;
+                    s::need(a::decodeMaterial48E(bytes,material,error),"Direct original PSM decode rejected: "+entry->name+" "+error.code);
+                    const auto key="disc:"+rig_detail::lower(entry->name)+":"+digest;
+                    d::Json record={{"origin","original-disc-runtime"},{"key",key},{"source_member",entry->name},
+                        {"source_sha256",digest},{"general",d::fieldsJson(material.general)},{"passes",d::Json::array()}};
+                    for(const auto& pass:material.passes){d::Json part={{"pass",pass.pass},{"program",pass.microprogram},
+                        {"texture_count_defaulted",pass.texture_count_defaulted},{"fields",d::fieldsJson(pass.fields)},
+                        {"textures",d::Json::array()}};
+                        for(const auto& map:pass.textures)part["textures"].push_back({{"slot",map.slot},{"name",map.name}});
+                        record["passes"].push_back(std::move(part));}
+                    materialSources_.emplace(materialName,SourceIdentity{entry->name,digest});
+                    materialRecords_.emplace(materialName,std::move(record));
+                    found=originalMaterials_.emplace(materialName,std::move(material)).first;
+                }
+                const auto& material=found->second;const auto& record=materialRecords_.at(materialName);
+                s::need(!material.passes.empty()&&material.passes.front().pass==1,"Direct original pass1 absent");
+                const auto& displayed=material.passes.front();
+                const bool flame=rig_detail::lower(displayed.microprogram)=="diffusetextranscompressed"&&
+                    rig_detail::lower(d::field(displayed.fields,"VertexAnimation"))=="unique";
+                if(flame)s::need(c>0,"Direct original flame attached to chariot");
+                const a::ResourceEntry48C* displayedTexture=nullptr;std::string displayedTextureName;
+                for(const auto& pass:material.passes)for(const auto& map:pass.textures){
+                    const auto* entry=rig.originalEntry("textures/"+rig_detail::lower(map.name)+".pst");
+                    pod_materials50ed_fixture::AuthoredSlot authored;
+                    authored.component=c;authored.materialIndex=mi;authored.pass=pass.pass;authored.slot=map.slot;
+                    authored.materialName=scene->materials[mi];authored.materialKey=record.at("key").get<std::string>();
+                    authored.program=pass.microprogram;authored.textureName=map.name;
+                    authored.selectedForDisplay=pass.pass==1&&map.slot==1;authored.resolvedInSelection=entry!=nullptr;
+                    if(entry)authored.textureKey="disc:"+rig_detail::lower(entry->name)+":"+s::sha256(rig.originalMember(entry->name));
+                    else authored.unresolvedReason="missing_original_archive_member";
+                    if(authored.selectedForDisplay){s::need(!displayedTexture,"Direct original duplicate base map");
+                        displayedTexture=entry;displayedTextureName=map.name;}
+                    authoredSlots.push_back(std::move(authored));
+                }
+                s::need(displayedTexture,"Direct original required base texture missing: "+materialName);
+                const auto source=rig.originalMember(displayedTexture->name);const auto digest=s::sha256(source);
+                const auto key="disc:"+rig_detail::lower(displayedTexture->name)+":"+digest;
+                auto known=textureIndices.find(key);
+                if(known==textureIndices.end()){
+                    a::Texture48E texture;a::DecodeError48C error;
+                    s::need(a::decodeTexture48E(source,texture,error),"Direct original PST decode rejected: "+displayedTexture->name+" "+error.code);
+                    s::need(!texture.mips.empty()&&texture.mips.size()<=7,"Direct original PST mip bound");
+                    const auto& mip=texture.mips.back();const auto index=static_cast<std::uint32_t>(textureBytes.size());
+                    s::need(index<32&&mip.width&&mip.height&&mip.width<=1024&&mip.height<=1024,
+                        "Direct original texture bank/dimension bound");
+                    pod_materials50ed_fixture::TextureSelection meta;
+                    meta.identity=textureIdentityBase+index+1;meta.bankIndex=index;meta.mipIndex=texture.mips.size()-1;
+                    meta.width=mip.width;meta.height=mip.height;meta.key=key;
+                    meta.path=displayedTexture->name;meta.sha256=s::sha256(texture.base_rrtex);
+                    textureSelections.push_back(std::move(meta));textureBytes.push_back(std::move(texture.base_rrtex));
+                    textureSources_.push_back({displayedTexture->name,digest});
+                    samplers_.push_back({rr::platform::MaterialTextureFilter50EB::linear,rr::platform::MaterialTextureFilter50EB::linear,
+                        rr::platform::MaterialTextureWrap50EB::repeat,rr::platform::MaterialTextureWrap50EB::repeat});
+                    s::add(rgbaBytes,static_cast<std::size_t>(mip.width)*mip.height*4,16u*1024u*1024u,"Direct original RGBA budget");
+                    s::add(sourceBytes,textureBytes.back().size(),16u*1024u*1024u,"Direct original texture source budget");
+                    known=textureIndices.emplace(key,index).first;
+                }
+                const auto textureIndex=known->second;
+                pod_materials50ed_fixture::Selection choice;choice.materialIndex=mi;choice.pass=choice.slot=1;
+                choice.assetIdentity=c+1;choice.bankSlot=static_cast<std::uint32_t>(slots.size());choice.textureIndex=textureIndex;
+                choice.textureIdentity=textureSelections[textureIndex].identity;choice.mipIndex=textureSelections[textureIndex].mipIndex;
+                choice.materialName=scene->materials[mi];choice.materialKey=record.at("key").get<std::string>();
+                choice.program=displayed.microprogram;choice.textureName=displayedTextureName;choice.textureKey=key;
+                choice.requirement=a::MaterialTextureRequirement50EA::required;
+                slots.push_back({{c+1,mi,1,1},choice.textureIdentity,choice.requirement});
+                textures[c].push_back(std::move(choice));windowBindings_[c].push_back(d::policy(displayed,textureIndex,flame));
+                if(flame){flameMaterials_[c].push_back(mi);s::need(d::field(displayed.fields,"wrapModeVertical")=="1",
+                    "Direct original flame vertical clamp unsupported");samplers_[textureIndex].t=rr::platform::MaterialTextureWrap50EB::clampToEdge;}
+                componentMaterials_[c].push_back(&material);
+            }
+        }
+        std::vector<a::MaterialTextureAssetInput50EA> textureInput;textureInput.reserve(textureBytes.size());
+        for(std::uint32_t i=0;i<textureBytes.size();++i)textureInput.push_back({textureSelections[i].identity,&textureBytes[i]});
+        a::MaterialTextureAssetsInput50EA materialInput{textureInput.data(),static_cast<std::uint32_t>(textureInput.size()),
+            slots.data(),static_cast<std::uint32_t>(slots.size()),
+            {static_cast<std::uint32_t>(textureInput.size()),static_cast<std::uint32_t>(slots.size()),sourceBytes,rgbaBytes,1024}};
+        a::MaterialTextureAssetDiagnostic50EA diagnostic;
+        s::need(materials.load(materialInput,diagnostic),"Direct original texture owner rejected: "+diagnostic.parserMessage);
+    }
     struct SourceIdentity {std::string member,sha256;};
     std::map<std::string,SourceIdentity> materialSources_;
     std::vector<SourceIdentity> textureSources_;

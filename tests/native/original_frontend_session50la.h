@@ -26,6 +26,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
  int terminalInputError=0;
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
+ const bool gaHumanCourseSupported=!allAiEnabled&&
+     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceRequested=!(raceSetting&&std::string(raceSetting)=="0");
  // Close retains context and texture owners on failure. The coordinator must
@@ -97,8 +99,10 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
       textureRequest.gl,missingTextureProc),"original frontend texture GL entry point unavailable");
   auto destination=original_main_entry50KG::courseRaceDestination([&](const original_course_targets50KX::Selection& selected){
    const auto* target=courseTargets.admits(selected);
-   return target&&courseCatalogPrepared&&courseCorpusPresent&&raceRequested&&!courseColdLoad.pending()&&
-       renderer.initialized()&&allAiEnabled;
+   return target&&courseCatalogPrepared&&(target->track==original_course_targets50KX::Track::RA||
+       (target->track==original_course_targets50KX::Track::GA&&gaHumanCourseSupported)||courseCorpusPresent)&&
+       raceRequested&&!courseColdLoad.pending()&&
+       renderer.initialized()&&(target->track==original_course_targets50KX::Track::GA?gaHumanCourseSupported:allAiEnabled);
   });
   // This reads genuine UI resources only. Race target authentication is deferred
   // until the real Course screen is active; Main/Options/Rider need no corpus.
@@ -352,7 +356,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const auto action=captureRoute.poll(snapshot,group,slot,
         windowCapture.captured(windows_capture50LD::Stage::main),windowCapture.captured(windows_capture50LD::Stage::rider),
         windowCapture.captured(windows_capture50LD::Stage::course),sourceAccepted,
-        courseCatalogPrepared&&courseCorpusPresent&&raceRequested&&allAiEnabled&&mawhonicTargetReady,
+        courseCatalogPrepared&&(courseCorpusPresent||(captureRun.navigateMawhonicRa()&&mawhonicTargetReady))&&
+        raceRequested&&allAiEnabled&&mawhonicTargetReady,
         originalMain.sourceFrameGeneration,originalMain.submittedPublication);
     if(action>=0){originalMain.input(static_cast<std::uint8_t>(action));captureRoute.validateDispatch(originalMain.coordinator.snapshot());}
    }
@@ -413,7 +418,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const auto begin=monotonicNow50DU();
     courseTargets.prepare(trackAdmission);courseCatalogPrepared=true;
     courseCorpusPresent=corpusPath&&std::filesystem::is_regular_file(std::filesystem::path(corpusPath));
-    if(!courseCorpusPresent)std::cerr<<"Course race unavailable: native race corpus is absent.\n";
+    if(!courseCorpusPresent)std::cerr<<"Legacy Course corpus absent; admitted direct-disc tracks use original native resources.\n";
     if(!raceRequested)std::cerr<<"Course race unavailable: RR_RACE=0 explicitly disables race entry.\n";
     const auto end=monotonicNow50DU();require50DU(end>=begin,"Course cold clock moved backwards");
     const auto elapsed=end-begin;
@@ -431,7 +436,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         selected.rider==7&&selected.course==11&&selected.planet==4&&selected.laps==3&&selected.entrants==8,
         "Gasgano/SA capture rejected a mismatched original Course handoff");
     const auto* target=courseTargets.admits(selected);
-    require50DU(target&&courseCorpusPresent&&courseColdLoad.publish(courseTargets,selected,sessionIndex+1),
+    require50DU(target&&(target->track==original_course_targets50KX::Track::RA||
+       (target->track==original_course_targets50KX::Track::GA&&gaHumanCourseSupported)||courseCorpusPresent)&&
+        courseColdLoad.publish(courseTargets,selected,sessionIndex+1),
         "actual Course exit could not publish its typed cold-load request");
     std::cerr<<"original_course_cold_load_queued course="<<selected.course<<" track="<<target->assets->world->code
         <<" rider="<<selected.rider<<" outgoing_world_ticks=0 frontend_only=1\n";

@@ -7,6 +7,9 @@
 #include "pod_scene_rebase50fb.h"
 #include "effect_names50bl.h"
 #include "json.hpp"
+#include "original_player_identity50ik_fixture.h"
+#include "../../src/assets/import_decode48c.h"
+#include <set>
 #include <map>
 #include <cstddef>
 #include <string>
@@ -76,6 +79,27 @@ public:
     std::filesystem::path directory,resourceFile;
     std::string podId,name;
     J manifest;
+    // Direct-disc ownership retains the native RES directory and decompressed
+    // bytes at this Rig's stable address. Metadata below describes this actual
+    // archive, never a historical importer generation or an on-disk cache.
+    bool directOriginal=false;
+    a::ResArchive48C originalArchive;
+    std::string displayName;
+    const a::ResourceEntry48C* originalEntry(const std::string& member)const {
+        const auto wanted=rig_detail::lower(member);const a::ResourceEntry48C* found=nullptr;
+        for(const auto& entry:originalArchive.entries)if(rig_detail::lower(entry.name)==wanted){
+            rig_detail::need(!found,"Original pod archive member is ambiguous: "+member);found=&entry;}
+        return found;
+    }
+    std::vector<std::uint8_t> originalMember(const std::string& member)const {
+        rig_detail::need(directOriginal,"Direct original member requires an archive-backed Rig");
+        const auto* entry=originalEntry(member);
+        rig_detail::need(entry,"Original pod archive member missing: "+member);
+        std::vector<std::uint8_t> bytes;a::DecodeError48C error;
+        rig_detail::need(a::extractResMember48C(originalArchive,entry->name,bytes,error),
+            "Original pod member extraction failed: "+member+" "+error.code);
+        return bytes;
+    }
     std::vector<std::uint8_t> phy;
     std::array<std::vector<std::uint8_t>,maxModels> psg,vut,mcf;
     // Exact authenticated archive-member names for subsequent model lifetime
@@ -100,26 +124,94 @@ public:
         using namespace rig_detail;
         const auto resolved=runtime_asset_paths50LB::resolve(podJson);
         const auto file=resolved.is_absolute()?resolved:repository/resolved;
-        directory=file.parent_path();const auto pod=json(file);manifest=json(directory/"import.json");
-        podId=pod.at("pod_id").get<std::string>();name=pod.at("name").get<std::string>();
+        directory=file.parent_path();J pod;
+        directOriginal=lower(file.extension().string())==".res";
+        if(directOriginal){
+            resourceFile=file;podId=file.stem().string();
+            for(auto& c:podId)if(c>='a'&&c<='z')c=char(c-'a'+'A');
+            const auto* identity=original_player_identity50IK::find(podId);
+            need(identity,"Original disc pod has no admitted identity");
+            const auto raw=f::readBytes(resourceFile);
+            const auto digest=pod_materials50ed_fixture::detail::sha256(raw);
+            need(raw.size()==identity->archiveBytes&&digest==identity->archiveSha256,
+                "Original disc pod archive identity differs: "+podId);
+            a::DecodeError48C error;
+            need(a::decodeResource48C(raw,originalArchive,error),"Original pod archive rejected: "+error.code);
+            manifest={{"schema","RR_ORIGINAL_DISC_POD_OWNER_V1"},{"source_container",resourceFile.filename().string()},
+                {"source_container_bytes",raw.size()},{"source_container_sha256",digest},{"members",J::array()}};
+            std::set<std::string> names;
+            for(std::size_t i=0;i<originalArchive.entries.size();++i){const auto& entry=originalArchive.entries[i];
+                need(names.insert(lower(entry.name)).second,"Original pod archive names are ambiguous");
+                std::vector<std::uint8_t> member;
+                need(a::extractResMember48C(originalArchive,entry.name,member,error),
+                    "Original pod member rejected: "+entry.name+" "+error.code);
+                manifest["members"].push_back({{"source_member",entry.name},{"source_index",i},
+                    {"logical_offset",entry.logical_offset},{"source_bytes",member.size()},
+                    {"source_sha256",pod_materials50ed_fixture::detail::sha256(member)}});
+            }
+            pod={{"phy",{{"source_member","pods/"+lower(podId)+"/"+lower(podId)+".phy"}}}};
+        }else{
+            pod=json(file);manifest=json(directory/"import.json");
+            podId=pod.at("pod_id").get<std::string>();name=pod.at("name").get<std::string>();
+            resourceFile=repository/runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/podId/(podId+".RES");
+        }
         need(podId.size()==5&&podId.substr(0,3)=="POD"&&podId[3]>='0'&&podId[3]<='9'&&podId[4]>='0'&&podId[4]<='9',"Roster pod identity");
-        resourceFile=repository/runtime_asset_paths50LB::resolve("work/native/project/disc/PODS")/podId/(podId+".RES");
         struct Member {std::filesystem::path path;std::string digest;std::size_t bytes;std::string sourceName;};
         std::map<std::string,Member> members;
         for(const auto& entry:manifest.at("members")){
-            const auto path=std::filesystem::path(entry.at("source_file").get<std::string>());
+            const auto path=directOriginal?std::filesystem::path{}:std::filesystem::path(entry.at("source_file").get<std::string>());
             need(!path.is_absolute()&&path==path.filename(),"Roster imported member path escapes owner");
             need(members.emplace(lower(entry.at("source_member").get<std::string>()),Member{directory/path,entry.at("source_sha256").get<std::string>(),entry.at("source_bytes").get<std::size_t>(),entry.at("source_member").get<std::string>()}).second,
                 "Roster duplicate source member");
         }
         auto read=[&](const std::string& member){const auto found=members.find(lower(member));
             need(found!=members.end(),"Roster "+podId+" source member missing: "+member);
-            auto bytes=f::readBytes(found->second.path);
+            auto bytes=directOriginal?originalMember(member):f::readBytes(found->second.path);
             need(bytes.size()==found->second.bytes&&pod_materials50ed_fixture::detail::sha256(bytes)==found->second.digest,
                 "Roster "+podId+" retained original member identity differs: "+member);return bytes;};
         phy=read(pod.at("phy").at("source_member").get<std::string>());
         const auto setup=ini(phy);const auto prefix=value(setup,"pod setup","prefix");
         need(prefix==podId.substr(3),"Roster PHY prefix identity differs");
+        if(directOriginal){
+            const auto* identity=original_player_identity50IK::find(podId);
+            need(identity&&pod_materials50ed_fixture::detail::sha256(phy)==identity->phySha256,
+                "Original disc PHY identity differs");
+            name=value(setup,"pod setup","name");
+            // Join the original UI selection comments to this pod's own
+            // authenticated speech prefix, preserving POD19's original Event39.
+            const auto speech=read("audio/speech/"+lower(podId)+"/taunts.ini");
+            need(pod_materials50ed_fixture::detail::sha256(speech)==identity->tauntsSha256,
+                "Original disc name speech identity differs");
+            const auto speechIni=ini(speech);std::set<std::string> prefixes;
+            const auto speechPath="speech/"+lower(podId)+"/";
+            for(const auto& section:speechIni)for(const auto& item:section.second)if(item.first=="filename"){
+                const auto clip=lower(item.second);
+                need(clip.compare(0,speechPath.size(),speechPath)==0&&clip.size()>speechPath.size()+3,
+                    "Original disc name speech path differs");
+                prefixes.insert(clip.substr(speechPath.size(),3));
+            }
+            need(prefixes.size()==1,"Original disc name speech prefix is ambiguous");
+            const auto speechPrefix=*prefixes.begin();
+            const auto disc=resourceFile.parent_path().parent_path().parent_path();
+            const auto ui=f::readBytes(disc/"AUDIO/UIACCEPT.INI");
+            need(pod_materials50ed_fixture::detail::sha256(ui)=="245b0bd530e6797637ac72bbf2de8f101f3b1da280e00e8fc24e4b4930d79f3b",
+                "Original UI selection names differ");
+            const std::string text(ui.begin(),ui.end());std::string comment,section;
+            for(std::size_t at=0;at<text.size();){auto end=text.find('\n',at);if(end==std::string::npos)end=text.size();
+                const auto line=trim(text.substr(at,end-at));at=end+1;
+                if(line.empty())continue;
+                if(line.front()==';'){comment=trim(line.substr(1));continue;}
+                if(line.front()=='['){section=lower(line);continue;}
+                const auto equal=line.find('=');if(equal==std::string::npos||lower(trim(line.substr(0,equal)))!="filename")continue;
+                const auto clip=lower(trim(line.substr(equal+1)));
+                const bool matches=podId=="POD19"?(speechPrefix=="an2"&&section=="[event39]"):
+                    clip.compare(0,10+speechPrefix.size(),"speech/ui/"+speechPrefix)==0&&
+                    clip.compare(10+speechPrefix.size(),3,"sel")==0;
+                if(matches){need(!comment.empty()&&(displayName.empty()||displayName==comment),
+                    "Original UI speech/name association ambiguous");displayName=comment;}
+            }
+            need(!displayName.empty(),"Original UI name unavailable for this pod");
+        }
         const std::string base="pods/"+lower(podId)+"/";
         const char* roles[]={"leftengine","rightengine","chariot","bottomleftengine","bottomrightengine"};
         const auto& authoredSetup=setup.at("pod setup");

@@ -48,8 +48,24 @@ enum class Status {Complete,Unprepared,InvalidInput,GeometryRejected,ResponseRej
 // +98 ->165430, with count238/slots23C instead of20C/210. +A4 ->165540 searches
 // every active slot. Native 0..10 admission avoids original out-of-bounds states.
 struct ProcessedList {
+    // Transaction-local scratch only. 1654C0 is the same algorithm as165430,
+    // hence the reused storage shape; the names20C/210 are NOT another owner.
+    // Canonical state is always the input/output RootBodyState48H's238/23C.
     BodyContactListState48R storage{};
+    bool load(const RootBodyState48H& root) noexcept {
+        std::memcpy(&storage.count20C,&root.callbackState238,sizeof(storage.count20C));
+        std::memcpy(storage.slots210.data(),root.processedContactPartners23C,
+            sizeof(root.processedContactPartners23C));
+        return storage.count20C>=0&&
+            storage.count20C<=static_cast<std::int32_t>(BodyContactCapacity48R);
+    }
+    void store(RootBodyState48H& root) const noexcept {
+        std::memcpy(&root.callbackState238,&storage.count20C,sizeof(storage.count20C));
+        std::memcpy(root.processedContactPartners23C,storage.slots210.data(),
+            sizeof(root.processedContactPartners23C));
+    }
     bool contains(std::uint32_t id)const noexcept {
+        if(storage.count20C<0||storage.count20C>static_cast<std::int32_t>(BodyContactCapacity48R))return false;
         for(std::int32_t i=0;i<storage.count20C;++i)
             if(storage.slots210[static_cast<std::size_t>(i)].value==id)return true;
         return false;
@@ -149,6 +165,10 @@ public:
         std::array<Body,maxRacers> staged{};
         std::memcpy(staged.data(),input,count*sizeof(Body));
         std::array<ProcessedList,maxRacers> processed{};Receipt result{};
+        // Never reset here: only the genuine root callback1654B0 owns cadence.
+        // Existing pending identities must participate in294C34 suppression.
+        for(std::size_t i=0;i<count;++i)
+            if(!processed[i].load(staged[i].physical.body.state))return Status::InvalidInput;
         result.normalModeWrite.bound=true; // prepared main690 query owners, including zero-pair pass
         for(std::size_t p=0;p<pairCount;++p){
             const auto a=order[p].primary,b=order[p].other;
@@ -222,6 +242,9 @@ public:
             for(std::size_t i=0;i<n;++i){records_[i].flags50=preparedFlags_[i];if(preparedFlags_[i]&2)++result.activeRecords;}
             result.generatedRecords+=n;++result.respondedPairs;
         }
+        // Publish the actual asymmetric1654C0 callbacks with the responses.
+        // A rejected pair leaves both canonical counts and every slot unchanged.
+        for(std::size_t i=0;i<count;++i)processed[i].store(staged[i].physical.body.state);
         std::memcpy(output,staged.data(),count*sizeof(Body));receipt=result;return Status::Complete;
     }
 private:

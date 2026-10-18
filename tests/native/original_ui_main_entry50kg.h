@@ -8,6 +8,7 @@ struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDia
 namespace original_camera_session50KX { class Session; }
 namespace native_ai50IV { struct Session; }
 #include "original_ui_main_output50kg.h"
+#include "original_ui_elapsed50lh.h"
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
 #include "../../platform/linux/native/game_host50er.h"
@@ -133,6 +134,7 @@ struct Application {
     // Additive original rider resource pairs only, retained across frontend rebuilds.
     std::uint32_t requestedPreviewRiders=0;
     std::filesystem::path assetRoot,audioRoot,riderCacheRoot;
+    bool decodeRiderImagesInProcess=false;
     rr::platform::OriginalUiMainAudioMode50KG audioMode=
         rr::platform::OriginalUiMainAudioMode50KG::muted;
     // One process-owned fresh normal-material setting for Main AND gameplay.
@@ -456,6 +458,9 @@ public:
         :animationClockBackend_(clock),controlsProfile(std::move(controls)) {
         // Retain the one application epoch even on the disabled-Main branch.
         require(bool(animationClockBackend_),"application animation clock owner missing");
+        const char* originalRoot=std::getenv("RR_ORIGINAL_ASSET_ROOT");
+        require(!originalRoot||*originalRoot,"RR_ORIGINAL_ASSET_ROOT must name a nonempty directory");
+        decodeRiderImagesInProcess=originalRoot&&*originalRoot;
         const char* enabledSetting=std::getenv("RR_ORIGINAL_MAIN_MENU");
         require(!enabledSetting || std::string(enabledSetting)=="0" || std::string(enabledSetting)=="1",
             "RR_ORIGINAL_MAIN_MENU must be 0 or 1");
@@ -481,8 +486,8 @@ public:
                 exact("RR_ORIGINAL_AI_ALL_RACERS","1")&&exact("RR_TRACK_FPS_BASELINE","1")&&
                 captureDirectory&&*captureDirectory,
                 "Explicit test profile requires the explicit complete original-AI window evidence route");
-            require(std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),
-                "Explicit test profile requires an authenticated Rider pixel cache");
+            require(decodeRiderImagesInProcess||std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),
+                "Explicit test profile requires original-disc Rider decoding or an authenticated pixel cache");
         }
         if(!enabled)return;
         const char* root=std::getenv("RR_ORIGINAL_UI_ROOT");
@@ -527,9 +532,12 @@ public:
         //17F970/1870B0: read the authenticated authored ability tables once
         // at explicit new-profile startup, sharing the actual Main profile.
         // No missing-save fallback and no reset on Rider entry or Back.
-        if(const char* cacheRoot=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE")){
-            require(*cacheRoot,"RR_ORIGINAL_RIDER_IPUM_CACHE must name a nonempty directory");
-            riderCacheRoot=std::filesystem::path(cacheRoot);
+        const char* cacheRoot=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
+        if(decodeRiderImagesInProcess||cacheRoot){
+            if(cacheRoot){
+                require(*cacheRoot,"RR_ORIGINAL_RIDER_IPUM_CACHE must name a nonempty directory");
+                riderCacheRoot=std::filesystem::path(cacheRoot);
+            }
             riderProfile=std::make_shared<rr::platform::OriginalUiRiderProfileOwner50KG>();
             rr::platform::OriginalUiRiderProfileDiagnostic50KG riderProfileDiagnostic;
             const auto physics=readArchive(assetRoot,rr::assets::OriginalUiArchiveId50KG::podPhysics);
@@ -1002,24 +1010,59 @@ public:
     // cold-time exclusion, frame delta or the unchanged one-second stall gate.
     const bool traceStages=[](){const char* v=std::getenv("RR_TRACE_ORIGINAL_UI_STAGES");
         return v&&v[0]=='1'&&v[1]=='\0';}();
-    StageClock::time_point stageStart() const noexcept {
-        return traceStages?StageClock::now():StageClock::time_point{};
-    }
-    void reportStage(const char* stage,StageClock::time_point start,bool okay=true,
+    struct StageObservation {
+        const char* name=nullptr;
+        StageClock::time_point begin{},end{};
+        std::uint64_t frame=0,sequence=0;
+        std::uint8_t screen=0,page=0;
+        bool okay=false;
+    };
+    // Fixed bounded history is always retained, without per-frame output.
+    // Observations can overlap (e.g. source_update contains bank publication)
+    // and must NEVER be summed or credited as cold-time authority.
+    mutable std::array<StageObservation,24> stageHistory{};
+    mutable std::size_t nextStageObservation=0,stageObservationCount=0;
+    StageClock::time_point stageStart() const noexcept {return StageClock::now();}
+    void reportStageRange(const char* stage,StageClock::time_point start,StageClock::time_point end,bool okay=true,
         const rr::platform::VehicleWindowDiagnostic50DS* renderer=nullptr) const {
-        if(!traceStages)return;
-        const auto elapsed=std::chrono::duration_cast<std::chrono::nanoseconds>(StageClock::now()-start).count();
+        const auto elapsed=std::chrono::duration_cast<std::chrono::nanoseconds>(end-start).count();
         const auto snapshot=coordinator.snapshot();const auto& route=snapshot.route;
+        stageHistory[nextStageObservation]={stage,start,end,frameCount,snapshot.updates,route.screen,route.page,okay};
+        nextStageObservation=(nextStageObservation+1)%stageHistory.size();
+        if(stageObservationCount<stageHistory.size())++stageObservationCount;
+        if(!traceStages)return;
         // End the observation before formatting/output; logging overhead still
         // remains real work in the next accepted update interval.
         std::cerr<<"original_ui_stage {\"stage\":\""<<stage<<"\",\"completed_frame\":"<<frameCount
             <<",\"accepted_update_sequence\":"<<snapshot.updates<<",\"screen\":"<<unsigned(route.screen)
             <<",\"page\":"<<unsigned(route.page)<<",\"wall_nanoseconds\":"<<elapsed
+            <<",\"steady_begin_nanoseconds\":"<<std::chrono::duration_cast<std::chrono::nanoseconds>(start.time_since_epoch()).count()
+            <<",\"steady_end_nanoseconds\":"<<std::chrono::duration_cast<std::chrono::nanoseconds>(end.time_since_epoch()).count()
             <<",\"okay\":"<<(okay?"true":"false");
         if(renderer)std::cerr<<",\"source_coherent_framebuffer_fetch\":"<<(renderer->originalUiCoherentFramebufferFetch?"true":"false")
             <<",\"draws\":"<<renderer->originalUiDraws<<",\"source_triangles\":"<<renderer->originalUiSourceTriangles
             <<",\"source_texture_barriers\":"<<renderer->originalUiTextureBarriers;
         std::cerr<<"}\n";
+    }
+    void reportStage(const char* stage,StageClock::time_point start,bool okay=true,
+        const rr::platform::VehicleWindowDiagnostic50DS* renderer=nullptr) const {
+        reportStageRange(stage,start,StageClock::now(),okay,renderer);
+    }
+    void accountColdInterval(const rr::platform::OriginalUiFrontendColdInterval50KG& interval) {
+        if(!interval.measured)return;
+        require(interval.end>=interval.begin,"UI measured cold clock moved backwards");
+        const auto actual=std::chrono::duration_cast<std::chrono::nanoseconds>(interval.end-interval.begin).count();
+        require(static_cast<std::uint64_t>(actual)==interval.nanoseconds,"UI measured cold duration mismatch");
+        require(original_ui_elapsed50LH::creditCold(interval.nanoseconds,
+            pendingUpdateColdNanoseconds,pendingMaterialColdNanoseconds),"UI cold interval overflow");
+    }
+    void accountBankPublication(const rr::platform::OriginalUiFrontendColdInterval50KG& interval,
+        const rr::platform::OriginalUiFrontendWorkObservation50KG& drain,bool okay) {
+        // Diagnostic stage ranges never feed the clocks. Only the coordinator's
+        // exact owned bank-publication receipt credits the two consumers.
+        if(drain.measured)reportStageRange("bank_gpu_drain",drain.begin,drain.end,okay);
+        if(interval.measured)reportStageRange("cold_bank_publication",interval.begin,interval.end,okay);
+        accountColdInterval(interval);
     }
     rr::platform::GameHost50ER* presentationHost=nullptr;
     std::uint64_t (*presentationNow)()noexcept=nullptr;
@@ -1056,13 +1099,19 @@ public:
     bool checkpointAudio()noexcept override {
         if(!presentationActive||!available())return false;
         const auto now=presentationNow();
-        if(now<lastUpdateNanoseconds||now-lastUpdateNanoseconds>1000000000ull)return false;
+        // Blocking presentation requires an already accepted active baseline;
+        // it cannot use the first/resumed-page zero-delta convention.
+        if(!lastUpdateNanoseconds)return false;
+        const auto interval=original_ui_elapsed50LH::project(lastUpdateNanoseconds,now,pendingUpdateColdNanoseconds);
+        if(interval.error!=original_ui_elapsed50LH::Error::none)return false;
         rr::platform::AudioOutputDiagnostic50HD d;
-        if(!audioOutput.advanceAcceptedNanoseconds(now-lastUpdateNanoseconds,d))return false;
+        if(!audioOutput.advanceAcceptedNanoseconds(interval.activeNanoseconds,d))return false;
         // These actual steady-clock intervals are mixed exactly once during
         // blocking native presentation. They are excluded from next page dt;
         // material timestamps retain their normal advancing application clock.
-        lastUpdateNanoseconds=now;return true;
+        // A successful checkpoint consumes update credit exactly once. The
+        // separately sampled material clock still owns its own cold credit.
+        pendingUpdateColdNanoseconds=0;lastUpdateNanoseconds=now;return true;
     }
     bool present(rr::platform::VehicleWindowGl50DS& renderer,
         const rr::platform::OriginalUiPrivatePublication50KP& image,
@@ -1154,10 +1203,9 @@ public:
         presentationClock=application.state->clock101A50.get();cold.riderPresentation=this;
         cold.lightManager=application.lightManager;
         cold.riderProfile=application.riderProfile;
-        // Explicit, optional native codec-cache input. This is not a readiness
-        // switch: the compiled output catalog, each retained mip, every source
-        // archive and the complete destination must still authenticate.
-        if(!application.riderCacheRoot.empty()){
+        // Original-disc mode decodes in process, with no external image pack.
+        // Both paths preserve the same source and decoded-image hash admission.
+        if(application.decodeRiderImagesInProcess||!application.riderCacheRoot.empty()){
             require(application.riderProfile && application.riderProfile->initialized(),
                 "original Rider application profile owner unavailable");
             using Cache=rr::assets::OriginalUiIpumTextureCache50KG;
@@ -1174,6 +1222,20 @@ public:
                 std::cerr<<"Original Course archive absent; Course destination remains unavailable.\n";
             cold.backgrounds=readArchive(application.assetRoot,Id::backgrounds);
             cold.podTextures=readArchive(application.assetRoot,Id::podTextures);
+            auto cache=std::make_shared<Cache>();
+            rr::assets::OriginalUiIpumCacheDiagnostic50KG cacheDiagnostic;
+            if(application.decodeRiderImagesInProcess){
+                if(!cache->loadOriginal(cold.rider,cacheDiagnostic))
+                    throw std::runtime_error("original Rider IPUM native decode/admission rejected: "+
+                        cacheDiagnostic.detail+" error="+std::to_string(static_cast<unsigned>(cacheDiagnostic.error))+
+                        " mip="+std::to_string(cacheDiagnostic.mip));
+                for(std::size_t source=0;source<Cache::additionalCatalogSourceCount();++source)
+                    if(!cache->loadAdditionalOriginal(source,cold.rider,cacheDiagnostic))
+                        throw std::runtime_error("additional Rider IPUM native decode/admission rejected: "+
+                            cacheDiagnostic.detail+" source="+std::to_string(source)+
+                            " error="+std::to_string(static_cast<unsigned>(cacheDiagnostic.error))+
+                            " mip="+std::to_string(cacheDiagnostic.mip));
+            }else{
             std::vector<std::vector<std::uint8_t>> mips;
             mips.reserve(rr::assets::originalUiIpumMipCount50KG);
             for(std::size_t mip=0;mip<rr::assets::originalUiIpumMipCount50KG;++mip){
@@ -1191,8 +1253,6 @@ public:
                 require(static_cast<bool>(input),"original Rider IPUM retained mip read failed");
                 mips.push_back(std::move(bytes));
             }
-            auto cache=std::make_shared<Cache>();
-            rr::assets::OriginalUiIpumCacheDiagnostic50KG cacheDiagnostic;
             require(cache->load(cold.rider,mips,cacheDiagnostic),
                 "original Rider IPUM retained mip authentication rejected");
             // A compiled additional catalog requires its real retained bytes.
@@ -1218,6 +1278,7 @@ public:
                 }
                 require(cache->loadAdditional(source,cold.rider,additionalMips,cacheDiagnostic),
                     "additional Rider IPUM retained mip authentication rejected");
+            }
             }
             cold.riderIpumCache=std::move(cache);
         }
@@ -1257,7 +1318,8 @@ public:
             require(audioOutput.soundModeOwner50KG()==application.soundMode.get(),
                 "original UI output did not retain the application sound mode owner");
             cold.audio=audioOutput.transport();
-            if(!application.riderCacheRoot.empty()&&!cold.audio->prepareRiderMenu(application.audioRoot,error))
+            if((application.decodeRiderImagesInProcess||!application.riderCacheRoot.empty())&&
+                !cold.audio->prepareRiderMenu(application.audioRoot,error))
                 throw std::runtime_error(error);
             if(cold.course&&!cold.audio->prepareCourseMenu(application.audioRoot,error))
                 throw std::runtime_error(error);
@@ -1297,13 +1359,11 @@ public:
     void input(std::uint8_t sourceInput) {
         rr::platform::OriginalUiMainSessionInput50KG in;in.controller=0;in.originalInput=sourceInput;
         rr::platform::OriginalUiFrontendInputReceipt50KG receipt;
+        const auto inputStart=stageStart();
         const auto status=coordinator.input(in,receipt,diagnostic);++inputCount;
-        if(receipt.coldInterval.measured){
-            const auto elapsed=receipt.coldInterval.nanoseconds;
-            require(elapsed<=std::numeric_limits<std::uint64_t>::max()-pendingUpdateColdNanoseconds&&
-                elapsed<=std::numeric_limits<std::uint64_t>::max()-pendingMaterialColdNanoseconds,"UI cold interval overflow");
-            pendingUpdateColdNanoseconds+=elapsed;pendingMaterialColdNanoseconds+=elapsed;
-        }
+        reportStage("source_input",inputStart,status==Status::ok||status==Status::noChange||
+            status==Status::routeAccepted||status==Status::unavailableDestination||status==Status::secondControllerRequired);
+        accountColdInterval(receipt.coldInterval);
         if(status==Status::unavailableDestination||status==Status::secondControllerRequired){
             ++unavailableCount;std::cerr<<"original_ui_destination unavailable screen="<<unsigned(receipt.source.screen)
                 <<" page="<<unsigned(receipt.source.page)
@@ -1430,22 +1490,50 @@ public:
                 <<"; no destination or gameplay entered.\n";
         }else if(status!=Status::ok&&status!=Status::noChange&&status!=Status::routeAccepted)fail("input");
     }
-    std::uint64_t acceptedElapsed(std::uint64_t now) {
-        require(!lastUpdateNanoseconds||now>=lastUpdateNanoseconds,"original UI update clock moved backwards");
-        std::uint64_t elapsed=lastUpdateNanoseconds?now-lastUpdateNanoseconds:0;
-        if(lastUpdateNanoseconds){
-            require(pendingUpdateColdNanoseconds<=elapsed,"UI cold interval exceeds update interval");
-            elapsed-=pendingUpdateColdNanoseconds;
+    void reportElapsedFailure(const original_ui_elapsed50LH::Interval& interval,std::uint64_t before,
+        std::uint64_t now,std::uint64_t pending,StageClock::time_point observedNow) const {
+        const auto snapshot=coordinator.snapshot();
+        std::cerr<<"original_ui_interval_failure {\"error\":"<<unsigned(interval.error)
+            <<",\"frame\":"<<frameCount<<",\"accepted_update_sequence\":"<<snapshot.updates
+            <<",\"screen\":"<<unsigned(snapshot.route.screen)<<",\"page\":"<<unsigned(snapshot.route.page)
+            <<",\"course\":"<<snapshot.course.selectedCourse44<<",\"planet\":"<<snapshot.course.selectedPlanet40
+            <<",\"course_refresh_updates\":"<<snapshot.course.deferred14D0
+            <<",\"update_clock_domain\":\"monotonicNow50DU_relative\",\"stage_clock_domain\":\"steady_clock_since_epoch\""
+            <<",\"host_sample_observed_steady_nanoseconds\":"<<std::chrono::duration_cast<std::chrono::nanoseconds>(observedNow.time_since_epoch()).count()
+            <<",\"update_begin_nanoseconds\":"<<before<<",\"update_end_nanoseconds\":"<<now
+            <<",\"wall_nanoseconds\":"<<interval.wallNanoseconds<<",\"pending_cold_nanoseconds\":"<<pending
+            <<",\"excluded_cold_nanoseconds\":"<<interval.excludedColdNanoseconds
+            <<",\"active_nanoseconds\":"<<interval.activeNanoseconds<<",\"recent_stages\":[";
+        const auto oldest=(nextStageObservation+stageHistory.size()-stageObservationCount)%stageHistory.size();
+        for(std::size_t i=0;i<stageObservationCount;++i){const auto& stage=stageHistory[(oldest+i)%stageHistory.size()];
+            if(i)std::cerr<<',';
+            std::cerr<<"{\"stage\":\""<<stage.name<<"\",\"frame\":"<<stage.frame<<",\"sequence\":"<<stage.sequence
+                <<",\"screen\":"<<unsigned(stage.screen)<<",\"page\":"<<unsigned(stage.page)
+                <<",\"steady_begin_nanoseconds\":"<<std::chrono::duration_cast<std::chrono::nanoseconds>(stage.begin.time_since_epoch()).count()
+                <<",\"steady_end_nanoseconds\":"<<std::chrono::duration_cast<std::chrono::nanoseconds>(stage.end.time_since_epoch()).count()
+                <<",\"wall_nanoseconds\":"<<std::chrono::duration_cast<std::chrono::nanoseconds>(stage.end-stage.begin).count()
+                <<",\"okay\":"<<(stage.okay?"true":"false")<<'}';
         }
-        pendingUpdateColdNanoseconds=0;lastUpdateNanoseconds=now;
-        require(elapsed<=1000000000ull,"original UI active update stall exceeds one second");
-        return elapsed;
+        std::cerr<<"]}\n";
+    }
+    std::uint64_t acceptedElapsed(std::uint64_t now) {
+        // Observation paired immediately after the caller's relative host
+        // sample. It labels clock domains; it never advances either clock.
+        const auto observedNow=StageClock::now();
+        const auto before=lastUpdateNanoseconds,pending=pendingUpdateColdNanoseconds;
+        const auto interval=original_ui_elapsed50LH::consume(lastUpdateNanoseconds,now,pendingUpdateColdNanoseconds);
+        if(interval.error!=original_ui_elapsed50LH::Error::none)reportElapsedFailure(interval,before,now,pending,observedNow);
+        require(interval.error!=original_ui_elapsed50LH::Error::backwards,"original UI update clock moved backwards");
+        require(interval.error!=original_ui_elapsed50LH::Error::coldExceedsWall,"UI cold interval exceeds update interval");
+        require(interval.error!=original_ui_elapsed50LH::Error::stall,"original UI active update stall exceeds one second");
+        return interval.activeNanoseconds;
     }
     void update(const rr::platform::OriginalUiMainSessionUpdate50KG& in,std::uint64_t elapsedNanoseconds) {
         rr::platform::OriginalUiFrontendUpdateReceipt50KG receipt;
         const auto updateStart=stageStart();
         const bool updated=coordinator.update(in,receipt,diagnostic)==Status::ok&&receipt.accepted&&receipt.sequence==lastAudioSequence+1;
         reportStage("source_update",updateStart,updated);
+        accountBankPublication(receipt.coldInterval,receipt.bankDrain,updated);
         if(!updated)
             fail("update");
         // One PCM advance for this exact accepted source update; never for
@@ -1479,8 +1567,11 @@ public:
     }
     void commitDeferred(rr::platform::VehicleWindowGl50DS& renderer) {
         const auto deferredStart=stageStart();
-        const auto status=coordinator.commitDeferred(renderer,diagnostic);
-        reportStage("deferred_commit",deferredStart,status==Status::ok||status==Status::noChange||status==Status::courseLaunchReady);
+        rr::platform::OriginalUiFrontendDeferredReceipt50KG receipt;
+        const auto status=coordinator.commitDeferred(renderer,receipt,diagnostic);
+        const bool okay=status==Status::ok||status==Status::noChange||status==Status::courseLaunchReady;
+        reportStage("deferred_commit",deferredStart,okay);
+        accountBankPublication(receipt.coldInterval,receipt.bankDrain,okay);
         if(status==Status::courseLaunchReady){
             require(materialApplicationOwner,"Course material directory owner missing");
             materialApplicationOwner->enterGameplayMaterialDirectory17D7A0();

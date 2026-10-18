@@ -1,6 +1,8 @@
 #pragma once
 #include "pod_materials50ed_fixture.h"
 #include "../../src/assets/original_standard_ipum_image_lease50la.h"
+#include "../../src/assets/original_standard_ipum_framing50la.h"
+#include "../../src/assets/original_ipu_decoder.h"
 #include <array>
 #include <utility>
 #include <cstring>
@@ -22,6 +24,39 @@ class Verifier final {
         {179092u,35486u,190721u,190741u,23837u,"365736f6a3e4bc336d165a919c0132e799e714264559903fc91b1c6bdc1144aa","8d36c299f0c0e0bf4b03ebd91b032a0b1ec907080c1d991d9f897d11e049f7af","93c38e0dbe0fd044a5e4b88b59cf5937ea106461d96e6ae484bfbab99cd78c60"},
     };
 public:
+    // Cold-only original source decode. The exact six existing output pins
+    // remain authoritative; this creates no resource lease or publication.
+    static bool decodeRaSixOriginal(const std::vector<std::uint8_t>& originalAtm,
+        std::array<std::vector<std::uint8_t>,6>& out,std::string& error) noexcept {
+        try {
+            namespace hash=pod_materials50ed_fixture::detail;
+            if(originalAtm.size()!=214578||hash::sha256(originalAtm)!=
+                "76b78e28cda066154e46a22e1ecda5ab4ade267ea30f44472af8e4304e738031"){
+                error="RA original crowd ATM identity differs";return false;}
+            std::vector<a::detail::OriginalIpumFrameExtent50LA> frames;std::size_t bad=0;
+            if(!a::detail::frameOriginalIpumAtm50LA(originalAtm,frames,bad)||frames.size()!=6){
+                error="RA original crowd ATM framing differs";return false;}
+            std::array<std::vector<std::uint8_t>,6> next;
+            for(std::size_t i=0;i<next.size();++i){
+                const auto& pin=pins_[i];const auto& frame=frames[i];const auto& mip=frame.mips[4];
+                if(frame.count!=5||frame.offset!=pin.pst||frame.bytes!=pin.pstBytes||
+                   mip.header!=pin.header||mip.payload!=pin.payload||mip.bytes!=pin.payloadBytes||
+                   mip.width!=256||mip.height!=256){error="RA original crowd frame/mip differs";return false;}
+                const std::vector<std::uint8_t> pst(originalAtm.begin()+pin.pst,originalAtm.begin()+pin.pst+pin.pstBytes);
+                const std::vector<std::uint8_t> payload(originalAtm.begin()+pin.payload,originalAtm.begin()+pin.payload+pin.payloadBytes);
+                if(hash::sha256(pst)!=pin.pstHash||hash::sha256(payload)!=pin.payloadHash){
+                    error="RA original crowd encoded identity differs";return false;}
+                std::vector<std::uint8_t> rgba;
+                if(!a::decodeOriginalIpuRgba(payload.data(),payload.size(),256,256,rgba,error))return false;
+                if(rgba.size()!=256u*256u*4u){error="RA decoded crowd RGBA extent differs";return false;}
+                next[i]={'R','R','T','E','X','0','0','1',0,1,0,0,0,1,0,0};
+                next[i].insert(next[i].end(),rgba.begin(),rgba.end());
+                if(hash::sha256(next[i])!=pin.outputHash){error="RA decoded crowd output identity differs";return false;}
+            }
+            out=std::move(next);error.clear();return true;
+        }catch(const std::exception& e){try{error=e.what();}catch(...){}return false;}
+        catch(...){try{error="RA original crowd decode allocation failed";}catch(...){}return false;}
+    }
     enum class Status : std::uint8_t {complete,input,sourceIdentity,sourceFrame,outputIdentity,allocation};
     struct Diagnostic {Status status=Status::input;const char* failure=nullptr;};
     // Existing frame0 API remains source/output-compatible.

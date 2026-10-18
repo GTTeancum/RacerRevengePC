@@ -1,3 +1,40 @@
+# Additional runtime verification: October 17, 2026, 11:39 p.m. EDT
+
+The same compiled checkpoint also passed a fresh normal-menu run through Anakin/Watchtower, real throttle, Pause, confirmed Restart, a fresh race countdown and player control, then Pause -> Original Main -> window close. Process exit0, no timeout. Two same-run screenshots were delivered. Full lap, finish/results and all-racer/all-track coverage remain unverified. Subsequent coverage runs must use a new racer/track pairing, prioritizing untested racers and tracks. This supersedes the pending Restart/return status below.
+
+# Current tested checkpoint: October 17, 2026, 9:34 p.m. EDT
+
+Linux application compiled all 354 translation units and linked successfully.
+Tested executable SHA256: 539fbfc83d9f97bcfe2eaa38887b22867c7edba7deedb749a73ad0f757b5e8c3.
+
+Runtime-confirmed through the normal player flow: Main -> Anakin Skywalker selection -> Watchtower Run selection -> loading -> original race intro/countdown -> real keyboard throttle movement -> Pause. Paired racer-selection and in-race screenshots were captured from the same run. The generated runtime root was absent; this GA route consumed the supplied original disc files.
+
+The previous eligible-human AI combat boundary is repaired with source-derived candidate geometry, attack driving, state transitions, target observations and processed-contact ownership. The current run proceeded past that former failure point and reached Pause. Focused candidate/state/attack/contact tests and wide-steering assertions pass. This does not establish exhaustive combat coverage or retail scheduler parity.
+
+Restart and return to Main are still being tested at this publication checkpoint. Full laps, finish/results, all racers/tracks and Windows runtime coverage remain incomplete. FPS tuning remains lower priority than the normal user flow. Existing HOST-ordered contact scheduling remains explicitly qualified.
+
+This source was reconstructed after a cloud workspace reset, from verified repository and saved source inputs, then reviewed, rebuilt and freshly tested. Older results below are historical and do not supersede this checkpoint. No original disc assets or generated data packs are included in this source publication.
+
+## Next work
+Complete the live Restart/return checks, then restore and test the TA direct-disc player route. TA static CPU loading is checked in a separate proposal, but that live-route proposal is not included here. Keep two same-run proofs per GUI run, and publish meaningful tested wins with their exact verification limits.
+
+---
+
+# Current takeover result — October 17, 2026, 12:33 p.m. EDT
+
+The local direct-disc Linux Ryloth startup test passed: Main, Mawhonic character
+selection and ALL8 gameplay, exit0 and clean cleanup. No generated runtime pack
+or image-cache files were supplied. Tested executable SHA256:
+762acaea811f4b59efc76c2f14f2268f7a3ba33cd3f699674acaa9dd00bad324.
+
+Changes are local against main644f7708df71e3fe7f58fd53fb6237a91d021f8f, not yet
+published. All other branches were already merged into main. Other tracks,
+Windows validation, and codec-library release packaging remain unfinished.
+See HANDOFF-CHAT.md for exact evidence and limitations. The text below is the
+previous owner's historical handoff, not the current validation status.
+
+---
+
 # Racer Revenge performance handoff
 
 Updated: 2026-10-17 8:33 a.m. EDT (2026-10-17 12:33 UTC).
