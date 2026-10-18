@@ -22,6 +22,16 @@ namespace original_main_entry50KG { struct Application; }
 namespace original_course_targets50KX {
 using Selection=rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection;
 using Track=rr::platform::HostTrack50IM;
+// Admission capability only, never proof of cold world/resource readiness.
+// Keep this set synchronized with the direct original human runtime owners.
+// Actual source profile visibility, rider/roster identity, mode2 and target
+// archive authentication remain independent requirements below.
+inline constexpr bool directHumanTrack(Track track) noexcept {
+    return track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA;
+}
+inline constexpr bool directDiscTarget(Track track) noexcept {
+    return directHumanTrack(track)||track==Track::RA;
+}
 struct Target {
     Track track;
     const track_session_assets50IG::SessionAssets* assets;
@@ -171,10 +181,12 @@ public:
             }
         }
         for(std::size_t i=0;i<targets.size();++i){const auto& t=targets[i];
-            if(directDisc_&&t.track!=Track::RA&&t.track!=Track::GA&&t.track!=Track::TA)continue;
-            // GA proof requires explicit original-disc ownership, never the
-            // legacy generated corpus or an absent-catalog fallback.
-            if((t.track==Track::GA||(directDisc_&&t.track==Track::TA))&&runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())continue;
+            if(directDisc_&&!directDiscTarget(t.track))continue;
+            // GA has no admitted legacy path. Every direct human target also
+            // requires explicit original-disc ownership; an absent generated
+            // roster alone must not opt TA/MA/SA into their direct loaders.
+            if((t.track==Track::GA||(directDisc_&&directHumanTrack(t.track)))&&
+               runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())continue;
             if(!admission.gcMode2||!rr::platform::hostTrackAdmitted50IM(t.track,admission))continue;
             try {
                 auto bytes=runtime_startup50fl::readBytes(t.assets->archive);
@@ -190,7 +202,7 @@ public:
         }
     }
     const Target* admits(const Selection& s)const noexcept {
-        const auto* selected=target(s);if(!attempted_||!selected||(directDisc_&&selected->track!=Track::RA&&selected->track!=Track::GA&&selected->track!=Track::TA))return nullptr;
+        const auto* selected=target(s);if(!attempted_||!selected||(directDisc_&&!directDiscTarget(selected->track)))return nullptr;
         bool rosterPresent=false;
         for(std::size_t i=0;i<riders.size();++i)
             if(s.rider==riders[i]&&!authenticatedRosters_[i].is_null())rosterPresent=true;

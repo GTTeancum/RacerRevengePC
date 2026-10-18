@@ -293,7 +293,12 @@ public:
                 offset += e.bytes;
                 if(request.decodeOriginalImages){
                     //128D50/24F2C0: exact tile descriptor followed by four IPUM mips.
-                    constexpr std::uint32_t descriptor[]{0,32,0,16,4096,4,0,0,0,0,0};
+                    constexpr std::array<std::uint32_t,11> standardDescriptor{0,32,0,16,4096,4,0,0,0,0,0};
+                    // Exact descriptor from all48 authenticated Sullust CUB tiles.
+                    // Keep source/output image pins and four IPUM mip checks below.
+                    constexpr std::array<std::uint32_t,11> saDescriptor{0,34,0,16,16,4,0,0,0,0,0};
+                    const auto& descriptor=request.track==track_source_fixture::Track::sa?
+                        saDescriptor:standardDescriptor;
                     need(source.size()>=sizeof(descriptor),"Original sky tile descriptor extent");
                     for(std::size_t word=0;word<11;++word)
                         need(u32(source.data()+word*4)==descriptor[word],"Original sky tile descriptor");

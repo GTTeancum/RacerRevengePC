@@ -1,10 +1,12 @@
 #pragma once
 #include "track_materials50fa_fixture.h"
 #include "../../src/assets/import_texture48e.h"
+#include "../../src/assets/original_ipu_decoder.h"
 #include "../../src/game/authored_texture_animation.h"
 
 // Exact selected-track ATM resource/PSM/frame closure. Source hashes and
-// genuine retained RRTEX hashes are independent. No image codec runs here.
+// genuine retained RRTEX hashes are independent. Native cold decoding only;
+// no generated frame files, subprocesses, or hot-path image decoding.
 namespace ma_sa_atm_animation_fixture {
 namespace a=rr::assets;
 constexpr std::uint32_t maxFrames=9u*64u, maxAnimations=4096u;
@@ -49,6 +51,57 @@ struct Frame {
     std::uint32_t offset,bytes,width,height,mip;
     const char* sourceSha; const char* nativeSha; const char* filename;
 };
+// Cold source-only conversion. Call only after the caller authenticates the
+// full archive, ATM and exact embedded PST slice. No path or fallback exists.
+inline std::vector<std::uint8_t> decodeOriginalFrame(const std::vector<std::uint8_t>& pst,
+    const Frame& frame,a::DecodeError48C& error) {
+    using shared::need;
+    const auto range=[&](std::size_t at,std::size_t n){return at<=pst.size()&&n<=pst.size()-at;};
+    const auto word=[&](std::size_t at){need(range(at,4),"Truncated original MA/SA ATM PST");return shared::u32(pst.data()+at);};
+    const auto dimension=[](std::uint32_t n){return n>=16&&n<=1024&&!(n&(n-1));};
+    need(pst.size()<=8u*1024u*1024u&&word(0)==1&&word(8)==frame.mip+1,
+        "Original MA/SA ATM PST header/mip identity");
+    std::vector<std::uint8_t> output;
+    if(word(4)==2){
+        // Kind2 is not supported by decodeTexture48E. Validate the complete
+        // ascending PST envelope, then decode only the pinned largest image.
+        const auto count=word(8);need(count>=1&&count<=7,"Original ATM IPUM mip count");
+        std::size_t at=12,payload=0,payloadBytes=0;std::uint32_t priorW=0,priorH=0;
+        for(std::uint32_t i=0;i<count;++i){
+            need(range(at,20),"Original ATM IPUM mip header extent");
+            const auto h=word(at),w=word(at+4),bytes=word(at+16);const auto p=at+20;
+            need(dimension(w)&&dimension(h)&&!word(at+8)&&!word(at+12)&&
+                (!i||(w==priorW*2&&h==priorH*2))&&bytes>=25&&range(p,bytes),
+                "Original ATM IPUM mip extent/order");
+            need(!std::memcmp(pst.data()+p,"ipum",4)&&word(p+4)==bytes-8&&
+                (std::uint32_t(pst[p+8])|(std::uint32_t(pst[p+9])<<8))==w&&
+                (std::uint32_t(pst[p+10])|(std::uint32_t(pst[p+11])<<8))==h&&
+                word(p+12)==1&&pst[p+16]==0,"Original ATM IPUM embedded header");
+            constexpr std::uint8_t end[]{0,0,1,0xb0,0,0,1,0xb1};
+            need(!std::memcmp(pst.data()+p+bytes-8,end,8),"Original ATM IPUM terminators");
+            payload=p;payloadBytes=bytes;at=p+bytes;priorW=w;priorH=h;
+        }
+        need(at==pst.size()&&priorW==frame.width&&priorH==frame.height,
+            "Original ATM IPUM full extent/selected dimensions");
+        a::TextureMip48E mip;mip.width=frame.width;mip.height=frame.height;
+        std::string why;
+        const bool decoded=a::decodeOriginalIpuRgba(pst.data()+payload,payloadBytes,frame.width,frame.height,mip.rgba,why);
+        need(decoded,"Original MA/SA ATM native IPUM decode: "+why);
+        need(a::encodeTextureLevel48E(mip,output,error),"Original ATM IPUM output framing");
+    }else{
+        need(word(4)==0||word(4)==1,"Unsupported original ATM PST kind");
+        a::Texture48E decoded;
+        need(a::decodeTexture48E(pst,decoded,error)&&decoded.mips.size()==frame.mip+1&&
+            decoded.mips.back().width==frame.width&&decoded.mips.back().height==frame.height,
+            "Original MA/SA ATM indexed frame decode/identity");
+        output=std::move(decoded.base_rrtex);
+    }
+    const auto size=std::size_t(frame.width)*frame.height*4+16;
+    need(output.size()==size&&shared::sha256(output)==frame.nativeSha&&
+        !std::memcmp(output.data(),"RRTEX001",8)&&shared::u32(output.data()+8)==frame.width&&
+        shared::u32(output.data()+12)==frame.height,"Original ATM decoded frame identity/framing");
+    return output;
+}
 struct Profile {
     const Source* sources; std::uint32_t sourceCount;
     const Entry* entries; std::uint32_t entryCount;
@@ -144,15 +197,37 @@ public:
             storage_->selectedFrames[i]=storage_->animations[i].initialFrame;
         }
     }
-    bool load(const std::filesystem::path& sourceArchive,const std::filesystem::path& frameRoot,
+    bool load(const std::filesystem::path& sourceArchive,
         track_source_fixture::Track selectedTrack,const track_materials50fa_fixture::Owner& track,
+        Diagnostic& d)noexcept {
+        return load<track_materials50fa_fixture::Owner>(sourceArchive,selectedTrack,track,d);
+    }
+    // Narrow read-only static-owner contract. Both generated-backed and
+    // direct-original owners publish these exact record/bank types. Borrow
+    // only during this cold load; preserve every submitted source index.
+    template<class StaticMaterialOwner>
+    bool load(const std::filesystem::path& sourceArchive,
+        track_source_fixture::Track selectedTrack,const StaticMaterialOwner& track,
         Diagnostic& d)noexcept {
         using namespace detail;using shared::need;
         try{
             d={};need(!storage_&&track.loaded(),"MA/SA ATM requires loaded static source materials");
+            const a::MaterialTextureAssets50EA* bank=track.bank();
+            const std::vector<track_materials50fa_fixture::Selection>* selections=track.selections();
+            const std::vector<track_materials50fa_fixture::Span>* spans=track.spans();
+            need(bank&&selections&&spans,"MA/SA ATM static source bank/selections/spans unavailable");
+            need(!selections->empty()&&selections->size()<=1000000&&
+                !spans->empty()&&spans->size()<=1000000,"MA/SA ATM static source record capacity");
             const auto p=profile(selectedTrack);const auto& archiveProfile=track_visual_profile_fixture::get(selectedTrack);
             need(p.frameCount&&p.frameCount<=maxFrames&&p.entryCount&&p.entryCount<=64,"Bounded MA/SA ATM metadata");
-            need(!frameRoot.empty()&&!std::filesystem::is_symlink(frameRoot),"Explicit nonsymlink ATM frame directory");
+            // Preserve bounded accumulated output before any image allocation.
+            std::size_t rgbaBytes=0;
+            for(std::uint32_t i=0;i<p.frameCount;++i){const auto& frame=p.frames[i];
+                need(frame.width>=16&&frame.width<=1024&&frame.height>=16&&frame.height<=1024&&frame.mip<=6,
+                    "Original ATM pinned dimensions/mip budget");
+                shared::add(rgbaBytes,std::size_t(frame.width)*frame.height*4,maxRgbaBytes,
+                    "Original ATM decoded RGBA budget");
+            }
             shared::Inputs inputs;inputs.capacity=maxRgbaBytes+8u*1024u*1024u;
             auto bytes=inputs.read(sourceArchive,archiveProfile.archiveBytes);
             need(bytes.size()==archiveProfile.archiveBytes&&shared::sha256(bytes)==archiveProfile.archiveSha,"Original ATM archive identity");
@@ -181,14 +256,7 @@ public:
                         "Original ATM frame extent/dimensions");
                     std::vector<std::uint8_t> pst(original.begin()+frame.offset,original.begin()+frame.offset+frame.bytes);
                     need(shared::sha256(pst)==frame.sourceSha,"Original embedded PST identity");
-                    const auto size=std::size_t(frame.width)*frame.height*4+16;
-                    const std::string filename=frame.filename;
-                    need(!filename.empty()&&filename.find_first_of("/\\:")==std::string::npos&&filename.find("..") == std::string::npos,
-                        "Retained ATM frame filename");
-                    native[index]=inputs.read(frameRoot/filename,size);
-                    need(native[index].size()==size&&shared::sha256(native[index])==frame.nativeSha&&
-                        std::memcmp(native[index].data(),"RRTEX001",8)==0&&shared::u32(native[index].data()+8)==frame.width&&
-                        shared::u32(native[index].data()+12)==frame.height,"Genuine retained ATM frame identity/framing");
+                    native[index]=decodeOriginalFrame(pst,frame,d.source);
                     images[index]={std::uint64_t(index)+1,&native[index]};end+=frame.bytes;
                 }
                 need(end==original.size(),"Original ATM complete frame coverage");nextFrame+=source.frameCount;
@@ -196,7 +264,7 @@ public:
             need(nextFrame==p.frameCount,"Original ATM complete bank coverage");
             std::vector<Animation> definitions(p.entryCount);
             std::vector<bool> samplerSet(p.frameCount,false);
-            std::vector<std::uint32_t> selectionEntry(track.selections()->size(),a::unresolvedMaterialTexture50EA),placed(p.entryCount,0);
+            std::vector<std::uint32_t> selectionEntry(selections->size(),a::unresolvedMaterialTexture50EA),placed(p.entryCount,0);
             for(std::uint32_t i=0;i<p.entryCount;++i){
                 d.animation=i;const auto& entry=p.entries[i];need(entry.sourceIndex<p.sourceCount,"ATM binding source index");
                 const auto& source=p.sources[entry.sourceIndex];auto& def=definitions[i];
@@ -235,17 +303,19 @@ public:
                 need(!entry.placedSpans||(entry.pass==1&&material.passes.size()==1),
                     "Placed ATM requires the original single-pass live subset");
                 const auto key=shared::sha256(std::string("rr-native-material-48E-v1\n")+entry.materialSha);
-                for(std::uint32_t mi=0;mi<track.selections()->size();++mi){
-                    const auto& selection=track.selections()->at(mi);
+                for(std::uint32_t mi=0;mi<selections->size();++mi){
+                    const auto& selection=selections->at(mi);
                     if(shared::normalized(selection.materialName)!=shared::normalized(entry.materialName)||selection.pass!=entry.pass)continue;
                     need(entry.placedSpans&&entry.pass==1&&material.passes.size()==1,
                         "Unplaced or layered ATM source cannot acquire a live static attachment");
                     need(selectionEntry[mi]==a::unresolvedMaterialTexture50EA&&selection.track==selectedTrack&&selection.materialKey==key&&
                         selection.slot==1&&selection.passCount==1&&selection.program==pass.microprogram&&selection.staticAnimationFrame&&
+                        !selection.projectedPrelit&&shared::normalized(selection.textureName)==shared::normalized(entry.textureName)&&
+                        shared::normalized(selection.decodedSourceMember)==shared::normalized(source.member)&&
                         selection.decodedSourceSha256==source.sha&&selection.textureIndex!=a::unresolvedMaterialTexture50EA&&
                         selection.clampU==def.clampU&&selection.clampV==def.clampV,"Original ATM static material association");
                     selectionEntry[mi]=i;
-                    const auto* initial=track.bank()->texture(selection.textureIndex);const auto& retained=native[source.firstTextureIndex+entry.initialFrame];
+                    const auto* initial=bank->texture(selection.textureIndex);const auto& retained=native[source.firstTextureIndex+entry.initialFrame];
                     need(initial&&initial->texture.width==p.frames[source.firstTextureIndex+entry.initialFrame].width&&
                         initial->texture.height==p.frames[source.firstTextureIndex+entry.initialFrame].height&&
                         initial->texture.rgba.size()==retained.size()-16&&
@@ -253,11 +323,12 @@ public:
                 }
             }
             for(bool assigned:samplerSet)need(assigned,"Original ATM source lacks material sampler ownership");
-            for(std::uint32_t si=0;si<track.spans()->size();++si){
-                const auto& span=track.spans()->at(si);const auto& selection=track.selections()->at(span.materialSelection);
+            for(std::uint32_t si=0;si<spans->size();++si){
+                const auto& span=spans->at(si);const auto& selection=selections->at(span.materialSelection);
                 const auto entry=selectionEntry.at(span.materialSelection);
                 if(entry==a::unresolvedMaterialTexture50EA){need(!selection.staticAnimationFrame,"Unowned original static ATM span");continue;}
-                need(next->animations.size()<maxAnimations&&span.sourcePass==1&&span.sourcePassCount==1&&span.projectionPass==0,"Original ATM placed span bound/pass");
+                need(next->animations.size()<maxAnimations&&span.sourcePass==1&&span.sourcePassCount==1&&span.projectionPass==0&&
+                    span.textureIndex==selection.textureIndex,"Original ATM placed span bound/pass/texture");
                 auto animation=definitions[entry];animation.sourceSpanIndex=si;animation.worldInstanceIndex=span.worldInstanceIndex;
                 animation.materialSelection=span.materialSelection;animation.sourceTextureIndex=selection.textureIndex;
                 next->animations.push_back(animation);++placed[entry];
@@ -271,7 +342,7 @@ public:
             }
             const a::MaterialTextureBudgets50EA budget{p.frameCount,0,maxRgbaBytes+std::size_t(p.frameCount)*16,maxRgbaBytes,1024};
             const a::MaterialTextureAssetsInput50EA input{images.data(),p.frameCount,nullptr,0,budget};
-            need(next->bank.load(input,d.bank),"Original retained ATM frame bank rejected");
+            need(next->bank.load(input,d.bank),"Original native-decoded ATM frame bank rejected");
             storage_=std::move(next);d.animation=d.frame=a::unresolvedMaterialTexture50EA;return true;
         }catch(const std::exception& e){try{d.message=e.what();}catch(...){}return false;}
         catch(...){try{d.message="Unexpected original MA/SA ATM preparation failure";}catch(...){}return false;}

@@ -106,12 +106,21 @@ public:
     // one source material/pass here even if repeated scene indices name it.
     // This does not automatically create per-model source registrations.
     bool load(const track_materials50fa_fixture::Owner& track, Diagnostic& d) noexcept {
+        return load<track_materials50fa_fixture::Owner>(track,d);
+    }
+    // Read-only cold borrow of the existing authenticated Span/Selection
+    // records. Direct owners keep their original indices; no view, reference,
+    // or material owner is retained after association.
+    template<class StaticMaterialOwner>
+    bool load(const StaticMaterialOwner& track, Diagnostic& d) noexcept {
         namespace shared=pod_materials50ed_fixture::detail;
         using shared::need;
         try {
-            d={}; need(!storage_&&track.loaded()&&track.spans()&&track.selections(),
-                "MA UV requires the existing loaded material owner");
-            const auto& spans=*track.spans(); const auto& selections=*track.selections();
+            d={}; need(!storage_&&track.loaded(),"MA UV requires the existing loaded material owner");
+            const std::vector<track_materials50fa_fixture::Span>* borrowedSpans=track.spans();
+            const std::vector<track_materials50fa_fixture::Selection>* borrowedSelections=track.selections();
+            need(borrowedSpans&&borrowedSelections,"MA UV source spans/selections unavailable");
+            const auto& spans=*borrowedSpans; const auto& selections=*borrowedSelections;
             need(spans.size()<=1000000,"MA UV source span capacity");
             const auto key=shared::sha256(std::string("rr-native-material-48E-v1\n")+materialSha);
             auto next=std::make_unique<Storage>();

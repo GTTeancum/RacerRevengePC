@@ -22,9 +22,15 @@ public:
  Owner()=default;Owner(const Owner&)=delete;Owner&operator=(const Owner&)=delete;
  Owner(Owner&&)=delete;Owner&operator=(Owner&&)=delete;
  bool loadSource(const std::filesystem::path& archive,const sa_animated_world::Owner& world,sa_dynamic_materials::Diagnostic& d){
+  return loadSource(archive,world,source_texture50fc_fixture::decodeSourceTextureSa,d);
+ }
+ // Explicit source-only decoder selection leaves motion, time, GL and alpha
+ // policy with their existing owners. Decoder failure never selects a fallback.
+ bool loadSource(const std::filesystem::path& archive,const sa_animated_world::Owner& world,
+     sa_dynamic_materials::SourceTextureDecoder sourceDecoder,sa_dynamic_materials::Diagnostic& d){
   if(loaded_){d.message="SA dynamic window source is already loaded";return false;}
   if(!world.ready()){d.message="SA dynamic window world is not ready";return false;}
-  loaded_=source_.load(archive,world,d);return loaded_;
+  loaded_=source_.load(archive,world,sourceDecoder,d);return loaded_;
  }
  bool loaded()const noexcept{return loaded_;}
  bool ownsResources()const noexcept{return gpu_.ownsResources();}

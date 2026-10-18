@@ -13,10 +13,18 @@ public:
     Owner()=default;Owner(const Owner&)=delete;Owner& operator=(const Owner&)=delete;
     bool loaded()const noexcept{return source_.loaded();}
     bool ownsResources()const noexcept{return gpu_.ownsResources();}
-    bool loadSource(const std::filesystem::path& archive,const std::filesystem::path& frameRoot,
+    bool loadSource(const std::filesystem::path& archive,
         track_source_fixture::Track selectedTrack,const track_materials50fa_fixture::Owner& track,
         ma_sa_atm_animation_fixture::Diagnostic& d)noexcept {
-        return source_.load(archive,frameRoot,selectedTrack,track,d);
+        return loadSource<track_materials50fa_fixture::Owner>(archive,selectedTrack,track,d);
+    }
+    // Same source-only decoder and GPU lifecycle for either static owner.
+    // The supplied owner is borrowed only by the cold association step.
+    template<class StaticMaterialOwner>
+    bool loadSource(const std::filesystem::path& archive,
+        track_source_fixture::Track selectedTrack,const StaticMaterialOwner& track,
+        ma_sa_atm_animation_fixture::Diagnostic& d)noexcept {
+        return source_.load(archive,selectedTrack,track,d);
     }
     bool createGpu(const p::MaterialTextureGlRequest50EB& caller,p::MaterialTextureGlDiagnostic50EB& d)noexcept {
         if(!source_.loaded())return false;

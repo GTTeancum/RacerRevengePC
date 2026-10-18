@@ -26,13 +26,21 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
  int terminalInputError=0;
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
- const bool directHumanCourseSupported=!allAiEnabled&&
+ const bool explicitOriginalRoot=
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
+ const bool directHumanCourseSupported=!allAiEnabled&&explicitOriginalRoot;
  // Capability only: the actual catalog/profile/roster and typed cold-load
  // guards below still authenticate the selected rider and destination.
  const auto directHumanTargetSupported=[&](original_course_targets50KX::Track track) noexcept {
-  return directHumanCourseSupported&&(track==original_course_targets50KX::Track::TA||
-      track==original_course_targets50KX::Track::GA);
+  return directHumanCourseSupported&&original_course_targets50KX::directHumanTrack(track);
+ };
+ const auto courseTargetModeSupported=[&](original_course_targets50KX::Track track) noexcept {
+  // A rooted direct-human target cannot use the ALL8 fallback to turn its
+  // actual Player0 into AI. Legacy unrooted targets and bounded RA retain
+  // their independent all-AI policy; GA never has a legacy human fallback.
+  const bool directHumanRequired=track==original_course_targets50KX::Track::GA||
+      (explicitOriginalRoot&&original_course_targets50KX::directHumanTrack(track));
+  return directHumanRequired?directHumanTargetSupported(track):allAiEnabled;
  };
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceRequested=!(raceSetting&&std::string(raceSetting)=="0");
@@ -108,8 +116,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    return target&&courseCatalogPrepared&&(target->track==original_course_targets50KX::Track::RA||
        directHumanTargetSupported(target->track)||courseCorpusPresent)&&
        raceRequested&&!courseColdLoad.pending()&&
-       renderer.initialized()&&(target->track==original_course_targets50KX::Track::GA?
-           directHumanTargetSupported(target->track):(allAiEnabled||directHumanTargetSupported(target->track)));
+       renderer.initialized()&&courseTargetModeSupported(target->track);
   });
   // This reads genuine UI resources only. Race target authentication is deferred
   // until the real Course screen is active; Main/Options/Rider need no corpus.
@@ -445,6 +452,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const auto* target=courseTargets.admits(selected);
     require50DU(target&&(target->track==original_course_targets50KX::Track::RA||
        directHumanTargetSupported(target->track)||courseCorpusPresent)&&
+        courseTargetModeSupported(target->track)&&
         courseColdLoad.publish(courseTargets,selected,sessionIndex+1),
         "actual Course exit could not publish its typed cold-load request");
     std::cerr<<"original_course_cold_load_queued course="<<selected.course<<" track="<<target->assets->world->code
