@@ -78,9 +78,17 @@ inline bool projectOriginalPodMaterialSetup2C21C0(OriginalPodMaterialAudioState&
 enum class OriginalPodMaterialAudioStatus : std::uint8_t {
     complete,input,owner,arithmetic,sourceSampleMetadata,nativeBackend,blocked,eventQueue
 };
+// Native failure evidence only; does not change source admission or sourcePC.
+enum class OriginalPodMaterialInputGuard : std::uint8_t {
+    none,channelArgument,vehicleClass,contactMaterial,listenerCount,listenerPointer,
+    soundMode,rounding,positionScalar,velocityScalar,listenerPositionScalar,listenerForwardScalar
+};
 struct OriginalPodMaterialAudioReceipt {
     OriginalPodMaterialAudioStatus status=OriginalPodMaterialAudioStatus::input;
     std::uint32_t sourcePC=0;
+    OriginalPodMaterialInputGuard inputGuard=OriginalPodMaterialInputGuard::none;
+    std::size_t inputListener=0;
+    unsigned inputAxis=0;
     std::size_t randomDraws=0,started=0,stopped=0,controlled=0,
         inactiveOrMissing=0,spatialCalls=0;
 };
@@ -357,13 +365,35 @@ template<class EnqueueEvent3> inline Receipt dispatch179070(
        state.vehicle248!=&identity||!identity.session||
        state.collisionCount>state.collision.size()||state.driveCount>state.drive.size()){
         r.status=Status::owner;return r;}
-    if(in.channelArgument<1||in.channelArgument>3||in.vehicle58!=actualVehicleClass58||
-       in.contactMaterialA9< -1||in.contactMaterialA9>255||listenerCount>4||
-       (listenerCount&&!listeners)||!validOriginalSoundModeFields50KG(mode)||
-       std::fegetround()!=FE_TONEAREST)return r;
-    for(unsigned k=0;k<4;++k)if(!scalar(in.position.v[k])||!scalar(in.velocity.v[k]))return r;
-    for(std::size_t i=0;i<listenerCount;++i)for(unsigned k=0;k<3;++k)
-        if(!scalar(listeners[i].position[k])||!scalar(listeners[i].forward[k]))return r;
+    // Preserve the exact existing short-circuit order and predicates. Record
+    // only the first rejected preflight guard; do not retry or admit it.
+    using InputGuard=OriginalPodMaterialInputGuard;
+    const auto rejectInput=[&](InputGuard guard,std::size_t listener=0,unsigned axis=0)noexcept {
+        r.inputGuard=guard;r.inputListener=listener;r.inputAxis=axis;return r;
+    };
+    if(in.channelArgument<1||in.channelArgument>3)return rejectInput(InputGuard::channelArgument);
+    if(in.vehicle58!=actualVehicleClass58)return rejectInput(InputGuard::vehicleClass);
+    if(in.contactMaterialA9< -1||in.contactMaterialA9>255)return rejectInput(InputGuard::contactMaterial);
+    if(listenerCount>4)return rejectInput(InputGuard::listenerCount);
+    if(listenerCount&&!listeners)return rejectInput(InputGuard::listenerPointer);
+    if(!validOriginalSoundModeFields50KG(mode))return rejectInput(InputGuard::soundMode);
+    if(std::fegetround()!=FE_TONEAREST)return rejectInput(InputGuard::rounding);
+    //1791E8..179224: argument3 clears22C bit3 and invokes D44+A8=2C27D0,
+    // then returns. It consumes no spatial vector/listener scalars. Keep every
+    // structural/owner guard above, but do not reject a source stop because of
+    // an unused finite subnormal (or other unused numerical lane). Arguments
+    //1/2 retain their existing scalar domain, including listener forward Y:
+    // original102A94 DOES read Y in the later spatial quantity calculation.
+    if(in.channelArgument!=3){
+        for(unsigned k=0;k<4;++k){
+            if(!scalar(in.position.v[k]))return rejectInput(InputGuard::positionScalar,0,k);
+            if(!scalar(in.velocity.v[k]))return rejectInput(InputGuard::velocityScalar,0,k);
+        }
+        for(std::size_t i=0;i<listenerCount;++i)for(unsigned k=0;k<3;++k){
+            if(!scalar(listeners[i].position[k]))return rejectInput(InputGuard::listenerPositionScalar,i,k);
+            if(!scalar(listeners[i].forward[k]))return rejectInput(InputGuard::listenerForwardScalar,i,k);
+        }
+    }
     state.inDispatch=true;struct Leave{State& s;~Leave(){s.inDispatch=false;}}leave{state};
     auto finish=[&](){r.status=Status::complete;r.sourcePC=0x1792a8u;return r;};
     if(in.channelArgument==3){

@@ -3213,6 +3213,28 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::cerr<<"Original material source boundary slot="<<actualRacerSlot<<" pc="<<std::hex
        <<receipt.sourcePC<<std::dec<<" status="<<static_cast<unsigned>(receipt.status)
        <<"; committed fields and shared RNG retained.\n";
+   if(humanCourseEnabled&&actualRacerSlot==0u){
+    // Read existing observations only. A zero/nonzero reset serial does not
+    // establish which host key was delivered or caused this failure.
+    std::cerr<<"original_material_human_context manual_reset_serial="<<originalManualResetSerial
+        <<" manual_reset_graphics_due="<<originalManualResetGraphicsDue
+        <<" recovery_stage="<<static_cast<unsigned>(originalHumanRecovery.stage)
+        <<" manual_reset_pc="<<std::hex<<originalManualRecoveryDiagnostic.sourcePC
+        <<" undertrack_reset_pc="<<originalHumanRecoveryDiagnostic.sourcePC<<std::dec
+        <<" undertrack_pending="<<humanBaseUndertrack.pending
+        <<" controller_phase="<<static_cast<unsigned>(controllerActions.phase())
+        <<" player_source5c="<<playerEvents.source5C<<" player_action_index="<<playerEvents.indexFFC
+        <<" player_field40="<<playerEvents.field40<<" player_countcd0="<<playerEvents.countCD0
+        <<" player_timer1098_bits="<<std::hex<<original_material_input_diagnostics50LN::bits(playerEvents.value1098)
+        <<" player_timer1094_bits="<<original_material_input_diagnostics50LN::bits(playerEvents.value1094)
+        <<" player_timer1090_bits="<<original_material_input_diagnostics50LN::bits(playerEvents.value1090)<<std::dec
+        <<" input_flags29="<<static_cast<unsigned>(playerEnvironment.flags29)
+        <<" input_gate58="<<static_cast<unsigned>(playerEnvironment.gate58)
+        <<" held_root_flags="<<static_cast<unsigned>(playerEnvironment.held.rootFlags228)
+        <<" frame_phase="<<static_cast<unsigned>(s.phase)<<" vehicle3c="<<s.fields.vehicle3C
+        <<" vehicle58="<<s.fields.vehicle58<<" body_state40="<<m.vehicleState40<<'\n';
+    std::cerr.flush();
+   }
    require50DU(false,"actual human/AI material dispatch failed");
   }
   addCounter50DU(effectCommands,1);

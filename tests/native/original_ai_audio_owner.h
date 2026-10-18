@@ -8,6 +8,8 @@
 #include "../../platform/linux/native/original_sound_mode50kg.h"
 #include <array>
 #include <memory>
+#include <iostream>
+#include "original_material_input_diagnostics50ln.h"
 
 namespace native_original_ai_audio {
 // Actual native-owned D40/D48/sound/resource instances for each admitted AI
@@ -310,6 +312,21 @@ public:
                 actualEvents,actualActors,actualEventOwner33CBound):
             g::dispatchOriginalPodMaterialAudio179070(racers_[slot].materialD44->material(),
                 racers_[slot].engine,input,&listener_,1,mode_->fields(),shared);
+        if(result.status!=g::OriginalPodMaterialAudioStatus::complete&&!materialFailureReported_){
+            materialFailureReported_=true; // Report the first failure before caller teardown.
+            try {
+                std::cerr<<"original_material_input_failure slot="<<slot<<" pod60="<<actualPod60
+                    <<" status="<<static_cast<unsigned>(result.status)<<" pc="<<std::hex<<result.sourcePC<<std::dec
+                    <<" activated="<<activated_<<" material_bound="<<materialNativeBound_
+                    <<" listener_ready="<<listenerReady_<<" mode_present="<<(mode_!=nullptr)
+                    <<" phase="<<static_cast<unsigned>(frame.phase)<<" event_target="<<event.target
+                    <<" event_pc="<<std::hex<<event.sourcePC<<std::dec
+                    <<" first_ai_slot="<<firstAiSlot_<<" random_draws="<<result.randomDraws;
+                original_material_input_diagnostics50LN::write(std::cerr,input,
+                    slot<firstAiSlot_?0u:1u,&listener_,1,mode_->fields(),std::fegetround(),result);
+                std::cerr<<'\n';std::cerr.flush();
+            }catch(...){/* Diagnostics cannot replace the original failure receipt. */}
+        }
         ++materialDispatches_;materialDraws_+=result.randomDraws;materialLast_=result;
         return result;
     }
@@ -453,6 +470,7 @@ private:
     bool attempted_=false,prepared_=false,activated_=false,listenerReady_=false;
     bool materialAttempted_=false,materialPrepared_=false;
     bool materialNativeBound_=false;
+    bool materialFailureReported_=false; // Diagnostic-only, no dispatch admission role.
     std::uint64_t materialDispatches_=0,materialDraws_=0;
     rr::game::OriginalPodMaterialAudioReceipt materialLast_{};
     bool speechAttempted_=false,speechPrepared_=false,speechInitialized_=false;
