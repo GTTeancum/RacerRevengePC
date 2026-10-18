@@ -9,6 +9,7 @@ namespace original_camera_session50KX { class Session; }
 namespace native_ai50IV { struct Session; }
 #include "original_ui_main_output50kg.h"
 #include "original_ui_elapsed50lh.h"
+#include "original_ui_rider_pacing50lb.h"
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
 #include "../../platform/linux/native/game_host50er.h"
@@ -31,6 +32,8 @@ namespace native_ai50IV { struct Session; }
 #include <filesystem>
 #include <chrono>
 #include <cstdlib>
+#include <cstdio>
+#include <thread>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -1066,31 +1069,106 @@ public:
     }
     rr::platform::GameHost50ER* presentationHost=nullptr;
     std::uint64_t (*presentationNow)()noexcept=nullptr;
-    bool presentationActive=false;
+    enum class RiderPresentationPolicy : std::uint8_t {inactive,restoring,driverSwapInterval1,nativePcDeadline60Hz};
+    RiderPresentationPolicy riderPresentationPolicy=RiderPresentationPolicy::inactive;
+    bool presentationActive=false,allowNativePcRiderDeadline=false;
     rr::game::HostMonotonicClock50ID* presentationClock=nullptr;
-    std::int32_t savedSwapInterval=0;
-    std::uint64_t riderPresentationSwaps=0;
+    std::int32_t savedSwapInterval=0,presentationWidth=0,presentationHeight=0;
+    std::uint64_t riderPresentationSwaps=0,presentationBeginSwaps=0;
+    std::uint64_t presentationCompletedWaits=0,presentationCompletedWaitNanoseconds=0;
+    original_ui_rider_pacing50LB::Deadline riderDeadline;
+    const char* presentationPolicyName()const noexcept {
+        switch(riderPresentationPolicy){
+        case RiderPresentationPolicy::driverSwapInterval1:return "driver_swap_interval1";
+        case RiderPresentationPolicy::nativePcDeadline60Hz:return "native_pc_deadline60hz";
+        case RiderPresentationPolicy::restoring:return "restoring";
+        default:return "inactive";
+        }
+    }
     bool available()const noexcept override {
         if(!presentationHost||!presentationNow||!presentationHost->hasWindow()||!presentationHost->current()||hostPaused())return false;
         const auto& info=presentationHost->info();
-        return info.focused&&!info.minimized&&info.drawableWidth>0&&info.drawableHeight>0&&
-            (!presentationActive||info.swapInterval==1);
+        if(!info.focused||info.minimized||info.drawableWidth<=0||info.drawableHeight<=0)return false;
+        if(!presentationActive)return riderPresentationPolicy==RiderPresentationPolicy::inactive;
+        if(info.drawableWidth!=presentationWidth||info.drawableHeight!=presentationHeight)return false;
+        return (riderPresentationPolicy==RiderPresentationPolicy::driverSwapInterval1&&info.swapInterval==1)||
+            (riderPresentationPolicy==RiderPresentationPolicy::nativePcDeadline60Hz&&info.swapInterval==0);
     }
     bool begin()noexcept override {
         if(presentationActive||!available())return false;
         savedSwapInterval=presentationHost->info().swapInterval;
-        // Keep ownership even after a failed setter: restoring the old native
-        // setting is an explicit cleanup obligation, not an assumed rollback.
-        presentationActive=true;rr::platform::GameHostDiagnostic50ER d;
-        if(presentationHost->setSwapInterval(1,d))return true;
-        if(presentationHost->setSwapInterval(savedSwapInterval,d))presentationActive=false;
-        return false;
+        presentationWidth=presentationHost->info().drawableWidth;
+        presentationHeight=presentationHost->info().drawableHeight;
+        presentationBeginSwaps=riderPresentationSwaps;
+        presentationCompletedWaits=0;presentationCompletedWaitNanoseconds=0;riderDeadline.reset();
+        // Any failed setter leaves an explicit restoration obligation until
+        // the exact saved native setting is verified; no assumed rollback.
+        presentationActive=true;riderPresentationPolicy=RiderPresentationPolicy::restoring;
+        rr::platform::GameHostDiagnostic50ER d;
+        if(presentationHost->setSwapInterval(1,d))riderPresentationPolicy=RiderPresentationPolicy::driverSwapInterval1;
+        else {
+            const bool swapControlFailure=d.error==rr::platform::GameHostError50ER::Window&&
+                d.window.error==rr::platform::WindowHostError50DQ::SwapIntervalFailure;
+            if(!presentationHost->setSwapInterval(savedSwapInterval,d))return false;
+            // Optional native-PC policy, never a fabricated interval1 result.
+            // Wrong context/thread, nonzero saved intervals and unaccepted
+            // audio/clock baselines cannot activate this alternate owner.
+            if(!allowNativePcRiderDeadline||!swapControlFailure||savedSwapInterval!=0||
+               presentationHost->info().swapInterval!=0||!lastUpdateNanoseconds||
+               original_ui_elapsed50LH::project(lastUpdateNanoseconds,presentationNow(),pendingUpdateColdNanoseconds).error!=
+                   original_ui_elapsed50LH::Error::none){
+                presentationActive=false;riderPresentationPolicy=RiderPresentationPolicy::inactive;return false;
+            }
+            riderPresentationPolicy=RiderPresentationPolicy::nativePcDeadline60Hz;
+        }
+        if(!available())return false;
+        std::fprintf(stderr,"original_rider_presentation_begin policy=%s actual_interval=%d saved_interval=%d physical_scanout_measured=0\n",
+            presentationPolicyName(),presentationHost->info().swapInterval,savedSwapInterval);
+        return true;
     }
     bool end()noexcept override {
         if(!presentationActive)return true;
         rr::platform::GameHostDiagnostic50ER d;
         if(!presentationHost||!presentationHost->setSwapInterval(savedSwapInterval,d))return false;
-        presentationActive=false;return true;
+        std::fprintf(stderr,"original_rider_presentation_end policy=%s restored_interval=%d swap_calls=%llu completed_waits=%llu completed_wait_scope_ns=%llu physical_scanout_measured=0\n",
+            presentationPolicyName(),presentationHost->info().swapInterval,
+            static_cast<unsigned long long>(riderPresentationSwaps-presentationBeginSwaps),
+            static_cast<unsigned long long>(presentationCompletedWaits),
+            static_cast<unsigned long long>(presentationCompletedWaitNanoseconds));
+        presentationActive=false;riderPresentationPolicy=RiderPresentationPolicy::inactive;
+        riderDeadline.reset();presentationWidth=0;presentationHeight=0;return true;
+    }
+    bool pollPresentationInput()noexcept {
+        if(!presentationActive||!available())return false;
+        rr::platform::GameHostInput50ER input;rr::platform::GameHostDiagnostic50ER d;
+        if(!presentationHost->poll(input,d)||input.keys.quitRequested||input.keys.activityLost||
+           input.keys.resized||input.keys.eventBudgetExhausted||!available())return false;
+        return true;
+    }
+    bool waitBeforeSample()noexcept override {
+        if(!pollPresentationInput())return false;
+        // Driver policy retains its existing real swap wait. The opt-in
+        // interval0 host policy waits BEFORE render, inside actual sample dt.
+        if(riderPresentationPolicy==RiderPresentationPolicy::driverSwapInterval1)return true;
+        if(riderPresentationPolicy!=RiderPresentationPolicy::nativePcDeadline60Hz)return false;
+        using Error=original_ui_rider_pacing50LB::Error;
+        const auto begin=presentationNow();
+        if(riderDeadline.beginWait(begin)!=Error::none)return false;
+        for(;;){
+            if(!pollPresentationInput()||!checkpointAudio())return false;
+            const auto now=presentationNow();const auto observed=riderDeadline.observe(now);
+            if(observed.error!=Error::none)return false;
+            if(observed.due){
+                if(now<begin||now-begin>std::numeric_limits<std::uint64_t>::max()-presentationCompletedWaitNanoseconds||
+                   presentationCompletedWaits==std::numeric_limits<std::uint64_t>::max()||
+                   riderDeadline.finishWait(now)!=Error::none)return false;
+                presentationCompletedWaitNanoseconds+=now-begin;++presentationCompletedWaits;return true;
+            }
+            // Sleep requests are at most1ms; oversleep remains real elapsed
+            // work. Existing audio project() still rejects active >1s stalls.
+            try{std::this_thread::sleep_for(std::chrono::nanoseconds(observed.sleepNanoseconds));}
+            catch(...){return false;}
+        }
     }
     bool materialClock(rr::platform::OriginalUiMainFrameClock50KG& out)noexcept override {
         if(!presentationClock)return false;
@@ -1116,9 +1194,8 @@ public:
     bool present(rr::platform::VehicleWindowGl50DS& renderer,
         const rr::platform::OriginalUiPrivatePublication50KP& image,
         rr::platform::VehicleWindowDiagnostic50DS& d)noexcept override {
-        if(!presentationActive||!available()||!image.completed())return false;
-        rr::platform::GameHostInput50ER input;rr::platform::GameHostDiagnostic50ER hostDiagnostic;
-        if(!presentationHost->poll(input,hostDiagnostic)||input.keys.quitRequested||!available())return false;
+        if(!presentationActive||!available()||!image.completed()||!pollPresentationInput())return false;
+        rr::platform::GameHostDiagnostic50ER hostDiagnostic;
         const auto& info=presentationHost->info();
         if(info.drawableWidth!=image.width()||info.drawableHeight!=image.height())return false;
         rr::platform::OriginalUiWindowBackBufferCopy copy;
@@ -1200,6 +1277,13 @@ public:
         cold.runtime=application.materialRuntime;cold.video=video->publication(video);
         cold.profile=application.profile;cold.application=application.state;cold.courseRaceDestination=std::move(raceDestination);
         presentationHost=&video->host;presentationNow=nativeNow;
+        // Absent retains strict driver-only admission. This request changes
+        // host pacing only, never Rider profile/resource/selection guards.
+        if(const char* policy=std::getenv("RR_ORIGINAL_RIDER_PRESENTATION")){
+            require(std::string(policy)=="allow-native-pc-deadline60hz",
+                "RR_ORIGINAL_RIDER_PRESENTATION must be allow-native-pc-deadline60hz");
+            allowNativePcRiderDeadline=true;
+        }
         presentationClock=application.state->clock101A50.get();cold.riderPresentation=this;
         cold.lightManager=application.lightManager;
         cold.riderProfile=application.riderProfile;

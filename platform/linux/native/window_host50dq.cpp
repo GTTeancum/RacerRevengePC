@@ -613,6 +613,13 @@ bool WindowHost50DQ::setSwapInterval(std::int32_t interval,WindowHostDiagnostic5
     if(!ownerThread())return fail(d,WindowHostError50DQ::WrongThread,"setSwapInterval");
     if(!created()||!current())return fail(d,WindowHostError50DQ::NotCurrent,"setSwapInterval");
     if(interval < -1||interval > 1)return fail(d,WindowHostError50DQ::InvalidRequest,"setSwapInterval");
+#if defined(__linux__)
+    // Match create(): an exact current interval needs no unsupported GLX
+    // setter. This also verifies unchanged native state after a rejected
+    // presentation request; it never substitutes a different interval.
+    info_.swapInterval=state_->getSwapInterval();
+    if(info_.swapInterval==interval)return true;
+#endif
     const auto accepted=state_->setSwapInterval(interval)==0;
     info_.swapInterval=state_->getSwapInterval();
     return (accepted&&info_.swapInterval==interval)||fail(d,WindowHostError50DQ::SwapIntervalFailure,"SDL_GL_SetSwapInterval");

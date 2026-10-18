@@ -48,14 +48,19 @@ struct OriginalUiFrontendDiagnostic50KG {
     game::OriginalUiTransitionStatus50KG transition=game::OriginalUiTransitionStatus50KG::ok;
 };
 // Native application presentation/audio owner. The window implementation uses
-// a verified swap-interval1 context; no page update, RNG draw or synthetic
-// timestamp is allowed while servicing the original blocking Rider effect.
+// verified driver swap-interval1, or an explicitly requested native PC deadline
+// policy with truthful interval0. Neither policy may tick pages/RNG or invent
+// timestamps, rendered-image completion, or physical scanout receipts.
 class OriginalUiRiderPresentationHost50KG {
 public:
     virtual ~OriginalUiRiderPresentationHost50KG()=default;
     virtual bool available()const noexcept=0;
     virtual bool begin()noexcept=0;
     virtual bool end()noexcept=0;
+    // Called after the actual source sample-begin timestamp, before rendering.
+    // Pacing only: a successful wait is not a render or presentation receipt.
+    // Final whole-incoming promotion does not call this source-sample hook.
+    virtual bool waitBeforeSample()noexcept=0;
     virtual bool present(VehicleWindowGl50DS&,const OriginalUiPrivatePublication50KP&,
         VehicleWindowDiagnostic50DS&)noexcept=0;
     virtual bool checkpointAudio()noexcept=0;

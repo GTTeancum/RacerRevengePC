@@ -226,7 +226,8 @@ struct OriginalUiFrontend50KG::Storage {
         std::uint32_t alpha=0,step=1;
         for(;;){
             std::uint32_t begin=0,end=0;
-            if(!game::sampleHostTimestamp50ID(clock,begin)||!cold.riderPresentation->available())return false;
+            if(!game::sampleHostTimestamp50ID(clock,begin)||!cold.riderPresentation->available()||
+               !cold.riderPresentation->waitBeforeSample())return false;
             OriginalUiByteBlendSample50KO sample,done;
             OriginalUiPrivatePublication50KP publication,published;
             if(!renderer->renderOriginalUiByteBlendSample(blend,alpha,sample,d.renderer)||
@@ -236,8 +237,8 @@ struct OriginalUiFrontend50KG::Storage {
                !cold.riderPresentation->present(*renderer,published,d.renderer))return false;
             // Genuine alpha128 draw precedes whole-incoming promotion. Borders
             // remain old during samples, including128, exactly as the source.
-            if(alpha==128)break;
-            alpha=std::min(128u,alpha+step);
+            const bool finalSample=alpha==128;
+            if(!finalSample)alpha=std::min(128u,alpha+step);
             if(!game::sampleHostTimestamp50ID(clock,end))return false;
             const auto elapsed=static_cast<std::uint32_t>(end-begin);
             if(elapsed>2)++step; //261F00(250):cvt.w.s(0.5+250/128)=2
@@ -245,7 +246,10 @@ struct OriginalUiFrontend50KG::Storage {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 if(!cold.riderPresentation->checkpointAudio()||!game::sampleHostTimestamp50ID(clock,end))return false;
             }
+            //25D8B4..25DA70 also measures/waits after the actual alpha128 draw.
+            if(finalSample)break;
         }
+        // Source final restoration/promotion has no extra display-event wait.
         OriginalUiPrivatePublication50KP publication,published;OriginalUiPromotedIncoming50KP promoted;
         if(!renderer->promoteOriginalUiByteBlendIncoming(blend,riderWidth,riderHeight,publication,promoted,d.renderer)||
            !renderer->completeOriginalUiPrivatePublication(publication,published,d.renderer)||
