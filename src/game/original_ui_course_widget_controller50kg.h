@@ -23,6 +23,12 @@ struct OriginalUiCourseWidgetPlan50KG {
     std::array<OriginalUiCourseWidgetStep50KG,512> steps{};std::size_t count=0;
     bool writesPromptMask42C=false;std::uint32_t promptMask42C=0;
 };
+// Page-local source writes only. Remembered profile fields are committed by
+// the genuine Back/Confirm transaction, never by these Left/Right callbacks.
+struct OriginalUiCourseLapMove50KG {
+    std::uint32_t laps14EC=0,sourcePC=0,audioPC=0,effectId=0;
+    float repeatRight14D4=0,repeatLeft14D8=0;
+};
 class OriginalUiCourseWidgetController50KG final {
 public:
     OriginalUiCourseWidgetController50KG()noexcept;~OriginalUiCourseWidgetController50KG();
@@ -34,6 +40,12 @@ public:
     bool initialNavigation(OriginalUiNavigation50KG&)const noexcept;
     OriginalUiCourseWidgetControllerStatus50KG moveCourse(const OriginalUiNavigation50KG&,bool forward,
         const OriginalUiCourseWidgetProfile50KG&,OriginalUiCourseWidgetPlan50KG&)const noexcept;
+    // Exact mode0/subtype1 row cycle from 1DF674/1DF810. Group3 is an
+    // authenticated empty-control group with real association callbacks.
+    OriginalUiCourseWidgetControllerStatus50KG moveRow(const OriginalUiNavigation50KG&,bool down,
+        const OriginalUiCourseWidgetProfile50KG&,OriginalUiCourseWidgetPlan50KG&)const noexcept;
+    OriginalUiCourseWidgetControllerStatus50KG moveLaps(const OriginalUiNavigation50KG&,std::uint32_t laps,bool forward,
+        const OriginalUiCourseWidgetProfile50KG&,OriginalUiCourseLapMove50KG&)const noexcept;
     OriginalUiCourseWidgetControllerStatus50KG phase(const OriginalUiNavigation50KG&,OriginalUiCourseWidgetPhase50KG,
         const OriginalUiCourseWidgetProfile50KG&,OriginalUiCourseWidgetPlan50KG&)const noexcept;
 private:struct Storage;std::unique_ptr<Storage> storage_;

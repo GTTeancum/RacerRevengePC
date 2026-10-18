@@ -44,6 +44,49 @@ S OriginalUiCourseWidgetController50KG::moveCourse(const OriginalUiNavigation50K
     if(!slot||slot>(profile.mawhonicRylothTest?5u:4u)||!control(p,page()->groups[1].controls[slot-1],O::reset,false,0x2A5A38))return S::invalidNavigation;
     out=p;return S::ok;
 }
+S OriginalUiCourseWidgetController50KG::moveRow(const OriginalUiNavigation50KG& n,bool down,
+    const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept {
+    if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
+    const auto old=n.controllerGroup[0];
+    if(old<1||old>3||n.controllerGroup[1]!=-1||!n.groups[1].enabled||!n.groups[2].enabled||!n.groups[3].enabled||
+       !n.groups[1].selectedSlot||n.groups[1].selectedSlot>(profile.mawhonicRylothTest?5u:4u)||
+       n.groups[2].selectedSlot!=1||n.groups[3].selectedSlot!=0)return S::invalidNavigation;
+    // Source1DF674/1DF810 choose the destination explicitly, not by scanning
+    // every enabled group (the enabled Back/Confirm groups are not rows).
+    const auto id=static_cast<std::size_t>(down?(old==3?1:old+1):(old==1?3:old-1));
+    P p;p.navigation=n;const auto& previous=page()->groups[static_cast<std::size_t>(old)];
+    //2A6A80 -> 2A4E40: associations first, then controls in authored order.
+    for(auto c:previous.associations)if(!control(p,c,O::deselect,false,0x2A4E78))return S::capacity;
+    for(auto c:previous.controls)if(!control(p,c,previous.keepEnabled?O::clearSelection:O::deselect,false,
+        previous.keepEnabled?0x2A4F10:0x2A4EC4))return S::capacity;
+    const auto& next=page()->groups[id];
+    for(auto c:next.associations)if(!control(p,c,O::select,false,0x2A4DFC))return S::capacity;
+    //2A4F64/68 returns before writing +3C if the group has zero controls.
+    // Never invent a control or slot for the genuine lap group3.
+    if(!next.controls.empty()){
+        const auto slot=p.navigation.groups[id].selectedSlot;
+        if(!slot||slot>next.controls.size())return S::invalidNavigation;
+        for(auto c:next.controls)if(!control(p,c,O::deselect,false,0x2A4FA8))return S::capacity;
+        if(!control(p,next.controls[slot-1],O::select,false,0x2A4FD4))return S::capacity;
+    }
+    p.navigation.controllerGroup[0]=static_cast<std::int16_t>(id); //2A6B78/88
+    out=p;return S::ok;
+}
+S OriginalUiCourseWidgetController50KG::moveLaps(const OriginalUiNavigation50KG& n,std::uint32_t laps,bool forward,
+    const OriginalUiCourseWidgetProfile50KG& profile,OriginalUiCourseLapMove50KG& out)const noexcept {
+    if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
+    if(n.controllerGroup[0]!=3||n.controllerGroup[1]!=-1||!n.groups[1].enabled||!n.groups[2].enabled||!n.groups[3].enabled||
+       !n.groups[1].selectedSlot||n.groups[1].selectedSlot>(profile.mawhonicRylothTest?5u:4u)||
+       n.groups[3].selectedSlot!=0||n.groups[2].selectedSlot!=1||laps<1||laps>25)return S::invalidNavigation;
+    OriginalUiCourseLapMove50KG next;
+    next.laps14EC=forward?(laps==25?1:laps+1):(laps==1?25:laps-1);
+    next.sourcePC=forward?0x1DF5C4:0x1DF310;
+    next.audioPC=forward?0x1DF64C:0x1DF398;next.effectId=forward?4u:3u;
+    // Source bits3F266666. The host supplies physical input edges; retained
+    // timer writes do not claim that original held-input repeat is joined.
+    next.repeatRight14D4=forward?0.65f:0.0f;next.repeatLeft14D8=forward?0.0f:0.65f;
+    out=next;return S::ok;
+}
 S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,OriginalUiCourseWidgetPhase50KG phase,const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept {
  if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
  P p;p.navigation=n;bool ok=true;switch(phase){
