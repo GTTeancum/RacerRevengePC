@@ -70,8 +70,8 @@ bool OriginalUiCoursePageDraw50KG::prepare(
            !assets::readOriginalUiDat50KG(*archive,"UI/UICourse/"+index.pageFiles[0],page,d.parse))return fail(d,E::parse,0x1D8F10);
         const auto fm=archive->find("font/denmrk16.psm"),om=archive->find("ui/textures/overlay1.psm");
         if(!fm.identity||!om.identity)return fail(d,E::material,0x1D8F10);
-        const auto* a=english.at(125);const auto* b=english.at(130);const auto* c=english.at(126);const auto* e=english.at(134);
-        if(!a||!b||!c||!e)return fail(d,E::localization,0x1DAB00);
+        const auto* a=english.at(125);const auto* b=english.at(130);const auto* c=english.at(126);const auto* e=english.at(134);const auto* singular=english.at(133);
+        if(!a||!b||!c||!e||!singular)return fail(d,E::localization,0x1DAB00);
         std::array<OriginalUiCoursePagePacket50KG,6> packets{};std::array<OriginalUiCoursePageTextSnapshot50KG,2> texts{};
         constexpr std::uint32_t pcs[]={0x1DAF50,0x1DAF58,0x1DAF60,0x1DB258,0x1DB260,0x1DB268};
         constexpr std::uint16_t offsets[]={0xAC0,0x4C0,0x520,0xB30,0x580,0x5E0};
@@ -86,9 +86,27 @@ bool OriginalUiCoursePageDraw50KG::prepare(
         for(std::size_t i=0;i<std::size(pi);++i){auto& p=packets[pi[i]];const float v0=(i&1)?1:0,v1=1-v0,y=ys[i];
             p.vertices={vertex(0,y,z,0,v0),vertex(640,y,z,1,v0),vertex(640,y+h,z,1,v1),vertex(0,y+h,z,0,v1)};
             color(p,0xFFFFFF);}
+        lapLabel126_=c->text;singularLap133_=singular->text;pluralLaps134_=e->text;
+        fontImage_=fontImage;packetZ_=z;lapCount_=3;
         archive_=std::move(archive);images_=std::move(images);pageIdentity_=page.identity();
         packets_=std::move(packets);texts_=std::move(texts);prepared_=true;return true;
     }catch(...){return fail(d,E::allocation,0x1D8F10);}
+}
+bool OriginalUiCoursePageDraw50KG::setLapCount(std::uint32_t laps,D& d)noexcept{
+    d={};if(!prepared())return fail(d,poisoned_?E::poisoned:E::notPrepared,0x1DAF78);
+    if(laps<1||laps>25)return fail(d,E::geometry,0x1DAF78);
+    if(laps==lapCount_)return true;
+    const auto* font=images_->font(fontImage_);const auto* atlas=images_->textures()->texture(fontImage_);
+    if(!font||!atlas)return fail(d,E::images,0x1DB1C8);
+    try{
+        //1DB090/1DB1B4 select the authenticated singular/plural format. Keep
+        // the source60-character allocation and original layout/material owner.
+        const auto formatted=lapLabel126_+"  "+std::to_string(laps)+" "+(laps==1?singularLap133_:pluralLaps134_);
+        auto packet=packets_[3];packet.vertices.clear();OriginalUiCoursePageTextSnapshot50KG snapshot;
+        snapshot.color54=texts_[1].color54;
+        if(!embeddedText(formatted,0xB30,147,*font,atlas->texture,packetZ_,snapshot,packet,d))return false;
+        packets_[3]=std::move(packet);texts_[1]=std::move(snapshot);lapCount_=laps;return true;
+    }catch(...){return fail(d,E::allocation,0x1DB1C8);}
 }
 bool OriginalUiCoursePageDraw50KG::applyPlanetPalette(OriginalUiCourseWidgets50KG& widgets,
     std::uint32_t primary,std::uint32_t secondary,D& d)noexcept{

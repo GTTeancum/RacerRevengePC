@@ -39,7 +39,7 @@ struct OriginalUiCoursePageDrawDiagnostic50KG {
     OriginalUiCourseWidgetDiagnostic50KG widget{};
 };
 // Embedded ScreenText / ScreenTexture objects created by 1D8F10, not DAT
-// widgets. Bounded mode0, subtype1, laps3, fresh Course slots1..4. The caller must
+// widgets. Bounded mode0, subtype1, laps1..25, fresh Course slots1..4. The caller must
 // enforce retained profile/selection and apply palette before collection.
 class OriginalUiCoursePageDraw50KG final {
 public:
@@ -54,6 +54,8 @@ public:
     const std::array<OriginalUiCoursePagePacket50KG,6>* packets()const noexcept{return prepared()?&packets_:nullptr;}
     const std::array<OriginalUiCoursePageTextSnapshot50KG,2>* texts()const noexcept{return prepared()?&texts_:nullptr;}
     std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images()const noexcept{return images_;}
+    // Source1DAF78..1DB258: genuine embedded B30 text, LOC126/133/134.
+    bool setLapCount(std::uint32_t laps,OriginalUiCoursePageDrawDiagnostic50KG&) noexcept;
     bool applyPlanetPalette(OriginalUiCourseWidgets50KG&,std::uint32_t primary79C,
         std::uint32_t secondary7A0,OriginalUiCoursePageDrawDiagnostic50KG&) noexcept;
 private:
@@ -61,6 +63,9 @@ private:
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive_;
     std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images_;
     const assets::OriginalUiMemberIdentity50KG* pageIdentity_=nullptr;
+    std::uint32_t fontImage_=0,lapCount_=0;
+    float packetZ_=0;
+    std::string lapLabel126_,singularLap133_,pluralLaps134_;
     std::array<OriginalUiCoursePagePacket50KG,6> packets_{};
     std::array<OriginalUiCoursePageTextSnapshot50KG,2> texts_{};
 };
