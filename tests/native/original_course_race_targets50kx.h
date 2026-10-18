@@ -171,10 +171,10 @@ public:
             }
         }
         for(std::size_t i=0;i<targets.size();++i){const auto& t=targets[i];
-            if(directDisc_&&t.track!=Track::RA&&t.track!=Track::GA)continue;
+            if(directDisc_&&t.track!=Track::RA&&t.track!=Track::GA&&t.track!=Track::TA)continue;
             // GA proof requires explicit original-disc ownership, never the
             // legacy generated corpus or an absent-catalog fallback.
-            if(t.track==Track::GA&&runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())continue;
+            if((t.track==Track::GA||(directDisc_&&t.track==Track::TA))&&runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty())continue;
             if(!admission.gcMode2||!rr::platform::hostTrackAdmitted50IM(t.track,admission))continue;
             try {
                 auto bytes=runtime_startup50fl::readBytes(t.assets->archive);
@@ -190,7 +190,7 @@ public:
         }
     }
     const Target* admits(const Selection& s)const noexcept {
-        const auto* selected=target(s);if(!attempted_||!selected||(directDisc_&&selected->track!=Track::RA&&selected->track!=Track::GA))return nullptr;
+        const auto* selected=target(s);if(!attempted_||!selected||(directDisc_&&selected->track!=Track::RA&&selected->track!=Track::GA&&selected->track!=Track::TA))return nullptr;
         bool rosterPresent=false;
         for(std::size_t i=0;i<riders.size();++i)
             if(s.rider==riders[i]&&!authenticatedRosters_[i].is_null())rosterPresent=true;

@@ -26,8 +26,14 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
  int terminalInputError=0;
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
- const bool gaHumanCourseSupported=!allAiEnabled&&
+ const bool directHumanCourseSupported=!allAiEnabled&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
+ // Capability only: the actual catalog/profile/roster and typed cold-load
+ // guards below still authenticate the selected rider and destination.
+ const auto directHumanTargetSupported=[&](original_course_targets50KX::Track track) noexcept {
+  return directHumanCourseSupported&&(track==original_course_targets50KX::Track::TA||
+      track==original_course_targets50KX::Track::GA);
+ };
  const char* raceSetting=std::getenv("RR_RACE");
  const bool raceRequested=!(raceSetting&&std::string(raceSetting)=="0");
  // Close retains context and texture owners on failure. The coordinator must
@@ -100,9 +106,10 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   auto destination=original_main_entry50KG::courseRaceDestination([&](const original_course_targets50KX::Selection& selected){
    const auto* target=courseTargets.admits(selected);
    return target&&courseCatalogPrepared&&(target->track==original_course_targets50KX::Track::RA||
-       (target->track==original_course_targets50KX::Track::GA&&gaHumanCourseSupported)||courseCorpusPresent)&&
+       directHumanTargetSupported(target->track)||courseCorpusPresent)&&
        raceRequested&&!courseColdLoad.pending()&&
-       renderer.initialized()&&(target->track==original_course_targets50KX::Track::GA?gaHumanCourseSupported:allAiEnabled);
+       renderer.initialized()&&(target->track==original_course_targets50KX::Track::GA?
+           directHumanTargetSupported(target->track):(allAiEnabled||directHumanTargetSupported(target->track)));
   });
   // This reads genuine UI resources only. Race target authentication is deferred
   // until the real Course screen is active; Main/Options/Rider need no corpus.
@@ -437,7 +444,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         "Gasgano/SA capture rejected a mismatched original Course handoff");
     const auto* target=courseTargets.admits(selected);
     require50DU(target&&(target->track==original_course_targets50KX::Track::RA||
-       (target->track==original_course_targets50KX::Track::GA&&gaHumanCourseSupported)||courseCorpusPresent)&&
+       directHumanTargetSupported(target->track)||courseCorpusPresent)&&
         courseColdLoad.publish(courseTargets,selected,sessionIndex+1),
         "actual Course exit could not publish its typed cold-load request");
     std::cerr<<"original_course_cold_load_queued course="<<selected.course<<" track="<<target->assets->world->code

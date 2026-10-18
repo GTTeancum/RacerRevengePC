@@ -2,6 +2,7 @@
 #include "runtime_allocations50fl.h"
 #include "original_disc_effects50lb.h"
 #include "ga_original_world50lh.h"
+#include "ta_original_world50le.h"
 #include "native_cold_model_retirement50lh.h"
 #include "../../src/game/original_pause_storage50la.h" // Inactive concrete Pause cold storage.
 #include "../../src/game/original_pause_text_geometry50la.h" // Inactive original CPU glyph leaf.
@@ -432,8 +433,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // legacy path descriptors prevents accidental generated visual/sky fallback.
  const bool gaOriginalDisc=isGaTrack&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool directOriginalInputs=isRaTrack||gaOriginalDisc;
- if(gaOriginalDisc){
+ const bool taOriginalDisc=isTaTrack&&
+     !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
+ const bool directOriginalHuman=gaOriginalDisc||taOriginalDisc;
+ const bool directOriginalInputs=isRaTrack||directOriginalHuman;
+ // Collision ownership is separate from the legacy all-pass/render-policy flag.
+ const bool sourceStaticCandidates=trackSession->originalStaticCandidates||taOriginalDisc;
+ if(taOriginalDisc){
+  resolvedTrackAssets.assets.tuningInArchive=true;
+  resolvedTrackAssets.assets.impactTuning="tracks\\ta.tun";
+ }
+ if(directOriginalHuman){
   resolvedTrackAssets.assets.visualRoot="";resolvedTrackAssets.assets.visualMesh="";
   resolvedTrackAssets.assets.visualReport="";resolvedTrackAssets.assets.skyTextureRoot="";
  }
@@ -446,6 +456,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!isGaTrack||(gaOriginalDisc&&courseRaceCold&&trackAdmission.gaOriginalAiCandidate&&
      !checkpointInput&&!startAtMenu),
      "GA requires original-disc Main/Course human ownership; checkpoint/start menu unsupported");
+ require50DU(!taOriginalDisc||(courseRaceCold&&!checkpointInput&&!startAtMenu),
+     "TA direct-disc human route requires actual Main/Course ownership");
  if(isGaTrack)std::cerr<<"GA HUMAN: one actual Player and seven original AI; original world, "
      "dynamic motions and native trigger geometry. Full retail trigger parity remains unclaimed.\n";
  // Retained HOST trigger source is dormant; native Gate has independent ownership.
@@ -519,9 +531,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      "native selected lights require their matching fresh authenticated race; checkpoint/Main unsupported");
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
- require50DU(!originalUiStarted||allAiEnabled||gaOriginalDisc,
+ require50DU(!originalUiStarted||allAiEnabled||directOriginalHuman,
      "recovered original profile entry requires its owned GA human or retained all-AI route");
- require50DU(!gaOriginalDisc||!allAiEnabled,"GA human Course must not replace Player0 with AI");
+ require50DU(!directOriginalHuman||!allAiEnabled,"GA human Course must not replace Player0 with AI");
  require50DU(!captureRun.enabled()||(!headlessLive&&raceEnabled&&allAiEnabled),
      "Window track capture requires a real window and original AI for every racer");
  // Native device selection never changes original player/AI classes. ALL8
@@ -540,7 +552,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // separate native roster, never the legacy one-AI diagnostic slice.
  // Every accepted human Course request cold-reloads, even the same selection.
  const bool humanCourseEnabled=courseRaceCold&&(isTaTrack||gaOriginalDisc)&&!allAiEnabled;
- require50DU(!gaOriginalDisc||!originalAiSetting||std::string(originalAiSetting)!="1",
+ require50DU(!directOriginalHuman||!originalAiSetting||std::string(originalAiSetting)!="1",
      "GA human Course forbids the legacy first-slice AI override");
  const bool nativeOriginalFleet=allAiEnabled||humanCourseEnabled;
  const bool originalAiEnabled=nativeOriginalFleet||(originalAiSetting&&std::string(originalAiSetting)=="1");
@@ -586,7 +598,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      isGcTrack&&originalCameraEnabled;
  require50DU(!nativeWaterEnabled||(isGcTrack&&originalCameraEnabled&&(!originalUiActive||courseRaceCold)),
      "GC water/particles require the genuine all-eight AI/source-camera world");
- require50DU(!(isMaSaTrack||isRaTrack||gaOriginalDisc)||originalCameraEnabled,"MA/SA/RA require the actual recovered camera/visibility owner");
+ require50DU(!(isMaSaTrack||isRaTrack||directOriginalHuman)||originalCameraEnabled,"MA/SA/RA require the actual recovered camera/visibility owner");
  require50DU(!gcNativeGate||(originalCameraEnabled&&!checkpointInput&&!startAtMenu),
      "GC native world triggers require the genuine fresh ALL8/source-camera world");
  const bool gcNativeWorldSelected=isGcTrack&&gcNativeGate&&nativeWaterEnabled&&
@@ -682,7 +694,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   for(const auto& item:corpus["cases"])if(item["name"]==trackSession->mainCollisionCase)chosen=&item;
   require50DU(chosen,"authored placement case present");const auto& row=*chosen;const auto& qj=row["query"];
   shape=cold::shape(corpus["shapes"][qj["shape"].get<std::size_t>()]);
-  if(!trackSession->originalStaticCandidates){meshes.reserve(corpus["meshes"].size());
+  if(!sourceStaticCandidates){meshes.reserve(corpus["meshes"].size());
    for(const auto& j:corpus["meshes"])meshes.push_back(cold::mesh(j));}
   qfilter=cold::filter(qj["filter"]);query.resource=&shape.view;query.filter=&qfilter;query.queryScene.value=77;
   query.normalMode54=0u;query.normalMode54Bound=true;
@@ -693,7 +705,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const auto& mainQueryResource=*query.resource;
  std::vector<std::string> names;
  std::vector<Type2StaticCandidate49X> legacyCandidates;std::size_t stackCount=1;
- if(!trackSession->originalStaticCandidates){
+ if(!sourceStaticCandidates){
  const auto& row=*chosen;
  names.resize(row["candidates"].size());for(std::size_t i=0;i<names.size();++i)names[i]=cold::unhex(row["candidates"][i]["name_hex"]);
  legacyCandidates.reserve(row["order"].size());
@@ -1046,7 +1058,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  groundRequest.mapSpline=trackSession->mapSpline;groundRequest.gridRank=trackSession->gridRank;
  groundRequest.archiveSha256=trackSession->archiveSha256;groundRequest.archiveBytes=trackSession->archiveBytes;
  groundRequest.bindFreshGameTrackHeight=originalAiEnabled;
- if(gaOriginalDisc)groundRequest.originalPodPhysics=&x.assets.phy;
+ if(directOriginalHuman)groundRequest.originalPodPhysics=&x.assets.phy;
  authored_runtime_ground50cp_fixture::ColdScene ground{};
  if(!isRaTrack)ground=authored_runtime_ground50cp_fixture::load({4,16,32,64},groundRequest);
  const auto& actualWorld=isRaTrack?raRuntime->source.world:ground.world;
@@ -1087,7 +1099,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::vector<track_runtime_storage50IG::Binding> trackBindings;
  std::vector<track_static_candidates50IG::Radii> originalStaticRadii;
  if(!isRaTrack){
- if(trackSession->originalStaticCandidates){
+ if(sourceStaticCandidates){
   track_static_candidates50IG::Bindings staticBindings{};
   staticBindings.firstIdentity=0x10000000u; // Explicit collision-object native namespace.
   staticBindings.collisionTypeTag=query.collisionTypeTag;staticBindings.groupTypeTag=query.groupTypeTag;
@@ -1356,7 +1368,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(gaAnimatedWorld)require50DU(ga_animated_candidates::admitNonBodyResponse(*gaAnimatedWorld,
      candidates.data(),candidates.size(),animatedCandidateFirst,query,secondaryQuery),
      "GA original CHARACTER non-body spring response routing differs");
- if(!trackSession->originalStaticCandidates)require50DU((*secondaryCase)["order"]==(*chosen)["order"]&&(*secondaryCase)["candidates"]==(*chosen)["candidates"],"same explicit ordered terrain inputs");
+ if(!sourceStaticCandidates)require50DU((*secondaryCase)["order"]==(*chosen)["order"]&&(*secondaryCase)["candidates"]==(*chosen)["candidates"],"same explicit ordered terrain inputs");
  StaticSpringState50G secondarySpring{};secondarySpring.records.generatedCapacity88=60;
  SpringRecord48N secondaryRecords[60]{},secondaryQueryRecords[60]{},secondaryScratchRecords[60]{};
  if(raceEnabled)require50DU(matchesEndpointPolicy(secondaryQueryResource),
@@ -1644,7 +1656,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
         audioError.empty()?"original RA contact material assignment failed":audioError.c_str());
    }
   }
-  if(trackSession->originalStaticCandidates&&!isRaTrack){
+  if(sourceStaticCandidates&&!isRaTrack){
    //271600 applies actual AUB assignments before the creator publishes A9.
    for(std::size_t i=0;i<trackBindings.size();++i){
     const auto& binding=trackBindings[i];
@@ -4455,7 +4467,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      // Only the admitted direct-GA Player0 uses the human constructor role.
      // Geometry comes from the same selected pod/probe owners as every AI;
      // neither source vehicle58 nor native AI ownership is rewritten.
-     const auto queryRole=gaOriginalDisc&&humanCourseEnabled&&racer==0?
+     const auto queryRole=directOriginalHuman&&humanCourseEnabled&&racer==0?
          undertrack_owners50ew_fixture::ColdQueryRole50LH::humanPlayer:
          undertrack_owners50ew_fixture::ColdQueryRole50LH::originalAi;
      const bool attached=undertrack_owners50ew_fixture::attachFreshQueries(recoveryQueryOwners,s,x.bindings,x.parameters,
@@ -4771,6 +4783,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Actual selected visual mesh, authenticated by its selected source profile.
  // Visual and collision member closures remain separate admissions.
  rr::assets::Mesh48B trackMesh;std::string trackLoadError;
+ std::unique_ptr<ta_original_world50LE::Owner> taOriginalWorld;
+ if(taOriginalDisc){
+  taOriginalWorld=std::make_unique<ta_original_world50LE::Owner>();
+  ta_original_world50LE::Diagnostic diagnostic;
+  const bool loaded=taOriginalWorld->load(runtime_startup50fl::readBytes(trackSession->archive),actualWorld,diagnostic);
+  require50DU(loaded,diagnostic.message.empty()?"TA original static world rejected":diagnostic.message.c_str());
+  require50DU(taOriginalWorld->mesh(),"TA original mesh publication missing");
+  trackMesh=*taOriginalWorld->mesh();
+ }
  std::unique_ptr<ga_original_world50LH::Owner> gaOriginalWorld;
  if(gaOriginalDisc){
   gaOriginalWorld=std::make_unique<ga_original_world50LH::Owner>();
@@ -4780,7 +4801,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(gaOriginalWorld->mesh(),"GA original mesh publication missing");
   trackMesh=*gaOriginalWorld->mesh();
  }
- const bool trackLoaded=isRaTrack||gaOriginalDisc||rr::assets::loadMesh48B(
+ const bool trackLoaded=isRaTrack||directOriginalHuman||rr::assets::loadMesh48B(
      trackSession->visualMesh,trackMesh,trackLoadError);
  require50DU(trackLoaded,trackLoadError.empty()?"selected-track visual mesh load failed":trackLoadError.c_str());
  namespace trackTextures=track_materials50fa_fixture;
@@ -4797,7 +4818,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      trackTextures::MipMode::largestRetained,0};
  trackMaterialRequest.coldSourceByteCapacity=isMaSaTrack?64u*1024u*1024u:32u*1024u*1024u;
  trackMaterialRequest.sourceArchive=trackSession->archive;
- trackMaterialRequest.decodeSourceTexture=gaOriginalDisc?&ga_original_world50LH::decodeSourceTexture:isRaTrack?nullptr:isMaTrack?&source_texture50fc_fixture::decodeSourceTextureMa:
+ trackMaterialRequest.decodeSourceTexture=taOriginalDisc?&ta_original_world50LE::decodeSourceTexture:gaOriginalDisc?&ga_original_world50LH::decodeSourceTexture:isRaTrack?nullptr:isMaTrack?&source_texture50fc_fixture::decodeSourceTextureMa:
      isSaTrack?&source_texture50fc_fixture::decodeSourceTextureSa:isGaTrack?&source_texture50fc_fixture::decodeSourceTextureGa:
      isGcTrack?&source_texture50fc_fixture::decodeSourceTextureGc:&source_texture50fc_fixture::decodeSourceTexture;
  trackMaterialRequest.includeAllAuthoredPasses=trackSession->originalStaticCandidates;
@@ -4844,9 +4865,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(overrides.apply(models.data(),models.size(),receipt),"GC actual static-model property application rejected");
  }
  std::vector<rr::assets::WorldNormal50HK> legacyTrackNormals;
- const auto& trackNormals=gaOriginalWorld?*gaOriginalWorld->normals():legacyTrackNormals;
+ const auto& trackNormals=taOriginalWorld?*taOriginalWorld->normals():gaOriginalWorld?*gaOriginalWorld->normals():legacyTrackNormals;
  track_normals50hk_fixture::Diagnostic trackNormalDiagnostic{};
- require50DU(isRaTrack||gaOriginalDisc||track_normals50hk_fixture::load(trackMaterialRequest.root,
+ require50DU(isRaTrack||directOriginalHuman||track_normals50hk_fixture::load(trackMaterialRequest.root,
      trackMaterialRequest.exportReport,trackMesh,legacyTrackNormals,trackNormalDiagnostic,trackSource),
      trackNormalDiagnostic.message.empty()?"selected-track authored normal load failed":trackNormalDiagnostic.message.c_str());
  std::cerr<<trackSession->world->code<<" source normals "<<trackNormalDiagnostic.normals
@@ -4867,7 +4888,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  sky50gw_fixture::Request skyRequest{};skyRequest.track=trackSource;
  skyRequest.archive=trackSession->archive;
  skyRequest.textureRoot=trackSession->skyTextureRoot;
- skyRequest.decodeOriginalImages=gaOriginalDisc;
+ skyRequest.decodeOriginalImages=directOriginalHuman;
  sky50gw_fixture::Diagnostic skyDiagnostic{};
  if(isRaTrack){
   ra_cold_aggregate50LA::Diagnostic raSkyDiagnostic;
@@ -5019,8 +5040,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // Borrowed by Session cold teardown, including partial-construction unwind.
  platform::VehicleWindowDiagnostic50DS rendererDiagnostic{},completionDiagnostic{};
  // The canonical TA4A0 provider outlives every Session racer borrowing it.
- const bool humanOriginalHud=gaOriginalDisc&&humanCourseEnabled&&originalCameraEnabled&&bool(nativeModelDomain);
- require50DU(!gaOriginalDisc||humanOriginalHud,"GA human world requires the real canonical HUD/material domain");
+ const bool humanOriginalHud=directOriginalHuman&&humanCourseEnabled&&originalCameraEnabled&&bool(nativeModelDomain);
+ require50DU(!directOriginalHuman||humanOriginalHud,"GA human world requires the real canonical HUD/material domain");
  OriginalTrackParticleCold50LA nativeTaParticles;
  OriginalTrackParticleColdDiagnostic50LA nativeTaParticleDiagnostic;
  namespace sourceCamera=original_camera_session50KX;
@@ -5338,8 +5359,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    // Authenticate and mount the complete selected archive, never a subset or
    // a guessed negative namespace. GA already retains this exact decoded owner.
    rr::assets::ResArchive48C retainedTrackArchive;
-   const auto* archive=gaOriginalWorld?gaOriginalWorld->archive():&retainedTrackArchive;
-   if(!gaOriginalWorld){
+   const auto* archive=taOriginalWorld?taOriginalWorld->archive():gaOriginalWorld?gaOriginalWorld->archive():&retainedTrackArchive;
+   if(!taOriginalWorld&&!gaOriginalWorld){
     const auto bytes=runtime_startup50fl::readBytes(trackSession->archive);
     rr::assets::DecodeError48C diagnostic;rr::assets::DecodeLimits48C limits;
     limits.resource_file_bytes=trackSession->archiveBytes;
@@ -5360,7 +5381,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        originalMainApplication,trackMaterialRequest.canonicalDomain->materials382B38(),
        sessionIndex+1,nativeTaParticleDiagnostic),"canonical particle source staging rejected");
   }
-  const bool trackMaterialsLoaded=isRaTrack||(gaOriginalWorld?
+  const bool trackMaterialsLoaded=isRaTrack||(taOriginalWorld?
+      taOriginalWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):gaOriginalWorld?
       gaOriginalWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):
       trackMaterialOwner->load(trackMaterialRequest,trackMesh,trackMaterialDiagnostic));
   if(!trackMaterialsLoaded){
@@ -5450,7 +5472,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    });
   }
   if(nativeGcWater){
-   const auto* spans=gaOriginalWorld?gaOriginalWorld->spans():trackMaterialOwner->spans();require50DU(spans,"GC source track spans missing");
+   const auto* spans=taOriginalWorld?taOriginalWorld->spans():gaOriginalWorld?gaOriginalWorld->spans():trackMaterialOwner->spans();require50DU(spans,"GC source track spans missing");
    std::array<bool,6> matched{};
    for(std::size_t index=0;index<spans->size();++index)for(unsigned fire=0;fire<6;++fire)
     if((*spans)[index].worldInstanceIndex==nativeGcWater->attachmentWorldInstances()[fire]){
@@ -5602,6 +5624,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        !maSaAtm.loaded()||!maSaAtm.ownsResources()))return false;
     if(isMaTrack&&(!maTriggerActions||!maTriggerActions->ready()||!maShieldUv.loaded()||!maSaAtm.loaded()||
        !maSaAtm.ownsResources()))return false;
+    if(taOriginalDisc&&(!humanOriginalHud||!taOriginalWorld||!taOriginalWorld->loaded()||
+       !sourceCameraSession||!sourceCameraSession->ready()))return false;
     if(isGaTrack&&(!humanOriginalHud||!gaOriginalWorld||!gaOriginalWorld->loaded()||
        !gaAnimatedWorld||!gaAnimatedWorld->ready()||!gaDynamicWindow.loaded()||
        !gaDynamicWindow.ownsResources()||!gaTriggerActions||!gaTriggerActions->ready()||
@@ -5728,14 +5752,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   renderRequest.track.maximumVertexBytes=isMaSaTrack?32u*1024u*1024u:isGaTrack?16u*1024u*1024u:
       trackSession->originalStaticCandidates?8u*1024u*1024u:4u*1024u*1024u;
   renderRequest.track.maximumIndexBytes=isMaSaTrack?16u*1024u*1024u:isGaTrack?8u*1024u*1024u:2u*1024u*1024u;
-  const auto* trackBank=gaOriginalWorld?gaOriginalWorld->bank():trackMaterialOwner->bank();
-  const auto* trackSpans=gaOriginalWorld?gaOriginalWorld->spans():trackMaterialOwner->spans();
+  const auto* trackBank=taOriginalWorld?taOriginalWorld->bank():gaOriginalWorld?gaOriginalWorld->bank():trackMaterialOwner->bank();
+  const auto* trackSpans=taOriginalWorld?taOriginalWorld->spans():gaOriginalWorld?gaOriginalWorld->spans():trackMaterialOwner->spans();
   require50DU(trackBank&&trackSpans,"selected-track material publication missing");
   std::vector<platform::MaterialTextureSampler50EB> trackSamplers(trackBank->textureCount(),
       {platform::MaterialTextureFilter50EB::linear,platform::MaterialTextureFilter50EB::linear,
        platform::MaterialTextureWrap50EB::repeat,platform::MaterialTextureWrap50EB::repeat});
-  if(trackSession->originalStaticCandidates){
-   const auto* selected=gaOriginalWorld?gaOriginalWorld->selections():trackMaterialOwner->selections();
+  if(trackSession->originalStaticCandidates||taOriginalDisc){
+   const auto* selected=taOriginalWorld?taOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():trackMaterialOwner->selections();
    require50DU(selected,"original GC sampler selections missing");
    for(const auto& entry:*selected){
     require50DU(entry.textureIndex<trackSamplers.size(),"original GC sampler texture unresolved");
@@ -5761,11 +5785,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        platform::VehicleWindowMaterialMode50DS::untextured:
        platform::VehicleWindowMaterialMode50DS::requiredTexture;
    binding.material.textureIndex=span.textureIndex;
-   const auto* trackSelections=gaOriginalWorld?gaOriginalWorld->selections():trackMaterialOwner->selections();
+   const auto* trackSelections=taOriginalWorld?taOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():trackMaterialOwner->selections();
    require50DU(trackSelections&&span.materialSelection<trackSelections->size(),"selected-track material selection missing");
    material_alpha50gx_fixture::Policy alpha{};
    const auto& sourceSelection=(*trackSelections)[span.materialSelection];
-   const bool alphaSelected=gaOriginalWorld?
+   const bool alphaSelected=taOriginalWorld?
+       taOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):gaOriginalWorld?
        gaOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):isGaTrack?
        material_alpha50gx_fixture::selectGa(sourceSelection,gameplayBinderTemplates,
            originalMainApplication.materialRuntime,alpha):(isMaTrack||isSaTrack)?
@@ -6043,7 +6068,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        trackMaterialRequest.canonicalDomain?&nativeBottomRightModels:nullptr,
        trackMaterialRequest.canonicalDomain?&nativeBottomLeftModels:nullptr,
        originalMainApplication.animationClock(),&sourceCameraCables,
-       gaOriginalDisc?navigationMap:nullptr});
+       directOriginalHuman?navigationMap:nullptr});
    const auto prepared=sourceCameraSession->prepare(sessionIndex+1,sourceCameraAssets.inputs,*sourceCameraDisplay);
    if(prepared.status!=sourceCamera::Status::complete)std::cerr<<"original_camera_cold_rejected status="
        <<static_cast<unsigned>(prepared.status)<<" source_pc="<<prepared.sourcePC
