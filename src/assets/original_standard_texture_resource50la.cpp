@@ -1,4 +1,5 @@
 #include "original_standard_texture_resource50la.h"
+#include "original_texture_candidate50tc.h"
 #include "original_standard_model_resource50la.h"
 #include "original_standard_collision_type0_resource50la.h"
 #include "original_standard_material_context50la.h"
@@ -771,10 +772,7 @@ bool OriginalStandardTextureResolver50LA::resolve24DADC(
     if(!prepared())return fail(d,E::unprepared,0x132820);
     if(!nameDomain(requested))return fail(d,E::input,0x24DA90);
     try {
-        std::string pst=requested;
-        //1169D0 finds the LAST dot anywhere, without interpreting separators.
-        const auto dot=pst.find_last_of('.');
-        if(dot==std::string::npos)pst+=".pst";else pst.replace(dot,std::string::npos,".pst");
+        std::string pst=detail::originalPstCandidate24DADC(requested);
         if(!nameDomain(pst))return fail(d,E::range,0x24DF10);
         using Provider=OriginalStandardArchiveProvider50LA;
         const auto& provider=storage_->provider;

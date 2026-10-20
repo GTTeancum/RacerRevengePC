@@ -127,7 +127,7 @@
             gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
             if(!coverageComplete())return false;
         }
-        if(hasSpecularPairs50LA || request.raStaticWorld){
+        if(hasSpecularPairs50LA || request.raStaticWorld || request.track.rcCrystal){
             if(!coverageFramebuffer(e.snapshot)||
                !coverageTextureStorage(e.snapshotColor,rgba8,width,height,true,colorAttachment))return false;
             gl.drawBuffer(colorAttachment);gl.readBuffer(colorAttachment);
@@ -181,7 +181,9 @@ void main(){
     // A static SampleID use requires separate invocations for every sample.
     // Geometry coverage came from the original AA0 triangle's center raster.
     vec4 destinationByte=floor(texelFetch(destinationImage,pixel,gl_SampleID)*255.0+0.5);
-    sourceByte.rgb=raComposition!=0 ?
+    sourceByte.rgb=raComposition==2 ?
+        clamp(floor(sourceByte.rgb*sourceByte.a/128.0)+destinationByte.rgb,0.0,255.0) :
+        raComposition!=0 ?
         clamp(destinationByte.rgb+floor((sourceByte.rgb-destinationByte.rgb)*sourceByte.a/128.0),0.0,255.0) :
         clamp(floor(sourceByte.rgb*destinationByte.a/128.0)+destinationByte.rgb,0.0,255.0);
     composedColor=sourceByte/255.0;
@@ -235,7 +237,7 @@ void main(){
         // without carrying state across spans or callbacks.
         if(firstCoverageSetup){coverageAa0();gl.disable(0x8DB9);gl.disable(0x0BE2);}
         // Later runs inherit disabled MULTISAMPLE from the checked tail.
-        if(request.raStaticWorld){
+        if(request.raStaticWorld||request.track.rcCrystal||request.track.tbWorld){
             gl.scissor(region[0],region[1],region[2]-region[0],region[3]-region[1]);gl.enable(0x0C11);
         }else gl.disable(0x0C11);
         gl.bindFramebuffer(framebuffer,coverageLive.raster);

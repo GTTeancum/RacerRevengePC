@@ -10,7 +10,7 @@
 namespace rr::platform {
 namespace {
 bool supportedRider(std::uint32_t rider) noexcept {
-    switch(rider){case 2:case 4:case 7:case 9:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
+    switch(rider){case 1:case 2:case 3:case 4:case 7:case 8:case 9:case 10:case 11:case 12:case 15:case 16:case 19:case 20:case 22:case 24:case 17:case 18:return true;default:return false;}
 }
 using Status=OriginalUiFrontendStatus50KG;
 using Diagnostic=OriginalUiFrontendDiagnostic50KG;
@@ -96,6 +96,9 @@ struct OriginalUiFrontend50KG::Storage {
         std::shared_ptr<const assets::OriginalUiImageBank50KG> publishedRiderBank;
         std::vector<MaterialTextureSampler50EB> gpuSamplers;
         std::shared_ptr<MaterialTextureGl50EB> gpu;
+        std::shared_ptr<MaterialTextureGl50EB> riderStagedGpu,riderRetiredGpu;
+        std::shared_ptr<OriginalUiRiderResidentPool50KG> riderPool;
+        OriginalUiRiderTextureValidation50KG riderValidation;
         std::uint64_t publication=0;
         std::shared_ptr<game::OriginalUiTransitionOwner50KG> transition;
         std::unique_ptr<OriginalUiMainSession50KG> main;
@@ -277,8 +280,8 @@ struct OriginalUiFrontend50KG::Storage {
            !cold.profile||!cold.profile->known||cold.profile->mode34!=0||
            (cold.profile->playerBits1125C&0x60)!=0x20)return false;
         game::OriginalUiCourseRememberedProfile50KG p;
-        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&p.course700>=1&&p.course700<=(p.mawhonicRylothTest?5u:4u)&&p.subtype70C==1&&
-            p.laps704==3&&p.entrants708==8&&!p.cardFlag100BC&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
+        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&(!p.sebulbaTbTest||(!p.scorchRcTest&&!p.tzidikTcTest&&!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&(!p.scorchRcTest||(!p.tzidikTcTest&&!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&(!p.tzidikTcTest||(!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&!(p.wanMbTest&&p.mawhonicRylothTest)&&(!p.gasganoScTest||(!p.wanMbTest&&!p.mawhonicRylothTest))&&p.mode34==0&&p.course700>=1&&p.course700<=(p.sebulbaTbTest?6u:p.scorchRcTest?12u:p.tzidikTcTest?13u:(p.gasganoScTest?9u:(p.wanMbTest?7u:(p.mawhonicRylothTest?5u:4u))))&&p.subtype70C==1&&
+            p.laps704>=1&&p.laps704<=25&&p.entrants708==8&&!p.cardFlag100BC&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
             p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
     }
     bool sourceCurrent() const noexcept {
@@ -352,10 +355,16 @@ struct OriginalUiFrontend50KG::Storage {
            decision.originalPlayerBits!=(decision.selectedSlot==2?0x40:0x20)||
            !s.pending->rider->canEnterMode(static_cast<std::uint32_t>(decision.originalGameMode))||
            s.pending->rider->intendedMode()!=static_cast<std::uint32_t>(decision.originalGameMode))return false;
+        const auto* demand=s.pending->rider->residencyDemand();
+        if(!demand||!s.pending->rider->residencyProposalCurrent(*demand))return false;
+        const auto before=s.cold.riderProfile->stamp();
         auto& profile=*s.cold.profile;const auto mode=static_cast<std::uint32_t>(decision.originalGameMode);
+        auto expected=profile;
+        if(expected.mode34!=mode){expected.previousMode38=expected.mode34;expected.mode34=mode;}
+        expected.playerBits1125C=static_cast<std::uint8_t>((expected.playerBits1125C&~0x60u)|decision.originalPlayerBits);
         if(profile.mode34!=mode){profile.previousMode38=profile.mode34;profile.mode34=mode;}
         profile.playerBits1125C=static_cast<std::uint8_t>((profile.playerBits1125C&~0x60u)|decision.originalPlayerBits);
-        return true;
+        return s.pending->rider->acceptEntryProfileCommit(before,expected,false);
     }
     bool courseLaunchProposal(OriginalUiRiderProfileOwner50KG::CourseRaceSelection& selection)const noexcept {
         if(!cold.courseRaceDestination||!active||!active->course||pending||
@@ -363,13 +372,13 @@ struct OriginalUiFrontend50KG::Storage {
            courseProposal.decision.request.kind!=game::OriginalUiRouteKind50KG::courseLaunch)return false;
         game::OriginalUiCourseContext50KG c;std::uint8_t rider=0;std::uint32_t comparison=0;
         if(!active->course->routeContext(courseProposal,c)||!cold.riderProfile->riderConfirmSnapshot(rider,comparison)||
-           c.mode34!=0||c.subtypeSlot14F4!=1||c.laps14EC!=3||c.entrants14F0!=8||
+           c.mode34!=0||c.subtypeSlot14F4!=1||c.laps14EC<1||c.laps14EC>25||c.entrants14F0!=8||
            !game::nativeCourseRacerOwned50KG(rider>>3)||comparison!=(rider>>3)||((c.packed1125C>>5)&3)!=1)return false;
         const auto actual=active->course->snapshot();
         if(!game::nativeCourseTrackOwned50KG(c.selectedControlWord44,actual.selectedPlanet40,c.courseSlot14E4)||
            actual.selectedCourse44!=c.selectedControlWord44)return false;
-        selection={c.selectedControlWord44,actual.selectedPlanet40,std::uint32_t(rider>>3),1,3,8,
-            static_cast<std::uint16_t>(3u|(1u<<5)|(7u<<7)|(std::uint32_t(rider>>3)<<11))};
+        selection={c.selectedControlWord44,actual.selectedPlanet40,std::uint32_t(rider>>3),1,c.laps14EC,8,
+            static_cast<std::uint16_t>(c.laps14EC|(1u<<5)|(7u<<7)|(std::uint32_t(rider>>3)<<11))};
         return cold.courseRaceDestination->admits(selection);
     }
     static bool admitCourse(void* p) noexcept {
@@ -401,8 +410,12 @@ struct OriginalUiFrontend50KG::Storage {
                !sameRouteProposal(decision,proposed)||decision.request.sourceScreen!=6||decision.request.sourcePage!=1||
                decision.request.targetScreen!=5||decision.request.targetPage!=1||decision.profileChanges.count!=4)return false;
             game::OriginalUiCourseContext50KG context;
+            const auto* demand=s.pending->rider->residencyDemand();
+            if(!demand||!s.pending->rider->residencyProposalCurrent(*demand))return false;
+            const auto before=s.cold.riderProfile->stamp();const auto expected=*s.cold.profile;
             return m.course->routeContext(s.courseProposal,context)&&
-                s.cold.riderProfile->commitCourseBack(decision,context,s.courseProposal.profileStamp);
+                s.cold.riderProfile->commitCourseBack(decision,context,s.courseProposal.profileStamp)&&
+                s.pending->rider->acceptEntryProfileCommit(before,expected,true);
         }
         if(m.rider){
             const auto& proposed=s.riderProposal.decision;
@@ -526,7 +539,7 @@ struct OriginalUiFrontend50KG::Storage {
                 if(!courseInputsReady()||prospectiveMode!=0||!active||!active->rider||!same(active->currentRoute(),{5,1})){
                     result(d,Status::unavailableDestination);return false;}
                 OriginalUiCourseColdInput50KG input;input.appStart=cold.appStart;input.course=cold.course;
-                input.prepareRylothBackground=cold.riderProfile->mawhonicRylothTestProfile();
+                input.prepareRylothBackground=cold.riderProfile->mawhonicRylothTestProfile()||cold.riderProfile->wanMbTestProfile()||cold.riderProfile->gasganoScTestProfile()||cold.riderProfile->tzidikTcTestProfile()||cold.riderProfile->scorchRcTestProfile()||cold.riderProfile->sebulbaTbTestProfile();
                 input.fonts=cold.fonts;input.backgrounds=cold.backgrounds;input.controllerPopup=cold.controllerPopup;
                 input.overlays=cold.overlays;input.english=&english;input.runtime=cold.runtime;
                 input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};
@@ -547,7 +560,13 @@ struct OriginalUiFrontend50KG::Storage {
             m.gpuSamplers=*samplers;
             m.gpu=std::make_shared<MaterialTextureGl50EB>();auto request=cold.textureRequest;
             request.samplers=samplers->data();request.samplerCount=static_cast<std::uint32_t>(samplers->size());
-            if(!m.gpu->create(request,*m.textures(),d.gpu)){result(d,Status::gpu);return false;}
+            if(m.rider){
+                OriginalUiRiderResidencyDemand50KG demand;
+                if(!renderer||m.rider->prepareEntryResidency(demand,d.rider)!=RiderStatus::ok){result(d,Status::session);return false;}
+                m.riderPool=m.rider->residentPool();
+                if(!m.riderPool||!m.riderPool->stage(m.riderPool,demand,request,*m.gpu,d.gpu)){result(d,Status::gpu);return false;}
+                if(!renderer->prevalidateRiderTextures(demand,*m.gpu,m.riderValidation,d.renderer)){result(d,Status::renderer);return false;}
+            }else if(!m.gpu->create(request,*m.textures(),d.gpu)){result(d,Status::gpu);return false;}
             m.publication=m.gpu->publicationToken();
             if(m.mainResources){
                 OriginalUiMainSessionCold50KG input;input.resources=m.mainResources;input.gpu=m.gpu;input.mainArchive=cold.mainMenu;
@@ -606,6 +625,33 @@ struct OriginalUiFrontend50KG::Storage {
             coldInterval.end-coldInterval.begin).count());
         return okay;
     }
+    bool discardRiderStage(Manager& m,Diagnostic& d) noexcept {
+        if(m.riderStagedGpu&&!m.riderStagedGpu->close(d.gpu))return false;
+        m.riderStagedGpu.reset();m.riderValidation={};
+        return m.riderPool&&m.riderPool->collect(d.gpu)&&!m.riderPool->faulted();
+    }
+    bool stageRiderMove(Manager& m,const OriginalUiRiderSessionInputReceipt50KG& input,Diagnostic& d) noexcept {
+        if(!m.rider||!renderer||!m.riderPool||m.riderStagedGpu||m.riderRetiredGpu){result(d,Status::invalidInput);return false;}
+        try{
+            OriginalUiRiderResidencyDemand50KG demand;
+            if(m.rider->prepareMoveResidency(input,demand,d.rider)!=RiderStatus::ok){result(d,Status::session);return false;}
+            m.riderStagedGpu=std::make_shared<MaterialTextureGl50EB>();auto request=cold.textureRequest;
+            request.samplers=m.gpuSamplers.data();request.samplerCount=static_cast<std::uint32_t>(m.gpuSamplers.size());
+            if(!m.riderPool->stage(m.riderPool,demand,request,*m.riderStagedGpu,d.gpu)){result(d,Status::gpu);return false;}
+            if(!renderer->prevalidateRiderTextures(demand,*m.riderStagedGpu,m.riderValidation,d.renderer)||
+               !m.rider->residencyProposalCurrent(demand)){result(d,Status::renderer);return false;}
+            return true;
+        }catch(...){result(d,Status::allocation);return false;}
+    }
+    bool publishRiderMove(Manager& m,Diagnostic& d) noexcept {
+        const auto* demand=m.rider?m.rider->residencyDemand():nullptr;
+        if(!demand||!m.riderStagedGpu||m.riderRetiredGpu||
+           m.rider->bindPublishedBank(m.riderStagedGpu,d.rider)!=RiderStatus::ok||
+           !renderer->commitRiderTextures(*demand,m.riderValidation,d.renderer))return false;
+        m.riderRetiredGpu=std::move(m.gpu);m.gpu=std::move(m.riderStagedGpu);m.publication=m.gpu->publicationToken();
+        if(!m.riderRetiredGpu->close(d.gpu)||!m.riderPool->collect(d.gpu))return false;
+        m.riderRetiredGpu.reset();return true;
+    }
     bool refreshRiderBank(Manager& m,Diagnostic& d,OriginalUiFrontendUpdateReceipt50KG& receipt) noexcept {
         if(!m.rider)return true;
         if(m.rider->prepareBank(d.rider)!=RiderStatus::ok){result(d,Status::session);return false;}
@@ -615,18 +661,12 @@ struct OriginalUiFrontend50KG::Storage {
            textures->textureCount()!=m.gpu->textureCount()||samplers->size()!=m.gpuSamplers.size()||samplers->size()!=m.gpu->textureCount()){
             result(d,Status::resource);return false;
         }
-        // Default-unlocked cold admission preloads every real image. This
-        // bounded screen never replaces a GPU image with an unadmitted rider.
-        // Reuse requires exact canonical identities AND actual sampler policy.
+        if(next!=m.publishedRiderBank||!m.riderPool||m.riderPool->faulted()||m.gpu->riderSession()!=m.rider.get()||
+           m.gpu->riderBank()!=next.get()){result(d,Status::resource);return false;}
         for(std::uint32_t i=0;i<m.gpu->textureCount();++i){const auto* gpu=m.gpu->asset(i);const auto* cpu=textures->texture(i);
-            if(!gpu||!cpu||gpu->identity!=cpu->identity){result(d,Status::resource);return false;}
+            if(!cpu||(gpu&&gpu->identity!=cpu->identity)){result(d,Status::resource);return false;}
             const auto& a=(*samplers)[i];const auto& b=m.gpuSamplers[i];
             if(a.minification!=b.minification||a.magnification!=b.magnification||a.s!=b.s||a.t!=b.t){result(d,Status::resource);return false;}
-        }
-        if(m.rider->bindPublishedBank(m.gpu,d.rider)!=RiderStatus::ok){result(d,Status::session);return false;}
-        if(renderer&&bank==&m&&next!=m.publishedRiderBank){
-            if(!drainBankWork(d,receipt.bankDrain)||
-               !publishResidentBank(*textures,*m.gpu,d,receipt.coldInterval)){result(d,Status::renderer);return false;}
         }
         m.publishedRiderBank=next;return true;
     }
@@ -648,6 +688,9 @@ struct OriginalUiFrontend50KG::Storage {
         if(!retireSource(*m,d))return false;
         m->main.reset();m->options.reset();m->rider.reset();m->course.reset(); // No further callback can reach them.
         if(m->gpu&&!m->gpu->close(d.gpu))return false;
+        if(m->riderStagedGpu&&!m->riderStagedGpu->close(d.gpu))return false;
+        if(m->riderRetiredGpu&&!m->riderRetiredGpu->close(d.gpu))return false;
+        if(m->riderPool&&(!m->riderPool->collect(d.gpu)||!m->riderPool->close(d.gpu)))return false;
         m.reset();return true;
     }
     bool prepareDestination(Route target,OriginalUiFrontendInputReceipt50KG& receipt,Diagnostic& d,std::uint32_t prospectiveMode=0) noexcept {
@@ -827,7 +870,14 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
             if(!s->cold.riderPresentation||!s->cold.riderPresentation->available()||!s->renderer||
                !s->cold.application->clock101A50||!s->riderWidth||!s->riderHeight)
                 return result(d,receipt.status=Status::unavailableDestination);
+            if(!s->stageRiderMove(*s->active,receipt.rider,d)){
+                Diagnostic cleanup;
+                if(!s->discardRiderStage(*s->active,cleanup)){d.gpu=cleanup.gpu;return s->fault(d,Status::cleanup);}
+                return result(d,receipt.status=Status::unavailableDestination);
+            }
             if(!s->cold.riderPresentation->begin()){
+                Diagnostic cleanup;
+                if(!s->discardRiderStage(*s->active,cleanup)){d.gpu=cleanup.gpu;return s->fault(d,Status::cleanup);}
                 if(!s->cold.riderPresentation->end())return s->fault(d,Status::cleanup);
                 return result(d,receipt.status=Status::unavailableDestination);
             }
@@ -840,9 +890,14 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
                 if(!s->renderer->releaseRetainedOriginalUiSource(d.renderer))return s->fault(d,Status::cleanup);
                 s->riderOldImage={};
                 if(!s->cold.riderPresentation->end())return s->fault(d,Status::cleanup);
-                if(moved==RiderStatus::unavailableDestination)return result(d,receipt.status=Status::unavailableDestination);
+                if(moved==RiderStatus::unavailableDestination){
+                    Diagnostic cleanup;
+                    if(!s->discardRiderStage(*s->active,cleanup)){d.gpu=cleanup.gpu;return s->fault(d,Status::cleanup);}
+                    return result(d,receipt.status=Status::unavailableDestination);
+                }
                 return s->fault(d,Status::session,d.rider.sourcePC);
             }
+            if(!s->publishRiderMove(*s->active,d))return s->fault(d,Status::cleanup);
             s->riderMoving=true;
             return result(d,receipt.status=Status::ok);
         }
@@ -1029,9 +1084,19 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
     const auto* destinationArchive=s->pending->main?s->cold.mainMenu.get():
         (s->pending->options?s->cold.options.get():s->pending->rider?s->cold.rider.get():s->pending->course?s->cold.course.get():nullptr);
     if(!destinationArchive)return s->fault(d,Status::unavailableDestination,0x1CCD88);
+    if(s->pending->rider){
+        const auto* demand=s->pending->rider->residencyDemand();
+        if(!demand||!s->pending->rider->residencyProposalCurrent(*demand)||
+           !s->renderer->prevalidateRiderTextures(*demand,*s->pending->gpu,s->pending->riderValidation,d.renderer))
+            return s->fault(d,Status::renderer);
+    }
     if(!s->drainBankWork(d,receipt.bankDrain))return s->fault(d,Status::renderer);
+    if(s->pending->rider&&!s->pending->rider->consumeEntryResidency())return s->fault(d,Status::session);
     if(!s->retireSource(*s->active,d))return s->fault(d,Status::cleanup);
-    if(!s->publishResidentBank(*s->pending->textures(),*s->pending->gpu,d,receipt.coldInterval))return s->fault(d,Status::renderer);
+    if(s->pending->rider){
+        const auto* demand=s->pending->rider->residencyDemand();
+        if(!demand||!s->renderer->commitRiderTextures(*demand,s->pending->riderValidation,d.renderer))return s->fault(d,Status::renderer);
+    }else if(!s->publishResidentBank(*s->pending->textures(),*s->pending->gpu,d,receipt.coldInterval))return s->fault(d,Status::renderer);
     // All outgoing source submissions have completed. Switch the shared light
     // manager BEFORE incoming page callbacks, while retaining old cold/GPU
     // resources for the existing retirement boundary. Page-only Options

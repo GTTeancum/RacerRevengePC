@@ -10,6 +10,11 @@ struct OriginalUiCourseWidgetProfile50KG {
     std::uint8_t flags100BC=0,flags11018=0,flags1125C=0;
     std::array<std::uint8_t,13> courseRecords100C4{};
     bool mawhonicRylothTest=false;
+    bool wanMbTest=false;
+    bool sebulbaTbTest=false; // Startup provenance only.
+    bool scorchRcTest=false; // Startup provenance only.
+    bool tzidikTcTest=false; // Distinct startup provenance; no launch capability.
+    bool gasganoScTest=false;
 };
 enum class OriginalUiCourseWidgetStepKind50KG :std::uint8_t {widget,audioStartLoop11,audioFade1,promptMask42C};
 struct OriginalUiCourseWidgetStep50KG {

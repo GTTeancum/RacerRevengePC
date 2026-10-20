@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <optional>
 #include <utility>
 namespace rr::platform {
 namespace {
@@ -34,7 +35,8 @@ struct Binding {
     const assets::OriginalUiMaterialPass50KG* pass=nullptr;
     const assets::OriginalUiImageProvenance50KG* provenance=nullptr;
     std::uint32_t image=unresolved,leaf=unresolved,registration=unresolved;
-    OriginalUiMaterialSpan50KG prototype{};
+    MaterialTextureSampler50EB resourceSampler{};
+    std::optional<OriginalUiMaterialSpan50KG> prototype; //Absent means resources only; never a default draw policy.
     // Real PSM registry existence, independent of cold sampler/image policy.
     // False bindings can be uploaded but cannot redirect or receive packets.
     bool sourceRegistered=false;
@@ -60,6 +62,137 @@ struct PendingLiveMaterial {
     std::shared_ptr<LiveMaterial> live;
     std::vector<assets::OriginalUiMaterialBindingState50KG> states;
 };
+const assets::OriginalUiMemberIdentity50KG* resourceMember(assets::OriginalUiArchiveId50KG id,const char* name) noexcept {
+    const auto* archive=assets::originalUiArchiveIdentity50KG(id);if(!archive)return nullptr;
+    for(std::size_t i=0;i<archive->memberCount;++i){const auto* member=assets::originalUiMemberIdentity50KG(id,i);
+        if(member){const char* a=member->name;const char* b=name;
+            while(*a&&*b&&fold(*a)==fold(*b)){++a;++b;}
+            if(!*a&&!*b)return member;}}return nullptr;
+}
+// Resource/sampler proof only. No raster adapter, AA0 rewrite, fallback pass or
+// default drawable span is constructed for the authentic AA1 character pass.
+bool resourceOnly25c7(const assets::OriginalUiMaterialPass50KG& pass,const assets::OriginalUiScreenAssets50KG& images,
+    std::uint32_t index,MaterialTextureSampler50EB& sampler,D& d) {
+    using A=assets::OriginalUiArchiveId50KG;using F=assets::OriginalUiGsField50KG;
+    const auto* psm=resourceMember(A::rider,"ui\\textures\\25c_7.psm");
+    const auto* pst=resourceMember(A::rider,"ui\\textures\\25c_7.pst");
+    if(!psm||!pst||pass.identity!=psm||pass.inheritedTemplate!=resourceMember(A::appStart,"AppStart\\DefaultMT.psm")||
+       pass.provenance.origin!=assets::OriginalUiMaterialOrigin50KG::authoredPsm||
+       pass.provenance.archive!=assets::originalUiArchiveIdentity50KG(A::rider)||
+       pass.provenance.creationPC!=0x247110u||pass.pass!=1||pass.enabled!=1||pass.textureCount!=1||
+       pass.textureCoordinateIndex!=0||!same(pass.microprogram,"DiffuseCompressed")||!same(pass.textureName,"25c_7")||
+       !same(pass.shaderPassGroup,"none"))return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::textureColorComponent].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::textureFunction].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::sourceAlphaValueWhenAis0].value!=255)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::sourceAlphaValueWhenAis1].value!=255)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::methodOfExpandingTextureAlpha].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::inputColorA].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::inputColorB].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::inputAlphaC].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::inputColorD].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::fixedAlphaValue].value!=128)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::wrapModeHorizontal].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::wrapModeVertical].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::minClampParameterInUDirection].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::maxClampParameterInUDirection].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::minClampParameterInVDirection].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::maxClampParameterInVDirection].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::colorClampingMethod].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::alphaCorrectionValue].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::alphaBlendingControlInUnitsOfPixels].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::gouraudShadingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::textureMappingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::foggingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::alphaBlendingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::onePassAntiAliasingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::textureCoordinatesSTQorUV].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::environmentContext0or1].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::fragmentValueControlFixedOrNot].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::alphaTestOnOff].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::alphaTestMethod].value!=6)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::alphaReferenceValue].value!=120)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::processingMethodWhenFailedInAlphaTest].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::destinationAlphaTestOnOff].value!=0)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::destinationAlphaTestMode].value!=1)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::depthTestMethod].value!=2)return fail(d,E::material,0x2476a0u);
+    if(pass.gs[F::zWriteDisabled].value!=0)return fail(d,E::material,0x2476a0u);
+    // Retain the source inputAlphaD spelling and every inactive/blank authored
+    // field as well as the resolved tuple; overrides cannot inherit admission.
+    struct Authored {const char* key;const char* text;};
+    constexpr Authored expected[]={
+        {"microProgramName","DiffuseCompressed"},
+        {"TextureMap_1","25c_7"},
+        {"inputColorA","0"},
+        {"inputColorB","1"},
+        {"inputAlphaC","0"},
+        {"inputAlphaD","1"},
+        {"fixedAlphaValue",""},
+        {"wrapModeHorizontal",""},
+        {"wrapModeVertical",""},
+        {"minClampParameterInUDirection",""},
+        {"maxClampParameterInUDirection",""},
+        {"minClampParameterInVDirection",""},
+        {"maxClampParameterInVDirection",""},
+        {"colorClampingMethod",""},
+        {"alphaCorrectionValue",""},
+        {"alphaBlendingControlInUnitsOfPixels",""},
+        {"gouraudShadingOnOff",""},
+        {"textureMappingOnOff",""},
+        {"foggingOnOff",""},
+        {"alphaBlendingOnOff","1"},
+        {"onePassAntiAliasingOnOff","1"},
+        {"textureCoordinatesSTQorUV",""},
+        {"environmentContext0or1",""},
+        {"fragmentValueControlFixedOrNot",""},
+        {"alphaTestOnOff","0"},
+        {"alphaTestMethod",""},
+        {"alphaReferenceValue","120"},
+        {"processingMethodWhenFailedInAlphaTest",""},
+        {"destinationAlphaTestOnOff",""},
+        {"destinationAlphaTestMode",""},
+        {"depthTestOnOff",""},
+        {"depthTestMethod",""},
+        {"textureColorComponent",""},
+        {"textureFunction",""},
+        {"lodCalculationMethod",""},
+        {"maximumMipLevel",""},
+        {"magFilter",""},
+        {"minFilter",""},
+        {"L",""},
+        {"K",""},
+        {"sourceAlphaValueWhenAis0",""},
+        {"sourceAlphaValueWhenAis1",""},
+        {"methodOfExpandingTextureAlpha",""},
+        {"zWriteDisabled",""},
+    };
+    if(pass.authored.values.size()!=sizeof(expected)/sizeof(expected[0]))return fail(d,E::material,0x247110u);
+    // DAT find() intentionally skips authored blank values. This proof must
+    // inspect retained records, including blanks, and reject duplicate keys.
+    for(const auto& value:expected){const assets::OriginalUiDatValue50KG* actual=nullptr;
+        for(const auto& field:pass.authored.values)if(same(field.key,value.key)){
+            if(actual)return fail(d,E::material,0x247110u);actual=&field;}
+        if(!actual||actual->text!=value.text||actual->sourceValuePresent!=bool(value.text[0]))return fail(d,E::material,0x247110u);}
+    // Independent sampler admission, separate from unsupported raster AA/blend.
+    if(pass.lodCalculationMethod!=0||pass.maximumMipLevel!=0||pass.magFilter!=1||pass.minFilter!=5||
+       pass.lodL!=0||pass.lodK!=-75)return fail(d,E::material,0x247f38u);
+    const auto* source=images.sourceProvenance(index);const auto* ipum=images.ipumProvenance(index);
+    const auto* texture=images.decodedTexture(index);const auto* bank=images.textures();const auto* image=bank?bank->texture(index):nullptr;
+    if(!images.loaded()||!source||!ipum||!texture||!image||source->memberIdentity!=pst||source->celIdentity||
+       source->pstOffset||source->pstBytes!=pst->bytes||texture->kind!=2||texture->mips.size()!=3||ipum->mipCount!=3||
+       ipum->sourcePstSha256!=pst->sha256||!same(ipum->sourceMember,pst->name)||
+       ipum->sourceArchiveSha256!=assets::originalUiArchiveIdentity50KG(A::rider)->sha256||
+       ipum->colorPolicyKind!=assets::OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1)
+        return fail(d,E::material,0x24e880u);
+    constexpr std::uint32_t extent[]={16,32,64};
+    for(std::size_t i=0;i<3;++i)if(texture->mips[i].width!=extent[i]||texture->mips[i].height!=extent[i]||
+        ipum->mips[i].width!=extent[i]||ipum->mips[i].height!=extent[i])return fail(d,E::material,0x24e880u);
+    const auto& base=texture->mips.back();
+    if(image->texture.width!=base.width||image->texture.height!=base.height||image->texture.rgba!=base.rgba)
+        return fail(d,E::material,0x24eb90u);
+    sampler={MaterialTextureFilter50EB::linear,MaterialTextureFilter50EB::linear,
+        MaterialTextureWrap50EB::repeat,MaterialTextureWrap50EB::repeat};return true;
+}
 bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::OriginalUiScreenAssets50KG& images,
     std::uint32_t index,OriginalUiMaterialSpan50KG& output,D& d) noexcept {
     const auto* textures=images.textures();if(!textures)return fail(d,E::bank);
@@ -150,8 +283,15 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
     bool submissionPending=false,historyPoisoned=false;
     std::uint8_t apertures=0;
     std::uint32_t find(const assets::OriginalUiMaterialPass50KG* pass,std::uint32_t image)const noexcept {
-        for(std::size_t i=0;i<bindings.size();++i)if(bindings[i].sourceRegistered&&bindings[i].leaf!=unresolved&&bindings[i].pass==pass&&bindings[i].image==image)return static_cast<std::uint32_t>(i);
+        for(std::size_t i=0;i<bindings.size();++i)if(bindings[i].sourceRegistered&&bindings[i].leaf!=unresolved&&bindings[i].pass==pass&&bindings[i].image==image)
+            return drawablePacket(static_cast<std::uint32_t>(i))?static_cast<std::uint32_t>(i):unresolved;
         return unresolved;
+    }
+    bool drawablePacket(std::uint32_t index)const noexcept {
+        if(index>=bindings.size()||!bindings[index].prototype)return false;
+        const auto leaf=bindings[index].leaf;
+        return leaf<representatives.size()&&representatives[leaf]<bindings.size()&&
+            bindings[representatives[leaf]].sourceRegistered&&bool(bindings[representatives[leaf]].prototype);
     }
     bool capacity(std::size_t quads)const noexcept {
         return quads<=originalUiMaximumSourceQuads50KM&&vertices.size()/4<=originalUiMaximumSourceQuads50KM-quads&&packets.size()<originalUiMaximumSpans50KG;
@@ -173,7 +313,14 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
                 map->sourceIdentity!=sourceImage->identity||map->combinedIdentity!=combinedImage->identity)return fail(d,E::bank);
             b.image=map->combinedIndex;b.provenance=to;
         }else if(map||image!=unresolved)return fail(d,E::material);
-        if(!material(pass,*bank->images(),b.image,b.prototype,d))return fail(d,E::material);
+        if(same(pass.textureName,"25c_7")){
+            if(kind!=RegistrationKind::ledgerDynamic)return fail(d,E::material);
+            if(!resourceOnly25c7(pass,*bank->images(),b.image,b.resourceSampler,d))return false;
+        }else{
+            OriginalUiMaterialSpan50KG drawable;
+            if(!material(pass,*bank->images(),b.image,drawable,d))return fail(d,E::material);
+            b.resourceSampler=drawable.native.sampler;b.prototype=std::move(drawable);
+        }
         out.push_back(std::move(b));return true;
     }
     // Defined below after source-backed pass key preparation. This always
@@ -195,7 +342,7 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
     }
 };
 OriginalUiRiderDrawContribution50KG::OriginalUiRiderDrawContribution50KG() noexcept=default;
-OriginalUiRiderDrawContribution50KG::~OriginalUiRiderDrawContribution50KG(){drain();}
+OriginalUiRiderDrawContribution50KG::~OriginalUiRiderDrawContribution50KG(){drain();if(storage_&&storage_->gpu)storage_->gpu->releaseRiderBorrow(this);}
 bool OriginalUiRiderDrawContribution50KG::bind(std::shared_ptr<OriginalUiRiderDrawResources50KG> resources,
     std::shared_ptr<const assets::OriginalUiRiderStatAssets50KG> stat,
     std::shared_ptr<const assets::OriginalUiRiderBinderAssets50KG> binder,
@@ -282,6 +429,7 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
             else if(const auto cold=s.dynamic->characterAssets(id))scene=cold->scene();
             if(!scene||scene->materials.size()!=m->materialCount())return fail(d,E::model);
             for(std::uint32_t slot=0;slot<m->materialCount();++slot)for(std::uint32_t p=0;p<m->passCount(slot);++p){
+                d.widget=id;d.material=slot;d.pass=p+1;
                 const auto* pass=m->pass(slot,p);if(!pass)return fail(d,E::material);
                 const auto* map=pass->imageIndex==unresolved?nullptr:s.backend->modelImage(id,pass->imageIndex);
                 if(!s.add("ui/textures/"+scene->materials[slot],pass->source,*m->images(),pass->imageIndex,map,bindings,d,RegistrationKind::ledgerDynamic))return false;
@@ -300,15 +448,106 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
         std::vector<bool> assigned(samplers.size(),false);
         for(const auto& binding:bindings)if(binding.image!=unresolved){
             if(binding.image>=samplers.size())return fail(d,E::bank);
-            const auto& sampler=binding.prototype.native.sampler;
+            const auto& sampler=binding.resourceSampler;
             if(assigned[binding.image]&&!samplerSame(samplers[binding.image],sampler))return fail(d,E::material);
             samplers[binding.image]=sampler;assigned[binding.image]=true;
         }
         for(bool known:assigned)if(!known)return fail(d,E::material);
         s.bindings=std::move(bindings);s.samplers=std::move(samplers);s.bankGeneration=s.backend->generation();
         s.history=std::move(history);s.representatives=std::move(representatives);s.groupsValid=true;
-        s.registryGeneration=s.backend->registryGeneration();s.gpu.reset();s.publication=0;
+        s.registryGeneration=s.backend->registryGeneration();if(s.gpu)s.gpu->releaseRiderBorrow(this);s.gpu.reset();s.publication=0;
         rollback.committed=true;return true;
+    }catch(...){return fail(d,E::allocation);}
+}
+bool OriginalUiRiderDrawContribution50KG::drawableModel(std::uint16_t id,D& d) const noexcept {
+    d={};if(!storage_||!storage_->bank||storage_->historyPoisoned||id==0||id>=120)return fail(d,E::bank);
+    const auto& s=*storage_;const auto* materials=s.backend->materials(id);
+    if(!materials||!materials->loaded()||bool(s.dynamic->podAssets(id))==bool(s.dynamic->characterAssets(id)))return fail(d,E::model);
+    for(std::uint32_t slot=0;slot<materials->materialCount();++slot)
+        for(std::uint32_t ordinal=0;ordinal<materials->passCount(slot);++ordinal){
+            const auto* pass=materials->pass(slot,ordinal);if(!pass)return fail(d,E::material);
+            std::uint32_t image=unresolved;
+            if(pass->source.textureCount){const auto* map=s.backend->modelImage(id,pass->imageIndex);
+                if(!map)return fail(d,E::bank);image=map->combinedIndex;
+            }else if(pass->imageIndex!=unresolved)return fail(d,E::material);
+            bool found=false;
+            for(const auto& binding:s.bindings)if(binding.kind==RegistrationKind::ledgerDynamic&&
+                binding.pass==&pass->source&&binding.image==image){
+                if(!binding.prototype)return fail(d,E::material);found=true;break;}
+            if(!found)return fail(d,E::material);
+        }
+    return true;
+}
+bool OriginalUiRiderDrawContribution50KG::nativeDrawableModels(const std::array<bool,120>& models,D& d)const noexcept {
+    d={};if(!storage_||!storage_->bank||storage_->historyPoisoned)return fail(d,E::bank);const auto& s=*storage_;
+    // Static includes the actual stat/widget/ATM lifetime registrations.
+    for(const auto& binding:s.bindings)if(binding.kind==RegistrationKind::existingStatic&&
+        (!binding.sourceRegistered||!binding.prototype))return fail(d,E::material);
+    if(models[0])return fail(d,E::model);
+    bool pod=false;
+    for(std::uint16_t id=1;id<120;++id)if(models[id]){
+        if(!drawableModel(id,d))return false;pod=pod||bool(s.dynamic->podAssets(id));
+    }
+    if(pod){const auto* images=s.binderAssets->images();const auto* pass=s.binderAssets->pass();
+        if(!images||!images->textures()||!pass)return fail(d,E::resource);
+        for(std::uint32_t i=0;i<images->textures()->textureCount();++i){
+            const auto* map=s.backend->binderImage(i);if(!map)return fail(d,E::bank);bool found=false;
+            for(const auto& binding:s.bindings)if(binding.kind==RegistrationKind::ledgerDynamic&&binding.pass==pass&&binding.image==map->combinedIndex){
+                if(!binding.prototype)return fail(d,E::material);found=true;break;}
+            if(!found)return fail(d,E::material);
+        }
+    }
+    return true;
+}
+bool OriginalUiRiderDrawContribution50KG::nativeResidencyImages(
+    const std::array<bool,120>& models,std::vector<std::uint32_t>& output,D& d) const noexcept {
+    d={};if(!storage_||!storage_->bank||storage_->historyPoisoned)return fail(d,E::bank);
+    if(!nativeDrawableModels(models,d))return false;
+    const auto& s=*storage_;const auto* textures=s.bank->images()?s.bank->images()->textures():nullptr;
+    if(!textures||textures->textureCount()>assets::maxMaterialTextureAssets50EA)return fail(d,E::bank);
+    try {
+        std::vector<bool> needed(textures->textureCount(),false);
+        const auto add=[&](std::uint32_t index){
+            if(index==unresolved)return true;
+            if(index>=needed.size()||!textures->texture(index))return false;
+            needed[index]=true;return true;
+        };
+        // These source material registrations live for this manager. Retain
+        // their complete image/frame closures; this is not visibility parity.
+        for(const auto& binding:s.bindings)
+            if(binding.kind==RegistrationKind::existingStatic){
+                if(!binding.sourceRegistered||!add(binding.image))return fail(d,E::material);
+            }
+        bool pod=false;
+        for(std::uint16_t id=1;id<120;++id)if(models[id]){
+            const auto* material=s.backend->materials(id);
+            if(!material||!material->loaded())return fail(d,E::model);
+            const auto ownedPod=s.dynamic->podAssets(id);const auto ownedCharacter=s.dynamic->characterAssets(id);
+            if(bool(ownedPod)==bool(ownedCharacter))return fail(d,E::model);
+            pod=pod||bool(ownedPod);
+            for(std::uint32_t slot=0;slot<material->materialCount();++slot)
+                for(std::uint32_t ordinal=0;ordinal<material->passCount(slot);++ordinal){
+                    const auto* pass=material->pass(slot,ordinal);if(!pass)return fail(d,E::material);
+                    if(pass->imageIndex==unresolved)continue;
+                    const auto* map=s.backend->modelImage(id,pass->imageIndex);
+                    if(!map||!add(map->combinedIndex))return fail(d,E::bank);
+                    bool policy=false;
+                    for(const auto& binding:s.bindings)
+                        if(binding.kind==RegistrationKind::ledgerDynamic&&binding.pass==&pass->source&&binding.image==map->combinedIndex){policy=true;break;}
+                    if(!policy)return fail(d,E::material);
+                }
+        }
+        // Real binder material ownership is independent of parent clipping.
+        if(pod){const auto* images=s.binderAssets->images();
+            if(!images||!images->textures())return fail(d,E::resource);
+            for(std::uint32_t i=0;i<images->textures()->textureCount();++i){
+                const auto* map=s.backend->binderImage(i);if(!map||!add(map->combinedIndex))return fail(d,E::bank);
+            }
+        }
+        std::vector<std::uint32_t> next;
+        for(std::uint32_t i=0;i<needed.size();++i)if(needed[i])next.push_back(i);
+        if(next.empty())return fail(d,E::bank);
+        output=std::move(next);return true;
     }catch(...){return fail(d,E::allocation);}
 }
 bool OriginalUiRiderDrawContribution50KG::consumeMaterials(bool rebuild,D& d) noexcept {
@@ -464,11 +703,22 @@ std::shared_ptr<const assets::OriginalUiImageBank50KG> OriginalUiRiderDrawContri
 const std::vector<MaterialTextureSampler50EB>* OriginalUiRiderDrawContribution50KG::samplers()const noexcept {
     return bank()?&storage_->samplers:nullptr;
 }
+bool OriginalUiRiderDrawContribution50KG::releasePublishedBank(D& d) noexcept {
+    d={};if(!storage_)return true;auto& s=*storage_;
+    if(s.active||frame_.native_||s.submissionPending)return fail(d,E::phase);
+    if(s.gpu&&!s.gpu->releaseRiderBorrow(this))return fail(d,E::publication);
+    s.gpu.reset();s.publication=0;return true;
+}
 bool OriginalUiRiderDrawContribution50KG::bindPublishedBank(std::shared_ptr<const MaterialTextureGl50EB> gpu,D& d) noexcept {
     d={};if(!storage_||storage_->active||frame_.native_||!bank()||!gpu||!gpu->initialized()||!gpu->publicationToken())return fail(d,E::publication);
     const auto* textures=storage_->bank->images()->textures();if(gpu->textureCount()!=textures->textureCount())return fail(d,E::publication);
+    if(gpu->riderSparse()&&gpu->riderBank()!=storage_->bank.get())return fail(d,E::publication);
     for(std::uint32_t i=0;i<gpu->textureCount();++i){const auto* a=gpu->asset(i);const auto* b=textures->texture(i);
-        if(!a||!b||a->identity!=b->identity)return fail(d,E::publication);}
+        if(!b||(!a&&!gpu->riderSparse())||(a&&(!a->name||a->identity!=b->identity)))return fail(d,E::publication);}
+    if(storage_->gpu==gpu)return true;
+    if(!gpu->acquireRiderBorrow(this))return fail(d,E::publication);
+    if(storage_->gpu&&!storage_->gpu->releaseRiderBorrow(this)){
+        gpu->releaseRiderBorrow(this);return fail(d,E::publication);}
     storage_->gpu=std::move(gpu);storage_->publication=storage_->gpu->publicationToken();return true;
 }
 bool OriginalUiRiderDrawContribution50KG::begin(const OriginalUiRiderDrawClock50KG& clock,
@@ -536,21 +786,35 @@ bool OriginalUiRiderDrawContribution50KG::model(std::uint16_t id,D& d) noexcept 
         const auto& surfaces=packet.scene->lods[0].surfaces;
         for(std::uint32_t surface=0;surface<surfaces.size();++surface){
             const auto materialIndex=surfaces[surface].material_index;
+            d.geometrySurface=surface;d.geometryComponent=surfaces[surface].component_word;
+            d.geometryStoredColors=surfaces[surface].has_original_colors;d.geometryStatus=255;d.material=materialIndex;
             if(materialIndex>=materials->materialCount()||surfaces[surface].indices.size()%3)return fail(d,E::material);
             const auto count=surfaces[surface].indices.size()/3;
             if(!count)continue;
             if(count>originalUiMaximumSourceQuads50KM)return fail(d,E::capacity);
             s.scratchVertices.resize(count*4);s.scratchW.resize(count*4);s.scratchFog.resize(count*4);
             for(std::uint32_t passIndex=0;passIndex<materials->passCount(materialIndex);++passIndex){
+                d.pass=passIndex+1;d.geometryStatus=255;
                 const auto* material=materials->pass(materialIndex,passIndex);if(!material)return fail(d,E::material);
                 const auto* map=material->imageIndex==unresolved?nullptr:s.backend->modelImage(id,material->imageIndex);
                 if(material->imageIndex!=unresolved&&!map)return fail(d,E::bank);
                 const auto binding=s.find(&material->source,map?map->combinedIndex:unresolved);
                 if(binding==unresolved)return fail(d,E::material);
                 game::OriginalUiLitSurfaceOutput50KM projected{s.scratchVertices.data(),s.scratchW.data(),s.scratchFog.data(),static_cast<std::uint32_t>(count),0,0};
-                const auto status=same(material->source.microprogram,"SpecularMapCompressed")?
+                const auto coloredOwner=s.dynamic->characterAssets(id);
+                const bool ownColored=surfaces[surface].has_original_colors&&coloredOwner&&
+                    coloredOwner->scene()==packet.scene;
+                const auto status=ownColored&&id==57?
+                    game::projectOriginalUiKraidColoredSurface50KM(*coloredOwner,0,surface,passIndex,
+                        material->source.microprogram,packet.palette,packet.context,
+                        packet.fog.computeRadialFog1B2,projected,s.workspace):ownColored?
+                    game::projectOriginalUiKnireColoredSurface50KM(*coloredOwner,0,surface,passIndex,
+                        material->source.microprogram,packet.palette,packet.context,
+                        packet.fog.computeRadialFog1B2,projected,s.workspace):
+                    same(material->source.microprogram,"SpecularMapCompressed")?
                     game::projectOriginalUiSpecularMapCompressedSurface50KM(*packet.scene,0,surface,packet.palette,packet.context,projected,s.workspace):
                     game::projectOriginalUiLitSceneSurface50KM(*packet.scene,0,surface,packet.palette,packet.context,packet.fog.computeRadialFog1B2,projected,s.workspace);
+                d.geometryStatus=static_cast<std::uint8_t>(status);
                 if(status!=game::OriginalUiLitGeometryStatus50KM::complete||projected.materialIndex!=materialIndex)return fail(d,E::geometry);
                 if(!s.capacity(projected.slotCount))return fail(d,E::capacity);
                 if(!projected.slotCount)continue;const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
@@ -588,7 +852,9 @@ bool OriginalUiRiderDrawContribution50KG::model(std::uint16_t id,D& d) noexcept 
 bool OriginalUiRiderDrawContribution50KG::widgets(bool top,bool shown,D& d) noexcept {
     auto& s=*storage_;auto& widgets=*s.resources->widgets();const auto* order=widgets.order(top);
     if(!order)return fail(d,E::widget);const auto& materials=*s.resources->materials();
-    for(const auto id:*order){d.widget=id;const auto state=widgets.state(id);if(!shown||!state.shown)continue;
+    for(const auto id:*order){d.widget=id;
+        d.geometrySurface=0xffffffffu;d.geometryComponent=0;d.geometryStoredColors=false;d.geometryStatus=255;
+        const auto state=widgets.state(id);if(!shown||!state.shown)continue;
         if(state.kind==game::OriginalUiRiderWidgetKind50KG::pod||state.kind==game::OriginalUiRiderWidgetKind50KG::character){
             if(!model(id,d))return false;continue;
         }
@@ -739,12 +1005,14 @@ bool OriginalUiRiderDrawContribution50KG::Storage::schedule(std::vector<Binding>
             for(;j<name.size()&&fold(name[j])==fold(static_cast<char>(table.data[start+j]));++j){}
             if(j!=name.size())continue;
             if(ranks[i]!=unresolved){
-                // Authenticated Mat_Stbl repeats pod_wndw. Original298C80
-                // returns the first matching row;299CAC retains that token.
-                // Admit only this exact later occurrence, never a new owner
-                // or a replacement rank. Other duplicate names still reject.
-                if(!same(name,"ui/textures/pod_wndw")||ranks[i]!=2490||
-                   ordinal!=3221||start!=70650)return fail(d,E::schedule,0x298C80);
+                // Original298C80 returns the first matching row;299CAC
+                // retains that token. The authenticated window and Mars
+                // duplicates never create an owner or replace the first rank.
+                const bool window=same(name,"ui/textures/pod_wndw")&&ranks[i]==2490&&
+                    ordinal==3221&&start==70650;
+                const bool mars=same(name,"ui/textures/08c_3")&&ranks[i]==2386&&
+                    ordinal==2387&&start==55274;
+                if(!window&&!mars)return fail(d,E::schedule,0x298C80);
                 continue;
             }
             ranks[i]=ordinal;
@@ -847,6 +1115,18 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
        s.packets.size()>originalUiMaximumSpans50KG){s.failed=true;return fail(d,E::bank);}
     try {
         s.order.clear();
+        // Complete actual frame coverage, before binding-history effects or GL.
+        // Actual ATM images, all model passes and binder/stat/widget packets
+        // are checked individually, not only material representatives.
+        for(const auto& packet:s.packets){
+            if(!s.drawablePacket(packet.binding)){s.failed=true;return fail(d,E::material);}
+            if(packet.binding>=s.bindings.size())return fail(d,E::publication);
+            const auto index=s.bindings[packet.binding].image;
+            if(index==unresolved)continue;
+            const auto* cpu=s.bank->images()->textures()->texture(index);
+            const auto* gpu=s.gpu->asset(index);
+            if(!cpu||!gpu||!gpu->name||cpu->identity!=gpu->identity){s.failed=true;return fail(d,E::publication);}
+        }
         for(std::size_t i=0;i<s.packets.size();++i){const auto& p=s.packets[i];
             if(p.binding>=s.bindings.size()||!s.bindings[p.binding].sourceRegistered||s.bindings[p.binding].leaf==unresolved||!p.count||
                p.first>=s.vertices.size()/4||p.count>s.vertices.size()/4-p.first){s.failed=true;return fail(d,E::schedule);}
@@ -859,12 +1139,12 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
         });
         s.orderedVertices.clear();s.orderedW.clear();s.orderedFog.clear();s.spans.clear();s.states.clear();
         for(const auto index:s.order){const auto& packet=s.packets[index];const auto& binding=s.bindings[packet.binding];
-            auto span=binding.prototype.span;span.firstQuad=static_cast<std::uint32_t>(s.orderedVertices.size()/4);span.quadCount=packet.count;
+            auto span=binding.prototype->span;span.firstQuad=static_cast<std::uint32_t>(s.orderedVertices.size()/4);span.quadCount=packet.count;
             const auto start=std::size_t(packet.first)*4,count=std::size_t(packet.count)*4;
             s.orderedVertices.insert(s.orderedVertices.end(),s.vertices.begin()+start,s.vertices.begin()+start+count);
             s.orderedW.insert(s.orderedW.end(),s.w.begin()+start,s.w.begin()+start+count);
             s.orderedFog.insert(s.orderedFog.end(),s.fog.begin()+start,s.fog.begin()+start+count);
-            s.spans.push_back(span);s.states.push_back(binding.prototype.native);
+            s.spans.push_back(span);s.states.push_back(binding.prototype->native);
         }
         if(s.orderedVertices.size()!=s.vertices.size()||s.frameGeneration==std::numeric_limits<std::uint64_t>::max()){
             s.failed=true;return fail(d,E::capacity);
@@ -949,6 +1229,8 @@ bool OriginalUiRiderDrawContribution50KG::finish(D& d) noexcept {
         s.draw.opaquePresentationAlphaOnly=false;
         s.finished=true;
         frame_.native_=&s.draw;frame_.owner_=this;frame_.frameGeneration_=++s.frameGeneration;frame_.terminal_=terminal;
+        frame_.riderSession_=s.gpu->riderSession();frame_.riderTextures_=s.gpu->riderSparse()?s.gpu.get():nullptr;
+        frame_.riderResidencySerial_=s.gpu->riderDemandSerial();
         return true;
     }catch(...){s.failed=true;return fail(d,E::allocation);}
 }
@@ -961,6 +1243,7 @@ const OriginalUiSourceFrame50KM* OriginalUiRiderDrawContribution50KG::frame()con
 }
 void OriginalUiRiderDrawContribution50KG::drain() noexcept {
     frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;frame_.terminal_={};
+    frame_.riderSession_=nullptr;frame_.riderTextures_=nullptr;frame_.riderResidencySerial_=0;
     if(!storage_)return;auto& s=*storage_;
     if(s.submissionPending)s.historyPoisoned=true;
     if(s.active)s.backend->endFrame();s.active=false;s.finished=false;s.draw={};s.pendingHistory.clear();s.pendingLive.clear();

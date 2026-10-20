@@ -1,0 +1,14 @@
+#pragma once
+#include "source_grid50ig_fixture.h"
+#include "../../src/game/track_navigation_view50tc.h"
+namespace source_grid50IG {
+inline bool prepare(const rr::game::TrackNavigationView50TC& view,std::uint32_t rank,
+    rr::game::GridCenterResult50AC& out) noexcept {
+    using namespace rr::game;
+    if(!view.gatesPrepared()||view.role()!=NavigationRole50TC::Map||view.count()!=268||view.capacity()!=268)return false;
+    struct Graph {const UndertrackNode50ET* nodes;std::uint32_t count;};
+    struct Navigation {Graph track;const TrackNavigationNode50EU* nodes;bool gatesPrepared;};
+    const Navigation map{{view.track().nodes(),view.count()},view.nodes(),true};
+    return detail::prepare(map,view.capacity(),rank,out);
+}
+}

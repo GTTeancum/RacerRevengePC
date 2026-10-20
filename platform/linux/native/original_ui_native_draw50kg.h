@@ -3,6 +3,7 @@
 #include "../../../src/assets/original_ui_material50kg.h"
 
 namespace rr::platform {
+class OriginalUiRiderSession50KG;
 // NEW reconstruction, not recovered historical bytes. No implicit material
 // defaults: caller joins authenticated material, packet-depth and pass owners.
 // Each span must first pass prepareOriginalUiNativeMaterial50KG (textured) or
@@ -123,5 +124,8 @@ private:
     // frame has assembled successfully. Borrowed arrays and owner remain live.
     std::uint64_t frameGeneration_=0;
     OriginalUiSourceTerminal50KN terminal_{};
+    const OriginalUiRiderSession50KG* riderSession_=nullptr;
+    const MaterialTextureGl50EB* riderTextures_=nullptr;
+    std::uint64_t riderResidencySerial_=0;
 };
 }

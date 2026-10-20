@@ -28,17 +28,49 @@
 #include <utility>
 #include <vector>
 
+namespace tc_cold_visibility50TC { class Retirement; }
+namespace tb_cold_visibility50TB { class Retirement; }
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 
+namespace native_racer50HN {class Bank;}
+namespace mb_source_trigger50MB {
+class Owner;
+// Minted only by the actual aggregate after all partial source owners retire.
+// Identity is necessary but does not substitute for that owner-specific cleanup.
+class RetirementReceipt final {
+    friend class Owner;friend class native_racer50HN::Bank;
+    const native_racer50HN::Bank* bank_;
+    const Owner* issuer_;
+    std::uint64_t generation_,serial_;std::size_t slot_;
+    RetirementReceipt(const native_racer50HN::Bank& bank,const Owner& issuer,
+        std::uint64_t generation,std::uint64_t serial,std::size_t slot)noexcept
+        :bank_(&bank),issuer_(&issuer),generation_(generation),serial_(serial),slot_(slot){}
+public:
+    RetirementReceipt(const RetirementReceipt&)=delete;
+    RetirementReceipt& operator=(const RetirementReceipt&)=delete;
+};
+}
 namespace native_racer50HN {
 inline constexpr std::size_t maximumRacers=rr::game::maxHostRaceRacers50HT;
 class Bank {
 public:
+    class QueryReservation final {
+        friend class Bank;friend class mb_source_trigger50MB::Owner;
+        Bank* bank_=nullptr;const mb_source_trigger50MB::Owner* issuer_=nullptr;
+        std::uint64_t generation_=0,serial_=0;std::size_t slot_=0;
+        QueryReservation()=default;
+    public:
+        QueryReservation(const QueryReservation&)=delete;
+        QueryReservation& operator=(const QueryReservation&)=delete;
+        ~QueryReservation()noexcept{if(bank_)std::terminate();}
+    };
+    bool sourceQueryPending()const noexcept{return pendingToken_!=nullptr;}
+    std::size_t sourceQuerySlot()const noexcept{return pendingToken_?pendingToken_->slot_:maximumRacers;}
     Bank()=default;
     ~Bank() noexcept {
         // Check BEFORE snapshots/spans and their externally borrowed owners die.
-        if(nativeFifoPins_)std::terminate();
+        if(nativeFifoPins_||pendingToken_||sourceIssuer_)std::terminate();
         // Only the RA-bound route adds a retirement obligation. The private
         // pin survives all snapshots/spans and checks its actual Follow owner.
         if(raWorldLifetime_&&(visiting_||readBlocked_))std::terminate();
@@ -58,7 +90,7 @@ public:
         ReadHandle()=default;
     };
     template<class T> ReadHandle<T> bindRead(const T& value) const {
-        if(retired_||!sealed_||visiting_||readBlocked_)
+        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_)
             throw std::runtime_error("racer read binding requires a sealed idle bank");
         const auto address=reinterpret_cast<std::uintptr_t>(&value);
         for(const auto& span:spans_){
@@ -75,7 +107,7 @@ public:
         throw std::runtime_error("racer read field is not within one registered owner span");
     }
     template<class T> T read(std::size_t index,const ReadHandle<T>& handle) const {
-        if(retired_||!sealed_||visiting_||readBlocked_||index>=count_||handle.owner_!=this||!handle.live_)
+        if(retired_||!sealed_||visiting_||readBlocked_||pendingToken_||index>=count_||handle.owner_!=this||!handle.live_)
             throw std::runtime_error("invalid or leased native racer scalar read");
         T value;
         // Slot0 may have advanced since its last save. Every nonzero slot is
@@ -116,25 +148,27 @@ public:
     // preserve an opponent's exact partial state on failure and restore player
     // even if the callback throws. No allocation occurs after seal().
     template<class F> decltype(auto) visit(std::size_t index,F&& operation) {
-        if(retired_||!sealed_||index>=count_||visiting_)
+        if(retired_||!sealed_||index>=count_||visiting_||pendingToken_)
             throw std::runtime_error("invalid or nested native racer visit");
         if(!index){
             // Legacy slot0 visits do not take the swapping lease. Keep their
             // existing nesting semantics, but reject scalar observations from
             // inside the callback just as for a nonzero/batched lease.
             const bool previous=readBlocked_;readBlocked_=true;
+            const auto priorSlot=currentSlot_;currentSlot_=0;++visitDepth_;
             struct ReadBlock {
-                Bank& bank;bool previous;
-                ~ReadBlock(){bank.readBlocked_=previous;}
-            } readBlock{*this,previous};
-            return std::forward<F>(operation)();
+                Bank& bank;bool previous;std::size_t priorSlot;
+                ~ReadBlock(){bank.readBlocked_=previous;bank.currentSlot_=priorSlot;--bank.visitDepth_;}
+            } readBlock{*this,previous,priorSlot};
+            return invokeSourceChecked(std::forward<F>(operation));
         }
         save(0);restore(index);visiting_=true;
+        const auto priorSlot=currentSlot_;currentSlot_=index;++visitDepth_;
         struct Restore {
-            Bank& bank;std::size_t index;
-            ~Restore(){bank.save(index);bank.restore(0);bank.visiting_=false;}
-        } restorePlayer{*this,index};
-        return std::forward<F>(operation)();
+            Bank& bank;std::size_t index,priorSlot;
+            ~Restore(){bank.save(index);bank.restore(0);bank.visiting_=false;bank.currentSlot_=priorSlot;--bank.visitDepth_;}
+        } restorePlayer{*this,index,priorSlot};
+        return invokeSourceChecked(std::forward<F>(operation));
     }
     // One bounded serial lease for an existing whole-fleet observation sweep.
     // A null order means slots0..visitCount-1; otherwise preserve the supplied
@@ -146,26 +180,33 @@ public:
     // This does not advance any slot's completedSteps or change eligibility.
     template<class F> bool visitMany(const std::size_t* order,
         std::size_t visitCount,F&& operation) {
-        if(retired_||!sealed_||visiting_||visitCount>count_)
+        if(retired_||!sealed_||visiting_||pendingToken_||visitCount>count_)
             throw std::runtime_error("invalid or nested native racer batch visit");
         for(std::size_t position=0;position<visitCount;++position)
             if(order&&order[position]>=count_)
                 throw std::runtime_error("invalid native racer batch slot");
         if(!visitCount)return true;
         visiting_=true;
+        const auto priorSlot=currentSlot_;currentSlot_=0;++visitDepth_;
         std::size_t current=0;
         struct Restore {
-            Bank& bank;std::size_t& current;
+            Bank& bank;std::size_t& current;std::size_t priorSlot;
             ~Restore(){
                 bank.save(current);
                 if(current)bank.restore(0);
-                bank.visiting_=false;
+                bank.visiting_=false;bank.currentSlot_=priorSlot;--bank.visitDepth_;
             }
-        } restorePlayer{*this,current};
+        } restorePlayer{*this,current,priorSlot};
         for(std::size_t position=0;position<visitCount;++position){
             const auto index=order?order[position]:position;
             if(index!=current){save(current);restore(index);current=index;}
-            if(!operation(index))return false;
+            currentSlot_=index;
+            const bool accepted=operation(index);
+            if(pendingToken_){
+                if(accepted)throw std::runtime_error("source query remains pending after batch callback");
+                return false;
+            }
+            if(!accepted)return false;
         }
         return true;
     }
@@ -175,7 +216,7 @@ public:
     // Race gate is supplied by the host countdown/finish owner. A stopped slot
     // remains inspectable/renderable; it is never silently reset or teleported.
     template<class Step> bool step(std::size_t index,bool racing,Step&& operation) {
-        if(retired_||index==0||index>=count_)throw std::runtime_error("invalid AI racer slot");
+        if(retired_||pendingToken_||index==0||index>=count_)throw std::runtime_error("invalid AI racer slot");
         if(!racing||!slots_[index].active)return false;
         try {
             const bool advanced=visit(index,std::forward<Step>(operation));
@@ -194,7 +235,7 @@ public:
     // and registration spans before releasing the actual RA lifetime owner.
     bool retireNativeBacking()noexcept {
         if(retired_)return true;
-        if(visiting_||readBlocked_||nativeFifoPins_||
+        if(visiting_||readBlocked_||pendingToken_||sourceIssuer_||nativeFifoPins_||
            (raWorldLifetime_&&!raWorldLifetime_->canRetire()))return false;
         retired_=true;sealed_=false;
         for(auto& slot:slots_)std::vector<unsigned char>().swap(slot.bytes);
@@ -204,6 +245,97 @@ public:
     std::size_t count()const noexcept{return count_;}
     std::size_t bytesPerRacer()const noexcept{return bytes_;}
 private:
+    friend class mb_source_trigger50MB::Owner;
+    friend class ::tc_cold_visibility50TC::Retirement;
+    friend class ::tb_cold_visibility50TB::Retirement;
+    enum class QueryState:std::uint8_t {idle,active,suspended};
+    const mb_source_trigger50MB::Owner* sourceIssuer_=nullptr;
+    std::uint64_t sourceGeneration_=0,lastSourceSerial_=0;
+    QueryReservation* pendingToken_=nullptr;
+    QueryState queryState_=QueryState::idle;
+    std::size_t currentSlot_=0,visitDepth_=0;
+    bool retirementVisit_=false;
+    bool matchesSourceQuery(const QueryReservation& token)const noexcept {
+        return pendingToken_==&token&&token.bank_==this&&token.issuer_==sourceIssuer_&&sourceIssuer_&&
+            token.generation_==sourceGeneration_&&token.serial_==lastSourceSerial_&&token.slot_<count_;
+    }
+    bool bindSourceQueryOwner(const mb_source_trigger50MB::Owner& issuer,std::uint64_t generation)noexcept {
+        if(retired_||!sealed_||visiting_||readBlocked_||visitDepth_||pendingToken_||sourceIssuer_||!generation)return false;
+        sourceIssuer_=&issuer;sourceGeneration_=generation;lastSourceSerial_=0;return true;
+    }
+    bool unbindSourceQueryOwner(const mb_source_trigger50MB::Owner& issuer,std::uint64_t generation)noexcept {
+        if(retired_||visiting_||readBlocked_||visitDepth_||pendingToken_||retirementVisit_||
+            sourceIssuer_!=&issuer||sourceGeneration_!=generation)return false;
+        sourceIssuer_=nullptr;sourceGeneration_=lastSourceSerial_=0;return true;
+    }
+    bool beginSourceQuery(const mb_source_trigger50MB::Owner& issuer,
+        std::uint64_t generation,std::uint64_t serial,QueryReservation& token)noexcept {
+        if(retired_||!sealed_||pendingToken_||token.bank_||sourceIssuer_!=&issuer||
+            generation!=sourceGeneration_||!serial||serial<=lastSourceSerial_||
+            visitDepth_!=1||currentSlot_>=count_||retirementVisit_)return false;
+        token.bank_=this;token.issuer_=&issuer;token.generation_=generation;
+        token.serial_=serial;token.slot_=currentSlot_;pendingToken_=&token;lastSourceSerial_=serial;
+        queryState_=QueryState::active;return true;
+    }
+    bool suspendSourceQuery(const mb_source_trigger50MB::Owner& issuer,QueryReservation& token)noexcept {
+        if(!matchesSourceQuery(token)||token.issuer_!=&issuer||queryState_!=QueryState::active||
+            visitDepth_!=1||currentSlot_!=token.slot_||retirementVisit_)return false;
+        queryState_=QueryState::suspended;return true;
+    }
+    void clearSourceQuery(QueryReservation& token)noexcept {
+        token.bank_=nullptr;token.issuer_=nullptr;token.generation_=token.serial_=0;
+        token.slot_=0;pendingToken_=nullptr;queryState_=QueryState::idle;
+    }
+    bool completeSourceQuery(const mb_source_trigger50MB::Owner& issuer,QueryReservation& token)noexcept {
+        if(!matchesSourceQuery(token)||token.issuer_!=&issuer||queryState_!=QueryState::active||
+            visitDepth_!=1||currentSlot_!=token.slot_||retirementVisit_)return false;
+        clearSourceQuery(token);return true;
+    }
+    template<class F> bool visitSuspendedForRetirement(const mb_source_trigger50MB::Owner& issuer,QueryReservation& token,F&& cleanup) {
+        if(retired_||!sealed_||!matchesSourceQuery(token)||token.issuer_!=&issuer||queryState_!=QueryState::suspended||
+            visiting_||readBlocked_||visitDepth_||retirementVisit_||nativeFifoPins_)
+            throw std::runtime_error("invalid suspended source cleanup visit");
+        const auto slot=token.slot_;if(slot){save(0);restore(slot);}
+        visiting_=true;readBlocked_=true;retirementVisit_=true;currentSlot_=slot;visitDepth_=1;
+        struct Restore {
+            Bank& bank;std::size_t slot;
+            ~Restore(){bank.save(slot);if(slot)bank.restore(0);bank.currentSlot_=0;
+                bank.visitDepth_=0;bank.visiting_=bank.readBlocked_=bank.retirementVisit_=false;}
+        } restorePlayer{*this,slot};
+        const bool accepted=std::forward<F>(cleanup)();
+        if(accepted&&pendingToken_)throw std::runtime_error("source cleanup did not retire pending owners");
+        return accepted;
+    }
+    bool retireSuspendedSourceQuery(const mb_source_trigger50MB::Owner& issuer,QueryReservation& token,
+        const mb_source_trigger50MB::RetirementReceipt& receipt)noexcept {
+        if(!matchesSourceQuery(token)||token.issuer_!=&issuer||queryState_!=QueryState::suspended||
+            !retirementVisit_||visitDepth_!=1||currentSlot_!=token.slot_||
+            receipt.bank_!=this||receipt.issuer_!=token.issuer_||
+            receipt.generation_!=token.generation_||receipt.serial_!=token.serial_||receipt.slot_!=token.slot_)return false;
+        clearSourceQuery(token);return true;
+    }
+    template<class F> decltype(auto) invokeSourceChecked(F&& operation) {
+        using Result=std::invoke_result_t<F&&>;
+        if constexpr(std::is_same_v<std::remove_cvref_t<Result>,bool>){
+            // Preserve bool references as well as ordinary bool values.
+            Result result=std::forward<F>(operation)();
+            if(pendingToken_&&result)
+                throw std::runtime_error("source query remains pending after successful callback");
+            return static_cast<Result>(result);
+        }else{
+            // Direct return preserves references and guaranteed copy elision,
+            // including callbacks returning a nonmovable prvalue. The check
+            // runs after result construction, but never while unwinding it.
+            struct NormalReturnCheck {
+                Bank& bank;int exceptions;
+                ~NormalReturnCheck() noexcept(false) {
+                    if(std::uncaught_exceptions()==exceptions&&bank.pendingToken_)
+                        throw std::runtime_error("source query remains pending after callback");
+                }
+            } check{*this,std::uncaught_exceptions()};
+            return std::forward<F>(operation)();
+        }
+    }
     friend class ra_source_camera50LA::OwnershipBridge;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     std::uint32_t nativeFifoPins_=0;

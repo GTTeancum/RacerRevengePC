@@ -84,6 +84,8 @@ public:
     OriginalGcParticleAuxiliaryChild50KG* auxiliaryChild() noexcept;
     const OriginalGcParticleAuxiliaryChild50KG* auxiliaryChild() const noexcept;
     std::uint32_t registerEmitter(const OriginalGcParticleEmitterState50KG&) noexcept;
+    // Actual retained registry allocation; observation only, no reservation.
+    std::size_t emitterStoragePayloadBytes() const noexcept;
     OriginalGcParticleEmitterState50KG* emitter(std::uint32_t ownerId) noexcept;
     const OriginalGcParticleEmitterState50KG* emitter(std::uint32_t ownerId) const noexcept;
     // Source pointers138[count128], then count128++. Reserve does not publish.

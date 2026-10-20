@@ -90,4 +90,11 @@ ResetGroundStatus50IZ queryResetGround50IZ(const ResetGroundInput50IZ&,
     const ResetGroundWorld50IZ&,const ResetGroundMutable50IZ&,
     const ResetGroundWorkspace50IZ&,ResetGroundResult50IZ&,
     ResetGroundDiagnostic50IZ&) noexcept;
+// Same numerical/collection operation with an authenticated outer result
+// borrow. Exactly one temporary shape0 child may be active at any instant.
+ResetGroundStatus50IZ queryResetGroundSourceBound50MB(const ResetGroundInput50IZ&,
+    const ResetGroundWorld50IZ&,const ResetGroundMutable50IZ&,
+    const ResetGroundWorkspace50IZ&,ResetGroundResult50IZ&,
+    ResetGroundDiagnostic50IZ&,CollisionResultBindingOwner50MB&,
+    const SourceOuterResultLease50MB&) noexcept;
 } // namespace rr::game

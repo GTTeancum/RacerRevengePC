@@ -118,6 +118,8 @@ const OriginalUiMemberIdentity50KG* originalUiMemberIdentity50KG(
 struct OriginalUiArchive50KG::Storage {
     const OriginalUiArchiveIdentity50KG* identity = nullptr;
     std::vector<std::uint8_t> decoded;
+    std::vector<std::uint8_t> encoded;
+    std::vector<ResourceBlock48C> blocks;
 };
 OriginalUiArchive50KG::OriginalUiArchive50KG() noexcept = default;
 OriginalUiArchive50KG::~OriginalUiArchive50KG() = default;
@@ -125,6 +127,16 @@ OriginalUiArchive50KG::~OriginalUiArchive50KG() = default;
 bool OriginalUiArchive50KG::load(OriginalUiArchiveId50KG id,
     const std::vector<std::uint8_t>& input, OriginalUiArchiveDiagnostic50KG& diagnostic,
     const DecodeHooks48C* hooks) noexcept {
+    return loadImpl(id,input,nullptr,diagnostic,hooks);
+}
+bool OriginalUiArchive50KG::loadOwned(OriginalUiArchiveId50KG id,
+    std::vector<std::uint8_t>&& input, OriginalUiArchiveDiagnostic50KG& diagnostic,
+    const DecodeHooks48C* hooks) noexcept {
+    return loadImpl(id,input,&input,diagnostic,hooks);
+}
+bool OriginalUiArchive50KG::loadImpl(OriginalUiArchiveId50KG id,
+    const std::vector<std::uint8_t>& input, std::vector<std::uint8_t>* transfer,
+    OriginalUiArchiveDiagnostic50KG& diagnostic, const DecodeHooks48C* hooks) noexcept {
     diagnostic = {};
     using Status = OriginalUiArchiveStatus50KG;
     if (storage_) { diagnostic.status = Status::alreadyLoaded; return false; }
@@ -167,7 +179,13 @@ bool OriginalUiArchive50KG::load(OriginalUiArchiveId50KG id,
         auto candidate = std::make_unique<Storage>();
         candidate->identity = expected;
         candidate->decoded = std::move(parsed.decoded);
+        candidate->blocks = std::move(parsed.blocks);
+        // Const-input callers need one owned encoded allocation. The actual
+        // file reader transfers its allocation instead; all fallible work and
+        // cancellation checks finish before that no-throw ownership transfer.
+        if (!transfer) candidate->encoded = input;
         if (isCancelled(hooks)) { diagnostic.status = Status::cancelled; return false; }
+        if (transfer) candidate->encoded.swap(*transfer);
         storage_ = std::move(candidate); // Only publication point, after all authentication.
         diagnostic = {};
         return true;
@@ -195,5 +213,23 @@ OriginalUiMemberView50KG OriginalUiArchive50KG::find(const std::string& name) co
     }
     return {};
 }
+const OriginalUiArchiveIdentity50KG* OriginalUiEncodedArchiveView50KG::identity() const noexcept {
+    return archive_ ? archive_->identity() : nullptr;
+}
+const std::uint8_t* OriginalUiEncodedArchiveView50KG::data() const noexcept {
+    return archive_ && archive_->storage_ ? archive_->storage_->encoded.data() : nullptr;
+}
+std::size_t OriginalUiEncodedArchiveView50KG::size() const noexcept {
+    return archive_ && archive_->storage_ ? archive_->storage_->encoded.size() : 0;
+}
+std::size_t OriginalUiEncodedArchiveView50KG::blockCount() const noexcept {
+    return archive_ && archive_->storage_ ? archive_->storage_->blocks.size() : 0;
+}
+bool OriginalUiEncodedArchiveView50KG::block(std::size_t i, ResourceBlock48C& out) const noexcept {
+    out={};
+    if(!archive_ || !archive_->storage_ || i>=archive_->storage_->blocks.size()) return false;
+    out=archive_->storage_->blocks[i]; return true;
+}
+
 }
 

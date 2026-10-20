@@ -251,7 +251,7 @@ Status projectOriginalUiRiderBinderPacket50KM(const OriginalUiRiderBinderQuad50K
 }
 static Status projectSceneSurface(const assets::Scene48D& scene,
     std::uint32_t lod,std::uint32_t surfaceIndex,const ModelPalette49S& palette,
-    const OriginalUiLitContext50KM& context,bool radialFog,bool specular,
+    const OriginalUiLitContext50KM& context,bool radialFog,bool specular,bool authenticatedStoredColors,
     OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
     if(!ready())return Status::arithmetic;
     if(radialFog)return Status::unsupportedFog;
@@ -262,7 +262,7 @@ static Status projectSceneSurface(const assets::Scene48D& scene,
         scene.quantization[5]!=0||scene.quantization[6]!=0)return Status::unsupportedScene;
     const auto& surface=scene.lods[lod].surfaces[surfaceIndex];
     const auto triangles=surface.indices.size()/3;
-    if(surface.has_original_colors||surface.material_index>=scene.materials.size()||
+    if((surface.has_original_colors&&!authenticatedStoredColors)||surface.material_index>=scene.materials.size()||
         surface.vertices.empty()||surface.vertices.size()>originalUiLitMaximumSurfaceVertices50KM||
         !triangles||surface.indices.size()%3||triangles>originalUiLitMaximumTriangles50KM)return Status::unsupportedScene;
     if(!output.vertices||!output.rasterW||!output.fogFactors||output.slotCapacity<triangles)return Status::input;
@@ -315,12 +315,52 @@ Status projectOriginalUiLitSceneSurface50KM(const assets::Scene48D& scene,
     std::uint32_t lod,std::uint32_t surface,const ModelPalette49S& palette,
     const OriginalUiLitContext50KM& context,bool radialFog,
     OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
-    return projectSceneSurface(scene,lod,surface,palette,context,radialFog,false,output,work);
+    return projectSceneSurface(scene,lod,surface,palette,context,radialFog,false,false,output,work);
+}
+Status projectOriginalUiKnireColoredSurface50KM(
+    const assets::OriginalUiRiderCharacterAssets50KG& owner,std::uint32_t lod,
+    std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
+    const ModelPalette49S& palette,const OriginalUiLitContext50KM& context,bool radialFog,
+    OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
+    const auto* identity=owner.geometrySource();const auto* scene=owner.scene();
+    if(!owner.loaded()||owner.widgetId()!=56||!identity||!identity->sha256||
+        identity->bytes!=84424||std::strcmp(identity->sha256,
+        "1e240e3c96bab3cf54b20ba8b482ab58a3e38685c62484c9ad6542d2314a4868")||
+        !scene||lod!=0||surface!=1||passIndex!=0||microprogram!="DiffuseCompressed"||
+        scene->nodes.size()!=18||scene->lods.size()!=1||scene->lods[0].surfaces.size()!=3||
+        scene->materials.size()!=3||scene->materials[1]!="22c_2")return Status::unsupportedScene;
+    const auto& original=scene->lods[0].surfaces[1];
+    if(original.component_word!=0x10f||!original.has_original_colors||
+        original.material_index!=1||original.vertices.size()!=923)return Status::unsupportedScene;
+    // PSG hash authenticates all 71 source groups (3..16 vertices). Their color
+    // rows end at B+64, before generated packets at B+68. The resident366430
+    // clipper consumes generated packet colors, including on the bit4 branch.
+    return projectSceneSurface(*scene,lod,surface,palette,context,radialFog,false,true,output,work);
+}
+Status projectOriginalUiKraidColoredSurface50KM(
+    const assets::OriginalUiRiderCharacterAssets50KG& owner,std::uint32_t lod,
+    std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
+    const ModelPalette49S& palette,const OriginalUiLitContext50KM& context,bool radialFog,
+    OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
+    const auto* identity=owner.geometrySource();const auto* scene=owner.scene();
+    if(!owner.loaded()||owner.widgetId()!=57||!identity||!identity->sha256||
+        identity->bytes!=99072||std::strcmp(identity->sha256,
+        "7ac6249f6219fcd2d8e779fc322f2b3de7cd8cccd5625b9bf30dbe66f2c2b2ba")||
+        !scene||lod!=0||surface!=1||passIndex!=0||microprogram!="DiffuseCompressed"||
+        scene->nodes.size()!=26||scene->lods.size()!=1||scene->lods[0].surfaces.size()!=3||
+        scene->materials.size()!=3||scene->materials[1]!="23c_2")return Status::unsupportedScene;
+    const auto& original=scene->lods[0].surfaces[1];
+    if(original.component_word!=0x10f||!original.has_original_colors||
+        original.material_index!=1||original.vertices.size()!=1850)return Status::unsupportedScene;
+    // PSG hash authenticates all 145 source groups (3..16 vertices). Their color
+    // rows end at B+64, before generated packets at B+68. The resident366430
+    // clipper consumes generated packet colors, including on the bit4 branch.
+    return projectSceneSurface(*scene,lod,surface,palette,context,radialFog,false,true,output,work);
 }
 Status projectOriginalUiSpecularMapCompressedSurface50KM(const assets::Scene48D& scene,
     std::uint32_t lod,std::uint32_t surface,const ModelPalette49S& palette,
     const OriginalUiLitContext50KM& context,
     OriginalUiLitSurfaceOutput50KM& output,OriginalUiLitGeometryWorkspace50KM& work) noexcept {
-    return projectSceneSurface(scene,lod,surface,palette,context,false,true,output,work);
+    return projectSceneSurface(scene,lod,surface,palette,context,false,true,false,output,work);
 }
 }

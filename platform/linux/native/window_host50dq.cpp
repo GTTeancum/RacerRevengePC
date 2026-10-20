@@ -539,6 +539,18 @@ bool WindowHost50DQ::poll(WindowInput50DQ& input, WindowHostDiagnostic50DQ& d) n
     for (Int i = 0; i < count; ++i) {
         const auto& event = events[i];
         const UInt type = field<UInt>(event, 0);
+        // Diagnostic receipt only, restricted to this owned game window.
+        // Reuse existing ABI fields before focus/scancode/repeat handling.
+        if ((type == keyDownEvent || type == keyUpEvent) &&
+            field<UInt>(event, 8) == s.windowId) {
+            std::fprintf(stderr,
+                "native_sdl_key_event type=%u scancode=%d window=%u matching_window=%u focused=%u repeat=%u\n",
+                static_cast<unsigned>(type),static_cast<int>(field<Int>(event,16)),
+                static_cast<unsigned>(field<UInt>(event,8)),
+                static_cast<unsigned>(field<UInt>(event,8)==s.windowId),
+                static_cast<unsigned>(info_.focused),
+                static_cast<unsigned>(field<std::uint8_t>(event,13)));
+        }
         if (type == quitEvent) s.quitRequested = true;
         else if (type == windowEvent && field<UInt>(event, 8) == s.windowId) {
             switch (field<std::uint8_t>(event, 12)) {

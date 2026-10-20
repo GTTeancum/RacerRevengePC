@@ -333,6 +333,9 @@ std::uint32_t OriginalGcParticleManager50KG::registerEmitter(const OriginalGcPar
     if(!storage_||!group(e.particleGroup)||storage_->emitters.size()>=originalGcParticleCapacity50KG)return 0;
     try{storage_->emitters.push_back(e);return static_cast<std::uint32_t>(storage_->emitters.size());}catch(...){return 0;}
 }
+std::size_t OriginalGcParticleManager50KG::emitterStoragePayloadBytes() const noexcept {
+    return storage_?storage_->emitters.capacity()*sizeof(OriginalGcParticleEmitterState50KG):0u;
+}
 OriginalGcParticleEmitterState50KG* OriginalGcParticleManager50KG::emitter(std::uint32_t id) noexcept {
     return storage_&&id&&id<=storage_->emitters.size()?&storage_->emitters[id-1]:nullptr;
 }

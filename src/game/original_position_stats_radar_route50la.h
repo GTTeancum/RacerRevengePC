@@ -1,5 +1,7 @@
 #pragma once
 #include "track_navigation50eu.h"
+#include "navigation_consumer_bridge50mb.h"
+#include <utility>
 #include <cstddef>
 #include <cstdint>
 
@@ -11,8 +13,13 @@ struct RadarRouteProgress {
 };
 //Original2A26E0 selection, including the same-branch fast path and the
 //descending search which excludes node0. The node0 query scans Next0 only.
-inline bool radarPredecessor2A26E0(const TrackNavigation50EU& map,
+template<class Navigation>
+inline bool radarPredecessor2A26E0Shared50MB(const Navigation& source_map,
     std::uint32_t node,std::uint32_t& previous)noexcept {
+    // MB admission is sealed at the shared entry, before source effects.
+    if(!navigation_consumer_detail50MB::mapReady(source_map))return false;
+
+    const auto& map=navigation_consumer_detail50MB::read(source_map);
     if(node>=map.track.count)return false;
     if(node&&map.nodes[node].branch68==map.nodes[node-1].branch68){previous=node-1;return true;}
     if(!node){
@@ -25,6 +32,10 @@ inline bool radarPredecessor2A26E0(const TrackNavigation50EU& map,
             if(map.track.nodes[i].next[n]==node){previous=i;return true;}
     return false;
 }
+inline bool radarPredecessor2A26E0(const TrackNavigation50EU& map,
+    std::uint32_t node,std::uint32_t& previous)noexcept {
+    return radarPredecessor2A26E0Shared50MB(map,node,previous);
+}
 //192568..1927E0, before the separate racer-marker loop. Callers supply the
 //actual authored map. Emit writes an existing element/point and returns the
 //192C70 alpha; Finish publishes its doubled type5 count/dirty state. Neither
@@ -32,14 +43,18 @@ inline bool radarPredecessor2A26E0(const TrackNavigation50EU& map,
 //Failure retains already emitted writes and reports the exact pending node.
 //Completed elements are CPU geometry only; original per-strip GPU submission
 //is deliberately a later native renderer responsibility.
-template<class Emit,class Finish>
-bool traverseRadar1924C0(const TrackNavigation50EU& map,Emit&& emit,Finish&& finish,
+template<class Navigation,class Emit,class Finish>
+bool traverseRadar1924C0Shared50MB(const Navigation& source_map,Emit&& emit,Finish&& finish,
     RadarRouteProgress& progress)noexcept {
+    // MB admission is sealed at the shared entry, before source effects.
+    if(!navigation_consumer_detail50MB::mapReady(source_map)) {progress={};progress.sourcePC=0x192734;return false;}
+
+    const auto& map=navigation_consumer_detail50MB::read(source_map);
     progress={};
     const auto fail=[&](std::uint32_t pc,std::uint32_t node)noexcept{
         progress.sourcePC=pc;progress.node=node;return false;
     };
-    if(!map.gatesPrepared||!map.track.count||map.track.count>maxUndertrackNodes50ET)
+    if(!map.gatesPrepared||!map.track.count||map.track.count>navigation_consumer_detail50MB::capacity(map))
         return fail(0x192734,0);
     for(std::uint32_t i=0;i<map.track.count;++i){
         const auto& n=map.track.nodes[i];
@@ -74,7 +89,7 @@ bool traverseRadar1924C0(const TrackNavigation50EU& map,Emit&& emit,Finish&& fin
         if(!append(node,alpha))return false;
         if(!alpha)continue; //Same uncounted point is overwritten by the next candidate.
         std::uint32_t predecessor=0;
-        if(!radarPredecessor2A26E0(map,node,predecessor))return fail(0x2a26e0,node);
+        if(!radarPredecessor2A26E0Shared50MB(map,node,predecessor))return fail(0x2a26e0,node);
         if(previous!=static_cast<std::int32_t>(predecessor)){
             if(progress.pointsInCurrent){
                 if(!close())return false;
@@ -90,4 +105,39 @@ bool traverseRadar1924C0(const TrackNavigation50EU& map,Emit&& emit,Finish&& fin
     if(progress.pointsInCurrent&&progress.completedElements<16){if(!close())return false;}
     progress.pointsInCurrent=0;return true;
 }
+template<class Emit,class Finish>
+bool traverseRadar1924C0(const TrackNavigation50EU& map,Emit&& emit,Finish&& finish,
+    RadarRouteProgress& progress)noexcept {
+    return traverseRadar1924C0Shared50MB(map,std::forward<Emit>(emit),std::forward<Finish>(finish),progress);
+}
+template<class Emit,class Finish>
+bool traverseRadar1924C0(const TrackNavigationView50EU& map,Emit&& emit,Finish&& finish,
+    RadarRouteProgress& progress)noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)) {
+        progress={};progress.sourcePC=0x192734;return false;
+    }
+    return traverseRadar1924C0Shared50MB(map,std::forward<Emit>(emit),std::forward<Finish>(finish),progress);
+}
+// TC-CONSUMER-BEGIN 0
+template<class Emit,class Finish>
+bool traverseRadar1924C0(const TrackNavigationView50TC& map,Emit&& emit,Finish&& finish,
+    RadarRouteProgress& progress)noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)) {
+        progress={};progress.sourcePC=0x192734;return false;
+    }
+    return traverseRadar1924C0Shared50MB(map,std::forward<Emit>(emit),std::forward<Finish>(finish),progress);
+}
+// TC-CONSUMER-END 0
+
+// TB-CONSUMER-BEGIN 0
+template<class Emit,class Finish>
+bool traverseRadar1924C0(const TrackNavigationView50TB& map,Emit&& emit,Finish&& finish,
+    RadarRouteProgress& progress)noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)) {
+        progress={};progress.sourcePC=0x192734;return false;
+    }
+    return traverseRadar1924C0Shared50MB(map,std::forward<Emit>(emit),std::forward<Finish>(finish),progress);
+}
+// TB-CONSUMER-END 0
+
 }

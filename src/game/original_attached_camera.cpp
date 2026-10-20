@@ -5,6 +5,10 @@
 #include <cfenv>
 #include <cmath>
 #include <cstring>
+#include <cstdio>
+#if defined(__SSE__)
+#include <xmmintrin.h>
+#endif
 #include <limits>
 
 namespace rr::game { namespace {
@@ -16,11 +20,47 @@ bool scalar(float f) noexcept {std::uint32_t u;std::memcpy(&u,&f,4);const auto e
     return e!=0x7f800000u&&(e!=0||(u&0x7fffffu)==0);}
 struct Math {
     bool ok=true;
-    float keep(float x) noexcept {ok=ok&&scalar(x);return x;}
-    float add(float a,float b) noexcept {keep(a);keep(b);volatile float r=a+b;return keep(r);}
-    float sub(float a,float b) noexcept {keep(a);keep(b);volatile float r=a-b;return keep(r);}
-    float mul(float a,float b) noexcept {keep(a);keep(b);volatile float r=a*b;return keep(r);}
-    float div(float a,float b) noexcept {keep(a);keep(b);if(b==0){ok=false;return 0;}volatile float r=a/b;return keep(r);}
+    // Diagnostic-only first rejected scalar. No new numeric admission or
+    // arithmetic: retain the original short-circuit predicate exactly.
+    unsigned stage=0,firstBadStage=0,firstBadOperation=0,firstBadRole=0;
+    std::uint32_t firstBadBits=0,firstBadA=0,firstBadB=0;
+    void reject(float x,unsigned operation,unsigned role,float a,float b) noexcept {
+        if(ok){std::memcpy(&firstBadBits,&x,4);std::memcpy(&firstBadA,&a,4);std::memcpy(&firstBadB,&b,4);
+            firstBadStage=stage;firstBadOperation=operation;firstBadRole=role;ok=false;}
+    }
+    float keep(float x,unsigned operation=0,unsigned role=0,float a=0,float b=0) noexcept {
+        if(ok&&!scalar(x))reject(x,operation,role,operation?a:x,b);
+        return x;
+    }
+    //13DF00's velocityY feeds only13E118..13E1BC's discarded vertical
+    //map. Admit its finite raw input without changing live-pose Math's
+    //normal/zero domain. NaN/Inf and every computed result remain checked.
+    float keepDiscardedVerticalVelocity(float x) noexcept {
+        if(ok){std::uint32_t u;std::memcpy(&u,&x,4);
+            if((u&0x7f800000u)==0x7f800000u)reject(x,0,0,x,0);}
+        return x;
+    }
+    float subtractDiscardedVerticalInput(float a,float b) noexcept {
+        keepDiscardedVerticalVelocity(a);keep(b,2,2,a,b);
+        volatile float r=a-b;return keep(r,2,3,a,b);
+    }
+    //13E074..13E114 consumes raw roll through an ordered interval map.
+    // Only its input may be finite-subnormal: with the actual range2 the
+    // first subtraction rounds to2, then the unchanged mapping gives +0.
+    // All other operands and EVERY computed result retain scalar checks.
+    float keepYawRollInput(float x) noexcept {
+        if(ok){std::uint32_t u;std::memcpy(&u,&x,4);
+            if((u&0x7f800000u)==0x7f800000u)reject(x,0,0,x,0);}
+        return x;
+    }
+    float subtractYawRollInput(float a,float b) noexcept {
+        keepYawRollInput(a);keep(b,2,2,a,b);
+        volatile float r=a-b;return keep(r,2,3,a,b);
+    }
+    float add(float a,float b) noexcept {keep(a,1,1,a,b);keep(b,1,2,a,b);volatile float r=a+b;return keep(r,1,3,a,b);}
+    float sub(float a,float b) noexcept {keep(a,2,1,a,b);keep(b,2,2,a,b);volatile float r=a-b;return keep(r,2,3,a,b);}
+    float mul(float a,float b) noexcept {keep(a,3,1,a,b);keep(b,3,2,a,b);volatile float r=a*b;return keep(r,3,3,a,b);}
+    float div(float a,float b) noexcept {keep(a,4,1,a,b);keep(b,4,2,a,b);if(b==0){reject(b,4,2,a,b);return 0;}volatile float r=a/b;return keep(r,4,3,a,b);}
     V cross(V a,V b) noexcept {return {sub(mul(a.y,b.z),mul(a.z,b.y)),sub(mul(a.z,b.x),mul(a.x,b.z)),
         sub(mul(a.x,b.y),mul(a.y,b.x)),0};}
     V normalize(V a) noexcept {
@@ -50,7 +90,7 @@ void lazy(G& g) noexcept {
 float yawAngle(Math& m,float input,float range,float angle) noexcept {
     const float low=-m.keep(range),high=m.keep(range),outHigh=m.keep(angle),outLow=-angle;
     if(high==low)return 0;
-    const float scaled=m.div(m.mul(m.sub(input,low),m.sub(outLow,outHigh)),m.sub(high,low));
+    const float scaled=m.div(m.mul(m.subtractYawRollInput(input,low),m.sub(outLow,outHigh)),m.sub(high,low));
     float value=m.add(outHigh,scaled);
     if(outLow<=outHigh){if(value<outLow)value=outLow;else if(!(value<=outHigh))value=outHigh;}
     else {if(!(value<=outLow))value=outLow;else if(value<outHigh)value=outHigh;}
@@ -59,7 +99,7 @@ float yawAngle(Math& m,float input,float range,float angle) noexcept {
 void unusedVerticalMap(Math& m,float input,float range,float angle) noexcept {
     const float low=-m.keep(range),high=m.keep(range),outHigh=m.keep(angle),outLow=-angle;
     if(high==low)return;
-    const float scaled=m.div(m.mul(m.sub(input,low),m.sub(outHigh,outLow)),m.sub(high,low));
+    const float scaled=m.div(m.mul(m.subtractDiscardedVerticalInput(input,low),m.sub(outHigh,outLow)),m.sub(high,low));
     const float value=m.add(outLow,scaled);(void)value;
     //13E150..13E1BC contains comparisons but publishes no value. f12 yaw is
     //unchanged across this complete dead vertical-swing calculation.
@@ -96,11 +136,31 @@ Result pose(C& c,const OriginalAttachedFrame& in,const SceneGraph49P& graph,G& g
     if(!refreshSceneWorld49P(graph,c.binding.model1B4))return fail(Status::graph,0x28b1a0);
     const auto& w=graph.nodes[static_cast<std::uint32_t>(model)].world100.v;
     const V position{w[12],w[13],w[14],1},forward{w[8],w[9],w[10],1},up{w[4],w[5],w[6],1};
-    Math m;const float roll=-m.keep(in.mainBodyA4),vertical=-m.keep(in.mainBodyVelocityY74);
-    const V right=m.cross(forward,up);lazy(globals);
-    const float yaw=yawAngle(m,roll,globals.yawInputRange3EB0,globals.yawAngle3EC0);
-    unusedVerticalMap(m,vertical,globals.verticalInputRange3EB8,globals.verticalAngle3EC8);
-    V look{0,0,0,1};if(!m.ok||!rotate(up,forward,yaw,look))return fail(Status::arithmetic,0x13e1c4);
+    Math m;m.stage=1;const float roll=-m.keepYawRollInput(in.mainBodyA4),vertical=-m.keepDiscardedVerticalVelocity(in.mainBodyVelocityY74);
+    m.stage=2;const V right=m.cross(forward,up);lazy(globals);
+    m.stage=3;const float yaw=yawAngle(m,roll,globals.yawInputRange3EB0,globals.yawAngle3EC0);
+    m.stage=4;unusedVerticalMap(m,vertical,globals.verticalInputRange3EB8,globals.verticalAngle3EC8);
+    V look{0,0,0,1};
+    const bool rotationAttempted=m.ok;
+    const bool rotationAccepted=rotationAttempted&&rotate(up,forward,yaw,look);
+    if(!m.ok||!rotationAccepted){
+        const auto word=[](float value) noexcept {std::uint32_t u;std::memcpy(&u,&value,4);return u;};
+        unsigned mxcsrAvailable=0,mxcsr=0;
+#if defined(__SSE__)
+        mxcsrAvailable=1;mxcsr=_mm_getcsr();
+#endif
+        std::fprintf(stderr,
+            "original_attached_13e1c4_rejected math_ok=%u first_bad_stage=%u first_bad_bits=%08x first_bad_operation=%u first_bad_role=%u first_bad_a=%08x first_bad_b=%08x rotation_attempted=%u rotation_accepted=%u "
+            "pod=%d body_node=%d model_node=%d a4=%08x velocity_y=%08x elapsed=%08x yaw=%08x "
+            "up=%08x,%08x,%08x forward=%08x,%08x,%08x right=%08x,%08x,%08x "
+            "yaw_range=%08x yaw_angle=%08x vertical_range=%08x vertical_angle=%08x rounding=%d mxcsr_available=%u mxcsr=%08x\n",
+            unsigned(m.ok),m.firstBadStage,m.firstBadBits,m.firstBadOperation,m.firstBadRole,m.firstBadA,m.firstBadB,unsigned(rotationAttempted),unsigned(rotationAccepted),
+            c.binding.pod60,body,model,word(in.mainBodyA4),word(in.mainBodyVelocityY74),word(in.elapsed),word(yaw),
+            word(up.x),word(up.y),word(up.z),word(forward.x),word(forward.y),word(forward.z),
+            word(right.x),word(right.y),word(right.z),word(globals.yawInputRange3EB0),word(globals.yawAngle3EC0),
+            word(globals.verticalInputRange3EB8),word(globals.verticalAngle3EC8),std::fegetround(),mxcsrAvailable,mxcsr);
+        return fail(Status::arithmetic,0x13e1c4);
+    }
     if(c.snap3C){c.direction30[0].value=look.x;c.direction30[1].value=look.y;c.direction30[2].value=look.z;c.snap3C=false;}
     else {look.x=m.filter(c.direction30[0],look.x,in.elapsed);look.y=m.filter(c.direction30[1],look.y,in.elapsed);
         look.z=m.filter(c.direction30[2],look.z,in.elapsed);}

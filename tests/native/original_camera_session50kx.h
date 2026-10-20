@@ -1,4 +1,6 @@
 #pragma once
+#include "track_navigation_view50tc.h"
+#include "track_navigation_view50tb.h"
 namespace original_cable_selection50LA { class Binding; }
 namespace rr::game { class OriginalDamageObservation50LA; }
 // Concrete original-AI / one-Player native session adapter. Intended install: tests/native.
@@ -100,7 +102,7 @@ struct ActualOwners {
     AiRuntimeState50IV& ai;
     LapTimingFields50ID& racerTiming;
     LapTimingManager50ID& all8Manager;
-    race_session50HM::Session& hostRace;
+    race_session50HM::SessionBorrow hostRace;
     SharedRandomOwner50ID& sharedRandom;
     OriginalAttachedGlobals& attachedGlobals;
     HostMonotonicClock50ID& applicationClock;
@@ -144,6 +146,9 @@ struct ActualOwners {
     OriginalApplicationAnimationClockView50KG applicationAnimation; //Same Application pause11C owner.
     const std::array<native_racer50HW::Cables*,8>* actualCables=nullptr; // RA factory pins every concrete owner.
     const TrackNavigation50EU* actualRadarMapB8=nullptr; // Borrow of the same retained authored map; RA factory only.
+    TrackNavigationView50EU actualRadarMapMb{};
+    TrackNavigationView50TC actualRadarMapTc{};
+    TrackNavigationView50TB actualRadarMapTb{};
 };
 enum class Cut : std::uint8_t {
     // Native hold: use real current final-grid/last-published body state while
@@ -164,6 +169,13 @@ struct Result {
     OriginalCameraStartResult start{};
     OriginalFollowResult follow{};
     OriginalAttachedResult attached{};
+    // Failure diagnostics only. Valid flags distinguish this child attempt
+    // from receipts retained from earlier successfully committed frames.
+    OriginalFollowRaceFrameResult stableFollow{};
+    OriginalAttachedRaceFrameResult stableAttached{};
+    bool stableFollowAttempted=false,stableAttachedAttempted=false;
+    bool cameraFrameMatches=false,cameraCutMatches=false,cameraCutAccepted=false;
+    std::uint32_t cameraChildStage=0;
     OriginalRetirementCameraResult50KG retirement{};
     OriginalDeathCameraResult50KG death{};
     OriginalCameraVisibilityJoinResult visibilityJoin{};
@@ -278,9 +290,8 @@ class Session final {
     OriginalCameraObjectChildHeads objectChildren_;
     OriginalCameraControllerEntityFields controllerEntity_;
     OriginalCameraSceneOwner spatial_;
-    std::array<CollectionZoneLink50BX,lighting::maximumPortals+1> links_{};
-    std::array<LiveZoneEntry50EN,lighting::maximumPortals+1> entries_{};
-    OriginalCameraVisibilityKeys visibilityKeys_;
+    OriginalSelectedCameraVisibilityBacking50SC visibilityBacking_;
+    OriginalSelectedCameraVisibilityKeys50SC visibilityKeys_;
     OriginalFollowSceneBinding sceneBinding_;
     CameraSceneState49F scene_;
     OriginalCameraSceneTick tick_;
@@ -612,7 +623,7 @@ class Session final {
         if(result_.start.status!=OriginalCameraStartStatus::complete)
             return set(Status::exitPending,result_.start.sourcePC);
         if(!countdownInstalled_){
-            auto& host=actual_.hostRace;
+            auto& host=actual_.hostRace.rows();
             //The already initialized route/standings owner is retained. This
             //is the ONE advancing countdown; source34 is only its start input.
             if(host.phase!=race_session50HM::Phase::Countdown||host.racerCount!=8||host.raceSeconds!=0||
@@ -835,10 +846,11 @@ public:
         invalidateFogPreparation();
         if(coldBound_||closed_)return set(Status::order);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
+        if(!actual_.hostRace.runtimeValid())return set(Status::owner);
         if(!generation||actual_.bank.count()!=8||actual_.all8Manager.flags58&2u||
            actual_.launchKind11258!=1u||
-           actual_.hostRace.phase!=race_session50HM::Phase::Countdown||actual_.hostRace.racerCount!=8||
-           actual_.hostRace.raceSeconds!=0||actual_.hostRace.finishCount)return set(Status::owner);
+           actual_.hostRace.rows().phase!=race_session50HM::Phase::Countdown||actual_.hostRace.rows().racerCount!=8||
+           actual_.hostRace.rows().raceSeconds!=0||actual_.hostRace.rows().finishCount)return set(Status::owner);
         if(displayInputs_&&displayInputs_!=&app)return set(Status::owner);
         if(generation_&&generation_!=generation)return set(Status::owner);
         generation_=generation;displayInputs_=&app;
@@ -959,8 +971,8 @@ public:
                 controllerEntity_.controllerKey=key(controller_);display_.controllers48[0]=&controllerEntity_;
                 ++coldPhase_;break;}
             case 7:
-                result_.visibilityJoin=attachFreshOriginalCamera0Visibility(actual_.visibility,generation_,key(scene_),
-                    spatial_,{links_.data(),entries_.data(),links_.size()},visibilityKeys_,sceneBinding_);
+                result_.visibilityJoin=attachFreshSelectedOriginalCamera0Visibility50SC(actual_.visibility,generation_,key(scene_),
+                    spatial_,visibilityBacking_,visibilityKeys_,sceneBinding_);
                 if(result_.visibilityJoin.status!=OriginalCameraVisibilityJoinStatus::complete){
                     if(result_.visibilityJoin.sceneAttached)return fail(Status::visibility,0x175224);
                     return set(Status::visibility,0x175224);
@@ -1023,12 +1035,18 @@ public:
     //at this SAME cut. Existing host-selected Player-derived audio/RNG suffix
     //runs in its existing caller later; this does not suppress/reproduce it.
     Result advanceCameraChild(std::uint64_t frame,Cut cut){
+        result_.stableFollowAttempted=false;result_.stableAttachedAttempted=false;
+        result_.cameraFrameMatches=false;result_.cameraCutMatches=false;result_.cameraCutAccepted=false;
+        result_.cameraChildStage=static_cast<std::uint32_t>(frameStage_);
         invalidateFogPreparation();
         if(!coldBound_||!displayInputs_)return set(Status::owner);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
-        if(frame!=frameNumber_||cut!=cut_||!cutCurrent(cut))return set(Status::order);
+        result_.cameraFrameMatches=frame==frameNumber_;result_.cameraCutMatches=cut==cut_;
+        if(!result_.cameraFrameMatches||!result_.cameraCutMatches)return set(Status::order);
+        result_.cameraCutAccepted=cutCurrent(cut);
+        if(!result_.cameraCutAccepted)return set(Status::order);
         if(frameStage_==FrameStage::cameraReady)frameStage_=FrameStage::cameraDispatch;
-        for(;;){switch(frameStage_){
+        for(;;){result_.cameraChildStage=static_cast<std::uint32_t>(frameStage_);switch(frameStage_){
         case FrameStage::cameraDispatch:
             result_.start=serviceBeforeChild();
             if(result_.start.status!=OriginalCameraStartStatus::complete)return set(Status::renderer,result_.start.sourcePC);
@@ -1146,6 +1164,7 @@ public:
                     if(!actual_.followQueries.commit())result.status=OriginalFollowRaceFrameStatus::owner;
                     return result;
                 });
+                result_.stableFollow=r;result_.stableFollowAttempted=true;
                 result_.follow=r.pose;
                 if(r.status!=OriginalFollowRaceFrameStatus::complete)return fail(Status::sourcePath,r.pose.sourcePC);
                 frameStage_=FrameStage::stableMatrix;break;
@@ -1162,6 +1181,7 @@ public:
                     actual_.blur,scene_,pose_,matrices_,tick_,*world,spatial_,zones,sceneBinding_,*work,
                     displayInputs_->rootFlags228,sceneFlags29_);
             });
+            result_.stableAttached=r;result_.stableAttachedAttempted=true;
             result_.attached=r.pose;
             if(r.status!=OriginalAttachedRaceFrameStatus::complete)return fail(Status::sourcePath,r.pose.sourcePC);
             frameStage_=FrameStage::stableMatrix;break;}
@@ -1304,8 +1324,8 @@ public:
         if(!coldBound_||frameStage_==FrameStage::failed)return set(Status::owner);
         if(pendingDisplayWork())return set(Status::videoPending);
         if(!countdownInstalled_)return set(Status::startHeld);
-        if(!race_session50HM::advanceCountdown(actual_.hostRace,static_cast<double>(actualPreparedSeconds))){
-            if(actual_.hostRace.error!=race_session50HM::Error::None)return fail(Status::numeric);
+        if(!actual_.hostRace.advanceCountdown(static_cast<double>(actualPreparedSeconds))){
+            if(actual_.hostRace.rows().error!=race_session50HM::Error::None)return fail(Status::numeric);
             return set(Status::startHeld);
         }
         if(!goPublished_){

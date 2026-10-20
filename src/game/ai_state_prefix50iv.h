@@ -18,6 +18,13 @@ using ai_speed_detail50IR::word;
 inline bool fail(AiPrefixDiagnostic50IV& d,AiPrefixError50IV e,std::uint32_t pc) noexcept {d={e,pc};return false;}
 struct Math : ai_speed_detail50IR::Math {
     float read(float v) noexcept {return keep(v);}
+    // Only the source-proven body+34 conversion, not generic scalar math.
+    float convertedCachedSpeed34(float cached) noexcept {
+        valid=valid&&std::isfinite(cached);
+        volatile float value=word(0x3f2e8bc1u)*cached;
+        valid=valid&&std::isfinite(value);
+        return value;
+    }
     float add(float a,float b) noexcept {read(a);read(b);return ai_speed_detail50IR::Math::add(a,b);}
     float sub(float a,float b) noexcept {read(a);read(b);return ai_speed_detail50IR::Math::sub(a,b);}
     float mul(float a,float b) noexcept {read(a);read(b);return ai_speed_detail50IR::Math::mul(a,b);}
@@ -168,7 +175,7 @@ inline bool updateAiPacking50IV(const AiPackingInput50IV& i,AiPackingState50IV& 
     auto finish=[&]() noexcept {if(!f.valid)return fail(d,AiPrefixError50IV::Arithmetic,0x171c60);
         state=n;thermalHeat7C=heat;out=r;return true;};
     if(i.referenceFF8<0||!i.referencePresent||i.referenceState40)return finish();
-    if(f.mul(word(0x3f2e8bc1u),i.referenceCachedSpeed34)<200.f)return finish();
+    if(f.convertedCachedSpeed34(i.referenceCachedSpeed34)<200.f)return finish();
     const float refLap=f.integer(i.referenceLapCC8);
     const float refProduct=f.mul(refLap,i.trackLength3C);
     const float refRemaining=f.sub(i.trackLength3C,i.referenceRemainingCC4);

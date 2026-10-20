@@ -18,9 +18,9 @@ template<class T> bool span(const T* p,std::size_t count,Span& out) noexcept {
 }
 bool overlap(Span a,Span b) noexcept {return a.first<b.last&&b.first<a.last;}
 struct Guard {
-    Span writable[7]{};unsigned count=0;
+    Span writable[9]{};unsigned count=0;
     template<class T> bool write(T* p,std::size_t n) noexcept {
-        Span s;if(count==7||!span(p,n,s))return false;
+        Span s;if(count==9||!span(p,n,s))return false;
         for(unsigned i=0;i<count;++i)if(overlap(s,writable[i]))return false;
         writable[count++]=s;return true;
     }
@@ -32,11 +32,19 @@ struct Guard {
 };
 bool storage(const ResetGroundInput50IZ& in,const ResetGroundWorld50IZ& world,
     const ResetGroundMutable50IZ& live,const ResetGroundWorkspace50IZ& work,
-    ResetGroundResult50IZ& out,ResetGroundDiagnostic50IZ& diagnostic) noexcept {
+    ResetGroundResult50IZ& out,ResetGroundDiagnostic50IZ& diagnostic,CollisionResultBindingOwner50MB* binding,const SourceOuterResultLease50MB* parent) noexcept {
     Guard g;
     if(!g.write(live.objects,live.objectCapacity)||!g.write(live.methods,live.methodCapacity)||
        !g.write(work.objects,work.objectCapacity)||!g.write(work.methods,work.methodCapacity)||
        !g.write(work.meshStack,work.meshStackCapacity)||!g.write(&out,1)||!g.write(&diagnostic,1))return false;
+    if(binding){
+        if(!parent||!binding->outerCurrent(*parent)||
+           !binding->disjointOuterStorage(binding,sizeof(*binding))||
+           !binding->disjointOuterStorage(parent,sizeof(*parent)))return false;
+        for(unsigned i=0;i<g.count;++i)if(!binding->disjointOuterStorage(
+            reinterpret_cast<const void*>(g.writable[i].first),g.writable[i].last-g.writable[i].first))return false;
+        if(!g.write(binding,1)||!g.read(parent,1))return false;
+    }
     if(!g.read(&in,1)||!g.read(&world,1)||!g.read(&live,1)||!g.read(&work,1)||
        !g.read(world.objects,world.objectCount)||!g.read(world.geometry,world.objectCount)||
        !g.read(world.methods,world.methodCount)||!g.read(world.zones,world.zoneCount)||
@@ -79,6 +87,8 @@ struct Query {
     const ResetGroundWorkspace50IZ& work;
     ResetGroundResult50IZ result;
     ResetGroundDiagnostic50IZ& diagnostic;
+    CollisionResultBindingOwner50MB* binding=nullptr;
+    const SourceOuterResultLease50MB* parent=nullptr;
     Ref zone=0,method=0;
     bool failed=false;
     bool fail(Status status,std::uint32_t pc,Ref object=0,
@@ -163,7 +173,10 @@ struct Query {
         ResetCandidateResult50AM found{};
         found.point=result.point;found.normal=result.normal;
         ++result.queried;
-        const auto status=queryResetCandidate50AM(in.start,result.end,shape->worldMatrix,center,
+        const auto status=binding?queryResetCandidateSourceBound50MB(in.start,result.end,shape->worldMatrix,center,
+            state.cachedRadius,object.filter.flags31,*shape->mesh,*in.normalMode3DF5B0,
+            work.meshStack,work.meshStackCapacity,found,*binding,*parent):
+            queryResetCandidate50AM(in.start,result.end,shape->worldMatrix,center,
             state.cachedRadius,object.filter.flags31,*shape->mesh,*in.normalMode3DF5B0,
             work.meshStack,work.meshStackCapacity,found);
         if(status!=ResetTreeStatus50AK::Complete)return fail(Status::Narrowphase,0x124e88u,ref,status);
@@ -207,16 +220,17 @@ struct Query {
 };
 } // namespace
 
-ResetGroundStatus50IZ queryResetGround50IZ(const ResetGroundInput50IZ& in,
+static ResetGroundStatus50IZ queryResetGroundImpl50MB(const ResetGroundInput50IZ& in,
     const ResetGroundWorld50IZ& world,const ResetGroundMutable50IZ& live,
     const ResetGroundWorkspace50IZ& work,ResetGroundResult50IZ& out,
-    ResetGroundDiagnostic50IZ& diagnostic) noexcept {
+    ResetGroundDiagnostic50IZ& diagnostic,CollisionResultBindingOwner50MB* binding,const SourceOuterResultLease50MB* parent) noexcept {
     // Storage rejection does not write a possibly aliased diagnostic.
-    if(!storage(in,world,live,work,out,diagnostic))return Status::Storage;
+    if(!storage(in,world,live,work,out,diagnostic,binding,parent))return Status::Storage;
     auto fail=[&](Status s,std::uint32_t pc) noexcept {
         diagnostic={s,pc,0,0,0,ResetTreeStatus50AK::Complete};return s;
     };
     diagnostic={};
+    if(bool(binding)!=bool(parent)||(binding&&!binding->outerCurrent(*parent)))return fail(Status::Binding,0x124cb0u);
     if(std::fegetround()!=FE_TONEAREST)return fail(Status::RoundingMode,0x124cb0u);
     if(!world.objectCount||!world.methodCount||!world.zoneCount||!in.zoneC34||
        in.zoneC34>world.zoneCount||!in.globalFallbackZone443108||!in.directTypeTagGp8010||
@@ -238,10 +252,16 @@ ResetGroundStatus50IZ queryResetGround50IZ(const ResetGroundInput50IZ& in,
             return fail(Status::Topology,0x294650u);
     std::memcpy(work.objects,live.objects,world.objectCount*sizeof(*work.objects));
     std::memcpy(work.methods,live.methods,world.methodCount*sizeof(*work.methods));
-    Query query{in,world,work,out,diagnostic};
+    Query query{in,world,work,out,diagnostic,binding,parent};
     if(!query.run())return diagnostic.status;
     std::memcpy(live.objects,work.objects,world.objectCount*sizeof(*live.objects));
     std::memcpy(live.methods,work.methods,world.methodCount*sizeof(*live.methods));
     out=query.result;diagnostic={};return Status::Complete;
+}
+ResetGroundStatus50IZ queryResetGround50IZ(const ResetGroundInput50IZ& in,const ResetGroundWorld50IZ& world,const ResetGroundMutable50IZ& live,const ResetGroundWorkspace50IZ& work,ResetGroundResult50IZ& out,ResetGroundDiagnostic50IZ& diagnostic) noexcept {
+ return queryResetGroundImpl50MB(in,world,live,work,out,diagnostic,nullptr,nullptr);
+}
+ResetGroundStatus50IZ queryResetGroundSourceBound50MB(const ResetGroundInput50IZ& in,const ResetGroundWorld50IZ& world,const ResetGroundMutable50IZ& live,const ResetGroundWorkspace50IZ& work,ResetGroundResult50IZ& out,ResetGroundDiagnostic50IZ& diagnostic,CollisionResultBindingOwner50MB& binding,const SourceOuterResultLease50MB& parent) noexcept {
+ return queryResetGroundImpl50MB(in,world,live,work,out,diagnostic,&binding,&parent);
 }
 } // namespace rr::game

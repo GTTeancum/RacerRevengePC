@@ -21,6 +21,22 @@ struct MaterialAudioCatalog50HI {
 // parameters; no guessed VAG names, generic impacts or timing thresholds.
 bool readMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
     MaterialAudioCatalog50HI&,std::vector<AudioRequest50HC>& uniqueRequests,std::string&error);
+// Exact authenticated MB AUB only:20 collision/12 drive,3 materials,
+//25 immutable PCM filenames and29 source-ordered assignment rows. This entry
+// does not broaden the legacy reader or admit an arbitrary count policy.
+bool readMbMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
+    MaterialAudioCatalog50HI&,std::vector<AudioRequest50HC>& uniqueRequests,std::string&error);
+// Exact authenticated TC AUB only:16 collision/12 drive,5 declared materials,
+//21 PCM names and8 source-ordered material2 assignments. The generic4 bound
+//stays unchanged; logical sound owners are never deduplicated with PCM.
+bool readTcMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
+    MaterialAudioCatalog50HI&,std::vector<AudioRequest50HC>& uniqueRequests,std::string&error);
+// Exact authenticated TB AUB only:24 collision/20 drive,5 materials,
+//33 immutable PCM names and54 ordered assignments. WOODHIT1..4 PCM is shared
+//by distinct one-shot collision and looping drive owners; request.loop remains
+//the first collision request's metadata and never governs PCM decoding.
+bool readTbMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
+    MaterialAudioCatalog50HI&,std::vector<AudioRequest50HC>& uniqueRequests,std::string&error);
 // Source track-specific collision loader1B5430 reads MaterialID with default1;
 // creator1B570C copies its positive byte toA9 (fresh collision default is0).
 // Call with the exact SCB instance that supplied the retained collider.

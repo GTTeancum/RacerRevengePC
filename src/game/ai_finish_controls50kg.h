@@ -13,10 +13,13 @@ inline bool applyOriginalAiEndingSpeed172B50(float cachedSpeed34,
     diagnostic={};
     if(std::fegetround()!=FE_TONEAREST)
         return d::fail(diagnostic,AiSpeedError50IR::RoundingMode,0x172b50u);
-    if(!d::admitted(cachedSpeed34)||!d::admitted(raceCountdown94))
+    if(!std::isfinite(cachedSpeed34)||!d::admitted(raceCountdown94))
         return d::fail(diagnostic,AiSpeedError50IR::Input,0x172b64u);
-    d::Math math;const float speed=math.mul(d::word(0x3f2e8bc1u),cachedSpeed34);
-    if(!math.valid)return d::fail(diagnostic,AiSpeedError50IR::Arithmetic,0x172b70u);
+    // Same scoped finite cached-speed conversion as the racing consumers.
+    // Preserve the actual rounded product; no guest FPU parity is claimed.
+    volatile float converted=d::word(0x3f2e8bc1u)*cachedSpeed34;
+    const float speed=converted;
+    if(!std::isfinite(speed))return d::fail(diagnostic,AiSpeedError50IR::Arithmetic,0x172b70u);
     auto next=controls;
     if(speed>160.f&&raceCountdown94>1.f){next.actionB7C=0.f;next.actionB80=1.f;}
     else if(raceCountdown94>1.25f){next.actionB7C=1.f;next.actionB80=1.f;}

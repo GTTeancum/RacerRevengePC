@@ -5,9 +5,12 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace rr::assets {
 class OriginalUiMaterialTemplates50KG;
+class OriginalStandardArchiveProvider50LA;
+class OriginalUiEncodedArchiveView50KG;
 struct OriginalUiMaterialTemplateStorage50KG;
 // NEW reconstruction: identities transcribed from the retained Full48F manifest.
 // These IDs identify exact US-disc originals, not arbitrary files.
@@ -71,6 +74,11 @@ public:
     // before authentication is complete and therefore never mean success.
     bool load(OriginalUiArchiveId50KG, const std::vector<std::uint8_t>&,
         OriginalUiArchiveDiagnostic50KG&, const DecodeHooks48C* = nullptr) noexcept;
+    // Same authentication and single publication as load. On failure input is
+    // unchanged. On success its allocation transfers to this immutable owner;
+    // callers relinquish mutable aliases. No second encoded allocation is made.
+    bool loadOwned(OriginalUiArchiveId50KG, std::vector<std::uint8_t>&&,
+        OriginalUiArchiveDiagnostic50KG&, const DecodeHooks48C* = nullptr) noexcept;
     bool loaded() const noexcept;
     const OriginalUiArchiveIdentity50KG* identity() const noexcept;
     std::size_t memberCount() const noexcept;
@@ -80,6 +88,10 @@ public:
     OriginalUiMemberView50KG find(const std::string& originalName) const noexcept;
 private:
     friend class OriginalUiMaterialTemplates50KG;
+    friend class OriginalUiEncodedArchiveView50KG;
+    bool loadImpl(OriginalUiArchiveId50KG, const std::vector<std::uint8_t>&,
+        std::vector<std::uint8_t>* transfer,
+        OriginalUiArchiveDiagnostic50KG&, const DecodeHooks48C*) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
     // An application retaining this SAME APPSTART archive retains the SAME
@@ -87,6 +99,26 @@ private:
     // Template handles also pin this backing; no reference back to the archive
     // is stored in it, so these two ownership directions do not form a cycle.
     mutable std::shared_ptr<const OriginalUiMaterialTemplateStorage50KG> materialTemplates_;
+};
+// Immutable original-file input, not decoded member data or manager readiness.
+// Only a real mounted UI archive in the existing provider can mint this view.
+// It pins that SAME archive, not a duplicate encoded buffer. providerIdentity is
+// comparison-only provenance and must never be dereferenced through this view.
+class OriginalUiEncodedArchiveView50KG final {
+    friend class OriginalStandardArchiveProvider50LA;
+    const OriginalStandardArchiveProvider50LA* provider_=nullptr;
+    std::shared_ptr<const OriginalUiArchive50KG> archive_;
+    OriginalUiEncodedArchiveView50KG(const OriginalStandardArchiveProvider50LA* provider,
+        std::shared_ptr<const OriginalUiArchive50KG> archive) noexcept
+        :provider_(provider),archive_(std::move(archive)){}
+public:
+    OriginalUiEncodedArchiveView50KG() noexcept=default;
+    const OriginalStandardArchiveProvider50LA* providerIdentity() const noexcept {return provider_;}
+    const OriginalUiArchiveIdentity50KG* identity() const noexcept;
+    const std::uint8_t* data() const noexcept;
+    std::size_t size() const noexcept;
+    std::size_t blockCount() const noexcept;
+    bool block(std::size_t, ResourceBlock48C&) const noexcept;
 };
 }
 

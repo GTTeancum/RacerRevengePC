@@ -12,6 +12,7 @@ namespace native_racer_model50LA { class Owner; }
 #include <string_view>
 #include <optional>
 #include <vector>
+#include <thread>
 
 namespace rr::game::original_gc_gameplay_lighting_candidate { class Owner; }
 namespace rr::game {
@@ -104,6 +105,10 @@ private:
 // and retains it across serial native race lifetimes. It is NOT a complete
 // retail application forest or a substitute race/manager ancestor chain.
 class OriginalApplicationEntities50LA final {
+    friend class OriginalFrontendCameraCold50LA;
+    // Native affinity of this actual shared owner, not a source field.
+    // Other owners retain their existing serialized-operation contract.
+    const std::thread::id nativeOwnerThread_=std::this_thread::get_id();
     friend class OriginalPauseStorage50LA;
     friend class OriginalTunnelTrack50LA;
     friend class OriginalRaceConstructor50LA;

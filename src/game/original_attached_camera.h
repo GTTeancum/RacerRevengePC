@@ -74,7 +74,13 @@ OriginalAttachedResult advanceOriginalAttachedCameraView(OriginalAttachedCamera&
     CoupledNoiseContext49M&,TVCameraUpdateOutput49F&,CameraSceneState49F&,
     CameraViewOutput49F&,std::uint8_t rootFlags228,std::uint8_t sceneFlags29) noexcept;
 //Bounded, fixed-storage, serial native instruction-step arithmetic: normal/zero
-//operands, separately rounded binary32, nearest-even, no contraction/fast math.
+//live operands/results, separately rounded binary32, nearest-even, no contraction/fast math.
+//The raw roll A4 input to13E074..13E114 and the dead13E118..13E1BC
+//vertical-map input (actual velocityY) admit finite subnormals; its first subtraction result and all later results retain
+//normal/zero admission. Actual range2 absorbs every subnormal roll in the
+//first subtraction; unchanged ordered yaw arithmetic yields +0. The dead
+//vertical block does not publish yaw/pose/state. No raw input is normalized.
+//No flushing, replacement input, exception-mode change or skipped arithmetic.
 //Existing49U/49F normalization semantics are retained; no universal EE/VU
 //exception or scratch-register-file equivalence is claimed. 28B9B0's scratch
 //W is dead: source13E338..13E358 consumes onlyXYZ and explicitly constructs W1.

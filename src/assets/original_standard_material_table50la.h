@@ -8,6 +8,7 @@ namespace original_position_stats_prestage50LA { class Owner; }
 
 namespace ra_static_world50LA {class Owner;}
 namespace rr::game {class OriginalPositionStatsResources50LA;class OriginalPauseMaterialAdmission50LA;}
+namespace rr::platform { class OriginalUiTournamentPodReferences50KG; }
 namespace rr::assets {
 // A partial CPU callback outcome, never a renderer capability. The first
 // enabled pass cannot return until24B9B0; subsequent passes remain untouched.
@@ -234,6 +235,7 @@ private:
     bool demandTournamentOutline2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,
         const OriginalUiMemberView50KG&,const OriginalUiMemberView50KG&,
         OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    friend class rr::platform::OriginalUiTournamentPodReferences50KG;
     friend class OriginalStandardMaterialReferences50LA;
     friend class OriginalStandardScreenMaterialReference50LA;
     friend class OriginalRadarOverlayMaterialReference50LA;

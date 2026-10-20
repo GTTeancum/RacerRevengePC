@@ -115,7 +115,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    const auto* target=courseTargets.admits(selected);
    return target&&courseCatalogPrepared&&(target->track==original_course_targets50KX::Track::RA||
        directHumanTargetSupported(target->track)||courseCorpusPresent)&&
-       raceRequested&&!courseColdLoad.pending()&&
+       raceRequested&&!courseColdLoad.pending()&&(!allAiEnabled||selected.laps==3)&&
        renderer.initialized()&&courseTargetModeSupported(target->track);
   });
   // This reads genuine UI resources only. Race target authentication is deferred
@@ -452,7 +452,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const auto* target=courseTargets.admits(selected);
     require50DU(target&&(target->track==original_course_targets50KX::Track::RA||
        directHumanTargetSupported(target->track)||courseCorpusPresent)&&
-        courseTargetModeSupported(target->track)&&
+        courseTargetModeSupported(target->track)&&(!allAiEnabled||selected.laps==3)&&
         courseColdLoad.publish(courseTargets,selected,sessionIndex+1),
         "actual Course exit could not publish its typed cold-load request");
     std::cerr<<"original_course_cold_load_queued course="<<selected.course<<" track="<<target->assets->world->code

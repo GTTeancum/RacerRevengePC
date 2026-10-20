@@ -132,6 +132,7 @@ std::uint16_t OriginalUiRiderCharacterAssets50KG::widgetId() const noexcept { re
 const std::string* OriginalUiRiderCharacterAssets50KG::baseName() const noexcept { return storage_?&storage_->base:nullptr; }
 const OriginalUiMemberIdentity50KG* OriginalUiRiderCharacterAssets50KG::widgetSource() const noexcept { return storage_?storage_->widgetSource:nullptr; }
 const OriginalUiMemberIdentity50KG* OriginalUiRiderCharacterAssets50KG::mcfSource() const noexcept { return storage_?storage_->mcfSource:nullptr; }
+const OriginalUiMemberIdentity50KG* OriginalUiRiderCharacterAssets50KG::geometrySource() const noexcept { return storage_?storage_->psg.identity:nullptr; }
 const PsgHierarchyView49O* OriginalUiRiderCharacterAssets50KG::hierarchy() const noexcept { return storage_?&storage_->hierarchy:nullptr; }
 const MotionNodeBindings49O* OriginalUiRiderCharacterAssets50KG::bindings() const noexcept { return storage_?&storage_->bindings:nullptr; }
 const Scene48D* OriginalUiRiderCharacterAssets50KG::scene() const noexcept { return storage_?&storage_->scene:nullptr; }

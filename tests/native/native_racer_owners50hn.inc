@@ -142,7 +142,7 @@ racerBank.owner(terrainOwner.prepared);
 // every slot. Rebuild this cold owner in place when installing an archetype;
 // copying an owner whose resource points into a temporary is invalid.
 racerBank.owner(terrainLiveOwner);
-if(!isRaTrack)for(auto& candidate:candidates){
+if(!isRaTrack&&!isMbTrack)for(auto& candidate:candidates){
  racerBank.owner(candidate.candidate.collision.filter.flagsF8);
  racerBank.owner(candidate.candidate.collision.copied40);
  racerBank.owner(candidate.candidate.collision.copied50);

@@ -11,7 +11,11 @@ namespace native_ai50IV { struct Session; }
 #include "original_ui_elapsed50lh.h"
 #include "original_ui_rider_pacing50lb.h"
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
+#include "../../src/assets/original_standard_texture_transfer_cold50la.h"
+#include "../../src/game/original_frontend_camera_cold50la.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
+#include "../../platform/linux/native/original_ui_tournament_pod_references50kg.h"
+#include "../../platform/linux/native/original_ui_search_list_cold50kg.h"
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
 #include "../../src/assets/original_ui_localization50kg.h"
@@ -19,6 +23,7 @@ namespace native_ai50IV { struct Session; }
 #include "../../src/assets/original_standard_material_context50la.h"
 #include "../../src/assets/original_native_texture_upload50la.h"
 #include "../../src/assets/original_standard_material_domain50la.h"
+#include "../../src/assets/original_archive_staged_reader50la.h"
 #include "../../src/assets/original_application_fonts50la.h"
 #include "../../src/game/lap_host_clock50id.h"
 #include "../../src/game/original_application_animation_clock50kg.h"
@@ -207,6 +212,9 @@ private:
     // so these two application-owned handles do not form a reference cycle.
     mutable std::shared_ptr<const rr::assets::OriginalStandardMaterialContext50LA> materialContextOwner_;
     mutable std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA> standardMaterialDomainOwner_;
+    // Native identity of each actual detached Tournament construction attempt.
+    // No source clock/profile/result meaning. Never reset on page return.
+    mutable std::uint64_t tournamentPodConstructionGeneration_=0;
     // First bounded Application328 registry. Declared after its canonical
     // domain/context so owned fonts release their texture leases first.
     // Scene teardown must retire every ScreenText/renderer Entry borrow;
@@ -361,6 +369,72 @@ public:
     void enterGameplayMaterialDirectory17D7A0() const {
         modelDirectory36B860_="geometry\\";materialDirectory36B970_="textures\\";
     }
+    // Empty staging may be issued after real canonical-domain startup. No
+    // historical mounts/rows/cache state is inferred and no service is activated.
+    bool stageArchiveReader(std::shared_ptr<rr::assets::OriginalArchiveStagedReader50LA>& out) const noexcept {
+        if(out||!standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared())return false;
+        const auto provider=standardMaterialDomainOwner_->archiveProvider3E1A70();
+        return provider&&provider->issueStagedReader(*this,provider,out);
+    }
+    // Uncalled actual-Application camera constructor prefix. Stops before2361C0;
+    // no page attachment, observer slot, renderer or visibility service exists here.
+    rr::game::OriginalFrontendCameraCold50LA::Result stageFrontendCameraCold(
+        std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA>& out)const noexcept {
+        return rr::game::OriginalFrontendCameraCold50LA::construct(this,entitiesOwner_,out);
+    }
+    // Partial scalar initialization only, stopped before renderer114A00 entry.
+    rr::game::OriginalFrontendCameraCold50LA::Result stageFrontendCameraViewportPrefix1149D4(
+        rr::game::OriginalFrontendCameraCold50LA& owner)const noexcept {
+        return owner.stageViewportPrefix1149D4(this,entitiesOwner_);
+    }
+    rr::game::OriginalFrontendCameraCold50LA::Result releaseFrontendCameraCold(
+        rr::game::OriginalFrontendCameraCold50LA& owner)const noexcept {
+        return owner.release(this,entitiesOwner_);
+    }
+    // Uncalled Tournament cold-reference proposal. This does not mount archives,
+    // construct a new canonical domain/Video, or admit a Tournament page.
+    bool stageUiSearchListCold(
+        std::shared_ptr<rr::platform::OriginalUiSearchListCold50KG>& out,
+        rr::platform::OriginalUiSearchListColdDiagnostic50KG& d)const noexcept {
+        using S=rr::platform::OriginalUiSearchListColdStatus50KG;d={};
+        if(out||!entitiesOwner_||!entitiesOwner_->application10()){
+            d={S::input,0x27E260,false};return false;
+        }
+        try {
+            out=std::shared_ptr<rr::platform::OriginalUiSearchListCold50KG>(
+                new rr::platform::OriginalUiSearchListCold50KG(*this,entitiesOwner_));
+            return out->construct27E260(this,entitiesOwner_,d);
+        }catch(...){d={S::allocation,0x1CCD14,false};return false;}
+    }
+    bool releaseUiSearchListCold(rr::platform::OriginalUiSearchListCold50KG& owner,
+        rr::platform::OriginalUiSearchListColdDiagnostic50KG& d)const noexcept {
+        return owner.releaseCold(this,entitiesOwner_,d);
+    }
+    // Uncalled staged252C70 owner. Never performs2542F0 or publishes13C.
+    bool stageTextureTransferCold(
+        std::shared_ptr<rr::assets::OriginalStandardTextureTransferCold50LA>& out,
+        rr::assets::OriginalStandardTextureTransferColdDiagnostic50LA& d)const noexcept {
+        using S=rr::assets::OriginalStandardTextureTransferColdStatus50LA;d={};
+        if(out||!textureLifetimeOwner_||!entitiesOwner_||!entitiesOwner_->application10()){
+            d={S::input,0x252C70,false};return false;
+        }
+        try {
+            out=std::shared_ptr<rr::assets::OriginalStandardTextureTransferCold50LA>(
+                new rr::assets::OriginalStandardTextureTransferCold50LA(*this,textureLifetimeOwner_));
+            return out->construct252C70(this,textureLifetimeOwner_,d);
+        }catch(...){d={S::allocation,0x2543AC,false};return false;}
+    }
+    bool releaseTextureTransferCold(rr::assets::OriginalStandardTextureTransferCold50LA& owner,
+        rr::assets::OriginalStandardTextureTransferColdDiagnostic50LA& d)const noexcept {
+        return owner.releaseCold(this,textureLifetimeOwner_,d);
+    }
+    bool stageTournamentPodReferencesCold(
+        std::shared_ptr<const rr::platform::OriginalUiTournamentCareerResources50KG>,
+        std::shared_ptr<rr::platform::OriginalUiTournamentPodReferences50KG>&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool releaseTournamentPodReferencesUnpublished(
+        rr::platform::OriginalUiTournamentPodReferences50KG&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     std::shared_ptr<rr::assets::OriginalStandardMaterialDomain50LA> standardMaterialDomain() const {
         require(materialApplication&&materialApplication->prepared(),
             "canonical domain requires actual application APPSTART owners");
@@ -474,6 +548,103 @@ public:
             require(enabled,"RR_ORIGINAL_RIDER_PREVIEWS requires RR_ORIGINAL_MAIN_MENU=1");
             requestedPreviewRiders=(1u<<3)|(1u<<7)|(1u<<9)|(1u<<23)|(1u<<24);
         }
+        const char* visibleRiderSetting=std::getenv("RR_ORIGINAL_TEST_VISIBLE_RIDER");
+        std::uint32_t visibleRiderTest=0;
+        if(visibleRiderSetting){
+            const std::string value(visibleRiderSetting);
+            require(value=="3"||value=="8"||value=="22",
+                "RR_ORIGINAL_TEST_VISIBLE_RIDER must be exactly 3, 8 or 22; other gameplay owners are not admitted");
+            visibleRiderTest=value=="3"?3u:value=="8"?8u:22u;
+            require(enabled&&!std::getenv("RR_ORIGINAL_TEST_PROFILE"),
+                "Visible Rider test override requires Main and excludes other test profiles");
+            require(decodeRiderImagesInProcess||std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),
+                "Visible Rider test override requires original-disc Rider decoding or an authenticated pixel cache");
+        }
+        const char* wanMbSetting=std::getenv("RR_ORIGINAL_TEST_WAN_MB");
+        const bool wanMbTest=wanMbSetting!=nullptr;
+        if(wanMbTest){
+            require(std::string(wanMbSetting)=="1",
+                "RR_ORIGINAL_TEST_WAN_MB must be exactly 1 when present");
+            require(enabled&&!visibleRiderSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE"),
+                "Wan/MB test profile requires Main and excludes other test profiles");
+            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+            require(!allAi||std::string(allAi)=="0",
+                "Wan/MB test profile requires the normal human-controlled race");
+            require(decodeRiderImagesInProcess||std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),
+                "Wan/MB test profile requires original-disc Rider decoding or an authenticated pixel cache");
+        }
+        const char* gasganoScSetting=std::getenv("RR_ORIGINAL_TEST_GASGANO_SC");
+        const bool gasganoScTest=gasganoScSetting!=nullptr;
+        if(gasganoScTest){
+            require(std::string(gasganoScSetting)=="1",
+                "RR_ORIGINAL_TEST_GASGANO_SC must be exactly 1 when present");
+            require(enabled&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
+                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
+                "Gasgano/SC test profile requires human Main and excludes other test overrides and unattended routes");
+            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+            require(!allAi||std::string(allAi)=="0",
+                "Gasgano/SC test profile requires the normal human-controlled race");
+            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
+            require(decodeRiderImagesInProcess||(cache&&*cache),
+                "Gasgano/SC test profile requires original-disc Rider decoding or an authenticated pixel cache");
+            // Explicit resource request precedes bind()'s population decision.
+            // Distinct SC provenance never impersonates the legacy Gasgano fixture.
+            requestedPreviewRiders|=1u<<7;
+        }
+        const char* tzidikTcSetting=std::getenv("RR_ORIGINAL_TEST_TZIDIK_TC");
+        const bool tzidikTcTest=tzidikTcSetting!=nullptr;
+        if(tzidikTcTest){
+            require(std::string(tzidikTcSetting)=="1",
+                "RR_ORIGINAL_TEST_TZIDIK_TC must be exactly 1 when present");
+            require(enabled&&!gasganoScSetting&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
+                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
+                "Tzidik/TC test profile requires human Main and excludes other test overrides and unattended routes");
+            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+            require(!allAi||std::string(allAi)=="0",
+                "Tzidik/TC test profile requires the normal human-controlled race");
+            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
+            require(decodeRiderImagesInProcess||(cache&&*cache),
+                "Tzidik/TC test profile requires original-disc Rider decoding or an authenticated pixel cache");
+            // Explicit resource request precedes bind()'s population decision.
+            // Distinct TC provenance never impersonates any earlier test fixture.
+            requestedPreviewRiders|=1u<<24;
+        }
+        const char* scorchRcSetting=std::getenv("RR_ORIGINAL_TEST_SCORCH_RC");
+        const bool scorchRcTest=scorchRcSetting!=nullptr;
+        if(scorchRcTest){
+            require(std::string(scorchRcSetting)=="1",
+                "RR_ORIGINAL_TEST_SCORCH_RC must be exactly 1 when present");
+            require(enabled&&!tzidikTcSetting&&!gasganoScSetting&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
+                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
+                "Scorch/RC test profile requires human Main and excludes other test overrides and unattended routes");
+            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+            require(!allAi||std::string(allAi)=="0",
+                "Scorch/RC test profile requires the normal human-controlled race");
+            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
+            require(decodeRiderImagesInProcess||(cache&&*cache),
+                "Scorch/RC test profile requires original-disc Rider decoding or an authenticated pixel cache");
+            // Explicit resource request precedes bind()'s population decision.
+            // Distinct RC provenance never impersonates any earlier test fixture.
+            requestedPreviewRiders|=1u<<17;
+        }
+        const char* sebulbaTbSetting=std::getenv("RR_ORIGINAL_TEST_SEBULBA_TB");
+        const bool sebulbaTbTest=sebulbaTbSetting!=nullptr;
+        if(sebulbaTbTest){
+            require(std::string(sebulbaTbSetting)=="1",
+                "RR_ORIGINAL_TEST_SEBULBA_TB must be exactly 1 when present");
+            require(enabled&&!scorchRcSetting&&!tzidikTcSetting&&!gasganoScSetting&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
+                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
+                "Sebulba/TB test profile requires human Main and excludes other test overrides and unattended routes");
+            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+            require(!allAi||std::string(allAi)=="0",
+                "Sebulba/TB test profile requires the normal human-controlled race");
+            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
+            require(decodeRiderImagesInProcess||(cache&&*cache),
+                "Sebulba/TB test profile requires original-disc Rider decoding or an authenticated pixel cache");
+            // Explicit resource request precedes bind()'s population decision.
+            // Distinct TB provenance never impersonates any earlier test fixture.
+            requestedPreviewRiders|=1u<<18;
+        }
         const char* testProfileSetting=std::getenv("RR_ORIGINAL_TEST_PROFILE");
         require(!testProfileSetting||std::string(testProfileSetting)=="gasgano"||std::string(testProfileSetting)=="mawhonic-ryloth",
             "unsupported explicit test profile");
@@ -544,13 +715,35 @@ public:
             riderProfile=std::make_shared<rr::platform::OriginalUiRiderProfileOwner50KG>();
             rr::platform::OriginalUiRiderProfileDiagnostic50KG riderProfileDiagnostic;
             const auto physics=readArchive(assetRoot,rr::assets::OriginalUiArchiveId50KG::podPhysics);
-            require(mawhonicRylothTest?
+            require(sebulbaTbTest?
+                riderProfile->initializeSebulbaTbTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):scorchRcTest?
+                riderProfile->initializeScorchRcTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):tzidikTcTest?
+                riderProfile->initializeTzidikTcTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):gasganoScTest?
+                riderProfile->initializeGasganoScTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):wanMbTest?
+                riderProfile->initializeWanMbTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):visibleRiderTest?
+                riderProfile->initializeVisibleRiderTestProfileAtApplicationStartup(profile,physics,visibleRiderTest,riderProfileDiagnostic):mawhonicRylothTest?
                 riderProfile->initializeMawhonicRylothTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):gasganoTest?
                 riderProfile->initializeGasganoTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):
                 riderProfile->initializeAtApplicationStartup(profile,physics,riderProfileDiagnostic),
                 "Rider startup profile initialization rejected");
             require(riderProfile->gasganoTestProfile()==gasganoTest&&
-                riderProfile->mawhonicRylothTestProfile()==mawhonicRylothTest,"Rider test profile provenance differs");
+                riderProfile->mawhonicRylothTestProfile()==mawhonicRylothTest&&
+                riderProfile->visibleRiderTestProfile()==visibleRiderTest&&
+                riderProfile->wanMbTestProfile()==wanMbTest&&
+                riderProfile->gasganoScTestProfile()==gasganoScTest&&
+                riderProfile->tzidikTcTestProfile()==tzidikTcTest&&
+                riderProfile->scorchRcTestProfile()==scorchRcTest&&
+                riderProfile->sebulbaTbTestProfile()==sebulbaTbTest,"Rider test profile provenance differs");
+            if(sebulbaTbTest)std::cerr<<"TEST UNLOCK OVERRIDE: Sebulba18 initially remembered; original course prefix6 and TB slot6 (course1/planet0). Process-local human testing only; no earned progression or save write. TB gameplay capability remains separately gated.\n";
+            if(scorchRcTest)std::cerr<<"TEST UNLOCK OVERRIDE: Scorch17 initially remembered; original course prefix12 and RC slot12 (course3/planet2). Process-local human testing only; no earned progression or save write. RC gameplay capability remains separately gated.\n";
+            if(tzidikTcTest)std::cerr<<"TEST UNLOCK OVERRIDE: Tzidik24 initially remembered; original course prefix13 and TC slot13 (course2/planet0). Process-local human testing only; no earned progression or save write. TC gameplay capability remains separately gated.\n";
+            if(gasganoScTest)std::cerr<<"TEST UNLOCK OVERRIDE: Gasgano7 initially remembered; original course prefix9 and SC slot9 (course12/planet4). "
+                "Process-local human testing only; no earned progression or save write. SC gameplay capability remains separately gated.\n";
+            if(wanMbTest)std::cerr<<"TEST UNLOCK OVERRIDE: Wan16 initially remembered; original course prefix7 and MB slot7. "
+                "Process-local testing only; no earned progression or save write. Real Wan/MB cold-loader checks remain mandatory.\n";
+            if(visibleRiderTest)std::cerr<<"TEST UNLOCK OVERRIDE: rider="<<visibleRiderTest
+                <<" available and initially remembered for this process only. Native test patch, not retail cheat execution; "
+                "no earned unlock, career progress, saved-profile import or save write. All gameplay loader gates remain active.\n";
             if(mawhonicRylothTest)std::cerr<<"TEST PROFILE: Mawhonic9 available and initially remembered; original course prefix availability5 for Brightlands, process-local only. "
                 "No earned unlock, qualification, career progress or save write is claimed. RA race admission remains subject to genuine runtime readiness.\n";
             if(gasganoTest)std::cerr<<"TEST PROFILE: Gasgano available and initially remembered for this process only; "
@@ -565,7 +758,7 @@ public:
         require(rr::game::sampleHostTimestamp50ID(*state->clock101A50,state->rawRandom308030),
             "Main startup shared application timestamp unavailable");
         state->known=true;
-        std::cerr<<"ORIGINAL MAIN: "<<(mawhonicRylothTest?"explicit Mawhonic/Ryloth test profile":gasganoTest?"explicit Gasgano test profile":"fresh native profile")
+        std::cerr<<"ORIGINAL MAIN: "<<(sebulbaTbTest?"explicit Sebulba/TB human test profile":scorchRcTest?"explicit Scorch/RC human test profile":tzidikTcTest?"explicit Tzidik/TC human test profile":gasganoScTest?"explicit Gasgano/SC human test profile":wanMbTest?"explicit Wan/MB test unlock profile":visibleRiderTest?"explicit visible-Rider test unlock profile":mawhonicRylothTest?"explicit Mawhonic/Ryloth test profile":gasganoTest?"explicit Gasgano test profile":"fresh native profile")
             <<"/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
@@ -652,6 +845,44 @@ inline std::shared_ptr<Video> Application::videoForSession() const {
     require(!videoOwner_->host.created()&&!videoOwner_->host.ownsResources(),
         "native session requires completed outgoing video/host cleanup");
     return videoOwner_;
+}
+inline bool Application::stageTournamentPodReferencesCold(
+    std::shared_ptr<const rr::platform::OriginalUiTournamentCareerResources50KG> resource,
+    std::shared_ptr<rr::platform::OriginalUiTournamentPodReferences50KG>& out,
+    rr::assets::OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
+    using S=rr::assets::OriginalStandardMaterialStatus50LA;d={};
+    const auto reject=[&]()noexcept{d.status=S::phase;d.sourcePC=0x1D3590;return false;};
+    if(out||!resource||!resource->current()||!riderProfile||!profile||
+       riderProfile->commonProfile()!=profile.get()||!resource->sameProfileOwner(*riderProfile)||
+       !videoOwner_||!Video::materialConstructionPinLive(*videoOwner_)||
+       !materialContextOwner_||!materialContextOwner_->live()||
+       materialContextOwner_->videoIdentity()!=videoOwner_.get()||
+       materialContextOwner_->materialApplication()!=materialApplication||
+       !standardMaterialDomainOwner_||!standardMaterialDomainOwner_->prepared())return reject();
+    std::uint8_t packed=0;std::uint32_t selected=0;
+    const auto* career=resource->career();
+    if(!career||!riderProfile->riderConfirmSnapshot(packed,selected)||selected!=(packed>>3)||
+       career->career100C0!=selected||riderProfile->stamp().mode34!=2)return reject();
+    try {
+        // Publish owner before acquiring any canonical numeric reference: a
+        // failure leaves its actual retained prefix available for cleanup.
+        if(tournamentPodConstructionGeneration_==std::numeric_limits<std::uint64_t>::max()){
+            d.status=S::overflow;d.sourcePC=0x1D3590;return false;
+        }
+        out=std::shared_ptr<rr::platform::OriginalUiTournamentPodReferences50KG>(
+            new rr::platform::OriginalUiTournamentPodReferences50KG(*this));
+        const auto generation=++tournamentPodConstructionGeneration_;
+        const bool okay=out->stage(this,std::move(resource),standardMaterialDomainOwner_,
+                                  materialContextOwner_,entitiesOwner_,generation,materialDirectory36B970_,d);
+        d.sourceEffectsCommitted=d.sourceEffectsCommitted||
+            out->constructionEffects();
+        return okay;
+    }catch(...){d.status=S::allocation;return false;}
+}
+inline bool Application::releaseTournamentPodReferencesUnpublished(
+    rr::platform::OriginalUiTournamentPodReferences50KG& owner,
+    rr::assets::OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
+    return owner.releaseUnpublished(this,d);
 }
 inline bool Application::stageTimeStatsNativeCold50LA(const std::filesystem::path& originalRoot,
     std::uint64_t actualSessionGeneration,TimeStatsColdResult50LA& out,bool deferPopulation)const noexcept {
@@ -988,7 +1219,7 @@ inline std::shared_ptr<const rr::assets::OriginalUiArchive50KG> readArchive(
     if(!input)throw std::runtime_error("cannot read complete original UI archive: "+path.string());
     auto archive=std::make_shared<rr::assets::OriginalUiArchive50KG>();
     rr::assets::OriginalUiArchiveDiagnostic50KG diagnostic;
-    if(!archive->load(id,raw,diagnostic))
+    if(!archive->loadOwned(id,std::move(raw),diagnostic))
         throw std::runtime_error("original UI archive authentication/decode rejected: "+path.string()+
             " status="+std::to_string(static_cast<unsigned>(diagnostic.status))+
             " member="+std::to_string(diagnostic.member));
@@ -1436,6 +1667,14 @@ public:
             " rider_sample_channel="+std::to_string(static_cast<unsigned>(diagnostic.rider.dynamic.model.playback.sample.channel))+
             " rider_backend="+std::to_string(static_cast<unsigned>(diagnostic.rider.backend.error))+
             " rider_draw="+std::to_string(static_cast<unsigned>(diagnostic.rider.draw.error))+
+            " rider_draw_pc="+std::to_string(diagnostic.rider.draw.sourcePC)+
+            " rider_draw_widget="+std::to_string(diagnostic.rider.draw.widget)+
+            " rider_draw_surface="+std::to_string(diagnostic.rider.draw.geometrySurface)+
+            " rider_draw_component="+std::to_string(diagnostic.rider.draw.geometryComponent)+
+            " rider_draw_colors="+std::to_string(diagnostic.rider.draw.geometryStoredColors)+
+            " rider_draw_geometry="+std::to_string(diagnostic.rider.draw.geometryStatus)+
+            " rider_draw_material_index="+std::to_string(diagnostic.rider.draw.material)+
+            " rider_draw_pass="+std::to_string(diagnostic.rider.draw.pass)+
             " course="+std::to_string(static_cast<unsigned>(diagnostic.course.status))+
             " course_pc="+std::to_string(diagnostic.course.sourcePC)+
             " renderer="+std::to_string(static_cast<unsigned>(diagnostic.renderer.error)));
@@ -1544,6 +1783,11 @@ public:
                 <<" rider_stats="<<unsigned(diagnostic.riderStats.error)
                 <<" rider_binder="<<unsigned(diagnostic.riderBinder.error)
                 <<" rider_draw="<<unsigned(diagnostic.rider.draw.error)
+                <<" rider_draw_pc="<<diagnostic.rider.draw.sourcePC
+                <<" rider_draw_surface="<<diagnostic.rider.draw.geometrySurface
+                <<" rider_draw_component="<<diagnostic.rider.draw.geometryComponent
+                <<" rider_draw_colors="<<diagnostic.rider.draw.geometryStoredColors
+                <<" rider_draw_geometry="<<unsigned(diagnostic.rider.draw.geometryStatus)
                 <<" rider_draw_material="<<unsigned(diagnostic.rider.draw.materialDetail.error)
                 <<" rider_draw_material_index="<<diagnostic.rider.draw.material
                 <<" rider_draw_material_pass="<<diagnostic.rider.draw.materialDetail.pass
@@ -1570,7 +1814,19 @@ public:
                 <<" rider_character_geometry="<<diagnostic.rider.dynamic.character.geometry.code
                 <<" rider_character_geometry_offset="<<diagnostic.rider.dynamic.character.geometry.offset
                 <<" rider_backend="<<unsigned(diagnostic.rider.backend.error)
-                <<" gpu="<<unsigned(diagnostic.gpu.error)<<" renderer="<<unsigned(diagnostic.renderer.error)
+                <<" gpu="<<unsigned(diagnostic.gpu.error)
+                <<" gpu_operation="<<(diagnostic.gpu.operation?diagnostic.gpu.operation:"")
+                <<" gpu_texture="<<diagnostic.gpu.texture
+                <<" gpu_bank_texture_count="<<diagnostic.gpu.bankTextureCount
+                <<" gpu_bank_rgba_bytes="<<diagnostic.gpu.bankRgbaBytes
+                <<" gpu_maximum_bytes="<<diagnostic.gpu.maximumGpuBytes
+                <<" gpu_bank_maximum_bytes="<<diagnostic.gpu.maximumBankRgbaBytes
+                <<" gpu_validated_prefix_bytes="<<diagnostic.gpu.validatedPrefixRgbaBytes
+                <<" gpu_candidate_bytes="<<diagnostic.gpu.candidateRgbaBytes
+                <<" gpu_candidate_identity="<<diagnostic.gpu.candidateIdentity
+                <<" gpu_candidate_width="<<diagnostic.gpu.candidateWidth
+                <<" gpu_candidate_height="<<diagnostic.gpu.candidateHeight
+                <<" renderer="<<unsigned(diagnostic.renderer.error)
                 <<"; no destination or gameplay entered.\n";
         }else if(status!=Status::ok&&status!=Status::noChange&&status!=Status::routeAccepted)fail("input");
     }

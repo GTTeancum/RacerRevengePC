@@ -5,6 +5,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
+#if defined(__SSE__)
+#include <xmmintrin.h>
+#endif
 
 namespace rr::game {
 // Native owner for the previously missing173180 cooldown only. Other AI state
@@ -49,7 +53,9 @@ inline bool fail(AiBoostDecisionDiagnostic50IT& d,AiBoostDecisionError50IT e,
 // Original173180..1734B0. Atomic admitted-domain numeric owner update. Input,
 // diagnostic and receipt must be disjoint; before/out actions may alias exactly.
 // Preserve the one genuine shared C-runtime RNG; never seed a private AI stream.
-// Native strict binary32/FE_TONEAREST and normal-or-zero domain from50IR apply.
+// Native strict binary32/FE_TONEAREST applies. Only actual cached-speed
+// input/conversion admits finite subnormals; other50IR guards are unchanged.
+// This scoped native policy does not establish guest FPU arithmetic/status parity.
 inline bool decideAiBoost50IT(const AiBoostDecisionInput50IT& in,
     const PlayerReadResult48X& before,PlayerReadResult48X& out,
     AiBoostDecisionState50IT& state,std::uint32_t& actualSharedRandom,
@@ -72,9 +78,24 @@ inline bool decideAiBoost50IT(const AiBoostDecisionInput50IT& in,
     using R=AiBoostDecisionReason50IT;
     const float threshold=word(0x3f666666u);
     if(!(in.heat7C<=threshold))return finish(R::Heat,false,true);
-    if(!admitted(in.cachedSpeed34)||!admitted(in.desiredSpeed))
+    bool cachedAccepted=false,desiredEvaluated=false,desiredAccepted=false;
+    if(!(cachedAccepted=std::isfinite(in.cachedSpeed34))||
+       !(desiredEvaluated=true,desiredAccepted=admitted(in.desiredSpeed))) {
+        const auto bits=[](float v) noexcept {std::uint32_t b;std::memcpy(&b,&v,sizeof b);return b;};
+        const int rounding=std::fegetround(),exceptions=std::fetestexcept(FE_ALL_EXCEPT);
+        unsigned mxcsrAvailable=0,mxcsr=0;
+#if defined(__SSE__)
+        mxcsrAvailable=1;mxcsr=_mm_getcsr();
+#endif
+        std::fprintf(stderr,"AI_BOOST_SPEED_INPUT_REJECT pc=001731e8 cached_speed=%08x desired=%08x first_guard=%u cached_accepted=%u desired_evaluated=%u desired_accepted=%u rounding=%d exceptions=%x mxcsr_available=%u mxcsr=%08x\n",
+            bits(in.cachedSpeed34),bits(in.desiredSpeed),cachedAccepted?2u:1u,unsigned(cachedAccepted),unsigned(desiredEvaluated),unsigned(desiredAccepted),rounding,unsigned(exceptions),mxcsrAvailable,mxcsr);
         return fail(d,AiBoostDecisionError50IT::Input,0x1731e8);
-    result.convertedSpeed=f.mul(word(0x3f2e8bc1u),in.cachedSpeed34);
+    }
+    auto convertedCachedSpeed=[&]() noexcept {
+        volatile float value=word(0x3f2e8bc1u)*in.cachedSpeed34;
+        f.valid=f.valid&&std::isfinite(value);return float(value);
+    };
+    result.convertedSpeed=convertedCachedSpeed();
     if(!f.valid)return fail(d,AiBoostDecisionError50IT::Arithmetic,0x1731ec);
     if(!(result.convertedSpeed<=in.desiredSpeed))return finish(R::AboveDesiredSpeed,false,true);
     if(!admitted(before.raw.values[0]))return fail(d,AiBoostDecisionError50IT::Input,0x173220);
@@ -87,7 +108,7 @@ inline bool decideAiBoost50IT(const AiBoostDecisionInput50IT& in,
         if(in.target1008FlagsB9C&1u)return finish(R::TargetBoosting,false,true);
     }
     //173314 recomputes the same cached-speed product, preserving source order.
-    result.convertedSpeed=f.mul(word(0x3f2e8bc1u),in.cachedSpeed34);
+    result.convertedSpeed=convertedCachedSpeed();
     if(!f.valid)return fail(d,AiBoostDecisionError50IT::Arithmetic,0x173314);
     if(result.convertedSpeed<400.f)return finish(R::Below400,false,true);
     if(actions.flagsB9C&1u)return finish(R::AlreadyBoosting,true,false);

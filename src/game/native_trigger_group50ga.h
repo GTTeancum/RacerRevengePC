@@ -49,8 +49,10 @@ inline std::size_t nativeTriggerCollider50GA(const NativeTriggerGroup50GA& group
  for(std::size_t i=0;i<group.colliders.size();++i)if(group.colliders[i].identity==id)return i;
  return group.colliders.size();
 }
-inline bool validNativeTriggerGroup50GA(const NativeTriggerGroup50GA& group)noexcept {
- if(!group.ready||group.actionsFailed||!group.actions.preflight||!group.actions.apply)return false;
+// Structural admission is shared by the distinct fallible source-action route.
+// A source-only group is never admitted by the legacy action dispatcher.
+inline bool validNativeTriggerStorage50GA(const NativeTriggerGroup50GA& group)noexcept {
+ if(!group.ready||group.actionsFailed)return false;
  for(std::size_t i=0;i<group.colliders.size();++i){
   if(!trigger_entry50IN_detail::valid(group.colliders[i]))return false;
   for(std::size_t j=0;j<i;++j)if(group.colliders[i].identity==group.colliders[j].identity)return false;
@@ -79,6 +81,9 @@ inline bool validNativeTriggerGroup50GA(const NativeTriggerGroup50GA& group)noex
   if(!matching||trigger_entry50IN_detail::find(matching->collider,collider.identity)==matching->collider.highWaterD0)return false;
  }
  return true;
+}
+inline bool validNativeTriggerGroup50GA(const NativeTriggerGroup50GA& group)noexcept {
+ return group.actions.preflight&&group.actions.apply&&validNativeTriggerStorage50GA(group);
 }
 // Additional actual trigger filters. Run in the ordinary indexed collector,
 // after its bilateral category/identity filters and before geometric dispatch.

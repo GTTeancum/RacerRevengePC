@@ -108,17 +108,17 @@ OriginalCameraStartResult advanceOriginalVideoFade25B5D0(
 struct OriginalRaceStartCountdown {
     float countdown34=0; //1AF87C constructor; caller must bind the actual field.
 };
-enum class OriginalCameraStartCourse : std::uint8_t { unspecified,gc,ga,ta,ma,sa,ra,rc };
+enum class OriginalCameraStartCourse : std::uint8_t { unspecified,gc,ga,ta,ma,sa,ra,rc,mb,sc,tc,tb };
 class OriginalCourseStartActions final {
     bool authenticated_=false;OriginalCameraStartCourse course_=OriginalCameraStartCourse::unspecified;
     // Immutable track authoring. Controller174DF0 applies its own real
-    // launch/configuration policy; authored TA3/MA4/SA5/RA7/RC5 remain intact.
+    // launch/configuration policy; authored TA3/MA4/SA5/RA7/RC5/MB5 remain intact.
     std::int32_t sourceSceneCutCount3E4_=-1;
 public:
     bool authenticated() const noexcept {return authenticated_;}
     OriginalCameraStartCourse course() const noexcept {return course_;}
     std::int32_t sourceSceneCutCount3E4() const noexcept {return sourceSceneCutCount3E4_;}
-    // Exact GC/GA/TA/MA/SA/RA/RC TOB members. All lack[321_Anims];1B28EC's0 survives.
+    // Exact GC/GA/TA/MA/SA/RA/RC/MB TOB members. All lack[321_Anims];1B28EC's0 survives.
     // No arbitrary parsed count/success receipt can claim this source path.
     bool prepare(OriginalCameraStartCourse,const std::uint8_t*,std::size_t) noexcept;
 };

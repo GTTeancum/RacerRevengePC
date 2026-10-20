@@ -2,11 +2,17 @@
 #include "import_decode48c.h"
 #include "original_ui_archive50kg.h"
 #include <cstring>
+#include <exception>
+#include <thread>
 #include <limits>
 #include <memory>
 #include <utility>
 
+namespace original_main_entry50KG { struct Application; }
+namespace rc_cold_sources50LA { class Owner; }
+namespace tb_cold_sources50LA { class Owner; }
 namespace rr::assets {
+class OriginalArchiveStagedReader50LA;
 // The actual bounded NATIVE Application mount set. This is not a claim that
 // retail3E1A70's complete mount chronology/priority has been reconstructed.
 // A mount always contains an entire authenticated archive directory, never a
@@ -93,14 +99,14 @@ public:
     // THIS native namespace. New mounts unseal it. This is a transaction phase,
     // not a fabricated proof about unmounted retail archives or selected files.
     bool sealNativeMounts(Diagnostic& d) noexcept {
-        d={};if(mounts_.empty())return fail(d,Status::input);
+        d={};if(mounts_.empty()||!retainedSourcesAccessible())return fail(d,Status::input);
         sealed_=true;return true;
     }
     bool sealed()const noexcept{return sealed_;}
     std::uint64_t revision()const noexcept{return revision_;}
     std::size_t mountCount()const noexcept{return mounts_.size();}
     bool mount(std::size_t i,MountView& out)const noexcept {
-        out={};if(i>=mounts_.size())return false;const auto& m=*mounts_[i];
+        out={};if(!retainedSourcesAccessible()||i>=mounts_.size())return false;const auto& m=*mounts_[i];
         out={&m.name,&m.digest,m.archiveBytes,m.rows.size()};return true;
     }
     // Positive/absent cover every member of every actual native mount. Unknown
@@ -109,7 +115,34 @@ public:
     // Successful append never moves existing rows, names, bytes or mount IDs.
     Lookup lookup132820(const std::string& requested,MemberView& out)const noexcept {
         out={};out.revision=revision_;
-        if(!sealed_||!nameOkay(requested))return Lookup::unknown;
+        if(!retainedSourcesAccessible()||!sealed_||!nameOkay(requested))return Lookup::unknown;
+        // Exact native POD17/RC collision authority is issued only by the
+        // authenticated RC owner. All other names retain ambiguity rejection.
+        if(sameName(requested,"textures\\specmap5.tga")){
+            const Mount* policy=nullptr;
+            for(std::size_t m=0;m<mounts_.size();++m){const auto& candidate=*mounts_[m];
+                if(candidate.rcSpecmapEarlierMount==static_cast<std::size_t>(-1))continue;
+                if(policy||!candidate.rcSource||candidate.rcSpecmapEarlierMount>=m||
+                   candidate.rcSpecmapOrdinal>=candidate.rows.size())return Lookup::unknown;
+                policy=&candidate;
+            }
+            if(policy){
+                const auto earlier=policy->rcSpecmapEarlierMount;
+                const auto& pod=*mounts_[earlier];
+                if(policy->rcSpecmapEarlierOrdinal>=pod.rows.size())return Lookup::unknown;
+                const auto& winner=pod.rows[policy->rcSpecmapEarlierOrdinal];
+                const auto& retainedRc=policy->rows[policy->rcSpecmapOrdinal];
+                if(!sameName(winner.name,requested)||!sameName(retainedRc.name,requested)||
+                   winner.size!=12332||retainedRc.size!=196652)return Lookup::unknown;
+                // Identical ordinary POD rows may coalesce. Only the exact
+                // retained RC row may differ; any third unequal row rejects.
+                for(const auto& mount:mounts_)for(const auto& row:mount->rows)
+                    if(sameName(requested,row.name) && &row!=&retainedRc&&!equalBytes(winner,row))
+                        return Lookup::unknown;
+                out={&winner.name,winner.data,winner.size,earlier,policy->rcSpecmapEarlierOrdinal,revision_};
+                return Lookup::present;
+            }
+        }
         const Row* matched=nullptr;
         for(std::size_t m=0;m<mounts_.size();++m){const auto& rows=mounts_[m]->rows;
             for(std::size_t i=0;i<rows.size();++i)if(sameName(requested,rows[i].name)){
@@ -121,17 +154,46 @@ public:
         }
         return matched?Lookup::present:Lookup::absent;
     }
+    // Only UI mounts carry this authenticated original-file backing. No
+    // registration, revision/seal change, cache activation or page admission.
+    // A view keeps immutable bytes alive even after this mount owner retires;
+    // its provider pointer is identity only, not a lifetime/service capability.
+    bool encodedUiInput(std::size_t mountIndex,OriginalUiEncodedArchiveView50KG& out) const noexcept {
+        out={};
+        if(mountIndex>=mounts_.size() || !mounts_[mountIndex]->ui) return false;
+        out=OriginalUiEncodedArchiveView50KG(this,mounts_[mountIndex]->ui);
+        return out.identity() && out.data() && out.size();
+    }
     static bool sameName(const std::string& a,const std::string& b)noexcept {
         if(a.size()!=b.size())return false;
         for(std::size_t i=0;i<a.size();++i)if(lower(a[i])!=lower(b[i]))return false;
         return true;
     }
 private:
+    friend class ::rc_cold_sources50LA::Owner;
+    friend class ::tb_cold_sources50LA::Owner;
+    friend struct ::original_main_entry50KG::Application;
+    bool issueStagedReader(const original_main_entry50KG::Application&,
+        const std::shared_ptr<OriginalStandardArchiveProvider50LA>&,
+        std::shared_ptr<OriginalArchiveStagedReader50LA>&) noexcept;
     struct Row {std::string name;const std::uint8_t* data=nullptr;std::size_t size=0,offset=0;};
     struct Mount {
         std::string name,digest;std::size_t archiveBytes=0,retainedBytes=0;
         std::shared_ptr<const std::vector<std::uint8_t>> backing;
         std::shared_ptr<const OriginalUiArchive50KG> ui;
+        // Complete RC compact namespace; the typed source retains every stable
+        // member and the exact encoded original. No generic row authority.
+        std::shared_ptr<const rc_cold_sources50LA::Owner> rcSource;
+        std::thread::id rcThread{};
+        // Distinct complete authenticated TB compact source; never an RC retag.
+        std::shared_ptr<const tb_cold_sources50LA::Owner> tbSource;
+        std::thread::id tbThread{};
+        // Immutable private row identities, never a caller-set lookup flag.
+        std::size_t rcSpecmapEarlierMount=static_cast<std::size_t>(-1);
+        std::size_t rcSpecmapEarlierOrdinal=static_cast<std::size_t>(-1);
+        std::size_t rcSpecmapOrdinal=static_cast<std::size_t>(-1);
+        ~Mount(){if((rcSource&&rcThread!=std::this_thread::get_id())||
+            (tbSource&&tbThread!=std::this_thread::get_id()))std::terminate();}
         std::vector<Row> rows;
     };
     static constexpr std::size_t maxMounts=64,maxEntries=65536,maxBytes=256u*1024u*1024u;
@@ -148,10 +210,16 @@ private:
         return a.size==b.size&&(!a.size||std::memcmp(a.data,b.data,a.size)==0);
     }
     static bool fail(Diagnostic& d,Status s)noexcept{d.status=s;return false;}
+    bool retainedSourcesAccessible()const noexcept {
+        for(const auto& m:mounts_)if((m->rcSource&&m->rcThread!=std::this_thread::get_id())||
+            (m->tbSource&&m->tbThread!=std::this_thread::get_id()))return false;
+        return true;
+    }
     bool commit(std::unique_ptr<Mount> next,Diagnostic& d) {
+        if(!retainedSourcesAccessible())return fail(d,Status::identity);
         for(std::size_t m=0;m<mounts_.size();++m)if(sameName(mounts_[m]->name,next->name)){
             d.mount=m;const auto& old=*mounts_[m];
-            if(old.digest!=next->digest||old.archiveBytes!=next->archiveBytes||
+            if(old.rcSource!=next->rcSource||old.tbSource!=next->tbSource||old.digest!=next->digest||old.archiveBytes!=next->archiveBytes||
                old.rows.size()!=next->rows.size())return fail(d,Status::identity);
             for(std::size_t i=0;i<old.rows.size();++i){d.ordinal=i;
                 if(old.rows[i].name!=next->rows[i].name||old.rows[i].offset!=next->rows[i].offset||

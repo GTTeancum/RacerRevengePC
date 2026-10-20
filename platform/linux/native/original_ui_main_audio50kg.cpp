@@ -74,22 +74,37 @@ constexpr OriginalFile riderOriginal{
 constexpr OriginalFile courseOriginal{
     "MUSIC/UI/SCREENS/UI_TRKS.VAG",448480,
     "b00ea0f7d26f88970eaa87899b5e185b821d82a2bd01a07a33ccf14ded42b40d",390628};
-// UIACCEPT.INI exact events for default-unlocked ranges and Gasgano's range.
+// UIACCEPT.INI exact events for default-unlocked ranges and retained additions.
+// Clegg and Mars keep their own original Event7..8 and17..18 identities.
 // These retained audio owners do not grant profile or Course admission.
 // Retained 48-byte zero-header VAGs, 22050 Hz mono: frames include the
 // first end-flag block (28 samples each), excluding the final padding block.
 // Counts and SHA256s come from raw headers/end flags and original bytes.
 struct OriginalRiderConfirmFile { std::uint32_t eventId; OriginalFile file; };
 constexpr std::array<OriginalRiderConfirmFile,OriginalUiMainAudio50KG::riderConfirmClipCount> riderConfirmOriginals{{
+    // Rider1: Anakin Skywalker (ep1), Event1..4. No profile unlock.
+    {1,{"SPEECH/UI/AN1SEL01.VAG",10512,"1f18ec7a0b1abd953659fa2490a69e9a9bec025b764cce4d3a81756442b16967",18284}},
+    {2,{"SPEECH/UI/AN1SEL02.VAG",16544,"9366c4771314c25a7955a648dc1912802f27f6b4604d0a1b9054c735deed41d5",28840}},
+    {3,{"SPEECH/UI/AN1SEL03.VAG",12992,"1a94a2c61af57c35dfbb88351e175128fdc6283228e344f04a6b68442a1140bc",22624}},
+    {4,{"SPEECH/UI/AN1SEL04.VAG",19328,"8dbd5571eecb2d8d34d39e2b5f671f80f407cc69d8a858cba73ebc90b4773902",33712}},
     // Rider2: Ben Quadinaros, Event5..6.
     {5,{"SPEECH/UI/BENSEL01.VAG",18736,"b74f9db0200e94509e85e5c2280c8e7fa5ecb49aa0de721f31b2e4a5a78ed9b2",32676}},
     {6,{"SPEECH/UI/BENSEL02.VAG",14304,"5a90c499cf9e04ee270ea1bb435ee53790c8464b244bd4846843e34223049646",24920}},
+    // Rider3: Clegg Holdfast, Event7..8. No profile unlock.
+    {7,{"SPEECH/UI/CLESEL01.VAG",27952,"23f773c2e56e91b00de2f70620cb4378410a95df6dfc27de8b91267395886327",48804}},
+    {8,{"SPEECH/UI/CLESEL02.VAG",26608,"94bbf2246149ac265ce9e8845f062c82ee56ecd16844dc91b4ad0fe024a455f3",46452}},
     // Rider4: Dud Bolt, Event9..10.
     {9,{"SPEECH/UI/DUDSEL01.VAG",31696,"4b711f32ba5d299a728fe04f0b2dc802caeceae955de94727986a39118cf84b6",55356}},
     {10,{"SPEECH/UI/DUDSEL02.VAG",13664,"ebeaa61ec7190e7b6d97d7c8ea83b563ab3c853062481e619be3bd7445f621f4",23800}},
     // Rider7: Gasgano, Event15..16. First-end blocks1661/1652 inclusive.
     {15,{"SPEECH/UI/GASSEL01.VAG",26656,"4076d3b4943d5828a0b7977ca0bc9a6e1fdffc1e4a0925f41aed560713183c90",46536}},
     {16,{"SPEECH/UI/GASSEL02.VAG",26512,"c647576fb9e438d58b921142c0592041ba2a9ccb0a9db539e0f6ceeb34eb28e9",46284}},
+    // Rider8: Mars Guo, Event17..18. No profile unlock.
+    {17,{"SPEECH/UI/MARSEL01.VAG",18304,"6fe7952e114a01b0a9afae0124aab1146e96c8e2bdfee2866e4a60abd3255bfe",31920}},
+    {18,{"SPEECH/UI/MARSEL02.VAG",37552,"c0744388aeac62a7c4b57fe55199553fedc18a9c71aa1106229b37678e7627f8",65604}},
+    // Rider9: Mawhonic, Event19..20. No profile unlock.
+    {19,{"SPEECH/UI/MAWSEL01.VAG",21312,"9d754175fee763ab3bbe32f33a32c5acdc104ee21719d92e086c6cd6c0240bfd",37184}},
+    {20,{"SPEECH/UI/MAWSEL02.VAG",16656,"d03bd2ae5bcc5441cd7e5bfa98c358f531f102fa011d165c62e0b8918f71131d",29036}},
     // Rider10: Aldar Beedo, Event21..22.
     {21,{"SPEECH/UI/ALDSEL01.VAG",36496,"029332c4f2eba4b37dad0a6fb007f849a607b08bdd686d6976714d3164eab748",63756}},
     {22,{"SPEECH/UI/ALDSEL02.VAG",18208,"71a6c0b1e4fd790d81d4580a0903dac2d846961a7c99e520ff5512264982560d",31752}},
@@ -102,6 +117,9 @@ constexpr std::array<OriginalRiderConfirmFile,OriginalUiMainAudio50KG::riderConf
     // Rider15: Teemto Pagalies, Event31..32.
     {31,{"SPEECH/UI/TEESEL01.VAG",27008,"40a3f4dda0aae7ef846fa8c49311b17dfbeec7a9eea586d0113933dca6d3f826",47152}},
     {32,{"SPEECH/UI/TEESEL02.VAG",32176,"e93fa4c842954cbb59792b56cc56a8b04314fbffeb1283a2e5706eee8813e0cf",56196}},
+    // Rider16: Wan Sandage, original Event33..34. One existing Confirm voice.
+    {33,{"SPEECH/UI/WANSEL01.VAG",47536,"c491692a4e115252d10c983f63757273638fb192b3232682e8e783a075d645f6",83076}},
+    {34,{"SPEECH/UI/WANSEL02.VAG",42128,"3fec9bc0636e6edbad8a15125f9200354cee146112fed29b9f502af415fc782b",73612}},
     // Rider19: Anakin Skywalker, Event39..43.
     {39,{"SPEECH/UI/A2ASEL01.VAG",25488,"854e09eaf3d5eb28bfccfc35e8a869b5fc10515b6e6c4a3a8dc11dee50cde698",44492}},
     {40,{"SPEECH/UI/A2ASEL02.VAG",19232,"7d11a96798382bde857a80d994317e92ec3a4fc57108c2de9b253e21ad519393",33544}},
@@ -111,6 +129,18 @@ constexpr std::array<OriginalRiderConfirmFile,OriginalUiMainAudio50KG::riderConf
     // Rider20: Occo Ninebar, Event44..45.
     {44,{"SPEECH/UI/OCCSEL01.VAG",24384,"f826ff76992d67646856ce9baa455400e807766edf77716d228ef9f7b6931f85",42560}},
     {45,{"SPEECH/UI/OCCSEL02.VAG",29712,"d0c0af3755a80d7840aa3f52b2f1903e3191c4ace12fe9b6c060bcb8573ce41e",51884}},
+    // Rider22: Knire Dark, Event50..51. No profile unlock.
+    {50,{"SPEECH/UI/KNISEL01.VAG",13472,"3b8f320f75d5ad7a565999f331270d5404d36ac1ada66b0d387ce6db1651592e",23464}},
+    {51,{"SPEECH/UI/KNISEL02.VAG",29120,"caf0470db721c4d3fb582356650056fd436aaf7b113827d454539e7224af6c7c",50848}},
+    // Rider18: Sebulba2, original UIACCEPT Event37..38.
+    {37,{"SPEECH/UI/SEBSEL01.VAG",30320,"8d2473facab3023d2f4fb98512d8ebb24ed3d34b578a52a153828e8bb761df34",52948}},
+    {38,{"SPEECH/UI/SEBSEL02.VAG",79152,"583965165f87ced323bcb73d001d5754d4449fa476a3c379a886b7fe65c35773",138404}},
+    // Rider17: Scorch Zanales, original UIACCEPT Event35..36.
+    {35,{"SPEECH/UI/SCOSEL01.VAG",31888,"80ca236eff9b445c4954211b9219d1170c4f1f0784dd2e55a1277ce96063c171",55692}},
+    {36,{"SPEECH/UI/SCOSEL02.VAG",53216,"1f4e7f5f9417af8f2b85b30b563bbcda109009a9369386feb3c76c347caaf8c0",93016}},
+    // Rider24: Tzidik Wrantojo, original UIACCEPT Event54..55.
+    {54,{"SPEECH/UI/TZISEL01.VAG",32144,"5e270d5f9fae2fcc2c1b4df59cae9d6507d89f5feb2e4c04d442bd4404d055a2",56140}},
+    {55,{"SPEECH/UI/TZISEL02.VAG",33664,"6080e2e94af66174aa2f3f053d5e9d9b7e096a17c9136434434af35f1e4f4685",58800}},
 }};
 std::size_t riderConfirmClipIndex(std::uint32_t eventId) noexcept {
     for(std::size_t i=0;i<riderConfirmOriginals.size();++i)

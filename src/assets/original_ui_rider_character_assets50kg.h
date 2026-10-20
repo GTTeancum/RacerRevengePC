@@ -50,6 +50,8 @@ public:
     const std::string* baseName() const noexcept;
     const OriginalUiMemberIdentity50KG* widgetSource() const noexcept;
     const OriginalUiMemberIdentity50KG* mcfSource() const noexcept;
+    // Identity of the retained, authenticated PSG backing scene().
+    const OriginalUiMemberIdentity50KG* geometrySource() const noexcept;
     const PsgHierarchyView49O* hierarchy() const noexcept;
     const MotionNodeBindings49O* bindings() const noexcept;
     const Scene48D* scene() const noexcept;

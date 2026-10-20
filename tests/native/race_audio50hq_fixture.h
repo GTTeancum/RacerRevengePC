@@ -70,6 +70,28 @@ inline std::vector<rr::assets::AudioRequest50HC> readEvents(
     }
     need(count==expected,"50HQ missing event count");for(bool n:names)need(n,"50HQ missing authored event");return out;
 }
+// Shared source filenames own one cold PCM allocation, while every authored
+// race/speech row keeps its own semantic event and variant-history position.
+inline std::vector<rr::assets::AudioRequest50HC> uniquePcmRequests(
+    const std::vector<rr::assets::AudioRequest50HC>& rows) {
+    using pod_materials50ed_fixture::detail::need;
+    need(rows.size()==clipCount,"50HQ logical event registry extent differs");
+    const auto normalized=[](std::string name){
+        for(auto& c:name){if(c=='\\')c='/';else if(c>='A'&&c<='Z')c=char(c-'A'+'a');}
+        return name;
+    };
+    std::vector<rr::assets::AudioRequest50HC> unique;unique.reserve(rows.size());
+    for(const auto& row:rows){
+        bool exists=false;
+        for(const auto& request:unique)if(normalized(request.name)==normalized(row.name)){
+            need(request.loop==row.loop&&request.stereo==row.stereo&&request.stream==row.stream,
+                "50HQ aliased source sample delivery flags differ");
+            exists=true;break;
+        }
+        if(!exists)unique.push_back(row);
+    }
+    return unique;
+}
 inline constexpr unsigned keys[clipCount]={1,2,3,4,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,27,28,29};
 struct State {
     bool seeded=false,finished=false;
@@ -78,7 +100,9 @@ struct State {
     double seconds=0,lastPositionVoiceSeconds=-5.0;
     std::array<std::uint8_t,7> variants{};
 };
-inline bool valid(const race_session50HM::Session&s)noexcept {
+template<race_session50HM::SessionType S>
+inline bool validShared50MB(const S&s)noexcept {
+    if(!race_session50HM::detail::lifetimeValid(s))return false;
     if(s.phase==race_session50HM::Phase::Uninitialized||s.error!=race_session50HM::Error::None||
        !s.racerCount||s.racerCount>race_session50HM::maxRacers||!s.config.lapTarget||
        !std::isfinite(s.raceSeconds)||s.raceSeconds<0||!std::isfinite(s.countdownRemaining)||s.countdownRemaining<0||
@@ -89,6 +113,10 @@ inline bool valid(const race_session50HM::Session&s)noexcept {
     return r.place>=1&&r.place<=s.racerCount&&(!r.finished||
         (r.finishPlace>=1&&r.finishPlace<=s.racerCount&&r.observed.completedLaps>=s.config.lapTarget));
 }
+inline bool valid(const race_session50HM::Session&s)noexcept {return validShared50MB(s);}
+inline bool valid(const race_session50HM::MbSession&s)noexcept {return validShared50MB(s);}
+inline bool valid(const race_session50HM::TcSession&s)noexcept {return validShared50MB(s);}
+inline bool valid(const race_session50HM::TbSession&s)noexcept {return validShared50MB(s);}
 }
 // Own at a stable address and keep the mixer alive longer. Cold PCM vectors are
 // immutable after prepare. Only main/simulation thread calls these methods.
@@ -119,9 +147,13 @@ public:
             std::vector<rr::assets::AudioRequest50HC> requests;requests.reserve(clipCount);
             for(std::size_t i=0;i<clipCount;++i){const auto&r=i<4?race[detail::keys[i]-1]:speech[detail::keys[i]-1];
                 d::need(!r.loop&&!r.stereo&&r.stream==(i>=4),"50HQ authored delivery flags differ");requests.push_back(r);}
-            if(!rr::assets::loadAudioBank50HC(audioRoot,requests,bank_,error))return false;
-            d::need(bank_.clips.size()==clipCount,"50HQ incomplete clip registry");
-            for(std::size_t i=0;i<clipCount;++i){const auto&c=bank_.clips[i];if(c.state!=rr::assets::AudioAssetState50HC::ready)continue;
+            const auto unique=detail::uniquePcmRequests(requests);
+            if(!rr::assets::loadAudioBank50HC(audioRoot,unique,bank_,error))return false;
+            d::need(bank_.clips.size()==unique.size(),"50HQ incomplete PCM registry");
+            for(std::size_t i=0;i<clipCount;++i){const auto* asset=bank_.find(requests[i].name);
+                d::need(asset,"50HQ logical event lacks original PCM registry entry");
+                const auto&c=*asset;availability_[i]=c.state;
+                if(c.state!=rr::assets::AudioAssetState50HC::ready)continue;
                 const auto&p=c.pcm;clips_[i]={p.samples.data(),p.frames,p.sampleRate,p.channels,0,0};
                 d::need(rr::platform::AudioMixer50HD::validClip(clips_[i]),"50HQ ready PCM invalid");}
             d::need(race_audio_groups50IC::bindProviderRange(groups,
@@ -141,7 +173,9 @@ public:
     bool setHostSpeechEnabled(bool enabled)noexcept {
         if(state_.seeded)return false;hostSpeechEnabled_=enabled;return true;
     }
-    Receipt observe(const race_session50HM::Session&s)noexcept {
+private:
+    template<race_session50HM::SessionType S>
+    Receipt observeShared50MB(const S&s)noexcept {
         Receipt result;if(!mixer_||!detail::valid(s)||!announcer_||!announcer_->pollCompletion()){
             ++counters_.rejected;return result;}
         const auto&r=s.racers[0];const auto number=race_session50HM::countdownNumber(s);
@@ -180,12 +214,40 @@ public:
         }
         remember(s);return result;
     }
+public:
+    Receipt observe(const race_session50HM::Session&s)noexcept {
+        return observeShared50MB(s);
+    }
+    Receipt observe(const race_session50HM::MbSession&s)noexcept {
+        return observeShared50MB(s);
+    }
+    Receipt observe(const race_session50HM::TcSession&s)noexcept {
+        return observeShared50MB(s);
+    }
+    Receipt observe(const race_session50HM::TbSession&s)noexcept {
+        return observeShared50MB(s);
+    }
     // Following an actual zero-time recovery/rebase, suppress position lines
     // caused solely by that move. Laps/results must agree with the prior commit.
-    bool rebase(const race_session50HM::Session&s)noexcept {
+private:
+    template<race_session50HM::SessionType S>
+    bool rebaseShared50MB(const S&s)noexcept {
         if(!mixer_||!detail::valid(s)||!state_.seeded||s.raceSeconds!=state_.seconds||
            s.phase!=state_.phase||s.racers[0].observed.completedLaps!=state_.laps||s.racers[0].finished!=state_.finished){++counters_.rejected;return false;}
         remember(s);++counters_.rebases;return true;
+    }
+public:
+    bool rebase(const race_session50HM::Session&s)noexcept {
+        return rebaseShared50MB(s);
+    }
+    bool rebase(const race_session50HM::MbSession&s)noexcept {
+        return rebaseShared50MB(s);
+    }
+    bool rebase(const race_session50HM::TcSession&s)noexcept {
+        return rebaseShared50MB(s);
+    }
+    bool rebase(const race_session50HM::TbSession&s)noexcept {
+        return rebaseShared50MB(s);
     }
     void reset()noexcept {
         if(mixer_)for(std::size_t i=0;i<4;++i)mixer_->stop(firstVoice+i);
@@ -199,7 +261,9 @@ private:
     std::size_t variant(std::size_t base,std::size_t count,std::size_t cursor)noexcept {
         const auto offset=state_.variants[cursor];state_.variants[cursor]=static_cast<std::uint8_t>((offset+1)%count);return base+offset;
     }
-    void remember(const race_session50HM::Session&s)noexcept {
+    template<race_session50HM::SessionType S>
+    void remember(const S&s)noexcept {
+        if(!race_session50HM::detail::lifetimeValid(s))return;
         const auto&r=s.racers[0];state_.seeded=true;state_.phase=s.phase;
         state_.number=race_session50HM::countdownNumber(s);state_.seconds=s.raceSeconds;
         state_.laps=r.observed.completedLaps;state_.place=r.place;state_.finished=r.finished;
@@ -207,7 +271,7 @@ private:
     void emit(Receipt&r,Kind kind,std::size_t index,bool preempt)noexcept {
         Event event{kind,detail::keys[index],Result::Rejected};
         const auto slot=firstVoice+(index<4?index:4);
-        if(bank_.clips[index].state!=rr::assets::AudioAssetState50HC::ready){event.result=Result::Unavailable;++counters_.unavailable;}
+        if(availability_[index]!=rr::assets::AudioAssetState50HC::ready){event.result=Result::Unavailable;++counters_.unavailable;}
         else if(index>=4){
             // Variant, cooldown and preemption choices above remain HOST50HQ.
             // Every actual Dax start/completion shares voice84 and callbacks.
@@ -221,6 +285,7 @@ private:
     }
     rr::assets::AudioBank50HC bank_{};
     std::array<rr::platform::AudioClip50HD,clipCount>clips_{};
+    std::array<rr::assets::AudioAssetState50HC,clipCount>availability_{};
     rr::platform::AudioMixer50HD*mixer_=nullptr;
     rr::platform::AnnouncerEpisode50IC*announcer_=nullptr;
     detail::State state_{};Counters counters_{};bool attempted_=false,hostSpeechEnabled_=true;

@@ -65,11 +65,20 @@ float quantizedPosition(std::uint16_t word) {
     volatile float expanded=32767.0f*normalized; // Original scale is 32767.
     return expanded;
 }
+// Original111100 packed optional-normal reader: signed16 -> CVT.S.W ->
+// one MUL.S by 0x38000100. Unlike positions, normals have no ScaleFactor
+// multiplication and are not renormalized or clamped. Preserve source shorts.
+float quantizedNormal(std::uint16_t word) {
+    const std::int32_t signedValue=word<32768u?std::int32_t(word):std::int32_t(word)-65536;
+    const std::uint32_t reciprocalBits=0x38000100u;
+    float reciprocal;std::memcpy(&reciprocal,&reciprocalBits,4);
+    volatile float converted=static_cast<float>(signedValue);
+    volatile float normalized=reciprocal*converted;
+    return normalized;
+}
 std::size_t validate(const Collision48G& c, bool inspectOriginalDegenerate = false, std::size_t vertexBase = 84) {
     need(c.version==1 && c.type==0 && c.quantized<=1,"col.typed_variant");
     need(c.reverse_mode<=1 && c.normals_present<=1,"col.boolean_flag");
-    supported(!c.quantized||!c.normals_present,"col.quantized_normals",80,
-        "Quantized optional vertex normals remain outside this bounded source projection");
     supported(!c.quantized||std::fegetround()==FE_TONEAREST,"col.quantized_rounding",80,
         "Quantized position projection requires individually rounded binary32 nearest-even");
     const auto nv=c.vertices.size(), nn=c.nodes.size(), nf=c.faces.size();
@@ -97,11 +106,13 @@ std::size_t validate(const Collision48G& c, bool inspectOriginalDegenerate = fal
         for(auto vertex:f.vertices)need(vertex<nv,"col.face_vertex",f.source_offset+16);
         const bool finite=std::isfinite(f.d)&&std::isfinite(f.normal[0])&&std::isfinite(f.normal[1])&&std::isfinite(f.normal[2]);
         if(!finite) {
-            // Nine original disc members contain this exact exporter degeneracy. It is
-            // retained exactly only with coincident finite positions. Runtime packing
-            // follows the original signed conversion; no face or tree link is removed.
+            // Existing float sources retain this exact exporter degeneracy.
+            // Packed sources additionally require equal ORIGINAL indices, as
+            // in TB door faces51/63. Common126250 face packing is independent
+            // of position format; no face or tree link is removed.
             const auto& a=c.vertices[f.vertices[0]];const auto& b=c.vertices[f.vertices[1]];const auto& d=c.vertices[f.vertices[2]];
-            const bool authored=inspectOriginalDegenerate&&!c.quantized&&floatBits(f.d)==0x7fc00000u&&
+            const bool repeatedIndex=f.vertices[0]==f.vertices[1]||f.vertices[0]==f.vertices[2]||f.vertices[1]==f.vertices[2];
+            const bool authored=inspectOriginalDegenerate&&(!c.quantized||repeatedIndex)&&floatBits(f.d)==0x7fc00000u&&
                 floatBits(f.normal[0])==0xffc00000u&&floatBits(f.normal[1])==0xffc00000u&&floatBits(f.normal[2])==0xffc00000u&&
                 (a==b||a==d||b==d);
             need(authored,"col.plane_nonfinite",f.source_offset,"Nonfinite face plane outside the evidenced coincident-vertex source variant");
@@ -131,7 +142,13 @@ Bytes original(const Collision48G& c) {
             need(floatBits(x)==floatBits(quantizedPosition(word)),"col.quantized_provenance",raw.at-2,
                 "Expanded collision coordinate differs from original signed-short source");w.u16(word);}
     }else for(const auto& v:c.vertices)w.values(v);
-    w.u32(c.normals_present);for(const auto& v:c.vertex_normals)w.values(v);
+    w.u32(c.normals_present);
+    if(c.quantized&&c.normals_present){
+        Reader raw{c.original_bytes,std::size_t(c.normals_flag_offset)+4};
+        for(const auto& v:c.vertex_normals)for(float x:v){const auto word=raw.u16();
+            need(floatBits(x)==floatBits(quantizedNormal(word)),"col.quantized_normal_provenance",raw.at-2,
+                "Expanded collision normal differs from original signed-short source");w.u16(word);}
+    }else for(const auto& v:c.vertex_normals)w.values(v);
     for(const auto& n:c.nodes){w.f32(n.volume);w.values(n.center);w.values(n.half);for(auto x:n.children)w.u16(originalChild(x));}
     for(const auto& f:c.faces){w.rawFloat(f.d);for(auto n:f.normal)w.rawFloat(n);for(auto x:f.vertices)w.u16(x);}
     need(w.b.size()<=8u*1024u*1024u,"col.original_size");
@@ -153,8 +170,6 @@ void decodeBody(Reader& r, Collision48G& c, const DecodeHooks48C* hooks,
     r.range(stride*nv+4);r.at=flag;c.normals_present=r.u32();need(c.normals_present<=1,"col.normals_flag",flag);
     const std::size_t expected=flag+4+stride*nv*c.normals_present+32u*nn+22u*nf;
     need(wholeFile?expected==r.b.size():expected<=r.b.size(),"col.exact_extent",r.at,"Truncated COL body or trailing bytes");
-    supported(!c.quantized||!c.normals_present,"col.quantized_normals",flag,
-        "Quantized optional vertex normals remain outside this bounded source projection");
     supported(!c.quantized||std::fegetround()==FE_TONEAREST,"col.quantized_rounding",bodyBase+64,
         "Quantized position projection requires individually rounded binary32 nearest-even");
     supported(nn>0,"col.single_leaf",bodyBase+56,"No-node single-face root query policy is not yet supported");
@@ -164,7 +179,9 @@ void decodeBody(Reader& r, Collision48G& c, const DecodeHooks48C* hooks,
         if(c.quantized)for(auto& x:c.vertices[i])x=quantizedPosition(r.u16());
         else r.values(c.vertices[i]);
         if((i&255u)==0)tick(hooks,"collision-vertices",i,nv);}
-    r.u32();if(c.normals_present){c.vertex_normals.resize(nv);for(auto& v:c.vertex_normals)r.values(v);}
+    r.u32();if(c.normals_present){c.vertex_normals.resize(nv);for(auto& v:c.vertex_normals){
+        if(c.quantized)for(auto& x:v)x=quantizedNormal(r.u16());
+        else r.values(v);}}
     c.nodes_offset=static_cast<std::uint32_t>(r.at);c.nodes.resize(nn);
     for(std::uint32_t i=0;i<nn;++i){auto& n=c.nodes[i];n.source_offset=static_cast<std::uint32_t>(r.at);n.volume=r.f32();r.values(n.center);r.values(n.half);
         for(auto& key:n.children){const auto raw=r.u16();key=(raw&32767u)|((raw&32768u)?collision_leaf48g:0u);}

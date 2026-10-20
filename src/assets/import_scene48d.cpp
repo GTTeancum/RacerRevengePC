@@ -5,6 +5,7 @@
 #include <limits>
 #include <new>
 #include <utility>
+#include <type_traits>
 
 namespace rr { namespace assets {
 namespace {
@@ -96,7 +97,7 @@ void accumulateBounds(SceneNode48D& node, const std::array<double, 3>& position)
 }
 void decodeSurface(const Read48D& read, std::size_t begin, std::size_t end, std::uint32_t expectedVertices,
     Scene48D& scene, SceneSurface48D& surface, const DecodeHooks48C* hooks,
-    bool allowSigned32QuantizedPositions) {
+    bool allowSigned32QuantizedPositions, SceneRawCapture48D* capture) {
     std::size_t at = begin;
     surface.vertices.reserve(expectedVertices);
     surface.indices.reserve(static_cast<std::size_t>(expectedVertices) * 3);
@@ -184,6 +185,14 @@ void decodeSurface(const Read48D& read, std::size_t begin, std::size_t end, std:
             start = finish;
         }
         for (unsigned i = 0; i < count; ++i) {
+            if(capture){
+                SceneRawVertex48D retained;
+                for(unsigned axis=0;axis<3;++axis){
+                    retained.position[axis]=raw[i].xyz[axis];
+                    retained.normal[axis]=static_cast<std::int8_t>(raw[i].normal[axis]);
+                }
+                capture->vertices.push_back(retained);
+            }
             SceneVertex48D vertex;
             vertex.bone = static_cast<std::uint16_t>(std::abs(raw[i].xyz[3]) / 16 - 1);
             for (unsigned axis = 0; axis < 3; ++axis) {
@@ -203,6 +212,12 @@ void decodeSurface(const Read48D& read, std::size_t begin, std::size_t end, std:
         "scene.surface_trailer", at, "Unexpected surface trailing bytes");
     require(surface.vertices.size() == expectedVertices, DecodeKind48C::malformed,
         "scene.vertex_header", surface.source_offset, "Surface vertex header count mismatch");
+    // Endpoint equality alone cannot distinguish a packet continuation from
+    // two authored strips that happen to share endpoints. Original24640C
+    // retains the authored strip count, while ADC signs define emitted strips.
+    // If that count already matches the actual packets, no continuation is
+    // required. Positive deficits still require the complete exact proof below.
+    if (surface.strips.size() == surface.source_strips) surface.continuations.clear();
     require(surface.strips.size() >= surface.continuations.size() &&
         surface.strips.size() - surface.continuations.size() == surface.source_strips, DecodeKind48C::unsupported,
         "scene.strip_continuations", surface.source_offset,
@@ -267,8 +282,9 @@ void exportNeutral(Scene48D& scene, const DecodeHooks48C* hooks) {
 }
 }
 
-bool decodeScene48D(const std::vector<std::uint8_t>& input, Scene48D& output,
-    DecodeError48C& error, const DecodeHooks48C* hooks, const SceneLimits48D& limits) {
+static bool decodeSceneInternal48D(const std::vector<std::uint8_t>& input, Scene48D& output,
+    DecodeError48C& error,const DecodeHooks48C* hooks,const SceneLimits48D& limits,
+    SceneRawCapture48D* rawOutput,const SceneRawCaptureLimits48D* rawLimits) {
     error = {};
     try {
         cancelled(hooks, 0);
@@ -280,6 +296,23 @@ bool decodeScene48D(const std::vector<std::uint8_t>& input, Scene48D& output,
             "scene.version", 0, "Only original PSG version3 supported");
         const auto nodeCount = read.u32(8);
         require(nodeCount >= 1 && nodeCount <= 256, DecodeKind48C::limit, "scene.node_count", 8, "Hierarchy count outside 1..256");
+        SceneRawCapture48D captured;
+        if(rawOutput){
+            require(rawLimits&&rawLimits->vertices&&rawLimits->surfaces&&
+                rawLimits->vertices<=std::min(std::uint32_t(1000000),limits.vertices_all_lods)&&
+                rawLimits->surfaces<=rawLimits->vertices/3u,
+                DecodeKind48C::limit,"scene.raw_capture_counts",0,"Raw capture capacities exceed existing scene limits");
+            const auto bytes=std::size_t(rawLimits->vertices)*sizeof(SceneRawVertex48D)+
+                std::size_t(rawLimits->surfaces)*sizeof(SceneRawSurface48D);
+            require(bytes<=rawLimits->availablePayloadBytes&&bytes<=8u*1024u*1024u,
+                DecodeKind48C::limit,"scene.raw_capture_payload",0,"Raw capture exceeds caller payload or existing input ceiling");
+            captured.vertices.reserve(rawLimits->vertices);captured.surfaces.reserve(rawLimits->surfaces);
+            captured.retainedPayloadBytes=captured.vertices.capacity()*sizeof(SceneRawVertex48D)+
+                captured.surfaces.capacity()*sizeof(SceneRawSurface48D);
+            require(captured.retainedPayloadBytes<=rawLimits->availablePayloadBytes&&
+                captured.retainedPayloadBytes<=8u*1024u*1024u,
+                DecodeKind48C::limit,"scene.raw_capture_capacity",0,"Actual raw vector capacity exceeds payload ceiling");
+        }
         Scene48D parsed;
         parsed.nodes.reserve(nodeCount);
         std::size_t at = 12;
@@ -370,8 +403,16 @@ bool decodeScene48D(const std::vector<std::uint8_t>& input, Scene48D& output,
                 require(parsed.vertices_all_lods <= vertexLimit && vertexCount <= vertexLimit - parsed.vertices_all_lods,
                     DecodeKind48C::limit, "scene.total_vertices", surface.source_offset, "Total vertices across LODs exceed limit");
                 parsed.vertices_all_lods += vertexCount;
+                if(rawOutput){
+                    require(captured.surfaces.size()<rawLimits->surfaces&&
+                        captured.vertices.size()<=rawLimits->vertices&&
+                        vertexCount<=rawLimits->vertices-captured.vertices.size(),
+                        DecodeKind48C::limit,"scene.raw_capture_extent",at,"Raw capture source counts exceed caller capacities");
+                    captured.surfaces.push_back({level,surfaceIndex,
+                        static_cast<std::uint32_t>(captured.vertices.size()),vertexCount,surface.source_offset});
+                }
                 decodeSurface(read, at, at + size, vertexCount, parsed, surface, hooks,
-                    limits.allow_signed32_quantized_positions); at += size;
+                    limits.allow_signed32_quantized_positions,rawOutput?&captured:nullptr); at += size;
                 lod.surfaces.push_back(std::move(surface)); ++parsed.surfaces_all_lods;
             }
             parsed.lods.push_back(std::move(lod));
@@ -405,10 +446,22 @@ bool decodeScene48D(const std::vector<std::uint8_t>& input, Scene48D& output,
         require(at == input.size(), DecodeKind48C::malformed, "scene.trailing_bytes", at, "Unconsumed PSG bytes");
         exportNeutral(parsed, hooks);
         cancelled(hooks, at);
+        static_assert(std::is_nothrow_move_assignable_v<Scene48D> &&
+            std::is_nothrow_move_assignable_v<SceneRawCapture48D>);
         output = std::move(parsed);
+        if(rawOutput)*rawOutput=std::move(captured);
         return true;
     } catch (const Failure48D& failure) { error = failure.error; }
     catch (const std::bad_alloc&) { error = {DecodeKind48C::limit, "scene.allocation", 0, "Scene allocation failed"}; }
     return false;
+}
+bool decodeScene48D(const std::vector<std::uint8_t>& input,Scene48D& output,
+    DecodeError48C& error,const DecodeHooks48C* hooks,const SceneLimits48D& limits){
+    return decodeSceneInternal48D(input,output,error,hooks,limits,nullptr,nullptr);
+}
+bool decodeSceneWithRaw48D(const std::vector<std::uint8_t>& input,Scene48D& output,
+    SceneRawCapture48D& rawOutput,const SceneRawCaptureLimits48D& rawLimits,
+    DecodeError48C& error,const DecodeHooks48C* hooks,const SceneLimits48D& limits){
+    return decodeSceneInternal48D(input,output,error,hooks,limits,&rawOutput,&rawLimits);
 }
 } }

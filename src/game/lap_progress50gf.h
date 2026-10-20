@@ -1,5 +1,8 @@
 #pragma once
 #include "track_navigation50eu.h"
+#include "track_navigation_view50mb.h"
+#include "track_navigation_view50tc.h"
+#include "track_navigation_view50tb.h"
 
 namespace rr::game {
 // Projection of the player's accepted map-gate effects inside 1A0DA0.
@@ -26,6 +29,87 @@ struct LapProgressDiagnostic50GF {
 // the numeric ProgressNode value is not an ordering number.
 bool prepareLapProgressTrack50GF(const TrackNavigationScratch50EU&,
     LapProgressTrack50GF&,LapProgressDiagnostic50GF&) noexcept;
+
+// Retains the exact immutable Map navigation, metadata and final liveWorld.
+// The bounded source marker list remains ten entries; MB needs four.
+class LapProgressTrackView50MB {
+    TrackNavigationView50EU map_{};
+    AiTrackMetadataView50IU metadata_{};
+    LapProgressTrack50GF data_{};
+    friend bool prepareLapProgressTrack50GF(const TrackNavigationView50EU&,
+        const AiTrackMetadataView50IU&,LapProgressTrackView50MB&,
+        LapProgressDiagnostic50GF&) noexcept;
+public:
+    LapProgressTrackView50MB()=default;
+    bool runtimeValid() const noexcept {
+        return map_.runtimeValid()&&map_.role()==NavigationRole50MB::Map&&
+            metadata_.matches(map_)&&data_.prepared&&data_.nodeCount==map_.count();
+    }
+    bool matches(const TrackNavigationView50EU& map) const noexcept {
+        return runtimeValid()&&map.role()==NavigationRole50MB::Map&&map_.sameOwner(map);
+    }
+    const LapProgressTrack50GF& data() const noexcept {return data_;}
+    std::size_t capacity() const noexcept {return runtimeValid()?map_.capacity():0;}
+};
+// TC-CONSUMER-BEGIN 0
+class LapProgressTrackView50TC {
+    TrackNavigationView50TC map_{};
+    AiTrackMetadataView50TC metadata_{};
+    LapProgressTrack50GF data_{};
+    friend bool prepareLapProgressTrack50GF(const TrackNavigationView50TC&,
+        const AiTrackMetadataView50TC&,LapProgressTrackView50TC&,
+        LapProgressDiagnostic50GF&) noexcept;
+public:
+    LapProgressTrackView50TC()=default;
+    bool runtimeValid() const noexcept {
+        return map_.runtimeValid()&&map_.role()==NavigationRole50TC::Map&&
+            metadata_.matches(map_)&&data_.prepared&&data_.nodeCount==map_.count();
+    }
+    bool matches(const TrackNavigationView50TC& map) const noexcept {
+        return runtimeValid()&&map.role()==NavigationRole50TC::Map&&map_.sameOwner(map);
+    }
+    const LapProgressTrack50GF& data() const noexcept {return data_;}
+    std::size_t capacity() const noexcept {return runtimeValid()?map_.capacity():0;}
+};
+// TC-CONSUMER-END 0
+
+// TB-CONSUMER-BEGIN 0
+class LapProgressTrackView50TB {
+    TrackNavigationView50TB map_{};
+    AiTrackMetadataView50TB metadata_{};
+    LapProgressTrack50GF data_{};
+    friend bool prepareLapProgressTrack50GF(const TrackNavigationView50TB&,
+        const AiTrackMetadataView50TB&,LapProgressTrackView50TB&,
+        LapProgressDiagnostic50GF&) noexcept;
+public:
+    LapProgressTrackView50TB()=default;
+    bool runtimeValid() const noexcept {
+        return map_.runtimeValid()&&map_.role()==NavigationRole50TB::Map&&
+            metadata_.matches(map_)&&data_.prepared&&data_.nodeCount==map_.count();
+    }
+    bool matches(const TrackNavigationView50TB& map) const noexcept {
+        return runtimeValid()&&map.role()==NavigationRole50TB::Map&&map_.sameOwner(map);
+    }
+    const LapProgressTrack50GF& data() const noexcept {return data_;}
+    std::size_t capacity() const noexcept {return runtimeValid()?map_.capacity():0;}
+};
+// TB-CONSUMER-END 0
+
+bool prepareLapProgressTrack50GF(const TrackNavigationView50EU&,
+    const AiTrackMetadataView50IU&,LapProgressTrackView50MB&,
+    LapProgressDiagnostic50GF&) noexcept;
+// TC-CONSUMER-BEGIN 1
+bool prepareLapProgressTrack50GF(const TrackNavigationView50TC&,
+    const AiTrackMetadataView50TC&,LapProgressTrackView50TC&,
+    LapProgressDiagnostic50GF&) noexcept;
+// TC-CONSUMER-END 1
+
+// TB-CONSUMER-BEGIN 1
+bool prepareLapProgressTrack50GF(const TrackNavigationView50TB&,
+    const AiTrackMetadataView50TB&,LapProgressTrackView50TB&,
+    LapProgressDiagnostic50GF&) noexcept;
+// TB-CONSUMER-END 1
+
 
 struct LapProgressState50GF {
     std::uint32_t vehicleFF8=0,vehicleCC8=0;
@@ -68,6 +152,24 @@ bool applyPlayerLapCrossing50GF(const LapProgressTrack50GF&,
     const LapProgressCrossing50GF&,LapProgressState50GF&,
     LapProgressContinuation50GF&,LapProgressReceipt50GF&,
     LapProgressDiagnostic50GF&) noexcept;
+bool applyPlayerLapCrossing50GF(const LapProgressTrackView50MB&,
+    const LapProgressCrossing50GF&,LapProgressState50GF&,
+    LapProgressContinuation50GF&,LapProgressReceipt50GF&,
+    LapProgressDiagnostic50GF&) noexcept;
+// TC-CONSUMER-BEGIN 2
+bool applyPlayerLapCrossing50GF(const LapProgressTrackView50TC&,
+    const LapProgressCrossing50GF&,LapProgressState50GF&,
+    LapProgressContinuation50GF&,LapProgressReceipt50GF&,
+    LapProgressDiagnostic50GF&) noexcept;
+// TC-CONSUMER-END 2
+
+// TB-CONSUMER-BEGIN 2
+bool applyPlayerLapCrossing50GF(const LapProgressTrackView50TB&,
+    const LapProgressCrossing50GF&,LapProgressState50GF&,
+    LapProgressContinuation50GF&,LapProgressReceipt50GF&,
+    LapProgressDiagnostic50GF&) noexcept;
+// TB-CONSUMER-END 2
+
 // Invoke ONLY after the actual native 1A2B80 behavior has completed, with all
 // its mutations reflected in the caller's player/state. Executes 1A0F2C's FF8
 // reset, consumes the pending request, and permits the caller to resume at

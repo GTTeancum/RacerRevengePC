@@ -5,7 +5,7 @@
 #include <thread>
 
 namespace original_main_entry50KG { class RaceDisplayLifetime50LA; struct Frontend; struct Video; }
-namespace rr::platform { class MaterialTextureGl50EB; }
+namespace rr::platform { class MaterialTextureGl50EB; class OriginalUiRiderResidentPool50KG; }
 namespace rr::assets {
 class OriginalNativeTextureUploadScope50LA;
 // Typed lifetime of the actual Frontend member, independent of race display.
@@ -62,6 +62,7 @@ public:
 // Link identity is the actual MaterialTextureGl owner, never a caller receipt.
 class OriginalNativeTextureUploadScope50LA final {
     friend class rr::platform::MaterialTextureGl50EB;
+    friend class rr::platform::OriginalUiRiderResidentPool50KG;
     friend class OriginalStandardTextureLifetime50LA;
     const std::shared_ptr<const OriginalNativeTextureUploadBinding50LA> binding_;
     std::shared_ptr<const ::original_main_entry50KG::RaceDisplayLifetime50LA> display_;

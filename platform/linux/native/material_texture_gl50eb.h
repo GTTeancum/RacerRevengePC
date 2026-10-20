@@ -7,8 +7,13 @@
 namespace ra_static_fire_visual50LA {class Owner;}
 namespace ra_static_world50LA {class Owner;}
 namespace ra_cold_aggregate50LA {class Owner;}
-namespace rr::assets { class OriginalNativeTextureUploadBinding50LA; }
+namespace rr::assets { class OriginalNativeTextureUploadBinding50LA; class OriginalUiImageBank50KG; }
 namespace rr::platform {
+class OriginalUiRiderResidentPool50KG;
+class OriginalUiRiderSession50KG;
+class OriginalUiRiderDrawContribution50KG;
+class OriginalUiFrontend50KG;
+class VehicleWindowGl50DS;
 // Linux desktop core GL >= 3.2 signatures. Resolve these in the context owner; no
 // GL headers, loader/link dependency, context creation or global proc table.
 // Every entry is required, synchronous, nonthrowing and non-reentrant.
@@ -67,6 +72,13 @@ struct MaterialTextureGlDiagnostic50EB {
     std::uint32_t texture = assets::unresolvedMaterialTexture50EA;
     std::uint32_t cleanupTexture = assets::unresolvedMaterialTexture50EA;
     std::uint32_t glError = 0, cleanupGlError = 0;
+    // Observations only. Populated from the existing loaded immutable bank and
+    // unchanged request; prefix excludes the current candidate texture.
+    std::uint64_t bankRgbaBytes = 0, maximumGpuBytes = 0, maximumBankRgbaBytes = 0;
+    std::uint64_t validatedPrefixRgbaBytes = 0, candidateRgbaBytes = 0, candidateIdentity = 0;
+    std::uint32_t bankTextureCount = 0, candidateWidth = 0, candidateHeight = 0;
+    std::uint32_t residentTextureCount=0,poolLiveTextureCount=0;
+    std::uint64_t poolLiveGpuBytes=0;
     bool errorStateUnclear = false, cleanupIncomplete = false;
 };
 
@@ -127,9 +139,23 @@ public:
     bool ownsResources() const noexcept; // Includes a published empty bank.
     std::uint32_t textureCount() const noexcept;
     std::size_t gpuByteCount() const noexcept;
+    // Sparse Rider retains full logical count; holes are never fallback names.
+    std::uint32_t residentTextureCount() const noexcept;
+    bool riderSparse()const noexcept;
+    const OriginalUiRiderSession50KG* riderSession()const noexcept;
+    std::uint64_t riderDemandSerial()const noexcept;
+    const assets::OriginalUiImageBank50KG* riderBank()const noexcept;
+    bool riderSamplerMatches(std::uint32_t,const MaterialTextureSampler50EB&)const noexcept;
     // Nonzero only for the current published bank. Each successful create on
     // this live owner has a distinct token, including close/recreate cycles.
     std::uint64_t publicationToken() const noexcept;
+    // Successful complete generic upload provenance, minted only by create().
+    // Address comparison only: no post-upload CPU-bank dereference. Callers
+    // must retain that immutable bank and still satisfy validBorrow() with the
+    // actual context. A close attempt clears this receipt, including failures.
+    // Sparse Rider publications do not issue this complete-bank receipt.
+    bool matchesSourceBank(const assets::MaterialTextureAssets50EA&,
+        std::uint64_t publicationToken) const noexcept;
     // Full-world RA remains closed here until its private renderer lease joins.
     // Read-only, allocation-free, and GL-free borrower validation. Requires
     // this exact callback/context pair, the creating thread, the same live
@@ -144,6 +170,14 @@ public:
     std::uint32_t texture(std::uint32_t bankIndex) const noexcept;
 
 private:
+    friend class OriginalUiRiderResidentPool50KG;
+    friend class OriginalUiRiderSession50KG;
+    friend class OriginalUiRiderDrawContribution50KG;
+    friend class OriginalUiFrontend50KG;
+    friend class VehicleWindowGl50DS;
+    bool acquireRiderBorrow(const void*)const noexcept;
+    bool releaseRiderBorrow(const void*)const noexcept;
+    std::shared_ptr<OriginalUiRiderResidentPool50KG> riderPool_;
     struct Storage;
     std::unique_ptr<Storage> storage_;
     std::shared_ptr<ra_static_fire_visual50LA::Owner> raStaticFire_;

@@ -60,6 +60,106 @@ struct Owners {
     EffectOwner50BE* effectOwners=nullptr;
     std::size_t effectOwnerCount=0;
 };
+// The selected final view is retained by value and cannot be reseated inside
+// this owner. Keep the same immutable selection across an unfinished State;
+// State itself remains the original bank-safe scalar continuation.
+struct Owners50MB {
+    visibility::Owner& visibility;
+    std::uint32_t& cables254Field50;
+    // Genuine19EBA0 reset fields share the existing human audio state.
+    // D44 is the actual session pool's human row, never a fresh zero scratch.
+    OriginalHumanEngineResetOwner50LB& controllerD40;
+    UndertrackPlayerPrefix50ET& playerPrefix;
+    std::uint32_t& materialD44Field24C;
+    const TrackNavigationView50EU mapTrack;
+    const UndertrackPhysicsDomain50EW& height;
+    const SecondaryActivationGlobals49V& activation;
+    const ResetLifecycleGlobals50AT& lifecycle;
+    const VisualVector49R& targetRelative2F0;
+    const UndertrackQueryOwners50EW& queries;
+    ZoneLifecycle50CL& collisionLifecycle;
+    LiveZoneWorld50EN& collisionWorld;
+    LiveZoneWorkspace50EN& collisionWorkspace;
+    original_ai_reset_ground_bridge::GroundBridge& ground;
+    Models& models;
+    const ResetEffectBindings50BK& effects;
+    EffectOwner50BE* effectOwners=nullptr;
+    std::size_t effectOwnerCount=0;
+};
+// TC-CONSUMER-BEGIN 0
+struct Owners50TC {
+    visibility::Owner& visibility;
+    std::uint32_t& cables254Field50;
+    // Genuine19EBA0 reset fields share the existing human audio state.
+    // D44 is the actual session pool's human row, never a fresh zero scratch.
+    OriginalHumanEngineResetOwner50LB& controllerD40;
+    UndertrackPlayerPrefix50ET& playerPrefix;
+    std::uint32_t& materialD44Field24C;
+    const TrackNavigationView50TC mapTrack;
+    const UndertrackPhysicsDomain50EW& height;
+    const SecondaryActivationGlobals49V& activation;
+    const ResetLifecycleGlobals50AT& lifecycle;
+    const VisualVector49R& targetRelative2F0;
+    const UndertrackQueryOwners50EW& queries;
+    ZoneLifecycle50CL& collisionLifecycle;
+    LiveZoneWorld50EN& collisionWorld;
+    LiveZoneWorkspace50EN& collisionWorkspace;
+    original_ai_reset_ground_bridge::GroundBridge& ground;
+    Models& models;
+    const ResetEffectBindings50BK& effects;
+    EffectOwner50BE* effectOwners=nullptr;
+    std::size_t effectOwnerCount=0;
+};
+// TC-CONSUMER-END 0
+
+// TB-CONSUMER-BEGIN 0
+struct Owners50TB {
+    visibility::Owner& visibility;
+    std::uint32_t& cables254Field50;
+    // Genuine19EBA0 reset fields share the existing human audio state.
+    // D44 is the actual session pool's human row, never a fresh zero scratch.
+    OriginalHumanEngineResetOwner50LB& controllerD40;
+    UndertrackPlayerPrefix50ET& playerPrefix;
+    std::uint32_t& materialD44Field24C;
+    const TrackNavigationView50TB mapTrack;
+    const UndertrackPhysicsDomain50EW& height;
+    const SecondaryActivationGlobals49V& activation;
+    const ResetLifecycleGlobals50AT& lifecycle;
+    const VisualVector49R& targetRelative2F0;
+    const UndertrackQueryOwners50EW& queries;
+    ZoneLifecycle50CL& collisionLifecycle;
+    LiveZoneWorld50EN& collisionWorld;
+    LiveZoneWorkspace50EN& collisionWorkspace;
+    original_ai_reset_ground_bridge::GroundBridge& ground;
+    Models& models;
+    const ResetEffectBindings50BK& effects;
+    EffectOwner50BE* effectOwners=nullptr;
+    std::size_t effectOwnerCount=0;
+};
+// TB-CONSUMER-END 0
+
+namespace ordinary_navigation_detail50MB=native_original_ai_recovery::ordinary_navigation_detail50MB;
+// Constant-true legacy admission leaves every original guard/effect ordered.
+inline bool navigationReadyOrdinaryShared50MB(const Owners&) noexcept {return true;}
+inline bool navigationReadyOrdinaryShared50MB(const Owners50MB& owners) noexcept {
+    return owners.mapTrack.runtimeValid()&&owners.mapTrack.role()==NavigationRole50MB::Map&&
+        owners.mapTrack.sameWorld(owners.collisionWorld);
+}
+// TC-CONSUMER-BEGIN 1
+inline bool navigationReadyOrdinaryShared50MB(const Owners50TC& owners) noexcept {
+    return owners.mapTrack.runtimeValid()&&owners.mapTrack.role()==NavigationRole50TC::Map&&
+        owners.mapTrack.sameWorld(owners.collisionWorld);
+}
+// TC-CONSUMER-END 1
+
+// TB-CONSUMER-BEGIN 1
+inline bool navigationReadyOrdinaryShared50MB(const Owners50TB& owners) noexcept {
+    return owners.mapTrack.runtimeValid()&&owners.mapTrack.role()==NavigationRole50TB::Map&&
+        owners.mapTrack.sameWorld(owners.collisionWorld);
+}
+// TB-CONSUMER-END 1
+
+
 inline bool fail(Diagnostic& d,std::uint32_t pc,const char* message) noexcept {
     d.sourcePC=pc;d.message=message;return false;
 }
@@ -67,11 +167,17 @@ inline bool fail(Diagnostic& d,std::uint32_t pc,const char* message) noexcept {
 // failure; callers must not replay Player input/navigation/packing. The camera
 // tail runs separately only AFTER this lease has released the visibility world.
 // No allocation, guest execution or replacement controls are used.
-inline bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+template<class OwnersT>
+    requires (std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>||std::is_same_v<OwnersT,Owners50TC>||std::is_same_v<OwnersT,Owners50TB>)
+inline bool resume2255B0OrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
-    Owners& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    OwnersT& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
     diagnostic={};
+    // Validate the final source role/world before any continuation or visibility
+    // effect, including when resuming after selection/placement already ran.
+    if(!navigationReadyOrdinaryShared50MB(owners))
+        return fail(diagnostic,0x2255e0u,"ordinary map reset requires its final same-world MB navigation view");
     const bool controller=domain==UndertrackResetDomain50EW::PlayerControllerReady50LC;
     if((!controller&&domain!=UndertrackResetDomain50EW::PlayerPostPackedBytes50S)||!serial||
        frame.phase!=(controller?VehicleFramePhase49W::Ready:VehicleFramePhase49W::PostPackedBytes50S)||
@@ -107,7 +213,7 @@ inline bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings4
     };
     for(;;)switch(state.stage){
     case Stage::Idle:
-        if(!owners.mapTrack.indicesPrepared||!owners.mapTrack.gatesPrepared)
+        if(!ordinary_navigation_detail50MB::indicesPrepared(owners.mapTrack)||!ordinary_navigation_detail50MB::gatesPrepared(owners.mapTrack))
             return fail(diagnostic,0x2255e0u,"actual human map progression/indices are unavailable");
         state.selectionProgress=progress.reset;state.stage=Stage::Select;break;
     case Stage::Select: {
@@ -119,7 +225,7 @@ inline bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings4
         std::memcpy(input.worldPosition,frame.nodes[main].world100.v+12,16);
         std::memcpy(input.localPosition,frame.nodes[main].localC0.v+12,16);
         input.lift7EC=parameters.visual.verticalLimit7EC;
-        if(!selectUndertrackReposition50ET(owners.mapTrack.track,state.selectionProgress,input,
+        if(!selectUndertrackReposition50ET(ordinary_navigation_detail50MB::track(owners.mapTrack),state.selectionProgress,input,
             state.selection,diagnostic.placement))
             return fail(diagnostic,diagnostic.placement.sourcePC,"source2255B0 geometry rejected");
         state.stage=Stage::Placement;break;
@@ -139,9 +245,8 @@ inline bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings4
                 return fail(diagnostic,0x225a74u,"actual application zone table row is unbound");
             collisionRows[ordinal]=static_cast<std::uint32_t>(ordinal+1u);
         }
-        UndertrackTableBindings50ET tables{};
-        if(!undertrackBindings50EU(owners.mapTrack,visibilityRows.data(),collisionRows.data(),count,tables)||
-           !bindUndertrackPlacement50ET(state.selection,tables,state.placement,diagnostic.placement))
+        if(!ordinary_navigation_detail50MB::bindPlacement(state.selection,owners.mapTrack,
+            visibilityRows.data(),collisionRows.data(),count,state.placement,diagnostic.placement))
             return fail(diagnostic,diagnostic.placement.sourcePC?diagnostic.placement.sourcePC:0x225a38u,
                 "source human map node78/application placement binding rejected");
         state.stage=Stage::PlayerPrefix;break;
@@ -236,22 +341,116 @@ inline bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings4
         return true;
     }
 }
+inline bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
+    Owners& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resume2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,domain,state,owners,workspace,diagnostic);
+}
+inline bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
+    Owners50MB& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resume2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,domain,state,owners,workspace,diagnostic);
+}
+// TC-CONSUMER-BEGIN 2
+inline bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
+    Owners50TC& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resume2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,domain,state,owners,workspace,diagnostic);
+}
+// TC-CONSUMER-END 2
+
+// TB-CONSUMER-BEGIN 2
+inline bool resume2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    std::uint64_t serial,UndertrackResetDomain50EW domain,State& state,
+    Owners50TB& owners,UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resume2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,domain,state,owners,workspace,diagnostic);
+}
+// TB-CONSUMER-END 2
+
 // The actual228BBC continuation supplies its own saved pre-reset base pose.
+template<class OwnersT>
+    requires (std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>||std::is_same_v<OwnersT,Owners50TC>||std::is_same_v<OwnersT,Owners50TB>)
+inline bool resumeOrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    const BaseUndertrackContinuation50X& base,State& state,OwnersT& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    if(!base.pending||base.frame!=&frame||base.bindings!=&bindings)
+        return fail(diagnostic,0x228bbcu,"human undertrack reset has no actual base continuation");
+    return resume2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,base.serial,
+        UndertrackResetDomain50EW::PlayerPostPackedBytes50S,state,owners,workspace,diagnostic);
+}
 inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     const BaseUndertrackContinuation50X& base,State& state,Owners& owners,
     UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    if(!base.pending||base.frame!=&frame||base.bindings!=&bindings)
-        return fail(diagnostic,0x228bbcu,"human undertrack reset has no actual base continuation");
-    return resume2255B0(frame,bindings,parameters,progress,base.serial,
-        UndertrackResetDomain50EW::PlayerPostPackedBytes50S,state,owners,workspace,diagnostic);
+    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,base,state,owners,workspace,diagnostic);
 }
+inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    const BaseUndertrackContinuation50X& base,State& state,Owners50MB& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,base,state,owners,workspace,diagnostic);
+}
+// TC-CONSUMER-BEGIN 3
+inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    const BaseUndertrackContinuation50X& base,State& state,Owners50TC& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,base,state,owners,workspace,diagnostic);
+}
+// TC-CONSUMER-END 3
+
+// TB-CONSUMER-BEGIN 3
+inline bool resume(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    const BaseUndertrackContinuation50X& base,State& state,Owners50TB& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resumeOrdinaryShared50MB(frame,bindings,parameters,progress,base,state,owners,workspace,diagnostic);
+}
+// TB-CONSUMER-END 3
+
 // Distinct1A17A4 event call. It never manufactures a base-frame cursor.
+template<class OwnersT>
+    requires (std::is_same_v<OwnersT,Owners>||std::is_same_v<OwnersT,Owners50MB>||std::is_same_v<OwnersT,Owners50TC>||std::is_same_v<OwnersT,Owners50TB>)
+inline bool resetController2255B0OrdinaryShared50MB(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    std::uint64_t serial,State& state,OwnersT& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resume2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,
+        UndertrackResetDomain50EW::PlayerControllerReady50LC,state,owners,workspace,diagnostic);
+}
 inline bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
     const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
     std::uint64_t serial,State& state,Owners& owners,
     UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
-    return resume2255B0(frame,bindings,parameters,progress,serial,
-        UndertrackResetDomain50EW::PlayerControllerReady50LC,state,owners,workspace,diagnostic);
+    return resetController2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,state,owners,workspace,diagnostic);
 }
+inline bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    std::uint64_t serial,State& state,Owners50MB& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resetController2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,state,owners,workspace,diagnostic);
+}
+// TC-CONSUMER-BEGIN 4
+inline bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    std::uint64_t serial,State& state,Owners50TC& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resetController2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,state,owners,workspace,diagnostic);
+}
+// TC-CONSUMER-END 4
+
+// TB-CONSUMER-BEGIN 4
+inline bool resetController2255B0(VehicleFrameState49W& frame,const VehicleFrameBindings49W& bindings,
+    const VehicleFrameParameters49W& parameters,TrackNavigationProgress50EU& progress,
+    std::uint64_t serial,State& state,Owners50TB& owners,
+    UndertrackPhysicsWorkspace50EW& workspace,Diagnostic& diagnostic) noexcept {
+    return resetController2255B0OrdinaryShared50MB(frame,bindings,parameters,progress,serial,state,owners,workspace,diagnostic);
+}
+// TB-CONSUMER-END 4
+
 } // namespace native_original_human_recovery

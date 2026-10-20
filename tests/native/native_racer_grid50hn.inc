@@ -6,6 +6,7 @@
 // Four front starts and three back starts retain at least42 lateral or
 //40 longitudinal units between pod centers, with player40 behind the back row.
 auto placeOpponentAtGrid50HN=[&](std::size_t racer){
+ requireMbRuntimeNavigation50MB();
  require50DU(racer<racerBank.count(),"invalid native grid slot");
  racerBank.visit(racer,[&](){
   require50DU(completedFrames==0,"opponent grid placement requires fresh state");
@@ -18,7 +19,10 @@ auto placeOpponentAtGrid50HN=[&](std::size_t racer){
    // every other source rank once. It is not an invented lateral grid layout.
    constexpr std::uint32_t nativeRank[maxHostRaceRacers50HT]={4,0,1,2,3,5,6,7};
    GridCenterResult50AC authoredGrid{};
-   require50DU(source_grid50IG::prepare(*navigationMap,nativeRank[racer],authoredGrid),
+   require50DU((isTbTrack?source_grid50IG::prepare(tbMapView,nativeRank[racer],authoredGrid):
+       isTcTrack?source_grid50IG::prepare(tcMapView,nativeRank[racer],authoredGrid):
+       isMbTrack?source_grid50IG::prepare(mbMapView,nativeRank[racer],authoredGrid):
+       source_grid50IG::prepare(*navigationMap,nativeRank[racer],authoredGrid)),
        "original complete starting-grid geometry unavailable");
    for(unsigned axis=0;axis<3;++axis){
     const float at=std::bit_cast<float>(authoredGrid.position[axis]);

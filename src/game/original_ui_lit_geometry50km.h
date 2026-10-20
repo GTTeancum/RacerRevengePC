@@ -3,6 +3,7 @@
 #include "model_palette49s.h"
 #include "original_ui_rider_binder50kg.h"
 #include "../assets/import_scene48d.h"
+#include "../assets/original_ui_rider_character_assets50kg.h"
 #include "../assets/native_asset48b.h"
 
 namespace rr::game {
@@ -105,6 +106,22 @@ struct OriginalUiLitSurfaceOutput50KM {
 // On failure output bytes/counts are unchanged; caller scratch may change.
 OriginalUiLitGeometryStatus50KM projectOriginalUiLitSceneSurface50KM(
     const assets::Scene48D&,std::uint32_t lod,std::uint32_t surface,
+    const ModelPalette49S&,const OriginalUiLitContext50KM&,bool computeRadialFog,
+    OriginalUiLitSurfaceOutput50KM&,OriginalUiLitGeometryWorkspace50KM&) noexcept;
+// Bounded original337690 no-fog DiffuseCompressed join for authenticated UI22c.
+// The immutable owner supplies the scene; arbitrary Scene48D copies cannot opt in.
+// Retained original RGBA stays untouched. Both original no-fog branches generate
+// raster RGBA from light rows; final UV prefetch into colors is dead at group end.
+// passIndex is zero-based. All ordinary geometry/fog/clipping guards still apply.
+OriginalUiLitGeometryStatus50KM projectOriginalUiKnireColoredSurface50KM(
+    const assets::OriginalUiRiderCharacterAssets50KG&,std::uint32_t lod,
+    std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
+    const ModelPalette49S&,const OriginalUiLitContext50KM&,bool computeRadialFog,
+    OriginalUiLitSurfaceOutput50KM&,OriginalUiLitGeometryWorkspace50KM&) noexcept;
+// Separate authenticated UI23c surface1: same proven no-fog kernel bounds.
+OriginalUiLitGeometryStatus50KM projectOriginalUiKraidColoredSurface50KM(
+    const assets::OriginalUiRiderCharacterAssets50KG&,std::uint32_t lod,
+    std::uint32_t surface,std::uint32_t passIndex,const std::string& microprogram,
     const ModelPalette49S&,const OriginalUiLitContext50KM&,bool computeRadialFog,
     OriginalUiLitSurfaceOutput50KM&,OriginalUiLitGeometryWorkspace50KM&) noexcept;
 // Separate original SpecularMapCompressed entry: same real per-node position

@@ -13,3 +13,4 @@ The executable needs SDL2, suitable graphics drivers, and the native IPU decoder
 Use a clean executable directory with no evidence/work/cacheobjects, generated meshes/textures/scenes, corpus JSON or rider cache. The launcher does not globally prohibit every legacy reader still present in source: when generated-root is unset, older paths can resolve relative to the executable directory. Each supported route needs absent-pack runtime and file-access verification before release. Original asset files must not be included in public packages.
 
 Historical retained-runtime tools remain for diagnostic provenance and tests; do not use their staged-runtime output as this release path. Ordinary compiler objects, build receipts and test screenshots are not runtime asset packs.
+

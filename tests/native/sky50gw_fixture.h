@@ -1,11 +1,15 @@
 #pragma once
 #include "pod_materials50ed_fixture.h"
 #include "track_source_fixture.h"
+#include "mb_original_world50lm.h"
+#include "tc_original_world50lm.h"
+#include "rc_cold_sources50la.h"
+#include "tb_cold_sources50la.h"
 #include "../../src/assets/import_decode48c.h"
 #include "../../src/assets/original_ipu_decoder.h"
 #include <cfenv>
 
-// Cold authenticated bridge for original TA/GC/GA/MA/SA/RA sky members. Cube geometry is the direct
+// Cold authenticated bridge for original TA/GC/GA/MA/SA/RA/MB/TC sky members. Cube geometry is the direct
 // 12A8A0 source constructor, not an invented enclosing mesh. Only authored
 // face/tile mask bits produce geometry. Images are genuine decoded IPUM bytes.
 namespace sky50gw_fixture {
@@ -20,6 +24,17 @@ struct Request {
     // Both CUB and SCB are authenticated below, with no second archive decode.
     const a::ResArchive48C* retainedArchive = nullptr;
     bool decodeOriginalImages = false; // Cold in-process decode from this same authenticated CUB.
+    // Typed cold borrow from the loaded authenticated MB world. The pointer and
+    // its archive are used only during load(); no borrowed storage is retained.
+    // Naked retainedArchive stays RA-only, and both borrows cannot be supplied.
+    const mb_original_world50LM::Owner* retainedMbWorld = nullptr;
+    // Appended typed TC cold borrow. Its own authenticated archive contains
+    // byte-identical ta.cub; source identity and zone selection remain TC.
+    const tc_original_world50LM::Owner* retainedTcWorld = nullptr;
+    // Synchronous cold borrow only; no archive decode or retained source copy.
+    const rc_cold_sources50LA::Owner* retainedRcSource = nullptr;
+    // Appended typed synchronous borrow from TB's authentic indexed source.
+    const tb_cold_sources50LA::Owner* retainedTbSource = nullptr;
 };
 struct Span {
     std::uint32_t indexStart = 0, indexCount = 0, vertexStart = 0, vertexCount = 0;
@@ -71,6 +86,20 @@ inline constexpr Entry raEntries[] = {
 };
 static_assert(sizeof(raEntries)/sizeof(raEntries[0]) == tileCount, "Actual authored RA tile count");
 #endif
+#if __has_include("sky_mb_index.inc")
+inline constexpr Entry mbEntries[] = {
+#include "sky_mb_index.inc"
+};
+static_assert(sizeof(mbEntries)/sizeof(mbEntries[0]) == tileCount, "Actual authored MB tile count");
+#endif
+inline constexpr Entry rcEntries[] = {
+#include "sky_rc_index.inc"
+};
+static_assert(sizeof(rcEntries)/sizeof(rcEntries[0]) == tileCount, "Actual authored RC tile count");
+inline constexpr Entry tbEntries[] = {
+#include "sky_tb_index.inc"
+};
+static_assert(sizeof(tbEntries)/sizeof(tbEntries[0]) == tileCount, "Actual authored TB tile count");
 struct Source {
     std::size_t archiveBytes, decodedCapacity, cubBytes, sceneBytes;
     std::uint32_t archiveEntries;
@@ -119,8 +148,33 @@ inline const Source& source(track_source_fixture::Track track) {
         "tracks\\ra.scb","57a0c9a244714d2f5f7b1ffcfb66fb182808348673b25362482458253b78ae81",
         38633,"180,180,165",raEntries};
 #endif
+#if __has_include("sky_mb_index.inc")
+    static const Source mb{4421779,16u*1024u*1024u,210066,621304,487,
+        "6aae7d59981cae6c741b14e147021960fdb4d8e68e21c217a446f779d3c821ca",
+        "skies\\mb.cub","31cff4858fd5132ab838102877e21c2d14077e12e1a86fae77dbbf9587efcdd0",
+        "tracks\\mb.scb","e64bd3c7085bd92ef0e6486bbfc2fcfed7aae4462858dcb73a5ef3c893233148",
+        37044,"177,201,230",mbEntries};
+#endif
+    static const Source tc{3607868,16u*1024u*1024u,164187,232284,509,
+        "7b5486f4029dabe137919127c879faef92b8bd2fb9df5c0d1a1d122e92731490",
+        "skies\\ta.cub","27e43db810442e9fd90fda8551e6804ab68d48e8398992a1b2997945e88d68f4",
+        "tracks\\tc.scb","795bbbf9882baf233b9d67f777d0bb1e36506dda0f1ad7e71a303faae3993d24",
+        17753,"85,91,102",entries};
+    static const Source rc{4655141,32u*1024u*1024u,167607,468918,1121,
+        "ce1b41b845935210c288c86d76b3ae0b99f198fb2c29190889c005631c7d2a8b",
+        "skies\\rcsky.cub","3f8a28b1d91d127638cb8e70cb996107968e135a0e9704bfba4cd98931697436",
+        "tracks\\rc.scb","1efe553a10cbeb349794c75c6f9e898f2871474a2dd587e0109772ae7cd1e27a",
+        35404,"0,0,0",rcEntries};
+    static const Source tb{3749557,32u*1024u*1024u,184730,448107,1465,
+        "1188206d7b1f64910c119192829fc357b9d4a9f021d64e8a2b7561f2c113a09b",
+        "skies\\tb.cub","fe992b1ccf89f28fa1f47ebe1ad1958e9f0e459a408e9341edf732ae95d95330",
+        "tracks\\tb.scb","c3536c6e76dc4d6836ee154aabc80f5e73bd80e85189b841538b3a3ce53e8184",
+        32324,"95,71,79",tbEntries};
     switch (track) {
+    case track_source_fixture::Track::tb: return tb;
+    case track_source_fixture::Track::rc: return rc;
     case track_source_fixture::Track::ta: return ta;
+    case track_source_fixture::Track::tc: return tc;
     case track_source_fixture::Track::gc: return gc;
     case track_source_fixture::Track::ga:
 #if __has_include("sky_ga_index.inc")
@@ -145,6 +199,12 @@ inline const Source& source(track_source_fixture::Track track) {
         return ra;
 #else
         throw std::runtime_error("RA sky bytes have not been cold-prepared and pinned");
+#endif
+    case track_source_fixture::Track::mb:
+#if __has_include("sky_mb_index.inc")
+        return mb;
+#else
+        throw std::runtime_error("MB sky bytes have not been cold-decoded and pinned");
 #endif
     default: throw std::runtime_error("Unsupported original sky track identity");
     }
@@ -211,14 +271,42 @@ public:
             d = {};
             need(!storage_, "Sky assets already loaded");
             need(std::fegetround() == FE_TONEAREST, "Sky geometry requires FE_TONEAREST");
-            need((!request.archive.empty() || request.retainedArchive) &&
-                (request.decodeOriginalImages || !request.textureRoot.empty()), "Explicit sky source paths required");
+            need(unsigned(bool(request.retainedArchive))+unsigned(bool(request.retainedMbWorld))+
+                unsigned(bool(request.retainedTcWorld))+unsigned(bool(request.retainedRcSource))+
+                unsigned(bool(request.retainedTbSource))<=1u, "Ambiguous retained sky owners");
             need(!request.retainedArchive || request.track == track_source_fixture::Track::ra, "Retained sky archive requires explicit RA identity");
+            const a::ResArchive48C* retainedArchive=request.retainedArchive;
+            if(request.retainedMbWorld){
+                need(request.track==track_source_fixture::Track::mb && request.retainedMbWorld->loaded() &&
+                    request.retainedMbWorld->archive(), "Retained MB sky requires the actual loaded MB world owner");
+                retainedArchive=request.retainedMbWorld->archive();
+                need(retainedArchive->entries.size()==487u && retainedArchive->decoded.size()==16392192u,
+                    "Retained MB archive shape differs");
+            }
+            if(request.retainedTcWorld){
+                need(request.track==track_source_fixture::Track::tc && request.retainedTcWorld->loaded() &&
+                    request.retainedTcWorld->archive(), "Retained TC sky requires the actual loaded TC world owner");
+                retainedArchive=request.retainedTcWorld->archive();
+                need(retainedArchive->entries.size()==509u && retainedArchive->decoded.size()==16048128u,
+                    "Retained TC archive shape differs");
+            }
+            need(request.track!=track_source_fixture::Track::rc||request.retainedRcSource,
+                "RC sky requires the actual retained compact source");
+            need(!request.retainedRcSource||(request.track==track_source_fixture::Track::rc&&
+                request.retainedRcSource->ready()&&request.decodeOriginalImages),
+                "RC sky requires its ready source and original image decoding");
+            need(request.track!=track_source_fixture::Track::tb||request.retainedTbSource,
+                "TB sky requires the actual retained compact source");
+            need(!request.retainedTbSource||(request.track==track_source_fixture::Track::tb&&
+                request.retainedTbSource->ready()&&request.decodeOriginalImages),
+                "TB sky requires its ready source and original image decoding");
+            need((!request.archive.empty() || retainedArchive || request.retainedRcSource || request.retainedTbSource) &&
+                (request.decodeOriginalImages || !request.textureRoot.empty()), "Explicit sky source paths required");
             need(request.decodeOriginalImages || !std::filesystem::is_symlink(request.textureRoot), "Sky texture root symlink rejected");
             const auto& selected = source(request.track);
             shared::Inputs input; input.capacity = 8u * 1024u * 1024u;
             a::ResArchive48C decodedArchive; a::DecodeError48C error;
-            if (!request.retainedArchive) {
+            if (!retainedArchive && !request.retainedRcSource && !request.retainedTbSource) {
                 auto archiveBytes = input.read(request.archive, selected.archiveBytes);
                 need(archiveBytes.size() == selected.archiveBytes && sha256(archiveBytes) == selected.archiveSha, "Original sky archive identity");
                 a::DecodeLimits48C limits;
@@ -229,9 +317,13 @@ public:
                 need(a::decodeResource48C(archiveBytes, decodedArchive, error, nullptr, limits),
                     "Original sky archive decode: " + error.detail);
             }
-            const auto& archive = request.retainedArchive ? *request.retainedArchive : decodedArchive;
+            const auto& archive = retainedArchive ? *retainedArchive : decodedArchive;
             Bytes cub;
-            need(a::extractResMember48C(archive, selected.cubMember, cub, error, selected.cubBytes),
+            need(request.retainedTbSource?
+                request.retainedTbSource->extractMember(selected.cubMember,cub,error,selected.cubBytes):
+                request.retainedRcSource?
+                request.retainedRcSource->extractMember(selected.cubMember,cub,error,selected.cubBytes):
+                a::extractResMember48C(archive, selected.cubMember, cub, error, selected.cubBytes),
                 "Original sky member extraction: " + error.detail);
             need(cub.size() == selected.cubBytes && sha256(cub) == selected.cubSha, "Original CUB identity");
             need(u32(cub.data()) == 1 && u32(cub.data()+4) == 1 &&
@@ -249,9 +341,13 @@ public:
                 need(f32(header+44+i*4) == sourcePose[i], "CUB authored origin/look/up");
 
             auto next = std::make_unique<Storage>();
-            Bytes sceneParameters;
-            need(a::extractResMember48C(archive, selected.sceneMember, sceneParameters, error, selected.sceneBytes),
+            Bytes extractedSceneParameters;
+            if(!request.retainedRcSource&&!request.retainedTbSource)need(a::extractResMember48C(archive, selected.sceneMember,
+                extractedSceneParameters,error,selected.sceneBytes),
                 "Original sky clear parameters extraction: " + error.detail);
+            const auto& sceneParameters=request.retainedTbSource?
+                request.retainedTbSource->world().parameters.original_bytes:request.retainedRcSource?
+                request.retainedRcSource->world().parameters.original_bytes:extractedSceneParameters;
             need(sceneParameters.size() == selected.sceneBytes && sha256(sceneParameters) == selected.sceneSha,
                 "Original scene parameter identity");
             // Exact BINARY1 Fog.ColorRGB field, verified by the existing

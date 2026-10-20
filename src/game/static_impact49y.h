@@ -39,10 +39,10 @@ enum class StaticImpactStatus49Y { applied, skipped, unsupported, arithmetic };
 // matches and no match bypass that gate. CFC=0 additionally requires and
 // applies actual authored+60 before CF0 reduction; no default1 is supplied.
 // Rear D18 raising uses normalizedZ<-0.85 when AI and CFC!=0, otherwise<-0.75.
-// Consumed operands/intermediates must be normal binary32 or signed zero;
-// subnormal/nonfinite arithmetic is rejected, including a subnormal squared
-// length before scalar SQRT or VU RSQRT. This avoids claiming host gradual
-// underflow equals EE/VU flush behavior. Exact-zero normalization uses original
+// Inputs/all other intermediates remain normal binary32/signed zero. Only the six static
+// world/local XYZ square results map subnormal results to signed zero (bounded native
+// PCSX2v2.4.0 value policy; no hardware/flag parity or global FTZ). Dynamic split stays strict.
+// Nonfinite results still fail. Exact-zero normalization uses original
 // positive maximum-finite Q and produces zero XYZ, not host division by zero.
 // Requires FE_TONEAREST, no fast math/contraction; IEEE ordinary rounding only,
 // not a proof of physical EE extended-float accuracy or status flags.

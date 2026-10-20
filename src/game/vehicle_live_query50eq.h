@@ -2,6 +2,7 @@
 #include "live_zone_membership50en.h"
 #include "vehicle_indexed_query50cd.h"
 #include "vehicle_secondary_contact50j.h"
+#include "source_trigger_entry50mb.h"
 
 namespace rr::game {
 // Native nonnull E0 projection, with independent ownership for each query.
@@ -69,4 +70,14 @@ VehicleLiveQueryResult50EQ querySecondaryLiveIndexedStaticVehicle50EQ(
     const std::size_t* indices,std::size_t count,const Type2StaticInitial49X&,
     const Type2StaticWorkspace49X&,const Type2StaticDestination49X&,
     Type2StaticResult49X&) noexcept;
+// Shared real admission/preparation/live-membership prefix for the separate
+// source-trigger continuation. Publishes prepared cache to the actual owner;
+// does not invoke the legacy whole-list numerical/callback driver.
+VehicleLiveQueryResult50EQ prepareSourceLiveQuery50MB(bool secondary,
+    const VehicleFrameState49W&,const VehicleFrameBindings49W&,
+    const MainStaticDetectorAdmission50H&,const VehicleLiveQueryContext50EQ&,
+    Type2StaticQuery49X&,const Type2StaticCandidate49X*,std::size_t,
+    const std::size_t*,std::size_t,const Type2StaticInitial49X&,
+    const Type2StaticWorkspace49X&,const Type2StaticDestination49X&,
+    Type2StaticResult49X&,const SourceTriggerActionHooks50MB&) noexcept;
 }

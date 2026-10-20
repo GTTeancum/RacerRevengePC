@@ -65,10 +65,14 @@ bool OriginalUiRiderMaterialRow50KG::prepare(const assets::OriginalUiArchive50KG
             for(;j<name.size()&&fold(name[j])==fold(static_cast<char>(source.data[start+j]));++j){}
             if(j==name.size()){
                 if(found){
-                    // Exact later duplicate in original Mat_Stbl;298C80 keeps
-                    // the first2490 token. No other collision is admitted.
-                    if(!sameName(name,"ui/textures/pod_wndw")||next.rank_!=2490||
-                       rank!=3221||start!=70650)return fail(d,E::table,0x298C80);
+                    // Original298C80 returns the first matching token. Admit
+                    // only the two exact authenticated later occurrences;
+                    // neither replaces its first row nor creates an owner.
+                    const bool window=sameName(name,"ui/textures/pod_wndw")&&next.rank_==2490&&
+                        rank==3221&&start==70650;
+                    const bool mars=sameName(name,"ui/textures/08c_3")&&next.rank_==2386&&
+                        next.offset_==55255&&rank==2387&&start==55274;
+                    if(!window&&!mars)return fail(d,E::table,0x298C80);
                 }else{next.table_=source.identity;next.rank_=rank;next.offset_=static_cast<std::uint32_t>(start);found=true;}
             }
         }

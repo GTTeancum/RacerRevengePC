@@ -9,6 +9,7 @@
 #include "../../../src/game/original_ui_text50kg.h"
 #include "../../../src/game/original_ui_main_layout50kg.h"
 
+namespace original_main_entry50KG { struct Application; }
 namespace rr::platform {
 struct OriginalUiMainFrameClock50KG;
 enum class OriginalUiTournamentCareerResourceError50KG : std::uint8_t {
@@ -115,6 +116,8 @@ public:
     // Host bank mapping for source ScreenTexturesE80/EE0/F40, not flags.
     const std::array<std::uint32_t,3>* trophyImages() const noexcept;
 private:
+    friend struct ::original_main_entry50KG::Application;
+    bool sameProfileOwner(const OriginalUiRiderProfileOwner50KG&) const noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

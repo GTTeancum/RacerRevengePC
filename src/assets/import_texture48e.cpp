@@ -204,8 +204,8 @@ bool decodeTexture48E(const Bytes& input, Texture48E& output, DecodeError48C& er
     return false;
 }
 
-bool decodeMaterial48E(const Bytes& input, Material48E& output, DecodeError48C& error,
-    const DecodeHooks48C* hooks, std::size_t maxBytes) {
+static bool decodeMaterialImpl48E(const Bytes& input, Material48E& output, DecodeError48C& error,
+    const DecodeHooks48C* hooks, std::size_t maxBytes,const char* exactTcMap) {
     error = {};
     try {
         checkCancel(hooks, 0);
@@ -300,7 +300,7 @@ bool decodeMaterial48E(const Bytes& input, Material48E& output, DecodeError48C& 
                 break;
             }
         }
-        if (!parsed.inactive_sections.empty() || retainedEmptyDuplicate) parsed.original_text = input;
+        if (!parsed.inactive_sections.empty() || retainedEmptyDuplicate || exactTcMap) parsed.original_text = input;
         progress(hooks, "psm.bindings", 0, count); checkCancel(hooks, 0);
         for (std::uint32_t pass = 1; pass <= count; ++pass) {
             const Section* section = nullptr; const auto name = "ShaderPass_" + std::to_string(pass);
@@ -315,7 +315,9 @@ bool decodeMaterial48E(const Bytes& input, Material48E& output, DecodeError48C& 
             const auto mapCount = maps ? number(maps->value, 1, 2, maps->source_offset, "psm.map_count") : 1;
             for (std::uint32_t slot = 1; slot <= mapCount; ++slot) {
                 const auto* map = section->find("TextureMap_" + std::to_string(slot));
-                require(map && identifier(map->value, true), DecodeKind48C::unsupported, "psm.texture_name", section->offset,
+                require(map && (identifier(map->value, true) ||
+                    (exactTcMap && pass==1 && slot==1 && map->value==exactTcMap)),
+                    DecodeKind48C::unsupported, "psm.texture_name", section->offset,
                     "Missing or unsupported texture basename/path; binding is not invented");
                 p.textures.push_back({slot, map->value});
             }
@@ -334,5 +336,24 @@ bool decodeMaterial48E(const Bytes& input, Material48E& output, DecodeError48C& 
     } catch (const Failure& failure) { error = failure.error; }
     catch (const std::bad_alloc&) { allocationError(error); }
     return false;
+}
+bool decodeMaterial48E(const Bytes& input, Material48E& output, DecodeError48C& error,
+    const DecodeHooks48C* hooks, std::size_t maxBytes) {
+    return decodeMaterialImpl48E(input,output,error,hooks,maxBytes,nullptr);
+}
+namespace {
+#include "original_tc_material_bytes50tc.inc"
+template<std::size_t N> bool exactTcBytes(const Bytes& input,const char (&expected)[N]) noexcept {
+    return input.size()==N-1 && std::equal(input.begin(),input.end(),expected);
+}
+}
+bool decodeOriginalTcMaterial50TC(const Bytes& input, Material48E& output, DecodeError48C& error,
+    const DecodeHooks48C* hooks, std::size_t maxBytes) {
+    const char* map=nullptr;
+    if(exactTcBytes(input,tcAhuts03))map="ahuts03.tga";
+    else if(exactTcBytes(input,tcBlend8))map="tc_blend8.psm";
+    if(!map){error={DecodeKind48C::unsupported,"psm.tc_identity",0,
+        "Only the two exact original TC material sources are admitted"};return false;}
+    return decodeMaterialImpl48E(input,output,error,hooks,maxBytes,map);
 }
 } }

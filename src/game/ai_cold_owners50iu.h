@@ -38,6 +38,9 @@ inline bool applyAiCreateClass50IU(AuthoredClass49N actualRaceClass,
 // MA: ID4, course order2, AI class1, course-record pod20.
 // GA WatchtowerRun: ID8, course order3, AI class1, course-record pod10.
 // RA TheBrightlands: ID7, course order4, AI class1, course-record pod9.
+// MB TheBallastComplex: ID5, course order6, AI class2, course-record pod22.
+// SC SerresSarrano: ID12, course order8, AI class2, course-record pod16.
+// TC: ID2, course order12, AI class3, course-record pod18.
 // RC TheNightlands: ID3, course order11, AI class3, course-record pod24.
 // GC TheCitadel: ID10, course order10, AI class3, course-record pod17.
 // Neither the visible Course control number nor the selected player pod may
@@ -57,13 +60,17 @@ inline bool bindFreshAiCreateSelection50IU(const char* trackCode,
     const bool secondA=trackCode[1]=='a'||trackCode[1]=='A';
     const bool ta=(trackCode[0]=='t'||trackCode[0]=='T')&&secondA;
     const bool sa=(trackCode[0]=='s'||trackCode[0]=='S')&&secondA;
-    const bool ma=(trackCode[0]=='m'||trackCode[0]=='M')&&secondA;
+    const bool firstM=trackCode[0]=='m'||trackCode[0]=='M';
+    const bool ma=firstM&&secondA;
+    const bool mb=firstM&&(trackCode[1]=='b'||trackCode[1]=='B');
     const bool ga=firstG&&secondA;
     const bool gc=firstG&&(trackCode[1]=='c'||trackCode[1]=='C');
     const bool firstR=trackCode[0]=='r'||trackCode[0]=='R';
     const bool ra=firstR&&secondA;
     const bool rc=firstR&&(trackCode[1]=='c'||trackCode[1]=='C');
-    if(!ta&&!sa&&!ma&&!ga&&!gc&&!ra&&!rc)return false;
+    const bool sc=(trackCode[0]=='s'||trackCode[0]=='S')&&(trackCode[1]=='c'||trackCode[1]=='C');
+    const bool tc=(trackCode[0]=='t'||trackCode[0]=='T')&&(trackCode[1]=='c'||trackCode[1]=='C');
+    if(!ta&&!sa&&!ma&&!mb&&!ga&&!gc&&!ra&&!rc&&!sc&&!tc)return false;
     AiFreshCreateSelection50IU next{};
     //17E680 loads "ta";17E9F0..17EA1C stores descriptor11278 and pod19.
     //17EAAC..17EAE0 writes MA112A8/record20 (s1=20 at17E68C).
@@ -74,8 +81,15 @@ inline bool bindFreshAiCreateSelection50IU(const char* trackCode,
     //17EA44/54..5C: "ra" at112CC;17EA78/80 stores record9 at112D4.
     //17ED64/6C..74: "rc" at1129C;17ED94/9C stores record24 at112A4.
     // Full source provenance: docs/recovery/ryloth-course-map-20261014.md.
-    next.selectedTrackId1125F=ta?0u:sa?11u:ma?4u:ga?8u:ra?7u:rc?3u:10u;
-    next.freshCourseRecordPod11280=ta?19:sa?12:ma?20:ga?10:ra?9:rc?24:17;
+    // Authenticated original17E6F8/FC selects "mb" at3A8A10.
+    //17EC2C/44..4C writes descriptor112B4;17EC68/70 writes record22 at112BC.
+    //17F2F0/F8 writes ID5 at100C4+40*6: order6 independently selects classB.
+    //17EE90..17EEA0 stores sc at11278+12*12;17EEC0/C8 stores record16.
+    // Source order8 remains classB under16E590..16E5B4.
+    //17E714 loads tc;17ED00/08..10 writes descriptor11290;17ED30/38 record18.
+    //17F6E4/EC stores ID2 at100C4+40*12; order12 selects classC.
+    next.selectedTrackId1125F=tc?2u:sc?12u:ta?0u:sa?11u:ma?4u:mb?5u:ga?8u:ra?7u:rc?3u:10u;
+    next.freshCourseRecordPod11280=tc?18:sc?16:ta?19:sa?12:ma?20:mb?22:ga?10:ra?9:rc?24:17;
     // Original fresh byte stores17EF00..17F6EC. The187B10 scan compares
     // (1125F&15) with these entries; it does not use the track ID as order.
     constexpr std::uint8_t freshCourseOrder[]{0,11,4,8,7,1,5,9,12,6,10,3,2};

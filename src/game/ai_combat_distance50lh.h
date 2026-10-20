@@ -1,6 +1,7 @@
 #pragma once
 // Authenticated retail2A2DC0. Strict native binary32 owner projection.
 #include "ai_cold_owners50iu.h"
+#include "navigation_consumer_bridge50mb.h"
 #include "ai_speed_braking50ir.h"
 #include <cstring>
 
@@ -26,15 +27,20 @@ inline std::int32_t incrementWord(std::int32_t value) noexcept {
 // a3 self node, t0 self lap. Both node+60 distances belong to the SAME FF4.
 // Do not replace this with CC4 subtraction or call it when caller170A34 skips
 // equal nodes. Output preserved on failure. Receipt describes reached effects.
-inline bool distanceBetweenNodes2A2DC0(const AiTrackMetadata50IU& metadata,
+template<class Metadata>
+inline bool distanceBetweenNodes2A2DC0Shared50MB(const Metadata& source_metadata,
     std::uint32_t targetNode,std::int32_t targetLap,
     std::uint32_t selfNode,std::int32_t selfLap,float& output,Receipt& receipt,
-    DiagnosticSink diagnostic=nullptr,void* diagnosticContext=nullptr) noexcept {
+    DiagnosticSink diagnostic,void* diagnosticContext) noexcept {
+    // MB admission is sealed at the shared entry, before source effects.
+    if(!navigation_consumer_detail50MB::metadataReady(source_metadata)) {receipt={};receipt.error=Error::Owner;receipt.sourcePC=0x2a2de0u;return false;}
+
+    const auto& metadata=navigation_consumer_detail50MB::read(source_metadata);
     receipt={};
     auto fail=[&](Error error,std::uint32_t pc) noexcept {
         receipt.error=error;receipt.sourcePC=pc;return false;
     };
-    if(!metadata.bound||!metadata.count||metadata.count>maxUndertrackNodes50ET||
+    if(!metadata.bound||!metadata.count||metadata.count>navigation_consumer_detail50MB::capacity(metadata)||
        targetNode>=metadata.count||selfNode>=metadata.count)
         return fail(Error::Owner,0x2a2de0u);
     if(std::fegetround()!=FE_TONEAREST)return fail(Error::Rounding,0x2a2dc0u);
@@ -67,4 +73,37 @@ inline bool distanceBetweenNodes2A2DC0(const AiTrackMetadata50IU& metadata,
     if(!math.valid)return fail(Error::Arithmetic,0x2a2ebcu);
     output=result;return true;
 }
+inline bool distanceBetweenNodes2A2DC0(const AiTrackMetadata50IU& metadata,
+    std::uint32_t targetNode,std::int32_t targetLap,
+    std::uint32_t selfNode,std::int32_t selfLap,float& output,Receipt& receipt,
+    DiagnosticSink diagnostic=nullptr,void* diagnosticContext=nullptr) noexcept {
+    return distanceBetweenNodes2A2DC0Shared50MB(metadata,targetNode,targetLap,selfNode,selfLap,output,receipt,diagnostic,diagnosticContext);
+}
+inline bool distanceBetweenNodes2A2DC0(const AiTrackMetadataView50IU& metadata,
+    std::uint32_t targetNode,std::int32_t targetLap,
+    std::uint32_t selfNode,std::int32_t selfLap,float& output,Receipt& receipt,
+    DiagnosticSink diagnostic=nullptr,void* diagnosticContext=nullptr) noexcept {
+    if(!navigation_consumer_detail50MB::metadataReady(metadata)) {receipt={};receipt.error=Error::Owner;receipt.sourcePC=0x2a2de0u;return false;}
+    return distanceBetweenNodes2A2DC0Shared50MB(metadata,targetNode,targetLap,selfNode,selfLap,output,receipt,diagnostic,diagnosticContext);
+}
+// TC-CONSUMER-BEGIN 0
+inline bool distanceBetweenNodes2A2DC0(const AiTrackMetadataView50TC& metadata,
+    std::uint32_t targetNode,std::int32_t targetLap,
+    std::uint32_t selfNode,std::int32_t selfLap,float& output,Receipt& receipt,
+    DiagnosticSink diagnostic=nullptr,void* diagnosticContext=nullptr) noexcept {
+    if(!navigation_consumer_detail50MB::metadataReady(metadata)) {receipt={};receipt.error=Error::Owner;receipt.sourcePC=0x2a2de0u;return false;}
+    return distanceBetweenNodes2A2DC0Shared50MB(metadata,targetNode,targetLap,selfNode,selfLap,output,receipt,diagnostic,diagnosticContext);
+}
+// TC-CONSUMER-END 0
+
+// TB-CONSUMER-BEGIN 0
+inline bool distanceBetweenNodes2A2DC0(const AiTrackMetadataView50TB& metadata,
+    std::uint32_t targetNode,std::int32_t targetLap,
+    std::uint32_t selfNode,std::int32_t selfLap,float& output,Receipt& receipt,
+    DiagnosticSink diagnostic=nullptr,void* diagnosticContext=nullptr) noexcept {
+    if(!navigation_consumer_detail50MB::metadataReady(metadata)) {receipt={};receipt.error=Error::Owner;receipt.sourcePC=0x2a2de0u;return false;}
+    return distanceBetweenNodes2A2DC0Shared50MB(metadata,targetNode,targetLap,selfNode,selfLap,output,receipt,diagnostic,diagnosticContext);
+}
+// TB-CONSUMER-END 0
+
 } //namespace rr::game::ai_combat_distance50LH

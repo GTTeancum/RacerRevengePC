@@ -1,5 +1,6 @@
 #pragma once
 #include "track_navigation50eu.h"
+#include "../../src/game/track_navigation_view50mb.h"
 #include "grid_center50ac.h"
 #include <bit>
 #include <cfenv>
@@ -13,10 +14,11 @@ using namespace rr::game;
 // two-racer row uses20/20. Row distance is integer(rank/3)*100. The caller
 // assigns racers to ranks explicitly; no claim is made about original ranking.
 // Gate10/20 are produced by the real M spline loader, never world X/Z guesses.
-inline bool prepare(const TrackNavigation50EU& map,std::uint32_t rank,
+namespace detail {
+template<class Track> inline bool prepare(const Track& map,std::size_t capacity,std::uint32_t rank,
     GridCenterResult50AC& result) noexcept {
     if(rank>7||!map.gatesPrepared||map.track.count<2||
-       map.track.count>maxUndertrackNodes50ET||std::fegetround()!=FE_TONEAREST)return false;
+       map.track.count>capacity||std::fegetround()!=FE_TONEAREST)return false;
     std::uint32_t previous=0;
     for(;previous<map.track.count;++previous){const auto& node=map.track.nodes[previous];
         if(!node.nextCount||node.nextCount>maxUndertrackNext50ET)return false;
@@ -58,5 +60,16 @@ inline bool prepare(const TrackNavigation50EU& map,std::uint32_t rank,
     }
     staged.position[3]=lateralColumn?0x3f800000u:center.current[3];
     result=staged;return true;
+}
+} // namespace detail
+inline bool prepare(const TrackNavigation50EU& map,std::uint32_t rank,GridCenterResult50AC& out) noexcept {
+    return detail::prepare(map,maxUndertrackNodes50ET,rank,out);
+}
+inline bool prepare(const TrackNavigationView50EU& view,std::uint32_t rank,GridCenterResult50AC& out) noexcept {
+    if(!view.gatesPrepared()||view.role()!=NavigationRole50MB::Map||view.count()!=265||view.capacity()!=265)return false;
+    struct Graph {const UndertrackNode50ET* nodes;std::uint32_t count;};
+    struct Navigation {Graph track;const TrackNavigationNode50EU* nodes;bool gatesPrepared;};
+    const Navigation map{{view.track().nodes(),view.count()},view.nodes(),true};
+    return detail::prepare(map,view.capacity(),rank,out);
 }
 } // namespace source_grid50IG

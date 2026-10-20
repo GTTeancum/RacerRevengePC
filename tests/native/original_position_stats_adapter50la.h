@@ -110,6 +110,9 @@ public:
 private:
     struct RadarObservation {
         const rr::game::TrackNavigation50EU* map=nullptr;
+        rr::game::TrackNavigationView50EU mbMap{};
+        rr::game::TrackNavigationView50TC tcMap{};
+        rr::game::TrackNavigationView50TB tbMap{};
         std::array<float,3> center{};
         float headingE4=0;
         std::array<std::array<float,3>,8> racerCenters{};
@@ -124,10 +127,22 @@ private:
         rr::game::OriginalPositionStatsNumbers50LA observation;
         if(!capture(observation,d))return false;
         const auto& c=*camera_;
-        if(!c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapB8->gatesPrepared){
+        const bool mb=c.actual_.actualRadarMapMb.gatesPrepared();
+        const bool tc=c.actual_.actualRadarMapTc.gatesPrepared();
+        const bool tb=c.actual_.actualRadarMapTb.gatesPrepared();
+        if(tb?(tc||mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapTb.runtimeValid()||
+               c.actual_.actualRadarMapTb.role()!=rr::game::NavigationRole50TB::Map):
+           tc?(mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapTc.runtimeValid()||
+               c.actual_.actualRadarMapTc.role()!=rr::game::NavigationRole50TC::Map):
+           mb?(c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapMb.runtimeValid()||
+               c.actual_.actualRadarMapMb.role()!=rr::game::NavigationRole50MB::Map):
+              (!c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapB8->gatesPrepared)){
             d.status=Status::owner;return false;}
         try {
             RadarObservation next;next.map=c.actual_.actualRadarMapB8;
+            if(tb)next.tbMap=c.actual_.actualRadarMapTb;
+            if(tc)next.tcMap=c.actual_.actualRadarMapTc;
+            if(mb)next.mbMap=c.actual_.actualRadarMapMb;
             next.publication=observation.cameraPublication;
             for(std::size_t slot=0;slot<8;++slot){
             next.racerStates[slot]=c.actual_.bank.read(slot,c.reads_.state40);

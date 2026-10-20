@@ -16,6 +16,9 @@ enum class OriginalUiRiderContributionError50KG : std::uint8_t {
 struct OriginalUiRiderContributionDiagnostic50KG {
     OriginalUiRiderContributionError50KG error=OriginalUiRiderContributionError50KG::none;
     std::uint16_t widget=0;std::uint32_t material=0,pass=0,sourcePC=0;
+    // Failure observation only;255 means no geometry projection was attempted.
+    std::uint32_t geometrySurface=0xffffffffu,geometryComponent=0;
+    std::uint8_t geometryStatus=255;bool geometryStoredColors=false;
     assets::OriginalUiMaterialDiagnostic50KG materialDetail;
     game::OriginalUiRiderWidgetDiagnostic50KG widgetDetail;
     game::OriginalUiRiderStatOwnerDiagnostic50KG stat;
@@ -72,6 +75,13 @@ private:
     // Synchronous parent+A4 grouping or authenticated retirement consumption.
     // Lifecycle acceptance is independent from source-frame acceptance. Only
     // the backend acknowledges the prefix after both consumers accepted it.
+    // Private native material-use upper bound. Stable static registrations plus
+    // actual prospective shown/attached model owners, never racer-ID heuristics.
+    bool releasePublishedBank(OriginalUiRiderContributionDiagnostic50KG&) noexcept;
+    bool drawableModel(std::uint16_t,OriginalUiRiderContributionDiagnostic50KG&) const noexcept;
+    bool nativeDrawableModels(const std::array<bool,120>&,OriginalUiRiderContributionDiagnostic50KG&) const noexcept;
+    bool nativeResidencyImages(const std::array<bool,120>&,
+        std::vector<std::uint32_t>&,OriginalUiRiderContributionDiagnostic50KG&) const noexcept;
     bool consumeMaterials(bool rebuild,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     std::uint64_t materialSequence()const noexcept;
     std::uint64_t sourceSubmissionWatermark()const noexcept;

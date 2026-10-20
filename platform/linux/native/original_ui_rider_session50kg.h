@@ -1,4 +1,5 @@
 #pragma once
+#include "original_ui_rider_residency50kg.h"
 #include "original_ui_rider_draw_contribution50kg.h"
 #include "original_ui_rider_profile50kg.h"
 #include "../../../src/game/original_ui_rider_panel50kg.h"
@@ -70,6 +71,9 @@ struct OriginalUiRiderSessionCold50KG {
     // bits are accepted. Every requested pair must prepare before publication.
     // Zero preserves existing defaults; legacy previewSet requests are unioned.
     std::uint32_t requestedPreviewRiders=0;
+    // Exact original hidden-tail resource pairs only. This role never admits
+    // a drawable destination, changes visibility or omits original callbacks.
+    std::uint32_t requestedTraversalRiders=0;
 };
 class OriginalUiRiderSession50KG;
 struct OriginalUiRiderRouteProposal50KG {
@@ -163,6 +167,16 @@ public:
     void requestQuit() noexcept;
 private:
     friend class OriginalUiFrontend50KG;
+    OriginalUiRiderSessionStatus50KG prepareEntryResidency(OriginalUiRiderResidencyDemand50KG&,
+        OriginalUiRiderSessionDiagnostic50KG&) noexcept;
+    OriginalUiRiderSessionStatus50KG prepareMoveResidency(const OriginalUiRiderSessionInputReceipt50KG&,
+        OriginalUiRiderResidencyDemand50KG&,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
+    bool residencyProposalCurrent(const OriginalUiRiderResidencyDemand50KG&) const noexcept;
+    std::shared_ptr<OriginalUiRiderResidentPool50KG> residentPool() const noexcept;
+    const OriginalUiRiderResidencyDemand50KG* residencyDemand() const noexcept;
+    bool consumeEntryResidency() noexcept;
+    bool acceptEntryProfileCommit(OriginalUiRiderProfileStamp50KG, const OriginalUiMainProfile50KG&, bool courseBack) noexcept;
+
     OriginalUiRiderSessionStatus50KG commitMove(const OriginalUiRiderSessionInputReceipt50KG&,
         VehicleWindowGl50DS&,VehicleWindowDiagnostic50DS&,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     // Public bind prepares the default-unlocked immutable union, adding Gasgano

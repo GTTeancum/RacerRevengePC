@@ -35,7 +35,8 @@ struct Collision48G {
     // quantized==1 positions retain the original query-prefix projection:
     // signed16 -> binary32 -> *bits38000100 -> *32767, rounded per operation.
     // Original shorts remain in original_bytes and are checked on serialization.
-    // Quantized optional normals are still unsupported; float normals unchanged.
+    // Quantized optional normals use signed16 -> binary32 -> *bits38000100 only.
+    // Their original shorts are checked exactly too; float normals are unchanged.
     std::vector<std::array<float, 3>> vertices, vertex_normals;
     std::vector<CollisionNode48G> nodes;
     std::vector<CollisionFace48G> faces;

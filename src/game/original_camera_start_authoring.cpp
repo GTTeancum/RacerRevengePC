@@ -72,16 +72,24 @@ bool OriginalCourseStartActions::prepare(OriginalCameraStartCourse course,const 
     else if(course==OriginalCameraStartCourse::sa){exact=13314;sha="b2b53df201ddfc5bd0283cd50911c6e94937f3633bba33b864da13557f415542";}
     else if(course==OriginalCameraStartCourse::ra){exact=95558;sha="7336c6bab40265adb5e82aec8ed3ee66669c19b26a597cfacedddfca4be48524";}
     else if(course==OriginalCameraStartCourse::rc){exact=124930;sha="71b1f9609c0a6ce84d71ff69355d9cfcbc8771eb7ddb8876473b4fddd6e23e6d";}
+    else if(course==OriginalCameraStartCourse::mb){exact=19909;sha="f25f10fff204f124e5525ff2c4a7c1e72f9ce17476e1404d1932f6ab6e8c776d";}
+    else if(course==OriginalCameraStartCourse::sc){exact=64047;sha="473351310a098008a477f9e72a6fc7e03d8bb808adcd79f5d810f90aa332b727";}
+    else if(course==OriginalCameraStartCourse::tc){exact=25512;sha="e080f96e2657e1331ac1f829faa880a5e984ebf1c5fab393daa6539534dd0573";}
+    else if(course==OriginalCameraStartCourse::tb){exact=106139;sha="12c908874736ea91dcd6d3f8af97413a0cfe3bcd87cfce0798e8ff86fe5fb0bc";}
     if(!sha||size!=exact||!hashMatches(bytes,size,sha))return false;
     // Independent static section-table inspection of these exact unchanged
     // originals proves no321_anims section. No generic section fallback here.
     // RA tracks\ra.tob:713 sections; RC tracks\rc.tob:907 sections.
     // CSCameras count bytes at TOB offsets15496/19491 are respectively7/5.
-    // Exact [CSCameras].NumberOfCameras: GC4, GA0, TA3, MA4, SA5, RA7, RC5.
+    // MB tracks\mb.tob:135 sections, no321_anims; own CSCameras count5 at3134.
+    // Exact [CSCameras].NumberOfCameras: GC4, GA0, TA3, MA4, SA5, RA7, RC5, MB5.
+    // SC tracks\\sc.tob: 476 sections, no321_anims; own CSCameras count3.
+    // TC own tracks\\tc.tob: exact CSCameras3, no321_anims.
+    // TB exact original TOB has742 sections, CSCameras5 (zones8/2/4/4/1), no321_anims.
     // Source174DF0 derives controllerA8 from this genuine track3E4 value.
-    sourceSceneCutCount3E4_=course==OriginalCameraStartCourse::ta?3:
+    sourceSceneCutCount3E4_=course==OriginalCameraStartCourse::mb?5:(course==OriginalCameraStartCourse::ta||course==OriginalCameraStartCourse::sc||course==OriginalCameraStartCourse::tc)?3:
         (course==OriginalCameraStartCourse::gc||course==OriginalCameraStartCourse::ma)?4:
-        (course==OriginalCameraStartCourse::sa||course==OriginalCameraStartCourse::rc)?5:
+        (course==OriginalCameraStartCourse::sa||course==OriginalCameraStartCourse::rc||course==OriginalCameraStartCourse::tb)?5:
         course==OriginalCameraStartCourse::ra?7:0;
     course_=course;authenticated_=true;return true;
 }

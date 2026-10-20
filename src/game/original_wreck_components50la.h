@@ -15,7 +15,8 @@ enum class OriginalWreckComponentKind50LA : std::uint8_t {
     external,effect19A5E0,effect19DBE0,effect15F100,effect15E800,
     entity141300,effect15DE00,effect19CC50,effect19BA50,
     racer27E130,overlay199840,animation1536F0,particleManager160B10,
-    staticModels27B610,podCables173CC0,strip23BCA0,constraint1276E0,podSphere1B6200,body164ED0,searchNode27F120,collisionObjects27BB40
+    staticModels27B610,podCables173CC0,strip23BCA0,constraint1276E0,podSphere1B6200,body164ED0,searchNode27F120,collisionObjects27BB40,
+    camera236180 // Cold typed ownership only; no live camera dispatch.
 };
 struct OriginalWreckComponent50LA final {
     //1048F0 base constructor owns the actual64-bit reference at source00.

@@ -32,6 +32,41 @@ struct AudioDispatchResult {
     std::int32_t originalSoundV0=0;
 };
 struct Owner {
+private:
+    LapProgressTrackView50MB mbTrack_{};
+    bool mbBound_=false;
+    LapProgressTrackView50TC tcTrack_{};
+    bool tcBound_=false;
+    LapProgressTrackView50TB tbTrack_{};
+    bool tbBound_=false;
+public:
+    bool bindMbTrack(const LapProgressTrackView50MB& actual) noexcept {
+        if(mbBound_||tcBound_||tbBound_||!actual.runtimeValid()||pending.pending.requested)return false;
+        mbTrack_=actual;mbBound_=true;return true;
+    }
+    const LapProgressTrackView50MB& mbTrack()const noexcept{return mbTrack_;}
+    bool releaseMbTrack() noexcept {
+        if(pending.pending.requested)return false;
+        mbTrack_={};mbBound_=false;return true;
+    }
+    bool bindTcTrack(const LapProgressTrackView50TC& actual) noexcept {
+        if(mbBound_||tcBound_||tbBound_||!actual.runtimeValid()||pending.pending.requested)return false;
+        tcTrack_=actual;tcBound_=true;return true;
+    }
+    const LapProgressTrackView50TC& tcTrack()const noexcept{return tcTrack_;}
+    bool releaseTcTrack() noexcept {
+        if(pending.pending.requested)return false;
+        tcTrack_={};tcBound_=false;return true;
+    }
+    bool bindTbTrack(const LapProgressTrackView50TB& actual) noexcept {
+        if(mbBound_||tcBound_||tbBound_||!actual.runtimeValid()||pending.pending.requested)return false;
+        tbTrack_=actual;tbBound_=true;return true;
+    }
+    const LapProgressTrackView50TB& tbTrack()const noexcept{return tbTrack_;}
+    bool releaseTbTrack() noexcept {
+        if(pending.pending.requested)return false;
+        tbTrack_={};tbBound_=false;return true;
+    }
     LapProgressTrack50GF track{};
     Continuity* continuity=nullptr;
     VehicleFrameFields49W* fields=nullptr;
@@ -191,13 +226,18 @@ struct Owner {
         return static_cast<Owner*>(context)->crossing(sequential,node,current);
     }
     bool crossing(bool sequential,std::uint32_t node,std::uint32_t current) noexcept {
+        if((mbBound_&&!mbTrack_.runtimeValid())||(tcBound_&&!tcTrack_.runtimeValid())||
+           (tbBound_&&!tbTrack_.runtimeValid()))return false;
         auto& c=*continuity;
         c.state.vehicleCD8=fields->impactFlagsCD8;
         LapProgressReceipt50GF receipt{};
         const LapProgressCrossing50GF crossing{
             sequential?LapProgressCrossingKind50GF::Sequential:LapProgressCrossingKind50GF::Scan,
             node,current,c.prefix.flags10CC};
-        if(!applyPlayerLapCrossing50GF(track,crossing,c.state,pending,receipt,diagnostic))return false;
+        if(!(tbBound_?applyPlayerLapCrossing50GF(tbTrack_,crossing,c.state,pending,receipt,diagnostic):
+            tcBound_?applyPlayerLapCrossing50GF(tcTrack_,crossing,c.state,pending,receipt,diagnostic):
+            mbBound_?applyPlayerLapCrossing50GF(mbTrack_,crossing,c.state,pending,receipt,diagnostic):
+            applyPlayerLapCrossing50GF(track,crossing,c.state,pending,receipt,diagnostic)))return false;
         fields->impactFlagsCD8=c.state.vehicleCD8;
         if(receipt.progressMarkerConsumed)++markers;
         if(!receipt.callback.requested)return true;

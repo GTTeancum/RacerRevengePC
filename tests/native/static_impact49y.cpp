@@ -92,9 +92,12 @@ int main(int argc,char** argv){
  in.readyMainScene190.v[12]=std::numeric_limits<float>::infinity();reject(S::arithmetic);in.readyMainScene190.v[12]=0;
  in.accumulatedImpact1C0[0]=std::numeric_limits<float>::max();reject(S::arithmetic);in.accumulatedImpact1C0[0]=0;
  in.accumulatedImpact1C0[0]=fp(1);reject(S::arithmetic);in.accumulatedImpact1C0[0]=0;
- // Normal input2^-64 has a subnormal square2^-128: finite-only admission is
- // insufficient. The scalar and VU source roots have their own flush behavior.
- in.accumulatedImpact1C0[0]=fp(0x1f800000u);reject(S::arithmetic);in.accumulatedImpact1C0[0]=0;
+ // The narrowly admitted static square-result policy publishes zero for
+ // normal2^-64 squared. Actual tiny1C0 still reaches the original BA0 store.
+ in.accumulatedImpact1C0[0]=fp(0x1f800000u);
+ {StaticImpactState49Y out{};float w=0;hot=true;const auto status=recordStaticImpact49Y(in,s,out,w);hot=false;
+  check(status==S::applied&&bits(out.impactBA0[0])==0x1f800000u&&bits(w)==0x3f800000u,"static square underflow retains actual impact");}
+ in.accumulatedImpact1C0[0]=0;
  in.reductionCF0=fp(0x007fffffu);reject(S::arithmetic);in.reductionCF0=0;
  std::fesetround(FE_DOWNWARD);reject(S::arithmetic);std::fesetround(FE_TONEAREST);
  // Entry gate precedes unsupported scope and arithmetic, and consumes no1C0.

@@ -172,7 +172,7 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
     // Admit one shared GC Gate OR one shared bounded trigger group as a writable
     // track owner before all immutable spans. Mixing these schemas is rejected;
     // duplicate candidate visits may share the same owner.
-    Range ownerRange{},indexRange{};GateTriggerBinding50KG* gateOwner=nullptr;NativeTriggerGroup50GA* triggerOwner=nullptr;
+    Range ownerRange{},indexRange{};GateTriggerBinding50KG* gateOwner=nullptr;NativeTriggerGroup50GA* triggerOwner=nullptr;NativeTriggerGroup50TC* tcOwner=nullptr;NativeTriggerGroup50TB* tbOwner=nullptr;
     if(!aligned(candidates,ownerCount)||!range(candidates,ownerCount,sizeof(*candidates),ownerRange)||
        !aligned(indices,count)||!range(indices,count,sizeof(*indices),indexRange))return Status::InvalidInput;
     for(std::size_t i=0;i<count;++i){
@@ -180,24 +180,32 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
         const auto& candidate=candidates[indices[i]];
         // Native trigger state belongs only to an admitted shape5/6 owner.
         // Reject stray pointers/indices before any group dereference or write.
-        if((candidate.nativeTriggers&&candidate.shapeType!=5&&candidate.shapeType!=6)||
-           (!candidate.nativeTriggers&&candidate.nativeTriggerIndex!=0))return Status::InvalidInput;
+        if(((candidate.nativeTriggers||candidate.nativeTriggersTC||candidate.nativeTriggersTB)&&candidate.shapeType!=5&&candidate.shapeType!=6)||
+           (!candidate.nativeTriggers&&!candidate.nativeTriggersTC&&!candidate.nativeTriggersTB&&candidate.nativeTriggerIndex!=0))return Status::InvalidInput;
         if(candidate.raOriginalTriggerSegments&&
-           (candidate.shapeType!=5||candidate.gate||!candidate.nativeTriggers||candidate.nativeTriggerIndex>=2))
+           (candidate.shapeType!=5||candidate.gate||candidate.nativeTriggersTC||candidate.nativeTriggersTB||!candidate.nativeTriggers||candidate.nativeTriggerIndex>=2))
             return Status::InvalidInput;
         if(candidate.shapeType==5||candidate.shapeType==6){
-            if((candidate.shapeType==6&&candidate.gate)||bool(candidate.gate)==bool(candidate.nativeTriggers))return Status::InvalidInput;
+            if((candidate.shapeType==6&&candidate.gate)||(unsigned(bool(candidate.gate))+unsigned(bool(candidate.nativeTriggers))+unsigned(bool(candidate.nativeTriggersTC))+unsigned(bool(candidate.nativeTriggersTB))!=1u))return Status::InvalidInput;
             if(candidate.gate){
-                if(triggerOwner||(gateOwner&&gateOwner!=candidate.gate))return Status::UnsupportedScope;
+                if(tbOwner||tcOwner||triggerOwner||(gateOwner&&gateOwner!=candidate.gate))return Status::UnsupportedScope;
                 gateOwner=candidate.gate;
+            }else if(candidate.nativeTriggersTC){
+                if(tbOwner||gateOwner||triggerOwner||(tcOwner&&tcOwner!=candidate.nativeTriggersTC))return Status::InvalidInput;
+                tcOwner=candidate.nativeTriggersTC;
+            }else if(candidate.nativeTriggersTB){
+                if(tcOwner||gateOwner||triggerOwner||(tbOwner&&tbOwner!=candidate.nativeTriggersTB))return Status::InvalidInput;
+                tbOwner=candidate.nativeTriggersTB;
             }else{
-                if(gateOwner||(triggerOwner&&triggerOwner!=candidate.nativeTriggers))return Status::UnsupportedScope;
+                if(tbOwner||tcOwner||gateOwner||(triggerOwner&&triggerOwner!=candidate.nativeTriggers))return Status::UnsupportedScope;
                 triggerOwner=candidate.nativeTriggers;
             }
         }
     }
     if(gateOwner&&!write(gateOwner,1))return Status::InvalidInput;
     if(triggerOwner&&(!write(triggerOwner,1)||!validNativeTriggerGroup50GA(*triggerOwner)))return Status::InvalidInput;
+    if(tcOwner&&(!write(tcOwner,1)||!validNativeTriggerGroup50TC(*tcOwner)))return Status::InvalidInput;
+    if(tbOwner&&(!write(tbOwner,1)||!validNativeTriggerGroup50TB(*tbOwner)))return Status::InvalidInput;
     const auto read=[&](const auto* p,std::size_t n) noexcept {
         Range input{};if(!aligned(p,n)||!range(p,n,sizeof(*p),input))return false;
         for(unsigned i=0;i<nw;++i)if(overlap(input,writes[i]))return false;
@@ -206,6 +214,8 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
     if(!read(&q,1)||!read(&initial,1)||!read(&w,1)||!read(&d,1)||!read(candidates,ownerCount)||!read(indices,count)||
        !read(q.resource,1)||!read(q.filter,1)||!read(initial.pairs,initial.pairSlots)||
        !read(initial.metadata,initial.pairSlots)||!read(initial.recordSlots,initial.recordCount))return Status::InvalidInput;
+    if(tcOwner&&!nativeTriggerQueryBound50TC(*tcOwner,q.filter->identity))return Status::InvalidInput;
+    if(tbOwner&&!nativeTriggerQueryBound50TB(*tbOwner,q.filter->identity))return Status::InvalidInput;
     if(continuation){
         if(!read(continuation,1)||!categoryOutput||count!=1||ownerCount!=1||
            (continuation->previous&&!read(continuation->previous,1))||
@@ -301,6 +311,14 @@ Status validate(const Type2StaticQuery49X& q,const Type2StaticCandidate49X* cand
                !c.hasResponseCallbackE8)return Status::UnsupportedScope;
             if(candidate.gate){
                 if(candidate.gate!=gateOwner||!candidate.gate->callbacks.activateAnimation)return Status::UnsupportedScope;
+            }else if(candidate.nativeTriggersTC){
+                if(candidate.nativeTriggersTC!=tcOwner||!tcOwner||candidate.nativeTriggerIndex>=tcOwner->triggers.size()||
+                   c.filter.identity!=tcOwner->triggers[candidate.nativeTriggerIndex].collider.identity||
+                   !nativeTriggerQueryBound50TC(*tcOwner,q.filter->identity))return Status::UnsupportedScope;
+            }else if(candidate.nativeTriggersTB){
+                if(candidate.nativeTriggersTB!=tbOwner||!tbOwner||candidate.nativeTriggerIndex>=tbOwner->triggers.size()||
+                   c.filter.identity!=tbOwner->triggers[candidate.nativeTriggerIndex].collider.identity||
+                   !nativeTriggerQueryBound50TB(*tbOwner,q.filter->identity))return Status::UnsupportedScope;
             }else if(candidate.nativeTriggers!=triggerOwner||!triggerOwner||
                 candidate.nativeTriggerIndex>=triggerOwner->triggers.size()||
                 c.filter.identity!=triggerOwner->triggers[candidate.nativeTriggerIndex].collider.identity||
@@ -372,6 +390,10 @@ static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49
         if((candidate.shapeType==5||candidate.shapeType==6)&&candidate.nativeTriggers&&
            !nativeTriggerPairAllowed50GA(*candidate.nativeTriggers,
             candidate.nativeTriggerIndex,query.filter->identity))continue;
+        if((candidate.shapeType==5||candidate.shapeType==6)&&candidate.nativeTriggersTC&&
+           !nativeTriggerPairAllowed50TC(*candidate.nativeTriggersTC,candidate.nativeTriggerIndex,query.filter->identity))continue;
+        if((candidate.shapeType==5||candidate.shapeType==6)&&candidate.nativeTriggersTB&&
+           !nativeTriggerPairAllowed50TB(*candidate.nativeTriggersTB,candidate.nativeTriggerIndex,query.filter->identity))continue;
         if(c.geometry.id!=c.filter.identity)return Status::InvalidInput;
         //121438 follows the genuine outer sphere/filter gate and precedes
         // target-shape dispatch, including a later coarse/triangle miss.
@@ -537,7 +559,15 @@ static Type2StaticStatus49X runIndexedType2Contacts50CC(const Type2StaticQuery49
             if(candidate.shapeType!=5&&candidate.shapeType!=6)return Status::UnsupportedScope;
             //122860..88: E4 skips TRIGGER8 first; E8 then commits its action
             // synchronously. A later numerical failure cannot undo this event.
-            if(candidate.nativeTriggers){
+            if(candidate.nativeTriggersTC){
+                const auto receipt=dispatchNativeTriggerContact50TC(*candidate.nativeTriggersTC,
+                    candidate.nativeTriggerIndex,query.filter->identity,candidateIndex);
+                if(receipt.status!=SourceTriggerContactStatus50TC::Complete)return Status::UnsupportedScope;
+            }else if(candidate.nativeTriggersTB){
+                const auto receipt=dispatchNativeTriggerContact50TB(*candidate.nativeTriggersTB,
+                    candidate.nativeTriggerIndex,query.filter->identity,candidateIndex);
+                if(receipt.status!=SourceTriggerContactStatus50TB::Complete)return Status::UnsupportedScope;
+            }else if(candidate.nativeTriggers){
                 const auto receipt=dispatchNativeTriggerContact50GA(*candidate.nativeTriggers,candidate.nativeTriggerIndex,query.filter->identity);
                 if(receipt.status!=TriggerEntryStatus50IN::Complete||receipt.randomConsumed)return Status::UnsupportedScope;
             }else{

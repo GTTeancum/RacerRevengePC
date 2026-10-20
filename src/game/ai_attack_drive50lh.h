@@ -17,13 +17,19 @@ struct AiAttackDriveSelection50LH {
 // their writes precede the steering/speed leaves and survive a later boundary.
 // No mode is synthesized: every mode other than3/4 follows the real172C50
 // branch. Runtime stateFE8=1 admission belongs to the source dispatcher.
-inline bool beginAiAttackDrive1711E0(const TrackNavigation50EU& track,
+template<class Navigation>
+inline bool beginAiAttackDrive1711E0Shared50MB(const Navigation& source_track,
     std::uint32_t currentNode,std::uint32_t mode1050,std::uint8_t& flagsB9C,
     float& field104C,AiAttackDriveGlobals50LH& globals,
     AiAttackDriveSelection50LH& selection,AiDrivingDiagnostic50IV& diagnostic) noexcept {
+    // MB admission is sealed at the shared entry, before source effects.
+    if(!navigation_consumer_detail50MB::aiReady(source_track))
+        return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x17121cu,currentNode);
+
+    const auto& track=navigation_consumer_detail50MB::read(source_track);
     using ai_driving_detail50IV::fail;selection={};diagnostic={};
     flagsB9C=static_cast<std::uint8_t>(flagsB9C&0xfdu); //171210, unconditionally.
-    if(!track.track.count||track.track.count>maxUndertrackNodes50ET||currentNode>=track.track.count)
+    if(!track.track.count||track.track.count>navigation_consumer_detail50MB::capacity(track)||currentNode>=track.track.count)
         return fail(diagnostic,AiDrivingError50IV::Owner,0x17121cu,currentNode);
     if(std::fegetround()!=FE_TONEAREST)
         return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x17123cu,currentNode);
@@ -45,6 +51,45 @@ inline bool beginAiAttackDrive1711E0(const TrackNavigation50EU& track,
     }
     return true;
 }
+inline bool beginAiAttackDrive1711E0(const TrackNavigation50EU& track,
+    std::uint32_t currentNode,std::uint32_t mode1050,std::uint8_t& flagsB9C,
+    float& field104C,AiAttackDriveGlobals50LH& globals,
+    AiAttackDriveSelection50LH& selection,AiDrivingDiagnostic50IV& diagnostic) noexcept {
+    return beginAiAttackDrive1711E0Shared50MB(track,currentNode,mode1050,flagsB9C,field104C,globals,selection,diagnostic);
+}
+inline bool beginAiAttackDrive1711E0(const TrackNavigationView50EU& track,
+    std::uint32_t currentNode,std::uint32_t mode1050,std::uint8_t& flagsB9C,
+    float& field104C,AiAttackDriveGlobals50LH& globals,
+    AiAttackDriveSelection50LH& selection,AiDrivingDiagnostic50IV& diagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiReady(track)) {
+        selection={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x17121cu,currentNode);
+    }
+    return beginAiAttackDrive1711E0Shared50MB(track,currentNode,mode1050,flagsB9C,field104C,globals,selection,diagnostic);
+}
+// TC-CONSUMER-BEGIN 0
+inline bool beginAiAttackDrive1711E0(const TrackNavigationView50TC& track,
+    std::uint32_t currentNode,std::uint32_t mode1050,std::uint8_t& flagsB9C,
+    float& field104C,AiAttackDriveGlobals50LH& globals,
+    AiAttackDriveSelection50LH& selection,AiDrivingDiagnostic50IV& diagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiReady(track)) {
+        selection={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x17121cu,currentNode);
+    }
+    return beginAiAttackDrive1711E0Shared50MB(track,currentNode,mode1050,flagsB9C,field104C,globals,selection,diagnostic);
+}
+// TC-CONSUMER-END 0
+
+// TB-CONSUMER-BEGIN 0
+inline bool beginAiAttackDrive1711E0(const TrackNavigationView50TB& track,
+    std::uint32_t currentNode,std::uint32_t mode1050,std::uint8_t& flagsB9C,
+    float& field104C,AiAttackDriveGlobals50LH& globals,
+    AiAttackDriveSelection50LH& selection,AiDrivingDiagnostic50IV& diagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiReady(track)) {
+        selection={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x17121cu,currentNode);
+    }
+    return beginAiAttackDrive1711E0Shared50MB(track,currentNode,mode1050,flagsB9C,field104C,globals,selection,diagnostic);
+}
+// TB-CONSUMER-END 0
+
 struct AiAttackSpeedInput50LH {
     const TrackNavigation50EU* trackFF4=nullptr;
     const AiTrackMetadata50IU* metadata=nullptr;
@@ -56,6 +101,46 @@ struct AiAttackSpeedInput50LH {
     ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
     void* diagnosticContext=nullptr;
 };
+// Strong immutable MB views retain their authentic storage and final world.
+struct AiAttackSpeedInput50MB {
+    TrackNavigationView50EU trackFF4{};
+    AiTrackMetadataView50IU metadata{};
+    const AiObservedRacer50IV* target=nullptr;
+    const float* selfPosition190=nullptr;
+    std::uint32_t selfNodeC80=0;
+    std::int32_t selfLapCC8=0,myMinSpeed108C=0;
+    float preparedFactor=0.f,selfCachedSpeed34=0.f;
+    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
+    void* diagnosticContext=nullptr;
+};
+// TC-CONSUMER-BEGIN 1
+struct AiAttackSpeedInput50TC {
+    TrackNavigationView50TC trackFF4{};
+    AiTrackMetadataView50TC metadata{};
+    const AiObservedRacer50IV* target=nullptr;
+    const float* selfPosition190=nullptr;
+    std::uint32_t selfNodeC80=0;
+    std::int32_t selfLapCC8=0,myMinSpeed108C=0;
+    float preparedFactor=0.f,selfCachedSpeed34=0.f;
+    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
+    void* diagnosticContext=nullptr;
+};
+// TC-CONSUMER-END 1
+
+// TB-CONSUMER-BEGIN 1
+struct AiAttackSpeedInput50TB {
+    TrackNavigationView50TB trackFF4{};
+    AiTrackMetadataView50TB metadata{};
+    const AiObservedRacer50IV* target=nullptr;
+    const float* selfPosition190=nullptr;
+    std::uint32_t selfNodeC80=0;
+    std::int32_t selfLapCC8=0,myMinSpeed108C=0;
+    float preparedFactor=0.f,selfCachedSpeed34=0.f;
+    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
+    void* diagnosticContext=nullptr;
+};
+// TB-CONSUMER-END 1
+
 struct AiAttackSpeedReceipt50LH {
     float selfGateDistance=0.f,targetGateDistance=0.f,signedDistance=0.f;
     float targetForwardAcceleration=0.f,desiredSpeed=0.f;
@@ -67,22 +152,39 @@ struct AiAttackSpeedReceipt50LH {
 //173180, reads heat, touches109C, or draws RNG. The sole terminal control leaf
 //is173770, which clears boost bit0 and writes accelerator/brake B7C/B80.
 //Input target position/forward/C0 are the real serial body/scene observations.
-inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50LH& input,
+inline bool applyAiAttackSpeed16FB50Admission50MB(const AiAttackSpeedInput50LH&) noexcept {return true;}
+inline bool applyAiAttackSpeed16FB50Admission50MB(const AiAttackSpeedInput50MB& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
+// TC-CONSUMER-BEGIN 2
+inline bool applyAiAttackSpeed16FB50Admission50MB(const AiAttackSpeedInput50TC& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
+// TC-CONSUMER-END 2
+
+// TB-CONSUMER-BEGIN 2
+inline bool applyAiAttackSpeed16FB50Admission50MB(const AiAttackSpeedInput50TB& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
+// TB-CONSUMER-END 2
+
+template<class Input>
+    requires (std::is_same_v<Input,AiAttackSpeedInput50LH>||std::is_same_v<Input,AiAttackSpeedInput50MB>||std::is_same_v<Input,AiAttackSpeedInput50TC>||std::is_same_v<Input,AiAttackSpeedInput50TB>)
+inline bool applyAiAttackSpeed16FB50Shared50MB(const Input& input,
     PlayerReadResult48X& actions,AiAttackSpeedReceipt50LH& receipt,
     AiDrivingDiagnostic50IV& diagnostic,AiSpeedDiagnostic50IR& speedDiagnostic) noexcept {
+    // MB admission is sealed at the shared entry, before source effects.
+    if(!applyAiAttackSpeed16FB50Admission50MB(input)) {receipt={};speedDiagnostic={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x1706c0u);}
+
+    const auto* trackFF4=navigation_consumer_detail50MB::pointer(input.trackFF4);
+    const auto* metadata=navigation_consumer_detail50MB::pointer(input.metadata);
     using ai_driving_detail50IV::fail;diagnostic={};speedDiagnostic={};receipt={};
     if(std::fegetround()!=FE_TONEAREST)
         return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x16fb50u);
-    if(!input.trackFF4||!input.metadata||!input.metadata->bound||
-       input.metadata->count!=input.trackFF4->track.count||!input.target||
+    if(!trackFF4||!metadata||!navigation_consumer_detail50MB::read(*metadata).bound||
+       navigation_consumer_detail50MB::read(*metadata).count!=navigation_consumer_detail50MB::read(*trackFF4).track.count||!input.target||
        !input.target->bound||!input.selfPosition190)
         return fail(diagnostic,AiDrivingError50IV::Owner,0x16fb80u);
-    const auto& track=*input.trackFF4;const auto& target=*input.target;
-    if(!ai_combat_candidate_detail50LH::gateDistance(track,input.selfNodeC80,
+    const auto& track=*trackFF4;const auto& target=*input.target;
+    if(!ai_combat_candidate_detail50LH::gateDistanceShared50MB(track,input.selfNodeC80,
         input.selfPosition190,receipt.selfGateDistance,diagnostic)){
         if(diagnostic.sourcePC==0x1706c0u)diagnostic.sourcePC=0x16fd44u;return false;
     }
-    if(!ai_combat_candidate_detail50LH::gateDistance(track,target.vehicleC80,
+    if(!ai_combat_candidate_detail50LH::gateDistanceShared50MB(track,target.vehicleC80,
         target.position190,receipt.targetGateDistance,diagnostic)){
         if(diagnostic.sourcePC==0x1706c0u)diagnostic.sourcePC=0x16fed8u;return false;
     }
@@ -90,7 +192,7 @@ inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50LH& input,
     receipt.signedDistance=f.sub(receipt.selfGateDistance,receipt.targetGateDistance); //16FEEC delay slot.
     if(input.selfNodeC80!=target.vehicleC80){
         float correction=0.f;
-        if(!ai_combat_distance50LH::distanceBetweenNodes2A2DC0(*input.metadata,
+        if(!ai_combat_distance50LH::distanceBetweenNodes2A2DC0(*metadata,
             target.vehicleC80,target.lapCC8,input.selfNodeC80,input.selfLapCC8,
             correction,receipt.distance,input.diagnostic,input.diagnosticContext))
             return fail(diagnostic,receipt.distance.error==ai_combat_distance50LH::Error::Owner?
@@ -109,8 +211,8 @@ inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50LH& input,
     if(desired<minimum){desired=minimum;receipt.minimumApplied=true;}
     if(!f.valid)return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x16ff6cu);
     //Gate distance already proved self node in bounds before either accessor.
-    if(input.metadata->nodes[input.selfNodeC80].flags79&0x10u){
-        desired=f.read(input.metadata->nodes[input.selfNodeC80].speedLimit5C);
+    if(navigation_consumer_detail50MB::read(*metadata).nodes[input.selfNodeC80].flags79&0x10u){
+        desired=f.read(navigation_consumer_detail50MB::read(*metadata).nodes[input.selfNodeC80].speedLimit5C);
         receipt.driveFullSpeedOverride=true;
     }
     if(!f.valid)return fail(diagnostic,AiDrivingError50IV::Arithmetic,0x16ffa0u);
@@ -120,4 +222,39 @@ inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50LH& input,
         return fail(diagnostic,AiDrivingError50IV::Arithmetic,speedDiagnostic.sourcePC);
     return true;
 }
+inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50LH& input,
+    PlayerReadResult48X& actions,AiAttackSpeedReceipt50LH& receipt,
+    AiDrivingDiagnostic50IV& diagnostic,AiSpeedDiagnostic50IR& speedDiagnostic) noexcept {
+    return applyAiAttackSpeed16FB50Shared50MB(input,actions,receipt,diagnostic,speedDiagnostic);
+}
+inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50MB& input,
+    PlayerReadResult48X& actions,AiAttackSpeedReceipt50LH& receipt,
+    AiDrivingDiagnostic50IV& diagnostic,AiSpeedDiagnostic50IR& speedDiagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiJoined(input.trackFF4,input.metadata)) {
+        receipt={};speedDiagnostic={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x16fb80u);
+    }
+    return applyAiAttackSpeed16FB50Shared50MB(input,actions,receipt,diagnostic,speedDiagnostic);
+}
+// TC-CONSUMER-BEGIN 3
+inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50TC& input,
+    PlayerReadResult48X& actions,AiAttackSpeedReceipt50LH& receipt,
+    AiDrivingDiagnostic50IV& diagnostic,AiSpeedDiagnostic50IR& speedDiagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiJoined(input.trackFF4,input.metadata)) {
+        receipt={};speedDiagnostic={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x16fb80u);
+    }
+    return applyAiAttackSpeed16FB50Shared50MB(input,actions,receipt,diagnostic,speedDiagnostic);
+}
+// TC-CONSUMER-END 3
+
+// TB-CONSUMER-BEGIN 3
+inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50TB& input,
+    PlayerReadResult48X& actions,AiAttackSpeedReceipt50LH& receipt,
+    AiDrivingDiagnostic50IV& diagnostic,AiSpeedDiagnostic50IR& speedDiagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiJoined(input.trackFF4,input.metadata)) {
+        receipt={};speedDiagnostic={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x16fb80u);
+    }
+    return applyAiAttackSpeed16FB50Shared50MB(input,actions,receipt,diagnostic,speedDiagnostic);
+}
+// TB-CONSUMER-END 3
+
 } //namespace rr::game

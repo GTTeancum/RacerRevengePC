@@ -21,6 +21,11 @@ namespace rr::game { struct OriginalCameraViewportFields; struct OriginalCameraS
 namespace ra_source_camera50LA { class OwnershipBridge; }
 namespace rr::game::original_world_environment50KG {struct SpatialBounds;}
 namespace ra_pod_scene50LA { class Owner; }
+namespace mb_source_trigger50MB { class Owner; }
+namespace tc_cold_visibility50TC { class Retirement; }
+namespace tb_cold_visibility50TB { class Retirement; }
+namespace tc_gate_visibility50TC { class Binding; }
+namespace tb_door_binding50TB { class Binding; }
 namespace original_cable_selection50LA { class Binding; }
 namespace ra_static_lighting50LA { class Binding; }
 namespace ra_static_model_cold50LA { class Owner; }
@@ -75,7 +80,12 @@ enum class CachePolicy : std::uint8_t {
     // Both use native authored-zone/top-two selection, not retail spatial parity.
     nativeMaAuthoredZoneLightSelection,
     nativeSaAuthoredZoneLightSelection,
-    nativeRaAuthoredZoneLightSelection
+    nativeRaAuthoredZoneLightSelection,
+    nativeMbAuthoredZoneLightSelection,
+    nativeScAuthoredZoneLightSelection,
+    nativeTcAuthoredZoneLightSelection,
+    nativeRcAuthoredZoneLightSelection,
+    nativeTbAuthoredZoneLightSelection
 };
 class Owner;
 // Immutable authored render metadata, owned beside the actual 4C0 rows.
@@ -141,6 +151,10 @@ public:
     // ordinal, never a collision pointer re-labelled as a visibility pointer.
     std::uint64_t zoneKey4C0(std::size_t ordinal) const noexcept;
     std::size_t zoneCount() const noexcept;
+    // Closed SC topology identity, available only through this current lease.
+    // Count alone never authorizes the distinct SC camera backing.
+    bool isScSourceTopology() const noexcept;
+    bool isTcSourceTopology() const noexcept;
     // Currently admitted for authenticated GA authoring only. Null for other
     // scenes, invalid ordinals or an expired lease. Borrow only within lease.
     const AuthoredRenderZone* authoredRenderZone(std::size_t ordinal) const noexcept;
@@ -151,6 +165,19 @@ public:
 // is implied. Keep this lease around the real ordered reset, including its
 // collision operations. A successful removal survives a later rejected slice;
 // ending an unfinished lease blocks other visibility consumers until resumed.
+// Authenticated by the runtime source Owner against its exact suspended Bank
+// query. The lighting owner validates the live frame/slot and pending event.
+struct SourceTriggerVisibilityIdentity50MB {
+    const void* issuer=nullptr;
+    std::uint64_t generation=0,querySerial=0;
+    std::size_t candidateOrdinal=0,actionIndex=0;
+    std::uint32_t racer60=0;
+};
+inline bool sameSourceTriggerVisibilityIdentity50MB(const SourceTriggerVisibilityIdentity50MB& a,
+    const SourceTriggerVisibilityIdentity50MB& b) noexcept {
+    return a.issuer==b.issuer&&a.generation==b.generation&&a.querySerial==b.querySerial&&
+        a.candidateOrdinal==b.candidateOrdinal&&a.actionIndex==b.actionIndex&&a.racer60==b.racer60;
+}
 class ResetVisibilityLease final {
     friend class Owner;
     Owner* owner_=nullptr;
@@ -159,7 +186,8 @@ class ResetVisibilityLease final {
     const VehicleFrameParameters49W* parameters_=nullptr;
     std::uint64_t generation_=0,graphicsSequence_=0;
     std::uint32_t racer_=0;
-    bool removed_=false,attached_=false,player_=false,input_=false;
+    bool removed_=false,attached_=false,player_=false,input_=false,sourceTrigger_=false;
+    SourceTriggerVisibilityIdentity50MB sourceIdentity_{};
 public:
     ResetVisibilityLease() noexcept=default;
     ~ResetVisibilityLease();
@@ -179,6 +207,9 @@ public:
 // authored lights, and a separate4C0 visibility namespace. It never borrows collision
 //4C4 membership or resets OriginalUiLightManagerLifetime50KG.
 class Owner final {
+    friend class ::mb_source_trigger50MB::Owner;
+    friend class ::tc_cold_visibility50TC::Retirement;
+    friend class ::tb_cold_visibility50TB::Retirement;
     friend class ::ra_pod_scene50LA::Owner;
     const original_world_environment50KG::SpatialBounds* sceneBounds534(const ::ra_pod_scene50LA::Owner*) const noexcept;
     const CollectionZone50BX* retainSceneZones272A78(const ::ra_pod_scene50LA::Owner*,std::size_t&) noexcept;
@@ -192,6 +223,22 @@ class Owner final {
         const CameraVisibilityLease&,std::uint32_t callbackRacer,
         const VehicleFrameState49W&,const VehicleFrameBindings49W&,
         const std::uint32_t& actualCableField50)const noexcept;
+    friend class ::tb_door_binding50TB::Binding;
+    bool bindTbDoorOwner(const ::tb_door_binding50TB::Binding*,const LiveZoneMembership50EN*) noexcept;
+    bool beginTbDoorAccess(const ::tb_door_binding50TB::Binding*,ResetVisibilityWorld50EY*&,
+        LiveZoneWorkspace50EN*&,CollectionRef50BX&) noexcept;
+    void endTbDoorAccess(const ::tb_door_binding50TB::Binding*) noexcept;
+    bool commitTbDoorOwner(const ::tb_door_binding50TB::Binding*) noexcept;
+    bool releaseTbDoorOwner(const ::tb_door_binding50TB::Binding*) noexcept;
+    bool currentTbDoorOwner(const ::tb_door_binding50TB::Binding*) const noexcept;
+    friend class ::tc_gate_visibility50TC::Binding;
+    bool bindTcGateOwner(const ::tc_gate_visibility50TC::Binding*,const LiveZoneMembership50EN*) noexcept;
+    bool beginTcGateAccess(const ::tc_gate_visibility50TC::Binding*,ResetVisibilityWorld50EY*&,
+        LiveZoneWorkspace50EN*&,CollectionRef50BX&) noexcept;
+    void endTcGateAccess(const ::tc_gate_visibility50TC::Binding*) noexcept;
+    bool commitTcGateOwner(const ::tc_gate_visibility50TC::Binding*) noexcept;
+    bool releaseTcGateOwner(const ::tc_gate_visibility50TC::Binding*) noexcept;
+    bool currentTcGateOwner(const ::tc_gate_visibility50TC::Binding*) const noexcept;
     friend class ::ra_static_model_cold50LA::Owner;
     // Only the retained static-world owner can bind these authored-instance
     // identities. One namespace and one lifecycle, never a copied registry.
@@ -254,7 +301,7 @@ class Owner final {
     friend class DrawLease;
     friend class CameraVisibilityLease;
     friend class ResetVisibilityLease;
-    enum class Scene : std::uint8_t { gc,ta,ga,ma,sa,ra };
+    enum class Scene : std::uint8_t { gc,ta,ga,ma,sa,ra,mb,sc,tc,rc,tb };
     struct Storage;
     std::unique_ptr<Storage> storage_;
     bool invalidated_=false; // Terminal even before a successful cold prepare.
@@ -265,10 +312,36 @@ class Owner final {
     bool resetLeaseCurrent(const ResetVisibilityLease&) const noexcept;
     bool beginResetVisibility(std::uint32_t,const VehicleFrameState49W&,
         const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
-        std::uint32_t*,ResetVisibilityLease&,Diagnostic&,bool player,bool input=false) noexcept;
+        std::uint32_t*,ResetVisibilityLease&,Diagnostic&,bool player,bool input=false,
+        const SourceTriggerVisibilityIdentity50MB* source=nullptr) noexcept;
     bool prepareScene(const std::vector<std::uint8_t>&,std::uint32_t,Scene,Diagnostic&) noexcept;
     // Native cold teardown only; never a live reset or a public lease escape.
     bool retireRaFreshVehicle(std::uint32_t,Diagnostic&) noexcept;
+    // Terminal MB cold-session unwind only, with the actual Bank slot installed.
+    // No source query/reset receipt is invented; active reset/borrowers reject.
+    bool retireMbColdVehicle(std::uint32_t,const VehicleFrameState49W&,
+        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
+        std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
+    // TC terminal native cold unwind, callable only through the actual Bank
+    // selection/typed Rig-Cables bridge. No source query/reset receipt exists.
+    bool retireTcColdVehicle(std::uint32_t,const VehicleFrameState49W&,
+        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
+        std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
+    // Read-only proof for a missing cold Rig/Cables prefix. A reached attach,
+    // partial registration, graphics publication or prior retirement rejects.
+    bool tcColdVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
+    // Distinct TB terminal cold bridge; actual Bank/Rig/Cables authority only.
+    bool retireTbColdVehicle(std::uint32_t,const VehicleFrameState49W&,
+        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
+        std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
+    bool tbColdVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
+    // Only the exact source Owner may call this inside Bank's private suspended
+    // retirement visit, after every raw query/result/visibility borrow closes.
+    // Never reports reset/graphics completion. A failed removal retains prefix.
+    bool retireSourceTriggerVisibility50MB(std::uint32_t,const VehicleFrameState49W&,
+        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,std::uint32_t*,
+        const SourceTriggerVisibilityIdentity50MB&,Diagnostic&) noexcept;
+
     bool matchesRaFreshRoster(std::uint32_t) const noexcept;
 public:
     Owner() noexcept;
@@ -303,6 +376,26 @@ public:
     // stray186/187 are excluded. Actual roster count remains caller-owned.
     // Same explicit native authored-zone policy; no course admission follows.
     bool prepareRaNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+        Diagnostic&) noexcept;
+    // Exact MB source; all384 rows validated,154 emitting locals retained.
+    // Native query only: authored flare rendering remains outside this owner.
+    // Authenticated RC15/15 topology uses unchanged legacy backing and no local lights.
+    // Exact TB10/11 source, including12 retained-selector repetitions ofLight92.
+    // Conservative additional descriptor reservation for this typed door lane:
+    // added common Storage fields/alignment plus the actual extra registration
+    // backing at maximumRacers. No topology/racer limit is enlarged.
+    static std::size_t tbDoorStorageReservationBytes() noexcept;
+    bool prepareTbNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+        Diagnostic&) noexcept;
+    bool prepareRcNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+        Diagnostic&) noexcept;
+    // Exact TC25-zone/26-portal backing; legacy25/25 and local240 remain.
+    bool prepareTcNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+        Diagnostic&) noexcept;
+    // Exact SC30-zone/34-portal backing; legacy25/25 and local240 remain.
+    bool prepareScNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+        Diagnostic&) noexcept;
+    bool prepareMbNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
         Diagnostic&) noexcept;
     const assets::World48F* world() const noexcept;
     // Authenticated GC/GA/TA/MA/SA global ambient+50 with no flash authoring.
@@ -342,6 +435,10 @@ public:
     // its field50 caches7F0 at225580..22558C. This owner never invents it.
     // Bindings/parameters and the selected frame must stay at their addresses
     // for the lease. Retain the original five-model POD02 binding unchanged.
+    bool beginSourceTriggerResetVisibility50MB(std::uint32_t actualRosterSlot,
+        const VehicleFrameState49W&,const VehicleFrameBindings49W&,
+        const VehicleFrameParameters49W&,std::uint32_t* actualCables254Field50,
+        const SourceTriggerVisibilityIdentity50MB&,ResetVisibilityLease&,Diagnostic&) noexcept;
     bool beginAiResetVisibility(std::uint32_t actualRosterSlot,
         const VehicleFrameState49W&,const VehicleFrameBindings49W&,
         const VehicleFrameParameters49W&,std::uint32_t* actualObject254Field50,

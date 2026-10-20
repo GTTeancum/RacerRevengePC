@@ -2,6 +2,7 @@
 #include "vehicle_draw_gl50cv.h"
 #include "vehicle_shader_gl50cz.h"
 #include "material_texture_gl50eb.h"
+#include "original_ui_rider_residency50kg.h"
 #include "original_ui_native_draw50kg.h"
 #include "../../../src/assets/native_asset48b.h"
 #include "../../../src/assets/world_normals50hk.h"
@@ -19,6 +20,10 @@
 #include <memory>
 
 namespace ra_cold_aggregate50LA { class Owner; }
+namespace rc_crystal50RC { class Owner; }
+namespace tb_original_world50LM { class Owner; }
+namespace rc_particle_visual50RC { class Window; }
+namespace rc_particle_render50RC { class Owner; }
 namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
 namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPauseNativeDraw50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
@@ -121,6 +126,9 @@ struct VehicleWindowMaterials50DS {
 // Explicit native policy, not GS sample parity. Source owners retain the actual
 // AA field and map it here only after authentic material admission.
 enum class NativeTrackCoverage50DS : std::uint8_t { aa0, fourSampleAa1 };
+// Explicit native track-only UV policy; old callers retain the one-pass guard.
+// scLavaTwoPass is issued by the authenticated SC lava association owner.
+enum class NativeTrackUvPolicy50DS : std::uint8_t { legacySinglePass, scLavaTwoPass };
 struct VehicleWindowTrackSpan50DS {
     // Source-ordered triangle/vertex ranges into the unchanged flattened mesh.
     // First material passes partition both arrays contiguously, from zero;
@@ -156,7 +164,56 @@ struct VehicleWindowTrackSpan50DS {
     bool sourceFogKnown = false, sourceFogEnabled = true;
     // Appended so existing positional aggregates retain their AA0 defaults.
     NativeTrackCoverage50DS nativeCoverage = NativeTrackCoverage50DS::aa0;
+    NativeTrackUvPolicy50DS sourceUvPolicy = NativeTrackUvPolicy50DS::legacySinglePass;
+    // Issued only by actual RC crystal source association: 1 base,2 Environment.
+    std::uint8_t rcCrystalPass = 0;
 };
+// Pure cold validation of the only newly admitted two-pass UV presentation.
+// Authentic source provenance is supplied by sc_lava_uv_fixture::Owner; this
+// checks its lowered render values and is also used by renderer preflight.
+inline bool validScLavaUvPair50DS(const VehicleWindowTrackSpan50DS& first,
+    const VehicleWindowTrackSpan50DS& second) noexcept {
+    const auto policy=[](const VehicleWindowTrackSpan50DS& s,bool secondPass) {
+        const auto& m=s.material;
+        return s.sourceUvPolicy==NativeTrackUvPolicy50DS::scLavaTwoPass &&
+            s.sourceUvAnimation && s.sourcePass==(secondPass?2u:1u) && s.sourcePassCount==2 &&
+            !s.projectionPass && m.mode==VehicleWindowMaterialMode50DS::requiredTexture &&
+            m.textureIndex!=assets::unresolvedMaterialTexture50EA && m.depthWrite && m.depthEqual &&
+            m.alphaScale==1.f && !m.unlit && !m.sourcePrelit && !m.sourceDiffuseCompressed50LA &&
+            !m.sourceSpecularPair50LA && !s.discardZeroAlpha && !s.sourceAlphaReference &&
+            s.sourceFogKnown && s.sourceFogEnabled && s.nativeCoverage==NativeTrackCoverage50DS::aa0 &&
+            m.blend==(secondPass?VehicleWindowBlend50DS::additive:VehicleWindowBlend50DS::opaque) &&
+            m.fixedBlendAlpha==secondPass && s.sourceAlphaTest==secondPass;
+    };
+    return policy(first,false) && policy(second,true) &&
+        first.material.textureIndex==second.material.textureIndex &&
+        first.indexStart==second.indexStart && first.indexCount==second.indexCount &&
+        first.vertexStart==second.vertexStart && first.vertexCount==second.vertexCount &&
+        first.indexCount && !(first.indexCount%3) && first.vertexCount;
+}
+// Closed RC pair policy; authentic source/image ownership is separately checked
+// against the retained rc_crystal50RC::Owner before any allocation or GL call.
+inline bool validRcCrystalPair50DS(const VehicleWindowTrackSpan50DS& first,
+    const VehicleWindowTrackSpan50DS& second) noexcept {
+    const auto valid=[](const VehicleWindowTrackSpan50DS& s,std::uint8_t pass){
+        const auto& m=s.material;
+        return s.rcCrystalPass==pass&&s.sourcePass==pass&&s.sourcePassCount==2&&
+            !s.projectionPass&&!s.sourceUvAnimation&&!s.allowPodShadow&&
+            s.sourceUvPolicy==NativeTrackUvPolicy50DS::legacySinglePass&&
+            s.nativeCoverage==NativeTrackCoverage50DS::aa0&&s.sourceFogKnown&&
+            s.sourceFogEnabled==(pass==2)&&s.sourceAlphaTest==(pass==2)&&
+            !s.sourceAlphaReference&&!s.discardZeroAlpha&&
+            m.mode==VehicleWindowMaterialMode50DS::requiredTexture&&
+            m.textureIndex!=assets::unresolvedMaterialTexture50EA&&
+            m.blend==VehicleWindowBlend50DS::additive&&!m.depthWrite&&m.depthEqual&&
+            m.alphaScale==1.f&&!m.fixedBlendAlpha&&m.unlit==(pass==2)&&m.sourcePrelit==(pass==1)&&
+            !m.sourceDiffuseCompressed50LA&&!m.sourceSpecularPair50LA;
+    };
+    return valid(first,1)&&valid(second,2)&&first.material.textureIndex!=second.material.textureIndex&&
+        first.indexStart==second.indexStart&&first.indexCount==second.indexCount&&
+        first.vertexStart==second.vertexStart&&first.vertexCount==second.vertexCount&&
+        first.indexCount&&!(first.indexCount%3)&&first.vertexCount;
+}
 // CPU receipt of the last GPU-completed gameplay submission. Span IDs index
 // the exact cold VehicleWindowTrack50DS::spans array, including material passes.
 // A submitted span issued at least one real indexed draw; this is not a claim
@@ -236,6 +293,17 @@ struct VehicleWindowTrack50DS {
     // Actual renderer and image owners retain private source leases until
     // checked retirement; caller cannot close canonical facets underneath them.
     std::shared_ptr<ra_static_fire_visual50LA::Owner> raStaticFire;
+    // Actual RC source/world/lighting lifetime; excludes generic projection.
+    // Exact float2 GPU capacity and compact CPU staging are caller charged.
+    std::shared_ptr<rc_crystal50RC::Owner> rcCrystal;
+    // Same authenticated immutable TB world retained through renderer retirement.
+    // Cold validation binds exact mesh, projection, spans and source texture bank.
+    std::shared_ptr<const tb_original_world50LM::Owner> tbWorld;
+    std::size_t maximumRcProjectionBytes=0,maximumRcStagingBytes=0;
+    // Exact RC world/attachment owner, retained through actual GPU retirement.
+    // Native per-instance completion policy: private gameplay draw attempts,
+    // never a caller-authored scene stamp or source portal-stamp equivalence.
+    std::shared_ptr<rc_particle_visual50RC::Window> rcParticleWindow;
 };
 // Narrow mutable world path for caller-animated authentic scene owners. The
 // aggregate retains one fixed source topology/material table across the session.
@@ -638,6 +706,10 @@ struct VehicleWindowFrame50DS {
     // optional lower left/right components 3/4, null for three-model pods.
     // Borrow only through submit, paired with each component's successful batch.
     std::array<game::OriginalRacerModelPackets50LA*, 4> sourceBodyModelPackets50LA{};
+    // Actual RC numeric owner, accepted only within its private withDraw
+    // borrow and the same Window's canonical material/atlas callback.
+    // It lends no caller-authored OriginalGcParticleDraw receipt.
+    std::shared_ptr<rc_particle_render50RC::Owner> rcParticles;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,
@@ -768,6 +840,15 @@ struct VehicleWindowDiagnostic50DS {
     // still abort the complete frame before the existing publication point.
     std::uint32_t sourceSpecularBaseGroups50LA = 0, sourceSpecularSecondTriangles50LA = 0;
     std::uint32_t sourceSpecularSkippedGroups50LA = 0;
+    // RC source-selected triangle work after ordinary frustum/chunk culling.
+    // Compositions are issued GL calls, never surviving-fragment counts.
+    // Wall time is CPU submit time only, measured iff the existing opt-in is on.
+    std::uint32_t rcCrystalTriangles = 0, rcCrystalEmptyTriangles = 0;
+    std::uint32_t rcCrystalCompositionsIssued = 0, rcCrystalFullRectangles = 0;
+    std::uint64_t rcCrystalSubmissionWallUs = 0;
+    bool rcCrystalWallMeasured = false;
+    // Actual RC particle kernel counters; no GC source-identity claim.
+    std::uint32_t rcParticleDraws = 0,rcParticleAlphaDraws = 0,rcParticleQuads = 0;
 };
 
 // Unforgeable renderer-issued value. The live renderer revalidates its weak
@@ -1211,6 +1292,11 @@ public:
     // completion receipt. Same owner-thread/no-reentrancy contract as close.
     bool hasSessionDependents50LA() const noexcept { return sessionDependentPins50LA_!=0; }
 private:
+    friend class OriginalUiFrontend50KG;
+    bool prevalidateRiderTextures(const OriginalUiRiderResidencyDemand50KG&,
+        const MaterialTextureGl50EB&,OriginalUiRiderTextureValidation50KG&,VehicleWindowDiagnostic50DS&) noexcept;
+    bool commitRiderTextures(const OriginalUiRiderResidencyDemand50KG&,
+        OriginalUiRiderTextureValidation50KG&,VehicleWindowDiagnostic50DS&) noexcept;
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
     // Actual session owner alone admits the source reset between submissions.
     bool idleForRaceReset50LA(VehicleWindowDiagnostic50DS&) const noexcept;
@@ -1225,7 +1311,7 @@ private:
     friend class OriginalVideoBlockingNativeBackend;
     bool submitOriginalUiImpl(const OriginalUiNativeDraw50KG&, std::int32_t width,
         std::int32_t height, bool sourceRgba, VehicleWindowDiagnostic50DS&,
-        bool* sourceWorkStarted=nullptr,bool publishSource=true) noexcept;
+        bool* sourceWorkStarted=nullptr,bool publishSource=true,bool riderReceiptChecked=false) noexcept;
     bool submitOriginalUiSourceFrame(const OriginalUiSourceFrame50KM&,std::int32_t width,
         std::int32_t height,bool publishSource,VehicleWindowDiagnostic50DS&) noexcept;
     bool matchesOriginalUiSource(const OriginalUiSourceSubmission50KN&)const noexcept;

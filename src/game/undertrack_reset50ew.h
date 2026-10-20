@@ -14,7 +14,8 @@ namespace rr::game {
 // undertrack entry retains its post-packed admission;1A17A4 controller input
 // uses Ready. Original AI16EAA0 stays PostPlayer with its scalar continuation.
 enum class UndertrackResetDomain50EW : std::uint8_t {
-    PlayerPostPackedBytes50S, OriginalAiPostPlayer, PlayerControllerReady50LC
+    PlayerPostPackedBytes50S, OriginalAiPostPlayer, PlayerControllerReady50LC,
+    SourceTriggerAiPostWorld
 };
 enum class UndertrackResetStatus50EW {
     SourceSliceComplete,Storage,Phase,Binding,Arithmetic,Scene,ModelBounds,

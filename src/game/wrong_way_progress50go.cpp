@@ -1,4 +1,5 @@
 #include "wrong_way_progress50go.h"
+#include "navigation_consumer_bridge50mb.h"
 #include <cfenv>
 #include <cmath>
 #include <cstring>
@@ -91,14 +92,15 @@ WrongWayHudRequest50GO request(Op operation,void* owner) noexcept {
     }
     return r;
 }
-bool validMarkers(const LapProgressTrack50GF& markers) noexcept {
+bool validMarkers(const LapProgressTrack50GF& markers,std::size_t extent) noexcept {
     return markers.prepared&&markers.nodeCount>0&&
-        markers.nodeCount<=maxUndertrackNodes50ET&&
+        markers.nodeCount<=extent&&
         markers.progressCount48<=maxLapProgressNodes50GF;
 }
 } // namespace
 
-bool beginWrongWayProgress50GO(const UndertrackTrack50ET& map,
+template<class Graph>
+static bool beginWrongWayProgress50GOShared50MB(const Graph& map,std::size_t extent,
     const LapProgressTrack50GF& markers,const WrongWayProgressInput50GO& in,
     WrongWayProgressState50GO& state,WrongWayProgressContinuation50GO& continuation,
     WrongWayProgressReceipt50GO& receipt,WrongWayProgressDiagnostic50GO& d) noexcept {
@@ -109,13 +111,13 @@ bool beginWrongWayProgress50GO(const UndertrackTrack50ET& map,
     WrongWayProgressReceipt50GO result{};
     next.flags10CC=static_cast<std::uint8_t>(next.flags10CC&~2u); // 1A2E64
     if(in.application34C){
-        if(!validMarkers(markers))return fail(d,E::Track,0x1a2e80);
+        if(!validMarkers(markers,extent))return fail(d,E::Track,0x1a2e80);
         next.vehicleFF8=markers.progressCount48; // 1A2E8C delay slot
         result.markerCursorFilled=true;
     }else if((in.config58&2u)&&!(in.config58&1u)){
         if(!(in.vehicleCD8&1u)&&in.vehicle40==0){
             if(std::fegetround()!=FE_TONEAREST)return fail(d,E::RoundingMode,0x1a2ef8);
-            if(!map.count||map.count>maxUndertrackNodes50ET||
+            if(!map.count||map.count>extent||
                in.vehicleC8C>=map.count||in.vehicleC88>=map.count)
                 return fail(d,E::Track,0x1a2f90);
             Math f;
@@ -154,6 +156,45 @@ bool beginWrongWayProgress50GO(const UndertrackTrack50ET& map,
     }
     state=next;continuation=nextContinuation;receipt=result;d={};return true;
 }
+bool beginWrongWayProgress50GO(const UndertrackTrack50ET& map,
+    const LapProgressTrack50GF& markers,const WrongWayProgressInput50GO& in,
+    WrongWayProgressState50GO& state,WrongWayProgressContinuation50GO& continuation,
+    WrongWayProgressReceipt50GO& receipt,WrongWayProgressDiagnostic50GO& d) noexcept {
+    return beginWrongWayProgress50GOShared50MB(map,maxUndertrackNodes50ET,markers,in,state,continuation,receipt,d);
+}
+bool beginWrongWayProgress50GO(const TrackNavigationView50EU& map,
+    const LapProgressTrackView50MB& markers,const WrongWayProgressInput50GO& in,
+    WrongWayProgressState50GO& state,WrongWayProgressContinuation50GO& continuation,
+    WrongWayProgressReceipt50GO& receipt,WrongWayProgressDiagnostic50GO& d) noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)||!markers.matches(map))
+        return fail(d,E::Track,0x1a2f90);
+    return beginWrongWayProgress50GOShared50MB(navigation_consumer_detail50MB::read(map.track()),
+        map.capacity(),markers.data(),in,state,continuation,receipt,d);
+}
+// TC-CONSUMER-BEGIN 0
+bool beginWrongWayProgress50GO(const TrackNavigationView50TC& map,
+    const LapProgressTrackView50TC& markers,const WrongWayProgressInput50GO& in,
+    WrongWayProgressState50GO& state,WrongWayProgressContinuation50GO& continuation,
+    WrongWayProgressReceipt50GO& receipt,WrongWayProgressDiagnostic50GO& d) noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)||!markers.matches(map))
+        return fail(d,E::Track,0x1a2f90);
+    return beginWrongWayProgress50GOShared50MB(navigation_consumer_detail50MB::read(map.track()),
+        map.capacity(),markers.data(),in,state,continuation,receipt,d);
+}
+// TC-CONSUMER-END 0
+
+// TB-CONSUMER-BEGIN 0
+bool beginWrongWayProgress50GO(const TrackNavigationView50TB& map,
+    const LapProgressTrackView50TB& markers,const WrongWayProgressInput50GO& in,
+    WrongWayProgressState50GO& state,WrongWayProgressContinuation50GO& continuation,
+    WrongWayProgressReceipt50GO& receipt,WrongWayProgressDiagnostic50GO& d) noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)||!markers.matches(map))
+        return fail(d,E::Track,0x1a2f90);
+    return beginWrongWayProgress50GOShared50MB(navigation_consumer_detail50MB::read(map.track()),
+        map.capacity(),markers.data(),in,state,continuation,receipt,d);
+}
+// TB-CONSUMER-END 0
+
 
 bool resumeWrongWayProgress50GO(WrongWayProgressContinuation50GO& continuation,
     WrongWayProgressDiagnostic50GO& d) noexcept {

@@ -30,6 +30,11 @@ inline void recordCollisionNormalMode50JA(CollisionNormalModeWrite50JA& write,
 // terminal atomic-call boundary; a stale result must never be published.
 class CollisionNormalModeOwner50JA {
 public:
+    // Reached121438 publication for the explicitly reentrant source-trigger
+    // route. Nested ground consumes this SAME word before E8 returns.
+    bool acceptReachedSourceDispatch50MB(std::uint32_t actualShapeMode,bool bound) noexcept {
+        if(!bound)return false;value_=actualShapeMode;written_=true;return true;
+    }
     void acceptCompletedWorldReset() noexcept {
         if(!worldGlobals_.initializedGp8184){worldGlobals_.sentinel3E0860=0xffffffffu;worldGlobals_.initializedGp8184=1;}
         worldGlobals_.count3DFDC0=0;worldGlobals_.count3DFDC8=0;worldGlobalsWritten_=true;

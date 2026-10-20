@@ -1,4 +1,5 @@
 #include "original_ui_rider_widgets50kg.h"
+#include "original_ui_rider_dynamic_owner50kg.h"
 #include <array>
 #include <utility>
 namespace rr::game {
@@ -8,6 +9,27 @@ using O=OriginalUiControlOperation50KG;using D=OriginalUiRiderWidgetDiagnostic50
 bool fail(D& d,E e)noexcept{d.error=e;return false;}
 bool idOk(std::uint16_t id)noexcept{return id>0&&id<120;}
 bool dynamic(K k)noexcept{return k==K::pod||k==K::character;}
+bool sameState(const OriginalUiRiderWidgetState50KG& a,const OriginalUiRiderWidgetState50KG& b) noexcept {
+    return a.kind==b.kind&&a.selected==b.selected&&a.shown==b.shown&&a.onTop==b.onTop;
+}
+// Shared by real ordinary-widget apply and private prospective projection.
+// For text this covers only hierarchy/selection, while actual callbacks keep
+// all line setup/color/lock effects in OriginalUiTextWidget50KG unchanged.
+bool projectOrdinary(OriginalUiRiderWidgetState50KG& state,const OriginalUiRiderWidgetCallback50KG& c,
+    bool enableSelect,bool disableSelect,bool enableDeselect,bool disableDeselect) noexcept {
+    const auto visibility=[&](bool show,bool hide){if(show!=hide)state.shown=show;};
+    const bool movement=state.kind==K::movement;
+    switch(c.operation){
+    case O::show:case O::reset:state.shown=true;break;
+    case O::hide:state.shown=false;break;
+    case O::select:state.selected=true;if(movement)state.shown=true;else visibility(enableSelect,disableSelect);break;
+    case O::deselect:state.selected=false;if(movement)state.shown=false;else visibility(enableDeselect,disableDeselect);break;
+    case O::clearSelection:state.selected=false;break;
+    case O::setEnabled:state.selected=c.value;state.shown=c.value;break;
+    default:return false;
+    }
+    return true;
+}
 bool operation(O o)noexcept{switch(o){case O::show:case O::hide:case O::select:case O::deselect:
     case O::clearSelection:case O::setEnabled:case O::reset:return true;}return false;}
 }
@@ -115,22 +137,18 @@ bool OriginalUiRiderWidgets50KG::apply(const OriginalUiRiderWidgetCallback50KG* 
     for(std::size_t i=0;i<count;++i){const auto& c=calls[i];d.widget=c.widget;d.callback=i;auto& state=s.states[c.widget];
         bool ok=true;
         if(state.kind==K::text){auto& text=s.textWidgets[c.widget];
+            auto expected=this->state(c.widget);const auto& policy=s.texts[c.widget];
+            ok=projectOrdinary(expected,c,policy.enableOnSelect,policy.disableOnSelect,
+                policy.enableOnDeselect,policy.disableOnDeselect);
             const auto status=c.operation==O::setEnabled?text.setControlEnabled(c.value):text.apply(c.operation,c.value);
-            ok=status==OriginalUiTextWidgetStatus50KG::ok;
+            ok=ok&&status==OriginalUiTextWidgetStatus50KG::ok&&sameState(expected,this->state(c.widget));
         }else if(dynamic(state.kind)) {
             auto actual=state;ok=hooks.apply(hooks.context,c,actual);
             ok=ok&&actual.kind==state.kind&&actual.onTop==state.onTop;if(ok)state=actual;
         }else {
-            const auto visibility=[&](bool show,bool hide){if(show!=hide)state.shown=show;};
-            const bool movement=state.kind==K::movement;const auto& icon=s.icons[c.widget];
-            switch(c.operation){
-            case O::show:case O::reset:state.shown=true;break;
-            case O::hide:state.shown=false;break;
-            case O::select:state.selected=true;if(movement)state.shown=true;else visibility(icon.enableOnSelect,icon.disableOnSelect);break;
-            case O::deselect:state.selected=false;if(movement)state.shown=false;else visibility(icon.enableOnDeselect,icon.disableOnDeselect);break;
-            case O::clearSelection:state.selected=false;break;
-            case O::setEnabled:state.selected=c.value;state.shown=c.value;break;
-            }
+            const auto& icon=s.icons[c.widget];
+            ok=projectOrdinary(state,c,icon.enableOnSelect,icon.disableOnSelect,
+                icon.enableOnDeselect,icon.disableOnDeselect);
         }
         if(!ok){s.inCallback=false;s.poisoned=true;return fail(d,E::callback);}
     }
@@ -154,6 +172,66 @@ bool OriginalUiRiderWidgets50KG::expandNavigation(std::uint8_t player,const Orig
         }
         output=std::move(calls);d={};return true;
     }catch(...){return fail(d,E::allocation);}
+}
+bool OriginalUiRiderWidgets50KG::beginNativeProjection(const OriginalUiRiderDynamicOwner50KG& owner,
+    NativeProjection& output,D& d) const noexcept {
+    d={};if(!storage_)return fail(d,E::notBound);
+    if(storage_->poisoned||storage_->inCallback||!owner.nativeProjectionForWidgets(*this))return fail(d,E::poisoned);
+    NativeProjection next;next.widgets=this;next.dynamic=&owner;
+    for(std::uint16_t id=0;id<120;++id){
+        next.states[id]=state(id);
+        if(dynamic(next.states[id].kind)){
+            OriginalUiRiderWidgetState50KG actual;
+            if(!owner.nativeProjectionSnapshot(id,actual,next.registered[id])||!sameState(actual,next.states[id])){
+                d.widget=id;return fail(d,E::callback);
+            }
+        }
+    }
+    output=next;return true;
+}
+bool OriginalUiRiderWidgets50KG::projectNativeCallbacks(NativeProjection& projection,
+    const OriginalUiRiderWidgetCallback50KG* calls,std::size_t count,D& d) const noexcept {
+    d={};if(!storage_)return fail(d,E::notBound);
+    if(storage_->poisoned||storage_->inCallback)return fail(d,E::poisoned);
+    if(projection.widgets!=this||!projection.dynamic||!projection.dynamic->nativeProjectionForWidgets(*this)||
+        (count&&!calls)||count>32768)return fail(d,E::callback);
+    auto next=projection;
+    for(std::size_t i=0;i<count;++i){
+        const auto& c=calls[i];d.widget=c.widget;d.callback=i;
+        if(!idOk(c.widget)||!operation(c.operation))return fail(d,E::callback);
+        auto& value=next.states[c.widget];const auto actual=state(c.widget);
+        if(value.kind!=actual.kind||value.onTop!=actual.onTop||value.kind==K::empty||value.kind==K::absent)
+            return fail(d,E::callback);
+        if(dynamic(value.kind)){
+            if(!projection.dynamic->projectNativeOne(c,value,next.registered[c.widget]))return fail(d,E::callback);
+        }else{
+            if(next.registered[c.widget])return fail(d,E::callback);
+            if(value.kind==K::text){const auto& t=storage_->texts[c.widget];
+                if(!projectOrdinary(value,c,t.enableOnSelect,t.disableOnSelect,t.enableOnDeselect,t.disableOnDeselect))
+                    return fail(d,E::callback);
+            }else{const auto& icon=storage_->icons[c.widget];
+                if(!projectOrdinary(value,c,icon.enableOnSelect,icon.disableOnSelect,icon.enableOnDeselect,icon.disableOnDeselect))
+                    return fail(d,E::callback);
+            }
+        }
+    }
+    projection=next;d={};return true;
+}
+bool OriginalUiRiderWidgets50KG::projectNativeNavigation(NativeProjection& projection,std::uint8_t player,
+    const OriginalUiNavigation50KG& next,const OriginalUiCommands50KG& commands,D& d) const noexcept {
+    std::vector<OriginalUiRiderWidgetCallback50KG> calls;
+    return expandNavigation(player,next,commands,calls,d)&&projectNativeCallbacks(projection,calls.data(),calls.size(),d);
+}
+bool OriginalUiRiderWidgets50KG::matchesNativeProjection(const NativeProjection& projection) const noexcept {
+    if(!storage_||storage_->poisoned||storage_->inCallback||projection.widgets!=this||!projection.dynamic||
+        !projection.dynamic->nativeProjectionForWidgets(*this))return false;
+    for(std::uint16_t id=0;id<120;++id){
+        if(!sameState(state(id),projection.states[id]))return false;
+        if(dynamic(projection.states[id].kind)){
+            if(!projection.dynamic->matchesNativeProjection(id,projection.states[id],projection.registered[id]))return false;
+        }else if(projection.registered[id])return false;
+    }
+    return true;
 }
 bool OriginalUiRiderWidgets50KG::preflightNavigation(std::uint8_t player,const OriginalUiNavigation50KG& next,
     const OriginalUiCommands50KG& commands,const OriginalUiRiderDynamicHooks50KG& hooks,D& d)noexcept {

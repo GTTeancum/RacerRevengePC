@@ -47,7 +47,7 @@ inline bool integer(Slice s,std::int32_t& out) noexcept {
 // semicolon comments, no duplicate sections/keys. Original permits broader
 // strings and first-match duplicates; unsupported text fails explicitly.
 // All work is bounded, serial and allocation-free. Unknown keys are not read.
-template<class Visit>
+template<std::size_t SectionCapacity=257,class Visit>
 inline bool scan(const char* text,std::size_t bytes,std::size_t maximum,
     std::uint32_t pc,Visit&& visit,AiAuthoringDiagnostic50IU& d) noexcept {
     if(!text||!bytes)return fail(d,AiAuthoringError50IU::Input,pc,0);
@@ -55,7 +55,7 @@ inline bool scan(const char* text,std::size_t bytes,std::size_t maximum,
     for(std::size_t i=0;i<bytes;++i){const auto c=static_cast<unsigned char>(text[i]);
         if((c<32&&c!=9&&c!=10&&c!=13)||c>126)
             return fail(d,AiAuthoringError50IU::Text,pc,i);}
-    Slice sections[257]{},keys[128]{};std::size_t sectionsUsed=0,keysUsed=0,at=0;
+    Slice sections[SectionCapacity]{},keys[128]{};std::size_t sectionsUsed=0,keysUsed=0,at=0;
     Slice section{};
     while(at<bytes){const auto start=at;while(at<bytes&&text[at]!='\n')++at;
         auto line=trim({text+start,at-start,start});if(at<bytes)++at;
@@ -67,7 +67,7 @@ inline bool scan(const char* text,std::size_t bytes,std::size_t maximum,
             if(!section.n)return fail(d,AiAuthoringError50IU::Text,pc,start);
             for(std::size_t i=0;i<sectionsUsed;++i)if(equal(section,sections[i]))
                 return fail(d,AiAuthoringError50IU::Duplicate,pc,start);
-            if(sectionsUsed==257)return fail(d,AiAuthoringError50IU::Limit,pc,start);
+            if(sectionsUsed==SectionCapacity)return fail(d,AiAuthoringError50IU::Limit,pc,start);
             sections[sectionsUsed++]=section;keysUsed=0;
             if(!visit(section,{},{}))return false;continue;
         }
@@ -129,14 +129,16 @@ inline bool readAiProfile50IU(const char* text,std::size_t bytes,
 // even for authored0, because source2A1678 etc use constant OR masks.
 // BoostScale uses the source INTEGER reader then signed CVT.S.W, not a float
 // lookup. Admit exactly representable integers here; other ranges fail closed.
-inline bool readAiTrackMetadata50IU(const char* text,std::size_t bytes,
-    const rr::game::TrackNavigation50EU& track,rr::game::AiTrackMetadata50IU& output,
+namespace ai_authoring_detail50IU {
+template<std::size_t N,class Track,class Metadata>
+inline bool readTrackMetadata(const char* text,std::size_t bytes,
+    const Track& track,Metadata& output,
     AiAuthoringDiagnostic50IU& d) noexcept {
     using namespace ai_authoring_detail50IU;using namespace rr::game;
-    d={};if(!track.gatesPrepared||track.track.count<2||track.track.count>maxUndertrackNodes50ET)
+    d={};if(!track.gatesPrepared||track.track.count<2||track.track.count>N)
         return fail(d,AiAuthoringError50IU::Input,0x2a1260,0);
-    AiTrackMetadata50IU result{};result.count=track.track.count;
-    bool seen[maxUndertrackNodes50ET]{};bool countSeen=false;std::int32_t current=-1;
+    Metadata result{};result.count=track.track.count;
+    bool seen[N]{};bool countSeen=false;std::int32_t current=-1;
     auto visit=[&](Slice section,Slice key,Slice value) noexcept {
         if(!key.n){current=-1;
             if(equal(section,"Track"))return true;
@@ -173,7 +175,7 @@ inline bool readAiTrackMetadata50IU(const char* text,std::size_t bytes,
             if(!integer(value,ignored))return fail(d,AiAuthoringError50IU::Number,0x2a18fc,value.offset);
             node.progressNode=true;}return true;
     };
-    if(!scan(text,bytes,maxUndertrackText50ET,0x2a1260,visit,d))return false;
+    if(!scan<N+1>(text,bytes,maxUndertrackText50ET,0x2a1260,visit,d))return false;
     if(!countSeen)return fail(d,AiAuthoringError50IU::Missing,0x2a1334,0);
     for(std::uint32_t n=0;n<result.count;++n){d.node=n;
         if(!seen[n])return fail(d,AiAuthoringError50IU::Missing,0x2a14d4,0);
@@ -202,6 +204,12 @@ inline bool readAiTrackMetadata50IU(const char* text,std::size_t bytes,
         return fail(d,AiAuthoringError50IU::Arithmetic,0x2a1c58,0);
     result.trackLength3C=total;
     result.bound=true;output=result;d={};return true;
+}
+}
+inline bool readAiTrackMetadata50IU(const char* text,std::size_t bytes,
+    const rr::game::TrackNavigation50EU& track,rr::game::AiTrackMetadata50IU& output,
+    AiAuthoringDiagnostic50IU& d) noexcept {
+    return ai_authoring_detail50IU::readTrackMetadata<rr::game::maxUndertrackNodes50ET>(text,bytes,track,output,d);
 }
 
 inline bool readAiTrackTuning50IU(const char* text,std::size_t bytes,

@@ -45,3 +45,4 @@ The new `tools/launch_original_disc.py` is development-only: explicit `--assets`
 ## Release acceptance
 
 Package only the executable, approved launch/configuration files, required redistributable libraries and notices. Users supply original assets separately. Exclude original game bytes, evidence/work/cacheobjects, runtime corpus JSON, generated meshes/scenes/textures/worlds and rider caches. Validate each supported racer/track through normal selection, controllable race, Pause/Restart, genuine finish/Results and return using a clean directory and absent/denied generated paths. Preserve failures and fix native readers/ownership rather than installing a fallback pack or weakening profile/resource checks.
+

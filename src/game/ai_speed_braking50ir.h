@@ -5,6 +5,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
+#if defined(__SSE__)
+#include <xmmintrin.h>
+#endif
 
 namespace rr::game {
 // Native supplied-owner projection of original AI speed selection172C50..172DA8
@@ -148,11 +152,36 @@ inline bool applyAiNonBoostSpeed50IR(float desiredSpeed,float bodyCachedSpeed34,
     d={};
     if(std::fegetround()!=FE_TONEAREST)
         return fail(d,AiSpeedError50IR::RoundingMode,0x173770);
-    if(!admitted(desiredSpeed)||!admitted(bodyCachedSpeed34))
+    bool desiredAccepted=false,cachedEvaluated=false,cachedAccepted=false;
+    if(!(desiredAccepted=admitted(desiredSpeed))||
+       !(cachedEvaluated=true,cachedAccepted=std::isfinite(bodyCachedSpeed34))) {
+        // Capture each actual predicate once, retaining short-circuit order.
+        // Additional word classification neither replays nor substitutes it.
+        const auto bits=[](float v) noexcept {std::uint32_t b;std::memcpy(&b,&v,sizeof b);return b;};
+        const auto wordAdmitted=[](std::uint32_t b) noexcept {
+            const auto magnitude=b&0x7fffffffu,exponent=b&0x7f800000u;
+            return magnitude==0u||(exponent!=0u&&exponent!=0x7f800000u);
+        };
+        const auto desiredBits=bits(desiredSpeed),cachedBits=bits(bodyCachedSpeed34);
+        const bool desiredWordAdmitted=wordAdmitted(desiredBits),cachedWordAdmitted=wordAdmitted(cachedBits);
+        const int rounding=std::fegetround(),exceptions=std::fetestexcept(FE_ALL_EXCEPT);
+        unsigned mxcsrAvailable=0,mxcsr=0;
+#if defined(__SSE__)
+        mxcsrAvailable=1;mxcsr=_mm_getcsr();
+#endif
+        std::fprintf(stderr,"AI_NONBOOST_INPUT_REJECT pc=0017379c desired=%08x cached_speed=%08x first_guard=%u desired_guard_accepted=%u cached_guard_accepted=%u desired_word_admitted=%u cached_guard_evaluated=%u cached_word_admitted=%u rounding=%d exceptions=%x mxcsr_available=%u mxcsr=%08x\n",
+            desiredBits,cachedBits,desiredAccepted?2u:1u,unsigned(desiredAccepted),unsigned(cachedAccepted),unsigned(desiredWordAdmitted),unsigned(cachedEvaluated),unsigned(cachedWordAdmitted),rounding,unsigned(exceptions),mxcsrAvailable,mxcsr);
         return fail(d,AiSpeedError50IR::Input,0x17379c);
+    }
     Math f;
     AiNonBoostSpeedReceipt50IR next{};
-    next.convertedCachedSpeed=f.mul(word(0x3f2e8bc1u),bodyCachedSpeed34);
+    // Scoped native gradual-underflow policy for the actual cached-speed field.
+    // Preserve the source MUL then SUB and the exact rounded product bits.
+    // This does not establish guest FPU arithmetic/status parity. All other
+    // inputs/results, including the live difference, retain their old guards.
+    volatile float converted=word(0x3f2e8bc1u)*bodyCachedSpeed34;
+    next.convertedCachedSpeed=converted;
+    f.valid=f.valid&&std::isfinite(next.convertedCachedSpeed);
     next.desiredMinusCurrent=f.sub(desiredSpeed,next.convertedCachedSpeed);
     if(!f.valid)return fail(d,AiSpeedError50IR::Arithmetic,0x1737a4);
     next.braking=next.desiredMinusCurrent<0.f; // Equality, including -0, accelerates.

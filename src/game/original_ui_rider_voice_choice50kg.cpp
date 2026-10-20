@@ -11,16 +11,24 @@ struct OriginalConfirmRange {
 // Constructor count page+53BC+rider*4, first page+5428+rider*4.
 // Explicit authored ranges, never a compact unlocked-list index.
 constexpr OriginalConfirmRange originalConfirmRanges[]{
+    {1,1,4,"Anakin Skywalker (ep1)"}, // count1E7C84, first1E7DAC
     {2,5,2,"Ben Quadinaros"},       // count1E7C98, first1E7DB4
+    {3,7,2,"Clegg Holdfast"},      // count1E7CAC, first1E7DBC
     {4,9,2,"Dud Bolt"},            // count1E7CC0, first1E7DC4
     {7,15,2,"Gasgano"},           // count1E7CFC, first1E7DDC
+    {8,17,2,"Mars Guo"},          // count1E7D10, first1E7DE4
     {9,19,2,"Mawhonic"},          // count1E7D1C, first1E7DEC
     {10,21,2,"Aldar Beedo"},       // count1E7D24, first1E7DF4
     {11,23,2,"Ody Mandrell"},      // count1E7D2C, first1E7DFC
     {12,25,2,"Shrivel Braittrand"},// count1E7D34, first1E7E04
     {15,31,2,"Teemto Pagalies"},   // count1E7D4C, first1E7E1C
+    {16,33,2,"Wan Sandage"},      // original UIACCEPT Event33..34
     {19,39,5,"Anakin Skywalker"},  // count1E7D6C, first1E7E3C
-    {20,44,2,"Occo Ninebar"}       // count1E7D74, first1E7E44
+    {20,44,2,"Occo Ninebar"},      // count1E7D74, first1E7E44
+    {18,37,2,"Sebulba 2"}, // original UIACCEPT Event37..38
+    {17,35,2,"Scorch Zanales"}, // original UIACCEPT Event35..36
+    {24,54,2,"Tzidik Wrantojo"}, // original UIACCEPT Event54..55
+    {22,50,2,"Knire Dark"}        // original UIACCEPT Event50..51
 };
 const OriginalConfirmRange* confirmRange(std::uint32_t rider) noexcept {
     for(const auto& range:originalConfirmRanges)if(range.rider==rider)return &range;
@@ -57,7 +65,7 @@ bool OriginalUiRiderVoiceChoice50KG::choose(std::uint32_t rider,HostMonotonicClo
     std::uint32_t quantized=random,shift=0;
     for(auto magnitude=random;magnitude>=0x01000000u;magnitude>>=1)++shift;
     if(shift)quantized&=~((std::uint32_t{1}<<shift)-1u);
-    // *2^-31 is exact. Multiplication by the authored count (2 or5) and positive truncation can
+    // *2^-31 is exact. Multiplication by the authored count (2,4 or5) and positive truncation can
     // be evaluated as this rational: every integer0..5 is representable,
     // so positive toward-zero binary32 reduction cannot cross its integer
     // floor. No intermediate float rounding can manufacture a choice==count.

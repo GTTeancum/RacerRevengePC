@@ -56,6 +56,22 @@ inline std::vector<rr::assets::AudioRequest50HC> events(
     }
     need(count==expected,"50IE missing event count");for(bool n:names)need(n,"50IE missing authored event");return out;
 }
+
+// Original292650 selects Event1..NumEvents inclusive. Exact POD17 declares29
+// while retaining an unselected Event30. Keep the generic text reader strict.
+inline std::vector<rr::assets::AudioRequest50HC> scorch17DeclaredEvents(
+    const std::vector<std::uint8_t>& bytes) {
+    using pod_materials50ed_fixture::detail::need;
+    need(bytes.size()==2478&&pod_materials50ed_fixture::detail::sha256(bytes)==
+        "ff897119ce1d9eba85e7f9b69f1811bd9d182dfb87db6afe3f022442ec6a2398",
+        "50IE exact POD17 declared-count source differs");
+    constexpr std::size_t unselectedEvent30=2405;
+    const std::string_view text(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+    need(text.substr(unselectedEvent30,9)=="[Event30]"&&
+        text.find("NumEvents=29")!=text.npos,"50IE exact POD17 source boundary differs");
+    return events(std::vector<std::uint8_t>(bytes.begin(),bytes.begin()+unselectedEvent30),29);
+}
+
 }
 inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std::string&error,
     std::uint32_t playerRacer60=1,const std::uint32_t* actualRacer60=nullptr,
@@ -104,7 +120,8 @@ inline bool readAuthoring(const std::filesystem::path&discRoot,Authoring&out,std
             d::need(pod.size()==identity.announcerBytes&&d::sha256(pod)==identity.announcerSha256,
                 std::string("50IE original named announcer differs: ")+identity.podId);
             // Original POD01/POD11 author29 events, other retained pods30.
-            const auto p=detail::events(pod,identity.announcerEvents);
+            const auto p=racer==17?detail::scorch17DeclaredEvents(pod):
+                detail::events(pod,identity.announcerEvents);
             for(unsigned key=roster?1u:7u;key<=15;++key)next.cues.push_back({racer,key,p[key-1]});
             for(unsigned key=24;key<=26;++key)next.cues.push_back({racer,key,p[key-1]});
         }

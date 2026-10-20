@@ -378,20 +378,24 @@ template<class EnqueueEvent3> inline Receipt dispatch179070(
     if(listenerCount&&!listeners)return rejectInput(InputGuard::listenerPointer);
     if(!validOriginalSoundModeFields50KG(mode))return rejectInput(InputGuard::soundMode);
     if(std::fegetround()!=FE_TONEAREST)return rejectInput(InputGuard::rounding);
-    //1791E8..179224: argument3 clears22C bit3 and invokes D44+A8=2C27D0,
-    // then returns. It consumes no spatial vector/listener scalars. Keep every
-    // structural/owner guard above, but do not reject a source stop because of
-    // an unused finite subnormal (or other unused numerical lane). Arguments
-    //1/2 retain their existing scalar domain, including listener forward Y:
-    // original102A94 DOES read Y in the later spatial quantity calculation.
-    if(in.channelArgument!=3){
+    // Stop3 and the source no-contact (-1) return consume no numeric lanes.
+    // Keep structural/owner/rounding guards above; defer scalar admission until
+    // arguments1/2 actually have a contact material. Do not normalize borrowed
+    // vectors. The native material presentation path keeps original heading
+    // X/Z and all other consumed scalar guards. Original102A94 also reads Y
+    // for a separate VU/CVT quantity, but233CF0/233CF4 unconditionally replace
+    // its sound multiplier with1 after an unbranched comparison. Admit finite
+    // forwardY here without changing its bits; this is bounded native output
+    // policy, not equivalence of those omitted source FPU/VU intermediates.
+    if(in.channelArgument!=3&&in.contactMaterialA9>=0){
         for(unsigned k=0;k<4;++k){
             if(!scalar(in.position.v[k]))return rejectInput(InputGuard::positionScalar,0,k);
             if(!scalar(in.velocity.v[k]))return rejectInput(InputGuard::velocityScalar,0,k);
         }
         for(std::size_t i=0;i<listenerCount;++i)for(unsigned k=0;k<3;++k){
             if(!scalar(listeners[i].position[k]))return rejectInput(InputGuard::listenerPositionScalar,i,k);
-            if(!scalar(listeners[i].forward[k]))return rejectInput(InputGuard::listenerForwardScalar,i,k);
+            if(!(k==1?std::isfinite(listeners[i].forward[k]):scalar(listeners[i].forward[k])))
+                return rejectInput(InputGuard::listenerForwardScalar,i,k);
         }
     }
     state.inDispatch=true;struct Leave{State& s;~Leave(){s.inDispatch=false;}}leave{state};

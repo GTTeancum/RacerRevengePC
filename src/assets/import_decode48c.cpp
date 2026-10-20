@@ -1,4 +1,6 @@
 #include "import_decode48c.h"
+#include "indexed_resource48c.h"
+#include <cstddef>
 #include <zlib.h>
 #include <algorithm>
 #include <cmath>
@@ -105,7 +107,44 @@ struct DecodedVertex {
 };
 }
 
-bool decodeResource48C(const std::vector<std::uint8_t>& input, ResArchive48C& output,
+namespace {
+struct ResourceReadData {
+    std::vector<ResourceEntry48C> entries;
+    std::vector<ResourceBlock48C> blocks;
+    std::vector<std::uint8_t> payload;
+    std::vector<std::size_t> compactOffsets;
+    std::size_t logicalExtent=0,preparationPeak=0,codecPeak=0;
+};
+void payloadAdd(std::size_t& n,std::size_t bytes){
+    require(bytes<=std::numeric_limits<std::size_t>::max()-n,DecodeKind48C::limit,
+        "res.compact_payload_limit",0,"Indexed resource payload sum overflow");n+=bytes;
+}
+std::size_t resourcePayload(const ResourceReadData& p){
+    std::size_t n=sizeof(ResourceReadData);
+    payloadAdd(n,p.entries.capacity()*sizeof(ResourceEntry48C));
+    payloadAdd(n,p.blocks.capacity()*sizeof(ResourceBlock48C));
+    payloadAdd(n,p.payload.capacity());payloadAdd(n,p.compactOffsets.capacity()*sizeof(std::size_t));
+    for(const auto& e:p.entries)payloadAdd(n,e.name.capacity()+1);return n;
+}
+// A charged fixed scratch arena bounds zlib's allocations for the new compact
+// path. Legacy decoding retains its original default allocator and error path.
+struct CodecArena {
+    alignas(std::max_align_t) std::uint8_t bytes[IndexedResArchive48C::codecArenaBytes]{};
+    std::size_t used=0;
+    void reset() noexcept {used=0;}
+    static voidpf allocate(voidpf opaque,uInt count,uInt size) noexcept {
+        auto& self=*static_cast<CodecArena*>(opaque);
+        if(size&&count>std::numeric_limits<std::size_t>::max()/size)return nullptr;
+        const auto n=std::size_t(count)*size;
+        const auto alignment=alignof(std::max_align_t);
+        const auto at=(self.used+alignment-1)/alignment*alignment;
+        if(!n||at>sizeof self.bytes||n>sizeof self.bytes-at)return nullptr;
+        auto* result=self.bytes+at;std::memset(result,0,n);self.used=at+n;return result;
+    }
+    static void release(voidpf,voidpf) noexcept {}
+};
+bool decodeResourceData48C(const std::vector<std::uint8_t>& input, ResourceReadData& output,
+    bool compact,std::size_t availablePayloadBytes,std::size_t outerStorageBytes,
     DecodeError48C& error, const DecodeHooks48C* hooks, const DecodeLimits48C& limits) {
     error = {};
     try {
@@ -135,7 +174,17 @@ bool decodeResource48C(const std::vector<std::uint8_t>& input, ResArchive48C& ou
         offset += 8;
         reader.range(offset, indexBytes);
         const std::size_t indexEnd = offset + indexBytes;
-        ResArchive48C parsed;
+        ResourceReadData parsed;
+        parsed.logicalExtent=decodedBytes;
+        if(compact){
+            // Bound metadata before any index/name allocation. The factor2
+            // covers the pinned string growth from its initial inline buffer.
+            const auto nameCap=std::min(std::uint32_t(1024),limits.resource_name_bytes);
+            std::size_t reservation=input.capacity();payloadAdd(reservation,outerStorageBytes);payloadAdd(reservation,sizeof(ResourceReadData));
+            payloadAdd(reservation,std::size_t(count)*(sizeof(ResourceEntry48C)+2u*std::max(15u,nameCap)+1u+sizeof(std::size_t)));
+            payloadAdd(reservation,blockCount*sizeof(ResourceBlock48C));payloadAdd(reservation,sizeof(CodecArena));payloadAdd(reservation,blockBytes+1);
+            require(reservation<=availablePayloadBytes,DecodeKind48C::limit,"res.compact_payload_limit",0,"Indexed resource metadata/scratch exceeds remaining payload budget");
+        }
         parsed.entries.reserve(count);
         for (std::uint32_t i = 0; i < count; ++i) {
             require(offset <= indexEnd && indexEnd - offset >= 4, DecodeKind48C::malformed,
@@ -160,8 +209,29 @@ bool decodeResource48C(const std::vector<std::uint8_t>& input, ResArchive48C& ou
             parsed.entries.push_back(std::move(entry));
         }
         require(offset == indexEnd, DecodeKind48C::malformed, "res.index_suffix", offset, "Unconsumed filename index bytes");
+        std::unique_ptr<CodecArena> arena;
+        if(compact){
+            std::size_t compactBytes=0;
+            for(const auto& entry:parsed.entries){
+                require(entry.bytes<=std::numeric_limits<std::size_t>::max()-compactBytes,
+                    DecodeKind48C::limit,"res.compact_payload_limit",entry.logical_offset,"Compact member sum overflow");
+                compactBytes+=entry.bytes;
+            }
+            std::size_t reservation=resourcePayload(parsed);payloadAdd(reservation,input.capacity());payloadAdd(reservation,outerStorageBytes);
+            payloadAdd(reservation,count*sizeof(std::size_t)+blockCount*sizeof(ResourceBlock48C));
+            payloadAdd(reservation,compactBytes);payloadAdd(reservation,sizeof(CodecArena));payloadAdd(reservation,blockBytes+1);
+            require(reservation<=availablePayloadBytes,DecodeKind48C::limit,"res.compact_payload_limit",0,"Complete compact resource exceeds remaining payload budget");
+            parsed.compactOffsets.reserve(count);std::size_t at=0;
+            for(const auto& entry:parsed.entries){parsed.compactOffsets.push_back(at);at+=entry.bytes;}
+            parsed.payload.resize(compactBytes);arena=std::make_unique<CodecArena>();
+        }
         parsed.blocks.reserve(blockCount);
-        parsed.decoded.reserve(decodedBytes);
+        if(!compact)parsed.payload.reserve(decodedBytes);
+        if(compact){
+            parsed.preparationPeak=resourcePayload(parsed);payloadAdd(parsed.preparationPeak,input.capacity());
+            payloadAdd(parsed.preparationPeak,outerStorageBytes);payloadAdd(parsed.preparationPeak,sizeof(CodecArena));payloadAdd(parsed.preparationPeak,blockBytes+1);
+            require(parsed.preparationPeak<=availablePayloadBytes,DecodeKind48C::limit,"res.compact_payload_limit",0,"Actual indexed capacities exceed remaining payload budget");
+        }
         progress(hooks, "res_blocks", 0, static_cast<std::uint32_t>(blockCount));
         for (std::size_t i = 0; i < blockCount; ++i) {
             checkCancel(hooks, offset);
@@ -171,6 +241,8 @@ bool decodeResource48C(const std::vector<std::uint8_t>& input, ResArchive48C& ou
                 "res.block_boundary", offset + compressedBytes, "Compressed block is not followed by 0xff");
             std::array<std::uint8_t, blockBytes + 1> decoded{};
             Inflater inflater;
+            if(compact){arena->reset();inflater.stream.zalloc=&CodecArena::allocate;
+                inflater.stream.zfree=&CodecArena::release;inflater.stream.opaque=arena.get();}
             const int initialized = inflateInit(&inflater.stream);
             require(initialized == Z_OK, DecodeKind48C::limit, "res.zlib_init", offset, "zlib initialization failed");
             inflater.initialized = true;
@@ -185,7 +257,18 @@ bool decodeResource48C(const std::vector<std::uint8_t>& input, ResArchive48C& ou
                 DecodeKind48C::malformed, "res.zlib_block", offset,
                 "zlib stream must end after exactly one 24576-byte block with no unused input");
             parsed.blocks.push_back({static_cast<std::uint32_t>(offset), compressedBytes});
-            parsed.decoded.insert(parsed.decoded.end(), decoded.begin(), decoded.begin() + blockBytes);
+            if(!compact)parsed.payload.insert(parsed.payload.end(), decoded.begin(), decoded.begin() + blockBytes);
+            else {
+                const std::size_t first=i*blockBytes,last=first+blockBytes;
+                for(std::size_t member=0;member<parsed.entries.size();++member){
+                    const auto& entry=parsed.entries[member];
+                    const auto from=std::max(first,std::size_t(entry.logical_offset));
+                    const auto to=std::min(last,std::size_t(entry.logical_offset)+entry.bytes);
+                    if(from<to)std::memcpy(parsed.payload.data()+parsed.compactOffsets[member]+from-entry.logical_offset,
+                        decoded.data()+from-first,to-from);
+                }
+                parsed.codecPeak=std::max(parsed.codecPeak,arena->used);
+            }
             offset += static_cast<std::size_t>(compressedBytes) + 1;
             progress(hooks, "res_blocks", static_cast<std::uint32_t>(i + 1), static_cast<std::uint32_t>(blockCount));
         }
@@ -197,6 +280,82 @@ bool decodeResource48C(const std::vector<std::uint8_t>& input, ResArchive48C& ou
     catch (const std::bad_alloc&) { allocationError(error); }
     return false;
 }
+
+} // private shared strict resource decoder
+bool decodeResource48C(const std::vector<std::uint8_t>& input, ResArchive48C& output,
+    DecodeError48C& error,const DecodeHooks48C* hooks,const DecodeLimits48C& limits) {
+    ResourceReadData parsed;
+    if(!decodeResourceData48C(input,parsed,false,0,0,error,hooks,limits))return false;
+    output.entries=std::move(parsed.entries);output.blocks=std::move(parsed.blocks);
+    output.decoded=std::move(parsed.payload);return true;
+}
+struct IndexedResArchive48C::Storage {
+    ResourceReadData data;
+    std::vector<std::uint8_t> original;
+};
+IndexedResArchive48C::IndexedResArchive48C() noexcept=default;
+IndexedResArchive48C::~IndexedResArchive48C()=default;
+bool IndexedResArchive48C::loadOwned(std::vector<std::uint8_t>&& input,
+    std::size_t availablePayloadBytes,DecodeError48C& error,const DecodeHooks48C* hooks,
+    const DecodeLimits48C& limits) noexcept {
+    error={};if(attempted_){error={DecodeKind48C::unsupported,"res.indexed_already_attempted",0,"Indexed resource is one-attempt"};return false;}
+    attempted_=true;
+    try {
+        require(availablePayloadBytes>=sizeof(IndexedResArchive48C)+sizeof(Storage),DecodeKind48C::limit,
+            "res.compact_payload_limit",0,"Indexed resource owner exceeds remaining payload budget");
+        auto next=std::make_unique<Storage>();
+        if(!decodeResourceData48C(input,next->data,true,availablePayloadBytes,
+            sizeof(IndexedResArchive48C)+sizeof(Storage),error,hooks,limits))return false;
+        next->original=std::move(input);storage_=std::move(next);return true;
+    }catch(const Failure& failure){error=failure.error;}
+    catch(const std::bad_alloc&){allocationError(error);}
+    catch(...){error={DecodeKind48C::unsupported,"res.indexed_exception",0,"Unexpected indexed resource exception"};}
+    return false;
+}
+bool IndexedResArchive48C::loaded() const noexcept{return bool(storage_);}
+const std::vector<ResourceEntry48C>& IndexedResArchive48C::entries() const noexcept {
+    static const std::vector<ResourceEntry48C> empty;return storage_?storage_->data.entries:empty;
+}
+const std::vector<ResourceBlock48C>& IndexedResArchive48C::blocks() const noexcept {
+    static const std::vector<ResourceBlock48C> empty;return storage_?storage_->data.blocks:empty;
+}
+const std::vector<std::uint8_t>& IndexedResArchive48C::original() const noexcept {
+    static const std::vector<std::uint8_t> empty;return storage_?storage_->original:empty;
+}
+std::size_t IndexedResArchive48C::decodedExtent() const noexcept{return storage_?storage_->data.logicalExtent:0;}
+std::size_t IndexedResArchive48C::compactBytes() const noexcept{return storage_?storage_->data.payload.size():0;}
+IndexedResArchive48C::Member IndexedResArchive48C::member(std::size_t i) const noexcept {
+    if(!storage_||i>=storage_->data.entries.size())return {};
+    const auto& s=storage_->data;const auto& e=s.entries[i];
+    return {&e,e.bytes?s.payload.data()+s.compactOffsets[i]:nullptr,e.bytes};
+}
+bool IndexedResArchive48C::extractMember(const std::string& name,std::vector<std::uint8_t>& output,
+    DecodeError48C& error,std::size_t maxBytes) const noexcept {
+    error={};try {
+        require(bool(storage_),DecodeKind48C::unsupported,"res.indexed_not_loaded",0,"Indexed resource is not published");
+        const ResourceEntry48C* found=nullptr;std::size_t ordinal=0;
+        for(std::size_t i=0;i<storage_->data.entries.size();++i){const auto& entry=storage_->data.entries[i];
+            if(sameAsciiName(entry.name,name)){
+                require(found==nullptr,DecodeKind48C::unsupported,"res.member_ambiguous",0,"Multiple case-insensitive filename matches");
+                found=&entry;ordinal=i;}}
+        require(found!=nullptr,DecodeKind48C::unsupported,"res.member_missing",0,"Requested member is absent");
+        require(found->bytes>0&&found->bytes<=std::min(maxMeshFile,maxBytes),DecodeKind48C::limit,
+            "res.member_limit",found->logical_offset,"Requested member exceeds extraction size bounds");
+        const auto view=member(ordinal);std::vector<std::uint8_t> next(view.data,view.data+view.size);
+        output=std::move(next);return true;
+    }catch(const Failure& f){error=f.error;}catch(const std::bad_alloc&){allocationError(error);}
+    catch(...){error={DecodeKind48C::unsupported,"res.indexed_exception",0,"Unexpected indexed extraction exception"};}
+    return false;
+}
+std::size_t IndexedResArchive48C::retainedPayloadBytes() const noexcept {
+    if(!storage_)return sizeof(*this);
+    try{auto n=resourcePayload(storage_->data);payloadAdd(n,sizeof(*this));payloadAdd(n,sizeof(Storage));payloadAdd(n,storage_->original.capacity());return n;}
+    catch(...){return std::numeric_limits<std::size_t>::max();}
+}
+std::size_t IndexedResArchive48C::preparationPeakPayloadBytes() const noexcept {
+    return storage_?storage_->data.preparationPeak:0;
+}
+std::size_t IndexedResArchive48C::codecPeakBytes() const noexcept{return storage_?storage_->data.codecPeak:0;}
 
 bool extractResMember48C(const ResArchive48C& archive, const std::string& name,
     std::vector<std::uint8_t>& output, DecodeError48C& error, std::size_t maxBytes) {

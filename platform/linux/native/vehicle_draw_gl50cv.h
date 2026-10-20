@@ -2,6 +2,8 @@
 #include "../../../src/game/vehicle_draw_submit50cs.h"
 #include <cstddef>
 #include <cstdint>
+#include <chrono>
+#include <limits>
 
 namespace rr::platform {
 // Linux OpenGL 3.2-style entry points, supplied by the context owner. These
@@ -35,6 +37,32 @@ struct VehicleGlResources50CV {
     VehicleGlBank50CV bank[2]{};
     VehicleGlIndices50CV indices[game::maxVehicleDrawComponents50CM]{}; // Immutable, shared by both banks.
     std::uint32_t componentCount = game::defaultVehicleDrawComponents50CM;
+};
+
+// Optional diagnostics only: actual owner supplies the observer; no GL work.
+enum class VehicleGlTimingPhase50CV : std::uint8_t {
+    upload,geometryBind,materialBind,spanDraw,unpairedSpan,baseOnlySpan,pairedSpan,count
+};
+using VehicleGlTimingObserver50CV=void(*)(void*,VehicleGlTimingPhase50CV,std::uint32_t,std::uint64_t,bool) noexcept;
+class VehicleGlTimingScope50CV final {
+public:
+    VehicleGlTimingScope50CV(VehicleGlTimingObserver50CV observer,void* context,
+        VehicleGlTimingPhase50CV phase,std::uint32_t component) noexcept
+        :observer_(observer),context_(context),phase_(phase),component_(component){
+        if(observer_)before_=std::chrono::steady_clock::now();
+    }
+    ~VehicleGlTimingScope50CV() noexcept {
+        if(!observer_)return;
+        const auto after=std::chrono::steady_clock::now();
+        const auto ns=std::chrono::duration<long double,std::nano>(after-before_).count();
+        const bool valid=after>=before_&&ns>=0&&ns<=static_cast<long double>(std::numeric_limits<std::uint64_t>::max());
+        observer_(context_,phase_,component_,valid?static_cast<std::uint64_t>(ns):0,valid);
+    }
+    VehicleGlTimingScope50CV(const VehicleGlTimingScope50CV&)=delete;
+    VehicleGlTimingScope50CV& operator=(const VehicleGlTimingScope50CV&)=delete;
+private:
+    VehicleGlTimingObserver50CV observer_;void* context_;VehicleGlTimingPhase50CV phase_;
+    std::uint32_t component_;std::chrono::steady_clock::time_point before_{};
 };
 
 struct VehicleGlHooks50CV {
@@ -73,6 +101,8 @@ struct VehicleGlHooks50CV {
     // commit. The default null path retains the original single draw.
     bool (*drawSpan)(void*, game::VehicleDrawComponent50CM, std::uint32_t ordinal,
         const assets::SceneSpan48D&, std::int32_t baseVertex) noexcept = nullptr;
+    // Null by default. Synchronous observational callback only; cannot affect success.
+    VehicleGlTimingObserver50CV timingObserver = nullptr;
 };
 
 // No allocation, resource creation/destruction, index upload, default state,

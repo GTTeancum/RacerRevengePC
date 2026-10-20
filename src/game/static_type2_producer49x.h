@@ -5,6 +5,8 @@
 #include "spring_query48n.h"
 #include "gate_trigger_action50kg.h"
 #include "native_trigger_group50ga.h"
+#include "native_trigger_group50tc.h"
+#include "native_trigger_group50tb.h"
 #include "native_trigger_box_geometry50ma.h"
 
 namespace rr::game {
@@ -61,6 +63,10 @@ struct Type2StaticCandidate49X {
     // No previous matrix or swept surface. Default leaves all other tracks alone.
     bool raOriginalTriggerSegments=false;
     NativeTriggerBox50MA nativeTriggerBox{}; // shape6 only, inline immutable geometry
+    // Separately typed exact TC22/3 owner; never mixed with gate/nativeTriggers.
+    NativeTriggerGroup50TC* nativeTriggersTC=nullptr;
+    // Distinct exact TB16/2 source owner; exclusive with every other schema.
+    NativeTriggerGroup50TB* nativeTriggersTB=nullptr;
 };
 struct Type2WorkItem49X { std::uint16_t queryTag,targetTag; };
 struct Type2Visit49X {

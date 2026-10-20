@@ -87,4 +87,10 @@ bool encodeTextureLevel48E(const TextureMip48E& mip, std::vector<std::uint8_t>& 
 bool decodeMaterial48E(const std::vector<std::uint8_t>& input, Material48E& output,
     DecodeError48C& error, const DecodeHooks48C* hooks = nullptr,
     std::size_t maxBytes = 64u * 1024u);
+// Separate exact-source admission for original TC AHUTS03 and TC_BLEND8.
+// Retains authored TextureMap strings and all original bytes. No lookup occurs.
+// Every other byte sequence, including mutations of those sources, is rejected.
+bool decodeOriginalTcMaterial50TC(const std::vector<std::uint8_t>& input, Material48E& output,
+    DecodeError48C& error, const DecodeHooks48C* hooks = nullptr,
+    std::size_t maxBytes = 64u * 1024u);
 } }

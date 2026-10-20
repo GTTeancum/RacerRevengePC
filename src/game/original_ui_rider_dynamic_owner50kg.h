@@ -120,6 +120,22 @@ public:
     std::shared_ptr<const assets::OriginalUiRiderPodAssets50KG> podAssets(std::uint16_t) const noexcept;
 private:
     friend class rr::platform::OriginalUiRiderSession50KG;
+    friend class OriginalUiRiderWidgets50KG;
+    // Native material-closure projection only. The exact bound widget owner and
+    // healthy actual entries supply provenance; copied state/registered values
+    // do not authorize callbacks, attachment, material acquisition or rendering.
+    bool nativeProjectionHealthy() const noexcept;
+    bool nativeProjectionForWidgets(const OriginalUiRiderWidgets50KG&) const noexcept;
+    bool nativeProjectionSnapshot(std::uint16_t,OriginalUiRiderWidgetState50KG&,
+        bool& registered) const noexcept;
+    bool projectNativeOne(const OriginalUiRiderWidgetCallback50KG&,
+        OriginalUiRiderWidgetState50KG&,bool& registered) const noexcept;
+    bool matchesNativeProjection(std::uint16_t,const OriginalUiRiderWidgetState50KG&,
+        bool registered) const noexcept;
+    // Pure descriptor semantics shared with the real callback's expected-result
+    // check. Deliberately has no global-health gate on real apply/cleanup paths.
+    bool projectNativeDescriptorOne(const OriginalUiRiderWidgetCallback50KG&,
+        OriginalUiRiderWidgetState50KG&,bool& registered) const noexcept;
     // The session invokes this once while its candidate is still private.
     // Local candidates commit together; no dynamic/source callback is run.
     bool prepareCold(OriginalUiRiderColdPopulation50KG,OriginalUiRiderDynamicDiagnostic50KG&,

@@ -91,6 +91,11 @@ bool entryDomain(const VehicleFrameState49W& s,UndertrackResetDomain50EW domain)
         return s.phase==VehicleFramePhase49W::PostPackedBytes50S&&s.fields.vehicle58==0u;
     case UndertrackResetDomain50EW::PlayerControllerReady50LC:
         return s.phase==VehicleFramePhase49W::Ready&&s.fields.vehicle58==0u;
+    case UndertrackResetDomain50EW::SourceTriggerAiPostWorld:
+        return s.phase==VehicleFramePhase49W::PostWorld&&s.fields.vehicle58==1u&&
+            s.fields.nativeAiOwnersBound50IV&&
+            s.bodies.main.phase==MainBodyPhase49K::AwaitingWorldPreparation&&
+            s.bodies.phase==CoupledBodyPhase49M::AwaitingWorldPreparation;
     case UndertrackResetDomain50EW::OriginalAiPostPlayer:
         return s.phase==VehicleFramePhase49W::PostPlayer&&s.fields.vehicle58==1u&&
             s.fields.nativeAiOwnersBound50IV;

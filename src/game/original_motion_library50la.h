@@ -336,12 +336,19 @@ public:
             // Native preflight/failure cleanup is deliberately stronger than
             // source's unsafe failed-load/unwritten-slot branch. Only fully
             // produced positive-count sets publish an actual1E4 pointer.
+            //157D00 preserves the selected section when lookup fails;151270
+            //ignores that result and reads the retained NAME. Do not invent a
+            //section or a null slot:151270 must still produce a real resource.
+            const OriginalMotionSection50LA* selectedSection=nullptr;
             for(std::int32_t i=0;i<count14;++i){
                 const auto section=configuration.find("motion "+std::to_string(i+1));
+                if(section!=configuration.end())selectedSection=&section->second;
                 OriginalMotionLibraryResult50LA r;
                 const OriginalMotionResource50LA* resource=nullptr;
-                if(section==configuration.end())r=result(S::configuration,0x151298u);
-                else r=library.load151270(section->second,defaults,resolve,resource);
+                // No pre-loop cursor is represented here. A missing first
+                //section remains rejected rather than guessing its contents.
+                if(!selectedSection)r=result(S::configuration,0x151298u);
+                else r=library.load151270(*selectedSection,defaults,resolve,resource);
                 if(r.okay())r=library.retain153610(resource);
                 if(!r.okay()){
                     // A failed retain cannot leave a newly constructed D8=0

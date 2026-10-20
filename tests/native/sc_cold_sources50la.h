@@ -3,6 +3,7 @@
 #include "pod_materials50ed_fixture.h"
 #include "../../src/assets/import_world48f.h"
 #include "../../src/assets/ai_authoring50iu.h"
+#include "../../src/game/lap_progress50gf.h"
 #include <array>
 #include <memory>
 #include <set>
@@ -44,6 +45,7 @@ struct DecodedSources final {
  a::World48F world;
  a::ParameterDocument48F triggerParameters;
  g::TrackNavigation50EU map,ai;
+ g::LapProgressTrack50GF mapLap;
  g::AiTrackMetadata50IU mapMetadata,aiMetadata;
  g::AiTrackTuning50IU aiTuning;
  DecodedSources()=default;
@@ -57,6 +59,7 @@ struct Diagnostic {
  const char* failure=nullptr;
  a::DecodeError48C decode;
  g::TrackNavigationDiagnostic50EU navigation;
+ g::LapProgressDiagnostic50GF lap;
  a::AiAuthoringDiagnostic50IU ai;
 };
 class Owner final {
@@ -77,7 +80,8 @@ public:
  Owner(Owner&&)=delete;Owner& operator=(Owner&&)=delete;
  // Caller supplies authentic bytes and its actual serial numeric owner.
  // Later failure can retain earlier M-parser libm effects: one attempt only.
- // No collision geometry, portal index binding, registry, racer or renderer.
+ // Retains MAP lap markers only; no collision geometry, portal index binding,
+ // registry, racer state or renderer.
  bool decode(const std::vector<std::uint8_t>& original,g::SourceLibmState49T& actualLibm,Diagnostic& d){
   if(attempted_){d.failure="SC source owner already attempted";d.failedAt=d.stage;d.stage=Diagnostic::Stage::failed;return false;}
   attempted_=true;d={};
@@ -120,6 +124,10 @@ public:
     if(!g::readTrackNavigation50EU(reinterpret_cast<const char*>(bytes.data()),bytes.size(),actualLibm,*scratch,navigation,d.navigation))
      return fail("SC independent source spline gates");
     (i==1?d.mapGatesCommitted:d.aiGatesCommitted)=true;
+    // Capture genuine MAP ProgressNode-presence data before the AI read reuses
+    // this same scratch. No repeated gate parse or serial libm execution.
+    if(i==1&&!g::prepareLapProgressTrack50GF(*scratch,s.mapLap,d.lap))
+     return fail("SC original map lap markers");
     if(navigation.track.count!=(i==1?mapNodeCount:aiNodeCount)||!navigation.gatesPrepared||navigation.indicesPrepared||
        !a::readAiTrackMetadata50IU(reinterpret_cast<const char*>(bytes.data()),bytes.size(),navigation,metadata,d.ai))
      return fail("SC source spline count or metadata");

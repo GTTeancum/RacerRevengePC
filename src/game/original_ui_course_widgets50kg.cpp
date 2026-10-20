@@ -71,6 +71,12 @@ bool OriginalUiCourseWidgets50KG::moveCourse(bool forward,const OriginalUiCourse
  if(d.controller!=OriginalUiCourseWidgetControllerStatus50KG::ok)return fail(d,E::controller);
  if(!apply(plan.steps.data(),plan.count,h,d))return false;storage_->navigation=plan.navigation;return true;
 }
+bool OriginalUiCourseWidgets50KG::moveRow(bool down,const OriginalUiCourseWidgetProfile50KG& p,const OriginalUiCourseWidgetHooks50KG& h,D& d)noexcept{
+ d={};if(!storage_)return fail(d,E::notBound);if(storage_->poisoned||storage_->inCallback)return fail(d,E::poisoned);
+ OriginalUiCourseWidgetPlan50KG plan;d.controller=storage_->controller.moveRow(storage_->navigation,down,p,plan);
+ if(d.controller!=OriginalUiCourseWidgetControllerStatus50KG::ok)return fail(d,E::controller);
+ if(!apply(plan.steps.data(),plan.count,h,d))return false;storage_->navigation=plan.navigation;return true;
+}
 bool OriginalUiCourseWidgets50KG::phase(OriginalUiCourseWidgetPhase50KG phase,const OriginalUiCourseWidgetProfile50KG& p,const OriginalUiCourseWidgetHooks50KG& h,D& d)noexcept {
  d={};if(!storage_)return fail(d,E::notBound);if(storage_->poisoned||storage_->inCallback)return fail(d,E::poisoned);OriginalUiCourseWidgetPlan50KG plan;d.controller=storage_->controller.phase(storage_->navigation,phase,p,plan);if(d.controller!=OriginalUiCourseWidgetControllerStatus50KG::ok)return fail(d,E::controller);if(!apply(plan.steps.data(),plan.count,h,d))return false;storage_->navigation=plan.navigation;if(plan.writesPromptMask42C)storage_->promptMask42C=plan.promptMask42C;return true;}
 bool OriginalUiCourseWidgets50KG::setDynamicLines(std::uint16_t id,const std::vector<std::string>& lines,D& d)noexcept {d={};d.widget=id;const auto* text=textDescriptor(id);if(!text||storage_->poisoned||storage_->inCallback||text->textSource!=assets::OriginalUiTextSource50KG::dynamic||lines.size()!=text->lines.size())return fail(d,E::text);for(const auto& line:lines)if(line.size()>255||line.size()>std::size_t(text->dynamicLineLength)||line.find('\0')!=std::string::npos)return fail(d,E::text);try{auto r=lines;storage_->dynamicLines[id].swap(r);return true;}catch(...){return fail(d,E::allocation);}}

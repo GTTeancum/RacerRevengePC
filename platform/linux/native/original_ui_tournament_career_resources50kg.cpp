@@ -317,6 +317,9 @@ bool OriginalUiTournamentCareerResources50KG::load(
         storage_=std::move(s);d={};return true;
     }catch(...){return fail(d,Error::allocation,0x1EEC40);}
 }
+bool OriginalUiTournamentCareerResources50KG::sameProfileOwner(const OriginalUiRiderProfileOwner50KG& p)const noexcept {
+    return storage_&&storage_->profile.get()==&p;
+}
 bool OriginalUiTournamentCareerResources50KG::loaded()const noexcept{return bool(storage_);}
 bool OriginalUiTournamentCareerResources50KG::current()const noexcept {
     return storage_&&!storage_->canonicalMarkerTerminal&&sameStamp(storage_->profile->stamp(),storage_->career.stamp);

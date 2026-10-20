@@ -139,6 +139,7 @@ bool VehicleGlBackend50CV::upload(void* context, game::VehicleDrawComponent50CM 
     if (!self.active_ || c >= self.activeComponentCount_ || !vertices || count != self.vertexCount_[c] ||
         (self.uploaded_ & (1u << c)) || self.nextComponent_ || self.boundComponent_ != componentCount)
         return false;
+    VehicleGlTimingScope50CV timing(self.hooks_.timingObserver,self.hooks_.context,VehicleGlTimingPhase50CV::upload,c);
     self.gl_.bindBuffer(arrayBuffer, self.resources_.bank[self.pendingBank_].vertexBuffer[c]);
     if (!self.noGlError()) return false;
     self.gl_.bufferSubData(arrayBuffer, 0,
@@ -155,6 +156,7 @@ bool VehicleGlBackend50CV::bind(void* context, game::VehicleDrawComponent50CM co
     if (!self.active_ || c >= self.activeComponentCount_ || self.uploaded_ != ((1u << self.activeComponentCount_) - 1u) ||
         c != self.nextComponent_ || self.nextSpan_ || self.boundComponent_ != componentCount ||
         indices != self.resources_.indices[c].data || count != self.resources_.indices[c].count) return false;
+    VehicleGlTimingScope50CV timing(self.hooks_.timingObserver,self.hooks_.context,VehicleGlTimingPhase50CV::geometryBind,c);
     self.gl_.bindVertexArray(self.resources_.bank[self.pendingBank_].vertexArray[c]);
     if (!self.noGlError()) return false;
     self.gl_.bindBuffer(elementArrayBuffer, self.resources_.indices[c].buffer);
@@ -172,8 +174,13 @@ bool VehicleGlBackend50CV::draw(void* context, game::VehicleDrawComponent50CM co
         ordinal >= self.spanCount_[c] || baseVertex != 0 || span.index_count % 3 ||
         span.index_start > self.resources_.indices[c].count ||
         span.index_count > self.resources_.indices[c].count - span.index_start) return false;
-    if (!self.hooks_.bindMaterial(self.hooks_.context, component, span.material_index) ||
-        !self.noGlError()) return false;
+    bool materialAccepted=false;
+    {
+        VehicleGlTimingScope50CV timing(self.hooks_.timingObserver,self.hooks_.context,VehicleGlTimingPhase50CV::materialBind,c);
+        materialAccepted=self.hooks_.bindMaterial(self.hooks_.context, component, span.material_index) && self.noGlError();
+    }
+    if(!materialAccepted)return false;
+    VehicleGlTimingScope50CV timing(self.hooks_.timingObserver,self.hooks_.context,VehicleGlTimingPhase50CV::spanDraw,c);
     if (self.hooks_.drawSpan) {
         if (!self.hooks_.drawSpan(self.hooks_.context, component, ordinal, span, baseVertex)) return false;
     } else {

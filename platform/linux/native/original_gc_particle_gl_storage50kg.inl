@@ -4,6 +4,28 @@ std::uint64_t gcParticlePublication=0;
 std::uint8_t gcParticleMaximumAlpha=0;
 const game::OriginalGcParticleDraw50KG* frameGcParticles=nullptr;
 I gcParticleModeUniform=-1;
+// Distinct RC source authority; the vertex/run/GPU kernel below is shared.
+std::uint64_t rcParticlePublication=0;
+std::uint8_t rcParticleMaximumAlpha=0;
+bool frameRcParticles=false;
+bool validateRcParticleBank(const VehicleWindowRequest50DS& input) noexcept {
+    if(!input.track.rcParticleWindow)return true;
+    const auto& window=*input.track.rcParticleWindow;
+    if(input.gcParticleCpuTextures||input.gcParticleTextures||input.gcParticleMaterial||
+       rcParticleWindow.get()!=&window||!window.ready()||window.renderer_!=rcParticleRenderer||
+       !window.bank_.loaded()||window.bank_.textureCount()!=1||window.gpu_.textureCount()!=1||
+       !window.gpu_.validBorrow(input.context,input.isCurrent,window.gpu_.publicationToken())||
+       !window.gpu_.matchesSourceBank(window.bank_,window.gpu_.publicationToken()))
+        return fail(*diagnostic,VehicleWindowError50DS::material,"RC particle bank requires its exact retained Window publication");
+    const auto* source=window.bank_.texture(0);const auto* image=window.gpu_.asset(0);
+    if(!source||!image||!image->name||image->identity!=source->identity||
+       source->identity!=rc_particle_visual50RC::Window::imageIdentity||
+       source->texture.width!=128||source->texture.height!=1024||source->texture.rgba.size()!=128u*1024u*4u)
+        return fail(*diagnostic,VehicleWindowError50DS::material,"RC actual particle atlas identity differs");
+    std::uint8_t maximum=0;
+    for(std::size_t i=3;i<source->texture.rgba.size();i+=4)maximum=std::max(maximum,source->texture.rgba[i]);
+    rcParticleMaximumAlpha=maximum;rcParticlePublication=window.gpu_.publicationToken();return true;
+}
 
 bool validateGcParticleBank(const VehicleWindowRequest50DS& input) noexcept {
     const auto* cpu=input.gcParticleCpuTextures;const auto* gpu=input.gcParticleTextures;
@@ -35,9 +57,13 @@ bool validateGcParticleBank(const VehicleWindowRequest50DS& input) noexcept {
     }
     gcParticleMaximumAlpha=maximum;gcParticlePublication=gpu->publicationToken();return true;
 }
-bool validateGcParticleFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d) const noexcept {
-    const auto* draw=frame.gcParticles;if(!draw)return true; //Resident bank while genuine UI owns presentation.
-    if(!request.gcParticleTextures||!uiProgram||!draw->generation||!draw->cameraSceneKey||!draw->cameraSessionGeneration||
+// Identity-free geometry validation reused only after each typed owner gate.
+// Existing GC conditions and diagnostics remain byte-for-byte in this body,
+// with only its already-selected bank presence/alpha bound parameterized.
+bool validateParticleDraw(const game::OriginalGcParticleDraw50KG* draw,
+    const VehicleWindowFrame50DS& frame,bool bankPresent,std::uint8_t maximumAlpha,
+    VehicleWindowDiagnostic50DS& d) const noexcept {
+    if(!bankPresent||!uiProgram||!draw->generation||!draw->cameraSceneKey||!draw->cameraSessionGeneration||
        draw->sourceParticleCount>game::originalGcParticleCapacity50KG||draw->quadCount>draw->sourceParticleCount||
        draw->runCount>draw->quadCount||!draw->vertices||!draw->fogFactors||!draw->runs||!frame.worldViewProjection)
         return fail(d,VehicleWindowError50DS::frame,"GC particle frame lacks actual manager/camera/bank publication");
@@ -63,12 +89,29 @@ bool validateGcParticleFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDi
                !std::isfinite(draw->fogFactors[i])||draw->fogFactors[i]<0||draw->fogFactors[i]>254.f/256.f||
                std::floor(draw->fogFactors[i]*256.f)!=draw->fogFactors[i]*256.f)
                 return fail(d,VehicleWindowError50DS::frame,"GC source packet depth/fog domain differs");
-            if(!run.stateIndex&&U(v.color[3])*gcParticleMaximumAlpha>128u*128u)
+            if(!run.stateIndex&&U(v.color[3])*maximumAlpha>128u*128u)
                 return fail(d,VehicleWindowError50DS::material,"GC source-alpha coefficient exceeds admitted native domain");
         }
         next+=run.quadCount;
     }
     return next==draw->quadCount||fail(d,VehicleWindowError50DS::frame,"GC particle run coverage differs");
+}
+bool validateGcParticleFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d) const noexcept {
+    const auto* draw=frame.gcParticles;if(!draw)return true; //Resident bank while genuine UI owns presentation.
+    return validateParticleDraw(draw,frame,request.gcParticleTextures!=nullptr,gcParticleMaximumAlpha,d);
+}
+bool validateRcParticleFrame(const VehicleWindowFrame50DS& frame,VehicleWindowDiagnostic50DS& d) const noexcept {
+    if(!rcParticleWindow&&!frame.rcParticles)return true;
+    if(!rcParticleWindow||!frame.rcParticles||frame.gcParticles||!rcParticlePendingAttempt)
+        return fail(d,VehicleWindowError50DS::frame,"RC particles require the actual scoped owner and current Window draw attempt");
+    const auto* draw=frame.rcParticles->rendererDraw();const auto* material=frame.rcParticles->rendererMaterial();
+    if(!draw||!material||!rcParticleWindow->acceptsMaterial(*material)||
+       rcParticleWindow->materialBank(*material)!=&rcParticleWindow->bank_||
+       rcParticleWindow->materialGpu(*material)!=&rcParticleWindow->gpu_||
+       !rcParticleWindow->gpu_.validBorrow(request.context,request.isCurrent,rcParticlePublication)||
+       !rcParticleWindow->gpu_.matchesSourceBank(rcParticleWindow->bank_,rcParticlePublication))
+        return fail(d,VehicleWindowError50DS::material,"RC numeric packet escaped its actual canonical material/atlas borrow");
+    return validateParticleDraw(draw,frame,true,rcParticleMaximumAlpha,d);
 }
 bool drawGcParticles() noexcept {
     if(!frameGcParticles||!frameGcParticles->quadCount)return true;
@@ -78,7 +121,7 @@ bool drawGcParticles() noexcept {
     //store below samples the same authentic atlas after each RGB run.
     resetNativeGcLighting();gl.useProgram(uiProgram);
     gl.activeTexture(textureUnit0);if(gl.bindSampler)gl.bindSampler(0,0);
-    gl.bindTexture(texture2D,request.gcParticleTextures->texture(0));
+    gl.bindTexture(texture2D,frameRcParticles?rcParticleWindow->gpu_.texture(0):request.gcParticleTextures->texture(0));
     constexpr U parameters[]={0x2801,0x2800,0x2802,0x2803,0x813C,0x813D};
     constexpr I expected[]={0x2601,0x2601,0x2901,0x2901,0,0};
     for(U i=0;i<6;++i){I actual=-1;gl.getTexParameteriv(texture2D,parameters[i],&actual);
@@ -110,7 +153,7 @@ bool drawGcParticles() noexcept {
             reinterpret_cast<const void*>(std::uintptr_t(run.firstQuad)*6*sizeof(U)),0);
         accepted=check("draw authentic GC particle RGB run");
         if(accepted){
-            ++diagnostic->gcParticleDraws;
+            if(frameRcParticles)++diagnostic->rcParticleDraws;else ++diagnostic->gcParticleDraws;
             //Actual separate source-A store, not source-over accumulation.
             //Both authenticated states use DATE0 and source (never destination)
             //alpha in ALPHA, so deferred alpha within this run cannot change
@@ -119,7 +162,8 @@ bool drawGcParticles() noexcept {
             drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(run.quadCount*6),0x1405,
                 reinterpret_cast<const void*>(std::uintptr_t(run.firstQuad)*6*sizeof(U)),0);
             accepted=check("store authentic GC particle source alpha");
-            if(accepted){++diagnostic->gcParticleAlphaDraws;diagnostic->gcParticleQuads+=run.quadCount;}
+            if(accepted){if(frameRcParticles){++diagnostic->rcParticleAlphaDraws;diagnostic->rcParticleQuads+=run.quadCount;}
+                else{++diagnostic->gcParticleAlphaDraws;diagnostic->gcParticleQuads+=run.quadCount;}}
         }
     }
     gl.uniform1i(gcParticleModeUniform,0);gl.disable(0x0BE2);gl.colorMask(1,1,1,1);

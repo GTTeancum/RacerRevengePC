@@ -408,6 +408,54 @@ public:
         if(!ready_||closed_||synced_||!death68Key||deathOwner_.owner9C||deathOwner_.state)return false;
         deathOwner_.owner9C=death68Key;return true;
     }
+    // Read-only borrow used by124CB0 reset. The active bank0 extent must be
+    // established by this actual owner; opponent extents never call this API.
+    bool ownsStorage(const storage::Storage& actual) const noexcept{return &actual==&storage_;}
+    bool resetTailExcluded(const storage::Storage& actual,std::uint32_t floorMask,
+        CollectionRef50BX& rejected) const noexcept {
+        rejected=0;
+        if(!ownsStorage(actual)||!ready_||closed_||synced_||!bindings()||
+           storage_.collectionInput.objectCount!=storage_.count.objects||
+           !floorMask||floorMask&(floorMask-1u)||
+           owner_.world.objects!=storage_.objects.data()||
+           owner_.mutableWorld.objects!=storage_.source.data()||
+           owner_.sphereObject!=storage_.count.cameraSphere||owner_.rayObject!=storage_.count.cameraRay||
+           owner_.sphereE0!=&sphereMembership_.state||owner_.rayE0!=&rayMembership_.state||
+           !sphereMembership_.state.attached||!rayMembership_.state.attached||
+           !admitOriginalCameraQueryPairStorage(owner_,nullptr,0,nullptr,0))return false;
+        const auto& n=storage_.count;
+        for(const auto ref:{n.cameraSphere,n.cameraRay}){
+            rejected=ref;const auto& object=storage_.objects[ref-1u];
+            if(object.identity!=(ref==n.cameraSphere?sphereIdentity:rayIdentity)||
+               object.shapeTag!=(ref==n.cameraSphere?5u:3u))return false;
+        }
+        rejected=n.cameraDeath;
+        if(deathOwner_.object120!=n.cameraDeath||deathOwner_.world.objects!=storage_.objects.data()||
+           deathOwner_.mutableWorld.objects!=storage_.source.data()||
+           deathOwner_.membershipE0!=&deathMembership_.state||
+           deathCold_.object120!=&storage_.objects[n.cameraDeath-1u]||
+           deathCold_.identity120!=deathIdentity||
+           !admitOriginalDeathCameraQueryColdStorage(deathOwner_,deathCold_,nullptr,0,nullptr,0))return false;
+        const auto& deathObject=storage_.objects[n.cameraDeath-1u];
+        if(deathObject.identity!=deathIdentity||deathObject.hasShape!=(deathOwner_.state!=nullptr)||
+           deathObject.shapeTag!=(deathOwner_.state?3u:0u))return false;
+        if(deathOwner_.state&&(deathOwner_.state->objectIdentity120!=deathIdentity||
+           deathOwner_.state->owner9C!=deathOwner_.owner9C||deathOwner_.state->callbackE4||
+           deathObject.filter.categoryA4!=0u))return false;
+        // The existing real piece owners prove every trailing E0/E4/E8 row.
+        // No spare identity, fake geometry or reduced active extent is minted.
+        rejected=n.wreckFirstQuery;
+        if(!wreckRecordsReady())return false;
+        for(auto ref=n.cameraSphere;ref<=n.objects;++ref){
+            rejected=ref;const auto& object=storage_.objects[ref-1u];
+            //124DF8 type and124E44 FLOOR gates precede124E84's F8 bit4 write.
+            // An eligible tail requires its genuine reset shape dispatch;
+            // this bounded borrow must reject it rather than silently skip it.
+            if(!object.identity||(object.typeTag==main_.collisionTypeTag&&
+                (object.filter.categoryA4&floorMask)))return false;
+        }
+        rejected=0;return true;
+    }
     OriginalDeathCameraQueryOwner& deathOwner() noexcept{return deathOwner_;}
     OriginalDeathCameraQueryColdOwner& deathColdOwner() noexcept{return deathCold_;}
 

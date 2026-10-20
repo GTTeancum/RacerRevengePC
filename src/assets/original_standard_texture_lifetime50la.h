@@ -9,6 +9,8 @@ namespace rr::assets {
 class OriginalStandardMaterialContext50LA;
 class OriginalStandardTextureResource50LA;
 class OriginalStandardTextureLifetime50LA;
+class OriginalStandardTextureTransferCold50LA;
+struct OriginalStandardTextureTransferNode50LA;
 class OriginalNativeTextureUploadScope50LA;
 class OriginalNativeTextureUploadBinding50LA;
 
@@ -45,6 +47,11 @@ class OriginalStandardTextureLifetime50LA final {
     friend class OriginalNativeTextureUploadScope50LA;
     friend class OriginalNativeTextureUploadBinding50LA;
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
+    friend class OriginalStandardTextureTransferCold50LA;
+    //253DF0 initializes source13C null. Staging never publishes this field.
+    OriginalStandardTextureTransferCold50LA* publishedTransfer13C_=nullptr;
+    OriginalStandardTextureTransferCold50LA* coldTransferOwner_=nullptr;
+    OriginalStandardTextureTransferNode50LA* treeCursor442B60_=nullptr;
     // Native direct-transfer ledger, distinct from source registration list30.
     OriginalNativeTextureUploadScope50LA* nativeUploads_=nullptr;
     std::uint64_t nativeUploadAttempts_=0,nativeUploadCompletions_=0;
@@ -92,7 +99,7 @@ public:
     ~OriginalStandardTextureLifetime50LA(){
         // The retained context prevents manager teardown under live resources.
         // A violated native lifetime is not repaired by dropping real entries.
-        if(head00_||tail04_||count0C_||nativeUploads_)std::terminate();
+        if(head00_||tail04_||count0C_||nativeUploads_||publishedTransfer13C_||coldTransferOwner_||treeCursor442B60_)std::terminate();
     }
 };
 }

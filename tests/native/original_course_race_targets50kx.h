@@ -27,7 +27,7 @@ using Track=rr::platform::HostTrack50IM;
 // Actual source profile visibility, rider/roster identity, mode2 and target
 // archive authentication remain independent requirements below.
 inline constexpr bool directHumanTrack(Track track) noexcept {
-    return track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA;
+    return track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC;
 }
 inline constexpr bool directDiscTarget(Track track) noexcept {
     return directHumanTrack(track)||track==Track::RA;
@@ -37,22 +37,27 @@ struct Target {
     const track_session_assets50IG::SessionAssets* assets;
     std::uint32_t course,planet;
 };
-inline const std::array<Target,6> targets{{
+inline const std::array<Target,10> targets{{
     {Track::TA,&track_session_assets50IG::retainedTA,0,0},
     {Track::SA,&track_session_assets50IG::retainedSA,11,4},
     {Track::MA,&track_session_assets50IG::retainedMA,4,5},
     {Track::GA,&track_session_assets50IG::retainedGA,8,1},
     {Track::RA,&track_session_assets50IG::retainedRA,7,2},
+    {Track::MB,&track_session_assets50IG::retainedMB,5,5},
+    {Track::SC,&track_session_assets50IG::retainedSC,12,4},
     // Authenticated UICourse Control11/Group1 slot11: Gamorr C, course10.
     // Capability only. Actual locked profile/UI state must independently admit
     // this destination. The genuine ALL8 world request or explicit diagnostic
     // acknowledgement, plus mode2, is checked below; no profile is unlocked.
-    {Track::GC,&track_session_assets50IG::retainedGC,10,1}}};
+    {Track::GC,&track_session_assets50IG::retainedGC,10,1},
+    {Track::TC,&track_session_assets50IG::retainedTC,2,0},
+    {Track::RC,&track_session_assets50IG::retainedRC,3,2}}};
 inline const Target* target(const Selection& s) noexcept {
-    if(!rr::game::nativeCourseRacerOwned50KG(s.rider)||s.subtype!=1||s.laps!=3||s.entrants!=8||
+    if(!rr::game::nativeCourseRacerOwned50KG(s.rider)||s.subtype!=1||s.laps<1||s.laps>25||s.entrants!=8||
        (s.packed1125C&31u)!=s.laps||((s.packed1125C>>5)&3u)!=1||((s.packed1125C>>7)&15u)!=7||
        (s.packed1125C>>11)!=s.rider)return nullptr;
-    for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet)return &t;
+    for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet&&
+        (s.laps==3||directHumanTrack(t.track)))return &t;
     return nullptr;
 }
 inline bool same(const Selection& a,const Selection& b) noexcept {

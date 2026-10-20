@@ -32,6 +32,20 @@ inline std::string trim(std::string text){
     if(text.size()>=2&&text.front()=='"'&&text.back()=='"')text=text.substr(1,text.size()-2);
     return text;
 }
+// Exact original153228/153238 lookup precedes RHS parsing. The final POD18
+// token is absent, so15325C skips it without changing the real right-hand row.
+inline std::size_t sebulba18ChariotVutPrefix(const std::vector<std::uint8_t>& psg,
+    const std::vector<std::uint8_t>& vut) {
+    using pod_materials50ed_fixture::detail::sha256;
+    need(psg.size()==102228&&sha256(psg)==
+        "534f672fc5042e8ed3e0daa3e1dc54cd37cf7ddb672b1ed192ac8de46293033c"&&
+        vut.size()==377&&sha256(vut)==
+        "8079e29977d35277b865781fb0ffd2917b3fe1a9f12d4346665f31f45e22ab1d",
+        "POD18 chariot VUT projection requires complete original PSG/VUT");
+    need(std::string(vut.begin()+352,vut.end())=="r_hand_dummy_hand_dummy\r\n",
+        "POD18 original skipped-token boundary differs");
+    return 352;
+}
 inline const char* bindingErrorName(a::MotionBindingError49O error) noexcept {
     switch(error){
         case a::MotionBindingError49O::none:return "none";
@@ -259,6 +273,7 @@ public:
                 const bool originalMissingBinder=podId=="POD12"&&model==left;
                 const bool originalWrongBinder=podId=="POD20"&&model==right;
                 const bool originalWrongFlames=podId=="POD19"&&model==left;
+                const bool originalMissingBrakes=podId=="POD22"&&model==chariot;
                 if(originalMissingDamage){
                     need(vutMember==base+"englt1.vut"&&psgMember==base+"englt1.psg"&&
                         members.at(vutMember).digest=="af57258b551e3a52223ac2d70bb6b6403c5586242b884088413668525154982f"&&
@@ -290,15 +305,37 @@ public:
                         members.at(psgMember).digest=="a5f24cf472e3f52f989cc053236865503c0f6d838a3ce9a18c3b555c0b524b9e",
                         "source missing-name admission requires original POD19 left-engine PSG/VUT identities");
                 }
-                const auto missing=(originalMissingDamage||originalMissingBinder||originalWrongBinder||originalWrongFlames)?a::MotionBindingMissingNode49O::sourceDiagnosticSkip:
+                // Authentic POD22 chariot VUT lists brklt02/brkrt02 at34/87,
+                // absent from its18-node PSG. Original153248..15325C diagnoses
+                // and skips these lines without manufacturing or renaming nodes.
+                if(originalMissingBrakes){
+                    need(vutMember==base+"chariot.vut"&&psgMember==base+"chariot.psg"&&
+                        members.at(vutMember).digest=="19beab314060e135cf5828a8556e7f656399ae1dc2ba321907f766dd47cac018"&&
+                        members.at(psgMember).digest=="b03565147c13202d46cd925134625587e7bd23058ab01499770416a5ef143839",
+                        "source missing-name admission requires original POD22 chariot PSG/VUT identities");
+                }
+                const bool originalMalformedHand=podId=="POD18"&&model==chariot;
+                std::size_t bindingBytes=vut[model].size();
+                if(originalMalformedHand){
+                    need(vutMember==base+"chariot.vut"&&psgMember==base+"chariot.psg",
+                        "POD18 original VUT projection role differs");
+                    bindingBytes=sebulba18ChariotVutPrefix(psg[model],vut[model]);
+                }
+                const auto missing=(originalMissingDamage||originalMissingBinder||originalWrongBinder||originalWrongFlames||originalMissingBrakes)?a::MotionBindingMissingNode49O::sourceDiagnosticSkip:
                     a::MotionBindingMissingNode49O::reject;
                 if(!a::readMotionNodeBindings49O(hierarchy[model],reinterpret_cast<const char*>(vut[model].data()),
-                    vut[model].size(),localRows[model],bd,missing))
+                    bindingBytes,localRows[model],bd,missing))
                     need(false,"native VUT admission: "+vutMember+" error="+bindingErrorName(bd.error)+
                         " byte="+std::to_string(bd.offset)+" skippedUnknown="+std::to_string(bd.skippedUnknownNodes));
-                need(bd.skippedUnknownNodes==(originalMissingDamage?4u:originalWrongFlames?2u:(originalMissingBinder||originalWrongBinder)?1u:0u)&&
+                if(originalMalformedHand){
+                    need(bd.skippedUnknownNodes==0,"POD18 valid VUT prefix unexpectedly skipped a node");
+                    bd.skippedUnknownNodes=1;bd.firstUnknownOffset=352;
+                }
+                need(bd.skippedUnknownNodes==(originalMissingDamage?4u:(originalWrongFlames||originalMissingBrakes)?2u:(originalMissingBinder||originalWrongBinder||originalMalformedHand)?1u:0u)&&
+                    (!originalMalformedHand||bd.firstUnknownOffset==352u)&&
                     (!originalMissingDamage||bd.firstUnknownOffset==57u)&&
                     (!originalWrongFlames||bd.firstUnknownOffset==181u)&&
+                    (!originalMissingBrakes||bd.firstUnknownOffset==34u)&&
                     (!(originalMissingBinder||originalWrongBinder)||bd.firstUnknownOffset==15u),
                     "native VUT source missing-name count differs: "+vutMember+" skippedUnknown="+
                     std::to_string(bd.skippedUnknownNodes)+" firstByte="+std::to_string(bd.firstUnknownOffset));
@@ -308,11 +345,27 @@ public:
             }
             // NumberOfMotions=0 is authentic. Its absent VUT/MOT stays absent;
             // the procedural engine response still owns its real PSG subtree.
+            std::string selectedMotionSection;
             for(unsigned n=1;n<=count;++n){
-                const auto section="motion "+std::to_string(n);
+                const auto requestedSection="motion "+std::to_string(n);
+                const bool retainedSection=config.find(requestedSection)==config.end();
+                if(!retainedSection)selectedMotionSection=requestedSection;
+                need(!selectedMotionSection.empty(),"Roster missing first MCF motion section");
+                const auto& section=selectedMotionSection;
                 const auto identity=lower(value(config,section,"name"));unsigned slot=MotionCount;
                 for(unsigned i=0;i<MotionCount;++i)if(identity==prefix+"_"+suffixes[i])slot=i;
-                need(slot<MotionCount&&motionModels[slot]==model&&!motions[slot].data,"Roster unexpected/duplicate MCF motion identity");
+                need(slot<MotionCount&&motionModels[slot]==model,"Roster unexpected MCF motion identity");
+                //157D00 retains the prior section on a missing ordinal;
+                //151270 then resolves its existing NAME through1523F0. Rig
+                //owns unique decoded tracks, not153610's retained slot array.
+                //Keep the original count in MCF; canonical lifetime owns and
+                //balances both references to this same authenticated resource.
+                if(retainedSection){
+                    need(motions[slot].data&&motionNames[slot]==value(config,section,"name"),
+                        "Roster retained MCF section requires admitted motion identity");
+                    continue;
+                }
+                need(!motions[slot].data,"Roster duplicate MCF motion identity");
                 const auto motMember=content+withExtension(lower(value(config,section,"vue")),".mot");
                 mot[slot]=read(motMember);
                 motMembers[slot]=members.at(lower(motMember)).sourceName;

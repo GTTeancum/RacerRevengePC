@@ -9,6 +9,9 @@ using K=OriginalUiRiderWidgetKind50KG;using O=OriginalUiControlOperation50KG;
 using E=OriginalUiRiderDynamicError50KG;
 bool idOk(std::uint16_t id) noexcept{return id>0&&id<120;}
 bool dynamic(K k) noexcept{return k==K::pod||k==K::character;}
+bool sameState(const OriginalUiRiderWidgetState50KG& a,const OriginalUiRiderWidgetState50KG& b) noexcept {
+    return a.kind==b.kind&&a.selected==b.selected&&a.shown==b.shown&&a.onTop==b.onTop;
+}
 }
 struct OriginalUiRiderDynamicOwner50KG::Storage {
     struct Entry {
@@ -20,6 +23,9 @@ struct OriginalUiRiderDynamicOwner50KG::Storage {
         OriginalUiRiderCharacterScene50KG character;OriginalUiRiderPodScene50KG pod;
     };
     std::array<Entry,120> entries;
+    // Exact bind origin, comparison only. Existing source-widget lifetime is
+    // required; projection never dereferences this possibly stale identity.
+    const OriginalUiRiderWidgets50KG* widgets=nullptr;
     std::array<std::uint16_t,32> pods{},characters{};
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive;
     ModelMotionSharedState49T* motion=nullptr;ModelMode0IkShared50KG* ik=nullptr;
@@ -88,7 +94,7 @@ bool OriginalUiRiderDynamicOwner50KG::bind(std::shared_ptr<const assets::Origina
             // Widget references come from the source control, never rider arithmetic.
             next->pods[rider]=ids[0];next->characters[rider]=ids[3];
         }
-        storage_=std::move(next);diagnostic_={};d={};return true;
+        next->widgets=&widgets;storage_=std::move(next);diagnostic_={};d={};return true;
     }catch(...){return fail(E::allocation);}
 }
 OriginalUiRiderDynamicHooks50KG OriginalUiRiderDynamicOwner50KG::hooks() noexcept {
@@ -108,6 +114,102 @@ std::uint16_t OriginalUiRiderDynamicOwner50KG::characterWidget(std::uint32_t rid
 }
 OriginalUiRiderWidgetState50KG OriginalUiRiderDynamicOwner50KG::state(std::uint16_t id)const noexcept {
     return storage_&&idOk(id)?storage_->entries[id].state:OriginalUiRiderWidgetState50KG{};
+}
+bool OriginalUiRiderDynamicOwner50KG::nativeProjectionHealthy()const noexcept {
+    if(!storage_||!storage_->coldPrepared||storage_->poisoned||storage_->drained||storage_->inCallback||
+       diagnostic_.cleanupPending||diagnostic_.cleanupPhase!=OriginalUiRiderDynamicCleanupPhase50KG::none||
+       diagnostic_.model.cleanupPending||diagnostic_.cleanupModel.cleanupPending)return false;
+    // Read the actual model/registration entries. Cleanup tokens on a healthy
+    // registered graph are normal; unregistered pending or detached-but-still-
+    // registered graphs are partial cleanup and cannot issue a projection.
+    for(const auto& e:storage_->entries){
+        const bool characterPending=e.character.requiresModelCleanup();
+        const bool podPending=e.pod.requiresModelCleanup();
+        const bool characterAttached=e.character.attached(),podLoaded=e.pod.loaded();
+        if(e.state.kind==K::character){
+            if(podPending||podLoaded||e.podAssets)return false;
+            if(e.characterAssets&&!e.characterAssets->loaded())return false;
+            if(e.registered){
+                if(!e.everLoaded||e.detachComplete||!e.characterAssets||!characterPending||!characterAttached)return false;
+            }else if(characterPending||characterAttached)return false;
+        }else if(e.state.kind==K::pod){
+            if(characterPending||characterAttached||e.characterAssets)return false;
+            if(e.podAssets&&(!e.podAssets->loaded()||!e.podAssets->config()))return false;
+            if(e.registered){
+                if(!e.everLoaded||e.detachComplete||!e.podAssets||!podPending||!podLoaded)return false;
+            }else if(podPending||podLoaded)return false;
+        }else if(e.registered||characterPending||podPending||characterAttached||podLoaded||
+                 e.characterAssets||e.podAssets)return false;
+    }
+    return true;
+}
+bool OriginalUiRiderDynamicOwner50KG::nativeProjectionForWidgets(
+    const OriginalUiRiderWidgets50KG& widgets)const noexcept {
+    return storage_&&storage_->widgets==&widgets&&nativeProjectionHealthy();
+}
+bool OriginalUiRiderDynamicOwner50KG::nativeProjectionSnapshot(std::uint16_t id,
+    OriginalUiRiderWidgetState50KG& output,bool& registered)const noexcept {
+    if(!nativeProjectionHealthy()||!idOk(id))return false;
+    const auto& e=storage_->entries[id];if(!dynamic(e.state.kind))return false;
+    output=e.state;registered=e.registered;return true;
+}
+bool OriginalUiRiderDynamicOwner50KG::projectNativeDescriptorOne(
+    const OriginalUiRiderWidgetCallback50KG& c,OriginalUiRiderWidgetState50KG& state,
+    bool& registered)const noexcept {
+    if(!storage_||!idOk(c.widget))return false;
+    const auto& e=storage_->entries[c.widget];
+    if(!dynamic(e.state.kind)||state.kind!=e.state.kind||state.onTop!=e.state.onTop)return false;
+    auto next=state;bool nextRegistered=registered;
+    const auto load=[&]() noexcept {
+        // Immutable actual descriptors only; no graph, ledger or RNG operation.
+        if(e.state.kind==K::character){if(!e.characterAssets||!e.characterAssets->loaded())return false;}
+        else if(!e.podAssets||!e.podAssets->loaded()||!e.podAssets->config())return false;
+        nextRegistered=true;return true;
+    };
+    const auto genericState=[&](bool selected) noexcept {
+        next.selected=selected;
+        const bool enable=selected?e.enableSelect:e.enableDeselect;
+        const bool disable=selected?e.disableSelect:e.disableDeselect;
+        // As in generic(): both set explicitly suppress both effects.
+        if(enable!=disable)next.shown=enable;
+    };
+    switch(c.operation){
+    case O::select:
+        if(e.state.kind==K::character){if(!load())return false;genericState(true);}
+        else{genericState(true);if(!load())return false;genericState(true);next.shown=true;}
+        break;
+    case O::deselect:
+        if(e.state.kind==K::character){nextRegistered=false;genericState(false);}
+        else{
+            genericState(false);
+            if(e.podAssets){
+                const auto* config=e.podAssets->config();if(!config)return false;
+                if(config->cleanFromMemory)nextRegistered=false;
+            }
+            genericState(false);next.shown=false;
+        }
+        break;
+    case O::clearSelection:
+        // Character+88 loads but does NOT imply shown. Pod+88 only clears select.
+        if(e.state.kind==K::character&&!load())return false;
+        next.selected=false;break;
+    case O::setEnabled:next.selected=c.value;next.shown=c.value;break;
+    case O::show:case O::reset:next.shown=true;break;
+    case O::hide:next.shown=false;break;
+    default:return false;
+    }
+    state=next;registered=nextRegistered;return true;
+}
+bool OriginalUiRiderDynamicOwner50KG::projectNativeOne(
+    const OriginalUiRiderWidgetCallback50KG& c,OriginalUiRiderWidgetState50KG& state,
+    bool& registered)const noexcept {
+    return nativeProjectionHealthy()&&projectNativeDescriptorOne(c,state,registered);
+}
+bool OriginalUiRiderDynamicOwner50KG::matchesNativeProjection(std::uint16_t id,
+    const OriginalUiRiderWidgetState50KG& expected,bool registered)const noexcept {
+    if(!nativeProjectionHealthy()||!idOk(id))return false;
+    const auto& e=storage_->entries[id];
+    return dynamic(e.state.kind)&&sameState(e.state,expected)&&e.registered==registered;
 }
 bool OriginalUiRiderDynamicOwner50KG::previewRequested(std::uint32_t rider)const noexcept {
     return storage_&&storage_->coldPrepared&&originalUiRiderRequested50KG(storage_->requestedPreviewRiders,rider);
@@ -253,6 +355,11 @@ bool OriginalUiRiderDynamicOwner50KG::apply(const OriginalUiRiderWidgetCallback5
     auto& s=*storage_;auto& e=s.entries[c.widget];
     if(!dynamic(e.state.kind)||e.state.kind!=actual.kind||e.state.onTop!=actual.onTop||
         e.state.selected!=actual.selected||e.state.shown!=actual.shown){diagnostic_.error=E::input;s.poisoned=true;return false;}
+    // Compute only copied semantic expectations. Do not use projection-health
+    // admission to strengthen existing real callback/cleanup preconditions, and
+    // do not skip any original effect even if an expectation cannot be formed.
+    auto expected=e.state;bool expectedRegistered=e.registered;
+    const bool expectedValid=projectNativeDescriptorOne(c,expected,expectedRegistered);
     s.inCallback=true;bool ok=true;
     switch(c.operation){
     case O::select:
@@ -285,6 +392,12 @@ bool OriginalUiRiderDynamicOwner50KG::apply(const OriginalUiRiderWidgetCallback5
     }
     s.inCallback=false;
     if(!ok){s.poisoned=true;if(diagnostic_.error==E::none)diagnostic_.error=E::backend;return false;}
+    // This is a check AFTER successful real hooks/load/unload/selection. A
+    // mismatch is a retained source fault, never synthetic callback completion
+    // or rollback of already-consumed material, motion, IK or RNG state.
+    if(!expectedValid||!sameState(e.state,expected)||e.registered!=expectedRegistered){
+        diagnostic_.error=E::input;s.poisoned=true;return false;
+    }
     actual=e.state;return true;
 }
 bool OriginalUiRiderDynamicOwner50KG::drain() noexcept {

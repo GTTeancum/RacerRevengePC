@@ -6,7 +6,9 @@
 #include "../assets/original_ui_movement_control50kg.h"
 #include <memory>
 #include <vector>
+namespace rr::platform {class OriginalUiRiderSession50KG;}
 namespace rr::game {
+class OriginalUiRiderDynamicOwner50KG;
 enum class OriginalUiRiderWidgetKind50KG : std::uint8_t { absent,empty,text,icon,movement,pod,character };
 enum class OriginalUiRiderWidgetError50KG : std::uint8_t {
     none,notBound,alreadyBound,archive,parse,population,input,callback,missingDynamicOwner,
@@ -97,6 +99,23 @@ public:
     bool projectIcon(std::uint16_t,bool ancestorsShown,OriginalUiRiderIconProjection50KG&,
         OriginalUiRiderWidgetDiagnostic50KG&)const noexcept;
 private:
+    friend class rr::platform::OriginalUiRiderSession50KG;
+    // Private native residency projection. These are prospective visibility
+    // facts, never graph/renderer ownership or acknowledgement of callbacks.
+    // Text shown is a conservative material bound, not line-overlay activity.
+    struct NativeProjection {
+        std::array<OriginalUiRiderWidgetState50KG,120> states{};
+        std::array<bool,120> registered{};
+        const OriginalUiRiderWidgets50KG* widgets=nullptr;
+        const OriginalUiRiderDynamicOwner50KG* dynamic=nullptr;
+    };
+    bool beginNativeProjection(const OriginalUiRiderDynamicOwner50KG&,NativeProjection&,
+        OriginalUiRiderWidgetDiagnostic50KG&) const noexcept;
+    bool projectNativeCallbacks(NativeProjection&,const OriginalUiRiderWidgetCallback50KG*,std::size_t,
+        OriginalUiRiderWidgetDiagnostic50KG&) const noexcept;
+    bool projectNativeNavigation(NativeProjection&,std::uint8_t,const OriginalUiNavigation50KG&,
+        const OriginalUiCommands50KG&,OriginalUiRiderWidgetDiagnostic50KG&) const noexcept;
+    bool matchesNativeProjection(const NativeProjection&) const noexcept;
     bool expandNavigation(std::uint8_t,const OriginalUiNavigation50KG&,
         const OriginalUiCommands50KG&,std::vector<OriginalUiRiderWidgetCallback50KG>&,
         OriginalUiRiderWidgetDiagnostic50KG&) const noexcept;

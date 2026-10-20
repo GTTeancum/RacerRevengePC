@@ -667,7 +667,7 @@ void main(){
     }
     std::array<I,4> racerTriangleRasterRegion(U slot,U component,U first)const noexcept {
         const std::array<I,4> full{{0,0,width,height}};
-        if(!request.raStaticWorld||slot>frameOpponentCount)return full;
+        if((!request.raStaticWorld&&!request.track.rcCrystal&&!request.track.tbWorld)||slot>frameOpponentCount)return full;
         const auto& batch=slot?frameOpponentBatches[slot-1]:framePlayerBatch;
         if(component>=batch.componentCount)return full;
         const auto& part=batch.component[component];

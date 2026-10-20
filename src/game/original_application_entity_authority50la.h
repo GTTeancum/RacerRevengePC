@@ -16,6 +16,7 @@ class OriginalPauseStorage50LA;
 // original forest, dispatch targets, or a completed Application phase.
 class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalApplicationEntities50LA;
+    friend class OriginalFrontendCameraCold50LA;
     friend class OriginalPauseStorage50LA;
     friend class OriginalTunnelTrack50LA;
     friend class OriginalRaceConstructor50LA;

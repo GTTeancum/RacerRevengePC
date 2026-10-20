@@ -80,4 +80,29 @@ struct Scene48D {
 bool decodeScene48D(const std::vector<std::uint8_t>& input, Scene48D& output,
     DecodeError48C& error, const DecodeHooks48C* hooks = nullptr,
     const SceneLimits48D& limits = SceneLimits48D{});
+// Optional source-integer capture. Existing Scene48D/SceneLimits layouts stay
+// unchanged. The caller supplies bounded capacities, charged before parsing.
+struct SceneRawVertex48D {
+    std::array<std::int32_t,3> position{};
+    std::array<std::int8_t,3> normal{};
+};
+struct SceneRawSurface48D {
+    std::uint32_t lod=0,surface=0,vertexStart=0,vertexCount=0;
+    std::size_t sourceOffset=0;
+};
+struct SceneRawCapture48D {
+    std::vector<SceneRawVertex48D> vertices;
+    std::vector<SceneRawSurface48D> surfaces;
+    std::size_t retainedPayloadBytes=0;
+};
+struct SceneRawCaptureLimits48D {
+    std::uint32_t vertices=0,surfaces=0;
+    std::size_t availablePayloadBytes=0;
+};
+// Scene and raw outputs are unchanged on any failure. Raw vertices follow
+// exactly the same original group/ADC vertex order as semantic surfaces.
+bool decodeSceneWithRaw48D(const std::vector<std::uint8_t>& input, Scene48D& output,
+    SceneRawCapture48D& rawOutput,const SceneRawCaptureLimits48D& rawLimits,
+    DecodeError48C& error,const DecodeHooks48C* hooks=nullptr,
+    const SceneLimits48D& limits=SceneLimits48D{});
 } }

@@ -151,6 +151,73 @@ inline constexpr SessionAssets retainedRA{
     "1e8e504383da884d1a8436402cbbc2a3ff7cdc9390d19d97b3398c3dd51f84d2",4604561,
     true,true,false,true
 };
+// Authenticated MB source binding, not a completed native-course admission.
+// Fresh2169C0 placement receives the actual first application table entries:
+// 1AE578/57C -> 1AE588/58C -> 1AE590; C34 store at216A2C.
+// Ordered native table reference1 is therefore not copied from camera defaults.
+// Runtime must bind those actual MB tables/world and construct every owner.
+// Empty legacy exports are intentional; original MB source owners supply data.
+inline constexpr SessionAssets retainedMB{
+    &worlds[5],"work/native/project/disc/TRACKS/MB.RES",
+    "tracks\\mmb.spl","tracks\\amb.spl","tracks\\mb.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "","","","",4,1,128,
+    "6aae7d59981cae6c741b14e147021960fdb4d8e68e21c217a446f779d3c821ca",4421779,
+    true,true,false,true
+};
+// Exact SC original resources. This selects a cold attempt, not readiness.
+// The existing fresh-session grid rank remains4. Initial collision reference1
+// is the first actual Application table entry, as in generic1AE578/216A2C.
+// SC preparation must retain that ordered world; no camera zone is substituted.
+//252 is the authenticated per-placement COL match count, not a visual count.
+inline constexpr SessionAssets retainedSC{
+    &worlds[9],"work/native/project/disc/TRACKS/SC.RES",
+    "tracks\\msc.spl","tracks\\asc.spl","tracks\\sc.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "","","","",4,1,252,
+    "8305641f0ac8fefeae6603145ad4f8441612e41926751ff853170763e66dfa4d",2974353,
+    true,true,false,true
+};
+// Authenticated TC metadata selects a cold attempt, never completed readiness.
+// Rank4 preserves the existing native human assignment. Initial ref1 denotes
+// actual Application table entry0; the root must retain that ordered table.
+// 69 is the own per-placement COL membership count, not600 model placements.
+inline constexpr SessionAssets retainedTC{
+    &worlds[11],"work/native/project/disc/TRACKS/TC.RES",
+    "tracks\\mtc.spl","tracks\\atc.spl","tracks\\tc.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "","","","",4,1,69,
+    "7b5486f4029dabe137919127c879faef92b8bd2fb9df5c0d1a1d122e92731490",3607868,
+    true,true,false,true
+};
+// Authenticated RC source binding selects a cold attempt, not readiness.
+// Existing native human rank4 and actual first Application table ref1 remain;
+// the genuine RC aggregate must construct those same ordered tables.
+//112 is own per-placement COL membership, not total visual placements.
+inline constexpr SessionAssets retainedRC{
+    &worlds[7],"work/native/project/disc/TRACKS/RC.RES",
+    "tracks\\mrc.spl","tracks\\arc.spl","tracks\\rc.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "","","","",4,1,112,
+    "ce1b41b845935210c288c86d76b3ae0b99f198fb2c29190889c005631c7d2a8b",4655141,
+    true,true,false,true
+};
+// Exact original TB archive metadata selects a cold attempt, not readiness.
+//320 counts all placed COL memberships, including four visual+COL placements.
+//The independently owned animated door is separate from this static set.
+inline constexpr SessionAssets retainedTB{
+    &worlds[10],"work/native/project/disc/TRACKS/TB.RES",
+    "tracks\\mtb.spl","tracks\\atb.spl","tracks\\tb.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "","","","",4,1,320,
+    "1188206d7b1f64910c119192829fc357b9d4a9f021d64e8a2b7561f2c113a09b",3749557,
+    true,true,false,true
+};
 inline bool codeEquals(const char* requested,const char* code) noexcept {
     if(!requested||!requested[0]||!requested[1]||requested[2])return false;
     for(unsigned i=0;i<2;++i){
@@ -173,7 +240,12 @@ inline const SessionAssets* sessionAssets(const WorldMetadata& world) noexcept {
         codeEquals(world.code,"GA")?&retainedGA:
         codeEquals(world.code,"MA")?&retainedMA:
         codeEquals(world.code,"SA")?&retainedSA:
-        codeEquals(world.code,"RA")?&retainedRA:nullptr;
+        codeEquals(world.code,"RA")?&retainedRA:
+        codeEquals(world.code,"MB")?&retainedMB:
+        codeEquals(world.code,"SC")?&retainedSC:
+        codeEquals(world.code,"TC")?&retainedTC:
+        codeEquals(world.code,"RC")?&retainedRC:
+        codeEquals(world.code,"TB")?&retainedTB:nullptr;
 }
 inline const SessionAssets* select(const char* code,const char*& error) noexcept {
     const auto* world=findWorld(code);
