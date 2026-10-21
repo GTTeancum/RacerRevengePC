@@ -94,10 +94,28 @@ public:
     bool initializeSebulbaTbTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&) noexcept;
     bool sebulbaTbTestProfile() const noexcept;
+    bool initializeKraidGbTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&) noexcept;
+    bool kraidGbTestProfile() const noexcept;
+    bool initializeYoungAnakinMcTestProfileAtApplicationStartup(std::shared_ptr<OriginalUiMainProfile50KG>,
+        std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&,
+        std::uint32_t mcRider=1) noexcept;
+    bool youngAnakinMcTestProfile() const noexcept;
     bool initialized() const noexcept;
     const OriginalUiMainProfile50KG* commonProfile() const noexcept;
     OriginalUiRiderProfileStamp50KG stamp() const noexcept;
     bool selectionSnapshot(game::OriginalUiRiderSelectionProfile50KG&) const noexcept;
+    struct RiderSelectionFacts {
+        std::uint32_t rider=0,unlock10FAC=0,hidden730=0;
+    };
+    // Read actual retained profile facts for an authored rider. Hidden is
+    // informational: original Confirm tests unlock10FAC, not hidden730.
+    // These facts do not certify any native model, renderer or race owner.
+    bool riderSelectionFacts(std::uint32_t rider,RiderSelectionFacts&) const noexcept;
+    // Native mode0 route-continuity guard, not an added original Course
+    // instruction: packed, remembered and comparison identity must still
+    // agree with the unlocked Rider selection committed by the source route.
+    bool courseRiderSelectionSnapshot(RiderSelectionFacts&) const noexcept;
     bool statSnapshot(std::uint32_t selectedRider,float panelY4DC,
         game::OriginalUiRiderStatInput50KG&) const noexcept;
     bool colors(std::uint32_t rider,OriginalUiRiderProfileColors50KG&) const noexcept;
@@ -127,7 +145,7 @@ private:
     bool beginPodRace1A66CC(const OriginalUiMainProfile50KG& actualCommon)noexcept;
     bool initializeStartupProfile(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint32_t testRider,
-        OriginalUiRiderProfileDiagnostic50KG&,bool gasganoSc=false,bool tzidikTc=false,bool scorchRc=false,bool sebulbaTb=false) noexcept;
+        OriginalUiRiderProfileDiagnostic50KG&,bool gasganoSc=false,bool tzidikTc=false,bool scorchRc=false,bool sebulbaTb=false,bool kraidGb=false,bool youngAnakinMc=false,std::uint32_t mcRider=1) noexcept;
     friend class OriginalUiTournamentSession50KG;
     friend class OriginalUiCourseSession50KG;
     bool commitRiderConfirmToCourse(const game::OriginalUiRouteDecision50KG&,OriginalUiRiderProfileStamp50KG)noexcept;

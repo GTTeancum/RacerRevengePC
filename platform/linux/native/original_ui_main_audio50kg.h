@@ -17,7 +17,7 @@ class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
 public:
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
     static constexpr std::size_t effectVoiceCount = 6, requiredVoices = 7;
-    static constexpr std::size_t riderConfirmClipCount = 41; // Two authored Sebulba clips; mixer voice count unchanged.
+    static constexpr std::size_t riderConfirmClipCount = 57; // Two additional authored Kraid clips; mixer voice count unchanged.
     // One accepted Rider Confirm per page lifetime. Its UIACCEPT stream
     // borrows a separate native voice; it cannot replace an active utterance.
     static constexpr std::size_t riderConfirmVoice = requiredVoices, courseRequiredVoices = requiredVoices + 1;

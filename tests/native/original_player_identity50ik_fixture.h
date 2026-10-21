@@ -27,7 +27,7 @@ struct Identity {
     unsigned announcerEvents;
     const char* announcerSha256;
 };
-inline constexpr std::array<Identity,18> originals{{
+inline constexpr std::array<Identity,23> originals{{
     {1,"POD01",349110,
      "08b4d7655cb796da8a29d9b9a5318c0364561c659794ac9de6c9dfed7416eca3",
      "47fcfbaab278d10506b302520adc51af4e3388ceb601daa3dbd588aea1f39a1b",
@@ -153,7 +153,42 @@ inline constexpr std::array<Identity,18> originals{{
      "c2a4122d47c2c5a0eea120a207f1cf657eb9ef728752f1c9d6dfd92458d77edd",
      "10fd2390804377f4b9e674d8d2c4df47797944b67ea27acfd96d6142edf32f0a",
      "958ed93d705ab47ee013a66462cd15f6f378e91c46c5ba4b61b38a26f5108dac",
-     2478,30,"4b1437bae906f37fe3a341bd61e77aea636b23c4ade69327964b568950456094"}
+     2478,30,"4b1437bae906f37fe3a341bd61e77aea636b23c4ade69327964b568950456094"},
+    {23,"POD23",374646,
+     "2edb056d14c79d70de96a2c5538f9ae03c9a7d2fcfd22bd49a02a3b0dbaa402d",
+     "bff832abc9bfaefcc9f40e323440c6017869314b196d8825f050cba8791e56cd",
+     "e61460979a3a1df75d1869a14221933afb4b1d83e83d2231d822644ecb6bb386",
+     "351d0090b63bf83a29a943cd0cf8d6c8d74e742cfded2e6c7dbb0807bd994095",
+     "a595c149cec3552a7c6ec1262b1ce4bde5fea61da6e5a440b3dfc9c2965ccaac",
+     2478,30,"0f657db3f1808c4421e6ae3bbce1a69ebe82fae7378130d2369cca77672b82c7"} ,
+    {14,"POD14",330051,
+     "921f3e143e01256bf044a10174f1dfecd176914a3702b95e7985bcef65bb374f",
+     "8c8961bd275e0cf38722454412b5e9028fada380d5bbe46ed2b9bfe5d87f8ac5",
+     "76eb62330c38cb9d629c87e2462d355d2dcca1b85efb73443a982ccceeba639c",
+     "94333d296378c84e0a69dfd6194558384de990c5bf0747ebe943df29882b1fe4",
+     "c5920bfea8e3a76ab07eee135bf36d85616432a4f4ec58f5198902b287b034b8",
+     2403,29,"aa2fb2f121397900daa9131acf8a3547717d81b078b2568c5cbce28c63de61fd"},
+    {21,"POD21",378544,
+     "7484042e95aa2f40d02ceeec91bfd59904076af3054fe4d797fe67773ed5f569",
+     "80c112799e219387065697af821c8a856ac6f7da4fa4aa0491964383a6ed03da",
+     "a7971091c45b6f570693cc81f0662e84746db52bed6adefe6bebe7cee387e119",
+     "6e304d92b3c0e3eb35cc7d4ee7e483a9f7f80da416b0891f2222952a8e070116",
+     "c927f511f3f521ea082ebbae9fe8232d76a6b40ad9c9516fe55f7bd4ef67c8c0",
+     2403,29,"03abdf908838822ddb5f881dbf2377713cd0179c8d2823927c602e2c39923b3b"},
+    {25,"POD25",362828,
+     "ee8c2ee81f5303dcb114b1db57f6bac176a4338b30920b0617ad23dba748e224",
+     "2cd531531650714d85259643a4a85ebc172dd332bf251fe1a44aa2dda84677a7",
+     "d39202ff0fa18ace316daf1c6f5a8406ed564d47c0f513e3261b280399c8b0fc",
+     "566e817ef5d812f24defa38f11a7202552306228a9fe2531e58ce38bd9a5dba3",
+     "f1584648c1a5d4205b503c0044480a566085654e9c0649c568bdc0ff7f14beb8",
+     2478,30,"245b78a21f4581c4f4429290880b09fd5cdba4addb1c01493654cfdf6eda8017"},
+    {26,"POD26",360724,
+     "857ef67eba2164509b7700aa51d2cbcf83745417adeaca175806e6bcdb89be7d",
+     "695e94107b68747d25af0c6bd0aca5f75940968fffba09809ea5e2065b831415",
+     "a59af01e25ddc0be7e2c9994fc8b5f2e4ecb608eae514c770dbdd37da933290e",
+     "e08babe6168cd4aa5de1d8840fdbe805fbd3b85df33e86d3f4134cfaf34a5780",
+     "6c1bf5e505b1cd6ec434513387d9bcd28aed94802173349df3897c7fedd486b9",
+     2478,30,"4168d648c1714682a34c316845b4e927abad2432e9b0e746d868dd6bafc91a49"}
 }};
 inline constexpr const Identity* find(std::uint32_t racer60) noexcept {
     for(const auto& entry:originals)if(entry.racer60==racer60)return &entry;
@@ -172,11 +207,19 @@ inline std::filesystem::path announcerPath(const std::filesystem::path& discRoot
 // Eleven independently authored originals have byte-identical counts. This
 // does not make their category names/PCM interchangeable: those hashes differ.
 inline constexpr std::array<std::uint8_t,9> speechCounts(const Identity& identity) noexcept {
+    if(identity.racer60==14)return {2,3,3,3,4,4,3,3,3};
+    if(identity.racer60==21)return {2,4,3,5,3,5,3,3,3};
+    if(identity.racer60==25)return {3,2,5,4,5,4,5,5,1};
+    if(identity.racer60==26)return {1,4,3,5,5,3,3,1,2};
     if(identity.racer60==19)return {5,6,7,6,6,6,3,4,4};
     return identity.racer60==1?std::array<std::uint8_t,9>{4,4,6,5,6,6,4,3,2}:
         std::array<std::uint8_t,9>{2,3,3,3,4,4,3,3,3};
 }
 inline constexpr const char* speechCountsSha256(const Identity& identity) noexcept {
+    if(identity.racer60==14)return "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2";
+    if(identity.racer60==21)return "a8113a836b77c3fe9c4cc7aa1cbeba5dcdc34b6b9c4c90b6ba3990b5cef19333";
+    if(identity.racer60==25)return "5bb23574bb9c0d3be740d67153091ac5aa767dee0e6e97cfe35f5e3411a9f799";
+    if(identity.racer60==26)return "15fa058384528f9cd2ecfee8095276b7047b9f888f76452c9df5e22c534b46bd";
     if(identity.racer60==19)return "24c40bf4fc181e88c0361742dec94c76d91c522ba358c5533bde2769fdfaa3ec";
     return identity.racer60==1?"57639f26df9b7eac14d08e1aa0b67689cfe1674a03e52c1dbd856ba523a6834e":
         "f0b3b4950bd40f71736964ee6cdd9c6e97424ff84e6b57ca464170cb2ab72be2";

@@ -155,6 +155,8 @@ struct VehicleDrawSubmission50CM {
     // translation. These are not the display AABB or its estimated origin.
     // Retaining them permits current-camera UV/distance refresh while stopped.
     bool sourceSpecularGeometry50LA = false;
+    const OriginalRacerModelPackets50LA* sourceGeometryModel50LA = nullptr;
+    std::uint64_t sourceGeometryRevision50LA = 0;
     BodyMatrix48G sourceRootWorld50LA{};
     OriginalRacerAggregateBounds50LA sourceAggregateBounds50LA{};
     std::array<float, 3> sourcePosition50LA{};

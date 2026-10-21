@@ -39,9 +39,12 @@ private:
     bool tcBound_=false;
     LapProgressTrackView50TB tbTrack_{};
     bool tbBound_=false;
+    LapProgressTrackView50GB gbTrack_{};
+    bool gbBound_=false;
+    LapProgressTrackView50MC mcTrack_{};bool mcBound_=false;
 public:
     bool bindMbTrack(const LapProgressTrackView50MB& actual) noexcept {
-        if(mbBound_||tcBound_||tbBound_||!actual.runtimeValid()||pending.pending.requested)return false;
+        if(mbBound_||tcBound_||tbBound_||gbBound_||mcBound_||!actual.runtimeValid()||pending.pending.requested)return false;
         mbTrack_=actual;mbBound_=true;return true;
     }
     const LapProgressTrackView50MB& mbTrack()const noexcept{return mbTrack_;}
@@ -50,7 +53,7 @@ public:
         mbTrack_={};mbBound_=false;return true;
     }
     bool bindTcTrack(const LapProgressTrackView50TC& actual) noexcept {
-        if(mbBound_||tcBound_||tbBound_||!actual.runtimeValid()||pending.pending.requested)return false;
+        if(mbBound_||tcBound_||tbBound_||gbBound_||mcBound_||!actual.runtimeValid()||pending.pending.requested)return false;
         tcTrack_=actual;tcBound_=true;return true;
     }
     const LapProgressTrackView50TC& tcTrack()const noexcept{return tcTrack_;}
@@ -59,13 +62,31 @@ public:
         tcTrack_={};tcBound_=false;return true;
     }
     bool bindTbTrack(const LapProgressTrackView50TB& actual) noexcept {
-        if(mbBound_||tcBound_||tbBound_||!actual.runtimeValid()||pending.pending.requested)return false;
+        if(mbBound_||tcBound_||tbBound_||gbBound_||mcBound_||!actual.runtimeValid()||pending.pending.requested)return false;
         tbTrack_=actual;tbBound_=true;return true;
     }
     const LapProgressTrackView50TB& tbTrack()const noexcept{return tbTrack_;}
     bool releaseTbTrack() noexcept {
         if(pending.pending.requested)return false;
         tbTrack_={};tbBound_=false;return true;
+    }
+    bool bindGbTrack(const LapProgressTrackView50GB& actual) noexcept {
+        if(mbBound_||tcBound_||tbBound_||gbBound_||mcBound_||!actual.runtimeValid()||pending.pending.requested)return false;
+        gbTrack_=actual;gbBound_=true;return true;
+    }
+    const LapProgressTrackView50GB& gbTrack()const noexcept{return gbTrack_;}
+    bool releaseGbTrack() noexcept {
+        if(pending.pending.requested)return false;
+        gbTrack_={};gbBound_=false;return true;
+    }
+    bool bindMcTrack(const LapProgressTrackView50MC& actual) noexcept {
+        if(mbBound_||tcBound_||tbBound_||gbBound_||mcBound_||!actual.runtimeValid()||pending.pending.requested)return false;
+        mcTrack_=actual;mcBound_=true;return true;
+    }
+    const LapProgressTrackView50MC& mcTrack()const noexcept{return mcTrack_;}
+    bool releaseMcTrack() noexcept {
+        if(pending.pending.requested)return false;
+        mcTrack_={};mcBound_=false;return true;
     }
     LapProgressTrack50GF track{};
     Continuity* continuity=nullptr;
@@ -227,14 +248,15 @@ public:
     }
     bool crossing(bool sequential,std::uint32_t node,std::uint32_t current) noexcept {
         if((mbBound_&&!mbTrack_.runtimeValid())||(tcBound_&&!tcTrack_.runtimeValid())||
-           (tbBound_&&!tbTrack_.runtimeValid()))return false;
+           (tbBound_&&!tbTrack_.runtimeValid())||(gbBound_&&!gbTrack_.runtimeValid())||(mcBound_&&!mcTrack_.runtimeValid()))return false;
         auto& c=*continuity;
         c.state.vehicleCD8=fields->impactFlagsCD8;
         LapProgressReceipt50GF receipt{};
         const LapProgressCrossing50GF crossing{
             sequential?LapProgressCrossingKind50GF::Sequential:LapProgressCrossingKind50GF::Scan,
             node,current,c.prefix.flags10CC};
-        if(!(tbBound_?applyPlayerLapCrossing50GF(tbTrack_,crossing,c.state,pending,receipt,diagnostic):
+        if(!(mcBound_?applyPlayerLapCrossing50GF(mcTrack_,crossing,c.state,pending,receipt,diagnostic):gbBound_?applyPlayerLapCrossing50GF(gbTrack_,crossing,c.state,pending,receipt,diagnostic):
+            tbBound_?applyPlayerLapCrossing50GF(tbTrack_,crossing,c.state,pending,receipt,diagnostic):
             tcBound_?applyPlayerLapCrossing50GF(tcTrack_,crossing,c.state,pending,receipt,diagnostic):
             mbBound_?applyPlayerLapCrossing50GF(mbTrack_,crossing,c.state,pending,receipt,diagnostic):
             applyPlayerLapCrossing50GF(track,crossing,c.state,pending,receipt,diagnostic)))return false;

@@ -84,6 +84,32 @@ bool prepareLapProgressTrack50GF(const TrackNavigationView50TB& map,
 }
 // TB-CONSUMER-END 0
 
+// GB-CONSUMER-BEGIN 0
+bool prepareLapProgressTrack50GF(const TrackNavigationView50GB& map,
+    const AiTrackMetadataView50GB& metadata,LapProgressTrackView50GB& out,
+    LapProgressDiagnostic50GF& d) noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)||!metadata.matches(map))
+        return fail(d,E::Track,0x2a1980);
+    LapProgressTrackView50GB next{};
+    const auto marker=[&](std::uint32_t i) noexcept {return metadata.nodes()[i].progressNode;};
+    if(!prepareLapProgressTrack50GFShared50MB(navigation_consumer_detail50MB::read(map),marker,next.data_,d))return false;
+    next.map_=map;next.metadata_=metadata;out=next;return true;
+}
+// GB-CONSUMER-END 0
+
+// MC-CONSUMER-BEGIN 0
+bool prepareLapProgressTrack50GF(const TrackNavigationView50MC& map,
+    const AiTrackMetadataView50MC& metadata,LapProgressTrackView50MC& out,
+    LapProgressDiagnostic50GF& d) noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)||!metadata.matches(map))
+        return fail(d,E::Track,0x2a1980);
+    LapProgressTrackView50MC next{};
+    const auto marker=[&](std::uint32_t i) noexcept {return metadata.nodes()[i].progressNode;};
+    if(!prepareLapProgressTrack50GFShared50MB(navigation_consumer_detail50MB::read(map),marker,next.data_,d))return false;
+    next.map_=map;next.metadata_=metadata;out=next;return true;
+}
+// MC-CONSUMER-END 0
+
 
 static bool applyPlayerLapCrossing50GFShared50MB(const LapProgressTrack50GF& track,std::size_t extent,
     const LapProgressCrossing50GF& crossing,LapProgressState50GF& state,
@@ -164,6 +190,26 @@ bool applyPlayerLapCrossing50GF(const LapProgressTrackView50TB& track,
     return applyPlayerLapCrossing50GFShared50MB(track.data(),track.capacity(),crossing,state,continuation,receipt,d);
 }
 // TB-CONSUMER-END 1
+
+// GB-CONSUMER-BEGIN 1
+bool applyPlayerLapCrossing50GF(const LapProgressTrackView50GB& track,
+    const LapProgressCrossing50GF& crossing,LapProgressState50GF& state,
+    LapProgressContinuation50GF& continuation,LapProgressReceipt50GF& receipt,
+    LapProgressDiagnostic50GF& d) noexcept {
+    if(!track.runtimeValid())return fail(d,E::Track,0x2a2fc0);
+    return applyPlayerLapCrossing50GFShared50MB(track.data(),track.capacity(),crossing,state,continuation,receipt,d);
+}
+// GB-CONSUMER-END 1
+
+// MC-CONSUMER-BEGIN 1
+bool applyPlayerLapCrossing50GF(const LapProgressTrackView50MC& track,
+    const LapProgressCrossing50GF& crossing,LapProgressState50GF& state,
+    LapProgressContinuation50GF& continuation,LapProgressReceipt50GF& receipt,
+    LapProgressDiagnostic50GF& d) noexcept {
+    if(!track.runtimeValid())return fail(d,E::Track,0x2a2fc0);
+    return applyPlayerLapCrossing50GFShared50MB(track.data(),track.capacity(),crossing,state,continuation,receipt,d);
+}
+// MC-CONSUMER-END 1
 
 
 bool resumePlayerLapAfterCallback50GF(LapProgressState50GF& state,

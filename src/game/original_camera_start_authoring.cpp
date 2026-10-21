@@ -76,6 +76,8 @@ bool OriginalCourseStartActions::prepare(OriginalCameraStartCourse course,const 
     else if(course==OriginalCameraStartCourse::sc){exact=64047;sha="473351310a098008a477f9e72a6fc7e03d8bb808adcd79f5d810f90aa332b727";}
     else if(course==OriginalCameraStartCourse::tc){exact=25512;sha="e080f96e2657e1331ac1f829faa880a5e984ebf1c5fab393daa6539534dd0573";}
     else if(course==OriginalCameraStartCourse::tb){exact=106139;sha="12c908874736ea91dcd6d3f8af97413a0cfe3bcd87cfce0798e8ff86fe5fb0bc";}
+    else if(course==OriginalCameraStartCourse::gb){exact=20617;sha="96469b3953b18d940bd0c8772758c68a75a69c3375b49ef98b966901c2e598d1";}
+    else if(course==OriginalCameraStartCourse::mc){exact=186642;sha="7070700a884c24a98a0a89d4ea58e61e34f9a89e19af3ca239779c56c0dd14b0";}
     if(!sha||size!=exact||!hashMatches(bytes,size,sha))return false;
     // Independent static section-table inspection of these exact unchanged
     // originals proves no321_anims section. No generic section fallback here.
@@ -86,9 +88,11 @@ bool OriginalCourseStartActions::prepare(OriginalCameraStartCourse course,const 
     // SC tracks\\sc.tob: 476 sections, no321_anims; own CSCameras count3.
     // TC own tracks\\tc.tob: exact CSCameras3, no321_anims.
     // TB exact original TOB has742 sections, CSCameras5 (zones8/2/4/4/1), no321_anims.
+    // GB exact original TOB has CSCameras4 at4700 (zones2/6/3/10), no321_anims.
     // Source174DF0 derives controllerA8 from this genuine track3E4 value.
+    // MC TOB has1268 sections, no321_anims; four CSCameras at36869, zones23/23/6/15.
     sourceSceneCutCount3E4_=course==OriginalCameraStartCourse::mb?5:(course==OriginalCameraStartCourse::ta||course==OriginalCameraStartCourse::sc||course==OriginalCameraStartCourse::tc)?3:
-        (course==OriginalCameraStartCourse::gc||course==OriginalCameraStartCourse::ma)?4:
+        (course==OriginalCameraStartCourse::gc||course==OriginalCameraStartCourse::ma||course==OriginalCameraStartCourse::gb||course==OriginalCameraStartCourse::mc)?4:
         (course==OriginalCameraStartCourse::sa||course==OriginalCameraStartCourse::rc||course==OriginalCameraStartCourse::tb)?5:
         course==OriginalCameraStartCourse::ra?7:0;
     course_=course;authenticated_=true;return true;

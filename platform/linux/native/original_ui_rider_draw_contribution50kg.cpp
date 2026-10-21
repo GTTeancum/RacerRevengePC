@@ -62,137 +62,6 @@ struct PendingLiveMaterial {
     std::shared_ptr<LiveMaterial> live;
     std::vector<assets::OriginalUiMaterialBindingState50KG> states;
 };
-const assets::OriginalUiMemberIdentity50KG* resourceMember(assets::OriginalUiArchiveId50KG id,const char* name) noexcept {
-    const auto* archive=assets::originalUiArchiveIdentity50KG(id);if(!archive)return nullptr;
-    for(std::size_t i=0;i<archive->memberCount;++i){const auto* member=assets::originalUiMemberIdentity50KG(id,i);
-        if(member){const char* a=member->name;const char* b=name;
-            while(*a&&*b&&fold(*a)==fold(*b)){++a;++b;}
-            if(!*a&&!*b)return member;}}return nullptr;
-}
-// Resource/sampler proof only. No raster adapter, AA0 rewrite, fallback pass or
-// default drawable span is constructed for the authentic AA1 character pass.
-bool resourceOnly25c7(const assets::OriginalUiMaterialPass50KG& pass,const assets::OriginalUiScreenAssets50KG& images,
-    std::uint32_t index,MaterialTextureSampler50EB& sampler,D& d) {
-    using A=assets::OriginalUiArchiveId50KG;using F=assets::OriginalUiGsField50KG;
-    const auto* psm=resourceMember(A::rider,"ui\\textures\\25c_7.psm");
-    const auto* pst=resourceMember(A::rider,"ui\\textures\\25c_7.pst");
-    if(!psm||!pst||pass.identity!=psm||pass.inheritedTemplate!=resourceMember(A::appStart,"AppStart\\DefaultMT.psm")||
-       pass.provenance.origin!=assets::OriginalUiMaterialOrigin50KG::authoredPsm||
-       pass.provenance.archive!=assets::originalUiArchiveIdentity50KG(A::rider)||
-       pass.provenance.creationPC!=0x247110u||pass.pass!=1||pass.enabled!=1||pass.textureCount!=1||
-       pass.textureCoordinateIndex!=0||!same(pass.microprogram,"DiffuseCompressed")||!same(pass.textureName,"25c_7")||
-       !same(pass.shaderPassGroup,"none"))return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::textureColorComponent].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::textureFunction].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::sourceAlphaValueWhenAis0].value!=255)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::sourceAlphaValueWhenAis1].value!=255)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::methodOfExpandingTextureAlpha].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::inputColorA].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::inputColorB].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::inputAlphaC].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::inputColorD].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::fixedAlphaValue].value!=128)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::wrapModeHorizontal].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::wrapModeVertical].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::minClampParameterInUDirection].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::maxClampParameterInUDirection].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::minClampParameterInVDirection].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::maxClampParameterInVDirection].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::colorClampingMethod].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::alphaCorrectionValue].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::alphaBlendingControlInUnitsOfPixels].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::gouraudShadingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::textureMappingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::foggingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::alphaBlendingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::onePassAntiAliasingOnOff].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::textureCoordinatesSTQorUV].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::environmentContext0or1].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::fragmentValueControlFixedOrNot].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::alphaTestOnOff].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::alphaTestMethod].value!=6)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::alphaReferenceValue].value!=120)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::processingMethodWhenFailedInAlphaTest].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::destinationAlphaTestOnOff].value!=0)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::destinationAlphaTestMode].value!=1)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::depthTestMethod].value!=2)return fail(d,E::material,0x2476a0u);
-    if(pass.gs[F::zWriteDisabled].value!=0)return fail(d,E::material,0x2476a0u);
-    // Retain the source inputAlphaD spelling and every inactive/blank authored
-    // field as well as the resolved tuple; overrides cannot inherit admission.
-    struct Authored {const char* key;const char* text;};
-    constexpr Authored expected[]={
-        {"microProgramName","DiffuseCompressed"},
-        {"TextureMap_1","25c_7"},
-        {"inputColorA","0"},
-        {"inputColorB","1"},
-        {"inputAlphaC","0"},
-        {"inputAlphaD","1"},
-        {"fixedAlphaValue",""},
-        {"wrapModeHorizontal",""},
-        {"wrapModeVertical",""},
-        {"minClampParameterInUDirection",""},
-        {"maxClampParameterInUDirection",""},
-        {"minClampParameterInVDirection",""},
-        {"maxClampParameterInVDirection",""},
-        {"colorClampingMethod",""},
-        {"alphaCorrectionValue",""},
-        {"alphaBlendingControlInUnitsOfPixels",""},
-        {"gouraudShadingOnOff",""},
-        {"textureMappingOnOff",""},
-        {"foggingOnOff",""},
-        {"alphaBlendingOnOff","1"},
-        {"onePassAntiAliasingOnOff","1"},
-        {"textureCoordinatesSTQorUV",""},
-        {"environmentContext0or1",""},
-        {"fragmentValueControlFixedOrNot",""},
-        {"alphaTestOnOff","0"},
-        {"alphaTestMethod",""},
-        {"alphaReferenceValue","120"},
-        {"processingMethodWhenFailedInAlphaTest",""},
-        {"destinationAlphaTestOnOff",""},
-        {"destinationAlphaTestMode",""},
-        {"depthTestOnOff",""},
-        {"depthTestMethod",""},
-        {"textureColorComponent",""},
-        {"textureFunction",""},
-        {"lodCalculationMethod",""},
-        {"maximumMipLevel",""},
-        {"magFilter",""},
-        {"minFilter",""},
-        {"L",""},
-        {"K",""},
-        {"sourceAlphaValueWhenAis0",""},
-        {"sourceAlphaValueWhenAis1",""},
-        {"methodOfExpandingTextureAlpha",""},
-        {"zWriteDisabled",""},
-    };
-    if(pass.authored.values.size()!=sizeof(expected)/sizeof(expected[0]))return fail(d,E::material,0x247110u);
-    // DAT find() intentionally skips authored blank values. This proof must
-    // inspect retained records, including blanks, and reject duplicate keys.
-    for(const auto& value:expected){const assets::OriginalUiDatValue50KG* actual=nullptr;
-        for(const auto& field:pass.authored.values)if(same(field.key,value.key)){
-            if(actual)return fail(d,E::material,0x247110u);actual=&field;}
-        if(!actual||actual->text!=value.text||actual->sourceValuePresent!=bool(value.text[0]))return fail(d,E::material,0x247110u);}
-    // Independent sampler admission, separate from unsupported raster AA/blend.
-    if(pass.lodCalculationMethod!=0||pass.maximumMipLevel!=0||pass.magFilter!=1||pass.minFilter!=5||
-       pass.lodL!=0||pass.lodK!=-75)return fail(d,E::material,0x247f38u);
-    const auto* source=images.sourceProvenance(index);const auto* ipum=images.ipumProvenance(index);
-    const auto* texture=images.decodedTexture(index);const auto* bank=images.textures();const auto* image=bank?bank->texture(index):nullptr;
-    if(!images.loaded()||!source||!ipum||!texture||!image||source->memberIdentity!=pst||source->celIdentity||
-       source->pstOffset||source->pstBytes!=pst->bytes||texture->kind!=2||texture->mips.size()!=3||ipum->mipCount!=3||
-       ipum->sourcePstSha256!=pst->sha256||!same(ipum->sourceMember,pst->name)||
-       ipum->sourceArchiveSha256!=assets::originalUiArchiveIdentity50KG(A::rider)->sha256||
-       ipum->colorPolicyKind!=assets::OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1)
-        return fail(d,E::material,0x24e880u);
-    constexpr std::uint32_t extent[]={16,32,64};
-    for(std::size_t i=0;i<3;++i)if(texture->mips[i].width!=extent[i]||texture->mips[i].height!=extent[i]||
-        ipum->mips[i].width!=extent[i]||ipum->mips[i].height!=extent[i])return fail(d,E::material,0x24e880u);
-    const auto& base=texture->mips.back();
-    if(image->texture.width!=base.width||image->texture.height!=base.height||image->texture.rgba!=base.rgba)
-        return fail(d,E::material,0x24eb90u);
-    sampler={MaterialTextureFilter50EB::linear,MaterialTextureFilter50EB::linear,
-        MaterialTextureWrap50EB::repeat,MaterialTextureWrap50EB::repeat};return true;
-}
 bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::OriginalUiScreenAssets50KG& images,
     std::uint32_t index,OriginalUiMaterialSpan50KG& output,D& d) noexcept {
     const auto* textures=images.textures();if(!textures)return fail(d,E::bank);
@@ -216,6 +85,10 @@ bool material(const assets::OriginalUiMaterialPass50KG& pass,const assets::Origi
     if(same(pass.microprogram,"SpecularMapCompressed")){assets::OriginalUiRider19SpecularMaterial50KM policy{};
         return assets::prepareOriginalUiRider19SpecularMaterial50KM(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19SpecularMaterialSpan50KM(policy,images,range,output);}
+    if(pass.gs[assets::OriginalUiGsField50KG::onePassAntiAliasingOnOff].value==1){
+        assets::OriginalUiRider19IpumMaterial50KM policy{};
+        return assets::prepareOriginalUiAa1IpumMaterial50KM(pass,images,index,policy,d.materialDetail)&&
+            convertOriginalUiRider19IpumMaterialSpan50KM(policy,images,range,output);}
     if(texture->kind==2){assets::OriginalUiRider19IpumMaterial50KM policy{};
         return assets::prepareOriginalUiRider19IpumMaterial50KM(pass,images,index,policy,d.materialDetail)&&
             convertOriginalUiRider19IpumMaterialSpan50KM(policy,images,range,output);}
@@ -313,14 +186,9 @@ struct OriginalUiRiderDrawContribution50KG::Storage {
                 map->sourceIdentity!=sourceImage->identity||map->combinedIdentity!=combinedImage->identity)return fail(d,E::bank);
             b.image=map->combinedIndex;b.provenance=to;
         }else if(map||image!=unresolved)return fail(d,E::material);
-        if(same(pass.textureName,"25c_7")){
-            if(kind!=RegistrationKind::ledgerDynamic)return fail(d,E::material);
-            if(!resourceOnly25c7(pass,*bank->images(),b.image,b.resourceSampler,d))return false;
-        }else{
-            OriginalUiMaterialSpan50KG drawable;
-            if(!material(pass,*bank->images(),b.image,drawable,d))return fail(d,E::material);
-            b.resourceSampler=drawable.native.sampler;b.prototype=std::move(drawable);
-        }
+        OriginalUiMaterialSpan50KG drawable;
+        if(!material(pass,*bank->images(),b.image,drawable,d))return fail(d,E::material);
+        b.resourceSampler=drawable.native.sampler;b.prototype=std::move(drawable);
         out.push_back(std::move(b));return true;
     }
     // Defined below after source-backed pass key preparation. This always
@@ -460,11 +328,12 @@ bool OriginalUiRiderDrawContribution50KG::prepareBank(D& d) noexcept {
     }catch(...){return fail(d,E::allocation);}
 }
 bool OriginalUiRiderDrawContribution50KG::drawableModel(std::uint16_t id,D& d) const noexcept {
-    d={};if(!storage_||!storage_->bank||storage_->historyPoisoned||id==0||id>=120)return fail(d,E::bank);
+    d={};d.widget=id;if(!storage_||!storage_->bank||storage_->historyPoisoned||id==0||id>=120)return fail(d,E::bank);
     const auto& s=*storage_;const auto* materials=s.backend->materials(id);
     if(!materials||!materials->loaded()||bool(s.dynamic->podAssets(id))==bool(s.dynamic->characterAssets(id)))return fail(d,E::model);
     for(std::uint32_t slot=0;slot<materials->materialCount();++slot)
         for(std::uint32_t ordinal=0;ordinal<materials->passCount(slot);++ordinal){
+            d.material=slot;d.pass=ordinal+1;
             const auto* pass=materials->pass(slot,ordinal);if(!pass)return fail(d,E::material);
             std::uint32_t image=unresolved;
             if(pass->source.textureCount){const auto* map=s.backend->modelImage(id,pass->imageIndex);
@@ -500,13 +369,24 @@ bool OriginalUiRiderDrawContribution50KG::nativeDrawableModels(const std::array<
     return true;
 }
 bool OriginalUiRiderDrawContribution50KG::nativeResidencyImages(
-    const std::array<bool,120>& models,std::vector<std::uint32_t>& output,D& d) const noexcept {
+    const std::array<bool,120>& models,std::vector<std::uint32_t>& output,bool& requiresCoverage,D& d) const noexcept {
     d={};if(!storage_||!storage_->bank||storage_->historyPoisoned)return fail(d,E::bank);
     if(!nativeDrawableModels(models,d))return false;
     const auto& s=*storage_;const auto* textures=s.bank->images()?s.bank->images()->textures():nullptr;
     if(!textures||textures->textureCount()>assets::maxMaterialTextureAssets50EA)return fail(d,E::bank);
     try {
         std::vector<bool> needed(textures->textureCount(),false);
+        bool nextCoverage=false;
+        const auto coverage=[&](const Binding& binding){
+            if(!binding.prototype||!binding.pass)return false;
+            const auto sourceAa=binding.pass->gs[assets::OriginalUiGsField50KG::onePassAntiAliasingOnOff].value;
+            switch(binding.prototype->native.coverage){
+            case OriginalUiCoverage50KG::aa0:return sourceAa==0;
+            case OriginalUiCoverage50KG::fourSampleAa1:
+                if(sourceAa!=1)return false;nextCoverage=true;return true;
+            default:return false;
+            }
+        };
         const auto add=[&](std::uint32_t index){
             if(index==unresolved)return true;
             if(index>=needed.size()||!textures->texture(index))return false;
@@ -516,7 +396,7 @@ bool OriginalUiRiderDrawContribution50KG::nativeResidencyImages(
         // their complete image/frame closures; this is not visibility parity.
         for(const auto& binding:s.bindings)
             if(binding.kind==RegistrationKind::existingStatic){
-                if(!binding.sourceRegistered||!add(binding.image))return fail(d,E::material);
+                if(!binding.sourceRegistered||!coverage(binding)||!add(binding.image))return fail(d,E::material);
             }
         bool pod=false;
         for(std::uint16_t id=1;id<120;++id)if(models[id]){
@@ -528,26 +408,35 @@ bool OriginalUiRiderDrawContribution50KG::nativeResidencyImages(
             for(std::uint32_t slot=0;slot<material->materialCount();++slot)
                 for(std::uint32_t ordinal=0;ordinal<material->passCount(slot);++ordinal){
                     const auto* pass=material->pass(slot,ordinal);if(!pass)return fail(d,E::material);
-                    if(pass->imageIndex==unresolved)continue;
-                    const auto* map=s.backend->modelImage(id,pass->imageIndex);
-                    if(!map||!add(map->combinedIndex))return fail(d,E::bank);
+                    std::uint32_t image=unresolved;
+                    if(pass->imageIndex!=unresolved){
+                        const auto* map=s.backend->modelImage(id,pass->imageIndex);
+                        if(!map||!add(map->combinedIndex))return fail(d,E::bank);
+                        image=map->combinedIndex;
+                    }
                     bool policy=false;
                     for(const auto& binding:s.bindings)
-                        if(binding.kind==RegistrationKind::ledgerDynamic&&binding.pass==&pass->source&&binding.image==map->combinedIndex){policy=true;break;}
+                        if(binding.kind==RegistrationKind::ledgerDynamic&&binding.pass==&pass->source&&binding.image==image){policy=coverage(binding);break;}
                     if(!policy)return fail(d,E::material);
                 }
         }
         // Real binder material ownership is independent of parent clipping.
-        if(pod){const auto* images=s.binderAssets->images();
-            if(!images||!images->textures())return fail(d,E::resource);
+        if(pod){const auto* images=s.binderAssets->images();const auto* pass=s.binderAssets->pass();
+            if(!images||!images->textures()||!pass)return fail(d,E::resource);
             for(std::uint32_t i=0;i<images->textures()->textureCount();++i){
                 const auto* map=s.backend->binderImage(i);if(!map||!add(map->combinedIndex))return fail(d,E::bank);
+                bool policy=false;
+                for(const auto& binding:s.bindings)
+                    if(binding.kind==RegistrationKind::ledgerDynamic&&binding.pass==pass&&binding.image==map->combinedIndex){
+                        policy=coverage(binding);break;
+                    }
+                if(!policy)return fail(d,E::material);
             }
         }
         std::vector<std::uint32_t> next;
         for(std::uint32_t i=0;i<needed.size();++i)if(needed[i])next.push_back(i);
         if(next.empty())return fail(d,E::bank);
-        output=std::move(next);return true;
+        output=std::move(next);requiresCoverage=nextCoverage;return true;
     }catch(...){return fail(d,E::allocation);}
 }
 bool OriginalUiRiderDrawContribution50KG::consumeMaterials(bool rebuild,D& d) noexcept {

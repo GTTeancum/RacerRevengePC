@@ -4,7 +4,7 @@
 namespace rr::platform {
 // Explicit currently bound tracks only. This is not the broader original SCB
 // metadata catalog and never means that an incomplete dynamic world is complete.
-enum class HostTrack50IM : std::uint8_t { TA, GC, GA, MA, SA, RA, MB, SC, TC, RC, TB };
+enum class HostTrack50IM : std::uint8_t { TA, GC, GA, MA, SA, RA, MB, SC, TC, RC, TB, GB, MC };
 struct HostTrackAdmission50IM {
     bool gcIncompleteWorld = false; // Explicit acknowledgement for diagnostic/legacy GC paths.
     bool gcMode2 = false;           // Explicit RR_RACE_MODE=2; never auto-selected.
@@ -14,24 +14,28 @@ struct HostTrackAdmission50IM {
     // does not imply profile unlocks or completed destination preparation.
     bool gcNativeWorldRequested = false;
     bool raNativeWorldRequested = false; // Explicit bounded native RA cold request; runtime checks remain mandatory.
-    bool mbNativeWorldRequested = false; // Explicit Wan/MB process-local request; actual owners remain mandatory.
-    bool scNativeWorldRequested = false; // Exact Gasgano/SC process-local request; real owners still required.
-    bool tcNativeWorldRequested = false; // Exact Tzidik/TC cold request only; real owners required.
-    bool rcNativeWorldRequested = false; // Exact Scorch/RC cold request only; real owners required.
-    bool tbNativeWorldRequested = false; // Exact Sebulba/TB request; actual owners required.
+    bool mbNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.
+    bool scNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.
+    bool tcNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.
+    bool rcNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.
+    bool tbNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.
+    bool gbNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.
+    bool mcNativeWorldRequested = false; // Shared native cold request capability; original profile unlocks and actual owners are independent.
 };
 inline constexpr bool validHostTrack50IM(HostTrack50IM track) noexcept {
     return track == HostTrack50IM::TA || track == HostTrack50IM::GC || track == HostTrack50IM::GA ||
-        track == HostTrack50IM::MA || track == HostTrack50IM::SA || track == HostTrack50IM::RA || track == HostTrack50IM::MB || track == HostTrack50IM::SC || track == HostTrack50IM::TC || track == HostTrack50IM::RC || track == HostTrack50IM::TB;
+        track == HostTrack50IM::MA || track == HostTrack50IM::SA || track == HostTrack50IM::RA || track == HostTrack50IM::MB || track == HostTrack50IM::SC || track == HostTrack50IM::TC || track == HostTrack50IM::RC || track == HostTrack50IM::TB || track == HostTrack50IM::GB || track == HostTrack50IM::MC;
 }
 inline constexpr const char* hostTrackCode50IM(HostTrack50IM track) noexcept {
     return track == HostTrack50IM::TA ? "TA" : track == HostTrack50IM::GC ? "GC" :
         track == HostTrack50IM::GA ? "GA" : track == HostTrack50IM::MA ? "MA" :
-        track == HostTrack50IM::SA ? "SA" : track == HostTrack50IM::RA ? "RA" : track == HostTrack50IM::MB ? "MB" : track == HostTrack50IM::SC ? "SC" : track == HostTrack50IM::TC ? "TC" : track == HostTrack50IM::RC ? "RC" : track == HostTrack50IM::TB ? "TB" : nullptr;
+        track == HostTrack50IM::SA ? "SA" : track == HostTrack50IM::RA ? "RA" : track == HostTrack50IM::MB ? "MB" : track == HostTrack50IM::SC ? "SC" : track == HostTrack50IM::TC ? "TC" : track == HostTrack50IM::RC ? "RC" : track == HostTrack50IM::TB ? "TB" : track == HostTrack50IM::GB ? "GB" : track == HostTrack50IM::MC ? "MC" : nullptr;
 }
 inline constexpr bool hostTrackAdmitted50IM(HostTrack50IM track,
     const HostTrackAdmission50IM& admission) noexcept {
     return track == HostTrack50IM::TA ||
+        (track == HostTrack50IM::MC && admission.mcNativeWorldRequested && admission.gcMode2) ||
+        (track == HostTrack50IM::GB && admission.gbNativeWorldRequested && admission.gcMode2) ||
         (track == HostTrack50IM::TB && admission.tbNativeWorldRequested && admission.gcMode2) ||
         (track == HostTrack50IM::RC && admission.rcNativeWorldRequested && admission.gcMode2) ||
         (track == HostTrack50IM::TC && admission.tcNativeWorldRequested && admission.gcMode2) ||

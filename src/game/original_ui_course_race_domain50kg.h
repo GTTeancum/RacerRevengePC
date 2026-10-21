@@ -9,7 +9,7 @@ namespace rr::game {
 // eight-racer field (1/3/4/7/8/9/10/11) or authenticated supplemental POD02/12/15/19/20/22. The real
 // UI unlock owner must independently admit selection, and cold loading must
 // authenticate that selected pod. Never replace an unsupported rider with19.
-inline constexpr std::array<std::uint32_t,18> nativeCourseRacers50KG{{1,2,3,4,7,8,9,10,11,12,15,16,19,20,22,24,17,18}};
+inline constexpr std::array<std::uint32_t,23> nativeCourseRacers50KG{{1,2,3,4,7,8,9,10,11,12,15,16,19,20,22,24,17,18,23,14,21,25,26}};
 inline constexpr bool nativeCourseRacerOwned50KG(std::uint32_t racer60) noexcept {
     for(const auto owned:nativeCourseRacers50KG)if(owned==racer60)return true;
     return false;
@@ -28,7 +28,9 @@ inline constexpr bool nativeCourseTrackOwned50KG(std::uint32_t course,
         (course==10&&planet==1&&sourceSlot==11)||
         (course==2&&planet==0&&sourceSlot==13)||
         (course==3&&planet==2&&sourceSlot==12)||
-        (course==1&&planet==0&&sourceSlot==6);
+        (course==1&&planet==0&&sourceSlot==6)||
+        (course==9&&planet==1&&sourceSlot==8)||
+        (course==6&&planet==5&&sourceSlot==10);
 }
 
 }

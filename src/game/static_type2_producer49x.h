@@ -7,6 +7,8 @@
 #include "native_trigger_group50ga.h"
 #include "native_trigger_group50tc.h"
 #include "native_trigger_group50tb.h"
+#include "native_trigger_group50gb.h"
+#include "native_trigger_group50mc.h"
 #include "native_trigger_box_geometry50ma.h"
 
 namespace rr::game {
@@ -67,6 +69,9 @@ struct Type2StaticCandidate49X {
     NativeTriggerGroup50TC* nativeTriggersTC=nullptr;
     // Distinct exact TB16/2 source owner; exclusive with every other schema.
     NativeTriggerGroup50TB* nativeTriggersTB=nullptr;
+    NativeTriggerGroup50MC* nativeTriggersMC=nullptr;
+    // Distinct exact GB18/5 source owner; exclusive with every other schema.
+    NativeTriggerGroup50GB* nativeTriggersGB=nullptr;
 };
 struct Type2WorkItem49X { std::uint16_t queryTag,targetTag; };
 struct Type2Visit49X {

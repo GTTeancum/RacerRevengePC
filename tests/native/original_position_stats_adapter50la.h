@@ -113,6 +113,8 @@ private:
         rr::game::TrackNavigationView50EU mbMap{};
         rr::game::TrackNavigationView50TC tcMap{};
         rr::game::TrackNavigationView50TB tbMap{};
+        rr::game::TrackNavigationView50GB gbMap{};
+        rr::game::TrackNavigationView50MC mcMap{};
         std::array<float,3> center{};
         float headingE4=0;
         std::array<std::array<float,3>,8> racerCenters{};
@@ -130,7 +132,13 @@ private:
         const bool mb=c.actual_.actualRadarMapMb.gatesPrepared();
         const bool tc=c.actual_.actualRadarMapTc.gatesPrepared();
         const bool tb=c.actual_.actualRadarMapTb.gatesPrepared();
-        if(tb?(tc||mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapTb.runtimeValid()||
+        const bool gb=c.actual_.actualRadarMapGb.gatesPrepared();
+        const bool mc=c.actual_.actualRadarMapMc.gatesPrepared();
+        if(mc?(gb||tb||tc||mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapMc.runtimeValid()||
+               c.actual_.actualRadarMapMc.role()!=rr::game::NavigationRole50MC::Map||c.actual_.actualRadarMapMc.count()!=173u):
+           gb?(tb||tc||mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapGb.runtimeValid()||
+               c.actual_.actualRadarMapGb.role()!=rr::game::NavigationRole50GB::Map):
+           tb?(tc||mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapTb.runtimeValid()||
                c.actual_.actualRadarMapTb.role()!=rr::game::NavigationRole50TB::Map):
            tc?(mb||c.actual_.actualRadarMapB8||!c.actual_.actualRadarMapTc.runtimeValid()||
                c.actual_.actualRadarMapTc.role()!=rr::game::NavigationRole50TC::Map):
@@ -141,6 +149,8 @@ private:
         try {
             RadarObservation next;next.map=c.actual_.actualRadarMapB8;
             if(tb)next.tbMap=c.actual_.actualRadarMapTb;
+            if(gb)next.gbMap=c.actual_.actualRadarMapGb;
+            if(mc)next.mcMap=c.actual_.actualRadarMapMc;
             if(tc)next.tcMap=c.actual_.actualRadarMapTc;
             if(mb)next.mbMap=c.actual_.actualRadarMapMb;
             next.publication=observation.cameraPublication;

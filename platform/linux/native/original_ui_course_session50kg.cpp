@@ -8,9 +8,6 @@
 #include "../../../src/assets/original_ui_course_background50kg.h"
 namespace rr::platform {
 namespace {
-bool supportedRider(std::uint32_t rider) noexcept {
-    switch(rider){case 2:case 3:case 4:case 7:case 8:case 9:case 10:case 11:case 12:case 15:case 16:case 19:case 20:case 22:case 24:case 17:case 18:return true;default:return false;}
-}
 using S=OriginalUiCourseSessionStatus50KG;using D=OriginalUiCourseSessionDiagnostic50KG;
 using Phase=game::OriginalUiTransitionPhase50KG;using Life=game::OriginalUiTransitionLifecycle50KG;
 using Notice=game::OriginalUiTransitionNotificationKind50KG;using Completion=game::OriginalUiTransitionCompletion50KG;
@@ -36,8 +33,8 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
 }
 bool bounded(const game::OriginalUiCourseRememberedProfile50KG& p,const OriginalUiMainProfile50KG& common)noexcept{
     constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
-    return (!p.sebulbaTbTest||(!p.scorchRcTest&&!p.tzidikTcTest&&!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&(!p.scorchRcTest||(!p.tzidikTcTest&&!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&(!p.tzidikTcTest||(!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&!(p.wanMbTest&&p.mawhonicRylothTest)&&(!p.gasganoScTest||(!p.wanMbTest&&!p.mawhonicRylothTest))&&p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700>=1&&p.course700<=(p.sebulbaTbTest?6u:p.scorchRcTest?12u:p.tzidikTcTest?13u:(p.gasganoScTest?9u:(p.wanMbTest?7u:(p.mawhonicRylothTest?5u:4u))))&&p.subtype70C==1&&
-        p.laps704>=1&&p.laps704<=25&&p.entrants708==8&&!p.cardFlag100BC&&(p.availability11018&31)==(p.sebulbaTbTest?6u:p.scorchRcTest?12u:p.tzidikTcTest?13u:(p.gasganoScTest?9u:(p.wanMbTest?7u:(p.mawhonicRylothTest?5u:4u))))&&
+    return p.ownerReady&&p.mode34==0&&common.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C==1&&
+        p.laps704>=1&&p.laps704<=25&&p.entrants708==8&&!p.cardFlag100BC&&(p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
         ((common.playerBits1125C>>5)&3)==1&&p.courseOrder100C4==order&&
         p.planet0Primary79C==0xc2a684&&p.planet0Secondary7A0==0x80674a;
 }
@@ -45,6 +42,8 @@ bool bounded(const game::OriginalUiCourseRememberedProfile50KG& p,const Original
 struct OriginalUiCourseSession50KG::Storage {
     OriginalUiCourseSessionCold50KG cold;OriginalUiCourseSessionSnapshot50KG state{};D faultDetail{};
     bool sebulbaTbTest=false;
+    bool kraidGbTest=false;
+    bool youngAnakinMcTest=false;
     bool scorchRcTest=false;
     bool tzidikTcTest=false;
     bool gasganoScTest=false; // Captured from the retained owner at bind.
@@ -94,7 +93,7 @@ struct OriginalUiCourseSession50KG::Storage {
         return w&&w->popupClones438()&&w->popupTemplatesHidden438()&&!w->popupEnabled438();
     }
     bool testProfileCurrent(const game::OriginalUiCourseRememberedProfile50KG& p)const noexcept{
-        return p.sebulbaTbTest==sebulbaTbTest&&p.sebulbaTbTest==cold.profile->sebulbaTbTestProfile()&&p.scorchRcTest==scorchRcTest&&p.scorchRcTest==cold.profile->scorchRcTestProfile()&&p.tzidikTcTest==tzidikTcTest&&p.tzidikTcTest==cold.profile->tzidikTcTestProfile()&&p.gasganoScTest==gasganoScTest&&p.gasganoScTest==cold.profile->gasganoScTestProfile();}
+        return p.youngAnakinMcTest==youngAnakinMcTest&&p.youngAnakinMcTest==cold.profile->youngAnakinMcTestProfile()&&p.kraidGbTest==kraidGbTest&&p.kraidGbTest==cold.profile->kraidGbTestProfile()&&p.sebulbaTbTest==sebulbaTbTest&&p.sebulbaTbTest==cold.profile->sebulbaTbTestProfile()&&p.scorchRcTest==scorchRcTest&&p.scorchRcTest==cold.profile->scorchRcTestProfile()&&p.tzidikTcTest==tzidikTcTest&&p.tzidikTcTest==cold.profile->tzidikTcTestProfile()&&p.gasganoScTest==gasganoScTest&&p.gasganoScTest==cold.profile->gasganoScTestProfile();}
     bool profileCurrent()const noexcept{game::OriginalUiCourseRememberedProfile50KG p;
         return cold.profile->courseSnapshot(p)&&bounded(p,*cold.commonProfile)&&testProfileCurrent(p)&&
             (!entered||sameStamp(cold.profile->stamp(),liveStamp))&&(!entered||(p.packed1125E>>5)==state.selectedPlanet40);}
@@ -117,7 +116,9 @@ struct OriginalUiCourseSession50KG::Storage {
         if(!selection.control(static_cast<std::uint16_t>(state.courseSlot14E4),control)||
             control.planet40!=state.selectedPlanet40||control.course44!=state.selectedCourse44)return false;
         c={};c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;
-        c.mode34=0;c.packed1125C=cold.commonProfile->playerBits1125C;c.firstControllerPresent=true;
+        OriginalUiRiderProfileOwner50KG::CourseRaceSelection retained;
+        if(!cold.profile->courseRaceSnapshot(retained))return false;
+        c.mode34=0;c.packed1125C=retained.packed1125C;c.firstControllerPresent=true;
         c.confirmEnabled42C=(state.promptMask42C&1)!=0;c.courseSlot14E4=static_cast<std::uint16_t>(state.courseSlot14E4);
         c.subtypeSlot14F4=static_cast<std::uint16_t>(state.subtypeSlot14F4);
         c.courseGroupSlotCount=static_cast<std::uint16_t>(selection.page()->groups[1].controls.size());
@@ -127,7 +128,7 @@ struct OriginalUiCourseSession50KG::Storage {
     }
     bool widgetProfile(game::OriginalUiCourseWidgetProfile50KG& out)const noexcept{
         game::OriginalUiCourseRememberedProfile50KG p;if(!cold.profile->courseSnapshot(p)||!bounded(p,*cold.commonProfile)||!testProfileCurrent(p))return false;
-        out={};out.mawhonicRylothTest=p.mawhonicRylothTest;out.wanMbTest=p.wanMbTest;out.gasganoScTest=p.gasganoScTest;out.tzidikTcTest=p.tzidikTcTest;out.scorchRcTest=p.scorchRcTest;out.sebulbaTbTest=p.sebulbaTbTest;out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
+        out={};out.mawhonicRylothTest=p.mawhonicRylothTest;out.wanMbTest=p.wanMbTest;out.gasganoScTest=p.gasganoScTest;out.tzidikTcTest=p.tzidikTcTest;out.scorchRcTest=p.scorchRcTest;out.sebulbaTbTest=p.sebulbaTbTest;out.kraidGbTest=p.kraidGbTest;out.youngAnakinMcTest=p.youngAnakinMcTest;out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
         out.flags100BC=p.cardFlag100BC?1:0;out.flags11018=p.availability11018;
         out.flags1125C=cold.commonProfile->playerBits1125C;out.courseRecords100C4=p.courseOrder100C4;return true;
     }
@@ -220,11 +221,13 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         s->tzidikTcTest=cold.profile->tzidikTcTestProfile();
         s->scorchRcTest=cold.profile->scorchRcTestProfile();
         s->sebulbaTbTest=cold.profile->sebulbaTbTestProfile();
+        s->kraidGbTest=cold.profile->kraidGbTestProfile();
+        s->youngAnakinMcTest=cold.profile->youngAnakinMcTestProfile();
         if(!s->processCurrent()||!s->profileCurrent()||s->coldStamp.generation>std::numeric_limits<std::uint64_t>::max()-2)return result(d,S::profile);
         if(!s->selection.load(cold.courseArchive,d.selection))return result(d,S::resource);
         game::OriginalUiCourseRememberedProfile50KG p;game::OriginalUiCourseEntryPrefix50KG entry;
         if(!cold.profile->courseSnapshot(p)||game::planOriginalUiCourseEntryPrefix50KG(s->selection,p,entry)!=game::OriginalUiCourseSelectionStatus50KG::ok||
-            entry.courseSlot14E4>(p.sebulbaTbTest?6u:p.scorchRcTest?12u:p.tzidikTcTest?13u:(p.gasganoScTest?9u:(p.wanMbTest?7u:(p.mawhonicRylothTest?5u:4u))))||!assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40)||entry.showPopup438)return result(d,S::profile,0x1DA618);
+            entry.courseSlot14E4>13u||!assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40)||entry.showPopup438)return result(d,S::profile,0x1DA618);
         if(!game::prepareOriginalUiCourseCamera50KG(*cold.courseArchive,s->camera,d.camera)||
            !game::prepareOriginalUiCourseRenderContext50KG(*cold.courseArchive,s->camera,s->renderContext,d.renderContext))return result(d,S::camera);
         if(!game::prepareOriginalUiCourseLighting50KG(*cold.courseArchive,s->lighting,d.lighting))return result(d,S::lighting);
@@ -237,7 +240,7 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         //1DDF00 stores BA0 from the actual English owner, capacity40. Visible
         // course names remain their authored control text widgets27/31/32/28.
         constexpr std::uint32_t ids[]={11,15,12,16,14,13};
-        for(auto planet:{0u,1u,4u,5u,2u}){if(planet==2&&!cold.profile->mawhonicRylothTestProfile()&&!cold.profile->wanMbTestProfile()&&!cold.profile->gasganoScTestProfile()&&!cold.profile->tzidikTcTestProfile()&&!cold.profile->scorchRcTestProfile()&&!cold.profile->sebulbaTbTestProfile())continue;const auto* text=cold.english->at(ids[planet]);if(!text)return result(d,S::resource,0x1DDF64);
+        for(auto planet:{0u,1u,4u,5u,2u}){const auto* text=cold.english->at(ids[planet]);if(!text)return result(d,S::resource,0x1DDF64);
             s->planetNamesBA0[planet]=text->text.substr(0,40);
             if(cold.resources->backgroundImage(planet)==assets::unresolvedMaterialTexture50EA)return result(d,S::resource,0x1DDF00);}
         if(!s->collector.bind(cold.resources,cold.holograms,d.draw)||!s->collector.prepareBank(d.draw))return result(d,S::draw);
@@ -264,12 +267,11 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
         valid=s->requested&&!s->entered&&t.initialRestartPending&&t.lifecycle==Life::idle&&t.phase==Phase::none&&e.sourcePC==0x2A3C58;
         if(!valid)break;
         game::OriginalUiCourseRememberedProfile50KG p;game::OriginalUiCourseEntryPrefix50KG entry;
-        const auto stamp=s->cold.profile->stamp();std::uint8_t packed=0;std::uint32_t comparison=0;
+        const auto stamp=s->cold.profile->stamp();OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
         valid=s->profileCurrent()&&stamp.mode34==0&&stamp.generation==s->coldStamp.generation+1&&
-            s->cold.profile->riderConfirmSnapshot(packed,comparison)&&
-            supportedRider(packed>>3)&&comparison==static_cast<std::uint32_t>(packed>>3)&&
+            s->cold.profile->courseRiderSelectionSnapshot(rider)&&
             s->cold.profile->courseSnapshot(p)&&game::planOriginalUiCourseEntryPrefix50KG(s->selection,p,entry)==game::OriginalUiCourseSelectionStatus50KG::ok&&
-            !entry.showPopup438&&entry.courseSlot14E4<=(p.sebulbaTbTest?6u:p.scorchRcTest?12u:p.tzidikTcTest?13u:(p.gasganoScTest?9u:(p.wanMbTest?7u:(p.mawhonicRylothTest?5u:4u))))&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);
+            !entry.showPopup438&&entry.courseSlot14E4<=13&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);
         if(!valid){s->fault(S::profile,0x1DA4A0);break;}
         if(s->cold.lightManager->activeUiIdentity()!=s->cold.courseArchive->identity()||
             !s->cold.lightManager->publishCourseRegistry(s->lighting,s->faultDetail.lightManager)){s->fault(S::lighting,0x1CDB10);break;}
@@ -364,7 +366,7 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
         const auto before=*navigation;const auto stamp=s->cold.profile->stamp();
         const auto planned=game::planOriginalUiCourseMove50KG(s->selection,before,profile,forward,move);
         if(planned==game::OriginalUiCourseSelectionStatus50KG::noChange)return result(d,S::noChange);
-        if(planned!=game::OriginalUiCourseSelectionStatus50KG::ok||move.courseSlot14E4>(profile.sebulbaTbTest?6u:profile.scorchRcTest?12u:profile.tzidikTcTest?13u:(profile.gasganoScTest?9u:(profile.wanMbTest?7u:(profile.mawhonicRylothTest?5u:4u))))||
+        if(planned!=game::OriginalUiCourseSelectionStatus50KG::ok||move.courseSlot14E4>13u||
            !assets::originalUiCourseBackgroundName50KG(move.selectedControl.planet40)||
            s->cold.resources->backgroundImage(move.selectedControl.planet40)==assets::unresolvedMaterialTexture50EA||
            stamp.generation==std::numeric_limits<std::uint64_t>::max())return result(d,S::unsupportedState,move.sourcePC);

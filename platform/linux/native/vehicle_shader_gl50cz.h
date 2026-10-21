@@ -34,6 +34,8 @@ constexpr std::uint32_t vehicleGlUvAttribute50CZ = 1;
 constexpr std::uint32_t vehicleGlColorAttribute50CZ = 2;
 constexpr std::uint32_t vehicleGlNormalAttribute50CZ = 3;
 constexpr std::uint32_t vehicleGlSpecularUvAttribute50LA = 4;
+// Separate float scalar in source byte units [0,255], not a normalized color.
+constexpr std::uint32_t vehicleGlSourceFogAttribute50LA = 5;
 constexpr std::uint32_t vehicleGlColorOutput50CZ = 0;
 
 struct VehicleGlShaderUniforms50CZ {
@@ -61,12 +63,18 @@ struct VehicleGlShaderUniforms50CZ {
     std::int32_t nativeGcDiffuse[3] = {-1, -1, -1};
     std::int32_t nativeGcDirection[3] = {-1, -1, -1};
     // Explicit base-map original packed-RGB MODULATE; bypasses host lighting.
-    // Generated color uses its own noperspective varying. Unpaired alpha stays 1.
+    // Generated color uses its own noperspective varying. Legacy unpaired
+    // alpha stays 1 unless the distinct single-map RGBA capability is enabled.
     std::int32_t useSourceDiffuseCompressed50LA = -1;
     // 0 preserves legacy opaque alpha, 1 writes paired base RGBA, 2 performs
     // the ordered source map-2 equation using the current destination byte A.
     std::int32_t sourcePairPass50LA = -1, sourcePairFog50LA = -1;
     std::int32_t sourcePairDestination50LA = -1, sourcePairAlphaTest50LA = -1;
+    // Independent static single-map RGBA path. Fog RGB is vec4.xyz in byte units (padding W=0);
+    // the scalar byte fog attribute is interpolated screen-linearly. All four
+    // locations are required even when this opt-in capability is disabled.
+    std::int32_t sourceSingleDiffuseRgba50LA = -1, sourceSingleFogColor50LA = -1;
+    std::int32_t sourceSingleFogEnabled50LA = -1, sourceSingleAlphaTest50LA = -1;
 };
 
 enum class VehicleGlShaderStage50CZ : std::uint8_t {

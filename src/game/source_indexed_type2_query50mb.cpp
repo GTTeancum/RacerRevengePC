@@ -107,10 +107,10 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
      !g.read(c.candidate.sceneName,c.candidate.sceneNameBytes)||t.filter.identity!=o.movementMirrors[i].collision.filter.identity)return false;
  }
  for(std::size_t i=0;i<count;++i){if(indices[i]>=ownerCount)return false;const auto& c=owners[indices[i]];const auto& t=c.candidate.collision;
-  if(c.shapeType==0){if(c.nativeTriggersTB||c.nativeTriggersTC||c.nativeTriggers||c.gate||c.nativeTriggerIndex||t.hasResponseCallbackE8||!mesh(t.geometry.mesh,c.nodeRadii,c.nodeRadiusCount))return false;}
-  else if(c.shapeType==1){if(c.nativeTriggersTB||c.nativeTriggersTC||c.nativeTriggers||c.gate||c.nativeTriggerIndex||t.hasResponseCallbackE8||!g.read(c.compound,1)||c.compound->count>maxCompoundMembers50IJ||!g.read(c.compound->parts,c.compound->count))return false;
+  if(c.shapeType==0){if(c.nativeTriggersGB||c.nativeTriggersMC||c.nativeTriggersTB||c.nativeTriggersTC||c.nativeTriggers||c.gate||c.nativeTriggerIndex||t.hasResponseCallbackE8||!mesh(t.geometry.mesh,c.nodeRadii,c.nodeRadiusCount))return false;}
+  else if(c.shapeType==1){if(c.nativeTriggersGB||c.nativeTriggersMC||c.nativeTriggersTB||c.nativeTriggersTC||c.nativeTriggers||c.gate||c.nativeTriggerIndex||t.hasResponseCallbackE8||!g.read(c.compound,1)||c.compound->count>maxCompoundMembers50IJ||!g.read(c.compound->parts,c.compound->count))return false;
    for(std::size_t j=0;j<c.compound->count;++j){const auto& a=c.compound->parts[j];if(!mesh(a.mesh,a.nodeRadii,a.nodeRadiusCount))return false;}}
-  else if(c.shapeType==5||c.shapeType==6){if(c.nativeTriggersTB||c.nativeTriggersTC||c.gate||c.raOriginalTriggerSegments||c.nativeTriggers!=&o.triggers||
+  else if(c.shapeType==5||c.shapeType==6){if(c.nativeTriggersGB||c.nativeTriggersMC||c.nativeTriggersTB||c.nativeTriggersTC||c.gate||c.raOriginalTriggerSegments||c.nativeTriggers!=&o.triggers||
     c.nativeTriggerIndex>=o.triggers.triggers.size()||t.filter.identity!=o.triggers.triggers[c.nativeTriggerIndex].collider.identity||
     t.shapeType!=c.shapeType||t.compound||t.geometry.mesh||t.filter.categoryA4!=8u||!t.hasResponseCallbackE8||
     nativeTriggerCollider50GA(o.triggers,o.filter.identity)==o.triggers.colliders.size()||

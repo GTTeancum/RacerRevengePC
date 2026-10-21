@@ -21,6 +21,15 @@ inline bool convertOriginalUiLitMaterialSpan50KM(
         next.span.materialMode=OriginalUiMaterialMode50KG::sourceDiffuseCompressed;break;
     default:return false;
     }
+    switch(material.coverage){
+    case assets::OriginalUiCoveragePolicy50KM::aa0: break;
+    case assets::OriginalUiCoveragePolicy50KM::fourSampleAa1:
+        if(material.program!=assets::OriginalUiLitProgram50KM::diffuseCompressed ||
+           material.raster.blend!=assets::OriginalUiMaterialBlend50KG::sourceAlpha ||
+           material.alphaTestGreaterZero)return false;
+        next.native.coverage=OriginalUiCoverage50KG::fourSampleAa1;break;
+    default:return false;
+    }
     next.native.sourceFogEnabled=material.fogEnabled;
     next.native.sourceAlphaTestGreaterZero=material.alphaTestGreaterZero;
     output=next;return true;

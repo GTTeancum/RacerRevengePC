@@ -158,6 +158,62 @@ struct AiRuntimeInput50TB {
 };
 // TB-CONSUMER-END 0
 
+// GB-CONSUMER-BEGIN 0
+struct AiRuntimeInput50GB {
+    TrackNavigationView50GB mapFF0{};
+    TrackNavigationView50GB aiFF4{};
+    TrackNavigationView50GB orientationTrackBC{};
+    AiTrackMetadataView50GB aiMetadata{};
+    // Borrow the actual selected aggregate world; final views retain its lifetime.
+    const LiveZoneWorld50EN* actualWorld=nullptr;
+    const AiTrackTuning50IU* tuning=nullptr;
+    const AiObservedRacer50IV* racers=nullptr;
+    std::size_t racerCount=0;
+    const AiRaceFields50IV* raceFields=nullptr;
+    const LapTimingFields50ID* timing=nullptr;
+    //Borrow the actual race94 owner. Consumed only by genuine state6 ending;
+    //manager30, racerCB8 and HOST race seconds are not substitutes.
+    const float* raceCountdown94=nullptr;
+    AiApplicationGlobals50IV* applicationGlobals=nullptr;
+    std::uint32_t actualZoneOrdinal48=0,managerHumanCount34=0;
+    std::uint8_t settings1125C=0;
+    float aiTrackLength3C=0.f;
+    bool raceOwnersBound=false,settings188F60Nonzero=false;
+    ai_combat_distance50LH::DiagnosticSink combatDiagnostic=nullptr;
+    void* combatDiagnosticContext=nullptr;
+    BodyContactIdentity48R (*resolveBody340)(const void*,std::uint32_t) noexcept=nullptr;
+    const void* body340Context=nullptr;
+};
+// GB-CONSUMER-END 0
+
+// MC-CONSUMER-BEGIN 0
+struct AiRuntimeInput50MC {
+    TrackNavigationView50MC mapFF0{};
+    TrackNavigationView50MC aiFF4{};
+    TrackNavigationView50MC orientationTrackBC{};
+    AiTrackMetadataView50MC aiMetadata{};
+    // Borrow the actual selected aggregate world; final views retain its lifetime.
+    const LiveZoneWorld50EN* actualWorld=nullptr;
+    const AiTrackTuning50IU* tuning=nullptr;
+    const AiObservedRacer50IV* racers=nullptr;
+    std::size_t racerCount=0;
+    const AiRaceFields50IV* raceFields=nullptr;
+    const LapTimingFields50ID* timing=nullptr;
+    //Borrow the actual race94 owner. Consumed only by genuine state6 ending;
+    //manager30, racerCB8 and HOST race seconds are not substitutes.
+    const float* raceCountdown94=nullptr;
+    AiApplicationGlobals50IV* applicationGlobals=nullptr;
+    std::uint32_t actualZoneOrdinal48=0,managerHumanCount34=0;
+    std::uint8_t settings1125C=0;
+    float aiTrackLength3C=0.f;
+    bool raceOwnersBound=false,settings188F60Nonzero=false;
+    ai_combat_distance50LH::DiagnosticSink combatDiagnostic=nullptr;
+    void* combatDiagnosticContext=nullptr;
+    BodyContactIdentity48R (*resolveBody340)(const void*,std::uint32_t) noexcept=nullptr;
+    const void* body340Context=nullptr;
+};
+// MC-CONSUMER-END 0
+
 namespace navigation_consumer_detail50MB {
 template<class Input> struct RuntimeTypes;
 template<> struct RuntimeTypes<AiRuntimeInput50IV> {
@@ -185,6 +241,22 @@ template<> struct RuntimeTypes<AiRuntimeInput50TB> {
     using AttackInput=AiAttackSpeedInput50TB;
 };
 // TB-CONSUMER-END 1
+
+// GB-CONSUMER-BEGIN 1
+template<> struct RuntimeTypes<AiRuntimeInput50GB> {
+    using RouteOwners=AiRouteChoiceOwners50GB;
+    using CandidateInput=AiCombatCandidateInput50GB;
+    using AttackInput=AiAttackSpeedInput50GB;
+};
+// GB-CONSUMER-END 1
+
+// MC-CONSUMER-BEGIN 1
+template<> struct RuntimeTypes<AiRuntimeInput50MC> {
+    using RouteOwners=AiRouteChoiceOwners50MC;
+    using CandidateInput=AiCombatCandidateInput50MC;
+    using AttackInput=AiAttackSpeedInput50MC;
+};
+// MC-CONSUMER-END 1
 
 }
 struct AiRuntimeReceipt50IV {
@@ -265,8 +337,28 @@ inline bool driveOriginalAiAdmission50MB(const AiRuntimeInput50TB& in) noexcept 
 }
 // TB-CONSUMER-END 2
 
+// GB-CONSUMER-BEGIN 2
+inline bool driveOriginalAiAdmission50MB(const AiRuntimeInput50GB& in) noexcept {
+    return in.actualWorld&&in.mapFF0.sameWorld(*in.actualWorld)&&
+        navigation_consumer_detail50MB::pairReady(in.mapFF0,in.aiFF4)&&
+        navigation_consumer_detail50MB::aiJoined(in.aiFF4,in.aiMetadata)&&
+        navigation_consumer_detail50MB::aiReady(in.orientationTrackBC)&&
+        in.orientationTrackBC.sameOwner(in.aiFF4);
+}
+// GB-CONSUMER-END 2
+
+// MC-CONSUMER-BEGIN 2
+inline bool driveOriginalAiAdmission50MB(const AiRuntimeInput50MC& in) noexcept {
+    return in.actualWorld&&in.mapFF0.sameWorld(*in.actualWorld)&&
+        navigation_consumer_detail50MB::pairReady(in.mapFF0,in.aiFF4)&&
+        navigation_consumer_detail50MB::aiJoined(in.aiFF4,in.aiMetadata)&&
+        navigation_consumer_detail50MB::aiReady(in.orientationTrackBC)&&
+        in.orientationTrackBC.sameOwner(in.aiFF4);
+}
+// MC-CONSUMER-END 2
+
 template<class Input>
-    requires (std::is_same_v<Input,AiRuntimeInput50IV>||std::is_same_v<Input,AiRuntimeInput50MB>||std::is_same_v<Input,AiRuntimeInput50TC>||std::is_same_v<Input,AiRuntimeInput50TB>)
+    requires (std::is_same_v<Input,AiRuntimeInput50IV>||std::is_same_v<Input,AiRuntimeInput50MB>||std::is_same_v<Input,AiRuntimeInput50TC>||std::is_same_v<Input,AiRuntimeInput50TB>||std::is_same_v<Input,AiRuntimeInput50GB>||std::is_same_v<Input,AiRuntimeInput50MC>)
 inline bool driveOriginalAi50IVShared50MB(VehicleFrameState49W&frame,const VehicleFrameBindings49W&bindings,
     VehicleFrameParameters49W&parameters,TrackNavigationProgress50EU&progress,
     const float previousCA0[4],std::uint32_t&lapCC8,BoostState50FK&thermal,
@@ -619,5 +711,43 @@ inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBin
     return driveOriginalAi50IVShared50MB(frame,bindings,parameters,progress,previousCA0,lapCC8,thermal,ai,in,receipt);
 }
 // TB-CONSUMER-END 3
+
+// GB-CONSUMER-BEGIN 3
+inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBindings49W&bindings,
+    VehicleFrameParameters49W&parameters,TrackNavigationProgress50EU&progress,
+    const float previousCA0[4],std::uint32_t&lapCC8,BoostState50FK&thermal,
+    AiRuntimeState50IV&ai,const AiRuntimeInput50GB&in,AiRuntimeReceipt50IV&receipt) noexcept {
+    // Reject incomplete/mixed authentic owners before a source frame or RNG
+    // prefix starts. Same role plus same owner pins the orientation graph too.
+    if(!in.actualWorld||!in.mapFF0.sameWorld(*in.actualWorld)||
+       !navigation_consumer_detail50MB::pairReady(in.mapFF0,in.aiFF4)||
+       !navigation_consumer_detail50MB::aiJoined(in.aiFF4,in.aiMetadata)||
+       !navigation_consumer_detail50MB::aiReady(in.orientationTrackBC)||
+       !in.orientationTrackBC.sameOwner(in.aiFF4)) {
+        receipt={};receipt.sourceBoundary=0x16e9c0u;receipt.stateFE8=ai.state.aiStateFE8;
+        receipt.physicalResetPending=ai.physicalReset2255B0Pending;return false;
+    }
+    return driveOriginalAi50IVShared50MB(frame,bindings,parameters,progress,previousCA0,lapCC8,thermal,ai,in,receipt);
+}
+// GB-CONSUMER-END 3
+
+// MC-CONSUMER-BEGIN 3
+inline bool driveOriginalAi50IV(VehicleFrameState49W&frame,const VehicleFrameBindings49W&bindings,
+    VehicleFrameParameters49W&parameters,TrackNavigationProgress50EU&progress,
+    const float previousCA0[4],std::uint32_t&lapCC8,BoostState50FK&thermal,
+    AiRuntimeState50IV&ai,const AiRuntimeInput50MC&in,AiRuntimeReceipt50IV&receipt) noexcept {
+    // Reject incomplete/mixed authentic owners before a source frame or RNG
+    // prefix starts. Same role plus same owner pins the orientation graph too.
+    if(!in.actualWorld||!in.mapFF0.sameWorld(*in.actualWorld)||
+       !navigation_consumer_detail50MB::pairReady(in.mapFF0,in.aiFF4)||
+       !navigation_consumer_detail50MB::aiJoined(in.aiFF4,in.aiMetadata)||
+       !navigation_consumer_detail50MB::aiReady(in.orientationTrackBC)||
+       !in.orientationTrackBC.sameOwner(in.aiFF4)) {
+        receipt={};receipt.sourceBoundary=0x16e9c0u;receipt.stateFE8=ai.state.aiStateFE8;
+        receipt.physicalResetPending=ai.physicalReset2255B0Pending;return false;
+    }
+    return driveOriginalAi50IVShared50MB(frame,bindings,parameters,progress,previousCA0,lapCC8,thermal,ai,in,receipt);
+}
+// MC-CONSUMER-END 3
 
 } //namespace rr::game

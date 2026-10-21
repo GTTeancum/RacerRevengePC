@@ -509,6 +509,12 @@ bool buildVehicleDraw50CM(const VehicleFrameState49W& state, const VehicleFrameB
     if (sourceColors && sourceColors->prepareSpecular50LA &&
         !prepareSourceSpecularGeometry(graph, root, selection, mesh, *rootWorld, next, d))
         return false;
+    if (sourceColors && sourceColors->prepareSpecular50LA && sourceColors->modelPackets50LA) {
+        if (!mesh.semanticScene || !sourceColors->modelPackets50LA->retainDrawGeometry50LA(
+            *mesh.semanticScene,next.sourceRootWorld50LA,next.sourceAggregateBounds50LA,
+            next.sourceGeometryRevision50LA))return reject(d,VehicleDrawError50CM::sourceSpecular);
+        next.sourceGeometryModel50LA=sourceColors->modelPackets50LA;
+    }
     if (sourceColors) {
         next.sourceColorMaterialModes50LA = sourceColors->materialModes;
         next.sourceColorMaterialCount50LA = sourceColors->materialCount;

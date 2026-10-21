@@ -106,4 +106,24 @@ inline bool distanceBetweenNodes2A2DC0(const AiTrackMetadataView50TB& metadata,
 }
 // TB-CONSUMER-END 0
 
+// GB-CONSUMER-BEGIN 0
+inline bool distanceBetweenNodes2A2DC0(const AiTrackMetadataView50GB& metadata,
+    std::uint32_t targetNode,std::int32_t targetLap,
+    std::uint32_t selfNode,std::int32_t selfLap,float& output,Receipt& receipt,
+    DiagnosticSink diagnostic=nullptr,void* diagnosticContext=nullptr) noexcept {
+    if(!navigation_consumer_detail50MB::metadataReady(metadata)) {receipt={};receipt.error=Error::Owner;receipt.sourcePC=0x2a2de0u;return false;}
+    return distanceBetweenNodes2A2DC0Shared50MB(metadata,targetNode,targetLap,selfNode,selfLap,output,receipt,diagnostic,diagnosticContext);
+}
+// GB-CONSUMER-END 0
+
+// MC-CONSUMER-BEGIN 0
+inline bool distanceBetweenNodes2A2DC0(const AiTrackMetadataView50MC& metadata,
+    std::uint32_t targetNode,std::int32_t targetLap,
+    std::uint32_t selfNode,std::int32_t selfLap,float& output,Receipt& receipt,
+    DiagnosticSink diagnostic=nullptr,void* diagnosticContext=nullptr) noexcept {
+    if(!navigation_consumer_detail50MB::metadataReady(metadata)) {receipt={};receipt.error=Error::Owner;receipt.sourcePC=0x2a2de0u;return false;}
+    return distanceBetweenNodes2A2DC0Shared50MB(metadata,targetNode,targetLap,selfNode,selfLap,output,receipt,diagnostic,diagnosticContext);
+}
+// MC-CONSUMER-END 0
+
 } //namespace rr::game::ai_combat_distance50LH

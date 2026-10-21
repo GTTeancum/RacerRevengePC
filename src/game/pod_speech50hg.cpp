@@ -12,17 +12,14 @@ float sub(float a,float b) noexcept {volatile float v=a-b;return v;}
 float add(float a,float b) noexcept {volatile float v=a+b;return v;}
 bool finite(float v) noexcept{return std::isfinite(v);}
 bool countsValid(const PodSpeechCounts50HG& c) noexcept {
-    const bool pod01=c.lowDamage==4&&c.wallHit==4&&c.passed==6&&c.attacked==5&&
-        c.passing==6&&c.attacking==6&&c.death==4&&c.win==3&&c.lose==2;
-    // POD03/04/07/08/09/10/11 author exactly these same counts, authenticated
-    // per selected archive. Their actual category filenames remain distinct.
-    const bool otherRetained=c.lowDamage==2&&c.wallHit==3&&c.passed==3&&c.attacked==3&&
-        c.passing==4&&c.attacking==4&&c.death==3&&c.win==3&&c.lose==3;
-    // Own POD19 SOUNDS.INI SHA24c40bf4...fdfaa3ec; these are different
-    // category lengths, not an alias of POD01's voice or selection cursors.
-    const bool pod19=c.lowDamage==5&&c.wallHit==6&&c.passed==7&&c.attacked==6&&
-        c.passing==6&&c.attacking==6&&c.death==3&&c.win==4&&c.lose==4;
-    return pod01||otherRetained||pod19;
+    // Original 2C1170 reads authored counts, stores bytes at 214..21C,
+    // then initializes cursors from each count with the shared 308030 RNG.
+    // No racer identity or count-vector allowlist exists in that routine.
+    // uint8_t preserves the source byte domain; zero cannot support an index.
+    // Authenticated category/PCM availability remains a cold-loader contract,
+    // not a restriction on this shared numeric selection kernel.
+    return c.lowDamage && c.wallHit && c.passed && c.attacked &&
+        c.passing && c.attacking && c.death && c.win && c.lose;
 }
 std::uint32_t draw(std::uint32_t& raw) noexcept {
     raw=raw*0x41c64e6du+0x3039u;return raw&0x7fffffffu;

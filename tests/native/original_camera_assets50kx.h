@@ -6,6 +6,7 @@
 #include "../../src/assets/import_decode48c.h"
 #include "rc_cold_sources50la.h"
 #include "tb_cold_sources50la.h"
+#include "gb_cold_sources50la.h"
 #include <memory>
 #include <utility>
 
@@ -19,6 +20,7 @@ private:
     // Owner access and final release enforce the issuing thread.
     std::shared_ptr<const rc_cold_sources50LA::Owner> rcSource_;
     std::shared_ptr<const tb_cold_sources50LA::Owner> tbSource_;
+    std::shared_ptr<const gb_cold_sources50LA::Owner> gbSource_;
 public:
 
     std::vector<std::uint8_t> cam,tob;
@@ -29,7 +31,7 @@ public:
         const std::string& pod,const std::vector<std::uint8_t>& actualPhy,
         std::shared_ptr<const rc_cold_sources50LA::Owner> source) {
         using runtime_startup50fl::require;
-        require(cam.empty()&&tob.empty()&&!rcSource_&&!tbSource_,
+        require(cam.empty()&&tob.empty()&&!rcSource_&&!tbSource_&&!gbSource_,
             "RC camera authoring requires fresh storage");
         require(track.world&&track_session_assets50IG::codeEquals(track.world->code,"RC")&&
             track.archiveBytes==4655141u&&track.archiveSha256&&std::string(track.archiveSha256)==
@@ -60,7 +62,7 @@ public:
         const std::string& pod,const std::vector<std::uint8_t>& actualPhy,
         std::shared_ptr<const tb_cold_sources50LA::Owner> source) {
         using runtime_startup50fl::require;
-        require(cam.empty()&&tob.empty()&&!tbSource_&&!rcSource_,
+        require(cam.empty()&&tob.empty()&&!tbSource_&&!rcSource_&&!gbSource_,
             "TB camera authoring requires fresh storage");
         require(track.world&&track_session_assets50IG::codeEquals(track.world->code,"TB")&&
             track.archiveBytes==3749557u&&track.archiveSha256&&std::string(track.archiveSha256)==
@@ -84,6 +86,37 @@ public:
         inputs={cam.data(),cam.size(),reinterpret_cast<const char*>(actualPhy.data()),actualPhy.size(),
             static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&actualPhy)),
             sourceTob.data(),sourceTob.size(),rr::game::OriginalCameraStartCourse::tb};
+    }
+    // GB Application path: borrow the already authenticated complete TOB.
+    // Complete GB authoring remains borrowed from its one retained compact source.
+    void loadGb(const track_session_assets50IG::SessionAssets& track,
+        const std::string& pod,const std::vector<std::uint8_t>& actualPhy,
+        std::shared_ptr<const gb_cold_sources50LA::Owner> source) {
+        using runtime_startup50fl::require;
+        require(cam.empty()&&tob.empty()&&!gbSource_&&!rcSource_&&!tbSource_,
+            "GB camera authoring requires fresh storage");
+        require(track.world&&track_session_assets50IG::codeEquals(track.world->code,"GB")&&
+            track.archiveBytes==4088586u&&track.archiveSha256&&std::string(track.archiveSha256)==
+                "e92af24305431dc5a96cebb5ebcf89159adb6d371045b2c5424dacd1f74b7d99"&&
+            source&&source->ready(),
+            "GB camera requires the authenticated retained GB source");
+        require(pod.size()==5&&pod[0]=='P'&&pod[1]=='O'&&pod[2]=='D'&&
+            pod[3]>='0'&&pod[3]<='9'&&pod[4]>='0'&&pod[4]<='9'&&!actualPhy.empty(),
+            "original camera requires actual selected pod authoring");
+        const auto& sourceTob=source->originalTob();
+        require(sourceTob.size()==20617u&&pod_materials50ed_fixture::detail::sha256(sourceTob)==
+            "96469b3953b18d940bd0c8772758c68a75a69c3375b49ef98b966901c2e598d1",
+            "GB camera retained TOB identity rejected");
+        auto selectedCam=runtime_startup50fl::readBytes(
+            std::filesystem::path("work/native/project/disc/PODS")/pod/(pod+".CAM"));
+        require(!selectedCam.empty(),"original camera selected CAM unavailable");
+        // All throwing validation precedes publication. The actual selected
+        // PHY remains borrowed from its existing retained original racer rig.
+        cam=std::move(selectedCam);
+        gbSource_=std::move(source);
+        inputs={cam.data(),cam.size(),reinterpret_cast<const char*>(actualPhy.data()),actualPhy.size(),
+            static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(&actualPhy)),
+            sourceTob.data(),sourceTob.size(),rr::game::OriginalCameraStartCourse::gb};
     }
     void load(const track_session_assets50IG::SessionAssets& track,
         const std::string& pod,const std::vector<std::uint8_t>& actualPhy) {

@@ -1,4 +1,3 @@
-#include "../../../src/game/original_ui_course_race_domain50kg.h"
 // Source-reviewed bounded Course integration; runtime acceptance is pending.
 #include "original_ui_frontend50kg.h"
 #include <thread>
@@ -9,8 +8,9 @@
 
 namespace rr::platform {
 namespace {
-bool supportedRider(std::uint32_t rider) noexcept {
-    switch(rider){case 1:case 2:case 3:case 4:case 7:case 8:case 9:case 10:case 11:case 12:case 15:case 16:case 19:case 20:case 22:case 24:case 17:case 18:return true;default:return false;}
+bool riderCanConfirm(const OriginalUiRiderProfileOwner50KG& profile,std::uint32_t rider) noexcept {
+    OriginalUiRiderProfileOwner50KG::RiderSelectionFacts facts;
+    return profile.riderSelectionFacts(rider,facts)&&facts.unlock10FAC!=0;
 }
 using Status=OriginalUiFrontendStatus50KG;
 using Diagnostic=OriginalUiFrontendDiagnostic50KG;
@@ -280,7 +280,9 @@ struct OriginalUiFrontend50KG::Storage {
            !cold.profile||!cold.profile->known||cold.profile->mode34!=0||
            (cold.profile->playerBits1125C&0x60)!=0x20)return false;
         game::OriginalUiCourseRememberedProfile50KG p;
-        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&(!p.sebulbaTbTest||(!p.scorchRcTest&&!p.tzidikTcTest&&!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&(!p.scorchRcTest||(!p.tzidikTcTest&&!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&(!p.tzidikTcTest||(!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&!(p.wanMbTest&&p.mawhonicRylothTest)&&(!p.gasganoScTest||(!p.wanMbTest&&!p.mawhonicRylothTest))&&p.mode34==0&&p.course700>=1&&p.course700<=(p.sebulbaTbTest?6u:p.scorchRcTest?12u:p.tzidikTcTest?13u:(p.gasganoScTest?9u:(p.wanMbTest?7u:(p.mawhonicRylothTest?5u:4u))))&&p.subtype70C==1&&
+        return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&
+            (p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
+            p.course700>=1&&p.course700<=13&&p.subtype70C==1&&
             p.laps704>=1&&p.laps704<=25&&p.entrants708==8&&!p.cardFlag100BC&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
             p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
     }
@@ -366,20 +368,29 @@ struct OriginalUiFrontend50KG::Storage {
         profile.playerBits1125C=static_cast<std::uint8_t>((profile.playerBits1125C&~0x60u)|decision.originalPlayerBits);
         return s.pending->rider->acceptEntryProfileCommit(before,expected,false);
     }
-    bool courseLaunchProposal(OriginalUiRiderProfileOwner50KG::CourseRaceSelection& selection)const noexcept {
-        if(!cold.courseRaceDestination||!active||!active->course||pending||
-           !active->course->routeProposalCurrent(courseProposal)||
-           courseProposal.decision.request.kind!=game::OriginalUiRouteKind50KG::courseLaunch)return false;
-        game::OriginalUiCourseContext50KG c;std::uint8_t rider=0;std::uint32_t comparison=0;
-        if(!active->course->routeContext(courseProposal,c)||!cold.riderProfile->riderConfirmSnapshot(rider,comparison)||
-           c.mode34!=0||c.subtypeSlot14F4!=1||c.laps14EC<1||c.laps14EC>25||c.entrants14F0!=8||
-           !game::nativeCourseRacerOwned50KG(rider>>3)||comparison!=(rider>>3)||((c.packed1125C>>5)&3)!=1)return false;
+    bool courseLaunchProposal(OriginalUiRiderProfileOwner50KG::CourseRaceSelection& selection,
+        game::OriginalCourseLoadAvailability50KG* reason=nullptr)const noexcept {
+        using A=game::OriginalCourseLoadAvailability50KG;
+        const auto reject=[&](A why){if(reason)*reason=why;return false;};
+        if(!cold.courseRaceDestination||!active||!active->course||pending)return reject(A::hostNotReady);
+        if(!active->course->routeProposalCurrent(courseProposal)||
+           courseProposal.decision.request.kind!=game::OriginalUiRouteKind50KG::courseLaunch)return reject(A::invalidSelection);
+        game::OriginalUiCourseContext50KG c;
+        OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
+        if(!active->course->routeContext(courseProposal,c)||
+           !cold.riderProfile->courseRiderSelectionSnapshot(rider))return reject(A::invalidSelection);
         const auto actual=active->course->snapshot();
-        if(!game::nativeCourseTrackOwned50KG(c.selectedControlWord44,actual.selectedPlanet40,c.courseSlot14E4)||
-           actual.selectedCourse44!=c.selectedControlWord44)return false;
-        selection={c.selectedControlWord44,actual.selectedPlanet40,std::uint32_t(rider>>3),1,c.laps14EC,8,
-            static_cast<std::uint16_t>(c.laps14EC|(1u<<5)|(7u<<7)|(std::uint32_t(rider>>3)<<11))};
-        return cold.courseRaceDestination->admits(selection);
+        if(actual.selectedCourse44!=c.selectedControlWord44)return reject(A::invalidSelection);
+        // Original control data and retained profile determine identities. Native
+        // mode/resource capability is checked separately, never as an unlock.
+        selection={c.selectedControlWord44,actual.selectedPlanet40,rider.rider,c.subtypeSlot14F4,
+            c.laps14EC,c.entrants14F0,game::originalCourseLaunchPackedMode050KG(
+                c.packed1125C,c.subtypeSlot14F4,c.laps14EC,c.entrants14F0)};
+        if(!game::originalCourseSelectionEncoding50KG(selection))return reject(A::invalidSelection);
+        if(c.mode34!=0||!game::nativeSingleHumanCourseMode50KG(selection))return reject(A::unsupportedNativeMode);
+        const auto availability=cold.courseRaceDestination->availability(selection);
+        if(reason)*reason=availability;
+        return availability==A::ready;
     }
     static bool admitCourse(void* p) noexcept {
         auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
@@ -429,7 +440,7 @@ struct OriginalUiFrontend50KG::Storage {
             if(decision.request.targetScreen==4&&s.destination({4,1}))
                 return s.cold.riderProfile->commitBack(decision,s.riderProposal.profileStamp);
             if(decision.request.targetScreen!=6||!s.courseInputsReady()||!s.destination({6,1})||!s.pending->course||
-               !s.pending->course->canEnterMode(0)||!supportedRider(decision.selectedRider)||decision.profileChanges.count!=3||
+               !s.pending->course->canEnterMode(0)||!riderCanConfirm(*s.cold.riderProfile,decision.selectedRider)||decision.profileChanges.count!=3||
                decision.request.sourcePC!=0x1EA604)return false;
             return s.cold.riderProfile->commitRiderConfirmToCourse(decision,s.riderProposal.profileStamp);
         }
@@ -539,7 +550,7 @@ struct OriginalUiFrontend50KG::Storage {
                 if(!courseInputsReady()||prospectiveMode!=0||!active||!active->rider||!same(active->currentRoute(),{5,1})){
                     result(d,Status::unavailableDestination);return false;}
                 OriginalUiCourseColdInput50KG input;input.appStart=cold.appStart;input.course=cold.course;
-                input.prepareRylothBackground=cold.riderProfile->mawhonicRylothTestProfile()||cold.riderProfile->wanMbTestProfile()||cold.riderProfile->gasganoScTestProfile()||cold.riderProfile->tzidikTcTestProfile()||cold.riderProfile->scorchRcTestProfile()||cold.riderProfile->sebulbaTbTestProfile();
+                input.prepareRylothBackground=true; // Original background resource, independent of test-pair provenance.
                 input.fonts=cold.fonts;input.backgrounds=cold.backgrounds;input.controllerPopup=cold.controllerPopup;
                 input.overlays=cold.overlays;input.english=&english;input.runtime=cold.runtime;
                 input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};
@@ -908,7 +919,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
                proposal.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||proposal.request.sourceScreen!=5||
                proposal.request.sourcePage!=1||proposal.request.targetScreen!=(confirm?6:4)||proposal.request.targetPage!=1)
                 return s->fault(d,Status::transition);
-            if(confirm&&(!s->courseInputsReady()||!supportedRider(proposal.selectedRider)||proposal.profileChanges.count!=3||
+            if(confirm&&(!s->courseInputsReady()||!riderCanConfirm(*s->cold.riderProfile,proposal.selectedRider)||proposal.profileChanges.count!=3||
                proposal.request.sourcePC!=0x1EA604))return result(d,receipt.status=Status::unavailableDestination);
             if(!s->prepareDestination({static_cast<std::uint8_t>(confirm?6:4),1},receipt,d))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
             if(!s->active->rider->routeProposalCurrent(s->riderProposal))return s->fault(d,Status::transition);
@@ -929,7 +940,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         if(status==CourseStatus::confirmProposed){
             s->courseProposal=receipt.course.routeProposal;
             OriginalUiRiderProfileOwner50KG::CourseRaceSelection selection;
-            if(!s->courseLaunchProposal(selection))return result(d,receipt.status=Status::unavailableDestination,0x1DED58);
+            if(!s->courseLaunchProposal(selection,&d.courseLoad))return result(d,receipt.status=Status::unavailableDestination,0x1DED58);
             auto admitted=s->courseProposal.decision;
             if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
                admitted.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::courseLaunchOwner))

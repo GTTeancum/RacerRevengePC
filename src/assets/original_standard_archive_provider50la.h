@@ -11,6 +11,8 @@
 namespace original_main_entry50KG { struct Application; }
 namespace rc_cold_sources50LA { class Owner; }
 namespace tb_cold_sources50LA { class Owner; }
+namespace gb_cold_sources50LA { class Owner; }
+namespace mc_cold_sources50LA { class Owner; }
 namespace rr::assets {
 class OriginalArchiveStagedReader50LA;
 // The actual bounded NATIVE Application mount set. This is not a claim that
@@ -172,6 +174,8 @@ public:
 private:
     friend class ::rc_cold_sources50LA::Owner;
     friend class ::tb_cold_sources50LA::Owner;
+    friend class ::gb_cold_sources50LA::Owner;
+    friend class ::mc_cold_sources50LA::Owner;
     friend struct ::original_main_entry50KG::Application;
     bool issueStagedReader(const original_main_entry50KG::Application&,
         const std::shared_ptr<OriginalStandardArchiveProvider50LA>&,
@@ -188,12 +192,20 @@ private:
         // Distinct complete authenticated TB compact source; never an RC retag.
         std::shared_ptr<const tb_cold_sources50LA::Owner> tbSource;
         std::thread::id tbThread{};
+        // Distinct complete authenticated GB source; every member stays retained.
+        std::shared_ptr<const gb_cold_sources50LA::Owner> gbSource;
+        std::thread::id gbThread{};
+        // Distinct complete authenticated MC source, with exact typed lifetime.
+        std::shared_ptr<const mc_cold_sources50LA::Owner> mcSource;
+        std::thread::id mcThread{};
         // Immutable private row identities, never a caller-set lookup flag.
         std::size_t rcSpecmapEarlierMount=static_cast<std::size_t>(-1);
         std::size_t rcSpecmapEarlierOrdinal=static_cast<std::size_t>(-1);
         std::size_t rcSpecmapOrdinal=static_cast<std::size_t>(-1);
         ~Mount(){if((rcSource&&rcThread!=std::this_thread::get_id())||
-            (tbSource&&tbThread!=std::this_thread::get_id()))std::terminate();}
+            (tbSource&&tbThread!=std::this_thread::get_id())||
+            (gbSource&&gbThread!=std::this_thread::get_id())||
+            (mcSource&&mcThread!=std::this_thread::get_id()))std::terminate();}
         std::vector<Row> rows;
     };
     static constexpr std::size_t maxMounts=64,maxEntries=65536,maxBytes=256u*1024u*1024u;
@@ -212,14 +224,16 @@ private:
     static bool fail(Diagnostic& d,Status s)noexcept{d.status=s;return false;}
     bool retainedSourcesAccessible()const noexcept {
         for(const auto& m:mounts_)if((m->rcSource&&m->rcThread!=std::this_thread::get_id())||
-            (m->tbSource&&m->tbThread!=std::this_thread::get_id()))return false;
+            (m->tbSource&&m->tbThread!=std::this_thread::get_id())||
+            (m->gbSource&&m->gbThread!=std::this_thread::get_id())||
+            (m->mcSource&&m->mcThread!=std::this_thread::get_id()))return false;
         return true;
     }
     bool commit(std::unique_ptr<Mount> next,Diagnostic& d) {
         if(!retainedSourcesAccessible())return fail(d,Status::identity);
         for(std::size_t m=0;m<mounts_.size();++m)if(sameName(mounts_[m]->name,next->name)){
             d.mount=m;const auto& old=*mounts_[m];
-            if(old.rcSource!=next->rcSource||old.tbSource!=next->tbSource||old.digest!=next->digest||old.archiveBytes!=next->archiveBytes||
+            if(old.rcSource!=next->rcSource||old.tbSource!=next->tbSource||old.gbSource!=next->gbSource||old.mcSource!=next->mcSource||old.digest!=next->digest||old.archiveBytes!=next->archiveBytes||
                old.rows.size()!=next->rows.size())return fail(d,Status::identity);
             for(std::size_t i=0;i<old.rows.size();++i){d.ordinal=i;
                 if(old.rows[i].name!=next->rows[i].name||old.rows[i].offset!=next->rows[i].offset||

@@ -5,6 +5,8 @@
 #include "tc_original_world50lm.h"
 #include "rc_cold_sources50la.h"
 #include "tb_cold_sources50la.h"
+#include "gb_cold_sources50la.h"
+#include "mc_cold_sources50la.h"
 #include "pod_materials50ed_fixture.h"
 #include "../../src/assets/import_world48f.h"
 #include <array>
@@ -19,7 +21,7 @@ namespace original_track_sky50KX {
 // The native root samples at presentation from its current recovered camera,
 // rather than claiming the complete retail world-service/render chronology.
 class Owner final {
-    std::array<std::int32_t,25> zoneCube_{};
+    std::array<std::int32_t,28> zoneCube_{};
     std::uint32_t zoneCount_=0;
     bool prepared_=false;
     static const std::string* field(const rr::assets::ParameterBlock48F& block,
@@ -146,12 +148,38 @@ public:
             "c3536c6e76dc4d6836ee154aabc80f5e73bd80e85189b841538b3a3ce53e8184",
             10u,"tb.cub",error);
     }
+    // GB selects its one authored file; its seven internal cube payloads are
+    // distinct from EnvironmentInfo's single authored cube-file selection.
+    bool prepareGbSource(const gb_cold_sources50LA::Owner& source,std::string& error){
+        if(prepared_){error="source sky selection is cold one-shot";return false;}
+        if(!source.ready()){error="actual authenticated GB source owner required";return false;}
+        std::vector<std::uint8_t> cube;rr::assets::DecodeError48C diagnostic;
+        if(!source.extractMember("skies\\gb.cub",cube,diagnostic,304110u)||cube.size()!=304110u||
+           pod_materials50ed_fixture::detail::sha256(cube)!="6b97ffd55d8aad11819d2696cc2366bf0303a42ebc65219b9ef4f4214a94a59c"){
+            error="GB sky selection requires its authentic gb.cub source";return false;
+        }
+        return prepareAuthenticated(source.world(),401867u,
+            "ed0eb494f8c91df5264e120bad3780016f67f297f259572d48a3e7a56aad27bb",
+            13u,"gb.cub",error);
+    }
+    bool prepareMcSource(const mc_cold_sources50LA::Owner& source,std::string& error){
+        if(prepared_){error="source sky selection is cold one-shot";return false;}
+        if(!source.ready()){error="actual authenticated MC source owner required";return false;}
+        std::vector<std::uint8_t> cube;rr::assets::DecodeError48C diagnostic;
+        if(!source.archive().extractMember("skies\\mcset4.cub",cube,diagnostic,194342u)||cube.size()!=194342u||
+           pod_materials50ed_fixture::detail::sha256(cube)!="ff3eb5a3e3480a04fe3bf3a85ab2d9113803f6fbd2b5301be43a2ff471a64383"){
+            error="MC sky selection requires its authentic mcset4.cub source";return false;
+        }
+        return prepareAuthenticated(source.world(),187711u,
+            "26f5d637533ee9840e916e02d5cef7b06d68352f1b7e0b11a48bf050d73df51e",
+            28u,"mcset4.cub",error);
+    }
 private:
     bool prepareAuthenticated(const rr::assets::World48F& world,std::size_t bytes,
         const char* hash,std::size_t zones,const char* cubeName,std::string& error){
         if(world.parameters.original_bytes.size()!=bytes||
            pod_materials50ed_fixture::detail::sha256(world.parameters.original_bytes)!=hash||
-           world.zones.size()!=zones){
+           world.zones.size()!=zones||zones>zoneCube_.size()){
             error="source sky selection requires its actual authenticated SCB";return false;
         }
         const rr::assets::ParameterBlock48F* environment=nullptr;

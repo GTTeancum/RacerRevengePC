@@ -5,8 +5,11 @@
 #include <cfenv>
 #include <cmath>
 #include <cstring>
+#include <exception>
 #include <limits>
+#include <new>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace rr::game {
@@ -190,6 +193,58 @@ bool readOriginalGcParticleText50KG(const Bytes& bytes,std::size_t expectedBytes
     try {Document result;if(!readText(bytes,result))return false;output=std::move(result);return true;}
     catch(...){return false;}
 }
+namespace {
+// Allocator copies borrow this stable subobject of the nonmoving Storage.
+// It is declared before the vector and therefore destroyed after the vector.
+// No callback, allocation, shared_ptr or independent control block is needed.
+struct EmitterAllocation50KG {
+    std::size_t live=0,peak=0,quota=0;
+    bool bound=false,attempted=false,terminal=false;
+    Status failure=Status::complete;
+    void reject(Status status) noexcept {
+        if(attempted){terminal=true;if(failure==Status::complete)failure=status;}
+    }
+};
+template<class T> struct EmitterAllocator50KG {
+    using value_type=T;
+    using is_always_equal=std::false_type;
+    using propagate_on_container_move_assignment=std::false_type;
+    using propagate_on_container_swap=std::false_type;
+    EmitterAllocation50KG* state=nullptr;
+    explicit EmitterAllocator50KG(EmitterAllocation50KG* s=nullptr) noexcept:state(s){}
+    template<class U> EmitterAllocator50KG(const EmitterAllocator50KG<U>& other) noexcept:state(other.state){}
+    T* allocate(std::size_t n) {
+        if(!state)throw std::bad_alloc{};
+        if(n>std::numeric_limits<std::size_t>::max()/sizeof(T)){
+            state->reject(Status::capacity);throw std::bad_alloc{};
+        }
+        const auto bytes=n*sizeof(T);
+        if(state->terminal||bytes>std::numeric_limits<std::size_t>::max()-state->live||
+           (state->bound&&(state->live>state->quota||bytes>state->quota-state->live))){
+            state->reject(Status::capacity);throw std::bad_alloc{};
+        }
+        // Keep the old vector allocation charged. A reserve/push_back request
+        // may exceed the requested capacity; it must fit WITHOUT guessing the
+        // implementation's growth factor. Reject before the upstream call.
+        state->live+=bytes;state->peak=std::max(state->peak,state->live);
+        try{return std::allocator<T>{}.allocate(n);}
+        catch(...){state->live-=bytes;state->reject(Status::allocation);throw;}
+    }
+    void deallocate(T* pointer,std::size_t n) noexcept {
+        if(!state||n>std::numeric_limits<std::size_t>::max()/sizeof(T)||
+           n*sizeof(T)>state->live)std::terminate();
+        std::allocator<T>{}.deallocate(pointer,n);
+        state->live-=n*sizeof(T);
+    }
+    template<class U> bool operator==(const EmitterAllocator50KG<U>& other) const noexcept{return state==other.state;}
+    template<class U> bool operator!=(const EmitterAllocator50KG<U>& other) const noexcept{return !(*this==other);}
+};
+using EmitterVector50KG=std::vector<OriginalGcParticleEmitterState50KG,
+    EmitterAllocator50KG<OriginalGcParticleEmitterState50KG>>;
+static_assert(std::is_nothrow_copy_constructible<OriginalGcParticleEmitterState50KG>::value&&
+    std::is_nothrow_move_constructible<OriginalGcParticleEmitterState50KG>::value,
+    "registry reservation does not add a throwing element migration");
+}
 struct OriginalGcParticleManager50KG::Storage {
     std::array<OriginalGcParticle50KG,originalGcParticleCapacity50KG> pool{};
     // Source active/free pointer permutation survives removals; swapping whole
@@ -198,7 +253,8 @@ struct OriginalGcParticleManager50KG::Storage {
     std::vector<OriginalGcParticleGroup50KG> groups;
     std::vector<OriginalGcParticleFrame50KG> frames;
     std::string atlasTextureMap;
-    std::vector<OriginalGcParticleEmitterState50KG> emitters;
+    EmitterAllocation50KG emitterAllocation{};
+    EmitterVector50KG emitters;
     FogDefinition fog{};
     OriginalGcParticleAuxiliaryChild50KG auxiliaryChild{};
     std::array<float,3> fireOffset{};
@@ -207,7 +263,13 @@ struct OriginalGcParticleManager50KG::Storage {
     std::array<std::int32_t,3> fogCurrentFrames{};
     std::size_t count=0;
     bool gcFogAuthoring=false,fogPopulated=false,fogPopulationAttempted=false;
-    Storage(){for(std::size_t i=0;i<pool.size();++i)order[i]=&pool[i];}
+    Storage():emitters(EmitterAllocator50KG<OriginalGcParticleEmitterState50KG>{&emitterAllocation}){
+        for(std::size_t i=0;i<pool.size();++i)order[i]=&pool[i];
+    }
+    Storage(const Storage&)=delete;
+    Storage& operator=(const Storage&)=delete;
+    Storage(Storage&&)=delete;
+    Storage& operator=(Storage&&)=delete;
 };
 OriginalGcParticleManager50KG::OriginalGcParticleManager50KG() noexcept=default;
 OriginalGcParticleManager50KG::~OriginalGcParticleManager50KG()=default;
@@ -286,10 +348,18 @@ OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::prepareTrackAtlas160
         auto next=std::make_unique<Storage>();next->atlasTextureMap=texture->text;
         next->groups.resize(static_cast<std::size_t>(groups));
         next->frames.resize(static_cast<std::size_t>(frames));
+        // Original161900..161948 reads metadata without clamping LastFrame.
+        // Authenticated MC declares152 frames but Group9 ends at152. Preserve
+        // that exact source metadata, not a synthetic153rd frame. frame(152)
+        // remains null and real render consumers fail closed before dereference.
+        const bool mcAuthoredEndpoint=prt.size()==10770&&hashMatches(prt.data(),prt.size(),
+            "a92a82d85adea560886fc0e6911baede2f11e9448b9ac4365bf7037e9e809020");
         for(std::size_t i=0;i<next->groups.size();++i){
             auto& g=next->groups[i];const auto* section=findSection(atlas,"Group"+std::to_string(i));
             if(!integer(section,"TypeID",g.type)||!integer(section,"FirstFrame",g.first)||
-               !integer(section,"LastFrame",g.last)||g.first<0||g.last<g.first||g.last>=frames)
+               !integer(section,"LastFrame",g.last)||g.first<0||g.last<g.first||
+               (g.last>=frames&&!(mcAuthoredEndpoint&&frames==152&&groups==10&&
+                 i==9&&g.type==8&&g.first==129&&g.last==152)))
                 return Status::authoredData;
         }
         for(std::size_t i=0;i<next->frames.size();++i){
@@ -330,8 +400,54 @@ const OriginalGcParticleAuxiliaryChild50KG* OriginalGcParticleManager50KG::auxil
     return storage_?&storage_->auxiliaryChild:nullptr;
 }
 std::uint32_t OriginalGcParticleManager50KG::registerEmitter(const OriginalGcParticleEmitterState50KG& e) noexcept {
-    if(!storage_||!group(e.particleGroup)||storage_->emitters.size()>=originalGcParticleCapacity50KG)return 0;
-    try{storage_->emitters.push_back(e);return static_cast<std::uint32_t>(storage_->emitters.size());}catch(...){return 0;}
+    if(!storage_||storage_->emitterAllocation.terminal||!group(e.particleGroup)||
+       storage_->emitters.size()>=originalGcParticleCapacity50KG)return 0;
+    try{storage_->emitters.push_back(e);return static_cast<std::uint32_t>(storage_->emitters.size());}
+    catch(...){storage_->emitterAllocation.reject(Status::allocation);return 0;}
+}
+std::size_t OriginalGcParticleManager50KG::retainedStoragePayloadBytes() const noexcept {
+    if(!storage_)return 0;
+    return sizeof(Storage)+storage_->groups.capacity()*sizeof(OriginalGcParticleGroup50KG)+
+        storage_->frames.capacity()*sizeof(OriginalGcParticleFrame50KG)+storage_->atlasTextureMap.capacity()+1+
+        storage_->emitters.capacity()*sizeof(OriginalGcParticleEmitterState50KG);
+}
+std::size_t OriginalGcParticleManager50KG::emitterRegistryReservationMetadataBytes() noexcept {
+    // Charge the entire replacement vector descriptor rather than guessing
+    // an ABI-specific difference from std::vector<Row>. Add a whole Storage
+    // alignment for each inserted/replaced field, conservatively covering
+    // inter-field/tail padding. No new heap control block is created.
+    return sizeof(EmitterAllocation50KG)+sizeof(EmitterVector50KG)+2u*alignof(Storage);
+}
+OriginalGcEmitterRegistryReservation50KG OriginalGcParticleManager50KG::emitterRegistryReservation() const noexcept {
+    OriginalGcEmitterRegistryReservation50KG result{};
+    if(!storage_)return result;
+    const auto& a=storage_->emitterAllocation;
+    result.registeredEmitters=storage_->emitters.size();result.reservedEmitters=storage_->emitters.capacity();
+    result.retainedPayloadBytes=a.live;result.peakPayloadBytes=a.peak;result.reservedPeakPayloadBytes=a.quota;
+    result.allocationBound=a.bound;result.reservationAttempted=a.attempted;result.terminal=a.terminal;
+    return result;
+}
+std::size_t OriginalGcParticleManager50KG::emitterRegistryPayloadReservationBytes() const noexcept {
+    return storage_&&storage_->emitterAllocation.bound?storage_->emitterAllocation.quota:0u;
+}
+OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::reserveAdditionalEmitters(
+    std::size_t additional,std::size_t quota,OriginalGcEmitterRegistryReservation50KG& result) noexcept {
+    result=emitterRegistryReservation();if(!storage_)return Status::unprepared;
+    auto& s=*storage_;auto& a=s.emitterAllocation;
+    if(a.attempted)return Status::alreadyPrepared;
+    a.attempted=true;
+    const auto fail=[&](Status status){a.reject(status);result=emitterRegistryReservation();return status;};
+    // This API cannot certify the parent's shared ledger. The inherited
+    // native 32 MiB maximum is only a final bound, never a second allowance.
+    if(!quota||quota>32u*1024u*1024u||a.live>quota||
+       s.emitters.size()>originalGcParticleCapacity50KG||
+       additional>originalGcParticleCapacity50KG-s.emitters.size())
+        return fail(Status::capacity);
+    a.bound=true;a.quota=quota;a.peak=a.live;
+    try {
+        s.emitters.reserve(s.emitters.size()+additional);
+        result=emitterRegistryReservation();return Status::complete;
+    }catch(...){return fail(a.failure==Status::complete?Status::allocation:a.failure);}
 }
 std::size_t OriginalGcParticleManager50KG::emitterStoragePayloadBytes() const noexcept {
     return storage_?storage_->emitters.capacity()*sizeof(OriginalGcParticleEmitterState50KG):0u;

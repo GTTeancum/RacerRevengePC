@@ -35,6 +35,10 @@ bool readTcMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
 //33 immutable PCM names and54 ordered assignments. WOODHIT1..4 PCM is shared
 //by distinct one-shot collision and looping drive owners; request.loop remains
 //the first collision request's metadata and never governs PCM decoding.
+// Exact original MC AUB only: twelve collision rows/eight drive rows,
+// five declared materials, three strict-less-than ordered assignments.
+bool readMcMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
+    MaterialAudioCatalog50HI& out,std::vector<AudioRequest50HC>& requests,std::string& error);
 bool readTbMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
     MaterialAudioCatalog50HI&,std::vector<AudioRequest50HC>& uniqueRequests,std::string&error);
 // Source track-specific collision loader1B5430 reads MaterialID with default1;

@@ -1,5 +1,6 @@
 #pragma once
 #include "vehicle_draw_gl50cv.h"
+#include "../../../src/game/original_racer_diffuse_camera50la.h"
 #include "vehicle_shader_gl50cz.h"
 #include "material_texture_gl50eb.h"
 #include "original_ui_rider_residency50kg.h"
@@ -24,11 +25,21 @@ namespace rc_crystal50RC { class Owner; }
 namespace tb_original_world50LM { class Owner; }
 namespace rc_particle_visual50RC { class Window; }
 namespace rc_particle_render50RC { class Owner; }
+namespace gb_particle_visual50GB { class Window; }
+namespace mc_particle_visual50MC { class Window; }
+namespace gb_particle_render50GB { class Owner; }
+namespace mc_particle_render50MC { class Owner; }
 namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
 namespace ra_static_fire_visual50LA {class Owner;class CompletedDrawReceipt;}
 namespace rr::game { struct CameraViewOutput49F; class OriginalRaceHud50KG; class OriginalTimeStats50LA; class OriginalDamage50LA; class OriginalPauseNativeDraw50LA; class OriginalPositionStatsNativeOwner50LA; class OriginalSpeedBoost50LA; struct PodCableMesh50FD; namespace original_gameplay_binder_candidate { struct Mesh; } }
 namespace rr::game { class OriginalRacerModelPackets50LA; class OriginalRacerModelRenderGlobals50LA; struct OriginalRaceFogFields; }
 namespace rr::platform {
+// Precharged common named-payload allowance for the GB binding metadata added
+// to the renderer Storage plus its retained Request, one input Request/Frame
+// and Diagnostic. Applies on every renderer route, including frontend/legacy.
+// This is not a claim about driver/allocator overhead or stack high-water use.
+inline constexpr std::size_t gbParticleRendererMetadataReservation50DS=256;
+inline constexpr std::size_t mcParticleRendererMetadataReservation50DS=256;
 class GameHost50ER;
 struct GameHostDiagnostic50ER;
 class OriginalVideoBlockingNativeBackend;
@@ -98,6 +109,7 @@ struct VehicleWindowMaterialBinding50DS {
     // Each original PSG group writes base RGBA before its matching map 2 reads
     // current destination A; no general gameplay-alpha validity is asserted.
     bool sourceSpecularPair50LA = false;
+    bool sourceSingleDiffuseRgba50LA = false, sourceBaseAlphaTest50LA = false;
     std::uint32_t specularTextureIndex50LA = assets::unresolvedMaterialTexture50EA;
     bool sourceBaseFog50LA = false, sourceSpecularFog50LA = false;
     // Optional actual map-2 GREATER/0/KEEP alpha test; base remains ATE0.
@@ -180,7 +192,7 @@ inline bool validScLavaUvPair50DS(const VehicleWindowTrackSpan50DS& first,
             !s.projectionPass && m.mode==VehicleWindowMaterialMode50DS::requiredTexture &&
             m.textureIndex!=assets::unresolvedMaterialTexture50EA && m.depthWrite && m.depthEqual &&
             m.alphaScale==1.f && !m.unlit && !m.sourcePrelit && !m.sourceDiffuseCompressed50LA &&
-            !m.sourceSpecularPair50LA && !s.discardZeroAlpha && !s.sourceAlphaReference &&
+            !m.sourceSpecularPair50LA && !m.sourceSingleDiffuseRgba50LA && !m.sourceBaseAlphaTest50LA && !s.discardZeroAlpha && !s.sourceAlphaReference &&
             s.sourceFogKnown && s.sourceFogEnabled && s.nativeCoverage==NativeTrackCoverage50DS::aa0 &&
             m.blend==(secondPass?VehicleWindowBlend50DS::additive:VehicleWindowBlend50DS::opaque) &&
             m.fixedBlendAlpha==secondPass && s.sourceAlphaTest==secondPass;
@@ -207,7 +219,7 @@ inline bool validRcCrystalPair50DS(const VehicleWindowTrackSpan50DS& first,
             m.textureIndex!=assets::unresolvedMaterialTexture50EA&&
             m.blend==VehicleWindowBlend50DS::additive&&!m.depthWrite&&m.depthEqual&&
             m.alphaScale==1.f&&!m.fixedBlendAlpha&&m.unlit==(pass==2)&&m.sourcePrelit==(pass==1)&&
-            !m.sourceDiffuseCompressed50LA&&!m.sourceSpecularPair50LA;
+            !m.sourceDiffuseCompressed50LA&&!m.sourceSpecularPair50LA&&!m.sourceSingleDiffuseRgba50LA&&!m.sourceBaseAlphaTest50LA;
     };
     return valid(first,1)&&valid(second,2)&&first.material.textureIndex!=second.material.textureIndex&&
         first.indexStart==second.indexStart&&first.indexCount==second.indexCount&&
@@ -304,6 +316,9 @@ struct VehicleWindowTrack50DS {
     // Native per-instance completion policy: private gameplay draw attempts,
     // never a caller-authored scene stamp or source portal-stamp equivalence.
     std::shared_ptr<rc_particle_visual50RC::Window> rcParticleWindow;
+    // Exact 55-placement GB static-world/material/complete-span authority.
+    std::shared_ptr<gb_particle_visual50GB::Window> gbParticleWindow;
+    std::shared_ptr<mc_particle_visual50MC::Window> mcParticleWindow;
 };
 // Narrow mutable world path for caller-animated authentic scene owners. The
 // aggregate retains one fixed source topology/material table across the session.
@@ -695,6 +710,7 @@ struct VehicleWindowFrame50DS {
     // The converted combined matrix must equal worldViewProjection exactly at
     // this viewport. Copy actual view/position before any frame GL work.
     const game::CameraViewOutput49F* sourceBodyCamera50LA = nullptr;
+    const game::OriginalRacerDiffuseCamera50LA* sourceDiffuseCamera50LA = nullptr;
     std::uintptr_t sourceBodyCameraOwner50LA = 0;
     std::uint64_t sourceBodyCameraPublication50LA = 0;
     // SAME session source fog and1A6AA0/2410E0 shared threshold owners.
@@ -710,6 +726,8 @@ struct VehicleWindowFrame50DS {
     // borrow and the same Window's canonical material/atlas callback.
     // It lends no caller-authored OriginalGcParticleDraw receipt.
     std::shared_ptr<rc_particle_render50RC::Owner> rcParticles;
+    std::shared_ptr<gb_particle_render50GB::Owner> gbParticles;
+    std::shared_ptr<mc_particle_render50MC::Owner> mcParticles;
 };
 enum class VehicleWindowError50DS : std::uint8_t {
     none, alreadyOwned, request, assets, allocation, entryPoint, context,
@@ -849,6 +867,8 @@ struct VehicleWindowDiagnostic50DS {
     bool rcCrystalWallMeasured = false;
     // Actual RC particle kernel counters; no GC source-identity claim.
     std::uint32_t rcParticleDraws = 0,rcParticleAlphaDraws = 0,rcParticleQuads = 0;
+    std::uint32_t gbParticleDraws = 0,gbParticleAlphaDraws = 0,gbParticleQuads = 0;
+    std::uint32_t mcParticleDraws = 0,mcParticleAlphaDraws = 0,mcParticleQuads = 0;
 };
 
 // Unforgeable renderer-issued value. The live renderer revalidates its weak

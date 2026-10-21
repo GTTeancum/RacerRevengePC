@@ -314,7 +314,9 @@ bool prepareOriginalRaceHudGleamMaterial50KG(const OriginalUiMaterialPass50KG&,
     OriginalRaceHudGleamMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 // Separate original 3D programs. These do not become ScreenObject passes.
 enum class OriginalUiLitProgram50KM : std::uint8_t { diffuse, diffuseCompressed, specularMapCompressed };
+enum class OriginalUiCoveragePolicy50KM : std::uint8_t { aa0, fourSampleAa1 };
 struct OriginalUiLitMaterial50KM {
+    OriginalUiCoveragePolicy50KM coverage = OriginalUiCoveragePolicy50KM::aa0;
     OriginalUiNativeMaterial50KG raster{};
     OriginalUiLitProgram50KM program = OriginalUiLitProgram50KM::diffuseCompressed;
     bool fogEnabled = false, alphaTestGreaterZero = false;
@@ -347,6 +349,11 @@ struct OriginalUiRider19IpumMaterial50KM {
 // alpha-test-off, with source-backed lit raster/sampler validation.
 // Actual authored additional passes still require their own admitted owners.
 // The images owner must outlive this result and renderer publication.
+// Shared authenticated IPUM first-pass AA1 capability. No rider/name exception.
+// Native four-sample coverage is explicit, not exact GS sample-position parity.
+bool prepareOriginalUiAa1IpumMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19IpumMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG&,
     const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
     OriginalUiRider19IpumMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;

@@ -4,5 +4,5 @@
 // Explicit source identity. TA remains the compatibility default; unknown
 // values are rejected by the cold adapters and never fall back to TA.
 namespace track_source_fixture {
-enum class Track : std::uint8_t { ta, gc, ga, ma, sa, ra, mb, sc, tc, rc, tb };
+enum class Track : std::uint8_t { ta, gc, ga, ma, sa, ra, mb, sc, tc, rc, tb, gb, mc };
 }

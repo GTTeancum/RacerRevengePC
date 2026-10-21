@@ -12,7 +12,9 @@ class OriginalUiRiderSession50KG;
 // resolve pass-group/animation enablement, and exclude every rejected source
 // state. This renderer cannot infer those owners from a texture-bank identity.
 enum class OriginalUiDepth50KG : std::uint8_t { unspecified, never, always, greaterEqual, greater };
+enum class OriginalUiCoverage50KG : std::uint8_t { aa0, fourSampleAa1 };
 struct OriginalUiNativeSpan50KG {
+    OriginalUiCoverage50KG coverage = OriginalUiCoverage50KG::aa0;
     OriginalUiDepth50KG depth = OriginalUiDepth50KG::unspecified;
     bool depthWrite = false;
     // Exact source policy per textured span, even when images repeat. The renderer

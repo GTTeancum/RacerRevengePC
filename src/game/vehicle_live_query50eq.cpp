@@ -60,30 +60,37 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
        !g.write(w.stack,w.stackCapacity)||!g.write(w.trace,w.traceCapacity)||
        !g.write(d.pairs,d.pairCapacity)||!g.write(d.metadata,d.metadataCapacity)||
        !g.write(d.records,d.recordCapacity)||!g.write(d.effects,d.effectCapacity)||!g.write(&result,1))return false;
-    Span ownerSpan{},indexSpan{};GateTriggerBinding50KG* gateOwner=nullptr;NativeTriggerGroup50GA* triggerOwner=nullptr;NativeTriggerGroup50TC* tcOwner=nullptr;NativeTriggerGroup50TB* tbOwner=nullptr;
+    Span ownerSpan{},indexSpan{};GateTriggerBinding50KG* gateOwner=nullptr;NativeTriggerGroup50GA* triggerOwner=nullptr;NativeTriggerGroup50TC* tcOwner=nullptr;NativeTriggerGroup50TB* tbOwner=nullptr;NativeTriggerGroup50MC* mcOwner=nullptr;NativeTriggerGroup50GB* gbOwner=nullptr;
     if(!span(owners,ownerCount,ownerSpan)||!span(indices,count,indexSpan))return false;
     for(std::size_t i=0;i<count;++i){
         if(indices[i]>=ownerCount)return false;
         const auto& owner=owners[indices[i]];
         // Apply the same shape ownership rule before the live membership
         // prefix can mutate buffers or hand this owner to indexed50CC.
-        if(((owner.nativeTriggers||owner.nativeTriggersTC||owner.nativeTriggersTB)&&owner.shapeType!=5&&owner.shapeType!=6)||
-           (!owner.nativeTriggers&&!owner.nativeTriggersTC&&!owner.nativeTriggersTB&&owner.nativeTriggerIndex!=0))return false;
+        if(((owner.nativeTriggers||owner.nativeTriggersTC||owner.nativeTriggersMC||owner.nativeTriggersTB||owner.nativeTriggersGB)&&owner.shapeType!=5&&owner.shapeType!=6)||
+           (!owner.nativeTriggers&&!owner.nativeTriggersTC&&!owner.nativeTriggersMC&&!owner.nativeTriggersTB&&!owner.nativeTriggersGB&&owner.nativeTriggerIndex!=0))return false;
+        if(owner.nativeTriggersGB&&owner.shapeType!=5)return false;
         if(owner.raOriginalTriggerSegments&&
-           (owner.shapeType!=5||owner.gate||owner.nativeTriggersTC||owner.nativeTriggersTB||!owner.nativeTriggers||owner.nativeTriggerIndex>=2))return false;
+           (owner.shapeType!=5||owner.gate||owner.nativeTriggersTC||owner.nativeTriggersMC||owner.nativeTriggersTB||owner.nativeTriggersGB||!owner.nativeTriggers||owner.nativeTriggerIndex>=2))return false;
         if(owner.shapeType==5||owner.shapeType==6){
-            if((owner.shapeType==6&&owner.gate)||(unsigned(bool(owner.gate))+unsigned(bool(owner.nativeTriggers))+unsigned(bool(owner.nativeTriggersTC))+unsigned(bool(owner.nativeTriggersTB))!=1u))return false;
+            if((owner.shapeType==6&&owner.gate)||(unsigned(bool(owner.gate))+unsigned(bool(owner.nativeTriggers))+unsigned(bool(owner.nativeTriggersTC))+unsigned(bool(owner.nativeTriggersMC))+unsigned(bool(owner.nativeTriggersTB))+unsigned(bool(owner.nativeTriggersGB))!=1u))return false;
             if(owner.gate){
-                if(tbOwner||tcOwner||triggerOwner||(gateOwner&&gateOwner!=owner.gate))return false;
+                if(mcOwner||gbOwner||tbOwner||tcOwner||triggerOwner||(gateOwner&&gateOwner!=owner.gate))return false;
                 gateOwner=owner.gate;
             }else if(owner.nativeTriggersTC){
-                if(tbOwner||gateOwner||triggerOwner||(tcOwner&&tcOwner!=owner.nativeTriggersTC))return false;
+                if(mcOwner||gbOwner||tbOwner||gateOwner||triggerOwner||(tcOwner&&tcOwner!=owner.nativeTriggersTC))return false;
                 tcOwner=owner.nativeTriggersTC;
+            }else if(owner.nativeTriggersMC){
+                if(tbOwner||gbOwner||tcOwner||gateOwner||triggerOwner||(mcOwner&&mcOwner!=owner.nativeTriggersMC))return false;
+                mcOwner=owner.nativeTriggersMC;
             }else if(owner.nativeTriggersTB){
-                if(tcOwner||gateOwner||triggerOwner||(tbOwner&&tbOwner!=owner.nativeTriggersTB))return false;
+                if(mcOwner||gbOwner||tcOwner||gateOwner||triggerOwner||(tbOwner&&tbOwner!=owner.nativeTriggersTB))return false;
                 tbOwner=owner.nativeTriggersTB;
+            }else if(owner.nativeTriggersGB){
+                if(mcOwner||tbOwner||tcOwner||gateOwner||triggerOwner||(gbOwner&&gbOwner!=owner.nativeTriggersGB))return false;
+                gbOwner=owner.nativeTriggersGB;
             }else{
-                if(tbOwner||tcOwner||gateOwner||(triggerOwner&&triggerOwner!=owner.nativeTriggers))return false;
+                if(mcOwner||gbOwner||tbOwner||tcOwner||gateOwner||(triggerOwner&&triggerOwner!=owner.nativeTriggers))return false;
                 triggerOwner=owner.nativeTriggers;
             }
         }
@@ -92,8 +99,17 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
     if(triggerOwner&&(!g.write(triggerOwner,1)||!(sourceHooks?validSourceTriggerGroup50MB(*triggerOwner,*sourceHooks):validNativeTriggerGroup50GA(*triggerOwner))))return false;
     if(tcOwner&&(!g.write(tcOwner,1)||sourceHooks||!validNativeTriggerGroup50TC(*tcOwner)))return false;
     if(tbOwner&&(!g.write(tbOwner,1)||sourceHooks||!validNativeTriggerGroup50TB(*tbOwner)))return false;
+    if(mcOwner&&(!g.write(mcOwner,1)||sourceHooks||!validNativeTriggerGroup50MC(*mcOwner)||mcOwner->chance.raw!=&frame.noiseOwner().sharedRandomState||!g.write(mcOwner->chance.raw,1)||!g.write(mcOwner->chance.shared,1)||!g.write(mcOwner->chance.clock,1)))return false;
+    if(gbOwner&&(!g.write(gbOwner,1)||sourceHooks||!validNativeTriggerGroup50GB(*gbOwner)))return false;
     if(sourcePublication&&(!sourceHooks||sourcePublication!=&source||!g.write(sourcePublication,1)))return false;
-    if(!g.read(&frame,1)||!g.read(&bindings,1)||!g.read(&admission,1)||!g.read(&live,1)||
+    bool frameRead=false;
+    if(mcOwner&&mcOwner->chance.raw==&frame.noise.sharedRandomState){
+        const auto* begin=reinterpret_cast<const unsigned char*>(&frame);
+        const auto* raw=reinterpret_cast<const unsigned char*>(&frame.noise.sharedRandomState);
+        const auto offset=static_cast<std::size_t>(raw-begin);
+        frameRead=g.read(begin,offset)&&g.read(raw+sizeof(std::uint32_t),sizeof(frame)-offset-sizeof(std::uint32_t));
+    }else frameRead=g.read(&frame,1);
+    if(!frameRead||!g.read(&bindings,1)||!g.read(&admission,1)||!g.read(&live,1)||
        (!sourcePublication&&!g.read(&source,1))||!g.read(&initial,1)||!g.read(&w,1)||!g.read(&d,1)||
        !g.read(&world,1)||!g.read(world.portalHeads,world.zoneCount)||!g.read(world.portals,world.portalCount)||
        !g.read(owners,ownerCount)||!g.read(indices,count)||!g.read(source.resource,1)||
@@ -101,6 +117,7 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
        !g.read(initial.metadata,initial.pairSlots)||!g.read(initial.recordSlots,initial.recordCount))return false;
     if(tcOwner&&!nativeTriggerQueryBound50TC(*tcOwner,source.filter->identity))return false;
     if(tbOwner&&!nativeTriggerQueryBound50TB(*tbOwner,source.filter->identity))return false;
+    if(mcOwner&&!nativeTriggerQueryBound50MC(*mcOwner,source.filter->identity))return false;
     if(!g.read(source.resource->nodes,source.resource->nodeCount)||
        !g.read(source.resource->rays,source.resource->rayCount)||!g.filter(*source.filter))return false;
     // The write guard is complete, and this admission pass performs no mesh
@@ -153,10 +170,18 @@ bool storage(const VehicleFrameState49W& frame,const VehicleFrameBindings49W& bi
                 if(owner.nativeTriggersTC!=tcOwner||!tcOwner||owner.nativeTriggerIndex>=tcOwner->triggers.size()||
                    candidate.collision.filter.identity!=tcOwner->triggers[owner.nativeTriggerIndex].collider.identity||
                    !nativeTriggerQueryBound50TC(*tcOwner,source.filter->identity))return false;
+            }else if(owner.nativeTriggersMC){
+                if(owner.nativeTriggersMC!=mcOwner||!mcOwner||owner.nativeTriggerIndex>=mcOwner->triggers.size()||
+                   candidate.collision.filter.identity!=mcOwner->triggers[owner.nativeTriggerIndex].collider.identity||
+                   !nativeTriggerQueryBound50MC(*mcOwner,source.filter->identity))return false;
             }else if(owner.nativeTriggersTB){
                 if(owner.nativeTriggersTB!=tbOwner||!tbOwner||owner.nativeTriggerIndex>=tbOwner->triggers.size()||
                    candidate.collision.filter.identity!=tbOwner->triggers[owner.nativeTriggerIndex].collider.identity||
                    !nativeTriggerQueryBound50TB(*tbOwner,source.filter->identity))return false;
+            }else if(owner.nativeTriggersGB){
+                if(owner.shapeType!=5||owner.nativeTriggersGB!=gbOwner||!gbOwner||owner.nativeTriggerIndex>=gbOwner->triggers.size()||
+                   candidate.collision.filter.identity!=gbOwner->triggers[owner.nativeTriggerIndex].collider.identity||
+                   !nativeTriggerQueryBound50GB(*gbOwner,source.filter->identity))return false;
             }else if(owner.nativeTriggers!=triggerOwner||!triggerOwner||
                 owner.nativeTriggerIndex>=triggerOwner->triggers.size()||
                 candidate.collision.filter.identity!=triggerOwner->triggers[owner.nativeTriggerIndex].collider.identity||

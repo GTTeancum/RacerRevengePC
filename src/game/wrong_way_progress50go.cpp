@@ -195,6 +195,30 @@ bool beginWrongWayProgress50GO(const TrackNavigationView50TB& map,
 }
 // TB-CONSUMER-END 0
 
+// GB-CONSUMER-BEGIN 0
+bool beginWrongWayProgress50GO(const TrackNavigationView50GB& map,
+    const LapProgressTrackView50GB& markers,const WrongWayProgressInput50GO& in,
+    WrongWayProgressState50GO& state,WrongWayProgressContinuation50GO& continuation,
+    WrongWayProgressReceipt50GO& receipt,WrongWayProgressDiagnostic50GO& d) noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)||!markers.matches(map))
+        return fail(d,E::Track,0x1a2f90);
+    return beginWrongWayProgress50GOShared50MB(navigation_consumer_detail50MB::read(map.track()),
+        map.capacity(),markers.data(),in,state,continuation,receipt,d);
+}
+// GB-CONSUMER-END 0
+
+// MC-CONSUMER-BEGIN 0
+bool beginWrongWayProgress50GO(const TrackNavigationView50MC& map,
+    const LapProgressTrackView50MC& markers,const WrongWayProgressInput50GO& in,
+    WrongWayProgressState50GO& state,WrongWayProgressContinuation50GO& continuation,
+    WrongWayProgressReceipt50GO& receipt,WrongWayProgressDiagnostic50GO& d) noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)||!markers.matches(map))
+        return fail(d,E::Track,0x1a2f90);
+    return beginWrongWayProgress50GOShared50MB(navigation_consumer_detail50MB::read(map.track()),
+        map.capacity(),markers.data(),in,state,continuation,receipt,d);
+}
+// MC-CONSUMER-END 0
+
 
 bool resumeWrongWayProgress50GO(WrongWayProgressContinuation50GO& continuation,
     WrongWayProgressDiagnostic50GO& d) noexcept {

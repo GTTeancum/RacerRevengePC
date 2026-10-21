@@ -5,13 +5,13 @@
 // This is a bounded native field policy, not retail opponent construction.
 #include "native_racer_rig50hw_fixture.h"
 #include "original_player_identity50ik_fixture.h"
-#include "../../src/game/original_ui_course_race_domain50kg.h"
 #include <filesystem>
 #include <string>
 
 namespace original_course_roster50KG {
 inline constexpr bool supportsPreparedRider(std::uint32_t racer60) noexcept {
-    return rr::game::nativeCourseRacerOwned50KG(racer60);
+    const auto* entry=rr::game::original_racer_selection50IJ::findByRacer60(racer60);
+    return entry&&entry->humanJoinImplemented&&original_player_identity50IK::find(racer60);
 }
 // Field selection describes the admitted original identities only. Each Rig
 // subsequently authenticates and decodes its own actual RES, PHY and model

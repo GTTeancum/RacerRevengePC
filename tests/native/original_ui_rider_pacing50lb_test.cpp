@@ -60,14 +60,14 @@ int main() {
     clock.value+=period;check(deadline.observe(clock()).due&&deadline.finishWait(clock())==Error::none,
         "fresh numeric wait works after cancelled overflow");
     // Deadline arithmetic cannot hide/credit a real stall. Runtime still uses
-    // this unchanged audio interval gate before admitting a waited sample.
+    // complete measured interval for separate source and PCM domains.
     constexpr std::uint64_t base=1000;
     const auto oneSecond=original_ui_elapsed50LH::project(base,base+1000000000ull,0);
     const auto stall=original_ui_elapsed50LH::project(base,base+1000000001ull,0);
     check(oneSecond.error==original_ui_elapsed50LH::Error::none&&oneSecond.activeNanoseconds==1000000000ull,
         "existing exact one-second active boundary remains accepted");
-    check(stall.error==original_ui_elapsed50LH::Error::stall&&stall.excludedColdNanoseconds==0,
-        "one-second-plus-one active wait still fails, with no cold credit");
+    check(stall.error==original_ui_elapsed50LH::Error::none&&stall.longActiveInterval&&stall.excludedColdNanoseconds==0,
+        "one-second-plus-one active wait remains fully measured, with no cold credit");
     std::printf("rider_pacing_arithmetic checks=%u failures=%u real_clock_or_display_tested=0\n",checks,failures);
     return failures?1:0;
 }

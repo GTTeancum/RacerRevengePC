@@ -1,3 +1,5 @@
+#include "mc_particle_render50mc.h"
+#include "mc_particle_cold50mc.h"
 #include "../../src/game/original_entity_chains50la.h" // Inactive source-faithful Entity chain operations.
 #include "runtime_allocations50fl.h"
 #include "original_disc_effects50lb.h"
@@ -6,6 +8,36 @@
 #include "ma_sa_original_world50lm.h"
 #include "sc_original_world50lm.h"
 #include "tb_original_world50lm.h"
+#include "gb_original_world50lm.h"
+#include "gb_track_fog50gb.h"
+#include "mc_track_fog50mc.h"
+#include "mc_water50mc.h"
+#include "mc_sky50mc.h"
+#include "mc_camera_assets50mc.h"
+#include "mc_positional_sound50mc.h"
+#include "gb_positional_sound50gb.h"
+#include "gb_dynamic_window_fixture.h"
+#include "mc_dynamic_window_fixture.h"
+#include "mc_atm_window_fixture.h"
+#include "mc_shield_uv_fixture.h"
+#include "mc_shield_render50mc.h"
+#include "mc_static_model_params50mc.h"
+#include "mc_cold_visibility50mc.h"
+#include "gb_particle_render50gb.h"
+#include "gb_particle_visual50gb.h"
+#include "gb_query50gb.h"
+#include "mc_query50mc.h"
+#include "gb_cold_visibility50gb.h"
+#include "gb_animation_binding50gb.h"
+#include "gb_collision_world50gb.h"
+#include "gb_atm_window_fixture.h"
+#include "gb_static_model_params50gb.h"
+#include "gb_particle_runtime50gb.h"
+#include "gb_animation_runtime50gb.h"
+#include "gb_trigger_actions50gb.h"
+#include "gb_navigation50gb.h"
+#include "source_grid50gb_fixture.h"
+#include "gb_pod_sound50gb.h"
 #include "tb_atm_window_fixture.h"
 #include "tb_shield_uv_fixture.h"
 #include "tb_static_model_params50tb.h"
@@ -227,6 +259,7 @@
 #include "ga_atm_window_fixture.h"
 #include "gameplay_binder_window_candidate_fixture.h"
 #include "source_grid50ig_fixture.h"
+#include "selected_grid_navigation50ig.h"
 #include "../../src/game/track_navigation_view50mb.h"
 #include <type_traits>
 #include <variant>
@@ -452,8 +485,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const original_main_entry50KG::Application& originalMainApplication,
     bool enterOriginalUi,ControlPresets49D& controlPresets,SharedRandomOwner50ID& directApplicationRandom,
     const std::int32_t& cameraStartup350,original_course_targets50KX::ColdLoadRequest& courseColdLoad,
-    native_gc_water_session50KG::Application& nativeWaterApplication,windows_capture50LD::Run& captureRun,
+    const std::shared_ptr<native_gc_water_session50KG::Application>& nativeWaterGlobals,windows_capture50LD::Run& captureRun,
     original_course_targets50KX::ConsumedLaunch* consumedLaunch){
+ auto& nativeWaterApplication=*nativeWaterGlobals;
  const bool originalUiStarted=originalMainApplication.enabled;
  bool originalUiActive=originalUiStarted&&enterOriginalUi,courseRaceLaunched=false;
  // Capture the immutable loaded identity before any front-menu choice changes
@@ -481,6 +515,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool isScTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"SC");
  const bool isTcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"TC");
  const bool isRcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"RC");
+ const bool isGbTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"GB");
+ const bool isMcTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"MC");
  const bool isTbTrack=track_session_assets50IG::codeEquals(trackSession->world->code,"TB");
  const bool isMaSaTrack=isMaTrack||isSaTrack;
  // Direct human worlds use only authenticated original archives. Clearing
@@ -501,9 +537,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
  const bool rcOriginalDisc=isRcTrack&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
+ const bool gbOriginalDisc=isGbTrack&&!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
+ const bool mcOriginalDisc=isMcTrack&&!runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
  const bool tbOriginalDisc=isTbTrack&&
      !runtime_asset_paths50LB::configuredRoot("RR_ORIGINAL_ASSET_ROOT").empty();
- const bool directOriginalHuman=gaOriginalDisc||taOriginalDisc||maOriginalDisc||saOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc;
+ const bool directOriginalHuman=gaOriginalDisc||taOriginalDisc||maOriginalDisc||saOriginalDisc||mbOriginalDisc||scOriginalDisc||tcOriginalDisc||rcOriginalDisc||tbOriginalDisc||gbOriginalDisc||mcOriginalDisc;
  const bool directOriginalInputs=isRaTrack||directOriginalHuman;
  // Collision ownership is separate from the legacy all-pass/render-policy flag.
  const bool sourceStaticCandidates=trackSession->originalStaticCandidates||taOriginalDisc;
@@ -515,8 +553,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   resolvedTrackAssets.assets.visualRoot="";resolvedTrackAssets.assets.visualMesh="";
   resolvedTrackAssets.assets.visualReport="";resolvedTrackAssets.assets.skyTextureRoot="";
  }
- const bool courseRaceCold=(isGcTrack||isGaTrack||isTaTrack||isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack)&&originalUiStarted;
- require50DU(!(isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack)||(!checkpointInput&&!startAtMenu),
+ const bool courseRaceCold=(isGcTrack||isGaTrack||isTaTrack||isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)&&originalUiStarted;
+ require50DU(!(isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)||(!checkpointInput&&!startAtMenu),
      "MA/SA/RA require a fresh ordinary cold race; host startup menu/checkpoint unsupported");
  require50DU(!courseRaceCold||!startAtMenu,"original Course race entry requires RR_START_MENU=0");
  // Only a real rooted Main/Course selection or its whole-world restart owns
@@ -608,15 +646,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const bool nativeScSelection=scLightingSetting?std::string(scLightingSetting)=="1":freshLevelLighting&&isScTrack;
  const bool nativeTcSelection=tcLightingSetting?std::string(tcLightingSetting)=="1":freshLevelLighting&&isTcTrack;
  const bool nativeRcSelection=rcLightingSetting?std::string(rcLightingSetting)=="1":freshLevelLighting&&isRcTrack;
+ const bool nativeGbSelection=freshLevelLighting&&isGbTrack;
+ const bool nativeMcSelection=freshLevelLighting&&isMcTrack;
  const bool nativeTbSelection=tbLightingSetting?std::string(tbLightingSetting)=="1":freshLevelLighting&&isTbTrack;
  const bool nativeRaSelection=raLightingSetting?std::string(raLightingSetting)=="1":freshLevelLighting&&isRaTrack;
  require50DU(unsigned(nativeGcSelection)+unsigned(nativeTaSelection)+unsigned(nativeGaSelection)+
-     unsigned(nativeMaSelection)+unsigned(nativeSaSelection)+unsigned(nativeRaSelection)+unsigned(nativeMbSelection)+unsigned(nativeScSelection)+unsigned(nativeTcSelection)+unsigned(nativeRcSelection)+unsigned(nativeTbSelection)<=1u,
+     unsigned(nativeMaSelection)+unsigned(nativeSaSelection)+unsigned(nativeRaSelection)+unsigned(nativeMbSelection)+unsigned(nativeScSelection)+unsigned(nativeTcSelection)+unsigned(nativeRcSelection)+unsigned(nativeTbSelection)+unsigned(nativeGbSelection)+unsigned(nativeMcSelection)<=1u,
      "choose exactly one native track-light policy");
- const bool nativeSelectedLights=nativeGcSelection||nativeTaSelection||nativeGaSelection||nativeMaSelection||nativeSaSelection||nativeRaSelection||nativeMbSelection||nativeScSelection||nativeTcSelection||nativeRcSelection||nativeTbSelection;
+ const bool nativeSelectedLights=nativeGcSelection||nativeTaSelection||nativeGaSelection||nativeMaSelection||nativeSaSelection||nativeRaSelection||nativeMbSelection||nativeScSelection||nativeTcSelection||nativeRcSelection||nativeTbSelection||nativeGbSelection||nativeMcSelection;
  require50DU(!nativeSelectedLights||(raceEnabled&&!checkpointInput&&
      (!originalUiActive||courseRaceCold)&&track_session_assets50IG::codeEquals(
-        trackSession->world->code,nativeTbSelection?"TB":nativeRcSelection?"RC":nativeTcSelection?"TC":nativeScSelection?"SC":nativeMbSelection?"MB":nativeRaSelection?"RA":nativeMaSelection?"MA":nativeSaSelection?"SA":nativeGaSelection?"GA":nativeTaSelection?"TA":"GC")),
+        trackSession->world->code,nativeMcSelection?"MC":nativeGbSelection?"GB":nativeTbSelection?"TB":nativeRcSelection?"RC":nativeTcSelection?"TC":nativeScSelection?"SC":nativeMbSelection?"MB":nativeRaSelection?"RA":nativeMaSelection?"MA":nativeSaSelection?"SA":nativeGaSelection?"GA":nativeTaSelection?"TA":"GC")),
      "native selected lights require their matching fresh authenticated race; checkpoint/Main unsupported");
  const char* allAiSetting=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
  const bool allAiEnabled=allAiSetting&&std::string(allAiSetting)=="1";
@@ -667,8 +707,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!isTcTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&trackAdmission.tcNativeWorldRequested),
      "TC requires the exact original Main/Course Player0 plus seven AI request");
  require50DU(!isRcTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&
-     trackAdmission.rcNativeWorldRequested&&trackAdmission.gcMode2&&playerRacer60==17),
-     "RC requires the exact Scorch17 Main/Course Player0 plus seven AI request and mode2");
+     trackAdmission.rcNativeWorldRequested&&trackAdmission.gcMode2),
+     "RC requires the shared Main/Course Player0 plus seven AI request and mode2");
+ require50DU(!isTbTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&
+     trackAdmission.tbNativeWorldRequested&&trackAdmission.gcMode2),
+     "TB requires the shared Main/Course Player0 plus seven AI request and mode2");
+ require50DU(!isGbTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&
+     trackAdmission.gbNativeWorldRequested&&trackAdmission.gcMode2),
+     "GB requires shared Main/Course Player0 plus seven AI request and mode2");
+ require50DU(!isMcTrack||(raceEnabled&&humanCourseEnabled&&!allAiEnabled&&!checkpointInput&&!startAtMenu&&
+     trackAdmission.mcNativeWorldRequested&&trackAdmission.gcMode2),
+     "MC requires genuine rooted human Course mode2 and actual runtime owners");
  require50DU(!isRaTrack||(raceEnabled&&allAiEnabled&&!checkpointInput&&!startAtMenu),
      "RA requires all eight actual original-AI owners including camera racer0");
  const auto originalAiCreateSelection=[&](){
@@ -873,7 +922,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       originalMainApplication.riderProfile->courseRaceSnapshot(selected)&&
       original_course_targets50KX::target(selected)&&
       original_course_targets50KX::target(selected)->track==loadedTrack&&
-      selected.rider==playerRacer60&&nativeCourseRacerOwned50KG(playerRacer60)&&
+      selected.rider==playerRacer60&&
       selected.subtype==1&&selected.laps==(humanCourseEnabled?(originalAiSettings1125C&31u):3u)&&selected.entrants==8&&
       ((selected.packed1125C>>5)&3)==1&&((selected.packed1125C>>7)&15)==7&&
       (!humanCourseEnabled||(selected.packed1125C&0x7ffu)==originalAiSettings1125C),
@@ -945,6 +994,36 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   tbPodSound=std::make_shared<tb_pod_sound50TB::Owner>();
   const bool soundReady=tbPodSound->prepare(std::move(authored),*mixer,*groups,tbPreparedAudioRoot,error);
   require50DU(soundReady,error.empty()?"TB actual HUGEDOOR source/voice126 rejected":error.c_str());
+ };
+ std::shared_ptr<gb_pod_sound50GB::Owner> gbPodSound;
+ std::shared_ptr<rr::platform::OriginalSoundMode50KG> gbSoundMode;
+ std::filesystem::path gbPreparedAudioRoot;
+ bool gbLiveAudioPrepared=false;
+ const auto prepareGbPodSound=[&](std::shared_ptr<const gb_trigger_authoring50GB::Owner> authored){
+  require50DU(isGbTrack&&nativeOriginalFleet&&authored&&authored->ready()&&
+      authored->coldSource()&&!gbLiveAudioPrepared&&!gbPodSound,
+      "GB early PodSound requires its actual fresh trigger source and human fleet");
+  const char* suppliedAudioRoot=std::getenv("RR_AUDIO_ROOT");
+  gbPreparedAudioRoot=suppliedAudioRoot?std::filesystem::path(suppliedAudioRoot):
+      runtime_asset_paths50LB::resolve("work/native/project/disc/AUDIO");
+  std::string error;
+  const bool audioPrepared=liveAudio->prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),
+      gbPreparedAudioRoot,error,playerRacer60,loadedAudioSettings);
+  require50DU(audioPrepared,error.empty()?"GB actual shared audio preparation rejected":error.c_str());
+  gbLiveAudioPrepared=true;
+  auto* mixer=liveAudio->mixerForMaterialOwner();auto* groups=liveAudio->groupsForProviders();
+  require50DU(mixer&&groups&&groups->uses(*mixer),"GB actual shared mixer/groups unavailable");
+  // Binding is cold and one-shot. Later material/engine setup reuses this
+  // exact actual mode rather than attempting to bind a second one.
+  gbSoundMode=originalMainApplication.soundMode;
+  if(!gbSoundMode){
+   gbSoundMode=std::make_shared<rr::platform::OriginalSoundMode50KG>();
+   require50DU(gbSoundMode->initializeFromProfile1101C(1),"GB direct native stereo mode rejected");
+  }
+  require50DU(mixer->bindOriginalSoundMode50KG(gbSoundMode),"GB early source-mode binding rejected");
+  gbPodSound=std::make_shared<gb_pod_sound50GB::Owner>();
+  const bool soundReady=gbPodSound->prepare(std::move(authored),*mixer,*groups,gbPreparedAudioRoot,error);
+  require50DU(soundReady,error.empty()?"GB actual BIGDOOR source/voice126 rejected":error.c_str());
  };
  std::uint32_t nativeOrdinaryLaunch11258=1;
  std::unique_ptr<OriginalRacerModelRenderGlobals50LA> sourceModelRenderGlobals;
@@ -1216,13 +1295,22 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  groundRequest.bindFreshGameTrackHeight=originalAiEnabled;
  if(directOriginalHuman)groundRequest.originalPodPhysics=&x.assets.phy;
  track_runtime_storage50IG::Limits trackStorageLimits;trackStorageLimits.originalCameraQueries=originalCameraEnabled;
+ // Explicit MC PC-native48MiB aggregate budget; all other tracks retain32MiB.
+ if(isMcTrack)trackStorageLimits.coldPayloadBytes=48u*1024u*1024u;
  trackStorageLimits.originalRecoveryQueries=originalRecoveryEnabled;
+ // Conservative precharge for GB fields added to shared VehicleWindow metadata, on every route.
+ // This reduces each route's bounded allowance; MC alone uses the measured48MiB policy above.
+ require50DU(trackStorageLimits.coldPayloadBytes>=rr::platform::gbParticleRendererMetadataReservation50DS,"shared renderer metadata reservation overflow");
+ trackStorageLimits.coldPayloadBytes-=rr::platform::gbParticleRendererMetadataReservation50DS;
+ if(isMcTrack){require50DU(trackStorageLimits.coldPayloadBytes>=rr::platform::mcParticleRendererMetadataReservation50DS,"MC renderer metadata reservation overflow");trackStorageLimits.coldPayloadBytes-=rr::platform::mcParticleRendererMetadataReservation50DS;}
  auto mbStorageLimits=trackStorageLimits;
  // These source/mesh owners precede every candidate, Storage and Bank borrower.
  // TC source/Gate/Sound/Action are independent strong owners; none retains
  // the aggregate. The final views and typed Borrow below retain actual Storage.
  // Immutable RC source is retained by the real canonical Application mount
  // across serial races. Each race owns fresh final collision/navigation leases.
+#include "gb_application_cold50gb.inl"
+#include "mc_application_cold50mc.inl"
  std::shared_ptr<const tb_cold_sources50LA::Owner> tbColdSources;
  std::shared_ptr<rr::game::original_gc_gameplay_lighting_candidate::Owner> tbLightOwner;
  std::shared_ptr<tb_trigger_authoring50TB::Owner> tbTriggerAuthoring;
@@ -1499,8 +1587,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(groundReady,error.empty()?"MB actual collision owner rejected":error.c_str());
  }
  authored_runtime_ground50cp_fixture::ColdScene legacyGround{};
- if(!isRaTrack&&!isMbTrack&&!isScTrack&&!isTcTrack&&!isRcTrack)legacyGround=authored_runtime_ground50cp_fixture::load({4,16,32,64},groundRequest);
- const auto& ground=isRcTrack?*rcCollisionWorld->ground():isTcTrack?*tcCollisionWorld->ground():isScTrack?*scGround->ground():isMbTrack?mbCollisionWorld->ground():legacyGround;
+ if(!isRaTrack&&!isMbTrack&&!isScTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)legacyGround=authored_runtime_ground50cp_fixture::load({4,16,32,64},groundRequest);
+ require50DU(!isTbTrack||(tbCollisionWorld&&tbCollisionWorld->coldSource()==tbColdSources.get()&&tbCollisionWorld->ground()),
+     "TB ground alias requires the actual same compact source owner");
+ const auto& ground=isMcTrack?*mcCollisionWorld->ground():isGbTrack?*gbCollisionWorld->ground():isTbTrack?*tbCollisionWorld->ground():isRcTrack?*rcCollisionWorld->ground():isTcTrack?*tcCollisionWorld->ground():isScTrack?*scGround->ground():isMbTrack?mbCollisionWorld->ground():legacyGround;
  auto& preparedCandidates=isRaTrack?raRuntime->candidates:legacyCandidates;
  const auto& actualWorld=isRaTrack?raRuntime->source.world:ground.world;
  const auto& actualHeight=isRaTrack?raRuntime->source.height:ground.height;
@@ -1514,6 +1604,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  require50DU(isRaTrack||ground.lift==x.parameters.visual.verticalLimit7EC,"same actual Pod01 lift");
  std::vector<std::uint32_t> groundStack(ground.stackCount);
+ std::shared_ptr<mc_water50MC::Owner> mcWaterOwner;
+ std::uint64_t mcWaterUpdateSequence=0;
  std::unique_ptr<native_gc_water_session50KG::Owner> nativeGcWater;
  std::array<std::unique_ptr<native_gc_water_racer50KG::Owner>,raceRacerCount> nativeWaterRacers;
  auto& nativeFireSerial=originalUiStarted?originalMainApplication.state->fireSerial433970:
@@ -1540,7 +1632,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::vector<track_runtime_storage50IG::Binding> legacyTrackBindings;
  auto& preparedBindings=legacyTrackBindings;
  std::vector<track_static_candidates50IG::Radii> originalStaticRadii;
- if(!isRaTrack&&!isMbTrack&&!isTcTrack&&!isRcTrack){
+ if(!isRaTrack&&!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack){
  if(sourceStaticCandidates){
   track_static_candidates50IG::Bindings staticBindings{};
   staticBindings.firstIdentity=0x10000000u; // Explicit collision-object native namespace.
@@ -1679,6 +1771,39 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   for(const auto& candidate:tcWorldBorrow->candidateStorage())
    stackCount=std::max(stackCount,1+mainQueryResource.maxDepth+candidate.maxDepth);
  }
+ if(isMcTrack){
+  track_static_candidates50IG::Bindings names{};names.firstIdentity=0x10000000u;
+  names.collisionTypeTag=query.collisionTypeTag;names.groupTypeTag=query.groupTypeTag;
+  names.preservedFlags31=static_cast<std::uint8_t>(qfilter.flags31&0xf0u);
+  names.preservedFlagsF8=static_cast<std::uint8_t>(qfilter.flagsF8&0xc0u);
+  mc_collision_world50MC::Diagnostic diagnostic;
+  const bool prepared=mcCollisionWorld->prepareStorage(originalMainApplication.entities(),
+      mcTriggerAuthoring,mcTriggerActions,mcAnimationRuntime,names,trackStorageLimits,diagnostic);
+  require50DU(prepared,diagnostic.message.empty()?"MC actual111 aggregate Storage rejected":diagnostic.message.c_str());
+  require50DU(mcAnimationBinding->completePreparation(mcCollisionWorld,s.animationShared.motion,mcAnimationBindingDiagnostic),
+      "MC actual fourteen-animation dual membership publication rejected");
+  mcWorldBorrow.emplace(mcCollisionWorld->borrow());
+  require50DU(bool(*mcWorldBorrow)&&mcWorldBorrow->registrationStorage()&&
+      mcWorldBorrow->candidateStorage().size()==111&&ground.owners.size()==89,"MC complete89+21+1 closure rejected");
+  require50DU(mcNavigation.bindWorld(mcCollisionWorld->lease(),mcNavigationDiagnostic),"MC actual same-world navigation rejected");
+  for(const auto& candidate:mcWorldBorrow->candidateStorage())stackCount=std::max(stackCount,1+mainQueryResource.maxDepth+candidate.maxDepth);
+ }else if(isGbTrack){
+  track_static_candidates50IG::Bindings names{};names.firstIdentity=0x10000000u;
+  names.collisionTypeTag=query.collisionTypeTag;names.groupTypeTag=query.groupTypeTag;
+  names.preservedFlags31=static_cast<std::uint8_t>(qfilter.flags31&0xf0u);
+  names.preservedFlagsF8=static_cast<std::uint8_t>(qfilter.flagsF8&0xc0u);
+  gb_collision_world50GB::Diagnostic diagnostic;
+  const bool prepared=gbCollisionWorld->prepareStorage(originalMainApplication.entities(),
+      gbTriggerAuthoring,gbTriggerActions,gbAnimationRuntime,names,trackStorageLimits,diagnostic);
+  require50DU(prepared,diagnostic.message.empty()?"GB actual637 aggregate Storage rejected":diagnostic.message.c_str());
+  require50DU(gbAnimationBinding->completePreparation(gbCollisionWorld,s.animationShared.motion,gbAnimationBindingDiagnostic),
+      "GB actual four-animation dual membership publication rejected");
+  gbWorldBorrow.emplace(gbCollisionWorld->borrow());
+  require50DU(bool(*gbWorldBorrow)&&gbWorldBorrow->registrationStorage()&&
+      gbWorldBorrow->candidateStorage().size()==637&&ground.owners.size()==615,"GB complete615+18+4 closure rejected");
+  require50DU(gbNavigation.bindWorld(gbCollisionWorld->lease(),gbNavigationDiagnostic),"GB actual same-world navigation rejected");
+  for(const auto& candidate:gbWorldBorrow->candidateStorage())stackCount=std::max(stackCount,1+mainQueryResource.maxDepth+candidate.maxDepth);
+ }
  if(isTbTrack){
   track_static_candidates50IG::Bindings names{};names.firstIdentity=0x10000000u;
   names.collisionTypeTag=query.collisionTypeTag;names.groupTypeTag=query.groupTypeTag;
@@ -1730,6 +1855,60 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  // This ledger extends the existing cold descriptor/source reservation only.
  // Ordinary visual mesh/image allocations retain their own established limits.
+ const auto mcRemainingPayloadBytes=[&](){
+  if(!isMcTrack)return std::size_t{0};
+  const auto used=mcCollisionWorld->payload().totalRequested;
+  require50DU(used<=trackStorageLimits.coldPayloadBytes&&
+      mcAdditionalPayloadReserved<=trackStorageLimits.coldPayloadBytes-used,
+      "MC additional cold payload accounting overflow");
+  return trackStorageLimits.coldPayloadBytes-used-mcAdditionalPayloadReserved;
+ };
+ const auto reserveMcAdditionalPayload=[&](std::size_t bytes,const char* reason){
+  require50DU(isMcTrack&&bytes<=mcRemainingPayloadBytes(),reason);
+  mcAdditionalPayloadReserved+=bytes;
+ };
+ if(isMcTrack){
+  mcWaterOwner=std::make_shared<mc_water50MC::Owner>();std::string error;
+  require50DU(actualHeight.sourceBound&&actualHeight.sourceDomain.terrain330==UndertrackHeightOwner50EW::Absent&&
+      actualHeight.sourceDomain.water334==UndertrackHeightOwner50EW::Present&&
+      mcWaterOwner->prepare(mcColdSources,nativeWaterApplication.water,error),
+      error.empty()?"MC actual water334 source/runtime preparation rejected":error.c_str());
+  reserveMcAdditionalPayload(mcWaterOwner->retainedPayloadBytes(),"MC actual water runtime/resources exceed remaining payload");
+ }
+ // Retain the selected runtime provider domain independently of its authored
+ // presence descriptor. This scope outlives the camera Session that borrows it.
+ auto selectedRuntimeHeightDomain=actualHeight.sourceDomain;
+ if(mcWaterOwner)require50DU(mcWaterOwner->bindResetDomain(actualHeight.sourceDomain,
+     terrainOwner.lift1F0,selectedRuntimeHeightDomain),
+     "selected actual water owner cannot publish its runtime height domain");
+ auto mcMapView=mcNavigation.map();
+ auto mcAiView=mcNavigation.ai();
+ auto mcMapMetadata=mcNavigation.mapMetadata();
+ auto mcAiMetadata=mcNavigation.aiMetadata();
+ require50DU(!isMcTrack||(mcWorldBorrow&&mcWorldBorrow->world()&&mcMapView.runtimeValid()&&mcAiView.runtimeValid()&&
+     mcMapView.sameOwner(mcAiView)&&mcMapView.sameWorld(*mcWorldBorrow->world())&&mcAiView.sameWorld(*mcWorldBorrow->world())&&
+     mcMapView.sourceIdentity()==mcColdSources.get()&&mcMapMetadata.matches(mcMapView)&&mcAiMetadata.matches(mcAiView)),
+     "MC final typed navigation/world identity differs");
+ const auto gbRemainingPayloadBytes=[&](){
+  if(!isGbTrack)return std::size_t{0};
+  const auto used=gbCollisionWorld->payload().totalRequested;
+  require50DU(used<=trackStorageLimits.coldPayloadBytes&&
+      gbAdditionalPayloadReserved<=trackStorageLimits.coldPayloadBytes-used,
+      "GB additional cold payload accounting overflow");
+  return trackStorageLimits.coldPayloadBytes-used-gbAdditionalPayloadReserved;
+ };
+ const auto reserveGbAdditionalPayload=[&](std::size_t bytes,const char* reason){
+  require50DU(isGbTrack&&bytes<=gbRemainingPayloadBytes(),reason);
+  gbAdditionalPayloadReserved+=bytes;
+ };
+ auto gbMapView=gbNavigation.map();
+ auto gbAiView=gbNavigation.ai();
+ auto gbMapMetadata=gbNavigation.mapMetadata();
+ auto gbAiMetadata=gbNavigation.aiMetadata();
+ require50DU(!isGbTrack||(gbWorldBorrow&&gbWorldBorrow->world()&&gbMapView.runtimeValid()&&gbAiView.runtimeValid()&&
+     gbMapView.sameOwner(gbAiView)&&gbMapView.sameWorld(*gbWorldBorrow->world())&&gbAiView.sameWorld(*gbWorldBorrow->world())&&
+     gbMapView.sourceIdentity()==gbColdSources.get()&&gbMapMetadata.matches(gbMapView)&&gbAiMetadata.matches(gbAiView)),
+     "GB final typed navigation/world identity differs");
  std::size_t tbAdditionalPayloadReserved=0;
  const auto tbRemainingPayloadBytes=[&](){
   if(!isTbTrack)return std::size_t{0};
@@ -1768,9 +1947,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!isRcTrack||(rcNavigationBorrow.valid()&&rcWorldBorrow&&
      rcWorldBorrow->world()&&rcNavigationBorrow.sameWorld(*rcWorldBorrow->world())&&
      rcNavigationBorrow.sourceIdentity()==rcColdSources.get()),"RC final navigation/world borrow mismatch");
- if(!isMbTrack&&!isTcTrack&&!isRcTrack)legacyGround.audit=J{};
- std::span<Type2StaticCandidate49X> candidates=isRcTrack?rcWorldBorrow->candidateStorage():isTcTrack?tcWorldBorrow->candidateStorage():isMbTrack?mbCollisionWorld->candidateStorage():std::span<Type2StaticCandidate49X>(preparedCandidates);
- std::span<const track_runtime_storage50IG::Binding> trackBindings=isRcTrack?rcWorldBorrow->bindingStorage():isTcTrack?tcWorldBorrow->bindingStorage():isMbTrack?mbCollisionWorld->bindingStorage():std::span<const track_runtime_storage50IG::Binding>(preparedBindings);
+ if(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)legacyGround.audit=J{};
+ std::span<Type2StaticCandidate49X> candidates=isMcTrack?mcWorldBorrow->candidateStorage():isGbTrack?gbWorldBorrow->candidateStorage():isTbTrack?tbWorldBorrow->candidateStorage():isRcTrack?rcWorldBorrow->candidateStorage():isTcTrack?tcWorldBorrow->candidateStorage():isMbTrack?mbCollisionWorld->candidateStorage():std::span<Type2StaticCandidate49X>(preparedCandidates);
+ std::span<const track_runtime_storage50IG::Binding> trackBindings=isMcTrack?mcWorldBorrow->bindingStorage():isGbTrack?gbWorldBorrow->bindingStorage():isTbTrack?tbWorldBorrow->bindingStorage():isRcTrack?rcWorldBorrow->bindingStorage():isTcTrack?tcWorldBorrow->bindingStorage():isMbTrack?mbCollisionWorld->bindingStorage():std::span<const track_runtime_storage50IG::Binding>(preparedBindings);
  // Cold, immovable, count-derived storage. Candidate order and every borrowed
  // source mesh/radius remain owned above; publication checks complete coverage.
  track_runtime_storage50IG::Owner trackStorageOwner;
@@ -1785,10 +1964,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(indexed,mbNavigationDiagnostic.message.empty()?"MB same-world navigation indices rejected":mbNavigationDiagnostic.message.c_str());
   require50DU(mbCollisionWorld->attachTriggers(),"MB authentic three-trigger memberships rejected");
  }
- if(!isRaTrack&&!isMbTrack&&!isTcTrack&&!isRcTrack)require50DU(trackStorageOwner.prepare(originalMainApplication.entities(),ground,trackBindings.data(),trackBindings.size(),trackStorageLimits,
+ if(!isRaTrack&&!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)require50DU(trackStorageOwner.prepare(originalMainApplication.entities(),ground,trackBindings.data(),trackBindings.size(),trackStorageLimits,
      trackStorageDiagnostic),trackStorageDiagnostic.message.empty()?"original track storage preparation failed":
      trackStorageDiagnostic.message.c_str());
- auto& trackStorage=isRcTrack?*rcWorldBorrow->storage():isTcTrack?*tcWorldBorrow->storage():isMbTrack?*mbCollisionWorld->storage():isRaTrack?raRuntime->storage:*trackStorageOwner.get();
+ auto& trackStorage=isMcTrack?*mcWorldBorrow->storage():isGbTrack?*gbWorldBorrow->storage():isTbTrack?*tbWorldBorrow->storage():isRcTrack?*rcWorldBorrow->storage():isTcTrack?*tcWorldBorrow->storage():isMbTrack?*mbCollisionWorld->storage():isRaTrack?raRuntime->storage:*trackStorageOwner.get();
  const auto& trackCounts=trackStorage.count;
  const auto tcMapView=tcNavigation.map();
  const auto tcAiView=tcNavigation.ai();
@@ -1847,6 +2026,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  SpringResponseParameters48L response{};response.maxSpeed94=10000;rr::assets::SpringCollisionAuthoring50F collision{};rr::assets::PodPhysicsDiagnostic49N diagnostic{};
  require50DU(rr::assets::readSpringCollision50F(reinterpret_cast<const char*>(phy.data()),phy.size(),collision,diagnostic)&&rr::assets::applySpringCollision50F(collision,x.parameters.bodies.main.body.mass,settings,response),"authored response settings");
  const auto tuning=[&](){
+  if(isMcTrack){
+   rr::assets::DecodeError48C error;std::vector<std::uint8_t> bytes;
+   const auto& pin=mc_cold_sources50LA::sources[4];
+   const bool extracted=mcColdSources->extractMember(pin.name,bytes,error,pin.bytes);
+   require50DU(extracted&&bytes.size()==pin.bytes&&pod_materials50ed_fixture::detail::sha256(bytes)==pin.sha,
+       "MC retained original TUN member unavailable");return bytes;
+  }else if(isGbTrack){
+   rr::assets::DecodeError48C error;std::vector<std::uint8_t> bytes;
+   const auto& pin=gb_cold_sources50LA::sources[4];
+   const bool extracted=gbColdSources->extractMember(pin.name,bytes,error,pin.bytes);
+   require50DU(extracted&&bytes.size()==pin.bytes&&pod_materials50ed_fixture::detail::sha256(bytes)==pin.sha,
+       "GB retained original TUN member unavailable");return bytes;
+  }
+  if(isTbTrack){
+   rr::assets::DecodeError48C error;std::vector<std::uint8_t> bytes;
+   const auto& pin=tb_cold_sources50LA::sources[4];
+   const bool extracted=tbColdSources->extractMember(pin.name,bytes,error,pin.bytes);
+   require50DU(extracted&&bytes.size()==pin.bytes&&pod_materials50ed_fixture::detail::sha256(bytes)==pin.sha,
+       "TB retained original TUN member unavailable");return bytes;
+  }
   if(isRcTrack){
    rr::assets::DecodeError48C error;std::vector<std::uint8_t> bytes;
    const auto& pin=rc_cold_sources50LA::sources[4];
@@ -1872,7 +2071,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(originalAiEnabled){
   require50DU(rr::assets::readAIEnvironmentImpact49Y(reinterpret_cast<const char*>(tuning.data()),
       tuning.size(),x.parameters.impactTuning,diagnostic),"original AI environment tuning unavailable");
-  if(isRcTrack)originalAiTuning=rcColdSources->aiTuning();
+  if(isMcTrack)originalAiTuning=mcColdSources->aiTuning();
+  else if(isGbTrack)originalAiTuning=gbColdSources->aiTuning();
+  else if(isTbTrack)originalAiTuning=tbColdSources->aiTuning();
+  else if(isRcTrack)originalAiTuning=rcColdSources->aiTuning();
   else if(isTcTrack)originalAiTuning=tcColdSources->aiTuning();
   else if(isScTrack)originalAiTuning=scColdSources->sourcesDecoded()->aiTuning;
   else require50DU(rr::assets::readAiTrackTuning50IU(reinterpret_cast<const char*>(tuning.data()),
@@ -1966,7 +2168,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // All these actual authored groups use the same declared native shape5/6
  // backend. MA/SA were already registered, so omitting them here rejected
  // their genuine trigger owners before any geometric/action dispatch.
- query.nativeGatePolicy=secondaryQuery.nativeGatePolicy=gcNativeGate||isGaTrack||isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack;
+ query.nativeGatePolicy=secondaryQuery.nativeGatePolicy=gcNativeGate||isGaTrack||isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack;
  if(gcAnimatedWorld)require50DU(gc_animated_candidates50IG::admitNonBodyResponse(*gcAnimatedWorld,
      candidates.data(),candidates.size(),animatedCandidateFirst,query,secondaryQuery),
      "GC original CHARACTER non-body spring response routing differs");
@@ -2101,6 +2303,52 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   bool& done;decltype(closeRcCurrentCollision)& close;
   ~RcCurrentCollisionGuard()noexcept{if(!done){if(!close())std::terminate();done=true;}}
  } rcCurrentCollisionGuard{rcCollisionCleanupDone,closeRcCurrentCollision};
+ bool mcCollisionCleanupDone=!isMcTrack;
+ auto closeMcCurrentCollision=[&]()noexcept->bool {
+  if(!isMcTrack)return true;
+  if(!mcWorldBorrow||mcWorldBorrow->world()!=&liveWorld||!mcTriggerActions||!mcTriggerActions->queryIdle()||zoneQueue.count)return false;
+  auto remove=[&](LiveZoneMembership50EN& state,CollectionRef50BX expected){
+   if(state.attached&&state.object!=expected)return false;
+   const auto r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,state,trackStorage.membershipWork);
+   return r.status==LiveZoneStatus50EN::Complete&&!state.attached&&!state.object;
+  };
+  if(!remove(trackStorage.mainMembership.state,trackCounts.mainQuery)||
+     !remove(trackStorage.secondaryMembership.state,trackCounts.secondaryQuery)||
+     !remove(trackStorage.terrainMembership.state,trackCounts.terrainQuery)||
+     !remove(recoveryQueryOwners.memberships[0],trackCounts.podQuery)||
+     !remove(recoveryQueryOwners.memberships[1],trackCounts.movementQuery))return false;
+  s.shape.registrationE0=0;
+  for(std::size_t i=0;i<21;++i){auto* member=mcWorldBorrow->triggerMembership(i);
+   if(!member||!remove(member->state,static_cast<CollectionRef50BX>(90+i)))return false;}
+  return true;
+ };
+ struct McCurrentCollisionGuard {
+  bool& done;decltype(closeMcCurrentCollision)& close;
+  ~McCurrentCollisionGuard()noexcept{if(!done){if(!close())std::terminate();done=true;}}
+ } mcCurrentCollisionGuard{mcCollisionCleanupDone,closeMcCurrentCollision};
+ bool gbCollisionCleanupDone=!isGbTrack;
+ auto closeGbCurrentCollision=[&]()noexcept->bool {
+  if(!isGbTrack)return true;
+  if(!gbWorldBorrow||gbWorldBorrow->world()!=&liveWorld||!gbTriggerActions||!gbTriggerActions->queryIdle()||zoneQueue.count)return false;
+  auto remove=[&](LiveZoneMembership50EN& state,CollectionRef50BX expected){
+   if(state.attached&&state.object!=expected)return false;
+   const auto r=removeLiveZoneMembership50EN(zoneLifecycle,liveWorld,state,trackStorage.membershipWork);
+   return r.status==LiveZoneStatus50EN::Complete&&!state.attached&&!state.object;
+  };
+  if(!remove(trackStorage.mainMembership.state,trackCounts.mainQuery)||
+     !remove(trackStorage.secondaryMembership.state,trackCounts.secondaryQuery)||
+     !remove(trackStorage.terrainMembership.state,trackCounts.terrainQuery)||
+     !remove(recoveryQueryOwners.memberships[0],trackCounts.podQuery)||
+     !remove(recoveryQueryOwners.memberships[1],trackCounts.movementQuery))return false;
+  s.shape.registrationE0=0;
+  for(std::size_t i=0;i<18;++i){auto* member=gbWorldBorrow->triggerMembership(i);
+   if(!member||!remove(member->state,static_cast<CollectionRef50BX>(616+i)))return false;}
+  return true;
+ };
+ struct GbCurrentCollisionGuard {
+  bool& done;decltype(closeGbCurrentCollision)& close;
+  ~GbCurrentCollisionGuard()noexcept{if(!done){if(!close())std::terminate();done=true;}}
+ } gbCurrentCollisionGuard{gbCollisionCleanupDone,closeGbCurrentCollision};
  bool tbCollisionCleanupDone=!isTbTrack;
  auto closeTbCurrentCollision=[&]() noexcept -> bool {
   if(!isTbTrack)return true;
@@ -2171,13 +2419,33 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  } scCurrentMembershipGuard{scMembershipCleanupDone,closeScCurrentMemberships};
  // Cold original TunnelTrack owners, separate from the grid-start projection.
  // Share the existing serial source-libm owner with49T; keep every node/NextN.
- auto legacyNavigationMap=(isRaTrack||isMbTrack||isTcTrack||isRcTrack||isTbTrack)?nullptr:std::make_unique<TrackNavigation50EU>();
- auto legacyNavigationAI=(isRaTrack||isMbTrack||isTcTrack||isRcTrack||isTbTrack)?nullptr:std::make_unique<TrackNavigation50EU>();
- const auto* navigationMap=(isMbTrack||isTcTrack||isTbTrack)?nullptr:isRcTrack?&rcNavigationBorrow.map():isRaTrack?&raRuntime->source.map:legacyNavigationMap.get();
- const auto* navigationAI=(isMbTrack||isTcTrack||isTbTrack)?nullptr:isRcTrack?&rcNavigationBorrow.ai():isRaTrack?&raRuntime->source.ai:legacyNavigationAI.get();
+ auto legacyNavigationMap=(isRaTrack||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)?nullptr:std::make_unique<TrackNavigation50EU>();
+ auto legacyNavigationAI=(isRaTrack||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)?nullptr:std::make_unique<TrackNavigation50EU>();
+ const auto* navigationMap=(isMbTrack||isTcTrack||isTbTrack||isGbTrack||isMcTrack)?nullptr:isRcTrack?&rcNavigationBorrow.map():isRaTrack?&raRuntime->source.map:legacyNavigationMap.get();
+ const auto* navigationAI=(isMbTrack||isTcTrack||isTbTrack||isGbTrack||isMcTrack)?nullptr:isRcTrack?&rcNavigationBorrow.ai():isRaTrack?&raRuntime->source.ai:legacyNavigationAI.get();
  // The root's final const views were issued once against this actual liveWorld,
  // outside Bank. All suspended ordinary recovery calls keep this same selection.
  const auto requireMbRuntimeNavigation50MB=[&](){
+  if(isMcTrack){
+   require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!navigationMap&&!navigationAI&&mcColdSources&&
+       mcMapView.runtimeValid()&&mcAiView.runtimeValid()&&
+       mcMapView.role()==NavigationRole50MC::Map&&mcAiView.role()==NavigationRole50MC::Ai&&
+       mcMapView.sourceIdentity()==mcColdSources.get()&&mcAiView.sourceIdentity()==mcColdSources.get()&&
+       mcMapView.sameOwner(mcAiView)&&mcMapView.sameWorld(liveWorld)&&mcAiView.sameWorld(liveWorld)&&
+       mcMapMetadata.matches(mcMapView)&&mcAiMetadata.matches(mcAiView),
+       "MC navigation requires its retained same-source final Map/Ai/metadata and actual liveWorld");
+   return;
+  }
+  if(isGbTrack){
+   require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!navigationMap&&!navigationAI&&gbColdSources&&
+       gbMapView.runtimeValid()&&gbAiView.runtimeValid()&&
+       gbMapView.role()==NavigationRole50GB::Map&&gbAiView.role()==NavigationRole50GB::Ai&&
+       gbMapView.sourceIdentity()==gbColdSources.get()&&gbAiView.sourceIdentity()==gbColdSources.get()&&
+       gbMapView.sameOwner(gbAiView)&&gbMapView.sameWorld(liveWorld)&&gbAiView.sameWorld(liveWorld)&&
+       gbMapMetadata.matches(gbMapView)&&gbAiMetadata.matches(gbAiView),
+       "GB navigation requires its retained same-source final Map/Ai/metadata and actual liveWorld");
+   return;
+  }
   if(isTbTrack){
    require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!navigationMap&&!navigationAI&&tbColdSources&&
        tbMapView.runtimeValid()&&tbAiView.runtimeValid()&&
@@ -2217,12 +2485,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  const auto& selectedOriginalAiMapMetadata=isRcTrack?rcNavigationBorrow.mapMetadata():originalAiMapMetadata;
  const auto& selectedOriginalAiMetadata=isRcTrack?rcNavigationBorrow.aiMetadata():originalAiMetadata;
  const auto selectedMapCount50MB=[&](){
-  requireMbRuntimeNavigation50MB();return isTbTrack?tbMapView.count():isTcTrack?tcMapView.count():isMbTrack?mbMapView.count():navigationMap->track.count;
+  requireMbRuntimeNavigation50MB();return isMcTrack?mcMapView.count():isGbTrack?gbMapView.count():isTbTrack?tbMapView.count():isTcTrack?tcMapView.count():isMbTrack?mbMapView.count():navigationMap->track.count;
  };
  const auto selectedAiCount50MB=[&](){
-  requireMbRuntimeNavigation50MB();return isTbTrack?tbAiView.count():isTcTrack?tcAiView.count():isMbTrack?mbAiView.count():navigationAI->track.count;
+  requireMbRuntimeNavigation50MB();return isMcTrack?mcAiView.count():isGbTrack?gbAiView.count():isTbTrack?tbAiView.count():isTcTrack?tcAiView.count():isMbTrack?mbAiView.count():navigationAI->track.count;
  };
  const auto selectedMapNode50MB=[&](std::uint32_t index)->const UndertrackNode50ET&{
+  if(isMcTrack){requireMbRuntimeNavigation50MB();
+   require50DU(index<mcMapView.count(),"MC map node is outside the actual source");
+   return mcMapView.track().nodes()[index];}
+  if(isGbTrack){requireMbRuntimeNavigation50MB();
+   require50DU(index<gbMapView.count(),"GB map node is outside the actual source");
+   return gbMapView.track().nodes()[index];}
   if(isTbTrack){requireMbRuntimeNavigation50MB();
    require50DU(index<tbMapView.count(),"TB map node is outside the actual source");
    return tbMapView.track().nodes()[index];}
@@ -2237,6 +2511,12 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   return navigationMap->track.nodes[index];
  };
  const auto selectedMapIndex50MB=[&](std::uint32_t index){
+  if(isMcTrack){requireMbRuntimeNavigation50MB();
+   require50DU(index<mcMapView.count(),"MC map index is outside the actual source");
+   return mcMapView.nodeIndex78()[index];}
+  if(isGbTrack){requireMbRuntimeNavigation50MB();
+   require50DU(index<gbMapView.count(),"GB map index is outside the actual source");
+   return gbMapView.nodeIndex78()[index];}
   if(isTbTrack){requireMbRuntimeNavigation50MB();
    require50DU(index<tbMapView.count(),"TB map index is outside the actual source");
    return tbMapView.nodeIndex78()[index];}
@@ -2342,6 +2622,42 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const decltype(retireTbAudioOwners)& retire;
   ~TbAudioOwnerGuard(){if(!retire())std::terminate();}
  } tbAudioOwnerGuard{retireTbAudioOwners};
+ std::unique_ptr<gb_positional_sound50GB::Owner> gbPositionalAudio;
+ bool gbAudioOwnersRetired=false;
+ const auto retireGbAudioOwners=[&]()noexcept{
+  if(!isGbTrack||gbAudioOwnersRetired)return true;
+  // Every D44 row borrows materialAudio PCM. End those admissions first,
+  // then the distinct positional transports, then the host material bank.
+  originalAiAudio->close();
+  if(gbPositionalAudio&&!gbPositionalAudio->close())return false;
+  gbPositionalAudio.reset();
+  if(materialAudio){materialAudio->reset();materialAudio.reset();}
+  gbAudioOwnersRetired=true;return true;
+ };
+ struct GbAudioOwnerGuard {
+  const decltype(retireGbAudioOwners)& retire;
+  ~GbAudioOwnerGuard(){if(!retire())std::terminate();}
+ } gbAudioOwnerGuard{retireGbAudioOwners};
+ const auto reserveMcAudioPayload=[&](std::size_t bytes,const char* reason){
+  require50DU(isMcTrack&&bytes<=mcRemainingPayloadBytes(),reason);
+  mcAdditionalPayloadReserved+=bytes;
+ };
+ std::unique_ptr<mc_positional_sound50MC::Owner> mcPositionalAudio;
+ bool mcAudioOwnersRetired=false;
+ const auto retireMcAudioOwners=[&]()noexcept{
+  if(!isMcTrack||mcAudioOwnersRetired)return true;
+  // Every D44 row borrows materialAudio PCM. End those admissions first,
+  // then the distinct positional transports, then the host material bank.
+  originalAiAudio->close();
+  if(mcPositionalAudio&&!mcPositionalAudio->close())return false;
+  mcPositionalAudio.reset();
+  if(materialAudio){materialAudio->reset();materialAudio.reset();}
+  mcAudioOwnersRetired=true;return true;
+ };
+ struct McAudioOwnerGuard {
+  const decltype(retireMcAudioOwners)& retire;
+  ~McAudioOwnerGuard(){if(!retire())std::terminate();}
+ } mcAudioOwnerGuard{retireMcAudioOwners};
  // Only fixed source state enters the racer bank; mixer/PCM ownership never does.
  opponent_audio50HX::BoostState opponentBoostAudio{};
  const char* audioSetting=std::getenv("RR_AUDIO");
@@ -2377,16 +2693,23 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const std::filesystem::path audioRoot=suppliedAudioRoot?std::filesystem::path(suppliedAudioRoot):
       runtime_asset_paths50LB::resolve("work/native/project/disc/AUDIO");
   std::string audioError;
-  if(!tcLiveAudioPrepared&&!tbLiveAudioPrepared){
+  if(!tcLiveAudioPrepared&&!tbLiveAudioPrepared&&!gbLiveAudioPrepared){
    const bool prepared=liveAudio->prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),audioRoot,audioError,playerRacer60,loadedAudioSettings);
    require50DU(prepared,audioError.empty()?"native audio bank preparation failed":audioError.c_str());
-  }else require50DU(((isTcTrack&&tcLiveAudioPrepared&&!tbLiveAudioPrepared)||
-      (isTbTrack&&tbLiveAudioPrepared&&!tcLiveAudioPrepared&&audioRoot==tbPreparedAudioRoot))&&
+  }else require50DU(((isTcTrack&&tcLiveAudioPrepared&&!tbLiveAudioPrepared&&!gbLiveAudioPrepared)||
+      (isTbTrack&&tbLiveAudioPrepared&&!tcLiveAudioPrepared&&!gbLiveAudioPrepared&&audioRoot==tbPreparedAudioRoot)||
+      (isGbTrack&&gbLiveAudioPrepared&&!tcLiveAudioPrepared&&!tbLiveAudioPrepared&&audioRoot==gbPreparedAudioRoot))&&
       liveAudio->bank().ready&&liveAudio->mixerForMaterialOwner()&&liveAudio->groupsForProviders(),
-      "TC/TB early audio owner no longer matches actual later consumers");
+      "TC/TB/GB early audio owner no longer matches actual later consumers");
   auto* materialMixer=liveAudio->mixerForMaterialOwner();
   if(originalAiAudioEnabled){
-   if(isTbTrack){
+   if(isGbTrack){
+    require50DU(gbLiveAudioPrepared&&gbSoundMode&&gbSoundMode->ready()&&materialMixer&&
+        materialMixer->originalSoundMode50KG()==gbSoundMode.get()&&
+        (!originalMainApplication.soundMode||originalMainApplication.soundMode==gbSoundMode),
+        "GB actual early source-mode owner differs at later audio join");
+    gameplaySoundMode=gbSoundMode;
+   }else if(isTbTrack){
     require50DU(tbLiveAudioPrepared&&tbSoundMode&&tbSoundMode->ready()&&materialMixer&&
         materialMixer->originalSoundMode50KG()==tbSoundMode.get()&&
         (!originalMainApplication.soundMode||originalMainApplication.soundMode==tbSoundMode),
@@ -2463,7 +2786,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     dynamicEventBindings.eventOwner33CBound=true;
    }
   }
-  const bool materialAudioReady=materialMixer&&(isTbTrack?
+  const bool materialAudioReady=materialMixer&&(isMcTrack?
+      materialAudio->prepareMc(mcColdSources,audioRoot,*materialMixer,64,audioError):isGbTrack?
+      materialAudio->prepareGb(gbColdSources,audioRoot,*materialMixer,64,audioError):isTbTrack?
       materialAudio->prepareTb(tbColdSources,audioRoot,*materialMixer,64,audioError):isRcTrack?
       materialAudio->prepareRc(rcColdSources,audioRoot,*materialMixer,64,audioError):
       materialAudio->prepare(runtime_asset_paths50LB::resolve("work/native/project/disc"),audioRoot,
@@ -2475,6 +2800,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       materialAudio->collisionRowCount()==24&&materialAudio->driveRowCount()==20&&
       materialAudio->extraVoiceFirst()==192&&materialAudio->extraVoiceCount()==28),
       "TB actual material rows or exclusive host extras192..219 differ");
+  require50DU(!isGbTrack||(materialAudio->gbSourceIdentity()==gbColdSources.get()&&
+      materialAudio->collisionRowCount()==20&&materialAudio->driveRowCount()==20&&
+      materialAudio->extraVoiceFirst()==192&&materialAudio->extraVoiceCount()==24),
+      "GB actual material rows or exclusive host extras192..215 differ");
+  require50DU(!isMcTrack||(materialAudio->mcSourceIdentity()==mcColdSources.get()&&
+      materialAudio->collisionRowCount()==12&&materialAudio->driveRowCount()==8&&
+      materialAudio->extraVoiceFirst()==192&&materialAudio->extraVoiceCount()==4),
+      "MC actual material rows or exclusive host extras192..195 differ");
+  if(isMcTrack)reserveMcAudioPayload(materialAudio->retainedPayloadBytes(),
+      "MC actual material audio retained payload exceeds remaining ledger");
   if(isRaTrack){
    const auto& originals=raRuntime->source.collisions;
    for(std::size_t i=0;i<trackBindings.size();++i){const auto& binding=trackBindings[i];
@@ -2527,6 +2862,33 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    const bool prepared=tbPositionalAudio->prepare(tbColdSources,*materialAudio,audioRoot,
        *materialMixer,*audioGroups,audioError);
    require50DU(prepared,audioError.empty()?"TB positional audio preparation rejected":audioError.c_str());
+  }
+  if(isMcTrack){
+   require50DU(nativeOriginalFleet&&humanCourseEnabled&&originalAiAudioEnabled&&
+       mcColdSources&&mcColdSources->ready()&&materialAudio->mcSourceIdentity()==mcColdSources.get()&&
+       materialMixer&&audioGroups&&audioGroups->uses(*materialMixer)&&materialMixer->originalSoundMode50KG(),
+       "MC positional audio requires actual same-source material/mixer/groups/mode owners");
+   mcPositionalAudio=std::make_unique<mc_positional_sound50MC::Owner>();
+   const bool prepared=mcPositionalAudio->prepare(mcColdSources,audioRoot,*materialMixer,*audioGroups,audioError);
+   require50DU(prepared&&mcPositionalAudio->uses(*materialMixer,*audioGroups),
+       audioError.empty()?"MC positional audio preparation rejected":audioError.c_str());
+   reserveMcAudioPayload(mcPositionalAudio->retainedPayloadBytes(),
+       "MC actual positional audio retained payload exceeds remaining ledger");
+  }
+  if(isGbTrack){
+   require50DU(nativeOriginalFleet&&humanCourseEnabled&&originalAiAudioEnabled&&gbLiveAudioPrepared&&
+       gbColdSources&&gbColdSources->ready()&&gbPodSound&&gbPodSound->prepared()&&
+       gbPodSound->sourceIdentity()==gbTriggerAuthoring.get()&&
+       gbPodSound->sourceIdentity()->coldSource()==gbColdSources.get()&&
+       materialAudio->gbSourceIdentity()==gbColdSources.get(),
+       "GB positional audio requires the same retained trigger/material/cold source");
+   gbPositionalAudio=std::make_unique<gb_positional_sound50GB::Owner>();
+   // prepare checks every actual128..151 slot is inactive and unbound before
+   // registering all49 descriptors with this same mixer and World4D8 owner.
+   const bool prepared=gbPositionalAudio->prepare(gbColdSources,*materialAudio,audioRoot,
+       *materialMixer,*audioGroups,audioError);
+   require50DU(prepared,audioError.empty()?"GB positional audio preparation rejected":audioError.c_str());
+   std::cerr<<"gb_native_audio ambient_rows=4 ambient_scheduling=unsupported positional_rows=49 native_transport_slots=24\n";
   }
   if(raceEnabled&&!originalAiAudioEnabled){
    std::array<opponent_audio50HX::Source,opponent_audio50HX::maxOpponents> sources{};
@@ -2612,7 +2974,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       <<" node "<<navigationDiagnostic.node<<'\n';
   return ok;
  };
- if(isTbTrack){
+ if(isMcTrack){
+  requireMbRuntimeNavigation50MB();
+  LapProgressTrackView50MC markers;
+  require50DU(prepareLapProgressTrack50GF(mcMapView,mcMapMetadata,markers,lapOwner.diagnostic)&&
+      lapOwner.bindMcTrack(markers),"actual MC lap markers or shared lap owner rejected");
+ }else if(isGbTrack){
+  requireMbRuntimeNavigation50MB();
+  LapProgressTrackView50GB markers;
+  require50DU(prepareLapProgressTrack50GF(gbMapView,gbMapMetadata,markers,lapOwner.diagnostic)&&
+      lapOwner.bindGbTrack(markers),"actual GB lap markers or shared lap owner rejected");
+ }else if(isTbTrack){
   requireMbRuntimeNavigation50MB();
   LapProgressTrackView50TB markers;
   require50DU(prepareLapProgressTrack50GF(tbMapView,tbMapMetadata,markers,lapOwner.diagnostic)&&
@@ -2711,7 +3083,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  float navigationCA0[4]{0.f,0.f,0.f,1.f};
  const CollectionRef50BX initialCollisionZone=checkpointInput?checkpointInput->primaryZone:trackSession->initialCollisionZone;
  if(checkpointInput){
-  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack,"MB/TC/RC/TB native session does not consume a HOST checkpoint reconstruction");
+  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack,"MB/TC/RC/TB/GB/MC native session does not consume a HOST checkpoint reconstruction");
   require50DU(checkpointInput->zoneCount==liveWorld.zoneCount,"checkpoint world namespace changed");
   require50DU(checkpointInput->progress.reset.vehicleC80<navigationAI->track.count&&
       checkpointInput->progress.vehicleC84<navigationAI->track.count&&
@@ -3150,6 +3522,25 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  native_gc_other_particle_children50KG::SharedAuthoring nativeParticleAuthoring;
  std::array<native_gc_other_particle_children50KG::Runtime,raceRacerCount> nativeParticleChildren;
+ std::shared_ptr<mc_particle_vehicle50MC::Owner> mcParticleVehicles;
+ if(isMcTrack){
+  require50DU(mcWaterOwner&&mcWaterOwner->ready()&&mcParticleSource&&mcTrackParticles,"MC real water/source pool before racer producers");
+  constexpr std::size_t selectedPodScratch=4u*1024u*1024u;
+  reserveMcAdditionalPayload(selectedPodScratch+mc_particle_vehicle50MC::Owner::maximumAdditionalPayloadBytes(),"MC actual selected-POD spray decode and eight-racer owner exceed shared budget");
+  { // Actual selected-POD decoder scratch scope, not a lifetime reservation.
+  const auto raw=runtime_startup50fl::readBytes(playerArchive.string());
+  require50DU(raw.size()<=1024u*1024u,"MC selected POD source exceeds cold decode bound");
+  rr::assets::ResArchive48C pod;rr::assets::DecodeError48C decoded;rr::assets::DecodeLimits48C limits;
+  limits.resource_file_bytes=1024u*1024u;limits.resource_decoded_bytes=3u*1024u*1024u;limits.resource_entries=512;
+  std::vector<std::uint8_t> spray;
+  require50DU(rr::assets::decodeResource48C(raw,pod,decoded,nullptr,limits)&&rr::assets::extractResMember48C(pod,"particle\\podSpray.emt",spray,decoded,1027),"MC actual selected-POD spray member rejected");
+  mcParticleVehicles=std::make_shared<mc_particle_vehicle50MC::Owner>();std::string error;
+  require50DU(mcParticleVehicles->prepare(mcParticleSource,mcWaterOwner,mcTrackParticles,effectSources,std::move(spray),mc_particle_vehicle50MC::Owner::maximumAdditionalPayloadBytes(),error),error.c_str());
+  } // raw RES, decoded directory/data and local source diagnostics are destroyed.
+  require50DU(mcAdditionalPayloadReserved>=selectedPodScratch,"MC scratch release accounting");
+  mcAdditionalPayloadReserved-=selectedPodScratch;
+ }
+
  std::array<std::uint64_t,raceRacerCount> nativeParticleChildSequence{};
  if(nativeGcWater)require50DU(nativeParticleAuthoring.parse(effectSources).okay(),
      "actual native particle derived/common authoring rejected");
@@ -3208,13 +3599,14 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(!isTbTrack||(tbColdSources&&tbColdSources->ready()&&tbLightOwner&&tbLightOwner->world()&&
      tbLightOwner->world()->parameters.original_bytes==tbColdSources->world().parameters.original_bytes),
      "TB actual shared source lighting owner absent");
- auto& gcLightOwner=isTbTrack?*tbLightOwner:isRcTrack?*rcLightOwner:isTcTrack?*tcLightOwner:isRaTrack?raRuntime->lighting:legacyLightOwner;
+ auto& gcLightOwner=isMcTrack?*mcLightOwner:isGbTrack?*gbLightOwner:isTbTrack?*tbLightOwner:isRcTrack?*rcLightOwner:isTcTrack?*tcLightOwner:isRaTrack?raRuntime->lighting:legacyLightOwner;
  gcLighting::Diagnostic gcLightDiagnostic{};
  // Session owners are deliberately OUTSIDE the transient native racer bank.
  // This count advances at actual graphics success, before later failure cuts.
  std::array<std::uint64_t,raceRacerCount> gcGraphicsSequence{};
  std::array<NativeGcSelectedLightsCandidate,raceRacerCount> gcDrawLights{};
- const auto nativeLightingPolicy=nativeTbSelection?
+ const auto nativeLightingPolicy=nativeMcSelection?gcLighting::CachePolicy::nativeMcAuthoredZoneLightSelection:nativeGbSelection?
+     gcLighting::CachePolicy::nativeGbAuthoredZoneLightSelection:nativeTbSelection?
      gcLighting::CachePolicy::nativeTbAuthoredZoneLightSelection:nativeRcSelection?
      gcLighting::CachePolicy::nativeRcAuthoredZoneLightSelection:nativeTcSelection?
      gcLighting::CachePolicy::nativeTcAuthoredZoneLightSelection:nativeScSelection?
@@ -3308,7 +3700,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
  };
  if(nativeSelectedLights){
-  const auto& bytes=isTbTrack?tbColdSources->world().parameters.original_bytes:actualWorld.parameters.original_bytes;
+  const auto& bytes=isMcTrack?mcColdSources->world().parameters.original_bytes:isGbTrack?gbColdSources->world().parameters.original_bytes:isTbTrack?tbColdSources->world().parameters.original_bytes:actualWorld.parameters.original_bytes;
   // RA borrows the already-prepared lighting owner from its actual cold aggregate.
   // Never reconstruct a second world owner or fall through to GC preparation.
   if(isTcTrack)require50DU(nativeTcSelection&&tcLightOwner&&tcLightOwner->world()&&
@@ -3318,18 +3710,25 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       &gcLightOwner==rcLightOwner.get()&&rcLightOwner->world()->parameters.original_bytes==bytes&&
       bytes==rcColdSources->world().parameters.original_bytes,
       "RC shared lighting lost its actual authenticated source");
+  if(isMcTrack)require50DU(nativeMcSelection&&mcColdSources&&mcLightOwner&&
+      mcLightOwner->mcSourceIdentity()==mcColdSources.get()&&mcLightOwner->world()==&mcColdSources->world()&&
+      &gcLightOwner==mcLightOwner.get(),"MC same-source lighting owner lost");
+  if(isGbTrack)require50DU(nativeGbSelection&&gbColdSources&&gbLightOwner&&gbLightOwner->world()&&
+      &gcLightOwner==gbLightOwner.get()&&gbLightOwner->world()->parameters.original_bytes==bytes,
+      "GB shared lighting lost its actual authenticated source");
   if(isTbTrack)require50DU(nativeTbSelection&&tbColdSources&&tbLightOwner&&tbLightOwner->world()&&
       &gcLightOwner==tbLightOwner.get()&&tbLightOwner->world()->parameters.original_bytes==bytes&&
       bytes==tbColdSources->world().parameters.original_bytes,
       "TB shared lighting lost its actual authenticated source");
-  if(!isRaTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack)require50DU(nativeScSelection?gcLightOwner.prepareScNative(bytes,raceRacerCount,gcLightDiagnostic):nativeMbSelection?gcLightOwner.prepareMbNative(bytes,raceRacerCount,gcLightDiagnostic):
+  if(!isRaTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack)require50DU(nativeScSelection?gcLightOwner.prepareScNative(bytes,raceRacerCount,gcLightDiagnostic):nativeMbSelection?gcLightOwner.prepareMbNative(bytes,raceRacerCount,gcLightDiagnostic):
       nativeMaSelection?gcLightOwner.prepareMaNative(bytes,raceRacerCount,gcLightDiagnostic):
       nativeSaSelection?gcLightOwner.prepareSaNative(bytes,raceRacerCount,gcLightDiagnostic):
       nativeGaSelection?gcLightOwner.prepareGaNative(bytes,raceRacerCount,gcLightDiagnostic):
       nativeTaSelection?gcLightOwner.prepareTaNative(bytes,raceRacerCount,gcLightDiagnostic):
       gcLightOwner.prepare(bytes,raceRacerCount,gcLightDiagnostic),
       "authenticated track light/visibility owner preparation failed");
-  std::cerr<<(nativeTbSelection?
+  std::cerr<<(nativeMcSelection?"NATIVE MC SELECTED LIGHTS: actual28-zone/28-portal topology,28 ambient/one directional source, no timed flash; ":nativeGbSelection?
+      "NATIVE GB SELECTED LIGHTS: genuine source ambient/directional/timed light registration and original Light+A0 particle semantics; ":nativeTbSelection?
       "NATIVE TB SELECTED LIGHTS: actual10-zone/11-portal source topology and authenticated retained-section light registration; ":nativeRcSelection?
       "NATIVE RC SELECTED LIGHTS: actual15-zone/15-portal source topology,15 ambient and one directional light; ":nativeTcSelection?
       "NATIVE TC SELECTED LIGHTS: actual25-zone/26-portal topology and authored ambient/directional lights; ":nativeScSelection?
@@ -3686,7 +4085,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto applyCourseInput=[&](std::size_t racerSlot=0){
   require50DU(!originalUiActive,"Main-only frontend cannot invoke a driving controller");
   require50DU(!nativeOriginalFleet,"native Course path reached forbidden HOST course driver");
-  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack,"MB/TC/RC/TB native session cannot enter the legacy HOST course driver");
+  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack,"MB/TC/RC/TB/GB/MC native session cannot enter the legacy HOST course driver");
   ++allAiHostDriverCalls;
   rr::host::CourseDriverInput50GK command{};
   command.enabled=autoDriveEnabled;command.elapsedSeconds=.016f;
@@ -3748,7 +4147,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(opponentFrame)return true; // Keep the unsupported prefix in this AI slot only.
   recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
   BodyMatrix48G groundedCheckpoint{};
-  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack,"MB/TC/RC/TB native session cannot enter legacy HOST checkpoint preparePortalRecovery");
+  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack,"MB/TC/RC/TB/GB/MC native session cannot enter legacy HOST checkpoint preparePortalRecovery");
   const bool prepared=recovery50FI::preparePortalRecovery(*navigationMap,navigationProgress,s,
       x.bindings,failure,x.parameters.visual.verticalLimit7EC,liveWorld,nextCheckpoint,recoveryDiagnostic);
   const bool repeated=prepared&&checkpointInput&&
@@ -3913,6 +4312,67 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  // RA keeps its separate Session/aggregate retirement obligation unchanged.
  native_racer50HN::BankBoundModelRetirement50LH<ra_cold_roster50LA::RuntimeOwners>
      nativeColdModelRetirement(*nativeRosterOwners,!isRaTrack);
+ // This guard begins before any Bank enrollment and captures only owners
+ // already declared. The later full-session guard retires contacts first and
+ // marks this predecessor complete; an early failure has no live query yet.
+ bool gbBankPrefixClosed=!isGbTrack;
+ auto closeGbBankRegistries=[&]()noexcept->bool {try{
+  if(!gbLightOwner||&gcLightOwner!=gbLightOwner.get())return false;
+  if(gbParticleRender&&!gbParticleRender->closed()&&!gbParticleRender->close())return false;
+  if(gbAnimationBinding&&gbAnimationBinding->needsClose()&&!gbAnimationBinding->close(gbAnimationBindingDiagnostic))return false;
+  if(!nativeColdModelRetirement.close())return false;
+  for(std::size_t slot=0;slot<racerBank.count();++slot)if(!racerBank.visit(slot,[&](){
+   const bool visibilityRetired=racerRigs[slot]&&racerCables[slot]?
+       gb_cold_visibility50GB::Retirement::retireSlot(racerBank,slot,s,x.bindings,x.parameters,
+           *racerRigs[slot],*racerCables[slot],gcLightOwner,gcLightDiagnostic):
+       gb_cold_visibility50GB::Retirement::untouchedSlot(racerBank,slot,gcLightOwner,gcLightDiagnostic);
+   return visibilityRetired&&closeGbCurrentCollision();
+  }))return false;
+  if(!racerBank.count()&&!closeGbCurrentCollision())return false;
+  gbCollisionCleanupDone=true;return true;
+ }catch(...){return false;}};
+ auto closeGbBankPrefix=[&]()noexcept->bool {try{
+  if(gbBankPrefixClosed)return true;
+  if(gbQueryBinding&&gbQueryBinding->enrolled())return false;
+  if(!closeGbBankRegistries())return false;
+  gbQueryBinding.reset();
+  if(!racerBank.retireNativeBacking())return false;
+  gbBankPrefixClosed=true;return true;
+ }catch(...){return false;}};
+ struct GbBankPrefixGuard {
+  decltype(closeGbBankPrefix)& close;
+  ~GbBankPrefixGuard()noexcept{if(!close()){
+   std::fputs("GB Bank prefix retirement rejected; backing retained until fail-stop\n",stderr);std::terminate();}}
+ } gbBankPrefixGuard{closeGbBankPrefix};
+ bool mcBankPrefixClosed=!isMcTrack;
+ auto closeMcBankRegistries=[&]()noexcept->bool {try{
+  if(!mcLightOwner||&gcLightOwner!=mcLightOwner.get())return false;
+  if(mcParticleRender&&!mcParticleRender->closed()&&!mcParticleRender->close())return false;
+  if(mcAnimationBinding&&mcAnimationBinding->needsClose()&&!mcAnimationBinding->close(mcAnimationBindingDiagnostic))return false;
+  if(!nativeColdModelRetirement.close())return false;
+  for(std::size_t slot=0;slot<racerBank.count();++slot)if(!racerBank.visit(slot,[&](){
+   const bool visibilityRetired=racerRigs[slot]&&racerCables[slot]?
+       mc_cold_visibility50MC::Retirement::retireSlot(racerBank,slot,s,x.bindings,x.parameters,
+           *racerRigs[slot],*racerCables[slot],gcLightOwner,gcLightDiagnostic):
+       mc_cold_visibility50MC::Retirement::untouchedSlot(racerBank,slot,gcLightOwner,gcLightDiagnostic);
+   return visibilityRetired&&closeMcCurrentCollision();
+  }))return false;
+  if(!racerBank.count()&&!closeMcCurrentCollision())return false;
+  mcCollisionCleanupDone=true;return true;
+ }catch(...){return false;}};
+ auto closeMcBankPrefix=[&]()noexcept->bool {try{
+  if(mcBankPrefixClosed)return true;
+  if(mcQueryBinding&&mcQueryBinding->enrolled())return false;
+  if(!closeMcBankRegistries())return false;
+  mcQueryBinding.reset();
+  if(!racerBank.retireNativeBacking())return false;
+  mcBankPrefixClosed=true;return true;
+ }catch(...){return false;}};
+ struct McBankPrefixGuard {
+  decltype(closeMcBankPrefix)& close;
+  ~McBankPrefixGuard()noexcept{if(!close()){
+   std::fputs("MC Bank prefix retirement rejected; backing retained until fail-stop\n",stderr);std::terminate();}}
+ } mcBankPrefixGuard{closeMcBankPrefix};
  bool tbColdPrefixClosed=!isTbTrack;
  auto closeTbColdPrefix=[&]() noexcept -> bool {try{
   if(tbColdPrefixClosed)return true;
@@ -4003,9 +4463,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(!originalAi.physicalReset2255B0Pending)
    runNative([&]{return readAiVehicleFrame50IV(s,x.bindings,read.preparedFactor,x.workspace,x.diagnostic);},"original AI frame entry");
   const auto driveSelectedOriginalAi50MB=[&]<class Input>()
-      requires (std::is_same_v<Input,AiRuntimeInput50IV>||std::is_same_v<Input,AiRuntimeInput50MB>||std::is_same_v<Input,AiRuntimeInput50TC>||std::is_same_v<Input,AiRuntimeInput50TB>){
+      requires (std::is_same_v<Input,AiRuntimeInput50IV>||std::is_same_v<Input,AiRuntimeInput50MB>||std::is_same_v<Input,AiRuntimeInput50TC>||std::is_same_v<Input,AiRuntimeInput50TB>||std::is_same_v<Input,AiRuntimeInput50GB>||std::is_same_v<Input,AiRuntimeInput50MC>){
   Input aiInput{};aiInput.applicationGlobals=&native_ai50IV::applicationNoise().ai;
-  if constexpr(std::is_same_v<Input,AiRuntimeInput50TB>){
+  if constexpr(std::is_same_v<Input,AiRuntimeInput50MC>){
+   requireMbRuntimeNavigation50MB();
+   aiInput.mapFF0=mcMapView;aiInput.aiFF4=mcAiView;
+   aiInput.orientationTrackBC=mcAiView;aiInput.aiMetadata=mcAiMetadata;aiInput.actualWorld=&liveWorld;
+  }else if constexpr(std::is_same_v<Input,AiRuntimeInput50GB>){
+   requireMbRuntimeNavigation50MB();
+   aiInput.mapFF0=gbMapView;aiInput.aiFF4=gbAiView;
+   aiInput.orientationTrackBC=gbAiView;aiInput.aiMetadata=gbAiMetadata;aiInput.actualWorld=&liveWorld;
+  }else if constexpr(std::is_same_v<Input,AiRuntimeInput50TB>){
    requireMbRuntimeNavigation50MB();
    aiInput.mapFF0=tbMapView;aiInput.aiFF4=tbAiView;
    aiInput.orientationTrackBC=tbAiView;aiInput.aiMetadata=tbAiMetadata;aiInput.actualWorld=&liveWorld;
@@ -4034,7 +4502,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // Consumers here read1125C low byte; the native roster owns the complete
   // packed count word, with the actual admitted low5 lap selection retained.
   aiInput.settings1125C=static_cast<std::uint8_t>(originalAiSettings1125C);
-  if constexpr(std::is_same_v<Input,AiRuntimeInput50TB>)aiInput.aiTrackLength3C=tbAiMetadata.trackLength3C();
+  if constexpr(std::is_same_v<Input,AiRuntimeInput50MC>)aiInput.aiTrackLength3C=mcAiMetadata.trackLength3C();
+  else if constexpr(std::is_same_v<Input,AiRuntimeInput50GB>)aiInput.aiTrackLength3C=gbAiMetadata.trackLength3C();
+  else if constexpr(std::is_same_v<Input,AiRuntimeInput50TB>)aiInput.aiTrackLength3C=tbAiMetadata.trackLength3C();
   else if constexpr(std::is_same_v<Input,AiRuntimeInput50TC>)aiInput.aiTrackLength3C=tcAiMetadata.trackLength3C();
   else if constexpr(std::is_same_v<Input,AiRuntimeInput50MB>)aiInput.aiTrackLength3C=mbAiMetadata.trackLength3C();
   else aiInput.aiTrackLength3C=selectedOriginalAiMetadata.trackLength3C;
@@ -4042,7 +4512,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   return driveOriginalAi50IV(s,x.bindings,x.parameters,navigationProgress,navigationCA0,
       lapContinuity.state.vehicleCC8,boostState,originalAi,aiInput,originalAiReceipt);
   };
-  bool aiReturned=isTbTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50TB>():
+  bool aiReturned=isMcTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50MC>():isGbTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50GB>():isTbTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50TB>():
       isTcTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50TC>():
       isMbTrack?driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50MB>():
       driveSelectedOriginalAi50MB.template operator()<AiRuntimeInput50IV>();
@@ -4054,16 +4524,29 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto drained=drainZoneRegistrations50CQ(zoneQueue,zoneLifecycle,zoneScratch,trackCounts.events);
     if(drained.status==ZoneQueueStatus50CQ::Complete&&!drained.remaining){
      const auto queries=recoveryQueries();
-     auto actualHeightDomain=actualHeight.sourceDomain;
+     auto actualHeightDomain=selectedRuntimeHeightDomain;
+     if(isMcTrack)require50DU(mcWaterOwner&&mcWaterOwner->bindResetDomain(selectedRuntimeHeightDomain,
+         terrainOwner.lift1F0,actualHeightDomain),"MC AI reset requires actual same-runtime water334 and live348 lift");
      if(nativeGcWater)require50DU(nativeWaterRacers[actualRacerSlot]&&
-         nativeWaterRacers[actualRacerSlot]->bindResetDomain(actualHeight.sourceDomain,
+         nativeWaterRacers[actualRacerSlot]->bindResetDomain(selectedRuntimeHeightDomain,
+             terrainOwner.lift1F0,actualHeightDomain),"actual native water reset domain unavailable");
+     if(isMcTrack)require50DU(mcParticleVehicles->racer(actualRacerSlot)&&
+         mcParticleVehicles->racer(actualRacerSlot)->bindResetDomain(selectedRuntimeHeightDomain,
              terrainOwner.lift1F0,actualHeightDomain),"actual native water reset domain unavailable");
      // Both native types represent the same four scalar target-relative
      // components. Copy explicitly; unrelated struct references cannot alias.
      const auto& relative=x.secondaryInputs.targetRelative2F0;
      const VisualVector49R recoveryTargetRelative{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
-     using RecoveryOwners50MB=std::variant<native_original_ai_recovery::Owners,native_original_ai_recovery::Owners50MB,native_original_ai_recovery::Owners50TC,native_original_ai_recovery::Owners50TB>;
-     RecoveryOwners50MB owners=isTbTrack?
+     using RecoveryOwners50MB=std::variant<native_original_ai_recovery::Owners,native_original_ai_recovery::Owners50MB,native_original_ai_recovery::Owners50TC,native_original_ai_recovery::Owners50TB,native_original_ai_recovery::Owners50GB,native_original_ai_recovery::Owners50MC>;
+     RecoveryOwners50MB owners=isMcTrack?
+         RecoveryOwners50MB{native_original_ai_recovery::Owners50MC{gcLightOwner,racerCables[actualRacerSlot]->visibility50(),
+             *flags22C,*field24C,mcAiView,actualHeightDomain,resetGlobals,resetLifecycle,
+             recoveryTargetRelative,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+             originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isGbTrack?
+         RecoveryOwners50MB{native_original_ai_recovery::Owners50GB{gcLightOwner,racerCables[actualRacerSlot]->visibility50(),
+             *flags22C,*field24C,gbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
+             recoveryTargetRelative,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
+             originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTbTrack?
          RecoveryOwners50MB{native_original_ai_recovery::Owners50TB{gcLightOwner,racerCables[actualRacerSlot]->visibility50(),
              *flags22C,*field24C,tbAiView,actualHeightDomain,resetGlobals,resetLifecycle,
              recoveryTargetRelative,queries,zoneLifecycle,liveWorld,membershipWork,*originalResetGround,
@@ -4096,8 +4579,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    std::cerr<<"ORIGINAL AI source boundary: slot="<<originalAi.managerIndexFE0
        <<" state="<<originalAiReceipt.stateFE8<<" pc="<<std::hex<<originalAiReceipt.sourceBoundary<<std::dec
        <<" ai_dispatches="<<originalAi.dispatchedFrames<<" brakes="<<originalAi.brakingFrames
-       <<" terrain330="<<static_cast<unsigned>(actualHeight.sourceDomain.terrain330)
-       <<" water334="<<static_cast<unsigned>(actualHeight.sourceDomain.water334)
+       <<" terrain330="<<static_cast<unsigned>(selectedRuntimeHeightDomain.terrain330)
+       <<" water334="<<static_cast<unsigned>(selectedRuntimeHeightDomain.water334)
        <<" height_source_bound="<<actualHeight.sourceBound
        <<" water_native_query="<<actualHeight.waterNativeQueryBound<<'\n';
    recoveryPaused=true;return false;
@@ -4130,7 +4613,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   navigationInput.mainBody104=m.components.probe348.field104;
   TrackNavigationReceipt50EU receipt{};
   const TrackNavigationMapEffects50GH lapEffects{&lapOwner,&lap_drive50GJ::Owner::accepted};
-  const bool advanced=isTbTrack?
+  const bool advanced=isMcTrack?
+      advancePlayerTrackNavigationEffects50GH(mcMapView,mcAiView,navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic):isGbTrack?
+      advancePlayerTrackNavigationEffects50GH(gbMapView,gbAiView,navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic):isTbTrack?
       advancePlayerTrackNavigationEffects50GH(tbMapView,tbAiView,navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic):
       isTcTrack?
       advancePlayerTrackNavigationEffects50GH(tcMapView,tcAiView,navigationInput,lapEffects,navigationProgress,receipt,navigationDiagnostic):
@@ -4195,7 +4680,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  wrongWayInput.warningOwner=nullptr;
  WrongWayProgressState50GO wrongWayState{lapContinuity.state.vehicleFF8,
      lapContinuity.prefix.flags10CC};
- require50DU(isTbTrack?
+ require50DU(isMcTrack?
+     beginWrongWayProgress50GO(mcMapView,lapOwner.mcTrack(),wrongWayInput,
+         wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic):isGbTrack?
+     beginWrongWayProgress50GO(gbMapView,lapOwner.gbTrack(),wrongWayInput,
+         wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic):isTbTrack?
      beginWrongWayProgress50GO(tbMapView,lapOwner.tbTrack(),wrongWayInput,
          wrongWayState,wrongWayContinuation,wrongWayReceipt,wrongWayDiagnostic):
      isTcTrack?
@@ -4434,7 +4923,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(opponentFrame)return false; // A failed AI never restarts the human session.
   recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
   BodyMatrix48G groundedCheckpoint{};
-  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack,"MB/TC/RC/TB native session cannot enter legacy HOST checkpoint prepareDamageRecovery");
+  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack,"MB/TC/RC/TB/GB/MC native session cannot enter legacy HOST checkpoint prepareDamageRecovery");
   const bool prepared=recovery50FI::prepareDamageRecovery(*navigationMap,navigationProgress,s,
       x.bindings,decision,x.diagnostic,0x3f800000u,x.parameters.visual.verticalLimit7EC,liveWorld,
       nextCheckpoint,recoveryDiagnostic);
@@ -4454,7 +4943,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  runNative([&]{return damageReady;},"ordinary damage decision");
  }
  require50DU(s.phase==VehicleFramePhase49W::AfterImpactBlock,"source impact outer skip continuation unavailable");
- if(nativeGcWater){
+ if(isMcTrack){
+  require50DU(mcParticleVehicles&&mcParticleVehicles->racer(actualRacerSlot)&&mcParticleVehicles->racer(actualRacerSlot)->attachedTail(s,x.bindings).okay(),"MC actual22A620 water tail rejected");
+ }else if(nativeGcWater){
   require50DU(nativeWaterRacers[actualRacerSlot]&&
       nativeWaterRacers[actualRacerSlot]->attachedTail(s,x.bindings).okay(),
       "actual22A620 native water tail rejected");
@@ -4488,24 +4979,35 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(drained.status==ZoneQueueStatus50CQ::Complete&&!drained.remaining){
     const auto queries=recoveryQueries();const auto& relative=x.secondaryInputs.targetRelative2F0;
     const VisualVector49R target{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
-    using RecoveryOwners50MB=std::variant<native_original_human_recovery::Owners,native_original_human_recovery::Owners50MB,native_original_human_recovery::Owners50TC,native_original_human_recovery::Owners50TB>;
-    RecoveryOwners50MB owners=isTbTrack?
+    auto mcActualHeightDomain=selectedRuntimeHeightDomain;
+    if(isMcTrack)require50DU(mcWaterOwner&&mcWaterOwner->bindResetDomain(selectedRuntimeHeightDomain,
+        terrainOwner.lift1F0,mcActualHeightDomain),"MC human reset requires actual same-runtime water334 and live348 lift");
+    using RecoveryOwners50MB=std::variant<native_original_human_recovery::Owners,native_original_human_recovery::Owners50MB,native_original_human_recovery::Owners50TC,native_original_human_recovery::Owners50TB,native_original_human_recovery::Owners50GB,native_original_human_recovery::Owners50MC>;
+    RecoveryOwners50MB owners=isMcTrack?
+        RecoveryOwners50MB{native_original_human_recovery::Owners50MC{gcLightOwner,racerCables[0]->visibility50(),
+        controllerD40,lapContinuity.prefix,*field24C,mcMapView,mcActualHeightDomain,
+        resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
+        *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isGbTrack?
+        RecoveryOwners50MB{native_original_human_recovery::Owners50GB{gcLightOwner,racerCables[0]->visibility50(),
+        controllerD40,lapContinuity.prefix,*field24C,gbMapView,selectedRuntimeHeightDomain,
+        resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
+        *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTbTrack?
         RecoveryOwners50MB{native_original_human_recovery::Owners50TB{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,tbMapView,actualHeight.sourceDomain,
+        controllerD40,lapContinuity.prefix,*field24C,tbMapView,selectedRuntimeHeightDomain,
         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
         isTcTrack?
         RecoveryOwners50MB{native_original_human_recovery::Owners50TC{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,tcMapView,actualHeight.sourceDomain,
+        controllerD40,lapContinuity.prefix,*field24C,tcMapView,selectedRuntimeHeightDomain,
         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
         isMbTrack?
         RecoveryOwners50MB{native_original_human_recovery::Owners50MB{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,mbMapView,actualHeight.sourceDomain,
+        controllerD40,lapContinuity.prefix,*field24C,mbMapView,selectedRuntimeHeightDomain,
         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
         RecoveryOwners50MB{native_original_human_recovery::Owners{gcLightOwner,racerCables[0]->visibility50(),
-        controllerD40,lapContinuity.prefix,*field24C,*navigationMap,actualHeight.sourceDomain,
+        controllerD40,lapContinuity.prefix,*field24C,*navigationMap,selectedRuntimeHeightDomain,
         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}};
     physicalReturned=std::visit([&](auto& actual){return native_original_human_recovery::resume(s,x.bindings,x.parameters,navigationProgress,
@@ -4545,7 +5047,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(opponentFrame)return false; // A failed AI never restarts the human session.
   recovery50FI::Plan nextCheckpoint{};recovery50FI::Diagnostic recoveryDiagnostic{};
   BodyMatrix48G groundedCheckpoint{};
-  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack,"MB/TC/RC/TB native session cannot enter legacy HOST checkpoint prepare");
+  require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack,"MB/TC/RC/TB/GB/MC native session cannot enter legacy HOST checkpoint prepare");
   const bool prepared=recovery50FI::prepare(*navigationMap,navigationProgress,s,x.bindings,
       x.diagnostic,x.parameters.visual.verticalLimit7EC,liveWorld,nextCheckpoint,recoveryDiagnostic);
   const bool grounded=prepared&&recovery50FI::resolveGround(ground,nextCheckpoint,16,0,
@@ -4568,6 +5070,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  runNative([&]{return refreshSecondaryVehicleFrame49W(s,x.bindings,f::cut(PreservingCut49W::OtherChildrenBetween340And35C),x.workspace,x.diagnostic);},"secondary cache");
  require50DU(s.phase==VehicleFramePhase49W::AfterBodyChildren,
      "racer child prefix did not reach the source camera cut");
+ if(isMcTrack){
+  auto& sequence=nativeParticleChildSequence[actualRacerSlot];require50DU(sequence!=std::numeric_limits<std::uint64_t>::max(),"MC child sequence exhausted");
+  require50DU(mcParticleVehicles&&mcParticleVehicles->advanceChildren(actualRacerSlot,nativeEffects,nativeEffectCount,++sequence,preparedOuterFactor,false,
+    s.noiseOwner().sharedRandomState,sessionRandom,applicationClock,nativeFireSerial,nativeWaterApplication.sparksGlobals),"MC actual prior dust/spark/fire then spray children rejected");
+ }
  if(nativeGcWater){
   auto& sequence=nativeParticleChildSequence[actualRacerSlot];
   require50DU(sequence!=std::numeric_limits<std::uint64_t>::max(),"native particle child sequence exhausted");
@@ -4668,6 +5175,38 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(!complete||ended,"TB successful query did not release its actual action cursor");
   return result;
  };
+ auto withMcTriggerLease=[&](bool secondary,auto&& queryOperation){
+  if(!isMcTrack)return queryOperation();
+  require50DU(mcQueryBinding&&mcQueryBinding->enrolled(),"MC current typed Bank query binding absent");
+  VehicleLiveQueryResult50EQ result{};bool entered=false;
+  const bool accepted=mcQueryBinding->query(actualRacerSlot,secondary,[&](track_runtime_storage50IG::Storage& actual){
+   if(&actual!=&trackStorage)return false;entered=true;result=queryOperation();
+   if(result.status==VehicleLiveQueryStatus50EQ::Complete&&result.prefixCommitted){
+    const auto& source=secondary?secondaryQuery:query;const auto& member=secondary?secondaryMembership:mainMembership;
+    if(!mcQueryBinding->observePrepared(source.filter->identity,*source.resource,member.lastShapeWorld))return false;
+   }
+   return result.status==VehicleLiveQueryStatus50EQ::Complete;
+  });
+  require50DU(entered,"MC genuine query admission rejected before indexed work");
+  require50DU(result.status!=VehicleLiveQueryStatus50EQ::Complete||accepted,"MC completed indexed query failed actual owner publication");
+  return result;
+ };
+ auto withGbTriggerLease=[&](bool secondary,auto&& queryOperation){
+  if(!isGbTrack)return queryOperation();
+  require50DU(gbQueryBinding&&gbQueryBinding->enrolled(),"GB current typed Bank query binding absent");
+  VehicleLiveQueryResult50EQ result{};bool entered=false;
+  const bool accepted=gbQueryBinding->query(actualRacerSlot,secondary,[&](track_runtime_storage50IG::Storage& actual){
+   if(&actual!=&trackStorage)return false;entered=true;result=queryOperation();
+   if(result.status==VehicleLiveQueryStatus50EQ::Complete&&result.prefixCommitted){
+    const auto& source=secondary?secondaryQuery:query;const auto& member=secondary?secondaryMembership:mainMembership;
+    if(!gbQueryBinding->observePrepared(source.filter->identity,*source.resource,member.lastShapeWorld))return false;
+   }
+   return result.status==VehicleLiveQueryStatus50EQ::Complete;
+  });
+  require50DU(entered,"GB genuine query admission rejected before indexed work");
+  require50DU(result.status!=VehicleLiveQueryStatus50EQ::Complete||accepted,"GB completed indexed query failed actual owner publication");
+  return result;
+ };
  auto withTcTriggerLease=[&](std::uint32_t actualCollider,auto&& queryOperation){
   if(!tcTriggerActions)return queryOperation();
   require50DU(tcWorldBorrow&&tcWorldBorrow->world()==&liveWorld&&racerBank.count()==8&&
@@ -4697,7 +5236,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  sa_trigger_actions::ActionLease mainSaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
  if(maTriggerActions)require50DU(maTriggerActions->beginQuery(mainMaLease),"MA main trigger arena lease unavailable");
  if(saTriggerActions)require50DU(saTriggerActions->beginQuery(mainSaLease),"SA main trigger arena lease unavailable");
- const auto mainQueryAttempt=withTbTriggerLease(qfilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(qfilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainLiveQuery,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);});});});});});
+ const auto mainQueryAttempt=withMcTriggerLease(false,[&](){return withGbTriggerLease(false,[&](){return withTbTriggerLease(qfilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(qfilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return queryMainLiveIndexedStaticVehicle50EQ(s,x.bindings,admission,mainLiveQuery,query,candidates.data(),candidates.size(),registeredIndices,registeredCount,initial,workspace,destination,queryResult);});});});});});});});
  if(isRaTrack&&mainQueryAttempt.prefixCommitted)
   require50DU(raWorld->observeRuntimeTriggerPoses(racerBank,actualRacerSlot,raDiagnostic),
       "RA committed query pose observation rejected");
@@ -4705,7 +5244,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(gaTriggerActions)require50DU(gaTriggerActions->endQuery(),"GA main source trigger action failed after contact commit");
  if(maTriggerActions)require50DU(maTriggerActions->endQuery(),"MA main trigger action failed after contact commit");
  if(saTriggerActions)require50DU(saTriggerActions->endQuery(),"SA main trigger action failed after contact commit");
- if(!isTcTrack&&mainQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
+ if(!isTcTrack&&!isGbTrack&&!isMcTrack&&mainQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(mainQueryAttempt.prefix,"main")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(mainQueryAttempt,query,mainMembership,mainCrossedPortals,"main");},
      "registered main terrain query");
@@ -4733,7 +5272,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  sa_trigger_actions::ActionLease secondarySaLease{qfilter.identity,&navigationProgress.reset.vehicleC80};
  if(maTriggerActions)require50DU(maTriggerActions->beginQuery(secondaryMaLease),"MA secondary trigger arena lease unavailable");
  if(saTriggerActions)require50DU(saTriggerActions->beginQuery(secondarySaLease),"SA secondary trigger arena lease unavailable");
- const auto secondaryQueryAttempt=withTbTriggerLease(secondaryFilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(secondaryFilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return querySecondaryLiveIndexedStaticVehicle50EQ(s,x.bindings,secondaryAdmission,secondaryLiveQuery,secondaryQuery,candidates.data(),candidates.size(),registeredIndices,registeredCount,si,sw,sd,secondaryResult);});});});});});
+ const auto secondaryQueryAttempt=withMcTriggerLease(true,[&](){return withGbTriggerLease(true,[&](){return withTbTriggerLease(secondaryFilter.identity,[&](){return withRcTriggerLease([&](){return withTcTriggerLease(secondaryFilter.identity,[&](){return withScTriggerLease([&](){return withRaTriggerLease([&](){return querySecondaryLiveIndexedStaticVehicle50EQ(s,x.bindings,secondaryAdmission,secondaryLiveQuery,secondaryQuery,candidates.data(),candidates.size(),registeredIndices,registeredCount,si,sw,sd,secondaryResult);});});});});});});});
  if(isRaTrack&&secondaryQueryAttempt.prefixCommitted)
   require50DU(raWorld->observeRuntimeTriggerPoses(racerBank,actualRacerSlot,raDiagnostic),
       "RA committed query pose observation rejected");
@@ -4741,7 +5280,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(gaTriggerActions)require50DU(gaTriggerActions->endQuery(),"GA secondary source trigger action failed after contact commit");
  if(maTriggerActions)require50DU(maTriggerActions->endQuery(),"MA secondary trigger action failed after contact commit");
  if(saTriggerActions)require50DU(saTriggerActions->endQuery(),"SA secondary trigger action failed after contact commit");
- if(!isTcTrack&&secondaryQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
+ if(!isTcTrack&&!isGbTrack&&!isMcTrack&&secondaryQueryAttempt.status==VehicleLiveQueryStatus50EQ::PrefixRejected&&
     recoverPortalBoundary(secondaryQueryAttempt.prefix,"secondary")){addCounter50DU(nativeCalls);return false;}
  runNative([&]{return acceptLiveQuery(secondaryQueryAttempt,secondaryQuery,secondaryMembership,secondaryCrossedPortals,"secondary");},
      "registered secondary terrain query");
@@ -4982,7 +5521,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  auto observeOriginalAiFleet=[&](const original_all8_frame::Schedule* schedule=nullptr){
   requireOriginalAiFleetAtBoundary(schedule);
   for(std::size_t slot=0;slot<racerBank.count();++slot){
-   if(isTbTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,tbMapView,tbMapMetadata);
+   if(isMcTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,mcMapView,mcMapMetadata);
+   else if(isGbTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,gbMapView,gbMapMetadata);
+   else if(isTbTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,tbMapView,tbMapMetadata);
    else if(isTcTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,tcMapView,tcMapMetadata);
    else if(isMbTrack)originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,mbMapView,mbMapMetadata);
    else originalAiReads.observe(originalAiSession,slot,racerBank,racerFrameReads,*navigationMap,selectedOriginalAiMapMetadata);
@@ -5210,11 +5751,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  race_session50HM::Session legacyRace{};
  race_session50HM::MbSession mbRace{};
  race_session50HM::TcSession tcRace{};
+ race_session50HM::GbSession gbRace{};
+ race_session50HM::McSession mcRace{};
  race_session50HM::TbSession tbRace{};
- auto& race=isTbTrack?static_cast<race_session50HM::SessionRows&>(tbRace):isTcTrack?static_cast<race_session50HM::SessionRows&>(tcRace):isMbTrack?static_cast<race_session50HM::SessionRows&>(mbRace):static_cast<race_session50HM::SessionRows&>(legacyRace);
- const race_session50HM::SessionBorrow raceBorrow=isTbTrack?race_session50HM::SessionBorrow(tbRace):isTcTrack?race_session50HM::SessionBorrow(tcRace):isMbTrack?race_session50HM::SessionBorrow(mbRace):race_session50HM::SessionBorrow(legacyRace);
+ auto& race=isMcTrack?static_cast<race_session50HM::SessionRows&>(mcRace):isGbTrack?static_cast<race_session50HM::SessionRows&>(gbRace):isTbTrack?static_cast<race_session50HM::SessionRows&>(tbRace):isTcTrack?static_cast<race_session50HM::SessionRows&>(tcRace):isMbTrack?static_cast<race_session50HM::SessionRows&>(mbRace):static_cast<race_session50HM::SessionRows&>(legacyRace);
+ const race_session50HM::SessionBorrow raceBorrow=isMcTrack?race_session50HM::SessionBorrow(mcRace):isGbTrack?race_session50HM::SessionBorrow(gbRace):isTbTrack?race_session50HM::SessionBorrow(tbRace):isTcTrack?race_session50HM::SessionBorrow(tcRace):isMbTrack?race_session50HM::SessionBorrow(mbRace):race_session50HM::SessionBorrow(legacyRace);
  const auto withRace=[&](auto&& operation)->decltype(auto){
   if(isRcTrack)requireMbRuntimeNavigation50MB();
+  if(isMcTrack){requireMbRuntimeNavigation50MB();return operation(mcRace);}
+  if(isGbTrack){requireMbRuntimeNavigation50MB();return operation(gbRace);}
   if(isTbTrack){requireMbRuntimeNavigation50MB();return operation(tbRace);}
   if(isTcTrack)return operation(tcRace);
   if(isMbTrack)return operation(mbRace);return operation(legacyRace);
@@ -5382,6 +5927,24 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto positional=tbPositionalAudio->service(&listener,1,s.noiseOwner());
     require50DU(positional.complete,"TB positional audio service rejected");
    }
+   if(isGbTrack){
+    require50DU(gbPositionalAudio&&gbPositionalAudio->ready()&&
+        gbPositionalAudio->sourceIdentity()==gbColdSources.get(),
+        "GB positional audio lost its actual retained source");
+    // Existing countdown/committed-world boundary, once before shared mix.
+    // Pause exits before this boundary; the adapter also respects World4D8.
+    const auto positional=gbPositionalAudio->service(&listener,1,s.noiseOwner());
+    require50DU(positional.complete,"GB positional audio service rejected");
+   }
+   if(isMcTrack){
+    require50DU(mcPositionalAudio&&mcPositionalAudio->ready()&&
+        mcPositionalAudio->sourceIdentity()==mcColdSources.get(),
+        "MC positional audio lost its actual retained source");
+    // Existing countdown/committed-world boundary, once before shared mix.
+    // Pause exits before this boundary; the adapter also respects World4D8.
+    const auto positional=mcPositionalAudio->service(&listener,1,s.noiseOwner());
+    require50DU(positional.complete,"MC positional audio service rejected");
+   }
    require50DU(originalAiAudio->setListener(listener)&&originalAiAudio->mixBoundary(s.noiseOwner()),
        "native AI Aural service rejected");return;
   }
@@ -5398,6 +5961,54 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(::allocations==beforeOpponentAudio,"opponent engine audio update allocated C++ storage");
  };
  std::function<void()> activateColdRace;
+ bool gbColdPrefixClosed=!isGbTrack;
+ auto closeGbColdPrefix=[&]()noexcept->bool {try{
+  if(gbColdPrefixClosed)return true;
+  if(gbQueryBinding&&gbQueryBinding->enrolled()&&!gbQueryBinding->fence())return false;
+  if(!closeGbBankRegistries())return false;
+  if(!lapOwner.releaseGbTrack())return false;
+  gbRace={};gbMapView={};gbAiView={};gbMapMetadata={};gbAiMetadata={};gbWorldBorrow.reset();
+  if(gbQueryBinding&&gbQueryBinding->enrolled()){
+   if(!gbQueryBinding->retireContacts()||!gbQueryBinding->close())return false;
+  }else if(!gbNavigation.close())return false;
+  gbQueryBinding.reset();
+  if(gbTriggerActions&&!gbTriggerActions->close())return false;
+  if(gbParticleRuntime&&!gbParticleRuntime->quiesce())return false;
+  if(gbTrackParticles&&!gbTrackParticles->close())return false;
+  if(gbParticleRuntime&&!gbParticleRuntime->closeAfterPool())return false;
+  if(!racerBank.retireNativeBacking())return false;
+  gbBankPrefixClosed=true;gbColdPrefixClosed=true;return true;
+ }catch(...){return false;}};
+ struct GbColdPrefixGuard {
+  decltype(closeGbColdPrefix)& close;bool armed=true;
+  ~GbColdPrefixGuard()noexcept {if(armed&&!close()){
+   std::fputs("GB actual Bank cold-prefix retirement rejected; retained until fail-stop\n",stderr);std::terminate();}}
+ } gbColdPrefixGuard{closeGbColdPrefix};
+ bool mcColdPrefixClosed=!isMcTrack;
+ auto closeMcColdPrefix=[&]()noexcept->bool {try{
+  if(mcColdPrefixClosed)return true;
+  if(mcQueryBinding&&mcQueryBinding->enrolled()&&!mcQueryBinding->fence())return false;
+  if(!closeMcBankRegistries())return false;
+  if(!lapOwner.releaseMcTrack())return false;
+  mcRace={};mcMapView={};mcAiView={};mcMapMetadata={};mcAiMetadata={};mcWorldBorrow.reset();
+  if(mcQueryBinding&&mcQueryBinding->enrolled()){
+   if(!mcQueryBinding->retireContacts()||!mcQueryBinding->close())return false;
+  }else if(!mcNavigation.close())return false;
+  mcQueryBinding.reset();
+  if(mcTriggerActions&&!mcTriggerActions->close())return false;
+  if(mcParticleRuntime&&!mcParticleRuntime->quiesce())return false;
+  if(mcTrackParticles&&!mcTrackParticles->close())return false;
+  if(mcParticleRuntime&&!mcParticleRuntime->closeAfterPool())return false;
+  mcParticleVehicles.reset();
+  if(!racerBank.retireNativeBacking())return false;
+  mcBankPrefixClosed=true;mcColdPrefixClosed=true;return true;
+ }catch(...){return false;}};
+ struct McColdPrefixGuard {
+  decltype(closeMcColdPrefix)& close;bool armed=true;
+  ~McColdPrefixGuard()noexcept {if(armed&&!close()){
+   std::fputs("MC actual Bank cold-prefix retirement rejected; retained until fail-stop\n",stderr);std::terminate();}}
+ } mcColdPrefixGuard{closeMcColdPrefix};
+
  // This interval precedes renderer/camera construction and closeWindow's
  // exception boundary. All captured owner backing predates this guard.
  bool mbColdBound=false;
@@ -5484,7 +6095,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // Actual authored trigger groups need stable, distinct main/secondary
   // identities. Only these scalar IDs are banked; shared reciprocal contacts,
   // Gate fired/audio state and action counters never roll back on arena visits.
-  if(gcTriggerActions||isGaTrack||isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack){racerBank.owner(qfilter.identity);racerBank.owner(secondaryFilter.identity);}
+  if(gcTriggerActions||isGaTrack||isMaSaTrack||isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){racerBank.owner(qfilter.identity);racerBank.owner(secondaryFilter.identity);}
   if(isRaTrack)require50DU(raWorld->registerRuntimeQueryWorldOwners(racerBank,raDiagnostic),
       raDiagnostic.failure?raDiagnostic.failure:"RA world registration rejected");
   if(isMbTrack)for(std::size_t i=0;i<3;++i){
@@ -5505,7 +6116,31 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
    racerBank.elements(membership->entries.data(),membership->entries.size());
   }
+  if(isTbTrack)for(std::size_t i=0;i<tb_trigger_authoring50TB::count;++i){
+   auto* membership=tbWorldBorrow->triggerMembership(i);
+   require50DU(membership,"TB actual trigger membership backing missing");
+   racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
+   racerBank.elements(membership->entries.data(),membership->entries.size());
+  }
+  if(isMcTrack){
+   for(std::size_t i=0;i<21;++i){auto* membership=mcWorldBorrow->triggerMembership(i);
+    require50DU(membership,"MC actual trigger membership backing missing");
+    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
+    racerBank.elements(membership->entries.data(),membership->entries.size());}
+   const bool enrolled=mcAnimationBinding->enrollBank(racerBank,mcAnimationBindingDiagnostic);
+   require50DU(enrolled,mcAnimationBindingDiagnostic.message.empty()?"MC real complete Bank animation enrollment rejected":mcAnimationBindingDiagnostic.message.c_str());
+  }else if(isGbTrack){
+   for(std::size_t i=0;i<18;++i){auto* membership=gbWorldBorrow->triggerMembership(i);
+    require50DU(membership,"GB actual trigger membership backing missing");
+    racerBank.owner(membership->state);racerBank.elements(membership->links.data(),membership->links.size());
+    racerBank.elements(membership->entries.data(),membership->entries.size());}
+   const bool enrolled=gbAnimationBinding->enrollBank(racerBank,gbAnimationBindingDiagnostic);
+   require50DU(enrolled,gbAnimationBindingDiagnostic.message.empty()?"GB real complete Bank animation enrollment rejected":gbAnimationBindingDiagnostic.message.c_str());
+  }
   racerBank.seal(raceRacerCount);
+  if(isMcTrack){const bool activated=mcAnimationBinding->activateSealedBank(mcAnimationBindingDiagnostic);
+   require50DU(activated,mcAnimationBindingDiagnostic.message.empty()?"MC actual sealed eight-peer animation backing rejected":mcAnimationBindingDiagnostic.message.c_str());}else if(isGbTrack){const bool activated=gbAnimationBinding->activateSealedBank(gbAnimationBindingDiagnostic);
+   require50DU(activated,gbAnimationBindingDiagnostic.message.empty()?"GB actual sealed eight-peer animation backing rejected":gbAnimationBindingDiagnostic.message.c_str());}
   if(originalAiEnabled){
    // Handles bind registered locations only. Actual values are read afresh
    // after every native step; no per-world peer cache or arena swap is used.
@@ -5626,8 +6261,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      nativeChariotModels[racer]->bindChariotSiblings(*nativeRightModels[racer],*nativeLeftModels[racer],
          nativeBottomRightModels[racer].get(),nativeBottomLeftModels[racer].get());
      rig.install(s,x.bindings,x.handRecords,nativeRightModels[racer].get(),nativeLeftModels[racer].get(),
-         nativeChariotModels[racer].get(),nativeBottomRightModels[racer].get(),nativeBottomLeftModels[racer].get());
-    }else rig.install(s,x.bindings,x.handRecords);
+         nativeChariotModels[racer].get(),nativeBottomRightModels[racer].get(),nativeBottomLeftModels[racer].get(),isGbTrack||isMcTrack);
+    }else if(isGbTrack||isMcTrack)rig.install(s,x.bindings,x.handRecords,nullptr,nullptr,nullptr,nullptr,nullptr,true);
+    else rig.install(s,x.bindings,x.handRecords);
    });
    auto racerSelection=selection;
    // The actual human preset/configuration belongs to slot0. AI construction
@@ -5673,7 +6309,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     require50DU(originalAi.fieldFE4==createIdentity.courseRecordMatchFE4,
         "selected course-record identity differs from original AI FE4");
     originalAiSession.packingReferences[racer]=-1;
-    if(isTbTrack){
+    if(isMcTrack){
+     requireMbRuntimeNavigation50MB();
+     AiColdTrackBindingsView50MC tracks{};
+     require50DU(bindAiColdTracks50IU(mcMapView,mcAiView,mcMapMetadata,
+         mcAiMetadata,navigationProgress,tracks),"original MC AI cold track owners unavailable");
+    }else if(isGbTrack){
+     requireMbRuntimeNavigation50MB();
+     AiColdTrackBindingsView50GB tracks{};
+     require50DU(bindAiColdTracks50IU(gbMapView,gbAiView,gbMapMetadata,
+         gbAiMetadata,navigationProgress,tracks),"original GB AI cold track owners unavailable");
+    }else if(isTbTrack){
      requireMbRuntimeNavigation50MB();
      AiColdTrackBindingsView50TB tracks{};
      require50DU(bindAiColdTracks50IU(tbMapView,tbAiView,tbMapMetadata,
@@ -5708,7 +6354,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    coldRacerStage50DU(rig.podId,"effect name binding",[&](){rig.buildEffectNames(s,namesForEffects);});
    coldRacerStage50DU(rig.podId,"effect owner construction",[&](){bindColdNativeEffects();});
    query.resource=&collision.main();secondaryQuery.resource=&collision.secondary();
-   if(gcTriggerActions||isGaTrack||isMaSaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack){qfilter.identity=0x30000000u+static_cast<std::uint32_t>(racer*2);
+   if(gcTriggerActions||isGaTrack||isMaSaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){qfilter.identity=0x30000000u+static_cast<std::uint32_t>(racer*2);
     secondaryFilter.identity=qfilter.identity+1u;}
    terrain_probe_authoring50fq_fixture::Owner ownProbe{};std::string probeError;
    coldRacerStage50DU(rig.podId,"terrain probe authoring",[&](){
@@ -5762,7 +6408,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // Recovery's cold scene carries the human lift admission. Terrain owners
     // and mesh data remain unchanged; opponent grid queries pass their own lift.
     if(isRcTrack)require50DU(rcCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"RC actual selected/class-applied human lift rejected");
-    if(isTcTrack)require50DU(tcCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"TC actual selected/class-applied human lift rejected");
+    if(isMcTrack)require50DU(mcCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"MC actual selected/class-applied human lift rejected");
+    if(isGbTrack)require50DU(gbCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"GB actual selected/class-applied human lift rejected");
+    if(isTbTrack)require50DU(tbCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"TB actual selected/class-applied human lift rejected");
+    else if(isTcTrack)require50DU(tcCollisionWorld->bindHumanLift(x.parameters.visual.verticalLimit7EC),"TC actual selected/class-applied human lift rejected");
     else if(isMbTrack)require50DU(mbCollisionWorld->setHumanLift(x.parameters.visual.verticalLimit7EC),"MB genuine human lift update rejected");
     else if(isScTrack)require50DU(scGround->bindHumanLift(*scColdSources,x.parameters.visual.verticalLimit7EC),
         "SC actual selected/class-applied human lift rejected");
@@ -5785,6 +6434,19 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        "original racer display name exceeds fixed HUD capacity");
    std::memcpy(racerHudNames[racer].data(),racerNames[racer].c_str(),racerNames[racer].size()+1);
   }
+ // Bind once to the selected authenticated map representation. Placement is
+ // shared across human/opponents; no per-racer track dispatch or null fallback.
+ source_grid50IG::SelectedMapGrid selectedGridNavigation;
+ if(trackSession->originalStaticCandidates){
+  requireMbRuntimeNavigation50MB();
+  const bool bound=isMcTrack?selectedGridNavigation.bindView(mcMapView):
+      isGbTrack?selectedGridNavigation.bindView(gbMapView):
+      isTbTrack?selectedGridNavigation.bindView(tbMapView):
+      isTcTrack?selectedGridNavigation.bindView(tcMapView):
+      isMbTrack?selectedGridNavigation.bindView(mbMapView):
+      selectedGridNavigation.bindLegacy(navigationMap);
+  require50DU(bound,"selected authenticated map has no cold grid capability");
+ }
 #include "native_racer_grid50hn.inc"
   if(!isRaTrack&&playerUsesRosterRig)coldRacerStage50DU(playerPodId,"human grounded grid placement",[&](){
    placeOpponentAtGrid50HN(0);
@@ -5835,6 +6497,29 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     require50DU(mbSourceTriggers->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
         mbSourceTriggers->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
         "MB actual cold query geometry observation rejected");
+   });
+  }
+  if(isMcTrack){
+   require50DU(originalAiEnabled&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&
+       originalAiOpponentCount==7&&racerBank.count()==8,"MC actual human/seven-AI Bank roster required");
+   mcQueryBinding=std::make_unique<mc_query50MC::Binding>();
+   require50DU(mcQueryBinding->enroll(racerBank,mcCollisionWorld,mcNavigationOwner,qfilter.identity,
+       secondaryFilter.identity,navigationProgress.reset.vehicleC80,originalAiHumanCount,s,sessionRandom,applicationClock),"MC typed current Bank/C80 enrollment rejected");
+   for(std::size_t slot=0;slot<8;++slot)racerBank.visit(slot,[&](){
+    require50DU(mcQueryBinding->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
+        mcQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+        "MC actual cold Bank geometry observation rejected");
+   });
+  }else if(isGbTrack){
+   require50DU(originalAiEnabled&&humanCourseEnabled&&!allAiEnabled&&originalAiHumanCount==1&&
+       originalAiOpponentCount==7&&racerBank.count()==8,"GB actual human/seven-AI Bank roster required");
+   gbQueryBinding=std::make_unique<gb_query50GB::Binding>();
+   require50DU(gbQueryBinding->enroll(racerBank,gbCollisionWorld,gbNavigationOwner,qfilter.identity,
+       secondaryFilter.identity,navigationProgress.reset.vehicleC80,originalAiHumanCount),"GB typed current Bank/C80 enrollment rejected");
+   for(std::size_t slot=0;slot<8;++slot)racerBank.visit(slot,[&](){
+    require50DU(gbQueryBinding->observePrepared(qfilter.identity,*query.resource,mainMembership.lastShapeWorld)&&
+        gbQueryBinding->observePrepared(secondaryFilter.identity,*secondaryQuery.resource,secondaryMembership.lastShapeWorld),
+        "GB actual cold Bank geometry observation rejected");
    });
   }
   if(tbTriggerActions){
@@ -6052,6 +6737,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        originalMainApplication.lightManager->beginNativeGameplay(sessionIndex+1,lightDiagnostic),
        "native race must borrow the dormant application lighting lifetime after real UI release");
   }
+  if(isMcTrack){
+   require50DU(mcParticleVehicles&&mcParticleVehicles->ready(),"MC actual retained racer producers absent");
+   for(std::size_t slot=0;slot<racerBank.count();++slot)racerBank.visit(slot,[&](){
+    std::string error;require50DU(mcParticleVehicles->initializeRacer(slot,nativeEffects,nativeEffectCount,x.bindings.visual.bottomLeft1C4!=SceneNodeIndex49P::none,
+      s,x.bindings,x.diagnostic,nativeWaterApplication.initialStep434630,s.noiseOwner().sharedRandomState,error),error.c_str());
+    auto* racer=mcParticleVehicles->racer(slot);require50DU(racer,"MC completed racer water owner absent");resetEffectBindings.table81CPresent=true;
+    for(unsigned side=0;side<2;++side){resetEffectBindings.owners81C[side]=0;resetEffectBindings.controls81C[side]=&racer->spray(side).controls();}
+   });
+   require50DU(mcParticleVehicles->initializedRacers()==raceRacerCount,"MC actual eight-racer constructor coverage");
+  }
   if(nativeGcWater){
    require50DU(nativeGcWater->activate(s.noiseOwner().sharedRandomState,sessionRandom,applicationClock),
        "actual GC gameplay fog population rejected");
@@ -6105,11 +6800,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(originalAiEnabled){
    requireMbRuntimeNavigation50MB();
    require50DU(!originalAiSession.managerBound&&selectedMapCount50MB()>1&&
-       (isTbTrack?tbMapMetadata.matches(tbMapView):isTcTrack?tcMapMetadata.matches(tcMapView):isMbTrack?mbMapMetadata.matches(mbMapView):selectedOriginalAiMapMetadata.bound),
+       (isMcTrack?mcMapMetadata.matches(mcMapView):isGbTrack?gbMapMetadata.matches(gbMapView):isTbTrack?tbMapMetadata.matches(tbMapView):isTcTrack?tcMapMetadata.matches(tcMapView):isMbTrack?mbMapMetadata.matches(mbMapView):selectedOriginalAiMapMetadata.bound),
        "source manager create/reset requires the actual cold MAP owner");
    require50DU(initializeOriginalAiManager(originalAiSession.manager,originalAiSession.finished44,
        originalAiSession.retired40,racerBank.count(),dynamicContactEnabled?dynamicMusicProfile.mode11258:2u,
-       isTbTrack?tbMapMetadata.nodes()[1].distanceToFinish60:isTcTrack?tcMapMetadata.nodes()[1].distanceToFinish60:isMbTrack?mbMapMetadata.nodes()[1].distanceToFinish60:selectedOriginalAiMapMetadata.nodes[1].distanceToFinish60,
+       isMcTrack?mcMapMetadata.nodes()[1].distanceToFinish60:isGbTrack?gbMapMetadata.nodes()[1].distanceToFinish60:isTbTrack?tbMapMetadata.nodes()[1].distanceToFinish60:isTcTrack?tcMapMetadata.nodes()[1].distanceToFinish60:isMbTrack?mbMapMetadata.nodes()[1].distanceToFinish60:selectedOriginalAiMapMetadata.nodes[1].distanceToFinish60,
        selectedMapNode50MB(0).position,selectedMapNode50MB(1).position,originalAiSession.trackLength38)==OriginalAiFinishStatus::Complete,
        "original1AF7F0/1AF960/1AFC70 manager lifecycle rejected");
    originalAiSession.managerBound=true;
@@ -6137,7 +6832,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   captureDynamicBeforeFrame(0);
   if(originalAiEnabled)observeOriginalAiFleet();
-  if(isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack)racerBank.visit(0,[&](){initializeGraphics(0);});
+  if(isRaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack)racerBank.visit(0,[&](){initializeGraphics(0);});
   else initializeGraphics(0);
   raceSetupFrame=false;
   if(originalAiEnabled){
@@ -6149,7 +6844,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   race_session50HM::Config racePresentationConfig;
   racePresentationConfig.lapTarget=originalAiSettings1125C&31u;
   if(isRcTrack)requireMbRuntimeNavigation50MB();
-  require50DU((isTbTrack?race_session50HM::initialize(tbRace,tbMapView,lapOwner.tbTrack(),raceRacerCount,racePresentationConfig):isTcTrack?race_session50HM::initialize(tcRace,tcMapView,lapOwner.tcTrack(),raceRacerCount,racePresentationConfig):isMbTrack?race_session50HM::initialize(mbRace,mbMapView,lapOwner.mbTrack(),raceRacerCount,racePresentationConfig):race_session50HM::initialize(legacyRace,*navigationMap,lapOwner.track,raceRacerCount,racePresentationConfig)),
+  require50DU((isMcTrack?race_session50HM::initialize(mcRace,mcMapView,lapOwner.mcTrack(),raceRacerCount,racePresentationConfig):isGbTrack?race_session50HM::initialize(gbRace,gbMapView,lapOwner.gbTrack(),raceRacerCount,racePresentationConfig):isTbTrack?race_session50HM::initialize(tbRace,tbMapView,lapOwner.tbTrack(),raceRacerCount,racePresentationConfig):isTcTrack?race_session50HM::initialize(tcRace,tcMapView,lapOwner.tcTrack(),raceRacerCount,racePresentationConfig):isMbTrack?race_session50HM::initialize(mbRace,mbMapView,lapOwner.mbTrack(),raceRacerCount,racePresentationConfig):race_session50HM::initialize(legacyRace,*navigationMap,lapOwner.track,raceRacerCount,racePresentationConfig)),
       "authored race route/markers rejected");
   std::uint32_t gridOrder[maxHostRaceRacers50HT]{};
   for(std::uint32_t index=0;index<raceOpponentCount;++index)gridOrder[index]=index+1;
@@ -6200,7 +6895,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       "ALL8 vehicle58=1 follows the original222D34 skip. "
       "Native serial world timing is explicit; no full original scheduler claim.\n";
   };
-  if(!originalUiActive)activateColdRace();
+  if(!originalUiActive&&!isGbTrack&&!isMcTrack)activateColdRace();
  }
  if(originalUiActive){
   // Read actual retained owners without changing a counter or fabricating
@@ -6383,7 +7078,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  require50DU(trackLoaded,trackLoadError.empty()?"selected-track visual mesh load failed":trackLoadError.c_str());
  namespace trackTextures=track_materials50fa_fixture;
  auto trackMaterialOwner=std::make_unique<trackTextures::Owner>();
- const auto trackSource=isTbTrack?track_source_fixture::Track::tb:isRcTrack?track_source_fixture::Track::rc:isTcTrack?track_source_fixture::Track::tc:isScTrack?track_source_fixture::Track::sc:isMbTrack?track_source_fixture::Track::mb:isRaTrack?track_source_fixture::Track::ra:isMaTrack?track_source_fixture::Track::ma:isSaTrack?track_source_fixture::Track::sa:
+ const auto trackSource=isMcTrack?track_source_fixture::Track::mc:isGbTrack?track_source_fixture::Track::gb:isTbTrack?track_source_fixture::Track::tb:isRcTrack?track_source_fixture::Track::rc:isTcTrack?track_source_fixture::Track::tc:isScTrack?track_source_fixture::Track::sc:isMbTrack?track_source_fixture::Track::mb:isRaTrack?track_source_fixture::Track::ra:isMaTrack?track_source_fixture::Track::ma:isSaTrack?track_source_fixture::Track::sa:
      isGaTrack?track_source_fixture::Track::ga:
      isGcTrack?track_source_fixture::Track::gc:track_source_fixture::Track::ta;
  trackTextures::Request trackMaterialRequest{};
@@ -6395,7 +7090,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      trackTextures::MipMode::largestRetained,0};
  trackMaterialRequest.coldSourceByteCapacity=isMaSaTrack?64u*1024u*1024u:32u*1024u*1024u;
  trackMaterialRequest.sourceArchive=trackSession->archive;
- trackMaterialRequest.decodeSourceTexture=isTbTrack?&tb_original_world50LM::decodeSourceTexture:isRcTrack?&rc_original_world50LM::decodeSourceTexture:tcOriginalDisc?&tc_original_world50LM::decodeSourceTexture:scOriginalDisc?&sc_original_world50LM::decodeSourceTexture:mbOriginalDisc?&mb_original_world50LM::decodeSourceTexture:taOriginalDisc?&ta_original_world50LE::decodeSourceTexture:gaOriginalDisc?&ga_original_world50LH::decodeSourceTexture:
+ trackMaterialRequest.decodeSourceTexture=isMcTrack?&mc_original_world50LM::decodeSourceTexture:isGbTrack?&gb_original_world50LM::decodeSourceTexture:isTbTrack?&tb_original_world50LM::decodeSourceTexture:isRcTrack?&rc_original_world50LM::decodeSourceTexture:tcOriginalDisc?&tc_original_world50LM::decodeSourceTexture:scOriginalDisc?&sc_original_world50LM::decodeSourceTexture:mbOriginalDisc?&mb_original_world50LM::decodeSourceTexture:taOriginalDisc?&ta_original_world50LE::decodeSourceTexture:gaOriginalDisc?&ga_original_world50LH::decodeSourceTexture:
      maOriginalDisc?&ma_original_world50LM::decodeSourceTexture:saOriginalDisc?&sa_original_world50LM::decodeSourceTexture:isRaTrack?nullptr:isMaTrack?&source_texture50fc_fixture::decodeSourceTextureMa:
      isSaTrack?&source_texture50fc_fixture::decodeSourceTextureSa:isGaTrack?&source_texture50fc_fixture::decodeSourceTextureGa:
      isGcTrack?&source_texture50fc_fixture::decodeSourceTextureGc:&source_texture50fc_fixture::decodeSourceTexture;
@@ -6475,6 +7170,45 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   require50DU(overrides.apply(models.data(),models.size(),receipt),"TB actual static-model property application rejected");
  }
+ if(isGbTrack){
+  reserveGbAdditionalPayload(gb_static_model_params50GB::Owner::maximumAdditionalPayloadBytes(),"GB static property reservation exceeds remaining payload");
+  gb_static_model_params50GB::Owner overrides;gb_static_model_params50GB::Receipt receipt;
+  std::string error;
+  const bool loaded=gbColdSources&&overrides.load(gbColdSources,error);
+  require50DU(loaded,error.empty()?"GB original static-model parameters rejected":error.c_str());
+  std::vector<std::string> names(actualWorld.instances.size());
+  std::vector<gb_static_model_params50GB::ModelLease> models(actualWorld.instances.size());
+  for(std::size_t i=0;i<actualWorld.instances.size();++i){
+   const auto& member=actualWorld.instances[i].geometry_member;
+   const auto slash=member.find_last_of("/\\");
+   names[i]=member.substr(slash==std::string::npos?0:slash+1);
+   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
+   models[i]={&names[i],&staticShadowReceiving[i],1u};
+  }
+  require50DU(overrides.apply(models.data(),models.size(),receipt),"GB actual static-model property application rejected");
+ }
+ if(isMcTrack){
+  reserveMcAdditionalPayload(mc_static_model_params50MC::Owner::maximumAdditionalPayloadBytes(),"MC static property reservation exceeds remaining payload");
+  mc_static_model_params50MC::Owner overrides;mc_static_model_params50MC::Receipt receipt;
+  std::string error;
+  const bool loaded=mcColdSources&&overrides.load(mcColdSources,mc_static_model_params50MC::Owner::maximumAdditionalPayloadBytes(),error);
+  require50DU(loaded,error.empty()?"MC original static-model parameters rejected":error.c_str());
+  std::vector<std::string> names(actualWorld.instances.size());
+  std::vector<mc_static_model_params50MC::ModelLease> models(actualWorld.instances.size());
+  for(std::size_t i=0;i<actualWorld.instances.size();++i){
+   const auto& member=actualWorld.instances[i].geometry_member;
+   const auto slash=member.find_last_of("/\\");
+   names[i]=member.substr(slash==std::string::npos?0:slash+1);
+   const auto dot=names[i].find_last_of('.');if(dot!=std::string::npos)names[i].resize(dot);
+   models[i]={&names[i],&staticShadowReceiving[i],1u};
+  }
+  require50DU(overrides.apply(models.data(),models.size(),receipt),"MC actual static-model property application rejected");
+ }
+ if(isMcTrack){ // All override/name/ModelLease temporaries above are destroyed.
+  const auto released=mc_static_model_params50MC::Owner::maximumAdditionalPayloadBytes();
+  require50DU(mcAdditionalPayloadReserved>=released,"MC static property scratch release accounting");
+  mcAdditionalPayloadReserved-=released;
+ }
  if(isRcTrack){
   reserveRcAdditionalPayload(rc_static_model_params50RC::Owner::maximumAdditionalPayloadBytes(),"RC static property reservation exceeds remaining payload");
   rc_static_model_params50RC::Owner overrides;rc_static_model_params50RC::Receipt receipt;
@@ -6525,7 +7259,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(overrides.apply(models.data(),models.size(),receipt),"GC actual static-model property application rejected");
  }
  std::vector<rr::assets::WorldNormal50HK> legacyTrackNormals;
- const auto& trackNormals=tbOriginalWorld?*tbOriginalWorld->normals():rcOriginalWorld?*rcOriginalWorld->normals():tcOriginalWorld?*tcOriginalWorld->normals():scOriginalWorld?*scOriginalWorld->normals():mbOriginalWorld?*mbOriginalWorld->normals():taOriginalWorld?*taOriginalWorld->normals():gaOriginalWorld?*gaOriginalWorld->normals():
+ const auto& trackNormals=mcOriginalWorld?*mcOriginalWorld->normals():gbOriginalWorld?*gbOriginalWorld->normals():tbOriginalWorld?*tbOriginalWorld->normals():rcOriginalWorld?*rcOriginalWorld->normals():tcOriginalWorld?*tcOriginalWorld->normals():scOriginalWorld?*scOriginalWorld->normals():mbOriginalWorld?*mbOriginalWorld->normals():taOriginalWorld?*taOriginalWorld->normals():gaOriginalWorld?*gaOriginalWorld->normals():
      maOriginalWorld?*maOriginalWorld->normals():saOriginalWorld?*saOriginalWorld->normals():legacyTrackNormals;
  track_normals50hk_fixture::Diagnostic trackNormalDiagnostic{};
  require50DU(isRaTrack||directOriginalHuman||track_normals50hk_fixture::load(trackMaterialRequest.root,
@@ -6534,6 +7268,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::cerr<<trackSession->world->code<<" source normals "<<trackNormalDiagnostic.normals
      <<" zero/fallback "<<trackNormalDiagnostic.zeroNormals<<'\n';
  auto advanceNativeGcWater=[&](){
+  if(mcWaterOwner){
+   require50DU(mcWaterOwner->ready()&&mcWaterOwner->sourceIdentity()==mcColdSources.get()&&
+       mcWaterUpdateSequence<std::numeric_limits<std::uint64_t>::max(),"MC actual water update owner rejected");
+   const auto node=static_cast<std::uint32_t>(x.bindings.animation.bodyScene288);
+   require50DU(node<s.sceneNodeCount,"MC followed water anchor scene missing");
+   float position[3];std::memcpy(position,s.nodes[node].localC0.v+12,12);
+   const WaterPresentationView50JC view{position,0,true,true};
+   require50DU(mcWaterOwner->runtime().anchor(view).status==native_water_runtime50JC::Status::Complete&&
+       mcWaterOwner->runtime().advance(++mcWaterUpdateSequence,.016f,0u).status==native_water_runtime50JC::Status::Complete,
+       "MC actual water root update rejected");
+  }
   if(!nativeGcWater)return;
   // Outside every bank lease, the canonical live arena is actual followed
   // racer0. Copy the lanes before lending them to shared world owners.
@@ -6550,6 +7295,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::string error;const bool ready=scZeroSky.prepare(scColdSources,error);
   require50DU(ready,error.empty()?"SC zero-sky authoring rejected":error.c_str());
  }
+ // Late environment storage participates in the parent's same MC payload ledger.
+ const auto reserveMcEnvironment=[&](std::size_t bytes,const char* reason){
+  require50DU(isMcTrack&&bytes<=mcRemainingPayloadBytes(),reason);
+  mcAdditionalPayloadReserved+=bytes;
+ };
+ std::unique_ptr<mc_sky50MC::Owner> mcSkyOwner;
+ if(isMcTrack){
+  reserveMcEnvironment(sizeof(mc_sky50MC::Owner),"MC sky owner exceeds remaining payload");
+  mcSkyOwner=std::make_unique<mc_sky50MC::Owner>();
+ }
  auto skyOwner=std::make_unique<sky50gw_fixture::Owner>();
  sky50gw_fixture::Request skyRequest{};skyRequest.track=trackSource;
  skyRequest.archive=trackSession->archive;
@@ -6559,21 +7314,30 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  skyRequest.retainedTcWorld=isTcTrack?tcOriginalWorld.get():nullptr;
  skyRequest.retainedRcSource=isRcTrack?rcColdSources.get():nullptr;
  skyRequest.retainedTbSource=isTbTrack?tbColdSources.get():nullptr;
+ skyRequest.retainedGbSource=isGbTrack?gbColdSources:nullptr;
  sky50gw_fixture::Diagnostic skyDiagnostic{};
  if(isRaTrack){
   ra_cold_aggregate50LA::Diagnostic raSkyDiagnostic;
   require50DU(raWorld&&raWorld->prepareSkyImages(
       runtime_asset_paths50LB::resolve("evidence/skyRA"),raSkyDiagnostic),
       "actual retained RA authored sky image preparation failed");
- }else if(isTcTrack||isRcTrack||isTbTrack){
+ }else if(isMcTrack){
+  // Bounded native texture load; all decoded images remain with this owner
+  // through the existing renderer/GPU-texture shutdown fence.
+  require50DU(mcRemainingPayloadBytes()>=48u*(65552u+65536u)+194342u,
+      "MC sky decoded/source bytes exceed remaining payload");
+  const bool loaded=mcSkyOwner->prepare(mcColdSources,skyDiagnostic);
+  require50DU(loaded,skyDiagnostic.message.c_str());
+  reserveMcEnvironment(mcSkyOwner->retainedPayloadBytes(),"MC retained sky exceeds remaining payload");
+ }else if(isTcTrack||isRcTrack||isTbTrack||isGbTrack){
   const bool loaded=skyOwner->load(skyRequest,skyDiagnostic);
   require50DU(loaded,skyDiagnostic.message.empty()?"TC own sky images rejected":skyDiagnostic.message.c_str());
  }else if(!isScTrack)require50DU(skyOwner->load(skyRequest,skyDiagnostic),
      skyDiagnostic.message.empty()?"actual selected-track sky load failed":skyDiagnostic.message.c_str());
  original_track_sky50KX::Owner sourceSkySelection;
- if(isMaSaTrack||isMbTrack||isTcTrack||isRcTrack||isTbTrack){
+ if(isMaSaTrack||isMbTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
   std::string skySelectionError;
-  const bool skySelected=isTbTrack?sourceSkySelection.prepareTbSource(*tbColdSources,skySelectionError):isRcTrack?sourceSkySelection.prepareRcSource(*rcColdSources,skySelectionError):isTcTrack?sourceSkySelection.prepareTcSource(*tcOriginalWorld,skySelectionError):
+  const bool skySelected=isMcTrack?sourceSkySelection.prepareMcSource(*mcColdSources,skySelectionError):isGbTrack?sourceSkySelection.prepareGbSource(*gbColdSources,skySelectionError):isTbTrack?sourceSkySelection.prepareTbSource(*tbColdSources,skySelectionError):isRcTrack?sourceSkySelection.prepareRcSource(*rcColdSources,skySelectionError):isTcTrack?sourceSkySelection.prepareTcSource(*tcOriginalWorld,skySelectionError):
       (isMbTrack?sourceSkySelection.prepareMbSource(*mbOriginalWorld,skySelectionError):
       sourceSkySelection.prepare(actualWorld,trackSource,skySelectionError));
   require50DU(skySelected,skySelectionError.empty()?"source zone-selected sky authoring rejected":skySelectionError.c_str());
@@ -6586,12 +7350,17 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  ga_dynamic_window::Owner gaDynamicWindow;
  tc_dynamic_window50TC::Owner tcDynamicWindow;
  tb_dynamic_window50TB::Owner tbDynamicWindow;
+ gb_dynamic_window50GB::Owner gbDynamicWindow;
+ mc_dynamic_window50MC::Owner mcDynamicWindow;
  sa_dynamic_window::Owner saDynamicWindow;
  gc_atm_window_fixture::Owner gcAtm;
  ga_atm_window_fixture::Owner gaAtm;
  ma_sa_atm_window_fixture::Owner maSaAtm;
  ma_shield_uv_fixture::Owner maShieldUv;
  tb_atm_window_fixture::Owner tbAtm;
+ gb_atm_window_fixture::Owner gbAtm;
+ mc_atm_window_fixture::Owner mcAtm;
+ mc_shield_uv_fixture::Owner mcShieldUv;
  tb_shield_uv_fixture::Owner tbShieldUv;
  rc_atm_window_fixture::Owner rcAtm;
  std::shared_ptr<rc_crystal50RC::Owner> rcCrystal;
@@ -6614,7 +7383,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  std::shared_ptr<const rr::assets::OriginalUiArchive50KG> gameplayBinderAppStart;
  if(gameplayBinderEnabled){
   require50DU(((isGaTrack&&gaAnimatedWorld)||(isGcTrack&&gcAnimatedWorld)||
-      (isTaTrack&&nativeTaSelection)||(isMaTrack&&nativeMaSelection)||(isSaTrack&&nativeSaSelection)||(isMbTrack&&nativeMbSelection)||(isScTrack&&nativeScSelection)||(isTcTrack&&nativeTcSelection)||(isRcTrack&&nativeRcSelection)||(isTbTrack&&nativeTbSelection)||
+      (isTaTrack&&nativeTaSelection)||(isMaTrack&&nativeMaSelection)||(isSaTrack&&nativeSaSelection)||(isMbTrack&&nativeMbSelection)||(isScTrack&&nativeScSelection)||(isTcTrack&&nativeTcSelection)||(isRcTrack&&nativeRcSelection)||(isTbTrack&&nativeTbSelection)||(isGbTrack&&nativeGbSelection)||(isMcTrack&&nativeMcSelection)||
       (isRaTrack&&nativeRaSelection&&originalCameraEnabled))&&racerBank.count()==8,
       "Binder requires an actual eight-racer authenticated ordinary session");
   gameplayBinderAppStart=originalMainApplication.appStart(
@@ -6686,12 +7455,25 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const bool loaded=tbDynamicWindow.loadSource(tbDoorRuntime,diagnostic);
   require50DU(loaded,diagnostic.message.empty()?"TB actual door materials rejected":diagnostic.message.c_str());
  }
+ if(isGbTrack){
+  require50DU(gbAnimationRuntime&&gbAnimationRuntime->ready(),"GB actual four-animation runtime absent before material preparation");
+  gb_dynamic_materials50GB::Diagnostic diagnostic;
+  const bool loaded=gbDynamicWindow.loadSource(gbAnimationRuntime,diagnostic);
+  require50DU(loaded,diagnostic.message.empty()?"GB actual four-animation materials rejected":diagnostic.message.c_str());
+ }
+ if(isMcTrack){
+  reserveMcAdditionalPayload(mc_dynamic_materials50MC::Owner::maximumPayloadReservation(),"MC dynamic source/material scratch exceeds remaining payload");
+  require50DU(mcAnimationRuntime&&mcAnimationRuntime->ready(),"MC actual fourteen-animation runtime absent before material preparation");
+  mc_dynamic_materials50MC::Diagnostic diagnostic;
+  const bool loaded=mcDynamicWindow.loadSource(mcAnimationRuntime,diagnostic);
+  require50DU(loaded,diagnostic.message.empty()?"MC actual fourteen-animation materials rejected":diagnostic.message.c_str());
+ }
  // One application publication survives frontend/race destruction. These
  // consumers only borrow its live view; no runSession-local clock authority.
  const auto sourceApplicationClock=originalMainApplication.animationClock();
- std::uint64_t gcAnimatedWorldSteps=0,gaAnimatedWorldSteps=0,saAnimatedWorldSteps=0;
+ std::uint64_t gcAnimatedWorldSteps=0,gaAnimatedWorldSteps=0,saAnimatedWorldSteps=0,gbWorldServiceStep=0,mcWorldServiceStep=0;
  auto advanceWorldAnimations=[&](){
-  if(!tcGateRuntime&&!isRcTrack&&!tbDoorRuntime){
+  if(!isGbTrack&&!isMcTrack&&!tcGateRuntime&&!isRcTrack&&!tbDoorRuntime){
   if(!gcAnimatedWorld&&!gaAnimatedWorld&&!saAnimatedWorld&&!gaAtm.loaded()&&!maSaAtm.loaded()&&!mbAtm.loaded()&&!scAtm.loaded()&&!tcAtm.loaded()&&!rcAtm.loaded()&&!tbAtm.loaded()&&!gameplayBinder.loaded())return;
   }
   // Source1AAD98 registers the complete racer group before1B4A58's animation
@@ -6703,6 +7485,28 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   std::uint32_t sourceApplicationTimestamp=0;
   require50DU(originalMainApplication.sampleAnimationTimestamp(sourceApplicationTimestamp),
       "shared source application timestamp rejected");
+  if(isMcTrack){
+   const bool published=mcAnimationBinding&&mcAnimationBinding->service(.016f,sourceApplicationTimestamp,
+       s.noiseOwner().sharedRandomState,sessionRandom,s.animationShared.motion,mcAnimationBindingDiagnostic);
+   require50DU(published,mcAnimationBindingDiagnostic.message.c_str());
+  }
+  if(isGbTrack){
+   std::uint32_t actualPause=0;
+   require50DU(sourceApplicationClock.readPause11C(actualPause),"GB actual world pause unavailable");
+   require50DU(gbLightOwner&&gbLightOwner->serviceGbTimedLights(.016f,s.noiseOwner().sharedRandomState,
+       actualPause!=0,gcLightDiagnostic),"GB actual timed light service rejected");
+   const bool animationPublished=gbAnimationBinding&&gbAnimationBinding->service(.016f,sourceApplicationTimestamp,
+       s.noiseOwner().sharedRandomState,sessionRandom,s.animationShared.motion,gbAnimationBindingDiagnostic);
+   require50DU(animationPublished,gbAnimationBindingDiagnostic.message.empty()?"GB actual four-animation world publication rejected":gbAnimationBindingDiagnostic.message.c_str());
+   const bool particlesAdvanced=gbParticleRender&&gbParticleRender->advance(.016f,gbParticleRuntimeDiagnostic);
+   require50DU(particlesAdvanced,gbParticleRuntimeDiagnostic.message.empty()?"GB actual shared manager and source-order emitter service rejected":gbParticleRuntimeDiagnostic.message.c_str());
+   require50DU(gbWorldServiceStep!=std::numeric_limits<std::uint64_t>::max()&&gbQueryBinding&&
+       gbQueryBinding->serviceWorld(++gbWorldServiceStep),"GB actual trigger exit service rejected");
+  }
+  if(isMcTrack){
+   const bool particlesAdvanced=mcParticleRender&&mcParticleRender->advance(.016f,mcParticleRuntimeDiagnostic);
+   require50DU(particlesAdvanced,mcParticleRuntimeDiagnostic.message.empty()?"MC actual shared manager/source-order40 emitter service rejected":mcParticleRuntimeDiagnostic.message.c_str());
+  }
   if(tbDoorRuntime){
    const bool advanced=tbDoorRuntime->service(.016f,sourceApplicationTimestamp,s.noiseOwner().sharedRandomState,
        sessionRandom,s.animationShared.motion,tbDoorDiagnostic);
@@ -6736,6 +7540,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(mbAtm.loaded())require50DU(mbAtm.advance(sourceApplicationTimestamp),"original MB ATM time update rejected");
   if(scAtm.loaded())require50DU(scAtm.advance(sourceApplicationTimestamp),"original SC ATM time update rejected");
   if(tbAtm.loaded())require50DU(tbAtm.advance(sourceApplicationTimestamp),"original TB ATM time update rejected");
+  if(mcAtm.loaded())require50DU(mcAtm.advance(sourceApplicationTimestamp),"MC actual ATM time update rejected");
+  if(isMcTrack)require50DU(mcWorldServiceStep!=std::numeric_limits<std::uint64_t>::max()&&mcQueryBinding&&mcQueryBinding->serviceWorld(++mcWorldServiceStep),"MC actual trigger exit service rejected");
+  if(gbAtm.loaded())require50DU(gbAtm.advance(sourceApplicationTimestamp),"original GB ATM time update rejected");
   if(rcAtm.loaded())require50DU(rcAtm.advance(sourceApplicationTimestamp),"original RC ATM time update rejected");
   if(tcAtm.loaded())require50DU(tcAtm.advance(sourceApplicationTimestamp),"original TC ATM time update rejected");
   if(isRaTrack)require50DU(raWorld->serviceRuntimeTriggers(racerBank,raDiagnostic),
@@ -6816,6 +7623,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  rc_particle_attachments50RC::Diagnostic rcParticleAttachmentDiagnostic;
  rc_particle_runtime50RC::Diagnostic rcParticleRuntimeDiagnostic;
  rc_particle_render50RC::Diagnostic rcParticleRenderDiagnostic;
+ gb_particle_render50GB::Diagnostic gbParticleRenderDiagnostic;
+ mc_particle_render50MC::Diagnostic mcParticleRenderDiagnostic;
+ bool mcParticleFrame152Notice=false;
  std::size_t rcParticleWindowPayloadReservation=0;
  std::size_t rcParticleRegistryPayloadCharged=0;
  bool rcParticleRegistryFinalAccounted=false;
@@ -6857,8 +7667,23 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  if(!sourceModelRenderGlobals)sourceModelRenderGlobals=
      std::make_unique<OriginalRacerModelRenderGlobals50LA>(nativeOrdinaryLaunch11258);
  OriginalAttachedGlobals sourceAttachedGlobals;
- OriginalRaceFogFields sourceTrackFog;
+ OriginalRaceFogFields legacySourceTrackFog;
+ require50DU(!isGbTrack||(gbFogOwner&&gbFogOwner->ready()&&gbFogOwner->sourceOwner()==gbColdSources.get()&&gbFogOwner->cameraFields()),
+     "GB actual source-bound fog owner unavailable");
+ require50DU(!isMcTrack||(mcFogOwner&&mcFogOwner->ready()&&mcFogOwner->sourceOwner()==mcColdSources.get()&&mcFogOwner->cameraFields()),
+     "MC actual source-bound fog owner unavailable");
+ auto& sourceTrackFog=isMcTrack?*mcFogOwner->cameraFields():isGbTrack?*gbFogOwner->cameraFields():legacySourceTrackFog;
+ std::unique_ptr<mc_camera_assets50MC::Owner> mcSourceCameraAssets;
+ if(isMcTrack){
+  reserveMcEnvironment(sizeof(mc_camera_assets50MC::Owner),"MC camera owner exceeds remaining payload");
+  mcSourceCameraAssets=std::make_unique<mc_camera_assets50MC::Owner>();
+ }
  sourceCamera::AuthoredStorage legacySourceCameraAssets;
+ std::unique_ptr<sourceCamera::AuthoredStorage> gbSourceCameraAssets;
+ if(isGbTrack){
+  reserveGbAdditionalPayload(sizeof(sourceCamera::AuthoredStorage),"GB camera descriptor exceeds remaining payload");
+  gbSourceCameraAssets=std::make_unique<sourceCamera::AuthoredStorage>();
+ }
  std::unique_ptr<sourceCamera::AuthoredStorage> tbSourceCameraAssets;
  if(isTbTrack){
   reserveTbAdditionalPayload(sizeof(sourceCamera::AuthoredStorage),"TB camera descriptor exceeds remaining payload");
@@ -6866,9 +7691,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
  }
  std::unique_ptr<sourceCamera::AuthoredStorage> rcSourceCameraAssets;
  if(isRcTrack)rcSourceCameraAssets=std::make_unique<sourceCamera::AuthoredStorage>();
- auto& sourceCameraAssets=isTbTrack?*tbSourceCameraAssets:isRcTrack?*rcSourceCameraAssets:legacySourceCameraAssets;
+ auto& sourceCameraAssets=isGbTrack?*gbSourceCameraAssets:isTbTrack?*tbSourceCameraAssets:isRcTrack?*rcSourceCameraAssets:legacySourceCameraAssets;
  std::unique_ptr<sourceCamera::DisplayInputs> sourceCameraDisplay;
  std::shared_ptr<sourceCamera::Session> sourceCameraSession;
+ sourceCamera::Session::GameplayFogRenderPhase sourceFogRenderPhase;
  std::array<native_racer50HW::Cables*,8> sourceCameraCables{};
  original_speed_boost_adapter50LA::Owner sourceSpeedBoostAdapter;
  bool sourceSpeedBoostRendering=false,sourceSpeedBoostDisplayReported=false;
@@ -6917,6 +7743,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   const auto closeAccumulated=[](const char* gate){
    std::cerr<<"native_close_accumulated gate="<<gate<<'\n';return false;
   };
+  if(gbQueryBinding&&gbQueryBinding->enrolled()&&!gbQueryBinding->fence())return closeRejected("gb_query_terminal_fence");
+  if(gbParticleRender&&!gbParticleRender->closed()&&!gbParticleRender->close())return closeRejected("gb_real_renderer_borrow_retirement");
+  if(mcParticleRender&&!mcParticleRender->closed()&&!mcParticleRender->close())return closeRejected("mc_real_renderer_borrow_retirement");
+  if(mcAnimationBinding&&mcAnimationBinding->needsClose()&&!mcAnimationBinding->close(mcAnimationBindingDiagnostic))
+   return closeRejected("mc_animation_membership_retirement");
+  if(gbAnimationBinding&&gbAnimationBinding->needsClose()&&!gbAnimationBinding->close(gbAnimationBindingDiagnostic))
+   return closeRejected("gb_actual_animation_membership_retirement");
   // Stop new RC numerical/scheduling borrows on normal and setup-failure
   // cleanup, before Session racer prefixes or renderer/Window owners retire.
   if(rcParticleRuntime&&!rcParticleRuntime->quiesce())return closeRejected("rc_emitter_quiesce");
@@ -7006,6 +7839,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   raceAudio->reset(); // Stop shared Dax and restore groups before mixer closure.
   if(tcGlobalSound&&tcGlobalSound->prepared()&&!tcGlobalSound->close())
    return closeRejected("tc_actual_global_sound_shutdown");
+  if(gbPodSound&&!gbPodSound->close())return closeRejected("gb_actual_pod_sound_shutdown");
+  if(!retireGbAudioOwners())return closeRejected("gb_positional_material_audio_retirement");
+  if(!retireMcAudioOwners())return closeRejected("mc_positional_material_audio_retirement");
   if(tbPodSound&&!tbPodSound->close())return closeRejected("tb_actual_pod_sound_shutdown");
   gcGateAudio.reset(); // Stop exclusive GC voice126 before its real mixer/groups.
   gaGateAudio.reset(); // Stop voice126 while its real mixer/groups still live.
@@ -7027,6 +7863,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   // prefixes. Renderer retirement above revoked Window publication/borrows.
   // Keep the real context alive for the atlas's checked GPU close.
   if(rcParticleRender&&!rcParticleRender->close())return closeRejected("rc_particle_numeric_retirement");
+  if(gbParticleWindow&&!gbParticleWindow->close(textureDiagnostic))return closeRejected("gb_particle_window_retirement");
+  if(mcParticleWindow&&!mcParticleWindow->close(textureDiagnostic))return closeRejected("mc_particle_window_retirement");
   if(rcParticleWindow&&!rcParticleWindow->close(textureDiagnostic))return closeRejected("rc_particle_window_retirement");
   if(rcTrackParticles&&!rcTrackParticles->close())return closeRejected("rc_actual_shared_pool_retirement");
   if(rcParticleRuntime&&!rcParticleRuntime->closeAfterPool())return closeRejected("rc_emitter_release_after_pool");
@@ -7057,6 +7895,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    clean=closeAccumulated("TB door texture cleanup failed");
   }
   if(tbDynamicWindow.ownsResources())return closeRejected("TB door texture resources remain");
+  if(mcDynamicWindow.ownsResources()&&!mcDynamicWindow.close(textureDiagnostic))return closeRejected("mc_dynamic_texture_retirement");
+  if(mcAtm.ownsResources()&&!mcAtm.close(textureDiagnostic))return closeRejected("mc_atm_texture_retirement");
+  if(gbDynamicWindow.ownsResources()&&!gbDynamicWindow.close(textureDiagnostic))return closeRejected("gb_dynamic_texture_retirement");
+  if(gbAtm.ownsResources()&&!gbAtm.close(textureDiagnostic))return closeRejected("gb_atm_texture_retirement");
   if(gcAtm.ownsResources()&&!gcAtm.close(textureDiagnostic)){
    std::cerr<<"GC ATM texture cleanup error "<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=closeAccumulated("std::cerr<<\"GC ATM texture cleanup error \"<<static_cast<unsigned>(textureDiagnostic.error)<<'\n';clean=false;");
   }
@@ -7181,6 +8023,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(!mbSourceTriggers->unbind())return closeRejected("mb_action_owner_unbind");
    mbSourceTriggers.reset();
   }
+  if(isGbTrack){
+   if(sourceCameraSession&&sourceCameraSession.use_count()!=1)return closeRejected("gb_camera_owner_still_borrowed");
+   sourceCameraSession.reset();gbSourceCameraAssets.reset();
+   if(!closeGbColdPrefix())return closeRejected("gb_all_peer_terminal_contact_retirement");
+  }
+  if(isMcTrack){
+   if(sourceCameraSession&&sourceCameraSession.use_count()!=1)return closeRejected("mc_camera_owner_still_borrowed");
+   sourceCameraSession.reset();mcSourceCameraAssets.reset();
+   if(!closeMcColdPrefix())return closeRejected("mc_all_peer_terminal_contact_retirement");
+  }
   if(isTbTrack){
    // Camera/Follow, pool and model/GPU borrowers have actually retired above.
    // Binding owns door337 retirement; this path removes only real query and
@@ -7217,6 +8069,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   return clean;
  };
  // Late explicit closeWindow now owns every MB retirement path.
+ mcColdPrefixGuard.armed=false;
+ gbColdPrefixGuard.armed=false;
  mbColdPrefixGuard.armed=false;
  tcColdPrefixGuard.armed=false;tcGatePrefixGuard.armed=false;
  tbColdPrefixGuard.armed=false;tbDoorPrefixGuard.armed=false;
@@ -7303,7 +8157,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        trackMaterialRequest.canonicalDomain->resolver3E1A70()->bindProvider3E1A70(provider,trackMaterialDiagnostic.canonical.texture),
        "RC same-source canonical mount/seal/bind rejected");
   }
-  if(originalCameraEnabled&&!isRaTrack&&!isRcTrack&&!isTbTrack&&trackMaterialRequest.canonicalDomain){
+  if(originalCameraEnabled&&!isRaTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack&&trackMaterialRequest.canonicalDomain){
    // Existing TA/SA canonical callers also stage particles before population.
    // Authenticate and mount the complete selected archive, never a subset or
    // a guessed negative namespace. GA already retains this exact decoded owner.
@@ -7391,7 +8245,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        rc_particle_render50RC::Owner::retainedPayloadBytes(),rcParticleRenderDiagnostic);
    require50DU(renderPrepared,"RC actual numerical particle renderer rejected");
   }
-  const bool trackMaterialsLoaded=isRaTrack||(tbOriginalWorld?
+  const bool trackMaterialsLoaded=isRaTrack||(mcOriginalWorld?mcOriginalWorld->populateCanonicalRacers(trackMaterialRequest,mcRemainingPayloadBytes(),trackMaterialDiagnostic):gbOriginalWorld?
+      gbOriginalWorld->populateCanonicalRacers(trackMaterialRequest,gbRemainingPayloadBytes(),trackMaterialDiagnostic):tbOriginalWorld?
       tbOriginalWorld->populateCanonicalRacers(trackMaterialRequest,tbRemainingPayloadBytes(),trackMaterialDiagnostic):rcOriginalWorld?
       rcOriginalWorld->populateCanonicalRacers(trackMaterialRequest,rcRemainingPayloadBytes(),trackMaterialDiagnostic):tcOriginalWorld?
       tcOriginalWorld->populateCanonicalRacers(trackMaterialRequest,trackMaterialDiagnostic):scOriginalWorld?
@@ -7524,6 +8379,57 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    const bool atmLoaded=scAtm.loadSource(trackSession->archive,trackSource,*scOriginalWorld,animationDiagnostic);
    require50DU(atmLoaded,animationDiagnostic.message.empty()?"SC actual animated textures rejected":animationDiagnostic.message.c_str());
   }
+  if(isGbTrack){
+   require50DU(gbOriginalWorld&&gbParticleRuntime&&gbParticleRuntime->sourceStaged()&&gbParticleAttachments&&
+       gbTrackParticles&&gbTrackParticles->prepared()&&gbFogOwner&&gbFogOwner->ready()&&trackMaterialRequest.canonicalDomain,
+       "GB actual canonical source, 67 emitters and fog missing before Window preparation");
+   // Reserve both fixed owners and their shared-owner control-block policy
+   // allowances before any visual/material or numerical storage allocation.
+   const auto visualBytes=gb_particle_visual50GB::Window::maximumAdditionalPayloadBytes();
+   const auto numericBytes=gb_particle_render50GB::Owner::retainedPayloadBytes();
+   reserveGbAdditionalPayload(visualBytes+numericBytes+256u,
+       "GB particle Window/numeric/control-block reservation exceeds shared payload");
+   gbParticleWindow=std::make_shared<gb_particle_visual50GB::Window>();
+   gb_particle_visual50GB::Diagnostic materialDiagnostic;
+   const bool materialReady=gbParticleWindow->prepare(gbOriginalWorld,gbParticleAttachments,gbTrackParticles,
+       trackMaterialRequest.canonicalDomain,sessionIndex+1,visualBytes,materialDiagnostic);
+   if(!materialReady)std::cerr<<"gb_particle_window_rejected message="<<materialDiagnostic.message
+       <<" material_status="<<static_cast<unsigned>(materialDiagnostic.material.status)
+       <<" material_pc="<<materialDiagnostic.material.sourcePC<<'\n';
+   require50DU(materialReady,"GB actual 130-frame canonical particle Window rejected");
+   gbParticleRender=std::make_shared<gb_particle_render50GB::Owner>();
+   const bool numericReady=gbParticleRender->prepare(gbParticleRuntime,gbLightOwner,gbParticleWindow,gbFogOwner,
+       numericBytes,gbParticleRenderDiagnostic);
+   if(!numericReady)std::cerr<<"gb_particle_numeric_rejected status="<<static_cast<unsigned>(gbParticleRenderDiagnostic.status)
+       <<" source_pc="<<gbParticleRenderDiagnostic.sourcePC<<'\n';
+   require50DU(numericReady,"GB actual numeric/material/light/fog destination binding rejected");
+  }
+  if(isMcTrack){
+   require50DU(mcOriginalWorld&&mcParticleRuntime&&mcParticleRuntime->sourceStaged()&&mcParticleAttachments&&
+       mcTrackParticles&&mcTrackParticles->prepared()&&mcFogOwner&&mcFogOwner->ready()&&trackMaterialRequest.canonicalDomain,
+       "MC actual canonical source, 40 emitters and fog missing before Window preparation");
+   // Reserve both fixed owners and their shared-owner control-block policy
+   // allowances before any visual/material or numerical storage allocation.
+   const auto visualBytes=mc_particle_visual50MC::Window::maximumAdditionalPayloadBytes();
+   const auto numericBytes=mc_particle_render50MC::Owner::retainedPayloadBytes();
+   reserveMcEnvironment(visualBytes+numericBytes+256u,
+       "MC particle Window/numeric/control-block reservation exceeds shared payload");
+   mcParticleWindow=std::make_shared<mc_particle_visual50MC::Window>();
+   mc_particle_visual50MC::Diagnostic materialDiagnostic;
+   const bool materialReady=mcParticleWindow->prepare(mcOriginalWorld,mcParticleAttachments,mcTrackParticles,
+       trackMaterialRequest.canonicalDomain,sessionIndex+1,visualBytes,materialDiagnostic);
+   if(!materialReady)std::cerr<<"mc_particle_window_rejected message="<<materialDiagnostic.message
+       <<" material_status="<<static_cast<unsigned>(materialDiagnostic.material.status)
+       <<" material_pc="<<materialDiagnostic.material.sourcePC<<'\n';
+   require50DU(materialReady,"MC actual 152-frame canonical particle Window rejected");
+   mcParticleRender=std::make_shared<mc_particle_render50MC::Owner>();
+   const bool numericReady=mcParticleRender->prepare(mcParticleRuntime,mcLightOwner,mcParticleWindow,mcFogOwner,
+       numericBytes,mcParticleRenderDiagnostic);
+   if(!numericReady)std::cerr<<"mc_particle_numeric_rejected status="<<static_cast<unsigned>(mcParticleRenderDiagnostic.status)
+       <<" source_pc="<<mcParticleRenderDiagnostic.sourcePC<<'\n';
+   require50DU(numericReady,"MC actual numeric/material/light/fog destination binding rejected");
+   require50DU(mcParticleRender->bindVehicles(mcParticleVehicles),"MC actual retained racer producer/render join rejected");
+  }
   if(isRcTrack){
    reserveRcAdditionalPayload(sizeof(rc_crystal50RC::Owner)+rc_crystal50RC::Owner::uvCount*sizeof(std::array<float,2>),"RC crystal bridge and CPU UV scratch exceed remaining payload");
    rcCrystal=std::make_shared<rc_crystal50RC::Owner>();std::string error;
@@ -7539,6 +8445,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        trackMaterialRequest.canonicalDomain,sessionIndex+1,
        rcParticleWindowPayloadReservation,particleDiagnostic);
    require50DU(particleReady,particleDiagnostic.message.empty()?"RC canonical particle Window rejected":particleDiagnostic.message.c_str());
+  }
+  if(isGbTrack){
+   gb_atm_animation_fixture::Diagnostic animationDiagnostic;
+   const bool atmLoaded=gbAtm.loadSource(trackSource,gbOriginalWorld,animationDiagnostic);
+   require50DU(atmLoaded,animationDiagnostic.message.empty()?"GB actual animated textures rejected":animationDiagnostic.message.c_str());
+  }
+  if(isMcTrack){
+   mc_shield_uv_fixture::Diagnostic uvDiagnostic;
+   require50DU(mcShieldUv.load(*mcOriginalWorld,uvDiagnostic),uvDiagnostic.message.c_str());
+   mc_atm_animation_fixture::Diagnostic animationDiagnostic;
+   const bool atmLoaded=mcAtm.loadSource(trackSource,mcOriginalWorld,animationDiagnostic);
+   require50DU(atmLoaded,animationDiagnostic.message.empty()?"MC actual animated textures rejected":animationDiagnostic.message.c_str());
   }
   if(isTbTrack){
    tb_shield_uv_fixture::Diagnostic diagnostic;
@@ -7672,7 +8590,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const auto* target=courseTargets.admits(selected);
     if(!target||!courseRaceCold||!originalUiActive||courseRaceLaunched||courseColdLoad.pending()||
        !raceEnabled||!nativeOriginalFleet||!originalAiEnabled||!originalCameraEnabled||
-       !nativeCourseRacerOwned50KG(playerRacer60)||race.phase!=race_session50HM::Phase::Uninitialized||racerBank.count()!=8||
+       race.phase!=race_session50HM::Phase::Uninitialized||racerBank.count()!=8||
        !renderer.initialized()||!trackGpuTextures.initialized()||!skyGpuTextures.initialized()||
        !gameplayBinder.loaded()||!gameplayBinder.ownsResources()||!activateColdRace||
        &s.noiseOwner()!=&originalMainApplication.state->sharedNoise308030||
@@ -7732,6 +8650,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        !navigationMap||!navigationAI||!navigationMap->indicesPrepared||!navigationAI->indicesPrepared||
        navigationMap->track.count!=179||navigationAI->track.count!=180||
        !sourceCameraSession||!sourceCameraSession->ready()))return false;
+    if(isGbTrack&&(!gbParticleAuthoring||!gbParticleAuthoring->ready()||!gbParticleAttachments||!gbParticleAttachments->sourceGraphReady()||
+       !gbTrackParticles||!gbTrackParticles->prepared()||!gbParticleRuntime||!gbParticleRuntime->sourceStaged()||
+       !gbParticleRender||!gbParticleRender->ready()||gbParticleRender->runtimeOwner()!=gbParticleRuntime.get()||
+       gbParticleRender->windowOwner()!=gbParticleWindow.get()||!gbParticleWindow||!gbParticleWindow->ready()||
+       !gbFogOwner||!gbFogOwner->ready()||gbFogOwner->sourceOwner()!=gbColdSources.get()||
+       !gbTrackParticles->particles()||gbTrackParticles->particles()->emitterRegistryReservation().registeredEmitters!=67u))return false;
+    if(isMcTrack&&(!mcParticleSource||!mcParticleSource->ready()||!mcParticleAttachments||!mcParticleAttachments->sourceGraphReady()||
+       !mcTrackParticles||!mcTrackParticles->prepared()||!mcParticleRuntime||!mcParticleRuntime->sourceStaged()||
+       !mcParticleRender||!mcParticleRender->ready()||mcParticleRender->runtimeOwner()!=mcParticleRuntime.get()||
+       mcParticleRender->windowOwner()!=mcParticleWindow.get()||!mcParticleWindow||!mcParticleWindow->ready()||
+       !mcFogOwner||!mcFogOwner->ready()||mcFogOwner->sourceOwner()!=mcColdSources.get()||
+       !mcTrackParticles->particles()||mcTrackParticles->particles()->emitterRegistryReservation().registeredEmitters!=40u+(mcParticleVehicles?mcParticleVehicles->registeredProducerCount():0u)))return false;
     if(isRcTrack&&(!rcParticleAuthoring||!rcParticleAuthoring->ready()||!rcParticleAttachments||!rcParticleAttachments->ready()||
        !rcTrackParticles||!rcTrackParticles->prepared()||!rcParticleRuntime||!rcParticleRuntime->active()||!rcParticleRender||
        rcParticleRuntime->sourceOwner()!=rcParticleAuthoring.get()||rcParticleRuntime->attachmentOwner()!=rcParticleAttachments.get()||
@@ -7758,7 +8688,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          racerBank.read(slot,racerFrameReads.aiOwnersBound))))return false;
     }
     return true;
-   });
+   },[&](const original_course_targets50KX::Selection& selected){return courseTargets.availability(selected);});
    originalMain.prepare(originalMainApplication,nativeVideo,textureRequest,renderRequest,std::move(destination),&monotonicNow50DU,sessionIndex);
   }
   std::vector<platform::MaterialTextureSampler50EB> samplers;
@@ -7824,22 +8754,26 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   renderRequest.mode=platform::VehicleWindowMode50DS::callerMaterialTextures;
   std::vector<platform::VehicleWindowTrackSpan50DS> trackBindings;
   if(!isRaTrack){
-  renderRequest.track.mesh=isTbTrack?tbOriginalWorld->mesh():isRcTrack?rcOriginalWorld->mesh():&trackMesh;
+  renderRequest.track.mesh=isMcTrack?mcOriginalWorld->mesh():isGbTrack?gbOriginalWorld->mesh():isTbTrack?tbOriginalWorld->mesh():isRcTrack?rcOriginalWorld->mesh():&trackMesh;
   renderRequest.track.rcCrystal=rcCrystal;
   renderRequest.track.tbWorld=tbOriginalWorld;
   renderRequest.track.maximumRcProjectionBytes=isRcTrack?rcOriginalWorld->mesh()->vertices.size()*sizeof(std::array<float,2>):0;
   renderRequest.track.maximumRcStagingBytes=isRcTrack?rc_crystal50RC::Owner::uvCount*sizeof(std::array<float,2>):0;
   renderRequest.track.rcParticleWindow=rcParticleWindow;
+  renderRequest.track.gbParticleWindow=gbParticleWindow;
+  renderRequest.track.mcParticleWindow=mcParticleWindow;
   // Authored fog RGB and gameplay ranges are source-backed. The native shader
   // policy is enabled by default; explicit 0 is a diagnostic opt-out. This does
   // not claim original material/interpolation/quantization parity.
   const char* authoredFogSetting=std::getenv("RR_AUTHORED_WORLD_FOG");
   require50DU(!authoredFogSetting||std::string(authoredFogSetting)=="0"||
       std::string(authoredFogSetting)=="1","RR_AUTHORED_WORLD_FOG must be 0 or 1");
+  require50DU(!(isGbTrack||isMcTrack)||!authoredFogSetting||std::string(authoredFogSetting)=="1",
+      "GB actual particle/camera rendering requires authored world fog");
   if(!authoredFogSetting||std::string(authoredFogSetting)=="1"){
-   require50DU(isTaTrack||isGcTrack||isGaTrack||isMaSaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack,"unsupported reconstructed fog track");
+   require50DU(isTaTrack||isGcTrack||isGaTrack||isMaSaTrack||isMbTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack,"unsupported reconstructed fog track");
    auto& fog=renderRequest.track.worldFog;
-   const float* color=isScTrack?scZeroSky.clearRgba():skyOwner->clearRgba();
+   const float* color=isScTrack?scZeroSky.clearRgba():isMcTrack?mcSkyOwner->clearRgba():skyOwner->clearRgba();
    require50DU(color,"authenticated world fog RGB missing");
    for(unsigned i=0;i<3;++i)fog.color[i]=color[i];
    constexpr float minimum=1333.300048828125f,maximum=4000.f;
@@ -7847,15 +8781,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    // MB and SC own authenticated global Fog fractions are 1/1.
    // SC zone RGB varies; this existing global native policy does not
    // claim camera-zone color/interpolation parity.
-   const float haziness=(isTbTrack||isRcTrack||isTcTrack)?.5f:(isScTrack||isMbTrack)?1.f:isMaSaTrack?1.f:.5f;
+   const float haziness=(isGbTrack||isMcTrack)?sourceTrackFog.authoredFraction40:(isTbTrack||isRcTrack||isTcTrack)?.5f:(isScTrack||isMbTrack)?1.f:isMaSaTrack?1.f:.5f;
    // GA source Fog.Visibility0.4 is authenticated with its own SCB.
-   const float visibility=(isTbTrack||isRcTrack||isTcTrack)?1.f:(isScTrack||isMbTrack)?1.f:(isTaTrack||isMaSaTrack)?1.f:isGaTrack?.4f:.5f;
+   const float visibility=(isGbTrack||isMcTrack)?sourceTrackFog.authoredFraction3C:(isTbTrack||isRcTrack||isTcTrack)?1.f:(isScTrack||isMbTrack)?1.f:(isTaTrack||isMaSaTrack)?1.f:isGaTrack?.4f:.5f;
    fog.end=minimum+visibility*(maximum-minimum);
    fog.start=(fog.end-64.f)*(1.f-haziness);fog.enabled=true;
    std::cerr<<"Authored native world fog: start "<<fog.start
        <<" end "<<fog.end<<"; source ranges established, native world shader parity pending\n";
   }
-  if(originalCameraEnabled){
+  if(originalCameraEnabled&&!isGbTrack&&!isMcTrack){
    const float* color=isScTrack?scZeroSky.clearRgba():skyOwner->clearRgba();
    require50DU(color,"actual source camera fog RGB missing");
    const auto channel=[&](unsigned axis){return static_cast<std::uint32_t>(std::lround(color[axis]*255.f));};
@@ -7868,7 +8802,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   renderRequest.track.maximumNormalBytes=isMaSaTrack?16u*1024u*1024u:isGaTrack?8u*1024u*1024u:
       trackSession->originalStaticCandidates?4u*1024u*1024u:2u*1024u*1024u;
   if(trackSession->originalStaticCandidates&&!isRcTrack){
-   const auto* projectionUvs=tbOriginalWorld?tbOriginalWorld->projectionUvs():tcOriginalWorld?tcOriginalWorld->projectionUvs():scOriginalWorld?scOriginalWorld->projectionUvs():mbOriginalWorld?mbOriginalWorld->projectionUvs():gaOriginalWorld?gaOriginalWorld->projectionUvs():maOriginalWorld?maOriginalWorld->projectionUvs():
+   const auto* projectionUvs=mcOriginalWorld?mcOriginalWorld->projectionUvs():gbOriginalWorld?gbOriginalWorld->projectionUvs():tbOriginalWorld?tbOriginalWorld->projectionUvs():tcOriginalWorld?tcOriginalWorld->projectionUvs():scOriginalWorld?scOriginalWorld->projectionUvs():mbOriginalWorld?mbOriginalWorld->projectionUvs():gaOriginalWorld?gaOriginalWorld->projectionUvs():maOriginalWorld?maOriginalWorld->projectionUvs():
        saOriginalWorld?saOriginalWorld->projectionUvs():trackMaterialOwner->projectionUvs();
    require50DU(projectionUvs,"original GC projected UV publication missing");
    renderRequest.track.sourceProjectionUvs=projectionUvs->data();
@@ -7882,16 +8816,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   renderRequest.track.maximumVertexBytes=isMaSaTrack?32u*1024u*1024u:isGaTrack?16u*1024u*1024u:
       trackSession->originalStaticCandidates?8u*1024u*1024u:4u*1024u*1024u;
   renderRequest.track.maximumIndexBytes=isMaSaTrack?16u*1024u*1024u:isGaTrack?8u*1024u*1024u:2u*1024u*1024u;
-  const auto* trackBank=tbOriginalWorld?tbOriginalWorld->bank():rcOriginalWorld?rcOriginalWorld->bank():tcOriginalWorld?tcOriginalWorld->bank():scOriginalWorld?scOriginalWorld->bank():mbOriginalWorld?mbOriginalWorld->bank():taOriginalWorld?taOriginalWorld->bank():gaOriginalWorld?gaOriginalWorld->bank():maOriginalWorld?maOriginalWorld->bank():
+  const auto* trackBank=mcOriginalWorld?mcOriginalWorld->bank():gbOriginalWorld?gbOriginalWorld->bank():tbOriginalWorld?tbOriginalWorld->bank():rcOriginalWorld?rcOriginalWorld->bank():tcOriginalWorld?tcOriginalWorld->bank():scOriginalWorld?scOriginalWorld->bank():mbOriginalWorld?mbOriginalWorld->bank():taOriginalWorld?taOriginalWorld->bank():gaOriginalWorld?gaOriginalWorld->bank():maOriginalWorld?maOriginalWorld->bank():
        saOriginalWorld?saOriginalWorld->bank():trackMaterialOwner->bank();
-  const auto* trackSpans=tbOriginalWorld?tbOriginalWorld->spans():rcOriginalWorld?rcOriginalWorld->spans():tcOriginalWorld?tcOriginalWorld->spans():scOriginalWorld?scOriginalWorld->spans():mbOriginalWorld?mbOriginalWorld->spans():taOriginalWorld?taOriginalWorld->spans():gaOriginalWorld?gaOriginalWorld->spans():maOriginalWorld?maOriginalWorld->spans():
+  const auto* trackSpans=mcOriginalWorld?mcOriginalWorld->spans():gbOriginalWorld?gbOriginalWorld->spans():tbOriginalWorld?tbOriginalWorld->spans():rcOriginalWorld?rcOriginalWorld->spans():tcOriginalWorld?tcOriginalWorld->spans():scOriginalWorld?scOriginalWorld->spans():mbOriginalWorld?mbOriginalWorld->spans():taOriginalWorld?taOriginalWorld->spans():gaOriginalWorld?gaOriginalWorld->spans():maOriginalWorld?maOriginalWorld->spans():
        saOriginalWorld?saOriginalWorld->spans():trackMaterialOwner->spans();
   require50DU(trackBank&&trackSpans,"selected-track material publication missing");
   std::vector<platform::MaterialTextureSampler50EB> trackSamplers(trackBank->textureCount(),
       {platform::MaterialTextureFilter50EB::linear,platform::MaterialTextureFilter50EB::linear,
        platform::MaterialTextureWrap50EB::repeat,platform::MaterialTextureWrap50EB::repeat});
   if(trackSession->originalStaticCandidates||taOriginalDisc){
-   const auto* selected=tbOriginalWorld?tbOriginalWorld->selections():rcOriginalWorld?rcOriginalWorld->selections():tcOriginalWorld?tcOriginalWorld->selections():scOriginalWorld?scOriginalWorld->selections():mbOriginalWorld?mbOriginalWorld->selections():taOriginalWorld?taOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():maOriginalWorld?maOriginalWorld->selections():
+   const auto* selected=mcOriginalWorld?mcOriginalWorld->selections():gbOriginalWorld?gbOriginalWorld->selections():tbOriginalWorld?tbOriginalWorld->selections():rcOriginalWorld?rcOriginalWorld->selections():tcOriginalWorld?tcOriginalWorld->selections():scOriginalWorld?scOriginalWorld->selections():mbOriginalWorld?mbOriginalWorld->selections():taOriginalWorld?taOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():maOriginalWorld?maOriginalWorld->selections():
        saOriginalWorld?saOriginalWorld->selections():trackMaterialOwner->selections();
    require50DU(selected,"original GC sampler selections missing");
    for(const auto& entry:*selected){
@@ -7918,12 +8852,13 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        platform::VehicleWindowMaterialMode50DS::untextured:
        platform::VehicleWindowMaterialMode50DS::requiredTexture;
    binding.material.textureIndex=span.textureIndex;
-   const auto* trackSelections=tbOriginalWorld?tbOriginalWorld->selections():rcOriginalWorld?rcOriginalWorld->selections():tcOriginalWorld?tcOriginalWorld->selections():scOriginalWorld?scOriginalWorld->selections():mbOriginalWorld?mbOriginalWorld->selections():taOriginalWorld?taOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():maOriginalWorld?maOriginalWorld->selections():
+   const auto* trackSelections=mcOriginalWorld?mcOriginalWorld->selections():gbOriginalWorld?gbOriginalWorld->selections():tbOriginalWorld?tbOriginalWorld->selections():rcOriginalWorld?rcOriginalWorld->selections():tcOriginalWorld?tcOriginalWorld->selections():scOriginalWorld?scOriginalWorld->selections():mbOriginalWorld?mbOriginalWorld->selections():taOriginalWorld?taOriginalWorld->selections():gaOriginalWorld?gaOriginalWorld->selections():maOriginalWorld?maOriginalWorld->selections():
        saOriginalWorld?saOriginalWorld->selections():trackMaterialOwner->selections();
    require50DU(trackSelections&&span.materialSelection<trackSelections->size(),"selected-track material selection missing");
    material_alpha50gx_fixture::Policy alpha{};
    const auto& sourceSelection=(*trackSelections)[span.materialSelection];
-   const bool alphaSelected=tbOriginalWorld?
+   const bool alphaSelected=mcOriginalWorld?mcOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):gbOriginalWorld?
+       gbOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):tbOriginalWorld?
        tbOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):rcOriginalWorld?
        rcOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):tcOriginalWorld?
        tcOriginalWorld->alpha(span.materialSelection,gameplayBinderTemplates,originalMainApplication.materialRuntime,alpha):scOriginalWorld?
@@ -7996,6 +8931,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    if(isScTrack&&scLavaUv.rows(static_cast<std::uint32_t>(trackBindings.size())))
     require50DU(scLavaUv.bindRenderSpan(static_cast<std::uint32_t>(trackBindings.size()),binding),
         "SC exact two-pass lava span lowering rejected");
+   if(isMcTrack&&mcShieldUv.rows(static_cast<std::uint32_t>(trackBindings.size())))
+    require50DU(mc_shield_render50MC::bind(mcShieldUv,*mcOriginalWorld,static_cast<std::uint32_t>(trackBindings.size()),binding),"MC actual unique shield UV span rejected");
    if(isTbTrack&&tbShieldUv.rows(static_cast<std::uint32_t>(trackBindings.size())))
     require50DU(tbShieldUv.bindRenderSpan(static_cast<std::uint32_t>(trackBindings.size()),binding),
         "TB actual shield span lowering rejected");
@@ -8048,9 +8985,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   require50DU(!isRaTrack||raSky,"actual RA authored sky publication missing");
   std::vector<platform::VehicleWindowTrackSpan50DS> skyBindings;
   if(!isScTrack){
-  const auto* skyBank=isRaTrack?raSky->bank():skyOwner->bank();
-  const auto* skyMesh=isRaTrack?raSky->mesh():skyOwner->mesh();
-  const auto* skySpans=isRaTrack?raSky->spans():skyOwner->spans();
+  const auto* skyBank=isRaTrack?raSky->bank():isMcTrack?mcSkyOwner->bank():skyOwner->bank();
+  const auto* skyMesh=isRaTrack?raSky->mesh():isMcTrack?mcSkyOwner->mesh():skyOwner->mesh();
+  const auto* skySpans=isRaTrack?raSky->spans():isMcTrack?mcSkyOwner->spans():skyOwner->spans();
   require50DU(skyBank&&skyMesh&&skySpans,"actual sky publication missing");
   std::vector<platform::MaterialTextureSampler50EB> skySamplers(skyBank->textureCount(),
       {platform::MaterialTextureFilter50EB::linear,platform::MaterialTextureFilter50EB::linear,
@@ -8058,7 +8995,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   auto skyTextureRequest=textureRequest;
   skyTextureRequest.samplers=skySamplers.data();
   skyTextureRequest.samplerCount=static_cast<std::uint32_t>(skySamplers.size());
-  skyTextureRequest.maximumGpuBytes=48u*128u*128u*4u;
+  skyTextureRequest.maximumGpuBytes=(isGbTrack?90u:48u)*128u*128u*4u;
   require50DU(skyGpuTextures.create(skyTextureRequest,*skyBank,textureDiagnostic),
       "actual selected-track sky texture upload failed");
   skyBindings.reserve(skySpans->size());
@@ -8136,6 +9073,18 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        originalMainApplication.materialRuntime,textureDiagnostic),"TB actual door texture upload failed");
    require50DU(tbDynamicWindow.bindRequest(renderRequest,*tbDoorRuntime),"TB actual door renderer publication failed");
   }
+  if(isGbTrack){
+   require50DU(gbAnimationRuntime&&gbAnimationRuntime->ready()&&gbDynamicWindow.loaded(),"GB actual four-animation source unavailable before GPU creation");
+   require50DU(gbDynamicWindow.createGpu(textureRequest,*gbAnimationRuntime,gameplayBinderTemplates,
+       originalMainApplication.materialRuntime,textureDiagnostic),"GB actual four-animation texture upload failed");
+   require50DU(gbDynamicWindow.bindRequest(renderRequest,*gbAnimationRuntime),"GB actual four-animation renderer publication failed");
+  }
+  if(isMcTrack){
+   require50DU(mcAnimationRuntime&&mcAnimationRuntime->ready()&&mcDynamicWindow.loaded(),"MC actual fourteen-animation source unavailable before GPU creation");
+   require50DU(mcDynamicWindow.createGpu(textureRequest,*mcAnimationRuntime,gameplayBinderTemplates,
+       originalMainApplication.materialRuntime,textureDiagnostic),"MC actual fourteen-animation texture upload failed");
+   require50DU(mcDynamicWindow.bindRequest(renderRequest,*mcAnimationRuntime),"MC actual fourteen-animation renderer publication failed");
+  }
   if(saAnimatedWorld){
    require50DU(saDynamicWindow.createGpu(textureRequest,*saAnimatedWorld,gameplayBinderTemplates,
        originalMainApplication.materialRuntime,textureDiagnostic),"SA actual dynamic texture upload failed");
@@ -8157,9 +9106,31 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
    require50DU(tbAtm.createGpu(textureRequest,textureDiagnostic),"TB actual ATM GPU bank rejected");
    require50DU(tbAtm.bindRequest(renderRequest),"TB actual ATM renderer binding rejected");
   }
+  if(gbAtm.loaded()){
+   require50DU(gbAtm.createGpu(textureRequest,textureDiagnostic),"GB actual ATM GPU bank rejected");
+   require50DU(gbAtm.bindRequest(renderRequest),"GB actual ATM renderer binding rejected");
+  }
+  if(mcAtm.loaded()){
+   require50DU(mcAtm.createGpu(textureRequest,textureDiagnostic),"MC actual ATM GPU bank rejected");
+   require50DU(mcAtm.bindRequest(renderRequest),"MC actual ATM renderer binding rejected");
+  }
   if(rcAtm.loaded()){
    require50DU(rcAtm.createGpu(textureRequest,textureDiagnostic),"RC actual ATM GPU bank rejected");
    require50DU(rcAtm.bindRequest(renderRequest),"RC actual ATM renderer binding rejected");
+  }
+  if(isGbTrack){
+   const platform::MaterialTextureSampler50EB sampler{platform::MaterialTextureFilter50EB::linear,
+       platform::MaterialTextureFilter50EB::linear,platform::MaterialTextureWrap50EB::repeat,platform::MaterialTextureWrap50EB::repeat};
+   auto request=textureRequest;request.samplers=&sampler;request.samplerCount=1;
+   require50DU(gbParticleWindow&&gbParticleWindow->createGpu(request,textureDiagnostic),
+       "GB exact canonical particle atlas upload rejected");
+  }
+  if(isMcTrack){
+   const platform::MaterialTextureSampler50EB sampler{platform::MaterialTextureFilter50EB::linear,
+       platform::MaterialTextureFilter50EB::linear,platform::MaterialTextureWrap50EB::repeat,platform::MaterialTextureWrap50EB::repeat};
+   auto request=textureRequest;request.samplers=&sampler;request.samplerCount=1;
+   require50DU(mcParticleWindow&&mcParticleWindow->createGpu(request,textureDiagnostic),
+       "MC exact canonical particle atlas upload rejected");
   }
   if(isRcTrack){
    const platform::MaterialTextureSampler50EB sampler{platform::MaterialTextureFilter50EB::linear,
@@ -8185,6 +9156,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   if(!sourceDisplayLifetime->create(renderRequest,playerDrawAssets,rendererDiagnostic)){
    reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("window vehicle renderer creation failed");
   }
+  if(isMcTrack){require50DU(mcQueryBinding&&mcQueryBinding->activateQueries(),"MC actual final renderer/query admission rejected");if(!originalUiActive&&race.phase==race_session50HM::Phase::Uninitialized)activateColdRace();}
+  if(isGbTrack){
+   // Only real Window creation may publish the renderer association. The
+   // aggregate/Bank issuer can now open genuine queries, without requiring
+   // an earlier positive particle span or fabricated first-draw receipt.
+   require50DU(gbParticleRender&&gbParticleRender->ready()&&gbQueryBinding&&
+       gbQueryBinding->activateRenderer(gbParticleRender),"GB actual final renderer/query admission rejected");
+   require50DU(gbQueryBinding->commitListeners(nullptr,0),"GB initial empty listener commit rejected");
+   if(!originalUiActive&&race.phase==race_session50HM::Phase::Uninitialized)activateColdRace();
+  }
   if(isGaTrack){
    // Actual cold owner/GPU state after successful renderer creation. No
    // fabricated trigger hits or rendered-frame counts enter this receipt.
@@ -8201,6 +9182,10 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   }
   auto publishSourceCameraFog=[&](){
    if(!originalCameraEnabled||!renderRequest.track.worldFog.enabled)return;
+   require50DU(!isMcTrack||(mcFogOwner&&mcFogOwner->ready()&& &sourceTrackFog==mcFogOwner->cameraFields()),
+       "MC source camera lost its actual same-owner fog fields");
+   require50DU(!isGbTrack||(gbFogOwner&&gbFogOwner->ready()&& &sourceTrackFog==gbFogOwner->cameraFields()),
+       "GB current camera fog storage identity differs");
    auto fog=renderRequest.track.worldFog;
    fog.start=sourceTrackFog.start34;fog.end=sourceTrackFog.end38;
    require50DU(renderer.updateWorldFog(fog,rendererDiagnostic),"original camera fog publication rejected");
@@ -8219,7 +9204,34 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        platform::OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0);
    if(humanCourseEnabled)sourceEndingFade=std::make_unique<platform::OriginalVideoBlockingNativeBackend>(renderer,host,
        platform::OriginalVideoNativeUse::asyncFrozenUnderlay25B5D0);
-   if(isTbTrack){
+   if(isMcTrack){
+    requireMbRuntimeNavigation50MB();
+    const auto pods=runtime_asset_paths50LB::resolve("work/native/project/disc/PODS");
+    const auto camBytes=std::filesystem::file_size(pods/playerPodId/(playerPodId+".CAM"));
+    reserveMcEnvironment(static_cast<std::size_t>(camBytes),"MC retained CAM exceeds remaining payload");
+    reserveMcEnvironment(4u*186642u,"MC TOB authentication scratch exceeds remaining payload");
+    std::string error;
+    require50DU(mcSourceCameraAssets&&mcSourceCameraAssets->prepare(mcColdSources,pods,playerPodId,racerRigs[0]->phy,error),error.c_str());
+    require50DU(mcSourceCameraAssets->sourceIdentity()==mcColdSources.get()&&
+        mcSourceCameraAssets->camBytes()==camBytes&&mcSourceCameraAssets->camCapacity()<=camBytes&&
+        mcSourceCameraAssets->inputs()->tob==mcColdSources->triggerParameters().original_bytes.data(),
+        "MC selected CAM/retained TOB differs from same-source reservation");
+   }
+   else if(isGbTrack){
+    requireMbRuntimeNavigation50MB();
+    require50DU(gbSourceCameraAssets&&gbColdSources&&gbColdSources->ready(),"GB scoped camera source unavailable");
+    const auto path=runtime_asset_paths50LB::resolve(
+        std::filesystem::path("work/native/project/disc/PODS")/playerPodId/(playerPodId+".CAM"));
+    const auto camBytes=std::filesystem::file_size(path);
+    require50DU(camBytes&&camBytes<=gbRemainingPayloadBytes(),"GB selected CAM exceeds remaining payload");
+    reserveGbAdditionalPayload(static_cast<std::size_t>(camBytes),"GB retained CAM exceeds remaining payload");
+    reserveGbAdditionalPayload(4u*20617u,"GB retained TOB authentication scratch exceeds remaining payload");
+    sourceCameraAssets.loadGb(*trackSession,playerPodId,racerRigs[0]->phy,gbColdSources);
+    require50DU(sourceCameraAssets.cam.size()==camBytes&&sourceCameraAssets.cam.capacity()<=camBytes&&
+        sourceCameraAssets.tob.empty()&&sourceCameraAssets.inputs.tob==gbColdSources->originalTob().data(),
+        "GB actual CAM allocation/retained TOB differs from its reserved source");
+   }
+   else if(isTbTrack){
     requireMbRuntimeNavigation50MB();
     require50DU(tbSourceCameraAssets&&tbColdSources&&tbColdSources->ready(),"TB scoped camera source unavailable");
     const auto path=runtime_asset_paths50LB::resolve(
@@ -8307,27 +9319,42 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
        trackMaterialRequest.canonicalDomain?trackMaterialRequest.canonicalDomain->materials382B38():nullptr,
        trackMaterialRequest.canonicalDomain?&originalMainApplication.materialDirectory36B970():nullptr,
        trackMaterialRequest.canonicalDomain?&racerRigs:nullptr,
-       trackMaterialRequest.canonicalDomain?(isTbTrack?tbTrackParticles.get():isRcTrack?rcTrackParticles.get():&nativeTaParticles):nullptr,
-       trackMaterialRequest.canonicalDomain?&actualHeight.sourceDomain:nullptr,
+       trackMaterialRequest.canonicalDomain?(isMcTrack?mcTrackParticles.get():isGbTrack?gbTrackParticles.get():isTbTrack?tbTrackParticles.get():isRcTrack?rcTrackParticles.get():&nativeTaParticles):nullptr,
+       trackMaterialRequest.canonicalDomain?&selectedRuntimeHeightDomain:nullptr,
        trackMaterialRequest.canonicalDomain?&nativeRightModels:nullptr,
        trackMaterialRequest.canonicalDomain?&nativeLeftModels:nullptr,
        trackMaterialRequest.canonicalDomain?&nativeChariotModels:nullptr,
        trackMaterialRequest.canonicalDomain?&nativeBottomRightModels:nullptr,
        trackMaterialRequest.canonicalDomain?&nativeBottomLeftModels:nullptr,
        originalMainApplication.animationClock(),&sourceCameraCables,
-       directOriginalHuman&&!isMbTrack&&!isTcTrack&&!isTbTrack?navigationMap:nullptr,
+       directOriginalHuman&&!isMbTrack&&!isTcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack?navigationMap:nullptr,
        directOriginalHuman&&isMbTrack?mbMapView:TrackNavigationView50EU{},
        directOriginalHuman&&isTcTrack?tcMapView:TrackNavigationView50TC{},
-       directOriginalHuman&&isTbTrack?tbMapView:TrackNavigationView50TB{}});
-   const auto prepared=sourceCameraSession->prepare(sessionIndex+1,sourceCameraAssets.inputs,*sourceCameraDisplay);
+       directOriginalHuman&&isTbTrack?tbMapView:TrackNavigationView50TB{},
+       directOriginalHuman&&isGbTrack?gbMapView:TrackNavigationView50GB{},
+       directOriginalHuman&&isMcTrack?mcMapView:TrackNavigationView50MC{}});
+   const auto prepared=sourceCameraSession->prepare(sessionIndex+1,isMcTrack?*mcSourceCameraAssets->inputs():sourceCameraAssets.inputs,*sourceCameraDisplay);
    if(prepared.status!=sourceCamera::Status::complete)std::cerr<<"original_camera_cold_rejected status="
        <<static_cast<unsigned>(prepared.status)<<" source_pc="<<prepared.sourcePC
+       <<" visibility_join_status="<<static_cast<unsigned>(prepared.visibilityJoin.status)
+       <<" visibility_owner_status="<<static_cast<unsigned>(prepared.visibilityJoin.owner.status)
+       <<" visibility_owner_pc="<<prepared.visibilityJoin.owner.sourcePC
+       <<" visibility_registration_status="<<static_cast<unsigned>(prepared.visibilityJoin.registration.status)
+       <<" visibility_scene_attached="<<prepared.visibilityJoin.sceneAttached
+       <<" entity_cold_status="<<static_cast<unsigned>(prepared.entityCold.status)
+       <<" entity_cold_pc="<<prepared.entityCold.sourcePC
        <<" follow_query_pc="<<sourceFollowQueries->diagnostic().sourcePC
-       <<" follow_query="<<sourceFollowQueries->diagnostic().message<<'\n';
+       <<" follow_query_diagnostic_may_be_unreached="<<sourceFollowQueries->diagnostic().message<<'\n';
    require50DU(prepared.status==sourceCamera::Status::complete,"original camera cold source join rejected");
    if(isTbTrack){accountTbParticleRegistry();tbParticleRegistryFinalAccounted=true;}
    if(isRcTrack){accountRcParticleRegistry();rcParticleRegistryFinalAccounted=true;}
    }
+   // Demand comes from actual retained consumers, not a course-name list.
+   // TB owns the canonical pool without a separate numeric renderer. RA has
+   // its separate static-fog observation phase and has none of these owners.
+   if(nativeGcWater||rcParticleRender||tbTrackParticles||gbParticleRender||mcParticleRender)
+    require50DU(sourceCameraSession&&sourceCameraSession->bindGameplayFogRenderPhase(sourceFogRenderPhase),
+        "actual selected render consumer fog phase binding rejected");
    // Pause draw admission pins FINAL: finish only after every real HUD/camera
    // resource retain and population call above has completed.
    if(consumedRaStage.race()&&!originalMainApplication.finishPauseDrawCold50LA(sourcePause)){
@@ -8464,24 +9491,35 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       return failManual(0x124cb0u,"actual reset world registration queue is pending");
      const auto queries=recoveryQueries();const auto& relative=x.secondaryInputs.targetRelative2F0;
      const VisualVector49R target{{relative.v[0],relative.v[1],relative.v[2],relative.v[3]}};
-     using RecoveryOwners50MB=std::variant<native_original_human_recovery::Owners,native_original_human_recovery::Owners50MB,native_original_human_recovery::Owners50TC,native_original_human_recovery::Owners50TB>;
-     RecoveryOwners50MB owners=isTbTrack?
+     auto mcActualHeightDomain=selectedRuntimeHeightDomain;
+     if(isMcTrack)require50DU(mcWaterOwner&&mcWaterOwner->bindResetDomain(selectedRuntimeHeightDomain,
+         terrainOwner.lift1F0,mcActualHeightDomain),"MC human reset requires actual same-runtime water334 and live348 lift");
+     using RecoveryOwners50MB=std::variant<native_original_human_recovery::Owners,native_original_human_recovery::Owners50MB,native_original_human_recovery::Owners50TC,native_original_human_recovery::Owners50TB,native_original_human_recovery::Owners50GB,native_original_human_recovery::Owners50MC>;
+     RecoveryOwners50MB owners=isMcTrack?
+         RecoveryOwners50MB{native_original_human_recovery::Owners50MC{gcLightOwner,racerCables[0]->visibility50(),
+         controllerD40,lapContinuity.prefix,*field24C,mcMapView,mcActualHeightDomain,
+         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
+         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isGbTrack?
+         RecoveryOwners50MB{native_original_human_recovery::Owners50GB{gcLightOwner,racerCables[0]->visibility50(),
+         controllerD40,lapContinuity.prefix,*field24C,gbMapView,selectedRuntimeHeightDomain,
+         resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
+         *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:isTbTrack?
          RecoveryOwners50MB{native_original_human_recovery::Owners50TB{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,tbMapView,actualHeight.sourceDomain,
+         controllerD40,lapContinuity.prefix,*field24C,tbMapView,selectedRuntimeHeightDomain,
          resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
          *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
          isTcTrack?
          RecoveryOwners50MB{native_original_human_recovery::Owners50TC{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,tcMapView,actualHeight.sourceDomain,
+         controllerD40,lapContinuity.prefix,*field24C,tcMapView,selectedRuntimeHeightDomain,
          resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
          *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
          isMbTrack?
          RecoveryOwners50MB{native_original_human_recovery::Owners50MB{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,mbMapView,actualHeight.sourceDomain,
+         controllerD40,lapContinuity.prefix,*field24C,mbMapView,selectedRuntimeHeightDomain,
          resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
          *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}}:
          RecoveryOwners50MB{native_original_human_recovery::Owners{gcLightOwner,racerCables[0]->visibility50(),
-         controllerD40,lapContinuity.prefix,*field24C,*navigationMap,actualHeight.sourceDomain,
+         controllerD40,lapContinuity.prefix,*field24C,*navigationMap,selectedRuntimeHeightDomain,
          resetGlobals,resetLifecycle,target,queries,zoneLifecycle,liveWorld,membershipWork,
          *originalResetGround,originalRecoveryModels,resetEffectBindings,nativeEffects,nativeEffectCount}};
      const std::uint32_t resetBeforePositionBits[3]={
@@ -8985,13 +10023,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      if(menuEvents[event])originalMain.input(static_cast<std::uint8_t>(event));
     const auto uiNow=monotonicNow50DU();
     const std::uint64_t elapsedNanoseconds=originalMain.acceptedElapsed(uiNow);
-    const float elapsed=static_cast<float>(double(elapsedNanoseconds)/1000000000.0);
-    // Real elapsed frame delta; no synthetic fixed ticks, clamping or RNG
-    // reseed. An unsupported long stall fails through the source session gate.
+    const float elapsed=originalMain.preparedSourceUpdateSeconds();
+    // Recovered capped Application dispatch factor, one real source update.
+    // The complete measured wall interval still advances PCM independently;
+    // material timestamps retain their existing uncapped source clock.
     platform::OriginalUiMainSessionUpdate50KG update;update.elapsedSeconds=elapsed;
     // This original-UI keyboard mapping has no original debug-button bindings.
     // Its four debug-query levels therefore remain actually released.
     originalMain.update(update,elapsedNanoseconds);
+    originalMain.commitSourceUpdateTiming();
     originalMain.render(mainClock,renderer,info.drawableWidth,info.drawableHeight);
     // video+84 suspends publication while the two genuine hidden incoming
     // frames are prepared. Do not swap stale/undefined window BACK contents or
@@ -9274,7 +10314,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }else{
      recovery50FI::Plan manualCheckpoint{};recovery50FI::Diagnostic manualDiagnostic{};
      BodyMatrix48G manualGrounded{};
-     require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack,"MB/TC/RC/TB native session cannot enter legacy HOST checkpoint prepareManualCheckpoint");
+     require50DU(!isMbTrack&&!isTcTrack&&!isRcTrack&&!isTbTrack&&!isGbTrack&&!isMcTrack,"MB/TC/RC/TB/GB/MC native session cannot enter legacy HOST checkpoint prepareManualCheckpoint");
      const bool prepared=recovery50FI::prepareManualCheckpoint(*navigationMap,navigationProgress,s,
          x.bindings,x.parameters.visual.verticalLimit7EC,liveWorld,manualCheckpoint,manualDiagnostic);
      const bool grounded=prepared&&recovery50FI::resolveGround(ground,manualCheckpoint,16,0,
@@ -9947,8 +10987,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      nativeLightFailure("publishNativeDraw rejected",0,lightLease);
     } //229EF4 semantic publication ends; only completed copied packet survives.
     projectionTiming.finish();
-    if(nativeGcWater||isRcTrack||isTbTrack)require50DU(sourceCameraSession&&
-        sourceCameraSession->prepareGameplayFogRender().status==sourceCamera::Status::complete,
+    if(sourceFogRenderPhase.bound())require50DU(
+        sourceFogRenderPhase.prepare(sourceCameraSession.get()).status==sourceCamera::Status::complete,
         "actual shared camera fog render phase rejected");
     render_diagnostics50GQ::Scope cameraTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::HostCamera);
     const auto& position=m.components.root.body.position;
@@ -10030,6 +11070,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      // eye/target are metadata for fog/audio/read-only capture diagnostics;
      // world/sky matrices above remain the exact recovered source outputs.
      audioListener={camera.eye[0],camera.eye[2]};audioListenerReady=true;
+     if(isGbTrack){const Vector3_48C committed{{camera.eye[0],0.f,camera.eye[2]}};
+      require50DU(gbQueryBinding&&gbQueryBinding->commitListeners(&committed,1),"GB actual accepted camera listener commit rejected");}
     }else{
     // Host chase-camera policy follows the actual main scene heading. This
     // changes only presentation; it is not the original camera controller.
@@ -10050,6 +11092,8 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     if(framingDiagnostic.limited)++cameraLimitedFrames;
     camera=framedCamera;
     audioListener={camera.eye[0],camera.eye[2]};audioListenerReady=true;
+    if(isGbTrack){const Vector3_48C committed{{camera.eye[0],0.f,camera.eye[2]}};
+     require50DU(gbQueryBinding&&gbQueryBinding->commitListeners(&committed,1),"GB actual camera listener commit rejected");}
     platform::VehicleViewCameraError50DG cameraError{};
     require50DU(platform::composeVehicleViewCamera50DG(camera,view,cameraError),
                 "host chase camera rejected live pose");
@@ -10155,7 +11199,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     // Original viewport clear consumes the authenticated track Fog.ColorRGB.
     // Unauthored sky tiles remain absent; do not invent lower sky geometry.
-    const float* clearColor=isScTrack?scZeroSky.clearRgba():isRaTrack?raSky->clearRgba():skyOwner->clearRgba();
+    const float* clearColor=isScTrack?scZeroSky.clearRgba():isRaTrack?raSky->clearRgba():isMcTrack?mcSkyOwner->clearRgba():skyOwner->clearRgba();
     require50DU(clearColor,"authored track clear color unavailable");
     hudTiming.finish();
     EngineFlareOutput50GV flameOutput{};EngineFlareDiagnostic50GV flameDiagnostic{};
@@ -10186,7 +11230,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      renderFrame.sourceBodyCameraOwner50LA=reinterpret_cast<std::uintptr_t>(sourceCameraSession.get());
      renderFrame.sourceBodyCameraPublication50LA=sourceCameraSession->publicationCount();
     }
-    if(specularGpuTextures50LA.initialized()){
+    if(std::any_of(racerVisuals.begin(),racerVisuals.end(),[](const auto& visual){return visual&&visual->hasCanonicalBodyColors50LA();})){
      // One genuine camera publication is shared by all paired bodies, even
      // stopped racers whose geometry/light packets remain retained. This is
      // view-dependent model preparation below the existing gameplay pause
@@ -10197,12 +11241,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      renderFrame.sourceBodyCameraOwner50LA=reinterpret_cast<std::uintptr_t>(sourceCameraSession.get());
      renderFrame.sourceBodyCameraPublication50LA=sourceCameraSession->publicationCount();
      renderFrame.sourceBodyFog50LA=&sourceTrackFog;
+     renderFrame.sourceDiffuseCamera50LA=sourceCameraSession->racerDiffuseCamera();
      renderFrame.sourceBodyGlobals50LA=sourceModelRenderGlobals.get();
+     if(racerVisuals[0]&&racerVisuals[0]->hasCanonicalBodyColors50LA()){
      renderFrame.sourceBodyModelPackets50LA={{nativeLeftModels[0]->modelPackets(),
          nativeRightModels[0]->modelPackets()}};
      if(racerRigs[0]->modelCount==5){
       renderFrame.sourceBodyModelPackets50LA[2]=nativeBottomLeftModels[0]->modelPackets();
       renderFrame.sourceBodyModelPackets50LA[3]=nativeBottomRightModels[0]->modelPackets();
+     }
      }
     }
     if(sourceRaceHudRendering&&sourceCameraSession&&sourceCameraSession->nativeHudVisible())
@@ -10291,12 +11338,16 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     if(gaAnimatedWorld)require50DU(gaDynamicWindow.bindFrame(renderFrame,*gaAnimatedWorld),"original GA dynamic frame publication failed");
     if(isTcTrack)require50DU(tcGateRuntime&&tcDynamicWindow.bindFrame(renderFrame,*tcGateRuntime),"TC actual gate dynamic frame publication failed");
     if(isTbTrack)require50DU(tbDoorRuntime&&tbDynamicWindow.bindFrame(renderFrame,*tbDoorRuntime),"TB actual door dynamic frame publication failed");
+    if(isMcTrack)require50DU(mcAnimationRuntime&&mcDynamicWindow.bindFrame(renderFrame,*mcAnimationRuntime),"MC actual14-animation dynamic frame publication rejected");
+    if(isGbTrack)require50DU(gbAnimationRuntime&&gbDynamicWindow.bindFrame(renderFrame,*gbAnimationRuntime),"GB actual four-animation dynamic frame publication failed");
     if(gaAtm.loaded())require50DU(gaAtm.bindFrame(renderFrame),"original GA ATM frame selection rejected");
     if(saAnimatedWorld)require50DU(saDynamicWindow.bindFrame(renderFrame,*saAnimatedWorld),"SA actual dynamic frame publication failed");
     if(maSaAtm.loaded())require50DU(maSaAtm.bindFrame(renderFrame),"MA/SA actual ATM frame selection rejected");
     if(mbAtm.loaded())require50DU(mbAtm.bindFrame(renderFrame),"MB actual ATM frame selection rejected");
     if(scAtm.loaded())require50DU(scAtm.bindFrame(renderFrame),"SC actual ATM frame selection rejected");
     if(tbAtm.loaded())require50DU(tbAtm.bindFrame(renderFrame),"TB actual ATM frame selection rejected");
+    if(mcAtm.loaded())require50DU(mcAtm.bindFrame(renderFrame),"MC actual ATM frame selection rejected");
+    if(gbAtm.loaded())require50DU(gbAtm.bindFrame(renderFrame),"GB actual ATM frame selection rejected");
     if(rcAtm.loaded())require50DU(rcAtm.bindFrame(renderFrame),"RC actual ATM frame selection rejected");
     if(tcAtm.loaded())require50DU(tcAtm.bindFrame(renderFrame),"TC actual ATM frame selection rejected");
     renderFrame.materialUvs=playerFlameUvs.data();
@@ -10304,7 +11355,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // TC has an actual48-tile sky request and retains the matching matrix.
     // Only authenticated zero-sky SC omits both indices and matrix.
     renderFrame.skyWorldViewProjection=isScTrack?nullptr:skyView.worldViewProjection;
-    if(isMaSaTrack||isMbTrack||isRaTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack){
+    if(isMaSaTrack||isMbTrack||isRaTrack||isScTrack||isTcTrack||isRcTrack||isTbTrack||isGbTrack||isMcTrack){
      std::uint32_t cameraZone48=0;
      require50DU(sourceCameraSession&&sourceCameraSession->readCameraPrimaryZone48(cameraZone48)&&
          (isScTrack?scZeroSky.select(cameraZone48,renderFrame.skyEnabled):isRaTrack?raWorld->sampleSky(cameraZone48,renderFrame.skyEnabled):
@@ -10384,7 +11435,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       opponents[nextRacePresentation.submittedOpponents++]={opponentDraw[index].batch(),&opponentDraw[index].cables,
           opponentUvs[index].data(),static_cast<std::uint32_t>(opponentUvs[index].size()),
           static_cast<std::uint32_t>(racer)};
-      if(opponentSpecularGpuTextures50LA[index].initialized()){
+      if(racerVisuals[racer]&&racerVisuals[racer]->hasCanonicalBodyColors50LA()){
        opponents[nextRacePresentation.submittedOpponents-1u].sourceBodyModelPackets50LA=
            {{nativeLeftModels[racer]->modelPackets(),nativeRightModels[racer]->modelPackets()}};
        if(racerRigs[racer]->modelCount==5){
@@ -10505,6 +11556,24 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      };
      renderFrame.trackUvAnimation=&tbShieldUvFrame;
     }
+    struct McShieldRenderService {
+     mc_shield_uv_fixture::Owner* owner;
+     std::uint32_t timestamp;
+     bool applicationPaused;
+    } mcShieldRender{&mcShieldUv,sourceApplicationTimestamp,sourceApplicationAnimation.pause11C!=0};
+    platform::VehicleWindowTrackUvFrame50DS mcShieldUvFrame;
+    if(mcShieldUv.loaded()){
+     require50DU(sourceApplicationTimestampPublished,"MC UV requires the shared application timestamp publication");
+     mcShieldUvFrame.owner=&mcShieldRender;
+     mcShieldUvFrame.service=[](void* opaque,std::uint32_t span,float& u,float& v) noexcept {
+      auto& input=*static_cast<McShieldRenderService*>(opaque);
+      if(!input.owner->service(span,input.timestamp,input.applicationPaused))return false;
+      const auto* rows=input.owner->rows(span);
+      if(!rows)return false;
+      u=rows->rows[2][0];v=rows->rows[2][1];return true;
+     };
+     renderFrame.trackUvAnimation=&mcShieldUvFrame;
+    }
     struct TcShieldRenderService {
      tc_shield_uv_fixture::Owner* owner;
      std::uint32_t timestamp;
@@ -10543,7 +11612,49 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     }
     render_diagnostics50GQ::Scope submitTiming(renderDiagnostics,render_diagnostics50GQ::Subphase::DriverSubmit);
     bool submitted=false;
-    if(isRcTrack){
+    if(isMcTrack){
+     require50DU(sourceCameraSession&&mcParticleWindow&&mcParticleRender,"MC actual current particle draw owners unavailable");
+     mc_particle_visual50MC::Diagnostic materialDiagnostic;
+     bool materialCallbackEntered=false,rendererCallbackEntered=false;
+     submitted=mcParticleWindow->withMaterial([&](const mc_particle_visual50MC::MaterialBorrow& material,const auto&){
+      materialCallbackEntered=true;
+      return mcParticleRender->withDraw(material,sourceCameraSession,mcParticleRenderDiagnostic,[&](const auto&){
+       rendererCallbackEntered=true;renderFrame.mcParticles=mcParticleRender;
+       struct End{platform::VehicleWindowFrame50DS& frame;~End(){frame.mcParticles.reset();}}end{renderFrame};
+       return renderer.submit(next,renderFrame,rendererDiagnostic);
+      });
+     },materialDiagnostic);
+     if(mcParticleRenderDiagnostic.skippedAuthoredFrame152&&!mcParticleFrame152Notice){
+      mcParticleFrame152Notice=true;std::cerr<<"MC_NATIVE_SAFETY omitted_authored_unallocated_particle_frame=152 count="
+       <<mcParticleRenderDiagnostic.skippedAuthoredFrame152<<" simulation_unchanged=1 synthetic_uv=0\n";
+     }
+     if(!submitted)std::cerr<<"MC_PARTICLE_SUBMIT_REJECT material_callback="<<materialCallbackEntered
+         <<" renderer_callback="<<rendererCallbackEntered<<" material_message="<<materialDiagnostic.message
+         <<" material_status="<<static_cast<unsigned>(materialDiagnostic.material.status)
+         <<" material_pc="<<materialDiagnostic.material.sourcePC
+         <<" numeric_status="<<static_cast<unsigned>(mcParticleRenderDiagnostic.status)
+         <<" numeric_pc="<<mcParticleRenderDiagnostic.sourcePC<<" particles="<<mcParticleRenderDiagnostic.particles
+         <<" quads="<<mcParticleRenderDiagnostic.quads<<" runs="<<mcParticleRenderDiagnostic.runs<<'\n';
+    }else     if(isGbTrack){
+     require50DU(sourceCameraSession&&gbParticleWindow&&gbParticleRender,"GB actual current particle draw owners unavailable");
+     gb_particle_visual50GB::Diagnostic materialDiagnostic;
+     bool materialCallbackEntered=false,rendererCallbackEntered=false;
+     submitted=gbParticleWindow->withMaterial([&](const gb_particle_visual50GB::MaterialBorrow& material,const auto&){
+      materialCallbackEntered=true;
+      return gbParticleRender->withDraw(material,sourceCameraSession,gbParticleRenderDiagnostic,[&](const auto&){
+       rendererCallbackEntered=true;renderFrame.gbParticles=gbParticleRender;
+       struct End{platform::VehicleWindowFrame50DS& frame;~End(){frame.gbParticles.reset();}}end{renderFrame};
+       return renderer.submit(next,renderFrame,rendererDiagnostic);
+      });
+     },materialDiagnostic);
+     if(!submitted)std::cerr<<"GB_PARTICLE_SUBMIT_REJECT material_callback="<<materialCallbackEntered
+         <<" renderer_callback="<<rendererCallbackEntered<<" material_message="<<materialDiagnostic.message
+         <<" material_status="<<static_cast<unsigned>(materialDiagnostic.material.status)
+         <<" material_pc="<<materialDiagnostic.material.sourcePC
+         <<" numeric_status="<<static_cast<unsigned>(gbParticleRenderDiagnostic.status)
+         <<" numeric_pc="<<gbParticleRenderDiagnostic.sourcePC<<" particles="<<gbParticleRenderDiagnostic.particles
+         <<" quads="<<gbParticleRenderDiagnostic.quads<<" runs="<<gbParticleRenderDiagnostic.runs<<'\n';
+    }else if(isRcTrack){
      require50DU(sourceCameraSession&&rcParticleWindow&&rcParticleRender,"RC actual particle draw owners unavailable");
      rc_particle_visual50RC::Diagnostic materialDiagnostic;
      bool materialCallbackEntered=false,rendererCallbackEntered=false;
@@ -10581,6 +11692,7 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     // later display completion or Session close cannot reuse them.
     renderFrame.sourceBodyModelPackets50LA.fill(nullptr);
     renderFrame.sourceBodyFog50LA=nullptr;renderFrame.sourceBodyGlobals50LA=nullptr;
+    renderFrame.sourceDiffuseCamera50LA=nullptr;
     for(auto& opponent:opponents)opponent.sourceBodyModelPackets50LA.fill(nullptr);
     if(!submitted){
      reportRenderer50DU(rendererDiagnostic);
@@ -10748,6 +11860,15 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
       drawn[nativeFireSpanOwner[i]]=drawn[nativeFireSpanOwner[i]]||nativeFireSpanDrawn[i]!=0;
      require50DU(nativeGcWater->completedRender(visibilityReceipt.completedGameplayGeneration,drawn),
          "actual completed native water/fire publication rejected");
+    }
+    if(mcWaterOwner&&actualGameplayImageCompleted){
+     platform::VehicleWindowTrackVisibilityReceipt50DS waterReceipt;
+     require50DU(renderer.completedTrackSpanVisibility(nullptr,nullptr,0,waterReceipt,completionDiagnostic),
+         "MC water requires actual completed gameplay-generation receipt");
+     const auto published=mcWaterOwner->runtime().present(waterReceipt.completedGameplayGeneration,true);
+     require50DU(published.status==WaterPresentationStatus50JC::Published||
+         published.status==WaterPresentationStatus50JC::DuplicateFrame,
+         "MC actual completed view water-origin publication rejected");
     }
     const bool publishAll8Results=allAiEnabled&&originalAiSession.all8FinishAwaitingDisplay&&actualGameplayImageCompleted;
     if(publishAll8Results){
@@ -11178,7 +12299,7 @@ int main(int argc,char**argv){try{
  original_main_entry50KG::Application originalMainApplication(applicationClockOwner,applicationControlsOwner);
  require50DU(!captureRun.navigate()||originalMainApplication.enabled,"unattended original UI route requires Original Main enabled");
  SharedRandomOwner50ID directApplicationRandom{};
- native_gc_water_session50KG::Application nativeWaterApplication;
+ auto nativeWaterGlobals=std::make_shared<native_gc_water_session50KG::Application>();
  // Original Main retains its real source default/selection. This optional
  // native direct-human selector cannot override a genuine UI-owned profile.
  const char* humanPresetSetting=std::getenv("RR_HUMAN_CONTROL_PRESET");
@@ -11230,35 +12351,25 @@ int main(int argc,char**argv){try{
  const bool initialSc=track_session_assets50IG::codeEquals(initialTrack->world->code,"SC");
  const bool initialTc=track_session_assets50IG::codeEquals(initialTrack->world->code,"TC");
  const bool initialRc=track_session_assets50IG::codeEquals(initialTrack->world->code,"RC");
- const char* rcRequestSetting=std::getenv("RR_ORIGINAL_TEST_SCORCH_RC");
- const char* rcModeSetting=std::getenv("RR_RACE_MODE");
- const bool rcNativeWorldRequested=rcRequestSetting&&std::string(rcRequestSetting)=="1"&&
-     rcModeSetting&&std::string(rcModeSetting)=="2"&&rootedHumanCourseSupported&&!startAtMenu&&
-     originalMainApplication.riderProfile&&originalMainApplication.riderProfile->scorchRcTestProfile();
- require50DU(!initialRc||rcNativeWorldRequested,
-     "RC requires the explicit rooted original Scorch/RC profile request and mode2");
+ // Shared native request capability, separate from process-local unlock fixtures.
+ // Catalog authentication and the actual cold loaders still establish resources.
+ const char* sharedCourseMode=std::getenv("RR_RACE_MODE");
+ const char* sharedCourseAllAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+ const bool sharedHumanCourseRequested=rootedHumanCourseSupported&&!startAtMenu&&
+     sharedCourseMode&&std::string(sharedCourseMode)=="2"&&
+     !(sharedCourseAllAi&&std::string(sharedCourseAllAi)=="1");
  const bool initialTb=track_session_assets50IG::codeEquals(initialTrack->world->code,"TB");
- const char* tbRequestSetting=std::getenv("RR_ORIGINAL_TEST_SEBULBA_TB");
- const char* tbModeSetting=std::getenv("RR_RACE_MODE");
- const bool tbNativeWorldRequested=tbRequestSetting&&std::string(tbRequestSetting)=="1"&&
-     tbModeSetting&&std::string(tbModeSetting)=="2"&&rootedHumanCourseSupported&&!startAtMenu&&
-     originalMainApplication.riderProfile&&originalMainApplication.riderProfile->sebulbaTbTestProfile();
- require50DU(!initialTb||tbNativeWorldRequested,
-     "TB requires the explicit rooted original Sebulba/TB profile request and mode2");
- const char* tcRequestSetting=std::getenv("RR_ORIGINAL_TEST_TZIDIK_TC");
- const bool tcNativeWorldRequested=tcRequestSetting&&std::string(tcRequestSetting)=="1"&&
-     rootedHumanCourseSupported&&!startAtMenu&&originalMainApplication.riderProfile&&
-     originalMainApplication.riderProfile->tzidikTcTestProfile();
- require50DU(!initialTc||tcNativeWorldRequested,"TC requires the explicit rooted original Tzidik/TC profile request");
- const char* scRequestSetting=std::getenv("RR_ORIGINAL_TEST_GASGANO_SC");
- const bool scNativeWorldRequested=scRequestSetting&&std::string(scRequestSetting)=="1"&&
-     rootedHumanCourseSupported&&!startAtMenu&&originalMainApplication.riderProfile&&
-     originalMainApplication.riderProfile->gasganoScTestProfile();
- require50DU(!initialSc||scNativeWorldRequested,"SC requires the explicit rooted original Gasgano/SC profile request");
- const char* mbRequestSetting=std::getenv("RR_ORIGINAL_TEST_WAN_MB");
- const bool mbNativeWorldRequested=mbRequestSetting&&std::string(mbRequestSetting)=="1"&&
-     rootedHumanCourseSupported&&!startAtMenu;
- require50DU(!initialMb||mbNativeWorldRequested,"MB requires the explicit rooted original Wan/MB request");
+ const bool initialGb=track_session_assets50IG::codeEquals(initialTrack->world->code,"GB");
+ const bool initialMc=track_session_assets50IG::codeEquals(initialTrack->world->code,"MC");
+ const bool rcNativeWorldRequested=sharedHumanCourseRequested;
+ const bool tbNativeWorldRequested=sharedHumanCourseRequested;
+ const bool gbNativeWorldRequested=sharedHumanCourseRequested;
+ const bool mcNativeWorldRequested=sharedHumanCourseRequested;
+ const bool tcNativeWorldRequested=sharedHumanCourseRequested;
+ const bool scNativeWorldRequested=sharedHumanCourseRequested;
+ const bool mbNativeWorldRequested=sharedHumanCourseRequested;
+ require50DU(!(initialRc||initialTb||initialGb||initialMc||initialTc||initialSc||initialMb)||sharedHumanCourseRequested,
+     "native human Course loader requires original-disc Main, mode2 and human Player0");
  const char* raRequestSetting=std::getenv("RR_RA_NATIVE_WORLD");
  require50DU(!raRequestSetting||std::string(raRequestSetting)=="0"||std::string(raRequestSetting)=="1",
      "RR_RA_NATIVE_WORLD must be 0 or 1");
@@ -11272,9 +12383,9 @@ int main(int argc,char**argv){try{
  require50DU(!initialGa||(rootedHumanCourseSupported&&!startAtMenu),
      "GA requires rooted original Main/Course human entry and RR_START_MENU=0");
  require50DU(track_session_assets50IG::codeEquals(initialTrack->world->code,"TA")||
-     track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")||initialGa||initialMa||initialSa||initialRa||initialMb||initialSc||initialTc||initialRc||initialTb,
+     track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")||initialGa||initialMa||initialSa||initialRa||initialMb||initialSc||initialTc||initialRc||initialTb||initialGb||initialMc,
      "track is not in the explicit native admission list");
- auto effectiveTrack=initialTb?rr::platform::HostTrack50IM::TB:initialRc?rr::platform::HostTrack50IM::RC:initialTc?rr::platform::HostTrack50IM::TC:initialSc?rr::platform::HostTrack50IM::SC:initialMb?rr::platform::HostTrack50IM::MB:initialRa?rr::platform::HostTrack50IM::RA:initialMa?rr::platform::HostTrack50IM::MA:initialSa?rr::platform::HostTrack50IM::SA:
+ auto effectiveTrack=initialMc?rr::platform::HostTrack50IM::MC:initialGb?rr::platform::HostTrack50IM::GB:initialTb?rr::platform::HostTrack50IM::TB:initialRc?rr::platform::HostTrack50IM::RC:initialTc?rr::platform::HostTrack50IM::TC:initialSc?rr::platform::HostTrack50IM::SC:initialMb?rr::platform::HostTrack50IM::MB:initialRa?rr::platform::HostTrack50IM::RA:initialMa?rr::platform::HostTrack50IM::MA:initialSa?rr::platform::HostTrack50IM::SA:
      initialGa?rr::platform::HostTrack50IM::GA:
      track_session_assets50IG::codeEquals(initialTrack->world->code,"GC")?
      rr::platform::HostTrack50IM::GC:rr::platform::HostTrack50IM::TA;
@@ -11289,6 +12400,8 @@ int main(int argc,char**argv){try{
  if(initialTc)selectedRacer60=24;
  if(initialRc)selectedRacer60=17;
  if(initialTb)selectedRacer60=18;
+ if(initialGb)selectedRacer60=23;
+ if(initialMc)selectedRacer60=1;
  const char* incompleteWorldSetting=std::getenv("RR_GC_INCOMPLETE_WORLD");
  const char* selectedModeSetting=std::getenv("RR_RACE_MODE");
  // This admits an authenticated cold destination request only. runSession
@@ -11303,7 +12416,7 @@ int main(int argc,char**argv){try{
      gcDefaultOnRequested("RR_GC_NATIVE_GATE")&&gcDefaultOnRequested("RR_GC_NATIVE_WATER");
  const rr::platform::HostTrackAdmission50IM trackAdmission{
      incompleteWorldSetting&&std::string(incompleteWorldSetting)=="1",
-     selectedModeSetting&&std::string(selectedModeSetting)=="2",gaCandidate||rootedHumanCourseSupported,gcNativeWorldRequested,raNativeWorldRequested,mbNativeWorldRequested,scNativeWorldRequested,tcNativeWorldRequested,rcNativeWorldRequested,tbNativeWorldRequested};
+     selectedModeSetting&&std::string(selectedModeSetting)=="2",gaCandidate||rootedHumanCourseSupported,gcNativeWorldRequested,raNativeWorldRequested,mbNativeWorldRequested,scNativeWorldRequested,tcNativeWorldRequested,rcNativeWorldRequested,tbNativeWorldRequested,gbNativeWorldRequested,mcNativeWorldRequested};
  std::uint64_t sessionIndex=0;
  std::unique_ptr<original_course_targets50KX::ConsumedLaunch> consumedCourseLaunch;
  for(;;){
@@ -11314,7 +12427,7 @@ int main(int argc,char**argv){try{
       runSession50DU(resolvedCorpusPath.c_str(),headlessLive,headlessLive?argv[3]:nullptr,
       useCheckpoint?&activeCheckpoint:nullptr,nextCheckpoint,lapContinuity,sessionIndex,
       applicationClock,collisionNormalMode,startAtMenu,selectedRacer60,effectiveAudioSettings,selectedAudioSettings,
-      effectiveTrack,selectedTrack,trackAdmission,originalMainApplication,enterOriginalUi,applicationControls,directApplicationRandom,cameraStartup350,courseColdLoad,nativeWaterApplication,captureRun,consumedCourseLaunch.get());
+      effectiveTrack,selectedTrack,trackAdmission,originalMainApplication,enterOriginalUi,applicationControls,directApplicationRandom,cameraStartup350,courseColdLoad,nativeWaterGlobals,captureRun,consumedCourseLaunch.get());
   // Expire even on restart/return: only a new actual Course consumption can
   // create another owner. Stack unwinding also releases it on session failure.
   consumedCourseLaunch.reset();
@@ -11345,7 +12458,9 @@ int main(int argc,char**argv){try{
         (effectiveTrack==rr::platform::HostTrack50IM::SC&&scNativeWorldRequested)||
         (effectiveTrack==rr::platform::HostTrack50IM::TC&&tcNativeWorldRequested)||
         (effectiveTrack==rr::platform::HostTrack50IM::RC&&rcNativeWorldRequested)||
-        (effectiveTrack==rr::platform::HostTrack50IM::TB&&tbNativeWorldRequested))));
+        (effectiveTrack==rr::platform::HostTrack50IM::TB&&tbNativeWorldRequested)||
+        (effectiveTrack==rr::platform::HostTrack50IM::GB&&gbNativeWorldRequested)||
+        (effectiveTrack==rr::platform::HostTrack50IM::MC&&mcNativeWorldRequested))));
   if(allOriginalAi||humanCourse){
    require50DU((exit==SessionExit50DU::Restart||exit==SessionExit50DU::ReturnOriginalMain||exit==SessionExit50DU::CourseColdLoad)&&
        rr::platform::validHostTrack50IM(effectiveTrack)&&selectedTrack==effectiveTrack,

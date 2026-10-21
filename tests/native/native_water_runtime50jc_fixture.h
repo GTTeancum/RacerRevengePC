@@ -208,6 +208,11 @@ public:
         application_=&application;application.active_=this;
         provider_.sourceStateBound=true;initialized_=true;
     }
+    // Actual retained dynamic storage; inline state belongs to sizeof(Owner).
+    std::size_t additionalPayloadBytes()const noexcept{
+        return buffers_[0].capacity()+buffers_[1].capacity()+texture_.capacity()+
+            nextSigned_.capacity()+nextTexture_.capacity();
+    }
     bool initialized() const noexcept{return initialized_;}
     const Update& update() const noexcept{return update_;}
     const WaterPresentationOwner50JC& presentation() const noexcept{return presentation_;}

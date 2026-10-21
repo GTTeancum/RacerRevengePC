@@ -72,9 +72,13 @@ bool hashMatches50HI(const std::uint8_t* data, std::size_t size,
             return false;
     return true;
 }
-enum class CatalogShape50HI { legacy, authenticatedMb, authenticatedTc, authenticatedTb };
+enum class CatalogShape50HI { legacy, authenticatedMb, authenticatedTc, authenticatedTb, authenticatedMc };
 bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50HI&out,std::vector<AudioRequest50HC>&requests,std::string&error,CatalogShape50HI shape){
     try{
+        const bool mc=shape==CatalogShape50HI::authenticatedMc;
+        if(mc)need(aub.size()==50722u&&hashMatches50HI(aub.data(),aub.size(),
+            "bbb238196c131979092c7a5cc5066fdfc131156ecb6ec632786279786f779554"),
+            "50HI exact MC AUB identity differs");
         const bool tb=shape==CatalogShape50HI::authenticatedTb;
         if(tb)need(aub.size()==50826u&&hashMatches50HI(aub.data(),aub.size(),
             "00729a0e848ca3a28996b312bcd789dbc3a3798c8b803ab3c612f4379dd94a19"),
@@ -90,18 +94,19 @@ bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50H
         ParameterDocument48F p;DecodeError48C d;WorldLimits48F limits{};limits.retainDuplicateLabels=true;need(decodeParameters48F(aub,p,d,nullptr,limits),"50HI AUB parameter decode failed");
         const auto&s=block(p,"sounds");const int rows=number(field(s,"nummaterialcollisionsounds"));
         const int driveRows=number(field(s,"nummaterialdriveonsounds"));
-        need(tb?(rows==24&&driveRows==20):tc?(rows==16&&driveRows==12):mb?(rows==20&&driveRows==12):
+        need(mc?(rows==12&&driveRows==8):tb?(rows==24&&driveRows==20):tc?(rows==16&&driveRows==12):mb?(rows==20&&driveRows==12):
             (((rows==8||rows==12||rows==20)&&driveRows==rows)||
              ((rows==16||rows==32)&&driveRows==12)),"50HI unsupported independent material row counts");
         MaterialAudioCatalog50HI next;std::vector<AudioRequest50HC> unique;
         next.parameters.rowCount=static_cast<std::uint32_t>(rows);
         next.parameters.driveRowCount=static_cast<std::uint32_t>(driveRows);
-        const int materials=number(field(s,"nummaterials"));need((tb||tc)?materials==5:mb?materials==3:(materials>=1&&materials<=4),"50HI unsupported material assignment count");
+        const int materials=number(field(s,"nummaterials"));need((mc||tb||tc)?materials==5:mb?materials==3:(materials>=1&&materials<=4),"50HI unsupported material assignment count");
         next.materialCount=static_cast<std::uint32_t>(materials);
         const auto* defaultText=optionalField(s,"defaultmaterial");const int fallback=defaultText?number(*defaultText):0;
         need(fallback>=0&&fallback<=255,"50HI invalid default material byte");next.defaultMaterial=static_cast<std::uint32_t>(fallback);
         if(mb)need(fallback==1,"50HI MB default material differs");
         if(tc)need(fallback==1,"50HI TC default material differs");
+        if(mc)need(fallback==1,"50HI MC default material differs");
         if(tb)need(fallback==1,"50HI TB default material differs");
         //271674..271804: increasing material order; missing list means0.
         //2717E4 is STRICT less-than. Preserve this source off-by-one behavior.
@@ -179,6 +184,13 @@ bool readCatalog50HI(const std::vector<std::uint8_t>&aub,MaterialAudioCatalog50H
                 next.collision[16u+i]=="sfx/race/woodhit"+std::to_string(i+1u)+".vag",
                 "50HI TB row-local loop alias differs");
         }
+        if(mc){
+            need(next.orderedObjectMaterials.size()==3u&&unique.size()==15u,"50HI MC source traversal differs");
+            constexpr const char* names[]{"colshieldx","colforces","colc_beacon"};
+            for(std::uint32_t i=0;i<3;++i)need(next.orderedObjectMaterials[i].material==2&&next.orderedObjectMaterials[i].object==names[i],"50HI MC strict-less-than source assignment differs");
+            for(std::uint32_t i=0;i<12;++i)need(next.collisionSectionKeys[i]==i+1,"50HI MC collision source ordinal differs");
+            for(std::uint32_t i=0;i<8;++i)need(next.driveSectionKeys[i]==i+1,"50HI MC drive source ordinal differs");
+        }
         out=std::move(next);requests=std::move(unique);error.clear();return true;
     }catch(const std::exception&e){error=e.what();return false;}
 }
@@ -198,6 +210,10 @@ bool readTcMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
 bool readTbMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
     MaterialAudioCatalog50HI& out,std::vector<AudioRequest50HC>& requests,std::string& error){
     return readCatalog50HI(aub,out,requests,error,CatalogShape50HI::authenticatedTb);
+}
+bool readMcMaterialAudioCatalog50HI(const std::vector<std::uint8_t>& aub,
+    MaterialAudioCatalog50HI& out,std::vector<AudioRequest50HC>& requests,std::string& error){
+    return readCatalog50HI(aub,out,requests,error,CatalogShape50HI::authenticatedMc);
 }
 bool applyTrackMaterialAssignments50HI(const MaterialAudioCatalog50HI& catalog,const World48F& world,
     std::uint32_t zone,std::uint32_t ordinal,rr::game::ContactMaterial50HI& value,std::string& error){

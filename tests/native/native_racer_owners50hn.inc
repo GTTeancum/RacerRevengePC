@@ -6,7 +6,8 @@
 //
 // Canonical frame includes both rigid bodies, complete graph/animation/visual,
 // filter histories, joint, ground follow, damage, own serial RNG and source libm.
-if(originalAiEnabled)registerRacerFrameExceptSharedNoise50IU(racerBank,s);
+if(isGbTrack||isMcTrack)registerRacerFrameExceptSharedMotionAndNoise50GB(racerBank,s);
+else if(originalAiEnabled)registerRacerFrameExceptSharedNoise50IU(racerBank,s);
 else racerBank.owner(s);
 racerBank.owner(originalAi);
 racerBank.owner(originalAiReceipt);

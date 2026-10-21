@@ -19,6 +19,7 @@ class OriginalUiRiderResidencyDemand50KG final {
     std::shared_ptr<const assets::OriginalUiImageBank50KG> bank_;
     std::vector<std::uint32_t> indices_;
     bool entry_=false,consumed_=false;
+    bool requiresCoverage_=false; // Derived only from validated closure prototypes.
 public:
     OriginalUiRiderResidencyDemand50KG()=default;
     const OriginalUiRiderSession50KG* session()const noexcept{return session_;}
@@ -54,8 +55,9 @@ public:
     std::uint32_t liveImageCount()const noexcept;
     bool faulted()const noexcept;
 };
-// Staging validation has no live renderer side effects. Only the same frontend
-// can request a private validation/commit; session validates its source plan.
+// Staging may allocate private renderer resources required by this source
+// closure, but cannot publish a live binding, frame, or source receipt. Only
+// the same frontend requests validation/commit; session validates its plan.
 class OriginalUiRiderTextureValidation50KG final {
     friend class VehicleWindowGl50DS;
     const VehicleWindowGl50DS* renderer_=nullptr;
@@ -65,6 +67,7 @@ class OriginalUiRiderTextureValidation50KG final {
     std::uint64_t serial_=0,token_=0,rendererEpoch_=0;
     std::array<std::uint8_t,assets::maxMaterialTextureAssets50EA> maximumAlpha_{};
     bool ready_=false;
+    bool requiresCoverage_=false;
 public:
     OriginalUiRiderTextureValidation50KG()=default;
 };

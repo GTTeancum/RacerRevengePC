@@ -416,6 +416,7 @@ private:
                 for(std::size_t j=0;j<i;++j)need((binding.animated||binding.trigger||bindings[j].animated||bindings[j].trigger||bindings[j].originalOwner!=binding.originalOwner)&&
                     bindings[j].candidate!=binding.candidate,"duplicate original collider binding");
                 const auto& c=binding.candidate->candidate.collision;
+                need((!binding.candidate->nativeTriggersMC&&!binding.candidate->nativeTriggersGB)||binding.trigger,"GB source group cannot annotate a non-trigger collider");
                 if(binding.trigger){
                     // Native group-owned MA boxes share the existing authored
                     // trigger registry. Legacy Gate bindings remain sphere5;
@@ -430,7 +431,7 @@ private:
                     // late racer identity binding intentionally has not made
                     // group.ready true at this Storage construction point.
                     bool tc=false;
-                    if(target.nativeTriggersTC&&!target.nativeTriggersTB&&!target.gate&&!target.nativeTriggers){
+                    if(target.nativeTriggersTC&&!target.nativeTriggersMC&&!target.nativeTriggersTB&&!target.nativeTriggersGB&&!target.gate&&!target.nativeTriggers){
                         const auto& group=*target.nativeTriggersTC;
                         if(target.nativeTriggerIndex<group.triggers.size()){
                             const auto& state=group.triggers[target.nativeTriggerIndex];
@@ -446,7 +447,7 @@ private:
                         }
                     }
                     bool tb=false;
-                    if(target.nativeTriggersTB&&!target.nativeTriggersTC&&!target.gate&&!target.nativeTriggers){
+                    if(target.nativeTriggersTB&&!target.nativeTriggersMC&&!target.nativeTriggersTC&&!target.nativeTriggersGB&&!target.gate&&!target.nativeTriggers){
                         const auto& group=*target.nativeTriggersTB;
                         if(target.nativeTriggerIndex<group.triggers.size()){
                             const auto& state=group.triggers[target.nativeTriggerIndex];
@@ -461,9 +462,40 @@ private:
                                 state.collider.highWaterD0==0;
                         }
                     }
+                    bool mc=false;
+                    if(target.nativeTriggersMC&&!target.nativeTriggersTB&&!target.nativeTriggersTC&&!target.nativeTriggersGB&&!target.gate&&!target.nativeTriggers){
+                        const auto& group=*target.nativeTriggersMC;
+                        if(target.nativeTriggerIndex<group.triggers.size()){
+                            const auto& state=group.triggers[target.nativeTriggerIndex];
+                            const bool shape=target.shapeType==5||(target.shapeType==6&&
+                                validNativeTriggerBox50MA(target.nativeTriggerBox)&&
+                                !std::memcmp(c.geometry.worldMatrix.v,target.nativeTriggerBox.world.v,sizeof c.geometry.worldMatrix.v));
+                            mc=shape&&!group.ready&&!group.queryActive&&!group.actionsFailed&&
+                                group.actions.context&&group.actions.preflight&&group.actions.resume&&
+                                state.collider.identity==c.filter.identity&&
+                                state.randomTriggerPercent90==(target.nativeTriggerIndex==20?50:(target.nativeTriggerIndex==1||target.nativeTriggerIndex==2||target.nativeTriggerIndex==19)?100:99)&&
+                                state.callbackCount98==1&&
+                                state.collider.highWaterD0==0;
+                        }
+                    }
+                    // GB is a distinct exact 18-row cold group. The aggregate
+                    // must separately prove same-source ActionOwner ownership;
+                    // this storage check neither supplies hooks nor grants ready.
+                    bool gb=false;
+                    if(target.nativeTriggersGB&&!target.nativeTriggersMC&&!target.nativeTriggersTB&&!target.nativeTriggersTC&&!target.gate&&!target.nativeTriggers){
+                        const auto& group=*target.nativeTriggersGB;
+                        if(target.nativeTriggerIndex<group.triggers.size()){
+                            const auto& state=group.triggers[target.nativeTriggerIndex];
+                            gb=target.shapeType==5&&!group.ready&&!group.queryActive&&!group.actionsFailed&&
+                                group.actions.context&&group.actions.preflight&&group.actions.resume&&
+                                state.collider.identity==c.filter.identity&&state.randomTriggerPercent90==100&&
+                                state.callbackCount98==(target.nativeTriggerIndex==15?2u:target.nativeTriggerIndex==17?5u:1u)&&
+                                state.collider.highWaterD0==0;
+                        }
+                    }
                     need(!binding.animated&&!binding.tbDoor&&binding.originalOwner==std::numeric_limits<std::size_t>::max()&&
                         binding.authoredZone&&binding.authoredZone<=n.zones&&binding.method==ZoneMethod50CL::First&&
-                        ((!target.nativeTriggersTC&&!target.nativeTriggersTB&&(sphere||box))||tc||tb)&&c.shapeType==target.shapeType&&
+                        ((!target.nativeTriggersTC&&!target.nativeTriggersMC&&!target.nativeTriggersTB&&!target.nativeTriggersGB&&(sphere||box))||tc||tb||mc||gb)&&c.shapeType==target.shapeType&&
                         !c.geometry.mesh&&!c.compound&&c.hasResponseCallbackE8&&c.filter.categoryA4==8u&&
                         c.filter.identity&&c.geometry.id==c.filter.identity&&c.ownerIdentity9C,
                         "original native sphere/box trigger binding is incomplete");

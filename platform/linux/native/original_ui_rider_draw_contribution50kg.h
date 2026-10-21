@@ -81,7 +81,7 @@ private:
     bool drawableModel(std::uint16_t,OriginalUiRiderContributionDiagnostic50KG&) const noexcept;
     bool nativeDrawableModels(const std::array<bool,120>&,OriginalUiRiderContributionDiagnostic50KG&) const noexcept;
     bool nativeResidencyImages(const std::array<bool,120>&,
-        std::vector<std::uint32_t>&,OriginalUiRiderContributionDiagnostic50KG&) const noexcept;
+        std::vector<std::uint32_t>&,bool& requiresCoverage,OriginalUiRiderContributionDiagnostic50KG&) const noexcept;
     bool consumeMaterials(bool rebuild,OriginalUiRiderContributionDiagnostic50KG&) noexcept;
     std::uint64_t materialSequence()const noexcept;
     std::uint64_t sourceSubmissionWatermark()const noexcept;

@@ -38,6 +38,7 @@ class Owner {
     // Closed typed borrow: no copied rows or SessionRows-only admission.
     // The actual Session/MbSession must outlive this owner, as for legacy &.
     const race_session50HM::SessionBorrow session_;
+    const bool sourceNativeOnly_=false;
 public:
     native_racer50HN::Bank& bank;
     lap_drive50GJ::Owner& lap;
@@ -64,6 +65,13 @@ public:
     Owner(native_racer50HN::Bank& b,lap_drive50GJ::Owner& l,
         VehicleFrameFields49W& f,race_session50HM::TbSession& h) noexcept:
         session_(h),bank(b),lap(l),fields(f),hostRace(session_.rows()){}
+    Owner(native_racer50HN::Bank& b,lap_drive50GJ::Owner& l,
+        VehicleFrameFields49W& f,race_session50HM::GbSession& h) noexcept:
+        session_(h),bank(b),lap(l),fields(f),hostRace(session_.rows()){}
+    // Compile-time visitor compatibility, not HOST runtime admission.
+    Owner(native_racer50HN::Bank& b,lap_drive50GJ::Owner& l,
+        VehicleFrameFields49W& f,race_session50HM::McSession& h) noexcept:
+        session_(h),sourceNativeOnly_(true),bank(b),lap(l),fields(f),hostRace(session_.rows()){}
     Owner(const Owner&)=delete;
     Owner& operator=(const Owner&)=delete;
 
@@ -71,7 +79,7 @@ public:
     // Current bounded client has one human in slot0; all original HUD fields
     // in its native scene are explicitly absent. HOST overlay remains separate.
     bool initialize(const RosterEntry* entries,std::size_t count) {
-        if(!session_.runtimeValid())return false;
+        if(sourceNativeOnly_||!session_.runtimeValid())return false;
         if(initialized||!entries||count!=bank.count()||count<2||count>roster.size()||
            count>16||!entries[0].human||entries[0].humanIndex5C!=0u)return false;
         for(std::size_t i=0;i<count;++i)
@@ -91,7 +99,7 @@ public:
     // Must run during its native step, before this world's timing/flush pass.
     DamageSpeechReceipt50HG produceDamage(const DamageSpeechInput50HG& liveInput) noexcept {
         DamageSpeechReceipt50HG bad{};bad.status=PodSpeechStatus50HG::Input;
-        if(!session_.runtimeValid())return bad;
+        if(sourceNativeOnly_||!session_.runtimeValid())return bad;
         if(!initialized||phase!=Phase::Idle)return bad;
         auto input=liveInput;input.vehicle60=roster[0].racer60;input.vehicle60Known=true;
         input.vehicle58=0; // Explicit HOST human role, not an arena mutation.
@@ -107,7 +115,7 @@ public:
     // interpolated finishSeconds is copied into CB0/CB8. Resume this method
     // on a blocked timing request before admitting another world.
     Receipt beforeHostCommit(std::uint64_t world,float seconds) {
-        if(!session_.runtimeValid())return {};
+        if(sourceNativeOnly_||!session_.runtimeValid())return {};
         if(!initialized||!world)return {};
         if(phase==Phase::Idle){
             if(world<=acceptedWorld||!std::isfinite(seconds)||seconds<0.0f||seconds>0.06f)
@@ -144,7 +152,7 @@ public:
     // The consumed CD8 bit1 is cleared only after the corresponding timing
     // cut and host observer have finished, before the same world's FIFO flush.
     Receipt afterHostCommit(std::uint64_t world,std::uint8_t application1B0) {
-        if(!session_.runtimeValid())return {};
+        if(sourceNativeOnly_||!session_.runtimeValid())return {};
         if(phase!=Phase::AwaitHostCommit||world!=currentWorld_||
            hostRace.racerCount!=bank.count()||hostRace.error!=race_session50HM::Error::None)return {};
         for(std::size_t i=0;i<bank.count();++i)if(hostRace.racers[i].sampled)return {};
@@ -171,7 +179,7 @@ public:
     Receipt flush(HostMonotonicClock50ID& clock,LapEventRandomOwner50ID& lazy,
         std::uint32_t& sharedRaw,const PodSpeechCounts50HG& counts,
         PodSpeechState50HG& humanSpeech,const Effects& effects) noexcept {
-        if(!session_.runtimeValid())return {};
+        if(sourceNativeOnly_||!session_.runtimeValid())return {};
         if(phase!=Phase::Flush)return {};
         DispatchContext context{*this,clock,sharedRaw,counts,humanSpeech,effects};
         const race_speech50ID::Providers providers{&context,&beginDamage,&damageEffect,&lapEffect};

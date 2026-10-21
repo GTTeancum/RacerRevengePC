@@ -82,6 +82,24 @@ constexpr OriginalFile courseOriginal{
 // Counts and SHA256s come from raw headers/end flags and original bytes.
 struct OriginalRiderConfirmFile { std::uint32_t eventId; OriginalFile file; };
 constexpr std::array<OriginalRiderConfirmFile,OriginalUiMainAudio50KG::riderConfirmClipCount> riderConfirmOriginals{{
+    // Original Rider14 confirm clips, authenticated independently.
+    {29,{"SPEECH/UI/SEBSEL01.VAG",30320,"8d2473facab3023d2f4fb98512d8ebb24ed3d34b578a52a153828e8bb761df34",52948}},
+    {30,{"SPEECH/UI/SEBSEL02.VAG",79152,"583965165f87ced323bcb73d001d5754d4449fa476a3c379a886b7fe65c35773",138404}},
+    // Original Rider21 confirm clips, authenticated independently.
+    {46,{"SPEECH/UI/MAUSEL01.VAG",39120,"2dbcb2cda403ed0292e4111d890907d3e5fa481d1dffabe5d4a8aa69770a6cc8",68348}},
+    {47,{"SPEECH/UI/MAUSEL02.VAG",31248,"3481b32d847e60f7a47a22912af3a7734249a8cf04752159b9019e3d557d1d69",54572}},
+    {48,{"SPEECH/UI/MAUSEL03.VAG",41488,"d12bdf94e2b4abf25ba36d124010ccb2070db14f7d79c6a35046d5aec71e769a",72492}},
+    {49,{"SPEECH/UI/MAUSEL04.VAG",44336,"eda30c9bfc1db34d081527dcdfba05a1dcbd061d53e848a396ec9b39ee140c8f",77476}},
+    // Original Rider25 confirm clips, authenticated independently.
+    {56,{"SPEECH/UI/WATSEL01.VAG",42976,"449364bd9cd7fef32d72143bef931e7fd05602af47dbf24ad165cd2d1c3a1a2e",75096}},
+    {57,{"SPEECH/UI/WATSEL02.VAG",53856,"5e1a7253dfd349300c0a749378240e55af3dc63121d32e3a0d1dc1e28ae3be84",94136}},
+    {58,{"SPEECH/UI/WATSEL03.VAG",65536,"01a2aa5faac307888d7fe786e3d69a3b2e93fe142778c9494c19c115881e6c50",114576}},
+    {59,{"SPEECH/UI/WATSEL04.VAG",60736,"91eb98ceeeb5a8ab377416bef271120c9e5b75d6fb91440d9560131f232634ca",106176}},
+    // Original Rider26 confirm clips, authenticated independently.
+    {60,{"SPEECH/UI/VADSEL01.VAG",34416,"1e121160449447c40551680fcfd7078d0cdde6ab8dea3eadf099db6c5faa08f4",60116}},
+    {61,{"SPEECH/UI/VADSEL02.VAG",46400,"7da71c9ad02eea29ad574e7ff681a8a4920a2358e60fc4648c9c8049f79a738f",81088}},
+    {62,{"SPEECH/UI/VADSEL03.VAG",45072,"fe43302c1f6df8e3ee8360af51acff87b788400cc4506f5070b5b0e7964654d7",78764}},
+    {63,{"SPEECH/UI/VADSEL04.VAG",38608,"90f73066fb9a020550cf8d98b548b44ae6a0749a94f5c484337fdba0415b271c",67452}},
     // Rider1: Anakin Skywalker (ep1), Event1..4. No profile unlock.
     {1,{"SPEECH/UI/AN1SEL01.VAG",10512,"1f18ec7a0b1abd953659fa2490a69e9a9bec025b764cce4d3a81756442b16967",18284}},
     {2,{"SPEECH/UI/AN1SEL02.VAG",16544,"9366c4771314c25a7955a648dc1912802f27f6b4604d0a1b9054c735deed41d5",28840}},
@@ -132,6 +150,9 @@ constexpr std::array<OriginalRiderConfirmFile,OriginalUiMainAudio50KG::riderConf
     // Rider22: Knire Dark, Event50..51. No profile unlock.
     {50,{"SPEECH/UI/KNISEL01.VAG",13472,"3b8f320f75d5ad7a565999f331270d5404d36ac1ada66b0d387ce6db1651592e",23464}},
     {51,{"SPEECH/UI/KNISEL02.VAG",29120,"caf0470db721c4d3fb582356650056fd436aaf7b113827d454539e7224af6c7c",50848}},
+    // Rider23: own Event52..53. Catalog entries do not unlock the racer.
+    {52,{"SPEECH/UI/KRASEL01.VAG",50656,"254fa9b23c4282733076749572daec501d70f3f876ddd9b28fc59959972a3198",88536}},
+    {53,{"SPEECH/UI/KRASEL02.VAG",31536,"355cda116f463c4a9a91ca7f27786e495bcb075bfc828882555d51da3b0c0cd6",55076}},
     // Rider18: Sebulba2, original UIACCEPT Event37..38.
     {37,{"SPEECH/UI/SEBSEL01.VAG",30320,"8d2473facab3023d2f4fb98512d8ebb24ed3d34b578a52a153828e8bb761df34",52948}},
     {38,{"SPEECH/UI/SEBSEL02.VAG",79152,"583965165f87ced323bcb73d001d5754d4449fa476a3c379a886b7fe65c35773",138404}},

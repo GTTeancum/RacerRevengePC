@@ -24,8 +24,14 @@ namespace ra_pod_scene50LA { class Owner; }
 namespace mb_source_trigger50MB { class Owner; }
 namespace tc_cold_visibility50TC { class Retirement; }
 namespace tb_cold_visibility50TB { class Retirement; }
+namespace gb_cold_visibility50GB { class Retirement; }
+namespace mc_cold_visibility50MC { class Retirement; }
 namespace tc_gate_visibility50TC { class Binding; }
 namespace tb_door_binding50TB { class Binding; }
+namespace gb_animation_binding50GB { class Binding; }
+namespace mc_animation_binding50MC { class Binding; }
+namespace mc_cold_sources50LA { class Owner; }
+namespace mc_lighting_authoring50MC { struct Record; }
 namespace original_cable_selection50LA { class Binding; }
 namespace ra_static_lighting50LA { class Binding; }
 namespace ra_static_model_cold50LA { class Owner; }
@@ -49,6 +55,42 @@ struct Diagnostic {
 };
 class CameraVisibilityLease;
 class Owner;
+// Read-only live original particle inputs. This lease grants no renderer or
+// gameplay admission. A copied value is observation, not a current borrow.
+struct GbParticleLightInputs {
+    std::array<float,4> globalAmbient50{}, registeredDirectional3C{}, positionA0{};
+    std::uint64_t timedServiceRevision=0;
+};
+class GbParticleLightLease final {
+    friend class Owner;
+    std::shared_ptr<Owner> owner_;
+    std::uint64_t revision_=0;
+public:
+    GbParticleLightLease() noexcept=default;
+    ~GbParticleLightLease();
+    GbParticleLightLease(const GbParticleLightLease&)=delete;
+    GbParticleLightLease& operator=(const GbParticleLightLease&)=delete;
+    GbParticleLightLease(GbParticleLightLease&&)=delete;
+    GbParticleLightLease& operator=(GbParticleLightLease&&)=delete;
+    bool read(GbParticleLightInputs&) const noexcept;
+};
+struct McParticleLightInputs {
+    std::array<float,4> globalAmbient50{}, registeredDirectional3C{}, positionA0{};
+    std::uint64_t timedServiceRevision=0;
+};
+class McParticleLightLease final {
+    friend class Owner;
+    std::shared_ptr<Owner> owner_;
+    std::uint64_t revision_=0;
+public:
+    McParticleLightLease() noexcept=default;
+    ~McParticleLightLease();
+    McParticleLightLease(const McParticleLightLease&)=delete;
+    McParticleLightLease& operator=(const McParticleLightLease&)=delete;
+    McParticleLightLease(McParticleLightLease&&)=delete;
+    McParticleLightLease& operator=(McParticleLightLease&&)=delete;
+    bool read(McParticleLightInputs&) const noexcept;
+};
 // Concrete native bridge only. No public constructor, arbitrary callback
 // registration, caller context, success flag or substitute racer collection.
 class RaRacerSelectionDispatch50LA final {
@@ -85,7 +127,9 @@ enum class CachePolicy : std::uint8_t {
     nativeScAuthoredZoneLightSelection,
     nativeTcAuthoredZoneLightSelection,
     nativeRcAuthoredZoneLightSelection,
-    nativeTbAuthoredZoneLightSelection
+    nativeTbAuthoredZoneLightSelection,
+    nativeGbAuthoredZoneLightSelection,
+    nativeMcAuthoredZoneLightSelection
 };
 class Owner;
 // Immutable authored render metadata, owned beside the actual 4C0 rows.
@@ -210,6 +254,8 @@ class Owner final {
     friend class ::mb_source_trigger50MB::Owner;
     friend class ::tc_cold_visibility50TC::Retirement;
     friend class ::tb_cold_visibility50TB::Retirement;
+    friend class ::gb_cold_visibility50GB::Retirement;
+    friend class ::mc_cold_visibility50MC::Retirement;
     friend class ::ra_pod_scene50LA::Owner;
     const original_world_environment50KG::SpatialBounds* sceneBounds534(const ::ra_pod_scene50LA::Owner*) const noexcept;
     const CollectionZone50BX* retainSceneZones272A78(const ::ra_pod_scene50LA::Owner*,std::size_t&) noexcept;
@@ -223,6 +269,22 @@ class Owner final {
         const CameraVisibilityLease&,std::uint32_t callbackRacer,
         const VehicleFrameState49W&,const VehicleFrameBindings49W&,
         const std::uint32_t& actualCableField50)const noexcept;
+    friend class ::gb_animation_binding50GB::Binding;
+    bool bindGbAnimationOwner(const ::gb_animation_binding50GB::Binding*,std::size_t,const LiveZoneMembership50EN*) noexcept;
+    bool beginGbAnimationAccess(const ::gb_animation_binding50GB::Binding*,std::size_t,ResetVisibilityWorld50EY*&,
+        LiveZoneWorkspace50EN*&,CollectionRef50BX&) noexcept;
+    void endGbAnimationAccess(const ::gb_animation_binding50GB::Binding*,std::size_t) noexcept;
+    bool commitGbAnimationOwner(const ::gb_animation_binding50GB::Binding*,std::size_t) noexcept;
+    bool releaseGbAnimationOwner(const ::gb_animation_binding50GB::Binding*,std::size_t) noexcept;
+    bool currentGbAnimationOwner(const ::gb_animation_binding50GB::Binding*,std::size_t) const noexcept;
+    friend class ::mc_animation_binding50MC::Binding;
+    bool bindMcAnimationOwner(const ::mc_animation_binding50MC::Binding*,std::size_t,const LiveZoneMembership50EN*) noexcept;
+    bool beginMcAnimationAccess(const ::mc_animation_binding50MC::Binding*,std::size_t,ResetVisibilityWorld50EY*&,
+        LiveZoneWorkspace50EN*&,CollectionRef50BX&) noexcept;
+    void endMcAnimationAccess(const ::mc_animation_binding50MC::Binding*,std::size_t) noexcept;
+    bool commitMcAnimationOwner(const ::mc_animation_binding50MC::Binding*,std::size_t) noexcept;
+    bool releaseMcAnimationOwner(const ::mc_animation_binding50MC::Binding*,std::size_t) noexcept;
+    bool currentMcAnimationOwner(const ::mc_animation_binding50MC::Binding*,std::size_t) const noexcept;
     friend class ::tb_door_binding50TB::Binding;
     bool bindTbDoorOwner(const ::tb_door_binding50TB::Binding*,const LiveZoneMembership50EN*) noexcept;
     bool beginTbDoorAccess(const ::tb_door_binding50TB::Binding*,ResetVisibilityWorld50EY*&,
@@ -298,10 +360,16 @@ class Owner final {
     bool selectRaStatic(std::uint32_t,const std::array<float,3>&,
         original_racer_lighting50KM::LightMatrices&,Diagnostic&) const noexcept;
     bool raStaticCurrent() const noexcept;
+    friend class GbParticleLightLease;
+    void endGbParticleLightBorrow(GbParticleLightLease&) noexcept;
+    bool readGbParticleLightBorrow(const GbParticleLightLease&,GbParticleLightInputs&) const noexcept;
+    friend class McParticleLightLease;
+    void endMcParticleLightBorrow(McParticleLightLease&) noexcept;
+    bool readMcParticleLightBorrow(const McParticleLightLease&,McParticleLightInputs&) const noexcept;
     friend class DrawLease;
     friend class CameraVisibilityLease;
     friend class ResetVisibilityLease;
-    enum class Scene : std::uint8_t { gc,ta,ga,ma,sa,ra,mb,sc,tc,rc,tb };
+    enum class Scene : std::uint8_t { gc,ta,ga,ma,sa,ra,mb,sc,tc,rc,tb,gb,mc };
     struct Storage;
     std::unique_ptr<Storage> storage_;
     bool invalidated_=false; // Terminal even before a successful cold prepare.
@@ -314,7 +382,7 @@ class Owner final {
         const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
         std::uint32_t*,ResetVisibilityLease&,Diagnostic&,bool player,bool input=false,
         const SourceTriggerVisibilityIdentity50MB* source=nullptr) noexcept;
-    bool prepareScene(const std::vector<std::uint8_t>&,std::uint32_t,Scene,Diagnostic&) noexcept;
+    bool prepareScene(const std::vector<std::uint8_t>&,std::uint32_t,Scene,Diagnostic&,std::shared_ptr<const ::mc_cold_sources50LA::Owner> = {}) noexcept;
     // Native cold teardown only; never a live reset or a public lease escape.
     bool retireRaFreshVehicle(std::uint32_t,Diagnostic&) noexcept;
     // Terminal MB cold-session unwind only, with the actual Bank slot installed.
@@ -335,6 +403,14 @@ class Owner final {
         const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
         std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
     bool tbColdVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
+    bool retireGbColdVehicle(std::uint32_t,const VehicleFrameState49W&,
+        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
+        std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
+    bool gbColdVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
+    bool retireMcColdVehicle(std::uint32_t,const VehicleFrameState49W&,
+        const VehicleFrameBindings49W&,const VehicleFrameParameters49W&,
+        std::uint32_t* actualCablesField50,Diagnostic&) noexcept;
+    bool mcColdVehicleUntouched(std::uint32_t,Diagnostic&) const noexcept;
     // Only the exact source Owner may call this inside Bank's private suspended
     // retirement visit, after every raw query/result/visibility borrow closes.
     // Never reports reset/graphics completion. A failed removal retains prefix.
@@ -385,6 +461,32 @@ public:
     // added common Storage fields/alignment plus the actual extra registration
     // backing at maximumRacers. No topology/racer limit is enlarged.
     static std::size_t tbDoorStorageReservationBytes() noexcept;
+    // Four source-counted GB animation identities; extra backing only on GB.
+    // Charge before prepareGbNative in the separately reviewed admission layer.
+    static std::size_t gbAnimationStorageReservationBytes() noexcept;
+    // Exact GB13/17 source, sixty emitted points and two authored flashers.
+    // Authored flare rendering is a separate visual owner.
+    // Requires this exact strong owner. Retains backing, excludes timed service,
+    // camera/reset/geometry publication, and reports Light+A0, NOT toward/look78.
+    bool beginGbParticleLightBorrow(const std::shared_ptr<Owner>&,
+        GbParticleLightLease&,Diagnostic&) noexcept;
+    bool beginMcParticleLightBorrow(const std::shared_ptr<Owner>&,
+        McParticleLightLease&,Diagnostic&) noexcept;
+    // MC retains the exact cold source owner; no caller-supplied World is admitted.
+    bool prepareMcNative(std::shared_ptr<const ::mc_cold_sources50LA::Owner>,std::uint32_t,Diagnostic&) noexcept;
+    const ::mc_cold_sources50LA::Owner* mcSourceIdentity() const noexcept;
+    const ::mc_lighting_authoring50MC::Record* mcLightRecord(std::size_t) const noexcept;
+    bool queryMcZoneLight(std::uint32_t,const std::array<float,3>&,
+        original_racer_lighting50KM::LightMatrices&,Diagnostic&) const noexcept;
+    static std::size_t mcAnimationStorageReservationBytes() noexcept;
+    std::size_t mcRetainedPayloadBytes() const noexcept;
+    bool prepareGbNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
+        Diagnostic&) noexcept;
+    static std::size_t gbTimedLightStorageReservationBytes() noexcept;
+    // Native fixed-boundary scheduling; actual shared RNG and pause come from
+    // the root. No draw/camera/reset/registration borrower may be active.
+    bool serviceGbTimedLights(float actualDelta,std::uint32_t& actualSharedRng,
+        bool paused,Diagnostic&) noexcept;
     bool prepareTbNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,
         Diagnostic&) noexcept;
     bool prepareRcNative(const std::vector<std::uint8_t>& scb,std::uint32_t actualRacers,

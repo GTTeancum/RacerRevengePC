@@ -103,19 +103,15 @@ inline OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCamera0Visi
     OriginalCameraSceneOwner&,OriginalSelectedCameraVisibilityBacking50SC&,
     OriginalSelectedCameraVisibilityKeys50SC&,OriginalFollowSceneBinding&) noexcept;
 
-// Session-owned fixed arrays never move or resize. Neither arbitrary counts nor
-// a caller-supplied descriptor can select or expose the SC or TC backing.
+// Stable bounded backing for every supported topology. The maxima are the
+// existing SC envelope; only the current lease's active span is exposed.
 class OriginalSelectedCameraVisibilityBacking50SC final {
     friend OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCamera0Visibility50SC(
         original_gc_gameplay_lighting_candidate::Owner&,std::uint64_t,std::uint64_t,
         OriginalCameraSceneOwner&,OriginalSelectedCameraVisibilityBacking50SC&,
         OriginalSelectedCameraVisibilityKeys50SC&,OriginalFollowSceneBinding&) noexcept;
-    std::array<CollectionZoneLink50BX,original_gc_gameplay_lighting_candidate::maximumPortals+1> legacyLinks_{};
-    std::array<LiveZoneEntry50EN,original_gc_gameplay_lighting_candidate::maximumPortals+1> legacyEntries_{};
-    std::array<CollectionZoneLink50BX,35> scLinks_{};
-    std::array<LiveZoneEntry50EN,35> scEntries_{};
-    std::array<CollectionZoneLink50BX,27> tcLinks_{};
-    std::array<LiveZoneEntry50EN,27> tcEntries_{};
+    std::array<CollectionZoneLink50BX,35> links_{};
+    std::array<LiveZoneEntry50EN,35> entries_{};
 public:
     OriginalSelectedCameraVisibilityBacking50SC() noexcept=default;
     OriginalSelectedCameraVisibilityBacking50SC(const OriginalSelectedCameraVisibilityBacking50SC&)=delete;
@@ -128,31 +124,25 @@ class OriginalSelectedCameraVisibilityKeys50SC final {
         original_gc_gameplay_lighting_candidate::Owner&,std::uint64_t,std::uint64_t,
         OriginalCameraSceneOwner&,OriginalSelectedCameraVisibilityBacking50SC&,
         OriginalSelectedCameraVisibilityKeys50SC&,OriginalFollowSceneBinding&) noexcept;
-    enum class Selected : std::uint8_t {none,legacy,sc,tc};
-    Selected selected_=Selected::none;
-    OriginalCameraVisibilityKeys legacy_{};
-    OriginalScCameraVisibilityKeys50SC sc_{};
-    OriginalCameraVisibilityKeys tc_{}; // TC has exactly25 canonical zone keys.
+    const original_gc_gameplay_lighting_candidate::Owner* owner_=nullptr;
+    std::uint64_t sessionGeneration_=0,sceneKey_=0;
+    std::array<std::uint64_t,30> keys_{};
     OriginalSelectedCameraVisibilityKeys50SC(const OriginalSelectedCameraVisibilityKeys50SC&)=default;
     OriginalSelectedCameraVisibilityKeys50SC& operator=(const OriginalSelectedCameraVisibilityKeys50SC&)=default;
 public:
     OriginalSelectedCameraVisibilityKeys50SC() noexcept=default;
     std::size_t count=0;
     OriginalFollowVisibilityZones view() const noexcept {
-        if(selected_==Selected::legacy&&count==legacy_.count)return legacy_.view();
-        if(selected_==Selected::sc&&count==sc_.count)return sc_.view();
-        if(selected_==Selected::tc&&count==tc_.count&&count==25u)return tc_.view();
-        return {};
+        if(!owner_||!sessionGeneration_||!sceneKey_||!count||count>keys_.size())return {};
+        return {keys_.data(),count};
     }
     bool matches(const original_gc_gameplay_lighting_candidate::Owner& owner,
         const original_gc_gameplay_lighting_candidate::CameraVisibilityLease& lease,
         std::uint64_t session,std::uint64_t scene) const noexcept {
-        if(selected_==Selected::legacy)return !lease.isScSourceTopology()&&!lease.isTcSourceTopology()&&count==legacy_.count&&
-            legacy_.matches(owner,lease,session,scene);
-        if(selected_==Selected::sc)return count==sc_.count&&sc_.matches(owner,lease,session,scene);
-        if(selected_==Selected::tc)return lease.isTcSourceTopology()&&count==25u&&count==tc_.count&&
-            tc_.matches(owner,lease,session,scene);
-        return false;
+        if(owner_!=&owner||!session||!scene||sessionGeneration_!=session||sceneKey_!=scene||
+           !count||count>keys_.size()||count!=lease.zoneCount())return false;
+        for(std::size_t i=0;i<count;++i)if(!keys_[i]||keys_[i]!=lease.zoneKey4C0(i))return false;
+        return true;
     }
 };
 
@@ -165,57 +155,42 @@ inline OriginalCameraVisibilityJoinResult attachFreshSelectedOriginalCamera0Visi
     OriginalCameraSceneOwner& spatial,OriginalSelectedCameraVisibilityBacking50SC& retainedBacking,
     OriginalSelectedCameraVisibilityKeys50SC& keys,OriginalFollowSceneBinding& scene) noexcept {
     using Status=OriginalCameraVisibilityJoinStatus;
-    using Selected=OriginalSelectedCameraVisibilityKeys50SC::Selected;
     OriginalCameraVisibilityJoinResult r;
     if(!sessionGeneration||!sceneKey)return r;
     if(spatial.sessionGeneration||spatial.sceneKey||spatial.object30||spatial.registration34.attached||
-       keys.selected_!=Selected::none||keys.count||scene.sceneKey||scene.registrationKey){
+       keys.owner_||keys.sessionGeneration_||keys.sceneKey_||keys.count||scene.sceneKey||scene.registrationKey){
         r.status=Status::freshness;return r;}
     original_gc_gameplay_lighting_candidate::CameraVisibilityLease lease;
     if(!actualWorldOwner.beginCameraVisibility(0u,lease,r.owner))return r;
     auto* world=lease.world();auto* workspace=lease.workspace();
     const auto* racer=lease.racerVisibility7F0();
     if(!world||!workspace||!racer||!lease.cameraObject30())return r;
-    const bool sc=lease.isScSourceTopology(),tc=lease.isTcSourceTopology();
-    if(sc&&tc)return r;
     OriginalSelectedCameraVisibilityKeys50SC nextKeys;
-    nextKeys.selected_=tc?Selected::tc:sc?Selected::sc:Selected::legacy;
+    nextKeys.owner_=&actualWorldOwner;nextKeys.sessionGeneration_=sessionGeneration;nextKeys.sceneKey_=sceneKey;
     nextKeys.count=lease.zoneCount();
-    std::uint64_t* selectedKeys=nullptr;
-    if(sc){
-        auto& k=nextKeys.sc_;k.owner=&actualWorldOwner;k.sessionGeneration=sessionGeneration;k.sceneKey=sceneKey;
-        k.count=nextKeys.count;if(k.count!=k.keys.size())return r;selectedKeys=k.keys.data();
-    }else if(tc){
-        auto& k=nextKeys.tc_;k.owner=&actualWorldOwner;k.sessionGeneration=sessionGeneration;k.sceneKey=sceneKey;
-        k.count=nextKeys.count;if(k.count!=25u||k.count!=k.keys.size())return r;selectedKeys=k.keys.data();
-    }else{
-        auto& k=nextKeys.legacy_;k.owner=&actualWorldOwner;k.sessionGeneration=sessionGeneration;k.sceneKey=sceneKey;
-        k.count=nextKeys.count;if(!k.count||k.count>k.keys.size())return r;selectedKeys=k.keys.data();
-    }
+    if(!nextKeys.count||nextKeys.count>nextKeys.keys_.size()||
+       world->lifecycle.zoneCount!=nextKeys.count||world->portals.zoneCount!=nextKeys.count)return r;
+    // Check before +1, including the zero-portal topology's one membership.
+    if(world->portals.portalCount>=retainedBacking.links_.size())return r;
+    const std::size_t activeCapacity=world->portals.portalCount+1u;
     for(std::size_t i=0;i<nextKeys.count;++i){
-        selectedKeys[i]=lease.zoneKey4C0(i);if(!selectedKeys[i])return r;
-        for(std::size_t j=0;j<i;++j)if(selectedKeys[j]==selectedKeys[i])return r;
+        nextKeys.keys_[i]=lease.zoneKey4C0(i);if(!nextKeys.keys_[i])return r;
+        for(std::size_t j=0;j<i;++j)if(nextKeys.keys_[j]==nextKeys.keys_[i])return r;
     }
-    const LiveZoneStorage50EN legacyBacking{retainedBacking.legacyLinks_.data(),retainedBacking.legacyEntries_.data(),retainedBacking.legacyLinks_.size()};
-    const LiveZoneStorage50EN scBacking{retainedBacking.scLinks_.data(),retainedBacking.scEntries_.data(),retainedBacking.scLinks_.size()};
-    const LiveZoneStorage50EN tcBacking{retainedBacking.tcLinks_.data(),retainedBacking.tcEntries_.data(),retainedBacking.tcLinks_.size()};
-    const LiveZoneStorage50EN backing=tc?tcBacking:sc?scBacking:legacyBacking;
-    const LiveZoneStorage50EN inactive=sc||tc?legacyBacking:scBacking;
-    const LiveZoneStorage50EN secondInactive=tc?scBacking:tcBacking;
+    const LiveZoneStorage50EN backing{retainedBacking.links_.data(),retainedBacking.entries_.data(),activeCapacity};
     OriginalCameraSceneOwner next;
     r.status=Status::storage;
     if(!bindFreshOriginalCameraScene(next,sessionGeneration,sceneKey,lease.cameraObject30(),backing))return r;
-    // Whole facade writes and full selected membership spans are admitted. The
-    // unused typed backing is also protected against a malformed aliased call.
+    // Admit the active membership writes and protect the unused tail against
+    // malformed aliasing. The active capacity is not the maximum backing size.
     const OriginalCameraSceneSpan writes[]={{&spatial,sizeof spatial},{&keys,sizeof keys},{&scene,sizeof scene}};
     const OriginalCameraSceneSpan reads[]={{&backing,sizeof backing},{&actualWorldOwner,sizeof actualWorldOwner},
         {racer,sizeof *racer},{racer->storage.links,racer->storage.capacity*sizeof(CollectionZoneLink50BX)},
         {racer->storage.entries,racer->storage.capacity*sizeof(LiveZoneEntry50EN)},
-        {inactive.links,inactive.capacity*sizeof(CollectionZoneLink50BX)},
-        {inactive.entries,inactive.capacity*sizeof(LiveZoneEntry50EN)},
-        {secondInactive.links,secondInactive.capacity*sizeof(CollectionZoneLink50BX)},
-        {secondInactive.entries,secondInactive.capacity*sizeof(LiveZoneEntry50EN)}};
-    if(!admitOriginalCameraSceneStorage(*world,next,*workspace,writes,3,reads,9))return r;
+        {retainedBacking.links_.data()+activeCapacity,(retainedBacking.links_.size()-activeCapacity)*sizeof(CollectionZoneLink50BX)},
+        {retainedBacking.entries_.data()+activeCapacity,(retainedBacking.entries_.size()-activeCapacity)*sizeof(LiveZoneEntry50EN)}};
+    const std::size_t readCount=activeCapacity<retainedBacking.links_.size()?7u:5u;
+    if(!admitOriginalCameraSceneStorage(*world,next,*workspace,writes,3,reads,readCount))return r;
     r.status=Status::attachment;
     r.registration=attachOriginalCameraSceneFromRacer175224(*world,next,*racer,*workspace);
     if(r.registration.status!=LiveZoneStatus50EN::Complete)return r;

@@ -90,6 +90,30 @@ inline bool beginAiAttackDrive1711E0(const TrackNavigationView50TB& track,
 }
 // TB-CONSUMER-END 0
 
+// GB-CONSUMER-BEGIN 0
+inline bool beginAiAttackDrive1711E0(const TrackNavigationView50GB& track,
+    std::uint32_t currentNode,std::uint32_t mode1050,std::uint8_t& flagsB9C,
+    float& field104C,AiAttackDriveGlobals50LH& globals,
+    AiAttackDriveSelection50LH& selection,AiDrivingDiagnostic50IV& diagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiReady(track)) {
+        selection={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x17121cu,currentNode);
+    }
+    return beginAiAttackDrive1711E0Shared50MB(track,currentNode,mode1050,flagsB9C,field104C,globals,selection,diagnostic);
+}
+// GB-CONSUMER-END 0
+
+// MC-CONSUMER-BEGIN 0
+inline bool beginAiAttackDrive1711E0(const TrackNavigationView50MC& track,
+    std::uint32_t currentNode,std::uint32_t mode1050,std::uint8_t& flagsB9C,
+    float& field104C,AiAttackDriveGlobals50LH& globals,
+    AiAttackDriveSelection50LH& selection,AiDrivingDiagnostic50IV& diagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiReady(track)) {
+        selection={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x17121cu,currentNode);
+    }
+    return beginAiAttackDrive1711E0Shared50MB(track,currentNode,mode1050,flagsB9C,field104C,globals,selection,diagnostic);
+}
+// MC-CONSUMER-END 0
+
 struct AiAttackSpeedInput50LH {
     const TrackNavigation50EU* trackFF4=nullptr;
     const AiTrackMetadata50IU* metadata=nullptr;
@@ -141,6 +165,34 @@ struct AiAttackSpeedInput50TB {
 };
 // TB-CONSUMER-END 1
 
+// GB-CONSUMER-BEGIN 1
+struct AiAttackSpeedInput50GB {
+    TrackNavigationView50GB trackFF4{};
+    AiTrackMetadataView50GB metadata{};
+    const AiObservedRacer50IV* target=nullptr;
+    const float* selfPosition190=nullptr;
+    std::uint32_t selfNodeC80=0;
+    std::int32_t selfLapCC8=0,myMinSpeed108C=0;
+    float preparedFactor=0.f,selfCachedSpeed34=0.f;
+    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
+    void* diagnosticContext=nullptr;
+};
+// GB-CONSUMER-END 1
+
+// MC-CONSUMER-BEGIN 1
+struct AiAttackSpeedInput50MC {
+    TrackNavigationView50MC trackFF4{};
+    AiTrackMetadataView50MC metadata{};
+    const AiObservedRacer50IV* target=nullptr;
+    const float* selfPosition190=nullptr;
+    std::uint32_t selfNodeC80=0;
+    std::int32_t selfLapCC8=0,myMinSpeed108C=0;
+    float preparedFactor=0.f,selfCachedSpeed34=0.f;
+    ai_combat_distance50LH::DiagnosticSink diagnostic=nullptr;
+    void* diagnosticContext=nullptr;
+};
+// MC-CONSUMER-END 1
+
 struct AiAttackSpeedReceipt50LH {
     float selfGateDistance=0.f,targetGateDistance=0.f,signedDistance=0.f;
     float targetForwardAcceleration=0.f,desiredSpeed=0.f;
@@ -162,8 +214,16 @@ inline bool applyAiAttackSpeed16FB50Admission50MB(const AiAttackSpeedInput50TC& 
 inline bool applyAiAttackSpeed16FB50Admission50MB(const AiAttackSpeedInput50TB& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
 // TB-CONSUMER-END 2
 
+// GB-CONSUMER-BEGIN 2
+inline bool applyAiAttackSpeed16FB50Admission50MB(const AiAttackSpeedInput50GB& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
+// GB-CONSUMER-END 2
+
+// MC-CONSUMER-BEGIN 2
+inline bool applyAiAttackSpeed16FB50Admission50MB(const AiAttackSpeedInput50MC& in) noexcept {return navigation_consumer_detail50MB::aiJoined(in.trackFF4,in.metadata);}
+// MC-CONSUMER-END 2
+
 template<class Input>
-    requires (std::is_same_v<Input,AiAttackSpeedInput50LH>||std::is_same_v<Input,AiAttackSpeedInput50MB>||std::is_same_v<Input,AiAttackSpeedInput50TC>||std::is_same_v<Input,AiAttackSpeedInput50TB>)
+    requires (std::is_same_v<Input,AiAttackSpeedInput50LH>||std::is_same_v<Input,AiAttackSpeedInput50MB>||std::is_same_v<Input,AiAttackSpeedInput50TC>||std::is_same_v<Input,AiAttackSpeedInput50TB>||std::is_same_v<Input,AiAttackSpeedInput50GB>||std::is_same_v<Input,AiAttackSpeedInput50MC>)
 inline bool applyAiAttackSpeed16FB50Shared50MB(const Input& input,
     PlayerReadResult48X& actions,AiAttackSpeedReceipt50LH& receipt,
     AiDrivingDiagnostic50IV& diagnostic,AiSpeedDiagnostic50IR& speedDiagnostic) noexcept {
@@ -256,5 +316,27 @@ inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50TB& input,
     return applyAiAttackSpeed16FB50Shared50MB(input,actions,receipt,diagnostic,speedDiagnostic);
 }
 // TB-CONSUMER-END 3
+
+// GB-CONSUMER-BEGIN 3
+inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50GB& input,
+    PlayerReadResult48X& actions,AiAttackSpeedReceipt50LH& receipt,
+    AiDrivingDiagnostic50IV& diagnostic,AiSpeedDiagnostic50IR& speedDiagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiJoined(input.trackFF4,input.metadata)) {
+        receipt={};speedDiagnostic={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x16fb80u);
+    }
+    return applyAiAttackSpeed16FB50Shared50MB(input,actions,receipt,diagnostic,speedDiagnostic);
+}
+// GB-CONSUMER-END 3
+
+// MC-CONSUMER-BEGIN 3
+inline bool applyAiAttackSpeed16FB50(const AiAttackSpeedInput50MC& input,
+    PlayerReadResult48X& actions,AiAttackSpeedReceipt50LH& receipt,
+    AiDrivingDiagnostic50IV& diagnostic,AiSpeedDiagnostic50IR& speedDiagnostic) noexcept {
+    if(!navigation_consumer_detail50MB::aiJoined(input.trackFF4,input.metadata)) {
+        receipt={};speedDiagnostic={};return ai_driving_detail50IV::fail(diagnostic,AiDrivingError50IV::Owner,0x16fb80u);
+    }
+    return applyAiAttackSpeed16FB50Shared50MB(input,actions,receipt,diagnostic,speedDiagnostic);
+}
+// MC-CONSUMER-END 3
 
 } //namespace rr::game

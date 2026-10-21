@@ -7,6 +7,7 @@
 #include "vehicle_window_gl50ds.h"
 #include "../../../src/assets/original_ui_localization50kg.h"
 #include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
+#include "../../../src/game/original_course_load_selection50kg.h"
 #include <chrono>
 #include <memory>
 
@@ -21,6 +22,9 @@ class OriginalUiCourseRaceDestination50KG {
 public:
     virtual ~OriginalUiCourseRaceDestination50KG()=default;
     virtual bool admits(const OriginalUiRiderProfileOwner50KG::CourseRaceSelection&)const noexcept=0;
+    virtual game::OriginalCourseLoadAvailability50KG availability(const OriginalUiRiderProfileOwner50KG::CourseRaceSelection& s)const noexcept {
+        return admits(s)?game::OriginalCourseLoadAvailability50KG::ready:game::OriginalCourseLoadAvailability50KG::hostNotReady;
+    }
 };
 enum class OriginalUiFrontendStatus50KG : std::uint8_t {
     ok,noChange,unavailableDestination,secondControllerRequired,routeAccepted,
@@ -31,6 +35,7 @@ struct OriginalUiFrontendDiagnostic50KG {
     OriginalUiFrontendStatus50KG status=OriginalUiFrontendStatus50KG::ok;
     OriginalUiFrontendStatus50KG preparationStatus=OriginalUiFrontendStatus50KG::ok;
     std::uint32_t sourcePC=0;
+    game::OriginalCourseLoadAvailability50KG courseLoad=game::OriginalCourseLoadAvailability50KG::hostNotReady;
     OriginalUiMainSessionDiagnostic50KG main{};
     OriginalUiOptionsSessionDiagnostic50KG options{};
     OriginalUiOptionsDrawDiagnostic50KG optionsResources{};

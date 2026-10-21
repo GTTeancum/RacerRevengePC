@@ -1,5 +1,6 @@
 #pragma once
 #include "original_ui_active_time_ledger50kg.h"
+#include "original_ui_pcm_drain50kg.h"
 #include "../../platform/linux/native/original_ui_main_audio50kg.h"
 #include "../../platform/linux/native/audio_output50hd.h"
 #include "../../platform/linux/native/original_sound_mode50kg.h"
@@ -13,6 +14,16 @@ namespace original_main_entry50KG {
 // Dedicated frontend device/WAV ownership. No reference to a race mixer, live
 // owner or race voice is accepted. Close this owner BEFORE any future race
 // output opens. The Course race handoff uses this same close boundary.
+// Diagnostic evidence only, never an admission receipt. Completed prefix and
+// attempted chunk remain visible after a fail-stop; do not replay either.
+struct PcmDrainObservation50KG {
+    pcm_drain_detail50KG::Plan plan{};
+    pcm_drain_detail50KG::Progress progress{};
+    rr::platform::AudioOutputInfo50HD before{},after{};
+    rr::platform::AudioOutputDiagnostic50HD diagnostic{};
+    std::uint64_t sourceMixedBefore=0,sourceMixedAfter=0;
+    bool prepared=false,incomplete=false;
+};
 class AudioOutput final {
 public:
     AudioOutput() = default;
@@ -63,8 +74,9 @@ public:
         transport_->pause(value);
         output_.pauseDevice(value); // Flush stale device PCM; retain source cursor/WAV.
     }
-    // The SAME elapsed nanosecond interval supplied to the accepted source
-    // update. Carry fractional microseconds rather than round every frame.
+    // Full measured active nanoseconds associated with one accepted source
+    // update, NOT its separately recovered/capped source factor. Carry
+    // fractional microseconds rather than round every frame.
     // Paused wall time is excluded by the caller; no render-rate resampling.
     bool advanceAcceptedNanoseconds(std::uint64_t nanoseconds,
         rr::platform::AudioOutputDiagnostic50HD& diagnostic) noexcept {
@@ -77,18 +89,57 @@ public:
         }
         legacyAdvanced_=true;
         if(!enabled_)return true; // Explicit mute owns no output or PCM transport.
-        if(closed_ || !transport_ || transport_->paused() || nanoseconds>1000000000ull ||
-            nanoseconds>std::numeric_limits<std::uint64_t>::max()-acceptedNanoseconds_){
+        if(closed_ || !transport_ || !transport_->ready() || transport_->paused()){
             diagnostic.error=rr::platform::AudioOutputError50HD::Clock;
             diagnostic.operation="Main output accepted interval";return false;
         }
-        const auto carried=nanoseconds+remainderNanoseconds_;
-        if(!output_.advanceMicroseconds(*transport_,static_cast<std::uint32_t>(carried/1000),diagnostic))
-            return false;
-        remainderNanoseconds_=static_cast<std::uint32_t>(carried%1000);
+        namespace drain=pcm_drain_detail50KG;
+        const auto before=output_.info();const auto sourceBefore=mixer_.mixedFrames();
+        if(before.paused||before.sampleRate!=transport_->sampleRate()){
+            diagnostic.error=rr::platform::AudioOutputError50HD::Clock;
+            diagnostic.operation="Main output live PCM domain";return false;
+        }
+        drain::Plan plan;
+        const drain::Counters counters{before.sampleRate,before.simulationMicroseconds,
+            before.mixedFrames,sourceBefore,before.capturedFrames,before.captureActive};
+        const auto preflight=drain::prepare(nanoseconds,acceptedNanoseconds_,remainderNanoseconds_,counters,plan);
+        if(preflight!=drain::Error::none){
+            diagnostic.error=preflight==drain::Error::captureLimit?
+                rr::platform::AudioOutputError50HD::CaptureLimit:rr::platform::AudioOutputError50HD::Clock;
+            diagnostic.operation="Main full PCM interval arithmetic/RIFF preflight";return false;
+        }
+        lastDrain_={};lastDrain_.prepared=true;lastDrain_.plan=plan;
+        lastDrain_.before=lastDrain_.after=before;lastDrain_.sourceMixedBefore=lastDrain_.sourceMixedAfter=sourceBefore;
+        std::uint64_t dropped=0;
+        const bool complete=drain::drain(plan,lastDrain_.progress,[&](std::uint32_t us,std::uint64_t prefix)noexcept{
+            rr::platform::AudioOutputDiagnostic50HD chunkDiagnostic;
+            const bool ok=output_.advanceMicroseconds(*transport_,us,chunkDiagnostic);
+            dropped+=chunkDiagnostic.droppedDeviceFrames; // <=prevalidated total due frames.
+            diagnostic=chunkDiagnostic;diagnostic.droppedDeviceFrames=dropped;
+            const auto after=output_.info();const auto sourceAfter=mixer_.mixedFrames();
+            lastDrain_.after=after;lastDrain_.sourceMixedAfter=sourceAfter;
+            const auto due=drain::framesThrough(plan,before.sampleRate,prefix);
+            const bool counted=ok&&after.sampleRate==before.sampleRate&&
+                after.simulationMicroseconds==before.simulationMicroseconds+prefix&&
+                after.mixedFrames==before.mixedFrames+due&&sourceAfter==sourceBefore+due&&
+                after.captureActive==before.captureActive&&
+                after.capturedFrames==before.capturedFrames+(before.captureActive?due:0);
+            if(!counted){
+                // Even false may advance the whole chunk clock, voice prefix,
+                // complete WAV blocks, partial bytes or the device queue.
+                advancementFault_=true;lastDrain_.incomplete=true;
+                if(ok){diagnostic.error=rr::platform::AudioOutputError50HD::Clock;
+                    diagnostic.operation="Main irreversible PCM counter mismatch";}
+                lastDrain_.diagnostic=diagnostic;return false;
+            }
+            lastDrain_.diagnostic=diagnostic;return true;
+        });
+        if(!complete)return false;
+        remainderNanoseconds_=plan.remainderNanoseconds;
         acceptedNanoseconds_+=nanoseconds;
         return true;
     }
+    const PcmDrainObservation50KG& lastPcmDrain()const noexcept{return lastDrain_;}
     rr::platform::AudioOutputInfo50HD info() const noexcept { return output_.info(); }
     std::uint64_t sourceMixedFrames() const noexcept { return mixer_.mixedFrames(); }
     std::uint64_t acceptedNanoseconds() const noexcept { return acceptedNanoseconds_; }
@@ -214,6 +265,7 @@ private:
     bool attempted_=false,enabled_=false,closed_=false;
     std::uint64_t acceptedNanoseconds_=0;
     std::uint32_t remainderNanoseconds_=0;
+    PcmDrainObservation50KG lastDrain_{};
     // Dormant until the application explicitly binds its private ledger.
     // No ordinary path creates these lifetimes or selects typed mode.
     bool legacyAdvanced_=false,typedBound_=false,typedMuted_=false,advancementFault_=false;

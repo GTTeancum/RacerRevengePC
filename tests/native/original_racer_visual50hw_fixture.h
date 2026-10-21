@@ -894,7 +894,7 @@ public:
         };
         std::array<EngineDraft,4> drafts;
         auto samplers=samplers_;
-        std::size_t totalBodyColorCount=0;
+        std::size_t totalBodyColorCount=0,totalSpecularPairCount=0;
         // Resource pointers and level borrows are cold-call-only dedup keys.
         // Only copied native RGBA, slot identities and samplers are published.
         struct SpecularProjection {
@@ -936,7 +936,8 @@ public:
                 resource->scene()->materials==scene->materials&&
                 *references.count1C0()==scene->materials.size()&&
                 scene->materials.size()==windowBindings_[component].size()&&
-                scene->materials.size()==textures[component].size(),
+                scene->materials.size()==textures[component].size()&&
+                scene->materials.size()==componentMaterials_[component].size(),
                 "Canonical engine PSG/material ordinal identity differs");
             //Borrow only immutable cold mapping descriptors, as opponent cold
             //storage preparation does. No batch is built, no matrix is read, and
@@ -1004,12 +1005,16 @@ public:
                     "Canonical engine program differs from authenticated display selection");
                 const auto programName=rig_detail::lower(program.canonicalName);
                 const bool flame=programName=="diffusetextranscompressed";
-                s::need(flame||programName=="specularmapdualcompressed",
+                const bool singleDiffuse=programName=="diffusecompressed";
+                // A single diffuse body cannot fall back to the older opaque-
+                // alpha base route. It requires its complete RGBA consumer.
+                s::need(flame||programName=="specularmapdualcompressed"||
+                    (singleDiffuse&&useOriginalBodyColors50LA),
                     "Canonical engine program has no admitted host base-map projection");
-                s::need(!flame||*pass.mapCount20==1,
-                    "Canonical engine flame requires its original single map");
+                s::need(!(flame||singleDiffuse)||*pass.mapCount20==1,
+                    "Canonical engine single-map program requires its original single map");
                 s::need(pass.state30->contextCount()>=1&&pass.state30->contextCount()<=2&&
-                    (!flame||pass.state30->contextCount()==1)&&(*pass.uv1E)[0]==0,
+                    (!(flame||singleDiffuse)||pass.state30->contextCount()==1)&&(*pass.uv1E)[0]==0,
                     "Canonical engine native base-map context/UV projection is unsupported");
                 a::OriginalStandardTextureRowView50LA textureRow;
                 const auto token=(*pass.texture1A)[0];
@@ -1073,7 +1078,63 @@ public:
                     binding.blend=p::VehicleWindowBlend50DS::sourceAlpha;
                     binding.alphaScale=(255.f/128.f)*(255.f/128.f);
                 }
-                if(useOriginalBodyColors50LA&&!flame){
+                if(singleDiffuse){
+                    // Separate static single-map capability. No map2 is invented,
+                    // no material ordinal is dropped, and no racer name selects it.
+                    // The positive-palette RGBA/fog producer remains a separately
+                    // authenticated per-frame requirement of the native consumer.
+                    s::need(scene->nodes.size()>1&&resource->scene()->nodes.size()==scene->nodes.size()&&
+                        *pass.flags21==2u&&!pass.animation10&&!pass.textureAnimation10&&
+                        pass.parameterCount28&&*pass.parameterCount28==0&&
+                        pass.parameterMask24&&!*pass.parameterMask24&&!pass.parameters34&&
+                        state.runtime435670==0&&value(Field::environmentContext0or1)==0&&
+                        value(Field::textureFunction)==0&&value(Field::textureColorComponent)==1&&
+                        value(Field::textureMappingOnOff)==1&&value(Field::gouraudShadingOnOff)==1&&
+                        value(Field::textureCoordinatesSTQorUV)==0&&value(Field::colorClampingMethod)==1&&
+                        value(Field::alphaCorrectionValue)==0&&value(Field::alphaBlendingControlInUnitsOfPixels)==0&&
+                        value(Field::onePassAntiAliasingOnOff)==0&&value(Field::fragmentValueControlFixedOrNot)==0&&
+                        value(Field::foggingOnOff)==1&&blend==0&&depth==0&&value(Field::depthTestMethod)==2&&
+                        value(Field::alphaTestOnOff)==1&&value(Field::alphaTestMethod)==6&&
+                        value(Field::alphaReferenceValue)==0&&value(Field::processingMethodWhenFailedInAlphaTest)==0&&
+                        value(Field::destinationAlphaTestOnOff)==0,
+                        "Canonical single diffuse context has no admitted static RGBA/fog/alpha/depth projection");
+                    const auto* retainedMaterial=componentMaterials_[component][ordinal];
+                    s::need(retainedMaterial&&retainedMaterial->passes.size()==1&&material->name00(),
+                        "Canonical single diffuse authored pass ownership differs");
+                    const auto& authored=retainedMaterial->passes.front();
+                    for(const auto* fields:{&retainedMaterial->general,&authored.fields})
+                        for(const char* key:{"VertexAnimation","TextureAnimation","PixelAnimation"}){
+                            const auto animation=rig_detail::lower(visual_detail::field(*fields,key));
+                            s::need(animation.empty()||animation=="none",
+                                "Canonical single diffuse authored animation is unsupported");
+                        }
+                    const auto slash=material->name00()->find_last_of('\\');
+                    const auto prefix=slash==std::string::npos?std::string{}:material->name00()->substr(0,slash+1);
+                    s::need(authored.pass==1&&rig_detail::lower(authored.microprogram)==programName&&
+                        authored.textures.size()==1&&authored.textures[0].slot==1&&firstMap.map==0&&
+                        textureRow.name00&&texture.references00()&&*texture.references00()>0&&texture.name20()&&
+                        visual_detail::sameSourceMember(*textureRow.name00,prefix+authored.textures[0].name)&&
+                        visual_detail::sameSourceMember(*texture.name20(),*textureRow.name00+".pst")&&
+                        visual_detail::sameSourceMember(*texture.sourceMember(),*texture.name20())&&
+                        texture.sourceFormat()&&*texture.sourceFormat()==a::OriginalStandardTextureSourceFormat50LA::pstIndexed,
+                        "Canonical single diffuse map differs from its actual authored PST owner");
+                    using Provider=a::OriginalStandardArchiveProvider50LA;
+                    const auto* provider=domain.archiveProvider3E1A70().get();
+                    Provider::MemberView sourceMember;
+                    const auto& sourceBytes=*texture.originalBytes();
+                    s::need(provider&&provider->sealed()&&
+                        provider->lookup132820(*texture.sourceMember(),sourceMember)==Provider::Lookup::present&&
+                        sourceMember.member&&sourceMember.data&&sourceMember.size==sourceBytes.size()&&
+                        visual_detail::sameSourceMember(*sourceMember.member,*texture.sourceMember())&&
+                        std::equal(sourceBytes.begin(),sourceBytes.end(),sourceMember.data),
+                        "Canonical single diffuse bytes differ from the same actual mounted source");
+                    binding.sourceDiffuseCompressed50LA=true;
+                    binding.sourceSingleDiffuseRgba50LA=true;
+                    binding.sourceBaseFog50LA=value(Field::foggingOnOff)!=0;
+                    binding.sourceBaseAlphaTest50LA=value(Field::alphaTestOnOff)!=0;
+                    binding.depthEqual=true;
+                    bodyColorModes[ordinal]=1;++bodyColorCount;
+                }else if(useOriginalBodyColors50LA&&!flame){
                     // The source pair is admitted together; no active parameter,
                     // animation or alternate one-node program path is substituted.
                     s::need(programName=="specularmapdualcompressed"&&*pass.mapCount20==2&&
@@ -1207,7 +1268,7 @@ public:
                     binding.sourceBaseFog50LA=value(Field::foggingOnOff)!=0;
                     binding.sourceSpecularFog50LA=secondValue(Field::foggingOnOff)!=0;
                     binding.sourceSpecularAlphaTest50LA=alphaTest!=0;binding.depthEqual=true;
-                    bodyColorModes[ordinal]=1;++bodyColorCount;
+                    bodyColorModes[ordinal]=1;++bodyColorCount;++totalSpecularPairCount;
                 }
                 if(engine>=2u){
                     const auto& retained=windowBindings_[component][ordinal];
@@ -1230,9 +1291,14 @@ public:
                 "Canonical engine has no actual body-color material");
             totalBodyColorCount+=bodyColorCount;
         }
-        if(useOriginalBodyColors50LA){
-            s::need(!specularProjections.empty()&&specularSlots.size()==totalBodyColorCount&&
+        if(useOriginalBodyColors50LA)
+            s::need(totalBodyColorCount&&totalSpecularPairCount<=totalBodyColorCount&&
+                specularSlots.size()==totalSpecularPairCount&&
+                specularProjections.empty()==(totalSpecularPairCount==0)&&
                 specularSamplers.size()==specularProjections.size(),"Canonical second-map publication is incomplete");
+        // A pure single-map engine family owns no map2 bank. Mixed families
+        // retain only the genuine dual slots, in their unchanged cold order.
+        if(useOriginalBodyColors50LA&&totalSpecularPairCount){
             std::vector<a::MaterialTextureAssetInput50EA> specularInput;
             specularInput.reserve(specularProjections.size());
             for(const auto& projection:specularProjections)
@@ -1276,12 +1342,17 @@ public:
         g::VehicleDrawBatchSourceColors50LA next;
         next.component[component]={canonicalBodyColorModes50LA_.data(),
             static_cast<std::uint32_t>(canonicalBodyColorModes50LA_.size()),&lights};
-        next.component[component].prepareSpecular50LA=canonicalEngineSpecularMaterials_.loaded();
+        // Legacy-named switch retains actual root/aggregate/palette geometry
+        // for BOTH single-map fog and map2. A nonempty source-color mode bank
+        // is published only after this engine has an authenticated body slot;
+        // a map2 texture bank is neither necessary nor sufficient for that.
+        next.component[component].prepareSpecular50LA=true;
         output=next;return true;
     }
     // One completed light publication and the actual component rows. Each
-    // requests its own model bounds/root/normals for the shared cold pair bank.
+    // requests its own model bounds/root/normals for single-map fog or map2.
     // The optional lower pair is complete or absent; failure preserves output.
+    bool hasCanonicalBodyColors50LA()const noexcept {return canonicalRightBound_&&!canonicalBodyColorModes50LA_.empty();}
     bool canonicalEngineSourceColors50LA(const g::NativeGcSelectedLightsCandidate& lights,
         std::uint32_t actualRacerSlot,g::VehicleDrawBatchSourceColors50LA& output)const noexcept {
         constexpr auto left=static_cast<unsigned>(g::VehicleDrawComponent50CM::leftEngine);
@@ -1290,7 +1361,7 @@ public:
            canonicalLeftBodyColorModes50LA_.empty()||!lights.component(left))return false;
         next.component[left]={canonicalLeftBodyColorModes50LA_.data(),
             static_cast<std::uint32_t>(canonicalLeftBodyColorModes50LA_.size()),&lights};
-        next.component[left].prepareSpecular50LA=canonicalEngineSpecularMaterials_.loaded();
+        next.component[left].prepareSpecular50LA=true;
         if(componentCount==5u){
             if(podId!="POD02"||!canonicalLowerBound_[0]||!canonicalLowerBound_[1])return false;
             for(unsigned lower=0;lower<2;++lower){
@@ -1298,7 +1369,7 @@ public:
                 const auto& modes=canonicalLowerBodyColorModes50LA_[lower];
                 if(modes.empty()||!lights.component(component))return false;
                 next.component[component]={modes.data(),static_cast<std::uint32_t>(modes.size()),&lights};
-                next.component[component].prepareSpecular50LA=canonicalEngineSpecularMaterials_.loaded();
+                next.component[component].prepareSpecular50LA=true;
             }
         }
         output=next;return true;

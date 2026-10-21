@@ -18,7 +18,7 @@ bool audio(P& p,K k,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return
 bool prompt(P& p,std::uint32_t mask,std::uint32_t pc)noexcept {if(p.count==p.steps.size())return false;p.steps[p.count++]={K::promptMask42C,0,O::hide,false,pc,mask};p.writesPromptMask42C=true;p.promptMask42C=mask;return true;}
 bool bounded(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
  constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
- return (!p.sebulbaTbTest||(!p.scorchRcTest&&!p.tzidikTcTest&&!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&(!p.scorchRcTest||(!p.tzidikTcTest&&!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&(!p.tzidikTcTest||(!p.gasganoScTest&&!p.wanMbTest&&!p.mawhonicRylothTest))&&!(p.wanMbTest&&p.mawhonicRylothTest)&&(!p.gasganoScTest||(!p.wanMbTest&&!p.mawhonicRylothTest))&&p.mode34==0&&p.course700>=1&&p.course700<=(p.sebulbaTbTest?6u:p.scorchRcTest?12u:p.tzidikTcTest?13u:(p.gasganoScTest?9u:(p.wanMbTest?7u:(p.mawhonicRylothTest?5u:4u))))&&p.subtype70C==1&&!(p.flags100BC&1)&&(p.flags11018&31)==(p.sebulbaTbTest?6u:p.scorchRcTest?12u:p.tzidikTcTest?13u:(p.gasganoScTest?9u:(p.wanMbTest?7u:(p.mawhonicRylothTest?5u:4u))))&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
+ return p.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C==1&&!(p.flags100BC&1)&&(p.flags11018&31u)>=1&&(p.flags11018&31u)<=13&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
 }
 struct OriginalUiCourseWidgetController50KG::Storage {std::shared_ptr<const assets::OriginalUiArchive50KG> archive;assets::OriginalUiDat50KG pageDat,widgets;assets::OriginalUiPage50KG page;std::array<std::int32_t,24> courseIndex{};};
 OriginalUiCourseWidgetController50KG::OriginalUiCourseWidgetController50KG()noexcept=default;
@@ -41,7 +41,7 @@ S OriginalUiCourseWidgetController50KG::moveCourse(const OriginalUiNavigation50K
     P p;p.navigation=n;OriginalUiCommands50KG commands;
     if(moveOriginalUiControl50KG(p.navigation,1,forward,commands)!=OriginalUiNavigationStatus50KG::ok||!expand(p,commands))return S::invalidNavigation;
     const auto slot=p.navigation.groups[1].selectedSlot;
-    if(!slot||slot>(profile.sebulbaTbTest?6u:profile.scorchRcTest?12u:profile.tzidikTcTest?13u:(profile.gasganoScTest?9u:(profile.wanMbTest?7u:(profile.mawhonicRylothTest?5u:4u))))||!control(p,page()->groups[1].controls[slot-1],O::reset,false,0x2A5A38))return S::invalidNavigation;
+    if(!slot||slot>page()->groups[1].controls.size()||!control(p,page()->groups[1].controls[slot-1],O::reset,false,0x2A5A38))return S::invalidNavigation;
     out=p;return S::ok;
 }
 S OriginalUiCourseWidgetController50KG::moveRow(const OriginalUiNavigation50KG& n,bool down,
@@ -49,7 +49,7 @@ S OriginalUiCourseWidgetController50KG::moveRow(const OriginalUiNavigation50KG& 
     if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
     const auto old=n.controllerGroup[0];
     if(old<1||old>3||n.controllerGroup[1]!=-1||!n.groups[1].enabled||!n.groups[2].enabled||!n.groups[3].enabled||
-       !n.groups[1].selectedSlot||n.groups[1].selectedSlot>(profile.sebulbaTbTest?6u:profile.scorchRcTest?12u:profile.tzidikTcTest?13u:(profile.gasganoScTest?9u:(profile.wanMbTest?7u:(profile.mawhonicRylothTest?5u:4u))))||
+       !n.groups[1].selectedSlot||n.groups[1].selectedSlot>page()->groups[1].controls.size()||
        n.groups[2].selectedSlot!=1||n.groups[3].selectedSlot!=0)return S::invalidNavigation;
     // Source1DF674/1DF810 choose the destination explicitly, not by scanning
     // every enabled group (the enabled Back/Confirm groups are not rows).
@@ -76,7 +76,7 @@ S OriginalUiCourseWidgetController50KG::moveLaps(const OriginalUiNavigation50KG&
     const OriginalUiCourseWidgetProfile50KG& profile,OriginalUiCourseLapMove50KG& out)const noexcept {
     if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
     if(n.controllerGroup[0]!=3||n.controllerGroup[1]!=-1||!n.groups[1].enabled||!n.groups[2].enabled||!n.groups[3].enabled||
-       !n.groups[1].selectedSlot||n.groups[1].selectedSlot>(profile.sebulbaTbTest?6u:profile.scorchRcTest?12u:profile.tzidikTcTest?13u:(profile.gasganoScTest?9u:(profile.wanMbTest?7u:(profile.mawhonicRylothTest?5u:4u))))||
+       !n.groups[1].selectedSlot||n.groups[1].selectedSlot>page()->groups[1].controls.size()||
        n.groups[3].selectedSlot!=0||n.groups[2].selectedSlot!=1||laps<1||laps>25)return S::invalidNavigation;
     OriginalUiCourseLapMove50KG next;
     next.laps14EC=forward?(laps==25?1:laps+1):(laps==1?25:laps-1);

@@ -33,7 +33,7 @@ inline constexpr Entry coursePod19{19,"POD19","Anakin Skywalker","pod19/pod.json
 // Genuine supplemental Course identities, outside the retained eight-entry
 // host-menu cycle. Names are the originals' own PHY Name fields. Every cold
 // selection still requires that pod's authenticated RES/import/PHY owners.
-inline constexpr std::array<Entry,9> additionalCoursePods{{
+inline constexpr std::array<Entry,14> additionalCoursePods{{
     {2,"POD02","Ben Quad","pod02/pod.json",true,"RACER: BEN QUAD"},
     {12,"POD12","Shrivel Braittrand","pod12/pod.json",true,"RACER: SHRIVEL BRAITTRAND"},
     {15,"POD15","Teemto","pod15/pod.json",true,"RACER: TEEMTO"},
@@ -42,7 +42,13 @@ inline constexpr std::array<Entry,9> additionalCoursePods{{
     {17,"POD17","Scorch Zanales","pod17/pod.json",true,"RACER: SCORCH ZANALES"},
     {18,"POD18","Sebulba 2","pod18/pod.json",true,"RACER: SEBULBA 2"},
     {24,"POD24","Tzidik Wrantojo","pod24/pod.json",true,"RACER: TZIDIK WRANTOJO"},
-    {22,"POD22","Knire Dark","pod22/pod.json",true,"RACER: KNIRE DARK"}
+    {22,"POD22","Knire Dark","pod22/pod.json",true,"RACER: KNIRE DARK"},
+    // Resource identity only; the live Course join remains pending.
+    {23,"POD23","Kraid Nemmeso","pod23/pod.json",true,"RACER: KRAID NEMMESO"},
+    {14,"POD14","Sebulba","pod14/pod.json",true,"RACER: SEBULBA"},
+    {21,"POD21","Darth Maul","pod21/pod.json",true,"RACER: DARTH MAUL"},
+    {25,"POD25","Watto","pod25/pod.json",true,"RACER: WATTO"},
+    {26,"POD26","Darth Vader","pod26/pod.json",true,"RACER: DARTH VADER"}
 }};
 inline constexpr const Entry* findByRacer60(std::uint32_t value) noexcept {
     for(const auto& entry:entries)if(entry.racer60==value)return &entry;

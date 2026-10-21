@@ -64,7 +64,24 @@ inline bool read(const std::filesystem::path& discRoot,std::uint32_t racer60,
             next.catalog[index]=request;
         };
         const auto events=[&](AudioBank50HE bank,const std::string& name,const char* digest,unsigned count){
-            const auto rows=source_announcer_authoring50IE::detail::events(member(name,digest),count);
+            const auto bytes=member(name,digest);
+            if(racer60==26&&bank==AudioBank50HE::PodCurses){
+                // Authenticated POD26 declares14, omits Event2, and retains
+                // Event3..14. Preserve exact source keys: never compact the
+                // hole or synthesize another racer's line for it. Speech-count
+                // selection stays independently authored (sum13).
+                const auto ini=native_racer50HW::rig_detail::ini(bytes);
+                d::need(count==13&&native_racer50HW::rig_detail::value(ini,"responseemitter","numevents")=="14"&&
+                    !ini.count("event2")&&ini.size()==14,"POD26 original sparse curses structure differs");
+                for(unsigned key=1;key<=14;++key){if(key==2)continue;
+                    const auto section="event"+std::to_string(key);
+                    const auto& row=ini.at(section);
+                    d::need(row.size()==2&&row.at("isstream")=="1","POD26 sparse event flags differ");
+                    put(bank,key,{row.at("filename"),false,false,true});
+                }
+                return;
+            }
+            const auto rows=source_announcer_authoring50IE::detail::events(bytes,count);
             for(unsigned key=1;key<=count;++key)put(bank,key,rows[key-1]);
         };
         const auto speechPrefix="audio\\speech\\"+native_racer50HW::rig_detail::lower(identity->podId)+"\\";

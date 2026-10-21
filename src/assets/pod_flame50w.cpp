@@ -38,7 +38,12 @@ bool buildPodFlameOwners50W(const PodFlameModelInput50W* input,std::uint32_t mod
    if(material.passes.size()!=1)return fail(PodFlameError50W::Shader);
    if(!noOtherAnimation(material.general,false))return fail(PodFlameError50W::Animation);
    const auto&pass=material.passes[0];
-   if(equal(pass.microprogram,"SpecularMapDualCompressed")){
+   // Original2208DC/26F438 selects the actual named flame material only.
+   // Static DiffuseCompressed has no animation owner (29BB28 default none,
+   //29BB40 bypasses construction). This is a flame-only projection; do not
+   //remove or rewrite the material in the actual visual model.
+   if(equal(pass.microprogram,"SpecularMapDualCompressed")||
+      equal(pass.microprogram,"DiffuseCompressed")){
     if(!noOtherAnimation(pass.fields,false))return fail(PodFlameError50W::Animation);
     next.references[referenceBase+j]=0;continue;
    }

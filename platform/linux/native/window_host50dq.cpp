@@ -1,5 +1,6 @@
 #include "window_host50dq.h"
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include "native_dynamic_library50win.h"
 #include <exception>
@@ -349,9 +350,35 @@ bool WindowHost50DQ::create(const WindowHostRequest50DQ& r, WindowHostDiagnostic
             std::fprintf(stderr,"native_window_attribute_set id=%d requested=%d\n",attribute[0],attribute[1]);
             return sdlFail(WindowHostError50DQ::AttributeFailure, "SDL_GL_SetAttribute");
         }
-    const UInt flags = windowOpenGl | windowShown | windowHighDpi | (r.resizable ? windowResizable : 0u);
+    // Explicit native presentation policy for window managers which restore a
+    // larger window after initial creation. This changes no logical game size
+    // or renderer capacity. Default resizable/high-DPI behavior is unchanged.
+    const char* fixedSetting=std::getenv("RR_NATIVE_FIXED_WINDOW");
+    if(fixedSetting&&std::strcmp(fixedSetting,"0")&&std::strcmp(fixedSetting,"1"))
+        return sdlFail(WindowHostError50DQ::WindowFailure,"RR_NATIVE_FIXED_WINDOW must be 0 or 1");
+    const bool fixedWindow=fixedSetting&&std::strcmp(fixedSetting,"1")==0;
+    using WindowSizePolicy=void (*)(SdlWindow*,Int,Int);
+    using RestoreWindow=void (*)(SdlWindow*);
+    WindowSizePolicy setMinimum=nullptr,setMaximum=nullptr,setSize=nullptr;
+    RestoreWindow restore=nullptr;
+    if(fixedWindow){
+        char detail[256]{};
+        setMinimum=reinterpret_cast<WindowSizePolicy>(native_library50win::symbol(s.library,"SDL_SetWindowMinimumSize",detail));
+        setMaximum=reinterpret_cast<WindowSizePolicy>(native_library50win::symbol(s.library,"SDL_SetWindowMaximumSize",detail));
+        setSize=reinterpret_cast<WindowSizePolicy>(native_library50win::symbol(s.library,"SDL_SetWindowSize",detail));
+        restore=reinterpret_cast<RestoreWindow>(native_library50win::symbol(s.library,"SDL_RestoreWindow",detail));
+        if(!setMinimum||!setMaximum||!setSize||!restore)
+            return sdlFail(WindowHostError50DQ::MissingEntryPoint,"fixed window size policy SDL entry points");
+    }
+    const UInt flags = windowOpenGl | windowShown |
+        (fixedWindow?0u:(windowHighDpi | (r.resizable ? windowResizable : 0u)));
     s.window = s.createWindow(r.title, windowCentered, windowCentered, r.width, r.height, flags);
     if (!s.window) return sdlFail(WindowHostError50DQ::WindowFailure, "SDL_CreateWindow");
+    if(fixedWindow){
+        setMinimum(s.window,r.width,r.height);setMaximum(s.window,r.width,r.height);
+        restore(s.window);setSize(s.window,r.width,r.height);
+        std::fprintf(stderr,"native_window_fixed_size width=%d height=%d resizable=false high_dpi=false\n",r.width,r.height);
+    }
     s.windowId = s.getWindowId(s.window);
     if (!s.windowId) return sdlFail(WindowHostError50DQ::WindowFailure, "SDL_GetWindowID");
     s.context = s.createContext(s.window);

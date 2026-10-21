@@ -6,12 +6,13 @@
 // reset a source clock, acknowledge an update, or advance audio. Callers supply
 // their retained wall baseline and only actual owner-measured cold credits.
 namespace original_ui_elapsed50LH {
-enum class Error : std::uint8_t {none,backwards,coldExceedsWall,stall};
+enum class Error : std::uint8_t {none,backwards,coldExceedsWall};
 struct Interval {
     Error error=Error::none;
+    bool longActiveInterval=false; // Observation only, not original rejection.
     std::uint64_t wallNanoseconds=0,excludedColdNanoseconds=0,activeNanoseconds=0;
 };
-inline constexpr std::uint64_t activeStallLimitNanoseconds=1000000000ull;
+inline constexpr std::uint64_t longIntervalDiagnosticNanoseconds=1000000000ull;
 inline constexpr Interval project(std::uint64_t last,std::uint64_t now,std::uint64_t cold) noexcept {
     Interval out;
     // Preserve the existing first/resumed-update convention: zero is an
@@ -22,13 +23,13 @@ inline constexpr Interval project(std::uint64_t last,std::uint64_t now,std::uint
     if(cold>out.wallNanoseconds){out.error=Error::coldExceedsWall;return out;}
     out.excludedColdNanoseconds=cold;
     out.activeNanoseconds=out.wallNanoseconds-cold;
-    if(out.activeNanoseconds>activeStallLimitNanoseconds)out.error=Error::stall;
+    if(out.activeNanoseconds>longIntervalDiagnosticNanoseconds)out.longActiveInterval=true;
     return out;
 }
 inline Interval consume(std::uint64_t& last,std::uint64_t now,std::uint64_t& cold) noexcept {
     const auto out=project(last,now,cold);
     // Match the existing throwing host path: invalid ordering does not mutate;
-    // a valid wall interval is consumed before its genuine active-stall gate.
+    // a valid wall interval is consumed without changing its measured duration.
     if(out.error!=Error::backwards&&out.error!=Error::coldExceedsWall){last=now;cold=0;}
     return out;
 }

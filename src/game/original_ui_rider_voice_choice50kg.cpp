@@ -11,6 +11,11 @@ struct OriginalConfirmRange {
 // Constructor count page+53BC+rider*4, first page+5428+rider*4.
 // Explicit authored ranges, never a compact unlocked-list index.
 constexpr OriginalConfirmRange originalConfirmRanges[]{
+    {14,29,2,"Sebulba"}, // original constructor and UIACCEPT
+    {21,46,4,"Darth Maul"}, // original constructor and UIACCEPT
+    {25,56,4,"Watto"}, // original constructor and UIACCEPT
+    {26,60,4,"Darth Vader"}, // original constructor and UIACCEPT
+
     {1,1,4,"Anakin Skywalker (ep1)"}, // count1E7C84, first1E7DAC
     {2,5,2,"Ben Quadinaros"},       // count1E7C98, first1E7DB4
     {3,7,2,"Clegg Holdfast"},      // count1E7CAC, first1E7DBC
@@ -28,7 +33,8 @@ constexpr OriginalConfirmRange originalConfirmRanges[]{
     {18,37,2,"Sebulba 2"}, // original UIACCEPT Event37..38
     {17,35,2,"Scorch Zanales"}, // original UIACCEPT Event35..36
     {24,54,2,"Tzidik Wrantojo"}, // original UIACCEPT Event54..55
-    {22,50,2,"Knire Dark"}        // original UIACCEPT Event50..51
+    {22,50,2,"Knire Dark"},       // original UIACCEPT Event50..51
+    {23,52,2,"Kraid Nemmeso"}      // original UIACCEPT Event52..53
 };
 const OriginalConfirmRange* confirmRange(std::uint32_t rider) noexcept {
     for(const auto& range:originalConfirmRanges)if(range.rider==rider)return &range;

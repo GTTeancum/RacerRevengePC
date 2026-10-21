@@ -29,7 +29,8 @@ inline constexpr WorldMetadata worlds[] = {
     {"SA","TRACKS/SA.RES","tracks\\sa.scb",25,25,1869},
     {"SC","TRACKS/SC.RES","tracks\\sc.scb",30,34,4107},
     {"TB","TRACKS/TB.RES","tracks\\tb.scb",10,11,1112},
-    {"TC","TRACKS/TC.RES","tracks\\tc.scb",25,26,600}
+    {"TC","TRACKS/TC.RES","tracks\\tc.scb",25,26,600},
+    {"MC","TRACKS/MC.RES","tracks\\mc.scb",28,28,458}
 };
 struct SessionAssets {
     const WorldMetadata* world;
@@ -218,6 +219,27 @@ inline constexpr SessionAssets retainedTB{
     "1188206d7b1f64910c119192829fc357b9d4a9f021d64e8a2b7561f2c113a09b",3749557,
     true,true,false,true
 };
+// GB source-only metadata: rank4 native policy; first real zone ref1, not spatial containment.
+inline constexpr SessionAssets retainedGB{
+    &worlds[2],"work/native/project/disc/TRACKS/GB.RES",
+    "tracks\\mgb.spl","tracks\\agb.spl","tracks\\gb.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "","","","",4,1,615,
+    "e92af24305431dc5a96cebb5ebcf89159adb6d371045b2c5424dacd1f74b7d99",4088586,
+    true,true,false,true
+};
+// MC uses existing native center-grid policy4 and first real registered zone1.
+// Neither value claims a recovered human rank assignment or spatial containment.
+inline constexpr SessionAssets retainedMC{
+    &worlds[12],"work/native/project/disc/TRACKS/MC.RES",
+    "tracks\\mmc.spl","tracks\\amc.spl","tracks\\mc.tun",
+    "podboxm.col-explicit37-authored-placements-forward",
+    "chariotm.col-explicit37-authored-placements-forward",
+    "","","","",4,1,89,
+    "f8854752f639676257d44e33479a0c31c047a17e4cd592d02f483ad593179c81",3822171,
+    true,true,false,true
+};
 inline bool codeEquals(const char* requested,const char* code) noexcept {
     if(!requested||!requested[0]||!requested[1]||requested[2])return false;
     for(unsigned i=0;i<2;++i){
@@ -245,7 +267,7 @@ inline const SessionAssets* sessionAssets(const WorldMetadata& world) noexcept {
         codeEquals(world.code,"SC")?&retainedSC:
         codeEquals(world.code,"TC")?&retainedTC:
         codeEquals(world.code,"RC")?&retainedRC:
-        codeEquals(world.code,"TB")?&retainedTB:nullptr;
+        codeEquals(world.code,"TB")?&retainedTB:codeEquals(world.code,"GB")?&retainedGB:codeEquals(world.code,"MC")?&retainedMC:nullptr;
 }
 inline const SessionAssets* select(const char* code,const char*& error) noexcept {
     const auto* world=findWorld(code);

@@ -5,6 +5,7 @@
 #include "tc_original_world50lm.h"
 #include "rc_cold_sources50la.h"
 #include "tb_cold_sources50la.h"
+#include "gb_cold_sources50la.h"
 #include "../../src/assets/import_decode48c.h"
 #include "../../src/assets/original_ipu_decoder.h"
 #include <cfenv>
@@ -35,6 +36,7 @@ struct Request {
     const rc_cold_sources50LA::Owner* retainedRcSource = nullptr;
     // Appended typed synchronous borrow from TB's authentic indexed source.
     const tb_cold_sources50LA::Owner* retainedTbSource = nullptr;
+    std::shared_ptr<const gb_cold_sources50LA::Owner> retainedGbSource; // Seven internal GB cubes, same retained source.
 };
 struct Span {
     std::uint32_t indexStart = 0, indexCount = 0, vertexStart = 0, vertexCount = 0;
@@ -248,6 +250,8 @@ class Owner final {
         std::array<float,4> clearRgba{};
     };
     std::unique_ptr<Storage> storage_;
+    std::shared_ptr<const gb_cold_sources50LA::Owner> gbSource_;
+    bool loadGb(const Request&,Diagnostic&) noexcept;
 public:
     Owner() = default;
     Owner(const Owner&) = delete;
@@ -267,6 +271,8 @@ public:
     // owner through all dependent GPU uploads. The mesh already includesY+1024.
     bool load(const Request& request, Diagnostic& d) noexcept {
         using namespace detail;
+        if(request.track==track_source_fixture::Track::gb)return loadGb(request,d);
+        if(request.retainedGbSource){d.message="GB source cannot supply another track sky";return false;}
         try {
             d = {};
             need(!storage_, "Sky assets already loaded");
@@ -456,3 +462,5 @@ public:
     }
 };
 } // namespace sky50gw_fixture
+
+#include "gb_sky_loader50gb.inl"

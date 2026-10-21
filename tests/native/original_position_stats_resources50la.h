@@ -400,7 +400,7 @@ class OriginalPositionStatsResources50LA final {
     }
     template<class Map> bool prepareRadarRoute1924C0(const Map& map,
         const std::array<float,3>& center,float heading,D& d)noexcept {
-        static_assert(std::is_same_v<Map,TrackNavigation50EU>||std::is_same_v<Map,TrackNavigationView50EU>||std::is_same_v<Map,TrackNavigationView50TC>||std::is_same_v<Map,TrackNavigationView50TB>);
+        static_assert(std::is_same_v<Map,TrackNavigation50EU>||std::is_same_v<Map,TrackNavigationView50EU>||std::is_same_v<Map,TrackNavigationView50TC>||std::is_same_v<Map,TrackNavigationView50TB>||std::is_same_v<Map,TrackNavigationView50GB>||std::is_same_v<Map,TrackNavigationView50MC>);
         if constexpr(std::is_same_v<Map,TrackNavigationView50EU>){
             if(!map.runtimeValid()||map.role()!=NavigationRole50MB::Map){d.error=E::phase;d.sourcePC=0x1924fc;return false;}
         }
@@ -409,6 +409,12 @@ class OriginalPositionStatsResources50LA final {
         }
         if constexpr(std::is_same_v<Map,TrackNavigationView50TB>){
             if(!map.runtimeValid()||map.role()!=NavigationRole50TB::Map){d.error=E::phase;d.sourcePC=0x1924fc;return false;}
+        }
+        if constexpr(std::is_same_v<Map,TrackNavigationView50GB>){
+            if(!map.runtimeValid()||map.role()!=NavigationRole50GB::Map){d.error=E::phase;d.sourcePC=0x1924fc;return false;}
+        }
+        if constexpr(std::is_same_v<Map,TrackNavigationView50MC>){
+            if(!map.runtimeValid()||map.role()!=NavigationRole50MC::Map){d.error=E::phase;d.sourcePC=0x1924fc;return false;}
         }
         radarRoute_={};
         float cosine=0,sine=0;
@@ -601,9 +607,11 @@ inline bool Application::preparePositionStatsRadar50LA(
     if(!visible||!preference.map)return true;
     Adapter adapter;Adapter::Diagnostic diagnostic;Adapter::RadarObservation radar;
     if(!adapter.bind(camera,manager,diagnostic)||!adapter.captureRadar1924C0(radar,diagnostic)||
-       radar.publication!=observation.cameraPublication||(!radar.map&&!radar.mbMap.runtimeValid()&&!radar.tcMap.runtimeValid()&&!radar.tbMap.runtimeValid())){
+       radar.publication!=observation.cameraPublication||(!radar.map&&!radar.mbMap.runtimeValid()&&!radar.tcMap.runtimeValid()&&!radar.tbMap.runtimeValid()&&!radar.gbMap.runtimeValid()&&!radar.mcMap.runtimeValid())){
         d.error=Error::phase;d.sourcePC=0x1924fc;return false;}
-    return (radar.tbMap.gatesPrepared()?resources.prepareRadarRoute1924C0(radar.tbMap,radar.center,radar.headingE4,d):
+    return (radar.mcMap.gatesPrepared()?resources.prepareRadarRoute1924C0(radar.mcMap,radar.center,radar.headingE4,d):
+        radar.gbMap.gatesPrepared()?resources.prepareRadarRoute1924C0(radar.gbMap,radar.center,radar.headingE4,d):
+        radar.tbMap.gatesPrepared()?resources.prepareRadarRoute1924C0(radar.tbMap,radar.center,radar.headingE4,d):
         radar.tcMap.gatesPrepared()?resources.prepareRadarRoute1924C0(radar.tcMap,radar.center,radar.headingE4,d):
         radar.mbMap.gatesPrepared()?resources.prepareRadarRoute1924C0(radar.mbMap,radar.center,radar.headingE4,d):
         resources.prepareRadarRoute1924C0(*radar.map,radar.center,radar.headingE4,d))&&

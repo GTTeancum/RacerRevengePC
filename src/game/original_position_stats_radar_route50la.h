@@ -140,4 +140,25 @@ bool traverseRadar1924C0(const TrackNavigationView50TB& map,Emit&& emit,Finish&&
 }
 // TB-CONSUMER-END 0
 
+// GB-CONSUMER-BEGIN 0
+template<class Emit,class Finish>
+bool traverseRadar1924C0(const TrackNavigationView50GB& map,Emit&& emit,Finish&& finish,
+    RadarRouteProgress& progress)noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)) {
+        progress={};progress.sourcePC=0x192734;return false;
+    }
+    return traverseRadar1924C0Shared50MB(map,std::forward<Emit>(emit),std::forward<Finish>(finish),progress);
+}
+// GB-CONSUMER-END 0
+// MC-CONSUMER-BEGIN 0
+template<class Emit,class Finish>
+bool traverseRadar1924C0(const TrackNavigationView50MC& map,Emit&& emit,Finish&& finish,
+    RadarRouteProgress& progress)noexcept {
+    if(!navigation_consumer_detail50MB::mapReady(map)) {
+        progress={};progress.sourcePC=0x192734;return false;
+    }
+    return traverseRadar1924C0Shared50MB(map,std::forward<Emit>(emit),std::forward<Finish>(finish),progress);
+}
+// MC-CONSUMER-END 0
+
 }

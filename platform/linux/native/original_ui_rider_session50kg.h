@@ -62,8 +62,8 @@ struct OriginalUiRiderSessionCold50KG {
     // and suppresses only output; its independent review gate stays closed.
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
     std::shared_ptr<OriginalUiMainAudio50KG> audio;
-    // Explicit cold-only resource opt-in; never unlocks or admits rider3 Confirm.
-    // Default false preserves all existing public-bind populations.
+    // Explicit cold-only resource opt-in; never changes rider3's unlock.
+    // Confirm separately requires actual profile and selected-resource owners.
     bool prepareCleggLockedPreview=false;
     // Explicit resources only; no frontend activation or confirmation admission.
     game::OriginalUiRiderPreviewSet50KG previewSet=game::OriginalUiRiderPreviewSet50KG::none;
@@ -179,13 +179,12 @@ private:
 
     OriginalUiRiderSessionStatus50KG commitMove(const OriginalUiRiderSessionInputReceipt50KG&,
         VehicleWindowGl50DS&,VehicleWindowDiagnostic50DS&,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
-    // Public bind prepares the default-unlocked immutable union, adding Gasgano
-    // for the explicit process-local test profile or a rider7 resource request.
-    // Neither resource request changes profile unlocks. The separate default-false
-    // cold option adds Clegg preview resources without changing profile words. The
-    // requestedPreviewRiders mask unions bounded original preview pairs. A cold population
-    // never selects or registers a model; real callbacks and renderer-first
-    // retirement remain required at each entry/direction boundary.
+    // Public bind derives additional visible preview demands from authenticated
+    // Rider controls and actual profile unlock/hidden facts. Legacy cold options
+    // and requestedPreviewRiders still request only genuine immutable pairs.
+    // None changes profile unlocks or certifies a Course/race destination.
+    // A cold population never selects or registers a model; real callbacks and
+    // renderer-first retirement remain required at each entry/direction boundary.
     OriginalUiRiderSessionStatus50KG bindCold(const OriginalUiRiderSessionCold50KG&,
         game::OriginalUiRiderColdPopulation50KG,OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     const OriginalUiRiderDrawContribution50KG* rendererOwner() const noexcept;

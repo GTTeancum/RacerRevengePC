@@ -9,6 +9,7 @@ namespace original_camera_session50KX { class Session; }
 namespace native_ai50IV { struct Session; }
 #include "original_ui_main_output50kg.h"
 #include "original_ui_elapsed50lh.h"
+#include "original_ui_source_timing50lh.h"
 #include "original_ui_rider_pacing50lb.h"
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
 #include "../../src/assets/original_standard_texture_transfer_cold50la.h"
@@ -64,6 +65,22 @@ public:
 };
 template<class Predicate> auto courseRaceDestination(Predicate predicate){
     return std::make_shared<CourseRaceDestination<Predicate>>(std::move(predicate));
+}
+template<class Predicate,class Availability> class DiagnosedCourseRaceDestination final:public rr::platform::OriginalUiCourseRaceDestination50KG {
+    Predicate predicate_;Availability availability_;
+public:
+    DiagnosedCourseRaceDestination(Predicate p,Availability a):predicate_(std::move(p)),availability_(std::move(a)){}
+    bool admits(const rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection& s)const noexcept override {
+        return availability(s)==rr::game::OriginalCourseLoadAvailability50KG::ready;
+    }
+    rr::game::OriginalCourseLoadAvailability50KG availability(const rr::platform::OriginalUiRiderProfileOwner50KG::CourseRaceSelection& s)const noexcept override {
+        using A=rr::game::OriginalCourseLoadAvailability50KG;
+        try{const auto a=availability_(s);return a!=A::ready?a:predicate_(s)?A::ready:A::hostNotReady;}
+        catch(...){return A::hostNotReady;}
+    }
+};
+template<class Predicate,class Availability> auto courseRaceDestination(Predicate predicate,Availability availability){
+    return std::make_shared<DiagnosedCourseRaceDestination<Predicate,Availability>>(std::move(predicate),std::move(availability));
 }
 inline void require(bool accepted,const char* message) {
     if(!accepted)throw std::runtime_error(message);
@@ -552,9 +569,9 @@ public:
         std::uint32_t visibleRiderTest=0;
         if(visibleRiderSetting){
             const std::string value(visibleRiderSetting);
-            require(value=="3"||value=="8"||value=="22",
-                "RR_ORIGINAL_TEST_VISIBLE_RIDER must be exactly 3, 8 or 22; other gameplay owners are not admitted");
-            visibleRiderTest=value=="3"?3u:value=="8"?8u:22u;
+            require(value=="3"||value=="8"||value=="22"||value=="14"||value=="21"||value=="25"||value=="26",
+                "RR_ORIGINAL_TEST_VISIBLE_RIDER must be exactly 3, 8, 22, 14, 21, 25 or 26; other gameplay owners are not admitted");
+            visibleRiderTest=value=="3"?3u:value=="8"?8u:value=="14"?14u:value=="21"?21u:value=="25"?25u:value=="26"?26u:22u;
             require(enabled&&!std::getenv("RR_ORIGINAL_TEST_PROFILE"),
                 "Visible Rider test override requires Main and excludes other test profiles");
             require(decodeRiderImagesInProcess||std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE"),
@@ -645,6 +662,43 @@ public:
             // Distinct TB provenance never impersonates any earlier test fixture.
             requestedPreviewRiders|=1u<<18;
         }
+        const char* kraidGbSetting=std::getenv("RR_ORIGINAL_TEST_KRAID_GB");
+        const bool kraidGbTest=kraidGbSetting!=nullptr;
+        if(kraidGbTest){
+            require(std::string(kraidGbSetting)=="1",
+                "RR_ORIGINAL_TEST_KRAID_GB must be exactly 1 when present");
+            require(enabled&&!sebulbaTbSetting&&!scorchRcSetting&&!tzidikTcSetting&&!gasganoScSetting&&!visibleRiderSetting&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
+                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
+                "Kraid/GB test profile requires human Main and excludes other test overrides and unattended routes");
+            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+            require(!allAi||std::string(allAi)=="0",
+                "Kraid/GB test profile requires the normal human-controlled race");
+            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
+            require(decodeRiderImagesInProcess||(cache&&*cache),
+                "Kraid/GB test profile requires original-disc Rider decoding or an authenticated pixel cache");
+            // Explicit resource request precedes bind()'s population decision.
+            // Distinct GB provenance never impersonates any earlier test fixture.
+            requestedPreviewRiders|=1u<<23;
+        }
+        const char* youngAnakinMcSetting=std::getenv("RR_ORIGINAL_TEST_YOUNG_ANAKIN_MC");
+        const bool youngAnakinMcTest=youngAnakinMcSetting!=nullptr;
+        const std::uint32_t mcSelectedRider=visibleRiderTest?visibleRiderTest:1u;
+        if(youngAnakinMcTest){
+            require(std::string(youngAnakinMcSetting)=="1",
+                "RR_ORIGINAL_TEST_YOUNG_ANAKIN_MC must be exactly 1 when present");
+            require(enabled&&!kraidGbSetting&&!sebulbaTbSetting&&!scorchRcSetting&&!tzidikTcSetting&&!gasganoScSetting&&(!visibleRiderSetting||mcSelectedRider==14||mcSelectedRider==21||mcSelectedRider==25||mcSelectedRider==26)&&!wanMbSetting&&!std::getenv("RR_ORIGINAL_TEST_PROFILE")&&
+                !std::getenv("RR_ORIGINAL_RIDER_PREVIEWS")&&!std::getenv("RR_UNATTENDED_UI_ROUTE"),
+                "Young Anakin/MC test profile requires human Main and excludes other test overrides and unattended routes");
+            const char* allAi=std::getenv("RR_ORIGINAL_AI_ALL_RACERS");
+            require(!allAi||std::string(allAi)=="0",
+                "Young Anakin/MC test profile requires the normal human-controlled race");
+            const char* cache=std::getenv("RR_ORIGINAL_RIDER_IPUM_CACHE");
+            require(decodeRiderImagesInProcess||(cache&&*cache),
+                "Young Anakin/MC test profile requires original-disc Rider decoding or an authenticated pixel cache");
+            // Explicit resource request precedes bind()'s population decision.
+            // Distinct MC provenance never impersonates any earlier test fixture.
+            requestedPreviewRiders|=1u<<mcSelectedRider;
+        }
         const char* testProfileSetting=std::getenv("RR_ORIGINAL_TEST_PROFILE");
         require(!testProfileSetting||std::string(testProfileSetting)=="gasgano"||std::string(testProfileSetting)=="mawhonic-ryloth",
             "unsupported explicit test profile");
@@ -715,7 +769,9 @@ public:
             riderProfile=std::make_shared<rr::platform::OriginalUiRiderProfileOwner50KG>();
             rr::platform::OriginalUiRiderProfileDiagnostic50KG riderProfileDiagnostic;
             const auto physics=readArchive(assetRoot,rr::assets::OriginalUiArchiveId50KG::podPhysics);
-            require(sebulbaTbTest?
+            require(youngAnakinMcTest?
+                riderProfile->initializeYoungAnakinMcTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic,mcSelectedRider):kraidGbTest?
+                riderProfile->initializeKraidGbTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):sebulbaTbTest?
                 riderProfile->initializeSebulbaTbTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):scorchRcTest?
                 riderProfile->initializeScorchRcTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):tzidikTcTest?
                 riderProfile->initializeTzidikTcTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):gasganoScTest?
@@ -728,12 +784,15 @@ public:
                 "Rider startup profile initialization rejected");
             require(riderProfile->gasganoTestProfile()==gasganoTest&&
                 riderProfile->mawhonicRylothTestProfile()==mawhonicRylothTest&&
-                riderProfile->visibleRiderTestProfile()==visibleRiderTest&&
+                riderProfile->visibleRiderTestProfile()==(youngAnakinMcTest?0u:visibleRiderTest)&&
                 riderProfile->wanMbTestProfile()==wanMbTest&&
                 riderProfile->gasganoScTestProfile()==gasganoScTest&&
                 riderProfile->tzidikTcTestProfile()==tzidikTcTest&&
                 riderProfile->scorchRcTestProfile()==scorchRcTest&&
-                riderProfile->sebulbaTbTestProfile()==sebulbaTbTest,"Rider test profile provenance differs");
+                riderProfile->sebulbaTbTestProfile()==sebulbaTbTest&&
+                riderProfile->kraidGbTestProfile()==kraidGbTest&&riderProfile->youngAnakinMcTestProfile()==youngAnakinMcTest,"Rider test profile provenance differs");
+            if(youngAnakinMcTest)std::cerr<<"TEST UNLOCK OVERRIDE: MC rider="<<mcSelectedRider<<" initially remembered; original course prefix10 and MC slot10 (course6/planet5). Process-local human testing only; no earned progression or save write. Actual MC gameplay owners remain mandatory.\n";
+            if(kraidGbTest)std::cerr<<"TEST UNLOCK OVERRIDE: Kraid23 initially remembered; original course prefix8 and GB slot8 (course9/planet1). Process-local human testing only; no earned progression or save write. GB gameplay capability remains separately gated.\n";
             if(sebulbaTbTest)std::cerr<<"TEST UNLOCK OVERRIDE: Sebulba18 initially remembered; original course prefix6 and TB slot6 (course1/planet0). Process-local human testing only; no earned progression or save write. TB gameplay capability remains separately gated.\n";
             if(scorchRcTest)std::cerr<<"TEST UNLOCK OVERRIDE: Scorch17 initially remembered; original course prefix12 and RC slot12 (course3/planet2). Process-local human testing only; no earned progression or save write. RC gameplay capability remains separately gated.\n";
             if(tzidikTcTest)std::cerr<<"TEST UNLOCK OVERRIDE: Tzidik24 initially remembered; original course prefix13 and TC slot13 (course2/planet0). Process-local human testing only; no earned progression or save write. TC gameplay capability remains separately gated.\n";
@@ -741,7 +800,7 @@ public:
                 "Process-local human testing only; no earned progression or save write. SC gameplay capability remains separately gated.\n";
             if(wanMbTest)std::cerr<<"TEST UNLOCK OVERRIDE: Wan16 initially remembered; original course prefix7 and MB slot7. "
                 "Process-local testing only; no earned progression or save write. Real Wan/MB cold-loader checks remain mandatory.\n";
-            if(visibleRiderTest)std::cerr<<"TEST UNLOCK OVERRIDE: rider="<<visibleRiderTest
+            if(visibleRiderTest&&!youngAnakinMcTest)std::cerr<<"TEST UNLOCK OVERRIDE: rider="<<visibleRiderTest
                 <<" available and initially remembered for this process only. Native test patch, not retail cheat execution; "
                 "no earned unlock, career progress, saved-profile import or save write. All gameplay loader gates remain active.\n";
             if(mawhonicRylothTest)std::cerr<<"TEST PROFILE: Mawhonic9 available and initially remembered; original course prefix availability5 for Brightlands, process-local only. "
@@ -758,7 +817,7 @@ public:
         require(rr::game::sampleHostTimestamp50ID(*state->clock101A50,state->rawRandom308030),
             "Main startup shared application timestamp unavailable");
         state->known=true;
-        std::cerr<<"ORIGINAL MAIN: "<<(sebulbaTbTest?"explicit Sebulba/TB human test profile":scorchRcTest?"explicit Scorch/RC human test profile":tzidikTcTest?"explicit Tzidik/TC human test profile":gasganoScTest?"explicit Gasgano/SC human test profile":wanMbTest?"explicit Wan/MB test unlock profile":visibleRiderTest?"explicit visible-Rider test unlock profile":mawhonicRylothTest?"explicit Mawhonic/Ryloth test profile":gasganoTest?"explicit Gasgano test profile":"fresh native profile")
+        std::cerr<<"ORIGINAL MAIN: "<<(youngAnakinMcTest?"explicit Young Anakin/MC human test profile":kraidGbTest?"explicit Kraid/GB human test profile":sebulbaTbTest?"explicit Sebulba/TB human test profile":scorchRcTest?"explicit Scorch/RC human test profile":tzidikTcTest?"explicit Tzidik/TC human test profile":gasganoScTest?"explicit Gasgano/SC human test profile":wanMbTest?"explicit Wan/MB test unlock profile":visibleRiderTest?"explicit visible-Rider test unlock profile":mawhonicRylothTest?"explicit Mawhonic/Ryloth test profile":gasganoTest?"explicit Gasgano test profile":"fresh native profile")
             <<"/application ownership; "
             "one clock-derived native RNG seed="<<state->rawRandom308030
             <<"; Main audio="<<audio<<". Main, Options menu and Game Options routing is wired; "
@@ -1396,7 +1455,7 @@ public:
                 presentationCompletedWaitNanoseconds+=now-begin;++presentationCompletedWaits;return true;
             }
             // Sleep requests are at most1ms; oversleep remains real elapsed
-            // work. Existing audio project() still rejects active >1s stalls.
+            // work. All measured active time remains in the PCM accounting domain.
             try{std::this_thread::sleep_for(std::chrono::nanoseconds(observed.sleepNanoseconds));}
             catch(...){return false;}
         }
@@ -1439,6 +1498,9 @@ public:
     rr::platform::OriginalUiFrontend50KG coordinator;
     rr::platform::OriginalUiFrontendDiagnostic50KG diagnostic{};
     std::uint64_t lastUpdateNanoseconds=0,inputCount=0,unavailableCount=0,frameCount=0;
+    original_ui_source_timing50LH::Owner sourceDispatchTiming;
+    original_ui_source_timing50LH::Sample sourceDispatchSample;
+    std::uint64_t sourceDispatchActiveNanoseconds=0;
     std::uint64_t captureSequence=0,lastAudioSequence=0;
     std::string sessionWavPath;
     // Actual accepted renderer receipt; diagnostic is reused by later calls.
@@ -1691,6 +1753,7 @@ public:
             ++unavailableCount;std::cerr<<"original_ui_destination unavailable screen="<<unsigned(receipt.source.screen)
                 <<" page="<<unsigned(receipt.source.page)
                 <<" status="<<unsigned(status)<<" source="<<diagnostic.sourcePC
+                <<" native_course_load="<<unsigned(diagnostic.courseLoad)
                 <<" main="<<unsigned(diagnostic.main.status)<<" options="<<unsigned(diagnostic.options.status)
                 <<" options_resource="<<unsigned(diagnostic.optionsResources.error)
                 <<" options_resource_widget="<<diagnostic.optionsResources.widgetId
@@ -1865,8 +1928,29 @@ public:
         if(interval.error!=original_ui_elapsed50LH::Error::none)reportElapsedFailure(interval,before,now,pending,observedNow);
         require(interval.error!=original_ui_elapsed50LH::Error::backwards,"original UI update clock moved backwards");
         require(interval.error!=original_ui_elapsed50LH::Error::coldExceedsWall,"UI cold interval exceeds update interval");
-        require(interval.error!=original_ui_elapsed50LH::Error::stall,"original UI active update stall exceeds one second");
+        // Native wall accounting is not the source-dispatched simulation factor.
+        // Original140C50 preserves raw250, then140C54..8C caps the factor passed
+        // through the real root/UI routers. Keep PCM/material time uncapped.
+        std::uint64_t active=now;
+        if(before){
+            require(interval.activeNanoseconds<=std::numeric_limits<std::uint64_t>::max()-sourceDispatchActiveNanoseconds,
+                "UI source dispatch active timeline overflow");
+            active=sourceDispatchActiveNanoseconds+interval.activeNanoseconds;
+        }
+        require(sourceDispatchTiming.prepare(active,!before,sourceDispatchSample),
+            "UI source dispatch timestamp/factor preparation rejected");
+        sourceDispatchActiveNanoseconds=active;
+        if(interval.longActiveInterval)
+            std::cerr<<"original_ui_long_interval active_nanoseconds="<<interval.activeNanoseconds
+                <<" source_delta_milliseconds="<<sourceDispatchSample.deltaMilliseconds
+                <<" source_raw250="<<sourceDispatchSample.raw250
+                <<" source_update_seconds="<<sourceDispatchSample.updateSeconds
+                <<" policy=source_capped_dispatch_pcm_full_interval\n";
         return interval.activeNanoseconds;
+    }
+    float preparedSourceUpdateSeconds() const noexcept {return sourceDispatchSample.updateSeconds;}
+    void commitSourceUpdateTiming() {
+        require(sourceDispatchTiming.commit(),"UI source dispatch timing commit rejected");
     }
     void update(const rr::platform::OriginalUiMainSessionUpdate50KG& in,std::uint64_t elapsedNanoseconds) {
         rr::platform::OriginalUiFrontendUpdateReceipt50KG receipt;

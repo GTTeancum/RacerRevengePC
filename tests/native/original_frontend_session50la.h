@@ -117,7 +117,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
        directHumanTargetSupported(target->track)||courseCorpusPresent)&&
        raceRequested&&!courseColdLoad.pending()&&(!allAiEnabled||selected.laps==3)&&
        renderer.initialized()&&courseTargetModeSupported(target->track);
-  });
+  },[&](const original_course_targets50KX::Selection& selected){return courseTargets.availability(selected);});
   // This reads genuine UI resources only. Race target authentication is deferred
   // until the real Course screen is active; Main/Options/Rider need no corpus.
   originalMain.prepare(originalMainApplication,nativeVideo,textureRequest,uiRequest,
@@ -365,7 +365,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
         static_cast<std::uint16_t>(3u|(1u<<5)|(7u<<7)|(9u<<11))};
     const bool mawhonicTargetReady=!captureRun.navigateMawhonicRa()||
         (mawhonicProfileReady&&snapshot.course.selectedCourse44==7&&snapshot.course.selectedPlanet40==2&&
-         snapshot.course.courseSlot14E4==5&&rr::game::nativeCourseTrackOwned50KG(7,2,5)&&
+         snapshot.course.courseSlot14E4==5&&
          courseTargets.admits(mawhonicSelection));
     const auto action=captureRoute.poll(snapshot,group,slot,
         windowCapture.captured(windows_capture50LD::Stage::main),windowCapture.captured(windows_capture50LD::Stage::rider),
@@ -377,8 +377,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    }
    const auto elapsedNanoseconds=originalMain.acceptedElapsed(monotonicNow50DU());
    platform::OriginalUiMainSessionUpdate50KG update;
-   update.elapsedSeconds=static_cast<float>(double(elapsedNanoseconds)/1000000000.0);
+   update.elapsedSeconds=originalMain.preparedSourceUpdateSeconds();
    originalMain.update(update,elapsedNanoseconds);
+   originalMain.commitSourceUpdateTiming();
    originalMain.render(mainClock,renderer,info.drawableWidth,info.drawableHeight);
    if(!originalMain.coordinator.snapshot().rider.deferred4EC){
     const auto snapshot=originalMain.coordinator.snapshot();

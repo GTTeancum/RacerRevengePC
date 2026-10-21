@@ -42,9 +42,12 @@ inline bool applyAiCreateClass50IU(AuthoredClass49N actualRaceClass,
 // SC SerresSarrano: ID12, course order8, AI class2, course-record pod16.
 // TC: ID2, course order12, AI class3, course-record pod18.
 // RC TheNightlands: ID3, course order11, AI class3, course-record pod24.
+// TB TheBadlands: ID1, course order5, AI class2, course-record pod7.
 // GC TheCitadel: ID10, course order10, AI class3, course-record pod17.
+// GB: ID9, course order7, AI class2, course-record pod23.
+// MC: ID6, course order9, AI class3, course-record pod8.
 // Neither the visible Course control number nor the selected player pod may
-// substitute for those source fields. Other tracks are deliberately rejected.
+// substitute for those source fields. Unknown names are rejected unchanged.
 // Metadata binding alone does not admit a native world or change profile locks.
 struct AiFreshCreateSelection50IU {
     std::uint8_t selectedTrackId1125F=0xff;
@@ -56,40 +59,29 @@ struct AiFreshCreateSelection50IU {
 inline bool bindFreshAiCreateSelection50IU(const char* trackCode,
     std::size_t bytes,AiFreshCreateSelection50IU& out) noexcept {
     if(!trackCode||bytes!=2)return false;
-    const bool firstG=trackCode[0]=='g'||trackCode[0]=='G';
-    const bool secondA=trackCode[1]=='a'||trackCode[1]=='A';
-    const bool ta=(trackCode[0]=='t'||trackCode[0]=='T')&&secondA;
-    const bool sa=(trackCode[0]=='s'||trackCode[0]=='S')&&secondA;
-    const bool firstM=trackCode[0]=='m'||trackCode[0]=='M';
-    const bool ma=firstM&&secondA;
-    const bool mb=firstM&&(trackCode[1]=='b'||trackCode[1]=='B');
-    const bool ga=firstG&&secondA;
-    const bool gc=firstG&&(trackCode[1]=='c'||trackCode[1]=='C');
-    const bool firstR=trackCode[0]=='r'||trackCode[0]=='R';
-    const bool ra=firstR&&secondA;
-    const bool rc=firstR&&(trackCode[1]=='c'||trackCode[1]=='C');
-    const bool sc=(trackCode[0]=='s'||trackCode[0]=='S')&&(trackCode[1]=='c'||trackCode[1]=='C');
-    const bool tc=(trackCode[0]=='t'||trackCode[0]=='T')&&(trackCode[1]=='c'||trackCode[1]=='C');
-    if(!ta&&!sa&&!ma&&!mb&&!ga&&!gc&&!ra&&!rc&&!sc&&!tc)return false;
+    // Original descriptor rows at profile11278, stride12. Names and record
+    // pods are constructor data, independent of human rider and native world
+    // readiness. MC:17EDBC..17EDD8 name at112C0;17EDF8/17EE00 record8
+    // at112C8. The remaining rows retain their authenticated constructor data.
+    struct Descriptor { char first,second; std::int32_t recordPod; };
+    constexpr Descriptor descriptors[]{
+        {'T','A',19},{'T','B',7},{'T','C',18},{'R','C',24},
+        {'M','A',20},{'M','B',22},{'M','C',8},{'R','A',9},
+        {'G','A',10},{'G','B',23},{'G','C',17},{'S','A',12},
+        {'S','C',16}};
+    const auto upper=[](char c) noexcept {
+        return c>='a'&&c<='z'?static_cast<char>(c-'a'+'A'):c;
+    };
     AiFreshCreateSelection50IU next{};
-    //17E680 loads "ta";17E9F0..17EA1C stores descriptor11278 and pod19.
-    //17EAAC..17EAE0 writes MA112A8/record20 (s1=20 at17E68C).
-    //17EB64..17EBA8 writes SA112FC/record12, independent of selected rider.
-    //17EB0C..17EB44: "ga" at112D8 and pod10 at112E0.
-    //17EE2C..17EE64: "gc" at112F0 and pod17 at112F8.
-    // Authenticated unchanged SLUS_202.68 c1f1b63e..6ce6c30:
-    //17EA44/54..5C: "ra" at112CC;17EA78/80 stores record9 at112D4.
-    //17ED64/6C..74: "rc" at1129C;17ED94/9C stores record24 at112A4.
-    // Full source provenance: docs/recovery/ryloth-course-map-20261014.md.
-    // Authenticated original17E6F8/FC selects "mb" at3A8A10.
-    //17EC2C/44..4C writes descriptor112B4;17EC68/70 writes record22 at112BC.
-    //17F2F0/F8 writes ID5 at100C4+40*6: order6 independently selects classB.
-    //17EE90..17EEA0 stores sc at11278+12*12;17EEC0/C8 stores record16.
-    // Source order8 remains classB under16E590..16E5B4.
-    //17E714 loads tc;17ED00/08..10 writes descriptor11290;17ED30/38 record18.
-    //17F6E4/EC stores ID2 at100C4+40*12; order12 selects classC.
-    next.selectedTrackId1125F=tc?2u:sc?12u:ta?0u:sa?11u:ma?4u:mb?5u:ga?8u:ra?7u:rc?3u:10u;
-    next.freshCourseRecordPod11280=tc?18:sc?16:ta?19:sa?12:ma?20:mb?22:ga?10:ra?9:rc?24:17;
+    for(std::size_t id=0;id<sizeof(descriptors)/sizeof(descriptors[0]);++id){
+        const auto& row=descriptors[id];
+        if(upper(trackCode[0])==row.first&&upper(trackCode[1])==row.second){
+            next.selectedTrackId1125F=static_cast<std::uint8_t>(id);
+            next.freshCourseRecordPod11280=row.recordPod;
+            break;
+        }
+    }
+    if(next.selectedTrackId1125F==0xff)return false;
     // Original fresh byte stores17EF00..17F6EC. The187B10 scan compares
     // (1125F&15) with these entries; it does not use the track ID as order.
     constexpr std::uint8_t freshCourseOrder[]{0,11,4,8,7,1,5,9,12,6,10,3,2};

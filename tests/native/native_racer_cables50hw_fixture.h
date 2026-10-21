@@ -2,6 +2,8 @@
 namespace original_cable_selection50LA { class Binding; }
 namespace tc_cold_visibility50TC { class Retirement; }
 namespace tb_cold_visibility50TB { class Retirement; }
+namespace gb_cold_visibility50GB { class Retirement; }
+namespace mc_cold_visibility50MC { class Retirement; }
 namespace ra_source_camera50LA {class OwnershipBridge;}
 namespace ra_cold_aggregate50LA {class Owner;}
 // Cold original-roster cable and flame adapters. Scene endpoints always come
@@ -48,6 +50,8 @@ class Cables final {
     friend class ::original_cable_selection50LA::Binding;
     friend class ::tc_cold_visibility50TC::Retirement;
     friend class ::tb_cold_visibility50TB::Retirement;
+    friend class ::gb_cold_visibility50GB::Retirement;
+    friend class ::mc_cold_visibility50MC::Retirement;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class ::ra_cold_aggregate50LA::Owner;

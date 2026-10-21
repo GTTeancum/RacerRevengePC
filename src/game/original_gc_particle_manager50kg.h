@@ -46,6 +46,14 @@ enum class OriginalGcParticleStatus50KG : std::uint8_t {
     complete,unprepared,alreadyPrepared,assetIdentity,authoredData,unsupported,
     arithmetic,delta,storage,capacity,clock,sourceRangeAssertion,allocation
 };
+// Requested registry element payload only. This is neither host heap usage
+// nor source Entity/component storage. Peak includes overlapping old/new
+// vector requests; after binding it starts with the already retained block.
+struct OriginalGcEmitterRegistryReservation50KG {
+    std::size_t registeredEmitters=0,reservedEmitters=0;
+    std::size_t retainedPayloadBytes=0,peakPayloadBytes=0,reservedPeakPayloadBytes=0;
+    bool allocationBound=false,reservationAttempted=false,terminal=false;
+};
 struct OriginalGcParticleReceipt50KG {
     OriginalGcParticleStatus50KG status=OriginalGcParticleStatus50KG::unprepared;
     std::uint32_t randomDraws=0,spawned=0,expired=0;
@@ -84,8 +92,34 @@ public:
     OriginalGcParticleAuxiliaryChild50KG* auxiliaryChild() noexcept;
     const OriginalGcParticleAuxiliaryChild50KG* auxiliaryChild() const noexcept;
     std::uint32_t registerEmitter(const OriginalGcParticleEmitterState50KG&) noexcept;
+    // Additive native storage policy, opt-in and one attempt. Before calling,
+    // the actual shared cold ledger must reserve reservedPeakPayloadBytes
+    // in total for THIS registry, including any already charged capacity.
+    // Keep that quota charged until this manager is destroyed, including on
+    // failure. Never charge actual capacity again on top of the quota.
+    // The allocator checks its actual request BEFORE upstream allocation;
+    // old and new blocks remain charged together until old deallocation.
+    // Successful reserve guarantees additionalEmitters allocation-free
+    // appends only while no intervening caller consumes that free capacity.
+    // Later legacy registerEmitter calls share the SAME lifetime quota.
+    // No source row, RNG, particle or component is created by reservation.
+    // Reservation/allocation failure after opt-in latches terminal, but
+    // existing rows/particles remain available for ordered retirement.
+    OriginalGcParticleStatus50KG reserveAdditionalEmitters(
+        std::size_t additionalEmitters,std::size_t reservedPeakPayloadBytes,
+        OriginalGcEmitterRegistryReservation50KG&) noexcept;
+    OriginalGcEmitterRegistryReservation50KG emitterRegistryReservation() const noexcept;
+    std::size_t emitterRegistryPayloadReservationBytes() const noexcept;
+    // Conservative incremental Storage bookkeeping allowance. Reserve once
+    // before prepare/prepareTrackAtlas allocates Storage; it is separate from
+    // the element quota. Existing particle/atlas domains remain unchanged.
+    static std::size_t emitterRegistryReservationMetadataBytes() noexcept;
     // Actual retained registry allocation; observation only, no reservation.
     std::size_t emitterStoragePayloadBytes() const noexcept;
+    // Read-only actual retained data payload. Includes fixed5000 pool/order,
+    // atlas vectors/string and emitter capacity, not allocator overhead or
+    // a reservation receipt. Do not charge registry capacity atop its quota.
+    std::size_t retainedStoragePayloadBytes() const noexcept;
     OriginalGcParticleEmitterState50KG* emitter(std::uint32_t ownerId) noexcept;
     const OriginalGcParticleEmitterState50KG* emitter(std::uint32_t ownerId) const noexcept;
     // Source pointers138[count128], then count128++. Reserve does not publish.

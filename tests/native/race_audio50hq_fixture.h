@@ -113,10 +113,10 @@ inline bool validShared50MB(const S&s)noexcept {
     return r.place>=1&&r.place<=s.racerCount&&(!r.finished||
         (r.finishPlace>=1&&r.finishPlace<=s.racerCount&&r.observed.completedLaps>=s.config.lapTarget));
 }
-inline bool valid(const race_session50HM::Session&s)noexcept {return validShared50MB(s);}
-inline bool valid(const race_session50HM::MbSession&s)noexcept {return validShared50MB(s);}
-inline bool valid(const race_session50HM::TcSession&s)noexcept {return validShared50MB(s);}
-inline bool valid(const race_session50HM::TbSession&s)noexcept {return validShared50MB(s);}
+// Audio observes the common committed rows of any authenticated session.
+// Backend-specific map lifetime remains checked by validShared50MB.
+template<race_session50HM::SessionType S>
+inline bool valid(const S& s)noexcept {return validShared50MB(s);}
 }
 // Own at a stable address and keep the mixer alive longer. Cold PCM vectors are
 // immutable after prepare. Only main/simulation thread calls these methods.
@@ -215,18 +215,11 @@ private:
         remember(s);return result;
     }
 public:
-    Receipt observe(const race_session50HM::Session&s)noexcept {
-        return observeShared50MB(s);
-    }
-    Receipt observe(const race_session50HM::MbSession&s)noexcept {
-        return observeShared50MB(s);
-    }
-    Receipt observe(const race_session50HM::TcSession&s)noexcept {
-        return observeShared50MB(s);
-    }
-    Receipt observe(const race_session50HM::TbSession&s)noexcept {
-        return observeShared50MB(s);
-    }
+    // Countdown/go observation is independent of navigation backend. The
+    // existing explicit hostSpeechEnabled policy still controls lap/place/
+    // finish announcements; admitting an owner never enables those policies.
+    template<race_session50HM::SessionType S>
+    Receipt observe(const S& s)noexcept {return observeShared50MB(s);}
     // Following an actual zero-time recovery/rebase, suppress position lines
     // caused solely by that move. Laps/results must agree with the prior commit.
 private:
@@ -237,18 +230,8 @@ private:
         remember(s);++counters_.rebases;return true;
     }
 public:
-    bool rebase(const race_session50HM::Session&s)noexcept {
-        return rebaseShared50MB(s);
-    }
-    bool rebase(const race_session50HM::MbSession&s)noexcept {
-        return rebaseShared50MB(s);
-    }
-    bool rebase(const race_session50HM::TcSession&s)noexcept {
-        return rebaseShared50MB(s);
-    }
-    bool rebase(const race_session50HM::TbSession&s)noexcept {
-        return rebaseShared50MB(s);
-    }
+    template<race_session50HM::SessionType S>
+    bool rebase(const S& s)noexcept {return rebaseShared50MB(s);}
     void reset()noexcept {
         if(mixer_)for(std::size_t i=0;i<4;++i)mixer_->stop(firstVoice+i);
         if(announcer_&&!announcer_->stop())++counters_.rejected;

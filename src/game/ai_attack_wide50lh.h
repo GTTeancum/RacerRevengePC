@@ -297,4 +297,32 @@ inline bool aiAttackWideSteering16EDD0(
 }
 // TB-CONSUMER-END 0
 
+// GB-CONSUMER-BEGIN 0
+inline bool aiAttackWideSteering16EDD0(
+    const TrackNavigationView50GB& track,const TrackNavigationProgress50EU& progress,
+    const AiObservedRacer50IV& target,const float selfPosition190[3],
+    const float selfForward190[3],float selfUpY,float selfCachedSpeed34,
+    float selfEngineDifference5C,float selfAngularA4,std::uint32_t selfRacer60,
+    AiAttackWideGlobals16EDD0& globals,float& field104C,
+    PlayerReadResult48X& actions,AiDrivingDiagnostic50IV& d) noexcept {
+    if(!navigation_consumer_detail50MB::aiReady(track))
+        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x16ee10u);
+    return aiAttackWideSteering16EDD0Shared50MB(track,progress,target,selfPosition190,selfForward190,selfUpY,selfCachedSpeed34,selfEngineDifference5C,selfAngularA4,selfRacer60,globals,field104C,actions,d);
+}
+// GB-CONSUMER-END 0
+
+// MC-CONSUMER-BEGIN 0
+inline bool aiAttackWideSteering16EDD0(
+    const TrackNavigationView50MC& track,const TrackNavigationProgress50EU& progress,
+    const AiObservedRacer50IV& target,const float selfPosition190[3],
+    const float selfForward190[3],float selfUpY,float selfCachedSpeed34,
+    float selfEngineDifference5C,float selfAngularA4,std::uint32_t selfRacer60,
+    AiAttackWideGlobals16EDD0& globals,float& field104C,
+    PlayerReadResult48X& actions,AiDrivingDiagnostic50IV& d) noexcept {
+    if(!navigation_consumer_detail50MB::aiReady(track))
+        return ai_driving_detail50IV::fail(d,AiDrivingError50IV::Owner,0x16ee10u);
+    return aiAttackWideSteering16EDD0Shared50MB(track,progress,target,selfPosition190,selfForward190,selfUpY,selfCachedSpeed34,selfEngineDifference5C,selfAngularA4,selfRacer60,globals,field104C,actions,d);
+}
+// MC-CONSUMER-END 0
+
 } // namespace rr::game

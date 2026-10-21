@@ -20,13 +20,13 @@ int main() {
         "actual >1s cold work excluded, active 16ms retained");
     okay&=check(cold==0&&last==begin+1516000000ull,"update credit consumed once");
     const auto next=consume(last,last+1500000000ull,cold);
-    okay&=check(next.error==Error::stall&&next.excludedColdNanoseconds==0&&next.activeNanoseconds==1500000000ull,
+    okay&=check(next.error==Error::none&&next.longActiveInterval&&next.excludedColdNanoseconds==0&&next.activeNanoseconds==1500000000ull,
         "previous credit cannot hide later active GPU/render/swap stall");
     const auto mixed=project(begin,begin+1500000000ull+second+1,1500000000ull);
-    okay&=check(mixed.error==Error::stall&&mixed.activeNanoseconds==second+1,
-        "genuine >1s active work fails even beside long cold work");
+    okay&=check(mixed.error==Error::none&&mixed.longActiveInterval&&mixed.activeNanoseconds==second+1,
+        "genuine >1s active work retained even beside long cold work");
     okay&=check(project(begin,begin+second,0).error==Error::none&&
-        project(begin,begin+second+1,0).error==Error::stall,"unchanged exact one-second boundary");
+        project(begin,begin+second+1,0).longActiveInterval,"one-second diagnostic boundary does not reject elapsed");
     last=100;cold=20;const auto backwards=consume(last,99,cold);
     okay&=check(backwards.error==Error::backwards&&last==100&&cold==20,"backwards interval leaves state intact");
     const auto overCredit=consume(last,119,cold);

@@ -108,7 +108,7 @@ OriginalCameraStartResult advanceOriginalVideoFade25B5D0(
 struct OriginalRaceStartCountdown {
     float countdown34=0; //1AF87C constructor; caller must bind the actual field.
 };
-enum class OriginalCameraStartCourse : std::uint8_t { unspecified,gc,ga,ta,ma,sa,ra,rc,mb,sc,tc,tb };
+enum class OriginalCameraStartCourse : std::uint8_t { unspecified,gc,ga,ta,ma,sa,ra,rc,mb,sc,tc,tb,gb,mc };
 class OriginalCourseStartActions final {
     bool authenticated_=false;OriginalCameraStartCourse course_=OriginalCameraStartCourse::unspecified;
     // Immutable track authoring. Controller174DF0 applies its own real

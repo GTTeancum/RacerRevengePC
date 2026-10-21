@@ -41,4 +41,40 @@ inline void registerRacerFrameExceptSharedNoise50IU(RacerBank& bank,
     bank.elements(bytes,offset);
     bank.elements(bytes+end,sizeof(VehicleFrameState49W)-end);
 }
+// GB's four shared world animations use the SAME motion owner as racer
+// animation. Its lazy source fields are process chronology, not racer state.
+// Keep all other animationShared fields banked; do not replace the owner with
+// a detached world-only surrogate or weaken the Binding's disjointness proof.
+struct RacerSharedFrameLayout50GB final {
+    using Frame=VehicleFrameState49W;
+    static constexpr std::size_t motionBegin=offsetof(Frame,animationShared)+offsetof(VehicleAnimationShared49T,motion);
+    static constexpr std::size_t motionEnd=motionBegin+sizeof(ModelMotionSharedState49T);
+    static constexpr std::size_t noiseBegin=offsetof(Frame,noise);
+    static constexpr std::size_t noiseEnd=noiseBegin+sizeof(CoupledNoiseContext49M);
+    static_assert(std::is_standard_layout_v<Frame>&&std::is_trivially_copyable_v<Frame>);
+    static_assert(std::is_standard_layout_v<VehicleAnimationShared49T>);
+    static_assert(motionBegin<motionEnd&&motionEnd<noiseBegin&&noiseEnd<sizeof(Frame));
+};
+template<class RacerBank>
+inline void registerRacerFrameExceptSharedMotionAndNoise50GB(RacerBank& bank,VehicleFrameState49W& frame) {
+    using L=RacerSharedFrameLayout50GB;
+    auto* bytes=reinterpret_cast<unsigned char*>(&frame);
+    bank.elements(bytes,L::motionBegin);
+    bank.elements(bytes+L::motionEnd,L::noiseBegin-L::motionEnd);
+    bank.elements(bytes+L::noiseEnd,sizeof(frame)-L::noiseEnd);
+}
+// Pure layout predicate shared by the concrete GB visibility bridge and its
+// regression. This is not Bank/query authority: the bridge supplies private
+// real span tests and separately authenticates its selected Bank/rig/cables.
+template<class ExactSpan,class DisjointSpan>
+inline bool racerFrameSharedExclusion50GB(const VehicleFrameState49W& frame,
+    ExactSpan&& exact,DisjointSpan&& disjoint) noexcept {
+    using L=RacerSharedFrameLayout50GB;
+    const auto* bytes=reinterpret_cast<const unsigned char*>(&frame);
+    return exact(bytes,L::motionBegin)&&
+        exact(bytes+L::motionEnd,L::noiseBegin-L::motionEnd)&&
+        exact(bytes+L::noiseEnd,sizeof(frame)-L::noiseEnd)&&
+        disjoint(bytes+L::motionBegin,sizeof(ModelMotionSharedState49T))&&
+        disjoint(bytes+L::noiseBegin,sizeof(CoupledNoiseContext49M));
+}
 } // namespace rr::game

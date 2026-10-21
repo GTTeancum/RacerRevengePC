@@ -3,6 +3,8 @@
 #include "track_navigation_view50mb.h"
 #include "track_navigation_view50tc.h"
 #include "track_navigation_view50tb.h"
+#include "track_navigation_view50gb.h"
+#include "track_navigation_view50mc.h"
 
 namespace rr::game {
 // Projection of the player's accepted map-gate effects inside 1A0DA0.
@@ -95,6 +97,50 @@ public:
 };
 // TB-CONSUMER-END 0
 
+// GB-CONSUMER-BEGIN 0
+class LapProgressTrackView50GB {
+    TrackNavigationView50GB map_{};
+    AiTrackMetadataView50GB metadata_{};
+    LapProgressTrack50GF data_{};
+    friend bool prepareLapProgressTrack50GF(const TrackNavigationView50GB&,
+        const AiTrackMetadataView50GB&,LapProgressTrackView50GB&,
+        LapProgressDiagnostic50GF&) noexcept;
+public:
+    LapProgressTrackView50GB()=default;
+    bool runtimeValid() const noexcept {
+        return map_.runtimeValid()&&map_.role()==NavigationRole50GB::Map&&
+            metadata_.matches(map_)&&data_.prepared&&data_.nodeCount==map_.count();
+    }
+    bool matches(const TrackNavigationView50GB& map) const noexcept {
+        return runtimeValid()&&map.role()==NavigationRole50GB::Map&&map_.sameOwner(map);
+    }
+    const LapProgressTrack50GF& data() const noexcept {return data_;}
+    std::size_t capacity() const noexcept {return runtimeValid()?map_.capacity():0;}
+};
+// GB-CONSUMER-END 0
+
+// MC-CONSUMER-BEGIN 0
+class LapProgressTrackView50MC {
+    TrackNavigationView50MC map_{};
+    AiTrackMetadataView50MC metadata_{};
+    LapProgressTrack50GF data_{};
+    friend bool prepareLapProgressTrack50GF(const TrackNavigationView50MC&,
+        const AiTrackMetadataView50MC&,LapProgressTrackView50MC&,
+        LapProgressDiagnostic50GF&) noexcept;
+public:
+    LapProgressTrackView50MC()=default;
+    bool runtimeValid() const noexcept {
+        return map_.runtimeValid()&&map_.role()==NavigationRole50MC::Map&&
+            metadata_.matches(map_)&&data_.prepared&&data_.nodeCount==map_.count();
+    }
+    bool matches(const TrackNavigationView50MC& map) const noexcept {
+        return runtimeValid()&&map.role()==NavigationRole50MC::Map&&map_.sameOwner(map);
+    }
+    const LapProgressTrack50GF& data() const noexcept {return data_;}
+    std::size_t capacity() const noexcept {return runtimeValid()?map_.capacity():0;}
+};
+// MC-CONSUMER-END 0
+
 bool prepareLapProgressTrack50GF(const TrackNavigationView50EU&,
     const AiTrackMetadataView50IU&,LapProgressTrackView50MB&,
     LapProgressDiagnostic50GF&) noexcept;
@@ -109,6 +155,18 @@ bool prepareLapProgressTrack50GF(const TrackNavigationView50TB&,
     const AiTrackMetadataView50TB&,LapProgressTrackView50TB&,
     LapProgressDiagnostic50GF&) noexcept;
 // TB-CONSUMER-END 1
+
+// GB-CONSUMER-BEGIN 1
+bool prepareLapProgressTrack50GF(const TrackNavigationView50GB&,
+    const AiTrackMetadataView50GB&,LapProgressTrackView50GB&,
+    LapProgressDiagnostic50GF&) noexcept;
+// GB-CONSUMER-END 1
+
+// MC-CONSUMER-BEGIN 1
+bool prepareLapProgressTrack50GF(const TrackNavigationView50MC&,
+    const AiTrackMetadataView50MC&,LapProgressTrackView50MC&,
+    LapProgressDiagnostic50GF&) noexcept;
+// MC-CONSUMER-END 1
 
 
 struct LapProgressState50GF {
@@ -169,6 +227,20 @@ bool applyPlayerLapCrossing50GF(const LapProgressTrackView50TB&,
     LapProgressContinuation50GF&,LapProgressReceipt50GF&,
     LapProgressDiagnostic50GF&) noexcept;
 // TB-CONSUMER-END 2
+
+// GB-CONSUMER-BEGIN 2
+bool applyPlayerLapCrossing50GF(const LapProgressTrackView50GB&,
+    const LapProgressCrossing50GF&,LapProgressState50GF&,
+    LapProgressContinuation50GF&,LapProgressReceipt50GF&,
+    LapProgressDiagnostic50GF&) noexcept;
+// GB-CONSUMER-END 2
+
+// MC-CONSUMER-BEGIN 2
+bool applyPlayerLapCrossing50GF(const LapProgressTrackView50MC&,
+    const LapProgressCrossing50GF&,LapProgressState50GF&,
+    LapProgressContinuation50GF&,LapProgressReceipt50GF&,
+    LapProgressDiagnostic50GF&) noexcept;
+// MC-CONSUMER-END 2
 
 // Invoke ONLY after the actual native 1A2B80 behavior has completed, with all
 // its mutations reflected in the caller's player/state. Executes 1A0F2C's FF8

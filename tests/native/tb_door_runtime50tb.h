@@ -238,7 +238,7 @@ public:
   if(!stagedSourceReady()||!binding_||!collisionPrepared_||candidate_!=&target||zone!=4||
      ready_||!initialSamplePending_||initialSampleAttempted_||collisionState_.registrationE0)return false;
   const auto& c=target.candidate.collision;
-  return target.shapeType==0&&!target.compound&&!target.gate&&!target.nativeTriggers&&!target.nativeTriggersTC&&!target.nativeTriggersTB&&
+  return target.shapeType==0&&!target.compound&&!target.gate&&!target.nativeTriggers&&!target.nativeTriggersTC&&!target.nativeTriggersTB&&!target.nativeTriggersGB&&
    !target.nativeTriggerIndex&&!target.raOriginalTriggerSegments&&target.nodeRadii==source_->nodeRadii().data()&&
    target.nodeRadiusCount==source_->nodeRadii().size()&&target.maxDepth==source_->maxDepth()&&
    c.shapeType==0&&!c.compound&&c.geometry.mesh==&source_->collision()&&c.geometry.id==0x3c000000u&&

@@ -105,3 +105,7 @@ inline bool pairReady(const NavigationRead& m,const NavigationRead& a) noexcept 
 
 #include "navigation_consumer_bridge50tc.h"
 #include "navigation_consumer_bridge50tb.h"
+
+#include "navigation_consumer_bridge50gb.h"
+
+#include "navigation_consumer_bridge50mc.h"

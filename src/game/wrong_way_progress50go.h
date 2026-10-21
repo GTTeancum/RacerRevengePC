@@ -89,6 +89,20 @@ bool beginWrongWayProgress50GO(const TrackNavigationView50TB& map,
     WrongWayProgressReceipt50GO&,WrongWayProgressDiagnostic50GO&) noexcept;
 // TB-CONSUMER-END 0
 
+// GB-CONSUMER-BEGIN 0
+bool beginWrongWayProgress50GO(const TrackNavigationView50GB& map,
+    const LapProgressTrackView50GB& markers,const WrongWayProgressInput50GO&,
+    WrongWayProgressState50GO&,WrongWayProgressContinuation50GO&,
+    WrongWayProgressReceipt50GO&,WrongWayProgressDiagnostic50GO&) noexcept;
+// GB-CONSUMER-END 0
+
+// MC-CONSUMER-BEGIN 0
+bool beginWrongWayProgress50GO(const TrackNavigationView50MC& map,
+    const LapProgressTrackView50MC& markers,const WrongWayProgressInput50GO&,
+    WrongWayProgressState50GO&,WrongWayProgressContinuation50GO&,
+    WrongWayProgressReceipt50GO&,WrongWayProgressDiagnostic50GO&) noexcept;
+// MC-CONSUMER-END 0
+
 // Invoke only after pending's actual native effect has completed. This advances
 // SetColor -> SetPosition -> SetText -> Show -> complete, or Hide -> complete.
 // A missing native HUD effect is not completion. Pending owner and arguments

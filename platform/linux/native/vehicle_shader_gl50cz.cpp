@@ -26,6 +26,7 @@ in vec2 rrUv;
 in vec4 rrColor;
 in vec3 rrWorldNormal;
 in vec2 rrSpecularUv50LA;
+in float rrSourceFog50LA;
 uniform mat4 worldViewProjection;
 uniform int useUvTransform;
 uniform vec4 uvScaleOffset;
@@ -33,6 +34,7 @@ out vec2 viewerUv;
 out vec2 sourceSpecularUv50LA;
 out vec4 viewerColor;
 noperspective out vec4 sourceColor;
+noperspective out float sourceFog50LA;
 out vec3 viewerWorldPosition;
 out vec3 viewerWorldNormal;
 void main() {
@@ -41,6 +43,7 @@ void main() {
     sourceSpecularUv50LA = rrSpecularUv50LA;
     viewerColor = rrColor;
     sourceColor = rrColor;
+    sourceFog50LA = rrSourceFog50LA;
     viewerWorldPosition = rrPosition;
     viewerWorldNormal = rrWorldNormal;
 }
@@ -53,6 +56,7 @@ in vec2 viewerUv;
 in vec2 sourceSpecularUv50LA;
 in vec4 viewerColor;
 noperspective in vec4 sourceColor;
+noperspective in float sourceFog50LA;
 in vec3 viewerWorldPosition;
 in vec3 viewerWorldNormal;
 uniform int useTexture;
@@ -63,6 +67,10 @@ uniform int suppressDraw;
 uniform int useLighting;
 uniform int useNativeGcSelectedLights;
 uniform int useSourceDiffuseCompressed50LA;
+uniform int sourceSingleDiffuseRgba50LA;
+uniform vec4 sourceSingleFogColor50LA;
+uniform int sourceSingleFogEnabled50LA;
+uniform int sourceSingleAlphaTest50LA;
 uniform int sourcePairPass50LA;
 uniform int sourcePairFog50LA;
 uniform int sourcePairAlphaTest50LA;
@@ -80,6 +88,21 @@ void main() {
         // rrColor is the original CPU-generated early-bias packed color for
         // this authenticated body material, never imported vertex RGB. The
         // base map uses MODULATE neutral 128 before byte clamp/truncation.
+        if (sourceSingleDiffuseRgba50LA != 0) {
+            // A genuine one-map RGBA body has no paired destination sampler.
+            // Preserve the source MODULATE byte algebra and screen-linear
+            // Gouraud alpha. Fog affects RGB only, never source alpha.
+            vec4 sourceByte = floor(clamp(texture(image, viewerUv) * 255.0 *
+                clamp(sourceColor * 255.0, 0.0, 255.0) / 128.0, 0.0, 255.0));
+            if (sourceSingleFogEnabled50LA != 0) {
+                float f = clamp(sourceFog50LA, 0.0, 255.0);
+                sourceByte.rgb = floor((sourceByte.rgb * f +
+                    sourceSingleFogColor50LA.xyz * (255.0 - f)) / 256.0);
+            }
+            if (sourceSingleAlphaTest50LA != 0 && sourceByte.a < 1.0) discard;
+            viewerOutput = sourceByte / 255.0;
+            return;
+        }
         if (sourcePairPass50LA != 0) {
             vec2 uv = sourcePairPass50LA >= 2 ? sourceSpecularUv50LA : viewerUv;
             vec4 sourceByte = floor(clamp(texture(image, uv) * 255.0 *
@@ -261,6 +284,8 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
     if (!noGlError(diagnostic)) return fail();
     gl_.bindAttribLocation(program_, vehicleGlSpecularUvAttribute50LA, "rrSpecularUv50LA");
     if (!noGlError(diagnostic)) return fail();
+    gl_.bindAttribLocation(program_, vehicleGlSourceFogAttribute50LA, "rrSourceFog50LA");
+    if (!noGlError(diagnostic)) return fail();
     gl_.bindFragDataLocation(program_, vehicleGlColorOutput50CZ, "viewerOutput");
     if (!noGlError(diagnostic)) return fail();
     if (coveragePayload) {
@@ -294,6 +319,10 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
     uniforms_.useLighting = gl_.getUniformLocation(program_, "useLighting");
     uniforms_.useNativeGcSelectedLights = gl_.getUniformLocation(program_, "useNativeGcSelectedLights");
     uniforms_.useSourceDiffuseCompressed50LA = gl_.getUniformLocation(program_, "useSourceDiffuseCompressed50LA");
+    uniforms_.sourceSingleDiffuseRgba50LA = gl_.getUniformLocation(program_, "sourceSingleDiffuseRgba50LA");
+    uniforms_.sourceSingleFogColor50LA = gl_.getUniformLocation(program_, "sourceSingleFogColor50LA");
+    uniforms_.sourceSingleFogEnabled50LA = gl_.getUniformLocation(program_, "sourceSingleFogEnabled50LA");
+    uniforms_.sourceSingleAlphaTest50LA = gl_.getUniformLocation(program_, "sourceSingleAlphaTest50LA");
     uniforms_.sourcePairPass50LA = gl_.getUniformLocation(program_, "sourcePairPass50LA");
     uniforms_.sourcePairFog50LA = gl_.getUniformLocation(program_, "sourcePairFog50LA");
     uniforms_.sourcePairDestination50LA = gl_.getUniformLocation(program_, "sourcePairDestination50LA");
@@ -314,7 +343,10 @@ bool VehicleGlShader50CZ::initialize(VehicleGlShaderDiagnostic50CZ& diagnostic, 
     if (!noGlError(diagnostic) || uniforms_.effectMode < 0 || uniforms_.alphaScale < 0 ||
         uniforms_.suppressDraw < 0 || uniforms_.useUvTransform < 0 || uniforms_.uvScaleOffset < 0 ||
         uniforms_.useLighting < 0 || uniforms_.useNativeGcSelectedLights < 0 ||
-        uniforms_.useSourceDiffuseCompressed50LA < 0 || uniforms_.sourcePairPass50LA < 0 ||
+        uniforms_.useSourceDiffuseCompressed50LA < 0 ||
+        uniforms_.sourceSingleDiffuseRgba50LA < 0 || uniforms_.sourceSingleFogColor50LA < 0 ||
+        uniforms_.sourceSingleFogEnabled50LA < 0 || uniforms_.sourceSingleAlphaTest50LA < 0 ||
+        uniforms_.sourcePairPass50LA < 0 ||
         uniforms_.sourcePairFog50LA < 0 || uniforms_.sourcePairDestination50LA < 0 ||
         uniforms_.sourcePairAlphaTest50LA < 0 ||
         uniforms_.nativeGcAmbient < 0)

@@ -109,7 +109,7 @@ template<class Track> inline bool validTrack(const Track& track,std::size_t capa
 template<std::size_t N,class Scratch,class Track>
 inline bool read(const char* text,std::size_t bytes,Scratch& scratch,
     Track& out,UndertrackDiagnostic50ET& d) noexcept {
-    static_assert(N==256||N==265||N==292||N==268||N==293||N==270||N==269);
+    static_assert(N==256||N==265||N==292||N==268||N==293||N==270||N==269||N==213||N==257||N==173); // MC exact original Map/Ai extent, not a new generic bound.
     const Span spans[]={{text,bytes},{&scratch,sizeof scratch},{&out,sizeof out},{&d,sizeof d}};
     if(!separate(spans,4))return false;
     if(!text||!bytes)return fail(d,E::Input,0x2a1260);

@@ -850,7 +850,8 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
     bool authenticatedRiderWindow = false, bool authenticatedRiderShadow = false,
     bool authenticatedCharacterFixed64 = false, bool authenticatedControlsTga1555 = false,
     bool authenticatedRaceGleam = false, bool authenticatedRaceClear = false,
-    bool authenticatedRider17Cutout = false, bool canonicalPauseAnimation = false) noexcept {
+    bool authenticatedRider17Cutout = false, bool canonicalPauseAnimation = false,
+    bool authenticatedAa1Ipum = false) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
@@ -887,7 +888,7 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
             !expect(Field::colorClampingMethod, 1) || !expect(Field::alphaCorrectionValue, 0) ||
             !expect(Field::alphaBlendingControlInUnitsOfPixels, 0) ||
             !expect(Field::gouraudShadingOnOff, 1) || !expect(Field::textureMappingOnOff, 1) ||
-            (!litProgram && !expect(Field::foggingOnOff, 0)) || !expect(Field::onePassAntiAliasingOnOff, 0) ||
+            (!litProgram && !expect(Field::foggingOnOff, 0)) || !expect(Field::onePassAntiAliasingOnOff, authenticatedAa1Ipum ? 1 : 0) ||
             !expect(Field::textureCoordinatesSTQorUV, 0) ||
             !expect(Field::environmentContext0or1, 0) ||
             !expect(Field::fragmentValueControlFixedOrNot, 0) ||
@@ -1160,6 +1161,57 @@ bool prepareOriginalUiRider19IpumMaterial50KM(const OriginalUiMaterialPass50KG& 
         OriginalUiRider19IpumMaterial50KM next;
         if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
             next.material.fogEnabled,next.material.alphaTestGreaterZero,true)) return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIpumImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=static_cast<std::uint32_t>(texture->mips.size()-1);
+        next.sourceMipCount=static_cast<std::uint32_t>(texture->mips.size());
+        output=next;return true;
+    } catch (...) { d.error=Error::allocation; return false; }
+}
+bool prepareOriginalUiAa1IpumMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19IpumMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d = {}; d.pass = pass.pass;
+    try {
+        const auto* source = images.sourceProvenance(imageIndex);
+        const auto* ipum = images.ipumProvenance(imageIndex);
+        const auto* texture = images.decodedTexture(imageIndex);
+        const auto* bank = images.textures();
+        const auto* image = bank ? bank->texture(imageIndex) : nullptr;
+        const auto* name=pass.textureName.c_str();
+        const auto psmName=std::string("ui\\textures\\")+name+".psm";
+        if(!*name||pass.identity!=catalogMember(OriginalUiArchiveId50KG::rider,psmName.c_str())||
+           pass.pass!=1||!same(pass.microprogram,"DiffuseCompressed"))
+            return fail(d,Error::profile,"authenticated UI IPUM AA1 first diffuse pass",0x2476a0u);
+        const auto memberName=std::string("ui\\textures\\")+name+".pst";
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::rider,memberName.c_str());
+        if (!images.loaded() || !source || !ipum || !texture || !image || !member ||
+            source->memberIdentity != member || source->celIdentity || source->pstOffset != 0 ||
+            source->pstBytes != member->bytes || ipum->sourcePstSha256 != member->sha256 ||
+            !same(ipum->sourceMember,member->name) ||
+            ipum->sourceArchiveSha256 != originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)->sha256 ||
+            ipum->colorPolicyKind != OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1 ||
+            !ipum->mipCount || ipum->mipCount > originalUiIpumMipCount50KG ||
+            texture->mips.size() != ipum->mipCount)
+            return fail(d,Error::texture,"authenticated per-source unlocked Rider IPUM image bank",0x24e880u);
+        const auto& base=texture->mips.back();
+        if (image->texture.width != base.width || image->texture.height != base.height ||
+            image->texture.rgba != base.rgba)
+            return fail(d,Error::texture,"published native image must equal original largest mip",0x24eb90u);
+        // AA1 is retained, not rewritten. This shared capability supports the
+        // authored source-alpha tuple; other blend/alpha-test modes remain closed.
+        if(pass.gs[Field::alphaBlendingOnOff].value!=1 ||
+           pass.gs[Field::onePassAntiAliasingOnOff].value!=1 ||
+           pass.gs[Field::alphaTestOnOff].value!=0 ||
+           pass.gs[Field::inputColorA].value!=0 || pass.gs[Field::inputColorB].value!=1 ||
+           pass.gs[Field::inputAlphaC].value!=0 || pass.gs[Field::inputColorD].value!=1)
+            return fail(d,Error::profile,"source-alpha AA1 alpha-test-off IPUM pass",0x2476a0u);
+        OriginalUiRider19IpumMaterial50KM next;
+        if(!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,true,
+            false,false,false,false,false,false,false,false,false,false,true))return false;
+        next.material.coverage=OriginalUiCoveragePolicy50KM::fourSampleAa1;
         next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
         next.imagePolicy=OriginalUiNativeIpumImagePolicy50KM::highestResolutionBaseOnly;
         next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;

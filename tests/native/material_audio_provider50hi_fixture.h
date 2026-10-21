@@ -6,6 +6,11 @@
 #include "rc_audio_originals50rc.h"
 #include "tb_cold_sources50la.h"
 #include "tb_audio_originals50tb.h"
+#include "gb_cold_sources50la.h"
+#include "gb_audio_originals50gb.h"
+#include "mc_cold_sources50la.h"
+#include "mc_material_audio_originals50mc.h"
+#include "audio_retained_payload50mc.h"
 #include <array>
 #include <filesystem>
 #include <string>
@@ -42,7 +47,11 @@ static_assert(tcExtraFirstVoice+tcMaximumExtraVoices<=rr::platform::originalMate
 inline constexpr std::size_t tbExtraFirstVoice=192,tbMaximumExtraVoices=28;
 static_assert(soundCount+tbMaximumExtraVoices==maximumSoundCount);
 static_assert(tbExtraFirstVoice+tbMaximumExtraVoices==rr::platform::originalMaterialFirstVoice50HD);
-enum class Track:std::uint8_t {ta,gc,ga,ma,sa,ra,mb,sc,tc,rc,tb};
+inline constexpr std::size_t gbExtraFirstVoice=192,gbMaximumExtraVoices=24;
+static_assert(soundCount+gbMaximumExtraVoices==40&&gbExtraFirstVoice+gbMaximumExtraVoices<=rr::platform::originalMaterialFirstVoice50HD);
+inline constexpr std::size_t mcExtraFirstVoice=192,mcMaximumExtraVoices=4;
+static_assert(soundCount+mcMaximumExtraVoices==20&&mcExtraFirstVoice+mcMaximumExtraVoices<=rr::platform::originalMaterialFirstVoice50HD);
+enum class Track:std::uint8_t {ta,gc,ga,ma,sa,ra,mb,sc,tc,rc,tb,gb,mc};
 struct TrackProfile {
     Track track;const char* archiveName;std::size_t archiveBytes;const char* archiveSha;
     const char* aubName;std::size_t aubBytes;const char* aubSha;
@@ -70,7 +79,11 @@ inline constexpr TrackProfile trackProfiles[]{
     {Track::rc,"TRACKS/RC.RES",4655141u,"ce1b41b845935210c288c86d76b3ae0b99f198fb2c29190889c005631c7d2a8b",
      "tracks\\rc.aub",47432u,"8b34867bb6e76e1ddce72ac65c6c4548068d52d30a53b4ca08af87bfe3ca1851",8,8,1,13,extraFirstVoice},
     {Track::tb,"TRACKS/TB.RES",3749557u,"1188206d7b1f64910c119192829fc357b9d4a9f021d64e8a2b7561f2c113a09b",
-     "tracks\\tb.aub",50826u,"00729a0e848ca3a28996b312bcd789dbc3a3798c8b803ab3c612f4379dd94a19",24,20,5,33,tbExtraFirstVoice}
+     "tracks\\tb.aub",50826u,"00729a0e848ca3a28996b312bcd789dbc3a3798c8b803ab3c612f4379dd94a19",24,20,5,33,tbExtraFirstVoice},
+    {Track::gb,"TRACKS/GB.RES",4088586u,"e92af24305431dc5a96cebb5ebcf89159adb6d371045b2c5424dacd1f74b7d99",
+     "tracks\\gb.aub",29684u,"2d42e759aef7b80193d60581b611c572b836de91145ee18f439d45f46e4f530f",20,20,4,37,gbExtraFirstVoice},
+    {Track::mc,"TRACKS/MC.RES",3822171u,"f8854752f639676257d44e33479a0c31c047a17e4cd592d02f483ad593179c81",
+     "tracks\\mc.aub",50722u,"bbb238196c131979092c7a5cc5066fdfc131156ecb6ec632786279786f779554",12,8,5,15,mcExtraFirstVoice}
 };
 inline constexpr const TrackProfile* profile(Track track)noexcept{
     for(const auto& p:trackProfiles)if(p.track==track)return &p;return nullptr;
@@ -99,7 +112,7 @@ public:
         namespace a=rr::assets;namespace d=pod_materials50ed_fixture::detail;
         if(attempted_){error="50HI requires a fresh stable provider";return false;}attempted_=true;
         try{d::need(firstVoice<=mixer.count()&&soundCount<=mixer.count()-firstVoice,"50HI dedicated16-slot range unavailable");
-            const auto* selected=profile(track);d::need(selected&&track!=Track::rc&&track!=Track::tb,"50HI unsupported source track or compact source required");
+            const auto* selected=profile(track);d::need(selected&&track!=Track::rc&&track!=Track::tb&&track!=Track::gb&&track!=Track::mc,"50HI unsupported source track or compact source required");
             d::Inputs files;files.capacity=selected->archiveBytes;
             auto bytes=files.read(discRoot/selected->archiveName,selected->archiveBytes);
             d::need(bytes.size()==selected->archiveBytes&&d::sha256(bytes)==selected->archiveSha,"50HI selected original archive identity differs");
@@ -145,6 +158,40 @@ public:
         }catch(const std::exception&e){error=e.what();return false;}
     }
     const tb_cold_sources50LA::Owner* tbSourceIdentity()const noexcept{return tbSource_.get();}
+    bool prepareGb(std::shared_ptr<const gb_cold_sources50LA::Owner> source,
+        const std::filesystem::path& audioRoot,rr::platform::AudioMixer50HD& mixer,
+        std::size_t firstVoice,std::string& error){
+        namespace a=rr::assets;namespace d=pod_materials50ed_fixture::detail;
+        if(attempted_){error="50HI requires a fresh stable provider";return false;}attempted_=true;
+        try{
+            d::need(source&&source->ready(),"GB same-source material audio unavailable");
+            d::need(firstVoice==64&&firstVoice<=mixer.count()&&soundCount<=mixer.count()-firstVoice,
+                "GB actual material host range64..79 unavailable");
+            std::vector<std::uint8_t> aub;a::DecodeError48C decode;const auto* selected=profile(Track::gb);
+            d::need(source->extractMember(selected->aubName,aub,decode,selected->aubBytes),
+                "GB same-source AUB extraction rejected");
+            gbSource_=std::move(source);
+            return prepareCatalog(aub,audioRoot,mixer,firstVoice,error,Track::gb,*selected);
+        }catch(const std::exception&e){error=e.what();return false;}
+    }
+    const gb_cold_sources50LA::Owner* gbSourceIdentity()const noexcept{return gbSource_.get();}
+    bool prepareMc(std::shared_ptr<const mc_cold_sources50LA::Owner> source,
+        const std::filesystem::path& audioRoot,rr::platform::AudioMixer50HD& mixer,
+        std::size_t firstVoice,std::string& error){
+        namespace a=rr::assets;namespace d=pod_materials50ed_fixture::detail;
+        if(attempted_){error="50HI requires a fresh stable provider";return false;}attempted_=true;
+        try{
+            d::need(source&&source->ready(),"MC same-source material audio unavailable");
+            d::need(firstVoice==64&&firstVoice<=mixer.count()&&soundCount<=mixer.count()-firstVoice,
+                "MC actual material host range64..79 unavailable");
+            std::vector<std::uint8_t> aub;a::DecodeError48C decode;const auto* selected=profile(Track::mc);
+            d::need(source->archive().extractMember(selected->aubName,aub,decode,selected->aubBytes),
+                "MC same-source AUB extraction rejected");
+            mcSource_=std::move(source);
+            return prepareCatalog(aub,audioRoot,mixer,firstVoice,error,Track::mc,*selected);
+        }catch(const std::exception&e){error=e.what();return false;}
+    }
+    const mc_cold_sources50LA::Owner* mcSourceIdentity()const noexcept{return mcSource_.get();}
 private:
     bool prepareCatalog(const std::vector<std::uint8_t>& aub,const std::filesystem::path& audioRoot,
         rr::platform::AudioMixer50HD& mixer,std::size_t firstVoice,std::string& error,
@@ -154,7 +201,8 @@ private:
         try{
             d::need(aub.size()==selected->aubBytes&&d::sha256(aub)==selected->aubSha,"50HI selected original AUB identity differs");
             std::vector<a::AudioRequest50HC>requests;
-            d::need(track==Track::tb?a::readTbMaterialAudioCatalog50HI(aub,catalog_,requests,error):
+            d::need(track==Track::mc?a::readMcMaterialAudioCatalog50HI(aub,catalog_,requests,error):
+                track==Track::tb?a::readTbMaterialAudioCatalog50HI(aub,catalog_,requests,error):
                 track==Track::tc?a::readTcMaterialAudioCatalog50HI(aub,catalog_,requests,error):
                 track==Track::mb?a::readMbMaterialAudioCatalog50HI(aub,catalog_,requests,error):
                 a::readMaterialAudioCatalog50HI(aub,catalog_,requests,error),"50HI material authoring rejected");
@@ -162,7 +210,7 @@ private:
             activeSoundCount_=collisionRowCount_+driveRowCount_;
             d::need(collisionRowCount_==selected->collisionRows&&driveRowCount_==selected->driveRows&&
                 catalog_.materialCount==selected->materials&&activeSoundCount_<=maximumSoundCount,"50HI selected material profile differs");
-            if(track==Track::ma||track==Track::sa||track==Track::ra||track==Track::mb||track==Track::sc||track==Track::tc||track==Track::rc||track==Track::tb)d::need(catalog_.defaultMaterial==1,"50HI selected default material differs");
+            if(track==Track::ma||track==Track::sa||track==Track::ra||track==Track::mb||track==Track::sc||track==Track::tc||track==Track::rc||track==Track::tb||track==Track::gb||track==Track::mc)d::need(catalog_.defaultMaterial==1,"50HI selected default material differs");
             // RA declares NumMaterials1. Material2 is outside271674..271804.
             if(track==Track::ra){
                 d::need(catalog_.orderedObjectMaterials.empty(),"RA material assignment traversal differs");
@@ -179,6 +227,15 @@ private:
             d::need(requests.size()==selected->uniqueClips&&a::loadAudioBank50HC(audioRoot,requests,bank_,error),"50HI real material PCM bank failed");
             if(track==Track::rc)for(const auto& clip:bank_.clips)d::need(rc_audio_originals50RC::authentic(clip),"RC actual material PCM identity differs");
             if(track==Track::tb)for(const auto& clip:bank_.clips)d::need(tb_audio_originals50TB::authentic(clip),"TB actual material PCM identity differs");
+            if(track==Track::mc){
+                d::need(catalog_.orderedObjectMaterials.size()==3,"MC exact source material assignment count differs");
+                for(const auto& clip:bank_.clips)d::need(mc_material_audio_originals50MC::authentic(clip),"MC actual material PCM identity differs");
+            }
+            if(track==Track::gb){
+                d::need(catalog_.orderedObjectMaterials.size()==38,"GB exact material assignment count differs");
+                for(std::size_t i=0;i<20;++i)d::need(catalog_.collisionSectionKeys[i]==i+1&&catalog_.driveSectionKeys[i]==i+1,"GB exact material section identity differs");
+                for(const auto& clip:bank_.clips)d::need(gb_audio_originals50GB::authentic(clip),"GB actual material PCM identity differs");
+            }
             // All source owners retain distinct slots, including SA17..32,
             // whose source section selection rereads16. Only PCM is shared.
             extraFirstVoice_=selected->extraVoiceFirst;
@@ -203,7 +260,7 @@ private:
 public:
     ApplyResult apply(const rr::game::MaterialAudioCommand50HI&c)noexcept{
         using namespace rr::game;
-        if((rcSource_&&!rcSource_->ready())||(tbSource_&&!tbSource_->ready())){++counters_.rejected;return ApplyResult::Rejected;}
+        if((rcSource_&&!rcSource_->ready())||(tbSource_&&!tbSource_->ready())||(gbSource_&&!gbSource_->ready())||(mcSource_&&!mcSource_->ready())){++counters_.rejected;return ApplyResult::Rejected;}
         if(!mixer_||(c.kind!=MaterialCueKind50HI::Collision&&c.kind!=MaterialCueKind50HI::DriveOn)){++counters_.rejected;return ApplyResult::Rejected;}
         const bool drive=c.kind==MaterialCueKind50HI::DriveOn;
         if(c.key<1||c.key>(drive?driveRowCount_:collisionRowCount_)){++counters_.rejected;return ApplyResult::Rejected;}
@@ -219,17 +276,28 @@ public:
         ++counters_.rejected;return ApplyResult::Rejected;
     }
     Receipt update(const rr::game::MaterialAudioInput50HI&input,std::uint32_t&sharedRandomState)noexcept{
-        Receipt r;if(!mixer_||(rcSource_&&!rcSource_->ready())||(tbSource_&&!tbSource_->ready()))return r;
+        Receipt r;if(!mixer_||(rcSource_&&!rcSource_->ready())||(tbSource_&&!tbSource_->ready())||(gbSource_&&!gbSource_->ready())||(mcSource_&&!mcSource_->ready()))return r;
         auto next=state_;r.status=rr::game::updateMaterialAudio50HI(catalog_.parameters,input,state_,next,sharedRandomState,r.commands.data(),r.commands.size(),r.commandCount);
         if(!r.okay())return r;state_=next;++counters_.updates;
         for(std::size_t i=0;i<r.commandCount;++i){r.results[i]=apply(r.commands[i]);if(r.results[i]==ApplyResult::Rejected)r.status=rr::game::AudioEventStatus50HE::Input;}return r;
     }
-    void reset()noexcept{if((rcSource_&&!rcSource_->ready())||(tbSource_&&!tbSource_->ready()))std::terminate();if(mixer_)for(std::size_t i=0;i<activeSoundCount_;++i)mixer_->stop(slots_[i]);state_={};}
+    void reset()noexcept{if((rcSource_&&!rcSource_->ready())||(tbSource_&&!tbSource_->ready())||(gbSource_&&!gbSource_->ready())||(mcSource_&&!mcSource_->ready()))std::terminate();if(mixer_)for(std::size_t i=0;i<activeSoundCount_;++i)mixer_->stop(slots_[i]);state_={};}
     std::size_t collisionRowCount()const noexcept{return collisionRowCount_;}
     std::size_t driveRowCount()const noexcept{return driveRowCount_;}
     std::size_t extraVoiceFirst()const noexcept{return extraFirstVoice_;}
     std::size_t extraVoiceCount()const noexcept{return activeSoundCount_>soundCount?activeSoundCount_-soundCount:0;}
-    bool prepared()const noexcept{return mixer_!=nullptr&&(!rcSource_||rcSource_->ready())&&(!tbSource_||tbSource_->ready());}
+    bool prepared()const noexcept{return mixer_!=nullptr&&(!rcSource_||rcSource_->ready())&&(!tbSource_||tbSource_->ready())&&(!gbSource_||gbSource_->ready())&&(!mcSource_||mcSource_->ready());}
+    // Includes this Provider's inline storage once, excludes retained shared source.
+    std::size_t retainedPayloadBytes()const noexcept{
+        namespace payload=audio_retained_payload50MC;
+        std::size_t bytes=sizeof(*this)+payload::bankDynamicBytes(bank_)+
+            catalog_.orderedObjectMaterials.capacity()*sizeof(rr::assets::MaterialAudioCatalog50HI::ObjectMaterial);
+        for(const auto& name:catalog_.collision)bytes+=payload::externalStringBytes(name);
+        for(const auto& name:catalog_.drive)bytes+=payload::externalStringBytes(name);
+        for(const auto& row:catalog_.orderedObjectMaterials)bytes+=payload::externalStringBytes(row.object);
+        return bytes;
+    }
+    std::size_t retainedPcmCapacityBytes()const noexcept{return audio_retained_payload50MC::bankPcmCapacityBytes(bank_);}
     const rr::assets::AudioBank50HC&bank()const noexcept{return bank_;}
     const rr::assets::MaterialAudioCatalog50HI&catalog()const noexcept{return catalog_;}
     const rr::game::MaterialAudioState50HI&state()const noexcept{return state_;}
@@ -237,6 +305,8 @@ public:
 private:
     std::shared_ptr<const rc_cold_sources50LA::Owner> rcSource_;
     std::shared_ptr<const tb_cold_sources50LA::Owner> tbSource_;
+    std::shared_ptr<const gb_cold_sources50LA::Owner> gbSource_;
+    std::shared_ptr<const mc_cold_sources50LA::Owner> mcSource_;
     rr::assets::AudioBank50HC bank_{};
     rr::assets::MaterialAudioCatalog50HI catalog_{};
     std::array<Sound,maximumSoundCount>sounds_{};

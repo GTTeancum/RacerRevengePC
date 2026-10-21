@@ -24,12 +24,6 @@ using Kind=game::OriginalUiRiderWidgetKind50KG;
 // predicates are still required. Runtime acceptance is pending.
 constexpr bool boundedRiderConfirmEnabled=true;
 constexpr std::uint32_t hiddenTraversalMask=(1u<<26)|(1u<<21)|(1u<<25)|(1u<<14)|(1u<<1);
-bool supportedRider(std::uint32_t rider) noexcept {
-    switch(rider){case 1:case 2:case 3:case 4:case 7:case 8:case 9:case 10:case 11:case 12:case 15:case 16:case 19:case 20:case 22:case 24:case 17:case 18:return true;default:return false;}
-}
-bool previewSupportedRider(std::uint32_t rider) noexcept {
-    return rider==3||supportedRider(rider);
-}
 Status result(Diagnostic& d,Status s,std::uint32_t pc=0) noexcept {d.status=s;d.sourcePC=pc;return s;}
 bool apertureOkay(ApertureStatus s) noexcept {return s==ApertureStatus::ok||s==ApertureStatus::noChange;}
 bool genuine(const std::shared_ptr<const assets::OriginalUiArchive50KG>& a,assets::OriginalUiArchiveId50KG id) noexcept {
@@ -65,9 +59,10 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
         a.requested.screen==b.requested.screen&&a.requested.page==b.requested.page&&a.lifecycle==b.lifecycle&&a.phase==b.phase&&
         a.applicationRequestQueued==b.applicationRequestQueued&&a.initialRestartPending==b.initialRestartPending;
 }
-bool confirmShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
+bool confirmShape(const game::OriginalUiRouteDecision50KG& d,std::uint32_t selectedRider) noexcept {
     using F=game::OriginalUiProfileField50KG;using W=game::OriginalUiProfileWrite50KG;
-    if(d.inputPC!=0x1EA460||!supportedRider(d.selectedRider)||!d.profileProposalComplete||d.profileChanges.count!=3||
+    if(d.inputPC!=0x1EA460||d.selectedRider<0||d.selectedRider>=32||
+       static_cast<std::uint32_t>(d.selectedRider)!=selectedRider||!d.profileProposalComplete||d.profileChanges.count!=3||
        d.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||d.request.sourceScreen!=5||d.request.sourcePage!=1||
        d.request.targetScreen!=6||d.request.targetPage!=1||d.request.sourcePC!=0x1EA604)return false;
     const auto& a=d.profileChanges.values[0];const auto& b=d.profileChanges.values[1];const auto& c=d.profileChanges.values[2];
@@ -170,15 +165,20 @@ struct OriginalUiRiderSession50KG::Storage {
         ++state.audio.submitted;return true;
     }
     bool preparedTraversal(std::uint32_t rider) const noexcept {
-        return (previewSupportedRider(rider)||dynamic.previewRequested(rider))&&backend.preparedRider(rider);
+        // Actual authored pair and sealed backend resources, not an identity
+        // admission list. Traversal still requires every intermediate callback.
+        return dynamic.podWidget(rider)&&dynamic.characterWidget(rider)&&backend.preparedRider(rider);
     }
-    bool preparedRider(std::uint32_t rider) const noexcept {
+    bool preparedRider(std::uint32_t rider,OriginalUiRiderContributionDiagnostic50KG* failure=nullptr) const noexcept {
+        if(failure)*failure={};
         if(rider>=32||!preparedTraversal(rider))return false;
         if((cold.requestedTraversalRiders&(1u<<rider))&&!(destinationPreviewRiders&(1u<<rider)))return false;
         if(!drawablePoliciesPrepared)return true; // Cold resource checks precede policy preparation.
         OriginalUiRiderContributionDiagnostic50KG diagnostic;
-        return collector.drawableModel(dynamic.podWidget(rider),diagnostic)&&
+        const bool okay=collector.drawableModel(dynamic.podWidget(rider),diagnostic)&&
             collector.drawableModel(dynamic.characterWidget(rider),diagnostic);
+        if(!okay&&failure)*failure=diagnostic;
+        return okay;
     }
     bool controlWidgets(std::uint16_t slot,std::uint32_t rider,std::array<std::uint16_t,4>& out) const noexcept {
         const auto* n=nav();
@@ -253,8 +253,10 @@ struct OriginalUiRiderSession50KG::Storage {
         return true;
     }
     bool confirmReady(game::OriginalUiRiderDynamicDiagnostic50KG& d) const noexcept {
+        OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
         return confirmAudioReady()&&cold.prospectiveMode==0&&
             cold.commonProfile->mode34==0&&(cold.commonProfile->playerBits1125C&0x60)==0x20&&
+            cold.profile->riderSelectionFacts(state.rider4C4,rider)&&rider.unlock10FAC&&
             confirmAnimationPreflight(d)&&confirmVoiceChronologyReady();
     }
     bool processCurrent() const noexcept {
@@ -362,12 +364,12 @@ struct OriginalUiRiderSession50KG::Storage {
         }
         return collector.nativeDrawableModels(models,d.draw);
     }
-    bool nativeImageClosure(const NativeProjection& projection,std::vector<std::uint32_t>& images,Diagnostic& d) const noexcept {
+    bool nativeImageClosure(const NativeProjection& projection,std::vector<std::uint32_t>& images,bool& requiresCoverage,Diagnostic& d) const noexcept {
         if(!nativeDrawableClosure(projection,d))return false;
         std::array<bool,120> models{};
         for(std::size_t i=1;i<models.size();++i)
             models[i]=projection.registered[i]&&projection.states[i].shown;
-        return collector.nativeResidencyImages(models,images,d.draw);
+        return collector.nativeResidencyImages(models,images,requiresCoverage,d.draw);
     }
     bool navigate(const game::OriginalUiNavigation50KG& next,const game::OriginalUiCommands50KG& commands,std::uint32_t pc) noexcept {
         if(nativeWidgetGeneration==std::numeric_limits<std::uint64_t>::max()){fault(Status::unsupportedState,pc);return false;}
@@ -541,13 +543,19 @@ Status OriginalUiRiderSession50KG::bind(const OriginalUiRiderSessionCold50KG& co
     // locked previews. This read neither awards nor selects any rider; source
     // Confirm independently requires its actual unlock. Fresh rider1 stays hidden.
     game::OriginalUiRiderSelectionProfile50KG visibleProfile;
+    const auto* selection=cold.resources&&cold.resources->widgets()?cold.resources->widgets()->selectionData():nullptr;
+    const auto* page=selection?selection->page():nullptr;
     if(cold.profile&&cold.profile->selectionSnapshotForMode(cold.prospectiveMode,visibleProfile)&&
-       visibleProfile.ownerReady){
-        for(const auto rider:{1u,3u,7u,8u,9u,16u,17u,18u,22u,23u,24u})
-            if(visibleProfile.riders[rider].ownerReady&&!visibleProfile.riders[rider].hidden730)
+       visibleProfile.ownerReady&&page&&page->groups.size()>1){
+        for(const auto control:page->groups[1].controls){
+            if(control<0)continue;const auto rider=selection->controlRider(static_cast<std::uint16_t>(control));
+            if(rider<0||static_cast<std::size_t>(rider)>=visibleProfile.riders.size())continue;
+            const auto& row=visibleProfile.riders[static_cast<std::size_t>(rider)];
+            if(row.ownerReady&&(row.unlock10FAC||!row.hidden730)&&
+               !game::originalUiRiderColdMember50KG(population,requested,static_cast<std::uint32_t>(rider)))
                 prepared.requestedPreviewRiders|=std::uint32_t{1}<<rider;
+        }
     }
-    if(cold.profile&&cold.profile->mawhonicRylothTestProfile())prepared.requestedPreviewRiders|=1u<<9;
     return bindCold(prepared,population,d);
 }
 Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG& cold,
@@ -692,9 +700,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         // Main's live mode4 is legitimate. Only this immutable cold projection
         // sees the exact prospective source decision; the shared word is untouched.
         if(!cold.profile->selectionSnapshotForMode(cold.prospectiveMode,copiedProfile)||
-           game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),0,copiedProfile,coldPlan)!=game::OriginalUiRiderSelectionStatus50KG::ok||
-           (!supportedRider(coldPlan.rider4C4)&&!(clegg&&coldPlan.rider4C4==3)&&
-            !game::originalUiRiderRequested50KG(requested,coldPlan.rider4C4)))
+           game::planOriginalUiRiderEntry50KG(*s->selection(),*s->nav(),0,copiedProfile,coldPlan)!=game::OriginalUiRiderSelectionStatus50KG::ok)
             return result(d,Status::unavailableDestination,0x1E9C50);
         // This local session has not escaped. Prepare genuine immutable
         // descriptor candidates, then one complete bank and irreversible seal.
@@ -728,8 +734,11 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         if(!s->collector.prepareBank(d.draw))return result(d,Status::draw,d.draw.sourcePC);
         s->drawablePoliciesPrepared=true;
         Storage::NativeProjection initialBefore,initialAfter;std::array<Storage::NativeProjection,4> initialPhases;
-        if(!s->preparedRider(coldPlan.rider4C4)||
-           !s->projectNativeEntry(copiedProfile,initialBefore,initialPhases,initialAfter,d))
+        if(!s->preparedRider(coldPlan.rider4C4,&d.draw))
+            return d.draw.error!=OriginalUiRiderContributionError50KG::none
+                ?result(d,Status::draw,d.draw.sourcePC)
+                :result(d,Status::unavailableDestination,0x1E9C50);
+        if(!s->projectNativeEntry(copiedProfile,initialBefore,initialPhases,initialAfter,d))
             return result(d,Status::unavailableDestination,0x1E9C50);
         if(!s->backend.bindMaterialConsumer(&s->collector,s.get(),&Storage::consumeMaterialEvents))return result(d,Status::backend);
         s->state.bound=true;storage_=std::move(s);return result(d,Status::ok);
@@ -840,7 +849,7 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     if(routed!=game::OriginalUiRouteStatus50KG::unavailable)return finish(Status::unsupportedState,0x1EA460);
     if(in.originalInput==4){
         const auto& r=receipt.decision;
-        if(!s->idleInput()||!confirmShape(r)||r.admitted||r.action!=game::OriginalUiRouteAction50KG::unavailable||
+        if(!s->idleInput()||!confirmShape(r,s->state.rider4C4)||r.admitted||r.action!=game::OriginalUiRouteAction50KG::unavailable||
            r.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
            !s->confirmReady(d.dynamic))return finish(Status::unavailableDestination,0x1EA694);
         if(!s->cold.profile->riderConfirmSnapshot(s->pendingPacked1125D,s->pendingComparison100C0))
@@ -869,9 +878,10 @@ Status OriginalUiRiderSession50KG::prepareEntryResidency(OriginalUiRiderResidenc
         if(!s->projectNativeEntry(profile,before,phases,projection,d))return result(d,Status::unavailableDestination);
         OriginalUiRiderResidencyDemand50KG demand;
         demand.session_=this;demand.serial_=s->proposalSerial;demand.bank_=bank();demand.entry_=true;
-        for(const auto& phase:phases){std::vector<std::uint32_t> images;
-            if(!s->nativeImageClosure(phase,images,d))return result(d,Status::draw,d.draw.sourcePC);
+        for(const auto& phase:phases){std::vector<std::uint32_t> images;bool requiresCoverage=false;
+            if(!s->nativeImageClosure(phase,images,requiresCoverage,d))return result(d,Status::draw,d.draw.sourcePC);
             demand.indices_.insert(demand.indices_.end(),images.begin(),images.end());
+            demand.requiresCoverage_=demand.requiresCoverage_||requiresCoverage;
         }
         std::sort(demand.indices_.begin(),demand.indices_.end());
         demand.indices_.erase(std::unique(demand.indices_.begin(),demand.indices_.end()),demand.indices_.end());
@@ -910,7 +920,7 @@ Status OriginalUiRiderSession50KG::prepareMoveResidency(const OriginalUiRiderSes
         demand.session_=this;demand.serial_=s->proposalSerial;demand.bank_=bank();
         // No draw occurs between the navigation, appearance and repeated SELECT.
         // Include the final whole-material closure, not a predicted clipped frame.
-        if(!s->nativeImageClosure(projection,demand.indices_,d))return result(d,Status::draw,d.draw.sourcePC);
+        if(!s->nativeImageClosure(projection,demand.indices_,demand.requiresCoverage_,d))return result(d,Status::draw,d.draw.sourcePC);
         output=demand;s->nativeDemand=std::move(demand);s->nativeBefore=before;s->nativePost=projection;
         s->nativeStamp=s->cold.profile->stamp();s->nativeCommon=*s->cold.commonProfile;s->nativeEntryProfile=profile;s->nativePreparedWidgetGeneration=s->nativeWidgetGeneration;
         s->nativePreparedMaterialGeneration=s->backend.registryGeneration();s->nativePrepared=true;
@@ -925,7 +935,7 @@ bool OriginalUiRiderSession50KG::residencyProposalCurrent(const OriginalUiRiderR
     return s->operational()&&s->nativePrepared&&!s->nativeDemand.consumed_&&
         demand.session_==this&&demand.serial_==s->proposalSerial&&demand.serial_==s->nativeDemand.serial_&&
         demand.bank_==bank()&&demand.bank_==s->nativeDemand.bank_&&demand.entry_==s->nativeDemand.entry_&&
-        demand.indices_==s->nativeDemand.indices_&&!demand.consumed_&&
+        demand.indices_==s->nativeDemand.indices_&&demand.requiresCoverage_==s->nativeDemand.requiresCoverage_&&!demand.consumed_&&
         s->nativePreparedWidgetGeneration==s->nativeWidgetGeneration&&
         s->nativePreparedMaterialGeneration==s->backend.registryGeneration()&&
         sameStamp(s->cold.profile->stamp(),s->nativeStamp)&&sameCommon(*s->cold.commonProfile,s->nativeCommon)&&
@@ -1046,7 +1056,7 @@ bool OriginalUiRiderSession50KG::routeProposalCurrent(const OriginalUiRiderRoute
        s->nav()->groups[1].selectedSlot!=s->state.slot4C8)return false;
     if(s->state.confirmProposalPending){
         game::OriginalUiRiderDynamicDiagnostic50KG preflight;std::uint8_t packed=0;std::uint32_t comparison=0;
-        if(s->state.backProposalPending||!confirmShape(p.decision)||!s->confirmReady(preflight)||
+        if(s->state.backProposalPending||!confirmShape(p.decision,s->state.rider4C4)||!s->confirmReady(preflight)||
            !s->cold.profile->riderConfirmSnapshot(packed,comparison)||packed!=s->pendingPacked1125D||
            comparison!=s->pendingComparison100C0)return false;
     }else if(!s->backAudioReady())return false;
@@ -1057,7 +1067,7 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
     if(s->state.confirmProposalPending){
         if(!s->operational()||s->inOperation||s->updatePrepared||s->backAccepted||s->confirmAccepted||s->state.backProposalPending||
            p.source!=this||!p.serial||p.serial!=s->proposalSerial||!sameDecision(p.decision,s->pendingBack)||
-           !confirmShape(p.decision)||!sameStamp(p.profileStamp,s->pendingStamp)||!s->processCurrent()||!s->lightCurrent()||
+           !confirmShape(p.decision,s->state.rider4C4)||!sameStamp(p.profileStamp,s->pendingStamp)||!s->processCurrent()||!s->lightCurrent()||
            !s->confirmReady(d.dynamic)||s->cold.application->uiObject3D8||!sameCommon(*s->cold.commonProfile,s->pendingCommon))
             return result(d,Status::invalidInput,0x1EA604);
         auto expectedLife=s->pendingLifecycle;expectedLife.requested={6,1};expectedLife.lifecycle=Life::requestScreenExit;

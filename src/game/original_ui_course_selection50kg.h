@@ -36,10 +36,12 @@ struct OriginalUiCourseRememberedProfile50KG {
     std::array<std::uint8_t,13> courseOrder100C4{};
     bool mawhonicRylothTest=false; // retained fixture provenance, not runtime capability
     bool wanMbTest=false; // exact startup provenance, not native course readiness
-    bool sebulbaTbTest=false; // Startup provenance only.
+    bool sebulbaTbTest=false;
     bool scorchRcTest=false; // Startup provenance only.
     bool tzidikTcTest=false; // Distinct startup provenance; no launch capability.
     bool gasganoScTest=false; // distinct human startup provenance; no launch capability
+    bool kraidGbTest=false; // Appended startup provenance only; old field ordering retained.
+    bool youngAnakinMcTest=false; // Process-local request only; authentic owners remain mandatory.
 };
 struct OriginalUiCourseEntryPrefix50KG {
     std::uint32_t promptMask42C=0;

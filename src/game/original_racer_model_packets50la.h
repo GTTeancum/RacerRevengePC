@@ -3,6 +3,7 @@
 #include "model_palette49s.h"
 #include "original_racer_light_selection50km.h"
 #include "original_racer_model_view50la.h"
+#include "original_racer_diffuse_clip50la.h"
 #include "../assets/original_standard_model_resource50la.h"
 #include <array>
 #include <cfenv>
@@ -118,6 +119,7 @@ public:
 
     bool constructed240740()const noexcept{return constructed_&&!released_;}
     bool released()const noexcept{return released_;}
+    std::uint16_t compressionFlag40()const noexcept {return constructed240740()&&model_?model_->fields().flags1B2&0x40u:0u;}
     std::size_t count()const noexcept{return constructed240740()?count_:0u;}
     const OriginalRacerModelPacket50LA* packet(std::size_t i)const noexcept {
         return constructed240740()&&i<count_?&packets_[i]:nullptr;
@@ -135,6 +137,7 @@ public:
     R preparePaletteMatrices241280(const ModelPaletteInput49S& input,
         const ModelPalette49S& worlds,
         const original_racer_lighting50KM::LightMatrices& lights)noexcept {
+        geometryRevision_=0;matricesPrepared_=false;
         if(!constructed240740()||!model_||model_->fields().packets1F0!=this||
            input.phase!=ModelPalettePhase49S::selectedRenderPreparation||
            input.suppliedState!=ModelPaletteSceneState49S::completeCurrentScene||
@@ -171,8 +174,78 @@ public:
                row->sceneIndex!=input.sourceNodes[id])return {S::palette,0x241540u};
             std::memcpy(out.matrixSlots[3u+i].v,worlds.nodeWorld[i].v,sizeof worlds.nodeWorld[i].v);
         }
-        matricesPrepared_=true;
+        if(matrixRevision_==std::numeric_limits<std::uint64_t>::max())return {S::phase,0x241598u};
+        ++matrixRevision_;geometryRevision_=0;matricesPrepared_=true;
         return {S::complete,0x241598u};
+    }
+    // Commit the actual successful post-motion draw's source geometry. This
+    // receipt remains paired with these exact palette matrices while stopped.
+    bool retainDrawGeometry50LA(const rr::assets::Scene48D& semantic,const BodyMatrix48G& world,
+        const OriginalRacerAggregateBounds50LA& bounds,std::uint64_t& revision)noexcept {
+        if(!constructed240740()||!matricesPrepared_||!matrixRevision_||count_!=1||
+           !geometry_||!geometry_->payload()||!geometry_->payload()->scene()||
+           semantic.nodes.size()!=model_->sourceRowCount()||
+           semantic.quantization!=geometry_->payload()->scene()->quantization||
+           std::memcmp(world.v,packets_[0].matrixSlots[2].v,sizeof world.v))return false;
+        // The visual and model resource are separate decodes of the same PSG.
+        // Bind their exact semantic payload once, never just a node count/scale.
+        if(retainedSemantic_&&retainedSemantic_!=&semantic)return false;
+        if(!retainedSemantic_){
+            const auto& original=*geometry_->payload()->scene();
+            if(semantic.materials!=original.materials||semantic.world_space!=original.world_space||
+               semantic.identity_matrix_palette!=original.identity_matrix_palette||
+               semantic.lods.size()!=original.lods.size())return false;
+            for(std::size_t i=0;i<semantic.nodes.size();++i){
+                const auto& a=semantic.nodes[i];const auto& b=original.nodes[i];
+                if(a.name!=b.name||a.parent!=b.parent||a.local_matrix!=b.local_matrix||
+                   a.bind_matrix!=b.bind_matrix||a.stored_bounds!=b.stored_bounds)return false;
+            }
+            for(std::size_t l=0;l<semantic.lods.size();++l){
+                const auto& a=semantic.lods[l];const auto& b=original.lods[l];
+                if(a.cutoff!=b.cutoff||a.surfaces.size()!=b.surfaces.size())return false;
+                for(std::size_t j=0;j<a.surfaces.size();++j){
+                    const auto& x=a.surfaces[j];const auto& y=b.surfaces[j];
+                    if(x.material_index!=y.material_index||x.component_word!=y.component_word||
+                       x.has_original_colors!=y.has_original_colors||x.groups!=y.groups||
+                       x.indices!=y.indices||x.vertices.size()!=y.vertices.size()||
+                       x.strips.size()!=y.strips.size())return false;
+                    for(std::size_t v=0;v<x.vertices.size();++v){
+                        const auto& c=x.vertices[v];const auto& d=y.vertices[v];
+                        if(c.position_local!=d.position_local||c.normal_local!=d.normal_local||
+                           c.uv!=d.uv||c.color!=d.color||c.bone!=d.bone)return false;
+                    }
+                    for(std::size_t t=0;t<x.strips.size();++t){
+                        const auto& c=x.strips[t];const auto& d=y.strips[t];
+                        if(c.group!=d.group||c.start!=d.start||c.end!=d.end||c.vertex_start!=d.vertex_start)return false;
+                    }
+                }
+            }
+        }
+        for(unsigned i=0;i<4;++i)if(!std::isfinite(bounds.center160[i])||
+            !std::isfinite(bounds.halfExtent170[i])||bounds.halfExtent170[i]<0.f)return false;
+        if(!std::isfinite(bounds.radius198)||bounds.radius198<0.f)return false;
+        retainedSemantic_=&semantic;retainedWorld_=world;retainedBounds_=bounds;
+        geometryRevision_=matrixRevision_;revision=geometryRevision_;return true;
+    }
+    bool prepareDiffuseSelection240C00(const rr::assets::Scene48D& semantic,std::uint64_t revision,
+        const BodyMatrix48G& world,const OriginalRacerAggregateBounds50LA& bounds,
+        const std::array<float,16>& combined,const std::array<float,16>& guard,
+        OriginalRacerDiffuseClip50LA& output)noexcept {
+        if(!constructed240740()||!matricesPrepared_||!model_||model_->fields().packets1F0!=this||
+           model_->model_.observer19C||!revision||revision!=geometryRevision_||revision!=matrixRevision_||
+           &semantic!=retainedSemantic_||std::memcmp(world.v,retainedWorld_.v,sizeof world.v)||
+           bounds.center160!=retainedBounds_.center160||bounds.halfExtent170!=retainedBounds_.halfExtent170||
+           bounds.radius198!=retainedBounds_.radius198)return false;
+        OriginalRacerDiffuseClip50LA next;
+        if(model_->model_.flags03&4u){model_->model_.flags191&=static_cast<std::uint8_t>(~1u);next.disabled=true;output=next;return true;}
+        if(!projectOriginalRacerDiffuseClip50LA(world,bounds,combined,guard,next))return false;
+        // These are the actual original selected/clip fields, not draw-ready
+        // flags. Rejected models remain rejected independently of bit04.
+        model_->model_.flags191=static_cast<std::uint8_t>((model_->model_.flags191&~1u)|(next.selected?1u:0u));
+        auto& f=model_->fields();
+        if(next.selected)f.flags1B2=static_cast<std::uint8_t>((f.flags1B2&~5u)|(next.remainingMask?5u:0u));
+        else f.flags1B2|=4u;
+        output=next;return true;
     }
     // Current-camera portion of26F070 and241320..24146C for the SAME
     // retained multi-node model. Called for every presentation, including a
@@ -243,5 +316,9 @@ private:
     std::unique_ptr<OriginalRacerModelPacket50LA[]> packets_;
     std::size_t count_=0;
     bool hasPalette20_=false,constructed_=false,released_=false,matricesPrepared_=false;
+    std::uint64_t matrixRevision_=0,geometryRevision_=0;
+    const rr::assets::Scene48D* retainedSemantic_=nullptr;
+    BodyMatrix48G retainedWorld_{};
+    OriginalRacerAggregateBounds50LA retainedBounds_{};
 };
 } // namespace rr::game

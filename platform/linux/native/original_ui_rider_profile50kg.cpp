@@ -1,6 +1,6 @@
-#include "../../../src/game/original_ui_course_race_domain50kg.h"
 // New reconstruction after rollback; source-only, unverified.
 #include "original_ui_rider_profile50kg.h"
+#include "../../../src/game/original_course_load_selection50kg.h"
 #include <cmath>
 #include <limits>
 #include <string>
@@ -8,13 +8,9 @@
 
 namespace rr::platform {
 namespace {
-bool supportedRider(std::uint32_t rider) noexcept {
+// Separate unsupported Tournament boundary; never used by the Course flow.
+bool supportedTournamentRider(std::uint32_t rider) noexcept {
     switch(rider){case 2:case 4:case 7:case 9:case 10:case 11:case 12:case 15:case 19:case 20:return true;default:return false;}
-}
-// Mode0 Course has authenticated existing owners for these test-visible riders.
-// Keep the separately gated Tournament domain unchanged.
-bool supportedCourseRider(std::uint32_t rider) noexcept {
-    return supportedRider(rider)||rider==3||rider==8||rider==16||rider==22||rider==24||rider==17||rider==18;
 }
 using Diagnostic=OriginalUiRiderProfileDiagnostic50KG;
 using Error=Diagnostic::Error;
@@ -91,6 +87,8 @@ struct OriginalUiRiderProfileOwner50KG::Storage {
     bool gasganoScTest=false;
     bool tzidikTcTest=false;
     bool sebulbaTbTest=false;
+    bool kraidGbTest=false;
+    bool youngAnakinMcTest=false;
     bool scorchRcTest=false; // Distinct immutable native startup provenance.
     std::array<OriginalUiCourseProfileColors50KG,6> planetColors{};
     std::array<std::uint8_t,13> courseOrder100C4{};
@@ -124,11 +122,11 @@ bool OriginalUiRiderProfileOwner50KG::initializeGasganoTestProfileAtApplicationS
 bool OriginalUiRiderProfileOwner50KG::initializeVisibleRiderTestProfileAtApplicationStartup(
     std::shared_ptr<OriginalUiMainProfile50KG> common,
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,std::uint32_t rider,Diagnostic& d) noexcept {
-    if(rider!=3&&rider!=8&&rider!=22){d={};return fail(d,Error::range,0x17F970);}
+    if(rider!=3&&rider!=8&&rider!=22&&rider!=14&&rider!=21&&rider!=25&&rider!=26){d={};return fail(d,Error::range,0x17F970);}
     return initializeStartupProfile(std::move(common),std::move(archive),rider,d);
 }
 std::uint32_t OriginalUiRiderProfileOwner50KG::visibleRiderTestProfile() const noexcept {
-    return storage_&&(storage_->testRider==3||storage_->testRider==8||storage_->testRider==22)?storage_->testRider:0;
+    return storage_&&(storage_->testRider==3||storage_->testRider==8||storage_->testRider==22||storage_->testRider==14||storage_->testRider==21||storage_->testRider==25||storage_->testRider==26)?storage_->testRider:0;
 }
 bool OriginalUiRiderProfileOwner50KG::gasganoTestProfile() const noexcept {
     return storage_&&storage_->testRider==7;
@@ -181,11 +179,28 @@ bool OriginalUiRiderProfileOwner50KG::initializeSebulbaTbTestProfileAtApplicatio
 bool OriginalUiRiderProfileOwner50KG::sebulbaTbTestProfile() const noexcept {
     return storage_&&storage_->sebulbaTbTest;
 }
+bool OriginalUiRiderProfileOwner50KG::initializeKraidGbTestProfileAtApplicationStartup(
+    std::shared_ptr<OriginalUiMainProfile50KG> common,
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
+    return initializeStartupProfile(std::move(common),std::move(archive),0,d,false,false,false,false,true);
+}
+bool OriginalUiRiderProfileOwner50KG::kraidGbTestProfile() const noexcept {
+    return storage_&&storage_->kraidGbTest;
+}
+bool OriginalUiRiderProfileOwner50KG::initializeYoungAnakinMcTestProfileAtApplicationStartup(
+    std::shared_ptr<OriginalUiMainProfile50KG> common,
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d,std::uint32_t mcRider) noexcept {
+    if(mcRider!=1&&mcRider!=14&&mcRider!=21&&mcRider!=25&&mcRider!=26){d={};return fail(d,Error::range,0x17F970);}
+    return initializeStartupProfile(std::move(common),std::move(archive),0,d,false,false,false,false,false,true,mcRider);
+}
+bool OriginalUiRiderProfileOwner50KG::youngAnakinMcTestProfile() const noexcept {
+    return storage_&&storage_->youngAnakinMcTest;
+}
 bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
     std::shared_ptr<OriginalUiMainProfile50KG> common,
-    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,std::uint32_t testRider,Diagnostic& d,bool gasganoSc,bool tzidikTc,bool scorchRc,bool sebulbaTb) noexcept {
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,std::uint32_t testRider,Diagnostic& d,bool gasganoSc,bool tzidikTc,bool scorchRc,bool sebulbaTb,bool kraidGb,bool youngAnakinMc,std::uint32_t mcRider) noexcept {
     d={};if(storage_)return fail(d,Error::alreadyInitialized,0x17F970);
-    if((sebulbaTb&&(scorchRc||tzidikTc||gasganoSc||testRider!=0))||(scorchRc&&(tzidikTc||gasganoSc||testRider!=0))||(tzidikTc&&(gasganoSc||testRider!=0))||(gasganoSc&&testRider!=0)||(testRider!=0&&testRider!=3&&testRider!=7&&testRider!=8&&testRider!=9&&testRider!=16&&testRider!=22))return fail(d,Error::range,0x17F970);
+    if((youngAnakinMc&&(kraidGb||sebulbaTb||scorchRc||tzidikTc||gasganoSc||testRider!=0))||(kraidGb&&(sebulbaTb||scorchRc||tzidikTc||gasganoSc||testRider!=0))||(sebulbaTb&&(scorchRc||tzidikTc||gasganoSc||testRider!=0))||(scorchRc&&(tzidikTc||gasganoSc||testRider!=0))||(tzidikTc&&(gasganoSc||testRider!=0))||(gasganoSc&&testRider!=0)||(testRider!=0&&testRider!=3&&testRider!=7&&testRider!=8&&testRider!=9&&testRider!=16&&testRider!=22&&testRider!=14&&testRider!=21&&testRider!=25&&testRider!=26))return fail(d,Error::range,0x17F970);
     if(!common||!common->known)return fail(d,Error::commonProfile,0x17F970);
     if(!archive||!archive->loaded()||!archive->identity()||
        archive->identity()->id!=assets::OriginalUiArchiveId50KG::podPhysics)
@@ -239,11 +254,17 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         for(const auto rider:{1u,14u,21u,25u,26u})next->hidden0730[rider]=1;
         // Explicit isolated test setup for the requested racer capture.
         // This does not execute187F40 or fabricate a qualification/result.
-        if(testRider){next->unlock10FAC[testRider]=1;next->testRider=testRider;}
+        if(testRider){next->unlock10FAC[testRider]=1;next->testRider=testRider;
+            // Only this explicitly requested process-local test identity is revealed.
+            if(testRider==14||testRider==21||testRider==25||testRider==26)next->hidden0730[testRider]=0;}
         if(gasganoSc){next->unlock10FAC[7]=1;next->gasganoScTest=true;}
         if(tzidikTc){next->unlock10FAC[24]=1;next->tzidikTcTest=true;}
         if(scorchRc){next->unlock10FAC[17]=1;next->scorchRcTest=true;}
         if(sebulbaTb){next->unlock10FAC[18]=1;next->sebulbaTbTest=true;}
+        if(kraidGb){next->unlock10FAC[23]=1;next->kraidGbTest=true;}
+        if(youngAnakinMc){next->unlock10FAC[mcRider]=1;next->hidden0730[mcRider]=0;next->youngAnakinMcTest=true;}
+        // Only the explicitly selected MC test identity is revealed. Other
+        // original hidden bonuses retain their actual reset visibility.
         //186678..186684, after unlock reset. Mode stays in the shared owner.
         next->remembered.fill(19);
         // Test profile enters through the original remembered-selection search.
@@ -253,9 +274,13 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
         if(tzidikTc)next->remembered[0]=24;
         if(scorchRc)next->remembered[0]=17;
         if(sebulbaTb)next->remembered[0]=18;
+        if(kraidGb)next->remembered[0]=23;
+        if(youngAnakinMc)next->remembered[0]=mcRider;
         // Original constructor/reset fields, same retained fresh profile.
         next->rememberedCourse={{1,3,8,1,1,8,3}}; //186688..1866A8
         if(testRider==16)next->rememberedCourse[0]=7; // explicit native MB test override
+        if(youngAnakinMc)next->rememberedCourse[0]=10; // exact MC authored slot
+        if(kraidGb)next->rememberedCourse[0]=8; // exact GB authored slot
         if(sebulbaTb)next->rememberedCourse[0]=6; // exact TB authored slot
         if(scorchRc)next->rememberedCourse[0]=12; // exact RC authored slot
         if(tzidikTc)next->rememberedCourse[0]=13; // exact TC authored slot
@@ -281,6 +306,10 @@ bool OriginalUiRiderProfileOwner50KG::initializeStartupProfile(
             static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|12u);
         if(sebulbaTb)next->common->availability11018=
             static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|6u);
+        if(kraidGb)next->common->availability11018=
+            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|8u);
+        if(youngAnakinMc)next->common->availability11018=
+            static_cast<std::uint8_t>((next->common->availability11018&0xe0u)|10u);
         storage_=std::move(next);d={};return true;
     }catch(...){return fail(d,Error::allocation,0x17F970);}
 }
@@ -294,6 +323,19 @@ OriginalUiRiderProfileStamp50KG OriginalUiRiderProfileOwner50KG::stamp() const n
 bool OriginalUiRiderProfileOwner50KG::selectionSnapshot(game::OriginalUiRiderSelectionProfile50KG& out) const noexcept {
     if(!storage_||!storage_->readable())return false;
     return selectionSnapshotForMode(storage_->common->mode34,out);
+}
+bool OriginalUiRiderProfileOwner50KG::riderSelectionFacts(std::uint32_t rider,
+    RiderSelectionFacts& out) const noexcept {
+    if(!storage_||!storage_->readable()||rider>=storage_->authored.size()||
+       !storage_->authored[rider].present)return false;
+    out={rider,storage_->unlock10FAC[rider],storage_->hidden0730[rider]};return true;
+}
+bool OriginalUiRiderProfileOwner50KG::courseRiderSelectionSnapshot(RiderSelectionFacts& out) const noexcept {
+    if(!storage_||!storage_->readable()||storage_->common->mode34!=0)return false;
+    const auto rider=std::uint32_t(storage_->packed1125D>>3);RiderSelectionFacts facts;
+    if(rider!=storage_->remembered[0]||rider!=storage_->comparison100C0||
+       !riderSelectionFacts(rider,facts)||!facts.unlock10FAC)return false;
+    out=facts;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::selectionSnapshotForMode(std::uint32_t mode,
     game::OriginalUiRiderSelectionProfile50KG& out) const noexcept {
@@ -350,7 +392,7 @@ bool OriginalUiRiderProfileOwner50KG::coursePlanetColors(std::uint32_t planet,Or
 }
 bool OriginalUiRiderProfileOwner50KG::courseSnapshot(game::OriginalUiCourseRememberedProfile50KG& out)const noexcept{
     if(!storage_||!storage_->readable())return false;const auto& s=*storage_;
-    game::OriginalUiCourseRememberedProfile50KG p;p.ownerReady=true;p.mode34=s.common->mode34;p.mawhonicRylothTest=s.testRider==9;p.wanMbTest=s.testRider==16;p.gasganoScTest=s.gasganoScTest;p.tzidikTcTest=s.tzidikTcTest;p.scorchRcTest=s.scorchRcTest;p.sebulbaTbTest=s.sebulbaTbTest;
+    game::OriginalUiCourseRememberedProfile50KG p;p.ownerReady=true;p.mode34=s.common->mode34;p.mawhonicRylothTest=s.testRider==9;p.wanMbTest=s.testRider==16;p.gasganoScTest=s.gasganoScTest;p.tzidikTcTest=s.tzidikTcTest;p.scorchRcTest=s.scorchRcTest;p.sebulbaTbTest=s.sebulbaTbTest;p.kraidGbTest=s.kraidGbTest;p.youngAnakinMcTest=s.youngAnakinMcTest;
     p.course700=s.rememberedCourse[0];p.laps704=s.rememberedCourse[1];p.entrants708=s.rememberedCourse[2];p.subtype70C=s.rememberedCourse[3];
     p.course710=s.rememberedCourse[4];p.entrants714=s.rememberedCourse[5];p.laps718=s.rememberedCourse[6];
     p.packed1125E=s.packed1125E;p.cardFlag100BC=s.cardFlag100BC;p.availability11018=s.common->availability11018;
@@ -360,11 +402,14 @@ bool OriginalUiRiderProfileOwner50KG::riderConfirmSnapshot(std::uint8_t& packed,
     if(!storage_||!storage_->readable())return false;packed=storage_->packed1125D;comparison=storage_->comparison100C0;return true;
 }
 bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToCourse(const game::OriginalUiRouteDecision50KG& d,OriginalUiRiderProfileStamp50KG expected)noexcept{
+    RiderSelectionFacts rider;
     if(!storage_||!storage_->readable()||storage_->common->mode34!=0||expected.mode34!=0||expected.generation!=storage_->generation||
        storage_->generation==std::numeric_limits<std::uint64_t>::max()||!d.admitted||!d.profileProposalComplete||d.blockers||
-       d.action!=game::OriginalUiRouteAction50KG::request||d.request.sourceScreen!=5||d.request.sourcePage!=1||!supportedCourseRider(d.selectedRider)||d.profileChanges.count!=3)return false;
+       d.action!=game::OriginalUiRouteAction50KG::request||d.request.sourceScreen!=5||d.request.sourcePage!=1||
+       d.selectedRider<0||!riderSelectionFacts(static_cast<std::uint32_t>(d.selectedRider),rider)||!rider.unlock10FAC||
+       d.profileChanges.count!=3)return false;
     game::OriginalUiRiderContext50KG c;c.mode34=0;c.selectedRider=d.selectedRider;c.playerIndex=0;c.packed1125C=storage_->common->playerBits1125C;
-    c.unlockOwnerReady=true;c.selectedUnlockWord10FAC=storage_->unlock10FAC[d.selectedRider];c.comparisonRider100C0=storage_->comparison100C0;
+    c.unlockOwnerReady=true;c.selectedUnlockWord10FAC=rider.unlock10FAC;c.comparisonRider100C0=storage_->comparison100C0;
     c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;c.admission.nativePageMasks[6]=1u<<1;
     game::OriginalUiRouteDecision50KG exact;
     if(game::dispatchOriginalUiRider50KG(0,game::OriginalUiRouteInput50KG::activate,c,exact)!=game::OriginalUiRouteStatus50KG::ok||
@@ -379,7 +424,7 @@ bool OriginalUiRiderProfileOwner50KG::commitRiderConfirmToTournament(const game:
     if(!storage_||!storage_->readable()||storage_->common->mode34!=2||expected.mode34!=2||expected.generation!=storage_->generation||
        storage_->generation==std::numeric_limits<std::uint64_t>::max()||!d.admitted||!d.profileProposalComplete||d.blockers||
        d.action!=game::OriginalUiRouteAction50KG::request||d.request.sourceScreen!=5||d.request.sourcePage!=1||
-       !supportedRider(d.selectedRider)||d.profileChanges.count!=3||storage_->tournamentResultArmed)return false;
+       !supportedTournamentRider(d.selectedRider)||d.profileChanges.count!=3||storage_->tournamentResultArmed)return false;
     game::OriginalUiRiderContext50KG c;c.mode34=2;c.selectedRider=d.selectedRider;c.playerIndex=0;
     c.packed1125C=storage_->common->playerBits1125C;c.unlockOwnerReady=true;
     c.selectedUnlockWord10FAC=storage_->unlock10FAC[d.selectedRider];c.comparisonRider100C0=storage_->comparison100C0;
@@ -474,14 +519,16 @@ bool OriginalUiRiderProfileOwner50KG::courseRaceSnapshot(CourseRaceSelection& ou
 }
 bool OriginalUiRiderProfileOwner50KG::commitCourseLaunch(const game::OriginalUiRouteDecision50KG& d,
     const game::OriginalUiCourseContext50KG& source,OriginalUiRiderProfileStamp50KG expected)noexcept{
+    RiderSelectionFacts rider;
     if(!storage_||!storage_->readable()||storage_->common->mode34!=0||expected.mode34!=0||source.mode34!=0||
        expected.generation!=storage_->generation||storage_->generation==std::numeric_limits<std::uint64_t>::max()||
        !d.admitted||!d.profileProposalComplete||d.blockers||d.action!=game::OriginalUiRouteAction50KG::request||
        d.request.sourceScreen!=6||d.request.sourcePage!=1||d.profileChanges.count!=8||
-       source.subtypeSlot14F4!=1||source.laps14EC<1||source.laps14EC>25||source.entrants14F0!=8||
-       !game::nativeCourseRacerOwned50KG(storage_->packed1125D>>3)||((storage_->common->playerBits1125C>>5)&3)!=1)return false;
-    if(!game::nativeCourseTrackOwned50KG(source.selectedControlWord44,
-        storage_->packed1125E>>5,source.courseSlot14E4))return false;
+       !courseRiderSelectionSnapshot(rider))return false;
+    // Current native race-mode envelope, separate from original Course route
+    // semantics and genuine resource capability owned by the launch consumer.
+    if(source.subtypeSlot14F4!=1||source.laps14EC<1||source.laps14EC>25||
+       source.entrants14F0!=8||((storage_->common->playerBits1125C>>5)&3)!=1)return false;
     auto c=source;c.admission={};c.admission.sourceControllerReady=true;
     c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;
     game::OriginalUiRouteDecision50KG exact;
@@ -494,8 +541,7 @@ bool OriginalUiRiderProfileOwner50KG::commitCourseLaunch(const game::OriginalUiR
     auto& s=*storage_;auto packed=std::uint16_t(s.common->playerBits1125C|(std::uint16_t(s.packed1125D)<<8));
     // Exact source field writes, preserving all unrelated rider and packed bits.
     s.packed1125F=static_cast<std::uint8_t>((s.packed1125F&0xf0u)|(c.selectedControlWord44&15u));
-    packed=static_cast<std::uint16_t>((packed&~0x780u)|(7u<<7));
-    packed=static_cast<std::uint16_t>((packed&~31u)|c.laps14EC);
+    packed=game::originalCourseLaunchPackedMode050KG(packed,c.subtypeSlot14F4,c.laps14EC,c.entrants14F0);
     s.common->playerBits1125C=static_cast<std::uint8_t>(packed);s.packed1125D=static_cast<std::uint8_t>(packed>>8);
     s.subtype11258=c.subtypeSlot14F4;s.rememberedCourse[0]=c.courseSlot14E4;s.rememberedCourse[1]=c.laps14EC;
     s.rememberedCourse[2]=c.entrants14F0;s.rememberedCourse[3]=c.subtypeSlot14F4;++s.generation;return true;

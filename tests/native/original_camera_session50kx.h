@@ -1,7 +1,12 @@
 #pragma once
+#include "../../src/game/original_racer_diffuse_camera50la.h"
 #include "track_navigation_view50tc.h"
 #include "track_navigation_view50tb.h"
+#include "track_navigation_view50gb.h"
+#include "track_navigation_view50mc.h"
 namespace original_cable_selection50LA { class Binding; }
+namespace gb_particle_render50GB {class Owner;}
+namespace mc_particle_render50MC {class Owner;}
 namespace rr::game { class OriginalDamageObservation50LA; }
 // Concrete original-AI / one-Player native session adapter. Intended install: tests/native.
 // All camera/scene/selector state stays OUTSIDE the sealed50HN racer bank.
@@ -59,6 +64,9 @@ struct AuthoredInputs {
     const char* phy=nullptr;std::size_t phyBytes=0;std::uint64_t phyIdentity=0;
     const std::uint8_t* tob=nullptr;std::size_t tobBytes=0;
     OriginalCameraStartCourse course=OriginalCameraStartCourse::unspecified;
+    // Borrow of the very same MC source retained by actualRadarMapMc. The
+    // source-specific AuthoredStorage issues it; never a generic course flag.
+    const mc_cold_sources50LA::Owner* mcSourceIdentity=nullptr;
 };
 // These are genuine external application/display inputs. Keep one instance
 // for the application's display lifetime, and borrow it here. The explicitly
@@ -149,6 +157,8 @@ struct ActualOwners {
     TrackNavigationView50EU actualRadarMapMb{};
     TrackNavigationView50TC actualRadarMapTc{};
     TrackNavigationView50TB actualRadarMapTb{};
+    TrackNavigationView50GB actualRadarMapGb{};
+    TrackNavigationView50MC actualRadarMapMc{};
 };
 enum class Cut : std::uint8_t {
     // Native hold: use real current final-grid/last-published body state while
@@ -186,6 +196,8 @@ struct Result {
 };
 
 class Session final {
+    friend class ::gb_particle_render50GB::Owner;
+    friend class ::mc_particle_render50MC::Owner;
     friend class ::original_cable_selection50LA::Binding;
     // Private same-RA factory verifies actual retirement, never a caller flag.
     friend class ra_source_camera50LA::OwnershipBridge;
@@ -326,6 +338,7 @@ class Session final {
     }
     static bool same(float a,float b) noexcept{return std::memcmp(&a,&b,sizeof a)==0;}
     #include "original_camera_fog_publication50la.inl"
+    rr::game::OriginalRacerDiffuseCamera50LA racerDiffuseCamera_;
     Result set(Status s,std::uint32_t pc=0) noexcept {result_.status=s;result_.sourcePC=pc;return result_;}
     Result fail(Status s,std::uint32_t pc=0) noexcept {invalidateFogPreparation();frameStage_=FrameStage::failed;return set(s,pc);}
     bool constructRacerEntityPrefixes()noexcept {
@@ -766,6 +779,43 @@ public:
         return actual_.actualRigs&&i<actual_.actualRigs->size()?(*actual_.actualRigs)[i].get():nullptr;
     }
     std::uint64_t mainBodyKey(std::size_t i)const noexcept{return i<8?key(identity_[i].mainBodyTag):0;}
+    // Bound once from an actual cold Session when a selected render consumer
+    // requires the source fog phase. This is a nonowning scheduling capability,
+    // never a prepared camera publication or substitute renderer authority.
+    const rr::game::OriginalRacerDiffuseCamera50LA* racerDiffuseCamera() noexcept {
+        racerDiffuseCamera_.owner_=this;
+        racerDiffuseCamera_.read_=[](const void* opaque,rr::game::OriginalRacerDiffuseCameraSnapshot50LA& out) noexcept {
+            const auto& session=*static_cast<const Session*>(opaque);
+            FogPreparation p;if(!session.readFogPreparation(p))return false;
+            rr::game::OriginalRacerDiffuseCameraSnapshot50LA next;
+            next.owner=reinterpret_cast<std::uintptr_t>(&session);next.revision=p.revision;
+            next.generation=p.generation;next.publication=p.publication;next.frame=p.frame;
+            next.camera=p.camera;next.guardCombined=p.guardCombined;next.fog=p.source;
+            out=next;return true;
+        };
+        return &racerDiffuseCamera_;
+    }
+    class GameplayFogRenderPhase final {
+        friend class Session;
+        Session* owner_=nullptr;
+        const OriginalRaceFogFields* fog_=nullptr;
+        std::uint64_t generation_=0;
+    public:
+        bool bound()const noexcept{return owner_!=nullptr;}
+        Result prepare(Session* actual)const noexcept {
+            if(!actual||actual!=owner_||actual->generation_!=generation_||
+               !actual->displayInputs_||actual->displayInputs_->trackFog3EC!=fog_||
+               actual->display_.actualTrackFog3EC!=fog_){
+                Result rejected;rejected.status=Status::phase;rejected.sourcePC=0x13ea30;return rejected;
+            }
+            return actual->prepareGameplayFogRender();
+        }
+    };
+    bool bindGameplayFogRenderPhase(GameplayFogRenderPhase& phase)noexcept {
+        if(phase.bound()||!coldBound_||closed_||abandoned_||!generation_||!displayInputs_||
+           !displayInputs_->trackFog3EC||display_.actualTrackFog3EC!=displayInputs_->trackFog3EC)return false;
+        phase.owner_=this;phase.fog_=displayInputs_->trackFog3EC;phase.generation_=generation_;return true;
+    }
     // Source fog13EA30/13EA60 changes the SAME active camera range before
     // world/particle draw. Native scheduling invokes this after the published
     // camera pose, before either world49F or ParticleCode projection. It does
@@ -846,6 +896,13 @@ public:
         invalidateFogPreparation();
         if(coldBound_||closed_)return set(Status::order);
         if(frameStage_==FrameStage::failed)return set(Status::terminal);
+        const bool mc=authored.course==OriginalCameraStartCourse::mc;
+        if(mc?(!authored.mcSourceIdentity||!actual_.actualRadarMapMc.runtimeValid()||
+                actual_.actualRadarMapMc.role()!=NavigationRole50MC::Map||actual_.actualRadarMapMc.count()!=173u||
+                actual_.actualRadarMapMc.sourceIdentity()!=authored.mcSourceIdentity||
+                actual_.actualRadarMapB8||actual_.actualRadarMapMb.gatesPrepared()||actual_.actualRadarMapTc.gatesPrepared()||
+                actual_.actualRadarMapTb.gatesPrepared()||actual_.actualRadarMapGb.gatesPrepared()):
+              (authored.mcSourceIdentity||actual_.actualRadarMapMc.gatesPrepared()))return set(Status::owner);
         if(!actual_.hostRace.runtimeValid())return set(Status::owner);
         if(!generation||actual_.bank.count()!=8||actual_.all8Manager.flags58&2u||
            actual_.launchKind11258!=1u||

@@ -2,7 +2,7 @@
 namespace original_main_entry50KG { struct Application; }
 #include "track_session_assets50ig_fixture.h"
 #include "original_course_roster50kg_fixture.h"
-#include "../../src/game/original_ui_course_race_domain50kg.h"
+#include "../../src/game/original_course_load_selection50kg.h"
 #include "runtime_startup50fl_fixture.h"
 #include "pod_materials50ed_fixture.h"
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
@@ -27,7 +27,7 @@ using Track=rr::platform::HostTrack50IM;
 // Actual source profile visibility, rider/roster identity, mode2 and target
 // archive authentication remain independent requirements below.
 inline constexpr bool directHumanTrack(Track track) noexcept {
-    return track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC;
+    return track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC||track==Track::TB||track==Track::GB||track==Track::MC;
 }
 inline constexpr bool directDiscTarget(Track track) noexcept {
     return directHumanTrack(track)||track==Track::RA;
@@ -37,7 +37,7 @@ struct Target {
     const track_session_assets50IG::SessionAssets* assets;
     std::uint32_t course,planet;
 };
-inline const std::array<Target,10> targets{{
+inline const std::array<Target,13> targets{{
     {Track::TA,&track_session_assets50IG::retainedTA,0,0},
     {Track::SA,&track_session_assets50IG::retainedSA,11,4},
     {Track::MA,&track_session_assets50IG::retainedMA,4,5},
@@ -51,11 +51,13 @@ inline const std::array<Target,10> targets{{
     // acknowledgement, plus mode2, is checked below; no profile is unlocked.
     {Track::GC,&track_session_assets50IG::retainedGC,10,1},
     {Track::TC,&track_session_assets50IG::retainedTC,2,0},
-    {Track::RC,&track_session_assets50IG::retainedRC,3,2}}};
+    {Track::RC,&track_session_assets50IG::retainedRC,3,2},
+    {Track::TB,&track_session_assets50IG::retainedTB,1,0},
+    {Track::GB,&track_session_assets50IG::retainedGB,9,1},
+    {Track::MC,&track_session_assets50IG::retainedMC,6,5}}};
 inline const Target* target(const Selection& s) noexcept {
-    if(!rr::game::nativeCourseRacerOwned50KG(s.rider)||s.subtype!=1||s.laps<1||s.laps>25||s.entrants!=8||
-       (s.packed1125C&31u)!=s.laps||((s.packed1125C>>5)&3u)!=1||((s.packed1125C>>7)&15u)!=7||
-       (s.packed1125C>>11)!=s.rider)return nullptr;
+    if(!rr::game::originalCourseSelectionEncoding50KG(s)||
+       !rr::game::nativeSingleHumanCourseMode50KG(s))return nullptr;
     for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet&&
         (s.laps==3||directHumanTrack(t.track)))return &t;
     return nullptr;
@@ -70,7 +72,11 @@ inline bool same(const Selection& a,const Selection& b) noexcept {
 // A missing target disables only that destination, with no fallback identity.
 class Catalog final {
     std::array<std::vector<std::uint8_t>,targets.size()> originals_;
-    inline static constexpr auto riders=rr::game::nativeCourseRacers50KG;
+    inline static constexpr auto riders=[](){
+        std::array<std::uint32_t,original_player_identity50IK::originals.size()> ids{};
+        for(std::size_t i=0;i<ids.size();++i)ids[i]=original_player_identity50IK::originals[i].racer60;
+        return ids;
+    }();
     std::array<native_racer50HW::J,riders.size()> authenticatedRosters_;
     // Disc-only admission retains each verified encoded original once. The
     // real post-handoff Rig/model loaders still create and validate their own
@@ -206,15 +212,26 @@ public:
             }
         }
     }
-    const Target* admits(const Selection& s)const noexcept {
-        const auto* selected=target(s);if(!attempted_||!selected||(directDisc_&&!directDiscTarget(selected->track)))return nullptr;
+    rr::game::OriginalCourseLoadAvailability50KG availability(const Selection& s)const noexcept {
+        using A=rr::game::OriginalCourseLoadAvailability50KG;
+        if(!rr::game::originalCourseSelectionEncoding50KG(s))return A::invalidSelection;
+        if(!rr::game::nativeSingleHumanCourseMode50KG(s))return A::unsupportedNativeMode;
+        if(!attempted_)return A::hostNotReady;
+        const Target* selected=nullptr;
+        for(const auto& t:targets)if(t.course==s.course&&t.planet==s.planet){selected=&t;break;}
+        if(!selected)return A::courseResourcesUnavailable;
+        if((s.laps!=3&&!directHumanTrack(selected->track))||
+           (directDisc_&&!directDiscTarget(selected->track)))return A::unsupportedNativeMode;
         bool rosterPresent=false;
         for(std::size_t i=0;i<riders.size();++i)
             if(s.rider==riders[i]&&!authenticatedRosters_[i].is_null())rosterPresent=true;
-        if(!rosterPresent)return nullptr;
+        if(!rosterPresent)return A::riderResourcesUnavailable;
         for(std::size_t i=0;i<targets.size();++i)
-            if(selected==&targets[i]&&originals_[i].size()==selected->assets->archiveBytes)return selected;
-        return nullptr;
+            if(selected==&targets[i]&&originals_[i].size()==selected->assets->archiveBytes)return A::ready;
+        return A::courseResourcesUnavailable;
+    }
+    const Target* admits(const Selection& s)const noexcept {
+        return availability(s)==rr::game::OriginalCourseLoadAvailability50KG::ready?target(s):nullptr;
     }
 };
 // Native application message, not a completed destination or source pointer.

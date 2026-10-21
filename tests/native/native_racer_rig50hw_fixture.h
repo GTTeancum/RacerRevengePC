@@ -274,6 +274,17 @@ public:
                 const bool originalWrongBinder=podId=="POD20"&&model==right;
                 const bool originalWrongFlames=podId=="POD19"&&model==left;
                 const bool originalMissingBrakes=podId=="POD22"&&model==chariot;
+                const bool originalMissingSpin=podId=="POD25"&&(model==left||model==right);
+                if(originalMissingSpin){
+                    // Original153248 skips the missing spin LHS, never aliases another node.
+                    need(members.at(vutMember).digest==(model==left?
+                        "2ba86dd85c18b029ecb5fd0f066ebfa0eafc97d1a1964b9fbbe3e22beee7334a":
+                        "0d44b65eebc5244e7cc01487ec2beb4ab90e4bd8c976869e403f8aae873d0c62")&&
+                        members.at(psgMember).digest==(model==left?
+                        "e06dc530b91da318441f9e3ec89ac9cfcdd1fd957d618f9623de1a0be428bebc":
+                        "a89d8932d6ebad3e0b21aae38e15a8387c037d7b0e22e853b23990aeeae6305d"),
+                        "POD25 missing-spin projection requires genuine own PSG/VUT");
+                }
                 if(originalMissingDamage){
                     need(vutMember==base+"englt1.vut"&&psgMember==base+"englt1.psg"&&
                         members.at(vutMember).digest=="af57258b551e3a52223ac2d70bb6b6403c5586242b884088413668525154982f"&&
@@ -321,7 +332,7 @@ public:
                         "POD18 original VUT projection role differs");
                     bindingBytes=sebulba18ChariotVutPrefix(psg[model],vut[model]);
                 }
-                const auto missing=(originalMissingDamage||originalMissingBinder||originalWrongBinder||originalWrongFlames||originalMissingBrakes)?a::MotionBindingMissingNode49O::sourceDiagnosticSkip:
+                const auto missing=(originalMissingDamage||originalMissingBinder||originalWrongBinder||originalWrongFlames||originalMissingBrakes||originalMissingSpin)?a::MotionBindingMissingNode49O::sourceDiagnosticSkip:
                     a::MotionBindingMissingNode49O::reject;
                 if(!a::readMotionNodeBindings49O(hierarchy[model],reinterpret_cast<const char*>(vut[model].data()),
                     bindingBytes,localRows[model],bd,missing))
@@ -331,7 +342,7 @@ public:
                     need(bd.skippedUnknownNodes==0,"POD18 valid VUT prefix unexpectedly skipped a node");
                     bd.skippedUnknownNodes=1;bd.firstUnknownOffset=352;
                 }
-                need(bd.skippedUnknownNodes==(originalMissingDamage?4u:(originalWrongFlames||originalMissingBrakes)?2u:(originalMissingBinder||originalWrongBinder||originalMalformedHand)?1u:0u)&&
+                need(bd.skippedUnknownNodes==(originalMissingDamage?4u:(originalWrongFlames||originalMissingBrakes)?2u:(originalMissingBinder||originalWrongBinder||originalMalformedHand||originalMissingSpin)?1u:0u)&&
                     (!originalMalformedHand||bd.firstUnknownOffset==352u)&&
                     (!originalMissingDamage||bd.firstUnknownOffset==57u)&&
                     (!originalWrongFlames||bd.firstUnknownOffset==181u)&&
@@ -339,6 +350,17 @@ public:
                     (!(originalMissingBinder||originalWrongBinder)||bd.firstUnknownOffset==15u),
                     "native VUT source missing-name count differs: "+vutMember+" skippedUnknown="+
                     std::to_string(bd.skippedUnknownNodes)+" firstByte="+std::to_string(bd.firstUnknownOffset));
+                rows[model]=localRows[model];
+                for(unsigned n=0;n<rows[model].count;++n)
+                    rows[model].rows[n].sceneNode=static_cast<std::uint8_t>(sourceNodes[model][localRows[model].rows[n].sceneNode]);
+            }
+            if(!count){
+                // Original152EA0 enumerates the PSG even with no MCF motions.
+                // Keep absent VUT/MOT absent, but retain the real static nodes
+                // for fresh bounds and bind-pose geometry (not a dummy motion).
+                a::MotionBindingDiagnostic49O enumeration;
+                need(a::readMotionNodeEnumeration49O(hierarchy[model],localRows[model],enumeration),
+                    "Static original model PSG enumeration failed");
                 rows[model]=localRows[model];
                 for(unsigned n=0;n<rows[model].count;++n)
                     rows[model].rows[n].sceneNode=static_cast<std::uint8_t>(sourceNodes[model][localRows[model].rows[n].sceneNode]);
@@ -417,7 +439,8 @@ public:
     void install(g::VehicleFrameState49W& state,g::VehicleFrameBindings49W& bindings,
         g::ChariotIkPair49T& hands,RightModelConstruction rightModel=nullptr,
         LeftModelConstruction leftModel=nullptr,ChariotModelConstruction chariotModel=nullptr,
-        BottomRightModelConstruction bottomRightModel=nullptr,BottomLeftModelConstruction bottomLeftModel=nullptr)const{
+        BottomRightModelConstruction bottomRightModel=nullptr,BottomLeftModelConstruction bottomLeftModel=nullptr,
+        bool preserveSharedMotion=false)const{
         using namespace rig_detail;using namespace g;
         need(state.phase==VehicleFramePhase49W::Ready&&state.bodies.main.frameFactor==0,"Roster rig install requires cold state");
         need(state.fields.cableMode48.construct20F6B4(),"Roster racer48 cold constructor already projected");
@@ -426,7 +449,12 @@ public:
         const auto previousContainer=state.nodes[static_cast<unsigned>(bindings.lifecycle.container194)];
         const auto previousHidden=state.nodes[static_cast<unsigned>(bindings.lifecycle.hidden198)];
         for(auto& node:state.nodes){node={};node.localC0=node.world100=f::identity();}
+        // GB has already sampled its four world owners against this exact
+        // process-shared motion lane. A fresh racer may reset its local
+        // animation records, but must not erase that live global chronology.
+        const auto sharedMotion=state.animationShared.motion;
         state.animationShared={}; //Before retained single-record28EB90/libm effects.
+        if(preserveSharedMotion)state.animationShared.motion=sharedMotion;
         // Complete each actual owner's constructor/setup in represented source
         // right/left/bottom-right/bottom-left/chariot order before normalization,
         // motion sample or rebase. This differs from the Rig's asset role order.
