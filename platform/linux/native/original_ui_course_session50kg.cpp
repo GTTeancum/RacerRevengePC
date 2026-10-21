@@ -2,6 +2,8 @@
 // Not byte-verified against lost candidate. Popup cloning/disable owner joined;
 // source-only review still required before destination admission.
 #include "original_ui_course_session50kg.h"
+#include "original_ui_tournament_session50kg.h"
+#include "../../../src/game/original_ui_course_mode2_entry50kg.h"
 #include <cmath>
 #include <limits>
 #include <utility>
@@ -56,6 +58,7 @@ struct OriginalUiCourseSession50KG::Storage {
     game::OriginalUiApertureOwner50KG aperture;
     OriginalUiRiderProfileStamp50KG coldStamp{},liveStamp{};
     bool published=false,requested=false,entered=false,managerEntered=false;
+    bool tournamentContinueAccepted=false;
     bool opening=false,opened=false,entryAuxiliary=false,entryCompleted=false;
     bool closing=false,restored=false,closed=false;
     std::uint64_t proposalSerial=0;
@@ -65,6 +68,7 @@ struct OriginalUiCourseSession50KG::Storage {
     OriginalUiRiderProfileStamp50KG pendingStamp{};
     bool rendering=false,inOperation=false,updatePrepared=false,paused=false;
     float preparedDelta=0;
+    std::array<bool,4> preparedDebug{};
     std::array<std::string,6> planetNamesBA0;
     bool selectionRefreshCompleted=false;
     game::OriginalUiCourseWidgets50KG& widgets()noexcept{return *cold.resources->widgets();}
@@ -94,9 +98,35 @@ struct OriginalUiCourseSession50KG::Storage {
     }
     bool testProfileCurrent(const game::OriginalUiCourseRememberedProfile50KG& p)const noexcept{
         return p.youngAnakinMcTest==youngAnakinMcTest&&p.youngAnakinMcTest==cold.profile->youngAnakinMcTestProfile()&&p.kraidGbTest==kraidGbTest&&p.kraidGbTest==cold.profile->kraidGbTestProfile()&&p.sebulbaTbTest==sebulbaTbTest&&p.sebulbaTbTest==cold.profile->sebulbaTbTestProfile()&&p.scorchRcTest==scorchRcTest&&p.scorchRcTest==cold.profile->scorchRcTestProfile()&&p.tzidikTcTest==tzidikTcTest&&p.tzidikTcTest==cold.profile->tzidikTcTestProfile()&&p.gasganoScTest==gasganoScTest&&p.gasganoScTest==cold.profile->gasganoScTestProfile();}
+    bool freshTournamentProfile(OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot& c,
+        game::OriginalUiCourseRememberedProfile50KG& p)const noexcept{
+        constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
+        if(!cold.profile->selectedTournamentCourseSnapshot(c,p)||!p.ownerReady||p.mode34!=2||cold.commonProfile->mode34!=2||
+           c.career100C0!=19||c.progress219C||c.cardFlag100BC||p.cardFlag100BC||c.earned2190||c.unspent2194||c.kills2198||
+           ((cold.commonProfile->playerBits1125C>>5)&3)!=1||p.courseOrder100C4!=order||
+           !sameStamp(c.stamp,cold.profile->stamp())||!testProfileCurrent(p))return false;
+        for(auto medal:c.medals1938)if(medal)return false;
+        return true;
+    }
     bool profileCurrent()const noexcept{game::OriginalUiCourseRememberedProfile50KG p;
-        return cold.profile->courseSnapshot(p)&&bounded(p,*cold.commonProfile)&&testProfileCurrent(p)&&
-            (!entered||sameStamp(cold.profile->stamp(),liveStamp))&&(!entered||(p.packed1125E>>5)==state.selectedPlanet40);}
+        OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
+        const bool valid=state.mode34==2?freshTournamentProfile(c,p):
+            cold.profile->courseSnapshot(p)&&bounded(p,*cold.commonProfile)&&testProfileCurrent(p);
+        return valid&&(!entered||sameStamp(cold.profile->stamp(),liveStamp))&&
+            (!entered||(p.packed1125E>>5)==state.selectedPlanet40);
+    }
+    bool entryPlan(game::OriginalUiCourseEntryPrefix50KG& e,game::OriginalUiCourseMode2EntryPlan50KG& mode2)const noexcept{
+        game::OriginalUiCourseRememberedProfile50KG p;
+        if(state.mode34==2){
+            OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
+            if(!freshTournamentProfile(c,p)||game::planOriginalUiCourseMode2Entry50KG(selection,
+                {2,c.career100C0,c.progress219C},mode2)!=game::OriginalUiCourseSelectionStatus50KG::ok)return false;
+            e={};e.courseSlot14E4=mode2.courseSlot14E4;e.subtypeSlot14F4=mode2.subtypeSlot14F4;
+            e.selectedControl=mode2.selectedControl;e.planetProfileChange=mode2.planetProfileChange;
+            return e.courseSlot14E4==1&&mode2.tier14E8==1;
+        }
+        return cold.profile->courseSnapshot(p)&&game::planOriginalUiCourseEntryPrefix50KG(selection,p,e)==game::OriginalUiCourseSelectionStatus50KG::ok;
+    }
     void fault(S status,std::uint32_t pc)noexcept{if(!state.faulted){faultDetail.status=status;faultDetail.sourcePC=pc;}state.faulted=true;state.framePublished=false;}
     void cpuDrain()noexcept{collector.drain();state.framePublished=false;}
     bool idleInput()const noexcept{
@@ -109,7 +139,11 @@ struct OriginalUiCourseSession50KG::Storage {
         if(!profileCurrent()||!cold.resources->widgets()->navigation()||!selection.page())return false;
         const auto* n=cold.resources->widgets()->navigation();
         // Source Confirm/Back dispatch does not require course-row focus.
-        if(n->controllerGroup[0]<1||n->controllerGroup[0]>3||state.laps14EC<1||state.laps14EC>25||
+        if(state.mode34==2){
+            if(n->controllerGroup[0]!=1||n->controllerGroup[1]!=-1||!n->groups[1].enabled||
+               n->groups[2].enabled||n->groups[3].enabled||!n->groups[5].enabled||
+               n->groups[1].selectedSlot!=1||state.courseSlot14E4!=1||state.subtypeSlot14F4!=1||state.tier14E8!=1)return false;
+        }else if(n->controllerGroup[0]<1||n->controllerGroup[0]>3||state.laps14EC<1||state.laps14EC>25||
             n->groups[1].selectedSlot!=state.courseSlot14E4||
             n->groups[2].selectedSlot!=state.subtypeSlot14F4)return false;
         game::OriginalUiCourseControl50KG control;
@@ -118,7 +152,7 @@ struct OriginalUiCourseSession50KG::Storage {
         c={};c.admission.sourceControllerReady=true;c.admission.selectionOwnerReady=true;c.admission.profileOwnerReady=true;
         OriginalUiRiderProfileOwner50KG::CourseRaceSelection retained;
         if(!cold.profile->courseRaceSnapshot(retained))return false;
-        c.mode34=0;c.packed1125C=retained.packed1125C;c.firstControllerPresent=true;
+        c.mode34=state.mode34;c.packed1125C=retained.packed1125C;c.firstControllerPresent=true;
         c.confirmEnabled42C=(state.promptMask42C&1)!=0;c.courseSlot14E4=static_cast<std::uint16_t>(state.courseSlot14E4);
         c.subtypeSlot14F4=static_cast<std::uint16_t>(state.subtypeSlot14F4);
         c.courseGroupSlotCount=static_cast<std::uint16_t>(selection.page()->groups[1].controls.size());
@@ -127,10 +161,30 @@ struct OriginalUiCourseSession50KG::Storage {
         return true;
     }
     bool widgetProfile(game::OriginalUiCourseWidgetProfile50KG& out)const noexcept{
-        game::OriginalUiCourseRememberedProfile50KG p;if(!cold.profile->courseSnapshot(p)||!bounded(p,*cold.commonProfile)||!testProfileCurrent(p))return false;
-        out={};out.mawhonicRylothTest=p.mawhonicRylothTest;out.wanMbTest=p.wanMbTest;out.gasganoScTest=p.gasganoScTest;out.tzidikTcTest=p.tzidikTcTest;out.scorchRcTest=p.scorchRcTest;out.sebulbaTbTest=p.sebulbaTbTest;out.kraidGbTest=p.kraidGbTest;out.youngAnakinMcTest=p.youngAnakinMcTest;out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
+        game::OriginalUiCourseRememberedProfile50KG p;OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
+        if(state.mode34==2){if(!freshTournamentProfile(c,p))return false;}
+        else if(!cold.profile->courseSnapshot(p)||!bounded(p,*cold.commonProfile)||!testProfileCurrent(p))return false;
+        out={};
+        if(state.mode34==2){
+            game::OriginalUiCourseEntryPrefix50KG e;game::OriginalUiCourseMode2EntryPlan50KG m;
+            if(!entryPlan(e,m))return false;
+            out.career100C0=c.career100C0;out.progress219C=c.progress219C;out.medals1938=c.medals1938;
+            out.courseSlot14E4=m.courseSlot14E4;out.tier14E8=m.tier14E8;
+        }
+        out.mawhonicRylothTest=p.mawhonicRylothTest;out.wanMbTest=p.wanMbTest;out.gasganoScTest=p.gasganoScTest;out.tzidikTcTest=p.tzidikTcTest;out.scorchRcTest=p.scorchRcTest;out.sebulbaTbTest=p.sebulbaTbTest;out.kraidGbTest=p.kraidGbTest;out.youngAnakinMcTest=p.youngAnakinMcTest;out.mode34=p.mode34;out.course700=p.course700;out.subtype70C=p.subtype70C;
         out.flags100BC=p.cardFlag100BC?1:0;out.flags11018=p.availability11018;
         out.flags1125C=cold.commonProfile->playerBits1125C;out.courseRecords100C4=p.courseOrder100C4;return true;
+    }
+    bool tournamentDrawState(game::OriginalUiCourseTournamentDrawState50KG& out)const noexcept{
+        OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot c;
+        OriginalUiRiderProfileOwner50KG::TournamentCourseRecordSnapshot record;
+        game::OriginalUiCourseRememberedProfile50KG p;
+        if(state.mode34!=2||!freshTournamentProfile(c,p)||!cold.profile->selectedTournamentCourseRecordSnapshot(record)||
+           !sameStamp(c.stamp,record.stamp)||!sameStamp(record.stamp,cold.profile->stamp())||
+           record.slot!=state.courseSlot14E4||record.course100C4!=state.selectedCourse44||record.slot!=1)return false;
+        out={};out.career=c.career100C0;out.slot=state.courseSlot14E4;out.tier=state.tier14E8;
+        out.progress=c.progress219C;out.medal=c.medals1938[record.slot-1];out.remainingPrize=c.remainingPrizes1946[record.slot-1];
+        out.killPercent=record.killPercent100CC;out.par=record.par100E8;return true;
     }
     static bool preflight(void* context,const game::OriginalUiCourseWidgetStep50KG* steps,std::size_t count)noexcept{
         auto& s=*static_cast<Storage*>(context);if(!s.operational()||!s.processCurrent()||(!steps&&count))return false;
@@ -210,13 +264,22 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
        !cold.resources->widgets()->popupTemplatesHidden438()||cold.resources->widgets()->popupEnabled438()||!cold.resources->video()||
        !cold.holograms||!cold.holograms->loaded()||!cold.courseArchive||!cold.english||!cold.english->loaded()||
        !cold.profile||!cold.profile->initialized()||!cold.commonProfile||!cold.application||!cold.lightManager||
-       !cold.externalTransition||cold.externalTransition->snapshot().bound||cold.previousScreen!=5)return result(d,S::unsupportedState);
+       !cold.externalTransition||cold.externalTransition->snapshot().bound||
+       (cold.previousScreen!=5&&cold.previousScreen!=9))return result(d,S::unsupportedState);
+    const bool tournament=cold.previousScreen==9;
+    if(tournament){
+        const auto& p=cold.tournamentProposal;
+        if(!p||!p->source||!p->source->ownsProfile(*cold.profile)||!p->source->routeProposalCurrent(*p)||
+           p->decision.request.sourceScreen!=9||p->decision.request.sourcePage!=1||p->decision.request.targetScreen!=6||
+           p->decision.request.targetPage!=1||p->decision.request.sourcePC!=0x1F2374||p->decision.profileChanges.count||
+           !sameStamp(p->profileStamp,cold.profile->stamp())||p->profileStamp.mode34!=2)return result(d,S::profile,0x1F2374);
+    }else if(cold.tournamentProposal||cold.profile->stamp().mode34!=0)return result(d,S::unsupportedState);
     if((cold.audioMode==OriginalUiMainAudioMode50KG::muted&&cold.audio)||
        (cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&(!cold.audio||!cold.audio->courseMenuReady()))||
        (cold.audioMode!=OriginalUiMainAudioMode50KG::muted&&cold.audioMode!=OriginalUiMainAudioMode50KG::enabled))
         return result(d,S::audio,0x1DA924);
     try{
-        auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->coldStamp=cold.profile->stamp();
+        auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->coldStamp=cold.profile->stamp();s->state.mode34=tournament?2u:0u;
         s->gasganoScTest=cold.profile->gasganoScTestProfile();
         s->tzidikTcTest=cold.profile->tzidikTcTestProfile();
         s->scorchRcTest=cold.profile->scorchRcTestProfile();
@@ -225,9 +288,9 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         s->youngAnakinMcTest=cold.profile->youngAnakinMcTestProfile();
         if(!s->processCurrent()||!s->profileCurrent()||s->coldStamp.generation>std::numeric_limits<std::uint64_t>::max()-2)return result(d,S::profile);
         if(!s->selection.load(cold.courseArchive,d.selection))return result(d,S::resource);
-        game::OriginalUiCourseRememberedProfile50KG p;game::OriginalUiCourseEntryPrefix50KG entry;
-        if(!cold.profile->courseSnapshot(p)||game::planOriginalUiCourseEntryPrefix50KG(s->selection,p,entry)!=game::OriginalUiCourseSelectionStatus50KG::ok||
-            entry.courseSlot14E4>13u||!assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40)||entry.showPopup438)return result(d,S::profile,0x1DA618);
+        game::OriginalUiCourseEntryPrefix50KG entry;game::OriginalUiCourseMode2EntryPlan50KG mode2;
+        if(!s->entryPlan(entry,mode2)||entry.courseSlot14E4>13u||
+            !assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40)||entry.showPopup438)return result(d,S::profile,0x1DA618);
         if(!game::prepareOriginalUiCourseCamera50KG(*cold.courseArchive,s->camera,d.camera)||
            !game::prepareOriginalUiCourseRenderContext50KG(*cold.courseArchive,s->camera,s->renderContext,d.renderContext))return result(d,S::camera);
         if(!game::prepareOriginalUiCourseLighting50KG(*cold.courseArchive,s->lighting,d.lighting))return result(d,S::lighting);
@@ -235,7 +298,16 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         const auto font=cold.resources->materialIndex("font/denmrk16"),overlay=cold.resources->materialIndex("ui/textures/overlay1");
         if(font>=mats->size()||overlay>=mats->size()||(*mats)[font].images.size()!=1||(*mats)[overlay].images.size()!=1)return result(d,S::resource);
         game::OriginalUiCoursePageDrawDiagnostic50KG pd;
-        if(!s->page.prepare(cold.courseArchive,*cold.english,cold.resources->images(),(*mats)[font].images[0],(*mats)[overlay].images[0],
+        if(tournament){
+            const auto font14=cold.resources->materialIndex("font/denmrk14");
+            const char* names[]={"ui/textures/medlgout","ui/textures/medstar","ui/textures/medlgicn"};
+            std::array<std::uint32_t,3> medals{};
+            if(font14>=mats->size()||(*mats)[font14].images.size()!=1)return result(d,S::resource);
+            for(std::size_t i=0;i<medals.size();++i){const auto index=cold.resources->materialIndex(names[i]);
+                if(index>=mats->size()||(*mats)[index].images.empty())return result(d,S::resource);medals[i]=(*mats)[index].images[0];}
+            if(!s->page.prepareTournamentFresh(cold.courseArchive,*cold.english,cold.resources->images(),(*mats)[font14].images[0],medals,
+                cold.resources->video()->packetZMaximum,pd))return result(d,S::resource,pd.sourcePC);
+        }else if(!s->page.prepare(cold.courseArchive,*cold.english,cold.resources->images(),(*mats)[font].images[0],(*mats)[overlay].images[0],
             cold.resources->video()->packetZMaximum,pd))return result(d,S::resource,pd.sourcePC);
         //1DDF00 stores BA0 from the actual English owner, capacity40. Visible
         // course names remain their authored control text widgets27/31/32/28.
@@ -243,20 +315,36 @@ S OriginalUiCourseSession50KG::bind(const OriginalUiCourseSessionCold50KG& cold,
         for(auto planet:{0u,1u,4u,5u,2u}){const auto* text=cold.english->at(ids[planet]);if(!text)return result(d,S::resource,0x1DDF64);
             s->planetNamesBA0[planet]=text->text.substr(0,40);
             if(cold.resources->backgroundImage(planet)==assets::unresolvedMaterialTexture50EA)return result(d,S::resource,0x1DDF00);}
-        if(!s->collector.bind(cold.resources,cold.holograms,d.draw)||!s->collector.prepareBank(d.draw))return result(d,S::draw);
+        const auto sourceClock=tournament?cold.applicationAnimation:game::OriginalApplicationAnimationClockView50KG{};
+        if(!s->collector.bind(cold.resources,cold.holograms,d.draw,sourceClock)||!s->collector.prepareBank(d.draw))return result(d,S::draw);
         game::OriginalUiApertureCallbacks50KG callbacks{s.get(),&Storage::available,&Storage::hook,&Storage::overlay};
         if(s->aperture.bindCourse(cold.courseArchive,callbacks,d.aperture)!=AS::ok)return result(d,S::aperture);
         s->state.bound=true;storage_=std::move(s);return result(d,S::ok);
     }catch(...){return result(d,S::allocation);}
 }
 bool OriginalUiCourseSession50KG::ownsPreparedPage(std::uint8_t page)const noexcept{
-    return page==1&&storage_&&storage_->operational()&&storage_->published&&storage_->page.prepared()&&storage_->processCurrent()&&storage_->profileCurrent()&&storage_->popupCurrent();
+    return page==1&&storage_&&storage_->operational()&&storage_->published&&storage_->page.prepared()&&(storage_->state.mode34!=2||storage_->page.tournamentFresh())&&storage_->processCurrent()&&storage_->profileCurrent()&&storage_->popupCurrent();
 }
-bool OriginalUiCourseSession50KG::canEnterMode(std::uint32_t mode)const noexcept{return mode==0&&ownsPreparedPage(1);}
+bool OriginalUiCourseSession50KG::canEnterMode(std::uint32_t mode)const noexcept{return storage_&&mode==storage_->state.mode34&&ownsPreparedPage(1);}
+std::uint32_t OriginalUiCourseSession50KG::intendedMode()const noexcept{return storage_?storage_->state.mode34:0;}
+bool OriginalUiCourseSession50KG::ownsProfile(const OriginalUiRiderProfileOwner50KG& p)const noexcept{return storage_&&storage_->cold.profile.get()==&p;}
+bool OriginalUiCourseSession50KG::acceptTournamentContinueCommit(const OriginalUiTournamentRouteProposal50KG& p)noexcept{
+    auto* s=storage_.get();if(!s||!s->operational()||s->state.mode34!=2||s->tournamentContinueAccepted||s->entered||
+       s->inOperation||s->rendering||s->updatePrepared||!s->collector.bank()||!s->profileCurrent()||
+       !s->cold.tournamentProposal||!p.source||p.source!=s->cold.tournamentProposal->source||
+       p.serial!=s->cold.tournamentProposal->serial||!sameDecision(p.decision,s->cold.tournamentProposal->decision)||
+       !sameStamp(p.profileStamp,s->coldStamp)||!sameStamp(s->cold.profile->stamp(),s->coldStamp)||
+       !p.source->ownsProfile(*s->cold.profile)||!p.source->routeProposalRetired(p))return false;
+    s->tournamentContinueAccepted=true;s->cold.tournamentProposal.reset();return true;
+}
 const game::OriginalUiTransitionOwner50KG* OriginalUiCourseSession50KG::externalLifecycleOwner()const noexcept{return storage_?storage_->cold.externalTransition.get():nullptr;}
 S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG& e,D& d)noexcept{
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
     if(!s->operational()||s->inOperation||s->rendering||!s->currentPage()||e.route.screen!=6||e.route.page!=1||!s->processCurrent())return result(d,S::unsupportedState,e.sourcePC);
+    if(s->state.mode34==2){
+        const bool initial=e.kind==Notice::requestedPage90||e.kind==Notice::pageEntry74;
+        if(initial==s->updatePrepared)return result(d,S::unsupportedState,e.sourcePC);
+    }
     const auto t=s->transition();if(e.phase!=t.phase||e.lifecycle!=t.lifecycle)return result(d,S::invalidInput,e.sourcePC);
     s->cpuDrain();s->state.backProposalPending=false;s->inOperation=true;bool valid=true;
     switch(e.kind){
@@ -266,20 +354,25 @@ S OriginalUiCourseSession50KG::notifyTransition(const game::OriginalUiTransition
     case Notice::pageEntry74:{
         valid=s->requested&&!s->entered&&t.initialRestartPending&&t.lifecycle==Life::idle&&t.phase==Phase::none&&e.sourcePC==0x2A3C58;
         if(!valid)break;
-        game::OriginalUiCourseRememberedProfile50KG p;game::OriginalUiCourseEntryPrefix50KG entry;
+        game::OriginalUiCourseEntryPrefix50KG entry;game::OriginalUiCourseMode2EntryPlan50KG mode2;
         const auto stamp=s->cold.profile->stamp();OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
-        valid=s->profileCurrent()&&stamp.mode34==0&&stamp.generation==s->coldStamp.generation+1&&
-            s->cold.profile->courseRiderSelectionSnapshot(rider)&&
-            s->cold.profile->courseSnapshot(p)&&game::planOriginalUiCourseEntryPrefix50KG(s->selection,p,entry)==game::OriginalUiCourseSelectionStatus50KG::ok&&
+        const bool origin=s->state.mode34==2?(s->tournamentContinueAccepted&&sameStamp(stamp,s->coldStamp)):
+            (stamp.mode34==0&&stamp.generation==s->coldStamp.generation+1&&s->cold.profile->courseRiderSelectionSnapshot(rider));
+        valid=(s->state.mode34!=2||s->published)&&s->profileCurrent()&&origin&&s->entryPlan(entry,mode2)&&
             !entry.showPopup438&&entry.courseSlot14E4<=13&&assets::originalUiCourseBackgroundName50KG(entry.selectedControl.planet40);
         if(!valid){s->fault(S::profile,0x1DA4A0);break;}
         if(s->cold.lightManager->activeUiIdentity()!=s->cold.courseArchive->identity()||
             !s->cold.lightManager->publishCourseRegistry(s->lighting,s->faultDetail.lightManager)){s->fault(S::lighting,0x1CDB10);break;}
         s->state.registryGeneration=s->cold.lightManager->managerGeneration();
-        if(!s->cold.profile->commitCourseEntry(s->selection,entry,stamp)){s->fault(S::profile,0x1DA618);break;}
+        const bool committed=s->state.mode34==2?s->cold.profile->commitCourseMode2Entry(s->selection,mode2,stamp):
+            s->cold.profile->commitCourseEntry(s->selection,entry,stamp);
+        if(!committed){s->fault(S::profile,0x1DA618);break;}
         s->liveStamp=s->cold.profile->stamp();s->state.courseSlot14E4=entry.courseSlot14E4;s->state.subtypeSlot14F4=entry.subtypeSlot14F4;
-        s->state.laps14EC=entry.laps14EC;s->state.entrants14F0=entry.entrants14F0;
+        if(s->state.mode34==2)s->state.tier14E8=mode2.tier14E8;
+        else {s->state.laps14EC=entry.laps14EC;s->state.entrants14F0=entry.entrants14F0;}
         s->state.selectedPlanet40=entry.selectedControl.planet40;s->state.selectedCourse44=entry.selectedControl.course44;
+        if(s->state.mode34==2){game::OriginalUiCoursePageDrawDiagnostic50KG pd;
+            if(!s->page.setTournamentPlanetName(s->state.selectedPlanet40,pd)){s->fault(S::widget,pd.sourcePC);break;}}
         if(!s->widgetPhase(WP::entry74))break;
         // Source1DA714 disables the actual popup clone entity. Source template
         // widgets stay manager-owned and hidden; no invented reparenting.
@@ -327,6 +420,15 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
     s->state.backProposalPending=false;
     if(!s->idleInput()||in.popupActive||in.sourceInputBlocked||in.controller!=0)return result(d,S::noChange);
     out.containerReached=true;out.pageCallbackRan=true;out.pageAccepted=true; // source1DF9A4
+    if(s->state.mode34==2){
+        if(in.originalInput<=3){
+            const std::uint32_t pcs[]={0x1DF19C,0x1DF454,0x1DF760,0x1DF8FC};
+            out.status=S::noChange;return result(d,S::noChange,pcs[in.originalInput]);
+        }
+        // Confirm/race is outside this navigation owner. Reject before source
+        // profile writes, effect1, manager state8 or application launch flags.
+        if(in.originalInput==4){out.status=S::unavailableDestination;return result(d,out.status,0x1DED58);}
+    }
     if(in.originalInput==2||in.originalInput==3){
         const bool down=in.originalInput==3;const auto pc=down?0x1DF8D0u:0x1DF734u;
         game::OriginalUiCourseWidgetProfile50KG profile;
@@ -401,12 +503,13 @@ S OriginalUiCourseSession50KG::input(const OriginalUiMainSessionInput50KG& in,Or
     if(status!=game::OriginalUiRouteStatus50KG::unavailable||decision.admitted||!decision.profileProposalComplete||
         decision.blockers!=static_cast<std::uint32_t>(blocker)||
         (confirm?(decision.request.kind!=game::OriginalUiRouteKind50KG::courseLaunch||decision.profileChanges.count!=8):
-                 (decision.request.targetScreen!=5||decision.request.targetPage!=1)))return result(d,S::unavailableDestination,decision.inputPC);
+                 (decision.request.targetScreen!=(s->state.mode34==2?9:5)||decision.request.targetPage!=1||
+                  (s->state.mode34==2&&decision.profileChanges.count))))return result(d,S::unavailableDestination,decision.inputPC);
     if(s->proposalSerial==std::numeric_limits<std::uint64_t>::max())return result(d,S::unsupportedState);
     ++s->proposalSerial;s->pendingContext=context;s->pendingDecision=decision;s->pendingStamp=s->cold.profile->stamp();
     s->pendingLifecycle=s->transition();s->state.backProposalPending=true;
     out.decision=decision;out.routeProposal={this,s->proposalSerial,decision,s->pendingStamp};out.status=confirm?S::confirmProposed:S::backProposed;
-    return result(d,out.status,confirm?0x1DED58:0x1DF020);
+    return result(d,out.status,confirm?0x1DED58:(s->state.mode34==2?0x1DF0B4:0x1DF020));
 }
 bool OriginalUiCourseSession50KG::routeProposalCurrent(const OriginalUiCourseRouteProposal50KG& p)const noexcept{
     const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->rendering||s->updatePrepared||
@@ -429,10 +532,15 @@ S OriginalUiCourseSession50KG::notifyRouteAccepted(const OriginalUiCourseRoutePr
         !sameStamp(p.profileStamp,s->pendingStamp)||!s->processCurrent()||!s->lightCurrent())return result(d,S::invalidInput);
     const bool launch=p.decision.request.kind==game::OriginalUiRouteKind50KG::courseLaunch;
     if(!s->effectReady(launch?1u:5u))return result(d,S::audio,launch?0x1DEF18:0x1DF0E0);
-    auto expected=s->pendingLifecycle;if(!launch)expected.requested={5,1};
+    auto expected=s->pendingLifecycle;if(!launch)expected.requested={static_cast<std::uint8_t>(s->state.mode34==2?9:5),1};
     expected.lifecycle=launch?Life::requestCourseExit:Life::requestScreenExit;
     const auto stamp=s->cold.profile->stamp();game::OriginalUiCourseRememberedProfile50KG profile;
-    if(!sameLife(s->transition(),expected)||s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
+    if(!sameLife(s->transition(),expected))return result(d,S::profile,0x1DEFCC);
+    if(s->state.mode34==2){
+        if(launch||p.decision.profileChanges.count||p.decision.request.targetScreen!=9||
+           p.decision.request.targetPage!=1||p.decision.request.sourcePC!=0x1DF0B4||
+           !sameStamp(stamp,s->pendingStamp)||!s->profileCurrent())return result(d,S::profile,0x1DF0B4);
+    }else if(s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
         stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=0||!s->cold.profile->courseSnapshot(profile)||
         !bounded(profile,*s->cold.commonProfile)||!s->testProfileCurrent(profile)||profile.course700!=s->pendingContext.courseSlot14E4||
         profile.laps704!=s->pendingContext.laps14EC||profile.entrants708!=s->pendingContext.entrants14F0||profile.subtype70C!=s->pendingContext.subtypeSlot14F4)
@@ -452,6 +560,7 @@ S OriginalUiCourseSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpd
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
     if(!s->operational()||!s->currentPage()||s->inOperation||s->rendering||s->updatePrepared)return result(d,S::unsupportedState);
     if(!std::isfinite(in.elapsedSeconds)||in.elapsedSeconds<0||in.elapsedSeconds>1||(in.paused&&in.elapsedSeconds!=0))return result(d,S::invalidInput);
+    if(s->state.mode34==2&&in.elapsedSeconds>0.06f)return result(d,S::invalidInput);
     for(bool held:in.debugChordHeld)if(held)return result(d,S::unsupportedState);
     if(!s->processCurrent()||!s->profileCurrent()||!s->lightCurrent()||!s->popupCurrent()||s->cold.application->uiObject3D8)return result(d,S::unsupportedState);
     s->cpuDrain();s->state.backProposalPending=false;s->paused=in.paused;s->inOperation=true;
@@ -462,13 +571,28 @@ S OriginalUiCourseSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpd
         if(!s->cold.audio->update(in.elapsedSeconds)){++s->state.audio.failed;s->fault(S::audio,0x234440);}
     }
     s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}
-    s->preparedDelta=in.elapsedSeconds;s->updatePrepared=true;return result(d,S::ok);
+    s->preparedDelta=in.elapsedSeconds;s->preparedDebug=in.debugChordHeld;s->updatePrepared=true;return result(d,S::ok);
 }
 S OriginalUiCourseSession50KG::update(const OriginalUiMainSessionUpdate50KG& in,D& d)noexcept{
     d={};auto* s=storage_.get();if(!s)return result(d,S::notBound);
     if(!s->operational()||!s->updatePrepared||in.elapsedSeconds!=s->preparedDelta||in.paused!=s->paused||
         !s->profileCurrent()||!s->lightCurrent()||!s->popupCurrent()||s->rendering||s->inOperation)return result(d,S::unsupportedState);
+    if(s->state.mode34==2&&(in.debugChordHeld!=s->preparedDebug||s->state.updates==std::numeric_limits<std::uint64_t>::max()))
+        return result(d,S::invalidInput);
     s->updatePrepared=false;s->inOperation=true;
+    if(s->state.mode34==2){
+        // Actual manager2A3FDC ->141ED0: ordinary widgets, page38, then top.
+        // Fresh mode2 never starts deferred selection refresh or held-row movement.
+        const auto* ordinary=s->widgets().order(false);const auto* top=s->widgets().order(true);
+        if(!ordinary||!top||s->state.deferred14D0)s->fault(S::widget,0x2A6BB0);
+        if(s->operational()&&s->state.pageShown)s->updateWidgets(*ordinary,in.elapsedSeconds);
+        if(s->operational()){
+            const auto saved=s->aperture.saveCourseUpdateDelta38(in.elapsedSeconds); //1E02BC
+            if(!apertureOkay(saved)){s->faultDetail.aperture.status=saved;s->fault(S::aperture,0x1E02BC);}
+        }
+        if(s->operational()&&s->state.pageShown)s->updateWidgets(*top,in.elapsedSeconds);
+        ++s->state.updates;s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}return result(d,S::ok);
+    }
     // Source1DFDF0: refresh on the third actual update, not a wall-time guess.
     // Native frontend performs a real GL finish and retained-bank rebind.
     if(s->state.deferred14D0){
@@ -487,12 +611,22 @@ S OriginalUiCourseSession50KG::render(const OriginalUiCourseDrawClock50KG& clock
     if(!s->operational()||s->inOperation||s->rendering||s->updatePrepared||!clock.known||(s->paused&&clock.advanceAnimations)||
         !s->currentPage()||!s->profileCurrent()||!s->lightCurrent()||!s->state.cameraActive||!s->state.pageShown||
         !s->popupCurrent()||!s->aperture.snapshot().hasUpdateDelta)return result(d,S::unsupportedState);
+    if(s->state.mode34==2){
+        game::OriginalApplicationAnimationClockSample50KG actual;
+        if(!clock.applicationAnimation.sameOwner(s->cold.applicationAnimation)||!clock.applicationAnimation.read(actual))
+            return result(d,S::unsupportedState,0x29ACA8);
+    }
     OriginalUiCourseProfileColors50KG colors;if(!s->cold.profile->coursePlanetColors(s->state.selectedPlanet40,colors))return result(d,S::profile);
     s->cpuDrain();s->state.backProposalPending=false;s->inOperation=true;s->rendering=true;
     bool okay=s->collector.begin(clock,s->renderContext,s->lighting,d.draw,s->state.selectedPlanet40)&&s->collector.projectOrdinaryWidgets(true,d.draw);
     game::OriginalUiCoursePageDrawDiagnostic50KG pageDiagnostic;
-    if(okay&&!s->page.setLapCount(s->state.laps14EC,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
+    if(okay&&s->state.mode34==0&&!s->page.setLapCount(s->state.laps14EC,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
     if(okay&&!s->page.applyPlanetPalette(s->widgets(),colors.primary79C,colors.secondary7A0,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
+    if(okay&&s->state.mode34==2){
+        game::OriginalUiCourseTournamentDrawState50KG actual;
+        if(!s->tournamentDrawState(actual)){s->fault(S::profile,0x1DB81C);okay=false;}
+        else if(!s->page.updateTournamentFresh(s->widgets(),actual,pageDiagnostic)){s->fault(S::widget,pageDiagnostic.sourcePC);okay=false;}
+    }
     if(okay)okay=s->collector.projectPage(s->page,d.draw);
     if(okay){const auto status=s->aperture.beginCourseEntryAtRender48(s->transition().phase);
         if(!apertureOkay(status)){s->faultDetail.aperture.status=status;s->fault(S::aperture,0x1DEB60);okay=false;}}

@@ -5,6 +5,7 @@
 #include "original_ui_rider_profile50kg.h"
 #include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
 namespace rr::platform {
+struct OriginalUiTournamentRouteProposal50KG;
 enum class OriginalUiCourseSessionStatus50KG : std::uint8_t {
     ok,noChange,backProposed,unavailableDestination,notBound,alreadyBound,invalidInput,
     unsupportedState,profile,resource,widget,model,camera,lighting,aperture,
@@ -36,6 +37,9 @@ struct OriginalUiCourseSessionCold50KG {
     OriginalUiMainAudioMode50KG audioMode=OriginalUiMainAudioMode50KG::enabled;
     std::shared_ptr<OriginalUiMainAudio50KG> audio;
     std::uint8_t previousScreen=0;
+    // Distinct actual mode-2 origin; absent for the unchanged Rider/mode-0 path.
+    std::shared_ptr<const OriginalUiTournamentRouteProposal50KG> tournamentProposal;
+    game::OriginalApplicationAnimationClockView50KG applicationAnimation{};
 };
 class OriginalUiCourseSession50KG;
 struct OriginalUiCourseRouteProposal50KG {
@@ -56,6 +60,7 @@ struct OriginalUiCourseSessionSnapshot50KG {
     bool backProposalPending=false,backAccepted=false,launchAccepted=false;
     bool popupEnabled438=false;
     std::uint32_t courseSlot14E4=0,subtypeSlot14F4=0,laps14EC=0,entrants14F0=0;
+    std::uint32_t mode34=0,tier14E8=0;
     std::uint32_t promptMask42C=0,selectedPlanet40=0,selectedCourse44=0,deferred14D0=0;
     // Initial source repeat timer writes are retained; physical-edge input
     // only. A held-controller-state owner is still required for repeat updates.
@@ -70,6 +75,8 @@ struct OriginalUiCourseSessionSnapshot50KG {
 // Left/right uses genuine authored controls/models/text/backgrounds. Original
 // Back creates a fresh Rider owner; Confirm proposes only the source launch transaction.
 // The frontend independently admits its actual cold native race destination.
+// Distinct mode2 navigation is restricted to actual fresh clean career19,
+// fixed slot1, original Continue entry and zero-write Back. No race admission.
 class OriginalUiCourseSession50KG final {
 public:
     OriginalUiCourseSession50KG()noexcept;~OriginalUiCourseSession50KG();
@@ -78,7 +85,8 @@ public:
     OriginalUiCourseSessionStatus50KG bind(const OriginalUiCourseSessionCold50KG&,OriginalUiCourseSessionDiagnostic50KG&)noexcept;
     bool ownsPreparedPage(std::uint8_t)const noexcept;
     bool canEnterMode(std::uint32_t)const noexcept;
-    std::uint32_t intendedMode()const noexcept{return 0;}
+    std::uint32_t intendedMode()const noexcept;
+    bool ownsProfile(const OriginalUiRiderProfileOwner50KG&)const noexcept;
     const game::OriginalUiTransitionOwner50KG* externalLifecycleOwner()const noexcept;
     OriginalUiCourseSessionStatus50KG notifyTransition(const game::OriginalUiTransitionNotification50KG&,OriginalUiCourseSessionDiagnostic50KG&)noexcept;
     game::OriginalUiTransitionCompletion50KG pollCompletion(game::OriginalUiTransitionRoute50KG,game::OriginalUiTransitionPhase50KG)const noexcept;
@@ -99,6 +107,8 @@ public:
     void drain()noexcept;void requestQuit()noexcept;
 private:
     friend class OriginalUiFrontend50KG;
+    // Only after the actual outgoing Tournament renderer/pod/material owners retire.
+    bool acceptTournamentContinueCommit(const OriginalUiTournamentRouteProposal50KG&)noexcept;
     // Called only by the frontend after actual finishSubmittedWork and exact
     // immutable-bank rebind. No public callback can mint completion.
     OriginalUiCourseSessionStatus50KG completeSelectionRefresh(OriginalUiCourseSessionDiagnostic50KG&)noexcept;

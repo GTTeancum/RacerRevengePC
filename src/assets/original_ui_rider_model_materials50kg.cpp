@@ -34,14 +34,28 @@ bool OriginalUiRiderModelMaterials50KG::loadPod(std::shared_ptr<const OriginalUi
     const auto* scene=model->scene();auto rider=model->archive();
     return load(std::move(model),scene,std::move(rider),std::move(app),std::move(podTextures),runtime,cache,d);
 }
+bool OriginalUiRiderModelMaterials50KG::loadTournamentPod(
+    std::shared_ptr<const OriginalUiRiderPodAssets50KG> model,
+    std::shared_ptr<const OriginalUiArchive50KG> app,
+    std::shared_ptr<const OriginalUiArchive50KG> podTextures,const OriginalUiMaterialRuntime50KG& runtime,
+    const OriginalUiIpumTextureCache50KG* cache,D& d) noexcept {
+    d={};const auto archive=model?model->archive():nullptr;
+    if(!model||!model->loaded()||!archive||!archive->loaded()||
+       archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::tournament)||
+       model->widgetSource()!=archive->find("UI/UITourn/Widgets.Dat").identity||
+       model->widgetId()<39||model->widgetId()>61||!podTextures||!podTextures->loaded()||
+       podTextures->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::podTextures))return fail(d,E::input);
+    const auto* scene=model->scene();
+    return load(std::move(model),scene,archive,std::move(app),std::move(podTextures),runtime,cache,d,true);
+}
 bool OriginalUiRiderModelMaterials50KG::load(std::shared_ptr<const void> model,const Scene48D* scene,
     std::shared_ptr<const OriginalUiArchive50KG> rider,std::shared_ptr<const OriginalUiArchive50KG> app,
     std::shared_ptr<const OriginalUiArchive50KG> podTextures,
-    const OriginalUiMaterialRuntime50KG& runtime,const OriginalUiIpumTextureCache50KG* cache,D& d) noexcept {
+    const OriginalUiMaterialRuntime50KG& runtime,const OriginalUiIpumTextureCache50KG* cache,D& d,bool tournament) noexcept {
     d={};if(storage_)return fail(d,E::alreadyLoaded);
     if(!model||!scene||scene->materials.empty()||scene->materials.size()>256||!rider||!app||
         !rider->loaded()||!app->loaded()||
-        rider->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
+        rider->identity()!=originalUiArchiveIdentity50KG(tournament?OriginalUiArchiveId50KG::tournament:OriginalUiArchiveId50KG::rider)||
         app->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::appStart))return fail(d,E::input);
     try {
         auto next=std::make_unique<Storage>();next->model=std::move(model);

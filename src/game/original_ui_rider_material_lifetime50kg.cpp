@@ -108,6 +108,32 @@ bool OriginalUiRiderMaterialFootprint50KG::pod(const assets::OriginalUiArchive50
     if(!next.model(app,*asset.scene(),d))return false;
     next.kind_=Kind::podGraph;next.widget_=id;next.source_=asset.modelSource().identity;out=next;return true;
 }
+bool OriginalUiRiderMaterialFootprint50KG::tournamentPod(const assets::OriginalUiArchive50KG& app,
+    const assets::OriginalUiRiderPodAssets50KG& asset,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {
+    d={};const auto id=asset.widgetId();const auto archive=asset.archive();
+    const auto* widget=member(assets::OriginalUiArchiveId50KG::tournament,"UI\\UITourn\\Widgets.Dat");
+    if(!archive||!archive->loaded()||archive->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::tournament)||
+       !widget||!asset.loaded()||!asset.scene()||id<39||id>61||asset.widgetSource()!=widget)
+        return fail(d,E::footprint,0x26E640);
+    bool modelMember=false;
+    for(std::size_t i=0;i<archive->memberCount();++i)if(archive->member(i).identity==asset.modelSource().identity)modelMember=true;
+    if(!modelMember||!asset.modelSource().identity)return fail(d,E::footprint,0x26E640);
+    OriginalUiRiderMaterialFootprint50KG next;if(!next.model(app,*asset.scene(),d))return false;
+    next.kind_=Kind::podGraph;next.widget_=id;next.source_=asset.modelSource().identity;out=next;return true;
+}
+bool OriginalUiRiderMaterialFootprint50KG::tournamentBinder(const assets::OriginalUiArchive50KG& app,
+    const assets::OriginalUiRiderBinderAssets50KG& asset,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {
+    d={};const auto* pass=asset.pass();
+    const auto* psm=member(assets::OriginalUiArchiveId50KG::tournament,"ui\\textures\\binder.psm");
+    const auto* atm=member(assets::OriginalUiArchiveId50KG::tournament,"ui\\textures\\binder.atm");
+    if(!psm||!atm||!asset.loaded()||!pass||pass->identity!=psm||pass->pass!=1||asset.atmMember().identity!=atm)
+        return fail(d,E::footprint,0x150450);
+    try {OriginalUiRiderMaterialFootprint50KG next;
+        if(!OriginalUiRiderMaterialRow50KG::prepare(app,"ui/textures/binder",next.keys_[0],d))return false;
+        next.kind_=Kind::binderHelper;next.source_=pass->identity;next.rows_=1;next.slots_=1;next.occurrences_[0]=1;
+        out=next;return true;
+    }catch(...){return fail(d,E::allocation);}
+}
 bool OriginalUiRiderMaterialFootprint50KG::character(const assets::OriginalUiArchive50KG& app,
     const assets::OriginalUiRiderCharacterAssets50KG& asset,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {
     d={};const auto id=asset.widgetId();

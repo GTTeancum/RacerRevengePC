@@ -9,6 +9,7 @@ namespace rr::platform {
 class OriginalUiMainDrawResources50KG;
 class OriginalUiCourseDrawResources50KG;
 class OriginalUiCourseHologramDraw50KG;
+class OriginalUiTournamentCareerResources50KG;
 class VehicleWindowGl50DS;
 struct VehicleWindowDiagnostic50DS;
 enum class OriginalUiRiderSessionStatus50KG : std::uint8_t {
@@ -38,6 +39,10 @@ struct OriginalUiRiderSessionCold50KG {
     // Course6 pair is mutually exclusive with Main4; copied synchronously.
     const OriginalUiCourseDrawResources50KG* predecessorCourseResources=nullptr;
     const OriginalUiCourseHologramDraw50KG* predecessorCourseHolograms=nullptr;
+    // Complete sealed inventory from the actual live Tournament collector.
+    // Definitions may be cold-validated now; live row reuse needs its one-use
+    // genuine retirement capability before any incoming callback/graph work.
+    std::shared_ptr<const game::OriginalUiTournamentPredecessorInventory50KG> predecessorTournament;
     std::shared_ptr<const assets::OriginalUiRiderStatAssets50KG> statAssets;
     std::shared_ptr<const assets::OriginalUiRiderBinderAssets50KG> binderAssets;
     std::shared_ptr<const assets::OriginalUiArchive50KG> riderArchive,appStart,podTextures;
@@ -54,7 +59,7 @@ struct OriginalUiRiderSessionCold50KG {
     // Exactly the prospective source Main decision, before its mode commit.
     // It may override a copied cold snapshot ONLY; never writes the profile.
     std::uint32_t prospectiveMode=0;
-    // Source1CCF90 predecessor screen. Main4 or genuine mode0 Course6 Back.
+    // Source1CCF90 predecessor screen: Main4, mode0 Course6, or mode2 Tournament9.
     std::uint8_t previousScreen=0;
     // Same concrete application frontend transport used by Main/Options.
     // Enabled initial19/Back needs its optional authenticated Song7. Muted
@@ -112,8 +117,9 @@ struct OriginalUiRiderSessionSnapshot50KG {
     game::OriginalUiRiderVoiceChoiceReceipt50KG voice{};
 };
 // Actual bounded Rider5/1 lifecycle and frame owner. Default-unlocked entry,
-// directional selection, normal Back and mode0 Confirm use real resource,
-// renderer-retirement, profile, animation and shared voice-RNG owners. Other
+// directional selection, normal Back and mode0/2 Confirm proposals use real resource,
+// renderer-retirement, profile, animation and shared voice-RNG owners. Actual
+// mode2 admission additionally requires the complete retained Tournament owner. Other
 // unprepared roster entries, page2 and reset popup remain unavailable before mutation.
 // The frontend owns sole manager.tick, profile commit, GPU upload/publication,
 // source-renderer retirement, and application queue consumption.
@@ -167,6 +173,9 @@ public:
     void requestQuit() noexcept;
 private:
     friend class OriginalUiFrontend50KG;
+    friend class OriginalUiTournamentCareerResources50KG;
+    friend class OriginalUiTournamentSession50KG;
+    bool ownsProfile(const OriginalUiRiderProfileOwner50KG&) const noexcept;
     OriginalUiRiderSessionStatus50KG prepareEntryResidency(OriginalUiRiderResidencyDemand50KG&,
         OriginalUiRiderSessionDiagnostic50KG&) noexcept;
     OriginalUiRiderSessionStatus50KG prepareMoveResidency(const OriginalUiRiderSessionInputReceipt50KG&,
@@ -175,7 +184,12 @@ private:
     std::shared_ptr<OriginalUiRiderResidentPool50KG> residentPool() const noexcept;
     const OriginalUiRiderResidencyDemand50KG* residencyDemand() const noexcept;
     bool consumeEntryResidency() noexcept;
-    bool acceptEntryProfileCommit(OriginalUiRiderProfileStamp50KG, const OriginalUiMainProfile50KG&, bool courseBack) noexcept;
+    bool acceptMainRememberedSlotCommit(std::uint16_t previousSlot,std::uint16_t selectedSlot) noexcept;
+    bool residencyProposalCurrentWithCommon(const OriginalUiRiderResidencyDemand50KG&,const OriginalUiMainProfile50KG&) const noexcept;
+    enum class EntryOrigin : std::uint8_t { main,course,tournament };
+    bool acceptEntryProfileCommit(OriginalUiRiderProfileStamp50KG, const OriginalUiMainProfile50KG&, EntryOrigin) noexcept;
+    bool acceptTournamentPredecessorRetirement(game::OriginalUiTournamentPredecessorRetirement50KG&,
+        OriginalUiRiderSessionDiagnostic50KG&) noexcept;
 
     OriginalUiRiderSessionStatus50KG commitMove(const OriginalUiRiderSessionInputReceipt50KG&,
         VehicleWindowGl50DS&,VehicleWindowDiagnostic50DS&,OriginalUiRiderSessionDiagnostic50KG&) noexcept;

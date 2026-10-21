@@ -17,14 +17,16 @@ struct OriginalUiCourseDrawResourceDiagnostic50KG {
  game::OriginalUiCourseWidgetDiagnostic50KG widgets{};game::OriginalUiTextGeometryDiagnostic50KG text{};game::OriginalUiExitTextDiagnostic50KG exitText{};
 };
 struct OriginalUiCourseVideoOwner50KG {std::shared_ptr<const void> lifetime;std::int32_t width=0,height=0,colorBits=0,packetZMaximum=0;std::uint32_t zBufferFormat=0;};
-struct OriginalUiCourseColdInput50KG {std::shared_ptr<const assets::OriginalUiArchive50KG> appStart,course,fonts,backgrounds,controllerPopup,overlays;const assets::OriginalUiEnglish50KG* english=nullptr;assets::OriginalUiMaterialRuntime50KG runtime{};OriginalUiCourseVideoOwner50KG video{};bool prepareRylothBackground=false;};
+struct OriginalUiCourseColdInput50KG {std::shared_ptr<const assets::OriginalUiArchive50KG> appStart,course,fonts,backgrounds,controllerPopup,overlays;const assets::OriginalUiEnglish50KG* english=nullptr;assets::OriginalUiMaterialRuntime50KG runtime{};OriginalUiCourseVideoOwner50KG video{};bool prepareRylothBackground=false;bool prepareTournamentFresh=false;};
+enum class OriginalUiCourseStaticPstSource50KG :std::uint8_t {none,leftTopDisabled,rightTopDisabled};
 struct OriginalUiCourseMaterialBinding50KG {
  std::string registeredName;assets::OriginalUiMaterial50KG material;std::vector<std::uint32_t> images;
  std::vector<assets::OriginalUiNativeMaterial50KG> policies;assets::OriginalUiNativeUntexturedMaterial50KG untextured{};
  // Retained authored unique-controller metadata, including disabled-arrow
- // PST declarations. Only animated (stored ATM frames) receives a live native
- // numeric controller; static PST controller-phase parity is not claimed.
- game::OriginalUiTextureAnimationConfig50KG animation{};bool animated=false;std::uint32_t registryToken=0;std::size_t registryByteOffset=0;const assets::OriginalUiMemberIdentity50KG* registryIdentity=nullptr;
+ // PST declarations. Mode0 retains metadata only; new mode2 explicitly
+ // identifies the two reached top-disabled PST controllers without an ATM.
+ game::OriginalUiTextureAnimationConfig50KG animation{};bool animated=false;
+ OriginalUiCourseStaticPstSource50KG staticPstSource=OriginalUiCourseStaticPstSource50KG::none;std::uint32_t registryToken=0;std::size_t registryByteOffset=0;const assets::OriginalUiMemberIdentity50KG* registryIdentity=nullptr;
 };
 struct OriginalUiCoursePrompt50KG {std::uint8_t mask=0;std::uint32_t material=assets::unresolvedMaterialTexture50EA;game::OriginalUiOverlayQuad50KG quad{};};
 // CPU resource ownership only. Unified composer must remap owner-local images.
@@ -33,6 +35,7 @@ public:
  OriginalUiCourseDrawResources50KG()noexcept;~OriginalUiCourseDrawResources50KG();
  OriginalUiCourseDrawResources50KG(const OriginalUiCourseDrawResources50KG&)=delete;OriginalUiCourseDrawResources50KG& operator=(const OriginalUiCourseDrawResources50KG&)=delete;
  bool load(const OriginalUiCourseColdInput50KG&,OriginalUiCourseDrawResourceDiagnostic50KG&)noexcept;bool loaded()const noexcept;
+ bool tournamentFreshPrepared()const noexcept;
  game::OriginalUiCourseWidgets50KG* widgets()noexcept;const game::OriginalUiCourseWidgets50KG* widgets()const noexcept;
  std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images()const noexcept;const assets::OriginalUiImageBankInput50KG* bankInput()const noexcept;
  const assets::MaterialTextureAssets50EA* textures()const noexcept;

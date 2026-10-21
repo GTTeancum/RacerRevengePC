@@ -1,5 +1,10 @@
 #include "original_ui_tournament_career_resources50kg.h"
+#include "original_ui_rider_session50kg.h"
+#include "original_ui_course_session50kg.h"
+#include <variant>
 #include <utility>
+#include <cstring>
+#include <limits>
 #include "original_ui_main_draw50kg.h"
 #include "../../../src/assets/original_ui_atm50kg.h"
 #include "../../../src/assets/original_standard_texture_resource50la.h"
@@ -20,6 +25,149 @@ bool authentic(const std::shared_ptr<const assets::OriginalUiArchive50KG>& a,Arc
 bool sameStamp(OriginalUiRiderProfileStamp50KG a,OriginalUiRiderProfileStamp50KG b) noexcept {
     return a.generation==b.generation&&a.mode34==b.mode34;
 }
+bool sameCommon(const OriginalUiMainProfile50KG& a,const OriginalUiMainProfile50KG& b) noexcept {
+    return a.known==b.known&&a.mode34==b.mode34&&a.previousMode38==b.previousMode38&&
+        a.savedSlot6E0==b.savedSlot6E0&&a.availability11018==b.availability11018&&
+        a.flags11054==b.flags11054&&a.playerBits1125C==b.playerBits1125C;
+}
+bool sameSelection(const game::OriginalUiRiderSelectionProfile50KG& a,
+    const game::OriginalUiRiderSelectionProfile50KG& b) noexcept {
+    if(a.ownerReady!=b.ownerReady||a.mode34!=b.mode34||a.remembered6F0!=b.remembered6F0||
+       a.remembered6F4!=b.remembered6F4||a.remembered6F8!=b.remembered6F8||a.remembered6FC!=b.remembered6FC)return false;
+    for(std::size_t i=0;i<a.riders.size();++i){const auto& x=a.riders[i];const auto& y=b.riders[i];
+        if(x.ownerReady!=y.ownerReady||x.unlock10FAC!=y.unlock10FAC||x.hidden730!=y.hidden730||
+           x.careerByteOwnerReady!=y.careerByteOwnerReady||x.career1938!=y.career1938)return false;}
+    return true;
+}
+bool sameCourse(const game::OriginalUiCourseRememberedProfile50KG& a,
+    const game::OriginalUiCourseRememberedProfile50KG& b) noexcept {
+    return a.ownerReady==b.ownerReady&&a.mode34==b.mode34&&a.course700==b.course700&&a.laps704==b.laps704&&
+        a.entrants708==b.entrants708&&a.subtype70C==b.subtype70C&&a.course710==b.course710&&
+        a.entrants714==b.entrants714&&a.laps718==b.laps718&&a.packed1125E==b.packed1125E&&
+        a.cardFlag100BC==b.cardFlag100BC&&a.availability11018==b.availability11018&&
+        a.planet0Primary79C==b.planet0Primary79C&&a.planet0Secondary7A0==b.planet0Secondary7A0&&
+        a.courseOrder100C4==b.courseOrder100C4&&a.mawhonicRylothTest==b.mawhonicRylothTest&&
+        a.wanMbTest==b.wanMbTest&&a.sebulbaTbTest==b.sebulbaTbTest&&a.scorchRcTest==b.scorchRcTest&&
+        a.tzidikTcTest==b.tzidikTcTest&&a.gasganoScTest==b.gasganoScTest&&a.kraidGbTest==b.kraidGbTest&&
+        a.youngAnakinMcTest==b.youngAnakinMcTest;
+}
+// Compare actual binary32 payloads, including signed zero. Padding is not data.
+bool sameFloat(float a,float b) noexcept {
+    static_assert(sizeof(float)==sizeof(std::uint32_t));
+    std::uint32_t x=0,y=0;std::memcpy(&x,&a,sizeof(x));std::memcpy(&y,&b,sizeof(y));return x==y;
+}
+bool sameStats(const game::OriginalUiRiderStatInput50KG& a,const game::OriginalUiRiderStatInput50KG& b) noexcept {
+    if(a.profileReady!=b.profileReady||a.selectedRider!=b.selectedRider||a.observedRider!=b.observedRider||
+       a.mode34!=b.mode34||a.unlocked10FAC!=b.unlocked10FAC||!sameFloat(a.panelY4DC,b.panelY4DC)||
+       a.accentColor17FA00!=b.accentColor17FA00||a.medal1938!=b.medal1938||a.careerTrack219C!=b.careerTrack219C)return false;
+    for(std::size_t i=0;i<a.current1920.size();++i)
+        if(!sameFloat(a.current1920[i],b.current1920[i])||!sameFloat(a.maximum0408[i],b.maximum0408[i]))return false;
+    return true;
+}
+bool samePodCareer(const game::OriginalTournamentPodCareer50KG& a,const game::OriginalTournamentPodCareer50KG& b) noexcept {
+    if(a.medals1938!=b.medals1938||a.remainingPrizes1946!=b.remainingPrizes1946)return false;
+    for(std::size_t i=0;i<a.abilities1920.size();++i)if(!sameFloat(a.abilities1920[i],b.abilities1920[i]))return false;
+    return true;
+}
+// Stamp equality is deliberately separate: attach projects only the observed
+// exact Confirm generation, while every actual career field must stay equal.
+bool sameCareerValues(const OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot& a,
+    const OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot& b) noexcept {
+    return a.career100C0==b.career100C0&&a.earned2190==b.earned2190&&a.unspent2194==b.unspent2194&&
+        a.kills2198==b.kills2198&&a.progress219C==b.progress219C&&a.availability11018==b.availability11018&&
+        a.cardFlag100BC==b.cardFlag100BC&&a.medals1938==b.medals1938&&a.remainingPrizes1946==b.remainingPrizes1946;
+}
+bool sameTextMetadata(const OriginalUiRiderProfileOwner50KG::TournamentTextMetadataSnapshot& a,
+    const OriginalUiRiderProfileOwner50KG::TournamentTextMetadataSnapshot& b) noexcept {
+    return a.career100C0==b.career100C0&&a.racerName3C==b.racerName3C&&a.courseTitle1127C==b.courseTitle1127C&&
+        a.planetTitle11281==b.planetTitle11281&&a.progressIndex==b.progressIndex&&a.course100C4==b.course100C4&&
+        sameStamp(a.stamp,b.stamp);
+}
+bool sameDecision(const game::OriginalUiRouteDecision50KG& a,const game::OriginalUiRouteDecision50KG& b) noexcept {
+    const auto& x=a.request;const auto& y=b.request;
+    if(a.action!=b.action||a.blockers!=b.blockers||a.admitted!=b.admitted||a.profileProposalComplete!=b.profileProposalComplete||
+       a.selectedSlot!=b.selectedSlot||a.selectedRider!=b.selectedRider||a.inputPC!=b.inputPC||x.kind!=y.kind||
+       x.sourceScreen!=y.sourceScreen||x.sourcePage!=y.sourcePage||x.targetScreen!=y.targetScreen||
+       x.targetPage!=y.targetPage||x.sourcePC!=y.sourcePC||a.profileChanges.count!=b.profileChanges.count||
+       a.profileChanges.count>a.profileChanges.values.size())return false;
+    for(std::size_t i=0;i<a.profileChanges.count;++i){const auto& p=a.profileChanges.values[i];const auto& q=b.profileChanges.values[i];
+        if(p.field!=q.field||p.operation!=q.operation||p.value!=q.value||p.replaceMask!=q.replaceMask||p.sourcePC!=q.sourcePC)return false;}
+    return true;
+}
+bool sameProposal(const OriginalUiRiderRouteProposal50KG& a,const OriginalUiRiderRouteProposal50KG& b) noexcept {
+    return a.source&&a.source==b.source&&a.serial&&a.serial==b.serial&&sameStamp(a.profileStamp,b.profileStamp)&&sameDecision(a.decision,b.decision);
+}
+using EntryProposal=std::variant<std::monostate,OriginalUiRiderRouteProposal50KG,OriginalUiCourseRouteProposal50KG>;
+bool sameProposal(const OriginalUiRiderRouteProposal50KG& a,const EntryProposal& b) noexcept {
+    const auto* p=std::get_if<OriginalUiRiderRouteProposal50KG>(&b);return p&&sameProposal(a,*p);
+}
+bool sameProposal(const OriginalUiCourseRouteProposal50KG& a,const EntryProposal& b) noexcept {
+    const auto* p=std::get_if<OriginalUiCourseRouteProposal50KG>(&b);
+    return p&&a.source&&a.source==p->source&&a.serial&&a.serial==p->serial&&
+        sameStamp(a.profileStamp,p->profileStamp)&&sameDecision(a.decision,p->decision);
+}
+struct ConfirmDependencies {
+    OriginalUiMainProfile50KG common{};
+    game::OriginalUiRiderSelectionProfile50KG selection{};
+    game::OriginalUiCourseRememberedProfile50KG course{};
+    OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career{};
+    OriginalUiRiderProfileOwner50KG::TournamentTextMetadataSnapshot text{};
+    game::OriginalTournamentPodCareer50KG pod{};
+    game::OriginalUiRiderStatInput50KG stats{};
+    OriginalUiRiderProfileColors50KG colors{};
+    std::uint8_t packed1125D=0;
+    std::uint32_t comparison100C0=0;
+};
+bool captureConfirmDependencies(const OriginalUiRiderProfileOwner50KG& profile,
+    std::uint32_t selected,ConfirmDependencies& out) noexcept {
+    const auto* common=profile.commonProfile();const auto before=profile.stamp();ConfirmDependencies next;
+    if(!common||!common->known||before.mode34!=2||common->mode34!=2||selected>=27)return false;
+    next.common=*common;
+    if(!profile.selectionSnapshot(next.selection)||!profile.courseSnapshot(next.course)||
+       !profile.tournamentCareerSnapshot(selected,next.career)||!profile.tournamentTextMetadataSnapshot(selected,next.text)||
+       !profile.tournamentPodCareerSnapshot(selected,selected,next.pod)||
+       !profile.statSnapshot(selected,0,next.stats)||!profile.colors(selected,next.colors)||
+       !profile.riderConfirmSnapshot(next.packed1125D,next.comparison100C0)||
+       !sameStamp(before,next.career.stamp)||!sameStamp(before,next.text.stamp)||
+       !sameStamp(before,profile.stamp())||!sameCommon(*common,next.common))return false;
+    out=next;return true;
+}
+bool sameDependencies(const ConfirmDependencies& a,const ConfirmDependencies& b) noexcept {
+    return sameCommon(a.common,b.common)&&sameSelection(a.selection,b.selection)&&sameCourse(a.course,b.course)&&
+        sameCareerValues(a.career,b.career)&&sameStamp(a.career.stamp,b.career.stamp)&&sameTextMetadata(a.text,b.text)&&
+        samePodCareer(a.pod,b.pod)&&
+        sameStats(a.stats,b.stats)&&a.colors.accent17FA00==b.colors.accent17FA00&&
+        a.colors.secondary17FA10==b.colors.secondary17FA10&&a.packed1125D==b.packed1125D&&a.comparison100C0==b.comparison100C0;
+}
+bool exactTournamentProposal(const OriginalUiRiderRouteProposal50KG& proposal,const ConfirmDependencies& before) noexcept {
+    const auto selected=before.career.career100C0;
+    if(!proposal.source||!proposal.serial||!sameStamp(proposal.profileStamp,before.career.stamp)||
+       before.common.mode34!=2||(before.common.playerBits1125C&0x60)!=0x20||before.career.cardFlag100BC||
+       before.course.cardFlag100BC||selected>=before.selection.riders.size()||
+       !before.selection.riders[selected].ownerReady||!before.selection.riders[selected].unlock10FAC)return false;
+    game::OriginalUiRiderContext50KG context;context.playerIndex=0;context.selectedRider=selected;context.mode34=2;
+    context.packed1125C=before.common.playerBits1125C;context.unlockOwnerReady=true;
+    context.comparisonRider100C0=before.comparison100C0;
+    context.selectedUnlockWord10FAC=before.selection.riders[selected].unlock10FAC;
+    context.admission.sourceControllerReady=true;context.admission.selectionOwnerReady=true;context.admission.profileOwnerReady=true;
+    game::OriginalUiRouteDecision50KG exact;
+    return game::dispatchOriginalUiRider50KG(0,game::OriginalUiRouteInput50KG::activate,context,exact)==game::OriginalUiRouteStatus50KG::unavailable&&
+        exact.request.targetScreen==9&&exact.request.targetPage==1&&exact.request.sourcePC==0x1EA5E4&&
+        exact.profileChanges.count==3&&exact.blockers==static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)&&
+        sameDecision(exact,proposal.decision);
+}
+bool exactCourseBackProposal(const OriginalUiCourseRouteProposal50KG& proposal,const ConfirmDependencies& before) noexcept {
+    if(!proposal.source||!proposal.serial||!sameStamp(proposal.profileStamp,before.career.stamp)||
+       before.common.mode34!=2||(before.common.playerBits1125C&0x60)!=0x20||before.career.cardFlag100BC||
+       before.course.cardFlag100BC||(before.career.progress219C&31u)!=0||
+       before.comparison100C0!=before.career.career100C0||(before.packed1125D>>3)!=before.career.career100C0)return false;
+    game::OriginalUiCourseContext50KG context;game::OriginalUiRouteDecision50KG exact;
+    return proposal.source->routeContext(proposal,context)&&context.mode34==2&&context.courseSlot14E4==1&&
+        game::dispatchOriginalUiCourse50KG(0,game::OriginalUiRouteInput50KG::back,context,exact)==game::OriginalUiRouteStatus50KG::unavailable&&
+        exact.request.targetScreen==9&&exact.request.targetPage==1&&exact.request.sourcePC==0x1DF0B4&&
+        exact.profileChanges.count==0&&exact.blockers==static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)&&
+        sameDecision(exact,proposal.decision);
+}
 // Source sprintf("%d") consumes a signed32 bit pattern. Avoid implementation-
 // defined unsigned-to-signed narrowing while preserving negative source values.
 std::string decimal(std::uint32_t value) {
@@ -32,6 +180,8 @@ unsigned category(unsigned oneBasedCourse) noexcept {
 }
 }
 struct OriginalUiTournamentCareerResources50KG::Storage {
+    const OriginalUiTournamentDrawContribution50KG* nativeMarkerOwner=nullptr;
+    bool nonNativeMarkerUsed=false;
     std::shared_ptr<OriginalUiRiderProfileOwner50KG> profile;
     std::shared_ptr<const assets::OriginalUiArchive50KG> tournament,fonts,appStart,backgrounds;
     assets::OriginalUiMaterialTemplates50KG templates;
@@ -55,6 +205,12 @@ struct OriginalUiTournamentCareerResources50KG::Storage {
     std::array<OriginalUiTournamentMedal50KG,13> medals{};
     std::array<std::uint32_t,3> trophyVisibility{};
     std::array<std::uint32_t,3> trophyImages{{missing,missing,missing}};
+    game::OriginalUiRiderStatInput50KG resourceStats{};
+    OriginalUiRiderProfileColors50KG resourceColors{};
+    ConfirmDependencies confirmBefore{};
+    EntryProposal confirmProposal{};
+    bool confirmPrepared=false,confirmAttachAttempted=false,confirmAttachmentTerminal=false;
+    Diagnostic confirmAttachmentFailure{};
 };
 OriginalUiTournamentCareerResources50KG::OriginalUiTournamentCareerResources50KG() noexcept=default;
 OriginalUiTournamentCareerResources50KG::~OriginalUiTournamentCareerResources50KG()=default;
@@ -76,6 +232,7 @@ bool OriginalUiTournamentCareerResources50KG::load(
             return fail(d,Error::profile,0x1EE088);
         OriginalUiRiderProfileColors50KG appearance;
         if(!s->profile->colors(selected,appearance))return fail(d,Error::profile,0x1F1DB8);
+        s->resourceColors=appearance;
         const auto progress=unsigned(s->career.progress219C&31u);
         // Native admission is restricted to progress0..13. Original masks31
         // and still iterates13 entries; rejecting larger progress is stricter.
@@ -250,6 +407,7 @@ bool OriginalUiTournamentCareerResources50KG::load(
         if(!s->profile->statSnapshot(selected,0,stats)||!stats.profileReady||
             stats.mode34!=2||stats.selectedRider!=selected||stats.observedRider!=selected)
             return fail(d,Error::profile,0x1F13DC);
+        s->resourceStats=stats;
         const auto count=[](float value,std::int32_t& output)->bool{
             //188D70/188DE0: distinct binary32 MUL/ADD, CVT.W.S, cap20.
             if(!std::isfinite(value))return false;
@@ -320,9 +478,120 @@ bool OriginalUiTournamentCareerResources50KG::load(
 bool OriginalUiTournamentCareerResources50KG::sameProfileOwner(const OriginalUiRiderProfileOwner50KG& p)const noexcept {
     return storage_&&storage_->profile.get()==&p;
 }
+bool OriginalUiTournamentCareerResources50KG::prepareRiderConfirm(
+    const OriginalUiRiderRouteProposal50KG& proposal,Diagnostic& d) noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||!current()||s->confirmPrepared||s->confirmAttachAttempted||!proposal.source||
+       !proposal.source->ownsProfile(*s->profile)||!proposal.source->routeProposalCurrent(proposal)||
+       !s->profile->canPrepareRiderConfirmToTournament(proposal.decision,proposal.profileStamp))
+        return fail(d,Error::profile,0x1EA5E4);
+    ConfirmDependencies before;
+    if(!captureConfirmDependencies(*s->profile,s->career.career100C0,before)||
+       before.career.stamp.generation==std::numeric_limits<std::uint64_t>::max()||
+       !sameStamp(before.career.stamp,s->career.stamp)||!sameCareerValues(before.career,s->career)||
+       !sameStats(before.stats,s->resourceStats)||
+       before.colors.accent17FA00!=s->resourceColors.accent17FA00||
+       before.colors.secondary17FA10!=s->resourceColors.secondary17FA10||
+       !exactTournamentProposal(proposal,before))return fail(d,Error::profile,0x1EEA64);
+    // Freeze only observations of the same live profile and the actual pending
+    // source proposal. In particular, do not manufacture a committed profile
+    // or acquire any canonical material/animation history here.
+    s->confirmBefore=before;s->confirmProposal=proposal;s->confirmPrepared=true;return true;
+}
+bool OriginalUiTournamentCareerResources50KG::riderConfirmPreparationCurrent(
+    const OriginalUiRiderRouteProposal50KG& proposal) const noexcept {
+    const auto* s=storage_.get();ConfirmDependencies actual;
+    return s&&s->confirmPrepared&&!s->confirmAttachAttempted&&current()&&
+        sameProposal(proposal,s->confirmProposal)&&proposal.source->ownsProfile(*s->profile)&&
+        proposal.source->routeProposalCurrent(proposal)&&
+        s->profile->canPrepareRiderConfirmToTournament(proposal.decision,proposal.profileStamp)&&
+        captureConfirmDependencies(*s->profile,s->career.career100C0,actual)&&
+        sameDependencies(actual,s->confirmBefore);
+}
+bool OriginalUiTournamentCareerResources50KG::acceptRiderConfirmCommit(
+    const OriginalUiRiderRouteProposal50KG& proposal,Diagnostic& d) noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||!s->confirmPrepared)return fail(d,Error::profile,0x1EA58C);
+    if(s->confirmAttachAttempted){
+        if(s->confirmAttachmentTerminal)d=s->confirmAttachmentFailure;
+        else fail(d,Error::profile,0x1EA58C);
+        return false;
+    }
+    // This is a one-use post-commit observation. A mismatch is terminal, never
+    // a reason to undo source writes or to try another stamp/profile/route.
+    s->confirmAttachAttempted=true;
+    const auto reject=[&]() noexcept {
+        fail(d,Error::profile,0x1EA58C);s->confirmAttachmentFailure=d;
+        s->confirmAttachmentTerminal=true;return false;
+    };
+    if(s->canonicalMarkerTerminal||!sameProposal(proposal,s->confirmProposal)||
+       !proposal.source->ownsProfile(*s->profile)||
+       !sameStamp(s->career.stamp,s->confirmBefore.career.stamp)||
+       !sameCareerValues(s->career,s->confirmBefore.career)||
+       !exactTournamentProposal(proposal,s->confirmBefore)||
+       s->confirmBefore.career.stamp.generation==std::numeric_limits<std::uint64_t>::max())return reject();
+    auto expected=s->confirmBefore;const auto selected=expected.career.career100C0;
+    expected.selection.remembered6FC=selected; //1EA54C
+    expected.packed1125D=static_cast<std::uint8_t>((expected.packed1125D&7u)|(selected<<3)); //1EA58C
+    expected.comparison100C0=selected; //1EA5A8
+    ++expected.career.stamp.generation;
+    ++expected.text.stamp.generation;
+    ConfirmDependencies actual;
+    if(!captureConfirmDependencies(*s->profile,selected,actual)||!sameDependencies(actual,expected))return reject();
+    // Equality above proves all consumed resource values remained unchanged.
+    // Reconcile this owner, not an arbitrary stamp supplied by the caller.
+    s->career.stamp=actual.career.stamp;s->confirmProposal=std::monostate{};return true;
+}
+bool OriginalUiTournamentCareerResources50KG::prepareCourseBack(
+    const OriginalUiCourseRouteProposal50KG& proposal,Diagnostic& d) noexcept {
+    d={};auto* s=storage_.get();ConfirmDependencies before;
+    if(!s||!current()||s->confirmPrepared||s->confirmAttachAttempted||!proposal.source||
+       !proposal.source->ownsProfile(*s->profile)||!proposal.source->routeProposalCurrent(proposal)||
+       !captureConfirmDependencies(*s->profile,s->career.career100C0,before)||
+       !sameStamp(before.career.stamp,s->career.stamp)||!sameCareerValues(before.career,s->career)||
+       !sameStats(before.stats,s->resourceStats)||
+       before.colors.accent17FA00!=s->resourceColors.accent17FA00||
+       before.colors.secondary17FA10!=s->resourceColors.secondary17FA10||
+       !exactCourseBackProposal(proposal,before))return fail(d,Error::profile,0x1DF0B4);
+    s->confirmBefore=before;s->confirmProposal=proposal;s->confirmPrepared=true;return true;
+}
+bool OriginalUiTournamentCareerResources50KG::courseBackPreparationCurrent(
+    const OriginalUiCourseRouteProposal50KG& proposal) const noexcept {
+    const auto* s=storage_.get();ConfirmDependencies actual;
+    return s&&s->confirmPrepared&&!s->confirmAttachAttempted&&current()&&
+        sameProposal(proposal,s->confirmProposal)&&proposal.source->ownsProfile(*s->profile)&&
+        proposal.source->routeProposalCurrent(proposal)&&
+        captureConfirmDependencies(*s->profile,s->career.career100C0,actual)&&
+        sameDependencies(actual,s->confirmBefore)&&exactCourseBackProposal(proposal,actual);
+}
+bool OriginalUiTournamentCareerResources50KG::acceptCourseBackCommit(
+    const OriginalUiCourseRouteProposal50KG& proposal,Diagnostic& d) noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||!s->confirmPrepared)return fail(d,Error::profile,0x1DF0B4);
+    if(s->confirmAttachAttempted){
+        if(s->confirmAttachmentTerminal)d=s->confirmAttachmentFailure;
+        else fail(d,Error::profile,0x1DF0B4);return false;
+    }
+    s->confirmAttachAttempted=true;
+    const auto reject=[&]() noexcept {
+        fail(d,Error::profile,0x1DF0B4);s->confirmAttachmentFailure=d;
+        s->confirmAttachmentTerminal=true;return false;
+    };
+    ConfirmDependencies actual;
+    if(s->canonicalMarkerTerminal||!sameProposal(proposal,s->confirmProposal)||
+       !proposal.source->ownsProfile(*s->profile)||!proposal.source->routeProposalCurrent(proposal)||
+       !sameStamp(s->career.stamp,s->confirmBefore.career.stamp)||
+       !sameCareerValues(s->career,s->confirmBefore.career)||
+       !exactCourseBackProposal(proposal,s->confirmBefore)||
+       !captureConfirmDependencies(*s->profile,s->career.career100C0,actual)||
+       !sameDependencies(actual,s->confirmBefore))return reject();
+    // The route itself writes nothing: retain the genuine unchanged stamp.
+    s->confirmProposal=std::monostate{};return true;
+}
 bool OriginalUiTournamentCareerResources50KG::loaded()const noexcept{return bool(storage_);}
 bool OriginalUiTournamentCareerResources50KG::current()const noexcept {
-    return storage_&&!storage_->canonicalMarkerTerminal&&sameStamp(storage_->profile->stamp(),storage_->career.stamp);
+    return storage_&&!storage_->canonicalMarkerTerminal&&!storage_->confirmAttachmentTerminal&&
+        sameStamp(storage_->profile->stamp(),storage_->career.stamp);
 }
 const OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot* OriginalUiTournamentCareerResources50KG::career()const noexcept{return storage_?&storage_->career:nullptr;}
 const assets::OriginalUiTournamentPageData50KG* OriginalUiTournamentCareerResources50KG::page()const noexcept{return storage_?&storage_->page:nullptr;}
@@ -355,7 +624,8 @@ const OriginalUiTournamentMedalPacket50KG* OriginalUiTournamentCareerResources50
 
 bool OriginalUiTournamentCareerResources50KG::sampleMarker(
     const OriginalUiMainFrameClock50KG& clock,std::uint8_t popup,OriginalUiTournamentMedalPacket50KG& output) noexcept {
-    if(!current()||!clock.known||(popup&1u))return false;
+    if(!current()||!clock.known||(popup&1u)||storage_->nativeMarkerOwner)return false;
+    storage_->nonNativeMarkerUsed=true;
     auto next=storage_->markerAnimation;std::uint32_t frame=0;
     if(clock.advanceAnimations){
         if(!game::advanceOriginalUiTextureAnimation50KG(next,clock.milliseconds,frame))return false;
@@ -385,7 +655,8 @@ bool OriginalUiTournamentCareerResources50KG::sampleCanonicalMarker(
     const auto reject=[&](std::uint32_t pc){
         d.status=assets::OriginalStandardMaterialStatus50LA::source;d.sourcePC=pc;return failure();
     };
-    if(!current()||(popup&1u))return reject(0x1F2884);
+    if(!current()||(popup&1u)||storage_->nativeMarkerOwner)return reject(0x1F2884);
+    storage_->nonNativeMarkerUsed=true;
     //No legacy known/milliseconds/advanceAnimations inference. Caller schedules
     //the real24A740 service; canonical controller owns duplicate/pause gates.
     if(!reference.serviceTournamentMarker24A740(clock.applicationAnimation,d))return failure();
@@ -413,6 +684,17 @@ bool OriginalUiTournamentCareerResources50KG::sampleCanonicalMarker(
         output=storage_->markerPackets[i];return true;
     }
     return reject(0x102050);
+}
+
+bool OriginalUiTournamentCareerResources50KG::claimNativeMarker(const OriginalUiTournamentDrawContribution50KG* owner) noexcept {
+    if(!storage_||!owner||storage_->nativeMarkerOwner||storage_->nonNativeMarkerUsed||storage_->canonicalMarkerTerminal)return false;
+    storage_->nativeMarkerOwner=owner;return true;
+}
+const game::OriginalUiTextureAnimationConfig50KG* OriginalUiTournamentCareerResources50KG::nativeMarkerConfig(const OriginalUiTournamentDrawContribution50KG* owner) const noexcept {
+    return storage_&&owner&&storage_->nativeMarkerOwner==owner?&storage_->markerAnimation.config:nullptr;
+}
+const OriginalUiTournamentMedalPacket50KG* OriginalUiTournamentCareerResources50KG::nativeMarkerPacket(const OriginalUiTournamentDrawContribution50KG* owner,std::uint32_t frame) const noexcept {
+    return current()&&owner&&storage_->nativeMarkerOwner==owner&&frame<storage_->markerPackets.size()?&storage_->markerPackets[frame]:nullptr;
 }
 
 }

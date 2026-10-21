@@ -30,19 +30,26 @@ struct OriginalUiOptionsMenuWidgets50KG::Storage {
     OriginalUiGameOptionsController50KG gameController;
     OriginalUiGameOptionsState50KG gameState;
     OriginalUiControlsController50KG controlsController;
+    OriginalUiCreditsController50KG creditsController;
+    OriginalUiCreditsState50KG creditsState;
+    assets::OriginalUiDat50KG memoryCardDat;
+    assets::OriginalUiPage50KG memoryCardPage;
+    OriginalUiNavigation50KG memoryCardNavigation;
+    OriginalUiMemoryCard50KG memoryCardController;
+    OriginalUiMemoryCardState50KG memoryCardState=OriginalUiMemoryCard50KG::initialState();
     struct Localized {std::uint16_t stringId=0;std::size_t writtenLineCount=0;std::vector<std::string> lines;};
-    std::array<std::vector<Localized>,168> localized;
-    std::array<std::string,168> dynamicSecond;
-    std::array<std::array<std::uint16_t,2>,168> renderedString;
-    std::array<std::string,168> dynamic;
-    std::array<std::int32_t,168> renderedVolume;
-    std::array<OriginalUiOptionsWidgetState50KG,168> state{};
-    std::array<assets::OriginalUiOverlayText50KG,168> texts;
-    std::array<assets::OriginalUiIcon50KG,168> icons;
-    std::array<OriginalUiTextWidget50KG,168> textWidgets;
+    std::array<std::vector<Localized>,originalUiOptionsWidgetStorageCount50KG> localized;
+    std::array<std::string,originalUiOptionsWidgetStorageCount50KG> dynamicSecond;
+    std::array<std::array<std::uint16_t,2>,originalUiOptionsWidgetStorageCount50KG> renderedString;
+    std::array<std::string,originalUiOptionsWidgetStorageCount50KG> dynamic;
+    std::array<std::int32_t,originalUiOptionsWidgetStorageCount50KG> renderedVolume;
+    std::array<OriginalUiOptionsWidgetState50KG,originalUiOptionsWidgetStorageCount50KG> state{};
+    std::array<assets::OriginalUiOverlayText50KG,originalUiOptionsWidgetStorageCount50KG> texts;
+    std::array<assets::OriginalUiIcon50KG,originalUiOptionsWidgetStorageCount50KG> icons;
+    std::array<OriginalUiTextWidget50KG,originalUiOptionsWidgetStorageCount50KG> textWidgets;
     struct Image {std::shared_ptr<const assets::OriginalUiScreenAssets50KG> owner;
         std::uint32_t index=0;OriginalUiIconLayout50KG layout{};};
-    std::array<Image,168> images;
+    std::array<Image,originalUiOptionsWidgetStorageCount50KG> images;
     OriginalUiOptionsWidgetOrder50KG order;
     std::uint32_t flags42C=0;
 };
@@ -58,10 +65,25 @@ Status OriginalUiOptionsMenuWidgets50KG::bind(std::shared_ptr<const assets::Orig
             return finish(d,Status::controllerFailure);
         d.controller=s->gameController.bind(archive,d.parse);
         if(d.controller!=Control::ok||!s->gameController.initialState(s->gameState))return finish(d,Status::controllerFailure);
-        d.controller=s->controlsController.bind(std::move(archive),0,d.parse);
+        d.controller=s->controlsController.bind(archive,0,d.parse);
         if(d.controller!=Control::ok)return finish(d,Status::controllerFailure);
         for(auto& row:s->renderedString)row.fill(0xffffu);
         const auto& dat=*s->controller.widgetsDat();
+        d.controller=s->creditsController.bind(archive,d.parse);
+        if(d.controller!=Control::ok||!s->creditsController.initialState(s->creditsState))
+            return finish(d,Status::controllerFailure);
+        if(!assets::readOriginalUiDat50KG(*archive,"UI/UIOption/memcard.dat",s->memoryCardDat,d.parse)||
+            !assets::readOriginalUiPage50KG(s->memoryCardDat,dat,s->memoryCardPage,d.parse))
+            return finish(d,Status::parseFailure);
+        const auto& mp=s->memoryCardPage;
+        if(mp.identity!=assets::originalUiMemberIdentity50KG(assets::OriginalUiArchiveId50KG::options,46)||
+            mp.pageNo!=5||mp.widgetCount!=357||mp.controls.size()!=1||mp.groups.size()!=1||
+            mp.controls[0].widgets!=std::vector<std::uint16_t>({2,16})||
+            mp.groups[0].controls!=std::vector<std::int16_t>({0})||!mp.groups[0].keepEnabled||
+            !mp.groups[0].associations.empty()||!mp.hasPopup||
+            mp.popupWidgets!=std::array<std::int32_t,9>{{23,43,41,42,30,31,40,44,45}}||
+            mp.openSize!=69||mp.openTime!=.5f||mp.start!="Open")return finish(d,Status::parseFailure);
+        if(!bindOriginalUiNavigation50KG(mp,s->memoryCardNavigation))return finish(d,Status::controllerFailure);
         for(auto id:originalUiOptionsManagerWidgetIds50KG) {
             d.widgetId=id;auto& state=s->state[id];
             const auto* section=dat.section("Widget "+std::to_string(id));
@@ -126,6 +148,99 @@ Status OriginalUiOptionsMenuWidgets50KG::bind(std::shared_ptr<const assets::Orig
 bool OriginalUiOptionsMenuWidgets50KG::bound() const noexcept {return bool(storage_);}
 const assets::OriginalUiPage50KG* OriginalUiOptionsMenuWidgets50KG::page() const noexcept {
     return storage_?storage_->controller.page():nullptr;
+}
+const assets::OriginalUiPage50KG* OriginalUiOptionsMenuWidgets50KG::memoryCardPage() const noexcept {
+    return storage_?&storage_->memoryCardPage:nullptr;
+}
+const OriginalUiNavigation50KG* OriginalUiOptionsMenuWidgets50KG::memoryCardNavigation() const noexcept {
+    return storage_?&storage_->memoryCardNavigation:nullptr;
+}
+const OriginalUiMemoryCard50KG* OriginalUiOptionsMenuWidgets50KG::memoryCardController() const noexcept {
+    return storage_?&storage_->memoryCardController:nullptr;
+}
+const OriginalUiMemoryCardState50KG* OriginalUiOptionsMenuWidgets50KG::memoryCardState() const noexcept {
+    return storage_?&storage_->memoryCardState:nullptr;
+}
+Status OriginalUiOptionsMenuWidgets50KG::preflightMemoryCardPlan(const OriginalUiMemoryCardPlan50KG& p,Diagnostic& d) const noexcept {
+    d={};if(!storage_)return finish(d,Status::notBound);
+    if(!OriginalUiMemoryCard50KG::valid(p.state)||p.callbackCount>p.callbacks.size()||
+        (p.writesPageInputFlags42C&&(p.pageInputFlags42C!=p.state.inputFlags42C||
+        (p.pageInputFlags42C!=0&&p.pageInputFlags42C!=2))))return finish(d,Status::invalidCommand);
+    if((p.enableOwnedDialog&&(!p.state.dialogActive||p.state.dialogState30!=4))||
+        (p.resetOwnedDialogText&&p.state.textIds!=std::array<std::int32_t,9>{{-1,-1,-1,-1,-1,-1,-1,-1,-1}}))
+        return finish(d,Status::invalidCommand);
+    for(std::size_t i=0;i<p.callbackCount;++i){const auto& c=p.callbacks[i];
+        d.callbackIndex=i;d.widgetId=c.widgetId;d.sourcePC=c.sourcePC;
+        bool owns=false;for(auto id:originalUiMemoryCardWidgetIds50KG)if(c.widgetId==id)owns=true;
+        if(!owns||!valid(c.operation)||storage_->state[c.widgetId].kind==Kind::absent)
+            return finish(d,Status::invalidCommand);
+    }
+    return finish(d,Status::ok);
+}
+Status OriginalUiOptionsMenuWidgets50KG::commitMemoryCardPlan(const OriginalUiMemoryCardPlan50KG& p,Diagnostic& d) noexcept {
+    if(preflightMemoryCardPlan(p,d)!=Status::ok)return d.status;
+    if(commitCallbacks(p.callbacks.data(),p.callbackCount,d)!=Status::ok)return d.status;
+    if(p.writesPageInputFlags42C)storage_->flags42C=p.pageInputFlags42C;
+    storage_->memoryCardState=p.state;return finish(d,Status::ok);
+}
+Status OriginalUiOptionsMenuWidgets50KG::commitMemoryCardRender(const OriginalUiMemoryCardRender50KG& r,Diagnostic& d) noexcept {
+    d={};if(!storage_)return finish(d,Status::notBound);
+    if(!OriginalUiMemoryCard50KG::valid(r.state)||r.sourcePC!=0x1F6DE0||r.dialogSourcePC!=0x1FFFD0)
+        return finish(d,Status::invalidCommand);
+    storage_->memoryCardState=r.state;return finish(d,Status::ok);
+}
+const assets::OriginalUiPage50KG* OriginalUiOptionsMenuWidgets50KG::creditsPage() const noexcept {
+    return storage_?storage_->creditsController.page():nullptr;
+}
+const OriginalUiCreditsController50KG* OriginalUiOptionsMenuWidgets50KG::creditsController() const noexcept {
+    return storage_?&storage_->creditsController:nullptr;
+}
+const OriginalUiCreditsState50KG* OriginalUiOptionsMenuWidgets50KG::creditsState() const noexcept {
+    return storage_?&storage_->creditsState:nullptr;
+}
+Status OriginalUiOptionsMenuWidgets50KG::preflightCreditsPlan(const OriginalUiCreditsPlan50KG& plan,Diagnostic& d) const noexcept {
+    d={};if(!storage_)return finish(d,Status::notBound);
+    if(plan.state.navigation.page!=creditsPage()||plan.callbackCount>plan.callbacks.size()||
+        plan.alphaCount>plan.alphaWrites.size()||plan.alphaAfterCallbackCount>plan.callbackCount)return finish(d,Status::invalidCommand);
+    for(std::size_t i=0;i<plan.alphaCount;++i){const auto& a=plan.alphaWrites[i];
+        d.callbackIndex=i;d.widgetId=a.widgetId;d.sourcePC=a.sourcePC;
+        if(a.widgetId<170||a.widgetId>357||!textDescriptor(a.widgetId))return finish(d,Status::invalidWidget);
+    }
+    for(std::size_t i=0;i<plan.callbackCount;++i){const auto& c=plan.callbacks[i];
+        d.callbackIndex=i;d.widgetId=c.widgetId;d.sourcePC=c.sourcePC;
+        bool owns=false;for(auto id:originalUiCreditsWidgetIds50KG)if(id==c.widgetId)owns=true;
+        if(!owns||!valid(c.operation))return finish(d,Status::invalidCommand);
+    }
+    return finish(d,Status::ok);
+}
+Status OriginalUiOptionsMenuWidgets50KG::commitCreditsPlan(const OriginalUiCreditsPlan50KG& plan,Diagnostic& d) noexcept {
+    if(preflightCreditsPlan(plan,d)!=Status::ok)return d.status;
+    for(std::size_t i=0;i<plan.alphaAfterCallbackCount;++i)
+        if(commitCallbacks(&plan.callbacks[i],1,d)!=Status::ok)return d.status;
+    for(std::size_t i=0;i<plan.alphaCount;++i){const auto& a=plan.alphaWrites[i];
+        d.callbackIndex=i;d.widgetId=a.widgetId;d.sourcePC=a.sourcePC;
+        d.text=storage_->textWidgets[a.widgetId].setWidgetAlpha(a.alpha);
+        if(d.text!=Text::ok)return finish(d,Status::textFailure);
+    }
+    // Exact Credits581-entry stream does not inflate the shared256-entry
+    // default callback admission. Every entry was preflighted above.
+    for(std::size_t i=plan.alphaAfterCallbackCount;i<plan.callbackCount;++i)
+        if(commitCallbacks(&plan.callbacks[i],1,d)!=Status::ok)return d.status;
+    storage_->creditsState=plan.state;
+    if(plan.writesPageInputFlags42C)storage_->flags42C=plan.pageInputFlags42C;
+    return finish(d,Status::ok);
+}
+Status OriginalUiOptionsMenuWidgets50KG::setCreditsCardAlpha(std::uint16_t control,std::uint8_t alpha,Diagnostic& d) noexcept {
+    d={};if(!storage_)return finish(d,Status::notBound);
+    const auto* page=creditsPage();
+    if(!control||control>=page->controls.size())return finish(d,Status::invalidInput);
+    for(auto id:page->controls[control].widgets)
+        if(id<170||id>357||!textDescriptor(id))return finish(d,Status::invalidWidget);
+    for(auto id:page->controls[control].widgets){d.widgetId=id;
+        d.text=storage_->textWidgets[id].setWidgetAlpha(alpha);
+        if(d.text!=Text::ok)return finish(d,Status::textFailure);
+    }
+    return finish(d,Status::ok);
 }
 const OriginalUiNavigation50KG* OriginalUiOptionsMenuWidgets50KG::navigation() const noexcept {
     return storage_?&storage_->navigation:nullptr;

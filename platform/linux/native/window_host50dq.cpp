@@ -184,7 +184,9 @@ struct WindowHost50DQ::State {
     }
     bool sampleControllers(WindowInput50DQ& input,WindowHostDiagnostic50DQ& d) noexcept {
         input.gameControllersEnabled=controllersEnabled;
+        input.secondControllerPresence=WindowControllerPresence50DQ::Unknown;
         if(!controllersEnabled)return true;
+        bool complete=true;
         for(unsigned slot=0;slot<2;++slot)if(controllers[slot]&&!controllerAttached(controllers[slot])){
             closeController(controllers[slot]);controllers[slot]=nullptr;controllerIds[slot]=-1;controllerRumbling[slot]=false;
         }
@@ -192,13 +194,13 @@ struct WindowHost50DQ::State {
         if(count<0)return fail(d,WindowHostError50DQ::ControllerFailure,"SDL_NumJoysticks",getError());
         for(Int device=0;device<count;++device){
             unsigned slot=0;while(slot<2&&controllers[slot])++slot;if(slot==2)break;
-            if(!isGameController(device))continue; // Unknown joystick layouts remain unsupported.
-            const auto id=deviceInstanceId(device);if(id<0)continue; // Removed during enumeration.
+            if(!isGameController(device)){complete=false;continue;} // Unknown layouts cannot establish absence.
+            const auto id=deviceInstanceId(device);if(id<0){complete=false;continue;} // Enumeration raced removal.
             if(controllerIds[0]==id||controllerIds[1]==id)continue;
             auto* opened=openController(device);
-            if(!opened){++input.controllerOpenFailures;continue;}
+            if(!opened){++input.controllerOpenFailures;complete=false;continue;}
             auto* joystick=controllerJoystick(opened);
-            if(!controllerAttached(opened)||!joystick||joystickInstanceId(joystick)!=id){closeController(opened);continue;}
+            if(!controllerAttached(opened)||!joystick||joystickInstanceId(joystick)!=id){complete=false;closeController(opened);continue;}
             controllers[slot]=opened;controllerIds[slot]=id;
         }
         for(unsigned slot=0;slot<2;++slot){
@@ -206,11 +208,19 @@ struct WindowHost50DQ::State {
             auto& snapshot=input.controllers[slot];
             for(Int axis=0;axis<6;++axis)snapshot.axes[static_cast<unsigned>(axis)]=controllerAxis(controller,axis);
             for(Int button=0;button<15;++button)snapshot.buttons[static_cast<unsigned>(button)]=controllerButton(controller,button);
-            // Disconnect during a read publishes absent, never partially live.
-            if(!controllerAttached(controller)){snapshot={};closeController(controller);controllers[slot]=nullptr;controllerIds[slot]=-1;controllerRumbling[slot]=false;continue;}
+            // Disconnect during a read clears this slot, never publishes partial
+            // input, and leaves overall second-slot presence unknown for this poll.
+            if(!controllerAttached(controller)){complete=false;snapshot={};closeController(controller);controllers[slot]=nullptr;controllerIds[slot]=-1;controllerRumbling[slot]=false;continue;}
             snapshot.instanceId=controllerIds[slot];snapshot.connected=true;
             snapshot.rumbleSupported=controllerHasRumble(controller)!=0;
         }
+        // Publish only after finalized attachment checks. A real slot1 wins over
+        // unrelated unsupported devices; an empty slot never means absent when
+        // enumeration/opening was ambiguous. Stable slots are not compacted.
+        if(numJoysticks()!=count)complete=false; // Hotplug changed enumeration extent.
+        input.secondControllerPresence=input.controllers[1].connected?
+            WindowControllerPresence50DQ::Present:complete?
+            WindowControllerPresence50DQ::Absent:WindowControllerPresence50DQ::Unknown;
         return true;
     }
 

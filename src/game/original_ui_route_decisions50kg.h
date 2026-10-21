@@ -41,7 +41,7 @@ struct OriginalUiRouteRequest50KG {
 // native memory offsets or guest addresses. word writes replace all 32 bits;
 // maskedByte/maskedHalfword preserve every bit outside replaceMask.
 enum class OriginalUiProfileField50KG : std::uint32_t {
-    mode34=0x34,previousMode38=0x38,optionsSlot6E4=0x6E4,optionsGroup6E8=0x6E8,
+    mode34=0x34,previousMode38=0x38,optionsSlot6E4=0x6E4,optionsGroup6E8=0x6E8,hallSlot6EC=0x6EC,
     riderMode0_6F0=0x6F0,rider1Mode1_6F4=0x6F4,rider2_6F8=0x6F8,
     riderOtherMode6FC=0x6FC,courseMode0_700=0x700,lapsMode0_704=0x704,
     entrantsMode0_708=0x708,subtypeMode0_70C=0x70C,

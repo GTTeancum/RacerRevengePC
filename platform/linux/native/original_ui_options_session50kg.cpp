@@ -1,4 +1,5 @@
 #include "original_ui_options_session50kg.h"
+#include "original_ui_controller_popup_resources50kg.h"
 #include <cmath>
 #include <limits>
 #include <new>
@@ -15,6 +16,23 @@ using ApertureStatus=game::OriginalUiApertureStatus50KG;
 bool widgetOkay(WidgetStatus s) noexcept {return s==WidgetStatus::ok||s==WidgetStatus::noChange||s==WidgetStatus::hidden;}
 bool apertureOkay(ApertureStatus s) noexcept {return s==ApertureStatus::ok||s==ApertureStatus::noChange;}
 Status result(Diagnostic& d,Status s,std::uint32_t pc=0) noexcept {d.status=s;d.sourcePC=pc;return s;}
+bool sameCommonHall(const OriginalUiMainProfile50KG& a,const OriginalUiMainProfile50KG& b) noexcept {
+ return a.known==b.known&&a.mode34==b.mode34&&a.previousMode38==b.previousMode38&&a.savedSlot6E0==b.savedSlot6E0&&a.availability11018==b.availability11018&&a.flags11054==b.flags11054&&a.playerBits1125C==b.playerBits1125C;
+}
+bool hallRequest(const game::OriginalUiRouteDecision50KG& d) noexcept {return d.inputPC==0x1F9640&&d.selectedSlot==4&&d.request.kind==game::OriginalUiRouteKind50KG::changeScreen&&d.request.sourceScreen==12&&d.request.sourcePage==1&&d.request.targetScreen==11&&d.request.targetPage==1&&d.request.sourcePC==0x1F98C8;}
+// Source1F9878 is an owned dialog operation, never a page3 admission.
+bool controllerPopupRequest(const game::OriginalUiRouteDecision50KG& d) noexcept {
+    using namespace game;
+    if(d.action!=OriginalUiRouteAction50KG::controllerRequired||d.admitted||!d.profileProposalComplete||
+       d.inputPC!=0x1F9640||d.selectedSlot!=2||d.request.kind!=OriginalUiRouteKind50KG::changePage||
+       d.request.sourceScreen!=12||d.request.sourcePage!=1||d.request.targetScreen!=12||d.request.targetPage!=3||
+       d.request.sourcePC!=0x1F9744||d.profileChanges.count!=1||
+       d.blockers!=(static_cast<std::uint32_t>(OriginalUiRouteBlocker50KG::controllerPresence)|
+                    static_cast<std::uint32_t>(OriginalUiRouteBlocker50KG::destinationOwner)))return false;
+    const auto&w=d.profileChanges.values[0];
+    return w.field==OriginalUiProfileField50KG::optionsSlot6E4&&w.operation==OriginalUiProfileWrite50KG::word&&
+        w.value==2&&w.replaceMask==0xFFFFFFFFu&&w.sourcePC==0x1F9940;
+}
 bool sameDecision(const game::OriginalUiRouteDecision50KG& a,const game::OriginalUiRouteDecision50KG& b) noexcept {
     const auto& x=a.request;const auto& y=b.request;
     if(a.action!=b.action||a.blockers!=b.blockers||a.admitted!=b.admitted||
@@ -35,8 +53,11 @@ void resetOriginalUiOptionsProfileFields50KG(OriginalUiOptionsProfile50KG& profi
 struct OriginalUiOptionsSession50KG::Storage {
     OriginalUiOptionsSessionCold50KG cold;
     OriginalUiOptionsDrawContribution50KG collector;
-    game::OriginalUiApertureOwner50KG aperture,gameAperture;
-    bool gamePrepared=false,controlsRegistryPublished=false;
+    game::OriginalUiApertureOwner50KG aperture,gameAperture,creditsAperture,memoryCardAperture;
+    bool memoryCardPrepared=false;
+    game::OriginalUiMemoryCardPlan50KG pendingMemoryCard;
+    bool gamePrepared=false,creditsPrepared=false,controlsRegistryPublished=false;
+    game::OriginalUiCreditsPlan50KG pendingCredits;
     std::array<game::OriginalUiApertureOwner50KG,2> controlsAperture;
     std::array<game::OriginalUiControlsController50KG,2> controlsController;
     std::array<game::OriginalUiControlsState50KG,2> controlsState;
@@ -49,11 +70,14 @@ struct OriginalUiOptionsSession50KG::Storage {
     OriginalUiOptionsSessionSnapshot50KG state;
     Diagnostic callbackFault;
     game::OriginalUiRouteDecision50KG pendingBack{};
+    OriginalUiMainProfile50KG pendingHallCommon{};
     game::OriginalUiGameSettingsProfile50KG pendingGameProfile{};
     game::OriginalUiGameSettings50KG pendingGameLocal{};
     std::uint64_t pendingSoundRevision=0;
     bool pendingAcceptCommitted=false;
     std::uint64_t proposalSerial=0;
+    WindowControllerPresence50DQ popupPresence=WindowControllerPresence50DQ::Unknown;
+    bool popupOpenedByInput=false,popupAttached=false;
     bool dependenciesPrepared=false,inOperation=false,rendering=false,paused=false,updatePrepared=false,sourceClosing=false,sourceTornDown=false;
     OriginalUiMainSessionUpdate50KG preparedUpdate{};
     game::OriginalUiOptionsMenuWidgets50KG& bank() noexcept {return *cold.resources->widgets();}
@@ -62,13 +86,81 @@ struct OriginalUiOptionsSession50KG::Storage {
     game::OriginalUiTransitionSnapshot50KG transition() const noexcept {return cold.externalTransition->snapshot();}
     std::uint8_t activePage() const noexcept {return transition().current.page;}
     static bool isControlsPage(std::uint8_t page) noexcept {return page==2||page==3;}
-    game::OriginalUiApertureOwner50KG& apertureFor(std::uint8_t page) noexcept {return isControlsPage(page)?controlsAperture[page-2]:page==4?gameAperture:aperture;}
-    const game::OriginalUiApertureOwner50KG& apertureFor(std::uint8_t page) const noexcept {return isControlsPage(page)?controlsAperture[page-2]:page==4?gameAperture:aperture;}
+    game::OriginalUiApertureOwner50KG& apertureFor(std::uint8_t page) noexcept {return isControlsPage(page)?controlsAperture[page-2]:page==5?memoryCardAperture:page==6?creditsAperture:page==4?gameAperture:aperture;}
+    const game::OriginalUiApertureOwner50KG& apertureFor(std::uint8_t page) const noexcept {return isControlsPage(page)?controlsAperture[page-2]:page==5?memoryCardAperture:page==6?creditsAperture:page==4?gameAperture:aperture;}
     game::OriginalUiApertureOwner50KG& activeAperture() noexcept {return apertureFor(activePage());}
     const game::OriginalUiApertureOwner50KG& activeAperture() const noexcept {return apertureFor(activePage());}
     bool ownsPage(std::uint8_t page) const noexcept {return page==1||
+        (page==5&&memoryCardPrepared&&cold.resources->memoryCardReady())||
+        (page==6&&creditsPrepared&&cold.commonProfile->known&&cold.commonProfile->mode34!=2)||
         (isControlsPage(page)&&controlsPrepared[page-2]&&cold.controlsProfile&&cold.resources->controlsModelReady())||
         (page==4&&gamePrepared&&cold.gameSettingsProfile&&game::validOriginalUiGameSettingsProfile50KG(*cold.gameSettingsProfile));}
+    bool memoryCardPlan(const game::OriginalUiMemoryCardPlan50KG& plan) noexcept {
+        if(!widgetOkay(bank().preflightMemoryCardPlan(plan,callbackFault.widget)))return false;
+        if(plan.soundRequested&&(plan.soundFlags!=1||plan.soundForce||!plan.flushRequested||cold.application->transportE00!=-1))return false;
+        if(plan.soundRequested&&cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
+           (!cold.audio||!cold.audio->canPlayOptionsEffect(plan.soundId)))return false;
+        if(plan.activateBorrowedCamera&&!cold.resources->camera())return false;
+        if(!widgetOkay(bank().commitMemoryCardPlan(plan,callbackFault.widget)))return false;
+        if(plan.activateBorrowedCamera)state.cameraActive=true;
+        // Actual APP->UI+47C, not the unrelated application UI scene field.
+        if(plan.resetGlobalPopupResult3D8)cold.application->controllerPopupState.result3D8=0;
+        if(plan.applyPageSceneField430){const auto* page=bank().memoryCardPage();if(!page)return false;
+            std::uint32_t packed=0;for(unsigned c=0;c<3;++c){std::int32_t v=0;
+                if(!game::convertOriginalUiApertureCvtWS50KG(page->backgroundColor[c],v)||v<0||v>255)return false;
+                packed|=std::uint32_t(v)<<(16-8*c);}state.packedBackground430=packed;}
+        if(plan.saveUpdateDelta298&&!apertureOkay(memoryCardAperture.saveMemoryCardUpdateDelta38(plan.state.updateDelta298)))return false;
+        return !plan.soundRequested||audioEffect(plan.soundId);
+    }
+    bool stageMemoryCardReturn(const game::OriginalUiMemoryCardPlan50KG& plan) noexcept {
+        game::OriginalUiRouteDecision50KG decision;
+        if(!idleInput()||!ownsPage(1)||!game::describeOriginalUiMemoryCardReturn50KG(plan,decision)||
+           !game::originalUiMemoryCardReturnShape50KG(decision))return false;
+        pendingMemoryCard=plan;pendingBack=decision;state.backProposalPending=true;
+        ++proposalSerial;if(!proposalSerial)++proposalSerial;return true;
+    }
+    bool memoryCardReturnCurrent() const noexcept {
+        const auto* current=cold.resources->widgets()->memoryCardState();
+        return current&&game::sameOriginalUiMemoryCardState50KG(*current,pendingMemoryCard.state);
+    }
+    bool creditsPlan(const game::OriginalUiCreditsPlan50KG& plan) noexcept {
+        if(!widgetOkay(bank().preflightCreditsPlan(plan,callbackFault.widget)))return false;
+        if(cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
+           ((plan.startMusic12&&(!cold.audio||!cold.audio->canStartCreditsLoop12()))||
+            (plan.fadeMusic&&(!cold.audio||!cold.audio->canFadeCreditsMusic()))))return false;
+        if(!widgetOkay(bank().commitCreditsPlan(plan,callbackFault.widget)))return false;
+        if(plan.activateBorrowedCamera){if(!cold.resources->camera())return false;state.cameraActive=true;}
+        if(plan.clearSceneField3D8)cold.application->uiObject3D8=0;
+        if(plan.applyPageSceneField430){const auto* page=bank().creditsPage();if(!page)return false;
+            std::uint32_t packed=0;for(unsigned c=0;c<3;++c){std::int32_t v=0;
+                if(!game::convertOriginalUiApertureCvtWS50KG(page->backgroundColor[c],v)||v<0||v>255)return false;
+                packed|=std::uint32_t(v)<<(16-8*c);}state.packedBackground430=packed;}
+        if(plan.startMusic12||plan.fadeMusic){
+            if(cold.audioMode==OriginalUiMainAudioMode50KG::muted)++state.audio.suppressedByMutedMode;
+            else {if(!(plan.startMusic12?cold.audio->startCreditsLoop12():cold.audio->fadeCreditsMusic()))return false;
+                ++state.audio.submitted;}}
+        if(plan.saveUpdateDelta298&&!apertureOkay(creditsAperture.saveCreditsUpdateDelta38(plan.updateDelta298)))return false;
+        return true;
+    }
+    bool stageCreditsReturn(const game::OriginalUiCreditsPlan50KG& plan) noexcept {
+        game::OriginalUiRouteDecision50KG decision;
+        if(!idleInput()||!game::describeOriginalUiCreditsReturn50KG(plan,decision)||
+           !game::originalUiCreditsReturnShape50KG(decision)||!ownsPage(1))return false;
+        pendingCredits=plan;pendingBack=decision;state.backProposalPending=true;
+        ++proposalSerial;if(!proposalSerial)++proposalSerial;return true;
+    }
+    bool creditsReturnCurrent() const noexcept {
+        const auto* current=cold.resources->widgets()->creditsState();const auto& expected=pendingCredits.state;
+        if(!current||current->navigation.page!=expected.navigation.page||current->loaded!=expected.loaded||
+           current->phase7D4!=expected.phase7D4||current->remaining7D8!=expected.remaining7D8||
+           current->inputFlags42C!=expected.inputFlags42C||current->navigation.controllerGroup!=expected.navigation.controllerGroup)return false;
+        for(std::size_t i=0;i<current->navigation.groups.size();++i){const auto& a=current->navigation.groups[i];const auto& b=expected.navigation.groups[i];
+            if(a.enabled!=b.enabled||a.selectedSlot!=b.selectedSlot)return false;}
+        for(std::size_t i=0;i<current->navigation.controls.size();++i){const auto& a=current->navigation.controls[i];const auto& b=expected.navigation.controls[i];
+            if(a.enabled!=b.enabled||a.blocked!=b.blocked||a.selected!=b.selected||a.shown!=b.shown)return false;}
+        return cold.audioMode==OriginalUiMainAudioMode50KG::muted||!pendingCredits.soundRequested||
+            (cold.audio&&cold.audio->canPlayGameOptionsEffect(pendingCredits.soundId));
+    }
     bool sameControlsLocal(const game::OriginalUiControlsState50KG& a,const game::OriginalUiControlsState50KG& b) const noexcept {
         return a.navigation.page==b.navigation.page&&a.controllerIndex4DC==b.controllerIndex4DC&&
             a.frontView4CC==b.frontView4CC&&a.modelBlocked4D0==b.modelBlocked4D0&&a.loaded==b.loaded&&
@@ -179,6 +271,13 @@ struct OriginalUiOptionsSession50KG::Storage {
     }
     void widgetPhase(Phase p,std::uint32_t pc,std::uint8_t page=0) noexcept {
         if(!page)page=activePage();
+        if(page==5){game::OriginalUiMemoryCardPlan50KG plan;
+            if(!ownsPage(5)||game::OriginalUiMemoryCard50KG::phase(*bank().memoryCardState(),p,plan)!=game::OriginalUiMemoryCardStatus50KG::ok||
+               !memoryCardPlan(plan))fault(Status::widget,pc);return;}
+        if(page==6){game::OriginalUiCreditsPlan50KG plan;
+            if(!ownsPage(6)||bank().creditsController()->phase(*bank().creditsState(),p,cold.commonProfile->known,
+                cold.commonProfile->mode34,plan)!=game::OriginalUiOptionsMenuStatus50KG::ok||!creditsPlan(plan))fault(Status::widget,pc);
+            return;}
         if(isControlsPage(page)){
             game::OriginalUiControlsPhase50KG phase;
             switch(p){
@@ -203,8 +302,24 @@ struct OriginalUiOptionsSession50KG::Storage {
     }
     static bool pageEffects(void* p,const game::OriginalUiOptionsMenuPageResult50KG& result) noexcept {
         auto& s=*static_cast<Storage*>(p);
-        // Unavailable routes defer every effect until real destination admission.
-        // Genuine directions sound BEFORE the later movement widget callback.
+        // Source1F9878 owns a dialog, not the unavailable page3 destination.
+        // Keep popup -> remembered slot -> sound/flush inside the page callback,
+        // before the later selected Movement_Control traversal.
+        if(controllerPopupRequest(result.route)&&s.popupPresence==WindowControllerPresence50DQ::Absent&&
+           s.idleInput()&&s.activePage()==1&&!s.cold.application->controllerPopupState.active3CC){
+            const auto owner=s.cold.resources->controllerPopup();
+            if(!owner||!owner->loaded()||owner->poisoned()||owner!=s.cold.application->controllerPopupResources)return true;
+            if(s.cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
+               (!s.cold.audio||!s.cold.audio->canPlayOptionsEffect(1)))return true;
+            game::OriginalUiControllerPopupPlan50KG plan;
+            if(game::OriginalUiControllerPopup50KG::startController2(s.cold.application->controllerPopupState,plan)!=
+               game::OriginalUiControllerPopupStatus50KG::ok)return false;
+            s.cold.application->controllerPopupState=plan.state;
+            s.cold.profile->savedSlot6E4=2;
+            if(!s.audioEffect(1))return false;
+            s.popupOpenedByInput=true;return true;
+        }
+        // Other unavailable routes still defer effects until real admission.
         return result.routeStatus==game::OriginalUiRouteStatus50KG::unavailable||!result.soundRequested||s.audioEffect(result.soundId);
     }
     static bool available(void* p) noexcept {auto& s=*static_cast<Storage*>(p);return s.operational()&&s.cold.resources->exitText()->prepared();}
@@ -218,7 +333,7 @@ struct OriginalUiOptionsSession50KG::Storage {
             if(isControlsPage(s.activePage())){
                 if(event.targetPC!=0x1F45E0u)s.fault(Status::unsupportedState,event.callPC);
                 else s.controlsPhase(game::OriginalUiControlsPhase50KG::closingThresholdB8,s.activePage(),event.callPC);
-            }else if(event.targetPC!=(s.activePage()==4?0x1F5F30u:0x1F9FE0u))s.fault(Status::unsupportedState,event.callPC);break;
+            }else if(event.targetPC!=(s.activePage()==5?0x1D79F0u:s.activePage()==6?0x1F8980u:s.activePage()==4?0x1F5F30u:0x1F9FE0u))s.fault(Status::unsupportedState,event.callPC);break;
         case Hook::closedBC:
             // Shared1D7A00 completion is implemented in the aperture itself.
             if(event.targetPC!=0x1D7A00)s.fault(Status::unsupportedState,event.callPC);break;
@@ -285,6 +400,17 @@ Status OriginalUiOptionsSession50KG::bind(const OriginalUiOptionsSessionCold50KG
                 return result(d,Status::resource,0x1F2F60);
             s->controlsPrepared[index]=true;
         }
+        if(cold.resources->memoryCardReady()){
+            if(!cold.resources->memoryCardExitText()||!cold.resources->memoryCardExitText()->prepared()||
+               s->memoryCardAperture.bindMemoryCard(cold.optionsArchive,callbacks,d.aperture)!=ApertureStatus::ok)return result(d,Status::aperture);
+            s->memoryCardPrepared=true;
+        }
+        if(cold.resources->widgets()->creditsPage()&&cold.resources->creditsExitText()&&
+           cold.resources->creditsExitText()->prepared()&&
+           (cold.audioMode==OriginalUiMainAudioMode50KG::muted||(cold.audio&&cold.audio->creditsMenuReady()))){
+            if(s->creditsAperture.bindCredits(cold.optionsArchive,callbacks,d.aperture)!=ApertureStatus::ok)return result(d,Status::aperture);
+            s->creditsPrepared=true;
+        }
         // No manager bind, tick, widget phase, shared-profile write or music
         // start during this cold prepare. Coordinator owns the initial notices.
         s->state.bound=true;storage_=std::move(s);return result(d,Status::ok);
@@ -301,6 +427,22 @@ Status OriginalUiOptionsSession50KG::notifyTransition(const game::OriginalUiTran
     case Notice::requestedPage90:s->widgetPhase(Phase::requestedPage90,event.sourcePC,event.route.page);s->state.pageShown=true;break;
     case Notice::previousPage94:s->widgetPhase(Phase::previousPage94,event.sourcePC,event.route.page);s->state.pageShown=false;break;
     case Notice::pageEntry74:
+        if(!s->popupAttached){
+            // Original attachment happens during loading before manager entry.
+            // Native cold preparation is prospective: publish it here only for
+            // the inactive retained owner, before any page entry callback.
+            game::OriginalUiControllerPopupPlan50KG plan;
+            if(s->cold.application->controllerPopupState.active3CC||
+               game::OriginalUiControllerPopup50KG::attach(s->cold.application->controllerPopupState,plan)!=
+               game::OriginalUiControllerPopupStatus50KG::ok){s->fault(Status::unsupportedState,0x207330);break;}
+            s->cold.application->controllerPopupState=plan.state;s->popupAttached=true;
+        }
+        if(event.route.page==1){
+            game::OriginalUiControllerPopupPlan50KG plan;
+            if(game::OriginalUiControllerPopup50KG::optionsEntryResetResult(s->cold.application->controllerPopupState,plan)!=
+               game::OriginalUiControllerPopupStatus50KG::ok){s->fault(Status::unsupportedState,0x1F9614);break;}
+            s->cold.application->controllerPopupState=plan.state;
+        }
         if(!s->controlsRegistryPublished&&s->cold.resources->controlsModelReady()){
             if(!s->cold.resources->publishControlsRegistry(s->callbackFault.draw.resource)){s->fault(Status::resource,0x1CDB10);break;}
             s->controlsRegistryPublished=true;
@@ -308,11 +450,17 @@ Status OriginalUiOptionsSession50KG::notifyTransition(const game::OriginalUiTran
         s->widgetPhase(Phase::entry74,event.sourcePC,event.route.page);
         // Page+C4 aliases the one real manager camera(+2B0); entry enables and
         // registers that camera. Renderer uses its authenticated prepared pose.
-        s->state.cameraActive=true;s->cold.application->uiObject3D8=0;break;
+        s->state.cameraActive=true;if(event.route.page!=5)s->cold.application->uiObject3D8=0;break;
     case Notice::managerEntry84:break; // inherited2A4330 return-only leaf
     case Notice::beginTransition7C:
         s->state.backProposalPending=false;
-        if(!apertureOkay(s->apertureFor(event.route.page).beginTransition7C(event.phase)))s->fault(Status::aperture,event.sourcePC);break;
+        if(event.route.page==5){
+            // Authentic page override1F74D0: exit2 sets4C8, entry is no-op.
+            // It does NOT call inherited aperture transition1D7480/1D74E0.
+            game::OriginalUiMemoryCardPlan50KG plan;
+            if(game::OriginalUiMemoryCard50KG::callback(*s->bank().memoryCardState(),static_cast<std::uint32_t>(event.phase),plan)!=game::OriginalUiMemoryCardStatus50KG::ok||
+               !s->memoryCardPlan(plan))s->fault(Status::widget,0x1F74D0);
+        }else if(!apertureOkay(s->apertureFor(event.route.page).beginTransition7C(event.phase)))s->fault(Status::aperture,event.sourcePC);break;
     case Notice::pageAuxiliary1C:s->state.inputContainerShown=false;break;
     case Notice::pageAuxiliary24:s->state.inputContainerShown=true;break;
     }
@@ -323,6 +471,8 @@ game::OriginalUiTransitionCompletion50KG OriginalUiOptionsSession50KG::pollCompl
     if(!s||!s->operational()||s->inOperation||route.screen!=12||!s->ownsPage(route.page))return game::OriginalUiTransitionCompletion50KG::unavailable;
     const auto t=s->transition();
     if(!t.bound||t.current.screen!=route.screen||t.current.page!=route.page||t.phase!=phase)return game::OriginalUiTransitionCompletion50KG::unavailable;
+    // Page5 virtual+80=1F74F0 returns1, independent of retained aperture.
+    if(route.page==5)return game::OriginalUiTransitionCompletion50KG::complete;
     return s->apertureFor(route.page).pollCompletion(route,phase);
 }
 const game::OriginalUiTransitionOwner50KG* OriginalUiOptionsSession50KG::externalLifecycleOwner() const noexcept {
@@ -336,10 +486,50 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
     if(s->state.faulted)return result(d,Status::faulted);if(s->state.quitRequested)return result(d,Status::quit);
     if(s->inOperation||s->updatePrepared||in.controller>1||in.originalInput>15)return result(d,Status::invalidInput);
     s->state.framePublished=false;s->state.backProposalPending=false;s->pendingAcceptCommitted=false;s->pendingControlsCommitted=false;receipt.sourceLifecycle=s->transition();
+    // Shared popup precedes the Options manager in original global traversal.
+    // Snapshot-active dispatch means the opening Confirm is not reused.
+    // The popup does not consume input: Options suppresses page actions, while
+    // its selected movement widget still receives mapped directions silently.
+    if(s->cold.application->controllerPopupState.active3CC){
+        game::OriginalUiControllerPopupPlan50KG plan;
+        if(game::OriginalUiControllerPopup50KG::input(s->cold.application->controllerPopupState,
+            in.controller,in.originalInput,true,plan)!=game::OriginalUiControllerPopupStatus50KG::ok)
+            return result(d,Status::unsupportedState,0x2062D0);
+        if(plan.accepted){
+            if(s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState,0x267BE0);
+            if(plan.soundRequested&&s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
+               (!s->cold.audio||!s->cold.audio->canPlayOptionsEffect(plan.soundId)))return result(d,Status::audio,plan.soundPC);
+            s->cold.application->controllerPopupState=plan.state;
+            if(plan.soundRequested&&!s->audioEffect(plan.soundId)){d=s->callbackFault;return d.status;}
+            receipt.popupChanged=true;receipt.popupSourcePC=plan.sourcePC;
+        }
+    }
     receipt.containerReached=s->currentPage()&&s->state.pageShown&&s->state.inputContainerShown;
     if(!receipt.containerReached||!s->activeAperture().snapshot().inputEnabled268)return result(d,Status::noChange);
     if(s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState,0x267BE0);
     s->inOperation=true;receipt.pageCallbackRan=true;
+    if(s->activePage()==5){game::OriginalUiMemoryCardPlan50KG plan;
+        const auto status=game::OriginalUiMemoryCard50KG::input(*s->bank().memoryCardState(),in.controller,
+            static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),true,true,plan);
+        receipt.pageAccepted=plan.pageAccepted;Status returned=Status::noChange;
+        if(status==game::OriginalUiMemoryCardStatus50KG::unavailableStorage)returned=Status::unavailableDestination;
+        else if(status!=game::OriginalUiMemoryCardStatus50KG::ok&&status!=game::OriginalUiMemoryCardStatus50KG::noChange)returned=Status::widget;
+        else if(!s->memoryCardPlan(plan))returned=Status::widget;
+        else if(plan.soundRequested)returned=Status::ok;
+        s->inOperation=false;receipt.status=returned;return result(d,returned,plan.sourcePC);
+    }
+    if(s->activePage()==6){game::OriginalUiCreditsPlan50KG plan;
+        const auto status=s->bank().creditsController()->input(*s->bank().creditsState(),in.controller,
+            static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),true,true,plan);
+        receipt.pageAccepted=plan.pageAccepted;Status returned=Status::noChange;
+        if(status!=game::OriginalUiOptionsMenuStatus50KG::ok&&status!=game::OriginalUiOptionsMenuStatus50KG::noChange&&
+           status!=game::OriginalUiOptionsMenuStatus50KG::unavailable)returned=Status::widget;
+        else if(plan.intent!=game::OriginalUiCreditsIntent50KG::none){
+            if(s->stageCreditsReturn(plan)){receipt.routeProposal={this,s->proposalSerial,s->pendingBack};returned=Status::pageProposed;}
+            else returned=Status::unavailableDestination;
+        }
+        s->inOperation=false;receipt.status=returned;return result(d,returned);
+    }
     if(Storage::isControlsPage(s->activePage())){
         const auto index=s->activePage()-2;
         const auto status=s->controlsController[index].input(s->controlsState[index],in.controller,
@@ -389,36 +579,47 @@ Status OriginalUiOptionsSession50KG::input(const OriginalUiMainSessionInput50KG&
         else if(receipt.gameOptions.soundRequested)status=s->audioEffect(receipt.gameOptions.soundId)?Status::ok:Status::audio;
         s->inOperation=false;if(s->state.faulted){d=s->callbackFault;status=d.status;}receipt.status=status;return result(d,status);
     }
+    s->popupPresence=in.secondControllerObservation;s->popupOpenedByInput=false;
     game::OriginalUiOptionsContext50KG context;
     context.admission.sourceControllerReady=true;context.admission.selectionOwnerReady=true;
     context.admission.profileOwnerReady=s->cold.profile->known&&s->cold.commonProfile->known;
-    context.popupActive=in.popupActive;context.sourceInputBlocked=in.sourceInputBlocked;
-    context.secondControllerPresent=in.secondControllerPresent;context.mode34=s->cold.commonProfile->mode34;
+    context.popupActive=in.popupActive||s->cold.application->controllerPopupState.active3CC;context.sourceInputBlocked=in.sourceInputBlocked;
+    context.secondControllerPresent=in.secondControllerObservation==WindowControllerPresence50DQ::Present;context.mode34=s->cold.commonProfile->mode34;
     // All destinations are closed here. Back is an UNACCEPTED proposal for the
     // coordinator; this page cannot attest another screen's native readiness.
     const auto ws=s->bank().inputWithPageEffects(in.controller,static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),
         true,true,context,s,&Storage::pageEffects,receipt.page,receipt.movement,d.widget);
-    receipt.pageAccepted=receipt.page.pageAccepted;Status status=Status::noChange;
+    receipt.pageAccepted=receipt.page.pageAccepted;
+    if(s->popupOpenedByInput){receipt.popupChanged=true;receipt.popupSourcePC=0x1F9878;}
+    Status status=receipt.popupChanged?Status::ok:Status::noChange;
     if(!widgetOkay(ws)&&ws!=WidgetStatus::unavailable){s->fault(Status::widget,0x1F9640);status=Status::widget;}
     else if(receipt.page.routeStatus==game::OriginalUiRouteStatus50KG::unavailable) {
         const auto& route=receipt.page.route;
-        status=route.action==game::OriginalUiRouteAction50KG::controllerRequired?Status::secondControllerRequired:Status::unavailableDestination;
+        status=s->popupOpenedByInput?Status::ok:
+            route.action==game::OriginalUiRouteAction50KG::controllerRequired&&s->popupPresence==WindowControllerPresence50DQ::Absent?
+            Status::secondControllerRequired:Status::unavailableDestination;
         if(in.originalInput==6&&s->idleInput()&&route.profileProposalComplete&&route.request.kind==game::OriginalUiRouteKind50KG::changeScreen&&
             route.request.targetScreen==4&&route.request.targetPage==1&&route.blockers==static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)) {
             s->pendingBack=route;s->state.backProposalPending=true;++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;receipt.routeProposal={this,s->proposalSerial,route};status=Status::backProposed;
         }
-        //Page3 is prepared for the source controller index, but no concrete
-        //native menu-controller/hotplug popup owner exists yet. Caller-supplied
-        //secondControllerPresent alone cannot certify that destination.
-        if(in.originalInput==4&&s->idleInput()&&route.request.targetPage>=2&&route.request.targetPage<=4&&
-            route.request.targetPage!=3&&s->ownsPage(route.request.targetPage)&&route.selectedSlot==route.request.targetPage-1&&route.profileProposalComplete&&
+        if(in.originalInput==4&&s->idleInput()&&hallRequest(route)&&route.profileProposalComplete&&
+           route.blockers==static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)){
+            s->pendingHallCommon=*s->cold.commonProfile;s->pendingBack=route;s->state.backProposalPending=true;
+            ++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;
+            receipt.routeProposal={this,s->proposalSerial,route};status=Status::screenProposed;
+        }
+        // Page3 is prepared, but the connected-controller input/lifetime join
+        // remains unsupported. Genuine presence and the absent-device popup
+        // do not certify the connected Controls2 destination.
+        if(in.originalInput==4&&s->idleInput()&&(route.request.targetPage>=2&&route.request.targetPage<=6)&&
+            route.request.targetPage!=3&&s->ownsPage(route.request.targetPage)&&route.selectedSlot==(route.request.targetPage>=5?route.request.targetPage:route.request.targetPage-1)&&route.profileProposalComplete&&
             route.request.kind==game::OriginalUiRouteKind50KG::changePage&&route.request.targetScreen==12&&
             route.blockers==static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)){
             s->pendingBack=route;s->state.backProposalPending=true;++s->proposalSerial;if(!s->proposalSerial)++s->proposalSerial;
             receipt.routeProposal={this,s->proposalSerial,route};status=Status::pageProposed;
         }
-        // Unavailable subpages and missing real popup are not successful work:
-        // retain prospective audio/profile requests, but do not partially apply.
+        // Other unavailable subpages retain prospective audio/profile requests.
+        // The independently owned absent-device dialog above is not page3 admission.
     } else if(receipt.page.soundRequested)status=Status::ok;
     // Actual page-first then selected Movement_Control5 traversal is inside
     // bank.input, including source popup/controller-suppressed page callbacks.
@@ -428,6 +629,20 @@ bool OriginalUiOptionsSession50KG::routeProposalCurrent(const OriginalUiOptionsR
     const auto& decision=proposal.decision;
     const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||!s->state.backProposalPending||!s->idleInput()||proposal.source!=this||!proposal.serial||proposal.serial!=s->proposalSerial)return false;
     const auto& expected=s->pendingBack;
+    if(hallRequest(expected)){
+        if(!sameCommonHall(*s->cold.commonProfile,s->pendingHallCommon)||!sameDecision(decision,expected))return false;
+        game::OriginalUiOptionsContext50KG context;context.mode34=s->cold.commonProfile->mode34;
+        context.admission.sourceControllerReady=context.admission.selectionOwnerReady=context.admission.profileOwnerReady=true;
+        game::OriginalUiRouteDecision50KG fresh;const auto* nav=s->cold.resources->widgets()->navigation();
+        return nav&&s->activePage()==1&&game::dispatchOriginalUiOptions50KG(*nav,0,game::OriginalUiRouteInput50KG::activate,context,fresh)==game::OriginalUiRouteStatus50KG::unavailable&&sameDecision(fresh,expected);
+    }
+    if(game::originalUiMemoryCardReturnShape50KG(expected))
+        return s->activePage()==5&&sameDecision(decision,expected)&&s->memoryCardReturnCurrent()&&
+            s->cold.commonProfile->known&&s->cold.application->known&&!(s->cold.application->globalFlags228&4u)&&s->cold.application->transportE00==-1;
+    if(game::originalUiCreditsReturnShape50KG(expected))
+        return s->activePage()==6&&sameDecision(decision,expected)&&s->creditsReturnCurrent()&&
+            s->cold.commonProfile->known&&s->cold.commonProfile->mode34!=2&&s->cold.application->known&&
+            !(s->cold.application->globalFlags228&4u)&&s->cold.application->transportE00==-1;
     if(game::originalUiControlsReturnShape50KG(expected))
         return s->activePage()==expected.request.sourcePage&&decision.profileProposalComplete&&sameDecision(decision,expected)&&
             s->cold.profile->known&&s->cold.commonProfile->known&&s->cold.application->known&&
@@ -502,6 +717,35 @@ Status OriginalUiOptionsSession50KG::notifyRouteAccepted(const OriginalUiOptions
     const auto& decision=proposal.decision;const auto& pending=s->pendingBack;
     const auto& r=decision.request;
     if(!sameDecision(decision,pending))return result(d,Status::invalidInput);
+    if(hallRequest(decision)){
+        auto expected=s->pendingHallCommon;if(expected.mode34!=5){expected.previousMode38=expected.mode34;expected.mode34=5;}
+        const auto t=s->transition();const auto* nav=s->bank().navigation();
+        if(!sameCommonHall(*s->cold.commonProfile,expected)||!s->cold.profile->known||s->cold.profile->savedSlot6E4!=4||
+           !nav||nav->controllerGroup[0]!=1||nav->groups[1].selectedSlot!=4||!t.bound||t.current.screen!=12||t.current.page!=1||
+           t.requested.screen!=11||t.requested.page!=1||t.lifecycle!=game::OriginalUiTransitionLifecycle50KG::requestScreenExit||
+           t.phase!=game::OriginalUiTransitionPhase50KG::none||t.applicationRequestQueued||t.initialRestartPending||
+           !s->cold.application->known||(s->cold.application->globalFlags228&4u)||s->cold.application->transportE00!=-1)
+            return result(d,Status::unsupportedState,0x1F98C8);
+        s->state.framePublished=false;s->state.backProposalPending=false;
+        if(!s->audioEffect(1)){d=s->callbackFault;return d.status;}return result(d,Status::ok);
+    }
+    if(game::originalUiMemoryCardReturnShape50KG(decision)){
+        const auto t=s->transition();
+        if(!s->memoryCardReturnCurrent()||!t.bound||t.current.screen!=12||t.current.page!=5||t.requested.screen!=12||t.requested.page!=1||
+           t.lifecycle!=game::OriginalUiTransitionLifecycle50KG::requestPageExit||t.phase!=game::OriginalUiTransitionPhase50KG::none||
+           t.applicationRequestQueued||t.initialRestartPending)return result(d,Status::unsupportedState,r.sourcePC);
+        s->state.framePublished=false;s->state.backProposalPending=false;return result(d,Status::ok);
+    }
+    if(game::originalUiCreditsReturnShape50KG(decision)){
+        const auto t=s->transition();
+        if(!s->creditsReturnCurrent()||!t.bound||t.current.screen!=12||t.current.page!=6||
+           t.requested.screen!=12||t.requested.page!=1||t.lifecycle!=game::OriginalUiTransitionLifecycle50KG::requestPageExit||
+           t.phase!=game::OriginalUiTransitionPhase50KG::none||t.applicationRequestQueued||t.initialRestartPending)
+            return result(d,Status::unsupportedState,r.sourcePC);
+        s->state.framePublished=false;s->state.backProposalPending=false;
+        if(s->pendingCredits.soundRequested&&!s->audioEffect(s->pendingCredits.soundId)){d=s->callbackFault;return d.status;}
+        return result(d,Status::ok);
+    }
     if(game::originalUiControlsReturnShape50KG(decision)){
         const auto t=s->transition();const auto index=r.sourcePage-2;
         if(index>=2||!s->pendingControlsCommitted||!s->ownsPage(r.sourcePage)||
@@ -524,8 +768,8 @@ Status OriginalUiOptionsSession50KG::notifyRouteAccepted(const OriginalUiOptions
     const bool shape=accept||(cancel?(sameScreen&&r.sourceScreen==12&&r.targetScreen==12&&r.targetPage==1&&r.sourcePC==0x1F51D8&&
         decision.inputPC==0x1F50F0&&p.field==game::OriginalUiProfileField50KG::optionsGroup6E8&&p.sourcePC==0x1F51C8):
         (r.sourceScreen==12&&r.sourcePage==1&&p.field==game::OriginalUiProfileField50KG::optionsSlot6E4&&
-         ((sameScreen&&r.targetScreen==12&&r.targetPage>=2&&r.targetPage<=4&&decision.selectedSlot==r.targetPage-1&&
-           r.sourcePC==(r.targetPage==2?0x1F96FCu:r.targetPage==3?0x1F9744u:0x1F9898u)&&p.sourcePC==0x1F9940)||
+         ((sameScreen&&r.targetScreen==12&&(r.targetPage>=2&&r.targetPage<=6)&&decision.selectedSlot==(r.targetPage>=5?r.targetPage:r.targetPage-1)&&
+           r.sourcePC==(r.targetPage==2?0x1F96FCu:r.targetPage==3?0x1F9744u:r.targetPage==5?0x1F98F4u:r.targetPage==6?0x1F9910u:0x1F9898u)&&p.sourcePC==0x1F9940)||
           (!sameScreen&&r.targetScreen==4&&r.targetPage==1&&r.sourcePC==0x1F99A4&&p.sourcePC==0x1F9994))));
     const auto t=s->transition();const auto* nav=gamePage?&s->bank().gameOptionsState()->navigation:s->bank().navigation();
     const bool selection=gamePage?(s->ownsPage(4)&&nav&&nav->controllerGroup[0]==decision.selectedSlot):
@@ -565,8 +809,24 @@ Status OriginalUiOptionsSession50KG::update(const OriginalUiMainSessionUpdate50K
     if(!s->updatePrepared||in.elapsedSeconds!=s->preparedUpdate.elapsedSeconds||in.paused!=s->preparedUpdate.paused||
         in.debugChordHeld!=s->preparedUpdate.debugChordHeld){s->fault(Status::unsupportedState,0x2A3C80);d=s->callbackFault;return d.status;}
     s->updatePrepared=false;s->state.backProposalPending=false;s->inOperation=true;
+    game::OriginalUiControllerPopupPlan50KG popupUpdate;
+    if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,in.elapsedSeconds,popupUpdate)!=
+       game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
+    else s->cold.application->controllerPopupState=popupUpdate.state;
     const auto* order=s->bank().order();if(!s->state.faulted)s->updateWidgets(order->ordinaryWidgets,in.elapsedSeconds);
-    if(!s->state.faulted&&s->state.pageShown&&(Storage::isControlsPage(s->activePage())?s->activeAperture().saveControlsUpdateDelta38(in.elapsedSeconds):s->activePage()==4?s->gameAperture.saveGameOptionsUpdateDelta38(in.elapsedSeconds):s->aperture.saveOptionsMenuUpdateDelta38(in.elapsedSeconds))!=ApertureStatus::ok)
+    if(!s->state.faulted&&s->state.pageShown&&s->activePage()==5){game::OriginalUiMemoryCardPlan50KG plan;
+        if(game::OriginalUiMemoryCard50KG::update(*s->bank().memoryCardState(),in.elapsedSeconds,plan)!=game::OriginalUiMemoryCardStatus50KG::ok||
+           !s->memoryCardPlan(plan))s->fault(Status::widget,0x1F6D40);
+        else if(plan.returnToOptions&&!s->stageMemoryCardReturn(plan))s->fault(Status::unsupportedState,plan.requestPC);
+    }
+    if(!s->state.faulted&&s->state.pageShown&&s->activePage()==6){game::OriginalUiCreditsPlan50KG plan;
+        const auto status=s->bank().creditsController()->update(*s->bank().creditsState(),in.elapsedSeconds,
+            static_cast<std::uint32_t>(s->transition().phase),false,false,plan);
+        if((status!=game::OriginalUiOptionsMenuStatus50KG::ok&&status!=game::OriginalUiOptionsMenuStatus50KG::unavailable)||
+           plan.completionPredicateRequired||!s->creditsPlan(plan))s->fault(Status::widget,0x1F85C0);
+        else if(plan.intent!=game::OriginalUiCreditsIntent50KG::none&&!s->stageCreditsReturn(plan))s->fault(Status::unsupportedState,plan.requestPC);
+    }
+    if(!s->state.faulted&&s->state.pageShown&&s->activePage()!=6&&s->activePage()!=5&&(Storage::isControlsPage(s->activePage())?s->activeAperture().saveControlsUpdateDelta38(in.elapsedSeconds):s->activePage()==4?s->gameAperture.saveGameOptionsUpdateDelta38(in.elapsedSeconds):s->aperture.saveOptionsMenuUpdateDelta38(in.elapsedSeconds))!=ApertureStatus::ok)
         s->fault(Status::aperture,Storage::isControlsPage(s->activePage())?0x1F3CD4:s->activePage()==4?0x1F5BE4:0x1F9A74);
     if(!s->state.faulted)s->updateWidgets(order->onTopWidgets,in.elapsedSeconds);
     // Options1D0DA0 attaches scene siblings after Pod widgets: particle manager,
@@ -587,7 +847,15 @@ Status OriginalUiOptionsSession50KG::render(const OriginalUiOptionsClock50KG& cl
     if(s->updatePrepared){s->fault(Status::unsupportedState,0x234440);d=s->callbackFault;return d.status;}
     if(!s->currentPage()||!s->state.updateCount||!s->state.cameraActive||(s->paused&&clock.advanceAnimations))return result(d,Status::invalidInput);
     s->state.backProposalPending=false;s->inOperation=true;s->rendering=true;
-    bool okay=s->collector.beginPage(s->activePage(),clock,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&s->collector.projectPage(s->state.pageShown,d.draw);
+    game::OriginalUiControllerPopupRender50KG popupRender;
+    game::OriginalUiMemoryCardRender50KG memoryRender;
+    const bool memoryShown=s->activePage()==5&&s->state.pageShown;
+    if(memoryShown&&game::OriginalUiMemoryCard50KG::render(*s->bank().memoryCardState(),memoryRender)!=game::OriginalUiMemoryCardStatus50KG::ok){
+        s->rendering=false;s->inOperation=false;return result(d,Status::widget,0x1F6DE0);}
+    bool okay=game::OriginalUiControllerPopup50KG::render(s->cold.application->controllerPopupState,popupRender)==
+        game::OriginalUiControllerPopupStatus50KG::ok&&s->collector.beginPage(s->activePage(),clock,d.draw)&&
+        s->collector.projectControllerRequiredPopup(popupRender,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&
+        (memoryShown?s->collector.projectMemoryCardPage(memoryRender,d.draw):s->activePage()==6&&s->state.pageShown?s->collector.projectCreditsPage(static_cast<std::uint32_t>(s->transition().phase),d.draw):s->collector.projectPage(s->state.pageShown,d.draw));
     if(okay&&Storage::isControlsPage(s->activePage())&&s->state.pageShown){
         bool animationNonzero=false;const bool known=s->cold.resources->controlsAnimationObservation(animationNonzero);
         game::OriginalUiControlsPlan50KG plan;const auto index=s->activePage()-2;
@@ -595,13 +863,16 @@ Status OriginalUiOptionsSession50KG::render(const OriginalUiOptionsClock50KG& cl
             known,animationNonzero,plan)==game::OriginalUiOptionsMenuStatus50KG::ok&&s->applyControlsPlan(plan);
     }else if(okay)okay=apertureOkay(s->activeAperture().render48(s->transition().lifecycle));
     okay=okay&&!s->state.faulted;
-    if(okay)okay=s->collector.projectPrompts(d.draw)&&s->collector.projectOnTopWidgets(true,d.draw)&&s->collector.projectParticles(d.draw)&&s->collector.drain(d.draw);
+    if(okay)okay=s->collector.projectPrompts(d.draw)&&(!memoryShown||s->collector.projectMemoryCardDialog(memoryRender,d.draw))&&
+        s->collector.projectOnTopWidgets(true,d.draw)&&s->collector.projectParticles(d.draw)&&s->collector.drain(d.draw);
+    if(okay&&memoryShown)okay=widgetOkay(s->bank().commitMemoryCardRender(memoryRender,d.widget));
     s->rendering=false;s->inOperation=false;
     if(!okay){if(s->state.faulted){d=s->callbackFault;return d.status;}return result(d,Status::draw);}
+    s->cold.application->controllerPopupState=popupRender.state;
     ++s->state.renderCount;s->state.framePublished=true;return result(d,Status::ok);
 }
 OriginalUiOptionsSessionSnapshot50KG OriginalUiOptionsSession50KG::snapshot() const noexcept {
-    if(!storage_)return {};auto out=storage_->state;out.transition=storage_->transition();out.aperture=storage_->activeAperture().snapshot();
+    if(!storage_)return {};auto out=storage_->state;out.controllerPopup=storage_->cold.application->controllerPopupState;out.transition=storage_->transition();out.aperture=storage_->activeAperture().snapshot();
     out.promptMask42C=storage_->cold.resources->widgets()->pageInputFlags42C();return out;
 }
 bool OriginalUiOptionsSession50KG::appliedAudioOptions(game::OriginalUiAudioOptions50KG& out) const noexcept {
@@ -635,5 +906,22 @@ Status OriginalUiOptionsSession50KG::teardownSource(VehicleWindowGl50DS* rendere
 }
 void OriginalUiOptionsSession50KG::requestQuit() noexcept {
     if(!storage_||storage_->inOperation)return;storage_->state.quitRequested=true;storage_->state.framePublished=false;
+}
+}
+
+namespace rr::platform {
+bool OriginalUiOptionsSession50KG::pendingAutomaticCreditsReturn(OriginalUiOptionsRouteProposal50KG& out) const noexcept {
+    const auto* s=storage_.get();if(!s||!s->state.backProposalPending||s->pendingBack.request.sourcePC!=0x1F8744)return false;
+    OriginalUiOptionsRouteProposal50KG next{this,s->proposalSerial,s->pendingBack};if(!routeProposalCurrent(next))return false;out=next;return true;
+}
+}
+
+namespace rr::platform {
+const game::OriginalUiMemoryCardState50KG* OriginalUiOptionsSession50KG::memoryCardState() const noexcept {
+    return storage_&&storage_->memoryCardPrepared?storage_->cold.resources->widgets()->memoryCardState():nullptr;
+}
+bool OriginalUiOptionsSession50KG::pendingAutomaticMemoryCardReturn(OriginalUiOptionsRouteProposal50KG& out) const noexcept {
+    const auto* s=storage_.get();if(!s||!s->state.backProposalPending||s->pendingBack.request.sourcePC!=0x1F6DB0)return false;
+    OriginalUiOptionsRouteProposal50KG next{this,s->proposalSerial,s->pendingBack};if(!routeProposalCurrent(next))return false;out=next;return true;
 }
 }

@@ -1,5 +1,6 @@
 #include "original_ui_light_manager_lifetime50kg.h"
 #include "original_ui_course_lighting50kg.h"
+#include "original_ui_tournament_camera50kg.h"
 #include "original_ui_controls_model50kg.h"
 #include <cmath>
 #include <cstring>
@@ -42,7 +43,7 @@ bool OriginalUiLightManagerLifetime50KG::beginUiManager(const assets::OriginalUi
     if(activeUi_||nativeGameplayGeneration_||managerGeneration_==std::numeric_limits<std::uint64_t>::max())
         return fail(d,Error::phase,0x1CCD88);
     const auto* identity=archive.identity();
-    if(!archive.loaded()||!(same(identity,Archive::mainMenu)||same(identity,Archive::options)||same(identity,Archive::rider)||same(identity,Archive::course)))
+    if(!archive.loaded()||!(same(identity,Archive::mainMenu)||same(identity,Archive::options)||same(identity,Archive::rider)||same(identity,Archive::course)||same(identity,Archive::hallOfFame)||same(identity,Archive::tournament)))
         return fail(d,Error::archive,0x1CCD88);
     if(!enteredFirstMain_&&!same(identity,Archive::mainMenu))return fail(d,Error::phase,0x140084);
     const auto* ui=member(Archive::rider,"UI\\UIRider\\ui.dat");
@@ -54,10 +55,24 @@ bool OriginalUiLightManagerLifetime50KG::beginUiManager(const assets::OriginalUi
     const auto* controlsWidgets=member(Archive::options,"UI\\UIOption\\Widgets.Dat");
     const auto* controlsScene=member(Archive::options,"ui\\UIOption\\opt.scn");
     if(same(identity,Archive::options)&&(!controlsUi||!controlsWidgets||!controlsScene))return fail(d,Error::archive,0x277FCC);
+    // Hall uses its own original screen manager, not Options ownership or a
+    // synthetic light registry. Authenticate its actual page closure while
+    // preserving the shared APPLICATION cache and manager generation contract.
+    if(same(identity,Archive::hallOfFame)&&
+       (!member(Archive::hallOfFame,"UI\\UIHOF\\ui.dat")||
+        !member(Archive::hallOfFame,"UI\\UIHOF\\Widgets.Dat")||
+        !member(Archive::hallOfFame,"UI\\UIHOF\\hall.dat")))return fail(d,Error::archive,0x1CCD88);
+    // Same authenticated UI manager light population; no new cache history.
+    const auto* tournamentUi=member(Archive::tournament,"UI\\UITourn\\ui.dat");
+    if(same(identity,Archive::tournament)&&(!tournamentUi||
+       !member(Archive::tournament,"UI\\UITourn\\Widgets.Dat")||
+       !member(Archive::tournament,"UI\\UITourn\\standing.dat")))return fail(d,Error::archive,0x1CCD88);
     //148B60 invokes148110, then initializes the requested zone rows. Neither
     // function writesA4; do not reassign cacheState here, even to null.
     activeUi_=identity;riderUiIdentity_=ui;riderWidgetIdentity_=widgets;
     riderRegistry_={};riderRegistryReady_=false;
+    tournamentUiIdentity_=same(identity,Archive::tournament)?tournamentUi:nullptr;
+    tournamentRegistry_={};tournamentAmbient50_={};tournamentDirectional3C_={};tournamentRegistryReady_=false;
     courseUiIdentity_=same(identity,Archive::course)?courseUi:nullptr;
     courseRegistry_={};courseRegistryReady_=false;
     controlsUiIdentity_=same(identity,Archive::options)?controlsUi:nullptr;
@@ -72,6 +87,7 @@ bool OriginalUiLightManagerLifetime50KG::releaseUiManager() noexcept {
     riderRegistry_={};riderRegistryReady_=false;
     controlsUiIdentity_=nullptr;controlsSceneIdentity_=nullptr;controlsWidgetIdentity_=nullptr;
     controlsRegistry_={};controlsRegistryReady_=false;
+    tournamentUiIdentity_=nullptr;tournamentRegistry_={};tournamentAmbient50_={};tournamentDirectional3C_={};tournamentRegistryReady_=false;
     courseUiIdentity_=nullptr;courseRegistry_={};courseRegistryReady_=false;
     //148110's non-reset ofA4 is intentional, including an untracked state.
     return true;
@@ -94,6 +110,48 @@ bool OriginalUiLightManagerLifetime50KG::publishRiderRegistry(const OriginalUiRi
     directional.specular4C=directional.diffuse3C; //146C40 mirrors3C into4C.
     next.selectedZoneAmbient=lighting.ambientSlot60;
     riderRegistry_=next;riderRegistryReady_=true;return true;
+}
+bool OriginalUiLightManagerLifetime50KG::publishTournamentRegistry(const OriginalUiTournamentLighting50KG& lighting,
+    Diagnostic& d) noexcept {
+    d={};tournamentRegistryReady_=false;
+    if(cacheState_!=Cache::absentSinceApplicationConstruction)
+        return fail(d,Error::untrackedLifetime,0x14A0E8);
+    if(!same(activeUi_,Archive::tournament)||!tournamentUiIdentity_||lighting.uiIdentity!=tournamentUiIdentity_)
+        return fail(d,Error::phase,0x1CDB10);
+    if(!finite(lighting.ambient50)||!finite(lighting.ambientSlot60)||!finite(lighting.directional3C))
+        return fail(d,Error::registry,0x148F30);
+    for(float x:lighting.directionalLook78)if(!std::isfinite(x))return fail(d,Error::registry,0x147200);
+    original_racer_lighting50KM::SmallDirectionalRegistry next{};
+    next.count=2;next.registered[0].type=4;
+    //146C80 keeps ambient light RGB slots zero; its color lives at+5C.
+    auto& directional=next.registered[1];directional.type=2;
+    directional.direction78=lighting.directionalLook78;directional.diffuse3C={lighting.directional3C[0],lighting.directional3C[1],lighting.directional3C[2]};
+    directional.specular4C=directional.diffuse3C; //146C40 mirrors3C into4C.
+    next.selectedZoneAmbient=lighting.ambientSlot60;
+    tournamentRegistry_=next;tournamentAmbient50_=lighting.ambient50;
+    tournamentDirectional3C_=lighting.directional3C;tournamentRegistryReady_=true;return true;
+}
+bool OriginalUiLightManagerLifetime50KG::matchesTournamentRegistry(
+    const OriginalUiTournamentLighting50KG& lighting) const noexcept {
+    if(cacheState_!=Cache::absentSinceApplicationConstruction ||
+       !same(activeUi_,Archive::tournament) || !tournamentUiIdentity_ ||
+       lighting.uiIdentity!=tournamentUiIdentity_ || !tournamentRegistryReady_ ||
+       tournamentRegistry_.count!=2 || tournamentAmbient50_!=lighting.ambient50 ||
+       tournamentDirectional3C_!=lighting.directional3C || !finite(lighting.ambient50) ||
+       !finite(lighting.ambientSlot60) || !finite(lighting.directional3C))return false;
+    const auto& ambient=tournamentRegistry_.registered[0];
+    const auto& directional=tournamentRegistry_.registered[1];
+    if(ambient.type!=4 || directional.type!=2 ||
+       tournamentRegistry_.selectedZoneAmbient!=lighting.ambientSlot60 ||
+       directional.direction78!=lighting.directionalLook78)return false;
+    for(std::size_t i=0;i<3;++i) {
+        if(!std::isfinite(lighting.directionalLook78[i]) ||
+           ambient.direction78[i]!=0.0f || ambient.diffuse3C[i]!=0.0f ||
+           ambient.specular4C[i]!=0.0f ||
+           directional.diffuse3C[i]!=lighting.directional3C[i] ||
+           directional.specular4C[i]!=lighting.directional3C[i])return false;
+    }
+    return true;
 }
 bool OriginalUiLightManagerLifetime50KG::publishCourseRegistry(const OriginalUiCourseLighting50KG& lighting,
     Diagnostic& d) noexcept {
@@ -167,7 +225,7 @@ bool OriginalUiLightManagerLifetime50KG::beginNativeGameplay(std::uint64_t gener
     d={};if(cacheState_!=Cache::absentSinceApplicationConstruction)
         return fail(d,Error::untrackedLifetime,0);
     if(!generation||nativeGameplayGeneration_||activeUi_||!enteredFirstMain_||
-       riderRegistryReady_||courseRegistryReady_||controlsRegistryReady_)return fail(d,Error::phase,0);
+       riderRegistryReady_||courseRegistryReady_||controlsRegistryReady_||tournamentRegistryReady_)return fail(d,Error::phase,0);
     nativeGameplayGeneration_=generation;return true;
 }
 bool OriginalUiLightManagerLifetime50KG::endNativeGameplay(std::uint64_t generation,Diagnostic& d) noexcept {
@@ -179,7 +237,7 @@ bool OriginalUiLightManagerLifetime50KG::endNativeGameplay(std::uint64_t generat
 }
 void OriginalUiLightManagerLifetime50KG::invalidateForUntrackedScene() noexcept {
     if(cacheState_==Cache::absentSinceApplicationConstruction)cacheState_=Cache::untracked;
-    riderRegistryReady_=false;courseRegistryReady_=false;controlsRegistryReady_=false;
+    riderRegistryReady_=false;courseRegistryReady_=false;controlsRegistryReady_=false;tournamentRegistryReady_=false;
 }
 void OriginalUiLightManagerLifetime50KG::destroyApplication() noexcept {
     nativeGameplayGeneration_=0;
@@ -187,6 +245,7 @@ void OriginalUiLightManagerLifetime50KG::destroyApplication() noexcept {
     riderRegistry_={};riderRegistryReady_=false;
     controlsUiIdentity_=nullptr;controlsSceneIdentity_=nullptr;controlsWidgetIdentity_=nullptr;
     controlsRegistry_={};controlsRegistryReady_=false;
+    tournamentUiIdentity_=nullptr;tournamentRegistry_={};tournamentAmbient50_={};tournamentDirectional3C_={};tournamentRegistryReady_=false;
     courseUiIdentity_=nullptr;courseRegistry_={};courseRegistryReady_=false;cacheState_=Cache::destroyed;
 }
 }

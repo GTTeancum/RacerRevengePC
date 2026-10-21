@@ -1,6 +1,8 @@
 #pragma once
 #include "original_ui_game_options_controller50kg.h"
 #include "original_ui_controls_controller50kg.h"
+#include "original_ui_credits_controller50kg.h"
+#include "original_ui_memory_card50kg.h"
 #include "original_ui_icon_layout50kg.h"
 #include "original_ui_text_widget50kg.h"
 #include "../assets/original_ui_screen_assets50kg.h"
@@ -18,8 +20,28 @@ inline constexpr std::array<std::uint16_t,37> originalUiGameOptionsWidgetIds50KG
     3,15,18,19,20,37,38,48,49,50,107,108,109,110,111,112,114,116,117,118,119,120,121,122,123,125,126,127,156,157,158,159,160,161,162,165,167}};
 inline constexpr std::array<std::uint16_t,83> originalUiControlsWidgetIds50KG{{
     13,14,36,46,47,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,125,126,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,163,164}};
-inline constexpr std::array<std::uint16_t,138> originalUiOptionsManagerWidgetIds50KG{{
+inline constexpr std::array<std::uint16_t,138> originalUiOptionsBaseManagerWidgetIds50KG{{
     1,2,3,5,6,7,8,9,10,12,13,14,15,18,19,20,36,37,38,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,114,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,167}};
+// UIOption/Widgets.Dat declares NumberOfWidgets=357. This is exact source
+// ownership storage, including the zero sentinel, not a rendering capacity.
+inline constexpr std::size_t originalUiOptionsWidgetStorageCount50KG=358;
+inline constexpr auto originalUiCreditsWidgetIds50KG=[]() constexpr {
+    std::array<std::uint16_t,191> ids{};ids[0]=3;ids[1]=11;ids[2]=17;
+    for(std::uint16_t id=170;id<=357;++id)ids[id-167]=id;
+    return ids;
+}();
+inline constexpr std::array<std::uint16_t,25> originalUiMemoryCardWidgetIds50KG{{
+    2,16,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,40,41,42,43,44,45,168,169}};
+inline constexpr auto originalUiOptionsManagerWidgetIds50KG=[]() constexpr {
+    std::array<std::uint16_t,352> ids{};std::size_t count=0;
+    for(std::uint16_t id=1;id<originalUiOptionsWidgetStorageCount50KG;++id){
+        bool owns=id==11||id==17||(id>=170&&id<=357);
+        for(auto base:originalUiOptionsBaseManagerWidgetIds50KG)if(id==base)owns=true;
+        for(auto memory:originalUiMemoryCardWidgetIds50KG)if(id==memory)owns=true;
+        if(owns)ids[count++]=id;
+    }
+    return ids;
+}();
 enum class OriginalUiOptionsWidgetKind50KG : std::uint8_t { absent,text,icon,movement,model };
 enum class OriginalUiOptionsWidgetStatus50KG : std::uint8_t {
     ok,noChange,hidden,unavailable,notBound,alreadyBound,parseFailure,allocation,
@@ -101,6 +123,31 @@ public:
     OriginalUiOptionsWidgetStatus50KG refreshGameOptionsVolumeText(OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
     const std::string* dynamicText(std::uint16_t,std::size_t line=0) const noexcept;
     const assets::OriginalUiPage50KG* controlsPage() const noexcept;
+    const assets::OriginalUiPage50KG* memoryCardPage() const noexcept;
+    const OriginalUiNavigation50KG* memoryCardNavigation() const noexcept;
+    const OriginalUiMemoryCard50KG* memoryCardController() const noexcept;
+    const OriginalUiMemoryCardState50KG* memoryCardState() const noexcept;
+    OriginalUiOptionsWidgetStatus50KG preflightMemoryCardPlan(const OriginalUiMemoryCardPlan50KG&,
+        OriginalUiOptionsWidgetDiagnostic50KG&) const noexcept;
+    OriginalUiOptionsWidgetStatus50KG commitMemoryCardPlan(const OriginalUiMemoryCardPlan50KG&,
+        OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
+    // Publish only after page callbacks, aperture, actual direct-video command
+    // and child strips have all joined the same successful source contribution.
+    OriginalUiOptionsWidgetStatus50KG commitMemoryCardRender(const OriginalUiMemoryCardRender50KG&,
+        OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
+    const assets::OriginalUiPage50KG* creditsPage() const noexcept;
+    const OriginalUiCreditsController50KG* creditsController() const noexcept;
+    const OriginalUiCreditsState50KG* creditsState() const noexcept;
+    OriginalUiOptionsWidgetStatus50KG preflightCreditsPlan(const OriginalUiCreditsPlan50KG&,
+        OriginalUiOptionsWidgetDiagnostic50KG&) const noexcept;
+    // Source alpha writes use the plan's exact callback split. External scene/audio/route effects
+    // must be preflighted by the caller before this irreversible callback stream.
+    OriginalUiOptionsWidgetStatus50KG commitCreditsPlan(const OriginalUiCreditsPlan50KG&,
+        OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
+    //1F8B4C ->2AA870 only sets target alpha. Do not insert a
+    // text update here: ordinary widget rendering precedes the page render.
+    OriginalUiOptionsWidgetStatus50KG setCreditsCardAlpha(std::uint16_t controlId,std::uint8_t,
+        OriginalUiOptionsWidgetDiagnostic50KG&) noexcept;
     // Bounded, cold-authenticated localized variants for actual SetText2AA030.
     const std::vector<std::string>* controlsLocalizedLines(std::uint16_t widget,std::uint16_t stringId) const noexcept;
     std::uint16_t controlsRenderedString(std::uint16_t widget,std::size_t line) const noexcept;

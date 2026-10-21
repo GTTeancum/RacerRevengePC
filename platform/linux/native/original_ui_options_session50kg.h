@@ -5,6 +5,7 @@
 #include "original_ui_audio_options50kg.h"
 #include "../../../src/game/original_ui_game_options_apply50kg.h"
 #include "../../../src/game/original_ui_controls_controller50kg.h"
+#include "../../../src/game/original_ui_memory_card50kg.h"
 namespace rr::platform {
 // The source +6E4 word is separate from Main's +6E0. Import/reset it only from
 // an authenticated profile owner. No implicit default or fabricated save file.
@@ -15,7 +16,7 @@ void resetOriginalUiOptionsProfileFields50KG(OriginalUiOptionsProfile50KG&) noex
 enum class OriginalUiOptionsSessionStatus50KG : std::uint8_t {
     ok,noChange,backProposed,pageProposed,unavailableDestination,secondControllerRequired,
     notBound,alreadyBound,invalidInput,unsupportedState,resource,widget,aperture,
-    transition,particle,audio,draw,allocation,faulted,quit
+    transition,particle,audio,draw,allocation,faulted,quit,screenProposed
 };
 struct OriginalUiOptionsSessionDiagnostic50KG {
     OriginalUiOptionsSessionStatus50KG status=OriginalUiOptionsSessionStatus50KG::ok;
@@ -52,6 +53,8 @@ struct OriginalUiOptionsRouteProposal50KG {
 };
 struct OriginalUiOptionsSessionInputReceipt50KG {
     bool containerReached=false,pageCallbackRan=false,pageAccepted=false;
+    bool popupChanged=false;
+    std::uint32_t popupSourcePC=0;
     game::OriginalUiOptionsMenuPageResult50KG page{};
     game::OriginalUiMovementNotification50KG movement{};
     game::OriginalUiGameOptionsPlan50KG gameOptions{};
@@ -63,6 +66,7 @@ struct OriginalUiOptionsSessionInputReceipt50KG {
 struct OriginalUiOptionsSessionSnapshot50KG {
     bool bound=false,faulted=false,quitRequested=false,pageShown=false,inputContainerShown=false;
     bool cameraActive=false,framePublished=false,backProposalPending=false;
+    game::OriginalUiControllerPopupState50KG controllerPopup{};
     std::uint32_t packedBackground430=0,promptMask42C=0;
     std::uint64_t updateCount=0,renderCount=0;
     std::uint64_t gameOptionsAcceptCount=0,lastGameOptionsSoundRevision=0,controlsAcceptCount=0;
@@ -73,8 +77,9 @@ struct OriginalUiOptionsSessionSnapshot50KG {
 };
 // Options menu, authentic Controls and bounded Game Options scene owner. Page4 Accept needs
 // the exact shared profile and actual frontend PCM sound-mode consumer.
-// Page3 is prepared but unadmitted until actual menu-controller/hotplug and
-// the original missing-controller popup are joined. Pages5/6 and HOF stay unavailable.
+// Page3 remains unadmitted despite the genuine absent-controller popup join.
+// MemoryCard page5 admits only authenticated state4 entry/Back with a live direct-video owner.
+// Storage actions remain unavailable before mutation; connected Controls2 stays closed.
 // Cross-screen admission, sole manager tick, deferred queue consumption and
 // renderer-bank publication belong to the root coordinator, not this page.
 class OriginalUiOptionsSession50KG final {
@@ -90,6 +95,8 @@ public:
     game::OriginalUiTransitionCompletion50KG pollCompletion(game::OriginalUiTransitionRoute50KG,game::OriginalUiTransitionPhase50KG) const noexcept;
     const game::OriginalUiTransitionOwner50KG* externalLifecycleOwner() const noexcept;
     bool ownsPreparedPage(std::uint8_t page) const noexcept;
+    bool pendingAutomaticMemoryCardReturn(OriginalUiOptionsRouteProposal50KG&) const noexcept;
+    bool pendingAutomaticCreditsReturn(OriginalUiOptionsRouteProposal50KG&) const noexcept;
     OriginalUiOptionsSessionStatus50KG input(const OriginalUiMainSessionInput50KG&,
         OriginalUiOptionsSessionInputReceipt50KG&,OriginalUiOptionsSessionDiagnostic50KG&) noexcept;
     // Root admits the concrete destination, commits the exact profile proposal
@@ -116,6 +123,7 @@ public:
     // Never exposes local edits or claims save/race-group application.
     bool appliedAudioOptions(game::OriginalUiAudioOptions50KG&) const noexcept;
     const game::OriginalUiControlsState50KG* controlsState(std::uint8_t controllerIndex) const noexcept;
+    const game::OriginalUiMemoryCardState50KG* memoryCardState() const noexcept;
     const OriginalUiNativeDraw50KG* draw() const noexcept;
     const OriginalUiSourceFrame50KM* sourceFrame() const noexcept;
     void requestQuit() noexcept;

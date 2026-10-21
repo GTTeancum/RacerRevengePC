@@ -82,8 +82,9 @@ public:
     }
     // The original static selections already authenticate each actual material
     // and initial frame. Recheck those associations before adding frame banks.
+    template<class StaticMaterialOwner>
     bool load(const std::filesystem::path& sourceArchive,
-        const track_materials50fa_fixture::Owner& track,Diagnostic& d)noexcept {
+        const StaticMaterialOwner& track,Diagnostic& d)noexcept {
         using namespace detail;using shared::need;
         try{
             d={};need(!storage_ && track.loaded(),"GC ATM requires a loaded static source material owner");

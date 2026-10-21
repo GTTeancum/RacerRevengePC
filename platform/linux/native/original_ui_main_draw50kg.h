@@ -1,6 +1,8 @@
 #pragma once
 #include "../../../src/game/original_application_animation_clock50kg.h"
 #include "original_ui_material_adapter50kg.h"
+#include "original_ui_controller_popup_resources50kg.h"
+#include "../../../src/assets/original_ui_image_bank50kg.h"
 #include "original_ui_main_particle_adapter50kg.h"
 #include "../../../src/game/original_ui_main_particle_geometry50kg.h"
 #include "../../../src/game/original_ui_main_particle_render_state50kg.h"
@@ -31,6 +33,7 @@ struct OriginalUiMainDrawDiagnostic50KG {
     assets::OriginalUiMaterialDiagnostic50KG material{};
     assets::DecodeError48C atm{};
     assets::OriginalUiMainMaterialScheduleDiagnostic50KG registry{};
+    OriginalUiControllerPopupResourceDiagnostic50KG controllerPopup{};
     game::OriginalUiMainWidgetDiagnostic50KG manager{};
     game::OriginalUiTextGeometryDiagnostic50KG text{};
     game::OriginalUiExitTextDiagnostic50KG exitText{};
@@ -49,11 +52,14 @@ struct OriginalUiMainColdInput50KG {
     const assets::OriginalUiEnglish50KG* english=nullptr; // synchronous copy only
     assets::OriginalUiMaterialRuntime50KG runtime{};
     OriginalUiMainVideoOwner50KG video{};
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> retainedControllerPopup;
 };
 struct OriginalUiMainMaterialBinding50KG {
     // Original registry spelling normalized only for lookup. Original PSM and
     // each pass retain their actual spelling, group and provenance unchanged.
     std::string registeredName;
+    std::uint32_t registryToken=0;
+    const assets::OriginalUiMemberIdentity50KG* registryIdentity=nullptr;
     assets::OriginalUiMaterial50KG material;
     std::vector<std::uint32_t> images; // one PST, or ALL actual ATM frame ranges
     std::vector<assets::OriginalUiNativeMaterial50KG> policies; // exact per-frame atlas
@@ -74,6 +80,8 @@ public:
     OriginalUiMainDrawResources50KG& operator=(const OriginalUiMainDrawResources50KG&)=delete;
     bool load(const OriginalUiMainColdInput50KG&,OriginalUiMainDrawDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> controllerPopup() const noexcept;
+    const assets::OriginalUiImageBank50KG* sourceImageBank() const noexcept;
     // Source page/controller owns mutation at its real callback/update points.
     // A draw projection never silently performs an entity update or selection.
     game::OriginalUiMainWidgetManager50KG* manager() noexcept;
@@ -98,7 +106,7 @@ private:
 };
 
 enum class OriginalUiMainDrawSegment50KG : std::uint8_t {
-    ordinaryWidgets,mainPage,aperture,basePrompts,onTopWidgets,particles,exitText
+    ordinaryWidgets,mainPage,aperture,basePrompts,onTopWidgets,particles,exitText,controllerPopup
 };
 struct OriginalUiMainSubmittedPacket50KG {
     // materialIndex==unresolvedMaterialTexture50EA denotes the separately
@@ -128,15 +136,21 @@ struct OriginalUiMainSceneInsertion50KG { std::uint32_t nextSubmissionOrdinal=0;
 // actual registry. drain requires the real source scene-packet join as well as
 // Main page/aperture/prompt points. Complete draw preparation does not itself
 // certify page transition hooks, audio, route capability or GPU submission.
-class OriginalUiMainDraw50KG final {
+class OriginalUiMainDraw50KG final : public OriginalUiSourceOwner50KM {
 public:
     OriginalUiMainDraw50KG() noexcept;
     ~OriginalUiMainDraw50KG();
     OriginalUiMainDraw50KG(const OriginalUiMainDraw50KG&)=delete;
     OriginalUiMainDraw50KG& operator=(const OriginalUiMainDraw50KG&)=delete;
+    // CPU-only projection owner cannot seal or submit without a real GPU bank.
+    bool bind(std::shared_ptr<OriginalUiMainDrawResources50KG>,OriginalUiMainDrawDiagnostic50KG&) noexcept;
     bool bind(std::shared_ptr<OriginalUiMainDrawResources50KG>,
         std::shared_ptr<const MaterialTextureGl50EB>,OriginalUiMainDrawDiagnostic50KG&) noexcept;
     bool begin(const OriginalUiMainFrameClock50KG&,OriginalUiMainDrawDiagnostic50KG&) noexcept;
+    bool projectControllerRequiredPopup(const game::OriginalUiControllerPopupRender50KG&,OriginalUiMainDrawDiagnostic50KG&) noexcept;
+    const OriginalUiSourceFrame50KM* sourceFrame() const noexcept;
+    bool sourceTeardownPending() const noexcept;
+    bool retireSourceRenderer(VehicleWindowGl50DS&,OriginalUiMainDrawDiagnostic50KG&) noexcept;
     // Preserves exact same-manager sibling order; does not filter by page
     // control membership. These are source attachment segments, not passes.
     bool projectOrdinaryWidgets(bool ancestorsShown,OriginalUiMainDrawDiagnostic50KG&) noexcept;
@@ -185,6 +199,9 @@ public:
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;
+    OriginalUiSourceFrame50KM frame_;
+    bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept override;
+    void finishSourceSubmission(std::uint64_t,bool,bool) const noexcept override;
     bool projectWidgets(bool onTop,bool ancestorsShown,OriginalUiMainDrawDiagnostic50KG&) noexcept;
     bool appendOverlay(const game::OriginalUiOverlayQuad50KG&,std::uint32_t material,
         float packetZ,OriginalUiMainDrawSegment50KG,std::uint16_t widget,

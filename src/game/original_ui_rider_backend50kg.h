@@ -3,12 +3,13 @@
 #include "original_ui_rider_visibility50kg.h"
 #include "original_ui_rider_binder_animation50kg.h"
 #include "original_ui_rider_material_lifetime50kg.h"
+#include "original_ui_tournament_predecessor50kg.h"
 #include "../assets/original_ui_image_bank50kg.h"
 #include "../assets/original_ui_material_binding50kg.h"
 #include "../assets/original_ui_rider_model_materials50kg.h"
 #include <string>
 #include <vector>
-namespace rr::platform {class OriginalUiRiderDrawContribution50KG;}
+namespace rr::platform {class OriginalUiRiderDrawContribution50KG;class OriginalUiTournamentDrawContribution50KG;}
 namespace rr::game {
 struct OriginalUiRiderBackendInput50KG {
     std::shared_ptr<const assets::OriginalUiArchive50KG> rider,appStart,podTextures;
@@ -18,6 +19,10 @@ struct OriginalUiRiderBackendInput50KG {
     // Canonical rows of the actual retained Rider widgets/stat assets and
     // predecessor Main records. An inventory is not a static live-owner token.
     std::vector<OriginalUiRiderMaterialRow50KG> staticRows;
+    // Complete real Tournament predecessor evidence stays distinct from the
+    // current Rider static population. Overlap authenticates immutable source
+    // definitions only; a private same-owner retirement is required to attach.
+    std::shared_ptr<const OriginalUiTournamentPredecessorInventory50KG> tournamentPredecessor;
 };
 enum class OriginalUiRiderBackendError50KG : std::uint8_t {
     none,input,alreadyBound,material,bank,membership,binder,busy,lifetime,completion,allocation
@@ -41,6 +46,8 @@ public:
     OriginalUiRiderLiveMaterial50KG& operator=(const OriginalUiRiderLiveMaterial50KG&)=delete;
 private:
     friend class OriginalUiRiderBackend50KG;
+    friend class OriginalUiTournamentPodOwner50KG;
+    friend class rr::platform::OriginalUiTournamentDrawContribution50KG;
     friend class rr::platform::OriginalUiRiderDrawContribution50KG;
     const OriginalUiRiderMaterialLifetime50KG* ledger=nullptr;
     OriginalUiRiderMaterialRow50KG row{};
@@ -84,6 +91,9 @@ private:
     friend class rr::platform::OriginalUiRiderSession50KG;
     friend class rr::platform::OriginalUiRiderDrawContribution50KG;
     bool prepareColdAndSeal(const OriginalUiRiderDynamicOwner50KG&,OriginalUiRiderBackendDiagnostic50KG&) noexcept;
+    bool acceptTournamentPredecessorRetirement(OriginalUiTournamentPredecessorRetirement50KG&,
+        OriginalUiRiderBackendDiagnostic50KG&) noexcept;
+    bool predecessorRetired() const noexcept;
     bool bindMaterialConsumer(const rr::platform::OriginalUiRiderDrawContribution50KG*,void*,bool(*)(void*,bool) noexcept) noexcept;
     bool sourceSubmissionStarted(const rr::platform::OriginalUiRiderDrawContribution50KG*,std::uint64_t) noexcept;
     // Called only by the session after the exact renderer's real retirement.

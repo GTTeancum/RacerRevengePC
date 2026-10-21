@@ -1,5 +1,6 @@
 #pragma once
 #include "water_resources50jc_fixture.h"
+#include "../../src/game/undertrack_reset50ew.h"
 #include "../../src/game/water_wake50jc.h"
 #include "../../src/game/water_presentation50jc.h"
 #include <array>
@@ -221,6 +222,15 @@ public:
     // actual source334 attachment,348 binding and ordered racer/root phases.
     const WaterHeightProvider50JC* provider() const noexcept{return initialized_&&idle()?&provider_:nullptr;}
     const WaterHeightGlobals50JC* globals() const noexcept{return initialized_&&idle()?&globals_:nullptr;}
+    // Publish the actual completed runtime owner into a retained source domain.
+    // Presence remains source-authored; callers retain this owner and the lift.
+    bool bindRuntimeHeightDomain(const UndertrackPhysicsDomain50EW& source,
+        const float& actual348Lift1F0,UndertrackPhysicsDomain50EW& output) const noexcept {
+        if(source.terrain330!=UndertrackHeightOwner50EW::Absent||
+           source.water334!=UndertrackHeightOwner50EW::Present||!provider()||!globals())return false;
+        auto next=source;next.waterProvider334=provider();next.waterGlobals=globals();
+        next.terrain348Lift1F0=&actual348Lift1F0;output=next;return true;
+    }
     WaterHeightResult50JC query(float (&position)[3],std::uint32_t* effect=nullptr) const noexcept {
         if(!initialized_||!idle())return {WaterHeightStatus50JC::Owner,0x2b10f0u,0};
         return queryWaterHeight50JC(provider_,globals_,position,effect);

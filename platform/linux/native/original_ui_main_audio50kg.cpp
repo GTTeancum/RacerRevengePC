@@ -74,6 +74,18 @@ constexpr OriginalFile riderOriginal{
 constexpr OriginalFile courseOriginal{
     "MUSIC/UI/SCREENS/UI_TRKS.VAG",448480,
     "b00ea0f7d26f88970eaa87899b5e185b821d82a2bd01a07a33ccf14ded42b40d",390628};
+// Authenticated UI_MUSIC.JUK/JUB Song12: 22050 Hz, 561232 compressed
+// bytes per channel, duration44.542221, pitch1881. Original stereo extent is
+// 0x7e0 + 2*561232; each channel's end block35075 yields982128 frames.
+constexpr OriginalFile creditsOriginal{
+    "MUSIC/UI/SCREENS/CREDITS.VAG",1124480,
+    "87f6f10e1faf403b383d478fc7230061ed9f4d6400082b26a3a455aaa9fb60a2",982128};
+// Authenticated UI_MUSIC.JUK/JUB Song5: 22050 Hz, 353744 compressed
+// bytes per channel, duration28.074921, pitch1881. The original Gallery
+// asset is not Song7 despite matching stereo extent and decoded frame count.
+constexpr OriginalFile hallOfFameOriginal{
+    "MUSIC/UI/GALLERY/GALLERY.VAG",709504,
+    "de3e6947ec4e4dfe1cc35c599361342152d55ec6f3783675933e88745c82af3f",619024};
 // UIACCEPT.INI exact events for default-unlocked ranges and retained additions.
 // Clegg and Mars keep their own original Event7..8 and17..18 identities.
 // These retained audio owners do not grant profile or Course admission.
@@ -356,6 +368,54 @@ bool OriginalUiMainAudio50KG::prepareCourseMenu(const std::filesystem::path& aud
     catch(...){error="Course audio cold preparation failed";}
     return false;
 }
+bool OriginalUiMainAudio50KG::prepareCreditsMenu(const std::filesystem::path& audioRoot,
+    std::string& error) noexcept {
+    if(creditsAttempted_){error="Credits music needs a fresh cold preparation";return false;}
+    creditsAttempted_=true;
+    try {
+        need(current()&&!paused_&&!ownsMusic_&&!mixer_->mixedFrames(),
+            "Credits music requires the prepared cold frontend transport");
+        for(std::size_t i=0;i<mixer_->count();++i)
+            need(!mixer_->active(i),"Credits music preparation cannot alter live playback");
+        // Both original authoring files establish Song12's exact identity;
+        // never borrow Main/Rider/Course PCM or accept a filename substitute.
+        authenticatedRead(audioRoot,"UI_MUSIC.JUK",1517,"4b814f8e4fec2fbcfa25807d5e147ecc164dbb0b0cb9ce5d064e2f3e3c89de98");
+        authenticatedRead(audioRoot,"UI_MUSIC.JUB",3623,"f97a5cbceec8056dfc9b277501087aaa54d86a0ccdc0c71cfde73522a048c661");
+        auto pcm=decodeMenuStereo(authenticatedRead(audioRoot,creditsOriginal.path,creditsOriginal.bytes,creditsOriginal.sha),
+            creditsOriginal,561232);
+        const AudioClip50HD clip{pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,0,0};
+        need(preparedClipMatches(clip,pcm,creditsOriginal,2),"Original Credits Song12 PCM metadata differs");
+        creditsPcm_=std::move(pcm);
+        creditsClip_={creditsPcm_.samples.data(),creditsPcm_.frames,creditsPcm_.sampleRate,creditsPcm_.channels,0,0};
+        creditsPrepared_=true;noteControlChange();error.clear();return true;
+    }catch(const std::exception& e){error=e.what();}
+    catch(...){error="Credits music cold preparation failed";}
+    return false;
+}
+bool OriginalUiMainAudio50KG::prepareHallOfFameMenu(const std::filesystem::path& audioRoot,
+    std::string& error) noexcept {
+    if(hallOfFameAttempted_){error="Hall of Fame music needs a fresh cold preparation";return false;}
+    hallOfFameAttempted_=true;
+    try {
+        need(current()&&!paused_&&!ownsMusic_&&!mixer_->mixedFrames(),
+            "Hall of Fame music requires the prepared cold frontend transport");
+        for(std::size_t i=0;i<mixer_->count();++i)
+            need(!mixer_->active(i),"Hall of Fame music preparation cannot alter live playback");
+        // Both original authoring files establish Song5's exact identity;
+        // never borrow Main/Rider/Course PCM or accept a filename substitute.
+        authenticatedRead(audioRoot,"UI_MUSIC.JUK",1517,"4b814f8e4fec2fbcfa25807d5e147ecc164dbb0b0cb9ce5d064e2f3e3c89de98");
+        authenticatedRead(audioRoot,"UI_MUSIC.JUB",3623,"f97a5cbceec8056dfc9b277501087aaa54d86a0ccdc0c71cfde73522a048c661");
+        auto pcm=decodeMenuStereo(authenticatedRead(audioRoot,hallOfFameOriginal.path,hallOfFameOriginal.bytes,hallOfFameOriginal.sha),
+            hallOfFameOriginal,353744);
+        const AudioClip50HD clip{pcm.samples.data(),pcm.frames,pcm.sampleRate,pcm.channels,0,0};
+        need(preparedClipMatches(clip,pcm,hallOfFameOriginal,2),"Original Hall of Fame Song5 PCM metadata differs");
+        hallOfFamePcm_=std::move(pcm);
+        hallOfFameClip_={hallOfFamePcm_.samples.data(),hallOfFamePcm_.frames,hallOfFamePcm_.sampleRate,hallOfFamePcm_.channels,0,0};
+        hallOfFamePrepared_=true;noteControlChange();error.clear();return true;
+    }catch(const std::exception& e){error=e.what();}
+    catch(...){error="Hall of Fame music cold preparation failed";}
+    return false;
+}
 bool OriginalUiMainAudio50KG::canRecordControlChange(std::uint64_t count) const noexcept {
     return !controlRevisionExhausted_&&count<=std::numeric_limits<std::uint64_t>::max()-controlRevision_;
 }
@@ -370,6 +430,46 @@ bool OriginalUiMainAudio50KG::riderMenuReady() const noexcept {
 bool OriginalUiMainAudio50KG::courseMenuReady() const noexcept {
     return riderMenuReady()&&coursePrepared_&&mixerCount_==courseRequiredVoices&&
         preparedClipMatches(courseClip_,coursePcm_,courseOriginal,2);
+}
+bool OriginalUiMainAudio50KG::creditsMenuReady() const noexcept {
+    return current()&&creditsPrepared_&&preparedClipMatches(creditsClip_,creditsPcm_,creditsOriginal,2);
+}
+bool OriginalUiMainAudio50KG::canStartCreditsLoop12() const noexcept {
+    return creditsMenuReady()&&!paused_&&canRecordControlChange()&&mixer_->canRecordControlChanges(1)&&
+        (!mixer_->active(musicVoice)||(ownsMusic_&&mixer_->playbackRevision(musicVoice)==musicPlaybackRevision_))&&
+        canPlayEffectClip(1); // Same centered routing check, without an effect command.
+}
+bool OriginalUiMainAudio50KG::startCreditsLoop12() noexcept {
+    return canStartCreditsLoop12()&&startMusicLoop(creditsClip_,12);
+}
+bool OriginalUiMainAudio50KG::canFadeCreditsMusic() const noexcept {
+    return creditsMenuReady()&&!paused_&&canRecordControlChange()&&
+        ((!ownsMusic_&&!mixer_->active(musicVoice))||
+         (ownsMusic_&&musicSong_==12&&mixer_->active(musicVoice)&&
+          mixer_->playbackRevision(musicVoice)==musicPlaybackRevision_));
+}
+bool OriginalUiMainAudio50KG::fadeCreditsMusic() noexcept {
+    return canFadeCreditsMusic()&&fadeMain(1.f);
+}
+bool OriginalUiMainAudio50KG::hallOfFameMenuReady() const noexcept {
+    return current()&&hallOfFamePrepared_&&preparedClipMatches(hallOfFameClip_,hallOfFamePcm_,hallOfFameOriginal,2);
+}
+bool OriginalUiMainAudio50KG::canStartHallOfFameLoop5() const noexcept {
+    return hallOfFameMenuReady()&&!paused_&&canRecordControlChange()&&mixer_->canRecordControlChanges(1)&&
+        (!mixer_->active(musicVoice)||(ownsMusic_&&mixer_->playbackRevision(musicVoice)==musicPlaybackRevision_))&&
+        canPlayEffectClip(1); // Same centered routing check, without an effect command.
+}
+bool OriginalUiMainAudio50KG::startHallOfFameLoop5() noexcept {
+    return canStartHallOfFameLoop5()&&startMusicLoop(hallOfFameClip_,5);
+}
+bool OriginalUiMainAudio50KG::canFadeHallOfFameMusic() const noexcept {
+    return hallOfFameMenuReady()&&!paused_&&canRecordControlChange()&&
+        ((!ownsMusic_&&!mixer_->active(musicVoice))||
+         (ownsMusic_&&musicSong_==5&&mixer_->active(musicVoice)&&
+          mixer_->playbackRevision(musicVoice)==musicPlaybackRevision_));
+}
+bool OriginalUiMainAudio50KG::fadeHallOfFameMusic() noexcept {
+    return canFadeHallOfFameMusic()&&fadeMain(1.f);
 }
 bool OriginalUiMainAudio50KG::canStartCourseLoop11() const noexcept {
     return courseMenuReady()&&!paused_&&canRecordControlChange()&&mixer_->canRecordControlChanges(1)&&
@@ -574,10 +674,19 @@ bool OriginalUiMainAudio50KG::fadeMain(float seconds) noexcept {
     volatile float retirement=seconds+0.35f; fadeRetireAt_=retirement;
     fading_=true;noteControlChange();return true;
 }
+bool OriginalUiMainAudio50KG::canPlayMenuEffect(std::uint32_t originalId) const noexcept {
+    if(!current()||paused_)return false;
+    const std::size_t clip=originalId==1?1:originalId==3?2:originalId==4?3:originalId==7?4:clips_.size();
+    return canPlayEffectClip(clip);
+}
 bool OriginalUiMainAudio50KG::playMenuEffect(std::uint32_t originalId) noexcept {
     if (!current() || paused_) return false;
     const std::size_t clip = originalId==1?1 : originalId==3?2 : originalId==4?3 : originalId==7?4 : clips_.size();
     return playEffectClip(clip);
+}
+bool OriginalUiMainAudio50KG::canPlayOptionsEffect(std::uint32_t originalId) const noexcept {
+    const std::size_t clip=originalId==1?1:originalId==3?2:originalId==4?3:originalId==5?5:clips_.size();
+    return canPlayEffectClip(clip);
 }
 bool OriginalUiMainAudio50KG::playOptionsEffect(std::uint32_t originalId) noexcept {
     const std::size_t clip=originalId==1?1:originalId==3?2:originalId==4?3:originalId==5?5:clips_.size();
@@ -670,7 +779,7 @@ std::uint32_t OriginalUiMainAudio50KG::activeMusicSong() const noexcept {
     return current()&&ownsMusic_&&mixer_->active(musicVoice)?musicSong_:0;
 }
 void OriginalUiMainAudio50KG::reset() noexcept {
-    const bool changed=prepared_||riderPrepared_||coursePrepared_||mixer_||ownsMusic_||ownsRiderConfirm_||fading_||paused_||musicSong_;
+    const bool changed=prepared_||riderPrepared_||coursePrepared_||creditsPrepared_||hallOfFamePrepared_||mixer_||ownsMusic_||ownsRiderConfirm_||fading_||paused_||musicSong_;
     if (current()) {
         if (ownsMusic_) mixer_->stop(musicVoice);
         for (std::size_t i=0; i<effectVoiceCount; ++i)
@@ -678,7 +787,7 @@ void OriginalUiMainAudio50KG::reset() noexcept {
         if(ownsRiderConfirm_&&mixer_->playbackRevision(riderConfirmVoice)==riderConfirmPlaybackRevision_)
             mixer_->stop(riderConfirmVoice);
     }
-    prepared_=false; riderPrepared_=false; coursePrepared_=false; mixer_=nullptr;
+    prepared_=false; riderPrepared_=false; coursePrepared_=false; creditsPrepared_=false; hallOfFamePrepared_=false; mixer_=nullptr;
     ownsMusic_=false; ownsRiderConfirm_=false; fading_=false; paused_=false; musicSong_=0;
     ownsEffect_.fill(false); musicGain_=0.f;
     if(changed)noteControlChange();

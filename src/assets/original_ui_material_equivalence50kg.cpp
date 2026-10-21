@@ -26,7 +26,8 @@ const OriginalUiArchiveIdentity50KG* memberArchive(const OriginalUiMemberIdentit
         OriginalUiArchiveId50KG::fonts,OriginalUiArchiveId50KG::mainMenu,
         OriginalUiArchiveId50KG::backgrounds,OriginalUiArchiveId50KG::controllerPopup,
         OriginalUiArchiveId50KG::course,OriginalUiArchiveId50KG::rider,
-        OriginalUiArchiveId50KG::options,OriginalUiArchiveId50KG::podTextures};
+        OriginalUiArchiveId50KG::options,OriginalUiArchiveId50KG::podTextures,
+        OriginalUiArchiveId50KG::hallOfFame,OriginalUiArchiveId50KG::tournament};
     for(auto id:ids){const auto* a=originalUiArchiveIdentity50KG(id);if(!a)continue;
         for(std::size_t i=0;i<a->memberCount;++i)if(originalUiMemberIdentity50KG(id,i)==member)return a;
     }

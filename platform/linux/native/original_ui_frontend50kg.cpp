@@ -1,4 +1,4 @@
-// Source-reviewed bounded Course integration; runtime acceptance is pending.
+// Source-reviewed bounded Course/Tournament integration; runtime acceptance is pending.
 #include "original_ui_frontend50kg.h"
 #include <thread>
 #include <algorithm>
@@ -21,8 +21,10 @@ using Transition=game::OriginalUiTransitionStatus50KG;
 using Admission=game::OriginalUiTransitionAdmission50KG;
 using MainStatus=OriginalUiMainSessionStatus50KG;
 using OptionsStatus=OriginalUiOptionsSessionStatus50KG;
+using HallStatus=OriginalUiHallSessionStatus50KG;
 using RiderStatus=OriginalUiRiderSessionStatus50KG;
 using CourseStatus=OriginalUiCourseSessionStatus50KG;
+using TournamentStatus=OriginalUiTournamentSessionStatus50KG;
 // Default-unlocked Rider -> Course -> Back, with the shared audio owner.
 // Native race requests admit only the independently owned 2/4/10/11/12/15/19/20 domain.
 // Real archive, profile, popup visibility and resource predicates remain required.
@@ -63,16 +65,26 @@ bool optionsBackShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
     return p.field==game::OriginalUiProfileField50KG::optionsSlot6E4&&p.operation==game::OriginalUiProfileWrite50KG::word&&
         p.value==d.selectedSlot&&p.replaceMask==0xFFFFFFFFu&&p.sourcePC==0x1F9994;
 }
+bool optionsHallShape(const game::OriginalUiRouteDecision50KG& d,std::uint32_t mode) noexcept {
+    const auto& r=d.request;using F=game::OriginalUiProfileField50KG;
+    if(r.kind!=game::OriginalUiRouteKind50KG::changeScreen||r.sourceScreen!=12||r.sourcePage!=1||
+       r.targetScreen!=11||r.targetPage!=1||r.sourcePC!=0x1F98C8||d.inputPC!=0x1F9640||
+       !d.profileProposalComplete||d.selectedSlot!=4||d.selectedRider!=-1||d.profileChanges.count!=(mode==5?1u:3u))return false;
+    const auto word=[&](std::size_t i,F field,std::uint32_t value,std::uint32_t pc){const auto& w=d.profileChanges.values[i];
+        return w.operation==game::OriginalUiProfileWrite50KG::word&&w.field==field&&w.value==value&&w.replaceMask==0xffffffffu&&w.sourcePC==pc;};
+    return (mode==5||(word(0,F::previousMode38,mode,0x17DE64)&&word(1,F::mode34,5,0x17DE6C)))&&
+        word(mode==5?0:2,F::optionsSlot6E4,4,0x1F9940);
+}
 bool optionsPageShape(const game::OriginalUiRouteDecision50KG& d) noexcept {
-    if(game::originalUiGameOptionsAcceptShape50KG(d)||game::originalUiControlsReturnShape50KG(d))return true;
+    if(game::originalUiGameOptionsAcceptShape50KG(d)||game::originalUiControlsReturnShape50KG(d)||game::originalUiMemoryCardReturnShape50KG(d)||game::originalUiCreditsReturnShape50KG(d))return true;
     const auto& r=d.request;
     if(r.kind!=game::OriginalUiRouteKind50KG::changePage||r.sourceScreen!=12||r.targetScreen!=12||
         !d.profileProposalComplete||d.selectedRider!=-1||d.profileChanges.count!=1)return false;
     const auto& p=d.profileChanges.values[0];
     if(p.operation!=game::OriginalUiProfileWrite50KG::word||p.value!=d.selectedSlot||p.replaceMask!=0xFFFFFFFFu)return false;
-    if(r.sourcePage==1&&r.targetPage>=2&&r.targetPage<=4)
-        return d.inputPC==0x1F9640&&d.selectedSlot==r.targetPage-1&&
-            r.sourcePC==(r.targetPage==2?0x1F96FCu:r.targetPage==3?0x1F9744u:0x1F9898u)&&
+    if(r.sourcePage==1&&(r.targetPage>=2&&r.targetPage<=6))
+        return d.inputPC==0x1F9640&&d.selectedSlot==(r.targetPage>=5?r.targetPage:r.targetPage-1)&&
+            r.sourcePC==(r.targetPage==2?0x1F96FCu:r.targetPage==3?0x1F9744u:r.targetPage==5?0x1F98F4u:r.targetPage==6?0x1F9910u:0x1F9898u)&&
             p.field==game::OriginalUiProfileField50KG::optionsSlot6E4&&p.sourcePC==0x1F9940;
     // Cancel's one store remains distinct from the source Accept transaction.
     return r.sourcePage==4&&r.targetPage==1&&d.inputPC==0x1F50F0&&d.selectedSlot>=1&&d.selectedSlot<=8&&
@@ -87,10 +99,16 @@ struct OriginalUiFrontend50KG::Storage {
         Route initialRoute{};
         std::shared_ptr<OriginalUiMainDrawResources50KG> mainResources;
         std::shared_ptr<OriginalUiOptionsDrawResources50KG> optionsResources;
+        std::shared_ptr<OriginalUiHallDrawResources50KG> hallResources;
         std::shared_ptr<OriginalUiRiderDrawResources50KG> riderResources;
         std::shared_ptr<OriginalUiCourseDrawResources50KG> courseResources;
         std::shared_ptr<OriginalUiCourseHologramDraw50KG> courseHolograms;
+        std::shared_ptr<OriginalUiTournamentCareerResources50KG> tournamentResources;
+        std::shared_ptr<OriginalUiTournamentWidgetResources50KG> tournamentWidgets;
+        std::shared_ptr<const assets::OriginalUiImageBank50KG> publishedTournamentBank;
+        std::shared_ptr<const game::OriginalUiTournamentPredecessorInventory50KG> tournamentPredecessor;
         std::shared_ptr<const assets::OriginalUiImageBank50KG> publishedCourseBank;
+        std::shared_ptr<const OriginalUiTournamentRouteProposal50KG> tournamentCourseOrigin;
         std::shared_ptr<assets::OriginalUiRiderStatAssets50KG> riderStats;
         std::shared_ptr<assets::OriginalUiRiderBinderAssets50KG> riderBinder;
         std::shared_ptr<const assets::OriginalUiImageBank50KG> publishedRiderBank;
@@ -103,19 +121,23 @@ struct OriginalUiFrontend50KG::Storage {
         std::shared_ptr<game::OriginalUiTransitionOwner50KG> transition;
         std::unique_ptr<OriginalUiMainSession50KG> main;
         std::unique_ptr<OriginalUiOptionsSession50KG> options;
+        std::unique_ptr<OriginalUiHallOfFameSession50KG> hall;
         std::unique_ptr<OriginalUiRiderSession50KG> rider;
         std::unique_ptr<OriginalUiCourseSession50KG> course;
-        bool riderRetired=false,optionsRetired=false;
+        std::unique_ptr<OriginalUiTournamentSession50KG> tournament;
+        bool riderRetired=false,optionsRetired=false,hallRetired=false,mainRetired=false,tournamentRetired=false;
         Route currentRoute() const noexcept {
             return transition&&transition->snapshot().bound?transition->snapshot().current:initialRoute;
         }
         bool ownsRoute(Route route) const noexcept {
             return route.screen==initialRoute.screen&&
-                (main?same(route,{4,1}):options?options->ownsPreparedPage(route.page):rider?rider->ownsPreparedPage(route.page):course&&course->ownsPreparedPage(route.page));
+                (main?same(route,{4,1}):options?options->ownsPreparedPage(route.page):hall?hall->ownsPreparedPage(route.page):rider?rider->ownsPreparedPage(route.page):course?course->ownsPreparedPage(route.page):tournament&&tournament->ownsPreparedPage(route.page));
         }
         const assets::MaterialTextureAssets50EA* textures() const noexcept {
+            if(tournament){const auto bank=publishedTournamentBank?publishedTournamentBank:tournament->bank();return bank&&bank->images()?bank->images()->textures():nullptr;}
             if(course){const auto bank=publishedCourseBank?publishedCourseBank:course->bank();return bank&&bank->images()?bank->images()->textures():nullptr;}
             if(rider){const auto bank=publishedRiderBank?publishedRiderBank:rider->bank();return bank&&bank->images()?bank->images()->textures():nullptr;}
+            if(hallResources)return hallResources->textures();
             return mainResources?mainResources->textures():(optionsResources?optionsResources->textures():nullptr);
         }
         bool prepared() const noexcept {
@@ -130,6 +152,11 @@ struct OriginalUiFrontend50KG::Storage {
                     options->externalLifecycleOwner()==transition.get()&&options->ownsPreparedPage(1)&&
                     optionsResources->exitText()&&optionsResources->exitText()->prepared();
             }
+            if(same(initialRoute,{11,1})&&hall&&hallResources&&!main&&!options&&!rider&&!course){
+                const auto v=hall->snapshot();return v.bound&&!v.faulted&&!v.quitRequested&&hallResources->loaded()&&
+                    hall->externalLifecycleOwner()==transition.get()&&hall->ownsPreparedPage(1)&&
+                    hallResources->exitText()&&hallResources->exitText()->prepared();
+            }
             if(same(initialRoute,{5,1})&&rider&&riderResources&&riderStats&&riderBinder&&!main&&!options){
                 const auto s=rider->snapshot();return s.bound&&!s.faulted&&!s.quitRequested&&riderResources->loaded()&&publishedRiderBank&&
                     rider->externalLifecycleOwner()==transition.get()&&rider->ownsPreparedPage(1)&&
@@ -138,13 +165,19 @@ struct OriginalUiFrontend50KG::Storage {
             if(same(initialRoute,{6,1})&&course&&courseResources&&courseHolograms&&!main&&!options&&!rider){
                 const auto s=course->snapshot();return s.bound&&!s.faulted&&!s.quitRequested&&publishedCourseBank&&
                     courseResources->loaded()&&courseHolograms->loaded()&&course->externalLifecycleOwner()==transition.get()&&
-                    course->ownsPreparedPage(1)&&course->canEnterMode(0)&&course->intendedMode()==0&&
+                    course->ownsPreparedPage(1)&&course->canEnterMode(course->intendedMode())&&
+                    (course->intendedMode()==0||course->intendedMode()==2)&&
                     courseResources->exitText()&&courseResources->exitText()->prepared();
+            }
+            if(same(initialRoute,{9,1})&&tournament&&tournamentResources&&tournamentWidgets&&!main&&!options&&!hall&&!rider&&!course){
+                const auto v=tournament->snapshot();return v.bound&&!v.faulted&&!v.quitRequested&&publishedTournamentBank&&
+                    tournamentResources->current()&&tournamentWidgets->loaded()&&tournament->externalLifecycleOwner()==transition.get()&&
+                    tournament->ownsPreparedPage(1)&&tournamentWidgets->exitText()&&tournamentWidgets->exitText()->prepared();
             }
             return false;
         }
-        game::OriginalUiApertureSnapshot50KG aperture() const noexcept {return main?main->snapshot().aperture:options?options->snapshot().aperture:rider?rider->snapshot().aperture:course->snapshot().aperture;}
-        const OriginalUiNativeDraw50KG* draw() const noexcept {return main?main->draw():(options?options->draw():course?course->draw():nullptr);}
+        game::OriginalUiApertureSnapshot50KG aperture() const noexcept {return main?main->snapshot().aperture:options?options->snapshot().aperture:hall?hall->snapshot().aperture:rider?rider->snapshot().aperture:course?course->snapshot().aperture:tournament->snapshot().aperture;}
+        const OriginalUiNativeDraw50KG* draw() const noexcept {return main?main->draw():(options?options->draw():hall?hall->draw():course?course->draw():tournament?tournament->draw():nullptr);}
     };
     OriginalUiFrontendCold50KG cold;
     assets::OriginalUiEnglish50KG english;
@@ -170,8 +203,10 @@ struct OriginalUiFrontend50KG::Storage {
     game::OriginalUiApplicationRequest50KG queue{};
     OriginalUiMainRouteProposal50KG mainProposal{};
     OriginalUiOptionsRouteProposal50KG optionsProposal{};
+    OriginalUiHallRouteProposal50KG hallProposal{};
     OriginalUiRiderRouteProposal50KG riderProposal{};
     OriginalUiCourseRouteProposal50KG courseProposal{};
+    OriginalUiTournamentRouteProposal50KG tournamentProposal{};
     OriginalUiMainProfile50KG mainProfileProposal{};
     std::uint64_t updates=0,renders=0,submissions=0,switches=0,renderedUpdate=0,submittedUpdate=0;
     Diagnostic failure{};
@@ -214,7 +249,7 @@ struct OriginalUiFrontend50KG::Storage {
             (cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:(cold.audio&&cold.audio->ready()));
     }
     bool finishRiderMovement(Diagnostic& d) noexcept {
-        if(!riderMoving||!active||!active->rider||active->rider->snapshot().deferred4EC||
+        if(!riderMoving||!active||(!active->rider&&!active->hall)||(active->rider?bool(active->rider->snapshot().deferred4EC):bool(active->hall->snapshot().deferred1460))||
            !renderer||!cold.riderPresentation||!cold.riderPresentation->available()||!cold.application->clock101A50)return false;
         // Third update1EB534 resumes video,244D60(1)/245090 drains the
         // preceding queued render;25A9C0 runs the effect BEFORE the next draw.
@@ -260,7 +295,15 @@ struct OriginalUiFrontend50KG::Storage {
            !renderer->releaseOriginalUiByteBlend(d.renderer)||!renderer->releaseRetainedOriginalUiSource(d.renderer)||
            !renderer->releasePromotedOriginalUiIncoming(d.renderer))return false;
         if(!cold.riderPresentation->end())return false;
+        if(active->hall&&!active->hall->completeMovementPresentation())return false;
         riderOldImage={};riderMoving=false;return true;
+    }
+    bool hallInputsReady() const noexcept {
+        return archive(cold.hall,assets::OriginalUiArchiveId50KG::hallOfFame)&&cold.riderProfile&&
+            cold.riderProfile->initialized()&&cold.riderProfile->hallRecordsReady()&&
+            cold.riderProfile->commonProfile()==cold.profile.get()&&
+            (cold.audioMode==OriginalUiMainAudioMode50KG::muted?!cold.audio:
+             cold.audio&&cold.audio->hallOfFameMenuReady());
     }
     bool riderInputsReady() const noexcept {
         using Id=assets::OriginalUiArchiveId50KG;
@@ -270,21 +313,39 @@ struct OriginalUiFrontend50KG::Storage {
             cold.riderIpumCache&&cold.riderIpumCache->loaded()&&cold.riderProfile&&cold.riderProfile->initialized()&&
             cold.riderProfile->commonProfile()==cold.profile.get();
     }
-    bool courseInputsReady() const noexcept {
+    bool courseInputsReady(std::uint32_t mode=0) const noexcept {
         using Id=assets::OriginalUiArchiveId50KG;
         if(!boundedCourseAdmissionEnabled||
            (cold.audioMode==OriginalUiMainAudioMode50KG::muted?bool(cold.audio):
             cold.audioMode!=OriginalUiMainAudioMode50KG::enabled||!cold.audio||!cold.audio->courseMenuReady())||
            !archive(cold.course,Id::course)||!archive(cold.backgrounds,Id::backgrounds)||!cold.riderProfile||
            !cold.riderProfile->initialized()||cold.riderProfile->commonProfile()!=cold.profile.get()||
-           !cold.profile||!cold.profile->known||cold.profile->mode34!=0||
+           !cold.profile||!cold.profile->known||cold.profile->mode34!=mode||(mode!=0&&mode!=2)||
            (cold.profile->playerBits1125C&0x60)!=0x20)return false;
         game::OriginalUiCourseRememberedProfile50KG p;
+        if(mode==2){
+            // Native capability envelope only, not an original unlock rule.
+            // Reject unsupported careers/progress before cold preparation or effects.
+            OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
+            return cold.riderProfile->selectedTournamentCourseSnapshot(career,p)&&p.ownerReady&&p.mode34==2&&
+                career.career100C0==19&&career.progress219C==0&&!p.cardFlag100BC&&!career.cardFlag100BC&&
+                career.earned2190==0&&career.unspent2194==0&&career.kills2198==0&&
+                std::all_of(career.medals1938.begin(),career.medals1938.end(),[](auto value){return value==0;})&&
+                p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
+        }
         return cold.riderProfile->courseSnapshot(p)&&p.ownerReady&&p.mode34==0&&
             (p.availability11018&31u)>=1&&(p.availability11018&31u)<=13&&
             p.course700>=1&&p.course700<=13&&p.subtype70C==1&&
             p.laps704>=1&&p.laps704<=25&&p.entrants708==8&&!p.cardFlag100BC&&assets::originalUiCourseBackgroundName50KG(p.packed1125E>>5)&&
             p.planet0Primary79C==0xC2A684&&p.planet0Secondary7A0==0x80674A;
+    }
+    bool tournamentInputsReady(std::uint32_t selected) const noexcept {
+        using Id=assets::OriginalUiArchiveId50KG;
+        if(!riderInputsReady()||!archive(cold.tournament,Id::tournament)||!cold.profile||cold.profile->mode34!=2||
+           (cold.profile->playerBits1125C&0x60)!=0x20||
+           (cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&!cold.audio->courseMenuReady()))return false;
+        OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
+        return cold.riderProfile->tournamentCareerSnapshot(selected,career)&&!career.cardFlag100BC&&(career.progress219C&31u)==0;
     }
     bool sourceCurrent() const noexcept {
         return activated&&ownsLightManager()&&processReady()&&renderer&&renderer->initialized()&&bank==active.get()&&active&&active->prepared()&&
@@ -295,8 +356,8 @@ struct OriginalUiFrontend50KG::Storage {
     }
     bool sourceProposalCurrent() const noexcept {
         return active&&(active->main?active->main->routeProposalCurrent(mainProposal):active->options?
-            active->options->routeProposalCurrent(optionsProposal):active->rider?active->rider->routeProposalCurrent(riderProposal):
-            active->course&&active->course->routeProposalCurrent(courseProposal));
+            active->options->routeProposalCurrent(optionsProposal):active->hall?active->hall->routeProposalCurrent(hallProposal):active->rider?active->rider->routeProposalCurrent(riderProposal):
+            active->course?active->course->routeProposalCurrent(courseProposal):active->tournament&&active->tournament->routeProposalCurrent(tournamentProposal));
     }
     static bool admit(void* p,const game::OriginalUiScreenFactory50KG& screen,
         const game::OriginalUiPageFactory50KG& page,Admission kind) noexcept {
@@ -318,7 +379,9 @@ struct OriginalUiFrontend50KG::Storage {
         const Route target=m.main?Route{static_cast<std::uint8_t>(s.mainProposal.decision.targetScreen),
             static_cast<std::uint8_t>(s.mainProposal.decision.routeArgument)}:m.rider?
             Route{s.riderProposal.decision.request.targetScreen,s.riderProposal.decision.request.targetPage}:m.course?
-            Route{s.courseProposal.decision.request.targetScreen,s.courseProposal.decision.request.targetPage}:Route{4,1};
+            Route{s.courseProposal.decision.request.targetScreen,s.courseProposal.decision.request.targetPage}:m.tournament?
+            Route{s.tournamentProposal.decision.request.targetScreen,s.tournamentProposal.decision.request.targetPage}:m.hall?Route{12,1}:
+            Route{s.optionsProposal.decision.request.targetScreen,s.optionsProposal.decision.request.targetPage};
         return s.destination(target)&& &screen==game::findOriginalUiScreenFactory50KG(target.screen)&&
             &page==game::findOriginalUiBoundedPageFactory50KG(target.screen,target.page);
     }
@@ -335,8 +398,8 @@ struct OriginalUiFrontend50KG::Storage {
             s.fault(d,Status::transition,event.sourcePC);return;
         }
         const bool okay=m.main?m.main->notifyTransition(event,d.main)==MainStatus::ok:m.options?
-            m.options->notifyTransition(event,d.options)==OptionsStatus::ok:m.rider?m.rider->notifyTransition(event,d.rider)==RiderStatus::ok:
-            m.course&&m.course->notifyTransition(event,d.course)==CourseStatus::ok;
+            m.options->notifyTransition(event,d.options)==OptionsStatus::ok:m.hall?m.hall->notifyTransition(event,d.hall)==HallStatus::ok:m.rider?m.rider->notifyTransition(event,d.rider)==RiderStatus::ok:
+            m.course?m.course->notifyTransition(event,d.course)==CourseStatus::ok:m.tournament&&m.tournament->notifyTransition(event,d.tournament)==TournamentStatus::ok;
         if(!okay)s.fault(d,Status::session,event.sourcePC);
     }
     static game::OriginalUiTransitionCompletion50KG poll(void* p,Route route,Phase phase) noexcept {
@@ -344,7 +407,7 @@ struct OriginalUiFrontend50KG::Storage {
         const auto t=m.transition->snapshot();
         if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!same(route,t.current)||phase!=t.phase)
             return game::OriginalUiTransitionCompletion50KG::unavailable;
-        return m.main?m.main->pollCompletion(route,phase):m.options?m.options->pollCompletion(route,phase):m.rider?m.rider->pollCompletion(route,phase):m.course->pollCompletion(route,phase);
+        return m.main?m.main->pollCompletion(route,phase):m.options?m.options->pollCompletion(route,phase):m.hall?m.hall->pollCompletion(route,phase):m.rider?m.rider->pollCompletion(route,phase):m.course?m.course->pollCompletion(route,phase):m.tournament->pollCompletion(route,phase);
     }
     static bool commitMain(void* p,const game::OriginalUiMainDecision50KG& decision) noexcept {
         auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
@@ -366,7 +429,7 @@ struct OriginalUiFrontend50KG::Storage {
         expected.playerBits1125C=static_cast<std::uint8_t>((expected.playerBits1125C&~0x60u)|decision.originalPlayerBits);
         if(profile.mode34!=mode){profile.previousMode38=profile.mode34;profile.mode34=mode;}
         profile.playerBits1125C=static_cast<std::uint8_t>((profile.playerBits1125C&~0x60u)|decision.originalPlayerBits);
-        return s.pending->rider->acceptEntryProfileCommit(before,expected,false);
+        return s.pending->rider->acceptEntryProfileCommit(before,expected,OriginalUiRiderSession50KG::EntryOrigin::main);
     }
     bool courseLaunchProposal(OriginalUiRiderProfileOwner50KG::CourseRaceSelection& selection,
         game::OriginalCourseLoadAvailability50KG* reason=nullptr)const noexcept {
@@ -399,6 +462,44 @@ struct OriginalUiFrontend50KG::Storage {
     }
     static bool commitOptions(void* p,const game::OriginalUiRouteDecision50KG& decision) noexcept {
         auto& m=*static_cast<Manager*>(p);auto& s=*m.owner;
+        if(m.hall){
+            return !s.faulted&&!s.quit&&&m==s.active.get()&&s.sourceCurrent()&&s.processReady()&&
+                s.destination({12,1})&&m.hall->routeProposalCurrent(s.hallProposal)&&
+                game::originalUiHallBackShape50KG(decision)&&sameRouteProposal(decision,s.hallProposal.decision)&&
+                decision.admitted&&!decision.blockers&&decision.action==game::OriginalUiRouteAction50KG::request&&
+                m.hall->commitBack(s.hallProposal,decision);
+        }
+        if(m.tournament){
+            const auto& proposed=s.tournamentProposal.decision;
+            if(proposed.request.targetScreen==6){
+                if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.courseInputsReady(2)||
+                   !m.tournament->routeProposalCurrent(s.tournamentProposal)||!s.destination({6,1})||!s.pending->course||
+                   !s.pending->course->canEnterMode(2)||s.pending->course->intendedMode()!=2||!s.pending->tournamentCourseOrigin||
+                   !decision.admitted||decision.blockers||decision.action!=game::OriginalUiRouteAction50KG::request||
+                   proposed.admitted||proposed.action!=game::OriginalUiRouteAction50KG::unavailable||
+                   proposed.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
+                   !sameRouteProposal(decision,proposed)||decision.request.sourceScreen!=9||decision.request.sourcePage!=1||
+                   decision.request.targetScreen!=6||decision.request.targetPage!=1||decision.request.sourcePC!=0x1F2374||
+                   decision.inputPC!=0x1F2310||decision.profileChanges.count)return false;
+                // Source Continue writes nothing. Course entry's later single
+                // planet-mask write belongs to the actual incoming callback.
+                return m.tournament->commitRoute(s.tournamentProposal,decision);
+            }
+            if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.riderInputsReady()||
+               !m.tournament->routeProposalCurrent(s.tournamentProposal)||!s.destination({5,1})||!s.pending->rider||
+               !s.pending->rider->canEnterMode(2)||s.pending->rider->intendedMode()!=2||
+               !decision.admitted||decision.blockers||decision.action!=game::OriginalUiRouteAction50KG::request||
+               proposed.admitted||proposed.action!=game::OriginalUiRouteAction50KG::unavailable||
+               proposed.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
+               !sameRouteProposal(decision,proposed)||decision.request.sourceScreen!=9||decision.request.sourcePage!=1||
+               decision.request.targetScreen!=5||decision.request.targetPage!=1||decision.request.sourcePC!=0x1F23C8||
+               decision.inputPC!=0x1F2310||decision.profileChanges.count)return false;
+            const auto* demand=s.pending->rider->residencyDemand();
+            if(!demand||!s.pending->rider->residencyProposalCurrent(*demand))return false;
+            const auto before=s.cold.riderProfile->stamp();const auto expected=*s.cold.profile;
+            return m.tournament->commitRoute(s.tournamentProposal,decision)&&
+                s.pending->rider->acceptEntryProfileCommit(before,expected,OriginalUiRiderSession50KG::EntryOrigin::tournament);
+        }
         if(m.course){
             const auto& proposed=s.courseProposal.decision;
             if(proposed.request.kind==game::OriginalUiRouteKind50KG::courseLaunch){
@@ -411,6 +512,22 @@ struct OriginalUiFrontend50KG::Storage {
                    !s.cold.riderProfile->commitCourseLaunch(decision,context,s.courseProposal.profileStamp))return false;
                 s.cold.application->courseUi474=0;s.cold.application->courseUi478=0;
                 s.launchSelection=selection;return true;
+            }
+            if(proposed.request.targetScreen==9){
+                game::OriginalUiCourseContext50KG context;
+                OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;game::OriginalUiCourseRememberedProfile50KG remembered;
+                if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.courseInputsReady(2)||
+                   !m.course->routeProposalCurrent(s.courseProposal)||!m.course->routeContext(s.courseProposal,context)||context.mode34!=2||
+                   !s.destination({9,1})||!s.pending->tournament||!s.pending->tournamentResources||
+                   !s.cold.riderProfile->selectedTournamentCourseSnapshot(career,remembered)||!s.tournamentInputsReady(career.career100C0)||
+                   !s.pending->tournamentResources->courseBackPreparationCurrent(s.courseProposal)||
+                   !decision.admitted||decision.blockers||decision.action!=game::OriginalUiRouteAction50KG::request||
+                   proposed.admitted||proposed.action!=game::OriginalUiRouteAction50KG::unavailable||
+                   proposed.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
+                   !sameRouteProposal(decision,proposed)||decision.request.sourceScreen!=6||decision.request.sourcePage!=1||
+                   decision.request.targetScreen!=9||decision.request.targetPage!=1||decision.request.sourcePC!=0x1DF0B4||
+                   decision.inputPC!=0x1DEB90||decision.profileChanges.count)return false;
+                return s.pending->tournament->acceptEntryProfileCommit(s.courseProposal);
             }
             if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.courseInputsReady()||!s.riderInputsReady()||
                !m.course->routeProposalCurrent(s.courseProposal)||!s.destination({5,1})||!s.pending->rider||
@@ -426,7 +543,7 @@ struct OriginalUiFrontend50KG::Storage {
             const auto before=s.cold.riderProfile->stamp();const auto expected=*s.cold.profile;
             return m.course->routeContext(s.courseProposal,context)&&
                 s.cold.riderProfile->commitCourseBack(decision,context,s.courseProposal.profileStamp)&&
-                s.pending->rider->acceptEntryProfileCommit(before,expected,true);
+                s.pending->rider->acceptEntryProfileCommit(before,expected,OriginalUiRiderSession50KG::EntryOrigin::course);
         }
         if(m.rider){
             const auto& proposed=s.riderProposal.decision;
@@ -439,6 +556,14 @@ struct OriginalUiFrontend50KG::Storage {
                decision.request.targetPage!=1)return false;
             if(decision.request.targetScreen==4&&s.destination({4,1}))
                 return s.cold.riderProfile->commitBack(decision,s.riderProposal.profileStamp);
+            if(decision.request.targetScreen==9){
+                if(!s.tournamentInputsReady(decision.selectedRider)||!s.destination({9,1})||!s.pending->tournament||
+                   !s.pending->tournamentResources||!s.pending->tournamentResources->riderConfirmPreparationCurrent(s.riderProposal)||
+                   !riderCanConfirm(*s.cold.riderProfile,decision.selectedRider)||decision.profileChanges.count!=3||
+                   decision.request.sourcePC!=0x1EA5E4)return false;
+                return s.cold.riderProfile->commitRiderConfirmToTournament(decision,s.riderProposal.profileStamp)&&
+                    s.pending->tournament->acceptEntryProfileCommit(s.riderProposal);
+            }
             if(decision.request.targetScreen!=6||!s.courseInputsReady()||!s.destination({6,1})||!s.pending->course||
                !s.pending->course->canEnterMode(0)||!riderCanConfirm(*s.cold.riderProfile,decision.selectedRider)||decision.profileChanges.count!=3||
                decision.request.sourcePC!=0x1EA604)return false;
@@ -451,6 +576,16 @@ struct OriginalUiFrontend50KG::Storage {
             !decision.admitted||decision.blockers||decision.action!=game::OriginalUiRouteAction50KG::request||
             decision.selectedSlot!=s.optionsProposal.decision.selectedSlot)return false;
         const auto& proposed=s.optionsProposal.decision;
+        if(optionsHallShape(proposed,s.cold.profile->mode34)){
+            if(!optionsHallShape(decision,s.cold.profile->mode34)||!sameRouteProposal(decision,proposed)||
+               !sameProfile(*s.cold.profile,s.mainProfileProposal)||!s.hallInputsReady()||!s.destination({11,1})||!s.pending->hall)return false;
+            auto& common=*s.cold.profile;
+            if(common.mode34!=5){common.previousMode38=common.mode34;common.mode34=5;}
+            if(!s.pending->hall->acceptEntryProfileCommit())return false;
+            // Source1F9940 remembers Options slot after mode/request preparation.
+            s.cold.optionsProfile->savedSlot6E4=4;return true;
+        }
+
         if(optionsBackShape(decision)){
             if(!optionsBackShape(proposed)||!s.destination({4,1}))return false;
             s.cold.optionsProfile->savedSlot6E4=decision.profileChanges.values[0].value;
@@ -459,6 +594,7 @@ struct OriginalUiFrontend50KG::Storage {
                 decision.request.sourcePage!=proposed.request.sourcePage||decision.request.targetPage!=proposed.request.targetPage||
                 decision.request.sourcePC!=proposed.request.sourcePC||
                 !m.ownsRoute({decision.request.targetScreen,decision.request.targetPage}))return false;
+            if(game::originalUiMemoryCardReturnShape50KG(decision)||game::originalUiCreditsReturnShape50KG(decision))return true; // No original profile writes.
             if(game::originalUiControlsReturnShape50KG(decision))
                 return m.options->commitControlsReturn(s.optionsProposal,decision);
             if(game::originalUiGameOptionsAcceptShape50KG(decision))
@@ -503,6 +639,7 @@ struct OriginalUiFrontend50KG::Storage {
             if(same(route,{4,1})){
                 OriginalUiMainColdInput50KG input;input.appStart=cold.appStart;input.mainMenu=cold.mainMenu;
                 input.fonts=cold.fonts;input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;
+                input.retainedControllerPopup=cold.application->controllerPopupResources;
                 input.english=&english;input.runtime=cold.runtime;input.video=cold.video;
                 m.mainResources=std::make_shared<OriginalUiMainDrawResources50KG>();
                 if(!m.mainResources->load(input,d.main.draw)){result(d,Status::resource);return false;}
@@ -510,13 +647,27 @@ struct OriginalUiFrontend50KG::Storage {
             }else if(same(route,{12,1})){
                 if(!renderer||!renderer->originalUiSourceRgbaAvailable()){result(d,Status::unavailableDestination);return false;}
                 OriginalUiOptionsColdInput50KG input;input.appStart=cold.appStart;input.options=cold.options;
+                input.retainedControllerPopup=cold.application->controllerPopupResources;
                 input.application=cold.application;input.lightManager=cold.lightManager;
                 input.fonts=cold.fonts;input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;
                 input.english=&english;input.runtime=cold.runtime;
                 input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};
+                // A missing capability keeps only MemoryCard page5 unavailable;
+                // other authenticated Options pages retain their existing owner.
+                VehicleWindowDiagnostic50DS directDiagnostic;
+                renderer->prepareOriginalUiDirectVideo(input.video.directVideoCapability,directDiagnostic);
                 m.optionsResources=std::make_shared<OriginalUiOptionsDrawResources50KG>();
                 if(!m.optionsResources->load(input,d.optionsResources)){result(d,Status::resource);return false;}
                 samplers=m.optionsResources->samplers();
+            }else if(same(route,{11,1})){
+                if(!hallInputsReady()||prospectiveMode!=5||!renderer||!renderer->originalUiSourceRgbaAvailable()){
+                    result(d,Status::unavailableDestination);return false;}
+                OriginalUiHallColdInput50KG input;input.appStart=cold.appStart;input.hall=cold.hall;input.fonts=cold.fonts;
+                input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;input.english=&english;input.runtime=cold.runtime;
+                input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};
+                m.hallResources=std::make_shared<OriginalUiHallDrawResources50KG>();
+                if(!m.hallResources->load(input,d.hallResources)){result(d,Status::resource);return false;}
+                samplers=m.hallResources->samplers();
             }else if(same(route,{5,1})){
                 if(!riderInputsReady()||prospectiveMode>2){result(d,Status::unavailableDestination);return false;}
                 OriginalUiRiderColdInput50KG input;input.appStart=cold.appStart;input.rider=cold.rider;input.fonts=cold.fonts;
@@ -537,7 +688,14 @@ struct OriginalUiFrontend50KG::Storage {
                 session.lightManager=cold.lightManager;session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;
                 const bool fromCourse=active&&active->course&&same(active->currentRoute(),{6,1});
                 if(fromCourse&&(!courseInputsReady()||prospectiveMode!=0)){result(d,Status::unavailableDestination);return false;}
-                session.prospectiveMode=prospectiveMode;session.previousScreen=fromCourse?6:4;
+                const bool fromTournament=active&&active->tournament&&same(active->currentRoute(),{9,1});
+                if(fromTournament){
+                    if(prospectiveMode!=2||!active->tournament->routeProposalCurrent(tournamentProposal)){result(d,Status::unavailableDestination);return false;}
+                    m.tournamentPredecessor=active->tournament->predecessorInventory(d.tournament);
+                    if(!m.tournamentPredecessor){result(d,Status::resource);return false;}
+                    session.predecessorTournament=m.tournamentPredecessor;
+                }
+                session.prospectiveMode=prospectiveMode;session.previousScreen=fromCourse?6:fromTournament?9:4;
                 session.predecessorResources=active&&active->main?active->mainResources.get():nullptr;
                 session.predecessorCourseResources=fromCourse?active->courseResources.get():nullptr;
                 session.predecessorCourseHolograms=fromCourse?active->courseHolograms.get():nullptr;
@@ -547,10 +705,14 @@ struct OriginalUiFrontend50KG::Storage {
                 samplers=m.rider->samplers();
                 m.publishedRiderBank=m.rider->bank();
             }else if(same(route,{6,1})){
-                if(!courseInputsReady()||prospectiveMode!=0||!active||!active->rider||!same(active->currentRoute(),{5,1})){
+                const bool fromRider=active&&active->rider&&same(active->currentRoute(),{5,1})&&prospectiveMode==0;
+                const bool fromTournament=active&&active->tournament&&same(active->currentRoute(),{9,1})&&prospectiveMode==2&&
+                    active->tournament->routeProposalCurrent(tournamentProposal)&&tournamentProposal.decision.request.targetScreen==6;
+                if(!courseInputsReady(prospectiveMode)||(!fromRider&&!fromTournament)){
                     result(d,Status::unavailableDestination);return false;}
                 OriginalUiCourseColdInput50KG input;input.appStart=cold.appStart;input.course=cold.course;
                 input.prepareRylothBackground=true; // Original background resource, independent of test-pair provenance.
+                input.prepareTournamentFresh=fromTournament; // Bounded authentic mode 2 embedded resources only.
                 input.fonts=cold.fonts;input.backgrounds=cold.backgrounds;input.controllerPopup=cold.controllerPopup;
                 input.overlays=cold.overlays;input.english=&english;input.runtime=cold.runtime;
                 input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};
@@ -561,11 +723,56 @@ struct OriginalUiFrontend50KG::Storage {
                 OriginalUiCourseSessionCold50KG session;session.resources=m.courseResources;session.holograms=m.courseHolograms;
                 session.courseArchive=cold.course;session.english=&english;session.profile=cold.riderProfile;
                 session.commonProfile=cold.profile;session.application=cold.application;session.lightManager=cold.lightManager;
-                session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;session.previousScreen=5;
+                session.externalTransition=m.transition;session.audioMode=cold.audioMode;session.audio=cold.audio;session.previousScreen=fromTournament?9:5;
+                if(fromTournament){
+                    session.applicationAnimation=cold.applicationAnimation;
+                    m.tournamentCourseOrigin=std::make_shared<const OriginalUiTournamentRouteProposal50KG>(tournamentProposal);
+                    session.tournamentProposal=m.tournamentCourseOrigin;
+                }
                 m.course=std::make_unique<OriginalUiCourseSession50KG>();
                 // bind prepares this immutable combined bank exactly once.
                 if(m.course->bind(session,d.course)!=CourseStatus::ok||!m.course->bank()){result(d,Status::session);return false;}
                 m.publishedCourseBank=m.course->bank();samplers=m.course->samplers();
+            }else if(same(route,{9,1})){
+                const bool fromRider=active&&active->rider&&same(active->currentRoute(),{5,1})&&
+                    active->rider->routeProposalCurrent(riderProposal);
+                const bool fromCourse=active&&active->course&&same(active->currentRoute(),{6,1})&&active->course->intendedMode()==2&&
+                    active->course->routeProposalCurrent(courseProposal)&&courseProposal.decision.request.targetScreen==9;
+                std::uint32_t selected=0;
+                if(fromRider)selected=riderProposal.decision.selectedRider;
+                else if(fromCourse){
+                    OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;game::OriginalUiCourseRememberedProfile50KG remembered;
+                    if(!cold.riderProfile->selectedTournamentCourseSnapshot(career,remembered)){result(d,Status::unavailableDestination);return false;}
+                    selected=career.career100C0;
+                }
+                if(prospectiveMode!=2||(!fromRider&&!fromCourse)||!tournamentInputsReady(selected)){
+                    result(d,Status::unavailableDestination);return false;}
+                // A new owner each time, never the retired Tournament pod or
+                // its material/search state from the preceding visit.
+                m.tournamentResources=std::make_shared<OriginalUiTournamentCareerResources50KG>();
+                if(!m.tournamentResources->load(cold.riderProfile,selected,cold.tournament,cold.fonts,
+                   cold.appStart,cold.backgrounds,cold.runtime,d.tournamentResources)||
+                   !(fromRider?m.tournamentResources->prepareRiderConfirm(riderProposal,d.tournamentResources):
+                       m.tournamentResources->prepareCourseBack(courseProposal,d.tournamentResources))){
+                    result(d,Status::resource);return false;}
+                OriginalUiTournamentWidgetColdInput50KG input;input.appStart=cold.appStart;input.tournament=cold.tournament;
+                input.fonts=cold.fonts;input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;
+                input.english=&english;input.runtime=cold.runtime;
+                input.video={cold.video.lifetime,cold.video.width,cold.video.height,cold.video.colorBits,cold.video.packetZMaximum,cold.video.zBufferFormat};
+                m.tournamentWidgets=std::make_shared<OriginalUiTournamentWidgetResources50KG>();
+                if(!m.tournamentWidgets->load(input,d.tournamentWidgets)){result(d,Status::resource);return false;}
+                OriginalUiTournamentSessionCold50KG session;session.resources=m.tournamentResources;session.widgets=m.tournamentWidgets;
+                session.tournamentArchive=cold.tournament;session.appStart=cold.appStart;session.podTextures=cold.podTextures;
+                session.ipumCache=cold.riderIpumCache;session.materialRuntime=cold.runtime;session.english=&english;
+                session.lightManager=cold.lightManager;session.profile=cold.riderProfile;session.commonProfile=cold.profile;
+                session.application=cold.application;session.applicationAnimation=cold.applicationAnimation;
+                session.audioMode=cold.audioMode;session.audio=cold.audio;session.externalTransition=m.transition;
+                if(fromRider)session.sourceProposal=riderProposal;else session.sourceProposal=courseProposal;
+                m.tournament=std::make_unique<OriginalUiTournamentSession50KG>();
+                if(m.tournament->bind(session,d.tournament)!=TournamentStatus::ok||
+                   m.tournament->prepareBank(d.tournament)!=TournamentStatus::ok||!m.tournament->bank()){
+                    result(d,Status::session);return false;}
+                m.publishedTournamentBank=m.tournament->bank();samplers=m.tournament->samplers();
             }else {result(d,Status::unavailableDestination);return false;}
             if(!samplers||!m.textures()){result(d,Status::resource);return false;}
             m.gpuSamplers=*samplers;
@@ -592,6 +799,14 @@ struct OriginalUiFrontend50KG::Storage {
                 input.audioMode=cold.audioMode;input.audio=cold.audio;input.externalTransition=m.transition;
                 m.options=std::make_unique<OriginalUiOptionsSession50KG>();
                 if(m.options->bind(input,d.options)!=OptionsStatus::ok){result(d,Status::session);return false;}
+            }else if(m.hallResources){
+                OriginalUiHallSessionCold50KG input;input.resources=m.hallResources;input.gpu=m.gpu;input.hallArchive=cold.hall;
+                input.profile=cold.riderProfile;input.commonProfile=cold.profile;input.application=cold.application;
+                input.audioMode=cold.audioMode;input.audio=cold.audio;input.externalTransition=m.transition;
+                m.hall=std::make_unique<OriginalUiHallOfFameSession50KG>();
+                if(m.hall->bind(input,d.hall)!=HallStatus::ok){result(d,Status::session);return false;}
+            }else if(m.tournament){
+                if(m.tournament->bindPublishedBank(m.gpu,d.tournament)!=TournamentStatus::ok){result(d,Status::session);return false;}
             }else if(m.course){
                 if(m.course->bindPublishedBank(m.gpu,d.course)!=CourseStatus::ok){result(d,Status::session);return false;}
             }else if(!m.rider||m.rider->bindPublishedBank(m.gpu,d.rider)!=RiderStatus::ok){
@@ -602,9 +817,21 @@ struct OriginalUiFrontend50KG::Storage {
         catch(...){result(d,Status::resource);return false;}
     }
     bool retireSource(Manager& m,Diagnostic& d) noexcept {
+        if(m.main&&!m.mainRetired){
+            if(m.main->teardownSource(renderer,d.main)!=MainStatus::ok){result(d,Status::cleanup);return false;}
+            m.mainRetired=true;
+        }
+        if(m.hall&&!m.hallRetired){
+            if(m.hall->teardownSource(renderer,d.hall)!=HallStatus::ok){result(d,Status::cleanup);return false;}
+            m.hallRetired=true;
+        }
         if(m.options&&!m.optionsRetired){
             if(m.options->teardownSource(renderer,d.options)!=OptionsStatus::ok){result(d,Status::cleanup);return false;}
             m.optionsRetired=true;
+        }
+        if(m.tournament&&!m.tournamentRetired){
+            if(m.tournament->teardownSource(renderer,d.tournament)!=TournamentStatus::ok){result(d,Status::cleanup);return false;}
+            m.tournamentRetired=true;
         }
         if(!m.rider||m.riderRetired)return true;
         // The private session path obtains actual renderer retirement and
@@ -697,7 +924,7 @@ struct OriginalUiFrontend50KG::Storage {
     bool release(std::unique_ptr<Manager>& m,Diagnostic& d) noexcept {
         if(!m)return true;
         if(!retireSource(*m,d))return false;
-        m->main.reset();m->options.reset();m->rider.reset();m->course.reset(); // No further callback can reach them.
+        m->main.reset();m->options.reset();m->hall.reset();m->rider.reset();m->course.reset();m->tournament.reset(); // No further callback can reach them.
         if(m->gpu&&!m->gpu->close(d.gpu))return false;
         if(m->riderStagedGpu&&!m->riderStagedGpu->close(d.gpu))return false;
         if(m->riderRetiredGpu&&!m->riderRetiredGpu->close(d.gpu))return false;
@@ -725,7 +952,9 @@ OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept {
     if(storage_&&storage_->lightManagerEntered&&storage_->cold.lightManager)
         storage_->cold.lightManager->invalidateForUntrackedScene();
     if(storage_)for(const auto* manager:{storage_->retiring.get(),storage_->pending.get(),storage_->active.get()})
-        if(manager&&((manager->rider&&manager->rider->sourceTeardownPending())||
+        if(manager&&((manager->main&&manager->main->sourceTeardownPending())||
+            (manager->rider&&manager->rider->sourceTeardownPending())||
+            (manager->tournament&&manager->tournament->sourceTeardownPending())||
             (manager->options&&manager->options->sourceTeardownPending()))){
             // Terminal misuse after omitted/failed explicit close. Keep the
             // Manager callback context, session, ledger and every cold/GPU/
@@ -791,8 +1020,8 @@ Status OriginalUiFrontend50KG::configureRendererRequest(VehicleWindowRequest50DS
     if(s->activated||s->closing||s->quit)return result(d,Status::busy);
     if(request.context!=s->cold.textureRequest.context||request.isCurrent!=s->cold.textureRequest.isCurrent||!s->active->prepared())return result(d,Status::invalidInput);
     request.enableOriginalUi=true;request.originalUiCpuTextures=s->active->textures();request.originalUiTextures=s->active->gpu.get();
-    //One sealed RGBA owner spans the whole authenticated Options bank, so
-    //page switches preserve destination-alpha and original material history.
+    //Main and Options each submit a complete sealed source-RGBA bank, so
+    //shared popup joins preserve destination-alpha and material history.
     //Allocating its target is capability preparation, not page admission.
     request.enableOriginalUiSourceRgba=bool(s->cold.options)||s->riderInputsReady();
     return result(d,Status::ok);
@@ -803,7 +1032,7 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
     if(!s->prepared)return result(d,Status::notPrepared);
     if(s->activated||s->renderer||s->closing||s->quit)return result(d,Status::busy);
     Operation operation(s->inOperation);s->renderer=&renderer;
-    if(!s->active->prepared()||!renderer.bindOriginalUiTextures(*s->active->textures(),*s->active->gpu,d.renderer))return s->fault(d,Status::renderer);
+    if(!s->active->prepared()||!renderer.originalUiSourceRgbaAvailable()||!renderer.bindOriginalUiTextures(*s->active->textures(),*s->active->gpu,d.renderer))return s->fault(d,Status::renderer);
     if(!s->enterLightManager(*s->cold.mainMenu,d))return s->fault(d,Status::session,d.lightManager.sourcePC);
     s->bank=s->active.get();s->activating=s->active.get();
     d.transition=s->active->transition->bindInitialPage(4,1,s->callbacks(*s->active));s->activating=nullptr;
@@ -822,7 +1051,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
     if(s->queued||s->updates!=s->submittedUpdate)return result(d,Status::busy);
     Operation operation(s->inOperation);s->frameRendered=false;s->frameSubmitted=false;
     if(!s->sourceCurrent()||!s->processReady())return s->fault(d,Status::session);
-    receipt.source=s->active->currentRoute();s->mainProposal={};s->optionsProposal={};s->riderProposal={};s->courseProposal={};
+    receipt.source=s->active->currentRoute();s->mainProposal={};s->optionsProposal={};s->hallProposal={};s->riderProposal={};s->courseProposal={};s->tournamentProposal={};
     if(s->active->main){
         const auto status=s->active->main->input(input,receipt.main,d.main);
         if(status==MainStatus::routeProposed){
@@ -842,6 +1071,10 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
             d.transition=s->active->transition->requestMain(decision);
             if(d.transition!=Transition::ok)return s->fault(d,Status::transition,0x1E6160);
             s->cold.profile->savedSlot6E0=decision.selectedSlot;
+            // requestMain commits mode/player first; source1E61A4 then writes
+            // remembered Main slot. Reconcile this exact owned write only.
+            if(rider&&!s->pending->rider->acceptMainRememberedSlotCommit(
+                s->mainProfileProposal.savedSlot6E0,decision.selectedSlot))return s->fault(d,Status::session,0x1E61A4);
             if(s->active->main->notifyRouteAccepted(s->mainProposal,d.main)!=MainStatus::ok)return s->fault(d,Status::session,0x1E61B4);
         }else {
             const auto mapped=status==MainStatus::ok?Status::ok:status==MainStatus::noChange?Status::noChange:
@@ -850,16 +1083,22 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         }
     }else if(s->active->options){
         const auto status=s->active->options->input(input,receipt.options,d.options);
-        if(status==OptionsStatus::backProposed||status==OptionsStatus::pageProposed){
+        if(status==OptionsStatus::backProposed||status==OptionsStatus::pageProposed||status==OptionsStatus::screenProposed){
             s->optionsProposal=receipt.options.routeProposal;
             const auto& proposal=s->optionsProposal.decision;
-            const bool pageChange=status==OptionsStatus::pageProposed;
-            if(!(pageChange?optionsPageShape(proposal):optionsBackShape(proposal))||s->pending||
+            const bool hallChange=status==OptionsStatus::screenProposed&&optionsHallShape(proposal,s->cold.profile->mode34);
+            const bool pageChange=status==OptionsStatus::pageProposed&&!hallChange;
+            if(!(hallChange|| (pageChange?optionsPageShape(proposal):optionsBackShape(proposal)))||s->pending||
                 !s->active->options->routeProposalCurrent(s->optionsProposal))return s->fault(d,Status::transition);
             if(pageChange){
                 if(!s->active->ownsRoute({proposal.request.targetScreen,proposal.request.targetPage}))
                     return result(d,receipt.status=Status::unavailableDestination);
-            }else if(!s->prepareDestination({4,1},receipt,d))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+            }else {
+                if(hallChange){if(!s->hallInputsReady())return result(d,receipt.status=Status::unavailableDestination);
+                    s->mainProfileProposal=*s->cold.profile;}
+                if(!s->prepareDestination(hallChange?Route{11,1}:Route{4,1},receipt,d,hallChange?5:0))
+                    return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+            }
             if(!s->active->options->routeProposalCurrent(s->optionsProposal))return s->fault(d,Status::transition);
             auto admitted=s->optionsProposal.decision;
             // Concrete destination now exists. Only its previously missing
@@ -875,6 +1114,44 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
                 status==OptionsStatus::unavailableDestination?Status::unavailableDestination:status==OptionsStatus::secondControllerRequired?Status::secondControllerRequired:Status::session;
             if(mapped==Status::session)return s->fault(d,mapped);return result(d,receipt.status=mapped);
         }
+    }else if(s->active->hall){
+        const bool direction=input.controller==0&&(input.originalInput==0||input.originalInput==1)&&s->active->hall->canBeginMovement();
+        bool retained=false;
+        if(direction){
+            if(!s->cold.riderPresentation||!s->cold.riderPresentation->available()||!s->cold.application->clock101A50||
+               !s->riderWidth||!s->riderHeight)return result(d,receipt.status=Status::unavailableDestination);
+            if(!s->cold.riderPresentation->begin()){
+                if(!s->cold.riderPresentation->end())return s->fault(d,Status::cleanup);
+                return result(d,receipt.status=Status::unavailableDestination);
+            }
+            if(!s->renderer->retainPublishedOriginalUiSource(s->riderOldImage,d.renderer))return s->fault(d,Status::renderer);
+            retained=true;
+        }
+        const auto status=s->active->hall->input(input,receipt.hall,d.hall);
+        if(receipt.hall.movementAccepted){
+            if(!retained||!s->active->hall->movementInProgress())return s->fault(d,Status::session);
+            s->riderMoving=true;return result(d,receipt.status=Status::ok);
+        }
+        if(retained){
+            if(!s->renderer->releaseRetainedOriginalUiSource(d.renderer)||!s->cold.riderPresentation->end())return s->fault(d,Status::cleanup);
+            s->riderOldImage={};
+        }
+        if(status==HallStatus::backProposed){
+            s->hallProposal=receipt.hall.routeProposal;const auto& proposal=s->hallProposal.decision;
+            if(s->pending||!game::originalUiHallBackShape50KG(proposal)||!s->active->hall->routeProposalCurrent(s->hallProposal))
+                return s->fault(d,Status::transition);
+            if(!s->prepareDestination({12,1},receipt,d))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+            if(!s->active->hall->routeProposalCurrent(s->hallProposal))return s->fault(d,Status::transition);
+            auto admitted=proposal;
+            if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
+               admitted.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner))return s->fault(d,Status::transition);
+            admitted.admitted=true;admitted.blockers=0;admitted.action=game::OriginalUiRouteAction50KG::request;
+            d.transition=s->active->transition->requestRouteDecision(admitted);
+            if(d.transition!=Transition::ok||s->active->hall->notifyRouteAccepted(s->hallProposal,d.hall)!=HallStatus::ok)
+                return s->fault(d,Status::transition,proposal.request.sourcePC);
+        }else if(status!=HallStatus::ok&&status!=HallStatus::noChange&&status!=HallStatus::unavailableDestination)
+            return s->fault(d,Status::session,d.hall.sourcePC);
+        else return result(d,receipt.status=status==HallStatus::ok?Status::ok:status==HallStatus::noChange?Status::noChange:Status::unavailableDestination);
     }else if(s->active->rider){
         const auto status=s->active->rider->input(input,receipt.rider,d.rider);
         if(status==RiderStatus::moveProposed){
@@ -917,11 +1194,13 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
             s->riderProposal=receipt.rider.routeProposal;const auto& proposal=s->riderProposal.decision;
             if(s->pending||!s->active->rider->routeProposalCurrent(s->riderProposal)||
                proposal.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||proposal.request.sourceScreen!=5||
-               proposal.request.sourcePage!=1||proposal.request.targetScreen!=(confirm?6:4)||proposal.request.targetPage!=1)
+               proposal.request.sourcePage!=1||proposal.request.targetScreen!=(confirm?(s->cold.profile->mode34==2?9:6):4)||proposal.request.targetPage!=1)
                 return s->fault(d,Status::transition);
-            if(confirm&&(!s->courseInputsReady()||!riderCanConfirm(*s->cold.riderProfile,proposal.selectedRider)||proposal.profileChanges.count!=3||
-               proposal.request.sourcePC!=0x1EA604))return result(d,receipt.status=Status::unavailableDestination);
-            if(!s->prepareDestination({static_cast<std::uint8_t>(confirm?6:4),1},receipt,d))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+            const bool tournament=confirm&&s->cold.profile->mode34==2;
+            if(confirm&&(!(tournament?s->tournamentInputsReady(proposal.selectedRider):s->courseInputsReady())||
+               !riderCanConfirm(*s->cold.riderProfile,proposal.selectedRider)||proposal.profileChanges.count!=3||
+               proposal.request.sourcePC!=(tournament?0x1EA5E4u:0x1EA604u)))return result(d,receipt.status=Status::unavailableDestination);
+            if(!s->prepareDestination({proposal.request.targetScreen,1},receipt,d,tournament?2:0))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
             if(!s->active->rider->routeProposalCurrent(s->riderProposal))return s->fault(d,Status::transition);
             auto admitted=proposal;
             if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
@@ -934,6 +1213,32 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
             const auto mapped=status==RiderStatus::ok?Status::ok:status==RiderStatus::noChange?Status::noChange:
                 status==RiderStatus::unavailableDestination?Status::unavailableDestination:Status::session;
             if(mapped==Status::session)return s->fault(d,mapped);return result(d,receipt.status=mapped);
+        }
+    }else if(s->active->tournament){
+        const auto status=s->active->tournament->input(input,receipt.tournament,d.tournament);
+        if(status==TournamentStatus::backProposed||status==TournamentStatus::continueProposed){
+            s->tournamentProposal=receipt.tournament.routeProposal;const auto& proposal=s->tournamentProposal.decision;
+            const bool continuing=status==TournamentStatus::continueProposed;
+            const std::uint8_t target=continuing?6:5;const std::uint32_t routePC=continuing?0x1F2374:0x1F23C8;
+            if(s->pending||!s->active->tournament->routeProposalCurrent(s->tournamentProposal)||
+               proposal.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||proposal.request.sourceScreen!=9||
+               proposal.request.sourcePage!=1||proposal.request.targetScreen!=target||proposal.request.targetPage!=1||
+               proposal.request.sourcePC!=routePC||proposal.inputPC!=0x1F2310||proposal.profileChanges.count)
+                return s->fault(d,Status::transition);
+            if(!(continuing?s->courseInputsReady(2):s->riderInputsReady())||!s->renderer->originalUiSourceRgbaAvailable())return result(d,receipt.status=Status::unavailableDestination);
+            if(!s->prepareDestination({target,1},receipt,d,2))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+            if(!s->active->tournament->routeProposalCurrent(s->tournamentProposal))return s->fault(d,Status::transition);
+            auto admitted=proposal;
+            if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
+               admitted.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner))return s->fault(d,Status::transition);
+            admitted.blockers=0;admitted.admitted=true;admitted.action=game::OriginalUiRouteAction50KG::request;
+            d.transition=s->active->transition->requestRouteDecision(admitted);
+            if(d.transition!=Transition::ok||s->active->tournament->notifyRouteAccepted(s->tournamentProposal,d.tournament)!=TournamentStatus::ok)
+                return s->fault(d,Status::transition,proposal.request.sourcePC);
+        }else{
+            const auto mapped=status==TournamentStatus::ok?Status::ok:status==TournamentStatus::noChange?Status::noChange:
+                status==TournamentStatus::unavailableDestination?Status::unavailableDestination:Status::session;
+            if(mapped==Status::session)return s->fault(d,mapped,d.tournament.sourcePC);return result(d,receipt.status=mapped);
         }
     }else if(s->active->course){
         const auto status=s->active->course->input(input,receipt.course,d.course);
@@ -951,13 +1256,15 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
                 return s->fault(d,Status::transition,0x1DED58);
         }else if(status==CourseStatus::backProposed){
             s->courseProposal=receipt.course.routeProposal;const auto& proposal=s->courseProposal.decision;
+            const bool toTournament=s->active->course->intendedMode()==2;
+            const std::uint8_t target=toTournament?9:5;
             if(s->pending||!s->active->course->routeProposalCurrent(s->courseProposal)||
                proposal.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||proposal.request.sourceScreen!=6||
-               proposal.request.sourcePage!=1||proposal.request.targetScreen!=5||proposal.request.targetPage!=1||
-               proposal.profileChanges.count!=4)return s->fault(d,Status::transition);
-            if(!s->courseInputsReady()||!s->riderInputsReady()||!s->renderer->originalUiSourceRgbaAvailable())
+               proposal.request.sourcePage!=1||proposal.request.targetScreen!=target||proposal.request.targetPage!=1||
+               proposal.profileChanges.count!=(toTournament?0u:4u)||(toTournament&&proposal.request.sourcePC!=0x1DF0B4))return s->fault(d,Status::transition);
+            if(!s->courseInputsReady(toTournament?2:0)||!s->riderInputsReady()||!s->renderer->originalUiSourceRgbaAvailable())
                 return result(d,receipt.status=Status::unavailableDestination);
-            if(!s->prepareDestination({5,1},receipt,d,0))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
+            if(!s->prepareDestination({target,1},receipt,d,toTournament?2:0))return s->faulted?d.status:result(d,receipt.status=Status::unavailableDestination);
             if(!s->active->course->routeProposalCurrent(s->courseProposal))return s->fault(d,Status::transition);
             auto admitted=proposal;
             if(admitted.admitted||admitted.action!=game::OriginalUiRouteAction50KG::unavailable||
@@ -973,7 +1280,7 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         }
     }else return s->fault(d,Status::session);
     receipt.routeAccepted=true;receipt.requested=s->active->transition->snapshot().requested;
-    s->mainProposal={};s->optionsProposal={};s->riderProposal={};s->courseProposal={};return result(d,receipt.status=Status::routeAccepted);
+    s->mainProposal={};s->optionsProposal={};s->hallProposal={};s->riderProposal={};s->courseProposal={};s->tournamentProposal={};return result(d,receipt.status=Status::routeAccepted);
 }
 Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& input,
     OriginalUiFrontendUpdateReceipt50KG& receipt,Diagnostic& d) noexcept {
@@ -998,17 +1305,31 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
         if(m.course->completeSelectionRefresh(d.course)!=CourseStatus::ok)return s->fault(d,Status::session,0x1DFE58);
     }
     const bool prepared=m.main?m.main->prepareUpdateAudio(input,d.main)==MainStatus::ok:m.options?
-        m.options->prepareUpdateAudio(input,d.options)==OptionsStatus::ok:m.rider?m.rider->prepareUpdateAudio(input,d.rider)==RiderStatus::ok:
-        m.course&&m.course->prepareUpdateAudio(input,d.course)==CourseStatus::ok;
+        m.options->prepareUpdateAudio(input,d.options)==OptionsStatus::ok:m.hall?m.hall->prepareUpdateAudio(input,d.hall)==HallStatus::ok:m.rider?m.rider->prepareUpdateAudio(input,d.rider)==RiderStatus::ok:
+        m.course?m.course->prepareUpdateAudio(input,d.course)==CourseStatus::ok:m.tournament&&m.tournament->prepareUpdateAudio(input,d.tournament)==TournamentStatus::ok;
     if(!prepared)return s->fault(d,Status::session,0x234440);
     d.transition=m.transition->tick();
     if(s->faulted)return s->fault(d,Status::session);
     if(d.transition!=Transition::ok&&d.transition!=Transition::noChange&&d.transition!=Transition::pending&&d.transition!=Transition::queued)
         return s->fault(d,Status::transition,0x2A3C80);
     const bool updated=m.main?m.main->update(input,d.main)==MainStatus::ok:m.options?
-        m.options->update(input,d.options)==OptionsStatus::ok:m.rider?m.rider->update(input,d.rider)==RiderStatus::ok:
-        m.course&&m.course->update(input,d.course)==CourseStatus::ok;
+        m.options->update(input,d.options)==OptionsStatus::ok:m.hall?m.hall->update(input,d.hall)==HallStatus::ok:m.rider?m.rider->update(input,d.rider)==RiderStatus::ok:
+        m.course?m.course->update(input,d.course)==CourseStatus::ok:m.tournament&&m.tournament->update(input,d.tournament)==TournamentStatus::ok;
     if(!updated)return s->fault(d,Status::session);
+    if(m.options&&(m.options->pendingAutomaticMemoryCardReturn(s->optionsProposal)||m.options->pendingAutomaticCreditsReturn(s->optionsProposal))){
+        const auto& proposal=s->optionsProposal.decision;
+        if((!game::originalUiMemoryCardReturnShape50KG(proposal)&&!game::originalUiCreditsReturnShape50KG(proposal))||proposal.admitted||
+           proposal.action!=game::OriginalUiRouteAction50KG::unavailable||
+           proposal.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
+           !m.ownsRoute({12,1})||s->pending||
+           !m.options->routeProposalCurrent(s->optionsProposal))return s->fault(d,Status::transition,proposal.request.sourcePC);
+        auto admitted=proposal;admitted.blockers=0;admitted.admitted=true;
+        admitted.action=game::OriginalUiRouteAction50KG::request;
+        d.transition=m.transition->requestRouteDecision(admitted);
+        if(d.transition!=Transition::ok||m.options->notifyRouteAccepted(s->optionsProposal,d.options)!=OptionsStatus::ok)
+            return s->fault(d,Status::transition,proposal.request.sourcePC);
+        s->optionsProposal={};
+    }
     if(!s->refreshRiderBank(m,d,receipt)||!s->verifyCourseBank(m,d))return s->fault(d,d.status);
     ++s->updates;receipt.accepted=true;receipt.sequence=s->updates;receipt.update=input;receipt.source=m.currentRoute();
     return result(d,Status::ok);
@@ -1022,7 +1343,7 @@ Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,
     Operation operation(s->inOperation);s->frameRendered=false;s->frameSubmitted=false;
     if(!s->sourceCurrent())return s->fault(d,Status::session);
     auto& m=*s->active;auto renderClock=clock;
-    if(s->riderMoving&&m.rider&&!m.rider->snapshot().deferred4EC){
+    if(s->riderMoving&&((m.rider&&!m.rider->snapshot().deferred4EC)||(m.hall&&!m.hall->snapshot().deferred1460))){
         if(!s->finishRiderMovement(d))return s->fault(d,Status::renderer,0x25D2F0);
         // The source samples material time only after the blocking video
         // effect returns. Keep the application's active/cold exclusions rather
@@ -1031,9 +1352,10 @@ Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,
     }
     const bool rendered=m.main?m.main->render(clock,d.main)==MainStatus::ok:m.options?
         m.options->render({clock.known,clock.advanceAnimations,clock.milliseconds,clock.applicationAnimation},d.options)==OptionsStatus::ok:
-        m.rider?m.rider->render({renderClock.known,renderClock.advanceAnimations,renderClock.milliseconds,renderClock.applicationAnimation},d.rider)==RiderStatus::ok:
-        m.course&&m.course->render({clock.known,clock.advanceAnimations,clock.milliseconds,clock.applicationAnimation},d.course)==CourseStatus::ok;
-    if(!rendered||(m.rider?!m.rider->sourceFrame():m.options?!m.options->sourceFrame():!m.draw()))return s->fault(d,Status::session);
+        m.hall?m.hall->render(renderClock,d.hall)==HallStatus::ok:m.rider?m.rider->render({renderClock.known,renderClock.advanceAnimations,renderClock.milliseconds,renderClock.applicationAnimation},d.rider)==RiderStatus::ok:
+        m.course?m.course->render({clock.known,clock.advanceAnimations,clock.milliseconds,clock.applicationAnimation},d.course)==CourseStatus::ok:
+        m.tournament&&m.tournament->render(clock,d.tournament)==TournamentStatus::ok;
+    if(!rendered||(m.main?!m.main->sourceFrame():m.rider?!m.rider->sourceFrame():m.options?!m.options->sourceFrame():m.hall?!m.hall->sourceFrame():m.tournament?!m.tournament->sourceFrame():!m.draw()))return s->fault(d,Status::session);
     s->renderedUpdate=s->updates;++s->renders;s->frameRendered=true;return result(d,Status::ok);
 }
 Status OriginalUiFrontend50KG::submit(VehicleWindowGl50DS& renderer,std::int32_t width,std::int32_t height,Diagnostic& d) noexcept {
@@ -1045,7 +1367,7 @@ Status OriginalUiFrontend50KG::submit(VehicleWindowGl50DS& renderer,std::int32_t
         return result(d,Status::invalidInput);
     Operation operation(s->inOperation);
     if(!s->sourceCurrent())return s->fault(d,Status::session);
-    if(s->active->rider){const auto* frame=s->active->rider->sourceFrame();
+    if(s->active->rider||s->active->hall){const auto* frame=s->active->rider?s->active->rider->sourceFrame():s->active->hall->sourceFrame();
         if(!frame)return s->fault(d,Status::renderer);
         if(s->riderMoving){OriginalUiSourceSubmission50KN hidden;
             if(!renderer.submitOriginalUiSourceUnpublished(*frame,width,height,hidden,d.renderer)||!d.renderer.originalUiSourceAccepted)
@@ -1053,7 +1375,7 @@ Status OriginalUiFrontend50KG::submit(VehicleWindowGl50DS& renderer,std::int32_t
         }else if(!renderer.submitOriginalUiSourceRgba(*frame,width,height,d.renderer)||!d.renderer.originalUiAccepted)
             return s->fault(d,Status::renderer);
         s->riderWidth=width;s->riderHeight=height;
-    }else if(s->active->options){const auto* frame=s->active->options->sourceFrame();
+    }else if(s->active->options||s->active->main||s->active->tournament){const auto* frame=s->active->options?s->active->options->sourceFrame():s->active->main?s->active->main->sourceFrame():s->active->tournament->sourceFrame();
         if(!frame||!renderer.submitOriginalUiSourceRgba(*frame,width,height,d.renderer)||!d.renderer.originalUiAccepted)
             return s->fault(d,Status::renderer);
     }else{const auto* draw=s->active->draw();
@@ -1093,7 +1415,7 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
     if(!old.applicationRequestQueued||old.lifecycle!=Life::queueScreen||!same(old.requested,target)||!s->destination(target))return s->fault(d,Status::transition);
     if(!s->ownsLightManager())return s->fault(d,Status::session,0x148110);
     const auto* destinationArchive=s->pending->main?s->cold.mainMenu.get():
-        (s->pending->options?s->cold.options.get():s->pending->rider?s->cold.rider.get():s->pending->course?s->cold.course.get():nullptr);
+        (s->pending->options?s->cold.options.get():s->pending->hall?s->cold.hall.get():s->pending->rider?s->cold.rider.get():s->pending->course?s->cold.course.get():s->pending->tournament?s->cold.tournament.get():nullptr);
     if(!destinationArchive)return s->fault(d,Status::unavailableDestination,0x1CCD88);
     if(s->pending->rider){
         const auto* demand=s->pending->rider->residencyDemand();
@@ -1104,6 +1426,18 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
     if(!s->drainBankWork(d,receipt.bankDrain))return s->fault(d,Status::renderer);
     if(s->pending->rider&&!s->pending->rider->consumeEntryResidency())return s->fault(d,Status::session);
     if(!s->retireSource(*s->active,d))return s->fault(d,Status::cleanup);
+    if(s->active->tournament&&s->pending->course){
+        if(!s->pending->tournamentCourseOrigin||
+           !s->pending->course->acceptTournamentContinueCommit(*s->pending->tournamentCourseOrigin))return s->fault(d,Status::session,0x1F2374);
+        s->pending->tournamentCourseOrigin.reset();
+    }
+    if(s->active->course&&s->pending->tournament)s->active->course->drain();
+    if(s->active->tournament&&s->pending->rider){
+        game::OriginalUiTournamentPredecessorRetirement50KG retirement;
+        if(!s->pending->tournamentPredecessor||
+           !s->active->tournament->retirePredecessorInventory(s->pending->tournamentPredecessor,retirement,d.tournament)||
+           !s->pending->rider->acceptTournamentPredecessorRetirement(retirement,d.rider))return s->fault(d,Status::cleanup);
+    }
     if(s->pending->rider){
         const auto* demand=s->pending->rider->residencyDemand();
         if(!demand||!s->renderer->commitRiderTextures(*demand,s->pending->riderValidation,d.renderer))return s->fault(d,Status::renderer);
@@ -1167,8 +1501,8 @@ bool OriginalUiFrontend50KG::borrowsRenderer(const VehicleWindowGl50DS& renderer
 void OriginalUiFrontend50KG::requestQuit() noexcept {
     auto* s=storage_.get();if(!s||s->inOperation)return;
     s->quit=true;s->frameRendered=false;s->frameSubmitted=false;
-    if(s->active){if(s->active->main)s->active->main->requestQuit();if(s->active->options)s->active->options->requestQuit();
-        if(s->active->rider)s->active->rider->requestQuit();if(s->active->course)s->active->course->requestQuit();}
+    if(s->active){if(s->active->main)s->active->main->requestQuit();if(s->active->options)s->active->options->requestQuit();if(s->active->hall)s->active->hall->requestQuit();
+        if(s->active->rider)s->active->rider->requestQuit();if(s->active->course)s->active->course->requestQuit();if(s->active->tournament)s->active->tournament->requestQuit();}
 }
 OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshot() const noexcept {
     OriginalUiFrontendSnapshot50KG out;const auto* s=storage_.get();if(!s)return out;
@@ -1179,14 +1513,16 @@ OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshot() const noexcept
         out.lightManagerGeneration=s->cold.lightManager->managerGeneration();}
     out.lightManagerEntered=s->ownsLightManager();
     if(s->active){out.route=s->active->currentRoute();if(s->active->transition)out.transition=s->active->transition->snapshot();
-        if(s->active->main)out.main=s->active->main->snapshot();if(s->active->options)out.options=s->active->options->snapshot();
-        if(s->active->rider)out.rider=s->active->rider->snapshot();if(s->active->course)out.course=s->active->course->snapshot();}
+        if(s->active->main)out.main=s->active->main->snapshot();if(s->active->options)out.options=s->active->options->snapshot();if(s->active->hall)out.hall=s->active->hall->snapshot();
+        if(s->active->rider)out.rider=s->active->rider->snapshot();if(s->active->course)out.course=s->active->course->snapshot();if(s->active->tournament)out.tournament=s->active->tournament->snapshot();}
     if(s->pending)out.preparedDestination=s->pending->initialRoute;return out;
 }
 const OriginalUiMainSession50KG* OriginalUiFrontend50KG::mainSession() const noexcept {return storage_&&storage_->active?storage_->active->main.get():nullptr;}
 const OriginalUiOptionsSession50KG* OriginalUiFrontend50KG::optionsSession() const noexcept {return storage_&&storage_->active?storage_->active->options.get():nullptr;}
 const OriginalUiRiderSession50KG* OriginalUiFrontend50KG::riderSession() const noexcept {return storage_&&storage_->active?storage_->active->rider.get():nullptr;}
 const OriginalUiCourseSession50KG* OriginalUiFrontend50KG::courseSession() const noexcept {return storage_&&storage_->active?storage_->active->course.get():nullptr;}
+const OriginalUiTournamentSession50KG* OriginalUiFrontend50KG::tournamentSession() const noexcept {return storage_&&storage_->active?storage_->active->tournament.get():nullptr;}
+const OriginalUiHallOfFameSession50KG* OriginalUiFrontend50KG::hallSession() const noexcept {return storage_&&storage_->active?storage_->active->hall.get():nullptr;}
 const OriginalUiCourseDrawResources50KG* OriginalUiFrontend50KG::courseResources() const noexcept {return storage_&&storage_->active?storage_->active->courseResources.get():nullptr;}
 const OriginalUiMainDrawResources50KG* OriginalUiFrontend50KG::mainResources() const noexcept {return storage_&&storage_->active?storage_->active->mainResources.get():nullptr;}
 const OriginalUiOptionsDrawResources50KG* OriginalUiFrontend50KG::optionsResources() const noexcept {return storage_&&storage_->active?storage_->active->optionsResources.get():nullptr;}

@@ -133,6 +133,18 @@ public:
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
     // Actual config.dat shared by factory pages2/3, with distinct lifetimes.
+    // Genuine UIHOF11/1 shared aperture and original1E46B0/4870/4900/4980 hooks.
+    OriginalUiApertureStatus50KG bindHallOfFame(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    OriginalUiApertureStatus50KG saveHallOfFameUpdateDelta38(float) noexcept;
+    // Actual MemoryCard page5 uses inherited return-only aperture hooks.
+    // This leaf does not admit its separate dialog or any storage operation.
+    OriginalUiApertureStatus50KG bindMemoryCard(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    OriginalUiApertureStatus50KG saveMemoryCardUpdateDelta38(float) noexcept;
+    OriginalUiApertureStatus50KG bindCredits(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    OriginalUiApertureStatus50KG saveCreditsUpdateDelta38(float) noexcept;
     OriginalUiApertureStatus50KG bindControls(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint8_t factoryPage,
         const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
@@ -208,13 +220,13 @@ private:
     OriginalUiApertureCallbacks50KG callbacks_{};
     mutable bool inOperation_=false;
     bool entryOnly_=false;
-    bool optionsMenu_=false,rider_=false,course_=false,tournament_=false;
+    bool optionsMenu_=false,rider_=false,course_=false,tournament_=false,hallOfFame_=false;
     mutable bool tournamentExitRequested4060_=false;
     std::uint8_t optionsPage_=1;
     OriginalUiApertureStatus50KG bindPageImpl(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,bool entryOnly,bool optionsMenu,std::uint8_t page,
-        OriginalUiApertureDiagnostic50KG&,bool rider=false,bool course=false,bool tournament=false) noexcept;
+        OriginalUiApertureDiagnostic50KG&,bool rider=false,bool course=false,bool tournament=false,bool hallOfFame=false) noexcept;
     OriginalUiApertureStatus50KG saveUpdateDelta38(float actualDelta) noexcept;
     bool available() const noexcept;
     void emit(OriginalUiApertureHookKind50KG,std::uint32_t callPC,

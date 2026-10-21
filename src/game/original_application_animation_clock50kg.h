@@ -60,6 +60,13 @@ class OriginalApplicationAnimationClockView50KG final {
         :owner_(std::move(owner)) {}
 public:
     OriginalApplicationAnimationClockView50KG() noexcept=default;
+    // Identity of the same still-live Application publication owner. Equal
+    // sampled values from two different applications do not confer authority.
+    bool sameOwner(const OriginalApplicationAnimationClockView50KG& other) const noexcept {
+        return owner_&&other.owner_&&owner_.get()==other.owner_.get()&&
+            !owner_.owner_before(other.owner_)&&!other.owner_.owner_before(owner_)&&
+            owner_->applicationAlive_;
+    }
     bool readUpdate250(OriginalApplicationUpdateClockSample50KG& out)const noexcept {
         if(!owner_||!owner_->applicationAlive_||!owner_->updateInProgress_||!owner_->updatePublication_)return false;
         out={owner_->value_.current230,owner_->previous234_,owner_->elapsed250_,owner_->updatePublication_};

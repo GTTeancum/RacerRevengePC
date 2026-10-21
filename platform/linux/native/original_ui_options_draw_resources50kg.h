@@ -1,5 +1,8 @@
 #pragma once
 #include "original_ui_controls_material_adapter50kg.h"
+#include "original_ui_controller_popup_resources50kg.h"
+#include "original_ui_memory_card_resources50kg.h"
+#include "original_ui_direct_video50kg.h"
 #include "../../../src/game/original_ui_controls_model50kg.h"
 #include "../../../src/assets/original_ui_image_bank50kg.h"
 #include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
@@ -25,6 +28,8 @@ struct OriginalUiOptionsDrawDiagnostic50KG {
     OriginalUiOptionsDrawError50KG error=OriginalUiOptionsDrawError50KG::none;
     std::uint16_t widgetId=0;
     std::uint32_t materialIndex=0,imageIndex=0,sourcePC=0;
+    OriginalUiControllerPopupResourceDiagnostic50KG controllerPopup{};
+    OriginalUiMemoryCardResourceDiagnostic50KG memoryCard{};
     assets::OriginalUiScreenAssetDiagnostic50KG resource{};
     assets::OriginalUiMaterialDiagnostic50KG material{};
     assets::DecodeError48C atm{};
@@ -43,6 +48,7 @@ struct OriginalUiOptionsVideoOwner50KG {
     std::shared_ptr<const void> lifetime;
     std::int32_t width=0,height=0,colorBits=0,packetZMaximum=0;
     std::uint32_t zBufferFormat=0;
+    OriginalUiDirectVideoCapability50KG directVideoCapability;
 };
 struct OriginalUiOptionsColdInput50KG {
     std::shared_ptr<const assets::OriginalUiArchive50KG> appStart,options,fonts,controllerPopup,overlays;
@@ -50,6 +56,7 @@ struct OriginalUiOptionsColdInput50KG {
     assets::OriginalUiMaterialRuntime50KG runtime{};
     OriginalUiOptionsVideoOwner50KG video{};
     std::shared_ptr<OriginalUiMainApplication50KG> application;
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> retainedControllerPopup;
     std::shared_ptr<game::OriginalUiLightManagerLifetime50KG> lightManager;
 };
 struct OriginalUiOptionsMaterialBinding50KG {
@@ -67,7 +74,8 @@ struct OriginalUiOptionsMaterialBinding50KG {
     std::uint32_t registryToken=0;
     const assets::OriginalUiMemberIdentity50KG* registryIdentity=nullptr;
 };
-// Native cold resource owner for menu, Controls and Game Options widgets.
+enum class OriginalUiCreditsLogo50KG : std::uint8_t {rain,lec,permanentPatch,permanentColumn};
+// Native cold resource owner for menu, Controls, Game Options and Credits widgets.
 // Exact Options PSMs, Options background/ATMs, real shared fonts/overlay/prompts.
 // No GPU publication, page/scene admission, source route or save effect implied.
 class OriginalUiOptionsDrawResources50KG final {
@@ -78,8 +86,14 @@ public:
     OriginalUiOptionsDrawResources50KG& operator=(const OriginalUiOptionsDrawResources50KG&)=delete;
     bool load(const OriginalUiOptionsColdInput50KG&,OriginalUiOptionsDrawDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> controllerPopup() const noexcept;
     game::OriginalUiExitText50KG* exitText() noexcept;
     game::OriginalUiExitText50KG* gameOptionsExitText() noexcept;
+    game::OriginalUiExitText50KG* creditsExitText() noexcept;
+    game::OriginalUiExitText50KG* memoryCardExitText() noexcept;
+    OriginalUiMemoryCardResources50KG* memoryCardResources() noexcept;
+    const OriginalUiMemoryCardResources50KG* memoryCardResources() const noexcept;
+    bool memoryCardReady() const noexcept;
     game::OriginalUiExitText50KG* controlsExitText(std::uint8_t controllerIndex) noexcept;
     bool controlsModelReady() const noexcept;
     bool publishControlsRegistry(OriginalUiOptionsDrawDiagnostic50KG&) noexcept;
@@ -104,6 +118,8 @@ public:
     const game::OriginalUiOptionsBackground50KG* background() const noexcept;
     const game::OriginalUiOptionsBackground50KG* gameOptionsBackground() const noexcept;
     const game::OriginalUiOptionsBackground50KG* controlsBackground() const noexcept;
+    const game::OriginalUiOptionsBackground50KG* creditsBackground() const noexcept;
+    const game::OriginalUiOverlayQuad50KG* creditsLogo(OriginalUiCreditsLogo50KG) const noexcept;
     const game::OriginalUiOptionsCamera50KG* camera() const noexcept;
     const game::OriginalUiMainSceneOwner50KG* scene() const noexcept;
     game::OriginalUiMainFireOwner50KG* fire() noexcept;

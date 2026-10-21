@@ -177,6 +177,8 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     std::int32_t capturedSlot=0;
     const bool capturedRider=capturedUi.route.screen==5&&capturedUi.route.page==1;
     const bool capturedCourse=capturedUi.route.screen==6&&capturedUi.route.page==1;
+    const bool capturedHall=capturedUi.route.screen==11&&capturedUi.route.page==1;
+    const bool capturedTournament=capturedUi.route.screen==9&&capturedUi.route.page==1;
     if(capturedRider){
      require50DU(originalMain.coordinator.riderSession(),"original Rider capture session missing");
      capturedSlot=capturedUi.rider.slot4C8;
@@ -188,7 +190,7 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
          capturedNavigation->groups[group].selectedSlot:0;
     }
     const auto capturedAperture=capturedUi.route.screen==4?capturedUi.main.aperture:
-        capturedRider?capturedUi.rider.aperture:capturedCourse?capturedUi.course.aperture:capturedUi.options.aperture;
+        capturedRider?capturedUi.rider.aperture:capturedCourse?capturedUi.course.aperture:capturedHall?capturedUi.hall.aperture:capturedTournament?capturedUi.tournament.aperture:capturedUi.options.aperture;
     J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
         {"screen",capturedUi.route.screen},{"page",capturedUi.route.page},{"switches",capturedUi.switches},
         {"requested_screen",capturedUi.transition.requested.screen},{"requested_page",capturedUi.transition.requested.page},
@@ -218,6 +220,17 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
      receipt["source_triangles"]=sourceAccepted?originalMain.submittedTriangles:0;
      receipt["source_coherent_framebuffer_fetch"]=sourceAccepted&&originalMain.submittedCoherentFramebufferFetch;
      receipt["source_texture_barriers"]=sourceAccepted?originalMain.submittedTextureBarriers:0;
+    }
+    if(capturedTournament){
+     const bool sourceAccepted=capturedUi.frameSubmitted&&originalMain.submittedScreen==9&&originalMain.sourceFrameGeneration!=0&&
+         originalMain.submittedPublication==originalMain.coordinator.gpu()->publicationToken();
+     receipt["career"]=capturedUi.tournament.career;receipt["prompt_mask"]=capturedUi.tournament.promptMask42C;
+     receipt["camera_active"]=capturedUi.tournament.cameraActive;receipt["accepted_source_frame"]=sourceAccepted;
+     receipt["source_frame_generation"]=sourceAccepted?originalMain.sourceFrameGeneration:0;
+     receipt["source_target_generation"]=sourceAccepted?originalMain.sourceTargetGeneration:0;
+     receipt["source_quads"]=sourceAccepted?originalMain.submittedQuads:0;
+     receipt["source_draws"]=sourceAccepted?originalMain.submittedDraws:0;
+     receipt["source_triangles"]=sourceAccepted?originalMain.submittedTriangles:0;
     }
     if(capturedCourse){
      const bool nativeAccepted=originalMain.submittedScreen==6&&capturedUi.frameSubmitted&&
@@ -318,11 +331,14 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    }
    const auto route=originalMain.coordinator.snapshot().route;
    const bool gameOptions=route.screen==12&&route.page==4;
+   const bool memoryCard=route.screen==12&&route.page==5;
    const bool controls=route.screen==12&&(route.page==2||route.page==3);
    const bool rider=route.screen==5&&route.page==1;
    const bool course=route.screen==6&&route.page==1;
+   const bool hall=route.screen==11&&route.page==1;
+   const bool tournament=route.screen==9&&route.page==1;
    if(physicalInput){
-   if(gameOptions||controls||rider||course){
+   if(gameOptions||controls||memoryCard||rider||course||hall||tournament){
     menuEvents[0]=menuEvents[0]||input.pressed[80];
     menuEvents[1]=menuEvents[1]||input.pressed[79];
     menuEvents[2]=menuEvents[2]||input.pressed[82]||input.pressed[26];
@@ -332,13 +348,13 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     menuEvents[3]=menuEvents[3]||input.pressed[81]||input.pressed[79]||input.pressed[22];
    }
    menuEvents[4]=menuEvents[4]||input.pressed[40]||input.pressed[88]||input.pressed[44];
-   menuEvents[5]=menuEvents[5]||((gameOptions||controls)&&input.pressed[21]);
-   menuEvents[7]=menuEvents[7]||(controls&&input.pressed[43]);
+   menuEvents[5]=menuEvents[5]||((gameOptions||controls||memoryCard||tournament)&&input.pressed[21]);
+   menuEvents[7]=menuEvents[7]||((controls||memoryCard)&&input.pressed[43]);
    menuEvents[6]=menuEvents[6]||input.pressed[41]||hostInput.menuRequested;
    // Same source-ID merge/order as the existing race-hosted frontend. One
    // actual keyboard/pad confirm edge dispatches once even if both are pressed.
    for(const unsigned event:{0u,1u,2u,3u,4u,5u,7u,6u})
-    if(menuEvents[event])originalMain.input(static_cast<std::uint8_t>(event));
+    if(menuEvents[event])originalMain.input(static_cast<std::uint8_t>(event),input.secondControllerPresence);
    }
    if(captureRoute.enabled()){
     require50DU(originalMain.inputCount==captureRoute.issuedActions(),"physical menu input interrupted unattended original UI route");

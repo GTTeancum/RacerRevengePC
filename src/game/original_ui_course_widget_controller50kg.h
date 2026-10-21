@@ -17,6 +17,10 @@ struct OriginalUiCourseWidgetProfile50KG {
     bool gasganoScTest=false;
     bool kraidGbTest=false; // Appended startup provenance only; old field ordering retained.
     bool youngAnakinMcTest=false; // Process-local request only; authentic owners remain mandatory.
+    // Mode-2 observations from the SAME selected live profile; never mode-0 remembered values.
+    std::uint32_t career100C0=0xffffffffu,courseSlot14E4=0,tier14E8=0;
+    std::uint8_t progress219C=0;
+    std::array<std::uint8_t,13> medals1938{};
 };
 enum class OriginalUiCourseWidgetStepKind50KG :std::uint8_t {widget,audioStartLoop11,audioFade1,promptMask42C};
 struct OriginalUiCourseWidgetStep50KG {

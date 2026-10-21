@@ -6,6 +6,7 @@
 
 namespace rr::game {
 struct OriginalUiCourseLighting50KG;
+struct OriginalUiTournamentLighting50KG;
 struct OriginalUiControlsLighting50KG;
 struct OriginalUiControlsModelSelection50KG;
 enum class OriginalUiLightManagerLifetimeError50KG : std::uint8_t {
@@ -51,6 +52,10 @@ public:
     // rows in Ambient,Directional order; later calls update those same rows.
     bool publishRiderRegistry(const OriginalUiRiderLighting50KG&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
+    bool publishTournamentRegistry(const OriginalUiTournamentLighting50KG&,
+        OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
+    // Current exact registry observation; does not publish or renew ownership.
+    bool matchesTournamentRegistry(const OriginalUiTournamentLighting50KG&) const noexcept;
     bool publishCourseRegistry(const OriginalUiCourseLighting50KG&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
     // Actual Options background272A48 zone reset then277FCC SCN population.
@@ -93,6 +98,10 @@ private:
     const assets::OriginalUiMemberIdentity50KG* riderUiIdentity_=nullptr;
     const assets::OriginalUiMemberIdentity50KG* riderWidgetIdentity_=nullptr;
     original_racer_lighting50KM::SmallDirectionalRegistry riderRegistry_{};
+    const assets::OriginalUiMemberIdentity50KG* tournamentUiIdentity_=nullptr;
+    original_racer_lighting50KM::SmallDirectionalRegistry tournamentRegistry_{};
+    std::array<float,4> tournamentAmbient50_{},tournamentDirectional3C_{};
+    bool tournamentRegistryReady_=false;
     const assets::OriginalUiMemberIdentity50KG* courseUiIdentity_=nullptr;
     original_racer_lighting50KM::SmallDirectionalRegistry courseRegistry_{};
     const assets::OriginalUiMemberIdentity50KG* controlsUiIdentity_=nullptr;

@@ -69,6 +69,9 @@ public:
     bool selected() const noexcept { return selected_; }
     bool disabled() const noexcept { return disabled_; }
     bool shown() const noexcept { return shown_; }
+    std::int32_t widgetAlpha() const noexcept { return alpha18C_; }
+    std::uint32_t widgetColor() const noexcept { return color17C_; }
+    bool fadeToggleState1A4() const noexcept { return fadeToggle1A4_; }
 
     // Native widget callback entry points. The legacy setEnabled operation
     // here selects text's enable/disable virtuals+80/+84; it is NOT the
@@ -94,6 +97,16 @@ public:
     OriginalUiTextWidgetStatus50KG setLineAlpha(std::size_t,std::int32_t,
         float duration=0) noexcept;
     OriginalUiTextWidgetStatus50KG stopLine(std::size_t) noexcept;
+
+    // UIOverlayText::SetAlpha2AA870 writes live widget+18C before invoking
+    //29DBC0(alpha,0) on each line. A locked line suppresses its own write, not
+    // the widget field. Selection2AA37C later uses this live value for Setup.
+    // The existing line-only setter intentionally does not change +18C.
+    OriginalUiTextWidgetStatus50KG setWidgetAlpha(std::int32_t) noexcept;
+
+    // Source2AA7F0 writes mutable base+17C before29DA10 for each line.
+    // Locked lines suppress only their own color, not the retained base color.
+    OriginalUiTextWidgetStatus50KG setWidgetColor(std::uint32_t) noexcept;
 
     // Source update's supported zero/nonpositive-duration branch, not a time
     // fast-forward. Call at the ordinary update point. Hidden hierarchy skips
@@ -126,6 +139,9 @@ private:
     const assets::OriginalUiOverlayText50KG* descriptor_=nullptr;
     std::array<OriginalUiTextLineState50KG,originalUiTextWidgetLineLimit50KG> lines_{};
     std::size_t count_=0;
+    std::int32_t alpha18C_=255;
+    std::uint32_t color17C_=0xffffffff;
+    bool fadeToggle1A4_=false;
     bool selected_=false,disabled_=false,shown_=false;
 };
 }

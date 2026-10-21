@@ -144,6 +144,19 @@ bool OriginalUiRiderVisibilityOwner50KG::bind(std::shared_ptr<const assets::Orig
     }
     catch(...){return fail(d,Error::allocation,0x1CCD34);}
 }
+bool OriginalUiRiderVisibilityOwner50KG::bindTournament(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,Diagnostic& d) noexcept {
+    d={};if(storage_)return fail(d,Error::alreadyBound,0x1CCD44);
+    if(!archive||!archive->loaded()||
+       archive->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::tournament))
+        return fail(d,Error::input,0x1CCD44);
+    try {auto next=std::make_unique<Storage>();
+        next->pageIdentity=archive->find("UI/UITourn/standing.dat").identity;
+        next->widgetIdentity=archive->find("UI/UITourn/Widgets.Dat").identity;
+        if(!next->pageIdentity||!next->widgetIdentity)return fail(d,Error::input,0x1CCD44);
+        next->archive=std::move(archive);storage_=std::move(next);return true;
+    }catch(...){return fail(d,Error::allocation,0x1CCD34);}
+}
 bool OriginalUiRiderVisibilityOwner50KG::registerModel(
     std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG> assets,
     OriginalUiRiderCharacterScene50KG& model,bool shown,OriginalUiRiderVisibilityHandle50KG& output,

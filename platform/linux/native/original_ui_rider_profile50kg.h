@@ -2,17 +2,20 @@
 #pragma once
 #include "original_ui_main_session50kg.h"
 #include "../../../src/game/original_ui_course_selection50kg.h"
+#include "../../../src/game/original_ui_course_mode2_entry50kg.h"
 #include "../../../src/game/original_ui_rider_selection50kg.h"
 #include "../../../src/game/original_ui_rider_stat_projection50kg.h"
 #include "../../../src/game/original_ui_route_decisions50kg.h"
 #include "../../../src/game/original_tournament_result50kg.h"
 #include "../../../src/game/lap_timing50id.h"
+#include "../../../src/game/original_ui_hall_records50kg.h"
 
 namespace original_main_entry50KG { struct Application; }
 
 namespace rr::platform {
 class OriginalUiFrontend50KG;
 class OriginalUiTournamentSession50KG;
+class OriginalUiHallOfFameSession50KG;
 struct OriginalUiRiderProfileDiagnostic50KG {
     enum class Error:std::uint8_t {none,alreadyInitialized,commonProfile,archive,member,parse,range,allocation} error=Error::none;
     std::uint32_t sourcePC=0,rider=0;
@@ -101,6 +104,15 @@ public:
         std::shared_ptr<const assets::OriginalUiArchive50KG>,OriginalUiRiderProfileDiagnostic50KG&,
         std::uint32_t mcRider=1) noexcept;
     bool youngAnakinMcTestProfile() const noexcept;
+    // Source17DE80 loads actual localized names before1801D0. One explicit
+    // startup population, never a menu-entry reset or missing-save fallback.
+    bool initializeHallRecordsAtApplicationStartup(const assets::OriginalUiEnglish50KG&,
+        OriginalUiRiderProfileDiagnostic50KG&) noexcept;
+    bool hallRecordsReady() const noexcept;
+    // Typed browse-mode views do not widen the existing racer mode0..2 gate.
+    bool hallSnapshot(game::OriginalUiHallProfile50KG&) const noexcept;
+    bool hallRecordSnapshot(std::uint32_t course,game::OriginalUiHallCourseRecords50KG&) const noexcept;
+    bool hallPlanetColors(std::uint32_t planet,OriginalUiCourseProfileColors50KG&) const noexcept;
     bool initialized() const noexcept;
     const OriginalUiMainProfile50KG* commonProfile() const noexcept;
     OriginalUiRiderProfileStamp50KG stamp() const noexcept;
@@ -130,13 +142,41 @@ public:
     struct TournamentCareerSnapshot {
         std::uint32_t career100C0=0,earned2190=0,unspent2194=0,kills2198=0;
         std::uint8_t progress219C=0,availability11018=0;
+        // Actual profile100BC bit0, tested by Tournament entry1EEA64/68.
+        // Observation only: a clean value never certifies popup ownership.
+        bool cardFlag100BC=false;
         std::array<std::uint8_t,13> medals1938{};
         std::array<std::int16_t,13> remainingPrizes1946{};
         OriginalUiRiderProfileStamp50KG stamp{};
     };
     bool tournamentCareerSnapshot(std::uint32_t career,TournamentCareerSnapshot&)const noexcept;
+    // Coherent read of the actual selected career and Course lanes. No caller
+    // supplied career/progress or independent snapshots confer selection.
+    bool selectedTournamentCourseSnapshot(TournamentCareerSnapshot&,
+        game::OriginalUiCourseRememberedProfile50KG&) const noexcept;
+    struct TournamentCourseRecordSnapshot {
+        std::uint32_t slot=0,course100C4=0;
+        std::int32_t constructorPurse100C8=0,par100E8=0;
+        std::array<std::int32_t,7> killPercent100CC{};
+        OriginalUiRiderProfileStamp50KG stamp{};
+    };
+    // Only the authenticated first constructor row is represented here.
+    // Actual remaining purse remains in the selected career/pod snapshot.
+    bool selectedTournamentCourseRecordSnapshot(TournamentCourseRecordSnapshot&) const noexcept;
     bool tournamentPodCareerSnapshot(std::uint32_t career,std::uint32_t pod,
         game::OriginalTournamentPodCareer50KG&)const noexcept;
+    struct TournamentTextMetadataSnapshot {
+        std::uint32_t career100C0=0;
+        std::int32_t racerName3C=-1,courseTitle1127C=-1;
+        std::int8_t planetTitle11281=-1; // Source1EF3F0 uses signed LB.
+        std::uint8_t progressIndex=0,course100C4=0;
+        OriginalUiRiderProfileStamp50KG stamp{};
+    };
+    // Observes retained constructor localization IDs and actual course order,
+    // not caller-supplied labels. Only the uncompleted0..12 next-course branch
+    // is represented; progress13 has its own source text path and rejects.
+    bool tournamentTextMetadataSnapshot(std::uint32_t career,
+        TournamentTextMetadataSnapshot&) const noexcept;
 private:
     friend struct ::original_main_entry50KG::Application;
     // Actual Application2DC owner only. Called at the future admitted race
@@ -146,9 +186,20 @@ private:
     bool initializeStartupProfile(std::shared_ptr<OriginalUiMainProfile50KG>,
         std::shared_ptr<const assets::OriginalUiArchive50KG>,std::uint32_t testRider,
         OriginalUiRiderProfileDiagnostic50KG&,bool gasganoSc=false,bool tzidikTc=false,bool scorchRc=false,bool sebulbaTb=false,bool kraidGb=false,bool youngAnakinMc=false,std::uint32_t mcRider=1) noexcept;
+    friend class OriginalUiHallOfFameSession50KG;
+    bool hallSnapshotForMode(std::uint32_t prospectiveMode,game::OriginalUiHallProfile50KG&) const noexcept;
+    bool commitHallPlanet(std::uint32_t planet,OriginalUiRiderProfileStamp50KG) noexcept;
+    bool commitHallBack(std::uint16_t selectedSlot,const game::OriginalUiRouteDecision50KG&,
+        OriginalUiRiderProfileStamp50KG) noexcept;
+    bool commitHallRender(OriginalUiRiderProfileStamp50KG) noexcept;
     friend class OriginalUiTournamentSession50KG;
     friend class OriginalUiCourseSession50KG;
     bool commitRiderConfirmToCourse(const game::OriginalUiRouteDecision50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
+    friend class OriginalUiTournamentCareerResources50KG;
+    // Same exact selection transaction validation, read-only before admission.
+    // This observes original authored/unlock facts, never race readiness.
+    bool canPrepareRiderConfirmToTournament(const game::OriginalUiRouteDecision50KG&,OriginalUiRiderProfileStamp50KG)const noexcept;
+    bool canCommitRiderConfirmToTournament(const game::OriginalUiRouteDecision50KG&,OriginalUiRiderProfileStamp50KG)const noexcept;
     bool commitRiderConfirmToTournament(const game::OriginalUiRouteDecision50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     // Concrete frontend only: call AFTER an admitted genuine mode2 cold race
     // launch commits its exact original selected profile fields and the SAME
@@ -161,6 +212,8 @@ private:
         const CourseRaceSelection&,OriginalUiRiderProfileStamp50KG,
         OriginalUiMainApplication50KG&,game::OriginalTournamentResultReceipt50KG&)noexcept;
     bool commitCourseEntry(const game::OriginalUiCourseSelectionData50KG&,const game::OriginalUiCourseEntryPrefix50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
+    bool commitCourseMode2Entry(const game::OriginalUiCourseSelectionData50KG&,
+        const game::OriginalUiCourseMode2EntryPlan50KG&,OriginalUiRiderProfileStamp50KG) noexcept;
     bool commitCourseMove(const game::OriginalUiCourseSelectionData50KG&,const game::OriginalUiNavigation50KG& before,
         bool forward,const game::OriginalUiCourseMove50KG&,OriginalUiRiderProfileStamp50KG)noexcept;
     bool commitCourseLaunch(const game::OriginalUiRouteDecision50KG&,const game::OriginalUiCourseContext50KG&,OriginalUiRiderProfileStamp50KG)noexcept;

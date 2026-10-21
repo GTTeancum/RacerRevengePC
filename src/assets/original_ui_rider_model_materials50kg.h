@@ -40,6 +40,12 @@ public:
         std::shared_ptr<const OriginalUiArchive50KG> podTextures,
         const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
         OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
+    // Separate authenticated Tournament entry; Rider loadPod remains Rider-only.
+    bool loadTournamentPod(std::shared_ptr<const OriginalUiRiderPodAssets50KG>,
+        std::shared_ptr<const OriginalUiArchive50KG> appStart,
+        std::shared_ptr<const OriginalUiArchive50KG> podTextures,
+        const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
+        OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
     bool loaded() const noexcept;
     std::uint32_t materialCount() const noexcept;
     std::uint32_t passCount(std::uint32_t material) const noexcept;
@@ -50,7 +56,7 @@ private:
         std::shared_ptr<const OriginalUiArchive50KG>,std::shared_ptr<const OriginalUiArchive50KG>,
         std::shared_ptr<const OriginalUiArchive50KG> podTextures,
         const OriginalUiMaterialRuntime50KG&,const OriginalUiIpumTextureCache50KG*,
-        OriginalUiRiderModelMaterialDiagnostic50KG&) noexcept;
+        OriginalUiRiderModelMaterialDiagnostic50KG&,bool tournament=false) noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };
 }

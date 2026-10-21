@@ -396,15 +396,19 @@ public:
                 if(request.decodeOriginalImages){
                     //128D50/24F2C0: exact tile descriptor followed by four IPUM mips.
                     constexpr std::array<std::uint32_t,11> standardDescriptor{0,32,0,16,4096,4,0,0,0,0,0};
-                    // Exact descriptor from all48 authenticated Sullust CUB tiles.
-                    // Keep source/output image pins and four IPUM mip checks below.
-                    constexpr std::array<std::uint32_t,11> saDescriptor{0,34,0,16,16,4,0,0,0,0,0};
-                    const auto& descriptor=request.track==track_source_fixture::Track::sa?
-                        saDescriptor:standardDescriptor;
-                    need(source.size()>=sizeof(descriptor),"Original sky tile descriptor extent");
-                    for(std::size_t word=0;word<11;++word)
-                        need(u32(source.data()+word*4)==descriptor[word],"Original sky tile descriptor");
-                    std::size_t at=sizeof(descriptor),largest=0,largestBytes=0;
+                    // Both exact source formats occur in authenticated CUB tiles.
+                    // Select by source bytes, not course identity. Archive/CUB/tile
+                    // hashes precede this check; mip/output identities follow it.
+                    constexpr std::array<std::uint32_t,11> alternateDescriptor{0,34,0,16,16,4,0,0,0,0,0};
+                    need(source.size()>=sizeof(standardDescriptor),"Original sky tile descriptor extent");
+                    bool standard=true,alternate=true;
+                    for(std::size_t word=0;word<11;++word){
+                        const auto value=u32(source.data()+word*4);
+                        standard=standard&&value==standardDescriptor[word];
+                        alternate=alternate&&value==alternateDescriptor[word];
+                    }
+                    need(standard||alternate,"Original sky tile descriptor");
+                    std::size_t at=sizeof(standardDescriptor),largest=0,largestBytes=0;
                     for(std::uint32_t dimension=16;dimension<=128;dimension*=2){
                         need(at<=source.size()&&source.size()-at>=4,"Original sky mip size extent");
                         const auto bytes=u32(source.data()+at);at+=4;

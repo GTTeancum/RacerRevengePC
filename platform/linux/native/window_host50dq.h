@@ -47,12 +47,15 @@ struct ControllerRumbleReceipt50KZ {
     std::int32_t instanceId=-1;
     std::uint8_t smallMotor=0,largeMotor=0;
 };
+// Native SDL slot observation, not original pad-port identity or page readiness.
+enum class WindowControllerPresence50DQ { Unknown, Absent, Present };
 struct WindowInput50DQ {
     // Raw SDL2 physical scancode indices, each value 0 or 1. No game bindings.
     // Edges reset each poll; both can be set if a press and release were drained.
     std::array<std::uint8_t, windowScancodeCount50DQ> down{}, pressed{}, released{};
     std::array<WindowGameController50DQ,2> controllers{};
     bool gameControllersEnabled=false;
+    WindowControllerPresence50DQ secondControllerPresence=WindowControllerPresence50DQ::Unknown;
     std::uint32_t controllerOpenFailures=0; // This poll; failed opens never report connected.
     std::uint32_t eventsProcessed = 0;
     bool quitRequested = false; // Latched until close/recreate, including titlebar close.

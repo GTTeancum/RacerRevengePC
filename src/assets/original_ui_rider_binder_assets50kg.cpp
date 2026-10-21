@@ -38,9 +38,19 @@ OriginalUiMemberView50KG OriginalUiRiderBinderAssets50KG::atmMember()const noexc
 bool OriginalUiRiderBinderAssets50KG::load(std::shared_ptr<const OriginalUiArchive50KG> rider,
     std::shared_ptr<const OriginalUiArchive50KG> appStart,const OriginalUiMaterialRuntime50KG& runtime,
     OriginalUiRiderBinderAssetDiagnostic50KG& d) noexcept {
+    return loadImpl(std::move(rider),std::move(appStart),runtime,d,false);
+}
+bool OriginalUiRiderBinderAssets50KG::loadTournament(std::shared_ptr<const OriginalUiArchive50KG> tournament,
+    std::shared_ptr<const OriginalUiArchive50KG> appStart,const OriginalUiMaterialRuntime50KG& runtime,
+    OriginalUiRiderBinderAssetDiagnostic50KG& d) noexcept {
+    return loadImpl(std::move(tournament),std::move(appStart),runtime,d,true);
+}
+bool OriginalUiRiderBinderAssets50KG::loadImpl(std::shared_ptr<const OriginalUiArchive50KG> rider,
+    std::shared_ptr<const OriginalUiArchive50KG> appStart,const OriginalUiMaterialRuntime50KG& runtime,
+    OriginalUiRiderBinderAssetDiagnostic50KG& d,bool tournament) noexcept {
     d={};if(storage_)return fail(d,E::alreadyLoaded);
     if(!rider||!appStart||!rider->loaded()||!appStart->loaded()||
-       !rider->identity()||rider->identity()->id!=OriginalUiArchiveId50KG::rider||
+       rider->identity()!=originalUiArchiveIdentity50KG(tournament?OriginalUiArchiveId50KG::tournament:OriginalUiArchiveId50KG::rider)||
        !appStart->identity()||appStart->identity()->id!=OriginalUiArchiveId50KG::appStart)
         return fail(d,E::archive);
     try {

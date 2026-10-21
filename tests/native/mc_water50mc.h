@@ -116,11 +116,7 @@ public:
  }
  bool bindResetDomain(const rr::game::UndertrackPhysicsDomain50EW& source,const float& actual348Lift1F0,
      rr::game::UndertrackPhysicsDomain50EW& output)const noexcept{
-  using namespace rr::game;
-  if(!ready()||source.terrain330!=UndertrackHeightOwner50EW::Absent||source.water334!=UndertrackHeightOwner50EW::Present||
-     !runtime_.provider()||!runtime_.globals())return false;
-  auto next=source;next.waterProvider334=runtime_.provider();next.waterGlobals=runtime_.globals();
-  next.terrain348Lift1F0=&actual348Lift1F0;output=next;return true;
+  return ready()&&runtime_.bindRuntimeHeightDomain(source,actual348Lift1F0,output);
  }
 };
 }

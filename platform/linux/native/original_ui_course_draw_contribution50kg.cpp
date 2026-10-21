@@ -4,6 +4,7 @@
 #include "original_ui_lit_material_adapter50km.h"
 #include "../../../src/game/original_ui_course_clip_camera50kg.h"
 #include "../../../src/game/original_ui_rider_model_fog50kg.h"
+#include "../../../src/game/original_ui_course_static_pst_animation50kg.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -20,6 +21,27 @@ bool sameSampler(const MaterialTextureSampler50EB& a,const MaterialTextureSample
 const assets::OriginalUiMemberIdentity50KG* member(const char* name)noexcept{
  const auto* a=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::course);if(!a)return nullptr;
  for(std::size_t i=0;i<a->memberCount;++i){auto* m=assets::originalUiMemberIdentity50KG(a->id,i);if(m&&!std::strcmp(m->name,name))return m;}return nullptr;
+ }
+const char* staticPstName(const OriginalUiCourseMaterialBinding50KG& b,
+ const assets::OriginalUiScreenAssets50KG& images)noexcept{
+ using K=OriginalUiCourseStaticPstSource50KG;
+ const bool left=b.staticPstSource==K::leftTopDisabled;
+ if(!left&&b.staticPstSource!=K::rightTopDisabled)return nullptr;
+ const char* registered=left?"ui/textures/arrwlefttop_d":"ui/textures/arrwrghttop_d";
+ const char* psm=left?"ui\\textures\\arrwlefttop_d.psm":"ui\\textures\\arrwrghttop_d.psm";
+ const char* pst=left?"ui\\textures\\arrwleft_d.pst":"ui\\textures\\arrwrght_d.pst";
+ const auto* shader=member(psm);
+ if(!shader||b.registeredName!=registered||b.animated||b.images.size()!=1||b.material.passes.size()!=1||
+    b.material.identity!=shader||b.material.passes[0].identity!=shader||
+    b.material.passes[0].enabled!=1||b.material.passes[0].textureCount!=1||
+    b.material.passes[0].textureName!=(left?"arrwleft_d":"arrwrght_d")||
+    b.animation.initialFrame!=0||b.animation.framesPerSecond!=8||!b.animation.looping||
+    !b.animation.reverseLoopOnEnd||b.animation.loopOnEndToFrame!=0)return nullptr;
+ const auto* provenance=images.sourceProvenance(b.images[0]);const auto* expected=member(pst);
+ const auto* mode=b.material.passes[0].authored.find("TextureAnimation");
+ if(!provenance||!expected||provenance->memberIdentity!=expected||provenance->celIdentity||
+    provenance->pstOffset||provenance->pstBytes!=expected->bytes||!mode||mode->text!="unique")return nullptr;
+ return pst;
 }
 }
 struct OriginalUiCourseDrawContribution50KG::Storage {
@@ -30,6 +52,10 @@ struct OriginalUiCourseDrawContribution50KG::Storage {
  std::vector<std::uint8_t> maxAlpha;
  std::shared_ptr<const MaterialTextureGl50EB> gpu;std::uint64_t publication=0;
  std::vector<game::OriginalUiTextureAnimation50KG> animation;std::vector<std::uint32_t> frames;
+ std::vector<std::uint32_t> controllerStamps;
+ std::vector<game::OriginalUiCourseStaticPstAnimation50KG> staticPstAnimation;
+ game::OriginalApplicationAnimationClockView50KG tournamentClock;
+ bool tournament=false,sourceMutationInFrame=false,sourceTerminal=false;
  std::map<const assets::OriginalUiMaterialPass50KG*,std::pair<std::uint32_t,std::uint32_t>> registrations;
  std::vector<std::pair<std::uint32_t,std::uint32_t>> orders;
  std::vector<assets::Vertex48B> vertices;std::vector<float> w,fog;
@@ -62,11 +88,24 @@ struct OriginalUiCourseDrawContribution50KG::Storage {
 };
 OriginalUiCourseDrawContribution50KG::OriginalUiCourseDrawContribution50KG()noexcept=default;
 OriginalUiCourseDrawContribution50KG::~OriginalUiCourseDrawContribution50KG()=default;
-bool OriginalUiCourseDrawContribution50KG::bind(std::shared_ptr<OriginalUiCourseDrawResources50KG> r,std::shared_ptr<OriginalUiCourseHologramDraw50KG> h,D& d)noexcept{
+bool OriginalUiCourseDrawContribution50KG::bind(std::shared_ptr<OriginalUiCourseDrawResources50KG> r,std::shared_ptr<OriginalUiCourseHologramDraw50KG> h,D& d,const game::OriginalApplicationAnimationClockView50KG& tournamentClock)noexcept{
  d={};if(storage_)return fail(d,E::alreadyBound);if(!r||!r->loaded()||!h||!h->loaded())return fail(d,E::resource);
+ game::OriginalApplicationAnimationClockSample50KG initial;
+ if(r->tournamentFreshPrepared()&&!tournamentClock.read(initial))return fail(d,E::clock,0x29ACA8);
  try{auto s=std::make_unique<Storage>();s->resources=std::move(r);s->holo=std::move(h);s->workspace=std::make_unique<game::OriginalUiLitGeometryWorkspace50KM>();
-  const auto& materials=*s->resources->materials();s->animation.resize(materials.size());s->frames.resize(materials.size());
-  for(std::size_t i=0;i<materials.size();++i)if(materials[i].animated&&!game::initializeOriginalUiTextureAnimation50KG(s->animation[i],materials[i].animation,static_cast<std::uint32_t>(materials[i].images.size())))return fail(d,E::clock);
+  s->tournament=s->resources->tournamentFreshPrepared();if(s->tournament)s->tournamentClock=tournamentClock;
+  const auto& materials=*s->resources->materials();s->animation.resize(materials.size());s->frames.resize(materials.size());s->staticPstAnimation.resize(materials.size());
+  s->controllerStamps.assign(materials.size(),0xffffffffu);
+  unsigned staticPstCount=0;
+  for(std::size_t i=0;i<materials.size();++i){const auto& b=materials[i];
+   if(b.animated&&!game::initializeOriginalUiTextureAnimation50KG(s->animation[i],b.animation,static_cast<std::uint32_t>(b.images.size())))return fail(d,E::clock);
+   if(b.staticPstSource!=OriginalUiCourseStaticPstSource50KG::none){
+    const auto* name=staticPstName(b,*s->resources->images());
+    if(!s->tournament||!name||!game::initializeOriginalUiCourseStaticPstAnimation50KG(s->staticPstAnimation[i],b.animation,name))return fail(d,E::clock,0x29A10C);
+    ++staticPstCount;
+   }
+  }
+  if(staticPstCount!=(s->tournament?2u:0u))return fail(d,E::clock,0x29A10C);
   storage_=std::move(s);return true;
  }catch(...){return fail(d,E::allocation);}
 }
@@ -115,6 +154,9 @@ bool OriginalUiCourseDrawContribution50KG::bindPublishedBank(std::shared_ptr<con
 }
 bool OriginalUiCourseDrawContribution50KG::begin(const OriginalUiCourseDrawClock50KG& clock,const game::OriginalUiCourseRenderContext50KG& render,const game::OriginalUiCourseLighting50KG& lights,D& d,std::uint32_t planet)noexcept{
  d={};if(!storage_||!storage_->bankPrepared||!storage_->gpu||!clock.known)return fail(d,E::phase);auto& s=*storage_;drain();
+ if(s.sourceTerminal||s.holo->animationFaulted())return fail(d,E::clock,0x29AD48);
+ game::OriginalApplicationAnimationClockSample50KG sourceClock;
+ if(s.tournament&&(!s.tournamentClock.sameOwner(clock.applicationAnimation)||!clock.applicationAnimation.read(sourceClock)))return fail(d,E::clock,0x29ACA8);
  if(!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication)return fail(d,E::publication);
  if(!s.resources->widgets()->popupTemplatesHidden438()||s.resources->widgets()->popupEnabled438())return fail(d,E::widget,0x1DA714);
  if(render.cameraAfterFog.pageIdentity!=member("UI\\UICourse\\track.dat")||render.fogIdentity!=member("UI\\UICourse\\ui.dat")||lights.uiIdentity!=render.fogIdentity)return fail(d,E::input);
@@ -122,7 +164,8 @@ bool OriginalUiCourseDrawContribution50KG::begin(const OriginalUiCourseDrawClock
  // Explicit native two-light adaptation, not original per-model14A0E8 cache.
  if(game::projectOriginalUiGlobalLightRows50KM(true,lights.directionalLook78,lights.directional3C,lights.ambient50,s.lit.lights)!=game::original_racer_lighting50KM::Status::complete)return fail(d,E::model);
  s.lit.viewC0=render.cameraAfterFog.core.view;s.lit.projection80=render.cameraAfterFog.core.projection;s.lit.clipProjection290=clip.clipProjection290;s.lit.screen140=render.cameraAfterFog.sourceScreen.sourceScreen140;s.lit.cameraPosition180=render.cameraAfterFog.position;s.lit.fogEnd33Z=render.packetFogStart33Z;s.lit.fogSlope33W=render.packetFogScale33W;s.lit.canvasOffset=render.sourceCanvasOffset;s.render=render;s.clock=clock;
- try{if(clock.advanceAnimations&&!s.holo->advanceTextureAnimations(clock.milliseconds,d.hologram))return fail(d,E::clock);
+ try{if(!s.tournament&&clock.advanceAnimations&&!s.holo->advanceTextureAnimations(clock.milliseconds,d.hologram))return fail(d,E::clock);
+  s.sourceMutationInFrame=false;
   s.active=true;s.ordinary=s.page=s.exit=s.prompts=s.top=s.finished=s.failed=false;s.aperture=0;s.vertices.clear();s.w.clear();s.fog.clear();s.spans.clear();s.states.clear();s.orders.clear();
   OriginalUiMaterialSpan50KG material;if(!prepareOriginalUiCourseBackgroundSpan50KG(*s.bank->images(),s.mapped(0,s.resources->backgroundImage(planet)),material.span,material.native))return fail(d,E::material);
   std::array<assets::Vertex48B,4> v{};constexpr float xy[4][2]={{0,0},{640,0},{640,448},{0,448}};
@@ -133,7 +176,40 @@ bool OriginalUiCourseDrawContribution50KG::begin(const OriginalUiCourseDrawClock
 bool OriginalUiCourseDrawContribution50KG::appendVertices(const std::vector<assets::Vertex48B>& v,std::uint32_t index,D& d)noexcept{
  auto& s=*storage_;if(v.empty())return true;if(index>=s.resources->materials()->size())return fail(d,E::material);
  try{const auto& b=(*s.resources->materials())[index];if(b.material.passes.size()!=1)return fail(d,E::material);const auto& p=b.material.passes[0];
-  if(b.animated&&s.clock.advanceAnimations&&!game::advanceOriginalUiTextureAnimation50KG(s.animation[index],s.clock.milliseconds,s.frames[index]))return fail(d,E::clock);
+  if(s.tournament&&!b.animated&&p.authored.find("TextureAnimation")){
+   // Source static PST dispatch24B27C ->29C6D0 always returns this actual
+   // texture. Its unique controller is still serviced; name20 is a numeric
+   // bound, never a fabricated frame count or an image ordinal.
+   if(!staticPstName(b,*s.resources->images()))return fail(d,E::clock,0x29A10C);
+   auto& state=s.staticPstAnimation[index];
+   if(!game::validOriginalUiCourseStaticPstAnimation50KG(state)||state.stopped||
+      state.previousMilliseconds!=s.controllerStamps[index])return fail(d,E::clock,0x29AC9C);
+   game::OriginalApplicationAnimationClockSample50KG entry,leaf,leafCommit,commit;
+   if(!s.clock.applicationAnimation.read(entry))return fail(d,E::clock,0x29ACA8);
+   if(s.controllerStamps[index]!=entry.current230&&!entry.pause11C){
+    leaf=entry;if(state.previousMilliseconds!=0xffffffffu&&!s.clock.applicationAnimation.read(leaf))return fail(d,E::clock,0x29A118);
+    if(!s.clock.applicationAnimation.read(leafCommit))return fail(d,E::clock,0x29A16C);
+    auto next=state;if(!game::advanceOriginalUiCourseStaticPstAnimation50KG(next,leaf.current230))return fail(d,E::clock,0x29A020);
+    next.previousMilliseconds=leafCommit.current230;state=next;s.sourceMutationInFrame=true;
+    if(!s.clock.applicationAnimation.read(commit))return fail(d,E::clock,0x29AD48);
+    s.controllerStamps[index]=commit.current230;
+   }
+   // b.images[0] is retained PST provenance. Never select by numeric phase.
+  }else if(b.animated&&s.tournament){
+   //Geometry is complete before24A740 ->29AC90. Use the real Application
+   //publication for each source read, not the legacy filtered UI timestamp.
+   game::OriginalApplicationAnimationClockSample50KG entry,leaf,leafCommit,commit;
+   if(!s.clock.applicationAnimation.read(entry))return fail(d,E::clock,0x29ACA8);
+   if(s.controllerStamps[index]!=entry.current230&&!entry.pause11C){
+    leaf=entry;if(s.animation[index].previousMilliseconds!=0xffffffffu&&!s.clock.applicationAnimation.read(leaf))return fail(d,E::clock,0x29A118);
+    if(!s.clock.applicationAnimation.read(leafCommit))return fail(d,E::clock,0x29A16C);
+    auto next=s.animation[index];std::uint32_t frame=0;
+    if(!game::advanceOriginalUiTextureAnimation50KG(next,leaf.current230,frame))return fail(d,E::clock,0x29A020);
+    next.previousMilliseconds=leafCommit.current230;s.animation[index]=next;s.frames[index]=frame;s.sourceMutationInFrame=true;
+    if(!s.clock.applicationAnimation.read(commit))return fail(d,E::clock,0x29AD48);
+    s.controllerStamps[index]=commit.current230;
+   }else if(!game::selectOriginalUiTextureAnimationFrame50KG(s.animation[index],s.frames[index]))return fail(d,E::clock,0x29AF90);
+  }else if(b.animated&&s.clock.advanceAnimations&&!game::advanceOriginalUiTextureAnimation50KG(s.animation[index],s.clock.milliseconds,s.frames[index]))return fail(d,E::clock);
   const auto first=static_cast<std::uint32_t>(s.vertices.size()/4),count=static_cast<std::uint32_t>(v.size()/4);OriginalUiMaterialSpan50KG m;
   if(!p.textureCount){assets::OriginalUiNativeUntexturedMaterial50KG policy;if(!assets::prepareOriginalUiNativeUntexturedMaterial50KG(p,policy,d.materialDetail)||!convertOriginalUiUntexturedMaterialSpan50KG(policy,{first,count,first+count},m))return fail(d,E::material);}
   else{auto frame=s.frames[index];if(frame>=b.images.size())return fail(d,E::clock);auto image=s.mapped(0,b.images[frame]);assets::OriginalUiNativeMaterial50KG policy;
@@ -155,7 +231,12 @@ bool OriginalUiCourseDrawContribution50KG::model(std::uint16_t id,D& d)noexcept{
    std::vector<assets::Vertex48B> vertices(count*4u);std::vector<float> w(count*4u),f(count*4u);
    game::OriginalUiLitSurfaceOutput50KM output{vertices.data(),w.data(),f.data(),count,0,0};
    if(!s.holo->project(id,surface,palette,s.lit,fog.computeRadialFog1B2,output,*s.workspace,d.hologram))return fail(d,E::model);
-   for(std::uint32_t pass=0;pass<material->passes.size();++pass){const auto& p=material->passes[pass];auto image=s.mapped(1,s.holo->currentImage(id,pass));assets::OriginalUiLitMaterial50KM policy;OriginalUiMaterialSpan50KG m;
+   for(std::uint32_t pass=0;pass<material->passes.size();++pass){const auto& p=material->passes[pass];
+    if(s.tournament){const auto before=s.holo->textureAnimationMutationSerial();
+     const bool ok=s.holo->serviceTextureAnimation24A740(id,pass,s.clock.applicationAnimation,d.hologram);
+     if(s.holo->textureAnimationMutationSerial()!=before)s.sourceMutationInFrame=true;
+     if(!ok)return fail(d,E::clock,d.hologram.sourcePC);}
+    auto image=s.mapped(1,s.holo->currentImage(id,pass));assets::OriginalUiLitMaterial50KM policy;OriginalUiMaterialSpan50KG m;
     const auto first=static_cast<std::uint32_t>(s.vertices.size()/4);
     if(image==missing||!assets::prepareOriginalUiLitMaterial50KM(p,*s.bank->images()->decodedTexture(image),policy,d.materialDetail)||!convertOriginalUiLitMaterialSpan50KM(policy,{first,output.slotCount,first+output.slotCount,image,s.bank->images()->textures()->textureCount()},m)||!s.add(vertices.data(),output.slotCount*4u,w.data(),f.data(),m,&p,d))return fail(d,E::material);
    }
@@ -193,10 +274,18 @@ bool OriginalUiCourseDrawContribution50KG::widgets(bool top,bool ancestors,D& d)
 bool OriginalUiCourseDrawContribution50KG::projectOrdinaryWidgets(bool shown,D& d)noexcept{
  d={};if(!storage_)return fail(d,E::phase);auto& s=*storage_;if(!s.active||s.ordinary||s.failed||s.finished)return fail(d,E::phase);if(!widgets(false,shown,d)){s.failed=true;return false;}s.ordinary=true;return true;
 }
-bool OriginalUiCourseDrawContribution50KG::projectPage(const game::OriginalUiCoursePageDraw50KG& page,D& d)noexcept{
+bool OriginalUiCourseDrawContribution50KG::projectPage(game::OriginalUiCoursePageDraw50KG& page,D& d)noexcept{
  d={};if(!storage_)return fail(d,E::phase);auto& s=*storage_;if(!s.active||!s.ordinary||s.page||s.failed||s.finished||!page.prepared()||page.images()!=s.resources->images()||page.pageIdentity()!=member("UI\\UICourse\\track.dat"))return fail(d,E::phase);
- const auto* packets=page.packets();if(!packets)return fail(d,E::geometry);
- for(const auto& p:*packets){if(!p.materialName){s.failed=true;return fail(d,E::material);}auto m=s.resources->materialIndex(p.materialName);if(m>=s.resources->materials()->size()||(*s.resources->materials())[m].material.identity!=p.materialIdentity||!appendVertices(p.vertices,m,d)){s.failed=true;return false;}}
+ if(page.tournamentFresh()!=s.tournament)return fail(d,E::phase);
+ const auto collect=[&](const auto* packets){if(!packets)return fail(d,E::geometry);
+  std::size_t ordinal=0;
+  for(const auto& p:*packets){
+   if(s.tournament&&(ordinal==0||ordinal==3||ordinal==4||ordinal==5||ordinal==23)){
+    const auto stage=std::uint8_t(ordinal==0?0:ordinal==3?1:ordinal==4?2:ordinal==5?3:4);
+    game::OriginalUiCoursePageDrawDiagnostic50KG detail;
+    if(!page.applyTournamentWidgetStage(stage,*s.resources->widgets(),detail)){s.failed=true;d.widgetDetail=detail.widget;return fail(d,E::widget,detail.sourcePC);}}
+   if(!p.materialName){s.failed=true;return fail(d,E::material);}auto m=s.resources->materialIndex(p.materialName);if(m>=s.resources->materials()->size()||(*s.resources->materials())[m].material.identity!=p.materialIdentity||!appendVertices(p.vertices,m,d)){s.failed=true;return false;}++ordinal;}return true;};
+ if(!(s.tournament?collect(page.tournamentPackets()):collect(page.packets())))return false;
  s.page=true;return true;
 }
 bool OriginalUiCourseDrawContribution50KG::projectExitText(const game::OriginalUiApertureHook50KG& hook,D& d)noexcept{
@@ -234,5 +323,5 @@ bool OriginalUiCourseDrawContribution50KG::finish(D& d)noexcept{
  }catch(...){s.failed=true;return fail(d,E::allocation);}
 }
 const OriginalUiNativeDraw50KG* OriginalUiCourseDrawContribution50KG::draw()const noexcept{return storage_&&storage_->finished&&!storage_->failed?&storage_->draw:nullptr;}
-void OriginalUiCourseDrawContribution50KG::drain()noexcept{if(storage_){storage_->active=false;storage_->finished=false;storage_->draw={};}}
+void OriginalUiCourseDrawContribution50KG::drain()noexcept{if(storage_){auto& s=*storage_;if(s.tournament&&s.failed&&s.sourceMutationInFrame)s.sourceTerminal=true;s.active=false;s.finished=false;s.draw={};}}
 }

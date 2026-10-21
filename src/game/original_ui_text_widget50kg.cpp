@@ -109,6 +109,9 @@ OriginalUiTextWidgetStatus50KG OriginalUiTextWidget50KG::bind(
         }
     }
     count_=descriptor.lines.size();
+    alpha18C_=descriptor.alpha;
+    color17C_=descriptor.color;
+    fadeToggle1A4_=false;
     selected_=false;
     disabled_=false;
     shown_=false; // Manager 2A44E0's recursive initial hide.
@@ -127,7 +130,7 @@ void OriginalUiTextWidget50KG::select() noexcept {
         for (std::size_t i=0;i<count_;++i) setColor(lines_[i],descriptor_->highlightColor);
     }
     OriginalUiTextLineSetup50KG setup;
-    setup.alpha=descriptor_->alpha; // Raw authored alpha, not setter-clamped.
+    setup.alpha=alpha18C_; // Live widget+18C (2AA37C), not setter-clamped.
     for (std::size_t i=0;i<count_;++i) setupStatic(lines_[i],setup);
 }
 
@@ -135,7 +138,7 @@ void OriginalUiTextWidget50KG::deselect() noexcept {
     selected_=false; // 2AA3E0.
     applyVisibility(descriptor_->enableOnDeselect,descriptor_->disableOnDeselect);
     if (descriptor_->hasHighlightColor) {
-        for (std::size_t i=0;i<count_;++i) setColor(lines_[i],descriptor_->color);
+        for (std::size_t i=0;i<count_;++i) setColor(lines_[i],color17C_);
     } else {
         for (std::size_t i=0;i<count_;++i) stop(lines_[i]);
     }
@@ -159,7 +162,7 @@ void OriginalUiTextWidget50KG::disable() noexcept {
 void OriginalUiTextWidget50KG::clearSelection() noexcept {
     selected_=false; // 2AA600 has neither deselect visibility nor stop.
     if (descriptor_->hasHighlightColor) {
-        for (std::size_t i=0;i<count_;++i) setColor(lines_[i],descriptor_->color);
+        for (std::size_t i=0;i<count_;++i) setColor(lines_[i],color17C_);
     }
 }
 
@@ -204,6 +207,14 @@ OriginalUiTextWidgetStatus50KG OriginalUiTextWidget50KG::setupLine(std::size_t i
     return OriginalUiTextWidgetStatus50KG::ok;
 }
 
+OriginalUiTextWidgetStatus50KG OriginalUiTextWidget50KG::setWidgetColor(std::uint32_t color) noexcept {
+    if(!descriptor_)return OriginalUiTextWidgetStatus50KG::notBound;
+    color17C_=color;
+    for(std::size_t i=0;i<count_;++i)setColor(lines_[i],color);
+    fadeToggle1A4_=true; //2AA84C; retained even when every line is locked.
+    return OriginalUiTextWidgetStatus50KG::ok;
+}
+
 OriginalUiTextWidgetStatus50KG OriginalUiTextWidget50KG::setLineColor(
     std::size_t index,std::uint32_t color) noexcept {
     if (!descriptor_) return OriginalUiTextWidgetStatus50KG::notBound;
@@ -221,6 +232,16 @@ OriginalUiTextWidgetStatus50KG OriginalUiTextWidget50KG::setLineAlpha(
     if (!std::isfinite(duration)) return OriginalUiTextWidgetStatus50KG::invalidInput;
     if (duration>0) return OriginalUiTextWidgetStatus50KG::unsupportedAnimation;
     setAlpha(lines_[index],alpha,duration);
+    return OriginalUiTextWidgetStatus50KG::ok;
+}
+
+OriginalUiTextWidgetStatus50KG OriginalUiTextWidget50KG::setWidgetAlpha(std::int32_t alpha) noexcept {
+    if(!descriptor_)return OriginalUiTextWidgetStatus50KG::notBound;
+    // Same signed16 admission as bind/setup. Validate before any field writes;
+    // actual Credits calls are0..255 and therefore never hit this boundary.
+    if(!rawAlphaAdmitted(alpha))return OriginalUiTextWidgetStatus50KG::invalidInput;
+    alpha18C_=alpha; //2AA888 is outside every line's lock gate.
+    for(std::size_t i=0;i<count_;++i)setAlpha(lines_[i],alpha,0);
     return OriginalUiTextWidgetStatus50KG::ok;
 }
 

@@ -1578,6 +1578,7 @@ struct VehicleWindowGl50DS::Storage {
     U menuTargets[2]{}, menuColors[2]{}, displayedTarget = 0;
     std::uint8_t menuPublished = 0;
     U uiTargets[2]{}, uiColors[2]{}, uiDepths[2]{};
+    std::shared_ptr<const std::uint8_t> uiDirectVideoLifetime;
     U uiSourceTarget=0,uiSourceColor=0,uiSourceDepth=0;
     U uiRetainedTarget=0,uiRetainedColor=0;
     U uiBlendIncomingTarget=0,uiBlendIncomingColor=0,uiBlendEffectTarget=0,uiBlendEffectColor=0;
@@ -6778,6 +6779,24 @@ bool VehicleWindowGl50DS::originalUiSourceRgbaAvailable() const noexcept {
         storage_->uiSourceTarget && storage_->uiSourceColor && storage_->uiSourceDepth &&
         storage_->uiSourceIndexBuffer && storage_->uiSourceIndices;
 }
+bool VehicleWindowGl50DS::prepareOriginalUiDirectVideo(OriginalUiDirectVideoCapability50KG& out,VehicleWindowDiagnostic50DS& d) noexcept {
+    d={};out={};
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"direct video requires actual source RGBA renderer");
+    auto& s=*storage_;
+    if(!s.current(d))return false;
+    if(s.active||s.frameSet||s.diagnostic||!s.uiProgram||!s.uiVertexArray||!s.uiVertexBuffer)
+        return fail(d,VehicleWindowError50DS::frame,"direct video capability requires idle actual UI draw owner");
+    // Dedicated frontend creation does not load gameplay-blur/display-fade
+    // entry points. Resolve this actual direct sprite dependency explicitly,
+    // using the same checked loader before minting any renderer capability.
+    s.diagnostic=&d;
+    const bool directDrawReady=s.gl.drawArrays||s.load(s.gl.drawArrays,"glDrawArrays");
+    s.diagnostic=nullptr;
+    if(!directDrawReady)return false;
+    try {if(!s.uiDirectVideoLifetime)s.uiDirectVideoLifetime=std::make_shared<const std::uint8_t>(0);}
+    catch(...){return fail(d,VehicleWindowError50DS::frame,"direct video capability allocation failed");}
+    out.lifetime_=s.uiDirectVideoLifetime;out.renderer_=this;return true;
+}
 bool VehicleWindowGl50DS::submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM& frame,
     std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d) noexcept {
     return submitOriginalUiSourceFrame(frame,width,height,true,d);
@@ -6793,6 +6812,10 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
         s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max() ||
         (publishSource && s.uiSourcePublicationGeneration==std::numeric_limits<std::uint64_t>::max()))
         return fail(d,VehicleWindowError50DS::frame,"unsealed or stale complete original UI frame");
+    if(frame.directVideoPresent_&&(!validOriginalUiDirectVideo50KG(frame.directVideo_)||
+       frame.directVideoCapability_.renderer_!=this||!frame.directVideoCapability_.valid()||
+       frame.directVideoCapability_.lifetime_.lock()!=s.uiDirectVideoLifetime))
+        return fail(d,VehicleWindowError50DS::frame,"direct video tuple or live renderer capability rejected");
     const auto* riderGpu=frame.native_->draw.textures;
     const bool riderSparse=riderGpu&&riderGpu->riderSparse();
     if(riderSparse&&(frame.riderSession_!=riderGpu->riderSession()||frame.riderTextures_!=riderGpu||
@@ -6803,7 +6826,7 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
     bool sourceWorkStarted=false;
     const auto sourceTargetBefore=s.uiSourceTargetGeneration;
     const auto submitDiagnosticStart=Storage::UiCoverageClock::now();
-    const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted,publishSource,riderSparse);
+    const bool accepted=submitOriginalUiImpl(*frame.native_,width,height,true,d,&sourceWorkStarted,publishSource,riderSparse,frame.directVideoPresent_?&frame.directVideo_:nullptr);
     const auto submitDiagnosticNs=Storage::uiCoverageNs(submitDiagnosticStart);
     if(s.uiCoverageSourceDiagnostic&&submitDiagnosticNs>=100000000ull&&s.uiCoverageSlowTotalReports<8){
         ++s.uiCoverageSlowTotalReports;
@@ -7377,7 +7400,7 @@ bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
 }
 bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& native,
     std::int32_t width,std::int32_t height,bool sourceRgba,VehicleWindowDiagnostic50DS& d,
-    bool* sourceWorkStarted,bool publishSource,bool riderReceiptChecked) noexcept {
+    bool* sourceWorkStarted,bool publishSource,bool riderReceiptChecked,const OriginalUiDirectVideo50KG* directVideo) noexcept {
     d = {};
     if(sourceWorkStarted)*sourceWorkStarted=false;
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
@@ -7400,6 +7423,8 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         !native.states || native.stateCount != input.spanCount ||
         (sourceRgba ? native.opaquePresentationAlphaOnly : !native.opaquePresentationAlphaOnly))
         return fail(d, VehicleWindowError50DS::frame, "original UI requires explicit native policy and bounded 640x448 draw");
+    if(directVideo&&(!sourceRgba||!validOriginalUiDirectVideo50KG(*directVideo)))
+        return fail(d,VehicleWindowError50DS::frame,"unsupported direct video source command");
     if (sourceRgba && (!originalUiSourceRgbaAvailable() || input.retainRaceImage))
         return fail(d,VehicleWindowError50DS::frame,"source UI requires fresh native source target, never retained race alpha");
     if (input.textures != s.request.originalUiTextures || input.texturePublication != s.uiTexturePublication ||
@@ -7774,6 +7799,31 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.gl.uniform4f(s.uiParticleFogColorUniform, native.particleFogColor[0],
             native.particleFogColor[1], native.particleFogColor[2], 1.f);
         s.drawGl.bindVertexArray(s.uiVertexArray); s.drawGl.bindBuffer(arrayBuffer, s.uiVertexBuffer);
+        if(directVideo){
+            // TEST=31001: alpha NEVER/FB_ONLY, depth ALWAYS; source writes
+            // RGBA but not Z. ALPHA=(Cd-0)*As/128+Cs with Cs=As=0 is exactly
+            // zero, independent of destination. This is an actual queued sprite
+            // draw, not the frame clear and not a fabricated material pass.
+            const assets::Vertex48B vertices[4]={
+                {{0,0,0},{0,0},{0,0,0,0}},{{0,448,0},{0,0},{0,0,0,0}},
+                {{640,0,0},{0,0},{0,0,0,0}},{{640,448,0},{0,0},{0,0,0,0}}};
+            s.gl.disable(0x0BE2);s.gl.depthFunc(0x0207);s.gl.depthMask(0);
+            s.gl.uniform1i(s.uiTexturedUniform,0);s.gl.uniform1i(s.uiSourceRasterUniform,0);
+            s.gl.uniform1i(s.uiSourceFogEnabledUniform,0);s.gl.uniform1i(s.uiSourceAlphaTestUniform,0);
+            s.gl.uniform1i(s.uiSourceBlendUniform,0);s.gl.uniform1f(s.uiAlphaUniform,1.f);
+            s.gl.bindTexture(texture2D,0);
+            if(!s.uiSourceCoherentFramebufferFetch){s.gl.activeTexture(textureUnit0+1);
+                s.gl.bindTexture(texture2D,0);s.gl.activeTexture(textureUnit0);}
+            s.drawGl.bufferSubData(arrayBuffer,0,sizeof(vertices),vertices);
+            if(sourceWorkStarted)*sourceWorkStarted=true;
+            s.gl.drawArrays(0x0005,0,4);
+            accepted=s.check("source direct video 25E610 before material drain");
+            if(accepted){++d.originalUiDraws;d.originalUiSourceTriangles+=2;}
+            // Subsequent spans establish their own depth/blend/material state;
+            // all source vertex/index/auxiliary streams are restored below.
+            // Fallback destination sampling is rebound by each source span;
+            // zero-source direct output must not sample the attached target.
+        }
         s.drawGl.bufferSubData(arrayBuffer, 0, std::intptr_t(input.quadCount) * 4 * sizeof(assets::Vertex48B), input.vertices);
         if (anyFog) {
             s.drawGl.bindBuffer(arrayBuffer, s.uiParticleFogBuffer);
@@ -7787,7 +7837,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         if (sourceRgba)
             s.drawGl.bufferSubData(elementBuffer, 0, std::intptr_t(sourceIndexCount) * sizeof(U),
                 s.uiSourceIndices->indices);
-        accepted = s.check("prepare authenticated original UI frame");
+        accepted = s.check("prepare authenticated original UI frame") && accepted;
         // No material representative has bound before this point. Read-only
         // preflight/context/window failures remain retryable with the same
         // composer generation. A later partial source pass failure is unknown.
@@ -8634,6 +8684,7 @@ bool VehicleWindowGl50DS::close(VehicleWindowDiagnostic50DS& d) noexcept {
         return fail(d,VehicleWindowError50DS::request,"dependent primitive retirement must precede renderer close");
     }
     if (!storage_) return true;
+    storage_->uiDirectVideoLifetime.reset();
     const bool result = storage_->cleanup(d);
     if (!d.cleanupIncomplete) {
         if(storage_->riderTextureBorrow&&!storage_->riderTextureBorrow->releaseRiderBorrow(storage_.get())){

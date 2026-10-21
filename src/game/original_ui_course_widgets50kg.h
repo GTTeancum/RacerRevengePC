@@ -63,6 +63,9 @@ public:
     const std::vector<std::string>* textLines(std::uint16_t)const noexcept;
     const std::array<std::int32_t,2>* textPosition(std::uint16_t)const noexcept;
     bool setDynamicLines(std::uint16_t,const std::vector<std::string>&,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;
+    // Mode2 direct SetText2A9DE0: always performs setup29DA40, even when
+    // bytes are unchanged. Bounded to actual Course labels60/61/63.
+    bool setTournamentDynamicLines(std::uint16_t,const std::vector<std::string>&,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;
     bool setTextPosition(std::uint16_t,std::int32_t,std::int32_t,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;
     bool setColor(std::uint16_t,std::uint32_t,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;
     bool updateText(std::uint16_t,bool,OriginalUiCourseWidgetDiagnostic50KG&)noexcept;

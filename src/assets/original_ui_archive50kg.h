@@ -17,7 +17,7 @@ struct OriginalUiMaterialTemplateStorage50KG;
 // Existing archive ordinals are preserved; authenticated menu pod physics appended.
 enum class OriginalUiArchiveId50KG : std::uint8_t {
     appStart = 0, localization = 1, overlays = 2, fonts = 3, mainMenu = 4,
-    backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11, tournament = 12
+    backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11, tournament = 12, hallOfFame = 13
 };
 struct OriginalUiArchiveIdentity50KG {
     OriginalUiArchiveId50KG id;

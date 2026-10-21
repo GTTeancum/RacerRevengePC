@@ -17,8 +17,9 @@ public:
     Owner& operator=(const Owner&)=delete;
     bool loaded()const noexcept{return source_.loaded();}
     bool ownsResources()const noexcept{return gpu_.ownsResources();}
+    template<class StaticMaterialOwner>
     bool loadSource(const std::filesystem::path& archive,
-        const track_materials50fa_fixture::Owner& track,gc_atm_animation_fixture::Diagnostic& d)noexcept {
+        const StaticMaterialOwner& track,gc_atm_animation_fixture::Diagnostic& d)noexcept {
         return source_.load(archive,track,d);
     }
     bool createGpu(const p::MaterialTextureGlRequest50EB& caller,

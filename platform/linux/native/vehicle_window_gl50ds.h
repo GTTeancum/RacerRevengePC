@@ -1102,6 +1102,7 @@ public:
     bool submitOriginalUiSourceRgba(const OriginalUiSourceFrame50KM&, std::int32_t width,
         std::int32_t height, VehicleWindowDiagnostic50DS&) noexcept;
     bool originalUiSourceRgbaAvailable() const noexcept;
+    bool prepareOriginalUiDirectVideo(OriginalUiDirectVideoCapability50KG&,VehicleWindowDiagnostic50DS&) noexcept;
     // Dormant slice1A. The existing combined submit above remains the default.
     // Hidden submissions execute the whole sealed source frame and acknowledge
     // its material history exactly once, without touching opaque publication.
@@ -1331,7 +1332,8 @@ private:
     friend class OriginalVideoBlockingNativeBackend;
     bool submitOriginalUiImpl(const OriginalUiNativeDraw50KG&, std::int32_t width,
         std::int32_t height, bool sourceRgba, VehicleWindowDiagnostic50DS&,
-        bool* sourceWorkStarted=nullptr,bool publishSource=true,bool riderReceiptChecked=false) noexcept;
+        bool* sourceWorkStarted=nullptr,bool publishSource=true,bool riderReceiptChecked=false,
+        const OriginalUiDirectVideo50KG* directVideo=nullptr) noexcept;
     bool submitOriginalUiSourceFrame(const OriginalUiSourceFrame50KM&,std::int32_t width,
         std::int32_t height,bool publishSource,VehicleWindowDiagnostic50DS&) noexcept;
     bool matchesOriginalUiSource(const OriginalUiSourceSubmission50KN&)const noexcept;

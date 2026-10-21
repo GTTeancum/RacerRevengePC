@@ -16,10 +16,14 @@ struct OriginalUiCourseHologramDraw50KG::Storage {
   std::array<std::vector<assets::OriginalUiLitMaterial50KM>,2> policies;
   game::OriginalUiTextureAnimation50KG animation{};
   std::uint32_t frame=0;
+  std::uint32_t controllerStamp=0xffffffffu;
  };
  std::array<Model,13> models;
  std::shared_ptr<assets::OriginalUiScreenAssets50KG> images;
  assets::OriginalUiImageBankInput50KG bank;
+ game::OriginalApplicationAnimationClockView50KG animationClock;
+ bool animationClockBound=false,animationTerminal=false;
+ std::uint64_t animationMutations=0;
 };
 OriginalUiCourseHologramDraw50KG::OriginalUiCourseHologramDraw50KG()noexcept=default;
 OriginalUiCourseHologramDraw50KG::~OriginalUiCourseHologramDraw50KG()=default;
@@ -79,6 +83,50 @@ bool OriginalUiCourseHologramDraw50KG::advanceTextureAnimations(std::uint32_t ms
  d={};if(!storage_)return false;
  // Only actual visible model submissions reach the unique texture controller.
  for(std::size_t i=0;i<ids.size();++i){auto& m=storage_->models[i];if(m.scene.shown()&&!game::advanceOriginalUiTextureAnimation50KG(m.animation,ms,m.frame)){d.widget=ids[i];d.sourcePC=0x29AC9C;return false;}}
+ return true;
+}
+bool OriginalUiCourseHologramDraw50KG::animationFaulted()const noexcept{
+ return storage_&&storage_->animationTerminal;
+}
+std::uint64_t OriginalUiCourseHologramDraw50KG::textureAnimationMutationSerial()const noexcept{
+ return storage_?storage_->animationMutations:0;
+}
+bool OriginalUiCourseHologramDraw50KG::serviceTextureAnimation24A740(std::uint16_t id,std::uint32_t pass,
+ const game::OriginalApplicationAnimationClockView50KG& clock,OriginalUiCourseHologramDrawDiagnostic50KG& d)noexcept{
+ d={};d.widget=id;auto fail=[&](std::uint32_t pc){d.sourcePC=pc;return false;};
+ const auto i=ordinal(id);if(!storage_||i>=ids.size()||pass>=2)return fail(0x24A728);
+ auto& s=*storage_;auto& m=s.models[i];
+ if(s.animationTerminal||!m.scene.shown()||m.material.passes.size()!=2||
+    m.material.passes[pass].enabled!=1)return fail(0x24A728);
+ // The authenticated two-pass holo PSMs have no controller on pass0 and a
+ // unique texture-only holobeam controller on pass1. Strict material loading
+ // rejects callback/vertex/pixel or animatesWhilePaused fields. The source
+ //29AB20/34 callback/context are null;29AB2C/30 defaults pause permission to0.
+ if(pass==0)return true;
+ game::OriginalApplicationAnimationClockSample50KG entry,leaf,leafCommit,controllerCommit;
+ if(!clock.read(entry))return fail(0x29ACA8);
+ if(s.animationClockBound&&!s.animationClock.sameOwner(clock))return fail(0x29ACA8);
+ // No callback or clock writer is admitted in this owner. A previous legacy
+ // mode0 advancement cannot be silently reinterpreted as canonical service.
+ if(m.controllerStamp!=m.animation.previousMilliseconds)return fail(0x29AC9C);
+ if(!s.animationClockBound){s.animationClock=clock;s.animationClockBound=true;}
+ if(m.controllerStamp==entry.current230||entry.pause11C){
+  if(!game::selectOriginalUiTextureAnimationFrame50KG(m.animation,m.frame))return fail(0x29AF90);
+  return true; //29ACB0/29ACC8: neither source timestamp is written.
+ }
+ if(s.animationMutations==std::numeric_limits<std::uint64_t>::max())return fail(0x29A020);
+ //29A108 skips the delta clock read while previous10 is the -1 sentinel.
+ leaf=entry;
+ if(m.animation.previousMilliseconds!=0xffffffffu&&!clock.read(leaf))return fail(0x29A118);
+ if(!clock.read(leafCommit))return fail(0x29A16C);
+ auto next=m.animation;std::uint32_t frame=0;
+ if(!game::advanceOriginalUiTextureAnimation50KG(next,leaf.current230,frame))return fail(0x29A020);
+ next.previousMilliseconds=leafCommit.current230;
+ m.animation=next;m.frame=frame;++s.animationMutations;
+ // From the first real leaf mutation onward a failure is terminal. Keep the
+ // actual phase/stamp, never roll back or reset a controller for a retry.
+ if(!clock.read(controllerCommit)){s.animationTerminal=true;return fail(0x29AD48);}
+ m.controllerStamp=controllerCommit.current230;
  return true;
 }
 bool OriginalUiCourseHologramDraw50KG::project(std::uint16_t id,std::uint32_t surface,const game::ModelPalette49S& palette,const game::OriginalUiLitContext50KM& context,bool fog,game::OriginalUiLitSurfaceOutput50KM& out,game::OriginalUiLitGeometryWorkspace50KM& workspace,OriginalUiCourseHologramDrawDiagnostic50KG& d)const noexcept{

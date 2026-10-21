@@ -44,6 +44,15 @@ bool sameCommon(const OriginalUiMainProfile50KG& a,const OriginalUiMainProfile50
     return a.known==b.known&&a.mode34==b.mode34&&a.previousMode38==b.previousMode38&&a.savedSlot6E0==b.savedSlot6E0&&
         a.availability11018==b.availability11018&&a.flags11054==b.flags11054&&a.playerBits1125C==b.playerBits1125C;
 }
+// Native transaction evidence for the source Main remembered-slot write only.
+bool mainRememberedSlotProjection(const OriginalUiMainProfile50KG& before,
+    std::uint16_t previousSlot,std::uint16_t selectedSlot,std::uint32_t prospectiveMode,
+    OriginalUiMainProfile50KG& output) noexcept {
+    if(!before.known||previousSlot<1||previousSlot>5||before.savedSlot6E0!=previousSlot||
+       selectedSlot<1||selectedSlot>3||prospectiveMode!=std::uint32_t(selectedSlot-1)||
+       before.mode34!=prospectiveMode)return false;
+    output=before;output.savedSlot6E0=selectedSlot;return true;
+}
 bool sameDecision(const game::OriginalUiRouteDecision50KG& a,const game::OriginalUiRouteDecision50KG& b) noexcept {
     const auto& x=a.request;const auto& y=b.request;
     if(a.action!=b.action||a.blockers!=b.blockers||a.admitted!=b.admitted||a.profileProposalComplete!=b.profileProposalComplete||
@@ -59,14 +68,14 @@ bool sameLife(const game::OriginalUiTransitionSnapshot50KG& a,const game::Origin
         a.requested.screen==b.requested.screen&&a.requested.page==b.requested.page&&a.lifecycle==b.lifecycle&&a.phase==b.phase&&
         a.applicationRequestQueued==b.applicationRequestQueued&&a.initialRestartPending==b.initialRestartPending;
 }
-bool confirmShape(const game::OriginalUiRouteDecision50KG& d,std::uint32_t selectedRider) noexcept {
+bool confirmShape(const game::OriginalUiRouteDecision50KG& d,std::uint32_t selectedRider,std::uint32_t mode) noexcept {
     using F=game::OriginalUiProfileField50KG;using W=game::OriginalUiProfileWrite50KG;
-    if(d.inputPC!=0x1EA460||d.selectedRider<0||d.selectedRider>=32||
+    if((mode!=0&&mode!=2)||d.inputPC!=0x1EA460||d.selectedRider<0||d.selectedRider>=27||
        static_cast<std::uint32_t>(d.selectedRider)!=selectedRider||!d.profileProposalComplete||d.profileChanges.count!=3||
        d.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||d.request.sourceScreen!=5||d.request.sourcePage!=1||
-       d.request.targetScreen!=6||d.request.targetPage!=1||d.request.sourcePC!=0x1EA604)return false;
+       d.request.targetScreen!=(mode==2?9:6)||d.request.targetPage!=1||d.request.sourcePC!=(mode==2?0x1EA5E4u:0x1EA604u))return false;
     const auto& a=d.profileChanges.values[0];const auto& b=d.profileChanges.values[1];const auto& c=d.profileChanges.values[2];
-    return a.field==F::riderMode0_6F0&&a.operation==W::word&&a.value==static_cast<std::uint32_t>(d.selectedRider)&&a.replaceMask==0xFFFFFFFFu&&a.sourcePC==0x1EA538&&
+    return a.field==(mode==2?F::riderOtherMode6FC:F::riderMode0_6F0)&&a.operation==W::word&&a.value==static_cast<std::uint32_t>(d.selectedRider)&&a.replaceMask==0xFFFFFFFFu&&a.sourcePC==(mode==2?0x1EA54Cu:0x1EA538u)&&
         b.field==F::rider1Bits1125D&&b.operation==W::maskedByte&&b.value==(static_cast<std::uint32_t>(d.selectedRider)<<3)&&b.replaceMask==0xF8&&b.sourcePC==0x1EA58C&&
         c.field==F::comparisonRider100C0&&c.operation==W::word&&c.value==static_cast<std::uint32_t>(d.selectedRider)&&c.replaceMask==0xFFFFFFFFu&&c.sourcePC==0x1EA5A8;
 }
@@ -254,8 +263,16 @@ struct OriginalUiRiderSession50KG::Storage {
     }
     bool confirmReady(game::OriginalUiRiderDynamicDiagnostic50KG& d) const noexcept {
         OriginalUiRiderProfileOwner50KG::RiderSelectionFacts rider;
-        return confirmAudioReady()&&cold.prospectiveMode==0&&
-            cold.commonProfile->mode34==0&&(cold.commonProfile->playerBits1125C&0x60)==0x20&&
+        const auto mode=cold.prospectiveMode;
+        // Mode2 only proposes the fresh clean branch; the frontend must still
+        // retain every genuine Tournament owner before any writes/audio.
+        if(mode==2){
+            OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
+            if(!cold.profile->tournamentCareerSnapshot(state.rider4C4,career)||
+               career.cardFlag100BC||(career.progress219C&31u)!=0)return false;
+        }
+        return confirmAudioReady()&&(mode==0||mode==2)&&
+            cold.commonProfile->mode34==mode&&(cold.commonProfile->playerBits1125C&0x60)==0x20&&
             cold.profile->riderSelectionFacts(state.rider4C4,rider)&&rider.unlock10FAC&&
             confirmAnimationPreflight(d)&&confirmVoiceChronologyReady();
     }
@@ -584,14 +601,16 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
     if(gasgano&&!gasganoPreview&&
        (!cold.profile||!cold.profile->gasganoTestProfile()))return result(d,Status::invalidInput);
     const bool fromMain=cold.previousScreen==4&&cold.predecessorResources&&
-        !cold.predecessorCourseResources&&!cold.predecessorCourseHolograms&&
+        !cold.predecessorCourseResources&&!cold.predecessorCourseHolograms&&!cold.predecessorTournament&&
         cold.predecessorResources->loaded()&&cold.predecessorResources->materials()&&cold.predecessorResources->particleMaterial();
-    const bool fromCourse=cold.previousScreen==6&&!cold.predecessorResources&&
+    const bool fromCourse=cold.previousScreen==6&&!cold.predecessorResources&&!cold.predecessorTournament&&
         cold.predecessorCourseResources&&cold.predecessorCourseHolograms&&
         cold.predecessorCourseResources->loaded()&&cold.predecessorCourseResources->widgets()&&
         cold.predecessorCourseResources->materials()&&cold.predecessorCourseHolograms->loaded()&&
         cold.prospectiveMode==0;
-    if((!fromMain&&!fromCourse)||!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->bankInput()||
+    const bool fromTournament=cold.previousScreen==9&&!cold.predecessorResources&&
+        !cold.predecessorCourseResources&&!cold.predecessorCourseHolograms&&cold.predecessorTournament&&cold.prospectiveMode==2;
+    if((!fromMain&&!fromCourse&&!fromTournament)||!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->bankInput()||
        !cold.resources->exitText(0)||!cold.resources->exitText(0)->prepared()||!cold.statAssets||!cold.statAssets->loaded()||
        !cold.binderAssets||!cold.binderAssets->loaded()||!genuine(cold.riderArchive,assets::OriginalUiArchiveId50KG::rider)||
        !genuine(cold.appStart,assets::OriginalUiArchiveId50KG::appStart)||!genuine(cold.podTextures,assets::OriginalUiArchiveId50KG::podTextures)||
@@ -599,7 +618,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
         return result(d,Status::resource);
     if(!cold.profile||!cold.profile->initialized()||!cold.commonProfile||!cold.commonProfile->known||
        cold.profile->commonProfile()!=cold.commonProfile.get()||!cold.application||!cold.application->known||
-       (cold.application->globalFlags228&4u)||cold.application->transportE00!=-1||cold.prospectiveMode>2||(fromCourse&&cold.commonProfile->mode34!=0)||
+       (cold.application->globalFlags228&4u)||cold.application->transportE00!=-1||cold.prospectiveMode>2||(fromCourse&&cold.commonProfile->mode34!=0)||(fromTournament&&cold.commonProfile->mode34!=2)||
        &cold.application->rawRandom308030!=&cold.application->sharedNoise308030.sharedRandomState||
        !cold.lightManager||cold.lightManager->cacheState()!=game::OriginalUiLightCacheState50KG::absentSinceApplicationConstruction||
        !cold.externalTransition||cold.externalTransition->snapshot().bound)return result(d,Status::unsupportedState);
@@ -674,7 +693,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
             if(particleName.size()<4||particleName.substr(particleName.size()-4)!=".psm")return result(d,Status::resource);
             particleName.resize(particleName.size()-4);
             if(!addStaticRow(particleName))return result(d,Status::resource);
-        }else{
+        }else if(fromCourse){
             // Actual Course inventory, no predecessor image/epoch/session replay.
             for(const auto& material:*cold.predecessorCourseResources->materials())
                 if(!addStaticRow(material.registeredName))return result(d,Status::resource);
@@ -692,6 +711,7 @@ Status OriginalUiRiderSession50KG::bindCold(const OriginalUiRiderSessionCold50KG
             // Two passes share one PSM row. Raw background has no material row.
             if(count!=13)return result(d,Status::resource);
         }
+        if(fromTournament)backend.tournamentPredecessor=cold.predecessorTournament;
         if(!s->backend.bind(backend,d.backend))return result(d,Status::backend);
         s->backendBound=true;
         if(!s->dynamic.bind(cold.riderArchive,s->widgets(),cold.application->modelMotion,cold.application->modelMode0Ik,
@@ -762,7 +782,7 @@ const game::OriginalUiTransitionOwner50KG* OriginalUiRiderSession50KG::externalL
 }
 Status OriginalUiRiderSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG& e,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notBound);
-    if(!s->operational()||s->inOperation||s->rendering||e.route.screen!=5||e.route.page!=1)return result(d,Status::unsupportedState,e.sourcePC);
+    if(!s->operational()||!s->backend.predecessorRetired()||s->inOperation||s->rendering||e.route.screen!=5||e.route.page!=1)return result(d,Status::unsupportedState,e.sourcePC);
     const auto t=s->transition();
     if(!t.bound||t.current.screen!=5||t.current.page!=1||e.lifecycle!=t.lifecycle||e.phase!=t.phase||!s->processCurrent())
         return result(d,Status::invalidInput,e.sourcePC);
@@ -849,14 +869,14 @@ Status OriginalUiRiderSession50KG::input(const OriginalUiMainSessionInput50KG& i
     if(routed!=game::OriginalUiRouteStatus50KG::unavailable)return finish(Status::unsupportedState,0x1EA460);
     if(in.originalInput==4){
         const auto& r=receipt.decision;
-        if(!s->idleInput()||!confirmShape(r,s->state.rider4C4)||r.admitted||r.action!=game::OriginalUiRouteAction50KG::unavailable||
+        if(!s->idleInput()||!confirmShape(r,s->state.rider4C4,s->cold.prospectiveMode)||r.admitted||r.action!=game::OriginalUiRouteAction50KG::unavailable||
            r.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
            !s->confirmReady(d.dynamic))return finish(Status::unavailableDestination,0x1EA694);
         if(!s->cold.profile->riderConfirmSnapshot(s->pendingPacked1125D,s->pendingComparison100C0))
             return finish(Status::profile,0x1EA58C);
         s->pendingProfile=profile;s->pendingCommon=*s->cold.commonProfile;s->pendingStamp=s->cold.profile->stamp();
         s->pendingBack=r;s->pendingLifecycle=s->transition();s->state.confirmProposalPending=true;
-        receipt.routeProposal={this,s->proposalSerial,r,s->pendingStamp};return finish(Status::confirmProposed,0x1EA604);
+        receipt.routeProposal={this,s->proposalSerial,r,s->pendingStamp};return finish(Status::confirmProposed,r.request.sourcePC);
     }
     const auto& r=receipt.decision;
     if(!s->idleInput()||!s->backAudioReady()||!r.profileProposalComplete||r.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner)||
@@ -928,6 +948,10 @@ Status OriginalUiRiderSession50KG::prepareMoveResidency(const OriginalUiRiderSes
     }catch(...){return result(d,Status::allocation);}
 }
 bool OriginalUiRiderSession50KG::residencyProposalCurrent(const OriginalUiRiderResidencyDemand50KG& demand) const noexcept {
+    const auto* s=storage_.get();return s&&residencyProposalCurrentWithCommon(demand,s->nativeCommon);
+}
+bool OriginalUiRiderSession50KG::residencyProposalCurrentWithCommon(const OriginalUiRiderResidencyDemand50KG& demand,
+    const OriginalUiMainProfile50KG& expectedCommon) const noexcept {
     const auto* s=storage_.get();
     game::OriginalUiRiderSelectionProfile50KG actual;
     if(!s||!s->processCurrent()||!s->cold.profile->selectionSnapshotForMode(s->cold.prospectiveMode,actual)||
@@ -938,22 +962,48 @@ bool OriginalUiRiderSession50KG::residencyProposalCurrent(const OriginalUiRiderR
         demand.indices_==s->nativeDemand.indices_&&demand.requiresCoverage_==s->nativeDemand.requiresCoverage_&&!demand.consumed_&&
         s->nativePreparedWidgetGeneration==s->nativeWidgetGeneration&&
         s->nativePreparedMaterialGeneration==s->backend.registryGeneration()&&
-        sameStamp(s->cold.profile->stamp(),s->nativeStamp)&&sameCommon(*s->cold.commonProfile,s->nativeCommon)&&
+        sameStamp(s->cold.profile->stamp(),s->nativeStamp)&&sameCommon(*s->cold.commonProfile,expectedCommon)&&
         s->widgets().matchesNativeProjection(s->nativeBefore);
 }
+bool OriginalUiRiderSession50KG::acceptMainRememberedSlotCommit(
+    std::uint16_t previousSlot,std::uint16_t selectedSlot) noexcept {
+    auto* s=storage_.get();OriginalUiMainProfile50KG expected;
+    if(!s||!s->nativeEntryCommitted||!s->nativeDemand.entry_||
+       !mainRememberedSlotProjection(s->nativeCommon,previousSlot,selectedSlot,s->cold.prospectiveMode,expected)||
+       !residencyProposalCurrentWithCommon(s->nativeDemand,expected))return false;
+    // All unchanged residency/profile/owner guards passed. Publish only +6E0.
+    s->nativeCommon.savedSlot6E0=expected.savedSlot6E0;return true;
+}
 bool OriginalUiRiderSession50KG::acceptEntryProfileCommit(OriginalUiRiderProfileStamp50KG before,
-    const OriginalUiMainProfile50KG& expected,bool courseBack) noexcept {
+    const OriginalUiMainProfile50KG& expected,EntryOrigin origin) noexcept {
     auto* s=storage_.get();if(!s||!s->operational()||!s->nativePrepared||!s->nativeDemand.entry_||s->nativeDemand.consumed_||
        !sameStamp(before,s->nativeStamp)||!sameCommon(*s->cold.commonProfile,expected)||
        expected.mode34!=s->cold.prospectiveMode||s->nativePreparedWidgetGeneration!=s->nativeWidgetGeneration||
        s->nativePreparedMaterialGeneration!=s->backend.registryGeneration()||!s->widgets().matchesNativeProjection(s->nativeBefore))return false;
+    const bool courseBack=origin==EntryOrigin::course;
+    if((origin==EntryOrigin::main&&s->cold.previousScreen!=4)||
+       (courseBack&&(s->cold.previousScreen!=6||s->cold.prospectiveMode!=0))||
+       (origin==EntryOrigin::tournament&&(s->cold.previousScreen!=9||s->cold.prospectiveMode!=2||!s->cold.predecessorTournament))||
+       (origin!=EntryOrigin::main&&origin!=EntryOrigin::course&&origin!=EntryOrigin::tournament))return false;
     const auto after=s->cold.profile->stamp();
     if(after.mode34!=s->cold.prospectiveMode||
+       (origin==EntryOrigin::tournament&&before.mode34!=2)||
        (courseBack?(before.mode34!=0||after.mode34!=0||before.generation==std::numeric_limits<std::uint64_t>::max()||
             after.generation!=before.generation+1):after.generation!=before.generation))return false;
     game::OriginalUiRiderSelectionProfile50KG actual;
     if(!s->liveProfile(actual)||!sameProfile(actual,s->nativeEntryProfile))return false;
     s->nativeStamp=after;s->nativeCommon=expected;s->nativeEntryCommitted=true;return true;
+}
+bool OriginalUiRiderSession50KG::acceptTournamentPredecessorRetirement(
+    game::OriginalUiTournamentPredecessorRetirement50KG& receipt,Diagnostic& d) noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||!s->operational()||s->cold.previousScreen!=9||!s->cold.predecessorTournament||
+       !s->nativeEntryCommitted||!s->nativePrepared||s->requested||s->entered||s->inOperation||s->rendering||
+       !sameStamp(s->nativeStamp,s->cold.profile->stamp())||!sameCommon(s->nativeCommon,*s->cold.commonProfile)){
+        result(d,Status::invalidInput);return false;
+    }
+    if(!s->backend.acceptTournamentPredecessorRetirement(receipt,d.backend)){result(d,Status::backend);return false;}
+    return true;
 }
 bool OriginalUiRiderSession50KG::consumeEntryResidency() noexcept {
     auto* s=storage_.get();if(!s||!s->nativeEntryCommitted||!s->nativeDemand.entry_||!residencyProposalCurrent(s->nativeDemand))return false;
@@ -1047,6 +1097,9 @@ Status OriginalUiRiderSession50KG::commitMove(const OriginalUiRiderSessionInputR
     if(!okay){if(!s->state.faulted)s->fault(Status::widget,plan.sourcePC);d=s->callbackFault;return d.status;}
     return result(d,Status::ok,plan.sourcePC);
 }
+bool OriginalUiRiderSession50KG::ownsProfile(const OriginalUiRiderProfileOwner50KG& profile) const noexcept {
+    return storage_&&storage_->cold.profile.get()==&profile;
+}
 bool OriginalUiRiderSession50KG::routeProposalCurrent(const OriginalUiRiderRouteProposal50KG& p) const noexcept {
     const auto* s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||(!s->state.backProposalPending&&!s->state.confirmProposalPending)||
        p.source!=this||!p.serial||p.serial!=s->proposalSerial||!s->idleInput()||!s->lightCurrent()||!s->processCurrent()||
@@ -1056,7 +1109,7 @@ bool OriginalUiRiderSession50KG::routeProposalCurrent(const OriginalUiRiderRoute
        s->nav()->groups[1].selectedSlot!=s->state.slot4C8)return false;
     if(s->state.confirmProposalPending){
         game::OriginalUiRiderDynamicDiagnostic50KG preflight;std::uint8_t packed=0;std::uint32_t comparison=0;
-        if(s->state.backProposalPending||!confirmShape(p.decision,s->state.rider4C4)||!s->confirmReady(preflight)||
+        if(s->state.backProposalPending||!confirmShape(p.decision,s->state.rider4C4,s->cold.prospectiveMode)||!s->confirmReady(preflight)||
            !s->cold.profile->riderConfirmSnapshot(packed,comparison)||packed!=s->pendingPacked1125D||
            comparison!=s->pendingComparison100C0)return false;
     }else if(!s->backAudioReady())return false;
@@ -1067,20 +1120,22 @@ Status OriginalUiRiderSession50KG::notifyRouteAccepted(const OriginalUiRiderRout
     if(s->state.confirmProposalPending){
         if(!s->operational()||s->inOperation||s->updatePrepared||s->backAccepted||s->confirmAccepted||s->state.backProposalPending||
            p.source!=this||!p.serial||p.serial!=s->proposalSerial||!sameDecision(p.decision,s->pendingBack)||
-           !confirmShape(p.decision,s->state.rider4C4)||!sameStamp(p.profileStamp,s->pendingStamp)||!s->processCurrent()||!s->lightCurrent()||
+           !confirmShape(p.decision,s->state.rider4C4,s->cold.prospectiveMode)||!sameStamp(p.profileStamp,s->pendingStamp)||!s->processCurrent()||!s->lightCurrent()||
            !s->confirmReady(d.dynamic)||s->cold.application->uiObject3D8||!sameCommon(*s->cold.commonProfile,s->pendingCommon))
-            return result(d,Status::invalidInput,0x1EA604);
-        auto expectedLife=s->pendingLifecycle;expectedLife.requested={6,1};expectedLife.lifecycle=Life::requestScreenExit;
+            return result(d,Status::invalidInput,s->cold.prospectiveMode==2?0x1EA5E4:0x1EA604);
+        auto expectedLife=s->pendingLifecycle;expectedLife.requested={static_cast<std::uint8_t>(s->cold.prospectiveMode==2?9:6),1};expectedLife.lifecycle=Life::requestScreenExit;
         const auto stamp=s->cold.profile->stamp();std::uint8_t packed=0;std::uint32_t comparison=0;
         if(!sameLife(s->transition(),expectedLife)||s->pendingStamp.generation==std::numeric_limits<std::uint64_t>::max()||
-           stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=0||
+           stamp.generation!=s->pendingStamp.generation+1||stamp.mode34!=s->cold.prospectiveMode||
            !s->cold.profile->riderConfirmSnapshot(packed,comparison)||
            packed!=static_cast<std::uint8_t>((s->pendingPacked1125D&7u)|(s->state.rider4C4<<3))||comparison!=s->state.rider4C4)
             return result(d,Status::profile,0x1EA58C);
-        auto expected=s->pendingProfile;expected.remembered6F0=s->state.rider4C4;game::OriginalUiRiderSelectionProfile50KG actual;
-        if(!s->liveProfile(actual)||!sameProfile(actual,expected))return result(d,Status::profile,0x1EA538);
+        auto expected=s->pendingProfile;
+        if(s->cold.prospectiveMode==2)expected.remembered6FC=s->state.rider4C4;else expected.remembered6F0=s->state.rider4C4;
+        game::OriginalUiRiderSelectionProfile50KG actual;
+        if(!s->liveProfile(actual)||!sameProfile(actual,expected))return result(d,Status::profile,s->cold.prospectiveMode==2?0x1EA54C:0x1EA538);
         std::uint16_t character=0;if(!s->selectedConfirmCharacter(character))return result(d,Status::model,0x1ECF70);
-        s->cpuDrain();s->state.fadeMusic4E8=true; //1EA620, after actual route/profile commit.
+        s->cpuDrain();s->state.fadeMusic4E8=true; //1EA600(mode2)/1EA620(mode0), after actual route/profile commit.
         if(!s->applyConfirmVoiceChronology()){d=s->callbackFault;return d.status;}
         if(!s->dynamic.confirmCharacter(character)){d.dynamic=s->dynamic.diagnostic();s->fault(Status::model,0x1D2690);return result(d,Status::model,0x1D2690);}
         //1EA7B0 follows the actual voice command and character _sel action.

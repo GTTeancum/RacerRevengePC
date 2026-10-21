@@ -1,5 +1,6 @@
 #pragma once
 #include "original_ui_draw50kg.h"
+#include "original_ui_direct_video50kg.h"
 #include "../../../src/assets/original_ui_material50kg.h"
 
 namespace rr::platform {
@@ -82,9 +83,10 @@ struct OriginalUiSourceTerminal50KN {
 };
 class OriginalUiRiderDrawContribution50KG;
 class OriginalUiOptionsDrawContribution50KG;
+class OriginalUiHallDrawContribution50KG;
 class VehicleWindowGl50DS;
 // A closed native ownership interface, not a caller-created certificate. Only
-// the two concrete full-frame composers can construct it. Both retain their
+// the concrete full-frame composers can construct it. Each retains its
 // own material-history transaction; renderer ownership and GPU retirement are
 // identical regardless of the active original UI destination.
 class OriginalUiSourceOwner50KM {
@@ -96,12 +98,15 @@ protected:
 private:
     friend class OriginalUiRiderDrawContribution50KG;
     friend class OriginalUiOptionsDrawContribution50KG;
+    friend class OriginalUiMainDraw50KG;
+    friend class OriginalUiHallDrawContribution50KG;
+    friend class OriginalUiTournamentDrawContribution50KG;
     friend class VehicleWindowGl50DS;
     OriginalUiSourceOwner50KM() noexcept=default;
     virtual bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept=0;
     virtual void finishSourceSubmission(std::uint64_t,bool sourceAccepted,bool sourceWorkStarted) const noexcept=0;
 };
-// Sealed by a concrete complete Rider or Options frame composer, after every real
+// Sealed by a concrete complete Rider, Options or Hall frame composer, after every real
 // widget/model/material pass has joined its source order and combined bank.
 // Source target is fresh PSMCT32/context0/mask0,640x448,clear alpha128,reverseD24.
 // No retained race image, unhandled group target, later source sampler or other
@@ -116,6 +121,9 @@ public:
 private:
     friend class OriginalUiRiderDrawContribution50KG;
     friend class OriginalUiOptionsDrawContribution50KG;
+    friend class OriginalUiMainDraw50KG;
+    friend class OriginalUiHallDrawContribution50KG;
+    friend class OriginalUiTournamentDrawContribution50KG;
     friend class VehicleWindowGl50DS;
     OriginalUiSourceFrame50KM() noexcept=default;
     OriginalUiSourceFrame50KM(const OriginalUiSourceFrame50KM&)=delete;
@@ -126,6 +134,9 @@ private:
     // frame has assembled successfully. Borrowed arrays and owner remain live.
     std::uint64_t frameGeneration_=0;
     OriginalUiSourceTerminal50KN terminal_{};
+    bool directVideoPresent_=false;
+    OriginalUiDirectVideo50KG directVideo_{};
+    OriginalUiDirectVideoCapability50KG directVideoCapability_{};
     const OriginalUiRiderSession50KG* riderSession_=nullptr;
     const MaterialTextureGl50EB* riderTextures_=nullptr;
     std::uint64_t riderResidencySerial_=0;

@@ -103,6 +103,10 @@ constexpr PromptSource promptSources[]={
     {"icon_sqr","ui\\textures\\icon_sqr.pst","ui\\textures\\icon_sqr","ui\\textures\\icon_sqr.psm",0x1d6994},
     {"icon_cir","ui\\textures\\icon_cir.pst","ui\\textures\\icon_cir","ui\\textures\\icon_cir.psm",0x1d6a4c}
 };
+// HasPopup1D6698 synchronously constructs these four ScreenTextures before
+// the shared page prompt objects at1D682C..1D6A4C. Tournament's fallback
+// provenance records its first real registration caller, not the later borrow.
+constexpr std::uint32_t tournamentPromptFirstCallerPC[]{0x1ff058,0x1ff110,0x1ff1c8,0x1ff280};
 constexpr PromptSource riderStatSources[]={
     {"podstat","ui\\textures\\podstat.pst","ui\\textures\\podstat","ui\\textures\\podstat.psm",0x1e89d8},
     {"podstat2","ui\\textures\\podstat2.pst","ui\\textures\\podstat2","ui\\textures\\podstat2.psm",0x1e89f0},
@@ -193,6 +197,20 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
             !catalogMember(id,"ui\\textures\\notch.psm")&&p.fallbackTexture==texture&&
             p.sourceCallerPC==0x1F1424&&p.registeredName=="ui/textures/notch"&&
             p.attemptedPsmMember=="ui/textures/notch.psm"&&pass.textureName=="notch";
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::courseTrophyMissingPsmFallback){
+        constexpr auto id=OriginalUiArchiveId50KG::course;
+        if(p.archive!=originalUiArchiveIdentity50KG(id)||p.fallbackWidgetSource||
+           p.fallbackPageSource!=catalogMember(id,"UI\\UICourse\\track.dat"))return false;
+        constexpr const char* names[]{"trphgldi","trphslvi","trphbrzi","trphglda","trphslva","trphbrza"};
+        constexpr std::uint32_t pcs[]{0x1D999C,0x1D99B4,0x1D99CC,0x1D99E4,0x1D99FC,0x1D9A14};
+        for(std::size_t i=0;i<6;++i){const auto registered=std::string("ui/textures/")+names[i];
+            const auto catalogName=std::string("ui\\textures\\")+names[i];
+            const auto* texture=catalogMember(id,(catalogName+".pst").c_str());
+            if(texture&&!catalogMember(id,(catalogName+".psm").c_str())&&p.sourceCallerPC==pcs[i]&&
+               p.registeredName==registered&&p.attemptedPsmMember==registered+".psm"&&
+               pass.textureName==names[i]&&p.fallbackTexture==texture)return true;
+        }return false;
     }
     if(p.origin==OriginalUiMaterialOrigin50KG::tournamentTrophyMissingPsmFallback){
         constexpr auto id=OriginalUiArchiveId50KG::tournament;
@@ -295,6 +313,51 @@ bool sourceIdentityKnown(const OriginalUiMaterialPass50KG& pass) {
         }
         return false;
     }
+    if(p.origin==OriginalUiMaterialOrigin50KG::tournamentPromptMissingPsmFallback){
+        if(p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::tournament,"UI\\UITourn\\standing.dat"))return false;
+        for(std::size_t i=0;i<4;++i){
+            const auto& source=promptSources[i];
+            const auto archive=i<2?OriginalUiArchiveId50KG::overlays:OriginalUiArchiveId50KG::tournament;
+            if(p.archive==originalUiArchiveIdentity50KG(archive)&&p.sourceCallerPC==tournamentPromptFirstCallerPC[i]&&
+                p.registeredName==source.registeredName&&p.attemptedPsmMember==source.psm&&
+                pass.textureName==source.texture&&p.fallbackTexture==catalogMember(archive,source.member))return true;
+        }
+        return false;
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::tournamentNameBlurMissingPsmFallback)
+        return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::tournament)&&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::tournament,"ui\\textures\\nameblur.pst")&&
+            p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::tournament,"UI\\UITourn\\Widgets.Dat")&&
+            !p.fallbackPageSource&&p.sourceCallerPC==0x2ac6b0&&
+            p.registeredName=="ui\\textures\\nameblur"&&p.attemptedPsmMember=="ui\\textures\\nameblur.psm"&&
+            !catalogMember(OriginalUiArchiveId50KG::tournament,"ui\\textures\\nameblur.psm")&&
+            pass.textureName=="nameblur";
+    if(p.origin==OriginalUiMaterialOrigin50KG::hallNameBlurMissingPsmFallback)
+        return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::hallOfFame)&&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::hallOfFame,"ui\\textures\\nameblur.pst")&&
+            p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::hallOfFame,"UI\\UIHOF\\Widgets.Dat")&&
+            !p.fallbackPageSource&&p.sourceCallerPC==0x2ac6b0&&
+            p.registeredName=="ui\\textures\\nameblur"&&p.attemptedPsmMember=="ui\\textures\\nameblur.psm"&&
+            pass.textureName=="nameblur";
+    if(p.origin==OriginalUiMaterialOrigin50KG::hallPromptMissingPsmFallback){
+        if(p.fallbackWidgetSource||
+            p.fallbackPageSource!=catalogMember(OriginalUiArchiveId50KG::hallOfFame,"UI\\UIHOF\\hall.dat"))return false;
+        for(std::size_t i=0;i<4;++i){
+            const auto& source=promptSources[i];
+            const auto archive=i<2?OriginalUiArchiveId50KG::overlays:OriginalUiArchiveId50KG::hallOfFame;
+            if(p.archive==originalUiArchiveIdentity50KG(archive)&&p.sourceCallerPC==source.callPC&&
+                p.registeredName==source.registeredName&&p.attemptedPsmMember==source.psm&&
+                pass.textureName==source.texture&&p.fallbackTexture==catalogMember(archive,source.member))return true;
+        }
+        return false;
+    }
+    if(p.origin==OriginalUiMaterialOrigin50KG::hallFontMissingPsmFallback)
+        return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::fonts)&&
+            p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::fonts,"font\\venus16.pst")&&
+            p.fallbackWidgetSource==catalogMember(OriginalUiArchiveId50KG::hallOfFame,"UI\\UIHOF\\Widgets.Dat")&&
+            !p.fallbackPageSource&&p.sourceCallerPC==0x2dfaa0&&p.registeredName=="font\\venus16"&&
+            p.attemptedPsmMember=="font\\venus16.psm"&&pass.textureName=="venus16";
     if(p.origin==OriginalUiMaterialOrigin50KG::controlsNameBlurMissingPsmFallback)
         return p.archive==originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::options)&&
             p.fallbackTexture==catalogMember(OriginalUiArchiveId50KG::options,"ui\\textures\\nameblur.pst")&&
@@ -819,6 +882,146 @@ bool readOriginalUiCoursePromptFallbackMaterial50KG(const OriginalUiArchive50KG&
         p.archive=textureOwner.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
         p.sourceCallerPC=source.callPC;p.registeredName=source.registeredName;p.attemptedPsmMember=source.psm;p.creationPC=0x2475c0;
         auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiTournamentPromptFallbackMaterial50KG(const OriginalUiArchive50KG& tournament,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!tournament.loaded()||tournament.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::tournament)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Tournament and OVERLAYS",0x1d8f10);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index>=4)return fail(d,Error::fallbackSource,"original shared Tournament page prompt");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto& textureOwner=index<2?overlays:tournament;
+        const auto texture=textureOwner.find(source.member);const auto page=tournament.find("UI\\UITourn\\standing.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||tournament.find(source.psm).identity||(index<2&&tournament.find(source.member).identity))
+            return fail(d,Error::fallbackSource,"actual shared/local Tournament prompt and absent PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::tournamentPromptMissingPsmFallback;
+        p.archive=textureOwner.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=tournamentPromptFirstCallerPC[index];p.registeredName=source.registeredName;p.attemptedPsmMember=source.psm;p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiTournamentNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG& tournament,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!tournament.loaded()||tournament.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::tournament))
+            return fail(d,Error::archive,"authenticated Tournament",0x2ac6b0);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=tournament.find("ui\\textures\\nameblur.pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||
+            tournament.find("ui\\textures\\nameblur.psm").identity)
+            return fail(d,Error::fallbackSource,"actual Tournament nameblur and absent PSM",0x29b638);
+        OriginalUiDat50KG widgets;
+        if(!readOriginalUiDat50KG(tournament,"UI\\UITourn\\Widgets.Dat",widgets,d.document,
+            OriginalUiRepeatedKeyPolicy50KG::preserveInOrder))return fail(d,Error::document,"Tournament widgets",0x2ac650);
+        const auto* type=widgets.find("Widget 30","Type");const auto* name=widgets.find("Widget 30","Texture");
+        if(!type||type->text!="Icon"||!name||name->text!="nameblur")
+            return fail(d,Error::fallbackSource,"Tournament Icon30 nameblur",0x2ac650);
+        OriginalUiMaterialProvenance50KG p;
+        p.origin=OriginalUiMaterialOrigin50KG::tournamentNameBlurMissingPsmFallback;
+        p.archive=tournament.identity();p.fallbackTexture=texture.identity;p.fallbackWidgetSource=widgets.identity();
+        p.sourceCallerPC=0x2ac6b0;p.registeredName="ui\\textures\\nameblur";
+        p.attemptedPsmMember="ui\\textures\\nameblur.psm";p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,"nameblur",*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiHallNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG& hall,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!hall.loaded()||hall.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::hallOfFame))
+            return fail(d,Error::archive,"authenticated Hall",0x2ac6b0);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto texture=hall.find("ui\\textures\\nameblur.pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||
+            hall.find("ui\\textures\\nameblur.psm").identity)
+            return fail(d,Error::fallbackSource,"actual Hall nameblur and absent PSM",0x29b638);
+        OriginalUiDat50KG widgets;
+        if(!readOriginalUiDat50KG(hall,"UI\\UIHOF\\Widgets.Dat",widgets,d.document,
+            OriginalUiRepeatedKeyPolicy50KG::preserveInOrder))return fail(d,Error::document,"Hall widgets",0x2ac650);
+        const auto* type=widgets.find("Widget 6","Type");const auto* name=widgets.find("Widget 6","Texture");
+        if(!type||type->text!="Icon"||!name||name->text!="nameblur")
+            return fail(d,Error::fallbackSource,"Hall Icon6 nameblur",0x2ac650);
+        OriginalUiMaterialProvenance50KG p;
+        p.origin=OriginalUiMaterialOrigin50KG::hallNameBlurMissingPsmFallback;
+        p.archive=hall.identity();p.fallbackTexture=texture.identity;p.fallbackWidgetSource=widgets.identity();
+        p.sourceCallerPC=0x2ac6b0;p.registeredName="ui\\textures\\nameblur";
+        p.attemptedPsmMember="ui\\textures\\nameblur.psm";p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,"nameblur",*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiHallPromptFallbackMaterial50KG(const OriginalUiArchive50KG& hall,
+    const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG prompt,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};
+    try {
+        if(!hall.loaded()||hall.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::hallOfFame)||
+            !overlays.loaded()||overlays.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
+            return fail(d,Error::archive,"authenticated Hall and OVERLAYS",0x1d8f10);
+        const auto index=static_cast<std::size_t>(prompt);
+        if(index>=4)return fail(d,Error::fallbackSource,"original shared Hall page prompt");
+        const auto& source=promptSources[index];const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenTexture ScreenMT/runtime owner",0x2df10c);
+        const auto& textureOwner=index<2?overlays:hall;
+        const auto texture=textureOwner.find(source.member);const auto page=hall.find("UI\\UIHOF\\hall.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+            overlays.find(source.psm).identity||hall.find(source.psm).identity||(index<2&&hall.find(source.member).identity))
+            return fail(d,Error::fallbackSource,"actual shared/local Hall prompt and absent PSM",source.callPC);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::hallPromptMissingPsmFallback;
+        p.archive=textureOwner.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=source.callPC;p.registeredName=source.registeredName;p.attemptedPsmMember=source.psm;p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,source.texture,*inherited,runtime);output=std::move(result);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiHallFontFallbackMaterial50KG(const OriginalUiArchive50KG& hall,
+    const OriginalUiArchive50KG& fonts,const OriginalUiMaterialTemplates50KG& templates,
+    OriginalUiTemplate50KG owner,const OriginalUiMaterialRuntime50KG& runtime,
+    OriginalUiMaterial50KG& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};try{
+        if(!hall.loaded()||hall.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::hallOfFame)||
+            !fonts.loaded()||fonts.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::fonts))
+            return fail(d,Error::archive,"authenticated Hall/Fonts",0x2a9940);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"actual ScreenMT/runtime",0x2df10c);
+        OriginalUiDat50KG widgets;
+        if(!readOriginalUiDat50KG(hall,"UI/UIHOF/Widgets.Dat",widgets,d.document,OriginalUiRepeatedKeyPolicy50KG::preserveInOrder))
+            return fail(d,Error::document,"Hall widgets",0x2a9000);
+        for(const char* id:{"Widget 17","Widget 18"}){
+            const auto* type=widgets.find(id,"Type");const auto* font=widgets.find(id,"FontName");
+            if(!type||type->text!="Overlay_Text"||!font||font->text!="venus16"||widgets.find(id,"MaterialName"))
+                return fail(d,Error::fallbackSource,"authentic blank Hall venus16 descriptor",0x2a90b8);
+        }
+        const auto texture=fonts.find("font/venus16.pst");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||
+            hall.find("font/venus16.psm").identity||fonts.find("font/venus16.psm").identity)
+            return fail(d,Error::fallbackSource,"actual venus16 texture and absent Hall PSM",0x29b638);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::hallFontMissingPsmFallback;
+        p.archive=fonts.identity();p.fallbackTexture=texture.identity;p.fallbackWidgetSource=widgets.identity();
+        p.sourceCallerPC=0x2dfaa0;p.registeredName="font\\venus16";
+        p.attemptedPsmMember="font\\venus16.psm";p.creationPC=0x2475c0;
+        auto result=screenTextureFallback(p,"venus16",*inherited,runtime);output=std::move(result);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }
 bool readOriginalRaceHudFontFallbackMaterial50KG(const OriginalUiArchive50KG& overlays,
@@ -1436,6 +1639,251 @@ bool prepareOriginalUiRider19SpecularMaterial50KM(const OriginalUiMaterialPass50
         output=next;return true;
     } catch (...) {d.error=Error::allocation;return false;}
 }
+
+// Tournament invokes the same native raster kernels from its own authentic
+// PSM/PST owners. The catalog authenticates matching source bytes; every call
+// below still verifies the actual Tournament identity and provenance. Rider
+// entry points and their finite identity sets above remain unchanged.
+namespace {
+const char* tournamentUnlockedBodyName(const OriginalUiMaterialPass50KG& pass) {
+    constexpr const char* names[]{"02_1","02_2","03_1","03_2","04_1","04_2","07_1","07_2","10_1","10_2","11_1","11_2",
+        "12_1","12_2","15_1","15_2","19_1","19_2","20_1","20_2","09_1","09_2","23_1","23_2","24_1","24_2",
+        "01_1","01_2","08_1","08_2","14_1","14_2","16_1","16_2","17_1","17_2","18_1","18_2","21_1","21_2","22_1","22_2","25_1","25_2","26_1","26_2"};
+    if(!pass.identity)return nullptr;
+    for(const auto* name:names){
+        const auto member=std::string("ui\\textures\\")+name+".psm";
+        if(pass.identity==catalogMember(OriginalUiArchiveId50KG::tournament,member.c_str()))return name;
+    }
+    return nullptr;
+}
+const char* tournamentUnlockedShadowName(const OriginalUiMaterialPass50KG& pass) {
+    // Original26_shdw.psm is byte-identical to25_shdw.psm and names25_shdw.pst.
+    // Preserve that authored cross-rider source rather than substituting26_shdw.pst.
+    if(pass.identity&&pass.identity==catalogMember(OriginalUiArchiveId50KG::tournament,"ui\\textures\\26_shdw.psm"))return "25_shdw";
+    constexpr const char* names[]{"02_shdw","03_shdw","04_shdw","07_shdw","10_shdw","11_shdw","12_shdw","15_shdw","19_shdw","20_shdw","09_shdw","23_shdw","24_shdw",
+        "01_shdw","08_shdw","14_shdw","16_shdw","17_shdw","18_shdw","21_shdw","22_shdw","25_shdw"};
+    if(!pass.identity)return nullptr;
+    for(const auto* name:names){
+        const auto member=std::string("ui\\textures\\")+name+".psm";
+        if(pass.identity==catalogMember(OriginalUiArchiveId50KG::tournament,member.c_str()))return name;
+    }
+    return nullptr;
+}
+}
+bool prepareOriginalUiTournamentPodBodyMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19BodyMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        const auto* name=tournamentUnlockedBodyName(pass);
+        const bool original19=name&&(same(name,"19_1")||same(name,"19_2"));
+        if(!name||pass.pass!=1||!same(pass.microprogram,"DiffuseCompressed")||!same(pass.textureName,name)||
+           (pass.gs[Field::alphaBlendingOnOff].value!=0||pass.gs[Field::alphaTestOnOff].value!=0))
+            return fail(d,Error::profile,"canonical unlocked Rider indexed body first pass",0x2476a0u);
+        const auto memberName=std::string("ui\\textures\\")+name+".pst";
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::podTextures,memberName.c_str());
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();
+        const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.empty() || texture->mips.size()>5 || (original19&&texture->mips.size()!=5))
+            return fail(d,Error::texture,"authenticated original UIPODTEX body image bank",0x24e880u);
+        const auto& base=texture->mips.back();
+        if ((original19&&(base.width!=256 || base.height!=256)) || image->texture.width!=base.width ||
+            image->texture.height!=base.height || image->texture.rgba!=base.rgba)
+            return fail(d,Error::texture,"published native body image must equal original largest mip",0x24eb90u);
+        OriginalUiRider19BodyMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=static_cast<std::uint32_t>(texture->mips.size()-1);
+        next.sourceMipCount=static_cast<std::uint32_t>(texture->mips.size());
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
+}
+bool prepareOriginalUiTournamentPodShadowMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19ShadowMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        if (!pass.identity)return fail(d,Error::profile,"canonical Rider shadow PSM identity",0x2476a0u);
+        const auto* name=tournamentUnlockedShadowName(pass);
+        if (!name || pass.pass!=1 || !same(pass.microprogram,"DiffuseCompressed") ||
+            !same(pass.textureName,name) ||
+            pass.gs[Field::alphaBlendingOnOff].value!=1 || pass.gs[Field::inputColorA].value!=2 ||
+            pass.gs[Field::inputColorB].value!=1 || pass.gs[Field::inputAlphaC].value!=0 ||
+            pass.gs[Field::inputColorD].value!=1 || pass.gs[Field::alphaTestOnOff].value!=1 ||
+            pass.gs[Field::alphaTestMethod].value!=6 || pass.gs[Field::alphaReferenceValue].value!=0 ||
+            pass.gs[Field::processingMethodWhenFailedInAlphaTest].value!=0 ||
+            pass.gs[Field::foggingOnOff].value!=1 || pass.gs[Field::depthTestMethod].value!=2 ||
+            pass.gs[Field::zWriteDisabled].value!=0)
+            return fail(d,Error::profile,"actual default-unlocked Rider shadow attenuation pass1",0x2476a0u);
+        // Exact canonical PSM selects its corresponding original PST.
+        const auto memberName=std::string("ui\\textures\\")+name+".pst";
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::tournament,memberName.c_str());
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=1)
+            return fail(d,Error::texture,"authenticated original default-unlocked Rider shadow image",0x24e880u);
+        const auto& mip=texture->mips.front();
+        if (mip.width!=128 || mip.height!=128 || image->texture.width!=mip.width ||
+            image->texture.height!=mip.height || image->texture.rgba!=mip.rgba)
+            return fail(d,Error::texture,"published source default-unlocked Rider shadow image");
+        OriginalUiRider19ShadowMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,false,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
+}
+bool prepareOriginalUiTournamentPodSpecularMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider19SpecularMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        if (!pass.identity)return fail(d,Error::profile,"canonical Rider specular PSM identity",0x2476a0u);
+        // Original03c_3/08c_3 pass2 has the same authored FIX64/depth-writing
+        // specular state as12c_4. Its single-mip diffuse passes stay generic.
+        constexpr bool character=false; // Tournament User_Rotate has no character graph.
+        const auto* bodyName=tournamentUnlockedBodyName(pass);
+        const bool original19=bodyName&&(same(bodyName,"19_1")||same(bodyName,"19_2"));
+        const bool window=pass.identity==catalogMember(OriginalUiArchiveId50KG::tournament,"ui\\textures\\pod_wndw.psm");
+        if ((!bodyName&&!window&&!character) || pass.pass!=2 || !same(pass.microprogram,"SpecularMapCompressed") ||
+            !same(pass.textureName,"specmap1") ||
+            ((bodyName||window)&&pass.gs[Field::inputAlphaC].value!=(window?2:1)) ||
+            (window && pass.gs[Field::fixedAlphaValue].value!=255))
+            return fail(d,Error::profile,"canonical unlocked Rider single-map specular pass2",0x2476a0u);
+        if(character&&(pass.gs[Field::inputAlphaC].value!=2||pass.gs[Field::fixedAlphaValue].value!=64||
+           pass.gs[Field::zWriteDisabled].value!=0||pass.gs[Field::foggingOnOff].value!=1||
+           pass.gs[Field::alphaTestOnOff].value!=1||pass.gs[Field::depthTestMethod].value!=2))
+            return fail(d,Error::profile,"actual03c_3/08c_3/12c_4 FIX64 depth-writing specular pass2",0x2476a0u);
+        // Preserve the existing20 exact inherited fog/ATE/GEQUAL state;
+        // added canonical bodies require all common source-backed validations; the common gate below retains ALPHA(0,2,1,1),
+        // enabled blending and disabled depth writes. Existing19 admission is
+        // unchanged, including the distinct pod_wndw FIX255 pass.
+        if (bodyName&&!original19 && (pass.gs[Field::foggingOnOff].value!=1 ||
+            pass.gs[Field::alphaTestOnOff].value!=1 || pass.gs[Field::alphaTestMethod].value!=6 ||
+            pass.gs[Field::alphaReferenceValue].value!=0 ||
+            pass.gs[Field::processingMethodWhenFailedInAlphaTest].value!=0 ||
+            pass.gs[Field::depthTestMethod].value!=2))
+            return fail(d,Error::profile,"actual unlocked body specular fog alpha-test depth state",0x2476a0u);
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::tournament,"ui\\textures\\specmap1.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=1)
+            return fail(d,Error::texture,"authenticated original Rider specmap1 image",0x24e880u);
+        const auto& mip=texture->mips.front();
+        if (mip.width!=256 || mip.height!=256 || image->texture.width!=mip.width ||
+            image->texture.height!=mip.height || image->texture.rgba!=mip.rgba)
+            return fail(d,Error::texture,"published source specmap1 image");
+        OriginalUiRider19SpecularMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,true,false,false,character))return false;
+        next.material.program=OriginalUiLitProgram50KM::specularMapCompressed;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
+}
+bool prepareOriginalUiTournamentPodWindowMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRiderWindowMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        constexpr bool character=false; // Exact Tournament pod_wndw only.
+        const auto* name=character?"12c_4":"pod_wndw";
+        if ((!character&&pass.identity!=catalogMember(OriginalUiArchiveId50KG::tournament,"ui\\textures\\pod_wndw.psm")) ||
+            (pass.pass!=1 && pass.pass!=3) || !same(pass.microprogram,"DiffuseCompressed") ||
+            !same(pass.textureName,name) || pass.gs[Field::alphaBlendingOnOff].value!=1 ||
+            pass.gs[Field::inputColorA].value!=0 || pass.gs[Field::inputColorB].value!=1 ||
+            pass.gs[Field::inputAlphaC].value!=0 || pass.gs[Field::inputColorD].value!=1 ||
+            pass.gs[Field::alphaTestOnOff].value!=1 || pass.gs[Field::foggingOnOff].value!=1 ||
+            pass.gs[Field::depthTestMethod].value!=2 || pass.gs[Field::zWriteDisabled].value!=0)
+            return fail(d,Error::profile,"actual pod_wndw/12c_4 DiffuseCompressed pass1 or3",0x2476a0u);
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::tournament,
+            character?"ui\\textures\\12c_4.pst":"ui\\textures\\pod_wndw.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if (!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=(character?4u:3u))
+            return fail(d,Error::texture,"authenticated original pod_wndw/12c_4 indexed image",0x24e880u);
+        const auto& base=texture->mips.back();
+        if (base.width!=(character?128u:64u) || base.height!=(character?128u:64u) || image->texture.width!=base.width ||
+            image->texture.height!=base.height || image->texture.rgba!=base.rgba)
+            return fail(d,Error::texture,"published native window image must equal original largest mip",0x24eb90u);
+        OriginalUiRiderWindowMaterial50KM next;
+        if (!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,false,false,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=character?3u:2u;next.sourceMipCount=character?4u:3u;next.sourcePass=pass.pass;
+        output=next;return true;
+    } catch (...) {d.error=Error::allocation;return false;}
+}
+bool prepareOriginalUiTournamentPodCutoutMaterial50KM(const OriginalUiMaterialPass50KG& pass,
+    const OriginalUiScreenAssets50KG& images,std::uint32_t imageIndex,
+    OriginalUiRider17CutoutMaterial50KM& output,OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};d.pass=pass.pass;
+    try {
+        const auto* psm=catalogMember(OriginalUiArchiveId50KG::tournament,"ui\\textures\\17_3.psm");
+        if(!psm || pass.identity!=psm ||
+            pass.provenance.archive!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::tournament) ||
+            pass.provenance.origin!=OriginalUiMaterialOrigin50KG::authoredPsm ||
+            pass.pass!=1 || !same(pass.microprogram,"DiffuseCompressed") || !same(pass.textureName,"17_3") ||
+            !same(pass.shaderPassGroup,"none") || pass.enabled!=1 || pass.textureCount!=1 || pass.textureCoordinateIndex!=0 ||
+            pass.lodCalculationMethod!=0 || pass.maximumMipLevel!=0 || pass.magFilter!=1 || pass.minFilter!=5 ||
+            pass.lodL!=0 || pass.lodK!=-75)
+            return fail(d,Error::profile,"canonical Rider17_3 single cutout pass/sampler",0x2476a0u);
+        // Every canonical GS value is the constructor value except REF=0,
+        // inherited from authenticated DefaultMT. Runtime overrides fail closed.
+        for(std::size_t i=0;i<originalUiGsFieldCount50KG;++i){
+            const auto expected=i==static_cast<std::size_t>(Field::alphaReferenceValue)?0:specs[i].initial;
+            if(pass.gs.fields[i].value!=expected)
+                return fail(d,Error::unsupportedValue,specs[i].name,pass.gs.fields[i].sourcePC);
+        }
+        const auto* member=catalogMember(OriginalUiArchiveId50KG::podTextures,"ui\\textures\\17_3.pst");
+        const auto* source=images.sourceProvenance(imageIndex);
+        const auto* texture=images.decodedTexture(imageIndex);
+        const auto* bank=images.textures();
+        const auto* image=bank?bank->texture(imageIndex):nullptr;
+        if(!images.loaded() || !member || !source || !texture || !image || images.ipumProvenance(imageIndex) ||
+            source->memberIdentity!=member || source->celIdentity || source->pstOffset!=0 ||
+            source->pstBytes!=member->bytes || texture->kind!=1 || texture->mips.size()!=4)
+            return fail(d,Error::texture,"authenticated original UIPODTEX17_3 image bank",0x24e880u);
+        constexpr std::size_t offsets[]{1052,1324,2364,6476};
+        for(std::size_t i=0;i<4;++i){
+            const auto& mip=texture->mips[i];const auto side=16u<<i;
+            if(mip.width!=side || mip.height!=side || mip.rgba.size()!=std::size_t(side)*side*4 ||
+                mip.source_indices_offset!=offsets[i] || mip.source_header_offset!=offsets[i]-16)
+                return fail(d,Error::texture,"original17_3 ascending16..128 mip chain",0x24e880u);
+        }
+        const auto& base=texture->mips.back();
+        if(image->texture.width!=base.width || image->texture.height!=base.height || image->texture.rgba!=base.rgba)
+            return fail(d,Error::texture,"published17_3 image must equal original largest mip",0x24eb90u);
+        OriginalUiRider17CutoutMaterial50KM next;
+        if(!prepareOriginalUiOneMapMaterial50KM(pass,*texture,next.material.raster,d,true,
+            next.material.fogEnabled,next.material.alphaTestGreaterZero,
+            false,false,false,false,false,false,false,false,false,true))return false;
+        next.material.program=OriginalUiLitProgram50KM::diffuseCompressed;
+        next.imagePolicy=OriginalUiNativeIndexedImagePolicy50KM::highestResolutionBaseOnly;
+        next.images=&images;next.imageIndex=imageIndex;next.imageIdentity=image->identity;
+        next.sourceStoredMipIndex=3;next.sourceMipCount=4;
+        output=next;return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
 bool prepareOriginalUiNativeUntexturedMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     OriginalUiNativeUntexturedMaterial50KG& output,
     OriginalUiMaterialDiagnostic50KG& d) noexcept {
@@ -1520,6 +1968,31 @@ bool readOriginalUiTournamentTrophyFallbackMaterial50KG(
         provenance.creationPC=0x2475C0;
         auto next=screenTextureFallback(provenance,names[index],*inherited,runtime);
         output=std::move(next);return true;
+    }catch(...){d.error=Error::allocation;return false;}
+}
+bool readOriginalUiCourseTrophyFallbackMaterial50KG(
+    const OriginalUiArchive50KG& course,OriginalUiTournamentTrophy50KG trophy,
+    const OriginalUiMaterialTemplates50KG& templates,OriginalUiTemplate50KG owner,
+    const OriginalUiMaterialRuntime50KG& runtime,OriginalUiMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    d={};try{
+        constexpr const char* names[]{"trphgldi","trphslvi","trphbrzi","trphglda","trphslva","trphbrza"};
+        constexpr std::uint32_t pcs[]{0x1D999C,0x1D99B4,0x1D99CC,0x1D99E4,0x1D99FC,0x1D9A14};
+        const auto i=static_cast<std::size_t>(trophy);
+        if(i>=6)return fail(d,Error::fallbackSource,"Course trophy",0x1D8F10);
+        if(!course.loaded()||course.identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::course))
+            return fail(d,Error::archive,"authenticated Course",pcs[i]);
+        const auto* inherited=templates.get(owner);
+        if(owner!=OriginalUiTemplate50KG::screenMt||!inherited||!runtime.overrideKnown)
+            return fail(d,Error::templateOwner,"explicit ScreenMT/runtime owner",0x2DF10C);
+        const auto registered=std::string("ui/textures/")+names[i];
+        const auto texture=course.find(registered+".pst"),page=course.find("UI/UICourse/track.dat");
+        if(!texture.identity||!texture.data||texture.size!=texture.identity->bytes||!page.identity||
+           course.find(registered+".psm").identity)return fail(d,Error::fallbackSource,"original Course trophy PST and absent PSM",pcs[i]);
+        OriginalUiMaterialProvenance50KG p;p.origin=OriginalUiMaterialOrigin50KG::courseTrophyMissingPsmFallback;
+        p.archive=course.identity();p.fallbackTexture=texture.identity;p.fallbackPageSource=page.identity;
+        p.sourceCallerPC=pcs[i];p.registeredName=registered;p.attemptedPsmMember=registered+".psm";p.creationPC=0x2475C0;
+        auto next=screenTextureFallback(p,names[i],*inherited,runtime);output=std::move(next);return true;
     }catch(...){d.error=Error::allocation;return false;}
 }
 bool readOriginalSpeedBoostFallbackMaterial50LA(

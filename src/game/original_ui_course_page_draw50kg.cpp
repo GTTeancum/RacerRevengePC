@@ -44,6 +44,33 @@ bool embeddedText(const std::string& formatted,std::uint16_t offset,std::int32_t
         packet.vertices.push_back(vertex(q.x,q.y,z,q.u,q.v));
     color(packet,snapshot.color54);return true;
 }
+bool tournamentText(const std::string& formatted,std::uint16_t offset,std::uint16_t capacity,
+    std::int32_t x,std::int32_t y,assets::OriginalUiTextJustification50KG justification,
+    std::uint32_t rgb,const assets::OriginalUiFont50KG& font,const assets::Texture48B& atlas,float z,
+    OriginalUiCoursePageTextSnapshot50KG& snapshot,OriginalUiCoursePagePacket50KG& packet,D& d){
+    snapshot={};snapshot.memberOffset=offset;snapshot.capacity=capacity;
+    snapshot.authoredX=x;snapshot.authoredY=y;snapshot.color54=rgb;
+    snapshot.formattedByteLength=formatted.size();snapshot.text=formatted.substr(0,capacity);
+    snapshot.count=static_cast<std::uint16_t>(snapshot.text.size());snapshot.packetCount=(snapshot.count+35u)/36u;
+    OriginalUiTextInput50KG input;input.font=&font;input.atlas=&atlas;
+    input.text=reinterpret_cast<const std::uint8_t*>(snapshot.text.data());input.length=snapshot.text.size();
+    OriginalUiTextLayout50KG glyphs;
+    if(!layoutOriginalUiText50KG(input,glyphs,d.text)||
+       !roundOriginalUiTextMetric50KG(glyphs.widthBeforeScaleAndRounding,1,snapshot.measuredWidth)||
+       !roundOriginalUiTextMetric50KG(glyphs.firstGlyphHeightBeforeScaleAndRounding,1,snapshot.measuredHeight))
+        return fail(d,E::geometry,0x2E13A0);
+    assets::OriginalUiOverlayText50KG position;position.x=x;position.y=y;position.justification=justification;
+    position.lines={snapshot.text};OriginalUiTextPosition50KG placed;
+    if(!positionOriginalUiText50KG({&position,0,glyphs.fontLineHeight,snapshot.measuredWidth,snapshot.measuredHeight},placed))
+        return fail(d,E::geometry,0x2E13A0);
+    snapshot.positionedX=placed.positionedX;snapshot.positionedY=placed.positionedY;
+    input.localX=placed.positionedX;input.localY=placed.positionedY;
+    if(!layoutOriginalUiText50KG(input,glyphs,d.text))return fail(d,E::geometry,0x2E0A30);
+    packet.vertices.clear();packet.vertices.reserve(glyphs.count*4u);
+    for(std::size_t i=0;i<glyphs.count;++i)for(const auto& q:glyphs.quads[i].vertices)
+        packet.vertices.push_back(vertex(q.x,q.y,z,q.u,q.v));
+    color(packet,rgb);return true;
+}
 }
 bool OriginalUiCoursePageDraw50KG::prepare(
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive,const assets::OriginalUiEnglish50KG& english,
@@ -94,6 +121,7 @@ bool OriginalUiCoursePageDraw50KG::prepare(
 }
 bool OriginalUiCoursePageDraw50KG::setLapCount(std::uint32_t laps,D& d)noexcept{
     d={};if(!prepared())return fail(d,poisoned_?E::poisoned:E::notPrepared,0x1DAF78);
+    if(tournament_)return fail(d,E::geometry,0x1DB814);
     if(laps<1||laps>25)return fail(d,E::geometry,0x1DAF78);
     if(laps==lapCount_)return true;
     const auto* font=images_->font(fontImage_);const auto* atlas=images_->textures()->texture(fontImage_);
@@ -107,6 +135,119 @@ bool OriginalUiCoursePageDraw50KG::setLapCount(std::uint32_t laps,D& d)noexcept{
         if(!embeddedText(formatted,0xB30,147,*font,atlas->texture,packetZ_,snapshot,packet,d))return false;
         packets_[3]=std::move(packet);texts_[1]=std::move(snapshot);lapCount_=laps;return true;
     }catch(...){return fail(d,E::allocation,0x1DB1C8);}
+}
+bool OriginalUiCoursePageDraw50KG::prepareTournamentFresh(
+    std::shared_ptr<const assets::OriginalUiArchive50KG> archive,const assets::OriginalUiEnglish50KG& english,
+    std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images,std::uint32_t fontImage,
+    const std::array<std::uint32_t,3>& medalImages,std::int32_t maximum,D& d)noexcept{
+    d={};using Id=assets::OriginalUiArchiveId50KG;
+    if(prepared_||poisoned_)return fail(d,E::alreadyPrepared,0x1D8F10);
+    if(!archive||!archive->loaded()||archive->identity()!=assets::originalUiArchiveIdentity50KG(Id::course))return fail(d,E::archive,0x1D8F10);
+    if(!english.loaded()||english.indexIdentity()!=assets::originalUiMemberIdentity50KG(Id::localization,1)||
+       english.textIdentity()!=assets::originalUiMemberIdentity50KG(Id::localization,0))return fail(d,E::localization,0x1DB814);
+    if(!images||!images->loaded()||!images->textures()||maximum!=16777215)return fail(d,E::images,0x2DEF40);
+    const auto* fp=images->sourceProvenance(fontImage);const auto* font=images->font(fontImage);
+    if(!fp||!font||!images->textures()->texture(fontImage)||
+       fp->memberIdentity!=assets::originalUiMemberIdentity50KG(Id::fonts,17)||
+       fp->celIdentity!=assets::originalUiMemberIdentity50KG(Id::fonts,16)||fp->pstOffset||fp->pstBytes!=fp->memberIdentity->bytes)
+        return fail(d,E::images,0x1D9A2C);
+    try{
+        constexpr const char* names[]={"medlgout","medstar","medlgicn"};
+        constexpr std::uint16_t offsets[]={0x640,0x7C0,0x820};
+        constexpr std::uint32_t pcs[]={0x1DB970,0x1DBF18,0x1DBF9C};
+        for(std::size_t i=0;i<3;++i){
+            const auto m=archive->find(std::string("ui/textures/")+names[i]+(i==1?".atm":".pst"));
+            const auto psm=archive->find(std::string("ui/textures/")+names[i]+".psm");
+            const auto* p=images->sourceProvenance(medalImages[i]);const auto* decoded=images->decodedTexture(medalImages[i]);
+            if(!m.identity||!psm.identity||!p||p->memberIdentity!=m.identity||p->celIdentity||!decoded||decoded->mips.size()!=1||
+               (i!=1&&(p->pstOffset||p->pstBytes!=m.size))||(i==1&&p->pstOffset!=12))return fail(d,E::images,pcs[i]);
+            auto& packet=tournamentPackets_[i];packet.materialName=i==0?"ui/textures/medlgout":i==1?"ui/textures/medstar":"ui/textures/medlgicn";
+            packet.materialIdentity=psm.identity;packet.sourcePC=pcs[i];packet.pageMemberOffset=offsets[i];packet.minimumTextureResidencyPriority=10;
+        }
+        for(std::size_t i=0;i<tournamentLabels_.size();++i){const auto* e=english.at(122+i);if(!e)return fail(d,E::localization,0x1DBFCC);tournamentLabels_[i]=e->text;}
+        // Original jump table3AF300: the planet ordinals are not LOC order.
+        constexpr std::uint32_t planetIds[]{11,15,12,16,14,13};
+        for(std::size_t i=0;i<planetNames_.size();++i){const auto* e=english.at(planetIds[i]);if(!e)return fail(d,E::localization,0x1DDF00);planetNames_[i]=e->text;}
+        const auto fm=archive->find("font/denmrk14.psm"),top=archive->find("font/denmrk14Top.psm"),page=archive->find("UI/UICourse/track.dat");
+        if(!fm.identity||!top.identity||!page.identity)return fail(d,E::material,0x1D9A2C);
+        for(std::size_t i=3;i<24;++i){auto& p=tournamentPackets_[i];p.materialName=i==23?"font/denmrk14top":"font/denmrk14";p.materialIdentity=i==23?top.identity:fm.identity;}
+        const auto& atlas=images->textures()->texture(fontImage)->texture;const auto z=float(maximum-1);
+        using J=assets::OriginalUiTextJustification50KG;
+        auto coldText=[&](std::size_t ti,std::size_t pi,std::uint16_t offset,std::uint16_t cap,int x,int y,J j,std::uint32_t rgb,const std::string& value=std::string{}){
+            tournamentPackets_[pi].pageMemberOffset=offset;
+            return tournamentText(value,offset,cap,x,y,j,rgb,*font,atlas,z,tournamentTexts_[ti],tournamentPackets_[pi],d);};
+        if(!coldText(0,3,0xC80,40,223,90,J::left,0xCCCCCC)||!coldText(1,4,0xD60,40,293,130,J::left,0xCCCCCC)||
+           !coldText(2,5,0xCF0,40,285,110,J::left,0xCCCCCC)||!coldText(3,6,0xC10,10,0,0,J::right,0xCCCCCC,tournamentLabels_[138-122])||
+           !coldText(20,23,0xBA0,40,320,43,J::centerBoth,0xFFFFFF))return false;
+        for(std::size_t i=0;i<8;++i)if(!coldText(4+2*i,7+2*i,std::uint16_t(0xDD0+i*0x70),10,0,0,J::centerHorizontal,0xFFFFFF)||
+            !coldText(5+2*i,8+2*i,std::uint16_t(0x1150+i*0x70),15,0,0,J::centerHorizontal,0xFFFFFF))return false;
+        fontImage_=fontImage;medalImages_=medalImages;packetZ_=float(maximum-1);
+        archive_=std::move(archive);images_=std::move(images);pageIdentity_=page.identity;tournament_=true;prepared_=true;
+        return true;
+    }catch(...){return fail(d,E::allocation,0x1D8F10);}
+}
+bool OriginalUiCoursePageDraw50KG::setTournamentPlanetName(std::uint32_t planet,D& d)noexcept{
+    d={};if(!tournamentFresh()||planet>=planetNames_.size())return fail(d,E::palette,0x1DDF00);
+    try{auto& p=tournamentPackets_[23];p.pageMemberOffset=0xBA0;p.sourcePC=0x1DD530;
+        if(!tournamentText(planetNames_[planet],0xBA0,40,320,43,assets::OriginalUiTextJustification50KG::centerBoth,
+            secondary_,*images_->font(fontImage_),images_->textures()->texture(fontImage_)->texture,packetZ_,tournamentTexts_[20],p,d))return false;
+        tournamentPlanet_=true;return true;
+    }catch(...){return fail(d,E::allocation,0x1DDF00);}
+}
+bool OriginalUiCoursePageDraw50KG::updateTournamentFresh(OriginalUiCourseWidgets50KG& widgets,
+    const OriginalUiCourseTournamentDrawState50KG& state,D& d)noexcept{
+    d={};using J=assets::OriginalUiTextJustification50KG;
+    constexpr std::array<std::int32_t,7> firstPercent{{30,50,60,70,80,90,100}};
+    if(!tournamentFresh()||!tournamentPlanet_||state.career>=27||state.slot!=1||state.tier!=1||
+       (state.progress&31u)||state.medal||state.remainingPrize!=2200||state.par!=2||state.killPercent!=firstPercent)
+        return fail(d,E::geometry,0x1DB814);
+    const auto* nav=widgets.navigation();if(widgets.poisoned()||!nav||!nav->page||nav->page->identity!=pageIdentity_)return fail(d,E::widget,0x1DB81C);
+    try{
+        auto packets=tournamentPackets_;std::array<OriginalUiCoursePageTextSnapshot50KG,21> texts{};
+        const auto& font=*images_->font(fontImage_);const auto& atlas=images_->textures()->texture(fontImage_)->texture;
+        constexpr float xs[]={40,27,44},ys[]={100,87,104};
+        for(std::size_t i=0;i<3;++i){auto& p=packets[i];const auto* image=images_->textures()->texture(medalImages_[i]);if(!image)return fail(d,E::images,p.sourcePC);
+            const float x=xs[i],y=ys[i],w=float(image->texture.width),h=float(image->texture.height);
+            p.vertices={vertex(x,y,packetZ_,0,0),vertex(x+w,y,packetZ_,1,0),vertex(x+w,y+h,packetZ_,1,1),vertex(x,y+h,packetZ_,0,1)};
+            color(p,i==1?0xFFFFFF:primary_);
+        }
+        auto text=[&](std::size_t pi,std::size_t ti,const std::string& value,std::uint16_t offset,std::uint16_t cap,
+            std::int32_t x,std::int32_t y,J j,std::uint32_t rgb,std::uint32_t pc){
+            auto& p=packets[pi];p.sourcePC=pc;p.pageMemberOffset=offset;
+            return tournamentText(value,offset,cap,x,y,j,rgb,font,atlas,packetZ_,texts[ti],p,d);
+        };
+        if(!text(3,0,tournamentLabels_[153-122],0xC80,40,223,90,J::left,0xCCCCCC,0x1DC644)||
+           !text(4,1,std::to_string(state.remainingPrize)+" "+tournamentLabels_[139-122],0xD60,40,293,130,J::left,0xCCCCCC,0x1DC824)||
+           !text(5,2,tournamentLabels_[147-122]+" "+tournamentLabels_[144-122],0xCF0,40,285,110,J::left,0xCCCCCC,0x1DCAA8)||
+           !text(6,3,tournamentLabels_[138-122],0xC10,10,75,225+17*state.par,J::right,0xCCCCCC,0x1DD30C))return false;
+        for(std::size_t i=0;i<8;++i){const auto rgb=i==0?primary_:i==std::size_t(state.par)?0xCCCCCC:secondary_;
+            if(!text(7+2*i,4+2*i,i?std::to_string(i):tournamentLabels_[137-122],std::uint16_t(0xDD0+i*0x70),10,100,225+int(i)*17,J::centerHorizontal,rgb,0x1DD4B8)||
+               !text(8+2*i,5+2*i,i?"+"+std::to_string(state.killPercent[i-1])+"%":"% WINNINGS",std::uint16_t(0x1150+i*0x70),15,200,225+int(i)*17,J::centerHorizontal,rgb,0x1DD4D0))return false;
+        }
+        if(!text(23,20,tournamentLabels_[state.tier-1],0xBA0,40,320,43,J::centerBoth,secondary_,0x1DD530))return false;
+        // Fallible immutable geometry preparation is separate from live widget
+        // callbacks. Collector interleaves those callbacks with actual source
+        // packet/material service in the order1DB834..1DD4F8.
+        tournamentPackets_=std::move(packets);tournamentTexts_=std::move(texts);tournamentFrame_=true;tournamentWidgetStage_=0;return true;
+    }catch(...){return fail(d,E::allocation,0x1DB81C);}
+}
+bool OriginalUiCoursePageDraw50KG::applyTournamentWidgetStage(std::uint8_t stage,
+    OriginalUiCourseWidgets50KG& widgets,D& d)noexcept{
+    d={};if(!tournamentFresh()||!tournamentFrame_||stage!=tournamentWidgetStage_||stage>4)return fail(d,E::widget,0x1DB81C);
+    bool ok=false;
+    if(stage==0||stage==4){OriginalUiCourseWidgetStep50KG steps[2]{};
+        const auto count=stage==0?2u:1u;
+        for(std::size_t i=0;i<count;++i){auto& s=steps[i];s.kind=OriginalUiCourseWidgetStepKind50KG::widget;
+            s.widget=std::uint16_t(stage==0?60+i:62);s.operation=OriginalUiControlOperation50KG::setEnabled;s.value=true;
+            s.sourcePC=stage==0?(i?0x1DB848:0x1DB834):0x1DD4F8;}
+        ok=widgets.apply(steps,count,{},d.widget);
+    }else{
+        constexpr std::uint16_t ids[]{60,61,63};constexpr unsigned labels[]{141,140,142};
+        try{ok=widgets.setTournamentDynamicLines(ids[stage-1],{tournamentLabels_[labels[stage-1]-122]},d.widget);}
+        catch(...){return fail(d,E::allocation,0x2A9DE0);}
+    }
+    if(!ok){poisoned_=true;return fail(d,E::widget,stage==0?0x1DB834:stage==1?0x1DC63C:stage==2?0x1DC81C:stage==3?0x1DCA64:0x1DD4F8);}
+    ++tournamentWidgetStage_;return true;
 }
 bool OriginalUiCoursePageDraw50KG::applyPlanetPalette(OriginalUiCourseWidgets50KG& widgets,
     std::uint32_t primary,std::uint32_t secondary,D& d)noexcept{
@@ -124,11 +265,12 @@ bool OriginalUiCoursePageDraw50KG::applyPlanetPalette(OriginalUiCourseWidgets50K
         K::text,K::text,K::text,K::text,K::text,K::text};
     for(std::size_t i=0;i<std::size(ids);++i)if(widgets.state(ids[i]).kind!=kinds[i])return fail(d,E::widget,0x1DD580);
     for(std::size_t i=0;i<18;++i)if(!widgets.setColor(ids[i],primary,d.widget)){poisoned_=true;return fail(d,E::widget,0x1DD580);}
-    for(auto& p:packets_)color(p,primary);for(auto& t:texts_)t.color54=primary;
+    primary_=primary;secondary_=secondary;
+    if(!tournament_){for(auto& p:packets_)color(p,primary);for(auto& t:texts_)t.color54=primary;}
     for(std::size_t i=18;i<std::size(ids);++i)if(!widgets.setColor(ids[i],secondary,d.widget)){poisoned_=true;return fail(d,E::widget,0x1DD580);}
     // Actual query 2A6DB8 compares controller0's attached group, not selected slot.
-    if(nav->controllerGroup[0]==2){texts_[0].color54=0xCCCCCC;color(packets_[0],0xCCCCCC);}
-    else if(nav->controllerGroup[0]==3){texts_[1].color54=0xCCCCCC;color(packets_[3],0xCCCCCC);}
+    if(!tournament_&&nav->controllerGroup[0]==2){texts_[0].color54=0xCCCCCC;color(packets_[0],0xCCCCCC);}
+    else if(!tournament_&&nav->controllerGroup[0]==3){texts_[1].color54=0xCCCCCC;color(packets_[3],0xCCCCCC);}
     return true;
 }
 }

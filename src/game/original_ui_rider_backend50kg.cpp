@@ -1,5 +1,6 @@
 #include "original_ui_rider_backend50kg.h"
 #include <algorithm>
+#include <cstring>
 #include <array>
 #include <limits>
 #include <utility>
@@ -13,6 +14,52 @@ constexpr std::uint32_t noOwner=std::numeric_limits<std::uint32_t>::max();
 bool valid(std::uint16_t id) noexcept{return id>0&&id<120;}
 bool genuine(const std::shared_ptr<const assets::OriginalUiArchive50KG>& a,assets::OriginalUiArchiveId50KG id) noexcept {
     return a&&a->loaded()&&a->identity()==assets::originalUiArchiveIdentity50KG(id);
+}
+bool sameDefinitionMember(const assets::OriginalUiMemberIdentity50KG* a,
+    const assets::OriginalUiMemberIdentity50KG* b) noexcept {
+    if(a==b)return true;
+    return a&&b&&a->name&&b->name&&a->sha256&&b->sha256&&a->bytes==b->bytes&&
+        std::strcmp(a->name,b->name)==0&&std::strcmp(a->sha256,b->sha256)==0;
+}
+bool samePredecessorDefinition(const OriginalUiTournamentPredecessorPass50KG& old,
+    const assets::OriginalUiMaterialPass50KG& next,const assets::OriginalUiImageProvenance50KG* image,
+    const assets::OriginalUiScreenAssets50KG* animatedImages) noexcept {
+    const auto& a=old.source;const auto& b=next;
+    // The finite cross-archive alias is authored Tournament -> Rider only.
+    // Equal content is a cold definition proof, never a shader-history merge.
+    if(a.provenance.origin!=assets::OriginalUiMaterialOrigin50KG::authoredPsm||
+       b.provenance.origin!=assets::OriginalUiMaterialOrigin50KG::authoredPsm||
+       a.provenance.archive!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::tournament)||
+       b.provenance.archive!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::rider)||
+       !a.identity||!b.identity||!sameDefinitionMember(a.identity,b.identity)||a.inheritedTemplate!=b.inheritedTemplate||
+       a.pass!=b.pass||a.microprogram!=b.microprogram||a.textureName!=b.textureName||a.shaderPassGroup!=b.shaderPassGroup||
+       a.enabled!=b.enabled||a.textureCount!=b.textureCount||a.textureCoordinateIndex!=b.textureCoordinateIndex||
+       a.lodCalculationMethod!=b.lodCalculationMethod||a.maximumMipLevel!=b.maximumMipLevel||
+       a.magFilter!=b.magFilter||a.minFilter!=b.minFilter||a.lodL!=b.lodL||a.lodK!=b.lodK||
+       a.authored.name!=b.authored.name||a.authored.sourceOffset!=b.authored.sourceOffset||
+       a.authored.values.size()!=b.authored.values.size()||bool(image)!=!old.images.empty())return false;
+    for(std::size_t i=0;i<a.gs.fields.size();++i){const auto& x=a.gs.fields[i];const auto& y=b.gs.fields[i];
+        if(x.value!=y.value||!sameDefinitionMember(x.member,y.member)||x.byteOffset!=y.byteOffset||x.sourcePC!=y.sourcePC)return false;}
+    for(std::size_t i=0;i<a.authored.values.size();++i){const auto& x=a.authored.values[i];const auto& y=b.authored.values[i];
+        if(x.key!=y.key||x.text!=y.text||x.keyOffset!=y.keyOffset||x.valueOffset!=y.valueOffset||x.sourceValuePresent!=y.sourceValuePresent)return false;}
+    const auto sameImage=[](const assets::OriginalUiImageProvenance50KG& x,const assets::OriginalUiImageProvenance50KG& y){
+        return sameDefinitionMember(x.memberIdentity,y.memberIdentity)&&sameDefinitionMember(x.celIdentity,y.celIdentity)&&
+            x.pstOffset==y.pstOffset&&x.pstBytes==y.pstBytes;
+    };
+    if(animatedImages){
+        // Binder has ten distinct stored-PST frames. The incoming cold row's
+        // initial equivalence key names frame0 only, while predecessor evidence
+        // must retain and authenticate the complete real frame multiset.
+        const auto* textures=animatedImages->textures();
+        if(!textures||old.images.size()!=textures->textureCount()||old.images.empty())return false;
+        for(const auto& prior:old.images){std::size_t oldCount=0,newCount=0;
+            for(const auto& occurrence:old.images)if(sameImage(prior,occurrence))++oldCount;
+            for(std::uint32_t i=0;i<textures->textureCount();++i){const auto* candidate=animatedImages->sourceProvenance(i);
+                if(!candidate)return false;if(sameImage(prior,*candidate))++newCount;}
+            if(oldCount!=newCount)return false;
+        }
+    }else for(const auto& prior:old.images)if(!image||!sameImage(prior,*image))return false;
+    return true;
 }
 // Inspect actual authored material references before widening the immutable
 // bank. Only absent authenticated kind2 cache entries make an optional rider
@@ -98,7 +145,7 @@ struct OriginalUiRiderBackend50KG::Storage {
     std::uint32_t binderOwner=noOwner;
     std::uint64_t generation=1;
     std::uint64_t registryGeneration=1;
-    bool coldSealed=false,frame=false;
+    bool coldSealed=false,frame=false,tournamentPredecessorRetired=false;
 };
 OriginalUiRiderBackend50KG::OriginalUiRiderBackend50KG() noexcept=default;
 OriginalUiRiderBackend50KG::~OriginalUiRiderBackend50KG(){
@@ -114,6 +161,15 @@ bool OriginalUiRiderBackend50KG::bind(const OriginalUiRiderBackendInput50KG& inp
        !genuine(input.podTextures,assets::OriginalUiArchiveId50KG::podTextures)||
        !input.binder||!input.binder->loaded()||!input.binder->images()||
        !input.materialRuntime.overrideKnown||input.staticRows.empty())return fail(E::input);
+    if(input.tournamentPredecessor){
+        const auto& prior=*input.tournamentPredecessor;
+        if(!prior.creator_||!prior.bank_||!prior.bankGeneration_||!prior.registryGeneration_||prior.passes_.empty())return fail(E::input);
+        for(std::size_t i=0;i<prior.passes_.size();++i){const auto& pass=prior.passes_[i];OriginalUiRiderMaterialRow50KG row;
+            if(!pass.row.prepared()||pass.registeredName.empty()||!pass.source.pass||
+               !OriginalUiRiderMaterialRow50KG::prepare(*input.appStart,pass.registeredName,row,d.lifetime)||!pass.row.same(row))return fail(E::input);
+            for(std::size_t j=0;j<i;++j)if(prior.passes_[j].row.same(pass.row)&&prior.passes_[j].source.pass==pass.source.pass)return fail(E::input);
+        }
+    }
     try {
         auto next=std::make_unique<Storage>();next->input=input;
         if(!next->visibility.bind(input.rider,d.membership))return fail(E::membership);
@@ -232,6 +288,22 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         if(!OriginalUiRiderMaterialFootprint50KG::binder(*s.input.appStart,*s.input.binder,binderFootprint,d.lifetime)||
            !s.input.binder->pass()||!addCold("ui/textures/binder",*s.input.binder->pass(),s.input.binder->images()->sourceProvenance(0)))
             return fail(E::lifetime);
+        if(s.input.tournamentPredecessor){
+            // Keep every predecessor row, including nonoverlapping rows. Only
+            // overlapping immutable definitions are compared here; no lifetime
+            // event or live instance can occur before the retirement capability.
+            for(const auto& prior:s.input.tournamentPredecessor->passes_){
+                const auto at=std::find_if(coldRows.begin(),coldRows.end(),[&](const Storage::ColdRow& r){return r.row.same(prior.row);});
+                if(at==coldRows.end())continue;
+                if(prior.source.pass>at->sources.size()||
+                   !samePredecessorDefinition(prior,*at->sources[prior.source.pass-1],at->images[prior.source.pass-1],
+                       prior.registeredName=="ui/textures/binder"?s.input.binder->images():nullptr))return fail(E::lifetime);
+                for(std::size_t pass=1;pass<=at->sources.size();++pass){bool found=false;
+                    for(const auto& old:s.input.tournamentPredecessor->passes_)if(old.row.same(prior.row)&&old.source.pass==pass){found=true;break;}
+                    if(!found)return fail(E::lifetime);
+                }
+            }
+        }
         // Bound every prepared graph and both optional helpers, including pods
         // authored to remain resident after deselection. Events are consumed at
         // each real parent+A4 boundary; no unbounded journal accumulates per move.
@@ -275,6 +347,19 @@ bool OriginalUiRiderBackend50KG::prepareColdAndSeal(const OriginalUiRiderDynamic
         ++s.generation;diagnostic_={};d={};return true;
     }catch(...){return fail(E::allocation);}
 }
+bool OriginalUiRiderBackend50KG::predecessorRetired() const noexcept {
+    return storage_&&(!storage_->input.tournamentPredecessor||storage_->tournamentPredecessorRetired);
+}
+bool OriginalUiRiderBackend50KG::acceptTournamentPredecessorRetirement(
+    OriginalUiTournamentPredecessorRetirement50KG& token,OriginalUiRiderBackendDiagnostic50KG& d) noexcept {
+    d={};if(!storage_){d.error=E::input;return false;}auto& s=*storage_;
+    const auto prior=s.input.tournamentPredecessor;
+    if(!prior||s.tournamentPredecessorRetired||!s.coldSealed||!s.bank||s.frame||s.poisoned||s.tornDown||
+       s.lifetime.sequence()!=0||s.lifetime.hasOwners()||!s.instances.empty()||s.submittedWatermark||
+       !token.issued()||token.inventory_!=prior||token.creator_!=prior->creator_||
+       token.materialSequence_<prior->materialSequence_){d.error=E::completion;return false;}
+    token.consumed_=true;s.tournamentPredecessorRetired=true;return true;
+}
 bool OriginalUiRiderBackend50KG::preflight(const OriginalUiRiderDynamicOwner50KG& owner,
     const OriginalUiRiderWidgetCallback50KG* calls,std::size_t count) noexcept {
     diagnostic_={};const auto fail=[&](E e){diagnostic_.error=e;return false;};
@@ -300,7 +385,7 @@ bool OriginalUiRiderBackend50KG::attach(std::uint16_t id,OriginalUiRiderDynamicO
     const auto fail=[&](E e){diagnostic_.error=e;if(storage_)storage_->poisoned=true;return false;};
     if(!storage_||!valid(id)||!storage_->entries[id].coldModel)return fail(E::input);
     auto& s=*storage_;auto& entry=s.entries[id];
-    if(s.frame||(s.submittedDynamicFrontier&&!cleanupEntitled())||s.poisoned||s.tornDown)return fail(E::busy);
+    if(s.frame||!predecessorRetired()||(s.submittedDynamicFrontier&&!cleanupEntitled())||s.poisoned||s.tornDown)return fail(E::busy);
     if(!s.coldSealed||!s.consume||entry.attached||!entry.materials||entry.imageOwner==noOwner||
        s.registryGeneration==std::numeric_limits<std::uint64_t>::max())return fail(E::input);
     const auto state=owner.state(id);
@@ -376,7 +461,10 @@ bool OriginalUiRiderBackend50KG::preparedRider(std::uint32_t rider)const noexcep
     return true;
 }
 bool OriginalUiRiderBackend50KG::beginFrame() noexcept {
-    if(!storage_||storage_->frame||!storage_->bank||storage_->poisoned||storage_->tornDown)return false;storage_->frame=true;return true;
+    // Cold static prototypes are local unbound copies, not live history leases.
+    // Even a direct collector caller cannot publish them until the exact
+    // Tournament predecessor has genuinely retired and its token was consumed.
+    if(!predecessorRetired()||storage_->frame||!storage_->bank||storage_->poisoned||storage_->tornDown)return false;storage_->frame=true;return true;
 }
 void OriginalUiRiderBackend50KG::endFrame() noexcept{if(storage_)storage_->frame=false;}
 std::uint64_t OriginalUiRiderBackend50KG::generation()const noexcept{return storage_?storage_->generation:0;}
@@ -404,7 +492,7 @@ OriginalUiRiderBinderAnimation50KG* OriginalUiRiderBackend50KG::binder(std::uint
     return attached(id)&&pair<2?storage_->entries[id].binders[pair].get():nullptr;
 }
 const OriginalUiRiderMaterialFootprint50KG* OriginalUiRiderBackend50KG::graphFootprint(std::uint16_t id)const noexcept {
-    if(!storage_||!storage_->coldSealed||!valid(id)||!storage_->entries[id].coldModel||storage_->poisoned||storage_->tornDown||
+    if(!storage_||!predecessorRetired()||!storage_->coldSealed||!valid(id)||!storage_->entries[id].coldModel||storage_->poisoned||storage_->tornDown||
        (storage_->submittedDynamicFrontier&&!cleanupEntitled())||storage_->entries[id].attached)return nullptr;
     const auto& footprint=storage_->entries[id].footprint;return footprint.prepared()?&footprint:nullptr;
 }

@@ -27,7 +27,7 @@ using Track=rr::platform::HostTrack50IM;
 // Actual source profile visibility, rider/roster identity, mode2 and target
 // archive authentication remain independent requirements below.
 inline constexpr bool directHumanTrack(Track track) noexcept {
-    return track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC||track==Track::TB||track==Track::GB||track==Track::MC;
+    return track==Track::GC||track==Track::TA||track==Track::GA||track==Track::MA||track==Track::SA||track==Track::MB||track==Track::SC||track==Track::TC||track==Track::RC||track==Track::TB||track==Track::GB||track==Track::MC;
 }
 inline constexpr bool directDiscTarget(Track track) noexcept {
     return directHumanTrack(track)||track==Track::RA;

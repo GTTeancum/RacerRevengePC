@@ -1,0 +1,138 @@
+#include "original_ui_hall_session50kg.h"
+#include <cmath>
+#include <limits>
+namespace rr::platform { namespace {
+using S=OriginalUiHallSessionStatus50KG;using D=OriginalUiHallSessionDiagnostic50KG;
+using HP=game::OriginalUiHallPhase50KG;using MS=game::OriginalUiOptionsMenuStatus50KG;
+using N=game::OriginalUiTransitionNotificationKind50KG;using H=game::OriginalUiApertureHookKind50KG;
+using AS=game::OriginalUiApertureStatus50KG;using Life=game::OriginalUiTransitionLifecycle50KG;
+S result(D& d,S s,std::uint32_t pc=0)noexcept{d.status=s;d.sourcePC=pc;return s;}
+bool okay(AS s)noexcept{return s==AS::ok||s==AS::noChange;}
+bool stamp(OriginalUiRiderProfileStamp50KG a,OriginalUiRiderProfileStamp50KG b)noexcept{return a.generation==b.generation&&a.mode34==b.mode34;}
+bool common(const OriginalUiMainProfile50KG&a,const OriginalUiMainProfile50KG&b)noexcept{return a.known==b.known&&a.mode34==b.mode34&&a.previousMode38==b.previousMode38&&a.savedSlot6E0==b.savedSlot6E0&&a.availability11018==b.availability11018&&a.flags11054==b.flags11054&&a.playerBits1125C==b.playerBits1125C;}
+bool decision(const game::OriginalUiRouteDecision50KG&a,const game::OriginalUiRouteDecision50KG&b)noexcept{
+ if(a.action!=b.action||a.blockers!=b.blockers||a.admitted!=b.admitted||a.profileProposalComplete!=b.profileProposalComplete||a.selectedSlot!=b.selectedSlot||a.selectedRider!=b.selectedRider||a.inputPC!=b.inputPC||a.request.kind!=b.request.kind||a.request.sourceScreen!=b.request.sourceScreen||a.request.sourcePage!=b.request.sourcePage||a.request.targetScreen!=b.request.targetScreen||a.request.targetPage!=b.request.targetPage||a.request.sourcePC!=b.request.sourcePC||a.profileChanges.count!=b.profileChanges.count||a.profileChanges.count>a.profileChanges.values.size())return false;
+ for(std::size_t i=0;i<a.profileChanges.count;++i){const auto&x=a.profileChanges.values[i];const auto&y=b.profileChanges.values[i];if(x.field!=y.field||x.operation!=y.operation||x.value!=y.value||x.replaceMask!=y.replaceMask||x.sourcePC!=y.sourcePC)return false;}return true;
+}
+}
+struct OriginalUiHallOfFameSession50KG::Storage {
+ OriginalUiHallSessionCold50KG cold;OriginalUiHallSessionSnapshot50KG state{};D faultDetail{};
+ game::OriginalUiHallOfFameController50KG controller;game::OriginalUiHallState50KG nav;
+ game::OriginalUiApertureOwner50KG aperture;OriginalUiHallDrawContribution50KG collector;
+ OriginalUiMainProfile50KG coldCommon{},liveCommon{};OriginalUiRiderProfileStamp50KG coldStamp{},liveStamp{},pendingStamp{};
+ game::OriginalUiHallPlan50KG pending;OriginalUiMainSessionUpdate50KG prepared{};
+ bool entryCommitted=false,backCommitted=false,inOperation=false,rendering=false,updatePrepared=false,paused=false,sourceClosing=false,sourceTornDown=false;
+ std::uint64_t serial=0;
+ bool operational()const noexcept{return !state.faulted&&!state.quitRequested&&!sourceClosing&&!sourceTornDown;}
+ auto transition()const noexcept{return cold.externalTransition->snapshot();}
+ bool currentPage()const noexcept{const auto t=transition();return t.bound&&t.current.screen==11&&t.current.page==1;}
+ bool process()const noexcept{return cold.application->known&&!(cold.application->globalFlags228&4u)&&cold.application->transportE00==-1&&cold.commonProfile->known&&cold.profile->commonProfile()==cold.commonProfile.get();}
+ bool profileCurrent()const noexcept{game::OriginalUiHallProfile50KG p;return entryCommitted&&process()&&common(*cold.commonProfile,liveCommon)&&stamp(cold.profile->stamp(),liveStamp)&&cold.profile->hallSnapshot(p);}
+ bool idle()const noexcept{const auto t=transition();return currentPage()&&t.lifecycle==Life::idle&&t.phase==game::OriginalUiTransitionPhase50KG::none&&!t.applicationRequestQueued&&!t.initialRestartPending;}
+ bool muted()const noexcept{return cold.audioMode==OriginalUiMainAudioMode50KG::muted;}
+ bool audioReady()const noexcept{return muted()?!cold.audio:cold.audio&&cold.audio->hallOfFameMenuReady();}
+ bool soundReady(std::uint32_t id)const noexcept{return audioReady()&&(muted()||cold.audio->canPlayGameOptionsEffect(id));}
+ bool sound(std::uint32_t id)noexcept{if(muted()){++state.audio.suppressedByMutedMode;return true;}if(!cold.audio->playGameOptionsEffect(id)){++state.audio.failed;return false;}++state.audio.submitted;return true;}
+ void fault(S v,std::uint32_t pc)noexcept{if(!state.faulted){faultDetail.status=v;faultDetail.sourcePC=pc;}state.faulted=true;state.framePublished=false;}
+ bool apply(const game::OriginalUiHallPlan50KG&p)noexcept{
+  auto& bank=*cold.resources->widgets();
+  if(!profileCurrent()||!bank.preflight(p.callbacks.data(),p.callbackCount,faultDetail.widget)||
+     (p.soundRequested&&!soundReady(p.soundId))||
+     (p.startSong5&&(!audioReady()||(!muted()&&!cold.audio->canStartHallOfFameLoop5())))||
+     (p.fadeMusic&&(!audioReady()||(!muted()&&!cold.audio->canFadeHallOfFameMusic())))||
+     (p.pauseVideo&&(state.videoPaused84||state.movementPresentationPending||p.pauseAfterCallbackCount>p.callbackCount))||
+     ((p.resumeVideo||p.drainPreviousFrame||p.setVideoEffect250)&&(!state.videoPaused84||nav.deferred1460!=1||!p.resumeVideo||!p.drainPreviousFrame||!p.setVideoEffect250)))return false;
+  if(p.activateCamera&&!cold.resources->camera())return false;
+  if(p.pauseVideo){if(!bank.apply(p.callbacks.data(),p.pauseAfterCallbackCount,faultDetail.widget))return false;
+   state.videoPaused84=true;
+   if(!bank.apply(p.callbacks.data()+p.pauseAfterCallbackCount,p.callbackCount-p.pauseAfterCallbackCount,faultDetail.widget))return false;
+  }else if(!bank.apply(p.callbacks.data(),p.callbackCount,faultDetail.widget))return false;
+  if(p.activateCamera)state.cameraActive=true;
+  if(p.clearScene3D8)cold.application->uiObject3D8=0;
+  if(p.applyBackground430){std::uint32_t packed=0;for(unsigned i=0;i<3;++i){std::int32_t x=0;if(!game::convertOriginalUiApertureCvtWS50KG(controller.page()->backgroundColor[i],x)||x<0||x>255)return false;packed|=std::uint32_t(x)<<(16-8*i);}state.packedBackground430=packed;}
+  if(p.writePlanet){if(!cold.profile->commitHallPlanet(p.planet,liveStamp))return false;liveStamp=cold.profile->stamp();}
+  if(p.startSong5||p.fadeMusic){if(muted())++state.audio.suppressedByMutedMode;else{if(!(p.startSong5?cold.audio->startHallOfFameLoop5():cold.audio->fadeHallOfFameMusic()))return false;++state.audio.submitted;}}
+  // Renderer queue completion and source framebuffer byteblend are executed by
+  // the frontend before its next render. This flag is a pending obligation,
+  // not a fabricated drain receipt. Only that owner can discharge it.
+  if(p.resumeVideo){state.videoPaused84=false;state.movementPresentationPending=true;}
+  if(p.saveUpdateDelta&&!okay(aperture.saveHallOfFameUpdateDelta38(p.updateDelta)))return false;
+  nav=p.state;if(!controller.selectedCourse(nav,state.courseIndex,state.planetIndex))return false;
+  if(p.soundRequested&&!sound(p.soundId))return false;return true;
+ }
+ void phase(HP p,std::uint32_t pc)noexcept{game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG plan;
+  if(!profileCurrent()||!cold.profile->hallSnapshot(view)||controller.phase(nav,p,view,plan)!=MS::ok||!apply(plan))fault(S::widget,pc);}
+ static bool available(void* p)noexcept{auto&s=*static_cast<Storage*>(p);return s.operational()&&s.cold.resources->exitText()&&s.cold.resources->exitText()->prepared();}
+ static void hook(void*p,const game::OriginalUiApertureHook50KG&e)noexcept{auto&s=*static_cast<Storage*>(p);if(!s.operational())return;
+  switch(e.kind){case H::openingAC:s.phase(HP::openingAC,e.targetPC);break;case H::openedB0:s.phase(HP::openedB0,e.targetPC);break;case H::closingB4:s.phase(HP::closingB4,e.targetPC);break;case H::closingThresholdB8:s.phase(HP::closedB8,e.targetPC);break;case H::closedBC:if(e.targetPC!=0x1D7A00)s.fault(S::aperture,e.targetPC);break;case H::screenExitObject440:if(!s.rendering||!s.collector.projectExitText(e,s.faultDetail.draw))s.fault(S::draw,e.callPC);break;}}
+ static void overlay(void*p,std::uint8_t ordinal,const game::OriginalUiApertureRectangle50KG&r)noexcept{auto&s=*static_cast<Storage*>(p);if(s.operational()&&(!s.rendering||!s.collector.projectAperture(ordinal,r,s.faultDetail.draw)))s.fault(S::draw,0x1D798C);}
+ bool updateWidgets(bool top)noexcept{const auto* ids=cold.resources->widgets()->order(top);if(!ids)return false;for(auto id:*ids){auto& b=*cold.resources->widgets();if(b.state(id).kind==game::OriginalUiHallWidgetKind50KG::text&&!b.updateText(id,true,faultDetail.widget)&&faultDetail.widget.error!=game::OriginalUiHallWidgetError50KG::hidden)return false;}return true;}
+};
+OriginalUiHallOfFameSession50KG::OriginalUiHallOfFameSession50KG()noexcept=default;
+OriginalUiHallOfFameSession50KG::~OriginalUiHallOfFameSession50KG()=default;
+S OriginalUiHallOfFameSession50KG::bind(const OriginalUiHallSessionCold50KG&cold,D&d)noexcept{
+ d={};if(storage_)return result(d,S::alreadyBound);
+ if(!cold.resources||!cold.resources->loaded()||!cold.resources->widgets()||!cold.resources->camera()||!cold.resources->exitText()||!cold.resources->exitText()->prepared()||!cold.hallArchive||cold.hallArchive->identity()!=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::hallOfFame))return result(d,S::resource);
+ if(!cold.externalTransition||cold.externalTransition->snapshot().bound||!cold.profile||!cold.profile->hallRecordsReady()||!cold.commonProfile||!cold.commonProfile->known||cold.profile->commonProfile()!=cold.commonProfile.get()||!cold.application||!cold.application->known||(cold.application->globalFlags228&4)||cold.application->transportE00!=-1)return result(d,S::profile);
+ if((cold.audioMode!=OriginalUiMainAudioMode50KG::muted&&cold.audioMode!=OriginalUiMainAudioMode50KG::enabled)||(cold.audioMode==OriginalUiMainAudioMode50KG::muted?bool(cold.audio):!cold.audio||!cold.audio->hallOfFameMenuReady()))return result(d,S::audio);
+ try{auto s=std::make_unique<Storage>();s->cold=cold;s->coldCommon=*cold.commonProfile;s->coldStamp=cold.profile->stamp();game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG plan;
+  assets::OriginalUiPageDiagnostic50KG parse;if(s->controller.bind(cold.hallArchive,parse)!=MS::ok||!s->controller.initialState(s->nav)||!cold.profile->hallSnapshotForMode(5,view)||s->controller.phase(s->nav,HP::entry74,view,plan)!=MS::ok)return result(d,S::profile);
+  if(!s->collector.bindFrame(cold.resources,cold.gpu,d.draw))return result(d,S::draw);
+  game::OriginalUiApertureCallbacks50KG cb;cb.context=s.get();cb.available=&Storage::available;cb.hook=&Storage::hook;cb.submitOverlay=&Storage::overlay;
+  if(s->aperture.bindHallOfFame(cold.hallArchive,cb,d.aperture)!=AS::ok)return result(d,S::aperture);
+  s->state.bound=true;storage_=std::move(s);return result(d,S::ok);
+ }catch(...){return result(d,S::resource);}
+}
+bool OriginalUiHallOfFameSession50KG::acceptEntryProfileCommit()noexcept{auto*s=storage_.get();if(!s||!s->operational()||s->entryCommitted||s->inOperation||!s->process())return false;auto expected=s->coldCommon;if(expected.mode34!=5){expected.previousMode38=expected.mode34;expected.mode34=5;}auto st=s->cold.profile->stamp();if(!common(expected,*s->cold.commonProfile)||st.generation!=s->coldStamp.generation||st.mode34!=5)return false;s->liveCommon=expected;s->liveStamp=st;s->entryCommitted=true;return true;}
+S OriginalUiHallOfFameSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG&e,D&d)noexcept{
+ d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational()||s->inOperation||!s->profileCurrent()||e.route.screen!=11||e.route.page!=1)return result(d,S::unsupportedState,e.sourcePC);
+ const auto t=s->transition();if(!t.bound||e.lifecycle!=t.lifecycle||e.phase!=t.phase||!((t.current.screen==11&&t.current.page==1)||(t.requested.screen==11&&t.requested.page==1)))return result(d,S::transition,e.sourcePC);
+ s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=true;
+ switch(e.kind){case N::requestedPage90:s->phase(HP::requestedPage90,e.sourcePC);s->state.pageShown=true;break;case N::previousPage94:s->phase(HP::previousPage94,e.sourcePC);s->state.pageShown=false;break;case N::pageEntry74:s->phase(HP::entry74,e.sourcePC);break;case N::managerEntry84:break;case N::beginTransition7C:if(!okay(s->aperture.beginTransition7C(e.phase)))s->fault(S::aperture,e.sourcePC);break;case N::pageAuxiliary1C:s->state.inputContainerShown=false;break;case N::pageAuxiliary24:s->state.inputContainerShown=true;break;}
+ s->inOperation=false;if(s->state.faulted){d=s->faultDetail;return d.status;}return result(d,S::ok);
+}
+game::OriginalUiTransitionCompletion50KG OriginalUiHallOfFameSession50KG::pollCompletion(game::OriginalUiTransitionRoute50KG r,game::OriginalUiTransitionPhase50KG p)const noexcept{const auto*s=storage_.get();if(!s||!s->operational()||s->inOperation||!s->profileCurrent()||r.screen!=11||r.page!=1)return game::OriginalUiTransitionCompletion50KG::unavailable;const auto t=s->transition();if(!s->currentPage()||t.phase!=p)return game::OriginalUiTransitionCompletion50KG::unavailable;return s->aperture.pollCompletion(r,p);}
+const game::OriginalUiTransitionOwner50KG* OriginalUiHallOfFameSession50KG::externalLifecycleOwner()const noexcept{return storage_?storage_->cold.externalTransition.get():nullptr;}
+bool OriginalUiHallOfFameSession50KG::ownsPreparedPage(std::uint8_t p)const noexcept{return storage_&&storage_->operational()&&!storage_->inOperation&&p==1;}
+bool OriginalUiHallOfFameSession50KG::canBeginMovement()const noexcept{const auto*s=storage_.get();return s&&s->operational()&&!s->inOperation&&!s->updatePrepared&&s->profileCurrent()&&s->idle()&&s->state.pageShown&&s->state.inputContainerShown&&s->state.framePublished&&s->aperture.snapshot().inputEnabled268&&!s->state.videoPaused84&&!s->state.movementPresentationPending&&!s->nav.deferred1460&&!s->state.backProposalPending;}
+bool OriginalUiHallOfFameSession50KG::movementInProgress()const noexcept{return storage_&&storage_->operational()&&(storage_->nav.deferred1460>0||storage_->state.movementPresentationPending);}
+bool OriginalUiHallOfFameSession50KG::completeMovementPresentation()noexcept{auto*s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||!s->state.movementPresentationPending||s->nav.deferred1460||s->state.videoPaused84)return false;s->state.movementPresentationPending=false;return true;}
+S OriginalUiHallOfFameSession50KG::input(const OriginalUiMainSessionInput50KG&in,OriginalUiHallSessionInputReceipt50KG&r,D&d)noexcept{
+ d={};r={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,s->state.quitRequested?S::quit:S::faulted);if(s->inOperation||s->updatePrepared||in.controller>1||in.originalInput>15)return result(d,S::invalidInput);
+ const bool movementReady=canBeginMovement();s->state.backProposalPending=false;s->backCommitted=false;
+ r.containerReached=s->currentPage()&&s->state.pageShown&&s->state.inputContainerShown;
+ if(!r.containerReached||!s->aperture.snapshot().inputEnabled268||in.popupActive||in.sourceInputBlocked||movementInProgress())return result(d,r.status=S::noChange);
+ if(!s->profileCurrent())return result(d,r.status=S::profile);
+ if(in.controller==0&&in.originalInput<=1&&!movementReady)return result(d,r.status=S::noChange);
+ game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG plan;if(!s->cold.profile->hallSnapshot(view))return result(d,r.status=S::profile);
+ r.pageCallbackRan=true;auto status=s->controller.input(s->nav,in.controller,static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),true,true,view,plan);r.pageAccepted=plan.pageAccepted;
+ if(status!=MS::ok&&status!=MS::noChange&&status!=MS::unavailable)return result(d,r.status=S::widget);
+ if(plan.backRequested){if(!s->idle()||!s->soundReady(5)||!game::originalUiHallBackShape50KG(plan.back))return result(d,r.status=S::unavailableDestination);s->pending=plan;s->pendingStamp=s->liveStamp;s->state.backProposalPending=true;++s->serial;if(!s->serial)++s->serial;r.routeProposal={this,s->serial,plan.back,s->pendingStamp};return result(d,r.status=S::backProposed);}
+ if(status==MS::noChange)return result(d,r.status=S::noChange);
+ s->state.framePublished=false;s->inOperation=true;const bool applied=s->apply(plan);s->inOperation=false;if(!applied){s->fault(S::widget,0x1E3F70);d=s->faultDetail;return r.status=d.status;}
+ r.movementAccepted=plan.pauseVideo;return result(d,r.status=S::ok);
+}
+bool OriginalUiHallOfFameSession50KG::routeProposalCurrent(const OriginalUiHallRouteProposal50KG&p)const noexcept{const auto*s=storage_.get();if(!s||!s->operational()||s->inOperation||s->updatePrepared||s->backCommitted||!s->state.backProposalPending||p.source!=this||!p.serial||p.serial!=s->serial||!stamp(p.profileStamp,s->pendingStamp)||!stamp(p.profileStamp,s->liveStamp)||!s->profileCurrent()||!s->idle()||!decision(p.decision,s->pending.back)||!s->soundReady(5))return false;game::OriginalUiHallProfile50KG view;game::OriginalUiHallPlan50KG expected;return s->cold.profile->hallSnapshot(view)&&s->controller.input(s->nav,0,assets::OriginalUiMovementInput50KG(6),true,true,view,expected)==MS::unavailable&&expected.backRequested&&decision(expected.back,p.decision);}
+bool OriginalUiHallOfFameSession50KG::commitBack(const OriginalUiHallRouteProposal50KG&p,const game::OriginalUiRouteDecision50KG&admitted)noexcept{if(!routeProposalCurrent(p)||!admitted.admitted||admitted.blockers)return false;auto expected=p.decision;expected.admitted=true;expected.blockers=0;expected.action=game::OriginalUiRouteAction50KG::request;if(!decision(expected,admitted))return false;auto&s=*storage_;if(!s.cold.profile->commitHallBack(admitted.selectedSlot,admitted,s.liveStamp))return false;s.liveStamp=s.cold.profile->stamp();s.backCommitted=true;return true;}
+S OriginalUiHallOfFameSession50KG::notifyRouteAccepted(const OriginalUiHallRouteProposal50KG&p,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational()||s->inOperation||s->updatePrepared||!s->backCommitted||!s->state.backProposalPending||p.source!=this||p.serial!=s->serial||!decision(p.decision,s->pending.back)||!stamp(p.profileStamp,s->pendingStamp)||!s->profileCurrent())return result(d,S::invalidInput);const auto t=s->transition();if(!s->currentPage()||t.requested.screen!=12||t.requested.page!=1||t.lifecycle!=Life::requestScreenExit||t.phase!=game::OriginalUiTransitionPhase50KG::none||t.applicationRequestQueued||t.initialRestartPending)return result(d,S::transition);s->state.framePublished=false;s->state.backProposalPending=false;if(!s->sound(5)){s->fault(S::audio,0x1E4280);return result(d,S::audio);}return result(d,S::ok);}
+S OriginalUiHallOfFameSession50KG::prepareUpdateAudio(const OriginalUiMainSessionUpdate50KG&in,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,S::faulted);if(s->inOperation||s->updatePrepared||!s->currentPage()||!s->profileCurrent()||!std::isfinite(in.elapsedSeconds)||in.elapsedSeconds<0||in.elapsedSeconds>1||(in.paused&&in.elapsedSeconds!=0))return result(d,S::invalidInput);s->state.framePublished=false;s->state.backProposalPending=false;s->paused=in.paused;if(!s->muted()){s->cold.audio->pause(in.paused);if(!s->cold.audio->update(in.elapsedSeconds)){s->fault(S::audio,0x234440);return result(d,S::audio);}}s->prepared=in;s->updatePrepared=true;return result(d,S::ok);}
+S OriginalUiHallOfFameSession50KG::update(const OriginalUiMainSessionUpdate50KG&in,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,S::faulted);if(s->inOperation||!s->currentPage()||!s->profileCurrent()||!s->updatePrepared||in.elapsedSeconds!=s->prepared.elapsedSeconds||in.paused!=s->prepared.paused||in.debugChordHeld!=s->prepared.debugChordHeld)return result(d,S::invalidInput);s->updatePrepared=false;s->inOperation=true;game::OriginalUiHallPlan50KG plan;bool ok=true;
+ // Source1E45C0 performs page deferred/video/delta work before generic2A6BB0.
+ if(s->state.pageShown)ok=s->controller.update(s->nav,in.elapsedSeconds,plan)==MS::ok&&s->apply(plan);
+ if(ok)ok=s->updateWidgets(false)&&s->updateWidgets(true);s->inOperation=false;if(!ok){s->fault(S::widget,0x1E45C0);d=s->faultDetail;return d.status;}++s->state.updateCount;return result(d,S::ok);}
+S OriginalUiHallOfFameSession50KG::render(const OriginalUiMainFrameClock50KG&clock,D&d)noexcept{d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational())return result(d,S::faulted);if(s->inOperation||s->updatePrepared||!s->currentPage()||!s->profileCurrent()||!s->state.updateCount||!s->state.pageShown||!s->state.cameraActive||s->state.movementPresentationPending||(s->paused&&clock.advanceAnimations))return result(d,S::invalidInput);s->state.framePublished=false;s->state.backProposalPending=false;s->inOperation=s->rendering=true;
+ game::OriginalUiHallCourseRecords50KG row;bool ok=s->cold.profile->hallRecordSnapshot(s->state.courseIndex,row);OriginalUiHallPageInput50KG page{s->state.courseIndex,s->state.planetIndex,s->aperture.snapshot().state==game::OriginalUiApertureState50KG::open,&row};
+ OriginalUiCourseProfileColors50KG colors;if(ok)ok=s->cold.profile->hallPlanetColors(s->state.planetIndex,colors);if(ok){page.colorsKnown=true;page.primaryColor79C=colors.primary79C;page.secondaryColor7A0=colors.secondary7A0;}
+ if(ok)ok=s->collector.begin({clock.known,clock.advanceAnimations,clock.milliseconds,clock.applicationAnimation},s->state.planetIndex,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw)&&s->collector.projectPage(page,s->state.pageShown,d.draw);
+ if(ok&&s->state.pageShown){ok=s->cold.profile->commitHallRender(s->liveStamp);if(ok)s->liveStamp=s->cold.profile->stamp();}
+ if(ok)ok=okay(s->aperture.render48(s->transition().lifecycle))&&!s->state.faulted;
+ if(ok)ok=s->collector.projectPrompts(s->nav.inputFlags42C,d.draw)&&s->collector.projectOnTopWidgets(true,d.draw)&&s->collector.drain(d.draw);
+ s->inOperation=s->rendering=false;if(!ok){if(s->state.faulted){d=s->faultDetail;return d.status;}s->fault(S::draw,0x1E3EF0);return result(d,S::draw,0x1E3EF0);}s->state.framePublished=true;++s->state.renderCount;return result(d,S::ok);}
+OriginalUiHallSessionSnapshot50KG OriginalUiHallOfFameSession50KG::snapshot()const noexcept{if(!storage_)return {};auto out=storage_->state;out.transition=storage_->transition();out.aperture=storage_->aperture.snapshot();out.deferred1460=storage_->nav.deferred1460;out.promptMask42C=storage_->nav.inputFlags42C;return out;}
+const game::OriginalUiHallState50KG* OriginalUiHallOfFameSession50KG::navigationState()const noexcept{return storage_?&storage_->nav:nullptr;}
+const OriginalUiNativeDraw50KG* OriginalUiHallOfFameSession50KG::draw()const noexcept{return storage_&&storage_->operational()&&storage_->state.framePublished&&!storage_->inOperation&&!storage_->updatePrepared&&storage_->currentPage()?storage_->collector.draw():nullptr;}
+const OriginalUiSourceFrame50KM* OriginalUiHallOfFameSession50KG::sourceFrame()const noexcept{return storage_&&storage_->operational()&&storage_->state.framePublished&&!storage_->inOperation&&!storage_->updatePrepared&&storage_->currentPage()?storage_->collector.sourceFrame():nullptr;}
+bool OriginalUiHallOfFameSession50KG::sourceTeardownPending()const noexcept{return storage_&&!storage_->sourceTornDown&&storage_->collector.sourceTeardownPending();}
+S OriginalUiHallOfFameSession50KG::teardownSource(VehicleWindowGl50DS*r,D&d)noexcept{d={};auto*s=storage_.get();if(!s||s->sourceTornDown)return result(d,S::ok);if(s->inOperation||s->rendering)return result(d,S::busy);s->sourceClosing=true;s->state.framePublished=false;if(s->collector.sourceTeardownPending()&&(!r||!s->collector.retireSourceRenderer(*r,d.draw)))return result(d,S::draw);s->sourceTornDown=true;return result(d,S::ok);}
+void OriginalUiHallOfFameSession50KG::requestQuit()noexcept{if(storage_&&!storage_->inOperation){storage_->state.quitRequested=true;storage_->state.framePublished=false;}}
+}

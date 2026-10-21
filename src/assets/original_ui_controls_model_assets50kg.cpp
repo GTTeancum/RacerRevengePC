@@ -118,7 +118,10 @@ bool OriginalUiControlsModelAssets50KG::load(std::shared_ptr<const OriginalUiArc
         // local normals, materials, surfaces and strip-derived index order.
         // Its accepted format/palette constraints remain unchanged. Fail closed.
         const std::vector<std::uint8_t> bytes(next->psg.data,next->psg.data+next->psg.size);
-        if (!decodeScene48D(bytes,next->scene,d.geometry)) return fail(d,E::geometry,0x1538B0);
+        // Authenticated controller.psg stores signed24 positions in V4_32 UNPACKs.
+        // Reuse the bounded decoder; retain its range, palette and strip guards.
+        SceneLimits48D limits;limits.allow_signed32_quantized_positions=true;
+        if (!decodeScene48D(bytes,next->scene,d.geometry,nullptr,limits)) return fail(d,E::geometry,0x1538B0);
         // Authenticated header provenance: exactly2 nodes,5 materials,1 LOD with5 surfaces.
         if (next->hierarchy.nodeCount!=2 || next->scene.materials.size()!=5 || next->scene.nodes.size()!=next->hierarchy.nodeCount || next->scene.world_space ||
             !next->scene.identity_matrix_palette || next->scene.lods.size()!=1 || next->scene.lods[0].surfaces.size()!=5)

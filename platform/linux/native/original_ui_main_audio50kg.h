@@ -96,9 +96,30 @@ public:
     // Native preload of authored IsStream=1
     // speech uses the existing decoder/mixer, with no IOP streamer emulation.
     bool prepareCourseMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
+    // Optional original Song12, independently cold-prepared after prepare and
+    // before any playback/mixing. Credits adds PCM, not a mixer voice or clock.
+    // Missing/changed music leaves the already prepared menu audio intact.
+    bool prepareCreditsMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
+    // Optional independently authenticated Song5 for Hall of Fame, cold only.
+    // Identical encoded lengths do not make this the Rider Song7 asset.
+    bool prepareHallOfFameMenu(const std::filesystem::path& audioRoot, std::string& error) noexcept;
     bool ready() const noexcept override;
     bool riderMenuReady() const noexcept;
     bool courseMenuReady() const noexcept;
+    bool creditsMenuReady() const noexcept;
+    bool hallOfFameMenuReady() const noexcept;
+    // Hall of Fame AC1E47FC/1E4844 ->234900(stream,5,1); B4
+    // 1E4950..1E495C ->234440(stream,1.0). Caller owns mode5 routing.
+    bool canStartHallOfFameLoop5() const noexcept;
+    bool startHallOfFameLoop5() noexcept;
+    bool canFadeHallOfFameMusic() const noexcept;
+    bool fadeHallOfFameMusic() noexcept;
+    // Credits opening1F8850 ->234900(stream,12,1); closing1F8910
+    // ->234440(stream,1.0). Replaces/fades the same frontend music voice.
+    bool canStartCreditsLoop12() const noexcept;
+    bool startCreditsLoop12() noexcept;
+    bool canFadeCreditsMusic() const noexcept;
+    bool fadeCreditsMusic() noexcept;
     bool canStartCourseLoop11() const noexcept;
     bool startCourseLoop11() noexcept;
     bool canFadeCourseMusic() const noexcept;
@@ -151,8 +172,10 @@ public:
     // Authenticated UIEVENTS IDs1(select),3(left),4(right),7(badcall), all one-shot.
     // Source292810 flags1 ->233410 stops an active sound before restart.
     // One voice per original event; different IDs may overlap.
+    bool canPlayMenuEffect(std::uint32_t originalId) const noexcept;
     bool playMenuEffect(std::uint32_t originalId) noexcept;
     // Actual Options menu1F9640 admits events1,3,4,5 only. Main allowlist stays unchanged.
+    bool canPlayOptionsEffect(std::uint32_t originalId) const noexcept;
     bool playOptionsEffect(std::uint32_t originalId) noexcept;
     // Page4 source1F50F0 additionally owns event2(defaults) and7(clamp).
     // Read-only concrete preflight for a serialized profile/route transaction.
@@ -185,6 +208,8 @@ private:
     bool attempted_ = false, prepared_ = false, paused_ = false;
     bool riderAttempted_ = false, riderPrepared_ = false;
     bool courseAttempted_ = false, coursePrepared_ = false;
+    bool creditsAttempted_ = false, creditsPrepared_ = false;
+    bool hallOfFameAttempted_ = false, hallOfFamePrepared_ = false;
     bool ownsMusic_ = false, fading_ = false;
     AudioMixer50HD* mixer_ = nullptr;
     std::uint64_t mixerEpoch_ = 0;
@@ -204,6 +229,10 @@ private:
     AudioClip50HD riderClip_{};
     assets::AudioPcm50HC coursePcm_{};
     AudioClip50HD courseClip_{};
+    assets::AudioPcm50HC creditsPcm_{};
+    AudioClip50HD creditsClip_{};
+    assets::AudioPcm50HC hallOfFamePcm_{};
+    AudioClip50HD hallOfFameClip_{};
     std::array<assets::AudioPcm50HC, riderConfirmClipCount> riderConfirmPcm_{};
     std::array<AudioClip50HD, riderConfirmClipCount> riderConfirmClips_{};
     std::uint64_t riderConfirmPlaybackRevision_ = 0;

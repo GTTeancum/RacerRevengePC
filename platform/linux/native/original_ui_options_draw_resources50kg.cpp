@@ -52,9 +52,15 @@ constexpr Image imageEntries[]={
     {"ps2_bluedark",Archive::options,"ui/textures/ps2_bluedark.pst",nullptr,false},
     {"ps2_bluelight",Archive::options,"ui/textures/ps2_bluelight.pst",nullptr,false},
     {"ps2_buttons",Archive::options,"ui/textures/ps2_buttons.pst",nullptr,false},
-    {"specmap3",Archive::options,"ui/textures/specmap3.tga",nullptr,false}
+    {"specmap3",Archive::options,"ui/textures/specmap3.tga",nullptr,false},
+    {"denmrk14credits",Archive::fonts,"font/denmrk14credits.pst","font/denmrk14credits.cel",false},
+    {"logorain",Archive::options,"ui/textures/logorain.pst",nullptr,false},
+    {"logolec",Archive::options,"ui/textures/logolec.pst",nullptr,false},
+    {"venus14",Archive::fonts,"font/venus14.pst","font/venus14.cel",false},
+    {"popup_icon_x",Archive::controllerPopup,"ui/textures/icon_x.pst",nullptr,false},
+    {"popup_icon_tri",Archive::controllerPopup,"ui/textures/icon_tri.pst",nullptr,false}
 };
-struct Material {const char* name;const char* texture;std::uint32_t token;std::size_t offset;};
+struct Material {const char* name;const char* texture;std::uint32_t token;std::size_t offset;Archive archive=Archive::options;const char* image=nullptr;};
 // Actual APPSTART registry order, projected to live Options menu materials.
 constexpr Material materialEntries[]={
     {"ui/textures/mmbkg","mmbkg",2956,65593},
@@ -77,7 +83,16 @@ constexpr Material materialEntries[]={
     {"ui/textures/nameblur","nameblur",3175,69816},
     {"ui/textures/arrwlefttop","arrwleft",3210,70395},
     {"ui/textures/arrwrghttop","arrwrght",3212,70447},
-    {"ui/textures/icon_cir","icon_cir",3214,70499}
+    {"ui/textures/icon_cir","icon_cir",3214,70499},
+    {"font/denmrk14credits","denmrk14credits",3012,66722},
+    {"ui/textures/logorain","logorain",3003,66582},
+    {"ui/textures/logolec","logolec",3002,66561},
+    {"ui/textures/dimpopup",nullptr,3228,70804,Archive::controllerPopup},
+    {"ui/textures/overlay1popup","overlay1",3229,70826,Archive::controllerPopup},
+    {"font/venus14popup","venus14",3231,70872,Archive::controllerPopup},
+    {"ui/textures/icon_x_popup","icon_x",3232,70891,Archive::controllerPopup,"popup_icon_x"},
+    {"ui/textures/icon_tri_popup","icon_tri",3233,70917,Archive::controllerPopup,"popup_icon_tri"},
+    {"ui/textures/overlay1top","overlay1",3176,69840}
 };
 const assets::OriginalUiArchive50KG& owner(const OriginalUiOptionsColdInput50KG& in,Archive id) noexcept {
     return *(id==Archive::fonts?in.fonts:id==Archive::controllerPopup?in.controllerPopup:
@@ -130,20 +145,23 @@ bool sameSampler(const MaterialTextureSampler50EB& a,const MaterialTextureSample
 }
 struct OriginalUiOptionsDrawResources50KG::Storage {
     OriginalUiOptionsColdInput50KG owners;
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> controllerPopup;
     assets::OriginalUiMaterialTemplates50KG templates;
     std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images;
     assets::OriginalUiImageBank50KG imageBank;
     game::OriginalUiOptionsMenuWidgets50KG widgets;
     std::vector<OriginalUiOptionsMaterialBinding50KG> bindings;
     std::vector<MaterialTextureSampler50EB> samplers;
-    std::array<std::unique_ptr<game::OriginalUiTextGeometry50KG>,168> text;
-    std::array<std::uint32_t,168> widgetMaterial{};
-    game::OriginalUiOptionsBackground50KG background,gameBackground,controlsBackground;
+    std::array<std::unique_ptr<game::OriginalUiTextGeometry50KG>,game::originalUiOptionsWidgetStorageCount50KG> text;
+    std::array<std::uint32_t,game::originalUiOptionsWidgetStorageCount50KG> widgetMaterial{};
+    game::OriginalUiOptionsBackground50KG background,gameBackground,controlsBackground,creditsBackground;
+    std::array<game::OriginalUiOverlayQuad50KG,4> creditsLogos;
     struct LocalizedGeometry {std::uint16_t stringId=0;std::unique_ptr<game::OriginalUiTextGeometry50KG> geometry;};
-    std::array<std::vector<LocalizedGeometry>,168> localizedText;
+    std::array<std::vector<LocalizedGeometry>,game::originalUiOptionsWidgetStorageCount50KG> localizedText;
     std::array<std::array<std::unique_ptr<game::OriginalUiTextGeometry50KG>,102>,4> volumeText;
     game::OriginalUiOptionsCamera50KG camera;
-    game::OriginalUiExitText50KG exitText,gameExitText;
+    game::OriginalUiExitText50KG exitText,gameExitText,creditsExitText,memoryCardExitText;
+    OriginalUiMemoryCardResources50KG memoryCard;
     std::array<game::OriginalUiExitText50KG,2> controlsExitText;
     game::OriginalUiMainSceneOwner50KG scene;
     game::OriginalUiControlsModel50KG controlsModel;
@@ -217,13 +235,13 @@ bool OriginalUiOptionsDrawResources50KG::load(const OriginalUiOptionsColdInput50
             else if(i==15||i==17||i==20)read=assets::readOriginalUiControlsFallbackMaterial50KG(*in.options,*in.fonts,
                 i==15?assets::OriginalUiControlsFallback50KG::smallFont:i==17?assets::OriginalUiControlsFallback50KG::nameBlur:assets::OriginalUiControlsFallback50KG::circle,
                 s->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material);
-            else read=assets::readOriginalUiMaterial50KG(*in.options,b.registeredName+".psm",s->templates,
+            else read=assets::readOriginalUiMaterial50KG(owner(in,entry.archive),b.registeredName+".psm",s->templates,
                 assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material);
             if(!read||b.material.passes.size()!=1)return fail(d,Error::material);
             const auto& pass=b.material.passes[0];
             if(entry.texture) {
                 if(pass.textureCount!=1||!same(pass.textureName,entry.texture))return fail(d,Error::material);
-                std::size_t image=0;for(;image<indices.size();++image)if(same(imageEntries[image].name,entry.texture))break;
+                std::size_t image=0;for(;image<indices.size();++image)if(same(imageEntries[image].name,entry.image?entry.image:entry.texture))break;
                 if(image==indices.size())return fail(d,Error::resource);b.images=indices[image];b.animated=imageEntries[image].atm;
                 if(b.animated) {
                     if(!animation(pass,b.animation,d)||!game::validOriginalUiTextureAnimationConfig50KG(b.animation,
@@ -340,15 +358,55 @@ bool OriginalUiOptionsDrawResources50KG::load(const OriginalUiOptionsColdInput50
             game::OriginalUiExitTextStatus50KG::ok)return fail(d,Error::geometry,0x1D6AEC);
         if(s->gameExitText.prepare({12,4},in.options,*in.english,s->images,indices[0][0],d.exitText)!=
             game::OriginalUiExitTextStatus50KG::ok)return fail(d,Error::geometry,0x1D6AEC);
+        if(s->creditsExitText.prepare({12,6},in.options,*in.english,s->images,indices[0][0],d.exitText)!=
+            game::OriginalUiExitTextStatus50KG::ok)return fail(d,Error::geometry,0x1D6AEC);
+        s->creditsBackground=s->background;for(auto& q:s->creditsBackground.quadrants)q.sourcePC=0x1F89C0;
+        // Credits loader1F7BF4..1F83BC owns four ScreenTextures independently.
+        // The two permanent logolec layers sample the original top-left10x10
+        // texels; the two fading logos retain their real natural dimensions.
+        for(std::size_t i=0;i<s->creditsLogos.size();++i){
+            const char* name=i==0?"ui/textures/logorain":"ui/textures/logolec";
+            const auto m=find(s->bindings,name);if(m==unresolved||s->bindings[m].images.size()!=1)return fail(d,Error::material);
+            const auto* image=bank->texture(s->bindings[m].images[0]);
+            if(!image||!image->texture.width||!image->texture.height)return fail(d,Error::resource);
+            const float width=i<2?float(image->texture.width):128.f;
+            const float height=i<2?float(image->texture.height):i==2?128.f:448.f;
+            const float x=46.f,y=i==3?0.f:160.f;
+            const float u=i<2?1.f:10.f/float(image->texture.width),v=i<2?1.f:10.f/float(image->texture.height);
+            auto& q=s->creditsLogos[i];q.materialName=name;q.authoredDepth=15;
+            q.vertices={{{x,y,0,0},{x+width,y,u,0},{x,y+height,0,v},{x+width,y+height,u,v}}};
+            q.sourcePacketColor=game::originalUiTextPacketColor50KG(0x00ffffff,i<2?0:i==2?255:89);
+            q.sourcePC=i==0?0x1F8BFC:i==1?0x1F8D20:i==2?0x1F89DC:0x1F89E4;
+        }
         s->controlsBackground=s->background;for(auto& q:s->controlsBackground.quadrants)q.sourcePC=0x1F3D28;
         for(std::uint8_t controller=0;controller<2;++controller)
             if(s->controlsExitText[controller].prepare({12,static_cast<std::uint8_t>(controller+2)},in.options,*in.english,s->images,indices[0][0],d.exitText)!=
                 game::OriginalUiExitTextStatus50KG::ok)return fail(d,Error::geometry,0x1D6AEC);
+        if(s->memoryCardExitText.prepare({12,5},in.options,*in.english,s->images,indices[0][0],d.exitText)!=
+            game::OriginalUiExitTextStatus50KG::ok)return fail(d,Error::geometry,0x1D6AEC);
+        if(!s->memoryCard.prepare(s->widgets,s->images,s->bindings,d.memoryCard))
+            return fail(d,Error::resource,d.memoryCard.sourcePC);
+        s->controllerPopup=in.retainedControllerPopup?in.retainedControllerPopup:std::make_shared<OriginalUiControllerPopupResources50KG>();
+        if(in.application->controllerPopupResources&&in.application->controllerPopupResources!=s->controllerPopup)
+            return fail(d,Error::input,0x1B7C1C);
+        if(!s->controllerPopup->prepareOrRejoin(in,s->images,s->bindings,d.controllerPopup))
+            return fail(d,Error::resource,d.controllerPopup.sourcePC);
+        in.application->controllerPopupResources=s->controllerPopup;
         storage_=std::move(s);d={};return true;
     } catch(...) {return fail(d,Error::allocation);}
 }
 game::OriginalUiExitText50KG* OriginalUiOptionsDrawResources50KG::exitText() noexcept {return storage_?&storage_->exitText:nullptr;}
 game::OriginalUiExitText50KG* OriginalUiOptionsDrawResources50KG::gameOptionsExitText() noexcept {return storage_?&storage_->gameExitText:nullptr;}
+game::OriginalUiExitText50KG* OriginalUiOptionsDrawResources50KG::creditsExitText() noexcept {return storage_?&storage_->creditsExitText:nullptr;}
+game::OriginalUiExitText50KG* OriginalUiOptionsDrawResources50KG::memoryCardExitText() noexcept {return storage_?&storage_->memoryCardExitText:nullptr;}
+OriginalUiMemoryCardResources50KG* OriginalUiOptionsDrawResources50KG::memoryCardResources() noexcept {return storage_?&storage_->memoryCard:nullptr;}
+const OriginalUiMemoryCardResources50KG* OriginalUiOptionsDrawResources50KG::memoryCardResources() const noexcept {return storage_?&storage_->memoryCard:nullptr;}
+bool OriginalUiOptionsDrawResources50KG::memoryCardReady() const noexcept {
+    // The renderer-minted weak token expires on renderer close/reopen. Cold
+    // resources alone never authorize entry or an initial-clear substitution.
+    return storage_&&storage_->memoryCard.loaded()&&storage_->memoryCard.geometry()->prepared()&&
+        storage_->owners.video.directVideoCapability.valid();
+}
 game::OriginalUiExitText50KG* OriginalUiOptionsDrawResources50KG::controlsExitText(std::uint8_t controller) noexcept {
     return storage_&&controller<2?&storage_->controlsExitText[controller]:nullptr;
 }
@@ -386,6 +444,7 @@ bool OriginalUiOptionsDrawResources50KG::currentControlsModelSelection(const gam
     return storage_&&storage_->controlsModel.isCurrentSelection(selection);
 }
 bool OriginalUiOptionsDrawResources50KG::loaded() const noexcept {return bool(storage_);}
+std::shared_ptr<OriginalUiControllerPopupResources50KG> OriginalUiOptionsDrawResources50KG::controllerPopup() const noexcept {return storage_?storage_->controllerPopup:nullptr;}
 game::OriginalUiOptionsMenuWidgets50KG* OriginalUiOptionsDrawResources50KG::widgets() noexcept {return storage_?&storage_->widgets:nullptr;}
 const game::OriginalUiOptionsMenuWidgets50KG* OriginalUiOptionsDrawResources50KG::widgets() const noexcept {return storage_?&storage_->widgets:nullptr;}
 const assets::OriginalUiScreenAssets50KG* OriginalUiOptionsDrawResources50KG::images() const noexcept {return storage_?storage_->images.get():nullptr;}
@@ -410,20 +469,20 @@ const std::vector<MaterialTextureSampler50EB>* OriginalUiOptionsDrawResources50K
 const std::vector<OriginalUiOptionsMaterialBinding50KG>* OriginalUiOptionsDrawResources50KG::materials() const noexcept {return storage_?&storage_->bindings:nullptr;}
 const OriginalUiOptionsVideoOwner50KG* OriginalUiOptionsDrawResources50KG::video() const noexcept {return storage_?&storage_->owners.video:nullptr;}
 const game::OriginalUiTextGeometry50KG* OriginalUiOptionsDrawResources50KG::textGeometry(std::uint16_t id) const noexcept {
-    if(!storage_||id>=168)return nullptr;
+    if(!storage_||id>=game::originalUiOptionsWidgetStorageCount50KG)return nullptr;
     const auto ordinal=id==38?0:id==112?1:id==114?2:id==165?3:4;
     if(ordinal<4){const auto value=storage_->widgets.gameOptionsRenderedVolume(id);
         return storage_->volumeText[ordinal][value<0?101:static_cast<std::size_t>(value)].get();}
     return storage_->text[id].get();
 }
 const game::OriginalUiPositionedLine50KG* OriginalUiOptionsDrawResources50KG::textGeometryLine(std::uint16_t id,std::size_t line) const noexcept {
-    if(!storage_||id>=168)return nullptr;
+    if(!storage_||id>=game::originalUiOptionsWidgetStorageCount50KG)return nullptr;
     const auto stringId=storage_->widgets.controlsRenderedString(id,line);
     for(const auto& value:storage_->localizedText[id])if(value.stringId==stringId)
         return line<value.geometry->lines().size()?&value.geometry->lines()[line]:nullptr;
     const auto* geometry=textGeometry(id);return geometry&&line<geometry->lines().size()?&geometry->lines()[line]:nullptr;
 }
-std::uint32_t OriginalUiOptionsDrawResources50KG::widgetMaterial(std::uint16_t id) const noexcept {return storage_&&id<168?storage_->widgetMaterial[id]:unresolved;}
+std::uint32_t OriginalUiOptionsDrawResources50KG::widgetMaterial(std::uint16_t id) const noexcept {return storage_&&id<game::originalUiOptionsWidgetStorageCount50KG?storage_->widgetMaterial[id]:unresolved;}
 std::uint32_t OriginalUiOptionsDrawResources50KG::materialIndex(const char* name) const noexcept {
     if(!storage_||!name)return unresolved;
     for(std::size_t i=0;i<storage_->bindings.size();++i) {
@@ -436,6 +495,13 @@ std::uint32_t OriginalUiOptionsDrawResources50KG::materialIndex(const char* name
 const game::OriginalUiOptionsBackground50KG* OriginalUiOptionsDrawResources50KG::background() const noexcept {return storage_?&storage_->background:nullptr;}
 const game::OriginalUiOptionsBackground50KG* OriginalUiOptionsDrawResources50KG::gameOptionsBackground() const noexcept {return storage_?&storage_->gameBackground:nullptr;}
 const game::OriginalUiOptionsBackground50KG* OriginalUiOptionsDrawResources50KG::controlsBackground() const noexcept {return storage_?&storage_->controlsBackground:nullptr;}
+const game::OriginalUiOptionsBackground50KG* OriginalUiOptionsDrawResources50KG::creditsBackground() const noexcept {
+    return storage_?&storage_->creditsBackground:nullptr;
+}
+const game::OriginalUiOverlayQuad50KG* OriginalUiOptionsDrawResources50KG::creditsLogo(OriginalUiCreditsLogo50KG logo) const noexcept {
+    const auto index=static_cast<std::size_t>(logo);
+    return storage_&&index<storage_->creditsLogos.size()?&storage_->creditsLogos[index]:nullptr;
+}
 const game::OriginalUiOptionsCamera50KG* OriginalUiOptionsDrawResources50KG::camera() const noexcept {return storage_?&storage_->camera:nullptr;}
 const game::OriginalUiMainSceneOwner50KG* OriginalUiOptionsDrawResources50KG::scene() const noexcept {return storage_?&storage_->scene:nullptr;}
 game::OriginalUiMainFireOwner50KG* OriginalUiOptionsDrawResources50KG::fire() noexcept {return storage_?&storage_->fire:nullptr;}

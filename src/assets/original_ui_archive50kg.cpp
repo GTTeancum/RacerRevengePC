@@ -12,7 +12,7 @@ namespace {
 constexpr bool validCatalogLayout() noexcept {
     constexpr auto archiveCount = sizeof(archiveCatalog) / sizeof(archiveCatalog[0]);
     constexpr auto memberCount = sizeof(memberCatalog) / sizeof(memberCatalog[0]);
-    if (archiveCount != 13 || memberCount != 1284) return false;
+    if (archiveCount != 14 || memberCount != 1306) return false;
     std::size_t next = 0;
     for (std::size_t i = 0; i < archiveCount; ++i) {
         const auto& archive = archiveCatalog[i];

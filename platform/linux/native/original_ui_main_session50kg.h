@@ -1,6 +1,8 @@
 // NEW unverified application clock/voice-static join; other declarations preserved.
 #pragma once
 #include "original_ui_main_draw50kg.h"
+#include "window_host50dq.h"
+#include "../../../src/game/original_ui_controller_popup50kg.h"
 #include "original_ui_main_audio50kg.h"
 #include "../../../src/game/original_ui_main_camera50kg.h"
 #include "../../../src/game/original_ui_main_particle_camera50kg.h"
@@ -14,6 +16,7 @@
 #include <memory>
 
 namespace rr::platform {
+class OriginalUiControllerPopupResources50KG;
 // This is the sole native profile subset, not a fabricated whole save file.
 // An imported profile supplies these exact fields; no filesystem writes occur.
 struct OriginalUiMainProfile50KG {
@@ -26,6 +29,9 @@ struct OriginalUiMainProfile50KG {
 // Preserve the high unlock bit and every other caller-owned profile field.
 void resetOriginalUiMainProfileFields50KG(OriginalUiMainProfile50KG&) noexcept;
 struct OriginalUiMainApplication50KG {
+    // Global UI +47C popup resources survive Options manager replacement.
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> controllerPopupResources;
+    game::OriginalUiControllerPopupState50KG controllerPopupState=game::OriginalUiControllerPopup50KG::initialState();
     OriginalUiMainApplication50KG() noexcept=default;
     OriginalUiMainApplication50KG(const OriginalUiMainApplication50KG&)=delete;
     OriginalUiMainApplication50KG& operator=(const OriginalUiMainApplication50KG&)=delete;
@@ -92,6 +98,7 @@ struct OriginalUiMainSessionSnapshot50KG {
     game::OriginalUiApertureSnapshot50KG aperture{};
     game::OriginalUiExitTextSnapshot50KG exitText{};
     OriginalUiMainSessionAudioReceipt50KG audio{};
+    game::OriginalUiControllerPopupState50KG controllerPopup{};
     game::OriginalUiMainFireReceipt50KG lastParticleAdvance{},lastFireEmit{};
 };
 struct OriginalUiMainSessionCold50KG {
@@ -117,6 +124,8 @@ struct OriginalUiMainSessionInput50KG {
     // genuinely unhandled and must not quit or substitute a host menu route.
     std::uint8_t controller=0,originalInput=0;
     bool popupActive=false,sourceInputBlocked=false,secondControllerPresent=false;
+    // Current successful SDL poll authority, separate from destination capability.
+    WindowControllerPresence50DQ secondControllerObservation=WindowControllerPresence50DQ::Unknown;
 };
 class OriginalUiMainSession50KG;
 struct OriginalUiMainRouteProposal50KG {
@@ -129,6 +138,7 @@ struct OriginalUiMainRouteProposal50KG {
 };
 struct OriginalUiMainSessionInputReceipt50KG {
     bool containerReached=false,pageCallbackRan=false,pageAccepted=false;
+    bool popupChanged=false;std::uint32_t popupSourcePC=0;
     game::OriginalUiMainDecision50KG decision{};
     OriginalUiMainRouteProposal50KG routeProposal{};
     game::OriginalUiMovementNotification50KG movement{};
@@ -196,6 +206,9 @@ public:
     void requestQuit() noexcept;
     OriginalUiMainSessionSnapshot50KG snapshot() const noexcept;
     const OriginalUiNativeDraw50KG* draw() const noexcept;
+    const OriginalUiSourceFrame50KM* sourceFrame() const noexcept;
+    bool sourceTeardownPending() const noexcept;
+    OriginalUiMainSessionStatus50KG teardownSource(VehicleWindowGl50DS*,OriginalUiMainSessionDiagnostic50KG&) noexcept;
     // Cold and scene-fog snapshots of ONE manager-owned original camera.
     // No second camera entity or PageInfo-derived pose is created.
     const game::OriginalUiMainCameraPreparation50KG* camera() const noexcept;

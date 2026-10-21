@@ -55,6 +55,12 @@ public:
     static bool pod(const assets::OriginalUiArchive50KG& appStart,
         const assets::OriginalUiRiderPodAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
         OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    static bool tournamentPod(const assets::OriginalUiArchive50KG& appStart,
+        const assets::OriginalUiRiderPodAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    static bool tournamentBinder(const assets::OriginalUiArchive50KG& appStart,
+        const assets::OriginalUiRiderBinderAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
+        OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
     static bool character(const assets::OriginalUiArchive50KG& appStart,
         const assets::OriginalUiRiderCharacterAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
         OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
@@ -170,6 +176,7 @@ public:
     bool acknowledgeThrough(std::uint64_t sequence,OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
 private:
     friend class OriginalUiRiderBackend50KG;
+    friend class OriginalUiTournamentPodOwner50KG;
     // Fix the exact sorted pending plan and reserve its row events, one
     // population boundary and one later group rebuild before construction.
     // A successful finish stays locked until recordGroupRebuilt or abort.

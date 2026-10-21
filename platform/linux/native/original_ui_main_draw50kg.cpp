@@ -1,4 +1,6 @@
 #include "original_ui_main_draw50kg.h"
+#include "vehicle_window_gl50ds.h"
+#include "../../../src/game/original_ui_controller_popup_geometry50kg.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -82,7 +84,10 @@ const ImageEntry imageEntries[]={
     {"icon_tri",Archive::overlays,"ui/textures/icon_tri.pst",nullptr,false},
     {"icon_sqr",Archive::overlays,"ui/textures/icon_sqr.pst",nullptr,false},
     {"icon_cir",Archive::overlays,"ui/textures/icon_cir.pst",nullptr,false},
-    {"mmprt",Archive::mainMenu,"particle/mmprt.pst",nullptr,false}
+    {"mmprt",Archive::mainMenu,"particle/mmprt.pst",nullptr,false},
+    {"venus14",Archive::fonts,"font/venus14.pst","font/venus14.cel",false},
+    {"popup_icon_x",Archive::controllerPopup,"ui/textures/icon_x.pst",nullptr,false},
+    {"popup_icon_tri",Archive::controllerPopup,"ui/textures/icon_tri.pst",nullptr,false}
 };
 struct MaterialEntry { const char* registry;const char* texture; };
 // Resource table order is an internal immutable index, NOT source draw order.
@@ -94,8 +99,25 @@ const MaterialEntry materialEntries[]={
     {"ui/textures/arrwrght","arrwrght"},{"ui/textures/arrwleft","arrwleft"},
     {"ui/textures/notexture",nullptr},
     {"ui/textures/icon_x","icon_x"},{"ui/textures/icon_tri","icon_tri"},
-    {"ui/textures/icon_sqr","icon_sqr"},{"ui/textures/icon_cir","icon_cir"}
+    {"ui/textures/icon_sqr","icon_sqr"},{"ui/textures/icon_cir","icon_cir"},
+    {"ui/textures/dimpopup",nullptr},{"ui/textures/overlay1popup","overlay1"},
+    {"font/venus14popup","venus14"},{"ui/textures/icon_x_popup","popup_icon_x"},
+    {"ui/textures/icon_tri_popup","popup_icon_tri"}
 };
+bool popupRegistry(const assets::OriginalUiMemberView50KG& table) noexcept {
+    if(!table.identity||!table.data||table.size!=70962)return false;
+    constexpr std::size_t offsets[]={70804,70826,70872,70891,70917};
+    const auto delimiter=[](std::uint8_t c){return c==' '||c=='\r'||c=='\n';};
+    std::size_t cursor=0,matched=0;std::uint32_t token=0;
+    while(cursor<table.size){while(cursor<table.size&&delimiter(table.data[cursor]))++cursor;if(cursor==table.size)break;
+        const auto start=cursor;while(cursor<table.size&&!delimiter(table.data[cursor]))++cursor;
+        for(std::size_t i=0;i<5;++i)if(token==OriginalUiControllerPopupResources50KG::registryTokens[i]){
+            const char* name=materialEntries[15+i].registry;std::size_t j=0;if(start!=offsets[i])return false;
+            for(;name[j];++j)if(start+j>=cursor||fold(char(table.data[start+j]))!=name[j])return false;
+            if(start+j!=cursor)return false;++matched;
+        }++token;
+    }return matched==5;
+}
 const assets::OriginalUiArchive50KG* selectArchive(const OriginalUiMainColdInput50KG& in,Archive id) noexcept {
     return id==Archive::fonts?in.fonts.get():id==Archive::controllerPopup?in.controllerPopup.get():
         id==Archive::overlays?in.overlays.get():in.mainMenu.get();
@@ -113,7 +135,9 @@ struct OriginalUiMainDrawResources50KG::Storage {
     assets::OriginalUiMainMaterialSchedule50KG schedule;
     assets::OriginalUiMainParticleMaterial50KG particle;
     std::uint32_t particleImage=unresolved;
-    std::shared_ptr<assets::OriginalUiScreenAssets50KG> images;
+    std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images;
+    assets::OriginalUiImageBank50KG imageBank;
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> popup;
     game::OriginalUiMainWidgetManager50KG manager;
     std::vector<OriginalUiMainMaterialBinding50KG> materials;
     std::vector<MaterialTextureSampler50EB> samplers;
@@ -142,6 +166,8 @@ bool OriginalUiMainDrawResources50KG::load(const OriginalUiMainColdInput50KG& in
             return fail(d,Error::manager);
         if(!next->templates.load(*in.appStart,d.material))return fail(d,Error::material);
         if(!next->schedule.load(*in.appStart,*in.mainMenu,*in.overlays,d.registry))return fail(d,Error::registry);
+        const auto table=in.appStart->find("AppStart/Mat_Stbl.txt");
+        if(!popupRegistry(table))return fail(d,Error::registry,0x298724);
         std::vector<assets::OriginalUiImageSource50KG> sources;
         constexpr auto imageCount=sizeof(imageEntries)/sizeof(imageEntries[0]);
         std::array<std::vector<std::uint32_t>,imageCount> imageIndices;
@@ -170,8 +196,14 @@ bool OriginalUiMainDrawResources50KG::load(const OriginalUiMainColdInput50KG& in
                 sources.push_back({identity,member,0,member.size,cel});
             }
         }
-        next->images=std::make_shared<assets::OriginalUiScreenAssets50KG>();
-        if(!next->images->load(sources,d.resource))return fail(d,Error::resource);
+        auto originalImages=std::make_shared<assets::OriginalUiScreenAssets50KG>();
+        if(!originalImages->load(sources,d.resource))return fail(d,Error::resource);
+        assets::OriginalUiImageBankInput50KG bankInput;bankInput.archives={in.appStart,in.mainMenu,in.fonts,in.controllerPopup,in.overlays};bankInput.owners={originalImages};
+        assets::OriginalUiImageBankDiagnostic50KG bankDiagnostic;
+        if(!next->imageBank.load(bankInput,bankDiagnostic))return fail(d,Error::resource);
+        for(std::uint32_t i=0;i<sources.size();++i){const auto* map=next->imageBank.mapping(0,i);
+            if(!map||map->combinedIndex!=i)return fail(d,Error::resource);}
+        next->images=next->imageBank.images();
         const auto* bank=next->images->textures();
         next->samplers.resize(bank->textureCount());
         std::vector<bool> samplerSet(bank->textureCount(),false);
@@ -182,7 +214,9 @@ bool OriginalUiMainDrawResources50KG::load(const OriginalUiMainColdInput50KG& in
             binding.registeredName=entry.registry;
             const bool logo=same(binding.registeredName,"ui/textures/mmlogo");
             bool read=false;
-            if(i>=11)read=assets::readOriginalUiMainPromptFallbackMaterial50KG(*in.mainMenu,*in.overlays,
+            if(i>=15)read=assets::readOriginalUiMaterial50KG(*in.controllerPopup,binding.registeredName+".psm",
+                next->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,binding.material,d.material);
+            else if(i>=11)read=assets::readOriginalUiMainPromptFallbackMaterial50KG(*in.mainMenu,*in.overlays,
                 static_cast<assets::OriginalUiMainPrompt50KG>(i-11),next->templates,
                 assets::OriginalUiTemplate50KG::screenMt,in.runtime,binding.material,d.material);
             else if(logo)read=assets::readOriginalUiMainLogoFallbackMaterial50KG(*in.mainMenu,
@@ -191,12 +225,16 @@ bool OriginalUiMainDrawResources50KG::load(const OriginalUiMainColdInput50KG& in
                 next->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,binding.material,d.material);
             if(!read||binding.material.passes.size()!=1)return fail(d,Error::material);
             const auto& pass=binding.material.passes[0];
-            const auto* scheduled=next->schedule.find(binding.registeredName);
-            if(!scheduled||scheduled->shaderPassCount!=1||scheduled->textureMapCount!=pass.textureCount||
-                scheduled->psmIdentity!=binding.material.identity)return fail(d,Error::registry);
-            binding.projectedLeafOrdinal=scheduled->projectedLeafOrdinal;
+            binding.registryIdentity=table.identity;
+            if(i>=15){binding.registryToken=OriginalUiControllerPopupResources50KG::registryTokens[i-15];}
+            else {const auto* scheduled=next->schedule.find(binding.registeredName);
+                if(!scheduled||scheduled->shaderPassCount!=1||scheduled->textureMapCount!=pass.textureCount||
+                    scheduled->psmIdentity!=binding.material.identity)return fail(d,Error::registry);
+                binding.projectedLeafOrdinal=scheduled->projectedLeafOrdinal;binding.registryToken=scheduled->registryTokenOrdinal;}
+
             if(entry.texture){
-                if(pass.textureCount!=1||!same(pass.textureName,entry.texture))return fail(d,Error::material);
+                const char* sourceTexture=i==18?"icon_x":i==19?"icon_tri":entry.texture;
+                if(pass.textureCount!=1||!same(pass.textureName,sourceTexture))return fail(d,Error::material);
                 std::size_t map=0;for(;map<imageCount;++map)if(same(imageEntries[map].name,entry.texture))break;
                 if(map==imageCount)return fail(d,Error::resource);
                 binding.images=imageIndices[map];binding.animated=imageEntries[map].atm;
@@ -279,10 +317,14 @@ bool OriginalUiMainDrawResources50KG::load(const OriginalUiMainColdInput50KG& in
         const auto* atlas=bank->texture(next->materials[backgroundMaterial].images[0]);
         if(!atlas||!game::layoutOriginalUiMainBackground50KG(atlas->texture.width,atlas->texture.height,next->background))
             return fail(d,Error::geometry);
+        next->popup=in.retainedControllerPopup?in.retainedControllerPopup:std::make_shared<OriginalUiControllerPopupResources50KG>();
+        if(!next->popup->prepareOrRejoin(in,next->images,next->materials,d.controllerPopup))return fail(d,Error::resource,d.controllerPopup.sourcePC);
         storage_=std::move(next);d={};return true;
     }catch(const std::bad_alloc&){return fail(d,Error::allocation);}
     catch(...){return fail(d,Error::input);}
 }
+std::shared_ptr<OriginalUiControllerPopupResources50KG> OriginalUiMainDrawResources50KG::controllerPopup()const noexcept{return storage_?storage_->popup:nullptr;}
+const assets::OriginalUiImageBank50KG* OriginalUiMainDrawResources50KG::sourceImageBank()const noexcept{return storage_?&storage_->imageBank:nullptr;}
 bool OriginalUiMainDrawResources50KG::loaded()const noexcept{return bool(storage_);}
 game::OriginalUiMainWidgetManager50KG* OriginalUiMainDrawResources50KG::manager()noexcept{return storage_?&storage_->manager:nullptr;}
 const game::OriginalUiMainWidgetManager50KG* OriginalUiMainDrawResources50KG::manager()const noexcept{return storage_?&storage_->manager:nullptr;}
@@ -311,6 +353,58 @@ const assets::OriginalUiMainParticleMaterial50KG* OriginalUiMainDrawResources50K
 std::uint32_t OriginalUiMainDrawResources50KG::particleImageIndex()const noexcept{return storage_?storage_->particleImage:unresolved;}
 
 struct OriginalUiMainDraw50KG::Storage {
+    std::shared_ptr<OriginalUiControllerPopupResources50KG> popup;
+    std::array<std::uint32_t,5> popupIndices{};
+    std::array<assets::OriginalUiMaterialBindingState50KG,5> popupPendingHistory;
+    std::vector<assets::OriginalUiMaterialBindingState50KG> history,pendingHistory;
+    std::vector<std::uint32_t> leaf,representatives;
+    std::uint64_t popupRevision=0,frameGeneration=0,attemptedGeneration=0,acknowledgedGeneration=0;
+    const VehicleWindowGl50DS* submittedRenderer=nullptr;
+    bool popupLeased=false,popupVisited=false,submissionPending=false,historyPoisoned=false;
+    bool prepareGroups(OriginalUiMainDrawDiagnostic50KG& d){
+        const auto& bindings=*resources->materials();const auto count=bindings.size();
+        popup=resources->controllerPopup();if(!popup)return fail(d,Error::resource);popupIndices.fill(unresolved);
+        history.clear();pendingHistory.clear();leaf.clear();representatives.clear();
+        std::vector<std::uint32_t> sequence;sequence.reserve(count);history.resize(count);leaf.resize(count);
+        for(std::size_t i=0;i<count;++i){const auto& b=bindings[i];
+            if(b.material.passes.size()!=1)return fail(d,Error::material);
+            const auto& pass=b.material.passes[0];assets::OriginalUiMaterialEquivalenceKey50KG key;
+            assets::OriginalUiMaterialEquivalenceDiagnostic50KG keyDetail;assets::OriginalUiMaterialBindingDiagnostic50KG detail;
+            const auto* source=b.images.empty()?nullptr:resources->images()->sourceProvenance(b.images[0]);
+            if(!assets::prepareOriginalUiMaterialEquivalence50KG(pass,source,key,keyDetail)||!history[i].initialize(key,detail))
+                return fail(d,Error::material,keyDetail.sourcePC?keyDetail.sourcePC:detail.sourcePC);
+            for(std::size_t role=0;role<popupIndices.size();++role)if(b.registryToken==OriginalUiControllerPopupResources50KG::registryTokens[role]){
+                if(popupIndices[role]!=unresolved||!popup->copyHistory(b.registryToken,key,history[i],d.controllerPopup))
+                    return fail(d,Error::material,d.controllerPopup.sourcePC);
+                popupIndices[role]=static_cast<std::uint32_t>(i);
+            }
+            sequence.push_back(static_cast<std::uint32_t>(i));
+        }
+        for(auto index:popupIndices)if(index==unresolved)return fail(d,Error::material);
+        std::sort(sequence.begin(),sequence.end(),[&](std::uint32_t a,std::uint32_t b){
+            return bindings[a].registryToken!=bindings[b].registryToken?bindings[a].registryToken<bindings[b].registryToken:
+                bindings[a].material.passes[0].pass<bindings[b].material.passes[0].pass;
+        });
+        struct Group {std::uint32_t binding=0,redirect=unresolved,limit=unresolved;};
+        std::vector<Group> groups;groups.reserve(count);
+        std::uint32_t previous=unresolved;
+        for(const auto index:sequence){const auto current=static_cast<std::uint32_t>(groups.size());
+            for(auto& prior:groups){const auto equal=history[index].compare(history[prior.binding]);
+                if(equal==assets::OriginalUiMaterialEquivalence50KG::unsupported)return fail(d,Error::material,0x249BA0);
+                if(equal==assets::OriginalUiMaterialEquivalence50KG::equivalent&&current<prior.limit)prior.redirect=current;}
+            groups.push_back({index,unresolved,unresolved});
+            if(previous!=unresolved&&bindings[previous].registryToken==bindings[index].registryToken){
+                if(bindings[index].material.passes[0].pass!=bindings[previous].material.passes[0].pass+1)return fail(d,Error::material,0x29BED0);
+                groups[current-1].limit=current;
+            }else if(bindings[index].material.passes[0].pass!=1)return fail(d,Error::material,0x29BED0);
+            leaf[index]=current;previous=index;
+        }
+        for(auto& value:leaf){std::size_t steps=0;while(groups[value].redirect!=unresolved){
+            const auto next=groups[value].redirect;if(next<=value||++steps>count)return fail(d,Error::material,0x29C150);value=next;}}
+        for(const auto& group:groups)representatives.push_back(group.binding);
+        pendingHistory=history;return true;
+    }
+
     std::shared_ptr<OriginalUiMainDrawResources50KG> resources;
     std::shared_ptr<const MaterialTextureGl50EB> gpu;
     std::uint64_t publication=0;
@@ -331,21 +425,17 @@ struct OriginalUiMainDraw50KG::Storage {
     std::uint32_t nextOrdinal=0;
 };
 OriginalUiMainDraw50KG::OriginalUiMainDraw50KG()noexcept=default;
-OriginalUiMainDraw50KG::~OriginalUiMainDraw50KG()=default;
+OriginalUiMainDraw50KG::~OriginalUiMainDraw50KG(){
+    if(storage_&&storage_->popup)storage_->popup->release(this,!storage_->submissionPending&&!storage_->submittedRenderer);
+}
 bool OriginalUiMainDraw50KG::bind(std::shared_ptr<OriginalUiMainDrawResources50KG> resources,
-    std::shared_ptr<const MaterialTextureGl50EB> gpu,OriginalUiMainDrawDiagnostic50KG& d) noexcept {
+    OriginalUiMainDrawDiagnostic50KG& d) noexcept {
     d={};
     try {
         if(storage_)return fail(d,Error::alreadyLoaded);
         if(!resources||!resources->loaded())return fail(d,Error::notLoaded);
-        if(!gpu||!gpu->initialized()||!gpu->publicationToken()||
-            gpu->textureCount()!=resources->textures()->textureCount())return fail(d,Error::publication);
-        for(std::uint32_t i=0;i<gpu->textureCount();++i){
-            const auto* actual=gpu->asset(i);const auto* source=resources->textures()->texture(i);
-            if(!actual||!source||actual->identity!=source->identity)return fail(d,Error::publication);
-        }
-        auto next=std::make_unique<Storage>();next->resources=std::move(resources);next->gpu=std::move(gpu);
-        next->publication=next->gpu->publicationToken();
+        auto next=std::make_unique<Storage>();next->resources=std::move(resources);
+        next->popup=next->resources->controllerPopup();if(!next->popup)return fail(d,Error::resource);
         const auto& materials=*next->resources->materials();
         next->animations.resize(materials.size());next->frames.resize(materials.size());
         for(std::size_t i=0;i<materials.size();++i)if(materials[i].animated&&
@@ -359,12 +449,31 @@ bool OriginalUiMainDraw50KG::bind(std::shared_ptr<OriginalUiMainDrawResources50K
         storage_=std::move(next);return true;
     }catch(...){return fail(d,Error::allocation);}
 }
+bool OriginalUiMainDraw50KG::bind(std::shared_ptr<OriginalUiMainDrawResources50KG> resources,
+    std::shared_ptr<const MaterialTextureGl50EB> gpu,OriginalUiMainDrawDiagnostic50KG& d) noexcept {
+    d={};if(storage_)return fail(d,Error::alreadyLoaded);
+    if(!resources||!resources->loaded())return fail(d,Error::notLoaded);
+        if(!gpu||!gpu->initialized()||!gpu->publicationToken()||
+            gpu->textureCount()!=resources->textures()->textureCount())return fail(d,Error::publication);
+        for(std::uint32_t i=0;i<gpu->textureCount();++i){
+            const auto* actual=gpu->asset(i);const auto* source=resources->textures()->texture(i);
+            if(!actual||!source||actual->identity!=source->identity)return fail(d,Error::publication);
+        }
+    if(!bind(std::move(resources),d))return false;
+    storage_->publication=gpu->publicationToken();storage_->gpu=std::move(gpu);return true;
+}
 bool OriginalUiMainDraw50KG::begin(const OriginalUiMainFrameClock50KG& clock,
     OriginalUiMainDrawDiagnostic50KG& d) noexcept {
     d={};if(!storage_)return fail(d,Error::notLoaded);
     auto& s=*storage_;
     if(!clock.known)return fail(d,Error::animation);
-    if(s.gpu->publicationToken()!=s.publication||!s.gpu->initialized())return fail(d,Error::publication);
+    if(s.gpu&&(s.gpu->publicationToken()!=s.publication||!s.gpu->initialized()))return fail(d,Error::publication);
+    if(s.submissionPending||s.historyPoisoned)return fail(d,Error::sourceOrder);
+    if(!s.popupLeased){try{if(!s.prepareGroups(d)||!s.popup->acquire(this,s.popupRevision))return fail(d,Error::sourceOrder);
+        s.popupLeased=true;}catch(...){return fail(d,Error::allocation);}}
+    if(!s.popup->current(this,s.popupRevision))return fail(d,Error::sourceOrder);
+    frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;frame_.terminal_={};
+    s.popupVisited=false;
     s.clock=clock;s.active=true;s.ordinary=s.main=s.prompts=s.top=s.scene=s.drained=s.failed=false;
     s.apertureCount=0;s.exitText=false;s.nextOrdinal=0;s.draw={};
     s.submittedVertices.clear();s.drainedVertices.clear();s.submittedFog.clear();s.drainedFog.clear();s.packets.clear();s.order.clear();s.spans.clear();s.states.clear();
@@ -407,6 +516,32 @@ bool OriginalUiMainDraw50KG::appendOverlay(const game::OriginalUiOverlayQuad50KG
     s.submittedFog.insert(s.submittedFog.end(),4,0.f);
     s.packets.push_back({first,1,material,image,frame,s.nextOrdinal++,quad.sourcePC,widget,segment});
     return true;
+}
+bool OriginalUiMainDraw50KG::projectControllerRequiredPopup(const game::OriginalUiControllerPopupRender50KG& render,OriginalUiMainDrawDiagnostic50KG& d) noexcept {
+    d={};if(!storage_)return fail(d,Error::notLoaded);auto& s=*storage_;
+    if(!s.active||s.popupVisited||s.ordinary||s.main||s.top||s.scene||s.drained||s.failed||
+       !s.popup->current(this,s.popupRevision))return fail(d,Error::sourceOrder,0x2064C0);
+    if(!s.popup->project(render,d.controllerPopup)){s.failed=true;return fail(d,Error::projection,d.controllerPopup.sourcePC);}
+    const auto* geometry=s.popup->geometry();if(!geometry)return fail(d,Error::resource);
+    for(std::size_t i=0;i<geometry->packetCount();++i){const auto& packet=geometry->packets()[i];
+        const auto role=static_cast<std::size_t>(packet.material);if(role>=s.popupIndices.size()){s.failed=true;return fail(d,Error::material);}
+        const auto material=s.popupIndices[role];
+        if(bool(packet.quad)==bool(packet.text)){s.failed=true;return fail(d,Error::geometry,packet.sourcePC);}
+        if(packet.quad){if(!appendOverlay(*packet.quad,material,packet.packetDepth,OriginalUiMainDrawSegment50KG::controllerPopup,0,d)){s.failed=true;return false;}continue;}
+        const auto& text=*packet.text;const auto& binding=(*s.resources->materials())[material];
+        if(binding.images.size()!=1||binding.animated||text.count>text.quads.size()||packet.packetColor[3]>128||packet.packetDepth!=16777214.f){
+            s.failed=true;return fail(d,Error::geometry,packet.sourcePC);}
+        if(!text.count)continue;
+        if(s.submittedVertices.size()/4+text.count>originalUiMaximumQuads50KG||s.packets.size()>=originalUiMaximumSpans50KG){s.failed=true;return fail(d,Error::capacity);}
+        for(std::size_t q=0;q<text.count;++q)for(const auto& v:text.quads[q].vertices)
+            if(!std::isfinite(v.x)||!std::isfinite(v.y)||!std::isfinite(v.u)||!std::isfinite(v.v)){s.failed=true;return fail(d,Error::geometry,packet.sourcePC);}
+        const auto first=static_cast<std::uint32_t>(s.submittedVertices.size()/4),ordinal=s.nextOrdinal++;
+        for(std::size_t q=0;q<text.count;++q)for(const auto& glyph:text.quads[q].vertices){assets::Vertex48B v{};
+            v.position[0]=glyph.x;v.position[1]=glyph.y;v.position[2]=packet.packetDepth;v.uv[0]=glyph.u;v.uv[1]=glyph.v;
+            for(unsigned c=0;c<4;++c)v.color[c]=packet.packetColor[c];s.submittedVertices.push_back(v);s.submittedFog.push_back(0);}
+        s.packets.push_back({first,text.count,material,binding.images[0],0,ordinal,packet.sourcePC,0,OriginalUiMainDrawSegment50KG::controllerPopup});
+    }
+    s.popupVisited=true;return true;
 }
 bool OriginalUiMainDraw50KG::projectWidgets(bool onTop,bool ancestorsShown,
     OriginalUiMainDrawDiagnostic50KG& d) noexcept {
@@ -458,7 +593,7 @@ bool OriginalUiMainDraw50KG::projectWidgets(bool onTop,bool ancestorsShown,
 }
 bool OriginalUiMainDraw50KG::projectOrdinaryWidgets(bool shown,OriginalUiMainDrawDiagnostic50KG& d) noexcept {
     d={};if(!storage_)return fail(d,Error::notLoaded);auto& s=*storage_;
-    if(!s.active||s.ordinary||s.top||s.failed||s.drained)return fail(d,Error::sourceOrder);
+    if(!s.active||!s.popupVisited||s.ordinary||s.top||s.failed||s.drained)return fail(d,Error::sourceOrder);
     if(!projectWidgets(false,shown,d)){s.failed=true;return false;}s.ordinary=true;return true;
 }
 bool OriginalUiMainDraw50KG::projectMainPage(bool shown,OriginalUiMainDrawDiagnostic50KG& d) noexcept {
@@ -645,20 +780,23 @@ bool OriginalUiMainDraw50KG::projectMainParticles(game::OriginalUiMainFireOwner5
 }
 bool OriginalUiMainDraw50KG::drain(OriginalUiMainDrawDiagnostic50KG& d) noexcept {
     d={};if(!storage_)return fail(d,Error::notLoaded);auto& s=*storage_;
-    if(!s.active||!s.ordinary||!s.main||!s.prompts||!s.top||!s.scene||s.failed||s.drained||s.apertureCount!=2)return fail(d,Error::unfinished);
+    if(!s.active||!s.popupVisited||!s.ordinary||!s.main||!s.prompts||!s.top||!s.scene||s.failed||s.drained||s.apertureCount!=2||s.historyPoisoned||!s.popup->current(this,s.popupRevision)||s.frameGeneration==std::numeric_limits<std::uint64_t>::max())return fail(d,Error::unfinished);
+    try {
     const auto& materials=*s.resources->materials();
-    if(!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication)return fail(d,Error::publication);
+    if(!s.gpu||!s.gpu->initialized()||s.gpu->publicationToken()!=s.publication)return fail(d,Error::publication);
+    s.pendingHistory=s.history;
     s.order.clear();
     for(std::size_t i=0;i<s.packets.size();++i)
         if(s.packets[i].materialIndex==unresolved||materials[s.packets[i].materialIndex].material.passes[0].enabled!=0)s.order.push_back(static_cast<std::uint32_t>(i));
     std::sort(s.order.begin(),s.order.end(),[&](std::uint32_t a,std::uint32_t b){
-        const auto ga=s.packets[a].materialIndex==unresolved?0:materials[s.packets[a].materialIndex].projectedLeafOrdinal;
-        const auto gb=s.packets[b].materialIndex==unresolved?0:materials[s.packets[b].materialIndex].projectedLeafOrdinal;
+        const auto ga=s.packets[a].materialIndex==unresolved?0:s.leaf[s.packets[a].materialIndex]+1;
+        const auto gb=s.packets[b].materialIndex==unresolved?0:s.leaf[s.packets[b].materialIndex]+1;
         return ga!=gb?ga<gb:s.packets[a].submissionOrdinal<s.packets[b].submissionOrdinal;
     });
     std::uint32_t total=0;for(const auto i:s.order)total+=s.packets[i].quadCount;
     if(!total)return fail(d,Error::unfinished);
     s.drainedVertices.clear();s.drainedFog.clear();s.spans.clear();s.states.clear();
+    std::uint32_t terminalMaterial=unresolved;
     for(const auto i:s.order){
         const auto& p=s.packets[i];
         const auto first=static_cast<std::uint32_t>(s.drainedVertices.size()/4);
@@ -671,6 +809,13 @@ bool OriginalUiMainDraw50KG::drain(OriginalUiMainDrawDiagnostic50KG& d) noexcept
                 convertOriginalUiUntexturedMaterialSpan50KG(material.untextured,{first,p.quadCount,total},converted):
                 convertOriginalUiMaterialSpan50KG(material.policies[p.frameIndex],
                     {first,p.quadCount,total,p.imageIndex,s.gpu->textureCount()},converted);
+            const auto representative=s.representatives[s.leaf[p.materialIndex]];
+            const auto& source=materials[representative].material.passes[0];
+            assets::OriginalUiMaterialBindingDiagnostic50KG detail;
+            if(source.textureCount&&(!s.resources->sourceImageBank()||
+                !s.pendingHistory[representative].recordDrainedBinding(*s.resources->sourceImageBank(),p.imageIndex,detail)))
+                return fail(d,Error::material,detail.sourcePC);
+            terminalMaterial=representative;
         }
         if(!okay){s.failed=true;return fail(d,Error::material);}
         const auto begin=s.submittedVertices.begin()+std::size_t(p.firstQuad)*4;
@@ -691,9 +836,55 @@ bool OriginalUiMainDraw50KG::drain(OriginalUiMainDrawDiagnostic50KG& d) noexcept
     s.draw.states=s.states.data();s.draw.stateCount=static_cast<std::uint32_t>(s.states.size());
     s.draw.particleFog=s.drainedFog.data();s.draw.particleFogCount=static_cast<std::uint32_t>(s.drainedFog.size());
     for(unsigned c=0;c<3;++c)s.draw.particleFogColor[c]=s.fogColor[c];
-    s.draw.opaquePresentationAlphaOnly=true;s.drained=true;return true;
+    s.draw.opaquePresentationAlphaOnly=false;
+    if(terminalMaterial==unresolved)return fail(d,Error::unfinished);
+    const auto& terminalBinding=materials[terminalMaterial];const auto& terminalPass=terminalBinding.material.passes[0];
+    OriginalUiSourceTerminal50KN terminal{};terminal.canonicalToken=terminalBinding.registryToken;
+    terminal.pass=terminalPass.pass;terminal.leaf=s.leaf[terminalMaterial];
+    // This immutable Main owner has one successful cold bank publication
+    // and one source group construction. Neither is rebuilt on page changes;
+    // the separate frameGeneration records each real accepted submission.
+    terminal.registryGeneration=1;terminal.bankGeneration=1;
+    if(!s.pendingHistory[terminalMaterial].copyEffectiveGs(terminal.gs))return fail(d,Error::material);
+    for(std::size_t f=0;f<terminalPass.gs.fields.size();++f){terminal.constructionFieldSourcePC[f]=terminalPass.gs.fields[f].sourcePC;
+        terminal.constructionFieldByteOffset[f]=terminalPass.gs.fields[f].byteOffset;}
+    terminal.enabled=terminalPass.enabled;terminal.textureCount=terminalPass.textureCount;terminal.textureCoordinateIndex=terminalPass.textureCoordinateIndex;
+    terminal.lodCalculationMethod=terminalPass.lodCalculationMethod;terminal.maximumMipLevel=terminalPass.maximumMipLevel;
+    terminal.magFilter=terminalPass.magFilter;terminal.minFilter=terminalPass.minFilter;terminal.lodL=terminalPass.lodL;terminal.lodK=terminalPass.lodK;
+    for(std::size_t i=0;i<s.popupIndices.size();++i)s.popupPendingHistory[i]=s.pendingHistory[s.popupIndices[i]];
+    s.drained=true;frame_.native_=&s.draw;frame_.owner_=this;frame_.frameGeneration_=++s.frameGeneration;frame_.terminal_=terminal;
+    return true;
+    }catch(...){s.failed=true;frame_.native_=nullptr;frame_.owner_=nullptr;return fail(d,Error::allocation);}
 }
 const OriginalUiNativeDraw50KG* OriginalUiMainDraw50KG::draw()const noexcept{return storage_&&storage_->drained&&!storage_->failed?&storage_->draw:nullptr;}
+const OriginalUiSourceFrame50KM* OriginalUiMainDraw50KG::sourceFrame() const noexcept {
+    return storage_&&storage_->drained&&!storage_->failed&&!storage_->historyPoisoned&&!storage_->submissionPending&&
+        storage_->popupLeased&&storage_->popup->current(this,storage_->popupRevision)&&frame_.native_?&frame_:nullptr;
+}
+bool OriginalUiMainDraw50KG::sourceTeardownPending() const noexcept {return storage_&&storage_->submittedRenderer;}
+bool OriginalUiMainDraw50KG::retireSourceRenderer(VehicleWindowGl50DS& renderer,OriginalUiMainDrawDiagnostic50KG& d) noexcept {
+    d={};if(!storage_)return true;auto& s=*storage_;
+    if(s.submissionPending||(s.submittedRenderer&&s.submittedRenderer!=&renderer))return fail(d,Error::sourceOrder);
+    if(s.submittedRenderer){VehicleWindowDiagnostic50DS detail;
+        if(!renderer.retireOriginalUiSourceOwner(*this,detail))return fail(d,Error::publication);}
+    s.submittedRenderer=nullptr;s.popup->release(this,true);s.popupLeased=false;
+    frame_.native_=nullptr;frame_.owner_=nullptr;frame_.frameGeneration_=0;return true;
+}
+bool OriginalUiMainDraw50KG::beginSourceSubmission(std::uint64_t generation,const VehicleWindowGl50DS& renderer) const noexcept {
+    if(!storage_||!sourceFrame()||generation!=frame_.frameGeneration_)return false;auto& s=*storage_;
+    if(s.submissionPending||s.historyPoisoned||(s.submittedRenderer&&s.submittedRenderer!=&renderer)||
+        generation<=s.attemptedGeneration||generation<=s.acknowledgedGeneration||s.pendingHistory.size()!=s.history.size())return false;
+    s.submittedRenderer=&renderer;s.attemptedGeneration=generation;s.submissionPending=true;return true;
+}
+void OriginalUiMainDraw50KG::finishSourceSubmission(std::uint64_t generation,bool accepted,bool started) const noexcept {
+    if(!storage_)return;auto& s=*storage_;
+    if(!s.submissionPending||generation!=frame_.frameGeneration_){s.historyPoisoned=true;s.popup->poison(this);return;}
+    s.submissionPending=false;
+    if(accepted){if(s.pendingHistory.size()!=s.history.size()||!s.popup->commit(this,s.popupRevision,s.popupPendingHistory)){
+            s.historyPoisoned=true;s.popup->poison(this);return;}
+        s.history.swap(s.pendingHistory);s.acknowledgedGeneration=generation;}
+    else if(started){s.historyPoisoned=true;s.popup->poison(this);}
+}
 const std::vector<OriginalUiMainSubmittedPacket50KG>* OriginalUiMainDraw50KG::packets()const noexcept{return storage_?&storage_->packets:nullptr;}
 const std::vector<std::uint32_t>* OriginalUiMainDraw50KG::drainedPacketIndices()const noexcept{return storage_&&storage_->drained?&storage_->order:nullptr;}
 }

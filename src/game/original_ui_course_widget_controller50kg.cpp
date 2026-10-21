@@ -19,6 +19,13 @@ bool prompt(P& p,std::uint32_t mask,std::uint32_t pc)noexcept {if(p.count==p.ste
 bool bounded(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
  constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
  return p.mode34==0&&p.course700>=1&&p.course700<=13&&p.subtype70C==1&&!(p.flags100BC&1)&&(p.flags11018&31u)>=1&&(p.flags11018&31u)<=13&&((p.flags1125C>>5)&3)<2&&p.courseRecords100C4==order;}
+bool boundedFreshTournament(const OriginalUiCourseWidgetProfile50KG& p)noexcept {
+ constexpr std::array<std::uint8_t,13> order{{0,11,4,8,7,1,5,9,12,6,10,3,2}};
+ if(p.mode34!=2||p.career100C0!=19||p.progress219C!=0||p.courseSlot14E4!=1||p.tier14E8!=1||
+    (p.flags100BC&1)||((p.flags1125C>>5)&3)!=1||p.courseRecords100C4!=order)return false;
+ for(auto medal:p.medals1938)if(medal)return false;
+ return true;
+}
 }
 struct OriginalUiCourseWidgetController50KG::Storage {std::shared_ptr<const assets::OriginalUiArchive50KG> archive;assets::OriginalUiDat50KG pageDat,widgets;assets::OriginalUiPage50KG page;std::array<std::int32_t,24> courseIndex{};};
 OriginalUiCourseWidgetController50KG::OriginalUiCourseWidgetController50KG()noexcept=default;
@@ -88,17 +95,33 @@ S OriginalUiCourseWidgetController50KG::moveLaps(const OriginalUiNavigation50KG&
     out=next;return S::ok;
 }
 S OriginalUiCourseWidgetController50KG::phase(const OriginalUiNavigation50KG& n,OriginalUiCourseWidgetPhase50KG phase,const OriginalUiCourseWidgetProfile50KG& profile,P& out)const noexcept {
- if(!storage_)return S::notBound;if(n.page!=page())return S::page;if(!bounded(profile))return S::unsupportedProfile;
+ if(!storage_)return S::notBound;if(n.page!=page())return S::page;
+ const bool tournament=boundedFreshTournament(profile);
+ if(!bounded(profile)&&!tournament)return S::unsupportedProfile;
  P p;p.navigation=n;bool ok=true;switch(phase){
  case OriginalUiCourseWidgetPhase50KG::requestedPage90:p.navigation.controllerGroup={{-1,-1}};for(std::size_t i=0;i<6&&ok;++i)ok=group(p,i,O::reset,false,0x2A57D8,0x2A5818);break;
  case OriginalUiCourseWidgetPhase50KG::previousPage94:for(std::size_t i=0;i<6&&ok;++i)ok=group(p,i,O::hide,false,0x2A4D58,0x2A4D8C);break;
  case OriginalUiCourseWidgetPhase50KG::entry74:ok=prompt(p,0,0x1DA4AC);for(std::size_t i=1;i<6&&ok;++i)ok=enable(p,i,false);break;
  case OriginalUiCourseWidgetPhase50KG::openingAC:{ok=enable(p,1,true);for(auto c:page()->groups[1].controls)if(ok)ok=control(p,c,O::setEnabled,false,0x1E0380);
- for(std::size_t i=0;ok&&i<(profile.flags11018&31);++i)for(auto c:page()->groups[1].controls)if(storage_->courseIndex[std::size_t(c)]==profile.courseRecords100C4[i]){ok=control(p,c,O::setEnabled,true,0x1E03F0);break;}
- if(ok)ok=enable(p,2,true);OriginalUiCommands50KG commands;if(ok){if(selectOriginalUiGroupSlot50KG(p.navigation,2,static_cast<std::uint16_t>(profile.subtype70C),commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
- if(ok)ok=enable(p,3,true);if(ok){if(enterOriginalUiGroup50KG(p.navigation,1,static_cast<std::uint16_t>(profile.course700),0,commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
+ const auto available=tournament?std::uint32_t((profile.progress219C&31u)+1u):std::uint32_t(profile.flags11018&31u);
+ for(std::size_t i=0;ok&&i<available;++i)for(auto c:page()->groups[1].controls)if(storage_->courseIndex[std::size_t(c)]==profile.courseRecords100C4[i]){ok=control(p,c,O::setEnabled,true,0x1E03F0);break;}
+ OriginalUiCommands50KG commands;
+ if(tournament){
+  // 1DA810 sets a1=1 in the branch delay slot. 1DA8A8 enables group5;
+  // mode2 never enables groups2/3. Fresh slot-1==progress skips Widget63 disable.
+  if(ok)ok=enable(p,5,true);
+ }else{
+  if(ok)ok=enable(p,2,true);if(ok){if(selectOriginalUiGroupSlot50KG(p.navigation,2,static_cast<std::uint16_t>(profile.subtype70C),commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
+  if(ok)ok=enable(p,3,true);
+ }
+ const auto slot=tournament?profile.courseSlot14E4:profile.course700;
+ if(ok){if(enterOriginalUiGroup50KG(p.navigation,1,static_cast<std::uint16_t>(slot),0,commands)!=OriginalUiNavigationStatus50KG::ok)return S::invalidNavigation;ok=expand(p,commands);}
  if(ok)ok=audio(p,K::audioStartLoop11,0x1DA924);if(ok)ok=enable(p,4,false);break;}
- case OriginalUiCourseWidgetPhase50KG::openedB0:ok=enable(p,4,true);if(ok)ok=prompt(p,3,0x1DA974);break;
+ case OriginalUiCourseWidgetPhase50KG::openedB0:
+  ok=enable(p,4,true);if(ok)ok=prompt(p,3,0x1DA974);
+  // The genuine selected own-pod medal record is validated above as zero.
+  // The byte==1 prompt2/Widget1 branch is not silently generalized here.
+  if(tournament){if(ok)ok=step(p,7,O::deselect,false,0x1DAA38);if(ok)ok=step(p,8,O::deselect,false,0x1DAA54);}break;
  case OriginalUiCourseWidgetPhase50KG::closingB4:ok=prompt(p,0,0x1DAA7C);if(ok)ok=enable(p,4,false);if(ok)ok=audio(p,K::audioFade1,0x1DAAA4);break;
  case OriginalUiCourseWidgetPhase50KG::closedB8:break;
  default:return S::invalidNavigation;}

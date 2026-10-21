@@ -78,7 +78,10 @@ enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     courseNameBlurMissingPsmFallback, coursePromptMissingPsmFallback,
     controlsNameBlurMissingPsmFallback, controlsFontMissingPsmFallback, controlsPromptMissingPsmFallback, raceHudFontMissingPsmFallback, tournamentTrophyMissingPsmFallback, tournamentNotchMissingPsmFallback, tournamentPortraitMissingPsmFallback,
     speedBoostTextureMissingPsmFallback, speedBoostTriangleMissingPsmFallback,
-    damageTextureMissingPsmFallback, pauseBackdropMissingPsmFallback
+    damageTextureMissingPsmFallback, pauseBackdropMissingPsmFallback,
+    hallNameBlurMissingPsmFallback, hallPromptMissingPsmFallback, hallFontMissingPsmFallback,
+    tournamentNameBlurMissingPsmFallback, tournamentPromptMissingPsmFallback,
+    courseTrophyMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -214,6 +217,31 @@ bool readOriginalUiCourseNameBlurFallbackMaterial50KG(const OriginalUiArchive50K
 bool readOriginalUiCoursePromptFallbackMaterial50KG(const OriginalUiArchive50KG& course,
     const OriginalUiArchive50KG& overlays,OriginalUiMainPrompt50KG,
     const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Exact authenticated UITourn Icon30, same native ScreenTexture missing-PSM leaf.
+bool readOriginalUiTournamentNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG&,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// The inherited Tournament page constructor uses these same four source calls.
+bool readOriginalUiTournamentPromptFallbackMaterial50KG(const OriginalUiArchive50KG&,
+    const OriginalUiArchive50KG&,OriginalUiMainPrompt50KG,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+
+// Exact UIHOF widget6 and inherited four shared prompts; no authored PSM is invented.
+bool readOriginalUiHallNameBlurFallbackMaterial50KG(const OriginalUiArchive50KG&,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+bool readOriginalUiHallPromptFallbackMaterial50KG(const OriginalUiArchive50KG&,
+    const OriginalUiArchive50KG&,OriginalUiMainPrompt50KG,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+// Blank Hall widgets17/18 still construct one capacity0 ScreenText and resolve
+// FontName venus16 as their material:2A90B8,2A997C,29CBD8,2DFFA0.
+bool readOriginalUiHallFontFallbackMaterial50KG(const OriginalUiArchive50KG&,
+    const OriginalUiArchive50KG&,const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 
 // Actual Controls Icon131 / Overlay_Text129 / inherited circle prompt.
@@ -481,6 +509,13 @@ bool readOriginalUiTournamentTrophyFallbackMaterial50KG(
     const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;
+// Course constructor1D999C..1D9A14 owns these same six named PSTs, but
+// authentic Course provenance and caller PCs remain distinct from Tournament.
+bool readOriginalUiCourseTrophyFallbackMaterial50KG(
+    const OriginalUiArchive50KG&,OriginalUiTournamentTrophy50KG,
+    const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
+    const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
 
 // Exact Tournament notch construction1F1424; same bounded2475C0 ScreenMT
 // path, separately identified from Rider notch and Tournament trophies.
@@ -508,4 +543,21 @@ bool readOriginalPauseBackdropFallbackMaterial50LA(const OriginalUiArchive50KG&,
 bool readOriginalDamageFallbackMaterial50LA(const OriginalUiArchive50KG&,
     const OriginalUiMaterialTemplates50KG&,OriginalUiTemplate50KG,
     const OriginalUiMaterialRuntime50KG&,OriginalUiMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+// Explicit Tournament pod policies. Numeric output/conversion shape is shared
+// with Rider, while source archive/member identity remains Tournament-only.
+bool prepareOriginalUiTournamentPodBodyMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19BodyMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+bool prepareOriginalUiTournamentPodShadowMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19ShadowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+bool prepareOriginalUiTournamentPodSpecularMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider19SpecularMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+bool prepareOriginalUiTournamentPodWindowMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRiderWindowMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+bool prepareOriginalUiTournamentPodCutoutMaterial50KM(const OriginalUiMaterialPass50KG&,
+    const OriginalUiScreenAssets50KG&,std::uint32_t imageIndex,
+    OriginalUiRider17CutoutMaterial50KM&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 }

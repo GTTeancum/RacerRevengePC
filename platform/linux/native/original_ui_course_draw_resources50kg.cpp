@@ -29,9 +29,9 @@ bool disabledArrowAnimationMetadata(OriginalUiCourseMaterialBinding50KG& b,
  // PST accessor29C6D0 always returns the same texture;
  // ATM accessor102050 alone indexes an authored frame array. Do not invent a
  // one-frame ATM, borrow the enabled arrow, or discard the unique PSM data.
- // Retain metadata only here. No native numeric controller is initialized or
- // ticked for a PST, and original layout-dependent controller phase is not
- // claimed. The existing draw owner advances only genuine stored ATM frames.
+ // This decoder retains metadata and never invents an ATM. Mode0 keeps its
+ // existing phase limitation. New mode2 marks only the two reached top rows
+ // for the distinct authenticated resource-name-bound numeric service.
  float fps=0;
  if(same(b.registeredName,"ui/textures/arrwlefttop_d")&&same(texture,"arrwleft_d"))fps=8;
  else if(same(b.registeredName,"ui/textures/arrwleft_d")&&same(texture,"arrwleft_d"))fps=16;
@@ -63,11 +63,29 @@ bool OriginalUiCourseDrawResources50KG::load(const OriginalUiCourseColdInput50KG
  else{const auto cel=font?owner.find("font/"+name+".cel"):assets::OriginalUiMemberView50KG{};if(font&&(!cel.identity||!cel.data))return fail(d,Error::resource);const auto identity=imageIdentity(owner.identity()->id,member,0);if(!identity)return fail(d,Error::resource);b.images.push_back(addSource({identity,member,0,member.size,cel}));}
  if(b.material.passes.size()!=1)return fail(d,Error::material);const auto& pass=b.material.passes[0];if(pass.textureCount!=1||!same(pass.textureName,name))return fail(d,Error::material);
  if(animated){if(!animation(pass,b.animation,d))return false;if(!game::validOriginalUiTextureAnimationConfig50KG(b.animation,static_cast<std::uint32_t>(b.images.size())))return fail(d,Error::animation,0x29b950);}
- else if(pass.authored.find("TextureAnimation")&&!disabledArrowAnimationMetadata(b,owner,member,name,d))return false;
+ else if(pass.authored.find("TextureAnimation")){
+  if(!disabledArrowAnimationMetadata(b,owner,member,name,d))return false;
+  // Only new mode2's reached Widgets7/8. Their resource name20, not PST
+  // payload or stored-image count, supplies the original numeric leaf bound.
+  if(in.prepareTournamentFresh){
+   if(same(b.registeredName,"ui/textures/arrwlefttop_d"))b.staticPstSource=OriginalUiCourseStaticPstSource50KG::leftTopDisabled;
+   else if(same(b.registeredName,"ui/textures/arrwrghttop_d"))b.staticPstSource=OriginalUiCourseStaticPstSource50KG::rightTopDisabled;
+  }
+ }
  return true;};
  const auto authored=[&](const char* material,const char* texture,bool font,bool animated)->bool{OriginalUiCourseMaterialBinding50KG b;b.registeredName=material;if(!assets::readOriginalUiMaterial50KG(*in.course,b.registeredName+".psm",s->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material))return fail(d,Error::material);if(texture&&!addImages(b,font?*in.fonts:same(texture,"overlay1")?*in.controllerPopup:*in.course,texture,font,animated))return false;if(!texture&&(b.material.passes.size()!=1||b.material.passes[0].textureCount!=0))return fail(d,Error::material);s->bindings.push_back(std::move(b));return true;};
  if(!authored("font/denmrk16top","denmrk16",true,false)||!authored("font/denmrk16","denmrk16",true,false)||!authored("font/denmrk14","denmrk14",true,false)||!authored("font/denmrk14top","denmrk14",true,false)||!authored("font/venus16top","venus16",true,false)||!authored("ui/textures/arrwlefttop","arrwleft",false,true)||!authored("ui/textures/arrwlefttop_d","arrwleft_d",false,false)||!authored("ui/textures/arrwrghttop","arrwrght",false,true)||!authored("ui/textures/arrwrghttop_d","arrwrght_d",false,false)||!authored("ui/textures/arrwleft","arrwleft",false,true)||!authored("ui/textures/arrwleft_d","arrwleft_d",false,false)||!authored("ui/textures/arrwrght","arrwrght",false,true)||!authored("ui/textures/arrwrght_d","arrwrght_d",false,false)||!authored("ui/textures/overlay1","overlay1",false,false)||!authored("ui/textures/notexture",nullptr,false,false))return false;
  {OriginalUiCourseMaterialBinding50KG b;b.registeredName="ui/textures/nameblur";if(!assets::readOriginalUiCourseNameBlurFallbackMaterial50KG(*in.course,s->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material))return fail(d,Error::material);if(!addImages(b,*in.course,"nameblur",false,false))return false;s->bindings.push_back(std::move(b));}
+ //1D990C..1D9A14 constructs all twelve retained ScreenTextures, not just
+ //the three reached by fresh slot1. Keep every actual material and ATM frame.
+ if(in.prepareTournamentFresh){
+  constexpr const char* medalNames[]={"medlgout","medlggld","medlgslv","medlgbrz","medstar","medlgicn"};
+  for(std::size_t i=0;i<6;++i){const auto name=std::string("ui/textures/")+medalNames[i];if(!authored(name.c_str(),medalNames[i],false,i==4))return false;}
+  constexpr const char* trophyNames[]={"trphgldi","trphslvi","trphbrzi","trphglda","trphslva","trphbrza"};
+  for(std::size_t i=0;i<6;++i){OriginalUiCourseMaterialBinding50KG b;b.registeredName=std::string("ui/textures/")+trophyNames[i];
+   if(!assets::readOriginalUiCourseTrophyFallbackMaterial50KG(*in.course,static_cast<assets::OriginalUiTournamentTrophy50KG>(i),s->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material))return fail(d,Error::material);
+   if(!addImages(b,*in.course,trophyNames[i],false,false))return false;s->bindings.push_back(std::move(b));}
+ }
  constexpr const char* promptNames[]={"icon_x","icon_tri","icon_sqr","icon_cir"};for(std::size_t i=0;i<4;++i){OriginalUiCourseMaterialBinding50KG b;b.registeredName=std::string("ui/textures/")+promptNames[i];if(!assets::readOriginalUiCoursePromptFallbackMaterial50KG(*in.course,*in.overlays,static_cast<assets::OriginalUiMainPrompt50KG>(i),s->templates,assets::OriginalUiTemplate50KG::screenMt,in.runtime,b.material,d.material))return fail(d,Error::material);if(!addImages(b,i<2?*in.overlays:*in.course,promptNames[i],false,false))return false;s->prompts[i].material=static_cast<std::uint32_t>(s->bindings.size());s->bindings.push_back(std::move(b));}
  // Eager native publication: four defaults plus explicitly requested Ryloth are part of one
  // immutable bank. Course changes never replace an in-flight GPU resource.
@@ -85,6 +103,7 @@ bool OriginalUiCourseDrawResources50KG::load(const OriginalUiCourseColdInput50KG
  const auto denmark=find(s->bindings,"font/denmrk16top");if(denmark==unresolved||s->bindings[denmark].images.size()!=1)return fail(d,Error::resource);if(s->exitText.prepare({6,1},in.course,*in.english,s->images,s->bindings[denmark].images[0],d.exitText)!=game::OriginalUiExitTextStatus50KG::ok)return fail(d,Error::geometry,0x1d6aec);
  s->bankInput.archives={in.appStart,in.course,in.fonts,in.backgrounds,in.controllerPopup,in.overlays};s->bankInput.owners={s->images};storage_=std::move(s);d={};return true;}catch(...){return fail(d,Error::allocation);}}
 bool OriginalUiCourseDrawResources50KG::loaded()const noexcept{return bool(storage_);}game::OriginalUiCourseWidgets50KG* OriginalUiCourseDrawResources50KG::widgets()noexcept{return storage_?&storage_->widgets:nullptr;}const game::OriginalUiCourseWidgets50KG* OriginalUiCourseDrawResources50KG::widgets()const noexcept{return storage_?&storage_->widgets:nullptr;}
+bool OriginalUiCourseDrawResources50KG::tournamentFreshPrepared()const noexcept{return storage_&&storage_->owners.prepareTournamentFresh;}
 std::shared_ptr<const assets::OriginalUiScreenAssets50KG> OriginalUiCourseDrawResources50KG::images()const noexcept{return storage_?storage_->images:nullptr;}const assets::OriginalUiImageBankInput50KG* OriginalUiCourseDrawResources50KG::bankInput()const noexcept{return storage_?&storage_->bankInput:nullptr;}const assets::MaterialTextureAssets50EA* OriginalUiCourseDrawResources50KG::textures()const noexcept{return storage_?storage_->images->textures():nullptr;}const std::vector<MaterialTextureSampler50EB>* OriginalUiCourseDrawResources50KG::samplers()const noexcept{return storage_?&storage_->samplers:nullptr;}const std::vector<OriginalUiCourseMaterialBinding50KG>* OriginalUiCourseDrawResources50KG::materials()const noexcept{return storage_?&storage_->bindings:nullptr;}const OriginalUiCourseVideoOwner50KG* OriginalUiCourseDrawResources50KG::video()const noexcept{return storage_?&storage_->owners.video:nullptr;}
 std::uint32_t OriginalUiCourseDrawResources50KG::widgetMaterial(std::uint16_t id,bool selected)const noexcept{return storage_&&id<85?storage_->widgetMaterial[id][selected?1:0]:unresolved;}
 std::uint32_t OriginalUiCourseDrawResources50KG::materialIndex(const char* name)const noexcept{if(!storage_||!name)return unresolved;for(std::size_t i=0;i<storage_->bindings.size();++i){const auto& a=storage_->bindings[i].registeredName;std::size_t j=0;for(;j<a.size()&&name[j]&&fold(a[j])==fold(name[j]);++j){}if(j==a.size()&&!name[j])return static_cast<std::uint32_t>(i);}return unresolved;}

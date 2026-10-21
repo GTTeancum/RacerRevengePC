@@ -14,7 +14,7 @@ struct OriginalUiOptionsContributionDiagnostic50KG {
     game::OriginalUiMainParticleGeometryStatus50KG particle{};
     std::uint16_t widgetId=0;std::uint32_t sourcePC=0;
 };
-enum class OriginalUiOptionsSegment50KG : std::uint8_t {ordinaryWidgets,page,exitText,aperture,prompts,onTopWidgets,particles};
+enum class OriginalUiOptionsSegment50KG : std::uint8_t {ordinaryWidgets,page,exitText,aperture,prompts,onTopWidgets,particles,controllerPopup,memoryCardDialog};
 struct OriginalUiOptionsPacket50KG {
     std::uint32_t firstQuad=0,quadCount=0,materialIndex=0,imageIndex=0,frameIndex=0;
     std::uint32_t sourceOrdinal=0,sourcePC=0;
@@ -36,17 +36,27 @@ public:
         std::shared_ptr<const MaterialTextureGl50EB>,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool begin(const OriginalUiOptionsClock50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     // Typed source page choice for the same Options manager resource bank.
-    // Actual menu1, Controls2/3 and Game Options4.
+    // Actual menu1, Controls2/3, Game Options4 and Credits6.
     bool beginPage(std::uint8_t,const OriginalUiOptionsClock50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
+    // Global UI+47C is appended during Options load before the manager.
+    bool projectControllerRequiredPopup(const game::OriginalUiControllerPopupRender50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectOrdinaryWidgets(bool ancestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     // Exact page1F9A80 draw point. Page visibility gates whole contribution.
     bool projectPage(bool pageAncestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
+    // Actual Credits1F8990 requires the caller's live manager phase170. Alpha
+    // target writes remain at the page draw point, after ordinary widgets.
+    bool projectCreditsPage(std::uint32_t managerPhase170,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
+    // Render.page callbacks are consumed here before the real aperture owner.
+    bool projectMemoryCardPage(const game::OriginalUiMemoryCardRender50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
+    // Exact page child traversal after aperture/prompts, before OnTop widgets.
+    // Retains the reached direct-video command separately from material groups.
+    bool projectMemoryCardDialog(const game::OriginalUiMemoryCardRender50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectControlsBackground(std::uint8_t ordinal,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectExitText(const game::OriginalUiApertureHook50KG&,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     // Wire only to real shared-aperture submitOverlay, original+424 then+428.
     bool projectAperture(std::uint8_t,const game::OriginalUiApertureRectangle50KG&,
         OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
-    // Reads the same bank's source mask42C (menu0/3, Controls0/15, Game Options0/7).
+    // Reads the same bank's source mask42C (menu0/3, Controls0/15, Game Options0/7, Credits0/2).
     bool projectPrompts(OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectOnTopWidgets(bool ancestorsShown,OriginalUiOptionsContributionDiagnostic50KG&) noexcept;
     bool projectParticles(OriginalUiOptionsContributionDiagnostic50KG&) noexcept;

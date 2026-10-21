@@ -1,4 +1,5 @@
 #include "original_ui_main_session50kg.h"
+#include "original_ui_controller_popup_resources50kg.h"
 #include <cmath>
 #include <new>
 #include <utility>
@@ -38,6 +39,7 @@ struct OriginalUiMainSession50KG::Storage {
     OriginalUiMainSessionSnapshot50KG state;
     OriginalUiMainSessionDiagnostic50KG callbackFault;
     bool dependenciesPrepared=false,rendering=false,inOperation=false,paused=false;
+    bool popupAttached=false,sourceClosing=false,sourceTornDown=false;
     std::uint64_t inputSerial=0;
     OriginalUiMainRouteProposal50KG pendingRoute{};
     bool updateAudioPrepared=false;
@@ -62,7 +64,7 @@ struct OriginalUiMainSession50KG::Storage {
         if(!state.faulted){state.faulted=true;callbackFault.status=s;callbackFault.sourcePC=pc;}
     }
     bool operational() const noexcept {
-        return dependenciesPrepared && !state.faulted && !state.quitRequested;
+        return dependenciesPrepared && !state.faulted && !state.quitRequested && !sourceClosing;
     }
     game::OriginalUiMainWidgetPhaseInput50KG phaseInput() const noexcept {
         return {cold.profile->known,cold.profile->savedSlot6E0,cold.profile->availability11018};
@@ -110,15 +112,24 @@ struct OriginalUiMainSession50KG::Storage {
         case Notice::previousPage94:
             s.widgetPhase(Phase::previousPage94,event.sourcePC);s.state.mainPageShown=false;break;
         case Notice::pageEntry74: {
+            if(!s.popupAttached){
+                const auto owner=s.cold.resources->controllerPopup();
+                if(!owner||!owner->loaded()||owner->poisoned()||
+                   (s.cold.application->controllerPopupResources&&s.cold.application->controllerPopupResources!=owner)||
+                   s.cold.application->controllerPopupState.active3CC){s.fault(Status::unsupportedState,0x207330);break;}
+                game::OriginalUiControllerPopupPlan50KG plan;
+                if(game::OriginalUiControllerPopup50KG::attach(s.cold.application->controllerPopupState,plan)!=
+                   game::OriginalUiControllerPopupStatus50KG::ok){s.fault(Status::unsupportedState,0x207330);break;}
+                s.cold.application->controllerPopupResources=owner;
+                s.cold.application->controllerPopupState=plan.state;s.popupAttached=true;
+            }
             auto& profile=*s.cold.profile;
             if(profile.mode34!=4){profile.previousMode38=profile.mode34;profile.mode34=4;}
             s.state.promptMask42C=0;
             s.widgetPhase(Phase::entry74,event.sourcePC);
             s.message704.fill(0);s.messageTime744=0;s.messageActive74C=false;s.state.debugChord748=false;
-            // Actual Main has no PageInfo movie/background-video path, so
-            // optional video object+4BC is absent. The actual global UI field
-            // is retained by the shared application subset, not guessed audio.
-            s.cold.application->uiObject3D8=0;
+            // 1E5DD8 addresses APP->UI+47C's result, not the scene field.
+            s.cold.application->controllerPopupState.result3D8=0;
             break;
         }
         case Notice::managerEntry84:
@@ -174,7 +185,11 @@ bool OriginalUiMainSession50KG::Storage::admit(void* p,const game::OriginalUiScr
         &s==game::findOriginalUiScreenFactory50KG(4) && &page==game::findOriginalUiBoundedPageFactory50KG(4,1);
 }
 OriginalUiMainSession50KG::OriginalUiMainSession50KG() noexcept=default;
-OriginalUiMainSession50KG::~OriginalUiMainSession50KG()=default;
+OriginalUiMainSession50KG::~OriginalUiMainSession50KG(){
+    // Preserve the real source owner and every borrowed backing if a caller
+    // omits successful explicit retirement, matching other sealed UI owners.
+    if(storage_&&storage_->collector.sourceTeardownPending())storage_.release();
+}
 Status OriginalUiMainSession50KG::bind(const OriginalUiMainSessionCold50KG& cold,
     OriginalUiMainSessionDiagnostic50KG& d) noexcept {
     d={};if(storage_)return result(d,Status::alreadyBound);
@@ -251,14 +266,30 @@ Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in
     s->state.framePublished=false;s->pendingRoute={};
     if(s->cold.externalTransition && !s->currentMainLifecycle())return result(d,Status::noChange);
     ++s->inputSerial;
+    // Global popup traversal precedes Main; snapshot-active delivery prevents
+    // the opening Confirm from being reused as dismissal.
+    if(s->cold.application->controllerPopupState.active3CC){
+        game::OriginalUiControllerPopupPlan50KG plan;
+        if(game::OriginalUiControllerPopup50KG::input(s->cold.application->controllerPopupState,
+            in.controller,in.originalInput,true,plan)!=game::OriginalUiControllerPopupStatus50KG::ok)
+            return result(d,Status::unsupportedState,0x2062D0);
+        if(plan.accepted){
+            if(s->cold.application->transportE00!=-1||plan.soundId!=1)return result(d,Status::unsupportedState,0x267BE0);
+            if(plan.soundRequested&&s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled&&
+               (!s->cold.audio||!s->cold.audio->canPlayMenuEffect(plan.soundId)))return result(d,Status::audio,plan.soundPC);
+            s->cold.application->controllerPopupState=plan.state;
+            if(plan.soundRequested&&!s->audioEffect(plan.soundId)){d=s->callbackFault;return d.status;}
+            receipt.popupChanged=true;receipt.popupSourcePC=plan.sourcePC;
+        }
+    }
     receipt.containerReached=s->state.mainPageShown && s->state.inputContainerShown;
     if(!receipt.containerReached || !s->aperture.snapshot().inputEnabled268)return result(d,Status::noChange);
     if(s->cold.application->transportE00!=-1)return result(d,Status::unsupportedState,0x267BE0);
     s->inOperation=true;
     receipt.pageCallbackRan=true;receipt.pageAccepted=true; //1E6284 unconditional1
     game::OriginalUiMainContext50KG context;
-    context.popupActive=in.popupActive;context.sourceInputBlocked=in.sourceInputBlocked || s->state.debugChord748;
-    context.secondControllerPresent=in.secondControllerPresent;
+    context.popupActive=in.popupActive||s->cold.application->controllerPopupState.active3CC;context.sourceInputBlocked=in.sourceInputBlocked || s->state.debugChord748;
+    context.secondControllerPresent=in.secondControllerObservation==WindowControllerPresence50DQ::Present;
     // Page-only dispatch cannot certify a destination. Actual labels remain selectable.
     // The coordinator may inspect an unaccepted exact proposal in external mode.
     Status status=Status::noChange;
@@ -266,8 +297,28 @@ Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in
         const auto ws=s->manager().dispatchMain(in.controller,static_cast<game::OriginalUiMainInput50KG>(in.originalInput),
             context,receipt.decision,d.widget);
         if(ws==WidgetStatus::unavailable){
-            status=receipt.decision.action==game::OriginalUiMainAction50KG::secondControllerRequired?
-                Status::secondControllerRequired:Status::unavailableDestination;
+            status=Status::unavailableDestination;
+            const auto& decision=receipt.decision;
+            if(decision.action==game::OriginalUiMainAction50KG::secondControllerRequired&&
+               in.secondControllerObservation==WindowControllerPresence50DQ::Absent&&
+               decision.selectedSlot==2&&decision.originalGameMode==1&&decision.originalPlayerBits==0x40&&
+               decision.targetScreen==5&&decision.routeArgument==1&&decision.sourcePC==0x1E5F2C&&
+               !s->cold.application->controllerPopupState.active3CC){
+                const auto owner=s->cold.resources->controllerPopup();
+                const auto* navigation=s->manager().navigation(1);
+                if(navigation&&navigation->groups.size()>1&&owner&&owner->loaded()&&!owner->poisoned()&&owner==s->cold.application->controllerPopupResources&&
+                   (s->cold.audioMode==OriginalUiMainAudioMode50KG::muted||
+                    (s->cold.audio&&s->cold.audio->canPlayMenuEffect(1)))){
+                    game::OriginalUiControllerPopupPlan50KG plan;
+                    if(game::OriginalUiControllerPopup50KG::startController2(s->cold.application->controllerPopupState,plan)!=
+                       game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x1E60DC);
+                    else {
+                        s->cold.application->controllerPopupState=plan.state; //1E60DC
+                        s->cold.profile->savedSlot6E0=s->manager().navigation(1)->groups[1].selectedSlot; //1E6184 reread ->1E61A4
+                        if(s->audioEffect(1)){receipt.popupChanged=true;receipt.popupSourcePC=0x1E60DC;status=Status::ok;}
+                    }
+                }
+            }
         }else if(!widgetOkay(ws)){s->fault(Status::widget,0x1E5E00);status=Status::widget;}
         else if(receipt.decision.action==game::OriginalUiMainAction50KG::changedSelection){
             status=s->audioEffect(in.originalInput==2?3:4)?Status::ok:Status::audio;
@@ -282,7 +333,7 @@ Status OriginalUiMainSession50KG::input(const OriginalUiMainSessionInput50KG& in
         static_cast<assets::OriginalUiMovementInput50KG>(in.originalInput),delivery,receipt.movement,d.widget);
     if(!widgetOkay(movement)){s->fault(Status::widget,0x2A73F0);status=Status::widget;}
     s->inOperation=false;
-    if(s->cold.externalTransition && !s->state.faulted && in.originalInput==4 &&
+    if(s->cold.externalTransition && !s->state.faulted && in.originalInput==4 && receipt.decision.selectedSlot!=2 &&
         (receipt.decision.action==game::OriginalUiMainAction50KG::unavailableMode ||
          receipt.decision.action==game::OriginalUiMainAction50KG::unavailableScreen)){
         const auto t=s->lifecycle().snapshot();
@@ -349,6 +400,10 @@ Status OriginalUiMainSession50KG::update(const OriginalUiMainSessionUpdate50KG& 
         return result(d,Status::unsupportedState);
     }
     s->inOperation=true;s->paused=in.paused;
+    game::OriginalUiControllerPopupPlan50KG popupUpdate;
+    if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,in.elapsedSeconds,popupUpdate)!=
+       game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
+    else s->cold.application->controllerPopupState=popupUpdate.state;
     if(!s->cold.externalTransition && s->cold.audioMode==OriginalUiMainAudioMode50KG::enabled){
         s->cold.audio->pause(in.paused);
         if(!s->cold.audio->update(in.elapsedSeconds)){s->fault(Status::audio,0x234440);}
@@ -406,7 +461,10 @@ Status OriginalUiMainSession50KG::render(const OriginalUiMainFrameClock50KG& clo
     // The cold typed boundary preserves that exact render-time matrix/color;
     // it does not replace the manager's immutable authored pose or page camera.
     s->state.framePublished=false;s->inOperation=true;s->rendering=true;
-    bool okay=s->collector.begin(clock,d.draw) && s->collector.projectOrdinaryWidgets(true,d.draw) &&
+    game::OriginalUiControllerPopupRender50KG popupRender;
+    bool okay=game::OriginalUiControllerPopup50KG::render(s->cold.application->controllerPopupState,popupRender)==
+        game::OriginalUiControllerPopupStatus50KG::ok&&s->collector.begin(clock,d.draw) &&
+        s->collector.projectControllerRequiredPopup(popupRender,d.draw)&&s->collector.projectOrdinaryWidgets(true,d.draw) &&
         s->collector.projectMainPage(s->state.mainPageShown,d.draw);
     if(okay)okay=apertureOkay(s->aperture.render48(s->lifecycle().snapshot().lifecycle));
     okay=okay && !s->state.faulted;
@@ -415,6 +473,7 @@ Status OriginalUiMainSession50KG::render(const OriginalUiMainFrameClock50KG& clo
         s->collector.projectMainParticles(s->fire,s->scene,s->particleRenderState,d.draw) && s->collector.drain(d.draw);
     s->rendering=false;s->inOperation=false;
     if(!okay){if(s->state.faulted){d=s->callbackFault;return d.status;}return result(d,Status::draw);}
+    s->cold.application->controllerPopupState=popupRender.state;
     ++s->state.renderCount;s->state.framePublished=true;return result(d,Status::ok);
 }
 namespace {
@@ -505,7 +564,7 @@ void OriginalUiMainSession50KG::requestQuit() noexcept {
 }
 OriginalUiMainSessionSnapshot50KG OriginalUiMainSession50KG::snapshot() const noexcept {
     if(!storage_)return {};
-    auto snapshot=storage_->state;snapshot.transition=storage_->lifecycle().snapshot();snapshot.aperture=storage_->aperture.snapshot();
+    auto snapshot=storage_->state;snapshot.controllerPopup=storage_->cold.application->controllerPopupState;snapshot.transition=storage_->lifecycle().snapshot();snapshot.aperture=storage_->aperture.snapshot();
     if(const auto* text=storage_->cold.resources->exitText())snapshot.exitText=text->snapshot();
     return snapshot;
 }
@@ -513,6 +572,21 @@ const OriginalUiNativeDraw50KG* OriginalUiMainSession50KG::draw() const noexcept
     return storage_ && !storage_->state.faulted && !storage_->state.quitRequested && storage_->state.framePublished &&
         !storage_->inOperation && !storage_->updateAudioPrepared &&
         (!storage_->cold.externalTransition || storage_->currentMainLifecycle())?storage_->collector.draw():nullptr;
+}
+const OriginalUiSourceFrame50KM* OriginalUiMainSession50KG::sourceFrame() const noexcept {
+    return storage_&&storage_->operational()&&storage_->state.framePublished&&!storage_->inOperation&&
+        !storage_->updateAudioPrepared&&(!storage_->cold.externalTransition||storage_->currentMainLifecycle())?
+        storage_->collector.sourceFrame():nullptr;
+}
+bool OriginalUiMainSession50KG::sourceTeardownPending() const noexcept {
+    return storage_&&!storage_->sourceTornDown&&storage_->collector.sourceTeardownPending();
+}
+Status OriginalUiMainSession50KG::teardownSource(VehicleWindowGl50DS* renderer,OriginalUiMainSessionDiagnostic50KG& d) noexcept {
+    d={};if(!storage_||storage_->sourceTornDown)return result(d,Status::ok);
+    auto& s=*storage_;if(s.inOperation||s.rendering)return result(d,Status::invalidInput);
+    s.sourceClosing=true;s.state.framePublished=false;
+    if(s.collector.sourceTeardownPending()&&(!renderer||!s.collector.retireSourceRenderer(*renderer,d.draw)))return result(d,Status::draw);
+    s.sourceTornDown=true;return result(d,Status::ok);
 }
 const game::OriginalUiMainCameraPreparation50KG* OriginalUiMainSession50KG::camera() const noexcept {return storage_?&storage_->camera:nullptr;}
 const game::OriginalUiMainParticleCamera50KG* OriginalUiMainSession50KG::particleCamera() const noexcept {return storage_?&storage_->particleRenderState.particleCamera:nullptr;}

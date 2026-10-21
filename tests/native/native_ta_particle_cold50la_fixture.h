@@ -12,7 +12,7 @@
 #include "gb_cold_sources50la.h"
 
 namespace native_ta_particle_cold50LA {
-// Actual native cold load for admitted TA/MA/SA/GA/MB/SC/TC callers. This consumes the
+// Shared native cold load for an authenticated selected-track capability. It consumes the
 // already authenticated SCB and exact selected-track archive in the SAME
 // Application material domain, before its caller performs material population.
 // No recovery-time decoder execution, alternate domain or source fallback.
@@ -24,27 +24,20 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
     std::uint64_t generation,rr::game::OriginalTrackParticleColdDiagnostic50LA& diagnostic) {
     using runtime_startup50fl::require;
     using Provider=rr::assets::OriginalStandardArchiveProvider50LA;
-    const bool ta=track.world&&track_session_assets50IG::codeEquals(track.world->code,"TA");
-    const bool ma=track.world&&track_session_assets50IG::codeEquals(track.world->code,"MA");
-    const bool sa=track.world&&track_session_assets50IG::codeEquals(track.world->code,"SA");
-    const bool ga=track.world&&track_session_assets50IG::codeEquals(track.world->code,"GA");
-    const bool mb=track.world&&track_session_assets50IG::codeEquals(track.world->code,"MB");
-    const bool sc=track.world&&track_session_assets50IG::codeEquals(track.world->code,"SC");
-    const bool tc=track.world&&track_session_assets50IG::codeEquals(track.world->code,"TC");
-    require(ta||ma||sa||ga||mb||sc||tc,"native particle cold load requires actual TA, MA, SA, GA, MB, SC or TC track");
-    const char* archiveName=tc?"TRACKS/TC.RES":sc?"TRACKS/SC.RES":mb?"TRACKS/MB.RES":ta?"TRACKS/TA.RES":ma?"TRACKS/MA.RES":sa?"TRACKS/SA.RES":"TRACKS/GA.RES";
-    const std::size_t archiveBytes=tc?3607868u:sc?2974353u:mb?4421779u:ta?3334562u:ma?3691592u:sa?3786696u:2834942u;
-    const char* archiveSha=tc?"7b5486f4029dabe137919127c879faef92b8bd2fb9df5c0d1a1d122e92731490":sc?"8305641f0ac8fefeae6603145ad4f8441612e41926751ff853170763e66dfa4d":mb?"6aae7d59981cae6c741b14e147021960fdb4d8e68e21c217a446f779d3c821ca":ta?"b491e34bf6cbd27869d5b9dc8db394b101ebaf4ac7f5e0d44fcca33a00d41ab8":
-        ma?"2a674f62e9d9d9ef9e6c2f7224d2aa0c55aeb883e55c499d58dfd3b00cddb228":
-        sa?"34826bbb3a3690ee20ac40f70515f7e903291cdf4546f7d8ab8d58849f30d96a":
-           "063b65cc9a0410ba0393362309fb3f80c4516a3c65ffee2b9f7bc76d1afe25d9";
-    const char* pstSha=tc?"9fe4c6d8c9399d50cbfd4b82c4b420b3584ee7af97f5eae4316302c4bd342a9c":sc?"75a36310131d44eb1111c58bd372099b20f6b24cf9846746f5408055a2dcedc9":mb?"f5ea0c3c3de3084af5ffb8c46f71f26604b7ebc1a8f6ebc2c25cf670a906a6ba":ta?"08363cd9b2ebb557f2c8c673caa9084f2042721afbb112d5bbc8b5e08a4c49ba":
-        ma?"d9506d37883d481d52f917e1d99d4bb57406c0f10191c5e233e91190d282909e":
-        sa?"41e8f989e3c5b875be8dd85e38a6dfcb33372fad34eebed62e8134be55b26ff1":
-           "05256d6b6cfcb5392cc38d4a2d5ce789ef2ea87fa10331d3597105be37b76b6a";
-    require(track.archive&&track.world->container&&track.archiveSha256&&
-        std::string(track.world->container)==archiveName&&track.archiveBytes==archiveBytes&&
-        std::string(track.archiveSha256)==archiveSha,"Track particle archive profile identity rejected");
+    // Source selection and availability are separate from this shared cold
+    // capability. Authenticate the descriptor against the retained catalog;
+    // caller-supplied hashes alone must never nominate another archive.
+    const char* selectionError=nullptr;
+    const auto* canonical=track_session_assets50IG::select(
+        track.world?track.world->code:nullptr,selectionError);
+    require(canonical&&track.world==canonical->world&&track.archive&&
+        track.archiveSha256&&canonical->archiveSha256&&
+        track.archiveBytes==canonical->archiveBytes&&
+        std::string(track.archiveSha256)==canonical->archiveSha256,
+        "Track particle canonical selected archive descriptor rejected");
+    const char* archiveName=canonical->world->container;
+    const auto archiveBytes=canonical->archiveBytes;
+    const char* archiveSha=canonical->archiveSha256;
     const auto domain=application.standardMaterialDomain();
     require(domain&&domain->prepared()&&actual382B38&&domain->materials382B38()==actual382B38&&
         domain->resolver3E1A70()&&!actual382B38->populationTerminal()&&!actual382B38->demandTerminal()&&
@@ -59,14 +52,18 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
             if(lower(a[i])!=lower(b[i]))return false;}
         return i==a.size()&&!b[i];
     };
-    const std::string* particleName=nullptr;
-    for(const auto& block:actualWorld.parameters.blocks){
-        if(!sameName(block.name,"Environment"))continue;
-        for(const auto& field:block.fields){
-            if(!sameName(field.name,"ParticleTextureMapName"))continue;
-            require(!particleName,"duplicate SCB ParticleTextureMapName");particleName=&field.value;
+    const auto selectedParticleName=[&](const rr::assets::World48F& world){
+        const std::string* name=nullptr;
+        for(const auto& block:world.parameters.blocks){
+            if(!sameName(block.name,"Environment"))continue;
+            for(const auto& field:block.fields){
+                if(!sameName(field.name,"ParticleTextureMapName"))continue;
+                require(!name,"duplicate SCB ParticleTextureMapName");name=&field.value;
+            }
         }
-    }
+        return name;
+    };
+    const auto* particleName=selectedParticleName(actualWorld);
     require(particleName&&!particleName->empty()&&particleName->size()<128&&
         particleName->find_first_of("/\\")==std::string::npos,
         "Original track particle atlas name is unavailable");
@@ -99,23 +96,31 @@ inline bool prepare(rr::game::OriginalTrackParticleCold50LA& owner,
         rr::assets::extractResMember48C(archive,psmMember,psm,error)&&
         rr::assets::extractResMember48C(archive,pstMember,pst,error),
         "SCB-selected original track PRT/PSM/PST closure unavailable");
-    require(prt.size()==(mb?10310u:9210u)&&pod_materials50ed_fixture::detail::sha256(prt)==
-        (mb?"98a7d3c28ed61d1e8c9fb90a9dd433119e5e2574f648308271d4a2f4a0bd7a2a":
-            "d4604f2cfd8f40b9704fb63527fdb7574323cbebc9ac34b255b166e9f6be0a5f"),
-        "Original selected-track PRT identity rejected");
+    // Verify the selected field against decoded authenticated SCB bytes,
+    // never silently substitute a conflicting mutable caller world.
+    std::vector<std::uint8_t> scb;rr::assets::World48F sourceWorld;
+    require(rr::assets::extractResMember48C(archive,canonical->world->worldMember,scb,error)&&
+        rr::assets::decodeWorld48F(scb,sourceWorld,error)&&
+        actualWorld.parameters.original_bytes==scb,
+        "Track particle world differs from the selected original SCB");
+    const auto* originalParticleName=selectedParticleName(sourceWorld);
+    require(originalParticleName&&*originalParticleName==*particleName,
+        "Track particle parsed selection differs from authenticated SCB");
+    // These are the two already-supported original atlas layouts, not
+    // course identities. The numerical constructor retains its own bounds.
+    const auto prtSha=pod_materials50ed_fixture::detail::sha256(prt);
+    require((prt.size()==9210u&&prtSha==
+            "d4604f2cfd8f40b9704fb63527fdb7574323cbebc9ac34b255b166e9f6be0a5f")||
+        (prt.size()==10310u&&prtSha==
+            "98a7d3c28ed61d1e8c9fb90a9dd433119e5e2574f648308271d4a2f4a0bd7a2a"),
+        "Original selected-track PRT supported layout rejected");
     require(psm.size()==5022u&&pod_materials50ed_fixture::detail::sha256(psm)==
         "ed7c0a0799dc749f0c406503f0c4825b481038bb790cae2f50fc12897bf9ebe1",
         "Original selected-track particle PSM identity rejected");
-    require(!pst.empty()&&pod_materials50ed_fixture::detail::sha256(pst)==pstSha,
-        "Original selected-track particle PST identity rejected");
-    if(ga)require(archive.entries.size()==970u&&archive.decoded.size()==26099712u&&pst.size()==132124u,
-        "GA original particle archive/member extent rejected");
-    if(mb)require(archive.entries.size()==487u&&archive.decoded.size()==16392192u&&pst.size()==132124u,
-        "MB original particle archive/member extent rejected");
-    if(sc)require(archive.entries.size()==984u&&archive.decoded.size()==26714112u&&pst.size()==132124u,
-        "SC original particle archive/member extent rejected");
-    if(tc)require(archive.entries.size()==509u&&archive.decoded.size()==16048128u&&pst.size()==132124u,
-        "TC original particle archive/member extent rejected");
+    // PST pixels belong to this exact authenticated whole archive. Preserve
+    // them byte-for-byte in the same mounted provider and canonical domain;
+    // no another-course image, exported pixels or independent lookup exists.
+    require(!pst.empty(),"Original selected-track particle PST missing");
     const auto matches=[&](const std::string& requested,const std::vector<std::uint8_t>& original){
         Provider::MemberView selected;Provider::MountView mounted;
         return provider->lookup132820(requested,selected)==Provider::Lookup::present&&

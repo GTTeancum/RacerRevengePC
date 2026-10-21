@@ -74,6 +74,9 @@ public:
     OriginalUiRiderVisibilityOwner50KG& operator=(const OriginalUiRiderVisibilityOwner50KG&)=delete;
     bool bind(std::shared_ptr<const assets::OriginalUiArchive50KG>,
         OriginalUiRiderVisibilityDiagnostic50KG&) noexcept;
+    // Separate source-authenticated owner; does not widen Rider bind().
+    bool bindTournament(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        OriginalUiRiderVisibilityDiagnostic50KG&) noexcept;
     bool registerModel(std::shared_ptr<const assets::OriginalUiRiderCharacterAssets50KG>,
         OriginalUiRiderCharacterScene50KG&,bool shown,OriginalUiRiderVisibilityHandle50KG&,
         OriginalUiRiderVisibilityDiagnostic50KG&) noexcept;

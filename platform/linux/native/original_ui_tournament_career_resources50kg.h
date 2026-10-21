@@ -8,10 +8,14 @@
 #include "../../../src/assets/original_ui_screen_material_reference50kg.h"
 #include "../../../src/game/original_ui_text50kg.h"
 #include "../../../src/game/original_ui_main_layout50kg.h"
+#include "../../../src/game/original_ui_texture_animation50kg.h"
 
 namespace original_main_entry50KG { struct Application; }
 namespace rr::platform {
+class OriginalUiTournamentDrawContribution50KG;
 struct OriginalUiMainFrameClock50KG;
+struct OriginalUiRiderRouteProposal50KG;
+struct OriginalUiCourseRouteProposal50KG;
 enum class OriginalUiTournamentCareerResourceError50KG : std::uint8_t {
     none,alreadyLoaded,owner,profile,unsupportedProgress,unsupportedMedal,
     page,pod,image,text,material,unsupportedStat,animation,allocation
@@ -116,7 +120,34 @@ public:
     // Host bank mapping for source ScreenTexturesE80/EE0/F40, not flags.
     const std::array<std::uint32_t,3>* trophyImages() const noexcept;
 private:
+    friend class OriginalUiTournamentDrawContribution50KG;
+    bool claimNativeMarker(const OriginalUiTournamentDrawContribution50KG*) noexcept;
+    const game::OriginalUiTextureAnimationConfig50KG* nativeMarkerConfig(const OriginalUiTournamentDrawContribution50KG*) const noexcept;
+    const OriginalUiTournamentMedalPacket50KG* nativeMarkerPacket(const OriginalUiTournamentDrawContribution50KG*,std::uint32_t) const noexcept;
     friend struct ::original_main_entry50KG::Application;
+    friend class OriginalUiFrontend50KG;
+    friend class OriginalUiTournamentSession50KG;
+    // Future complete destination only. Immutable load may use the actual
+    // pending career before its three source writes; no shadow profile is used.
+    // These private calls require the genuine same-owner Rider proposal. They
+    // do not grant page, canonical construction, renderer or popup admission.
+    bool prepareRiderConfirm(const OriginalUiRiderRouteProposal50KG&,
+        OriginalUiTournamentCareerResourceDiagnostic50KG&) noexcept;
+    bool riderConfirmPreparationCurrent(const OriginalUiRiderRouteProposal50KG&) const noexcept;
+    // Allocation-free, one-use observation immediately after the genuine
+    // private profile commit. Checks the exact three-write projection and all
+    // captured dependencies before reconciling the generation. Failed attach
+    // latches this owner invalid without rolling back any actual effects.
+    bool acceptRiderConfirmCommit(const OriginalUiRiderRouteProposal50KG&,
+        OriginalUiTournamentCareerResourceDiagnostic50KG&) noexcept;
+    // Course Back is a distinct live predecessor with no profile writes.
+    // Capture and compare the same complete dependency set, without applying
+    // Rider confirmation's three-write/generation projection.
+    bool prepareCourseBack(const OriginalUiCourseRouteProposal50KG&,
+        OriginalUiTournamentCareerResourceDiagnostic50KG&) noexcept;
+    bool courseBackPreparationCurrent(const OriginalUiCourseRouteProposal50KG&) const noexcept;
+    bool acceptCourseBackCommit(const OriginalUiCourseRouteProposal50KG&,
+        OriginalUiTournamentCareerResourceDiagnostic50KG&) noexcept;
     bool sameProfileOwner(const OriginalUiRiderProfileOwner50KG&) const noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;
 };

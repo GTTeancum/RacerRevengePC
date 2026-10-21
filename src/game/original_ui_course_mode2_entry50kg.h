@@ -21,8 +21,8 @@ struct OriginalUiCourseMode2EntryPlan50KG {
 // Requires actual loaded Course metadata; an unbound data owner is rejected.
 // All256 progress bytes retain original mask/add/cap behavior. career<27 is
 // the represented profile-bank bound, not proof of selection or unlock.
-// Failure leaves out unchanged. This function is intentionally uncalled by
-// the existing session/frontend and cannot admit any profile transaction.
+// Failure leaves out unchanged. The bounded fresh Course Session and private
+// profile commit consume this pure plan; it cannot authorize a transaction.
 OriginalUiCourseSelectionStatus50KG planOriginalUiCourseMode2Entry50KG(
     const OriginalUiCourseSelectionData50KG&,
     const OriginalUiCourseMode2EntryInput50KG&,

@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+namespace rr::platform { class OriginalUiCourseDrawContribution50KG; }
 namespace rr::game {
 struct OriginalUiCoursePagePacket50KG {
     const char* materialName=nullptr;
@@ -26,6 +27,15 @@ struct OriginalUiCoursePageTextSnapshot50KG {
     float positionedX=0,positionedY=0;
     std::uint32_t color54=0xFFFFFF;std::int16_t alpha58=255;
     std::string text;
+};
+// Observations only. Session must obtain these from its coherent selected
+// profile/career owner; this value does not grant a route or profile write.
+struct OriginalUiCourseTournamentDrawState50KG {
+    std::uint32_t career=0,slot=0,tier=0;
+    std::uint8_t progress=0,medal=0;
+    std::int16_t remainingPrize=0;
+    std::array<std::int32_t,7> killPercent{};
+    std::int32_t par=0;
 };
 enum class OriginalUiCoursePageDrawError50KG : std::uint8_t {
     none,alreadyPrepared,notPrepared,archive,localization,images,material,parse,
@@ -56,9 +66,30 @@ public:
     std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images()const noexcept{return images_;}
     // Source1DAF78..1DB258: genuine embedded B30 text, LOC126/133/134.
     bool setLapCount(std::uint32_t laps,OriginalUiCoursePageDrawDiagnostic50KG&) noexcept;
+    // Separate original mode2 branch1DB81C..1DD530. No mode0 lap/entrant
+    // text is constructed. Retains original40/10/15-character allocations.
+    bool prepareTournamentFresh(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const assets::OriginalUiEnglish50KG&,
+        std::shared_ptr<const assets::OriginalUiScreenAssets50KG>,
+        std::uint32_t denmrk14Image,const std::array<std::uint32_t,3>& medalImages,
+        std::int32_t packetZMaximum,OriginalUiCoursePageDrawDiagnostic50KG&) noexcept;
+    bool tournamentFresh()const noexcept{return prepared()&&tournament_;}
+    //1DA634 ->1DDF00 initial planet label. Render replaces it with actual tier.
+    bool setTournamentPlanetName(std::uint32_t planet,OriginalUiCoursePageDrawDiagnostic50KG&) noexcept;
+    bool updateTournamentFresh(OriginalUiCourseWidgets50KG&,
+        const OriginalUiCourseTournamentDrawState50KG&,OriginalUiCoursePageDrawDiagnostic50KG&) noexcept;
+    const std::array<OriginalUiCoursePagePacket50KG,24>* tournamentPackets()const noexcept {
+        return tournamentFresh()&&tournamentFrame_?&tournamentPackets_:nullptr;
+    }
+    const std::array<OriginalUiCoursePageTextSnapshot50KG,21>* tournamentTexts()const noexcept {
+        return tournamentFresh()?&tournamentTexts_:nullptr;
+    }
     bool applyPlanetPalette(OriginalUiCourseWidgets50KG&,std::uint32_t primary79C,
         std::uint32_t secondary7A0,OriginalUiCoursePageDrawDiagnostic50KG&) noexcept;
 private:
+    friend class rr::platform::OriginalUiCourseDrawContribution50KG;
+    bool applyTournamentWidgetStage(std::uint8_t,OriginalUiCourseWidgets50KG&,
+        OriginalUiCoursePageDrawDiagnostic50KG&) noexcept;
     bool prepared_=false,poisoned_=false;
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive_;
     std::shared_ptr<const assets::OriginalUiScreenAssets50KG> images_;
@@ -68,5 +99,13 @@ private:
     std::string lapLabel126_,singularLap133_,pluralLaps134_;
     std::array<OriginalUiCoursePagePacket50KG,6> packets_{};
     std::array<OriginalUiCoursePageTextSnapshot50KG,2> texts_{};
+    bool tournament_=false,tournamentFrame_=false,tournamentPlanet_=false;
+    std::uint8_t tournamentWidgetStage_=0;
+    std::uint32_t primary_=0xFFFFFF,secondary_=0xFFFFFF;
+    std::array<std::uint32_t,3> medalImages_{};
+    std::array<std::string,6> planetNames_{};
+    std::array<std::string,32> tournamentLabels_{}; // English122..153.
+    std::array<OriginalUiCoursePagePacket50KG,24> tournamentPackets_{};
+    std::array<OriginalUiCoursePageTextSnapshot50KG,21> tournamentTexts_{};
 };
 }

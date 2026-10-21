@@ -1,9 +1,11 @@
-// Source-reviewed bounded Course integration; runtime acceptance is pending.
+// Source-reviewed bounded Course/Tournament integration; runtime acceptance is pending.
 #pragma once
 #include "original_ui_options_session50kg.h"
+#include "original_ui_hall_session50kg.h"
 #include "../../../src/game/control_presets49d.h"
 #include "original_ui_rider_session50kg.h"
 #include "original_ui_course_session50kg.h"
+#include "original_ui_tournament_session50kg.h"
 #include "vehicle_window_gl50ds.h"
 #include "../../../src/assets/original_ui_localization50kg.h"
 #include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
@@ -38,9 +40,14 @@ struct OriginalUiFrontendDiagnostic50KG {
     game::OriginalCourseLoadAvailability50KG courseLoad=game::OriginalCourseLoadAvailability50KG::hostNotReady;
     OriginalUiMainSessionDiagnostic50KG main{};
     OriginalUiOptionsSessionDiagnostic50KG options{};
+    OriginalUiHallSessionDiagnostic50KG hall{};
+    OriginalUiHallDrawDiagnostic50KG hallResources{};
     OriginalUiOptionsDrawDiagnostic50KG optionsResources{};
     OriginalUiRiderSessionDiagnostic50KG rider{};
     OriginalUiRiderDrawResourceDiagnostic50KG riderResources{};
+    OriginalUiTournamentSessionDiagnostic50KG tournament{};
+    OriginalUiTournamentCareerResourceDiagnostic50KG tournamentResources{};
+    OriginalUiTournamentWidgetResourceDiagnostic50KG tournamentWidgets{};
     OriginalUiCourseSessionDiagnostic50KG course{};
     OriginalUiCourseDrawResourceDiagnostic50KG courseResources{};
     OriginalUiCourseHologramDrawDiagnostic50KG courseHolograms{};
@@ -75,10 +82,10 @@ struct OriginalUiFrontendCold50KG {
     // Already-authenticated immutable original archives, retained by this owner.
     // English is decoded once from localization and retained for every lifetime.
     std::shared_ptr<const assets::OriginalUiArchive50KG> appStart,mainMenu,options,
-        fonts,controllerPopup,overlays,localization;
+        fonts,controllerPopup,overlays,localization,hall;
     // Optional concrete Rider inputs. Missing any leaves Main's genuine Rider
     // action unavailable; a cache flag or remembered rider is not readiness.
-    std::shared_ptr<const assets::OriginalUiArchive50KG> rider,backgrounds,podTextures,course;
+    std::shared_ptr<const assets::OriginalUiArchive50KG> rider,backgrounds,podTextures,course,tournament;
     std::shared_ptr<const assets::OriginalUiIpumTextureCache50KG> riderIpumCache;
     std::shared_ptr<OriginalUiRiderProfileOwner50KG> riderProfile;
     std::shared_ptr<const OriginalUiCourseRaceDestination50KG> courseRaceDestination;
@@ -96,6 +103,7 @@ struct OriginalUiFrontendCold50KG {
     // the same pointer is attached to audio's current native mixer.
     std::shared_ptr<OriginalSoundMode50KG> soundMode;
     std::shared_ptr<OriginalUiMainApplication50KG> application;
+    game::OriginalApplicationAnimationClockView50KG applicationAnimation{};
     // Constructed once by the native APPLICATION before initial Main, retained
     // across every screen/frontend lifetime. Never created by a destination.
     std::shared_ptr<game::OriginalUiLightManagerLifetime50KG> lightManager;
@@ -140,8 +148,10 @@ struct OriginalUiFrontendInputReceipt50KG {
     OriginalUiFrontendColdInterval50KG coldInterval{};
     OriginalUiMainSessionInputReceipt50KG main{};
     OriginalUiOptionsSessionInputReceipt50KG options{};
+    OriginalUiHallSessionInputReceipt50KG hall{};
     OriginalUiRiderSessionInputReceipt50KG rider{};
     OriginalUiCourseSessionInputReceipt50KG course{};
+    OriginalUiTournamentSessionInputReceipt50KG tournament{};
 };
 struct OriginalUiFrontendUpdateReceipt50KG {
     // True only after exactly one audio preparation, actual manager switch
@@ -169,16 +179,19 @@ struct OriginalUiFrontendSnapshot50KG {
     game::OriginalUiApplicationRequest50KG queuedRequest{};
     OriginalUiMainSessionSnapshot50KG main{};
     OriginalUiOptionsSessionSnapshot50KG options{};
+    OriginalUiHallSessionSnapshot50KG hall{};
     OriginalUiRiderSessionSnapshot50KG rider{};
     OriginalUiCourseSessionSnapshot50KG course{};
+    OriginalUiTournamentSessionSnapshot50KG tournament{};
     std::uint64_t updates=0,renders=0,submissions=0,switches=0;
     game::OriginalUiLightCacheState50KG lightCacheState=game::OriginalUiLightCacheState50KG::notConstructed;
     std::uint64_t lightManagerGeneration=0;
     bool lightManagerEntered=false;
 };
 // Concrete native Main4/1 <-> Options12/{1,2,3,4}, plus Rider5/1 for
-// authenticated default-unlocked Rider selection, with mode0 Confirm -> bounded Course6/1
-// and Back. Course Confirm additionally requires the concrete native race lease.
+// authenticated Rider selection: mode0 Confirm -> bounded Course6/1; mode2
+// Confirm -> clean fresh-career Tournament9/1 and Back. Tournament Course/Garage
+// stay unavailable. Course Confirm additionally requires the concrete native race lease.
 // No guest execution, fallback UI or profile reset. Runtime acceptance is pending.
 // One freshly prepared bank/session/manager per screen lifetime; shared process
 // profile/application/audio/light manager remain the same. Options page changes
@@ -235,6 +248,8 @@ public:
     const OriginalUiOptionsSession50KG* optionsSession() const noexcept;
     const OriginalUiRiderSession50KG* riderSession() const noexcept;
     const OriginalUiCourseSession50KG* courseSession() const noexcept;
+    const OriginalUiTournamentSession50KG* tournamentSession() const noexcept;
+    const OriginalUiHallOfFameSession50KG* hallSession() const noexcept;
     const OriginalUiCourseDrawResources50KG* courseResources() const noexcept;
     const OriginalUiMainDrawResources50KG* mainResources() const noexcept;
     const OriginalUiOptionsDrawResources50KG* optionsResources() const noexcept;

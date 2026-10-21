@@ -782,6 +782,14 @@ public:
                 riderProfile->initializeGasganoTestProfileAtApplicationStartup(profile,physics,riderProfileDiagnostic):
                 riderProfile->initializeAtApplicationStartup(profile,physics,riderProfileDiagnostic),
                 "Rider startup profile initialization rejected");
+            // Original17DE80/1801D0 fresh-profile record producer. Populate
+            // once at APPLICATION startup, never Hall entry or missing-save recovery.
+            const auto recordLocalization=readArchive(assetRoot,rr::assets::OriginalUiArchiveId50KG::localization);
+            rr::assets::OriginalUiEnglish50KG recordEnglish;
+            rr::assets::OriginalUiLocalizationDiagnostic50KG recordLocalizationDiagnostic;
+            require(rr::assets::readOriginalUiEnglish50KG(*recordLocalization,recordEnglish,recordLocalizationDiagnostic)&&
+                riderProfile->initializeHallRecordsAtApplicationStartup(recordEnglish,riderProfileDiagnostic),
+                "Original fresh Hall record initialization rejected");
             require(riderProfile->gasganoTestProfile()==gasganoTest&&
                 riderProfile->mawhonicRylothTestProfile()==mawhonicRylothTest&&
                 riderProfile->visibleRiderTestProfile()==(youngAnakinMcTest?0u:visibleRiderTest)&&
@@ -1563,12 +1571,13 @@ public:
         cold.appStart=application.appStart(application.assetRoot);
         cold.mainMenu=readArchive(application.assetRoot,Id::mainMenu);
         cold.options=readArchive(application.assetRoot,Id::options);
+        cold.hall=readArchive(application.assetRoot,Id::hallOfFame);
         cold.fonts=readArchive(application.assetRoot,Id::fonts);
         cold.controllerPopup=readArchive(application.assetRoot,Id::controllerPopup);
         cold.overlays=readArchive(application.assetRoot,Id::overlays);
         cold.localization=readArchive(application.assetRoot,Id::localization);
         cold.runtime=application.materialRuntime;cold.video=video->publication(video);
-        cold.profile=application.profile;cold.application=application.state;cold.courseRaceDestination=std::move(raceDestination);
+        cold.profile=application.profile;cold.application=application.state;cold.applicationAnimation=application.animationClock();cold.courseRaceDestination=std::move(raceDestination);
         presentationHost=&video->host;presentationNow=nativeNow;
         // Absent retains strict driver-only admission. This request changes
         // host pacing only, never Rider profile/resource/selection guards.
@@ -1597,6 +1606,13 @@ public:
                 cold.course=readArchive(application.assetRoot,Id::course);
             else
                 std::cerr<<"Original Course archive absent; Course destination remains unavailable.\n";
+            // Optional genuine Tournament archive, independent of Course. A
+            // missing owner keeps only that destination unavailable.
+            const auto* tournamentIdentity=rr::assets::originalUiArchiveIdentity50KG(Id::tournament);
+            require(tournamentIdentity,"original Tournament archive identity missing");
+            if(std::filesystem::exists(application.assetRoot/std::filesystem::path(tournamentIdentity->discPath)))
+                cold.tournament=readArchive(application.assetRoot,Id::tournament);
+            else std::cerr<<"Original Tournament archive absent; Tournament destination remains unavailable.\n";
             cold.backgrounds=readArchive(application.assetRoot,Id::backgrounds);
             cold.podTextures=readArchive(application.assetRoot,Id::podTextures);
             auto cache=std::make_shared<Cache>();
@@ -1698,7 +1714,11 @@ public:
             if((application.decodeRiderImagesInProcess||!application.riderCacheRoot.empty())&&
                 !cold.audio->prepareRiderMenu(application.audioRoot,error))
                 throw std::runtime_error(error);
-            if(cold.course&&!cold.audio->prepareCourseMenu(application.audioRoot,error))
+            if((cold.course||cold.tournament)&&!cold.audio->prepareCourseMenu(application.audioRoot,error))
+                throw std::runtime_error(error);
+            if(cold.options&&!cold.audio->prepareCreditsMenu(application.audioRoot,error))
+                throw std::runtime_error(error);
+            if(cold.hall&&!cold.audio->prepareHallOfFameMenu(application.audioRoot,error))
                 throw std::runtime_error(error);
             const auto info=audioOutput.info();
             std::cerr<<"Original UI audio device="<<rr::platform::audioDeviceStatusName50HD(info.deviceStatus)
@@ -1715,6 +1735,19 @@ public:
             std::to_string(static_cast<unsigned>(diagnostic.status))+" source="+std::to_string(diagnostic.sourcePC)+
             " main="+std::to_string(static_cast<unsigned>(diagnostic.main.status))+
             " options="+std::to_string(static_cast<unsigned>(diagnostic.options.status))+
+            " hall="+std::to_string(static_cast<unsigned>(diagnostic.hall.status))+
+            " hall_pc="+std::to_string(diagnostic.hall.sourcePC)+
+            " hall_draw="+std::to_string(static_cast<unsigned>(diagnostic.hall.draw.error))+
+            " hall_draw_pc="+std::to_string(diagnostic.hall.draw.sourcePC)+
+            " hall_draw_widget="+std::to_string(diagnostic.hall.draw.widgetId)+
+            " hall_widget="+std::to_string(static_cast<unsigned>(diagnostic.hall.widget.error))+
+            " hall_resource="+std::to_string(static_cast<unsigned>(diagnostic.hallResources.error))+
+            " options_draw="+std::to_string(static_cast<unsigned>(diagnostic.options.draw.error))+
+            " options_draw_pc="+std::to_string(diagnostic.options.draw.sourcePC)+
+            " options_draw_widget="+std::to_string(diagnostic.options.draw.widgetId)+
+            " options_resource="+std::to_string(static_cast<unsigned>(diagnostic.options.draw.resource.error))+
+            " options_model="+std::to_string(static_cast<unsigned>(diagnostic.options.draw.resource.controlsModel.error))+
+            " options_model_pc="+std::to_string(diagnostic.options.draw.resource.controlsModel.sourcePC)+
             " rider="+std::to_string(static_cast<unsigned>(diagnostic.rider.status))+
             " rider_pc="+std::to_string(diagnostic.rider.sourcePC)+
             " rider_widget="+std::to_string(static_cast<unsigned>(diagnostic.rider.widget.error))+
@@ -1737,26 +1770,56 @@ public:
             " rider_draw_geometry="+std::to_string(diagnostic.rider.draw.geometryStatus)+
             " rider_draw_material_index="+std::to_string(diagnostic.rider.draw.material)+
             " rider_draw_pass="+std::to_string(diagnostic.rider.draw.pass)+
+            " tournament="+std::to_string(static_cast<unsigned>(diagnostic.tournament.status))+
+            " tournament_pc="+std::to_string(diagnostic.tournament.sourcePC)+
+            " tournament_resource="+std::to_string(static_cast<unsigned>(diagnostic.tournamentResources.error))+
+            " tournament_widgets="+std::to_string(static_cast<unsigned>(diagnostic.tournamentWidgets.error))+
+            " tournament_draw="+std::to_string(static_cast<unsigned>(diagnostic.tournament.draw.error))+
+            " tournament_model="+std::to_string(static_cast<unsigned>(diagnostic.tournament.model.error))+
             " course="+std::to_string(static_cast<unsigned>(diagnostic.course.status))+
             " course_pc="+std::to_string(diagnostic.course.sourcePC)+
             " renderer="+std::to_string(static_cast<unsigned>(diagnostic.renderer.error)));
     }
-    void input(std::uint8_t sourceInput) {
-        rr::platform::OriginalUiMainSessionInput50KG in;in.controller=0;in.originalInput=sourceInput;
+    void input(std::uint8_t sourceInput,rr::platform::WindowControllerPresence50DQ presence=rr::platform::WindowControllerPresence50DQ::Unknown) {
+        rr::platform::OriginalUiMainSessionInput50KG in;in.controller=0;in.originalInput=sourceInput;in.secondControllerObservation=presence;
         rr::platform::OriginalUiFrontendInputReceipt50KG receipt;
         const auto inputStart=stageStart();
         const auto status=coordinator.input(in,receipt,diagnostic);++inputCount;
         reportStage("source_input",inputStart,status==Status::ok||status==Status::noChange||
             status==Status::routeAccepted||status==Status::unavailableDestination||status==Status::secondControllerRequired);
         accountColdInterval(receipt.coldInterval);
+        if(receipt.options.popupChanged||receipt.main.popupChanged){
+            const auto ui=coordinator.snapshot();const auto& popup=receipt.main.popupChanged?ui.main.controllerPopup:ui.options.controllerPopup;
+            std::cerr<<"original_controller_popup {\"source_pc\":"<<(receipt.main.popupChanged?receipt.main.popupSourcePC:receipt.options.popupSourcePC)
+                <<",\"device_observation\":"<<unsigned(presence)<<",\"active\":"<<(popup.active3CC?"true":"false")
+                <<",\"closing\":"<<(popup.closing3C8?"true":"false")<<",\"result\":"<<popup.result3D8
+                <<",\"timer\":"<<popup.timer3C4<<",\"cancel_label\":"<<(popup.hasCancel3D4?"true":"false")<<"}\n";
+        }
         if(status==Status::unavailableDestination||status==Status::secondControllerRequired){
             ++unavailableCount;std::cerr<<"original_ui_destination unavailable screen="<<unsigned(receipt.source.screen)
                 <<" page="<<unsigned(receipt.source.page)
-                <<" status="<<unsigned(status)<<" source="<<diagnostic.sourcePC
+                <<" status="<<unsigned(status)<<" original_input="<<unsigned(sourceInput)<<" device_observation="<<unsigned(presence)<<" source="<<diagnostic.sourcePC
                 <<" native_course_load="<<unsigned(diagnostic.courseLoad)
                 <<" main="<<unsigned(diagnostic.main.status)<<" options="<<unsigned(diagnostic.options.status)
+                <<" tournament_status="<<unsigned(diagnostic.tournament.status)<<" tournament_pc="<<diagnostic.tournament.sourcePC
+                <<" tournament_resource="<<unsigned(diagnostic.tournamentResources.error)<<" tournament_resource_pc="<<diagnostic.tournamentResources.sourcePC
+                <<" tournament_widgets="<<unsigned(diagnostic.tournamentWidgets.error)<<" tournament_widgets_pc="<<diagnostic.tournamentWidgets.sourcePC
+                <<" tournament_model="<<unsigned(diagnostic.tournament.model.error)<<" tournament_draw="<<unsigned(diagnostic.tournament.draw.error)
+                <<" hall_status="<<unsigned(diagnostic.hall.status)<<" hall_pc="<<diagnostic.hall.sourcePC
+                <<" hall_resource="<<unsigned(diagnostic.hallResources.error)<<" hall_resource_pc="<<diagnostic.hallResources.sourcePC
                 <<" options_resource="<<unsigned(diagnostic.optionsResources.error)
                 <<" options_resource_widget="<<diagnostic.optionsResources.widgetId
+                <<" options_resource_pc="<<diagnostic.optionsResources.sourcePC
+                <<" options_camera="<<unsigned(diagnostic.optionsResources.camera.status)
+                <<" options_controls_model="<<unsigned(diagnostic.optionsResources.controlsModel.error)
+                <<" options_controls_model_pc="<<diagnostic.optionsResources.controlsModel.sourcePC
+                <<" options_controls_asset="<<unsigned(diagnostic.optionsResources.controlsModel.asset.error)
+                <<" options_controls_geometry="<<diagnostic.optionsResources.controlsModel.asset.geometry.code
+                <<" options_controls_geometry_offset="<<diagnostic.optionsResources.controlsModel.asset.geometry.offset
+                <<" options_controls_geometry_detail="<<diagnostic.optionsResources.controlsModel.asset.geometry.detail
+                <<" options_fire="<<unsigned(diagnostic.optionsResources.fire)
+                <<" options_lighting="<<unsigned(diagnostic.optionsResources.lighting)
+                <<" options_render_state="<<unsigned(diagnostic.optionsResources.renderState)
                 <<" options_widget_status="<<unsigned(diagnostic.optionsResources.widgets.status)
                 <<" options_widget_id="<<diagnostic.optionsResources.widgets.widgetId
                 <<" options_widget_controller="<<unsigned(diagnostic.optionsResources.widgets.controller)
@@ -2027,11 +2090,20 @@ public:
             const auto* resources=coordinator.courseResources();
             return resources&&resources->widgets()?resources->widgets()->navigation():nullptr;
         }
+        if(route.screen==9&&route.page==1){
+            const auto* session=coordinator.tournamentSession();return session?session->navigation():nullptr;
+        }
+        if(route.screen==11&&route.page==1){
+            const auto* session=coordinator.hallSession();const auto* state=session?session->navigationState():nullptr;
+            return state?&state->navigation:nullptr;
+        }
         if(route.screen==12){
             const auto* resources=coordinator.optionsResources();
             const auto* widgets=resources?resources->widgets():nullptr;
             if(!widgets)return nullptr;
             if(route.page==1)return widgets->navigation();
+            if(route.page==5)return widgets->memoryCardNavigation();
+            if(route.page==6&&widgets->creditsState())return &widgets->creditsState()->navigation;
             if(route.page==4){const auto* state=widgets->gameOptionsState();return state?&state->navigation:nullptr;}
             if(route.page==2||route.page==3){const auto* session=coordinator.optionsSession();
                 const auto* state=session?session->controlsState(route.page-2):nullptr;return state?&state->navigation:nullptr;}
@@ -2079,6 +2151,8 @@ public:
                 <<",\"presentation\":\"native_host_rgb\",\"switches\":"<<snapshot.switches
                 <<",\"gpu_publication\":"<<publication<<",\"updates\":"<<snapshot.updates
                 <<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<snapshot.submissions
+                <<",\"mode34\":"<<course.mode34<<",\"tier14E8\":"<<course.tier14E8
+                <<",\"entry_writes_laps_entrants\":"<<(course.mode34==0?"true":"false")
                 <<",\"course_slot\":"<<course.courseSlot14E4<<",\"subtype_slot\":"<<course.subtypeSlot14F4
                 <<",\"selected_planet\":"<<course.selectedPlanet40<<",\"selected_course_index\":"<<course.selectedCourse44
                 <<",\"selection_refresh_updates\":"<<course.deferred14D0
@@ -2158,6 +2232,49 @@ public:
             reportRiderProfile();std::cerr<<"}\n";
             return;
         }
+        if(snapshot.route.screen==9){
+            require(snapshot.route.page==1&&coordinator.tournamentSession(),"original Tournament session report unavailable");
+            const auto& tournament=snapshot.tournament;const auto publication=coordinator.gpu()?coordinator.gpu()->publicationToken():0;
+            const bool accepted=snapshot.frameSubmitted&&submittedScreen==9&&submittedPublication==publication&&sourceFrameGeneration!=0;
+            const auto* nav=navigation();require(nav,"original Tournament navigation report unavailable");
+            const auto group=nav->controllerGroup[0];
+            const auto slot=group>0&&static_cast<std::size_t>(group)<nav->groups.size()?nav->groups[group].selectedSlot:0;
+            std::cerr<<"original_tournament_state {\"reason\":\""<<reason<<"\",\"screen\":9,\"page\":1"
+                <<",\"career\":"<<tournament.career<<",\"selected_group\":"<<group<<",\"selected_slot\":"<<slot
+                <<",\"page_shown\":"<<(tournament.pageShown?"true":"false")<<",\"input_shown\":"<<(tournament.inputContainerShown?"true":"false")
+                <<",\"camera_active\":"<<(tournament.cameraActive?"true":"false")<<",\"timer4064\":"<<tournament.timer4064
+                <<",\"audio_submitted\":"<<tournament.audio.submitted<<",\"audio_failed\":"<<tournament.audio.failed
+                <<",\"audio_music_song\":"<<(audioOutput.transport()?audioOutput.transport()->activeMusicSong():0)
+                <<",\"prompt_mask\":"<<tournament.promptMask42C<<",\"gpu_publication\":"<<publication
+                <<",\"updates\":"<<snapshot.updates<<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<snapshot.submissions
+                <<",\"aperture_state\":"<<unsigned(tournament.aperture.state)
+                <<",\"source_rgba_accepted\":"<<(accepted?"true":"false")
+                <<",\"source_frame\":"<<sourceFrameGeneration<<",\"source_target\":"<<sourceTargetGeneration
+                <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount;
+            reportRiderProfile();std::cerr<<"}\n";return;
+        }
+        if(snapshot.route.screen==11){
+            require(snapshot.route.page==1&&coordinator.hallSession(),"original Hall session report unavailable");
+            const auto& hall=snapshot.hall;const auto publication=coordinator.gpu()?coordinator.gpu()->publicationToken():0;
+            const bool accepted=snapshot.frameSubmitted&&submittedScreen==11&&submittedPublication==publication&&sourceFrameGeneration!=0;
+            const auto* nav=navigation();require(nav,"original Hall navigation report unavailable");
+            const auto group=nav->controllerGroup[0];
+            const auto slot=group>0&&static_cast<std::size_t>(group)<nav->groups.size()?nav->groups[group].selectedSlot:0;
+            std::cerr<<"original_hall_state {\"reason\":\""<<reason<<"\",\"screen\":11,\"page\":1"
+                <<",\"course_index\":"<<hall.courseIndex<<",\"planet_index\":"<<hall.planetIndex
+                <<",\"selected_group\":"<<group<<",\"selected_slot\":"<<slot
+                <<",\"audio_submitted\":"<<hall.audio.submitted<<",\"audio_failed\":"<<hall.audio.failed
+                <<",\"audio_music_song\":"<<(audioOutput.transport()?audioOutput.transport()->activeMusicSong():0)
+                <<",\"deferred1460\":"<<hall.deferred1460<<",\"video_paused\":"<<(hall.videoPaused84?"true":"false")
+                <<",\"presentation_pending\":"<<(hall.movementPresentationPending?"true":"false")
+                <<",\"prompt_mask\":"<<hall.promptMask42C<<",\"gpu_publication\":"<<publication
+                <<",\"updates\":"<<snapshot.updates<<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<snapshot.submissions
+                <<",\"aperture_state\":"<<unsigned(hall.aperture.state)
+                <<",\"source_rgba_accepted\":"<<(accepted?"true":"false")
+                <<",\"source_frame\":"<<sourceFrameGeneration<<",\"source_target\":"<<sourceTargetGeneration
+                <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount;
+            reportRiderProfile();std::cerr<<"}\n";return;
+        }
         const auto* optionsResources=coordinator.optionsResources();
         const auto* nav=navigation();require(nav,"original UI live navigation missing");
         const auto group=nav->controllerGroup[0];
@@ -2203,6 +2320,10 @@ public:
             <<",\"audio_device_consumed_frames\":"<<audioInfo.deviceConsumedFrames<<",\"audio_device_queued_frames\":"<<audioInfo.deviceQueuedFrames
             <<",\"audio_device_underrun_frames\":"<<audioInfo.deviceUnderrunFrames<<",\"audio_device_overflow_frames\":"<<audioInfo.deviceOverflowFrames
             <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames;
+        const auto& popup=main?snapshot.main.controllerPopup:snapshot.options.controllerPopup;
+        std::cerr<<",\"controller_popup_active\":"<<(popup.active3CC?"true":"false")
+            <<",\"controller_popup_closing\":"<<(popup.closing3C8?"true":"false")
+            <<",\"controller_popup_result\":"<<popup.result3D8<<",\"controller_popup_timer\":"<<popup.timer3C4;
         const auto& saved=*application.gameSettingsProfile;
         std::cerr<<",\"game_profile_sound_mode\":"<<saved.soundMode1101C
             <<",\"game_profile_volumes\":["<<saved.volume11020[0]<<','<<saved.volume11020[1]<<','<<saved.volume11020[2]<<','<<saved.volume11020[3]<<']'
@@ -2214,6 +2335,22 @@ public:
                 <<",\"game_local_volumes\":["<<local.volume[0]<<','<<local.volume[1]<<','<<local.volume[2]<<','<<local.volume[3]<<']'
                 <<",\"game_local_vertical_split\":"<<(local.verticalSplit?"true":"false")
                 <<",\"game_local_vibration\":"<<(local.vibration?"true":"false");
+        }
+        if(snapshot.route.screen==12&&snapshot.route.page==5){
+            const auto* session=coordinator.optionsSession();const auto* card=session?session->memoryCardState():nullptr;
+            if(card)std::cerr<<",\"memory_card_dialog_state\":"<<card->dialogState30
+                <<",\"memory_card_active\":"<<(card->dialogActive?"true":"false")
+                <<",\"memory_card_closing\":"<<(card->closing3AC?"true":"false")
+                <<",\"memory_card_complete\":"<<(card->completed3A4?"true":"false")
+                <<",\"memory_card_timer\":"<<card->timer398
+                <<",\"memory_card_storage_supported\":false";
+        }
+        if(snapshot.route.screen==12&&snapshot.route.page==6&&optionsResources){
+            const auto* credits=optionsResources->widgets()->creditsState();
+            if(credits)std::cerr<<",\"credits_slot\":"<<credits->navigation.groups[1].selectedSlot
+                <<",\"credits_phase\":"<<unsigned(credits->phase7D4)
+                <<",\"credits_remaining\":"<<credits->remaining7D8
+                <<",\"credits_input_flags\":"<<credits->inputFlags42C;
         }
         if(application.controlsProfile){
             std::cerr<<",\"controls_accepts\":"<<snapshot.options.controlsAcceptCount
