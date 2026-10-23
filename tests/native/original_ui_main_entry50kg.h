@@ -253,6 +253,11 @@ private:
     bool clearAuralRegistrations103DD0(rr::platform::OriginalApplicationAural50KG::Diagnostic&)const noexcept;
     bool releaseAuralCold102CD0(rr::platform::OriginalApplicationAural50KG::Diagnostic&)const noexcept;
     mutable std::shared_ptr<rr::game::OriginalUiEntityScope50KG> sharedUiScopeOwner_;
+    // Bounded last-completed dispatcher receipt. This keeps the old address
+    // generation distinct while its genuine successor is constructed.
+    mutable std::shared_ptr<rr::platform::OriginalUiSharedDialogs50KG> retiredSharedUiDialogs_;
+    mutable rr::game::OriginalUiControllerPopupState50KG retiredControllerPopupState_{};
+    bool sharedUiRetirementReceiptCurrent17C1D8()const noexcept;
     enum class SharedUiBootResult { unavailable,complete,failed };
     SharedUiBootResult prepareSharedDialogsInitial1B7BD0(
         std::shared_ptr<rr::platform::OriginalUiControllerPopupResources50KG>,

@@ -7,6 +7,8 @@
 #include <bit>
 #include <limits>
 #include <new>
+#include <cstring>
+#include <cstdio>
 namespace rr::platform {
 OriginalUiSharedDialogs50KG::~OriginalUiSharedDialogs50KG()noexcept {
     // Global UI shutdown must perform its actual two child callbacks. Neither
@@ -27,8 +29,8 @@ bool OriginalUiSharedDialogs50KG::bindInitial1B7BD0(std::shared_ptr<Scope> scope
     // A native session that already published47C resources has real history.
     // Do not manufacture470's constructor history alongside that live UI.
     const auto& state=app->controllerPopupState;
-    if(app->controllerPopupResources||state.delta3C0!=0||state.timer3C4!=0||state.active3CC||
-       state.closing3C8||state.hasConfirm3D0||state.hasCancel3D4||state.result3D8)
+    if(app->controllerPopupResources||(!successorConstructor_&&(state.delta3C0!=0||state.timer3C4!=0||state.active3CC||
+       state.closing3C8||state.hasConfirm3D0||state.hasCancel3D4||state.result3D8)))
         return fail(d,Status::history,0x1B7BD0);
     scope_=std::move(scope);application_=app;inputs_=std::move(inputs);phase_=Phase::bound;
     return construct470203C90(d);
@@ -148,8 +150,15 @@ bool OriginalUiSharedDialogs50KG::construct47C2054D0(Diagnostic& d)noexcept {
     d.entity=scope_->constructControllerPopup2054D0(*this,controller47C_.entity);
     if(!d.entity.okay())return fail(d,Status::owner,d.entity.sourcePC);
     controller47C_.vtable=0x3D0890;
-    // The actual native ControllerPopupState was created with MainApplication.
-    // Its represented2054D0 initialization is not replayed over live fields.
+    //205564..20559C initializes the NEW 47C instance. A successor is issued
+    // only after exact prior object retirement; Root/profile/audio history is
+    // not reset. Initial boot keeps its existing constructor/loader projection.
+    if(successorConstructor_){
+        auto app=application_.lock();if(!app)std::terminate();
+        auto& q=app->controllerPopupState;
+        q.timer3C4=0;q.delta3C0=0;q.closing3C8=false;q.active3CC=false;
+        q.hasConfirm3D0=false;q.hasCancel3D4=false;q.result3D8=0;
+    }
     phase_=Phase::controller47CConstructed;d.sourceEffectsCommitted=true;d.sourcePC=0x2055AC;return true;
 }
 bool OriginalUiSharedDialogs50KG::bindLoaded47C2055B0(
@@ -162,6 +171,8 @@ bool OriginalUiSharedDialogs50KG::bindLoaded47C2055B0(
     // Resource provenance must also match this exact initial boot archive and
     // native Video owner. The concrete resource owner validates these inputs.
     if(!resources->bindSharedDialogOwner2055B0(*this))return fail(d,Status::owner,0x2055B0);
+    if(successorConstructor_)app->controllerPopupState.strips=
+        game::OriginalUiControllerPopup50KG::initialState().strips;
     app->controllerPopupResources=resources;controller47C_.resources=std::move(resources);
     controller47C_.loaded=true;phase_=Phase::loaded;d.sourceEffectsCommitted=true;d.sourcePC=0x2055B0;return true;
 }
@@ -461,6 +472,11 @@ bool OriginalUiEntityScope50KG::sharedDialogRetirementCurrent(const SharedDialog
  return ordinal?c.previous10==&owner.dialog470_.entity&&!sharedDialogRetired_[0]:
    !c.previous10&&sharedDialogRetired_[1]&&!dispatcher_.firstChild18;
 }
+bool OriginalUiEntityScope50KG::sharedDialogRetiredNodesAbsent(const SharedDialogs& owner)const noexcept {
+ const auto view=application_->entityAuthority_.view();
+ return !contains(view,&dispatcher_)&&!contains(view,&owner.dialog470_.entity)&&
+        !contains(view,&owner.controller47C_.entity);
+}
 OriginalUiEntityScope50KG::Result OriginalUiEntityScope50KG::finishSharedDialogRetirement1413E0(
  SharedDialogs& owner,std::size_t ordinal,C& c)noexcept {
  if(!sharedDialogRetirementCurrent(owner,ordinal,c))return {Status::phase,0x1413E0};
@@ -474,13 +490,89 @@ OriginalUiEntityScope50KG::Result OriginalUiEntityScope50KG::finishSharedDialogR
 }
 
 namespace original_main_entry50KG {
+bool Application::sharedUiRetirementReceiptCurrent17C1D8()const noexcept {
+ using Scope=rr::game::OriginalUiEntityScope50KG;
+ using Owner=rr::platform::OriginalUiSharedDialogs50KG;
+ const auto& old=retiredSharedUiDialogs_;const auto& scope=sharedUiScopeOwner_;
+ const auto rejected=[](const auto& observed,const char* guard)noexcept {
+  const bool failed=static_cast<bool>(observed);
+  if(failed)std::fprintf(stderr,"original_shared_ui_retirement_receipt_rejected guard=%s\n",guard);
+  return failed;
+ };
+ if(rejected(garageAudioOwnerThread_!=std::this_thread::get_id(),"garageAudioOwnerThread_!=std::this_thread::get_id()")||
+    rejected(!entitiesOwner_,"!entitiesOwner_")||
+    rejected(!entitiesOwner_->application10(),"!entitiesOwner_->application10()")||
+    rejected(!state,"!state")||
+    rejected(state->sharedDialogs,"state->sharedDialogs")||
+    rejected(state->controllerPopupResources,"state->controllerPopupResources")||
+    rejected(garageCustodyOwner_,"garageCustodyOwner_")||
+    rejected(nativeCollectorFifoOwner_,"nativeCollectorFifoOwner_")||
+    rejected(uiCollector1B73BCAttempted_,"uiCollector1B73BCAttempted_")||
+    rejected(!old,"!old")||
+    rejected(!scope,"!scope")||
+    rejected(scope.use_count()!=2,"scope.use_count()!=2")||
+    rejected(old->inputs_.root!=this,"old->inputs_.root!=this")||
+    rejected(old->application_.lock()!=state,"old->application_.lock()!=state")||
+    rejected(old->scope_!=scope,"old->scope_!=scope")||
+    rejected(old->phase_!=Owner::Phase::retired,"old->phase_!=Owner::Phase::retired")||
+    rejected(old->dialog470_.entity.reference00,"old->dialog470_.entity.reference00")||
+    rejected(old->controller47C_.entity.reference00,"old->controller47C_.entity.reference00")||
+    rejected(old->dialog470_.loaded,"old->dialog470_.loaded")||
+    rejected(old->controller47C_.loaded,"old->controller47C_.loaded")||
+    rejected(old->controller47C_.resources,"old->controller47C_.resources")||
+    rejected(old->retirementDisplay_,"old->retirementDisplay_")||
+    rejected(old->retirementDisplayPinned_,"old->retirementDisplayPinned_")||
+    rejected(old->reorderingPage_,"old->reorderingPage_")||
+    rejected(old->reorderedPage_,"old->reorderedPage_")||
+    rejected(!old->reorderedGrant_.expired(),"!old->reorderedGrant_.expired()")||
+    rejected(old->loaded470Texts_,"old->loaded470Texts_")||
+    rejected(old->loaded470Quads_,"old->loaded470Quads_")||
+    rejected(old->constructed470Quads_,"old->constructed470Quads_")||
+    rejected(scope->issuer_!=this,"scope->issuer_!=this")||
+    rejected(scope->application_!=entitiesOwner_,"scope->application_!=entitiesOwner_")||
+    rejected(!scope->closed_,"!scope->closed_")||
+    rejected(scope->dispatcherLive_,"scope->dispatcherLive_")||
+    rejected(scope->managerLive_,"scope->managerLive_")||
+    rejected(scope->managerPublished_,"scope->managerPublished_")||
+    rejected(scope->dispatcherCurrentManager30_,"scope->dispatcherCurrentManager30_")||
+    rejected(scope->transitionDisplayPinned_,"scope->transitionDisplayPinned_")||
+    rejected(scope->transitionDisplay_,"scope->transitionDisplay_")||
+    rejected(scope->sharedDialogs_[0],"scope->sharedDialogs_[0]")||
+    rejected(scope->sharedDialogs_[1],"scope->sharedDialogs_[1]")||
+    rejected(scope->dispatcher_.reference00,"scope->dispatcher_.reference00")||
+    rejected(scope->dispatcher_.firstChild18,"scope->dispatcher_.firstChild18")||
+    rejected(scope->dispatcher_.kind!=rr::game::OriginalWreckComponentKind50LA::uiDispatcher1B7140,"scope->dispatcher_.kind!=rr::game::OriginalWreckComponentKind50LA::uiDispatcher1B7140")||
+    rejected(scope->dispatcher_.sessionGeneration!=scope->scopeGeneration_,"scope->dispatcher_.sessionGeneration!=scope->scopeGeneration_")||
+    rejected(scope->dispatcher_.objectKey!=Scope::key(&scope->dispatcher_),"scope->dispatcher_.objectKey!=Scope::key(&scope->dispatcher_)")||
+    rejected(!scope->sharedDialogRetiredNodesAbsent(*old),"!scope->sharedDialogRetiredNodesAbsent(*old)"))return false;
+ const auto& q=state->controllerPopupState;const auto& saved=retiredControllerPopupState_;
+ const auto same=[](float a,float b)noexcept{return std::bit_cast<std::uint32_t>(a)==std::bit_cast<std::uint32_t>(b);};
+ if(rejected(!rr::game::OriginalUiControllerPopup50KG::valid(q),"!rr::game::OriginalUiControllerPopup50KG::valid(q)")||
+    rejected(q.active3CC,"q.active3CC")||
+    rejected(!same(q.delta3C0,saved.delta3C0),"!same(q.delta3C0,saved.delta3C0)")||
+    rejected(!same(q.timer3C4,saved.timer3C4),"!same(q.timer3C4,saved.timer3C4)")||
+    rejected(q.active3CC!=saved.active3CC,"q.active3CC!=saved.active3CC")||
+    rejected(q.closing3C8!=saved.closing3C8,"q.closing3C8!=saved.closing3C8")||
+    rejected(q.hasConfirm3D0!=saved.hasConfirm3D0,"q.hasConfirm3D0!=saved.hasConfirm3D0")||
+    rejected(q.hasCancel3D4!=saved.hasCancel3D4,"q.hasCancel3D4!=saved.hasCancel3D4")||
+    rejected(q.result3D8!=saved.result3D8,"q.result3D8!=saved.result3D8"))return false;
+ for(std::size_t i=0;i<q.strips.size();++i){const auto& a=q.strips[i];const auto& b=saved.strips[i];
+  if(!same(a.x,b.x)||!same(a.y,b.y)||!same(a.width,b.width)||!same(a.height,b.height)){
+   std::fprintf(stderr,"original_shared_ui_retirement_receipt_rejected guard=popup_strip index=%zu\n",i);return false;}}
+ return true;
+}
 Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
  std::shared_ptr<rr::platform::OriginalUiControllerPopupResources50KG> resources,
  std::shared_ptr<const rr::assets::OriginalUiArchive50KG> popup,
  rr::platform::VehicleWindowGl50DS& renderer,std::string& error)const noexcept {
  using Owner=rr::platform::OriginalUiSharedDialogs50KG;
  error.clear();
- if(!state||state->sharedDialogs||sharedUiScopeOwner_){error="Persistent UI constructor already owned or retired; no history adoption";return SharedUiBootResult::unavailable;}
+ if(!state||state->sharedDialogs){error="Persistent UI constructor already owned; no history adoption";return SharedUiBootResult::unavailable;}
+ const bool successor=bool(sharedUiScopeOwner_);
+ if(successor&&!sharedUiRetirementReceiptCurrent17C1D8()){
+  error="Fresh UI dispatcher requires its exact completed predecessor retirement";return SharedUiBootResult::failed;
+ }
+ if(!successor&&retiredSharedUiDialogs_){error="UI predecessor receipt lost its closed scope";return SharedUiBootResult::failed;}
  const auto display=raceDisplayOwner50LA_.lock();
  // No counted prefix is installed until genuine same-Root dependencies and
  // its actual live renderer can also support ordered normal retirement.
@@ -515,11 +607,11 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
    rr::assets::OriginalStandardArchiveProvider50LA::MemberView mounted;
    if(!member.identity||!member.data||!member.size||
       globalsProvider->lookup132820(name,mounted)!=rr::assets::OriginalStandardArchiveProvider50LA::Lookup::present||
-      mounted.data!=member.data||mounted.size!=member.size||!mounted.member){
+      !mounted.member||!mounted.data||mounted.size!=member.size||std::memcmp(mounted.data,member.data,member.size)!=0){
     error="Shared UI canonical Popup PSM source unavailable";return SharedUiBootResult::unavailable;
    }
    auto source=std::make_shared<rr::assets::OriginalStandardMaterialSource50LA>();
-   if(!source->prepare(*mounted.member,std::vector<std::uint8_t>(member.data,member.data+member.size),sourceDiagnostic.document)){
+   if(!source->prepare(*mounted.member,std::vector<std::uint8_t>(mounted.data,mounted.data+mounted.size),sourceDiagnostic.document)){
     error="Shared UI canonical Popup PSM source rejected";return SharedUiBootResult::unavailable;
    }
    materials.push_back(std::move(source));
@@ -531,10 +623,10 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
    if(name.size()<4||name.compare(name.size()-4,4,".pst"))continue;
    rr::assets::OriginalStandardArchiveProvider50LA::MemberView mounted;
    if(globalsProvider->lookup132820(member.identity->name,mounted)!=rr::assets::OriginalStandardArchiveProvider50LA::Lookup::present||
-      !mounted.member||mounted.data!=member.data||mounted.size!=member.size){
+      !mounted.member||!mounted.data||mounted.size!=member.size||std::memcmp(mounted.data,member.data,member.size)!=0){
     error="Shared UI canonical Popup PST source unavailable";return SharedUiBootResult::unavailable;
    }
-   textures.push_back({*mounted.member,std::vector<std::uint8_t>(member.data,member.data+member.size)});
+   textures.push_back({*mounted.member,std::vector<std::uint8_t>(mounted.data,mounted.data+mounted.size)});
   }
   if(!standardMaterialDomainOwner_->appendOriginalSources(materials,textures,sourceDiagnostic)){
    error="Shared UI canonical Popup corpus rejected at source PC "+std::to_string(sourceDiagnostic.sourcePC);
@@ -542,24 +634,30 @@ Application::SharedUiBootResult Application::prepareSharedDialogsInitial1B7BD0(
   }
  }catch(...){error="Shared UI Popup source admission allocation failed";return SharedUiBootResult::unavailable;}
  const auto& q=state->controllerPopupState;
- if(state->controllerPopupResources||q.delta3C0!=0||q.timer3C4!=0||q.active3CC||q.closing3C8||q.hasConfirm3D0||q.hasCancel3D4||q.result3D8){
+ if(state->controllerPopupResources||(!successor&&(q.delta3C0!=0||q.timer3C4!=0||q.active3CC||q.closing3C8||q.hasConfirm3D0||q.hasCancel3D4||q.result3D8))){
   error="Existing47C native history cannot be replaced by a fresh shared constructor";return SharedUiBootResult::unavailable;}
  rr::platform::OriginalApplicationAural50KG::Diagnostic audioInitializer;
  if(!sourceAural00Owner_||
     !sourceAural00Owner_->canActivateUiInitializer1B7340(audioInitializer)||
-    !sourceAural00Owner_->canInitializeUiReverb232C70(audioInitializer)){
+    !(successor?sourceAural00Owner_->canInitializeUiReentryReverb232C70(audioInitializer):
+      sourceAural00Owner_->canInitializeUiReverb232C70(audioInitializer))){
   error="Actual UI audio initializer preflight rejected at source PC "+std::to_string(audioInitializer.sourcePC);
   return SharedUiBootResult::unavailable;
  }
  try {
   auto owner=std::shared_ptr<Owner>(new Owner); //Native envelope allocation, not a source counted prefix.
-  const auto result=rr::game::OriginalUiEntityScope50KG::construct(this,entitiesOwner_,sharedUiScopeOwner_);
+  std::shared_ptr<rr::game::OriginalUiEntityScope50KG> nextScope;
+  const auto result=rr::game::OriginalUiEntityScope50KG::construct(this,entitiesOwner_,nextScope);
   if(!result.okay()){error="Actual UI dispatcher construction failed";return SharedUiBootResult::failed;}
+  // Publish the actual constructed successor. The old receipt stays owned;
+  // failed later initialization retains this new prefix and cannot replay it.
+  sharedUiScopeOwner_=std::move(nextScope);owner->successorConstructor_=successor;
   // Genuine UI initializer effects precede any activated native page, Song,
   // source update or draw. Earlier immutable language/font preparation does
   // not publish a frame or play audio. Preserve actual Aural identity/order.
   if(!sourceAural00Owner_->activateUiInitializer1B7340(audioInitializer)||
-     !sourceAural00Owner_->initializeUiReverb232C70(audioInitializer)){
+     !(successor?sourceAural00Owner_->initializeUiReentryReverb232C70(audioInitializer):
+      sourceAural00Owner_->initializeUiReverb232C70(audioInitializer))){
    error="Actual UI audio initializer retained failure at source PC "+std::to_string(audioInitializer.sourcePC);
    return SharedUiBootResult::failed;
   }
@@ -595,8 +693,9 @@ bool Application::finishSharedUiDispatcherAfterBanks1B7140(std::string& error)co
  if(owner->inputs_.root!=this||owner->scope_!=sharedUiScopeOwner_||owner->phase_!=rr::platform::OriginalUiSharedDialogs50KG::Phase::retired){
   error="Global dialog payloads must retire before the native UI banks and dispatcher";return false;}
  const auto result=sharedUiScopeOwner_->close();if(!result.okay()){error="Actual UI dispatcher still owns live children";return false;}
- // Keep the closed scope receipt for this Root. A later frontend cannot
- // silently manufacture another original UI startup or overwrite47C history.
+ // Preserve only the last completed lifetime, including exact 47C state.
+ // A fresh constructor may replace that state, never a failed/active owner.
+ retiredSharedUiDialogs_=owner;retiredControllerPopupState_=state->controllerPopupState;
  state->sharedDialogs.reset();return true;
 }
 }

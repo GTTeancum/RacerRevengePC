@@ -163,8 +163,24 @@ bool OriginalUiGarageScreenText50KG::loadColdSource2DFD90(
   const auto provider=domain->archiveProvider3E1A70();
   assets::OriginalStandardArchiveProvider50LA::MemberView mounted;
   using Lookup=assets::OriginalStandardArchiveProvider50LA::Lookup;
-  if(!provider||!provider->sealed()||!material.identity||!material.data||material.size!=material.identity->bytes||
-     provider->lookup132820(material.identity->name,mounted)!=Lookup::present||mounted.data!=material.data||mounted.size!=material.size||
+  const auto materialSourceCurrent=[&]()noexcept {
+   if(!material.identity||!material.data||material.size!=material.identity->bytes||
+      provider->lookup132820(material.identity->name,mounted)!=Lookup::present||
+      !mounted.member||!mounted.data||mounted.size!=material.size)return false;
+   if(mounted.data==material.data)return true;
+   //132820 retains the original authenticated mount on an equal-byte repeat.
+   //A fresh Popup constructor owns a new archive allocation, not new contents.
+   //Admit only this exact Popup PSM with its real canonical mount provenance;
+   //ordinary Garage materials and the retained font atlas still require identity.
+   if(materialName!="venus16popup"||*mounted.member!=material.identity->name)return false;
+   assets::OriginalStandardArchiveProvider50LA::MountView mount;
+   const auto* expected=assets::originalUiArchiveIdentity50KG(assets::OriginalUiArchiveId50KG::controllerPopup);
+   return expected&&provider->mount(mounted.mount,mount)&&mount.archiveName&&mount.archiveSha256&&
+    *mount.archiveName==expected->discPath&&*mount.archiveSha256==expected->sha256&&
+    mount.archiveBytes==expected->bytes&&mount.memberCount==expected->memberCount&&
+    std::memcmp(mounted.data,material.data,material.size)==0;
+  };
+  if(!provider||!provider->sealed()||!materialSourceCurrent()||
      !cel.identity||!cel.data||!pst.identity||!pst.data||
      cel.identity!=font->celIdentity()||pst.identity!=font->atlasIdentity()||
      provider->lookup132820(cel.identity->name,mounted)!=Lookup::present||mounted.data!=cel.data||mounted.size!=cel.size||

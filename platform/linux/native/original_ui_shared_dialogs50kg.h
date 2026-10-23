@@ -68,6 +68,7 @@ private:
     std::shared_ptr<Scope> scope_;
     std::weak_ptr<OriginalUiMainApplication50KG> application_;
     Phase phase_=Phase::empty;
+    bool successorConstructor_=false; // Only Application issues after exact retired-predecessor proof.
     std::size_t constructed470Quads_=0,loaded470Texts_=0,loaded470Quads_=0;
     std::uint8_t reorderStep_=0;
     std::uint64_t completedReorders_=0;

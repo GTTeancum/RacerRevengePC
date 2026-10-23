@@ -80,6 +80,7 @@ private:
     Result reappendSharedDialog1B86D0(SharedDialogs&,std::size_t,C&)noexcept;
     Result beginSharedDialogRetirement142590(SharedDialogs&,std::size_t,C&)noexcept;
     bool sharedDialogRetirementCurrent(const SharedDialogs&,std::size_t,const C&)const noexcept;
+    bool sharedDialogRetiredNodesAbsent(const SharedDialogs&)const noexcept;
     Result finishSharedDialogRetirement1413E0(SharedDialogs&,std::size_t,C&)noexcept;
 
     //Original1B8250 literal3AC6C0 →1D1950 →1CCBDC strcpy. Only the

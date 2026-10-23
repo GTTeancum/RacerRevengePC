@@ -1375,6 +1375,7 @@ bool OriginalUiFrontend50KG::prepareSharedDialogsInitial(const ::original_main_e
  const auto resultValue=root.prepareSharedDialogsInitial1B7BD0(s->active->mainResources->controllerPopup(),
   s->cold.controllerPopup,renderer,error);
  if(resultValue==::original_main_entry50KG::Application::SharedUiBootResult::failed){
+  std::fprintf(stderr,"original_shared_ui_initialization_failed detail=%s\n",error.c_str());
   s->fault(d,Status::cleanup,0x1B7BD0);return false;}
  // Missing genuine Root services leave only the new Garage/global-dialog
  // join unopened. Existing Main/Options behavior is unchanged, not replaced

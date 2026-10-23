@@ -320,6 +320,86 @@ bool OriginalApplicationAural50KG::initializeUiReverb232C70(Diagnostic& d)noexce
     // FIR phase, clock and dry gains remain intact; this is not DSP completion.
     d={Status::complete,0x232D0C};return true;
 }
+bool OriginalApplicationAural50KG::canInitializeUiReentryReverb232C70(Diagnostic& d)const noexcept {
+    d={};
+    // Application alone issues this branch from a new1B7300, after proving
+    // the prior dispatcher/dialog retirement. It may preflight before the
+    // new counted dispatcher exists; that constructor owns the no-replay
+    // boundary, not a persistent readiness bit on Aural or its PCM backing.
+    if(!current()||!nativeInitialized_||!backendCurrent()||!attached_||
+       entity_.parent1C!=&entities_->root10_||entity_.firstChild18||entity_.descendants24||
+       issuer_->sourceAural00Owner_.get()!=this||issuer_->frontendAudioShutdownComplete_||
+       issuer_->garageCustodyOwner_||!nativeOutputSourceQuiescent())
+        return fail(d,Status::owner,0x1B7364);
+    const auto& b=issuer_->garageAudioBackingOwner_;
+    const auto& i=**interfaceA0_;const auto& main=*i.main;
+    if(b->stage_!=OriginalUiGarageAudioBacking50KG::Stage::transportPrepared||
+       !b->frontendOutputAttempted_||b->frontendOutputClosed_||b->frontendOutputCloseFailed_||
+       b->frontendOutputAccountingFailed_||b->frontendOutputSerial_<=1||
+       b->frontendOutputAuralEntity_!=&entity_||!b->frontendOutputOwner_)
+        return fail(d,Status::owner,0x1B7364);
+    const auto& output=*b->frontendOutputOwner_;
+    const auto transport=output.transport();const auto info=output.info();
+    const auto frame=i.mixer->mixedFrames();
+    // prepareFrontendAudioOutput already consumed the genuine device-close
+    // receipt before rebinding this same transport. Rebind changes control
+    // revisions, so do not demand the now-consumed old revision snapshot.
+    // Its stopped playback/PCM cursors and cumulative frame remain exact.
+    if(!output.enabled()||!transport||transport.get()!=i.main.get()||
+       transport.owner_before(b)||b.owner_before(transport)||
+       output.retainedOutputSerial()!=b->frontendOutputSerial_||
+       output.sourceFrameOrigin()!=frame||output.sourceMixedFrames()!=frame||
+       b->frontendClosedSourceFrames_!=frame||output.acceptedNanoseconds()||
+       output.remainderNanoseconds()||output.lastPcmDrain().prepared||
+       info.sampleRate!=i.nativeRate||info.simulationMicroseconds||info.mixedFrames||info.capturedFrames||
+       info.deviceQueuedFrames||info.deviceConsumedFrames||info.deviceOverflowFrames)
+        return fail(d,Status::phase,0x26A820);
+    // Only normal initial/retired Garage source ownership can cross a real
+    // frontend output rebind. Terminal failed-entry families remain closed.
+    if(!main.current()||!main.reconstructibleGarageRowsCurrent()||
+       (main.garageSourceLifetime_!=OriginalUiMainAudio50KG::GarageSourceLifetime::initialPrefix&&
+        main.garageSourceLifetime_!=OriginalUiMainAudio50KG::GarageSourceLifetime::retired)||
+       main.nativeGroupControlCount_||i.mixer->nativeWattoRouting_.command||i.mixer->nativeSceneRouting_.command||
+       main.ownsMusic_||main.ownsRiderConfirm_||main.musicSong_||main.fading_||
+       !entities_->pendingWaves98A4_||!entities_->pendingWaves98A4_->current()||
+       i.wetProcessor->nextFrame()!=frame||!main.nativeWetMasterCount_||
+       !main.nativeWetMasterSequence_||main.nativeWetMasterSequence_>main.nativeGroupControlSequence_||
+       main.nativeWetMasterFrame_>frame||
+       main.nativeWetMasterCount_==std::numeric_limits<std::uint64_t>::max()||
+       main.nativeGroupControlSequence_==std::numeric_limits<std::uint64_t>::max()||
+       !main.canRecordControlChange(1)||!i.mixer->canRecordControlChanges(1))
+        return fail(d,Status::phase,0x26A820);
+    for(const auto& command:main.nativeGroupControls_)
+        if(command)return fail(d,Status::phase,0x26A820);
+    for(bool owned:main.ownsEffect_)if(owned)return fail(d,Status::phase,0x26A820);
+    for(std::size_t n=0;n<i.nativeCount;++n){
+        AudioVoiceObservation50HD voice;
+        if(!i.mixer->inspectVoice(n,voice)||voice.voice.active)
+            return fail(d,Status::phase,0x26A820);
+        if(n<OriginalUiMainAudio50KG::courseRequiredVoices&&
+           (voice.playbackRevision!=b->frontendClosedPlaybackRevisions_[n]||
+            voice.voice.sourceFrame!=b->frontendClosedSourceFramesByVoice_[n]))
+            return fail(d,Status::phase,0x26A820);
+    }
+    d={Status::complete,0x1B7364};return true;
+}
+bool OriginalApplicationAural50KG::initializeUiReentryReverb232C70(Diagnostic& d)noexcept {
+    if(!canInitializeUiReentryReverb232C70(d))return false;
+    if((entity_.flags29&0x0du)!=1u)return fail(d,Status::phase,0x1B7340);
+    auto& i=**interfaceA0_;auto& main=*i.main;
+    // The real repeated232C70(AuralA0,0,0,-1,-1), after1B7340. Apply at
+    // the unchanged cumulative sample boundary, never rebuild/configure or
+    // clear the processor, advance voices, rewind clocks or erase history.
+    const std::array<NativeSourceReverb50KG::RawMaster,2> zero{{{0,0},{0,0}}};
+    if(!i.wetProcessor->setRawMasters(zero,i.mixer->mixedFrames()))
+        return fail(d,Status::backend,0x26A820);
+    ++main.nativeWetMasterCount_;main.nativeWetMasterSequence_=++main.nativeGroupControlSequence_;
+    main.nativeWetMasterFrame_=i.mixer->mixedFrames();main.nativeWetMasterPercent_=0;main.nativeWetMasterRaw_=0;
+    i.mixer->noteControlChange();main.noteControlChange();
+    // Numerical write is the last fallible operation. Existing work/FIR,
+    // stream ages/generations, clips, cursors and output accounting survive.
+    d={Status::complete,0x232D0C};return true;
+}
 bool OriginalApplicationAural50KG::finishNativeControls267BE0(Diagnostic& d)noexcept {
     d={};
     if(!current()||issuer_->sourceApplicationMode22C_!=0)return fail(d,Status::owner,0x267BE0);

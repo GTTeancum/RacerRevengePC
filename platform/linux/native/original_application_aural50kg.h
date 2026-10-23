@@ -152,6 +152,11 @@ private:
     bool activateUiInitializer1B7340(Diagnostic&)noexcept;
     bool canInitializeUiReverb232C70(Diagnostic&)const noexcept;
     bool initializeUiReverb232C70(Diagnostic&)noexcept;
+    // Distinct later1B7300 issuance by Application, after its actual retired
+    // dispatcher receipt and fresh output bind. No first-start guard or
+    // persistent source/PCM/DSP history is reset to admit this command.
+    bool canInitializeUiReentryReverb232C70(Diagnostic&)const noexcept;
+    bool initializeUiReentryReverb232C70(Diagnostic&)noexcept;
     // Exact eligible Root141ED0 callback. The factor is the current real
     // Application23C publication, not PCM time, wall time or Main fade dt.
     bool canUpdate103720(float sourceFactor23C,Diagnostic&)const noexcept;
