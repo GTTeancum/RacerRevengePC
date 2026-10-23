@@ -5,6 +5,7 @@
 #include "../../platform/linux/native/audio_output50hd.h"
 #include "../../platform/linux/native/original_sound_mode50kg.h"
 #include <array>
+#include <exception>
 #include <limits>
 #include <memory>
 #include <string>
@@ -21,7 +22,7 @@ struct PcmDrainObservation50KG {
     pcm_drain_detail50KG::Progress progress{};
     rr::platform::AudioOutputInfo50HD before{},after{};
     rr::platform::AudioOutputDiagnostic50HD diagnostic{};
-    std::uint64_t sourceMixedBefore=0,sourceMixedAfter=0;
+    std::uint64_t sourceMixedBefore=0,sourceMixedAfter=0,sourceFrameOrigin=0;
     bool prepared=false,incomplete=false;
 };
 class AudioOutput final {
@@ -32,7 +33,9 @@ public:
     AudioOutput(AudioOutput&&)=delete;
     AudioOutput& operator=(AudioOutput&&)=delete;
     ~AudioOutput() noexcept {
-        rr::platform::AudioOutputDiagnostic50HD diagnostic;close(diagnostic);
+        rr::platform::AudioOutputDiagnostic50HD diagnostic;
+        const bool retained=!retainedBacking_.expired();
+        if(!close(diagnostic)&&retained)std::terminate();
     }
     bool prepare(const std::filesystem::path& root,
         const rr::platform::AudioOutputRequest50HD& request,std::string& error,
@@ -83,9 +86,9 @@ public:
         diagnostic={};
         // A future typed binding is exclusive and one-way. Existing callers
         // retain the exact legacy accounting until that private bind happens.
-        if(typedBound_||advancementFault_){
+        if(closed_||typedBound_||advancementFault_){
             diagnostic.error=rr::platform::AudioOutputError50HD::Clock;
-            diagnostic.operation="Main output typed owner or advancement fault";return false;
+            diagnostic.operation="Main output closed, typed owner or advancement fault";return false;
         }
         legacyAdvanced_=true;
         if(!enabled_)return true; // Explicit mute owns no output or PCM transport.
@@ -94,21 +97,25 @@ public:
             diagnostic.operation="Main output accepted interval";return false;
         }
         namespace drain=pcm_drain_detail50KG;
-        const auto before=output_.info();const auto sourceBefore=mixer_.mixedFrames();
-        if(before.paused||before.sampleRate!=transport_->sampleRate()){
+        const auto before=output_.info();const auto sourceBefore=sourceMixedFrames();
+        if(before.paused||before.sampleRate!=transport_->sampleRate()||sourceBefore<sourceFrameOrigin_){
             diagnostic.error=rr::platform::AudioOutputError50HD::Clock;
             diagnostic.operation="Main output live PCM domain";return false;
         }
         drain::Plan plan;
         const drain::Counters counters{before.sampleRate,before.simulationMicroseconds,
-            before.mixedFrames,sourceBefore,before.capturedFrames,before.captureActive};
+            before.mixedFrames,sourceBefore-sourceFrameOrigin_,before.capturedFrames,before.captureActive};
         const auto preflight=drain::prepare(nanoseconds,acceptedNanoseconds_,remainderNanoseconds_,counters,plan);
         if(preflight!=drain::Error::none){
             diagnostic.error=preflight==drain::Error::captureLimit?
                 rr::platform::AudioOutputError50HD::CaptureLimit:rr::platform::AudioOutputError50HD::Clock;
             diagnostic.operation="Main full PCM interval arithmetic/RIFF preflight";return false;
         }
-        lastDrain_={};lastDrain_.prepared=true;lastDrain_.plan=plan;
+        if(!drain::addable(sourceBefore,plan.frames)){
+            diagnostic.error=rr::platform::AudioOutputError50HD::Clock;
+            diagnostic.operation="Main cumulative source mixer overflow";return false;
+        }
+        lastDrain_={};lastDrain_.prepared=true;lastDrain_.plan=plan;lastDrain_.sourceFrameOrigin=sourceFrameOrigin_;
         lastDrain_.before=lastDrain_.after=before;lastDrain_.sourceMixedBefore=lastDrain_.sourceMixedAfter=sourceBefore;
         std::uint64_t dropped=0;
         const bool complete=drain::drain(plan,lastDrain_.progress,[&](std::uint32_t us,std::uint64_t prefix)noexcept{
@@ -116,7 +123,7 @@ public:
             const bool ok=output_.advanceMicroseconds(*transport_,us,chunkDiagnostic);
             dropped+=chunkDiagnostic.droppedDeviceFrames; // <=prevalidated total due frames.
             diagnostic=chunkDiagnostic;diagnostic.droppedDeviceFrames=dropped;
-            const auto after=output_.info();const auto sourceAfter=mixer_.mixedFrames();
+            const auto after=output_.info();const auto sourceAfter=sourceMixedFrames();
             lastDrain_.after=after;lastDrain_.sourceMixedAfter=sourceAfter;
             const auto due=drain::framesThrough(plan,before.sampleRate,prefix);
             const bool counted=ok&&after.sampleRate==before.sampleRate&&
@@ -141,18 +148,32 @@ public:
     }
     const PcmDrainObservation50KG& lastPcmDrain()const noexcept{return lastDrain_;}
     rr::platform::AudioOutputInfo50HD info() const noexcept { return output_.info(); }
-    std::uint64_t sourceMixedFrames() const noexcept { return mixer_.mixedFrames(); }
+    std::uint64_t sourceMixedFrames() const noexcept {
+        return sourceMixer_?sourceMixer_->mixedFrames():closedSourceMixedFrames_;
+    }
+    // Process-wide source history above is never reset on frontend reentry.
+    // This origin is sealed by Root from the actual mixer at device-open;
+    // only the difference belongs to this output's fresh sample clock/WAV.
+    std::uint64_t sourceFrameOrigin()const noexcept{return sourceFrameOrigin_;}
+    std::uint64_t retainedOutputSerial()const noexcept{return retainedOutputSerial_;}
+    std::uint64_t outputSourceMixedFrames()const noexcept {
+        const auto frames=sourceMixedFrames();
+        return frames>=sourceFrameOrigin_?frames-sourceFrameOrigin_:std::numeric_limits<std::uint64_t>::max();
+    }
     std::uint64_t acceptedNanoseconds() const noexcept { return acceptedNanoseconds_; }
     std::uint32_t remainderNanoseconds() const noexcept { return remainderNanoseconds_; }
     bool close(rr::platform::AudioOutputDiagnostic50HD& diagnostic) noexcept {
+        if(!retainedBacking_.expired())return closeRetained(diagnostic);
         const bool result=output_.close(diagnostic); // Joins callback/finalizes WAV first.
         if(transport_)transport_->reset(); // Stops only our own frontend voices.
         closed_=true;return result;
     }
 private:
+    friend struct Application;
+    bool closeRetained(rr::platform::AudioOutputDiagnostic50HD&)noexcept;
     friend class OriginalUiActiveTimeLedger50KG;
     AudioCounterObservation50KG counterObservation()const noexcept {
-        return {acceptedNanoseconds_,mixer_.mixedFrames(),remainderNanoseconds_,output_.info()};
+        return {acceptedNanoseconds_,sourceMixedFrames(),remainderNanoseconds_,output_.info(),sourceFrameOrigin_};
     }
     // Only the ledger can construct this typed context. It does not itself
     // certify Song7, event2, a swap or a steady presentation lease.
@@ -190,7 +211,7 @@ private:
         observed.before=counterObservation();
         if(typedMuted_){
             if(enabled_||attempted_||transport_||observed.before.pcmNanoseconds||
-                observed.before.sourceMixedFrames||observed.before.remainderNanoseconds||
+                observed.before.sourceMixedFrames||observed.before.sourceFrameOrigin||observed.before.remainderNanoseconds||
                 observed.before.output.simulationMicroseconds||observed.before.output.mixedFrames||
                 observed.before.output.capturedFrames||observed.before.output.captureActive)
                 return reject(Error::outputAccounting,"UI explicit mute owns no PCM output");
@@ -201,7 +222,8 @@ private:
             if(acceptedNanoseconds_!=typedAccountedNanoseconds_||remainderNanoseconds_>=1000||
                 remainderNanoseconds_!=acceptedNanoseconds_%1000||
                 observed.before.output.simulationMicroseconds!=acceptedNanoseconds_/1000||
-                observed.before.sourceMixedFrames!=observed.before.output.mixedFrames)
+                observed.before.sourceMixedFrames<observed.before.sourceFrameOrigin||
+                observed.before.sourceMixedFrames-observed.before.sourceFrameOrigin!=observed.before.output.mixedFrames)
                 return reject(Error::outputAccounting,"UI typed prior successful counters");
         }
         if(!nanoseconds)return Result::noChange; // No call, sequence or fabricated PCM receipt.
@@ -224,6 +246,7 @@ private:
             const bool ok=output_.advanceMicroseconds(*transport_,static_cast<std::uint32_t>(microseconds),outputDiagnostic);
             observed.after=counterObservation();observed.diagnostic=outputDiagnostic;
             const bool countersOk=ok&&
+                observed.after.sourceFrameOrigin==observed.before.sourceFrameOrigin&&
                 observed.after.output.sampleRate==rate&&
                 observed.after.output.simulationMicroseconds==observed.before.output.simulationMicroseconds+microseconds&&
                 observed.after.sourceMixedFrames>=observed.before.sourceMixedFrames&&
@@ -260,6 +283,14 @@ private:
     std::array<rr::platform::AudioVoice50HD,
         rr::platform::OriginalUiMainAudio50KG::courseRequiredVoices> voices_{};
     rr::platform::AudioMixer50HD mixer_;
+    // Each actual fresh output may borrow the same retained Root transport.
+    // The local ordinary8 storage remains untouched on that branch; no public
+    // caller may choose an origin, recreate Main, or rewrite its mixer clock.
+    rr::platform::AudioMixer50HD* sourceMixer_=&mixer_;
+    std::weak_ptr<rr::platform::OriginalUiGarageAudioBacking50KG> retainedBacking_;
+    std::uint64_t closedSourceMixedFrames_=0,sourceFrameOrigin_=0,retainedOutputSerial_=0;
+    bool retainedCloseFailed_=false;
+    rr::platform::AudioOutputDiagnostic50HD retainedCloseDiagnostic_{};
     std::shared_ptr<rr::platform::OriginalUiMainAudio50KG> transport_;
     rr::platform::AudioOutput50HD output_;
     bool attempted_=false,enabled_=false,closed_=false;
@@ -284,9 +315,9 @@ inline bool OriginalUiActiveTimeLedger50KG::bind(const rr::game::HostMonotonicCl
     const bool muted=policy==UiAudioPolicy50KG::explicitMute;
     const auto before=output.counterObservation();
     if(output.closed_||output.legacyAdvanced_||output.advancementFault_||before.pcmNanoseconds||
-        before.remainderNanoseconds||before.sourceMixedFrames||before.output.simulationMicroseconds||
+        before.remainderNanoseconds||before.sourceMixedFrames!=before.sourceFrameOrigin||before.output.simulationMicroseconds||
         before.output.mixedFrames||before.output.capturedFrames||
-        (muted?(output.attempted_||output.enabled_||bool(output.transport_)):
+        (muted?(output.attempted_||output.enabled_||bool(output.transport_)||before.sourceFrameOrigin):
             (!output.enabled_||!output.transport_||!output.transport_->ready()||output.transport_->paused()||before.output.paused)))
         return fail(d,ActiveTimeError50KG::outputUnavailable,"UI ledger requires fresh explicit audio policy");
     const auto now=Clock::now();

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+namespace rr::platform {class OriginalUiGarageSceneConfig50KG;}
 namespace rr::assets {
 // Native admission bounds, not constants claimed to exist in the original.
 constexpr std::size_t originalUiDatByteLimit50KG = 256 * 1024;
@@ -44,6 +45,11 @@ public:
     const OriginalUiMemberIdentity50KG* identity() const noexcept { return identity_; }
     const std::vector<OriginalUiDatSection50KG>& sections() const noexcept { return sections_; }
 private:
+    friend class rr::platform::OriginalUiGarageSceneConfig50KG;
+    // Private authenticated read buffer entry, used by the retained native
+    // Scene Config file owner. Never a public raw-byte parser admission.
+    static bool parseRetainedMember(const OriginalUiMemberView50KG&,OriginalUiDat50KG&,
+        OriginalUiPageDiagnostic50KG&,OriginalUiRepeatedKeyPolicy50KG) noexcept;
     const OriginalUiMemberIdentity50KG* identity_ = nullptr;
     std::vector<OriginalUiDatSection50KG> sections_;
     friend bool readOriginalUiDat50KG(const OriginalUiArchive50KG&, const std::string&,

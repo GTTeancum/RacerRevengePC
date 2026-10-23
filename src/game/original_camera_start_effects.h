@@ -20,6 +20,13 @@ struct OriginalCameraStartResult {
     OriginalCameraStartStatus status=OriginalCameraStartStatus::owner;
     std::uint32_t sourcePC=0;
 };
+//115510/237000 only: preserve the existing view/projection X/Y and screen.
+//Ordered native stores are retained even if a later arithmetic step rejects.
+OriginalCameraStartResult setOriginalCameraRange237000(float nearPlane,float farPlane,
+    const std::array<float,16>& view,const std::array<float,16>& screen,float guardX,float guardY,
+    std::array<float,16>& projection,std::array<float,16>& combined,
+    std::array<float,16>& combinedScreen,std::array<float,16>& guardProjection,
+    std::array<float,16>& guardCombined)noexcept;
 struct OriginalVideoFadeState {
     //259E00 initializes every represented value below EXCEPT3E8. Its first
     //actual assignment is blocking260850/261630 or a reached25B5D0 update.
@@ -177,6 +184,14 @@ OriginalCameraStartResult setOriginalFullRaceViewport1158A0(
 // that scene's zoom, which need not be the scene whose viewport was supplied.
 OriginalCameraStartResult updateOriginalViewportZoom2458C0(
     const OriginalCameraViewportFields& supplied,OriginalCameraViewportFields& rendererCurrent) noexcept;
+//115350's complete numeric core, independent of game-camera bounds318..324.
+//Used by the real frontend Camera initializer before those bounds are written.
+//No target setter, normalization, renderer call, or lifecycle readiness.
+OriginalCameraStartResult rebuildOriginalSceneCore115350(const CameraSceneState49F&,
+    const assets::TVCameraVector49E& position,std::int32_t width1E8,
+    CameraViewOutput49F&,float& focalPixels1D8) noexcept;
+OriginalCameraStartResult computeOriginalGuardAngle2371D0(float focalPixels1D8,
+    float& guardAngle330) noexcept;
 OriginalCameraStartResult rebuildOriginalRaceScene236DD0(
     OriginalCameraViewportFields&,const CameraSceneState49F&,
     const assets::TVCameraVector49E& actualPosition180,CameraViewOutput49F&) noexcept;

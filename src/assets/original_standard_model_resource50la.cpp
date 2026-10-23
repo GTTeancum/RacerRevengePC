@@ -1,5 +1,7 @@
 #include "original_standard_model_resource50la.h"
+#include <cstring>
 #include "original_standard_material_table50la.h"
+#include "../game/original_racer_model_scene50la.h"
 #include <exception>
 #include <cstdio>
 #include <limits>
@@ -73,6 +75,7 @@ struct OriginalStandardModelGeometry50LA::Storage {
     std::int64_t references=1; //1048F0 reached through26E050.
     float scale=1.f; //26E078/26E07C.
     std::vector<std::vector<std::int32_t>> surfaceMaterials;
+    std::vector<std::vector<OriginalStandardSurface246300_50LA>> runtimeSurfaces;
     std::vector<std::vector<std::uint8_t>> palettes;
     //Native provenance for each real26E820 owner, not another source ref.
     std::vector<const rr::game::OriginalRacerModelSceneOwner50LA*> models;
@@ -116,15 +119,34 @@ bool OriginalStandardModelGeometry50LA::construct240110(
             (std::uint32_t(bytes[at+1])<<8)|(std::uint32_t(bytes[at+2])<<16)|
             (std::uint32_t(bytes[at+3])<<24);};
         if(scene.lods.empty()||scene.lods.back().surfaces.empty())return fail(d,S::geometry,0x26E1A8);
-        next->surfaceMaterials.reserve(scene.lods.size());
-        for(const auto& lod:scene.lods){
+        next->surfaceMaterials.reserve(scene.lods.size());next->runtimeSurfaces.reserve(scene.lods.size());
+        for(std::size_t level=0;level<scene.lods.size();++level){
+            const auto& lod=scene.lods[level];
             std::vector<std::int32_t> materials;materials.reserve(lod.surfaces.size());
-            for(const auto& surface:lod.surfaces){
+            std::vector<OriginalStandardSurface246300_50LA> runtime;runtime.reserve(lod.surfaces.size());
+            for(std::size_t ordinal=0;ordinal<lod.surfaces.size();++ordinal){
+                const auto& surface=lod.surfaces[ordinal];const auto at=surface.source_offset;
                 if(surface.material_index>static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()))
                     return fail(d,S::geometry,0x299BB0);
+                if(at>bytes.size()||bytes.size()-at<20||read32(at)!=surface.material_index||
+                   read32(at+4)!=surface.component_word||bytes[at+5]!=1u)
+                    return fail(d,S::geometry,0x246344);
                 materials.push_back(static_cast<std::int32_t>(surface.material_index));
+                OriginalStandardSurface246300_50LA loaded;
+                loaded.material00=&materials.back();loaded.attributes0C=bytes[at+4];
+                loaded.uvCount0D=bytes[at+5];loaded.palette0E=bytes[at+6];
+                //24637C reads source+6, not the unrelated strip count at+14.
+                //Source+7 is consumed into a temporary. Runtime flags0F are
+                //constructor/allocation state, not copied from that byte.
+                const auto scale=read32(at+8);std::memcpy(&loaded.uvScale18[0],&scale,sizeof(float));
+                loaded.vertexCount20=static_cast<std::uint16_t>(std::uint16_t(bytes[at+12])|(std::uint16_t(bytes[at+13])<<8));
+                loaded.stripCount22=static_cast<std::uint16_t>(std::uint16_t(bytes[at+14])|(std::uint16_t(bytes[at+15])<<8));
+                loaded.lodOrdinal=static_cast<std::uint32_t>(level);loaded.surfaceOrdinal=static_cast<std::uint32_t>(ordinal);
+                loaded.sourceOffset=at;runtime.push_back(loaded);
             }
-            next->surfaceMaterials.push_back(std::move(materials));
+            //Moving each reserved inner vector preserves actual element and
+            //material-slot addresses. No descriptor aliases another LOD.
+            next->surfaceMaterials.push_back(std::move(materials));next->runtimeSurfaces.push_back(std::move(runtime));
         }
         //240210 reads the actual count after the final surface payload. The
         //decoded identity-palette flag alone is not proof of a zero trailer.
@@ -192,6 +214,15 @@ std::size_t OriginalStandardModelGeometry50LA::paletteCount20() const noexcept {
 const std::vector<std::uint8_t>* OriginalStandardModelGeometry50LA::palette20(std::size_t ordinal) const noexcept {
     return constructed240110()&&ordinal<storage_->palettes.size()?&storage_->palettes[ordinal]:nullptr;
 }
+const OriginalStandardSurface246300_50LA* OriginalStandardModelGeometry50LA::surface246300(
+    std::size_t lod,std::size_t surface)const noexcept {
+    if(!constructed240110()||lod>=storage_->runtimeSurfaces.size()||surface>=storage_->runtimeSurfaces[lod].size())return nullptr;
+    const auto& row=storage_->runtimeSurfaces[lod][surface];
+    return row.material00==surfaceMaterial00(lod,surface)?&row:nullptr;
+}
+std::size_t OriginalStandardModelGeometry50LA::surfaceCount26E2B8(std::size_t lod)const noexcept {
+    return constructed240110()&&lod<storage_->runtimeSurfaces.size()?storage_->runtimeSurfaces[lod].size():0u;
+}
 const std::int32_t* OriginalStandardModelGeometry50LA::surfaceMaterial00(std::size_t lod,std::size_t ordinal) const noexcept {
     return constructed240110()&&lod<storage_->surfaceMaterials.size()&&ordinal<storage_->surfaceMaterials[lod].size()?
         &storage_->surfaceMaterials[lod][ordinal]:nullptr;
@@ -233,7 +264,12 @@ bool OriginalStandardModelGeometry50LA::release26E598(
     const rr::game::OriginalRacerModelSceneOwner50LA* model,
     const OriginalStandardMaterialReferences50LA& materials,D& d) noexcept {
     d={};if(!canReleaseForModel(model))return fail(d,S::reference,0x26E598);
-    if(!materials.released26E4C0())return fail(d,S::phase,0x26E4C0);
+    // A warm26E9F4 retain precedes hierarchy/material allocation. If that
+    // native prefix fails before26EB44 starts, the ACTUAL constructor count0
+    // skips26E4C0's loop. Do not invent a released material allocation.
+    const bool untouchedZeroMaterials=!materials.started()&&model&&
+        model->fields().materialCount1C0==0&&model->fields().materials1C4==nullptr;
+    if(!materials.released26E4C0()&&!untouchedZeroMaterials)return fail(d,S::phase,0x26E4C0);
     auto& s=*storage_;
     if(s.references==1){
         //26E510..594 repeats this sweep once per model material. Repeating
@@ -244,11 +280,16 @@ bool OriginalStandardModelGeometry50LA::release26E598(
     for(auto it=s.models.begin();it!=s.models.end();++it)if(*it==model){s.models.erase(it);break;}
     if(s.references==0){
         std::vector<std::vector<std::uint8_t>>().swap(s.palettes);
+        std::vector<std::vector<OriginalStandardSurface246300_50LA>>().swap(s.runtimeSurfaces);
         std::vector<std::vector<std::int32_t>>().swap(s.surfaceMaterials);
         std::vector<const rr::game::OriginalRacerModelSceneOwner50LA*>().swap(s.models);
         s.payload.reset(); //240150/26E0A0: release all owned resource backing.
         s.resolver->clearGeometry1327D0(this); //26E5BC..26E5C8, after destruction.
         s.released=true;
+        // The selected temporary bank may have closed while this resource
+        // was live. Only now can its native duplicate PSG bytes be reclaimed.
+        // Active banks and other payload families remain retained unchanged.
+        s.resolver->reclaimRetiredPsgBacking26E5C8(*this);
     }
     return true;
 }

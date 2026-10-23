@@ -50,7 +50,7 @@ public:
     OriginalUiExitText50KG(OriginalUiExitText50KG&&)=delete;
     OriginalUiExitText50KG& operator=(OriginalUiExitText50KG&&)=delete;
     // Verified shared-constructor users only: Main4/1, Options12/1,
-    // Rider5/1 or5/2, Course6/1, Tournament9/1, Hall11/1. This does not admit any of those destinations.
+    // Rider5/1 or5/2, Course6/1, Tournament9/1, Hall11/1, Garage13/1. This does not admit any of those destinations.
     // Follows actual ui.dat PageFile; no filename search or fabricated config.
     // Images pin the exact original denmrk16 CEL/PST decode. English is copied
     // synchronously. Failure is cold/atomic/retryable; no effects occur.

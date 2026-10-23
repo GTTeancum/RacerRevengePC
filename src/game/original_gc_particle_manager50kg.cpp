@@ -252,6 +252,10 @@ struct OriginalGcParticleManager50KG::Storage {
     std::array<OriginalGcParticle50KG*,originalGcParticleCapacity50KG> order{};
     std::vector<OriginalGcParticleGroup50KG> groups;
     std::vector<OriginalGcParticleFrame50KG> frames;
+    //Native access units, not source158/readiness. Starting normalization
+    //revokes the pixel-only capability before any lane can change.
+    enum class AtlasUnits {pixels,garageNormalizationStarted,garageNormalized};
+    AtlasUnits atlasUnits=AtlasUnits::pixels;
     std::string atlasTextureMap;
     EmitterAllocation50KG emitterAllocation{};
     EmitterVector50KG emitters;
@@ -271,6 +275,41 @@ struct OriginalGcParticleManager50KG::Storage {
     Storage(Storage&&)=delete;
     Storage& operator=(Storage&&)=delete;
 };
+// Private real-pool write, reached only from Draw's authentic162870 cursor.
+// No const-cast: Storage owns mutable particles; the public manager borrow is
+// intentionally read-only and exposes no corresponding write operation.
+bool OriginalGcParticleManager50KG::readGarageFrames1626D0(
+    const OriginalGcParticleFrame50KG*& frames,std::size_t& count)const noexcept {
+    if(!storage_||!prepared()||storage_->atlasUnits!=Storage::AtlasUnits::garageNormalized||
+       storage_->frames.empty())return false;
+    frames=storage_->frames.data();count=storage_->frames.size();return true;
+}
+bool OriginalGcParticleManager50KG::readGaragePoolSlot162448(
+    const OriginalGcParticle50KG* expected,std::size_t& actualPoolSlot)const noexcept {
+    if(!storage_||!prepared()||storage_->atlasUnits!=Storage::AtlasUnits::garageNormalized||!expected)return false;
+    const auto begin=reinterpret_cast<std::uintptr_t>(storage_->pool.data());
+    const auto pointer=reinterpret_cast<std::uintptr_t>(expected);
+    const auto extent=sizeof(OriginalGcParticle50KG)*storage_->pool.size();
+    if(pointer<begin||pointer-begin>=extent||(pointer-begin)%sizeof(OriginalGcParticle50KG))return false;
+    actualPoolSlot=(pointer-begin)/sizeof(OriginalGcParticle50KG);
+    return &storage_->pool[actualPoolSlot]==expected;
+}
+bool OriginalGcParticleManager50KG::publishGarageProjection162A24(
+    std::size_t activeIndex,const OriginalGcParticle50KG* expected,float depth,
+    std::size_t& actualPoolSlot)const noexcept {
+    if(!storage_||!prepared()||storage_->atlasUnits!=Storage::AtlasUnits::garageNormalized||
+       activeIndex>=storage_->count||!expected||storage_->order[activeIndex]!=expected||!std::isfinite(depth))
+        return false;
+    const auto begin=reinterpret_cast<std::uintptr_t>(storage_->pool.data());
+    const auto pointer=reinterpret_cast<std::uintptr_t>(expected);
+    const auto extent=sizeof(OriginalGcParticle50KG)*storage_->pool.size();
+    if(pointer<begin||pointer-begin>=extent||(pointer-begin)%sizeof(OriginalGcParticle50KG))return false;
+    actualPoolSlot=(pointer-begin)/sizeof(OriginalGcParticle50KG);
+    auto& actual=storage_->pool[actualPoolSlot];
+    if(&actual!=expected)return false;
+    std::memcpy(&actual.reserved24,&depth,sizeof depth); //Actual float source24 bits.
+    return true;
+}
 OriginalGcParticleManager50KG::OriginalGcParticleManager50KG() noexcept=default;
 OriginalGcParticleManager50KG::~OriginalGcParticleManager50KG()=default;
 OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::prepare(const Bytes& prt,
@@ -387,8 +426,24 @@ const std::string* OriginalGcParticleManager50KG::atlasTextureMapName() const no
 const OriginalGcParticleGroup50KG* OriginalGcParticleManager50KG::group(std::int32_t i) const noexcept {
     return storage_&&i>=0&&std::size_t(i)<storage_->groups.size()?&storage_->groups[std::size_t(i)]:nullptr;
 }
+OriginalGcParticleStatus50KG OriginalGcParticleManager50KG::normalizeGarageAtlas161234(float width,float height) noexcept {
+    if(!storage_||storage_->atlasUnits!=Storage::AtlasUnits::pixels)return Status::unsupported;
+    if(std::fegetround()!=FE_TONEAREST||!scalar(width)||!scalar(height)||width<=0||height<=0)
+        return Status::arithmetic;
+    storage_->atlasUnits=Storage::AtlasUnits::garageNormalizationStarted;
+    //The actual single atlas vector, frame order then U/V lane order. No
+    //second normalized table or replacement numeric manager is allocated.
+    //A failure retains earlier writes; the Scene callback forbids replay.
+    for(auto& frame:storage_->frames)for(auto& corner:frame.sourceUv)for(unsigned lane=0;lane<2;++lane){
+        if(!scalar(corner[lane]))return Status::arithmetic;
+        volatile float normalized=corner[lane]/(lane?height:width);
+        if(!scalar(normalized))return Status::arithmetic;
+        corner[lane]=normalized;
+    }
+    storage_->atlasUnits=Storage::AtlasUnits::garageNormalized;return Status::complete;
+}
 const OriginalGcParticleFrame50KG* OriginalGcParticleManager50KG::frame(std::int32_t i) const noexcept {
-    return storage_&&i>=0&&std::size_t(i)<storage_->frames.size()?&storage_->frames[std::size_t(i)]:nullptr;
+    return storage_&&storage_->atlasUnits==Storage::AtlasUnits::pixels&&i>=0&&std::size_t(i)<storage_->frames.size()?&storage_->frames[std::size_t(i)]:nullptr;
 }
 const std::array<float,3>* OriginalGcParticleManager50KG::generatorFireAttachmentOffset() const noexcept {
     return gcFogAuthoringPrepared()?&storage_->fireOffset:nullptr;

@@ -10,6 +10,8 @@ struct OriginalUiMainParticleMaterial50KG {
     const OriginalUiMemberIdentity50KG* textureIdentity=nullptr;
     const OriginalUiMemberIdentity50KG* templateIdentity=nullptr;
     std::array<OriginalUiNativeMaterial50KG,2> states{};
+    std::array<OriginalUiGsState50KG,2> sourceStates{};
+    std::array<std::array<std::int32_t,6>,2> sourceSamplers{};
     bool fogEnabled=false,alphaTestGreaterZero=false;
     bool noDestinationAlphaConsumer=false;
 };
@@ -19,6 +21,11 @@ struct OriginalUiMainParticleMaterial50KG {
 // The output's noDestinationAlphaConsumer is per-leaf policy, not authority
 // over every other leaf, target transition or framebuffer-alpha consumer.
 bool prepareOriginalUiMainParticleMaterial50KG(const OriginalUiArchive50KG&,
+    const OriginalUiMaterialTemplates50KG&,const OriginalUiMaterialRuntime50KG&,
+    const Texture48E&,OriginalUiMainParticleMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+//Garage owns its own authenticated garageprt source, not an mmprt alias.
+bool prepareOriginalUiGarageParticleMaterial50KG(const OriginalUiArchive50KG&,
     const OriginalUiMaterialTemplates50KG&,const OriginalUiMaterialRuntime50KG&,
     const Texture48E&,OriginalUiMainParticleMaterial50KG&,
     OriginalUiMaterialDiagnostic50KG&) noexcept;

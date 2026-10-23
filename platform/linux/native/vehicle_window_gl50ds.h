@@ -41,6 +41,7 @@ namespace rr::platform {
 inline constexpr std::size_t gbParticleRendererMetadataReservation50DS=256;
 inline constexpr std::size_t mcParticleRendererMetadataReservation50DS=256;
 class GameHost50ER;
+class OriginalUiGarageDrawContribution50KG;
 struct GameHostDiagnostic50ER;
 class OriginalVideoBlockingNativeBackend;
 using VehicleWindowGlProc50DS = void (*)();
@@ -1313,6 +1314,21 @@ public:
     // completion receipt. Same owner-thread/no-reentrancy contract as close.
     bool hasSessionDependents50LA() const noexcept { return sessionDependentPins50LA_!=0; }
 private:
+    friend class OriginalUiGarageRendererLease50KG;
+    friend class OriginalUiGarageDrawContribution50KG;
+    bool pollOriginalRenderer245030(bool& complete,VehicleWindowDiagnostic50DS&)noexcept;
+    bool completeGarageSourceTarget140A38(OriginalUiGarageDrawContribution50KG&,VehicleWindowDiagnostic50DS&)noexcept;
+    bool publishGarageSourceTarget140A68(OriginalUiGarageDrawContribution50KG&,std::int32_t,std::int32_t,VehicleWindowDiagnostic50DS&)noexcept;
+    bool rearmGarageSourceTarget140230(OriginalUiGarageDrawContribution50KG&,VehicleWindowDiagnostic50DS&)noexcept;
+
+    bool applyGarageFogColor244A40(const OriginalUiSourceOwner50KM&,std::uint64_t,std::uint32_t,VehicleWindowDiagnostic50DS&)noexcept;
+    bool clearGarageSourceViewport50KG(const OriginalUiSourceOwner50KM&,std::uint64_t,
+        bool color,std::uint32_t argb,VehicleWindowDiagnostic50DS&)noexcept;
+    bool releaseGarageSourcePrelude50KG(const OriginalUiSourceOwner50KM&,std::uint64_t,
+        VehicleWindowDiagnostic50DS&)noexcept;
+    bool ownsGarageSourcePrelude50KG(const OriginalUiSourceOwner50KM&,std::uint64_t)const noexcept;
+    bool garageUnsealedRenderQuiescent50KG(const OriginalUiGarageDrawContribution50KG&,
+        std::uint64_t)const noexcept;
     friend class OriginalUiFrontend50KG;
     bool prevalidateRiderTextures(const OriginalUiRiderResidencyDemand50KG&,
         const MaterialTextureGl50EB&,OriginalUiRiderTextureValidation50KG&,VehicleWindowDiagnostic50DS&) noexcept;
@@ -1321,9 +1337,15 @@ private:
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
     // Actual session owner alone admits the source reset between submissions.
     bool idleForRaceReset50LA(VehicleWindowDiagnostic50DS&) const noexcept;
+    // First canonical frontend Camera only. Ordinary sealed RGBA submission
+    // does not execute source26F940 or select a canonical Scene.
+    bool garageFirstCameraViewportIdle50KG(VehicleWindowDiagnostic50DS&) const noexcept;
     // Private session authority: callers cannot mint a pin or authorize creation.
     const void* sessionDisplayOwner50LA_=nullptr;
     bool sessionDisplayCreate50LA_=false;
+    bool sessionDisplayFrontendCreate50KG_=false;
+    // Native frontend no-error domain. No source C4/frame/process history.
+    bool frontendLocalizationIdle50KG(VehicleWindowDiagnostic50DS&) const noexcept;
     std::uint32_t sessionDependentPins50LA_=0;
     // Only the concrete optional GameHost adapter may supply these bindings.
     bool completeGameplayDisplayImpl(GameHost50ER&, GameHostDiagnostic50ER&,
@@ -1333,7 +1355,9 @@ private:
     bool submitOriginalUiImpl(const OriginalUiNativeDraw50KG&, std::int32_t width,
         std::int32_t height, bool sourceRgba, VehicleWindowDiagnostic50DS&,
         bool* sourceWorkStarted=nullptr,bool publishSource=true,bool riderReceiptChecked=false,
-        const OriginalUiDirectVideo50KG* directVideo=nullptr) noexcept;
+        const OriginalUiDirectVideo50KG* directVideo=nullptr,bool garageBatch=false) noexcept;
+    bool completeGarageCollector24C160(OriginalUiGarageDrawContribution50KG&,VehicleWindowDiagnostic50DS&)noexcept;
+    bool submitGarageCollectorBatch24B26C(OriginalUiGarageDrawContribution50KG&,VehicleWindowDiagnostic50DS&)noexcept;
     bool submitOriginalUiSourceFrame(const OriginalUiSourceFrame50KM&,std::int32_t width,
         std::int32_t height,bool publishSource,VehicleWindowDiagnostic50DS&) noexcept;
     bool matchesOriginalUiSource(const OriginalUiSourceSubmission50KN&)const noexcept;

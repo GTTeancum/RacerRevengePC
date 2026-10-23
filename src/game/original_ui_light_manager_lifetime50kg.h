@@ -4,9 +4,11 @@
 #include "original_racer_light_selection50km.h"
 #include <cstdint>
 
+namespace rr::platform {class OriginalUiLightManagerOwner50KG;}
 namespace rr::game {
 struct OriginalUiCourseLighting50KG;
 struct OriginalUiTournamentLighting50KG;
+struct OriginalUiGarageLighting50KG;
 struct OriginalUiControlsLighting50KG;
 struct OriginalUiControlsModelSelection50KG;
 enum class OriginalUiLightManagerLifetimeError50KG : std::uint8_t {
@@ -35,27 +37,55 @@ enum class OriginalUiLightCacheState50KG : std::uint8_t {
 // to manufacture absence. A future shared cache implementation can replace
 // this bounded owner once its real creation/counter/invalidation path is joined.
 class OriginalUiLightManagerLifetime50KG final {
+    friend class rr::platform::OriginalUiLightManagerOwner50KG;
+    // Installed only by the Root-issued concrete constructor. Game-only builds
+    // keep the original scalar path without linking a platform implementation.
+    // The callback authenticates this exact scalar and commits native projection
+    // leases; it never constructs counted source zones or UI/Scene Light rows.
+    enum class NativeProjectionOperation : std::uint8_t {
+        observe,beginUi,endUi,beginGameplay,endGameplay
+    };
+    using NativeProjectionBridge=bool (*)(rr::platform::OriginalUiLightManagerOwner50KG*,
+        const OriginalUiLightManagerLifetime50KG&,NativeProjectionOperation,
+        const assets::OriginalUiArchiveIdentity50KG*,std::uint64_t)noexcept;
+    rr::platform::OriginalUiLightManagerOwner50KG* concreteBorrower_=nullptr;
+    NativeProjectionBridge concreteProjection_=nullptr;
+    // Final source retirement cannot fall back into a new unbound scalar era.
+    bool concreteProjectionRetired_=false;
+    bool nativeProjectionStep(NativeProjectionOperation,
+        const assets::OriginalUiArchiveIdentity50KG* =nullptr,std::uint64_t=0)const noexcept;
+    bool nativeProjectionCurrent()const noexcept {
+        return nativeProjectionStep(NativeProjectionOperation::observe);
+    }
 public:
     OriginalUiLightManagerLifetime50KG() noexcept=default;
     OriginalUiLightManagerLifetime50KG(const OriginalUiLightManagerLifetime50KG&)=delete;
     OriginalUiLightManagerLifetime50KG& operator=(const OriginalUiLightManagerLifetime50KG&)=delete;
     bool constructAtApplicationStartup(OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
-    // Actual UI manager entry, not cold resource preparation. First manager
-    // must be authenticated Main. Later entries admit Main/Options/Rider/Course only;
-    // release previous manager after its packets/lights are drained.
+    // Native UI projection entry, not cold resource preparation. First manager
+    // must be authenticated Main; release each lease after its packets drain.
+    // A concrete singleton verifies this scalar's same-owner receipt without
+    // constructing source zones or Light rows. Concrete Garage stays separate.
     bool beginUiManager(const assets::OriginalUiArchive50KG&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
-    //1CCB04->148110 frees per-zone data. Deliberately does NOT reset cacheA4.
+    // Native projection release follows1CCB04->148110's lifetime boundary.
+    // It releases no concrete source zone and deliberately does NOT resetA4.
     bool releaseUiManager() noexcept;
-    // Actual Rider1CDB10/148F30 population after zone148B60 setup, followed by
-    // current146C40/149900 color changes. First call installs the two original
-    // rows in Ambient,Directional order; later calls update those same rows.
+    // Native projection of Rider1CDB10/148F30 and146C40/149900 colors.
+    // Ambient,Directional order is preserved in scalar rendering rows; this
+    // never substitutes for concrete counted source Entity registration.
     bool publishRiderRegistry(const OriginalUiRiderLighting50KG&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
     bool publishTournamentRegistry(const OriginalUiTournamentLighting50KG&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
     // Current exact registry observation; does not publish or renew ownership.
     bool matchesTournamentRegistry(const OriginalUiTournamentLighting50KG&) const noexcept;
+    // Legacy scalar-only Garage rendering projection. A retained concrete
+    // Light owner requires actual Garage UI/Scene rows and will not admit this
+    // scalar Garage lease as a substitute for272A48/273AA0 source ownership.
+    bool publishGarageRegistry(const OriginalUiGarageLighting50KG&,
+        OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
+    bool matchesGarageRegistry(const OriginalUiGarageLighting50KG&) const noexcept;
     bool publishCourseRegistry(const OriginalUiCourseLighting50KG&,
         OriginalUiLightManagerLifetimeDiagnostic50KG&) noexcept;
     // Actual Options background272A48 zone reset then277FCC SCN population.
@@ -89,9 +119,9 @@ public:
     // Read-only scope identity for the application coordinator's generation
     // lease. It cannot create, reset or substitute a cache/lifetime.
     const assets::OriginalUiArchiveIdentity50KG* activeUiIdentity() const noexcept {return activeUi_;}
-    bool riderRegistryReady() const noexcept {return riderRegistryReady_;}
-    bool controlsRegistryReady()const noexcept{return controlsRegistryReady_;}
-    bool courseRegistryReady() const noexcept {return courseRegistryReady_;}
+    bool riderRegistryReady() const noexcept {return nativeProjectionCurrent()&&riderRegistryReady_;}
+    bool controlsRegistryReady()const noexcept{return nativeProjectionCurrent()&&controlsRegistryReady_;}
+    bool courseRegistryReady() const noexcept {return nativeProjectionCurrent()&&courseRegistryReady_;}
 private:
     OriginalUiLightCacheState50KG cacheState_=OriginalUiLightCacheState50KG::notConstructed;
     const assets::OriginalUiArchiveIdentity50KG* activeUi_=nullptr;
@@ -102,6 +132,11 @@ private:
     original_racer_lighting50KM::SmallDirectionalRegistry tournamentRegistry_{};
     std::array<float,4> tournamentAmbient50_{},tournamentDirectional3C_{};
     bool tournamentRegistryReady_=false;
+    const assets::OriginalUiMemberIdentity50KG* garageUiIdentity_=nullptr;
+    const assets::OriginalUiMemberIdentity50KG* garageSceneIdentity_=nullptr;
+    original_racer_lighting50KM::SmallDirectionalRegistry garageRegistry_{};
+    std::array<float,4> garageAmbient50_{},garageDirectional3C_{};
+    bool garageRegistryReady_=false;
     const assets::OriginalUiMemberIdentity50KG* courseUiIdentity_=nullptr;
     original_racer_lighting50KM::SmallDirectionalRegistry courseRegistry_{};
     const assets::OriginalUiMemberIdentity50KG* controlsUiIdentity_=nullptr;

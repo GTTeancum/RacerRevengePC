@@ -4,9 +4,11 @@
 #include <exception>
 #include <vector>
 #include <limits>
+#include <functional>
+#include <utility>
 
 namespace ra_pod_scene50LA { class Owner; }
-namespace rr::platform { class RaceAudioGroups50IC; }
+namespace rr::platform { class RaceAudioGroups50IC;class OriginalApplicationAural50KG;class OriginalUiLightManagerOwner50KG; }
 namespace rr::game {
 class OriginalTunnelTrack50LA;
 class OriginalApplicationEntities50LA;
@@ -17,10 +19,13 @@ class OriginalPauseStorage50LA;
 class OriginalApplicationEntityAuthority50LA final {
     friend class OriginalApplicationEntities50LA;
     friend class OriginalFrontendCameraCold50LA;
+    friend class OriginalUiEntityScope50KG;
     friend class OriginalPauseStorage50LA;
     friend class OriginalTunnelTrack50LA;
     friend class OriginalRaceConstructor50LA;
     friend class rr::platform::RaceAudioGroups50IC;
+    friend class rr::platform::OriginalUiLightManagerOwner50KG;
+    friend class rr::platform::OriginalApplicationAural50KG;
     friend class ::ra_pod_scene50LA::Owner;
     using C=OriginalWreckComponent50LA;
     struct Entry { C* node=nullptr;std::uint64_t generation=0,key=0; };
@@ -35,10 +40,28 @@ class OriginalApplicationEntityAuthority50LA final {
         T& operator[](std::size_t i)noexcept{return data()[i];}
         const T& operator[](std::size_t i)const noexcept{return data()[i];}
     };
+    // Validation scratch maps exact pointer identity to the ORIGINAL row.
+    // It never owns/copies an Entity or certifies a previous forest traversal.
+    struct VisitIndex { const C* node=nullptr;std::size_t row=0; };
     Storage<Entry> entries_;
     Storage<C*> nodes_;
     mutable Storage<unsigned char> visitScratch_;
+    mutable Storage<VisitIndex> visitIndexScratch_;
     std::size_t count_=0;
+    // Native cold-factory provenance only, not a guest field. Never reset by
+    // retirement: a currently empty forest cannot prove no prior dispatcher.
+    bool nonRootEnrollmentObserved_=false;
+    // Monotonic native provenance. Even retirement/address reuse cannot make a
+    // later forest look like the exact source13FE24 constructor prefix.
+    std::uint64_t enrollmentSerial_=0;
+    C* auralStartupPrefix_=nullptr;
+    bool enrollAuralStartupPrefix(C& node,const C& outer,const C& inner)noexcept {
+        if(count_!=2||enrollmentSerial_!=2||nonRootEnrollmentObserved_||auralStartupPrefix_||
+           entries_[0].node!=&outer||entries_[1].node!=&inner||
+           node.kind!=OriginalWreckComponentKind50LA::auralScape102BE0)return false;
+        if(!enroll(node))return false; // The existing non-root latch STILL becomes true.
+        auralStartupPrefix_=&node;return true;
+    }
     // Private, synchronous view. No caller can retain an address snapshot.
     struct View {
         const OriginalApplicationEntityAuthority50LA* authority;
@@ -47,7 +70,7 @@ class OriginalApplicationEntityAuthority50LA final {
         bool valid()const noexcept {
             if(!authority||!count||count!=authority->count_||objects!=authority->nodes_.data()||
                count>authority->entries_.size()||count>authority->nodes_.size()||
-               count>authority->visitScratch_.size())return false;
+               count>authority->visitScratch_.size()||count>authority->visitIndexScratch_.size())return false;
             for(std::size_t i=0;i<count;++i){
                 const auto& e=authority->entries_[i];const auto* p=objects[i];
                 if(!p||p!=e.node||!p->reference00||p->sessionGeneration!=e.generation||
@@ -55,7 +78,55 @@ class OriginalApplicationEntityAuthority50LA final {
             }
             return true;
         }
-        unsigned char* scratch()const noexcept{return authority->visitScratch_.data();}
+        unsigned char* scratch()const noexcept {
+            // forest() has just performed the full domain/Entry validation.
+            // Rebuild on EVERY traversal; no cache crosses a mutation or call.
+            auto* index=authority->visitIndexScratch_.data();
+            for(std::size_t i=0;i<count;++i)index[i]={objects[i],i};
+            const std::less<const C*> less;
+            // In-place heap sort: bounded native scratch, no per-frame heap
+            // allocation and no pointer-order assumption for unrelated nodes.
+            const auto sift=[&](std::size_t root,std::size_t end) noexcept {
+                while(root<end/2){
+                    std::size_t child=root*2+1;
+                    if(child+1<end&&less(index[child].node,index[child+1].node))++child;
+                    if(!less(index[root].node,index[child].node))return;
+                    std::swap(index[root],index[child]);root=child;
+                }
+            };
+            for(std::size_t start=count/2;start;)sift(--start,count);
+            for(std::size_t end=count;end>1;){
+                --end;std::swap(index[0],index[end]);sift(0,end);
+            }
+            return authority->visitScratch_.data();
+        }
+        bool visitRow(const C* p,std::size_t& row)const noexcept {
+            // Only the same synchronous forest walk consumes scratch().
+            // Search uses the total pointer order, never a foreign dereference.
+            const auto* index=authority->visitIndexScratch_.data();
+            const std::less<const C*> less;
+            std::size_t first=0,last=count;
+            while(first<last){
+                const auto middle=first+(last-first)/2;
+                if(less(index[middle].node,p))first=middle+1;else last=middle;
+            }
+            if(first==count||index[first].node!=p)return false;
+            row=index[first].row;
+            return row<count&&objects[row]==p;
+        }
+        friend bool walk(const View& v,const C* first,const C* parent,
+                         unsigned char* seen)noexcept {
+            const C* previous=nullptr;
+            for(auto* p=first;p;p=p->next14){
+                std::size_t i=0;
+                if(!v.visitRow(p,i))return false; // Exact enrolled-pointer membership.
+                if(seen[i]||p->parent1C!=parent||p->previous10!=previous)return false;
+                seen[i]=true;
+                if(!walk(v,p->firstChild18,p,seen))return false;
+                previous=p;
+            }
+            return true;
+        }
         friend unsigned char* entityVisitScratch(const View& v)noexcept{return v.scratch();}
         friend bool domain(const View& v)noexcept{return v.valid();}
         friend bool contains(const View& v,const C* p)noexcept {
@@ -75,16 +146,19 @@ class OriginalApplicationEntityAuthority50LA final {
             std::vector<Entry> entries;
             std::vector<C*> nodes;
             std::vector<unsigned char> scratch;
-            if(required>entries.max_size()||required>nodes.max_size()||required>scratch.max_size())return false;
-            entries.resize(required);nodes.resize(required);scratch.resize(required);
+            std::vector<VisitIndex> index;
+            if(required>entries.max_size()||required>nodes.max_size()||required>scratch.max_size()||
+               required>index.max_size())return false;
+            entries.resize(required);nodes.resize(required);scratch.resize(required);index.resize(required);
             for(std::size_t i=0;i<count_;++i){entries[i]=entries_[i];nodes[i]=nodes_[i];}
-            // All three allocations succeeded before the first mutation.
+            // All four allocations succeeded before the first mutation.
             entries_.expanded.swap(entries);nodes_.expanded.swap(nodes);visitScratch_.expanded.swap(scratch);
+            visitIndexScratch_.expanded.swap(index);
             return true;
         }catch(...){return false;}
     }
     bool canEnroll(const C& node,std::uint64_t key)const noexcept {
-        if(count_==entries_.size()||!key)return false;
+        if(count_==entries_.size()||!key||enrollmentSerial_==std::numeric_limits<std::uint64_t>::max())return false;
         for(std::size_t i=0;i<count_;++i)
             if(entries_[i].node==&node||entries_[i].key==key)return false;
         return true;
@@ -92,7 +166,8 @@ class OriginalApplicationEntityAuthority50LA final {
     bool enroll(C& node)noexcept {
         if(!canEnroll(node,node.objectKey)||!node.reference00||!node.sessionGeneration||
            node.kind==OriginalWreckComponentKind50LA::unbound)return false;
-        entries_[count_]={&node,node.sessionGeneration,node.objectKey};nodes_[count_++]=&node;
+        if(count_>=2)nonRootEnrollmentObserved_=true;
+        entries_[count_]={&node,node.sessionGeneration,node.objectKey};nodes_[count_++]=&node;++enrollmentSerial_;
         return true;
     }
     bool canRetire(const C& node)const noexcept {

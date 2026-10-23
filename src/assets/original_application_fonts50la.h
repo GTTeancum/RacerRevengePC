@@ -9,6 +9,7 @@
 #include <string>
 
 namespace original_main_entry50KG { struct Application; }
+namespace rr::platform { class OriginalUiGarageScreenText50KG; }
 namespace rr::assets {
 enum class OriginalApplicationFontStatus50LA : std::uint8_t {
     complete, phase, source, font, texture, allocation
@@ -29,11 +30,13 @@ struct OriginalApplicationFontDiagnostic50LA {
 class OriginalApplicationFonts50LA final {
     friend struct original_main_entry50KG::Application;
     friend class rr::game::OriginalPauseStorage50LA;
+    friend class rr::platform::OriginalUiGarageScreenText50KG;
 public:
-    enum class Name : std::uint8_t { eurostile13=0, denmark16=1, eurostileItalic26=2 };
+    enum class Name : std::uint8_t { eurostile13=0, denmark16=1, eurostileItalic26=2, frontendDenmrk16=3, frontendVenus16=4, frontendDenmrk14=5 };
     class Entry final {
         friend class OriginalApplicationFonts50LA;
         friend class rr::game::OriginalPauseStorage50LA;
+    friend class rr::platform::OriginalUiGarageScreenText50KG;
         std::shared_ptr<OriginalStandardMaterialDomain50LA> domain_;
         std::shared_ptr<const OriginalStandardMaterialContext50LA> context_;
         std::shared_ptr<const OriginalUiArchive50KG> archive_;
@@ -59,8 +62,18 @@ public:
 private:
     std::shared_ptr<OriginalStandardMaterialDomain50LA> domain_;
     std::shared_ptr<const OriginalStandardMaterialContext50LA> context_;
-    std::array<std::shared_ptr<const Entry>,3> entries_{};
-    std::array<std::size_t,3> publicationOrder_{};
+    // Six represented proven names, NOT an original registry/GPU capacity.
+    // Keep in-game denmark16 distinct from frontend denmrk16.
+    struct Specification {const char* basename;OriginalUiArchiveId50KG archive;};
+    static constexpr std::array<Specification,6> specifications_{{
+        {"eurostileboldbold13ingame",OriginalUiArchiveId50KG::overlays},
+        {"denmarkbold16ingame",OriginalUiArchiveId50KG::overlays},
+        {"eurostileboldbolditalic26ingame",OriginalUiArchiveId50KG::overlays},
+        {"denmrk16",OriginalUiArchiveId50KG::fonts},
+        {"venus16",OriginalUiArchiveId50KG::fonts},
+        {"denmrk14",OriginalUiArchiveId50KG::fonts}}};
+    std::array<std::shared_ptr<const Entry>,specifications_.size()> entries_{};
+    std::array<std::size_t,specifications_.size()> publicationOrder_{};
     std::size_t publicationCount_=0;
     // Unpublished acquired state survives failure until owner cleanup;
     // previously appended entries and table population effects are retained.
@@ -104,6 +117,32 @@ public:
         return i<entries_.size()?entries_[i]:nullptr;
     }
 private:
+    // Root validation through this owner's existing Domain friendship. The
+    // Domain's constructor binds its canonical tables to this retained owner;
+    // no material-table friendship or public readiness surface is introduced.
+    static bool domainApplicationMatches(
+        const std::shared_ptr<OriginalStandardMaterialDomain50LA>& domain,
+        const std::shared_ptr<const OriginalUiMaterialApplication50LA>& application)noexcept {
+        return domain&&domain->prepared()&&application&&
+            domain->application_.get()==application.get()&&
+            !domain->application_.owner_before(application)&&!application.owner_before(domain->application_);
+    }
+    // Concrete ScreenText checks its retained Entry through the already-owning
+    // Font manager's TextureTable friendship. This reads the SAME canonical
+    // row/resource and PST; it neither acquires a ref nor grants readiness.
+    static bool currentResource281F90(const OriginalStandardMaterialDomain50LA& domain,const Entry& font)noexcept {
+        const auto table=domain.textures383400();
+        if(!table||!font.cel_.identity||!font.cel_.data||font.cel_.size!=font.cel_.identity->bytes||
+           !font.pst_.identity||!font.pst_.data||font.pst_.size!=font.pst_.identity->bytes)return false;
+        OriginalStandardTextureRowView50LA row;OriginalStandardTextureResource50LA* resource=nullptr;
+        OriginalStandardTextureDiagnostic50LA diagnostic;
+        if(!table->row(font.texture408_,row)||!row.references08||*row.references08<=0||
+           !table->resolve298E60(font.texture408_,resource,diagnostic)||resource!=font.texture_||row.object04!=resource||
+           !resource||!resource->constructed24DA30()||resource->animated102070()||
+           !resource->references00()||*resource->references00()<=0)return false;
+        const auto* bytes=resource->originalBytes();
+        return bytes&&bytes->size()==font.pst_.size&&!std::memcmp(bytes->data(),font.pst_.data,font.pst_.size);
+    }
     // Only Application supplies its actual mutable36B970 and constant36B420.
     // Exact TimeStats193A0C two-name/reload0 subset of282430. Input is the
     // authenticated OVERLAYS owner, already mounted in this SAME provider;
@@ -145,6 +184,24 @@ private:
         return loadNames282430<1>(std::move(archive),actualDirectory36B970,fontDirectory36B420,
             {{Name::eurostile13}},0x190E64,d);
     }
+    // Reached TextOverlay29CA40 calls282430 at29CB74, count1/reload0.
+    // This is the frontend FONTS name, never the in-game denmark16 alias.
+    // Actual caller/localization/Entity predecessors remain outside this leaf.
+    bool loadGarageText29CB74(std::shared_ptr<const OriginalUiArchive50KG> archive,
+        std::string& actualDirectory36B970,const std::string& fontDirectory36B420,
+        OriginalApplicationFontDiagnostic50LA& d)noexcept {
+        return loadGarageText29CB74(std::move(archive),actualDirectory36B970,fontDirectory36B420,
+            Name::frontendDenmrk16,d);
+    }
+    bool loadGarageText29CB74(std::shared_ptr<const OriginalUiArchive50KG> archive,
+        std::string& actualDirectory36B970,const std::string& fontDirectory36B420,Name name,
+        OriginalApplicationFontDiagnostic50LA& d)noexcept {
+        if(name!=Name::frontendDenmrk16&&name!=Name::frontendVenus16&&name!=Name::frontendDenmrk14){
+            d={};return fail(d,OriginalApplicationFontStatus50LA::source,0x29CB74);
+        }
+        return loadNames282430<1>(std::move(archive),actualDirectory36B970,fontDirectory36B420,
+            {{name}},0x29CB74,d);
+    }
     //Only the fixed private source wrappers select names/count. The existing
     //canonical acquisition, whole-table population and failure body is shared.
     template<std::size_t Count>
@@ -161,9 +218,11 @@ private:
            domain_->textures383400()->populationTerminal()||
            domain_->materials382B38()->populationTerminal()||
            domain_->materials382B38()->demandTerminal())return fail(d,S::phase,sourceCaller);
-        if(!archive||!archive->loaded()||archive->identity()!=
-           originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays))
-            return fail(d,S::source,sourceCaller);
+        if(!archive||!archive->loaded())return fail(d,S::source,sourceCaller);
+        for(const auto name:requested){const auto i=static_cast<std::size_t>(name);
+            if(i>=specifications_.size()||archive->identity()!=originalUiArchiveIdentity50KG(specifications_[i].archive))
+                return fail(d,S::source,sourceCaller);
+        }
         const auto provider=domain_->archiveProvider3E1A70();
         if(!provider||!provider->sealed()||!domain_->resolver3E1A70()->prepared())
             return fail(d,S::source,0x281880);
@@ -182,11 +241,11 @@ private:
         // afresh and compare real canonical objects/source bytes each time.
         const auto existingEntriesIntact=[&]()noexcept {
             const auto table=domain_->textures383400();
-            for(const auto& entry:entries_){
+            for(std::size_t i=0;i<entries_.size();++i){const auto& entry=entries_[i];
                 if(!entry)continue;
                 if(entry->domain_!=domain_||entry->context_!=context_||
                     !entry->archive_||!entry->archive_->loaded()||
-                    entry->archive_->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::overlays)||
+                    entry->archive_->identity()!=originalUiArchiveIdentity50KG(specifications_[i].archive)||
                     entry->texture408_<0||!entry->texture_||!entry->metrics_.decoded()||
                     !entry->cel_.identity||!entry->cel_.data||entry->cel_.size!=entry->cel_.identity->bytes||
                     !entry->pst_.identity||!entry->pst_.data||entry->pst_.size!=entry->pst_.identity->bytes)
@@ -207,12 +266,11 @@ private:
         };
         if(!existingEntriesIntact())return stop(S::phase,0x281F90);
         try {
-            static const char* names[]={"eurostileboldbold13ingame","denmarkbold16ingame","eurostileboldbolditalic26ingame"};
             for(const auto name:requested){
                 const auto i=static_cast<std::size_t>(name);
                 d.font=i;
                 if(entries_[i])continue; //2824C8, reload0: preserve object and handle.
-                const std::string base=std::string("font\\")+names[i];
+                const std::string base=std::string("font\\")+specifications_[i].basename;
                 const auto cel=archive->find(base+".cel"),pst=archive->find(base+".pst");
                 if(!cel.identity||!cel.data||!pst.identity||!pst.data)
                     return stop(S::source,0x281880);
@@ -239,7 +297,7 @@ private:
                     void restore()noexcept{if(active){actual.swap(previous);active=false;}}
                     ~DirectoryScope(){restore();}
                 } directory(actualDirectory36B970,fontDirectory36B420);
-                const std::string textureName=actualDirectory36B970+names[i];
+                const std::string textureName=actualDirectory36B970+specifications_[i].basename;
                 auto table=domain_->textures383400();
                 if(!table->bindMaterialContext(context_,d.texture))
                     return stop(S::texture,0x281F14);

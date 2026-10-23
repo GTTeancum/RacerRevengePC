@@ -3,6 +3,7 @@
 #include <array>
 #include <memory>
 
+namespace rr::platform {class OriginalUiMainSession50KG;class OriginalUiOptionsSession50KG;}
 namespace rr::game {
 constexpr std::size_t originalUiMainParticleCapacity50KG=5000; //1B4E60
 constexpr std::size_t originalUiMainDepthBuckets50KG=2500;    //160E44
@@ -66,6 +67,15 @@ public:
     std::size_t packetCount() const noexcept;
     const OriginalUiMainParticlePacket50KG* packets() const noexcept;
 private:
+    friend class rr::platform::OriginalUiMainSession50KG;
+    friend class rr::platform::OriginalUiOptionsSession50KG;
+    // Concrete application callers publish the real shared lazy byte at
+    //15E2A8, never a per-menu flag or a second serial. Legacy numeric emit
+    //still accepts an already-initialized serial without issuing authority.
+    OriginalUiMainFireReceipt50KG emitSource15E2A8(float,bool,std::uint32_t&,
+        std::uint32_t&,bool&)noexcept;
+    OriginalUiMainFireReceipt50KG emitImpl(float,bool,std::uint32_t&,
+        std::uint32_t&,bool*)noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
     OriginalUiMainFireStatus50KG initializeScene(const OriginalUiMainSceneOwner50KG&,bool options) noexcept;

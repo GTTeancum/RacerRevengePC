@@ -1,10 +1,12 @@
 #pragma once
 #include "original_ui_draw50kg.h"
+#include <array>
 #include "original_ui_direct_video50kg.h"
 #include "../../../src/assets/original_ui_material50kg.h"
 
 namespace rr::platform {
 class OriginalUiRiderSession50KG;
+class OriginalUiGarageCanonicalSubmission50KG;
 // NEW reconstruction, not recovered historical bytes. No implicit material
 // defaults: caller joins authenticated material, packet-depth and pass owners.
 // Each span must first pass prepareOriginalUiNativeMaterial50KG (textured) or
@@ -28,6 +30,10 @@ struct OriginalUiNativeSpan50KG {
     // material owner supplies FGE and the admitted GREATER/AREF0/KEEP test.
     bool sourceFogEnabled = false;
     bool sourceAlphaTestGreaterZero = false;
+    // Opt in per actual source packet, not by image or stream presence.
+    // Raw339600/366430 STQ keeps its separately rounded Q; W remains the
+    // original geometry value. Requires a sealed source-RGBA frame.
+    bool sourcePacketStq = false;
 };
 struct OriginalUiNativeDraw50KG {
     OriginalUiDraw50KG draw{};
@@ -53,6 +59,12 @@ struct OriginalUiNativeDraw50KG {
     // packet RGB and fog remain screen-linear. No reconstruction from depth.
     const float* sourceRasterW = nullptr;
     std::uint32_t sourceRasterWCount = 0;
+    // Raw original packet S,T,Q, parallel to ALL vertex slots when present.
+    // Only sourcePacketStq spans consume it. Other slots are neutral {0,0,1}.
+    // Never reconstruct Q from W or multiply already divided native UV by Q.
+    // The producer copies packet lanes and reorders them with its geometry.
+    const std::array<float,3>* sourcePacketStq = nullptr;
+    std::uint32_t sourcePacketStqCount = 0;
     // Vertex position[2] is the original integer packet Z in [0,16777215].
     // The vertex shader normalizes it once into native D24 reverse depth.
     // XY stays on the 640x448 source canvas. UI corners are TL,TR,BR,BL;
@@ -101,6 +113,7 @@ private:
     friend class OriginalUiMainDraw50KG;
     friend class OriginalUiHallDrawContribution50KG;
     friend class OriginalUiTournamentDrawContribution50KG;
+    friend class OriginalUiGarageDrawContribution50KG;
     friend class VehicleWindowGl50DS;
     OriginalUiSourceOwner50KM() noexcept=default;
     virtual bool beginSourceSubmission(std::uint64_t,const VehicleWindowGl50DS&) const noexcept=0;
@@ -124,12 +137,16 @@ private:
     friend class OriginalUiMainDraw50KG;
     friend class OriginalUiHallDrawContribution50KG;
     friend class OriginalUiTournamentDrawContribution50KG;
+    friend class OriginalUiGarageDrawContribution50KG;
     friend class VehicleWindowGl50DS;
     OriginalUiSourceFrame50KM() noexcept=default;
     OriginalUiSourceFrame50KM(const OriginalUiSourceFrame50KM&)=delete;
     OriginalUiSourceFrame50KM& operator=(const OriginalUiSourceFrame50KM&)=delete;
     const OriginalUiNativeDraw50KG* native_=nullptr;
     const OriginalUiSourceOwner50KM* owner_=nullptr;
+    // Optional typed canonical pass transaction, never a frame-sealing owner.
+    OriginalUiGarageCanonicalSubmission50KG* garageCanonical_=nullptr;
+    bool attachGarageCanonical(OriginalUiGarageCanonicalSubmission50KG&)noexcept;
     // Nonzero, increasing for this live composer; written only after a whole
     // frame has assembled successfully. Borrowed arrays and owner remain live.
     std::uint64_t frameGeneration_=0;

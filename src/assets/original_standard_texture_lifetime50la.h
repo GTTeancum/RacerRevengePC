@@ -93,6 +93,9 @@ class OriginalStandardTextureLifetime50LA final {
     // actual Application texture-manager254AD0 frame entry; this candidate
     // installs no caller and never resets demand at lookup or selection.
     void resetDemand14D180() noexcept;
+    // Exact443870 vtable3D2220+88=255800: jr ra; addiu v0,zero,1.
+    //The actual initialized owner's callback has no service/transfer effects.
+    std::int32_t loadedResources255800()const noexcept{return 1;}
 public:
     OriginalStandardTextureLifetime50LA(const OriginalStandardTextureLifetime50LA&)=delete;
     OriginalStandardTextureLifetime50LA& operator=(const OriginalStandardTextureLifetime50LA&)=delete;

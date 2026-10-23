@@ -147,6 +147,34 @@ bool guards(Arithmetic& a,OriginalCameraViewportFields& p) noexcept {
     p.guardY338=a.div(yy,detail::scalarMin48O(y,ry));return a.ok;
 }
 }
+OriginalCameraStartResult setOriginalCameraRange237000(float nearPlane,float farPlane,
+    const Mat& view,const Mat& screen,float guardX,float guardY,Mat& projection,Mat& combined,
+    Mat& combinedScreen,Mat& guardProjection,Mat& guardCombined)noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x115510);
+    Arithmetic a;
+    const float ratio=a.div(nearPlane,farPlane),z=a.div(1,a.sub(1,ratio));
+    if(!a.ok)return result(S::arithmetic,0x115538);
+    projection[10]=z; //11553C
+    const float translation=a.mul(-z,nearPlane);
+    if(!a.ok)return result(S::arithmetic,0x115544);
+    projection[14]=translation; //115548
+    auto product=multiply(a,view,projection);
+    if(!a.ok)return result(S::arithmetic,0x11554C);
+    combined=product; //1155AC..1155BC
+    product=multiply(a,combined,screen);
+    if(!a.ok)return result(S::arithmetic,0x237020);
+    combinedScreen=product; //237080..23708C
+    guardProjection=projection; //23709C..2370B4
+    for(std::size_t row=0;row<4;++row){const float x=a.mul(guardProjection[row*4],guardX);
+        if(!a.ok)return result(S::arithmetic,0x2370D0+static_cast<std::uint32_t>(row)*16u);
+        guardProjection[row*4]=x;}
+    for(std::size_t row=0;row<4;++row){const float y=a.mul(guardProjection[row*4+1],guardY);
+        if(!a.ok)return result(S::arithmetic,0x237110+static_cast<std::uint32_t>(row)*16u);
+        guardProjection[row*4+1]=y;}
+    product=multiply(a,view,guardProjection);
+    if(!a.ok)return result(S::arithmetic,0x237148);
+    guardCombined=product;return result(S::complete,0x2371C0);
+}
 OriginalCameraStartResult requestOriginalCameraExitFade2AED60(std::int32_t a8,
     std::int32_t appMode,OriginalVideoFadeState& video,HostMonotonicClock50ID& clock) noexcept {
     if(a8!=0)return result(S::complete,0x2aee60); //v0=0, caller ignores it.
@@ -284,6 +312,25 @@ OriginalCameraStartResult updateOriginalViewportZoom2458C0(const OriginalCameraV
     const float x=a.div(static_cast<float>(supplied.width1E8),static_cast<float>(width));
     if(!a.ok)return result(S::arithmetic,0x245acc);
     current.zoom328=x;current.zoom32C=y;return result(S::complete,0x245c68);
+}
+OriginalCameraStartResult rebuildOriginalSceneCore115350(const CameraSceneState49F& scene,
+    const Vec& position,std::int32_t width,CameraViewOutput49F& output,float& focal) noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x115350);
+    Arithmetic a;CameraViewOutput49F next;next.sceneAfter=scene;next.position=position;
+    next.view=viewMatrix(a,position,scene.look,scene.up,scene.rollRadians);
+    next.projection=projectionMatrix(a,scene);next.combined=multiply(a,next.view,next.projection);
+    const float tanValue=tangent(a,a.mul(constant(0x3c8efa34),a.mul(.5f,scene.fovDegrees)));
+    if(width<0)return result(S::arithmetic,0x1154b4);
+    const float nextFocal=a.div(a.mul(.5f,static_cast<float>(width)),tanValue);
+    if(!a.ok)return result(S::arithmetic,0x1154fc);
+    output=next;focal=nextFocal;return result(S::complete,0x11550c);
+}
+OriginalCameraStartResult computeOriginalGuardAngle2371D0(float focal,float& output) noexcept {
+    if(std::fegetround()!=FE_TONEAREST)return result(S::arithmetic,0x2371d0);
+    Arithmetic a;float angle=0;std::int32_t angleInt=0;
+    if(!originalAngle48G(2048,focal,angle)||!cvt(a.mul(constant(0x42652ee1),angle),angleInt)||
+       angleInt>1073741823||angleInt<-1073741824||!a.ok)return result(S::arithmetic,0x237204);
+    output=static_cast<float>(angleInt*2);return result(S::complete,0x237220);
 }
 OriginalCameraStartResult rebuildOriginalRaceScene236DD0(OriginalCameraViewportFields& viewport,
     const CameraSceneState49F& scene,const Vec& position,CameraViewOutput49F& output) noexcept {

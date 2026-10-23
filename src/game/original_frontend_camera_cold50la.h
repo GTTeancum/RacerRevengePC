@@ -11,8 +11,10 @@
 #include <thread>
 #include <utility>
 
-namespace original_main_entry50KG { struct Application; }
+namespace original_main_entry50KG { struct Application; class RaceDisplayLifetime50LA; }
+namespace rr::platform { class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCameraFrame50KG; class OriginalUiGaragePageOwner50KG; class OriginalUiGarageManagerSearch50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageRendererLease50KG; }
 namespace rr::game {
+class OriginalUiEntityScope50KG;
 
 // Actual-Application-issued236180 plus an optional private scalar prefix of
 //2361C0 ending after1149D4, BEFORE entering114A00. No full initializer, renderer,
@@ -22,6 +24,14 @@ namespace rr::game {
 // operation; this owner does not pretend to retrofit a universal registry lock.
 class OriginalFrontendCameraCold50LA final {
     friend struct ::original_main_entry50KG::Application;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    friend class rr::platform::OriginalUiGarageCameraFrame50KG;
+    friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
+    friend class rr::platform::OriginalUiGaragePageOwner50KG;
+    friend class rr::platform::OriginalUiGarageManagerSearch50KG;
+    friend class rr::platform::OriginalUiGarageVisibility50KG;
+    friend class rr::platform::OriginalUiGarageRendererLease50KG;
+    friend class OriginalUiEntityScope50KG;
 public:
     enum class Status : std::uint8_t {
         complete,outputNotEmpty,owner,affinity,phase,identity,topology,
@@ -30,7 +40,11 @@ public:
     enum class Phase : std::uint8_t {
         empty,constructedCold,released,
         unavailable, // diagnostic only, never an owned construction phase
-        beforeViewport114A00 // partial initializer; pending service is NOT entered
+        beforeViewport114A00, // partial initializer; pending service is NOT entered
+        insideViewport114A00,afterViewport114A00,selectedBeforeBounds236214,
+        viewportInitialized2361C0,poseSet114F90, // Page-owned renderer continuation; no cold retirement
+        pageAttached1FB620,pageRetiring1155C0, // Genuine attached Page forest phases.
+        failedLoaderRetiring1155C0 // Distinct real ref0 detached failure destructor.
     };
     struct Result {
         Status status=Status::owner;
@@ -54,7 +68,15 @@ private:
         std::uint8_t type32=0,flags33=0;
         const void* registration34=nullptr;
         const void* parent38=nullptr;
-        Words16 matrix40{},matrix140{};
+        Words16 matrix40{},matrix140{},projection80{},viewC0{},combined100{},
+            combinedScreen250{},guardProjection290{},guardCombined2D0{};
+        // The two early236DD0 callbacks read source-unwritten bounds. Their
+        // dependent caches remain UNKNOWN, not safe backing or a computed
+        // guess.2361C0 overwrites140/250/2D0/334/338; pose114F90 later overwrites290.
+        bool coreKnown=false,screen140Known=true,guardProjection290Known=false;
+        bool combinedScreen250Known=false,guardCombined2D0Known=false;
+        std::uint32_t focal1D8=0,guardAngle330=0,guardX334=0,guardY338=0;
+        std::uint32_t depth310=0,depth314=0,left318=0,right31C=0,top320=0,bottom324=0;
         Words4 position180{},look190{},up1A0{},previousPosition1B0{},previousLook1C0{};
         std::uint32_t fov1D0=0,roll1D4=0;
         // Safe native backing is not known source state in constructedCold.
@@ -79,6 +101,14 @@ private:
     bool entityConstructed_=false,fieldsComplete_=false,enrolled_=false;
     std::uint32_t ancestryTable_=0; // source type evidence, never callable
     Fields fields_;
+    //Native invocation custody only, never Source Camera/readiness fields.
+    std::uint64_t updatePublication_=0;
+    std::uint32_t updateSourcePC_=0;
+    bool updateReturned_=false,updateFailed_=false;
+    // Native failed-loader destructor cursor, not a source Camera phase reset.
+    // 1 records the actual manager1148D0 return; 2..5 are the reached ref0
+    // destructor; 6 records the actual1413E0 count release. Never reused.
+    std::uint8_t failedLoaderRetirementStep_=0;
 
     static std::uint64_t nativeKey(const void* p)noexcept {
         return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(p));
@@ -101,6 +131,89 @@ private:
             generation_==nativeKey(entities_.get())&&
             entities_->rootDomain_.sessionGeneration==generation_&&
             entities_->entityAuthority_.view().valid();
+    }
+    bool nativeRegistrationIdentityCurrent()const noexcept {
+        return onAffinity()&&actualEntitiesAlive()&&entityConstructed_&&fieldsComplete_&&enrolled_&&
+            generation_==nativeKey(entities_.get())&&key_==nativeKey(&entity_)&&
+            entities_->entityAuthority_.canRetire(entity_);
+    }
+    // Called only inside the actual last-reference1155C0 callback. Reading
+    // and rewriting are distinct source calls; no source add-ref is involved.
+    bool retireApplicationCameraSlots115620()noexcept {
+        if(!onAffinity()||!actualEntitiesAlive()||enrolled_||entity_.reference00||
+           !entityConstructed_||!fieldsComplete_||
+           phase_!=Phase::pageRetiring1155C0)return false;
+        std::array<Component*,4> local;
+        if(!entities_->snapshotCameras140200(local))return false;
+        for(auto*& camera:local)if(camera==&entity_)camera=nullptr;
+        return entities_->rewriteCameras1401B0(local);
+    }
+    // Distinct initialized, detached failure path. Cold release admission and
+    // the normal Page/Scene observer destructor remain unchanged.
+    Result preflightFailedLoaderEntity104970()const noexcept {
+        if(!onAffinity())return {Status::affinity,0x104970};
+        if(!actualEntitiesAlive())return {Status::owner,0x104970};
+        if(phase_!=Phase::poseSet114F90||!entityConstructed_||!fieldsComplete_||
+           !enrolled_||failedLoaderRetirementStep_>1||updatePublication_||
+           updateSourcePC_||updateReturned_||updateFailed_)
+            return {Status::phase,0x104970};
+        if(entities_->attachmentLock423F58_)return {Status::attachmentLocked,0x104970};
+        if(entity_.kind!=Kind::camera236180||entity_.objectKey!=key_||
+           key_!=nativeKey(&entity_)||entity_.sessionGeneration!=generation_)
+            return {Status::identity,0x104970};
+        if(entity_.reference00!=1||entity_.previous10||entity_.next14||
+           entity_.firstChild18||entity_.parent1C||entity_.mask20||entity_.descendants24||
+           entity_.category28!=0xffu||(entity_.flags29&0x0fu)!=3u||
+           entity_.nativeEffectControlId)return {Status::topology,0x104970};
+        if(ancestryTable_!=0x3d1c10u||fields_.searchable30||fields_.type32!=0xffu||
+           (fields_.flags33&7u)||fields_.resource224||!fields_.parent38)
+            return {Status::identity,0x1155C0};
+        if(!entities_->objectCount423F60_||!entities_->entityAuthority_.canRetire(entity_))
+            return {Status::identity,0x1413E0};
+        std::array<Component*,4> slots;
+        if(!entities_->snapshotCameras140200(slots))return {Status::owner,0x115620};
+        return {Status::complete,0x104970};
+    }
+    Result beginFailedLoaderRetirement104970()noexcept {
+        const auto ready=preflightFailedLoaderEntity104970();
+        if(!ready.okay())return ready;
+        if(failedLoaderRetirementStep_!=1||fields_.registration34)
+            return {Status::phase,0x114910};
+        if(!entities_->entityAuthority_.retire(entity_))std::terminate();
+        enrolled_=false;--entity_.reference00; //104970, actual last reference.
+        phase_=Phase::failedLoaderRetiring1155C0;
+        ancestryTable_=0x3D1C10; //231334 before1155C0.
+        ancestryTable_=0x3CCA00; //1155E4 before observer/resource branches.
+        failedLoaderRetirementStep_=2;
+        return {Status::complete,0x104970};
+    }
+    bool failedLoaderRef0Current1155C0()const noexcept {
+        return onAffinity()&&actualEntitiesAlive()&&entityConstructed_&&fieldsComplete_&&
+            !enrolled_&&phase_==Phase::failedLoaderRetiring1155C0&&
+            failedLoaderRetirementStep_>=2&&failedLoaderRetirementStep_<=5&&
+            entity_.kind==Kind::camera236180&&entity_.objectKey==key_&&key_==nativeKey(&entity_)&&
+            entity_.sessionGeneration==generation_&&!entity_.reference00&&
+            !entity_.previous10&&!entity_.next14&&!entity_.firstChild18&&!entity_.parent1C&&
+            !entity_.mask20&&!entity_.descendants24&&ancestryTable_==0x3CCA00&&
+            !fields_.registration34&&!fields_.resource224&&fields_.parent38&&
+            !contains(entities_->entityAuthority_.view(),&entity_)&&entities_->objectCount423F60_;
+    }
+    bool retireFailedLoaderApplicationSlots115620()noexcept {
+        if(!failedLoaderRef0Current1155C0()||failedLoaderRetirementStep_!=3)return false;
+        std::array<Component*,4> slots;
+        if(!entities_->snapshotCameras140200(slots))return false;
+        for(auto*& camera:slots)if(camera==&entity_)camera=nullptr;
+        return entities_->rewriteCameras1401B0(slots); //11566C, not a cold reset.
+    }
+    Result finishFailedLoaderRetirement1413E0()noexcept {
+        if(!failedLoaderRef0Current1155C0()||failedLoaderRetirementStep_!=5)
+            return {Status::phase,0x1413E0};
+        std::array<Component*,4> slots;
+        if(!entities_->snapshotCameras140200(slots))return {Status::owner,0x115620};
+        for(const auto* camera:slots)if(camera==&entity_)return {Status::identity,0x11566C};
+        --entities_->objectCount423F60_; //11569C ->1413E0, once after real slot cleanup.
+        phase_=Phase::released;failedLoaderRetirementStep_=6;
+        return {Status::complete,0x1413E0};
     }
     bool freshComponent()const noexcept {
         return !entityConstructed_&&!fieldsComplete_&&!enrolled_&&phase_==Phase::empty&&

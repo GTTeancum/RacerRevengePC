@@ -6,6 +6,7 @@
 #include "../game/original_application_animation_clock50kg.h"
 #include <cfenv>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <exception>
 #include <new>
@@ -34,6 +35,17 @@ bool same(const std::string& a,const char* b) noexcept {
 }
 bool fail(D& d,E e,std::uint32_t pc,const char* field=nullptr) noexcept {
     d.status=e;d.sourcePC=pc;d.field=field;return false;
+}
+bool demandMultiplyFailure(D& d,std::uint32_t pc,float a,float b,const char* reason) noexcept {
+    std::uint32_t aBits=0,bBits=0;
+    std::memcpy(&aBits,&a,sizeof(aBits));std::memcpy(&bBits,&b,sizeof(bBits));
+    const char* why=reason?reason:"texture-demand multiplication";
+    // Failure only: retain bounded numeric operands, not private addresses.
+    // Keep the original PC/status/row/pass/map and already committed effects.
+    std::fprintf(stderr,"[garage-demand-arithmetic] pc=0x%08x row=%d pass=%zu map=%zu lhs_bits=0x%08x rhs_bits=0x%08x reason=%s\n",
+        static_cast<unsigned>(pc),static_cast<int>(d.row),d.pass,d.map,
+        static_cast<unsigned>(aBits),static_cast<unsigned>(bBits),why);
+    return fail(d,E::arithmetic,pc,why);
 }
 bool ascii(const std::string& s,std::size_t limit,bool empty=false) noexcept {
     if(s.size()>limit||(!empty&&s.empty()))return false;
@@ -283,6 +295,7 @@ struct OriginalStandardMaterialObject50LA::Storage {
         std::array<std::uint8_t,4> fillRgba2C{{128,128,128,255}};
         const OriginalUiMaterialTemplateState50KG* constructionTemplate=nullptr;
         std::unique_ptr<OriginalStandardMaterialState50LA> state30;
+        std::array<OriginalStandardMaterialNativeBinding50KG,2> nativeBindings{};
         std::uint32_t parameterMask24=0;
         std::int32_t parameterCount28=0;
         std::unique_ptr<const OriginalStandardMaterialParameters50LA> parameters34;
@@ -301,6 +314,7 @@ struct OriginalStandardMaterialObject50LA::Storage {
     std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm;
     std::unique_ptr<OriginalUiMaterial50KG> damageFallback;
     std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm;
+    std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback;
     std::unique_ptr<OriginalUiMaterial50KG> pauseBackdropFallback;
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates;
     std::shared_ptr<const OriginalStandardProgramTable50LA> programs;
@@ -350,12 +364,32 @@ void OriginalStandardMaterialObject50LA::setCollector29BED0(std::size_t pass,std
         std::terminate();
     storage_->collectors5C[pass]=index;
 }
+void OriginalStandardMaterialObject50LA::commitNativeUntexturedState249BA0(std::size_t slot,
+    const OriginalStandardMaterialStateContext50LA& context)noexcept {
+    if(!storage_||slot>=4||!storage_->passes4C[slot])std::terminate();
+    auto& p=*storage_->passes4C[slot];
+    if(p.mapCount20||!p.state30||p.state30->contextCount()!=1u||p.nativeBindings[0].bound()||p.nativeBindings[1].bound())std::terminate();
+    static_cast<OriginalStandardMaterialStateContext50LA&>(*p.state30)=context;
+    //No texture native history is created. Source TME0 never bound an image.
+}
+void OriginalStandardMaterialObject50LA::commitNativeBinding249610(std::size_t slot,std::size_t map,
+    const OriginalStandardMaterialStateContext50LA& context,
+    const OriginalStandardMaterialNativeBinding50KG& binding) noexcept {
+    // Table preflights the WHOLE transaction before the first nonallocating
+    // store. Alias submitters never receive the final representative's state.
+    if(!storage_||slot>=4||!storage_->passes4C[slot])std::terminate();
+    auto& p=*storage_->passes4C[slot];
+    if(!p.state30||map>=p.state30->contextCount()||map>=p.nativeBindings.size()||!binding.bound())std::terminate();
+    if(map==0)static_cast<OriginalStandardMaterialStateContext50LA&>(*p.state30)=context;
+    else *p.state30->secondContext=context;
+    p.nativeBindings[map]=binding;
+}
 bool OriginalStandardMaterialObject50LA::pass4C(std::size_t i,OriginalStandardMaterialPassView50LA& out) const noexcept {
     if(!storage_||i>=4||!storage_->passes4C[i])return false;
     const auto& p=*storage_->passes4C[i];
     out={&p.references04,&p.program18,&p.texture1A,&p.uv1E,&p.mapCount20,&p.flags21,
         &p.group22,&p.fillRgba2C,p.constructionTemplate,p.state30.get(),
-        &p.parameterMask24,&p.parameterCount28,p.parameters34.get(),p.animation10.get(),p.textureAnimation10.get()};return true;
+        &p.parameterMask24,&p.parameterCount28,p.parameters34.get(),p.animation10.get(),p.textureAnimation10.get(),&p.nativeBindings};return true;
 }
 const OriginalUiMaterialProvenance50KG* OriginalStandardMaterialObject50LA::tournamentFallbackProvenance() const noexcept {
     return storage_&&storage_->tournamentFallback?&storage_->tournamentFallback->provenance:nullptr;
@@ -368,6 +402,67 @@ const OriginalUiMaterialProvenance50KG* OriginalStandardMaterialObject50LA::dama
 }
 const OriginalUiMaterialProvenance50KG* OriginalStandardMaterialObject50LA::pauseBackdropFallbackProvenance() const noexcept {
     return storage_&&storage_->pauseBackdropFallback?&storage_->pauseBackdropFallback->provenance:nullptr;
+}
+bool OriginalStandardMaterialObject50LA::borrowGarageScreenFallback2475C0(
+    std::size_t slot,const OriginalStandardTextureResource50LA& texture,
+    const OriginalUiArchive50KG& archive,const OriginalUiMemberView50KG& member,
+    OriginalUiMaterial50KG& output,D& d) const noexcept {
+    d={};d.pass=slot;
+    if(!storage_||!storage_->constructed||storage_->source||slot!=0||storage_->count48!=1||
+       !storage_->garageFallback||!storage_->passes4C[0])
+        return fail(d,E::source,0x2475C0,"actual constructed Garage missing-PSM owner");
+    const auto& s=*storage_;const auto& proof=*s.garageFallback;const auto& pass=*s.passes4C[0];d.row=s.row40;
+    try {
+        if(proof.row_!=s.row40||!proof.current(s.name00,s.construction,s.textures)||
+           !s.templates||pass.constructionTemplate!=s.templates->get(OriginalUiTemplate50KG::screenMt)||
+           !s.construction||!s.construction->materialApplication()||
+           &s.construction->materialApplication()->templates()!=s.templates.get()||
+           !pass.constructionTemplate||pass.constructionTemplate->microprogram!="ScreenObject"||
+           pass.references04!=1||pass.mapCount20!=1||pass.flags21!=2||pass.uv1E[0]||pass.uv1E[1]||
+           pass.group22!=-1||pass.texture1A[0]<0||pass.texture1A[1]!=-1||
+           pass.parameterMask24||pass.parameterCount28||pass.parameters34||pass.animation10||pass.textureAnimation10||
+           !pass.state30||pass.state30->contextCount()!=1u)
+            return fail(d,E::reference,0x2475C0,"same live one-map ScreenMT fallback pass");
+        OriginalStandardProgramRowView50LA program;
+        if(!s.programs||!s.programs->row(pass.program18,program)||!program.canonicalName||
+           std::strcmp(program.canonicalName,"ScreenObject"))
+            return fail(d,E::program,0x247620,"actual retained ScreenObject program");
+        OriginalStandardTextureResource50LA* actual=nullptr;
+        if(!s.textures->resolve298E60(pass.texture1A[0],actual,d.texture)||actual!=&texture||
+           !texture.constructed24DA30()||texture.animated102070()||!texture.references00()||*texture.references00()<=0)
+            return fail(d,E::texture,0x247648,"actual fallback texture token and resource");
+        OriginalStandardArchiveProvider50LA::MemberView selected;
+        const auto* bytes=texture.originalBytes();const auto* name=texture.sourceMember();
+        const auto actualMember=name?archive.find(*name):OriginalUiMemberView50KG{};
+        std::size_t offset=0,extent=0;
+        if(!archive.loaded()||archive.identity()!=originalUiArchiveIdentity50KG(proof.pstArchive_)||
+           !member.identity||!member.data||!member.size||actualMember.identity!=member.identity||
+           actualMember.data!=member.data||actualMember.size!=member.size||!name||*name!=proof.pstMember_||
+           proof.provider_->lookup132820(*name,selected)!=OriginalStandardArchiveProvider50LA::Lookup::present||
+           selected.data!=member.data||selected.size!=member.size||
+           !bytes||bytes->size()!=member.size||proof.pstBytes_.size()!=member.size||
+           std::memcmp(bytes->data(),member.data,member.size)||std::memcmp(proof.pstBytes_.data(),member.data,member.size)||
+           !texture.pstExtent24E880(offset,extent)||offset||extent!=member.size)
+            return fail(d,E::texture,0x24E880,"same winning Garage fallback PST and retained bytes");
+        OriginalUiMaterial50KG next;auto& provenance=next.provenance;
+        provenance.origin=OriginalUiMaterialOrigin50KG::garageCanonicalScreenMissingPsmFallback;
+        provenance.archive=archive.identity();provenance.fallbackTexture=member.identity;
+        provenance.fallbackPageSource=proof.garage_->find("UI/UIGarage/garage.dat").identity;
+        provenance.registeredName=proof.name_;provenance.attemptedPsmMember=s.name00;provenance.creationPC=0x2475C0;
+        next.passes.emplace_back();auto& projected=next.passes.back();
+        projected.provenance=provenance;projected.pass=1;projected.microprogram=program.canonicalName;
+        projected.inheritedTemplate=pass.constructionTemplate->identity;
+        projected.textureName=proof.name_.substr(proof.name_.find_last_of('\\')+1);
+        projected.shaderPassGroup="none";projected.enabled=1;projected.textureCount=1;projected.textureCoordinateIndex=0;
+        // Observe the real state30, including any already-committed249610
+        // history. Do not regenerate template defaults or change GS fields.
+        for(std::size_t i=0;i<projected.gs.fields.size();++i){const auto& field=pass.state30->fields[i];
+            projected.gs.fields[i]={field.value,field.templateMember,field.byteOffset,field.sourcePC};}
+        projected.lodCalculationMethod=pass.state30->sampler[0].value;projected.maximumMipLevel=pass.state30->sampler[1].value;
+        projected.magFilter=pass.state30->sampler[2].value;projected.minFilter=pass.state30->sampler[3].value;
+        projected.lodL=pass.state30->sampler[4].value;projected.lodK=pass.state30->sampler[5].value;
+        output=std::move(next);return true;
+    }catch(...){return fail(d,E::allocation,0x2475C0,"retained Garage fallback state projection");}
 }
 bool OriginalStandardMaterialObject50LA::serviceCableBasePrototype29AC90(
     std::size_t slot,D& d) noexcept {
@@ -568,6 +663,26 @@ bool OriginalStandardMaterialObject50LA::demandTournamentOutline2DF8A0(
     d.pass=0;d.map=0;d.demandMapsVisited=1;d.texturesDemanded=1;
     d.textureDemandWritten=written;d.sourceEffectsCommitted=written;return true;
 }
+bool OriginalStandardMaterialObject50LA::demandGarage2DF8A0(
+    const OriginalStandardTextureTable50LA& expected,std::uint32_t pc,D& d) const noexcept {
+    if(pc!=0x1FDDA8&&pc!=0x1FDDE8)return fail(d,E::source,pc);
+    if(!storage_||!storage_->constructed)return fail(d,E::missingMaterialObject,0x2DF8BC);
+    const auto& s=*storage_;
+    if(!s.construction||!s.construction->live()||s.textures.get()!=&expected)
+        return fail(d,E::source,0x2DF8A0);
+    if(s.count48<1||!s.passes4C[0])return fail(d,E::unsupportedPass,0x2DF8BC);
+    const auto& pass=*s.passes4C[0];
+    if(pass.mapCount20<1||pass.texture1A[0]<0)return fail(d,E::unsupportedPass,0x2DF8C4);
+    OriginalStandardTextureResource50LA* texture=nullptr;
+    if(!s.textures->resolve298E60(pass.texture1A[0],texture,d.texture))
+        return fail(d,E::texture,d.texture.sourcePC);
+    if(!texture)return fail(d,E::texture,0x2DF8D0);
+    bool written=false;
+    if(!texture->demandGarageFloor1FDD60(pc,written,d.texture))
+        return fail(d,E::texture,d.texture.sourcePC);
+    d.sourcePC=pc;d.pass=0;d.map=0;d.demandMapsVisited=1;d.texturesDemanded=1;
+    d.textureDemandWritten=written;d.sourceEffectsCommitted=written;return true;
+}
 bool OriginalStandardMaterialObject50LA::demandTournamentFallback2DF8A0(
     const OriginalStandardTextureTable50LA& expectedTextures,const OriginalUiArchive50KG& archive,
     std::uint32_t storePC,D& d) const noexcept {
@@ -660,7 +775,8 @@ bool OriginalStandardMaterialObject50LA::demand24A430(const float* sizes,std::ui
     //actually consumes the cap. Zero-map/null-texture paths have no arithmetic
     //output or texture store that could be fabricated by this unused value.
     float cap=0;
-    const bool capSupported=Math::multiply(projectedRadius,applicationScale,cap);
+    const char* capReason=nullptr;
+    const bool capSupported=Math::multiplyTowardZero(projectedRadius,applicationScale,cap,&capReason);
     for(std::int32_t n=0;n<s.count48;++n){
         d.pass=static_cast<std::size_t>(n);
         const auto* pass=s.passes4C[d.pass].get();
@@ -675,7 +791,7 @@ bool OriginalStandardMaterialObject50LA::demand24A430(const float* sizes,std::ui
             //24A4D4: a real pending row is skipped. Do not manufacture an image
             //or read its UV selector/assertion state before this null branch.
             if(!texture){++d.nullTexturesSkipped;continue;}
-            if(!capSupported)return fail(d,E::arithmetic,0x24A4A0);
+            if(!capSupported)return demandMultiplyFailure(d,0x24A4A0,projectedRadius,applicationScale,capReason);
             const std::uint8_t uv=pass->uv1E[map];
             if(!firstTexture){assertUv=1;firstTexture=true;d.sourceEffectsCommitted=true;}
             //Always retain the native bounds guard, even should a future real
@@ -685,8 +801,11 @@ bool OriginalStandardMaterialObject50LA::demand24A430(const float* sizes,std::ui
             if(!width||*width<=0||!Math::ordinary(sizes[uv])||sizes[uv]<0.f)return fail(d,E::texture,0x24A578);
             //Source operation order: scale*uvSize, then *float(texture14).
             float scaledUv=0,request=0;
-            if(!Math::multiply(scale,sizes[uv],scaledUv))return fail(d,E::arithmetic,0x24A584);
-            if(!Math::multiply(scaledUv,static_cast<float>(*width),request))return fail(d,E::arithmetic,0x24A588);
+            const char* reason=nullptr;
+            if(!Math::multiplyTowardZero(scale,sizes[uv],scaledUv,&reason))
+                return demandMultiplyFailure(d,0x24A584,scale,sizes[uv],reason);
+            if(!Math::multiplyTowardZero(scaledUv,static_cast<float>(*width),request,&reason))
+                return demandMultiplyFailure(d,0x24A588,scaledUv,static_cast<float>(*width),reason);
             if(!(request<=cap))request=cap; //24A58C..5A0, preserve comparison order.
             bool written=false;
             if(!texture->demand104A00(request,written,d.texture))return fail(d,E::texture,d.texture.sourcePC);
@@ -703,7 +822,8 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
     std::shared_ptr<const OriginalUiArchive50KG> tournamentMissingPsm,
     std::shared_ptr<const OriginalUiArchive50KG> speedBoostMissingPsm,
     std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm,
-    std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm,D& d) noexcept {
+    std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm,
+    std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback,D& d) noexcept {
     try {
         auto& s=*storage_;
         if(s.row40!=-1)return fail(d,E::phase,0x29B550);
@@ -724,6 +844,31 @@ bool OriginalStandardMaterialObject50LA::construct29B550(std::int32_t row,const 
         if((tournamentMissingPsm&&speedBoostMissingPsm)||
            (damageMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm))||
            (pauseBackdropMissingPsm&&(tournamentMissingPsm||speedBoostMissingPsm||damageMissingPsm)))return fail(d,E::source,0x29B638);
+        if(garageFallback){
+            if(s.source||tournamentMissingPsm||speedBoostMissingPsm||damageMissingPsm||pauseBackdropMissingPsm||
+               garageFallback->row_!=row||!garageFallback->current(s.name00,input.construction,input.actualTextures383400))
+                return fail(d,E::source,0x29B638,"Garage canonical absent-PSM proof");
+            if(!templates||association!=templates->get(OriginalUiTemplate50KG::screenMt)||
+               !input.construction||!input.construction->live()||
+               &input.construction->materialApplication()->templates()!=templates.get())
+                return fail(d,E::templates,0x2475F8);
+            s.templates=std::move(templates);s.programs=input.actualPrograms382B70;
+            s.textures=input.actualTextures383400;s.construction=input.construction;
+            s.garageFallback=std::move(garageFallback);
+            s.count48=1;s.passes4C[0]=std::make_unique<Storage::Pass>();
+            auto& pass=*s.passes4C[0];pass.constructionTemplate=association;
+            if(!s.programs||!s.programs->prepared()||
+               !s.programs->find298C80(association->microprogram,pass.program18,d.program))
+                return fail(d,E::program,0x247620);
+            pass.mapCount20=1; //247630; flags21 remain2 and UV1E remains0.
+            if(!s.textures||!s.textures->prepared()||!s.textures->bindMaterialContext(s.construction,d.texture)||
+               !s.textures->acquire299330AndRetain298A30(s.garageFallback->name_,pass.texture1A[0],d.texture))
+                return fail(d,E::texture,0x247648);
+            const OriginalUiDatSection50KG noAttributes{}; //NULL document at247670, never a fabricated PSM.
+            auto state=std::make_unique<OriginalStandardMaterialState50LA>();
+            if(!singleState(noAttributes,*association,s.construction.get(),*state,d))return false;
+            pass.state30=std::move(state);s.constructed=true;return true;
+        }
         if(!s.source&&speedBoostMissingPsm){
             // Only a retained concrete Speed/Boost primitive reference can
             // attach this archive proof to the canonical row. No input flag.

@@ -213,10 +213,10 @@ void main(){
         return check("restore ordered UI state after coverage span");
     }
     bool drawUiCoverageRange(bool aa1,U index,U indexCount,U image,U depth,bool write,I sourceBlend,
-        bool opaqueBatch,const OriginalUiCoverageBounds50KG& region)noexcept {
+        bool opaqueBatch,const OriginalUiCoverageBounds50KG& region,U sourceSampler=0)noexcept {
         // No scratch texture remains sampled while attached for raster writes.
-        // Keep the full feedback fence for every range. Sampler zero is
-        // invariant within this span; no external renderer interleaves here.
+        // Keep the full feedback fence for every range. A private Garage
+        // sampler applies only to source raster, never the coverage scratch.
         for(U i=0;i<5;++i){gl.activeTexture(textureUnit0+i);gl.bindTexture(texture2D,0);gl.bindTexture(coverageTexture,0);}
         gl.activeTexture(textureUnit0);
         // Same conservative rectangle bounds scratch clear, source raster,
@@ -234,7 +234,10 @@ void main(){
         gl.clearBufferfv(0x1800,0,empty);gl.clearBufferfv(0x1801,0,&zero);
         gl.useProgram(uiProgram);
         gl.bindTexture(texture2D,image);drawGl.bindVertexArray(uiVertexArray);
+        if(sourceSampler)gl.bindSampler(0,sourceSampler);
         drawGl.drawElementsBaseVertex(0x0004,static_cast<I>(indexCount),0x1405,reinterpret_cast<const void*>(std::uintptr_t(index)*sizeof(U)),0);
+        // Restore sampler0 even on raster failure, before scratch/feedback reads.
+        if(sourceSampler)gl.bindSampler(0,0);
         bool accepted=check("raster ordered original UI range into native coverage payload");
         if(accepted&&sourceBlend!=0&&!uiCoverage.coherentFetch){
             gl.bindFramebuffer(readFramebuffer,uiCoverage.scene);gl.bindFramebuffer(drawFramebuffer,uiCoverage.snapshot);

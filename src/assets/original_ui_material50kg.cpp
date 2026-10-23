@@ -2,6 +2,7 @@
 #include "original_ui_screen_assets50kg.h"
 #include "original_ui_controls_specmap50kg.h"
 #include "original_standard_material_object50la.h"
+#include "original_standard_material_table50la.h"
 #include "original_standard_material_animation50la.h"
 #include <utility>
 
@@ -1054,20 +1055,34 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
     bool authenticatedCharacterFixed64 = false, bool authenticatedControlsTga1555 = false,
     bool authenticatedRaceGleam = false, bool authenticatedRaceClear = false,
     bool authenticatedRider17Cutout = false, bool canonicalPauseAnimation = false,
-    bool authenticatedAa1Ipum = false) noexcept {
+    bool authenticatedAa1Ipum = false,
+    const OriginalUiGarageModelMaterials50KG* authenticatedGaragePrelit = nullptr,
+    const OriginalUiGarageModelMaterials50KG* authenticatedGarageLit = nullptr,
+    bool authenticatedGarageAa1 = false,
+    const OriginalStandardMaterialObject50LA* authenticatedGarageScreen = nullptr) noexcept {
     d = {}; d.pass = pass.pass;
     try {
         if (pass.textureCount == 0)
             return fail(d, Error::untexturedAdapterRequired, "zero-map requires untextured material policy", 0x2474b8u);
         const bool programMatches = litProgram ?
             ((same(pass.microprogram, "Diffuse") || same(pass.microprogram, "DiffuseCompressed") ||
-              (authenticatedRiderSpecular && same(pass.microprogram,"SpecularMapCompressed"))) &&
+              ((authenticatedRiderSpecular || authenticatedGarageLit) && same(pass.microprogram,"SpecularMapCompressed")) ||
+              (authenticatedGaragePrelit && same(pass.microprogram,"PreLitCompressed"))) &&
              pass.provenance.origin == OriginalUiMaterialOrigin50KG::authoredPsm &&
              pass.inheritedTemplate == catalogMember(OriginalUiArchiveId50KG::appStart,
                  "AppStart\\DefaultMT.psm")) : pass.microprogram == "ScreenObject";
-        if (!sourceIdentityKnown(pass) || !pass.inheritedTemplate || !programMatches ||
+        // This internal-only alternative is issued by the private Object
+        // member below after its exact constructed fallback/texture borrow.
+        // All standalone callers still require sourceIdentityKnown unchanged.
+        const bool canonicalGarageScreen=authenticatedGarageScreen && !litProgram &&
+            authenticatedGarageScreen->constructed29B550() && !authenticatedGarageScreen->source() &&
+            pass.provenance.origin==OriginalUiMaterialOrigin50KG::garageCanonicalScreenMissingPsmFallback &&
+            !pass.identity && pass.pass==1 && pass.provenance.creationPC==0x2475C0 &&
+            pass.authored.values.empty() && pass.authored.name.empty();
+        if ((!sourceIdentityKnown(pass) && !canonicalGarageScreen) || !pass.inheritedTemplate || !programMatches ||
             pass.enabled != 1 || pass.textureCount != 1 || pass.textureCoordinateIndex != 0)
-            return fail(d, Error::profile, litProgram ? "authored DefaultMT Diffuse/Compressed" :
+            return fail(d, Error::profile, authenticatedGaragePrelit ? "authored Garage DefaultMT PreLitCompressed" :
+                litProgram ? "authored DefaultMT Diffuse/Compressed" :
                 "enabled single-map ScreenObject", 0x2471bcu);
         for (const auto& field : pass.authored.values)
             if (field.sourceValuePresent && !knownPassField(field.key) &&
@@ -1091,7 +1106,7 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
             !expect(Field::colorClampingMethod, 1) || !expect(Field::alphaCorrectionValue, 0) ||
             !expect(Field::alphaBlendingControlInUnitsOfPixels, 0) ||
             !expect(Field::gouraudShadingOnOff, 1) || !expect(Field::textureMappingOnOff, 1) ||
-            (!litProgram && !expect(Field::foggingOnOff, 0)) || !expect(Field::onePassAntiAliasingOnOff, authenticatedAa1Ipum ? 1 : 0) ||
+            (!litProgram && !expect(Field::foggingOnOff, 0)) || !expect(Field::onePassAntiAliasingOnOff, (authenticatedAa1Ipum || authenticatedGarageAa1) ? 1 : 0) ||
             !expect(Field::textureCoordinatesSTQorUV, 0) ||
             !expect(Field::environmentContext0or1, 0) ||
             !expect(Field::fragmentValueControlFixedOrNot, 0) ||
@@ -1105,7 +1120,9 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
         if (sourceAlphaTest && (!expect(Field::alphaTestMethod, 6) ||
             !expect(Field::alphaReferenceValue, 0) ||
             !expect(Field::processingMethodWhenFailedInAlphaTest, 0))) return false;
-        const bool textureShape = authenticatedRider17Cutout ?
+        const bool textureShape = (authenticatedGaragePrelit || authenticatedGarageLit) ?
+            (litProgram && texture.kind<=2 && !texture.mips.empty() &&
+             texture.mips.size()<=originalUiIpumMipCount50KG) : authenticatedRider17Cutout ?
             (litProgram && texture.kind == 1 && texture.mips.size() == 4) : authenticatedControlsTga1555 ?
             (litProgram && texture.kind==originalUiControlsTga1555Kind50KG && texture.mips.size()==1) : authenticatedRiderIpum ?
             (litProgram && texture.kind == 2 && !texture.mips.empty() && texture.mips.size() <= originalUiIpumMipCount50KG) :
@@ -1148,7 +1165,7 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
                 !expect(Field::inputColorB,2)||!expect(Field::inputAlphaC,1)||
                 !expect(Field::inputColorD,1))return false;
             policy.blend=OriginalUiMaterialBlend50KG::destinationAlphaAdditive;
-        } else if (authenticatedRiderSpecular) {
+        } else if (authenticatedRiderSpecular || (authenticatedGarageLit && same(pass.microprogram,"SpecularMapCompressed"))) {
             if (!expect(Field::alphaBlendingOnOff,1) || !expect(Field::inputColorA,0) ||
                 !expect(Field::inputColorB,2) || !expect(Field::inputColorD,1) ||
                 !expect(Field::zWriteDisabled,authenticatedCharacterFixed64?0:1))return false;
@@ -1191,6 +1208,21 @@ static bool prepareOriginalUiOneMapMaterial50KM(const OriginalUiMaterialPass50KG
         output = policy; fogEnabled = sourceFog; alphaTestGreaterZero = sourceAlphaTest;
         d = {}; return true;
     } catch (...) { d.error = Error::allocation; return false; }
+}
+bool OriginalStandardMaterialObject50LA::prepareGarageScreenFallback2475C0(
+    std::size_t slot,const OriginalStandardTextureResource50LA& texture,
+    const OriginalUiArchive50KG& archive,const OriginalUiMemberView50KG& member,
+    const Texture48E& decoded,OriginalUiMaterial50KG& material,OriginalUiNativeMaterial50KG& output,
+    OriginalStandardMaterialDiagnostic50LA& d) const noexcept {
+    OriginalUiMaterial50KG actual;
+    if(!borrowGarageScreenFallback2475C0(slot,texture,archive,member,actual,d))return false;
+    OriginalUiNativeMaterial50KG policy;OriginalUiMaterialDiagnostic50KG numeric;bool fog=false,alphaTest=false;
+    if(!prepareOriginalUiOneMapMaterial50KM(actual.passes[0],decoded,policy,numeric,false,fog,alphaTest,
+        false,false,false,false,false,false,false,false,false,false,false,false,nullptr,nullptr,false,this)){
+        d.status=OriginalStandardMaterialStatus50LA::unsupportedPass;d.sourcePC=numeric.sourcePC;
+        d.document=numeric.document;d.field="actual Garage fallback GS/texture policy";return false;
+    }
+    material=std::move(actual);output=policy;return true;
 }
 bool prepareOriginalUiNativeMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     const Texture48E& texture, OriginalUiNativeMaterial50KG& output,
@@ -1255,6 +1287,27 @@ bool prepareOriginalUiLitMaterial50KM(const OriginalUiMaterialPass50KG& pass,
     next.program = same(pass.microprogram, "Diffuse") ? OriginalUiLitProgram50KM::diffuse :
         OriginalUiLitProgram50KM::diffuseCompressed;
     output = next; return true;
+}
+bool OriginalUiGaragePrelitRasterAdapter50KG::convert(
+    const OriginalUiGarageModelMaterials50KG& owner,const OriginalUiMaterialPass50KG& pass,
+    const Texture48E& texture,OriginalUiGaragePrelitMaterial50KG& next,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    return prepareOriginalUiOneMapMaterial50KM(pass,texture,next.raster,d,true,
+        next.fogEnabled,next.alphaTestGreaterZero,
+        false,false,false,false,false,false,false,false,false,false,false,false,&owner);
+}
+bool OriginalUiGarageLitRasterAdapter50KG::convert(
+    const OriginalUiGarageModelMaterials50KG& owner,const OriginalUiMaterialPass50KG& pass,
+    const Texture48E& texture,bool actualWatto25c7Aa1,OriginalUiGarageLitMaterial50KG& next,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    if(same(pass.microprogram,"Diffuse"))next.program=OriginalUiGarageProgram50KG::diffuse;
+    else if(same(pass.microprogram,"DiffuseCompressed"))next.program=OriginalUiGarageProgram50KG::diffuseCompressed;
+    else if(same(pass.microprogram,"SpecularMapCompressed"))next.program=OriginalUiGarageProgram50KG::specularMapCompressed;
+    else return fail(d,Error::profile,"actual Garage diffuse/specular program",0x247110);
+    next.coverage=actualWatto25c7Aa1?OriginalUiCoveragePolicy50KM::fourSampleAa1:OriginalUiCoveragePolicy50KM::aa0;
+    return prepareOriginalUiOneMapMaterial50KM(pass,texture,next.raster,d,true,
+        next.fogEnabled,next.alphaTestGreaterZero,
+        false,false,false,false,false,false,false,false,false,false,false,false,nullptr,&owner,actualWatto25c7Aa1);
 }
 bool prepareOriginalUiControlsSpecularMaterial50KG(const OriginalUiMaterialPass50KG& pass,
     const OriginalUiScreenAssets50KG& images,std::uint32_t index,

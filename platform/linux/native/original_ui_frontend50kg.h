@@ -6,6 +6,8 @@
 #include "original_ui_rider_session50kg.h"
 #include "original_ui_course_session50kg.h"
 #include "original_ui_tournament_session50kg.h"
+#include "original_ui_garage_destination50kg.h"
+#include "../../../src/assets/original_standard_material_table50la.h"
 #include "vehicle_window_gl50ds.h"
 #include "../../../src/assets/original_ui_localization50kg.h"
 #include "../../../src/game/original_ui_light_manager_lifetime50kg.h"
@@ -13,7 +15,9 @@
 #include <chrono>
 #include <memory>
 
+namespace original_main_entry50KG { struct Application; struct Frontend; }
 namespace rr::platform {
+class OriginalUiGarageSession50KG;
 // Concrete native host gate admits either its already-prepared same-world
 // destination or a supported cold-load request whose authentic source archive
 // is retained. A queued request is not a loaded-world/completion receipt: the
@@ -46,6 +50,9 @@ struct OriginalUiFrontendDiagnostic50KG {
     OriginalUiRiderSessionDiagnostic50KG rider{};
     OriginalUiRiderDrawResourceDiagnostic50KG riderResources{};
     OriginalUiTournamentSessionDiagnostic50KG tournament{};
+    OriginalUiGarageDestinationDiagnostic50KG garage{};
+    assets::OriginalStandardMaterialDiagnostic50LA garageRuntime{};
+    std::string garageDetail;
     OriginalUiTournamentCareerResourceDiagnostic50KG tournamentResources{};
     OriginalUiTournamentWidgetResourceDiagnostic50KG tournamentWidgets{};
     OriginalUiCourseSessionDiagnostic50KG course{};
@@ -145,6 +152,8 @@ struct OriginalUiFrontendInputReceipt50KG {
     OriginalUiFrontendStatus50KG status=OriginalUiFrontendStatus50KG::noChange;
     game::OriginalUiTransitionRoute50KG source{},requested{};
     bool routeAccepted=false;
+    bool garageInputReached=false,garageInputCompleted=false,garageRequestWritten=false;
+    std::uint64_t garageInputSerial=0;std::uint32_t garageInputSourcePC=0;
     OriginalUiFrontendColdInterval50KG coldInterval{};
     OriginalUiMainSessionInputReceipt50KG main{};
     OriginalUiOptionsSessionInputReceipt50KG options{};
@@ -158,6 +167,10 @@ struct OriginalUiFrontendUpdateReceipt50KG {
     // case, and complete source child update. Caller advances its PCM output
     // once for this sequence using its corresponding accepted nanoseconds.
     bool accepted=false;
+    // Observation of the actual Root transaction. A Garage update has already
+    // committed SourceTiming; the host must not commit the generic menu tick.
+    bool sourceTimingCommitted=false;
+    std::uint64_t sourcePublication=0;
     std::uint64_t sequence=0;
     OriginalUiMainSessionUpdate50KG update{};
     game::OriginalUiTransitionRoute50KG source{};
@@ -187,11 +200,15 @@ struct OriginalUiFrontendSnapshot50KG {
     game::OriginalUiLightCacheState50KG lightCacheState=game::OriginalUiLightCacheState50KG::notConstructed;
     std::uint64_t lightManagerGeneration=0;
     bool lightManagerEntered=false;
+    bool garageLoaded=false,garageRootReturned=false,garageTimingCommitted=false,garageTargetPublished=false;
+    std::uint64_t garagePublication=0;
+    std::uint32_t garageManagerLifecycle=0,garageManagerTransition=0,garageSelectedStat=0;
+    game::OriginalUiApertureSnapshot50KG garageAperture{};
 };
 // Concrete native Main4/1 <-> Options12/{1,2,3,4}, plus Rider5/1 for
 // authenticated Rider selection: mode0 Confirm -> bounded Course6/1; mode2
 // Confirm -> clean fresh-career Tournament9/1 and Back. Tournament Course/Garage
-// stay unavailable. Course Confirm additionally requires the concrete native race lease.
+// use retained concrete destination owners. Course Confirm additionally requires the concrete native race lease.
 // No guest execution, fallback UI or profile reset. Runtime acceptance is pending.
 // One freshly prepared bank/session/manager per screen lifetime; shared process
 // profile/application/audio/light manager remain the same. Options page changes
@@ -242,6 +259,9 @@ public:
     // Retains every UI/GPU bank through close; no native world is launched here.
     bool takeCourseLaunch(OriginalUiRiderProfileOwner50KG::CourseRaceSelection&)noexcept;
     bool borrowsRenderer(const VehicleWindowGl50DS&) const noexcept;
+    // Native custody observation only, including a retained failed loader.
+    bool ownsGarageCustody() const noexcept;
+    OriginalUiFrontendStatus50KG retireGarageBeforeClose(OriginalUiFrontendDiagnostic50KG&) noexcept;
     void requestQuit() noexcept;
     OriginalUiFrontendSnapshot50KG snapshot() const noexcept;
     const OriginalUiMainSession50KG* mainSession() const noexcept;
@@ -257,6 +277,39 @@ public:
     const MaterialTextureGl50EB* gpu() const noexcept;
     const OriginalUiNativeDraw50KG* draw() const noexcept;
 private:
+    friend struct ::original_main_entry50KG::Frontend;
+    friend struct ::original_main_entry50KG::Application;
+    friend class OriginalUiGarageSession50KG;
+    bool queueGarageScreen17DE10(const OriginalUiGarageSession50KG&,std::int32_t,std::int32_t)noexcept;
+    friend class OriginalUiGarageDrawContribution50KG;
+    bool prepareGarageSourceImages12CEA0(const OriginalUiGarageSession50KG&,
+        const std::shared_ptr<const assets::OriginalUiArchive50KG>&,
+        std::shared_ptr<const assets::OriginalUiIpumTextureCache50KG>&,
+        assets::OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool borrowGarageTextureServices50KG(OriginalUiGarageDrawContribution50KG&,
+        MaterialTextureGlRequest50EB&,std::shared_ptr<const assets::OriginalUiArchive50KG>&,
+        std::shared_ptr<const assets::OriginalUiIpumTextureCache50KG>&,VehicleWindowDiagnostic50DS&)noexcept;
+    bool bindGarageTextureBank50KG(OriginalUiGarageDrawContribution50KG&,
+        const assets::MaterialTextureAssets50EA&,const MaterialTextureGl50EB&,VehicleWindowDiagnostic50DS&)noexcept;
+    bool releaseGarageTextureServices50KG(OriginalUiGarageDrawContribution50KG&,VehicleWindowDiagnostic50DS&)noexcept;
+    bool canRearmGarageTextureServices50KG(const OriginalUiGarageDrawContribution50KG&)const noexcept;
+    bool renewGarageTexturePublication140230(OriginalUiGarageDrawContribution50KG&,std::uint64_t)noexcept;
+
+    // Bind the actual enclosing native owner, never a callback/readiness flag.
+    bool bindGarageDestinationRoot50KG(::original_main_entry50KG::Frontend&)noexcept;
+    //Exclusive same-Frontend request custody across one actual renderer reset.
+    //The private caller supplies no readiness flag or replacement context.
+    bool frontendTransferRequestCurrent50KG(
+        const std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA>&)const noexcept;
+    bool beginFrontendTransferReset50KG(
+        std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA>&,
+        OriginalUiFrontendDiagnostic50KG&)noexcept;
+    bool finishFrontendTransferReset50KG(
+        const std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA>&,
+        std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA>,
+        OriginalUiFrontendDiagnostic50KG&)noexcept;
+    bool prepareSharedDialogsInitial(const ::original_main_entry50KG::Application&,
+        VehicleWindowGl50DS&,OriginalUiFrontendDiagnostic50KG&)noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

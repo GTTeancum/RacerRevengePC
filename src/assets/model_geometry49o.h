@@ -68,6 +68,19 @@ bool readPsgHierarchy49O(const std::uint8_t* data, std::size_t bytes,
 // Channels/tracks/keys remain in source order, including repeated row indices.
 bool readMot49O(const std::uint8_t* data, std::size_t bytes,
     MotionView49O& output, GeometryDiagnostic49O& diagnostic) noexcept;
+// Explicit numeric admission for the authenticated Garage Watto closure only.
+// Existing readMot49O remains4096. All file, frame, per-track, channel, row,
+// angle, time and exact-consumption limits above remain unchanged. This enum
+// is NOT authentication authority: the sole production opt-in must require a
+// loaded exact Garage archive plus its exact pinned Watto motion member.
+// Largest actual w_*_9s is5587 keys (37 tracks *151); this changes no storage
+// shape or per-track sampling/workspace bound and permits no arbitrary limit.
+enum class MotKeyAdmission50KG : std::uint8_t {
+    default4096,authenticatedGarageWatto5587
+};
+bool readMot49O(const std::uint8_t* data, std::size_t bytes,
+    MotionView49O& output, GeometryDiagnostic49O& diagnostic,
+    MotKeyAdmission50KG) noexcept;
 // Accessors consume a successfully admitted, unmodified view; invalid indexes
 // return false without changing output. They perform bytewise LE reads, so no
 // host alignment or packed-struct layout assumptions are required.

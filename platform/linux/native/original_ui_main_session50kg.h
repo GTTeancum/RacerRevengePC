@@ -10,13 +10,18 @@
 #include "../../../src/game/original_ui_main_particle_render_state50kg.h"
 #include "../../../src/game/original_ui_main_particle_lighting50kg.h"
 #include "../../../src/game/original_ui_main_fire50kg.h"
+#include "../../../src/game/original_wreck_explosion50la.h"
 #include "../../../src/game/model_playback50kg.h"
 #include "../../../src/game/original_ui_rider_voice_choice50kg.h"
 #include "../../../src/game/coupled_body_advancement49m.h"
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace rr::platform {
 class OriginalUiControllerPopupResources50KG;
+class OriginalUiSharedDialogs50KG;
+class OriginalUiGarageInstanceMaster50KG;
 // This is the sole native profile subset, not a fabricated whole save file.
 // An imported profile supplies these exact fields; no filesystem writes occur.
 struct OriginalUiMainProfile50KG {
@@ -29,6 +34,8 @@ struct OriginalUiMainProfile50KG {
 // Preserve the high unlock bit and every other caller-owned profile field.
 void resetOriginalUiMainProfileFields50KG(OriginalUiMainProfile50KG&) noexcept;
 struct OriginalUiMainApplication50KG {
+    // Actual persistent UI470/47C lifetime, separate from each menu manager.
+    std::shared_ptr<OriginalUiSharedDialogs50KG> sharedDialogs;
     // Global UI +47C popup resources survive Options manager replacement.
     std::shared_ptr<OriginalUiControllerPopupResources50KG> controllerPopupResources;
     game::OriginalUiControllerPopupState50KG controllerPopupState=game::OriginalUiControllerPopup50KG::initialState();
@@ -39,6 +46,29 @@ struct OriginalUiMainApplication50KG {
     OriginalUiMainApplication50KG& operator=(OriginalUiMainApplication50KG&&)=delete;
     // Must be the process owners shared with all other native consumers.
     bool known=false;
+    // Absolute source globals, NOT offsets in the Application object. Native
+    // play-only operation retains their ELF zero-fill defaults process-wide.
+    // No export command is exposed; generated .scb/.tob output is unsupported.
+    // This does not certify guest argc or the separate Fire boot branch.
+private:
+    friend class OriginalUiGaragePodScene50KG;
+    friend class OriginalUiMainSession50KG;
+    friend class OriginalUiOptionsSession50KG;
+    // Actual startup100018 zero-fill, before any UI owner: gp84C8/84CC
+    // and absolute433978. Same noncopyable process state across menus.
+    // fireSerial433970 below remains the one existing Main/Options counter.
+    bool fireLazy84C8_=false;
+    game::OriginalWreckExplosionGlobals50LA explosionGlobals15E800_{};
+    struct SceneConfigExportGlobals final {
+        std::string namespacePrefix36B640;
+        const std::int32_t exportScb434310=0;
+        const std::int32_t exportTob434318=0;
+    } sceneConfigExportGlobals;
+    // Source270FD0 overwrites absolute444078 with a fresh owner every load.
+    // Preserve any overwritten allocation, rather than silently destroying it.
+    std::shared_ptr<OriginalUiGarageInstanceMaster50KG> instanceMaster444078;
+    std::vector<std::shared_ptr<OriginalUiGarageInstanceMaster50KG>> overwrittenInstanceMasters;
+public:
     // The Main fire leaf's uint32 reference and Rider's CoupledNoise context
     // designate the SAME raw RNG word. No copy-in/out, shadow RNG, new seed,
     // or destination-local reset occurs. Application startup writes the same
@@ -53,6 +83,12 @@ struct OriginalUiMainApplication50KG {
     // seeding does not initialize these caches. Survive every menu page.
     // Course native race entry borrows this exact owner; no destination copy.
     game::SharedRandomOwner50ID sharedRandomSelectors{};
+    // Actual process-shared Watto transition assertion lazy guard86B0 and
+    // word434510. A valid motion still initializes these at1D4D0C..18.
+    // Both addresses are in the authenticated ELF zero-fill range. These
+    // process-lifetime fields survive every Watto owner/page retirement.
+    bool wattoMotionGuard86B0=false;
+    std::uint32_t wattoMotionAssertion434510=0;
     game::OriginalUiRiderVoiceChoice50KG riderVoiceChoice;
     // Process-wide lazy playback/IK/libm owners survive page/model destruction.
     // Native application startup initializes them once, alongside this sole
@@ -66,8 +102,10 @@ struct OriginalUiMainApplication50KG {
     // return, not a caller-certified successful no-op for an active request.
     std::int32_t transportE00=-1;
     std::uint32_t uiObject3D8=0;
-    // Source1DEEFC/1DEF08 Course Confirm resets these represented global UI
-    // handles. Native fresh startup has no borrowed object at either handle.
+    // Actual global UI474/478 enable the first/second disconnected-device
+    // check; they are NOT object handles. The concrete shared boot/Main
+    // constructor writes1/0. Source1DEEFC/1DEF08 Course Confirm resets0/0.
+    // The preexisting unjoined native path keeps its historical defaults.
     std::uint32_t courseUi474=0,courseUi478=0;
 };
 enum class OriginalUiMainAudioMode50KG : std::uint8_t { enabled,muted };

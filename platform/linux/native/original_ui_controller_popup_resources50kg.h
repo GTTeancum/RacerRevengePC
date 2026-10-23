@@ -10,6 +10,7 @@ struct OriginalUiOptionsColdInput50KG;
 struct OriginalUiMainColdInput50KG;
 struct OriginalUiMainMaterialBinding50KG;
 class OriginalUiMainDraw50KG;
+class OriginalUiSharedDialogs50KG;
 class OriginalUiMainDrawResources50KG;
 class OriginalUiSourceOwner50KM;
 struct OriginalUiOptionsMaterialBinding50KG;
@@ -37,6 +38,13 @@ public:
  const game::OriginalUiControllerPopupGeometry50KG* geometry() const noexcept;
  bool project(const game::OriginalUiControllerPopupRender50KG&,OriginalUiControllerPopupResourceDiagnostic50KG&) noexcept;
 private:
+ friend class OriginalUiSharedDialogs50KG;
+ bool sharedDialogOwnerCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
+ bool bindSharedDialogOwner2055B0(OriginalUiSharedDialogs50KG&)noexcept;
+ bool sharedDialogBoundCurrent(const OriginalUiSharedDialogs50KG&)const noexcept;
+ bool preflightSharedRetirement20DF80(const OriginalUiSharedDialogs50KG&)const noexcept;
+ bool retireSharedPayloadPart20DF80(OriginalUiSharedDialogs50KG&,std::size_t,OriginalUiControllerPopupResourceDiagnostic50KG&)noexcept;
+ bool finishSharedPayload20E008(OriginalUiSharedDialogs50KG&)noexcept;
  friend class OriginalUiOptionsDrawResources50KG;
  friend class OriginalUiMainDraw50KG;
  friend class OriginalUiMainDrawResources50KG;

@@ -1,4 +1,5 @@
 #pragma once
+#include <exception>
 #include "../../platform/linux/native/original_ui_controller_navigation50la.h"
 // Native original Main session. Included by50DU after its host diagnostics and
 // SessionExit50DU declaration. This lifetime owns no vehicle, world, race audio,
@@ -15,8 +16,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
      "standalone Main requires its real application and no pending Course handoff");
  require50DU(std::fesetround(FE_TONEAREST)==0,"round-to-nearest setup failed");
  auto nativeVideo=originalMainApplication.videoForSession();
+ auto sourceDisplayLifetime=originalMainApplication.raceDisplayForSession50LA();
  auto& host=nativeVideo->host;
- platform::VehicleWindowGl50DS renderer;
+ auto& renderer=sourceDisplayLifetime->renderer();
  original_main_entry50KG::Frontend originalMain;
  original_course_targets50KX::Catalog courseTargets;
  platform::GameHostDiagnostic50ER hostDiagnostic;
@@ -48,8 +50,26 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
  // retire live Rider source publications before the renderer or bank dies.
  auto closeWindow=[&](){
   bool clean=true;
-  if(!originalMain.coordinator.borrowsRenderer(renderer)&&renderer.ownsResources()&&
-      !renderer.close(rendererDiagnostic))return false;
+  // Garage Draw retirement needs its real process FIFO. Retire only that
+  // retained manager first, not the generic renderer/UI. Partial source
+  // failure retains both custody and queued work.
+  if(originalMain.coordinator.ownsGarageCustody()){
+   const auto retired=originalMain.coordinator.retireGarageBeforeClose(originalMain.diagnostic);
+   if(retired!=rr::platform::OriginalUiFrontendStatus50KG::ok&&
+      retired!=rr::platform::OriginalUiFrontendStatus50KG::noChange){
+    std::cerr<<"original frontend Garage retirement source="<<originalMain.diagnostic.sourcePC
+        <<" status="<<static_cast<unsigned>(retired)<<'\n';return false;
+   }
+  }
+  // Retire only the actual empty process collector. Queued source records,
+  // draining work, registry pins or population owners still refuse closure.
+  // Do not close an unborrowed renderer first: partial startup can own real
+  // UI payloads before coordinator.activate publishes its renderer borrow.
+  rr::assets::OriginalStandardMaterialDiagnostic50LA collector;
+  if(!originalMainApplication.retireNativeCollector1A6948(collector)){
+   std::cerr<<"original frontend collector retirement source="<<collector.sourcePC
+       <<" status="<<static_cast<unsigned>(collector.status)<<'\n';return false;
+  }
   if(!originalMain.closeUi())return false;
   if(!originalMain.closeAudio())clean=false;
   if(renderer.ownsResources()&&!renderer.close(rendererDiagnostic))return false;
@@ -97,13 +117,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // The renderer independently verifies GL renderbuffer/viewport limits before
   // allocation. These CPU bounds do not claim GPU capacity or a rendered frame.
   platform::VehicleWindowRequest50DS uiRequest;
-  uiRequest.context=&host;
-  uiRequest.procAddress=[](void* context,const char* name)noexcept->platform::VehicleWindowGlProc50DS {
-   return static_cast<platform::GameHost50ER*>(context)->procAddress(name);
-  };
-  uiRequest.isCurrent=[](void* context)noexcept {
-   return static_cast<platform::GameHost50ER*>(context)->current();
-  };
+  // Use the same retained Application display/context identity as source
+  // services. UI upload ownership remains the actual Frontend UploadLifetime.
+  sourceDisplayLifetime->bindFrontendCreationRequest(uiRequest);
   uiRequest.maximumWidth=maximumWidth;uiRequest.maximumHeight=maximumHeight;
   uiRequest.output=headlessLive?platform::VehicleWindowOutput50DS::headless:platform::VehicleWindowOutput50DS::defaultBackBuffer;
   platform::MaterialTextureGlRequest50EB textureRequest;
@@ -122,13 +138,18 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   // until the real Course screen is active; Main/Options/Rider need no corpus.
   originalMain.prepare(originalMainApplication,nativeVideo,textureRequest,uiRequest,
       std::move(destination),&monotonicNow50DU,sessionIndex);
+  // Authentic APPSTART was prepared above; this same native host is current.
+  // Retain the existing Application-owned canonical construction context
+  // before the dedicated language/font service borrows it.
+  require50DU(bool(nativeVideo->standardMaterialConstructionContext(nativeVideo,originalMainApplication)),
+      "original frontend requires its genuine canonical material context");
   platform::OriginalFrontendWindowRequest50LA rendererRequest;
   rendererRequest.context=uiRequest.context;rendererRequest.procAddress=uiRequest.procAddress;
   rendererRequest.isCurrent=uiRequest.isCurrent;rendererRequest.maximumWidth=uiRequest.maximumWidth;
   rendererRequest.maximumHeight=uiRequest.maximumHeight;rendererRequest.output=uiRequest.output;
   rendererRequest.enableSourceRgba=uiRequest.enableOriginalUiSourceRgba;
   rendererRequest.cpuTextures=uiRequest.originalUiCpuTextures;rendererRequest.textures=uiRequest.originalUiTextures;
-  if(!renderer.createOriginalFrontend(rendererRequest,rendererDiagnostic)){
+  if(!sourceDisplayLifetime->createOriginalFrontend(rendererRequest,rendererDiagnostic)){
    reportRenderer50DU(rendererDiagnostic);throw std::runtime_error("dedicated original frontend renderer creation failed");
   }
   originalMain.activate(renderer);
@@ -179,10 +200,11 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
     const bool capturedCourse=capturedUi.route.screen==6&&capturedUi.route.page==1;
     const bool capturedHall=capturedUi.route.screen==11&&capturedUi.route.page==1;
     const bool capturedTournament=capturedUi.route.screen==9&&capturedUi.route.page==1;
+    const bool capturedGarage=capturedUi.route.screen==13&&capturedUi.route.page==1;
     if(capturedRider){
      require50DU(originalMain.coordinator.riderSession(),"original Rider capture session missing");
      capturedSlot=capturedUi.rider.slot4C8;
-    }else{
+    }else if(!capturedGarage){
      const auto* capturedNavigation=originalMain.navigation();
      require50DU(capturedNavigation,"original UI capture navigation missing");
      const auto group=capturedNavigation->controllerGroup[0];capturedGroup=group;
@@ -190,20 +212,23 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
          capturedNavigation->groups[group].selectedSlot:0;
     }
     const auto capturedAperture=capturedUi.route.screen==4?capturedUi.main.aperture:
-        capturedRider?capturedUi.rider.aperture:capturedCourse?capturedUi.course.aperture:capturedHall?capturedUi.hall.aperture:capturedTournament?capturedUi.tournament.aperture:capturedUi.options.aperture;
+        capturedRider?capturedUi.rider.aperture:capturedCourse?capturedUi.course.aperture:capturedHall?capturedUi.hall.aperture:capturedTournament?capturedUi.tournament.aperture:capturedGarage?capturedUi.garageAperture:capturedUi.options.aperture;
     J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
         {"screen",capturedUi.route.screen},{"page",capturedUi.route.page},{"switches",capturedUi.switches},
-        {"requested_screen",capturedUi.transition.requested.screen},{"requested_page",capturedUi.transition.requested.page},
-        {"selected_group",capturedGroup},{"selected_slot",capturedSlot},
+        {"requested_screen",capturedGarage?J(nullptr):J(capturedUi.transition.requested.screen)},{"requested_page",capturedGarage?J(nullptr):J(capturedUi.transition.requested.page)},
+        {"selected_group",capturedGroup},{"selected_slot",capturedGarage?J(nullptr):J(capturedSlot)},
         {"saved_group",originalMainApplication.gameSettingsProfile->savedGroup6E8},
-        {"lifecycle",static_cast<unsigned>(capturedUi.transition.lifecycle)},
-        {"phase",static_cast<unsigned>(capturedUi.transition.phase)},
+        {"lifecycle",capturedGarage?capturedUi.garageManagerLifecycle:static_cast<unsigned>(capturedUi.transition.lifecycle)},
+        {"phase",capturedGarage?capturedUi.garageManagerTransition:static_cast<unsigned>(capturedUi.transition.phase)},
         {"aperture_state",static_cast<unsigned>(capturedAperture.state)},
         {"aperture_input_enabled",capturedAperture.inputEnabled268},
-        {"gpu_publication",originalMain.coordinator.gpu()->publicationToken()},
+        {"gpu_publication",capturedGarage?J(nullptr):J(originalMain.coordinator.gpu()->publicationToken())},
         {"accepted_update_sequence",originalMain.lastAudioSequence},
         {"file",captureFile.string()},{"width",width},{"height",height},
         {"audio_mixed_frames",mainAudioInfo.mixedFrames},
+        {"audio_source_frame_origin",originalMain.audioOutput.sourceFrameOrigin()},
+        {"audio_output_source_mixed_frames",originalMain.audioOutput.outputSourceMixedFrames()},
+        {"audio_output_serial",originalMain.audioOutput.retainedOutputSerial()},
         {"audio_captured_frames",mainAudioInfo.capturedFrames},{"audio_rate",mainAudioInfo.sampleRate},
         {"audio_clock_microseconds",mainAudioInfo.simulationMicroseconds},
         {"audio_accepted_nanoseconds",originalMain.audioOutput.acceptedNanoseconds()}};
@@ -220,6 +245,25 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
      receipt["source_triangles"]=sourceAccepted?originalMain.submittedTriangles:0;
      receipt["source_coherent_framebuffer_fetch"]=sourceAccepted&&originalMain.submittedCoherentFramebufferFetch;
      receipt["source_texture_barriers"]=sourceAccepted?originalMain.submittedTextureBarriers:0;
+    }
+    if(capturedGarage){
+     // Real Garage is a completed Root target, not the legacy immutable
+     // SourceFrame/GPU bank or a copied Options navigation object.
+     const bool accepted=capturedUi.frameSubmitted&&capturedUi.garageTargetPublished&&
+         capturedUi.garageRootReturned&&capturedUi.garageTimingCommitted&&
+         originalMain.submittedScreen==13&&capturedUi.garagePublication!=0&&
+         originalMain.submittedGaragePublication==capturedUi.garagePublication;
+     receipt["presentation"]="native_source_rgba_target";
+     receipt["garage_loaded"]=capturedUi.garageLoaded;
+     receipt["selected_stat"]=capturedUi.garageLoaded?J(capturedUi.garageSelectedStat):J(nullptr);
+     receipt["source_publication"]=capturedUi.garagePublication;
+     receipt["root_returned"]=capturedUi.garageRootReturned;
+     receipt["timing_committed"]=capturedUi.garageTimingCommitted;
+     receipt["target_published"]=capturedUi.garageTargetPublished;
+     receipt["accepted_native_target"]=accepted;
+     receipt["aperture_bound"]=capturedAperture.bound;
+     receipt["aperture_top"]=capturedAperture.top284;
+     receipt["aperture_bottom"]=capturedAperture.bottom28C;
     }
     if(capturedTournament){
      const bool sourceAccepted=capturedUi.frameSubmitted&&originalMain.submittedScreen==9&&originalMain.sourceFrameGeneration!=0&&
@@ -337,8 +381,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    const bool course=route.screen==6&&route.page==1;
    const bool hall=route.screen==11&&route.page==1;
    const bool tournament=route.screen==9&&route.page==1;
+   const bool garage=route.screen==13&&route.page==1;
    if(physicalInput){
-   if(gameOptions||controls||memoryCard||rider||course||hall||tournament){
+   if(gameOptions||controls||memoryCard||rider||course||hall||tournament||garage){
     menuEvents[0]=menuEvents[0]||input.pressed[80];
     menuEvents[1]=menuEvents[1]||input.pressed[79];
     menuEvents[2]=menuEvents[2]||input.pressed[82]||input.pressed[26];
@@ -394,8 +439,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
    const auto elapsedNanoseconds=originalMain.acceptedElapsed(monotonicNow50DU());
    platform::OriginalUiMainSessionUpdate50KG update;
    update.elapsedSeconds=originalMain.preparedSourceUpdateSeconds();
-   originalMain.update(update,elapsedNanoseconds);
-   originalMain.commitSourceUpdateTiming();
+   const auto acceptedSource=originalMain.update(update,elapsedNanoseconds);
+   // Garage Root already committed its exact source timing; PCM was still advanced once.
+   if(!acceptedSource.sourceTimingCommitted)originalMain.commitSourceUpdateTiming();
    originalMain.render(mainClock,renderer,info.drawableWidth,info.drawableHeight);
    if(!originalMain.coordinator.snapshot().rider.deferred4EC){
     const auto snapshot=originalMain.coordinator.snapshot();
@@ -480,10 +526,19 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
   }
   require50DU(terminalInputError==0,"original frontend input stream failed");
  }catch(...){
+  const auto originalFailure=std::current_exception();
+  // Preserve the original failure before any strict retained-owner cleanup
+  // can terminate. This observation does not relax or skip that cleanup.
+  try{std::rethrow_exception(originalFailure);}
+  catch(const std::exception& e){std::cerr<<"original frontend failure before cleanup: "<<e.what()<<std::endl;}
+  catch(...){std::cerr<<"original frontend failure before cleanup: non-standard exception"<<std::endl;}
   if(!closeWindow()&&!closeWindow()){
    std::cerr<<"original frontend cleanup unresolved; retaining context and owners by terminating\n";std::terminate();
   }
-  throw;
+  // Actual output close has stopped/drained its native voices. The enclosing
+  // terminal boundary retires Root services only after these session locals
+  // (including the real Display) unwind, before Application destruction.
+  std::rethrow_exception(originalFailure);
  }
  bool closed=closeWindow();
  if(!closed&&!(closed=closeWindow())){
@@ -493,7 +548,9 @@ inline SessionExit50DU runOriginalFrontend50LA(const char* corpusPath,bool headl
  const auto audio=originalMain.audioOutput.info();
  J receipt={{"native_frames",originalMain.frameCount},{"captures",originalMain.captureSequence},
      {"world_ticks",0},{"window_swaps",windowSwaps},{"cleanup_complete",true},{"frontend_only",true},
-     {"audio_mixed_frames",audio.mixedFrames},{"audio_source_mixed_frames",originalMain.audioOutput.sourceMixedFrames()},
+     {"audio_mixed_frames",audio.mixedFrames},{"audio_source_mixed_frames",originalMain.audioOutput.sourceMixedFrames()},{"audio_source_frame_origin",originalMain.audioOutput.sourceFrameOrigin()},
+            {"audio_output_source_mixed_frames",originalMain.audioOutput.outputSourceMixedFrames()},
+     {"audio_output_serial",originalMain.audioOutput.retainedOutputSerial()},
      {"audio_captured_frames",audio.capturedFrames},{"audio_rate",audio.sampleRate},
      {"audio_accepted_nanoseconds",originalMain.audioOutput.acceptedNanoseconds()}};
  std::cout<<"original_main_closed "<<receipt.dump()<<'\n';

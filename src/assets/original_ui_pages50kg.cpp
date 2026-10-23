@@ -151,7 +151,11 @@ bool readOriginalUiDat50KG(const OriginalUiArchive50KG& archive,const std::strin
     OriginalUiDat50KG& output,OriginalUiPageDiagnostic50KG& d,
     OriginalUiRepeatedKeyPolicy50KG repeatedKeys) noexcept {
     if (!archive.loaded()) return fail(d,OriginalUiPageError50KG::missingArchive);
-    const auto member=archive.find(name);
+    return OriginalUiDat50KG::parseRetainedMember(archive.find(name),output,d,repeatedKeys);
+}
+bool OriginalUiDat50KG::parseRetainedMember(const OriginalUiMemberView50KG& member,
+    OriginalUiDat50KG& output,OriginalUiPageDiagnostic50KG& d,
+    OriginalUiRepeatedKeyPolicy50KG repeatedKeys) noexcept {
     if (!member.identity || !member.data || !member.size)
         return fail(d,OriginalUiPageError50KG::missingMember);
     if (member.size>originalUiDatByteLimit50KG) return fail(d,OriginalUiPageError50KG::capacity);

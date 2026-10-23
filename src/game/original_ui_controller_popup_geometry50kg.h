@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <string>
 
+namespace rr::platform {class OriginalUiControllerPopupResources50KG;}
 namespace rr::game {
 enum class OriginalUiControllerPopupMaterial50KG : std::uint8_t {
     dim=0,overlay=1,font=2,cross=3,triangle=4
@@ -47,6 +48,7 @@ struct OriginalUiControllerPopupPacket50KG {
 // is synthesized. Borrowed packet pointers survive until the next successful
 // project, and borrowed glyph atlases require the prepared image bank to live.
 class OriginalUiControllerPopupGeometry50KG final {
+    friend class rr::platform::OriginalUiControllerPopupResources50KG;
 public:
     using Diagnostic=OriginalUiControllerPopupGeometryDiagnostic50KG;
     static constexpr std::size_t maximumPackets=9;

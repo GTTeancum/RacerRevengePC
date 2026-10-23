@@ -257,10 +257,21 @@ void GameHost50ER::consumeCommand(GameHostInput50ER& input) noexcept {
 }
 #endif
 
+void GameHost50ER::retainSharedDialogPoll50KG(const GameHostInput50ER& input)noexcept {
+    // Window mode means the actual SDL keyboard route exists. In explicit
+    // headless mode this is the actual retained stdin stream. Focus loss is
+    // not hardware removal; no gamepad is fabricated from keyboard activity.
+    if(sharedDialogPollRevision50KG_==UINT64_MAX){sharedDialogPollCurrent50KG_=false;return;}
+    ++sharedDialogPollRevision50KG_;
+    sharedDialogPrimaryPresent50KG_=info_.inputConnected;
+    sharedDialogSecondPresence50KG_=input.keys.secondControllerPresence;
+    sharedDialogPollCurrent50KG_=true;
+}
 bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noexcept {
     d = {};
     if (!ownerThread()) return fail(d, GameHostError50ER::WrongThread, "poll");
     if (!created()) return fail(d, GameHostError50ER::NotCreated, "poll");
+    sharedDialogPollCurrent50KG_=false;
     input = {};
     if (mode_ == GameHostMode50ER::Window) {
         if (!window_.poll(input.keys, d.window))
@@ -271,6 +282,7 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
         input.checkpointRequested = input.keys.pressed[42] != 0 && // SDL Backspace
             !input.keys.quitRequested && !input.keys.pressed[41] && !input.keys.down[41];
         refreshInfo();
+        retainSharedDialogPoll50KG(input);
         return true;
     }
 #if defined(__linux__)
@@ -316,6 +328,7 @@ bool GameHost50ER::poll(GameHostInput50ER& input, GameHostDiagnostic50ER& d) noe
     refreshInfo();
     input.keys.focused = info_.focused;
     input.keys.minimized = info_.minimized;
+    retainSharedDialogPoll50KG(input);
     return true;
 #else
     return fail(d, GameHostError50ER::UnsupportedMode, "poll/HeadlessLive is unsupported on Windows");
@@ -356,6 +369,7 @@ bool GameHost50ER::closeOwned(GameHostDiagnostic50ER& d) noexcept {
     // Also reached directly by the destructor: never invalidate a retained context.
     if(sessionDisplayBlocksClose50LA())return fail(d,GameHostError50ER::AlreadyOwned,"session renderer/context still retained");
     ready_ = false;
+    sharedDialogPollCurrent50KG_=false;
     bool okay = true;
     if (window_.ownsResources() && !window_.close(d.window))
         okay = fail(d, GameHostError50ER::Window, "WindowHost50DQ::close");

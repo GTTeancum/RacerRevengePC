@@ -59,7 +59,8 @@ DIAGNOSTIC_FIELDS = ('reason', 'screen', 'page', 'switches', 'updates', 'renders
                      'lifecycle', 'aperture_state', 'aperture_top', 'aperture_bottom',
                      'input_shown', 'aperture_input_enabled', 'source_rng', 'fire_serial',
                      'source_milliseconds', 'world_ticks', 'mixed_frames', 'audio_muted', 'audio_failed',
-                     'audio_source_mixed_frames', 'audio_mixed_frames', 'audio_captured_frames',
+                     'audio_source_mixed_frames', 'audio_source_frame_origin', 'audio_output_serial',
+                     'audio_output_source_mixed_frames', 'audio_mixed_frames', 'audio_captured_frames',
                      'audio_accepted_nanoseconds', 'audio_clock_microseconds', 'audio_device_status',
                      'selected_rider', 'selection_attached', 'input_blocked', 'panel_y', 'prompt_mask',
                      'accepted_source_frame', 'source_frame_generation', 'source_target_generation',
@@ -188,6 +189,7 @@ class Recorder:
         self.primary_problem = None
         self.gpu_publications = {}
         self.audio_last = None
+        self.audio_output_identity = None
         self.wav_observation = None
         self.open_checkpoints = set()
         self.checkpoint_source_ns = {}
@@ -294,8 +296,20 @@ class Recorder:
         microseconds = uint(row, 'audio_clock_microseconds')
         if mixed != captured or mixed > MAX_WAV_FRAMES:
             raise ValueError('Real UI PCM/capture counts differ or exceed the WAV bound')
-        if source and uint(row, 'audio_source_mixed_frames') != mixed:
-            raise ValueError('Dedicated source mixer frame count differs from output PCM')
+        # Main's mixer is process-owned; this capture/output's clock is local.
+        # Old ordinary8 receipts have no origin/serial and retain their zero origin.
+        origin = uint(row, 'audio_source_frame_origin') if 'audio_source_frame_origin' in row else 0
+        serial = uint(row, 'audio_output_serial') if 'audio_output_serial' in row else 0
+        identity = (serial, origin)
+        if self.audio_output_identity is not None and identity != self.audio_output_identity:
+            raise ValueError('This UI-only recording cannot cross native output lifetimes')
+        self.audio_output_identity = identity
+        if source:
+            cumulative = uint(row, 'audio_source_mixed_frames')
+            if cumulative < origin or cumulative - origin != mixed:
+                raise ValueError('Actual source mixer frames since output open differ from output PCM')
+        if 'audio_output_source_mixed_frames' in row and uint(row, 'audio_output_source_mixed_frames') != mixed:
+            raise ValueError('Output-relative source counter differs from actual output PCM')
         if microseconds != accepted // 1000 or mixed != microseconds * AUDIO_RATE // 1_000_000:
             raise ValueError('UI PCM counts differ from the accepted source interval clock')
         if device:
@@ -307,7 +321,7 @@ class Recorder:
                     raise ValueError('Unexpected physical-device activity: ' + key)
         observed = (mixed, captured, accepted, microseconds)
         if self.audio_last and any(a < b for a, b in zip(observed, self.audio_last)):
-            raise ValueError('Process-owned audio counters regressed')
+            raise ValueError('Counters regressed within the same actual native output lifetime')
         self.audio_last = observed
 
     @staticmethod

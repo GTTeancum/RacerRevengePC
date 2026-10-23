@@ -43,4 +43,12 @@ struct OriginalUiOverlayText50KG {
 bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
     std::uint16_t widgetId,const OriginalUiEnglish50KG* english,
     OriginalUiOverlayText50KG&,OriginalUiPageDiagnostic50KG&) noexcept;
+// Explicit source-prefix RGB adapter for the authenticated Garage Widgets.Dat
+// only. Source158C00 tokenizes X/Y at comma and Z at newline, then302E10 reads
+// a numeric prefix. Garage17..22 therefore use RGB104 despite the original
+// fourth ",104" suffix. That suffix remains in the DAT; it is not alpha.
+// The generic strict entry above and originalUiTriple50KG remain unchanged.
+bool readOriginalUiGarageOverlayText50KG(const OriginalUiDat50KG& widgets,
+    std::uint16_t widgetId,const OriginalUiEnglish50KG* english,
+    OriginalUiOverlayText50KG&,OriginalUiPageDiagnostic50KG&) noexcept;
 }

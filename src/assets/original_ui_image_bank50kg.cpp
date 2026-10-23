@@ -103,4 +103,13 @@ const OriginalUiImageBankMapping50KG* OriginalUiImageBank50KG::mapping(std::uint
     return storage_&&owner<storage_->mappings.size()&&image<storage_->mappings[owner].size()?
         &storage_->mappings[owner][image]:nullptr;
 }
+OriginalUiMemberView50KG OriginalUiImageBank50KG::sourceMember(std::uint32_t index)const noexcept {
+    const auto* source=storage_&&storage_->images?storage_->images->sourceProvenance(index):nullptr;
+    if(!source||!source->memberIdentity)return {};
+    for(const auto& archive:storage_->archives)for(std::size_t i=0;i<archive->memberCount();++i){
+        const auto member=archive->member(i);if(member.identity==source->memberIdentity)return member;
+    }
+    return {};
+}
+
 }

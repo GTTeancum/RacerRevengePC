@@ -1,6 +1,13 @@
+#include "original_ui_garage_draw_contribution50kg.h"
+#include "original_ui_garage_session50kg.h"
+#include "original_ui_shared_dialogs50kg.h"
+#include "../../../tests/native/original_ui_main_entry50kg.h"
+#include "../../../tests/native/original_race_display_lifetime50la.h"
 // Source-reviewed bounded Course/Tournament integration; runtime acceptance is pending.
 #include "original_ui_frontend50kg.h"
 #include <thread>
+#include <array>
+#include <cstdio>
 #include <algorithm>
 #include "../../../src/assets/original_ui_course_background50kg.h"
 #include <new>
@@ -125,11 +132,18 @@ struct OriginalUiFrontend50KG::Storage {
         std::unique_ptr<OriginalUiRiderSession50KG> rider;
         std::unique_ptr<OriginalUiCourseSession50KG> course;
         std::unique_ptr<OriginalUiTournamentSession50KG> tournament;
+        // Manager13 is the actual counted Root Session, not a synthetic
+        // Transition owner or an immutable SourceFrame recipe.
+        std::shared_ptr<OriginalUiGarageSession50KG> garage;
+        OriginalUiTournamentRouteProposal50KG garageOrigin{};
+        bool garageResourcesPrepared=false,garageEntryAttempted=false,garageRetired=false;
+        std::shared_ptr<const OriginalUiGarageSession50KG> garageReturnOrigin;
         bool riderRetired=false,optionsRetired=false,hallRetired=false,mainRetired=false,tournamentRetired=false;
         Route currentRoute() const noexcept {
             return transition&&transition->snapshot().bound?transition->snapshot().current:initialRoute;
         }
         bool ownsRoute(Route route) const noexcept {
+            if(garage)return same(route,{13,1})&&same(initialRoute,{13,1});
             return route.screen==initialRoute.screen&&
                 (main?same(route,{4,1}):options?options->ownsPreparedPage(route.page):hall?hall->ownsPreparedPage(route.page):rider?rider->ownsPreparedPage(route.page):course?course->ownsPreparedPage(route.page):tournament&&tournament->ownsPreparedPage(route.page));
         }
@@ -141,6 +155,12 @@ struct OriginalUiFrontend50KG::Storage {
             return mainResources?mainResources->textures():(optionsResources?optionsResources->textures():nullptr);
         }
         bool prepared() const noexcept {
+            if(garage){
+                const auto* frontend=owner?owner->garageDestinationFrontend:nullptr;
+                return frontend&&frontend->materialApplicationOwner&&same(initialRoute,{13,1})&&
+                    !garageRetired&&!transition&&!gpu&&!main&&!options&&!hall&&!rider&&!course&&!tournament&&
+                    frontend->materialApplicationOwner->garageManagerLoadedCurrent(*frontend,*garage);
+            }
             if(!owner||!transition||!gpu||!publication||!textures()||!gpu->initialized()||
                 !gpu->validBorrow(owner->cold.textureRequest.context,owner->cold.textureRequest.isCurrent,publication))return false;
             if(same(initialRoute,{4,1})&&main&&mainResources&&!options&&!optionsResources){
@@ -176,18 +196,42 @@ struct OriginalUiFrontend50KG::Storage {
             }
             return false;
         }
-        game::OriginalUiApertureSnapshot50KG aperture() const noexcept {return main?main->snapshot().aperture:options?options->snapshot().aperture:hall?hall->snapshot().aperture:rider?rider->snapshot().aperture:course?course->snapshot().aperture:tournament->snapshot().aperture;}
+        game::OriginalUiApertureSnapshot50KG aperture() const noexcept {return main?main->snapshot().aperture:options?options->snapshot().aperture:hall?hall->snapshot().aperture:rider?rider->snapshot().aperture:course?course->snapshot().aperture:tournament?tournament->snapshot().aperture:game::OriginalUiApertureSnapshot50KG{};}
         const OriginalUiNativeDraw50KG* draw() const noexcept {return main?main->draw():(options?options->draw():hall?hall->draw():course?course->draw():tournament?tournament->draw():nullptr);}
     };
     OriginalUiFrontendCold50KG cold;
+    // The containing native Frontend outlives this coordinator. The actual
+    // Application clock is checked before dereferencing its borrowed context.
+    ::original_main_entry50KG::Frontend* garageDestinationFrontend=nullptr;
+    // Failure text borrows this same retained coordinator, never a local cache
+    // diagnostic string. Failed entry retains the coordinator and its custody.
+    std::array<char,1024> garageSourceImageFailure{};
+    //Native reservation only. It never changes source manager/page state.
+    std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA> transferResetRequest;
+
     assets::OriginalUiEnglish50KG english;
     // Callback contexts are Manager objects at stable addresses, not snapshots.
     // Manager owns no parent shared_ptr, so no cross-session ownership cycle.
     std::unique_ptr<Manager> active,pending,retiring;
+    // The outgoing Tournament's source objects retire normally. Its immutable
+    // bank/GPU stay alive solely for exact renderer restoration on Garage close.
+    std::unique_ptr<Manager> garageRestoration;
+    enum class GarageOperation : std::uint8_t {none,entry,input,update,submit,retire};
+    GarageOperation garageOperation=GarageOperation::none;
+    struct GarageCall {
+        Storage& s;
+        explicit GarageCall(Storage& value,GarageOperation kind)noexcept:s(value){s.inOperation=true;s.garageOperation=kind;}
+        ~GarageCall(){s.garageOperation=GarageOperation::none;s.inOperation=false;}
+    };
+    bool transferResetOuterOperation=false;
     Manager* activating=nullptr;
     Manager* bank=nullptr;
     VehicleWindowGl50DS* renderer=nullptr;
     bool prepared=false,activated=false,faulted=false,quit=false,inOperation=false,closing=false;
+    //An actual exclusive native bank borrow, not a source manager-ready flag.
+    //The owning Draw restores THIS retained manager bank before release.
+    OriginalUiGarageDrawContribution50KG* garageTextureDraw=nullptr;
+    std::uint64_t garageTexturePublication=0;bool garageTextureBound=false;
     bool queued=false,frameRendered=false,frameSubmitted=false;
     bool courseLaunchReady=false,courseLaunchTaken=false;
     bool riderMoving=false;
@@ -347,11 +391,27 @@ struct OriginalUiFrontend50KG::Storage {
         OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;
         return cold.riderProfile->tournamentCareerSnapshot(selected,career)&&!career.cardFlag100BC&&(career.progress219C&31u)==0;
     }
+    bool garageActive()const noexcept {return active&&active->garage&&same(active->initialRoute,{13,1});}
+    bool garageBankCurrent()const noexcept {
+        const auto* m=garageRestoration.get();
+        return m&&m->tournament&&m->tournamentRetired&&m->publishedTournamentBank&&m->textures()&&m->gpu&&
+            m->publication&&m->gpu->initialized()&&m->gpu->validBorrow(cold.textureRequest.context,
+                cold.textureRequest.isCurrent,m->publication)&&bank==m;
+    }
+    bool garageServiceCall(GarageOperation expected)const noexcept {
+        return inOperation&&garageOperation==expected&&garageDestinationFrontend&&
+            garageDestinationFrontend->materialApplicationOwner&&garageBankCurrent();
+    }
     bool sourceCurrent() const noexcept {
+        if(garageActive())return activated&&!faulted&&!closing&&processReady()&&renderer&&renderer->initialized()&&
+            garageBankCurrent()&&active->prepared();
         return activated&&ownsLightManager()&&processReady()&&renderer&&renderer->initialized()&&bank==active.get()&&active&&active->prepared()&&
             active->transition->snapshot().bound&&active->ownsRoute(active->transition->snapshot().current);
     }
     bool destination(Route route) const noexcept {
+        if(same(route,{13,1}))return pending&&same(pending->initialRoute,route)&&
+            pending->garageResourcesPrepared&&!pending->garage&&!pending->transition&&active&&active->tournament&&
+            pending->garageOrigin.source==active->tournament.get()&&pending->garageOrigin.serial&&processReady();
         return pending&&same(pending->initialRoute,route)&&pending->prepared()&&!pending->transition->snapshot().bound&&processReady();
     }
     bool sourceProposalCurrent() const noexcept {
@@ -471,6 +531,15 @@ struct OriginalUiFrontend50KG::Storage {
         }
         if(m.tournament){
             const auto& proposed=s.tournamentProposal.decision;
+            if(proposed.request.targetScreen==13){
+                return !s.faulted&&!s.quit&&&m==s.active.get()&&s.sourceCurrent()&&s.destination({13,1})&&
+                    m.tournament->routeProposalCurrent(s.tournamentProposal)&&
+                    s.pending->garageOrigin.serial==s.tournamentProposal.serial&&
+                    decision.admitted&&!decision.blockers&&decision.action==game::OriginalUiRouteAction50KG::request&&
+                    sameRouteProposal(decision,proposed)&&decision.request.sourceScreen==9&&decision.request.sourcePage==1&&
+                    decision.request.targetScreen==13&&decision.request.targetPage==1&&decision.request.sourcePC==0x1F241C&&
+                    decision.inputPC==0x1F2310&&!decision.profileChanges.count&&m.tournament->commitRoute(s.tournamentProposal,decision);
+            }
             if(proposed.request.targetScreen==6){
                 if(s.faulted||s.quit||&m!=s.active.get()||!s.sourceCurrent()||!s.courseInputsReady(2)||
                    !m.tournament->routeProposalCurrent(s.tournamentProposal)||!s.destination({6,1})||!s.pending->course||
@@ -738,22 +807,25 @@ struct OriginalUiFrontend50KG::Storage {
                     active->rider->routeProposalCurrent(riderProposal);
                 const bool fromCourse=active&&active->course&&same(active->currentRoute(),{6,1})&&active->course->intendedMode()==2&&
                     active->course->routeProposalCurrent(courseProposal)&&courseProposal.decision.request.targetScreen==9;
+                const bool fromGarage=garageActive()&&active->garageRetired&&
+                    active->garage->profileOwnerForReturn17DE10()==cold.riderProfile;
                 std::uint32_t selected=0;
                 if(fromRider)selected=riderProposal.decision.selectedRider;
-                else if(fromCourse){
+                else if(fromCourse||fromGarage){
                     OriginalUiRiderProfileOwner50KG::TournamentCareerSnapshot career;game::OriginalUiCourseRememberedProfile50KG remembered;
                     if(!cold.riderProfile->selectedTournamentCourseSnapshot(career,remembered)){result(d,Status::unavailableDestination);return false;}
                     selected=career.career100C0;
                 }
-                if(prospectiveMode!=2||(!fromRider&&!fromCourse)||!tournamentInputsReady(selected)){
+                if(prospectiveMode!=2||(!fromRider&&!fromCourse&&!fromGarage)||!tournamentInputsReady(selected)){
                     result(d,Status::unavailableDestination);return false;}
                 // A new owner each time, never the retired Tournament pod or
                 // its material/search state from the preceding visit.
                 m.tournamentResources=std::make_shared<OriginalUiTournamentCareerResources50KG>();
                 if(!m.tournamentResources->load(cold.riderProfile,selected,cold.tournament,cold.fonts,
                    cold.appStart,cold.backgrounds,cold.runtime,d.tournamentResources)||
-                   !(fromRider?m.tournamentResources->prepareRiderConfirm(riderProposal,d.tournamentResources):
-                       m.tournamentResources->prepareCourseBack(courseProposal,d.tournamentResources))){
+                   !(fromRider?m.tournamentResources->prepareRiderConfirm(riderProposal,d.tournamentResources):fromCourse?
+                       m.tournamentResources->prepareCourseBack(courseProposal,d.tournamentResources):
+                       m.tournamentResources->prepareGarageBack(active->garage,d.tournamentResources))){
                     result(d,Status::resource);return false;}
                 OriginalUiTournamentWidgetColdInput50KG input;input.appStart=cold.appStart;input.tournament=cold.tournament;
                 input.fonts=cold.fonts;input.controllerPopup=cold.controllerPopup;input.overlays=cold.overlays;
@@ -767,7 +839,8 @@ struct OriginalUiFrontend50KG::Storage {
                 session.lightManager=cold.lightManager;session.profile=cold.riderProfile;session.commonProfile=cold.profile;
                 session.application=cold.application;session.applicationAnimation=cold.applicationAnimation;
                 session.audioMode=cold.audioMode;session.audio=cold.audio;session.externalTransition=m.transition;
-                if(fromRider)session.sourceProposal=riderProposal;else session.sourceProposal=courseProposal;
+                if(fromRider)session.sourceProposal=riderProposal;else if(fromCourse)session.sourceProposal=courseProposal;
+                else{m.garageReturnOrigin=active->garage;session.sourceProposal=m.garageReturnOrigin;}
                 m.tournament=std::make_unique<OriginalUiTournamentSession50KG>();
                 if(m.tournament->bind(session,d.tournament)!=TournamentStatus::ok||
                    m.tournament->prepareBank(d.tournament)!=TournamentStatus::ok||!m.tournament->bank()){
@@ -817,6 +890,41 @@ struct OriginalUiFrontend50KG::Storage {
         catch(...){result(d,Status::resource);return false;}
     }
     bool retireSource(Manager& m,Diagnostic& d) noexcept {
+        if(same(m.initialRoute,{13,1})&&m.garageEntryAttempted&&!m.garageRetired){
+            if(!m.garage||!garageDestinationFrontend||!garageDestinationFrontend->materialApplicationOwner){
+                result(d,Status::cleanup,0x1D1CD0);return false;
+            }
+            const auto& root=*garageDestinationFrontend->materialApplicationOwner;
+            const bool failedEnrollment=m.garage->hasUnenrolledSelectedFailure();
+            const bool failedPending=m.garage->failed_&&m.garage->pendingRetainFailed98A4_;
+            const bool retired=m.garage->hasUnsealedRenderFailure()?
+                root.retireGarageUnsealedRenderFailure(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                m.garage->hasActorSampleFailure()?
+                root.retireGarageActorSampleFailure(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                m.garage->hasPublishedObservationFailure()?
+                root.retireGaragePublishedObservationFailure(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                m.garage->hasWattoBindingFailure()?
+                root.retireGarageWattoBindingFailure(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+            m.garage->hasLoadedPageHideFailure()?
+                root.retireGarageLoadedPageHideFailure(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                m.garage->hasLateSceneBorrowFailure()?
+                root.retireGarageLateSceneBorrowFailure(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                m.garage->hasPartialSceneAttachmentFailure()?
+                root.retireGaragePartialSceneAttachmentFailure(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                m.garage->hasSharedPromptFailure()?
+                root.retireGarageSharedLoaderFailure(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                failedPending?
+                root.retireGaragePendingRetainFailure(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                failedEnrollment?
+                root.retireGarageUnenrolledSelectedEntry(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                m.garage->failed_?
+                (m.garage->managerBaseImagesFailed12CEA0_||m.garage->managerBaseCorpusBeforeAppendFailed_?
+                    root.retireGarageEntryBeforeDat(*garageDestinationFrontend,d.garageRuntime,d.garageDetail):
+                    root.retireGarageEntryBeforeSelected(*garageDestinationFrontend,d.garageRuntime,d.garageDetail)):
+                root.retireGarageManagerNormal2A3510(*garageDestinationFrontend,d.garageRuntime,d.garageDetail);
+            if(!retired){result(d,Status::cleanup,d.garageRuntime.sourcePC);return false;}
+            m.garageRetired=true;
+        }
         if(m.main&&!m.mainRetired){
             if(m.main->teardownSource(renderer,d.main)!=MainStatus::ok){result(d,Status::cleanup);return false;}
             m.mainRetired=true;
@@ -924,6 +1032,51 @@ struct OriginalUiFrontend50KG::Storage {
     bool release(std::unique_ptr<Manager>& m,Diagnostic& d) noexcept {
         if(!m)return true;
         if(!retireSource(*m,d))return false;
+        if(m->garage){
+            OriginalUiGarageNativeState50KG actual;
+            if(!m->garageRetired||!garageDestinationFrontend||!garageDestinationFrontend->materialApplicationOwner){
+                result(d,Status::cleanup,0x2A3B04);return false;
+            }
+            const bool aborted=m->garage->failed_&&m->garage->closed_&&
+                ((m->garage->entryAbortPhase_==OriginalUiGarageSession50KG::EntryAbortPhase::closed&&
+                  m->garage->entryAbortFrontend_==garageDestinationFrontend)||
+                 (m->garage->baseEntryAbortPhase_==OriginalUiGarageSession50KG::BaseEntryAbortPhase::closed&&
+                  m->garage->baseEntryAbortFrontend_==garageDestinationFrontend))&&
+                m->garage->issuer_==garageDestinationFrontend->materialApplicationOwner;
+            const bool abortedUnenrolled=m->garage->failed_&&m->garage->closed_&&
+                m->garage->unenrolledSelectedAbortPhase_==OriginalUiGarageSession50KG::UnenrolledSelectedAbortPhase::closed&&
+                m->garage->unenrolledSelectedAbortFrontend_==garageDestinationFrontend&&
+                m->garage->issuer_==garageDestinationFrontend->materialApplicationOwner;
+            const bool abortedPending=m->garage->failed_&&m->garage->closed_&&
+                m->garage->pendingRetainAbortPhase_==OriginalUiGarageSession50KG::PendingRetainAbortPhase::closed&&
+                m->garage->pendingRetainAbortFrontend_==garageDestinationFrontend&&
+                m->garage->issuer_==garageDestinationFrontend->materialApplicationOwner;
+            const bool abortedShared=m->garage->failed_&&m->garage->closed_&&
+                m->garage->sharedPageAbortPhase_==OriginalUiGarageSession50KG::SharedPageAbortPhase::closed&&
+                m->garage->sharedPageAbortFrontend_==garageDestinationFrontend&&
+                m->garage->issuer_==garageDestinationFrontend->materialApplicationOwner;
+            const bool abortedWattoBinding=m->garage->failed_&&m->garage->closed_&&
+                m->garage->wattoBindingAbortPhase_==OriginalUiGarageSession50KG::WattoBindingAbortPhase::closed&&
+                m->garage->wattoBindingAbortFrontend_==garageDestinationFrontend&&
+                m->garage->issuer_==garageDestinationFrontend->materialApplicationOwner;
+            const bool abortedLoadedPage=m->garage->failed_&&m->garage->closed_&&
+                m->garage->loadedPageAbortPhase_==OriginalUiGarageSession50KG::LoadedPageAbortPhase::closed&&
+                m->garage->loadedPageAbortFrontend_==garageDestinationFrontend&&
+                m->garage->issuer_==garageDestinationFrontend->materialApplicationOwner;
+            const bool abortedLateBorrow=m->garage->failed_&&m->garage->closed_&&
+                m->garage->lateBorrowAbortPhase_==OriginalUiGarageSession50KG::LateBorrowAbortPhase::closed&&
+                m->garage->lateBorrowAbortFrontend_==garageDestinationFrontend&&
+                m->garage->issuer_==garageDestinationFrontend->materialApplicationOwner;
+            const bool abortedPartial=m->garage->failed_&&m->garage->closed_&&
+                m->garage->partialSceneAbortPhase_==OriginalUiGarageSession50KG::PartialSceneAbortPhase::closed&&
+                m->garage->partialSceneAbortFrontend_==garageDestinationFrontend&&
+                m->garage->issuer_==garageDestinationFrontend->materialApplicationOwner;
+            if(!aborted&&!abortedUnenrolled&&!abortedPending&&!abortedShared&&!abortedPartial&&!abortedLateBorrow&&!abortedLoadedPage&&!abortedWattoBinding&&(!garageDestinationFrontend->materialApplicationOwner->observeGarageRuntime50KG(
+                    *garageDestinationFrontend,*m->garage,actual)||!actual.retired)){
+                result(d,Status::cleanup,0x2A3B04);return false;
+            }
+            m->garage.reset();
+        }
         m->main.reset();m->options.reset();m->hall.reset();m->rider.reset();m->course.reset();m->tournament.reset(); // No further callback can reach them.
         if(m->gpu&&!m->gpu->close(d.gpu))return false;
         if(m->riderStagedGpu&&!m->riderStagedGpu->close(d.gpu))return false;
@@ -951,8 +1104,9 @@ OriginalUiFrontend50KG::~OriginalUiFrontend50KG() noexcept {
     // completed close cannot certify a reusable process light lifetime.
     if(storage_&&storage_->lightManagerEntered&&storage_->cold.lightManager)
         storage_->cold.lightManager->invalidateForUntrackedScene();
-    if(storage_)for(const auto* manager:{storage_->retiring.get(),storage_->pending.get(),storage_->active.get()})
-        if(manager&&((manager->main&&manager->main->sourceTeardownPending())||
+    if(storage_)for(const auto* manager:{storage_->retiring.get(),storage_->pending.get(),storage_->active.get(),storage_->garageRestoration.get()})
+        if(manager&&((manager->garageEntryAttempted&&!manager->garageRetired)||
+            (manager->main&&manager->main->sourceTeardownPending())||
             (manager->rider&&manager->rider->sourceTeardownPending())||
             (manager->tournament&&manager->tournament->sourceTeardownPending())||
             (manager->options&&manager->options->sourceTeardownPending()))){
@@ -1013,9 +1167,182 @@ Status OriginalUiFrontend50KG::prepare(const OriginalUiFrontendCold50KG& cold,Di
     }catch(const std::bad_alloc&){if(storage_)return storage_->fault(d,Status::allocation);return result(d,Status::allocation);}
     catch(...){if(storage_)return storage_->fault(d,Status::resource);return result(d,Status::resource);}
 }
+
+bool OriginalUiFrontend50KG::prepareGarageSourceImages12CEA0(
+    const OriginalUiGarageSession50KG& session,
+    const std::shared_ptr<const assets::OriginalUiArchive50KG>& archive,
+    std::shared_ptr<const assets::OriginalUiIpumTextureCache50KG>& out,
+    assets::OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+    d={};auto* s=storage_.get();
+    using EP=OriginalUiGarageSession50KG::ManagerEntryPhase;
+    const auto reject=[&](assets::OriginalStandardMaterialStatus50LA status,std::uint32_t pc,const char* field){
+        d.status=status;d.sourcePC=pc;d.field=field;return false;
+    };
+    if(out||!s||!s->prepared||!s->activated||s->faulted||s->closing||s->transferResetRequest||
+       s->garageTextureDraw||!s->garageServiceCall(Storage::GarageOperation::entry)||
+       !s->active||!same(s->active->initialRoute,{13,1})||!s->active->garageEntryAttempted||
+       s->pending||s->retiring||!s->cold.riderIpumCache||!s->cold.riderIpumCache->loaded()||
+       session.entryFrontend_!=s->garageDestinationFrontend||
+       session.issuer_!=s->garageDestinationFrontend->materialApplicationOwner||
+       !session.sceneAssets_||session.issuer_->garageCustodyOwner_.get()!=&session||
+       !OriginalUiGarageSession50KG::constructionInputsCurrent(*session.issuer_,session.grant_,session.resources_,session.sceneAssets_)||
+       //published_ is Root cleanup custody, established BEFORE1D1860.
+       //The separate source dispatcher publication must still be absent here.
+       session.failed_||!session.published_||session.managerPublished1B8274_||!archive||!archive->loaded())
+        return reject(assets::OriginalStandardMaterialStatus50LA::phase,0x12CEA0,"same live Garage manager entry/cache required");
+    const bool selected=archive==session.sceneAssets_->selectedArchive()&&
+        session.managerEntryPhase_==EP::selectedBankOpened1D1D68&&
+        session.selectedBankLease_&&session.selectedArchiveOnlyScope1D1D88_;
+    const bool garage=archive==session.sceneAssets_->archive()&&
+        session.managerEntryPhase_==EP::selectedReturned1D1CD0&&
+        session.managerArchiveOnlyScope170_;
+    if(!selected&&!garage)return reject(assets::OriginalStandardMaterialStatus50LA::phase,
+        0x12CEA0,"actual selected/base source bank predecessor required");
+    assets::OriginalUiIpumCacheDiagnostic50KG cacheDiagnostic;
+    if(!s->cold.riderIpumCache->appendGarageArchive12CEA0(archive,cacheDiagnostic)){
+        d.slot=cacheDiagnostic.mip;
+        d.texture.status=assets::OriginalStandardTextureStatus50LA::source;
+        d.texture.sourcePC=0x24F178;
+        std::snprintf(s->garageSourceImageFailure.data(),s->garageSourceImageFailure.size(),
+            "authenticated fixed Garage IPUM append failed: cache_error=%u source=%zu mip=%zu "
+            "retained_bytes=%zu requested_bytes=%zu decoded_limit=%zu input_bytes=%zu input_limit=%zu detail=%s",
+            static_cast<unsigned>(cacheDiagnostic.error),cacheDiagnostic.sourceIndex,cacheDiagnostic.mip,
+            cacheDiagnostic.retainedBytes,cacheDiagnostic.requestedBytes,cacheDiagnostic.decodedByteLimit,
+            cacheDiagnostic.inputBytes,cacheDiagnostic.inputByteLimit,cacheDiagnostic.detail.c_str());
+        return reject(assets::OriginalStandardMaterialStatus50LA::texture,0x24F178,
+            s->garageSourceImageFailure.data());
+    }
+    out=s->cold.riderIpumCache;return true;
+}
+bool OriginalUiFrontend50KG::borrowGarageTextureServices50KG(
+    OriginalUiGarageDrawContribution50KG& draw,MaterialTextureGlRequest50EB& request,
+    std::shared_ptr<const assets::OriginalUiArchive50KG>& appStart,
+    std::shared_ptr<const assets::OriginalUiIpumTextureCache50KG>& ipum,
+    VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||!s->prepared||!s->activated||s->faulted||s->closing||s->transferResetRequest||
+       (s->inOperation&&!s->garageServiceCall(Storage::GarageOperation::update))||
+       !s->active||s->pending||s->retiring||
+       (s->garageActive()?(!s->garageBankCurrent()||!s->active->prepared()):!s->active->prepared())||!s->renderer||
+       !draw.frontendTextureServicesCurrent(*this)||!draw.frontendTextureRendererCurrent(*s->renderer)||
+       (s->garageTextureDraw&&(s->garageTextureDraw!=&draw||s->garageTexturePublication!=draw.publication_))||
+       !s->cold.textureRequest.originalUploadBinding||!s->cold.appStart){
+        d.error=VehicleWindowError50DS::material;d.operation="exact live Frontend Garage texture borrow required";return false;
+    }
+    //The real manager and its GPU bank cannot mutate/retire while this borrow
+    //is present. No replacement request, stale transfer generation or menu recipe.
+    s->garageTextureDraw=&draw;s->garageTexturePublication=draw.publication_;
+    request=s->cold.textureRequest;appStart=s->cold.appStart;ipum=s->cold.riderIpumCache;
+    return true;
+}
+bool OriginalUiFrontend50KG::bindGarageTextureBank50KG(OriginalUiGarageDrawContribution50KG& draw,
+    const assets::MaterialTextureAssets50EA& cpu,const MaterialTextureGl50EB& gpu,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||s->garageTextureDraw!=&draw||s->garageTexturePublication!=draw.publication_||s->garageTextureBound||
+       !s->renderer||!draw.frontendTextureServicesCurrent(*this)||!draw.frontendTextureRendererCurrent(*s->renderer)){
+        d.error=VehicleWindowError50DS::material;d.operation="actual pending Garage bank binding required";return false;}
+    if(!s->renderer->bindOriginalUiTextures(cpu,gpu,d))return false;
+    s->garageTextureBound=true;return true;
+}
+bool OriginalUiFrontend50KG::canRearmGarageTextureServices50KG(const OriginalUiGarageDrawContribution50KG& draw)const noexcept {
+    const auto* s=storage_.get();
+    return s&&s->prepared&&s->activated&&!s->faulted&&!s->closing&&!s->transferResetRequest&&
+        (!s->inOperation||s->garageServiceCall(Storage::GarageOperation::update))&&
+        s->active&&s->active->prepared()&&(!s->garageActive()||s->garageBankCurrent())&&!s->pending&&!s->retiring&&s->renderer&&
+        s->garageTextureDraw==&draw&&s->garageTexturePublication==draw.publication_&&s->garageTextureBound&&
+        draw.textureCoordinator_==this&&draw.frontendTextureRendererCurrent(*s->renderer)&&
+        draw.targetCompleted140A38_&&draw.targetPublished140A68_&&draw.terminalQueue105990Current();
+}
+bool OriginalUiFrontend50KG::renewGarageTexturePublication140230(
+    OriginalUiGarageDrawContribution50KG& draw,std::uint64_t next)noexcept {
+    if(!canRearmGarageTextureServices50KG(draw)||next<=draw.publication_)return false;
+    //Same owner-thread, same actual bound GPU bank. This changes only the
+    //native frame lease identity; no upload, native/source cache reset or
+    //ordinary menu history is performed.
+    storage_->garageTexturePublication=next;return true;
+}
+bool OriginalUiFrontend50KG::releaseGarageTextureServices50KG(
+    OriginalUiGarageDrawContribution50KG& draw,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||s->garageTextureDraw!=&draw||s->garageTexturePublication!=draw.publication_||
+       !s->active||!s->renderer||s->closing||
+       (s->garageActive()?(!s->garageBankCurrent()||!s->garageServiceCall(Storage::GarageOperation::retire)):
+            (!s->active->prepared()||s->inOperation))||
+       !draw.frontendTextureRendererCurrent(*s->renderer)){
+        d.error=VehicleWindowError50DS::cleanup;d.operation="retained Garage bank restoration owner mismatch";return false;}
+    //Draw calls only after the real queue is discharged and its native source
+    //prelude has completed. Restore the exact still-retained prior GPU owner.
+    const auto* restoration=s->garageActive()?s->garageRestoration.get():s->active.get();
+    if(!restoration||!restoration->textures()||!restoration->gpu)return false;
+    if(s->garageTextureBound&&!s->renderer->bindOriginalUiTextures(*restoration->textures(),*restoration->gpu,d))return false;
+    s->garageTextureBound=false;s->garageTextureDraw=nullptr;s->garageTexturePublication=0;return true;
+}
+bool OriginalUiFrontend50KG::frontendTransferRequestCurrent50KG(
+ const std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA>& expected)const noexcept {
+    const auto* s=storage_.get();
+    if(!expected||!s||!s->prepared||!s->activated||!s->renderer||!s->active||s->closing||s->transferResetRequest||
+       s->riderMoving||s->cold.textureRequest.originalUploadBinding!=expected)return false;
+    const bool entry=s->garageServiceCall(Storage::GarageOperation::entry)&&same(s->active->initialRoute,{13,1});
+    const bool retirement=s->garageServiceCall(Storage::GarageOperation::retire)&&s->garageActive();
+    const bool runtime=(s->garageServiceCall(Storage::GarageOperation::input)||
+        s->garageServiceCall(Storage::GarageOperation::update)||s->garageServiceCall(Storage::GarageOperation::submit))&&
+        s->garageActive()&&!s->faulted&&!s->quit&&s->active->garage->entryFrontend_==s->garageDestinationFrontend&&
+        s->active->garage->issuer_==s->garageDestinationFrontend->materialApplicationOwner&&
+        !s->active->garage->closed_&&!s->active->garage->failed_;
+    if(runtime)return !s->retiring&&!s->activating&&
+        (!(s->frameRendered&&!s->frameSubmitted)||s->garageOperation==Storage::GarageOperation::submit);
+    if(entry||retirement){
+        // Exact same-root loader/ref0 continuation. Retirement preflight can
+        // still observe its own completed Draw lease; beginReset below cannot.
+        return !s->retiring&&!s->activating&&!(s->frameRendered&&!s->frameSubmitted);
+    }
+    return !s->faulted&&!s->quit&&!s->inOperation&&!s->garageTextureDraw&&!s->pending&&!s->retiring&&
+        !s->activating&&!s->queued&&s->active->prepared()&&!(s->frameRendered&&!s->frameSubmitted);
+}
+bool OriginalUiFrontend50KG::beginFrontendTransferReset50KG(
+ std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA>& out,Diagnostic& d)noexcept {
+    d={};auto* s=storage_.get();
+    if(out||!s||s->garageTextureDraw||
+       (s->garageActive()&&s->garageOperation!=Storage::GarageOperation::entry&&s->garageOperation!=Storage::GarageOperation::retire)||
+       !frontendTransferRequestCurrent50KG(s->cold.textureRequest.originalUploadBinding)){
+        result(d,Status::busy);d.sourcePC=0x2543A4;return false;
+    }
+    //Committed images are allowed. This is not source queue completion or a
+    //blank-image requirement; the actual display performs its own drain gate.
+    s->transferResetRequest=s->cold.textureRequest.originalUploadBinding;
+    out=s->transferResetRequest;s->transferResetOuterOperation=s->inOperation;s->inOperation=true;return true;
+}
+bool OriginalUiFrontend50KG::finishFrontendTransferReset50KG(
+ const std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA>& expected,
+ std::shared_ptr<const assets::OriginalNativeTextureUploadBinding50LA> replacement,Diagnostic& d)noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||!expected||!s->inOperation||s->transferResetRequest!=expected||
+       s->cold.textureRequest.originalUploadBinding!=expected||replacement==expected){
+        result(d,Status::invalidInput);d.sourcePC=0x2543CC;return false;
+    }
+    //Only the owning Frontend can construct replacement. No context, callback,
+    //sampler, budget, decoded asset, image publication or renderer is replaced.
+    if(replacement)s->cold.textureRequest.originalUploadBinding=std::move(replacement);
+    s->transferResetRequest.reset();s->inOperation=s->transferResetOuterOperation;s->transferResetOuterOperation=false;return true;
+}
+bool OriginalUiFrontend50KG::queueGarageScreen17DE10(const OriginalUiGarageSession50KG& source,
+    std::int32_t screen,std::int32_t page)noexcept {
+    auto* s=storage_.get();using Session=OriginalUiGarageSession50KG;
+    if(!s||!s->garageServiceCall(Storage::GarageOperation::update)||s->faulted||s->quit||s->closing||
+       !s->garageActive()||s->active->garage.get()!=&source||s->queued||s->pending||s->retiring||
+       screen!=9||page!=1||source.entryFrontend_!=s->garageDestinationFrontend||
+       source.issuer_!=s->garageDestinationFrontend->materialApplicationOwner||
+       source.runtimePhase_!=Session::RuntimePhase::manager||!source.runtimeFrame_||
+       source.managerLifecycle16C_!=9||source.managerTransition170_||source.managerField15C_||
+       source.managerLifecycleCallbackPending_||source.managerQueued17DE10_||
+       !source.managerPendingScreen164_||*source.managerPendingScreen164_!=screen||
+       !source.managerPendingPage168_||*source.managerPendingPage168_!=page||
+       !source.page_||!source.canRequestPage1D6130(*source.page_))return false;
+    s->queue={2,9,1,0x2A3F70};s->queued=true;return true;
+}
 Status OriginalUiFrontend50KG::configureRendererRequest(VehicleWindowRequest50DS& request,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notPrepared);
-    if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+    if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->prepared)return result(d,Status::notPrepared);
     if(s->activated||s->closing||s->quit)return result(d,Status::busy);
     if(request.context!=s->cold.textureRequest.context||request.isCurrent!=s->cold.textureRequest.isCurrent||!s->active->prepared())return result(d,Status::invalidInput);
@@ -1026,9 +1353,38 @@ Status OriginalUiFrontend50KG::configureRendererRequest(VehicleWindowRequest50DS
     request.enableOriginalUiSourceRgba=bool(s->cold.options)||s->riderInputsReady();
     return result(d,Status::ok);
 }
+bool OriginalUiFrontend50KG::bindGarageDestinationRoot50KG(
+    ::original_main_entry50KG::Frontend& frontend)noexcept {
+    auto* s=storage_.get();
+    if(!s||!s->prepared||s->activated||s->inOperation||s->closing||s->quit||
+       s->garageDestinationFrontend||&frontend.coordinator!=this||!frontend.materialApplicationOwner)
+        return false;
+    const auto& root=*frontend.materialApplicationOwner;
+    if(s->cold.application!=root.state||s->cold.profile!=root.profile)return false;
+    std::uint32_t pause=0;
+    if(!s->cold.applicationAnimation.readPause11C(pause))return false;
+    s->garageDestinationFrontend=&frontend;return true;
+}
+bool OriginalUiFrontend50KG::prepareSharedDialogsInitial(const ::original_main_entry50KG::Application& root,
+ VehicleWindowGl50DS& renderer,Diagnostic& d)noexcept {
+ d={};auto* s=storage_.get();if(!s||!s->prepared||s->activated||s->renderer||s->closing||s->quit||
+    !s->active||!s->active->main||!s->active->mainResources||!s->active->prepared()||s->cold.application!=root.state){
+  result(d,Status::notPrepared);return false;}
+ if(s->cold.application->sharedDialogs){result(d,Status::busy);return false;}
+ std::string error;
+ const auto resultValue=root.prepareSharedDialogsInitial1B7BD0(s->active->mainResources->controllerPopup(),
+  s->cold.controllerPopup,renderer,error);
+ if(resultValue==::original_main_entry50KG::Application::SharedUiBootResult::failed){
+  s->fault(d,Status::cleanup,0x1B7BD0);return false;}
+ // Missing genuine Root services leave only the new Garage/global-dialog
+ // join unopened. Existing Main/Options behavior is unchanged, not replaced
+ // by fake32C,328,renderer or controller history.
+ result(d,resultValue==::original_main_entry50KG::Application::SharedUiBootResult::complete?Status::ok:Status::noChange);
+ return true;
+}
 Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notPrepared);
-    if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+    if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->prepared)return result(d,Status::notPrepared);
     if(s->activated||s->renderer||s->closing||s->quit)return result(d,Status::busy);
     Operation operation(s->inOperation);s->renderer=&renderer;
@@ -1042,7 +1398,25 @@ Status OriginalUiFrontend50KG::activate(VehicleWindowGl50DS& renderer,Diagnostic
 Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input,
     OriginalUiFrontendInputReceipt50KG& receipt,Diagnostic& d) noexcept {
     d={};receipt={};auto* s=storage_.get();if(!s)return result(d,Status::notActive);
-    if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+    if(s->garageActive()){
+        if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+        if(!s->activated||s->quit||s->closing)return result(d,Status::notActive);
+        if(s->queued||s->updates!=s->submittedUpdate)return result(d,Status::busy);
+        receipt.source={13,1};
+        if(input.popupActive||input.sourceInputBlocked)return result(d,receipt.status=Status::noChange);
+        Storage::GarageCall operation(*s,Storage::GarageOperation::input);
+        if(!s->sourceCurrent())return s->fault(d,Status::session,0x1FDE70);
+        receipt.source={13,1};OriginalUiGarageNativeInput50KG actual;
+        auto& frontend=*s->garageDestinationFrontend;
+        const bool returned=frontend.materialApplicationOwner->inputGaragePage1FDE70(
+            frontend,input.originalInput,input.controller,actual,d.garageRuntime,d.garageDetail);
+        receipt.garageInputReached=actual.serial!=0;receipt.garageInputCompleted=actual.status==OriginalUiGarageNativeInput50KG::Status::completed;
+        receipt.garageInputSerial=actual.serial;receipt.garageInputSourcePC=actual.sourcePC;receipt.garageRequestWritten=actual.requestWritten;
+        if(!returned)return s->fault(d,Status::session,actual.sourcePC?actual.sourcePC:d.garageRuntime.sourcePC);
+        // Writing Page+16C is not source17DE10 and creates no destination yet.
+        return result(d,receipt.status=receipt.garageInputCompleted?Status::ok:Status::noChange,actual.sourcePC);
+    }
+    if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->activated)return result(d,Status::notActive);
     if(s->quit||s->closing)return result(d,Status::quit);
     // Do not discard an accepted source frame, especially the unique +440
@@ -1216,7 +1590,42 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
         }
     }else if(s->active->tournament){
         const auto status=s->active->tournament->input(input,receipt.tournament,d.tournament);
-        if(status==TournamentStatus::backProposed||status==TournamentStatus::continueProposed){
+        if(status==TournamentStatus::garageProposed){
+            const auto& proposal=receipt.tournament.routeProposal;
+            const auto& decision=proposal.decision;const auto& request=decision.request;
+            if(s->pending||!s->active->tournament->routeProposalCurrent(proposal)||
+               request.kind!=game::OriginalUiRouteKind50KG::changeScreen||request.sourceScreen!=9||
+               request.sourcePage!=1||request.targetScreen!=13||request.targetPage!=1||
+               request.sourcePC!=0x1F241C||decision.inputPC!=0x1F2310||decision.profileChanges.count||
+               decision.admitted||decision.action!=game::OriginalUiRouteAction50KG::unavailable||
+               decision.blockers!=static_cast<std::uint32_t>(game::OriginalUiRouteBlocker50KG::destinationOwner))
+                return s->fault(d,Status::transition,0x1F241C);
+            receipt.requested={13,1};
+            d.garage.proposalSerial=proposal.serial;d.garage.requestSourcePC=0x1F241C;
+            std::uint32_t pause=0;
+            if(!s->cold.applicationAnimation.readPause11C(pause)||!s->garageDestinationFrontend||
+               !s->garageDestinationFrontend->materialApplicationOwner){
+                d.garage.status=OriginalUiGarageDestinationStatus50KG::rootOwner;
+                d.garage.pendingSourcePC=0x1B823C;
+            }else{
+                auto& frontend=*s->garageDestinationFrontend;
+                frontend.materialApplicationOwner->prepareGarageDestinationResources1F241C(
+                    frontend,proposal,d.garage,receipt.coldInterval);
+            }
+            if(d.garage.status!=OriginalUiGarageDestinationStatus50KG::resourcesPrepared)
+                return result(d,receipt.status=Status::unavailableDestination,d.garage.pendingSourcePC);
+            try{
+                s->pending=std::make_unique<Storage::Manager>();s->pending->owner=s;s->pending->initialRoute={13,1};
+                s->pending->garageResourcesPrepared=true;s->pending->garageOrigin=proposal;
+            }catch(...){return result(d,receipt.status=Status::allocation,0x1F241C);}
+            s->tournamentProposal=proposal;
+            auto admitted=decision;admitted.admitted=true;admitted.blockers=0;admitted.action=game::OriginalUiRouteAction50KG::request;
+            d.transition=s->active->transition->requestRouteDecision(admitted);
+            if(d.transition!=Transition::ok||s->active->tournament->notifyRouteAccepted(proposal,d.tournament)!=TournamentStatus::ok)
+                return s->fault(d,Status::transition,0x1F241C);
+            // Actual constructor/loader is deferred until the outgoing source
+            // frame is submitted and Tournament's real source owner retires.
+        }else if(status==TournamentStatus::backProposed||status==TournamentStatus::continueProposed){
             s->tournamentProposal=receipt.tournament.routeProposal;const auto& proposal=s->tournamentProposal.decision;
             const bool continuing=status==TournamentStatus::continueProposed;
             const std::uint8_t target=continuing?6:5;const std::uint32_t routePC=continuing?0x1F2374:0x1F23C8;
@@ -1285,7 +1694,29 @@ Status OriginalUiFrontend50KG::input(const OriginalUiMainSessionInput50KG& input
 Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& input,
     OriginalUiFrontendUpdateReceipt50KG& receipt,Diagnostic& d) noexcept {
     d={};receipt={};auto* s=storage_.get();if(!s)return result(d,Status::notActive);
-    if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+    if(s->garageActive()){
+        if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+        if(!s->activated||s->quit||s->closing)return result(d,Status::notActive);
+        if(s->queued||s->updates!=s->submittedUpdate)return result(d,Status::busy);
+        Storage::GarageCall operation(*s,Storage::GarageOperation::update);
+        if(!s->sourceCurrent())return s->fault(d,Status::session,0x140CE0);
+        auto& frontend=*s->garageDestinationFrontend;const auto& root=*frontend.materialApplicationOwner;
+        // Actual Frontend SourceTiming is the sole dt producer. Never tick the
+        // detached Transition/immutable menu render or prepare audio again.
+        if(!root.prepareNextGarageFrame140CE0(frontend,d.garageRuntime,d.garageDetail)||
+           !root.continueGarageRootUpdate140CE0(frontend,d.garageRuntime,d.garageDetail))
+            return s->fault(d,Status::session,d.garageRuntime.sourcePC);
+        OriginalUiGarageNativeState50KG actual;
+        if(!root.observeGarageRuntime50KG(frontend,*s->active->garage,actual)||!actual.loaded||
+           !actual.rootReturned||!actual.timingCommitted||actual.targetPublished||!actual.publication)
+            return s->fault(d,Status::session,0x140D60);
+        s->frameRendered=false;s->frameSubmitted=false;++s->updates;
+        receipt.accepted=true;receipt.sequence=s->updates;receipt.source={13,1};
+        receipt.update.elapsedSeconds=static_cast<float>(actual.updateSeconds);receipt.update.paused=actual.paused;
+        receipt.sourceTimingCommitted=true;receipt.sourcePublication=actual.publication;
+        return result(d,Status::ok,0x140D60);
+    }
+    if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->activated)return result(d,Status::notActive);
     if(s->quit||s->closing)return result(d,Status::quit);
     // Do not discard an accepted source frame, especially the unique +440
@@ -1316,6 +1747,16 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
         m.options->update(input,d.options)==OptionsStatus::ok:m.hall?m.hall->update(input,d.hall)==HallStatus::ok:m.rider?m.rider->update(input,d.rider)==RiderStatus::ok:
         m.course?m.course->update(input,d.course)==CourseStatus::ok:m.tournament&&m.tournament->update(input,d.tournament)==TournamentStatus::ok;
     if(!updated)return s->fault(d,Status::session);
+    if(const auto shared=s->cold.application->sharedDialogs;shared&&!m.main&&!m.options){
+        // Main/Options already run the same470 call immediately before their
+        // real47C update. Other native managers must not freeze global state.
+        OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!shared->advance4702048F0(input.elapsedSeconds,sd))return s->fault(d,Status::session,sd.sourcePC);
+        game::OriginalUiControllerPopupPlan50KG plan;
+        if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,input.elapsedSeconds,plan)!=
+           game::OriginalUiControllerPopupStatus50KG::ok)return s->fault(d,Status::session,0x206420);
+        s->cold.application->controllerPopupState=plan.state;
+    }
     if(m.options&&(m.options->pendingAutomaticMemoryCardReturn(s->optionsProposal)||m.options->pendingAutomaticCreditsReturn(s->optionsProposal))){
         const auto& proposal=s->optionsProposal.decision;
         if((!game::originalUiMemoryCardReturnShape50KG(proposal)&&!game::originalUiCreditsReturnShape50KG(proposal))||proposal.admitted||
@@ -1336,7 +1777,20 @@ Status OriginalUiFrontend50KG::update(const OriginalUiMainSessionUpdate50KG& inp
 }
 Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notActive);
-    if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+    if(s->garageActive()){
+        if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+        if(!s->activated||s->quit||s->closing)return result(d,Status::notActive);
+        if(!s->updates||s->renderedUpdate==s->updates)return result(d,Status::invalidInput);
+        Operation operation(s->inOperation);OriginalUiGarageNativeState50KG actual;
+        const auto* frontend=s->garageDestinationFrontend;
+        if(!s->sourceCurrent()||!frontend->materialApplicationOwner->observeGarageRuntime50KG(*frontend,*s->active->garage,actual)||
+           !actual.rootReturned||!actual.timingCommitted||actual.targetPublished)
+            return s->fault(d,Status::renderer,0x140844);
+        // Root already performed the complete actual render callback chain.
+        // This observes that target; it does not manufacture a SourceFrame.
+        s->renderedUpdate=s->updates;++s->renders;s->frameRendered=true;return result(d,Status::ok);
+    }
+    if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->activated)return result(d,Status::notActive);
     if(s->quit||s->closing)return result(d,Status::quit);
     if(!s->updates||s->renderedUpdate==s->updates)return result(d,Status::invalidInput);
@@ -1350,6 +1804,11 @@ Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,
         // than copying raw wall time or advancing the page a second time.
         if(!s->cold.riderPresentation->materialClock(renderClock))return s->fault(d,Status::session);
     }
+    if(const auto shared=s->cold.application->sharedDialogs){OriginalUiSharedDialogs50KG::Diagnostic sd;
+        if(!shared->invisible470204AC0(sd))return s->fault(d,Status::session,sd.sourcePC);
+        if(!m.main&&!m.options&&s->cold.application->controllerPopupState.active3CC)
+            return s->fault(d,Status::session,0x206420);
+    }
     const bool rendered=m.main?m.main->render(clock,d.main)==MainStatus::ok:m.options?
         m.options->render({clock.known,clock.advanceAnimations,clock.milliseconds,clock.applicationAnimation},d.options)==OptionsStatus::ok:
         m.hall?m.hall->render(renderClock,d.hall)==HallStatus::ok:m.rider?m.rider->render({renderClock.known,renderClock.advanceAnimations,renderClock.milliseconds,renderClock.applicationAnimation},d.rider)==RiderStatus::ok:
@@ -1360,7 +1819,19 @@ Status OriginalUiFrontend50KG::render(const OriginalUiMainFrameClock50KG& clock,
 }
 Status OriginalUiFrontend50KG::submit(VehicleWindowGl50DS& renderer,std::int32_t width,std::int32_t height,Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::notActive);
-    if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+    if(s->garageActive()){
+        if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+        if(!s->activated||s->quit||s->closing)return result(d,Status::notActive);
+        if(&renderer!=s->renderer||!s->frameRendered||s->frameSubmitted||s->renderedUpdate!=s->updates)
+            return result(d,Status::invalidInput);
+        Storage::GarageCall operation(*s,Storage::GarageOperation::submit);
+        if(!s->sourceCurrent())return s->fault(d,Status::session,0x140A68);
+        auto& frontend=*s->garageDestinationFrontend;
+        if(!frontend.materialApplicationOwner->publishGarageTarget140A68(frontend,width,height,d.renderer,d.garageDetail))
+            return s->fault(d,Status::renderer,0x140A68);
+        s->frameSubmitted=true;s->submittedUpdate=s->updates;++s->submissions;return result(d,Status::ok);
+    }
+    if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->activated)return result(d,Status::notActive);
     if(s->quit||s->closing)return result(d,Status::quit);
     if(&renderer!=s->renderer||s->bank!=s->active.get()||!s->frameRendered||s->frameSubmitted||s->renderedUpdate!=s->updates)
@@ -1390,7 +1861,44 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,Diag
 Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
     OriginalUiFrontendDeferredReceipt50KG& receipt,Diagnostic& d) noexcept {
     d={};receipt={};auto* s=storage_.get();if(!s)return result(d,Status::notActive);
-    if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+    if(s->garageActive()){
+        if(s->inOperation)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
+        if(!s->activated||s->quit||s->closing)return result(d,Status::notActive);
+        if(!s->queued)return result(d,Status::noChange);
+        if(&renderer!=s->renderer||!s->frameSubmitted||s->submittedUpdate!=s->updates||s->pending||s->retiring||
+           s->queue.flags!=2||s->queue.screen!=9||s->queue.page!=1||s->queue.sourcePC!=0x2A3F70||
+           s->active->garage->profileOwnerForReturn17DE10()!=s->cold.riderProfile)
+            return result(d,Status::invalidInput,0x2A3F70);
+        Storage::GarageCall operation(*s,Storage::GarageOperation::retire);
+        if(!s->sourceCurrent()||!s->drainBankWork(d,receipt.bankDrain)||!s->retireSource(*s->active,d))
+            return s->fault(d,Status::cleanup,d.garageRuntime.sourcePC);
+        // Root2A3510 has retired actual source children and released its native
+        // capsule. Only the genuine unchanged profile receipt remains.
+        if(s->garageTextureDraw||!s->garageBankCurrent()||s->ownsLightManager())
+            return s->fault(d,Status::cleanup,0x2A3B04);
+        s->garageOperation=Storage::GarageOperation::none;
+        receipt.coldInterval.measured=true;receipt.coldInterval.begin=std::chrono::steady_clock::now();
+        const bool prepared=s->build(s->pending,{9,1},d,2)&&s->pending->tournament&&
+            s->pending->garageReturnOrigin==s->active->garage&&s->pending->prepared()&&
+            renderer.bindOriginalUiTextures(*s->pending->textures(),*s->pending->gpu,d.renderer);
+        receipt.coldInterval.end=std::chrono::steady_clock::now();
+        receipt.coldInterval.nanoseconds=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            receipt.coldInterval.end-receipt.coldInterval.begin).count());
+        if(!prepared)return s->fault(d,d.status==Status::ok?Status::session:d.status,d.sourcePC);
+        if(!s->pending->tournament->acceptEntryProfileCommit(s->pending->garageReturnOrigin))
+            return s->fault(d,Status::session,0x17DE10);
+        s->pending->garageReturnOrigin.reset();
+        if(!s->enterLightManager(*s->cold.tournament,d))return s->fault(d,Status::session,d.lightManager.sourcePC);
+        s->bank=s->pending.get();s->activating=s->pending.get();
+        d.transition=s->pending->transition->bindInitialPage(9,1,s->callbacks(*s->pending));s->activating=nullptr;
+        if(d.transition!=Transition::ok||s->faulted)return s->fault(d,Status::transition,0x2A3C10);
+        s->retiring=std::move(s->active);s->active=std::move(s->pending);
+        s->queued=false;s->queue={};s->frameRendered=false;s->frameSubmitted=false;s->renderedUpdate=s->updates;
+        ++s->switches;
+        if(!s->release(s->retiring,d)||!s->release(s->garageRestoration,d))return s->fault(d,Status::cleanup);
+        return result(d,Status::ok);
+    }
+    if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);if(s->faulted){d=s->failure;return d.status;}
     if(!s->activated)return result(d,Status::notActive);
     if(s->quit||s->closing)return result(d,Status::quit);if(!s->queued)return result(d,Status::noChange);
     if(&renderer!=s->renderer||s->bank!=s->active.get()||!s->frameSubmitted||s->submittedUpdate!=s->updates||s->retiring)
@@ -1414,6 +1922,28 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
     }
     if(!old.applicationRequestQueued||old.lifecycle!=Life::queueScreen||!same(old.requested,target)||!s->destination(target))return s->fault(d,Status::transition);
     if(!s->ownsLightManager())return s->fault(d,Status::session,0x148110);
+    if(same(target,{13,1})){
+        if(!s->pending->garageResourcesPrepared||s->pending->garage||s->garageRestoration||!s->active->tournament||
+           !s->garageDestinationFrontend||!s->garageDestinationFrontend->materialApplicationOwner)
+            return s->fault(d,Status::transition,0x1B823C);
+        if(!s->drainBankWork(d,receipt.bankDrain)||!s->retireSource(*s->active,d)||!s->releaseLightManager(d))
+            return s->fault(d,Status::cleanup,0x2A3510);
+        // Immutable bank survives source teardown. It is NOT a second live
+        // Tournament Session and never supplies Garage geometry or history.
+        s->garageRestoration=std::move(s->active);s->active=std::move(s->pending);s->bank=s->garageRestoration.get();
+        s->queued=false;s->queue={};s->frameRendered=false;s->frameSubmitted=false;s->renderedUpdate=s->updates;
+        s->active->garageEntryAttempted=true;s->garageOperation=Storage::GarageOperation::entry;
+        receipt.coldInterval.measured=true;receipt.coldInterval.begin=std::chrono::steady_clock::now();
+        auto& frontend=*s->garageDestinationFrontend;
+        const bool loaded=frontend.materialApplicationOwner->loadPreparedGarageManager1D1950(
+            frontend,s->cold.fonts,s->active->garage,d.garageRuntime,d.garageDetail);
+        receipt.coldInterval.end=std::chrono::steady_clock::now();
+        receipt.coldInterval.nanoseconds=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            receipt.coldInterval.end-receipt.coldInterval.begin).count());
+        s->garageOperation=Storage::GarageOperation::none;
+        if(!loaded||!s->active->prepared())return s->fault(d,Status::session,d.garageRuntime.sourcePC);
+        ++s->switches;return result(d,Status::ok);
+    }
     const auto* destinationArchive=s->pending->main?s->cold.mainMenu.get():
         (s->pending->options?s->cold.options.get():s->pending->hall?s->cold.hall.get():s->pending->rider?s->cold.rider.get():s->pending->course?s->cold.course.get():s->pending->tournament?s->cold.tournament.get():nullptr);
     if(!destinationArchive)return s->fault(d,Status::unavailableDestination,0x1CCD88);
@@ -1458,9 +1988,29 @@ Status OriginalUiFrontend50KG::commitDeferred(VehicleWindowGl50DS& renderer,
     if(!s->release(s->retiring,d))return s->fault(d,Status::cleanup);
     return result(d,Status::ok);
 }
-Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
+Status OriginalUiFrontend50KG::retireGarageBeforeClose(Diagnostic& d) noexcept {
     d={};auto* s=storage_.get();if(!s)return result(d,Status::noChange);
     if(s->inOperation)return result(d,Status::busy);
+    Storage::GarageCall operation(*s,Storage::GarageOperation::retire);bool retired=false;
+    for(auto* m:{s->active.get(),s->pending.get(),s->retiring.get()}){
+        if(!m||!same(m->initialRoute,{13,1})||!m->garageEntryAttempted||m->garageRetired)continue;
+        // Source manager custody is transferred only into active. A later
+        // native handle may remain in retiring, but only after this exact
+        // Root retirement has already created garageRetired.
+        if(m!=s->active.get()||!m->garage||!s->retireSource(*m,d))
+            return result(d,Status::cleanup,d.garageRuntime.sourcePC);
+        retired=true;
+    }
+    if(s->garageTextureDraw)return result(d,Status::cleanup,0x105990);
+    return result(d,retired?Status::ok:Status::noChange);
+}
+Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
+    d={};auto* s=storage_.get();if(!s)return result(d,Status::noChange);
+    if(ownsGarageCustody()||(s->active&&same(s->active->initialRoute,{13,1})&&s->active->garageEntryAttempted)){
+        const auto retired=retireGarageBeforeClose(d);
+        if(retired!=Status::ok&&retired!=Status::noChange)return retired;
+    }
+    if(s->inOperation||s->garageTextureDraw)return result(d,Status::busy);
     // Reject before closing/frame flags, Rider end, or source-owner retirement.
     // Keep every backing intact until actual primitive leases have retired.
     if(s->renderer&&s->renderer->hasSessionDependents50LA()) {
@@ -1475,8 +2025,10 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
         if(s->renderer){
             // Source owner retirement must occur while the exact live renderer
             // context exists. Failed retirement retains every owner for retry.
-            for(auto* manager:{s->retiring.get(),s->pending.get(),s->active.get()})
+            for(auto* manager:{s->retiring.get(),s->pending.get(),s->active.get(),s->garageRestoration.get()})
                 if(manager&&!s->retireSource(*manager,d))return result(d,Status::cleanup);
+            if(const auto shared=s->cold.application->sharedDialogs){OriginalUiSharedDialogs50KG::Diagnostic sd;
+                if(!shared->retireAttached142590(sd))return result(d,Status::cleanup,sd.sourcePC);}
             // Retain the exact borrowed object even if failed close ended
             // resource ownership. An idempotent successful retry clears it.
             if(!s->renderer->close(d.renderer))return result(d,Status::cleanup);
@@ -1485,21 +2037,31 @@ Status OriginalUiFrontend50KG::close(Diagnostic& d) noexcept {
         if(!s->release(s->retiring,d))return result(d,Status::cleanup);
         if(!s->release(s->pending,d))return result(d,Status::cleanup);
         if(!s->release(s->active,d))return result(d,Status::cleanup);
+        if(!s->release(s->garageRestoration,d))return result(d,Status::cleanup);
         // Cleanup retries retain this lease until every renderer/session/GPU
         // consumer is gone. Per-manager release above must not touch it.
         if(!s->releaseLightManager(d))return result(d,Status::cleanup,d.lightManager.sourcePC);
+        if(const auto shared=s->cold.application->sharedDialogs){std::string error;
+            if(!shared->inputs_.root||!shared->inputs_.root->finishSharedUiDispatcherAfterBanks1B7140(error))
+                return result(d,Status::cleanup,0x1B7140);
+        }
     }
     storage_.reset();return result(d,Status::ok);
 }
 bool OriginalUiFrontend50KG::takeCourseLaunch(OriginalUiRiderProfileOwner50KG::CourseRaceSelection& out)noexcept{
-    auto* s=storage_.get();if(!s||s->faulted||s->quit||s->closing||s->inOperation||!s->courseLaunchReady||s->courseLaunchTaken)return false;
+    auto* s=storage_.get();if(!s||s->faulted||s->quit||s->closing||s->inOperation||s->garageTextureDraw||!s->courseLaunchReady||s->courseLaunchTaken)return false;
     out=s->launchSelection;s->courseLaunchTaken=true;return true;
 }
 bool OriginalUiFrontend50KG::borrowsRenderer(const VehicleWindowGl50DS& renderer) const noexcept {
     return storage_&&storage_->renderer==&renderer;
 }
+bool OriginalUiFrontend50KG::ownsGarageCustody() const noexcept {
+    const auto* s=storage_.get();if(!s)return false;
+    for(const auto* m:{s->active.get(),s->pending.get(),s->retiring.get()})if(m&&m->garage)return true;
+    return false;
+}
 void OriginalUiFrontend50KG::requestQuit() noexcept {
-    auto* s=storage_.get();if(!s||s->inOperation)return;
+    auto* s=storage_.get();if(!s||s->inOperation||(s->garageTextureDraw&&!s->garageActive()))return;
     s->quit=true;s->frameRendered=false;s->frameSubmitted=false;
     if(s->active){if(s->active->main)s->active->main->requestQuit();if(s->active->options)s->active->options->requestQuit();if(s->active->hall)s->active->hall->requestQuit();
         if(s->active->rider)s->active->rider->requestQuit();if(s->active->course)s->active->course->requestQuit();if(s->active->tournament)s->active->tournament->requestQuit();}
@@ -1515,6 +2077,15 @@ OriginalUiFrontendSnapshot50KG OriginalUiFrontend50KG::snapshot() const noexcept
     if(s->active){out.route=s->active->currentRoute();if(s->active->transition)out.transition=s->active->transition->snapshot();
         if(s->active->main)out.main=s->active->main->snapshot();if(s->active->options)out.options=s->active->options->snapshot();if(s->active->hall)out.hall=s->active->hall->snapshot();
         if(s->active->rider)out.rider=s->active->rider->snapshot();if(s->active->course)out.course=s->active->course->snapshot();if(s->active->tournament)out.tournament=s->active->tournament->snapshot();}
+    if(s->garageActive()&&s->garageDestinationFrontend&&s->garageDestinationFrontend->materialApplicationOwner){
+        OriginalUiGarageNativeState50KG actual;
+        if(s->garageDestinationFrontend->materialApplicationOwner->observeGarageRuntime50KG(*s->garageDestinationFrontend,*s->active->garage,actual)){
+            out.garageLoaded=actual.loaded;out.garageRootReturned=actual.rootReturned;out.garageTimingCommitted=actual.timingCommitted;
+            out.garageTargetPublished=actual.targetPublished;out.garagePublication=actual.publication;
+            out.garageManagerLifecycle=actual.managerLifecycle;out.garageManagerTransition=actual.managerTransition;
+            out.garageSelectedStat=actual.selectedStat;out.garageAperture=actual.aperture;
+        }
+    }
     if(s->pending)out.preparedDestination=s->pending->initialRoute;return out;
 }
 const OriginalUiMainSession50KG* OriginalUiFrontend50KG::mainSession() const noexcept {return storage_&&storage_->active?storage_->active->main.get():nullptr;}
@@ -1529,6 +2100,325 @@ const OriginalUiOptionsDrawResources50KG* OriginalUiFrontend50KG::optionsResourc
 const assets::MaterialTextureAssets50EA* OriginalUiFrontend50KG::textures() const noexcept {return storage_&&storage_->active?storage_->active->textures():nullptr;}
 const MaterialTextureGl50EB* OriginalUiFrontend50KG::gpu() const noexcept {return storage_&&storage_->active?storage_->active->gpu.get():nullptr;}
 const OriginalUiNativeDraw50KG* OriginalUiFrontend50KG::draw() const noexcept {
-    const auto* s=storage_.get();return s&&!s->inOperation&&!s->faulted&&!s->quit&&!s->closing&&s->frameRendered&&s->active?s->active->draw():nullptr;
+    const auto* s=storage_.get();return s&&!s->inOperation&&!s->garageTextureDraw&&!s->faulted&&!s->quit&&!s->closing&&s->frameRendered&&s->active?s->active->draw():nullptr;
+}
+}
+
+namespace original_main_entry50KG {
+//Native equivalent of the reached UIGarage transfer setup/reset pair. The
+//source's fixed transfer rows are not GPU resources on this backend: real GL
+//uploads are synchronous, sealed scopes. Retire their generation only after
+//one real2450A0 drain, then renew the same Frontend's stored upload request.
+bool Frontend::garageTransferIdentityCurrent(
+ const std::shared_ptr<GarageTransferGrant>& grant)const noexcept {
+    const auto display=garageTransferDisplay_.lock();
+    return grant&&grant==garageTransferGrant_&&garageTransferManager_&&
+        grant->generation_==garageTransferGeneration_&&grant->epoch_==garageTransferEpoch_&&
+        garageTransferApplication_==materialApplicationOwner&&display&&
+        display->application_==garageTransferApplication_&&
+        display->frontendOwnerCurrent50KG()&&uploadLifetime_&&
+        uploadLifetime_->frontend_==this&&!uploadLifetime_->retired_&&!uploadLifetime_->active_&&
+        uploadLifetime_->thread_==std::this_thread::get_id()&&uploadLifetimeLive(*uploadLifetime_);
+}
+bool Frontend::garageTransferOwnerCurrent(
+ const std::shared_ptr<GarageTransferGrant>& grant)const noexcept {
+    const auto display=garageTransferDisplay_.lock();
+    return grant&&grant->current()&&garageTransferPhase_==GarageTransferPhase::ready&&
+        garageTransferIdentityCurrent(grant)&&display&&garageTransferActive_&&
+        display->frontendTransferBindingCurrent50KG(*garageTransferActive_,uploadLifetime_)&&
+        coordinator.borrowsRenderer(display->renderer_)&&
+        coordinator.frontendTransferRequestCurrent50KG(garageTransferActive_);
+}
+bool Frontend::prepareGarageTransfers2542F0(
+ const std::shared_ptr<GarageTransferGrant>& grant,GarageTransferDiagnostic& d)noexcept {
+    d={};
+    const bool same=grant&&grant==garageTransferGrant_&&
+        grant->generation_==garageTransferGeneration_&&grant->epoch_==garageTransferEpoch_;
+    if(same&&garageTransferPhase_==GarageTransferPhase::failed){d=garageTransferFailure_;return false;}
+    if(same&&garageTransferPhase_==GarageTransferPhase::ready){
+        if(!garageTransferOwnerCurrent(grant)){
+            d.status=Status::invalidInput;d.sourcePC=0x2543CC;return false;
+        }
+        d.sourcePC=0x2543CC;return true; //Historical exact entry; never repeat its drain.
+    }
+    //1D1980 precedes manager load and dispatcher1B8268 publication. A later
+    //manager may replace the ledger only after an actual prior exit and a new
+    //authentic constructor epoch, never merely a Back input or pointer reuse.
+    if(!grant||!grant->current()||!materialApplicationOwner||
+       grant->issuer()!=materialApplicationOwner||
+       grant->application()!=materialApplicationOwner->entitiesOwner_||
+       !grant->borrowManagerName194()||grant->scope_->garageManagerPublished()||
+       (garageTransferGrant_&&(same||garageTransferPhase_!=GarageTransferPhase::retired||
+         garageTransferGrant_->current()||grant->scope_!=garageTransferGrant_->scope_||
+         grant->epoch_<=garageTransferEpoch_))){
+        d.status=Status::invalidInput;d.sourcePC=0x1D1980;return false;
+    }
+    const auto* manager=grant->manager();
+    auto display=materialApplicationOwner->raceDisplayOwner50LA_.lock();
+    if(!manager||manager->reference00!=1||manager->kind!=rr::game::OriginalWreckComponentKind50LA::uiGarageManager1D1860||
+       manager->sessionGeneration!=grant->generation_||manager->parent1C||manager->previous10||
+       manager->next14||manager->firstChild18||!display||display->application_!=materialApplicationOwner||
+       !display->frontendOwnerCurrent50KG()||!uploadLifetime_||uploadLifetime_->retired_||
+       uploadLifetime_->active_||uploadLifetime_->thread_!=std::this_thread::get_id()||
+       !uploadLifetimeLive(*uploadLifetime_)||!coordinator.borrowsRenderer(display->renderer_)){
+        d.status=Status::invalidInput;d.sourcePC=0x1D1980;return false;
+    }
+    std::shared_ptr<const GarageTransferBinding> previous;
+    if(!coordinator.beginFrontendTransferReset50KG(previous,d))return false;
+    if(!display->frontendTransferBindingCurrent50KG(*previous,uploadLifetime_)){
+        GarageTransferDiagnostic release;
+        if(!coordinator.finishFrontendTransferReset50KG(previous,{},release)){d=release;return false;}
+        d.status=Status::invalidInput;d.sourcePC=0x2543A4;return false;
+    }
+    garageTransferGrant_=grant;garageTransferDisplay_=display;
+    garageTransferApplication_=materialApplicationOwner;garageTransferManager_=manager;
+    garageTransferGeneration_=grant->generation_;garageTransferEpoch_=grant->epoch_;
+    garageTransferBefore_=previous;garageTransferActive_.reset();garageTransferAfter_.reset();garageTransferFailure_={};
+    garageTransferEntryDrain_={};garageTransferExitDrain_={};
+    garageTransferEntryResetStatus_=255;garageTransferExitResetStatus_=255;
+    garageTransferPhase_=GarageTransferPhase::entryDrainAttempted;
+    const auto reset=display->retireDirectUploadBindings2543F0(d.renderer);
+    garageTransferEntryResetStatus_=static_cast<std::uint8_t>(reset.status);
+    garageTransferEntryDrain_.renderer=d.renderer;garageTransferEntryDrain_.sourcePC=reset.sourcePC;
+    garageTransferEntryDrain_.status=reset.status==rr::game::OriginalCameraStartStatus::complete?Status::ok:Status::renderer;
+    if(reset.status!=rr::game::OriginalCameraStartStatus::complete){
+        d.status=Status::renderer;d.sourcePC=reset.sourcePC;
+        GarageTransferDiagnostic release;
+        if(!coordinator.finishFrontendTransferReset50KG(previous,{},release)){
+            d.status=release.status;d.sourcePC=release.sourcePC;
+        }
+        garageTransferFailure_=d;garageTransferPhase_=GarageTransferPhase::failed;return false;
+    }
+    garageTransferPhase_=GarageTransferPhase::entryDrained;
+    std::shared_ptr<const GarageTransferBinding> replacement;
+    try{replacement=std::shared_ptr<const GarageTransferBinding>(new GarageTransferBinding(
+        uploadLifetime_,previous->manager_,previous->context_,previous->current_));}
+    catch(...){
+        d.status=Status::allocation;d.sourcePC=0x2543AC;
+        GarageTransferDiagnostic release;
+        if(!coordinator.finishFrontendTransferReset50KG(previous,{},release)){
+            d.status=release.status;d.sourcePC=release.sourcePC;
+        }
+        garageTransferFailure_=d;garageTransferPhase_=GarageTransferPhase::failed;return false;
+    }
+    //Old sealed request remains stored until this exact, nonallocating replace.
+    GarageTransferDiagnostic publication;
+    if(!display->frontendTransferBindingCurrent50KG(*replacement,uploadLifetime_)||
+       !coordinator.finishFrontendTransferReset50KG(previous,replacement,publication)){
+        d.status=publication.status==Status::ok?Status::invalidInput:publication.status;
+        d.sourcePC=0x2543CC;
+        //If publication failed before replacement, discharge only our exact
+        //reservation. Never overwrite an unexpected request or unlock another.
+        GarageTransferDiagnostic release;
+        coordinator.finishFrontendTransferReset50KG(previous,{},release);
+        garageTransferFailure_=d;garageTransferPhase_=GarageTransferPhase::failed;return false;
+    }
+    garageTransferActive_=std::move(replacement);garageTransferPhase_=GarageTransferPhase::ready;
+    d.sourcePC=0x2543CC;return true;
+}
+bool Frontend::retireFailedSharedPageTransfers(
+ const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>& owner,GarageTransferDiagnostic& d)noexcept {
+    using Session=rr::platform::OriginalUiGarageSession50KG;
+    d={};
+    if(!materialApplicationOwner||!owner||materialApplicationOwner->garageCustodyOwner_!=owner||
+       owner->entryFrontend_!=this||owner->sharedPageAbortFrontend_!=this||
+       owner->sharedPageAbortPhase_!=Session::SharedPageAbortPhase::managerRefReleased||
+       !owner->sharedPageFailurePrefixCurrent(*materialApplicationOwner)||
+       !owner->grant_->garageFailedSharedLoaderPayloadCurrent(owner.get())){
+        d.status=Status::invalidInput;d.sourcePC=0x1D18FC;return false;
+    }
+    return retireGarageTransfersAtPayload(owner->grant_,owner.get(),d);
+}
+bool Frontend::retireFailedPartialSceneTransfers(
+ const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>& owner,GarageTransferDiagnostic& d)noexcept {
+    using Session=rr::platform::OriginalUiGarageSession50KG;d={};
+    if(!materialApplicationOwner||!owner||materialApplicationOwner->garageCustodyOwner_!=owner||
+       owner->entryFrontend_!=this||owner->partialSceneAbortFrontend_!=this||
+       owner->partialSceneAbortPhase_!=Session::PartialSceneAbortPhase::managerRefReleased||
+       !owner->partialSceneFailurePrefixCurrent(*materialApplicationOwner)||
+       !owner->grant_->garageFailedPartialScenePayloadCurrent(owner.get())){
+        d.status=Status::invalidInput;d.sourcePC=0x1D18FC;return false;
+    }
+    return retireGarageTransfersAtPayload(owner->grant_,owner.get(),d,true);
+}
+bool Frontend::retireFailedWattoBindingTransfers(
+ const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>& owner,GarageTransferDiagnostic& d)noexcept {
+    using Session=rr::platform::OriginalUiGarageSession50KG;d={};
+    if(!materialApplicationOwner||!owner||materialApplicationOwner->garageCustodyOwner_!=owner||
+       owner->entryFrontend_!=this||owner->wattoBindingAbortFrontend_!=this||
+       owner->wattoBindingAbortPhase_!=Session::WattoBindingAbortPhase::managerRefReleased||
+       !owner->wattoBindingFailurePrefixCurrent(*materialApplicationOwner)||
+       !owner->grant_->garageFailedWattoBindingPayloadCurrent(owner.get())){
+        d.status=Status::invalidInput;d.sourcePC=0x1D18FC;return false;
+    }
+    return retireGarageTransfersAtPayload(owner->grant_,owner.get(),d,false,false,false,true);
+}
+bool Frontend::retireFailedLoadedHideTransfers(
+ const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>& owner,GarageTransferDiagnostic& d)noexcept {
+    using Session=rr::platform::OriginalUiGarageSession50KG;d={};
+    if(!materialApplicationOwner||!owner||materialApplicationOwner->garageCustodyOwner_!=owner||
+       owner->entryFrontend_!=this||owner->loadedPageAbortFrontend_!=this||
+       owner->loadedPageAbortPhase_!=Session::LoadedPageAbortPhase::managerRefReleased||
+       !owner->loadedPageFailurePrefixCurrent(*materialApplicationOwner)||
+       !owner->grant_->garageFailedLoadedHidePayloadCurrent(owner.get())){
+        d.status=Status::invalidInput;d.sourcePC=0x1D18FC;return false;
+    }
+    return retireGarageTransfersAtPayload(owner->grant_,owner.get(),d,false,false,true);
+}
+bool Frontend::retireFailedLateBorrowTransfers(
+ const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>& owner,GarageTransferDiagnostic& d)noexcept {
+    using Session=rr::platform::OriginalUiGarageSession50KG;d={};
+    if(!materialApplicationOwner||!owner||materialApplicationOwner->garageCustodyOwner_!=owner||
+       owner->entryFrontend_!=this||owner->lateBorrowAbortFrontend_!=this||
+       owner->lateBorrowAbortPhase_!=Session::LateBorrowAbortPhase::managerRefReleased||
+       !owner->lateBorrowFailurePrefixCurrent(*materialApplicationOwner)||
+       !owner->grant_->garageFailedLateBorrowPayloadCurrent(owner.get())){
+        d.status=Status::invalidInput;d.sourcePC=0x1D18FC;return false;
+    }
+    return retireGarageTransfersAtPayload(owner->grant_,owner.get(),d,false,true);
+}
+bool Frontend::retireGarageTransfers2543F0(
+ const std::shared_ptr<GarageTransferGrant>& grant,GarageTransferDiagnostic& d)noexcept {
+    return retireGarageTransfersAtPayload(grant,nullptr,d);
+}
+bool Frontend::retireGarageTransfersAtPayload(
+ const std::shared_ptr<GarageTransferGrant>& grant,const rr::platform::OriginalUiGarageSession50KG* failedPage,
+ GarageTransferDiagnostic& d,bool failedPartial,bool failedLateBorrow,bool failedLoadedHide,bool failedWattoBinding)noexcept {
+    d={};const auto display=garageTransferDisplay_.lock();
+    const bool same=grant&&grant==garageTransferGrant_&&
+        grant->generation_==garageTransferGeneration_&&grant->epoch_==garageTransferEpoch_&&
+        garageTransferApplication_==materialApplicationOwner;
+    if(same&&garageTransferPhase_==GarageTransferPhase::failed){d=garageTransferFailure_;return false;}
+    if(same&&garageTransferPhase_==GarageTransferPhase::retired){d.sourcePC=0x254420;return true;}
+    //current()/manager()/issuer() are intentionally NOT used here: genuine
+    //1D18FC is after manager ref0. Scope authenticates that exact payload point.
+    if(!same||!display||garageTransferPhase_!=GarageTransferPhase::ready||
+       (static_cast<unsigned>(failedPartial)+static_cast<unsigned>(failedLateBorrow)+
+        static_cast<unsigned>(failedLoadedHide)+static_cast<unsigned>(failedWattoBinding)>1)||
+       !(failedPage?(failedWattoBinding?grant->garageFailedWattoBindingPayloadCurrent(failedPage):
+         (failedLoadedHide?grant->garageFailedLoadedHidePayloadCurrent(failedPage):
+          (failedLateBorrow?grant->garageFailedLateBorrowPayloadCurrent(failedPage):
+           (failedPartial?grant->garageFailedPartialScenePayloadCurrent(failedPage):
+            grant->garageFailedSharedLoaderPayloadCurrent(failedPage))))):grant->garageTransferRetirement1D18FCCurrent())||!garageTransferIdentityCurrent(grant)||
+       !garageTransferActive_||
+       !display->frontendTransferBindingCurrent50KG(*garageTransferActive_,uploadLifetime_)||
+       !coordinator.borrowsRenderer(display->renderer_)){
+        d.status=Status::invalidInput;d.sourcePC=0x1D18FC;return false;
+    }
+    std::shared_ptr<const GarageTransferBinding> current;
+    if(!coordinator.beginFrontendTransferReset50KG(current,d))return false;
+    if(current!=garageTransferActive_){
+        GarageTransferDiagnostic release;
+        if(!coordinator.finishFrontendTransferReset50KG(current,{},release)){d=release;return false;}
+        d.status=Status::invalidInput;d.sourcePC=0x1D18FC;return false;
+    }
+    garageTransferPhase_=GarageTransferPhase::exitDrainAttempted;
+    const auto reset=display->retireDirectUploadBindings2543F0(d.renderer);
+    garageTransferExitResetStatus_=static_cast<std::uint8_t>(reset.status);
+    garageTransferExitDrain_.renderer=d.renderer;garageTransferExitDrain_.sourcePC=reset.sourcePC;
+    garageTransferExitDrain_.status=reset.status==rr::game::OriginalCameraStartStatus::complete?Status::ok:Status::renderer;
+    if(reset.status!=rr::game::OriginalCameraStartStatus::complete){
+        d.status=Status::renderer;d.sourcePC=reset.sourcePC;
+        GarageTransferDiagnostic release;
+        if(!coordinator.finishFrontendTransferReset50KG(current,{},release)){
+            d.status=release.status;d.sourcePC=release.sourcePC;
+        }
+        garageTransferFailure_=d;garageTransferPhase_=GarageTransferPhase::failed;return false;
+    }
+    garageTransferPhase_=GarageTransferPhase::exitDrained;
+    std::shared_ptr<const GarageTransferBinding> replacement;
+    try{replacement=std::shared_ptr<const GarageTransferBinding>(new GarageTransferBinding(
+        uploadLifetime_,current->manager_,current->context_,current->current_));}
+    catch(...){
+        d.status=Status::allocation;d.sourcePC=0x254420;
+        GarageTransferDiagnostic release;
+        if(!coordinator.finishFrontendTransferReset50KG(current,{},release)){
+            d.status=release.status;d.sourcePC=release.sourcePC;
+        }
+        garageTransferFailure_=d;garageTransferPhase_=GarageTransferPhase::failed;return false;
+    }
+    GarageTransferDiagnostic publication;
+    if(!display->frontendTransferBindingCurrent50KG(*replacement,uploadLifetime_)||
+       !coordinator.finishFrontendTransferReset50KG(current,replacement,publication)){
+        d.status=publication.status==Status::ok?Status::invalidInput:publication.status;
+        d.sourcePC=0x254420;
+        GarageTransferDiagnostic release;
+        coordinator.finishFrontendTransferReset50KG(current,{},release);
+        garageTransferFailure_=d;garageTransferPhase_=GarageTransferPhase::failed;return false;
+    }
+    //2543F0 retires optional transfer storage, not global texture/direct-upload
+    //authority. Retain the old expired binding and renew only the Frontend's
+    //native request, so subsequent ordinary UI uploads use a real current
+    //generation. This is NOT construction of source13C at destructor return.
+    garageTransferAfter_=std::move(replacement);
+    garageTransferPhase_=GarageTransferPhase::retired;d.sourcePC=0x254420;return true;
+}
+
+bool Frontend::retireFailedGarageEntryTransfers(
+ const std::shared_ptr<GarageTransferGrant>& grant,GarageTransferDiagnostic& d)noexcept {
+    d={};const auto display=garageTransferDisplay_.lock();
+    const bool same=grant&&grant==garageTransferGrant_&&
+        grant->generation_==garageTransferGeneration_&&grant->epoch_==garageTransferEpoch_&&
+        garageTransferApplication_==materialApplicationOwner;
+    if(same&&garageTransferPhase_==GarageTransferPhase::failed){d=garageTransferFailure_;return false;}
+    if(same&&garageTransferPhase_==GarageTransferPhase::failedEntryRetired){d.sourcePC=0x254420;return true;}
+    const auto* manager=grant&&grant->current()?grant->manager():nullptr;
+    // Application checks the failed Session, bank and absent/retired model consumers
+    // before this private call. Independently enforce the actual empty manager
+    // and its own ready transfer owner; no normal source receipt is fabricated.
+    if(!same||!manager||grant->scope_->garageManagerPublished()||
+       manager!=garageTransferManager_||manager->reference00!=1||manager->parent1C||
+       manager->previous10||manager->next14||manager->firstChild18||
+       !display||garageTransferPhase_!=GarageTransferPhase::ready||
+       !garageTransferOwnerCurrent(grant)||!garageTransferActive_||
+       !display->frontendTransferBindingCurrent50KG(*garageTransferActive_,uploadLifetime_)){
+        d.status=Status::invalidInput;d.sourcePC=0x1D1CD0;return false;
+    }
+    std::shared_ptr<const GarageTransferBinding> current;
+    if(!coordinator.beginFrontendTransferReset50KG(current,d))return false;
+    if(current!=garageTransferActive_){
+        GarageTransferDiagnostic release;
+        if(!coordinator.finishFrontendTransferReset50KG(current,{},release)){d=release;return false;}
+        d.status=Status::invalidInput;d.sourcePC=0x1D1CD0;return false;
+    }
+    garageTransferPhase_=GarageTransferPhase::exitDrainAttempted;
+    const auto reset=display->retireDirectUploadBindings2543F0(d.renderer);
+    garageTransferExitResetStatus_=static_cast<std::uint8_t>(reset.status);
+    garageTransferExitDrain_.renderer=d.renderer;garageTransferExitDrain_.sourcePC=reset.sourcePC;
+    garageTransferExitDrain_.status=reset.status==rr::game::OriginalCameraStartStatus::complete?Status::ok:Status::renderer;
+    if(reset.status!=rr::game::OriginalCameraStartStatus::complete){
+        d.status=Status::renderer;d.sourcePC=reset.sourcePC;
+        GarageTransferDiagnostic release;
+        if(!coordinator.finishFrontendTransferReset50KG(current,{},release)){
+            d.status=release.status;d.sourcePC=release.sourcePC;
+        }
+        garageTransferFailure_=d;garageTransferPhase_=GarageTransferPhase::failed;return false;
+    }
+    garageTransferPhase_=GarageTransferPhase::exitDrained;
+    std::shared_ptr<const GarageTransferBinding> replacement;
+    try{replacement=std::shared_ptr<const GarageTransferBinding>(new GarageTransferBinding(
+        uploadLifetime_,current->manager_,current->context_,current->current_));}
+    catch(...){
+        d.status=Status::allocation;d.sourcePC=0x254420;
+        GarageTransferDiagnostic release;
+        if(!coordinator.finishFrontendTransferReset50KG(current,{},release)){
+            d.status=release.status;d.sourcePC=release.sourcePC;
+        }
+        garageTransferFailure_=d;garageTransferPhase_=GarageTransferPhase::failed;return false;
+    }
+    GarageTransferDiagnostic publication;
+    if(!display->frontendTransferBindingCurrent50KG(*replacement,uploadLifetime_)||
+       !coordinator.finishFrontendTransferReset50KG(current,replacement,publication)){
+        d.status=publication.status==Status::ok?Status::invalidInput:publication.status;
+        d.sourcePC=0x254420;
+        GarageTransferDiagnostic release;
+        coordinator.finishFrontendTransferReset50KG(current,{},release);
+        garageTransferFailure_=d;garageTransferPhase_=GarageTransferPhase::failed;return false;
+    }
+    // Native failed-constructor cleanup of the same real request generation.
+    // Preserve old sealed identities and the real replacement; this is NOT
+    // normal1D18FC/Page retirement and cannot authorize a failed-entry replay.
+    garageTransferAfter_=std::move(replacement);
+    garageTransferPhase_=GarageTransferPhase::failedEntryRetired;d.sourcePC=0x254420;return true;
 }
 }

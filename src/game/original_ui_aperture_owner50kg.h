@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 
+namespace rr::platform { class OriginalUiGarageSession50KG; }
 namespace rr::game {
 // Source page+0x4B4, not the manager's lifecycle or transition phase.
 enum class OriginalUiApertureState50KG : std::uint8_t {
@@ -77,10 +78,10 @@ struct OriginalUiApertureCallbacks50KG {
     // Borrowed native owners must outlive this object. All calls are serial,
     // synchronous and noexcept. Callbacks must not mutate/reenter the owner.
     void* context=nullptr;
-    // Certifies real Main hook side-effect owners, the +0x440 native object,
+    // Certifies real selected-route hook side-effect owners, the +0x440 native object,
     // both original primitives and their real render-pass submission owner.
     // A trace-only sink or asset-presence check is insufficient certification.
-    // This does NOT certify the rest of Main's page/input/manager capabilities.
+    // This does NOT certify the rest of that route's page/input/manager capabilities.
     bool (*available)(void*) noexcept=nullptr;
     // Synchronous native implementation of the exact hook in the event. PCs
     // are provenance only and are NEVER interpreted as executable addresses.
@@ -179,6 +180,16 @@ public:
     OriginalUiApertureStatus50KG beginTournamentEntryAtRender48(
         OriginalUiTransitionPhase50KG actualManagerPhase170,std::uint8_t actualPopupFlags29) noexcept;
     bool tournamentExitRequested4060() const noexcept {return tournament_&&tournamentExitRequested4060_;}
+    // Garage13/1 shares1D63B0/1D7550, but not its complete transition predicate.
+    // Entry1FEA10 delegates1D6280. Exit7C is an intentional no-op; the real
+    // session must retain4D8/panel and Watto1D5C10 before delayed close1FE980.
+    OriginalUiApertureStatus50KG bindGarage(std::shared_ptr<const assets::OriginalUiArchive50KG>,
+        const OriginalUiApertureCallbacks50KG&,OriginalUiApertureDiagnostic50KG&) noexcept;
+    OriginalUiApertureStatus50KG saveGarageUpdateDelta38(float actualDelta) noexcept;
+    // Shared aperture numeric predicate only, never Garage transition completion.
+    // pollCompletion deliberately returns unavailable for Garage. The session
+    // must additionally apply literal1FEA60 to actual panel4D8.
+    bool garageAperturePredicate(OriginalUiTransitionPhase50KG) const noexcept;
     OriginalUiApertureSnapshot50KG snapshot() const noexcept { return state_; }
     const OriginalUiApertureConfig50KG* config() const noexcept {
         return state_.bound?&config_:nullptr;
@@ -213,6 +224,10 @@ public:
         OriginalUiTransitionRoute50KG,OriginalUiTransitionPhase50KG) const noexcept;
 
 private:
+    friend class rr::platform::OriginalUiGarageSession50KG;
+    // Only the actual future Garage session can enter this path, after reaching
+    // original1FE954..980. No public boolean/timer substitute admits close.
+    OriginalUiApertureStatus50KG beginGarageDeferredCloseAtUpdate38() noexcept;
     std::shared_ptr<const assets::OriginalUiArchive50KG> archive_;
     OriginalUiApertureConfig50KG config_{};
     OriginalUiApertureSnapshot50KG state_{};
@@ -220,13 +235,13 @@ private:
     OriginalUiApertureCallbacks50KG callbacks_{};
     mutable bool inOperation_=false;
     bool entryOnly_=false;
-    bool optionsMenu_=false,rider_=false,course_=false,tournament_=false,hallOfFame_=false;
+    bool optionsMenu_=false,rider_=false,course_=false,tournament_=false,hallOfFame_=false,garage_=false;
     mutable bool tournamentExitRequested4060_=false;
     std::uint8_t optionsPage_=1;
     OriginalUiApertureStatus50KG bindPageImpl(
         std::shared_ptr<const assets::OriginalUiArchive50KG>,
         const OriginalUiApertureCallbacks50KG&,bool entryOnly,bool optionsMenu,std::uint8_t page,
-        OriginalUiApertureDiagnostic50KG&,bool rider=false,bool course=false,bool tournament=false,bool hallOfFame=false) noexcept;
+        OriginalUiApertureDiagnostic50KG&,bool rider=false,bool course=false,bool tournament=false,bool hallOfFame=false,bool garage=false) noexcept;
     OriginalUiApertureStatus50KG saveUpdateDelta38(float actualDelta) noexcept;
     bool available() const noexcept;
     void emit(OriginalUiApertureHookKind50KG,std::uint32_t callPC,

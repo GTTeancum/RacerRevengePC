@@ -11,8 +11,10 @@
 #include <cstring>
 #include <exception>
 #include <memory>
+#include <optional>
 #include <vector>
 
+namespace rr::platform {class OriginalUiGarageModelResource50KG; class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageModelLowering50KG; class OriginalUiGarageVisibility50KG;}
 namespace rr::game {
 enum class OriginalRacerModelPacketStatus50LA : std::uint8_t {
     complete,phase,geometry,palette,numeric,allocation
@@ -38,10 +40,17 @@ struct OriginalRacerModelPacket50LA {
     // native view producer. Other clip/LOD flags and complete packet20 remain
     // outside this field; in particular this is not a fabricated full word.
     std::uint16_t distanceFlags20=0;
+    // Full source20 is absent until the real Garage241280 matrix callback.
+    // It is captured before the later1B3 cache-bit store, never reconstructed.
+    std::optional<std::uint16_t> garageSourceFlags20;
     std::size_t modelMatrixIndex()const noexcept{return extraMatrixCount;}
 };
 
 class OriginalRacerModelPackets50LA final {
+    friend class rr::platform::OriginalUiGarageModelResource50KG;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    friend class rr::platform::OriginalUiGarageModelLowering50KG;
+    friend class rr::platform::OriginalUiGarageVisibility50KG;
     using S=OriginalRacerModelPacketStatus50LA;
     using R=OriginalRacerModelPacketResult50LA;
 public:
@@ -311,6 +320,114 @@ public:
         return {S::complete,0x240520u};
     }
 private:
+    // Actual one-node/no20 Garage branch. Private to its real retained model
+    // and draw owner. This is only241280's numeric packet preparation, not a
+    // visibility selection, queue admission or accepted-frame capability.
+    R prepareGarageDirectMatrix241684(const SceneGraph49P& graph,
+        const std::array<float,3>& cameraPosition,float fogStartB0)noexcept {
+        matricesPrepared_=false;geometryRevision_=0;
+        if(!constructed240740()||!model_||!geometry_||hasPalette20_||count_!=1||
+           model_->fields().packets1F0!=this||model_->sourceRowCount()!=1||
+           (!model_->loadedFreshRows28CAC0()&&!model_->warmChildlessRows_)||
+           model_->model_.nodeCount1A0!=(model_->warmChildlessRows_?0u:1u)||!(model_->model_.flags191&1u)||
+           (model_->fields().flags1B3&1u)||model_->fields().offsetEnabled1DC||
+           packets_[0].extraMatrixCount||packets_[0].matrixSlots.size()!=1||
+           !packets_[0].sourcePaletteRows.empty())return {S::phase,0x2415e0u};
+        const auto bounds=model_->publishDirectRootBounds28E110(graph);
+        if(!bounds.okay())return {S::phase,bounds.sourcePC};
+        const auto index=static_cast<std::size_t>(model_->model_.sceneIndex);
+        if(index>=graph.count||!refreshSceneWorld49P(graph,model_->model_.sceneIndex))return {S::phase,0x2897b0u};
+        const auto& root=graph.nodes[index];
+        const std::array<float,3> local{{root.localC0.v[12],root.localC0.v[13],root.localC0.v[14]}};
+        float distance=0;
+        if(!std::isfinite(fogStartB0)||!model_->model_.radius198||
+           !projectOriginalRacerDistance26F070(model_->model_.bounds160,local,cameraPosition,distance))return {S::numeric,0x26f190u};
+        volatile float farEdge=distance+*model_->model_.radius198;
+        if(!std::isfinite(farEdge)||matrixRevision_==std::numeric_limits<std::uint64_t>::max())return {S::numeric,0x24133cu};
+        auto& fields=model_->fields();fields.distance1BC=distance;
+        fields.flags1B2=static_cast<std::uint8_t>((fields.flags1B2&~2u)|(farEdge<fogStartB0?0u:2u));
+        //241390 skips24141C..24146C: no palette second-map distance test.
+        // Keep the actual previous1B3 byte; do not manufacture a map2 gate.
+        directFlags20_=static_cast<std::uint16_t>(fields.flags1B2)|(static_cast<std::uint16_t>(fields.flags1B3)<<8);
+        packets_[0].distanceFlags20=static_cast<std::uint16_t>(directFlags20_&0x0202u);
+        std::memcpy(packets_[0].matrixSlots[0].v,root.world100.v,sizeof root.world100.v);
+        ++matrixRevision_;matricesPrepared_=true;return {S::complete,0x2416a0u};
+    }
+    // Private reached241280 producer. The owning Visibility callback supplies
+    // the same retained model graph, actual14A0A0 light result and live Display
+    // B0/process382FA0 values. This is only the matrix/flag prefix: no material
+    // cache, FIFO append, Entity children or complete-frame receipt is implied.
+    R prepareGaragePackets241280(SceneGraph49P graph,
+        const original_racer_lighting50KM::LightMatrices* lights,
+        float fogStartB0,float secondMapDistance382FA0)noexcept {
+        matricesPrepared_=false;geometryRevision_=0;
+        if(!constructed240740()||!model_||!geometry_||!packets_||!count_||
+           model_->fields().packets1F0!=this||model_->fields().geometry1B4!=geometry_||
+           !model_->fields().sourceRows1B8||!(model_->model_.flags191&1u)||
+           !model_->fields().distance1BC||std::fegetround()!=FE_TONEAREST)
+            return {S::phase,0x2412acu};
+        const auto index=static_cast<std::size_t>(model_->model_.sceneIndex);
+        if(index>=graph.count||!refreshSceneWorld49P(graph,model_->model_.sceneIndex))
+            return {S::phase,0x2897b0u};
+        auto& fields=model_->fields();
+        const auto radius=model_->model_.nodeCount1A0==1u?model_->model_.radius194:model_->model_.radius198;
+        if(!radius||!std::isfinite(*radius)||!std::isfinite(*fields.distance1BC)||
+           !std::isfinite(fogStartB0)||!std::isfinite(secondMapDistance382FA0)||
+           matrixRevision_==std::numeric_limits<std::uint64_t>::max())return {S::numeric,0x24133cu};
+        const bool extra=(fields.flags1B3&1u)!=0;
+        if(extra&&!lights)return {S::phase,hasPalette20_?0x2413c8u:0x24161cu};
+        if(hasPalette20_!=(geometry_->hasPalette20())||count_!=(hasPalette20_?geometry_->paletteCount20():1u))
+            return {S::palette,0x24141cu};
+        for(std::size_t i=0;i<count_;++i){
+            const auto& packet=packets_[i];
+            if(packet.extraMatrixCount!=(extra?2u:0u)||
+               packet.matrixSlots.size()!=packet.extraMatrixCount+1u+packet.sourcePaletteRows.size())
+                return {S::palette,0x241488u};
+            if(hasPalette20_){
+                const auto* original=geometry_->palette20(i);
+                if(!original||*original!=packet.sourcePaletteRows)return {S::palette,0x24150cu};
+                for(auto id:packet.sourcePaletteRows)
+                    if(id>=model_->sourceRowCount())return {S::palette,0x241540u};
+            }else if(!packet.sourcePaletteRows.empty())return {S::palette,0x2415e0u};
+        }
+        volatile float farEdge=*fields.distance1BC+*radius;
+        if(!std::isfinite(farEdge))return {S::numeric,0x24133cu};
+        fields.flags1B2=static_cast<std::uint8_t>((fields.flags1B2&~2u)|(farEdge<fogStartB0?0u:2u));
+        if(hasPalette20_)fields.flags1B3=static_cast<std::uint8_t>((fields.flags1B3&~2u)|
+            (secondMapDistance382FA0<*fields.distance1BC?2u:0u));
+        const auto sourceFlags=static_cast<std::uint16_t>(fields.flags1B2)|
+            (static_cast<std::uint16_t>(fields.flags1B3)<<8);
+        for(std::size_t i=0;i<count_;++i){
+            auto& packet=packets_[i];packet.garageSourceFlags20=sourceFlags;
+            packet.distanceFlags20=static_cast<std::uint16_t>(sourceFlags&0x0202u);
+            if(extra){
+                for(unsigned row=0;row<4;++row){
+                    std::memcpy(packet.matrixSlots[0].v+4u*row,lights->directions[row].data(),4u*sizeof(float));
+                    std::memcpy(packet.matrixSlots[1].v+4u*row,lights->diffuse[row].data(),4u*sizeof(float));
+                }
+                if(fields.flags1F4&1u){packet.matrixSlots[1].v[12]=fields.field1F8;
+                    packet.matrixSlots[1].v[13]=fields.field1FC;packet.matrixSlots[1].v[14]=fields.field200;}
+                if(fields.flags1F4&2u)std::memcpy(packet.matrixSlots[1].v+15,&fields.field204,sizeof(float));
+            }
+            if(hasPalette20_||!fields.offsetEnabled1DC)
+                std::memcpy(packet.matrixSlots[packet.modelMatrixIndex()].v,graph.nodes[index].world100.v,sizeof graph.nodes[index].world100.v);
+            for(std::size_t row=0;row<packet.sourcePaletteRows.size();++row){
+                const auto* actual=model_->sourceRow(packet.sourcePaletteRows[row]);
+                //241548's actual null branch retains the prior slot. It does
+                // not substitute an identity/bind matrix or erase provenance.
+                if(!actual)continue;
+                if(static_cast<std::size_t>(actual->sceneIndex)>=graph.count||
+                   !refreshSceneWorld49P(graph,actual->sceneIndex))return {S::phase,0x2897b0u};
+                std::memcpy(packet.matrixSlots[packet.modelMatrixIndex()+1u+row].v,
+                    graph.nodes[static_cast<std::size_t>(actual->sceneIndex)].world100.v,sizeof graph.nodes[static_cast<std::size_t>(actual->sceneIndex)].world100.v);
+            }
+        }
+        ++matrixRevision_;matricesPrepared_=true;
+        // The no-palette cache scan2416A4..241750 is performed by the actual
+        // collector caller, not replaced here with a null1C8 or a ready bit.
+        return {S::complete,hasPalette20_?0x2415b4u:0x2416a0u};
+    }
+    std::uint16_t directFlags20_=0;
     OriginalRacerModelSceneOwner50LA* model_=nullptr;
     const rr::assets::OriginalStandardModelGeometry50LA* geometry_=nullptr;
     std::unique_ptr<OriginalRacerModelPacket50LA[]> packets_;

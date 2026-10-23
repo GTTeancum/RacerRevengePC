@@ -9,6 +9,7 @@
 namespace original_main_entry50KG { class RaceDisplayLifetime50LA; }
 namespace rr::platform {
 class VehicleWindowGl50DS;
+class OriginalUiSharedDialogs50KG;
 enum class GameHostMode50ER : std::uint8_t { Unspecified, Window, HeadlessLive };
 inline constexpr std::size_t gameHostInputByteBudget50ER = 1024;
 inline constexpr std::size_t gameHostCommandCapacity50ER = 64;
@@ -117,6 +118,15 @@ public:
     const GameHostInfo50ER& info() const noexcept { return info_; }
 private:
     friend class ::original_main_entry50KG::RaceDisplayLifetime50LA;
+    friend class OriginalUiSharedDialogs50KG;
+    // Native global UI470 consumes the actual successful input poll, not a
+    // caller-supplied controller-presence assertion. This owner is independent
+    // of any menu generation; close/failure invalidates the observation.
+    std::uint64_t sharedDialogPollRevision50KG_=0;
+    bool sharedDialogPollCurrent50KG_=false;
+    bool sharedDialogPrimaryPresent50KG_=false;
+    WindowControllerPresence50DQ sharedDialogSecondPresence50KG_=WindowControllerPresence50DQ::Unknown;
+    void retainSharedDialogPoll50KG(const GameHostInput50ER&)noexcept;
     const VehicleWindowGl50DS* sessionDisplayRenderer50LA_=nullptr;
     std::uint32_t sessionDependentPins50LA_=0;
     bool sessionDisplayBlocksClose50LA() const noexcept;

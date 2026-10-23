@@ -1,5 +1,5 @@
 #pragma once
-// Cold constructor/lifetime only. No zone assignment, members, observer or draw API.
+// Cold constructor plus private exact manager Camera membership. No public member or draw API.
 #include "../../../src/game/original_application_entities50la.h"
 #include "../../../src/game/search_cold50bu.h"
 #include <memory>
@@ -7,6 +7,8 @@
 #include <exception>
 namespace original_main_entry50KG { struct Application; }
 namespace rr::platform {
+class OriginalUiGarageManagerSearch50KG;
+class OriginalUiLightManagerOwner50KG;
 enum class OriginalUiSearchListColdStatus50KG : std::uint8_t {
     complete,input,identity,alreadyStarted,allocation,registry,phase
 };
@@ -17,6 +19,8 @@ struct OriginalUiSearchListColdDiagnostic50KG {
 };
 class OriginalUiSearchListCold50KG final {
     friend struct ::original_main_entry50KG::Application;
+    friend class OriginalUiGarageManagerSearch50KG;
+    friend class OriginalUiLightManagerOwner50KG;
     using D=OriginalUiSearchListColdDiagnostic50KG;
     using S=OriginalUiSearchListColdStatus50KG;
     const original_main_entry50KG::Application* const creator_;
@@ -28,8 +32,24 @@ class OriginalUiSearchListCold50KG final {
     std::unique_ptr<const game::OriginalWreckComponent50LA*[]> selected1C_;
     std::uint8_t soultreeType2C_=0xffu,searchableType2D_=0xffu;
     bool soultreeKnown_=false,searchableKnown_=false;
-    game::SearchStorage50BS storage_{}; // No block backing has been published.
+    // Native bounded backing, owned by this List. Source block publication is
+    // still lazy; the native word array replaces malloc/realloc transport, not
+    // the source used/free-list state. No capacity is increased.
+    game::SearchStorage50BS storage_{};
+    const std::uint32_t* managerBlockPointers_[1]{};
+    const std::uint32_t* const* managerTable3C_=nullptr;
+    const game::OriginalWreckComponent50LA* managerCamera_=nullptr;
+    // Token4 is a private native identity for the one typed Camera binding,
+    // never a truncated guest/host pointer. It is not exposed as a guest address.
+    static constexpr std::uint32_t cameraToken_=4;
+
     bool attempted_=false,derivedConstructed_=false,complete_=false,released_=false;
+    // Manager2A0 is ONE list, aliased by the same node's34/38. This native
+    // authority is distinct from the four independent Scene search lists.
+    const OriginalUiGarageManagerSearch50KG* managerOwner_=nullptr;
+    std::uint8_t managerAliases_=0,managerReleasedAliases_=0;
+    const OriginalUiLightManagerOwner50KG* lightManagerOwner_=nullptr;
+    std::uint8_t lightAliases_=0,lightReleasedAliases_=0;
     OriginalUiSearchListCold50KG(const original_main_entry50KG::Application& creator,
         std::shared_ptr<game::OriginalApplicationEntities50LA> application)noexcept
         :creator_(&creator),application_(std::move(application)){}
@@ -72,6 +92,7 @@ class OriginalUiSearchListCold50KG final {
     bool releaseCold(const original_main_entry50KG::Application* creator,
         const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,D& d)noexcept {
         d={};if(!same(creator,application))return fail(d,S::identity,0x104970);
+        if(managerOwner_||lightManagerOwner_)return fail(d,S::phase,0x104970);
         if(released_)return true;
         if(!attempted_){released_=true;return true;}
         // No retain, member insertion, zone or observer API exists. Fail closed
@@ -87,6 +108,138 @@ class OriginalUiSearchListCold50KG final {
         selected1C_.reset();
         released_=true;complete_=false;d={S::complete,derivedConstructed_?0x27E384u:0x27EAE0u,true};return true;
     }
+    bool managerHistoryCurrent(const OriginalUiGarageManagerSearch50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application)const noexcept {
+        if(!(owner&&owner==managerOwner_&&!lightManagerOwner_&&same(creator,application)&&attempted_&&!released_&&
+            managerAliases_<=2&&managerReleasedAliases_<=managerAliases_&&
+            reference00_==1u+managerAliases_-managerReleasedAliases_&&usage10_==managerAliases_&&
+            !selectedCount18_&&selectedGrowth20_==30&&selectedCapacity24_==30&&selectedOwned28Bit0_))return false;
+        if(!storage_.blockCount)return !managerTable3C_&&!managerBlockPointers_[0]&&!managerCamera_&&!storage_.freeHead&&
+            (derivedConstructed_?(storage_.perBlock==0x400&&storage_.lastUsed==0x400):
+                                 (!storage_.perBlock&&!storage_.lastUsed));
+        if(!complete_||!derivedConstructed_||!selected1C_||storage_.perBlock!=0x400||
+           storage_.blockCount!=1||storage_.lastUsed!=1||managerTable3C_!=managerBlockPointers_||managerBlockPointers_[0]!=storage_.words)return false;
+        return managerCamera_?(!storage_.freeHead&&storage_.words[0]==cameraToken_):
+            (storage_.freeHead==1&&storage_.words[0]==2);
+    }
+    bool managerEmptyCurrent(const OriginalUiGarageManagerSearch50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application)const noexcept {
+        return managerHistoryCurrent(owner,creator,application)&&!storage_.blockCount;
+    }
+    bool insertManagerCamera(const OriginalUiGarageManagerSearch50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        const game::OriginalWreckComponent50LA& camera,std::uint32_t& slot,D& d)noexcept {
+        d={};if(!managerHistoryCurrent(owner,creator,application)||!complete_||managerCamera_||
+            managerAliases_!=2||managerReleasedAliases_||reference00_!=3||usage10_!=2)
+            return fail(d,S::phase,0x27E3B0);
+        auto next=storage_;std::uint32_t selected=0;
+        auto result=next.blockCount?game::selectSearchSlot50BS(next,0,selected):
+            game::adoptFirstSearchBlock50BU(next,selected);
+        if(result!=game::SearchStorageStatus50BS::Complete||selected!=1||
+           game::insertSearchSlot50BS(next,selected,cameraToken_)!=game::SearchStorageStatus50BS::Complete)
+            return fail(d,S::phase,0x27E578);
+        // Publish only the used words. Unused native backing never supplies
+        // source-known values or fake members. A removed first slot is reused.
+        storage_.blockCount=next.blockCount;storage_.lastUsed=next.lastUsed;
+        storage_.freeHead=next.freeHead;storage_.words[0]=next.words[0];
+        managerBlockPointers_[0]=storage_.words;managerTable3C_=managerBlockPointers_;
+        managerCamera_=&camera;slot=selected;
+        d={S::complete,0x27E5A8,true};return true;
+    }
+    bool managerCameraCurrent(const OriginalUiGarageManagerSearch50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        const game::OriginalWreckComponent50LA& camera,std::uint32_t slot)const noexcept {
+        return managerHistoryCurrent(owner,creator,application)&&managerCamera_==&camera&&slot==1&&
+            managerAliases_==2&&!managerReleasedAliases_&&reference00_==3;
+    }
+    bool removeManagerCamera(const OriginalUiGarageManagerSearch50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        const game::OriginalWreckComponent50LA& camera,std::uint32_t slot,D& d)noexcept {
+        d={};if(!managerCameraCurrent(owner,creator,application,camera,slot))return fail(d,S::identity,0x27E5B0);
+        auto next=storage_;
+        if(game::removeSearchSlot50BS(next,slot,cameraToken_)!=game::SearchStorageStatus50BS::Complete)
+            return fail(d,S::phase,0x27E5B0);
+        storage_.freeHead=next.freeHead;storage_.words[0]=next.words[0];managerCamera_=nullptr;
+        // Removal does NOT deallocate its source block, reset lastUsed or
+        // decrease usage10. That history belongs to the later List destructor.
+        d={S::complete,0x27E5B0,true};return true;
+    }
+    bool assignManagerAlias(const OriginalUiGarageManagerSearch50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        std::uint8_t ordinal,OriginalUiSearchListCold50KG*& actualField,D& d)noexcept {
+        d={};const auto pc=ordinal==1?0x27F420u:0x27F490u;
+        if(!managerEmptyCurrent(owner,creator,application)||!complete_||!selected1C_||
+           managerReleasedAliases_||ordinal!=managerAliases_+1||ordinal>2||actualField)
+            return fail(d,S::phase,pc);
+        // Fresh old field is genuinely null. Preserve source setter order:
+        // incoming usage, actual node pointer, then104960 retain.
+        usage10_=ordinal;actualField=this;++reference00_;++managerAliases_;
+        d={S::complete,ordinal==1?0x27F468u:0x27F4D8u,true};return true;
+    }
+    bool releaseManagerAlias(const OriginalUiGarageManagerSearch50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        std::uint8_t ordinal,const OriginalUiSearchListCold50KG* actualField,D& d)noexcept {
+        d={};const auto pc=ordinal==1?0x27F200u:0x27F21Cu;
+        if(!managerHistoryCurrent(owner,creator,application)||managerCamera_||actualField!=this||
+           ordinal!=managerReleasedAliases_+1||ordinal>managerAliases_||reference00_<2)
+            return fail(d,S::phase,pc);
+        --reference00_;++managerReleasedAliases_; // No usage or dying-field null write.
+        d={S::complete,pc,true};return true;
+    }
+    bool releaseManagerPayload(const OriginalUiGarageManagerSearch50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,D& d)noexcept {
+        d={};if(!managerHistoryCurrent(owner,creator,application)||managerCamera_||reference00_!=1||
+            managerAliases_!=managerReleasedAliases_)return fail(d,S::phase,0x1CCADC);
+        --reference00_;
+        //27E2C0 retires the real bounded block/table publication, including
+        // removed-Camera history; backing lives inside this native List.
+        managerTable3C_=nullptr;managerBlockPointers_[0]=nullptr;selected1C_.reset();released_=true;complete_=false;
+        //27EA70 frees the selected array. No Entity count contribution.
+        d={S::complete,0x1CCADC,true};return true;
+    }
+    bool lightEmptyCurrent(const OriginalUiLightManagerOwner50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application)const noexcept {
+        return owner&&owner==lightManagerOwner_&&!managerOwner_&&same(creator,application)&&attempted_&&!released_&&
+            lightAliases_<=2&&lightReleasedAliases_<=lightAliases_&&
+            reference00_==1u+lightAliases_-lightReleasedAliases_&&usage10_==lightAliases_&&
+            !selectedCount18_&&selectedGrowth20_==30&&selectedCapacity24_==30&&selectedOwned28Bit0_&&
+            !storage_.blockCount&&!storage_.freeHead&&
+            (derivedConstructed_?(storage_.perBlock==0x400&&storage_.lastUsed==0x400):
+                                 (!storage_.perBlock&&!storage_.lastUsed));
+    }
+    bool assignLightAlias(const OriginalUiLightManagerOwner50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        std::uint8_t ordinal,OriginalUiSearchListCold50KG*& field,D& d)noexcept {
+        d={};if(!lightEmptyCurrent(owner,creator,application)||!complete_||!selected1C_||
+            lightReleasedAliases_||ordinal!=lightAliases_+1||ordinal>2||field)return fail(d,S::phase,0x27F420);
+        usage10_=ordinal;field=this;++reference00_;++lightAliases_;
+        d={S::complete,ordinal==1?0x27F468u:0x27F4D8u,true};return true;
+    }
+    bool releaseLightAlias(const OriginalUiLightManagerOwner50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,
+        std::uint8_t ordinal,const OriginalUiSearchListCold50KG* field,D& d)noexcept {
+        d={};if(!lightEmptyCurrent(owner,creator,application)||field!=this||ordinal!=lightReleasedAliases_+1||
+            ordinal>lightAliases_||reference00_<2)return fail(d,S::phase,0x27F200);
+        --reference00_;++lightReleasedAliases_;d={S::complete,ordinal==1?0x27F200u:0x27F21Cu,true};return true;
+    }
+    bool releaseLightPayload(const OriginalUiLightManagerOwner50KG* owner,
+        const original_main_entry50KG::Application* creator,
+        const std::shared_ptr<game::OriginalApplicationEntities50LA>& application,D& d)noexcept {
+        d={};if(!lightEmptyCurrent(owner,creator,application)||reference00_!=1||
+            lightAliases_!=lightReleasedAliases_)return fail(d,S::phase,0x1481A8);
+        --reference00_;selected1C_.reset();released_=true;complete_=false;d={S::complete,0x1481A8,true};return true;
+    }
 public:
     struct Snapshot {
         bool attempted=false,derivedConstructed=false,complete=false,released=false;
@@ -95,12 +248,14 @@ public:
         bool selectedOwned28Bit0=false,selectedBackingPresent=false,soultreeKnown=false,searchableKnown=false;
         std::uint8_t soultreeType2C=0xffu,searchableType2D=0xffu;
         std::uint32_t perBlock30=0,blockCount34=0,lastUsed38=0,freeHead40=0;
+        bool managerBlockPublished=false,cameraMemberLive=false;
     };
     Snapshot snapshot()const noexcept {
         return {attempted_,derivedConstructed_,complete_,released_,reference00_,usage10_,
             selectedCount18_,selectedGrowth20_,selectedCapacity24_,selectedOwned28Bit0_,bool(selected1C_),
             soultreeKnown_,searchableKnown_,soultreeType2C_,searchableType2D_,
-            storage_.perBlock,storage_.blockCount,storage_.lastUsed,storage_.freeHead};
+            storage_.perBlock,storage_.blockCount,storage_.lastUsed,storage_.freeHead,
+            bool(managerTable3C_),bool(managerCamera_)};
     }
     ~OriginalUiSearchListCold50KG(){if(reference00_&&!released_)std::terminate();}
     OriginalUiSearchListCold50KG(const OriginalUiSearchListCold50KG&)=delete;

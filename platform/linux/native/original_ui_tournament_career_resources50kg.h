@@ -12,6 +12,7 @@
 
 namespace original_main_entry50KG { struct Application; }
 namespace rr::platform {
+class OriginalUiGarageSession50KG;
 class OriginalUiTournamentDrawContribution50KG;
 struct OriginalUiMainFrameClock50KG;
 struct OriginalUiRiderRouteProposal50KG;
@@ -147,6 +148,13 @@ private:
         OriginalUiTournamentCareerResourceDiagnostic50KG&) noexcept;
     bool courseBackPreparationCurrent(const OriginalUiCourseRouteProposal50KG&) const noexcept;
     bool acceptCourseBackCommit(const OriginalUiCourseRouteProposal50KG&,
+        OriginalUiTournamentCareerResourceDiagnostic50KG&) noexcept;
+    // Actual Garage17DE10 predecessor. Its private receipt retains the exact
+    // unchanged profile and survives true Page/manager retirement.
+    bool prepareGarageBack(const std::shared_ptr<const OriginalUiGarageSession50KG>&,
+        OriginalUiTournamentCareerResourceDiagnostic50KG&) noexcept;
+    bool garageBackPreparationCurrent(const std::shared_ptr<const OriginalUiGarageSession50KG>&)const noexcept;
+    bool acceptGarageBackCommit(const std::shared_ptr<const OriginalUiGarageSession50KG>&,
         OriginalUiTournamentCareerResourceDiagnostic50KG&) noexcept;
     bool sameProfileOwner(const OriginalUiRiderProfileOwner50KG&) const noexcept;
     struct Storage;std::unique_ptr<Storage> storage_;

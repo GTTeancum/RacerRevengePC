@@ -14,10 +14,11 @@ class OriginalUiEncodedArchiveView50KG;
 struct OriginalUiMaterialTemplateStorage50KG;
 // NEW reconstruction: identities transcribed from the retained Full48F manifest.
 // These IDs identify exact US-disc originals, not arbitrary files.
-// Existing archive ordinals are preserved; authenticated menu pod physics appended.
+// Existing archive ordinals are preserved; authenticated Garage resources append.
 enum class OriginalUiArchiveId50KG : std::uint8_t {
     appStart = 0, localization = 1, overlays = 2, fonts = 3, mainMenu = 4,
-    backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11, tournament = 12, hallOfFame = 13
+    backgrounds = 5, controllerPopup = 6, course = 7, rider = 8, options = 9, podTextures = 10, podPhysics = 11, tournament = 12, hallOfFame = 13,
+    garage = 14, garagePod19 = 15
 };
 struct OriginalUiArchiveIdentity50KG {
     OriginalUiArchiveId50KG id;

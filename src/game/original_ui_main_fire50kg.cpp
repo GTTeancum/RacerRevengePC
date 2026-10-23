@@ -60,6 +60,14 @@ OriginalUiMainFireStatus50KG OriginalUiMainFireOwner50KG::initializeScene(
 }
 OriginalUiMainFireReceipt50KG OriginalUiMainFireOwner50KG::emit(float dt,bool paused,
     std::uint32_t& sharedRawRandom,std::uint32_t& sharedFireSerial) noexcept {
+    return emitImpl(dt,paused,sharedRawRandom,sharedFireSerial,nullptr);
+}
+OriginalUiMainFireReceipt50KG OriginalUiMainFireOwner50KG::emitSource15E2A8(float dt,bool paused,
+    std::uint32_t& raw,std::uint32_t& serial,bool& lazy)noexcept {
+    return emitImpl(dt,paused,raw,serial,&lazy);
+}
+OriginalUiMainFireReceipt50KG OriginalUiMainFireOwner50KG::emitImpl(float dt,bool paused,
+    std::uint32_t& sharedRawRandom,std::uint32_t& sharedFireSerial,bool* sourceLazy84C8)noexcept {
     using S=OriginalUiMainFireStatus50KG;OriginalUiMainFireReceipt50KG r;
     if(!storage_)return r;
     if(std::fegetround()!=FE_TONEAREST){r.status=S::arithmetic;return r;}
@@ -90,6 +98,10 @@ OriginalUiMainFireReceipt50KG OriginalUiMainFireOwner50KG::emit(float dt,bool pa
             r.nativeUndefinedCarryPolicy=true;
         }
     }
+    // Original15E2A8..C0 is AFTER all count/carry arithmetic and BEFORE
+    //capacity/particle effects, including a determined zero count. Paused
+    //and first-update common returns above do not initialize this global.
+    if(sourceLazy84C8&&!*sourceLazy84C8){sharedFireSerial=0;*sourceLazy84C8=true;}
     const auto available=s.pool.size()-s.count;
     const auto count=std::min<std::size_t>(requested,available);
     auto raw=sharedRawRandom,serial=sharedFireSerial;

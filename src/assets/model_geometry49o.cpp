@@ -73,7 +73,14 @@ bool readPsgNode49O(const PsgHierarchyView49O& v, std::uint32_t index,
 }
 bool readMot49O(const std::uint8_t* data, std::size_t bytes,
     MotionView49O& output, GeometryDiagnostic49O& d) noexcept {
+    return readMot49O(data,bytes,output,d,MotKeyAdmission50KG::default4096);
+}
+bool readMot49O(const std::uint8_t* data, std::size_t bytes,
+    MotionView49O& output, GeometryDiagnostic49O& d,MotKeyAdmission50KG policy) noexcept {
     d = {};
+    std::uint32_t totalKeyLimit=maxMotTotalKeys49O;
+    if(policy==MotKeyAdmission50KG::authenticatedGarageWatto5587)totalKeyLimit=5587;
+    else if(policy!=MotKeyAdmission50KG::default4096)return reject(d,GeometryError49O::invalid_input,0);
     if (!data) return reject(d, GeometryError49O::invalid_input, 0);
     if (bytes > maxMotBytes49O) return reject(d, GeometryError49O::file_limit, 0);
     if (bytes < 28) return reject(d, GeometryError49O::truncated, bytes);
@@ -96,7 +103,7 @@ bool readMot49O(const std::uint8_t* data, std::size_t bytes,
             MotTrack49O& t = channel ? v.rotation[i] : v.position[i];
             t.keyCount = u32(data + at); t.rowIndex = u32(data + at + 4);
             if (!t.keyCount || t.keyCount > maxMotKeysPerTrack49O) return reject(d, GeometryError49O::key_count, at);
-            if (t.keyCount > maxMotTotalKeys49O - v.totalKeys) return reject(d, GeometryError49O::total_keys, at);
+            if (t.keyCount > totalKeyLimit - v.totalKeys) return reject(d, GeometryError49O::total_keys, at);
             if (t.rowIndex >= maxModelNodes49O) return reject(d, GeometryError49O::row_index, at + 4);
             v.totalKeys += t.keyCount; at += 8; t.keyDataOffset = static_cast<std::uint32_t>(at);
             if (!range(bytes, at, std::size_t(t.keyCount) * stride)) return reject(d, GeometryError49O::truncated, bytes);

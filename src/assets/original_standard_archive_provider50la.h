@@ -7,14 +7,17 @@
 #include <limits>
 #include <memory>
 #include <utility>
+#include <string_view>
 
 namespace original_main_entry50KG { struct Application; }
 namespace rc_cold_sources50LA { class Owner; }
 namespace tb_cold_sources50LA { class Owner; }
 namespace gb_cold_sources50LA { class Owner; }
 namespace mc_cold_sources50LA { class Owner; }
+namespace rr::platform {class OriginalUiGarageDrawContribution50KG;}
 namespace rr::assets {
 class OriginalArchiveStagedReader50LA;
+class OriginalStandardTextureResolver50LA;
 // The actual bounded NATIVE Application mount set. This is not a claim that
 // retail3E1A70's complete mount chronology/priority has been reconstructed.
 // A mount always contains an entire authenticated archive directory, never a
@@ -34,7 +37,7 @@ public:
         const std::string* member=nullptr;
         const std::uint8_t* data=nullptr;
         std::size_t size=0,mount=static_cast<std::size_t>(-1),ordinal=static_cast<std::size_t>(-1);
-        std::uint64_t revision=0;
+        std::uint64_t revision=0,bankGeneration=0;
     };
     struct MountView {
         const std::string* archiveName=nullptr;
@@ -83,6 +86,7 @@ public:
         try {
             auto next=std::make_unique<Mount>();next->name=identity->discPath;
             next->digest=identity->sha256;next->archiveBytes=identity->bytes;next->ui=std::move(archive);
+            next->admittedUi=next->ui;
             if(!nameOkay(next->name)||!digestOkay(next->digest)||!next->archiveBytes||
                identity->memberCount>maxEntries)return fail(d,Status::identity);
             next->rows.reserve(identity->memberCount);
@@ -106,9 +110,10 @@ public:
     }
     bool sealed()const noexcept{return sealed_;}
     std::uint64_t revision()const noexcept{return revision_;}
+    // Stable slot extent, including retired tombstones; mount(i) rejects them.
     std::size_t mountCount()const noexcept{return mounts_.size();}
     bool mount(std::size_t i,MountView& out)const noexcept {
-        out={};if(!retainedSourcesAccessible()||i>=mounts_.size())return false;const auto& m=*mounts_[i];
+        out={};if(!retainedSourcesAccessible()||i>=mounts_.size()||!mounts_[i]->active)return false;const auto& m=*mounts_[i];
         out={&m.name,&m.digest,m.archiveBytes,m.rows.size()};return true;
     }
     // Positive/absent cover every member of every actual native mount. Unknown
@@ -123,6 +128,7 @@ public:
         if(sameName(requested,"textures\\specmap5.tga")){
             const Mount* policy=nullptr;
             for(std::size_t m=0;m<mounts_.size();++m){const auto& candidate=*mounts_[m];
+                if(!candidate.active)continue;
                 if(candidate.rcSpecmapEarlierMount==static_cast<std::size_t>(-1))continue;
                 if(policy||!candidate.rcSource||candidate.rcSpecmapEarlierMount>=m||
                    candidate.rcSpecmapOrdinal>=candidate.rows.size())return Lookup::unknown;
@@ -131,27 +137,27 @@ public:
             if(policy){
                 const auto earlier=policy->rcSpecmapEarlierMount;
                 const auto& pod=*mounts_[earlier];
-                if(policy->rcSpecmapEarlierOrdinal>=pod.rows.size())return Lookup::unknown;
+                if(!pod.active||policy->rcSpecmapEarlierOrdinal>=pod.rows.size())return Lookup::unknown;
                 const auto& winner=pod.rows[policy->rcSpecmapEarlierOrdinal];
                 const auto& retainedRc=policy->rows[policy->rcSpecmapOrdinal];
                 if(!sameName(winner.name,requested)||!sameName(retainedRc.name,requested)||
                    winner.size!=12332||retainedRc.size!=196652)return Lookup::unknown;
                 // Identical ordinary POD rows may coalesce. Only the exact
                 // retained RC row may differ; any third unequal row rejects.
-                for(const auto& mount:mounts_)for(const auto& row:mount->rows)
+                for(const auto& mount:mounts_)if(mount->active)for(const auto& row:mount->rows)
                     if(sameName(requested,row.name) && &row!=&retainedRc&&!equalBytes(winner,row))
                         return Lookup::unknown;
-                out={&winner.name,winner.data,winner.size,earlier,policy->rcSpecmapEarlierOrdinal,revision_};
+                out={&winner.name,winner.data,winner.size,earlier,policy->rcSpecmapEarlierOrdinal,revision_,pod.generation};
                 return Lookup::present;
             }
         }
         const Row* matched=nullptr;
-        for(std::size_t m=0;m<mounts_.size();++m){const auto& rows=mounts_[m]->rows;
+        for(std::size_t m=0;m<mounts_.size();++m){if(!mounts_[m]->active)continue;const auto& rows=mounts_[m]->rows;
             for(std::size_t i=0;i<rows.size();++i)if(sameName(requested,rows[i].name)){
                 if(matched&&!equalBytes(*matched,rows[i])){
                     out={};out.revision=revision_;return Lookup::unknown;
                 }
-                if(!matched){matched=&rows[i];out={&rows[i].name,rows[i].data,rows[i].size,m,i,revision_};}
+                if(!matched){matched=&rows[i];out={&rows[i].name,rows[i].data,rows[i].size,m,i,revision_,mounts_[m]->generation};}
             }
         }
         return matched?Lookup::present:Lookup::absent;
@@ -162,16 +168,53 @@ public:
     // its provider pointer is identity only, not a lifetime/service capability.
     bool encodedUiInput(std::size_t mountIndex,OriginalUiEncodedArchiveView50KG& out) const noexcept {
         out={};
-        if(mountIndex>=mounts_.size() || !mounts_[mountIndex]->ui) return false;
+        if(mountIndex>=mounts_.size() || !mounts_[mountIndex]->active || !mounts_[mountIndex]->ui) return false;
         out=OriginalUiEncodedArchiveView50KG(this,mounts_[mountIndex]->ui);
         return out.identity() && out.data() && out.size();
     }
-    static bool sameName(const std::string& a,const std::string& b)noexcept {
+    // Allocation-free even for the literal special-case query inside noexcept
+    // lookup132820. ASCII case folds only; slash spelling remains significant.
+    static bool sameName(std::string_view a,std::string_view b)noexcept {
         if(a.size()!=b.size())return false;
         for(std::size_t i=0;i<a.size();++i)if(lower(a[i])!=lower(b[i]))return false;
         return true;
     }
 private:
+    friend class OriginalStandardTextureResolver50LA;
+    friend class OriginalStandardMaterialDomain50LA;
+    // Historical corpus custody, NOT a bank/file-manager lookup capability.
+    // Only this provider can mint it from an actual active positive lookup;
+    // the same Domain retains the exact immutable PSM source alongside it.
+    struct RetainedMaterialMember {
+        const OriginalStandardArchiveProvider50LA* provider=nullptr;
+        std::size_t mount=static_cast<std::size_t>(-1),ordinal=static_cast<std::size_t>(-1);
+        std::uint64_t generation=0;
+        const std::uint8_t* data=nullptr;
+        std::size_t size=0;
+    };
+    bool retainMaterialMember132820(const std::string& name,const std::vector<std::uint8_t>& bytes,
+        RetainedMaterialMember& out)const noexcept {
+        out={};MemberView member;
+        if(lookup132820(name,member)!=Lookup::present||!member.member||!member.data||
+           !member.bankGeneration||member.revision!=revision_||!sameName(name,*member.member)||
+           member.size!=bytes.size()||(member.size&&std::memcmp(member.data,bytes.data(),member.size)))return false;
+        out={this,member.mount,member.ordinal,member.bankGeneration,member.data,member.size};
+        return true;
+    }
+    bool retainedClosedMaterialMemberCurrent(const RetainedMaterialMember& retained,
+        const std::string& name,const std::vector<std::uint8_t>& bytes)const noexcept {
+        if(!sealed_||!retainedSourcesAccessible()||retained.provider!=this||!retained.generation||
+           retained.mount>=mounts_.size())return false;
+        const auto& bank=*mounts_[retained.mount];
+        // Reentry authenticates every row and keeps original backing intact.
+        // An earlier genuine generation therefore still owns its immutable
+        // bytes after a later close, but never becomes a new live file ID.
+        if(bank.active||retained.generation>bank.generation||retained.ordinal>=bank.rows.size())return false;
+        const auto& row=bank.rows[retained.ordinal];
+        return row.data&&row.data==retained.data&&row.size==retained.size&&
+            sameName(row.name,name)&&row.size==bytes.size()&&
+            (!row.size||!std::memcmp(row.data,bytes.data(),row.size));
+    }
     friend class ::rc_cold_sources50LA::Owner;
     friend class ::tb_cold_sources50LA::Owner;
     friend class ::gb_cold_sources50LA::Owner;
@@ -180,11 +223,33 @@ private:
     bool issueStagedReader(const original_main_entry50KG::Application&,
         const std::shared_ptr<OriginalStandardArchiveProvider50LA>&,
         std::shared_ptr<OriginalArchiveStagedReader50LA>&) noexcept;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    bool borrowGarageUiMember132820(const std::string& name,std::shared_ptr<const OriginalUiArchive50KG>& archive,
+        OriginalUiMemberView50KG& member)const noexcept {
+        MemberView found;if(lookup132820(name,found)!=Lookup::present||found.mount>=mounts_.size())return false;
+        const auto& mount=*mounts_[found.mount];const auto current=mount.admittedUi.lock();
+        if(!mount.active||!mount.ui||!current||found.bankGeneration!=mount.generation||
+           found.revision!=revision_||!current->loaded())return false;
+        //commit() authenticates identical rows/bytes on reentry while keeping
+        //the original backing. Borrow the actual lookup winner, not a fresh
+        //equal-content archive whose data pointer is not the retained member.
+        const auto actual=mount.ui->find(*found.member);
+        if(!actual.identity||actual.data!=found.data||actual.size!=found.size)return false;
+        archive=mount.ui;member=actual;return true;
+    }
     struct Row {std::string name;const std::uint8_t* data=nullptr;std::size_t size=0,offset=0;};
     struct Mount {
+        // Stable native backing survives logical12EB60 removal. Never reused
+        // as a live bank until a new authenticated mount transaction succeeds.
+        mutable bool active=true;
+        mutable std::uint64_t generation=1;
         std::string name,digest;std::size_t archiveBytes=0,retainedBytes=0;
         std::shared_ptr<const std::vector<std::uint8_t>> backing;
         std::shared_ptr<const OriginalUiArchive50KG> ui;
+        // Exact current-generation admission owner. A new authenticated load
+        // may reenter without replacing old borrowed bytes or doubling this
+        // provider's retained backing. The caller/lease pins the new owner.
+        mutable std::weak_ptr<const OriginalUiArchive50KG> admittedUi;
         // Complete RC compact namespace; the typed source retains every stable
         // member and the exact encoded original. No generic row authority.
         std::shared_ptr<const rc_cold_sources50LA::Owner> rcSource;
@@ -239,7 +304,14 @@ private:
                 if(old.rows[i].name!=next->rows[i].name||old.rows[i].offset!=next->rows[i].offset||
                    !equalBytes(old.rows[i],next->rows[i]))return fail(d,Status::identity);
             }
-            d={};return true; //Same immutable mount, no revision/phase change.
+            if(!old.active){
+                if(revision_==std::numeric_limits<std::uint64_t>::max()||
+                   old.generation==std::numeric_limits<std::uint64_t>::max())
+                    return fail(d,Status::capacity);
+                old.admittedUi=next->ui;
+                ++old.generation;old.active=true;++revision_;sealed_=false;
+            }
+            d={};return true; // Active repeat is idempotent; retired repeat is genuine reentry.
         }
         if(mounts_.size()>=maxMounts||next->rows.size()>maxEntries-entryCount_||
            next->retainedBytes>maxBytes-retainedBytes_||revision_==std::numeric_limits<std::uint64_t>::max())

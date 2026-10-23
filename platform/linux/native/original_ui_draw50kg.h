@@ -25,7 +25,10 @@ enum class OriginalUiMaterialMode50KG : std::uint8_t {
     mainParticle,
     // Actual DefaultMT Diffuse identities. CPU owner supplies original packet
     // RGB, source fixed-point XY/Z and perspective W; no generic relighting.
-    sourceDiffuse, sourceDiffuseCompressed, sourceSpecularMapCompressed
+    sourceDiffuse, sourceDiffuseCompressed, sourceSpecularMapCompressed,
+    // Original339600 stored-RGBA program. Never aliases Diffuse lighting.
+    // Requires sealed source-RGBA composition and original raw packet STQ.
+    sourcePrelitCompressed
 };
 struct OriginalUiSpan50KG {
     // Contiguous quad partition in the caller's source-resolved draw order.

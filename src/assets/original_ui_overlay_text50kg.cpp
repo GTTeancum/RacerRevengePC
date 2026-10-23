@@ -1,4 +1,5 @@
 #include "original_ui_overlay_text50kg.h"
+#include "pod_physics49n.h"
 #include <cmath>
 #include <utility>
 
@@ -12,10 +13,41 @@ std::uint32_t truncateColor(float f) noexcept {
     // Source CVT.W.S truncates; color() admits only finite [0,255] inputs.
     return static_cast<std::uint32_t>(static_cast<std::int32_t>(f));
 }
+bool garageSourceRgb(const OriginalUiDatSection50KG& s,const char* key,float fallback,
+    std::array<float,3>& output,OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
+    const auto* value=s.find(key);std::array<float,3> result{{fallback,fallback,fallback}};
+    if(!value){output=result;return true;}
+    const auto& text=value->text;
+    if(text.empty()||text.size()>=128)return fail(d,OriginalUiPageError50KG::capacity,s,key,pc);
+    // Source158C5C/80 split at comma;158CA4 at newline. Numeric reader
+    // 302E10 ->30AB18 ->309C18 consumes only the decimal prefix. In the
+    // authenticated Garage RGB vocabulary every scalar is a decimal integer.
+    // Keep exact double-then-float rounding via the existing bounded decoder;
+    // do not use host locale, reinterpret a fourth scalar as alpha or edit DAT.
+    std::size_t at=0;
+    for(unsigned i=0;i<3;++i){
+        while(at<text.size()&&(text[at]==' '||text[at]=='\t'||text[at]=='\r'))++at;
+        const auto first=at;
+        if(at<text.size()&&(text[at]=='+'||text[at]=='-'))++at;
+        const auto digit=at;
+        while(at<text.size()&&text[at]>='0'&&text[at]<='9')++at;
+        if(at==digit||!parseOriginalUiNumber49N(text.data()+first,at-first,result[i]))
+            return fail(d,OriginalUiPageError50KG::numberSyntax,s,key,pc);
+        if(i<2){
+            // The fixed authenticated resource has no skipped empty fields or
+            // scalar suffixes before these first two delimiters.
+            if(at==text.size()||text[at]!=',')return fail(d,OriginalUiPageError50KG::numberSyntax,s,key,pc);
+            ++at;
+        }else if(at<text.size()&&text[at]!=',')
+            return fail(d,OriginalUiPageError50KG::numberSyntax,s,key,pc);
+    }
+    output=result;return true;
+}
 bool color(const OriginalUiDatSection50KG& s,const char* key,float fallback,
-    std::uint32_t& output,OriginalUiPageDiagnostic50KG& d,std::uint32_t pc) noexcept {
+    std::uint32_t& output,OriginalUiPageDiagnostic50KG& d,std::uint32_t pc,bool garage) noexcept {
     std::array<float,3> v{};
-    if (!originalUiTriple50KG(s,key,{{fallback,fallback,fallback}},v,d,pc)) return false;
+    if(garage){if(!garageSourceRgb(s,key,fallback,v,d,pc))return false;}
+    else if (!originalUiTriple50KG(s,key,{{fallback,fallback,fallback}},v,d,pc)) return false;
     for (float f:v) if (!std::isfinite(f) || f<0 || f>255)
         return fail(d,OriginalUiPageError50KG::unsupportedValue,s,key,pc);
     output=0xff000000u | (truncateColor(v[0])<<16) | (truncateColor(v[1])<<8) | truncateColor(v[2]);
@@ -39,9 +71,9 @@ bool split(const std::string& text,OriginalUiOverlayText50KG& result,
     result.usesExplicitHeight=result.height!=0;return true;
 }
 }
-bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
+static bool readOverlayText(const OriginalUiDat50KG& widgets,
     std::uint16_t widgetId,const OriginalUiEnglish50KG* english,
-    OriginalUiOverlayText50KG& output,OriginalUiPageDiagnostic50KG& d) noexcept {
+    OriginalUiOverlayText50KG& output,OriginalUiPageDiagnostic50KG& d,bool garage) noexcept {
     if (!widgets.identity()) {d={OriginalUiPageError50KG::missingMember,0,0x2A9000};return false;}
     try {
         const auto* s=widgets.section("Widget "+std::to_string(widgetId));
@@ -61,9 +93,9 @@ bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
             !originalUiInteger50KG(*s,"Alpha",255,r.alpha,d,0x2A91D0) ||
             !originalUiNumber50KG(*s,"LeadingFactor",1,r.leadingFactor,d,0x2A9138) ||
             !originalUiNumber50KG(*s,"Depth",1,r.depth,d,0x2A91EC) ||
-            !color(*s,"Color",40,r.color,d,0x2A921C) ||
-            !color(*s,"HighlightColor",255,r.highlightColor,d,0x2A9290) ||
-            !color(*s,"DisabledColor",128,r.disabledColor,d,0x2A9314) ||
+            !color(*s,"Color",40,r.color,d,0x2A921C,garage) ||
+            !color(*s,"HighlightColor",255,r.highlightColor,d,0x2A9290,garage) ||
+            !color(*s,"DisabledColor",128,r.disabledColor,d,0x2A9314,garage) ||
             !flag(*s,"EnableOnSelect",r.enableOnSelect,d,0x2A9038) ||
             !flag(*s,"DisableOnSelect",r.disableOnSelect,d,0x2A9050) ||
             !flag(*s,"EnableOnDeSelect",r.enableOnDeselect,d,0x2A9068) ||
@@ -119,5 +151,18 @@ bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
         }
         output=std::move(r);d={};return true;
     } catch (...) { d={OriginalUiPageError50KG::allocation,0,0x2A9000};return false; }
+}
+bool readOriginalUiOverlayText50KG(const OriginalUiDat50KG& widgets,
+    std::uint16_t widgetId,const OriginalUiEnglish50KG* english,
+    OriginalUiOverlayText50KG& output,OriginalUiPageDiagnostic50KG& d) noexcept {
+    return readOverlayText(widgets,widgetId,english,output,d,false);
+}
+bool readOriginalUiGarageOverlayText50KG(const OriginalUiDat50KG& widgets,
+    std::uint16_t widgetId,const OriginalUiEnglish50KG* english,
+    OriginalUiOverlayText50KG& output,OriginalUiPageDiagnostic50KG& d) noexcept {
+    if(widgets.identity()!=originalUiMemberIdentity50KG(OriginalUiArchiveId50KG::garage,21)){
+        d={OriginalUiPageError50KG::missingMember,0,0x2A9000};return false;
+    }
+    return readOverlayText(widgets,widgetId,english,output,d,true);
 }
 }

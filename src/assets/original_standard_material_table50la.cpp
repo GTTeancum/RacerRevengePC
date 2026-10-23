@@ -42,7 +42,7 @@ bool collectorPass(const OriginalStandardMaterialObject50LA& material,std::size_
        !pass.program18||*pass.program18<0||!pass.texture1A||!pass.uv1E||
        !pass.mapCount20||*pass.mapCount20>2||!pass.flags21||(*pass.flags21&~7u)||
        !pass.group22||(*pass.group22!=-1&&*pass.group22!=-2&&
-           !OriginalShaderPassGroups50LA::contains(*pass.group22))||!pass.state30||
+           !OriginalShaderPassGroups50LA::contains(*pass.group22))||!pass.state30||!pass.nativeBindings||
        bool(*pass.flags21&1u)!=(*pass.mapCount20==2)||
        pass.state30->contextCount()!=(*pass.mapCount20==2?2u:1u))
         return fail(d,S::collector,0x249BA0u);
@@ -79,7 +79,8 @@ bool equalCollectorPass249BA0(const OriginalStandardMaterialPassView50LA& a,
     // Single2476A0 has15 payload qwords; dual2480D0 has27. Context count
     // distinguishes those complete shapes; both dual contexts are compared.
     for(std::size_t i=0;i<a.state30->contextCount();++i)
-        if(!equalCollectorState(*a.state30->context(i),*b.state30->context(i)))return false;
+        if(!equalCollectorState(*a.state30->context(i),*b.state30->context(i))||
+           !(*a.nativeBindings)[i].equivalent((*b.nativeBindings)[i]))return false;
     // Material name/pass ordinal, fill RGBA, parameters and vertex animation
     // are deliberately absent from the original comparison. A future FIFO
     // must retain each originating submission's own parameter/animation data.
@@ -101,6 +102,7 @@ struct OriginalStandardMaterialTable50LA::Storage {
         std::shared_ptr<OriginalStandardTextureTable50LA> damageTextures;
         std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm;
         std::shared_ptr<OriginalStandardTextureTable50LA> pauseBackdropTextures;
+        std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback;
     };
     std::shared_ptr<const OriginalUiArchive50KG> appStart;
     std::shared_ptr<const OriginalUiMaterialTemplates50KG> templates;
@@ -113,11 +115,14 @@ struct OriginalStandardMaterialTable50LA::Storage {
         const OriginalStandardMaterialObject50LA* material=nullptr;
         std::int32_t row=-1,pass=-1,redirect=-1;
         std::int32_t limit=std::numeric_limits<std::int32_t>::max(); //29C0E4..F0.
+        void* nativeHead0C=nullptr;void* nativeTail10=nullptr;std::uint32_t nativeEpoch14=0;
     };
     std::vector<CollectorEntry> collector;
     std::uint64_t collectorGeneration=0; // Native seal, not source frame epoch04.
     bool collectorActive=false,collectorSealed=false;
     std::uint32_t nativeFifoPins=0;
+    bool nativeBindingPoisoned=false,collectorBindingDirty=false;
+    const ::original_main_entry50KG::NativeCollectorFifo50LA* uiNativeCollectorOwner=nullptr;
     void invalidateCollector() noexcept {
         collectorSealed=false;
         collector.clear(); // Borrowed node pointers retire before any actual pass destruction.
@@ -266,6 +271,22 @@ bool OriginalStandardMaterialTable50LA::demandTournamentOutline2DF8A0(
     struct Guard {bool& value;explicit Guard(bool& v):value(v){value=true;}~Guard(){value=false;}} guard(s.demandActive);
     return row.object04->demandTournamentOutline2DF8A0(textures,psm,pst,d);
 }
+bool OriginalStandardMaterialTable50LA::demandGarage2DF8A0(
+    std::int32_t index,const OriginalStandardTextureTable50LA& textures,
+    std::uint32_t pc,D& d) const noexcept {
+    d={};d.row=index;
+    if(!storage_)return fail(d,S::unprepared,0x2DF8A0);
+    auto& s=*storage_;
+    if(s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||s.demandTerminal)
+        return fail(d,S::phase,0x2DF8A0);
+    if(index<0||static_cast<std::size_t>(index)>=s.rows.size())return fail(d,S::range,0x2DF8B4);
+    const auto& row=s.rows[static_cast<std::size_t>(index)];
+    if(row.references08<=0||row.associated30!=s.templates->get(OriginalUiTemplate50KG::screenMt)||
+       s.textures.get()!=&textures)return fail(d,S::reference,0x2DF8B4);
+    if(!row.object04)return fail(d,S::missingMaterialObject,0x2DF8BC);
+    struct Guard {bool& value;explicit Guard(bool& v):value(v){value=true;}~Guard(){value=false;}} guard(s.demandActive);
+    return row.object04->demandGarage2DF8A0(textures,pc,d);
+}
 bool OriginalStandardMaterialTable50LA::demandTournamentFallback2DF8A0(
     std::int32_t index,const OriginalStandardTextureTable50LA& textures,
     const OriginalUiArchive50KG& archive,std::uint32_t storePC,D& d) const noexcept {
@@ -290,7 +311,7 @@ bool OriginalStandardMaterialTable50LA::rebuildColdCollector14D440(
     OriginalStandardMaterialCollectorReceipt50LA& output,D& d) noexcept {
     d={};if(!storage_)return fail(d,S::unprepared,0x14D440u);
     auto& s=*storage_;
-    if(s.nativeFifoPins||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||demandTerminal())
+    if(s.nativeBindingPoisoned||s.nativeFifoPins||s.populationTerminal||s.populationActive||s.demandActive||s.collectorActive||demandTerminal())
         return fail(d,S::phase,0x14D440u);
     if(s.populationBound&&(!s.construction||!s.construction->live()))return fail(d,S::video,0x14D440u);
     if(s.collectorGeneration==std::numeric_limits<std::uint64_t>::max())return fail(d,S::overflow,0x14D440u);
@@ -342,6 +363,13 @@ bool OriginalStandardMaterialTable50LA::rebuildColdCollector14D440(
     }catch(const std::bad_alloc&){return fail(d,S::allocation,0x29C558u);}
     catch(...){return fail(d,S::collector,0x14D440u);}
 }
+bool OriginalStandardMaterialTable50LA::bindUiNativeCollector1B73BC(
+    const ::original_main_entry50KG::NativeCollectorFifo50LA& owner)noexcept {
+    //Construction may precede14D440. This retains only actual native collector
+    //lifetime; every later append still requires the separately sealed registry.
+    if(!prepared()||storage_->uiNativeCollectorOwner||storage_->nativeFifoPins||storage_->collectorActive)return false;
+    storage_->uiNativeCollectorOwner=&owner;return true;
+}
 bool OriginalStandardMaterialTable50LA::canRetireNativeCollector29C300()const noexcept {
     return storage_&&!storage_->nativeFifoPins&&!storage_->collectorActive&&
         !storage_->populationActive&&!storage_->demandActive;
@@ -355,6 +383,7 @@ void OriginalStandardMaterialTable50LA::retireNativeCollector29C300()noexcept {
     for(auto& entry:storage_->collector)entry=Storage::CollectorEntry{};
     std::vector<Storage::CollectorEntry>().swap(storage_->collector);
     // Unlike14D440 rebuild, source29C300 does NOT call29BEA0 on materials.
+    storage_->uiNativeCollectorOwner=nullptr;storage_->collectorBindingDirty=false;
 }
 bool OriginalStandardMaterialTable50LA::pinNativeCollector(
     const OriginalStandardMaterialCollectorReceipt50LA& receipt) noexcept {
@@ -364,10 +393,16 @@ bool OriginalStandardMaterialTable50LA::pinNativeCollector(
 void OriginalStandardMaterialTable50LA::unpinNativeCollector() noexcept {
     if(!storage_||!storage_->nativeFifoPins)std::terminate();
     --storage_->nativeFifoPins;
+    //Source registration leaves are fixed throughout the actual FIFO drain.
+    //Accepted249610 history is real immediately, but14D440 cannot rebuild
+    //while pins exist. Expire the old comparison only at its last real pin.
+    if(!storage_->nativeFifoPins&&storage_->collectorBindingDirty&&!storage_->uiNativeCollectorOwner){
+        storage_->collectorSealed=false;storage_->collectorBindingDirty=false;
+    }
 }
 bool OriginalStandardMaterialTable50LA::coldCollectorCurrent(
     const OriginalStandardMaterialCollectorReceipt50LA& receipt) const noexcept {
-    return storage_&&receipt.owner_==this&&receipt.generation_&&
+    return storage_&&!storage_->nativeBindingPoisoned&&receipt.owner_==this&&receipt.generation_&&
         receipt.generation_==storage_->collectorGeneration&&storage_->collectorSealed&&
         !storage_->collectorActive&&!storage_->populationActive&&!storage_->populationTerminal&&
         !demandTerminal()&&(!storage_->populationBound||
@@ -393,6 +428,21 @@ bool OriginalStandardMaterialTable50LA::coldCollectorEntry(
     view.redirect18=entry.redirect;view.limit1C=entry.limit;view.finalLeaf=static_cast<std::int32_t>(leaf);
     view.material=entry.material;output=view;return true;
 }
+const void* OriginalStandardMaterialTable50LA::nativeCollectorEntry29C0B0(
+    const OriginalStandardMaterialCollectorReceipt50LA& receipt,std::size_t index)const noexcept {
+    return coldCollectorCurrent(receipt)&&index<storage_->collector.size()?&storage_->collector[index]:nullptr;
+}
+bool OriginalStandardMaterialTable50LA::appendNativeCollector29C150(
+    const OriginalStandardMaterialCollectorReceipt50LA& receipt,std::size_t index,
+    std::uint32_t epoch,void* record,void*& previousTail)noexcept {
+    OriginalStandardMaterialCollectorEntryView50LA view;
+    if(!record||!coldCollectorEntry(receipt,index,view)||!storage_->nativeFifoPins||view.finalLeaf<0)return false;
+    auto& leaf=storage_->collector[static_cast<std::size_t>(view.finalLeaf)];
+    if(leaf.nativeEpoch14==epoch&&!leaf.nativeTail10)return false;
+    previousTail=leaf.nativeEpoch14==epoch?leaf.nativeTail10:nullptr;
+    if(leaf.nativeEpoch14!=epoch){leaf.nativeEpoch14=epoch;leaf.nativeHead0C=record;}
+    leaf.nativeTail10=record;return true;
+}
 bool OriginalStandardMaterialTable50LA::coldCollectorPass(
     const OriginalStandardMaterialCollectorReceipt50LA& receipt,std::int32_t row,std::size_t pass,
     OriginalStandardMaterialCollectorEntryView50LA& output) const noexcept {
@@ -410,10 +460,25 @@ bool OriginalStandardMaterialTable50LA::prepareColdRepresentativeMap249610(
     std::size_t slot,std::size_t map,OriginalStandardMaterialMapBindingView50LA& output,D& d) const noexcept {
     return prepareColdMap249610(receipt,row,slot,map,PrototypeRoute::ordinary,output,d);
 }
+bool OriginalStandardMaterialTable50LA::prepareGarageParticleMap249610(
+    const OriginalStandardMaterialCollectorReceipt50LA& receipt,std::int32_t row,std::size_t map,
+    OriginalStandardMaterialMapBindingView50LA& out,D& d)const noexcept {
+    OriginalStandardMaterialMapBindingView50LA next;
+    if(!prepareColdMap249610(receipt,row,0,map,PrototypeRoute::ordinary,next,d))return false;
+    OriginalStandardMaterialPassView50LA pass;OriginalStandardProgramRowView50LA program;
+    if(map>1||!next.representative.material||next.representative.pass!=0||
+       !next.representative.material->pass4C(0,pass)||!pass.program18||!pass.mapCount20||*pass.mapCount20!=2||
+       !pass.constructionTemplate||pass.constructionTemplate!=storage_->templates->get(OriginalUiTemplate50KG::defaultMt)||
+       pass.animation10||pass.textureAnimation10||!pass.uv1E||(*pass.uv1E)[0]||(*pass.uv1E)[1]||
+       !storage_->programs->row(*pass.program18,program)||!program.canonicalName||
+       std::strcmp(program.canonicalName,"ParticleCode"))return fail(d,S::unsupportedPass,0x24B1C0);
+    next.nativeParticleRoute=true;out=next;return true;
+}
 bool OriginalStandardMaterialTable50LA::prepareColdScreenPrototypeMap249610(
     const OriginalStandardMaterialCollectorReceipt50LA& receipt,std::int32_t row,
     std::size_t slot,std::size_t map,OriginalStandardMaterialMapBindingView50LA& output,D& d) const noexcept {
-    return prepareColdMap249610(receipt,row,slot,map,PrototypeRoute::screenNullKey,output,d);
+    if(!prepareColdMap249610(receipt,row,slot,map,PrototypeRoute::screenNullKey,output,d))return false;
+    output.nativeScreenPrototypeRoute=true;return true;
 }
 bool OriginalStandardMaterialTable50LA::selectRacerMaterial29BFF0(std::int32_t index,D& d) noexcept {
     d={};d.row=index;
@@ -655,6 +720,94 @@ bool OriginalStandardMaterialTable50LA::prepareColdMap249610(
     next.preparation=OriginalStandardMaterialMapPreparation50LA::ready;
     output=next;return true;
 }
+bool OriginalStandardMaterialTable50LA::prepareGarageNativeBinding249610(
+    const OriginalStandardMaterialCollectorReceipt50LA& receipt,std::int32_t row,std::size_t pass,
+    OriginalStandardMaterialMapBindingView50LA& output,OriginalUiGarageProgram50KG& family,D& d)const noexcept {
+    d={};OriginalStandardMaterialMapBindingView50LA next;
+    if(!prepareColdRepresentativeMap249610(receipt,row,pass,0,next,d))return false;
+    if(next.preparation!=OriginalStandardMaterialMapPreparation50LA::ready||!next.texture)
+        return fail(d,S::texture,0x24B254);
+    OriginalStandardMaterialPassView50LA view;
+    OriginalStandardProgramRowView50LA program;
+    if(!next.representative.material->pass4C(static_cast<std::size_t>(next.representative.pass),view)||
+       !view.mapCount20||*view.mapCount20!=1||!view.program18||!view.nativeBindings||
+       !storage_->programs->row(*view.program18,program)||!program.canonicalName||
+       view.animation10||view.textureAnimation10)
+        return fail(d,S::unsupportedPass,0x24B278);
+    OriginalUiGarageProgram50KG actual;
+    if(std::strcmp(program.canonicalName,"PrelitCompressed")==0)actual=OriginalUiGarageProgram50KG::prelitCompressed;
+    else if(std::strcmp(program.canonicalName,"Diffuse")==0)actual=OriginalUiGarageProgram50KG::diffuse;
+    else if(std::strcmp(program.canonicalName,"DiffuseCompressed")==0)actual=OriginalUiGarageProgram50KG::diffuseCompressed;
+    else if(std::strcmp(program.canonicalName,"SpecularMapCompressed")==0)actual=OriginalUiGarageProgram50KG::specularMapCompressed;
+    else return fail(d,S::unsupportedPass,0x24B278);
+    // Distinct source identities. No program, pass or required contribution is
+    // skipped; unsupported animation/dual-map/foreign programs remain closed.
+    output=next;family=actual;return true;
+}
+
+bool OriginalStandardMaterialTable50LA::prepareGarageUntexturedState249BA0(
+    const OriginalStandardMaterialCollectorReceipt50LA& receipt,std::int32_t row,std::size_t slot,
+    OriginalStandardMaterialMapBindingView50LA& output,D& d)const noexcept {
+    d={};d.row=row;d.pass=slot;OriginalStandardMaterialMapBindingView50LA next;
+    if(!coldCollectorPass(receipt,row,slot,next.origin)||next.origin.finalLeaf<0||
+       !coldCollectorEntry(receipt,static_cast<std::size_t>(next.origin.finalLeaf),next.representative)||
+       next.representative.redirect18!=-1||!next.representative.material||!storage_->construction)
+        return fail(d,S::collector,0x24B1A0);
+    OriginalStandardMaterialPassView50LA pass;OriginalStandardProgramRowView50LA program;
+    if(!collectorPass(*next.representative.material,static_cast<std::size_t>(next.representative.pass),*storage_->construction,pass,d))return false;
+    if(!pass.flags21||!(*pass.flags21&2u)||!pass.mapCount20||*pass.mapCount20||!pass.program18||
+       !storage_->programs->row(*pass.program18,program)||!program.canonicalName||
+       std::strcmp(program.canonicalName,"ScreenObject")||pass.animation10||pass.textureAnimation10||
+       !pass.state30||pass.state30->contextCount()!=1u||!pass.nativeBindings||
+       (*pass.nativeBindings)[0].bound()||(*pass.nativeBindings)[1].bound())return fail(d,S::unsupportedPass,0x249BA0);
+    next.contextAfter249610=*pass.state30->context(0);
+    using F=OriginalUiGsField50KG;
+    if(next.contextAfter249610.fields[static_cast<std::size_t>(F::textureMappingOnOff)].value!=0)
+        return fail(d,S::unsupportedPass,0x249BA0);
+    next.nativeUntexturedRoute=true;next.preparation=OriginalStandardMaterialMapPreparation50LA::absentMap;
+    output=next;return true;
+}
+bool OriginalStandardMaterialTable50LA::garageNativeBindingsCurrent(
+    const OriginalStandardMaterialCollectorReceipt50LA& receipt,
+    const std::vector<OriginalStandardMaterialMapBindingView50LA>& maps)const noexcept {
+    if(!coldCollectorCurrent(receipt)||!storage_->nativeFifoPins||maps.empty())return false;
+    for(const auto& expected:maps){
+        OriginalStandardMaterialMapBindingView50LA now;D d;
+        const bool prepared=expected.nativeParticleRoute?
+            prepareGarageParticleMap249610(receipt,expected.origin.materialRow,expected.map,now,d):
+            expected.nativeUntexturedRoute?
+            prepareGarageUntexturedState249BA0(receipt,expected.origin.materialRow,static_cast<std::size_t>(expected.origin.pass),now,d):
+            prepareColdMap249610(receipt,expected.origin.materialRow,static_cast<std::size_t>(expected.origin.pass),0,
+                expected.nativeScreenPrototypeRoute?PrototypeRoute::screenNullKey:PrototypeRoute::ordinary,now,d);
+        if(!prepared||now.nativeParticleRoute!=expected.nativeParticleRoute||now.map!=expected.map||
+           now.nativeUntexturedRoute!=expected.nativeUntexturedRoute||
+           now.preparation!=(expected.nativeUntexturedRoute?OriginalStandardMaterialMapPreparation50LA::absentMap:OriginalStandardMaterialMapPreparation50LA::ready)||
+           now.origin.material!=expected.origin.material||now.origin.registration!=expected.origin.registration||
+           now.representative.material!=expected.representative.material||
+           now.representative.registration!=expected.representative.registration||now.texture!=expected.texture||
+           !equalCollectorState(now.contextAfter249610,expected.contextAfter249610))return false;
+    }
+    return true;
+}
+void OriginalStandardMaterialTable50LA::commitGarageNativeBindings249610(
+    const OriginalStandardMaterialCollectorReceipt50LA& receipt,
+    const std::vector<OriginalStandardMaterialMapBindingView50LA>& maps,
+    const std::vector<OriginalStandardMaterialNativeBinding50KG>& images)noexcept {
+    if(maps.size()!=images.size()||!garageNativeBindingsCurrent(receipt,maps))std::terminate();
+    for(std::size_t i=0;i<images.size();++i)if(images[i].bound()==maps[i].nativeUntexturedRoute)std::terminate();
+    // All validation precedes any mutation. Store only genuine final leaves.
+    for(std::size_t i=0;i<maps.size();++i){const auto& map=maps[i];
+        auto& object=storage_->rows[static_cast<std::size_t>(map.representative.materialRow)].object04;
+        if(map.nativeUntexturedRoute)object->commitNativeUntexturedState249BA0(static_cast<std::size_t>(map.representative.pass),map.contextAfter249610);
+        else object->commitNativeBinding249610(static_cast<std::size_t>(map.representative.pass),map.nativeParticleRoute?map.map:0,map.contextAfter249610,images[i]);
+    }
+    // The next14D440 must compare the retained effective history. A previous
+    // construction/redirect receipt cannot be reused as that new comparison.
+    storage_->collectorBindingDirty=true;
+}
+void OriginalStandardMaterialTable50LA::poisonGarageNativeBindings()noexcept {
+    if(storage_){storage_->nativeBindingPoisoned=true;storage_->collectorSealed=false;}
+}
 bool OriginalStandardMaterialTable50LA::demandTerminal() const noexcept {
     return storage_&&(storage_->demandTerminal||
         (storage_->textures&&storage_->textures->populationTerminal()));
@@ -770,7 +923,7 @@ bool OriginalStandardMaterialTable50LA::populate14D370(
             if(row.tournamentMissingPsm&&row.tournamentTextures!=input.actualTextures383400){
                 fail(d,S::texture,0x247638);return terminal();
             }
-            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,row.pauseBackdropMissingPsm,d))return terminal();
+            if(!s.partial->construct29B550(canonical,row.name00,s.templates,row.associated30,input,row.tournamentMissingPsm,row.speedBoostMissingPsm,row.damageMissingPsm,row.pauseBackdropMissingPsm,row.garageFallback,d))return terminal();
             if(!s.partial->constructed29B550()){
                 fail(d,S::phase,0x29B854);return terminal();
             }
@@ -844,6 +997,23 @@ bool OriginalStandardMaterialTable50LA::retainSpeedBoostFallback14D590(
     if(!retainScreen14D590(index,d))return false;
     if(!row.speedBoostMissingPsm)row.speedBoostMissingPsm=std::move(archive);
     if(!row.speedBoostTextures)row.speedBoostTextures=std::move(textures);
+    return true;
+}
+bool OriginalStandardMaterialTable50LA::bindGarageScreenFallbackAfterRetain(std::int32_t index,
+    std::shared_ptr<const OriginalGarageScreenFallback50KG> proof,D& d)noexcept {
+    if(!storage_||index<0||static_cast<std::size_t>(index)>=storage_->rows.size()||!proof||proof->row_!=index)
+        return fail(d,S::source,0x29B638);
+    auto& row=storage_->rows[static_cast<std::size_t>(index)];
+    if(row.references08<=0||!storage_->templates||row.associated30!=storage_->templates->get(OriginalUiTemplate50KG::screenMt)||
+       row.tournamentMissingPsm||row.speedBoostMissingPsm||row.damageMissingPsm||row.pauseBackdropMissingPsm||
+       (row.object04&&!row.garageFallback)||!proof->current(row.name00+".psm",proof->context_,proof->textures_))
+        return fail(d,S::phase,0x29B638);
+    //Numeric104960 retain already happened at2465B0. This is native source
+    //admission only and MUST NOT add a second source reference.
+    if(row.garageFallback){
+        if(!row.garageFallback->current(row.name00+".psm",proof->context_,proof->textures_))
+            return fail(d,S::source,0x29B638);
+    }else row.garageFallback=std::move(proof);
     return true;
 }
 bool OriginalStandardMaterialTable50LA::retainDamageFallback14D590(

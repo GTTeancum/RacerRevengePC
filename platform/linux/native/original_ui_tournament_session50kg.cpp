@@ -1,3 +1,4 @@
+#include "original_ui_garage_session50kg.h"
 #include "original_ui_tournament_session50kg.h"
 #include "original_ui_main_draw50kg.h"
 #include "vehicle_window_gl50ds.h"
@@ -75,6 +76,7 @@ struct OriginalUiTournamentSession50KG::Storage {
  bool entryPreparationCurrent()const noexcept{
   if(const auto* p=std::get_if<OriginalUiRiderRouteProposal50KG>(&cold.sourceProposal))return cold.resources->riderConfirmPreparationCurrent(*p);
   if(const auto* p=std::get_if<OriginalUiCourseRouteProposal50KG>(&cold.sourceProposal))return cold.resources->courseBackPreparationCurrent(*p);
+  if(const auto* p=std::get_if<std::shared_ptr<const OriginalUiGarageSession50KG>>(&cold.sourceProposal))return cold.resources->garageBackPreparationCurrent(*p);
   return false;
  }
  bool profileCurrent()const noexcept{
@@ -188,6 +190,8 @@ S OriginalUiTournamentSession50KG::bind(const OriginalUiTournamentSessionCold50K
   sourceCurrent=p->source&&p->source->ownsProfile(*cold.profile)&&p->source->routeProposalCurrent(*p)&&cold.resources->riderConfirmPreparationCurrent(*p);
  else if(const auto* p=std::get_if<OriginalUiCourseRouteProposal50KG>(&cold.sourceProposal))
   sourceCurrent=p->source&&p->source->ownsProfile(*cold.profile)&&p->source->routeProposalCurrent(*p)&&cold.resources->courseBackPreparationCurrent(*p);
+ else if(const auto* p=std::get_if<std::shared_ptr<const OriginalUiGarageSession50KG>>(&cold.sourceProposal))
+  sourceCurrent=*p&&(*p)->profileOwnerForReturn17DE10()==cold.profile&&cold.resources->garageBackPreparationCurrent(*p);
  if(!sourceCurrent||!cold.resources->sameProfileOwner(*cold.profile))return result(d,S::profile);
  try{auto s=std::make_unique<Storage>();s->cold=cold;s->cold.english=nullptr;s->coldCommon=*cold.commonProfile;s->coldStamp=cold.profile->stamp();
   if(!s->process()||!cold.resources->career()||!fresh(*cold.resources->career())||!stamp(cold.resources->career()->stamp,s->coldStamp))return result(d,S::profile);
@@ -226,6 +230,13 @@ bool OriginalUiTournamentSession50KG::acceptEntryProfileCommit(const OriginalUiC
  auto*s=storage_.get();if(!s||!s->operational()||s->inOperation||s->entryCommitted||!s->bankPublished||!s->process()||!common(s->coldCommon,*s->cold.commonProfile)||
   !std::holds_alternative<OriginalUiCourseRouteProposal50KG>(s->cold.sourceProposal))return false;
  if(!s->cold.resources->acceptCourseBackCommit(p,s->failure.resource)){s->fault(S::profile,0x1DF0B4);return false;}
+ s->liveStamp=s->cold.profile->stamp();s->entryCommitted=true;s->cold.sourceProposal=std::monostate{};return s->profileCurrent();
+}
+bool OriginalUiTournamentSession50KG::acceptEntryProfileCommit(const std::shared_ptr<const OriginalUiGarageSession50KG>& p)noexcept{
+ auto*s=storage_.get();if(!s||!p||!s->operational()||s->inOperation||s->entryCommitted||!s->bankPublished||!s->process()||
+  !common(s->coldCommon,*s->cold.commonProfile)||!std::holds_alternative<std::shared_ptr<const OriginalUiGarageSession50KG>>(s->cold.sourceProposal)||
+  std::get<std::shared_ptr<const OriginalUiGarageSession50KG>>(s->cold.sourceProposal)!=p)return false;
+ if(!s->cold.resources->acceptGarageBackCommit(p,s->failure.resource)){s->fault(S::profile,0x17DE10);return false;}
  s->liveStamp=s->cold.profile->stamp();s->entryCommitted=true;s->cold.sourceProposal=std::monostate{};return s->profileCurrent();
 }
 S OriginalUiTournamentSession50KG::notifyTransition(const game::OriginalUiTransitionNotification50KG&e,D&d)noexcept{
@@ -282,13 +293,15 @@ S OriginalUiTournamentSession50KG::input(const OriginalUiMainSessionInput50KG&in
  r.pageCallbackRan=true;r.pageAccepted=true;
  const auto plan=game::planOriginalUiTournamentInput50KG(in.controller,in.originalInput,s->popup.entity29,std::uint32_t(s->transition().phase));
  if(plan.status!=game::OriginalUiTournamentInputStatus50KG::proposed)return result(d,r.status=S::noChange);
- // Garage remains unavailable BEFORE route, sound or profile effects.
+ // All three genuine inputs produce only a typed proposal here. The
+ // coordinator must admit the actual destination before its source sound.
  const bool continuing=in.originalInput==4&&plan.request.targetScreen==6&&plan.sound==1;
  const bool back=in.originalInput==6&&plan.request.targetScreen==5&&plan.sound==5;
- if(!continuing&&!back)return result(d,r.status=S::unavailableDestination,plan.requestCallPC);
+ const bool garage=in.originalInput==5&&plan.request.targetScreen==13&&plan.sound==1;
+ if(!continuing&&!back&&!garage)return result(d,r.status=S::unavailableDestination,plan.requestCallPC);
  if(!s->effectReady(plan.sound)||plan.request.kind!=game::OriginalUiRouteKind50KG::changeScreen)return result(d,r.status=S::audio,plan.soundPC);
  s->pending={};s->pending.action=game::OriginalUiRouteAction50KG::unavailable;s->pending.request=plan.request;s->pending.blockers=std::uint32_t(game::OriginalUiRouteBlocker50KG::destinationOwner);s->pending.selectedRider=std::int32_t(s->state.career);s->pending.inputPC=0x1F2310;s->pending.profileProposalComplete=true;
- s->pendingStamp=s->liveStamp;s->pendingInput=in.originalInput;s->pendingSound=plan.sound;s->state.backProposalPending=true;if(++s->serial==0)++s->serial;r.routeProposal={this,s->serial,s->pending,s->pendingStamp};return result(d,r.status=continuing?S::continueProposed:S::backProposed);
+ s->pendingStamp=s->liveStamp;s->pendingInput=in.originalInput;s->pendingSound=plan.sound;s->state.backProposalPending=true;if(++s->serial==0)++s->serial;r.routeProposal={this,s->serial,s->pending,s->pendingStamp};return result(d,r.status=garage?S::garageProposed:continuing?S::continueProposed:S::backProposed);
 }
 bool OriginalUiTournamentSession50KG::ownsProfile(const OriginalUiRiderProfileOwner50KG&p)const noexcept{return storage_&&storage_->cold.profile.get()==&p;}
 bool OriginalUiTournamentSession50KG::routeProposalCurrent(const OriginalUiTournamentRouteProposal50KG&p)const noexcept{
@@ -299,7 +312,8 @@ bool OriginalUiTournamentSession50KG::commitRoute(const OriginalUiTournamentRout
  const auto&s=*storage_;
  const bool continuing=s.pendingInput==4&&s.pendingSound==1&&admitted.request.targetScreen==6&&admitted.request.sourcePC==0x1F2374;
  const bool back=s.pendingInput==6&&s.pendingSound==5&&admitted.request.targetScreen==5&&admitted.request.sourcePC==0x1F23C8;
- if((!continuing&&!back)||!decision(expected,admitted)||admitted.profileChanges.count||admitted.inputPC!=0x1F2310||
+ const bool garage=s.pendingInput==5&&s.pendingSound==1&&admitted.request.targetScreen==13&&admitted.request.sourcePC==0x1F241C;
+ if((!continuing&&!back&&!garage)||!decision(expected,admitted)||admitted.profileChanges.count||admitted.inputPC!=0x1F2310||
   admitted.request.kind!=game::OriginalUiRouteKind50KG::changeScreen||admitted.request.sourceScreen!=9||admitted.request.sourcePage!=1||admitted.request.targetPage!=1)return false;
  storage_->backCommitted=true;return true; //1F2310 writes no profile fields.
 }
@@ -307,7 +321,7 @@ S OriginalUiTournamentSession50KG::notifyRouteAccepted(const OriginalUiTournamen
  d={};auto*s=storage_.get();if(!s)return result(d,S::notBound);if(!s->operational()||s->inOperation||s->updatePrepared||!s->backCommitted||!s->state.backProposalPending||p.source!=this||p.serial!=s->serial||!decision(p.decision,s->pending)||!stamp(p.profileStamp,s->pendingStamp)||!s->profileCurrent())return result(d,S::invalidInput);
  const auto t=s->transition();if(!s->currentPage()||t.requested.screen!=p.decision.request.targetScreen||t.requested.page!=1||t.lifecycle!=Life::requestScreenExit||t.phase!=Phase::none||t.applicationRequestQueued||t.initialRestartPending)return result(d,S::transition);
  s->state.backProposalPending=false;s->state.framePublished=false;s->backAccepted=true;
- const auto soundPC=s->pendingInput==4?0x1F2394u:0x1F23E8u;
+ const auto soundPC=s->pendingInput==5?0x1F243Cu:s->pendingInput==4?0x1F2394u:0x1F23E8u;
  if(!s->effect(s->pendingSound)){s->fault(S::audio,soundPC);return result(d,S::audio,soundPC);}return result(d,S::ok); //267BE0 actual transportE00==-1 proven by process().
 }
 bool OriginalUiTournamentSession50KG::routeProposalRetired(const OriginalUiTournamentRouteProposal50KG&p)const noexcept{

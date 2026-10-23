@@ -81,7 +81,10 @@ enum class OriginalUiMaterialOrigin50KG : std::uint8_t {
     damageTextureMissingPsmFallback, pauseBackdropMissingPsmFallback,
     hallNameBlurMissingPsmFallback, hallPromptMissingPsmFallback, hallFontMissingPsmFallback,
     tournamentNameBlurMissingPsmFallback, tournamentPromptMissingPsmFallback,
-    courseTrophyMissingPsmFallback
+    courseTrophyMissingPsmFallback,
+    // Only the private canonical Object conversion admits this provenance.
+    // The public recipe converter continues to reject it without that owner.
+    garageCanonicalScreenMissingPsmFallback
 };
 struct OriginalUiMaterialProvenance50KG {
     OriginalUiMaterialOrigin50KG origin = OriginalUiMaterialOrigin50KG::authoredPsm;
@@ -348,6 +351,73 @@ struct OriginalUiLitMaterial50KM {
     OriginalUiNativeMaterial50KG raster{};
     OriginalUiLitProgram50KM program = OriginalUiLitProgram50KM::diffuseCompressed;
     bool fogEnabled = false, alphaTestGreaterZero = false;
+};
+// Separate typed construction policy for the genuine Garage stored-color
+// program. It is not a Diffuse material and supplies no light/default colors.
+// This immutable PSG/material/image owner is NOT the live canonical registry:
+// the complete collector must retain/resolve the actual1C4 slot and final leaf,
+// compare effective binding state, and commit its real249610/drain history.
+// No field below is a submission, live residency or complete-frame receipt.
+class OriginalUiGarageModelMaterials50KG;
+struct OriginalUiGarageModelMaterialPass50KG;
+struct OriginalUiGaragePrelitMaterial50KG {
+    OriginalUiNativeMaterial50KG raster{};
+    bool fogEnabled=false,alphaTestGreaterZero=false;
+    const OriginalUiGarageModelMaterials50KG* owner=nullptr;
+    const OriginalUiGarageModelMaterialPass50KG* sourcePass=nullptr;
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+    std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0;
+};
+// Authenticates the exact owner's material slot/pass/PST and all stored mips.
+// Native highest-resolution sampling is explicit; it does not assert original
+// residentF4/LOD parity. Current packet RGB/alpha/F/STQ and clipping remain
+// separate actual producers. Raw source-alpha storage is always required.
+// Failure leaves output unchanged, including disabled/foreign/unsupported
+// passes; this routine does not silently skip any authored model or pass.
+bool prepareOriginalUiGaragePrelitMaterial50KG(const OriginalUiGarageModelMaterials50KG&,
+    std::uint32_t materialSlot,std::uint32_t passIndex,OriginalUiGaragePrelitMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+// Internal common raster converter: only the genuine owner-authenticating
+// function above may select this new program path. Keeping the gate here
+// avoids adding Garage loader link dependencies to every existing UI parser.
+class OriginalUiGaragePrelitRasterAdapter50KG final {
+private:
+    friend bool prepareOriginalUiGaragePrelitMaterial50KG(const OriginalUiGarageModelMaterials50KG&,
+        std::uint32_t,std::uint32_t,OriginalUiGaragePrelitMaterial50KG&,
+        OriginalUiMaterialDiagnostic50KG&) noexcept;
+    static bool convert(const OriginalUiGarageModelMaterials50KG&,const OriginalUiMaterialPass50KG&,
+        const Texture48E&,OriginalUiGaragePrelitMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+};
+// Distinct actual canonical program identities, not interchangeable shaders.
+enum class OriginalUiGarageProgram50KG : std::uint8_t {prelitCompressed,diffuse,diffuseCompressed,specularMapCompressed};
+struct OriginalUiGarageLitMaterial50KG {
+    OriginalUiNativeMaterial50KG raster{};
+    OriginalUiCoveragePolicy50KM coverage=OriginalUiCoveragePolicy50KM::aa0;
+    OriginalUiGarageProgram50KG program=OriginalUiGarageProgram50KG::diffuseCompressed;
+    bool fogEnabled=false,alphaTestGreaterZero=false;
+    const OriginalUiGarageModelMaterials50KG* owner=nullptr;
+    const OriginalUiGarageModelMaterialPass50KG* sourcePass=nullptr;
+    const OriginalUiScreenAssets50KG* images=nullptr;
+    std::uint32_t imageIndex=0;
+    std::uint64_t imageIdentity=0;
+    std::uint32_t sourceStoredMipIndex=0,sourceMipCount=0;
+};
+// Actual loaded static, Actor, selected19E or Watto policy. This admits only
+// the real diffuse/specular family and authenticated original PST image;
+// no caller can use it to turn stored PreLit color into calculated lighting.
+// Existing GS/sampler checks remain. AA1 is admitted only for the exact
+// authenticated Watto25c_7 source-alpha pass; every other pass retains AA0.
+bool prepareOriginalUiGarageLitMaterial50KG(const OriginalUiGarageModelMaterials50KG&,
+    std::uint32_t materialSlot,std::uint32_t passIndex,OriginalUiGarageLitMaterial50KG&,
+    OriginalUiMaterialDiagnostic50KG&) noexcept;
+class OriginalUiGarageLitRasterAdapter50KG final {
+private:
+    friend bool prepareOriginalUiGarageLitMaterial50KG(const OriginalUiGarageModelMaterials50KG&,
+        std::uint32_t,std::uint32_t,OriginalUiGarageLitMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
+    static bool convert(const OriginalUiGarageModelMaterials50KG&,const OriginalUiMaterialPass50KG&,
+        const Texture48E&,bool actualWatto25c7Aa1,OriginalUiGarageLitMaterial50KG&,OriginalUiMaterialDiagnostic50KG&) noexcept;
 };
 // Actual authored, DefaultMT-associated one-map Diffuse/Compressed only.
 // Requires original normal/light/projection producers and a real fog-byte

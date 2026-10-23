@@ -9,6 +9,8 @@ namespace original_position_stats_prestage50LA { class Owner; }
 namespace ra_static_world50LA {class Owner;}
 namespace rr::game {class OriginalPositionStatsResources50LA;class OriginalPauseMaterialAdmission50LA;}
 namespace rr::platform { class OriginalUiTournamentPodReferences50KG; }
+namespace rr::platform {class OriginalUiGarageModelResource50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageQuad50KG;class OriginalUiGaragePageOwner50KG;}
+namespace rr::platform { class OriginalUiGarageCanonicalSubmission50KG; class OriginalUiGarageDrawContribution50KG; }
 namespace rr::assets {
 // A partial CPU callback outcome, never a renderer capability. The first
 // enabled pass cannot return until24B9B0; subsequent passes remain untouched.
@@ -21,9 +23,11 @@ class OriginalStandardScreenMaterialReference50LA;
 class OriginalPausePrimitiveReferences50LA;
 class OriginalStandardMaterialTable50LA;
 class OriginalStandardMaterialAnimationInstance50LA;
-// A sealed observation of this actual table's complete CONSTRUCTION-STATE
-// registry. Only a successful whole-table rebuild can mint it. It is not a
-// rendered-frame, effective249610 binding-history or FIFO-drain receipt.
+// A sealed observation of this actual table's complete current registry.
+// Initially construction-state; subsequent accepted native bindings remain
+// on their REAL pass owners and participate in the next14D440 comparison.
+// Only a whole-table rebuild mints this value. It is not a rendered-frame
+// admission, effective249610 binding receipt or FIFO-drain receipt.
 // The same application/table must outlive this borrowed value.
 class OriginalStandardMaterialCollectorReceipt50LA final {
 public:
@@ -51,6 +55,9 @@ struct OriginalStandardMaterialMapBindingView50LA {
     OriginalStandardMaterialCollectorEntryView50LA origin{},representative{};
     OriginalStandardMaterialMapPreparation50LA preparation=OriginalStandardMaterialMapPreparation50LA::disabled;
     std::size_t map=0;
+    bool nativeUntexturedRoute=false; //Exact zero-map249BA0 state, not an image binding.
+    bool nativeParticleRoute=false; //Private retained ParticleCode two-context route.
+    bool nativeScreenPrototypeRoute=false; //Actual private ScreenObject null-key route, not a source field.
     std::int16_t textureToken=-1;
     const OriginalStandardTextureResource50LA* texture=nullptr;
     // Constructor fields plus ONLY the proven per-map249610 TEXA overwrite.
@@ -114,6 +121,10 @@ struct OriginalStandardMaterialRowView50LA {
 // existing foreign owners are absent. Default construction is UNPREPARED.
 // Serial and nonreentrant; no table mutation during scene/renderer borrows.
 class OriginalStandardMaterialTable50LA final {
+    friend class rr::platform::OriginalUiGarageModelResource50KG;
+    friend class rr::platform::OriginalUiGarageScreenText50KG;
+    friend class rr::platform::OriginalUiGarageQuad50KG;
+    friend class rr::platform::OriginalUiGaragePageOwner50KG;
 public:
     OriginalStandardMaterialTable50LA() noexcept;
     ~OriginalStandardMaterialTable50LA();
@@ -165,11 +176,12 @@ public:
         OriginalStandardMaterialCollectorEntryView50LA&) const noexcept;
     bool coldCollectorPass(const OriginalStandardMaterialCollectorReceipt50LA&,
         std::int32_t row,std::size_t pass,OriginalStandardMaterialCollectorEntryView50LA&) const noexcept;
-    // Read-only preparation from this exact sealed cold registry. Resolves
+    // Read-only preparation from this exact sealed current registry. Resolves
     // the final entry FIRST, then its enabled pass, actual map token and SAME
     // texture table. Null resources remain a genuine no-bind result.
     // This ordinary path rejects texture animation: it has no null-key UI
-    // caller proof. IPU/RenderTarget/residency remain closed.
+    // caller proof. Native IPUM ownership is real; RenderTarget/residency
+    // emulation remains closed. This does not itself bind a native image.
     // Output is unchanged on failure; success does not mutate source history.
     bool prepareColdRepresentativeMap249610(const OriginalStandardMaterialCollectorReceipt50LA&,
         std::int32_t row,std::size_t pass,std::size_t map,
@@ -197,12 +209,32 @@ public:
     bool firstPending14D370(std::int32_t& row,const std::string*& name,
         OriginalStandardMaterialDiagnostic50LA&) const noexcept;
 private:
+    friend class rr::platform::OriginalUiGarageCanonicalSubmission50KG;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    bool prepareGarageUntexturedState249BA0(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t,std::size_t,OriginalStandardMaterialMapBindingView50LA&,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool prepareGarageNativeBinding249610(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t row,std::size_t pass,OriginalStandardMaterialMapBindingView50LA&,
+        OriginalUiGarageProgram50KG&,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
+    bool garageNativeBindingsCurrent(const OriginalStandardMaterialCollectorReceipt50LA&,
+        const std::vector<OriginalStandardMaterialMapBindingView50LA>&)const noexcept;
+    void commitGarageNativeBindings249610(const OriginalStandardMaterialCollectorReceipt50LA&,
+        const std::vector<OriginalStandardMaterialMapBindingView50LA>&,
+        const std::vector<OriginalStandardMaterialNativeBinding50KG>&)noexcept;
+    void poisonGarageNativeBindings()noexcept;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     friend class rr::game::OriginalPauseMaterialAdmission50LA;
     bool serviceRetainedScreenPrototype24A740(const OriginalStandardMaterialCollectorReceipt50LA&,
         std::int32_t,std::size_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool bindUiNativeCollector1B73BC(const ::original_main_entry50KG::NativeCollectorFifo50LA&)noexcept;
     bool canRetireNativeCollector29C300()const noexcept;
     void retireNativeCollector29C300()noexcept;
+    //Exact native allocation identity of the registered29C0B0 entry. The
+    //receipt expires before its backing can be reused; never dereference an
+    //expired source1C8. Its queue heads/epoch are the SAME entry's fields.
+    const void* nativeCollectorEntry29C0B0(const OriginalStandardMaterialCollectorReceipt50LA&,std::size_t)const noexcept;
+    bool appendNativeCollector29C150(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::size_t,std::uint32_t,void* record,void*& previousTail)noexcept;
     bool pinNativeCollector(const OriginalStandardMaterialCollectorReceipt50LA&) noexcept;
     void unpinNativeCollector() noexcept;
     friend class ::ra_static_world50LA::Owner;
@@ -214,6 +246,8 @@ private:
     bool prepareRetainedModelMap24B26C(const OriginalStandardMaterialCollectorReceipt50LA&,
         std::int32_t,std::size_t,std::size_t,OriginalStandardMaterialMapBindingView50LA&,
         OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    bool prepareGarageParticleMap249610(const OriginalStandardMaterialCollectorReceipt50LA&,
+        std::int32_t,std::size_t,OriginalStandardMaterialMapBindingView50LA&,OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     enum class PrototypeRoute {ordinary,screenNullKey,retainedModel,cableNullKey};
     bool prepareColdMap249610(const OriginalStandardMaterialCollectorReceipt50LA&,
         std::int32_t,std::size_t,std::size_t,PrototypeRoute,
@@ -227,6 +261,8 @@ private:
         std::shared_ptr<OriginalStandardTextureTable50LA>,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool screenApplicationMatches(const OriginalUiMaterialApplication50LA&) const noexcept;
+    bool demandGarage2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,
+        std::uint32_t storePC,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
     bool demandTournamentFallback2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,
         const OriginalUiArchive50KG&,std::uint32_t storePC,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
     bool demandTournamentMarker2DF8A0(std::int32_t,const OriginalStandardTextureTable50LA&,
@@ -265,6 +301,8 @@ private:
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool retainDefault14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool retainScreen14D590(std::int32_t,OriginalStandardMaterialDiagnostic50LA&) noexcept;
+    bool bindGarageScreenFallbackAfterRetain(std::int32_t,
+        std::shared_ptr<const OriginalGarageScreenFallback50KG>,OriginalStandardMaterialDiagnostic50LA&)noexcept;
     bool release14D500(std::int32_t) noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;

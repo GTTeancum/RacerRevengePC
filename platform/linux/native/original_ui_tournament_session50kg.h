@@ -10,9 +10,10 @@
 #include "../../../src/game/original_ui_tournament_input50kg.h"
 #include "../../../src/game/original_ui_tournament_pod_owner50kg.h"
 namespace rr::platform {
+class OriginalUiGarageSession50KG;
 class OriginalUiTournamentDrawContribution50KG;
 
-enum class OriginalUiTournamentSessionStatus50KG:std::uint8_t {ok,noChange,backProposed,unavailableDestination,notBound,alreadyBound,invalidInput,resource,profile,transition,aperture,widget,audio,camera,model,draw,unsupportedState,busy,faulted,quit,continueProposed};
+enum class OriginalUiTournamentSessionStatus50KG:std::uint8_t {ok,noChange,backProposed,unavailableDestination,notBound,alreadyBound,invalidInput,resource,profile,transition,aperture,widget,audio,camera,model,draw,unsupportedState,busy,faulted,quit,continueProposed,garageProposed};
 struct OriginalUiTournamentSessionDiagnostic50KG {
  OriginalUiTournamentSessionStatus50KG status=OriginalUiTournamentSessionStatus50KG::ok;
  std::uint32_t sourcePC=0;
@@ -42,7 +43,7 @@ struct OriginalUiTournamentSessionCold50KG {
  std::shared_ptr<OriginalUiMainAudio50KG> audio;
  std::shared_ptr<game::OriginalUiTransitionOwner50KG> externalTransition;
  // Actual typed predecessor. Course Back never reuses a retired Rider proposal.
- std::variant<std::monostate,OriginalUiRiderRouteProposal50KG,OriginalUiCourseRouteProposal50KG> sourceProposal{};
+ std::variant<std::monostate,OriginalUiRiderRouteProposal50KG,OriginalUiCourseRouteProposal50KG,std::shared_ptr<const OriginalUiGarageSession50KG>> sourceProposal{};
 };
 class OriginalUiTournamentSession50KG;
 struct OriginalUiTournamentRouteProposal50KG {
@@ -99,6 +100,7 @@ private:
  friend class OriginalUiFrontend50KG;
  bool acceptEntryProfileCommit(const OriginalUiRiderRouteProposal50KG&) noexcept;
  bool acceptEntryProfileCommit(const OriginalUiCourseRouteProposal50KG&) noexcept;
+ bool acceptEntryProfileCommit(const std::shared_ptr<const OriginalUiGarageSession50KG>&) noexcept;
  bool commitRoute(const OriginalUiTournamentRouteProposal50KG&,const game::OriginalUiRouteDecision50KG&) noexcept;
  bool retirePredecessorInventory(std::shared_ptr<const game::OriginalUiTournamentPredecessorInventory50KG>,game::OriginalUiTournamentPredecessorRetirement50KG&,OriginalUiTournamentSessionDiagnostic50KG&) const noexcept;
  bool sourceTeardownPending() const noexcept;

@@ -5,10 +5,13 @@
 #include "original_standard_program_table50la.h"
 #include "original_standard_texture_table50la.h"
 #include "original_ui_material50kg.h"
+#include "original_garage_screen_fallback50kg.h"
+#include "original_standard_material_native_binding50kg.h"
 #include <array>
 #include <optional>
 
 namespace rr::game { class OriginalApplicationAnimationClockView50KG; }
+namespace rr::platform { class OriginalUiGarageDrawContribution50KG; class OriginalUiGarageCanonicalSubmission50KG; }
 namespace rr::assets {
 class OriginalStandardMaterialTable50LA;
 class OriginalStandardMaterialAnimation50LA;
@@ -70,6 +73,7 @@ struct OriginalStandardMaterialPassView50LA {
     const OriginalStandardMaterialParameters50LA* parameters34=nullptr;
     OriginalStandardMaterialAnimation50LA* animation10=nullptr;
     const OriginalStandardMaterialTextureAnimation50LA* textureAnimation10=nullptr;
+    const std::array<OriginalStandardMaterialNativeBinding50KG,2>* nativeBindings=nullptr;
     // Concrete construction owns every published dependency. No caller-set
     // readiness bit or substitute texture/program/animation object is accepted.
 };
@@ -96,6 +100,22 @@ public:
     const OriginalStandardTextureTable50LA* textures383400() const noexcept;
 private:
     friend class OriginalStandardMaterialTable50LA;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    friend class rr::platform::OriginalUiGarageCanonicalSubmission50KG;
+    // Only the actual queued representative may expose its constructed
+    // missing-PSM state. Neither method creates source() or an authored PSM.
+    bool borrowGarageScreenFallback2475C0(std::size_t,
+        const OriginalStandardTextureResource50LA&,const OriginalUiArchive50KG&,
+        const OriginalUiMemberView50KG&,OriginalUiMaterial50KG&,
+        OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    bool prepareGarageScreenFallback2475C0(std::size_t,
+        const OriginalStandardTextureResource50LA&,const OriginalUiArchive50KG&,
+        const OriginalUiMemberView50KG&,const Texture48E&,OriginalUiMaterial50KG&,
+        OriginalUiNativeMaterial50KG&,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    void commitNativeUntexturedState249BA0(std::size_t,const OriginalStandardMaterialStateContext50LA&)noexcept;
+    void commitNativeBinding249610(std::size_t pass,std::size_t map,
+        const OriginalStandardMaterialStateContext50LA&,
+        const OriginalStandardMaterialNativeBinding50KG&) noexcept;
     bool select29BFF0(OriginalStandardMaterialDiagnostic50LA&) noexcept;
     bool serviceCableBasePrototype29AC90(std::size_t,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
@@ -113,6 +133,8 @@ private:
     bool selectScreenPrototype24B278(std::size_t,std::size_t,
         const OriginalStandardTextureResource50LA&,
         const OriginalStandardTextureResource50LA*&,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
+    bool demandGarage2DF8A0(const OriginalStandardTextureTable50LA&,
+        std::uint32_t storePC,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
     bool demandTournamentFallback2DF8A0(const OriginalStandardTextureTable50LA&,
         const OriginalUiArchive50KG&,std::uint32_t storePC,OriginalStandardMaterialDiagnostic50LA&) const noexcept;
     bool demandTournamentMarker2DF8A0(const OriginalStandardTextureTable50LA&,
@@ -134,6 +156,7 @@ private:
         std::shared_ptr<const OriginalUiArchive50KG> speedBoostMissingPsm,
         std::shared_ptr<const OriginalUiArchive50KG> damageMissingPsm,
         std::shared_ptr<const OriginalUiArchive50KG> pauseBackdropMissingPsm,
+        std::shared_ptr<const OriginalGarageScreenFallback50KG> garageFallback,
         OriginalStandardMaterialDiagnostic50LA&) noexcept;
     // Source24A430. Only the canonical manager supplies its one persistent
     // lazy application state. Surface values come from the retained PSG;

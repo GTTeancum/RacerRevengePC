@@ -56,6 +56,21 @@ bool sampleModelMotion49T(const assets::MotionView49O& motion,
     const SceneGraph49P& graph, ModelMotionState49T& state,
     ModelMotionSharedState49T& shared, ModelMotionWorkspace49T& workspace,
     ModelMotionDiagnostic49T& diagnostic) noexcept;
+// Source156500 allocates one32-bit mask lane per source binding row.
+// Any nonzero lane suppresses that row in1559F0 before sampling/setters.
+// This is a numeric view, not proof of a widget/model lifetime or node search.
+struct ModelMotionMask50KG {
+    std::uint32_t count=0;
+    std::uint32_t rows[64]{};
+};
+// Same nonmirrored1559F0 contract and bounds as above, with the real source
+// row mask. The caller retains its independently resolved mask, graph and
+// bindings. Masked tracks do not initialize interpolation state or setters.
+// No ancestor propagation, static-pose substitute or playback-clock update.
+bool sampleModelMotionMasked50KG(const assets::MotionView49O&,
+    const assets::MotionNodeBindings49O&,const ModelMotionMask50KG&,float frameFraction,
+    const SceneGraph49P&,ModelMotionState49T&,ModelMotionSharedState49T&,
+    ModelMotionWorkspace49T&,ModelMotionDiagnostic49T&) noexcept;
 // Original154480's nonmirrored, unmasked direct-time sampling route with
 // no cross-motion blend or scale-restoration owners. Consumes sampleTime as
 // current34, with no duration/fraction roundtrip. Rotation145850 clamps at the

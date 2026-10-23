@@ -4,6 +4,7 @@
 #include <memory>
 namespace original_main_entry50KG {class NativeCollectorFifo50LA;}
 namespace rr::game::original_gc_gameplay_lighting_candidate {class Owner;}
+namespace rr::platform {class OriginalUiGarageVisibility50KG;}
 namespace rr::game {
 class OriginalApplicationEntities50LA;
 // Numeric semantic owner of zone+A0 (27F120 null;280230 allocation/update).
@@ -11,9 +12,13 @@ class OriginalApplicationEntities50LA;
 // the same four endpoints. Keep stable identity while the source updates it.
 class OriginalZoneScissor50LA final {
     friend class original_gc_gameplay_lighting_candidate::Owner;
+    friend class rr::platform::OriginalUiGarageVisibility50KG;
     friend class ::original_main_entry50KG::NativeCollectorFifo50LA;
     std::array<std::uint32_t,4> endpoints_{}; // x0,x1,y0,y1, inclusive source fields.
     std::uint32_t zone_=0;
+    //Garage source lifetime is independent of native backing retained by4014.
+    const rr::platform::OriginalUiGarageVisibility50KG* garageOwner_=nullptr;
+    bool garageRetired_=false;
     std::uint64_t revision_=0;
     explicit OriginalZoneScissor50LA(std::uint32_t zone):zone_(zone){}
 };

@@ -155,7 +155,7 @@ bool sample(const assets::MotionView49O& motion, const assets::MotionView49O* se
     const assets::MotionNodeBindings49O& bindings, float fraction, float weight,
     const SceneGraph49P& graph, ModelMotionState49T& state,
     ModelMotionSharedState49T& shared, ModelMotionWorkspace49T& workspace,
-    ModelMotionDiagnostic49T& d,bool directTime=false) noexcept {
+    ModelMotionDiagnostic49T& d,bool directTime=false,const ModelMotionMask50KG* mask=nullptr) noexcept {
     d={};
     if(std::fegetround()!=FE_TONEAREST)return reject(d,ModelMotionError49T::rounding_mode);
     if(!graph.nodes||!graph.count||graph.count>maxSceneNodes49P||!motion.data||
@@ -167,6 +167,12 @@ bool sample(const assets::MotionView49O& motion, const assets::MotionView49O* se
        (second&&(motion.rotationCount!=second->rotationCount||motion.positionCount!=second->positionCount))||
        !validateSceneGraph49P(graph))return reject(d,ModelMotionError49T::topology);
     const auto bytes=sizeof(SceneNode49P)*graph.count;
+    if(mask&&(second||directTime||mask->count!=bindings.count||
+       overlaps(mask,sizeof *mask,&workspace,sizeof workspace)||
+       overlaps(mask,sizeof *mask,graph.nodes,bytes)||
+       overlaps(mask,sizeof *mask,&state,sizeof state)||
+       overlaps(mask,sizeof *mask,&shared,sizeof shared)))
+        return reject(d,ModelMotionError49T::input);
     if(overlaps(&workspace,sizeof workspace,graph.nodes,bytes)||
        overlaps(&workspace,sizeof workspace,&state,sizeof state)||
        overlaps(&workspace,sizeof workspace,&shared,sizeof shared)||
@@ -209,6 +215,9 @@ bool sample(const assets::MotionView49O& motion, const assets::MotionView49O* se
                 return reject(d,ModelMotionError49T::topology,i,channel);
             if(track.rowIndex>=bindings.count||bindings.rows[track.rowIndex].sceneNode>=graph.count)
                 return reject(d,ModelMotionError49T::binding,i,channel);
+            //155B00/155C88 source mask is indexed by the MOT row, not the
+            //PSG index. A suppressed row reaches neither sampler nor setter.
+            if(mask&&mask->rows[track.rowIndex])continue;
             const auto target=static_cast<SceneNodeIndex49P>(bindings.rows[track.rowIndex].sceneNode);
             BodyMatrix48G local=workspace.nodes[bindings.rows[track.rowIndex].sceneNode].localC0;
             if(!channel){Q q{};if(!e.rotation(motion,i,time,q,directTime))return reject(d,ModelMotionError49T::sample_time,i,channel);
@@ -249,6 +258,13 @@ bool sampleModelMotion49T(const assets::MotionView49O& motion,
     ModelMotionSharedState49T& shared, ModelMotionWorkspace49T& workspace,
     ModelMotionDiagnostic49T& diagnostic) noexcept {
     return sample(motion,nullptr,bindings,fraction,0,graph,state,shared,workspace,diagnostic);
+}
+bool sampleModelMotionMasked50KG(const assets::MotionView49O& motion,
+    const assets::MotionNodeBindings49O& bindings,const ModelMotionMask50KG& mask,float fraction,
+    const SceneGraph49P& graph,ModelMotionState49T& state,
+    ModelMotionSharedState49T& shared,ModelMotionWorkspace49T& workspace,
+    ModelMotionDiagnostic49T& diagnostic) noexcept {
+    return sample(motion,nullptr,bindings,fraction,0,graph,state,shared,workspace,diagnostic,false,&mask);
 }
 bool sampleModelMotionTime50IG(const assets::MotionView49O& motion,
     const assets::MotionNodeBindings49O& bindings,float sampleTime,

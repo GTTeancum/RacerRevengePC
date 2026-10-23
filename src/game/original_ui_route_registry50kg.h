@@ -48,7 +48,7 @@ struct OriginalUiPageFactory50KG {
     std::uint32_t factoryPC,constructorPC,vtableVA,inputPC;
     std::uint8_t variant; // Rider player index; options controller index.
 };
-inline constexpr std::array<OriginalUiPageFactory50KG,16> originalUiBoundedPageFactories50KG{{
+inline constexpr std::array<OriginalUiPageFactory50KG,17> originalUiBoundedPageFactories50KG{{
     {4,1,"PodUIPageMain",            0x1CFB80,0x1E5400,0x3D11E0,0x1E5E00,0},
     {4,2,"PodUIPageLegal",           0x1CFB80,0x1E49C0,0x3D12B0,0x1E5130,0},
     {4,3,"PodUIPageOpening",         0x1CFB80,0x1D7C80,0x3D15F0,0x1D7DF0,0},
@@ -65,6 +65,7 @@ inline constexpr std::array<OriginalUiPageFactory50KG,16> originalUiBoundedPageF
     {12,4,"PodUIPageGameOptions",    0x1D0E30,0x1F46A0,0x3D0D50,0x1F50F0,0},
     {12,5,"PodUIPageMemoryCard",     0x1D0E30,0x1F6880,0x3D0C80,0x1F6AB0,0},
     {12,6,"PodUIPageCredits",        0x1D0E30,0x1F7500,0x3D0BB0,0x1F8520,0},
+    {13,1,"PodUIPageGarage",         0x1D1BD0,0x1F9FF0,0x3D0A10,0x1FDE70,0},
 }};
 inline constexpr const OriginalUiPageFactory50KG*
 findOriginalUiBoundedPageFactory50KG(std::uint32_t screen,std::uint32_t page) noexcept {

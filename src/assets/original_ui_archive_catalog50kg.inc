@@ -16,6 +16,8 @@ constexpr OriginalUiArchiveIdentity50KG archiveCatalog[] = {
     {OriginalUiArchiveId50KG::podPhysics, "UI/PODPHYS.RES", 46563u, "8361cb484ea841e1772cc0ddec2223fa923e397c1cc9a89f06ab06b1cd7ca2c8", 1037u, 23u},
     {OriginalUiArchiveId50KG::tournament, "UI/UITOURN/UITOURN.RES", 1624190u, "bae6a47a7cd406aba1905ea4bfa7d9ba3527eccb9a06955323e33979c3e1c99c", 1060u, 224u},
     {OriginalUiArchiveId50KG::hallOfFame, "UI/UIHOF/UIHOF.RES", 598215u, "568f79e42c9ac86e5607d19bff81275562c413db9c920d73cf2169109c72961e", 1284u, 22u},
+    {OriginalUiArchiveId50KG::garage, "UI/UIGARAGE/UIGARAGE.RES", 1926215u, "fdc7af917de37df46c3801323092e7abde1a2056df242825faf3e4b45fef57da", 1306u, 170u},
+    {OriginalUiArchiveId50KG::garagePod19, "UI/UIGARAGE/19E.RES", 116288u, "72d443450ac68811cbd75491357d730ed9715478864957abd77a8bac56d760c6", 1476u, 4u},
 };
 constexpr OriginalUiMemberIdentity50KG memberCatalog[] = {
     {"AppStart\\Mat_Stbl.txt", 0u, 70962u, "a3b786f57a1a5f468e649a7f1b3d076a95c318a2fab2f622b754038d01dedd35"},
@@ -1324,5 +1326,6 @@ constexpr OriginalUiMemberIdentity50KG memberCatalog[] = {
     {"font\\denmrk14.psm", 1548288u, 990u, "7e77f4a9962e25d652d2d6e559e28e16207c9c4fd1a17130c694b089e7944682"},
     {"font\\denmrk14top.psm", 1572864u, 1090u, "fdc8a373d7c017b1eb9cd5872d45cdf2bfbd020345b6f51cea26b4bb509fb450"},
     {"UI\\Textures\\tat_bkg.pst", 1597440u, 287772u, "bb0f37a5ddf5e0cf99bdb3417f11f4c947ffd10a5fdb9b6ec9ea3ac7b22feab9"},
+#include "original_ui_garage_member_catalog50kg.inc"
 };
 

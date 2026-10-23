@@ -150,6 +150,15 @@ public:
         OriginalUiRiderProfileStamp50KG stamp{};
     };
     bool tournamentCareerSnapshot(std::uint32_t career,TournamentCareerSnapshot&)const noexcept;
+    struct GarageProfileSnapshot {
+        TournamentCareerSnapshot career{};
+        std::array<float,6> base0180{},maximum0408{},current1920{};
+        OriginalUiRiderProfileColors50KG colors{};
+    };
+    // Coherent read of the selected career's actual diagonal ability row and
+    // original authored bounds. No upgrade, cash, dirty-bit or save mutation.
+    // This native observation is not Garage resource/route admission.
+    bool selectedGarageProfileSnapshot(GarageProfileSnapshot&)const noexcept;
     // Coherent read of the actual selected career and Course lanes. No caller
     // supplied career/progress or independent snapshots confer selection.
     bool selectedTournamentCourseSnapshot(TournamentCareerSnapshot&,

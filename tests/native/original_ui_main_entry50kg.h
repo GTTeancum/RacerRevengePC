@@ -1,4 +1,6 @@
 #pragma once
+#include "../../src/game/original_camera_start_effects.h"
+#include "../../platform/linux/native/original_application_aural50kg.h"
 namespace original_pause_observation50LA { class Owner; }
 namespace original_course_targets50KX { class ConsumedLaunch; }
 namespace ra_cold_aggregate50LA { class Owner; }
@@ -6,10 +8,14 @@ namespace ra_cold_sources50LA { class ColdNavigationLease; }
 namespace rr::game { class OriginalRacerModelRenderGlobals50LA; class OriginalRaceConstructor50LA; class OriginalRaceTuning50LA; class OriginalTunnelTrack50LA; enum class OriginalTunnelTrackRole50LA : unsigned; class OriginalPauseStorage50LA; class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA;
 struct OriginalPositionStatsNumbers50LA; struct OriginalPositionStatsResourceDiagnostic50LA; }
 namespace original_camera_session50KX { class Session; }
+namespace rr::assets {class OriginalUiGarageSceneAssets50KG; struct OriginalUiGaragePageData50KG;}
+namespace rr::platform {class OriginalUiSharedDialogs50KG; class OriginalUiGarageSharedPageDrawOwner50KG; class OriginalUiGarageSession50KG; struct OriginalUiGarageNativeInput50KG; struct OriginalUiGarageNativeState50KG; class OriginalUiGarageModelResources50KG; class OriginalUiGarageVisibility50KG; class OriginalUiGarageTextOverlay50KG; class OriginalUiGarageFogColorLease50KG; class OriginalUiGarageScreenText50KG; struct OriginalUiGarageScreenTextDiagnostic50KG; class OriginalUiGarageWidget1Owner50KG; struct OriginalUiGarageWidget1Diagnostic50KG; class OriginalUiGarageManagerFog50KG;}
 namespace native_ai50IV { struct Session; }
 #include "original_ui_main_output50kg.h"
+#include "../../platform/linux/native/original_ui_garage_audio_backing50kg.h"
 #include "original_ui_elapsed50lh.h"
 #include "original_ui_source_timing50lh.h"
+#include <optional>
 #include "original_ui_rider_pacing50lb.h"
 #include "../../platform/linux/native/original_ui_frontend50kg.h"
 #include "../../src/assets/original_standard_texture_transfer_cold50la.h"
@@ -17,6 +23,7 @@ namespace native_ai50IV { struct Session; }
 #include "../../platform/linux/native/original_ui_rider_profile50kg.h"
 #include "../../platform/linux/native/original_ui_tournament_pod_references50kg.h"
 #include "../../platform/linux/native/original_ui_search_list_cold50kg.h"
+#include "../../platform/linux/native/original_ui_light_manager_owner50kg.h"
 #include "../../platform/linux/native/game_host50er.h"
 #include "../../platform/linux/native/vehicle_window_gl50ds.h"
 #include "../../src/assets/original_ui_localization50kg.h"
@@ -26,9 +33,15 @@ namespace native_ai50IV { struct Session; }
 #include "../../src/assets/original_standard_material_domain50la.h"
 #include "../../src/assets/original_archive_staged_reader50la.h"
 #include "../../src/assets/original_application_fonts50la.h"
+#include "../../src/assets/original_application_localization50kg.h"
+#include "../../src/game/original_renderer_service_state50kg.h"
+#include "../../src/game/original_video_preflip50kg.h"
+#include "../../src/game/original_ui_entity_scope50kg.h"
+#include "../../platform/linux/native/original_localization_renderer_lease50kg.h"
 #include "../../src/game/lap_host_clock50id.h"
 #include "../../src/game/original_application_animation_clock50kg.h"
 #include "../../src/game/original_application_entities50la.h"
+#include "../../platform/linux/native/original_audio_pending_waves50kg.h"
 #include "../../src/game/original_motion_library50la.h"
 #include "../../src/game/original_time_stats50la.h"
 #include "../../src/game/original_speed_boost50la.h"
@@ -50,6 +63,7 @@ namespace native_ai50IV { struct Session; }
 #include <utility>
 
 namespace original_pause_cold50LA { class Owner; }
+namespace rr::platform { class OriginalUiGarageManagerSearch50KG; }
 namespace original_main_entry50KG {
 // Concrete host lease: the predicate captures stable native owner references,
 // performs read-only exact identity/state checks. An authenticated cold-load
@@ -152,6 +166,17 @@ struct DamageColdResult50LA {
     std::string failure;
 };
 struct Application {
+    friend class RaceDisplayLifetime50LA;
+    friend class rr::platform::OriginalUiLightManagerOwner50KG;
+    friend class rr::assets::OriginalApplicationLocalization50KG;
+    friend class rr::platform::OriginalLocalizationRendererLease50KG;
+    friend class rr::game::OriginalVideoPreFlipList50KG;
+    friend class rr::platform::OriginalUiGarageFogColorLease50KG;
+    friend class rr::platform::OriginalUiGarageTextOverlay50KG;
+    friend class rr::platform::OriginalUiGaragePageOwner50KG;
+    friend class rr::platform::OriginalUiGarageSession50KG;
+    friend class rr::platform::OriginalUiSharedDialogs50KG;
+    friend class rr::platform::OriginalUiFrontend50KG;
     bool enabled=false;
     // Persistent native preview request only; never a profile unlock or race grant.
     // Legacy Clegg request remains separate; each frontend authenticates its caches.
@@ -167,7 +192,33 @@ struct Application {
     // not admitted; never reinitialize this owner on page/race/session entry.
 private:
     friend class ::original_pause_observation50LA::Owner;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     mutable std::uint32_t sourceCameraIndex0C_=0;
+    //13FC90..13FC9C. These remain this actual process Root's fields across
+    //Garage reentry. Ordinary menu projections do not manufacture this cursor.
+    mutable std::uint32_t sourceRenderedCamera268_=0,sourcePreviousModels270_=0,sourceRenderedModels274_=0;
+    mutable float sourceSecondMapDistance382FA0_=130.f; //ELF data43020000, actual2410E0 writer only.
+    const void* sourceDebugOverlay14_=nullptr; //13FBF8; no bounded native debug-overlay creation writer.
+    std::uint32_t sourceModelPassOverride4354F8_=0; //Actual process BSS, no native bounded writer.
+    struct RenderHistory140230 final {
+        std::array<std::int32_t,8> diagnostic{};std::array<bool,8> diagnosticGuard{};
+        std::array<std::uint32_t,4> words{};std::array<bool,4> wordGuard{};
+    };
+    mutable RenderHistory140230 sourceRenderHistory140230_;
+    // Actual process BSS and the reached 1407A4/244270/24427C stores. These
+    // are not host presentation counters and never reset on Garage entry.
+    mutable std::uint32_t sourceRenderDispatch423F40_=0,sourceRenderStats4355F0_=0,sourceRenderStats4355F8_=0;
+    struct RenderPeak164CB0 { std::uint32_t timestamp00=0;std::int32_t value04=0;std::uint32_t lifetime08=0; };
+    mutable std::array<RenderPeak164CB0,2> sourceRenderPeaks4355C0_{};
+
+    //Actual data word36ADA8=1. No native debug writer is inferred from GL.
+    std::uint32_t sourceCameraSearch36ADA8_=1;
+    //Actual process BSS435600. No bounded native input/race writer exists;
+    //retain it across Garage entries, independent of GL debug flags.
+    std::uint32_t sourceCameraSynchronous435600_=0;
+    mutable std::array<bool,4> sourceCameraRenderLazyGuards_{};
+    mutable std::array<std::int32_t,4> sourceCameraRenderLazyWords_{}; //3E00B0/B8/C0/C8.
+    friend class rr::platform::OriginalApplicationAural50KG;
     friend struct Video;
     friend struct Frontend;
     friend class NativeCollectorFifo50LA;
@@ -176,9 +227,46 @@ private:
     // Retain actual storage once with Application, never per race/session.
     std::uint32_t sourceProcessWord3E1C10_=0;
     mutable std::int32_t sourceApplicationMode22C_=1; //13FDBC genuine constructor store.
+    // Source23C is not constructor-written here. Only the actual140CE4
+    // continuation publishes its passed/capped factor, never raw250.
+    mutable std::optional<float> sourceApplicationElapsed23C_;
     void clearRaceProcessWord1A6884() noexcept { sourceProcessWord3E1C10_=0; }
 
     mutable std::weak_ptr<RaceDisplayLifetime50LA> raceDisplayOwner50LA_;
+    // The actual persistent dispatcher is Root-owned, never manufactured on
+    // Garage entry. The two counted global dialog children share this scope.
+    mutable std::shared_ptr<rr::platform::OriginalApplicationAural50KG> sourceAural00Owner_;
+    bool stageAuralLightNativePrefix13FE24(std::uint32_t nativeOutputRate,
+        rr::platform::OriginalApplicationAural50KG::Diagnostic&,std::string&)const noexcept;
+    bool stageAuralCold13FE24(std::shared_ptr<rr::platform::OriginalApplicationAural50KG>&,
+        rr::platform::OriginalApplicationAural50KG::Diagnostic&)const noexcept;
+    bool stageLightManagerAfterAuralNative140074(std::shared_ptr<rr::platform::OriginalUiLightManagerOwner50KG>&,
+        rr::platform::OriginalUiLightManagerOwner50KG::Diagnostic&)const noexcept;
+    bool initializeAuralNative102DE0(rr::platform::OriginalApplicationAural50KG::Diagnostic&)const noexcept;
+    bool attachAuralNativePrefix140108(rr::platform::OriginalApplicationAural50KG::Diagnostic&)const noexcept;
+    bool nativeSourceAudioDispatcherCurrent(const rr::platform::OriginalApplicationAural50KG&)const noexcept;
+    bool beginNativeFrontendRootAudio140CE0(Frontend&,const rr::platform::OriginalUiMainSessionUpdate50KG&,
+        rr::platform::OriginalUiFrontendDiagnostic50KG&,std::string&)const noexcept;
+    bool finishNativeFrontendRootAudio140CFC(Frontend&,const rr::platform::OriginalUiFrontendUpdateReceipt50KG&,
+        rr::platform::OriginalUiFrontendDiagnostic50KG&,std::string&)const noexcept;
+    friend class rr::platform::OriginalUiGaragePodScene50KG;
+    bool clearAuralRegistrations103DD0(rr::platform::OriginalApplicationAural50KG::Diagnostic&)const noexcept;
+    bool releaseAuralCold102CD0(rr::platform::OriginalApplicationAural50KG::Diagnostic&)const noexcept;
+    mutable std::shared_ptr<rr::game::OriginalUiEntityScope50KG> sharedUiScopeOwner_;
+    enum class SharedUiBootResult { unavailable,complete,failed };
+    SharedUiBootResult prepareSharedDialogsInitial1B7BD0(
+        std::shared_ptr<rr::platform::OriginalUiControllerPopupResources50KG>,
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        rr::platform::VehicleWindowGl50DS&,std::string&)const noexcept;
+    bool finishSharedUiDispatcherAfterBanks1B7140(std::string&)const noexcept;
+    rr::game::OriginalUiEntityScope50KG::Result loadDispatcherGlobalWidgets2A35E0()const noexcept;
+    // Executes only Display20/24 and proven zero global-row hide. The caller
+    // must still execute actual manager detach/142590/clear30, in that order.
+    rr::game::OriginalUiEntityScope50KG::Result continueDispatcherTransitionPrefix2A3510(
+        std::uint64_t,rr::platform::VehicleWindowDiagnostic50DS&)const noexcept;
+
+    // Uncalled scalar-only issuance; not a renderer-service or startup grant.
+    std::shared_ptr<rr::platform::OriginalUiGarageFogColorLease50KG> retainGarageFogColor13E8A8()const noexcept;
     mutable std::weak_ptr<rr::game::OriginalPauseStorage50LA> pauseColdOwner50LA_;
     mutable std::array<std::weak_ptr<rr::game::OriginalTunnelTrack50LA>,2> tunnelTrackColdOwners50LA_;
     mutable std::weak_ptr<rr::game::OriginalRaceTuning50LA> raceTuningColdOwner50LA_;
@@ -186,9 +274,232 @@ private:
     // Actual Application28C publication. Native backing is retained through
     // partial load/cleanup; only explicit completed native retirement clears it.
     mutable std::shared_ptr<rr::game::OriginalRaceConstructor50LA> sourceRace28COwner_;
+    // Native-only creator affinity and one cold allocation. Ordinary8 remains
+    // unchanged unless actual early Aural/Light startup already issued this
+    // retained backing before the fresh frontend output's first publication.
+    const std::thread::id garageAudioOwnerThread_=std::this_thread::get_id();
+    mutable std::shared_ptr<rr::platform::OriginalUiGarageAudioBacking50KG> garageAudioBackingOwner_;
+    mutable bool garageAudioBackingAttempted_=false;
+    bool garageAudioApplicationInputsCurrent()const noexcept;
+    bool prepareGarageAudioBackingCold(std::uint32_t nativeOutputRate,std::string&)const noexcept;
+    bool retainGarageAudioTransportCold(std::shared_ptr<rr::platform::OriginalUiMainAudio50KG>&,
+        std::string&)const noexcept;
+    bool finishGarageAudioBackingCold(std::string&)const noexcept;
+    bool rearmGarageAudioAfterManagerRetirementCold(
+        const std::shared_ptr<rr::platform::OriginalUiGaragePageOwner50KG>&,
+        std::uint64_t retiredManagerGeneration,std::string&)const noexcept;
+    bool retireGarageAudioBackingCold(std::string&)const noexcept;
+    friend class AudioOutput;
+    bool prepareFrontendAudioOutput(Frontend&,const rr::platform::AudioOutputRequest50HD&,
+        std::string&,rr::platform::AudioOutputDiagnostic50HD&)const;
+    bool closeFrontendAudioOutput(AudioOutput&,
+        const std::shared_ptr<rr::platform::OriginalUiGarageAudioBacking50KG>&,
+        rr::platform::AudioOutputDiagnostic50HD&)const noexcept;
+    bool retireFrontendAudioBackingClosed(std::string&)const noexcept;
+    bool frontendAudioClosedReceiptCurrent()const noexcept;
+    bool prepareFrontendMenuAudio(Frontend&,const rr::platform::OriginalUiFrontendCold50KG&,
+        std::string&)const noexcept;
+    mutable bool frontendAudioShutdownComplete_=false;
+    // Actual Tournament input5 resource transaction. No counted manager is
+    // created until a complete Garage frame destination can own its lifetime.
+    void prepareGarageDestinationResources1F241C(Frontend&,
+        const rr::platform::OriginalUiTournamentRouteProposal50KG&,
+        rr::platform::OriginalUiGarageDestinationDiagnostic50KG&,
+        rr::platform::OriginalUiFrontendColdInterval50KG&)const noexcept;
+    bool loadPreparedGarageManager1D1950(Frontend&,
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool garageManagerLoadedCurrent(const Frontend&,const rr::platform::OriginalUiGarageSession50KG&)const noexcept;
+    bool observeGarageRuntime50KG(const Frontend&,const rr::platform::OriginalUiGarageSession50KG&,
+        rr::platform::OriginalUiGarageNativeState50KG&)const noexcept;
+    bool inputGaragePage1FDE70(Frontend&,std::uint32_t,std::uint32_t,
+        rr::platform::OriginalUiGarageNativeInput50KG&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool publishGarageTarget140A68(Frontend&,int,int,
+        rr::platform::VehicleWindowDiagnostic50DS&,std::string&)const noexcept;
+    bool prepareNextGarageFrame140CE0(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    // Source-owned entry prefix, still not a normal menu-route capability.
+    // The Root retains every actual manager/transfer/model prefix on failure.
+    mutable std::shared_ptr<rr::platform::OriginalUiGarageSession50KG> garageCustodyOwner_;
+    mutable bool garageCustodyAttempted_=false;
+    //Actual private normal LOAD driver. It owns sequencing and all native
+    //inputs; successful source load is not normal frame/menu admission.
+    bool loadGarageManager1D1950(Frontend&,
+        std::shared_ptr<const rr::assets::OriginalUiGarageSceneAssets50KG>,
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,std::int32_t requestedPage,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    //Bounded actual dispatcher callback, not frontend route/frame admission.
+    //Scoped manager/dispatcher returns have separate retained state. This
+    //continuation still refuses success at the missing outer26C/root10 walk.
+    //Its actual RuntimeFrame remains retained, preventing callback replay.
+    bool continueGarageDispatcherUpdate141ED0(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    // Authentic same-Frontend frame borrow, with no source callback effects.
+    // Shared by the explicit legacy dispatcher seam and enclosing Root path.
+    bool retainGarageUpdateFrame140CF4(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    // Scoped140CE0/CE4 -> outer26C/root10 invocation. It does not claim the
+    // earlier245030/input prefix or later140230 render/audio/frame completion.
+    bool continueGarageRootUpdate140CE0(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool prepareGarageManagerEntry1D1950(Frontend&,
+        std::shared_ptr<const rr::assets::OriginalUiGarageSceneAssets50KG>,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    // Continues the same entry's real Search/Light/Fog/22-Widget owners.
+    // Fonts is authenticated immutable input, never an initialized context.
+    bool continueGarageManagerConstructors1CCD14(Frontend&,
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGarageCustodyInputsCold(
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    // Historical detached downstream seam. The normal entry above never
+    // accepts a caller-issued Grant, model population or constructor receipt.
+    bool prepareGarageCustodyCold(
+        std::shared_ptr<rr::game::OriginalUiEntityScope50KG::GarageConstructionGrant>,
+        std::shared_ptr<rr::platform::OriginalUiGarageModelResources50KG>,
+        std::shared_ptr<const rr::assets::OriginalUiGarageSceneAssets50KG>,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGarageWidgetsCustodyCold(
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGaragePageCustodyCold(
+        std::shared_ptr<rr::platform::OriginalUiGarageManagerSearch50KG>,
+        std::shared_ptr<const rr::assets::OriginalUiGaragePageData50KG>,
+        std::shared_ptr<const rr::platform::OriginalUiGarageSharedPageDrawOwner50KG>,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGaragePageSceneCustodyCold(
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGaragePageSpecificCustodyCold(
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    // Actual Application17C650/17C76C initializes344 to0. The only
+    // recovered startup write1 is exact argv[1]=BuildUIResFiles at17C98C.
+    // This native normal-UI owner does not admit the resource-builder mode;
+    // do not derive this field from host argc or a Page-local ready boolean.
+    const std::int32_t sourceBuildUiResFiles344_=0;
+    //13FC74 constructs Application228 bit5 true;17CD7C reinforces it.
+    //The admitted normal native path has no producer clearing this bit.
+    //This owns only that proven flag, not an invented whole guest byte.
+    const bool sourceTextureCallback228Bit5_=true;
+    //13FBF4 clears this actual Application bit;140008 clears it again.
+    //Keep process history separate from native renderer/current Camera state.
+    //No bounded normal UI writer enables it; debug input is unsupported.
+    bool sourceDebugCamera228Bit2_=false;
+    //13FC20 clears bit3 independently.140CA4 bypasses update AND render
+    //when set;140EA8/140F04 also gate source key-event traversal. No current
+    //native normal UI writer changes it. This is not Camera debug bit2.
+    bool sourceUpdateRenderBypass228Bit3_=false;
+    // Process BSS100008..100030. Original148250 toggles these only via
+    //1277D0(mask80), rejected by143E30 while the retained bit2 is clear.
+    // No Garage entry/reset writes them; enabled debug history is unsupported.
+    std::int32_t sourceLightDebug426F50_=0,sourceLightDebug426F58_=0;
+    bool rewriteGarageCameraSlots1401B0(const rr::platform::OriginalUiGaragePageOwner50KG&)const noexcept;
+    bool observeGarageLoaderApplication344(
+        const rr::platform::OriginalUiGaragePageOwner50KG&,std::int32_t&)const noexcept;
+    bool continueGarageManagerLoadReturnCold(std::int32_t requestedPage,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGaragePageLateForestCustodyCold(
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGaragePageForestCustodyCold(
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGarageScenePopulationCustodyCold(
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGarageScenePrefixCustodyCold(
+        std::shared_ptr<const rr::platform::OriginalUiMainProfile50KG>,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool continueGarageWidgetsThrough22_1CD860(rr::platform::OriginalUiGarageWidget1Owner50KG&,
+        std::shared_ptr<rr::platform::OriginalUiGarageWattoOwner50KG>,
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        rr::platform::OriginalUiGarageWidget1Diagnostic50KG&)const noexcept;
+    bool continueGarageWattoCustodyCold(
+        std::shared_ptr<rr::platform::OriginalUiGarageWidget1Owner50KG>,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    // Exact selected-complete base-cache or pre-Domain corpus failure receipt:
+    // retire selected, transfer/bank/manager, then Main's empty entry borrow.
+    // Never a failure after Domain append or any later constructor operation.
+    //Exact failed first shared prompt with constructed Widgets/Watto, no Scene.
+    bool retireGarageWattoBindingFailure(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool retireGarageLoadedPageHideFailure(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool retireGarageLateSceneBorrowFailure(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool retireGaragePartialSceneAttachmentFailure(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool retireGarageSharedLoaderFailure(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool retireGarageEntryBeforeDat(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    // Exact native failed-entry unwind before any selected model is created.
+    // Does not claim a completed source manager or retire shared Main/Aural.
+    bool retireGarageEntryBeforeSelected(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    //Exact failed read of Pending after persistent Main borrow, before its
+    //per-entry begin call. Does not retire/create any namespace or Main entry.
+    bool retireGaragePendingRetainFailure(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    //Exact terminal failure after selected resource construction, before its
+    //first successful Scope enrollment. No per-entry audio or Page existed.
+    bool retireGarageUnenrolledSelectedEntry(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    // Private exact-owner normal Back continuation; not normal admission.
+    bool retireGarageUnsealedRenderFailure(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool retireGarageActorSampleFailure(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool retireGaragePublishedObservationFailure(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool retireGarageManagerNormal2A3510(Frontend&,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool releaseGarageCustodyNormal(
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool retireGarageCustodyConsumersCold(
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&,std::string&)const noexcept;
+    bool releaseRetiredGarageCustodyCold(std::string&)const noexcept;
+    // Private isolated root audio stages. These retain the ONE namespace in
+    // entitiesOwner_; no manager/widget constructs a replacement. Ordinary
+    // startup and Garage construction do not call these unjoined stages.
+    bool preparePendingWaves17CD84(
+        std::shared_ptr<rr::platform::OriginalAudioPendingWaves50KG>&,std::string&)const noexcept;
+    bool retainPendingWaves98A4(
+        std::shared_ptr<rr::platform::OriginalAudioPendingWaves50KG>&,std::string&)const noexcept;
+    bool preparePendingWaveNativeBacking(std::string&)const noexcept;
+    bool retirePendingWaves2668E0(
+        const std::shared_ptr<rr::platform::OriginalAudioPendingWaves50KG>&,std::string&)const noexcept;
+    // Private cold-only issuance. Ordinary startup does not call this staged leaf.
+    mutable std::shared_ptr<rr::platform::OriginalUiLightManagerOwner50KG> sourceLightManager426F60Owner_;
+    std::shared_ptr<rr::game::OriginalUiLightManagerLifetime50KG> lightManagerStartupWitness_;
+    bool stageLightManagerCold140074(std::shared_ptr<rr::platform::OriginalUiLightManagerOwner50KG>&,
+        rr::platform::OriginalUiLightManagerOwner50KG::Diagnostic&)const noexcept;
+    bool releaseLightManagerCold148020(rr::platform::OriginalUiLightManagerOwner50KG&,
+        rr::platform::OriginalUiLightManagerOwner50KG::Diagnostic&)const noexcept;
+    // Source-shaped frontend one-font loader; no ordinary startup issuance.
+    bool loadGarageTextFont29CB74(std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        rr::assets::OriginalApplicationFontDiagnostic50LA&)const noexcept;
+    bool loadGarageTextFont29CB74(std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        rr::assets::OriginalApplicationFonts50LA::Name,
+        rr::assets::OriginalApplicationFontDiagnostic50LA&)const noexcept;
+    // This staged seam remains closed before genuine selected-text ownership.
+    bool prepareGarageScreenText29CBD8(std::shared_ptr<rr::platform::OriginalUiGarageScreenText50KG>&,
+        rr::platform::OriginalUiGarageScreenTextDiagnostic50KG&)const noexcept;
+    // Only the genuinely reached detached Widget1 constructor prefix is admitted.
+    bool prepareGarageWidget1_1CD7A0(rr::platform::OriginalUiGarageWidget1Owner50KG&,
+        std::shared_ptr<rr::game::OriginalUiEntityScope50KG::GarageConstructionGrant>,
+        std::shared_ptr<rr::platform::OriginalUiGarageManagerFog50KG>,
+        rr::platform::OriginalUiGarageWidget1Diagnostic50KG&)const noexcept;
+    // Reached2A9540 continuation: actual typed selected text and same-root FONTS.
+    bool continueGarageWidget1_2A9540(rr::platform::OriginalUiGarageWidget1Owner50KG&,
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        rr::platform::OriginalUiGarageWidget1Diagnostic50KG&)const noexcept;
+    bool continueGarageWidgetsThrough9_1CD860(rr::platform::OriginalUiGarageWidget1Owner50KG&,
+        std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        rr::platform::OriginalUiGarageWidget1Diagnostic50KG&)const noexcept;
     bool clearNativeRetiredRace28C(rr::game::OriginalRaceConstructor50LA&)const noexcept;
     // Process443848 FIFO identity. Scene/display close cannot silently reset it.
     mutable std::shared_ptr<NativeCollectorFifo50LA> nativeCollectorFifoOwner_;
+    mutable bool uiCollector1B73BCAttempted_=false;
+    bool constructUiCollector1B73BC(rr::assets::OriginalStandardMaterialDiagnostic50LA&)const noexcept;
     mutable std::uint64_t raceDisplayGeneration50LA_=0;
     mutable std::weak_ptr<rr::game::OriginalPositionStatsPrimitiveOwner50LA> positionStatsPrimitivesOwner50LA_;
     mutable std::weak_ptr<rr::game::OriginalPositionStatsResources50LA> positionStatsResourcesOwner50LA_;
@@ -237,6 +548,37 @@ private:
     // Scene teardown must retire every ScreenText/renderer Entry borrow;
     // the process registry itself survives serial Video close/reopen.
     mutable std::shared_ptr<rr::assets::OriginalApplicationFonts50LA> fonts328Owner_;
+    // Process-owned dictionary selected by the real initialized frontend below.
+    mutable std::shared_ptr<rr::assets::OriginalApplicationLocalization50KG> sourceLocalization32COwner_;
+    mutable std::shared_ptr<rr::platform::OriginalLocalizationRendererLease50KG> localizationRendererCall14C5A0_;
+    // Native one-invocation envelope, not an original per-dictionary prohibition.
+    // Future independent language calls require their own genuine caller join.
+    mutable std::weak_ptr<rr::assets::OriginalApplicationLocalization50KG> localizationRendererAttempted32C_;
+    mutable std::uint64_t localizationRendererInvocationSerial_=0;
+    bool stageLocalizationRenderer14C5A0(std::shared_ptr<rr::platform::OriginalLocalizationRendererLease50KG>&,
+        rr::platform::OriginalLocalizationRendererDiagnostic50KG&)const noexcept;
+    bool advanceLocalizationRenderer14C5A0(rr::platform::OriginalLocalizationRendererLease50KG&,
+        rr::platform::OriginalLocalizationRendererDiagnostic50KG&)const noexcept;
+    bool cancelLocalizationRenderer14C5A0(rr::platform::OriginalLocalizationRendererLease50KG&,
+        rr::platform::OriginalLocalizationRendererDiagnostic50KG&)const noexcept;
+    bool stageLocalizationIndex17DEF4(std::shared_ptr<const rr::assets::OriginalUiArchive50KG>,
+        std::shared_ptr<rr::assets::OriginalApplicationLocalization50KG>&,
+        rr::assets::OriginalApplicationLocalizationDiagnostic50KG&)const noexcept;
+    bool selectLocalizationEnglish14C5F0(rr::assets::OriginalApplicationLocalization50KG&,
+        rr::assets::OriginalApplicationLocalizationDiagnostic50KG&)const noexcept;
+    bool borrowLocalizationText18AC60(rr::assets::OriginalApplicationLocalization50KG&,std::int32_t,
+        std::shared_ptr<const rr::assets::OriginalApplicationLocalization50KG::SelectedText>&,
+        rr::assets::OriginalApplicationLocalizationDiagnostic50KG&)const noexcept;
+    bool retireLocalization17C8B8(rr::assets::OriginalApplicationLocalization50KG&,
+        rr::assets::OriginalApplicationLocalizationDiagnostic50KG&)const noexcept;
+    // Native startup/retirement bookkeeping is separate from original32C.
+    // Repeated frontend incarnations borrow the SAME selected bytes; neither
+    // native window recreation nor a failed attempt replays language selection.
+    enum class FrontendLanguagePhase { untouched, preparing, selected, failed, retired };
+    mutable FrontendLanguagePhase frontendLanguagePhase_=FrontendLanguagePhase::untouched;
+    mutable std::shared_ptr<const rr::assets::OriginalUiArchive50KG> frontendLanguageArchive_,frontendFontsArchive_;
+    bool prepareFrontendLanguageServices(Frontend&,rr::platform::VehicleWindowGl50DS&,std::string&)const;
+    bool retireFrontendLanguageServices17C8A4(std::string&)const noexcept;
     // At most one live native-host-scheduled TimeStats cold owner. Neither
     // this weak lifetime guard nor the factory activates presentation.
     mutable std::weak_ptr<rr::game::OriginalTimeStats50LA> timeStatsColdOwner_;
@@ -362,6 +704,9 @@ public:
     bool attachNativeConsumedRacePause(rr::game::OriginalRaceConstructor50LA&,
         const std::shared_ptr<original_camera_session50KX::Session>&)const noexcept;
     bool finishPauseEntityCold1A8ADC(rr::game::OriginalPauseStorage50LA&)const noexcept;
+    // Terminal caller only, after the real frontend/race stack and gameplay
+    // Light lease have closed. Course handoff closes its output, NOT Root.
+    bool finishNativeFrontendAudio(std::string&)const noexcept;
     const std::shared_ptr<rr::game::OriginalApplicationEntities50LA>& entities() const noexcept {
         return entitiesOwner_;
     }
@@ -542,9 +887,17 @@ public:
     Application(const Application&)=delete;
     Application& operator=(const Application&)=delete;
     ~Application() {
+        if((state&&state->sharedDialogs)||(sharedUiScopeOwner_&&!sharedUiScopeOwner_->closed_))std::terminate();
         // A live source slot may still own renderer/context and counted state.
         // Application destruction cannot substitute for its checked retirement.
-        if(sourceRace28COwner_)std::terminate();
+        if(sourceAural00Owner_||sourceRace28COwner_||sourceLightManager426F60Owner_||sourceLocalization32COwner_||localizationRendererCall14C5A0_)std::terminate();
+        // Fail closed before invalidating the actual clock. This is not
+        // cleanup: failed-prefix consumers and their mixer remain owned.
+        if(garageAudioOwnerThread_!=std::this_thread::get_id()||garageAudioBackingOwner_||garageCustodyOwner_)std::terminate();
+        if(!rr::game::OriginalVideoPreFlipList50KG::applicationMayRetire(*this))std::terminate();
+        // Checked audio retirement must precede lifetime invalidation. This
+        // assertion does not clear rows, flush registrations, or drain owners.
+        if(!rr::platform::OriginalAudioPendingWaves50KG::applicationMayRetire(*this))std::terminate();
         animationClockOwner_->applicationAlive_=false;
     }
     explicit Application(std::shared_ptr<rr::game::HostMonotonicClock50ID> clock,
@@ -749,6 +1102,7 @@ public:
         rr::game::OriginalUiLightManagerLifetimeDiagnostic50KG lightDiagnostic;
         require(lightManager->constructAtApplicationStartup(lightDiagnostic),
             "original shared LightManager startup rejected");
+        lightManagerStartupWitness_=lightManager; // Exact existing constructor owner, not a new concrete startup call.
         // Fresh native backing starts with no imported unlocks or debug bits.
         // Source1864B0/186EF0 reset only its proven Main fields.
         rr::platform::resetOriginalUiMainProfileFields50KG(*profile);
@@ -843,20 +1197,41 @@ public:
 // source Z format0x31 is the admitted original24-bit packet representation.
 struct Video {
     friend struct Application;
+    friend class rr::platform::OriginalLocalizationRendererLease50KG;
+    friend class rr::game::OriginalVideoPreFlipList50KG;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     rr::platform::GameHost50ER host;
     const bool originalMain;
     const std::int32_t width=640,height,colorBits=32,packetZMaximum=0xffffff;
     const std::uint32_t zBufferFormat=0x31;
     ~Video()=default;
 private:
+    // Actual base2AE080 list precedes the later Video40/44 constructor writes.
+    rr::game::OriginalVideoPreFlipList50KG sourcePreFlip18_;
+    rr::game::OriginalVideoServiceFields50KG sourceRendererServiceVideo_; //259E9C precedes259F58.
     // Actual Video443A60 scalar, initialized by259F58. It is not a
     // resource pointer, renderer queue44, or a claim that race load ran.
     std::uint32_t sourceMode44_=0;
-    void beginRaceDisplay1A7658() noexcept { sourceMode44_=1; }
+    // The ordinary RA aggregate still owns its separate recovered effect
+    // continuation. Do not pretend its writes transferred back into these
+    // same-Video frontend fields after a real race display use.
+    void beginRaceDisplay1A7658() noexcept { sourceMode44_=1;sourceFrontendEndEffectsKnown_=false; }
+    struct EndView25B110 {
+        std::uint32_t overlay40C=0; //25A1E8, four real slots.
+        std::uint8_t overlay494=0; //25A250.
+        std::uint8_t covered2F4=0,increasing2F8=0,decreasing2FC=0,completed300=0;
+        float lastMilliseconds3C4=0; //25A098.
+    };
+    std::array<EndView25B110,4> sourceEndViews_{};
+    rr::game::OriginalVideoFadeState sourceEndFade_; //Actual259E00 initialized fields;3E8 remains unknown.
+    bool sourceFrontendEndEffectsKnown_=true;
+
     void clearRaceDisplay1A6870() noexcept { sourceMode44_=0; }
     rr::game::OriginalApplicationAnimationClockView50KG applicationAnimation_;
-    explicit Video(bool main,rr::game::OriginalApplicationAnimationClockView50KG animation)
-        :originalMain(main),height(main?448:480),applicationAnimation_(std::move(animation)){}
+    explicit Video(bool main,rr::game::OriginalApplicationAnimationClockView50KG animation,
+        const Application& application)
+        :originalMain(main),height(main?448:480),sourcePreFlip18_(*this,application),
+         applicationAnimation_(std::move(animation)){}
     static bool materialConstructionPinLive(const Video& owner) noexcept {
         return owner.originalMain&&owner.width==640&&owner.height==448&&
             owner.colorBits==32&&owner.packetZMaximum==0xffffff&&
@@ -905,8 +1280,13 @@ public:
     }
 };
 inline std::shared_ptr<Video> Application::videoForSession() const {
+    require(rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this),
+        "Video factory requires its live Application owner thread");
     require(raceDisplayOwner50LA_.expired(),"previous race display lifetime still retained");
-    if(!videoOwner_)videoOwner_=std::shared_ptr<Video>(new Video(enabled,animationClock()));
+    if(!videoOwner_){
+        videoOwner_=std::shared_ptr<Video>(new Video(enabled,animationClock(),*this));
+        videoOwner_->sourcePreFlip18_.bindPublishedVideo(videoOwner_);
+    }
     require(videoOwner_->originalMain==enabled,
         "native application cannot replace its original/direct video mode");
     require(!videoOwner_->host.created()&&!videoOwner_->host.ownsResources(),
@@ -1296,6 +1676,60 @@ struct Frontend : rr::platform::OriginalUiRiderPresentationHost50KG {
 private:
     using UploadLifetime=rr::assets::OriginalNativeFrontendUploadLifetime50LA;
     std::shared_ptr<UploadLifetime> uploadLifetime_;
+    friend struct Application;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    // Exact native prefix/return custody for THIS prepared timing publication.
+    // This is not a source tick flag or a claim that the native coordinator
+    // executes every original dispatcher descendant. Failures retain the prefix.
+    enum class NativeRootAudioPhase : std::uint8_t { absent,entered,awaitingDispatcher,returned,failed };
+    NativeRootAudioPhase nativeRootAudioPhase_=NativeRootAudioPhase::absent;
+    original_ui_source_timing50LH::PublicationView nativeRootAudioTiming_;
+    std::uint64_t nativeRootAudioPublication_=0,nativeRootAudioExpectedUpdate_=0;
+    std::uint32_t nativeRootAudioSourcePC_=0;
+    // Immutable catalog resources only. They own no Entity/material/GPU/audio
+    // references and can be released normally even when the destination is
+    // unavailable. A failed native resource attempt is retained, not replayed.
+    bool garageDestinationAssetsAttempted_=false;
+    std::shared_ptr<const rr::assets::OriginalUiArchive50KG> garageDestinationArchive_,garageDestinationPod19_;
+    std::shared_ptr<const rr::assets::OriginalUiGarageSceneAssets50KG> garageDestinationAssets_;
+    rr::platform::OriginalUiGarageDestinationDiagnostic50KG garageDestinationFailure_{};
+    using GarageTransferGrant=rr::game::OriginalUiEntityScope50KG::GarageConstructionGrant;
+    using GarageTransferDiagnostic=rr::platform::OriginalUiFrontendDiagnostic50KG;
+    using GarageTransferBinding=rr::assets::OriginalNativeTextureUploadBinding50LA;
+    enum class GarageTransferPhase : std::uint8_t {
+        absent,entryDrainAttempted,entryDrained,ready,exitDrainAttempted,exitDrained,retired,failed,failedEntryRetired
+    };
+    GarageTransferPhase garageTransferPhase_=GarageTransferPhase::absent;
+    std::shared_ptr<GarageTransferGrant> garageTransferGrant_;
+    std::weak_ptr<RaceDisplayLifetime50LA> garageTransferDisplay_;
+    std::shared_ptr<const GarageTransferBinding> garageTransferBefore_,garageTransferActive_,garageTransferAfter_;
+    const Application* garageTransferApplication_=nullptr;
+    const rr::game::OriginalWreckComponent50LA* garageTransferManager_=nullptr;
+    std::uint64_t garageTransferGeneration_=0,garageTransferEpoch_=0;
+    GarageTransferDiagnostic garageTransferFailure_{},garageTransferEntryDrain_{},garageTransferExitDrain_{};
+    //Exact native OriginalCameraStartStatus values;255 means no call occurred.
+    std::uint8_t garageTransferEntryResetStatus_=255,garageTransferExitResetStatus_=255;
+    bool prepareGarageTransfers2542F0(const std::shared_ptr<GarageTransferGrant>&,
+        GarageTransferDiagnostic&)noexcept;
+    bool retireGarageTransfers2543F0(const std::shared_ptr<GarageTransferGrant>&,
+        GarageTransferDiagnostic&)noexcept;
+    bool retireFailedSharedPageTransfers(const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>&,
+        GarageTransferDiagnostic&)noexcept;
+    bool retireFailedWattoBindingTransfers(const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>&,
+        GarageTransferDiagnostic&)noexcept;
+    bool retireFailedLoadedHideTransfers(const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>&,
+        GarageTransferDiagnostic&)noexcept;
+    bool retireFailedLateBorrowTransfers(const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>&,
+        GarageTransferDiagnostic&)noexcept;
+    bool retireFailedPartialSceneTransfers(const std::shared_ptr<rr::platform::OriginalUiGarageSession50KG>&,
+        GarageTransferDiagnostic&)noexcept;
+    bool retireGarageTransfersAtPayload(const std::shared_ptr<GarageTransferGrant>&,
+        const rr::platform::OriginalUiGarageSession50KG*,GarageTransferDiagnostic&,bool failedPartial=false,bool failedLateBorrow=false,bool failedLoadedHide=false,bool failedWattoBinding=false)noexcept;
+    bool retireFailedGarageEntryTransfers(const std::shared_ptr<GarageTransferGrant>&,
+        GarageTransferDiagnostic&)noexcept;
+    bool garageTransferOwnerCurrent(const std::shared_ptr<GarageTransferGrant>&)const noexcept;
+    bool garageTransferIdentityCurrent(const std::shared_ptr<GarageTransferGrant>&)const noexcept;
+
     static bool uploadLifetimeLive(const UploadLifetime& token)noexcept {
         const auto* owner=token.frontend_;
         return owner&&owner->uploadLifetime_.get()==&token&&owner->materialApplicationOwner&&
@@ -1305,6 +1739,7 @@ private:
 public:
 
     const Application* materialApplicationOwner=nullptr;
+    std::shared_ptr<const rr::assets::OriginalUiArchive50KG> languageArchive,fontArchive;
     using Status=rr::platform::OriginalUiFrontendStatus50KG;
     using StageClock=std::chrono::steady_clock;
     // Host observation only. These samples never feed a source/accepted clock,
@@ -1514,6 +1949,7 @@ public:
     // Actual accepted renderer receipt; diagnostic is reused by later calls.
     std::uint8_t submittedScreen=0;
     std::uint64_t submittedPublication=0,sourceFrameGeneration=0,sourceTargetGeneration=0;
+    std::uint64_t submittedGaragePublication=0; // Actual completed Root target, never a GPU token.
     std::uint32_t submittedDraws=0,submittedQuads=0,submittedTriangles=0;
     std::uint32_t submittedTextureBarriers=0;
     bool submittedCoherentFramebufferFetch=false;
@@ -1576,6 +2012,7 @@ public:
         cold.controllerPopup=readArchive(application.assetRoot,Id::controllerPopup);
         cold.overlays=readArchive(application.assetRoot,Id::overlays);
         cold.localization=readArchive(application.assetRoot,Id::localization);
+        languageArchive=cold.localization;fontArchive=cold.fonts;
         cold.runtime=application.materialRuntime;cold.video=video->publication(video);
         cold.profile=application.profile;cold.application=application.state;cold.applicationAnimation=application.animationClock();cold.courseRaceDestination=std::move(raceDestination);
         presentationHost=&video->host;presentationNow=nativeNow;
@@ -1707,28 +2144,43 @@ public:
                 outputRequest.tryDevice=std::string(setting)=="1";
             }
             std::string error;rr::platform::AudioOutputDiagnostic50HD outputDiagnostic;
-            if(!audioOutput.prepare(application.audioRoot,outputRequest,error,outputDiagnostic,application.soundMode))throw std::runtime_error(error);
+            if(!application.prepareFrontendAudioOutput(*this,outputRequest,error,outputDiagnostic))throw std::runtime_error(error);
             require(audioOutput.soundModeOwner50KG()==application.soundMode.get(),
                 "original UI output did not retain the application sound mode owner");
             cold.audio=audioOutput.transport();
-            if((application.decodeRiderImagesInProcess||!application.riderCacheRoot.empty())&&
-                !cold.audio->prepareRiderMenu(application.audioRoot,error))
-                throw std::runtime_error(error);
-            if((cold.course||cold.tournament)&&!cold.audio->prepareCourseMenu(application.audioRoot,error))
-                throw std::runtime_error(error);
-            if(cold.options&&!cold.audio->prepareCreditsMenu(application.audioRoot,error))
-                throw std::runtime_error(error);
-            if(cold.hall&&!cold.audio->prepareHallOfFameMenu(application.audioRoot,error))
-                throw std::runtime_error(error);
+            if(!application.prepareFrontendMenuAudio(*this,cold,error))throw std::runtime_error(error);
             const auto info=audioOutput.info();
             std::cerr<<"Original UI audio device="<<rr::platform::audioDeviceStatusName50HD(info.deviceStatus)
                 <<" capture="<<info.captureActive<<" rate="<<info.sampleRate<<" detail="<<info.deviceDetail.data()<<'\n';
         }
         if(coordinator.prepare(cold,diagnostic)!=Status::ok)fail("preparation");
+        require(coordinator.bindGarageDestinationRoot50KG(*this),"original UI same-Root destination binding failed");
         if(coordinator.configureRendererRequest(rendererRequest,diagnostic)!=Status::ok)fail("renderer configuration");
     }
     void activate(rr::platform::VehicleWindowGl50DS& renderer) {
+        std::string languageError;
+        if(!materialApplicationOwner||!materialApplicationOwner->prepareFrontendLanguageServices(*this,renderer,languageError))
+            throw std::runtime_error("original UI language startup rejected: "+languageError);
+        if(!materialApplicationOwner||!coordinator.prepareSharedDialogsInitial(*materialApplicationOwner,renderer,diagnostic))
+            fail("shared UI initial ownership");
         if(coordinator.activate(renderer,diagnostic)!=Status::ok)fail("activation");
+    }
+    std::string garageRuntimeFailureText() const {
+        const auto& g=diagnostic.garageRuntime;
+        if(g.status==rr::assets::OriginalStandardMaterialStatus50LA::complete&&!g.sourcePC&&diagnostic.garageDetail.empty())return {};
+        return " garage_runtime="+std::to_string(static_cast<unsigned>(g.status))+
+            " garage_runtime_pc="+std::to_string(g.sourcePC)+" garage_runtime_row="+std::to_string(g.row)+
+            " garage_runtime_slot="+std::to_string(g.slot)+" garage_runtime_pass="+std::to_string(g.pass)+
+            " garage_runtime_map="+std::to_string(g.map)+" garage_runtime_field="+(g.field?g.field:"")+
+            " garage_source_effects="+(g.sourceEffectsCommitted?"true":"false")+
+            " garage_document="+std::to_string(static_cast<unsigned>(g.document.error))+
+            " garage_document_pc="+std::to_string(g.document.sourcePC)+
+            " garage_document_offset="+std::to_string(g.document.byteOffset)+
+            " garage_program="+std::to_string(static_cast<unsigned>(g.program.status))+
+            " garage_program_pc="+std::to_string(g.program.sourcePC)+" garage_program_row="+std::to_string(g.program.row)+
+            " garage_texture="+std::to_string(static_cast<unsigned>(g.texture.status))+
+            " garage_texture_pc="+std::to_string(g.texture.sourcePC)+" garage_texture_row="+std::to_string(g.texture.row)+
+            " garage_texture_offset="+std::to_string(g.texture.byteOffset)+" garage_detail="+diagnostic.garageDetail;
     }
     [[noreturn]] void fail(const char* operation) const {
         throw std::runtime_error(std::string("original UI ")+operation+" rejected: status="+
@@ -1778,7 +2230,7 @@ public:
             " tournament_model="+std::to_string(static_cast<unsigned>(diagnostic.tournament.model.error))+
             " course="+std::to_string(static_cast<unsigned>(diagnostic.course.status))+
             " course_pc="+std::to_string(diagnostic.course.sourcePC)+
-            " renderer="+std::to_string(static_cast<unsigned>(diagnostic.renderer.error)));
+            " renderer="+std::to_string(static_cast<unsigned>(diagnostic.renderer.error))+garageRuntimeFailureText());
     }
     void input(std::uint8_t sourceInput,rr::platform::WindowControllerPresence50DQ presence=rr::platform::WindowControllerPresence50DQ::Unknown) {
         rr::platform::OriginalUiMainSessionInput50KG in;in.controller=0;in.originalInput=sourceInput;in.secondControllerObservation=presence;
@@ -1801,6 +2253,10 @@ public:
                 <<" status="<<unsigned(status)<<" original_input="<<unsigned(sourceInput)<<" device_observation="<<unsigned(presence)<<" source="<<diagnostic.sourcePC
                 <<" native_course_load="<<unsigned(diagnostic.courseLoad)
                 <<" main="<<unsigned(diagnostic.main.status)<<" options="<<unsigned(diagnostic.options.status)
+                <<" garage_phase="<<rr::platform::originalUiGarageDestinationStatusName50KG(diagnostic.garage.status)
+                <<" garage_request_pc="<<diagnostic.garage.requestSourcePC<<" garage_pending_pc="<<diagnostic.garage.pendingSourcePC
+                <<" garage_asset_error="<<unsigned(diagnostic.garage.scene.error)<<" garage_asset_pc="<<diagnostic.garage.scene.sourcePC
+                <<garageRuntimeFailureText()
                 <<" tournament_status="<<unsigned(diagnostic.tournament.status)<<" tournament_pc="<<diagnostic.tournament.sourcePC
                 <<" tournament_resource="<<unsigned(diagnostic.tournamentResources.error)<<" tournament_resource_pc="<<diagnostic.tournamentResources.sourcePC
                 <<" tournament_widgets="<<unsigned(diagnostic.tournamentWidgets.error)<<" tournament_widgets_pc="<<diagnostic.tournamentWidgets.sourcePC
@@ -2015,14 +2471,52 @@ public:
     void commitSourceUpdateTiming() {
         require(sourceDispatchTiming.commit(),"UI source dispatch timing commit rejected");
     }
-    void update(const rr::platform::OriginalUiMainSessionUpdate50KG& in,std::uint64_t elapsedNanoseconds) {
+    rr::platform::OriginalUiFrontendUpdateReceipt50KG update(
+        const rr::platform::OriginalUiMainSessionUpdate50KG& in,std::uint64_t elapsedNanoseconds) {
         rr::platform::OriginalUiFrontendUpdateReceipt50KG receipt;
         const auto updateStart=stageStart();
-        const bool updated=coordinator.update(in,receipt,diagnostic)==Status::ok&&receipt.accepted&&receipt.sequence==lastAudioSequence+1;
+        const bool garageRoot=coordinator.snapshot().route.screen==13;
+        const bool sourceAudio=materialApplicationOwner&&materialApplicationOwner->garageAudioBackingOwner_;
+        const bool ordinarySourceAudio=sourceAudio&&!garageRoot;
+        original_ui_source_timing50LH::PublicationView garageTiming;
+        original_ui_source_timing50LH::Sample garageSample;std::uint64_t garagePublication=0;
+        if(garageRoot){
+            // Root13 owns its real Light/Aural/dispatcher traversal. Capture
+            // THIS prepared publication before it commits; do not invoke the
+            // ordinary-manager prefix or manufacture another audio sample.
+            require(sourceAudio&&nativeRootAudioPhase_==NativeRootAudioPhase::returned&&
+                nativeRootAudioPublication_!=std::numeric_limits<std::uint64_t>::max()&&
+                lastAudioSequence!=std::numeric_limits<std::uint64_t>::max()&&
+                sourceDispatchTiming.retainPublication(garageTiming)&&
+                garageTiming.sameOwner(nativeRootAudioTiming_)&&
+                garageTiming.readPrepared(garageSample,garagePublication)&&
+                garagePublication==nativeRootAudioPublication_+1&&
+                garageSample.updateSeconds==in.elapsedSeconds,
+                "Garage host lost its exact preceding Root/audio/timing publication");
+        }
+        std::string rootAudioError;
+        if(ordinarySourceAudio&&!materialApplicationOwner->beginNativeFrontendRootAudio140CE0(*this,in,diagnostic,rootAudioError)){
+            reportStage("source_update",updateStart,false);throw std::runtime_error(rootAudioError);
+        }
+        bool updated=coordinator.update(in,receipt,diagnostic)==Status::ok&&receipt.accepted&&receipt.sequence==lastAudioSequence+1;
+        if(ordinarySourceAudio&&updated)
+            updated=materialApplicationOwner->finishNativeFrontendRootAudio140CFC(*this,receipt,diagnostic,rootAudioError);
+        if(updated){
+            if(garageRoot){
+                original_ui_source_timing50LH::Sample stillPrepared;std::uint64_t pending=0;
+                updated=receipt.source.screen==13&&receipt.source.page==1&&receipt.sourceTimingCommitted&&
+                    receipt.sourcePublication==garagePublication&&
+                    receipt.update.elapsedSeconds==garageSample.updateSeconds&&receipt.update.paused==in.paused&&
+                    !garageTiming.readPrepared(stillPrepared,pending);
+            }else updated=!receipt.sourceTimingCommitted&&!receipt.sourcePublication&&receipt.source.screen!=13;
+            if(!updated)rootAudioError="Native frontend returned an inconsistent Root timing/audio receipt; source effects retained";
+        }
         reportStage("source_update",updateStart,updated);
         accountBankPublication(receipt.coldInterval,receipt.bankDrain,updated);
-        if(!updated)
+        if(!updated){
+            if(!rootAudioError.empty())throw std::runtime_error(rootAudioError);
             fail("update");
+        }
         // One PCM advance for this exact accepted source update; never for
         // loading, rejected updates, or a second screen's copied clock.
         rr::platform::AudioOutputDiagnostic50HD outputDiagnostic;
@@ -2032,6 +2526,16 @@ public:
         if(!advanced)
             throw std::runtime_error(std::string("original UI PCM advance failed: ")+outputDiagnostic.detail.data());
         lastAudioSequence=receipt.sequence;
+        if(garageRoot){
+            // PCM above is still required: Root267BE0 drains controls, not
+            // samples. Observe its actual completed publication only after
+            // this one PCM drain succeeds. Preserve chronology for a later
+            // ordinary manager instead of resetting its prefix cursor.
+            nativeRootAudioTiming_=garageTiming;nativeRootAudioPublication_=garagePublication;
+            nativeRootAudioExpectedUpdate_=receipt.sequence;nativeRootAudioPhase_=NativeRootAudioPhase::returned;
+            nativeRootAudioSourcePC_=0x140D60;
+        }
+        return receipt;
     }
     void render(const rr::platform::OriginalUiMainFrameClock50KG& clock,
         rr::platform::VehicleWindowGl50DS& renderer,std::int32_t width,std::int32_t height) {
@@ -2043,7 +2547,9 @@ public:
         const bool submitted=coordinator.submit(renderer,width,height,diagnostic)==Status::ok;
         reportStage("native_submit",submitStart,submitted,&diagnostic.renderer);
         if(!submitted)fail("submission");
-        submittedScreen=coordinator.snapshot().route.screen;
+        const auto submittedState=coordinator.snapshot();submittedScreen=submittedState.route.screen;
+        submittedGaragePublication=submittedScreen==13&&submittedState.route.page==1&&
+            submittedState.garageTargetPublished?submittedState.garagePublication:0;
         submittedPublication=coordinator.gpu()?coordinator.gpu()->publicationToken():0;
         submittedDraws=diagnostic.renderer.originalUiDraws;submittedQuads=diagnostic.renderer.originalUiQuads;
         submittedTriangles=diagnostic.renderer.originalUiSourceTriangles;
@@ -2142,6 +2648,34 @@ public:
                 <<",\"light_manager_generation\":"<<application.lightManager->managerGeneration()
                 <<",\"light_cache_state\":"<<unsigned(application.lightManager->cacheState());
         };
+        if(snapshot.route.screen==13){
+            const auto& aperture=snapshot.garageAperture;
+            const bool accepted=snapshot.route.page==1&&snapshot.frameSubmitted&&snapshot.garageTargetPublished&&
+                snapshot.garageRootReturned&&snapshot.garageTimingCommitted&&submittedScreen==13&&
+                snapshot.garagePublication!=0&&submittedGaragePublication==snapshot.garagePublication;
+            std::cerr<<"original_garage_state {\"reason\":\""<<reason<<"\",\"screen\":13,\"page\":"<<unsigned(snapshot.route.page)
+                <<",\"presentation\":\"native_source_rgba_target\",\"switches\":"<<snapshot.switches
+                <<",\"updates\":"<<snapshot.updates<<",\"renders\":"<<snapshot.renders<<",\"submitted\":"<<snapshot.submissions
+                <<",\"loaded\":"<<(snapshot.garageLoaded?"true":"false")<<",\"selected_stat\":"<<(snapshot.garageLoaded?std::to_string(snapshot.garageSelectedStat):"null")
+                <<",\"source_publication\":"<<snapshot.garagePublication
+                <<",\"root_returned\":"<<(snapshot.garageRootReturned?"true":"false")
+                <<",\"timing_committed\":"<<(snapshot.garageTimingCommitted?"true":"false")
+                <<",\"target_published\":"<<(snapshot.garageTargetPublished?"true":"false")
+                <<",\"accepted_native_target\":"<<(accepted?"true":"false")
+                <<",\"lifecycle\":"<<snapshot.garageManagerLifecycle<<",\"phase\":"<<snapshot.garageManagerTransition
+                <<",\"aperture_bound\":"<<(aperture.bound?"true":"false")<<",\"aperture_state\":"<<unsigned(aperture.state)
+                <<",\"aperture_top\":"<<aperture.top284<<",\"aperture_bottom\":"<<aperture.bottom28C
+                <<",\"aperture_input_enabled\":"<<(aperture.inputEnabled268?"true":"false")
+                <<",\"selected_group\":null,\"selected_slot\":null,\"gpu_publication\":null"
+                <<",\"input_events\":"<<inputCount<<",\"unavailable_destinations\":"<<unavailableCount
+                <<",\"source_rng\":"<<application.state->rawRandom308030<<",\"source_milliseconds\":"<<sourceMilliseconds
+                <<",\"audio_music_song\":"<<(audioOutput.transport()?audioOutput.transport()->activeMusicSong():0)
+                <<",\"audio_source_mixed_frames\":"<<audioOutput.sourceMixedFrames()
+                <<",\"audio_output_serial\":"<<audioOutput.retainedOutputSerial()
+                <<",\"audio_mixed_frames\":"<<audioOutput.info().mixedFrames
+                <<",\"world_ticks\":"<<worldTicks<<",\"mixed_frames\":"<<mixedFrames;
+            reportRiderProfile();std::cerr<<"}\n";return;
+        }
         if(snapshot.route.screen==6){
             require(snapshot.route.page==1&&coordinator.courseSession(),"original Course session report unavailable");
             const auto& course=snapshot.course;const auto& aperture=course.aperture;
@@ -2175,6 +2709,9 @@ public:
                 <<",\"audio_submitted\":"<<course.audio.submitted<<",\"audio_failed\":"<<course.audio.failed
                 <<",\"audio_music_song\":"<<(audioOutput.transport()?audioOutput.transport()->activeMusicSong():0)
                 <<",\"audio_source_mixed_frames\":"<<audioOutput.sourceMixedFrames()
+                <<",\"audio_source_frame_origin\":"<<audioOutput.sourceFrameOrigin()
+                <<",\"audio_output_source_mixed_frames\":"<<audioOutput.outputSourceMixedFrames()
+                <<",\"audio_output_serial\":"<<audioOutput.retainedOutputSerial()
                 <<",\"audio_mixed_frames\":"<<audioOutput.info().mixedFrames
                 <<",\"audio_captured_frames\":"<<audioOutput.info().capturedFrames
                 <<",\"audio_rate\":"<<audioOutput.info().sampleRate
@@ -2217,6 +2754,9 @@ public:
                 <<",\"audio_source_gate_suppressed\":"<<rider.audio.suppressedBySourceGate
                 <<",\"audio_music_song\":"<<(audioOutput.transport()?audioOutput.transport()->activeMusicSong():0)
                 <<",\"audio_source_mixed_frames\":"<<audioOutput.sourceMixedFrames()
+                <<",\"audio_source_frame_origin\":"<<audioOutput.sourceFrameOrigin()
+                <<",\"audio_output_source_mixed_frames\":"<<audioOutput.outputSourceMixedFrames()
+                <<",\"audio_output_serial\":"<<audioOutput.retainedOutputSerial()
                 <<",\"audio_mixed_frames\":"<<audioOutput.info().mixedFrames
                 <<",\"audio_captured_frames\":"<<audioOutput.info().capturedFrames
                 <<",\"audio_rate\":"<<audioOutput.info().sampleRate
@@ -2312,7 +2852,10 @@ public:
             <<",\"source_milliseconds\":"<<sourceMilliseconds<<",\"audio_muted\":"<<(audioOutput.enabled()?"false":"true")
             <<",\"audio_suppressed\":"<<audio.suppressedByMutedMode<<",\"audio_submitted\":"<<audio.submitted
             <<",\"audio_source_gate_suppressed\":"<<audio.suppressedBySourceGate<<",\"audio_failed\":"<<audio.failed
-            <<",\"audio_source_mixed_frames\":"<<audioOutput.sourceMixedFrames()<<",\"audio_mixed_frames\":"<<audioInfo.mixedFrames
+            <<",\"audio_source_mixed_frames\":"<<audioOutput.sourceMixedFrames()
+                <<",\"audio_source_frame_origin\":"<<audioOutput.sourceFrameOrigin()
+                <<",\"audio_output_source_mixed_frames\":"<<audioOutput.outputSourceMixedFrames()
+                <<",\"audio_output_serial\":"<<audioOutput.retainedOutputSerial()<<",\"audio_mixed_frames\":"<<audioInfo.mixedFrames
             <<",\"audio_captured_frames\":"<<audioInfo.capturedFrames<<",\"audio_rate\":"<<audioInfo.sampleRate
             <<",\"audio_accepted_nanoseconds\":"<<audioOutput.acceptedNanoseconds()<<",\"audio_clock_microseconds\":"<<audioInfo.simulationMicroseconds
             <<",\"audio_remainder_nanoseconds\":"<<audioOutput.remainderNanoseconds()

@@ -1,9 +1,12 @@
 #include "audio_mixer50hd.h"
+#include "native_source_reverb50kg.h"
 #include "original_sound_mode50kg.h"
+#include "original_ui_main_audio50kg.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <utility>
+#include <exception>
 
 namespace rr::platform {
 namespace {
@@ -47,6 +50,9 @@ bool AudioMixer50HD::validClip(const AudioClip50HD& clip) noexcept {
            ((!clip.loopStart && !clip.loopEnd) ||
             (clip.loopStart < clip.loopEnd && clip.loopEnd <= clip.frames));
 }
+AudioMixer50HD::~AudioMixer50HD()noexcept {
+    if(nativeSourceWetProcessor_||auralMasterOwner_||nativeWattoRouting_.command||nativeSceneRouting_.command)std::terminate();
+}
 bool AudioMixer50HD::canRecordControlChanges(std::uint64_t count) const noexcept {
     return !controlRevisionExhausted_ &&
         count<=std::numeric_limits<std::uint64_t>::max()-controlRevision_;
@@ -57,7 +63,7 @@ void AudioMixer50HD::noteControlChange() noexcept {
 }
 bool AudioMixer50HD::initialize(AudioVoice50HD* voices, std::size_t count,
                               std::uint32_t outputRate) noexcept {
-    if (!voices || !count || count > audioMaximumVoices50HD || !validRate(outputRate) ||
+    if (nativeSourceWetProcessor_||auralMasterOwner_||nativeWattoRouting_.command||nativeSceneRouting_.command||!voices || !count || count > audioMaximumVoices50HD || !validRate(outputRate) ||
         groupEpoch50IC_ == std::numeric_limits<std::uint64_t>::max())
         return false;
     voices_ = voices; count_ = count; rate_ = outputRate;
@@ -72,6 +78,533 @@ bool AudioMixer50HD::initialize(AudioVoice50HD* voices, std::size_t count,
         playbackRevisions_[i] = 0;
     }
     return true;
+}
+bool AudioMixer50HD::coldNativeGarageRange(const NativeGarageRoutingClaim& c)const noexcept {
+    if(!voices_||c.storage!=voices_||c.epoch!=groupEpoch50IC_||!c.voiceCount||
+       c.firstVoice>=count_||c.voiceCount>count_-c.firstVoice||!canRecordControlChanges())return false;
+    for(std::size_t i=c.firstVoice;i<c.firstVoice+c.voiceCount;++i){const auto& v=voices_[i];
+        // Stopped/completed voices cannot prove zero contribution. Pending
+        // Scene Sounds may still have no native group binding at1FB594; that
+        // genuine absence is not replaced with a gain or a fake source handle.
+        if(playbackRevisions_[i]||v.active||v.clip.samples||v.clip.frames||v.clip.sampleRate||v.clip.channels||
+           v.clip.loopStart||v.clip.loopEnd||v.sourceFrame!=0.0||v.gain!=1.f||v.pitch!=1.f||v.pan!=0.f||v.loop||
+           (c.kind==NativeGarageRoutingKind::watto&&!groupKnown50IC_[i])||
+           groupGains50IC_[i]!=1.f||groupPaused50IC_[i]||
+           originalLeft50KG_[i]!=1.f||originalRight50KG_[i]!=1.f)return false;
+    }
+    return true;
+}
+bool AudioMixer50HD::canClaimNativeGarageRouting(const NativeGarageRoutingClaim& c)const noexcept {
+    if(!c.command||!c.main||!c.entity||!c.sequence||!c.generation||!c.objectKey||c.routingApplied||
+       c.sourceGroupSlot<0||static_cast<std::size_t>(c.sourceGroupSlot)>=persistentWetRouting50KG_.size()||
+       !canRecordControlChanges(1)||!coldNativeGarageRange(c))return false;
+    const auto scene=c.kind==NativeGarageRoutingKind::scene;
+    if(scene){
+        if(!c.scene||c.group||count_!=53||c.firstVoice!=49||c.voiceCount!=4)return false;
+    }else if(!c.group||c.scene||(count_!=49&&count_!=53)||c.firstVoice!=8||c.voiceCount!=41)return false;
+    const auto& same=scene?nativeSceneRouting_:nativeWattoRouting_;
+    const auto& other=scene?nativeWattoRouting_:nativeSceneRouting_;
+    if(same.command)return false;
+    if(other.command&&(other.command==c.command||other.main!=c.main||other.entity==c.entity||
+       other.sourceGroupSlot==c.sourceGroupSlot||other.epoch!=c.epoch||other.storage!=c.storage||
+       !nativeGarageRoutingCurrent(other,other.command,other.routingApplied)||
+       !(c.firstVoice+c.voiceCount<=other.firstVoice||other.firstVoice+other.voiceCount<=c.firstVoice)))return false;
+    return true;
+}
+bool AudioMixer50HD::retainedNativeGarageRange(const NativeGarageRoutingClaim& c)const noexcept {
+    if(!voices_||c.storage!=voices_||c.epoch!=groupEpoch50IC_||!c.voiceCount||
+       c.firstVoice>=count_||c.voiceCount>count_-c.firstVoice||!auralMasterOwner_||
+       !nativeSourceWetProcessor_||!nativeSourceWetProcessorCurrent(
+           *auralMasterOwner_,*nativeSourceWetProcessor_))return false;
+    for(std::size_t i=c.firstVoice;i<c.firstVoice+c.voiceCount;++i)
+        if(voices_[i].active||nativeSourceVoiceRoutes_[i].count||groupPaused50IC_[i]||
+           groupGains50IC_[i]!=1.f||(c.kind==NativeGarageRoutingKind::watto&&!groupKnown50IC_[i]))return false;
+    return true;
+}
+bool AudioMixer50HD::claimRetainedNativeGarageRouting(const NativeGarageRoutingClaim& c)noexcept {
+    if(!c.command||!c.main||!c.entity||!c.sequence||!c.generation||!c.objectKey||c.routingApplied||
+       c.sourceGroupSlot<0||static_cast<std::size_t>(c.sourceGroupSlot)>=persistentWetRouting50KG_.size()||
+       !canRecordControlChanges(1)||!retainedNativeGarageRange(c))return false;
+    const bool scene=c.kind==NativeGarageRoutingKind::scene;
+    if(scene){if(!c.scene||c.group||count_!=53||c.firstVoice!=49||c.voiceCount!=4)return false;}
+    else if(!c.group||c.scene||(count_!=49&&count_!=53)||c.firstVoice!=8||c.voiceCount!=41)return false;
+    auto& same=scene?nativeSceneRouting_:nativeWattoRouting_;
+    const auto& other=scene?nativeWattoRouting_:nativeSceneRouting_;
+    if(same.command)return false;
+    if(other.command&&(other.command==c.command||other.main!=c.main||other.entity==c.entity||
+       other.sourceGroupSlot==c.sourceGroupSlot||other.epoch!=c.epoch||other.storage!=c.storage||
+       !(other.routingApplied?nativeGarageRoutingLiveCurrent(other,other.command):retainedNativeGarageRange(other))||
+       !(c.firstVoice+c.voiceCount<=other.firstVoice||other.firstVoice+other.voiceCount<=c.firstVoice)))return false;
+    same=c;noteControlChange();return true;
+}
+bool AudioMixer50HD::applyRetainedNativeGarageRouting(NativeGarageRoutingClaim& c,const void* command)noexcept {
+    if(!command||c.command!=command||c.routingApplied||!retainedNativeGarageRange(c)||
+       c.sourceGroupSlot<0||static_cast<std::size_t>(c.sourceGroupSlot)>=persistentWetRouting50KG_.size()||
+       !canRecordControlChanges(1))return false;
+    // All source reservations have genuinely stopped. Preserve clip custody,
+    // and apply the actual ordered source-slot byte without a fake live scan.
+    persistentWetRouting50KG_[c.sourceGroupSlot]=1;c.routingApplied=true;noteControlChange();return true;
+}
+bool AudioMixer50HD::claimRetainedNativeWattoRouting(const NativeWattoRoutingClaim& c)noexcept {
+    return c.kind==NativeGarageRoutingKind::watto&&claimRetainedNativeGarageRouting(c);
+}
+bool AudioMixer50HD::applyRetainedNativeWattoRouting(const void* command)noexcept {
+    return applyRetainedNativeGarageRouting(nativeWattoRouting_,command);
+}
+bool AudioMixer50HD::claimRetainedNativeSceneRouting(const NativeSceneRoutingClaim& c)noexcept {
+    return c.kind==NativeGarageRoutingKind::scene&&claimRetainedNativeGarageRouting(c);
+}
+bool AudioMixer50HD::applyRetainedNativeSceneRouting(const void* command)noexcept {
+    return applyRetainedNativeGarageRouting(nativeSceneRouting_,command);
+}
+bool AudioMixer50HD::nativeRetainedWattoRoutingCurrent(const void* command,bool applied)const noexcept {
+    const auto& c=nativeWattoRouting_;
+    if(applied)return nativeGarageRoutingLiveCurrent(c,command);
+    return command&&c.command==command&&!c.routingApplied&&c.main&&c.entity&&
+        c.sequence&&c.generation&&c.objectKey&&c.sourceGroupSlot>=0&&
+        static_cast<std::size_t>(c.sourceGroupSlot)<persistentWetRouting50KG_.size()&&
+        retainedNativeGarageRange(c);
+}
+bool AudioMixer50HD::nativeRetainedSceneRoutingCurrent(const void* command,bool applied)const noexcept {
+    const auto& c=nativeSceneRouting_;
+    if(applied)return nativeGarageRoutingLiveCurrent(c,command);
+    return command&&c.command==command&&!c.routingApplied&&c.main&&c.entity&&
+        c.sequence&&c.generation&&c.objectKey&&c.sourceGroupSlot>=0&&
+        static_cast<std::size_t>(c.sourceGroupSlot)<persistentWetRouting50KG_.size()&&
+        retainedNativeGarageRange(c);
+}
+bool AudioMixer50HD::canClaimNativeWattoRouting(const NativeWattoRoutingClaim& c)const noexcept {
+    return c.kind==NativeGarageRoutingKind::watto&&canClaimNativeGarageRouting(c);
+}
+bool AudioMixer50HD::claimNativeWattoRouting(const NativeWattoRoutingClaim& c)noexcept {
+    if(!canClaimNativeWattoRouting(c))return false;
+    nativeWattoRouting_=c;noteControlChange();return true;
+}
+bool AudioMixer50HD::claimNativeSceneRouting(const NativeSceneRoutingClaim& c)noexcept {
+    if(c.kind!=NativeGarageRoutingKind::scene||!canClaimNativeGarageRouting(c))return false;
+    nativeSceneRouting_=c;noteControlChange();return true;
+}
+bool AudioMixer50HD::nativeGarageRoutingCurrent(const NativeGarageRoutingClaim& c,
+    const void* command,bool applied)const noexcept {
+    return command&&c.command==command&&c.routingApplied==applied&&coldNativeGarageRange(c)&&
+        c.sourceGroupSlot>=0&&static_cast<std::size_t>(c.sourceGroupSlot)<persistentWetRouting50KG_.size()&&
+        (!applied||persistentWetRouting50KG_[c.sourceGroupSlot]==1);
+}
+bool AudioMixer50HD::nativeWattoRoutingCurrent(const void* command,bool applied)const noexcept {
+    return nativeGarageRoutingCurrent(nativeWattoRouting_,command,applied);
+}
+bool AudioMixer50HD::nativeSceneRoutingCurrent(const void* command,bool applied)const noexcept {
+    return nativeGarageRoutingCurrent(nativeSceneRouting_,command,applied);
+}
+bool AudioMixer50HD::nativeSceneImmediateRoutingCurrent(const void* command)const noexcept {
+    const auto& c=nativeSceneRouting_;
+    if(c.routingApplied)return nativeGarageRoutingLiveCurrent(c,command);
+    // The real accepted Scene25 claim already identifies its native slots and
+    // actual source registry slot. Immediate RPC8 may precede its submission.
+    // Do not replace retained routing history with a fresh zero/true value.
+    return command&&c.command==command&&c.kind==NativeGarageRoutingKind::scene&&
+        c.main&&c.scene&&!c.group&&c.entity&&c.sequence&&c.generation&&c.objectKey&&
+        voices_&&c.storage==voices_&&c.epoch==groupEpoch50IC_&&count_==53&&
+        c.firstVoice==49&&c.voiceCount==4&&c.sourceGroupSlot>=0&&
+        static_cast<std::size_t>(c.sourceGroupSlot)<persistentWetRouting50KG_.size()&&
+        persistentWetRouting50KG_[c.sourceGroupSlot]<=1&&auralMasterOwner_&&nativeSourceWetProcessor_&&
+        nativeSourceWetProcessorCurrent(*auralMasterOwner_,*nativeSourceWetProcessor_);
+}
+bool AudioMixer50HD::nativeSceneSampleVoiceCurrent(std::size_t slot)const noexcept {
+    const auto& c=nativeSceneRouting_;
+    if(!nativeSceneImmediateRoutingCurrent(c.command)||slot<c.firstVoice||
+       slot-c.firstVoice>=c.voiceCount||!playbackRevisions_[slot]||
+       !groupKnown50IC_[slot]||groupGains50IC_[slot]!=1.f||groupPaused50IC_[slot])return false;
+    const auto& v=voices_[slot];const auto& route=nativeSourceVoiceRoutes_[slot];
+    if(!validClip(v.clip)||v.clip.channels!=1||v.loop||
+       !nativeSourceRoutes_.current(route)||route.count!=1)return false;
+    const auto& cell=nativeSourceRoutes_.cells_[route.cells[0]];
+    return cell.kind==NativeVoiceKind::sample&&cell.sourceBound&&!cell.loop&&!cell.paused&&
+        std::isfinite(cell.duration)&&cell.duration>0.f&&std::isfinite(cell.elapsed)&&cell.elapsed>=0.f;
+}
+bool AudioMixer50HD::nativeWattoSourceVoiceCurrent(std::size_t slot)const noexcept {
+    const auto& c=nativeWattoRouting_;
+    // Render-only use of a real privately published Watto reservation. The
+    // caller Main has already checked its strong Group/Sound/PCM ownership;
+    // this bounded Mixer proof cannot publish, steal or revise that voice.
+    if(c.kind!=NativeGarageRoutingKind::watto||count_!=53||
+       !nativeGarageRoutingLiveCurrent(c,c.command)||slot<c.firstVoice||
+       slot-c.firstVoice>=c.voiceCount||!playbackRevisions_[slot]||
+       !groupKnown50IC_[slot]||groupGains50IC_[slot]!=1.f||groupPaused50IC_[slot])return false;
+    const auto& v=voices_[slot];const auto& route=nativeSourceVoiceRoutes_[slot];
+    if(!validClip(v.clip)||v.clip.channels!=1||v.clip.sampleRate!=22050||
+       v.clip.loopStart||v.clip.loopEnd||v.loop||v.gain!=1.f||v.pan!=0.f||
+       v.pitch!=OriginalUiGarageWattoAudio50KG::nativeRendererPitch||
+       !std::isfinite(v.sourceFrame)||v.sourceFrame<0.0||
+       (v.active&&v.sourceFrame>=static_cast<double>(v.clip.frames))||
+       !nativeSourceRoutes_.current(route)||route.count!=1)return false;
+    const auto& cell=nativeSourceRoutes_.cells_[route.cells[0]];
+    if(!cell.sourceBound||cell.loop||cell.paused||!std::isfinite(cell.duration)||cell.duration<=0.f||
+       !std::isfinite(cell.elapsed)||cell.elapsed<0.f)return false;
+    std::int32_t volume=0;
+    if(cell.kind==NativeVoiceKind::sample){
+        // Actual wing SourceSound flags1, volume17, mono/nonloop sample.
+        if(cell.streamSlot||cell.streamGeneration)return false;
+        volume=17;
+    }else if(cell.kind==NativeVoiceKind::stream){
+        // Actual response flags2, volume100, mono/nonloop stream. The native
+        // Aural-issued slot/generation survives from atomic publication; it
+        // is NOT a guest stream handle or an ID inferred from PCM length.
+        if(cell.streamSlot>=8||!cell.streamGeneration)return false;
+        std::array<std::uint64_t,8> references{};
+        if(!nativeSourceRoutes_.streamReferences267CB0(references)||
+           references[cell.streamSlot]!=cell.streamGeneration)return false;
+        volume=100;
+    }else return false;
+    float left=0.f,right=0.f;
+    return originalRouting50KG(0,left,right,volume)&&
+        originalLeft50KG_[slot]==left&&originalRight50KG_[slot]==right;
+}
+bool AudioMixer50HD::applyNativeSceneImmediateRouting(const void* command)noexcept {
+    auto& c=nativeSceneRouting_;
+    if(c.routingApplied||!nativeSceneImmediateRoutingCurrent(command)||!canRecordControlChanges(1))return false;
+    for(std::size_t slot=c.firstVoice;slot<c.firstVoice+c.voiceCount;++slot)
+        if((voices_[slot].active||nativeSourceVoiceRoutes_[slot].count)&&
+           !nativeSceneSampleVoiceCurrent(slot))return false;
+    // IRX B820 updates the real group byte and every currently matching voice.
+    // These Scene samples all have actual InitSound policy1 and no reached
+    // command14/20 override. Their render sends consume this same slot byte,
+    // so this write updates both existing and future matching native voices.
+    persistentWetRouting50KG_[c.sourceGroupSlot]=1;c.routingApplied=true;noteControlChange();return true;
+}
+// Live custody validates the exact retained claim, not constructor-zero voice
+// history. Stopped clips and their revisions remain owned by the Sound backing.
+bool AudioMixer50HD::nativeSourceVoiceReserved(std::size_t slot,std::uint64_t revision)const noexcept {
+    if(!voices_||slot>=count_||!revision||playbackRevisions_[slot]!=revision||
+       !nativeSourceWetProcessor_||!auralMasterOwner_||
+       !nativeSourceWetProcessorCurrent(*auralMasterOwner_,*nativeSourceWetProcessor_))return false;
+    return nativeSourceRoutes_.current(nativeSourceVoiceRoutes_[slot]);
+}
+bool AudioMixer50HD::nativeGarageRoutingLiveCurrent(const NativeGarageRoutingClaim& c,
+    const void* command)const noexcept {
+    if(!command||c.command!=command||!c.routingApplied||!c.main||!c.entity||
+       !c.sequence||!c.generation||!c.objectKey||!voices_||c.storage!=voices_||
+       c.epoch!=groupEpoch50IC_||!c.voiceCount||c.firstVoice>=count_||
+       c.voiceCount>count_-c.firstVoice||c.sourceGroupSlot<0||
+       static_cast<std::size_t>(c.sourceGroupSlot)>=persistentWetRouting50KG_.size()||
+       persistentWetRouting50KG_[c.sourceGroupSlot]!=1||!auralMasterOwner_||
+       !nativeSourceWetProcessor_||!nativeSourceWetProcessorCurrent(
+           *auralMasterOwner_,*nativeSourceWetProcessor_))return false;
+    if(c.kind==NativeGarageRoutingKind::scene)
+        return c.scene&&!c.group&&count_==53&&c.firstVoice==49&&c.voiceCount==4;
+    return c.group&&!c.scene&&(count_==49||count_==53)&&c.firstVoice==8&&c.voiceCount==41;
+}
+bool AudioMixer50HD::canRetireNativeGarageRouting(const NativeGarageRoutingClaim& c,
+    const void* command)const noexcept {
+    if(!nativeGarageRoutingLiveCurrent(c,command)||!canRecordControlChanges(1))return false;
+    for(std::size_t i=c.firstVoice;i<c.firstVoice+c.voiceCount;++i)
+        if(voices_[i].active||nativeSourceVoiceRoutes_[i].count)return false;
+    return true;
+}
+bool AudioMixer50HD::nativeWattoRoutingLiveCurrent(const void* command)const noexcept {
+    return nativeGarageRoutingLiveCurrent(nativeWattoRouting_,command);
+}
+bool AudioMixer50HD::canRetireNativeWattoRouting(const void* command)const noexcept {
+    return canRetireNativeGarageRouting(nativeWattoRouting_,command);
+}
+bool AudioMixer50HD::retireNativeWattoRouting(const void* command)noexcept {
+    if(!canRetireNativeWattoRouting(command))return false;
+    // No clip, revision, source-slot byte or DSP history is cleared here.
+    nativeWattoRouting_={};noteControlChange();return true;
+}
+bool AudioMixer50HD::nativeSceneRoutingLiveCurrent(const void* command)const noexcept {
+    return nativeGarageRoutingLiveCurrent(nativeSceneRouting_,command);
+}
+bool AudioMixer50HD::canRetireNativeSceneRouting(const void* command)const noexcept {
+    return canRetireNativeGarageRouting(nativeSceneRouting_,command);
+}
+bool AudioMixer50HD::retireNativeSceneRouting(const void* command)noexcept {
+    if(!canRetireNativeSceneRouting(command))return false;
+    // No clip, revision, source-slot byte or DSP history is cleared here.
+    nativeSceneRouting_={};noteControlChange();return true;
+}
+bool AudioMixer50HD::applyColdNativeGarageRouting(NativeGarageRoutingClaim& c,const void* command)noexcept {
+    if(!nativeGarageRoutingCurrent(c,command,false)||!canRecordControlChanges(1))return false;
+    // IRX B848..B86C writes the source-slot byte. The active-voice scan has
+    // exactly zero matches in the claimed native range, proven, not skipped.
+    persistentWetRouting50KG_[c.sourceGroupSlot]=1;
+    c.routingApplied=true;noteControlChange();return true;
+}
+bool AudioMixer50HD::applyColdNativeWattoRouting(const void* command)noexcept {
+    return applyColdNativeGarageRouting(nativeWattoRouting_,command);
+}
+bool AudioMixer50HD::applyColdNativeSceneRouting(const void* command)noexcept {
+    return applyColdNativeGarageRouting(nativeSceneRouting_,command);
+}
+bool AudioMixer50HD::canRetireColdNativeWattoRouting(const void* command)const noexcept {
+    return nativeWattoRoutingCurrent(command,true)&&canRecordControlChanges(1);
+}
+bool AudioMixer50HD::retireColdNativeWattoRouting(const void* command)noexcept {
+    if(!canRetireColdNativeWattoRouting(command))return false;
+    // Detach only Watto after actual235150. Scene custody is independent.
+    // Neither the source slot byte nor global effect history is reset.
+    nativeWattoRouting_={};noteControlChange();return true;
+}
+bool AudioMixer50HD::canRetireColdNativeSceneRouting(const void* command)const noexcept {
+    return nativeSceneRoutingCurrent(command,true)&&canRecordControlChanges(1);
+}
+bool AudioMixer50HD::retireColdNativeSceneRouting(const void* command)noexcept {
+    if(!canRetireColdNativeSceneRouting(command))return false;
+    // Only Main's real final source-owner retirement may remove this claim.
+    // SoundGroup destruction never clears the persistent source-slot byte.
+    nativeSceneRouting_={};noteControlChange();return true;
+}
+bool AudioMixer50HD::canRecycleRetiredColdSceneBindings()const noexcept {
+    if(!voices_||count_!=53||nativeSceneRouting_.command||!canRecordControlChanges(1))return false;
+    for(std::size_t i=49;i<53;++i){const auto& v=voices_[i];
+        if(!groupKnown50IC_[i]||groupGains50IC_[i]!=1.f||groupPaused50IC_[i]||
+           playbackRevisions_[i]||v.active||v.clip.samples||v.clip.frames||v.clip.sampleRate||
+           v.clip.channels||v.clip.loopStart||v.clip.loopEnd||v.sourceFrame!=0.0||
+           v.gain!=1.f||v.pitch!=1.f||v.pan!=0.f||v.loop||
+           originalLeft50KG_[i]!=1.f||originalRight50KG_[i]!=1.f)return false;
+    }
+    return true;
+}
+bool AudioMixer50HD::recycleRetiredColdSceneBindings()noexcept {
+    if(!canRecycleRetiredColdSceneBindings())return false;
+    // Only host binding presence returns to constructor state. Unity is the
+    // unbound initial gain too; no source Group field or wet byte is written.
+    for(std::size_t i=49;i<53;++i)groupKnown50IC_[i]=false;
+    noteControlChange();return true;
+}
+bool AudioMixer50HD::canRecycleRetiredSceneBindings()const noexcept {
+    if(!voices_||count_!=53||nativeSceneRouting_.command||!canRecordControlChanges(1)||
+       !auralMasterOwner_||!nativeSourceWetProcessor_||
+       !nativeSourceWetProcessorCurrent(*auralMasterOwner_,*nativeSourceWetProcessor_))return false;
+    for(std::size_t i=49;i<53;++i)
+        if(voices_[i].active||nativeSourceVoiceRoutes_[i].count||!groupKnown50IC_[i]||
+           groupGains50IC_[i]!=1.f||groupPaused50IC_[i])return false;
+    return true;
+}
+bool AudioMixer50HD::recycleRetiredSceneBindings()noexcept {
+    if(!canRecycleRetiredSceneBindings())return false;
+    // Main's genuine retired Scene owner retains all stopped clip backing.
+    // Recycle binding presence only, never voice identity or source history.
+    for(std::size_t i=49;i<53;++i)groupKnown50IC_[i]=false;
+    noteControlChange();return true;
+}
+bool AudioMixer50HD::publishColdNativeSceneVoiceGroup50IC(
+    const void* command,std::size_t slot,float sourceGroupGain)noexcept {
+    const auto& c=nativeSceneRouting_;
+    if(!nativeSceneRoutingCurrent(command,c.routingApplied)||slot<c.firstVoice||
+       slot-c.firstVoice>=c.voiceCount||groupKnown50IC_[slot]||sourceGroupGain!=1.f||
+       !canRecordControlChanges(1))return false;
+    // Actual source Group38=100 supplies this initial unity gain, exactly as
+    // the unclaimed source-row publication. No voice, pause, route or claim
+    // identity changes; all playback/control entries remain wet-gated.
+    groupGains50IC_[slot]=sourceGroupGain;groupKnown50IC_[slot]=true;noteControlChange();return true;
+}
+bool AudioMixer50HD::publishRetainedNativeSceneVoiceGroup50IC(
+    const void* command,std::size_t slot,float sourceGroupGain)noexcept {
+    const auto& c=nativeSceneRouting_;
+    if(!command||c.command!=command||!retainedNativeGarageRange(c)||
+       slot<c.firstVoice||slot-c.firstVoice>=c.voiceCount||groupKnown50IC_[slot]||
+       sourceGroupGain!=1.f||!canRecordControlChanges(1))return false;
+    groupGains50IC_[slot]=sourceGroupGain;groupKnown50IC_[slot]=true;noteControlChange();return true;
+}
+bool AudioMixer50HD::bindNativeSourceWetProcessor(const OriginalApplicationAural50KG& owner,
+    NativeSourceReverb50KG& processor,decltype(&NativeSourceReverb50KG::preflight) preflight,
+    decltype(&NativeSourceReverb50KG::process) process) noexcept {
+    if(!preflight||!process||auralMasterOwner_!=&owner||nativeSourceWetProcessor_||!voices_||!count_||rate_!=48000||
+       mixedFrames_||nativeWattoRouting_.command||nativeSceneRouting_.command||
+       !soundMode50KG_||!soundMode50KG_->ready()||
+       !processor.configured()||processor.nextFrame()!=mixedFrames_)return false;
+    for(std::size_t i=0;i<count_;++i)if(voices_[i].active||playbackRevisions_[i]||nativeSourceVoiceRoutes_[i].count)return false;
+    for(const auto& c:nativeSourceRoutes_.cells_)if(c.reserved)return false;
+    // Actual source267910 cold initialization, not a reset on Garage entry.
+    nativeSourceRoutes_=NativeSourceVoiceRoutes50KG{};
+    nativeSourceWetProcessor_=&processor;nativeSourceWetEpoch_=groupEpoch50IC_;
+    nativeWetPreflight_=preflight;nativeWetProcess_=process;
+    return true;
+}
+bool AudioMixer50HD::nativeSourceWetProcessorCurrent(const OriginalApplicationAural50KG& owner,
+    const NativeSourceReverb50KG& processor)const noexcept {
+    return auralMasterOwner_==&owner&&nativeSourceWetProcessor_==&processor&&
+        nativeSourceWetEpoch_==groupEpoch50IC_&&nativeWetPreflight_&&nativeWetProcess_&&rate_==48000&&processor.configured()&&
+        processor.nextFrame()==mixedFrames_;
+}
+bool AudioMixer50HD::releaseNativeSourceWetProcessor(const OriginalApplicationAural50KG& owner,
+    NativeSourceReverb50KG& processor) noexcept {
+    if(!nativeSourceWetProcessorCurrent(owner,processor)||nativeWattoRouting_.command||nativeSceneRouting_.command)return false;
+    for(std::size_t i=0;i<count_;++i)if(voices_[i].active||nativeSourceVoiceRoutes_[i].count)return false;
+    for(const auto& c:nativeSourceRoutes_.cells_)if(c.reserved)return false;
+    // No master write, work clear or invented drain. The owner destroys its
+    // retained history only after this exact borrow has been retired.
+    nativeSourceWetProcessor_=nullptr;nativeWetPreflight_=nullptr;nativeWetProcess_=nullptr;nativeSourceWetEpoch_=0;return true;
+}
+bool AudioMixer50HD::canRetireStoppedNativeGarageClips(const OriginalUiMainAudio50KG& main,
+    const AudioVoiceObservation50HD* expected,std::size_t size)const noexcept {
+    using Main=OriginalUiMainAudio50KG;
+    if(std::this_thread::get_id()!=main.nativeControlThread_||main.mixer_!=this||!main.prepared_||
+       main.finalNativePcmRetired_||!main.ordinaryOutputRetired_||main.mixerEpoch_!=groupEpoch50IC_||
+       main.mixerRate_!=rate_||main.mixerCount_!=count_||count_!=Main::garageSceneRequiredVoices||
+       !voices_||!expected||size!=Main::finalGarageClipCount||
+       main.nativeWetOwner_!=auralMasterOwner_||main.nativeWetProcessor_!=nativeSourceWetProcessor_||
+       !nativeSourceWetProcessor_||main.nativeWetEpoch_!=nativeSourceWetEpoch_||
+       nativeWattoRouting_.command||nativeSceneRouting_.command)return false;
+    // Reject all native reservations, including stale per-slot routes and a
+    // reserved pool cell which no logical slot presently identifies. EOF alone
+    // cannot satisfy this exact actual source-stop/release boundary.
+    for(std::size_t slot=0;slot<count_;++slot)
+        if(voices_[slot].active||nativeSourceVoiceRoutes_[slot].count)return false;
+    for(const auto& cell:nativeSourceRoutes_.cells_)if(cell.reserved)return false;
+    const auto sameClip=[](const AudioClip50HD& a,const AudioClip50HD& b)noexcept {
+        return a.samples==b.samples&&a.frames==b.frames&&a.sampleRate==b.sampleRate&&
+            a.channels==b.channels&&a.loopStart==b.loopStart&&a.loopEnd==b.loopEnd;
+    };
+    for(std::size_t i=0;i<size;++i){AudioVoiceObservation50HD now;const auto& old=expected[i];
+        if(!inspectVoice(Main::courseRequiredVoices+i,now)||old.voice.active||
+           !sameClip(now.voice.clip,old.voice.clip)||now.playbackRevision!=old.playbackRevision||
+           now.voice.sourceFrame!=old.voice.sourceFrame||now.voice.gain!=old.voice.gain||now.voice.pitch!=old.voice.pitch||
+           now.voice.pan!=old.voice.pan||now.voice.loop!=old.voice.loop||now.groupKnown!=old.groupKnown||
+           now.groupPaused!=old.groupPaused||now.groupGain!=old.groupGain||
+           now.originalLeft!=old.originalLeft||now.originalRight!=old.originalRight)return false;
+    }
+    return true;
+}
+void AudioMixer50HD::retireStoppedNativeGarageClipsPreflighted()noexcept {
+    // Native lifetime withdrawal only, not a source stop/restart/control call.
+    // Preserve playback/control revisions, cursor, route ages/generations,
+    // bus/group state, clocks, persistent routing and the entire wet processor.
+    for(std::size_t slot=OriginalUiMainAudio50KG::courseRequiredVoices;
+        slot<OriginalUiMainAudio50KG::garageSceneRequiredVoices;++slot)voices_[slot].clip={};
+}
+bool AudioMixer50HD::canServiceNativeSourceVoices267CB0(
+    const OriginalApplicationAural50KG& owner,float factor)const noexcept {
+    if(!std::isfinite(factor)||factor<0.f||!nativeSourceWetProcessor_||
+       !nativeSourceWetProcessorCurrent(owner,*nativeSourceWetProcessor_))return false;
+    auto next=nativeSourceRoutes_;
+    if(!next.serviceChannels267CB0(factor))return false;
+    bool expires=false;
+    for(std::size_t i=0;i<count_;++i){const auto& route=nativeSourceVoiceRoutes_[i];
+        if(!route.count){if(voices_[i].active)return false;continue;}
+        if(!nativeSourceRoutes_.current(route))return false;
+        if(!next.current(route)){
+            // Native PCM completion and source reservation expiry are distinct.
+            // The bounded service cannot drop a still-rendering core route.
+            // Leave the whole update unchanged until its real tail is drained.
+            if(voices_[i].active)return false;
+            expires=true;
+        }
+    }
+    return !expires||canRecordControlChanges(1);
+}
+bool AudioMixer50HD::serviceNativeSourceVoices267CB0(
+    const OriginalApplicationAural50KG& owner,float factor)noexcept {
+    if(!canServiceNativeSourceVoices267CB0(owner,factor))return false;
+    if(!nativeSourceRoutes_.serviceChannels267CB0(factor))std::terminate();
+    bool expired=false;
+    for(std::size_t i=0;i<count_;++i){auto& route=nativeSourceVoiceRoutes_[i];
+        if(route.count&&!nativeSourceRoutes_.current(route)){
+            // Proven stopped by the identical preflight. Keep raw clip and
+            // its strong Sound lease; only the expired EE reservation ends.
+            route={};expired=true;
+        }
+    }
+    if(expired)noteControlChange();
+    // Aural separately validates/owns the actual37C stream-slot suffix.
+    // Live special branches and still-playing expiry remain closed. Stream
+    // associations are retained through their exact inactive grace interval.
+    return true;
+}
+bool AudioMixer50HD::canReserveNativeSourceMonoVoices(std::size_t count)const noexcept {
+    if(count>48||!auralMasterOwner_||!nativeSourceWetProcessor_||
+       !nativeSourceWetProcessorCurrent(*auralMasterOwner_,*nativeSourceWetProcessor_))return false;
+    auto samples=nativeSourceRoutes_,streams=nativeSourceRoutes_;
+    // Both original mono scan orders must fit the promised bound. These are
+    // unpublished reservations, not fake elapsed/publication or a DSP write.
+    for(std::size_t i=0;i<count;++i){NativeVoiceRoute a,b;
+        if(!samples.reserve(NativeVoiceKind::sample,1,a)||
+           !streams.reserve(NativeVoiceKind::stream,1,b))return false;
+    }
+    return true;
+}
+bool AudioMixer50HD::nativeSourceStreamReferences267CB0(
+    const OriginalApplicationAural50KG& owner,float factor,bool afterService,
+    std::array<std::uint64_t,8>& out)const noexcept {
+    if(!std::isfinite(factor)||factor<0.f||!nativeSourceWetProcessor_||
+       !nativeSourceWetProcessorCurrent(owner,*nativeSourceWetProcessor_))return false;
+    auto next=nativeSourceRoutes_;
+    if(afterService&&(!canServiceNativeSourceVoices267CB0(owner,factor)||
+       !next.serviceChannels267CB0(factor)))return false;
+    return next.streamReferences267CB0(out);
+}
+AudioMixer50HD::NativeVoiceKind AudioMixer50HD::nativeDefaultVoiceKind(std::size_t slot)const noexcept {
+    // Actual retained frontend producers: stereo Song stream, six sample
+    // effect instances, Rider stream; four authenticated Scene sample slots.
+    if(slot==0||slot==7)return NativeVoiceKind::stream;
+    if(slot>=1&&slot<=6)return NativeVoiceKind::sample;
+    if(nativeSceneRouting_.command&&slot>=nativeSceneRouting_.firstVoice&&
+       slot-nativeSceneRouting_.firstVoice<nativeSceneRouting_.voiceCount)return NativeVoiceKind::sample;
+    return NativeVoiceKind::unknown;
+}
+bool AudioMixer50HD::prepareNativeVoiceRoute(std::size_t slot,const AudioClip50HD& clip,
+    NativeVoiceKind kind,NativeSourceVoiceRoutes50KG& pool,NativeVoiceRoute& route)const noexcept {
+    if(!nativeSourceWetProcessor_)return true;
+    if(slot>=count_||!auralMasterOwner_||!nativeSourceWetProcessorCurrent(*auralMasterOwner_,*nativeSourceWetProcessor_)||
+       kind==NativeVoiceKind::unknown||!validClip(clip))return false;
+    pool=nativeSourceRoutes_;route=nativeSourceVoiceRoutes_[slot];
+    if(voices_[slot].active&&!route.count)return false;
+    // Existing native logical-instance replacement is one atomic stop/play.
+    // Plan it on a copy so unavailable source routes leave the old voice alive.
+    return pool.release(route)&&pool.reserve(kind,clip.channels,route);
+}
+void AudioMixer50HD::retireNativeVoiceRoute(std::size_t slot)noexcept {
+    if(!nativeSourceWetProcessor_)return;
+    if(slot>=count_||!nativeSourceRoutes_.release(nativeSourceVoiceRoutes_[slot]))std::terminate();
+}
+bool AudioMixer50HD::nativeVoiceWetSend(std::size_t slot)const noexcept {
+    const NativeGarageRoutingClaim* c=nullptr;
+    for(const auto* claim:{&nativeWattoRouting_,&nativeSceneRouting_})
+        if(claim->command&&slot>=claim->firstVoice&&slot-claim->firstVoice<claim->voiceCount)c=claim;
+    // Reserved source groups0/1 start dry. Only genuine ordered command25
+    // publication changes the reached Garage groups. Per-sample AE64 overrides
+    // are outside this bounded producer set; InitSound5EA4 publishes policy1.
+    if(!c)return false;
+    if((!c->routingApplied&&c->kind!=NativeGarageRoutingKind::scene)||
+       c->sourceGroupSlot<0||static_cast<std::size_t>(c->sourceGroupSlot)>=persistentWetRouting50KG_.size())return false;
+    const auto value=persistentWetRouting50KG_[c->sourceGroupSlot];
+    const auto& r=nativeSourceVoiceRoutes_[slot];
+    if(!r.count)return false;
+    const auto kind=nativeSourceRoutes_.cells_[r.cells[0]].kind;
+    return kind==NativeVoiceKind::stream?value!=0:value==1;
+}
+bool AudioMixer50HD::nativeWetVoiceAdmitted(std::size_t slot)const noexcept {
+    const auto owns=[&](const NativeGarageRoutingClaim& c){
+        return c.command&&slot>=c.firstVoice&&slot-c.firstVoice<c.voiceCount;
+    };
+    // Both pending and applied command25(true) require a real wet processor.
+    // A persistent byte is routing state, never permission to play dry PCM,
+    // alter gains, pause the group, or steal its voices.
+    // DSP construction is not the live Sound/custody retirement contract.
+    // Preserve the existing claimed-range gate until that concrete owner
+    // accepts played histories; never broaden cold retirement implicitly.
+    return !owns(nativeWattoRouting_)&&!owns(nativeSceneRouting_);
+}
+bool AudioMixer50HD::inspectNativeGarageRouting(const NativeGarageRoutingClaim& c,
+    NativeGarageRoutingObservation& out)const noexcept {
+    out={};if(!c.command)return false;
+    out.kind=c.kind;out.main=c.main;out.group=c.group;out.scene=c.scene;out.entity=c.entity;out.sequence=c.sequence;
+    out.generation=c.generation;out.objectKey=c.objectKey;out.epoch=c.epoch;
+    out.firstVoice=c.firstVoice;out.voiceCount=c.voiceCount;out.sourceGroupSlot=c.sourceGroupSlot;
+    if(c.sourceGroupSlot>=0&&static_cast<std::size_t>(c.sourceGroupSlot)<persistentWetRouting50KG_.size())
+        out.persistentRoutingByte=persistentWetRouting50KG_[c.sourceGroupSlot];
+    out.queued=!c.routingApplied;out.routingApplied=c.routingApplied;out.neverPlayed=coldNativeGarageRange(c);
+    return true;
+}
+bool AudioMixer50HD::inspectNativeWattoRouting(NativeWattoRoutingObservation& out)const noexcept {
+    return inspectNativeGarageRouting(nativeWattoRouting_,out);
+}
+bool AudioMixer50HD::inspectNativeSceneRouting(NativeSceneRoutingObservation& out)const noexcept {
+    return inspectNativeGarageRouting(nativeSceneRouting_,out);
+}
+bool AudioMixer50HD::inspectPersistentWetRoutingByte(std::size_t slot,std::uint8_t& out)const noexcept {
+    out=0;if(slot>=persistentWetRouting50KG_.size())return false;out=persistentWetRouting50KG_[slot];return true;
 }
 bool AudioMixer50HD::bindOriginalSoundMode50KG(std::shared_ptr<OriginalSoundMode50KG> owner) noexcept {
     if(!owner||!owner->ready()||soundMode50KG_||!voices_||!count_||mixedFrames_)return false;
@@ -94,9 +627,12 @@ bool AudioMixer50HD::originalRouting50KG(std::int32_t angle,float& left,float& r
 bool AudioMixer50HD::playOriginalAngle50KG(std::size_t slot,const AudioClip50HD& clip,
     float gain,float pitch,bool loop,std::int32_t engineAngle) noexcept {
     float left=0.f,right=0.f;
-    if(slot>=count_||!validClip(clip)||!validControls(gain,pitch,0.f)||
+    if(slot>=count_||!nativeWetVoiceAdmitted(slot)||!validClip(clip)||!validControls(gain,pitch,0.f)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        !originalRouting50KG(engineAngle,left,right))return false;
+    NativeSourceVoiceRoutes50KG pool;NativeVoiceRoute route;
+    if(!prepareNativeVoiceRoute(slot,clip,nativeDefaultVoiceKind(slot),pool,route))return false;
+    if(nativeSourceWetProcessor_){nativeSourceRoutes_=pool;nativeSourceVoiceRoutes_[slot]=route;}
     noteControlChange();playbackRevisions_[slot]=controlRevision_;
     voices_[slot]={clip,0.0,gain,pitch,0.f,true,loop};
     originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
@@ -104,7 +640,7 @@ bool AudioMixer50HD::playOriginalAngle50KG(std::size_t slot,const AudioClip50HD&
 bool AudioMixer50HD::controlsOriginalAngle50KG(std::size_t slot,float gain,float pitch,
     std::int32_t engineAngle) noexcept {
     float left=0.f,right=0.f;
-    if(slot>=count_||!validControls(gain,pitch,0.f)||
+    if(slot>=count_||!nativeWetVoiceAdmitted(slot)||!validControls(gain,pitch,0.f)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        !originalRouting50KG(engineAngle,left,right))return false;
     auto& voice=voices_[slot];
@@ -116,7 +652,8 @@ bool AudioMixer50HD::controlsOriginalAngle50KG(std::size_t slot,float gain,float
 bool AudioMixer50HD::play(std::size_t slot, const AudioClip50HD& clip, float gain,
                         float pitch, bool loop, float pan) noexcept {
     if(soundMode50KG_)return pan==0.f&&playOriginalAngle50KG(slot,clip,gain,pitch,loop,0);
-    if (slot >= count_ || !validClip(clip) || !validControls(gain, pitch, pan) ||
+    if(nativeSourceWetProcessor_)return false;
+    if (slot >= count_ || !nativeWetVoiceAdmitted(slot) || !validClip(clip) || !validControls(gain, pitch, pan) ||
         (requireGroups50IC_ && !groupKnown50IC_[slot])) return false;
     noteControlChange();playbackRevisions_[slot]=controlRevision_;
     voices_[slot] = {clip, 0.0, gain, pitch, pan, true, loop};
@@ -124,7 +661,7 @@ bool AudioMixer50HD::play(std::size_t slot, const AudioClip50HD& clip, float gai
 }
 bool AudioMixer50HD::controls(std::size_t slot, float gain, float pitch, float pan) noexcept {
     if(soundMode50KG_)return pan==0.f&&controlsOriginalAngle50KG(slot,gain,pitch,0);
-    if (slot >= count_ || !validControls(gain, pitch, pan) ||
+    if (slot >= count_ || !nativeWetVoiceAdmitted(slot) || !validControls(gain, pitch, pan) ||
         (requireGroups50IC_ && !groupKnown50IC_[slot])) return false;
     auto& voice = voices_[slot];
     if(voice.gain!=gain||voice.pitch!=pitch||voice.pan!=pan)noteControlChange();
@@ -134,10 +671,13 @@ bool AudioMixer50HD::controls(std::size_t slot, float gain, float pitch, float p
 bool AudioMixer50HD::playSourceRate(std::size_t slot,const AudioClip50HD& clip,
     float gain,float pitch,bool loop,std::int32_t engineAngle) noexcept {
     float left=1.f,right=1.f;
-    if(slot>=count_||!validSourceRate(clip,rate_,gain,pitch)||
+    if(slot>=count_||!nativeWetVoiceAdmitted(slot)||!validSourceRate(clip,rate_,gain,pitch)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        (!soundMode50KG_&&engineAngle!=0)||
        (soundMode50KG_&&!originalRouting50KG(engineAngle,left,right)))return false;
+    NativeSourceVoiceRoutes50KG pool;NativeVoiceRoute route;
+    if(!prepareNativeVoiceRoute(slot,clip,nativeDefaultVoiceKind(slot),pool,route))return false;
+    if(nativeSourceWetProcessor_){nativeSourceRoutes_=pool;nativeSourceVoiceRoutes_[slot]=route;}
     noteControlChange();playbackRevisions_[slot]=controlRevision_;
     voices_[slot]={clip,0.0,gain,pitch,0.f,true,loop};
     originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
@@ -145,7 +685,7 @@ bool AudioMixer50HD::playSourceRate(std::size_t slot,const AudioClip50HD& clip,
 bool AudioMixer50HD::controlsSourceRate(std::size_t slot,float gain,float pitch,
     std::int32_t engineAngle) noexcept {
     float left=1.f,right=1.f;
-    if(slot>=count_||!validSourceRate(voices_[slot].clip,rate_,gain,pitch)||
+    if(slot>=count_||!nativeWetVoiceAdmitted(slot)||!validSourceRate(voices_[slot].clip,rate_,gain,pitch)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        (!soundMode50KG_&&engineAngle!=0)||
        (soundMode50KG_&&!originalRouting50KG(engineAngle,left,right)))return false;
@@ -157,18 +697,132 @@ bool AudioMixer50HD::controlsSourceRate(std::size_t slot,float gain,float pitch,
 }
 bool AudioMixer50HD::playSourceVolume(std::size_t slot,const AudioClip50HD& clip,
     std::int32_t volume,float pitch,bool loop,std::int32_t engineAngle) noexcept {
+    return playSourceVolumeWithNativeKind(slot,clip,volume,pitch,loop,engineAngle,nativeDefaultVoiceKind(slot));
+}
+bool AudioMixer50HD::playGarageSourceVolume(std::size_t slot,const AudioClip50HD& clip,
+    std::int32_t volume,float pitch,bool stream)noexcept {
+    const auto& c=nativeWattoRouting_;
+    if(!c.command||slot<c.firstVoice||slot-c.firstVoice>=c.voiceCount)return false;
+    return playSourceVolumeWithNativeKind(slot,clip,volume,pitch,false,0,
+        stream?NativeVoiceKind::stream:NativeVoiceKind::sample);
+}
+bool AudioMixer50HD::playSourceVolumeWithNativeKind(std::size_t slot,const AudioClip50HD& clip,
+    std::int32_t volume,float pitch,bool loop,std::int32_t engineAngle,NativeVoiceKind kind) noexcept {
     float left=0.f,right=0.f;
-    if(slot>=count_||!validSourceRate(clip,rate_,1.f,pitch,true)||
+    if(slot>=count_||!nativeWetVoiceAdmitted(slot)||!validSourceRate(clip,rate_,1.f,pitch,true)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        !originalRouting50KG(engineAngle,left,right,volume))return false;
+    NativeSourceVoiceRoutes50KG pool;NativeVoiceRoute route;
+    if(!prepareNativeVoiceRoute(slot,clip,kind,pool,route))return false;
+    if(nativeSourceWetProcessor_){nativeSourceRoutes_=pool;nativeSourceVoiceRoutes_[slot]=route;}
     noteControlChange();playbackRevisions_[slot]=controlRevision_;
     voices_[slot]={clip,0.0,1.f,pitch,0.f,true,loop};
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
+}
+bool AudioMixer50HD::playNativeSourceOrdinarySample(const OriginalApplicationAural50KG& owner,
+    std::size_t slot,const AudioClip50HD& clip,float gain,float pitch,
+    const NativeSourceSampleStart50KG& source)noexcept {
+    float left=0.f,right=0.f;
+    if(slot<1||slot>6||slot>=count_||!nativeSourceWetProcessor_||
+       !nativeSourceWetProcessorCurrent(owner,*nativeSourceWetProcessor_)||
+       !nativeWetVoiceAdmitted(slot)||!canRecordControlChanges(1)||
+       !validClip(clip)||!validControls(gain,pitch,0.f)||source.stream1A8||
+       source.stereo1AC!=(clip.channels==2)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||!originalRouting50KG(0,left,right))return false;
+    NativeSourceVoiceRoutes50KG pool;NativeVoiceRoute route;
+    if(!prepareNativeVoiceRoute(slot,clip,NativeVoiceKind::sample,pool,route)||
+       !pool.bindSamplePublication266DA0(route,source.duration20,source.loop1B0))return false;
+    nativeSourceRoutes_=pool;nativeSourceVoiceRoutes_[slot]=route;
+    noteControlChange();playbackRevisions_[slot]=controlRevision_;
+    voices_[slot]={clip,0.0,gain,pitch,0.f,true,source.loop1B0};
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
+}
+bool AudioMixer50HD::playNativeSourceOrdinaryStream(const OriginalApplicationAural50KG& owner,
+    std::size_t slot,const AudioClip50HD& clip,float gain,float pitch,
+    const NativeSourceStreamStart50KG& source)noexcept {
+    float left=0.f,right=0.f;
+    if((slot!=0&&slot!=7)||slot>=count_||source.count!=clip.channels||!nativeSourceWetProcessor_||
+       !nativeSourceWetProcessorCurrent(owner,*nativeSourceWetProcessor_)||
+       !nativeWetVoiceAdmitted(slot)||!canRecordControlChanges(1)||
+       !validClip(clip)||!validControls(gain,pitch,0.f)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||!originalRouting50KG(0,left,right))return false;
+    NativeSourceVoiceRoutes50KG pool;NativeVoiceRoute route;
+    if(!prepareNativeVoiceRoute(slot,clip,NativeVoiceKind::stream,pool,route)||
+       !pool.bindStreamPublication266DA0(route,source.duration,source.loop,
+           source.slots,source.generations,source.count))return false;
+    nativeSourceRoutes_=pool;nativeSourceVoiceRoutes_[slot]=route;
+    noteControlChange();playbackRevisions_[slot]=controlRevision_;
+    voices_[slot]={clip,0.0,gain,pitch,0.f,true,source.loop};
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
+}
+bool AudioMixer50HD::playNativeSourceStreamVolume(const void* command,
+    const OriginalApplicationAural50KG& owner,std::size_t slot,const AudioClip50HD& clip,
+    std::int32_t volume,float pitch,std::int32_t engineAngle,
+    const NativeSourceStreamStart50KG& source)noexcept {
+    float left=0.f,right=0.f;
+    const auto& claim=nativeWattoRouting_;
+    if(!command||claim.command!=command||!nativeGarageRoutingLiveCurrent(claim,command)||
+       slot>=count_||slot<claim.firstVoice||slot-claim.firstVoice>=claim.voiceCount||
+       source.count!=clip.channels||!nativeSourceWetProcessor_||
+       !nativeSourceWetProcessorCurrent(owner,*nativeSourceWetProcessor_)||!canRecordControlChanges(1)||
+       !validSourceRate(clip,rate_,1.f,pitch,true)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||
+       !originalRouting50KG(engineAngle,left,right,volume))return false;
+    NativeSourceVoiceRoutes50KG pool;NativeVoiceRoute route;
+    if(!prepareNativeVoiceRoute(slot,clip,NativeVoiceKind::stream,pool,route)||
+       !pool.bindStreamPublication266DA0(route,source.duration,source.loop,
+           source.slots,source.generations,source.count))return false;
+    nativeSourceRoutes_=pool;nativeSourceVoiceRoutes_[slot]=route;
+    noteControlChange();playbackRevisions_[slot]=controlRevision_;
+    voices_[slot]={clip,0.0,1.f,pitch,0.f,true,source.loop};
+    originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
+}
+bool AudioMixer50HD::playNativeSourceSampleVolume(const void* command,std::size_t slot,
+    const AudioClip50HD& clip,std::int32_t volume,float pitch,std::int32_t engineAngle,
+    const NativeSourceSampleStart50KG& source)noexcept {
+    // The authentic caller has already retained/validated nativeSample28 and
+    // its strong PCM lease. This cannot admit a stream or invent sample IDs.
+    const NativeGarageRoutingClaim* claim=nullptr;
+    if(command&&nativeWattoRouting_.command==command)claim=&nativeWattoRouting_;
+    else if(command&&nativeSceneRouting_.command==command)claim=&nativeSceneRouting_;
+    return claim&&nativeGarageRoutingLiveCurrent(*claim,command)&&
+        publishNativeSourceSampleVolume(*claim,slot,clip,volume,pitch,engineAngle,source);
+}
+bool AudioMixer50HD::playNativeSceneImmediateSampleVolume(const void* command,std::size_t slot,
+    const AudioClip50HD& clip,std::int32_t volume,float pitch,std::int32_t engineAngle,
+    const NativeSourceSampleStart50KG& source)noexcept {
+    // Only Main's real retained Droid Sound callback issues this private path.
+    // Preserve the original immediate flag2, not an invented deferred voice.
+    return nativeSceneImmediateRoutingCurrent(command)&&!source.stream1A8&&
+        !source.stereo1AC&&!source.loop1B0&&source.duration20>0.f&&
+        publishNativeSourceSampleVolume(nativeSceneRouting_,slot,clip,volume,pitch,engineAngle,source);
+}
+bool AudioMixer50HD::publishNativeSourceSampleVolume(const NativeGarageRoutingClaim& claim,std::size_t slot,
+    const AudioClip50HD& clip,std::int32_t volume,float pitch,std::int32_t engineAngle,
+    const NativeSourceSampleStart50KG& source)noexcept {
+    // Both private wrappers authenticate their exact claim immediately above;
+    // no callback or mutation separates that proof from this common publisher.
+    float left=0.f,right=0.f;
+    if(slot>=count_||slot<claim.firstVoice||slot-claim.firstVoice>=claim.voiceCount||
+       !canRecordControlChanges(1)||source.stream1A8||
+       source.stereo1AC!=(clip.channels==2)||!std::isfinite(source.duration20)||source.duration20<0.f||
+       !validSourceRate(clip,rate_,1.f,pitch,true)||
+       (requireGroups50IC_&&!groupKnown50IC_[slot])||
+       !originalRouting50KG(engineAngle,left,right,volume))return false;
+    NativeSourceVoiceRoutes50KG pool;NativeVoiceRoute route;
+    if(!prepareNativeVoiceRoute(slot,clip,NativeVoiceKind::sample,pool,route)||
+       !pool.bindSamplePublication266DA0(route,source.duration20,source.loop1B0))return false;
+    // Publish source reservation, metadata and native PCM together only after
+    // all checks. No source factor is fabricated from this play or DSP time.
+    nativeSourceRoutes_=pool;nativeSourceVoiceRoutes_[slot]=route;
+    noteControlChange();playbackRevisions_[slot]=controlRevision_;
+    voices_[slot]={clip,0.0,1.f,pitch,0.f,true,source.loop1B0};
     originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
 }
 bool AudioMixer50HD::controlsSourceVolume(std::size_t slot,std::int32_t volume,
     float pitch,std::int32_t engineAngle) noexcept {
     float left=0.f,right=0.f;
-    if(slot>=count_||!validSourceRate(voices_[slot].clip,rate_,1.f,pitch,true)||
+    if(slot>=count_||!nativeWetVoiceAdmitted(slot)||!validSourceRate(voices_[slot].clip,rate_,1.f,pitch,true)||
        (requireGroups50IC_&&!groupKnown50IC_[slot])||
        !originalRouting50KG(engineAngle,left,right,volume))return false;
     auto& voice=voices_[slot];
@@ -178,7 +832,7 @@ bool AudioMixer50HD::controlsSourceVolume(std::size_t slot,std::int32_t volume,
     originalLeft50KG_[slot]=left;originalRight50KG_[slot]=right;return true;
 }
 bool AudioMixer50HD::setLoop(std::size_t slot, bool loop) noexcept {
-    if (slot >= count_) return false;
+    if (slot >= count_ || !nativeWetVoiceAdmitted(slot)) return false;
     if(voices_[slot].loop!=loop)noteControlChange();
     voices_[slot].loop = loop;
     return true;
@@ -189,12 +843,12 @@ bool AudioMixer50HD::setMasterGain(float gain) noexcept {
     masterGain_ = gain; return true;
 }
 bool AudioMixer50HD::setVoiceGroupGain50IC(std::size_t slot, float gain) noexcept {
-    if (slot >= count_ || !std::isfinite(gain) || gain < 0.0f || gain > 1.0f) return false;
+    if (slot >= count_ || !nativeWetVoiceAdmitted(slot) || !std::isfinite(gain) || gain < 0.0f || gain > 1.0f) return false;
     if(!groupKnown50IC_[slot]||groupGains50IC_[slot]!=gain)noteControlChange();
     groupGains50IC_[slot] = gain; groupKnown50IC_[slot] = true; return true;
 }
 bool AudioMixer50HD::setVoiceGroupPaused50IC(std::size_t slot,bool paused) noexcept {
-    if(slot>=count_||!groupKnown50IC_[slot])return false;
+    if(slot>=count_||!nativeWetVoiceAdmitted(slot)||!groupKnown50IC_[slot])return false;
     if(groupPaused50IC_[slot]!=paused)noteControlChange();
     groupPaused50IC_[slot]=paused;return true;
 }
@@ -202,7 +856,7 @@ bool AudioMixer50HD::hasVoiceGroupGain50IC(std::size_t slot) const noexcept {
     return slot < count_ && groupKnown50IC_[slot];
 }
 bool AudioMixer50HD::retireStoppedVoiceGroup50IC(std::size_t slot) noexcept {
-    if(slot>=count_||voices_[slot].active||!groupKnown50IC_[slot])return false;
+    if(slot>=count_||!nativeWetVoiceAdmitted(slot)||voices_[slot].active||!groupKnown50IC_[slot])return false;
     noteControlChange();
     groupKnown50IC_[slot]=false;groupGains50IC_[slot]=0.f;groupPaused50IC_[slot]=false;
     return true;
@@ -215,14 +869,16 @@ bool AudioMixer50HD::requireVoiceGroupGains50IC() noexcept {
     requireGroups50IC_ = true; return true;
 }
 void AudioMixer50HD::stop(std::size_t slot) noexcept {
-    if (slot < count_ && voices_[slot].active) {
-        noteControlChange();voices_[slot].active = false;
+    if(slot<count_&&(voices_[slot].active||nativeSourceVoiceRoutes_[slot].count)){
+        retireNativeVoiceRoute(slot);noteControlChange();voices_[slot].active=false;
     }
 }
 void AudioMixer50HD::stopAll() noexcept {
     bool changed=false;
     for (std::size_t i = 0; i < count_; ++i) {
-        changed=changed||voices_[i].active;voices_[i].active = false;
+        const bool retainedRoute=nativeSourceVoiceRoutes_[i].count!=0;
+        if(voices_[i].active||retainedRoute)retireNativeVoiceRoute(i);
+        changed=changed||voices_[i].active||retainedRoute;voices_[i].active=false;
     }
     if(changed)noteControlChange();
 }
@@ -241,14 +897,32 @@ bool AudioMixer50HD::inspectVoice(std::size_t slot, AudioVoiceObservation50HD& o
 std::size_t AudioMixer50HD::availableVoice(std::size_t first, std::size_t count) const noexcept {
     if (first >= count_) return count_;
     const auto end = first + std::min(count, count_ - first);
-    for (auto i = first; i < end; ++i) if (!voices_[i].active) return i;
+    for (auto i = first; i < end; ++i) if (!voices_[i].active&&nativeWetVoiceAdmitted(i)) return i;
     return count_;
 }
 bool AudioMixer50HD::mixStereo16(std::int16_t* output, std::size_t frames) noexcept {
     if (!voices_ || !rate_ || frames > rate_ || (!output && frames) ||
         frames > std::numeric_limits<std::uint64_t>::max() - mixedFrames_) return false;
+    NativeSourceReverb50KG::Frame effectInput{},effectOutput{};
+    if(nativeSourceWetProcessor_){
+        if(!auralMasterOwner_||!nativeSourceWetProcessorCurrent(*auralMasterOwner_,*nativeSourceWetProcessor_))return false;
+        // Preflight every actual source allocation before output, history or
+        // cursor mutation. A logical voice index is not a source core/channel.
+        for(std::size_t i=0;i<count_;++i)if(voices_[i].active){
+            const auto& route=nativeSourceVoiceRoutes_[i];
+            if(!nativeSourceRoutes_.current(route)||route.count!=voices_[i].clip.channels)return false;
+        }
+        if(frames&&!(nativeSourceWetProcessor_->*nativeWetPreflight_)(&effectInput,1,&effectOutput,1,1,mixedFrames_))return false;
+    }
+    // Generic claimed-range mutation remains closed. The distinct Scene and
+    // Watto render proofs accept only actual private source reservations with
+    // retained PCM and exact command claims. Watto requires applied25; only
+    // Scene's immediate path may use its genuine prior persistent routing byte.
+    for(std::size_t i=0;i<count_;++i)if(voices_[i].active&&!nativeWetVoiceAdmitted(i)&&
+        !nativeSceneSampleVoiceCurrent(i)&&!nativeWattoSourceVoiceCurrent(i))return false;
     for (std::size_t f = 0; f < frames; ++f) {
         double left = 0.0, right = 0.0;
+        std::array<double,2> wetLeft{},wetRight{};
         for (std::size_t i = 0; i < count_; ++i) {
             auto& voice = voices_[i];
             if (!voice.active) continue;
@@ -268,6 +942,9 @@ bool AudioMixer50HD::mixStereo16(std::int16_t* output, std::size_t frames) noexc
                     std::fmod(voice.sourceFrame - static_cast<double>(loopStart),
                               static_cast<double>(loopEnd - loopStart));
             if (voice.sourceFrame >= static_cast<double>(clip.frames)) {
+                // Decoder EOF is not267CB0's source duration+margin expiry.
+                // Retain the source reservation until its real update or an
+                // explicit source/native lifetime stop discharges it.
                 voice.active = false; continue;
             }
             const auto first = static_cast<std::uint64_t>(voice.sourceFrame);
@@ -288,15 +965,35 @@ bool AudioMixer50HD::mixStereo16(std::int16_t* output, std::size_t frames) noexc
             // remapping active voices when188740 changes the manager fields.
             const float panLeft=soundMode50KG_?originalLeft50KG_[i]:(1.0f-std::max(voice.pan,0.0f));
             const float panRight=soundMode50KG_?originalRight50KG_[i]:(1.0f+std::min(voice.pan,0.0f));
-            left += sampleLeft * voice.gain * groupGains50IC_[i] * panLeft;
-            right += sampleRight * voice.gain * groupGains50IC_[i] * panRight;
+            // Source master gain is an additional real PCM consumer, not a
+            // queued-control receipt or a claim of wet DSP implementation.
+            const float sourceMaster=auralMasterOwner_?auralMasterGain_[auralMasterBus_[i]]:1.f;
+            const auto voiceLeft=sampleLeft * voice.gain * groupGains50IC_[i] * panLeft * sourceMaster;
+            const auto voiceRight=sampleRight * voice.gain * groupGains50IC_[i] * panRight * sourceMaster;
+            left+=voiceLeft;right+=voiceRight;
+            if(nativeSourceWetProcessor_&&nativeVoiceWetSend(i)){
+                const auto& route=nativeSourceVoiceRoutes_[i];
+                wetLeft[route.cells[0]/24]+=voiceLeft;
+                wetRight[route.cells[route.count==2?1:0]/24]+=voiceRight;
+            }
             voice.sourceFrame += static_cast<double>(clip.sampleRate) / rate_ * voice.pitch;
             if (voice.loop && voice.sourceFrame >= static_cast<double>(loopEnd))
                 voice.sourceFrame = static_cast<double>(loopStart) +
                     std::fmod(voice.sourceFrame - static_cast<double>(loopStart),
                               static_cast<double>(loopEnd - loopStart));
-            else if (!voice.loop && voice.sourceFrame >= static_cast<double>(clip.frames))
+            else if (!voice.loop && voice.sourceFrame >= static_cast<double>(clip.frames)){
                 voice.active = false;
+            }
+        }
+        if(nativeSourceWetProcessor_){
+            // Existing native PCM interpolation/mixing remains the input model;
+            // each source core is summed/saturated separately before its own
+            // retained processor. This is not hardware-bit-exact SPU mixing.
+            std::uint64_t intermediateClips=0;
+            for(unsigned c=0;c<2;++c){effectInput.core[c].left=quantize(wetLeft[c],intermediateClips);
+                effectInput.core[c].right=quantize(wetRight[c],intermediateClips);}
+            if(!(nativeSourceWetProcessor_->*nativeWetProcess_)(&effectInput,1,&effectOutput,1,1,mixedFrames_+f))std::terminate();
+            for(const auto& core:effectOutput.core){left+=core.left;right+=core.right;}
         }
         output[2 * f] = quantize(left * masterGain_, clippedSamples_);
         output[2 * f + 1] = quantize(right * masterGain_, clippedSamples_);

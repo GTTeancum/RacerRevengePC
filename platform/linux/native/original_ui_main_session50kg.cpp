@@ -1,3 +1,4 @@
+#include "original_ui_shared_dialogs50kg.h"
 #include "original_ui_main_session50kg.h"
 #include "original_ui_controller_popup_resources50kg.h"
 #include <cmath>
@@ -117,11 +118,16 @@ struct OriginalUiMainSession50KG::Storage {
                 if(!owner||!owner->loaded()||owner->poisoned()||
                    (s.cold.application->controllerPopupResources&&s.cold.application->controllerPopupResources!=owner)||
                    s.cold.application->controllerPopupState.active3CC){s.fault(Status::unsupportedState,0x207330);break;}
-                game::OriginalUiControllerPopupPlan50KG plan;
-                if(game::OriginalUiControllerPopup50KG::attach(s.cold.application->controllerPopupState,plan)!=
-                   game::OriginalUiControllerPopupStatus50KG::ok){s.fault(Status::unsupportedState,0x207330);break;}
-                s.cold.application->controllerPopupResources=owner;
-                s.cold.application->controllerPopupState=plan.state;s.popupAttached=true;
+                if(const auto shared=s.cold.application->sharedDialogs){OriginalUiSharedDialogs50KG::Diagnostic sd;
+                    if(shared->controller47C_.resources!=owner||!shared->reappendMainEntry1D7CF4(sd)){
+                        s.fault(Status::unsupportedState,sd.sourcePC?sd.sourcePC:0x1D7CF4);break;}
+                }else{
+                    game::OriginalUiControllerPopupPlan50KG plan;
+                    if(game::OriginalUiControllerPopup50KG::attach(s.cold.application->controllerPopupState,plan)!=
+                       game::OriginalUiControllerPopupStatus50KG::ok){s.fault(Status::unsupportedState,0x207330);break;}
+                    s.cold.application->controllerPopupResources=owner;s.cold.application->controllerPopupState=plan.state;
+                }
+                s.popupAttached=true;
             }
             auto& profile=*s.cold.profile;
             if(profile.mode34!=4){profile.previousMode38=profile.mode34;profile.mode34=4;}
@@ -400,6 +406,12 @@ Status OriginalUiMainSession50KG::update(const OriginalUiMainSessionUpdate50KG& 
         return result(d,Status::unsupportedState);
     }
     s->inOperation=true;s->paused=in.paused;
+    if(const auto shared=s->cold.application->sharedDialogs){
+        OriginalUiSharedDialogs50KG::Diagnostic sharedDiagnostic;
+        if(!shared->advance4702048F0(in.elapsedSeconds,sharedDiagnostic)){
+            s->fault(Status::unsupportedState,sharedDiagnostic.sourcePC);s->inOperation=false;d=s->callbackFault;return d.status;
+        }
+    }
     game::OriginalUiControllerPopupPlan50KG popupUpdate;
     if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,in.elapsedSeconds,popupUpdate)!=
        game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
@@ -437,8 +449,9 @@ Status OriginalUiMainSession50KG::update(const OriginalUiMainSessionUpdate50KG& 
     // typed particleRenderState is that SAME camera's later render boundary,
     // not another entity. Unconsumed motion metrics are not claimed recovered.
     if(!s->state.faulted){
-        s->state.lastFireEmit=s->fire.emit(in.elapsedSeconds,in.paused,
-            s->cold.application->rawRandom308030,s->cold.application->fireSerial433970);
+        s->state.lastFireEmit=s->fire.emitSource15E2A8(in.elapsedSeconds,in.paused,
+            s->cold.application->rawRandom308030,s->cold.application->fireSerial433970,
+            s->cold.application->fireLazy84C8_);
         if(!s->state.lastFireEmit.okay())s->fault(Status::particle,0x15AEA0);
     }
     s->inOperation=false;

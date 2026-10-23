@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+namespace rr::assets { class OriginalUiGarageSceneAssets50KG; class OriginalUiGarageWattoAssets50KG; }
 namespace rr::game {
 enum class OriginalUiRiderMaterialLifetimeError50KG : std::uint8_t {
     none,input,archive,table,row,footprint,alreadyBound,notBound,staleSequence,
@@ -32,7 +33,7 @@ private:
     const assets::OriginalUiMemberIdentity50KG* table_=nullptr;
     std::uint32_t rank_=0,offset_=0;
 };
-enum class OriginalUiRiderMaterialOwnerKind50KG : std::uint8_t {absent,podGraph,characterGraph,binderHelper};
+enum class OriginalUiRiderMaterialOwnerKind50KG : std::uint8_t {absent,podGraph,characterGraph,binderHelper,garageStaticModel,garageActorModel,garageSelectedModel,garageWattoModel};
 constexpr std::size_t originalUiRiderMaterialRows50KG=256;
 constexpr std::size_t originalUiRiderMaterialOwners50KG=128;
 constexpr std::size_t originalUiRiderMaterialEvents50KG=4096;
@@ -47,6 +48,8 @@ public:
     bool prepared()const noexcept{return kind_!=OriginalUiRiderMaterialOwnerKind50KG::absent;}
     OriginalUiRiderMaterialOwnerKind50KG kind()const noexcept{return kind_;}
     std::uint16_t widget()const noexcept{return widget_;}
+    // Original one-based SCN/TOY source ordinal; never a fabricated widget identity.
+    std::uint16_t garageOrdinal()const noexcept{return garageOrdinal_;}
     const assets::OriginalUiMemberIdentity50KG* source()const noexcept{return source_;}
     std::size_t rowCount()const noexcept{return rows_;}
     std::uint32_t materialSlotCount()const noexcept{return slots_;}
@@ -67,13 +70,28 @@ public:
     static bool binder(const assets::OriginalUiArchive50KG& appStart,
         const assets::OriginalUiRiderBinderAssets50KG&,OriginalUiRiderMaterialFootprint50KG&,
         OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    // Authenticated Garage domains. These record immutable slot footprints,
+    // not graph construction, live refs, native rows, observer or draw readiness.
+    static bool garageStatic(const assets::OriginalUiArchive50KG& appStart,
+        const assets::OriginalUiGarageSceneAssets50KG&,std::size_t ordinal,
+        OriginalUiRiderMaterialFootprint50KG&,OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    static bool garageActor(const assets::OriginalUiArchive50KG& appStart,
+        const assets::OriginalUiGarageSceneAssets50KG&,std::size_t ordinal,
+        OriginalUiRiderMaterialFootprint50KG&,OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    static bool garageSelected(const assets::OriginalUiArchive50KG& appStart,
+        const assets::OriginalUiGarageSceneAssets50KG&,
+        OriginalUiRiderMaterialFootprint50KG&,OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+    static bool garageWatto(const assets::OriginalUiArchive50KG& appStart,
+        const assets::OriginalUiGarageWattoAssets50KG&,
+        OriginalUiRiderMaterialFootprint50KG&,OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
+
 private:
     bool model(const assets::OriginalUiArchive50KG&,const assets::Scene48D&,
         OriginalUiRiderMaterialLifetimeDiagnostic50KG&) noexcept;
     std::array<OriginalUiRiderMaterialRow50KG,originalUiRiderMaterialRows50KG> keys_{};
     std::array<std::uint32_t,originalUiRiderMaterialRows50KG> occurrences_{};
     const assets::OriginalUiMemberIdentity50KG* source_=nullptr;
-    std::size_t rows_=0;std::uint32_t slots_=0;std::uint16_t widget_=0;
+    std::size_t rows_=0;std::uint32_t slots_=0;std::uint16_t widget_=0,garageOrdinal_=0;
     OriginalUiRiderMaterialOwnerKind50KG kind_=OriginalUiRiderMaterialOwnerKind50KG::absent;
 };
 class OriginalUiRiderMaterialLifetime50KG;

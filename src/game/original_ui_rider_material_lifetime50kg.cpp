@@ -1,4 +1,6 @@
 #include "original_ui_rider_material_lifetime50kg.h"
+#include "../assets/original_ui_garage_scene_assets50kg.h"
+#include "../assets/original_ui_garage_watto_assets50kg.h"
 #include <cstring>
 #include <limits>
 #include <utility>
@@ -96,6 +98,38 @@ bool OriginalUiRiderMaterialFootprint50KG::model(const assets::OriginalUiArchive
         }
         return true;
     }catch(...){return fail(d,E::allocation);}
+}
+bool OriginalUiRiderMaterialFootprint50KG::garageStatic(const assets::OriginalUiArchive50KG& app,
+    const assets::OriginalUiGarageSceneAssets50KG& a,std::size_t i,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {
+    d={};const auto* m=a.staticModel(i);
+    if(!a.loaded()||!m||m->ordinal!=i+1||!m->model||!m->model->scene()||!m->model->source.identity)
+        return fail(d,E::footprint,0x26E640);
+    OriginalUiRiderMaterialFootprint50KG n;if(!n.model(app,*m->model->scene(),d))return false;
+    n.kind_=Kind::garageStaticModel;n.garageOrdinal_=static_cast<std::uint16_t>(i+1);
+    n.source_=m->model->source.identity;out=n;return true;
+}
+bool OriginalUiRiderMaterialFootprint50KG::garageActor(const assets::OriginalUiArchive50KG& app,
+    const assets::OriginalUiGarageSceneAssets50KG& a,std::size_t i,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {
+    d={};const auto* m=a.actor(i);
+    if(!a.loaded()||!m||m->ordinal!=i+1||!m->model||!m->model->scene()||!m->mcf.identity())
+        return fail(d,E::footprint,0x1538B0);
+    OriginalUiRiderMaterialFootprint50KG n;if(!n.model(app,*m->model->scene(),d))return false;
+    n.kind_=Kind::garageActorModel;n.garageOrdinal_=static_cast<std::uint16_t>(i+1);
+    n.source_=m->mcf.identity();out=n;return true;
+}
+bool OriginalUiRiderMaterialFootprint50KG::garageSelected(const assets::OriginalUiArchive50KG& app,
+    const assets::OriginalUiGarageSceneAssets50KG& a,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {
+    d={};const auto* m=a.selectedPod();
+    if(!a.loaded()||!m||!m->model||!m->model->scene()||!m->model->source.identity)
+        return fail(d,E::footprint,0x1D1CD0);
+    OriginalUiRiderMaterialFootprint50KG n;if(!n.model(app,*m->model->scene(),d))return false;
+    n.kind_=Kind::garageSelectedModel;n.source_=m->model->source.identity;out=n;return true;
+}
+bool OriginalUiRiderMaterialFootprint50KG::garageWatto(const assets::OriginalUiArchive50KG& app,
+    const assets::OriginalUiGarageWattoAssets50KG& a,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {
+    d={};if(!a.loaded()||!a.scene()||!a.geometrySource())return fail(d,E::footprint,0x1D4430);
+    OriginalUiRiderMaterialFootprint50KG n;if(!n.model(app,*a.scene(),d))return false;
+    n.kind_=Kind::garageWattoModel;n.widget_=10;n.source_=a.geometrySource();out=n;return true;
 }
 bool OriginalUiRiderMaterialFootprint50KG::pod(const assets::OriginalUiArchive50KG& app,
     const assets::OriginalUiRiderPodAssets50KG& asset,OriginalUiRiderMaterialFootprint50KG& out,D& d) noexcept {

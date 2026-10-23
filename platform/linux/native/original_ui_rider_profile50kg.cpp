@@ -567,6 +567,24 @@ bool OriginalUiRiderProfileOwner50KG::tournamentCareerSnapshot(std::uint32_t ind
     p.cardFlag100BC=storage_->cardFlag100BC;
     p.medals1938=c.pods[index].medals1938;p.remainingPrizes1946=c.pods[index].remainingPrizes1946;p.stamp=stamp();out=p;return true;
 }
+bool OriginalUiRiderProfileOwner50KG::selectedGarageProfileSnapshot(GarageProfileSnapshot& out)const noexcept {
+    if(!storage_||!storage_->readable()||storage_->common->mode34!=2)return false;
+    const auto& s=*storage_;const auto selected=s.comparison100C0;
+    // The bounded normal CareerInfo predecessor has a committed selection.
+    // Do not manufacture the original -1 fallback for a missing native owner.
+    if(selected>=s.authored.size()||!s.authored[selected].present||
+       (s.packed1125D>>3)!=selected)return false;
+    GarageProfileSnapshot next;const auto before=stamp();
+    if(!tournamentCareerSnapshot(selected,next.career))return false;
+    next.base0180=s.authored[selected].base0180;
+    next.maximum0408=s.authored[selected].maximum0408;
+    next.current1920=s.tournament.careers[selected].pods[selected].abilities1920;
+    next.colors=s.authored[selected].colors;
+    const auto after=stamp();
+    if(next.career.stamp.generation!=before.generation||next.career.stamp.mode34!=before.mode34||
+       after.generation!=before.generation||after.mode34!=before.mode34)return false;
+    out=next;return true;
+}
 bool OriginalUiRiderProfileOwner50KG::selectedTournamentCourseSnapshot(
     TournamentCareerSnapshot& career,game::OriginalUiCourseRememberedProfile50KG& course) const noexcept {
     if(!storage_||!storage_->readable()||storage_->common->mode34!=2)return false;

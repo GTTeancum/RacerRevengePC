@@ -196,6 +196,22 @@ bool sourceSinePositiveReduced50IG(std::uint32_t inputBits,std::uint32_t& output
  outputBits=to_float(sine_positive_reduced(x));return true;
 }
 
+std::uint32_t SourceUiLightMath50KG::range146898()noexcept {
+    //302BA0's finite positive wrapper reaches300198 with no errno mutation.
+    return to_float(sqrt(0x47efffffe0000000ull));
+}
+bool SourceUiLightMath50KG::luminance146E60(std::uint32_t r,std::uint32_t g,std::uint32_t b,
+    std::uint32_t& output)noexcept {
+    // This bounded consumer admits only finite RGB in [0,128]. Unknown alpha
+    // is deliberately not an input to146E60. False preserves output.
+    if(r>0x43000000u||g>0x43000000u||b>0x43000000u)return false;
+    const D blue=mul(0x3fbd2f1a9fbe76c9ull,from_float(b));
+    const D green=mul(0x3fe2c8b439581062ull,from_float(g));
+    const D sum=add(blue,green);
+    const D red=mul(0x3fd322d0e5604189ull,from_float(r));
+    output=to_float(add(red,sum));return true;
+}
+
 #ifdef RR_SOURCE_ACOS49T_TEST_API
 namespace source_acos49t_test {
 std::uint64_t arithmetic(Operation op, std::uint64_t a, std::uint64_t b) noexcept {

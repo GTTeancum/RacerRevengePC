@@ -7,6 +7,7 @@
 
 namespace ra_static_world50LA {class Owner;}
 namespace rr::game { class OriginalRaceConstructor50LA; class OriginalPauseStorage50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsResources50LA; }
+namespace rr::platform {class OriginalUiGarageQuad50KG;}
 namespace rr::assets {
 // The one Application-owned canonical382B38/382B70/383400 domain. Its tables
 // retain their identities across native scene/Video close and reopen. This is
@@ -17,6 +18,7 @@ namespace rr::assets {
 class OriginalStandardMaterialDomain50LA final {
     friend class ::ra_static_world50LA::Owner;
     friend class OriginalApplicationFonts50LA;
+    friend class rr::platform::OriginalUiGarageQuad50KG;
     friend class OriginalTimeStatsMaterialReference50LA;
     friend class OriginalSpeedBoostMaterialReference50LA;
     friend class OriginalDamageMaterialReference50LA;
@@ -32,6 +34,13 @@ class OriginalStandardMaterialDomain50LA final {
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver_;
     std::shared_ptr<OriginalStandardArchiveProvider50LA> archiveProvider_;
     std::vector<std::shared_ptr<const OriginalStandardMaterialSource50LA>> sources_;
+    struct SourceAdmission {
+        std::shared_ptr<const OriginalStandardMaterialSource50LA> source;
+        OriginalStandardArchiveProvider50LA::RetainedMaterialMember member;
+    };
+    // Actual positive-lookup receipts, coupled to exact strong source owners.
+    // Parsed bytes/name alone never prove a previously closed bank admission.
+    std::vector<SourceAdmission> sourceAdmissions_;
     OriginalStandardMaterialCollectorReceipt50LA coldCollector_;
     // Last member: canonical materials release their pass/texture refs before
     // the remaining domain owners. Actual model refs independently pin this
@@ -113,6 +122,12 @@ public:
                 if(!source||!source->prepared()||!source->member()||!source->originalBytes()){
                     d.status=OriginalStandardMaterialStatus50LA::source;return false;
                 }
+                // Every incoming request still requires active namespace
+                // authentication, even when it equals an old corpus member.
+                OriginalStandardArchiveProvider50LA::RetainedMaterialMember incoming;
+                if(!archiveProvider_->retainMaterialMember132820(*source->member(),*source->originalBytes(),incoming)){
+                    d.status=OriginalStandardMaterialStatus50LA::source;d.sourcePC=0x29B628u;return false;
+                }
                 bool found=false;
                 for(const auto& existing:next)if(same(*existing->member(),*source->member())){
                     if(*existing->originalBytes()!=*source->originalBytes()){
@@ -122,18 +137,33 @@ public:
                 }
                 if(!found)next.push_back(source);
             }
-            // Terrain and racer PSMs use the same mounted namespace, including
-            // earlier cached sources after a later Course adds an archive.
-            // Never let an old corpus entry conceal a new ambiguous lookup.
+            // New ambiguity or unequal active bytes still reject. Genuine
+            // absence after a temporary bank close is different: an already
+            // admitted immutable corpus owner survives only with its exact
+            // provider-issued receipt, never by filename or byte equality alone.
+            std::vector<SourceAdmission> nextAdmissions;nextAdmissions.reserve(next.size());
             for(const auto& source:next){
-                OriginalStandardArchiveProvider50LA::MemberView member;
+                using Provider=OriginalStandardArchiveProvider50LA;
+                Provider::MemberView member;
                 const auto& bytes=*source->originalBytes();
-                if(archiveProvider_->lookup132820(*source->member(),member)!=
-                       OriginalStandardArchiveProvider50LA::Lookup::present||
-                   !member.data||member.size!=bytes.size()||
-                   (member.size&&std::memcmp(member.data,bytes.data(),member.size))){
+                const auto lookup=archiveProvider_->lookup132820(*source->member(),member);
+                SourceAdmission admission;admission.source=source;
+                bool authenticated=false;
+                if(lookup==Provider::Lookup::present){
+                    authenticated=archiveProvider_->retainMaterialMember132820(*source->member(),bytes,admission.member);
+                }else if(lookup==Provider::Lookup::absent){
+                    for(const auto& old:sourceAdmissions_)if(old.source.get()==source.get()&&
+                        !old.source.owner_before(source)&&!source.owner_before(old.source)){
+                        if(archiveProvider_->retainedClosedMaterialMemberCurrent(old.member,*source->member(),bytes)){
+                            admission.member=old.member;authenticated=true;
+                        }
+                        break;
+                    }
+                }
+                if(!authenticated){
                     d.status=OriginalStandardMaterialStatus50LA::source;d.sourcePC=0x29B628u;return false;
                 }
+                nextAdmissions.push_back(std::move(admission));
             }
             if(archiveProvider_->revision()!=providerRevision){
                 d.status=OriginalStandardMaterialStatus50LA::phase;d.sourcePC=0x132820u;return false;
@@ -145,7 +175,7 @@ public:
             if(!textures.empty()&&!resolver_->appendOriginalSources(textures,d.texture)){
                 d.status=OriginalStandardMaterialStatus50LA::texture;return false;
             }
-            sources_=std::move(next);return true;
+            sources_=std::move(next);sourceAdmissions_=std::move(nextAdmissions);return true;
         }catch(...){d.status=OriginalStandardMaterialStatus50LA::allocation;return false;}
     }
 
@@ -195,10 +225,16 @@ public:
             if(!resolver_->prepareFresh(textures,d.texture)){
                 d.status=OriginalStandardMaterialStatus50LA::texture;return false;
             }
-            sources_=std::move(sources);return true;
+            // This legacy binding does not issue positive provider receipts.
+            // A later append must authenticate these actual owners while live.
+            sources_=std::move(sources);sourceAdmissions_.clear();return true;
         }catch(...){d.status=OriginalStandardMaterialStatus50LA::allocation;return false;}
     }
 private:
+    bool populateGarageResources2DF144(std::shared_ptr<const OriginalStandardMaterialContext50LA> context,
+        OriginalStandardMaterialDiagnostic50LA& d) noexcept {
+        return populateTimeStatsResources2DF144(std::move(context),d);
+    }
     bool populateDamageResources2DF144(std::shared_ptr<const OriginalStandardMaterialContext50LA> context,
         OriginalStandardMaterialDiagnostic50LA& d) noexcept {
         return populateTimeStatsResources2DF144(std::move(context),d);

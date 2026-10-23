@@ -1,6 +1,7 @@
 #include "original_ui_tournament_career_resources50kg.h"
 #include "original_ui_rider_session50kg.h"
 #include "original_ui_course_session50kg.h"
+#include "original_ui_garage_session50kg.h"
 #include <variant>
 #include <utility>
 #include <cstring>
@@ -97,7 +98,7 @@ bool sameDecision(const game::OriginalUiRouteDecision50KG& a,const game::Origina
 bool sameProposal(const OriginalUiRiderRouteProposal50KG& a,const OriginalUiRiderRouteProposal50KG& b) noexcept {
     return a.source&&a.source==b.source&&a.serial&&a.serial==b.serial&&sameStamp(a.profileStamp,b.profileStamp)&&sameDecision(a.decision,b.decision);
 }
-using EntryProposal=std::variant<std::monostate,OriginalUiRiderRouteProposal50KG,OriginalUiCourseRouteProposal50KG>;
+using EntryProposal=std::variant<std::monostate,OriginalUiRiderRouteProposal50KG,OriginalUiCourseRouteProposal50KG,std::shared_ptr<const OriginalUiGarageSession50KG>>;
 bool sameProposal(const OriginalUiRiderRouteProposal50KG& a,const EntryProposal& b) noexcept {
     const auto* p=std::get_if<OriginalUiRiderRouteProposal50KG>(&b);return p&&sameProposal(a,*p);
 }
@@ -586,6 +587,36 @@ bool OriginalUiTournamentCareerResources50KG::acceptCourseBackCommit(
        !captureConfirmDependencies(*s->profile,s->career.career100C0,actual)||
        !sameDependencies(actual,s->confirmBefore))return reject();
     // The route itself writes nothing: retain the genuine unchanged stamp.
+    s->confirmProposal=std::monostate{};return true;
+}
+bool OriginalUiTournamentCareerResources50KG::prepareGarageBack(
+    const std::shared_ptr<const OriginalUiGarageSession50KG>& source,Diagnostic& d)noexcept {
+    d={};auto* s=storage_.get();ConfirmDependencies before;
+    if(!s||!source||!current()||s->confirmPrepared||s->confirmAttachAttempted||
+       source->profileOwnerForReturn17DE10()!=s->profile||
+       !captureConfirmDependencies(*s->profile,s->career.career100C0,before)||
+       !sameStamp(before.career.stamp,s->career.stamp)||!sameCareerValues(before.career,s->career)||
+       !sameStats(before.stats,s->resourceStats)||before.colors.accent17FA00!=s->resourceColors.accent17FA00||
+       before.colors.secondary17FA10!=s->resourceColors.secondary17FA10)return fail(d,Error::profile,0x17DE10);
+    s->confirmBefore=before;s->confirmProposal=source;s->confirmPrepared=true;return true;
+}
+bool OriginalUiTournamentCareerResources50KG::garageBackPreparationCurrent(
+    const std::shared_ptr<const OriginalUiGarageSession50KG>& source)const noexcept {
+    const auto* s=storage_.get();ConfirmDependencies actual;
+    const auto* held=s?std::get_if<std::shared_ptr<const OriginalUiGarageSession50KG>>(&s->confirmProposal):nullptr;
+    return s&&source&&held&&*held==source&&s->confirmPrepared&&!s->confirmAttachAttempted&&current()&&
+        source->profileOwnerForReturn17DE10()==s->profile&&
+        captureConfirmDependencies(*s->profile,s->career.career100C0,actual)&&sameDependencies(actual,s->confirmBefore);
+}
+bool OriginalUiTournamentCareerResources50KG::acceptGarageBackCommit(
+    const std::shared_ptr<const OriginalUiGarageSession50KG>& source,Diagnostic& d)noexcept {
+    d={};auto* s=storage_.get();
+    if(!s||!s->confirmPrepared||s->confirmAttachAttempted)return fail(d,Error::profile,0x17DE10);
+    const bool current=garageBackPreparationCurrent(source);
+    s->confirmAttachAttempted=true;
+    if(!current){fail(d,Error::profile,0x17DE10);s->confirmAttachmentFailure=d;s->confirmAttachmentTerminal=true;return false;}
+    // No source profile mutation or generation increment on Garage Back.
+    // Frontend invokes this only after actual manager2A3510 retirement.
     s->confirmProposal=std::monostate{};return true;
 }
 bool OriginalUiTournamentCareerResources50KG::loaded()const noexcept{return bool(storage_);}

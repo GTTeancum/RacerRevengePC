@@ -3,10 +3,12 @@
 #include "original_standard_texture_lifetime50la.h"
 #include <array>
 #include <vector>
+#include <thread>
 
 namespace original_main_entry50KG { struct Application; }
 namespace ra_crowd_image50LA { class Verifier; }
 namespace ra_tga_source50LA { class Verifier; }
+namespace rr::platform { class OriginalUiGarageSession50KG; class OriginalUiGarageActors50GN; class OriginalUiGarageWattoOwner50KG; }
 namespace rr::game { class OriginalRacerAnimationCold50LA; class OriginalTimeStats50LA; class OriginalSpeedBoost50LA; class OriginalDamage50LA; class OriginalPositionStatsHud50LA; class OriginalPauseStorage50LA; }
 namespace rr::assets {
 class OriginalStandardMaterialContext50LA;
@@ -15,6 +17,10 @@ class OriginalStandardTextureResolver50LA;
 class OriginalStandardModelGeometry50LA;
 class OriginalStandardCollisionType0Resource50LA;
 class OriginalStandardArchiveProvider50LA;
+class OriginalUiArchive50KG;
+class OriginalUiIpumTextureCache50KG;
+struct OriginalUiIpumProvenance50KG;
+class OriginalStandardGarageIpumLease50KG;
 class OriginalStandardIpumCompressedFrames50LA;
 // Private fixed-source image leases/sets are minted only by the concrete
 // native verifier. Resource ownership and GPU publication remain separate.
@@ -52,7 +58,7 @@ struct OriginalStandardTextureSourceInput50LA {
 };
 enum class OriginalStandardTextureSourceFormat50LA : std::uint8_t { pstIndexed,tgaBgr24,atmPstFrames,tgaBgra32,pstIpum };
 enum class OriginalStandardTextureLevelStorage50LA : std::uint8_t {
-    pstPacked4,pstTransfer8,tgaConverted1555,tgaGenerated1555,tgaConverted8888,tgaGenerated8888,ipumCompressed1555
+    pstPacked4,pstTransfer8,tgaConverted1555,tgaGenerated1555,tgaConverted8888,tgaGenerated8888,ipumCompressed1555,garageIpumCompressed1555
 };
 struct OriginalStandardTextureLevelView50LA {
     //Actual final100 storage: kind0's retained packed4 source, or kind1's
@@ -74,17 +80,21 @@ struct OriginalStandardTextureLevelView50LA {
     //are red, next5 green, next5 blue, high bit coverage. No GS expansion.
     const std::uint16_t* packed1555=nullptr;
     std::size_t packed1555Words=0;
-    // Owned top-origin, unpremultiplied RGBA8888. This is final CPU storage,
+    // Top-origin, unpremultiplied RGBA8888. TGA owns it; the distinct Garage tag
+    // borrows sealed native IPUM cache pixels. This is CPU storage,
     // not a decoded image lease, renderer upload or fabricated PST indices.
     const std::uint8_t* rgba8888=nullptr;
     std::size_t rgba8888Bytes=0;
-    // Kind2 final storage: actual adopted aligned encoded base/codec span,
+    // Kind2 encoded storage: adopted aligned RA span or retained static source span,
     // never palette indices or decoded1555. Image lease is a separate borrow.
     const std::uint8_t* compressed00=nullptr;
     std::size_t compressedBytes=0;
     const std::uint8_t* codec18=nullptr;
     std::size_t codecBytes1C=0;
     const OriginalStandardIpumImageLease50LA* hostImage=nullptr;
+    // Distinct fixed-catalog static Garage bridge. rgba8888 is borrowed from
+    // the retained native cache, not a RA animated lease or a second decode.
+    const OriginalUiIpumProvenance50KG* garageIpumProvenance=nullptr;
 };
 
 // Native cold projection of resolved PST/TGA/ATM/MCF/PSG/COL entries in source3E1A70. Owns
@@ -97,6 +107,35 @@ struct OriginalStandardTextureLevelView50LA {
 // missing input in this corpus remains unresolved. IPU and nonzero ATM storage remain closed.
 class OriginalStandardTextureResolver50LA final {
 public:
+    // Opaque one-bank capability; only the actual Application can issue/use it.
+    // Destruction never unloads anything. A stale copy cannot replay retirement.
+    class GarageBankLease50LA final {
+        friend class OriginalStandardTextureResolver50LA;
+        std::shared_ptr<OriginalStandardArchiveProvider50LA> provider_;
+        std::shared_ptr<const OriginalUiArchive50KG> archive_;
+        std::shared_ptr<const void> managerIdentity_;
+        const OriginalStandardTextureResolver50LA* resolver_=nullptr;
+        std::size_t mount_=static_cast<std::size_t>(-1);
+        std::uint64_t generation_=0;
+        bool selected19E_=false; //Exact separate1D1D68 bank issuer, never a caller-selected archive.
+        std::thread::id thread_{};
+        // Historical native closure proof, NOT an active bank capability.
+        // Minted only after actual12EB60; reissue invalidates it. It cannot
+        // open a file, revive a row or stand in for a resource destructor.
+        struct ClosedBackingReceipt {
+            std::shared_ptr<OriginalStandardArchiveProvider50LA> provider;
+            std::shared_ptr<const void> managerIdentity;
+            const OriginalStandardTextureResolver50LA* resolver=nullptr;
+            std::size_t mount=static_cast<std::size_t>(-1);
+            std::uint64_t generation=0;
+            bool selected19E=false;
+            std::thread::id thread{};
+        } closedBacking_;
+    public:
+        GarageBankLease50LA() noexcept=default;
+        GarageBankLease50LA(const GarageBankLease50LA&)=delete;
+        GarageBankLease50LA& operator=(const GarageBankLease50LA&)=delete;
+    };
     OriginalStandardTextureResolver50LA() noexcept;
     ~OriginalStandardTextureResolver50LA();
     OriginalStandardTextureResolver50LA(const OriginalStandardTextureResolver50LA&)=delete;
@@ -177,7 +216,62 @@ public:
     void clearAnimation1327D0(const rr::game::OriginalRacerAnimationCold50LA*) noexcept;
     void clearGeometry1327D0(const OriginalStandardModelGeometry50LA*) noexcept;
 private:
+    friend class OriginalStandardModelGeometry50LA;
+    friend class rr::platform::OriginalUiGarageActors50GN;
+    friend class rr::platform::OriginalUiGarageWattoOwner50KG;
+    // Only the two actual loaded Garage animation owners call this AFTER
+    // motion/array/configuration teardown and their final Entity1413E0.
+    //1327D0 or native pointer expiration alone never authorizes reclamation.
+    void recordGarageFinalMcfRelease153F50(OriginalStandardModelFileId50LA,
+        const rr::game::OriginalRacerAnimationCold50LA&) noexcept;
+    // Records the actual resource's final26E598/26E0A0/1327D0. Only an
+    // already-retired Garage PSG row can release backing here. Active bank
+    // rows retain both bytes and the private historical final-release proof.
+    // Does not evict active rows, reuse IDs, or retire any source reference.
+    void reclaimRetiredPsgBacking26E5C8(const OriginalStandardModelGeometry50LA&) noexcept;
+    // Native normal-manager completion only, after source bank/children,
+    // transfer/renderer and audio/routing retirement. Requires BOTH genuine
+    // final-resource and closed-bank receipts;12E5E0 itself still frees nothing.
+    // Includes proved-final Garage MCF/PSG and closed-bank PST rows with exact
+    // final-destructor or never-borrowed proof. No decoded cache eviction.
+    bool reclaimGaragePsgBackingAfterManagerRetirement(GarageBankLease50LA&,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
     friend struct ::original_main_entry50KG::Application;
+    friend class rr::platform::OriginalUiGarageSession50KG;
+    // Native PST pointer custody, separate from the weak1326A0 association.
+    // Every real PST resource publishes before exposing source pointers; its
+    // actual destructor discharges only after levels/manager/cache teardown.
+    bool beginPstSourceBorrow24E1B0(OriginalStandardTextureResource50LA&,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
+    void finishPstSourceBorrow29C7A0(OriginalStandardTextureResource50LA&) noexcept;
+    // Called only after actual selected1D1EA4 bank close and completed manager
+    // population. Does not reclaim any row ever borrowed by a Resource.
+    bool reclaimNeverBorrowedSelectedPstAfterBankClose(GarageBankLease50LA&,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
+    bool preflightRetiredGaragePstBacking(std::size_t fileIndex,bool allowNeverBorrowed,
+        bool& eligible,OriginalStandardTextureDiagnostic50LA&) const noexcept;
+    // Native immutable ownership only, before actual source corpus admission.
+    // Requires the exact sealed mounted provider and already-authenticated
+    // fixed Garage cache. Does not decode, populate, upload or rebuild rows.
+    bool bindGarageStaticIpumCache24E880(
+        const std::shared_ptr<const OriginalUiIpumTextureCache50KG>&,
+        const std::shared_ptr<const OriginalUiArchive50KG>&,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
+    bool validateGarageBankRows12EAA0(std::size_t,std::uint64_t,
+        OriginalStandardTextureDiagnostic50LA&) const noexcept;
+    bool issueGarageBank12E5E0(const std::shared_ptr<OriginalStandardArchiveProvider50LA>&,
+        const std::shared_ptr<const OriginalUiArchive50KG>&,GarageBankLease50LA&,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
+    bool issueGarageSelectedBank1D1D68(const std::shared_ptr<OriginalStandardArchiveProvider50LA>&,
+        const std::shared_ptr<const OriginalUiArchive50KG>&,GarageBankLease50LA&,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
+    bool issueGarageBank(const std::shared_ptr<OriginalStandardArchiveProvider50LA>&,
+        const std::shared_ptr<const OriginalUiArchive50KG>&,GarageBankLease50LA&,bool selected19E,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
+    bool canRetireGarageBank12E5E0(const GarageBankLease50LA&,
+        OriginalStandardTextureDiagnostic50LA&) const noexcept;
+    bool retireGarageBank12E5E0(GarageBankLease50LA&,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
     // Actual resolver-owned native scratch backing. Explicit dormant suffixes,
     // never inferred from file/cache readiness or called by ordinary lookup.
     bool initializeScratch12CDF0(OriginalStandardTextureDiagnostic50LA&)noexcept;
@@ -295,7 +389,7 @@ public:
     const std::string* sourceMember() const noexcept; //Canonical provider spelling.
     const std::vector<std::uint8_t>* originalBytes() const noexcept;
     const OriginalStandardTextureSourceFormat50LA* sourceFormat() const noexcept;
-    const std::uint32_t* sourceKind() const noexcept; //PST enum0/1 only; null forTGA.
+    const std::uint32_t* sourceKind() const noexcept; //PST enum0/1 or sealed static Garage2; null forTGA.
     const std::int32_t* formatAC() const noexcept;
     const std::int32_t* bitsPerPixelE8() const noexcept;
     // Only known-mask bits are source claims. The admitted24E1B0 cold
@@ -331,6 +425,9 @@ private:
     // Only the canonical material consumer can reach this operation.
     bool demandTournamentFallbackFloor10(std::uint32_t storePC,bool& written,
         OriginalStandardTextureDiagnostic50LA&) noexcept;
+    // Actual1FDD60 resolved prototype, not a selected animation frame.
+    bool demandGarageFloor1FDD60(std::uint32_t storePC,bool& written,
+        OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool demandTournamentMarker1F264C(bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     bool demandTournamentOutline1F2530(bool& written,OriginalStandardTextureDiagnostic50LA&) noexcept;
     //18BA70 texture/font/triangle floors. The concrete owner must first
@@ -362,6 +459,8 @@ private:
     std::uint8_t flagsF8_=0,flagsF8KnownMask_=0;
     const std::uint32_t uploadConversion382FC8_=1; //Original data at00382FC8.
     std::size_t sourceIndex_=static_cast<std::size_t>(-1);
+    const void* pstSourceBorrowIdentity_=nullptr; // Actual stable resolver File.
+    std::uint64_t pstSourceBorrowPublication_=0;
     std::string name20_;
     std::array<OriginalStandardTextureLevelView50LA,5> levels_{};
     std::array<std::vector<std::uint8_t>,5> transferBacking_{};
@@ -374,6 +473,7 @@ private:
     // construction and ascending retirement. Resolver association is weak.
     std::shared_ptr<const OriginalStandardIpumImageSet50LA> ipumImages_;
     std::shared_ptr<const OriginalStandardIpumImageLease50LA> ipumLease_;
+    std::shared_ptr<const OriginalStandardGarageIpumLease50KG> garageIpumLease_;
     std::vector<std::shared_ptr<OriginalStandardTextureResource50LA>> frames24_;
     std::int32_t frameCount20_=0;
     std::size_t pstOffset_=0,pstBytes_=0;

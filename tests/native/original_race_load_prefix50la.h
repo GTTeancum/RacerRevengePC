@@ -29,6 +29,7 @@ inline bool Application::beginConsumedRaceLoad1A6AA0(rr::game::OriginalRaceConst
     sourceApplicationMode22C_=1; //1A6AC8, SAME Application scalar.
     display->beginRaceClear1A6AD8(); //141C20 itself is an identity-return leaf.
     actualModelGlobals.setRaceDistance2410E0(selected.subtype); //1A6B0C or1A6B24.
+    sourceSecondMapDistance382FA0_=actualModelGlobals.secondMapDistance382FA0(); //Same reached process store, preserved across later Garage entries.
     nativeCollectorFifoOwner_=fifo; //1A6B40->24B6E0->29C270, actual443848 slot.
     owner.loadDisplay_=display;owner.loadFifo_=std::move(fifo);
     owner.loadPrefixReached_=true;d.sourceEffectsCommitted=true;d.sourcePC=0x1a6b4c;return true;

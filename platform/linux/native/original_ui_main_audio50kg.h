@@ -1,20 +1,330 @@
 #pragma once
 #include "audio_mixer50hd.h"
+#include "native_source_reverb50kg.h"
 #include "audio_stereo_producer50hd.h"
+#include "original_ui_garage_watto_audio50kg.h"
+#include "original_ui_garage_droid_audio50gn.h"
 #include "../../../src/assets/audio_assets50hc.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <string>
+#include <thread>
 
+namespace original_main_entry50KG { struct Application; }
+namespace rr::game { struct OriginalWreckComponent50LA; }
 namespace rr::platform {
+class OriginalUiGaragePodScene50KG;
+class OriginalUiGaragePageOwner50KG;
+class NativeSourceReverb50KG;
+class OriginalApplicationAural50KG;
+class OriginalUiGarageAudioBacking50KG;
+class OriginalUiGarageSession50KG;
 // Host-only frontend transport. The application supplies a DEDICATED freshly
 // initialized mixer/voice array, never the live race mixer or its slot117.
-// This transport must be reset and its device output closed before race output
-// begins. Mixer/storage outlive this stable-address owner. All calls main-thread.
+// The ordinary standalone transport resets before race output begins. A Root-
+// retained transport instead requires real device-close and ordinary-voice
+// retirement before race output, retaining PCM/cursors/clock until terminal
+// source retirement. Mixer/storage outlive this stable owner. Main-thread only.
 class OriginalUiMainAudio50KG final : public AudioStereoProducer50HD {
+    friend class OriginalAudioSampleCache50KG;
+    friend class OriginalAudioPendingWaves50KG;
+    friend bool AudioMixer50HD::canRetireStoppedNativeGarageClips(
+        const OriginalUiMainAudio50KG&,const AudioVoiceObservation50HD*,std::size_t)const noexcept;
+    friend class OriginalUiGarageWattoSoundGroup50KG;
+    friend class OriginalUiGaragePodScene50KG;
+    friend class OriginalUiGarageDroidAudio50GN;
+    friend class OriginalUiGarageWattoAudio50KG;
+    friend class OriginalUiGaragePageOwner50KG;
+    // Native ordered command custody, not a guest RPC buffer or applied DSP.
+    //The source26D6C0 queue holds64 commands. A full native queue stays closed
+    //outside the two typed Garage cold consumers; no eviction or synthetic flush.
+    struct QueuedGroupControl;
+    class ReverbEnqueueReceipt final {
+        friend class OriginalUiMainAudio50KG;
+        std::weak_ptr<const QueuedGroupControl> command_;
+        std::uint64_t sequence_=0;
+    };
+    bool enqueueWattoReverb26D6C0(const std::shared_ptr<OriginalUiGarageWattoSoundGroup50KG>&,
+        ReverbEnqueueReceipt&,std::string&)noexcept;
+    bool queuedWattoReverbCurrent(const OriginalUiGarageWattoSoundGroup50KG&,const ReverbEnqueueReceipt&)const noexcept;
+    bool mayRetireQueuedWattoGroup(const OriginalUiGarageWattoSoundGroup50KG&)const noexcept;
+    //Synchronous native cold service. This is not an invented source flush PC
+    //and does not grant wet-output, playback, or Page readiness.
+    bool serviceColdGarageRouting(std::string&)noexcept;
+    bool releaseRetiredColdWattoRouting(OriginalUiGarageWattoSoundGroup50KG&)noexcept;
+    bool queuedGroupIdentityCurrent(const QueuedGroupControl&)const noexcept;
+    bool queuedGroupRoutingCurrent(const QueuedGroupControl&)const noexcept;
+    bool queuedGroupHistoryCurrent(const QueuedGroupControl&)const noexcept;
+    bool queuedGroupSourceLifetimeCurrent(const QueuedGroupControl&)const noexcept;
+    bool queuedSceneImmediateLifetimeCurrent(const QueuedGroupControl&)const noexcept;
+    bool queuedRetiredSceneLifetimeCurrent(const QueuedGroupControl&)const noexcept;
+    bool nativeWattoWetLifetimeCurrent(const OriginalUiGarageWattoSoundGroup50KG&)const noexcept;
+    bool publishNativeWattoSample(OriginalUiGarageWattoAudio50KG&,std::size_t sound,std::size_t slot,const AudioClip50HD&)noexcept;
+    bool publishNativeSceneSample(OriginalUiGarageDroidAudio50GN&,std::size_t ordinal,const AudioClip50HD&)noexcept;
+    bool nativeSceneWetLifetimeCurrent(const OriginalUiGaragePodScene50KG&)const noexcept;
+    bool liveGarageVoiceRangesCurrent()const noexcept;
+    bool ownedStoppedGarageClipHistoryCurrent()const noexcept;
+    bool wattoConstructionHistoryCurrent(const OriginalUiGarageWattoSoundGroup50KG&)const noexcept;
+    bool sceneConstructionHistoryCurrent(const OriginalUiGaragePodScene50KG&)const noexcept;
+    bool releaseRetiredSceneRouting(const std::shared_ptr<OriginalUiGaragePageOwner50KG>&,OriginalUiGaragePodScene50KG&)noexcept;
+    bool releaseRetiredWattoRouting(OriginalUiGarageWattoSoundGroup50KG&)noexcept;
+    bool precedingGroupControlsCurrent()const noexcept;
+    // Aural owns the processor and this Main; these exact non-owning borrows
+    // cannot outlive its interface. No ordinary Main target calls a DSP TU.
+    const OriginalApplicationAural50KG* nativeWetOwner_=nullptr;
+    NativeSourceReverb50KG* nativeWetProcessor_=nullptr;
+    decltype(&NativeSourceReverb50KG::setRawMasters) nativeWetSetRawMasters_=nullptr;
+    // Exact Aural-issued members, not untyped callbacks. Ordinary Main-only
+    // targets retain their old link boundary and their unbound dry behavior.
+    using NativeSongPublisher=bool (OriginalApplicationAural50KG::*)(OriginalUiMainAudio50KG&,
+        std::uint32_t,const AudioClip50HD&,float,float)const noexcept;
+    using NativeEffectPublisher=bool (OriginalApplicationAural50KG::*)(OriginalUiMainAudio50KG&,
+        std::size_t,const AudioClip50HD&,float,float)const noexcept;
+    NativeSongPublisher nativeWetPlaySong_=nullptr;
+    NativeEffectPublisher nativeWetPlayEffect_=nullptr,nativeWetPlayRider_=nullptr;
+    using NativeWattoPublisher=bool (OriginalApplicationAural50KG::*)(OriginalUiMainAudio50KG&,
+        const void*,std::size_t,std::size_t,const AudioClip50HD&,std::int32_t,float,std::int32_t)const noexcept;
+    NativeWattoPublisher nativeWetPlayWatto_=nullptr;
+    using NativePlaybackPreflight=bool (OriginalApplicationAural50KG::*)(const OriginalUiMainAudio50KG&,std::size_t)const noexcept;
+    NativePlaybackPreflight nativeWetCanPublish_=nullptr;
+    bool nativeSourcePlaybackCurrent(std::size_t maximumMonoPlays=0)const noexcept;
+    // Native dry-music envelope custody only. Ordered command25 may still
+    // be queued; this never authorizes a source voice, wet routing or PCM.
+    bool nativeGaragePageControlCustodyCurrent(const OriginalUiGaragePageOwner50KG&)const noexcept;
+    // Exact live input-enabled Garage Page only; this is not a second public
+    // effect API. Page owns the source action/selection/response cursor.
+    bool nativeGaragePageAudioCurrent(const OriginalUiGaragePageOwner50KG&)const noexcept;
+    bool nativeGaragePageInputAudioCurrent(const OriginalUiGaragePageOwner50KG&)const noexcept;
+    // Opening preflight includes raw25, optional outgoing stop and Song6
+    // start budgets. Execution separately proves the actual raw25 predecessor.
+    bool nativeGaragePageSong6StartCurrent(const OriginalUiGaragePageOwner50KG&)const noexcept;
+    bool canStartGaragePageSong6_234900(const OriginalUiGaragePageOwner50KG&)const noexcept;
+    bool startGaragePageSong6_234900(const OriginalUiGaragePageOwner50KG&)noexcept;
+    bool canFadeGaragePageSong6_234440(const OriginalUiGaragePageOwner50KG&)const noexcept;
+    bool fadeGaragePageSong6_234440(const OriginalUiGaragePageOwner50KG&)noexcept;
+    // Garage Root services only this existing native envelope, at the same
+    // pre-manager boundary as ordinary prepareUpdateAudio. No PCM/voice aging.
+    bool advanceGarageNativeMusicControl(const OriginalUiGaragePageOwner50KG&,float)noexcept;
+    bool canPlayGaragePageEffect1FDE70(const OriginalUiGaragePageOwner50KG&,std::uint32_t)const noexcept;
+    bool playGaragePageEffect1FDE70(const OriginalUiGaragePageOwner50KG&,std::uint32_t)noexcept;
+    bool nativeWattoPlaybackCurrent(const OriginalUiGarageWattoAudio50KG&)const noexcept;
+    bool nativeScenePlaybackCurrent(const OriginalUiGarageDroidAudio50GN&)const noexcept;
+    bool nativeSceneImmediatePlaybackCurrent(const OriginalUiGarageDroidAudio50GN&)const noexcept;
+
+    std::array<const assets::OriginalStreamMetadataRow50KZ*,57> nativeRiderSources_{};
+    const assets::OriginalStreamMetadataRow50KZ* nativeRiderSourceCurrent(std::size_t,const AudioClip50HD&)const noexcept;
+    const assets::OriginalStreamMetadataRow50KZ* nativeWattoStreamSourceCurrent(std::size_t,const AudioClip50HD&)const noexcept;
+    bool nativeWattoStreamStartCurrent(std::size_t,std::size_t,const AudioClip50HD&,const void*)const noexcept;
+    bool publishNativeWattoStream(OriginalUiGarageWattoAudio50KG&,std::size_t,std::size_t,const AudioClip50HD&)noexcept;
+    struct NativeEffectSource {
+        std::uint32_t event=0,payloadBytes=0,headerRate=0,durationMs=0,pitch=0;
+        float duration20=0.f;
+    };
+    std::array<NativeEffectSource,6> nativeEffectSources_{};
+    std::shared_ptr<const assets::OriginalStreamMetadata50KZ> nativeSourceMetadata_;
+    const assets::OriginalStreamMetadataRow50KZ* nativeSongSourceCurrent(
+        std::uint32_t,const AudioClip50HD&)const noexcept;
+    bool nativeEffectSourceCurrent(std::size_t,const AudioClip50HD&,
+        AudioMixer50HD::NativeSourceSampleStart50KG&)const noexcept;
+    std::uint64_t nativeWetEpoch_=0;
+    bool nativeWetInterfaceRetired_=false;
+    std::uint64_t nativeWetMasterCount_=0,nativeWetMasterSequence_=0,nativeWetMasterFrame_=0;
+    std::uint32_t nativeWetMasterPercent_=0;
+    std::uint16_t nativeWetMasterRaw_=0;
+    bool nativeWetInterfaceCurrent()const noexcept;
+    bool queuedGroupProcessorCurrent(const QueuedGroupControl&)const noexcept;
+    // Only the genuine Page opening/closing source callers may use this
+    // bounded absolute command2 endpoint. Optional delay/feedback are both -1.
+    // No pending command25 may be overtaken; acceptance and DSP application
+    // are synchronous at the supplied current native frame boundary.
+    bool canApplyGarageMasterReverb26A820(const OriginalUiGaragePageOwner50KG&,
+        std::uint32_t absolutePercent,std::uint64_t acceptedFrame)const noexcept;
+    bool applyGarageMasterReverb26A820(const OriginalUiGaragePageOwner50KG&,
+        std::uint32_t absolutePercent,std::uint64_t acceptedFrame)noexcept;
+    bool appendColdGroupControl(std::shared_ptr<QueuedGroupControl>,std::string&)noexcept;
+    bool enqueueSceneReverb26D6C0(const std::shared_ptr<OriginalUiGaragePodScene50KG>&,
+        std::string&)noexcept;
+    bool queuedSceneReverbCurrent(const OriginalUiGaragePodScene50KG&)const noexcept;
+    bool sceneGroupIdentityCurrent(const OriginalUiGaragePodScene50KG&)const noexcept;
+    bool sceneRoutingHistoryCurrent(const OriginalUiGaragePodScene50KG&)const noexcept;
+    bool mayRetireQueuedSceneGroup(const OriginalUiGaragePodScene50KG&)const noexcept;
+    // Root-issued native lifetime, independent of a source Page's readiness.
+    // No public caller can mint this boundary or turn it into wet admission.
+    enum class GarageSourceLifetime : std::uint8_t { unbound, initialPrefix, constructing, constructed, retired, emptyEntryRetired, sharedPageEntryRetired, partialSceneEntryRetired, lateBorrowEntryRetired, loadedPageEntryRetired, wattoBindingEntryRetired, publishedObservationEntryRetired, actorSampleEntryRetired, unsealedRenderEntryRetired };
+    enum class UnresolvedEntryFailure : std::uint8_t { partialAttachment,lateBorrow,loadedPageHide,wattoBinding };
+    GarageSourceLifetime garageSourceLifetime_=GarageSourceLifetime::unbound;
+    std::weak_ptr<OriginalUiGarageAudioBacking50KG> garagePersistentBacking_;
+    std::weak_ptr<OriginalUiGarageSession50KG> garageEntryCustody_;
+    std::uint64_t garageEntryGeneration_=0,garageEntryEpoch_=0;
+    bool bindRetainedGarageTransport(const std::shared_ptr<OriginalUiGarageAudioBacking50KG>&,std::string&)noexcept;
+    bool beginRetainedGarageEntry(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    // Exact failed base-cache prefix only. Native retirement is distinct from
+    // completed Page/Scene rearm and does not authorize failed-entry replay.
+    bool preflightEmptyGarageEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)const noexcept;
+    bool retireEmptyGarageEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    bool emptyGarageEntryFailureCurrent(const std::shared_ptr<OriginalUiGarageSession50KG>&,bool managerRetired)const noexcept;
+    // Exact failed shared prompt load: Watto exists, Scene does not. Only the
+    // actual Session retirement cursor can discharge this nonempty prefix.
+    bool preflightSharedPageEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)const noexcept;
+    bool retireSharedPageEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    // GUI76 source prefix: unresolved Scene plus Watto were genuinely destroyed.
+    // Terminal custody is distinct from both normal rearm and never-Scene abort.
+    bool preflightPartialSceneEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)const noexcept;
+    bool retirePartialSceneEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    bool partialSceneEntryFailureCurrent(const std::shared_ptr<OriginalUiGarageSession50KG>&,bool managerRetired)const noexcept;
+    bool terminalPartialSceneRowsCurrent()const noexcept;
+    bool preflightLateBorrowEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)const noexcept;
+    bool retireLateBorrowEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    bool lateBorrowEntryFailureCurrent(const std::shared_ptr<OriginalUiGarageSession50KG>&,bool managerRetired)const noexcept;
+    bool terminalLateBorrowRowsCurrent()const noexcept;
+    bool preflightLoadedPageEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)const noexcept;
+    bool retireLoadedPageEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    bool loadedPageEntryFailureCurrent(const std::shared_ptr<OriginalUiGarageSession50KG>&,bool managerRetired)const noexcept;
+    bool preflightWattoBindingEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)const noexcept;
+    bool retireWattoBindingEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    bool wattoBindingEntryFailureCurrent(const std::shared_ptr<OriginalUiGarageSession50KG>&,bool managerRetired)const noexcept;
+    // Exact resolved, published, never-framed failed observation. The first
+    // endpoint is readonly; the drain is private native terminal admission,
+    // not guest267BE0, and the final endpoint never issues a reentry receipt.
+    bool preflightPublishedObservationEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)const noexcept;
+    bool drainPublishedObservationEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    bool retirePublishedObservationEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    // Distinct first partial-Actor-frame failure. Real ages, stream slots,
+    // active reservations and retained PCM survive until genuine Group stops.
+    bool preflightActorSampleEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)const noexcept;
+    bool drainActorSampleEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    bool retireActorSampleEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    // Completed update followed by an actual failed unsealed Draw return.
+    // Readonly custody also precedes native Draw release; only the distinct
+    // released-Draw retirement cursor may drain controls or retire source owners.
+    bool preflightUnsealedRenderEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)const noexcept;
+    bool drainUnsealedRenderEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    bool retireUnsealedRenderEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,std::string&)noexcept;
+    enum class ResolvedEntryFailure : std::uint8_t { publishedObservation, actorSample, unsealedRender };
+    bool resolvedEntryFailureSourceCustodyCurrent(const std::shared_ptr<OriginalUiGarageSession50KG>&,
+        ResolvedEntryFailure)const noexcept;
+    bool drainResolvedEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,
+        ResolvedEntryFailure,std::string&)noexcept;
+    bool retireResolvedEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,
+        ResolvedEntryFailure,std::string&)noexcept;
+    bool terminalLoadedPageRowsCurrent()const noexcept;
+    bool terminalWattoBindingRowsCurrent()const noexcept;
+    bool unresolvedEntryFailureCurrent(const std::shared_ptr<OriginalUiGarageSession50KG>&,
+        bool managerRetired,UnresolvedEntryFailure)const noexcept;
+    bool retireUnresolvedEntryFailure(const std::shared_ptr<OriginalUiGarageSession50KG>&,
+        UnresolvedEntryFailure,std::string&)noexcept;
+    bool terminalUnresolvedSceneRowsCurrent()const noexcept;
+    bool unresolvedLateBorrowActorAudioCurrent(const OriginalUiGaragePageOwner50KG&,
+        const OriginalUiGaragePodScene50KG&)const noexcept;
+    bool unresolvedLoadedPageActorAudioCurrent(const OriginalUiGaragePageOwner50KG&,
+        const OriginalUiGaragePodScene50KG&)const noexcept;
+    bool unresolvedWattoBindingActorAudioCurrent(const OriginalUiGaragePageOwner50KG&,
+        const OriginalUiGaragePodScene50KG&)const noexcept;
+    bool unresolvedSceneEntryFailureCurrent(const OriginalUiGarageSession50KG&,
+        const OriginalUiGaragePodScene50KG&,bool sceneRetiring)const noexcept;
+    bool unresolvedLateBorrowEntryFailureCurrent(const OriginalUiGarageSession50KG&,
+        const OriginalUiGaragePodScene50KG&,bool sceneRetiring)const noexcept;
+    bool unresolvedLoadedPageEntryFailureCurrent(const OriginalUiGarageSession50KG&,
+        const OriginalUiGaragePodScene50KG&,bool sceneRetiring)const noexcept;
+    bool unresolvedWattoBindingEntryFailureCurrent(const OriginalUiGarageSession50KG&,
+        const OriginalUiGaragePodScene50KG&,bool sceneRetiring)const noexcept;
+    bool sharedPageEntryFailureCurrent(const std::shared_ptr<OriginalUiGarageSession50KG>&,bool managerRetired)const noexcept;
+    bool retainedGarageTransportCurrent()const noexcept;
+    bool retainedGarageStorageCurrent()const noexcept;
+    static constexpr std::size_t finalGarageClipCount=
+        OriginalUiGarageWattoAudio50KG::instanceCount+OriginalUiGarageDroidAudio50GN::soundCount;
+    struct FinalNativePcmRetirement {
+        std::array<AudioVoiceObservation50HD,finalGarageClipCount> voices{};
+        std::uint64_t mainRevision=0,mixerRevision=0,mixedFrames=0,wattoRevision=0,droidRevision=0;
+    };
+    FinalNativePcmRetirement finalNativePcmReceipt_{};
+    bool finalNativePcmRetired_=false;
+    bool canRetireFinalNativePcm(const OriginalAudioSampleCache50KG&,FinalNativePcmRetirement&)const noexcept;
+    void retireFinalNativePcmPreflighted(const FinalNativePcmRetirement&)noexcept;
+    bool finalNativePcmRetirementCurrent()const noexcept;
+    bool retainedGarageEntryCurrent()const noexcept;
+    bool reconstructibleGarageRowsCurrent()const noexcept;
+    bool silentGarageVoiceRangesCurrent()const noexcept;
+    bool ordinaryVoiceOwnershipCurrent()const noexcept;
+    bool retainedGarageOrdinaryCurrent()const noexcept;
+    // Only the real root-owned output's checked device-close continuation.
+    bool canRetireOrdinaryFrontendOutput()const noexcept;
+    bool retireOrdinaryFrontendOutputAfterDeviceClose()noexcept;
+    bool retiredOrdinaryFrontendOutputCurrent()const noexcept;
+    bool rebindOrdinaryFrontendOutput(std::uint32_t applicationPause)noexcept;
+    // Native ordinary output use is detached, NOT source Aural/Main teardown.
+    // Only the exact Root close receipt permits a fresh output reattachment.
+    bool ordinaryOutputRetired_=false;
+    enum class GarageReentryTransport : std::uint8_t { pristineCold, retainedOrdinary };
+    bool rearmGarageAfterManagerRetirementRetainingTransport(
+        const std::shared_ptr<OriginalUiGaragePageOwner50KG>&,std::uint64_t,
+        const std::shared_ptr<const assets::OriginalStreamMetadata50KZ>&,std::string&)noexcept;
+    bool rearmGarageAfterManagerRetirement(
+        const std::shared_ptr<OriginalUiGaragePageOwner50KG>&,std::uint64_t,
+        const std::shared_ptr<const assets::OriginalStreamMetadata50KZ>&,GarageReentryTransport,std::string&)noexcept;
+    // Only the completed normal manager closure can recycle a Scene lifetime.
+    // Does not prepare a new Page, flush pending work, or admit wet playback.
+    bool rearmGarageAfterManagerRetirementCold(
+        const std::shared_ptr<OriginalUiGaragePageOwner50KG>&,std::uint64_t,
+        const std::shared_ptr<const assets::OriginalStreamMetadata50KZ>&,std::string&)noexcept;
+    std::weak_ptr<OriginalUiGaragePageOwner50KG> lastRearmedGaragePage_;
+    std::uint64_t lastRearmedGarageGeneration_=0;
+    // Final actual Page owner tail only, not merely Group235150 completion.
+    bool releaseRetiredColdSceneRouting(const std::shared_ptr<OriginalUiGaragePageOwner50KG>&,
+        OriginalUiGaragePodScene50KG&)noexcept;
+    // Called only from Droid's genuine resolved-row publication, after its
+    // authenticated binding/handle check and native LogicalAudioOwner insert.
+    bool publishColdSceneSampleGroupGain(OriginalUiGarageDroidAudio50GN&,std::size_t,
+        const AudioClip50HD&)noexcept;
+    static constexpr std::size_t nativeGroupControlCapacity=64;
+    std::array<std::shared_ptr<QueuedGroupControl>,nativeGroupControlCapacity> nativeGroupControls_{};
+    std::size_t nativeGroupControlCount_=0;
+    std::uint64_t nativeGroupControlSequence_=0;
+    std::thread::id nativeControlThread_=std::this_thread::get_id();
+    OriginalUiGarageWattoAudio50KG* garageWattoAudioCold() noexcept;
+    // Cold sample binding needs the existing transport, not completed Garage
+    // reverb/playback admission. Public readiness remains unchanged.
+    const OriginalUiGarageWattoAudio50KG* nativeWattoSampleTransport() const noexcept;
+    const OriginalUiGarageDroidAudio50GN* nativeDroidSampleTransport() const noexcept;
+    bool nativeDroidSampleIdentity(const OriginalUiGarageDroidAudio50GN*,const AudioMixer50HD*,std::uint64_t) const noexcept;
+    bool nativeWattoSampleIdentity(const OriginalUiGarageWattoAudio50KG*,const AudioMixer50HD*,std::uint64_t) const noexcept;
+    friend class OriginalUiGarageSession50KG;
+    friend class OriginalUiGarageActors50GN;
+    friend struct ::original_main_entry50KG::Application;
+    friend class OriginalApplicationAural50KG;
 public:
+    enum class NativeGroupControlKind : std::uint8_t { watto, scene };
+    struct NativeGroupControlObservation {
+        NativeGroupControlKind kind=NativeGroupControlKind::watto;
+        const OriginalUiGaragePodScene50KG* scene=nullptr;
+        const OriginalUiGarageWattoSoundGroup50KG* group=nullptr;
+        const game::OriginalWreckComponent50LA* countedEntity=nullptr;
+        const AudioMixer50HD* mixer=nullptr;
+        const NativeSourceReverb50KG* wetProcessor=nullptr;
+        std::uint64_t sequence=0,groupGeneration=0,objectKey=0,mixerEpoch=0,acceptedControlRevision=0;
+        std::uint64_t acceptedFrame=0,routingFrame=0;
+        std::int32_t groupSlot=-1;
+        std::uint32_t sourceCommand=0;
+        std::array<std::uint32_t,3> sourceArguments{};
+        //applied means wet DSP/output, never merely applied routing metadata.
+        bool queued=false,routingApplied=false,applied=false,identityCurrent=false,neverPlayed=false;
+        bool processorBound=false;
+    };
+    //Read-only pending versus retained custody. Never a playback/Page token.
+    std::size_t pendingNativeGroupControls()const noexcept;
+    std::size_t retainedNativeGroupControls()const noexcept{return nativeGroupControlCount_;}
+    bool inspectNativeGroupControl(std::size_t,NativeGroupControlObservation&)const noexcept;
+    struct NativeMasterControlObservation {
+        const NativeSourceReverb50KG* processor=nullptr;
+        std::uint64_t appliedCount=0,sequence=0,acceptedFrame=0;
+        std::uint32_t command=2,absolutePercent=0;
+        std::uint16_t rawLeft=0,rawRight=0;
+        bool processorBound=false,numericallyApplied=false;
+    };
+    NativeMasterControlObservation inspectNativeMasterControl()const noexcept;
     static constexpr std::size_t musicVoice = 0, firstEffectVoice = 1;
     static constexpr std::size_t effectVoiceCount = 6, requiredVoices = 7;
     static constexpr std::size_t riderConfirmClipCount = 57; // Two additional authored Kraid clips; mixer voice count unchanged.
@@ -85,6 +395,28 @@ public:
     // and original VAGs before decoding. Missing/changed bytes fail; no substitute.
     bool prepare(const std::filesystem::path& audioRoot, AudioMixer50HD& dedicatedFrontendMixer,
         std::string& error) noexcept;
+    // Explicit bounded Garage opt-in, never an arbitrary larger mixer.
+    // Legacy prepare remains7/8 voices. This exact49 shape adds41 exclusively
+    // owned finite Garage instance slots while preserving the SAME music voice.
+    static constexpr std::size_t garageRequiredVoices=OriginalUiGarageWattoAudio50KG::requiredFrontendVoices;
+    bool prepareGarageFrontend(const std::filesystem::path& audioRoot,
+        std::shared_ptr<const assets::OriginalStreamMetadata50KZ>,AudioMixer50HD&,std::string&) noexcept;
+    // Separate exact53 aggregate: the original49 contract is unchanged.
+    // Slots49..52 belong only to fresh Garage's four once-only scene Sounds.
+    // This bounded scene lifetime does not authorize general101DA0 replay.
+    static constexpr std::size_t garageSceneRequiredVoices=OriginalUiGarageDroidAudio50GN::requiredFrontendVoices;
+    bool prepareGarageSceneFrontend(const std::filesystem::path& audioRoot,
+        std::shared_ptr<const assets::OriginalStreamMetadata50KZ>,AudioMixer50HD&,std::string&) noexcept;
+    bool garageSceneMenuReady() const noexcept;
+    OriginalUiGarageDroidAudio50GN* garageDroidAudio() noexcept;
+    const OriginalUiGarageDroidAudio50GN* garageDroidAudio() const noexcept;
+    bool garageMenuReady() const noexcept;
+    bool canStartGarageLoop6() const noexcept;
+    bool startGarageLoop6() noexcept;
+    bool canFadeGarageMusic() const noexcept;
+    bool fadeGarageMusic() noexcept;
+    OriginalUiGarageWattoAudio50KG* garageWattoAudio() noexcept;
+    const OriginalUiGarageWattoAudio50KG* garageWattoAudio() const noexcept;
     // Optional additional cold original Song7. Call after prepare and BEFORE
     // any playback/mixing. Main/Options require no Rider music bytes. Failure
     // leaves their already prepared transport intact and Rider unavailable.
@@ -187,7 +519,7 @@ public:
     bool playControlsEffect(std::uint32_t originalId) noexcept;
     bool update(float sourceSeconds) noexcept;
     void pause(bool value) noexcept {
-        if(paused_!=value){paused_=value;noteControlChange();}
+        if(paused_!=value){paused_=value;garageAudio_.paused_=value;garageDroidAudio_.paused_=value;noteControlChange();}
     }
     bool paused() const noexcept { return paused_; }
     // Application must use this gate for the dedicated frontend mixer. Paused
@@ -199,10 +531,56 @@ public:
     std::uint32_t activeMusicSong() const noexcept;
     float mainGain() const noexcept { return musicGain_; }
 private:
+    // Downstream music leaves only, NOT Garage AC/B4 completion. Source AC
+    // invokes real26A820(25% wet master) BEFORE1FAF58; no production caller
+    // may reach this leaf until that concrete predecessor exists. There is no
+    // caller-supplied reverb/ready flag. Ordinary8 retains its SAME mixer,
+    // music voice, clock and mode; no scene/Watto Sound is constructed here.
+    bool prepareGarageSong6LeafPcm(const std::filesystem::path&,std::string&) noexcept;
+    bool canStartGarageSong6Leaf1FAF58() const noexcept;
+    bool startGarageSong6Leaf1FAF58() noexcept;
+    bool canFadeGarageSong6Leaf1FB09C() const noexcept;
+    bool fadeGarageSong6Leaf1FB09C() noexcept;
+    bool garageSong6LeafCurrent() const noexcept;
+    bool garageSong6LeafAttempted_=false,garageSong6LeafPrepared_=false;
+    // Cold transport is not menu readiness. Actual Actors interleave source
+    // Sound construction with each model/initial-pose/bounds continuation.
+    bool prepareGarageSceneColdTransport(const std::filesystem::path&,
+        std::shared_ptr<const assets::OriginalStreamMetadata50KZ>,AudioMixer50HD&,std::string&) noexcept;
+    OriginalUiGarageDroidAudio50GN* garageDroidAudioCold() noexcept;
+    // Observation only: this slice has no counted Scene+4D8 retirement witness.
+    // Native retired_ merely means stop/logical close, NOT source registry or
+    // per-Sound reference retirement. Only never-populated rows may release.
+    bool garageSceneNativeRowsNeverPopulatedCold()const noexcept {
+        const auto& droids=garageDroidAudio_;
+        if(droids.sourceSceneGroup_)return false;
+        if(!droids.current()||!droids.quiet())return false;
+        if(droids.nextActor_||droids.constructedSounds_)return false;
+        // append publishes source/sound BEFORE incrementing the count. A
+        // failed partial row is not empty merely because the count is zero.
+        for(const auto& row:droids.rows_)
+            if(row.source||row.sound||row.played108||row.playbackRevision)return false;
+        return true;
+    }
+
+    bool finishGarageSceneColdTransport(std::string&) noexcept;
+    bool prepareImpl(const std::filesystem::path&,AudioMixer50HD&,std::string&,bool,
+        std::shared_ptr<const assets::OriginalStreamMetadata50KZ>,bool scene=false,bool incremental=false) noexcept;
+    bool garageColdPending_=false,garageColdFinishAttempted_=false;
+    std::filesystem::path garageColdRoot_;
+    std::shared_ptr<const assets::OriginalStreamMetadata50KZ> garageColdMetadata_;
+
+    bool garageGroupCurrent() const noexcept;
+    bool courseMixerShape() const noexcept;
+    OriginalUiGarageDroidAudio50GN garageDroidAudio_;
+    OriginalUiGarageWattoAudio50KG garageAudio_;
+    assets::AudioPcm50HC garagePcm_{};
+    AudioClip50HD garageClip_{};
+    bool garagePrepared_=false,garageScenePrepared_=false;
     bool canRecordControlChange(std::uint64_t count = 1) const noexcept;
     void noteControlChange() noexcept;
     bool current() const noexcept;
-    bool startMusicLoop(const AudioClip50HD&, std::uint32_t song) noexcept;
+    bool startMusicLoop(const AudioClip50HD&, std::uint32_t song,float pitch=1.f) noexcept;
     bool canPlayEffectClip(std::size_t) const noexcept;
     bool playEffectClip(std::size_t) noexcept;
     bool attempted_ = false, prepared_ = false, paused_ = false;
@@ -219,7 +597,7 @@ private:
     std::uint64_t controlRevision_ = 0, musicPlaybackRevision_ = 0;
     std::array<std::uint64_t, effectVoiceCount> effectPlaybackRevisions_{};
     bool controlRevisionExhausted_ = false;
-    float musicGain_ = 0.4f, fadeStartGain_ = 0.4f;
+    float musicGain_ = 0.4f, fadeStartGain_ = 0.4f, musicPitch_ = 1.f;
     float fadeElapsed_ = 0.f, fadeDuration_ = 0.f, fadeRetireAt_ = 0.f;
     std::uint32_t musicSong_ = 0;
     // Original UI setup1B7944 music40/100 and1B78D0 effects100/100.

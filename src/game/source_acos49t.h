@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 
+namespace rr::platform {class OriginalUiGarageUiLights50KG;class OriginalUiGarageSceneLighting50KG;}
 namespace rr::game {
 struct SourceLibmState49T {
     std::int32_t mode = 1;
@@ -37,6 +38,16 @@ bool sourceAcos49T(std::uint32_t inputBits, SourceLibmState49T& state,
 // Legacy original MOT rotation conversion consumes this bounded domain.
 // False preserves output. This does not admit arbitrary sine arguments.
 bool sourceSinePositiveReduced50IG(std::uint32_t inputBits,std::uint32_t& outputBits) noexcept;
+
+// Concrete reached146898/146E60 use of the SAME source software-double
+// operations. Private finite nonnegative RGB envelope, not a parser policy.
+class SourceUiLightMath50KG final {
+    friend class ::rr::platform::OriginalUiGarageUiLights50KG;
+    friend class ::rr::platform::OriginalUiGarageSceneLighting50KG;
+    static std::uint32_t range146898()noexcept;
+    static bool luminance146E60(std::uint32_t r,std::uint32_t g,std::uint32_t b,
+        std::uint32_t& output)noexcept;
+};
 
 #ifdef RR_SOURCE_ACOS49T_TEST_API
 // Test-only access to the elementary source operations and conversions.

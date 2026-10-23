@@ -5,6 +5,7 @@
 
 namespace ra_collision_resources50LA { class Owner; }
 namespace rr::game { class OriginalWreckType0Owners50LA; }
+namespace rr::platform { class OriginalUiGarageSceneCollision50KG; }
 namespace rr::assets {
 // Typed immutable native prewarming lease. Only authenticated owners can bind
 // it into a resource; retaining cache bytes is separate from source ref60.
@@ -21,6 +22,7 @@ public:
 // Only12559C/11AEE0 change signed ref60. shared_ptr merely pins host storage.
 class OriginalStandardCollisionType0Resource50LA final {
     friend class rr::game::OriginalWreckType0Owners50LA;
+    friend class rr::platform::OriginalUiGarageSceneCollision50KG;
     friend class ::ra_collision_resources50LA::Owner;
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver_;
     OriginalStandardModelFileId50LA file_{};

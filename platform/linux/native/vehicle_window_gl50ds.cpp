@@ -1,3 +1,7 @@
+#include "original_ui_garage_draw_contribution50kg.h"
+#include "../../../tests/native/original_native_collector_fifo50la.h"
+#include "original_ui_garage_canonical_submission50kg.h"
+struct __GLsync; // OpenGL opaque sync type, never a native-dereferenced pointer.
 #include "../../../tests/native/ra_static_fire_visual50la.h"
 #include "vehicle_window_gl50ds.h"
 #include "original_ui_coverage_bounds50kg.h"
@@ -1137,6 +1141,11 @@ struct OwnerGl {
     void (*getTexParameteriv)(U, U, I*) = nullptr;
     // Only loaded if GL >= 3.3 or ARB_sampler_objects is advertised.
     void (*bindSampler)(U, U) = nullptr;
+    // Loaded only when the actual Garage batch first needs its own sampling state.
+    void (*genSamplers)(I, U*) = nullptr;
+    void (*deleteSamplers)(I, const U*) = nullptr;
+    void (*samplerParameteri)(U, U, I) = nullptr;
+    void (*getSamplerParameteriv)(U, U, I*) = nullptr;
     const unsigned char* (*getStringi)(U, U) = nullptr;
     void (*viewport)(I, I, I, I) = nullptr;
     void (*scissor)(I, I, I, I) = nullptr;
@@ -1155,6 +1164,12 @@ struct OwnerGl {
     void (*pixelStorei)(U, I) = nullptr;
     void (*readPixels)(I, I, I, I, U, U, void*) = nullptr;
     void (*finish)() = nullptr;
+    void (*garageFlush24C160)()=nullptr; //Lazy same-context core glFlush, no ordinary startup dependency.
+    // Garage-only lazy GL3.2 core observation. Ordinary startup is unchanged.
+    __GLsync* (*fenceSync)(U,U)=nullptr;
+    void (*getSynciv)(__GLsync*,U,I,I*,I*)=nullptr;
+    std::uint8_t (*isSync)(__GLsync*)=nullptr;
+    void (*deleteSync)(__GLsync*)=nullptr;
     // Dormant blend-only lookup; normal renderer creation is unchanged.
     void (*drawArrays)(U,I,I) = nullptr;
     const unsigned char* (*getString)(U) = nullptr;
@@ -1612,7 +1627,7 @@ struct VehicleWindowGl50DS::Storage {
     const OriginalUiSourceOwner50KM* uiSourceFrameOwner=nullptr;
     std::uint64_t uiSourceFrameGeneration=0,uiSourceTargetGeneration=0;
     U uiProgram = 0, uiVertexShader = 0, uiFragmentShader = 0;
-    U uiVertexBuffer = 0, uiIndexBuffer = 0, uiVertexArray = 0, uiParticleFogBuffer = 0, uiSourceRasterWBuffer = 0;
+    U uiVertexBuffer = 0, uiIndexBuffer = 0, uiVertexArray = 0, uiParticleFogBuffer = 0, uiSourceRasterWBuffer = 0, uiSourcePacketStqBuffer = 0;
     struct UiSourceIndexStream {
         static_assert(std::uint64_t(originalUiMaximumSourceQuads50KM) * 6 <=
             std::uint64_t(std::numeric_limits<I>::max()), "source UI draw count must fit GLsizei");
@@ -1627,6 +1642,10 @@ struct VehicleWindowGl50DS::Storage {
     // Source-only cold storage; the ordinary RGB quad index buffer stays immutable.
     std::unique_ptr<UiSourceIndexStream> uiSourceIndices;
     U uiSourceIndexBuffer = 0;
+    // Eight immutable effective policies: matching nearest/linear, repeat/clamp S/T.
+    // These own no pixels and never modify a published MaterialTextureGl image.
+    U garageSamplers50KG[8]{};
+    bool garageSamplersReady50KG=false;
     I uiCanvasUniform = -1, uiImageUniform = -1, uiAlphaUniform = -1, uiTexturedUniform = -1;
     I uiParticleFogColorUniform = -1, uiSourceRasterUniform = -1;
     I uiSourceFogEnabledUniform = -1, uiSourceAlphaTestUniform = -1;
@@ -1648,6 +1667,13 @@ struct VehicleWindowGl50DS::Storage {
     std::uint8_t published = 0;
     bool initialized = false, active = false, frameSet = false, imageCommitted = false;
     bool frontendOnly = false;
+    __GLsync* garagePollFence50KG=nullptr;
+    const OriginalUiSourceOwner50KM* garagePreludeOwner50KG=nullptr;
+    std::uint64_t garageCompletedPublication50KG=0,garageCompletedTarget50KG=0,garagePublishedPublication50KG=0;
+
+    std::uint64_t garagePreludePublication50KG=0;
+    bool garagePreludeFailed50KG=false;
+    bool nativeGlFaultObserved50KG = false; // Never reset while this Storage lives.
     std::uint64_t contextDrainGeneration = 0;
 
 #include "original_gameplay_blur_storage.inl"
@@ -2518,6 +2544,8 @@ void main() {
         displayFadeDeletionPending=false;return true;
     }
     bool hasGlResources() const noexcept {
+        if(garagePollFence50KG)return true;
+        for(U name:garageSamplers50KG)if(name)return true;
         if(hasRaWorldResources())return true;
         if(hasCoverageResources()||uiCoverage.owns())return true;
         if(hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())return true;
@@ -2528,7 +2556,7 @@ void main() {
         if (hostHudProgram || hostHudVertexShader || hostHudFragmentShader ||
             hostHudVertexBuffer || hostHudIndexBuffer || hostHudVertexArray) return true;
         if (uiProgram || uiVertexShader || uiFragmentShader ||
-            uiVertexBuffer || uiIndexBuffer || uiVertexArray || uiParticleFogBuffer || uiSourceRasterWBuffer ||
+            uiVertexBuffer || uiIndexBuffer || uiVertexArray || uiParticleFogBuffer || uiSourceRasterWBuffer || uiSourcePacketStqBuffer ||
             uiSourceIndexBuffer) return true;
         for (U b = 0; b < 2; ++b)
             if (uiTargets[b] || uiColors[b] || uiDepths[b]) return true;
@@ -2571,6 +2599,7 @@ void main() {
     bool check(const char* operation) noexcept {
         const U error = drawGl.getError();
         if (!error) return true;
+        nativeGlFaultObserved50KG=true;
         if (!diagnostic->glError) diagnostic->glError = error;
         return fail(*diagnostic, VehicleWindowError50DS::gl, operation);
     }
@@ -3553,10 +3582,12 @@ in vec2 rrUv;
 in vec4 rrColor;
 in float rrParticleFog;
 in float rrSourceRasterW;
+in vec3 rrSourceStq;
 uniform vec4 canvasToClip;
 uniform int uiSourceRaster;
 uniform int gcParticleMode;
 out vec2 uiUv;
+noperspective out vec3 uiSourceStq;
 noperspective out vec4 uiColor;
 noperspective out float uiParticleFog;
 void main() {
@@ -3567,6 +3598,9 @@ void main() {
     gl_Position = vec4(rrPosition.xy * canvasToClip.xy + canvasToClip.zw,
         z * 2.0 - 1.0, 1.0) * w;
     uiUv = rrUv; uiColor = rrColor; uiParticleFog = rrParticleFog;
+    // Modes0/1 retain the existing semantic-UV path. Mode2 transports the
+    // actual packet lanes screen-affinely, independently of projected W.
+    uiSourceStq = uiSourceRaster == 2 ? rrSourceStq : vec3(0.0,0.0,1.0);
 }
 )GLSL";
         constexpr const char* fragmentPrefix = "#version 150 core\n";
@@ -3576,6 +3610,8 @@ void main() {
             "#define RR_UI_COHERENT_FRAMEBUFFER_FETCH 1\n";
         constexpr const char* fragmentSource = R"GLSL(
 in vec2 uiUv;
+noperspective in vec3 uiSourceStq;
+uniform int uiSourceRaster;
 noperspective in vec4 uiColor;
 noperspective in float uiParticleFog;
 uniform sampler2D uiImage;
@@ -3601,8 +3637,12 @@ void main() {
         // Explicit native byte representation. Native GL sampling/interpolation
         // remains separately documented; no PS2 rasterizer/device is executed.
         vec4 vertexByte=clamp(uiColor*255.0,0.0,255.0);
+        vec2 sampleUv=uiUv;
+        // Q was separately rounded by the original packet/clipper. Do not
+        // replace this division with semantic UV perspective interpolation.
+        if(uiSourceRaster==2)sampleUv=uiSourceStq.xy/uiSourceStq.z;
         vec4 source=uiTextured!=0 ?
-            floor(clamp(texture(uiImage,uiUv)*255.0*vertexByte/128.0,0.0,255.0)) :
+            floor(clamp(texture(uiImage,sampleUv)*255.0*vertexByte/128.0,0.0,255.0)) :
             floor(vertexByte);
         if (uiSourceAlphaTest!=0 && source.a<1.0) discard;
         if (uiSourceFogEnabled!=0) {
@@ -3704,6 +3744,7 @@ void main() {
         shaderGl.bindAttribLocation(uiProgram, 2, "rrColor");
         shaderGl.bindAttribLocation(uiProgram, 3, "rrParticleFog");
         shaderGl.bindAttribLocation(uiProgram, 4, "rrSourceRasterW");
+        shaderGl.bindAttribLocation(uiProgram, 5, "rrSourceStq");
         shaderGl.bindFragDataLocation(uiProgram, vehicleGlColorOutput50CZ, "viewerOutput");
         shaderGl.linkProgram(uiProgram);
         I linked = 0; shaderGl.getProgramiv(uiProgram, 0x8B82, &linked);
@@ -3754,6 +3795,12 @@ void main() {
         if (!check("allocate bounded original UI source W")) return false;
         if (!uiSourceRasterWBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI source W buffer");
         if (!verifyBuffer(arrayBuffer, fogBytes, dynamicDraw)) return false;
+        const std::intptr_t stqBytes = uiCapacity * 4 * sizeof(std::array<float,3>);
+        gl.genBuffers(1, &uiSourcePacketStqBuffer); drawGl.bindBuffer(arrayBuffer, uiSourcePacketStqBuffer);
+        gl.bufferData(arrayBuffer, stqBytes, nullptr, dynamicDraw);
+        if (!check("allocate bounded original UI packet STQ")) return false;
+        if (!uiSourcePacketStqBuffer) return fail(*diagnostic, VehicleWindowError50DS::allocation, "zero UI packet STQ buffer");
+        if (!verifyBuffer(arrayBuffer, stqBytes, dynamicDraw)) return false;
         // Heap allocation is cold-only; no large transient frame stack.
         std::unique_ptr<U[]> indices(new (std::nothrow) U[uiCapacity * 6]);
         if (!indices) return fail(*diagnostic, VehicleWindowError50DS::allocation, "allocate original UI quad indices");
@@ -3826,7 +3873,22 @@ void main() {
         }
         void* wPointer = nullptr; gl.getVertexAttribPointerv(4, 0x8645, &wPointer);
         if (!check("verify original UI source W offset")) return false;
-        return !wPointer || fail(*diagnostic, VehicleWindowError50DS::layout, "source W offset mismatch");
+        if (wPointer) return fail(*diagnostic, VehicleWindowError50DS::layout, "source W offset mismatch");
+        drawGl.bindBuffer(arrayBuffer, uiSourcePacketStqBuffer);
+        gl.enableVertexAttribArray(5);
+        gl.vertexAttribPointer(5, 3, floatType, 0, sizeof(std::array<float,3>), nullptr);
+        if (!check("create original UI packet STQ layout")) return false;
+        const I stqExpected[] = {1, 3, sizeof(std::array<float,3>), static_cast<I>(floatType), 0,
+            static_cast<I>(uiSourcePacketStqBuffer), 0};
+        for (U p = 0; p < 7; ++p) {
+            I value = 0; gl.getVertexAttribiv(5, fogProperties[p], &value);
+            if (!check("verify original UI packet STQ attribute")) return false;
+            if (value != stqExpected[p]) return fail(*diagnostic, VehicleWindowError50DS::layout,
+                "source packet STQ attribute mismatch");
+        }
+        void* stqPointer = nullptr; gl.getVertexAttribPointerv(5, 0x8645, &stqPointer);
+        if (!check("verify original UI packet STQ offset")) return false;
+        return !stqPointer || fail(*diagnostic, VehicleWindowError50DS::layout, "source packet STQ offset mismatch");
     }
     bool createHostHud() noexcept {
         if (!request.enableHostHud) return true;
@@ -4411,6 +4473,44 @@ void main() {
             }
         }
         return !samplerObjects || load(gl.bindSampler, "glBindSampler");
+    }
+    U garageSampler50KG(const MaterialTextureSampler50EB& sampler)const noexcept {
+        const auto filter=[](MaterialTextureFilter50EB v){return v==MaterialTextureFilter50EB::nearest||v==MaterialTextureFilter50EB::linear;};
+        const auto wrap=[](MaterialTextureWrap50EB v){return v==MaterialTextureWrap50EB::repeat||v==MaterialTextureWrap50EB::clampToEdge;};
+        if(!garageSamplersReady50KG||!filter(sampler.minification)||sampler.minification!=sampler.magnification||
+           !wrap(sampler.s)||!wrap(sampler.t))return 0;
+        const U index=(sampler.minification==MaterialTextureFilter50EB::linear?4u:0u)|
+            (sampler.s==MaterialTextureWrap50EB::clampToEdge?2u:0u)|(sampler.t==MaterialTextureWrap50EB::clampToEdge?1u:0u);
+        return garageSamplers50KG[index];
+    }
+    bool ensureGarageSamplers50KG()noexcept {
+        if(garageSamplersReady50KG){
+            for(U name:garageSamplers50KG)if(!name)return fail(*diagnostic,VehicleWindowError50DS::material,"Garage sampler owner lost a published name");
+            return true;
+        }
+        // A partial creation owns its names until real cleanup, never replay it.
+        for(U name:garageSamplers50KG)if(name)return fail(*diagnostic,VehicleWindowError50DS::material,"partial Garage sampler creation retained for cleanup");
+        // bindSampler exists only after the unchanged advertised capability check.
+        // Ordinary startup and all non-Garage draws retain their original requirements.
+        if(!gl.bindSampler)return fail(*diagnostic,VehicleWindowError50DS::context,"Garage per-material sampling requires advertised sampler objects");
+        if(!load(gl.genSamplers,"glGenSamplers")||!load(gl.deleteSamplers,"glDeleteSamplers")||
+           !load(gl.samplerParameteri,"glSamplerParameteri")||!load(gl.getSamplerParameteriv,"glGetSamplerParameteriv"))return false;
+        constexpr U parameters[]={0x2801,0x2800,0x2802,0x2803};
+        for(U i=0;i<8;++i){
+            gl.genSamplers(1,&garageSamplers50KG[i]);
+            if(!check("create bounded Garage sampler object"))return false;
+            if(!garageSamplers50KG[i])return fail(*diagnostic,VehicleWindowError50DS::allocation,"zero Garage sampler name");
+            const I values[]={(i&4u)?0x2601:0x2600,(i&4u)?0x2601:0x2600,
+                (i&2u)?0x812F:0x2901,(i&1u)?0x812F:0x2901};
+            for(U j=0;j<4;++j)gl.samplerParameteri(garageSamplers50KG[i],parameters[j],values[j]);
+            if(!check("configure immutable Garage sampler object"))return false;
+            for(U j=0;j<4;++j){
+                I actual=-1;gl.getSamplerParameteriv(garageSamplers50KG[i],parameters[j],&actual);
+                if(!check("verify immutable Garage sampler object"))return false;
+                if(actual!=values[j])return fail(*diagnostic,VehicleWindowError50DS::material,"Garage sampler parameter publication mismatch");
+            }
+        }
+        garageSamplersReady50KG=true;return true;
     }
     bool checkOriginalUiSourceSupport(I major,I minor) noexcept {
         if (!request.enableOriginalUiSourceRgba)return true;
@@ -5755,6 +5855,7 @@ void main() {
         for (unsigned i = 0; i < 32; ++i) {
             const U error = drawGl.getError();
             if (!error) return true;
+            nativeGlFaultObserved50KG=true;
             if (!d.cleanupGlError) d.cleanupGlError = error;
         }
         return false;
@@ -5764,7 +5865,8 @@ void main() {
         deleter(1, &name);
         const U error = drawGl.getError();
         if (!error) { name = 0; return true; }
-        if (!d.cleanupGlError) d.cleanupGlError = error;
+        nativeGlFaultObserved50KG=true;
+            if (!d.cleanupGlError) d.cleanupGlError = error;
         // Retain the name conservatively until deletion is acknowledged. The
         // host may not create/reuse GL objects between unsuccessful close calls.
         return false;
@@ -5775,10 +5877,13 @@ void main() {
         else shaderGl.deleteShader(name);
         const U error = drawGl.getError();
         if (!error) { name = 0; return true; }
-        if (!d.cleanupGlError) d.cleanupGlError = error;
+        nativeGlFaultObserved50KG=true;
+            if (!d.cleanupGlError) d.cleanupGlError = error;
         return false;
     }
     bool cleanup(VehicleWindowDiagnostic50DS& d) noexcept {
+        if(garagePreludeOwner50KG){d.cleanupIncomplete=true;
+            return fail(d,VehicleWindowError50DS::cleanup,"Garage source-target prelude must retire its actual owner before renderer cleanup");}
         if (thread != std::this_thread::get_id()) {
             d.cleanupIncomplete = true;
             return fail(d, VehicleWindowError50DS::wrongThread, "cleanup requires creating thread");
@@ -5830,12 +5935,25 @@ void main() {
             d.cleanupIncomplete = true;
             return fail(d, VehicleWindowError50DS::cleanup, "GL error state will not clear for cleanup");
         }
+        // A failed nonblocking Garage observation can retain its one native
+        // fence. Query actual ownership before deletion, including a prior
+        // delete whose diagnostic outcome was uncertain. No replayed draw.
+        if(garagePollFence50KG){
+            if(!gl.isSync||!gl.deleteSync){d.cleanupIncomplete=true;
+                return fail(d,VehicleWindowError50DS::cleanup,"Garage poll fence lacks its exact GL release owner");}
+            const auto alive=gl.isSync(garagePollFence50KG);
+            U error=drawGl.getError();
+            if(error){d.cleanupIncomplete=true;d.cleanupGlError=error;return false;}
+            if(alive){gl.deleteSync(garagePollFence50KG);error=drawGl.getError();
+                if(error){d.cleanupIncomplete=true;d.cleanupGlError=error;return false;}}
+            garagePollFence50KG=nullptr;
+        }
         // Explicit source/display leases add a real completion obligation. Never
         // confuse a CPU generation increment or deferred GL deletion with it.
         if (riderTextureBorrow || raWorld || raStaticFireOwner || rcParticleWindow || gbParticleWindow || mcParticleWindow || hasDisplayFadeNames() || uiCoverage.owns() || uiSourceLeaseWork || uiRetainedTarget || uiRetainedColor || uiBlendOldSnapshot ||
             uiPromotedIncomingTarget || uiPromotedIncomingColor || hasGameplayBlurResources() || (hasRaceHudResources() || hasTimeStatsResources() || hasPositionStatsResources() || hasDamageResources() || hasPauseDerivedResources() || hasSpeedBoostResources())){
             gl.finish();const U error=drawGl.getError();
-            if (error){if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
+            if (error){nativeGlFaultObserved50KG=true;if(!d.cleanupGlError)d.cleanupGlError=error;d.cleanupIncomplete=true;
                 return fail(d,VehicleWindowError50DS::cleanup,"complete source leases before cleanup");}
             uiSourceLeaseWork=false;
         }
@@ -5861,6 +5979,7 @@ void main() {
         }
         const U unbindError = drawGl.getError();
         if (unbindError) {
+            nativeGlFaultObserved50KG=true;
             if (!d.cleanupGlError) d.cleanupGlError = unbindError;
             d.cleanupIncomplete = true;
             return fail(d, VehicleWindowError50DS::cleanup, "unbind renderer resources before cleanup");
@@ -5884,6 +6003,8 @@ void main() {
         else {
             if(!deleteDisplayFadeNames(d))goto incomplete;
             if (!deleteUiByteBlendNames(d) || !deleteUiCoverage(d))goto incomplete;
+            garageSamplersReady50KG=false;
+            for(auto& name:garageSamplers50KG)if(!deleteName(name,gl.deleteSamplers,d))goto incomplete;
             uiBlendOldSnapshot=uiBlendIncomingSource=0;
             if (!deleteName(uiPromotedIncomingTarget,gl.deleteFramebuffers,d) ||
                 !deleteName(uiPromotedIncomingColor,gl.deleteTextures,d))goto incomplete;
@@ -5894,6 +6015,7 @@ void main() {
                 !deleteName(uiVertexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(uiParticleFogBuffer, gl.deleteBuffers, d) ||
                 !deleteName(uiSourceRasterWBuffer, gl.deleteBuffers, d) ||
+                !deleteName(uiSourcePacketStqBuffer, gl.deleteBuffers, d) ||
                 !deleteName(uiSourceIndexBuffer, gl.deleteBuffers, d) ||
                 !deleteName(uiIndexBuffer, gl.deleteBuffers, d)) goto incomplete;
             for (U b = 0; b < 2; ++b)
@@ -5993,7 +6115,7 @@ VehicleWindowGl50DS::~VehicleWindowGl50DS() noexcept {
 bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
     const assets::VehicleDrawAssets50CR& assets, VehicleWindowDiagnostic50DS& d) noexcept {
     d = {};
-    if(sessionDisplayOwner50LA_&&!sessionDisplayCreate50LA_)
+    if(sessionDisplayFrontendCreate50KG_||(sessionDisplayOwner50LA_&&!sessionDisplayCreate50LA_))
         return fail(d,VehicleWindowError50DS::request,"session renderer creation requires its actual display owner");
     if(request.gameplayBinderTextures){
         // Binder uses the shared cable quad buffers and the requested
@@ -6100,8 +6222,9 @@ bool VehicleWindowGl50DS::create(const VehicleWindowRequest50DS& request,
 
 bool VehicleWindowGl50DS::createOriginalFrontend(const OriginalFrontendWindowRequest50LA& input,
     VehicleWindowDiagnostic50DS& d) noexcept {
-    if(sessionDisplayOwner50LA_){d={};return fail(d,VehicleWindowError50DS::request,
-        "race display renderer cannot be replaced by a frontend renderer");}
+    if(sessionDisplayCreate50LA_||(sessionDisplayOwner50LA_&&!sessionDisplayFrontendCreate50KG_)){
+        d={};return fail(d,VehicleWindowError50DS::request,
+            "frontend renderer creation requires its actual frontend display scope");}
     d={};
     if(storage_)return fail(d,VehicleWindowError50DS::alreadyOwned,"renderer already owns resources");
     if(!input.procAddress||!input.isCurrent||!input.cpuTextures||!input.textures||
@@ -6806,6 +6929,9 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
     d={};
     if (!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"source UI composition is unavailable");
     auto& s=*storage_;
+    if(s.garagePreludeOwner50KG&&(frame.owner_!=s.garagePreludeOwner50KG||
+       frame.frameGeneration_!=s.garagePreludePublication50KG||s.garagePreludeFailed50KG))
+        return fail(d,VehicleWindowError50DS::frame,"source frame differs from actual Garage viewport prelude");
     if (!frame.native_ || !frame.owner_ || !frame.frameGeneration_ ||
         (s.uiSourceFrameOwner && frame.owner_!=s.uiSourceFrameOwner) ||
         (frame.owner_==s.uiSourceFrameOwner && frame.frameGeneration_<=s.uiSourceFrameGeneration) ||
@@ -6821,8 +6947,22 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
     if(riderSparse&&(frame.riderSession_!=riderGpu->riderSession()||frame.riderTextures_!=riderGpu||
        frame.riderResidencySerial_!=riderGpu->riderDemandSerial()||s.riderTextureBorrow!=riderGpu))
         return fail(d,VehicleWindowError50DS::material,"Rider complete-frame receipt session/publication/serial mismatch");
+    if(frame.native_->draw.spanCount>originalUiMaximumSpans50KG||
+       (frame.native_->draw.spanCount&&!frame.native_->draw.spans))
+        return fail(d,VehicleWindowError50DS::frame,"bounded source span array is missing");
+    bool hasGaragePrelit=false;
+    for(std::uint32_t i=0;i<frame.native_->draw.spanCount;++i)
+        if(frame.native_->draw.spans[i].materialMode==OriginalUiMaterialMode50KG::sourcePrelitCompressed)hasGaragePrelit=true;
+    if(hasGaragePrelit&&!frame.garageCanonical_)
+        return fail(d,VehicleWindowError50DS::material,"Garage PreLit requires its actual canonical pass transaction");
+    if(frame.garageCanonical_&&!frame.garageCanonical_->preflight(frame,frame.owner_,frame.frameGeneration_,frame.native_,*this))
+        return fail(d,VehicleWindowError50DS::material,"Garage canonical handles, source image bank or effective state rejected");
     if (!frame.owner_->beginSourceSubmission(frame.frameGeneration_,*this))
         return fail(d,VehicleWindowError50DS::frame,"original UI source binding-history receipt rejected");
+    if(frame.garageCanonical_&&!frame.garageCanonical_->begin(frame,frame.owner_,frame.frameGeneration_,frame.native_,*this)){
+        frame.owner_->finishSourceSubmission(frame.frameGeneration_,false,false);
+        return fail(d,VehicleWindowError50DS::material,"Garage canonical submission changed before target work");
+    }
     bool sourceWorkStarted=false;
     const auto sourceTargetBefore=s.uiSourceTargetGeneration;
     const auto submitDiagnosticStart=Storage::UiCoverageClock::now();
@@ -6835,6 +6975,8 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
             (unsigned long long)s.uiSourceTargetGeneration,(unsigned long long)submitDiagnosticNs,
             unsigned(accepted),unsigned(d.originalUiSourceAccepted));
     }
+    const bool canonicalHistoryAccepted=!frame.garageCanonical_||frame.garageCanonical_->finish(
+        frame.frameGeneration_,d.originalUiSourceAccepted,sourceWorkStarted);
     frame.owner_->finishSourceSubmission(frame.frameGeneration_,d.originalUiSourceAccepted,sourceWorkStarted);
     d.originalUiSourceFrameGeneration=frame.frameGeneration_;
     d.originalUiSourceTargetGeneration=s.uiSourceTargetGeneration;
@@ -6851,6 +6993,8 @@ bool VehicleWindowGl50DS::submitOriginalUiSourceFrame(const OriginalUiSourceFram
         s.uiSourceTerminal=frame.terminal_;
         for(unsigned i=0;i<4;++i)s.uiSourceClear[i]=frame.native_->draw.clearRgba[i];
     }
+    if(!canonicalHistoryAccepted)
+        return fail(d,VehicleWindowError50DS::material,"Garage canonical history indeterminate after actual source work");
     return accepted;
 }
 bool VehicleWindowGl50DS::matchesOriginalUiSource(const OriginalUiSourceSubmission50KN& receipt)const noexcept {
@@ -7376,6 +7520,180 @@ bool VehicleWindowGl50DS::releaseOriginalUiByteBlend(VehicleWindowDiagnostic50DS
     if(!accepted)d.cleanupIncomplete=true;
     s.diagnostic=nullptr;return accepted;
 }
+bool VehicleWindowGl50DS::applyGarageFogColor244A40(const OriginalUiSourceOwner50KM& owner,
+    std::uint64_t publication,std::uint32_t argb,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};if(!originalUiSourceRgbaAvailable()||!ownsGarageSourcePrelude50KG(owner,publication))
+        return fail(d,VehicleWindowError50DS::context,"Garage Fog command requires exact live source-target owner");
+    auto& s=*storage_;
+    if(!s.current(d)||s.active||s.frameSet||s.diagnostic||s.garagePreludeFailed50KG||
+       s.nativeGlFaultObserved50KG||!s.uiProgram||s.uiParticleFogColorUniform<0)
+        return fail(d,VehicleWindowError50DS::frame,"Garage Fog command requires current idle source renderer");
+    s.diagnostic=&d;s.gl.useProgram(s.uiProgram);
+    //Native equivalent of the single13EBBC GSFOGCOL write. Apply the actual
+    //retained source-RGBA shader state in command order; do not draw/present.
+    s.gl.uniform4f(s.uiParticleFogColorUniform,float((argb>>16)&255u)/255.f,
+        float((argb>>8)&255u)/255.f,float(argb&255u)/255.f,1.f);
+    const bool accepted=s.check("apply actual Garage Fog GSFOGCOL command");
+    s.diagnostic=nullptr;if(!accepted)s.garagePreludeFailed50KG=true;return accepted;
+}
+bool VehicleWindowGl50DS::clearGarageSourceViewport50KG(const OriginalUiSourceOwner50KM& owner,
+    std::uint64_t publication,bool color,std::uint32_t argb,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};
+    if(!publication||!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"Garage source clear requires actual source target and publication");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(!s.frontendOnly||s.active||s.frameSet||s.diagnostic||s.nativeGlFaultObserved50KG||
+       s.garagePreludeFailed50KG||(s.garagePreludeOwner50KG&&
+       (s.garagePreludeOwner50KG!=&owner||s.garagePreludePublication50KG!=publication))||
+       (s.uiSourceFrameOwner&&s.uiSourceFrameOwner!=&owner))
+        return fail(d,VehicleWindowError50DS::frame,"Garage source clear requires idle exact source-target ownership");
+    const bool first=!s.garagePreludeOwner50KG;
+    if(first&&s.uiSourceTargetGeneration==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,VehicleWindowError50DS::frame,"Garage source target generation exhausted");
+    s.garagePreludeOwner50KG=&owner;s.garagePreludePublication50KG=publication;
+    if(first)++s.uiSourceTargetGeneration;
+    s.uiSourceAcceptedTargetGeneration=0;s.uiSourcePublishedTargetGeneration=0;
+    s.diagnostic=&d;
+    //Actual full640x448 source viewport.2458C0's sprite has ATE=NEVER,
+    //AFAIL=ZB_ONLY,Z=0. This real D24 clear has no color/image-publication effect.
+    s.gl.bindFramebuffer(framebuffer,s.uiSourceTarget);s.gl.viewport(0,0,640,448);
+    s.gl.disable(0x0C11);s.gl.depthMask(1);s.gl.clearDepth(0.0);
+    U mask=depthBufferBit;
+    if(color){
+        s.gl.colorMask(1,1,1,1);
+        //25C0A0 emits alpha128 regardless of the incoming ARGB high byte.
+        s.gl.clearColor(float((argb>>16)&255u)/255.f,float((argb>>8)&255u)/255.f,
+            float(argb&255u)/255.f,128.f/255.f);mask|=colorBufferBit;
+    }
+    s.gl.clear(mask);
+    const bool accepted=s.check("apply actual Garage full-viewport source clear");
+    if(accepted&&color){s.uiSourceClear[0]=float((argb>>16)&255u)/255.f;
+        s.uiSourceClear[1]=float((argb>>8)&255u)/255.f;s.uiSourceClear[2]=float(argb&255u)/255.f;
+        s.uiSourceClear[3]=1.f;} //Actual clear provenance for later opaque target copy.
+    s.diagnostic=nullptr;s.garagePreludeFailed50KG=!accepted;
+    //No source frame, source alpha receipt, image acceptance or timing commit.
+    return accepted;
+}
+bool VehicleWindowGl50DS::ownsGarageSourcePrelude50KG(const OriginalUiSourceOwner50KM& owner,
+    std::uint64_t publication)const noexcept {
+    return storage_&&storage_->garagePreludeOwner50KG==&owner&&storage_->garagePreludePublication50KG==publication;
+}
+bool VehicleWindowGl50DS::garageUnsealedRenderQuiescent50KG(
+    const OriginalUiGarageDrawContribution50KG& draw,std::uint64_t publication)const noexcept {
+    if(!storage_||!publication||draw.publication_!=publication||
+       !draw.frontendTextureRendererCurrent(*this)||!originalUiSourceRgbaAvailable())return false;
+    const auto& s=*storage_;VehicleWindowDiagnostic50DS observed;
+    if(!s.current(observed)||!s.frontendOnly||s.active||s.frameSet||s.diagnostic||
+       s.garagePollFence50KG||s.nativeGlFaultObserved50KG||s.garagePreludeFailed50KG||
+       s.uiSourceFrameOwner||s.uiSourceFrameGeneration||s.garageCompletedPublication50KG||
+       s.garageCompletedTarget50KG||s.garagePublishedPublication50KG)return false;
+    // A prior prelude may not have started, or may already be truly released
+    // on this native retry. A live one must be this exact Draw/publication.
+    // Poll fences and observed GL faults are independent owners/history and
+    // cannot be discharged by this read-only observation or inferred finish.
+    return s.garagePreludeOwner50KG?
+        s.garagePreludeOwner50KG==&draw&&s.garagePreludePublication50KG==publication:
+        s.garagePreludePublication50KG==0;
+}
+bool VehicleWindowGl50DS::releaseGarageSourcePrelude50KG(const OriginalUiSourceOwner50KM& owner,
+    std::uint64_t publication,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};if(!storage_)return false;auto& s=*storage_;
+    if(!s.garagePreludeOwner50KG)return true;
+    if(s.garagePreludeOwner50KG!=&owner||s.garagePreludePublication50KG!=publication||
+       s.active||s.frameSet||s.diagnostic||!s.current(d))return false;
+    //Retire only this native source-target work. Failed GL completion retains
+    //the exact owner; it cannot be hidden by dropping the SourceOwner pointer.
+    s.diagnostic=&d;bool okay=s.check("before Garage source prelude retirement");
+    if(okay){s.gl.finish();okay=s.check("retire actual Garage source-target work");}
+    s.diagnostic=nullptr;
+    if(okay){s.garagePreludeOwner50KG=nullptr;s.garagePreludePublication50KG=0;s.garagePreludeFailed50KG=false;
+        s.garageCompletedPublication50KG=0;s.garageCompletedTarget50KG=0;s.garagePublishedPublication50KG=0;}
+    return okay;
+}
+bool VehicleWindowGl50DS::pollOriginalRenderer245030(bool& complete,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};complete=false;
+    if(!originalUiSourceRgbaAvailable())return fail(d,VehicleWindowError50DS::context,"Garage poll requires source RGBA renderer");
+    auto& s=*storage_;if(!s.current(d))return false;
+    if(!s.frontendOnly||s.active||s.frameSet||s.diagnostic||s.garagePollFence50KG||s.nativeGlFaultObserved50KG)
+        return fail(d,VehicleWindowError50DS::frame,"Garage poll requires idle current frontend without a failed poll");
+    s.diagnostic=&d;
+    const bool loaded=(s.gl.fenceSync||s.load(s.gl.fenceSync,"glFenceSync"))&&
+        (s.gl.getSynciv||s.load(s.gl.getSynciv,"glGetSynciv"))&&
+        (s.gl.isSync||s.load(s.gl.isSync,"glIsSync"))&&
+        (s.gl.deleteSync||s.load(s.gl.deleteSync,"glDeleteSync"));
+    if(!loaded||!s.check("before Garage nonblocking renderer poll")){s.diagnostic=nullptr;return false;}
+    // Observe the real context's preceding native work. This inserts no draw,
+    // flush, wait, source timing sample or completion receipt. The sync object
+    // is a native observation marker, not a reconstruction of guest DMA pools.
+    s.garagePollFence50KG=s.gl.fenceSync(0x9117u,0u); //SYNC_GPU_COMMANDS_COMPLETE
+    if(!s.check("create Garage native poll marker")||!s.garagePollFence50KG){
+        if(d.error==VehicleWindowError50DS::none)fail(d,VehicleWindowError50DS::gl,"Garage native poll marker is null");
+        s.diagnostic=nullptr;return false;
+    }
+    I length=0,status=0;s.gl.getSynciv(s.garagePollFence50KG,0x9114u,1,&length,&status); //SYNC_STATUS
+    if(!s.check("observe Garage native completion without waiting")||length!=1||
+       (status!=0x9118&&status!=0x9119)){
+        if(d.error==VehicleWindowError50DS::none)fail(d,VehicleWindowError50DS::gl,"Garage native poll status is unsupported");
+        s.diagnostic=nullptr;return false;
+    }
+    s.gl.deleteSync(s.garagePollFence50KG);
+    if(!s.check("release Garage native poll marker")){s.diagnostic=nullptr;return false;}
+    s.garagePollFence50KG=nullptr;s.diagnostic=nullptr;
+    complete=status==0x9119;return true;
+}
+bool VehicleWindowGl50DS::completeGarageSourceTarget140A38(
+    OriginalUiGarageDrawContribution50KG& draw,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};
+    if(!originalUiSourceRgbaAvailable()||!draw.identityCurrent()||
+       draw.phase_!=decltype(draw.phase_)::finalPass||draw.sourcePC_!=0x140A38||
+       !draw.finalPassReturned140844_||!draw.rendererEndReturned2442CC_||
+       !draw.terminalQueue105990Current()||draw.targetCompleted140A38_||
+       !ownsGarageSourcePrelude50KG(draw,draw.publication_))
+        return fail(d,VehicleWindowError50DS::frame,"Garage target requires the actual complete Root render and retired FIFO");
+    auto& s=*storage_;
+    if(!s.current(d)||s.active||s.frameSet||s.diagnostic||s.garagePreludeFailed50KG||
+       s.garageCompletedPublication50KG||!s.uiSourceTarget||!s.uiSourceTargetGeneration)
+        return fail(d,VehicleWindowError50DS::frame,"Garage target completion requires the same idle actual context");
+    s.diagnostic=&d;s.gl.finish();const bool okay=s.check("complete actual Garage Root render target");
+    if(okay){s.garageCompletedPublication50KG=draw.publication_;s.garageCompletedTarget50KG=s.uiSourceTargetGeneration;}
+    else s.garagePreludeFailed50KG=true;
+    d.submittedWorkCompleted=okay;s.diagnostic=nullptr;return okay;
+}
+bool VehicleWindowGl50DS::publishGarageSourceTarget140A68(
+    OriginalUiGarageDrawContribution50KG& draw,std::int32_t width,std::int32_t height,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};if(!originalUiSourceRgbaAvailable()||!draw.issuer_||!draw.renderReturned140230Current(*draw.issuer_)||
+       !draw.targetPublishAttempted_||draw.targetPublished140A68_||!ownsGarageSourcePrelude50KG(draw,draw.publication_))
+        return fail(d,VehicleWindowError50DS::frame,"Garage publication requires this actual completed Root target");
+    auto& s=*storage_;
+    if(!s.current(d)||s.active||s.frameSet||s.diagnostic||s.garagePreludeFailed50KG||
+       s.garageCompletedPublication50KG!=draw.publication_||s.garageCompletedTarget50KG!=s.uiSourceTargetGeneration||
+       s.garagePublishedPublication50KG||width<=0||height<=0)
+        return fail(d,VehicleWindowError50DS::frame,"Garage target publication is stale or already attempted");
+    s.diagnostic=&d;
+    //Copy the genuine completed source-RGBA target. Do not replay any packets,
+    //make an empty SourceFrame, or manufacture a generic byte-blend terminal.
+    const bool okay=s.publishUiSource(s.uiSourceClear,width,height);
+    if(okay)s.garagePublishedPublication50KG=draw.publication_;
+    else s.garagePreludeFailed50KG=true;
+    s.diagnostic=nullptr;return okay;
+}
+bool VehicleWindowGl50DS::rearmGarageSourceTarget140230(
+    OriginalUiGarageDrawContribution50KG& draw,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};if(!storage_||!draw.issuer_||!draw.renderReturned140230Current(*draw.issuer_)||
+       !draw.targetPublished140A68_||!ownsGarageSourcePrelude50KG(draw,draw.publication_))
+        return fail(d,VehicleWindowError50DS::frame,"Garage rearm requires its published completed target");
+    auto& s=*storage_;
+    if(!s.current(d)||s.active||s.frameSet||s.diagnostic||s.garagePreludeFailed50KG||
+       s.garageCompletedPublication50KG!=draw.publication_||s.garagePublishedPublication50KG!=draw.publication_||
+       s.garageCompletedTarget50KG!=s.uiSourceTargetGeneration||!draw.drainGpu_||
+       s.request.originalUiTextures!=draw.drainGpu_.get()||s.uiTexturePublication!=draw.drainGpu_->publicationToken())
+        return fail(d,VehicleWindowError50DS::frame,"Garage prior target or actual bank lifetime changed before rearm");
+    //Consume only this native invocation's target lease. The published image
+    //and its backing survive; next source clear mints the actual next target
+    //generation. No GL bank, source history, FIFO epoch or Camera is reset.
+    s.garagePreludeOwner50KG=nullptr;s.garagePreludePublication50KG=0;
+    s.garageCompletedPublication50KG=0;s.garageCompletedTarget50KG=0;s.garagePublishedPublication50KG=0;
+    return true;
+}
 bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
     const OriginalUiSourceOwner50KM& owner,VehicleWindowDiagnostic50DS& d) noexcept {
     d={};
@@ -7398,13 +7716,89 @@ bool VehicleWindowGl50DS::retireOriginalUiSourceOwner(
     s.diagnostic=nullptr;
     return accepted;
 }
+bool VehicleWindowGl50DS::completeGarageCollector24C160(OriginalUiGarageDrawContribution50KG& draw,
+    VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};if(!initialized()||!draw.identityCurrent()||draw.phase_!=decltype(draw.phase_)::collectorDrain24B7B0||
+       draw.sourcePC_!=0x105990u||!draw.drainContextCaptured_||!ownsGarageSourcePrelude50KG(draw,draw.publication_))
+        return fail(d,VehicleWindowError50DS::frame,"actual completed Garage leaf traversal required");
+    const auto fifo=draw.fifoForBackendDrain();
+    if(!fifo||!fifo->draining_||fifo->epoch04_!=draw.drainEpoch_||draw.drainCursor_!=draw.drainOrder_.size()||
+       draw.drainOrder_.size()!=fifo->records_.size()||draw.drainBatchPending_||draw.drainBatchFailed_||
+       (!fifo->records_.empty()&&!draw.drainBatchSubmitted_))return fail(d,VehicleWindowError50DS::frame,"actual FIFO epoch and all accepted leaves");
+    auto& s=*storage_;if(!s.current(d)||s.active||s.frameSet||s.diagnostic||s.garagePreludeFailed50KG)return false;
+    if(!s.gl.garageFlush24C160){s.diagnostic=&d;const bool loaded=s.load(s.gl.garageFlush24C160,"glFlush");s.diagnostic=nullptr;
+        if(!loaded)return false;}
+    //All retained primitive bytes have been copied to actual GL-owned buffers.
+    //Only now perform source105990 and24B954. A later real command error
+    //retains this completed prefix/epoch, never reconstructs discarded records.
+    ::original_main_entry50KG::NativeCollectorFifo50LA::CompletedLowering receipt(*fifo);
+    if(!fifo->commitActualDrain(receipt))return fail(d,VehicleWindowError50DS::frame,"actual105990 FIFO release rejected");
+    draw.sourcePC_=0x24C160;
+    //24C274/278 emits GS TEXFLUSH(1). Native image writes and draws use the
+    //same current ordered GL context, which owns texture coherence; submit
+    //that real command stream without a fabricated guest packet or GPU wait.
+    s.diagnostic=&d;s.gl.garageFlush24C160();const bool okay=s.check("actual Garage ordered texture command tail");s.diagnostic=nullptr;
+    if(!okay)s.garagePreludeFailed50KG=true;
+    return okay;
+}
+bool VehicleWindowGl50DS::submitGarageCollectorBatch24B26C(
+    OriginalUiGarageDrawContribution50KG& draw,VehicleWindowDiagnostic50DS& d)noexcept {
+    d={};
+    if(!initialized()||!draw.identityCurrent()||
+       draw.phase_!=decltype(draw.phase_)::collectorDrain24B7B0||draw.sourcePC_!=0x24B26Cu||
+       !draw.drainBatchPending_||draw.drainBatchSubmitted_||draw.drainBatchFailed_||
+       !draw.drainBatchCanonical_||!ownsGarageSourcePrelude50KG(draw,draw.publication_))
+        return fail(d,VehicleWindowError50DS::frame,"actual retained Garage collector batch required");
+    if(draw.drainParticleGeometry_&&!draw.drainParticleRecordCurrent())
+        return fail(d,VehicleWindowError50DS::frame,"actual pinned particle record required");
+    auto& s=*storage_;
+    if(!s.current(d)||s.active||s.frameSet||s.diagnostic||s.garagePreludeFailed50KG)
+        return fail(d,VehicleWindowError50DS::material,"actual Garage batch binding transaction rejected");
+    // One-time native resource preparation, before this real canonical transaction.
+    // No frame creates additional sampler names once this bounded owner is published.
+    s.diagnostic=&d;const bool samplers=s.ensureGarageSamplers50KG();s.diagnostic=nullptr;
+    if(!samplers)return false;
+    if(!draw.drainBatchCanonical_->beginGarageBatch(draw,*this))
+        return fail(d,VehicleWindowError50DS::material,"actual Garage batch binding transaction rejected");
+    bool started=false;
+    bool accepted=false;
+    if(draw.drainModelClippedEmptyCurrent()||draw.drainParticleClippedEmptyCurrent()){
+        //The exact queued numeric owner processed every source triangle and
+        //returned clipped-empty. GPU image upload and canonical bindings are
+        //real; no raster command exists, so do not manufacture a one-quad draw.
+        const auto& input=draw.drainBatchNative_.draw;
+        accepted=input.quadCount==0&&input.spanCount==0&&input.textures==s.request.originalUiTextures&&
+            input.texturePublication==s.uiTexturePublication&&input.textures&&
+            input.textures->validBorrow(s.request.context,s.request.isCurrent,s.uiTexturePublication);
+    }else accepted=submitOriginalUiImpl(draw.drainBatchNative_,640,448,true,d,&started,false,false,nullptr,true);
+    const bool committed=draw.drainBatchCanonical_->finish(draw.publication_,accepted,started);
+    //No SourceOwner begin/finish, SourceFrame acceptance, publication or swap.
+    //A failure retains the real FIFO records and blocks replay of this batch.
+    draw.drainBatchPending_=false;draw.drainBatchSubmitted_=accepted&&committed;
+    draw.drainBatchFailed_=!draw.drainBatchSubmitted_;
+    if(draw.drainBatchFailed_)s.garagePreludeFailed50KG=true;
+    if(draw.drainBatchFailed_){
+        std::fprintf(stderr,"original_garage_native_batch_rejected publication=%llu epoch=%u cursor=%zu record=%zu accepted=%u started=%u committed=%u renderer_error=%u operation=%.256s gl_error=%u cleanup_gl_error=%u batch_quads=%u batch_spans=%u ui_draws=%u ui_quads=%u ui_triangles=%u prelude_failed=%u\n",
+            static_cast<unsigned long long>(draw.publication_),draw.drainEpoch_,draw.drainCursor_,draw.drainActiveRecordOrdinal_,
+            accepted?1u:0u,started?1u:0u,committed?1u:0u,static_cast<unsigned>(d.error),d.operation?d.operation:"",
+            d.glError,d.cleanupGlError,draw.drainBatchNative_.draw.quadCount,draw.drainBatchNative_.draw.spanCount,
+            d.originalUiDraws,d.originalUiQuads,d.originalUiSourceTriangles,s.garagePreludeFailed50KG?1u:0u);
+    }
+    d.originalUiSourceAccepted=false;d.originalUiAccepted=false;
+    return draw.drainBatchSubmitted_;
+}
+
 bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& native,
     std::int32_t width,std::int32_t height,bool sourceRgba,VehicleWindowDiagnostic50DS& d,
-    bool* sourceWorkStarted,bool publishSource,bool riderReceiptChecked,const OriginalUiDirectVideo50KG* directVideo) noexcept {
+    bool* sourceWorkStarted,bool publishSource,bool riderReceiptChecked,const OriginalUiDirectVideo50KG* directVideo,bool garageBatch) noexcept {
     d = {};
     if(sourceWorkStarted)*sourceWorkStarted=false;
     if (!initialized()) return fail(d, VehicleWindowError50DS::notInitialized, "renderer not initialized");
     auto& s = *storage_; const auto& input = native.draw;
+    if(garageBatch&&(!sourceRgba||publishSource||directVideo||!s.garagePreludeOwner50KG||s.garagePreludeFailed50KG))
+        return fail(d,VehicleWindowError50DS::frame,"Garage batch requires retained unaccepted source target");
+    if(s.garagePreludeOwner50KG&&!sourceRgba)
+        return fail(d,VehicleWindowError50DS::frame,"ordinary UI draw cannot interleave with retained Garage source work");
     const auto submitStageStart=Storage::UiCoverageClock::now();
     std::uint64_t preDrawDiagnosticNs=0,drawDiagnosticNs=0,resolveDiagnosticNs=0,publishDiagnosticNs=0;
     U diagnosticPrefixDraws=0,diagnosticMixedDraws=0,diagnosticEmptyAa1=0;
@@ -7414,7 +7808,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
     d.originalUiCoherentFramebufferFetch=sourceRgba && s.uiSourceCoherentFramebufferFetch;
     if (!s.current(d)) return false;
     if (s.active || s.frameSet || !s.request.enableOriginalUi || !s.uiProgram ||
-        !s.uiVertexBuffer || !s.uiIndexBuffer || !s.uiVertexArray || !s.uiParticleFogBuffer || !s.uiSourceRasterWBuffer ||
+        !s.uiVertexBuffer || !s.uiIndexBuffer || !s.uiVertexArray || !s.uiParticleFogBuffer || !s.uiSourceRasterWBuffer || !s.uiSourcePacketStqBuffer ||
         !s.uiTargets[0] || !s.uiTargets[1] ||
         width <= 0 || height <= 0 || width > s.maximumWidth || height > s.maximumHeight ||
         input.canvasWidth != 640.f || input.canvasHeight != 448.f ||
@@ -7448,8 +7842,12 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             std::floor(v.position[2]) != v.position[2] || v.color[3] > 128)
             return fail(d, VehicleWindowError50DS::frame, "UI requires original 24-bit packet depth and raw alpha <=128");
     }
+    if ((native.sourcePacketStq == nullptr) != (native.sourcePacketStqCount == 0) ||
+        (native.sourcePacketStq && native.sourcePacketStqCount != input.quadCount * 4) ||
+        (native.sourcePacketStq && !sourceRgba))
+        return fail(d, VehicleWindowError50DS::frame, "invalid or non-source packet STQ stream");
     U next = 0;
-    bool anyFog = false, anySourceRaster = false, anyCoverage = false;
+    bool anyFog = false, anySourceRaster = false, anyCoverage = false, anySourcePacketStq = false;
     for (U i = 0; i < input.spanCount; ++i) {
         const auto& span = input.spans[i]; const auto& state = native.states[i];
         if(state.coverage!=OriginalUiCoverage50KG::aa0&&state.coverage!=OriginalUiCoverage50KG::fourSampleAa1)
@@ -7464,7 +7862,8 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         const bool particle = span.materialMode == OriginalUiMaterialMode50KG::mainParticle;
         const bool specular=span.materialMode==OriginalUiMaterialMode50KG::sourceSpecularMapCompressed;
         const bool sourceRaster = span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuse ||
-            span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed || specular;
+            span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed || specular ||
+            span.materialMode == OriginalUiMaterialMode50KG::sourcePrelitCompressed;
         const bool fixed64Specular=span.blend==OriginalUiBlend50KG::fixed64Additive;
         const bool specularBlend=span.blend==OriginalUiBlend50KG::destinationAlphaAdditive ||
             span.blend==OriginalUiBlend50KG::fixed255Additive || fixed64Specular;
@@ -7491,6 +7890,12 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             return fail(d, VehicleWindowError50DS::material, "invalid ordered original UI material/depth policy");
         if (!sourceRaster && (state.sourceFogEnabled || state.sourceAlphaTestGreaterZero))
             return fail(d, VehicleWindowError50DS::material, "source Diffuse flags on another material identity");
+        if (state.sourcePacketStq && (!sourceRgba || !sourceRaster || !native.sourcePacketStq))
+            return fail(d, VehicleWindowError50DS::material, "raw packet STQ requires sealed source raster ownership");
+        if (span.materialMode == OriginalUiMaterialMode50KG::sourcePrelitCompressed &&
+            (!sourceRgba || !state.sourcePacketStq))
+            return fail(d, VehicleWindowError50DS::material, "original PreLit requires its raw packet STQ source route");
+        anySourcePacketStq = anySourcePacketStq || state.sourcePacketStq;
         anyFog = anyFog || particle || (sourceRaster && state.sourceFogEnabled);
         anySourceRaster = anySourceRaster || sourceRaster;
         if (particle) {
@@ -7556,6 +7961,12 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         (native.sourceRasterW && native.sourceRasterWCount != input.quadCount * 4) ||
         (anySourceRaster && !native.sourceRasterW))
         return fail(d, VehicleWindowError50DS::frame, "invalid or missing source perspective W stream");
+    for (U i = 0; i < native.sourcePacketStqCount; ++i) {
+        const auto& stq = native.sourcePacketStq[i];
+        if (!std::isfinite(stq[0]) || !std::isfinite(stq[1]) || !std::isfinite(stq[2]) || stq[2] <= 0.f ||
+            !std::isfinite(stq[0] / stq[2]) || !std::isfinite(stq[1] / stq[2]))
+            return fail(d, VehicleWindowError50DS::frame, "invalid original packet STQ sampling range");
+    }
     for (U i = 0; i < native.sourceRasterWCount; ++i)
         if (!std::isfinite(native.sourceRasterW[i]) || native.sourceRasterW[i] <= 0.f)
             return fail(d, VehicleWindowError50DS::frame, "source perspective W must be finite and positive");
@@ -7630,11 +8041,11 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         ((sourceRgba && !publishSource) || s.request.output == VehicleWindowOutput50DS::headless || s.checkDefaultFramebuffer());
     const auto pending = static_cast<std::uint8_t>(s.uiPublished ^ 1u);
     if (accepted) {
-        // Sampler zero exposes the immutable published texture parameters.
-        // Cache only this submission's actual GL image observations. Compare
-        // every span's expectations independently: same-image conflicts reject.
-        // Zero-map spans have no sampled image or texture parameters to query.
-        struct SamplerObservation { U image; I values[6]; };
+        // Ordinary spans still use immutable image parameters through sampler0.
+        // Only an authenticated canonical Garage batch uses the Window-owned
+        // per-policy sampler; image base/max levels remain separately immutable.
+        // Cache this submission's exact image+sampler observations, never readiness.
+        struct SamplerObservation { U image, sampler; I values[6]; };
         SamplerObservation observed[originalUiMaximumSpans50KG];
         U observedCount = 0;
         constexpr U parameters[] = {0x2801, 0x2800, 0x2802, 0x2803, 0x813C, 0x813D};
@@ -7643,14 +8054,22 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             if (input.spans[i].materialMode == OriginalUiMaterialMode50KG::untexturedVertexColor) continue;
             const auto& sampler = native.states[i].sampler;
             const U image = input.textures->texture(input.spans[i].textureIndex);
+            const U samplerName=garageBatch?s.garageSampler50KG(sampler):0;
+            if(garageBatch&&!samplerName){accepted=fail(d,VehicleWindowError50DS::material,"actual Garage span has no owned effective sampler");break;}
             U observation = 0;
-            while (observation < observedCount && observed[observation].image != image) ++observation;
+            while (observation < observedCount && (observed[observation].image != image||observed[observation].sampler!=samplerName)) ++observation;
             const bool firstObservation = observation == observedCount;
             // At most one new entry per span; spanCount was bounded above.
             auto& actual = observed[observation];
             if (firstObservation) {
-                actual.image = image;
+                actual.image = image;actual.sampler=samplerName;
                 s.gl.bindTexture(texture2D, image);
+                if(garageBatch){
+                    s.gl.bindSampler(0,samplerName);I bound=0;s.gl.getIntegerv(0x8919,&bound);
+                    accepted=s.check("verify actual Garage sampler binding");
+                    if(accepted&&static_cast<U>(bound)!=samplerName)
+                        accepted=fail(d,VehicleWindowError50DS::material,"Garage sampler binding differs from its retained owner");
+                }
             }
             const I expected[] = {
                 sampler.minification == MaterialTextureFilter50EB::nearest ? 0x2600 : 0x2601,
@@ -7660,15 +8079,18 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             for (U p = 0; accepted && p < 6; ++p) {
                 if (firstObservation) {
                     actual.values[p] = -1;
-                    s.gl.getTexParameteriv(texture2D, parameters[p], &actual.values[p]);
+                    if(garageBatch&&p<4)s.gl.getSamplerParameteriv(samplerName,parameters[p],&actual.values[p]);
+                    else s.gl.getTexParameteriv(texture2D, parameters[p], &actual.values[p]);
                     accepted = s.check("verify per-span original UI sampler");
                 }
                 if (accepted && actual.values[p] != expected[p])
                     accepted = fail(d, VehicleWindowError50DS::material,
-                        "UI span source sampler differs from immutable bank texture parameters");
+                        garageBatch?"Garage span sampler/image parameters differ from actual retained owners":
+                            "UI span source sampler differs from immutable bank texture parameters");
             }
             if (firstObservation && accepted) ++observedCount;
         }
+        if(garageBatch){s.gl.bindSampler(0,0);const bool restored=s.check("restore sampler0 after Garage binding preflight");accepted=accepted&&restored;}
     }
     // Observation only, after authenticated frame/index/sampler preflight.
     // It cannot grant readiness, modify native diagnostics, or alter drawing.
@@ -7686,7 +8108,8 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             const bool opaque=originalUiCoverageOpaqueBatch50KG(span,state);
             const bool raster=span.materialMode==OriginalUiMaterialMode50KG::sourceDiffuse||
                 span.materialMode==OriginalUiMaterialMode50KG::sourceDiffuseCompressed||
-                span.materialMode==OriginalUiMaterialMode50KG::sourceSpecularMapCompressed;
+                span.materialMode==OriginalUiMaterialMode50KG::sourceSpecularMapCompressed||
+                span.materialMode==OriginalUiMaterialMode50KG::sourcePrelitCompressed;
             OriginalUiCoverageDisjoint50KG measure;OriginalUiCoverageBounds50KG whole;
             std::uint64_t full=0,wFallback=0,xyFallback=0,invalid=0;
             for(U index=range.firstIndex;index<range.firstIndex+range.indexCount;index+=3){
@@ -7757,8 +8180,10 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         s.gl.depthRange(0.0, 1.0); s.gl.clearDepth(0.0);
         s.gl.polygonMode(0x0408, 0x1B02);
         s.gl.clearColor(input.clearRgba[0],input.clearRgba[1],input.clearRgba[2],sourceRgba?128.f/255.f:1.f);
-        s.gl.clear(colorBufferBit | depthBufferBit);
-        if(sourceRgba){s.uiCoverageSourceDiagnostic=anyCoverage;++s.uiSourceTargetGeneration;s.uiSourceAcceptedTargetGeneration=0;
+        //Actual mid-Camera24B7B0 must preserve all preceding callback draws.
+        //Only a fresh complete-frame invocation owns this old clear path.
+        if(!garageBatch)s.gl.clear(colorBufferBit | depthBufferBit);
+        if(sourceRgba&&!garageBatch){s.uiCoverageSourceDiagnostic=anyCoverage;++s.uiSourceTargetGeneration;s.uiSourceAcceptedTargetGeneration=0;
             s.uiSourcePublishedTargetGeneration=0;}
 
         if (input.retainRaceImage) {
@@ -7833,6 +8258,11 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             s.drawGl.bindBuffer(arrayBuffer, s.uiSourceRasterWBuffer);
             s.drawGl.bufferSubData(arrayBuffer, 0, std::intptr_t(native.sourceRasterWCount) * sizeof(float), native.sourceRasterW);
         }
+        if (anySourcePacketStq) {
+            s.drawGl.bindBuffer(arrayBuffer, s.uiSourcePacketStqBuffer);
+            s.drawGl.bufferSubData(arrayBuffer, 0,
+                std::intptr_t(native.sourcePacketStqCount) * sizeof(std::array<float,3>), native.sourcePacketStq);
+        }
         s.drawGl.bindBuffer(elementBuffer, sourceRgba ? s.uiSourceIndexBuffer : s.uiIndexBuffer);
         if (sourceRgba)
             s.drawGl.bufferSubData(elementBuffer, 0, std::intptr_t(sourceIndexCount) * sizeof(U),
@@ -7868,13 +8298,16 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             const bool particle = span.materialMode == OriginalUiMaterialMode50KG::mainParticle;
             const bool sourceRaster = span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuse ||
                 span.materialMode == OriginalUiMaterialMode50KG::sourceDiffuseCompressed ||
-                span.materialMode == OriginalUiMaterialMode50KG::sourceSpecularMapCompressed;
+                span.materialMode == OriginalUiMaterialMode50KG::sourceSpecularMapCompressed ||
+                span.materialMode == OriginalUiMaterialMode50KG::sourcePrelitCompressed;
             const bool textured = span.materialMode == OriginalUiMaterialMode50KG::texturedModulate || particle || sourceRaster;
             s.gl.uniform1i(s.uiTexturedUniform, textured ? 1 : 0);
-            s.gl.uniform1i(s.uiSourceRasterUniform, sourceRaster ? 1 : 0);
+            s.gl.uniform1i(s.uiSourceRasterUniform, sourceRaster ? (state.sourcePacketStq ? 2 : 1) : 0);
             s.gl.uniform1i(s.uiSourceFogEnabledUniform, (particle || state.sourceFogEnabled) ? 1 : 0);
             s.gl.uniform1i(s.uiSourceAlphaTestUniform, (particle || state.sourceAlphaTestGreaterZero) ? 1 : 0);
             s.gl.bindTexture(texture2D, textured ? input.textures->texture(span.textureIndex) : 0);
+            const U sourceSampler=garageBatch&&textured?s.garageSampler50KG(state.sampler):0;
+            if(garageBatch)s.gl.bindSampler(0,sourceSampler);
             if(sourceRgba&&anyCoverage&&!coverageMixed&&state.coverage==OriginalUiCoverage50KG::fourSampleAa1){
                 if(i<firstCoveredAa1Span){
                     // All retained bounds in this AA1 span were proven empty.
@@ -7926,7 +8359,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                             spanRegion.width=right-spanRegion.x;spanRegion.height=top-spanRegion.y;}
                     }else{
                         accepted=s.drawUiCoverageRange(state.coverage==OriginalUiCoverage50KG::fourSampleAa1,
-                            index,3,image,depth,state.depthWrite,sourceBlend,false,region);if(accepted)++draws;
+                            index,3,image,depth,state.depthWrite,sourceBlend,false,region,sourceSampler);if(accepted)++draws;
                     }
                 }
                 if(accepted&&opaqueBatch&&!spanRegion.empty()){
@@ -7934,7 +8367,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
                     // center-depth reduction selects the same surviving payload
                     // for comparison against every retained destination sample.
                     accepted=s.drawUiCoverageRange(false,range.firstIndex,range.indexCount,image,depth,
-                        true,0,true,spanRegion);if(accepted)++draws;
+                        true,0,true,spanRegion,sourceSampler);if(accepted)++draws;
                 }
                 const bool spanRestored=s.endUiCoverageSpan(image,depth,state.depthWrite);
                 accepted=accepted&&spanRestored;
@@ -8012,7 +8445,7 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
         const bool restored = s.check("finish private original UI frame");
         accepted = accepted && restored;
         if (accepted && sourceRgba){
-            d.originalUiSourceAccepted=true;
+            d.originalUiSourceAccepted=!garageBatch;
             if(publishSource){const auto publishStart=Storage::UiCoverageClock::now();
                 accepted=s.publishUiSource(input.clearRgba,width,height);
                 publishDiagnosticNs=Storage::uiCoverageNs(publishStart);
@@ -8032,6 +8465,9 @@ bool VehicleWindowGl50DS::submitOriginalUiImpl(const OriginalUiNativeDraw50KG& n
             }
         }
     }
+    // Also restore after rejected preflight, which never entered the draw body.
+    // This precedes the sole return and never clears batch/GL failure history.
+    if(garageBatch){s.gl.bindSampler(0,0);const bool restored=s.check("restore sampler0 after Garage submission");accepted=accepted&&restored;}
     const auto stageTotalNs=Storage::uiCoverageNs(submitStageStart);
     if(anyCoverage&&stageTotalNs>=100000000ull&&s.uiCoverageSlowReports<8){++s.uiCoverageSlowReports;
         std::fprintf(stderr,"ui_coverage_slow_stages target=%llu total_wall_ns=%llu pre_draw_wall_ns=%llu ordered_draw_wall_ns=%llu resolve_wall_ns=%llu publication_wall_ns=%llu first_aa1_span=%u spans=%u prefix_draws=%u mixed_draws=%u empty_aa1_spans=%u promoted=%u promotion_wall_ns=%llu accepted=%u scope=cpu_stage_times_no_added_wait\n",
@@ -8565,6 +9001,43 @@ bool VehicleWindowGl50DS::idleForRaceReset50LA(VehicleWindowDiagnostic50DS& d) c
     if(!s.current(d))return false;
     if(s.active||s.frameSet||s.diagnostic)
         return fail(d,VehicleWindowError50DS::frame,"race reset requires idle native submission ownership");
+    return true;
+}
+
+bool VehicleWindowGl50DS::garageFirstCameraViewportIdle50KG(VehicleWindowDiagnostic50DS& d) const noexcept {
+    if(!idleForRaceReset50LA(d))return false;
+    const auto& s=*storage_;
+    // Sealed Main/Rider/Career RGBA frames own pixels, not source Scene0.
+    // They do not execute26F940 and must not invalidate canonical selection.
+    // Gameplay uses a different creation path and is not admitted here.
+    if(!s.frontendOnly||s.nativeGlFaultObserved50KG||s.frameSet)
+        return fail(d,VehicleWindowError50DS::frame,"Garage first Camera requires untouched native frontend scene selection");
+    return true;
+}
+
+bool VehicleWindowGl50DS::frontendLocalizationIdle50KG(VehicleWindowDiagnostic50DS& d) const noexcept {
+    if(!idleForRaceReset50LA(d))return false;
+    const auto& s=*storage_;
+    if(!s.frontendOnly||s.nativeGlFaultObserved50KG)
+        return fail(d,VehicleWindowError50DS::frame,"localization requires the retained no-error frontend renderer");
+    // Do not accept closed/replaced UI banks merely because the GL context is
+    // still current. Their real context/publication borrows must remain valid.
+    const auto* cpu=s.request.originalUiCpuTextures;
+    const auto* gpu=s.request.originalUiTextures;
+    if(!cpu||!cpu->loaded()||!gpu||!cpu->textureCount()||cpu->textureCount()!=gpu->textureCount()||
+       !gpu->validBorrow(s.request.context,s.request.isCurrent,s.uiTexturePublication))
+        return fail(d,VehicleWindowError50DS::material,"localization requires the exact live UI bank publication");
+    if(gpu->riderSparse()){
+        const auto* bank=gpu->riderBank();const auto images=bank?bank->images():nullptr;
+        if(s.riderTextureBorrow!=gpu||!gpu->riderSession()||!images||images->textures()!=cpu)
+            return fail(d,VehicleWindowError50DS::material,"localization requires the actual retained sparse Rider bank");
+        for(U i=0;i<cpu->textureCount();++i){
+            const auto* source=cpu->texture(i);const auto* image=gpu->asset(i);
+            if(!source||(image&&(!image->name||image->identity!=source->identity)))
+                return fail(d,VehicleWindowError50DS::material,"localization sparse UI identity changed");
+        }
+    }else if(!gpu->matchesSourceBank(*cpu,s.uiTexturePublication))
+        return fail(d,VehicleWindowError50DS::material,"localization CPU/UI upload identity changed");
     return true;
 }
 

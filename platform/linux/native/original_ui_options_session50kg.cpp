@@ -1,3 +1,4 @@
+#include "original_ui_shared_dialogs50kg.h"
 #include "original_ui_options_session50kg.h"
 #include "original_ui_controller_popup_resources50kg.h"
 #include <cmath>
@@ -431,11 +432,16 @@ Status OriginalUiOptionsSession50KG::notifyTransition(const game::OriginalUiTran
             // Original attachment happens during loading before manager entry.
             // Native cold preparation is prospective: publish it here only for
             // the inactive retained owner, before any page entry callback.
-            game::OriginalUiControllerPopupPlan50KG plan;
-            if(s->cold.application->controllerPopupState.active3CC||
-               game::OriginalUiControllerPopup50KG::attach(s->cold.application->controllerPopupState,plan)!=
-               game::OriginalUiControllerPopupStatus50KG::ok){s->fault(Status::unsupportedState,0x207330);break;}
-            s->cold.application->controllerPopupState=plan.state;s->popupAttached=true;
+            if(s->cold.application->controllerPopupState.active3CC){s->fault(Status::unsupportedState,0x207330);break;}
+            if(const auto shared=s->cold.application->sharedDialogs){OriginalUiSharedDialogs50KG::Diagnostic sd;
+                if(!shared->reappendOptionsEntry1B86D0(sd)){s->fault(Status::unsupportedState,sd.sourcePC);break;}
+            }else{
+                game::OriginalUiControllerPopupPlan50KG plan;
+                if(game::OriginalUiControllerPopup50KG::attach(s->cold.application->controllerPopupState,plan)!=
+                   game::OriginalUiControllerPopupStatus50KG::ok){s->fault(Status::unsupportedState,0x207330);break;}
+                s->cold.application->controllerPopupState=plan.state;
+            }
+            s->popupAttached=true;
         }
         if(event.route.page==1){
             game::OriginalUiControllerPopupPlan50KG plan;
@@ -809,6 +815,12 @@ Status OriginalUiOptionsSession50KG::update(const OriginalUiMainSessionUpdate50K
     if(!s->updatePrepared||in.elapsedSeconds!=s->preparedUpdate.elapsedSeconds||in.paused!=s->preparedUpdate.paused||
         in.debugChordHeld!=s->preparedUpdate.debugChordHeld){s->fault(Status::unsupportedState,0x2A3C80);d=s->callbackFault;return d.status;}
     s->updatePrepared=false;s->state.backProposalPending=false;s->inOperation=true;
+    if(const auto shared=s->cold.application->sharedDialogs){
+        OriginalUiSharedDialogs50KG::Diagnostic sharedDiagnostic;
+        if(!shared->advance4702048F0(in.elapsedSeconds,sharedDiagnostic)){
+            s->fault(Status::unsupportedState,sharedDiagnostic.sourcePC);s->inOperation=false;d=s->callbackFault;return d.status;
+        }
+    }
     game::OriginalUiControllerPopupPlan50KG popupUpdate;
     if(game::OriginalUiControllerPopup50KG::update(s->cold.application->controllerPopupState,in.elapsedSeconds,popupUpdate)!=
        game::OriginalUiControllerPopupStatus50KG::ok)s->fault(Status::unsupportedState,0x206420);
@@ -834,7 +846,8 @@ Status OriginalUiOptionsSession50KG::update(const OriginalUiMainSessionUpdate50K
     auto& fire=*s->cold.resources->fire();
     if(!s->state.faulted){s->state.lastParticleAdvance=fire.advance(in.elapsedSeconds,in.paused);
         if(!s->state.lastParticleAdvance.okay())s->fault(Status::particle,0x160E40);}
-    if(!s->state.faulted){s->state.lastFireEmit=fire.emit(in.elapsedSeconds,in.paused,s->cold.application->rawRandom308030,s->cold.application->fireSerial433970);
+    if(!s->state.faulted){s->state.lastFireEmit=fire.emitSource15E2A8(in.elapsedSeconds,in.paused,s->cold.application->rawRandom308030,
+        s->cold.application->fireSerial433970,s->cold.application->fireLazy84C8_);
         if(!s->state.lastFireEmit.okay())s->fault(Status::particle,0x15AEA0);}
     s->inOperation=false;if(s->state.faulted){d=s->callbackFault;return d.status;}
     ++s->state.updateCount;return result(d,Status::ok);

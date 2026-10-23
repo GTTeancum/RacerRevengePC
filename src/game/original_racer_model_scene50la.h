@@ -1,5 +1,6 @@
 #pragma once
 namespace native_racer_model50LA {class Owner;}
+namespace rr::platform {class OriginalUiGarageStaticModels50KG; class OriginalUiGarageSelectedModel50KG; class OriginalUiGarageModelResource50KG; class OriginalUiGarageVisibility50KG;}
 #include "model_bounds49o.h"
 #include "original_application_entities50la.h"
 #include "scene_graph49p.h"
@@ -108,6 +109,11 @@ class OriginalRacerModelSceneOwner50LA final {
     friend class original_gc_gameplay_lighting_candidate::Owner;
     friend class OriginalRacerModelPackets50LA;
     friend class ::native_racer_model50LA::Owner;
+    friend class rr::platform::OriginalUiGarageSelectedModel50KG;
+    friend class rr::platform::OriginalUiGarageVisibility50KG;
+    friend class rr::platform::OriginalUiGarageStaticModels50KG;
+    friend class rr::platform::OriginalUiGarageModelResource50KG;
+    friend class OriginalUiEntityScope50KG;
     using S=OriginalRacerModelSceneStatus50LA;
     using R=OriginalRacerModelSceneResult50LA;
     using C=OriginalWreckComponent50LA;
@@ -270,6 +276,100 @@ private:
         warmChildlessRows_=true;rowsLoaded_=true;
         return {S::complete,0x26eb3cu};
     }
+    // Actual warm virtual98=28E5D0 ->9C=28E5F0 hierarchy copy.
+    // This is NOT re-reading PSG locals: a retained cache prototype may already
+    // contain sampled motion/placement. Copy its actual local/bounds/flags and
+    // allocate siblings BEFORE children, then enumerate28C400 into actual1B8
+    // order. The genuine geometry104960/material26EB90 owners run separately.
+    // Bounded same-layout source branches: separate->separate26EA28 and
+    // non-childless direct->direct26EB10. Childless remains its exact API above.
+    R loadWarmHierarchy26EA28(const SceneGraph49P& graph,
+        const OriginalRacerModelSceneOwner50LA& prototype,
+        const SceneGraph49P& prototypeGraph)noexcept {
+        if(!modelConstructorComplete_||rowsLoaded_||referenceReleased_||released_||
+           &prototype==this||rootMode_!=prototype.rootMode_||!prototype.rowsLoaded_||
+           prototype.referenceReleased_||prototype.released_||binding_.sourceRowCount<2||
+           binding_.sourceRowCount!=prototype.binding_.sourceRowCount||
+           binding_.sessionGeneration!=prototype.binding_.sessionGeneration||
+           binding_.actualObjectCount423F60!=prototype.binding_.actualObjectCount423F60||
+           binding_.actualTypes383408!=prototype.binding_.actualTypes383408||
+           !validateSceneGraph49P(graph)||!validateSceneGraph49P(prototypeGraph))
+            return {S::phase,0x26ea28u};
+        auto* root=sourceRowObject(0);const auto* priorRoot=prototype.sourceRowObject(0);
+        if(!root||!priorRoot||!root->constructed||!priorRoot->constructed||
+           at(graph,root->sceneIndex).firstChild184!=none||at(graph,root->sceneIndex).nextSibling188!=none||
+           at(prototypeGraph,priorRoot->sceneIndex).nextSibling188!=none||
+           (rootMode_==RootMode::separate?
+              (at(graph,root->sceneIndex).parent180!=model_.sceneIndex||!(prototype.model_.flags191&2u)):
+              (!directRootPrepared_||directRowsStarted_||at(graph,model_.sceneIndex).parent180!=none||
+               (prototype.model_.flags191&2u))))return {S::hierarchy,0x28e5d0u};
+        //28C400 appends ALL immediate children, then their children in source
+        // sibling order, recursively repeating the same two-level procedure.
+        std::array<const O*,rr::assets::maxModelNodes49O> originals{};
+        originals[0]=priorRoot;std::uint32_t count=1;
+        const auto enumerate=[&](auto&& self,const O* parent)->bool {
+            auto c=at(prototypeGraph,parent->sceneIndex).firstChild184;
+            for(auto n=c;n!=none;n=at(prototypeGraph,n).nextSibling188){
+                const auto* o=prototype.object(n);if(!o||count==binding_.sourceRowCount)return false;
+                for(std::uint32_t i=0;i<count;++i)if(originals[i]==o)return false;
+                originals[count++]=o;
+            }
+            for(auto n=c;n!=none;n=at(prototypeGraph,n).nextSibling188){
+                auto g=at(prototypeGraph,n).firstChild184;
+                for(auto k=g;k!=none;k=at(prototypeGraph,k).nextSibling188){
+                    const auto* o=prototype.object(k);if(!o||count==binding_.sourceRowCount)return false;
+                    for(std::uint32_t i=0;i<count;++i)if(originals[i]==o)return false;
+                    originals[count++]=o;
+                }
+                for(auto k=g;k!=none;k=at(prototypeGraph,k).nextSibling188)
+                    if(!self(self,prototype.object(k)))return false;
+            }
+            return true;
+        };
+        if(!enumerate(enumerate,priorRoot)||count!=binding_.sourceRowCount)return {S::hierarchy,0x28c400u};
+        std::array<std::unique_ptr<O>,rr::assets::maxModelNodes49O> backing;
+        std::array<std::string,rr::assets::maxModelNodes49O> names;
+        std::array<std::int32_t,rr::assets::maxModelNodes49O> parents{};
+        const auto rowFor=[&](I index)->std::int32_t {
+            for(std::uint32_t i=0;i<count;++i)if(originals[i]->sceneIndex==index)return static_cast<std::int32_t>(i);
+            return -1;
+        };
+        try {
+            for(std::uint32_t i=0;i<count;++i){
+                const auto* o=originals[i];if(!o->constructed||o->released||o->observer19C||o->configuration1A4)
+                    return {S::hierarchy,0x28e610u};
+                names[i]=o->name38;parents[i]=i?rowFor(at(prototypeGraph,o->sceneIndex).parent180):-1;
+                if(i){if(parents[i]<0||!freshNode(graph,indices_[i]))return {S::hierarchy,0x28e7a8u};
+                    backing[i]=std::make_unique<O>();}
+            }
+        }catch(...){return {S::allocation,0x28d060u};}
+        if(rootMode_==RootMode::direct)directRowsStarted_=true;
+        // Source allocation visitation: current, next-sibling subtree, child.
+        // Backing is preallocated above; only these reached constructors count.
+        const auto clone=[&](auto&& self,std::uint32_t i)->R {
+            if(i){rows_[i]=std::move(backing[i]);auto r=constructScene2893A0(*rows_[i],indices_[i],graph,true,K::scene2893A0);
+                if(!r.okay())return r;}
+            auto& dst=*sourceRowObject(i);const auto& src=*originals[i];
+            auto& dn=at(graph,dst.sceneIndex);const auto& sn=at(prototypeGraph,src.sceneIndex);
+            dst.name38.swap(names[i]);dn.localC0=sn.localC0;
+            dn.sceneFlags190=static_cast<std::uint8_t>((dn.sceneFlags190&~(1u|4u|32u|64u))|(sn.sceneFlags190&(4u|32u|64u)));
+            dst.flags03=static_cast<std::uint8_t>((dst.flags03&~4u)|(src.flags03&4u));
+            dst.bounds140=src.bounds140;dst.bounds150=src.bounds150;dst.radius194=src.radius194;
+            dst.bounds160=src.bounds160;dst.bounds170=src.bounds170;dst.radius198=src.radius198;
+            sourceParents_[i]=parents[i];
+            if(sn.nextSibling188!=none){const auto k=rowFor(sn.nextSibling188);if(k<0)return {S::hierarchy,0x28e764u};
+                auto r=self(self,static_cast<std::uint32_t>(k));if(!r.okay())return r;}
+            if(sn.firstChild184!=none){const auto k=rowFor(sn.firstChild184);if(k<0)return {S::hierarchy,0x28e7b0u};
+                auto r=self(self,static_cast<std::uint32_t>(k));if(!r.okay())return r;}
+            return {S::complete,0x28e7e0u};
+        };
+        const auto result=clone(clone,0);if(!result.okay())return result;
+        for(std::uint32_t i=1;i<count;++i)appendScene28BEF0(graph,*sourceRowObject(static_cast<std::uint32_t>(parents[i])),*sourceRowObject(i));
+        //26EA40 restores the old parent after28E5D0 cleared it. Native root
+        // retained that same parent throughout; no observer/entity attach ran.
+        if(rootMode_==RootMode::separate)model_.nodeCount1A0=prototype.model_.nodeCount1A0;
+        warmHierarchyRows_=true;rowsLoaded_=true;return {S::complete,0x26eb3cu};
+    }
     R loadFreshRows28CAC0(const SceneGraph49P& graph,
         const rr::assets::PsgHierarchyView49O& hierarchy)noexcept {
         auto* root=sourceRowObject(0);
@@ -345,7 +445,7 @@ public:
     }
 
     bool constructed2403A0()const noexcept{return modelConstructorComplete_&&!released_;}
-    bool loadedFreshRows28CAC0()const noexcept{return rowsLoaded_&&!warmChildlessRows_&&!released_;}
+    bool loadedFreshRows28CAC0()const noexcept{return rowsLoaded_&&!warmChildlessRows_&&!warmHierarchyRows_&&!released_;}
     bool loadedQuantization240570()const noexcept{return quantizationLoaded_&&!released_;}
     bool released()const noexcept{return released_;}
     const C* modelEntity8()const noexcept{return model_.constructed?&model_.entity8:nullptr;}
@@ -419,6 +519,23 @@ public:
                 S::attachmentLocked:S::entity,result.sourcePC};
         publishedToAnimation_=true;
         return {S::complete,0x154348u};
+    }
+
+    // Character11A750 derives the1536F0 prefix, but owns a distinct actual
+    // Entity dispatch kind. Do not weaken appendToAnimation's exact guard.
+    R appendToCharacter154348(const OriginalWreckComponentDomain50LA& outside,
+        C& character)noexcept {
+        if(!modelConstructorComplete_||!rowsLoaded_||referenceReleased_||released_||
+           character.kind!=K::character11A750)return {S::phase,0x154348u};
+        std::array<C*,maxOriginalWreckComponents50LA> list{};
+        OriginalWreckComponentDomain50LA joined{};
+        if(!joinDomain(outside,list,joined,nullptr,nullptr,nullptr,nullptr))return {S::entity,0x154348u};
+        const auto result=appendOriginalWreckComponent50LA(joined,character,model_.entity8,0,
+            *binding_.actualAttachmentLock423F58);
+        if(result.status!=OriginalWreckComponentStatus50LA::complete)
+            return {result.status==OriginalWreckComponentStatus50LA::attachmentLocked?
+                S::attachmentLocked:S::entity,result.sourcePC};
+        publishedToAnimation_=true;return {S::complete,0x154348u};
     }
 
     // The bounded second141960 at210CA4/210F68/21126C/211568/211998. Preserve the old
@@ -548,7 +665,8 @@ private:
         for(std::uint32_t row=0;row<binding_.sourceRowCount;++row){
             const auto* source=sourceRowObject(row);
             // Aliased row0 already received model preflight and its one count.
-            if(!source||source==&model_)continue;const auto& object=*source;
+            if(!source||source==&model_)continue;
+            const auto& object=*source;
             if(!object.constructed||object.released||!inRange(graph,object.sceneIndex)||
                object.observer19C||object.configuration1A4)return {S::observer,0x289760u};
             const auto& c=object.entity8;
@@ -559,6 +677,40 @@ private:
         std::size_t seen=0;
         if(!admitSceneSubtree(graph,model_,seen,owned)||seen!=owned)return {S::graph,0x289744u};
         return {S::complete,0x2896d0u};
+    }
+
+    C& uiScopeModelEntity8()noexcept{return model_.entity8;}
+
+    // The actual Application authority may contain several constructor
+    // generations. Its private synchronous View is the only issuer of this
+    // path; never rewrite ancestors into a single-generation model domain.
+    template<class ActualAuthorityView>
+    R preflightModelReference142590InAuthority(const ActualAuthorityView& actual)const noexcept {
+        if(!model_.constructed||referenceReleased_||released_)return {S::phase,0x142590u};
+        if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
+        const auto& c=model_.entity8;
+        if(!domain(actual)||!contains(actual,&c)||c.reference00!=1u||
+           c.kind!=K::model2403A0||c.firstChild18)return {S::entity,0x1425b8u};
+        if(c.previous10&&(!contains(actual,c.previous10)||c.previous10->next14!=&c||
+           c.previous10->parent1C!=c.parent1C))return {S::entity,0x142604u};
+        if(c.next14&&(!contains(actual,c.next14)||c.next14->previous10!=&c||
+           c.next14->parent1C!=c.parent1C))return {S::entity,0x14261cu};
+        if(c.parent1C){if(!contains(actual,c.parent1C)||
+           (!c.previous10&&c.parent1C->firstChild18!=&c))return {S::entity,0x14262cu};}
+        else if(c.previous10||c.next14)return {S::entity,0x14262cu};
+        return {S::complete,0x142590u};
+    }
+    // Only the scope calls immediately after actual authority preflight and
+    // enrollment retirement in the same serial operation. No public token.
+    R releasePreflightedModelReference142590()noexcept {
+        if(!model_.constructed||referenceReleased_||released_||
+           *binding_.actualAttachmentLock423F58||model_.entity8.reference00!=1u)
+            return {S::phase,0x142590u};
+        auto& c=model_.entity8;
+        if(c.previous10)c.previous10->next14=c.next14;
+        if(c.next14)c.next14->previous10=c.previous10;
+        if(c.parent1C&&c.parent1C->firstChild18==&c)c.parent1C->firstChild18=c.next14;
+        --c.reference00;referenceReleased_=true;return {S::complete,0x142654u};
     }
 
 public:
@@ -672,6 +824,78 @@ public:
         return {S::complete,0x2897acu};
     }
 private:
+    // Normal Garage destructor continuation. Public/null-observer cleanup
+    //is deliberately unchanged. The concrete resource owner reaches these
+    //only after240450/26E460 payloads and the real Entity last-reference drop.
+    bool garageSceneChildrenRetired_=false;
+    R retireGarageSceneChildren2896D0(const SceneGraph49P& graph,const void* observer)noexcept {
+        if(!referenceReleased_||released_||rowTable_||!rowTableFreed_||garageSceneChildrenRetired_)
+            return {S::phase,0x2896D0u};
+        const auto check=preflightRetainedScene2896D0(graph,observer);
+        if(!check.okay())return check;
+        model_.dispatch1A8=K::scene2893A0;
+        auto& node=at(graph,model_.sceneIndex);
+        //Preflight proves this real root has no scene-parent. Child order is
+        //the source next-after-first loop, not reverse allocation order.
+        while(node.firstChild184!=none&&at(graph,node.firstChild184).nextSibling188!=none){
+            auto& next=*object(at(graph,node.firstChild184).nextSibling188);
+            --next.entity8.reference00;destroyScene2896D0(graph,next);
+        }
+        if(node.firstChild184!=none){
+            auto& first=*object(node.firstChild184);
+            --first.entity8.reference00;destroyScene2896D0(graph,first);
+        }
+        garageSceneChildrenRetired_=true;return {S::complete,0x289760u};
+    }
+    R finishGarageSceneBase1413E0(const SceneGraph49P& graph,const void* retiredObserver)noexcept {
+        if(!garageSceneChildrenRetired_||!referenceReleased_||released_||rowTable_||
+           !rowTableFreed_||!model_.constructed||model_.released||model_.entity8.reference00||
+           model_.observer19C!=retiredObserver||model_.configuration1A4||
+           !binding_.actualObjectCount423F60||!*binding_.actualObjectCount423F60||
+           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex))return {S::phase,0x289778u};
+        const auto& node=at(graph,model_.sceneIndex);
+        if(node.parent180!=none||node.nextSibling188!=none||node.firstChild184!=none)
+            return {S::graph,0x289778u};
+        //The caller already performed280920. Source never clears19C here.
+        --*binding_.actualObjectCount423F60;model_.released=true;released_=true;
+        return {S::complete,0x2897ACu};
+    }
+
+    // Garage a2=0 aliases source row0 to this model. Cold28CB04 writes1A0=1;
+    // warm childless26EAC4 leaves the constructor1A0=0. Both retain one1B8
+    // source row. Cold26F6F8 visits that SAME root world once after the local
+    // box seed; warm26F70C visits zero rows. Never multiply row0 local again.
+    R publishDirectRootBounds28E110(const SceneGraph49P& graph)noexcept {
+        if(!constructed2403A0()||rootMode_!=RootMode::direct||!rowsLoaded_||referenceReleased_||
+           binding_.sourceRowCount!=1||(!loadedFreshRows28CAC0()&&!warmChildlessRows_)||
+           model_.nodeCount1A0!=(warmChildlessRows_?0u:1u)||!rowTable_||
+           fields_.sourceRows1B8!=rowTable_.get()||rowTable_[0]!=&model_||sourceRowObject(0)!=&model_||
+           !validateSceneGraph49P(graph)||!inRange(graph,model_.sceneIndex))return {S::phase,0x28e110u};
+        auto& root=at(graph,model_.sceneIndex);const auto flags=root.sceneFlags190;
+        if(flags&0x10u)return {S::phase,0x26f4c0u};
+        const bool recompute=(flags&0x80u)&&((flags&8u)||!(flags&0x40u));
+        if(!recompute){
+            if((flags&0x80u)&&!(flags&1u)&&!refreshSceneWorld49P(graph,model_.sceneIndex))return {S::graph,0x2897b0u};
+            return model_.radius198?R{S::complete,0x28e218u}:R{S::phase,0x28e1f8u};
+        }
+        if(!(flags&4u)||!refreshSceneWorld49P(graph,model_.sceneIndex))return {S::graph,0x26f608u};
+        ModelBoundsContext49O context{};context.rootWorld100=root.world100;context.rootSceneFlags190=root.sceneFlags190;
+        for(unsigned axis=0;axis<3;++axis){context.rootCenter140.v[axis]=model_.bounds140[axis];
+            context.rootHalfExtent150.v[axis]=model_.bounds150[axis];}
+        ModelBoundsWorkspace49O scratch{};ModelBoundsResult49O result{};
+        if(warmChildlessRows_){
+            if(!computeModelBounds49O(nullptr,0,context,scratch,result))return {S::graph,0x26f718u};
+        }else {
+            ModelBoundsNode49O row{};row.local=root.localC0;row.parent=-1;row.sceneFlags190=root.sceneFlags190;
+            row.center140=context.rootCenter140;row.halfExtent150=context.rootHalfExtent150;
+            if(!computeDirectRootModelBounds50KG(&row,1,context,scratch,result))return {S::graph,0x26f6f8u};
+        }
+        std::memcpy(model_.bounds160.data(),result.center160,sizeof result.center160);
+        std::memcpy(model_.bounds170.data(),result.halfExtent170,sizeof result.halfExtent170);
+        model_.radius198=result.radius198;root.sceneFlags190=result.rootSceneFlags190;
+        return {S::complete,0x26f844u};
+    }
+
     // Actual28E110 -> virtual90=26F4B0, only from the retained native owner.
     // No caller bounds/flags or publication receipt. Separate racer rows only.
     R publishAggregate28E110(const SceneGraph49P& graph)noexcept {
@@ -728,7 +952,7 @@ private:
     std::array<std::unique_ptr<O>,rr::assets::maxModelNodes49O> rows_;
     std::unique_ptr<O*[]> rowTable_;
     RootMode rootMode_=RootMode::separate;
-    bool directRootPrepared_=false,directRowsStarted_=false,warmChildlessRows_=false;
+    bool directRootPrepared_=false,directRowsStarted_=false,warmChildlessRows_=false,warmHierarchyRows_=false;
     bool modelConstructorComplete_=false,rowsLoaded_=false,referenceReleased_=false;
     bool rowTableFreed_=false,released_=false;
     bool publishedToAnimation_=false,reappended7F8_=false;

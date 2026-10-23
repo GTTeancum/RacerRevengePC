@@ -8,6 +8,10 @@
 #include <thread>
 #include <limits>
 #include <vector>
+namespace rr::assets {struct OriginalStandardSurface246300_50LA;}
+namespace rr::platform {class OriginalUiGarageDrawContribution50KG;class OriginalUiGarageModelResource50KG;
+class OriginalUiGarageQuad50KG;class OriginalUiGarageScreenText50KG;class OriginalUiGarageVisibility50KG;
+class OriginalUiGarageSceneParticles50KG;}
 namespace original_main_entry50KG {
 // Inactive native443848 semantic FIFO. The actual Application owns exactly
 //one active process-slot instance. Source race teardown clears that slot; a
@@ -17,6 +21,7 @@ class NativeCollectorFifo50LA final {
     friend class ::original_cable_selection50LA::Binding;
     friend class ::ra_source_camera50LA::OwnershipBridge;
     friend class rr::platform::VehicleWindowGl50DS;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
     using Table=rr::assets::OriginalStandardMaterialTable50LA;
     using Binding=rr::assets::OriginalCableEmissionBinding50LA;
     using Allocation=rr::game::OriginalPodCableAllocation50LA;
@@ -28,6 +33,26 @@ class NativeCollectorFifo50LA final {
     struct Result {Status status=Status::owner;std::uint32_t sourcePC=0;bool sourceEffectsCommitted=false;};
     struct Record {
         Record* next=nullptr;
+        //Source record identity and arguments, not a reconstructed immutable
+        //menu mesh. Actual primitive/attribute owners survive through105990.
+        std::shared_ptr<rr::platform::OriginalUiGarageDrawContribution50KG> garageDraw;
+        std::shared_ptr<rr::platform::OriginalUiGarageModelResource50KG> garageModel;
+        rr::platform::OriginalUiGarageScreenText50KG* garageText=nullptr;
+        rr::platform::OriginalUiGarageQuad50KG* garageQuad=nullptr;
+        std::uint64_t quadPacketRevision=0;
+        rr::platform::OriginalUiGarageSceneParticles50KG* garageParticles=nullptr;
+        std::uint64_t particlePacketRevision=0;
+        std::shared_ptr<rr::platform::OriginalUiGaragePageOwner50KG> garageAperturePage;
+        std::size_t apertureOrdinal=0;std::uint64_t apertureRevision=0;
+        std::uint64_t garagePublication=0,matrixRevision=0;
+        std::size_t lod=0,surface=0,packetIndex=0,textPrimitive=0;
+        const rr::assets::OriginalStandardSurface246300_50LA* surface04=nullptr;
+        const void* primitive04=nullptr; //Actual retained ScreenText primitive when not a Model surface.
+        const void* attributes08=nullptr;bool attributeArray1F0=false;
+        std::int32_t originRegistration=-1,finalRegistration=-1;
+        const rr::assets::OriginalStandardMaterialParameters50LA* originParameters=nullptr;
+        const rr::assets::OriginalStandardMaterialAnimationInstance50LA* vertexBase=nullptr;
+        const rr::assets::OriginalStandardMaterialTextureAnimation50LA* textureBase=nullptr;
         std::shared_ptr<Bridge> camera; // Must outlive allocation destruction.
         std::shared_ptr<Allocation> allocation;
         std::uint32_t strip=0;
@@ -48,7 +73,32 @@ class NativeCollectorFifo50LA final {
     Zone scissor4014_; // Actual slot; value_ starts null at24B704.
     std::list<Record> records_; // Stable native nodes, source insertion order.
     std::vector<Leaf> leaves_; // Actual registration ordinals; redirects share final leaf.
-    bool draining_=false,closed_=false;
+    bool draining_=false,closed_=false,uiConstructor1B73BC_=false;
+    std::size_t garageRecordCount_=0;
+    const rr::platform::OriginalUiGarageVisibility50KG* garageScissorOwner_=nullptr;
+    std::uint64_t garageScissorPublication_=0;
+    bool bindUiTable1B73BC()noexcept{return table_&&table_->bindUiNativeCollector1B73BC(*this);}
+    static bool initialTableCurrent(const Table& table)noexcept{return table.canRetireNativeCollector29C300();}
+    bool retainGarageRegistry(const Application&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool selectGarageParticleLeaf1628EC(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiGarageSceneParticles50KG&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool appendGarage24B9B0(Record&&,std::int32_t,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectGarageModel241280(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiGarageModelResource50KG&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectGarageText246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiGarageScreenText50KG&,std::size_t,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectGarageParticle24B9B0(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiGarageSceneParticles50KG&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectGarageAperture246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiGaragePageOwner50KG&,std::size_t,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool collectGarageQuad246760(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiGarageQuad50KG&,rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool publishGarageScissor280118(rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::OriginalUiGarageVisibility50KG&,std::shared_ptr<rr::game::OriginalZoneScissor50LA>,
+        rr::assets::OriginalStandardMaterialDiagnostic50LA&)noexcept;
+    bool garageQueueOwnerCurrent(const rr::platform::OriginalUiGarageDrawContribution50KG&,std::uint64_t)const noexcept;
+    void releaseGarageRecordAfter105990(Record&)noexcept;
+
     const std::thread::id ownerThread_=std::this_thread::get_id();
     NativeCollectorFifo50LA(const Application& app,std::shared_ptr<Table> table)
         :application_(&app),table_(std::move(table)),scissor4014_(app.entitiesOwner_.get()){}
@@ -69,7 +119,7 @@ class NativeCollectorFifo50LA final {
     Result accept24B9B0(std::shared_ptr<Allocation> allocation,std::uint32_t strip,
         std::shared_ptr<Bridge> camera,native_racer50HW::Cables& cables,std::unique_ptr<Binding> binding,
         std::unique_ptr<Pin> display,const Zone& zone,const Visibility& visibility)noexcept {
-        if(closed_||draining_||!allocation||!camera||!binding||!binding->context_||!display||!display->owner_||
+        if(closed_||draining_||garageRecordCount_||!allocation||!camera||!binding||!binding->context_||!display||!display->owner_||
            camera->closed_||camera->nativeFifoPins_==std::numeric_limits<std::uint32_t>::max()||
            display->owner_->application_!=application_||!display->owner_->canRetain()||
            binding->context_->videoIdentity()!=display->owner_->video_.get()||
@@ -127,8 +177,8 @@ class NativeCollectorFifo50LA final {
         return {Status::loweringRequired,0x24b870u};
     }
     // Sealed eventual backend completion, not a caller callback/Boolean. The
-    // real VehicleWindow implementation is the only possible issuer, and no
-    // issuer is implemented here. A mere context finish cannot create it.
+    // real VehicleWindow Garage drain is the only issuer. A mere context
+    // finish or an empty-queue assertion cannot create it.
     class CompletedLowering final {
         friend class rr::platform::VehicleWindowGl50DS;
         friend class NativeCollectorFifo50LA;
@@ -143,6 +193,7 @@ class NativeCollectorFifo50LA final {
         //105990 belongs AFTER all actual source drain work. Resources survive
         //every unsupported/failed drain; this is its only successful release.
         for(auto& record:records_){
+            if(record.garageDraw){releaseGarageRecordAfter105990(record);continue;}
             if(!record.allocation->fifoPins_)std::terminate();
             --record.allocation->fifoPins_;
             if(!record.camera->nativeFifoPins_)std::terminate();
@@ -180,6 +231,7 @@ inline bool NativeCollectorFifo50LA::retire24B720(const Application& app,
     //29C354/360 clears443848 iff this is the actual registered instance.
     // Application entry retains this storage through registration cleanup.
     app.nativeCollectorFifoOwner_.reset();
+    if(uiConstructor1B73BC_)app.uiCollector1B73BCAttempted_=false;
     table_->retireNativeCollector29C300();
     leaves_.clear();registry_={};
     scissor4014_.value_.reset();scissor4014_.owner_=nullptr;

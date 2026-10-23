@@ -12,12 +12,14 @@
 #include <optional>
 
 namespace ra_pod_scene50LA {class Owner;}
+namespace rr::platform {class OriginalUiGarageVisibility50KG;}
 namespace rr::game {
 // Future registrations must retain their actual native object identity here.
 // No guest pointer, render-mesh surrogate, or synthetic collection identity.
 struct OriginalVisibilityMembership50LA;
 class OriginalVisibilityQuadTree50LA final {
     friend class ::ra_pod_scene50LA::Owner;
+    friend class rr::platform::OriginalUiGarageVisibility50KG;
     struct ItemBlock {
         ItemBlock* next=nullptr;
         std::array<OriginalVisibilityMembership50LA*,4> objects{};
@@ -68,6 +70,10 @@ class OriginalVisibilityQuadTree50LA final {
     std::uint32_t candidateCount8A0_=0,candidateCapacity8A4_=0,requestedCapacity8C0_=0;
     std::array<std::optional<std::int32_t>,4> cached8A8_;
     bool published_=false,configured_=false;
+    enum class EmptyQueryPhase {none,epochAdvanced,returned};
+    EmptyQueryPhase emptyQueryPhase_=EmptyQueryPhase::none;
+    std::uint64_t emptyQueryPublication_=0;
+
     static float binary32(float v)noexcept{volatile float rounded=v;return rounded;}
     bool construct(OriginalApplicationEntities50LA& app,
         const original_world_environment50KG::SpatialBounds& bounds,std::uint32_t& pc)noexcept {
@@ -129,9 +135,71 @@ class OriginalVisibilityQuadTree50LA final {
             (!root94_||(!root94_->children0&&!root94_->items4&&nodeCount888_==1))&&
             (!items98_||items98_->fresh())&&(!scratch9C_||scratch9C_->fresh());
     }
+    bool emptyGarageQueryStateCurrent()const noexcept {
+        if(constructorStateOnly())return true;
+        return configured_&&application_&&selected18_&&selectedOwned28_&&
+            selectedGrowth20_==30&&selectedCapacity24_==30&&!selectedCount18_&&
+            root94_&&!root94_->children0&&!root94_->items4&&nodeCount888_==1&&
+            items98_&&items98_->fresh()&&scratch9C_&&scratch9C_->fresh()&&
+            !headA4_&&!tailA8_&&!countAC_&&!countB4_&&!field890_&&
+            requestedCapacity8C0_==5000&&!candidateCount8A0_&&candidateCapacity8A4_==5000&&
+            emptyQueryPublication_&&
+            ((emptyQueryPhase_==EmptyQueryPhase::returned&&candidate89C_&&
+              published898_==candidate89C_.get()&&field894_==5000)||
+             (emptyQueryPhase_==EmptyQueryPhase::epochAdvanced&&!candidate89C_&&!published898_&&!field894_));
+    }
+    //Only the real Garage2B00E0 caller can enter this reached empty-root branch.
+    //The live root/pools, not an authored zero-count promise, prove the branch.
+    bool queryGarageEmpty2AF1D0(float cameraX,float cameraZ,std::uint64_t publication,
+        std::uint32_t& pc)noexcept {
+        pc=0;
+        if(!configured_||!application_||!application_->treeQuantum442E20_||!publication||!root94_||root94_->children0||
+           root94_->items4||nodeCount888_!=1||!items98_||!items98_->fresh()||
+           !scratch9C_||!scratch9C_->fresh()||headA4_||tailA8_||countAC_||countB4_||
+           field890_||requestedCapacity8C0_!=5000||std::fegetround()!=FE_TONEAREST){pc=0x2AF1D0;return false;}
+        const float x=binary32(binary32(cameraX-originX30_)*scale5C_);
+        const float z=binary32(binary32(cameraZ-originZ38_)*scale5C_);
+        if(!std::isfinite(x)||!std::isfinite(z)||x< -2147483648.f||z< -2147483648.f||
+           x>2147483520.f||z>2147483520.f){pc=0x2AF354;return false;}
+        const auto gridX=static_cast<std::int32_t>(std::nearbyint(x));
+        const auto gridZ=static_cast<std::int32_t>(std::nearbyint(z));
+        //2AF3C0 reaches the actual root, computes its bounds, calls2664D0 on
+        //root.items4(null), then exits at2B0088 because root.children0 is null.
+        const float quantum=*application_->treeQuantum442E20_;
+        const float centerX=binary32(originX30_+binary32(16384.f*quantum));
+        const float centerZ=binary32(originZ38_+binary32(16384.f*quantum));
+        const float half=binary32(8192.f*quantum);
+        if(!std::isfinite(centerX)||!std::isfinite(centerZ)||!std::isfinite(half)){pc=0x2AF454;return false;}
+        (void)gridX;(void)gridZ;
+        if(emptyQueryPublication_!=publication){
+            if(emptyQueryPhase_!=EmptyQueryPhase::none&&emptyQueryPhase_!=EmptyQueryPhase::returned){pc=0x2AF1D0;return false;}
+            if(scratchDirty16_&&!reset265C60(pc))return false;
+            ++field14_; //2AF254/260, real16-bit query epoch.
+            emptyQueryPublication_=publication;emptyQueryPhase_=EmptyQueryPhase::epochAdvanced;
+        }
+        if(emptyQueryPhase_==EmptyQueryPhase::returned)return true;
+        candidateCapacity8A4_=requestedCapacity8C0_; //Nonzero input capacity,2AF2A8.
+        if(!candidate89C_){
+            try{candidate89C_.reset(new OriginalVisibilityMembership50LA*[candidateCapacity8A4_]);}
+            catch(...){pc=0x2AF2BC;return false;}
+            field894_=candidateCapacity8A4_;
+        }else if(field894_!=5000){pc=0x2AF264;return false;}
+        candidateCount8A0_=0;published898_=candidate89C_.get();scratchDirty16_=true;
+        application_->activeTree442E18_=this; //2AF330, before actual empty-root visit.
+        emptyQueryPhase_=EmptyQueryPhase::returned;return true;
+    }
+    bool closeGarageEmptyQuery2AF060()noexcept {
+        if(!reference00_)return true;
+        if(!emptyGarageQueryStateCurrent())return false;
+        return closeEmptyBacking2AF060();
+    }
     bool closeConstructor()noexcept {
         if(!reference00_)return true;
-        if(!application_||!constructorStateOnly()||reference00_!=1||
+        if(!constructorStateOnly())return false;
+        return closeEmptyBacking2AF060();
+    }
+    bool closeEmptyBacking2AF060()noexcept {
+        if(!application_||reference00_!=1||
            (published_&&application_->visibility443A98_!=this))return false;
         --reference00_; //104970 reaches2AF060, then263BF0.
         if(published_)application_->visibility443A98_=nullptr;

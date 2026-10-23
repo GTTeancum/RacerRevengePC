@@ -9810,10 +9810,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const bool capturedCourse=capturedUi.route.screen==6&&capturedUi.route.page==1;
     const bool capturedHall=capturedUi.route.screen==11&&capturedUi.route.page==1;
     const bool capturedTournament=capturedUi.route.screen==9&&capturedUi.route.page==1;
+    const bool capturedGarage=capturedUi.route.screen==13&&capturedUi.route.page==1;
     if(capturedRider){
      require50DU(originalMain.coordinator.riderSession(),"original Rider capture session missing");
      capturedSlot=capturedUi.rider.slot4C8;
-    }else{
+    }else if(!capturedGarage){
      const auto* capturedNavigation=originalMain.navigation();
      require50DU(capturedNavigation,"original UI capture navigation missing");
      const auto group=capturedNavigation->controllerGroup[0];capturedGroup=group;
@@ -9821,20 +9822,23 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
          capturedNavigation->groups[group].selectedSlot:0;
     }
     const auto capturedAperture=capturedUi.route.screen==4?capturedUi.main.aperture:
-        capturedRider?capturedUi.rider.aperture:capturedCourse?capturedUi.course.aperture:capturedHall?capturedUi.hall.aperture:capturedTournament?capturedUi.tournament.aperture:capturedUi.options.aperture;
+        capturedRider?capturedUi.rider.aperture:capturedCourse?capturedUi.course.aperture:capturedHall?capturedUi.hall.aperture:capturedTournament?capturedUi.tournament.aperture:capturedGarage?capturedUi.garageAperture:capturedUi.options.aperture;
     J receipt={{"sequence",++originalMain.captureSequence},{"native_frame",originalMain.frameCount},
         {"screen",capturedUi.route.screen},{"page",capturedUi.route.page},{"switches",capturedUi.switches},
-        {"requested_screen",capturedUi.transition.requested.screen},{"requested_page",capturedUi.transition.requested.page},
-        {"selected_group",capturedGroup},{"selected_slot",capturedSlot},
+        {"requested_screen",capturedGarage?J(nullptr):J(capturedUi.transition.requested.screen)},{"requested_page",capturedGarage?J(nullptr):J(capturedUi.transition.requested.page)},
+        {"selected_group",capturedGroup},{"selected_slot",capturedGarage?J(nullptr):J(capturedSlot)},
         {"saved_group",originalMainApplication.gameSettingsProfile->savedGroup6E8},
-        {"lifecycle",static_cast<unsigned>(capturedUi.transition.lifecycle)},
-        {"phase",static_cast<unsigned>(capturedUi.transition.phase)},
+        {"lifecycle",capturedGarage?capturedUi.garageManagerLifecycle:static_cast<unsigned>(capturedUi.transition.lifecycle)},
+        {"phase",capturedGarage?capturedUi.garageManagerTransition:static_cast<unsigned>(capturedUi.transition.phase)},
         {"aperture_state",static_cast<unsigned>(capturedAperture.state)},
         {"aperture_input_enabled",capturedAperture.inputEnabled268},
-        {"gpu_publication",originalMain.coordinator.gpu()->publicationToken()},
+        {"gpu_publication",capturedGarage?J(nullptr):J(originalMain.coordinator.gpu()->publicationToken())},
         {"accepted_update_sequence",originalMain.lastAudioSequence},
         {"file",captureFile.string()},{"width",width},{"height",height},
         {"audio_mixed_frames",mainAudioInfo.mixedFrames},
+        {"audio_source_frame_origin",originalMain.audioOutput.sourceFrameOrigin()},
+        {"audio_output_source_mixed_frames",originalMain.audioOutput.outputSourceMixedFrames()},
+        {"audio_output_serial",originalMain.audioOutput.retainedOutputSerial()},
         {"audio_captured_frames",mainAudioInfo.capturedFrames},{"audio_rate",mainAudioInfo.sampleRate},
         {"audio_clock_microseconds",mainAudioInfo.simulationMicroseconds},
         {"audio_accepted_nanoseconds",originalMain.audioOutput.acceptedNanoseconds()}};
@@ -9851,6 +9855,25 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
      receipt["source_triangles"]=sourceAccepted?originalMain.submittedTriangles:0;
      receipt["source_coherent_framebuffer_fetch"]=sourceAccepted&&originalMain.submittedCoherentFramebufferFetch;
      receipt["source_texture_barriers"]=sourceAccepted?originalMain.submittedTextureBarriers:0;
+    }
+    if(capturedGarage){
+     // Real Garage is a completed Root target, not the legacy immutable
+     // SourceFrame/GPU bank or a copied Options navigation object.
+     const bool accepted=capturedUi.frameSubmitted&&capturedUi.garageTargetPublished&&
+         capturedUi.garageRootReturned&&capturedUi.garageTimingCommitted&&
+         originalMain.submittedScreen==13&&capturedUi.garagePublication!=0&&
+         originalMain.submittedGaragePublication==capturedUi.garagePublication;
+     receipt["presentation"]="native_source_rgba_target";
+     receipt["garage_loaded"]=capturedUi.garageLoaded;
+     receipt["selected_stat"]=capturedUi.garageLoaded?J(capturedUi.garageSelectedStat):J(nullptr);
+     receipt["source_publication"]=capturedUi.garagePublication;
+     receipt["root_returned"]=capturedUi.garageRootReturned;
+     receipt["timing_committed"]=capturedUi.garageTimingCommitted;
+     receipt["target_published"]=capturedUi.garageTargetPublished;
+     receipt["accepted_native_target"]=accepted;
+     receipt["aperture_bound"]=capturedAperture.bound;
+     receipt["aperture_top"]=capturedAperture.top284;
+     receipt["aperture_bottom"]=capturedAperture.bottom28C;
     }
     if(capturedTournament){
      const bool sourceAccepted=capturedUi.frameSubmitted&&originalMain.submittedScreen==9&&originalMain.sourceFrameGeneration!=0&&
@@ -10043,10 +10066,11 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     const bool courseInput=inputRoute.screen==6&&inputRoute.page==1;
     const bool hallInput=inputRoute.screen==11&&inputRoute.page==1;
     const bool tournamentInput=inputRoute.screen==9&&inputRoute.page==1;
+    const bool garageInput=inputRoute.screen==13&&inputRoute.page==1;
     // Merge real keyboard/pad edges by source ID so a simultaneous confirm
     // dispatches once. Preserve the current keyboard ordering, including Back
     // after Controls configuration7. Source pages still own all admission.
-    if(gameOptionsInput||controlsInput||memoryCardInput||riderInput||courseInput||hallInput||tournamentInput){
+    if(gameOptionsInput||controlsInput||memoryCardInput||riderInput||courseInput||hallInput||tournamentInput||garageInput){
      menuEvents[0]=menuEvents[0]||input.pressed[80];
      menuEvents[1]=menuEvents[1]||input.pressed[79];
      menuEvents[2]=menuEvents[2]||input.pressed[82]||input.pressed[26];
@@ -10070,8 +10094,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
     platform::OriginalUiMainSessionUpdate50KG update;update.elapsedSeconds=elapsed;
     // This original-UI keyboard mapping has no original debug-button bindings.
     // Its four debug-query levels therefore remain actually released.
-    originalMain.update(update,elapsedNanoseconds);
-    originalMain.commitSourceUpdateTiming();
+    const auto acceptedSource=originalMain.update(update,elapsedNanoseconds);
+    // Garage Root already committed its exact source timing; PCM was still advanced once.
+    if(!acceptedSource.sourceTimingCommitted)originalMain.commitSourceUpdateTiming();
     originalMain.render(mainClock,renderer,info.drawableWidth,info.drawableHeight);
     // video+84 suspends publication while the two genuine hidden incoming
     // frames are prepared. Do not swap stale/undefined window BACK contents or
@@ -12249,6 +12274,9 @@ SessionExit50DU runSession50DU(const char* corpusPath,bool headlessLive,const ch
   J closed={{"native_frames",originalMain.frameCount},{"captures",originalMain.captureSequence},
       {"world_ticks",completedFrames},{"window_swaps",windowSwaps},{"cleanup_complete",true},
       {"audio_mixed_frames",mainAudioInfo.mixedFrames},
+        {"audio_source_frame_origin",originalMain.audioOutput.sourceFrameOrigin()},
+        {"audio_output_source_mixed_frames",originalMain.audioOutput.outputSourceMixedFrames()},
+        {"audio_output_serial",originalMain.audioOutput.retainedOutputSerial()},
       {"audio_source_mixed_frames",originalMain.audioOutput.sourceMixedFrames()},
       {"audio_captured_frames",mainAudioInfo.capturedFrames},{"audio_rate",mainAudioInfo.sampleRate},
       {"audio_clock_microseconds",mainAudioInfo.simulationMicroseconds},
@@ -12337,6 +12365,10 @@ int main(int argc,char**argv){try{
  initializeControlPresets49D(*applicationControlsOwner);
  auto& applicationControls=*applicationControlsOwner;
  original_main_entry50KG::Application originalMainApplication(applicationClockOwner,applicationControlsOwner);
+ // Keep the actual Application alive while terminal exception cleanup retires
+ // its source Aural/Pending/Light/backing. Session-local owners unwind FIRST.
+ // Normal Course handoffs remain inside this scope and do not retire services.
+ try {
  require50DU(!captureRun.navigate()||originalMainApplication.enabled,"unattended original UI route requires Original Main enabled");
  SharedRandomOwner50ID directApplicationRandom{};
  auto nativeWaterGlobals=std::make_shared<native_gc_water_session50KG::Application>();
@@ -12524,6 +12556,27 @@ int main(int argc,char**argv){try{
   if(useCheckpoint){activeCheckpoint=nextCheckpoint;std::cerr<<"Starting source-derived host checkpoint session.\n";}
   else {lapContinuity={};std::cerr<<"Starting a fresh authored-grid session.\n";}
  }
+ // All real session-local audio/GL/world owners and the matching gameplay
+ // Light lease have ended. Transient Course exits deliberately do not retire
+ // these process-owned services; only this terminal root continuation does.
+ std::string frontendShutdownError;
+ const bool frontendServicesClosed=originalMainApplication.finishNativeFrontendAudio(frontendShutdownError);
+ require50DU(frontendServicesClosed,frontendShutdownError.c_str());
  captureRun.reportClosed();
  return captureRun.timedOut()||(captureRun.navigate()&&(!captureRun.evidenceComplete()||!captureRun.videoHoldComplete()))?3:0;
+ }catch(...){
+  const auto originalFailure=std::current_exception();
+  std::string terminalError;
+  if(!originalMainApplication.finishNativeFrontendAudio(terminalError)){
+   // Do not let the strict source-owner destructor hide the first failure,
+   // and never release live backing merely to make exception unwinding pass.
+   try{std::rethrow_exception(originalFailure);}
+   catch(const std::exception& e){std::cerr<<"interactive drive original failure: "<<e.what()<<'\n';}
+   catch(...){std::cerr<<"interactive drive original failure: non-standard exception\n";}
+   std::cerr<<"terminal frontend source retirement unresolved: "<<terminalError
+       <<"; retaining actual owners by terminating\n";
+   std::terminate();
+  }
+  std::rethrow_exception(originalFailure);
+ }
 }catch(const std::exception&e){std::cerr<<"interactive drive: "<<e.what()<<'\n';return 1;}}

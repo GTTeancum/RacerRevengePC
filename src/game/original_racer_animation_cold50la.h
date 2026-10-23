@@ -6,6 +6,7 @@
 #include <string>
 
 namespace native_racer_model50LA { class Owner; }
+namespace rr::platform { class OriginalUiGarageActors50GN; class OriginalUiGarageWattoOwner50KG; }
 namespace rr::game {
 enum class OriginalRacerAnimationColdStatus50LA : std::uint8_t {
     complete,binding,alreadyConstructed,component,attachmentLocked,topology,allocationState
@@ -63,6 +64,9 @@ struct OriginalRacerAnimationColdFields50LA {
 // model; the concrete model owner performs those later operations explicitly.
 class OriginalRacerAnimationCold50LA final {
     friend class ::native_racer_model50LA::Owner;
+    friend class rr::platform::OriginalUiGarageActors50GN;
+    friend class rr::platform::OriginalUiGarageWattoOwner50KG;
+    friend class OriginalUiEntityScope50KG;
 public:
     OriginalRacerAnimationCold50LA()=default;
     OriginalRacerAnimationCold50LA(const OriginalRacerAnimationCold50LA&)=delete;
@@ -116,7 +120,7 @@ public:
         return constructed_?&fields_:nullptr;
     }
     const OriginalWreckComponent50LA* entity220()const noexcept {
-        return constructed_?&entity220_:nullptr;
+        return constructed_&&!character290_?&entity220_:nullptr;
     }
 
     // Bounded142590->104970->156FF0->153F50(1)->1413E0(0), solely for the
@@ -127,6 +131,10 @@ public:
         using S=OriginalRacerAnimationColdStatus50LA;
         if(released_)return {S::complete,0x154130u};
         if(!constructed_){released_=true;return {S::complete,0};}
+        // A derived character owns its own granted Entity290. Its concrete
+        // destructor must release loaded resources and that single Entity;
+        // this public fresh-Entity220 path cannot retire it.
+        if(character290_)return {S::binding,0x11a840u};
         if(!binding_.actualObjectCount423F60||!binding_.actualAttachmentLock423F58)
             return {S::binding,0x1425a4u};
         if(*binding_.actualAttachmentLock423F58)return {S::attachmentLocked,0x1425a8u};
@@ -166,7 +174,38 @@ public:
         return {S::complete,0x154130u};
     }
 private:
+    //11A794 calls1536F0 with a1=0 after constructing the ONE actual Entity290.
+    //This base still has its genuine stable MCF-cache identity. Its unused
+    //Entity220 native backing remains unconstructed and is never enrolled.
+    OriginalRacerAnimationColdResult50LA constructCharacterBase1536F0(
+        const OriginalRacerAnimationColdBinding50LA& b,OriginalWreckComponent50LA& character)noexcept {
+        using S=OriginalRacerAnimationColdStatus50LA;
+        if(constructed_||released_)return {S::alreadyConstructed,0x1536f0u};
+        if(!b.sessionGeneration||!b.actualObjectCount423F60||!b.actualAttachmentLock423F58||
+           character.kind!=OriginalWreckComponentKind50LA::character11A750||character.reference00!=1||
+           character.sessionGeneration!=b.sessionGeneration||character.objectKey!=b.animationKey||
+           character.parent1C||character.previous10||character.next14||character.firstChild18||
+           *b.actualAttachmentLock423F58)return {S::binding,0x11a794u};
+        binding_=b;character290_=&character;fields_.self00=&character;
+        fields_.field10=1;fields_.field0C=0;fields_.motionCount14=0;
+        fields_.motion18=nullptr;fields_.time34=0.f;
+        fields_.field20=1;fields_.field24=1;fields_.field28=0;fields_.field2C=1;
+        fields_.motion1C=nullptr;fields_.time38=0.f;fields_.field30=0;
+        fields_.definition48.clear();fields_.model98.clear();fields_.motionE8.clear();
+        fields_.rig138.clear();fields_.directory190.clear();
+        fields_.allocation1EC=nullptr;fields_.allocation1F4=nullptr;
+        fields_.allocation1FC=nullptr;fields_.allocation200=nullptr;fields_.field1F8=0;
+        fields_.field1E0=1;fields_.motionArray1E4=nullptr;fields_.allocation1F0=nullptr;
+        fields_.field204=0;fields_.count208=0;fields_.allocation210=nullptr;
+        fields_.allocation20C=nullptr;fields_.field214=0;fields_.allocation218=nullptr;
+        //153764 computes source+220 minus the already selected source+290.
+        //The enclosing11A750 constructor next installs derived dispatch/zero.
+        fields_.dispatch21C=OriginalWreckComponentKind50LA::animation1536F0;
+        fields_.entity220Adjustment30=-0x70;constructed_=true;
+        return {S::complete,0x1538a4u};
+    }
     OriginalWreckComponent50LA entity220_;
+    OriginalWreckComponent50LA* character290_=nullptr;
     OriginalRacerAnimationColdFields50LA fields_;
     OriginalRacerAnimationColdBinding50LA binding_{};
     bool constructed_=false,released_=false;

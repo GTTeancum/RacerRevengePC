@@ -48,6 +48,9 @@ struct AudioCounterObservation50KG {
     // Successful cumulative microseconds and mixed frames represent the live
     // AudioSampleClock values; no second mutable sample clock is introduced.
     rr::platform::AudioOutputInfo50HD output{};
+    // Cumulative Main mixer history remains sourceMixedFrames. Only frames
+    // since this actual output-open origin belong to output.mixedFrames.
+    std::uint64_t sourceFrameOrigin=0;
 };
 struct AudioIntervalObservation50KG {
     AudioAccountingKind50KG kind=AudioAccountingKind50KG::none;

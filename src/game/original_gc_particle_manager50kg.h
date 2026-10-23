@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+namespace rr::platform {class OriginalUiGarageDrawContribution50KG;class OriginalUiGarageSceneParticles50KG;}
 namespace rr::game {
 constexpr std::size_t originalGcParticleCapacity50KG=5000;
 constexpr std::size_t originalGcParticleDepthBuckets50KG=2500;
@@ -66,6 +67,8 @@ struct OriginalGcParticleReceipt50KG {
 // renderer scratch or outer scene attachment. Those remain their actual
 // callers' obligations. Never substitute atlas readiness for those constructors.
 class OriginalGcParticleManager50KG final {
+    friend class OriginalUiGarageParticles50KG;
+    OriginalGcParticleStatus50KG normalizeGarageAtlas161234(float,float) noexcept;
 public:
     OriginalGcParticleManager50KG() noexcept;
     ~OriginalGcParticleManager50KG();
@@ -87,6 +90,11 @@ public:
     bool gcFogAuthoringPrepared() const noexcept;
     const std::string* atlasTextureMapName() const noexcept;
     const OriginalGcParticleGroup50KG* group(std::int32_t index) const noexcept;
+    //Pixel-coordinate consumer. Genuine Garage161234 normalization closes
+    //this legacy view rather than letting existing renderers divide twice.
+    //Pixel-coordinate borrow for existing track renderers. The actual
+    //Garage161234 operation revokes this capability before its first lane
+    //write; both partial and complete normalization are unavailable here.
     const OriginalGcParticleFrame50KG* frame(std::int32_t index) const noexcept;
     const std::array<float,3>* generatorFireAttachmentOffset() const noexcept;
     OriginalGcParticleAuxiliaryChild50KG* auxiliaryChild() noexcept;
@@ -142,6 +150,12 @@ public:
         const std::array<float,3>& activeCameraPosition) const noexcept;
     bool coldFogPopulated() const noexcept;
 private:
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    friend class rr::platform::OriginalUiGarageSceneParticles50KG;
+    bool readGarageFrames1626D0(const OriginalGcParticleFrame50KG*&,std::size_t&)const noexcept;
+    bool readGaragePoolSlot162448(const OriginalGcParticle50KG*,std::size_t&)const noexcept;
+    bool publishGarageProjection162A24(std::size_t activeIndex,const OriginalGcParticle50KG* expected,
+        float quantizedDepth,std::size_t& actualPoolSlot)const noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 };

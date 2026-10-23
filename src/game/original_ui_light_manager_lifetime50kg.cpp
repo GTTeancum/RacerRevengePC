@@ -1,10 +1,12 @@
 #include "original_ui_light_manager_lifetime50kg.h"
 #include "original_ui_course_lighting50kg.h"
 #include "original_ui_tournament_camera50kg.h"
+#include "original_ui_garage_camera50kg.h"
 #include "original_ui_controls_model50kg.h"
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <exception>
 
 namespace rr::game {
 namespace {
@@ -31,6 +33,11 @@ bool finite(const std::array<float,4>& values) noexcept {
     for(float x:values)if(!std::isfinite(x))return false;return true;
 }
 }
+bool OriginalUiLightManagerLifetime50KG::nativeProjectionStep(NativeProjectionOperation operation,
+    const assets::OriginalUiArchiveIdentity50KG* identity,std::uint64_t generation)const noexcept {
+    if(!concreteBorrower_)return !concreteProjection_&&!concreteProjectionRetired_;
+    return concreteProjection_&&concreteProjection_(concreteBorrower_,*this,operation,identity,generation);
+}
 bool OriginalUiLightManagerLifetime50KG::constructAtApplicationStartup(Diagnostic& d) noexcept {
     d={};if(cacheState_!=Cache::notConstructed)return fail(d,Error::phase,0x140084);
     //147FF8, observed from the sole140084 application construction call.
@@ -38,12 +45,13 @@ bool OriginalUiLightManagerLifetime50KG::constructAtApplicationStartup(Diagnosti
 }
 bool OriginalUiLightManagerLifetime50KG::beginUiManager(const assets::OriginalUiArchive50KG& archive,
     Diagnostic& d) noexcept {
-    d={};if(cacheState_!=Cache::absentSinceApplicationConstruction)
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x148B60);
+    if(cacheState_!=Cache::absentSinceApplicationConstruction)
         return fail(d,Error::untrackedLifetime,0x14A0E8);
     if(activeUi_||nativeGameplayGeneration_||managerGeneration_==std::numeric_limits<std::uint64_t>::max())
         return fail(d,Error::phase,0x1CCD88);
     const auto* identity=archive.identity();
-    if(!archive.loaded()||!(same(identity,Archive::mainMenu)||same(identity,Archive::options)||same(identity,Archive::rider)||same(identity,Archive::course)||same(identity,Archive::hallOfFame)||same(identity,Archive::tournament)))
+    if(!archive.loaded()||!(same(identity,Archive::mainMenu)||same(identity,Archive::options)||same(identity,Archive::rider)||same(identity,Archive::course)||same(identity,Archive::hallOfFame)||same(identity,Archive::tournament)||same(identity,Archive::garage)))
         return fail(d,Error::archive,0x1CCD88);
     if(!enteredFirstMain_&&!same(identity,Archive::mainMenu))return fail(d,Error::phase,0x140084);
     const auto* ui=member(Archive::rider,"UI\\UIRider\\ui.dat");
@@ -67,12 +75,24 @@ bool OriginalUiLightManagerLifetime50KG::beginUiManager(const assets::OriginalUi
     if(same(identity,Archive::tournament)&&(!tournamentUi||
        !member(Archive::tournament,"UI\\UITourn\\Widgets.Dat")||
        !member(Archive::tournament,"UI\\UITourn\\standing.dat")))return fail(d,Error::archive,0x1CCD88);
-    //148B60 invokes148110, then initializes the requested zone rows. Neither
-    // function writesA4; do not reassign cacheState here, even to null.
+    const auto* garageUi=member(Archive::garage,"UI\\UIGarage\\ui.dat");
+    const auto* garageScene=member(Archive::garage,"ui\\UIGarage\\garage.scn");
+    if(same(identity,Archive::garage)&&(!garageUi||!garageScene||
+       !member(Archive::garage,"UI\\UIGarage\\garage.dat")))return fail(d,Error::archive,0x1CCD88);
+    // All source/archive preflight precedes the concrete native receipt. After
+    // this checked commit the scalar stores below cannot fail or call out.
+    if(!nativeProjectionStep(NativeProjectionOperation::beginUi,identity,managerGeneration_+1))
+        return fail(d,Error::phase,0x148B60);
+    // This existing scalar registry is the native renderer projection. With a
+    // concrete owner it does NOT issue counted148B60 zones or148F30 Light rows.
+    // Neither path writesA4; do not reassign cacheState, even to null.
     activeUi_=identity;riderUiIdentity_=ui;riderWidgetIdentity_=widgets;
     riderRegistry_={};riderRegistryReady_=false;
     tournamentUiIdentity_=same(identity,Archive::tournament)?tournamentUi:nullptr;
     tournamentRegistry_={};tournamentAmbient50_={};tournamentDirectional3C_={};tournamentRegistryReady_=false;
+    garageUiIdentity_=same(identity,Archive::garage)?garageUi:nullptr;
+    garageSceneIdentity_=same(identity,Archive::garage)?garageScene:nullptr;
+    garageRegistry_={};garageAmbient50_={};garageDirectional3C_={};garageRegistryReady_=false;
     courseUiIdentity_=same(identity,Archive::course)?courseUi:nullptr;
     courseRegistry_={};courseRegistryReady_=false;
     controlsUiIdentity_=same(identity,Archive::options)?controlsUi:nullptr;
@@ -82,19 +102,21 @@ bool OriginalUiLightManagerLifetime50KG::beginUiManager(const assets::OriginalUi
     enteredFirstMain_=true;++managerGeneration_;return true;
 }
 bool OriginalUiLightManagerLifetime50KG::releaseUiManager() noexcept {
-    if(!activeUi_)return false;
+    if(!activeUi_||!nativeProjectionStep(NativeProjectionOperation::endUi,activeUi_,managerGeneration_))return false;
     activeUi_=nullptr;riderUiIdentity_=nullptr;riderWidgetIdentity_=nullptr;
     riderRegistry_={};riderRegistryReady_=false;
     controlsUiIdentity_=nullptr;controlsSceneIdentity_=nullptr;controlsWidgetIdentity_=nullptr;
     controlsRegistry_={};controlsRegistryReady_=false;
     tournamentUiIdentity_=nullptr;tournamentRegistry_={};tournamentAmbient50_={};tournamentDirectional3C_={};tournamentRegistryReady_=false;
+    garageUiIdentity_=nullptr;garageSceneIdentity_=nullptr;garageRegistry_={};garageAmbient50_={};garageDirectional3C_={};garageRegistryReady_=false;
     courseUiIdentity_=nullptr;courseRegistry_={};courseRegistryReady_=false;
     //148110's non-reset ofA4 is intentional, including an untracked state.
     return true;
 }
 bool OriginalUiLightManagerLifetime50KG::publishRiderRegistry(const OriginalUiRiderLighting50KG& lighting,
     Diagnostic& d) noexcept {
-    d={};riderRegistryReady_=false;
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x148F30);
+    riderRegistryReady_=false;
     if(cacheState_!=Cache::absentSinceApplicationConstruction)
         return fail(d,Error::untrackedLifetime,0x14A0E8);
     if(!same(activeUi_,Archive::rider)||!riderUiIdentity_||lighting.uiIdentity!=riderUiIdentity_)
@@ -113,7 +135,8 @@ bool OriginalUiLightManagerLifetime50KG::publishRiderRegistry(const OriginalUiRi
 }
 bool OriginalUiLightManagerLifetime50KG::publishTournamentRegistry(const OriginalUiTournamentLighting50KG& lighting,
     Diagnostic& d) noexcept {
-    d={};tournamentRegistryReady_=false;
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x148F30);
+    tournamentRegistryReady_=false;
     if(cacheState_!=Cache::absentSinceApplicationConstruction)
         return fail(d,Error::untrackedLifetime,0x14A0E8);
     if(!same(activeUi_,Archive::tournament)||!tournamentUiIdentity_||lighting.uiIdentity!=tournamentUiIdentity_)
@@ -133,7 +156,7 @@ bool OriginalUiLightManagerLifetime50KG::publishTournamentRegistry(const Origina
 }
 bool OriginalUiLightManagerLifetime50KG::matchesTournamentRegistry(
     const OriginalUiTournamentLighting50KG& lighting) const noexcept {
-    if(cacheState_!=Cache::absentSinceApplicationConstruction ||
+    if(!nativeProjectionCurrent()||cacheState_!=Cache::absentSinceApplicationConstruction ||
        !same(activeUi_,Archive::tournament) || !tournamentUiIdentity_ ||
        lighting.uiIdentity!=tournamentUiIdentity_ || !tournamentRegistryReady_ ||
        tournamentRegistry_.count!=2 || tournamentAmbient50_!=lighting.ambient50 ||
@@ -153,9 +176,54 @@ bool OriginalUiLightManagerLifetime50KG::matchesTournamentRegistry(
     }
     return true;
 }
+bool OriginalUiLightManagerLifetime50KG::publishGarageRegistry(const OriginalUiGarageLighting50KG& lighting,
+    Diagnostic& d) noexcept {
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x148F30);
+    garageRegistryReady_=false;
+    if(cacheState_!=Cache::absentSinceApplicationConstruction)
+        return fail(d,Error::untrackedLifetime,0x14A0E8);
+    if(!same(activeUi_,Archive::garage)||!garageUiIdentity_||lighting.uiIdentity!=garageUiIdentity_||!garageSceneIdentity_||lighting.sceneIdentity!=garageSceneIdentity_)
+        return fail(d,Error::phase,0x1CDB10);
+    if(!finite(lighting.ambient50)||!finite(lighting.ambientSlot60)||!finite(lighting.directional3C))
+        return fail(d,Error::registry,0x148F30);
+    for(float x:lighting.directionalLook78)if(!std::isfinite(x))return fail(d,Error::registry,0x147200);
+    original_racer_lighting50KM::SmallDirectionalRegistry next{};
+    next.count=2;next.registered[0].type=4;
+    //146C80 keeps ambient light RGB slots zero; its color lives at+5C.
+    auto& directional=next.registered[1];directional.type=2;
+    directional.direction78=lighting.directionalLook78;directional.diffuse3C={lighting.directional3C[0],lighting.directional3C[1],lighting.directional3C[2]};
+    directional.specular4C=directional.diffuse3C; //146C40 mirrors3C into4C.
+    next.selectedZoneAmbient=lighting.ambientSlot60;
+    garageRegistry_=next;garageAmbient50_=lighting.ambient50;
+    garageDirectional3C_=lighting.directional3C;garageRegistryReady_=true;return true;
+}
+bool OriginalUiLightManagerLifetime50KG::matchesGarageRegistry(
+    const OriginalUiGarageLighting50KG& lighting) const noexcept {
+    if(!nativeProjectionCurrent()||cacheState_!=Cache::absentSinceApplicationConstruction ||
+       !same(activeUi_,Archive::garage) || !garageUiIdentity_ ||
+       lighting.uiIdentity!=garageUiIdentity_ || !garageSceneIdentity_ ||
+       lighting.sceneIdentity!=garageSceneIdentity_ || !garageRegistryReady_ ||
+       garageRegistry_.count!=2 || garageAmbient50_!=lighting.ambient50 ||
+       garageDirectional3C_!=lighting.directional3C || !finite(lighting.ambient50) ||
+       !finite(lighting.ambientSlot60) || !finite(lighting.directional3C))return false;
+    const auto& ambient=garageRegistry_.registered[0];
+    const auto& directional=garageRegistry_.registered[1];
+    if(ambient.type!=4 || directional.type!=2 ||
+       garageRegistry_.selectedZoneAmbient!=lighting.ambientSlot60 ||
+       directional.direction78!=lighting.directionalLook78)return false;
+    for(std::size_t i=0;i<3;++i) {
+        if(!std::isfinite(lighting.directionalLook78[i]) ||
+           ambient.direction78[i]!=0.0f || ambient.diffuse3C[i]!=0.0f ||
+           ambient.specular4C[i]!=0.0f ||
+           directional.diffuse3C[i]!=lighting.directional3C[i] ||
+           directional.specular4C[i]!=lighting.directional3C[i])return false;
+    }
+    return true;
+}
 bool OriginalUiLightManagerLifetime50KG::publishCourseRegistry(const OriginalUiCourseLighting50KG& lighting,
     Diagnostic& d) noexcept {
-    d={};courseRegistryReady_=false;
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x148F30);
+    courseRegistryReady_=false;
     if(cacheState_!=Cache::absentSinceApplicationConstruction)
         return fail(d,Error::untrackedLifetime,0x14A0E8);
     if(!same(activeUi_,Archive::course)||!courseUiIdentity_||lighting.uiIdentity!=courseUiIdentity_)
@@ -174,7 +242,8 @@ bool OriginalUiLightManagerLifetime50KG::publishCourseRegistry(const OriginalUiC
 }
 bool OriginalUiLightManagerLifetime50KG::publishControlsRegistry(const OriginalUiControlsLighting50KG& lighting,
     Diagnostic& d) noexcept {
-    d={};controlsRegistryReady_=false;
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x148F30);
+    controlsRegistryReady_=false;
     if(cacheState_!=Cache::absentSinceApplicationConstruction)return fail(d,Error::untrackedLifetime,0x14A0E8);
     if(!same(activeUi_,Archive::options)||!controlsUiIdentity_||lighting.uiIdentity!=controlsUiIdentity_||
        !controlsSceneIdentity_||lighting.sceneIdentity!=controlsSceneIdentity_)
@@ -190,7 +259,8 @@ bool OriginalUiLightManagerLifetime50KG::publishControlsRegistry(const OriginalU
 }
 bool OriginalUiLightManagerLifetime50KG::selectControlsModel(const OriginalUiControlsModelSelection50KG& selection,
     original_racer_lighting50KM::LightMatrices& output,Diagnostic& d) const noexcept {
-    d={};if(cacheState_!=Cache::absentSinceApplicationConstruction)return fail(d,Error::untrackedLifetime,0x14A0E8);
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x14A0E8);
+    if(cacheState_!=Cache::absentSinceApplicationConstruction)return fail(d,Error::untrackedLifetime,0x14A0E8);
     if(!same(activeUi_,Archive::options)||!controlsRegistryReady_||controlsRegistry_.count!=2)
         return fail(d,Error::registry,0x14A128);
     if(!selection.owner||selection.owner->widgetIdentity()!=controlsWidgetIdentity_||
@@ -205,7 +275,7 @@ bool OriginalUiLightManagerLifetime50KG::selectRiderCharacter(
     const assets::OriginalUiRiderCharacterAssets50KG& assets,
     const OriginalUiRiderModelSelection50KG& selection,
     original_racer_lighting50KM::LightMatrices& output,Diagnostic& d) const noexcept {
-    d={};
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x14A0E8);
     // This is the actual14A0E8 branch, established by owned startup/lifetime.
     // There is no call to14A860, no cache hit/miss assertion and no insertion.
     if(cacheState_!=Cache::absentSinceApplicationConstruction)
@@ -222,10 +292,12 @@ bool OriginalUiLightManagerLifetime50KG::selectRiderCharacter(
     return true;
 }
 bool OriginalUiLightManagerLifetime50KG::beginNativeGameplay(std::uint64_t generation,Diagnostic& d) noexcept {
-    d={};if(cacheState_!=Cache::absentSinceApplicationConstruction)
+    d={};if(!nativeProjectionCurrent())return fail(d,Error::phase,0x148B60);
+    if(cacheState_!=Cache::absentSinceApplicationConstruction)
         return fail(d,Error::untrackedLifetime,0);
     if(!generation||nativeGameplayGeneration_||activeUi_||!enteredFirstMain_||
-       riderRegistryReady_||courseRegistryReady_||controlsRegistryReady_||tournamentRegistryReady_)return fail(d,Error::phase,0);
+       riderRegistryReady_||courseRegistryReady_||controlsRegistryReady_||tournamentRegistryReady_||garageRegistryReady_)return fail(d,Error::phase,0);
+    if(!nativeProjectionStep(NativeProjectionOperation::beginGameplay,nullptr,generation))return fail(d,Error::phase,0);
     nativeGameplayGeneration_=generation;return true;
 }
 bool OriginalUiLightManagerLifetime50KG::endNativeGameplay(std::uint64_t generation,Diagnostic& d) noexcept {
@@ -233,19 +305,23 @@ bool OriginalUiLightManagerLifetime50KG::endNativeGameplay(std::uint64_t generat
         return fail(d,Error::untrackedLifetime,0);
     if(!generation||generation!=nativeGameplayGeneration_||activeUi_)
         return fail(d,Error::phase,0);
+    if(!nativeProjectionStep(NativeProjectionOperation::endGameplay,nullptr,generation))return fail(d,Error::phase,0);
     nativeGameplayGeneration_=0;return true;
 }
 void OriginalUiLightManagerLifetime50KG::invalidateForUntrackedScene() noexcept {
+    if(concreteBorrower_||concreteProjection_)std::terminate();
     if(cacheState_==Cache::absentSinceApplicationConstruction)cacheState_=Cache::untracked;
-    riderRegistryReady_=false;courseRegistryReady_=false;controlsRegistryReady_=false;tournamentRegistryReady_=false;
+    riderRegistryReady_=false;courseRegistryReady_=false;controlsRegistryReady_=false;tournamentRegistryReady_=false;garageRegistryReady_=false;
 }
 void OriginalUiLightManagerLifetime50KG::destroyApplication() noexcept {
+    if(concreteBorrower_||concreteProjection_)std::terminate();
     nativeGameplayGeneration_=0;
     activeUi_=nullptr;riderUiIdentity_=nullptr;riderWidgetIdentity_=nullptr;
     riderRegistry_={};riderRegistryReady_=false;
     controlsUiIdentity_=nullptr;controlsSceneIdentity_=nullptr;controlsWidgetIdentity_=nullptr;
     controlsRegistry_={};controlsRegistryReady_=false;
     tournamentUiIdentity_=nullptr;tournamentRegistry_={};tournamentAmbient50_={};tournamentDirectional3C_={};tournamentRegistryReady_=false;
+    garageUiIdentity_=nullptr;garageSceneIdentity_=nullptr;garageRegistry_={};garageAmbient50_={};garageDirectional3C_={};garageRegistryReady_=false;
     courseUiIdentity_=nullptr;courseRegistry_={};courseRegistryReady_=false;cacheState_=Cache::destroyed;
 }
 }

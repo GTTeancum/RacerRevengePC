@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+namespace rr::platform { class OriginalUiFrontend50KG; }
 namespace rr::assets {
 // The first bounded closure is the actual Rider19 character texture19c_1.
 // More sources require a separately authenticated, compiled catalog change.
@@ -17,6 +18,7 @@ enum class OriginalUiIpumColorPolicy50KG : std::uint8_t {
 struct OriginalUiIpumMipProvenance50KG {
     std::uint32_t width=0,height=0;
     std::size_t sourceHeaderOffset=0,sourcePayloadOffset=0,sourcePayloadBytes=0;
+    // Native RGBA-only Garage conversion leaves unobserved YUV hash empty.
     std::string sourcePayloadSha256,yuv420pSha256,rgbaSha256,rrtexSha256;
     std::string retainedFilename;
 };
@@ -25,7 +27,9 @@ struct OriginalUiIpumProvenance50KG {
     std::string sourceMember,sourcePstSha256,sourceArchiveSha256;
     std::string converterSha256,generatorSha256,ffmpegVersion,ffmpegSha256;
     std::string ffmpegCommand,colorPolicy;
-    // Codec fields above identify the pinned reference conversion. This flag
+    // Codec fields identify the pinned reference/native conversion. For the
+    // Garage native path ffmpegSha256 identifies libavcodec, and ffmpegCommand
+    // describes the in-process call rather than inventing a subprocess. This flag
     // distinguishes fresh in-process decoding from supplied cached pixels.
     bool decodedInProcess=false;
     // Native host decoding of the original image-codec bytes. This is NOT
@@ -43,6 +47,11 @@ struct OriginalUiIpumCacheDiagnostic50KG {
     OriginalUiIpumCacheError50KG error=OriginalUiIpumCacheError50KG::none;
     std::size_t mip=0;
     std::string detail;
+    // Native cache diagnostics, not original material/texture row identities.
+    // Budget fields describe the actual attempted immutable Garage append.
+    std::size_t sourceIndex=static_cast<std::size_t>(-1);
+    std::size_t retainedBytes=0,requestedBytes=0,decodedByteLimit=0;
+    std::size_t inputBytes=0,inputByteLimit=0;
 };
 
 // Cold, load-once authentication of a compiled, source-derived image cache.
@@ -79,6 +88,15 @@ public:
         const std::vector<std::vector<std::uint8_t>>& retainedMipRrtex,
         OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C* =nullptr,
         const TextureLimits48E& =TextureLimits48E{}) noexcept;
+    // Separate fixed Garage closure: ten genuine UIGARAGE members and the
+    // distinct19E spcgarge member. Does not widen Rider's29-source catalog.
+    // Native decoding only; no public pixel/hash/foreign-archive admission.
+    static std::size_t garageCatalogSourceCount() noexcept;
+    static const char* garageSourceMember(std::size_t source) noexcept;
+    static const OriginalUiArchiveIdentity50KG* garageSourceArchive(std::size_t source) noexcept;
+    bool loadGarageOriginal(std::size_t source,std::shared_ptr<const OriginalUiArchive50KG>,
+        OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C* =nullptr,
+        const TextureLimits48E& =TextureLimits48E{}) noexcept;
     static const char* retainedMipFilename(std::size_t mip) noexcept;
     // Cold native decoding from the authenticated archive. Outputs pass the
     // same fixed source/pixel hash admission as the compatibility cache path.
@@ -107,8 +125,20 @@ public:
     const OriginalUiIpumProvenance50KG* provenanceFor(const OriginalUiMemberView50KG&,
         std::size_t pstOffset,std::size_t pstBytes) const noexcept;
 private:
+    friend class rr::platform::OriginalUiFrontend50KG;
+    // Serialized real manager-entry extension of this same native cache. Only
+    // previously absent fixed Garage slots may publish; old views never move,
+    // get replaced or receive a new identity. Successful partial work is kept.
+    bool appendGarageArchive12CEA0(const std::shared_ptr<const OriginalUiArchive50KG>&,
+        OriginalUiIpumCacheDiagnostic50KG&) const noexcept;
+    bool loadGarageOriginalImpl(std::size_t,std::shared_ptr<const OriginalUiArchive50KG>,
+        OriginalUiIpumCacheDiagnostic50KG&,const DecodeHooks48C*,const TextureLimits48E&,
+        std::size_t retainedByteCeiling) const noexcept;
     struct Storage;
     std::unique_ptr<Storage> storage_;
     std::array<std::unique_ptr<Storage>,originalUiIpumAdditionalCapacity50KG> additional_{};
+    // Logical constness: fixed-address immutable publications are appended,
+    // never mutated. Existing Rider/static canonical leases remain valid.
+    mutable std::array<std::unique_ptr<Storage>,11> garage_{};
 };
 } // namespace rr::assets

@@ -9,6 +9,7 @@ namespace rr::platform {
 // actual frontend/race mixer; mixing/controls and edits use one producer thread.
 // This owner never resets, steals or retunes another provider's voices/groups.
 class OriginalSoundMode50KG final {
+    friend class OriginalApplicationAural50KG;
 public:
     OriginalSoundMode50KG() noexcept=default;
     OriginalSoundMode50KG(const OriginalSoundMode50KG&)=delete;

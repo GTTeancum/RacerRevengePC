@@ -68,6 +68,18 @@ private:
 //The creator prototype1C is borrowed, never cloned or silently retargeted.
 //Serial callers must release warm users before this prototype; the explicit
 //release admission prevents leaving a cache hit with a destroyed prototype.
+// Retained native identity for one actually loaded2461E0/246300 Surface.
+// These are source scalar operands, not a guest ABI/DMA packet.26E170 owns a
+// distinct contiguous array per LOD (source stride36); native sizeof differs.
+struct OriginalStandardSurface246300_50LA final {
+    const std::int32_t* material00=nullptr; // Same actual mutable geometry slot.
+    std::uint8_t attributes0C=0,uvCount0D=0,palette0E=0xff;
+    std::array<float,2> uvScale18{{1.f,1.f}}; //246218/21C; source reads0D entries.
+    std::uint16_t vertexCount20=0,stripCount22=0;
+    std::uint32_t lodOrdinal=0,surfaceOrdinal=0;
+    std::size_t sourceOffset=0;
+};
+
 class OriginalStandardModelGeometry50LA final {
 public:
     OriginalStandardModelGeometry50LA() noexcept;
@@ -91,6 +103,10 @@ public:
     std::size_t paletteCount20() const noexcept;
     const std::vector<std::uint8_t>* palette20(std::size_t) const noexcept;
     const std::int32_t* surfaceMaterial00(std::size_t lod,std::size_t surface) const noexcept;
+    // Only present after the genuine resource constructor publishes. Immutable
+    // identity survives warm instances and is retired with the actual array.
+    const OriginalStandardSurface246300_50LA* surface246300(std::size_t lod,std::size_t surface)const noexcept;
+    std::size_t surfaceCount26E2B8(std::size_t lod)const noexcept;
     bool retain104960(const rr::game::OriginalRacerModelSceneOwner50LA*,
         OriginalStandardResourceDiagnostic50LA&) noexcept;
     bool holdsModelReference(const rr::game::OriginalRacerModelSceneOwner50LA*) const noexcept;

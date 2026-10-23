@@ -8,6 +8,7 @@ namespace original_cable_selection50LA { class Binding; }
 #include <memory>
 #include <thread>
 
+namespace rr::platform {class OriginalUiSharedDialogs50KG; class OriginalUiGaragePageOwner50KG;class OriginalUiGarageRendererLease50KG;class OriginalUiGarageFogColorLease50KG;}
 namespace rr::game { class OriginalPositionStatsPrimitiveOwner50LA; class OriginalPositionStatsResources50LA; }
 namespace original_main_entry50KG {
 class NativeCollectorFifo50LA;
@@ -18,6 +19,14 @@ class PositionStatsTextureLease50LA;
 // borrow these same members. No PositionStats resources are activated here.
 class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDisplayLifetime50LA> {
     friend struct Application;
+    friend struct Frontend;
+    friend class rr::platform::OriginalUiGaragePageOwner50KG;
+    friend class rr::platform::OriginalUiSharedDialogs50KG;
+    friend class rr::platform::OriginalUiGarageRendererLease50KG;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    friend class rr::platform::OriginalUiGarageCameraFrame50KG;
+    friend class rr::platform::OriginalUiGarageFogColorLease50KG;
+    friend class rr::platform::OriginalLocalizationRendererLease50KG;
     friend class NativeCollectorFifo50LA;
     friend class PositionStatsRendererLease50LA;
     friend class PositionStatsTextureLease50LA;
@@ -49,30 +58,133 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
         return std::unique_ptr<CableInspection>(new CableInspection(owner->shared_from_this()));
     }
     const Application* const application_; // Actual factory owner, no caller replacement.
+    const rr::game::OriginalApplicationAnimationClockView50KG applicationLifetime_;
     const std::shared_ptr<rr::assets::OriginalStandardTextureLifetime50LA> textureLifetime_;
     const std::shared_ptr<Video> video_; // Authoritative Application control block.
     const std::uint64_t generation_;
     const std::thread::id thread_=std::this_thread::get_id();
     rr::platform::VehicleWindowGl50DS renderer_;
     rr::game::OriginalRendererDispatchFields dispatch_{1,2,0,0,0};
+    rr::game::OriginalRendererServiceFields50KG sourceRendererService_;
     // SAME renderer's scalar2C: base26F880 initializes zero; race load
     // writes one at1A6AD8.243FC0 reads it to choose default clear mask2/3.
     // It is separate from current scene0 and dispatch queue44.
     std::uint32_t sourceClearMode2C_=0;
-    void beginRaceClear1A6AD8() noexcept { sourceClearMode2C_=1; }
+    std::array<std::uint32_t,4> sourceClearCounters30_{}; //26F894..26F8A0.
+    float sourceFogStartB0_=50.f,sourceFogEndB4_=300.f,sourceFogScaleB8_=0.f; //243B74/7C/84.
+    bool sourceFogRangeKnown_=true;
+    //Actual native backing for the renderer246040(16) reset-list. Ordinary
+    //GL command queues are not these source primitive registrations.
+    std::array<const void*,16> sourcePrimitiveResetList68_{};
+    std::uint32_t sourcePrimitiveResetCount68_=0,sourceRendererCounter64_=0,sourceRendererCounterBC_=0,sourceRendererCounterC0_=0;
+    //26F87C/884 constructor fields of THIS renderer, not a race aggregate.
+    //243CB4 writes2 when its native frontend initialization succeeds. Two is
+    //the source Camera dirty-countdown input, not a claim of two host FBOs.
+    std::uint32_t sourceBufferCount0C_=0;
+    //Real26F884/888/88C constructor words on the SAME process Display.
+    //26F910 advances these source counters, not a host swap/presentation count.
+    std::uint32_t sourceCurrentBuffer10_=0,sourceFrame14_=0;
+    std::weak_ptr<rr::platform::OriginalUiGarageDrawContribution50KG> garageAdvancedDraw26F910_;
+    std::uint64_t garageAdvancedPublication26F910_=0;
+    bool advanceGarageFrame26F910(const rr::platform::OriginalUiGarageDrawContribution50KG&,
+        rr::platform::VehicleWindowDiagnostic50DS&)noexcept;
+    bool sourceBufferCount0CInitialized_=false;
+    //26F940 selects a Camera, not a world Scene/PodScene. The native pin
+    //retains its identity without adding a source Entity reference. Retirement
+    //must inspect this same owner and never infer null merely from deletion.
+    std::shared_ptr<rr::game::OriginalFrontendCameraCold50LA> sourceSelectedCamera0_;
+    std::int32_t sourceWidth4_=0,sourceHeight8_=0; //243E1C/28 after native init.
+    bool sourceCurrentCamera0Known_=true;
+    bool garageFirstViewportCurrent50KG(rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
+        if(!frontendOwnerCurrent50KG()||!canRetain()||!frontendCreated_||
+           !sourceBufferCount0CInitialized_||sourceBufferCount0C_!=2u||
+           !sourceCurrentCamera0Known_||sourceSelectedCamera0_||textureLifetime_->nativeUploads_||
+           localizationServiceActive_||dispatch_.pendingCallbackDC||dispatch_.count54||dispatch_.count60)
+            return false;
+        if(!renderer_.garageFirstCameraViewportIdle50KG(d))return false;
+        return true;
+    }
+    // Failed shared-loader Camera is initialized but never entered the Page
+    // forest. Authenticate that distinct owner before any unregister/ref0 effect.
+    bool preflightFailedLoaderCamera231310(const rr::game::OriginalFrontendCameraCold50LA& camera,
+        rr::platform::VehicleWindowDiagnostic50DS& d)const noexcept {
+        using Camera=rr::game::OriginalFrontendCameraCold50LA;
+        if(!frontendOwnerCurrent50KG()||!canRetain()||!frontendCreated_||
+           !sourceBufferCount0CInitialized_||sourceBufferCount0C_!=2u||
+           !sourceCurrentCamera0Known_||sourceSelectedCamera0_.get()!=&camera||
+           camera.issuer_!=application_||!camera.nativeRegistrationIdentityCurrent()||
+           camera.phase_!=Camera::Phase::poseSet114F90||camera.failedLoaderRetirementStep_||
+           textureLifetime_->nativeUploads_||localizationServiceActive_||
+           dispatch_.pendingCallbackDC||dispatch_.count54||dispatch_.count60)return false;
+        return renderer_.garageFirstCameraViewportIdle50KG(d);
+    }
+    bool retireFailedLoaderSelectedCamera115690(const rr::game::OriginalFrontendCameraCold50LA& camera)noexcept {
+        if(!frontendOwnerCurrent50KG()||!sourceCurrentCamera0Known_||
+           camera.issuer_!=application_||!camera.failedLoaderRef0Current1155C0()||
+           camera.failedLoaderRetirementStep_!=4)return false;
+        //115684 compares the same Display field;115690 ->26F948 clears it
+        //only on an exact match. No renderer/context/buffer owner is retired.
+        if(sourceSelectedCamera0_.get()==&camera)sourceSelectedCamera0_.reset();
+        return true;
+    }
+    bool retireSelectedCamera115690(const rr::game::OriginalFrontendCameraCold50LA& camera)noexcept {
+        if(!frontendOwnerCurrent50KG()||!sourceCurrentCamera0Known_||
+           camera.issuer_!=application_||!camera.onAffinity()||!camera.actualEntitiesAlive()||
+           camera.phase_!=rr::game::OriginalFrontendCameraCold50LA::Phase::pageRetiring1155C0||
+           camera.enrolled_||camera.entity_.reference00)return false;
+        //115684 compares actual Display0. Only the identity-match branch calls
+        //26F940(nullptr), whose26F948 store reestablishes known-null for reentry.
+        if(sourceSelectedCamera0_.get()==&camera)sourceSelectedCamera0_.reset();
+        return true;
+    }
+    //26F870/243A80 do NOT initialize28. Native backing is unreadable as
+    // source state until an actual reached writer publishes this exact field.
+    std::uint32_t sourceFogColor28_=0;
+    std::uint32_t sourceFogGsColor3D_=0;bool sourceFogGsColor3DKnown_=false; //Actual applied244A40 command, not clear-color28.
+    bool sourceFogColor28Known_=false;
+    void beginRaceClear1A6AD8() noexcept { sourceClearMode2C_=1;sourceFogRangeKnown_=false; }
     void clearRaceClear1A687C() noexcept { sourceClearMode2C_=0; }
 
     bool attempted_=false,created_=false,retiring_=false;
+    // Native creation/service provenance only. Neither is a source Video frame.
+    bool frontendCreated_=false,localizationServiceActive_=false,localizationServiceFaulted_=false;
     bool positionStatsTextureLeaseActive_=false;
     RaceDisplayLifetime50LA(std::shared_ptr<Video> video,std::uint64_t generation,const Application& application,
         std::shared_ptr<rr::assets::OriginalStandardTextureLifetime50LA> textureLifetime)
-        :application_(&application),textureLifetime_(std::move(textureLifetime)),video_(std::move(video)),generation_(generation) {
+        :application_(&application),applicationLifetime_(application.animationClock()),textureLifetime_(std::move(textureLifetime)),video_(std::move(video)),generation_(generation) {
         require(video_&&textureLifetime_&&generation_&&!video_->host.sessionDisplayRenderer50LA_,
             "display requires the actual unclaimed Application Video");
         renderer_.sessionDisplayOwner50LA_=this;
         video_->host.sessionDisplayRenderer50LA_=&renderer_;
     }
     bool ownerThread()const noexcept{return thread_==std::this_thread::get_id();}
+    bool frontendTransferBindingCurrent50KG(
+        const rr::assets::OriginalNativeTextureUploadBinding50LA& binding,
+        const std::shared_ptr<rr::assets::OriginalNativeFrontendUploadLifetime50LA>& owner)const noexcept {
+        return owner&&frontendOwnerCurrent50KG()&&frontendCreated_&&created_&&!retiring_&&
+            binding.frontend_.lock()==owner&&binding.display_.expired()&&
+            binding.manager_==textureLifetime_&&binding.context_==&video_->host&&
+            binding.current_==&current&&binding.generation_==textureLifetime_->nativeUploadGeneration_&&
+            !textureLifetime_->nativeUploads_&&!textureLifetime_->publishedTransfer13C_&&
+            !textureLifetime_->coldTransferOwner_&&!textureLifetime_->treeCursor442B60_;
+    }
+
+    bool frontendOwnerCurrent50KG()const noexcept {
+        if(!ownerThread())return false;
+        std::uint32_t pause=0;
+        // Clock backing survives the root but becomes unreadable at actual
+        // Application destruction. Never inspect a dead raw application_.
+        if(!applicationLifetime_.readPause11C(pause)||!application_||!video_)return false;
+        const auto& issuedVideo=application_->videoOwner_;
+        const auto issuedDisplay=application_->raceDisplayOwner50LA_.lock();
+        const auto& authority=application_->entities();
+        return authority&&authority->application10()&&
+            applicationLifetime_.sameOwner(application_->animationClock())&&
+            issuedVideo&&issuedVideo.get()==video_.get()&&!issuedVideo.owner_before(video_)&&!video_.owner_before(issuedVideo)&&
+            issuedDisplay&&issuedDisplay.get()==this&&
+            !issuedDisplay.owner_before(weak_from_this())&&!weak_from_this().owner_before(issuedDisplay)&&
+            application_->raceDisplayGeneration50LA_==generation_;
+    }
     static rr::platform::VehicleWindowGlProc50DS proc(void* context,const char* name)noexcept {
         return static_cast<rr::platform::GameHost50ER*>(context)->procAddress(name);
     }
@@ -105,6 +217,36 @@ class RaceDisplayLifetime50LA final : public std::enable_shared_from_this<RaceDi
             renderer_.sessionDependentPins50LA_<std::numeric_limits<std::uint32_t>::max()&&
             video_->host.sessionDependentPins50LA_<std::numeric_limits<std::uint32_t>::max();
     }
+    // Exact constructed native backing only: no GL readiness or queue service.
+    bool sourceFogFieldLifetimeCurrent()const noexcept {
+        return ownerThread()&&!retiring_&&video_&&
+            video_->host.sessionDisplayRenderer50LA_==&renderer_&&
+            renderer_.sessionDisplayOwner50LA_==this;
+    }
+    bool canRetainSourceFogField()const noexcept {
+        return sourceFogFieldLifetimeCurrent()&&
+            renderer_.sessionDependentPins50LA_<std::numeric_limits<std::uint32_t>::max()&&
+            video_->host.sessionDependentPins50LA_<std::numeric_limits<std::uint32_t>::max();
+    }
+    // Existing lease identity remains retireable at pin capacity or after
+    // retirement begins. New-pin capacity is not a cancellation prerequisite.
+    bool localizationServiceIdentityCurrent50KG()const noexcept {
+        return ownerThread()&&video_&&
+            video_->host.sessionDisplayRenderer50LA_==&renderer_&&
+            renderer_.sessionDisplayOwner50LA_==this&&
+            renderer_.sessionDependentPins50LA_&&video_->host.sessionDependentPins50LA_;
+    }
+    // Actual initialized-context idle observation, never reset2450A0 or D8 clear.
+    bool localizationServiceIdle50KG(rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
+        if(!localizationServiceIdentityCurrent50KG()||retiring_||!created_||!video_->originalMain||
+           !renderer_.initialized()||!video_->host.created()||!video_->host.current()||
+           textureLifetime_->nativeUploads_)return false;
+        return renderer_.frontendLocalizationIdle50KG(d);
+    }
+    bool localizationFrontendTransfersIdle50KG()const noexcept {
+        return !textureLifetime_->nativeUploads_&&
+            textureLifetime_->nativeUploadAttempts_==textureLifetime_->nativeUploadCompletions_;
+    }
     void pin()noexcept {
         ++renderer_.sessionDependentPins50LA_;++video_->host.sessionDependentPins50LA_;
     }
@@ -117,7 +259,7 @@ public:
     RaceDisplayLifetime50LA(const RaceDisplayLifetime50LA&)=delete;
     RaceDisplayLifetime50LA& operator=(const RaceDisplayLifetime50LA&)=delete;
     ~RaceDisplayLifetime50LA()noexcept {
-        if(!ownerThread()||renderer_.sessionDependentPins50LA_)std::terminate();
+        if(!ownerThread()||renderer_.sessionDependentPins50LA_||localizationServiceActive_)std::terminate();
         rr::platform::VehicleWindowDiagnostic50DS d;
         renderer_.close(d);
         if(d.cleanupIncomplete||renderer_.ownsResources())std::terminate();
@@ -145,6 +287,39 @@ public:
         request.originalUploadBinding=std::shared_ptr<const Binding>(new Binding(
             shared_from_this(),textureLifetime_,&video_->host,&current,&uploadBindingLive));
     }
+    // Dedicated frontend uses its existing Frontend UploadLifetime. Bind only
+    // these real host callbacks, never a second gameplay upload capability.
+    void bindFrontendCreationRequest(rr::platform::VehicleWindowRequest50DS& request)const {
+        require(frontendOwnerCurrent50KG()&&!attempted_&&!retiring_&&
+            renderer_.sessionDisplayOwner50LA_==this&&
+            video_->host.sessionDisplayRenderer50LA_==&renderer_,
+            "frontend display requires its exact unattempted owner");
+        request.context=&video_->host;request.procAddress=&proc;request.isCurrent=&current;
+    }
+    bool createOriginalFrontend(const rr::platform::OriginalFrontendWindowRequest50LA& request,
+        rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
+        d={};
+        if(!frontendOwnerCurrent50KG()||attempted_||retiring_||!video_->originalMain||
+           renderer_.sessionDisplayOwner50LA_!=this||video_->host.sessionDisplayRenderer50LA_!=&renderer_||
+           request.context!=&video_->host||request.procAddress!=&proc||request.isCurrent!=&current||
+           !video_->host.created()||!video_->host.current()) {
+            d.error=rr::platform::VehicleWindowError50DS::request;
+            d.operation="frontend display requires its actual current host and canonical creation callbacks";
+            return false;
+        }
+        attempted_=true;
+        // Separate from gameplay's private scope; neither may authorize the
+        // other create API. Canonical callbacks cannot dispatch application work.
+        renderer_.sessionDisplayFrontendCreate50KG_=true;
+        created_=renderer_.createOriginalFrontend(request,d);
+        renderer_.sessionDisplayFrontendCreate50KG_=false;
+        frontendCreated_=created_;
+        if(created_){
+            sourceBufferCount0C_=2u;sourceBufferCount0CInitialized_=true; //243CB4.
+            sourceWidth4_=video_->width;sourceHeight8_=video_->height; //243E1C/28 exact Video mode.
+        }
+        return created_;
+    }
     bool create(const rr::platform::VehicleWindowRequest50DS& request,
         const rr::assets::VehicleDrawAssets50CR& assets,
         rr::platform::VehicleWindowDiagnostic50DS& d)noexcept {
@@ -157,6 +332,7 @@ public:
             return false;
         }
         attempted_=true;
+        sourceCurrentCamera0Known_=false;
         renderer_.sessionDisplayCreate50LA_=true;
         created_=renderer_.create(request,assets,d); // Real creation, same callbacks/banks.
         renderer_.sessionDisplayCreate50LA_=false;
@@ -217,7 +393,7 @@ public:
     // retire explicitly through their real drain path, then root retries here.
     // Failure forbids new acquisitions but does not disable drain retries.
     bool beginCloseAfterDependents()noexcept {
-        if(!ownerThread())return false;
+        if(!ownerThread()||localizationServiceActive_)return false;
         retiring_=true;
         return renderer_.sessionDependentPins50LA_==0&&video_->host.sessionDependentPins50LA_==0;
     }
@@ -379,6 +555,8 @@ inline std::unique_ptr<PositionStatsTextureLease50LA> RaceDisplayLifetime50LA::r
     return std::unique_ptr<PositionStatsTextureLease50LA>(new PositionStatsTextureLease50LA(shared_from_this()));
 }
 inline std::shared_ptr<RaceDisplayLifetime50LA> Application::raceDisplayForSession50LA()const {
+    require(rr::game::OriginalVideoPreFlipList50KG::applicationVideoEntryCurrent(*this),
+        "display factory requires the live Application owner thread");
     require(videoOwner_&&raceDisplayOwner50LA_.expired()&&!videoOwner_->host.created()&&
         !videoOwner_->host.ownsResources(),"race display requires actual closed Application Video");
     require(raceDisplayGeneration50LA_!=std::numeric_limits<std::uint64_t>::max(),

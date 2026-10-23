@@ -48,4 +48,14 @@ OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuad50KG(
     std::uint16_t authenticatedFrameCount,float maximumBrightness,
     OriginalUiMainParticleQuad50KG&) noexcept;
 
+// Explicit source ELENG/MFP fog operand. Existing callers retain the legacy
+// depth-operand wrapper unchanged; live Garage authenticates world/Camera
+// positions before supplying this separately rounded distance.
+OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuadWithDistance50KG(
+    const OriginalUiMainParticlePacket50KG&,std::uint8_t stateIndex,
+    const OriginalUiMainParticleCamera50KG&,
+    const OriginalUiMainParticleRenderConstants50KG&,
+    std::uint16_t authenticatedFrameCount,float maximumBrightness,
+    float sourceDistanceP,OriginalUiMainParticleQuad50KG&) noexcept;
+
 }

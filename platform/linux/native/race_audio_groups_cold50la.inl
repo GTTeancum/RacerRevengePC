@@ -84,7 +84,7 @@ inline bool RaceAudioGroups50IC::constructNextCold2350D0(AudioMixer50HD& mixer,
     std::unique_ptr<game::OriginalWreckComponent50LA*[]> storage;
     try {storage.reset(new game::OriginalWreckComponent50LA*[8]);}catch(...){return false;}
     std::size_t slot=0;
-    while(slot<app->soundGroups434A10_.size()&&app->soundGroups434A10_[slot])++slot;
+    while(slot<app->soundGroups434A10_.size()&&(app->soundGroups434A10_[slot]||app->soundGroupReserved434A10_[slot]))++slot;
     if(slot==app->soundGroups434A10_.size())return false; //No invalid-1 owner admitted.
     if(!coldStarted_){coldApplication_=app;coldMixer_=&mixer;coldSession_=session;
         coldEpoch_=mixer.groupEpoch50IC();coldThread_=std::this_thread::get_id();coldStarted_=true;}

@@ -1,5 +1,7 @@
 #pragma once
 #include "original_standard_material_table50la.h"
+#include "original_standard_texture_resource50la.h"
+namespace rr::platform {class OriginalUiGaragePodScene50KG;class OriginalUiGarageDrawContribution50KG;class OriginalUiGarageSceneParticles50KG;}
 #include <exception>
 #include <new>
 #include <utility>
@@ -8,13 +10,70 @@ namespace rr::assets {
 // The concrete2461E0 primitive at particle-manager150. Its2465B0->299BE0
 // handle owns one numeric14D590 reference in the SAME application382B38
 // table. The host shared_ptr only pins that canonical owner. This is the
-// cold constructor/reference/destructor domain; no246300 draw, packet,
-// texture demand, renderer allocation or material-object readiness is implied.
+// cold reference alone implies no246300 draw, packet, texture demand or
+// renderer readiness. The private Garage update explicitly performs its
+// actual29BFF0 demand and same-table texture-dimension lookup.
 class OriginalStandardParticleMaterialReference50LA final {
+    friend class rr::platform::OriginalUiGaragePodScene50KG;
+    friend class rr::platform::OriginalUiGarageDrawContribution50KG;
+    bool bindGarageScratch162E44(const rr::platform::OriginalUiGarageSceneParticles50KG& owner,
+        const void* scratch,OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        if(!table_||!started_||released_||!retained_||!scratch||garageReleaseAuthorized_||
+           fields_.optional04||fields_.allocation14||(fields_.flags0F&1u)||
+           (garageScratchOwner_&&garageScratchOwner_!=&owner)||
+           (fields_.allocation10&&fields_.allocation10!=scratch))
+            return fail(d,OriginalStandardMaterialStatus50LA::phase,0x162E44);
+        garageScratchOwner_=&owner;fields_.allocation10=scratch;return true;
+    }
+    bool authorizeGarageRelease160D38(const rr::platform::OriginalUiGarageSceneParticles50KG& owner,
+        const void* scratch)noexcept {
+        if(fields_.allocation10&&(!scratch||garageScratchOwner_!=&owner||
+           fields_.allocation10!=scratch||(fields_.flags0F&1u)))return false;
+        garageReleaseAuthorized_=true;return true;
+    }
+    bool selectGarage1628CC(const OriginalStandardMaterialObject50LA*& object,
+        OriginalStandardMaterialDiagnostic50LA& d)noexcept {
+        object=nullptr;using S=OriginalStandardMaterialStatus50LA;
+        if(!table_||!started_||released_||!retained_)return fail(d,S::phase,0x1628B4);
+        if(!table_->resolve298E60(material00_,object,d))return false;
+        if(!object)return fail(d,S::missingMaterialObject,0x1628C8);
+        if(table_->selectRacerMaterial29BFF0(material00_,d))return true;
+        if(d.sourcePC==0x229B40)d.sourcePC=0x1628CC;
+        return false;
+    }
+    bool selectGarage1611DC(OriginalStandardMaterialDiagnostic50LA& d) noexcept {
+        using S=OriginalStandardMaterialStatus50LA;
+        if(!table_||!started_||released_||!retained_)return fail(d,S::phase,0x1611C4);
+        if(table_->selectRacerMaterial29BFF0(material00_,d))return true;
+        //The shared native selector's absent-object caller diagnostic belongs
+        //to its racer use; this call is genuinely1611DC, never229B40.
+        if(d.sourcePC==0x229B40)d.sourcePC=0x1611DC;
+        return false;
+    }
+    bool garageDimensions161220(const OriginalStandardTextureTable50LA& textures,
+        std::int32_t& width,std::int32_t& height,OriginalStandardMaterialDiagnostic50LA& d)const noexcept {
+        using S=OriginalStandardMaterialStatus50LA;
+        if(!table_||!started_||released_||!retained_)return fail(d,S::phase,0x1611F0);
+        const OriginalStandardMaterialObject50LA* material=nullptr;
+        if(!table_->resolve298E60(material00_,material,d))return false;
+        OriginalStandardMaterialPassView50LA pass;OriginalStandardTextureRowView50LA row;
+        if(!material||material->textures383400()!=&textures||!material->pass4C(0,pass)||
+           !pass.texture1A||!pass.references04||*pass.references04<=0)
+            return fail(d,S::phase,0x1611FC);
+        //24AE60 reads the signed map0 token. Null texture leaves source f20/f21
+        //unwritten; do not invent dimensions from PRT text or decoded images.
+        if(!textures.row((*pass.texture1A)[0],row)||!row.object04||
+           !row.object04->constructed24DA30()||!row.object04->references00()||
+           *row.object04->references00()<=0||!row.object04->sourceWidth14()||!row.object04->sourceHeight18())
+            return fail(d,S::source,0x16121C);
+        width=*row.object04->sourceWidth14();height=*row.object04->sourceHeight18();
+        return true;
+    }
 public:
     struct ColdFields2461E0 {
-        //299AA0 and246200..248. No mutable buffer/draw entry point is exposed,
-        // so the optional299B50 pair04 and246260 buffers10/14 remain absent.
+        //299AA0 and246200..248 constructor fields. No public mutable draw
+        //entry exists. Private Garage162E44 may lend actual scratch15C as10;
+        //04/14 remain absent and246260 never owns that borrowed allocation.
         const void* optional04=nullptr;
         std::uint8_t byte0C=0,byte0D=0,byte0E=0xffu,flags0F=0;
         const void* allocation10=nullptr;
@@ -86,12 +145,14 @@ public:
     const std::int32_t& material00() const noexcept{return material00_;}
     const ColdFields2461E0& coldFields() const noexcept{return fields_;}
     const OriginalStandardMaterialTable50LA* table382B38() const noexcept{return table_.get();}
-    // Bounded246260->299AC0: constructor-only buffers are genuinely null.
+    //246260->299AC0: cold buffers are null; the private Garage borrowed10
+    //requires exact160D38 authorization while its original scratch is live.
     // Native idempotence prevents a second source release. Keep the handle
     // and table pin for inspection;14D500 leaves associated30 untouched.
     void release246260() noexcept {
         if(released_)return;
-        if(fields_.optional04||fields_.allocation10||fields_.allocation14||
+        if(fields_.optional04||(fields_.allocation10&&
+           (!garageScratchOwner_||!garageReleaseAuthorized_))||fields_.allocation14||
            (fields_.flags0F&1u))std::terminate();
         if(retained_){
             if(!table_||!table_->release14D500(material00_))std::terminate();
@@ -107,6 +168,8 @@ private:
     std::shared_ptr<OriginalStandardMaterialTable50LA> table_;
     std::int32_t material00_=-1; //299AB0's actual constructor sentinel.
     ColdFields2461E0 fields_{};
+    const rr::platform::OriginalUiGarageSceneParticles50KG* garageScratchOwner_=nullptr;
+    bool garageReleaseAuthorized_=false;
     bool started_=false,retained_=false,released_=false;
 };
 }

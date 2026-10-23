@@ -1,11 +1,13 @@
 #include "original_standard_texture_resource50la.h"
 #include "original_texture_candidate50tc.h"
 #include "original_standard_model_resource50la.h"
+#include "../game/original_racer_animation_cold50la.h"
 #include "original_standard_collision_type0_resource50la.h"
 #include "original_standard_material_context50la.h"
 #include "original_standard_texture_demand_math50la.h"
 #include "original_standard_archive_provider50la.h"
 #include "original_ui_atm50kg.h"
+#include "original_ui_ipum_texture_cache50kg.h"
 #include "original_tga_conversion50la.h"
 #include "original_standard_ipum_framing50la.h"
 #include "original_standard_ipum_image_lease50la.h"
@@ -127,19 +129,84 @@ void scalar24D6F0(const std::uint8_t* source,std::size_t width,std::size_t heigh
     }
 }
 }
+// Only the actual resolver can mint this bridge from the cache's fixed
+// Garage catalog and a positive current provider lookup. It owns immutable
+// pixels and original archive bytes; bank closure does not invalidate a live
+// Resource's already-loaded image. No decoded arrays or codec claims are copied.
+class OriginalStandardGarageIpumLease50KG final {
+    friend class OriginalStandardTextureResolver50LA;
+    friend class OriginalStandardTextureResource50LA;
+    std::shared_ptr<const OriginalUiIpumTextureCache50KG> cache;
+    std::shared_ptr<const OriginalUiArchive50KG> archive;
+    OriginalUiMemberView50KG member{};
+    const Texture48E* texture=nullptr;
+    const OriginalUiIpumProvenance50KG* provenance=nullptr;
+    OriginalStandardGarageIpumLease50KG() noexcept=default;
+public:
+    bool current() const noexcept {
+        return cache&&archive&&archive->loaded()&&member.identity&&member.data&&
+            texture&&provenance&&cache->textureFor(member,0,member.size)==texture&&
+            cache->provenanceFor(member,0,member.size)==provenance&&
+            provenance->decodedInProcess&&
+            provenance->colorPolicyKind==OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1;
+    }
+    bool matches(const std::string& name,const std::vector<std::uint8_t>& bytes)const noexcept {
+        return current()&&same(provenance->sourceMember,name)&&bytes.size()==member.size&&
+            std::equal(bytes.begin(),bytes.end(),member.data);
+    }
+};
 struct OriginalStandardTextureResolver50LA::Storage {
+    // Allocation identity is pinned by opaque leases; resolver address reuse
+    // cannot revive a capability issued by a destroyed manager.
+    const std::shared_ptr<const int> managerIdentity=std::make_shared<const int>(0);
     enum class FileKind : std::uint8_t { pst,tga,atm,mcf,psg,colType0 };
     struct File {
+        bool retired=false;
+        std::size_t bank=static_cast<std::size_t>(-1),bankOrdinal=static_cast<std::size_t>(-1);
+        std::uint64_t bankGeneration=0;
         std::string member;
         std::vector<std::uint8_t> bytes;
         FileKind kind=FileKind::pst;
         OriginalStandardTextureSourceFormat50LA format=OriginalStandardTextureSourceFormat50LA::pstIndexed;
+        // Actual source-pointer borrows, including partial constructed PSTs.
+        // Unlike cached/cacheIdentity, bank12E5E0 cannot clear this authority.
+        std::size_t pstBorrowers=0;
+        std::uint64_t pstPublication=0;
+        struct FinalPstRelease {
+            std::size_t bank=static_cast<std::size_t>(-1),bytes=0;
+            std::uint64_t generation=0,publication=0;
+        } finalPstRelease;
         std::weak_ptr<const OriginalStandardIpumImageSet50LA> ipumImages;
+        std::shared_ptr<const OriginalStandardGarageIpumLease50KG> garageIpum;
         std::weak_ptr<OriginalStandardTextureResource50LA> cached;
         const OriginalStandardTextureResource50LA* cacheIdentity=nullptr;
         const rr::game::OriginalRacerAnimationCold50LA* animation=nullptr;
+        // Stable publication identity, not another animation reference and
+        // never dereferenced after its owner dies. Bank closure clears the
+        // source cache, but cannot impersonate actual153F50/final1413E0.
+        struct AnimationPublication {
+            std::uintptr_t owner=0;
+            std::uint64_t sessionGeneration=0,objectKey=0;
+        } animationPublication;
+        struct FinalAnimationRelease {
+            std::size_t bank=static_cast<std::size_t>(-1),bytes=0;
+            std::uint64_t generation=0;
+            AnimationPublication publication;
+        } finalAnimationRelease;
         std::weak_ptr<OriginalStandardModelGeometry50LA> geometry;
         const OriginalStandardModelGeometry50LA* geometryIdentity=nullptr;
+        // Native payload borrower, distinct from the source1326A0 cache.
+        //12E5E0 removes the cache while this exact resource may remain live.
+        // This weak proof neither retains a source reference nor republishes it.
+        std::weak_ptr<OriginalStandardModelGeometry50LA> payloadGeometry;
+        // Source-final-release receipt, minted only from the actual live
+        // resource after refs00==0/payload/1327D0. Weak expiration alone is
+        // never sufficient. Every new1326A0 publication invalidates this.
+        struct FinalGeometryRelease {
+            std::size_t bank=static_cast<std::size_t>(-1),bytes=0;
+            std::uint64_t generation=0;
+            std::weak_ptr<OriginalStandardModelGeometry50LA> publication;
+        } finalGeometryRelease;
         std::weak_ptr<OriginalStandardCollisionType0Resource50LA> collision;
         const OriginalStandardCollisionType0Resource50LA* collisionIdentity=nullptr;
     };
@@ -160,10 +227,25 @@ struct OriginalStandardTextureResolver50LA::Storage {
     //Every source family shares this one name/association domain.
     std::vector<std::unique_ptr<File>> files;
     std::vector<Entry> entries;
+    // At most the existing11 fixed Garage catalog sources; no new image limit.
+    std::vector<std::shared_ptr<const OriginalStandardGarageIpumLease50KG>> garageIpum;
     std::size_t modelBytes=0,textureBytes=0;
     std::weak_ptr<const OriginalStandardMaterialContext50LA> construction;
     std::shared_ptr<const OriginalStandardArchiveProvider50LA> provider;
     bool bound=false,texturesPrepared=false;
+    // Provenance is minted by the bound authenticated provider's actual lookup,
+    // including selected ordinal and exact bytes, never a filename prefix/list.
+    static bool matchBank(const File& file,const OriginalStandardArchiveProvider50LA& provider,
+        OriginalStandardArchiveProvider50LA::MemberView& view) noexcept {
+        return provider.lookup132820(file.member,view)==OriginalStandardArchiveProvider50LA::Lookup::present&&
+            view.member&&same(*view.member,file.member)&&view.data&&view.size==file.bytes.size()&&
+            view.bankGeneration&&view.revision==provider.revision()&&
+            std::equal(file.bytes.begin(),file.bytes.end(),view.data);
+    }
+    static void ownBank(File& file,const OriginalStandardArchiveProvider50LA::MemberView& view) noexcept {
+        file.bank=view.mount;file.bankOrdinal=view.ordinal;file.bankGeneration=view.bankGeneration;
+        file.finalPstRelease={}; // New real bank association invalidates old proof.
+    }
 };
 struct OriginalStandardIpumCompressedFrames50LA::Storage {
     struct FreeAligned {
@@ -240,7 +322,7 @@ bool OriginalStandardTextureResolver50LA::stageIpumFlags0(
         return fail(d,E::source,0x132820);
     using Provider=OriginalStandardArchiveProvider50LA;
     const auto& entry=storage_->entries[index];
-    if(entry.file->format!=OriginalStandardTextureSourceFormat50LA::atmPstFrames||
+    if(entry.file->retired||entry.file->format!=OriginalStandardTextureSourceFormat50LA::atmPstFrames||
        entry.kind!=2||entry.frames.empty())return fail(d,E::unsupported,0x24F148);
     const auto provider=storage_->provider;
     Provider::MemberView member;Provider::MountView mount;
@@ -288,7 +370,7 @@ bool OriginalStandardTextureResolver50LA::bindIpumImages(
     const auto index=images->frame(0)->sourceIndex();
     if(index>=storage_->entries.size())return fail(d,E::source,0x132820);
     auto& root=storage_->entries[index];auto& file=*root.file;
-    if(root.kind!=2||root.frames.size()!=6||file.format!=OriginalStandardTextureSourceFormat50LA::atmPstFrames||
+    if(file.retired||root.kind!=2||root.frames.size()!=6||file.format!=OriginalStandardTextureSourceFormat50LA::atmPstFrames||
        file.cacheIdentity||!file.cached.expired())return fail(d,E::phase,0x1326A0);
     if(const auto existing=file.ipumImages.lock()){
         if(existing!=images)return fail(d,E::phase,0x24F148);
@@ -382,6 +464,55 @@ OriginalStandardTextureResolver50LA::~OriginalStandardTextureResolver50LA() {
            file->collisionIdentity||!file->collision.expired())
             std::terminate();
 }
+bool OriginalStandardTextureResolver50LA::bindGarageStaticIpumCache24E880(
+    const std::shared_ptr<const OriginalUiIpumTextureCache50KG>& cache,
+    const std::shared_ptr<const OriginalUiArchive50KG>& archive,D& d) noexcept {
+    d={};
+    if(!storage_||!storage_->provider||!storage_->provider->sealed()||!cache||!cache->loaded()||
+       !archive||!archive->loaded()||!archive->identity())return fail(d,E::phase,0x24E880);
+    try {
+        auto next=storage_->garageIpum;bool found=false;
+        const auto count=OriginalUiIpumTextureCache50KG::garageCatalogSourceCount();
+        if(!count||count>11)return fail(d,E::source,0x24E880);
+        for(std::size_t i=0;i<count;++i){
+            if(OriginalUiIpumTextureCache50KG::garageSourceArchive(i)!=archive->identity())continue;
+            found=true;const auto* name=OriginalUiIpumTextureCache50KG::garageSourceMember(i);
+            if(!name)return fail(d,E::source,0x24E880);
+            const auto member=archive->find(name);
+            const auto* texture=cache->textureFor(member,0,member.size);
+            const auto* provenance=cache->provenanceFor(member,0,member.size);
+            OriginalStandardArchiveProvider50LA::MemberView actual;
+            OriginalStandardArchiveProvider50LA::MountView mount;
+            if(!member.identity||!member.data||!texture||!provenance||!provenance->decodedInProcess||
+               provenance->colorPolicyKind!=OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1||
+               provenance->sourcePstSha256!=member.identity->sha256||
+               provenance->sourceArchiveSha256!=archive->identity()->sha256||
+               texture->revision!=1||texture->flags||texture->kind!=2||texture->mips.empty()||
+               texture->mips.size()>5||provenance->mipCount!=texture->mips.size()||
+               storage_->provider->lookup132820(name,actual)!=OriginalStandardArchiveProvider50LA::Lookup::present||
+               !storage_->provider->mount(actual.mount,mount)||!mount.archiveSha256||
+               *mount.archiveSha256!=archive->identity()->sha256||mount.archiveBytes!=archive->identity()->bytes||
+               !actual.bankGeneration||actual.revision!=storage_->provider->revision()||!actual.data||
+               actual.size!=member.size||std::memcmp(actual.data,member.data,member.size))
+                return fail(d,E::source,0x24E880);
+            bool retained=false;
+            for(const auto& old:next)if(old&&old->archive->identity()==archive->identity()&&
+                same(old->provenance->sourceMember,provenance->sourceMember)){
+                if(!old->current()||old->archive!=archive||old->cache!=cache||old->member.identity!=member.identity||
+                   old->member.data!=member.data||old->texture!=texture||old->provenance!=provenance)
+                    return fail(d,E::phase,0x24E880);
+                retained=true;break;
+            }
+            if(retained)continue;
+            if(next.size()>=11)return fail(d,E::range,0x24E880);
+            auto lease=std::shared_ptr<OriginalStandardGarageIpumLease50KG>(new OriginalStandardGarageIpumLease50KG);
+            lease->cache=cache;lease->archive=archive;lease->member=member;
+            lease->texture=texture;lease->provenance=provenance;next.push_back(std::move(lease));
+        }
+        if(!found)return fail(d,E::source,0x24E880);
+        storage_->garageIpum=std::move(next);return true;
+    }catch(...){return fail(d,E::allocation,0x24E880);}
+}
 bool OriginalStandardTextureResolver50LA::prepareFresh(
     const std::vector<OriginalStandardTextureSourceInput50LA>& inputs,D& d) noexcept {
     d={};
@@ -423,6 +554,7 @@ bool OriginalStandardTextureResolver50LA::appendSources(
         std::size_t totalBytes=storage_?storage_->textureBytes:0;
         for(std::size_t ordinal=0;ordinal<inputs.size();++ordinal){
             d.source=ordinal;const auto& source=inputs[ordinal];const auto& bytes=source.bytes;
+            std::shared_ptr<const OriginalStandardGarageIpumLease50KG> garageImage;
             const bool tga=tgaName(source.member);
             const auto n=source.member.size();
             const bool atm=nameDomain(source.member)&&n>=4&&
@@ -431,11 +563,11 @@ bool OriginalStandardTextureResolver50LA::appendSources(
             const auto fileKind=atm?Storage::FileKind::atm:
                 tga?Storage::FileKind::tga:Storage::FileKind::pst;
             bool duplicate=false;
-            for(const auto& file:next->files)if(same(file->member,source.member)){
+            for(const auto& file:next->files)if(!file->retired&&same(file->member,source.member)){
                 if(file->kind!=fileKind||file->bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
                 duplicate=true;break;
             }
-            if(storage_)for(const auto& file:storage_->files)if(same(file->member,source.member)){
+            if(storage_)for(const auto& file:storage_->files)if(!file->retired&&same(file->member,source.member)){
                 if(file->kind!=fileKind||file->bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
                 duplicate=true;break;
             }
@@ -474,6 +606,40 @@ bool OriginalStandardTextureResolver50LA::appendSources(
                 if(!range(bytes,begin,extent)||extent<12)return fail(d,E::malformed,0x24E8B8,begin);
                 if(u32(bytes,begin)!=1)return fail(d,E::unsupported,0x24E938,begin);
                 const auto kind=u32(bytes,begin+4),count=u32(bytes,begin+8);
+                if(kind==2&&!atm&&begin==0&&extent==bytes.size()){
+                    OriginalStandardArchiveProvider50LA::MemberView selected;
+                    OriginalStandardArchiveProvider50LA::MountView mount;
+                    if(!storage_||!storage_->provider||
+                       storage_->provider->lookup132820(source.member,selected)!=OriginalStandardArchiveProvider50LA::Lookup::present||
+                       !storage_->provider->mount(selected.mount,mount)||!mount.archiveSha256)
+                        return fail(d,E::source,0x24E880);
+                    for(const auto& lease:storage_->garageIpum)
+                        if(lease&&lease->matches(source.member,bytes)&&
+                           *mount.archiveSha256==lease->archive->identity()->sha256){garageImage=lease;break;}
+                    if(!garageImage||count<1||count>5||count!=garageImage->texture->mips.size())
+                        return fail(d,E::unsupported,0x24E994,begin+4);
+                    frame.count=static_cast<std::int32_t>(count);frame.kind=2;
+                    frame.pstOffset=begin;frame.pstBytes=extent;
+                    std::size_t at=12;std::uint32_t priorWidth=0,priorHeight=0;
+                    for(std::size_t i=0;i<count;++i){
+                        const auto& mip=garageImage->texture->mips[i];
+                        const auto& proof=garageImage->provenance->mips[i];
+                        if(!range(bytes,at,20))return fail(d,E::malformed,0x24EB20,at);
+                        const auto height=u32(bytes,at),width=u32(bytes,at+4),size=u32(bytes,at+16);
+                        if(!dimension(width)||!dimension(height)||u32(bytes,at+8)||u32(bytes,at+12)||
+                           (i&&(width!=priorWidth*2||height!=priorHeight*2))||size<25||!range(bytes,at+20,size)||
+                           mip.width!=width||mip.height!=height||mip.source_header_offset!=at||
+                           mip.source_indices_offset!=at+20||mip.rgba.size()!=std::size_t(width)*height*4||
+                           proof.width!=width||proof.height!=height||proof.sourceHeaderOffset!=at||
+                           proof.sourcePayloadOffset!=at+20||proof.sourcePayloadBytes!=size)
+                            return fail(d,E::source,0x24F158,at);
+                        // The cache authenticated the exact original IPUM payload and
+                        // native RGB5/TEXA255/AEM1 output before this source admission.
+                        frame.levels[i]={static_cast<std::int32_t>(width),static_cast<std::int32_t>(height),at,at+20,size};
+                        at+=20+size;priorWidth=width;priorHeight=height;
+                    }
+                    return at==bytes.size()?true:fail(d,E::malformed,0x24EBD0,at);
+                }
                 if(kind>1)return fail(d,E::unsupported,0x24E994,begin+4);
                 if(count<1||count>5)return fail(d,E::unsupported,0x24EB10,begin+8);
                 const std::size_t end=begin+extent,paletteBytes=kind==0?64:1024;
@@ -530,11 +696,15 @@ bool OriginalStandardTextureResolver50LA::appendSources(
             }else if(!parsePst(entry,0,bytes.size()))return false;
             }
             auto file=std::make_unique<Storage::File>();
-            file->member=source.member;file->bytes=bytes;file->kind=fileKind;
+            file->member=source.member;file->bytes=bytes;file->kind=fileKind;file->garageIpum=garageImage;
             file->format=atm?OriginalStandardTextureSourceFormat50LA::atmPstFrames:
                 tga?(bytes[16]==32?OriginalStandardTextureSourceFormat50LA::tgaBgra32:
                     OriginalStandardTextureSourceFormat50LA::tgaBgr24):
-                OriginalStandardTextureSourceFormat50LA::pstIndexed;
+                garageImage?OriginalStandardTextureSourceFormat50LA::pstIpum:OriginalStandardTextureSourceFormat50LA::pstIndexed;
+            if(storage_&&storage_->provider){
+                OriginalStandardArchiveProvider50LA::MemberView view;
+                if(Storage::matchBank(*file,*storage_->provider,view))Storage::ownBank(*file,view);
+            }
             entry.file=file.get();
             for(auto& frame:entry.frames)frame.file=file.get();
             next->files.push_back(std::move(file));
@@ -574,8 +744,122 @@ bool OriginalStandardTextureResolver50LA::bindProvider3E1A70(
     try {
         if(!storage_)storage_=std::make_unique<Storage>();
         storage_->provider=std::move(provider);
+        // Ordinary provider binding keeps its original acceptance behavior.
+        // Capture only genuine positive provenance; absence/ambiguity here
+        // does not become a new global source-admission restriction.
+        for(auto& file:storage_->files)if(!file->retired&&!file->bankGeneration){
+            OriginalStandardArchiveProvider50LA::MemberView view;
+            if(Storage::matchBank(*file,*storage_->provider,view))Storage::ownBank(*file,view);
+        }
         return validateProviderCache(d);
     }catch(...){return fail(d,E::allocation,0x132820);}
+}
+bool OriginalStandardTextureResolver50LA::issueGarageBank12E5E0(
+    const std::shared_ptr<OriginalStandardArchiveProvider50LA>& provider,
+    const std::shared_ptr<const OriginalUiArchive50KG>& archive,GarageBankLease50LA& lease,D& d) noexcept {
+    return issueGarageBank(provider,archive,lease,false,d);
+}
+bool OriginalStandardTextureResolver50LA::issueGarageSelectedBank1D1D68(
+    const std::shared_ptr<OriginalStandardArchiveProvider50LA>& provider,
+    const std::shared_ptr<const OriginalUiArchive50KG>& archive,GarageBankLease50LA& lease,D& d) noexcept {
+    return issueGarageBank(provider,archive,lease,true,d);
+}
+bool OriginalStandardTextureResolver50LA::issueGarageBank(
+    const std::shared_ptr<OriginalStandardArchiveProvider50LA>& provider,
+    const std::shared_ptr<const OriginalUiArchive50KG>& archive,GarageBankLease50LA& lease,
+    bool selected19E,D& d) noexcept {
+    d={};
+    const auto expected=selected19E?OriginalUiArchiveId50KG::garagePod19:OriginalUiArchiveId50KG::garage;
+    if(lease.resolver_||!storage_||!provider||storage_->provider!=provider||!provider->sealed_||
+       !provider->retainedSourcesAccessible()||!archive||!archive->loaded()||!archive->identity()||
+       archive->identity()->id!=expected)
+        return fail(d,E::phase,0x12E5E0);
+    std::size_t bank=static_cast<std::size_t>(-1);
+    for(std::size_t i=0;i<provider->mounts_.size();++i){const auto& mount=*provider->mounts_[i];
+        if(!mount.active||mount.admittedUi.lock()!=archive)continue;
+        if(bank!=static_cast<std::size_t>(-1))return fail(d,E::source,0x12E5E0);
+        bank=i;
+    }
+    if(bank==static_cast<std::size_t>(-1))return fail(d,E::unresolved,0x12E5E0);
+    if(!validateGarageBankRows12EAA0(bank,provider->mounts_[bank]->generation,d))return false;
+    lease.closedBacking_={}; // A new real capability cannot reuse old closure history.
+    lease.provider_=provider;lease.archive_=archive;lease.managerIdentity_=storage_->managerIdentity;
+    lease.resolver_=this;lease.mount_=bank;
+    lease.generation_=provider->mounts_[bank]->generation;lease.selected19E_=selected19E;
+    lease.thread_=std::this_thread::get_id();
+    return true;
+}
+bool OriginalStandardTextureResolver50LA::canRetireGarageBank12E5E0(
+    const GarageBankLease50LA& lease,D& d) const noexcept {
+    d={};const auto& provider=lease.provider_;
+    if(lease.resolver_!=this||lease.thread_!=std::this_thread::get_id()||!storage_||!provider||
+       lease.managerIdentity_!=storage_->managerIdentity||storage_->provider!=provider||
+       !provider->sealed_||!provider->retainedSourcesAccessible()||
+       lease.mount_>=provider->mounts_.size()||
+       provider->revision_==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,E::phase,0x12E5E0);
+    const auto& bank=*provider->mounts_[lease.mount_];
+    if(!bank.active||bank.generation!=lease.generation_||bank.admittedUi.lock()!=lease.archive_||
+       !lease.archive_||!bank.ui||!bank.ui->identity()||
+       bank.ui->identity()->id!=(lease.selected19E_?OriginalUiArchiveId50KG::garagePod19:
+            OriginalUiArchiveId50KG::garage))return fail(d,E::phase,0x12E6D0);
+    return validateGarageBankRows12EAA0(lease.mount_,lease.generation_,d);
+}
+bool OriginalStandardTextureResolver50LA::validateGarageBankRows12EAA0(
+    std::size_t mountIndex,std::uint64_t generation,D& d) const noexcept {
+    if(!storage_||!storage_->provider||mountIndex>=storage_->provider->mounts_.size())
+        return fail(d,E::phase,0x12EAA0);
+    const auto& provider=*storage_->provider;
+    const auto& bank=*provider.mounts_[mountIndex];
+    if(!bank.active||bank.generation!=generation)return fail(d,E::phase,0x12EAA0);
+    for(const auto& file:storage_->files){
+        if(file->retired)continue;
+        bool possibleTarget=false;
+        for(const auto& row:bank.rows)if(same(row.name,file->member)){possibleTarget=true;break;}
+        // The complete authenticated directory proves nonmembers unrelated.
+        // A matching name is only a reason to demand provenance, never proof
+        // of ownership. Do not silently omit an unproven possible target row.
+        if(!possibleTarget&&file->bank!=mountIndex)continue;
+        if(!file->bankGeneration||file->bank>=provider.mounts_.size())
+            return fail(d,E::source,0x12EAA0);
+        const auto& owner=*provider.mounts_[file->bank];
+        if(!owner.active||owner.generation!=file->bankGeneration||
+           file->bankOrdinal>=owner.rows.size())return fail(d,E::source,0x12EAA0);
+        const auto& row=owner.rows[file->bankOrdinal];
+        if(!same(row.name,file->member)||row.size!=file->bytes.size()||
+           !std::equal(file->bytes.begin(),file->bytes.end(),row.data))return fail(d,E::source,0x12EAA0);
+        if(file->bank==mountIndex&&(!possibleTarget||file->bankGeneration!=generation))
+            return fail(d,E::source,0x12EAA0);
+        // Proven equal-name rows owned by a different active bank stay intact.
+    }
+    return true;
+}
+bool OriginalStandardTextureResolver50LA::retireGarageBank12E5E0(GarageBankLease50LA& lease,D& d) noexcept {
+    if(!canRetireGarageBank12E5E0(lease,d))return false;
+    //12E6D0(force1)->12EAA0 removes row associations even while canonical
+    //resources survive. Never release texture/material/geometry/animation refs.
+    //Stable native rows/bytes remain tombstoned for outstanding resource views;
+    //new generation admission appends fresh rows rather than reviving old IDs.
+    for(auto& file:storage_->files){
+        if(file->retired||file->bank!=lease.mount_||file->bankGeneration!=lease.generation_)continue;
+        file->cached.reset();file->cacheIdentity=nullptr;file->animation=nullptr;
+        file->geometry.reset();file->geometryIdentity=nullptr;
+        file->collision.reset();file->collisionIdentity=nullptr;file->ipumImages.reset();
+        file->retired=true;
+    }
+    //12EB60: remove precisely this bank from all new lookup/encoded-reader
+    //issuance. Native immutable retained views are not active manager readers.
+    lease.provider_->mounts_[lease.mount_]->active=false;
+    lease.provider_->mounts_[lease.mount_]->admittedUi.reset();++lease.provider_->revision_;
+    // Native history only, AFTER the actual bank close. Do not free even a
+    // released resource's backing in this source association-removal method.
+    lease.closedBacking_.provider=lease.provider_;
+    lease.closedBacking_.managerIdentity=lease.managerIdentity_;
+    lease.closedBacking_.resolver=this;lease.closedBacking_.mount=lease.mount_;
+    lease.closedBacking_.generation=lease.generation_;
+    lease.closedBacking_.selected19E=lease.selected19E_;lease.closedBacking_.thread=lease.thread_;
+    lease.resolver_=nullptr;lease.generation_=0;lease.archive_.reset();lease.provider_.reset();lease.managerIdentity_.reset();
+    d={};d.sourceEffectsCommitted=true;return true;
 }
 bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& name,
     OriginalStandardModelFileKind50LA kind,const std::vector<std::uint8_t>& bytes,
@@ -607,7 +891,7 @@ bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& nam
         Storage::FileKind::mcf:kind==OriginalStandardModelFileKind50LA::psg?
         Storage::FileKind::psg:Storage::FileKind::colType0;
     for(std::size_t i=0;i<storage_->files.size();++i){const auto& file=*storage_->files[i];
-        if(!same(file.member,name))continue;
+        if(file.retired||!same(file.member,name))continue;
         if(file.kind!=fileKind||file.bytes!=bytes)return fail(d,E::duplicateSource,0x132820);
         out={this,i};d.source=i;return true;
     }
@@ -617,6 +901,10 @@ bool OriginalStandardTextureResolver50LA::bindModelMember(const std::string& nam
     try {
         auto file=std::make_unique<Storage::File>();
         file->member=name;file->bytes=bytes;file->kind=fileKind;
+        if(storage_->provider){
+            OriginalStandardArchiveProvider50LA::MemberView view;
+            if(Storage::matchBank(*file,*storage_->provider,view))Storage::ownBank(*file,view);
+        }
         const auto row=storage_->files.size();
         storage_->files.push_back(std::move(file));storage_->modelBytes+=bytes.size();
         out={this,row};d.source=row;return true;
@@ -628,9 +916,15 @@ bool OriginalStandardTextureResolver50LA::modelFile(OriginalStandardModelFileId5
     if(!storage_)return fail(d,E::unprepared,0x132820);
     if(id.resolver!=this||id.row>=storage_->files.size())return fail(d,E::range,0x1329A0);
     const auto& file=*storage_->files[id.row];d.source=id.row;
+    // Direct stable-ID inspection remains available for already-owned resource
+    // release preflights. Retired rows expose bytes but no cache associations
+    // until proved-final PSG/MCF backing is reclaimed. The tombstone ID
+    // survives reclamation but cannot become a new positive file view.
+    if(file.retired&&(file.kind==Storage::FileKind::psg||file.kind==Storage::FileKind::mcf)&&file.bytes.empty())
+        return fail(d,E::unresolved,0x1329A0);
     if((file.kind!=Storage::FileKind::mcf&&file.kind!=Storage::FileKind::psg&&file.kind!=Storage::FileKind::colType0)||file.cacheIdentity||!file.cached.expired())
         return fail(d,E::phase,0x1329A0);
-    if(file.kind==Storage::FileKind::colType0){
+    if(!file.retired&&file.kind==Storage::FileKind::colType0){
         using Provider=OriginalStandardArchiveProvider50LA;Provider::MemberView actual;
         if(!storage_->provider||!storage_->provider->sealed()||
            storage_->provider->lookup132820(file.member,actual)!=Provider::Lookup::present)
@@ -663,7 +957,7 @@ bool OriginalStandardTextureResolver50LA::lookupModel132820(const std::string& n
     d={};out={};if(!storage_)return fail(d,E::unprepared,0x132820);
     if(name.empty()||name.size()>259)return fail(d,E::input,0x132820);
     for(unsigned char c:name)if(c<32||c>=127)return fail(d,E::input,0x132820);
-    for(std::size_t i=0;i<storage_->files.size();++i)if(same(storage_->files[i]->member,name)){
+    for(std::size_t i=0;i<storage_->files.size();++i)if(!storage_->files[i]->retired&&same(storage_->files[i]->member,name)){
         if(!modelFile({this,i},out,d))return false;
         if(out.kind!=kind){out={};return fail(d,E::phase,0x1329A0);}
         //1329A0 reads the association without retaining it. A null value is
@@ -696,7 +990,7 @@ OriginalStandardCollisionLookup50LA OriginalStandardTextureResolver50LA::lookupC
     if(resolution==Provider::Lookup::absent){
         // A retained positive row contradicting the current namespace must
         // never be converted into a successful negative-load cleanup path.
-        for(const auto& file:storage_->files)if(same(file->member,name)){
+        for(const auto& file:storage_->files)if(!file->retired&&same(file->member,name)){
             fail(d,E::phase,0x132820);return Result::rejected;
         }
         d.sourcePC=0x13294c;return Result::absent;
@@ -709,24 +1003,37 @@ bool OriginalStandardTextureResolver50LA::publishAnimation1326A0(OriginalStandar
     const rr::game::OriginalRacerAnimationCold50LA* animation,D& d) noexcept {
     OriginalStandardModelFileView50LA file;
     if(!modelFile(id,file,d))return false;
+    if(storage_->files[id.row]->retired)return fail(d,E::phase,0x1326A0);
     if(!animation||file.kind!=OriginalStandardModelFileKind50LA::mcf||
        file.animation1536F0||file.geometry240110)return fail(d,E::phase,0x1327B0);
-    storage_->files[id.row]->animation=animation;d.sourceEffectsCommitted=true;return true;
+    auto& target=*storage_->files[id.row];
+    target.finalAnimationRelease={}; // A later publication cannot reuse history.
+    target.animationPublication={};
+    target.animationPublication.owner=reinterpret_cast<std::uintptr_t>(animation);
+    if(const auto* fields=animation->fields();fields&&fields->self00){
+        target.animationPublication.sessionGeneration=fields->self00->sessionGeneration;
+        target.animationPublication.objectKey=fields->self00->objectKey;
+    }
+    target.animation=animation;d.sourceEffectsCommitted=true;return true;
 }
 bool OriginalStandardTextureResolver50LA::publishGeometry1326A0(OriginalStandardModelFileId50LA id,
     const std::shared_ptr<OriginalStandardModelGeometry50LA>& geometry,D& d) noexcept {
     OriginalStandardModelFileView50LA file;
     if(!modelFile(id,file,d))return false;
+    if(storage_->files[id.row]->retired)return fail(d,E::phase,0x1326A0);
     if(!geometry||!geometry->constructed240110()||geometry->fileId().resolver!=this||
        geometry->fileId().row!=id.row||file.kind!=OriginalStandardModelFileKind50LA::psg||
        file.animation1536F0||file.geometry240110)return fail(d,E::phase,0x1327B0);
+    storage_->files[id.row]->finalGeometryRelease={};
     storage_->files[id.row]->geometry=geometry;
+    storage_->files[id.row]->payloadGeometry=geometry;
     storage_->files[id.row]->geometryIdentity=geometry.get();d.sourceEffectsCommitted=true;return true;
 }
 bool OriginalStandardTextureResolver50LA::publishCollision1326A0(OriginalStandardModelFileId50LA id,
     const std::shared_ptr<OriginalStandardCollisionType0Resource50LA>& resource,D& d) noexcept {
     OriginalStandardModelFileView50LA file;
     if(!modelFile(id,file,d))return false;
+    if(storage_->files[id.row]->retired)return fail(d,E::phase,0x1326A0);
     if(!resource||!resource->live()||resource->fileId().resolver!=this||resource->fileId().row!=id.row||
        file.kind!=OriginalStandardModelFileKind50LA::colType0||file.collision125014||
        file.animation1536F0||file.geometry240110)return fail(d,E::phase,0x1327B0);
@@ -753,6 +1060,193 @@ void OriginalStandardTextureResolver50LA::clearGeometry1327D0(
     for(auto& file:storage_->files)if(file->geometryIdentity==geometry){
         file->geometry.reset();file->geometryIdentity=nullptr;return;
     }
+}
+void OriginalStandardTextureResolver50LA::reclaimRetiredPsgBacking26E5C8(
+    const OriginalStandardModelGeometry50LA& geometry) noexcept {
+    const auto id=geometry.fileId();
+    if(!storage_||id.resolver!=this||id.row>=storage_->files.size())return;
+    auto& file=*storage_->files[id.row];
+    // Only private Garage12E5E0 marks a File retired. An active row may
+    // record release history only for its genuine authenticated Garage bank;
+    // ordinary Rider/Main/race and every other payload family stay untouched.
+    if(file.kind!=Storage::FileKind::psg||file.bytes.empty()||
+       file.bank==static_cast<std::size_t>(-1)||!file.bankGeneration)return;
+    if(!file.retired){
+        if(!storage_->provider||file.bank>=storage_->provider->mounts_.size())return;
+        const auto& bank=*storage_->provider->mounts_[file.bank];
+        if(!bank.active||bank.generation!=file.bankGeneration||!bank.ui||!bank.ui->identity()||
+           (bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage&&
+            bank.ui->identity()->id!=OriginalUiArchiveId50KG::garagePod19))return;
+    }
+    const auto owner=file.payloadGeometry.lock();
+    const auto* references=geometry.references00();
+    if(owner.get()!=&geometry||!references||*references!=0||geometry.constructed240110()||
+       geometry.payload()||file.geometryIdentity||!file.geometry.expired()||
+       file.cacheIdentity||!file.cached.expired()||file.animation||
+       file.collisionIdentity||!file.collision.expired()||file.garageIpum||
+       !file.ipumImages.expired())return;
+    const auto bytes=file.bytes.size();
+    if(bytes>storage_->modelBytes)return; // Retain on inconsistent accounting.
+    file.finalGeometryRelease.bank=file.bank;file.finalGeometryRelease.generation=file.bankGeneration;
+    file.finalGeometryRelease.bytes=bytes;file.finalGeometryRelease.publication=file.payloadGeometry;
+    if(!file.retired)return; // Genuine final release, but bank still owns lookup backing.
+    // Actual no-throw allocation release, not clear() with retained capacity.
+    // Stable File/row/generation metadata remains. A new bank must still
+    // authenticate and append a fresh row; no old ID is revived or reused.
+    std::vector<std::uint8_t>().swap(file.bytes);
+    storage_->modelBytes-=bytes;
+    file.payloadGeometry.reset();file.finalGeometryRelease={};
+}
+void OriginalStandardTextureResolver50LA::recordGarageFinalMcfRelease153F50(
+    OriginalStandardModelFileId50LA id,const rr::game::OriginalRacerAnimationCold50LA& animation) noexcept {
+    if(!storage_||id.resolver!=this||id.row>=storage_->files.size()||!storage_->provider)return;
+    auto& file=*storage_->files[id.row];const auto* fields=animation.fields();
+    if(file.kind!=Storage::FileKind::mcf||file.bytes.empty()||!file.bankGeneration||
+       file.bank>=storage_->provider->mounts_.size()||!animation.released()||!fields||!fields->self00)
+        return;
+    const auto& entity=*fields->self00;const auto& published=file.animationPublication;
+    using K=rr::game::OriginalWreckComponentKind50LA;
+    if(published.owner!=reinterpret_cast<std::uintptr_t>(&animation)||!published.sessionGeneration||
+       !published.objectKey||entity.sessionGeneration!=published.sessionGeneration||
+       entity.objectKey!=published.objectKey||entity.reference00||entity.firstChild18||
+       (entity.kind!=K::animation1536F0&&entity.kind!=K::character11A750)||
+       fields->dispatch21C!=K::animation1536F0||fields->motion18||fields->count208||
+       file.animation||file.cacheIdentity||!file.cached.expired()||file.geometryIdentity||
+       !file.geometry.expired()||!file.payloadGeometry.expired()||file.collisionIdentity||
+       !file.collision.expired()||file.garageIpum||!file.ipumImages.expired())return;
+    const auto& bank=*storage_->provider->mounts_[file.bank];
+    if(bank.generation!=file.bankGeneration||bank.active==file.retired||
+       !bank.ui||!bank.ui->identity()||bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage||
+       file.bankOrdinal>=bank.rows.size()||file.bytes.size()>storage_->modelBytes)return;
+    const auto& source=bank.rows[file.bankOrdinal];
+    if(!same(source.name,file.member)||source.size!=file.bytes.size()||!source.data||
+       !std::equal(file.bytes.begin(),file.bytes.end(),source.data))return;
+    // The private caller has just completed the counted last-reference
+    // callback. Incomplete callbacks never reach here. No allocation, byte
+    // release or source-state mutation occurs, even for an already closed bank.
+    file.finalAnimationRelease.bank=file.bank;
+    file.finalAnimationRelease.generation=file.bankGeneration;
+    file.finalAnimationRelease.bytes=file.bytes.size();
+    file.finalAnimationRelease.publication=published;
+}
+bool OriginalStandardTextureResolver50LA::reclaimGaragePsgBackingAfterManagerRetirement(
+    GarageBankLease50LA& lease,D& d) noexcept {
+    d={};const auto& receipt=lease.closedBacking_;
+    if(!storage_||lease.resolver_||lease.generation_||lease.provider_||lease.archive_||
+       receipt.resolver!=this||receipt.thread!=std::this_thread::get_id()||receipt.selected19E||
+       !receipt.provider||receipt.provider!=storage_->provider||
+       receipt.managerIdentity!=storage_->managerIdentity||!receipt.generation||
+       !receipt.provider->sealed_||!receipt.provider->retainedSourcesAccessible()||
+       receipt.mount>=receipt.provider->mounts_.size())return fail(d,E::phase,0x12EB60);
+    const auto& bank=*receipt.provider->mounts_[receipt.mount];
+    if(bank.active||bank.generation!=receipt.generation||!bank.admittedUi.expired()||
+       !bank.ui||!bank.ui->identity()||bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage)
+        return fail(d,E::phase,0x12EB60);
+    // No allocations, source callbacks or mutations during this complete
+    // preflight. The exact creator thread cannot reopen/publish midway.
+    std::size_t residentBytes=0,releaseBytes=0,residentTextureBytes=0,releasePstBytes=0;
+    for(std::size_t index=0;index<storage_->files.size();++index){
+        const auto& file=*storage_->files[index];
+        if(file.kind==Storage::FileKind::pst||file.kind==Storage::FileKind::tga||file.kind==Storage::FileKind::atm){
+            if(file.bytes.size()>std::numeric_limits<std::size_t>::max()-residentTextureBytes)
+                return fail(d,E::range,0x1327D0);
+            residentTextureBytes+=file.bytes.size();
+        }
+        if(file.retired&&file.kind==Storage::FileKind::pst&&!file.bytes.empty()&&
+           file.bank==receipt.mount&&file.bankGeneration==receipt.generation){
+            bool eligible=false;
+            if(!preflightRetiredGaragePstBacking(index,true,eligible,d))return false;
+            if(eligible){
+                if(file.bytes.size()>std::numeric_limits<std::size_t>::max()-releasePstBytes)
+                    return fail(d,E::range,0x1327D0);
+                releasePstBytes+=file.bytes.size();
+            }
+        }
+        if(file.kind==Storage::FileKind::mcf||file.kind==Storage::FileKind::psg||
+           file.kind==Storage::FileKind::colType0){
+            if(file.bytes.size()>std::numeric_limits<std::size_t>::max()-residentBytes)
+                return fail(d,E::range,0x26E5C8);
+            residentBytes+=file.bytes.size();
+        }
+        if(file.retired&&file.kind==Storage::FileKind::mcf&&!file.bytes.empty()&&
+           file.bank==receipt.mount&&file.bankGeneration==receipt.generation){
+            const auto& final=file.finalAnimationRelease;
+            // Only an explicit final callback, never cache null/weak expiry.
+            if(!final.generation)continue;
+            d.source=index;const auto& published=file.animationPublication;
+            if(final.bank!=file.bank||final.generation!=file.bankGeneration||final.bytes!=file.bytes.size()||
+               !final.publication.owner||!final.publication.sessionGeneration||!final.publication.objectKey||
+               final.publication.owner!=published.owner||
+               final.publication.sessionGeneration!=published.sessionGeneration||
+               final.publication.objectKey!=published.objectKey||file.animation||
+               file.geometryIdentity||!file.geometry.expired()||!file.payloadGeometry.expired()||
+               file.cacheIdentity||!file.cached.expired()||file.collisionIdentity||!file.collision.expired()||
+               file.garageIpum||!file.ipumImages.expired()||file.bankOrdinal>=bank.rows.size())
+                return fail(d,E::phase,0x1540E0);
+            const auto& source=bank.rows[file.bankOrdinal];
+            if(!same(source.name,file.member)||source.size!=file.bytes.size()||!source.data||
+               !std::equal(file.bytes.begin(),file.bytes.end(),source.data))return fail(d,E::source,0x1329A0);
+            if(file.bytes.size()>std::numeric_limits<std::size_t>::max()-releaseBytes)
+                return fail(d,E::range,0x1540E0);
+            releaseBytes+=file.bytes.size();
+            continue;
+        }
+        if(!file.retired||file.kind!=Storage::FileKind::psg||file.bytes.empty()||
+           file.bank!=receipt.mount||file.bankGeneration!=receipt.generation)continue;
+        const auto& final=file.finalGeometryRelease;
+        // Never-constructed or unproved rows remain retained. Expiration of
+        // payloadGeometry is NOT a substitute for this destructor receipt.
+        if(!final.generation)continue;
+        d.source=index;
+        if(final.bank!=file.bank||final.generation!=file.bankGeneration||final.bytes!=file.bytes.size()||
+           final.publication.owner_before(file.payloadGeometry)||file.payloadGeometry.owner_before(final.publication)||
+           file.geometryIdentity||!file.geometry.expired()||file.cacheIdentity||!file.cached.expired()||
+           file.animation||file.collisionIdentity||!file.collision.expired()||file.garageIpum||
+           !file.ipumImages.expired()||file.bankOrdinal>=bank.rows.size())
+            return fail(d,E::phase,0x26E5C8);
+        const auto& source=bank.rows[file.bankOrdinal];
+        if(!same(source.name,file.member)||source.size!=file.bytes.size()||!source.data||
+           !std::equal(file.bytes.begin(),file.bytes.end(),source.data))return fail(d,E::source,0x1329A0);
+        // If the exact native tombstone still exists, require the same actual
+        // released state too. Its absence is allowed ONLY by the above proof.
+        if(const auto owner=file.payloadGeometry.lock()){
+            const auto id=owner->fileId();const auto* refs=owner->references00();
+            if(id.resolver!=this||id.row!=index||!refs||*refs||owner->constructed240110()||owner->payload())
+                return fail(d,E::phase,0x26E5C8);
+        }
+        if(file.bytes.size()>std::numeric_limits<std::size_t>::max()-releaseBytes)
+            return fail(d,E::range,0x26E5C8);
+        releaseBytes+=file.bytes.size();
+    }
+    if(residentBytes!=storage_->modelBytes||releaseBytes>residentBytes)
+        return fail(d,E::phase,0x26E5C8);
+    if(residentTextureBytes!=storage_->textureBytes||releasePstBytes>residentTextureBytes)
+        return fail(d,E::phase,0x1327D0);
+    // All identities and complete accounting are proved before the first
+    // irreversible swap. No allocation/throw/source code occurs below.
+    for(auto& row:storage_->files){auto& file=*row;
+        if(file.retired&&file.kind==Storage::FileKind::pst&&!file.bytes.empty()&&
+           file.bank==receipt.mount&&file.bankGeneration==receipt.generation&&!file.pstBorrowers&&
+           (!file.pstPublication||file.finalPstRelease.generation)){
+            std::vector<std::uint8_t>().swap(file.bytes);file.finalPstRelease={};
+            continue;
+        }
+        if(file.retired&&file.kind==Storage::FileKind::mcf&&!file.bytes.empty()&&
+           file.bank==receipt.mount&&file.bankGeneration==receipt.generation&&
+           file.finalAnimationRelease.generation){
+            std::vector<std::uint8_t>().swap(file.bytes);
+            file.animationPublication={};file.finalAnimationRelease={};
+            continue;
+        }
+        if(!file.retired||file.kind!=Storage::FileKind::psg||file.bytes.empty()||
+           file.bank!=receipt.mount||file.bankGeneration!=receipt.generation||
+           !file.finalGeometryRelease.generation)continue;
+        std::vector<std::uint8_t>().swap(file.bytes);
+        file.payloadGeometry.reset();file.finalGeometryRelease={};
+    }
+    storage_->modelBytes-=releaseBytes;storage_->textureBytes-=releasePstBytes;
+    lease.closedBacking_={}; // Consumed historical receipt, never a live lease.
+    d={};d.sourceEffectsCommitted=releaseBytes!=0||releasePstBytes!=0;return true;
 }
 bool OriginalStandardTextureResolver50LA::bind(
     const std::shared_ptr<const OriginalStandardMaterialContext50LA>& context,D& d) noexcept {
@@ -782,7 +1276,7 @@ bool OriginalStandardTextureResolver50LA::resolve24DADC(
             const Provider::MemberView* view) {
             for(std::size_t i=0;i<storage_->entries.size();++i){
                 const auto& entry=storage_->entries[i];
-                if(!same(name,entry.file->member))continue;
+                if(entry.file->retired||!same(name,entry.file->member))continue;
                 if(view&&(!view->member||!same(*view->member,entry.file->member)||!view->data||
                    view->size!=entry.file->bytes.size()||view->revision!=revision||
                    !std::equal(entry.file->bytes.begin(),entry.file->bytes.end(),view->data)))
@@ -841,7 +1335,9 @@ bool OriginalStandardTextureResolver50LA::cached132820(std::size_t i,
     std::shared_ptr<OriginalStandardTextureResource50LA>& out,D& d) noexcept {
     out.reset();
     if(!storage_||i>=storage_->entries.size())return fail(d,E::range,0x1329A0);
-    auto& entry=*storage_->entries[i].file;out=entry.cached.lock();
+    auto& entry=*storage_->entries[i].file;
+    if(entry.retired)return fail(d,E::unresolved,0x1329A0);
+    out=entry.cached.lock();
     if((entry.cacheIdentity!=out.get())||(out&&!out->constructed24DA30()))
         return fail(d,E::phase,0x1329A0);
     return true;
@@ -850,7 +1346,7 @@ bool OriginalStandardTextureResolver50LA::cache1326A0(std::size_t i,
     const std::shared_ptr<OriginalStandardTextureResource50LA>& resource) noexcept {
     if(!storage_||i>=storage_->entries.size()||!resource||!resource->constructed24DA30()||
        resource->resolver_.get()!=this||resource->sourceIndex_!=i)return false;
-    auto& entry=*storage_->entries[i].file;if(entry.cacheIdentity||!entry.cached.expired())return false;
+    auto& entry=*storage_->entries[i].file;if(entry.retired||entry.cacheIdentity||!entry.cached.expired())return false;
     entry.cached=resource;entry.cacheIdentity=resource.get();
     //TGA source24DFD8 publishes1326A0 before24DFE4 releases29F770's
     //temporary reader image. The final1555 level owners stay untouched.
@@ -862,6 +1358,138 @@ void OriginalStandardTextureResolver50LA::clear1327D0(const OriginalStandardText
     for(auto& file:storage_->files)if(file->cacheIdentity==resource){
         file->cached.reset();file->cacheIdentity=nullptr;return;
     }
+}
+bool OriginalStandardTextureResolver50LA::reclaimNeverBorrowedSelectedPstAfterBankClose(
+    GarageBankLease50LA& lease,D& d) noexcept {
+    d={};const auto& receipt=lease.closedBacking_;
+    if(!storage_||lease.resolver_||lease.generation_||lease.provider_||lease.archive_||
+       receipt.resolver!=this||receipt.thread!=std::this_thread::get_id()||!receipt.selected19E||
+       !receipt.provider||receipt.provider!=storage_->provider||
+       receipt.managerIdentity!=storage_->managerIdentity||!receipt.generation||
+       !receipt.provider->sealed_||!receipt.provider->retainedSourcesAccessible()||
+       receipt.mount>=receipt.provider->mounts_.size())return fail(d,E::phase,0x12EB60);
+    const auto& bank=*receipt.provider->mounts_[receipt.mount];
+    if(bank.active||bank.generation!=receipt.generation||!bank.admittedUi.expired()||
+       !bank.ui||!bank.ui->identity()||bank.ui->identity()->id!=OriginalUiArchiveId50KG::garagePod19)
+        return fail(d,E::phase,0x12EB60);
+    std::size_t residentBytes=0,releaseBytes=0;
+    for(std::size_t index=0;index<storage_->files.size();++index){
+        const auto& file=*storage_->files[index];
+        if(file.kind==Storage::FileKind::pst||file.kind==Storage::FileKind::tga||file.kind==Storage::FileKind::atm){
+            if(file.bytes.size()>std::numeric_limits<std::size_t>::max()-residentBytes)
+                return fail(d,E::range,0x1327D0);
+            residentBytes+=file.bytes.size();
+        }
+        if(!file.retired||file.kind!=Storage::FileKind::pst||file.bytes.empty()||
+           file.bank!=receipt.mount||file.bankGeneration!=receipt.generation||file.pstPublication)continue;
+        bool eligible=false;
+        if(file.pstBorrowers)return fail(d,E::phase,0x1327D0);
+        if(!preflightRetiredGaragePstBacking(index,true,eligible,d))return false;
+        if(!eligible)return fail(d,E::phase,0x1327D0);
+        if(file.bytes.size()>std::numeric_limits<std::size_t>::max()-releaseBytes)
+            return fail(d,E::range,0x1327D0);
+        releaseBytes+=file.bytes.size();
+    }
+    if(residentBytes!=storage_->textureBytes||releaseBytes>residentBytes)
+        return fail(d,E::phase,0x1327D0);
+    // Complete source identity and accounting preflight above. Preserve all
+    // consumed row bytes, final-release receipts, pixel leases and stable IDs.
+    for(auto& row:storage_->files){auto& file=*row;
+        if(file.retired&&file.kind==Storage::FileKind::pst&&!file.bytes.empty()&&
+           file.bank==receipt.mount&&file.bankGeneration==receipt.generation&&!file.pstPublication){
+            std::vector<std::uint8_t>().swap(file.bytes);
+        }
+    }
+    storage_->textureBytes-=releaseBytes;lease.closedBacking_={};
+    d={};d.sourceEffectsCommitted=releaseBytes!=0;return true;
+}
+bool OriginalStandardTextureResolver50LA::beginPstSourceBorrow24E1B0(
+    OriginalStandardTextureResource50LA& resource,D& d) noexcept {
+    if(!storage_||resource.resolver_.get()!=this||resource.sourceIndex_>=storage_->entries.size()||
+       resource.pstSourceBorrowIdentity_||resource.pstSourceBorrowPublication_)
+        return fail(d,E::phase,0x24E1B0);
+    auto& file=*storage_->entries[resource.sourceIndex_].file;
+    // ATM aggregate/child and TGA ownership remain exactly their old paths.
+    if(file.kind!=Storage::FileKind::pst)return true;
+    if(file.bytes.empty()||file.pstBorrowers==std::numeric_limits<std::size_t>::max()||
+       file.pstPublication==std::numeric_limits<std::uint64_t>::max())
+        return fail(d,E::range,0x24E1B0);
+    ++file.pstBorrowers;++file.pstPublication;file.finalPstRelease={};
+    resource.pstSourceBorrowIdentity_=&file;
+    resource.pstSourceBorrowPublication_=file.pstPublication;
+    // No throwing operation follows publication here. Any later constructor
+    // failure retains this real resource and discharges at the same destructor.
+    return true;
+}
+bool OriginalStandardTextureResolver50LA::preflightRetiredGaragePstBacking(
+    std::size_t index,bool allowNeverBorrowed,bool& eligible,D& d)const noexcept {
+    eligible=false;
+    if(!storage_||index>=storage_->files.size())return fail(d,E::phase,0x1327D0);
+    const auto& file=*storage_->files[index];
+    if(!file.retired||file.kind!=Storage::FileKind::pst||file.bytes.empty()||file.pstBorrowers)return true;
+    // No weak expiration inference: zero publication means no real resource
+    // ever borrowed this row; otherwise require the actual final destructor.
+    if(!file.pstPublication){
+        if(!allowNeverBorrowed)return true;
+        if(file.finalPstRelease.generation||file.finalPstRelease.publication)
+            return fail(d,E::phase,0x1327D0);
+    }else {
+        const auto& final=file.finalPstRelease;
+        if(!final.generation)return true; // Uncompleted/failed source prefix retained.
+        if(final.bank!=file.bank||final.generation!=file.bankGeneration||
+           final.bytes!=file.bytes.size()||final.publication!=file.pstPublication)
+            return fail(d,E::phase,0x1327D0);
+    }
+    const auto& provider=storage_->provider;
+    if(!provider||!provider->sealed_||!provider->retainedSourcesAccessible()||
+       !file.bankGeneration||file.bank>=provider->mounts_.size())return fail(d,E::phase,0x12EB60);
+    const auto& bank=*provider->mounts_[file.bank];
+    if(bank.active||bank.generation!=file.bankGeneration||!bank.admittedUi.expired()||
+       !bank.ui||!bank.ui->identity()||
+       (bank.ui->identity()->id!=OriginalUiArchiveId50KG::garage&&
+        bank.ui->identity()->id!=OriginalUiArchiveId50KG::garagePod19)||file.bankOrdinal>=bank.rows.size())
+        return fail(d,E::phase,0x12EB60);
+    if(file.cacheIdentity||!file.cached.expired()||file.animation||file.geometryIdentity||
+       !file.geometry.expired()||!file.payloadGeometry.expired()||file.collisionIdentity||
+       !file.collision.expired()||!file.ipumImages.expired())return fail(d,E::phase,0x1327D0);
+    const auto& source=bank.rows[file.bankOrdinal];
+    if(!same(source.name,file.member)||!source.data||source.size!=file.bytes.size()||
+       !std::equal(file.bytes.begin(),file.bytes.end(),source.data)||
+       (file.garageIpum&&!file.garageIpum->matches(file.member,file.bytes)))
+        return fail(d,E::source,0x1329A0);
+    eligible=true;return true;
+}
+void OriginalStandardTextureResolver50LA::finishPstSourceBorrow29C7A0(
+    OriginalStandardTextureResource50LA& resource) noexcept {
+    if(!resource.pstSourceBorrowIdentity_)return;
+    if(!storage_||resource.resolver_.get()!=this||resource.sourceIndex_>=storage_->entries.size())std::terminate();
+    auto& file=*storage_->entries[resource.sourceIndex_].file;
+    if(resource.pstSourceBorrowIdentity_!=&file||!resource.pstSourceBorrowPublication_||
+       resource.pstSourceBorrowPublication_>file.pstPublication||file.kind!=Storage::FileKind::pst||
+       !file.pstBorrowers||resource.references00_||resource.registered_||resource.levelCountB0_||
+       resource.ipumLease_||resource.ipumImages_||resource.garageIpumLease_||!resource.frames24_.empty())
+        std::terminate();
+    --file.pstBorrowers;
+    resource.pstSourceBorrowIdentity_=nullptr;resource.pstSourceBorrowPublication_=0;
+    if(file.pstBorrowers||!resource.constructed_)return;
+    // Minted only at actual destructor tail, never from clear1327D0 alone.
+    file.finalPstRelease={file.bank,file.bytes.size(),file.bankGeneration,file.pstPublication};
+    if(!file.retired)return;
+    std::size_t index=0;
+    for(;index<storage_->files.size()&&storage_->files[index].get()!=&file;++index){}
+    D diagnostic;bool eligible=false;
+    if(!preflightRetiredGaragePstBacking(index,false,eligible,diagnostic)||!eligible)return;
+    std::size_t residentBytes=0;
+    for(const auto& row:storage_->files){
+        if(row->kind!=Storage::FileKind::pst&&row->kind!=Storage::FileKind::tga&&row->kind!=Storage::FileKind::atm)continue;
+        if(row->bytes.size()>std::numeric_limits<std::size_t>::max()-residentBytes)return;
+        residentBytes+=row->bytes.size();
+    }
+    if(residentBytes!=storage_->textureBytes||file.bytes.size()>residentBytes)return;
+    const auto bytes=file.bytes.size();
+    std::vector<std::uint8_t>().swap(file.bytes);storage_->textureBytes-=bytes;
+    file.finalPstRelease={};
+    // Retain indices, bank history and shared immutable decoded IPUM leases.
 }
 OriginalStandardTextureResource50LA::OriginalStandardTextureResource50LA(AllocationKey) noexcept
     :lifetimeLink_(*this) {}
@@ -886,7 +1514,7 @@ OriginalStandardTextureResource50LA::~OriginalStandardTextureResource50LA() {
         ipumLease_->compressed_->retire(ipumLease_->sourceFrame().frame,this);
         ipumLease_.reset();
     }
-    ipumImages_.reset();
+    ipumImages_.reset();garageIpumLease_.reset();
     for(auto& backing:transferBacking_)std::vector<std::uint8_t>().swap(backing);
     for(auto& backing:colorBacking_)std::vector<std::uint16_t>().swap(backing);
     for(auto& backing:rgbaBacking_)std::vector<std::uint8_t>().swap(backing);
@@ -894,7 +1522,10 @@ OriginalStandardTextureResource50LA::~OriginalStandardTextureResource50LA() {
     if(registered_&&(!construction_||!construction_->unregisterTexture29C7E0(lifetimeLink_)))
         std::terminate();
     registered_=false;
-    if(resolver_)resolver_->clear1327D0(this);
+    if(resolver_){
+        resolver_->clear1327D0(this);
+        resolver_->finishPstSourceBorrow29C7A0(*this);
+    }
 }
 bool OriginalStandardTextureResource50LA::construct24DA30(
     std::shared_ptr<OriginalStandardTextureResolver50LA> resolver,std::size_t index,
@@ -905,6 +1536,8 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
         return fail(d,E::source,0x24DAF8);
     if(!context||!context->live())return fail(d,E::video,0x29C768);
     const auto& root=resolver->storage_->entries[index];
+    // Stable reclaimed tombstones cannot become fresh resource constructors.
+    if(root.file->retired&&root.file->bytes.empty())return fail(d,E::unresolved,0x132820);
     const bool child=frame!=static_cast<std::size_t>(-1);
     if(child&&(root.file->format!=OriginalStandardTextureSourceFormat50LA::atmPstFrames||
         frame>=root.frames.size()))return fail(d,E::source,0x10237C);
@@ -912,7 +1545,8 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
     // Lock the entire actual six-frame bridge before any aggregate effects.
     // Bind/adoption are lifetime-once per stage; no reset under old leases.
     std::shared_ptr<const OriginalStandardIpumImageSet50LA> images;
-    if(entry.kind==2){
+    const auto garageImage=root.file->garageIpum;
+    if(entry.kind==2&&(!garageImage||child)){
         images=root.file->ipumImages.lock();
         if(!images||root.frames.size()!=6||images->count()!=6)
             return fail(d,E::unsupported,0x24F148,entry.pstOffset);
@@ -924,6 +1558,10 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
                 return fail(d,E::source,0x24F148,entry.pstOffset);
         }
     }
+    if(entry.kind==2&&garageImage&&(!garageImage->matches(root.file->member,root.file->bytes)||
+       child||root.file->format!=OriginalStandardTextureSourceFormat50LA::pstIpum||
+       entry.count<1||static_cast<std::size_t>(entry.count)!=garageImage->texture->mips.size()))
+        return fail(d,E::source,0x24F148);
     std::uint32_t allocationPC=0x29EB00;
     std::size_t allocationAt=0;
     try {
@@ -961,6 +1599,7 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
             if(!read)return fail(d,E::unsupported,tga32?0x29EE40:0x29EA90,18);
         }
         resolver_=std::move(resolver);construction_=std::move(context);sourceIndex_=index;
+        if(!resolver_->beginPstSourceBorrow24E1B0(*this,d))return false;
         if(!construction_->registerTexture29C780(lifetimeLink_))return fail(d,E::video,0x29C780);
         registered_=true;d.sourceEffectsCommitted=true;
         //24E310..24E320 clears the binding-policy bit. Neither admitted PST0/1 nor
@@ -1025,6 +1664,27 @@ bool OriginalStandardTextureResource50LA::construct24DA30(
             //same resolver actually publishes this resource association.
             if(!construction_->live())return fail(d,E::video,0x24DFD8);
             constructed_=true;return true;
+        }
+        if(entry.kind==2&&garageImage&&!child){
+            // Static table loader uses flags2: every actual authored mip is
+            // retained in descending native slots. RA flags0 remains below.
+            garageIpumLease_=garageImage;formatAC_=1555;bitsPerPixelE8_=16;
+            flagsF8_=static_cast<std::uint8_t>(flagsF8_|1u);
+            for(std::int32_t i=0;i<entry.count;++i){
+                const auto ordinal=static_cast<std::size_t>(i),slot=static_cast<std::size_t>(entry.count-1-i);
+                const auto& source=entry.levels[ordinal];const auto& image=garageImage->texture->mips[ordinal];
+                auto& level=levels_[slot];level.storage=OriginalStandardTextureLevelStorage50LA::garageIpumCompressed1555;
+                level.compressed00=entry.file->bytes.data()+source.indices;level.compressedBytes=source.bytes;
+                level.codec18=level.compressed00+16;level.codecBytes1C=source.bytes-16;
+                level.sourceHeaderOffset=source.header;level.sourceIndicesOffset=source.indices;
+                level.sourceMipOrdinal=static_cast<std::uint32_t>(i);level.width104=source.width;level.height110=source.height;
+                level.rgba8888=image.rgba.data();level.rgba8888Bytes=image.rgba.size();
+                level.garageIpumProvenance=garageImage->provenance;
+            }
+            const auto& base=entry.levels[static_cast<std::size_t>(entry.count-1)];
+            width14_=base.width;height18_=base.height;levelCountB0_=entry.count;
+            if(!construction_->live())return fail(d,E::video,0x24E090);
+            constructed_=true;return true; // No upload, second decode or image copy.
         }
         if(entry.kind==2){
             if(!child||!images||!images->frame(frame))return fail(d,E::phase,0x24F148);
@@ -1120,7 +1780,8 @@ const OriginalStandardTextureSourceFormat50LA* OriginalStandardTextureResource50
     return constructed_?&sourceFormat_:nullptr;
 }
 const std::uint32_t* OriginalStandardTextureResource50LA::sourceKind() const noexcept {
-    return constructed_&&sourceFormat_==OriginalStandardTextureSourceFormat50LA::pstIndexed?&sourceKind_:nullptr;
+    return constructed_&&(sourceFormat_==OriginalStandardTextureSourceFormat50LA::pstIndexed||
+        (sourceFormat_==OriginalStandardTextureSourceFormat50LA::pstIpum&&garageIpumLease_))?&sourceKind_:nullptr;
 }
 const std::int32_t* OriginalStandardTextureResource50LA::formatAC() const noexcept {return constructed_&&!aggregate_?&formatAC_:nullptr;}
 const std::int32_t* OriginalStandardTextureResource50LA::bitsPerPixelE8() const noexcept {return constructed_&&!aggregate_?&bitsPerPixelE8_:nullptr;}
@@ -1151,6 +1812,20 @@ bool OriginalStandardTextureResource50LA::retain104960(D& d) noexcept {
 bool OriginalStandardTextureResource50LA::release104970() noexcept {
     if(references00_<=0)return false;
     --references00_;return true;
+}
+bool OriginalStandardTextureResource50LA::demandGarageFloor1FDD60(
+    std::uint32_t pc,bool& written,D& d) noexcept {
+    written=false;
+    if(pc!=0x1FDDA8&&pc!=0x1FDDE8)return fail(d,E::unsupported,pc);
+    if(!constructed_||references00_<=0||!construction_||!construction_->live())
+        return fail(d,E::phase,pc);
+    using Math=detail::StandardTextureDemandMath50LA;
+    if(!Math::supported()||!Math::ordinary(demand10_)||demand10_<0.f)
+        return fail(d,E::number,pc);
+    // Both original compares are10<=current. Do not104A00, choose an ATM
+    // child, clear demand, or reinterpret this as GPU residency.
+    if(!(10.f<=demand10_)){demand10_=10.f;written=true;}
+    return true;
 }
 bool OriginalStandardTextureResource50LA::demandTournamentMarker1F264C(bool& written,D& d) noexcept {
     written=false;
@@ -1300,13 +1975,15 @@ bool OriginalStandardTextureResource50LA::demand104A00(float request,bool& writt
     else if(integer>=32){base=32;level=5;}
     const float baseValue=static_cast<float>(base);
     float difference=0.f,fraction=0.f,next=0.f;
-    //This exact-arithmetic admitted subset avoids known host rounding
-    //differences; it is not a general EE floating-point emulator/parity claim.
-    if(!Math::subtract(request,baseValue,difference)||
+    // Preserve104AAC SUB.S,104AB0 DIV.S, then104ADC ADD.S as separate
+    // binary32 results. A rounded material request need not produce an exact
+    // level+fraction sum. Use the bounded directed path, not host nearest-even;
+    // division by the actual power-of-two base remains exact-only.
+    if(!Math::subtractTowardZero(request,baseValue,difference)||
        !Math::divideByPowerOfTwo(difference,baseValue,fraction))
         return fail(d,E::number,0x104AB0);
     if(fraction<0.f)fraction=0.f;
-    if(!Math::add(static_cast<float>(level),fraction,next))return fail(d,E::number,0x104ADC);
+    if(!Math::addTowardZero(static_cast<float>(level),fraction,next))return fail(d,E::number,0x104ADC);
     if(next>demand10_){demand10_=next;written=true;d.sourceEffectsCommitted=true;}
     return true;
 }

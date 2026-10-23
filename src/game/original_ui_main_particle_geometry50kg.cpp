@@ -29,11 +29,11 @@ float fixed4(float value) noexcept {
     return div(std::trunc(mul(value,16.f)),16.f);
 }
 }
-OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuad50KG(
+static OriginalUiMainParticleGeometryStatus50KG projectParticleNumeric50KG(
     const OriginalUiMainParticlePacket50KG& packet,std::uint8_t stateIndex,
     const OriginalUiMainParticleCamera50KG& camera,
     const OriginalUiMainParticleRenderConstants50KG& constants,
-    std::uint16_t authenticatedFrameCount,float maximumBrightness,
+    std::uint16_t authenticatedFrameCount,float maximumBrightness,float sourceDistanceP,
     OriginalUiMainParticleQuad50KG& output) noexcept {
     using Status=OriginalUiMainParticleGeometryStatus50KG;
     static_assert(sizeof(float)==4 && std::numeric_limits<float>::is_iec559,
@@ -49,7 +49,7 @@ OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuad50KG(
     for(const auto& uv:packet.normalizedUv)for(float v:uv)if(!finite(v))return Status::input;
     for(float v:camera.combinedSourceScreen250)if(!finite(v))return Status::input;
     for(float v:constants.combinedClip100)if(!finite(v))return Status::input;
-    if(!finite(constants.fogStart33Z) || !finite(constants.fogScale33W) ||
+    if(!finite(sourceDistanceP)||!finite(constants.fogStart33Z) || !finite(constants.fogScale33W) ||
         constants.sourceCanvasOffset[0]!=1728.f || constants.sourceCanvasOffset[1]!=1824.f)
         return Status::input;
     if(std::fegetround()!=FE_TONEAREST)return Status::arithmetic;
@@ -70,7 +70,7 @@ OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuad50KG(
     const float x=mul(screen[0],reciprocal),y=mul(screen[1],reciprocal);
     const float z=mul(screen[2],reciprocal);
     const float extent=mul(packet.sizeTimesCamera1D8,reciprocal);
-    const float fog=mul(sub(packet.quantizedSourceDepth,constants.fogStart33Z),constants.fogScale33W);
+    const float fog=mul(sub(sourceDistanceP,constants.fogStart33Z),constants.fogScale33W);
     if(!finite(reciprocal)||!finite(x)||!finite(y)||!finite(z)||!finite(extent)||!finite(fog))
         return Status::arithmetic;
     if(z<0 || z>16777215.f || extent>1048576.f)return Status::arithmetic;
@@ -114,6 +114,26 @@ OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuad50KG(
         v.color[3]=alpha;next.fogFactors[n]=fogFactor;
     }
     next.visible=true;output=next;return Status::complete;
+}
+OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuad50KG(
+    const OriginalUiMainParticlePacket50KG& packet,std::uint8_t stateIndex,
+    const OriginalUiMainParticleCamera50KG& camera,
+    const OriginalUiMainParticleRenderConstants50KG& constants,
+    std::uint16_t authenticatedFrameCount,float maximumBrightness,
+    OriginalUiMainParticleQuad50KG& output) noexcept {
+    return projectParticleNumeric50KG(packet,stateIndex,camera,constants,
+        authenticatedFrameCount,maximumBrightness,packet.quantizedSourceDepth,output);
+}
+OriginalUiMainParticleGeometryStatus50KG projectOriginalParticleQuadWithDistance50KG(
+    const OriginalUiMainParticlePacket50KG& packet,std::uint8_t stateIndex,
+    const OriginalUiMainParticleCamera50KG& camera,
+    const OriginalUiMainParticleRenderConstants50KG& constants,
+    std::uint16_t authenticatedFrameCount,float maximumBrightness,float sourceDistanceP,
+    OriginalUiMainParticleQuad50KG& output) noexcept {
+    if(!std::isfinite(sourceDistanceP)||sourceDistanceP<0)
+        return OriginalUiMainParticleGeometryStatus50KG::input;
+    return projectParticleNumeric50KG(packet,stateIndex,camera,constants,
+        authenticatedFrameCount,maximumBrightness,sourceDistanceP,output);
 }
 OriginalUiMainParticleGeometryStatus50KG projectOriginalUiMainParticleQuad50KG(
     const OriginalUiMainParticlePacket50KG& packet,std::uint8_t stateIndex,

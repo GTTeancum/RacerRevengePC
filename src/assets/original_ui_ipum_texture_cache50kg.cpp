@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstring>
 #include <new>
+#include <limits>
 #include <utility>
 
 namespace rr::assets {
@@ -52,6 +53,14 @@ struct AdditionalSourceRecord {
     RetainedCodecRecord codec;
 };
 #include "original_ui_ipum_texture_cache50kg_additional_generated.inc"
+struct GarageSourceRecord {
+    OriginalUiArchiveId50KG archive;
+    std::size_t memberIndex;
+    const char* archiveSha;
+    AdditionalSourceRecord source;
+};
+#include "original_ui_ipum_texture_cache50kg_garage_generated.inc"
+
 // Independently retained original whole-member pins. Generated conversion
 // records may describe only this finite source set. The Gasgano source pin
 // alone supplies no converted pixels and cannot make a cache available.
@@ -341,6 +350,63 @@ bool additionalCatalogValid() noexcept {
     }
     return true;
 }
+bool garageCatalogValid() noexcept {
+    if(!garageCatalogAvailable||garageSourceCount!=11)return false;
+    for(std::size_t index=0;index<garageSourceCount;++index){
+        const auto& binding=garageSources[index];const auto& a=binding.source;const auto& c=a.codec;
+        if(binding.archive!=OriginalUiArchiveId50KG::garage&&binding.archive!=OriginalUiArchiveId50KG::garagePod19)return false;
+        const auto* archive=originalUiArchiveIdentity50KG(binding.archive);
+        const auto* member=originalUiMemberIdentity50KG(binding.archive,binding.memberIndex);
+        if(!archive||!member||!hexHash(binding.archiveSha)||std::strcmp(archive->sha256,binding.archiveSha)||
+           std::strcmp(member->name,a.member)||member->bytes!=a.sourceBytes||std::strcmp(member->sha256,a.sourceSha256)||
+           !a.mipCount||a.mipCount>originalUiIpumMipCount50KG)return false;
+        for(std::size_t j=0;j<index;++j)if(binding.archive==garageSources[j].archive&&binding.memberIndex==garageSources[j].memberIndex)return false;
+        if(!hexHash(c.converterSha256)||!hexHash(c.generatorSha256)||!hexHash(c.ffmpegSha256)||
+           !c.ffmpegVersion||!c.ffmpegVersion[0]||!c.ffmpegCommand||!c.ffmpegCommand[0])return false;
+        for(std::size_t i=0;i<a.mipCount;++i){const auto& m=a.sourceMips[i];const auto& r=a.retainedMips[i];
+            if(m.width<16||m.height<16||m.width>1024||m.height>1024||(m.width&(m.width-1))||
+               (m.height&(m.height-1))||!hexHash(m.sha256)||!hexHash(r.rrtexSha256)||!hexHash(r.rgbaSha256)||
+               !m.filename||!m.filename[0])return false;
+        }
+    }
+    return true;
+}
+// Retained payload only, not codec scratch, allocator overhead or GPU memory.
+// The existing public Rider/standalone Garage APIs keep their16MiB ceiling.
+// Only the private same-Frontend Garage append uses the complete authenticated
+// corpus:30 Rider entries plus11 archive-qualified Garage entries. Recompute
+// every mip and separate base RRTEX allocation, including its16-byte header.
+bool addRetainedBytes(std::size_t& total,std::size_t bytes) noexcept {
+    if(bytes>std::numeric_limits<std::size_t>::max()-total)return false;
+    total+=bytes;return true;
+}
+bool sourceRetainedBytes(const SourceMipRecord* mips,std::size_t count,std::size_t& out) noexcept {
+    out=0;if(!mips||!count||count>originalUiIpumMipCount50KG)return false;
+    std::size_t base=0;
+    for(std::size_t i=0;i<count;++i){
+        const std::size_t width=mips[i].width,height=mips[i].height;
+        if(!width||!height||width>std::numeric_limits<std::size_t>::max()/height)return false;
+        const auto pixels=width*height;
+        if(pixels>std::numeric_limits<std::size_t>::max()/4)return false;
+        base=pixels*4;if(!addRetainedBytes(out,base))return false;
+    }
+    return addRetainedBytes(out,base)&&addRetainedBytes(out,16);
+}
+bool completeGarageCatalogRetainedLimit(std::size_t& out) noexcept {
+    out=0;
+    if(!catalogValid()||!additionalCatalogValid()||!garageCatalogValid()||
+       additionalSourceCount!=29||garageSourceCount!=11)return false;
+    std::size_t bytes=0;
+    if(!sourceRetainedBytes(sourceMips,originalUiIpumMipCount50KG,bytes)||
+       bytes!=retainedDecodedBytes||!addRetainedBytes(out,bytes))return false;
+    for(const auto& record:additionalSources)
+        if(!sourceRetainedBytes(record.sourceMips,record.mipCount,bytes)||!addRetainedBytes(out,bytes))return false;
+    for(const auto& binding:garageSources){const auto& record=binding.source;
+        if(!sourceRetainedBytes(record.sourceMips,record.mipCount,bytes)||!addRetainedBytes(out,bytes))return false;
+    }
+    // Exact current authored corpus, no rounded-up headroom or implicit growth.
+    return out==std::size_t(20018832);
+}
 std::uint16_t u16(const std::uint8_t* p) noexcept {
     return static_cast<std::uint16_t>(std::uint16_t(p[0])|(std::uint16_t(p[1])<<8));
 }
@@ -417,10 +483,11 @@ bool decodeOriginalMips(const std::shared_ptr<const OriginalUiArchive50KG>& arch
     const char* member,std::size_t expectedBytes,const char* expectedSha,
     const SourceMipRecord* mips,std::size_t count,
     std::vector<std::vector<std::uint8_t>>& images,OriginalUiIpumCacheDiagnostic50KG& d,
-    const DecodeHooks48C* hooks,const TextureLimits48E& limits) {
+    const DecodeHooks48C* hooks,const TextureLimits48E& limits,
+    OriginalUiArchiveId50KG archiveId=OriginalUiArchiveId50KG::rider,const char* expectedArchiveSha=archiveSha256) {
     if(!archive||!archive->loaded()||
-       archive->identity()!=originalUiArchiveIdentity50KG(OriginalUiArchiveId50KG::rider)||
-       std::strcmp(archive->identity()->sha256,archiveSha256)!=0)return fail(d,Error::archive);
+       archive->identity()!=originalUiArchiveIdentity50KG(archiveId)||
+       std::strcmp(archive->identity()->sha256,expectedArchiveSha)!=0)return fail(d,Error::archive);
     const auto source=archive->find(member);
     if(!source.identity||!source.data||source.size!=expectedBytes||
        source.identity->bytes!=expectedBytes||std::strcmp(source.identity->sha256,expectedSha)!=0)
@@ -512,6 +579,7 @@ bool OriginalUiIpumTextureCache50KG::load(std::shared_ptr<const OriginalUiArchiv
         std::size_t totalDecodedBytes=retainedDecodedBytes;
         if(storage_)totalDecodedBytes+=storage_->decodedBytes;
         for(const auto& existing:additional_)if(existing)totalDecodedBytes+=existing->decodedBytes;
+        for(const auto& existing:garage_)if(existing)totalDecodedBytes+=existing->decodedBytes;
         if(sourceBytes>std::min(limits.input_bytes,std::size_t(8u*1024u*1024u))||
             totalDecodedBytes>std::min(limits.decoded_bytes,std::size_t(16u*1024u*1024u)))
             return fail(d,Error::limit);
@@ -614,6 +682,7 @@ bool OriginalUiIpumTextureCache50KG::loadAdditional(std::size_t sourceIndex,std:
         std::size_t totalDecodedBytes=retainedDecodedBytes;
         if(storage_)totalDecodedBytes+=storage_->decodedBytes;
         for(const auto& existing:additional_)if(existing)totalDecodedBytes+=existing->decodedBytes;
+        for(const auto& existing:garage_)if(existing)totalDecodedBytes+=existing->decodedBytes;
         if(sourceBytes>std::min(limits.input_bytes,std::size_t(8u*1024u*1024u))||
             totalDecodedBytes>std::min(limits.decoded_bytes,std::size_t(16u*1024u*1024u)))
             return fail(d,Error::limit);
@@ -686,9 +755,156 @@ bool OriginalUiIpumTextureCache50KG::loadAdditional(std::size_t sourceIndex,std:
     }catch(const std::bad_alloc&){return fail(d,Error::allocation);}
     catch(...){return fail(d,Error::unexpectedFailure);}
 }
+bool OriginalUiIpumTextureCache50KG::appendGarageArchive12CEA0(
+    const std::shared_ptr<const OriginalUiArchive50KG>& archive,OriginalUiIpumCacheDiagnostic50KG& d)const noexcept {
+    d={};
+    try {
+    if(!archive||!archive->loaded()||!garageCatalogValid())return fail(d,Error::archive);
+    std::size_t retainedLimit=0;
+    if(!completeGarageCatalogRetainedLimit(retainedLimit))return fail(d,Error::cacheUnavailable);
+    const TextureLimits48E nativeLimits; // Per-source decoder limits stay unchanged.
+    bool found=false;
+    for(std::size_t i=0;i<garageSourceCount;++i){
+        const auto& binding=garageSources[i];
+        if(archive->identity()!=originalUiArchiveIdentity50KG(binding.archive))continue;
+        found=true;d={};d.sourceIndex=i;const auto& existing=garage_[i];
+        if(existing){
+            const auto source=archive->find(binding.source.member);
+            // Reentry retains the genuine original immutable publication; no
+            // replacement pixels or rebinding to a same-name allocation.
+            if(existing->archive!=archive||source.identity!=existing->source.identity||
+               source.data!=existing->source.data||source.size!=existing->source.size||
+               !existing->evidence.decodedInProcess)
+                return fail(d,Error::source);
+            continue;
+        }
+        if(!loadGarageOriginalImpl(i,archive,d,nullptr,nativeLimits,retainedLimit))return false;
+    }
+    return found?true:fail(d,Error::archive);
+    }catch(const std::bad_alloc&){return fail(d,Error::allocation);}
+    catch(...){return fail(d,Error::unexpectedFailure);}
+}
+bool OriginalUiIpumTextureCache50KG::loadGarageOriginal(std::size_t sourceIndex,std::shared_ptr<const OriginalUiArchive50KG> archive,
+    OriginalUiIpumCacheDiagnostic50KG& d,
+    const DecodeHooks48C* hooks,const TextureLimits48E& limits) noexcept {
+    return loadGarageOriginalImpl(sourceIndex,std::move(archive),d,hooks,limits,
+        std::min(limits.decoded_bytes,std::size_t(16u*1024u*1024u)));
+}
+bool OriginalUiIpumTextureCache50KG::loadGarageOriginalImpl(std::size_t sourceIndex,std::shared_ptr<const OriginalUiArchive50KG> archive,
+    OriginalUiIpumCacheDiagnostic50KG& d,
+    const DecodeHooks48C* hooks,const TextureLimits48E& limits,std::size_t retainedByteCeiling) const noexcept {
+    d={};d.sourceIndex=sourceIndex;
+    try {
+        if(!garageCatalogValid()||sourceIndex>=garageSourceCount)return fail(d,Error::cacheUnavailable);
+        if(garage_[sourceIndex])return fail(d,Error::alreadyLoaded);
+        const auto& binding=garageSources[sourceIndex];const auto& record=binding.source;
+        if(!archive||!archive->loaded()||archive->identity()!=originalUiArchiveIdentity50KG(binding.archive)||
+           archive->member(binding.memberIndex).identity!=originalUiMemberIdentity50KG(binding.archive,binding.memberIndex))return fail(d,Error::archive);
+        std::vector<std::vector<std::uint8_t>> retained;
+        const auto* sourceMember=record.member;const auto* sourceSha256=record.sourceSha256;
+        const auto sourceBytes=record.sourceBytes;const auto mipCount=record.mipCount;
+        const auto& sourceMips=record.sourceMips;const auto& retainedMipRecords=record.retainedMips;
+        const auto& retainedCodecRecord=record.codec;
+        std::size_t retainedDecodedBytes=0;
+        if(!sourceRetainedBytes(sourceMips,mipCount,retainedDecodedBytes))return fail(d,Error::limit);
+        if(cancelled(hooks))return fail(d,Error::cancelled);
+        if(!archive||!archive->loaded()||
+            archive->identity()!=originalUiArchiveIdentity50KG(binding.archive)||
+            std::strcmp(archive->identity()->sha256,binding.archiveSha)!=0)return fail(d,Error::archive);
+        const auto source=archive->find(sourceMember);
+        if(!source.identity||!source.data||source.size!=sourceBytes||
+            source.identity->bytes!=sourceBytes||
+            std::strcmp(source.identity->sha256,sourceSha256)!=0)return fail(d,Error::source);
+        d.inputBytes=sourceBytes;
+        d.inputByteLimit=std::min(limits.input_bytes,std::size_t(8u*1024u*1024u));
+        d.requestedBytes=retainedDecodedBytes;
+        // Aggregate retained cache capacity is distinct from per-source decode bounds.
+        d.decodedByteLimit=retainedByteCeiling;
+        if(storage_&&!addRetainedBytes(d.retainedBytes,storage_->decodedBytes))return fail(d,Error::limit);
+        for(const auto& existing:additional_)
+            if(existing&&!addRetainedBytes(d.retainedBytes,existing->decodedBytes))return fail(d,Error::limit);
+        for(const auto& existing:garage_)
+            if(existing&&!addRetainedBytes(d.retainedBytes,existing->decodedBytes))return fail(d,Error::limit);
+        std::size_t totalDecodedBytes=d.retainedBytes;
+        if(!addRetainedBytes(totalDecodedBytes,retainedDecodedBytes)||
+           sourceBytes>d.inputByteLimit||totalDecodedBytes>d.decodedByteLimit)
+            return fail(d,Error::limit);
+        if(!decodeOriginalMips(archive,record.member,record.sourceBytes,record.sourceSha256,record.sourceMips,
+            record.mipCount,retained,d,hooks,limits,binding.archive,binding.archiveSha))return false;
+        if(retained.size()!=mipCount)return fail(d,Error::imageCount);
+        if(!checkedHash(source.data,source.size,sourceSha256,hooks,d,Error::source))return false;
+        if(u16(source.data)!=1||u16(source.data+2)!=0||u32(source.data+4)!=2||
+            u32(source.data+8)!=mipCount)return fail(d,Error::sourceLayout);
+        // Validate every source extent and every retained output before any
+        // decoded pixel allocation/publication. Constants are exact originals.
+        constexpr std::uint8_t terminators[]{0,0,1,0xb0,0,0,1,0xb1};
+        for(std::size_t i=0;i<mipCount;++i){
+            if(cancelled(hooks))return fail(d,Error::cancelled,i);
+            const auto& s=sourceMips[i];const auto& r=retainedMipRecords[i];const auto& image=retained[i];
+            if(s.header>source.size||20>source.size-s.header||s.payload!=s.header+20||
+                s.payload>source.size||s.bytes>source.size-s.payload||s.bytes<25||
+                (i==0?s.header!=12:s.header!=sourceMips[i-1].payload+sourceMips[i-1].bytes)||
+                (i+1==mipCount&&s.payload+s.bytes!=source.size))
+                return fail(d,Error::sourceLayout,i);
+            const auto* h=source.data+s.header;const auto* p=source.data+s.payload;
+            if(u32(h)!=s.height||u32(h+4)!=s.width||u32(h+8)||u32(h+12)||u32(h+16)!=s.bytes||
+                std::memcmp(p,"ipum",4)||u32(p+4)!=s.bytes-8||u16(p+8)!=s.width||
+                u16(p+10)!=s.height||u32(p+12)!=1||p[16]!=0||
+                std::memcmp(p+s.bytes-8,terminators,8))return fail(d,Error::sourceLayout,i);
+            if(!checkedHash(p,s.bytes,s.sha256,hooks,d,Error::encodedIdentity,i))return false;
+            const std::size_t rgbaBytes=std::size_t(s.width)*s.height*4;
+            if(image.size()!=rgbaBytes+16)return fail(d,Error::imageFormat,i);
+            if(!checkedHash(image.data(),image.size(),r.rrtexSha256,hooks,d,Error::imageIdentity,i)||
+                !checkedHash(image.data()+16,rgbaBytes,r.rgbaSha256,hooks,d,Error::imageIdentity,i))return false;
+            if(std::memcmp(image.data(),"RRTEX001",8)||u32(image.data()+8)!=s.width||
+                u32(image.data()+12)!=s.height)return fail(d,Error::imageFormat,i);
+            for(std::size_t pixelAt=16;pixelAt<image.size();pixelAt+=4){
+                if((pixelAt-16)%65536==0&&cancelled(hooks))return fail(d,Error::cancelled,i);
+                if((image[pixelAt]&7u)||(image[pixelAt+1]&7u)||(image[pixelAt+2]&7u)||
+                    image[pixelAt+3]!=(image[pixelAt]||image[pixelAt+1]||image[pixelAt+2]?255:0))
+                    return fail(d,Error::imageFormat,i);
+            }
+        }
+        auto next=std::make_unique<Storage>();next->archive=std::move(archive);next->source=source;
+        next->decodedBytes=retainedDecodedBytes;
+        auto& texture=next->texture;texture.revision=1;texture.flags=0;texture.kind=2;
+        // No authored palette exists for kind2; zero storage is not a palette.
+        texture.mips.reserve(mipCount);
+        auto& evidence=next->evidence;
+        evidence.mipCount=mipCount;
+        evidence.colorPolicyKind=OriginalUiIpumColorPolicy50KG::original50FcRgb5Texa255Aem1;
+        evidence.sourceMember=sourceMember;
+        evidence.sourcePstSha256=sourceSha256;evidence.sourceArchiveSha256=binding.archiveSha;
+        evidence.decodedInProcess=true;
+        evidence.converterSha256=retainedCodecRecord.converterSha256;
+        evidence.generatorSha256=retainedCodecRecord.generatorSha256;
+        evidence.ffmpegVersion=retainedCodecRecord.ffmpegVersion;
+        evidence.ffmpegSha256=retainedCodecRecord.ffmpegSha256;
+        evidence.ffmpegCommand=retainedCodecRecord.ffmpegCommand;evidence.colorPolicy=colorPolicyDescription;
+        if(hooks&&hooks->progress)hooks->progress(hooks->context,"pst.ipum_cache",0,mipCount);
+        for(std::size_t i=0;i<mipCount;++i){
+            if(cancelled(hooks))return fail(d,Error::cancelled,i);
+            const auto& s=sourceMips[i];const auto& r=retainedMipRecords[i];const auto& image=retained[i];
+            TextureMip48E mip;mip.width=s.width;mip.height=s.height;
+            mip.source_header_offset=s.header;mip.source_indices_offset=s.payload;
+            mip.rgba.assign(image.begin()+16,image.end());texture.mips.push_back(std::move(mip));
+            auto& e=evidence.mips[i];e.width=s.width;e.height=s.height;e.sourceHeaderOffset=s.header;
+            e.sourcePayloadOffset=s.payload;e.sourcePayloadBytes=s.bytes;e.sourcePayloadSha256=s.sha256;
+            e.rrtexSha256=r.rrtexSha256;e.rgbaSha256=r.rgbaSha256;e.yuv420pSha256=r.yuv420pSha256;
+            e.retainedFilename=s.filename;
+            if(hooks&&hooks->progress)hooks->progress(hooks->context,"pst.ipum_cache",
+                static_cast<std::uint32_t>(i+1),mipCount);
+        }
+        texture.base_rrtex=retained.back();
+        if(cancelled(hooks))return fail(d,Error::cancelled,mipCount-1);
+        garage_[sourceIndex]=std::move(next);return true;
+    }catch(const std::bad_alloc&){return fail(d,Error::allocation);}
+    catch(...){return fail(d,Error::unexpectedFailure);}
+}
 bool OriginalUiIpumTextureCache50KG::loaded() const noexcept {
     if(storage_)return true;
     for(const auto& entry:additional_)if(entry)return true;
+    for(const auto& entry:garage_)if(entry)return true;
     return false;
 }
 OriginalUiIpumColorPolicy50KG OriginalUiIpumTextureCache50KG::colorPolicy() const noexcept {
@@ -702,10 +918,20 @@ const Texture48E* OriginalUiIpumTextureCache50KG::textureFor(const OriginalUiMem
         source.identity==entry->source.identity&&source.data==entry->source.data&&source.size==entry->source.size;};
     if(matches(storage_.get()))return &storage_->texture;
     for(const auto& entry:additional_)if(matches(entry.get()))return &entry->texture;
+    for(const auto& entry:garage_)if(matches(entry.get()))return &entry->texture;
     return nullptr;
 }
 const OriginalUiIpumProvenance50KG* OriginalUiIpumTextureCache50KG::provenance() const noexcept {
     return storage_?&storage_->evidence:nullptr;
+}
+std::size_t OriginalUiIpumTextureCache50KG::garageCatalogSourceCount() noexcept {
+    return garageCatalogValid()?garageSourceCount:0;
+}
+const char* OriginalUiIpumTextureCache50KG::garageSourceMember(std::size_t source) noexcept {
+    return source<garageCatalogSourceCount()?garageSources[source].source.member:nullptr;
+}
+const OriginalUiArchiveIdentity50KG* OriginalUiIpumTextureCache50KG::garageSourceArchive(std::size_t source) noexcept {
+    return source<garageCatalogSourceCount()?originalUiArchiveIdentity50KG(garageSources[source].archive):nullptr;
 }
 std::size_t OriginalUiIpumTextureCache50KG::additionalCatalogSourceCount() noexcept {
     return additionalCatalogValid()?additionalSourceCount:0;
@@ -726,6 +952,7 @@ const OriginalUiIpumProvenance50KG* OriginalUiIpumTextureCache50KG::provenanceFo
         source.identity==entry->source.identity&&source.data==entry->source.data&&source.size==entry->source.size;};
     if(matches(storage_.get()))return &storage_->evidence;
     for(const auto& entry:additional_)if(matches(entry.get()))return &entry->evidence;
+    for(const auto& entry:garage_)if(matches(entry.get()))return &entry->evidence;
     return nullptr;
 }
 } // namespace rr::assets

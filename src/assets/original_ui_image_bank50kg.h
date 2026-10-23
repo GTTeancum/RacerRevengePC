@@ -39,6 +39,8 @@ public:
     bool loaded() const noexcept;
     std::shared_ptr<const OriginalUiScreenAssets50KG> images() const noexcept;
     const OriginalUiImageBankMapping50KG* mapping(std::uint32_t owner,std::uint32_t image) const noexcept;
+    // Read-only exact member backing pinned by this combined bank. No new identity.
+    OriginalUiMemberView50KG sourceMember(std::uint32_t combinedImageIndex)const noexcept;
 private:
     struct Storage;std::unique_ptr<Storage> storage_;
 };

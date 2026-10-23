@@ -5,6 +5,7 @@
 #include <limits>
 
 namespace rr::platform {
+class OriginalUiGarageDroidAudio50GN;
 // Native replacement for the source channel backend. Tokens are deliberately
 // NOT PS2 channel numbers. Each token names one actual mixer playback revision;
 // a replaced/reused slot never grants control of somebody else's sound.
@@ -30,6 +31,8 @@ public:
         std::uint64_t revision=0;
         std::int32_t token=-1;
         friend class LogicalAudioOwner;
+        // Existing exact Droid235150 preflight authenticates owner/slot.
+        friend class OriginalUiGarageDroidAudio50GN;
     };
     LogicalAudioOwner()=default;
     ~LogicalAudioOwner(){close();}
@@ -125,6 +128,26 @@ public:
         mixer_=nullptr;count_=0;
     }
 private:
+    friend class OriginalUiGarageDroidAudio50GN;
+    // The concrete Droid source owner alone may reuse its CLOSED, never-played
+    // logical allocation after actual Scene/Group/Sound destruction. No token
+    // is recycled and no active/foreign clip is stopped by this operation.
+    bool canRebindRetiredDroidCold()const noexcept {
+        if(!attempted_||mixer_||count_||nextToken_)return false;
+        for(const auto& s:sounds_)
+            if(s.owner||s.channel2C!=-1||s.revision||s.token!=-1)return false;
+        return true;
+    }
+    bool rebindRetiredDroidCold(AudioMixer50HD& mixer)noexcept {
+        if(!canRebindRetiredDroidCold()||mixer.count()!=53||mixer.groupEpoch50IC()!=epoch_)return false;
+        for(std::size_t i=49;i<53;++i){AudioVoiceObservation50HD v;
+            if(!mixer.inspectVoice(i,v)||v.voice.active||v.playbackRevision||
+               v.voice.clip.samples||v.voice.clip.frames)return false;
+        }
+        sounds_={};registered_={};mixer_=&mixer;count_=4;
+        for(std::size_t i=0;i<count_;++i){sounds_[i].owner=this;sounds_[i].slot=49+i;}
+        return true;
+    }
     bool owns(const Sound& s) const noexcept {
         if(!mixer_||mixer_->groupEpoch50IC()!=epoch_||s.owner!=this)return false;
         for(std::size_t i=0;i<count_;++i)

@@ -84,8 +84,11 @@ static bool prepareParticleMaterial(const OriginalUiArchive50KG& archive,
         if(!inherited||!inherited->identity||!runtime.overrideKnown)
             return fail(d,Error::templateOwner,"actual particle DefaultMT",0x160ff4);
         if(runtime.override435670)return fail(d,Error::unsupportedValue,"435670 override",0x248924);
+        const bool garage=expected==OriginalUiArchiveId50KG::garage;
+        const char* textureName=garage?"garageprt":"mmprt";
+        const std::string stem=std::string("particle\\")+textureName;
         OriginalUiDat50KG data;
-        if(!readOriginalUiDat50KG(archive,"particle\\mmprt.psm",data,d.document,
+        if(!readOriginalUiDat50KG(archive,stem+".psm",data,d.document,
             OriginalUiRepeatedKeyPolicy50KG::preserveInOrder))return fail(d,Error::document,"mmprt.psm");
         const auto* general=data.section("General");const auto* section=data.section("ShaderPass_1");
         if(!general||!section)return fail(d,Error::section,"Main ParticleCode sections");
@@ -102,20 +105,23 @@ static bool prepareParticleMaterial(const OriginalUiArchive50KG& archive,
         for(const auto& field:section->values)
             if(field.sourceValuePresent&&!known(field.key))return fail(d,Error::unsupportedField,field.key.c_str());
         if(texture.revision!=1||texture.flags||texture.kind>1||texture.mips.size()!=1)
-            return fail(d,Error::texture,"actual single indexed mmprt mip");
+            return fail(d,Error::texture,garage?"actual single indexed garageprt mip":"actual single indexed mmprt mip");
         const auto& mip=texture.mips[0];
-        if(mip.width!=128||mip.height!=256||mip.rgba.size()!=128u*256u*4u)
-            return fail(d,Error::texture,"mmprt128x256");
+        if((!garage&&(mip.width!=128||mip.height!=256))||
+           (garage&&(mip.width<16||mip.height<16||mip.width>1024||mip.height>1024||
+              (mip.width&(mip.width-1))||(mip.height&(mip.height-1))))||
+           mip.rgba.size()!=std::uint64_t(mip.width)*mip.height*4u)
+            return fail(d,Error::texture,garage?"actual bounded garageprt atlas":"mmprt128x256");
         // Real mmprt contains alpha255. Preserve full authored bytes; native
         // draw admission bounds textureAlpha*vertexAlpha, not each separately.
         OriginalUiMainParticleMaterial50KG next;
         next.identity=data.identity();next.templateIdentity=inherited->identity;
-        next.textureIdentity=archive.find("particle\\mmprt.pst").identity;
+        next.textureIdentity=archive.find(stem+".pst").identity;
         if(!next.identity||!next.textureIdentity)return fail(d,Error::archive,"mmprt identities");
         for(unsigned state=0;state<2;++state){
             const auto suffix="_"+std::to_string(state+1);
             const auto* map=section->find("TextureMap"+suffix);std::int32_t uv=0;
-            if(!map||!same(map->text,"mmprt")||
+            if(!map||!same(map->text,textureName)||
                 !integer(("TextureCoordinateIndex"+suffix).c_str(),0,uv,0x247338)||uv!=0)
                 return fail(d,Error::textureName,"actual mmprt map/UV0");
             auto gs=inherited->gs;
@@ -153,6 +159,10 @@ static bool prepareParticleMaterial(const OriginalUiArchive50KG& archive,
                 if(!integer((std::string(names[n])+suffix).c_str(),defaults[n],value)||value!=defaults[n])
                     return fail(d,Error::unsupportedValue,"actual Main TEX1 sampler",state?0x24863c:0x24853c);
             }
+            gs.fields[static_cast<std::size_t>(Field::environmentContext0or1)]={
+                static_cast<std::int32_t>(state),nullptr,0,state?0x248FCCu:0x248E6Cu};
+            next.sourceStates[state]=gs;
+            for(unsigned i=0;i<6;++i)next.sourceSamplers[state][i]=defaults[i];
             auto& policy=next.states[state];
             policy.blend=state?OriginalUiMaterialBlend50KG::additive:OriginalUiMaterialBlend50KG::sourceAlpha;
             policy.minification=policy.magnification=OriginalUiMaterialFilter50KG::linear;
@@ -176,4 +186,11 @@ bool prepareOriginalUiOptionsParticleMaterial50KG(const OriginalUiArchive50KG& a
     OriginalUiMaterialDiagnostic50KG& d) noexcept {
     return prepareParticleMaterial(archive,templates,runtime,texture,output,d,OriginalUiArchiveId50KG::options);
 }
+bool prepareOriginalUiGarageParticleMaterial50KG(const OriginalUiArchive50KG& archive,
+    const OriginalUiMaterialTemplates50KG& templates,const OriginalUiMaterialRuntime50KG& runtime,
+    const Texture48E& texture,OriginalUiMainParticleMaterial50KG& output,
+    OriginalUiMaterialDiagnostic50KG& d) noexcept {
+    return prepareParticleMaterial(archive,templates,runtime,texture,output,d,OriginalUiArchiveId50KG::garage);
+}
+
 }

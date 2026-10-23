@@ -8,6 +8,8 @@ namespace original_main_entry50KG::pcm_drain_detail50KG {
 inline constexpr std::uint64_t maximumWavFrames=(std::uint64_t{0xffffffff}-36)/4;
 inline constexpr std::uint32_t maximumChunkMicroseconds=1000000;
 struct Counters {
+ // sourceMixedFrames is relative to the sealed real per-output origin;
+ // the owner separately retains the cumulative Main mixer observation.
  std::uint32_t rate=0;
  std::uint64_t simulationMicroseconds=0,mixedFrames=0,sourceMixedFrames=0,capturedFrames=0;
  bool captureActive=false;
